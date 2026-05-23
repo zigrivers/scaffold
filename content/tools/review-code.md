@@ -430,7 +430,7 @@ _review_session_id() {
     return
   fi
   if [ -n "${__REVIEW_SESSION_ID:-}" ]; then
-    printf '%s' "$__REVIEW_SESSION_ID"
+    _review_sanitize_session_id "$__REVIEW_SESSION_ID"
     return
   fi
   local branch base
@@ -457,11 +457,22 @@ _review_attempts_file() {
 The functions `_review_normalize_location`, `_review_normalize_description`,
 `_review_normalize_suggestion`, `_review_finding_hash`,
 `_review_description_shingle`, `_review_record_attempt`, and
-`_review_at_strike_limit` are **identical** to the ones defined in
-`content/tools/review-pr.md` Step 7a. Copy them verbatim; they are
-reproduced here so this file is self-contained:
+`_review_at_strike_limit` match the semantics of the ones defined in
+`content/tools/review-pr.md` Step 7a. They are reproduced here so this file is
+self-contained:
+
+They are intentionally reproduced in this tool file instead of sourced from a
+shared script because agent-facing tool markdown must be self-contained until
+MMR v3.30 provides native `finding_key` and session tracking.
 
 ```bash
+_review_require_python3() {
+  command -v python3 >/dev/null 2>&1 || {
+    echo "Error: python3 is required for review finding normalization" >&2
+    return 1
+  }
+}
+
 _review_normalize_location() {
   # Input: $1 = raw location (e.g. "src/foo.ts:42-44" or "pkg/Bar.kt (line 10)")
   # Output: lowercased file path with trailing :N, :N-M, :N:M, (line N) stripped
@@ -474,6 +485,7 @@ _review_normalize_location() {
 _review_normalize_description() {
   # Input: $1 = raw description
   # Output: tokenize on backticks → normalize non-code segments → reassemble
+  _review_require_python3 || return 1
   printf '%s' "$1" | python3 -c '
 import re, sys
 s = sys.stdin.read()
@@ -495,6 +507,7 @@ print(" ".join(p for p in out if p))
 }
 
 _review_normalize_suggestion() {
+  _review_require_python3 || return 1
   printf '%s' "$1" | python3 -c 'import re, sys; print(re.sub(r"\s+", " ", sys.stdin.read().lower()).strip())'
 }
 
@@ -522,6 +535,7 @@ _review_finding_hash() {
 _review_description_shingle() {
   # Input: $1 = normalized description
   # Output: JSON array of normalized 5-grams (token-based)
+  _review_require_python3 || return 1
   printf '%s' "$1" | python3 -c '
 import json, sys
 tokens = sys.stdin.read().split()
@@ -535,20 +549,14 @@ _review_record_attempt() {
   # Side effect: increments attempts in the attempts file
   # Output: prints new attempt count on stdout
   local f="$1" round="$2" hash="${3:-}"
-  local file loc cat desc sugg nloc ndesc nsugg dhash shash shingle
+  local file loc desc nloc ndesc shingle
   file=$(_review_attempts_file)
   loc=$(printf '%s' "$f"  | jq -r '.location // ""')
-  cat=$(printf '%s' "$f"  | jq -r '.category // ""')
   desc=$(printf '%s' "$f" | jq -r '.description // ""')
-  sugg=$(printf '%s' "$f" | jq -r '.suggestion // ""')
   nloc=$(_review_normalize_location "$loc")
   ndesc=$(_review_normalize_description "$desc")
-  nsugg=$(_review_normalize_suggestion "$sugg")
   if [ -z "$hash" ]; then
-    dhash=$(printf '%s' "$ndesc" | shasum -a 1 | awk '{print $1}')
-    shash=$(printf '%s' "$nsugg" | shasum -a 1 | awk '{print $1}')
-    hash=$(printf '%s|%s|%s|%s' "$nloc" "$cat" "$dhash" "$shash" \
-      | shasum -a 1 | awk '{print $1}')
+    hash=$(_review_finding_hash "$f")
   fi
   shingle=$(_review_description_shingle "$ndesc")
 
@@ -568,14 +576,14 @@ _review_record_attempt() {
 
 _review_at_strike_limit() {
   # Input: $1 = finding JSON, $2 = optional precomputed finding hash
-  # Exit: 0 if hash already has >= 3 attempts, 1 otherwise
+  # Exit: 0 if hash already has >= REVIEW_STRIKE_LIMIT attempts, 1 otherwise
   local f="$1" file hash
   hash="${2:-}"
   file=$(_review_attempts_file)
   [ -f "$file" ] || return 1
   [ -n "$hash" ] || hash=$(_review_finding_hash "$f")
   local n; n=$(jq -r --arg h "$hash" '.findings[$h].attempts // 0' "$file")
-  [ "$n" -ge 3 ]
+  [ "$n" -ge "${REVIEW_STRIKE_LIMIT:-3}" ]
 }
 ```
 
