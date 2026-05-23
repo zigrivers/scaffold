@@ -260,8 +260,18 @@ the verdict JSON directly.
 #   2. Branch+base    → "<branch>@<base>" (sanitized to ^[a-zA-Z0-9_.-]+$)
 #   3. Fallback       → "ts-$(date -u +%Y%m%dT%H%M%SZ)"
 _review_session_id() {
+  _review_sanitize_session_id() {
+    local raw="$1" sanitized
+    sanitized=$(printf '%s' "$raw" | tr -c 'a-zA-Z0-9_.-' '_')
+    if [ -z "$sanitized" ] || [ "$sanitized" = "." ] || [ "$sanitized" = ".." ]; then
+      echo "Error: review session id resolves to an unsafe path segment" >&2
+      return 1
+    fi
+    printf '%s' "$sanitized"
+  }
+
   if [ -n "${REVIEW_SESSION_ID:-}" ]; then
-    printf '%s' "$REVIEW_SESSION_ID"
+    _review_sanitize_session_id "$REVIEW_SESSION_ID"
     return
   fi
   if [ -n "${__REVIEW_SESSION_ID:-}" ]; then
@@ -269,7 +279,7 @@ _review_session_id() {
     return
   fi
   if [ -n "${PR_NUMBER:-}" ]; then
-    __REVIEW_SESSION_ID="pr-$PR_NUMBER"
+    __REVIEW_SESSION_ID=$(_review_sanitize_session_id "pr-$PR_NUMBER") || return 1
     printf '%s' "$__REVIEW_SESSION_ID"
     return
   fi
@@ -277,11 +287,11 @@ _review_session_id() {
   branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
   base="${BASE_REF:-main}"
   if [ -n "$branch" ] && [ "$branch" != "HEAD" ]; then
-    __REVIEW_SESSION_ID=$(printf '%s@%s' "$branch" "$base" | tr -c 'a-zA-Z0-9_.-' '_')
+    __REVIEW_SESSION_ID=$(_review_sanitize_session_id "$branch@$base") || return 1
     printf '%s' "$__REVIEW_SESSION_ID"
     return
   fi
-  __REVIEW_SESSION_ID="ts-$(date -u +%Y%m%dT%H%M%SZ)"
+  __REVIEW_SESSION_ID=$(_review_sanitize_session_id "ts-$(date -u +%Y%m%dT%H%M%SZ)") || return 1
   printf '%s' "$__REVIEW_SESSION_ID"
 }
 
@@ -332,8 +342,8 @@ for i, seg in enumerate(parts):
     else:
         seg = seg.lower()
         seg = re.sub(r"\bline\s+\d+\b", "", seg)
-        seg = re.sub(r"\bat\s+\d+\b", "", seg)
-        seg = re.sub(r"^\s*(p[0-3]|critical|high|medium|low)\s*:\s*", "", seg)
+        seg = re.sub(r"\bat\s+line\s+\d+\b", "", seg)
+        seg = re.sub(r"^\s*(p[0-3]|critical|high|medium|low|trivial)\s*:\s*", "", seg)
         seg = re.sub(r"\s+", " ", seg).strip()
         out.append(seg)
 print(" ".join(p for p in out if p))
@@ -420,13 +430,13 @@ _review_record_attempt() {
   fi
   shingle=$(_review_description_shingle "$ndesc")
 
-  [ -f "$file" ] || printf '{"session_id":"%s","created_at":"%s","findings":{}}' \
-    "$(_review_session_id)" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$file"
+  [ -f "$file" ] || jq -n --arg id "$(_review_session_id)" --arg created "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    '{session_id: $id, created_at: $created, findings: {}}' > "$file"
 
   jq --arg h "$hash" --arg loc "$nloc" --argjson sh "$shingle" --argjson r "$round" '
     .findings[$h] = (
       .findings[$h] // {attempts: 0, first_seen_round: $r, normalized_location: $loc, description_shingle: $sh}
-      | .attempts += 1
+      | .attempts += (if .last_seen_round == $r then 0 else 1 end)
       | .last_seen_round = $r
     )
   ' "$file" > "$file.tmp" && mv "$file.tmp" "$file"
