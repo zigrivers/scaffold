@@ -239,6 +239,214 @@ If any findings sit at or above `fix_threshold` (the verdict JSON's `fix_thresho
 
 **Fix cycle channel rule:** Re-run only channels that originally completed or ran as compensating passes. Never retry a channel marked `not_installed`, `auth_failed`, or `timeout` during fix rounds — its availability does not change within a session.
 
+### Step 7a: Wrapper-Side Per-Finding Hash (Stopgap until MMR v3.30)
+
+Before each fix round, compute a stable hash per finding and record an attempt
+in `.scaffold/review-attempts/<session-id>.json`. The hash mirrors MMR T2-A's
+forthcoming `finding_key` identity (location + category + description +
+suggestion) so it migrates cleanly when MMR v3.30 ships native `--session` and
+`finding_key`. **Until then**, this wrapper-side bookkeeping is what enforces
+the per-finding 3-strike rule.
+
+This section is throwaway — when MMR v3.30 lands, replace this entire block
+with `mmr review --session <id> --max-rounds N` and read `finding_key` from
+the verdict JSON directly.
+
+#### Derive the session id
+
+```bash
+# Session id rules (first match wins):
+#   1. PR mode (--pr N) → "pr-<N>"
+#   2. Branch+base    → "<branch>@<base>" (sanitized to ^[a-zA-Z0-9_.-]+$)
+#   3. Fallback       → "ts-$(date -u +%Y%m%dT%H%M%SZ)"
+_review_session_id() {
+  if [ -n "${PR_NUMBER:-}" ]; then
+    printf 'pr-%s' "$PR_NUMBER"
+    return
+  fi
+  local branch base
+  branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+  base="${BASE_REF:-main}"
+  if [ -n "$branch" ] && [ "$branch" != "HEAD" ]; then
+    printf '%s@%s' "$branch" "$base" | tr -c 'a-zA-Z0-9_.-' '_'
+    return
+  fi
+  printf 'ts-%s' "$(date -u +%Y%m%dT%H%M%SZ)"
+}
+
+_review_attempts_file() {
+  local id; id=$(_review_session_id)
+  mkdir -p .scaffold/review-attempts
+  printf '.scaffold/review-attempts/%s.json' "$id"
+}
+```
+
+#### Normalize the four identity components
+
+`normalized_location` strips trailing line/column spans (anchored to
+end-of-string so mid-path digits survive):
+
+```bash
+_review_normalize_location() {
+  # Input: $1 = raw location (e.g. "src/foo.ts:42-44" or "pkg/Bar.kt (line 10)")
+  # Output: lowercased file path with trailing :N, :N-M, :N:M, (line N) stripped
+  printf '%s' "$1" \
+    | tr '[:upper:]' '[:lower:]' \
+    | awk '{ sub(/^[ \t]+/, ""); sub(/[ \t]+$/, ""); print }' \
+    | sed -E 's/(:[0-9]+(:[0-9]+)?(-[0-9]+)?|[[:space:]]*\(line[[:space:]]+[0-9]+\))$//'
+}
+```
+
+`description_normalized` is the tricky one — backtick-quoted code spans must
+stay case-sensitive while prose around them is lowercased and stripped of
+line-number filler. A python3 one-liner is the least painful implementation:
+
+```bash
+_review_normalize_description() {
+  # Input: $1 = raw description
+  # Output: tokenize on backticks → normalize non-code segments → reassemble
+  python3 - "$1" <<'PY'
+import re, sys
+s = sys.argv[1]
+parts = s.split("`")
+out = []
+for i, seg in enumerate(parts):
+    if i % 2 == 1:
+        # Odd index = inside backticks = code, preserve exactly
+        out.append("`" + seg + "`")
+    else:
+        seg = seg.lower()
+        seg = re.sub(r"\bline\s+\d+\b", "", seg)
+        seg = re.sub(r"\bat\s+\d+\b", "", seg)
+        seg = re.sub(r"^\s*(p[0-3]|critical|high|medium|low)\s*:\s*", "", seg)
+        seg = re.sub(r"\s+", " ", seg).strip()
+        out.append(seg)
+print(" ".join(p for p in out if p))
+PY
+}
+```
+
+`suggestion_normalized` is lowercase + collapse-whitespace only (suggestions
+are short and distinguishing — no further stripping):
+
+```bash
+_review_normalize_suggestion() {
+  printf '%s' "$1" \
+    | tr '[:upper:]' '[:lower:]' \
+    | awk '{ $1=$1; print }'
+}
+```
+
+#### Compute the stable hash
+
+```bash
+_review_finding_hash() {
+  # Input: $1 = single-finding JSON object (with location, category, description, suggestion fields)
+  # Output: 40-char sha1 hex of normalized_location + "|" + category + "|" + sha1(description_normalized) + "|" + sha1(suggestion_normalized)
+  local f="$1"
+  local loc cat desc sugg
+  loc=$(printf '%s' "$f"  | jq -r '.location // ""')
+  cat=$(printf '%s' "$f"  | jq -r '.category // ""')
+  desc=$(printf '%s' "$f" | jq -r '.description // ""')
+  sugg=$(printf '%s' "$f" | jq -r '.suggestion // ""')
+
+  local nloc ndesc nsugg dhash shash
+  nloc=$(_review_normalize_location "$loc")
+  ndesc=$(_review_normalize_description "$desc")
+  nsugg=$(_review_normalize_suggestion "$sugg")
+  dhash=$(printf '%s' "$ndesc" | shasum -a 1 | awk '{print $1}')
+  shash=$(printf '%s' "$nsugg" | shasum -a 1 | awk '{print $1}')
+
+  printf '%s|%s|%s|%s' "$nloc" "$cat" "$dhash" "$shash" \
+    | shasum -a 1 | awk '{print $1}'
+}
+```
+
+#### Compute the description shingle (for future cross-round fuzzy matching)
+
+This array is persisted alongside the hash so a follow-up MMR v3.30 migration
+can run Jaccard ≥ 0.7 against historical findings without re-deriving
+shingles. The wrapper itself does not currently consume the shingle for any
+gating decision — strict-hash exact match is enough for the 3-strike rule.
+
+```bash
+_review_description_shingle() {
+  # Input: $1 = normalized description
+  # Output: JSON array of normalized 5-grams (token-based)
+  python3 - "$1" <<'PY'
+import json, sys
+tokens = sys.argv[1].split()
+shingles = sorted({" ".join(tokens[i:i+5]) for i in range(max(0, len(tokens)-4))})
+print(json.dumps(shingles))
+PY
+}
+```
+
+#### Record an attempt and check the strike limit
+
+```bash
+_review_record_attempt() {
+  # Input: $1 = finding JSON, $2 = current round number (1-based)
+  # Side effect: increments attempts in the attempts file
+  # Output: prints new attempt count on stdout
+  local f="$1" round="$2"
+  local file hash nloc shingle desc ndesc
+  file=$(_review_attempts_file)
+  hash=$(_review_finding_hash "$f")
+  nloc=$(_review_normalize_location "$(printf '%s' "$f" | jq -r '.location // ""')")
+  desc=$(printf '%s' "$f" | jq -r '.description // ""')
+  ndesc=$(_review_normalize_description "$desc")
+  shingle=$(_review_description_shingle "$ndesc")
+
+  [ -f "$file" ] || printf '{"session_id":"%s","created_at":"%s","findings":{}}' \
+    "$(_review_session_id)" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$file"
+
+  jq --arg h "$hash" --arg loc "$nloc" --argjson sh "$shingle" --argjson r "$round" '
+    .findings[$h] = (
+      .findings[$h] // {attempts: 0, first_seen_round: $r, normalized_location: $loc, description_shingle: $sh}
+      | .attempts += 1
+      | .last_seen_round = $r
+    )
+    | .findings[$h]
+  ' "$file" > "$file.tmp" && mv "$file.tmp" "$file"
+
+  jq -r --arg h "$hash" '.findings[$h].attempts' "$file"
+}
+
+_review_at_strike_limit() {
+  # Input: $1 = finding JSON
+  # Exit: 0 if hash already has >= 3 attempts, 1 otherwise
+  local f="$1" file hash
+  file=$(_review_attempts_file)
+  [ -f "$file" ] || return 1
+  hash=$(_review_finding_hash "$f")
+  local n; n=$(jq -r --arg h "$hash" '.findings[$h].attempts // 0' "$file")
+  [ "$n" -ge 3 ]
+}
+```
+
+#### Per-round flow
+
+After every `mmr review … --sync --format json` call:
+
+1. Extract reconciled findings: `FINDINGS=$(mmr results "$JOB_ID" | jq -c '.reconciled_findings[]')`
+2. For each blocking finding (severity at or above `fix_threshold`):
+   - Compute its hash via `_review_finding_hash`.
+   - Call `_review_record_attempt "$f" "$ROUND"` to increment its counter.
+   - Call `_review_at_strike_limit "$f"` — if true, this finding has hit the
+     3-strike limit. Stop the fix loop, emit verdict `blocked`, and follow
+     the **Stop path** in Step 8.
+3. Otherwise apply fixes, re-push, increment `ROUND`, and loop.
+
+For very noisy fix loops, you may suggest the user re-run with
+`--fix-threshold P1` to narrow the gate (the project default stays at P2 per
+the design's Decision 4). Do not auto-change the threshold.
+
+This mirrors T2-A's identity components — `location`, `category`,
+`description`, `suggestion` — so a future migration to MMR's native
+`finding_key` is a search-and-replace of the helper calls with the field
+read from the verdict JSON.
+
 ### Step 8: Confirm Completion
 
 **Success path** — all findings resolved (verdict is `pass` or `degraded-pass`):
