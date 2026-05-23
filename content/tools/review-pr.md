@@ -260,18 +260,29 @@ the verdict JSON directly.
 #   2. Branch+base    → "<branch>@<base>" (sanitized to ^[a-zA-Z0-9_.-]+$)
 #   3. Fallback       → "ts-$(date -u +%Y%m%dT%H%M%SZ)"
 _review_session_id() {
+  if [ -n "${REVIEW_SESSION_ID:-}" ]; then
+    printf '%s' "$REVIEW_SESSION_ID"
+    return
+  fi
+  if [ -n "${__REVIEW_SESSION_ID:-}" ]; then
+    printf '%s' "$__REVIEW_SESSION_ID"
+    return
+  fi
   if [ -n "${PR_NUMBER:-}" ]; then
-    printf 'pr-%s' "$PR_NUMBER"
+    __REVIEW_SESSION_ID="pr-$PR_NUMBER"
+    printf '%s' "$__REVIEW_SESSION_ID"
     return
   fi
   local branch base
   branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
   base="${BASE_REF:-main}"
   if [ -n "$branch" ] && [ "$branch" != "HEAD" ]; then
-    printf '%s@%s' "$branch" "$base" | tr -c 'a-zA-Z0-9_.-' '_'
+    __REVIEW_SESSION_ID=$(printf '%s@%s' "$branch" "$base" | tr -c 'a-zA-Z0-9_.-' '_')
+    printf '%s' "$__REVIEW_SESSION_ID"
     return
   fi
-  printf 'ts-%s' "$(date -u +%Y%m%dT%H%M%SZ)"
+  __REVIEW_SESSION_ID="ts-$(date -u +%Y%m%dT%H%M%SZ)"
+  printf '%s' "$__REVIEW_SESSION_ID"
 }
 
 _review_attempts_file() {
@@ -293,9 +304,13 @@ _review_normalize_location() {
   printf '%s' "$1" \
     | tr '[:upper:]' '[:lower:]' \
     | awk '{ sub(/^[ \t]+/, ""); sub(/[ \t]+$/, ""); print }' \
-    | sed -E 's/(:[0-9]+(:[0-9]+)?(-[0-9]+)?|[[:space:]]*\(line[[:space:]]+[0-9]+\))$//'
+    | sed -E 's/(:[0-9]+(:[0-9]+)?(-[0-9]+)?|[[:space:]]+\(line[[:space:]]+[0-9]+\))$//'
 }
 ```
+
+The `(line N)` form requires whitespace before the parenthetical, so paths
+like `archive/v1(line 10).txt` are preserved rather than treated as review
+line references.
 
 `description_normalized` is the tricky one — backtick-quoted code spans must
 stay case-sensitive while prose around them is lowercased and stripped of
@@ -305,9 +320,9 @@ line-number filler. A python3 one-liner is the least painful implementation:
 _review_normalize_description() {
   # Input: $1 = raw description
   # Output: tokenize on backticks → normalize non-code segments → reassemble
-  python3 - "$1" <<'PY'
+  printf '%s' "$1" | python3 -c '
 import re, sys
-s = sys.argv[1]
+s = sys.stdin.read()
 parts = s.split("`")
 out = []
 for i, seg in enumerate(parts):
@@ -322,7 +337,7 @@ for i, seg in enumerate(parts):
         seg = re.sub(r"\s+", " ", seg).strip()
         out.append(seg)
 print(" ".join(p for p in out if p))
-PY
+'
 }
 ```
 
@@ -331,9 +346,7 @@ are short and distinguishing — no further stripping):
 
 ```bash
 _review_normalize_suggestion() {
-  printf '%s' "$1" \
-    | tr '[:upper:]' '[:lower:]' \
-    | awk '{ $1=$1; print }'
+  printf '%s' "$1" | python3 -c 'import re, sys; print(re.sub(r"\s+", " ", sys.stdin.read().lower()).strip())'
 }
 ```
 
@@ -373,12 +386,12 @@ gating decision — strict-hash exact match is enough for the 3-strike rule.
 _review_description_shingle() {
   # Input: $1 = normalized description
   # Output: JSON array of normalized 5-grams (token-based)
-  python3 - "$1" <<'PY'
+  printf '%s' "$1" | python3 -c '
 import json, sys
-tokens = sys.argv[1].split()
+tokens = sys.stdin.read().split()
 shingles = sorted({" ".join(tokens[i:i+5]) for i in range(max(0, len(tokens)-4))})
 print(json.dumps(shingles))
-PY
+'
 }
 ```
 
@@ -434,6 +447,10 @@ _review_at_strike_limit() {
 }
 ```
 
+This bookkeeping assumes sequential execution within a single workspace or
+worktree. Do not run multiple review/fix loops against the same
+`REVIEW_SESSION_ID` concurrently.
+
 #### Per-round flow
 
 After every `mmr review … --sync --format json` call:
@@ -444,8 +461,9 @@ After every `mmr review … --sync --format json` call:
 3. For each blocking finding (severity at or above `fix_threshold`):
    - Compute its hash via `_review_finding_hash`.
    - Call `_review_at_strike_limit "$f" "$hash"` before incrementing — if true,
-     this finding already has 3 recorded attempts. Stop the fix loop, emit
-     verdict `blocked`, and follow the **Stop path** in Step 8.
+     this finding already has 3 recorded attempts. Abort the entire task with
+     a clear blocked error; do not merely `break` the inner `while` loop or
+     continue the outer fix loop. Then follow the **Stop path** in Step 8.
    - Call `_review_record_attempt "$f" "$ROUND" "$hash"` to increment its counter.
 4. Otherwise apply fixes, re-push, increment `ROUND`, and loop.
 
