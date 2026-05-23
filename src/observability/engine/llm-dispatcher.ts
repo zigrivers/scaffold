@@ -28,6 +28,7 @@ export function dispatchLlm(input: DispatchInput): Promise<DispatchResult> {
 
     let stdout = ''
     let stderr = ''
+    let stdinError: NodeJS.ErrnoException | undefined
     let resolved = false
     const decoder = new StringDecoder('utf8')
     const stderrDecoder = new StringDecoder('utf8')
@@ -51,6 +52,9 @@ export function dispatchLlm(input: DispatchInput): Promise<DispatchResult> {
 
     child.stdout?.on('data', (chunk: Buffer) => { stdout += decoder.write(chunk) })
     child.stderr?.on('data', (chunk: Buffer) => { stderr += stderrDecoder.write(chunk) })
+    child.stdin?.on('error', (err: NodeJS.ErrnoException) => {
+      stdinError = err
+    })
 
     child.on('error', (err: NodeJS.ErrnoException) => {
       if (resolved) return
@@ -68,7 +72,10 @@ export function dispatchLlm(input: DispatchInput): Promise<DispatchResult> {
       stderr += stderrDecoder.end()
       if (code !== 0 || code === null) {
         const codeStr = code !== null ? `exit ${code}` : `signal ${signal ?? 'unknown'}`
-        const hint = stderr.trim() ? ` — stderr: ${stderr.trim().slice(0, 200)}` : ''
+        const stderrHint = stderr.trim() ? `stderr: ${stderr.trim().slice(0, 200)}` : ''
+        const stdinHint = stdinError ? `stdin error (${stdinError.code ?? 'unknown'}): ${stdinError.message}` : ''
+        const hintParts = [stderrHint, stdinHint].filter(Boolean)
+        const hint = hintParts.length > 0 ? ` — ${hintParts.join('; ')}` : ''
         resolve({ ok: false, reason: `subprocess ${codeStr}${hint}`, raw: stdout })
         return
       }
