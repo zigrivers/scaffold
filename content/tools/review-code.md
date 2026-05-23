@@ -404,8 +404,8 @@ Otherwise:
 ### Step 7a: Wrapper-Side Per-Finding Hash (Stopgap until MMR v3.30)
 
 Same wrapper-side bookkeeping as `review-pr.md` Step 7a. Local review reuses
-the helpers verbatim — only the session-id derivation differs (no PR number,
-so the rule falls through to `<branch>@<base>` or a timestamp).
+the helper semantics, with local-session derivation (no PR number) and the
+portable hardening noted below.
 
 This section is throwaway — when MMR v3.30 lands, replace this entire block
 with `mmr review --session <id> --max-rounds N` and read `finding_key` from
@@ -448,7 +448,7 @@ _review_session_id() {
     printf '%s' "$__REVIEW_SESSION_ID"
     return
   fi
-  __REVIEW_SESSION_ID=$(_review_sanitize_session_id "ts-$(date -u +%Y%m%dT%H%M%SZ)") || return 1
+  __REVIEW_SESSION_ID=$(_review_sanitize_session_id "ts-$(date -u +%Y-%m-%dT%H:%M:%SZ)") || return 1
   printf '%s' "$__REVIEW_SESSION_ID"
 }
 
@@ -472,12 +472,34 @@ They are intentionally reproduced in this tool file instead of sourced from a
 shared script because agent-facing tool markdown must be self-contained until
 MMR v3.30 provides native `finding_key` and session tracking.
 
+The local-review variant also makes dependency checks explicit, preserves
+backtick code spans in suggestions, and keeps short-description shingles useful
+with shorter n-grams.
+
 ```bash
+_review_require_jq() {
+  command -v jq >/dev/null 2>&1 || {
+    echo "Error: jq is required for review finding bookkeeping" >&2
+    return 1
+  }
+}
+
 _review_require_python3() {
   command -v python3 >/dev/null 2>&1 || {
     echo "Error: python3 is required for review finding normalization" >&2
     return 1
   }
+}
+
+_review_sha1() {
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 1 | awk '{print $1}'
+  elif command -v sha1sum >/dev/null 2>&1; then
+    sha1sum | awk '{print $1}'
+  else
+    echo "Error: shasum or sha1sum is required for review finding hashing" >&2
+    return 1
+  fi
 }
 
 _review_normalize_location() {
@@ -533,10 +555,11 @@ print(" ".join(p for p in out if p))
 _review_finding_hash() {
   # Input: $1 = single-finding JSON object (with location, category, description, suggestion fields)
   # Output: 40-char sha1 hex of normalized_location + "|" + category + "|" + sha1(description_normalized) + "|" + sha1(suggestion_normalized)
+  _review_require_jq || return 1
   local f="$1"
   local loc cat desc sugg
   loc=$(printf '%s' "$f"  | jq -r '.location // ""')
-  cat=$(printf '%s' "$f"  | jq -r '.category // ""')
+  cat=$(printf '%s' "$f"  | jq -r '.category // .severity // ""')
   desc=$(printf '%s' "$f" | jq -r '.description // ""')
   sugg=$(printf '%s' "$f" | jq -r '.suggestion // ""')
 
@@ -544,11 +567,11 @@ _review_finding_hash() {
   nloc=$(_review_normalize_location "$loc") || return 1
   ndesc=$(_review_normalize_description "$desc") || return 1
   nsugg=$(_review_normalize_suggestion "$sugg") || return 1
-  dhash=$(printf '%s' "$ndesc" | shasum -a 1 | awk '{print $1}')
-  shash=$(printf '%s' "$nsugg" | shasum -a 1 | awk '{print $1}')
+  dhash=$(printf '%s' "$ndesc" | _review_sha1) || return 1
+  shash=$(printf '%s' "$nsugg" | _review_sha1) || return 1
 
   printf '%s|%s|%s|%s' "$nloc" "$cat" "$dhash" "$shash" \
-    | shasum -a 1 | awk '{print $1}'
+    | _review_sha1
 }
 
 _review_description_shingle() {
@@ -568,6 +591,7 @@ _review_record_attempt() {
   # Input: $1 = finding JSON, $2 = current round number (1-based), $3 = optional precomputed finding hash
   # Side effect: increments attempts in the attempts file
   # Output: prints new attempt count on stdout
+  _review_require_jq || return 1
   local f="$1" round="$2" hash="${3:-}"
   local file loc desc nloc ndesc shingle
   file=$(_review_attempts_file)
@@ -597,6 +621,7 @@ _review_record_attempt() {
 _review_at_strike_limit() {
   # Input: $1 = finding JSON, $2 = optional precomputed finding hash
   # Exit: 0 if hash already has >= REVIEW_STRIKE_LIMIT attempts, 1 otherwise
+  _review_require_jq || return 1
   local f="$1" file hash
   hash="${2:-}"
   file=$(_review_attempts_file)
