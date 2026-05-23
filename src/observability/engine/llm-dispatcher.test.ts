@@ -63,6 +63,20 @@ describe('dispatchLlm', () => {
     if (!result.ok) expect(result.reason).toMatch(/stdin error/i)
   })
 
+  it('fails promptly when a subprocess closes stdin and keeps running', async () => {
+    const startedAt = Date.now()
+    const result = await dispatchLlm({
+      prompt: 'x'.repeat(1024 * 1024),
+      command: 'exec 0<&-; sleep 5',
+      timeoutMs: 3000,
+    })
+    const elapsedMs = Date.now() - startedAt
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.reason).toMatch(/stdin error/i)
+    expect(elapsedMs).toBeLessThan(1500)
+  })
+
   it('handles objects containing nested arrays (mixed delimiters) correctly', async () => {
     // Verifies that tracking only {/} or [/] per top-level block is sufficient:
     // inner [1,2] brackets are balanced content and never produce spurious depth=0 events.

@@ -36,6 +36,11 @@ export function dispatchLlm(input: DispatchInput): Promise<DispatchResult> {
     const timer = setTimeout(() => {
       if (resolved) return
       resolved = true
+      terminateChild()
+      resolve({ ok: false, reason: `timed out after ${input.timeoutMs}ms`, raw: stdout })
+    }, input.timeoutMs)
+
+    const terminateChild = () => {
       // Kill the entire process group (negated PID) so wrapper scripts and
       // child LLM processes are all terminated, not just the sh -c parent.
       // Negated PID is POSIX-only; Windows does not support process groups.
@@ -47,13 +52,25 @@ export function dispatchLlm(input: DispatchInput): Promise<DispatchResult> {
       } else {
         try { child.kill('SIGTERM') } catch { /* ignore */ }
       }
-      resolve({ ok: false, reason: `timed out after ${input.timeoutMs}ms`, raw: stdout })
-    }, input.timeoutMs)
+    }
+
+    const failOnStdinError = (err: NodeJS.ErrnoException) => {
+      if (resolved) return
+      resolved = true
+      clearTimeout(timer)
+      terminateChild()
+      resolve({
+        ok: false,
+        reason: `stdin error (${err.code ?? 'unknown'}): ${err.message}`,
+        raw: stdout,
+      })
+    }
 
     child.stdout?.on('data', (chunk: Buffer) => { stdout += decoder.write(chunk) })
     child.stderr?.on('data', (chunk: Buffer) => { stderr += stderrDecoder.write(chunk) })
     child.stdin?.on('error', (err: NodeJS.ErrnoException) => {
       stdinError = err
+      failOnStdinError(err)
     })
 
     child.on('error', (err: NodeJS.ErrnoException) => {
