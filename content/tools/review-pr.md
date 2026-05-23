@@ -239,6 +239,253 @@ If any findings sit at or above `fix_threshold` (the verdict JSON's `fix_thresho
 
 **Fix cycle channel rule:** Re-run only channels that originally completed or ran as compensating passes. Never retry a channel marked `not_installed`, `auth_failed`, or `timeout` during fix rounds — its availability does not change within a session.
 
+### Step 7a: Wrapper-Side Per-Finding Hash (Stopgap until MMR v3.30)
+
+Before each fix round, compute a stable hash per finding and record an attempt
+in `.scaffold/review-attempts/<session-id>.json`. The hash mirrors MMR T2-A's
+forthcoming `finding_key` identity (location + category + description +
+suggestion) so it migrates cleanly when MMR v3.30 ships native `--session` and
+`finding_key`. **Until then**, this wrapper-side bookkeeping is what enforces
+the per-finding 3-strike rule.
+
+This section is throwaway — when MMR v3.30 lands, replace this entire block
+with `mmr review --session <id> --max-rounds N` and read `finding_key` from
+the verdict JSON directly.
+
+#### Derive the session id
+
+```bash
+# Session id rules (first match wins):
+#   1. PR mode (--pr N) → "pr-<N>"
+#   2. Branch+base    → "<branch>@<base>" (sanitized to ^[a-zA-Z0-9_.-]+$)
+#   3. Fallback       → "ts-$(date -u +%Y%m%dT%H%M%SZ)"
+_review_session_id() {
+  _review_sanitize_session_id() {
+    local raw="$1" sanitized
+    sanitized=$(printf '%s' "$raw" | tr -c 'a-zA-Z0-9_.-' '_')
+    if [ -z "$sanitized" ] || [ "$sanitized" = "." ] || [ "$sanitized" = ".." ]; then
+      echo "Error: review session id resolves to an unsafe path segment" >&2
+      return 1
+    fi
+    printf '%s' "$sanitized"
+  }
+
+  if [ -n "${REVIEW_SESSION_ID:-}" ]; then
+    _review_sanitize_session_id "$REVIEW_SESSION_ID"
+    return
+  fi
+  if [ -n "${__REVIEW_SESSION_ID:-}" ]; then
+    printf '%s' "$__REVIEW_SESSION_ID"
+    return
+  fi
+  if [ -n "${PR_NUMBER:-}" ]; then
+    __REVIEW_SESSION_ID=$(_review_sanitize_session_id "pr-$PR_NUMBER") || return 1
+    printf '%s' "$__REVIEW_SESSION_ID"
+    return
+  fi
+  local branch base
+  branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+  base="${BASE_REF:-main}"
+  if [ -n "$branch" ] && [ "$branch" != "HEAD" ]; then
+    __REVIEW_SESSION_ID=$(_review_sanitize_session_id "$branch@$base") || return 1
+    printf '%s' "$__REVIEW_SESSION_ID"
+    return
+  fi
+  __REVIEW_SESSION_ID=$(_review_sanitize_session_id "ts-$(date -u +%Y%m%dT%H%M%SZ)") || return 1
+  printf '%s' "$__REVIEW_SESSION_ID"
+}
+
+_review_attempts_file() {
+  local id; id=$(_review_session_id)
+  mkdir -p .scaffold/review-attempts
+  printf '.scaffold/review-attempts/%s.json' "$id"
+}
+```
+
+#### Normalize the four identity components
+
+`normalized_location` strips trailing line/column spans (anchored to
+end-of-string so mid-path digits survive):
+
+```bash
+_review_normalize_location() {
+  # Input: $1 = raw location (e.g. "src/foo.ts:42-44" or "pkg/Bar.kt (line 10)")
+  # Output: lowercased file path with trailing :N, :N-M, :N:M, (line N) stripped
+  printf '%s' "$1" \
+    | tr '[:upper:]' '[:lower:]' \
+    | awk '{ sub(/^[ \t]+/, ""); sub(/[ \t]+$/, ""); print }' \
+    | sed -E 's/(:[0-9]+(:[0-9]+)?(-[0-9]+)?|[[:space:]]+\(line[[:space:]]+[0-9]+\))$//'
+}
+```
+
+The `(line N)` form requires whitespace before the parenthetical, so paths
+like `archive/v1(line 10).txt` are preserved rather than treated as review
+line references.
+
+`description_normalized` is the tricky one — backtick-quoted code spans must
+stay case-sensitive while prose around them is lowercased and stripped of
+line-number filler. A python3 one-liner is the least painful implementation:
+
+```bash
+_review_normalize_description() {
+  # Input: $1 = raw description
+  # Output: tokenize on backticks → normalize non-code segments → reassemble
+  printf '%s' "$1" | python3 -c '
+import re, sys
+s = sys.stdin.read()
+parts = s.split("`")
+out = []
+for i, seg in enumerate(parts):
+    if i % 2 == 1:
+        # Odd index = inside backticks = code, preserve exactly
+        out.append("`" + seg + "`")
+    else:
+        seg = seg.lower()
+        seg = re.sub(r"\bline\s+\d+\b", "", seg)
+        seg = re.sub(r"\bat\s+line\s+\d+\b", "", seg)
+        seg = re.sub(r"^\s*(p[0-3]|critical|high|medium|low|trivial)\s*:\s*", "", seg)
+        seg = re.sub(r"\s+", " ", seg).strip()
+        out.append(seg)
+print(" ".join(p for p in out if p))
+'
+}
+```
+
+`suggestion_normalized` is lowercase + collapse-whitespace only (suggestions
+are short and distinguishing — no further stripping):
+
+```bash
+_review_normalize_suggestion() {
+  printf '%s' "$1" | python3 -c 'import re, sys; print(re.sub(r"\s+", " ", sys.stdin.read().lower()).strip())'
+}
+```
+
+#### Compute the stable hash
+
+```bash
+_review_finding_hash() {
+  # Input: $1 = single-finding JSON object (with location, category, description, suggestion fields)
+  # Output: 40-char sha1 hex of normalized_location + "|" + category + "|" + sha1(description_normalized) + "|" + sha1(suggestion_normalized)
+  local f="$1"
+  local loc cat desc sugg
+  loc=$(printf '%s' "$f"  | jq -r '.location // ""')
+  cat=$(printf '%s' "$f"  | jq -r '.category // ""')
+  desc=$(printf '%s' "$f" | jq -r '.description // ""')
+  sugg=$(printf '%s' "$f" | jq -r '.suggestion // ""')
+
+  local nloc ndesc nsugg dhash shash
+  nloc=$(_review_normalize_location "$loc")
+  ndesc=$(_review_normalize_description "$desc")
+  nsugg=$(_review_normalize_suggestion "$sugg")
+  dhash=$(printf '%s' "$ndesc" | shasum -a 1 | awk '{print $1}')
+  shash=$(printf '%s' "$nsugg" | shasum -a 1 | awk '{print $1}')
+
+  printf '%s|%s|%s|%s' "$nloc" "$cat" "$dhash" "$shash" \
+    | shasum -a 1 | awk '{print $1}'
+}
+```
+
+#### Compute the description shingle (for future cross-round fuzzy matching)
+
+This array is persisted alongside the hash so a follow-up MMR v3.30 migration
+can run Jaccard ≥ 0.7 against historical findings without re-deriving
+shingles. The wrapper itself does not currently consume the shingle for any
+gating decision — strict-hash exact match is enough for the 3-strike rule.
+
+```bash
+_review_description_shingle() {
+  # Input: $1 = normalized description
+  # Output: JSON array of normalized 5-grams (token-based)
+  printf '%s' "$1" | python3 -c '
+import json, sys
+tokens = sys.stdin.read().split()
+shingles = sorted({" ".join(tokens[i:i+5]) for i in range(max(0, len(tokens)-4))})
+print(json.dumps(shingles))
+'
+}
+```
+
+#### Record an attempt and check the strike limit
+
+```bash
+_review_record_attempt() {
+  # Input: $1 = finding JSON, $2 = current round number (1-based), $3 = optional precomputed finding hash
+  # Side effect: increments attempts in the attempts file
+  # Output: prints new attempt count on stdout
+  local f="$1" round="$2" hash="${3:-}"
+  local file loc cat desc sugg nloc ndesc nsugg dhash shash shingle
+  file=$(_review_attempts_file)
+  loc=$(printf '%s' "$f"  | jq -r '.location // ""')
+  cat=$(printf '%s' "$f"  | jq -r '.category // ""')
+  desc=$(printf '%s' "$f" | jq -r '.description // ""')
+  sugg=$(printf '%s' "$f" | jq -r '.suggestion // ""')
+  nloc=$(_review_normalize_location "$loc")
+  ndesc=$(_review_normalize_description "$desc")
+  nsugg=$(_review_normalize_suggestion "$sugg")
+  if [ -z "$hash" ]; then
+    dhash=$(printf '%s' "$ndesc" | shasum -a 1 | awk '{print $1}')
+    shash=$(printf '%s' "$nsugg" | shasum -a 1 | awk '{print $1}')
+    hash=$(printf '%s|%s|%s|%s' "$nloc" "$cat" "$dhash" "$shash" \
+      | shasum -a 1 | awk '{print $1}')
+  fi
+  shingle=$(_review_description_shingle "$ndesc")
+
+  [ -f "$file" ] || jq -n --arg id "$(_review_session_id)" --arg created "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    '{session_id: $id, created_at: $created, findings: {}}' > "$file"
+
+  jq --arg h "$hash" --arg loc "$nloc" --argjson sh "$shingle" --argjson r "$round" '
+    .findings[$h] = (
+      .findings[$h] // {attempts: 0, first_seen_round: $r, normalized_location: $loc, description_shingle: $sh}
+      | .attempts += (if .last_seen_round == $r then 0 else 1 end)
+      | .last_seen_round = $r
+    )
+  ' "$file" > "$file.tmp" && mv "$file.tmp" "$file"
+
+  jq -r --arg h "$hash" '.findings[$h].attempts' "$file"
+}
+
+_review_at_strike_limit() {
+  # Input: $1 = finding JSON, $2 = optional precomputed finding hash
+  # Exit: 0 if hash already has >= 3 attempts, 1 otherwise
+  local f="$1" file hash
+  hash="${2:-}"
+  file=$(_review_attempts_file)
+  [ -f "$file" ] || return 1
+  [ -n "$hash" ] || hash=$(_review_finding_hash "$f")
+  local n; n=$(jq -r --arg h "$hash" '.findings[$h].attempts // 0' "$file")
+  [ "$n" -ge 3 ]
+}
+```
+
+This bookkeeping assumes sequential execution within a single workspace or
+worktree. Do not run multiple review/fix loops against the same
+`REVIEW_SESSION_ID` concurrently.
+
+#### Per-round flow
+
+After every `mmr review … --sync --format json` call:
+
+1. Extract reconciled findings: `FINDINGS=$(mmr results "$JOB_ID" | jq -c '.reconciled_findings[]')`
+2. Iterate safely over the newline-delimited JSON:
+   `printf '%s\n' "$FINDINGS" | while IFS= read -r f; do ... done`
+3. For each blocking finding (severity at or above `fix_threshold`):
+   - Compute its hash via `_review_finding_hash`.
+   - Call `_review_at_strike_limit "$f" "$hash"` before incrementing — if true,
+     this finding already has 3 recorded attempts. Abort the entire task with
+     a clear blocked error; do not merely `break` the inner `while` loop or
+     continue the outer fix loop. Then follow the **Stop path** in Step 8.
+   - Call `_review_record_attempt "$f" "$ROUND" "$hash"` to increment its counter.
+4. Otherwise apply fixes, re-push, increment `ROUND`, and loop.
+
+For very noisy fix loops, you may suggest the user re-run with
+`--fix-threshold P1` to narrow the gate (the project default stays at P2 per
+the design's Decision 4). Do not auto-change the threshold.
+
+This mirrors T2-A's identity components — `location`, `category`,
+`description`, `suggestion` — so a future migration to MMR's native
+`finding_key` is a search-and-replace of the helper calls with the field
+read from the verdict JSON.
+
 ### Step 8: Confirm Completion
 
 **Success path** — all findings resolved (verdict is `pass` or `degraded-pass`):

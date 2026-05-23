@@ -40,6 +40,7 @@ tests/screenshots/dashboard-test.html
 # >>> scaffold managed
 .scaffold/generated/
 .scaffold/lock.json
+.scaffold/review-attempts/
 .scaffold/*.tmp
 .scaffold/**/*.tmp
 .scaffold/identity.json
