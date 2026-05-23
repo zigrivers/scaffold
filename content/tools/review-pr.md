@@ -386,16 +386,25 @@ PY
 
 ```bash
 _review_record_attempt() {
-  # Input: $1 = finding JSON, $2 = current round number (1-based)
+  # Input: $1 = finding JSON, $2 = current round number (1-based), $3 = optional precomputed finding hash
   # Side effect: increments attempts in the attempts file
   # Output: prints new attempt count on stdout
-  local f="$1" round="$2"
-  local file hash nloc shingle desc ndesc
+  local f="$1" round="$2" hash="${3:-}"
+  local file loc cat desc sugg nloc ndesc nsugg dhash shash shingle
   file=$(_review_attempts_file)
-  hash=$(_review_finding_hash "$f")
-  nloc=$(_review_normalize_location "$(printf '%s' "$f" | jq -r '.location // ""')")
+  loc=$(printf '%s' "$f"  | jq -r '.location // ""')
+  cat=$(printf '%s' "$f"  | jq -r '.category // ""')
   desc=$(printf '%s' "$f" | jq -r '.description // ""')
+  sugg=$(printf '%s' "$f" | jq -r '.suggestion // ""')
+  nloc=$(_review_normalize_location "$loc")
   ndesc=$(_review_normalize_description "$desc")
+  nsugg=$(_review_normalize_suggestion "$sugg")
+  if [ -z "$hash" ]; then
+    dhash=$(printf '%s' "$ndesc" | shasum -a 1 | awk '{print $1}')
+    shash=$(printf '%s' "$nsugg" | shasum -a 1 | awk '{print $1}')
+    hash=$(printf '%s|%s|%s|%s' "$nloc" "$cat" "$dhash" "$shash" \
+      | shasum -a 1 | awk '{print $1}')
+  fi
   shingle=$(_review_description_shingle "$ndesc")
 
   [ -f "$file" ] || printf '{"session_id":"%s","created_at":"%s","findings":{}}' \
@@ -407,19 +416,19 @@ _review_record_attempt() {
       | .attempts += 1
       | .last_seen_round = $r
     )
-    | .findings[$h]
   ' "$file" > "$file.tmp" && mv "$file.tmp" "$file"
 
   jq -r --arg h "$hash" '.findings[$h].attempts' "$file"
 }
 
 _review_at_strike_limit() {
-  # Input: $1 = finding JSON
+  # Input: $1 = finding JSON, $2 = optional precomputed finding hash
   # Exit: 0 if hash already has >= 3 attempts, 1 otherwise
   local f="$1" file hash
+  hash="${2:-}"
   file=$(_review_attempts_file)
   [ -f "$file" ] || return 1
-  hash=$(_review_finding_hash "$f")
+  [ -n "$hash" ] || hash=$(_review_finding_hash "$f")
   local n; n=$(jq -r --arg h "$hash" '.findings[$h].attempts // 0' "$file")
   [ "$n" -ge 3 ]
 }
@@ -430,13 +439,15 @@ _review_at_strike_limit() {
 After every `mmr review … --sync --format json` call:
 
 1. Extract reconciled findings: `FINDINGS=$(mmr results "$JOB_ID" | jq -c '.reconciled_findings[]')`
-2. For each blocking finding (severity at or above `fix_threshold`):
+2. Iterate safely over the newline-delimited JSON:
+   `printf '%s\n' "$FINDINGS" | while IFS= read -r f; do ... done`
+3. For each blocking finding (severity at or above `fix_threshold`):
    - Compute its hash via `_review_finding_hash`.
-   - Call `_review_record_attempt "$f" "$ROUND"` to increment its counter.
-   - Call `_review_at_strike_limit "$f"` — if true, this finding has hit the
-     3-strike limit. Stop the fix loop, emit verdict `blocked`, and follow
-     the **Stop path** in Step 8.
-3. Otherwise apply fixes, re-push, increment `ROUND`, and loop.
+   - Call `_review_at_strike_limit "$f" "$hash"` before incrementing — if true,
+     this finding already has 3 recorded attempts. Stop the fix loop, emit
+     verdict `blocked`, and follow the **Stop path** in Step 8.
+   - Call `_review_record_attempt "$f" "$ROUND" "$hash"` to increment its counter.
+4. Otherwise apply fixes, re-push, increment `ROUND`, and loop.
 
 For very noisy fix loops, you may suggest the user re-run with
 `--fix-threshold P1` to narrow the gate (the project default stays at P2 per
