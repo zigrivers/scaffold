@@ -55,12 +55,12 @@ describe('dispatchLlm', () => {
   it('handles subprocesses that close stdin before the prompt is written', async () => {
     const result = await dispatchLlm({
       prompt: 'x'.repeat(1024 * 1024),
-      command: 'true',
+      command: 'exec 0<&-; sleep 0.05; true',
       timeoutMs: 5000,
     })
 
     expect(result.ok).toBe(false)
-    if (!result.ok) expect(result.reason).toMatch(/JSON parse failed|subprocess exit|stdin error/i)
+    if (!result.ok) expect(result.reason).toMatch(/stdin error/i)
   })
 
   it('handles objects containing nested arrays (mixed delimiters) correctly', async () => {

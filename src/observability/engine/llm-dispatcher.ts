@@ -79,6 +79,14 @@ export function dispatchLlm(input: DispatchInput): Promise<DispatchResult> {
         resolve({ ok: false, reason: `subprocess ${codeStr}${hint}`, raw: stdout })
         return
       }
+      if (stdinError) {
+        resolve({
+          ok: false,
+          reason: `stdin error (${stdinError.code ?? 'unknown'}): ${stdinError.message}`,
+          raw: stdout,
+        })
+        return
+      }
       // Brace-depth extraction — tolerates LLM filler text before/after the JSON block
       try {
         const parsed = extractJsonObject(stdout)
