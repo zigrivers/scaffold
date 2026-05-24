@@ -40,7 +40,7 @@ export function isSecretKey(name: string, options: { exemptEnvNameKeys?: boolean
 }
 
 function redactValue(value: unknown, options: { exemptEnvNameKeys?: boolean }): unknown {
-  if (Array.isArray(value)) return redactList(value)
+  if (Array.isArray(value)) return redactList(value, options)
   if (value && typeof value === 'object') return redactRecord(value as Record<string, unknown>, options)
   return value
 }
@@ -70,15 +70,21 @@ function redactKeyValueString(input: string): string {
     : `${leading}${key}${separator}${value}`
 }
 
-function redactList(input: unknown[]): unknown[] {
+function redactList(
+  input: unknown[],
+  options: { exemptEnvNameKeys?: boolean } = { exemptEnvNameKeys: false },
+): unknown[] {
   return input.map((value) => {
     if (typeof value === 'string') return redactKeyValueString(value)
+    if (Array.isArray(value)) return redactList(value, options)
     if (value && typeof value === 'object' && !Array.isArray(value)) {
       const original = value as Record<string, unknown>
       const secretLabel =
         (typeof original.name === 'string' && isSecretKey(original.name, { exemptEnvNameKeys: false })) ||
         (typeof original.key === 'string' && isSecretKey(original.key, { exemptEnvNameKeys: false }))
-      const redacted = redactRecord(value as Record<string, unknown>, { exemptEnvNameKeys: false })
+      const redacted = redactRecord(value as Record<string, unknown>, options)
+      if (typeof original.name === 'string') redacted.name = original.name
+      if (typeof original.key === 'string') redacted.key = original.key
       if (secretLabel && 'value' in redacted) {
         redacted.value = '<redacted>'
       }

@@ -122,7 +122,13 @@ describe('redactChannel (T1-E)', () => {
         'TOKEN',
         { name: 'OPENAI_API_KEY', value: 'sk-xxx' },
       ],
-      headers: ['Authorization: Bearer abc', '  X-Trace: true', { key: 'Authorization', value: 'Bearer abc' }],
+      headers: [
+        'Authorization: Bearer abc',
+        '  X-Trace: true',
+        { key: 'Authorization', value: 'Bearer abc' },
+        { key: 'X-Trace', value: 'true' },
+        ['TOKEN=nested'],
+      ],
     }
     expect(redactChannel(channel)).toEqual({
       env: [
@@ -132,7 +138,13 @@ describe('redactChannel (T1-E)', () => {
         '<redacted>',
         { name: 'OPENAI_API_KEY', value: '<redacted>' },
       ],
-      headers: ['Authorization: <redacted>', '  X-Trace: true', { key: '<redacted>', value: '<redacted>' }],
+      headers: [
+        'Authorization: <redacted>',
+        '  X-Trace: true',
+        { key: 'Authorization', value: '<redacted>' },
+        { key: 'X-Trace', value: 'true' },
+        ['TOKEN=<redacted>'],
+      ],
     })
   })
 })
