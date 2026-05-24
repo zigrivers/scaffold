@@ -120,8 +120,8 @@ Recover your context by checking the current state of work:
 - Otherwise, clean up and start fresh:
   - `git fetch origin --prune && git clean -fd`
   - Run the install command from CLAUDE.md Key Commands
-  - `bd ready` to find the next available task
-- Continue working until `bd ready` shows no available tasks
+  - Atomically claim the next ready task: `TASK=$(bd ready --claim --json | jq -r '.id')` (sets `assignee=$BEADS_ACTOR` + `status=in_progress`; no race window between agents).
+- Continue working until `bd ready --claim --json` returns no task.
 
 **Without Beads:**
 - Read `docs/implementation-playbook.md` as the primary task reference.

@@ -100,8 +100,8 @@ Recover your context by checking the current state of work:
 - `bd list` — check for tasks with `in_progress` status
 - If a PR shows as merged, close the corresponding task: `bd close <id>`
 - If there is in-progress work, finish it (see "Resume In-Progress Work" below)
-- Otherwise, start fresh with `bd ready` to find the next available task
-- Continue working until `bd ready` shows no available tasks
+- Otherwise, atomically claim the next ready task: `TASK=$(bd ready --claim --json | jq -r '.id')` (sets `assignee=$BEADS_ACTOR` + `status=in_progress`; no race window).
+- Continue working until `bd ready --claim --json` returns no task.
 
 **Without Beads:**
 - Read `docs/implementation-playbook.md` as the primary task reference.

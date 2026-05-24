@@ -119,11 +119,13 @@ These rules are critical for multi-agent operation:
 
 **If Beads is configured** (`.beads/` exists):
 - Branch naming: `bd-<id>/<desc>`
-- Run `bd ready` to see available tasks
-- Pick the lowest-ID unblocked task
+- Verify `$BEADS_ACTOR` is set per agent (echo it; bail if empty).
+- Atomically claim the next ready task: `TASK=$(bd ready --claim --json | jq -r '.id')`
+  - This sets `assignee=$BEADS_ACTOR` and `status=in_progress` in a single round-trip — eliminates the race window where two agents both see the same "ready" task.
+  - If `bd ready --claim` returns no task, you're done — exit the loop.
 - Implement following the TDD workflow below
 - After PR is merged: `bd close <id>`
-- Repeat with `bd ready` until no tasks remain
+- Repeat (`bd ready --claim --json`) until no tasks remain
 
 **Without Beads:**
 - Branch naming: `<type>/<desc>` (e.g., `feat/add-auth`)
