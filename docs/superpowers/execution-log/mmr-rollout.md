@@ -11,3 +11,4 @@
 [2026-05-24T04:43:58Z] stopgap Task 9: merged (PR #347, MMR rounds: 0, deferred: 0; no diff content for pre-existing gitignore rule)
 [2026-05-24T05:42:13Z] stopgap Task 10: BLOCKED-P0P1 (PR #348, MMR rounds: 3, deferred: 0; same Gemini P0 recurred across 3 consecutive rounds claiming Bats uses @src/observability/engine/llm-dispatcher.test.ts instead of @test, while `bats tests/review-wrapper-hash.bats` passes 11 tests and `make check-all` passes)
 [2026-05-24T10:01:36Z] stopgap Task 10: false-positive override approved; proceeding to merge PR #348 (MMR rounds: 3, deferred: 0; operator-approved waiver for repeated Gemini-only P0 contradicted by file contents, Bats execution, full local gate, and CI)
+[2026-05-24T10:11:40Z] stopgap Task 10: merged (PR #348, MMR rounds: 3, deferred: 0; Gemini-only false-positive P0 waived by operator)
