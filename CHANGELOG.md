@@ -4,6 +4,59 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.28.0] — 2026-05-24
+
+### Changed — Beads integration overhaul (aligns with upstream Beads v1.0.4)
+
+Comprehensive update to scaffold's Beads task-tracking integration to match the current upstream CLI surface. Covers ~28 audit findings plus four originally-deferred design decisions. See `docs/audits/beads-integration-audit-2026-05-24.md` for the full audit and `docs/superpowers/plans/2026-05-24-beads-integration-{fixes,deferred-decisions}.md` for the implementation plans.
+
+**Stale CLI commands removed or corrected:**
+- `bd sync` (non-existent in v1.0.4) replaced with `bd close` + optional `bd dolt push` (guarded by `bd config get dolt.remote --json | jq -r .value`).
+- `bd start <id>` / `bd claim <id>` / `bd status <id>` replaced with `bd update <id> --claim`, `bd ready --claim --json`, and `bd show <id>`.
+- `bd done` / `bd block` documented as aliases / `bd update --status blocked`.
+- `bd list --actor` → `bd list --assignee` (upstream rename).
+
+**Vocabulary alignment:**
+- Task statuses now use the upstream enum (`open, in_progress, blocked, deferred, closed`) plus status categories (`active | wip | done | frozen`).
+- `BD_ACTOR` env var renamed to `BEADS_ACTOR` across active surfaces; historical surfaces annotated.
+- Priority scale extended to P0–P4 (was P0–P3).
+- ID format examples migrated to lowercase hash-style (`bd-a3f8`, `bd-a3f9`) per upstream default.
+
+**New prescriptions:**
+- `bd doctor --fix` runs after `bd init` and on every worktree setup (`scripts/setup-agent-worktree.sh`). Fixes stale `bd hook <name>` shims from older versions.
+- `bd ready --claim --json` is the canonical atomic claim (eliminates race windows in multi-agent runs).
+- `bd preflight` runs before `gh pr create`.
+- `bd merge-slot create` + `bd merge-slot acquire --wait` / `release` for 3+-agent merge serialization.
+- `bd gate create --blocks <id> --type ...` for async coordination (PR-merge, GHA-run, timer, human).
+- `--deps discovered-from:<id>` documented for incidental work.
+
+**Upstream recipe adoption:**
+- `/scaffold:beads` now delegates CLAUDE.md / AGENTS.md / GEMINI.md integration to `bd setup <recipe>` instead of hand-rolling content. `bd prime` is the single source of truth for agent workflow context.
+- New knowledge entry: `content/knowledge/execution/multi-agent-coordination.md` covering `bd merge-slot` + `bd gate`.
+
+**Observability cross-link:**
+- `src/observability/adapters/beads.ts` adapter degrades on `bd < 1.0.0`.
+- New `beadsAdapter.claimWithEvent(cwd, { id, eventId })` helper runs `bd update <id> --set-metadata ledger_event_id=<id> --claim` atomically.
+- `src/observability/engine/ledger-writer.ts` `writeEvent` returns the persisted (redacted) `WrittenEvent`, enabling `src/cli/commands/observe.ts` to cross-link every `task_claimed` event to its corresponding Beads issue.
+
+**Opt-in MMR → Beads bridge:**
+- `.mmr.yaml` gains a commented-out `beads.*` config block.
+- `content/tools/review-pr.md` and `review-code.md` gain Step 7b: when enabled, blocking MMR findings (≥ `fix_threshold`) are filed as `bd` bugs with `--external-ref "mmr:<finding-hash>"` (stable across MMR job IDs).
+
+**Memory scope split:**
+- Filesystem auto-memory is now explicitly documented as *user-level* (per-user, cross-project).
+- `bd remember` is documented as *project-level* (per-project, team-shareable via Dolt).
+
+**Methodology-scaled custom types:**
+- `bd config set types.custom '["story","milestone","spike"]'` runs in `deep` methodology; stays off in `mvp`.
+
+**P3 polish:**
+- Documented `bd backup`, `beads-mcp` (CLI + hooks preferred over MCP for most use), safe re-init (`--reinit-local` / `--discard-remote` / `--destroy-token` + exit codes 10/11/12), the built-in `decision` issue type, and the upstream install-script as the preferred install method.
+
+### Known follow-ups
+
+See `docs/audits/beads-integration-audit-2026-05-24-followups.md` for the small set of P1/P2/P3 documentation-polish items not addressed in this release. None block real-world use; a single follow-up PR will sweep them.
+
 ## [3.27.0] — 2026-05-12
 
 ### Added
