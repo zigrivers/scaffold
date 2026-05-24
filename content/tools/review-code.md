@@ -364,7 +364,7 @@ Respond with JSON:
     {
       "severity": "P0" | "P1" | "P2" | "P3",
       "category": "correctness|edge-case|security|acceptance-criteria|test-coverage",
-      "location": "file:line or section",
+      "location": "relative/path/to/file.ts:42",
       "description": "what is wrong",
       "suggestion": "specific fix"
     }
