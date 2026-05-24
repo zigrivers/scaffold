@@ -14,10 +14,16 @@ interface ConfigArgs {
 
 async function ossProbeResults(): Promise<Map<OssRuntimeId, boolean>> {
   const results = await Promise.all(
-    OSS_RUNTIMES.map(async (runtime) => [
-      runtime.id,
-      (await probeRuntime(runtime.probe.command, runtime.probe.args, runtime.probe.timeoutMs)).detected,
-    ] as const),
+    OSS_RUNTIMES.map(async (runtime) => {
+      try {
+        return [
+          runtime.id,
+          (await probeRuntime(runtime.probe.command, runtime.probe.args, runtime.probe.timeoutMs)).detected,
+        ] as const
+      } catch {
+        return [runtime.id, false] as const
+      }
+    }),
   )
   return new Map(results)
 }
