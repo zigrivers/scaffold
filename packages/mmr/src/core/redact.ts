@@ -76,7 +76,14 @@ function redactList(
 ): unknown[] {
   return input.map((value) => {
     if (typeof value === 'string') return redactKeyValueString(value)
-    if (Array.isArray(value)) return redactList(value, options)
+    if (Array.isArray(value)) {
+      const key = value[0]
+      const rest = value.slice(2)
+      if (typeof key === 'string' && isSecretKey(key, { exemptEnvNameKeys: false }) && value.length >= 2) {
+        return [key, '<redacted>', ...redactList(rest, options)]
+      }
+      return redactList(value, options)
+    }
     if (value && typeof value === 'object' && !Array.isArray(value)) {
       const original = value as Record<string, unknown>
       const secretLabel =
@@ -100,16 +107,5 @@ function redactList(
  * as-is because the name is non-secret and useful for debugging.
  */
 export function redactChannel(channel: Record<string, unknown>): Record<string, unknown> {
-  const copy = redactRecord(channel)
-  if (Array.isArray(copy.env)) {
-    copy.env = redactList(copy.env)
-  } else if (copy.env && typeof copy.env === 'object') {
-    copy.env = redactRecord(copy.env as Record<string, unknown>, { exemptEnvNameKeys: false })
-  }
-  if (Array.isArray(copy.headers)) {
-    copy.headers = redactList(copy.headers)
-  } else if (copy.headers && typeof copy.headers === 'object') {
-    copy.headers = redactRecord(copy.headers as Record<string, unknown>, { exemptEnvNameKeys: false })
-  }
-  return copy
+  return redactRecord(channel)
 }
