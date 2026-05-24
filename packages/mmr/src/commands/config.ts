@@ -6,7 +6,7 @@ import { BUILTIN_CHANNELS } from '../config/defaults.js'
 import { checkInstalled, checkAuth } from '../core/auth.js'
 import { probeRuntime } from '../core/runtime-probe.js'
 import { OSS_RUNTIMES, exampleBlockFor, type OssRuntimeId } from '../core/oss-examples.js'
-import { isSecretKey, redactChannel } from '../core/redact.js'
+import { redactChannel } from '../core/redact.js'
 
 interface ConfigArgs {
   action: string
@@ -153,9 +153,58 @@ function configChannels(): void {
 function commandContainsInlineSecret(command: string): boolean {
   const keyValueRe = /(?:^|[\s'"?&{,])"?([A-Za-z0-9_.-]+)"?\s*[:=]/g
   for (const match of command.matchAll(keyValueRe)) {
-    if (isSecretKey(match[1], { exemptEnvNameKeys: false })) return true
+    if (isCommandSecretKey(match[1])) return true
   }
 
+  const tokens = command.match(/"[^"]*"|'[^']*'|\S+/g) ?? []
+  for (let i = 0; i < tokens.length - 1; i += 1) {
+    const token = stripQuotes(tokens[i])
+    const next = stripQuotes(tokens[i + 1])
+    if (!token.startsWith('--') || token.includes('=') || token.includes(':') || next.startsWith('-')) continue
+    if (isCommandSecretKey(token)) return true
+  }
+
+  return false
+}
+
+function stripQuotes(value: string): string {
+  return value.replace(/^['"]|['"]$/g, '')
+}
+
+function isCommandSecretKey(name: string): boolean {
+  const parts = name
+    .replace(/^-+/, '')
+    .split(/[_.-]+|(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])/)
+    .filter(Boolean)
+    .map((part) => part.toLowerCase())
+  const compact = parts.join('')
+  if (
+    [
+      'apikey',
+      'auth',
+      'authorization',
+      'clientsecret',
+      'cookie',
+      'credential',
+      'credentials',
+      'creds',
+      'password',
+      'passphrase',
+      'passwd',
+      'secret',
+      'token',
+    ].includes(compact)
+  ) {
+    return true
+  }
+  if (parts.includes('key') && parts.some((part) => ['access', 'api', 'private'].includes(part))) return true
+  if (
+    parts.includes('token') &&
+    parts.some((part) => ['access', 'api', 'auth', 'bearer', 'refresh', 'session'].includes(part))
+  ) {
+    return true
+  }
+  if (parts.includes('secret') && parts.some((part) => ['api', 'client', 'private'].includes(part))) return true
   return false
 }
 

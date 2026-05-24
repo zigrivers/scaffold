@@ -27,7 +27,7 @@ describe('mmr config channels', () => {
         'version: 1',
         'channels:',
         '  local:',
-        '    command: "review --session-dir /tmp/mmr --token-limit 4096 --auth-type none"',
+        '    command: "review --session-dir=/tmp/mmr --token-limit=4096 --auth-type=none"',
       ].join('\n'),
     )
 
@@ -37,11 +37,11 @@ describe('mmr config channels', () => {
     const output = String(logSpy.mock.calls.at(-1)?.[0])
     const channels = JSON.parse(output) as Array<{ name: string; command: string }>
     expect(channels.find((channel) => channel.name === 'local')?.command).toBe(
-      'review --session-dir /tmp/mmr --token-limit 4096 --auth-type none',
+      'review --session-dir=/tmp/mmr --token-limit=4096 --auth-type=none',
     )
   })
 
-  it('redacts commands with inline secret key/value arguments', async () => {
+  it('redacts commands with equals-form secret arguments', async () => {
     fs.writeFileSync(
       path.join(tmpDir, '.mmr.yaml'),
       [
@@ -58,5 +58,27 @@ describe('mmr config channels', () => {
     const output = String(logSpy.mock.calls.at(-1)?.[0])
     const channels = JSON.parse(output) as Array<{ name: string; command: string }>
     expect(channels.find((channel) => channel.name === 'local')?.command).toBe('<redacted>')
+  })
+
+  it('redacts commands with space-separated secret arguments', async () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.mmr.yaml'),
+      [
+        'version: 1',
+        'channels:',
+        '  local:',
+        '    command: "review --api-key sk-live --model qwen"',
+        '  token:',
+        '    command: "review --token abc --model qwen"',
+      ].join('\n'),
+    )
+
+    const { configCommand } = await import('../../src/commands/config.js')
+    await configCommand.handler({ action: 'channels', _: ['config'], $0: 'mmr' } as never)
+
+    const output = String(logSpy.mock.calls.at(-1)?.[0])
+    const channels = JSON.parse(output) as Array<{ name: string; command: string }>
+    expect(channels.find((channel) => channel.name === 'local')?.command).toBe('<redacted>')
+    expect(channels.find((channel) => channel.name === 'token')?.command).toBe('<redacted>')
   })
 })
