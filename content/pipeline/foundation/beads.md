@@ -21,28 +21,37 @@ and autonomous behavior guidelines.
 - Existing CLAUDE.md (optional) — if present, operates in update mode
 
 ## Expected Outputs
-- .beads/ directory — initialized Beads data store with git hooks
+- .beads/ directory — initialized Beads data store with git hooks (installed/repaired via `bd doctor --fix`)
 - tasks/lessons.md — patterns and anti-patterns file for cross-session learning
 - CLAUDE.md — initial skeleton with Core Principles, Task Management (Beads),
-  Self-Improvement, and Autonomous Behavior sections
+  Self-Improvement, and Autonomous Behavior sections, including an upgrade-remediation
+  callout pointing at `bd doctor --fix` for users who upgrade `bd` after `bd init`
 
 ## Quality Criteria
 - (mvp) `bd ready` executes without error (Beads is initialized)
 - (mvp) .beads/ directory exists and contains Beads data files
-- (mvp) Beads git hooks are installed (data-sync hooks, not code-quality hooks)
+- (mvp) Beads git hooks are installed; `bd doctor --fix` was run after `bd init` to
+  ensure hooks/config are current (idempotent — also the canonical recovery path if
+  `bd` is upgraded later)
 - (mvp) tasks/lessons.md exists with Patterns, Anti-Patterns, and Common Gotchas sections
 - (mvp) CLAUDE.md contains Core Principles with all four tenets (Simplicity, No Laziness, TDD, Prove It)
 - (mvp) CLAUDE.md contains Beads command reference table
 - (mvp) CLAUDE.md contains commit-message convention requiring Beads task IDs
-- (mvp) Bootstrap commit uses `[BD-0]` convention
+- (mvp) CLAUDE.md contains an upgrade-remediation callout: "If `bd` was upgraded since
+  last `bd init`, run `bd doctor --fix` to re-sync git hooks and project config. This
+  fixes errors like `unknown command \"hook\" for \"bd\"` from stale post-checkout /
+  post-merge hook shims."
+- (mvp) Bootstrap commit uses `[bd-<id>]` convention (lowercase hash-style IDs per Beads v1.0.0+)
 - (deep) Cross-doc consistency verified against git-workflow.md and coding-standards.md
 
 ## Methodology Scaling
-- **deep**: Full Beads setup with all CLAUDE.md sections, detailed command reference
-  table, priority level documentation, and cross-doc consistency checks against
-  existing git-workflow.md and coding-standards.md.
-- **mvp**: Initialize Beads, create tasks/lessons.md, add minimal CLAUDE.md
-  sections (Core Principles + Beads commands). Skip cross-doc checks.
+- **deep**: Full Beads setup — `bd init`, then `bd doctor --fix` (sync hooks/config),
+  all CLAUDE.md sections including the upgrade-remediation callout, detailed command
+  reference table, priority level documentation, and cross-doc consistency checks
+  against existing git-workflow.md and coding-standards.md.
+- **mvp**: `bd init`, `bd doctor --fix`, create tasks/lessons.md, add minimal
+  CLAUDE.md sections (Core Principles + Beads commands + upgrade-remediation callout).
+  Skip cross-doc checks.
 - **custom:depth(1-5)**:
   - Depth 1: Initialize Beads + create tasks/lessons.md. Minimal CLAUDE.md with Core Principles only.
   - Depth 2: Depth 1 + add Beads command reference table to CLAUDE.md.
