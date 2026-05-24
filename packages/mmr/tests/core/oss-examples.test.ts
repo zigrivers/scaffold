@@ -35,4 +35,12 @@ describe('OSS_RUNTIMES catalog (T1-D)', () => {
     expect(llama).toMatch(/^# example: llama-server/m)
     expect(llama).toMatch(/v3\.30/i)
   })
+
+  it('exampleBlockFor("local-ai-delegate") includes a commented command template', () => {
+    const block = exampleBlockFor('local-ai-delegate')
+    expect(block).toMatch(/^# example: local-ai-delegate/m)
+    expect(block).toMatch(/v3\.30/i)
+    expect(block).toMatch(/#\s+command: local-ai-delegate review/m)
+    expect(block).toMatch(/#\s+abstract: true/m)
+  })
 })

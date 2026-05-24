@@ -10,9 +10,9 @@ export interface OssRuntime {
 }
 
 /**
- * Catalog of OSS runtimes detected by `mmr config init`. v3.28 ships
- * subprocess support only; HTTP-shaped runtimes (lms, llama-server) get
- * commented-out stubs that note v3.30 will enable them.
+ * Catalog of OSS runtimes available to config-init probing. v3.28 ships
+ * subprocess support only; HTTP-shaped runtimes (lms, llama-server,
+ * local-ai-delegate) get commented-out stubs that note v3.30 will enable them.
  */
 export const OSS_RUNTIMES: OssRuntime[] = [
   { id: 'ollama', probe: { command: 'ollama', args: ['list'], timeoutMs: 1000 } },
@@ -58,10 +58,13 @@ export function exampleBlockFor(id: OssRuntime['id']): string {
     ].join('\n')
   case 'local-ai-delegate':
     return [
-      '# example: local-ai-delegate (MCP bridge)',
+      '# example: local-ai-delegate (MCP bridge, HTTP) - requires MMR v3.30+',
       '#   The local-ai-delegate MCP server proxies an OpenAI-compatible',
       '#   endpoint to a locally-hosted model. HTTP channel kind ships in',
       '#   v3.30; for v3.28 you can wrap it in a shell shim if needed.',
+      '#   abstract: true                                    # template only',
+      '#   command: local-ai-delegate review',
+      '#   flags: ["--format", "json"]',
     ].join('\n')
   }
 }
