@@ -178,7 +178,7 @@ describe('loadConfig', () => {
       .toThrow('Channel "broken" must define command after inheritance unless abstract is set')
   })
 
-  it('throws when a concrete channel has no auth', () => {
+  it('allows a concrete channel with no auth check', () => {
     const yaml = [
       'version: 1',
       'channels:',
@@ -187,8 +187,9 @@ describe('loadConfig', () => {
     ].join('\n')
     fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), yaml)
 
-    expect(() => loadConfig({ projectRoot: tmpDir, userHome: tmpDir }))
-      .toThrow('Channel "broken" must define auth after inheritance unless abstract is set')
+    const config = loadConfig({ projectRoot: tmpDir, userHome: tmpDir })
+    expect(config.channels.broken?.command).toBe('broken review')
+    expect(config.channels.broken?.auth).toBeUndefined()
   })
 
   it('does not overwrite base values with undefined overlay values', () => {

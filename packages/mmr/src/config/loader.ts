@@ -131,9 +131,6 @@ function validateRunnableChannels(config: MmrConfigParsed): void {
     if (!channel.command) {
       throw new Error(`Channel "${name}" must define command after inheritance unless abstract is set`)
     }
-    if (!channel.auth) {
-      throw new Error(`Channel "${name}" must define auth after inheritance unless abstract is set`)
-    }
   }
 }
 
