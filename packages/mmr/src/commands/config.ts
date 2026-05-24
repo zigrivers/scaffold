@@ -197,7 +197,26 @@ function isCommandSecretKey(name: string): boolean {
   ) {
     return true
   }
+  if (
+    parts.some((part) =>
+      [
+        'cookie',
+        'credential',
+        'credentials',
+        'creds',
+        'pass',
+        'passphrase',
+        'passwd',
+        'password',
+        'signature',
+      ].includes(part),
+    )
+  ) {
+    return true
+  }
   if (parts.includes('key') && parts.some((part) => ['access', 'api', 'private'].includes(part))) return true
+  if (parts.includes('sid')) return true
+  if (parts.includes('session') && parts.some((part) => ['id', 'key', 'secret', 'token'].includes(part))) return true
   if (
     parts.includes('token') &&
     parts.some((part) => ['access', 'api', 'auth', 'bearer', 'refresh', 'session'].includes(part))

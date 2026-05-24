@@ -81,4 +81,32 @@ describe('mmr config channels', () => {
     expect(channels.find((channel) => channel.name === 'local')?.command).toBe('<redacted>')
     expect(channels.find((channel) => channel.name === 'token')?.command).toBe('<redacted>')
   })
+
+  it('redacts commands with common compound secret flag names', async () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.mmr.yaml'),
+      [
+        'version: 1',
+        'channels:',
+        '  pass:',
+        '    command: "review --db-pass hunter2"',
+        '  session:',
+        '    command: "review --session-id abc"',
+        '  sid:',
+        '    command: "review --sid abc"',
+        '  signature:',
+        '    command: "review --signature abc"',
+      ].join('\n'),
+    )
+
+    const { configCommand } = await import('../../src/commands/config.js')
+    await configCommand.handler({ action: 'channels', _: ['config'], $0: 'mmr' } as never)
+
+    const output = String(logSpy.mock.calls.at(-1)?.[0])
+    const channels = JSON.parse(output) as Array<{ name: string; command: string }>
+    expect(channels.find((channel) => channel.name === 'pass')?.command).toBe('<redacted>')
+    expect(channels.find((channel) => channel.name === 'session')?.command).toBe('<redacted>')
+    expect(channels.find((channel) => channel.name === 'sid')?.command).toBe('<redacted>')
+    expect(channels.find((channel) => channel.name === 'signature')?.command).toBe('<redacted>')
+  })
 })
