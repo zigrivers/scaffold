@@ -45,6 +45,18 @@ function deepMerge<T extends Record<string, unknown>>(base: T, overlay: Record<s
   return result as T
 }
 
+function resetExtendingChannelBases(
+  base: Record<string, unknown>,
+  overlay: Record<string, unknown>,
+): void {
+  if (!isPlainRecord(base.channels) || !isPlainRecord(overlay.channels)) return
+  for (const [name, channel] of Object.entries(overlay.channels)) {
+    if (isPlainRecord(channel) && typeof channel.extends === 'string') {
+      base.channels[name] = {}
+    }
+  }
+}
+
 /**
  * Try to read and parse a YAML file; returns undefined if missing.
  */
@@ -107,7 +119,12 @@ function resolveChannelExtends(
 
   const childDefinesAbstract = Object.prototype.hasOwnProperty.call(channel, 'abstract')
   const parentBase = structuredClone(parentResolved) as Record<string, unknown>
+  const parentFlags = Array.isArray(parentBase.flags) ? parentBase.flags : undefined
+  const childFlags = Array.isArray(childWithoutExtends.flags) ? childWithoutExtends.flags : undefined
   const merged = deepMerge(parentBase, childWithoutExtends)
+  if (parentFlags && childFlags) {
+    merged.flags = [...parentFlags, ...childFlags]
+  }
   if (!childDefinesAbstract) {
     delete merged.abstract
   }
@@ -156,6 +173,7 @@ export function loadConfig(opts: LoadConfigOptions): MmrConfigParsed {
   const userConfigPath = path.join(userHome, '.mmr', 'config.yaml')
   const userConfig = loadYaml(userConfigPath)
   if (userConfig) {
+    resetExtendingChannelBases(merged, userConfig)
     merged = deepMerge(merged, userConfig)
   }
 
@@ -163,6 +181,7 @@ export function loadConfig(opts: LoadConfigOptions): MmrConfigParsed {
   const projectConfigPath = path.join(projectRoot, '.mmr.yaml')
   const projectConfig = loadYaml(projectConfigPath)
   if (projectConfig) {
+    resetExtendingChannelBases(merged, projectConfig)
     merged = deepMerge(merged, projectConfig)
   }
 

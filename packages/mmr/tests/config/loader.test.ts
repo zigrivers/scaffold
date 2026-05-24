@@ -282,7 +282,7 @@ describe('loadConfig extends inheritance (T1-A)', () => {
     ].join('\n')
     fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), yamlText)
     const config = loadConfig({ projectRoot: tmpDir, userHome: tmpDir })
-    expect(config.channels.first?.flags).toEqual(['first'])
+    expect(config.channels.first?.flags).toEqual(['base', 'first'])
     expect(config.channels.second?.flags).toEqual(['base'])
   })
 
@@ -306,7 +306,27 @@ describe('loadConfig extends inheritance (T1-A)', () => {
     const config = loadConfig({ projectRoot: tmpDir, userHome: tmpDir })
     expect(config.channels.c?.abstract).toBe(false)
     expect(config.channels.c?.command).toBe('ollama run')
-    expect(config.channels.c?.flags).toEqual(['c-override'])
+    expect(config.channels.c?.flags).toEqual(['base', 'c-override'])
+  })
+
+  it('resolves same-name builtin channels from their extends parent, not stale builtin fields', () => {
+    const yamlText = [
+      'version: 1',
+      'channels:',
+      '  local-base:',
+      '    abstract: true',
+      '    command: ollama run',
+      '    flags: ["--json"]',
+      '    auth: { check: "ollama list", failure_exit_codes: [1], recovery: "x" }',
+      '  claude:',
+      '    extends: local-base',
+      '    flags: ["qwen2.5-coder:32b"]',
+    ].join('\n')
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), yamlText)
+    const config = loadConfig({ projectRoot: tmpDir, userHome: tmpDir })
+    expect(config.channels.claude?.command).toBe('ollama run')
+    expect(config.channels.claude?.auth?.check).toBe('ollama list')
+    expect(config.channels.claude?.flags).toEqual(['--json', 'qwen2.5-coder:32b'])
   })
 
   it('rejects extends cycle (A extends B extends A)', () => {
