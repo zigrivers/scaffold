@@ -202,13 +202,18 @@ way.
 - **Verdict handling** — proceed only on `pass` or `degraded-pass`. If the
   review returns `blocked` or `needs-user-decision`, stop and surface the
   verdict and remaining findings to the user. Do NOT merge automatically.
-- **3-round limit** — the limit is **per finding**, not per total review
-  rounds. Stop and ask the user only when the *same* blocking finding (or
-  set of findings) remains unresolved after 3 fix attempts. Each round
-  surfacing a *new, different, fixable* finding is healthy review/fix
-  iteration — keep going. Other stop conditions: a finding is genuinely
-  ambiguous or channels contradict each other; the user explicitly asks
-  to stop.
+- **3-round limit** — the limit is **per finding hash**, enforced by the
+  wrapper-side bookkeeping in `content/tools/review-pr.md` Step 7a (and the
+  parallel Step 7a in `review-code.md`). The hash combines normalized
+  `location` + `category` + `description` + `suggestion` and is persisted
+  in `.scaffold/review-attempts/<session-id>.json`. Stop and ask the user
+  only when a blocking finding's hash hits 3 attempts (`_review_at_strike_limit`
+  returns true). Each round surfacing findings with *new* hashes is healthy
+  review/fix iteration — keep going. Other stop conditions: a finding is
+  genuinely ambiguous or channels contradict each other; the user explicitly
+  asks to stop. This wrapper-side bookkeeping is a stopgap until MMR v3.30
+  ships native `--session` and stable `finding_key` (see
+  `docs/superpowers/specs/2026-05-22-mmr-config-ux-and-round-bounding-design.md`).
 
 **Quick reference** (when `scaffold run` is unavailable):
 <!-- Escape hatch only. Canonical commands live in content/tools/review-pr.md.
