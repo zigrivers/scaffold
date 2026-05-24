@@ -123,6 +123,18 @@ A task is complete when all of the following are true:
 
 Only after all five criteria are met should the task be marked as done.
 
+## Discovered Work
+
+While implementing a claimed task, you may discover bugs or follow-up tasks. Don't silently expand the current task's scope — file the new work as a separate Beads issue with `discovered-from`:
+
+```bash
+bd create "fix(parser): handle empty input edge case" \
+  --type bug -p 2 \
+  --deps discovered-from:$CURRENT_TASK_ID
+```
+
+`discovered-from` is metadata for traceability — the new issue appears in `bd ready` normally and does NOT block the current task. This preserves the audit trail of why the new task exists.
+
 ## See Also
 
 - [tdd-execution-loop](./tdd-execution-loop.md) — Red-green-refactor cycle and commit timing

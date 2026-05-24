@@ -203,6 +203,14 @@ bd create "type(scope): description" -p <priority>
 # Example: bd create "fix(auth): prevent duplicate session creation on rapid re-login" -p 2
 ```
 
+If this task was discovered while doing other work, link the lineage with `discovered-from`:
+```bash
+bd create "fix(parser): handle empty input edge case" \
+  --type bug -p 2 \
+  --deps discovered-from:$CURRENT_TASK_ID
+```
+The new task appears in `bd ready` normally; `discovered-from` is metadata for traceability and does NOT block readiness.
+
 **Without Beads:** Document the task inline and proceed directly to implementation.
 
 Then set the task description with the full context from Phase 2. Include all of:
