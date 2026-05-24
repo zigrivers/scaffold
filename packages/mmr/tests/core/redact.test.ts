@@ -120,7 +120,6 @@ describe('redactChannel (T1-E)', () => {
         'TOKEN=x',
         '  authToken = abc',
         'NO_BROWSER=true',
-        'TOKEN',
         { name: 'OPENAI_API_KEY', value: 'sk-xxx' },
       ],
       headers: [
@@ -142,7 +141,6 @@ describe('redactChannel (T1-E)', () => {
         'TOKEN=<redacted>',
         '  authToken = <redacted>',
         'NO_BROWSER=true',
-        '<redacted>',
         { name: 'OPENAI_API_KEY', value: '<redacted>' },
       ],
       headers: [
@@ -158,6 +156,12 @@ describe('redactChannel (T1-E)', () => {
         'Authorization',
         '<redacted>',
       ],
+    })
+  })
+
+  it('redacts standalone secret-like strings in list-shaped config', () => {
+    expect(redactChannel({ env: ['TOKEN'] })).toEqual({
+      env: ['<redacted>'],
     })
   })
 })
