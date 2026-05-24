@@ -151,7 +151,7 @@ function configChannels(): void {
 }
 
 function commandContainsInlineSecret(command: string): boolean {
-  const keyValueRe = /(?:^|[\s'"])([A-Za-z0-9_.-]+)\s*[:=]/g
+  const keyValueRe = /(?:^|[\s'"?&])([A-Za-z0-9_.-]+)\s*[:=]/g
   for (const match of command.matchAll(keyValueRe)) {
     if (isSecretKey(match[1], { exemptEnvNameKeys: false })) return true
   }
