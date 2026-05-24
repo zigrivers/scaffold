@@ -157,6 +157,7 @@ Assign priority using Beads conventions:
 - **P1** — Must-have for current milestone
 - **P2** — Should-have (default for most quick tasks)
 - **P3** — Nice-to-have, backlog
+- **P4** — Backlog / future-consideration (lowest priority; effectively deferred)
 
 #### Acceptance Criteria
 Write 2-5 testable acceptance criteria in Given/When/Then format:

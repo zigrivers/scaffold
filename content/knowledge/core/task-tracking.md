@@ -18,7 +18,9 @@ Core properties:
 - **Repository-local** — Task data lives in `.beads/`, committed alongside code
 - **Git-hook synced** — Task state updates automatically on commit via data-sync hooks
 - **CLI-driven** — All operations via `bd` commands (create, list, status, ready)
-- **ID-prefixed commits** — Every commit message includes `[BD-xxx]` for traceability
+- **ID-prefixed commits** — Every commit message includes `[bd-<id>]` for traceability
+
+> IDs are hash-based and lowercase (e.g., `bd-a3f8`). The `bd-` prefix is configurable at `bd init` time. Hierarchical IDs for epic children: `bd-a3f8.1`, `bd-a3f8.1.1`. Older example IDs in this doc using `BD-42`-style uppercase digits reflect a pre-v1.0.0 convention; current upstream emits hash-based lowercase IDs.
 
 ### Task Hierarchy
 
@@ -94,7 +96,7 @@ Initialization creates:
 Every commit references its Beads task:
 
 ```
-[BD-42] feat(api): implement user registration endpoint
+[bd-a3f8] feat(api): implement user registration endpoint
 
 - Add POST /api/v1/auth/register
 - Add input validation with zod schema
