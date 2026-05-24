@@ -708,7 +708,7 @@ if [ "$beads_enabled" = "true" ] && [ -d .beads ] && command -v bd >/dev/null 2>
     title=$(jq -r '.description | .[0:120]' <<<"$finding")
     severity=$(jq -r '.severity' <<<"$finding")
     pnum="${severity#P}"
-    description=$(jq -r '.description + "\n\nSuggestion: " + .suggestion + "\n\nLocation: " + .location' <<<"$finding")
+    description=$(jq -r '"\(.description)\n\nSuggestion: \(.suggestion // "(none)")\n\nLocation: \(.location // "(unknown)")"' <<<"$finding")
 
     args=(
       "$title"

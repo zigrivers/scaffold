@@ -535,7 +535,7 @@ if [ "$beads_enabled" = "true" ] && [ -d .beads ] && command -v bd >/dev/null 2>
     title=$(jq -r '.description | .[0:120]' <<<"$finding")
     severity=$(jq -r '.severity' <<<"$finding")
     pnum="${severity#P}"
-    description=$(jq -r '.description + "\n\nSuggestion: " + .suggestion + "\n\nLocation: " + .location' <<<"$finding")
+    description=$(jq -r '"\(.description)\n\nSuggestion: \(.suggestion // "(none)")\n\nLocation: \(.location // "(unknown)")"' <<<"$finding")
 
     # Build args conditionally — only include --deps discovered-from when SOURCE_BD_ID
     # is set AND non-empty. Avoids bd create rejecting a bogus "discovered-from:unknown".

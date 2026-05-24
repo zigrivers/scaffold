@@ -1509,7 +1509,7 @@ When a PR is merged, close the associated task:
 
 ```bash
 bd close <id>
-[ -n "$(bd config get dolt.remote 2>/dev/null)" ] && bd dolt push  # only pushes when a Dolt remote is configured
+if remote=$(bd config get dolt.remote 2>/dev/null) && [ -n "$remote" ]; then bd dolt push; fi  # only pushes when a Dolt remote is configured
 ```
 
 Then check for newly unblocked tasks:
@@ -1617,7 +1617,7 @@ When a PR is merged, close the associated task:
 
 ```bash
 bd close <id>
-[ -n "$(bd config get dolt.remote 2>/dev/null)" ] && bd dolt push  # only pushes when a Dolt remote is configured
+if remote=$(bd config get dolt.remote 2>/dev/null) && [ -n "$remote" ]; then bd dolt push; fi  # only pushes when a Dolt remote is configured
 ```
 
 Then check for newly unblocked tasks:
