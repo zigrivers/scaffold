@@ -133,7 +133,7 @@ echo "$AGENT_FINDINGS" > /tmp/agent-findings.json
 mmr reconcile "$JOB_ID" --channel superpowers --input /tmp/agent-findings.json
 ```
 
-The agent's review output must use MMR-compatible finding schema: each finding needs `severity` (P0-P3), `location` (file:line), and `description` (`suggestion` is optional).
+The agent's review output must use MMR-compatible finding schema: each finding needs `severity` (P0-P3), `location` (file:line), and `description` (`category` and `suggestion` are optional, but `category` is recommended for finding identity).
 
 If `mmr` is not installed (`command -v mmr` fails), fall back to the manual multi-channel flow below.
 
@@ -363,6 +363,7 @@ Respond with JSON:
   "findings": [
     {
       "severity": "P0" | "P1" | "P2" | "P3",
+      "category": "optional stable category for finding identity",
       "location": "file:line or section",
       "description": "what is wrong",
       "suggestion": "specific fix"
