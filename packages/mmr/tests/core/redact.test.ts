@@ -131,6 +131,10 @@ describe('redactChannel (T1-E)', () => {
         ['TOKEN=nested'],
         ['Authorization', 'Bearer abc'],
         ['TOKEN', 'x'],
+        'X-Trace',
+        '1',
+        'Authorization',
+        'Bearer later',
       ],
     }
     expect(redactChannel(channel)).toEqual({
@@ -149,6 +153,10 @@ describe('redactChannel (T1-E)', () => {
         ['TOKEN=<redacted>'],
         ['Authorization', '<redacted>'],
         ['TOKEN', '<redacted>'],
+        'X-Trace',
+        '1',
+        'Authorization',
+        '<redacted>',
       ],
     })
   })

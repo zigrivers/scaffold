@@ -74,15 +74,31 @@ function redactList(
   input: unknown[],
   options: { exemptEnvNameKeys?: boolean } = { exemptEnvNameKeys: false },
 ): unknown[] {
-  return input.map((value) => {
-    if (typeof value === 'string') return redactKeyValueString(value)
+  const out: unknown[] = []
+  for (let i = 0; i < input.length; i += 1) {
+    const value = input[i]
+    if (
+      typeof value === 'string' &&
+      typeof input[i + 1] === 'string' &&
+      isSecretKey(value, { exemptEnvNameKeys: false })
+    ) {
+      out.push(value, '<redacted>')
+      i += 1
+      continue
+    }
+    if (typeof value === 'string') {
+      out.push(redactKeyValueString(value))
+      continue
+    }
     if (Array.isArray(value)) {
       const key = value[0]
       const rest = value.slice(2)
       if (typeof key === 'string' && isSecretKey(key, { exemptEnvNameKeys: false }) && value.length >= 2) {
-        return [key, '<redacted>', ...redactList(rest, options)]
+        out.push([key, '<redacted>', ...redactList(rest, options)])
+      } else {
+        out.push(redactList(value, options))
       }
-      return redactList(value, options)
+      continue
     }
     if (value && typeof value === 'object' && !Array.isArray(value)) {
       const original = value as Record<string, unknown>
@@ -95,10 +111,12 @@ function redactList(
       if (secretLabel && 'value' in redacted) {
         redacted.value = '<redacted>'
       }
-      return redacted
+      out.push(redacted)
+      continue
     }
-    return value
-  })
+    out.push(value)
+  }
+  return out
 }
 
 /**

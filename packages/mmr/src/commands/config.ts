@@ -6,7 +6,7 @@ import { BUILTIN_CHANNELS } from '../config/defaults.js'
 import { checkInstalled, checkAuth } from '../core/auth.js'
 import { probeRuntime } from '../core/runtime-probe.js'
 import { OSS_RUNTIMES, exampleBlockFor, type OssRuntimeId } from '../core/oss-examples.js'
-import { redactChannel } from '../core/redact.js'
+import { isSecretKey, redactChannel } from '../core/redact.js'
 
 interface ConfigArgs {
   action: string
@@ -151,9 +151,16 @@ function configChannels(): void {
 }
 
 function commandContainsInlineSecret(command: string): boolean {
-  const keyValueSecretRe = /(?:authorization|token|api[_-]?key|password|secret|auth)[\w-]*\s*[:=]/i
-  const flagSecretRe = /--(?:token|api[_-]?key|password|secret|auth)\b/i
-  return keyValueSecretRe.test(command) || flagSecretRe.test(command)
+  const keyValueRe = /(?:^|[\s'"])([A-Za-z0-9_.-]+)\s*[:=]/g
+  for (const match of command.matchAll(keyValueRe)) {
+    if (isSecretKey(match[1], { exemptEnvNameKeys: false })) return true
+  }
+
+  const flagRe = /--([A-Za-z0-9_.-]+)/g
+  for (const match of command.matchAll(flagRe)) {
+    if (isSecretKey(match[1], { exemptEnvNameKeys: false })) return true
+  }
+  return false
 }
 
 export const configCommand: CommandModule<object, ConfigArgs> = {
