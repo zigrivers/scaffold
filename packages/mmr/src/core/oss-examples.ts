@@ -36,14 +36,17 @@ export function exampleBlockFor(id: OssRuntime['id']): string {
     return [
       '# example: ollama (subprocess, JSON output)',
       '#   Uncomment and adjust to enable a local Ollama channel.',
-      '#   abstract: true                                    # template only',
-      '#   command: ollama run',
-      '#   flags: ["qwen2.5-coder:32b", "--format", "json"]',
-      '#   auth:',
-      '#     check: "ollama list"',
-      '#     timeout: 5                                      # seconds',
-      '#     failure_exit_codes: [1]',
-      '#     recovery: "ollama serve"',
+      '#   ollama-base:',
+      '#     abstract: true                                  # template only',
+      '#     command: ollama run',
+      '#     auth:',
+      '#       check: "ollama list"',
+      '#       timeout: 5                                    # seconds',
+      '#       failure_exit_codes: [1]',
+      '#       recovery: "ollama serve"',
+      '#   qwen-local:',
+      '#     extends: ollama-base',
+      '#     flags: ["qwen2.5-coder:32b", "--format", "json"]',
     ].join('\n')
   case 'lms':
     return [
@@ -63,9 +66,14 @@ export function exampleBlockFor(id: OssRuntime['id']): string {
       '#   The local-ai-delegate MCP server proxies an OpenAI-compatible',
       '#   endpoint to a locally-hosted model. Native HTTP channel kind ships',
       '#   in v3.30; this v3.28 example assumes a shell shim wrapper.',
-      '#   abstract: true                                    # template only',
-      '#   command: local-ai-delegate review',
-      '#   flags: ["--format", "json"]',
+      '#   local-ai-delegate-base:',
+      '#     abstract: true                                  # template only',
+      '#     command: local-ai-delegate review',
+      '#   local-ai-delegate-local:',
+      '#     extends: local-ai-delegate-base',
+      '#     flags: ["--format", "json"]',
     ].join('\n')
   }
+  const exhaustive: never = id
+  return exhaustive
 }
