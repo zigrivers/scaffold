@@ -86,6 +86,48 @@ Beads also exposes a *status category* dimension (`active | wip | done | frozen`
 
 > Scaffold previously documented `ready → in-progress → review → done` — none of those (except via `ready` as a *query*) are upstream statuses. The `review` state, if needed, can be added per-project via `bd config set types.custom_statuses '[{"name":"review","category":"wip"}]'`.
 
+### Optional: enable custom issue types
+
+`bd create -t` supports `bug`, `feature`, `task`, `epic`, `chore`, `decision` out of the box. To use `story`, `milestone`, or `spike`, enable them via project config:
+
+```bash
+bd config set types.custom '["story", "milestone", "spike"]'
+```
+
+After that, `bd create -t story "US-XXX: …"` works as expected.
+
+### Production option: off-site backup
+
+Beads can push a versioned mirror to filesystem, S3, GCS, Azure Blob, or DoltHub:
+
+```bash
+bd backup init s3://my-bucket/beads-backup/
+bd backup sync     # push current DB
+bd backup restore  # bring it back if needed
+```
+
+Worth setting up for any project where task state matters beyond the developer's laptop.
+
+### When to use the MCP server (rarely)
+
+Beads ships a Python MCP server (`beads-mcp`) for clients that don't have shell access — e.g., Claude Desktop, some IDE plugins. Install:
+
+```bash
+uv tool install beads-mcp   # or: pip install beads-mcp
+```
+
+For Claude Code, Cursor, Windsurf, and any agent with shell access, **CLI + hooks is preferred** — it's ~1-2k tokens of context (via `bd prime`) vs 10-50k for the MCP tool schemas. Only reach for `beads-mcp` when shell access isn't available.
+
+### Safe re-initialization
+
+If you need to re-init a Beads database (e.g., migrating to a fresh prefix, recovering from corruption), use the explicit flags rather than `--force`:
+
+- `bd init --reinit-local` — bypass the local-exists guard
+- `bd init --discard-remote` — explicitly authorize discarding remote Dolt history
+- `bd init --destroy-token DESTROY-<prefix>` — required in non-interactive mode for destructive re-init
+
+Stable exit codes: `10` (remote divergence), `11` (local exists), `12` (destroy-token missing). The legacy `--force` flag still works but is deprecated.
+
 ### Lessons-Learned Workflow
 
 The `tasks/lessons.md` file captures patterns discovered during work. It has three sections:

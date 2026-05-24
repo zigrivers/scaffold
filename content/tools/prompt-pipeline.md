@@ -27,7 +27,7 @@ Print the following reference directly. Do not read any files or run any command
 ### Phase 0 — Prerequisites (one-time)
 | Action | Command |
 |--------|---------|
-| Install Beads | `npm install -g @beads/bd` or `brew install beads` **(optional)** |
+| Install Beads | `curl -fsSL https://raw.githubusercontent.com/gastownhall/beads/main/scripts/install.sh \| bash` (upstream-recommended), `brew install beads`, or `npm install -g @beads/bd` **(optional)** |
 | Install Playwright MCP | `claude mcp add playwright npx @playwright/mcp@latest` **(optional — web apps only)** |
 
 ### Phase 0 — Product Vision (`vision`)
