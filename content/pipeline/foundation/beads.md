@@ -81,6 +81,82 @@ and autonomous behavior guidelines.
   - Depth 4: Full setup with cross-doc consistency checks against git-workflow.md and coding-standards.md. Enable `bd config set types.custom '["story","milestone","spike"]'`.
   - Depth 5: Full setup + detailed autonomous behavior rules + commit-message convention enforcement. Run `bd setup codex` and `bd setup gemini` if the project targets those CLIs.
 
+## Instructions
+
+Execute these steps in order. Each is idempotent — re-running this prompt on an
+existing setup updates rather than re-initializes.
+
+1. **Initialize Beads** (skip if `.beads/` already contains a Dolt DB):
+   ```bash
+   bd init
+   ```
+
+2. **Sync hooks and project config against the installed bd version** (idempotent; also
+   the canonical recovery path if `bd` is upgraded later):
+   ```bash
+   bd doctor --fix
+   ```
+
+3. **Install the upstream-managed editor integration** for whichever AI agent CLI
+   the project targets. The recipe writes a marker-managed block in CLAUDE.md /
+   AGENTS.md / GEMINI.md and installs the SessionStart hooks that load
+   `bd prime --hook-json`:
+   ```bash
+   bd setup claude     # Claude Code (always)
+   bd setup codex      # Codex CLI (multi-platform projects only)
+   bd setup gemini     # Gemini CLI (multi-platform projects only)
+   ```
+   Verify with `bd setup claude --check`.
+
+4. **Enable JSONL auto-export** so release/version-bump tooling can rely on
+   `.beads/issues.jsonl` being current (Beads v1.0.4-Unreleased flipped these
+   to opt-in):
+   ```bash
+   bd config set export.auto true
+   bd config set export.git-add true
+   ```
+
+5. **(deep methodology only) Enable custom issue types** so downstream prompts can
+   use `-t story` for user stories and `-t milestone` for releases:
+   ```bash
+   bd config set types.custom '["story","milestone","spike"]'
+   ```
+   Verify with `bd config get types.custom`.
+
+6. **Create the lessons-learned file** for cross-session memory:
+   ```bash
+   mkdir -p tasks && cat > tasks/lessons.md <<'EOF'
+   # Lessons Learned
+
+   ## Patterns
+
+   (Add discovered patterns here.)
+
+   ## Anti-Patterns
+
+   (Add anti-patterns here.)
+
+   ## Common Gotchas
+
+   (Add gotchas here.)
+   EOF
+   ```
+
+7. **Compose scaffold-owned CLAUDE.md sections** ADJACENT to (not replacing) the
+   recipe-managed block from step 3. The scaffold-owned content includes Core
+   Principles (Simplicity, No Laziness, TDD, Prove It), the commit-message
+   convention (`[bd-<id>]` prefix, lowercase hash IDs), the upgrade-remediation
+   callout ("If `bd` was upgraded since last `bd init`, run `bd doctor --fix`..."),
+   and (deep) autonomous behavior rules.
+
+8. **Bootstrap commit** with the lowercase hash-style ID convention:
+   ```bash
+   git add .beads tasks/lessons.md CLAUDE.md
+   git commit -m "[bd-<id>] chore: initialize Beads task tracking"
+   ```
+   The bd-<id> here references whatever bootstrap task you created via
+   `bd create "Initialize Beads"` (or the auto-generated bootstrap bead).
+
 ## Conditional Evaluation
 Enable when: project uses Beads task tracking methodology (user selects Beads during
 setup), or user explicitly enables structured task management. Skip when: user prefers
