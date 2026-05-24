@@ -536,6 +536,13 @@ if [ "$beads_enabled" = "true" ] && [ -d .beads ] && command -v bd >/dev/null 2>
     severity=$(jq -r '.severity' <<<"$finding")
     pnum="${severity#P}"
     description=$(jq -r '"\(.description)\n\nSuggestion: \(.suggestion // "(none)")\n\nLocation: \(.location // "(unknown)")"' <<<"$finding")
+    # Per-finding identity in the external-ref so re-running the bridge can
+    # detect duplicates and skip already-filed findings. Use the same
+    # location+description identity components as the wrapper-side hash stopgap
+    # (Step 7a) for consistency.
+    loc=$(jq -r '.location // ""' <<<"$finding")
+    desc_for_hash=$(jq -r '.description // ""' <<<"$finding")
+    finding_hash=$(printf '%s|%s' "$loc" "$desc_for_hash" | shasum -a 1 | cut -c1-8)
 
     # Build args conditionally — only include --deps discovered-from when SOURCE_BD_ID
     # is set AND non-empty. Avoids bd create rejecting a bogus "discovered-from:unknown".
@@ -544,7 +551,7 @@ if [ "$beads_enabled" = "true" ] && [ -d .beads ] && command -v bd >/dev/null 2>
       --type "$beads_default_type"
       -p "$pnum"
       --description "$description"
-      --external-ref "mmr-$JOB_ID"
+      --external-ref "mmr-$JOB_ID:$finding_hash"
     )
     if [ -n "${SOURCE_BD_ID:-}" ]; then
       args+=(--deps "discovered-from:$SOURCE_BD_ID")
@@ -567,9 +574,9 @@ Notes on this script:
 - `.description | .[0:120]` truncates safely under UTF-8 (unlike `head -c 120`).
 - The `--deps discovered-from:$SOURCE_BD_ID` flag is included only when `$SOURCE_BD_ID` is non-empty — avoids a bogus `discovered-from:unknown` dependency or a `bd create` failure for the common case where no source task is in scope.
 
-Use `--external-ref "mmr-$JOB_ID"` to link the new Beads issue back to the MMR job;
-`--deps discovered-from:$SOURCE_BD_ID` chains it to whatever current task triggered
-the review (only when that ID is known).
+Use `--external-ref "mmr-$JOB_ID:$finding_hash"` to link the new Beads issue back to the specific MMR finding within the job — the per-finding hash (location + description, same identity components as Step 7a's wrapper hash) means re-running the bridge can dedupe instead of filing duplicates.
+
+`--deps discovered-from:$SOURCE_BD_ID` chains the new issue to whatever current task triggered the review (only when that ID is known).
 
 ### Step 8: Confirm Completion
 

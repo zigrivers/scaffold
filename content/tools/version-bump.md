@@ -185,8 +185,8 @@ If `.beads/` exists:
 
 ```markdown
 ### Completed Tasks
-- [BD-xxx] Task title
-- [BD-yyy] Task title
+- [bd-<id>] Task title
+- [bd-<id2>] Task title
 ```
 
 If `.beads/` does not exist or no tasks match, silently skip.
@@ -232,7 +232,7 @@ git add <changed-files>
 git commit -m "chore(version): vX.Y.Z"
 ```
 
-If Beads is configured (`.beads/` exists) and a task is active, include the task ID: `[BD-xxx] chore(version): vX.Y.Z`.
+If Beads is configured (`.beads/` exists) and a task is active, include the task ID: `[bd-<id>] chore(version): vX.Y.Z`.
 
 ---
 
