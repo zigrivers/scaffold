@@ -3,8 +3,7 @@ import { probeRuntime } from '../../src/core/runtime-probe.js'
 
 describe('probeRuntime (T1-D)', () => {
   it('returns detected=true when the command exists on PATH', async () => {
-    // `sh` is guaranteed present on POSIX systems where these tests run.
-    const result = await probeRuntime('sh', ['-c', 'exit 0'], 1000)
+    const result = await probeRuntime(process.execPath, ['--version'], 1000)
     expect(result.detected).toBe(true)
   })
 
@@ -28,5 +27,17 @@ describe('probeRuntime (T1-D)', () => {
     const result = await probeRuntime('bad name; rm -rf /', [], 1000)
     expect(result.detected).toBe(false)
     expect(result.reason).toMatch(/invalid/i)
+  })
+
+  it('returns detected=false when timeout is outside the safe timer range', async () => {
+    const result = await probeRuntime(process.execPath, ['--version'], 2_147_483_648)
+    expect(result.detected).toBe(false)
+    expect(result.reason).toMatch(/timeout/i)
+  })
+
+  it('returns detected=false when an argument contains a NUL byte', async () => {
+    const result = await probeRuntime(process.execPath, ['bad\0arg'], 1000)
+    expect(result.detected).toBe(false)
+    expect(result.reason).toMatch(/argument/i)
   })
 })
