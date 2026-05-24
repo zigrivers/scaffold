@@ -108,7 +108,15 @@ existing setup updates rather than re-initializes.
    ```
    Verify with `bd setup claude --check`.
 
-4. **Enable JSONL auto-export** so release/version-bump tooling can rely on
+4. **Create the project merge-slot** (one-time; idempotent — re-running on an
+   existing slot is a no-op). This is required by the multi-agent flow's
+   `bd merge-slot acquire --wait` later, and creating it now means downstream
+   PR steps can rely on it being present:
+   ```bash
+   bd merge-slot create 2>/dev/null || true   # exit 0 even if slot already exists
+   ```
+
+5. **Enable JSONL auto-export** so release/version-bump tooling can rely on
    `.beads/issues.jsonl` being current (Beads v1.0.4-Unreleased flipped these
    to opt-in):
    ```bash
@@ -116,14 +124,14 @@ existing setup updates rather than re-initializes.
    bd config set export.git-add true
    ```
 
-5. **(deep methodology only) Enable custom issue types** so downstream prompts can
+6. **(deep methodology only) Enable custom issue types** so downstream prompts can
    use `-t story` for user stories and `-t milestone` for releases:
    ```bash
    bd config set types.custom '["story","milestone","spike"]'
    ```
    Verify with `bd config get types.custom`.
 
-6. **Create the lessons-learned file** for cross-session memory (skip if it already exists — never overwrite accumulated lessons):
+7. **Create the lessons-learned file** for cross-session memory (skip if it already exists — never overwrite accumulated lessons):
    ```bash
    mkdir -p tasks
    if [ ! -f tasks/lessons.md ]; then
@@ -150,14 +158,14 @@ existing setup updates rather than re-initializes.
    fi
    ```
 
-7. **Compose scaffold-owned CLAUDE.md sections** ADJACENT to (not replacing) the
+8. **Compose scaffold-owned CLAUDE.md sections** ADJACENT to (not replacing) the
    recipe-managed block from step 3. The scaffold-owned content includes Core
    Principles (Simplicity, No Laziness, TDD, Prove It), the commit-message
    convention (`[bd-<id>]` prefix, lowercase hash IDs), the upgrade-remediation
    callout ("If `bd` was upgraded since last `bd init`, run `bd doctor --fix`..."),
    and (deep) autonomous behavior rules.
 
-8. **Bootstrap commit** with the lowercase hash-style ID convention:
+9. **Bootstrap commit** with the lowercase hash-style ID convention:
    ```bash
    git add .beads tasks/lessons.md CLAUDE.md
    git commit -m "[bd-<id>] chore: initialize Beads task tracking"
@@ -171,11 +179,14 @@ setup), or user explicitly enables structured task management. Skip when: user p
 GitHub Issues, Linear, or another task tracker, or explicitly declines Beads setup.
 
 ## Mode Detection
-Update mode if .beads/ contains a config.json or tasks directory (not just an
-empty directory). In update mode: never re-initialize
-.beads/ (existing task data is irreplaceable), never overwrite tasks/lessons.md
-(only add missing sections), update CLAUDE.md Beads sections in-place preserving
-project-specific customizations.
+Update mode if `.beads/` contains a populated database (look for `.beads/embeddeddolt/`
+in the default embedded-Dolt layout, `.beads/dolt/` in server mode, or any `.beads/*.db`
+file). Legacy v0.x Beads used `.beads/config.json` and a `tasks` directory — recognize
+those too for older projects. When unsure, run `bd info` from the project root: a
+populated DB returns project metadata; an uninitialized one errors. In update mode:
+never re-initialize `.beads/` (existing task data is irreplaceable), never overwrite
+`tasks/lessons.md` (only add missing sections), update CLAUDE.md Beads sections
+in-place preserving project-specific customizations.
 
 ## Update Mode Specifics
 - **Detect prior artifact**: .beads/ directory exists with data files
