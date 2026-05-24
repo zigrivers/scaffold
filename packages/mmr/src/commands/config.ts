@@ -137,14 +137,20 @@ function configChannels(): void {
   const config = loadConfig({ projectRoot: process.cwd() })
   const channels = Object.entries(config.channels).map(([name, ch]) => {
     const display = redactChannel(ch as unknown as Record<string, unknown>)
+    const command = typeof display.command === 'string' && commandContainsInlineSecret(display.command)
+      ? '<redacted>'
+      : display.command
     return {
       name,
-      enabled: display.enabled,
-      command: display.command,
-      parser: display.output_parser,
+      ...display,
+      command,
     }
   })
   console.log(JSON.stringify(channels, null, 2))
+}
+
+function commandContainsInlineSecret(command: string): boolean {
+  return /(?:authorization\s*:|(?:token|api[_-]?key|password|secret|auth)[\w-]*\s*=)/i.test(command)
 }
 
 export const configCommand: CommandModule<object, ConfigArgs> = {

@@ -27,7 +27,7 @@ const SECRET_KEY_PARTS = new Set([
 ])
 const NON_SECRET_ENV_NAME_KEYS = new Set(['api_key_env'])
 const KEY_PART_RE = /[_.-]+|(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])/
-const SENSITIVE_KEY_CONTEXT_PARTS = new Set(['api', 'openai', 'private', 'secret', 'access'])
+const SENSITIVE_KEY_CONTEXT_PARTS = new Set(['api', 'openai', 'private', 'access'])
 
 export function isSecretKey(name: string, options: { exemptEnvNameKeys?: boolean } = {}): boolean {
   const normalized = name.toLowerCase()
