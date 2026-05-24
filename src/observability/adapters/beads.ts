@@ -13,6 +13,7 @@ export interface BeadsAdapterOpts {
 export const beadsAdapter: BaseAdapter & {
   probe(cwd: string, opts?: BeadsAdapterOpts): Promise<AdapterStatus>
   listTasks(cwd: string, opts?: BeadsAdapterOpts): Promise<unknown[]>
+  claimWithEvent(cwd: string, args: { id: string; eventId: string }, opts?: BeadsAdapterOpts): Promise<boolean>
 } = {
   id: 'beads',
 
@@ -48,6 +49,25 @@ export const beadsAdapter: BaseAdapter & {
       return JSON.parse(stdout) as unknown[]
     } catch {
       return []
+    }
+  },
+
+  async claimWithEvent(
+    cwd: string,
+    args: { id: string; eventId: string },
+    opts: BeadsAdapterOpts = {},
+  ): Promise<boolean> {
+    const probe = await beadsAdapter.probe(cwd, opts)
+    if (probe.status !== 'available') return false
+    try {
+      await execFile(
+        opts.bdBin ?? 'bd',
+        ['update', args.id, '--set-metadata', `ledger_event_id=${args.eventId}`, '--claim'],
+        { cwd },
+      )
+      return true
+    } catch {
+      return false
     }
   },
 }
