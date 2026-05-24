@@ -122,7 +122,7 @@ These rules are critical for multi-agent operation:
 - Run `bd ready` to see available tasks
 - Pick the lowest-ID unblocked task
 - Implement following the TDD workflow below
-- After PR is merged: `bd close <id> && bd sync`
+- After PR is merged: `bd close <id>`
 - Repeat with `bd ready` until no tasks remain
 
 **Without Beads:**
@@ -210,7 +210,7 @@ For each task:
 - Resolve conflicts, re-run tests, force-push the branch
 
 **Another agent claimed the same task:**
-- If Beads: `bd sync` will reveal the conflict — pick a different task
+- If Beads: a `git pull` (and `bd dolt pull` if a Dolt remote is configured) brings the local DB current; run `bd doctor --fix` if anything looks stale.
 - Without Beads: check open PRs (`gh pr list`) for overlapping work
 - Move to the next available unblocked task
 

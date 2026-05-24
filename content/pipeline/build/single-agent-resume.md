@@ -98,7 +98,7 @@ Recover your context by checking the current state of work:
 
 **If Beads is configured** (`.beads/` exists):
 - `bd list` — check for tasks with `in_progress` status
-- If a PR shows as merged, close the corresponding task: `bd close <id> && bd sync`
+- If a PR shows as merged, close the corresponding task: `bd close <id>`
 - If there is in-progress work, finish it (see "Resume In-Progress Work" below)
 - Otherwise, start fresh with `bd ready` to find the next available task
 - Continue working until `bd ready` shows no available tasks
@@ -187,7 +187,7 @@ Once in-progress work is complete (or if there was none):
 - Push updates and re-request review
 
 **Task was completed by another agent (multi-agent overlap):**
-- If Beads: `bd sync` will show updated task states
+- If Beads: a `git pull` (and `bd dolt pull` if a Dolt remote is configured) brings the local DB current; run `bd doctor --fix` if anything looks stale.
 - Without Beads: check the plan/playbook for recently completed tasks
 - Skip to the next available task
 

@@ -4,6 +4,8 @@
 **Status:** Draft
 **Author:** Ken Allred + Claude
 
+> **2026-05-24 note:** `bd sync` is referenced in this spec but is not a real upstream command in Beads v1.0.4. See `docs/audits/beads-integration-audit-2026-05-24.md` F-2.1.
+
 ## Revision History
 
 | Date | Change |

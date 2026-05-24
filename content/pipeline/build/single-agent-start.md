@@ -104,7 +104,7 @@ Check if `.beads/` directory exists.
 - Run `bd ready` to see available tasks
 - Pick the lowest-ID unblocked task
 - Implement following the TDD workflow below
-- After PR is merged, run `bd close <id> && bd sync`
+- After PR is merged, run `bd close <id>`
 - Repeat with `bd ready` until no tasks remain
 
 **Without Beads:**

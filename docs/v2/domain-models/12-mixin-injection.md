@@ -1137,7 +1137,7 @@ General setup instructions for the task-tracking system.
 
 <!-- section:close-workflow -->
 When you complete a task, run `bd close <id>` to mark it done.
-Then run `bd sync` to persist the change.
+Then run `bd dolt push` (no-op if no Dolt remote is configured) to persist the change.
 
 <!-- section:pr-integration -->
 Before creating a PR, check `bd ready` for any tasks
@@ -1510,7 +1510,7 @@ When a PR is merged, close the associated task:
 
 ```bash
 bd close <id>
-bd sync
+bd dolt push  # no-op if no Dolt remote configured
 ```
 
 Then check for newly unblocked tasks:
@@ -1618,7 +1618,7 @@ When a PR is merged, close the associated task:
 
 ```bash
 bd close <id>
-bd sync
+bd dolt push  # no-op if no Dolt remote configured
 ```
 
 Then check for newly unblocked tasks:

@@ -3,6 +3,8 @@
 **Date:** 2026-04-02
 **Status:** Approved
 
+> **2026-05-24 note:** `bd sync` is referenced in this spec but is not a real upstream command in Beads v1.0.4. See `docs/audits/beads-integration-audit-2026-05-24.md` F-2.1.
+
 ## Problem
 
 Scaffold still supports Beads as an optional feature for downstream user
