@@ -1,15 +1,17 @@
 /**
- * Regex for keys whose VALUE should be redacted in any introspection output.
- * Deliberately broad: matches token / key / secret / password / auth (incl.
- * authorization). Case-insensitive. The *name* `api_key_env` is intentionally
- * non-secret (it stores the env-var name, not its value) - but if a user puts
- * `api_key` under `env:` or `headers:` they're storing the value, which this
- * regex must catch.
+ * Key parts whose VALUE should be redacted in any introspection output.
+ * Deliberately broad, but separator-aware: `api_key` is secret-like while
+ * harmless words such as `tokenizer`, `monkey`, or `author` are not.
+ * The *name* `api_key_env` is intentionally non-secret (it stores the env-var
+ * name, not its value).
  */
-const SECRET_KEY_RE = /(token|key|secret|password|auth(?:orization)?)/i
+const SECRET_KEY_PARTS = new Set(['token', 'key', 'secret', 'password', 'auth', 'authorization'])
+const NON_SECRET_ENV_NAME_KEYS = new Set(['api_key_env'])
 
 export function isSecretKey(name: string): boolean {
-  return SECRET_KEY_RE.test(name)
+  const normalized = name.toLowerCase()
+  if (NON_SECRET_ENV_NAME_KEYS.has(normalized)) return false
+  return normalized.split(/[_.-]+/).some((part) => SECRET_KEY_PARTS.has(part))
 }
 
 /**
@@ -30,13 +32,13 @@ export function redactRecord(input: Record<string, string> | undefined): Record<
  * `redactRecord`. `api_key_env` (the env-var NAME, not its value) is preserved
  * as-is because the name is non-secret and useful for debugging.
  */
-export function redactChannel<T extends Record<string, unknown>>(channel: T): T {
+export function redactChannel(channel: Record<string, unknown>): Record<string, unknown> {
   const copy: Record<string, unknown> = { ...channel }
-  if (copy.env && typeof copy.env === 'object') {
+  if (copy.env && typeof copy.env === 'object' && !Array.isArray(copy.env)) {
     copy.env = redactRecord(copy.env as Record<string, string>)
   }
-  if (copy.headers && typeof copy.headers === 'object') {
+  if (copy.headers && typeof copy.headers === 'object' && !Array.isArray(copy.headers)) {
     copy.headers = redactRecord(copy.headers as Record<string, string>)
   }
-  return copy as T
+  return copy
 }

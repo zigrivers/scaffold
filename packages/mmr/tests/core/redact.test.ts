@@ -19,7 +19,7 @@ describe('isSecretKey (T1-E)', () => {
   })
 
   it('does not match harmless keys', () => {
-    for (const k of ['model', 'endpoint', 'NO_BROWSER', 'TIMEOUT', 'flag']) {
+    for (const k of ['model', 'endpoint', 'NO_BROWSER', 'TIMEOUT', 'flag', 'tokenizer', 'author', 'monkey']) {
       expect(isSecretKey(k)).toBe(false)
     }
   })
@@ -29,6 +29,7 @@ describe('isSecretKey (T1-E)', () => {
     // it lives in a different field and stores the *name* of an env var.
     // The regex itself catches `api_key` because the user could put it
     // under `env:` or `headers:`, where it would carry the actual value.
+    expect(isSecretKey('api_key_env')).toBe(false)
     expect(isSecretKey('api_key')).toBe(true)
   })
 })
@@ -68,5 +69,10 @@ describe('redactChannel (T1-E)', () => {
     const redacted = redactChannel(channel)
     expect(channel.env.TOKEN).toBe('x')
     expect(redacted.env).toEqual({ TOKEN: '<redacted>' })
+  })
+
+  it('does not coerce array-valued env or headers into records', () => {
+    const channel = { env: ['TOKEN=x'], headers: ['Authorization: Bearer abc'] }
+    expect(redactChannel(channel)).toEqual(channel)
   })
 })
