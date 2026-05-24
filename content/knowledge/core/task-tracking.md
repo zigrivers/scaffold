@@ -22,6 +22,37 @@ Core properties:
 
 > IDs are hash-based and lowercase (e.g., `bd-a3f8`). The `bd-` prefix is configurable at `bd init` time. Hierarchical IDs for epic children: `bd-a3f8.1`, `bd-a3f8.1.1`. Older example IDs in this doc using `BD-42`-style uppercase digits reflect a pre-v1.0.0 convention; current upstream emits hash-based lowercase IDs.
 
+### Agent context: `bd prime` is the SSOT
+
+Beads ships `bd prime` as the single source of truth for workflow context injected into agent sessions. The default output is ~1-2k tokens and includes:
+- Current ready/in-progress task counts
+- The next 1-2 ready tasks with full descriptions
+- Recent activity (last few closed/updated)
+- Persistent memories set via `bd remember`
+
+Variants:
+- `bd prime` — full default
+- `bd prime --memories-only` — just persistent memories (very small)
+- `bd prime --full` — extended context (use sparingly; ~5k tokens)
+- `bd prime --hook-json` — Claude Code SessionStart hook envelope
+
+Override the default output by writing `.beads/PRIME.md` (Markdown, free-form). The `bd setup claude` / `bd setup gemini` recipes wire `bd prime --hook-json` into SessionStart hooks for you — you don't typically invoke it by hand.
+
+`bd onboard` emits a one-line snippet you can paste into any agent context file to remind it about `bd prime`.
+
+### Editor integration via `bd setup` recipes
+
+Beads ships built-in setup recipes that write the integration block into CLAUDE.md, AGENTS.md, GEMINI.md, or `.cursor/rules/` for you, using marker-managed format that survives re-runs:
+
+- `bd setup claude` — Claude Code (writes CLAUDE.md block + SessionStart/PreCompact hooks)
+- `bd setup codex` — Codex CLI (writes `.agents/skills/beads/SKILL.md` + AGENTS.md section)
+- `bd setup gemini` — Gemini CLI (writes GEMINI.md section + hooks)
+- `bd setup cursor` / `bd setup windsurf` / `bd setup aider` / `bd setup factory` / `bd setup mux` — other editors
+
+Each recipe is idempotent (re-running it does not duplicate content), reversible (`--remove`), and verifiable (`--check`). Recipe choice determines profile (claude/gemini default to `minimal` ~60% smaller; codex/factory/mux default to `full`). There is no runtime `--profile` flag in v1.0.4 — recipe choice is the knob.
+
+Custom recipes can be added via `bd setup --add <name> <path>`, persisted in `.beads/recipes.toml`.
+
 ### Task Hierarchy
 
 Tasks organize into three levels:
