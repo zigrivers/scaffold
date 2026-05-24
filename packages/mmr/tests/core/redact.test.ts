@@ -13,6 +13,11 @@ describe('isSecretKey (T1-E)', () => {
       'auth',
       'Authorization',
       'X-API-Key',
+      'credential',
+      'passphrase',
+      'cookie',
+      'signature',
+      'session',
     ]) {
       expect(isSecretKey(k)).toBe(true)
     }
@@ -36,16 +41,17 @@ describe('isSecretKey (T1-E)', () => {
 
 describe('redactRecord (T1-E)', () => {
   it('replaces values for secret-like keys with <redacted>', () => {
-    const input = { OPENAI_API_KEY: 'sk-xxxx', NO_BROWSER: 'true', PASSWORD: 'hunter2' }
+    const input = { OPENAI_API_KEY: 'sk-xxxx', NO_BROWSER: 'true', PASSWORD: 'hunter2', api_key_env: 'sk-actual' }
     expect(redactRecord(input)).toEqual({
       OPENAI_API_KEY: '<redacted>',
       NO_BROWSER: 'true',
       PASSWORD: '<redacted>',
+      api_key_env: '<redacted>',
     })
   })
 
   it('passes through non-secret values unchanged', () => {
-    const input = { model: 'qwen', endpoint: 'http://localhost:11434' }
+    const input = { model: 'qwen', endpoint: 'http://localhost:11434', timeout: 30 }
     expect(redactRecord(input)).toEqual(input)
   })
 })
@@ -71,8 +77,11 @@ describe('redactChannel (T1-E)', () => {
     expect(redacted.env).toEqual({ TOKEN: '<redacted>' })
   })
 
-  it('does not coerce array-valued env or headers into records', () => {
-    const channel = { env: ['TOKEN=x'], headers: ['Authorization: Bearer abc'] }
-    expect(redactChannel(channel)).toEqual(channel)
+  it('redacts array-valued env and headers without coercing them into records', () => {
+    const channel = { env: ['TOKEN=x', 'NO_BROWSER=true'], headers: ['Authorization: Bearer abc', 'X-Trace: true'] }
+    expect(redactChannel(channel)).toEqual({
+      env: ['TOKEN=<redacted>', 'NO_BROWSER=true'],
+      headers: ['Authorization: <redacted>', 'X-Trace: true'],
+    })
   })
 })
