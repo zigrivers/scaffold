@@ -40,6 +40,15 @@ Override the default output by writing `.beads/PRIME.md` (Markdown, free-form). 
 
 `bd onboard` emits a one-line snippet you can paste into any agent context file to remind it about `bd prime`.
 
+### Two memory scopes — when to use which
+
+Scaffold-generated projects have two persistent memory layers when `.beads/` exists:
+
+- **Filesystem auto-memory** (per-user, cross-project) — facts about you the developer. Stored under `~/.claude/projects/.../memory/` by the Claude Code client.
+- **`bd remember`** (per-project, team-shareable) — facts about this project. Stored in `.beads/embeddeddolt/`, committed with the repo.
+
+For project-level facts that should travel with the repo (in-flight context, team conventions, project-specific blockers, decisions), use `bd remember` instead of filesystem memory. See `content/knowledge/core/ai-memory-management.md` for the full scope split table.
+
 ### Editor integration via `bd setup` recipes
 
 Beads ships built-in setup recipes that write the integration block into CLAUDE.md, AGENTS.md, GEMINI.md, or `.cursor/rules/` for you, using marker-managed format that survives re-runs:
