@@ -11,16 +11,14 @@ setup() {
     command -v shasum >/dev/null || skip "shasum is required for review wrapper hash tests"
     command -v python3 >/dev/null || skip "python3 is required for review wrapper hash tests"
 
-    TMPDIR_REVIEW="$(mktemp -d)"
+    TMPDIR_REVIEW="$(mktemp -d)" || exit 1
     export ORIG_PWD="$PWD"
-    cd "$TMPDIR_REVIEW"
+    cd "$TMPDIR_REVIEW" || exit 1
     git init -q .
-    # Extract every fenced bash block under Step 7a from review-pr.md.
-    # The block we want starts at the "### Step 7a:" header and ends at the
-    # next "### Step 8:" header; we then keep only fenced bash blocks inside it.
+    # Extract every fenced bash block from the marked helper region in review-pr.md.
     awk '
-        /^### Step 7a:/ { in_section=1 }
-        /^### Step 8:/ { in_section=0 }
+        /^<!-- review-wrapper-hash-helpers:start -->$/ { in_section=1; next }
+        /^<!-- review-wrapper-hash-helpers:end -->$/ { in_section=0 }
         in_section && /^```bash$/ { in_fence=1; next }
         in_section && /^```$/ && in_fence { in_fence=0; next }
         in_section && in_fence { print }
@@ -50,6 +48,11 @@ teardown() {
 @test "_review_normalize_location leaves mid-path digits alone" {
     result=$(_review_normalize_location "src/v2/api3/foo.ts")
     [ "$result" = "src/v2/api3/foo.ts" ]
+}
+
+@test "_review_normalize_location lowercases path components" {
+    result=$(_review_normalize_location "SRC/Path/File.ts")
+    [ "$result" = "src/path/file.ts" ]
 }
 
 @test "_review_normalize_description preserves backtick code spans case" {
