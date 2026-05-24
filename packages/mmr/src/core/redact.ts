@@ -26,7 +26,9 @@ const NON_SECRET_ENV_NAME_KEYS = new Set(['api_key_env'])
 export function isSecretKey(name: string, options: { exemptEnvNameKeys?: boolean } = {}): boolean {
   const normalized = name.toLowerCase()
   if (options.exemptEnvNameKeys !== false && NON_SECRET_ENV_NAME_KEYS.has(normalized)) return false
-  return normalized.split(/[_.-]+/).some((part) => SECRET_KEY_PARTS.has(part))
+  return name
+    .split(/[_.-]+|(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])/)
+    .some((part) => SECRET_KEY_PARTS.has(part.toLowerCase()))
 }
 
 /**
@@ -43,10 +45,12 @@ export function redactRecord(input: Record<string, unknown> | undefined): Record
 }
 
 function redactKeyValueString(input: string): string {
-  const match = /^([^:=\s]+)(\s*[:=]\s*)(.*)$/.exec(input)
+  const match = /^(\s*)([^:=\s]+)(\s*[:=]\s*)(.*)$/.exec(input)
   if (!match) return input
-  const [, key, separator, value] = match
-  return isSecretKey(key, { exemptEnvNameKeys: false }) ? `${key}${separator}<redacted>` : `${key}${separator}${value}`
+  const [, leading, key, separator, value] = match
+  return isSecretKey(key, { exemptEnvNameKeys: false })
+    ? `${leading}${key}${separator}<redacted>`
+    : `${leading}${key}${separator}${value}`
 }
 
 function redactList(input: unknown[]): unknown[] {

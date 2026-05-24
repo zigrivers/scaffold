@@ -18,6 +18,11 @@ describe('isSecretKey (T1-E)', () => {
       'cookie',
       'signature',
       'session',
+      'apiKey',
+      'authToken',
+      'clientSecret',
+      'privateKey',
+      'sessionId',
     ]) {
       expect(isSecretKey(k)).toBe(true)
     }
@@ -78,10 +83,13 @@ describe('redactChannel (T1-E)', () => {
   })
 
   it('redacts array-valued env and headers without coercing them into records', () => {
-    const channel = { env: ['TOKEN=x', 'NO_BROWSER=true'], headers: ['Authorization: Bearer abc', 'X-Trace: true'] }
+    const channel = {
+      env: ['TOKEN=x', '  authToken = abc', 'NO_BROWSER=true'],
+      headers: ['Authorization: Bearer abc', '  X-Trace: true'],
+    }
     expect(redactChannel(channel)).toEqual({
-      env: ['TOKEN=<redacted>', 'NO_BROWSER=true'],
-      headers: ['Authorization: <redacted>', 'X-Trace: true'],
+      env: ['TOKEN=<redacted>', '  authToken = <redacted>', 'NO_BROWSER=true'],
+      headers: ['Authorization: <redacted>', '  X-Trace: true'],
     })
   })
 })
