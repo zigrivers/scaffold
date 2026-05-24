@@ -684,13 +684,15 @@ beads_fix_threshold=P2
 beads_default_type=bug
 if [ -f .mmr.yaml ]; then
   # POSIX character classes ([[:space:]]) for BSD-sed compatibility (macOS default).
-  if grep -qE '^[[:space:]]*create_issues_from_blocking_findings:[[:space:]]*true[[:space:]]*$' .mmr.yaml; then
+  # Patterns tolerate trailing whitespace/comments — uncommenting a template line with
+  # a trailing `# comment` should still match.
+  if grep -qE '^[[:space:]]*create_issues_from_blocking_findings:[[:space:]]*true([[:space:]]+#.*)?[[:space:]]*$' .mmr.yaml; then
     beads_enabled=true
   fi
-  if v=$(grep -E '^[[:space:]]*fix_threshold:[[:space:]]*P[0-4][[:space:]]*$' .mmr.yaml | head -1 | sed -E 's/.*:[[:space:]]*(P[0-4]).*/\1/'); [ -n "$v" ]; then
+  if v=$(grep -E '^[[:space:]]*fix_threshold:[[:space:]]*P[0-4]([[:space:]]+#.*)?[[:space:]]*$' .mmr.yaml | head -1 | sed -E 's/.*:[[:space:]]*(P[0-4]).*/\1/'); [ -n "$v" ]; then
     beads_fix_threshold=$v
   fi
-  if v=$(grep -E '^[[:space:]]*default_type:[[:space:]]*[a-zA-Z]+[[:space:]]*$' .mmr.yaml | head -1 | sed -E 's/.*:[[:space:]]*([a-zA-Z]+).*/\1/'); [ -n "$v" ]; then
+  if v=$(grep -E '^[[:space:]]*default_type:[[:space:]]*[a-zA-Z]+([[:space:]]+#.*)?[[:space:]]*$' .mmr.yaml | head -1 | sed -E 's/.*:[[:space:]]*([a-zA-Z]+).*/\1/'); [ -n "$v" ]; then
     beads_default_type=$v
   fi
 fi
