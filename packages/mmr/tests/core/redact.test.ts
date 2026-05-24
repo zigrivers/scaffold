@@ -34,7 +34,19 @@ describe('isSecretKey (T1-E)', () => {
   })
 
   it('does not match harmless keys', () => {
-    for (const k of ['model', 'endpoint', 'NO_BROWSER', 'TIMEOUT', 'flag', 'tokenizer', 'author', 'monkey']) {
+    for (const k of [
+      'model',
+      'endpoint',
+      'NO_BROWSER',
+      'TIMEOUT',
+      'flag',
+      'tokenizer',
+      'author',
+      'monkey',
+      'publicKey',
+      'primaryKey',
+      'cacheKey',
+    ]) {
       expect(isSecretKey(k)).toBe(false)
     }
   })
@@ -70,6 +82,12 @@ describe('redactRecord (T1-E)', () => {
     const input = { model: 'qwen', endpoint: 'http://localhost:11434', timeout: 30 }
     expect(redactRecord(input)).toEqual(input)
   })
+
+  it('recursively redacts nested objects under non-secret keys', () => {
+    expect(redactRecord({ config: { api_token: 'x', nested: { clientSecret: 'y' } } })).toEqual({
+      config: { api_token: '<redacted>', nested: { clientSecret: '<redacted>' } },
+    })
+  })
 })
 
 describe('redactChannel (T1-E)', () => {
@@ -97,8 +115,14 @@ describe('redactChannel (T1-E)', () => {
 
   it('redacts array-valued env and headers without coercing them into records', () => {
     const channel = {
-      env: ['TOKEN=x', '  authToken = abc', 'NO_BROWSER=true', 'TOKEN', { name: 'OPENAI_API_KEY', value: 'sk-xxx' }],
-      headers: ['Authorization: Bearer abc', '  X-Trace: true'],
+      env: [
+        'TOKEN=x',
+        '  authToken = abc',
+        'NO_BROWSER=true',
+        'TOKEN',
+        { name: 'OPENAI_API_KEY', value: 'sk-xxx' },
+      ],
+      headers: ['Authorization: Bearer abc', '  X-Trace: true', { key: 'Authorization', value: 'Bearer abc' }],
     }
     expect(redactChannel(channel)).toEqual({
       env: [
@@ -108,7 +132,7 @@ describe('redactChannel (T1-E)', () => {
         '<redacted>',
         { name: 'OPENAI_API_KEY', value: '<redacted>' },
       ],
-      headers: ['Authorization: <redacted>', '  X-Trace: true'],
+      headers: ['Authorization: <redacted>', '  X-Trace: true', { key: '<redacted>', value: '<redacted>' }],
     })
   })
 })

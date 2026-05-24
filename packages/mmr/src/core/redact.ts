@@ -15,7 +15,6 @@ const SECRET_KEY_PARTS = new Set([
   'creds',
   'credential',
   'apikey',
-  'key',
   'pass',
   'passphrase',
   'passwd',
@@ -27,13 +26,23 @@ const SECRET_KEY_PARTS = new Set([
   'token',
 ])
 const NON_SECRET_ENV_NAME_KEYS = new Set(['api_key_env'])
+const KEY_PART_RE = /[_.-]+|(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])/
+const SENSITIVE_KEY_CONTEXT_PARTS = new Set(['api', 'openai', 'private', 'secret', 'access'])
 
 export function isSecretKey(name: string, options: { exemptEnvNameKeys?: boolean } = {}): boolean {
   const normalized = name.toLowerCase()
   if (options.exemptEnvNameKeys !== false && NON_SECRET_ENV_NAME_KEYS.has(normalized)) return false
-  return name
-    .split(/[_.-]+|(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])/)
-    .some((part) => SECRET_KEY_PARTS.has(part.toLowerCase()))
+  const parts = name.split(KEY_PART_RE).map((part) => part.toLowerCase())
+  if (parts.some((part) => SECRET_KEY_PARTS.has(part))) return true
+  if (!parts.includes('key')) return false
+  if (parts.length === 1) return true
+  return parts.some((part) => SENSITIVE_KEY_CONTEXT_PARTS.has(part))
+}
+
+function redactValue(value: unknown, options: { exemptEnvNameKeys?: boolean }): unknown {
+  if (Array.isArray(value)) return redactList(value)
+  if (value && typeof value === 'object') return redactRecord(value as Record<string, unknown>, options)
+  return value
 }
 
 /**
@@ -47,7 +56,7 @@ export function redactRecord(
   if (!input) return {}
   const out: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(input)) {
-    out[k] = isSecretKey(k, options) ? '<redacted>' : v
+    out[k] = isSecretKey(k, options) ? '<redacted>' : redactValue(v, options)
   }
   return out
 }
@@ -65,9 +74,12 @@ function redactList(input: unknown[]): unknown[] {
   return input.map((value) => {
     if (typeof value === 'string') return redactKeyValueString(value)
     if (value && typeof value === 'object' && !Array.isArray(value)) {
+      const original = value as Record<string, unknown>
+      const secretLabel =
+        (typeof original.name === 'string' && isSecretKey(original.name, { exemptEnvNameKeys: false })) ||
+        (typeof original.key === 'string' && isSecretKey(original.key, { exemptEnvNameKeys: false }))
       const redacted = redactRecord(value as Record<string, unknown>, { exemptEnvNameKeys: false })
-      const nameIsSecret = typeof redacted.name === 'string' && isSecretKey(redacted.name, { exemptEnvNameKeys: false })
-      if (nameIsSecret && 'value' in redacted) {
+      if (secretLabel && 'value' in redacted) {
         redacted.value = '<redacted>'
       }
       return redacted
