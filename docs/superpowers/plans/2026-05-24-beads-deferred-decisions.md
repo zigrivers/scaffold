@@ -209,6 +209,8 @@ git commit -m "feat(beads): register worktree with bd worktree create on setup (
 - Modify: `content/pipeline/build/multi-agent-start.md` — reference merge-slot in the PR section; reference gate in the blocked-task recovery procedure.
 - Modify: `content/pipeline/build/multi-agent-resume.md` — same references (lighter-weight; just link to the new knowledge entry).
 
+> **⚠ Embedded snippets in this Phase C are HISTORICAL** and contain commands that don't match the actual `bd v1.0.4` CLI surface — specifically `SLOT=$(bd merge-slot acquire --json | jq .slot_id)`, `bd merge-slot release "$SLOT"`, `bd gate create "<name>" --description`, and `bd gate add-waiter "<name>" --task` are all WRONG. They reflect my mistaken model when this plan was drafted; the real upstream commands were verified live before the actual code shipped and look quite different. **For the canonical command shapes, see `content/knowledge/execution/multi-agent-coordination.md`** (the file this phase produced), which uses `bd merge-slot acquire --wait` / `bd merge-slot release` (one slot per project, no ID), and `bd gate create --blocks <issue-id> --reason "..." --type <human|timer|gh:run|gh:pr>` (gates are issues, not named entities). The embedded snippets below are kept as record of the planning process; they should not be copy-pasted.
+
 ### Task C.1: Create the multi-agent-coordination knowledge entry
 
 **Files:**

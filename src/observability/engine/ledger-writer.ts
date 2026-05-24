@@ -50,7 +50,10 @@ export async function writeEvent(worktreeRoot: string, input: WriteEventInput): 
     throw new Error(`event validation failed: ${validated.errors.join('; ')}`)
   }
 
-  const redacted = redactEvent(validated.event)
+  // redactEvent's return is the discriminated-union Event type whose per-type payload
+  // shapes are stricter than WrittenEvent.payload's Record<string, unknown>. The
+  // runtime shape is the same — cast through unknown is the standard TS escape.
+  const redacted = redactEvent(validated.event) as unknown as WrittenEvent
   const line = JSON.stringify(redacted) + '\n'
   if (Buffer.byteLength(line, 'utf8') > MAX_EVENT_BYTES) {
     throw new Error(`event too large (>${MAX_EVENT_BYTES} bytes / 4 KiB): split or summarize the payload`)
@@ -69,7 +72,9 @@ export async function writeEvent(worktreeRoot: string, input: WriteEventInput): 
   } finally {
     await release()
   }
-  return candidate
+  // Return the same redacted event that was actually persisted, so callers see
+  // exactly what's on disk (no unredacted secrets, no dropped fields).
+  return redacted
 }
 
 function deriveLabel(worktreeRoot: string): string {

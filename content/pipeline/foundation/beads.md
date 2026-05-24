@@ -123,9 +123,11 @@ existing setup updates rather than re-initializes.
    ```
    Verify with `bd config get types.custom`.
 
-6. **Create the lessons-learned file** for cross-session memory:
+6. **Create the lessons-learned file** for cross-session memory (skip if it already exists — never overwrite accumulated lessons):
    ```bash
-   mkdir -p tasks && cat > tasks/lessons.md <<'EOF'
+   mkdir -p tasks
+   if [ ! -f tasks/lessons.md ]; then
+     cat > tasks/lessons.md <<'EOF'
    # Lessons Learned
 
    ## Patterns
@@ -140,6 +142,12 @@ existing setup updates rather than re-initializes.
 
    (Add gotchas here.)
    EOF
+   else
+     # Append any missing section headings; existing content stays.
+     grep -q "^## Patterns" tasks/lessons.md || printf '\n## Patterns\n\n(Add discovered patterns here.)\n' >> tasks/lessons.md
+     grep -q "^## Anti-Patterns" tasks/lessons.md || printf '\n## Anti-Patterns\n\n(Add anti-patterns here.)\n' >> tasks/lessons.md
+     grep -q "^## Common Gotchas" tasks/lessons.md || printf '\n## Common Gotchas\n\n(Add gotchas here.)\n' >> tasks/lessons.md
+   fi
    ```
 
 7. **Compose scaffold-owned CLAUDE.md sections** ADJACENT to (not replacing) the
