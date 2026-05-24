@@ -16,14 +16,25 @@ export interface WriteEventInput {
   payload: Record<string, unknown>
 }
 
+export interface WrittenEvent {
+  event_id: string
+  worktree_id: string
+  actor_label: string
+  branch: string
+  task_id: string | null
+  type: EventType
+  ts: string
+  payload: Record<string, unknown>
+}
+
 export function ledgerPath(worktreeRoot: string): string {
   return join(worktreeRoot, '.scaffold', 'activity.jsonl')
 }
 
-export async function writeEvent(worktreeRoot: string, input: WriteEventInput): Promise<void> {
+export async function writeEvent(worktreeRoot: string, input: WriteEventInput): Promise<WrittenEvent> {
   const id = ensureIdentity(worktreeRoot, deriveLabel(worktreeRoot))
 
-  const candidate = {
+  const candidate: WrittenEvent = {
     event_id: ulid(),
     worktree_id: id.worktree_id,
     actor_label: id.worktree_label,
@@ -58,6 +69,7 @@ export async function writeEvent(worktreeRoot: string, input: WriteEventInput): 
   } finally {
     await release()
   }
+  return candidate
 }
 
 function deriveLabel(worktreeRoot: string): string {
