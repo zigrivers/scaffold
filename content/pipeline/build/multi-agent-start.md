@@ -183,8 +183,21 @@ For each task:
      fi
      ```
      Fix any issues `bd preflight` flags before proceeding.
+   - **For 3+ parallel agents**, acquire a merge slot to serialize merge-time conflicts:
+     ```bash
+     if [ -d .beads ]; then
+       SLOT=$(bd merge-slot acquire --json | jq -r '.slot_id')
+     fi
+     ```
+     Skip for single-agent or two-agent runs. See `content/knowledge/execution/multi-agent-coordination.md`.
    - Push the branch: `git push -u origin HEAD`
    - Create a pull request: `gh pr create`
+   - After the PR merges (or if you abandon the work), release the slot:
+     ```bash
+     if [ -d .beads ] && [ -n "${SLOT:-}" ]; then
+       bd merge-slot release "$SLOT"
+     fi
+     ```
    - Include in the PR description: what was implemented, key decisions, files changed, agent name
    - Follow the PR workflow from `docs/git-workflow.md` or CLAUDE.md
 
@@ -222,6 +235,11 @@ For each task:
 - If Beads: A `git pull` (and `bd dolt pull` if a Dolt remote is configured) brings the local DB current; run `bd doctor --fix` if anything looks stale.
 - Without Beads: check open PRs (`gh pr list`) for overlapping work
 - Move to the next available unblocked task
+
+**Discovered a category of work blocked by something not yet done:**
+- If Beads: file the blocker as a gate (`bd gate create "<gate-name>"`), then add each affected downstream task as a waiter (`bd gate add-waiter "<gate-name>" --task <id>`). Resolve the gate when the underlying condition is met (`bd gate resolve "<gate-name>"`).
+- Use this pattern when multiple downstream tasks share the same blocker. For one-off "this task blocks that task" cases, `bd dep add --blocks` is enough.
+- See `content/knowledge/execution/multi-agent-coordination.md` for the full pattern.
 
 **Dependency install fails after cleanup:**
 - `git clean -fd` may have removed generated files — re-run the full install sequence
