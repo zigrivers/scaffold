@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process'
+import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { StringDecoder } from 'node:string_decoder'
 
 export interface DispatchInput {
@@ -13,7 +13,7 @@ export type DispatchResult =
 
 export function dispatchLlm(input: DispatchInput): Promise<DispatchResult> {
   return new Promise((resolve) => {
-    let child
+    let child: ChildProcessWithoutNullStreams
     try {
       // detached: true puts the child in its own process group so the timeout
       // can kill the entire subtree (wrapper scripts + child LLM processes).
@@ -28,13 +28,12 @@ export function dispatchLlm(input: DispatchInput): Promise<DispatchResult> {
 
     let stdout = ''
     let stderr = ''
+    let stdinError: NodeJS.ErrnoException | undefined
     let resolved = false
     const decoder = new StringDecoder('utf8')
     const stderrDecoder = new StringDecoder('utf8')
 
-    const timer = setTimeout(() => {
-      if (resolved) return
-      resolved = true
+    function terminateChild() {
       // Kill the entire process group (negated PID) so wrapper scripts and
       // child LLM processes are all terminated, not just the sh -c parent.
       // Negated PID is POSIX-only; Windows does not support process groups.
@@ -46,11 +45,33 @@ export function dispatchLlm(input: DispatchInput): Promise<DispatchResult> {
       } else {
         try { child.kill('SIGTERM') } catch { /* ignore */ }
       }
+    }
+
+    const timer = setTimeout(() => {
+      if (resolved) return
+      resolved = true
+      terminateChild()
       resolve({ ok: false, reason: `timed out after ${input.timeoutMs}ms`, raw: stdout })
     }, input.timeoutMs)
 
+    const failOnStdinError = (err: NodeJS.ErrnoException) => {
+      if (resolved) return
+      resolved = true
+      clearTimeout(timer)
+      terminateChild()
+      resolve({
+        ok: false,
+        reason: `stdin error (${err.code ?? 'unknown'}): ${err.message}`,
+        raw: stdout,
+      })
+    }
+
     child.stdout?.on('data', (chunk: Buffer) => { stdout += decoder.write(chunk) })
     child.stderr?.on('data', (chunk: Buffer) => { stderr += stderrDecoder.write(chunk) })
+    child.stdin?.on('error', (err: NodeJS.ErrnoException) => {
+      stdinError = err
+      failOnStdinError(err)
+    })
 
     child.on('error', (err: NodeJS.ErrnoException) => {
       if (resolved) return
@@ -68,8 +89,19 @@ export function dispatchLlm(input: DispatchInput): Promise<DispatchResult> {
       stderr += stderrDecoder.end()
       if (code !== 0 || code === null) {
         const codeStr = code !== null ? `exit ${code}` : `signal ${signal ?? 'unknown'}`
-        const hint = stderr.trim() ? ` — stderr: ${stderr.trim().slice(0, 200)}` : ''
+        const stderrHint = stderr.trim() ? `stderr: ${stderr.trim().slice(0, 200)}` : ''
+        const stdinHint = stdinError ? `stdin error (${stdinError.code ?? 'unknown'}): ${stdinError.message}` : ''
+        const hintParts = [stderrHint, stdinHint].filter(Boolean)
+        const hint = hintParts.length > 0 ? ` — ${hintParts.join('; ')}` : ''
         resolve({ ok: false, reason: `subprocess ${codeStr}${hint}`, raw: stdout })
+        return
+      }
+      if (stdinError) {
+        resolve({
+          ok: false,
+          reason: `stdin error (${stdinError.code ?? 'unknown'}): ${stdinError.message}`,
+          raw: stdout,
+        })
         return
       }
       // Brace-depth extraction — tolerates LLM filler text before/after the JSON block
