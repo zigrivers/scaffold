@@ -37,4 +37,4 @@ channels:
 #   create_issues_from_blocking_findings: false   # set true to enable
 #   fix_threshold: P2                             # severity at-or-above to file
 #   default_type: bug                             # bd create -t <type>
-#   default_priority: 2
+# Note: priority is always derived from the finding's severity (P0..P4), not configurable.
