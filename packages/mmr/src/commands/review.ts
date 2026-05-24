@@ -80,12 +80,12 @@ export function resolveDispatchChannels(
 ): string[] {
   const isDispatchable = (name: string): boolean => {
     const ch = channels[name]
-    if (!ch) return false
+    if (!ch) throw new Error(`Channel "${name}" not found in config`)
     if (ch.abstract === true) return false
     return true
   }
 
-  if (explicit && explicit.length > 0) {
+  if (explicit !== undefined) {
     return explicit.filter(isDispatchable)
   }
   return Object.entries(channels)

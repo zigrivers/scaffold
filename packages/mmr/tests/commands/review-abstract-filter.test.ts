@@ -22,6 +22,16 @@ describe('resolveDispatchChannels (T1-A)', () => {
     expect(names).toContain('qwen')
   })
 
+  it('throws when an explicitly requested channel does not exist', () => {
+    expect(() => resolveDispatchChannels(sampleChannels, ['missing-channel', 'qwen'], new Set()))
+      .toThrow('Channel "missing-channel" not found in config')
+  })
+
+  it('honors an explicitly provided empty channel list', () => {
+    const names = resolveDispatchChannels(sampleChannels, [], new Set())
+    expect(names).toEqual([])
+  })
+
   it('respects channels_disabled set alongside abstract filter', () => {
     const names = resolveDispatchChannels(sampleChannels, undefined, new Set(['qwen']))
     expect(names).not.toContain('qwen')
