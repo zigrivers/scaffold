@@ -678,18 +678,20 @@ become standalone follow-up work.
 
 ```bash
 # First: gate on the opt-in flag in .mmr.yaml. Defaults to disabled.
+# Uses pure bash + grep/sed — no yq dependency.
 beads_enabled=false
 beads_fix_threshold=P2
 beads_default_type=bug
-beads_default_priority=2
-if [ -f .mmr.yaml ] && command -v yq >/dev/null 2>&1; then
-  beads_enabled=$(yq -r '.beads.create_issues_from_blocking_findings // false' .mmr.yaml)
-  beads_fix_threshold=$(yq -r '.beads.fix_threshold // "P2"' .mmr.yaml)
-  beads_default_type=$(yq -r '.beads.default_type // "bug"' .mmr.yaml)
-  beads_default_priority=$(yq -r '.beads.default_priority // 2' .mmr.yaml)
-elif [ -f .mmr.yaml ]; then
-  if grep -qE '^\s*create_issues_from_blocking_findings:\s*true' .mmr.yaml; then
+if [ -f .mmr.yaml ]; then
+  # POSIX character classes ([[:space:]]) for BSD-sed compatibility (macOS default).
+  if grep -qE '^[[:space:]]*create_issues_from_blocking_findings:[[:space:]]*true[[:space:]]*$' .mmr.yaml; then
     beads_enabled=true
+  fi
+  if v=$(grep -E '^[[:space:]]*fix_threshold:[[:space:]]*P[0-4][[:space:]]*$' .mmr.yaml | head -1 | sed -E 's/.*:[[:space:]]*(P[0-4]).*/\1/'); [ -n "$v" ]; then
+    beads_fix_threshold=$v
+  fi
+  if v=$(grep -E '^[[:space:]]*default_type:[[:space:]]*[a-zA-Z]+[[:space:]]*$' .mmr.yaml | head -1 | sed -E 's/.*:[[:space:]]*([a-zA-Z]+).*/\1/'); [ -n "$v" ]; then
+    beads_default_type=$v
   fi
 fi
 
