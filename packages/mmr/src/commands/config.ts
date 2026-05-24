@@ -5,26 +5,30 @@ import { loadConfig } from '../config/loader.js'
 import { BUILTIN_CHANNELS } from '../config/defaults.js'
 import { checkInstalled, checkAuth } from '../core/auth.js'
 import { probeRuntime } from '../core/runtime-probe.js'
-import { OSS_RUNTIMES, exampleBlockFor } from '../core/oss-examples.js'
+import { OSS_RUNTIMES, exampleBlockFor, type OssRuntimeId } from '../core/oss-examples.js'
 
 interface ConfigArgs {
   action: string
-  name?: string
   'with-examples'?: boolean
-  'no-redact'?: boolean
 }
 
-async function detectedExampleBlocks(includeAll: boolean): Promise<string[]> {
-  const blocks: string[] = []
-  for (const runtime of OSS_RUNTIMES) {
-    const detected = includeAll
-      ? true
-      : (await probeRuntime(runtime.probe.command, runtime.probe.args, runtime.probe.timeoutMs)).detected
-    if (detected) {
-      blocks.push(exampleBlockFor(runtime.id))
-    }
-  }
-  return blocks
+async function ossProbeResults(): Promise<Map<OssRuntimeId, boolean>> {
+  const results = await Promise.all(
+    OSS_RUNTIMES.map(async (runtime) => [
+      runtime.id,
+      (await probeRuntime(runtime.probe.command, runtime.probe.args, runtime.probe.timeoutMs)).detected,
+    ] as const),
+  )
+  return new Map(results)
+}
+
+function exampleBlocksFor(
+  probeResults: Map<OssRuntimeId, boolean>,
+  includeAll: boolean,
+): string[] {
+  return OSS_RUNTIMES
+    .filter((runtime) => includeAll || probeResults.get(runtime.id) === true)
+    .map((runtime) => exampleBlockFor(runtime.id))
 }
 
 async function configInit(opts: { withExamples: boolean } = { withExamples: false }): Promise<void> {
@@ -45,10 +49,10 @@ async function configInit(opts: { withExamples: boolean } = { withExamples: fals
     console.log(`  ${name}: ${installed ? 'detected' : 'not found'}`)
   }
 
-  const ossBlocks = await detectedExampleBlocks(opts.withExamples)
+  const ossResults = await ossProbeResults()
+  const ossBlocks = exampleBlocksFor(ossResults, opts.withExamples)
   for (const runtime of OSS_RUNTIMES) {
-    const detected = ossBlocks.some((block) => block.includes(`# example: ${runtime.id}`))
-    console.log(`  ${runtime.id}: ${detected ? 'detected' : 'not found'}`)
+    console.log(`  ${runtime.id}: ${ossResults.get(runtime.id) ? 'detected' : 'not found'}`)
   }
 
   const template = [
@@ -144,19 +148,10 @@ export const configCommand: CommandModule<object, ConfigArgs> = {
         describe: 'Config action',
         choices: ['init', 'test', 'channels'],
       })
-      .positional('name', {
-        type: 'string',
-        describe: 'Optional name argument (for "channels show <name>")',
-      })
       .option('with-examples', {
         type: 'boolean',
         default: false,
         describe: 'Emit all OSS runtime example blocks (init)',
-      })
-      .option('no-redact', {
-        type: 'boolean',
-        default: false,
-        describe: 'Disable secret redaction in printed output',
       }),
   handler: async (args: ArgumentsCamelCase<ConfigArgs>) => {
     switch (args.action) {
