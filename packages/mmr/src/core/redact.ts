@@ -56,7 +56,7 @@ export function redactRecord(
   if (!input) return {}
   const out: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(input)) {
-    out[k] = isSecretKey(k, options) ? '<redacted>' : redactValue(v, options)
+    out[k] = isSecretKey(k, options) ? '<redacted>' : redactValue(v, { ...options, exemptEnvNameKeys: false })
   }
   return out
 }

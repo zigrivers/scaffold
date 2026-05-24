@@ -76,6 +76,7 @@ describe('redactRecord (T1-E)', () => {
     expect(redactRecord({ api_key_env: 'sk-actual' }, { exemptEnvNameKeys: false })).toEqual({
       api_key_env: '<redacted>',
     })
+    expect(redactRecord({ env: { api_key_env: 'sk-actual' } })).toEqual({ env: { api_key_env: '<redacted>' } })
   })
 
   it('passes through non-secret values unchanged', () => {
