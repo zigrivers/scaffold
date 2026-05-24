@@ -56,6 +56,10 @@ async function configTest(): Promise<void> {
   let allOk = true
 
   for (const [name, chConfig] of Object.entries(config.channels)) {
+    if (chConfig.abstract) {
+      results[name] = { installed: false, auth: 'abstract' }
+      continue
+    }
     if (!chConfig.enabled) {
       results[name] = { installed: false, auth: 'disabled' }
       continue

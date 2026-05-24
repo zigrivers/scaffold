@@ -81,7 +81,7 @@ async function runAuthCheck(config: AuthenticatedChannelConfig): Promise<AuthRes
  */
 export async function checkAuth(config: ChannelConfigParsed): Promise<AuthResult> {
   if (!config.auth) {
-    return { status: 'failed', recovery: 'Channel auth configuration is missing' }
+    return { status: 'ok' }
   }
   const authConfig = { ...config, auth: config.auth }
   const result = await runAuthCheck(authConfig)

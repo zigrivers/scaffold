@@ -130,6 +130,66 @@ describe('loadConfig', () => {
     expect(config.channels.claude.command).toBe('claude -p')
   })
 
+  it('allows abstract channels without command or auth', () => {
+    const yaml = [
+      'version: 1',
+      'channels:',
+      '  base-reviewer:',
+      '    abstract: true',
+      '    prompt_wrapper: "Base: {{prompt}}"',
+    ].join('\n')
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), yaml)
+
+    const config = loadConfig({ projectRoot: tmpDir, userHome: tmpDir })
+    expect(config.channels['base-reviewer']?.abstract).toBe(true)
+    expect(config.channels['base-reviewer']?.command).toBeUndefined()
+  })
+
+  it('allows channels with extends to omit inherited command and auth before resolution', () => {
+    const yaml = [
+      'version: 1',
+      'channels:',
+      '  strict-claude:',
+      '    extends: claude',
+      '    prompt_wrapper: "Strict: {{prompt}}"',
+    ].join('\n')
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), yaml)
+
+    const config = loadConfig({ projectRoot: tmpDir, userHome: tmpDir })
+    expect(config.channels['strict-claude']?.extends).toBe('claude')
+    expect(config.channels['strict-claude']?.command).toBeUndefined()
+  })
+
+  it('throws when a concrete channel has no command', () => {
+    const yaml = [
+      'version: 1',
+      'channels:',
+      '  broken:',
+      '    auth:',
+      '      check: "broken auth"',
+      '      timeout: 5',
+      '      failure_exit_codes: [1]',
+      '      recovery: "Configure broken"',
+    ].join('\n')
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), yaml)
+
+    expect(() => loadConfig({ projectRoot: tmpDir, userHome: tmpDir }))
+      .toThrow('Channel "broken" must define command unless abstract or extends is set')
+  })
+
+  it('throws when a concrete channel has no auth', () => {
+    const yaml = [
+      'version: 1',
+      'channels:',
+      '  broken:',
+      '    command: broken review',
+    ].join('\n')
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), yaml)
+
+    expect(() => loadConfig({ projectRoot: tmpDir, userHome: tmpDir }))
+      .toThrow('Channel "broken" must define auth unless abstract or extends is set')
+  })
+
   it('does not overwrite base values with undefined overlay values', () => {
     const config = loadConfig({
       projectRoot: tmpDir,

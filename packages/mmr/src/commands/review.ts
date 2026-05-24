@@ -146,7 +146,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     //    explicit --channels args override it (users know what they're asking for)
     const disabledSet = new Set(config.channels_disabled ?? [])
     const channelNames = args.channels ?? Object.entries(config.channels)
-      .filter(([name, ch]) => ch.enabled && !disabledSet.has(name))
+      .filter(([name, ch]) => ch.enabled && !ch.abstract && !disabledSet.has(name))
       .map(([name]) => name)
 
     if (channelNames.length === 0) {
@@ -162,6 +162,10 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       const chConfig = config.channels[name]
       if (!chConfig) {
         authResults[name] = { status: 'skipped', recovery: `Channel "${name}" not found in config` }
+        continue
+      }
+      if (chConfig.abstract) {
+        authResults[name] = { status: 'skipped', recovery: `Channel "${name}" is abstract and cannot run directly` }
         continue
       }
       if (!chConfig.command) {
@@ -237,7 +241,13 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       const dispatches: Promise<void>[] = []
       for (const name of validChannels) {
         const chConfig = config.channels[name]
-        if (!chConfig.command) continue
+        if (!chConfig.command) {
+          store.updateChannel(job.job_id, name, {
+            status: 'skipped',
+            recovery: `Channel "${name}" is missing command`,
+          })
+          continue
+        }
         store.updateChannel(job.job_id, name, { output_parser: chConfig.output_parser })
         dispatches.push(
           dispatchChannel(store, job.job_id, name, {
@@ -256,7 +266,13 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     } else {
       for (const name of validChannels) {
         const chConfig = config.channels[name]
-        if (!chConfig.command) continue
+        if (!chConfig.command) {
+          store.updateChannel(job.job_id, name, {
+            status: 'skipped',
+            recovery: `Channel "${name}" is missing command`,
+          })
+          continue
+        }
         store.updateChannel(job.job_id, name, { output_parser: chConfig.output_parser })
         await dispatchChannel(store, job.job_id, name, {
           command: chConfig.command,

@@ -69,6 +69,18 @@ function loadYaml(filePath: string): Record<string, unknown> | undefined {
   return parsed as Record<string, unknown>
 }
 
+function validateRunnableChannels(config: MmrConfigParsed): void {
+  for (const [name, channel] of Object.entries(config.channels)) {
+    if (channel.abstract || channel.extends) continue
+    if (!channel.command) {
+      throw new Error(`Channel "${name}" must define command unless abstract or extends is set`)
+    }
+    if (!channel.auth) {
+      throw new Error(`Channel "${name}" must define auth unless abstract or extends is set`)
+    }
+  }
+}
+
 /**
  * Load and merge configuration from multiple sources.
  *
@@ -113,6 +125,9 @@ export function loadConfig(opts: LoadConfigOptions): MmrConfigParsed {
     }
   }
 
-  // Validate through Zod schema
-  return MmrConfigSchema.parse(merged)
+  // Validate through Zod schema, then enforce invariants that depend on
+  // resolved channel metadata rather than the raw channel object shape.
+  const config = MmrConfigSchema.parse(merged)
+  validateRunnableChannels(config)
+  return config
 }

@@ -19,6 +19,20 @@ describe('checkInstalled', () => {
 })
 
 describe('checkAuth', () => {
+  it('returns ok when a channel has no auth check configured', async () => {
+    const result = await checkAuth({
+      enabled: true,
+      abstract: false,
+      command: 'echo',
+      flags: [],
+      env: {},
+      prompt_wrapper: '{{prompt}}',
+      output_parser: 'default',
+      stderr: 'capture',
+    })
+    expect(result.status).toBe('ok')
+  })
+
   it('returns ok for a command that exits 0', async () => {
     const result = await checkAuth({
       enabled: true,
