@@ -433,6 +433,7 @@ The per-story review prompt for Codex and Gemini:
     \"findings\": [
       {
         \"severity\": \"P0|P1|P2|P3\",
+        \"category\": \"correctness|edge-case|security|acceptance-criteria|test-coverage\",
         \"acceptance_criterion\": \"Which criterion (or null if general)\",
         \"file\": \"relative/path/to/file.ts\",
         \"line\": 42,
@@ -448,7 +449,7 @@ The per-story review prompt for Codex and Gemini:
   Return ONLY valid JSON."
 
 Normalize the Superpowers code-reviewer findings to the same JSON shape as
-Codex/Gemini (severity, acceptance_criterion, file, line, description, suggestion)
+Codex/Gemini (severity, category, acceptance_criterion, file, line, description, suggestion)
 before returning. Then return all three channels' findings plus channel status:
 {
   "story": "[STORY_TITLE]",
@@ -479,8 +480,8 @@ mmr reconcile "$JOB_ID" --channel superpowers --input /tmp/agent-findings.json
 ```
 
 All findings injected via `mmr reconcile` must use MMR-compatible schema: each
-finding needs `severity` (P0-P3), `location` (file:line), and `description`
-(`suggestion` is optional). The strict validator will reject findings with
+finding needs `severity` (P0-P3), `category` (stable finding category),
+`location` (file:line), and `description` (`suggestion` is optional). The strict validator will reject findings with
 missing or invalid required fields.
 
 This step is optional — post-implementation review is a full-codebase review (not
