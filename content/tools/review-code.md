@@ -397,7 +397,7 @@ Otherwise:
 1. Fix all findings at or above `fix_threshold` (read from `results.fix_threshold` in the verdict JSON; default `P2`)
 2. Re-run the channels that produced findings
 3. Keep iterating as long as each new round surfaces *different, concrete, fixable* findings — that is healthy review/fix iteration, not a stuck loop
-4. The 3-round limit is **per finding**: stop and surface to the user when the *same* blocking finding (or set) recurs across 3 attempts without progress. Other stop conditions: a finding is genuinely ambiguous (channels contradict each other), or the user explicitly asks to stop. Use verdict `needs-user-decision` for ambiguity, `blocked` for stuck-loop cases.
+4. The 3-round limit is **per finding hash**, enforced by the wrapper-side bookkeeping in Step 7a (`.scaffold/review-attempts/<session-id>.json`). Stop and surface to the user when any blocking finding's hash hits 3 attempts (`_review_at_strike_limit` returns true). Other stop conditions: a finding is genuinely ambiguous (channels contradict each other), or the user explicitly asks to stop. Use verdict `needs-user-decision` for ambiguity, `blocked` for stuck-hash cases. Identity components — `location`, `category`, `description`, `suggestion` — mirror MMR T2-A's forthcoming native `finding_key` (v3.30).
 
 **Fix cycle channel rule:** Re-run only channels that originally completed or ran as compensating passes. Never retry a channel marked `not_installed`, `auth_failed`, or `timeout` during fix rounds — its availability does not change within a session.
 
