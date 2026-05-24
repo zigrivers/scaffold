@@ -27,3 +27,14 @@ channels:
   gemini:
     auth:
       timeout: 20
+
+# Opt-in: file blocking MMR findings as Beads tasks (see content/tools/review-pr.md
+# Step 7b and review-code.md Step 7b). Disabled by default. When enabled AND the
+# project has a .beads/ directory, each blocking finding at-or-above `fix_threshold`
+# becomes a bd-tracked bug with `--external-ref "mmr-<job-id>"`.
+#
+# beads:
+#   create_issues_from_blocking_findings: false   # set true to enable
+#   fix_threshold: P2                             # severity at-or-above to file
+#   default_type: bug                             # bd create -t <type>
+#   default_priority: 2

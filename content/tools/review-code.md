@@ -668,6 +668,41 @@ Identity components — `location`, `category`, `description`, and `suggestion`
 — mirror MMR T2-A's forthcoming native `finding_key` so this remains a clean
 migration when v3.30 ships.
 
+### Step 7b: File blocking findings as Beads tasks (opt-in)
+
+If `.mmr.yaml` has `beads.create_issues_from_blocking_findings: true` AND `.beads/`
+exists, file each blocking finding (severity at-or-above `beads.fix_threshold`,
+default `P2`) as a Beads bug. This is purely additive tracking — it does NOT replace
+Step 7's fix-in-place flow; it creates a durable record of findings that ought to
+become standalone follow-up work.
+
+```bash
+if [ -d .beads ] && command -v bd >/dev/null 2>&1; then
+  threshold_rank=$(case "${BEADS_FIX_THRESHOLD:-P2}" in P0) echo 0;; P1) echo 1;; P2) echo 2;; P3) echo 3;; *) echo 4;; esac)
+
+  while IFS= read -r finding; do
+    title=$(jq -r '.description | .[0:120]' <<<"$finding")
+    severity=$(jq -r '.severity' <<<"$finding")
+    pnum="${severity#P}"
+    description=$(jq -r '.description + "\n\nSuggestion: " + .suggestion + "\n\nLocation: " + .location' <<<"$finding")
+
+    bd create "$title" \
+      --type bug \
+      -p "$pnum" \
+      --description "$description" \
+      --external-ref "mmr-$JOB_ID" \
+      --deps "discovered-from:${SOURCE_BD_ID:-unknown}"
+  done < <(jq -c --argjson maxRank "$threshold_rank" '
+    .results.channels[].findings[]
+    | (.severity | sub("^P";"") | tonumber) as $rank
+    | select($rank <= $maxRank)
+  ' "$REVIEW_JSON")
+fi
+```
+
+Same shell idioms as `review-pr.md` Step 7b — see that file for notes on the jq
+arguments and UTF-8-safe truncation.
+
 ### Step 8: Final Verdict
 
 Return exactly one verdict:

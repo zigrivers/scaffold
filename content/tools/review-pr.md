@@ -491,6 +491,50 @@ read from the verdict JSON.
 
 <!-- review-wrapper-hash-helpers:end -->
 
+### Step 7b: File blocking findings as Beads tasks (opt-in)
+
+If `.mmr.yaml` has `beads.create_issues_from_blocking_findings: true` AND `.beads/`
+exists in the project, file each blocking finding (severity at-or-above
+`beads.fix_threshold`, default `P2`) as a Beads bug. This is purely additive
+tracking — it does NOT replace Step 7's fix-in-place flow; it only creates a
+durable record of findings that ought to become standalone follow-up work.
+
+```bash
+if [ -d .beads ] && command -v bd >/dev/null 2>&1; then
+  # Threshold from .mmr.yaml beads.fix_threshold (default P2)
+  threshold_rank=$(case "${BEADS_FIX_THRESHOLD:-P2}" in P0) echo 0;; P1) echo 1;; P2) echo 2;; P3) echo 3;; *) echo 4;; esac)
+
+  while IFS= read -r finding; do
+    title=$(jq -r '.description | .[0:120]' <<<"$finding")
+    severity=$(jq -r '.severity' <<<"$finding")
+    pnum="${severity#P}"
+    description=$(jq -r '.description + "\n\nSuggestion: " + .suggestion + "\n\nLocation: " + .location' <<<"$finding")
+
+    bd create "$title" \
+      --type bug \
+      -p "$pnum" \
+      --description "$description" \
+      --external-ref "mmr-$JOB_ID" \
+      --deps "discovered-from:${SOURCE_BD_ID:-unknown}"
+  done < <(jq -c --argjson maxRank "$threshold_rank" '
+    .results.channels[].findings[]
+    | (.severity | sub("^P";"") | tonumber) as $rank
+    | select($rank <= $maxRank)
+  ' "$REVIEW_JSON")
+fi
+```
+
+Notes on this script:
+- `--argjson maxRank "$threshold_rank"` passes a number so jq can compare numerically.
+- `(.severity | sub("^P";"") | tonumber)` extracts the integer rank from `P2`-style severities.
+- `while IFS= read -r` streams one JSON object per line without word-splitting on spaces.
+- `.description | .[0:120]` truncates safely under UTF-8 (unlike `head -c 120`).
+- The whole block is gated on `[ -d .beads ] && command -v bd` so it no-ops on non-Beads or non-installed environments.
+
+Use `--external-ref "mmr-$JOB_ID"` to link the new Beads issue back to the MMR job;
+`--deps discovered-from:${SOURCE_BD_ID}` chains it to whatever current task triggered
+the review (if known).
+
 ### Step 8: Confirm Completion
 
 **Success path** — all findings resolved (verdict is `pass` or `degraded-pass`):
