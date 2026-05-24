@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process'
+import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { StringDecoder } from 'node:string_decoder'
 
 export interface DispatchInput {
@@ -13,7 +13,7 @@ export type DispatchResult =
 
 export function dispatchLlm(input: DispatchInput): Promise<DispatchResult> {
   return new Promise((resolve) => {
-    let child
+    let child: ChildProcessWithoutNullStreams
     try {
       // detached: true puts the child in its own process group so the timeout
       // can kill the entire subtree (wrapper scripts + child LLM processes).
@@ -33,14 +33,7 @@ export function dispatchLlm(input: DispatchInput): Promise<DispatchResult> {
     const decoder = new StringDecoder('utf8')
     const stderrDecoder = new StringDecoder('utf8')
 
-    const timer = setTimeout(() => {
-      if (resolved) return
-      resolved = true
-      terminateChild()
-      resolve({ ok: false, reason: `timed out after ${input.timeoutMs}ms`, raw: stdout })
-    }, input.timeoutMs)
-
-    const terminateChild = () => {
+    function terminateChild() {
       // Kill the entire process group (negated PID) so wrapper scripts and
       // child LLM processes are all terminated, not just the sh -c parent.
       // Negated PID is POSIX-only; Windows does not support process groups.
@@ -53,6 +46,13 @@ export function dispatchLlm(input: DispatchInput): Promise<DispatchResult> {
         try { child.kill('SIGTERM') } catch { /* ignore */ }
       }
     }
+
+    const timer = setTimeout(() => {
+      if (resolved) return
+      resolved = true
+      terminateChild()
+      resolve({ ok: false, reason: `timed out after ${input.timeoutMs}ms`, raw: stdout })
+    }, input.timeoutMs)
 
     const failOnStdinError = (err: NodeJS.ErrnoException) => {
       if (resolved) return
