@@ -32,7 +32,7 @@ describe('probeRuntime (T1-D)', () => {
   it('returns detected=false when timeout is outside the safe timer range', async () => {
     const result = await probeRuntime(process.execPath, ['--version'], 2_147_483_648)
     expect(result.detected).toBe(false)
-    expect(result.reason).toMatch(/timeout/i)
+    expect(result.reason).toBe('invalid timeout')
   })
 
   it('returns detected=false when an argument contains a NUL byte', async () => {
