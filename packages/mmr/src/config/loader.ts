@@ -45,6 +45,18 @@ function deepMerge<T extends Record<string, unknown>>(base: T, overlay: Record<s
   return result as T
 }
 
+function resetExtendingChannelBases(
+  base: Record<string, unknown>,
+  overlay: Record<string, unknown>,
+): void {
+  if (!isPlainRecord(base.channels) || !isPlainRecord(overlay.channels)) return
+  for (const [name, channel] of Object.entries(overlay.channels)) {
+    if (isPlainRecord(channel) && typeof channel.extends === 'string') {
+      base.channels[name] = {}
+    }
+  }
+}
+
 /**
  * Try to read and parse a YAML file; returns undefined if missing.
  */
@@ -69,6 +81,71 @@ function loadYaml(filePath: string): Record<string, unknown> | undefined {
   return parsed as Record<string, unknown>
 }
 
+const MAX_EXTENDS_DEPTH = 4
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return (
+    value !== null
+    && typeof value === 'object'
+    && !Array.isArray(value)
+  )
+}
+
+function resolveChannelExtends(
+  name: string,
+  channels: Record<string, Record<string, unknown>>,
+  stack: string[] = [],
+): Record<string, unknown> {
+  if (stack.includes(name)) {
+    throw new Error(`Channel extends cycle detected: ${[...stack, name].join(' -> ')}`)
+  }
+  if (stack.length >= MAX_EXTENDS_DEPTH) {
+    throw new Error(
+      `Channel extends depth exceeds max (${MAX_EXTENDS_DEPTH}) at ${[...stack, name].join(' -> ')}`,
+    )
+  }
+
+  const channel = channels[name]
+  if (!channel) {
+    throw new Error(`Channel "${name}" referenced by extends not found`)
+  }
+
+  const parentName = channel.extends
+  if (typeof parentName !== 'string') return channel
+
+  const parentResolved = resolveChannelExtends(parentName, channels, [...stack, name])
+  const childWithoutExtends: Record<string, unknown> = { ...channel }
+  delete childWithoutExtends.extends
+
+  const childDefinesAbstract = Object.prototype.hasOwnProperty.call(channel, 'abstract')
+  const parentBase = structuredClone(parentResolved) as Record<string, unknown>
+  const merged = deepMerge(parentBase, childWithoutExtends)
+  if (!childDefinesAbstract) {
+    delete merged.abstract
+  }
+  return merged
+}
+
+function resolveExtendsAcrossChannels(
+  channels: Record<string, Record<string, unknown>> | undefined,
+): Record<string, Record<string, unknown>> {
+  if (!channels) return {}
+  const resolved: Record<string, Record<string, unknown>> = {}
+  for (const name of Object.keys(channels)) {
+    resolved[name] = resolveChannelExtends(name, channels)
+  }
+  return resolved
+}
+
+function validateRunnableChannels(config: MmrConfigParsed): void {
+  for (const [name, channel] of Object.entries(config.channels)) {
+    if (channel.abstract) continue
+    if (!channel.command) {
+      throw new Error(`Channel "${name}" must define command after inheritance unless abstract is set`)
+    }
+  }
+}
+
 /**
  * Load and merge configuration from multiple sources.
  *
@@ -91,6 +168,7 @@ export function loadConfig(opts: LoadConfigOptions): MmrConfigParsed {
   const userConfigPath = path.join(userHome, '.mmr', 'config.yaml')
   const userConfig = loadYaml(userConfigPath)
   if (userConfig) {
+    resetExtendingChannelBases(merged, userConfig)
     merged = deepMerge(merged, userConfig)
   }
 
@@ -98,6 +176,7 @@ export function loadConfig(opts: LoadConfigOptions): MmrConfigParsed {
   const projectConfigPath = path.join(projectRoot, '.mmr.yaml')
   const projectConfig = loadYaml(projectConfigPath)
   if (projectConfig) {
+    resetExtendingChannelBases(merged, projectConfig)
     merged = deepMerge(merged, projectConfig)
   }
 
@@ -113,6 +192,15 @@ export function loadConfig(opts: LoadConfigOptions): MmrConfigParsed {
     }
   }
 
-  // Validate through Zod schema
-  return MmrConfigSchema.parse(merged)
+  if (isPlainRecord(merged.channels)) {
+    merged.channels = resolveExtendsAcrossChannels(
+      merged.channels as Record<string, Record<string, unknown>>,
+    )
+  }
+
+  // Validate through Zod schema, then enforce invariants that depend on
+  // resolved channel metadata rather than the raw channel object shape.
+  const config = MmrConfigSchema.parse(merged)
+  validateRunnableChannels(config)
+  return config
 }

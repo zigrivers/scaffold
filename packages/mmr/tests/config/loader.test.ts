@@ -130,6 +130,68 @@ describe('loadConfig', () => {
     expect(config.channels.claude.command).toBe('claude -p')
   })
 
+  it('allows abstract channels without command or auth', () => {
+    const yaml = [
+      'version: 1',
+      'channels:',
+      '  base-reviewer:',
+      '    abstract: true',
+      '    prompt_wrapper: "Base: {{prompt}}"',
+    ].join('\n')
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), yaml)
+
+    const config = loadConfig({ projectRoot: tmpDir, userHome: tmpDir })
+    expect(config.channels['base-reviewer']?.abstract).toBe(true)
+    expect(config.channels['base-reviewer']?.command).toBeUndefined()
+  })
+
+  it('resolves channels with extends before validation', () => {
+    const yaml = [
+      'version: 1',
+      'channels:',
+      '  strict-claude:',
+      '    extends: claude',
+      '    prompt_wrapper: "Strict: {{prompt}}"',
+    ].join('\n')
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), yaml)
+
+    const config = loadConfig({ projectRoot: tmpDir, userHome: tmpDir })
+    expect(config.channels['strict-claude']?.extends).toBeUndefined()
+    expect(config.channels['strict-claude']?.command).toBe('claude -p')
+    expect(config.channels['strict-claude']?.auth?.check).toBe('claude -p "respond with ok" 2>/dev/null')
+  })
+
+  it('throws when a concrete channel has no command', () => {
+    const yaml = [
+      'version: 1',
+      'channels:',
+      '  broken:',
+      '    auth:',
+      '      check: "broken auth"',
+      '      timeout: 5',
+      '      failure_exit_codes: [1]',
+      '      recovery: "Configure broken"',
+    ].join('\n')
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), yaml)
+
+    expect(() => loadConfig({ projectRoot: tmpDir, userHome: tmpDir }))
+      .toThrow('Channel "broken" must define command after inheritance unless abstract is set')
+  })
+
+  it('allows a concrete channel with no auth check', () => {
+    const yaml = [
+      'version: 1',
+      'channels:',
+      '  broken:',
+      '    command: broken review',
+    ].join('\n')
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), yaml)
+
+    const config = loadConfig({ projectRoot: tmpDir, userHome: tmpDir })
+    expect(config.channels.broken?.command).toBe('broken review')
+    expect(config.channels.broken?.auth).toBeUndefined()
+  })
+
   it('does not overwrite base values with undefined overlay values', () => {
     const config = loadConfig({
       projectRoot: tmpDir,
@@ -148,5 +210,163 @@ describe('loadConfig', () => {
   it('throws on non-object YAML root', () => {
     fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), '- just\n- a\n- list\n')
     expect(() => loadConfig({ projectRoot: tmpDir, userHome: tmpDir })).toThrow('expected an object')
+  })
+})
+
+describe('loadConfig extends inheritance (T1-A)', () => {
+  let tmpDir: string
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-test-'))
+  })
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true })
+  })
+
+  it('child inherits command from parent', () => {
+    const yamlText = [
+      'version: 1',
+      'channels:',
+      '  ollama-base:',
+      '    abstract: true',
+      '    command: ollama run',
+      '    auth:',
+      '      check: "ollama list"',
+      '      failure_exit_codes: [1]',
+      '      recovery: "ollama serve"',
+      '  qwen:',
+      '    extends: ollama-base',
+      '    flags: ["qwen2.5-coder:32b"]',
+    ].join('\n')
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), yamlText)
+    const config = loadConfig({ projectRoot: tmpDir, userHome: tmpDir })
+    expect(config.channels.qwen?.abstract).toBe(false)
+    expect(config.channels.qwen?.command).toBe('ollama run')
+    expect(config.channels.qwen?.flags).toEqual(['qwen2.5-coder:32b'])
+  })
+
+  it('child overrides parent fields', () => {
+    const yamlText = [
+      'version: 1',
+      'channels:',
+      '  base:',
+      '    abstract: true',
+      '    command: ollama run',
+      '    timeout: 60',
+      '    auth: { check: "ollama list", failure_exit_codes: [1], recovery: "x" }',
+      '  child:',
+      '    extends: base',
+      '    timeout: 300',
+    ].join('\n')
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), yamlText)
+    const config = loadConfig({ projectRoot: tmpDir, userHome: tmpDir })
+    expect(config.channels.child?.timeout).toBe(300)
+    expect(config.channels.child?.command).toBe('ollama run')
+  })
+
+  it('resolves sibling children without mutating the shared parent', () => {
+    const yamlText = [
+      'version: 1',
+      'channels:',
+      '  base:',
+      '    abstract: true',
+      '    command: ollama run',
+      '    flags: ["base"]',
+      '    auth: { check: "ollama list", failure_exit_codes: [1], recovery: "x" }',
+      '  first:',
+      '    extends: base',
+      '    flags: ["first"]',
+      '  second:',
+      '    extends: base',
+    ].join('\n')
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), yamlText)
+    const config = loadConfig({ projectRoot: tmpDir, userHome: tmpDir })
+    expect(config.channels.first?.flags).toEqual(['first'])
+    expect(config.channels.second?.flags).toEqual(['base'])
+  })
+
+  it('supports two-level extends chains', () => {
+    const yamlText = [
+      'version: 1',
+      'channels:',
+      '  a:',
+      '    abstract: true',
+      '    command: ollama run',
+      '    auth: { check: "ollama list", failure_exit_codes: [1], recovery: "x" }',
+      '  b:',
+      '    abstract: true',
+      '    extends: a',
+      '    flags: ["base"]',
+      '  c:',
+      '    extends: b',
+      '    flags: ["c-override"]',
+    ].join('\n')
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), yamlText)
+    const config = loadConfig({ projectRoot: tmpDir, userHome: tmpDir })
+    expect(config.channels.c?.abstract).toBe(false)
+    expect(config.channels.c?.command).toBe('ollama run')
+    expect(config.channels.c?.flags).toEqual(['c-override'])
+  })
+
+  it('resolves same-name builtin channels from their extends parent, not stale builtin fields', () => {
+    const yamlText = [
+      'version: 1',
+      'channels:',
+      '  local-base:',
+      '    abstract: true',
+      '    command: ollama run',
+      '    flags: ["--json"]',
+      '    auth: { check: "ollama list", failure_exit_codes: [1], recovery: "x" }',
+      '  claude:',
+      '    extends: local-base',
+      '    flags: ["qwen2.5-coder:32b"]',
+    ].join('\n')
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), yamlText)
+    const config = loadConfig({ projectRoot: tmpDir, userHome: tmpDir })
+    expect(config.channels.claude?.command).toBe('ollama run')
+    expect(config.channels.claude?.auth?.check).toBe('ollama list')
+    expect(config.channels.claude?.flags).toEqual(['qwen2.5-coder:32b'])
+  })
+
+  it('rejects extends cycle (A extends B extends A)', () => {
+    const yamlText = [
+      'version: 1',
+      'channels:',
+      '  a: { extends: b, command: "x", auth: { check: "x", failure_exit_codes: [1], recovery: "x" } }',
+      '  b: { extends: a, command: "y", auth: { check: "y", failure_exit_codes: [1], recovery: "y" } }',
+    ].join('\n')
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), yamlText)
+    expect(() => loadConfig({ projectRoot: tmpDir, userHome: tmpDir }))
+      .toThrow(/cycle/i)
+  })
+
+  it('rejects extends depth > 4', () => {
+    const yamlText = [
+      'version: 1',
+      'channels:',
+      '  l1: { abstract: true, command: "x", auth: { check: "x", failure_exit_codes: [1], recovery: "x" } }',
+      '  l2: { abstract: true, extends: l1 }',
+      '  l3: { abstract: true, extends: l2 }',
+      '  l4: { abstract: true, extends: l3 }',
+      '  l5: { abstract: true, extends: l4 }',
+      '  l6: { extends: l5 }',
+    ].join('\n')
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), yamlText)
+    expect(() => loadConfig({ projectRoot: tmpDir, userHome: tmpDir }))
+      .toThrow(/depth/i)
+  })
+
+  it('rejects concrete channel missing command after merge', () => {
+    const yamlText = [
+      'version: 1',
+      'channels:',
+      '  orphan:',
+      '    flags: ["x"]',
+      '    auth: { check: "x", failure_exit_codes: [1], recovery: "x" }',
+    ].join('\n')
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), yamlText)
+    expect(() => loadConfig({ projectRoot: tmpDir, userHome: tmpDir }))
+      .toThrow(/command/i)
   })
 })

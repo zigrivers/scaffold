@@ -47,7 +47,7 @@ describe('MmrConfigSchema', () => {
       expect(ch.prompt_wrapper).toBe('{{prompt}}')
       expect(ch.output_parser).toBe('default')
       expect(ch.stderr).toBe('capture')
-      expect(ch.auth.timeout).toBe(5)
+      expect(ch.auth?.timeout).toBe(5)
     }
   })
 
@@ -88,5 +88,63 @@ describe('Severity', () => {
     expect(Severity.parse('P0')).toBe('P0')
     expect(Severity.parse('P3')).toBe('P3')
     expect(() => Severity.parse('P4')).toThrow()
+  })
+})
+
+describe('ChannelConfigSchema extends/abstract fields (T1-A)', () => {
+  it('accepts a channel with extends: string', () => {
+    const config = {
+      version: 1,
+      channels: {
+        qwen: {
+          extends: 'ollama-base',
+          command: 'ollama run',
+          flags: ['qwen2.5-coder:32b'],
+          auth: { check: 'ollama list', failure_exit_codes: [1], recovery: 'ollama serve' },
+        },
+      },
+    }
+    const result = MmrConfigSchema.safeParse(config)
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.channels.qwen.extends).toBe('ollama-base')
+    }
+  })
+
+  it('accepts a channel with abstract: true even when command-required fields are absent at the local level', () => {
+    // Note: schema only enforces command presence at the local level today;
+    // loader merges before validation, so this confirms abstract is a tracked field.
+    const config = {
+      version: 1,
+      channels: {
+        'ollama-base': {
+          abstract: true,
+          command: 'ollama run',
+          auth: { check: 'ollama list', failure_exit_codes: [1], recovery: 'ollama serve' },
+        },
+      },
+    }
+    const result = MmrConfigSchema.safeParse(config)
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.channels['ollama-base'].abstract).toBe(true)
+    }
+  })
+
+  it('defaults abstract to false when omitted', () => {
+    const config = {
+      version: 1,
+      channels: {
+        claude: {
+          command: 'claude -p',
+          auth: { check: 'claude -p ok', failure_exit_codes: [1], recovery: 'claude login' },
+        },
+      },
+    }
+    const result = MmrConfigSchema.safeParse(config)
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.channels.claude.abstract).toBe(false)
+    }
   })
 })

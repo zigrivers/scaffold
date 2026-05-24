@@ -19,6 +19,7 @@ async function configInit(): Promise<void> {
   // Auto-detect which CLIs are installed
   const channelLines: string[] = ['channels:']
   for (const [name, chConfig] of Object.entries(BUILTIN_CHANNELS)) {
+    if (!chConfig.command) continue
     const cmd = chConfig.command.split(' ')[0]
     const installed = await checkInstalled(cmd)
     channelLines.push(`  ${name}:`)
@@ -55,8 +56,17 @@ async function configTest(): Promise<void> {
   let allOk = true
 
   for (const [name, chConfig] of Object.entries(config.channels)) {
+    if (chConfig.abstract) {
+      results[name] = { installed: false, auth: 'abstract' }
+      continue
+    }
     if (!chConfig.enabled) {
       results[name] = { installed: false, auth: 'disabled' }
+      continue
+    }
+    if (!chConfig.command) {
+      results[name] = { installed: false, auth: 'missing_command' }
+      allOk = false
       continue
     }
 

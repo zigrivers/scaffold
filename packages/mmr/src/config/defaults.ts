@@ -23,6 +23,7 @@ export const DEFAULT_CONFIG: MmrConfigParsed = {
 export const BUILTIN_CHANNELS: Record<string, ChannelConfigParsed> = {
   claude: {
     enabled: true,
+    abstract: false,
     command: 'claude -p',
     flags: ['--output-format', 'json'],
     env: {},
@@ -41,6 +42,7 @@ export const BUILTIN_CHANNELS: Record<string, ChannelConfigParsed> = {
   },
   gemini: {
     enabled: true,
+    abstract: false,
     // No `-p` here: gemini's `-p/--prompt` flag *requires* a positional
     // value, but MMR delivers prompts via stdin. With `gemini -p
     // --output-format json` and prompt on stdin, gemini parses
@@ -69,6 +71,7 @@ export const BUILTIN_CHANNELS: Record<string, ChannelConfigParsed> = {
   },
   codex: {
     enabled: true,
+    abstract: false,
     command: 'codex exec',
     flags: ['--skip-git-repo-check', '-s', 'read-only', '--ephemeral'],
     env: {},
@@ -86,6 +89,7 @@ export const BUILTIN_CHANNELS: Record<string, ChannelConfigParsed> = {
     // Disabled by default: runs up to 3 LLM calls (~3 min) via scaffold observe audit.
     // Enable in .mmr.yaml or pass --channels=doc-conformance to use.
     enabled: false,
+    abstract: false,
     command: 'scaffold observe audit --profile=full --scope=all --output-mode=mmr-findings',
     flags: [],
     env: {},

@@ -1,6 +1,10 @@
 import { spawn } from 'node:child_process'
 import type { ChannelConfigParsed } from '../config/schema.js'
 
+type AuthenticatedChannelConfig = ChannelConfigParsed & {
+  auth: NonNullable<ChannelConfigParsed['auth']>
+}
+
 export interface AuthResult {
   status: 'ok' | 'failed' | 'timeout'
   recovery?: string
@@ -26,7 +30,7 @@ export async function checkInstalled(command: string): Promise<boolean> {
  * env merged into process.env. Returns ok/failed/timeout based on exit code
  * and timeout.
  */
-async function runAuthCheck(config: ChannelConfigParsed): Promise<AuthResult> {
+async function runAuthCheck(config: AuthenticatedChannelConfig): Promise<AuthResult> {
   const { auth, env } = config
 
   return new Promise((resolve) => {
@@ -76,10 +80,14 @@ async function runAuthCheck(config: ChannelConfigParsed): Promise<AuthResult> {
  * to handle transient network issues.
  */
 export async function checkAuth(config: ChannelConfigParsed): Promise<AuthResult> {
-  const result = await runAuthCheck(config)
+  if (!config.auth) {
+    return { status: 'ok' }
+  }
+  const authConfig = { ...config, auth: config.auth }
+  const result = await runAuthCheck(authConfig)
   if (result.status === 'timeout') {
     // Retry once on timeout (transient network issue)
-    return runAuthCheck(config)
+    return runAuthCheck(authConfig)
   }
   return result
 }
