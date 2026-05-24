@@ -4,6 +4,8 @@
 **Auditor:** Claude (AI agent system design expert)
 **Input:** v2 spec (`docs/superpowers/specs/2026-03-12-scaffold-v2-modular-cross-platform-design.md`), v1 PRD (`docs/prd-v1.md`), scaffold overview, project structure, representative v1 prompts
 
+> **2026-05-24 note:** `BD_ACTOR` references in this document are retained as historical record. The current Beads env var is `BEADS_ACTOR` (since v1.0.0). See `docs/audits/beads-integration-audit-2026-05-24.md` F-2.5.
+
 ---
 
 ## Dimension 1: Machine-Parseability of State & Config

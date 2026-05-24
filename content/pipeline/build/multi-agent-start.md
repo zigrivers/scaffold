@@ -90,7 +90,7 @@ Before writing any code, verify the worktree environment:
    - If on a feature branch with changes, redirect to `/scaffold:multi-agent-resume $ARGUMENTS`
 
 3. **Beads identity** (if `.beads/` exists)
-   - `echo $BD_ACTOR` — should show `$ARGUMENTS`
+   - `echo $BEADS_ACTOR` — should show `$ARGUMENTS`
    - If not set, the worktree setup may be incomplete
 
 4. **Dependency check**

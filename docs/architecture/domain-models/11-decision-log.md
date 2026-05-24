@@ -154,7 +154,7 @@ interface DecisionEntry {
   /**
    * Identity of who made this decision.
    * For human users: username or identifier.
-   * For agents: the BD_ACTOR value (e.g., "agent-1", "codex-main").
+   * For agents: the BEADS_ACTOR value (e.g., "agent-1", "codex-main").
    * For CLI-generated entries (brownfield adoption): "scaffold-adopt".
    */
   completed_by: string;
@@ -207,7 +207,7 @@ interface DecisionWriteInput {
   /** Prompt slug that produced these decisions */
   prompt: string;
 
-  /** Identity of the decision-maker (user, agent name, BD_ACTOR) */
+  /** Identity of the decision-maker (user, agent name, BEADS_ACTOR) */
   actor: string;
 
   /** Whether the prompt completed successfully */

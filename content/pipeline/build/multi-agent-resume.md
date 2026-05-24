@@ -85,7 +85,7 @@ Before doing anything else, confirm the environment:
    - If NOT in a worktree, stop and instruct the user to set one up or navigate to the correct directory
 
 2. **Beads identity** (if `.beads/` exists)
-   - `echo $BD_ACTOR` — should show `$ARGUMENTS`
+   - `echo $BEADS_ACTOR` — should show `$ARGUMENTS`
    - If not set, the worktree setup may be incomplete
 
 ### State Recovery
@@ -114,7 +114,7 @@ Recover your context by checking the current state of work:
 ### Beads Recovery
 
 **If Beads is configured** (`.beads/` exists):
-- `bd list --actor $ARGUMENTS` — check for tasks with `in_progress` status owned by this agent
+- `bd list --assignee $ARGUMENTS` — check for tasks with `in_progress` status owned by this agent
 - If a PR shows as merged, close the corresponding task: `bd close <id>`
 - If there is in-progress work, finish it (see "Resume In-Progress Work" below)
 - Otherwise, clean up and start fresh:

@@ -34,11 +34,11 @@ parallel agents, CI pipeline, branch protection, and conflict prevention rules.
 
 ## Quality Criteria
 - (mvp) Branch naming format is consistent (Beads: bd-<task-id>/<desc>. Non-Beads: <type>/<desc>)
-- (mvp) Commit format is consistent (Beads: [BD-<id>] type(scope): desc. Non-Beads: type(scope): desc)
+- (mvp) Commit format is consistent (Beads: [bd-<id>] type(scope): desc. Non-Beads: type(scope): desc)
 - (deep) PR workflow includes all 8 sub-steps (commit, AI review, rebase, push, create,
   auto-merge with --delete-branch, watch CI, confirm merge)
 - (deep) Worktree script creates permanent worktrees with workspace branches
-- (deep) If Beads: BD_ACTOR environment variable documented for agent identity
+- (deep) If Beads: BEADS_ACTOR environment variable documented for agent identity
 - (deep) CI workflow job name matches branch protection context
 - (mvp) Branch cleanup documented for both single-agent and worktree-agent variants
 - (deep) Agent crash recovery procedure documented

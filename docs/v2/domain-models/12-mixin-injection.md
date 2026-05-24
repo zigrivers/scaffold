@@ -1542,10 +1542,10 @@ scripts/setup-agent-worktree.sh <agent-name>
 
 ### Agent Identity
 
-Set `BD_ACTOR` for task attribution:
+Set `BEADS_ACTOR` for task attribution:
 
 ```bash
-export BD_ACTOR="agent-1"
+export BEADS_ACTOR="agent-1"
 ```
 
 ### Task Claiming
@@ -1641,10 +1641,10 @@ scripts/setup-agent-worktree.sh <agent-name>
 
 ### Agent Identity
 
-Set `BD_ACTOR` for task attribution:
+Set `BEADS_ACTOR` for task attribution:
 
 ```bash
-export BD_ACTOR="agent-1"
+export BEADS_ACTOR="agent-1"
 ```
 
 ### Task Claiming

@@ -179,15 +179,17 @@ git branch | grep "workspace" | xargs -r git branch -D
 
 Use `-D` here because workspace branches are not merged — they're disposable.
 
-### BD_ACTOR Environment Variable
+### BEADS_ACTOR Environment Variable
 
-When using Beads for task tracking, set `BD_ACTOR` per agent for attribution:
+When using Beads for task tracking, set `BEADS_ACTOR` per agent for attribution:
 
 ```bash
-export BD_ACTOR="agent-1"
+export BEADS_ACTOR="agent-1"
 ```
 
 This ensures that task claims, completions, and other Beads operations are attributed to the correct agent. Set it in the agent's shell environment before starting work.
+
+> Older Beads versions (<v1.0.0) used `BD_ACTOR`. It's still accepted as a deprecated alias — if you see it in legacy scripts, rename when you next edit.
 
 ### Listing Active Worktrees
 

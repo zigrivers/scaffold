@@ -5,6 +5,8 @@
 
 > **2026-05-24 note:** `bd sync` is referenced in this spec but is not a real upstream command in Beads v1.0.4. See `docs/audits/beads-integration-audit-2026-05-24.md` F-2.1.
 
+> **2026-05-24 note:** `BD_ACTOR` references in this document are retained as historical record. The current Beads env var is `BEADS_ACTOR` (since v1.0.0). See `docs/audits/beads-integration-audit-2026-05-24.md` F-2.5.
+
 ## Problem
 
 Scaffold still supports Beads as an optional feature for downstream user
