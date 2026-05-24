@@ -697,7 +697,9 @@ if [ -f .mmr.yaml ]; then
   fi
 fi
 
-if [ "$beads_enabled" = "true" ] && [ -d .beads ] && command -v bd >/dev/null 2>&1; then
+if [ "$beads_enabled" = "true" ] && [ -d .beads ] && command -v bd >/dev/null 2>&1 \
+   && command -v mmr >/dev/null 2>&1 && [ -n "${JOB_ID:-}" ]; then
+  # Skip when the review-code flow ran in manual fallback mode (no mmr, no JOB_ID).
   threshold_rank=$(case "$beads_fix_threshold" in P0) echo 0;; P1) echo 1;; P2) echo 2;; P3) echo 3;; *) echo 4;; esac)
 
   # Capture the reconciled findings from the MMR job we already ran upstream.

@@ -66,7 +66,7 @@ Before starting a task, verify all its blockers are resolved. After completing e
 ### Multi-Agent Conflict Avoidance — Extended
 
 **Claiming a task:**
-- Creating a feature branch (e.g., `bd-42/add-user-endpoint`) is the claim signal
+- Creating a feature branch (e.g., `bd-a3f8/add-user-endpoint`) is the claim signal
 - Other agents should check for existing branches before claiming the same task
 - If two agents accidentally claim the same task, the one with fewer commits yields
 
@@ -102,7 +102,7 @@ Beads is an optional task-tracking tool. Detect its presence and adapt.
 - Use `bd ready` to list tasks that are ready for work
 - Use `bd update <id> --claim` to atomically claim a task (or `bd ready --claim --json` to find and claim the first available in one call)
 - Use `bd close <id>` after PR is merged to mark task complete
-- Task IDs come from Beads (`bd-42`, `bd-43`, etc.)
+- Task IDs come from Beads (`bd-a3f8`, `bd-a3f9`, etc. — hash-based, lowercase)
 - Branch naming follows Beads convention: `bd-<id>/<short-desc>`
 
 **Without Beads:**

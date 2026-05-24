@@ -1502,7 +1502,7 @@ in the `.beads/` directory with SQLite-backed storage.
 
 ### Commit Format
 
-All commits must include a Beads task ID: `[BD-<id>] type(scope): description`
+All commits must include a Beads task ID: `[bd-<id>] type(scope): description`
 
 <!-- section:close-workflow -->
 When a PR is merged, close the associated task:
@@ -1598,7 +1598,7 @@ in the `.beads/` directory with SQLite-backed storage.
 
 ### Commit Format
 
-All commits must include a Beads task ID: `[BD-<id>] type(scope): description`
+All commits must include a Beads task ID: `[bd-<id>] type(scope): description`
 
 ## Branch Naming Convention
 
