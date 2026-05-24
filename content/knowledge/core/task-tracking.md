@@ -78,8 +78,9 @@ Initialization creates:
 |---------|---------|-------------|
 | `bd create "title"` | Create a new task | Starting new work |
 | `bd list` | Show all tasks | Session start, planning |
-| `bd status BD-xxx` | Check task state | Before picking up work |
-| `bd start BD-xxx` | Mark task in-progress | Beginning work on a task |
+| `bd show <id>` | Inspect full task (alias `bd view`) | Before picking up work |
+| `bd update <id> --claim` | Atomically claim (assigns to you + sets `in_progress`) | Beginning work on a task |
+| `bd ready --claim --json` | Find and claim first ready task in one call | Picking next task with no preference |
 | `bd done BD-xxx` | Mark task complete | After PR merged |
 | `bd ready` | List tasks ready to start | Picking next task |
 | `bd block BD-xxx "reason"` | Mark task blocked | When dependency is unmet |
@@ -108,7 +109,7 @@ The `[BD-xxx]` prefix enables:
 1. Review `tasks/lessons.md` for recent patterns and corrections
 2. Run `bd ready` to see available tasks
 3. Pick the highest-priority ready task (or continue an in-progress task)
-4. Run `bd start BD-xxx` to claim the task
+4. Run `bd update <id> --claim` to atomically claim the task (or skip step 2-3 and just `bd ready --claim --json`)
 5. Read the task description and acceptance criteria before writing code
 
 #### Session End Protocol

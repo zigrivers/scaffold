@@ -100,7 +100,7 @@ Beads is an optional task-tracking tool. Detect its presence and adapt.
 
 **When `.beads/` directory exists:**
 - Use `bd ready` to list tasks that are ready for work
-- Use `bd claim <id>` to claim a task (if available)
+- Use `bd update <id> --claim` to atomically claim a task (or `bd ready --claim --json` to find and claim the first available in one call)
 - Use `bd close <id>` after PR is merged to mark task complete
 - Task IDs come from Beads (`bd-42`, `bd-43`, etc.)
 - Branch naming follows Beads convention: `bd-<id>/<short-desc>`
