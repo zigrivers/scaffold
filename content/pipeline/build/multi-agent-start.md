@@ -183,19 +183,19 @@ For each task:
      fi
      ```
      Fix any issues `bd preflight` flags before proceeding.
-   - **For 3+ parallel agents**, acquire a merge slot to serialize merge-time conflicts:
+   - **For 3+ parallel agents**, acquire the project's merge slot to serialize merge-time conflicts:
      ```bash
      if [ -d .beads ]; then
-       SLOT=$(bd merge-slot acquire --json | jq -r '.slot_id')
+       bd merge-slot acquire --wait    # blocks if held; queues you in priority order
      fi
      ```
-     Skip for single-agent or two-agent runs. See `content/knowledge/execution/multi-agent-coordination.md`.
+     There is one merge slot per project; `--wait` blocks until you have it. Skip for single-agent or two-agent runs. See `content/knowledge/execution/multi-agent-coordination.md`.
    - Push the branch: `git push -u origin HEAD`
    - Create a pull request: `gh pr create`
    - After the PR merges (or if you abandon the work), release the slot:
      ```bash
-     if [ -d .beads ] && [ -n "${SLOT:-}" ]; then
-       bd merge-slot release "$SLOT"
+     if [ -d .beads ]; then
+       bd merge-slot release   # holder verified via $BEADS_ACTOR
      fi
      ```
    - Include in the PR description: what was implemented, key decisions, files changed, agent name
@@ -236,9 +236,10 @@ For each task:
 - Without Beads: check open PRs (`gh pr list`) for overlapping work
 - Move to the next available unblocked task
 
-**Discovered a category of work blocked by something not yet done:**
-- If Beads: file the blocker as a gate (`bd gate create "<gate-name>"`), then add each affected downstream task as a waiter (`bd gate add-waiter "<gate-name>" --task <id>`). Resolve the gate when the underlying condition is met (`bd gate resolve "<gate-name>"`).
-- Use this pattern when multiple downstream tasks share the same blocker. For one-off "this task blocks that task" cases, `bd dep add --blocks` is enough.
+**A downstream task is blocked on a specific async condition (PR merge, workflow run, timer, human decision):**
+- If Beads: create a gate that blocks the downstream task. The gate has an auto-generated ID. For a PR-merge blocker: `bd gate create --type=gh:pr --blocks <task-id> --await-id=<pr-number> --reason "..."`. For a human-resolved blocker: `bd gate create --blocks <task-id> --reason "..."` (defaults to `--type=human`). Capture the gate ID via `--json | jq -r '.id'` if you need to resolve manually later.
+- The gated task disappears from `bd ready` until the gate resolves. `gh:pr` / `gh:run` / `timer` gates auto-resolve via watchers; `human` gates resolve via `bd gate resolve <gate-id>`.
+- If multiple downstream tasks share one underlying blocker, create one gate per blocked task pointing at the same `--await-id`. For dependency-style blocking ("this task can't start until that task finishes"), use `bd dep add --blocks` instead.
 - See `content/knowledge/execution/multi-agent-coordination.md` for the full pattern.
 
 **Dependency install fails after cleanup:**
