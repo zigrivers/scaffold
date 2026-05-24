@@ -700,6 +700,10 @@ fi
 if [ "$beads_enabled" = "true" ] && [ -d .beads ] && command -v bd >/dev/null 2>&1; then
   threshold_rank=$(case "$beads_fix_threshold" in P0) echo 0;; P1) echo 1;; P2) echo 2;; P3) echo 3;; *) echo 4;; esac)
 
+  # Capture the reconciled findings from the MMR job we already ran upstream.
+  # MMR JSON shape: { reconciled_findings: [{ severity, location, description, suggestion, ... }] }
+  review_json=$(mmr results "$JOB_ID" --format json)
+
   while IFS= read -r finding; do
     title=$(jq -r '.description | .[0:120]' <<<"$finding")
     severity=$(jq -r '.severity' <<<"$finding")
@@ -718,10 +722,10 @@ if [ "$beads_enabled" = "true" ] && [ -d .beads ] && command -v bd >/dev/null 2>
     fi
     bd create "${args[@]}"
   done < <(jq -c --argjson maxRank "$threshold_rank" '
-    .results.channels[].findings[]
+    .reconciled_findings[]?
     | (.severity | sub("^P";"") | tonumber) as $rank
     | select($rank <= $maxRank)
-  ' "$REVIEW_JSON")
+  ' <<<"$review_json")
 fi
 ```
 
