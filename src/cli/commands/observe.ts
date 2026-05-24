@@ -1,5 +1,6 @@
 import type { CommandModule } from 'yargs'
 import { writeEvent } from '../../observability/engine/ledger-writer.js'
+import { beadsAdapter } from '../../observability/adapters/beads.js'
 import type { EventType, EngineOutput } from '../../observability/engine/types.js'
 import { EVENT_PAYLOAD_KEYS } from '../../observability/engine/event-schemas.js'
 import { runProgress, runAudit } from '../../observability/engine/api.js'
@@ -41,6 +42,8 @@ export interface HandleEventInput {
   branch: string
   taskId: string | null
   keyValues: Record<string, string>
+  /** Optional override of the `bd` binary path — used by tests; defaults to "bd" via beadsAdapter. */
+  bdBin?: string
 }
 
 const NUMERIC_KEYS = new Set(['pr-number'])
@@ -71,12 +74,23 @@ function buildPayload(type: EventType, kv: Record<string, string>): Record<strin
 export async function handleEvent(input: HandleEventInput): Promise<number> {
   const payload = buildPayload(input.type, input.keyValues)
   try {
-    await writeEvent(input.cwd, {
+    const written = await writeEvent(input.cwd, {
       type: input.type,
       branch: input.branch,
       task_id: input.taskId,
       payload,
     })
+    // Cross-link to Beads when the event is task_claimed and a task_id is present.
+    // Fail-soft: claimWithEvent returns false on missing .beads/, missing bd, or any
+    // bd error — we don't propagate failures to the caller, since the ledger
+    // write succeeded.
+    if (input.type === 'task_claimed' && input.taskId) {
+      await beadsAdapter.claimWithEvent(
+        input.cwd,
+        { id: input.taskId, eventId: written.event_id },
+        input.bdBin ? { bdBin: input.bdBin } : undefined,
+      )
+    }
     return 0
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)

@@ -33,6 +33,45 @@ describe('observe event subcommand', () => {
     expect((obj.payload as Record<string, unknown>).wave).toBe('wave-2')
   })
 
+  it('task_claimed cross-links to Beads via claimWithEvent when .beads/ + bd available', async () => {
+    mkdirSync(join(dir, '.beads'), { recursive: true })
+    const log = join(dir, 'bd-invocations.log')
+    const shim = join(dir, 'fake-bd.sh')
+    writeFileSync(shim, `#!/usr/bin/env bash
+if [ "$1" = "--version" ]; then echo "bd version 1.0.4"; exit 0; fi
+if [ "$1" = "update" ]; then echo "$@" >> "${log}"; exit 0; fi
+exit 0
+`, { mode: 0o755 })
+
+    const exitCode = await handleEvent({
+      cwd: dir,
+      type: 'task_claimed',
+      branch: 'feat',
+      taskId: 'bd-a3f8',
+      keyValues: { 'task-title': 'Atomic claim wiring' },
+      bdBin: shim,
+    })
+    expect(exitCode).toBe(0)
+    expect(existsSync(log)).toBe(true)
+    const logged = readFileSync(log, 'utf-8')
+    expect(logged).toMatch(/update bd-a3f8/)
+    expect(logged).toMatch(/--set-metadata ledger_event_id=[0-9A-Z]+/) // ULID
+    expect(logged).toMatch(/--claim/)
+  })
+
+  it('task_claimed does NOT call bd when .beads/ is absent (fail-soft)', async () => {
+    // No .beads/ dir; the event should still be written, no bd invocation attempted.
+    const exitCode = await handleEvent({
+      cwd: dir,
+      type: 'task_claimed',
+      branch: 'feat',
+      taskId: 'T-001',
+      keyValues: { 'task-title': 'No Beads here' },
+    })
+    expect(exitCode).toBe(0)
+    expect(existsSync(join(dir, '.scaffold/activity.jsonl'))).toBe(true)
+  })
+
   it('exits with code 2 on schema-invalid input (missing payload field)', async () => {
     const exitCode = await handleEvent({
       cwd: dir,
