@@ -567,20 +567,23 @@ print(" ".join(p for p in out if p))
 
 _review_finding_hash() {
   # Input: $1 = single-finding JSON object (with location, category, description, suggestion fields)
-  # Output: 40-char sha1 hex of normalized_location + "|" + category + "|" + sha1(description_normalized)
+  # Output: 40-char sha1 hex of normalized_location + "|" + category + "|" + sha1(description_normalized) + "|" + sha1(suggestion_normalized)
   _review_require_jq || return 1
   local f="$1"
-  local loc cat desc
+  local loc cat desc sugg
   loc=$(printf '%s' "$f"  | jq -r '.location // ""')
-  cat=$(printf '%s' "$f"  | jq -r '.category // .severity // ""')
+  cat=$(printf '%s' "$f"  | jq -r '.category // ""')
   desc=$(printf '%s' "$f" | jq -r '.description // ""')
+  sugg=$(printf '%s' "$f" | jq -r '.suggestion // ""')
 
-  local nloc ndesc dhash
+  local nloc ndesc nsugg dhash shash
   nloc=$(_review_normalize_location "$loc") || return 1
   ndesc=$(_review_normalize_description "$desc") || return 1
+  nsugg=$(_review_normalize_suggestion "$sugg") || return 1
   dhash=$(printf '%s' "$ndesc" | _review_sha1) || return 1
+  shash=$(printf '%s' "$nsugg" | _review_sha1) || return 1
 
-  printf '%s|%s|%s' "$nloc" "$cat" "$dhash" \
+  printf '%s|%s|%s|%s' "$nloc" "$cat" "$dhash" "$shash" \
     | _review_sha1
 }
 
@@ -660,10 +663,9 @@ For very noisy fix loops you may suggest `--fix-threshold P1` to narrow the
 gate; the project default stays at P2 per the design's Decision 4. Do not
 auto-change the threshold.
 
-Identity components — `location`, `category`, and `description` — mirror MMR
-T2-A's forthcoming native `finding_key` while keeping suggestions out of the
-strict hash so alternative fix advice for the same defect does not reset the
-strike counter. This remains a clean migration when v3.30 ships.
+Identity components — `location`, `category`, `description`, and `suggestion`
+— mirror MMR T2-A's forthcoming native `finding_key` so this remains a clean
+migration when v3.30 ships.
 
 ### Step 8: Final Verdict
 
