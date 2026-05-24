@@ -712,3 +712,4 @@ for the next delivery step (commit, push, or PR creation).
 4. **Independence** — never share one channel's output with another.
 5. **Fix before proceeding** — findings at or above `fix_threshold` must be resolved before moving to the next task.
 6. **Dispatch pattern** follows `multi-model-review-dispatch` knowledge entry. When modifying channel dispatch in this file, verify consistency with `review-pr.md` and `post-implementation-review.md`.
+7. **3-round limit (per finding hash)** — never attempt to fix the *same* blocking finding (identified by the Step 7a hash of `location` + `category` + `description` + `suggestion`) more than 3 times. The attempts file `.scaffold/review-attempts/<session-id>.json` is the source of truth; `_review_at_strike_limit` checks it. For noisy fix loops, optionally suggest `--fix-threshold P1` (the project default stays at P2).
