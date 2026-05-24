@@ -123,7 +123,17 @@ git commit -m "docs(beads): cross-reference user-level vs project-level memory s
 **Files:**
 - Modify: `scripts/setup-agent-worktree.sh`
 
-### Task B.1: Add `bd worktree create` after the existing doctor block
+> **⚠ Phase B as originally planned was SUPERSEDED post-implementation.** The
+> snippets below are historical (what was attempted on first pass); the actual
+> shipped change does NOT add `bd worktree create`. Reasoning: `bd worktree
+> create <name>` is a CREATOR (makes a new git worktree at `./<name>` or the
+> given path), not a registrar for an existing worktree. Upstream Beads v1.0.4
+> documents that worktrees automatically share the parent's Beads DB via git
+> common-directory discovery — there is nothing to register. The shipped
+> script just runs `bd doctor --fix`; the embedded code below should not be
+> copy-pasted.
+
+### Task B.1: Add `bd worktree create` after the existing doctor block (HISTORICAL — superseded)
 
 - [ ] **Step 1: Find the existing Beads remediation block**
 

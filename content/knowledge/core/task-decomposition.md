@@ -12,7 +12,7 @@ Expert knowledge for breaking user stories into implementable tasks with depende
 
 ### Story-to-Task Mapping
 
-User stories bridge PRD features and implementation tasks. Each story decomposes into tasks following the technical layers needed. Every task must trace back to a user story, and every story to a PRD feature (PRD Feature → US-xxx → Task BD-xxx).
+User stories bridge PRD features and implementation tasks. Each story decomposes into tasks following the technical layers needed. Every task must trace back to a user story, and every story to a PRD feature (PRD Feature → US-xxx → Task bd-<id>).
 
 ### Task Sizing
 
@@ -146,9 +146,9 @@ Every task must trace back to a user story, and every user story must trace to a
 ```
 PRD Feature: User Profile Management
   -> US-002: Edit display name and bio
-    -> Task BD-42: implement PATCH /api/v1/users/:id
-    -> Task BD-43: add profile edit form component
-    -> Task BD-44: add profile edit page with state management
+    -> Task bd-a3f8: implement PATCH /api/v1/users/:id
+    -> Task bd-a3f9: add profile edit form component
+    -> Task bd-a3fa: add profile edit page with state management
 ```
 
 This traceability ensures:

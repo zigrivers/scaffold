@@ -193,14 +193,14 @@ For complex projects, maintain a progress summary:
 # Progress
 
 ## Current Sprint
-- [x] BD-10: Database schema migration (done)
-- [x] BD-11: Auth middleware (done)
+- [x] bd-a1b2: Database schema migration (done)
+- [x] bd-a1b3: Auth middleware (done)
 - [ ] bd-a3f8: User registration endpoint (in_progress)
 - [ ] bd-a3f9: Login endpoint (open, ready to pick up)
-- [ ] BD-14: Profile management (blocked — needs BD-12)
+- [ ] bd-a3fa: Profile management (blocked — needs bd-a3f8)
 
 ## Blocked
-- BD-14: Waiting on BD-12 (user model finalization)
+- bd-a3fa: Waiting on bd-a3f8 (user model finalization)
 ```
 
 #### Completion Criteria Checklists
@@ -208,7 +208,7 @@ For complex projects, maintain a progress summary:
 Each task should define explicit completion criteria, not vague goals:
 
 ```markdown
-## BD-12: User registration endpoint
+## bd-a3f8: User registration endpoint
 
 ### Done when:
 - [ ] POST /api/v1/auth/register endpoint exists

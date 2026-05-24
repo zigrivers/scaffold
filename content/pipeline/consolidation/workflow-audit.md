@@ -37,7 +37,7 @@ inconsistent command formats. Fix all issues found.
 
 ## Quality Criteria
 - (mvp) CLAUDE.md contains complete workflow (9 steps + AI review step 4.5)
-- (mvp) Commit format is consistent everywhere (If Beads: [BD-<id>] type(scope): description. Without Beads: type(scope): description)
+- (mvp) Commit format is consistent everywhere (If Beads: [bd-<id>] type(scope): description. Without Beads: type(scope): description)
 - (mvp) Branch naming is consistent everywhere (If Beads: bd-<task-id>/<short-desc>. Without Beads: <type>/<short-desc>)
 - (mvp) PR workflow includes all 8 sub-steps with --delete-branch flag
 - (mvp) If Beads: task closure uses bd close (not bd update --status completed)
