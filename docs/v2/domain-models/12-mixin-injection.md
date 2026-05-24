@@ -1136,8 +1136,7 @@ Sub-section targeting allows a prompt to inject only a specific portion of a mix
 General setup instructions for the task-tracking system.
 
 <!-- section:close-workflow -->
-When you complete a task, run `bd close <id>` to mark it done.
-Then run `bd dolt push` (no-op if no Dolt remote is configured) to persist the change.
+When you complete a task, run `bd close <id>` to mark it done. If a Dolt remote is configured (`bd config get dolt.remote` returns a value), follow up with `bd dolt push` to share the change with teammates; otherwise the local auto-commit is sufficient.
 
 <!-- section:pr-integration -->
 Before creating a PR, check `bd ready` for any tasks
@@ -1510,7 +1509,7 @@ When a PR is merged, close the associated task:
 
 ```bash
 bd close <id>
-bd dolt push  # no-op if no Dolt remote configured
+[ -n "$(bd config get dolt.remote 2>/dev/null)" ] && bd dolt push  # only pushes when a Dolt remote is configured
 ```
 
 Then check for newly unblocked tasks:
@@ -1618,7 +1617,7 @@ When a PR is merged, close the associated task:
 
 ```bash
 bd close <id>
-bd dolt push  # no-op if no Dolt remote configured
+[ -n "$(bd config get dolt.remote 2>/dev/null)" ] && bd dolt push  # only pushes when a Dolt remote is configured
 ```
 
 Then check for newly unblocked tasks:

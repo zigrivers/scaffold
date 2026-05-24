@@ -784,7 +784,7 @@ The spec defines 8 verbs. Analysis of 182+ `bd` command occurrences across v1 pr
 | `close` | `bd close $ID` | inline-code |
 | `dep-add` | `bd dep add $CHILD $PARENT` | inline-code |
 | `show` | `bd show $ID` | inline-code |
-| `sync` | `bd dolt push` (no-op when no Dolt remote is configured) | inline-code |
+| `sync` | `[ -n "$(bd config get dolt.remote 2>/dev/null)" ] && bd dolt push` (only when a Dolt remote is configured) | inline-code |
 | `dep-tree` | `bd dep tree` (+ `$ID` if ID arg) | inline-code |
 | `dep-remove` | `bd dep remove $CHILD $PARENT` | inline-code |
 | `dep-cycles` | `bd dep cycles` | inline-code |
@@ -1295,7 +1295,7 @@ close:
   template: '`bd close $ID`'
   format: prose
 sync:
-  template: '`bd dolt push`'
+  template: '`[ -n "$(bd config get dolt.remote 2>/dev/null)" ] && bd dolt push` (only when a Dolt remote is configured)'
   format: prose
 ```
 
@@ -1332,7 +1332,7 @@ sync:
 
 6. Close the tracking task:
    `bd close TASK_ID`
-   `bd dolt push`  # no-op if no Dolt remote configured
+   `[ -n "$(bd config get dolt.remote 2>/dev/null)" ] && bd dolt push`  # only pushes when a Dolt remote is configured
 ```
 
 The output reads naturally and contains concrete Beads commands.

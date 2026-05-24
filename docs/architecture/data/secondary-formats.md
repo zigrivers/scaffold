@@ -705,7 +705,7 @@ After completing a task:
 
 ```bash
 bd close <id>
-bd dolt push  # no-op if no Dolt remote configured
+[ -n "$(bd config get dolt.remote 2>/dev/null)" ] && bd dolt push  # only pushes when a Dolt remote is configured
 ```
 
 <!-- section:pr-integration -->
@@ -713,7 +713,7 @@ bd dolt push  # no-op if no Dolt remote configured
 Before creating a PR, ensure all tasks are synced:
 
 ```bash
-bd dolt push  # no-op if no Dolt remote configured
+[ -n "$(bd config get dolt.remote 2>/dev/null)" ] && bd dolt push  # only pushes when a Dolt remote is configured
 gh pr create --title "[BD-<id>] type(scope): description"
 ```
 ```
@@ -721,7 +721,7 @@ gh pr create --title "[BD-<id>] type(scope): description"
 Parsed result:
 - **Preamble**: "Beads is the task-tracking tool... `bd` CLI."
 - **Section `setup`**: "Install Beads... `bd init`"
-- **Section `close-workflow`**: "After completing... `bd dolt push`"
+- **Section `close-workflow`**: "After completing... `bd dolt push` (only when a Dolt remote is configured)"
 - **Section `pr-integration`**: "Before creating a PR... description\""
 
 **Mixin file with no sections** (`mixins/tdd/strict.md`):
