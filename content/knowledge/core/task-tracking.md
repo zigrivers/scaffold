@@ -38,9 +38,11 @@ Epics group related tasks. Tasks are the unit of work assignment — one task pe
 
 Beads tracks task status through this state machine (upstream v1.0.4 enum):
 
-`open → in_progress → closed` (happy path)
+```text
+open → in_progress → closed       (happy path)
             ↓
-        `blocked` | `deferred` (off-path)
+        blocked | deferred         (off-path)
+```
 
 - **open** — Not started.
 - **in_progress** — Atomically claimed via `bd update <id> --claim` or `bd ready --claim`.
@@ -87,9 +89,9 @@ Initialization creates:
 | `bd show <id>` | Inspect full task (alias `bd view`) | Before picking up work |
 | `bd update <id> --claim` | Atomically claim (assigns to you + sets `in_progress`) | Beginning work on a task |
 | `bd ready --claim --json` | Find and claim first ready task in one call | Picking next task with no preference |
-| `bd done BD-xxx` | Mark task complete | After PR merged |
+| `bd close <id>` (alias `bd done`) | Mark task complete | After PR merged |
 | `bd ready` | List tasks ready to start | Picking next task |
-| `bd block BD-xxx "reason"` | Mark task blocked | When dependency is unmet |
+| `bd update <id> --status blocked` | Mark task blocked | When dependency is unmet |
 
 #### Commit Message Convention
 

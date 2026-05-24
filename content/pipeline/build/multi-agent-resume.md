@@ -219,7 +219,7 @@ Once in-progress work is complete (or if there was none):
 - Push updates and re-request review
 
 **Task was completed by another agent:**
-- If Beads: a `git pull` (and `bd dolt pull` if a Dolt remote is configured) brings the local DB current; run `bd doctor --fix` if anything looks stale.
+- If Beads: A `git pull` (and `bd dolt pull` if a Dolt remote is configured) brings the local DB current; run `bd doctor --fix` if anything looks stale.
 - Without Beads: check the plan/playbook for recently completed tasks and open PRs
 - Skip to the next available task
 

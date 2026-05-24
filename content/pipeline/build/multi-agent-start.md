@@ -210,7 +210,7 @@ For each task:
 - Resolve conflicts, re-run tests, force-push the branch
 
 **Another agent claimed the same task:**
-- If Beads: a `git pull` (and `bd dolt pull` if a Dolt remote is configured) brings the local DB current; run `bd doctor --fix` if anything looks stale.
+- If Beads: A `git pull` (and `bd dolt pull` if a Dolt remote is configured) brings the local DB current; run `bd doctor --fix` if anything looks stale.
 - Without Beads: check open PRs (`gh pr list`) for overlapping work
 - Move to the next available unblocked task
 
