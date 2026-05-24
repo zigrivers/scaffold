@@ -7,6 +7,10 @@
 ROOT="$BATS_TEST_DIRNAME/.."
 
 setup() {
+    command -v jq >/dev/null || skip "jq is required for review wrapper hash tests"
+    command -v shasum >/dev/null || skip "shasum is required for review wrapper hash tests"
+    command -v python3 >/dev/null || skip "python3 is required for review wrapper hash tests"
+
     TMPDIR_REVIEW="$(mktemp -d)"
     export ORIG_PWD="$PWD"
     cd "$TMPDIR_REVIEW"
@@ -15,12 +19,13 @@ setup() {
     # The block we want starts at the "### Step 7a:" header and ends at the
     # next "### Step 8:" header; we then keep only fenced bash blocks inside it.
     awk '
-        /^### Step 7a: Wrapper-Side Per-Finding Hash/ { in_section=1 }
-        /^### Step 8: Confirm Completion/ { in_section=0 }
+        /^### Step 7a:/ { in_section=1 }
+        /^### Step 8:/ { in_section=0 }
         in_section && /^```bash$/ { in_fence=1; next }
         in_section && /^```$/ && in_fence { in_fence=0; next }
         in_section && in_fence { print }
     ' "$ROOT/content/tools/review-pr.md" > helpers.sh
+    grep -q "_review_finding_hash()" helpers.sh
     # The section embeds a python3 heredoc; bats sources helpers.sh, which
     # defines the functions — they call python3 at runtime, not source time.
     # shellcheck disable=SC1091
