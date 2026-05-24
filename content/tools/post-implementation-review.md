@@ -435,8 +435,7 @@ The per-story review prompt for Codex and Gemini:
         \"severity\": \"P0|P1|P2|P3\",
         \"category\": \"correctness|edge-case|security|acceptance-criteria|test-coverage\",
         \"acceptance_criterion\": \"Which criterion (or null if general)\",
-        \"file\": \"relative/path/to/file.ts\",
-        \"line\": 42,
+        \"location\": \"relative/path/to/file.ts:42\",
         \"description\": \"Specific description\",
         \"suggestion\": \"How to fix it\"
       }
@@ -449,7 +448,7 @@ The per-story review prompt for Codex and Gemini:
   Return ONLY valid JSON."
 
 Normalize the Superpowers code-reviewer findings to the same JSON shape as
-Codex/Gemini (severity, category, acceptance_criterion, file, line, description, suggestion)
+Codex/Gemini (severity, category, acceptance_criterion, location, description, suggestion)
 before returning. Then return all three channels' findings plus channel status:
 {
   "story": "[STORY_TITLE]",
