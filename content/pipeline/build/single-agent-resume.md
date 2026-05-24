@@ -98,10 +98,10 @@ Recover your context by checking the current state of work:
 
 **If Beads is configured** (`.beads/` exists):
 - `bd list` — check for tasks with `in_progress` status
-- If a PR shows as merged, close the corresponding task: `bd close <id> && bd sync`
+- If a PR shows as merged, close the corresponding task: `bd close <id>`
 - If there is in-progress work, finish it (see "Resume In-Progress Work" below)
-- Otherwise, start fresh with `bd ready` to find the next available task
-- Continue working until `bd ready` shows no available tasks
+- Otherwise, atomically claim the next ready task: `TASK=$(bd ready --claim --json | jq -r '.id')` (sets `assignee=$BEADS_ACTOR` + `status=in_progress`; no race window).
+- Continue working until `bd ready --claim --json` returns no task.
 
 **Without Beads:**
 - Read `docs/implementation-playbook.md` as the primary task reference.
@@ -148,6 +148,13 @@ Once in-progress work is complete (or if there was none):
    - Fix any findings at or above `fix_threshold` before proceeding
 
 3. **Create PR** (if not already created for in-progress work)
+   - If Beads is configured, run the PR-readiness checklist first:
+     ```bash
+     if [ -d .beads ]; then
+       bd preflight
+     fi
+     ```
+     Fix any issues `bd preflight` flags before proceeding.
    - Push the branch: `git push -u origin HEAD`
    - Create a pull request: `gh pr create`
    - Follow the PR workflow from `docs/git-workflow.md` or CLAUDE.md
@@ -187,7 +194,7 @@ Once in-progress work is complete (or if there was none):
 - Push updates and re-request review
 
 **Task was completed by another agent (multi-agent overlap):**
-- If Beads: `bd sync` will show updated task states
+- If Beads: A `git pull` (and `bd dolt pull` if a Dolt remote is configured) brings the local DB current; run `bd doctor --fix` if anything looks stale.
 - Without Beads: check the plan/playbook for recently completed tasks
 - Skip to the next available task
 

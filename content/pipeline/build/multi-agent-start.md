@@ -9,7 +9,7 @@ outputs: []
 conditional: null
 stateless: true
 category: pipeline
-knowledge-base: [tdd-execution-loop, task-claiming-strategy, worktree-management]
+knowledge-base: [tdd-execution-loop, task-claiming-strategy, worktree-management, multi-agent-coordination]
 reads: [coding-standards, tdd, git-workflow]
 argument-hint: "<agent-name>"
 ---
@@ -90,7 +90,7 @@ Before writing any code, verify the worktree environment:
    - If on a feature branch with changes, redirect to `/scaffold:multi-agent-resume $ARGUMENTS`
 
 3. **Beads identity** (if `.beads/` exists)
-   - `echo $BD_ACTOR` — should show `$ARGUMENTS`
+   - `echo $BEADS_ACTOR` — should show `$ARGUMENTS`
    - If not set, the worktree setup may be incomplete
 
 4. **Dependency check**
@@ -119,11 +119,13 @@ These rules are critical for multi-agent operation:
 
 **If Beads is configured** (`.beads/` exists):
 - Branch naming: `bd-<id>/<desc>`
-- Run `bd ready` to see available tasks
-- Pick the lowest-ID unblocked task
+- Verify `$BEADS_ACTOR` is set per agent (echo it; bail if empty).
+- Atomically claim the next ready task: `TASK=$(bd ready --claim --json | jq -r '.id')`
+  - This sets `assignee=$BEADS_ACTOR` and `status=in_progress` in a single round-trip — eliminates the race window where two agents both see the same "ready" task.
+  - If `bd ready --claim` returns no task, you're done — exit the loop.
 - Implement following the TDD workflow below
-- After PR is merged: `bd close <id> && bd sync`
-- Repeat with `bd ready` until no tasks remain
+- After PR is merged: `bd close <id>`
+- Repeat (`bd ready --claim --json`) until no tasks remain
 
 **Without Beads:**
 - Branch naming: `<type>/<desc>` (e.g., `feat/add-auth`)
@@ -174,8 +176,28 @@ For each task:
    - Fix any findings at or above `fix_threshold` before proceeding
 
 7. **Create PR**
+   - If Beads is configured, run the PR-readiness checklist first:
+     ```bash
+     if [ -d .beads ]; then
+       bd preflight
+     fi
+     ```
+     Fix any issues `bd preflight` flags before proceeding.
+   - **For 3+ parallel agents**, acquire the project's merge slot to serialize merge-time conflicts:
+     ```bash
+     if [ -d .beads ]; then
+       bd merge-slot acquire --wait    # blocks if held; queues you in priority order
+     fi
+     ```
+     There is one merge slot per project; `--wait` blocks until you have it. Skip for single-agent or two-agent runs. See `content/knowledge/execution/multi-agent-coordination.md`.
    - Push the branch: `git push -u origin HEAD`
    - Create a pull request: `gh pr create`
+   - After the PR merges (or if you abandon the work), release the slot:
+     ```bash
+     if [ -d .beads ]; then
+       bd merge-slot release   # holder verified via $BEADS_ACTOR
+     fi
+     ```
    - Include in the PR description: what was implemented, key decisions, files changed, agent name
    - Follow the PR workflow from `docs/git-workflow.md` or CLAUDE.md
 
@@ -210,9 +232,15 @@ For each task:
 - Resolve conflicts, re-run tests, force-push the branch
 
 **Another agent claimed the same task:**
-- If Beads: `bd sync` will reveal the conflict — pick a different task
+- If Beads: A `git pull` (and `bd dolt pull` if a Dolt remote is configured) brings the local DB current; run `bd doctor --fix` if anything looks stale.
 - Without Beads: check open PRs (`gh pr list`) for overlapping work
 - Move to the next available unblocked task
+
+**A downstream task is blocked on a specific async condition (PR merge, workflow run, timer, human decision):**
+- If Beads: create a gate that blocks the downstream task. The gate has an auto-generated ID. For a PR-merge blocker: `bd gate create --type=gh:pr --blocks <task-id> --await-id=<pr-number> --reason "..."`. For a human-resolved blocker: `bd gate create --blocks <task-id> --reason "..."` (defaults to `--type=human`). Capture the gate ID via `--json | jq -r '.id'` if you need to resolve manually later.
+- The gated task disappears from `bd ready` until the gate resolves. `gh:pr` / `gh:run` / `timer` gates auto-resolve via watchers; `human` gates resolve via `bd gate resolve <gate-id>`.
+- If multiple downstream tasks share one underlying blocker, create one gate per blocked task pointing at the same `--await-id`. For dependency-style blocking ("this task can't start until that task finishes"), use `bd dep add --blocks` instead.
+- See `content/knowledge/execution/multi-agent-coordination.md` for the full pattern.
 
 **Dependency install fails after cleanup:**
 - `git clean -fd` may have removed generated files — re-run the full install sequence

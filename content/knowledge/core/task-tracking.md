@@ -18,7 +18,9 @@ Core properties:
 - **Repository-local** — Task data lives in `.beads/`, committed alongside code
 - **Git-hook synced** — Task state updates automatically on commit via data-sync hooks
 - **CLI-driven** — All operations via `bd` commands (create, list, status, ready)
-- **ID-prefixed commits** — Every commit message includes `[BD-xxx]` for traceability
+- **ID-prefixed commits** — Every commit message includes `[bd-<id>]` for traceability
+
+> IDs are hash-based and lowercase (e.g., `bd-a3f8`). The `bd-` prefix is configurable at `bd init` time. Hierarchical IDs for epic children: `bd-a3f8.1`, `bd-a3f8.1.1`. Older example IDs in this doc using `BD-42`-style uppercase digits reflect a pre-v1.0.0 convention; current upstream emits hash-based lowercase IDs.
 
 ### Task Hierarchy
 
@@ -34,18 +36,24 @@ Epics group related tasks. Tasks are the unit of work assignment — one task pe
 
 ### Progress Tracking
 
-Track task status through a simple state machine:
+Beads tracks task status through this state machine (upstream v1.0.4 enum):
 
-```
-ready → in-progress → review → done
-                  ↘ blocked
+```text
+open → in_progress → closed       (happy path)
+            ↓
+        blocked | deferred         (off-path)
 ```
 
-- **ready** — All dependencies met, can start immediately
-- **in-progress** — Agent is actively working on it
-- **review** — Implementation complete, awaiting PR merge
-- **done** — PR merged, tests passing on main
-- **blocked** — Cannot proceed, dependency or question unresolved
+- **open** — Not started.
+- **in_progress** — Atomically claimed via `bd update <id> --claim` or `bd ready --claim`.
+- **blocked** — Dependency unresolved (set automatically when a `blocks:` dep exists on an open issue).
+- **deferred** — Hidden from `bd ready` until `--defer` date passes.
+- **closed** — Completed (via `bd close <id>`). Reopen with `bd reopen <id>`.
+- **pinned** / **hooked** — Special states; rarely set manually.
+
+Beads also exposes a *status category* dimension (`active | wip | done | frozen`) for higher-level grouping. Use `bd state <id>` to query, `bd statuses` to list valid statuses.
+
+> Scaffold previously documented `ready → in-progress → review → done` — none of those (except via `ready` as a *query*) are upstream statuses. The `review` state, if needed, can be added per-project via `bd config set types.custom_statuses '[{"name":"review","category":"wip"}]'`.
 
 ### Lessons-Learned Workflow
 
@@ -70,7 +78,7 @@ bd init              # Creates .beads/ directory with data store and git hooks
 Initialization creates:
 - `.beads/` — Data directory (committed to git)
 - Git hooks for automatic data sync (these are Beads data hooks, not code-quality hooks like pre-commit linters)
-- Initial `[BD-0]` bootstrap convention
+- Initial `[bd-<id>]` bootstrap convention (lowercase hash-style)
 
 #### Core Commands
 
@@ -78,25 +86,26 @@ Initialization creates:
 |---------|---------|-------------|
 | `bd create "title"` | Create a new task | Starting new work |
 | `bd list` | Show all tasks | Session start, planning |
-| `bd status BD-xxx` | Check task state | Before picking up work |
-| `bd start BD-xxx` | Mark task in-progress | Beginning work on a task |
-| `bd done BD-xxx` | Mark task complete | After PR merged |
+| `bd show <id>` | Inspect full task (alias `bd view`) | Before picking up work |
+| `bd update <id> --claim` | Atomically claim (assigns to you + sets `in_progress`) | Beginning work on a task |
+| `bd ready --claim --json` | Find and claim first ready task in one call | Picking next task with no preference |
+| `bd close <id>` (alias `bd done`) | Mark task complete | After PR merged |
 | `bd ready` | List tasks ready to start | Picking next task |
-| `bd block BD-xxx "reason"` | Mark task blocked | When dependency is unmet |
+| `bd update <id> --status blocked` | Mark task blocked | When dependency is unmet |
 
 #### Commit Message Convention
 
 Every commit references its Beads task:
 
 ```
-[BD-42] feat(api): implement user registration endpoint
+[bd-a3f8] feat(api): implement user registration endpoint
 
 - Add POST /api/v1/auth/register
 - Add input validation with zod schema
 - Add integration tests for happy path and validation errors
 ```
 
-The `[BD-xxx]` prefix enables:
+The `[bd-<id>]` prefix enables:
 - Automatic task-to-commit traceability
 - Progress tracking based on commit activity
 - Session reconstruction (which commits belong to which task)
@@ -108,13 +117,13 @@ The `[BD-xxx]` prefix enables:
 1. Review `tasks/lessons.md` for recent patterns and corrections
 2. Run `bd ready` to see available tasks
 3. Pick the highest-priority ready task (or continue an in-progress task)
-4. Run `bd start BD-xxx` to claim the task
+4. Run `bd update <id> --claim` to atomically claim the task (or skip step 2-3 and just `bd ready --claim --json`)
 5. Read the task description and acceptance criteria before writing code
 
 #### Session End Protocol
 
-1. Commit all work with `[BD-xxx]` prefix
-2. If task is complete: create PR, run `bd done BD-xxx`
+1. Commit all work with `[bd-<id>]` prefix (lowercase hash-style)
+2. If task is complete: create PR, run `bd close <id>` (alias: `bd done`)
 3. If task is incomplete: leave clear notes about current state and next steps
 4. If lessons were learned: update `tasks/lessons.md`
 
@@ -124,7 +133,7 @@ A task is done when:
 - All acceptance criteria from the task description are met
 - Tests pass (`make check` or equivalent)
 - Code follows project coding standards
-- Changes are committed with proper `[BD-xxx]` message
+- Changes are committed with proper `[bd-<id>]` message
 - PR is created (or merged, depending on workflow)
 
 Do not mark a task done based on "it seems to work." Prove it works — tests pass, logs clean, behavior verified.
@@ -184,14 +193,14 @@ For complex projects, maintain a progress summary:
 # Progress
 
 ## Current Sprint
-- [x] BD-10: Database schema migration (done)
-- [x] BD-11: Auth middleware (done)
-- [ ] BD-12: User registration endpoint (in-progress)
-- [ ] BD-13: Login endpoint (ready)
-- [ ] BD-14: Profile management (blocked — needs BD-12)
+- [x] bd-a1b2: Database schema migration (done)
+- [x] bd-a1b3: Auth middleware (done)
+- [ ] bd-a3f8: User registration endpoint (in_progress)
+- [ ] bd-a3f9: Login endpoint (open, ready to pick up)
+- [ ] bd-a3fa: Profile management (blocked — needs bd-a3f8)
 
 ## Blocked
-- BD-14: Waiting on BD-12 (user model finalization)
+- bd-a3fa: Waiting on bd-a3f8 (user model finalization)
 ```
 
 #### Completion Criteria Checklists
@@ -199,7 +208,7 @@ For complex projects, maintain a progress summary:
 Each task should define explicit completion criteria, not vague goals:
 
 ```markdown
-## BD-12: User registration endpoint
+## bd-a3f8: User registration endpoint
 
 ### Done when:
 - [ ] POST /api/v1/auth/register endpoint exists
@@ -218,8 +227,90 @@ Each task should define explicit completion criteria, not vague goals:
 
 **Missing lessons.** The user corrects the same mistake three sessions in a row because nobody captured it in `tasks/lessons.md`. Fix: treat lesson capture as mandatory, not optional. After every correction, update the file before continuing with other work.
 
-**Task ID drift.** Commits stop including `[BD-xxx]` prefixes partway through the project. Traceability breaks down. Fix: make task ID inclusion a habit enforced by review. If using a pre-commit hook, validate the prefix.
+**Task ID drift.** Commits stop including `[bd-<id>]` prefixes partway through the project. Traceability breaks down. Fix: make task ID inclusion a habit enforced by review. If using a pre-commit hook, validate the prefix.
 
 **Overloaded tasks.** A single task covers "implement the API, write the UI, add tests, update docs." This overflows a single session and makes progress tracking meaningless. Fix: split into tasks that each fit in one agent session (30-90 minutes).
 
 **Lessons without rules.** A lesson says "we had trouble with X" but doesn't state a preventive rule. Future sessions read the lesson but don't know what to do differently. Fix: every lesson must include a concrete rule — "Always do Y" or "Never do Z" — not just a description of what went wrong.
+
+### Agent context: `bd prime` is the SSOT
+
+Beads ships `bd prime` as the single source of truth for workflow context injected into agent sessions. The default output is ~1-2k tokens and includes:
+- Current ready/in-progress task counts
+- The next 1-2 ready tasks with full descriptions
+- Recent activity (last few closed/updated)
+- Persistent memories set via `bd remember`
+
+Variants:
+- `bd prime` — full default
+- `bd prime --memories-only` — just persistent memories (very small)
+- `bd prime --full` — extended context (use sparingly; ~5k tokens)
+- `bd prime --hook-json` — Claude Code SessionStart hook envelope
+
+Override the default output by writing `.beads/PRIME.md` (Markdown, free-form). The `bd setup claude` / `bd setup gemini` recipes wire `bd prime --hook-json` into SessionStart hooks for you — you don't typically invoke it by hand.
+
+`bd onboard` emits a one-line snippet you can paste into any agent context file to remind it about `bd prime`.
+
+### Two memory scopes — when to use which
+
+Scaffold-generated projects have two persistent memory layers when `.beads/` exists:
+
+- **Filesystem auto-memory** (per-user, cross-project) — facts about you the developer. Stored under `~/.claude/projects/.../memory/` by the Claude Code client.
+- **`bd remember`** (per-project, team-shareable) — facts about this project. Stored in `.beads/embeddeddolt/`, committed with the repo.
+
+For project-level facts that should travel with the repo (in-flight context, team conventions, project-specific blockers, decisions), use `bd remember` instead of filesystem memory. See `content/knowledge/core/ai-memory-management.md` for the full scope split table.
+
+### Editor integration via `bd setup` recipes
+
+Beads ships built-in setup recipes that write the integration block into CLAUDE.md, AGENTS.md, GEMINI.md, or `.cursor/rules/` for you, using marker-managed format that survives re-runs:
+
+- `bd setup claude` — Claude Code (writes CLAUDE.md block + SessionStart/PreCompact hooks)
+- `bd setup codex` — Codex CLI (writes `.agents/skills/beads/SKILL.md` + AGENTS.md section)
+- `bd setup gemini` — Gemini CLI (writes GEMINI.md section + hooks)
+- `bd setup cursor` / `bd setup windsurf` / `bd setup aider` / `bd setup factory` / `bd setup mux` — other editors
+
+Each recipe is idempotent (re-running it does not duplicate content), reversible (`--remove`), and verifiable (`--check`). Recipe choice determines profile (claude/gemini default to `minimal` ~60% smaller; codex/factory/mux default to `full`). There is no runtime `--profile` flag in v1.0.4 — recipe choice is the knob.
+
+Custom recipes can be added via `bd setup --add <name> <path>`, persisted in `.beads/recipes.toml`.
+
+### Optional: enable custom issue types
+
+`bd create -t` supports `bug`, `feature`, `task`, `epic`, `chore`, `decision` out of the box. To use `story`, `milestone`, or `spike`, enable them via project config:
+
+```bash
+bd config set types.custom '["story", "milestone", "spike"]'
+```
+
+After that, `bd create -t story "US-XXX: …"` works as expected.
+
+### Production option: off-site backup
+
+Beads can push a versioned mirror to filesystem, S3, GCS, Azure Blob, or DoltHub:
+
+```bash
+bd backup init s3://my-bucket/beads-backup/
+bd backup sync     # push current DB
+bd backup restore  # bring it back if needed
+```
+
+Worth setting up for any project where task state matters beyond the developer's laptop.
+
+### When to use the MCP server (rarely)
+
+Beads ships a Python MCP server (`beads-mcp`) for clients that don't have shell access — e.g., Claude Desktop, some IDE plugins. Install:
+
+```bash
+uv tool install beads-mcp   # or: pip install beads-mcp
+```
+
+For Claude Code, Cursor, Windsurf, and any agent with shell access, **CLI + hooks is preferred** — it's ~1-2k tokens of context (via `bd prime`) vs 10-50k for the MCP tool schemas. Only reach for `beads-mcp` when shell access isn't available.
+
+### Safe re-initialization
+
+If you need to re-init a Beads database (e.g., migrating to a fresh prefix, recovering from corruption), use the explicit flags rather than `--force`:
+
+- `bd init --reinit-local` — bypass the local-exists guard
+- `bd init --discard-remote` — explicitly authorize discarding remote Dolt history
+- `bd init --destroy-token DESTROY-<prefix>` — required in non-interactive mode for destructive re-init
+
+Stable exit codes: `10` (remote divergence), `11` (local exists), `12` (destroy-token missing). The legacy `--force` flag still works but is deprecated.

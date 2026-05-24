@@ -263,8 +263,15 @@ For each user story (or logical grouping of small stories):
 **If Beads:**
 ```bash
 bd create "US-XXX: <imperative title>" -p <priority>
-# Priority: 0=blocking release, 1=must-have, 2=should-have, 3=nice-to-have
+# Priority: 0=blocking release, 1=must-have, 2=should-have, 3=nice-to-have, 4=backlog
 ```
+
+For architectural decisions (ADRs), use the built-in `decision` type:
+```bash
+bd create "Use Postgres over MySQL for X" -t decision -p 1
+```
+
+If your project enables custom types via `bd config set types.custom '["story","milestone","spike"]'`, you can also use `-t story` for user-story-sized work and `-t milestone` for releases.
 
 **Without Beads:** Document tasks as a structured list in `docs/implementation-plan.md` with title, priority, dependencies, and description.
 

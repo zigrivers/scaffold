@@ -668,6 +668,82 @@ Identity components — `location`, `category`, `description`, and `suggestion`
 — mirror MMR T2-A's forthcoming native `finding_key` so this remains a clean
 migration when v3.30 ships.
 
+### Step 7b: File blocking findings as Beads tasks (opt-in)
+
+If `.mmr.yaml` has `beads.create_issues_from_blocking_findings: true` AND `.beads/`
+exists, file each blocking finding (severity at-or-above `beads.fix_threshold`,
+default `P2`) as a Beads bug. This is purely additive tracking — it does NOT replace
+Step 7's fix-in-place flow; it creates a durable record of findings that ought to
+become standalone follow-up work.
+
+```bash
+# First: gate on the opt-in flag in .mmr.yaml. Defaults to disabled.
+# Uses pure bash + grep/sed — no yq dependency.
+beads_enabled=false
+beads_fix_threshold=P2
+beads_default_type=bug
+if [ -f .mmr.yaml ]; then
+  # POSIX character classes ([[:space:]]) for BSD-sed compatibility (macOS default).
+  # Patterns tolerate trailing whitespace/comments — uncommenting a template line with
+  # a trailing `# comment` should still match.
+  if grep -qE '^[[:space:]]*create_issues_from_blocking_findings:[[:space:]]*true([[:space:]]+#.*)?[[:space:]]*$' .mmr.yaml; then
+    beads_enabled=true
+  fi
+  if v=$(grep -E '^[[:space:]]*fix_threshold:[[:space:]]*P[0-4]([[:space:]]+#.*)?[[:space:]]*$' .mmr.yaml | head -1 | sed -E 's/^[^:]*:[[:space:]]*(P[0-4]).*/\1/'); [ -n "$v" ]; then
+    beads_fix_threshold=$v
+  fi
+  if v=$(grep -E '^[[:space:]]*default_type:[[:space:]]*[a-zA-Z]+([[:space:]]+#.*)?[[:space:]]*$' .mmr.yaml | head -1 | sed -E 's/^[^:]*:[[:space:]]*([a-zA-Z]+).*/\1/'); [ -n "$v" ]; then
+    beads_default_type=$v
+  fi
+fi
+
+if [ "$beads_enabled" = "true" ] && [ -d .beads ] && command -v bd >/dev/null 2>&1 \
+   && command -v mmr >/dev/null 2>&1 && [ -n "${JOB_ID:-}" ]; then
+  # Skip when the review-code flow ran in manual fallback mode (no mmr, no JOB_ID).
+  threshold_rank=$(case "$beads_fix_threshold" in P0) echo 0;; P1) echo 1;; P2) echo 2;; P3) echo 3;; *) echo 4;; esac)
+
+  # Capture the reconciled findings from the MMR job we already ran upstream.
+  # MMR JSON shape: { reconciled_findings: [{ severity, location, description, suggestion, ... }] }
+  review_json=$(mmr results "$JOB_ID" --format json)
+
+  while IFS= read -r finding; do
+    title=$(jq -r '.description | .[0:120]' <<<"$finding")
+    severity=$(jq -r '.severity' <<<"$finding")
+    pnum="${severity#P}"
+    description=$(jq -r --arg job "$JOB_ID" '"\(.description)\n\nSuggestion: \(.suggestion // "(none)")\n\nLocation: \(.location // "(unknown)")\n\nFirst seen in MMR job: \($job)"' <<<"$finding")
+    # Per-finding identity for a future dedupe-on-re-runs mechanism (matches
+    # review-pr.md Step 7b). NOTE: bd v1.0.4 has no `bd list --external-ref`
+    # flag, so the bridge does not enforce dedupe at write time — known
+    # limitation; same-job re-runs will create duplicates.
+    loc=$(jq -r '.location // ""' <<<"$finding")
+    desc_for_hash=$(jq -r '.description // ""' <<<"$finding")
+    finding_hash=$(printf '%s|%s' "$loc" "$desc_for_hash" | shasum -a 1 | cut -c1-8)
+
+    args=(
+      "$title"
+      --type "$beads_default_type"
+      -p "$pnum"
+      --description "$description"
+      --external-ref "mmr:$finding_hash"
+    )
+    if [ -n "${SOURCE_BD_ID:-}" ]; then
+      args+=(--deps "discovered-from:$SOURCE_BD_ID")
+    fi
+    bd create "${args[@]}"
+  done < <(jq -c --argjson maxRank "$threshold_rank" '
+    .reconciled_findings[]?
+    | (.severity | sub("^P";"") | tonumber) as $rank
+    | select($rank <= $maxRank)
+  ' <<<"$review_json")
+fi
+```
+
+Same shell idioms as `review-pr.md` Step 7b — see that file for notes on the jq
+arguments and UTF-8-safe truncation. The `.mmr.yaml` opt-in flag is read first;
+the rest of the block is skipped unless `beads.create_issues_from_blocking_findings`
+is `true`. The `--deps discovered-from:$SOURCE_BD_ID` flag is conditional on a
+non-empty `$SOURCE_BD_ID`.
+
 ### Step 8: Final Verdict
 
 Return exactly one verdict:

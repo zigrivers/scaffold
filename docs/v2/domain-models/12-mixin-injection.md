@@ -1136,8 +1136,7 @@ Sub-section targeting allows a prompt to inject only a specific portion of a mix
 General setup instructions for the task-tracking system.
 
 <!-- section:close-workflow -->
-When you complete a task, run `bd close <id>` to mark it done.
-Then run `bd sync` to persist the change.
+When you complete a task, run `bd close <id>` to mark it done. If a Dolt remote is configured (check via `bd config get dolt.remote --json | jq -r .value` — empty string means no remote), follow up with `bd dolt push` to share the change with teammates; otherwise the local auto-commit is sufficient.
 
 <!-- section:pr-integration -->
 Before creating a PR, check `bd ready` for any tasks
@@ -1503,14 +1502,14 @@ in the `.beads/` directory with SQLite-backed storage.
 
 ### Commit Format
 
-All commits must include a Beads task ID: `[BD-<id>] type(scope): description`
+All commits must include a Beads task ID: `[bd-<id>] type(scope): description`
 
 <!-- section:close-workflow -->
 When a PR is merged, close the associated task:
 
 ```bash
 bd close <id>
-bd sync
+if remote=$(bd config get dolt.remote --json 2>/dev/null | jq -r .value 2>/dev/null) && [ -n "$remote" ]; then bd dolt push; fi  # only pushes when a Dolt remote is configured
 ```
 
 Then check for newly unblocked tasks:
@@ -1542,10 +1541,10 @@ scripts/setup-agent-worktree.sh <agent-name>
 
 ### Agent Identity
 
-Set `BD_ACTOR` for task attribution:
+Set `BEADS_ACTOR` for task attribution:
 
 ```bash
-export BD_ACTOR="agent-1"
+export BEADS_ACTOR="agent-1"
 ```
 
 ### Task Claiming
@@ -1599,7 +1598,7 @@ in the `.beads/` directory with SQLite-backed storage.
 
 ### Commit Format
 
-All commits must include a Beads task ID: `[BD-<id>] type(scope): description`
+All commits must include a Beads task ID: `[bd-<id>] type(scope): description`
 
 ## Branch Naming Convention
 
@@ -1618,7 +1617,7 @@ When a PR is merged, close the associated task:
 
 ```bash
 bd close <id>
-bd sync
+if remote=$(bd config get dolt.remote --json 2>/dev/null | jq -r .value 2>/dev/null) && [ -n "$remote" ]; then bd dolt push; fi  # only pushes when a Dolt remote is configured
 ```
 
 Then check for newly unblocked tasks:
@@ -1641,10 +1640,10 @@ scripts/setup-agent-worktree.sh <agent-name>
 
 ### Agent Identity
 
-Set `BD_ACTOR` for task attribution:
+Set `BEADS_ACTOR` for task attribution:
 
 ```bash
-export BD_ACTOR="agent-1"
+export BEADS_ACTOR="agent-1"
 ```
 
 ### Task Claiming

@@ -293,7 +293,7 @@ Every PRD feature must map to at least one user story. This is a non-negotiable 
 - Loading states, empty states, and offline behavior are often implied but not stated
 
 **Traceability notation:**
-- Use IDs to create a traceable chain: PRD-REQ-001 → US-001 → (downstream: Task BD-42)
+- Use IDs to create a traceable chain: PRD-REQ-001 → US-001 → (downstream: Task bd-a3f8)
 - Story IDs (US-001, US-002, ...) are stable — they persist through updates and are referenced by downstream phases
 
 ### Story Dependencies

@@ -157,6 +157,7 @@ Assign priority using Beads conventions:
 - **P1** — Must-have for current milestone
 - **P2** — Should-have (default for most quick tasks)
 - **P3** — Nice-to-have, backlog
+- **P4** — Backlog / future-consideration (lowest priority; effectively deferred)
 
 #### Acceptance Criteria
 Write 2-5 testable acceptance criteria in Given/When/Then format:
@@ -201,6 +202,14 @@ Reference `docs/tdd-standards.md` for the project's test conventions:
 bd create "type(scope): description" -p <priority>
 # Example: bd create "fix(auth): prevent duplicate session creation on rapid re-login" -p 2
 ```
+
+If this task was discovered while doing other work, link the lineage with `discovered-from`:
+```bash
+bd create "fix(parser): handle empty input edge case" \
+  --type bug -p 2 \
+  --deps discovered-from:$CURRENT_TASK_ID
+```
+The new task appears in `bd ready` normally; `discovered-from` is metadata for traceability and does NOT block readiness.
 
 **Without Beads:** Document the task inline and proceed directly to implementation.
 

@@ -16,14 +16,25 @@ export interface WriteEventInput {
   payload: Record<string, unknown>
 }
 
+export interface WrittenEvent {
+  event_id: string
+  worktree_id: string
+  actor_label: string
+  branch: string
+  task_id: string | null
+  type: EventType
+  ts: string
+  payload: Record<string, unknown>
+}
+
 export function ledgerPath(worktreeRoot: string): string {
   return join(worktreeRoot, '.scaffold', 'activity.jsonl')
 }
 
-export async function writeEvent(worktreeRoot: string, input: WriteEventInput): Promise<void> {
+export async function writeEvent(worktreeRoot: string, input: WriteEventInput): Promise<WrittenEvent> {
   const id = ensureIdentity(worktreeRoot, deriveLabel(worktreeRoot))
 
-  const candidate = {
+  const candidate: WrittenEvent = {
     event_id: ulid(),
     worktree_id: id.worktree_id,
     actor_label: id.worktree_label,
@@ -39,7 +50,10 @@ export async function writeEvent(worktreeRoot: string, input: WriteEventInput): 
     throw new Error(`event validation failed: ${validated.errors.join('; ')}`)
   }
 
-  const redacted = redactEvent(validated.event)
+  // redactEvent's return is the discriminated-union Event type whose per-type payload
+  // shapes are stricter than WrittenEvent.payload's Record<string, unknown>. The
+  // runtime shape is the same — cast through unknown is the standard TS escape.
+  const redacted = redactEvent(validated.event) as unknown as WrittenEvent
   const line = JSON.stringify(redacted) + '\n'
   if (Buffer.byteLength(line, 'utf8') > MAX_EVENT_BYTES) {
     throw new Error(`event too large (>${MAX_EVENT_BYTES} bytes / 4 KiB): split or summarize the payload`)
@@ -58,6 +72,9 @@ export async function writeEvent(worktreeRoot: string, input: WriteEventInput): 
   } finally {
     await release()
   }
+  // Return the same redacted event that was actually persisted, so callers see
+  // exactly what's on disk (no unredacted secrets, no dropped fields).
+  return redacted
 }
 
 function deriveLabel(worktreeRoot: string): string {

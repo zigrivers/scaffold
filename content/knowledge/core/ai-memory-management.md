@@ -22,6 +22,23 @@ AI memory operates in layers, each with different persistence and token cost:
 | **MCP memory server** | Cross-session (structured) | Low (queried on demand) | Decisions, lessons, error patterns |
 | **External docs** | Always current | Zero until queried | Library APIs, framework docs |
 
+### When to use which: user-level vs project-level memory
+
+Two persistent memory mechanisms can coexist on one machine. They serve different scopes — pick the right one for each fact:
+
+| Scope | Mechanism | Lives in | Survives across | Shared with team? |
+|-------|-----------|----------|-----------------|-------------------|
+| **User-level** (per-user, cross-project) | Filesystem auto-memory (Claude Code client) | `~/.claude/projects/<encoded-cwd>/memory/*.md` | Sessions, projects | No — local to your machine |
+| **Project-level** (per-project, team-shareable) | `bd remember` (Beads) | `.beads/embeddeddolt/` | Sessions, repo clones | Yes — committed and synced via Dolt |
+
+Rule of thumb:
+- Facts about the **person** (role, expertise level, communication style, preferences) → filesystem auto-memory.
+- Facts about the **project** (in-flight context, team conventions, project-specific blockers, decisions) → `bd remember`.
+
+When `.beads/` exists in a project, prefer `bd remember` for project facts so teammates inherit the context. When working in a project without Beads, the filesystem layer is your only persistent memory.
+
+> Upstream Beads's AGENTS.md says "do not create MEMORY.md files" — that prescription is about project memory specifically. Filesystem auto-memory continues to be the right layer for *user* memory (facts about you, not the project).
+
 ### Core Principle: Signal Over Volume
 
 ETH Zurich research (2026) found that dumping context into AI sessions hurts more than it helps — 3% performance decrease with 20% cost increase for LLM-generated context files. The key insight: **only store what cannot be derived from the code itself.** Custom build commands, project-specific conventions, decision rationale, and team agreements are high-signal. Code patterns, file structure, and API shapes are low-signal (the agent can read the code).

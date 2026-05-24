@@ -2,6 +2,8 @@
 
 > Reverse-engineered from the v1.18.0 codebase on `main` branch. Every feature documented here is traceable to released code, commands, or scripts.
 
+> **2026-05-24 note:** `BD_ACTOR` references in this document are retained as historical record. The current Beads env var is `BEADS_ACTOR` (since v1.0.0). See `docs/audits/beads-integration-audit-2026-05-24.md` F-2.5.
+
 ## Overview
 
 Scaffold is a **prompt pipeline** — a curated sequence of structured prompts that guides AI agents (primarily Claude Code) through scaffolding a new software project from idea to working implementation. The pipeline spans 7 phases (product definition through implementation) and produces a complete set of project documentation, configuration, and task tracking artifacts that enable one or more AI agents to build production-ready software with minimal human intervention.

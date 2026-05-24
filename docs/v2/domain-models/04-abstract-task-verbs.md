@@ -778,13 +778,13 @@ The spec defines 8 verbs. Analysis of 182+ `bd` command occurrences across v1 pr
 | Verb | Replacement | Format |
 |------|-------------|--------|
 | `create` | `bd create "$TITLE" -p $PRIORITY` | inline-code |
-| `list` | `bd list` (+ `--status $STATUS` if status arg, `--actor $ACTOR` if actor arg) | inline-code |
+| `list` | `bd list` (+ `--status $STATUS` if status arg, `--assignee $ACTOR` if actor arg — upstream Beads v1.0.0+ renamed `--actor` to `--assignee`) | inline-code |
 | `ready` | `bd ready` | inline-code |
 | `claim` | `bd update $ID --claim` | inline-code |
 | `close` | `bd close $ID` | inline-code |
 | `dep-add` | `bd dep add $CHILD $PARENT` | inline-code |
 | `show` | `bd show $ID` | inline-code |
-| `sync` | `bd sync` | inline-code |
+| `sync` | `if remote=$(bd config get dolt.remote --json 2>/dev/null \| jq -r .value 2>/dev/null) && [ -n "$remote" ]; then bd dolt push; fi` (exit-0 no-op when no Dolt remote is configured; safe under `set -e`; `--json \| jq -r .value` returns the empty string when unset, not the "(not set)" text the plain output emits) | inline-code |
 | `dep-tree` | `bd dep tree` (+ `$ID` if ID arg) | inline-code |
 | `dep-remove` | `bd dep remove $CHILD $PARENT` | inline-code |
 | `dep-cycles` | `bd dep cycles` | inline-code |
@@ -1295,7 +1295,7 @@ close:
   template: '`bd close $ID`'
   format: prose
 sync:
-  template: '`bd sync`'
+  template: '`if remote=$(bd config get dolt.remote --json 2>/dev/null | jq -r .value 2>/dev/null) && [ -n "$remote" ]; then bd dolt push; fi` (exit-0 no-op when no Dolt remote is configured)'
   format: prose
 ```
 
@@ -1332,7 +1332,7 @@ sync:
 
 6. Close the tracking task:
    `bd close TASK_ID`
-   `bd sync`
+   `if remote=$(bd config get dolt.remote --json 2>/dev/null | jq -r .value 2>/dev/null) && [ -n "$remote" ]; then bd dolt push; fi`  # exit-0 no-op when no Dolt remote is configured
 ```
 
 The output reads naturally and contains concrete Beads commands.

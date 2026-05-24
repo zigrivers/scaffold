@@ -1144,7 +1144,7 @@ See `docs/dev-setup.md` for full setup guide.
 <!-- scaffold:managed by git-workflow -->
 - Branch: `bd-<task-id>/<short-description>` from main
 - PR: rebase on main → push → `gh pr create` → squash merge
-- Parallel agents: separate worktrees, `BD_ACTOR` identity
+- Parallel agents: separate worktrees, `BEADS_ACTOR` identity
 - See `docs/git-workflow.md` for full workflow
 <!-- /scaffold:managed -->
 ```
@@ -1429,7 +1429,7 @@ See `docs/project-structure.md` for full structure.
 <!-- scaffold:managed by git-workflow -->
 - Branch: `bd-<task-id>/<short-description>` from main
 - PR: rebase on main → push → `gh pr create` → squash merge
-- Parallel agents: separate worktrees, `BD_ACTOR` identity
+- Parallel agents: separate worktrees, `BEADS_ACTOR` identity
 - See `docs/git-workflow.md` for full workflow
 <!-- /scaffold:managed -->
 
@@ -1512,7 +1512,7 @@ See `docs/project-structure.md`
 ## Git Workflow
 <!-- scaffold:managed by git-workflow -->
 - Branch: `bd-<task-id>/<desc>` → rebase → PR → squash merge
-- Parallel: worktrees + `BD_ACTOR`
+- Parallel: worktrees + `BEADS_ACTOR`
 - See `docs/git-workflow.md`
 <!-- /scaffold:managed -->
 

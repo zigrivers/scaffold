@@ -9,7 +9,7 @@ outputs: []
 conditional: null
 stateless: true
 category: pipeline
-knowledge-base: [tdd-execution-loop, task-claiming-strategy, worktree-management]
+knowledge-base: [tdd-execution-loop, task-claiming-strategy, worktree-management, multi-agent-coordination]
 reads: [coding-standards, tdd, git-workflow]
 argument-hint: "<agent-name>"
 ---
@@ -85,7 +85,7 @@ Before doing anything else, confirm the environment:
    - If NOT in a worktree, stop and instruct the user to set one up or navigate to the correct directory
 
 2. **Beads identity** (if `.beads/` exists)
-   - `echo $BD_ACTOR` — should show `$ARGUMENTS`
+   - `echo $BEADS_ACTOR` — should show `$ARGUMENTS`
    - If not set, the worktree setup may be incomplete
 
 ### State Recovery
@@ -114,14 +114,14 @@ Recover your context by checking the current state of work:
 ### Beads Recovery
 
 **If Beads is configured** (`.beads/` exists):
-- `bd list --actor $ARGUMENTS` — check for tasks with `in_progress` status owned by this agent
-- If a PR shows as merged, close the corresponding task: `bd close <id> && bd sync`
+- `bd list --assignee $ARGUMENTS` — check for tasks with `in_progress` status owned by this agent
+- If a PR shows as merged, close the corresponding task: `bd close <id>`
 - If there is in-progress work, finish it (see "Resume In-Progress Work" below)
 - Otherwise, clean up and start fresh:
   - `git fetch origin --prune && git clean -fd`
   - Run the install command from CLAUDE.md Key Commands
-  - `bd ready` to find the next available task
-- Continue working until `bd ready` shows no available tasks
+  - Atomically claim the next ready task: `TASK=$(bd ready --claim --json | jq -r '.id')` (sets `assignee=$BEADS_ACTOR` + `status=in_progress`; no race window between agents).
+- Continue working until `bd ready --claim --json` returns no task.
 
 **Without Beads:**
 - Read `docs/implementation-playbook.md` as the primary task reference.
@@ -171,8 +171,28 @@ Once in-progress work is complete (or if there was none):
    - Fix any findings at or above `fix_threshold` before proceeding
 
 3. **Create PR** (if not already created for in-progress work)
+   - If Beads is configured, run the PR-readiness checklist first:
+     ```bash
+     if [ -d .beads ]; then
+       bd preflight
+     fi
+     ```
+     Fix any issues `bd preflight` flags before proceeding.
+   - **For 3+ parallel agents**, acquire the project's merge slot to serialize merge-time conflicts:
+     ```bash
+     if [ -d .beads ]; then
+       bd merge-slot acquire --wait    # blocks if held; queues you in priority order
+     fi
+     ```
+     There is one merge slot per project; `--wait` blocks until you have it. Skip for single-agent or two-agent runs. See `content/knowledge/execution/multi-agent-coordination.md`.
    - Push the branch: `git push -u origin HEAD`
    - Create a pull request: `gh pr create`
+   - After the PR merges (or if you abandon the work), release the slot:
+     ```bash
+     if [ -d .beads ]; then
+       bd merge-slot release   # holder verified via $BEADS_ACTOR
+     fi
+     ```
    - Include agent name in PR description for traceability
 
 4. **Run code reviews (MANDATORY)**
@@ -219,7 +239,7 @@ Once in-progress work is complete (or if there was none):
 - Push updates and re-request review
 
 **Task was completed by another agent:**
-- If Beads: `bd sync` will show updated task states
+- If Beads: A `git pull` (and `bd dolt pull` if a Dolt remote is configured) brings the local DB current; run `bd doctor --fix` if anything looks stale.
 - Without Beads: check the plan/playbook for recently completed tasks and open PRs
 - Skip to the next available task
 

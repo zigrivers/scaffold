@@ -66,7 +66,7 @@ Before starting a task, verify all its blockers are resolved. After completing e
 ### Multi-Agent Conflict Avoidance — Extended
 
 **Claiming a task:**
-- Creating a feature branch (e.g., `bd-42/add-user-endpoint`) is the claim signal
+- Creating a feature branch (e.g., `bd-a3f8/add-user-endpoint`) is the claim signal
 - Other agents should check for existing branches before claiming the same task
 - If two agents accidentally claim the same task, the one with fewer commits yields
 
@@ -100,9 +100,9 @@ Beads is an optional task-tracking tool. Detect its presence and adapt.
 
 **When `.beads/` directory exists:**
 - Use `bd ready` to list tasks that are ready for work
-- Use `bd claim <id>` to claim a task (if available)
+- Use `bd update <id> --claim` to atomically claim a task (or `bd ready --claim --json` to find and claim the first available in one call)
 - Use `bd close <id>` after PR is merged to mark task complete
-- Task IDs come from Beads (`bd-42`, `bd-43`, etc.)
+- Task IDs come from Beads (`bd-a3f8`, `bd-a3f9`, etc. — hash-based, lowercase)
 - Branch naming follows Beads convention: `bd-<id>/<short-desc>`
 
 **Without Beads:**
@@ -122,6 +122,18 @@ A task is complete when all of the following are true:
 5. **No regressions** — existing functionality is unchanged unless the task explicitly modifies it
 
 Only after all five criteria are met should the task be marked as done.
+
+## Discovered Work
+
+While implementing a claimed task, you may discover bugs or follow-up tasks. Don't silently expand the current task's scope — file the new work as a separate Beads issue with `discovered-from`:
+
+```bash
+bd create "fix(parser): handle empty input edge case" \
+  --type bug -p 2 \
+  --deps discovered-from:$CURRENT_TASK_ID
+```
+
+`discovered-from` is metadata for traceability — the new issue appears in `bd ready` normally and does NOT block the current task. This preserves the audit trail of why the new task exists.
 
 ## See Also
 

@@ -67,7 +67,7 @@ Each line in `decisions.jsonl` MUST be a valid JSON object conforming to the fol
     "completed_by": {
       "type": "string",
       "minLength": 1,
-      "description": "Identity of who made this decision. For humans: username. For agents: BD_ACTOR value (e.g., agent-1, codex-main). For CLI-generated entries: scaffold-adopt."
+      "description": "Identity of who made this decision. For humans: username. For agents: BEADS_ACTOR value (e.g., agent-1, codex-main). For CLI-generated entries: scaffold-adopt."
     },
     "prompt_completed": {
       "type": "boolean",
@@ -129,7 +129,7 @@ Each line in `decisions.jsonl` MUST be a valid JSON object conforming to the fol
 | `prompt` | `string` | Yes | — | kebab-case (`^[a-z][a-z0-9-]*$`). Should match a step name in `state.json` `prompts` map. | Step name (kebab-case slug) that produced this decision. |
 | `decision` | `string` | Yes | — | Non-empty after trimming (minLength: 1). Recommended max: 500 characters (semantic warning, not structural). | Human-readable decision text describing what was decided and why. |
 | `at` | `string` | Yes | — | Valid ISO 8601 date-time. Example: `2026-03-13T14:30:00.000Z` | Timestamp of when the CLI recorded this entry. |
-| `completed_by` | `string` | Yes | — | Non-empty after trimming. | Actor identity: username, `BD_ACTOR` value, or `scaffold-adopt`. |
+| `completed_by` | `string` | Yes | — | Non-empty after trimming. | Actor identity: username, `BEADS_ACTOR` value, or `scaffold-adopt`. |
 | `prompt_completed` | `boolean` | Yes | — | Must be `true` or `false`. | `true` if the prompt completed successfully before this entry was written (confirmed). `false` if written during execution before completion was confirmed (provisional). |
 | `category` | `string` | No | *(absent)* | One of: `technology`, `architecture`, `process`, `convention`, `infrastructure`. | Decision classification. Aids filtering and downstream consumption. |
 | `tags` | `string[]` | No | *(absent)* | Array of unique strings. Currently only `NEEDS_USER_REVIEW` is defined. | Tags for special handling. |
@@ -146,7 +146,7 @@ Each line in `decisions.jsonl` MUST be a valid JSON object conforming to the fol
 |---|---|---|---|---|
 | `prompt` | Prompt slug key | `.scaffold/state.json` → `prompts.{key}` | Decision's prompt should exist as a key in the state file's `prompts` map. | Orphaned decisions (prompt removed by methodology change) are harmless. `scaffold validate` emits `DECISION_UNKNOWN_PROMPT` warning. Orphaned entries remain in the file and are excluded from "latest per prompt" queries for active prompts. |
 | `id` | Other `id` values | `.scaffold/decisions.jsonl` (self-referential) | IDs should be unique within the file. | Duplicate IDs (from concurrent appends) are resolved by file position: last entry with a given ID wins. `scaffold validate` detects duplicates; `--fix` reassigns. |
-| `completed_by` | Actor identity | `BD_ACTOR` environment variable / CLI session | Links a decision to the agent or user who made it. | No validation against an external actor registry. Any non-empty string is accepted. |
+| `completed_by` | Actor identity | `BEADS_ACTOR` environment variable / CLI session | Links a decision to the agent or user who made it. | No validation against an external actor registry. Any non-empty string is accepted. |
 | `at` | Temporal ordering | `.scaffold/state.json` → `prompts.{key}.completed_at` | Decision timestamp should be close to (within minutes of) the prompt's completion timestamp in state.json. | No cross-file timestamp validation. Divergence is expected for provisional entries and re-runs. |
 
 **Prompt slug stability**: Prompt slugs are treated as immutable identifiers across methodology versions. If a prompt's content changes significantly, the methodology deprecates the old slug and introduces a new one. Orphaned `decisions.jsonl` entries referencing deprecated slugs remain in the log but are not surfaced by "latest decision per prompt" queries for active prompts.

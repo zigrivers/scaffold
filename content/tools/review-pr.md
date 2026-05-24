@@ -491,6 +491,96 @@ read from the verdict JSON.
 
 <!-- review-wrapper-hash-helpers:end -->
 
+### Step 7b: File blocking findings as Beads tasks (opt-in)
+
+If `.mmr.yaml` has `beads.create_issues_from_blocking_findings: true` AND `.beads/`
+exists in the project, file each blocking finding (severity at-or-above
+`beads.fix_threshold`, default `P2`) as a Beads bug. This is purely additive
+tracking — it does NOT replace Step 7's fix-in-place flow; it only creates a
+durable record of findings that ought to become standalone follow-up work.
+
+```bash
+# First: gate on the opt-in flag in .mmr.yaml. Defaults to disabled.
+# Uses pure bash + grep/sed — no yq dependency (yq isn't always installed).
+beads_enabled=false
+beads_fix_threshold=P2
+beads_default_type=bug
+if [ -f .mmr.yaml ]; then
+  # Match a `create_issues_from_blocking_findings: true` line under any indentation.
+  # We don't validate it's nested under `beads:` — false positives in unrelated
+  # config keys with the same name are unlikely given the explicit name.
+  # POSIX character classes ([[:space:]]) for BSD-sed compatibility (macOS default).
+  # Patterns tolerate trailing whitespace/comments — uncommenting a template line with
+  # a trailing `# comment` should still match.
+  if grep -qE '^[[:space:]]*create_issues_from_blocking_findings:[[:space:]]*true([[:space:]]+#.*)?[[:space:]]*$' .mmr.yaml; then
+    beads_enabled=true
+  fi
+  # Optional overrides for threshold / type. Defaults apply if the keys are absent.
+  if v=$(grep -E '^[[:space:]]*fix_threshold:[[:space:]]*P[0-4]([[:space:]]+#.*)?[[:space:]]*$' .mmr.yaml | head -1 | sed -E 's/^[^:]*:[[:space:]]*(P[0-4]).*/\1/'); [ -n "$v" ]; then
+    beads_fix_threshold=$v
+  fi
+  if v=$(grep -E '^[[:space:]]*default_type:[[:space:]]*[a-zA-Z]+([[:space:]]+#.*)?[[:space:]]*$' .mmr.yaml | head -1 | sed -E 's/^[^:]*:[[:space:]]*([a-zA-Z]+).*/\1/'); [ -n "$v" ]; then
+    beads_default_type=$v
+  fi
+fi
+
+if [ "$beads_enabled" = "true" ] && [ -d .beads ] && command -v bd >/dev/null 2>&1 \
+   && command -v mmr >/dev/null 2>&1 && [ -n "${JOB_ID:-}" ]; then
+  threshold_rank=$(case "$beads_fix_threshold" in P0) echo 0;; P1) echo 1;; P2) echo 2;; P3) echo 3;; *) echo 4;; esac)
+
+  # Capture the reconciled findings from the MMR job we already ran in Step 2.
+  # MMR JSON shape: { reconciled_findings: [{ severity, location, description, suggestion, ... }] }
+  review_json=$(mmr results "$JOB_ID" --format json)
+
+  while IFS= read -r finding; do
+    title=$(jq -r '.description | .[0:120]' <<<"$finding")
+    severity=$(jq -r '.severity' <<<"$finding")
+    pnum="${severity#P}"
+    description=$(jq -r --arg job "$JOB_ID" '"\(.description)\n\nSuggestion: \(.suggestion // "(none)")\n\nLocation: \(.location // "(unknown)")\n\nFirst seen in MMR job: \($job)"' <<<"$finding")
+    # Per-finding identity in the external-ref so a future Beads release with
+    # filter-by-external-ref can dedupe on re-runs. Uses the same
+    # location+description identity components as the wrapper-side hash stopgap
+    # (Step 7a) for consistency. NOTE: bd v1.0.4 has no `bd list --external-ref`
+    # flag, so cross-run dedupe is not enforced at the bridge level today —
+    # known limitation; re-running on the same MMR job will create duplicates.
+    loc=$(jq -r '.location // ""' <<<"$finding")
+    desc_for_hash=$(jq -r '.description // ""' <<<"$finding")
+    finding_hash=$(printf '%s|%s' "$loc" "$desc_for_hash" | shasum -a 1 | cut -c1-8)
+
+    # Build args conditionally — only include --deps discovered-from when SOURCE_BD_ID
+    # is set AND non-empty. Avoids bd create rejecting a bogus "discovered-from:unknown".
+    args=(
+      "$title"
+      --type "$beads_default_type"
+      -p "$pnum"
+      --description "$description"
+      --external-ref "mmr:$finding_hash"
+    )
+    if [ -n "${SOURCE_BD_ID:-}" ]; then
+      args+=(--deps "discovered-from:$SOURCE_BD_ID")
+    fi
+    bd create "${args[@]}"
+  done < <(jq -c --argjson maxRank "$threshold_rank" '
+    .reconciled_findings[]?
+    | (.severity | sub("^P";"") | tonumber) as $rank
+    | select($rank <= $maxRank)
+  ' <<<"$review_json")
+fi
+```
+
+Notes on this script:
+- The opt-in flag `beads.create_issues_from_blocking_findings` in `.mmr.yaml` is read first; the rest of the block is skipped unless it's `true`. No env-var override — config is the single source of truth.
+- Pure-bash YAML parsing (grep + sed) — no `yq` dependency. The match patterns are intentionally simple: a single boolean enable flag, plus optional `fix_threshold` and `default_type` overrides. Anything more complex than that should be parsed with a real YAML library.
+- `--argjson maxRank "$threshold_rank"` passes a number so jq can compare numerically.
+- `(.severity | sub("^P";"") | tonumber)` extracts the integer rank from `P2`-style severities.
+- `while IFS= read -r` streams one JSON object per line without word-splitting on spaces.
+- `.description | .[0:120]` truncates safely under UTF-8 (unlike `head -c 120`).
+- The `--deps discovered-from:$SOURCE_BD_ID` flag is included only when `$SOURCE_BD_ID` is non-empty — avoids a bogus `discovered-from:unknown` dependency or a `bd create` failure for the common case where no source task is in scope.
+
+Use `--external-ref "mmr:$finding_hash"` to link the new Beads issue to the *finding identity* (location + description hash, same components as Step 7a's wrapper hash). The ref is stable across MMR job IDs. **Known limitation:** Beads v1.0.4 has no `bd list --external-ref <ref>` filter, so this bridge can't dedupe at write time — re-running the bridge on the same finding will create another Beads issue. When upstream adds an external-ref filter, prepend a `bd list --external-ref "mmr:$finding_hash"` skip-check to this loop. The job ID is preserved in the issue's description (`First seen in MMR job: <id>`) for traceability.
+
+`--deps discovered-from:$SOURCE_BD_ID` chains the new issue to whatever current task triggered the review (only when that ID is known).
+
 ### Step 8: Confirm Completion
 
 **Success path** — all findings resolved (verdict is `pass` or `degraded-pass`):

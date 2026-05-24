@@ -101,11 +101,13 @@ Before writing any code, verify the environment is ready:
 Check if `.beads/` directory exists.
 
 **If Beads is configured:**
-- Run `bd ready` to see available tasks
-- Pick the lowest-ID unblocked task
+- Atomically claim the next ready task: `TASK=$(bd ready --claim --json | jq -r '.id')`
+  - This sets `assignee=$BEADS_ACTOR` (or your git user.name) and `status=in_progress` in a single round-trip — no race window vs other agents.
+  - If you need a specific task by ID instead, use `bd update <id> --claim`.
+  - If `bd ready --claim` returns no task, you're done — exit the loop.
 - Implement following the TDD workflow below
-- After PR is merged, run `bd close <id> && bd sync`
-- Repeat with `bd ready` until no tasks remain
+- After PR is merged, run `bd close <id>`
+- Repeat (`bd ready --claim --json`) until no tasks remain
 
 **Without Beads:**
 1. Read `docs/implementation-playbook.md` as the primary task execution reference.
@@ -153,6 +155,13 @@ For each task:
    - Fix any findings at or above `fix_threshold` before proceeding
 
 7. **Create PR**
+   - If Beads is configured, run the PR-readiness checklist first:
+     ```bash
+     if [ -d .beads ]; then
+       bd preflight
+     fi
+     ```
+     Fix any issues `bd preflight` flags before proceeding. (Note: do NOT use `[ -d .beads ] && bd preflight` — that returns exit-1 when `.beads/` is absent and breaks any caller running under `set -e`.)
    - Push the branch: `git push -u origin HEAD`
    - Create a pull request: `gh pr create`
    - Include in the PR description: what was implemented, key decisions, files changed
