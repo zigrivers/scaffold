@@ -712,7 +712,7 @@ Source documents (in this branch):
 - Multi-agent pipeline prompts (`multi-agent-start.md`, `multi-agent-resume.md`) reference merge-slot before `git push` and gates in the Recovery Procedures section.
 
 ### Worktree integration
-- `scripts/setup-agent-worktree.sh` now calls `bd worktree create` when `.beads/` exists (in addition to `bd doctor --fix`).
+- `scripts/setup-agent-worktree.sh` calls `bd doctor --fix` when `.beads/` exists. **The original plan included `bd worktree create` but that was removed** after verifying the upstream CLI — `bd worktree create` is a CREATOR (it makes a new git worktree from `<name>`), not a registrar for existing ones. Upstream Beads docs explicitly say worktree DB resolution is automatic via git common-directory discovery, so there's nothing to register from the worktree side.
 
 ### Methodology-scaled custom types
 - `bd config set types.custom '["story","milestone","spike"]'` runs in `deep` methodology; stays off in `mvp`.
@@ -732,7 +732,7 @@ Source documents (in this branch):
 
 None — all four originally-deferred design discussions are implemented in this PR:
 - D1 / F-1.3 — auto-memory ↔ bd remember = Option 3 (document and divide)
-- D2 / F-1.7 — bd worktree create in setup-agent-worktree.sh
+- D2 / F-1.7 — bd doctor --fix on worktree setup (bd worktree create premise corrected post-verification)
 - D3 / F-3.1 — bd merge-slot + bd gate documented + wired into multi-agent flows
 - D4 / F-1.10 phase 2 — methodology-scaled types.custom
 

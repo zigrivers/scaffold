@@ -708,18 +708,23 @@ if [ "$beads_enabled" = "true" ] && [ -d .beads ] && command -v bd >/dev/null 2>
     title=$(jq -r '.description | .[0:120]' <<<"$finding")
     severity=$(jq -r '.severity' <<<"$finding")
     pnum="${severity#P}"
-    description=$(jq -r '"\(.description)\n\nSuggestion: \(.suggestion // "(none)")\n\nLocation: \(.location // "(unknown)")"' <<<"$finding")
+    description=$(jq -r --arg job "$JOB_ID" '"\(.description)\n\nSuggestion: \(.suggestion // "(none)")\n\nLocation: \(.location // "(unknown)")\n\nFirst seen in MMR job: \($job)"' <<<"$finding")
     # Per-finding identity for dedupe on re-runs (matches review-pr.md Step 7b).
     loc=$(jq -r '.location // ""' <<<"$finding")
     desc_for_hash=$(jq -r '.description // ""' <<<"$finding")
     finding_hash=$(printf '%s|%s' "$loc" "$desc_for_hash" | shasum -a 1 | cut -c1-8)
+
+    # Skip create if a Beads issue with this finding hash already exists.
+    if bd list --external-ref "mmr:$finding_hash" --json 2>/dev/null | jq -e '. | length > 0' >/dev/null; then
+      continue
+    fi
 
     args=(
       "$title"
       --type "$beads_default_type"
       -p "$pnum"
       --description "$description"
-      --external-ref "mmr-$JOB_ID:$finding_hash"
+      --external-ref "mmr:$finding_hash"
     )
     if [ -n "${SOURCE_BD_ID:-}" ]; then
       args+=(--deps "discovered-from:$SOURCE_BD_ID")

@@ -705,7 +705,7 @@ After completing a task:
 
 ```bash
 bd close <id>
-if remote=$(bd config get dolt.remote 2>/dev/null) && [ -n "$remote" ]; then bd dolt push; fi  # only pushes when a Dolt remote is configured
+if remote=$(bd config get dolt.remote --json 2>/dev/null | jq -r .value 2>/dev/null) && [ -n "$remote" ]; then bd dolt push; fi  # only pushes when a Dolt remote is configured
 ```
 
 <!-- section:pr-integration -->
@@ -713,7 +713,7 @@ if remote=$(bd config get dolt.remote 2>/dev/null) && [ -n "$remote" ]; then bd 
 Before creating a PR, ensure all tasks are synced:
 
 ```bash
-if remote=$(bd config get dolt.remote 2>/dev/null) && [ -n "$remote" ]; then bd dolt push; fi  # only pushes when a Dolt remote is configured
+if remote=$(bd config get dolt.remote --json 2>/dev/null | jq -r .value 2>/dev/null) && [ -n "$remote" ]; then bd dolt push; fi  # only pushes when a Dolt remote is configured
 gh pr create --title "[BD-<id>] type(scope): description"
 ```
 ```
