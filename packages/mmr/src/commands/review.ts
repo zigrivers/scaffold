@@ -11,6 +11,7 @@ import { dispatchChannel } from '../core/dispatcher.js'
 import { runResultsPipeline } from '../core/results-pipeline.js'
 import { getCompensatingChannels, dispatchCompensatingPasses } from '../core/compensator.js'
 import type { Severity, OutputFormat, ChannelStatus } from '../types.js'
+import type { ChannelConfigParsed } from '../config/schema.js'
 
 interface ReviewArgs {
   diff?: string
@@ -64,6 +65,32 @@ function resolveDiff(args: ReviewArgs): string {
 
   // Default: unstaged changes
   return execFileSync('git', ['diff'], { encoding: 'utf-8', maxBuffer: MAX_DIFF_BUFFER })
+}
+
+/**
+ * Resolve the list of channels to dispatch.
+ * - Filters out any channel with `abstract: true` (never dispatchable).
+ * - Honors explicit --channels list when provided; otherwise enabled channels
+ *   minus channels_disabled.
+ */
+export function resolveDispatchChannels(
+  channels: Record<string, ChannelConfigParsed>,
+  explicit: string[] | undefined,
+  disabled: Set<string>,
+): string[] {
+  const isDispatchable = (name: string): boolean => {
+    const ch = channels[name]
+    if (!ch) return false
+    if (ch.abstract === true) return false
+    return true
+  }
+
+  if (explicit && explicit.length > 0) {
+    return explicit.filter(isDispatchable)
+  }
+  return Object.entries(channels)
+    .filter(([name, ch]) => ch.enabled && !disabled.has(name) && !ch.abstract)
+    .map(([name]) => name)
 }
 
 export const reviewCommand: CommandModule<object, ReviewArgs> = {
@@ -143,11 +170,10 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     }
 
     // 3. Determine enabled channels — channels_disabled applies to the default list only;
-    //    explicit --channels args override it (users know what they're asking for)
+    //    explicit --channels args override it (users know what they're asking for).
+    //    Abstract channels are always filtered out.
     const disabledSet = new Set(config.channels_disabled ?? [])
-    const channelNames = args.channels ?? Object.entries(config.channels)
-      .filter(([name, ch]) => ch.enabled && !ch.abstract && !disabledSet.has(name))
-      .map(([name]) => name)
+    const channelNames = resolveDispatchChannels(config.channels, args.channels, disabledSet)
 
     if (channelNames.length === 0) {
       console.error('No channels enabled. Configure channels or pass --channels.')
