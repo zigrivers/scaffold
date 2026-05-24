@@ -20,7 +20,7 @@ export async function probeRuntime(
   args: string[],
   timeoutMs: number,
 ): Promise<ProbeResult> {
-  if (!/^[a-zA-Z0-9._/\\: -]+$/.test(command)) {
+  if (!/^[a-zA-Z0-9._/\\: ()@+~-]+$/.test(command)) {
     return { detected: false, reason: 'invalid command name' }
   }
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > MAX_TIMEOUT_MS) {
@@ -34,21 +34,31 @@ export async function probeRuntime(
 
   return new Promise<ProbeResult>((resolve) => {
     let settled = false
+    let timedOut = false
+    let killTimer: ReturnType<typeof setTimeout> | undefined
     const child = spawn(command, args, { stdio: 'ignore' })
 
     const timer = setTimeout(() => {
-      child.kill('SIGKILL')
-      finish({ detected: false, reason: 'timeout' })
+      timedOut = true
+      child.kill('SIGTERM')
+      killTimer = setTimeout(() => {
+        child.kill('SIGKILL')
+      }, 250)
     }, timeoutMs)
 
     function finish(result: ProbeResult): void {
       if (settled) return
       settled = true
       clearTimeout(timer)
+      if (killTimer) clearTimeout(killTimer)
       resolve(result)
     }
 
     child.on('close', (code, signal) => {
+      if (timedOut) {
+        finish({ detected: false, reason: 'timeout' })
+        return
+      }
       const reason = code === 0 ? undefined : signal ? `signal ${signal}` : `exit ${code}`
       finish({ detected: code === 0, reason })
     })

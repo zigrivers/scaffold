@@ -17,8 +17,11 @@ describe('probeRuntime (T1-D)', () => {
   })
 
   it('returns detected=false when the probe exceeds timeout', async () => {
-    // `sleep 5` won't exit within a 200ms timeout.
-    const result = await probeRuntime('sleep', ['5'], 200)
+    const result = await probeRuntime(
+      process.execPath,
+      ['-e', 'setTimeout(() => {}, 5000)'],
+      200,
+    )
     expect(result.detected).toBe(false)
     expect(result.reason).toMatch(/timeout/i)
   })
