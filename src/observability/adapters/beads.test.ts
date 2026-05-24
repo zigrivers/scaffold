@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, mkdirSync } from 'node:fs'
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { beadsAdapter } from './beads.js'
@@ -22,7 +22,26 @@ describe('beads adapter', () => {
 
   it('probe returns available when .beads/ + bd both exist', async () => {
     mkdirSync(join(dir, '.beads'), { recursive: true })
-    const s = await beadsAdapter.probe(dir, { bdBin: 'true' })
+    const shim = join(dir, 'fake-bd.sh')
+    writeFileSync(shim, '#!/usr/bin/env bash\necho "bd version 1.0.4"\n', { mode: 0o755 })
+    const s = await beadsAdapter.probe(dir, { bdBin: shim })
+    expect(s.status).toBe('available')
+  })
+
+  it('probe returns degraded when bd is too old (below v1.0.0)', async () => {
+    mkdirSync(join(dir, '.beads'), { recursive: true })
+    const oldBd = join(dir, 'fake-bd.sh')
+    writeFileSync(oldBd, '#!/usr/bin/env bash\necho "bd version 0.62.0"\n', { mode: 0o755 })
+    const s = await beadsAdapter.probe(dir, { bdBin: oldBd })
+    expect(s.status).toBe('degraded')
+    expect(s.reason).toMatch(/version/)
+  })
+
+  it('probe returns available when bd is v1.0.0 or newer', async () => {
+    mkdirSync(join(dir, '.beads'), { recursive: true })
+    const newBd = join(dir, 'fake-bd.sh')
+    writeFileSync(newBd, '#!/usr/bin/env bash\necho "bd version 1.0.4 (Homebrew)"\n', { mode: 0o755 })
+    const s = await beadsAdapter.probe(dir, { bdBin: newBd })
     expect(s.status).toBe('available')
   })
 })

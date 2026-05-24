@@ -23,14 +23,21 @@ export const beadsAdapter: BaseAdapter & {
       return { status: 'unavailable', reason: '.beads directory not found (project chose markdown-only tracking)' }
     }
     const bin = opts.bdBin ?? 'bd'
+    let stdout: string
     try {
-      await execFile(bin, ['--version'], { cwd })
-      return { status: 'available' }
+      ;({ stdout } = await execFile(bin, ['--version'], { cwd }))
     } catch (err: unknown) {
       const e = err as { code?: string }
       if (e.code === 'ENOENT') return { status: 'degraded', reason: 'bd binary not installed' }
       return { status: 'degraded', reason: 'bd probe failed' }
     }
+    const m = stdout.match(/(\d+)\.(\d+)\.(\d+)/)
+    if (!m) return { status: 'degraded', reason: `bd version could not be parsed from: ${stdout.trim()}` }
+    const major = Number(m[1])
+    if (major < 1) {
+      return { status: 'degraded', reason: `bd version ${m[0]} is below the supported minimum (1.0.0). Run 'brew upgrade beads' or your equivalent.` }
+    }
+    return { status: 'available' }
   },
 
   async listTasks(cwd: string, opts: BeadsAdapterOpts = {}): Promise<unknown[]> {
