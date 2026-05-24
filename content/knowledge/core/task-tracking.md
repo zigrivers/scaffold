@@ -195,8 +195,8 @@ The `[BD-xxx]` prefix enables:
 
 #### Session End Protocol
 
-1. Commit all work with `[BD-xxx]` prefix
-2. If task is complete: create PR, run `bd done BD-xxx`
+1. Commit all work with `[bd-<id>]` prefix (lowercase hash-style)
+2. If task is complete: create PR, run `bd close <id>` (alias: `bd done`)
 3. If task is incomplete: leave clear notes about current state and next steps
 4. If lessons were learned: update `tasks/lessons.md`
 
