@@ -34,18 +34,22 @@ Epics group related tasks. Tasks are the unit of work assignment — one task pe
 
 ### Progress Tracking
 
-Track task status through a simple state machine:
+Beads tracks task status through this state machine (upstream v1.0.4 enum):
 
-```
-ready → in-progress → review → done
-                  ↘ blocked
-```
+`open → in_progress → closed` (happy path)
+            ↓
+        `blocked` | `deferred` (off-path)
 
-- **ready** — All dependencies met, can start immediately
-- **in-progress** — Agent is actively working on it
-- **review** — Implementation complete, awaiting PR merge
-- **done** — PR merged, tests passing on main
-- **blocked** — Cannot proceed, dependency or question unresolved
+- **open** — Not started.
+- **in_progress** — Atomically claimed via `bd update <id> --claim` or `bd ready --claim`.
+- **blocked** — Dependency unresolved (set automatically when a `blocks:` dep exists on an open issue).
+- **deferred** — Hidden from `bd ready` until `--defer` date passes.
+- **closed** — Completed (via `bd close <id>`). Reopen with `bd reopen <id>`.
+- **pinned** / **hooked** — Special states; rarely set manually.
+
+Beads also exposes a *status category* dimension (`active | wip | done | frozen`) for higher-level grouping. Use `bd state <id>` to query, `bd statuses` to list valid statuses.
+
+> Scaffold previously documented `ready → in-progress → review → done` — none of those (except via `ready` as a *query*) are upstream statuses. The `review` state, if needed, can be added per-project via `bd config set types.custom_statuses '[{"name":"review","category":"wip"}]'`.
 
 ### Lessons-Learned Workflow
 
@@ -187,8 +191,8 @@ For complex projects, maintain a progress summary:
 ## Current Sprint
 - [x] BD-10: Database schema migration (done)
 - [x] BD-11: Auth middleware (done)
-- [ ] BD-12: User registration endpoint (in-progress)
-- [ ] BD-13: Login endpoint (ready)
+- [ ] bd-a3f8: User registration endpoint (in_progress)
+- [ ] bd-a3f9: Login endpoint (open, ready to pick up)
 - [ ] BD-14: Profile management (blocked — needs BD-12)
 
 ## Blocked
