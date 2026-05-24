@@ -178,8 +178,21 @@ Once in-progress work is complete (or if there was none):
      fi
      ```
      Fix any issues `bd preflight` flags before proceeding.
+   - **For 3+ parallel agents**, acquire a merge slot to serialize merge-time conflicts:
+     ```bash
+     if [ -d .beads ]; then
+       SLOT=$(bd merge-slot acquire --json | jq -r '.slot_id')
+     fi
+     ```
+     Skip for single-agent or two-agent runs. See `content/knowledge/execution/multi-agent-coordination.md`.
    - Push the branch: `git push -u origin HEAD`
    - Create a pull request: `gh pr create`
+   - After the PR merges (or if you abandon the work), release the slot:
+     ```bash
+     if [ -d .beads ] && [ -n "${SLOT:-}" ]; then
+       bd merge-slot release "$SLOT"
+     fi
+     ```
    - Include agent name in PR description for traceability
 
 4. **Run code reviews (MANDATORY)**
