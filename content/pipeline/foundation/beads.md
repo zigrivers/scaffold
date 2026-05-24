@@ -49,6 +49,10 @@ and autonomous behavior guidelines.
   fixes errors like `unknown command \"hook\" for \"bd\"` from stale post-checkout /
   post-merge hook shims."
 - (mvp) Bootstrap commit uses `[bd-<id>]` convention (lowercase hash-style IDs per Beads v1.0.0+)
+- (mvp) Auto-export to `.beads/issues.jsonl` is explicitly enabled after `bd init`:
+  `bd config set export.auto true && bd config set export.git-add true`. As of
+  Beads v1.0.4-Unreleased this is opt-in (previously default); explicit enable means
+  release/version-bump tooling can rely on `.beads/issues.jsonl` being current.
 - (mvp) Agents pick up Beads workflow context via `bd prime` (loaded automatically by
   the hooks `bd setup claude` installs). Scaffold does NOT hand-roll a Beads command
   reference table — that lives upstream in `bd prime` output. If a project wants
