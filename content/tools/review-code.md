@@ -133,7 +133,7 @@ echo "$AGENT_FINDINGS" > /tmp/agent-findings.json
 mmr reconcile "$JOB_ID" --channel superpowers --input /tmp/agent-findings.json
 ```
 
-The agent's review output must use MMR-compatible finding schema: each finding needs `severity` (P0-P3), `location` (file:line), and `description` (`suggestion` is optional).
+The agent's review output must use MMR-compatible finding schema: each finding needs `severity` (P0-P3), `category` (correctness, edge-case, security, acceptance-criteria, test-coverage, or another stable category), `location` (file:line), and `description` (`suggestion` is optional).
 
 If `mmr` is not installed (`command -v mmr` fails), fall back to the manual multi-channel flow below.
 
@@ -363,7 +363,8 @@ Respond with JSON:
   "findings": [
     {
       "severity": "P0" | "P1" | "P2" | "P3",
-      "location": "file:line or section",
+      "category": "correctness|edge-case|security|acceptance-criteria|test-coverage",
+      "location": "relative/path/to/file.ts:42",
       "description": "what is wrong",
       "suggestion": "specific fix"
     }
@@ -712,3 +713,4 @@ for the next delivery step (commit, push, or PR creation).
 4. **Independence** — never share one channel's output with another.
 5. **Fix before proceeding** — findings at or above `fix_threshold` must be resolved before moving to the next task.
 6. **Dispatch pattern** follows `multi-model-review-dispatch` knowledge entry. When modifying channel dispatch in this file, verify consistency with `review-pr.md` and `post-implementation-review.md`.
+7. **3-round limit (per finding hash)** — never attempt to fix the *same* blocking finding (identified by the Step 7a hash of `location` + `category` + `description` + `suggestion`) more than 3 times. The attempts file `.scaffold/review-attempts/<session-id>.json` is the exact-hash source of truth; `_review_at_strike_limit` checks it. Description and suggestion are intentionally part of the strict hash to mirror MMR T2-A's forthcoming native `finding_key`; the same-underlying-defect stop condition is a co-equal guard for wording jitter that produces new hashes. Each round that surfaces genuinely different findings with *new* hashes is healthy iteration — keep going. Stop when a hash hits 3 attempts, when the same underlying defect recurs across 3 rounds even if reviewer wording produces new hashes, when channels contradict each other, or when the user asks to stop. For noisy fix loops, optionally suggest `--fix-threshold P1` (the project default stays at P2).

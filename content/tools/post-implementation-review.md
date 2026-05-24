@@ -433,9 +433,9 @@ The per-story review prompt for Codex and Gemini:
     \"findings\": [
       {
         \"severity\": \"P0|P1|P2|P3\",
+        \"category\": \"correctness|edge-case|security|acceptance-criteria|test-coverage\",
         \"acceptance_criterion\": \"Which criterion (or null if general)\",
-        \"file\": \"relative/path/to/file.ts\",
-        \"line\": 42,
+        \"location\": \"relative/path/to/file.ts:42\",
         \"description\": \"Specific description\",
         \"suggestion\": \"How to fix it\"
       }
@@ -448,7 +448,7 @@ The per-story review prompt for Codex and Gemini:
   Return ONLY valid JSON."
 
 Normalize the Superpowers code-reviewer findings to the same JSON shape as
-Codex/Gemini (severity, acceptance_criterion, file, line, description, suggestion)
+Codex/Gemini (severity, category, acceptance_criterion, location, description, suggestion)
 before returning. Then return all three channels' findings plus channel status:
 {
   "story": "[STORY_TITLE]",
@@ -479,8 +479,8 @@ mmr reconcile "$JOB_ID" --channel superpowers --input /tmp/agent-findings.json
 ```
 
 All findings injected via `mmr reconcile` must use MMR-compatible schema: each
-finding needs `severity` (P0-P3), `location` (file:line), and `description`
-(`suggestion` is optional). The strict validator will reject findings with
+finding needs `severity` (P0-P3), `category` (stable finding category),
+`location` (file:line), and `description` (`suggestion` is optional). The strict validator will reject findings with
 missing or invalid required fields.
 
 This step is optional — post-implementation review is a full-codebase review (not
@@ -721,7 +721,7 @@ the user they require manual attention before the project is ready to release.
 3. **Auth failures are not silent** — always surface to the user with the exact recovery command (`! codex login` or `! gemini -p "hello"`). Wait for user response before queuing a compensating pass.
 4. **Independence** — never share one channel's output with another. Each reviews independently.
 5. **Verify every fix** — run tests (or re-read the file) immediately after each fix before moving on.
-6. **3-round limit (per finding)** — never attempt to fix the *same* blocking finding more than 3 times. Each round that surfaces a *new, different, fixable* finding is healthy iteration — keep going. Stop only when the same finding recurs across 3 attempts, channels contradict each other, or the user asks to stop. Surface unresolved findings to the user.
+6. **3-round limit (per finding identity)** — never attempt to fix the *same* blocking finding more than 3 times. Mirror the wrapper hash identity used by `review-pr.md` and `review-code.md`: `location` + `category` + `description` + `suggestion`. This tool's JSON prompt templates already require `category`; it does not have wrapper-side Step 7a attempts-file bookkeeping, so track attempts in the review report/session notes. Each round that surfaces genuinely different findings with new identities is healthy iteration — keep going. Stop when an identity hits 3 attempts, when the same underlying defect recurs across 3 rounds even if reviewer wording changes, when channels contradict each other, or when the user asks to stop. Surface unresolved findings to the user.
 7. **Document everything** — the report must show which channels ran, which were compensating, which were skipped, and the root cause for any degraded channel.
 8. **No auto-merge** — this tool modifies local files only. It never pushes, merges, or creates PRs.
 9. **Dispatch pattern cross-reference** — Phase 2 parallel dispatch uses `superpowers:dispatching-parallel-agents`. Each story subagent dispatches its own `superpowers:code-reviewer` as Channel 3. This two-level nesting is intentional and supported.
