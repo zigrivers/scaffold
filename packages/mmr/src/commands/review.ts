@@ -69,7 +69,8 @@ function resolveDiff(args: ReviewArgs): string {
 
 /**
  * Resolve the list of channels to dispatch.
- * - Filters out any channel with `abstract: true` (never dispatchable).
+ * - Filters out abstract channels from default resolution.
+ * - Rejects explicit abstract channel requests with a clear error.
  * - Honors explicit --channels list when provided; otherwise enabled channels
  *   minus channels_disabled.
  */

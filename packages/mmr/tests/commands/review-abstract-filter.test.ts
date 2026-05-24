@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { resolveDispatchChannels } from '../../src/commands/review.js'
+import type { ChannelConfigParsed } from '../../src/config/schema.js'
 
 describe('resolveDispatchChannels (T1-A)', () => {
   const sampleChannels = {
@@ -7,7 +8,7 @@ describe('resolveDispatchChannels (T1-A)', () => {
     qwen: { enabled: true, abstract: false, command: 'ollama run', flags: ['qwen'], env: {}, prompt_wrapper: '{{prompt}}', output_parser: 'default', stderr: 'capture' as const },
     deepseek: { enabled: true, abstract: false, command: 'ollama run', flags: ['deepseek'], env: {}, prompt_wrapper: '{{prompt}}', output_parser: 'default', stderr: 'capture' as const },
     disabled: { enabled: false, abstract: false, command: 'x', flags: [], env: {}, prompt_wrapper: '{{prompt}}', output_parser: 'default', stderr: 'capture' as const },
-  }
+  } satisfies Record<string, ChannelConfigParsed>
 
   it('filters out channels with abstract: true from default resolution', () => {
     const names = resolveDispatchChannels(sampleChannels, undefined, new Set())
