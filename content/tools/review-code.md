@@ -677,8 +677,24 @@ Step 7's fix-in-place flow; it creates a durable record of findings that ought t
 become standalone follow-up work.
 
 ```bash
-if [ -d .beads ] && command -v bd >/dev/null 2>&1; then
-  threshold_rank=$(case "${BEADS_FIX_THRESHOLD:-P2}" in P0) echo 0;; P1) echo 1;; P2) echo 2;; P3) echo 3;; *) echo 4;; esac)
+# First: gate on the opt-in flag in .mmr.yaml. Defaults to disabled.
+beads_enabled=false
+beads_fix_threshold=P2
+beads_default_type=bug
+beads_default_priority=2
+if [ -f .mmr.yaml ] && command -v yq >/dev/null 2>&1; then
+  beads_enabled=$(yq -r '.beads.create_issues_from_blocking_findings // false' .mmr.yaml)
+  beads_fix_threshold=$(yq -r '.beads.fix_threshold // "P2"' .mmr.yaml)
+  beads_default_type=$(yq -r '.beads.default_type // "bug"' .mmr.yaml)
+  beads_default_priority=$(yq -r '.beads.default_priority // 2' .mmr.yaml)
+elif [ -f .mmr.yaml ]; then
+  if grep -qE '^\s*create_issues_from_blocking_findings:\s*true' .mmr.yaml; then
+    beads_enabled=true
+  fi
+fi
+
+if [ "$beads_enabled" = "true" ] && [ -d .beads ] && command -v bd >/dev/null 2>&1; then
+  threshold_rank=$(case "$beads_fix_threshold" in P0) echo 0;; P1) echo 1;; P2) echo 2;; P3) echo 3;; *) echo 4;; esac)
 
   while IFS= read -r finding; do
     title=$(jq -r '.description | .[0:120]' <<<"$finding")
@@ -686,12 +702,17 @@ if [ -d .beads ] && command -v bd >/dev/null 2>&1; then
     pnum="${severity#P}"
     description=$(jq -r '.description + "\n\nSuggestion: " + .suggestion + "\n\nLocation: " + .location' <<<"$finding")
 
-    bd create "$title" \
-      --type bug \
-      -p "$pnum" \
-      --description "$description" \
-      --external-ref "mmr-$JOB_ID" \
-      --deps "discovered-from:${SOURCE_BD_ID:-unknown}"
+    args=(
+      "$title"
+      --type "$beads_default_type"
+      -p "$pnum"
+      --description "$description"
+      --external-ref "mmr-$JOB_ID"
+    )
+    if [ -n "${SOURCE_BD_ID:-}" ]; then
+      args+=(--deps "discovered-from:$SOURCE_BD_ID")
+    fi
+    bd create "${args[@]}"
   done < <(jq -c --argjson maxRank "$threshold_rank" '
     .results.channels[].findings[]
     | (.severity | sub("^P";"") | tonumber) as $rank
@@ -701,7 +722,10 @@ fi
 ```
 
 Same shell idioms as `review-pr.md` Step 7b — see that file for notes on the jq
-arguments and UTF-8-safe truncation.
+arguments and UTF-8-safe truncation. The `.mmr.yaml` opt-in flag is read first;
+the rest of the block is skipped unless `beads.create_issues_from_blocking_findings`
+is `true`. The `--deps discovered-from:$SOURCE_BD_ID` flag is conditional on a
+non-empty `$SOURCE_BD_ID`.
 
 ### Step 8: Final Verdict
 

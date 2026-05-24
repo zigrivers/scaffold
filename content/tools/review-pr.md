@@ -500,9 +500,26 @@ tracking — it does NOT replace Step 7's fix-in-place flow; it only creates a
 durable record of findings that ought to become standalone follow-up work.
 
 ```bash
-if [ -d .beads ] && command -v bd >/dev/null 2>&1; then
-  # Threshold from .mmr.yaml beads.fix_threshold (default P2)
-  threshold_rank=$(case "${BEADS_FIX_THRESHOLD:-P2}" in P0) echo 0;; P1) echo 1;; P2) echo 2;; P3) echo 3;; *) echo 4;; esac)
+# First: gate on the opt-in flag in .mmr.yaml. Defaults to disabled.
+beads_enabled=false
+beads_fix_threshold=P2
+beads_default_type=bug
+beads_default_priority=2
+if [ -f .mmr.yaml ] && command -v yq >/dev/null 2>&1; then
+  # yq (Mike Farah's Go version) ships on most dev machines; fall back to grep below.
+  beads_enabled=$(yq -r '.beads.create_issues_from_blocking_findings // false' .mmr.yaml)
+  beads_fix_threshold=$(yq -r '.beads.fix_threshold // "P2"' .mmr.yaml)
+  beads_default_type=$(yq -r '.beads.default_type // "bug"' .mmr.yaml)
+  beads_default_priority=$(yq -r '.beads.default_priority // 2' .mmr.yaml)
+elif [ -f .mmr.yaml ]; then
+  # yq-less fallback: only the boolean enable flag is parsed; other values stay at default.
+  if grep -qE '^\s*create_issues_from_blocking_findings:\s*true' .mmr.yaml; then
+    beads_enabled=true
+  fi
+fi
+
+if [ "$beads_enabled" = "true" ] && [ -d .beads ] && command -v bd >/dev/null 2>&1; then
+  threshold_rank=$(case "$beads_fix_threshold" in P0) echo 0;; P1) echo 1;; P2) echo 2;; P3) echo 3;; *) echo 4;; esac)
 
   while IFS= read -r finding; do
     title=$(jq -r '.description | .[0:120]' <<<"$finding")
@@ -510,12 +527,19 @@ if [ -d .beads ] && command -v bd >/dev/null 2>&1; then
     pnum="${severity#P}"
     description=$(jq -r '.description + "\n\nSuggestion: " + .suggestion + "\n\nLocation: " + .location' <<<"$finding")
 
-    bd create "$title" \
-      --type bug \
-      -p "$pnum" \
-      --description "$description" \
-      --external-ref "mmr-$JOB_ID" \
-      --deps "discovered-from:${SOURCE_BD_ID:-unknown}"
+    # Build args conditionally — only include --deps discovered-from when SOURCE_BD_ID
+    # is set AND non-empty. Avoids bd create rejecting a bogus "discovered-from:unknown".
+    args=(
+      "$title"
+      --type "$beads_default_type"
+      -p "$pnum"
+      --description "$description"
+      --external-ref "mmr-$JOB_ID"
+    )
+    if [ -n "${SOURCE_BD_ID:-}" ]; then
+      args+=(--deps "discovered-from:$SOURCE_BD_ID")
+    fi
+    bd create "${args[@]}"
   done < <(jq -c --argjson maxRank "$threshold_rank" '
     .results.channels[].findings[]
     | (.severity | sub("^P";"") | tonumber) as $rank
@@ -525,15 +549,17 @@ fi
 ```
 
 Notes on this script:
+- The opt-in flag `beads.create_issues_from_blocking_findings` in `.mmr.yaml` is read first; the rest of the block is skipped unless it's `true`. No env-var override — config is the single source of truth.
+- `yq` is the preferred parser; a grep fallback handles the boolean enable flag for environments without `yq` (other config values stay at default).
 - `--argjson maxRank "$threshold_rank"` passes a number so jq can compare numerically.
 - `(.severity | sub("^P";"") | tonumber)` extracts the integer rank from `P2`-style severities.
 - `while IFS= read -r` streams one JSON object per line without word-splitting on spaces.
 - `.description | .[0:120]` truncates safely under UTF-8 (unlike `head -c 120`).
-- The whole block is gated on `[ -d .beads ] && command -v bd` so it no-ops on non-Beads or non-installed environments.
+- The `--deps discovered-from:$SOURCE_BD_ID` flag is included only when `$SOURCE_BD_ID` is non-empty — avoids a bogus `discovered-from:unknown` dependency or a `bd create` failure for the common case where no source task is in scope.
 
 Use `--external-ref "mmr-$JOB_ID"` to link the new Beads issue back to the MMR job;
-`--deps discovered-from:${SOURCE_BD_ID}` chains it to whatever current task triggered
-the review (if known).
+`--deps discovered-from:$SOURCE_BD_ID` chains it to whatever current task triggered
+the review (only when that ID is known).
 
 ### Step 8: Confirm Completion
 
