@@ -148,6 +148,13 @@ Once in-progress work is complete (or if there was none):
    - Fix any findings at or above `fix_threshold` before proceeding
 
 3. **Create PR** (if not already created for in-progress work)
+   - If Beads is configured, run the PR-readiness checklist first:
+     ```bash
+     if [ -d .beads ]; then
+       bd preflight
+     fi
+     ```
+     Fix any issues `bd preflight` flags before proceeding.
    - Push the branch: `git push -u origin HEAD`
    - Create a pull request: `gh pr create`
    - Follow the PR workflow from `docs/git-workflow.md` or CLAUDE.md

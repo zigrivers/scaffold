@@ -155,6 +155,13 @@ For each task:
    - Fix any findings at or above `fix_threshold` before proceeding
 
 7. **Create PR**
+   - If Beads is configured, run the PR-readiness checklist first:
+     ```bash
+     if [ -d .beads ]; then
+       bd preflight
+     fi
+     ```
+     Fix any issues `bd preflight` flags before proceeding. (Note: do NOT use `[ -d .beads ] && bd preflight` — that returns exit-1 when `.beads/` is absent and breaks any caller running under `set -e`.)
    - Push the branch: `git push -u origin HEAD`
    - Create a pull request: `gh pr create`
    - Include in the PR description: what was implemented, key decisions, files changed
