@@ -78,7 +78,7 @@ bd init              # Creates .beads/ directory with data store and git hooks
 Initialization creates:
 - `.beads/` — Data directory (committed to git)
 - Git hooks for automatic data sync (these are Beads data hooks, not code-quality hooks like pre-commit linters)
-- Initial `[BD-0]` bootstrap convention
+- Initial `[bd-<id>]` bootstrap convention (lowercase hash-style)
 
 #### Core Commands
 
@@ -105,7 +105,7 @@ Every commit references its Beads task:
 - Add integration tests for happy path and validation errors
 ```
 
-The `[BD-xxx]` prefix enables:
+The `[bd-<id>]` prefix enables:
 - Automatic task-to-commit traceability
 - Progress tracking based on commit activity
 - Session reconstruction (which commits belong to which task)
@@ -133,7 +133,7 @@ A task is done when:
 - All acceptance criteria from the task description are met
 - Tests pass (`make check` or equivalent)
 - Code follows project coding standards
-- Changes are committed with proper `[BD-xxx]` message
+- Changes are committed with proper `[bd-<id>]` message
 - PR is created (or merged, depending on workflow)
 
 Do not mark a task done based on "it seems to work." Prove it works — tests pass, logs clean, behavior verified.
@@ -227,7 +227,7 @@ Each task should define explicit completion criteria, not vague goals:
 
 **Missing lessons.** The user corrects the same mistake three sessions in a row because nobody captured it in `tasks/lessons.md`. Fix: treat lesson capture as mandatory, not optional. After every correction, update the file before continuing with other work.
 
-**Task ID drift.** Commits stop including `[BD-xxx]` prefixes partway through the project. Traceability breaks down. Fix: make task ID inclusion a habit enforced by review. If using a pre-commit hook, validate the prefix.
+**Task ID drift.** Commits stop including `[bd-<id>]` prefixes partway through the project. Traceability breaks down. Fix: make task ID inclusion a habit enforced by review. If using a pre-commit hook, validate the prefix.
 
 **Overloaded tasks.** A single task covers "implement the API, write the UI, add tests, update docs." This overflows a single session and makes progress tracking meaningless. Fix: split into tasks that each fit in one agent session (30-90 minutes).
 

@@ -689,10 +689,10 @@ if [ -f .mmr.yaml ]; then
   if grep -qE '^[[:space:]]*create_issues_from_blocking_findings:[[:space:]]*true([[:space:]]+#.*)?[[:space:]]*$' .mmr.yaml; then
     beads_enabled=true
   fi
-  if v=$(grep -E '^[[:space:]]*fix_threshold:[[:space:]]*P[0-4]([[:space:]]+#.*)?[[:space:]]*$' .mmr.yaml | head -1 | sed -E 's/.*:[[:space:]]*(P[0-4]).*/\1/'); [ -n "$v" ]; then
+  if v=$(grep -E '^[[:space:]]*fix_threshold:[[:space:]]*P[0-4]([[:space:]]+#.*)?[[:space:]]*$' .mmr.yaml | head -1 | sed -E 's/^[^:]*:[[:space:]]*(P[0-4]).*/\1/'); [ -n "$v" ]; then
     beads_fix_threshold=$v
   fi
-  if v=$(grep -E '^[[:space:]]*default_type:[[:space:]]*[a-zA-Z]+([[:space:]]+#.*)?[[:space:]]*$' .mmr.yaml | head -1 | sed -E 's/.*:[[:space:]]*([a-zA-Z]+).*/\1/'); [ -n "$v" ]; then
+  if v=$(grep -E '^[[:space:]]*default_type:[[:space:]]*[a-zA-Z]+([[:space:]]+#.*)?[[:space:]]*$' .mmr.yaml | head -1 | sed -E 's/^[^:]*:[[:space:]]*([a-zA-Z]+).*/\1/'); [ -n "$v" ]; then
     beads_default_type=$v
   fi
 fi
@@ -709,15 +709,13 @@ if [ "$beads_enabled" = "true" ] && [ -d .beads ] && command -v bd >/dev/null 2>
     severity=$(jq -r '.severity' <<<"$finding")
     pnum="${severity#P}"
     description=$(jq -r --arg job "$JOB_ID" '"\(.description)\n\nSuggestion: \(.suggestion // "(none)")\n\nLocation: \(.location // "(unknown)")\n\nFirst seen in MMR job: \($job)"' <<<"$finding")
-    # Per-finding identity for dedupe on re-runs (matches review-pr.md Step 7b).
+    # Per-finding identity for a future dedupe-on-re-runs mechanism (matches
+    # review-pr.md Step 7b). NOTE: bd v1.0.4 has no `bd list --external-ref`
+    # flag, so the bridge does not enforce dedupe at write time — known
+    # limitation; same-job re-runs will create duplicates.
     loc=$(jq -r '.location // ""' <<<"$finding")
     desc_for_hash=$(jq -r '.description // ""' <<<"$finding")
     finding_hash=$(printf '%s|%s' "$loc" "$desc_for_hash" | shasum -a 1 | cut -c1-8)
-
-    # Skip create if a Beads issue with this finding hash already exists.
-    if bd list --external-ref "mmr:$finding_hash" --json 2>/dev/null | jq -e '. | length > 0' >/dev/null; then
-      continue
-    fi
 
     args=(
       "$title"

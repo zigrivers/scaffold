@@ -516,10 +516,10 @@ if [ -f .mmr.yaml ]; then
     beads_enabled=true
   fi
   # Optional overrides for threshold / type. Defaults apply if the keys are absent.
-  if v=$(grep -E '^[[:space:]]*fix_threshold:[[:space:]]*P[0-4]([[:space:]]+#.*)?[[:space:]]*$' .mmr.yaml | head -1 | sed -E 's/.*:[[:space:]]*(P[0-4]).*/\1/'); [ -n "$v" ]; then
+  if v=$(grep -E '^[[:space:]]*fix_threshold:[[:space:]]*P[0-4]([[:space:]]+#.*)?[[:space:]]*$' .mmr.yaml | head -1 | sed -E 's/^[^:]*:[[:space:]]*(P[0-4]).*/\1/'); [ -n "$v" ]; then
     beads_fix_threshold=$v
   fi
-  if v=$(grep -E '^[[:space:]]*default_type:[[:space:]]*[a-zA-Z]+([[:space:]]+#.*)?[[:space:]]*$' .mmr.yaml | head -1 | sed -E 's/.*:[[:space:]]*([a-zA-Z]+).*/\1/'); [ -n "$v" ]; then
+  if v=$(grep -E '^[[:space:]]*default_type:[[:space:]]*[a-zA-Z]+([[:space:]]+#.*)?[[:space:]]*$' .mmr.yaml | head -1 | sed -E 's/^[^:]*:[[:space:]]*([a-zA-Z]+).*/\1/'); [ -n "$v" ]; then
     beads_default_type=$v
   fi
 fi
@@ -536,17 +536,15 @@ if [ "$beads_enabled" = "true" ] && [ -d .beads ] && command -v bd >/dev/null 2>
     severity=$(jq -r '.severity' <<<"$finding")
     pnum="${severity#P}"
     description=$(jq -r --arg job "$JOB_ID" '"\(.description)\n\nSuggestion: \(.suggestion // "(none)")\n\nLocation: \(.location // "(unknown)")\n\nFirst seen in MMR job: \($job)"' <<<"$finding")
-    # Per-finding identity in the external-ref so re-running the bridge across
-    # MMR jobs can dedupe. Uses the same location+description identity components
-    # as the wrapper-side hash stopgap (Step 7a) for consistency.
+    # Per-finding identity in the external-ref so a future Beads release with
+    # filter-by-external-ref can dedupe on re-runs. Uses the same
+    # location+description identity components as the wrapper-side hash stopgap
+    # (Step 7a) for consistency. NOTE: bd v1.0.4 has no `bd list --external-ref`
+    # flag, so cross-run dedupe is not enforced at the bridge level today —
+    # known limitation; re-running on the same MMR job will create duplicates.
     loc=$(jq -r '.location // ""' <<<"$finding")
     desc_for_hash=$(jq -r '.description // ""' <<<"$finding")
     finding_hash=$(printf '%s|%s' "$loc" "$desc_for_hash" | shasum -a 1 | cut -c1-8)
-
-    # Skip create if a Beads issue with this finding hash already exists.
-    if bd list --external-ref "mmr:$finding_hash" --json 2>/dev/null | jq -e '. | length > 0' >/dev/null; then
-      continue
-    fi
 
     # Build args conditionally — only include --deps discovered-from when SOURCE_BD_ID
     # is set AND non-empty. Avoids bd create rejecting a bogus "discovered-from:unknown".
@@ -578,7 +576,7 @@ Notes on this script:
 - `.description | .[0:120]` truncates safely under UTF-8 (unlike `head -c 120`).
 - The `--deps discovered-from:$SOURCE_BD_ID` flag is included only when `$SOURCE_BD_ID` is non-empty — avoids a bogus `discovered-from:unknown` dependency or a `bd create` failure for the common case where no source task is in scope.
 
-Use `--external-ref "mmr:$finding_hash"` to link the new Beads issue to the *finding identity*, not to a particular MMR job. The hash (location + description, same components as Step 7a's wrapper hash) is stable across MMR re-runs — so the next run of this step on a re-discovered finding can `bd list --external-ref "mmr:$finding_hash"` first and skip the `bd create` if a Beads issue already exists. (The job ID is preserved separately in the issue's description for traceability.)
+Use `--external-ref "mmr:$finding_hash"` to link the new Beads issue to the *finding identity* (location + description hash, same components as Step 7a's wrapper hash). The ref is stable across MMR job IDs. **Known limitation:** Beads v1.0.4 has no `bd list --external-ref <ref>` filter, so this bridge can't dedupe at write time — re-running the bridge on the same finding will create another Beads issue. When upstream adds an external-ref filter, prepend a `bd list --external-ref "mmr:$finding_hash"` skip-check to this loop. The job ID is preserved in the issue's description (`First seen in MMR job: <id>`) for traceability.
 
 `--deps discovered-from:$SOURCE_BD_ID` chains the new issue to whatever current task triggered the review (only when that ID is known).
 
