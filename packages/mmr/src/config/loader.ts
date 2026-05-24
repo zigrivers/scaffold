@@ -69,14 +69,69 @@ function loadYaml(filePath: string): Record<string, unknown> | undefined {
   return parsed as Record<string, unknown>
 }
 
+const MAX_EXTENDS_DEPTH = 4
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return (
+    value !== null
+    && typeof value === 'object'
+    && !Array.isArray(value)
+  )
+}
+
+function resolveChannelExtends(
+  name: string,
+  channels: Record<string, Record<string, unknown>>,
+  stack: string[] = [],
+): Record<string, unknown> {
+  if (stack.includes(name)) {
+    throw new Error(`Channel extends cycle detected: ${[...stack, name].join(' -> ')}`)
+  }
+  if (stack.length >= MAX_EXTENDS_DEPTH) {
+    throw new Error(
+      `Channel extends depth exceeds max (${MAX_EXTENDS_DEPTH}) at ${[...stack, name].join(' -> ')}`,
+    )
+  }
+
+  const channel = channels[name]
+  if (!channel) {
+    throw new Error(`Channel "${name}" referenced by extends not found`)
+  }
+
+  const parentName = channel.extends
+  if (typeof parentName !== 'string') return channel
+
+  const parentResolved = resolveChannelExtends(parentName, channels, [...stack, name])
+  const childWithoutExtends: Record<string, unknown> = { ...channel }
+  delete childWithoutExtends.extends
+
+  const childDefinesAbstract = Object.prototype.hasOwnProperty.call(channel, 'abstract')
+  const merged = deepMerge(parentResolved, childWithoutExtends)
+  if (!childDefinesAbstract) {
+    delete merged.abstract
+  }
+  return merged
+}
+
+function resolveExtendsAcrossChannels(
+  channels: Record<string, Record<string, unknown>> | undefined,
+): Record<string, Record<string, unknown>> {
+  if (!channels) return {}
+  const resolved: Record<string, Record<string, unknown>> = {}
+  for (const name of Object.keys(channels)) {
+    resolved[name] = resolveChannelExtends(name, channels)
+  }
+  return resolved
+}
+
 function validateRunnableChannels(config: MmrConfigParsed): void {
   for (const [name, channel] of Object.entries(config.channels)) {
-    if (channel.abstract || channel.extends) continue
+    if (channel.abstract) continue
     if (!channel.command) {
-      throw new Error(`Channel "${name}" must define command unless abstract or extends is set`)
+      throw new Error(`Channel "${name}" must define command after inheritance unless abstract is set`)
     }
     if (!channel.auth) {
-      throw new Error(`Channel "${name}" must define auth unless abstract or extends is set`)
+      throw new Error(`Channel "${name}" must define auth after inheritance unless abstract is set`)
     }
   }
 }
@@ -123,6 +178,12 @@ export function loadConfig(opts: LoadConfigOptions): MmrConfigParsed {
     if (Object.keys(overrideDefaults).length > 0) {
       merged = deepMerge(merged, { defaults: overrideDefaults })
     }
+  }
+
+  if (isPlainRecord(merged.channels)) {
+    merged.channels = resolveExtendsAcrossChannels(
+      merged.channels as Record<string, Record<string, unknown>>,
+    )
   }
 
   // Validate through Zod schema, then enforce invariants that depend on
