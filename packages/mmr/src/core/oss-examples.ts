@@ -11,8 +11,9 @@ export interface OssRuntime {
 
 /**
  * Catalog of OSS runtimes available to config-init probing. v3.28 ships
- * subprocess support only; HTTP-shaped runtimes (lms, llama-server,
- * local-ai-delegate) get commented-out stubs that note v3.30 will enable them.
+ * subprocess support only; HTTP-shaped runtimes (lms, llama-server) get
+ * commented-out stubs that note v3.30 will enable them. local-ai-delegate
+ * documents a subprocess shim users can adapt in v3.28.
  */
 export const OSS_RUNTIMES: OssRuntime[] = [
   { id: 'ollama', probe: { command: 'ollama', args: ['list'], timeoutMs: 1000 } },
@@ -40,7 +41,7 @@ export function exampleBlockFor(id: OssRuntime['id']): string {
       '#   flags: ["qwen2.5-coder:32b", "--format", "json"]',
       '#   auth:',
       '#     check: "ollama list"',
-      '#     timeout: 5',
+      '#     timeout: 5                                      # seconds',
       '#     failure_exit_codes: [1]',
       '#     recovery: "ollama serve"',
     ].join('\n')
@@ -58,10 +59,10 @@ export function exampleBlockFor(id: OssRuntime['id']): string {
     ].join('\n')
   case 'local-ai-delegate':
     return [
-      '# example: local-ai-delegate (MCP bridge, HTTP) - requires MMR v3.30+',
+      '# example: local-ai-delegate (MCP bridge subprocess shim)',
       '#   The local-ai-delegate MCP server proxies an OpenAI-compatible',
-      '#   endpoint to a locally-hosted model. HTTP channel kind ships in',
-      '#   v3.30; for v3.28 you can wrap it in a shell shim if needed.',
+      '#   endpoint to a locally-hosted model. Native HTTP channel kind ships',
+      '#   in v3.30; this v3.28 example assumes a shell shim wrapper.',
       '#   abstract: true                                    # template only',
       '#   command: local-ai-delegate review',
       '#   flags: ["--format", "json"]',
