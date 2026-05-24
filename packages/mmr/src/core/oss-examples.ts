@@ -4,8 +4,10 @@ export interface OssProbeSpec {
   timeoutMs: number
 }
 
+export type OssRuntimeId = 'ollama' | 'lms' | 'llama-server' | 'local-ai-delegate'
+
 export interface OssRuntime {
-  id: 'ollama' | 'lms' | 'llama-server' | 'local-ai-delegate'
+  id: OssRuntimeId
   probe: OssProbeSpec
 }
 
@@ -15,22 +17,23 @@ export interface OssRuntime {
  * commented-out stubs that note v3.30 will enable them. local-ai-delegate
  * documents a subprocess shim users can adapt in v3.28.
  */
-export const OSS_RUNTIMES: OssRuntime[] = [
-  { id: 'ollama', probe: { command: 'ollama', args: ['list'], timeoutMs: 1000 } },
-  { id: 'lms', probe: { command: 'lms', args: ['ps'], timeoutMs: 1000 } },
-  { id: 'llama-server', probe: { command: 'llama-server', args: ['--help'], timeoutMs: 1000 } },
-  {
-    id: 'local-ai-delegate',
-    probe: { command: 'local-ai-delegate', args: ['--version'], timeoutMs: 1000 },
-  },
-]
+const OSS_RUNTIME_PROBES: Record<OssRuntimeId, OssProbeSpec> = {
+  ollama: { command: 'ollama', args: ['list'], timeoutMs: 1000 },
+  lms: { command: 'lms', args: ['ps'], timeoutMs: 1000 },
+  'llama-server': { command: 'llama-server', args: ['--help'], timeoutMs: 1000 },
+  'local-ai-delegate': { command: 'local-ai-delegate', args: ['--version'], timeoutMs: 1000 },
+}
+
+export const OSS_RUNTIMES: OssRuntime[] = (
+  Object.entries(OSS_RUNTIME_PROBES) as Array<[OssRuntimeId, OssProbeSpec]>
+).map(([id, probe]) => ({ id, probe }))
 
 /**
  * Commented YAML block for the given runtime. The block is meant to be
  * pasted directly into a generated .mmr.yaml; every line is prefixed with
  * `# ` so the user must explicitly opt in by uncommenting and editing.
  */
-export function exampleBlockFor(id: OssRuntime['id']): string {
+export function exampleBlockFor(id: OssRuntimeId): string {
   switch (id) {
   case 'ollama':
     return [
