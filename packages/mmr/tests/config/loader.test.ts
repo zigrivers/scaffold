@@ -357,6 +357,21 @@ describe('loadConfig extends inheritance (T1-A)', () => {
       .toThrow(/depth/i)
   })
 
+  it('allows extends depth of exactly 4', () => {
+    const yamlText = [
+      'version: 1',
+      'channels:',
+      '  l1: { abstract: true, command: "x", auth: { check: "x", failure_exit_codes: [1], recovery: "x" } }',
+      '  l2: { abstract: true, extends: l1 }',
+      '  l3: { abstract: true, extends: l2 }',
+      '  l4: { abstract: true, extends: l3 }',
+      '  l5: { extends: l4 }',
+    ].join('\n')
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), yamlText)
+    const config = loadConfig({ projectRoot: tmpDir, userHome: tmpDir })
+    expect(config.channels.l5?.command).toBe('x')
+  })
+
   it('rejects concrete channel missing command after merge', () => {
     const yamlText = [
       'version: 1',
