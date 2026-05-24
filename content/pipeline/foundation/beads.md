@@ -57,23 +57,28 @@ and autonomous behavior guidelines.
   the hooks `bd setup claude` installs). Scaffold does NOT hand-roll a Beads command
   reference table — that lives upstream in `bd prime` output. If a project wants
   custom prime content, write `.beads/PRIME.md`.
+- (deep) `bd config set types.custom '["story","milestone","spike"]'` was run so
+  downstream prompts can use `-t story` and `-t milestone`. Verify with `bd config get types.custom`.
 - (deep) Cross-doc consistency verified against git-workflow.md and coding-standards.md
 
 ## Methodology Scaling
 - **deep**: Full Beads setup — `bd init`, then `bd doctor --fix`, then `bd setup
   claude` (and/or `bd setup codex`, `bd setup gemini` for multi-platform projects).
-  Scaffold-owned CLAUDE.md content (Core Principles + commit convention +
+  Enable custom issue types via `bd config set types.custom '["story","milestone","spike"]'`
+  so downstream prompts can use `-t story` for user stories and `-t milestone` for
+  releases. Scaffold-owned CLAUDE.md content (Core Principles + commit convention +
   upgrade-remediation callout) is composed ADJACENT to the recipe-managed integration
   block. Detailed priority level documentation. Cross-doc consistency checks against
   existing git-workflow.md and coding-standards.md.
 - **mvp**: `bd init`, `bd doctor --fix`, `bd setup claude`, create tasks/lessons.md,
   add minimal scaffold-owned CLAUDE.md sections (Core Principles + commit convention +
-  upgrade-remediation callout). Skip cross-doc checks.
+  upgrade-remediation callout). Skip cross-doc checks. Custom types stay off — only
+  built-in `bug|feature|task|epic|chore|decision` available.
 - **custom:depth(1-5)**:
   - Depth 1: `bd init` + `bd doctor --fix` + `bd setup claude` + create tasks/lessons.md. Minimal scaffold CLAUDE.md content (Core Principles only).
   - Depth 2: Depth 1 + add commit convention + upgrade-remediation callout.
   - Depth 3: Add priority level documentation and autonomous behavior rules.
-  - Depth 4: Full setup with cross-doc consistency checks against git-workflow.md and coding-standards.md.
+  - Depth 4: Full setup with cross-doc consistency checks against git-workflow.md and coding-standards.md. Enable `bd config set types.custom '["story","milestone","spike"]'`.
   - Depth 5: Full setup + detailed autonomous behavior rules + commit-message convention enforcement. Run `bd setup codex` and `bd setup gemini` if the project targets those CLIs.
 
 ## Conditional Evaluation
