@@ -255,6 +255,8 @@ the verdict JSON directly.
 
 #### Derive the session id
 
+<!-- review-wrapper-hash-helpers:start -->
+
 ```bash
 # Session id rules (first match wins):
 #   1. PR mode (--pr N) → "pr-<N>"
@@ -486,6 +488,8 @@ This mirrors T2-A's identity components — `location`, `category`,
 `description`, `suggestion` — so a future migration to MMR's native
 `finding_key` is a search-and-replace of the helper calls with the field
 read from the verdict JSON.
+
+<!-- review-wrapper-hash-helpers:end -->
 
 ### Step 8: Confirm Completion
 
