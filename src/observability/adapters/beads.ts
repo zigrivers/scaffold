@@ -36,7 +36,10 @@ export const beadsAdapter: BaseAdapter & {
     if (!m) return { status: 'degraded', reason: `bd version could not be parsed from: ${stdout.trim()}` }
     const major = Number(m[1])
     if (major < 1) {
-      return { status: 'degraded', reason: `bd version ${m[0]} is below the supported minimum (1.0.0). Run 'brew upgrade beads' or your equivalent.` }
+      const reason =
+        `bd version ${m[0]} is below the supported minimum (1.0.0). `
+        + 'Run \'brew upgrade beads\' or your equivalent.'
+      return { status: 'degraded', reason }
     }
     return { status: 'available' }
   },

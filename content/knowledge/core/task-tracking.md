@@ -22,46 +22,6 @@ Core properties:
 
 > IDs are hash-based and lowercase (e.g., `bd-a3f8`). The `bd-` prefix is configurable at `bd init` time. Hierarchical IDs for epic children: `bd-a3f8.1`, `bd-a3f8.1.1`. Older example IDs in this doc using `BD-42`-style uppercase digits reflect a pre-v1.0.0 convention; current upstream emits hash-based lowercase IDs.
 
-### Agent context: `bd prime` is the SSOT
-
-Beads ships `bd prime` as the single source of truth for workflow context injected into agent sessions. The default output is ~1-2k tokens and includes:
-- Current ready/in-progress task counts
-- The next 1-2 ready tasks with full descriptions
-- Recent activity (last few closed/updated)
-- Persistent memories set via `bd remember`
-
-Variants:
-- `bd prime` — full default
-- `bd prime --memories-only` — just persistent memories (very small)
-- `bd prime --full` — extended context (use sparingly; ~5k tokens)
-- `bd prime --hook-json` — Claude Code SessionStart hook envelope
-
-Override the default output by writing `.beads/PRIME.md` (Markdown, free-form). The `bd setup claude` / `bd setup gemini` recipes wire `bd prime --hook-json` into SessionStart hooks for you — you don't typically invoke it by hand.
-
-`bd onboard` emits a one-line snippet you can paste into any agent context file to remind it about `bd prime`.
-
-### Two memory scopes — when to use which
-
-Scaffold-generated projects have two persistent memory layers when `.beads/` exists:
-
-- **Filesystem auto-memory** (per-user, cross-project) — facts about you the developer. Stored under `~/.claude/projects/.../memory/` by the Claude Code client.
-- **`bd remember`** (per-project, team-shareable) — facts about this project. Stored in `.beads/embeddeddolt/`, committed with the repo.
-
-For project-level facts that should travel with the repo (in-flight context, team conventions, project-specific blockers, decisions), use `bd remember` instead of filesystem memory. See `content/knowledge/core/ai-memory-management.md` for the full scope split table.
-
-### Editor integration via `bd setup` recipes
-
-Beads ships built-in setup recipes that write the integration block into CLAUDE.md, AGENTS.md, GEMINI.md, or `.cursor/rules/` for you, using marker-managed format that survives re-runs:
-
-- `bd setup claude` — Claude Code (writes CLAUDE.md block + SessionStart/PreCompact hooks)
-- `bd setup codex` — Codex CLI (writes `.agents/skills/beads/SKILL.md` + AGENTS.md section)
-- `bd setup gemini` — Gemini CLI (writes GEMINI.md section + hooks)
-- `bd setup cursor` / `bd setup windsurf` / `bd setup aider` / `bd setup factory` / `bd setup mux` — other editors
-
-Each recipe is idempotent (re-running it does not duplicate content), reversible (`--remove`), and verifiable (`--check`). Recipe choice determines profile (claude/gemini default to `minimal` ~60% smaller; codex/factory/mux default to `full`). There is no runtime `--profile` flag in v1.0.4 — recipe choice is the knob.
-
-Custom recipes can be added via `bd setup --add <name> <path>`, persisted in `.beads/recipes.toml`.
-
 ### Task Hierarchy
 
 Tasks organize into three levels:
@@ -94,48 +54,6 @@ open → in_progress → closed       (happy path)
 Beads also exposes a *status category* dimension (`active | wip | done | frozen`) for higher-level grouping. Use `bd state <id>` to query, `bd statuses` to list valid statuses.
 
 > Scaffold previously documented `ready → in-progress → review → done` — none of those (except via `ready` as a *query*) are upstream statuses. The `review` state, if needed, can be added per-project via `bd config set types.custom_statuses '[{"name":"review","category":"wip"}]'`.
-
-### Optional: enable custom issue types
-
-`bd create -t` supports `bug`, `feature`, `task`, `epic`, `chore`, `decision` out of the box. To use `story`, `milestone`, or `spike`, enable them via project config:
-
-```bash
-bd config set types.custom '["story", "milestone", "spike"]'
-```
-
-After that, `bd create -t story "US-XXX: …"` works as expected.
-
-### Production option: off-site backup
-
-Beads can push a versioned mirror to filesystem, S3, GCS, Azure Blob, or DoltHub:
-
-```bash
-bd backup init s3://my-bucket/beads-backup/
-bd backup sync     # push current DB
-bd backup restore  # bring it back if needed
-```
-
-Worth setting up for any project where task state matters beyond the developer's laptop.
-
-### When to use the MCP server (rarely)
-
-Beads ships a Python MCP server (`beads-mcp`) for clients that don't have shell access — e.g., Claude Desktop, some IDE plugins. Install:
-
-```bash
-uv tool install beads-mcp   # or: pip install beads-mcp
-```
-
-For Claude Code, Cursor, Windsurf, and any agent with shell access, **CLI + hooks is preferred** — it's ~1-2k tokens of context (via `bd prime`) vs 10-50k for the MCP tool schemas. Only reach for `beads-mcp` when shell access isn't available.
-
-### Safe re-initialization
-
-If you need to re-init a Beads database (e.g., migrating to a fresh prefix, recovering from corruption), use the explicit flags rather than `--force`:
-
-- `bd init --reinit-local` — bypass the local-exists guard
-- `bd init --discard-remote` — explicitly authorize discarding remote Dolt history
-- `bd init --destroy-token DESTROY-<prefix>` — required in non-interactive mode for destructive re-init
-
-Stable exit codes: `10` (remote divergence), `11` (local exists), `12` (destroy-token missing). The legacy `--force` flag still works but is deprecated.
 
 ### Lessons-Learned Workflow
 
@@ -314,3 +232,85 @@ Each task should define explicit completion criteria, not vague goals:
 **Overloaded tasks.** A single task covers "implement the API, write the UI, add tests, update docs." This overflows a single session and makes progress tracking meaningless. Fix: split into tasks that each fit in one agent session (30-90 minutes).
 
 **Lessons without rules.** A lesson says "we had trouble with X" but doesn't state a preventive rule. Future sessions read the lesson but don't know what to do differently. Fix: every lesson must include a concrete rule — "Always do Y" or "Never do Z" — not just a description of what went wrong.
+
+### Agent context: `bd prime` is the SSOT
+
+Beads ships `bd prime` as the single source of truth for workflow context injected into agent sessions. The default output is ~1-2k tokens and includes:
+- Current ready/in-progress task counts
+- The next 1-2 ready tasks with full descriptions
+- Recent activity (last few closed/updated)
+- Persistent memories set via `bd remember`
+
+Variants:
+- `bd prime` — full default
+- `bd prime --memories-only` — just persistent memories (very small)
+- `bd prime --full` — extended context (use sparingly; ~5k tokens)
+- `bd prime --hook-json` — Claude Code SessionStart hook envelope
+
+Override the default output by writing `.beads/PRIME.md` (Markdown, free-form). The `bd setup claude` / `bd setup gemini` recipes wire `bd prime --hook-json` into SessionStart hooks for you — you don't typically invoke it by hand.
+
+`bd onboard` emits a one-line snippet you can paste into any agent context file to remind it about `bd prime`.
+
+### Two memory scopes — when to use which
+
+Scaffold-generated projects have two persistent memory layers when `.beads/` exists:
+
+- **Filesystem auto-memory** (per-user, cross-project) — facts about you the developer. Stored under `~/.claude/projects/.../memory/` by the Claude Code client.
+- **`bd remember`** (per-project, team-shareable) — facts about this project. Stored in `.beads/embeddeddolt/`, committed with the repo.
+
+For project-level facts that should travel with the repo (in-flight context, team conventions, project-specific blockers, decisions), use `bd remember` instead of filesystem memory. See `content/knowledge/core/ai-memory-management.md` for the full scope split table.
+
+### Editor integration via `bd setup` recipes
+
+Beads ships built-in setup recipes that write the integration block into CLAUDE.md, AGENTS.md, GEMINI.md, or `.cursor/rules/` for you, using marker-managed format that survives re-runs:
+
+- `bd setup claude` — Claude Code (writes CLAUDE.md block + SessionStart/PreCompact hooks)
+- `bd setup codex` — Codex CLI (writes `.agents/skills/beads/SKILL.md` + AGENTS.md section)
+- `bd setup gemini` — Gemini CLI (writes GEMINI.md section + hooks)
+- `bd setup cursor` / `bd setup windsurf` / `bd setup aider` / `bd setup factory` / `bd setup mux` — other editors
+
+Each recipe is idempotent (re-running it does not duplicate content), reversible (`--remove`), and verifiable (`--check`). Recipe choice determines profile (claude/gemini default to `minimal` ~60% smaller; codex/factory/mux default to `full`). There is no runtime `--profile` flag in v1.0.4 — recipe choice is the knob.
+
+Custom recipes can be added via `bd setup --add <name> <path>`, persisted in `.beads/recipes.toml`.
+
+### Optional: enable custom issue types
+
+`bd create -t` supports `bug`, `feature`, `task`, `epic`, `chore`, `decision` out of the box. To use `story`, `milestone`, or `spike`, enable them via project config:
+
+```bash
+bd config set types.custom '["story", "milestone", "spike"]'
+```
+
+After that, `bd create -t story "US-XXX: …"` works as expected.
+
+### Production option: off-site backup
+
+Beads can push a versioned mirror to filesystem, S3, GCS, Azure Blob, or DoltHub:
+
+```bash
+bd backup init s3://my-bucket/beads-backup/
+bd backup sync     # push current DB
+bd backup restore  # bring it back if needed
+```
+
+Worth setting up for any project where task state matters beyond the developer's laptop.
+
+### When to use the MCP server (rarely)
+
+Beads ships a Python MCP server (`beads-mcp`) for clients that don't have shell access — e.g., Claude Desktop, some IDE plugins. Install:
+
+```bash
+uv tool install beads-mcp   # or: pip install beads-mcp
+```
+
+For Claude Code, Cursor, Windsurf, and any agent with shell access, **CLI + hooks is preferred** — it's ~1-2k tokens of context (via `bd prime`) vs 10-50k for the MCP tool schemas. Only reach for `beads-mcp` when shell access isn't available.
+
+### Safe re-initialization
+
+If you need to re-init a Beads database (e.g., migrating to a fresh prefix, recovering from corruption), use the explicit flags rather than `--force`:
+
+- `bd init --reinit-local` — bypass the local-exists guard
+- `bd init --discard-remote` — explicitly authorize discarding remote Dolt history
+- `bd init --destroy-token DESTROY-<prefix>` — required in non-interactive mode for destructive re-init
+
+Stable exit codes: `10` (remote divergence), `11` (local exists), `12` (destroy-token missing). The legacy `--force` flag still works but is deprecated.

@@ -9,7 +9,7 @@ outputs: []
 conditional: null
 stateless: true
 category: pipeline
-knowledge-base: [tdd-execution-loop, task-claiming-strategy, worktree-management]
+knowledge-base: [tdd-execution-loop, task-claiming-strategy, worktree-management, multi-agent-coordination]
 reads: [coding-standards, tdd, git-workflow]
 argument-hint: "<agent-name>"
 ---
