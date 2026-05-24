@@ -13,14 +13,16 @@ const AuthConfigSchema = z.object({
 
 const ChannelConfigSchema = z.object({
   enabled: z.boolean().default(true),
-  command: z.string(),
+  command: z.string().optional(),
   flags: z.array(z.string()).default([]),
   env: z.record(z.string()).default({}),
-  auth: AuthConfigSchema,
+  auth: AuthConfigSchema.optional(),
   prompt_wrapper: z.string().default('{{prompt}}'),
   output_parser: z.string().default('default'),
   stderr: z.enum(['suppress', 'capture', 'passthrough']).default('capture'),
   timeout: z.number().optional(),
+  extends: z.string().optional(),
+  abstract: z.boolean().default(false),
 })
 
 const TemplateSchema = z.object({

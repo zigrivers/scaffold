@@ -164,6 +164,10 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
         authResults[name] = { status: 'skipped', recovery: `Channel "${name}" not found in config` }
         continue
       }
+      if (!chConfig.command) {
+        authResults[name] = { status: 'skipped', recovery: `Channel "${name}" is missing command` }
+        continue
+      }
 
       const cmd = chConfig.command.split(' ')[0]
       const installed = await checkInstalled(cmd)
@@ -233,6 +237,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       const dispatches: Promise<void>[] = []
       for (const name of validChannels) {
         const chConfig = config.channels[name]
+        if (!chConfig.command) continue
         store.updateChannel(job.job_id, name, { output_parser: chConfig.output_parser })
         dispatches.push(
           dispatchChannel(store, job.job_id, name, {
@@ -251,6 +256,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     } else {
       for (const name of validChannels) {
         const chConfig = config.channels[name]
+        if (!chConfig.command) continue
         store.updateChannel(job.job_id, name, { output_parser: chConfig.output_parser })
         await dispatchChannel(store, job.job_id, name, {
           command: chConfig.command,
