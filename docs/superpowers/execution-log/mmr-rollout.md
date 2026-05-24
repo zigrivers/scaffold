@@ -9,3 +9,4 @@
 [2026-05-24T03:48:38Z] stopgap Task 7: merged (PR #345, MMR rounds: 12, deferred: 8)
 [2026-05-24T04:22:02Z] stopgap Task 8: merged (PR #346, MMR rounds: 2, deferred: 0)
 [2026-05-24T04:43:58Z] stopgap Task 9: merged (PR #347, MMR rounds: 0, deferred: 0; no diff content for pre-existing gitignore rule)
+[2026-05-24T05:42:13Z] stopgap Task 10: BLOCKED-P0P1 (PR #348, MMR rounds: 3, deferred: 0; same Gemini P0 recurred across 3 consecutive rounds claiming Bats uses @src/observability/engine/llm-dispatcher.test.ts instead of @test, while `bats tests/review-wrapper-hash.bats` passes 11 tests and `make check-all` passes)
