@@ -99,7 +99,7 @@ function resolveChannelExtends(
   if (stack.includes(name)) {
     throw new Error(`Channel extends cycle detected: ${[...stack, name].join(' -> ')}`)
   }
-  if (stack.length >= MAX_EXTENDS_DEPTH) {
+  if (stack.length > MAX_EXTENDS_DEPTH) {
     throw new Error(
       `Channel extends depth exceeds max (${MAX_EXTENDS_DEPTH}) at ${[...stack, name].join(' -> ')}`,
     )
