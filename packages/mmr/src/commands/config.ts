@@ -142,15 +142,18 @@ function configChannels(): void {
       : display.command
     return {
       name,
-      ...display,
+      enabled: display.enabled,
       command,
+      parser: display.output_parser,
     }
   })
   console.log(JSON.stringify(channels, null, 2))
 }
 
 function commandContainsInlineSecret(command: string): boolean {
-  return /(?:authorization\s*:|(?:token|api[_-]?key|password|secret|auth)[\w-]*\s*=)/i.test(command)
+  const keyValueSecretRe = /(?:authorization|token|api[_-]?key|password|secret|auth)[\w-]*\s*[:=]/i
+  const flagSecretRe = /--(?:token|api[_-]?key|password|secret|auth)\b/i
+  return keyValueSecretRe.test(command) || flagSecretRe.test(command)
 }
 
 export const configCommand: CommandModule<object, ConfigArgs> = {
