@@ -16,10 +16,9 @@ describe('resolveDispatchChannels (T1-A)', () => {
     expect(names).toContain('deepseek')
   })
 
-  it('filters out abstract channels even when explicitly requested via --channels', () => {
-    const names = resolveDispatchChannels(sampleChannels, ['ollama-base', 'qwen'], new Set())
-    expect(names).not.toContain('ollama-base')
-    expect(names).toContain('qwen')
+  it('throws when an abstract channel is explicitly requested via --channels', () => {
+    expect(() => resolveDispatchChannels(sampleChannels, ['ollama-base', 'qwen'], new Set()))
+      .toThrow('Channel "ollama-base" is abstract and cannot be dispatched')
   })
 
   it('throws when an explicitly requested channel does not exist', () => {

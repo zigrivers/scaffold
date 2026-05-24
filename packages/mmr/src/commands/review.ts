@@ -78,15 +78,20 @@ export function resolveDispatchChannels(
   explicit: string[] | undefined,
   disabled: Set<string>,
 ): string[] {
-  const isDispatchable = (name: string): boolean => {
+  const isDispatchable = (name: string, explicitRequest = false): boolean => {
     const ch = channels[name]
     if (!ch) throw new Error(`Channel "${name}" not found in config`)
-    if (ch.abstract === true) return false
+    if (ch.abstract === true) {
+      if (explicitRequest) {
+        throw new Error(`Channel "${name}" is abstract and cannot be dispatched`)
+      }
+      return false
+    }
     return true
   }
 
   if (explicit !== undefined) {
-    return explicit.filter(isDispatchable)
+    return explicit.filter((name) => isDispatchable(name, true))
   }
   return Object.entries(channels)
     .filter(([name, ch]) => ch.enabled && !disabled.has(name) && !ch.abstract)
