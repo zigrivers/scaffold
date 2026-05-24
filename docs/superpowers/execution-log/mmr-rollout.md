@@ -14,3 +14,4 @@
 [2026-05-24T10:11:40Z] stopgap Task 10: merged (PR #348, MMR rounds: 3, deferred: 0; Gemini-only false-positive P0 waived by operator)
 [2026-05-24T10:32:18Z] stopgap Task 11: merged (PR #349, MMR rounds: 0, deferred: 0; no diff content for verification-only empty commit)
 [2026-05-24T10:54:08Z] stopgap Task 12: merged (PR #350, MMR rounds: 0, deferred: 0; no diff content for verification-only empty commit)
+[2026-05-24T13:42:47Z] v3.28 Task 1: merged (PR #351, MMR rounds: 7, deferred: 6)
