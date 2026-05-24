@@ -6,7 +6,7 @@ import { BUILTIN_CHANNELS } from '../config/defaults.js'
 import { checkInstalled, checkAuth } from '../core/auth.js'
 import { probeRuntime } from '../core/runtime-probe.js'
 import { OSS_RUNTIMES, exampleBlockFor, type OssRuntimeId } from '../core/oss-examples.js'
-import { redactChannel } from '../core/redact.js'
+import { isSecretKey, redactChannel } from '../core/redact.js'
 
 interface ConfigArgs {
   action: string
@@ -172,59 +172,9 @@ function stripQuotes(value: string): string {
 }
 
 function isCommandSecretKey(name: string): boolean {
-  const parts = name
-    .replace(/^-+/, '')
-    .split(/[_.-]+|(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])/)
-    .filter(Boolean)
-    .map((part) => part.toLowerCase())
-  const compact = parts.join('')
-  if (
-    [
-      'apikey',
-      'auth',
-      'authorization',
-      'clientsecret',
-      'cookie',
-      'credential',
-      'credentials',
-      'creds',
-      'password',
-      'passphrase',
-      'passwd',
-      'secret',
-      'token',
-    ].includes(compact)
-  ) {
-    return true
-  }
-  if (
-    parts.some((part) =>
-      [
-        'cookie',
-        'credential',
-        'credentials',
-        'creds',
-        'pass',
-        'passphrase',
-        'passwd',
-        'password',
-        'signature',
-      ].includes(part),
-    )
-  ) {
-    return true
-  }
-  if (parts.includes('key') && parts.some((part) => ['access', 'api', 'private'].includes(part))) return true
-  if (parts.includes('sid')) return true
-  if (parts.includes('session') && parts.some((part) => ['id', 'key', 'secret', 'token'].includes(part))) return true
-  if (
-    parts.includes('token') &&
-    parts.some((part) => ['access', 'api', 'auth', 'bearer', 'refresh', 'session'].includes(part))
-  ) {
-    return true
-  }
-  if (parts.includes('secret') && parts.some((part) => ['api', 'client', 'private'].includes(part))) return true
-  return false
+  const normalized = name.replace(/^-+/, '').toLowerCase()
+  if (['auth-type', 'max-tokens', 'session-dir', 'token-limit', 'token-usage'].includes(normalized)) return false
+  return isSecretKey(normalized, { exemptEnvNameKeys: false })
 }
 
 export const configCommand: CommandModule<object, ConfigArgs> = {

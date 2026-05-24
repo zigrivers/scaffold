@@ -109,4 +109,29 @@ describe('mmr config channels', () => {
     expect(channels.find((channel) => channel.name === 'sid')?.command).toBe('<redacted>')
     expect(channels.find((channel) => channel.name === 'signature')?.command).toBe('<redacted>')
   })
+
+  it('redacts commands with provider-specific token and key flags', async () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.mmr.yaml'),
+      [
+        'version: 1',
+        'channels:',
+        '  github:',
+        '    command: "review --github-token ghp_live"',
+        '  slack:',
+        '    command: "review --slack-token xoxb-live"',
+        '  openai:',
+        '    command: "review --openai-key sk-live"',
+      ].join('\n'),
+    )
+
+    const { configCommand } = await import('../../src/commands/config.js')
+    await configCommand.handler({ action: 'channels', _: ['config'], $0: 'mmr' } as never)
+
+    const output = String(logSpy.mock.calls.at(-1)?.[0])
+    const channels = JSON.parse(output) as Array<{ name: string; command: string }>
+    expect(channels.find((channel) => channel.name === 'github')?.command).toBe('<redacted>')
+    expect(channels.find((channel) => channel.name === 'slack')?.command).toBe('<redacted>')
+    expect(channels.find((channel) => channel.name === 'openai')?.command).toBe('<redacted>')
+  })
 })
