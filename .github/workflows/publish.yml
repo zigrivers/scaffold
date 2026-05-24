@@ -30,6 +30,9 @@ jobs:
         run: npm test
 
       - name: Publish scaffold
+        # Uses npm trusted publishing via GitHub OIDC (configured in the npm
+        # package settings — see https://www.npmjs.com/package/@zigrivers/scaffold/access).
+        # No NODE_AUTH_TOKEN needed: the `id-token: write` permission above lets
+        # npm sign the provenance statement AND authenticate the publish via OIDC.
+        # See CLAUDE.md release section.
         run: npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
