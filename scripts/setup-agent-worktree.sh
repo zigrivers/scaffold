@@ -77,16 +77,16 @@ fi
 # ─── Beads remediation (if .beads/ exists) ──────────────────
 # Run bd doctor --fix to re-sync git hooks and project config against the installed
 # bd version. Idempotent and fail-soft so non-Beads users (or stale bd installs)
-# don't block worktree setup. Also register the worktree with Beads so hook/DB
-# resolution stays correct across linked worktrees.
+# don't block worktree setup.
+#
+# Note on worktree registration: upstream Beads v1.0.4 documents that worktrees
+# automatically share the same Beads DB as the main repository via git common
+# directory discovery — there is nothing to "register" from the worktree side.
+# `bd worktree create <name>` is a CREATOR (creates a new git worktree), not a
+# registrar; calling it inside an existing worktree is the wrong shape. So we
+# just run `bd doctor --fix` here.
 if [ -d "$worktree_dir/.beads" ] && command -v bd >/dev/null 2>&1; then
     if ! (cd "$worktree_dir" && bd doctor --fix >/dev/null 2>&1); then
         echo "Note: 'bd doctor --fix' reported issues in $worktree_dir. Run it manually for details." >&2
-    fi
-    # Register this worktree with Beads. Idempotent — bd worktree create is a no-op
-    # if the worktree is already registered. Fail-soft for older bd versions that
-    # don't have the `worktree` subcommand.
-    if ! (cd "$worktree_dir" && bd worktree create >/dev/null 2>&1); then
-        echo "Note: 'bd worktree create' was not run (older bd?). Multi-worktree DB resolution may be suboptimal." >&2
     fi
 fi
