@@ -106,7 +106,8 @@ function resolveChannelExtends(
   delete childWithoutExtends.extends
 
   const childDefinesAbstract = Object.prototype.hasOwnProperty.call(channel, 'abstract')
-  const merged = deepMerge(parentResolved, childWithoutExtends)
+  const parentBase = structuredClone(parentResolved) as Record<string, unknown>
+  const merged = deepMerge(parentBase, childWithoutExtends)
   if (!childDefinesAbstract) {
     delete merged.abstract
   }

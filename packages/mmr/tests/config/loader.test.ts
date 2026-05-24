@@ -264,6 +264,27 @@ describe('loadConfig extends inheritance (T1-A)', () => {
     expect(config.channels.child?.command).toBe('ollama run')
   })
 
+  it('resolves sibling children without mutating the shared parent', () => {
+    const yamlText = [
+      'version: 1',
+      'channels:',
+      '  base:',
+      '    abstract: true',
+      '    command: ollama run',
+      '    flags: ["base"]',
+      '    auth: { check: "ollama list", failure_exit_codes: [1], recovery: "x" }',
+      '  first:',
+      '    extends: base',
+      '    flags: ["first"]',
+      '  second:',
+      '    extends: base',
+    ].join('\n')
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), yamlText)
+    const config = loadConfig({ projectRoot: tmpDir, userHome: tmpDir })
+    expect(config.channels.first?.flags).toEqual(['first'])
+    expect(config.channels.second?.flags).toEqual(['base'])
+  })
+
   it('supports two-level extends chains', () => {
     const yamlText = [
       'version: 1',
