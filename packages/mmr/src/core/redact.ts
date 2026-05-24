@@ -11,9 +11,14 @@ const SECRET_KEY_PARTS = new Set([
   'authorization',
   'cookie',
   'cred',
+  'credentials',
+  'creds',
   'credential',
+  'apikey',
   'key',
+  'pass',
   'passphrase',
+  'passwd',
   'password',
   'secret',
   'session',
@@ -35,18 +40,21 @@ export function isSecretKey(name: string, options: { exemptEnvNameKeys?: boolean
  * Return a new record with secret-keyed values replaced by `<redacted>`.
  * Non-secret keys pass through unchanged.
  */
-export function redactRecord(input: Record<string, unknown> | undefined): Record<string, unknown> {
+export function redactRecord(
+  input: Record<string, unknown> | undefined,
+  options: { exemptEnvNameKeys?: boolean } = {},
+): Record<string, unknown> {
   if (!input) return {}
   const out: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(input)) {
-    out[k] = isSecretKey(k, { exemptEnvNameKeys: false }) ? '<redacted>' : v
+    out[k] = isSecretKey(k, options) ? '<redacted>' : v
   }
   return out
 }
 
 function redactKeyValueString(input: string): string {
   const match = /^(\s*)([^:=\s]+)(\s*[:=]\s*)(.*)$/.exec(input)
-  if (!match) return input
+  if (!match) return isSecretKey(input.trim(), { exemptEnvNameKeys: false }) ? '<redacted>' : input
   const [, leading, key, separator, value] = match
   return isSecretKey(key, { exemptEnvNameKeys: false })
     ? `${leading}${key}${separator}<redacted>`
@@ -54,7 +62,18 @@ function redactKeyValueString(input: string): string {
 }
 
 function redactList(input: unknown[]): unknown[] {
-  return input.map((value) => (typeof value === 'string' ? redactKeyValueString(value) : value))
+  return input.map((value) => {
+    if (typeof value === 'string') return redactKeyValueString(value)
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      const redacted = redactRecord(value as Record<string, unknown>, { exemptEnvNameKeys: false })
+      const nameIsSecret = typeof redacted.name === 'string' && isSecretKey(redacted.name, { exemptEnvNameKeys: false })
+      if (nameIsSecret && 'value' in redacted) {
+        redacted.value = '<redacted>'
+      }
+      return redacted
+    }
+    return value
+  })
 }
 
 /**
@@ -63,16 +82,16 @@ function redactList(input: unknown[]): unknown[] {
  * as-is because the name is non-secret and useful for debugging.
  */
 export function redactChannel(channel: Record<string, unknown>): Record<string, unknown> {
-  const copy: Record<string, unknown> = { ...channel }
+  const copy = redactRecord(channel)
   if (Array.isArray(copy.env)) {
     copy.env = redactList(copy.env)
   } else if (copy.env && typeof copy.env === 'object') {
-    copy.env = redactRecord(copy.env as Record<string, unknown>)
+    copy.env = redactRecord(copy.env as Record<string, unknown>, { exemptEnvNameKeys: false })
   }
   if (Array.isArray(copy.headers)) {
     copy.headers = redactList(copy.headers)
   } else if (copy.headers && typeof copy.headers === 'object') {
-    copy.headers = redactRecord(copy.headers as Record<string, unknown>)
+    copy.headers = redactRecord(copy.headers as Record<string, unknown>, { exemptEnvNameKeys: false })
   }
   return copy
 }

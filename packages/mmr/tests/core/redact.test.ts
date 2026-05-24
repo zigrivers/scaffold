@@ -23,6 +23,11 @@ describe('isSecretKey (T1-E)', () => {
       'clientSecret',
       'privateKey',
       'sessionId',
+      'DB_PASS',
+      'MYSQL_PASSWD',
+      'AWS_CREDENTIALS',
+      'creds',
+      'apikey',
     ]) {
       expect(isSecretKey(k)).toBe(true)
     }
@@ -46,11 +51,17 @@ describe('isSecretKey (T1-E)', () => {
 
 describe('redactRecord (T1-E)', () => {
   it('replaces values for secret-like keys with <redacted>', () => {
-    const input = { OPENAI_API_KEY: 'sk-xxxx', NO_BROWSER: 'true', PASSWORD: 'hunter2', api_key_env: 'sk-actual' }
+    const input = { OPENAI_API_KEY: 'sk-xxxx', NO_BROWSER: 'true', PASSWORD: 'hunter2' }
     expect(redactRecord(input)).toEqual({
       OPENAI_API_KEY: '<redacted>',
       NO_BROWSER: 'true',
       PASSWORD: '<redacted>',
+    })
+  })
+
+  it('preserves api_key_env by default but can redact it in value-bearing records', () => {
+    expect(redactRecord({ api_key_env: 'OPENAI_API_KEY' })).toEqual({ api_key_env: 'OPENAI_API_KEY' })
+    expect(redactRecord({ api_key_env: 'sk-actual' }, { exemptEnvNameKeys: false })).toEqual({
       api_key_env: '<redacted>',
     })
   })
@@ -65,11 +76,13 @@ describe('redactChannel (T1-E)', () => {
   it('redacts secrets in env and headers but preserves api_key_env name', () => {
     const channel = {
       command: 'curl',
+      api_token: 'plain-secret',
       env: { OPENAI_API_KEY: 'sk-xxx', NO_BROWSER: 'true' },
       headers: { Authorization: 'Bearer abc', 'X-Trace': 'true' },
       api_key_env: 'OPENAI_API_KEY',
     }
     const redacted = redactChannel(channel)
+    expect(redacted.api_token).toBe('<redacted>')
     expect(redacted.env).toEqual({ OPENAI_API_KEY: '<redacted>', NO_BROWSER: 'true' })
     expect(redacted.headers).toEqual({ Authorization: '<redacted>', 'X-Trace': 'true' })
     expect(redacted.api_key_env).toBe('OPENAI_API_KEY')
@@ -84,11 +97,17 @@ describe('redactChannel (T1-E)', () => {
 
   it('redacts array-valued env and headers without coercing them into records', () => {
     const channel = {
-      env: ['TOKEN=x', '  authToken = abc', 'NO_BROWSER=true'],
+      env: ['TOKEN=x', '  authToken = abc', 'NO_BROWSER=true', 'TOKEN', { name: 'OPENAI_API_KEY', value: 'sk-xxx' }],
       headers: ['Authorization: Bearer abc', '  X-Trace: true'],
     }
     expect(redactChannel(channel)).toEqual({
-      env: ['TOKEN=<redacted>', '  authToken = <redacted>', 'NO_BROWSER=true'],
+      env: [
+        'TOKEN=<redacted>',
+        '  authToken = <redacted>',
+        'NO_BROWSER=true',
+        '<redacted>',
+        { name: 'OPENAI_API_KEY', value: '<redacted>' },
+      ],
       headers: ['Authorization: <redacted>', '  X-Trace: true'],
     })
   })
