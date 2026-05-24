@@ -4,12 +4,40 @@ import path from 'node:path'
 import { loadConfig } from '../config/loader.js'
 import { BUILTIN_CHANNELS } from '../config/defaults.js'
 import { checkInstalled, checkAuth } from '../core/auth.js'
+import { probeRuntime } from '../core/runtime-probe.js'
+import { OSS_RUNTIMES, exampleBlockFor, type OssRuntimeId } from '../core/oss-examples.js'
 
 interface ConfigArgs {
   action: string
+  'with-examples'?: boolean
 }
 
-async function configInit(): Promise<void> {
+async function ossProbeResults(): Promise<Map<OssRuntimeId, boolean>> {
+  const results = await Promise.all(
+    OSS_RUNTIMES.map(async (runtime) => {
+      try {
+        return [
+          runtime.id,
+          (await probeRuntime(runtime.probe.command, runtime.probe.args, runtime.probe.timeoutMs)).detected,
+        ] as const
+      } catch {
+        return [runtime.id, false] as const
+      }
+    }),
+  )
+  return new Map(results)
+}
+
+function exampleBlocksFor(
+  probeResults: Map<OssRuntimeId, boolean>,
+  includeAll: boolean,
+): string[] {
+  return OSS_RUNTIMES
+    .filter((runtime) => includeAll || probeResults.get(runtime.id) === true)
+    .map((runtime) => exampleBlockFor(runtime.id))
+}
+
+async function configInit(opts: { withExamples: boolean } = { withExamples: false }): Promise<void> {
   const configPath = path.join(process.cwd(), '.mmr.yaml')
   if (fs.existsSync(configPath)) {
     console.error('.mmr.yaml already exists. Remove it first to re-initialize.')
@@ -25,6 +53,12 @@ async function configInit(): Promise<void> {
     channelLines.push(`  ${name}:`)
     channelLines.push(`    enabled: ${installed}`)
     console.log(`  ${name}: ${installed ? 'detected' : 'not found'}`)
+  }
+
+  const ossResults = await ossProbeResults()
+  const ossBlocks = exampleBlocksFor(ossResults, opts.withExamples)
+  for (const runtime of OSS_RUNTIMES) {
+    console.log(`  ${runtime.id}: ${ossResults.get(runtime.id) ? 'detected' : 'not found'}`)
   }
 
   const template = [
@@ -44,6 +78,11 @@ async function configInit(): Promise<void> {
     '',
     ...channelLines,
     '',
+    ...(ossBlocks.length > 0 ? [
+      '# --- OSS runtime examples (uncomment to enable) ---',
+      ...ossBlocks,
+      '',
+    ] : []),
   ].join('\n')
 
   fs.writeFileSync(configPath, template)
@@ -108,16 +147,22 @@ export const configCommand: CommandModule<object, ConfigArgs> = {
   command: 'config <action>',
   describe: 'Manage mmr configuration',
   builder: (yargs) =>
-    yargs.positional('action', {
-      type: 'string',
-      demandOption: true,
-      describe: 'Config action',
-      choices: ['init', 'test', 'channels'],
-    }),
+    yargs
+      .positional('action', {
+        type: 'string',
+        demandOption: true,
+        describe: 'Config action',
+        choices: ['init', 'test', 'channels'],
+      })
+      .option('with-examples', {
+        type: 'boolean',
+        default: false,
+        describe: 'Emit all OSS runtime example blocks (init)',
+      }),
   handler: async (args: ArgumentsCamelCase<ConfigArgs>) => {
     switch (args.action) {
     case 'init':
-      await configInit()
+      await configInit({ withExamples: args['with-examples'] === true })
       break
     case 'test':
       await configTest()
