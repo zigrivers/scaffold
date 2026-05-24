@@ -30,9 +30,13 @@ jobs:
         run: npm test
 
       - name: Publish scaffold
-        # Uses npm trusted publishing via GitHub OIDC (configured in the npm
-        # package settings — see https://www.npmjs.com/package/@zigrivers/scaffold/access).
-        # No NODE_AUTH_TOKEN needed: the `id-token: write` permission above lets
-        # npm sign the provenance statement AND authenticate the publish via OIDC.
+        # Uses both OIDC (id-token: write above, for provenance signing) AND a
+        # legacy NPM_TOKEN secret (for registry auth). Earlier attempt at pure
+        # OIDC failed with npm 404 in v3.28.0 (PR #360); the trusted-publisher
+        # config on the npm side wasn't authorizing publishes despite accepting
+        # the OIDC token for provenance signing. NPM_TOKEN remains the working
+        # auth path. Rotate the secret when it nears its 30-day default expiry.
         # See CLAUDE.md release section.
         run: npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
