@@ -156,10 +156,6 @@ function commandContainsInlineSecret(command: string): boolean {
     if (isSecretKey(match[1], { exemptEnvNameKeys: false })) return true
   }
 
-  const flagRe = /--([A-Za-z0-9_.-]+)/g
-  for (const match of command.matchAll(flagRe)) {
-    if (isSecretKey(match[1], { exemptEnvNameKeys: false })) return true
-  }
   return false
 }
 
