@@ -6,6 +6,7 @@ import { BUILTIN_CHANNELS } from '../config/defaults.js'
 import { checkInstalled, checkAuth } from '../core/auth.js'
 import { probeRuntime } from '../core/runtime-probe.js'
 import { OSS_RUNTIMES, exampleBlockFor, type OssRuntimeId } from '../core/oss-examples.js'
+import { redactChannel } from '../core/redact.js'
 
 interface ConfigArgs {
   action: string
@@ -134,12 +135,15 @@ async function configTest(): Promise<void> {
 
 function configChannels(): void {
   const config = loadConfig({ projectRoot: process.cwd() })
-  const channels = Object.entries(config.channels).map(([name, ch]) => ({
-    name,
-    enabled: ch.enabled,
-    command: ch.command,
-    parser: ch.output_parser,
-  }))
+  const channels = Object.entries(config.channels).map(([name, ch]) => {
+    const display = redactChannel(ch as unknown as Record<string, unknown>)
+    return {
+      name,
+      enabled: display.enabled,
+      command: display.command,
+      parser: display.output_parser,
+    }
+  })
   console.log(JSON.stringify(channels, null, 2))
 }
 
