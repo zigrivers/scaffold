@@ -319,6 +319,7 @@ export const configCommand: CommandModule<object, ConfigArgs> = {
   describe: 'Manage mmr configuration',
   builder: (yargs) =>
     yargs
+      .parserConfiguration({ 'boolean-negation': false })
       .positional('action', {
         type: 'string',
         demandOption: true,
@@ -342,6 +343,15 @@ export const configCommand: CommandModule<object, ConfigArgs> = {
         type: 'boolean',
         default: true,
         describe: 'Redact secrets for config channels show',
+      })
+      .option('no-redact', {
+        type: 'boolean',
+        default: false,
+        describe: 'Print secrets verbatim for config channels show',
+      })
+      .check((args) => {
+        if (args['no-redact'] === true) args.redact = false
+        return true
       }),
   handler: async (args: ArgumentsCamelCase<ConfigArgs>) => {
     if (args.action !== 'channels' && (args.name || args.target)) {
