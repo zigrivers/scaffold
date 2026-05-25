@@ -220,8 +220,10 @@ This reuses every piece of MMR's reconciliation logic. No new reconciliation cod
 A second CLI subcommand handles the PR step:
 
 ```
-scaffold knowledge-freshness audit-apply <verdict.json>
+scaffold knowledge-freshness audit-apply <entry-path> <verdict.json>
 ```
+
+**Phasing:** This section describes the end-state design. The Phase 1 implementation (plan Task 8) ships only steps 1–3 below — it edits the entry on disk and prints a git diff. Steps 4 (branch creation) and the `gh pr create` invocation land in Phase 2 Task 10 when the daily cron is added.
 
 Behavior:
 

@@ -146,8 +146,30 @@ body`
     const fm = extractKBFrontmatter(content)
     expect(fm!.volatility).toBe('evolving')
   })
+
+  it('parses unquoted ISO dates as strings (not Date objects)', () => {
+    // js-yaml's default schema coerces unquoted YYYY-MM-DD into a JS Date.
+    // We use JSON_SCHEMA + a Date-aware coercer so lastReviewed is always
+    // a string or null — never an object.
+    const content = `---
+name: x
+description: y
+topics: []
+last-reviewed: 2026-04-01
+sources:
+  - url: https://x
+    retrieved: 2026-04-01
+---
+body`
+    const fm = extractKBFrontmatter(content)
+    expect(fm!.lastReviewed).toBe('2026-04-01')
+    expect(typeof fm!.lastReviewed).toBe('string')
+    expect(fm!.sources[0].retrieved).toBe('2026-04-01')
+  })
 })
 ```
+
+> **Note on appending to an existing test file.** `src/core/assembly/knowledge-loader.test.ts` may already exist and already import `describe`, `it`, `expect`, and `extractKBFrontmatter`. If so, do not append the import lines — only append the new `describe(...)` block. If the file does not yet exist, create it with the imports shown above. Either way, end up with exactly one import of each symbol.
 
 - [ ] **Step 2: Run the test and confirm failure**
 
@@ -184,6 +206,17 @@ function coerceVolatility(raw: unknown): Volatility {
   return typeof raw === 'string' && VOLATILITIES.has(raw as Volatility) ? (raw as Volatility) : 'evolving'
 }
 
+/**
+ * Coerce a YAML-parsed value to an ISO date string. Accepts either a string
+ * (e.g. quoted `'2026-05-24'`) or a Date (e.g. unquoted `2026-05-24` under the
+ * default js-yaml schema, which interprets it as a timestamp).
+ */
+function coerceIsoDate(raw: unknown): string | null {
+  if (typeof raw === 'string') return raw
+  if (raw instanceof Date && !isNaN(raw.getTime())) return raw.toISOString().slice(0, 10)
+  return null
+}
+
 function coerceSources(raw: unknown): KBSource[] {
   if (!Array.isArray(raw)) return []
   const out: KBSource[] = []
@@ -193,7 +226,8 @@ function coerceSources(raw: unknown): KBSource[] {
     if (typeof o.url !== 'string') continue
     const src: KBSource = { url: o.url }
     if (typeof o.anchor === 'string') src.anchor = o.anchor
-    if (typeof o.retrieved === 'string') src.retrieved = o.retrieved
+    const retrieved = coerceIsoDate(o.retrieved)
+    if (retrieved) src.retrieved = retrieved
     if (typeof o.hash === 'string') src.hash = o.hash
     out.push(src)
   }
@@ -211,7 +245,10 @@ export function extractKBFrontmatter(content: string): KBFrontmatter | null {
   const yamlText = lines.slice(1, closeIdx).join('\n')
 
   let parsed: unknown
-  try { parsed = yaml.load(yamlText) } catch { return null }
+  // Use JSON_SCHEMA so unquoted ISO dates parse as strings, not Date objects.
+  // (The default schema converts `2026-05-24` to a JS Date, which silently
+  // null'd out `last-reviewed` before this fix.)
+  try { parsed = yaml.load(yamlText, { schema: yaml.JSON_SCHEMA }) } catch { return null }
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null
   const obj = parsed as Record<string, unknown>
   if (typeof obj['name'] !== 'string' || obj['name'].trim() === '') return null
@@ -223,7 +260,7 @@ export function extractKBFrontmatter(content: string): KBFrontmatter | null {
       ? (obj['topics'] as unknown[]).filter((t): t is string => typeof t === 'string')
       : [],
     volatility: coerceVolatility(obj['volatility']),
-    lastReviewed: typeof obj['last-reviewed'] === 'string' ? obj['last-reviewed'] : null,
+    lastReviewed: coerceIsoDate(obj['last-reviewed']),
     versionPin: typeof obj['version-pin'] === 'string' ? obj['version-pin'] : null,
     sources: coerceSources(obj['sources']),
   }
@@ -360,15 +397,21 @@ const sourceSchema = z.object({
   hash: z.string().optional(),
 })
 
+// Note: description has no max in the schema because some existing entries
+// already exceed 200 chars (e.g. content/knowledge/core/automated-review-tooling.md
+// is ~228). Overlong descriptions surface as a *warning* below, not an error,
+// so the Phase 1 CI gate doesn't break on day one.
 const kbSchema = z.object({
   name: z.string().regex(/^[a-z][a-z0-9-]*$/),
-  description: z.string().max(200),
+  description: z.string(),
   topics: z.array(z.string()).default([]),
   volatility: z.enum(['stable', 'evolving', 'fast-moving']).default('evolving'),
   'last-reviewed': z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().default(null),
   'version-pin': z.string().nullable().default(null),
   sources: z.array(sourceSchema).default([]),
 })
+
+const DESCRIPTION_SOFT_MAX = 200
 
 export interface KBValidationIssue { message: string; field?: string }
 export interface KBValidationResult { errors: KBValidationIssue[]; warnings: KBValidationIssue[] }
@@ -391,7 +434,7 @@ export function validateKnowledgeFile(filePath: string): KBValidationResult {
     return { errors, warnings }
   }
   let parsed: unknown
-  try { parsed = yaml.load(lines.slice(1, closeIdx).join('\n')) }
+  try { parsed = yaml.load(lines.slice(1, closeIdx).join('\n'), { schema: yaml.JSON_SCHEMA }) }
   catch (e) {
     errors.push({ message: `yaml parse error: ${(e as Error).message}` })
     return { errors, warnings }
@@ -404,6 +447,9 @@ export function validateKnowledgeFile(filePath: string): KBValidationResult {
     return { errors, warnings }
   }
   const fm = result.data
+  if (fm.description.length > DESCRIPTION_SOFT_MAX) {
+    warnings.push({ message: `description is ${fm.description.length} chars (>${DESCRIPTION_SOFT_MAX}); consider trimming for downstream prompt token budgets` })
+  }
   if (fm.volatility === 'fast-moving' && fm.sources.length === 0) {
     warnings.push({ message: 'fast-moving entry has empty sources — audit cannot run' })
   }
@@ -449,7 +495,9 @@ export async function runValidateKnowledge(): Promise<number> {
 }
 ```
 
-Wire it into the existing CLI dispatch (look for the pattern used by `src/cli/commands/complete.ts:141`; mirror it).
+Wire it into the existing CLI dispatch. Look for the pattern used by `src/cli/commands/complete.ts:141` — find where the scaffold CLI entry point (likely `src/cli/scaffold.ts` or `src/cli/index.ts`, whichever exports the binary) imports and dispatches subcommand handlers. Add a `validate-knowledge` subcommand that calls `runValidateKnowledge()` and uses its return value (0 or 1) as the process exit code.
+
+**Do NOT** rely on running `src/cli/commands/validate-knowledge.ts` directly — it has no top-level invocation, so `node dist/cli/commands/validate-knowledge.js` would no-op. The command must be invoked through the CLI dispatcher.
 
 - [ ] **Step 5: Add `make validate-knowledge` target**
 
@@ -457,11 +505,11 @@ In `Makefile`, after the existing `validate:` target, add:
 
 ```makefile
 .PHONY: validate-knowledge
-validate-knowledge:
-	node dist/cli/commands/validate-knowledge.js
+validate-knowledge: build
+	node dist/cli/scaffold.js validate-knowledge
 ```
 
-Update the `check:` target to depend on `validate-knowledge`.
+The `build` dependency ensures `dist/` exists on clean checkouts. Update the `check:` target to depend on `validate-knowledge`. Confirm the CLI binary path (`dist/cli/scaffold.js`) matches what `package.json` and the existing CLI tests use; adjust if the actual entry point differs.
 
 - [ ] **Step 6: Add CI step**
 
@@ -652,10 +700,10 @@ You are auditing a single Scaffold knowledge entry against its declared authorit
   ],
   "proposed_changes": [
     {
-      "location": "<section heading or line range>",
+      "location": "<exact existing top-level \"## \" heading line, e.g. \"## Deep Guidance\" or \"## OWASP Top 10\" — MUST be a verbatim H2 heading currently present in the entry. Phase 1 does not support targeting H3 or deeper subsections; if a change needs to land inside a subsection, replace or update the enclosing H2 section instead.>",
       "kind": "replace | insert | delete",
       "rationale": "<one sentence pointing at the finding(s) this resolves>",
-      "new_text": "<the proposed replacement or insertion, with markdown link citations to retrieved sources>"
+      "new_text": "<the proposed replacement or insertion text, with markdown link citations to retrieved sources. For `replace`, the new section's heading line (the same \"## \" heading) must be included as the first line. Omit this field for `delete`.>"
     }
   ],
   "preserve_warnings": [
@@ -1016,6 +1064,91 @@ Old content.
     }
     expect(() => applyVerdictToEntry(baseEntry, verdict)).toThrow(/Deep Guidance/)
   })
+
+  it('throws when a proposed_change.location does not match any heading (does not silently advance last-reviewed)', () => {
+    const verdict = {
+      entry_name: 'x', audit_date: '2026-05-24', model: 'claude-opus-4-7',
+      verdict: 'major-drift' as const, sources_checked: [], findings: [],
+      proposed_changes: [
+        { location: '## Nonexistent Heading', kind: 'replace' as const,
+          rationale: '', new_text: '## Nonexistent Heading\n\nx' },
+      ],
+      preserve_warnings: [],
+    }
+    expect(() => applyVerdictToEntry(baseEntry, verdict)).toThrow(/did not match/)
+  })
+
+  it('applies a delete kind by removing the targeted section', () => {
+    const entry = `---
+name: x
+description: y
+topics: []
+---
+
+## Summary
+
+## Deprecated Section
+
+old stuff here
+
+## Deep Guidance
+
+keep me
+`
+    const verdict = {
+      entry_name: 'x', audit_date: '2026-05-24', model: 'claude-opus-4-7',
+      verdict: 'major-drift' as const, sources_checked: [], findings: [],
+      proposed_changes: [
+        { location: '## Deprecated Section', kind: 'delete' as const, rationale: '' },
+      ],
+      preserve_warnings: [],
+    }
+    const out = applyVerdictToEntry(entry, verdict)
+    expect(out).not.toContain('Deprecated Section')
+    expect(out).not.toContain('old stuff here')
+    expect(out).toContain('## Deep Guidance')
+    expect(out).toContain('keep me')
+  })
+
+  it('preserves literal "$1" in new_text (no replace-string interpolation)', () => {
+    const verdict = {
+      entry_name: 'x', audit_date: '2026-05-24', model: 'claude-opus-4-7',
+      verdict: 'major-drift' as const, sources_checked: [], findings: [],
+      proposed_changes: [
+        { location: '## Deep Guidance', kind: 'replace' as const,
+          rationale: '', new_text: '## Deep Guidance\n\nCost: $1 per request, $20/month plan.' },
+      ],
+      preserve_warnings: [],
+    }
+    const out = applyVerdictToEntry(baseEntry, verdict)
+    expect(out).toContain('Cost: $1 per request, $20/month plan.')
+  })
+
+  it('parses unquoted ISO dates in existing entries correctly (no Date coercion)', () => {
+    const entryWithUnquotedDate = `---
+name: x
+description: y
+topics: []
+last-reviewed: 2026-04-01
+sources:
+  - url: https://x
+    hash: 'old'
+---
+
+## Deep Guidance
+
+Old content.
+`
+    const verdict = {
+      entry_name: 'x', audit_date: '2026-05-24', model: 'claude-opus-4-7',
+      verdict: 'current' as const, sources_checked: [], findings: [],
+      proposed_changes: [], preserve_warnings: [],
+    }
+    const out = applyVerdictToEntry(entryWithUnquotedDate, verdict)
+    // The new date is set, and it serializes as a string (not [object Object]).
+    expect(out).toContain('last-reviewed: 2026-05-24')
+    expect(out).not.toContain('[object Object]')
+  })
 })
 ```
 
@@ -1031,6 +1164,23 @@ Expected: FAIL — module not found.
 import yaml from 'js-yaml'
 import type { AuditVerdict } from './audit-runner.js'
 
+const HEADING_RE = /^##\s+/
+
+/** Locate a markdown heading line. `location` must be the exact heading text (e.g. "## Deep Guidance"). */
+function findHeading(body: string, location: string): { start: number; end: number } | null {
+  if (!HEADING_RE.test(location.trim())) return null
+  const lines = body.split('\n')
+  const target = location.trim()
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].trim() === target) {
+      let j = i + 1
+      while (j < lines.length && !HEADING_RE.test(lines[j])) j++
+      return { start: i, end: j }
+    }
+  }
+  return null
+}
+
 export function applyVerdictToEntry(original: string, verdict: AuditVerdict): string {
   const lines = original.split('\n')
   if (lines[0]?.trim() !== '---') throw new Error('entry has no frontmatter')
@@ -1038,7 +1188,8 @@ export function applyVerdictToEntry(original: string, verdict: AuditVerdict): st
   for (let i = 1; i < lines.length; i++) if (lines[i].trim() === '---') { close = i; break }
   if (close === -1) throw new Error('frontmatter unclosed')
 
-  const fmObj = yaml.load(lines.slice(1, close).join('\n')) as Record<string, unknown>
+  // Parse frontmatter with a safe schema so ISO dates stay strings (F-001).
+  const fmObj = yaml.load(lines.slice(1, close).join('\n'), { schema: yaml.JSON_SCHEMA }) as Record<string, unknown>
   fmObj['last-reviewed'] = verdict.audit_date
   if (Array.isArray(fmObj['sources'])) {
     const sourcesArr = fmObj['sources'] as Array<Record<string, unknown>>
@@ -1048,26 +1199,48 @@ export function applyVerdictToEntry(original: string, verdict: AuditVerdict): st
     }
   }
 
-  const newFm = yaml.dump(fmObj, { lineWidth: 120 }).trimEnd()
+  const newFm = yaml.dump(fmObj, { lineWidth: 120, schema: yaml.JSON_SCHEMA }).trimEnd()
   let body = lines.slice(close + 1).join('\n')
 
   for (const change of verdict.proposed_changes) {
-    if (change.location.includes('Deep Guidance') && change.kind === 'delete') {
-      throw new Error('refusing to delete "## Deep Guidance" — assembly engine depends on it')
+    // Protect the Deep Guidance heading: assembly engine depends on it.
+    if (change.location.trim() === '## Deep Guidance' && (change.kind === 'delete' || change.kind === 'replace')) {
+      // Allow replace, but only if new_text still begins with the heading line.
+      if (change.kind === 'delete') {
+        throw new Error('refusing to delete "## Deep Guidance" — assembly engine depends on it')
+      }
+      if (change.kind === 'replace' && !(change.new_text ?? '').trim().startsWith('## Deep Guidance')) {
+        throw new Error('refusing to remove "## Deep Guidance" heading in a replace — assembly engine depends on it')
+      }
     }
-    if (change.kind === 'replace' && change.new_text) {
-      const headingRe = new RegExp(`(^|\\n)${escapeRegex(change.location)}[\\s\\S]*?(?=\\n## |$)`)
-      body = body.replace(headingRe, (match, lead) => `${lead}${change.new_text!.trim()}\n`)
-    } else if (change.kind === 'insert' && change.new_text) {
-      const headingRe = new RegExp(`(${escapeRegex(change.location)}\\n)`)
-      body = body.replace(headingRe, `$1\n${change.new_text!.trim()}\n`)
+
+    const region = findHeading(body, change.location)
+    if (!region) {
+      // Throw rather than silently advance `last-reviewed` on a failed apply (F-002, F-010).
+      throw new Error(`proposed_change.location "${change.location}" did not match any "## …" heading in the entry`)
+    }
+    const bodyLines = body.split('\n')
+    const before = bodyLines.slice(0, region.start)
+    const after = bodyLines.slice(region.end)
+
+    if (change.kind === 'replace') {
+      if (!change.new_text) throw new Error(`replace change at "${change.location}" missing new_text`)
+      // Use a verbatim splice instead of String.replace to avoid `$1` interpolation in new_text (F-004).
+      const replacement = change.new_text.trim().split('\n')
+      body = [...before, ...replacement, ...after].join('\n')
+    } else if (change.kind === 'insert') {
+      if (!change.new_text) throw new Error(`insert change at "${change.location}" missing new_text`)
+      const original = bodyLines.slice(region.start, region.end)
+      const insertion = change.new_text.trim().split('\n')
+      body = [...before, ...original, '', ...insertion, ...after].join('\n')
+    } else if (change.kind === 'delete') {
+      // Remove the section entirely, including its heading line (F-003).
+      body = [...before, ...after].join('\n')
     }
   }
 
   return `---\n${newFm}\n---\n${body}`
 }
-
-function escapeRegex(s: string): string { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') }
 ```
 
 - [ ] **Step 4: Run and confirm pass**
@@ -1077,7 +1250,9 @@ Expected: PASS.
 
 - [ ] **Step 5: Wire CLI**
 
-Create `src/cli/commands/knowledge-freshness-audit-apply.ts` that reads a verdict JSON path from argv, reads the target entry, calls `applyVerdictToEntry`, writes back, and runs `git diff <file>` for the operator to see.
+Create `src/cli/commands/knowledge-freshness-audit-apply.ts` that takes two positional argv arguments — `<entry-path>` and `<verdict.json>` — in that order. Read both files, sanity-check that the verdict's `entry_name` matches the entry's frontmatter `name` (throw with a clear message if not, to catch a mismatched-pair operator error), call `applyVerdictToEntry`, write the result back to `<entry-path>`, and run `git diff <entry-path>` for the operator to see.
+
+The signature is explicit (path first, verdict second) because the verdict schema intentionally does not carry a filesystem path — keeping the path out of LLM-emitted output preserves the safety property that the LLM cannot redirect writes to an unrelated file.
 
 - [ ] **Step 6: Commit**
 
@@ -1114,7 +1289,9 @@ Inspect `/tmp/verdict.json`. Expected: a verdict object validating against the s
 Apply the verdict to a working copy, generate a patch, run MMR review:
 
 ```bash
-node dist/cli/scaffold.js knowledge-freshness audit-apply /tmp/verdict.json
+node dist/cli/scaffold.js knowledge-freshness audit-apply \
+  content/knowledge/core/security-best-practices.md \
+  /tmp/verdict.json
 git diff content/knowledge/core/security-best-practices.md > /tmp/freshness.patch
 mmr review --diff /tmp/freshness.patch --sync --format json \
   --focus "Are the proposed changes justified by retrieved evidence? Are any new claims unsourced?" \
