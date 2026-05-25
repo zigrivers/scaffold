@@ -86,7 +86,7 @@ channels:
       then: default          # default; pass the extracted string through the default parser
 ```
 
-`wrap` is the schema key for the JSONPath selector inside the wrapper envelope. Supported jsonpath subset: `$`, `$.foo`, `$.foo.bar`, `$.foo[0]`, `$.foo[0].bar`.
+`wrap` is the schema key for the JSONPath selector inside the wrapper envelope. Supported jsonpath subset: `$` plus repeated property and numeric-index segments, such as `$.foo`, `$.foo.bar`, `$.foo[0]`, `$.foo[0].bar`, and `$.choices[0].message.content`.
 
 ### `regex-findings` — one finding per regex match
 
