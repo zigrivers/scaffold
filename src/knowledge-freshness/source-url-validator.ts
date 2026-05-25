@@ -135,16 +135,25 @@ export const defaultResolver: Resolver = async (host) => {
  * every returned IP against the IPv4/IPv6 blocklists. Prevents DNS-rebinding
  * attacks where a public hostname resolves to a private IP (round-5 F-001).
  *
- * TOCTOU residual risk: a DNS record can change between this check and the
- * actual fetch. Phase 1 accepts the residual risk in exchange for the simpler
- * implementation; pinning the fetch to a validated IP is roadmap (Phase 2).
+ * Returns BOTH the URL and the validated IPs so callers can pin the fetch
+ * to one of those IPs without resolving again (round-8 F-001/F-002).
+ * Performing a second DNS lookup at fetch time would re-open the TOCTOU
+ * window the validator was supposed to close.
+ *
+ * For raw IP literals, `ips` contains the literal itself (no DNS lookup).
  */
-export async function assertSafeSourceUrlWithDns(raw: string, resolver: Resolver = defaultResolver): Promise<URL> {
+export interface DnsValidatedUrl { url: URL; ips: string[] }
+
+export async function assertSafeSourceUrlWithDns(
+  raw: string,
+  resolver: Resolver = defaultResolver,
+): Promise<DnsValidatedUrl> {
   const url = assertSafeSourceUrl(raw)
   let host = url.hostname
   if (host.startsWith('[') && host.endsWith(']')) host = host.slice(1, -1)
-  // Skip DNS for raw IP literals — already validated by the sync guard.
-  if (net.isIP(host) !== 0) return url
+  // For raw IP literals the sync guard already validated; return it as the
+  // only "resolved" IP so the caller pinning logic still has one address.
+  if (net.isIP(host) !== 0) return { url, ips: [host] }
   const ips = await resolver(host)
   if (ips.length === 0) {
     throw new Error(
@@ -168,7 +177,7 @@ export async function assertSafeSourceUrlWithDns(raw: string, resolver: Resolver
       )
     }
   }
-  return url
+  return { url, ips }
 }
 
 /**

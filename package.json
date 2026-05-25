@@ -32,7 +32,7 @@
     "LICENSE"
   ],
   "engines": {
-    "node": ">=18"
+    "node": ">=18.17.0"
   },
   "bin": {
     "scaffold": "dist/index.js"
@@ -63,7 +63,7 @@
     "remark-stringify": "^11.0.0",
     "smol-toml": "^1.6.1",
     "ulid": "^3.0.2",
-    "undici": "^8.3.0",
+    "undici": "^6.26.0",
     "unified": "^11.0.5",
     "uuid": "^14.0.0",
     "yaml": "^2.8.3",

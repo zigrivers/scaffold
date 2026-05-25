@@ -70,16 +70,17 @@ export async function fetchAndHash(
   let current = url
   for (let hop = 0; hop <= MAX_REDIRECT_HOPS; hop++) {
     // DNS-rebinding guard: also resolve the hostname and check every returned
-    // IP, not just the literal hostname (round-5 F-001). Round-7 F-002 then
-    // pins the fetch to the first validated IP so a second resolution at
-    // fetch time can't return a different (private) address.
-    const validated = await assertSafeSourceUrlWithDns(current, resolver)
+    // IP, not just the literal hostname (round-5 F-001). Round-7 F-002 pins
+    // the fetch to the first validated IP. Round-8 F-001/F-002 closes the
+    // residual TOCTOU by having the validator RETURN the validated IP list
+    // — we don't resolve again here.
+    const { url: validated, ips } = await assertSafeSourceUrlWithDns(current, resolver)
     let host = validated.hostname
     if (host.startsWith('[') && host.endsWith(']')) host = host.slice(1, -1)
-    const ips = net.isIP(host) !== 0 ? [host] : await resolver(host)
     const pinnedIp = ips[0]
     // Pin only when the host is a hostname, not when the URL already used an
-    // IP literal — that case has no rebinding window.
+    // IP literal — that case has no rebinding window. `ips` from the
+    // validator already contains the literal itself in that case.
     const dispatcher = net.isIP(host) === 0 && pinnedIp ? pinningAgent(pinnedIp) : undefined
 
     // Per-hop timeout (round-6 F-003): a hanging server would otherwise block
