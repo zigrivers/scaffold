@@ -16,6 +16,7 @@ const ChannelConfigSchema = z.object({
   command: z.string().optional(),
   flags: z.array(z.string()).default([]),
   env: z.record(z.string()).default({}),
+  headers: z.record(z.string()).optional(),
   auth: AuthConfigSchema.optional(),
   prompt_wrapper: z.string().default('{{prompt}}'),
   output_parser: z.string().default('default'),
