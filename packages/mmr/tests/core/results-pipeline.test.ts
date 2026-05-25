@@ -47,6 +47,29 @@ describe('runResultsPipeline', () => {
     expect(exitCode).toBe(2)
   })
 
+  it('uses an object-form output_parser stored on the channel entry', () => {
+    const inner = '{"approved": false, "findings": [{"severity": "P0", "location": "f.ts:1", "description": "vuln", "suggestion": "fix"}], "summary": "issue"}'
+    const envelope = JSON.stringify({ choices: [{ message: { content: inner } }] })
+    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['claude'] })
+    store.updateChannel(job.job_id, 'claude', {
+      status: 'completed',
+      started_at: '2026-04-13T00:00:00Z',
+      completed_at: '2026-04-13T00:00:10Z',
+      output_parser: {
+        kind: 'unwrap-jsonpath',
+        wrap: '$.choices[0].message.content',
+        then: 'default',
+      },
+    })
+    store.saveChannelOutput(job.job_id, 'claude', envelope)
+
+    const { results } = runResultsPipeline(store, store.loadJob(job.job_id), 'json')
+    expect(results.reconciled_findings).toHaveLength(1)
+    expect(results.reconciled_findings[0].severity).toBe('P0')
+    expect(results.per_channel.claude.findings).toHaveLength(1)
+    expect(results.per_channel.claude.findings[0].severity).toBe('P0')
+  })
+
   it('produces degraded-pass when some channels failed', () => {
     const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['claude', 'gemini'] })
     store.updateChannel(job.job_id, 'claude', {
