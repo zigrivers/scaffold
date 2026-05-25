@@ -204,3 +204,66 @@ export function loadConfig(opts: LoadConfigOptions): MmrConfigParsed {
   validateRunnableChannels(config)
   return config
 }
+
+export type ProvenanceSource = 'default' | 'user' | 'project'
+
+export interface ChannelProvenance {
+  [field: string]: ProvenanceSource | ChannelProvenance
+}
+
+export interface ConfigProvenance {
+  channels: Record<string, ChannelProvenance>
+}
+
+export interface LoadConfigWithProvenanceResult {
+  config: MmrConfigParsed
+  provenance: ConfigProvenance
+}
+
+function provenanceForChannel(
+  channelName: string,
+  layers: { source: ProvenanceSource, channels?: Record<string, Record<string, unknown>> }[],
+): ChannelProvenance {
+  const result: ChannelProvenance = {}
+  const walk = (
+    target: ChannelProvenance,
+    overlay: Record<string, unknown>,
+    source: ProvenanceSource,
+  ): void => {
+    for (const [k, v] of Object.entries(overlay)) {
+      if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
+        const nested = (target[k] as ChannelProvenance | undefined) ?? {}
+        walk(nested, v as Record<string, unknown>, source)
+        target[k] = nested
+      } else {
+        target[k] = source
+      }
+    }
+  }
+  for (const layer of layers) {
+    const ch = layer.channels?.[channelName]
+    if (ch) walk(result, ch, layer.source)
+  }
+  return result
+}
+
+export function loadConfigWithProvenance(opts: LoadConfigOptions): LoadConfigWithProvenanceResult {
+  const userHome = opts.userHome ?? os.homedir()
+
+  const defaultChannels = (structuredClone(DEFAULT_CONFIG) as MmrConfigParsed).channels
+  const userPath = path.join(userHome, '.mmr', 'config.yaml')
+  const projectPath = path.join(opts.projectRoot, '.mmr.yaml')
+  const userYaml = (loadYaml(userPath) ?? {}) as Record<string, unknown>
+  const projectYaml = (loadYaml(projectPath) ?? {}) as Record<string, unknown>
+
+  const config = loadConfig(opts)
+  const provenance: ConfigProvenance = { channels: {} }
+  for (const name of Object.keys(config.channels)) {
+    provenance.channels[name] = provenanceForChannel(name, [
+      { source: 'default', channels: defaultChannels as unknown as Record<string, Record<string, unknown>> },
+      { source: 'user', channels: userYaml.channels as Record<string, Record<string, unknown>> | undefined },
+      { source: 'project', channels: projectYaml.channels as Record<string, Record<string, unknown>> | undefined },
+    ])
+  }
+  return { config, provenance }
+}
