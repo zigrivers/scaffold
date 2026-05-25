@@ -512,7 +512,7 @@ export async function runValidateKnowledge(): Promise<number> {
 }
 ```
 
-Wire it into the existing CLI dispatch. Look for the pattern used by `src/cli/commands/complete.ts:141` — find where the scaffold CLI entry point (likely `src/cli/scaffold.ts` or `src/cli/index.ts`, whichever exports the binary) imports and dispatches subcommand handlers. Add a `validate-knowledge` subcommand that calls `runValidateKnowledge()` and uses its return value (0 or 1) as the process exit code.
+Wire it into the existing CLI dispatch at `src/cli/index.ts`. That file is a yargs-based dispatcher that imports each command module (e.g. `import completeCommand from './commands/complete.js'`) and chains `.command(...)` calls on the yargs builder. Mirror that pattern: import `validateKnowledgeCommand` from `./commands/validate-knowledge.js`, add the `.command(validateKnowledgeCommand)` chain, and have the command's handler call `runValidateKnowledge()` and use its return value (0 or 1) as the process exit code via `process.exit(code)`.
 
 **Do NOT** rely on running `src/cli/commands/validate-knowledge.ts` directly — it has no top-level invocation, so `node dist/cli/commands/validate-knowledge.js` would no-op. The command must be invoked through the CLI dispatcher.
 
@@ -563,9 +563,12 @@ Expected: many `[warn]` lines (entries don't yet have `## Deep Guidance` in some
 git add src/validation/knowledge-frontmatter-validator.ts \
         src/validation/knowledge-frontmatter-validator.test.ts \
         src/cli/commands/validate-knowledge.ts \
+        src/cli/index.ts \
         Makefile .github/workflows/ci.yml
 git commit -m "feat(knowledge): add frontmatter validator and CI gate"
 ```
+
+`src/cli/index.ts` MUST be in the commit — it's where the subcommand was registered in Step 4. Without it, the built CLI has no `validate-knowledge` subcommand and the Makefile target fails at runtime even though all the other files look correct in review.
 
 ---
 
