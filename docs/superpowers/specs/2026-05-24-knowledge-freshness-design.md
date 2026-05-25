@@ -97,7 +97,7 @@ The single hardest constraint is that **the model cannot be both the auditor and
 
    In parallel, gap detection (separate cadence):
    ┌───────────────────────────────────────────────────────────────────┐
-   │ pipeline meta-prompts emit `scaffold observe gap-signal …`        │
+   │ pipeline meta-prompts emit `scaffold observe event …`             │
    │ (always-on; SCAFFOLD_GAP_SIGNAL_QUIET=1 silences for tests/CI)    │
    │ aggregated by Lens I in docs/audits/                              │
    └───────────────────────────────────────────────────────────────────┘
@@ -309,7 +309,7 @@ A new observability event `knowledge_gap_signal`, emitted by pipeline meta-promp
 }
 ```
 
-**Emission policy (decisions-locked): always-on.** Every pipeline meta-prompt that references `knowledge-base:` entries gets a tail instruction telling the executing agent to run `scaffold observe gap-signal --topic=<slug> --step=<name>` when it can't find what it needs. `SCAFFOLD_GAP_SIGNAL_QUIET=1` suppresses for tests/CI. Trade-off: small token bloat in every prompt is accepted in exchange for catching gaps everywhere they occur, including in steps where someone would have forgotten to opt in.
+**Emission policy (decisions-locked): always-on.** Every pipeline meta-prompt that references `knowledge-base:` entries gets a tail instruction telling the executing agent to run `scaffold observe event knowledge_gap_signal --topic=<slug> --step=<name>` when it can't find what it needs. (Uses the existing `observe event <type>` channel — the gap signal is one event type among many, not a top-level subcommand.) `SCAFFOLD_GAP_SIGNAL_QUIET=1` suppresses for tests/CI. Trade-off: small token bloat in every prompt is accepted in exchange for catching gaps everywhere they occur, including in steps where someone would have forgotten to opt in.
 
 **Aggregation: Lens I.** Add a new audit lens (`I-knowledge-gaps`) that reads the build-observability ledger, counts signals per topic over a rolling window, and surfaces the top topics in `docs/audits/<id>.md`. Severity rules: a topic with ≥3 signals across ≥2 distinct projects becomes a P2 finding ("propose a new knowledge entry for X"). The lens fits the existing audit structure exactly — `src/observability/checks/lens-i-knowledge-gaps.ts`, registered alongside the existing lenses.
 
