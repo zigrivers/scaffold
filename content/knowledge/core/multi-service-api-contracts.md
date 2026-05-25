@@ -2,6 +2,11 @@
 name: multi-service-api-contracts
 description: Internal API versioning, backward compatibility, retries, and idempotency patterns
 topics: [internal-api-versioning, backward-compatibility, retries, idempotency, contract-evolution]
+volatility: evolving
+last-reviewed: null
+version-pin: 'RFC 9110'
+sources:
+  - url: https://www.rfc-editor.org/rfc/rfc9110
 ---
 
 ## Summary
