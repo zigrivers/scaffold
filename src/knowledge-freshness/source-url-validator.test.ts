@@ -66,6 +66,43 @@ describe('validateSourceUrl', () => {
     const r = validateSourceUrl('ftp://example.com/x')
     expect(r.ok).toBe(false)
   })
+
+  // Round-4 F-001: IPv6 hardening
+  it('rejects IPv6 loopback [::1]', () => {
+    expect(validateSourceUrl('http://[::1]/').ok).toBe(false)
+  })
+
+  it('rejects IPv6 link-local [fe80::1]', () => {
+    expect(validateSourceUrl('http://[fe80::1]/').ok).toBe(false)
+  })
+
+  it('rejects IPv6 ULA [fd00::1]', () => {
+    expect(validateSourceUrl('http://[fd00::1]/').ok).toBe(false)
+  })
+
+  it('rejects IPv6 ULA [fc00::1]', () => {
+    expect(validateSourceUrl('http://[fc00::1]/').ok).toBe(false)
+  })
+
+  it('rejects IPv4-mapped IPv6 loopback [::ffff:127.0.0.1]', () => {
+    expect(validateSourceUrl('http://[::ffff:127.0.0.1]/').ok).toBe(false)
+  })
+
+  it('rejects IPv4-mapped IPv6 private [::ffff:10.0.0.1]', () => {
+    expect(validateSourceUrl('http://[::ffff:10.0.0.1]/').ok).toBe(false)
+  })
+
+  it('rejects IPv4-mapped IPv6 link-local [::ffff:169.254.169.254]', () => {
+    expect(validateSourceUrl('http://[::ffff:169.254.169.254]/').ok).toBe(false)
+  })
+
+  it('accepts public IPv6 [2606:4700:4700::1111] (Cloudflare)', () => {
+    expect(validateSourceUrl('http://[2606:4700:4700::1111]/').ok).toBe(true)
+  })
+
+  it('rejects IPv6 unspecified [::]', () => {
+    expect(validateSourceUrl('http://[::]/').ok).toBe(false)
+  })
 })
 
 describe('assertSafeSourceUrl', () => {
