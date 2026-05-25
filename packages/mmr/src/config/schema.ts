@@ -11,6 +11,33 @@ const AuthConfigSchema = z.object({
   recovery: z.string(),
 })
 
+type SeverityConfig = z.infer<typeof Severity>
+
+export interface RegexFindingsParserConfig {
+  kind: 'regex-findings'
+  pattern: string
+  default_severity?: SeverityConfig
+  fields: {
+    id?: number
+    category?: number
+    severity?: number
+    location: number
+    description: number
+    suggestion?: number
+  }
+}
+
+export interface UnwrapJsonpathParserConfig {
+  kind: 'unwrap-jsonpath'
+  wrap: string
+  then?: OutputParserConfig
+}
+
+export type OutputParserConfig =
+  | string
+  | UnwrapJsonpathParserConfig
+  | RegexFindingsParserConfig
+
 const RegexFindingsFieldsSchema = z.object({
   id: z.number().int().nonnegative().optional(),
   category: z.number().int().nonnegative().optional(),
@@ -18,31 +45,30 @@ const RegexFindingsFieldsSchema = z.object({
   location: z.number().int().nonnegative(),
   description: z.number().int().nonnegative(),
   suggestion: z.number().int().nonnegative().optional(),
-})
+}) satisfies z.ZodType<RegexFindingsParserConfig['fields']>
 
 export const RegexFindingsParserSchema = z.object({
   kind: z.literal('regex-findings'),
   pattern: z.string(),
+  default_severity: Severity.default('P2'),
   fields: RegexFindingsFieldsSchema,
-})
+}) satisfies z.ZodType<RegexFindingsParserConfig>
 
 export const UnwrapJsonpathParserSchema = z.object({
   kind: z.literal('unwrap-jsonpath'),
   wrap: z.string(),
-  then: z.union([z.string(), RegexFindingsParserSchema]).default('default'),
-})
+  then: z.lazy(() => OutputParserSchema).default('default'),
+}) satisfies z.ZodType<UnwrapJsonpathParserConfig>
 
-export const OutputParserSchema = z.union([
-  z.string(),
-  z.discriminatedUnion('kind', [
-    UnwrapJsonpathParserSchema,
-    RegexFindingsParserSchema,
+export const OutputParserSchema: z.ZodType<OutputParserConfig> = z.lazy(() =>
+  z.union([
+    z.string(),
+    z.discriminatedUnion('kind', [
+      UnwrapJsonpathParserSchema,
+      RegexFindingsParserSchema,
+    ]),
   ]),
-])
-
-export type OutputParserConfig = z.infer<typeof OutputParserSchema>
-export type UnwrapJsonpathParserConfig = z.infer<typeof UnwrapJsonpathParserSchema>
-export type RegexFindingsParserConfig = z.infer<typeof RegexFindingsParserSchema>
+)
 
 const ChannelConfigSchema = z.object({
   enabled: z.boolean().default(true),

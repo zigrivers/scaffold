@@ -94,11 +94,48 @@ describe('parser factory', () => {
     expect(out.approved).toBe(true)
   })
 
-  it('routes object parser configs through an explicit unsupported-kind error', () => {
+  it('unwraps jsonpath output and parses it with the next parser', () => {
     const cfg: OutputParserConfig = { kind: 'unwrap-jsonpath', wrap: '$', then: 'default' }
     const result = parseChannelOutput('{"approved": true, "findings": [], "summary": "ok"}', cfg)
+    expect(result.approved).toBe(true)
+  })
+
+  it('unwraps nested jsonpath output before parsing', () => {
+    const cfg: OutputParserConfig = {
+      kind: 'unwrap-jsonpath',
+      wrap: '$.choices[0].message.content',
+      then: 'default',
+    }
+    const result = parseChannelOutput(JSON.stringify({
+      choices: [{ message: { content: '{"approved": true, "findings": [], "summary": "ok"}' } }],
+    }), cfg)
+    expect(result.approved).toBe(true)
+  })
+
+  it('parses regex findings', () => {
+    const cfg: OutputParserConfig = {
+      kind: 'regex-findings',
+      pattern: '^(P[0-3])\\|([^|]+)\\|(.+)$',
+      fields: { severity: 1, location: 2, description: 3 },
+    }
+    const result = parseChannelOutput('P2|src/a.ts:1|Needs a fix', cfg)
     expect(result.approved).toBe(false)
-    expect(result.findings[0].description).toMatch(/Unsupported output_parser kind: unwrap-jsonpath/)
+    expect(result.findings[0]).toMatchObject({
+      severity: 'P2',
+      location: 'src/a.ts:1',
+      description: 'Needs a fix',
+    })
+  })
+
+  it('uses default_severity when regex severity is not captured', () => {
+    const cfg: OutputParserConfig = {
+      kind: 'regex-findings',
+      pattern: '^([^|]+)\\|(.+)$',
+      default_severity: 'P1',
+      fields: { location: 1, description: 2 },
+    }
+    const result = parseChannelOutput('src/a.ts:1|Needs a fix', cfg)
+    expect(result.findings[0].severity).toBe('P1')
   })
 })
 

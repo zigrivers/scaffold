@@ -254,6 +254,29 @@ describe('output_parser union', () => {
     expect(result.success).toBe(true)
   })
 
+  it('accepts unwrap-jsonpath chained to another unwrap-jsonpath object parser', () => {
+    const config = {
+      version: 1,
+      channels: {
+        c1: {
+          command: 'echo',
+          auth: baseAuth,
+          output_parser: {
+            kind: 'unwrap-jsonpath',
+            wrap: '$.outer',
+            then: {
+              kind: 'unwrap-jsonpath',
+              wrap: '$.inner',
+              then: 'default',
+            },
+          },
+        },
+      },
+    }
+    const result = MmrConfigSchema.safeParse(config)
+    expect(result.success).toBe(true)
+  })
+
   it('rejects an unknown parser kind with a clear error', () => {
     const config = {
       version: 1,

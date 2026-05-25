@@ -216,7 +216,75 @@ export function buildParser(spec: OutputParserConfig): Parser {
   if (typeof spec === 'string') {
     return getParser(spec)
   }
-  throw new Error(`Unsupported output_parser kind: ${spec.kind}`)
+  if (spec.kind === 'unwrap-jsonpath') {
+    const nextParser = getParser(spec.then ?? 'default')
+    return (raw: string) => {
+      const decoded = JSON.parse(raw) as unknown
+      const unwrapped = jsonpathGet(decoded, spec.wrap)
+      const nextRaw = typeof unwrapped === 'string' ? unwrapped : JSON.stringify(unwrapped)
+      return nextParser(nextRaw)
+    }
+  }
+  if (spec.kind === 'regex-findings') {
+    return (raw: string) => parseRegexFindings(raw, spec)
+  }
+  throw new Error(`Unsupported output_parser kind: ${(spec as { kind: string }).kind}`)
+}
+
+function jsonpathGet(value: unknown, path: string): unknown {
+  if (path === '$') return value
+  if (!path.startsWith('$.')) {
+    throw new Error('jsonpath must start with $')
+  }
+
+  let current = value
+  for (const segment of path.slice(2).split('.')) {
+    if (!segment) throw new Error('invalid jsonpath segment')
+    const match = /^([A-Za-z_][A-Za-z0-9_-]*)(?:\[(\d+)\])?$/.exec(segment)
+    if (!match) throw new Error(`invalid jsonpath segment: ${segment}`)
+    if (typeof current !== 'object' || current === null) return undefined
+    current = (current as Record<string, unknown>)[match[1]]
+    if (match[2] !== undefined) {
+      if (!Array.isArray(current)) return undefined
+      current = current[Number(match[2])]
+    }
+  }
+  return current
+}
+
+function parseRegexFindings(
+  raw: string,
+  spec: Extract<OutputParserConfig, { kind: 'regex-findings' }>,
+): ParsedOutput {
+  const regex = new RegExp(spec.pattern, 'gm')
+  const findings: Finding[] = []
+  let match: RegExpExecArray | null
+
+  while ((match = regex.exec(raw)) !== null) {
+    const field = (index: number | undefined): string | undefined =>
+      index === undefined ? undefined : match?.[index]
+    const severityValue = field(spec.fields.severity)
+    const severity = isSeverity(severityValue) ? severityValue : (spec.default_severity ?? 'P2')
+    findings.push({
+      id: field(spec.fields.id),
+      category: field(spec.fields.category),
+      severity,
+      location: field(spec.fields.location) ?? '',
+      description: field(spec.fields.description) ?? '',
+      suggestion: field(spec.fields.suggestion) ?? '',
+    })
+    if (match[0] === '') regex.lastIndex += 1
+  }
+
+  return {
+    approved: findings.length === 0,
+    findings,
+    summary: findings.length === 0 ? 'No regex findings.' : `Parsed ${findings.length} regex finding(s).`,
+  }
+}
+
+function isSeverity(value: string | undefined): value is Finding['severity'] {
+  return value === 'P0' || value === 'P1' || value === 'P2' || value === 'P3'
 }
 
 /**
