@@ -164,7 +164,7 @@ function commandContainsInlineSecret(command: string): boolean {
   for (let i = 0; i < tokens.length - 1; i += 1) {
     const token = stripQuotes(tokens[i])
     const next = stripQuotes(tokens[i + 1])
-    if (!token.startsWith('--') || token.includes('=') || token.includes(':') || next.startsWith('-')) continue
+    if (!token.startsWith('-') || token.includes('=') || token.includes(':') || next.startsWith('-')) continue
     if (isCommandSecretKey(token)) return true
   }
 
