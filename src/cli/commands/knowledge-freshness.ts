@@ -1,6 +1,6 @@
 import type { CommandModule } from 'yargs'
 import auditPrefilterCommand from './knowledge-freshness-audit-prefilter.js'
-// Task 7 adds:  import auditRunEntryCommand from './knowledge-freshness-audit-run-entry.js'
+import auditRunEntryCommand from './knowledge-freshness-audit-run-entry.js'
 // Task 8 adds:  import auditApplyCommand     from './knowledge-freshness-audit-apply.js'
 
 const knowledgeFreshnessCommand: CommandModule = {
@@ -9,7 +9,8 @@ const knowledgeFreshnessCommand: CommandModule = {
   builder: (y) =>
     y
       .command(auditPrefilterCommand)
-      // Tasks 7 and 8 chain their .command(...) calls here as they land.
+      .command(auditRunEntryCommand)
+      // Task 8 chains its .command(...) call here as it lands.
       .demandCommand(1, 'Specify a knowledge-freshness subcommand'),
   handler: () => { /* yargs routes to the chosen subcommand */ },
 }
