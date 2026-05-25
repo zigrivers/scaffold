@@ -2,6 +2,12 @@
 name: ai-memory-management
 description: AI memory and context management patterns for Claude Code projects including modular rules, MCP memory servers, lifecycle hooks, decision logging, and external context integration
 topics: [ai-memory, claude-code, claude-rules, mcp-servers, lifecycle-hooks, context-management, session-handoff, decision-logging, mcp-knowledge-graph, context7]
+volatility: fast-moving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://modelcontextprotocol.io/specification
+  - url: https://docs.anthropic.com/en/docs/build-with-claude/memory
 ---
 
 # AI Memory Management
