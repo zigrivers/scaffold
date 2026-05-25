@@ -299,6 +299,89 @@ describe('unwrap-jsonpath parser kind', () => {
   })
 })
 
+describe('regex-findings parser kind', () => {
+  it('extracts one finding per match using the fields map', () => {
+    const raw = [
+      'P1|src/foo.ts:10|Null check missing',
+      'P2|src/bar.ts:42|Unused variable `x`',
+    ].join('\n')
+    const cfg = {
+      kind: 'regex-findings' as const,
+      pattern: '^(P[0-3])\\|([^|]+)\\|(.+)$',
+      fields: { severity: 1, location: 2, description: 3 },
+    }
+    const result = parseChannelOutput(raw, cfg)
+    expect(result.findings).toHaveLength(2)
+    expect(result.findings[0]).toEqual({
+      severity: 'P1',
+      location: 'src/foo.ts:10',
+      description: 'Null check missing',
+      suggestion: '',
+    })
+    expect(result.findings[1].severity).toBe('P2')
+    expect(result.findings[1].location).toBe('src/bar.ts:42')
+  })
+
+  it('treats severity-less matches as P2 by default (via validateFinding)', () => {
+    const raw = 'src/x.ts:1: some issue'
+    const cfg = {
+      kind: 'regex-findings' as const,
+      pattern: '^([^:]+:\\d+): (.+)$',
+      fields: { location: 1, description: 2 },
+    }
+    const result = parseChannelOutput(raw, cfg)
+    expect(result.findings).toHaveLength(1)
+    expect(result.findings[0].severity).toBe('P2')
+    expect(result.findings[0].location).toBe('src/x.ts:1')
+  })
+
+  it('coerces invalid severity capture to P2 (via validateFinding)', () => {
+    const raw = 'CRITICAL|src/x.ts:1|boom'
+    const cfg = {
+      kind: 'regex-findings' as const,
+      pattern: '^(\\w+)\\|([^|]+)\\|(.+)$',
+      fields: { severity: 1, location: 2, description: 3 },
+    }
+    const result = parseChannelOutput(raw, cfg)
+    expect(result.findings[0].severity).toBe('P2')
+  })
+
+  it('captures optional suggestion when fields.suggestion is set', () => {
+    const raw = 'P0|src/a.ts:1|leaked secret|rotate the token'
+    const cfg = {
+      kind: 'regex-findings' as const,
+      pattern: '^(P[0-3])\\|([^|]+)\\|([^|]+)\\|(.+)$',
+      fields: { severity: 1, location: 2, description: 3, suggestion: 4 },
+    }
+    const result = parseChannelOutput(raw, cfg)
+    expect(result.findings[0].suggestion).toBe('rotate the token')
+  })
+
+  it('returns approved=true with empty findings when no matches', () => {
+    const raw = 'no review issues here'
+    const cfg = {
+      kind: 'regex-findings' as const,
+      pattern: '^(P[0-3])\\|([^|]+)\\|(.+)$',
+      fields: { severity: 1, location: 2, description: 3 },
+    }
+    const result = parseChannelOutput(raw, cfg)
+    expect(result.findings).toHaveLength(0)
+    expect(result.approved).toBe(true)
+  })
+
+  it('emits an error finding when the pattern is an invalid regex', () => {
+    const cfg = {
+      kind: 'regex-findings' as const,
+      pattern: '[unclosed',
+      fields: { location: 1, description: 2 },
+    }
+    const result = parseChannelOutput('anything', cfg)
+    expect(result.findings).toHaveLength(1)
+    expect(result.findings[0].location).toBe('output-parser')
+    expect(result.findings[0].description).toMatch(/regex|pattern|invalid/i)
+  })
+})
+
 describe('validateFindingStrict', () => {
   it('accepts a valid finding', () => {
     const f = validateFindingStrict({ severity: 'P1', location: 'f.ts:10', description: 'bug', suggestion: 'fix' })
