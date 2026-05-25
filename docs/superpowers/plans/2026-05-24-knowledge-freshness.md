@@ -490,15 +490,16 @@ export function validateKnowledgeDir(dir: string): Map<string, KBValidationResul
 }
 ```
 
-- [ ] **Step 4: Add CLI entry point**
+- [ ] **Step 4: Add CLI command file (validator runner + yargs CommandModule)**
 
-Create `src/cli/commands/validate-knowledge.ts`:
+Create `src/cli/commands/validate-knowledge.ts`. The file contains two things: the I/O-and-exit-code runner (`runValidateKnowledge`) that wraps the pure validator functions from Step 3, and a yargs `CommandModule` export that `src/cli/index.ts` will import and register.
 
 ```typescript
+import type { CommandModule } from 'yargs'
 import { validateKnowledgeDir } from '../../validation/knowledge-frontmatter-validator.js'
 import path from 'node:path'
 
-export async function runValidateKnowledge(): Promise<number> {
+async function runValidateKnowledge(): Promise<number> {
   const dir = path.resolve('content/knowledge')
   const results = validateKnowledgeDir(dir)
   let errorCount = 0
@@ -510,17 +511,6 @@ export async function runValidateKnowledge(): Promise<number> {
   console.error(`\nknowledge validation: ${errorCount} error(s), ${warnCount} warning(s) across ${results.size} files`)
   return errorCount > 0 ? 1 : 0
 }
-```
-
-Wire it into the existing CLI dispatch at `src/cli/index.ts`. That file is a yargs-based dispatcher that imports each command module (e.g. `import completeCommand from './commands/complete.js'`) and chains `.command(...)` calls on the yargs builder. Mirror that pattern.
-
-**Each new command file must export a yargs `CommandModule`** with `command`, `describe`, `builder`, and `handler` fields, plus a default export. The runner function (`runValidateKnowledge` etc.) is wrapped by `handler`. Example shape for `src/cli/commands/validate-knowledge.ts`:
-
-```typescript
-import type { CommandModule } from 'yargs'
-import { runValidateKnowledge } from '../../validation/knowledge-frontmatter-validator.js'
-
-// (The runner function itself, as shown above, lives below or in a sibling module.)
 
 const validateKnowledgeCommand: CommandModule = {
   command: 'validate-knowledge',
@@ -534,6 +524,12 @@ const validateKnowledgeCommand: CommandModule = {
 
 export default validateKnowledgeCommand
 ```
+
+The validator file (Step 3) exports only the pure functions `validateKnowledgeFile` and `validateKnowledgeDir`. The CLI-side `runValidateKnowledge` adapts those into stdio + an exit code and lives in this command file — do not move it back into the validator.
+
+Then wire the command into `src/cli/index.ts`: add `import validateKnowledgeCommand from './commands/validate-knowledge.js'` next to the other command imports, and add `.command(validateKnowledgeCommand)` to the yargs chain alongside the existing `.command(completeCommand)`-style calls.
+
+The same shape applies to the Task 6 / Task 7 / Task 8 command files (positional argv via the `builder` callback's `.positional(...)` chain, handler reads `argv`). For an existing example with positional arguments, look at `src/cli/commands/complete.ts`. For an existing example of a **nested** parent-command — which Tasks 6/7/8 require, since Task 9 invokes `knowledge-freshness audit-prefilter` — look at `src/cli/commands/observe.ts`, which exposes `observe event`, `observe progress`, `observe audit`, `observe harvest`, `observe ack` as subcommands. Mirror that nesting in a parent `knowledgeFreshnessCommand` whose `builder` chains `.command(auditPrefilterSubcommand).command(auditRunEntrySubcommand).command(auditApplySubcommand)`.
 
 Then in `src/cli/index.ts`, add an `import validateKnowledgeCommand from './commands/validate-knowledge.js'` line beside the others and `.command(validateKnowledgeCommand)` in the yargs chain.
 
@@ -929,7 +925,9 @@ Expected: PASS (all 6 tests).
 
 - [ ] **Step 5: Wire CLI command**
 
-Create `src/cli/commands/knowledge-freshness-audit-prefilter.ts` — reuses `loadFullEntries` from the assembly engine to load entries, calls `selectAuditCandidates` with an HTTP fetcher that performs `fetch(url, {method: 'GET'})` and sha-256s the body, and prints the resulting candidate names as JSON on stdout. **Register in the CLI dispatcher at `src/cli/index.ts`** — import the new command and add it to the yargs chain mirroring the `completeCommand` pattern. The `knowledge-freshness` namespace can be a parent command with `audit-prefilter`, `audit-run-entry`, and `audit-apply` as subcommands; if yargs idioms in `src/cli/index.ts` use nested commands elsewhere, follow that. Otherwise register `knowledge-freshness-audit-prefilter` as a flat command and revisit nesting in Task 14.
+Create `src/cli/commands/knowledge-freshness-audit-prefilter.ts` — exports a yargs subcommand (same `CommandModule` shape as Task 2). It reuses `loadFullEntries` from the assembly engine to load entries, calls `selectAuditCandidates` with `fetchAndHash` from `src/knowledge-freshness/source-hash.ts`, and prints the resulting candidate names as JSON on stdout.
+
+**Register as a subcommand of a `knowledge-freshness` parent command** at `src/cli/index.ts`, mirroring the existing `src/cli/commands/observe.ts` pattern (which nests `observe event`, `observe progress`, etc.). This is what makes Task 9's invocation `node dist/index.js knowledge-freshness audit-prefilter` resolve. Do not register as a flat command — Task 9 invokes the nested form.
 
 - [ ] **Step 6: Commit**
 
@@ -1197,8 +1195,13 @@ function findFirstMatchingJson<T>(s: string, schema: { safeParse: (v: unknown) =
       }
     }
   }
-  // Last-resort: strip a ```json fence pair if present and try once more.
-  return tryCandidate(s.replace(/```json\n?|\n?```/g, '').trim())
+  // The forward-walk scans every balanced {...} block in the response and
+  // try-parses each. A separate "strip ```json fences and try once more"
+  // fallback was considered, but the inner JSON inside a fence pair is
+  // itself a balanced {...} block that the primary loop already finds —
+  // the fallback was dead code in practice. If nothing matched, the
+  // dispatcher response is too degenerate to recover.
+  return undefined
 }
 ```
 
