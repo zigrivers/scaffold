@@ -527,7 +527,7 @@ validate-knowledge:
 	node dist/index.js validate-knowledge
 ```
 
-The Makefile has no `build` target (build is `npm run build`, exposed via the `ts-check` target). The recipe above always runs `npm run build` first — TypeScript's incremental compile is fast, and we cannot rely on `dist/index.js` existence alone because a stale `dist/` would silently miss the newly-added `validate-knowledge` subcommand. Update the `ts-check:` target to depend on `validate-knowledge`. Confirm the CLI binary path matches `package.json` `bin.scaffold` (currently `dist/index.js`).
+The Makefile has no `build` target (build is `npm run build`, exposed via the `ts-check` target). The recipe above always runs `npm run build` first — TypeScript's incremental compile is fast, and we cannot rely on `dist/index.js` existence alone because a stale `dist/` would silently miss the newly-added `validate-knowledge` subcommand. **Do not** make `ts-check` depend on `validate-knowledge` — `ts-check` already runs `npm run build`, and adding the dependency would double-build. Instead, invoke `make validate-knowledge` as its own CI step (Task 2 Step 6) and from `make check` directly. Confirm the CLI binary path matches `package.json` `bin.scaffold` (currently `dist/index.js`).
 
 - [ ] **Step 6: Add CI step**
 
@@ -1107,6 +1107,15 @@ export async function runEntryAudit(
  * Robust against model preamble/postamble that contains brace-like noise
  * (round-6 F-002), invalid braced text (round-7 F-001), or earlier parseable
  * but schema-mismatched objects like a `{"thinking": …}` block (round-8 F-001).
+ *
+ * NB: this is NOT a copy of `extractJsonObject` in
+ * `src/observability/engine/llm-dispatcher.ts`. That helper walks last→first
+ * and is schema-unaware — it returns the first parseable object found, which
+ * is wrong for our use case (a thinking-shaped object emitted before the
+ * verdict would short-circuit). The schema-threaded walk here is the
+ * round-8 fix and cannot be reduced to reusing that helper without losing
+ * the protection. If/when the dispatcher's helper gains a schema predicate,
+ * collapse this into a shared utility.
  */
 function findFirstMatchingJson<T>(s: string, schema: { safeParse: (v: unknown) => { success: boolean; data?: T } }): T | undefined {
   const tryCandidate = (candidate: string): T | undefined => {
@@ -1445,6 +1454,44 @@ x
     expect(() => applyVerdictToEntry(entry, verdict, { trustedHashes })).toThrow(/trustedHashes/)
   })
 
+  it('stops the targeted section at an H1 boundary, not just at the next H2', () => {
+    // Knowledge entries rarely have H1s (titles live in frontmatter) but if
+    // one ever appears, an H2 region must end at the H1 — not swallow it.
+    const entry = `---
+name: x
+description: y
+topics: []
+---
+
+## Old Section
+
+old content
+
+# Stray H1 inside the body
+
+other content
+
+## Deep Guidance
+
+keep me
+`
+    const verdict = {
+      entry_name: 'x', audit_date: '2026-05-24', model: 'claude-opus-4-7',
+      verdict: 'major-drift' as const, sources_checked: [], findings: [],
+      proposed_changes: [
+        { location: '## Old Section', kind: 'delete' as const, rationale: '' },
+      ],
+      preserve_warnings: [],
+    }
+    const out = applyVerdictToEntry(entry, verdict)
+    expect(out).not.toContain('## Old Section')
+    expect(out).not.toContain('old content')
+    expect(out).toContain('# Stray H1 inside the body')
+    expect(out).toContain('other content')
+    expect(out).toContain('## Deep Guidance')
+    expect(out).toContain('keep me')
+  })
+
   it('rejects near-miss heading replacements that would break extractDeepGuidance()', () => {
     const verdict = {
       entry_name: 'x', audit_date: '2026-05-24', model: 'claude-opus-4-7',
@@ -1512,17 +1559,23 @@ Expected: FAIL — module not found.
 import yaml from 'js-yaml'
 import type { AuditVerdict } from './audit-runner.js'
 
-const HEADING_RE = /^##\s+/
+/** Valid target heading: exactly H2. */
+const TARGET_HEADING_RE = /^##\s+/
+/** Boundary heading: stop the section at the next H2 OR any H1 (in case the entry has one). */
+const BOUNDARY_HEADING_RE = /^#{1,2}\s+/
 
 /** Locate a markdown heading line. `location` must be the exact heading text (e.g. "## Deep Guidance"). */
 function findHeading(body: string, location: string): { start: number; end: number } | null {
-  if (!HEADING_RE.test(location.trim())) return null
-  const lines = body.split('\n')
   const target = location.trim()
+  if (!TARGET_HEADING_RE.test(target)) return null
+  const lines = body.split('\n')
   for (let i = 0; i < lines.length; i++) {
     if (lines[i].trim() === target) {
+      // Region ends at the next H2 or H1 boundary, whichever comes first.
+      // (Knowledge entries don't usually have H1s — the title is in
+      // frontmatter — but if one appears we must not swallow it.)
       let j = i + 1
-      while (j < lines.length && !HEADING_RE.test(lines[j])) j++
+      while (j < lines.length && !BOUNDARY_HEADING_RE.test(lines[j])) j++
       return { start: i, end: j }
     }
   }
