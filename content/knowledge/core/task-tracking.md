@@ -2,6 +2,14 @@
 name: task-tracking
 description: Task tracking patterns including Beads methodology, task hierarchies, progress tracking, and lessons-learned workflows
 topics: [task-management, beads, progress-tracking, lessons-learned, autonomous-work]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://github.com/steveyegge/beads
+    anchor: '#beads'
+  - url: https://martinfowler.com/bliki/UserStory.html
+    anchor: '#task-tracking'
 ---
 
 # Task Tracking
