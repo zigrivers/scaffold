@@ -278,17 +278,19 @@ export function buildParser(spec: OutputParserConfig): Parser {
     return getParser(spec)
   }
   if (spec.kind === 'unwrap-jsonpath') {
-    const nextParser = getParser(spec.then ?? 'default')
+    const nextSpec = spec.then ?? 'default'
+    const nextParser = getParser(nextSpec)
     return (raw: string) => {
       const decoded = parseJsonFromOutput(raw)
       const unwrapped = jsonpathGet(decoded, spec.wrap)
       if (unwrapped === undefined) {
         throw new Error(`jsonpath did not match: ${spec.wrap}`)
       }
-      if (typeof unwrapped !== 'string') {
+      if (typeof unwrapped !== 'string' && typeof nextSpec === 'string') {
         throw new Error(`unwrap-jsonpath extracted value at ${spec.wrap} is not a string`)
       }
-      return nextParser(unwrapped)
+      const nextRaw = typeof unwrapped === 'string' ? unwrapped : JSON.stringify(unwrapped)
+      return nextParser(nextRaw)
     }
   }
   if (spec.kind === 'regex-findings') {

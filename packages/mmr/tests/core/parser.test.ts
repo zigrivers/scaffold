@@ -257,7 +257,19 @@ describe('unwrap-jsonpath parser kind', () => {
   it('defaults `then` to "default" when omitted', () => {
     const inner = '{"approved": true, "findings": [], "summary": "ok"}'
     const envelope = JSON.stringify({ content: inner })
-    const cfg = { kind: 'unwrap-jsonpath' as const, wrap: '$.content', then: 'default' }
+    const cfg = { kind: 'unwrap-jsonpath' as const, wrap: '$.content' }
+    const result = parseChannelOutput(envelope, cfg)
+    expect(result.approved).toBe(true)
+  })
+
+  it('serializes non-string extracted values when chaining to another structured parser', () => {
+    const inner = '{"approved": true, "findings": [], "summary": "ok"}'
+    const envelope = JSON.stringify({ outer: { inner } })
+    const cfg = {
+      kind: 'unwrap-jsonpath' as const,
+      wrap: '$.outer',
+      then: { kind: 'unwrap-jsonpath' as const, wrap: '$.inner', then: 'default' },
+    }
     const result = parseChannelOutput(envelope, cfg)
     expect(result.approved).toBe(true)
   })
