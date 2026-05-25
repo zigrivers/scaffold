@@ -539,6 +539,8 @@ check-all: check ts-check mmr-check validate-knowledge ## Run all quality gates 
 
 `ts-check` runs first within `check-all` and produces a fresh `dist/`; `validate-knowledge`'s own `npm run build` is then an incremental no-op (TypeScript skips unchanged inputs).
 
+> **Note on the redundant build.** When invoked from `make check-all`, `npm run build` runs twice — once via `ts-check`, once via `validate-knowledge`. The second invocation is an incremental compile that takes ~1–2 seconds because TypeScript skips already-built inputs. A cleaner mtime-based dependency is possible (e.g. `validate-knowledge: dist/index.js` + a separate `dist/index.js: $(SRC)` rule), but it'd require teaching Make about TypeScript dependency graphs — not worth the complexity at current scale. Standalone invocations (`make validate-knowledge` from a developer shell) still need the unconditional build to guarantee `dist/` reflects the latest source.
+
 The Makefile has no `build` target (build is `npm run build`, exposed via the `ts-check` target). The `validate-knowledge` recipe always runs `npm run build` first — TypeScript's incremental compile is fast, and we cannot rely on `dist/index.js` existence alone because a stale `dist/` would silently miss the newly-added `validate-knowledge` subcommand. **Do not** make `ts-check` depend on `validate-knowledge` — `ts-check` already runs `npm run build`, and adding the dependency would double-build. Confirm the CLI binary path matches `package.json` `bin.scaffold` (currently `dist/index.js`).
 
 - [ ] **Step 6: Add CI step**
