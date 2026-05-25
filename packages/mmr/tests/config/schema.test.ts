@@ -335,3 +335,53 @@ describe('output_parser union', () => {
     expect(result.success).toBe(false)
   })
 })
+
+describe('defaults.compensator (T1-G)', () => {
+  it('accepts a compensator block referencing a channel', () => {
+    const config = {
+      version: 1,
+      defaults: {
+        compensator: {
+          channel: 'qwen-local',
+          channel_focus_map: { codex: 'Focus on security' },
+        },
+      },
+      channels: {},
+    }
+    const result = MmrConfigSchema.safeParse(config)
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.defaults.compensator?.channel).toBe('qwen-local')
+      expect(result.data.defaults.compensator?.channel_focus_map?.codex).toBe('Focus on security')
+    }
+  })
+
+  it('accepts a compensator block without channel_focus_map', () => {
+    const config = {
+      version: 1,
+      defaults: { compensator: { channel: 'qwen-local' } },
+      channels: {},
+    }
+    const result = MmrConfigSchema.safeParse(config)
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects a compensator block missing the required channel field', () => {
+    const config = {
+      version: 1,
+      defaults: { compensator: {} },
+      channels: {},
+    }
+    const result = MmrConfigSchema.safeParse(config)
+    expect(result.success).toBe(false)
+  })
+
+  it('defaults.compensator is undefined when omitted (back-compat)', () => {
+    const config = { version: 1, channels: {} }
+    const result = MmrConfigSchema.safeParse(config)
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.defaults.compensator).toBeUndefined()
+    }
+  })
+})
