@@ -26,6 +26,7 @@ interface ReviewArgs {
   template?: string
   format?: string
   sync?: boolean
+  'dry-run'?: boolean
 }
 
 /** 10MB buffer for large diffs (default is ~1MB which can throw) */
@@ -156,6 +157,11 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
         type: 'boolean',
         describe: 'Run full review pipeline: dispatch, parse, reconcile, and output results with verdict',
         default: false,
+      })
+      .option('dry-run', {
+        type: 'boolean',
+        default: false,
+        describe: 'Resolve diff and assemble prompt without dispatching channels',
       }),
   handler: async (args: ArgumentsCamelCase<ReviewArgs>) => {
     // 1. Load config with CLI overrides
@@ -225,6 +231,34 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
         console.error(`  ${name}: ${result.status}${result.recovery ? ` — ${result.recovery}` : ''}`)
       }
       process.exit(1)
+    }
+
+    if (args['dry-run']) {
+      const templateCriteria = args.template && config.templates?.[args.template]
+        ? config.templates[args.template].criteria
+        : undefined
+      const prompt = assemblePrompt({
+        diff,
+        reviewCriteria: config.review_criteria,
+        templateCriteria,
+        focus: args.focus,
+      })
+      console.log('=== DRY RUN - no channels will be dispatched ===')
+      console.log(`Channels that would dispatch: ${validChannels.join(', ') || '(none)'}`)
+      for (const [name, status] of Object.entries(authResults)) {
+        if (!validChannels.includes(name)) {
+          console.log(`  ${name}: ${status.status}${status.recovery ? ` — ${status.recovery}` : ''}`)
+        }
+      }
+      for (const name of validChannels) {
+        const ch = config.channels[name]
+        const wrapped = ch.prompt_wrapper === '{{prompt}}'
+          ? prompt
+          : ch.prompt_wrapper.replace('{{prompt}}', prompt)
+        console.log(`\n--- Assembled prompt for ${name} ---`)
+        console.log(wrapped)
+      }
+      return
     }
 
     // 5. Create job
