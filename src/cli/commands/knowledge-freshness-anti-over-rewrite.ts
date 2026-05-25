@@ -1,0 +1,99 @@
+import fs from 'node:fs'
+import path from 'node:path'
+import type { Argv, CommandModule } from 'yargs'
+import {
+  evaluateChurn,
+  parseUnifiedDiffForChurn,
+} from '../../knowledge-freshness/gates/anti-over-rewrite.js'
+import {
+  resolveTargetFiles,
+  gitDiffForFiles,
+  readPrBody,
+} from '../../knowledge-freshness/gates/changed-files.js'
+
+interface AntiOverRewriteArgs {
+  files: string[]
+  diff?: string
+  prBody?: string
+}
+
+const antiOverRewriteCommand: CommandModule<Record<string, unknown>, AntiOverRewriteArgs> = {
+  command: 'anti-over-rewrite [files..]',
+  describe: 'CI gate: fail if a stable entry has >20% line churn without an explicit PR-body override',
+  builder: (y) => y
+    .positional('files', {
+      type: 'string',
+      array: true,
+      default: [],
+      describe: 'Knowledge entry paths to check (default: git diff origin/main...HEAD)',
+    })
+    .option('diff', {
+      type: 'string',
+      describe: 'Path to a unified diff file (default: git diff origin/main...HEAD)',
+    })
+    .option('pr-body', {
+      type: 'string',
+      describe: 'PR description body (default: gh pr view --json body)',
+    }) as unknown as Argv<AntiOverRewriteArgs>,
+  handler: async (argv) => {
+    const cwd = process.cwd()
+    const files = resolveTargetFiles(argv.files ?? [], cwd)
+    if (files.length === 0) {
+      process.stdout.write('anti-over-rewrite: no changed knowledge entries\n')
+      return
+    }
+    const diffText = argv.diff
+      ? fs.readFileSync(path.resolve(cwd, argv.diff), 'utf8')
+      : gitDiffForFiles(cwd, files)
+    // PR body precedence: explicit --pr-body flag > gh CLI > null. The
+    // override marker is meaningful only on stable entries past threshold,
+    // so null is fine for everything else.
+    const argvAny = argv as unknown as Record<string, unknown>
+    const explicitBody = (argvAny['pr-body'] ?? argvAny.prBody) as string | undefined
+    const prBody = explicitBody ?? readPrBody(cwd) ?? undefined
+    const churn = parseUnifiedDiffForChurn(diffText)
+    const byFile = new Map(churn.map((c) => [c.file, c]))
+    const inputs = files.map((abs) => {
+      const rel = path.relative(cwd, abs)
+      const c = byFile.get(rel)
+      return {
+        file: rel,
+        content: fs.readFileSync(abs, 'utf8'),
+        addedCount: c?.addedCount ?? 0,
+        removedCount: c?.removedCount ?? 0,
+      }
+    })
+    const results = evaluateChurn(inputs, { prBody })
+    let anyBlock = false
+    for (const r of results) {
+      const pct = (r.churnPct * 100).toFixed(1)
+      const summary =
+        `volatility=${r.volatility ?? 'unknown'} ` +
+        `churn=${r.addedCount}+/${r.removedCount}- (${pct}% of ${r.totalLines})`
+      if (r.blocking) {
+        anyBlock = true
+        process.stdout.write(
+          `::error file=${r.file}::anti-over-rewrite: ${summary} exceeds 20% threshold ` +
+          'for stable entry (add `[override:anti-over-rewrite]` to PR description to bypass)\n',
+        )
+      } else if (r.overridden) {
+        process.stdout.write(
+          `::notice file=${r.file}::anti-over-rewrite: ${summary} OVERRIDDEN by PR-body marker\n`,
+        )
+      } else if (r.volatility !== 'stable' && r.churnPct > 0.2) {
+        process.stdout.write(
+          `::notice file=${r.file}::anti-over-rewrite: ${summary} (advisory — non-stable entry)\n`,
+        )
+      } else {
+        process.stdout.write(`OK ${r.file} — ${summary}\n`)
+      }
+    }
+    if (anyBlock) {
+      process.stdout.write('anti-over-rewrite: FAILED — stable entry rewritten beyond threshold\n')
+      process.exit(1)
+    }
+    process.stdout.write('anti-over-rewrite: OK\n')
+  },
+}
+
+export default antiOverRewriteCommand

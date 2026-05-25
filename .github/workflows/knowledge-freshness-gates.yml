@@ -1,0 +1,94 @@
+name: Knowledge Freshness Gates
+
+# CI gates for freshness PRs (spec §A.5).
+#
+# Fires on every PR targeting `main` that touches `content/knowledge/**`. The
+# cron in `knowledge-freshness-audit.yml` opens PRs from
+# `knowledge-freshness/<entry>-<date>` branches; human-authored knowledge
+# edits also flow through these gates because the paths filter matches both.
+#
+# Five gates, one job, separate steps so a failure surfaces the exact gate.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'content/knowledge/**'
+
+# Cancel an in-flight run if the same PR pushes again — gates are deterministic
+# and re-running on every push is wasteful.
+concurrency:
+  group: knowledge-freshness-gates-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout PR HEAD
+        uses: actions/checkout@v4
+        with:
+          # full history so `git diff origin/main...HEAD` works for the
+          # gates that need a diff (lint-unsourced, anti-over-rewrite).
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.17'
+          cache: 'npm'
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build CLI
+        run: npm run build
+
+      - name: Resolve changed knowledge entries
+        id: changed
+        # Compute once and reuse so every gate looks at the same set of files.
+        run: |
+          set -euo pipefail
+          mapfile -t FILES < <(git diff --name-only origin/main...HEAD -- 'content/knowledge/**/*.md')
+          echo "files=${FILES[*]:-}" >> "$GITHUB_OUTPUT"
+          if [ "${#FILES[@]}" -eq 0 ]; then
+            echo "no_changes=1" >> "$GITHUB_OUTPUT"
+          fi
+          printf 'changed knowledge files:\n'
+          printf '  %s\n' "${FILES[@]:-<none>}"
+
+      # ---------- Gate 1: validator (BLOCKING) ----------
+      - name: 'Gate 1 of 5 — knowledge frontmatter validator'
+        if: steps.changed.outputs.no_changes != '1'
+        run: make validate-knowledge
+
+      # ---------- Gate 2: link-check (BLOCKING) ----------
+      - name: 'Gate 2 of 5 — source link-check'
+        if: steps.changed.outputs.no_changes != '1'
+        run: node dist/index.js knowledge-freshness link-check ${{ steps.changed.outputs.files }}
+
+      # ---------- Gate 3: lint-unsourced (ADVISORY) ----------
+      # `if: always()` runs this even when gate 1/2 failed so reviewers see
+      # advisory warnings alongside blocking errors. Advisory steps never fail
+      # the workflow regardless of `if` condition.
+      - name: 'Gate 3 of 5 — unsourced-claims lint (advisory)'
+        if: always() && steps.changed.outputs.no_changes != '1'
+        run: node dist/index.js knowledge-freshness lint-unsourced ${{ steps.changed.outputs.files }}
+
+      # ---------- Gate 4: anti-over-rewrite (BLOCKING for stable) ----------
+      # Skip when the PR branch is NOT freshness-managed: human edits to stable
+      # entries are gated by review, not by a 20% bot-applied heuristic.
+      # Cron-opened PRs come from `knowledge-freshness/*` and DO get gated.
+      - name: 'Gate 4 of 5 — anti-over-rewrite (stable entries)'
+        if: steps.changed.outputs.no_changes != '1' && startsWith(github.head_ref, 'knowledge-freshness/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node dist/index.js knowledge-freshness anti-over-rewrite ${{ steps.changed.outputs.files }}
+
+      # ---------- Gate 5: Deep Guidance preserved (BLOCKING) ----------
+      - name: 'Gate 5 of 5 — Deep Guidance heading preserved'
+        if: steps.changed.outputs.no_changes != '1'
+        run: node dist/index.js knowledge-freshness deep-guidance-check ${{ steps.changed.outputs.files }}
