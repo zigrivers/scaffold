@@ -67,6 +67,70 @@ channels:
     enabled: true
 ```
 
+## Custom output parsers
+
+Channels emit reviewer output in different shapes. `output_parser` accepts either a built-in parser name (string form — `default`, `gemini`, `doc-conformance`) or a structured object that builds a parser at dispatch time.
+
+### `unwrap-jsonpath` — extract the model's response from an envelope
+
+For OSS endpoints that wrap content in OpenAI-chat shape (`{choices: [{message: {content: "..."}}]}`):
+
+```yaml
+channels:
+  qwen-local:
+    command: scripts/ollama-openai-chat.sh  # posts stdin to Ollama's /v1/chat/completions endpoint
+    flags: ["qwen2.5-coder:32b"]
+    output_parser:
+      kind: unwrap-jsonpath
+      wrap: $.choices[0].message.content
+      then: default          # default; pass the extracted string through the default parser
+```
+
+`wrap` is the schema key for the JSONPath selector inside the wrapper envelope. Supported jsonpath subset: `$` plus repeated property and numeric-index segments, such as `$.foo`, `$.foo.bar`, `$.foo[0]`, `$.foo[0].bar`, and `$.choices[0].message.content`.
+
+### `regex-findings` — one finding per regex match
+
+For tools that emit findings as flat lines (linter-style):
+
+```yaml
+channels:
+  my-linter:
+    command: my-linter
+    flags: ["--format", "pipe"]
+    output_parser:
+      kind: regex-findings
+      pattern: '^(P[0-3])\|([^|]+)\|([^|]+)(?:\|(.+))?$'
+      fields:
+        severity: 1
+        location: 2
+        description: 3
+        suggestion: 4   # optional
+```
+
+`fields.location` and `fields.description` are required; `severity` and `suggestion` are optional. Missing or invalid severity defaults to `P2` during standard MMR finding validation.
+
+### Ollama recipe (full example)
+
+```yaml
+channels:
+  ollama-base:
+    abstract: true            # v3.28 — template only, not dispatchable
+    command: ollama
+    auth:
+      check: ollama list >/dev/null 2>&1
+      failure_exit_codes: [1]
+      recovery: Install Ollama and pull the model configured by this channel
+    output_parser: default     # `ollama run` writes the model response directly
+
+  qwen-coder:
+    extends: ollama-base
+    flags: ["run", "qwen2.5-coder:32b", "--format", "json"]
+
+  deepseek-coder:
+    extends: ollama-base
+    flags: ["run", "deepseek-coder:33b", "--format", "json"]
+```
+
 ## Features
 
 - **--sync mode** — single-command entry point for agents and CI
