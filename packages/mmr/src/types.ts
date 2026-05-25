@@ -1,3 +1,5 @@
+import type { OutputParserConfig } from './config/schema.js'
+
 export type Severity = 'P0' | 'P1' | 'P2' | 'P3'
 
 export const SEVERITY_ORDER: Record<Severity, number> = {
@@ -73,7 +75,7 @@ export interface ChannelJobEntry {
   completed_at?: string
   elapsed?: string
   findings_count?: number
-  output_parser?: string
+  output_parser?: string | OutputParserConfig
 }
 
 export interface ReconciledResults {

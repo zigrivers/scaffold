@@ -1,3 +1,4 @@
+import type { OutputParserConfig } from '../config/schema.js'
 import type { Finding } from '../types.js'
 
 export interface ParsedOutput {
@@ -58,6 +59,66 @@ export function extractJson(text: string): string {
   }
 
   throw new Error('Unbalanced braces in JSON output')
+}
+
+function extractJsonValue(text: string): string {
+  let firstUnbalanced: Error | undefined
+
+  for (let start = 0; start < text.length; start++) {
+    const opener = text[start]
+    if (opener !== '{' && opener !== '[') continue
+
+    try {
+      const candidate = extractBalancedJsonValue(text, start)
+      JSON.parse(fixTrailingCommas(candidate))
+      return candidate
+    } catch (err) {
+      firstUnbalanced ??= err instanceof Error ? err : new Error(String(err))
+    }
+  }
+
+  if (firstUnbalanced) throw firstUnbalanced
+  throw new Error('No JSON object or array found in output')
+}
+
+function extractBalancedJsonValue(text: string, start: number): string {
+  const opener = text[start]
+  const stack: string[] = []
+  let inString = false
+
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i]
+
+    if (inString) {
+      if (ch === '\\') {
+        i++
+      } else if (ch === '"') {
+        inString = false
+      }
+      continue
+    }
+
+    if (ch === '"') {
+      inString = true
+    } else if (ch === '{' || ch === '[') {
+      stack.push(ch)
+    } else if (ch === '}' || ch === ']') {
+      const expected = ch === '}' ? '{' : '['
+      if (stack.pop() !== expected) {
+        throw new Error(`Mismatched JSON delimiters near: ${text.slice(start, i + 1)}`)
+      }
+      if (stack.length === 0) {
+        return text.slice(start, i + 1)
+      }
+    }
+  }
+
+  throw new Error(`Unbalanced ${opener === '{' ? 'braces' : 'brackets'} in JSON output`)
+}
+
+function parseJsonFromOutput(raw: string): unknown {
+  const text = extractJsonValue(stripMarkdownFences(raw))
+  return JSON.parse(fixTrailingCommas(text))
 }
 
 /**
@@ -192,25 +253,125 @@ function docConformanceParser(raw: string): ParsedOutput {
   }
 }
 
-const parsers: Record<string, Parser> = {
+const builtinParsers: Record<string, Parser> = {
   default: defaultParser,
   gemini: geminiParser,
   'doc-conformance': docConformanceParser,
 }
 
 /**
- * Returns a parser function by name. Falls back to default if name is unknown.
+ * Build or look up a parser.
+ *
+ * String form looks up a built-in parser by name. Object form is intentionally
+ * routed through buildParser so structured configs are never silently ignored.
  */
-export function getParser(name: string): Parser {
-  return parsers[name] ?? parsers['default']
+export function getParser(spec: string | OutputParserConfig): Parser {
+  if (typeof spec === 'string') {
+    return builtinParsers[spec] ?? builtinParsers['default']
+  }
+  return buildParser(spec)
+}
+
+export function buildParser(spec: OutputParserConfig): Parser {
+  if (typeof spec === 'string') {
+    return getParser(spec)
+  }
+  if (spec.kind === 'unwrap-jsonpath') {
+    const nextParser = getParser(spec.then ?? 'default')
+    return (raw: string) => {
+      const decoded = parseJsonFromOutput(raw)
+      const unwrapped = jsonpathGet(decoded, spec.wrap)
+      if (unwrapped === undefined) {
+        throw new Error(`jsonpath did not match: ${spec.wrap}`)
+      }
+      const nextRaw = typeof unwrapped === 'string' ? unwrapped : JSON.stringify(unwrapped)
+      return nextParser(nextRaw)
+    }
+  }
+  if (spec.kind === 'regex-findings') {
+    return (raw: string) => parseRegexFindings(raw, spec)
+  }
+  throw new Error(`Unsupported output_parser kind: ${(spec as { kind: string }).kind}`)
+}
+
+function jsonpathGet(value: unknown, path: string): unknown {
+  if (path === '$') return value
+  if (!path.startsWith('$')) {
+    throw new Error('jsonpath must start with $')
+  }
+
+  let current = value
+  let cursor = 1
+  while (cursor < path.length) {
+    const char = path[cursor]
+    if (char === '.') {
+      cursor += 1
+      if (path[cursor] === '[') continue
+      const match = /^[A-Za-z_][A-Za-z0-9_-]*/.exec(path.slice(cursor))
+      if (!match) throw new Error(`invalid jsonpath segment near: ${path.slice(cursor)}`)
+      if (typeof current !== 'object' || current === null) return undefined
+      current = (current as Record<string, unknown>)[match[0]]
+      cursor += match[0].length
+    } else if (char === '[') {
+      const match = /^\[(\d+)\]/.exec(path.slice(cursor))
+      if (!match) throw new Error(`invalid jsonpath index near: ${path.slice(cursor)}`)
+      if (!Array.isArray(current)) return undefined
+      current = current[Number(match[1])]
+      cursor += match[0].length
+    } else {
+      throw new Error(`invalid jsonpath segment near: ${path.slice(cursor)}`)
+    }
+  }
+  return current
+}
+
+function parseRegexFindings(
+  raw: string,
+  spec: Extract<OutputParserConfig, { kind: 'regex-findings' }>,
+): ParsedOutput {
+  const regex = new RegExp(spec.pattern, spec.flags ?? 'gm')
+  const findings: Finding[] = []
+  let match: RegExpExecArray | null
+
+  while ((match = regex.exec(raw)) !== null) {
+    const field = (index: number | undefined): string | undefined =>
+      index === undefined ? undefined : match?.[index]
+    const location = field(spec.fields.location)
+    const description = field(spec.fields.description)
+    if (!location?.trim() || !description?.trim()) {
+      throw new Error('regex-findings parser requires non-empty location and description captures')
+    }
+    const severityValue = field(spec.fields.severity)
+    const severity = isSeverity(severityValue) ? severityValue : (spec.default_severity ?? 'P2')
+    findings.push({
+      id: field(spec.fields.id),
+      category: field(spec.fields.category),
+      severity,
+      location,
+      description,
+      suggestion: field(spec.fields.suggestion) ?? '',
+    })
+    if (!regex.global) break
+    if (match[0] === '') regex.lastIndex += 1
+  }
+
+  return {
+    approved: findings.length === 0,
+    findings,
+    summary: findings.length === 0 ? 'No regex findings.' : `Parsed ${findings.length} regex finding(s).`,
+  }
+}
+
+function isSeverity(value: string | undefined): value is Finding['severity'] {
+  return value === 'P0' || value === 'P1' || value === 'P2' || value === 'P3'
 }
 
 /**
  * Wraps getParser in try/catch, returns error finding on parse failure.
  */
-export function parseChannelOutput(raw: string, parserName: string): ParsedOutput {
+export function parseChannelOutput(raw: string, parserSpec: string | OutputParserConfig): ParsedOutput {
   try {
-    const parser = getParser(parserName)
+    const parser = getParser(parserSpec)
     return parser(raw)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)

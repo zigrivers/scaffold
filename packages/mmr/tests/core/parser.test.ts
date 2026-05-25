@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import type { OutputParserConfig } from '../../src/config/schema.js'
 import { parseChannelOutput, getParser, validateFindingStrict, validateParsedOutputStrict } from '../../src/core/parser.js'
 
 describe('default parser', () => {
@@ -83,6 +84,129 @@ describe('gemini parser', () => {
     expect(result.approved).toBe(false)
     expect(result.findings).toEqual([])
     expect(result.summary).toBe('')
+  })
+})
+
+describe('parser factory', () => {
+  it('still resolves string parser names (back-compat)', () => {
+    const parser = getParser('default')
+    const out = parser('{"approved": true, "findings": [], "summary": "ok"}')
+    expect(out.approved).toBe(true)
+  })
+
+  it('unwraps jsonpath output and parses it with the next parser', () => {
+    const cfg: OutputParserConfig = { kind: 'unwrap-jsonpath', wrap: '$', then: 'default' }
+    const result = parseChannelOutput('{"approved": true, "findings": [], "summary": "ok"}', cfg)
+    expect(result.approved).toBe(true)
+  })
+
+  it('unwraps nested jsonpath output before parsing', () => {
+    const cfg: OutputParserConfig = {
+      kind: 'unwrap-jsonpath',
+      wrap: '$.choices[0].message.content',
+      then: 'default',
+    }
+    const result = parseChannelOutput(JSON.stringify({
+      choices: [{ message: { content: '{"approved": true, "findings": [], "summary": "ok"}' } }],
+    }), cfg)
+    expect(result.approved).toBe(true)
+  })
+
+  it('unwraps nested jsonpath output from fenced JSON', () => {
+    const cfg: OutputParserConfig = {
+      kind: 'unwrap-jsonpath',
+      wrap: '$.choices[0].message.content',
+      then: 'default',
+    }
+    const result = parseChannelOutput('```json\n{"choices":[{"message":{"content":"{\\"approved\\":true,\\"findings\\":[],\\"summary\\":\\"ok\\"}"}}]}\n```', cfg)
+    expect(result.approved).toBe(true)
+  })
+
+  it('unwraps nested jsonpath output from surrounding text', () => {
+    const cfg: OutputParserConfig = {
+      kind: 'unwrap-jsonpath',
+      wrap: '$.choices[0].message.content',
+      then: 'default',
+    }
+    const result = parseChannelOutput('Here is the result:\n{"choices":[{"message":{"content":"{\\"approved\\":true,\\"findings\\":[],\\"summary\\":\\"ok\\"}"}}]}\nDone.', cfg)
+    expect(result.approved).toBe(true)
+  })
+
+  it('unwraps root array jsonpath output from surrounding text', () => {
+    const cfg: OutputParserConfig = {
+      kind: 'unwrap-jsonpath',
+      wrap: '$[0]',
+      then: 'default',
+    }
+    const result = parseChannelOutput('API response:\n["{\\"approved\\":true,\\"findings\\":[],\\"summary\\":\\"ok\\"}"]', cfg)
+    expect(result.approved).toBe(true)
+  })
+
+  it('unwraps root array jsonpath output before parsing', () => {
+    const cfg: OutputParserConfig = {
+      kind: 'unwrap-jsonpath',
+      wrap: '$[0]',
+      then: 'default',
+    }
+    const result = parseChannelOutput(JSON.stringify([
+      '{"approved": true, "findings": [], "summary": "ok"}',
+    ]), cfg)
+    expect(result.approved).toBe(true)
+  })
+
+  it('returns a parser error when jsonpath does not match', () => {
+    const cfg: OutputParserConfig = { kind: 'unwrap-jsonpath', wrap: '$.missing', then: 'default' }
+    const result = parseChannelOutput('{"approved": true}', cfg)
+    expect(result.approved).toBe(false)
+    expect(result.findings[0].description).toMatch(/jsonpath did not match/)
+  })
+
+  it('parses regex findings', () => {
+    const cfg: OutputParserConfig = {
+      kind: 'regex-findings',
+      pattern: '^(P[0-3])\\|([^|]+)\\|(.+)$',
+      fields: { severity: 1, location: 2, description: 3 },
+    }
+    const result = parseChannelOutput('P2|src/a.ts:1|Needs a fix', cfg)
+    expect(result.approved).toBe(false)
+    expect(result.findings[0]).toMatchObject({
+      severity: 'P2',
+      location: 'src/a.ts:1',
+      description: 'Needs a fix',
+    })
+  })
+
+  it('uses default_severity when regex severity is not captured', () => {
+    const cfg: OutputParserConfig = {
+      kind: 'regex-findings',
+      pattern: '^([^|]+)\\|(.+)$',
+      default_severity: 'P1',
+      fields: { location: 1, description: 2 },
+    }
+    const result = parseChannelOutput('src/a.ts:1|Needs a fix', cfg)
+    expect(result.findings[0].severity).toBe('P1')
+  })
+
+  it('honors regex flags from config', () => {
+    const cfg: OutputParserConfig = {
+      kind: 'regex-findings',
+      pattern: '^(src/[^|]+)\\|(.+)$',
+      flags: 'i',
+      fields: { location: 1, description: 2 },
+    }
+    const result = parseChannelOutput('SRC/A.TS:1|Needs a fix', cfg)
+    expect(result.findings[0].location).toBe('SRC/A.TS:1')
+  })
+
+  it('returns a parser error when required regex captures are empty', () => {
+    const cfg: OutputParserConfig = {
+      kind: 'regex-findings',
+      pattern: '^(P[0-3])\\|([^|]*)\\|(.+)$',
+      fields: { severity: 1, location: 2, description: 3 },
+    }
+    const result = parseChannelOutput('P2||Needs a fix', cfg)
+    expect(result.approved).toBe(false)
+    expect(result.findings[0].description).toMatch(/requires non-empty location and description/)
   })
 })
 
