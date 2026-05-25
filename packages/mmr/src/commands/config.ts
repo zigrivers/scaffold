@@ -1,7 +1,12 @@
 import type { CommandModule, ArgumentsCamelCase } from 'yargs'
 import fs from 'node:fs'
 import path from 'node:path'
-import { loadConfig } from '../config/loader.js'
+import {
+  loadConfig,
+  loadConfigWithProvenance,
+  type ChannelProvenance,
+  type ProvenanceSource,
+} from '../config/loader.js'
 import { BUILTIN_CHANNELS } from '../config/defaults.js'
 import { checkInstalled, checkAuth } from '../core/auth.js'
 import { probeRuntime } from '../core/runtime-probe.js'
@@ -10,7 +15,9 @@ import { isSecretKey, redactChannel } from '../core/redact.js'
 
 interface ConfigArgs {
   action: string
+  name?: string
   'with-examples'?: boolean
+  'no-redact'?: boolean
 }
 
 async function ossProbeResults(): Promise<Map<OssRuntimeId, boolean>> {
@@ -133,7 +140,14 @@ async function configTest(): Promise<void> {
   process.exit(allOk ? 0 : 1)
 }
 
-function configChannels(): void {
+function configChannels(opts: { name?: string, noRedact?: boolean } = {}): void {
+  const rawName = opts.name
+  if (rawName && rawName.startsWith('show:')) {
+    const channelName = rawName.slice('show:'.length).trim()
+    showChannel(channelName, { noRedact: opts.noRedact === true })
+    return
+  }
+
   const config = loadConfig({ projectRoot: process.cwd() })
   const channels = Object.entries(config.channels).map(([name, ch]) => {
     const display = redactChannel(ch as unknown as Record<string, unknown>)
@@ -148,6 +162,51 @@ function configChannels(): void {
     }
   })
   console.log(JSON.stringify(channels, null, 2))
+}
+
+function showChannel(name: string, opts: { noRedact: boolean }): void {
+  const { config, provenance } = loadConfigWithProvenance({ projectRoot: process.cwd() })
+  const ch = config.channels[name]
+  if (!ch) {
+    const known = Object.keys(config.channels).join(', ')
+    console.error(`Channel "${name}" not found. Known channels: ${known}`)
+    process.exit(1)
+    return
+  }
+
+  const display = opts.noRedact ? ch : redactChannel(ch as unknown as Record<string, unknown>)
+  if (opts.noRedact) {
+    console.error('WARNING: --no-redact is enabled; secrets in env/headers are printed verbatim.')
+  }
+
+  const prov = provenance.channels[name] ?? {}
+  console.log(`# Channel: ${name}`)
+  printWithProvenance(display as Record<string, unknown>, prov, 0)
+}
+
+function printWithProvenance(
+  obj: Record<string, unknown>,
+  prov: ChannelProvenance,
+  indent: number,
+): void {
+  const pad = '  '.repeat(indent)
+  for (const [k, v] of Object.entries(obj)) {
+    if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
+      console.log(`${pad}${k}:`)
+      const nestedProv = (prov[k] as ChannelProvenance | undefined) ?? {}
+      printWithProvenance(v as Record<string, unknown>, nestedProv, indent + 1)
+    } else {
+      const source = typeof prov[k] === 'string' ? (prov[k] as ProvenanceSource) : 'default'
+      const rendered = renderScalar(k, v)
+      console.log(`${pad}${k}: ${rendered}  # from ${source}`)
+    }
+  }
+}
+
+function renderScalar(key: string, value: unknown): string {
+  if (key === 'command' && typeof value === 'string') return value
+  if (value === '<redacted>') return '<redacted>'
+  return typeof value === 'string' ? `"${value}"` : JSON.stringify(value)
 }
 
 function commandContainsInlineSecret(command: string): boolean {
@@ -194,10 +253,19 @@ export const configCommand: CommandModule<object, ConfigArgs> = {
         describe: 'Config action',
         choices: ['init', 'test', 'channels'],
       })
+      .positional('name', {
+        type: 'string',
+        describe: 'Optional config target, such as show:<channel> for channels',
+      })
       .option('with-examples', {
         type: 'boolean',
         default: false,
         describe: 'Emit all OSS runtime example blocks (init)',
+      })
+      .option('no-redact', {
+        type: 'boolean',
+        default: false,
+        describe: 'Disable secret redaction for config channels show',
       }),
   handler: async (args: ArgumentsCamelCase<ConfigArgs>) => {
     switch (args.action) {
@@ -208,7 +276,7 @@ export const configCommand: CommandModule<object, ConfigArgs> = {
       await configTest()
       break
     case 'channels':
-      configChannels()
+      configChannels({ name: args.name, noRedact: args['no-redact'] === true })
       break
     default:
       console.error(`Unknown config action: ${args.action}`)
