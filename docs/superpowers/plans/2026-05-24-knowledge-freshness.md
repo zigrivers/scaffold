@@ -786,9 +786,92 @@ git commit -m "feat(knowledge-freshness): add grounded audit meta-prompt"
 
 **Files:**
 - Create: `src/knowledge-freshness/source-hash.ts` (shared `fetchAndHash(url): Promise<{hash: string}>` helper — used by both Task 6's pre-filter and Task 8's apply)
+- Create: `src/knowledge-freshness/source-hash.test.ts`
 - Create: `src/knowledge-freshness/audit-prefilter.ts`
 - Create: `src/knowledge-freshness/audit-prefilter.test.ts`
-- Create: `src/cli/commands/knowledge-freshness-audit-prefilter.ts`
+- Create: `src/cli/commands/knowledge-freshness.ts` (yargs parent command that hosts the three subcommands; Tasks 7 and 8 add their subcommands to it)
+- Create: `src/cli/commands/knowledge-freshness-audit-prefilter.ts` (the first subcommand)
+
+- [ ] **Step 0a: Create the shared source-hash helper**
+
+```typescript
+// src/knowledge-freshness/source-hash.ts
+import { createHash } from 'node:crypto'
+
+/**
+ * GET a URL and sha256 its body. Used by:
+ *   - audit-prefilter: to detect upstream changes (compare fresh hash
+ *     against the frontmatter's stored hash)
+ *   - audit-apply: to compute deterministic hashes for persistence,
+ *     preferring them over LLM-emitted content_hash values
+ * Throws on network or HTTP-status failures so callers can decide
+ * whether to skip (pre-filter) or abort (apply).
+ */
+export async function fetchAndHash(url: string): Promise<{ hash: string; body: string }> {
+  const res = await fetch(url)
+  if (!res.ok) throw new Error(`fetch ${url} returned HTTP ${res.status}`)
+  const body = await res.text()
+  const hash = `sha256:${createHash('sha256').update(body).digest('hex')}`
+  return { hash, body }
+}
+```
+
+A single test that hits a stable URL (or uses `vi.spyOn(globalThis, 'fetch')` to mock):
+
+```typescript
+// src/knowledge-freshness/source-hash.test.ts
+import { describe, it, expect, vi } from 'vitest'
+import { fetchAndHash } from './source-hash.js'
+
+describe('fetchAndHash', () => {
+  it('returns a sha256:-prefixed hex digest of the response body', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response('hello world', { status: 200 }) as Response,
+    )
+    const { hash, body } = await fetchAndHash('https://example.org/anything')
+    expect(hash).toBe('sha256:b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9')
+    expect(body).toBe('hello world')
+  })
+
+  it('throws on non-2xx response', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response('', { status: 503 }) as Response)
+    await expect(fetchAndHash('https://example.org/down')).rejects.toThrow(/503/)
+  })
+})
+```
+
+- [ ] **Step 0b: Create the `knowledge-freshness` parent command module**
+
+```typescript
+// src/cli/commands/knowledge-freshness.ts
+import type { CommandModule } from 'yargs'
+import auditPrefilterCommand from './knowledge-freshness-audit-prefilter.js'
+// Task 7 adds:  import auditRunEntryCommand from './knowledge-freshness-audit-run-entry.js'
+// Task 8 adds:  import auditApplyCommand     from './knowledge-freshness-audit-apply.js'
+
+const knowledgeFreshnessCommand: CommandModule = {
+  command: 'knowledge-freshness <command>',
+  describe: 'Knowledge-base freshness audit commands',
+  builder: (y) =>
+    y
+      .command(auditPrefilterCommand)
+      // Tasks 7 and 8 chain their .command(...) calls here as they land.
+      .demandCommand(1, 'Specify a knowledge-freshness subcommand'),
+  handler: () => { /* yargs routes to the chosen subcommand */ },
+}
+
+export default knowledgeFreshnessCommand
+```
+
+Then register the parent in `src/cli/index.ts`:
+
+```typescript
+import knowledgeFreshnessCommand from './commands/knowledge-freshness.js'
+// ...
+  .command(knowledgeFreshnessCommand)
+```
+
+Tasks 7 and 8 each (a) create their subcommand file, (b) add the import + `.command()` chain entry in `src/cli/commands/knowledge-freshness.ts`, and (c) stage that file alongside their own. They do NOT modify `src/cli/index.ts` again — the parent command is registered once in this step.
 
 - [ ] **Step 1: Write failing tests**
 
@@ -932,14 +1015,15 @@ Create `src/cli/commands/knowledge-freshness-audit-prefilter.ts` — exports a y
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/knowledge-freshness/source-hash.ts \
+git add src/knowledge-freshness/source-hash.ts src/knowledge-freshness/source-hash.test.ts \
         src/knowledge-freshness/audit-prefilter.ts src/knowledge-freshness/audit-prefilter.test.ts \
+        src/cli/commands/knowledge-freshness.ts \
         src/cli/commands/knowledge-freshness-audit-prefilter.ts \
         src/cli/index.ts
 git commit -m "feat(knowledge-freshness): add audit pre-filter (source-hash + cadence)"
 ```
 
-`src/cli/index.ts` MUST be staged — without the dispatcher registration the built CLI has no `audit-prefilter` subcommand and Task 9's invocation fails at runtime. `source-hash.ts` is the shared `fetchAndHash` helper that Task 8 will import; landing it here keeps Task 8's commit small.
+`src/cli/index.ts` MUST be staged — without the parent-command registration the built CLI has no `knowledge-freshness` namespace and Task 9's invocation fails at runtime. `src/cli/commands/knowledge-freshness.ts` is the parent module that Tasks 7 and 8 will extend with their own subcommands — landing it here lets the implementer test `node dist/index.js knowledge-freshness audit-prefilter` end-to-end immediately.
 
 ---
 
@@ -1221,12 +1305,12 @@ If the observability LLM dispatcher does not export a reusable function, extract
 ```bash
 git add src/knowledge-freshness/audit-runner.ts src/knowledge-freshness/audit-runner.test.ts \
         src/cli/commands/knowledge-freshness-audit-run-entry.ts \
-        src/cli/index.ts \
+        src/cli/commands/knowledge-freshness.ts \
         src/observability/engine/llm-dispatcher.ts  # only if extracted helper
 git commit -m "feat(knowledge-freshness): add per-entry grounded audit runner"
 ```
 
-`src/cli/index.ts` MUST be in the commit — same dispatcher-registration requirement as Tasks 2, 6, and 8.
+`src/cli/commands/knowledge-freshness.ts` MUST be in the commit — this task adds an `import auditRunEntryCommand from './knowledge-freshness-audit-run-entry.js'` line and a new `.command(auditRunEntryCommand)` entry to the parent's builder chain. Do NOT touch `src/cli/index.ts` (the parent was already registered there in Task 6 Step 0b).
 
 ---
 
@@ -1805,9 +1889,11 @@ The hashing helper is the same `fetchAndHash` primitive that Task 6 created in `
 ```bash
 git add src/knowledge-freshness/audit-apply.ts src/knowledge-freshness/audit-apply.test.ts \
         src/cli/commands/knowledge-freshness-audit-apply.ts \
-        src/cli/index.ts
+        src/cli/commands/knowledge-freshness.ts
 git commit -m "feat(knowledge-freshness): apply audit verdicts to entries (Phase 1: no PR yet)"
 ```
+
+`src/cli/commands/knowledge-freshness.ts` MUST be in the commit — this task adds the third subcommand (`auditApplyCommand`) to the parent's builder chain. Same pattern as Task 7.
 
 ---
 
