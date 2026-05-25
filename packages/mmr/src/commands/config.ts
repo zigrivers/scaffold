@@ -176,7 +176,7 @@ function configChannels(opts: { name?: string, target?: string, noRedact?: boole
 }
 
 function isNoRedact(args: Pick<ConfigArgs, 'redact' | 'no-redact'>): boolean {
-  return args.redact === false || args['no-redact'] === true
+  return args['no-redact'] === true
 }
 
 function showChannel(name: string, opts: { noRedact: boolean }): boolean {

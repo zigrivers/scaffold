@@ -21,6 +21,7 @@ function parse<T>(cmd: CommandModule<object, T>, argv: string[]): Record<string,
 }
 
 describe('v3.28 flag plumbing', () => {
+  // Task 13 is a regression guard for flags wired by earlier v3.28 tasks.
   it('review --dry-run parses to boolean true', () => {
     const args = parse(reviewCommand, ['review', '--dry-run'])
     expect(args['dry-run']).toBe(true)
