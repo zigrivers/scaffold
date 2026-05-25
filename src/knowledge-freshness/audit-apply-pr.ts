@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process'
+import path from 'node:path'
 import yaml from 'js-yaml'
 import type { AuditVerdict } from './audit-runner.js'
 
@@ -64,6 +65,24 @@ export function renderPrTitle(verdict: AuditVerdict): string {
   return `chore(knowledge): refresh ${verdict.entry_name} against ${oneSentenceSourceSummary(verdict)}`
 }
 
+/**
+ * Collapse newlines and trim LLM-controlled text before splicing into the
+ * PR body. F-003 round-4: a `preserve_warnings` entry containing a literal
+ * `\nBREAKING CHANGE:` would render as a new line starting with that
+ * footer, which `deriveBumpKind` (now anchored to start-of-line per the
+ * F-002 round-2 fix) would treat as a real major-bump signal. Collapsing
+ * to a single line — and replacing the BREAKING CHANGE token itself with
+ * a non-functional variant — closes that path entirely.
+ *
+ * We don't sanitize Conventional Commits tokens in the BODY render itself
+ * (citations of "BREAKING CHANGE:" in evidence text are legitimate); the
+ * round-2 regex change ensures they only trigger major bumps when at the
+ * start of a line, which collapsing newlines here also prevents.
+ */
+function sanitizeLlmField(s: string): string {
+  return s.replace(/\r?\n/g, ' ').trim()
+}
+
 export function renderPrBody(verdict: AuditVerdict, opts: RenderPrOptions = {}): string {
   const sourceList = verdict.sources_checked.length === 0
     ? '_No sources._'
@@ -77,7 +96,7 @@ export function renderPrBody(verdict: AuditVerdict, opts: RenderPrOptions = {}):
 
   const preserveSection = verdict.preserve_warnings.length === 0
     ? '_None._'
-    : verdict.preserve_warnings.map((w) => `- ${w}`).join('\n')
+    : verdict.preserve_warnings.map((w) => `- ${sanitizeLlmField(w)}`).join('\n')
 
   const mmrLine = opts.mmrJobId
     ? `job_id: ${opts.mmrJobId}`
@@ -202,10 +221,18 @@ export function openFreshnessPr(verdict: AuditVerdict, opts: OpenPrOptions): { b
   // they'd be carried along by `git add <entryPath>` only if the path matches,
   // but a porcelain check is the cleanest precondition.
   const porcelain = runOrThrow('git', ['status', '--porcelain']).split('\n').filter((l) => l.length > 0)
+  // Path normalization (round-4 F-001): `git status --porcelain` outputs
+  // paths relative to the GIT REPOSITORY ROOT, but the operator may pass
+  // `opts.entryPath` as either an absolute path or a relative path against
+  // the current cwd. Normalize via the repo root so the comparison is
+  // robust to either form.
+  const repoRoot = runOrThrow('git', ['rev-parse', '--show-toplevel']).trim()
+  const normalize = (p: string): string => path.resolve(repoRoot, p)
+  const targetEntry = normalize(opts.entryPath)
   const relevant = porcelain.filter((line) => {
     // Tolerate any 2-char status (M, A, D, ??, etc.); we just need the path.
     const filePath = line.slice(3).trim()
-    return filePath === opts.entryPath
+    return normalize(filePath) === targetEntry
   })
   if (porcelain.length === 0) {
     throw new Error('refusing to open PR: working tree has no changes (did you forget to apply the verdict?)')
@@ -322,7 +349,14 @@ export function openFreshnessPr(verdict: AuditVerdict, opts: OpenPrOptions): { b
  * a minimal yaml-only read keeps this surface lean.
  */
 export function readVolatility(entryContent: string): string | undefined {
-  const match = entryContent.match(/^---\n([\s\S]*?)\n---/)
+  // F-004 round-4: tolerate optional UTF-8 BOM (U+FEFF) and CRLF line
+  // endings. The strict /^---\n.../ regex would silently miss-match a
+  // file authored on Windows or with a BOM, leaving the PR without its
+  // volatility label. We strip a leading BOM defensively, then match
+  // both LF and CRLF line endings via \r?\n.
+  const BOM = '﻿'
+  const noBom = entryContent.startsWith(BOM) ? entryContent.slice(BOM.length) : entryContent
+  const match = noBom.match(/^---\r?\n([\s\S]*?)\r?\n---/)
   if (!match) return undefined
   const fm = yaml.load(match[1], { schema: yaml.JSON_SCHEMA }) as { volatility?: string }
   return fm?.volatility
