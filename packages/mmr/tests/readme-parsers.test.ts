@@ -3,6 +3,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+// Documentation freshness check for the Task 8 README contract. Parser behavior
+// itself is covered by parser and results-pipeline tests.
 describe('README documents declarative parsers (T1-B)', () => {
   const __dirname = path.dirname(fileURLToPath(import.meta.url))
   const readme = fs.readFileSync(path.resolve(__dirname, '../README.md'), 'utf-8')
