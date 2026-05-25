@@ -1,5 +1,6 @@
 import { dispatchChannel } from './dispatcher.js'
 import type { JobStore } from './job-store.js'
+import type { MmrConfigParsed, OutputParserConfig } from '../config/schema.js'
 import type { ChannelStatus } from '../types.js'
 
 /** Focus areas for compensating passes, keyed by the channel being compensated */
@@ -24,6 +25,47 @@ export interface CompensatingChannel {
   compensatingName: string
   /** Focus prompt to prepend */
   focusPrompt: string
+}
+
+export interface CompensatorDispatch {
+  command: string
+  flags: string[]
+  env: Record<string, string>
+  stderr: 'capture' | 'suppress' | 'passthrough'
+  output_parser: string | OutputParserConfig
+}
+
+export function resolveCompensatorDispatch(
+  config: MmrConfigParsed,
+  _originalChannel: string,
+): CompensatorDispatch {
+  const compConfig = config.defaults.compensator
+  if (!compConfig) {
+    return {
+      command: 'claude -p',
+      flags: ['--output-format', 'json'],
+      env: {},
+      stderr: 'capture',
+      output_parser: 'default',
+    }
+  }
+
+  const channelName = compConfig.channel
+  const channelConfig = config.channels[channelName]
+  if (!channelConfig) {
+    throw new Error(`Compensator channel "${channelName}" not found in config`)
+  }
+  if (!channelConfig.command) {
+    throw new Error(`Compensator channel "${channelName}" has no command`)
+  }
+
+  return {
+    command: channelConfig.command,
+    flags: channelConfig.flags,
+    env: channelConfig.env,
+    stderr: channelConfig.stderr,
+    output_parser: channelConfig.output_parser,
+  }
 }
 
 /**
