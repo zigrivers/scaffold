@@ -103,6 +103,66 @@ describe('validateSourceUrl', () => {
   it('rejects IPv6 unspecified [::]', () => {
     expect(validateSourceUrl('http://[::]/').ok).toBe(false)
   })
+
+  // Round-9 F-001: broader public-IP classifier
+  it('rejects CGNAT range (100.64.0.0/10)', () => {
+    expect(validateSourceUrl('http://100.64.0.1/').ok).toBe(false)
+    expect(validateSourceUrl('http://100.127.255.254/').ok).toBe(false)
+  })
+
+  it('accepts 100.63.x.x and 100.128.x.x (boundaries outside CGNAT)', () => {
+    expect(validateSourceUrl('http://100.63.0.1/').ok).toBe(true)
+    expect(validateSourceUrl('http://100.128.0.1/').ok).toBe(true)
+  })
+
+  it('rejects IPv4 benchmark range (198.18.0.0/15)', () => {
+    expect(validateSourceUrl('http://198.18.0.1/').ok).toBe(false)
+    expect(validateSourceUrl('http://198.19.255.254/').ok).toBe(false)
+  })
+
+  it('rejects IPv4 TEST-NET ranges (192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24)', () => {
+    expect(validateSourceUrl('http://192.0.2.1/').ok).toBe(false)
+    expect(validateSourceUrl('http://198.51.100.1/').ok).toBe(false)
+    expect(validateSourceUrl('http://203.0.113.1/').ok).toBe(false)
+  })
+
+  it('rejects IPv4 multicast (224.0.0.0/4) and reserved (240.0.0.0/4)', () => {
+    expect(validateSourceUrl('http://224.0.0.1/').ok).toBe(false)
+    expect(validateSourceUrl('http://239.255.255.255/').ok).toBe(false)
+    expect(validateSourceUrl('http://240.0.0.1/').ok).toBe(false)
+    expect(validateSourceUrl('http://255.255.255.255/').ok).toBe(false)
+  })
+
+  it('rejects 0.0.0.0/8 (this network)', () => {
+    expect(validateSourceUrl('http://0.0.0.0/').ok).toBe(false)
+    expect(validateSourceUrl('http://0.1.2.3/').ok).toBe(false)
+  })
+
+  it('rejects 192.0.0.0/24 (IETF protocol assignments)', () => {
+    expect(validateSourceUrl('http://192.0.0.1/').ok).toBe(false)
+  })
+
+  it('accepts 8.8.8.8, 1.1.1.1, 93.184.216.34 (globally routable)', () => {
+    expect(validateSourceUrl('http://8.8.8.8/').ok).toBe(true)
+    expect(validateSourceUrl('http://1.1.1.1/').ok).toBe(true)
+    expect(validateSourceUrl('http://93.184.216.34/').ok).toBe(true)
+  })
+
+  it('rejects IPv6 multicast [ff02::1]', () => {
+    expect(validateSourceUrl('http://[ff02::1]/').ok).toBe(false)
+  })
+
+  it('rejects IPv6 documentation [2001:db8::1]', () => {
+    expect(validateSourceUrl('http://[2001:db8::1]/').ok).toBe(false)
+  })
+
+  it('rejects IPv6 6to4 anycast [2002::1]', () => {
+    expect(validateSourceUrl('http://[2002::1]/').ok).toBe(false)
+  })
+
+  it('accepts Cloudflare public IPv6 [2606:4700::6810:84e5]', () => {
+    expect(validateSourceUrl('http://[2606:4700::6810:84e5]/').ok).toBe(true)
+  })
 })
 
 describe('assertSafeSourceUrl', () => {

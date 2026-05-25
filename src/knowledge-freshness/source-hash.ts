@@ -85,7 +85,14 @@ export async function fetchAndHash(
 
     // Per-hop timeout (round-6 F-003): a hanging server would otherwise block
     // the daily cron indefinitely. AbortSignal.timeout is built-in to Node 22+.
-    let res: Response
+    //
+    // The dispatcher must stay alive until the response body is fully read
+    // (round-9 F-002). Earlier rounds closed it right after fetch() returned
+    // headers, but res.body is a stream — closing the agent mid-stream
+    // would stall or truncate reads. Wrap the entire per-hop handling in
+    // try/finally so the close only happens after body consumption (or after
+    // we decide to follow a redirect, in which case the body is discarded).
+    let res: Response | undefined
     try {
       res = await fetch(current, {
         redirect: 'manual',
@@ -94,30 +101,35 @@ export async function fetchAndHash(
         // hood) but not part of the WHATWG fetch standard, so we cast.
         ...(dispatcher ? { dispatcher } as RequestInit & { dispatcher: Agent } : {}),
       } as RequestInit)
+
+      // 3xx with a Location header → re-validate and follow.
+      if (res.status >= 300 && res.status < 400) {
+        const location = res.headers.get('location')
+        if (!location) {
+          throw new Error(`fetch ${current} returned ${res.status} with no Location header`)
+        }
+        // Drain/cancel the redirect response so the underlying connection is
+        // free before we close the agent. Without this, agent.close() can
+        // race the still-open response body.
+        try { await res.body?.cancel() } catch { /* noop */ }
+        // Resolve relative redirects against the URL we just hit.
+        current = new URL(location, current).toString()
+        continue
+      }
+
+      if (!res.ok) throw new Error(`fetch ${current} returned HTTP ${res.status}`)
+
+      // Read body with a size cap so a malicious or massive response can't
+      // exhaust memory (round-7 F-003).
+      const body = await readBodyWithLimit(res, maxBodyBytes, current)
+      const hash = `sha256:${createHash('sha256').update(body).digest('hex')}`
+      return { hash, body }
     } finally {
-      // Close the agent so we don't leak sockets. Each hop builds a fresh
-      // agent because the hostname can change between hops.
+      // Close the agent only AFTER the body has been consumed (or the
+      // redirect response cancelled). Each hop builds a fresh agent because
+      // the hostname can change between hops, so we never reuse one.
       if (dispatcher) await dispatcher.close()
     }
-
-    // 3xx with a Location header → re-validate and follow.
-    if (res.status >= 300 && res.status < 400) {
-      const location = res.headers.get('location')
-      if (!location) {
-        throw new Error(`fetch ${current} returned ${res.status} with no Location header`)
-      }
-      // Resolve relative redirects against the URL we just hit.
-      current = new URL(location, current).toString()
-      continue
-    }
-
-    if (!res.ok) throw new Error(`fetch ${current} returned HTTP ${res.status}`)
-
-    // Read body with a size cap so a malicious or massive response can't
-    // exhaust memory (round-7 F-003).
-    const body = await readBodyWithLimit(res, maxBodyBytes, current)
-    const hash = `sha256:${createHash('sha256').update(body).digest('hex')}`
-    return { hash, body }
   }
   throw new Error(`fetch ${url} exceeded ${MAX_REDIRECT_HOPS} redirects`)
 }

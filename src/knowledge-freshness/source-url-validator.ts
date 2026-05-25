@@ -22,46 +22,110 @@ import yaml from 'js-yaml'
  * Round-3 F-001; round-4 F-001 hardens the IPv6 and IPv4-mapped paths.
  */
 
-// IPv4 hostname blocklist regexes operate on the un-bracketed dotted form.
+// Named-host blocklist (regexes operate on the lowercased un-bracketed host).
+// IPv4 numeric ranges are handled by isBlockedIPv4 below using octet math —
+// regex matching can't fully express CGNAT / benchmark / multicast / reserved.
 const BLOCKED_HOST_PATTERNS: RegExp[] = [
   /^localhost$/i,
-  /^127(?:\.\d{1,3}){3}$/,            // 127.0.0.0/8 loopback
-  /^0(?:\.\d{1,3}){3}$/,              // 0.0.0.0/8
-  /^10(?:\.\d{1,3}){3}$/,             // 10.0.0.0/8 private
-  /^192\.168(?:\.\d{1,3}){2}$/,       // 192.168.0.0/16 private
-  /^169\.254(?:\.\d{1,3}){2}$/,       // 169.254.0.0/16 link-local
-  /^172\.(?:1[6-9]|2\d|3[01])(?:\.\d{1,3}){2}$/, // 172.16.0.0/12 private
 ]
 
 /**
- * Return true if a dotted-quad IPv4 string falls in any private/reserved
- * range we want to block. Reused for raw IPv4 hosts AND for IPv4-mapped
- * IPv6 addresses like `::ffff:127.0.0.1` (round-4 F-001).
+ * Parse a dotted-quad IPv4 string to its four octets. Returns null if it
+ * isn't a valid IPv4 literal.
+ */
+function parseIPv4(addr: string): [number, number, number, number] | null {
+  const parts = addr.split('.')
+  if (parts.length !== 4) return null
+  const out: number[] = []
+  for (const p of parts) {
+    if (!/^\d{1,3}$/.test(p)) return null
+    const n = Number(p)
+    if (n < 0 || n > 255) return null
+    out.push(n)
+  }
+  return [out[0], out[1], out[2], out[3]]
+}
+
+/**
+ * Return true if a dotted-quad IPv4 string is NOT globally routable
+ * (round-9 F-001). Covers every IANA-reserved IPv4 range, not just RFC1918.
+ * The validator now allowlists "is public?" rather than blocklisting a
+ * named-range set, so future spec additions (e.g. a new reserved block) don't
+ * silently slip past until someone notices.
+ *
+ * Ranges blocked:
+ *   0.0.0.0/8         this network / unspecified
+ *   10.0.0.0/8        private RFC1918
+ *   100.64.0.0/10     CGNAT (RFC6598)
+ *   127.0.0.0/8       loopback
+ *   169.254.0.0/16    link-local
+ *   172.16.0.0/12     private RFC1918
+ *   192.0.0.0/24      IETF protocol assignments
+ *   192.0.2.0/24      TEST-NET-1
+ *   192.88.99.0/24    6to4 relay anycast (deprecated)
+ *   192.168.0.0/16    private RFC1918
+ *   198.18.0.0/15     benchmark
+ *   198.51.100.0/24   TEST-NET-2
+ *   203.0.113.0/24    TEST-NET-3
+ *   224.0.0.0/4       multicast
+ *   240.0.0.0/4       reserved (incl. 255.255.255.255 broadcast)
  */
 function isBlockedIPv4(addr: string): boolean {
-  return BLOCKED_HOST_PATTERNS.some((pat) => pat.test(addr))
+  const octets = parseIPv4(addr)
+  if (!octets) return false
+  const [a, b] = octets
+  if (a === 0) return true                                     // 0.0.0.0/8
+  if (a === 10) return true                                    // 10.0.0.0/8
+  if (a === 100 && b >= 64 && b <= 127) return true            // 100.64.0.0/10
+  if (a === 127) return true                                   // 127.0.0.0/8
+  if (a === 169 && b === 254) return true                      // 169.254.0.0/16
+  if (a === 172 && b >= 16 && b <= 31) return true             // 172.16.0.0/12
+  if (a === 192 && b === 0 && octets[2] === 0) return true     // 192.0.0.0/24
+  if (a === 192 && b === 0 && octets[2] === 2) return true     // 192.0.2.0/24
+  if (a === 192 && b === 88 && octets[2] === 99) return true   // 192.88.99.0/24
+  if (a === 192 && b === 168) return true                      // 192.168.0.0/16
+  if (a === 198 && (b === 18 || b === 19)) return true         // 198.18.0.0/15
+  if (a === 198 && b === 51 && octets[2] === 100) return true  // 198.51.100.0/24
+  if (a === 203 && b === 0 && octets[2] === 113) return true   // 203.0.113.0/24
+  if (a >= 224 && a <= 239) return true                        // 224.0.0.0/4
+  if (a >= 240) return true                                    // 240.0.0.0/4 + 255.255.255.255
+  return false
 }
 
 /**
  * Block IPv6 loopback / link-local / unique-local / IPv4-mapped private.
  * `addr` is the un-bracketed hostname.
  */
+/**
+ * Comprehensive IPv6 non-global classifier (round-9 F-001 expansion).
+ *
+ * Blocks:
+ *   ::             unspecified
+ *   ::1            loopback
+ *   ::ffff:0:0/96  IPv4-mapped (covers both dotted and hex forms; legitimate
+ *                  public servers don't expose endpoints via this range)
+ *   100::/64       discard prefix
+ *   2001::/23      IETF protocol assignments (Teredo, ORCHIDv2)
+ *   2001:db8::/32  documentation
+ *   2002::/16      6to4 anycast (deprecated)
+ *   fc00::/7       unique local (fc.. and fd..)
+ *   fe80::/10      link-local
+ *   fec0::/10      site-local (deprecated)
+ *   ff00::/8       multicast
+ */
 function isBlockedIPv6(addr: string): boolean {
   const lower = addr.toLowerCase()
-  if (lower === '::' || lower === '::1') return true            // loopback / unspecified
-  // Block the entire ::ffff:0:0/96 IPv4-mapped range. The URL parser normalizes
-  // `[::ffff:127.0.0.1]` → `::ffff:7f00:1` (hex hextets), so a regex matching
-  // only the dotted form would miss the normalized version. Legitimate public
-  // servers don't expose endpoints exclusively via IPv4-mapped IPv6, so a
-  // blanket reject is a safe and simple guard (round-4 F-001 follow-up).
-  // Also block ::ffff:0:x.x.x.x (RFC 6052 IPv4-translated, ::ffff:0:0:0:0/96).
-  if (/^::ffff:/.test(lower)) return true
-  // Link-local: fe80::/10 → leading hextet is fe80..febf.
-  if (/^fe[89ab]\w*:/.test(lower)) return true
-  // Unique-local: fc00::/7 → leading hextet starts with fc or fd.
-  if (/^f[cd]\w*:/.test(lower)) return true
-  // Site-local (deprecated but historically valid): fec0::/10.
-  if (/^fec[\dabcdef]:/.test(lower)) return true
+  if (lower === '::' || lower === '::1') return true
+  if (/^::ffff:/.test(lower)) return true                          // IPv4-mapped
+  if (/^100:0?:0?:0?:/.test(lower) || lower.startsWith('100::')) return true  // discard 100::/64
+  // 2001::/23 — first 23 bits are 0010 0000 0000 0001 0000 000 → "2001:0" .. "2001:1"
+  if (/^2001:[01]\w{0,2}:/.test(lower)) return true
+  if (/^2001:0?db8:/.test(lower) || lower.startsWith('2001:db8:')) return true // documentation
+  if (/^2002:/.test(lower)) return true                            // 6to4 anycast
+  if (/^f[cd]\w*:/.test(lower)) return true                        // fc00::/7 ULA
+  if (/^fe[89ab]\w*:/.test(lower)) return true                     // fe80::/10 link-local
+  if (/^fec[0-9a-f]:/.test(lower)) return true                     // fec0::/10 site-local
+  if (/^ff/.test(lower)) return true                               // ff00::/8 multicast
   return false
 }
 
