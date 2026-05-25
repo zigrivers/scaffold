@@ -175,6 +175,10 @@ function configChannels(opts: { name?: string, target?: string, noRedact?: boole
   return true
 }
 
+function isNoRedact(args: Pick<ConfigArgs, 'redact' | 'no-redact'>): boolean {
+  return args.redact === false || args['no-redact'] === true
+}
+
 function showChannel(name: string, opts: { noRedact: boolean }): boolean {
   const { config, provenance } = loadConfigWithProvenance({ projectRoot: process.cwd() })
   const ch = config.channels[name]
@@ -363,7 +367,7 @@ export const configCommand: CommandModule<object, ConfigArgs> = {
       const ok = configChannels({
         name: args.name,
         target: args.target,
-        noRedact: args.redact === false,
+        noRedact: isNoRedact(args),
       })
       if (!ok) process.exit(1)
       break

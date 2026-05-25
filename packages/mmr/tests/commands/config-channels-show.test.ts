@@ -374,7 +374,6 @@ describe('mmr config channels show <name> (T1-E)', () => {
     await configCommand.handler({
       action: 'channels',
       name: 'show:claude',
-      redact: false,
       'no-redact': true,
       _: ['config'],
       $0: 'mmr',
