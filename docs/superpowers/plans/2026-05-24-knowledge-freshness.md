@@ -903,15 +903,18 @@ Expected: PASS (all 6 tests).
 
 - [ ] **Step 5: Wire CLI command**
 
-Create `src/cli/commands/knowledge-freshness-audit-prefilter.ts` — reuses `loadFullEntries` from the assembly engine to load entries, calls `selectAuditCandidates` with an HTTP fetcher that performs `fetch(url, {method: 'GET'})` and sha-256s the body, and prints the resulting candidate names as JSON on stdout. Register in the CLI dispatcher mirroring `complete.ts:141`. (Implementation is mechanical; if any non-obvious choices arise, surface them rather than guessing.)
+Create `src/cli/commands/knowledge-freshness-audit-prefilter.ts` — reuses `loadFullEntries` from the assembly engine to load entries, calls `selectAuditCandidates` with an HTTP fetcher that performs `fetch(url, {method: 'GET'})` and sha-256s the body, and prints the resulting candidate names as JSON on stdout. **Register in the CLI dispatcher at `src/cli/index.ts`** — import the new command and add it to the yargs chain mirroring the `completeCommand` pattern. The `knowledge-freshness` namespace can be a parent command with `audit-prefilter`, `audit-run-entry`, and `audit-apply` as subcommands; if yargs idioms in `src/cli/index.ts` use nested commands elsewhere, follow that. Otherwise register `knowledge-freshness-audit-prefilter` as a flat command and revisit nesting in Task 14.
 
 - [ ] **Step 6: Commit**
 
 ```bash
 git add src/knowledge-freshness/audit-prefilter.ts src/knowledge-freshness/audit-prefilter.test.ts \
-        src/cli/commands/knowledge-freshness-audit-prefilter.ts
+        src/cli/commands/knowledge-freshness-audit-prefilter.ts \
+        src/cli/index.ts
 git commit -m "feat(knowledge-freshness): add audit pre-filter (source-hash + cadence)"
 ```
+
+`src/cli/index.ts` MUST be staged — without the dispatcher registration the built CLI has no `audit-prefilter` subcommand and Task 9's invocation fails at runtime.
 
 ---
 
@@ -1188,9 +1191,12 @@ If the observability LLM dispatcher does not export a reusable function, extract
 ```bash
 git add src/knowledge-freshness/audit-runner.ts src/knowledge-freshness/audit-runner.test.ts \
         src/cli/commands/knowledge-freshness-audit-run-entry.ts \
+        src/cli/index.ts \
         src/observability/engine/llm-dispatcher.ts  # only if extracted helper
 git commit -m "feat(knowledge-freshness): add per-entry grounded audit runner"
 ```
+
+`src/cli/index.ts` MUST be in the commit — same dispatcher-registration requirement as Tasks 2, 6, and 8.
 
 ---
 
@@ -1758,6 +1764,8 @@ Create `src/cli/commands/knowledge-freshness-audit-apply.ts` that takes two posi
 4. Write the result back to `<entry-path>`.
 5. Run `git diff <entry-path>` for the operator to see.
 
+**Register the command in `src/cli/index.ts`** — same yargs pattern as Tasks 2, 6, and 7. Without dispatcher registration, the built CLI has no `audit-apply` subcommand and Task 9's invocation fails at runtime.
+
 The signature is explicit (path first, verdict second) because the verdict schema intentionally does not carry a filesystem path — keeping the path out of LLM-emitted output preserves the safety property that the LLM cannot redirect writes to an unrelated file. Likewise, source hashes are recomputed in Node rather than trusted from the LLM, because LLM-emitted sha256s cannot be deterministically verified.
 
 The hashing helper can be shared with the audit-prefilter (Task 6 step 5) — both want the same "fetch URL, sha256 body, return hex" primitive. Factor it into `src/knowledge-freshness/source-hash.ts` if it isn't already.
@@ -1766,7 +1774,8 @@ The hashing helper can be shared with the audit-prefilter (Task 6 step 5) — bo
 
 ```bash
 git add src/knowledge-freshness/audit-apply.ts src/knowledge-freshness/audit-apply.test.ts \
-        src/cli/commands/knowledge-freshness-audit-apply.ts
+        src/cli/commands/knowledge-freshness-audit-apply.ts \
+        src/cli/index.ts
 git commit -m "feat(knowledge-freshness): apply audit verdicts to entries (Phase 1: no PR yet)"
 ```
 
@@ -1775,6 +1784,10 @@ git commit -m "feat(knowledge-freshness): apply audit verdicts to entries (Phase
 ### Task 9: End-to-end validation on `security-best-practices.md`
 
 This is the gate to Phase 2. The audit loop runs against one real entry, against the live web, with real MMR corroboration. Cost: one `claude -p` invocation plus an MMR review.
+
+**Prerequisite: Tasks 1–8 must be merged to `main` before starting Task 9.** Task 9 produces a freshness-only PR (one file modified — the audited entry). For `git checkout -b knowledge-freshness/<entry> main` to work cleanly with the modified working tree, `main` must already contain the freshness infrastructure (validator, CLI, meta-prompt, backfill metadata for the target entry). Running Task 9 from a feature branch that hasn't merged would either silently carry the infrastructure into the freshness PR or refuse to switch branches.
+
+If a clean infrastructure-on-main state isn't yet available, either: (a) merge the Phase 1 infrastructure PR(s) to `main` first and pull, or (b) run Task 9 as a dry-run from the feature branch — capture the verdict + diff but don't open the freshness PR until prerequisites are met.
 
 - [ ] **Step 1: Confirm prerequisites**
 
