@@ -11,21 +11,25 @@ const AuthConfigSchema = z.object({
   recovery: z.string(),
 })
 
-export const UnwrapJsonpathParserSchema = z.object({
-  kind: z.literal('unwrap-jsonpath'),
-  wrap: z.string(),
-  then: z.string().default('default'),
+const RegexFindingsFieldsSchema = z.object({
+  id: z.number().int().nonnegative().optional(),
+  category: z.number().int().nonnegative().optional(),
+  severity: z.number().int().nonnegative().optional(),
+  location: z.number().int().nonnegative(),
+  description: z.number().int().nonnegative(),
+  suggestion: z.number().int().nonnegative().optional(),
 })
 
 export const RegexFindingsParserSchema = z.object({
   kind: z.literal('regex-findings'),
   pattern: z.string(),
-  fields: z.object({
-    severity: z.number().int().nonnegative().optional(),
-    location: z.number().int().nonnegative(),
-    description: z.number().int().nonnegative(),
-    suggestion: z.number().int().nonnegative().optional(),
-  }),
+  fields: RegexFindingsFieldsSchema,
+})
+
+export const UnwrapJsonpathParserSchema = z.object({
+  kind: z.literal('unwrap-jsonpath'),
+  wrap: z.string(),
+  then: z.union([z.string(), RegexFindingsParserSchema]).default('default'),
 })
 
 export const OutputParserSchema = z.union([

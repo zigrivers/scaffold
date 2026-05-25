@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import type { OutputParserConfig } from '../../src/config/schema.js'
 import { parseChannelOutput, getParser, validateFindingStrict, validateParsedOutputStrict } from '../../src/core/parser.js'
 
 describe('default parser', () => {
@@ -83,6 +84,21 @@ describe('gemini parser', () => {
     expect(result.approved).toBe(false)
     expect(result.findings).toEqual([])
     expect(result.summary).toBe('')
+  })
+})
+
+describe('parser factory', () => {
+  it('still resolves string parser names (back-compat)', () => {
+    const parser = getParser('default')
+    const out = parser('{"approved": true, "findings": [], "summary": "ok"}')
+    expect(out.approved).toBe(true)
+  })
+
+  it('routes object parser configs through an explicit unsupported-kind error', () => {
+    const cfg: OutputParserConfig = { kind: 'unwrap-jsonpath', wrap: '$', then: 'default' }
+    const result = parseChannelOutput('{"approved": true, "findings": [], "summary": "ok"}', cfg)
+    expect(result.approved).toBe(false)
+    expect(result.findings[0].description).toMatch(/Unsupported output_parser kind: unwrap-jsonpath/)
   })
 })
 

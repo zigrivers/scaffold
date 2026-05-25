@@ -1,3 +1,4 @@
+import type { OutputParserConfig } from '../config/schema.js'
 import type { Finding } from '../types.js'
 
 export interface ParsedOutput {
@@ -192,25 +193,38 @@ function docConformanceParser(raw: string): ParsedOutput {
   }
 }
 
-const parsers: Record<string, Parser> = {
+const builtinParsers: Record<string, Parser> = {
   default: defaultParser,
   gemini: geminiParser,
   'doc-conformance': docConformanceParser,
 }
 
 /**
- * Returns a parser function by name. Falls back to default if name is unknown.
+ * Build or look up a parser.
+ *
+ * String form looks up a built-in parser by name. Object form is intentionally
+ * routed through buildParser so structured configs are never silently ignored.
  */
-export function getParser(name: string): Parser {
-  return parsers[name] ?? parsers['default']
+export function getParser(spec: string | OutputParserConfig): Parser {
+  if (typeof spec === 'string') {
+    return builtinParsers[spec] ?? builtinParsers['default']
+  }
+  return buildParser(spec)
+}
+
+export function buildParser(spec: OutputParserConfig): Parser {
+  if (typeof spec === 'string') {
+    return getParser(spec)
+  }
+  throw new Error(`Unsupported output_parser kind: ${spec.kind}`)
 }
 
 /**
  * Wraps getParser in try/catch, returns error finding on parse failure.
  */
-export function parseChannelOutput(raw: string, parserName: string): ParsedOutput {
+export function parseChannelOutput(raw: string, parserSpec: string | OutputParserConfig): ParsedOutput {
   try {
-    const parser = getParser(parserName)
+    const parser = getParser(parserSpec)
     return parser(raw)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)

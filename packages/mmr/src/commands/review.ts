@@ -116,10 +116,6 @@ function buildChannelPrompt(channel: ChannelConfigParsed, prompt: string): strin
     : wrapper.replaceAll('{{prompt}}', () => prompt)
 }
 
-function currentParserName(channel: ChannelConfigParsed): string {
-  return typeof channel.output_parser === 'string' ? channel.output_parser : 'default'
-}
-
 export const reviewCommand: CommandModule<object, ReviewArgs> = {
   command: 'review',
   describe: 'Dispatch a multi-model code review',
@@ -321,7 +317,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
           })
           continue
         }
-        store.updateChannel(job.job_id, name, { output_parser: currentParserName(chConfig) })
+        store.updateChannel(job.job_id, name, { output_parser: chConfig.output_parser })
         dispatches.push(
           dispatchChannel(store, job.job_id, name, {
             command: chConfig.command,
@@ -346,7 +342,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
           })
           continue
         }
-        store.updateChannel(job.job_id, name, { output_parser: currentParserName(chConfig) })
+        store.updateChannel(job.job_id, name, { output_parser: chConfig.output_parser })
         await dispatchChannel(store, job.job_id, name, {
           command: chConfig.command,
           prompt: buildChannelPrompt(chConfig, prompt),

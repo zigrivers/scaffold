@@ -212,6 +212,48 @@ describe('output_parser union', () => {
     expect(result.success).toBe(true)
   })
 
+  it('accepts optional regex metadata fields', () => {
+    const config = {
+      version: 1,
+      channels: {
+        c1: {
+          command: 'echo',
+          auth: baseAuth,
+          output_parser: {
+            kind: 'regex-findings',
+            pattern: '^([^|]+)\\|([^|]+)\\|(P[0-3])\\|([^|]+)\\|(.+)$',
+            fields: { id: 1, category: 2, severity: 3, location: 4, description: 5 },
+          },
+        },
+      },
+    }
+    const result = MmrConfigSchema.safeParse(config)
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts unwrap-jsonpath chained to a regex-findings object parser', () => {
+    const config = {
+      version: 1,
+      channels: {
+        c1: {
+          command: 'echo',
+          auth: baseAuth,
+          output_parser: {
+            kind: 'unwrap-jsonpath',
+            wrap: '$.content',
+            then: {
+              kind: 'regex-findings',
+              pattern: '^(P[0-3])\\|([^|]+)\\|(.+)$',
+              fields: { severity: 1, location: 2, description: 3 },
+            },
+          },
+        },
+      },
+    }
+    const result = MmrConfigSchema.safeParse(config)
+    expect(result.success).toBe(true)
+  })
+
   it('rejects an unknown parser kind with a clear error', () => {
     const config = {
       version: 1,
