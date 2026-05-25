@@ -107,7 +107,7 @@ channels:
         suggestion: 4   # optional
 ```
 
-`fields.location` and `fields.description` are required; `severity` and `suggestion` are optional. Missing or invalid severity defaults to `P2` (matches `validateFinding`).
+`fields.location` and `fields.description` are required; `severity` and `suggestion` are optional. Missing or invalid severity defaults to `P2` during standard MMR finding validation.
 
 ### Ollama recipe (full example)
 
@@ -119,7 +119,7 @@ channels:
     auth:
       check: ollama list >/dev/null 2>&1
       failure_exit_codes: [1]
-      recovery: Install Ollama and run `ollama pull qwen2.5-coder:32b`
+      recovery: Install Ollama and pull the model configured by this channel
     output_parser: default     # `ollama run` writes the model response directly
 
   qwen-coder:

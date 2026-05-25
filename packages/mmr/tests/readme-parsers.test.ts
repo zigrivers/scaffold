@@ -9,17 +9,28 @@ describe('README documents declarative parsers (T1-B)', () => {
   const __dirname = path.dirname(fileURLToPath(import.meta.url))
   const readme = fs.readFileSync(path.resolve(__dirname, '../README.md'), 'utf-8')
 
+  function yamlBlockContaining(text: string): string {
+    const blocks = [...readme.matchAll(/```yaml\n([\s\S]*?)```/g)].map((match) => match[1])
+    const block = blocks.find((candidate) => candidate.includes(text))
+    expect(block).toBeDefined()
+    return block!
+  }
+
   it('documents the object form of output_parser', () => {
-    expect(readme).toMatch(/output_parser:\s*\n\s+kind:\s*unwrap-jsonpath/i)
+    const block = yamlBlockContaining('qwen-local:')
+    expect(block).toContain('output_parser:')
+    expect(block).toContain('kind: unwrap-jsonpath')
   })
 
   it('documents the regex-findings kind', () => {
-    expect(readme).toMatch(/regex-findings/)
-    expect(readme).toMatch(/fields:/)
+    const block = yamlBlockContaining('my-linter:')
+    expect(block).toContain('kind: regex-findings')
+    expect(block).toContain('fields:')
   })
 
   it('includes an Ollama / OpenAI-chat envelope recipe', () => {
-    expect(readme).toMatch(/ollama/i)
-    expect(readme).toMatch(/\$\.choices\[0\]\.message\.content/)
+    const block = yamlBlockContaining('scripts/ollama-openai-chat.sh')
+    expect(block).toContain('/v1/chat/completions')
+    expect(block).toContain('$.choices[0].message.content')
   })
 })
