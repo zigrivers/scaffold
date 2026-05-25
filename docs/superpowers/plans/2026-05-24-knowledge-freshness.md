@@ -982,6 +982,21 @@ describe('runEntryAudit', () => {
     expect(out.verdict).toBe('minor-drift')
   })
 
+  it('skips parseable-but-irrelevant JSON earlier in the output', async () => {
+    // The model emits a thinking-shaped JSON object before the verdict. The
+    // first is parseable, but doesn't match the verdict schema — the extractor
+    // must continue past it and find the actual verdict.
+    const dispatcher: Dispatcher = vi.fn().mockResolvedValue(
+      `${JSON.stringify({ thinking: 'first I will check OWASP', confidence: 0.9 })}\n\n` +
+      `${JSON.stringify({
+        entry_name: 'stub', audit_date: '2026-05-24', model: 'claude-opus-4-7',
+        verdict: 'superseded', sources_checked: [], findings: [], proposed_changes: [], preserve_warnings: [],
+      })}\n`,
+    )
+    const out = await runEntryAudit(entryPath(), dispatcher)
+    expect(out.verdict).toBe('superseded')
+  })
+
   it('throws on non-JSON dispatcher output', async () => {
     const dispatcher: Dispatcher = vi.fn().mockResolvedValue('not json at all')
     await expect(runEntryAudit(entryPath(), dispatcher)).rejects.toThrow()
@@ -1067,18 +1082,31 @@ export async function runEntryAudit(entryPath: string, dispatch: Dispatcher): Pr
     .replaceAll('{{entry_body}}', () => content)
 
   const raw = await dispatch(filled)
-  const parsed = tryParseEmbeddedJson(raw)
-  if (parsed === undefined) throw new Error('audit output contained no parseable JSON object')
-  return verdictSchema.parse(parsed)
+  const verdict = findFirstMatchingJson(raw, verdictSchema)
+  if (verdict === undefined) {
+    throw new Error(
+      'audit output contained no JSON object matching the verdict schema. ' +
+      'Check that the dispatcher returned the meta-prompt\'s expected shape.',
+    )
+  }
+  return verdict
 }
 
 /**
- * Walk `s` looking for balanced `{...}` blocks (respecting JSON string literals)
- * and JSON.parse each candidate. Returns the first one that parses successfully,
- * or `undefined` if none do. This is robust against model preamble/postamble
- * that itself contains brace-like noise (round-6 F-002, round-7 F-001).
+ * Walk `s` looking for balanced `{...}` blocks (respecting JSON string literals),
+ * JSON.parse each, and return the first whose parse passes the given Zod schema.
+ * Robust against model preamble/postamble that contains brace-like noise
+ * (round-6 F-002), invalid braced text (round-7 F-001), or earlier parseable
+ * but schema-mismatched objects like a `{"thinking": …}` block (round-8 F-001).
  */
-function tryParseEmbeddedJson(s: string): unknown | undefined {
+function findFirstMatchingJson<T>(s: string, schema: { safeParse: (v: unknown) => { success: boolean; data?: T } }): T | undefined {
+  const tryCandidate = (candidate: string): T | undefined => {
+    let parsed: unknown
+    try { parsed = JSON.parse(candidate) } catch { return undefined }
+    const result = schema.safeParse(parsed)
+    return result.success ? result.data : undefined
+  }
+
   for (let start = 0; start < s.length; start++) {
     if (s[start] !== '{') continue
     let depth = 0
@@ -1097,17 +1125,15 @@ function tryParseEmbeddedJson(s: string): unknown | undefined {
       else if (ch === '}') {
         depth--
         if (depth === 0) {
-          const candidate = s.slice(start, i + 1)
-          try { return JSON.parse(candidate) }
-          catch { /* try the next candidate */ }
-          break
+          const hit = tryCandidate(s.slice(start, i + 1))
+          if (hit !== undefined) return hit
+          break // skip past this candidate; outer loop continues at start+1
         }
       }
     }
   }
   // Last-resort: strip a ```json fence pair if present and try once more.
-  const fenced = s.replace(/```json\n?|\n?```/g, '').trim()
-  try { return JSON.parse(fenced) } catch { return undefined }
+  return tryCandidate(s.replace(/```json\n?|\n?```/g, '').trim())
 }
 ```
 
