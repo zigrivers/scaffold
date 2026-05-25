@@ -101,8 +101,10 @@ describe('parser factory', () => {
   })
 
   it('unwraps jsonpath output and parses it with the next parser', () => {
-    const cfg: OutputParserConfig = { kind: 'unwrap-jsonpath', wrap: '$', then: 'default' }
-    const result = parseChannelOutput('{"approved": true, "findings": [], "summary": "ok"}', cfg)
+    const cfg: OutputParserConfig = { kind: 'unwrap-jsonpath', wrap: '$.content', then: 'default' }
+    const result = parseChannelOutput(JSON.stringify({
+      content: '{"approved": true, "findings": [], "summary": "ok"}',
+    }), cfg)
     expect(result.approved).toBe(true)
   })
 
@@ -238,6 +240,52 @@ describe('parseChannelOutput', () => {
     expect(result.approved).toBe(false)
     expect(result.findings).toHaveLength(1)
     expect(result.findings[0].description).toContain('Unbalanced braces')
+  })
+})
+
+describe('unwrap-jsonpath parser kind', () => {
+  it('unwraps an OpenAI-chat envelope and delegates to default', () => {
+    const inner = '{"approved": false, "findings": [{"severity": "P1", "location": "f.ts:1", "description": "bug", "suggestion": "fix"}], "summary": "found bug"}'
+    const envelope = JSON.stringify({ choices: [{ message: { content: inner } }] })
+    const cfg = { kind: 'unwrap-jsonpath' as const, wrap: '$.choices[0].message.content', then: 'default' }
+    const result = parseChannelOutput(envelope, cfg)
+    expect(result.approved).toBe(false)
+    expect(result.findings).toHaveLength(1)
+    expect(result.findings[0].severity).toBe('P1')
+  })
+
+  it('defaults `then` to "default" when omitted', () => {
+    const inner = '{"approved": true, "findings": [], "summary": "ok"}'
+    const envelope = JSON.stringify({ content: inner })
+    const cfg = { kind: 'unwrap-jsonpath' as const, wrap: '$.content', then: 'default' }
+    const result = parseChannelOutput(envelope, cfg)
+    expect(result.approved).toBe(true)
+  })
+
+  it('emits an error finding when the jsonpath does not resolve', () => {
+    const envelope = JSON.stringify({ choices: [] })
+    const cfg = { kind: 'unwrap-jsonpath' as const, wrap: '$.choices[0].message.content', then: 'default' }
+    const result = parseChannelOutput(envelope, cfg)
+    expect(result.approved).toBe(false)
+    expect(result.findings).toHaveLength(1)
+    expect(result.findings[0].severity).toBe('P1')
+    expect(result.findings[0].location).toBe('output-parser')
+    expect(result.findings[0].description).toMatch(/jsonpath|did not resolve|wrap/i)
+  })
+
+  it('emits an error finding when the envelope is not JSON', () => {
+    const cfg = { kind: 'unwrap-jsonpath' as const, wrap: '$.x', then: 'default' }
+    const result = parseChannelOutput('totally not json', cfg)
+    expect(result.approved).toBe(false)
+    expect(result.findings[0].location).toBe('output-parser')
+  })
+
+  it('emits an error finding when the extracted value is not a string', () => {
+    const envelope = JSON.stringify({ choices: [{ message: { content: { not: 'a string' } } }] })
+    const cfg = { kind: 'unwrap-jsonpath' as const, wrap: '$.choices[0].message.content', then: 'default' }
+    const result = parseChannelOutput(envelope, cfg)
+    expect(result.approved).toBe(false)
+    expect(result.findings[0].description).toMatch(/string|extracted/i)
   })
 })
 
