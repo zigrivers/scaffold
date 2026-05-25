@@ -31,6 +31,7 @@ mmr reconcile <job-id> --channel superpowers --input findings.json
 |---------|---------|
 | `mmr review` | Dispatch review to configured channels |
 | `mmr review --sync` | Full pipeline: dispatch, parse, reconcile, output verdict |
+| `mmr review --dry-run` | Resolve diff, validate install/auth, and print prompts without dispatching |
 | `mmr status <job-id>` | Check job progress |
 | `mmr results <job-id>` | Collect and reconcile findings |
 | `mmr config init` | Auto-detect CLIs and generate `.mmr.yaml` |
@@ -69,6 +70,7 @@ channels:
 ## Features
 
 - **--sync mode** — single-command entry point for agents and CI
+- **--dry-run mode** — preview resolved channels and assembled prompts without spawning review subprocesses; install and auth checks still run so the preview shows which channels would dispatch
 - **Compensating passes** — Claude-based review for unavailable channels
 - **Consensus scoring** — multi-source findings get high confidence
 - **Atomic job store** — per-channel status files, no write races

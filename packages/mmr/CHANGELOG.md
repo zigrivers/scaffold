@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+- **`mmr review --dry-run` preview mode.** Resolves the target diff,
+  validates channel install/auth status, and prints the assembled prompt
+  each valid channel would receive without spawning review subprocesses.
+
 ## [1.3.0] — 2026-04-28
 
 ### Added
