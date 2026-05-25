@@ -2,6 +2,14 @@
 name: operations-runbook
 description: Deployment pipeline, deployment strategies, monitoring, alerting, and incident response
 topics: [operations, ci-cd, deployment, monitoring, incident-response, alerting, rollback]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://sre.google/sre-book/table-of-contents/
+    anchor: '#part-iii-practices'
+  - url: https://sre.google/workbook/table-of-contents/
+    anchor: '#incident-response'
 ---
 
 ## Summary
