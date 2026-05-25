@@ -175,6 +175,10 @@ function configChannels(opts: { name?: string, target?: string, noRedact?: boole
   return true
 }
 
+function isNoRedact(args: Pick<ConfigArgs, 'redact' | 'no-redact'>): boolean {
+  return args['no-redact'] === true
+}
+
 function showChannel(name: string, opts: { noRedact: boolean }): boolean {
   const { config, provenance } = loadConfigWithProvenance({ projectRoot: process.cwd() })
   const ch = config.channels[name]
@@ -342,6 +346,9 @@ export const configCommand: CommandModule<object, ConfigArgs> = {
         type: 'boolean',
         default: true,
         describe: 'Redact secrets for config channels show',
+      })
+      .middleware((args) => {
+        if (args.redact === false) args['no-redact'] = true
       }),
   handler: async (args: ArgumentsCamelCase<ConfigArgs>) => {
     if (args.action !== 'channels' && (args.name || args.target)) {
@@ -360,7 +367,7 @@ export const configCommand: CommandModule<object, ConfigArgs> = {
       const ok = configChannels({
         name: args.name,
         target: args.target,
-        noRedact: args.redact === false || args['no-redact'] === true,
+        noRedact: isNoRedact(args),
       })
       if (!ok) process.exit(1)
       break
