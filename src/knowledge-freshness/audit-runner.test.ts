@@ -52,7 +52,7 @@ describe('runEntryAudit', () => {
     // The first {...} block in this output is not JSON; the extractor must
     // skip it and try the next balanced block.
     const dispatcher: Dispatcher = vi.fn().mockResolvedValue(
-      `Notes: I considered {alpha, beta} options but went with the second one.\n` +
+      'Notes: I considered {alpha, beta} options but went with the second one.\n' +
       `Result:\n${JSON.stringify({
         entry_name: 'stub', audit_date: '2026-05-24', model: 'claude-opus-4-7',
         verdict: 'minor-drift', sources_checked: [], findings: [], proposed_changes: [], preserve_warnings: [],

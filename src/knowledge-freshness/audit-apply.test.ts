@@ -100,7 +100,7 @@ keep me
     expect(() => applyVerdictToEntry(baseEntry, verdict)).toThrow(/Deep Guidance/)
   })
 
-  it('throws when a proposed_change.location does not match any heading (does not silently advance last-reviewed)', () => {
+  it('throws when a proposed_change.location does not match a heading (no silent last-reviewed advance)', () => {
     const verdict = {
       entry_name: 'x', audit_date: '2026-05-24', model: 'claude-opus-4-7',
       verdict: 'major-drift' as const, sources_checked: [], findings: [],

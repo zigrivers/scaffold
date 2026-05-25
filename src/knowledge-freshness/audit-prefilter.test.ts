@@ -31,7 +31,10 @@ describe('selectAuditCandidates', () => {
   it('selects fast-moving entries last reviewed >14d ago', async () => {
     const fetch = vi.fn().mockResolvedValue({ hash: 'h1' }) as unknown as FetchSourceFn
     const out = await selectAuditCandidates(
-      [entry({ name: 'a', volatility: 'fast-moving', lastReviewed: '2026-05-01', sources: [{ url: 'https://x', hash: 'h1' }] })],
+      [entry({
+        name: 'a', volatility: 'fast-moving', lastReviewed: '2026-05-01',
+        sources: [{ url: 'https://x', hash: 'h1' }],
+      })],
       { now: today, max: 10, fetch },
     )
     expect(out.map(c => c.name)).toEqual(['a'])
@@ -49,7 +52,10 @@ describe('selectAuditCandidates', () => {
   it('skips stable entries within their 180d window with matching hashes', async () => {
     const fetch = vi.fn().mockResolvedValue({ hash: 'h1' }) as unknown as FetchSourceFn
     const out = await selectAuditCandidates(
-      [entry({ name: 'a', volatility: 'stable', lastReviewed: '2026-04-01', sources: [{ url: 'https://x', hash: 'h1' }] })],
+      [entry({
+        name: 'a', volatility: 'stable', lastReviewed: '2026-04-01',
+        sources: [{ url: 'https://x', hash: 'h1' }],
+      })],
       { now: today, max: 10, fetch },
     )
     expect(out).toEqual([])

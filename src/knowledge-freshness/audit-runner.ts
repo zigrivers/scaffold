@@ -111,7 +111,9 @@ export async function runEntryAudit(
  * the protection. If/when the dispatcher's helper gains a schema predicate,
  * collapse this into a shared utility.
  */
-function findFirstMatchingJson<T>(s: string, schema: { safeParse: (v: unknown) => { success: boolean; data?: T } }): T | undefined {
+type SafeParser<T> = { safeParse: (v: unknown) => { success: boolean; data?: T } }
+
+function findFirstMatchingJson<T>(s: string, schema: SafeParser<T>): T | undefined {
   const tryCandidate = (candidate: string): T | undefined => {
     let parsed: unknown
     try { parsed = JSON.parse(candidate) } catch { return undefined }

@@ -54,7 +54,7 @@ export function applyVerdictToEntry(
   if ((verdict.verdict === 'current' || verdict.verdict === 'minor-drift') && verdict.proposed_changes.length > 0) {
     throw new Error(
       `verdict "${verdict.verdict}" must have no proposed_changes — got ${verdict.proposed_changes.length}. ` +
-      `Use "major-drift" or "superseded" if changes are needed (also gates MMR corroboration per spec §A.4).`,
+      'Use "major-drift" or "superseded" if changes are needed (also gates MMR corroboration per spec §A.4).',
     )
   }
 
@@ -85,7 +85,7 @@ export function applyVerdictToEntry(
           if (fresh === undefined) {
             throw new Error(
               `trustedHashes was supplied but did not include "${matchNormalized}" — ` +
-              `the CLI should compute hashes for every verdict.sources_checked URL before calling apply.`,
+              'the CLI should compute hashes for every verdict.sources_checked URL before calling apply.',
             )
           }
           s.hash = fresh

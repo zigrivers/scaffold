@@ -62,7 +62,10 @@ export function validateKnowledgeFile(filePath: string): KBValidationResult {
   }
   const fm = result.data
   if (fm.description.length > DESCRIPTION_SOFT_MAX) {
-    warnings.push({ message: `description is ${fm.description.length} chars (>${DESCRIPTION_SOFT_MAX}); consider trimming for downstream prompt token budgets` })
+    warnings.push({
+      message: `description is ${fm.description.length} chars (>${DESCRIPTION_SOFT_MAX}); ` +
+        'consider trimming for downstream prompt token budgets',
+    })
   }
   if (fm.volatility === 'fast-moving' && fm.sources.length === 0) {
     warnings.push({ message: 'fast-moving entry has empty sources — audit cannot run' })

@@ -22,25 +22,25 @@ afterEach(() => {
 
 describe('validateKnowledgeFile', () => {
   it('passes a minimal valid entry', () => {
-    const file = tmpFile(`---\nname: x\ndescription: y\n---\nbody`)
+    const file = tmpFile('---\nname: x\ndescription: y\n---\nbody')
     const result = validateKnowledgeFile(file)
     expect(result.errors).toEqual([])
   })
 
   it('errors when last-reviewed is not an ISO date', () => {
-    const file = tmpFile(`---\nname: x\ndescription: y\nlast-reviewed: 'last tuesday'\n---\nbody`)
+    const file = tmpFile('---\nname: x\ndescription: y\nlast-reviewed: \'last tuesday\'\n---\nbody')
     const result = validateKnowledgeFile(file)
     expect(result.errors[0].message).toMatch(/last-reviewed/)
   })
 
   it('errors when a source entry is missing url', () => {
-    const file = tmpFile(`---\nname: x\ndescription: y\nsources:\n  - anchor: '#a'\n---\nbody`)
+    const file = tmpFile('---\nname: x\ndescription: y\nsources:\n  - anchor: \'#a\'\n---\nbody')
     const result = validateKnowledgeFile(file)
     expect(result.errors[0].message).toMatch(/url/)
   })
 
   it('warns when sources is empty and volatility is fast-moving', () => {
-    const file = tmpFile(`---\nname: x\ndescription: y\nvolatility: fast-moving\nsources: []\n---\nbody`)
+    const file = tmpFile('---\nname: x\ndescription: y\nvolatility: fast-moving\nsources: []\n---\nbody')
     const result = validateKnowledgeFile(file)
     expect(result.warnings.some(w => /sources/.test(w.message))).toBe(true)
   })
