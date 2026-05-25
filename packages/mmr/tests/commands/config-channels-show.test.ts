@@ -75,6 +75,66 @@ describe('mmr config channels show <name> (T1-E)', () => {
     expect(output).not.toMatch(/sk-real-secret/)
   })
 
+  it('redacts inline command secrets by default', async () => {
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), [
+      'version: 1',
+      'channels:',
+      '  local:',
+      '    command: "review --api-key sk-live --model qwen"',
+    ].join('\n'))
+    const { configCommand } = await import('../../src/commands/config.js')
+    const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(tmpDir)
+    const homeSpy = vi.spyOn(os, 'homedir').mockReturnValue(tmpDir)
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never)
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await configCommand.handler({
+      action: 'channels',
+      name: 'show:local',
+      _: ['config'],
+      $0: 'mmr',
+    } as never)
+
+    const output = logSpy.mock.calls.map((c) => c.join(' ')).join('\n')
+    cwdSpy.mockRestore()
+    homeSpy.mockRestore()
+    exitSpy.mockRestore()
+    logSpy.mockRestore()
+
+    expect(output).toMatch(/^command: <redacted>\s+# from project$/m)
+    expect(output).not.toMatch(/sk-live/)
+  })
+
+  it('escapes quoted string values in channel output', async () => {
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), [
+      'version: 1',
+      'channels:',
+      '  local:',
+      '    command: local-review',
+      '    prompt_wrapper: "Say \\"{{prompt}}\\""',
+    ].join('\n'))
+    const { configCommand } = await import('../../src/commands/config.js')
+    const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(tmpDir)
+    const homeSpy = vi.spyOn(os, 'homedir').mockReturnValue(tmpDir)
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never)
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await configCommand.handler({
+      action: 'channels',
+      name: 'show:local',
+      _: ['config'],
+      $0: 'mmr',
+    } as never)
+
+    const output = logSpy.mock.calls.map((c) => c.join(' ')).join('\n')
+    cwdSpy.mockRestore()
+    homeSpy.mockRestore()
+    exitSpy.mockRestore()
+    logSpy.mockRestore()
+
+    expect(output).toMatch(/^prompt_wrapper: "Say \\"{{prompt}}\\""  # from project$/m)
+  })
+
   it('--no-redact disables redaction but emits a warning banner', async () => {
     fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), [
       'version: 1',

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import yargs, { type CommandModule } from 'yargs'
 import { reviewCommand } from '../../src/commands/review.js'
 import { reconcileCommand } from '../../src/commands/reconcile.js'
+import { configCommand } from '../../src/commands/config.js'
 
 /**
  * Argv-parsing tests: build a yargs parser using each command's builder,
@@ -81,5 +82,13 @@ describe('reconcile command argv parsing', () => {
     expect(() => parse(reconcileCommand, [
       'reconcile', 'mmr-abc', '--input', '--channel', 'superpowers',
     ])).toThrow()
+  })
+})
+
+describe('config command argv parsing', () => {
+  it('accepts config channels show:<name> as the optional name positional', () => {
+    const args = parse(configCommand, ['config', 'channels', 'show:claude'])
+    expect(args.action).toBe('channels')
+    expect(args.name).toBe('show:claude')
   })
 })

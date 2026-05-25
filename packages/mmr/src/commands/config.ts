@@ -174,7 +174,12 @@ function showChannel(name: string, opts: { noRedact: boolean }): void {
     return
   }
 
-  const display = opts.noRedact ? ch : redactChannel(ch as unknown as Record<string, unknown>)
+  const display = opts.noRedact
+    ? { ...ch } as Record<string, unknown>
+    : redactChannel(ch as unknown as Record<string, unknown>)
+  if (!opts.noRedact && typeof display.command === 'string' && commandContainsInlineSecret(display.command)) {
+    display.command = '<redacted>'
+  }
   if (opts.noRedact) {
     console.error('WARNING: --no-redact is enabled; secrets in env/headers are printed verbatim.')
   }
@@ -204,9 +209,9 @@ function printWithProvenance(
 }
 
 function renderScalar(key: string, value: unknown): string {
-  if (key === 'command' && typeof value === 'string') return value
   if (value === '<redacted>') return '<redacted>'
-  return typeof value === 'string' ? `"${value}"` : JSON.stringify(value)
+  if (key === 'command' && typeof value === 'string') return value
+  return JSON.stringify(value)
 }
 
 function commandContainsInlineSecret(command: string): boolean {
@@ -243,7 +248,7 @@ function isCommandSecretKey(name: string): boolean {
 }
 
 export const configCommand: CommandModule<object, ConfigArgs> = {
-  command: 'config <action>',
+  command: 'config <action> [name]',
   describe: 'Manage mmr configuration',
   builder: (yargs) =>
     yargs
