@@ -523,11 +523,11 @@ In `Makefile`, after the existing `validate:` target, add:
 ```makefile
 .PHONY: validate-knowledge
 validate-knowledge:
-	@if [ ! -f dist/index.js ]; then npm run build; fi
+	npm run build
 	node dist/index.js validate-knowledge
 ```
 
-The Makefile has no `build` target (build is `npm run build`, exposed via the `ts-check` target). The recipe above lazily runs `npm run build` when `dist/` is absent so a clean checkout doesn't fail with "command not found". Update the `check:` or `ts-check:` target to depend on `validate-knowledge`. Confirm the CLI binary path matches `package.json` `bin.scaffold` (currently `dist/index.js`).
+The Makefile has no `build` target (build is `npm run build`, exposed via the `ts-check` target). The recipe above always runs `npm run build` first — TypeScript's incremental compile is fast, and we cannot rely on `dist/index.js` existence alone because a stale `dist/` would silently miss the newly-added `validate-knowledge` subcommand. Update the `ts-check:` target to depend on `validate-knowledge`. Confirm the CLI binary path matches `package.json` `bin.scaffold` (currently `dist/index.js`).
 
 - [ ] **Step 6: Add CI step**
 
