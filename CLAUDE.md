@@ -115,7 +115,10 @@ Minimum checklist:
   symptoms each map to a specific token-setting mistake)
 - Verify npm publish and Homebrew update workflows succeeded
 - Verify users can update with `npm update -g @zigrivers/scaffold` and
-  `brew upgrade scaffold`
+  `brew update && brew upgrade scaffold` — the `brew update` prefix is REQUIRED:
+  without it, `brew outdated` and `brew upgrade` read from the local tap cache
+  and report "already installed" even when the tap on GitHub has a newer
+  formula. Confirmed during the v3.28.0 ship.
 
 ## Self-Improvement
 
