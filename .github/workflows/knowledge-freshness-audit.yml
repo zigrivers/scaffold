@@ -1,0 +1,102 @@
+name: Knowledge Freshness Audit
+
+# Daily grounded audit of the knowledge base.
+#
+# Each run:
+#   1. Pre-filters at most 10 entries that are due for a check (cadence + source hash).
+#   2. For each candidate, runs `audit-run-entry` to produce a verdict.
+#   3. If the verdict is `major-drift` or `superseded`, applies the verdict and
+#      opens a PR with the rendered findings table.
+#
+# MMR corroboration is intentionally NOT wired into this Phase 2 workflow. Task 11
+# will add it as a separate CI gate that fires on the freshness PR's pushed branch,
+# where the MMR CLI + channel auth context is straightforward.
+
+on:
+  schedule:
+    # 09:00 UTC daily. Choose UTC so the schedule is unaffected by DST.
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+
+# Prevent two scheduled runs from racing (e.g. a manual dispatch firing while
+# the cron is still working through candidates).
+concurrency: knowledge-freshness-audit
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          # full history needed so we can branch off origin/main without
+          # the shallow-clone fetch dance.
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.17'
+          cache: 'npm'
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build CLI
+        run: npm run build
+
+      - name: Configure git identity
+        # Required for `git commit` inside `audit-apply --open-pr`.
+        run: |
+          git config user.name "knowledge-freshness-bot"
+          git config user.email "knowledge-freshness@users.noreply.github.com"
+
+      - name: Pre-filter candidates
+        run: node dist/index.js knowledge-freshness audit-prefilter --max=10 > /tmp/candidates.json
+
+      - name: Run audits and open PRs
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # jq -c streams one candidate per line so the bash loop is simple.
+          # Empty array case: the loop body just never runs.
+          jq -c '.[]' /tmp/candidates.json | while read -r candidate; do
+            name=$(printf '%s' "$candidate" | jq -r '.name')
+            path=$(printf '%s' "$candidate" | jq -r '.path')
+            if [ "$path" = "null" ] || [ -z "$path" ]; then
+              echo "skip $name: no path resolved"
+              continue
+            fi
+            echo "::group::audit $name"
+            verdict_path="/tmp/verdict-${name}.json"
+            if ! node dist/index.js knowledge-freshness audit-run-entry "$path" > "$verdict_path"; then
+              echo "audit failed for $name — moving on"
+              echo "::endgroup::"
+              continue
+            fi
+            verdict=$(jq -r '.verdict' "$verdict_path")
+            echo "verdict: $verdict"
+            case "$verdict" in
+              current|minor-drift)
+                echo "no PR needed for $name (verdict=$verdict)"
+                ;;
+              major-drift|superseded)
+                # Each PR runs in its own subshell so a failure on one entry
+                # doesn't abort the loop. The workflow's overall PR ceiling
+                # is already enforced by the pre-filter's --max=10.
+                if ! node dist/index.js knowledge-freshness audit-apply "$path" "$verdict_path" --open-pr; then
+                  echo "audit-apply --open-pr failed for $name"
+                fi
+                ;;
+              *)
+                echo "unknown verdict for $name: $verdict"
+                ;;
+            esac
+            echo "::endgroup::"
+          done
