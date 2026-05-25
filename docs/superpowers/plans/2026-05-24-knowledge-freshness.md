@@ -522,11 +522,12 @@ In `Makefile`, after the existing `validate:` target, add:
 
 ```makefile
 .PHONY: validate-knowledge
-validate-knowledge: build
+validate-knowledge:
+	@if [ ! -f dist/index.js ]; then npm run build; fi
 	node dist/index.js validate-knowledge
 ```
 
-The `build` dependency ensures `dist/` exists on clean checkouts. Update the `check:` target to depend on `validate-knowledge`. Confirm the CLI binary path (`dist/index.js`) matches what `package.json` and the existing CLI tests use; adjust if the actual entry point differs.
+The Makefile has no `build` target (build is `npm run build`, exposed via the `ts-check` target). The recipe above lazily runs `npm run build` when `dist/` is absent so a clean checkout doesn't fail with "command not found". Update the `check:` or `ts-check:` target to depend on `validate-knowledge`. Confirm the CLI binary path matches `package.json` `bin.scaffold` (currently `dist/index.js`).
 
 - [ ] **Step 6: Add CI step**
 
