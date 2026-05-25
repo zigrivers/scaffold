@@ -70,6 +70,39 @@ describe('parseUnifiedDiffForChurn', () => {
       '+came',
     ].join('\n')
     const out = parseUnifiedDiffForChurn(diff)
-    expect(out).toEqual([{ file: 'content/knowledge/x/y.md', addedCount: 2, removedCount: 2 }])
+    // Hunk starts at line 1 → state begins 'inside' frontmatter; none of the
+    // diff content contains `---` boundaries to flip to 'after', so body
+    // counts stay zero. The total counts reflect the raw diff.
+    expect(out).toEqual([{
+      file: 'content/knowledge/x/y.md',
+      addedCount: 2, removedCount: 2,
+      bodyAddedCount: 0, bodyRemovedCount: 0,
+    }])
+  })
+
+  it('counts body adds/removes separately from frontmatter ones (round-6 F-002)', () => {
+    // A diff where the closing --- appears, transitioning frontmatter→body.
+    // Frontmatter changes (last-reviewed) should NOT count toward body churn.
+    const diff = [
+      'diff --git a/content/knowledge/core/x.md b/content/knowledge/core/x.md',
+      '--- a/content/knowledge/core/x.md',
+      '+++ b/content/knowledge/core/x.md',
+      '@@ -1,8 +1,8 @@',
+      ' ---',
+      ' name: x',
+      ' description: y',
+      '-last-reviewed: null',
+      '+last-reviewed: 2026-05-25',
+      ' ---',
+      '',
+      '-old body line',
+      '+new body line',
+    ].join('\n')
+    const out = parseUnifiedDiffForChurn(diff)
+    expect(out).toEqual([{
+      file: 'content/knowledge/core/x.md',
+      addedCount: 2, removedCount: 2,         // raw diff: 2 +, 2 -
+      bodyAddedCount: 1, bodyRemovedCount: 1, // only the body line pair
+    }])
   })
 })

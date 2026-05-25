@@ -86,12 +86,17 @@ function sanitizeLlmField(s: string): string {
 export function renderPrBody(verdict: AuditVerdict, opts: RenderPrOptions = {}): string {
   const sourceList = verdict.sources_checked.length === 0
     ? '_No sources._'
-    : verdict.sources_checked.map((s) => `- ${s.url}`).join('\n')
+    : verdict.sources_checked.map((s) => `- ${sanitizeLlmField(s.url)}`).join('\n')
 
   const provenance = verdict.sources_checked.length === 0
     ? '_No sources._'
     : verdict.sources_checked
-      .map((s) => `- ${s.url} (${s.content_hash}, retrieved ${s.retrieved_at})`)
+      .map((s) => {
+        const u = sanitizeLlmField(s.url)
+        const h = sanitizeLlmField(s.content_hash)
+        const r = sanitizeLlmField(s.retrieved_at)
+        return `- ${u} (${h}, retrieved ${r})`
+      })
       .join('\n')
 
   const preserveSection = verdict.preserve_warnings.length === 0
@@ -102,15 +107,22 @@ export function renderPrBody(verdict: AuditVerdict, opts: RenderPrOptions = {}):
     ? `job_id: ${opts.mmrJobId}`
     : '_Not run inline — see knowledge-freshness CI gates._'
 
+  // F-003 round-6: every LLM-controlled scalar that's spliced into the PR
+  // body gets `sanitizeLlmField` applied. The Zod schema permits arbitrary
+  // strings for `entry_name`/`audit_date`/`model`/`content_hash`/`retrieved_at`,
+  // so a verdict containing "\nBREAKING CHANGE:" in any of those would
+  // otherwise create a start-of-line footer that deriveBumpKind treats as a
+  // real major bump signal. Sanitizing collapses newlines so the rendered
+  // body cannot inject a footer regardless of model output.
   return [
     '## Summary',
-    `Grounded audit of ${verdict.entry_name}.md against:`,
+    `Grounded audit of ${sanitizeLlmField(verdict.entry_name)}.md against:`,
     sourceList,
     '',
     '## Verdict',
-    `- verdict: ${verdict.verdict}`,
-    `- audit_date: ${verdict.audit_date}`,
-    `- model: ${verdict.model}`,
+    `- verdict: ${sanitizeLlmField(verdict.verdict)}`,
+    `- audit_date: ${sanitizeLlmField(verdict.audit_date)}`,
+    `- model: ${sanitizeLlmField(verdict.model)}`,
     '',
     '## Findings',
     renderFindingsTable(verdict),

@@ -69,6 +69,8 @@ const antiOverRewriteCommand: CommandModule<Record<string, unknown>, AntiOverRew
         content: fs.readFileSync(abs, 'utf8'),
         addedCount: c?.addedCount ?? 0,
         removedCount: c?.removedCount ?? 0,
+        bodyAddedCount: c?.bodyAddedCount ?? 0,
+        bodyRemovedCount: c?.bodyRemovedCount ?? 0,
       }
     })
     const results = evaluateChurn(inputs, { prLabels })

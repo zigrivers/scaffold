@@ -27,7 +27,12 @@ const VOLATILITIES = new Set(['stable', 'evolving', 'fast-moving'])
  * treat that as a hard fail (link-check) or a noop (over-rewrite).
  */
 export function parseEntry(raw: string): ParsedFreshnessEntry {
-  const lines = raw.split('\n')
+  // Round-6 F-001: strip optional UTF-8 BOM (U+FEFF) so files authored on
+  // Windows or with a BOM don't crash gate processing. lines[0].trim() would
+  // see the BOM glyph in front of `---` and fail the equality check.
+  const BOM = '﻿'
+  const normalized = raw.startsWith(BOM) ? raw.slice(BOM.length) : raw
+  const lines = normalized.split(/\r?\n/)
   if (lines[0]?.trim() !== '---') {
     throw new Error('entry has no frontmatter')
   }
