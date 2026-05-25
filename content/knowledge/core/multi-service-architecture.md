@@ -2,6 +2,11 @@
 name: multi-service-architecture
 description: Service boundary design, communication patterns, service discovery, and networking topology
 topics: [service-boundaries, communication-patterns, service-discovery, networking-topology, data-ownership, sync-vs-async]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://docs.aws.amazon.com/wellarchitected/latest/microservices-lens/microservices-lens.html
 ---
 
 ## Summary
