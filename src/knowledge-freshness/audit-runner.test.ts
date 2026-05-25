@@ -86,4 +86,69 @@ describe('runEntryAudit', () => {
     const dispatcher: Dispatcher = vi.fn().mockResolvedValue(JSON.stringify({ entry_name: 'x' }))
     await expect(run(dispatcher)).rejects.toThrow()
   })
+
+  it('pre-fetches declared sources and embeds bodies via {{prefetched_sources}} (round-6 F-001)', async () => {
+    // Use a fresh tmp setup with sources declared in the entry.
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'runner-prefetch-'))
+    try {
+      const prompt = path.join(tmp, 'audit.md')
+      fs.writeFileSync(prompt, '{{prefetched_sources}}')
+      const entry = path.join(tmp, 'entry.md')
+      fs.writeFileSync(
+        entry,
+        '---\nname: stub\ndescription: y\nsources:\n  - url: https://example.org/spec\n---\nbody\n',
+      )
+
+      vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+        new Response('upstream content here', { status: 200 }) as Response,
+      )
+      const publicResolver = async () => ['93.184.216.34']
+
+      let promptSeen = ''
+      const dispatcher: Dispatcher = async (p) => {
+        promptSeen = p
+        return JSON.stringify({
+          entry_name: 'stub', audit_date: '2026-05-24', model: 'claude-opus-4-7',
+          verdict: 'current', sources_checked: [], findings: [],
+          proposed_changes: [], preserve_warnings: [],
+        })
+      }
+
+      await runEntryAudit(entry, dispatcher, { promptPath: prompt, resolver: publicResolver })
+      // The prompt should now contain the pre-fetched source body verbatim.
+      expect(promptSeen).toContain('upstream content here')
+      expect(promptSeen).toContain('https://example.org/spec')
+      // And a hash that's deterministically computed in Node, not invented by
+      // the model. We don't assert the exact value to keep the test resilient,
+      // but it must look like a sha256 hex digest.
+      expect(promptSeen).toMatch(/sha256:[0-9a-f]{64}/)
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true })
+    }
+  })
+
+  it('skipPrefetch=true bypasses source fetching (test fixtures with unresolvable URLs)', async () => {
+    // With prefetch on, fixture URLs that don't resolve would throw. The opt
+    // exists so unit tests of the JSON-extraction path can supply stub
+    // entries with placeholder URLs without needing to mock fetch + DNS.
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'runner-skip-'))
+    try {
+      const prompt = path.join(tmp, 'audit.md')
+      fs.writeFileSync(prompt, '{{prefetched_sources}}')
+      const entry = path.join(tmp, 'entry.md')
+      fs.writeFileSync(entry, '---\nname: stub\ndescription: y\nsources:\n  - url: https://x\n---\nbody\n')
+
+      const dispatcher: Dispatcher = async () =>
+        JSON.stringify({
+          entry_name: 'stub', audit_date: '2026-05-24', model: 'claude-opus-4-7',
+          verdict: 'current', sources_checked: [], findings: [],
+          proposed_changes: [], preserve_warnings: [],
+        })
+
+      const out = await runEntryAudit(entry, dispatcher, { promptPath: prompt, skipPrefetch: true })
+      expect(out.verdict).toBe('current')
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true })
+    }
+  })
 })

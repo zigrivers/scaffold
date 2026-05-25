@@ -14,10 +14,11 @@ You are auditing a single Scaffold knowledge entry against its declared authorit
 - `{{entry_path}}` — absolute path to the knowledge entry being audited.
 - `{{entry_frontmatter}}` — parsed frontmatter object including `name`, `volatility`, `last-reviewed`, `version-pin`, `sources`.
 - `{{entry_body}}` — full body of the entry.
+- `{{prefetched_sources}}` — JSON array of `{url, body, hash, truncated}` objects. The Node-side audit runner has already fetched each declared source through an SSRF / DNS / redirect / timeout guard and embedded the response bodies here. **You have no web-fetch tool available — read these bodies instead.** A `truncated: true` flag means the body was capped at 96 KiB; do not infer anything is missing solely from that flag, but mention it in `preserve_warnings` if it materially limits your audit.
 
 ## Procedure
 
-1. For each source in `{{entry_frontmatter}}.sources`, call `WebFetch` on `source.url` (with `source.anchor` appended if present).
+1. Read each entry in `{{prefetched_sources}}`. Each `body` is the current content of the corresponding source URL as of dispatch time. Treat these bodies as authoritative — they are what's live, regardless of what your training data says.
 2. Read the retrieved content carefully. Pay particular attention to:
    - The current edition / version of any taxonomy or standard (compare against `version-pin`).
    - Any normative statements in the entry body ("must", "should", "never") that the retrieved source contradicts or supersedes.
@@ -30,11 +31,12 @@ You are auditing a single Scaffold knowledge entry against its declared authorit
 
 ## CRITICAL: Grounding Rules
 
-- Where retrieved content contradicts the entry, **trust the retrieved content**.
-- Where retrieved content contradicts your own prior knowledge, **trust the retrieved content**.
-- When you cannot verify a claim against any retrieved source, mark it `preserve_warnings` — do NOT mark it as drift, and do NOT invent corroboration.
-- Do not propose changes that introduce new normative claims unless those claims are verbatim or near-verbatim derivable from a retrieved source. Cite the source for every new normative claim.
+- Where the prefetched source body contradicts the entry, **trust the prefetched body**.
+- Where the prefetched body contradicts your own prior knowledge, **trust the prefetched body**.
+- When you cannot verify a claim against any prefetched body, mark it `preserve_warnings` — do NOT mark it as drift, and do NOT invent corroboration.
+- Do not propose changes that introduce new normative claims unless those claims are verbatim or near-verbatim derivable from a prefetched body. Cite the source URL (from `{{prefetched_sources}}`) for every new normative claim.
 - Preserve the `## Summary` and `## Deep Guidance` headings exactly — the assembly engine depends on them.
+- You have NO tools available. Do not attempt to call WebFetch, Bash, Read, or any other tool. All evidence must come from `{{prefetched_sources}}` and the entry body.
 
 ## Output (JSON only — no prose)
 
@@ -46,9 +48,9 @@ You are auditing a single Scaffold knowledge entry against its declared authorit
   "verdict": "current | minor-drift | major-drift | superseded",
   "sources_checked": [
     {
-      "url": "<source url>",
-      "retrieved_at": "<ISO date>",
-      "content_hash": "<sha256:... of retrieved body>",
+      "url": "<exact url from {{prefetched_sources}}>",
+      "retrieved_at": "<today's ISO date>",
+      "content_hash": "<exact hash from the matching {{prefetched_sources}} entry — do not recompute or invent>",
       "summary": "<one sentence summary of what the source currently says>"
     }
   ],

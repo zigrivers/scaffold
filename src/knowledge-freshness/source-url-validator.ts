@@ -117,13 +117,17 @@ export function validateSourceUrl(raw: string): ValidationResult {
 export type Resolver = (host: string) => Promise<string[]>
 
 export const defaultResolver: Resolver = async (host) => {
+  // Use `dns.lookup(..., { all: true })` rather than `resolve4`/`resolve6`
+  // (round-6 F-002). `lookup()` consults the SAME path that `fetch()` will
+  // use — system resolver, /etc/hosts, NSS — so a hostname that routes via
+  // /etc/hosts to 127.0.0.1 surfaces here, not just in true DNS.
   const dns = await import('node:dns')
-  const addrs: string[] = []
-  // resolve4 / resolve6 throw on NXDOMAIN. We try both and pool the answers;
-  // a missing record family is normal (no AAAA on an IPv4-only host).
-  try { addrs.push(...await dns.promises.resolve4(host)) } catch { /* no A records */ }
-  try { addrs.push(...await dns.promises.resolve6(host)) } catch { /* no AAAA records */ }
-  return addrs
+  try {
+    const results = await dns.promises.lookup(host, { all: true })
+    return results.map((r) => r.address)
+  } catch {
+    return []
+  }
 }
 
 /**
@@ -142,6 +146,13 @@ export async function assertSafeSourceUrlWithDns(raw: string, resolver: Resolver
   // Skip DNS for raw IP literals — already validated by the sync guard.
   if (net.isIP(host) !== 0) return url
   const ips = await resolver(host)
+  if (ips.length === 0) {
+    throw new Error(
+      `[knowledge-freshness] DNS-rebinding guard: "${host}" has no resolvable address. ` +
+      'Refusing to fetch hosts with no A/AAAA records — silent passes would let typos or ' +
+      'placeholder URLs through CI gates.',
+    )
+  }
   for (const ip of ips) {
     const kind = net.isIP(ip)
     if (kind === 4 && isBlockedIPv4(ip)) {

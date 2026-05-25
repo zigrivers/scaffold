@@ -3,12 +3,15 @@ import path from 'node:path'
 import { z } from 'zod'
 import { extractKBFrontmatter } from '../core/assembly/knowledge-loader.js'
 import { getPackageRoot } from '../utils/fs.js'
-import {
-  assertSafeSourceUrl,
-  assertSafeSourceUrlWithDns,
-  defaultResolver,
-  type Resolver,
-} from './source-url-validator.js'
+import { defaultResolver, type Resolver } from './source-url-validator.js'
+import { fetchAndHash } from './source-hash.js'
+
+/**
+ * Max body bytes injected per source. Caps prompt size and keeps a malicious
+ * giant response from blowing the context window. 96 KiB is comfortably
+ * larger than current targets (OWASP Top 10 page ≈ 50 KiB).
+ */
+const MAX_SOURCE_BODY_BYTES = 96 * 1024
 
 export type Dispatcher = (prompt: string) => Promise<string>
 
@@ -42,11 +45,11 @@ export interface RunEntryAuditOptions {
   /** Override the DNS resolver used for the rebinding guard (round-5 F-001). Default: Node `dns.promises`. */
   resolver?: Resolver
   /**
-   * Skip the DNS-rebinding check. Used only by tests that supply fixture
-   * URLs which aren't expected to resolve (e.g. `https://x`). Defaults to
-   * running the check.
+   * Skip prefetching source bodies. Used only by tests that supply fixture
+   * URLs which aren't expected to resolve (e.g. `https://x`) and don't care
+   * about the prefetched-sources payload. Defaults to running the prefetch.
    */
-  skipDnsCheck?: boolean
+  skipPrefetch?: boolean
 }
 
 export async function runEntryAudit(
@@ -58,20 +61,35 @@ export async function runEntryAudit(
   const fm = extractKBFrontmatter(content)
   if (!fm) throw new Error(`could not parse frontmatter at ${entryPath}`)
 
-  // Validate each source URL against the SSRF guard BEFORE we hand them to the
-  // `claude -p` subprocess via the prompt body — the meta-prompt will WebFetch
-  // each one, and the subprocess is harder to constrain than this Node side.
-  // Round-3 F-001 added the sync check; round-5 F-001 additionally resolves
-  // hostnames and checks A/AAAA records against the IP blocklists (DNS-
-  // rebinding guard). TOCTOU residual: the subprocess re-resolves at fetch
-  // time; full pinning is Phase 2 roadmap.
+  // SECURITY (round-6 F-001): the entry body is author-controlled. If the
+  // subprocess had WebFetch enabled, a prompt-injected body could direct it
+  // at arbitrary URLs — bypassing every Node-side URL guard, because the
+  // attacker URL never came through the declared sources array.
+  //
+  // Mitigation: pre-fetch source bodies in Node, where the SSRF / DNS /
+  // redirect-hop / timeout guards apply, and embed the bodies into the
+  // prompt. The model runs with NO tools (`--tools ""` set by the CLI
+  // wrapper). The only way to "fetch a URL" is to declare it in the entry's
+  // frontmatter sources — and those go through the guards.
+  //
+  // TOCTOU still possible between Node fetch and any future subprocess fetch,
+  // but a no-tools model can't re-fetch at all, so the window collapses to
+  // zero. The Phase 2 "constrained fetch tool with pre-validated IDs" idea
+  // can re-introduce WebFetch later if needed.
   const resolver = opts.resolver ?? defaultResolver
-  for (const s of fm.sources) {
-    const targetUrl = s.url + (s.anchor ?? '')
-    if (opts.skipDnsCheck) {
-      assertSafeSourceUrl(targetUrl)
-    } else {
-      await assertSafeSourceUrlWithDns(targetUrl, resolver)
+  interface PrefetchedSource { url: string; body: string; hash: string; truncated: boolean }
+  const prefetched: PrefetchedSource[] = []
+  if (!opts.skipPrefetch) {
+    for (const s of fm.sources) {
+      const targetUrl = s.url + (s.anchor ?? '')
+      const { body, hash } = await fetchAndHash(targetUrl, { resolver })
+      const truncated = body.length > MAX_SOURCE_BODY_BYTES
+      prefetched.push({
+        url: targetUrl,
+        body: truncated ? body.slice(0, MAX_SOURCE_BODY_BYTES) : body,
+        hash,
+        truncated,
+      })
     }
   }
 
@@ -109,9 +127,10 @@ export async function runEntryAudit(
     '{{entry_path}}': entryPath,
     '{{entry_frontmatter}}': JSON.stringify(fmForPrompt, null, 2),
     '{{entry_body}}': content,
+    '{{prefetched_sources}}': JSON.stringify(prefetched, null, 2),
   }
   const filled = promptTemplate.replace(
-    /\{\{(entry_path|entry_frontmatter|entry_body)\}\}/g,
+    /\{\{(entry_path|entry_frontmatter|entry_body|prefetched_sources)\}\}/g,
     (match) => substitutions[match] ?? match,
   )
 

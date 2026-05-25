@@ -28,12 +28,15 @@ const auditRunEntryCommand: CommandModule<Record<string, unknown>, AuditRunEntry
     // Only the timeout is exposed as a flag (performance only, not code execution).
     // Matches the security stance of src/observability/checks/lens-h-cross-doc.ts.
     //
-    // `--allowedTools WebFetch` is REQUIRED for headless / cron audits:
-    // without it, the meta-prompt's WebFetch calls block on a permission
-    // prompt that never arrives in `-p` (non-interactive) mode. The allowlist
-    // is intentionally narrow — only WebFetch is needed by the audit prompt,
-    // so we don't grant anything broader (no Bash, no Write, no Edit).
-    const command = 'claude -p --allowedTools WebFetch'
+    // SECURITY (round-6 F-001): the model runs with NO tools. The audit
+    // runner pre-fetches source bodies in Node (where the SSRF / DNS /
+    // redirect / timeout guards apply) and embeds them in the prompt as
+    // `{{prefetched_sources}}`. If we instead granted WebFetch here, a
+    // prompt-injection attack from the author-controlled entry body could
+    // direct WebFetch at arbitrary URLs — bypassing every Node-side URL
+    // guard. Disabling tools eliminates that class of attack at the cost
+    // of larger prompts.
+    const command = 'claude -p --tools ""'
     const timeoutMs = argv.timeout * 1000
 
     const dispatcher: Dispatcher = async (prompt) => {
