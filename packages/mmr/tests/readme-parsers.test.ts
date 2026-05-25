@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 describe('README documents declarative parsers (T1-B)', () => {
+  const __dirname = path.dirname(fileURLToPath(import.meta.url))
   const readme = fs.readFileSync(path.resolve(__dirname, '../README.md'), 'utf-8')
 
   it('documents the object form of output_parser', () => {

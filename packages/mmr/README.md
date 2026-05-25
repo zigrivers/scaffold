@@ -78,8 +78,8 @@ For OSS endpoints that wrap content in OpenAI-chat shape (`{choices: [{message: 
 ```yaml
 channels:
   qwen-local:
-    extends: ollama-base
-    flags: ["run", "qwen2.5-coder:32b"]
+    command: scripts/ollama-openai-chat.sh  # posts stdin to Ollama's /v1/chat/completions endpoint
+    flags: ["qwen2.5-coder:32b"]
     output_parser:
       kind: unwrap-jsonpath
       wrap: $.choices[0].message.content
@@ -99,7 +99,7 @@ channels:
     flags: ["--format", "pipe"]
     output_parser:
       kind: regex-findings
-      pattern: "^(P[0-3])\\|([^|]+)\\|(.+)$"
+      pattern: "^(P[0-3])\\|([^|]+)\\|([^|]+)(?:\\|(.+))?$"
       fields:
         severity: 1
         location: 2
@@ -120,10 +120,7 @@ channels:
       check: ollama list >/dev/null 2>&1
       failure_exit_codes: [1]
       recovery: Install Ollama and run `ollama pull qwen2.5-coder:32b`
-    output_parser:
-      kind: unwrap-jsonpath
-      wrap: $.response          # ollama's native /api/generate envelope
-      then: default
+    output_parser: default     # `ollama run` writes the model response directly
 
   qwen-coder:
     extends: ollama-base
