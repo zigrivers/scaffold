@@ -71,4 +71,15 @@ describe('loadConfigWithProvenance (T1-E)', () => {
     expect(provenance.channels.local?.enabled).toBe('default')
     expect(provenance.channels.local?.flags).toBe('default')
   })
+
+  it('tracks top-level defaults provenance', () => {
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), [
+      'version: 1',
+      'defaults:',
+      '  timeout: 900',
+    ].join('\n'))
+    const { provenance } = loadConfigWithProvenance({ projectRoot: tmpDir, userHome: tmpDir })
+    expect(provenance.defaults.timeout).toBe('project')
+    expect(provenance.defaults.format).toBe('default')
+  })
 })

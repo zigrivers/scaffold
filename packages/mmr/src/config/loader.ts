@@ -15,6 +15,12 @@ export interface LoadConfigOptions {
   }
 }
 
+interface ConfigLayers {
+  merged: Record<string, unknown>
+  userConfig: Record<string, unknown>
+  projectConfig: Record<string, unknown>
+}
+
 /**
  * Deep-merge two plain objects. Arrays replace (not concat).
  * Primitives from `overlay` win over `base`.
@@ -53,6 +59,18 @@ function resetExtendingChannelBases(
   for (const [name, channel] of Object.entries(overlay.channels)) {
     if (isPlainRecord(channel) && typeof channel.extends === 'string') {
       base.channels[name] = {}
+    }
+  }
+}
+
+function resetExtendingChannelProvenance(
+  baseChannels: Record<string, ChannelProvenance>,
+  overlay: Record<string, unknown>,
+): void {
+  if (!isPlainRecord(overlay.channels)) return
+  for (const [name, channel] of Object.entries(overlay.channels)) {
+    if (isPlainRecord(channel) && typeof channel.extends === 'string') {
+      baseChannels[name] = {}
     }
   }
 }
@@ -146,6 +164,40 @@ function validateRunnableChannels(config: MmrConfigParsed): void {
   }
 }
 
+function loadConfigLayers(opts: LoadConfigOptions): ConfigLayers {
+  const { projectRoot, cliOverrides } = opts
+  const userHome = opts.userHome ?? os.homedir()
+
+  let merged: Record<string, unknown> = structuredClone(DEFAULT_CONFIG) as unknown as Record<string, unknown>
+
+  const userConfigPath = path.join(userHome, '.mmr', 'config.yaml')
+  const userConfig = loadYaml(userConfigPath) ?? {}
+  if (Object.keys(userConfig).length > 0) {
+    resetExtendingChannelBases(merged, userConfig)
+    merged = deepMerge(merged, userConfig)
+  }
+
+  const projectConfigPath = path.join(projectRoot, '.mmr.yaml')
+  const projectConfig = loadYaml(projectConfigPath) ?? {}
+  if (Object.keys(projectConfig).length > 0) {
+    resetExtendingChannelBases(merged, projectConfig)
+    merged = deepMerge(merged, projectConfig)
+  }
+
+  if (cliOverrides) {
+    const overrideDefaults: Record<string, unknown> = {}
+    if (cliOverrides.fix_threshold !== undefined) overrideDefaults.fix_threshold = cliOverrides.fix_threshold
+    if (cliOverrides.timeout !== undefined) overrideDefaults.timeout = cliOverrides.timeout
+    if (cliOverrides.format !== undefined) overrideDefaults.format = cliOverrides.format
+
+    if (Object.keys(overrideDefaults).length > 0) {
+      merged = deepMerge(merged, { defaults: overrideDefaults })
+    }
+  }
+
+  return { merged, userConfig, projectConfig }
+}
+
 /**
  * Load and merge configuration from multiple sources.
  *
@@ -158,39 +210,7 @@ function validateRunnableChannels(config: MmrConfigParsed): void {
  * The merged result is validated through MmrConfigSchema.parse().
  */
 export function loadConfig(opts: LoadConfigOptions): MmrConfigParsed {
-  const { projectRoot, cliOverrides } = opts
-  const userHome = opts.userHome ?? os.homedir()
-
-  // Start with defaults
-  let merged: Record<string, unknown> = structuredClone(DEFAULT_CONFIG) as unknown as Record<string, unknown>
-
-  // Layer 2: user config
-  const userConfigPath = path.join(userHome, '.mmr', 'config.yaml')
-  const userConfig = loadYaml(userConfigPath)
-  if (userConfig) {
-    resetExtendingChannelBases(merged, userConfig)
-    merged = deepMerge(merged, userConfig)
-  }
-
-  // Layer 3: project config
-  const projectConfigPath = path.join(projectRoot, '.mmr.yaml')
-  const projectConfig = loadYaml(projectConfigPath)
-  if (projectConfig) {
-    resetExtendingChannelBases(merged, projectConfig)
-    merged = deepMerge(merged, projectConfig)
-  }
-
-  // Layer 4: CLI overrides (applied to defaults sub-object)
-  if (cliOverrides) {
-    const overrideDefaults: Record<string, unknown> = {}
-    if (cliOverrides.fix_threshold !== undefined) overrideDefaults.fix_threshold = cliOverrides.fix_threshold
-    if (cliOverrides.timeout !== undefined) overrideDefaults.timeout = cliOverrides.timeout
-    if (cliOverrides.format !== undefined) overrideDefaults.format = cliOverrides.format
-
-    if (Object.keys(overrideDefaults).length > 0) {
-      merged = deepMerge(merged, { defaults: overrideDefaults })
-    }
-  }
+  const { merged } = loadConfigLayers(opts)
 
   if (isPlainRecord(merged.channels)) {
     merged.channels = resolveExtendsAcrossChannels(
@@ -212,6 +232,7 @@ export interface ChannelProvenance {
 }
 
 export interface ConfigProvenance {
+  defaults: ChannelProvenance
   channels: Record<string, ChannelProvenance>
 }
 
@@ -237,7 +258,10 @@ function applyProvenanceLayer(
   overlay: Record<string, unknown>,
   source: ProvenanceSource,
 ): void {
-  resetExtendingChannelBases(base as unknown as Record<string, unknown>, overlay)
+  if (isPlainRecord(overlay.defaults)) {
+    base.defaults = deepMerge(base.defaults, provenanceForRecord(overlay.defaults, source))
+  }
+  resetExtendingChannelProvenance(base.channels, overlay)
   if (!isPlainRecord(overlay.channels)) return
   for (const [name, channel] of Object.entries(overlay.channels)) {
     if (!isPlainRecord(channel)) continue
@@ -294,29 +318,16 @@ function fillDefaultProvenance(finalValue: unknown, provenance: ChannelProvenanc
 }
 
 export function loadConfigWithProvenance(opts: LoadConfigOptions): LoadConfigWithProvenanceResult {
-  const userHome = opts.userHome ?? os.homedir()
+  const { merged: mergedRaw, userConfig, projectConfig } = loadConfigLayers(opts)
 
-  let mergedRaw = structuredClone(DEFAULT_CONFIG) as unknown as Record<string, unknown>
-  const userPath = path.join(userHome, '.mmr', 'config.yaml')
-  const projectPath = path.join(opts.projectRoot, '.mmr.yaml')
-  const userYaml = (loadYaml(userPath) ?? {}) as Record<string, unknown>
-  const projectYaml = (loadYaml(projectPath) ?? {}) as Record<string, unknown>
-
-  const rawProvenance: ConfigProvenance = { channels: {} }
-  applyProvenanceLayer(rawProvenance, mergedRaw, 'default')
-  if (Object.keys(userYaml).length > 0) {
-    resetExtendingChannelBases(mergedRaw, userYaml)
-    mergedRaw = deepMerge(mergedRaw, userYaml)
-    applyProvenanceLayer(rawProvenance, userYaml, 'user')
-  }
-  if (Object.keys(projectYaml).length > 0) {
-    resetExtendingChannelBases(mergedRaw, projectYaml)
-    mergedRaw = deepMerge(mergedRaw, projectYaml)
-    applyProvenanceLayer(rawProvenance, projectYaml, 'project')
-  }
+  const rawProvenance: ConfigProvenance = { defaults: {}, channels: {} }
+  applyProvenanceLayer(rawProvenance, DEFAULT_CONFIG as unknown as Record<string, unknown>, 'default')
+  if (Object.keys(userConfig).length > 0) applyProvenanceLayer(rawProvenance, userConfig, 'user')
+  if (Object.keys(projectConfig).length > 0) applyProvenanceLayer(rawProvenance, projectConfig, 'project')
 
   const config = loadConfig(opts)
-  const provenance: ConfigProvenance = { channels: {} }
+  const provenance: ConfigProvenance = { defaults: rawProvenance.defaults, channels: {} }
+  fillDefaultProvenance(config.defaults, provenance.defaults)
   const mergedChannels = isPlainRecord(mergedRaw.channels)
     ? mergedRaw.channels as Record<string, Record<string, unknown>>
     : {}
