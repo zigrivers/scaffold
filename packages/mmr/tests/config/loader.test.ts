@@ -212,6 +212,22 @@ channels:
     ).toThrow(/compensator.*nonexistent-local|not found|does not exist|unknown channel/i)
   })
 
+  it('rejects an empty compensator.channel value', () => {
+    const projectYaml = `
+version: 1
+defaults:
+  compensator:
+    channel: ""
+channels:
+  claude:
+    command: claude -p
+`
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), projectYaml)
+    expect(() =>
+      loadConfig({ projectRoot: tmpDir, userHome: path.join(tmpDir, 'home') }),
+    ).toThrow(/compensator.*unknown channel ""|remove the compensator block/i)
+  })
+
   it('rejects compensator.channel that targets an abstract channel (depends on v3.28 T1-A)', () => {
     const projectYaml = `
 version: 1

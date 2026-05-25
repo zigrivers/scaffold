@@ -170,10 +170,12 @@ function validateRunnableChannels(config: MmrConfigParsed): void {
 }
 
 function validateCompensatorReference(config: MmrConfigParsed): void {
-  const ref = config.defaults.compensator?.channel
-  if (!ref) return
+  const compensator = config.defaults.compensator
+  if (!compensator) return
+  const ref = compensator.channel
+  const hasTarget = Object.prototype.hasOwnProperty.call(config.channels, ref)
   const target = config.channels[ref]
-  if (!target) {
+  if (!hasTarget || !target) {
     throw new Error(
       `defaults.compensator.channel references unknown channel "${ref}". `
       + 'Configure a channel with this name in the channels: section, or remove the compensator block.',
