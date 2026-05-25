@@ -1,7 +1,14 @@
 import { createHash } from 'node:crypto'
 import net from 'node:net'
-import { Agent } from 'undici'
+// Use undici's own fetch (not Node's built-in) so the Agent dispatcher we
+// pass matches the same undici version. Node's built-in fetch uses its
+// internally-bundled undici which can drift in dispatcher API from the
+// npm-installed package, producing "invalid onError method" at runtime.
+import { fetch as undiciFetch, Agent } from 'undici'
 import { assertSafeSourceUrlWithDns, defaultResolver, type Resolver } from './source-url-validator.js'
+
+/** Production fetch implementation. Tests inject a mock via opts.fetchImpl. */
+export type FetchImpl = (input: string, init?: Record<string, unknown>) => Promise<Response>
 
 const MAX_REDIRECT_HOPS = 5
 const DEFAULT_FETCH_TIMEOUT_MS = 30_000
@@ -19,6 +26,12 @@ export interface FetchAndHashOptions {
   timeoutMs?: number
   /** Body size ceiling in bytes. Default 5 MiB. */
   maxBodyBytes?: number
+  /**
+   * Override the fetch implementation. Used only by tests so they can
+   * mock responses without going to the network. Production uses undici's
+   * fetch so the pinning Agent dispatcher API matches.
+   */
+  fetchImpl?: FetchImpl
 }
 
 /**
@@ -32,15 +45,22 @@ export interface FetchAndHashOptions {
  * return the pinned IP directly without re-resolving.
  */
 function pinningAgent(pinnedIp: string): Agent {
-  return new Agent({
-    connect: {
-      // The Agent's `connect.lookup` is invoked once per connection. Returning
-      // the pre-validated IP means the kernel-level resolve is bypassed.
-      lookup: (_hostname, _opts, callback) => {
-        callback(null, pinnedIp, net.isIP(pinnedIp) === 6 ? 6 : 4)
-      },
-    },
-  })
+  const family = net.isIP(pinnedIp) === 6 ? 6 : 4
+  // Node's `dns.lookup` callback has TWO forms depending on `opts.all`:
+  //   all=true  → callback(err, [{address, family}])
+  //   all=false → callback(err, address, family)
+  // undici can invoke either, so handle both shapes — otherwise we get
+  // `ERR_INVALID_IP_ADDRESS: Invalid IP address: undefined` when undici
+  // passes `{all: true}` and we call the 3-arg form.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const lookup = (_hostname: string, opts: any, callback: any) => {
+    if (opts && opts.all === true) {
+      callback(null, [{ address: pinnedIp, family }])
+    } else {
+      callback(null, pinnedIp, family)
+    }
+  }
+  return new Agent({ connect: { lookup } })
 }
 
 /**
@@ -67,6 +87,7 @@ export async function fetchAndHash(
   const resolver = opts.resolver ?? defaultResolver
   const timeoutMs = opts.timeoutMs ?? DEFAULT_FETCH_TIMEOUT_MS
   const maxBodyBytes = opts.maxBodyBytes ?? MAX_RESPONSE_BODY_BYTES
+  const doFetch: FetchImpl = opts.fetchImpl ?? (undiciFetch as unknown as FetchImpl)
   let current = url
   for (let hop = 0; hop <= MAX_REDIRECT_HOPS; hop++) {
     // DNS-rebinding guard: also resolve the hostname and check every returned
@@ -94,13 +115,12 @@ export async function fetchAndHash(
     // we decide to follow a redirect, in which case the body is discarded).
     let res: Response | undefined
     try {
-      res = await fetch(current, {
+      res = await doFetch(current, {
         redirect: 'manual',
         signal: AbortSignal.timeout(timeoutMs),
-        // `dispatcher` is supported by Node's built-in fetch (undici under the
-        // hood) but not part of the WHATWG fetch standard, so we cast.
-        ...(dispatcher ? { dispatcher } as RequestInit & { dispatcher: Agent } : {}),
-      } as RequestInit)
+        // `dispatcher` is an undici extension to the WHATWG fetch standard.
+        ...(dispatcher ? { dispatcher } : {}),
+      })
 
       // 3xx with a Location header → re-validate and follow.
       if (res.status >= 300 && res.status < 400) {

@@ -99,9 +99,11 @@ describe('runEntryAudit', () => {
         '---\nname: stub\ndescription: y\nsources:\n  - url: https://example.org/spec\n---\nbody\n',
       )
 
-      vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-        new Response('upstream content here', { status: 200 }) as Response,
-      )
+      const fetchImpl = vi.fn(async () =>
+        new Response('upstream content here', { status: 200 }),
+      ) as unknown as Parameters<typeof runEntryAudit>[2] extends infer T
+        ? T extends { fetchImpl?: infer F } ? F : never
+        : never
       const publicResolver = async () => ['93.184.216.34']
 
       let promptSeen = ''
@@ -114,7 +116,9 @@ describe('runEntryAudit', () => {
         })
       }
 
-      await runEntryAudit(entry, dispatcher, { promptPath: prompt, resolver: publicResolver })
+      await runEntryAudit(entry, dispatcher, {
+        promptPath: prompt, resolver: publicResolver, fetchImpl,
+      })
       // The prompt should now contain the pre-fetched source body verbatim.
       expect(promptSeen).toContain('upstream content here')
       expect(promptSeen).toContain('https://example.org/spec')

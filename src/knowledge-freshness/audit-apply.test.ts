@@ -165,6 +165,30 @@ body
     expect(() => applyVerdictToEntry(entry, verdictFull)).not.toThrow()
   })
 
+  it('does NOT advance last-reviewed on a superseded verdict (body still references old edition)', () => {
+    // MMR corroboration on Task 9 dry-run flagged: a "superseded" verdict
+    // typically only adds an edition-staleness notice — the body still claims
+    // the old taxonomy. Advancing last-reviewed would mark a known-stale
+    // entry as fresh, skipping it from the prefilter until cadence expires.
+    // Apply should preserve last-reviewed: null (or the prior value) so a
+    // human can re-review and produce a follow-up audit with `current` or
+    // `major-drift`.
+    const verdict = {
+      entry_name: 'x', audit_date: '2026-05-24', model: 'claude-opus-4-7',
+      verdict: 'superseded' as const,
+      sources_checked: baseEntryChecked,
+      findings: [], proposed_changes: [
+        { location: '## Summary', kind: 'replace' as const,
+          rationale: '', new_text: '## Summary\n\n> Edition notice: …' },
+      ], preserve_warnings: [],
+    }
+    const out = applyVerdictToEntry(baseEntry, verdict)
+    // The notice is added, source hash updates, but last-reviewed stays null.
+    expect(out).toContain('Edition notice')
+    expect(out).toMatch(/last-reviewed:\s*null/)
+    expect(out).not.toContain('last-reviewed: 2026-05-24')
+  })
+
   it('refuses to advance last-reviewed when sources_checked is missing a declared source', () => {
     // Round-2 F-002: a malformed/ungrounded verdict whose `sources_checked`
     // does not cover every declared frontmatter source must throw BEFORE

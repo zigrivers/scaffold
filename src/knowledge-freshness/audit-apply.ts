@@ -100,7 +100,22 @@ export function applyVerdictToEntry(
     }
   }
 
-  fmObj['last-reviewed'] = verdict.audit_date
+  // Do NOT advance `last-reviewed` on a `superseded` verdict. Superseded
+  // means the source has shipped a new edition that changes the taxonomy
+  // — any proposed_changes here are only a "needs-review" notice, not an
+  // actual content refresh. Advancing last-reviewed would make a
+  // known-stale entry appear fresh and skip it from the prefilter until
+  // cadence expires (live-audit MMR corroboration P1 finding on the Task
+  // 9 dry-run).
+  //
+  // A human must re-review the entry against the new edition and produce
+  // a follow-up audit with verdict `current` or `major-drift` (with a
+  // rewritten body) before `last-reviewed` advances. Source `hash` and
+  // `retrieved` still update so the prefilter can tell the upstream
+  // changed.
+  if (verdict.verdict !== 'superseded') {
+    fmObj['last-reviewed'] = verdict.audit_date
+  }
 
   if (Array.isArray(fmObj['sources'])) {
     const sourcesArr = fmObj['sources'] as Array<{ url?: string; hash?: string; retrieved?: string }>

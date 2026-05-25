@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { extractKBFrontmatter } from '../core/assembly/knowledge-loader.js'
 import { getPackageRoot } from '../utils/fs.js'
 import { defaultResolver, type Resolver } from './source-url-validator.js'
-import { fetchAndHash } from './source-hash.js'
+import { fetchAndHash, type FetchImpl } from './source-hash.js'
 
 /**
  * Max body bytes injected per source. Caps prompt size and keeps a malicious
@@ -44,6 +44,8 @@ export interface RunEntryAuditOptions {
   promptPath?: string
   /** Override the DNS resolver used for the rebinding guard (round-5 F-001). Default: Node `dns.promises`. */
   resolver?: Resolver
+  /** Override the fetch implementation. Tests inject a mock. Default: undici fetch via fetchAndHash. */
+  fetchImpl?: FetchImpl
   /**
    * Skip prefetching source bodies. Used only by tests that supply fixture
    * URLs which aren't expected to resolve (e.g. `https://x`) and don't care
@@ -82,7 +84,7 @@ export async function runEntryAudit(
   if (!opts.skipPrefetch) {
     for (const s of fm.sources) {
       const targetUrl = s.url + (s.anchor ?? '')
-      const { body, hash } = await fetchAndHash(targetUrl, { resolver })
+      const { body, hash } = await fetchAndHash(targetUrl, { resolver, fetchImpl: opts.fetchImpl })
       const truncated = body.length > MAX_SOURCE_BODY_BYTES
       prefetched.push({
         url: targetUrl,
