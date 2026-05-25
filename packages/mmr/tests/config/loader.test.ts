@@ -192,6 +192,26 @@ describe('loadConfig', () => {
     expect(config.channels.broken?.auth).toBeUndefined()
   })
 
+  it('rejects a compensator.channel that does not exist in channels', () => {
+    const projectYaml = `
+version: 1
+defaults:
+  compensator:
+    channel: nonexistent-local
+channels:
+  claude:
+    command: claude -p
+    auth:
+      check: 'true'
+      failure_exit_codes: [1]
+      recovery: 'noop'
+`
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), projectYaml)
+    expect(() =>
+      loadConfig({ projectRoot: tmpDir, userHome: path.join(tmpDir, 'home') }),
+    ).toThrow(/compensator.*nonexistent-local|not found|does not exist|unknown channel/i)
+  })
+
   it('does not overwrite base values with undefined overlay values', () => {
     const config = loadConfig({
       projectRoot: tmpDir,

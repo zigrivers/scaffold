@@ -169,6 +169,18 @@ function validateRunnableChannels(config: MmrConfigParsed): void {
   }
 }
 
+function validateCompensatorReference(cfg: MmrConfigParsed): void {
+  const ref = cfg.defaults.compensator?.channel
+  if (!ref) return
+  const target = cfg.channels[ref]
+  if (!target) {
+    throw new Error(
+      `defaults.compensator.channel references unknown channel "${ref}". `
+      + 'Configure a channel with this name in the channels: section, or remove the compensator block.',
+    )
+  }
+}
+
 function warnOnInlineSecretHeaders(config: MmrConfigParsed, warn: WarningSink): void {
   for (const [name, channel] of Object.entries(config.channels)) {
     const headers = channel.headers
@@ -233,6 +245,7 @@ function parseMergedConfig(mergedRaw: Record<string, unknown>, warn: WarningSink
   const config = MmrConfigSchema.parse(merged)
   warnOnInlineSecretHeaders(config, warn)
   validateRunnableChannels(config)
+  validateCompensatorReference(config)
   return config
 }
 
