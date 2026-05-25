@@ -60,17 +60,27 @@ Snapshot from 2026-05-24: 89 pipeline steps, 266 knowledge entries (268 `.md` fi
 
 ```bash
 git checkout -b chore/claude-md-fix-stale-counts main
+
+# Compute live counts first; substitute into both the file edit and the commit/PR messages.
+PIPELINE=$(find content/pipeline -name '*.md' | wc -l | tr -d ' ')
+KB_ENTRIES=$(( $(find content/knowledge -name '*.md' | wc -l) - $(find content/knowledge -name 'README.md' | wc -l) ))
+KB_CATS=$(ls -d content/knowledge/*/ | wc -l | tr -d ' ')
+
+# Edit CLAUDE.md to use $PIPELINE, $KB_ENTRIES, $KB_CATS. (Do this with your
+# editor, not sed — there's only ~3 occurrences and a visual check is safer.)
+
 git add CLAUDE.md
 git commit -m "docs: fix stale pipeline/knowledge counts in CLAUDE.md
 
 Surveyed by Phase 0 of the knowledge-freshness design work: pipeline has
-89 steps across 16 phases (was 60/16); knowledge has 267 entries across
-18 categories (was 64/7)."
+$PIPELINE steps across 16 phases (was 60/16); knowledge has $KB_ENTRIES entries
+across $KB_CATS categories (was 64/7). Knowledge count excludes directory
+README files (knowledge-loader.ts:138-139, :186-187)."
 git push -u origin HEAD
 gh pr create --title "docs: fix stale pipeline/knowledge counts in CLAUDE.md" \
-  --body "Surveyed counts in CLAUDE.md were stale. Updates pipeline step count (60→89), knowledge entry count (64→267), category count (7→18).
+  --body "Surveyed counts in CLAUDE.md were stale. Updates pipeline step count (60→$PIPELINE), knowledge entry count (64→$KB_ENTRIES), category count (7→$KB_CATS).
 
-Sourced from \`find content/pipeline -name '*.md' | wc -l\` and equivalent; no functional changes."
+Sourced from live \`find\`/\`ls\` against content/; knowledge count excludes README files per the assembly loader. No functional changes."
 ```
 
 - [ ] **Step 3: Wait for merge before starting Phase 1 Task 1.**
@@ -606,7 +616,11 @@ last-reviewed: null
 version-pin: 'OWASP Top 10 2021'
 sources:
   - url: https://owasp.org/Top10/
-    anchor: 'top-10-list'
+    anchor: '#top-10-list'   # anchors MUST include the leading "#" — the audit
+                              # meta-prompt appends source.anchor to source.url
+                              # literally, and applyVerdictToEntry's normalizeUrl
+                              # only strips text *after* a "#". A bare value like
+                              # "top-10-list" would produce a wrong URL.
 ---
 ```
 
@@ -984,10 +998,13 @@ export async function runEntryAudit(entryPath: string, dispatch: Dispatcher): Pr
     path.resolve('content/tools/knowledge-audit-entry.md'), 'utf8',
   )
 
+  // Use replacer-function form to avoid String.replace's special-pattern
+  // handling (`$$`, `$&`, `$'`, `$1`) on values that may contain dollar signs
+  // (entry bodies routinely have shell snippets, regex examples, etc.).
   const filled = promptTemplate
-    .replace('{{entry_path}}', entryPath)
-    .replace('{{entry_frontmatter}}', JSON.stringify(fmForPrompt, null, 2))
-    .replace('{{entry_body}}', content)
+    .replace('{{entry_path}}', () => entryPath)
+    .replace('{{entry_frontmatter}}', () => JSON.stringify(fmForPrompt, null, 2))
+    .replace('{{entry_body}}', () => content)
 
   const raw = await dispatch(filled)
   const stripped = raw.replace(/```json\n?|\n?```/g, '').trim()
@@ -1232,8 +1249,10 @@ x
       findings: [], proposed_changes: [], preserve_warnings: [],
     }
     const out = applyVerdictToEntry(entry, verdict)
-    expect(out).toContain("hash: 'sha256:new'")
-    expect(out).not.toContain("hash: 'old'")
+    // yaml.dump quoting under JSON_SCHEMA is value-dependent; match by content,
+    // not exact YAML formatting.
+    expect(out).toMatch(/hash:\s*['"]?sha256:new['"]?/)
+    expect(out).not.toContain("'old'")
   })
 
   it('prefers caller-supplied trustedHashes over LLM-claimed content_hash', () => {
@@ -1261,8 +1280,37 @@ x
     }
     const trustedHashes = new Map([['https://example.org/spec', 'sha256:deterministic']])
     const out = applyVerdictToEntry(entry, verdict, { trustedHashes })
-    expect(out).toContain("hash: 'sha256:deterministic'")
+    expect(out).toMatch(/hash:\s*['"]?sha256:deterministic['"]?/)
     expect(out).not.toContain('llm-claimed-untrusted')
+  })
+
+  it('throws when trustedHashes is supplied but is missing a verdict source URL', () => {
+    const entry = `---
+name: x
+description: y
+topics: []
+sources:
+  - url: https://example.org/spec
+    hash: 'old'
+---
+
+## Deep Guidance
+
+x
+`
+    const verdict = {
+      entry_name: 'x', audit_date: '2026-05-24', model: 'claude-opus-4-7',
+      verdict: 'current' as const,
+      sources_checked: [
+        { url: 'https://example.org/spec', retrieved_at: '2026-05-24',
+          content_hash: 'sha256:llm', summary: '' },
+      ],
+      findings: [], proposed_changes: [], preserve_warnings: [],
+    }
+    // Supply trustedHashes but omit the URL → strict mode: throw rather than
+    // silently fall back to the LLM-claimed hash.
+    const trustedHashes = new Map<string, string>()
+    expect(() => applyVerdictToEntry(entry, verdict, { trustedHashes })).toThrow(/trustedHashes/)
   })
 
   it('protects "## Summary" the same way it protects "## Deep Guidance"', () => {
@@ -1386,10 +1434,24 @@ export function applyVerdictToEntry(
       const sNormalized = s.url ? normalizeUrl(s.url) : undefined
       const match = verdict.sources_checked.find(c => normalizeUrl(c.url) === sNormalized)
       if (match) {
-        // Prefer the caller-supplied deterministic hash (round-3 F-001); fall
-        // back to the LLM-claimed hash only when no trustedHashes map was passed.
-        const fresh = opts.trustedHashes?.get(normalizeUrl(match.url))
-        s.hash = fresh ?? match.content_hash
+        const matchNormalized = normalizeUrl(match.url)
+        if (opts.trustedHashes !== undefined) {
+          // Strict mode: caller has taken responsibility for deterministic hashing.
+          // A missing URL means the deterministic fetch failed for it — refuse to
+          // persist the LLM-claimed hash as a silent fallback (round-4 F-003).
+          const fresh = opts.trustedHashes.get(matchNormalized)
+          if (fresh === undefined) {
+            throw new Error(
+              `trustedHashes was supplied but did not include "${matchNormalized}" — ` +
+              `the CLI should compute hashes for every verdict.sources_checked URL before calling apply.`,
+            )
+          }
+          s.hash = fresh
+        } else {
+          // Test mode (or callers that explicitly accept LLM-claimed hashes):
+          // fall back to the LLM-claimed value.
+          s.hash = match.content_hash
+        }
         s.retrieved = match.retrieved_at
       }
     }
@@ -1420,19 +1482,31 @@ export function applyVerdictToEntry(
     const before = bodyLines.slice(0, region.start)
     const after = bodyLines.slice(region.end)
 
+    // Splice helper — guarantees a blank line between each chunk so we don't
+    // glue inserted text directly onto the next "## " heading (round-4 F-005).
+    const splice = (...chunks: string[][]): string => {
+      const padded: string[] = []
+      for (const chunk of chunks) {
+        if (chunk.length === 0) continue
+        if (padded.length > 0 && padded[padded.length - 1] !== '') padded.push('')
+        padded.push(...chunk)
+      }
+      return padded.join('\n')
+    }
+
     if (change.kind === 'replace') {
       if (!change.new_text) throw new Error(`replace change at "${change.location}" missing new_text`)
-      // Use a verbatim splice instead of String.replace to avoid `$1` interpolation in new_text (F-004).
+      // Verbatim splice instead of String.replace to avoid `$&`/`$1`/`$$` interpolation in new_text (F-004).
       const replacement = change.new_text.trim().split('\n')
-      body = [...before, ...replacement, ...after].join('\n')
+      body = splice(before, replacement, after)
     } else if (change.kind === 'insert') {
       if (!change.new_text) throw new Error(`insert change at "${change.location}" missing new_text`)
       const original = bodyLines.slice(region.start, region.end)
       const insertion = change.new_text.trim().split('\n')
-      body = [...before, ...original, '', ...insertion, ...after].join('\n')
+      body = splice(before, original, insertion, after)
     } else if (change.kind === 'delete') {
       // Remove the section entirely, including its heading line (F-003).
-      body = [...before, ...after].join('\n')
+      body = splice(before, after)
     }
   }
 
