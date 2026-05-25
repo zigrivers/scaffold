@@ -2,6 +2,14 @@
 name: database-design
 description: Database schema design, normalization, indexing, and migration patterns
 topics: [database, schema, sql, nosql, migrations, indexing, data-modeling]
+volatility: stable
+last-reviewed: null
+version-pin: 'SQL:2023 / PostgreSQL 16'
+sources:
+  - url: https://www.postgresql.org/docs/current/ddl.html
+    anchor: '#data-definition'
+  - url: https://www.iso.org/standard/76583.html
+    anchor: '#sql-2023'
 ---
 
 ## Summary
