@@ -16,6 +16,12 @@ name: Knowledge Freshness Gates
 
 on:
   pull_request:
+    # Default activity types are opened, synchronize, reopened. We add
+    # `labeled` and `unlabeled` so the gate workflow re-runs when a
+    # maintainer applies/removes the `override:anti-over-rewrite` label
+    # (F-003 round-3). Without these, the label-based override is
+    # unusable — applying the label wouldn't trigger a re-run.
+    types: [opened, synchronize, reopened, labeled, unlabeled]
     branches: [main]
     paths:
       - 'content/knowledge/**'
@@ -72,29 +78,42 @@ jobs:
         working-directory: base
         run: npm run build
 
-      - name: Resolve changed knowledge entries
+      - name: Resolve changed knowledge entries + capture diff
         id: changed
         working-directory: base
         # F-001: write the file list to a JSON file and pass it via
         # `--files-from`. We do NOT interpolate filenames into bash, because
         # a PR could add a content/knowledge path containing shell
         # metacharacters that would `$()`-execute when interpolated.
+        #
+        # F-002 round-3: also persist the actual PR diff (from the head
+        # checkout) so gates that need a diff (lint-unsourced, anti-over-
+        # rewrite) see new files correctly. Working-tree diff on the base
+        # checkout sees the overlaid files as untracked → empty diff.
+        #
+        # F-001 round-3: `--diff-filter=d` excludes deleted entries from the
+        # changed-files list so subsequent gates don't try to read missing
+        # paths and crash with ENOENT.
         run: |
           set -euo pipefail
-          mapfile -t FILES < <(git -C ../head diff --name-only origin/main...HEAD -- 'content/knowledge/**/*.md')
+          mapfile -t FILES < <(git -C ../head diff --name-only --diff-filter=d origin/main...HEAD -- 'content/knowledge/**/*.md')
           if [ "${#FILES[@]}" -eq 0 ]; then
             echo "no_changes=1" >> "$GITHUB_OUTPUT"
             echo '[]' > "$GITHUB_WORKSPACE/changed-files.json"
+            : > "$GITHUB_WORKSPACE/pr.diff"
           else
             # Emit a JSON array. The CLI validates each entry server-side.
             printf '%s\n' "${FILES[@]}" \
               | jq -R . \
               | jq -s . \
               > "$GITHUB_WORKSPACE/changed-files.json"
+            git -C ../head diff origin/main...HEAD -- 'content/knowledge/**/*.md' \
+              > "$GITHUB_WORKSPACE/pr.diff"
           fi
           printf 'changed knowledge files:\n'
           printf '  %s\n' "${FILES[@]:-<none>}"
           echo "files_json=$GITHUB_WORKSPACE/changed-files.json" >> "$GITHUB_OUTPUT"
+          echo "diff_path=$GITHUB_WORKSPACE/pr.diff" >> "$GITHUB_OUTPUT"
 
       # ---------- Gate 1: validator (BLOCKING) ----------
       # F-005: standardize on `node dist/index.js validate-knowledge` so the
@@ -122,7 +141,8 @@ jobs:
         working-directory: base
         env:
           FILES_JSON: ${{ steps.changed.outputs.files_json }}
-        run: node dist/index.js knowledge-freshness lint-unsourced --files-from "$FILES_JSON"
+          DIFF_PATH: ${{ steps.changed.outputs.diff_path }}
+        run: node dist/index.js knowledge-freshness lint-unsourced --files-from "$FILES_JSON" --diff "$DIFF_PATH"
 
       # ---------- Gate 4: anti-over-rewrite (BLOCKING for stable) ----------
       # Skip when the PR branch is NOT freshness-managed: human edits to stable
@@ -138,7 +158,8 @@ jobs:
         env:
           PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
           FILES_JSON: ${{ steps.changed.outputs.files_json }}
-        run: node dist/index.js knowledge-freshness anti-over-rewrite --pr-labels "$PR_LABELS" --files-from "$FILES_JSON"
+          DIFF_PATH: ${{ steps.changed.outputs.diff_path }}
+        run: node dist/index.js knowledge-freshness anti-over-rewrite --pr-labels "$PR_LABELS" --files-from "$FILES_JSON" --diff "$DIFF_PATH"
 
       # ---------- Gate 5: Deep Guidance preserved (BLOCKING) ----------
       - name: 'Gate 5 of 5 — Deep Guidance heading preserved'

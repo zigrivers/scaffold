@@ -104,18 +104,24 @@ jobs:
                   echo "::endgroup::"
                   continue
                 fi
-                # Run the five gates locally on the modified file.
+                # F-004 round-3: blocking inline gates are the NON-overridable
+                # ones (validator, link-check, deep-guidance). anti-over-rewrite
+                # is the only overridable gate (via the `override:anti-over-
+                # rewrite` label that a maintainer applies on the PR), so we
+                # run it inline only as a NOTICE — the PR still opens, the
+                # PR-gate workflow re-runs gates on label-change events and
+                # surfaces the violation if no override label is applied.
+                # lint-unsourced is advisory, never blocks.
                 gate_failed=0
                 node dist/index.js validate-knowledge || gate_failed=1
                 node dist/index.js knowledge-freshness link-check "$path" || gate_failed=1
-                node dist/index.js knowledge-freshness lint-unsourced "$path" || true  # advisory
-                # anti-over-rewrite for inline gating: no labels yet (PR doesn't exist).
-                # A maintainer can re-run after applying the label if they want a stable
-                # entry's rewrite through; the bot will not auto-override stable churn.
-                node dist/index.js knowledge-freshness anti-over-rewrite "$path" --pr-labels "" || gate_failed=1
                 node dist/index.js knowledge-freshness deep-guidance-check "$path" || gate_failed=1
+                # Advisory-only: do not affect gate_failed.
+                node dist/index.js knowledge-freshness lint-unsourced "$path" || true
+                node dist/index.js knowledge-freshness anti-over-rewrite "$path" --pr-labels "" || \
+                  echo "::notice::anti-over-rewrite flagged $name — PR will open and surface the violation, apply override:anti-over-rewrite label to bypass"
                 if [ "$gate_failed" != "0" ]; then
-                  echo "::error::gates failed for $name — not opening PR"
+                  echo "::error::non-overridable gates failed for $name — not opening PR"
                   # Restore the file so subsequent entries aren't poisoned.
                   git checkout -- "$path"
                   echo "::endgroup::"
