@@ -2,6 +2,14 @@
 name: data-science-security
 description: Practical security guardrails for solo / small-team data-science work — PII masking at ingest, credential hygiene with direnv and 1Password, data classification tiers, notebook output stripping, and a note on model memorization
 topics: [data-science, security, pii, secrets, data-classification]
+volatility: fast-moving
+last-reviewed: null
+version-pin: 'OWASP ML Top 10 2023'
+sources:
+  - url: https://owasp.org/www-project-machine-learning-security-top-10/
+    anchor: '#ml-top-10'
+  - url: https://csrc.nist.gov/pubs/ai/100/2/e2025/final
+    anchor: '#adversarial-ml'
 ---
 
 DS work has elevated security risk because analysis code routinely touches raw customer data before anyone has had a chance to sanitize it. A notebook can render real names, emails, and account numbers inline, then get committed to git, emailed to a stakeholder, or pasted into Slack without a second thought. Prediction caches and CSV exports quietly duplicate sensitive rows into `data/` subdirectories. Credentials for warehouses and cloud buckets get dropped into `.env` files or — worse — directly into a notebook cell. The blast radius of a sloppy DS workflow is larger than people assume, and the mitigations are not exotic: they are cheap, boring habits that need to be enforced by tooling.
