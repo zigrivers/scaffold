@@ -26,6 +26,7 @@ export function jsonpathGet(root: unknown, path: string): unknown {
       if (path[i] === '[') continue
       const match = /^[A-Za-z_][A-Za-z0-9_-]*/.exec(path.slice(i))
       if (!match) throw new Error(`jsonpath malformed empty property at offset ${i - 1} (path: ${path})`)
+      if (isPrototypeSensitiveKey(match[0])) return undefined
       if (cursor === null || typeof cursor !== 'object') return undefined
       cursor = (cursor as Record<string, unknown>)[match[0]]
       i += match[0].length
@@ -49,4 +50,8 @@ export function jsonpathGet(root: unknown, path: string): unknown {
     if (cursor === undefined) return undefined
   }
   return cursor
+}
+
+function isPrototypeSensitiveKey(key: string): boolean {
+  return key === '__proto__' || key === 'constructor' || key === 'prototype'
 }

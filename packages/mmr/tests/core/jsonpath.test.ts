@@ -41,6 +41,12 @@ describe('jsonpathGet', () => {
     expect(jsonpathGet({ a: 'string' }, '$.a.b')).toBeUndefined()
   })
 
+  it('returns undefined for prototype-sensitive property names', () => {
+    expect(jsonpathGet({ constructor: 'x' }, '$.constructor')).toBeUndefined()
+    expect(jsonpathGet({ prototype: 'x' }, '$.prototype')).toBeUndefined()
+    expect(jsonpathGet({ __proto__: 'x' }, '$.__proto__')).toBeUndefined()
+  })
+
   it('throws on a path that does not start with $', () => {
     expect(() => jsonpathGet({ a: 1 }, 'a.b')).toThrow(/must start with \$/i)
   })
