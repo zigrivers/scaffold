@@ -15,7 +15,7 @@ This is a design document, not an implementation. All decisions are resolved (se
 
 The framing in the planning prompt was largely accurate, but the following needed correction or clarification before designing on top of it:
 
-- **Entry count and category count.** `content/knowledge/` contains **267 entries across 18 category subdirectories** — not "~64 entries in 7 categories" as `CLAUDE.md` currently states (`CLAUDE.md:71`). The CLAUDE.md figure is stale and is fixed in the prerequisite Task 0 of the implementation plan.
+- **Entry count and category count.** `content/knowledge/` contains approximately **266 entries across 19 category subdirectories** (live snapshot 2026-05-24: 268 `.md` files of which 2 are `README.md` excluded by the assembly loader at `knowledge-loader.ts:138-139, :186-187`) — not "~64 entries in 7 categories" as `CLAUDE.md` currently states (`CLAUDE.md:71`). The Phase 0 survey reported 267/18 a few days earlier; both reflect a moving target. Task 0 of the plan re-runs the count commands at execution time so `CLAUDE.md` lands on live numbers, not snapshot numbers.
 - **Knowledge entries are NOT routed through `src/validation/frontmatter-validator.ts`.** That validator handles only pipeline steps and tool meta-prompts (`content/pipeline/`, `content/tools/`). Knowledge entries are parsed by an independent, ad-hoc parser at `src/core/assembly/knowledge-loader.ts:18` (`extractKBFrontmatter`), backed by the `KBFrontmatter` shape (`knowledge-loader.ts:8-12`) and the public `KnowledgeEntry` type at `src/types/assembly.ts:8-13`. The extension point for new freshness metadata is the **knowledge loader**, not the pipeline frontmatter validator. The pipeline validator stays untouched.
 - **`topics:` is not a known YAML key in the pipeline validator.** `KNOWN_YAML_KEYS` (`src/project/frontmatter.ts:18-34`) does not list `topics`. If knowledge entries ever pass through that path they emit `unknown field` warnings. They do not pass through it today — but anyone proposing to "extend the frontmatter validator" must understand which validator they mean.
 - **`security-best-practices.md` confirmed.** Frontmatter is exactly `name` / `description` / `topics` (no version pin, no source URL). The body opens with an empty `## Summary` heading and then `## OWASP Top 10` with no edition marker. This is the canonical first-pass target for the end-to-end loop.
@@ -187,8 +187,9 @@ A new tool meta-prompt at `content/tools/knowledge-audit-entry.md` (`category: t
     }
   ],
   "proposed_changes": [
-    {"location": "## OWASP Top 10 heading", "kind": "replace",
-     "rationale": "Entry pins generically to a 2021-shaped list; 2025 added supply-chain category and folded SSRF into Broken Access Control."}
+    {"location": "## OWASP Top 10", "kind": "replace",
+     "rationale": "Entry pins generically to a 2021-shaped list; 2025 added supply-chain category and folded SSRF into Broken Access Control.",
+     "new_text": "## OWASP Top 10\n\nThe [OWASP Top 10 2025 edition](https://owasp.org/Top10/) introduces A11:2025 Software Supply Chain Failures…\n\n(Phase 1 plan requires `location` to be an exact existing H2 heading and `new_text` to begin with the same heading line.)"}
   ],
   "preserve_warnings": []
 }

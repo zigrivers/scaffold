@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Keep Scaffold's 267 knowledge entries accurate against external reality via volatility-tagged, grounded, multi-model-corroborated audits — and surface gaps where the knowledge base doesn't yet cover what downstream agents need.
+**Goal:** Keep Scaffold's ~266 knowledge entries (live count; see plan Task 0) accurate against external reality via volatility-tagged, grounded, multi-model-corroborated audits — and surface gaps where the knowledge base doesn't yet cover what downstream agents need.
 
 **Architecture:** Extend the knowledge frontmatter additively with `volatility` / `last-reviewed` / `sources` / `version-pin`. A daily cron pre-filters entries by source-hash diff and overdue cadence, dispatches a grounded audit meta-prompt that performs WebFetch on each `sources:` URL and emits a structured verdict, corroborates via `mmr review --diff`, and opens a PR with provenance for human merge. A parallel `knowledge_gap_signal` observability event aggregates "agent asked but KB didn't cover" into a new audit lens (I). Reuses the knowledge loader, observability engine, MMR dispatch, and existing CI; adds no parallel infrastructure.
 
@@ -20,7 +20,7 @@
 | **1** | End-to-end loop validated on **one entry** (`security-best-practices.md`): frontmatter extended, validator passing, audit meta-prompt + driver work manually, MMR corroboration runs, PR opens with clean provenance. | Manual audit run produces a reviewable PR with citations, MMR verdict, and updated `last-reviewed`. |
 | **2** | Loop runs unattended on cron; expanded backfill to ~30 entries; CI gates enforced on freshness PRs. | A weekly cron has opened ≥1 audit PR autonomously and the gates blocked at least one bad-faith test PR. |
 | **3** | Gap detection — `knowledge_gap_signal` event + Lens I aggregator. | Signals from real pipeline runs surface in a `docs/audits/` report. |
-| **4** | Full backfill across all 267 entries; KB SemVer pinned and consumable downstream. | `content/knowledge/VERSION` is bumped on every audit-PR merge; downstream pins demonstrably work. |
+| **4** | Full backfill across all knowledge entries (live count); KB SemVer pinned and consumable downstream. | `content/knowledge/VERSION` is bumped on every audit-PR merge; downstream pins demonstrably work. |
 | **5** | Roadmap items: native MMR `knowledge-freshness` channel, frontier scan tool, taxonomy cross-reference. | Out of scope for this plan; specs only. |
 
 **Phases 0 and 1 are detailed task-by-task below.** Phases 2–5 are scoped as tasks with acceptance criteria; the next round of planning expands them once Phase 1 ships.
@@ -41,19 +41,20 @@ A 5-minute standalone PR. Lands first so the freshness work doesn't inherit drif
 - [ ] **Step 1: Find and fix the three stale references**
 
 In `CLAUDE.md`, locate:
-- `CLAUDE.md:55` — "60 meta-prompt files organized into 16 phases" → `89 meta-prompt files organized into 16 phases`
-- `CLAUDE.md:71` — "64 domain expertise entries in 7 categories" → `267 domain expertise entries in 18 categories`
+- `CLAUDE.md:55` — "60 meta-prompt files organized into 16 phases" → use the live `find` count below for pipeline steps.
+- `CLAUDE.md:71` — "64 domain expertise entries in 7 categories" → use the live `find` counts below. Knowledge entries are the `.md` files minus `README.md` per `knowledge-loader.ts:138-139, :186-187`.
 - Any other place either count is repeated (search `60 meta-prompt` and `64 domain` to be sure).
 
-Verify the file counts before committing:
+Compute the live counts before committing:
 
 ```bash
-find content/pipeline -name '*.md' | wc -l
-find content/knowledge -name '*.md' | wc -l
-ls -d content/knowledge/*/ | wc -l
+find content/pipeline -name '*.md' | wc -l                 # pipeline step count
+# Knowledge entries: total .md minus README files (loader excludes READMEs).
+echo $(( $(find content/knowledge -name '*.md' | wc -l) - $(find content/knowledge -name 'README.md' | wc -l) ))
+ls -d content/knowledge/*/ | wc -l                          # category count
 ```
 
-Expected outputs (today): 89, 267 (or 268 if `VERSION` lands first — adjust accordingly), 18. If the counts differ from what the survey reported, **use the live counts**, not the survey numbers.
+Snapshot from 2026-05-24: 89 pipeline steps, 266 knowledge entries (268 `.md` files − 2 READMEs), 19 categories. **Use whatever the live commands return at execution time**, not these snapshot numbers.
 
 - [ ] **Step 2: Commit and PR**
 
@@ -465,7 +466,11 @@ export function validateKnowledgeDir(dir: string): Map<string, KBValidationResul
     for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
       const p = `${d}/${entry.name}`
       if (entry.isDirectory()) walk(p)
-      else if (entry.isFile() && p.endsWith('.md')) results.set(p, validateKnowledgeFile(p))
+      // Skip directory READMEs — the assembly engine excludes them
+      // (knowledge-loader.ts:138-139, :186-187), so we don't validate them either.
+      else if (entry.isFile() && p.endsWith('.md') && entry.name !== 'README.md') {
+        results.set(p, validateKnowledgeFile(p))
+      }
     }
   }
   walk(dir)
@@ -506,10 +511,10 @@ In `Makefile`, after the existing `validate:` target, add:
 ```makefile
 .PHONY: validate-knowledge
 validate-knowledge: build
-	node dist/cli/scaffold.js validate-knowledge
+	node dist/index.js validate-knowledge
 ```
 
-The `build` dependency ensures `dist/` exists on clean checkouts. Update the `check:` target to depend on `validate-knowledge`. Confirm the CLI binary path (`dist/cli/scaffold.js`) matches what `package.json` and the existing CLI tests use; adjust if the actual entry point differs.
+The `build` dependency ensures `dist/` exists on clean checkouts. Update the `check:` target to depend on `validate-knowledge`. Confirm the CLI binary path (`dist/index.js`) matches what `package.json` and the existing CLI tests use; adjust if the actual entry point differs.
 
 - [ ] **Step 6: Add CI step**
 
@@ -837,7 +842,15 @@ export async function selectAuditCandidates(
       else {
         for (const s of e.sources) {
           if (!s.hash) continue
-          const { hash } = await opts.fetch(s.url)
+          // Fetch errors must not crash the whole cron. Treat any error as
+          // "could not verify" — leave the entry alone this run; the next
+          // cadence-window expiry will pick it up.
+          let hash: string
+          try { ({ hash } = await opts.fetch(s.url)) }
+          catch (err) {
+            console.warn(`[knowledge-freshness] fetch failed for ${s.url} (entry ${e.name}): ${(err as Error).message}`)
+            continue
+          }
           if (hash !== s.hash) { select = true; priority = 75; break }
         }
       }
@@ -953,13 +966,27 @@ export async function runEntryAudit(entryPath: string, dispatch: Dispatcher): Pr
   const fm = extractKBFrontmatter(content)
   if (!fm) throw new Error(`could not parse frontmatter at ${entryPath}`)
 
+  // Re-emit the frontmatter with the same hyphenated keys the meta-prompt
+  // describes (`last-reviewed`, `version-pin`). The parser's TS-side shape
+  // is camelCase; the prompt and the on-disk YAML are hyphenated, and the
+  // model is told to expect hyphenated keys.
+  const fmForPrompt = {
+    name: fm.name,
+    description: fm.description,
+    topics: fm.topics,
+    volatility: fm.volatility,
+    'last-reviewed': fm.lastReviewed,
+    'version-pin': fm.versionPin,
+    sources: fm.sources,
+  }
+
   const promptTemplate = fs.readFileSync(
     path.resolve('content/tools/knowledge-audit-entry.md'), 'utf8',
   )
 
   const filled = promptTemplate
     .replace('{{entry_path}}', entryPath)
-    .replace('{{entry_frontmatter}}', JSON.stringify(fm, null, 2))
+    .replace('{{entry_frontmatter}}', JSON.stringify(fmForPrompt, null, 2))
     .replace('{{entry_body}}', content)
 
   const raw = await dispatch(filled)
@@ -1035,7 +1062,50 @@ Old content.
       proposed_changes: [], preserve_warnings: [],
     }
     const out = applyVerdictToEntry(baseEntry, verdict)
-    expect(out).toContain("last-reviewed: '2026-05-24'")
+    // yaml.dump with JSON_SCHEMA emits the date unquoted (e.g. `last-reviewed: 2026-05-24`)
+    // — match that, since JSON_SCHEMA is what audit-apply uses to avoid Date-coercion (F-001).
+    expect(out).toContain('last-reviewed: 2026-05-24')
+  })
+
+  it('applies an insert kind by appending new text after the targeted section', () => {
+    const entry = `---
+name: x
+description: y
+topics: []
+---
+
+## Summary
+
+## OWASP Top 10
+
+The 2021 list.
+
+## Deep Guidance
+
+keep me
+`
+    const verdict = {
+      entry_name: 'x', audit_date: '2026-05-24', model: 'claude-opus-4-7',
+      verdict: 'minor-drift' as const, sources_checked: [], findings: [],
+      proposed_changes: [
+        { location: '## OWASP Top 10', kind: 'insert' as const,
+          rationale: '', new_text: '> 2025 edition adds A11 Software Supply Chain Failures.' },
+      ],
+      preserve_warnings: [],
+    }
+    const out = applyVerdictToEntry(entry, verdict)
+    expect(out).toContain('## OWASP Top 10')
+    expect(out).toContain('The 2021 list.')
+    expect(out).toContain('2025 edition adds A11')
+    expect(out).toContain('## Deep Guidance')
+    expect(out).toContain('keep me')
+    // The insert must land between the OWASP section and the next H2,
+    // not after the entire file.
+    const idxOwasp = out.indexOf('## OWASP Top 10')
+    const idxInsert = out.indexOf('2025 edition')
+    const idxDeepGuidance = out.indexOf('## Deep Guidance')
+    expect(idxOwasp).toBeLessThan(idxInsert)
+    expect(idxInsert).toBeLessThan(idxDeepGuidance)
   })
 
   it('applies a replace proposed_change targeting "## Deep Guidance"', () => {
@@ -1192,7 +1262,10 @@ export function applyVerdictToEntry(original: string, verdict: AuditVerdict): st
   const fmObj = yaml.load(lines.slice(1, close).join('\n'), { schema: yaml.JSON_SCHEMA }) as Record<string, unknown>
   fmObj['last-reviewed'] = verdict.audit_date
   if (Array.isArray(fmObj['sources'])) {
-    const sourcesArr = fmObj['sources'] as Array<Record<string, unknown>>
+    // Cast to the narrow on-disk shape so dot-notation reads/writes type-check
+    // cleanly under `tsc --strict` (Record<string, unknown> would force `s.url`
+    // to type `unknown` and break the `===` comparison below).
+    const sourcesArr = fmObj['sources'] as Array<{ url?: string; hash?: string; retrieved?: string }>
     for (const s of sourcesArr) {
       const match = verdict.sources_checked.find(c => c.url === s.url)
       if (match) { s.hash = match.content_hash; s.retrieved = match.retrieved_at }
@@ -1275,12 +1348,12 @@ Expected: no errors. `security-best-practices.md` has `volatility: fast-moving` 
 
 - [ ] **Step 2: Pre-filter**
 
-Run: `node dist/cli/scaffold.js knowledge-freshness audit-prefilter --max=5`
+Run: `node dist/index.js knowledge-freshness audit-prefilter --max=5`
 Expected: stdout JSON includes `security-best-practices`.
 
 - [ ] **Step 3: Run the grounded audit**
 
-Run: `node dist/cli/scaffold.js knowledge-freshness audit-run-entry content/knowledge/core/security-best-practices.md > /tmp/verdict.json`
+Run: `node dist/index.js knowledge-freshness audit-run-entry content/knowledge/core/security-best-practices.md > /tmp/verdict.json`
 
 Inspect `/tmp/verdict.json`. Expected: a verdict object validating against the schema. Given the OWASP 2025 release referenced in the planning prompt, `verdict` is plausibly `superseded`; if it is `current`, that itself is a finding — verify the source URL really reflects the 2025 edition.
 
@@ -1289,7 +1362,7 @@ Inspect `/tmp/verdict.json`. Expected: a verdict object validating against the s
 Apply the verdict to a working copy, generate a patch, run MMR review:
 
 ```bash
-node dist/cli/scaffold.js knowledge-freshness audit-apply \
+node dist/index.js knowledge-freshness audit-apply \
   content/knowledge/core/security-best-practices.md \
   /tmp/verdict.json
 git diff content/knowledge/core/security-best-practices.md > /tmp/freshness.patch
@@ -1364,7 +1437,7 @@ Scoped tasks; expand to bite-sized steps in the next planning round once Phase 1
 
 ## Phase 4 — Full Backfill
 
-- [ ] **Task 19:** Backfill all remaining knowledge entries with `volatility` and (where applicable) `sources`. Use a tracking issue. Acceptance: `make validate-knowledge` reports zero warnings across all 267 entries.
+- [ ] **Task 19:** Backfill all remaining knowledge entries with `volatility` and (where applicable) `sources`. Use a tracking issue. Acceptance: `make validate-knowledge` reports zero warnings across all knowledge entries (live count).
 
 ---
 
