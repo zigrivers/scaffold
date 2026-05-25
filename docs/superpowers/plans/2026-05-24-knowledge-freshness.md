@@ -348,18 +348,27 @@ entries load unchanged."
 
 ```typescript
 // src/validation/knowledge-frontmatter-validator.test.ts
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, afterEach } from 'vitest'
 import { validateKnowledgeFile } from './knowledge-frontmatter-validator.js'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
 
+const tmpDirs: string[] = []
+
 function tmpFile(content: string): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kb-test-'))
+  tmpDirs.push(dir)
   const file = path.join(dir, 'entry.md')
   fs.writeFileSync(file, content)
   return file
 }
+
+afterEach(() => {
+  while (tmpDirs.length) {
+    fs.rmSync(tmpDirs.pop()!, { recursive: true, force: true })
+  }
+})
 
 describe('validateKnowledgeFile', () => {
   it('passes a minimal valid entry', () => {
