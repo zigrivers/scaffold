@@ -18,7 +18,7 @@ describe('README v3.28 documentation', () => {
   })
 
   it('documents mmr config channels show', () => {
-    expect(readme).toMatch(/config channels show/)
+    expect(readme).toMatch(/mmr config channels show claude/)
   })
 
   it('documents mmr review --dry-run', () => {

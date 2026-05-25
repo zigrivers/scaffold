@@ -129,7 +129,7 @@ provenance (`# from default | user | project`). Secrets in `env` and
 to print them verbatim (a warning banner is printed to stderr).
 
 ```bash
-mmr config channels show:claude
+mmr config channels show claude
 ```
 
 The loader also warns when a channel `headers:` block contains a literal
