@@ -60,6 +60,51 @@ describe('loader inline-secret warnings (T1-E)', () => {
     expect(warnOutput).not.toMatch(/Authorization/)
   })
 
+  it('warns when headers contain api_key_env as a literal header key', () => {
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), [
+      'version: 1',
+      'channels:',
+      '  custom:',
+      '    command: curl',
+      '    headers:',
+      '      api_key_env: "sk-literal-secret"',
+      '    auth:',
+      '      check: "true"',
+      '      failure_exit_codes: [1]',
+      '      recovery: "x"',
+    ].join('\n'))
+    const warnings: string[] = []
+
+    loadConfig({ projectRoot: tmpDir, userHome: tmpDir, onWarning: (message) => warnings.push(message) })
+
+    expect(warnings.join('\n')).toMatch(/custom/)
+    expect(warnings.join('\n')).toMatch(/api_key_env/)
+  })
+
+  it('routes inline-secret warnings through the configured warning sink', () => {
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), [
+      'version: 1',
+      'channels:',
+      '  custom:',
+      '    command: curl',
+      '    headers:',
+      '      Authorization: "Bearer literal-secret"',
+      '    auth:',
+      '      check: "true"',
+      '      failure_exit_codes: [1]',
+      '      recovery: "x"',
+    ].join('\n'))
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnings: string[] = []
+
+    loadConfig({ projectRoot: tmpDir, userHome: tmpDir, onWarning: (message) => warnings.push(message) })
+    warnSpy.mockRestore()
+
+    expect(warnings).toHaveLength(1)
+    expect(warnings[0]).toMatch(/Authorization/)
+    expect(warnSpy).not.toHaveBeenCalled()
+  })
+
   it('does not preserve arbitrary forward-compatible channel fields', () => {
     fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), [
       'version: 1',

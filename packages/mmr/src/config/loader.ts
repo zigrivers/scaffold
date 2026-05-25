@@ -9,12 +9,15 @@ import { isSecretKey } from '../core/redact.js'
 export interface LoadConfigOptions {
   projectRoot: string
   userHome?: string
+  onWarning?: (message: string) => void
   cliOverrides?: {
     fix_threshold?: string
     timeout?: number
     format?: string
   }
 }
+
+type WarningSink = (message: string) => void
 
 interface ConfigLayers {
   merged: Record<string, unknown>
@@ -166,13 +169,13 @@ function validateRunnableChannels(config: MmrConfigParsed): void {
   }
 }
 
-function warnOnInlineSecretHeaders(config: MmrConfigParsed): void {
+function warnOnInlineSecretHeaders(config: MmrConfigParsed, warn: WarningSink): void {
   for (const [name, channel] of Object.entries(config.channels)) {
-    const headers = (channel as unknown as { headers?: Record<string, string> }).headers
+    const headers = channel.headers
     if (!headers) continue
     for (const headerKey of Object.keys(headers)) {
-      if (isSecretKey(headerKey)) {
-        console.warn(
+      if (isSecretKey(headerKey, { exemptEnvNameKeys: false })) {
+        warn(
           `[mmr] warning: channel "${name}" has a literal "${headerKey}" header. ` +
           'Move the secret to an env var and reference it via api_key_env ' +
           '(api_key_env composes with HTTP channels landing in v3.30).',
@@ -220,7 +223,7 @@ function cliOverridesToConfig(cliOverrides: LoadConfigOptions['cliOverrides']): 
   return Object.keys(overrideDefaults).length > 0 ? { defaults: overrideDefaults } : {}
 }
 
-function parseMergedConfig(mergedRaw: Record<string, unknown>): MmrConfigParsed {
+function parseMergedConfig(mergedRaw: Record<string, unknown>, warn: WarningSink = console.warn): MmrConfigParsed {
   const merged = structuredClone(mergedRaw) as Record<string, unknown>
   if (isPlainRecord(merged.channels)) {
     merged.channels = resolveExtendsAcrossChannels(
@@ -229,7 +232,7 @@ function parseMergedConfig(mergedRaw: Record<string, unknown>): MmrConfigParsed 
   }
 
   const config = MmrConfigSchema.parse(merged)
-  warnOnInlineSecretHeaders(config)
+  warnOnInlineSecretHeaders(config, warn)
   validateRunnableChannels(config)
   return config
 }
@@ -247,7 +250,7 @@ function parseMergedConfig(mergedRaw: Record<string, unknown>): MmrConfigParsed 
  */
 export function loadConfig(opts: LoadConfigOptions): MmrConfigParsed {
   const { merged } = loadConfigLayers(opts)
-  return parseMergedConfig(merged)
+  return parseMergedConfig(merged, opts.onWarning)
 }
 
 export type ProvenanceSource = 'default' | 'user' | 'project' | 'cli'
@@ -351,7 +354,7 @@ export function loadConfigWithProvenance(opts: LoadConfigOptions): LoadConfigWit
   if (Object.keys(projectConfig).length > 0) applyProvenanceLayer(rawProvenance, projectConfig, 'project')
   if (Object.keys(cliConfig).length > 0) applyProvenanceLayer(rawProvenance, cliConfig, 'cli')
 
-  const config = parseMergedConfig(mergedRaw)
+  const config = parseMergedConfig(mergedRaw, opts.onWarning)
   const provenance: ConfigProvenance = { defaults: rawProvenance.defaults, channels: {} }
   fillDefaultProvenance(config.defaults, provenance.defaults)
   const mergedChannels = isPlainRecord(mergedRaw.channels)
