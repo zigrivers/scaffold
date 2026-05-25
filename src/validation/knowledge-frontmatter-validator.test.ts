@@ -55,6 +55,25 @@ describe('validateKnowledgeFile', () => {
     expect(result.errors[0].message).toMatch(/url/)
   })
 
+  it('errors when source.url would be refused by the SSRF guard (file://)', () => {
+    // Round-5 F-003: z.string().url() accepts file:, ftp:, javascript:, and
+    // localhost URLs. The refined schema rejects them at CI rather than
+    // letting them slip through to the audit runtime.
+    const file = tmpFile(
+      '---\nname: x\ndescription: y\nsources:\n  - url: file:///etc/passwd\n---\nbody',
+    )
+    const result = validateKnowledgeFile(file)
+    expect(result.errors.some(e => /SSRF guard/.test(e.message))).toBe(true)
+  })
+
+  it('errors when source.url points at localhost', () => {
+    const file = tmpFile(
+      '---\nname: x\ndescription: y\nsources:\n  - url: http://localhost:8080/\n---\nbody',
+    )
+    const result = validateKnowledgeFile(file)
+    expect(result.errors.some(e => /SSRF guard/.test(e.message))).toBe(true)
+  })
+
   it('warns when sources is empty and volatility is fast-moving', () => {
     const file = tmpFile('---\nname: x\ndescription: y\nvolatility: fast-moving\nsources: []\n---\nbody')
     const result = validateKnowledgeFile(file)

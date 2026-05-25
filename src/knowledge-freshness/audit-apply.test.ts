@@ -121,6 +121,50 @@ keep me
     expect(() => applyVerdictToEntry(baseEntry, verdict)).toThrow(/did not match/)
   })
 
+  it('coverage is anchor-aware: two same-base sources with different anchors must both be checked', () => {
+    // Round-5 F-002: an entry with two sources at the same base URL but
+    // different anchors must require BOTH anchors in verdict.sources_checked.
+    // Without this, an audit that only fetched #a would falsely satisfy
+    // coverage for both #a and #b.
+    const entry = `---
+name: x
+description: y
+topics: []
+sources:
+  - url: https://x
+    anchor: '#a'
+    hash: 'old-a'
+  - url: https://x
+    anchor: '#b'
+    hash: 'old-b'
+---
+
+## Deep Guidance
+
+body
+`
+    const verdictPartial = {
+      entry_name: 'x', audit_date: '2026-05-24', model: 'claude-opus-4-7',
+      verdict: 'current' as const,
+      sources_checked: [
+        { url: 'https://x#a', retrieved_at: '2026-05-24', content_hash: 'sha256:1', summary: '' },
+        // #b NOT checked
+      ],
+      findings: [], proposed_changes: [], preserve_warnings: [],
+    }
+    expect(() => applyVerdictToEntry(entry, verdictPartial)).toThrow(/missing entry source "https:\/\/x#b"/)
+
+    // Full coverage → passes.
+    const verdictFull = {
+      ...verdictPartial,
+      sources_checked: [
+        { url: 'https://x#a', retrieved_at: '2026-05-24', content_hash: 'sha256:1', summary: '' },
+        { url: 'https://x#b', retrieved_at: '2026-05-24', content_hash: 'sha256:2', summary: '' },
+      ],
+    }
+    expect(() => applyVerdictToEntry(entry, verdictFull)).not.toThrow()
+  })
+
   it('refuses to advance last-reviewed when sources_checked is missing a declared source', () => {
     // Round-2 F-002: a malformed/ungrounded verdict whose `sources_checked`
     // does not cover every declared frontmatter source must throw BEFORE

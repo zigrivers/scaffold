@@ -1,6 +1,11 @@
 import fs from 'node:fs'
 import yaml from 'js-yaml'
 import { z } from 'zod'
+import {
+  validateSourceUrl,
+  loadAuthoritativeAllowlist,
+  isAllowlistedSource,
+} from '../knowledge-freshness/source-url-validator.js'
 
 // Strict calendar-date refinement. A regex like /^\d{4}-\d{2}-\d{2}$/ accepts
 // "2026-99-99", which then becomes NaN at `new Date(...)` and silently breaks
@@ -14,8 +19,15 @@ const isoDateSchema = z.string()
     return d.toISOString().slice(0, 10) === s
   }, 'must be a real calendar date')
 
+// Reject sources that the SSRF guard would refuse at fetch time. The schema
+// gate catches them earlier (CI) so a malformed/unsafe entry doesn't slip
+// into `main` and then surprise the daily cron (round-5 F-003).
+const safeSourceUrl = z.string().url().refine((u) => validateSourceUrl(u).ok, {
+  message: 'source URL would be refused by the SSRF guard (file:, ftp:, localhost, private/link-local IP, etc.)',
+})
+
 const sourceSchema = z.object({
-  url: z.string().url(),
+  url: safeSourceUrl,
   // Anchors are appended to source.url literally by the audit meta-prompt, so
   // they must include the leading "#" to produce a valid URL fragment.
   anchor: z.string().regex(/^#/, 'anchor must start with "#"').optional(),
@@ -42,7 +54,12 @@ const DESCRIPTION_SOFT_MAX = 200
 export interface KBValidationIssue { message: string; field?: string }
 export interface KBValidationResult { errors: KBValidationIssue[]; warnings: KBValidationIssue[] }
 
-export function validateKnowledgeFile(filePath: string): KBValidationResult {
+export interface KBValidationOptions {
+  /** Project root used to locate `docs/knowledge-freshness/authoritative-sources.yaml`. */
+  projectRoot?: string
+}
+
+export function validateKnowledgeFile(filePath: string, opts: KBValidationOptions = {}): KBValidationResult {
   const errors: KBValidationIssue[] = []
   const warnings: KBValidationIssue[] = []
   const content = fs.readFileSync(filePath, 'utf8')
@@ -85,10 +102,28 @@ export function validateKnowledgeFile(filePath: string): KBValidationResult {
   if (!content.includes('## Deep Guidance')) {
     warnings.push({ message: 'missing "## Deep Guidance" heading — assembly engine will fall back to full body' })
   }
+  // Advisory: surface sources whose host is not in the authoritative-sources
+  // allowlist. Locked decision #4 — warn only, don't block (round-5 F-003).
+  if (opts.projectRoot && fm.sources.length > 0) {
+    const allowlist = loadAuthoritativeAllowlist(opts.projectRoot)
+    if (allowlist.hosts.length > 0 || allowlist.github_repos.length > 0) {
+      for (const src of fm.sources) {
+        try {
+          const url = new URL(src.url)
+          if (!isAllowlistedSource(url, allowlist)) {
+            warnings.push({
+              message: `source "${src.url}" host not in authoritative-sources.yaml allowlist (advisory)`,
+              field: 'sources',
+            })
+          }
+        } catch { /* unparseable URL already caught by schema */ }
+      }
+    }
+  }
   return { errors, warnings }
 }
 
-export function validateKnowledgeDir(dir: string): Map<string, KBValidationResult> {
+export function validateKnowledgeDir(dir: string, opts: KBValidationOptions = {}): Map<string, KBValidationResult> {
   const results = new Map<string, KBValidationResult>()
   function walk(d: string) {
     for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
@@ -97,7 +132,7 @@ export function validateKnowledgeDir(dir: string): Map<string, KBValidationResul
       // Skip directory READMEs — the assembly engine excludes them
       // (knowledge-loader.ts:138-139, :186-187), so we don't validate them either.
       else if (entry.isFile() && p.endsWith('.md') && entry.name !== 'README.md') {
-        results.set(p, validateKnowledgeFile(p))
+        results.set(p, validateKnowledgeFile(p, opts))
       }
     }
   }

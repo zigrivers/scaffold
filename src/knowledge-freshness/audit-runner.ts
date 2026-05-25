@@ -3,7 +3,12 @@ import path from 'node:path'
 import { z } from 'zod'
 import { extractKBFrontmatter } from '../core/assembly/knowledge-loader.js'
 import { getPackageRoot } from '../utils/fs.js'
-import { assertSafeSourceUrl } from './source-url-validator.js'
+import {
+  assertSafeSourceUrl,
+  assertSafeSourceUrlWithDns,
+  defaultResolver,
+  type Resolver,
+} from './source-url-validator.js'
 
 export type Dispatcher = (prompt: string) => Promise<string>
 
@@ -34,6 +39,14 @@ export type AuditVerdict = z.infer<typeof verdictSchema>
 export interface RunEntryAuditOptions {
   /** Override the meta-prompt path. Defaults to the bundled `content/tools/knowledge-audit-entry.md`. */
   promptPath?: string
+  /** Override the DNS resolver used for the rebinding guard (round-5 F-001). Default: Node `dns.promises`. */
+  resolver?: Resolver
+  /**
+   * Skip the DNS-rebinding check. Used only by tests that supply fixture
+   * URLs which aren't expected to resolve (e.g. `https://x`). Defaults to
+   * running the check.
+   */
+  skipDnsCheck?: boolean
 }
 
 export async function runEntryAudit(
@@ -48,10 +61,18 @@ export async function runEntryAudit(
   // Validate each source URL against the SSRF guard BEFORE we hand them to the
   // `claude -p` subprocess via the prompt body — the meta-prompt will WebFetch
   // each one, and the subprocess is harder to constrain than this Node side.
-  // Round-3 F-001. (fetchAndHash also validates, but that path runs in
-  // prefilter/apply; the meta-prompt dispatch needs its own check.)
+  // Round-3 F-001 added the sync check; round-5 F-001 additionally resolves
+  // hostnames and checks A/AAAA records against the IP blocklists (DNS-
+  // rebinding guard). TOCTOU residual: the subprocess re-resolves at fetch
+  // time; full pinning is Phase 2 roadmap.
+  const resolver = opts.resolver ?? defaultResolver
   for (const s of fm.sources) {
-    assertSafeSourceUrl(s.url + (s.anchor ?? ''))
+    const targetUrl = s.url + (s.anchor ?? '')
+    if (opts.skipDnsCheck) {
+      assertSafeSourceUrl(targetUrl)
+    } else {
+      await assertSafeSourceUrlWithDns(targetUrl, resolver)
+    }
   }
 
   // Re-emit the frontmatter with the same hyphenated keys the meta-prompt

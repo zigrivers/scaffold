@@ -3,8 +3,9 @@ import { validateKnowledgeDir } from '../../validation/knowledge-frontmatter-val
 import path from 'node:path'
 
 async function runValidateKnowledge(): Promise<number> {
+  const projectRoot = path.resolve('.')
   const dir = path.resolve('content/knowledge')
-  const results = validateKnowledgeDir(dir)
+  const results = validateKnowledgeDir(dir, { projectRoot })
   let errorCount = 0
   let warnCount = 0
   for (const [file, r] of results) {

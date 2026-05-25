@@ -1,7 +1,10 @@
 import { createHash } from 'node:crypto'
-import { assertSafeSourceUrl } from './source-url-validator.js'
+import { assertSafeSourceUrlWithDns, defaultResolver, type Resolver } from './source-url-validator.js'
 
 const MAX_REDIRECT_HOPS = 5
+
+/** Test-injectable options. Production callers omit this. */
+export interface FetchAndHashOptions { resolver?: Resolver }
 
 /**
  * GET a URL and sha256 its body. Used by:
@@ -20,10 +23,16 @@ const MAX_REDIRECT_HOPS = 5
  * redirect-without-Location so callers can decide whether to skip
  * (pre-filter) or abort (apply).
  */
-export async function fetchAndHash(url: string): Promise<{ hash: string; body: string }> {
+export async function fetchAndHash(
+  url: string,
+  opts: FetchAndHashOptions = {},
+): Promise<{ hash: string; body: string }> {
+  const resolver = opts.resolver ?? defaultResolver
   let current = url
   for (let hop = 0; hop <= MAX_REDIRECT_HOPS; hop++) {
-    assertSafeSourceUrl(current)
+    // DNS-rebinding guard: also resolve the hostname and check every returned
+    // IP, not just the literal hostname (round-5 F-001).
+    await assertSafeSourceUrlWithDns(current, resolver)
     const res = await fetch(current, { redirect: 'manual' })
 
     // 3xx with a Location header → re-validate and follow.

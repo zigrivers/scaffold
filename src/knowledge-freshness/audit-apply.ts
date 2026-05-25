@@ -72,15 +72,27 @@ export function applyVerdictToEntry(
   // audit didn't fetch it — marking the entry reviewed in that state would
   // leave the source un-checked AND skip it from the prefilter until cadence
   // expires (round-2 F-002).
+  //
+  // Coverage is ANCHOR-AWARE (round-5 F-002): if a frontmatter source carries
+  // an `anchor`, the verdict URL must match `url + anchor` exactly. Without
+  // this, an entry with two sources at the same base URL but different
+  // anchors (`#a` vs `#b`) could be partially audited yet treated as fully
+  // covered. Sources without an anchor still match leniently — a verdict URL
+  // that happens to carry a fragment counts.
   if (Array.isArray(fmObj['sources'])) {
-    const sourcesArr = fmObj['sources'] as Array<{ url?: string; hash?: string; retrieved?: string }>
-    const checkedUrls = new Set(verdict.sources_checked.map((c) => normalizeUrl(c.url)))
+    const sourcesArr = fmObj['sources'] as Array<{ url?: string; anchor?: string; hash?: string; retrieved?: string }>
     for (const s of sourcesArr) {
       if (!s.url) continue
-      const sNormalized = normalizeUrl(s.url)
-      if (!checkedUrls.has(sNormalized)) {
+      const url = s.url
+      const anchor = typeof s.anchor === 'string' ? s.anchor : ''
+      const hasAnchor = anchor.length > 0
+      const covered = hasAnchor
+        ? verdict.sources_checked.some((c) => c.url === url + anchor)
+        : verdict.sources_checked.some((c) => normalizeUrl(c.url) === normalizeUrl(url))
+      if (!covered) {
+        const target = hasAnchor ? url + anchor : url
         throw new Error(
-          `verdict.sources_checked is missing entry source "${sNormalized}" — ` +
+          `verdict.sources_checked is missing entry source "${target}" — ` +
           'refusing to advance last-reviewed when the audit did not cover every declared source. ' +
           'Either the audit failed for that source (rerun) or the verdict is malformed.',
         )

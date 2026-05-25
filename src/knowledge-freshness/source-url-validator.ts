@@ -110,6 +110,57 @@ export function validateSourceUrl(raw: string): ValidationResult {
 }
 
 /**
+ * Resolve a hostname to its A/AAAA records. Pulled out as an injectable type
+ * so tests can stub DNS without hitting the network. The real resolver uses
+ * Node's `dns.promises`.
+ */
+export type Resolver = (host: string) => Promise<string[]>
+
+export const defaultResolver: Resolver = async (host) => {
+  const dns = await import('node:dns')
+  const addrs: string[] = []
+  // resolve4 / resolve6 throw on NXDOMAIN. We try both and pool the answers;
+  // a missing record family is normal (no AAAA on an IPv4-only host).
+  try { addrs.push(...await dns.promises.resolve4(host)) } catch { /* no A records */ }
+  try { addrs.push(...await dns.promises.resolve6(host)) } catch { /* no AAAA records */ }
+  return addrs
+}
+
+/**
+ * Same as `assertSafeSourceUrl`, but ALSO resolves the hostname and checks
+ * every returned IP against the IPv4/IPv6 blocklists. Prevents DNS-rebinding
+ * attacks where a public hostname resolves to a private IP (round-5 F-001).
+ *
+ * TOCTOU residual risk: a DNS record can change between this check and the
+ * actual fetch. Phase 1 accepts the residual risk in exchange for the simpler
+ * implementation; pinning the fetch to a validated IP is roadmap (Phase 2).
+ */
+export async function assertSafeSourceUrlWithDns(raw: string, resolver: Resolver = defaultResolver): Promise<URL> {
+  const url = assertSafeSourceUrl(raw)
+  let host = url.hostname
+  if (host.startsWith('[') && host.endsWith(']')) host = host.slice(1, -1)
+  // Skip DNS for raw IP literals — already validated by the sync guard.
+  if (net.isIP(host) !== 0) return url
+  const ips = await resolver(host)
+  for (const ip of ips) {
+    const kind = net.isIP(ip)
+    if (kind === 4 && isBlockedIPv4(ip)) {
+      throw new Error(
+        `[knowledge-freshness] DNS-rebinding guard: "${host}" resolves to blocked IPv4 ${ip}. ` +
+        'Source URLs that route to private networks are rejected even if the hostname looks public.',
+      )
+    }
+    if (kind === 6 && isBlockedIPv6(ip)) {
+      throw new Error(
+        `[knowledge-freshness] DNS-rebinding guard: "${host}" resolves to blocked IPv6 ${ip}. ` +
+        'Source URLs that route to private networks are rejected even if the hostname looks public.',
+      )
+    }
+  }
+  return url
+}
+
+/**
  * Throws if the URL would route to a restricted target. Use at every external
  * fetch boundary; the helper is intentionally identical for prefilter, apply,
  * and meta-prompt dispatch so one guard covers all three callsites.
