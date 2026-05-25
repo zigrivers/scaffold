@@ -16,8 +16,10 @@ import { isSecretKey, redactChannel } from '../core/redact.js'
 interface ConfigArgs {
   action: string
   name?: string
+  target?: string
   'with-examples'?: boolean
   'no-redact'?: boolean
+  redact?: boolean
 }
 
 async function ossProbeResults(): Promise<Map<OssRuntimeId, boolean>> {
@@ -140,12 +142,14 @@ async function configTest(): Promise<void> {
   process.exit(allOk ? 0 : 1)
 }
 
-function configChannels(opts: { name?: string, noRedact?: boolean } = {}): void {
+function configChannels(opts: { name?: string, target?: string, noRedact?: boolean } = {}): boolean {
   const rawName = opts.name
+  if (rawName === 'show' && opts.target) {
+    return showChannel(opts.target, { noRedact: opts.noRedact === true })
+  }
   if (rawName && rawName.startsWith('show:')) {
     const channelName = rawName.slice('show:'.length).trim()
-    showChannel(channelName, { noRedact: opts.noRedact === true })
-    return
+    return showChannel(channelName, { noRedact: opts.noRedact === true })
   }
 
   const config = loadConfig({ projectRoot: process.cwd() })
@@ -162,16 +166,16 @@ function configChannels(opts: { name?: string, noRedact?: boolean } = {}): void 
     }
   })
   console.log(JSON.stringify(channels, null, 2))
+  return true
 }
 
-function showChannel(name: string, opts: { noRedact: boolean }): void {
+function showChannel(name: string, opts: { noRedact: boolean }): boolean {
   const { config, provenance } = loadConfigWithProvenance({ projectRoot: process.cwd() })
   const ch = config.channels[name]
   if (!ch) {
     const known = Object.keys(config.channels).join(', ')
     console.error(`Channel "${name}" not found. Known channels: ${known}`)
-    process.exit(1)
-    return
+    return false
   }
 
   const display = opts.noRedact
@@ -187,6 +191,7 @@ function showChannel(name: string, opts: { noRedact: boolean }): void {
   const prov = provenance.channels[name] ?? {}
   console.log(`# Channel: ${name}`)
   printWithProvenance(display as Record<string, unknown>, prov, 0)
+  return true
 }
 
 function printWithProvenance(
@@ -202,15 +207,14 @@ function printWithProvenance(
       printWithProvenance(v as Record<string, unknown>, nestedProv, indent + 1)
     } else {
       const source = typeof prov[k] === 'string' ? (prov[k] as ProvenanceSource) : 'default'
-      const rendered = renderScalar(k, v)
+      const rendered = renderScalar(v)
       console.log(`${pad}${k}: ${rendered}  # from ${source}`)
     }
   }
 }
 
-function renderScalar(key: string, value: unknown): string {
+function renderScalar(value: unknown): string {
   if (value === '<redacted>') return '<redacted>'
-  if (key === 'command' && typeof value === 'string') return value
   return JSON.stringify(value)
 }
 
@@ -248,7 +252,7 @@ function isCommandSecretKey(name: string): boolean {
 }
 
 export const configCommand: CommandModule<object, ConfigArgs> = {
-  command: 'config <action> [name]',
+  command: 'config <action> [name] [target]',
   describe: 'Manage mmr configuration',
   builder: (yargs) =>
     yargs
@@ -262,15 +266,19 @@ export const configCommand: CommandModule<object, ConfigArgs> = {
         type: 'string',
         describe: 'Optional config target, such as show:<channel> for channels',
       })
+      .positional('target', {
+        type: 'string',
+        describe: 'Optional target name for config channels show <channel>',
+      })
       .option('with-examples', {
         type: 'boolean',
         default: false,
         describe: 'Emit all OSS runtime example blocks (init)',
       })
-      .option('no-redact', {
+      .option('redact', {
         type: 'boolean',
-        default: false,
-        describe: 'Disable secret redaction for config channels show',
+        default: true,
+        describe: 'Redact secrets for config channels show',
       }),
   handler: async (args: ArgumentsCamelCase<ConfigArgs>) => {
     switch (args.action) {
@@ -280,9 +288,15 @@ export const configCommand: CommandModule<object, ConfigArgs> = {
     case 'test':
       await configTest()
       break
-    case 'channels':
-      configChannels({ name: args.name, noRedact: args['no-redact'] === true })
+    case 'channels': {
+      const ok = configChannels({
+        name: args.name,
+        target: args.target,
+        noRedact: args.redact === false || args['no-redact'] === true,
+      })
+      if (!ok) process.exit(1)
       break
+    }
     default:
       console.error(`Unknown config action: ${args.action}`)
       process.exit(1)

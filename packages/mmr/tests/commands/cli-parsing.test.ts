@@ -91,4 +91,16 @@ describe('config command argv parsing', () => {
     expect(args.action).toBe('channels')
     expect(args.name).toBe('show:claude')
   })
+
+  it('accepts config channels show <name> as optional positionals', () => {
+    const args = parse(configCommand, ['config', 'channels', 'show', 'claude'])
+    expect(args.action).toBe('channels')
+    expect(args.name).toBe('show')
+    expect(args.target).toBe('claude')
+  })
+
+  it('parses --no-redact as redact=false', () => {
+    const args = parse(configCommand, ['config', 'channels', 'show:claude', '--no-redact'])
+    expect(args.redact).toBe(false)
+  })
 })

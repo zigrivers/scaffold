@@ -38,7 +38,7 @@ describe('mmr config channels show <name> (T1-E)', () => {
     exitSpy.mockRestore()
     logSpy.mockRestore()
 
-    expect(output).toMatch(/^command: claude -p\s+# from default$/m)
+    expect(output).toMatch(/^command: "claude -p"\s+# from default$/m)
     expect(output).toMatch(/^timeout: 600\s+# from project$/m)
   })
 
@@ -103,6 +103,59 @@ describe('mmr config channels show <name> (T1-E)', () => {
 
     expect(output).toMatch(/^command: <redacted>\s+# from project$/m)
     expect(output).not.toMatch(/sk-live/)
+  })
+
+  it('quotes command values so provenance comments remain unambiguous', async () => {
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), [
+      'version: 1',
+      'channels:',
+      '  local:',
+      '    command: "echo #literal"',
+    ].join('\n'))
+    const { configCommand } = await import('../../src/commands/config.js')
+    const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(tmpDir)
+    const homeSpy = vi.spyOn(os, 'homedir').mockReturnValue(tmpDir)
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never)
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await configCommand.handler({
+      action: 'channels',
+      name: 'show:local',
+      _: ['config'],
+      $0: 'mmr',
+    } as never)
+
+    const output = logSpy.mock.calls.map((c) => c.join(' ')).join('\n')
+    cwdSpy.mockRestore()
+    homeSpy.mockRestore()
+    exitSpy.mockRestore()
+    logSpy.mockRestore()
+
+    expect(output).toMatch(/^command: "echo #literal"\s+# from project$/m)
+  })
+
+  it('supports conventional channels show <name> invocation shape', async () => {
+    const { configCommand } = await import('../../src/commands/config.js')
+    const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(tmpDir)
+    const homeSpy = vi.spyOn(os, 'homedir').mockReturnValue(tmpDir)
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never)
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await configCommand.handler({
+      action: 'channels',
+      name: 'show',
+      target: 'claude',
+      _: ['config'],
+      $0: 'mmr',
+    } as never)
+
+    const output = logSpy.mock.calls.map((c) => c.join(' ')).join('\n')
+    cwdSpy.mockRestore()
+    homeSpy.mockRestore()
+    exitSpy.mockRestore()
+    logSpy.mockRestore()
+
+    expect(output).toMatch(/# Channel: claude/)
   })
 
   it('escapes quoted string values in channel output', async () => {
