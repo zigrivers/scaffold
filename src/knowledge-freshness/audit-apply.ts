@@ -66,6 +66,28 @@ export function applyVerdictToEntry(
 
   // Parse frontmatter with a safe schema so ISO dates stay strings (round-1 F-001).
   const fmObj = yaml.load(lines.slice(1, close).join('\n'), { schema: yaml.JSON_SCHEMA }) as Record<string, unknown>
+
+  // Before advancing `last-reviewed`, verify the verdict covers every declared
+  // source. A verdict that's missing one of the entry's sources implies the
+  // audit didn't fetch it — marking the entry reviewed in that state would
+  // leave the source un-checked AND skip it from the prefilter until cadence
+  // expires (round-2 F-002).
+  if (Array.isArray(fmObj['sources'])) {
+    const sourcesArr = fmObj['sources'] as Array<{ url?: string; hash?: string; retrieved?: string }>
+    const checkedUrls = new Set(verdict.sources_checked.map((c) => normalizeUrl(c.url)))
+    for (const s of sourcesArr) {
+      if (!s.url) continue
+      const sNormalized = normalizeUrl(s.url)
+      if (!checkedUrls.has(sNormalized)) {
+        throw new Error(
+          `verdict.sources_checked is missing entry source "${sNormalized}" — ` +
+          'refusing to advance last-reviewed when the audit did not cover every declared source. ' +
+          'Either the audit failed for that source (rerun) or the verdict is malformed.',
+        )
+      }
+    }
+  }
+
   fmObj['last-reviewed'] = verdict.audit_date
 
   if (Array.isArray(fmObj['sources'])) {

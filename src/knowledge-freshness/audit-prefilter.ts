@@ -49,5 +49,10 @@ export async function selectAuditCandidates(
     if (select) candidates.push({ entry: e, priority })
   }
   candidates.sort((a, b) => b.priority - a.priority)
-  return candidates.slice(0, opts.max).map(c => c.entry)
+  // Defensive: clamp max to a positive integer. Negative values would make
+  // `slice(0, -n)` return all-but-n, silently bypassing the ceiling (round-2
+  // F-003). The yargs CLI also rejects non-positive integers, but the library
+  // is callable from tests and other CLIs, so the guard belongs here too.
+  const ceiling = Number.isInteger(opts.max) && opts.max > 0 ? opts.max : 0
+  return candidates.slice(0, ceiling).map(c => c.entry)
 }

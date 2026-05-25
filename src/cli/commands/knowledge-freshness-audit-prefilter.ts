@@ -17,6 +17,15 @@ const auditPrefilterCommand: CommandModule<Record<string, unknown>, AuditPrefilt
       type: 'number',
       default: 10,
       describe: 'Maximum number of candidates to return (daily ceiling)',
+      coerce: (value: number) => {
+        // Guard against negative / fractional / zero. `slice(0, -1)` would
+        // bypass the ceiling silently by returning all-but-last; clamp to a
+        // positive integer (round-2 F-003).
+        if (!Number.isFinite(value) || !Number.isInteger(value) || value < 1) {
+          throw new Error(`--max must be a positive integer; got ${value}`)
+        }
+        return value
+      },
     }),
   handler: async (argv) => {
     const cwd = findProjectRoot(process.cwd()) ?? process.cwd()

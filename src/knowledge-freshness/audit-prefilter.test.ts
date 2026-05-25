@@ -81,4 +81,15 @@ describe('selectAuditCandidates', () => {
     const out = await selectAuditCandidates(entries, { now: today, max: 2, fetch })
     expect(out).toHaveLength(2)
   })
+
+  it('returns no candidates when max is 0, negative, or non-integer (no ceiling bypass)', async () => {
+    const fetch = vi.fn().mockResolvedValue({ hash: 'new' }) as unknown as FetchSourceFn
+    const entries = Array.from({ length: 5 }, (_, i) =>
+      entry({ name: `e${i}`, sources: [{ url: `https://x${i}`, hash: 'old' }], lastReviewed: null }),
+    )
+    // Negative would otherwise become `slice(0, -1)` → "all but last" (round-2 F-003).
+    expect(await selectAuditCandidates(entries, { now: today, max: -1, fetch })).toEqual([])
+    expect(await selectAuditCandidates(entries, { now: today, max: 0, fetch })).toEqual([])
+    expect(await selectAuditCandidates(entries, { now: today, max: 1.5, fetch })).toEqual([])
+  })
 })

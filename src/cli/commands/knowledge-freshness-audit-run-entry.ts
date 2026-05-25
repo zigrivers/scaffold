@@ -27,7 +27,13 @@ const auditRunEntryCommand: CommandModule<Record<string, unknown>, AuditRunEntry
     // would allow arbitrary code execution when auditing untrusted repositories.
     // Only the timeout is exposed as a flag (performance only, not code execution).
     // Matches the security stance of src/observability/checks/lens-h-cross-doc.ts.
-    const command = 'claude -p'
+    //
+    // `--allowedTools WebFetch` is REQUIRED for headless / cron audits:
+    // without it, the meta-prompt's WebFetch calls block on a permission
+    // prompt that never arrives in `-p` (non-interactive) mode. The allowlist
+    // is intentionally narrow — only WebFetch is needed by the audit prompt,
+    // so we don't grant anything broader (no Bash, no Write, no Edit).
+    const command = 'claude -p --allowedTools WebFetch'
     const timeoutMs = argv.timeout * 1000
 
     const dispatcher: Dispatcher = async (prompt) => {

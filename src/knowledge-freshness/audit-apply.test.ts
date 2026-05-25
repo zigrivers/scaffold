@@ -20,10 +20,18 @@ sources:
 Old content.
 `
 
+  // Covers `baseEntry`'s single source so the round-2 F-002 guard (refuse to
+  // advance last-reviewed when the verdict does not cover every declared
+  // source) does not fire on tests that focus on heading or frontmatter
+  // behavior rather than source-coverage behavior.
+  const baseEntryChecked = [
+    { url: 'https://x', retrieved_at: '2026-05-24', content_hash: 'sha256:new', summary: '' },
+  ]
+
   it('updates last-reviewed to verdict.audit_date', () => {
     const verdict = {
       entry_name: 'x', audit_date: '2026-05-24', model: 'claude-opus-4-7',
-      verdict: 'current' as const, sources_checked: [], findings: [],
+      verdict: 'current' as const, sources_checked: baseEntryChecked, findings: [],
       proposed_changes: [], preserve_warnings: [],
     }
     const out = applyVerdictToEntry(baseEntry, verdict)
@@ -51,7 +59,7 @@ keep me
 `
     const verdict = {
       entry_name: 'x', audit_date: '2026-05-24', model: 'claude-opus-4-7',
-      verdict: 'major-drift' as const, sources_checked: [], findings: [],
+      verdict: 'major-drift' as const, sources_checked: baseEntryChecked, findings: [],
       proposed_changes: [
         { location: '## OWASP Top 10', kind: 'insert' as const,
           rationale: '', new_text: '> 2025 edition adds A11 Software Supply Chain Failures.' },
@@ -76,7 +84,7 @@ keep me
   it('applies a replace proposed_change targeting "## Deep Guidance"', () => {
     const verdict = {
       entry_name: 'x', audit_date: '2026-05-24', model: 'claude-opus-4-7',
-      verdict: 'major-drift' as const, sources_checked: [], findings: [],
+      verdict: 'major-drift' as const, sources_checked: baseEntryChecked, findings: [],
       proposed_changes: [
         { location: '## Deep Guidance', kind: 'replace' as const,
           rationale: '', new_text: '## Deep Guidance\n\nNew content with [source](https://x).\n' },
@@ -91,7 +99,7 @@ keep me
   it('preserves the "## Deep Guidance" heading if a proposed_change tries to delete it', () => {
     const verdict = {
       entry_name: 'x', audit_date: '2026-05-24', model: 'claude-opus-4-7',
-      verdict: 'major-drift' as const, sources_checked: [], findings: [],
+      verdict: 'major-drift' as const, sources_checked: baseEntryChecked, findings: [],
       proposed_changes: [
         { location: '## Deep Guidance', kind: 'delete' as const, rationale: '' },
       ],
@@ -103,7 +111,7 @@ keep me
   it('throws when a proposed_change.location does not match a heading (no silent last-reviewed advance)', () => {
     const verdict = {
       entry_name: 'x', audit_date: '2026-05-24', model: 'claude-opus-4-7',
-      verdict: 'major-drift' as const, sources_checked: [], findings: [],
+      verdict: 'major-drift' as const, sources_checked: baseEntryChecked, findings: [],
       proposed_changes: [
         { location: '## Nonexistent Heading', kind: 'replace' as const,
           rationale: '', new_text: '## Nonexistent Heading\n\nx' },
@@ -111,6 +119,21 @@ keep me
       preserve_warnings: [],
     }
     expect(() => applyVerdictToEntry(baseEntry, verdict)).toThrow(/did not match/)
+  })
+
+  it('refuses to advance last-reviewed when sources_checked is missing a declared source', () => {
+    // Round-2 F-002: a malformed/ungrounded verdict whose `sources_checked`
+    // does not cover every declared frontmatter source must throw BEFORE
+    // last-reviewed is updated. Otherwise the prefilter would skip the entry
+    // until cadence expires, leaving the un-checked source stale.
+    const verdict = {
+      entry_name: 'x', audit_date: '2026-05-24', model: 'claude-opus-4-7',
+      verdict: 'current' as const,
+      // Empty: doesn't cover baseEntry's `https://x` source.
+      sources_checked: [],
+      findings: [], proposed_changes: [], preserve_warnings: [],
+    }
+    expect(() => applyVerdictToEntry(baseEntry, verdict)).toThrow(/missing entry source/)
   })
 
   it('rejects an H3 (### …) location — Phase 1 supports H2 only', () => {
@@ -131,7 +154,7 @@ content
 `
     const verdict = {
       entry_name: 'x', audit_date: '2026-05-24', model: 'claude-opus-4-7',
-      verdict: 'major-drift' as const, sources_checked: [], findings: [],
+      verdict: 'major-drift' as const, sources_checked: baseEntryChecked, findings: [],
       proposed_changes: [
         { location: '### Some Subsection', kind: 'replace' as const,
           rationale: '', new_text: '### Some Subsection\n\nnew content' },
@@ -161,7 +184,7 @@ x
 `
     const verdict = {
       entry_name: 'x', audit_date: '2026-05-24', model: 'claude-opus-4-7',
-      verdict: 'major-drift' as const, sources_checked: [], findings: [],
+      verdict: 'major-drift' as const, sources_checked: baseEntryChecked, findings: [],
       proposed_changes: [
         { location: '# Some H1', kind: 'replace' as const,
           rationale: '', new_text: '# Some H1\n\nnew' },
@@ -190,7 +213,7 @@ keep me
 `
     const verdict = {
       entry_name: 'x', audit_date: '2026-05-24', model: 'claude-opus-4-7',
-      verdict: 'major-drift' as const, sources_checked: [], findings: [],
+      verdict: 'major-drift' as const, sources_checked: baseEntryChecked, findings: [],
       proposed_changes: [
         { location: '## Deprecated Section', kind: 'delete' as const, rationale: '' },
       ],
@@ -206,7 +229,7 @@ keep me
   it('preserves literal "$1" in new_text (no replace-string interpolation)', () => {
     const verdict = {
       entry_name: 'x', audit_date: '2026-05-24', model: 'claude-opus-4-7',
-      verdict: 'major-drift' as const, sources_checked: [], findings: [],
+      verdict: 'major-drift' as const, sources_checked: baseEntryChecked, findings: [],
       proposed_changes: [
         { location: '## Deep Guidance', kind: 'replace' as const,
           rationale: '', new_text: '## Deep Guidance\n\nCost: $1 per request, $20/month plan.' },
@@ -220,7 +243,7 @@ keep me
   it('throws when minor-drift or current verdicts carry proposed_changes', () => {
     const verdict = {
       entry_name: 'x', audit_date: '2026-05-24', model: 'claude-opus-4-7',
-      verdict: 'minor-drift' as const, sources_checked: [], findings: [],
+      verdict: 'minor-drift' as const, sources_checked: baseEntryChecked, findings: [],
       proposed_changes: [
         { location: '## Deep Guidance', kind: 'replace' as const,
           rationale: '', new_text: '## Deep Guidance\n\nNew.' },
@@ -343,7 +366,7 @@ keep me
 `
     const verdict = {
       entry_name: 'x', audit_date: '2026-05-24', model: 'claude-opus-4-7',
-      verdict: 'major-drift' as const, sources_checked: [], findings: [],
+      verdict: 'major-drift' as const, sources_checked: baseEntryChecked, findings: [],
       proposed_changes: [
         { location: '## Old Section', kind: 'delete' as const, rationale: '' },
       ],
@@ -361,7 +384,7 @@ keep me
   it('rejects near-miss heading replacements that would break extractDeepGuidance()', () => {
     const verdict = {
       entry_name: 'x', audit_date: '2026-05-24', model: 'claude-opus-4-7',
-      verdict: 'major-drift' as const, sources_checked: [], findings: [],
+      verdict: 'major-drift' as const, sources_checked: baseEntryChecked, findings: [],
       proposed_changes: [
         // "## Deep Guidance (Updated)" starts with "## Deep Guidance" but is
         // NOT the exact heading the assembly engine matches. Must throw.
@@ -376,7 +399,7 @@ keep me
   it('protects "## Summary" the same way it protects "## Deep Guidance"', () => {
     const verdict = {
       entry_name: 'x', audit_date: '2026-05-24', model: 'claude-opus-4-7',
-      verdict: 'major-drift' as const, sources_checked: [], findings: [],
+      verdict: 'major-drift' as const, sources_checked: baseEntryChecked, findings: [],
       proposed_changes: [
         { location: '## Summary', kind: 'delete' as const, rationale: '' },
       ],
@@ -402,7 +425,7 @@ Old content.
 `
     const verdict = {
       entry_name: 'x', audit_date: '2026-05-24', model: 'claude-opus-4-7',
-      verdict: 'current' as const, sources_checked: [], findings: [],
+      verdict: 'current' as const, sources_checked: baseEntryChecked, findings: [],
       proposed_changes: [], preserve_warnings: [],
     }
     const out = applyVerdictToEntry(entryWithUnquotedDate, verdict)
