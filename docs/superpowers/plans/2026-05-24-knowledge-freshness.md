@@ -1010,7 +1010,7 @@ Expected: PASS (all 6 tests).
 
 Create `src/cli/commands/knowledge-freshness-audit-prefilter.ts` — exports a yargs subcommand (same `CommandModule` shape as Task 2). It reuses `loadFullEntries` from the assembly engine to load entries, calls `selectAuditCandidates` with `fetchAndHash` from `src/knowledge-freshness/source-hash.ts`, and prints the resulting candidate names as JSON on stdout.
 
-**Register as a subcommand of a `knowledge-freshness` parent command** at `src/cli/index.ts`, mirroring the existing `src/cli/commands/observe.ts` pattern (which nests `observe event`, `observe progress`, etc.). This is what makes Task 9's invocation `node dist/index.js knowledge-freshness audit-prefilter` resolve. Do not register as a flat command — Task 9 invokes the nested form.
+**Register as a subcommand of the `knowledge-freshness` parent** in `src/cli/commands/knowledge-freshness.ts` (the parent module created in Step 0b). The parent's `.builder` already chains `.command(auditPrefilterCommand)` from Step 0b — when this step's subcommand file is created, Step 0b's import line resolves and the nested invocation `node dist/index.js knowledge-freshness audit-prefilter` works. Do not register at the top level in `src/cli/index.ts`; the parent itself was registered there once in Step 0b.
 
 - [ ] **Step 6: Commit**
 
@@ -1296,7 +1296,7 @@ Expected: PASS.
 
 - [ ] **Step 5: Wire CLI subcommand and dispatcher**
 
-In `src/cli/commands/knowledge-freshness-audit-run-entry.ts`, import the existing LLM dispatcher pattern from `src/observability/engine/llm-dispatcher.ts` (specifically the subprocess invocation of `claude -p` with timeout). Inject it as the `Dispatcher` and call `runEntryAudit(entryPath, dispatcher)`. Print verdict JSON to stdout. Register in CLI dispatch.
+In `src/cli/commands/knowledge-freshness-audit-run-entry.ts`, import the existing LLM dispatcher pattern from `src/observability/engine/llm-dispatcher.ts` (specifically the subprocess invocation of `claude -p` with timeout). Inject it as the `Dispatcher` and call `runEntryAudit(entryPath, dispatcher)`. Print verdict JSON to stdout. Export as a `CommandModule` matching the Task 2/6 pattern, then **add the subcommand to the `knowledge-freshness` parent** in `src/cli/commands/knowledge-freshness.ts` (import `auditRunEntryCommand` + chain `.command(auditRunEntryCommand)` into the parent's builder). Do not touch `src/cli/index.ts`; the parent is already registered from Task 6 Step 0b.
 
 If the observability LLM dispatcher does not export a reusable function, extract the subprocess-invocation portion into `src/observability/engine/llm-dispatcher.ts`'s exported surface as part of this task (small refactor, no behavior change) and add a single test exercising the extracted helper. The hardcoded `claude -p` and the security rationale must be preserved.
 
@@ -1878,7 +1878,7 @@ Create `src/cli/commands/knowledge-freshness-audit-apply.ts` that takes two posi
 4. Write the result back to `<entry-path>`.
 5. Run `git diff <entry-path>` for the operator to see.
 
-**Register the command in `src/cli/index.ts`** — same yargs pattern as Tasks 2, 6, and 7. Without dispatcher registration, the built CLI has no `audit-apply` subcommand and Task 9's invocation fails at runtime.
+**Add the subcommand to the `knowledge-freshness` parent command** in `src/cli/commands/knowledge-freshness.ts` — import `auditApplyCommand` and chain `.command(auditApplyCommand)` into the parent's builder, matching the pattern set in Task 6 Step 0b. Do NOT register at the top level in `src/cli/index.ts`; the parent command is already registered there from Task 6 and Task 9's invocation expects the nested form (`knowledge-freshness audit-apply`).
 
 The signature is explicit (path first, verdict second) because the verdict schema intentionally does not carry a filesystem path — keeping the path out of LLM-emitted output preserves the safety property that the LLM cannot redirect writes to an unrelated file. Likewise, source hashes are recomputed in Node rather than trusted from the LLM, because LLM-emitted sha256s cannot be deterministically verified.
 

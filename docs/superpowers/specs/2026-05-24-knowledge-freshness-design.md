@@ -261,7 +261,7 @@ The 10 entries to backfill `sources:` and `volatility` for first (decisions-lock
 6. `core/multi-service-api-contracts.md` — `evolving`.
 7. `core/multi-service-auth.md` — OAuth / OIDC RFCs, `evolving`.
 8. `core/multi-service-testing.md` — `evolving`.
-9. `core/multi-service-patterns.md` — `evolving`.
+9. `core/multi-service-resilience.md` — `evolving`. (Originally listed as `multi-service-patterns.md`, which doesn't exist in the tree; verified live with `ls content/knowledge/core/`.)
 10. `core/api-design.md` — OpenAPI / GraphQL specs, `evolving`.
 
 This mix validates both the `fast-moving` 14-day cadence and the `evolving` 60-day cadence in real conditions during Phase 1/2.
