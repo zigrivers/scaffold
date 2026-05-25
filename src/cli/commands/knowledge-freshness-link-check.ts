@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import type { CommandModule } from 'yargs'
+import type { Argv, CommandModule } from 'yargs'
 import { parseEntry } from '../../knowledge-freshness/gates/parse-entry.js'
 import { checkUrlsForEntries } from '../../knowledge-freshness/gates/link-check.js'
 import { resolveTargetFiles, loadLinkCheckSkip } from '../../knowledge-freshness/gates/changed-files.js'
@@ -12,15 +12,22 @@ interface LinkCheckArgs {
 const linkCheckCommand: CommandModule<Record<string, unknown>, LinkCheckArgs> = {
   command: 'link-check [files..]',
   describe: 'CI gate: verify every sources[*].url in changed knowledge entries returns 2xx',
-  builder: (y) => y.positional('files', {
-    type: 'string',
-    array: true,
-    default: [],
-    describe: 'Knowledge entry paths to check (default: git diff origin/main...HEAD)',
-  }),
+  builder: (y) => y
+    .positional('files', {
+      type: 'string',
+      array: true,
+      default: [],
+      describe: 'Knowledge entry paths to check (default: git diff origin/main...HEAD)',
+    })
+    .option('files-from', {
+      type: 'string',
+      describe: 'Read file list from a JSON array file (avoids shell-injection via filenames)',
+    }) as unknown as Argv<LinkCheckArgs>,
   handler: async (argv) => {
     const cwd = process.cwd()
-    const files = resolveTargetFiles(argv.files ?? [], cwd)
+    const argvAny = argv as unknown as Record<string, unknown>
+    const filesFrom = (argvAny['files-from'] ?? argvAny.filesFrom) as string | undefined
+    const files = resolveTargetFiles(argv.files ?? [], cwd, { filesFrom })
     if (files.length === 0) {
       process.stdout.write('link-check: no changed knowledge entries — gate passes trivially\n')
       return

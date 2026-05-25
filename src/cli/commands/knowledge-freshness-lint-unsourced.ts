@@ -22,10 +22,16 @@ const lintUnsourcedCommand: CommandModule<Record<string, unknown>, LintUnsourced
     .option('diff', {
       type: 'string',
       describe: 'Path to a unified diff file (default: compute from origin/main...HEAD)',
+    })
+    .option('files-from', {
+      type: 'string',
+      describe: 'Read file list from a JSON array file (avoids shell-injection via filenames)',
     }) as unknown as Argv<LintUnsourcedArgs>,
   handler: async (argv) => {
     const cwd = process.cwd()
-    const files = resolveTargetFiles(argv.files ?? [], cwd)
+    const argvAny = argv as unknown as Record<string, unknown>
+    const filesFrom = (argvAny['files-from'] ?? argvAny.filesFrom) as string | undefined
+    const files = resolveTargetFiles(argv.files ?? [], cwd, { filesFrom })
     if (files.length === 0) {
       process.stdout.write('lint-unsourced: no changed knowledge entries\n')
       return

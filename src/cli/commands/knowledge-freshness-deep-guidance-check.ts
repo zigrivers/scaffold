@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import type { CommandModule } from 'yargs'
+import type { Argv, CommandModule } from 'yargs'
 import { checkDeepGuidance } from '../../knowledge-freshness/gates/deep-guidance-check.js'
 import { resolveTargetFiles } from '../../knowledge-freshness/gates/changed-files.js'
 
@@ -11,15 +11,22 @@ interface DeepGuidanceArgs {
 const deepGuidanceCheckCommand: CommandModule<Record<string, unknown>, DeepGuidanceArgs> = {
   command: 'deep-guidance-check [files..]',
   describe: 'CI gate: every changed entry must retain the literal `## Deep Guidance` heading',
-  builder: (y) => y.positional('files', {
-    type: 'string',
-    array: true,
-    default: [],
-    describe: 'Knowledge entry paths to check (default: git diff origin/main...HEAD)',
-  }),
+  builder: (y) => y
+    .positional('files', {
+      type: 'string',
+      array: true,
+      default: [],
+      describe: 'Knowledge entry paths to check (default: git diff origin/main...HEAD)',
+    })
+    .option('files-from', {
+      type: 'string',
+      describe: 'Read file list from a JSON array file (avoids shell-injection via filenames)',
+    }) as unknown as Argv<DeepGuidanceArgs>,
   handler: async (argv) => {
     const cwd = process.cwd()
-    const files = resolveTargetFiles(argv.files ?? [], cwd)
+    const argvAny = argv as unknown as Record<string, unknown>
+    const filesFrom = (argvAny['files-from'] ?? argvAny.filesFrom) as string | undefined
+    const files = resolveTargetFiles(argv.files ?? [], cwd, { filesFrom })
     if (files.length === 0) {
       process.stdout.write('deep-guidance-check: no changed knowledge entries\n')
       return

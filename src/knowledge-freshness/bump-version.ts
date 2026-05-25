@@ -25,7 +25,14 @@ export type BumpKind = 'major' | 'minor' | 'patch'
  */
 export function deriveBumpKind(prTitle: string, prBody: string): BumpKind {
   // BREAKING CHANGE wins over everything else, even if title is `feat(...)`.
-  if (prTitle.includes('BREAKING CHANGE:') || prBody.includes('BREAKING CHANGE:')) {
+  //
+  // Round-2 F-002: the body match MUST be anchored to start-of-line. A
+  // freshness PR's body contains an LLM-generated findings table where an
+  // evidence URL or excerpt that happens to mention "BREAKING CHANGE:"
+  // would otherwise trigger an accidental major bump. The canonical
+  // Conventional Commits "BREAKING CHANGE:" footer lives on its own line.
+  const breakingInBody = /^BREAKING CHANGE:/m.test(prBody)
+  if (prTitle.includes('BREAKING CHANGE:') || breakingInBody) {
     return 'major'
   }
   if (prTitle.startsWith('feat(knowledge):') || prTitle.startsWith('feat(knowledge-freshness):')) {

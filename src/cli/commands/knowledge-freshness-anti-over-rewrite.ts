@@ -36,10 +36,16 @@ const antiOverRewriteCommand: CommandModule<Record<string, unknown>, AntiOverRew
         'Comma-separated list of labels currently on the PR. The gate honors the ' +
         'literal label `override:anti-over-rewrite` (F-005). PR-body markers are NOT honored ' +
         'because they can be prompt-injected via LLM-generated verdict text.',
+    })
+    .option('files-from', {
+      type: 'string',
+      describe: 'Read file list from a JSON array file (avoids shell-injection via filenames)',
     }) as unknown as Argv<AntiOverRewriteArgs>,
   handler: async (argv) => {
     const cwd = process.cwd()
-    const files = resolveTargetFiles(argv.files ?? [], cwd)
+    const argvAnyOpt = argv as unknown as Record<string, unknown>
+    const filesFromOpt = (argvAnyOpt['files-from'] ?? argvAnyOpt.filesFrom) as string | undefined
+    const files = resolveTargetFiles(argv.files ?? [], cwd, { filesFrom: filesFromOpt })
     if (files.length === 0) {
       process.stdout.write('anti-over-rewrite: no changed knowledge entries\n')
       return

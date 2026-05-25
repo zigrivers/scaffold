@@ -133,5 +133,9 @@ jobs:
                 echo "unknown verdict for $name: $verdict"
                 ;;
             esac
+            # F-004: audit-apply --open-pr leaves us on the freshness PR
+            # branch. Restore main before the next iteration so each
+            # candidate's audit starts from a clean base.
+            git checkout main >/dev/null 2>&1 || true
             echo "::endgroup::"
           done

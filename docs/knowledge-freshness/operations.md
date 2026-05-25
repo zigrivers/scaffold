@@ -266,7 +266,7 @@ and surface to the user when a blocking finding's hash hits 3 attempts.
 | `fetch failed` for a source URL | Source is down OR the SSRF guard rejected it. | Hit the URL with `curl -I`; if guard-blocked, see next row. |
 | `DNS-rebinding guard: <host> resolves to blocked IP` | Source URL resolves to a private/loopback/link-local IP — usually a typo in the hostname, occasionally a misbehaving CDN. | Double-check the hostname; if legitimate, file an issue (the guard does not have an exception list by design). |
 | `verdict.sources_checked is missing entry source` | The audit subprocess dropped a source mid-run (timeout, parse error). | Re-run `audit-run-entry`. If persistent, increase `--timeout` (default 600s). |
-| Gate 4 fails: "stable entry with >20% line churn" | A rewrite landed on a `volatility: stable` entry without an override phrase in the PR body. | Either narrow the diff, downgrade `volatility` to `evolving` in the entry, or add the explicit override phrase the gate looks for. |
+| Gate 4 fails: "stable entry with >20% line churn" | A rewrite landed on a `volatility: stable` entry without the override label. | Either narrow the diff, downgrade `volatility` to `evolving` in the entry, or (as a maintainer with write access) apply the `override:anti-over-rewrite` label to the PR — PR-body markers are deliberately NOT honored since a malicious source could prompt-inject one. |
 | Version-bump didn't fire on merge | PR title prefix not recognized by `bump-version`. | Recognized prefixes: `BREAKING CHANGE:` (major), `feat(knowledge):` / `feat(knowledge-freshness):` (minor), `chore(knowledge):` / `chore(knowledge-freshness):` (patch). Unrecognized prefixes default to patch and emit a `::notice::`. |
 
 ## 10. Roadmap (Phase 3+)

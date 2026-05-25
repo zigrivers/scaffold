@@ -8,10 +8,22 @@ describe('deriveBumpKind', () => {
     ).toBe('major')
   })
 
-  it('returns major when BREAKING CHANGE appears in body even if title is feat', () => {
+  it('returns major when BREAKING CHANGE appears at the start of a body line', () => {
     expect(
       deriveBumpKind('feat(knowledge): new entry', 'Body line\nBREAKING CHANGE: removes Y'),
     ).toBe('major')
+  })
+
+  it('does NOT return major when BREAKING CHANGE appears mid-line (round-2 F-002)', () => {
+    // A freshness PR body's findings table can quote evidence containing the
+    // string "BREAKING CHANGE:" inside a cell. That must NOT trigger major.
+    const body = '| P1 | citation: "see the BREAKING CHANGE: removed-deprecated section above" |'
+    expect(deriveBumpKind('chore(knowledge): refresh X', body)).toBe('patch')
+  })
+
+  it('does NOT return major when BREAKING CHANGE is preceded by whitespace or > (quoted)', () => {
+    expect(deriveBumpKind('chore(knowledge): X', '> BREAKING CHANGE: from external doc')).toBe('patch')
+    expect(deriveBumpKind('chore(knowledge): X', '  BREAKING CHANGE: indented')).toBe('patch')
   })
 
   it('returns minor for feat(knowledge): prefix', () => {

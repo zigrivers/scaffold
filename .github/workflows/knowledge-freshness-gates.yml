@@ -75,30 +75,43 @@ jobs:
       - name: Resolve changed knowledge entries
         id: changed
         working-directory: base
-        # `head` is the PR HEAD checkout (full history). We compute the diff
-        # against origin/main from THAT checkout so the file list matches the
-        # PR's actual changes, but the gate CLI we run is built from base.
+        # F-001: write the file list to a JSON file and pass it via
+        # `--files-from`. We do NOT interpolate filenames into bash, because
+        # a PR could add a content/knowledge path containing shell
+        # metacharacters that would `$()`-execute when interpolated.
         run: |
           set -euo pipefail
           mapfile -t FILES < <(git -C ../head diff --name-only origin/main...HEAD -- 'content/knowledge/**/*.md')
-          echo "files=${FILES[*]:-}" >> "$GITHUB_OUTPUT"
           if [ "${#FILES[@]}" -eq 0 ]; then
             echo "no_changes=1" >> "$GITHUB_OUTPUT"
+            echo '[]' > "$GITHUB_WORKSPACE/changed-files.json"
+          else
+            # Emit a JSON array. The CLI validates each entry server-side.
+            printf '%s\n' "${FILES[@]}" \
+              | jq -R . \
+              | jq -s . \
+              > "$GITHUB_WORKSPACE/changed-files.json"
           fi
           printf 'changed knowledge files:\n'
           printf '  %s\n' "${FILES[@]:-<none>}"
+          echo "files_json=$GITHUB_WORKSPACE/changed-files.json" >> "$GITHUB_OUTPUT"
 
       # ---------- Gate 1: validator (BLOCKING) ----------
+      # F-005: standardize on `node dist/index.js validate-knowledge` so the
+      # gate workflow and the cron's inline gates invoke the same CLI surface.
+      # `npm run build` has already run, so dist/ is current.
       - name: 'Gate 1 of 5 — knowledge frontmatter validator'
         if: steps.changed.outputs.no_changes != '1'
         working-directory: base
-        run: make validate-knowledge
+        run: node dist/index.js validate-knowledge
 
       # ---------- Gate 2: link-check (BLOCKING) ----------
       - name: 'Gate 2 of 5 — source link-check'
         if: steps.changed.outputs.no_changes != '1'
         working-directory: base
-        run: node dist/index.js knowledge-freshness link-check ${{ steps.changed.outputs.files }}
+        env:
+          FILES_JSON: ${{ steps.changed.outputs.files_json }}
+        run: node dist/index.js knowledge-freshness link-check --files-from "$FILES_JSON"
 
       # ---------- Gate 3: lint-unsourced (ADVISORY) ----------
       # `if: always()` runs this even when gate 1/2 failed so reviewers see
@@ -107,7 +120,9 @@ jobs:
       - name: 'Gate 3 of 5 — unsourced-claims lint (advisory)'
         if: always() && steps.changed.outputs.no_changes != '1'
         working-directory: base
-        run: node dist/index.js knowledge-freshness lint-unsourced ${{ steps.changed.outputs.files }}
+        env:
+          FILES_JSON: ${{ steps.changed.outputs.files_json }}
+        run: node dist/index.js knowledge-freshness lint-unsourced --files-from "$FILES_JSON"
 
       # ---------- Gate 4: anti-over-rewrite (BLOCKING for stable) ----------
       # Skip when the PR branch is NOT freshness-managed: human edits to stable
@@ -116,16 +131,19 @@ jobs:
       #
       # F-005 / F-007: the override is a maintainer-applied label, NOT a PR
       # body marker. We extract labels from the PR event payload and pass them
-      # explicitly; the CLI no longer reads `gh pr view`.
+      # explicitly via env var; the CLI never reads `gh pr view`.
       - name: 'Gate 4 of 5 — anti-over-rewrite (stable entries)'
         if: steps.changed.outputs.no_changes != '1' && startsWith(github.head_ref, 'knowledge-freshness/')
         working-directory: base
         env:
           PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
-        run: node dist/index.js knowledge-freshness anti-over-rewrite --pr-labels "$PR_LABELS" ${{ steps.changed.outputs.files }}
+          FILES_JSON: ${{ steps.changed.outputs.files_json }}
+        run: node dist/index.js knowledge-freshness anti-over-rewrite --pr-labels "$PR_LABELS" --files-from "$FILES_JSON"
 
       # ---------- Gate 5: Deep Guidance preserved (BLOCKING) ----------
       - name: 'Gate 5 of 5 — Deep Guidance heading preserved'
         if: steps.changed.outputs.no_changes != '1'
         working-directory: base
-        run: node dist/index.js knowledge-freshness deep-guidance-check ${{ steps.changed.outputs.files }}
+        env:
+          FILES_JSON: ${{ steps.changed.outputs.files_json }}
+        run: node dist/index.js knowledge-freshness deep-guidance-check --files-from "$FILES_JSON"
