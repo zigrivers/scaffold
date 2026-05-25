@@ -2,6 +2,14 @@
 name: web3-common-vulnerabilities
 description: SWC-style checklist of the most-exploited Solidity bugs — reentrancy, delegatecall hazards, signature replay, front-running, unchecked calls, unbounded loops, and the small set of patterns that catch them
 topics: [web3, vulnerabilities, security, swc, solidity]
+volatility: fast-moving
+last-reviewed: null
+version-pin: 'SWC Registry'
+sources:
+  - url: https://swcregistry.io/
+    anchor: '#smart-contract-weakness-classification'
+  - url: https://consensys.github.io/smart-contract-best-practices/attacks/
+    anchor: '#known-attacks'
 ---
 
 The most-exploited contract bugs are usually the same handful, recycled across protocols by attackers who know exactly which patterns auditors and authors keep missing. Internalize this checklist; gate every PR with Slither and Foundry tests so the mechanical findings never reach review; require a dedicated reviewer pass for any change that touches the patterns below. Where this doc is the SWC-style enumeration of "what goes wrong," `web3-security.md` is the practices doc on "how to build so it doesn't" — read both, and treat `web3-audit-workflow.md` as the tooling glue.
