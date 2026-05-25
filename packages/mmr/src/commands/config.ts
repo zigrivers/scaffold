@@ -343,9 +343,8 @@ export const configCommand: CommandModule<object, ConfigArgs> = {
         default: true,
         describe: 'Redact secrets for config channels show',
       })
-      .check((args) => {
+      .middleware((args) => {
         if (args.redact === false) args['no-redact'] = true
-        return true
       }),
   handler: async (args: ArgumentsCamelCase<ConfigArgs>) => {
     if (args.action !== 'channels' && (args.name || args.target)) {
@@ -364,7 +363,7 @@ export const configCommand: CommandModule<object, ConfigArgs> = {
       const ok = configChannels({
         name: args.name,
         target: args.target,
-        noRedact: args.redact === false || args['no-redact'] === true,
+        noRedact: args.redact === false,
       })
       if (!ok) process.exit(1)
       break
