@@ -172,7 +172,7 @@ function warnOnInlineSecretHeaders(config: MmrConfigParsed): void {
     if (!headers) continue
     for (const headerKey of Object.keys(headers)) {
       if (isSecretKey(headerKey)) {
-        console.error(
+        console.warn(
           `[mmr] warning: channel "${name}" has a literal "${headerKey}" header. ` +
           'Move the secret to an env var and reference it via api_key_env ' +
           '(api_key_env composes with HTTP channels landing in v3.30).',

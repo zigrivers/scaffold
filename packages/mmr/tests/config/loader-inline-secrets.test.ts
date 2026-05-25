@@ -29,14 +29,14 @@ describe('loader inline-secret warnings (T1-E)', () => {
       '      failure_exit_codes: [1]',
       '      recovery: "x"',
     ].join('\n'))
-    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     loadConfig({ projectRoot: tmpDir, userHome: tmpDir })
-    const errOutput = errSpy.mock.calls.map((c) => c.join(' ')).join('\n')
-    errSpy.mockRestore()
+    const warnOutput = warnSpy.mock.calls.map((c) => c.join(' ')).join('\n')
+    warnSpy.mockRestore()
 
-    expect(errOutput).toMatch(/custom/)
-    expect(errOutput).toMatch(/Authorization/)
-    expect(errOutput).toMatch(/api_key_env/)
+    expect(warnOutput).toMatch(/custom/)
+    expect(warnOutput).toMatch(/Authorization/)
+    expect(warnOutput).toMatch(/api_key_env/)
   })
 
   it('does not warn when headers contain only innocuous values', () => {
@@ -52,11 +52,30 @@ describe('loader inline-secret warnings (T1-E)', () => {
       '      failure_exit_codes: [1]',
       '      recovery: "x"',
     ].join('\n'))
-    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     loadConfig({ projectRoot: tmpDir, userHome: tmpDir })
-    const errOutput = errSpy.mock.calls.map((c) => c.join(' ')).join('\n')
-    errSpy.mockRestore()
+    const warnOutput = warnSpy.mock.calls.map((c) => c.join(' ')).join('\n')
+    warnSpy.mockRestore()
 
-    expect(errOutput).not.toMatch(/Authorization/)
+    expect(warnOutput).not.toMatch(/Authorization/)
+  })
+
+  it('does not preserve arbitrary forward-compatible channel fields', () => {
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), [
+      'version: 1',
+      'channels:',
+      '  custom:',
+      '    command: curl',
+      '    future_secret_shape:',
+      '      Authorization: "Bearer literal-secret"',
+      '    auth:',
+      '      check: "true"',
+      '      failure_exit_codes: [1]',
+      '      recovery: "x"',
+    ].join('\n'))
+
+    const config = loadConfig({ projectRoot: tmpDir, userHome: tmpDir })
+
+    expect(config.channels.custom).not.toHaveProperty('future_secret_shape')
   })
 })
