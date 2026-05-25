@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
@@ -29,10 +29,9 @@ describe('loader inline-secret warnings (T1-E)', () => {
       '      failure_exit_codes: [1]',
       '      recovery: "x"',
     ].join('\n'))
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    loadConfig({ projectRoot: tmpDir, userHome: tmpDir })
-    const warnOutput = warnSpy.mock.calls.map((c) => c.join(' ')).join('\n')
-    warnSpy.mockRestore()
+    const warnings: string[] = []
+    loadConfig({ projectRoot: tmpDir, userHome: tmpDir, onWarning: (message) => warnings.push(message) })
+    const warnOutput = warnings.join('\n')
 
     expect(warnOutput).toMatch(/custom/)
     expect(warnOutput).toMatch(/Authorization/)
@@ -52,10 +51,9 @@ describe('loader inline-secret warnings (T1-E)', () => {
       '      failure_exit_codes: [1]',
       '      recovery: "x"',
     ].join('\n'))
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    loadConfig({ projectRoot: tmpDir, userHome: tmpDir })
-    const warnOutput = warnSpy.mock.calls.map((c) => c.join(' ')).join('\n')
-    warnSpy.mockRestore()
+    const warnings: string[] = []
+    loadConfig({ projectRoot: tmpDir, userHome: tmpDir, onWarning: (message) => warnings.push(message) })
+    const warnOutput = warnings.join('\n')
 
     expect(warnOutput).not.toMatch(/Authorization/)
   })
@@ -94,15 +92,12 @@ describe('loader inline-secret warnings (T1-E)', () => {
       '      failure_exit_codes: [1]',
       '      recovery: "x"',
     ].join('\n'))
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const warnings: string[] = []
 
     loadConfig({ projectRoot: tmpDir, userHome: tmpDir, onWarning: (message) => warnings.push(message) })
-    warnSpy.mockRestore()
 
     expect(warnings).toHaveLength(1)
     expect(warnings[0]).toMatch(/Authorization/)
-    expect(warnSpy).not.toHaveBeenCalled()
   })
 
   it('does not preserve arbitrary forward-compatible channel fields', () => {

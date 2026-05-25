@@ -177,8 +177,7 @@ function warnOnInlineSecretHeaders(config: MmrConfigParsed, warn: WarningSink): 
       if (isSecretKey(headerKey, { exemptEnvNameKeys: false })) {
         warn(
           `[mmr] warning: channel "${name}" has a literal "${headerKey}" header. ` +
-          'Move the secret to an env var and reference it via api_key_env ' +
-          '(api_key_env composes with HTTP channels landing in v3.30).',
+          'For HTTP channels in v3.30, move the secret to an env var and reference it via api_key_env.',
         )
       }
     }
