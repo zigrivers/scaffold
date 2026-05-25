@@ -30,8 +30,8 @@ describe('mmr review --dry-run (T1-F)', () => {
     const checkAuthSpy = vi.fn()
     vi.doMock('../../src/core/dispatcher.js', () => ({ dispatchChannel: dispatchSpy }))
     vi.doMock('../../src/core/auth.js', () => ({
-      checkInstalled: checkInstalledSpy,
-      checkAuth: checkAuthSpy,
+      checkInstalled: checkInstalledSpy.mockResolvedValue(true),
+      checkAuth: checkAuthSpy.mockResolvedValue({ status: 'ok' }),
     }))
 
     const { reviewCommand } = await import('../../src/commands/review.js')
@@ -56,8 +56,8 @@ describe('mmr review --dry-run (T1-F)', () => {
     vi.doUnmock('../../src/core/auth.js')
 
     expect(dispatchSpy).not.toHaveBeenCalled()
-    expect(checkInstalledSpy).not.toHaveBeenCalled()
-    expect(checkAuthSpy).not.toHaveBeenCalled()
+    expect(checkInstalledSpy).toHaveBeenCalled()
+    expect(checkAuthSpy).toHaveBeenCalled()
     expect(output).toMatch(/DRY RUN/i)
     expect(output).toMatch(/Channels that would dispatch:/)
     expect(output).toMatch(/claude/)
@@ -79,8 +79,8 @@ describe('mmr review --dry-run (T1-F)', () => {
     vi.resetModules()
     vi.doMock('../../src/core/dispatcher.js', () => ({ dispatchChannel: vi.fn() }))
     vi.doMock('../../src/core/auth.js', () => ({
-      checkInstalled: vi.fn(),
-      checkAuth: vi.fn(),
+      checkInstalled: vi.fn().mockResolvedValue(true),
+      checkAuth: vi.fn().mockResolvedValue({ status: 'ok' }),
     }))
 
     const { reviewCommand } = await import('../../src/commands/review.js')
@@ -135,8 +135,8 @@ describe('mmr review --dry-run (T1-F)', () => {
     vi.resetModules()
     vi.doMock('../../src/core/dispatcher.js', () => ({ dispatchChannel: vi.fn() }))
     vi.doMock('../../src/core/auth.js', () => ({
-      checkInstalled: vi.fn(),
-      checkAuth: vi.fn(),
+      checkInstalled: vi.fn().mockResolvedValue(true),
+      checkAuth: vi.fn().mockResolvedValue({ status: 'ok' }),
     }))
 
     const { reviewCommand } = await import('../../src/commands/review.js')

@@ -216,17 +216,6 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       focus: args.focus,
     })
 
-    if (args['dry-run']) {
-      console.log('=== DRY RUN - no channels will be dispatched ===')
-      console.log(`Channels that would dispatch: ${channelNames.join(', ') || '(none)'}`)
-      for (const name of channelNames) {
-        const ch = config.channels[name]
-        console.log(`\n--- Assembled prompt for ${name} ---`)
-        console.log(buildChannelPrompt(ch, prompt))
-      }
-      return
-    }
-
     // 4. Auth-check each channel
     const validChannels: string[] = []
     const authResults: Record<string, { status: string; recovery?: string }> = {}
@@ -258,6 +247,22 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       if (authResult.status === 'ok') {
         validChannels.push(name)
       }
+    }
+
+    if (args['dry-run']) {
+      console.log('=== DRY RUN - no channels will be dispatched ===')
+      console.log(`Channels that would dispatch: ${validChannels.join(', ') || '(none)'}`)
+      for (const [name, status] of Object.entries(authResults)) {
+        if (!validChannels.includes(name)) {
+          console.log(`  ${name}: ${status.status}${status.recovery ? ` — ${status.recovery}` : ''}`)
+        }
+      }
+      for (const name of validChannels) {
+        const ch = config.channels[name]
+        console.log(`\n--- Assembled prompt for ${name} ---`)
+        console.log(buildChannelPrompt(ch, prompt))
+      }
+      return
     }
 
     if (validChannels.length === 0) {
