@@ -24,6 +24,7 @@ import checkCommand from './commands/check.js'
 import completeCommand from './commands/complete.js'
 import reworkCommand from './commands/rework.js'
 import observeCommand from './commands/observe.js'
+import knowledgeFreshnessCommand from './commands/knowledge-freshness.js'
 
 export async function runCli(argv: string[]): Promise<void> {
   shutdown.install()
@@ -52,6 +53,7 @@ export async function runCli(argv: string[]): Promise<void> {
     .command(completeCommand)
     .command(reworkCommand)
     .command(observeCommand)
+    .command(knowledgeFreshnessCommand)
     .options({
       format: {
         type: 'string',
