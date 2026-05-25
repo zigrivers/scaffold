@@ -968,6 +968,20 @@ describe('runEntryAudit', () => {
     expect(out.verdict).toBe('current')
   })
 
+  it('skips brace-shaped noise in prose and finds the real JSON object', async () => {
+    // The first {...} block in this output is not JSON; the extractor must
+    // skip it and try the next balanced block.
+    const dispatcher: Dispatcher = vi.fn().mockResolvedValue(
+      `Notes: I considered {alpha, beta} options but went with the second one.\n` +
+      `Result:\n${JSON.stringify({
+        entry_name: 'stub', audit_date: '2026-05-24', model: 'claude-opus-4-7',
+        verdict: 'minor-drift', sources_checked: [], findings: [], proposed_changes: [], preserve_warnings: [],
+      })}\n`,
+    )
+    const out = await runEntryAudit(entryPath(), dispatcher)
+    expect(out.verdict).toBe('minor-drift')
+  })
+
   it('throws on non-JSON dispatcher output', async () => {
     const dispatcher: Dispatcher = vi.fn().mockResolvedValue('not json at all')
     await expect(runEntryAudit(entryPath(), dispatcher)).rejects.toThrow()
@@ -1053,20 +1067,18 @@ export async function runEntryAudit(entryPath: string, dispatch: Dispatcher): Pr
     .replaceAll('{{entry_body}}', () => content)
 
   const raw = await dispatch(filled)
-  let parsed: unknown
-  try { parsed = JSON.parse(extractFirstJsonObject(raw)) }
-  catch (e) { throw new Error(`audit output is not valid JSON: ${(e as Error).message}`) }
+  const parsed = tryParseEmbeddedJson(raw)
+  if (parsed === undefined) throw new Error('audit output contained no parseable JSON object')
   return verdictSchema.parse(parsed)
 }
 
 /**
- * Find the first balanced `{...}` block in a string by scanning forward with
- * brace counting. Skips over braces inside JSON string literals. This is more
- * robust than first-`{`/last-`}` slicing when the model wraps the verdict in
- * conversational prose that itself contains braces (round-6 F-002).
- * Falls back to fence-stripping if no balanced object is found.
+ * Walk `s` looking for balanced `{...}` blocks (respecting JSON string literals)
+ * and JSON.parse each candidate. Returns the first one that parses successfully,
+ * or `undefined` if none do. This is robust against model preamble/postamble
+ * that itself contains brace-like noise (round-6 F-002, round-7 F-001).
  */
-function extractFirstJsonObject(s: string): string {
+function tryParseEmbeddedJson(s: string): unknown | undefined {
   for (let start = 0; start < s.length; start++) {
     if (s[start] !== '{') continue
     let depth = 0
@@ -1084,12 +1096,18 @@ function extractFirstJsonObject(s: string): string {
       if (ch === '{') depth++
       else if (ch === '}') {
         depth--
-        if (depth === 0) return s.slice(start, i + 1)
+        if (depth === 0) {
+          const candidate = s.slice(start, i + 1)
+          try { return JSON.parse(candidate) }
+          catch { /* try the next candidate */ }
+          break
+        }
       }
     }
   }
-  // Fallback: strip a ```json fence pair if present.
-  return s.replace(/```json\n?|\n?```/g, '').trim()
+  // Last-resort: strip a ```json fence pair if present and try once more.
+  const fenced = s.replace(/```json\n?|\n?```/g, '').trim()
+  try { return JSON.parse(fenced) } catch { return undefined }
 }
 ```
 
