@@ -117,4 +117,10 @@ jobs:
           # branch named `knowledge-freshness/...`, so this is belt-and-braces
           # against accidental recursion.
           git commit -m "chore(knowledge): bump KB VERSION to $NEXT"
+          # F-006: rebase before push so a concurrent main update doesn't
+          # cause a non-fast-forward push failure. If branch protection
+          # rejects the direct push, the workflow surfaces the error and
+          # the maintainer needs to grant the bot bypass on `main` (or
+          # adapt to land via PR). Documented in operations.md.
+          git pull --rebase origin main
           git push origin main

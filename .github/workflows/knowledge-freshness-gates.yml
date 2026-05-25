@@ -8,6 +8,11 @@ name: Knowledge Freshness Gates
 # edits also flow through these gates because the paths filter matches both.
 #
 # Five gates, one job, separate steps so a failure surfaces the exact gate.
+#
+# F-004: the gate implementation is built from the PR's BASE ref (origin/main),
+# not the PR HEAD. Otherwise a PR that touches `content/knowledge/**` could ALSO
+# modify the gate code to bypass itself. We checkout TWO refs: base for the
+# build, HEAD-of-PR for the content under test (read-only).
 
 on:
   pull_request:
@@ -28,31 +33,54 @@ jobs:
       contents: read
       pull-requests: read
     steps:
-      - name: Checkout PR HEAD
+      # F-004: build the gate CLI from the PR's BASE ref so a malicious PR
+      # cannot modify the gate code itself. We then overlay the PR HEAD's
+      # `content/knowledge/` into the base checkout so the gates inspect the
+      # PR's content but execute the base's code.
+      - name: Checkout base (origin/main) for gate code
         uses: actions/checkout@v4
         with:
-          # full history so `git diff origin/main...HEAD` works for the
-          # gates that need a diff (lint-unsourced, anti-over-rewrite).
+          ref: ${{ github.event.pull_request.base.ref }}
+          fetch-depth: 0
+          path: base
+
+      - name: Checkout PR HEAD into a separate directory
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: head
           fetch-depth: 0
 
-      - name: Set up Node.js
+      - name: Overlay PR head content/knowledge into base checkout
+        run: |
+          set -euo pipefail
+          rm -rf base/content/knowledge
+          cp -R head/content/knowledge base/content/knowledge
+
+      - name: Set working directory and Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18.17'
           cache: 'npm'
+          cache-dependency-path: base/package-lock.json
 
-      - name: Install npm dependencies
+      - name: Install npm dependencies (base)
+        working-directory: base
         run: npm ci
 
-      - name: Build CLI
+      - name: Build CLI (base)
+        working-directory: base
         run: npm run build
 
       - name: Resolve changed knowledge entries
         id: changed
-        # Compute once and reuse so every gate looks at the same set of files.
+        working-directory: base
+        # `head` is the PR HEAD checkout (full history). We compute the diff
+        # against origin/main from THAT checkout so the file list matches the
+        # PR's actual changes, but the gate CLI we run is built from base.
         run: |
           set -euo pipefail
-          mapfile -t FILES < <(git diff --name-only origin/main...HEAD -- 'content/knowledge/**/*.md')
+          mapfile -t FILES < <(git -C ../head diff --name-only origin/main...HEAD -- 'content/knowledge/**/*.md')
           echo "files=${FILES[*]:-}" >> "$GITHUB_OUTPUT"
           if [ "${#FILES[@]}" -eq 0 ]; then
             echo "no_changes=1" >> "$GITHUB_OUTPUT"
@@ -63,11 +91,13 @@ jobs:
       # ---------- Gate 1: validator (BLOCKING) ----------
       - name: 'Gate 1 of 5 — knowledge frontmatter validator'
         if: steps.changed.outputs.no_changes != '1'
+        working-directory: base
         run: make validate-knowledge
 
       # ---------- Gate 2: link-check (BLOCKING) ----------
       - name: 'Gate 2 of 5 — source link-check'
         if: steps.changed.outputs.no_changes != '1'
+        working-directory: base
         run: node dist/index.js knowledge-freshness link-check ${{ steps.changed.outputs.files }}
 
       # ---------- Gate 3: lint-unsourced (ADVISORY) ----------
@@ -76,19 +106,26 @@ jobs:
       # the workflow regardless of `if` condition.
       - name: 'Gate 3 of 5 — unsourced-claims lint (advisory)'
         if: always() && steps.changed.outputs.no_changes != '1'
+        working-directory: base
         run: node dist/index.js knowledge-freshness lint-unsourced ${{ steps.changed.outputs.files }}
 
       # ---------- Gate 4: anti-over-rewrite (BLOCKING for stable) ----------
       # Skip when the PR branch is NOT freshness-managed: human edits to stable
       # entries are gated by review, not by a 20% bot-applied heuristic.
       # Cron-opened PRs come from `knowledge-freshness/*` and DO get gated.
+      #
+      # F-005 / F-007: the override is a maintainer-applied label, NOT a PR
+      # body marker. We extract labels from the PR event payload and pass them
+      # explicitly; the CLI no longer reads `gh pr view`.
       - name: 'Gate 4 of 5 — anti-over-rewrite (stable entries)'
         if: steps.changed.outputs.no_changes != '1' && startsWith(github.head_ref, 'knowledge-freshness/')
+        working-directory: base
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node dist/index.js knowledge-freshness anti-over-rewrite ${{ steps.changed.outputs.files }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: node dist/index.js knowledge-freshness anti-over-rewrite --pr-labels "$PR_LABELS" ${{ steps.changed.outputs.files }}
 
       # ---------- Gate 5: Deep Guidance preserved (BLOCKING) ----------
       - name: 'Gate 5 of 5 — Deep Guidance heading preserved'
         if: steps.changed.outputs.no_changes != '1'
+        working-directory: base
         run: node dist/index.js knowledge-freshness deep-guidance-check ${{ steps.changed.outputs.files }}

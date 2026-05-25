@@ -11,6 +11,14 @@ name: Knowledge Freshness Audit
 # MMR corroboration is intentionally NOT wired into this Phase 2 workflow. Task 11
 # will add it as a separate CI gate that fires on the freshness PR's pushed branch,
 # where the MMR CLI + channel auth context is straightforward.
+#
+# Note on the gate workflow visibility (F-003): GitHub suppresses workflow events
+# triggered by the default `GITHUB_TOKEN`, so the freshness-PR gate workflow
+# (knowledge-freshness-gates.yml) would NOT fire on PRs this cron opens unless
+# we switch to a PAT/App token. To keep the trust boundary minimal, this workflow
+# runs the SAME gate logic inline before calling `audit-apply --open-pr`; any
+# gate failure skips PR creation. The gate workflow remains the source of truth
+# for human-opened freshness PRs (which `GITHUB_TOKEN` does NOT suppress).
 
 on:
   schedule:
@@ -87,9 +95,36 @@ jobs:
                 echo "no PR needed for $name (verdict=$verdict)"
                 ;;
               major-drift|superseded)
-                # Each PR runs in its own subshell so a failure on one entry
-                # doesn't abort the loop. The workflow's overall PR ceiling
-                # is already enforced by the pre-filter's --max=10.
+                # F-003: run gates inline because GITHUB_TOKEN-opened PRs don't
+                # trigger the gate workflow. We apply the verdict in a transient
+                # staged state, then run the same per-file gates the workflow
+                # would run, then either open the PR or skip the entry.
+                if ! node dist/index.js knowledge-freshness audit-apply "$path" "$verdict_path"; then
+                  echo "audit-apply (pre-gates dry-run) failed for $name"
+                  echo "::endgroup::"
+                  continue
+                fi
+                # Run the five gates locally on the modified file.
+                gate_failed=0
+                node dist/index.js validate-knowledge || gate_failed=1
+                node dist/index.js knowledge-freshness link-check "$path" || gate_failed=1
+                node dist/index.js knowledge-freshness lint-unsourced "$path" || true  # advisory
+                # anti-over-rewrite for inline gating: no labels yet (PR doesn't exist).
+                # A maintainer can re-run after applying the label if they want a stable
+                # entry's rewrite through; the bot will not auto-override stable churn.
+                node dist/index.js knowledge-freshness anti-over-rewrite "$path" --pr-labels "" || gate_failed=1
+                node dist/index.js knowledge-freshness deep-guidance-check "$path" || gate_failed=1
+                if [ "$gate_failed" != "0" ]; then
+                  echo "::error::gates failed for $name — not opening PR"
+                  # Restore the file so subsequent entries aren't poisoned.
+                  git checkout -- "$path"
+                  echo "::endgroup::"
+                  continue
+                fi
+                # Restore the file so each open-pr starts from a clean main.
+                # audit-apply --open-pr re-runs the on-disk edits inside the
+                # branch it creates.
+                git checkout -- "$path"
                 if ! node dist/index.js knowledge-freshness audit-apply "$path" "$verdict_path" --open-pr; then
                   echo "audit-apply --open-pr failed for $name"
                 fi

@@ -83,7 +83,7 @@ describe('deliberately-bad freshness PR fixtures', () => {
     expect(out[0].volatility).toBe('stable')
   })
 
-  it('Gate 4 (anti-over-rewrite): override marker in PR body skips the block', () => {
+  it('Gate 4 (anti-over-rewrite): maintainer override label skips the block', () => {
     const content = read('over-rewrite-stable.md')
     const diff = read('over-rewrite-stable.diff')
     const churn = parseUnifiedDiffForChurn(diff)
@@ -94,7 +94,7 @@ describe('deliberately-bad freshness PR fixtures', () => {
         addedCount: churn[0].addedCount,
         removedCount: churn[0].removedCount,
       }],
-      { prBody: 'see [override:anti-over-rewrite] — full rewrite is intentional' },
+      { prLabels: ['override:anti-over-rewrite'] },
     )
     expect(out[0].blocking).toBe(false)
     expect(out[0].overridden).toBe(true)

@@ -8,13 +8,12 @@ import {
 import {
   resolveTargetFiles,
   gitDiffForFiles,
-  readPrBody,
 } from '../../knowledge-freshness/gates/changed-files.js'
 
 interface AntiOverRewriteArgs {
   files: string[]
   diff?: string
-  prBody?: string
+  prLabels?: string
 }
 
 const antiOverRewriteCommand: CommandModule<Record<string, unknown>, AntiOverRewriteArgs> = {
@@ -31,9 +30,12 @@ const antiOverRewriteCommand: CommandModule<Record<string, unknown>, AntiOverRew
       type: 'string',
       describe: 'Path to a unified diff file (default: git diff origin/main...HEAD)',
     })
-    .option('pr-body', {
+    .option('pr-labels', {
       type: 'string',
-      describe: 'PR description body (default: gh pr view --json body)',
+      describe:
+        'Comma-separated list of labels currently on the PR. The gate honors the ' +
+        'literal label `override:anti-over-rewrite` (F-005). PR-body markers are NOT honored ' +
+        'because they can be prompt-injected via LLM-generated verdict text.',
     }) as unknown as Argv<AntiOverRewriteArgs>,
   handler: async (argv) => {
     const cwd = process.cwd()
@@ -45,12 +47,12 @@ const antiOverRewriteCommand: CommandModule<Record<string, unknown>, AntiOverRew
     const diffText = argv.diff
       ? fs.readFileSync(path.resolve(cwd, argv.diff), 'utf8')
       : gitDiffForFiles(cwd, files)
-    // PR body precedence: explicit --pr-body flag > gh CLI > null. The
-    // override marker is meaningful only on stable entries past threshold,
-    // so null is fine for everything else.
+    // Labels can be passed explicitly via --pr-labels (CI sets it from
+    // github.event.pull_request.labels). The override label must be applied
+    // by a human with write access — that's the trust anchor (F-005).
     const argvAny = argv as unknown as Record<string, unknown>
-    const explicitBody = (argvAny['pr-body'] ?? argvAny.prBody) as string | undefined
-    const prBody = explicitBody ?? readPrBody(cwd) ?? undefined
+    const labelsArg = (argvAny['pr-labels'] ?? argvAny.prLabels) as string | undefined
+    const prLabels = labelsArg ? labelsArg.split(',').map((s) => s.trim()).filter((s) => s) : []
     const churn = parseUnifiedDiffForChurn(diffText)
     const byFile = new Map(churn.map((c) => [c.file, c]))
     const inputs = files.map((abs) => {
@@ -63,7 +65,7 @@ const antiOverRewriteCommand: CommandModule<Record<string, unknown>, AntiOverRew
         removedCount: c?.removedCount ?? 0,
       }
     })
-    const results = evaluateChurn(inputs, { prBody })
+    const results = evaluateChurn(inputs, { prLabels })
     let anyBlock = false
     for (const r of results) {
       const pct = (r.churnPct * 100).toFixed(1)
@@ -74,11 +76,12 @@ const antiOverRewriteCommand: CommandModule<Record<string, unknown>, AntiOverRew
         anyBlock = true
         process.stdout.write(
           `::error file=${r.file}::anti-over-rewrite: ${summary} exceeds 20% threshold ` +
-          'for stable entry (add `[override:anti-over-rewrite]` to PR description to bypass)\n',
+          'for stable entry (apply the `override:anti-over-rewrite` label as a maintainer ' +
+          'with write access to bypass)\n',
         )
       } else if (r.overridden) {
         process.stdout.write(
-          `::notice file=${r.file}::anti-over-rewrite: ${summary} OVERRIDDEN by PR-body marker\n`,
+          `::notice file=${r.file}::anti-over-rewrite: ${summary} OVERRIDDEN by maintainer label\n`,
         )
       } else if (r.volatility !== 'stable' && r.churnPct > 0.2) {
         process.stdout.write(

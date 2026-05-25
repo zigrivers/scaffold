@@ -16,14 +16,27 @@ describe('evaluateChurn', () => {
     expect(out[0].blocking).toBe(true)
   })
 
-  it('does not block when PR body carries the override marker', () => {
+  it('does not block when maintainer applied the override label', () => {
     const content = makeContent('stable', 100)
     const out = evaluateChurn(
       [{ file: 'x.md', content, addedCount: 15, removedCount: 15 }],
-      { prBody: 'rewriting deliberately [override:anti-over-rewrite] please review' },
+      { prLabels: ['knowledge-freshness', 'override:anti-over-rewrite'] },
     )
     expect(out[0].blocking).toBe(false)
     expect(out[0].overridden).toBe(true)
+  })
+
+  it('DOES still block when only a PR-body marker is present (no label)', () => {
+    // F-005: the gate explicitly does not honor PR-body markers, which a
+    // prompt-injected source body could plant. Only the maintainer-applied
+    // label is trusted.
+    const content = makeContent('stable', 100)
+    const out = evaluateChurn(
+      [{ file: 'x.md', content, addedCount: 15, removedCount: 15 }],
+      { prLabels: [] },
+    )
+    expect(out[0].blocking).toBe(true)
+    expect(out[0].overridden).toBe(false)
   })
 
   it('does not block evolving entries even at high churn', () => {

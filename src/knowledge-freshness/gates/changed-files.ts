@@ -62,20 +62,9 @@ export function loadLinkCheckSkip(projectRoot: string): string[] {
   }
 }
 
-/**
- * Read the PR body via `gh pr view --json body`. Returns null when `gh` is
- * not on PATH, when no PR is associated with the branch, or when the command
- * fails for any reason — the anti-over-rewrite gate falls back to "no
- * override" in that case, which is the safe default (blocking for stable).
- */
-export function readPrBody(cwd: string): string | null {
-  const out = spawnSync('gh', ['pr', 'view', '--json', 'body', '-q', '.body'], {
-    cwd, encoding: 'utf8',
-  })
-  if (out.status !== 0) return null
-  const trimmed = out.stdout.trimEnd()
-  return trimmed.length > 0 ? trimmed : ''
-}
+// F-007: the former `readPrBody` helper was removed. Anti-over-rewrite no
+// longer reads the PR body — the override is now a maintainer-applied label
+// passed explicitly via `--pr-labels` from the workflow (see F-005).
 
 /**
  * Produce a unified diff (relative to origin/main) for a SPECIFIC set of

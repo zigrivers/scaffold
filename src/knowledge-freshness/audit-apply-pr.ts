@@ -223,10 +223,12 @@ export function openFreshnessPr(verdict: AuditVerdict, opts: OpenPrOptions): { b
   const rendered = renderFreshnessPr(verdict, { mmrJobId: opts.mmrJobId })
 
   // Branch off main so the PR is against the same base regardless of which
-  // local branch the operator was on. We use `git switch -c` from origin/main
-  // to avoid carrying along any local-branch state.
+  // local branch the operator was on. `-C` forcefully creates or resets the
+  // branch — needed for re-runs on the same date (workflow_dispatch retry
+  // after a cron failure), where `-c` would fail because the branch already
+  // exists. F-001.
   runOrThrow('git', ['fetch', 'origin', 'main'])
-  runOrThrow('git', ['switch', '-c', branch, 'origin/main'])
+  runOrThrow('git', ['switch', '-C', branch, 'origin/main'])
 
   // Re-stage the file. After switching branches, the file's working-tree
   // contents are preserved (since the change wasn't committed), but the
@@ -243,26 +245,58 @@ export function openFreshnessPr(verdict: AuditVerdict, opts: OpenPrOptions): { b
     )
   }
 
-  // Push the branch with upstream tracking. The cron workflow's
-  // GITHUB_TOKEN scope (contents: write, pull-requests: write) covers
-  // both push and pr-create.
-  runOrThrow('git', ['push', '-u', 'origin', branch])
+  // Force-push so re-runs on the same date overwrite the prior bot-run
+  // branch state instead of erroring (F-002 + F-001 follow-through). This
+  // is safe because branches under `knowledge-freshness/*` are bot-owned;
+  // human edits live on other branches.
+  runOrThrow('git', ['push', '--force-with-lease', '-u', 'origin', branch])
 
-  // Open the PR via gh. Labels are best-effort: if a label doesn't exist
-  // yet in the repo, `gh pr create --label X` fails, so we add labels in
-  // a follow-up `gh pr edit` call which is more forgiving. The workflow's
-  // first run will create the labels manually.
-  const ghArgs = [
-    'pr', 'create', '--base', 'main', '--head', branch,
-    '--title', rendered.title, '--body', rendered.body,
-  ]
-  const ghResult = spawnSync('gh', ghArgs, { encoding: 'utf8' })
-  if (ghResult.status !== 0) {
-    throw new Error(
-      `gh pr create failed (exit ${ghResult.status})\nstdout: ${ghResult.stdout}\nstderr: ${ghResult.stderr}`,
-    )
+  // If a PR already exists for this branch, UPDATE it instead of trying to
+  // create a new one (F-002). gh pr create errors when a PR is already open
+  // for the head ref, which would crash the daily cron on retry.
+  const existingPrList = spawnSync(
+    'gh',
+    ['pr', 'list', '--head', branch, '--state', 'open', '--json', 'number,url'],
+    { encoding: 'utf8' },
+  )
+  let prUrl = ''
+  if (existingPrList.status === 0) {
+    try {
+      const parsed = JSON.parse(existingPrList.stdout || '[]') as Array<{ number: number; url: string }>
+      if (parsed.length > 0) {
+        const existing = parsed[0]
+        // Update title + body on the existing PR via `gh pr edit`.
+        const editResult = spawnSync(
+          'gh',
+          ['pr', 'edit', String(existing.number), '--title', rendered.title, '--body', rendered.body],
+          { encoding: 'utf8' },
+        )
+        if (editResult.status !== 0) {
+          throw new Error(
+            `gh pr edit failed (exit ${editResult.status})\nstdout: ${editResult.stdout}\nstderr: ${editResult.stderr}`,
+          )
+        }
+        prUrl = existing.url
+      }
+    } catch (err) {
+      throw new Error(`failed to parse gh pr list output: ${(err as Error).message}`)
+    }
   }
-  const prUrl = (ghResult.stdout ?? '').trim().split('\n').pop() ?? ''
+
+  if (!prUrl) {
+    // No existing PR — open a new one. Labels are best-effort and added below.
+    const ghArgs = [
+      'pr', 'create', '--base', 'main', '--head', branch,
+      '--title', rendered.title, '--body', rendered.body,
+    ]
+    const ghResult = spawnSync('gh', ghArgs, { encoding: 'utf8' })
+    if (ghResult.status !== 0) {
+      throw new Error(
+        `gh pr create failed (exit ${ghResult.status})\nstdout: ${ghResult.stdout}\nstderr: ${ghResult.stderr}`,
+      )
+    }
+    prUrl = (ghResult.stdout ?? '').trim().split('\n').pop() ?? ''
+  }
 
   // Best-effort label attachment. `gh pr edit --add-label` will create
   // the labels in the repo on first use only if they exist; the workflow's

@@ -120,9 +120,13 @@ For each cron-opened PR, verify before merging:
    - Gate 3 — `lint-unsourced` (advisory): warns on new normative claims
      with no nearby source link. Does not block.
    - Gate 4 — `anti-over-rewrite`: a `volatility: stable` entry with >20%
-     line churn fails unless the PR body contains an explicit override
-     phrase. Skipped on non-`knowledge-freshness/*` branches (human edits
-     to stable entries are governed by review, not heuristics).
+     line churn fails unless a maintainer with write access applies the
+     `override:anti-over-rewrite` label to the PR. PR-body markers are
+     intentionally NOT honored — a malicious source could prompt-inject
+     one via the generated verdict text, so the trust anchor must be a
+     label only humans with write access can apply. Skipped on
+     non-`knowledge-freshness/*` branches (human edits to stable entries
+     are governed by review, not heuristics).
    - Gate 5 — `deep-guidance-check`: the literal `## Deep Guidance` heading
      must survive the rewrite.
 4. **Version-pin alignment.** If the verdict is `superseded`, the body

@@ -2,15 +2,18 @@
  * Anti-over-rewrite gate (spec §A.5): for `volatility: stable` entries, fail
  * if the diff's add+remove line count exceeds 20% of the entry's total line
  * count. For `evolving` and `fast-moving` entries we still compute the churn
- * percentage and surface it as a notice, but never fail. The PR description
- * can opt out for stable entries by including the literal string
- * `[override:anti-over-rewrite]` (case-sensitive, the override must be
- * explicit and grep-able).
+ * percentage and surface it as a notice, but never fail.
+ *
+ * The override is a maintainer-applied PR label `override:anti-over-rewrite`
+ * — NOT a PR-body marker. F-005 (round-1 Phase 2 MMR review): a marker in
+ * the PR body could be prompt-injected via LLM-generated verdict text from
+ * a malicious source. Labels are applied by GitHub users with write access,
+ * so they're trustworthy.
  */
 import { parseEntry } from './parse-entry.js'
 
 const STABLE_THRESHOLD = 0.20
-const OVERRIDE_MARKER = '[override:anti-over-rewrite]'
+const OVERRIDE_LABEL = 'override:anti-over-rewrite'
 
 export interface ChurnInput {
   file: string
@@ -36,12 +39,16 @@ export interface ChurnFinding {
 }
 
 export interface ChurnOptions {
-  /** Full PR description body, if known. Used to detect the override marker. */
-  prBody?: string
+  /**
+   * Labels currently applied to the PR. The gate honors the literal label
+   * `override:anti-over-rewrite` (F-005). PR-body markers are explicitly
+   * NOT honored because the bot can write the body but cannot apply labels.
+   */
+  prLabels?: string[]
 }
 
 export function evaluateChurn(inputs: ChurnInput[], opts: ChurnOptions = {}): ChurnFinding[] {
-  const overridden = typeof opts.prBody === 'string' && opts.prBody.includes(OVERRIDE_MARKER)
+  const overridden = Array.isArray(opts.prLabels) && opts.prLabels.includes(OVERRIDE_LABEL)
   const out: ChurnFinding[] = []
   for (const input of inputs) {
     let volatility: ChurnFinding['volatility'] = null
