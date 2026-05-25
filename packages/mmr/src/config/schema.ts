@@ -91,12 +91,20 @@ const TemplateSchema = z.object({
   criteria: z.array(z.string()).optional(),
 })
 
+export const CompensatorConfigSchema = z.object({
+  channel: z.string(),
+  channel_focus_map: z.record(z.string()).optional(),
+})
+
+export type CompensatorConfig = z.infer<typeof CompensatorConfigSchema>
+
 const DefaultsSchema = z.object({
   fix_threshold: Severity.default('P2'),
   timeout: z.number().default(300),
   format: OutputFormat.default('json'),
   parallel: z.boolean().default(true),
   job_retention_days: z.number().default(7),
+  compensator: CompensatorConfigSchema.optional(),
 })
 
 export const MmrConfigSchema = z.object({
