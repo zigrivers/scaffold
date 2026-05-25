@@ -4,12 +4,23 @@ import type { ScaffoldConfig } from './config.js'
 import type { PipelineState } from './state.js'
 import type { ScaffoldError, ScaffoldWarning } from './errors.js'
 
+export interface KnowledgeSource {
+  url: string
+  anchor?: string
+  retrieved?: string
+  hash?: string
+}
+
 /** A knowledge base entry loaded from knowledge/. */
 export interface KnowledgeEntry {
   name: string
   description: string
   topics: string[]
   content: string
+  volatility: 'stable' | 'evolving' | 'fast-moving'
+  lastReviewed: string | null
+  versionPin: string | null
+  sources: KnowledgeSource[]
 }
 
 /** An existing artifact from a completed step (for update mode). */
