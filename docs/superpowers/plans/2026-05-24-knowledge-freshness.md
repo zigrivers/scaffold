@@ -1086,7 +1086,7 @@ keep me
 `
     const verdict = {
       entry_name: 'x', audit_date: '2026-05-24', model: 'claude-opus-4-7',
-      verdict: 'minor-drift' as const, sources_checked: [], findings: [],
+      verdict: 'major-drift' as const, sources_checked: [], findings: [],
       proposed_changes: [
         { location: '## OWASP Top 10', kind: 'insert' as const,
           rationale: '', new_text: '> 2025 edition adds A11 Software Supply Chain Failures.' },
@@ -1194,6 +1194,89 @@ keep me
     expect(out).toContain('Cost: $1 per request, $20/month plan.')
   })
 
+  it('throws when minor-drift or current verdicts carry proposed_changes', () => {
+    const verdict = {
+      entry_name: 'x', audit_date: '2026-05-24', model: 'claude-opus-4-7',
+      verdict: 'minor-drift' as const, sources_checked: [], findings: [],
+      proposed_changes: [
+        { location: '## Deep Guidance', kind: 'replace' as const,
+          rationale: '', new_text: '## Deep Guidance\n\nNew.' },
+      ],
+      preserve_warnings: [],
+    }
+    expect(() => applyVerdictToEntry(baseEntry, verdict)).toThrow(/must have no proposed_changes/)
+  })
+
+  it('matches sources by normalized URL so anchors do not block hash updates', () => {
+    const entry = `---
+name: x
+description: y
+topics: []
+sources:
+  - url: https://example.org/spec
+    hash: 'old'
+---
+
+## Deep Guidance
+
+x
+`
+    const verdict = {
+      entry_name: 'x', audit_date: '2026-05-24', model: 'claude-opus-4-7',
+      verdict: 'current' as const,
+      sources_checked: [
+        // Verdict's URL has an anchor; frontmatter's doesn't. Apply should still match.
+        { url: 'https://example.org/spec#section-2', retrieved_at: '2026-05-24',
+          content_hash: 'sha256:new', summary: '' },
+      ],
+      findings: [], proposed_changes: [], preserve_warnings: [],
+    }
+    const out = applyVerdictToEntry(entry, verdict)
+    expect(out).toContain("hash: 'sha256:new'")
+    expect(out).not.toContain("hash: 'old'")
+  })
+
+  it('prefers caller-supplied trustedHashes over LLM-claimed content_hash', () => {
+    const entry = `---
+name: x
+description: y
+topics: []
+sources:
+  - url: https://example.org/spec
+    hash: 'old'
+---
+
+## Deep Guidance
+
+x
+`
+    const verdict = {
+      entry_name: 'x', audit_date: '2026-05-24', model: 'claude-opus-4-7',
+      verdict: 'current' as const,
+      sources_checked: [
+        { url: 'https://example.org/spec', retrieved_at: '2026-05-24',
+          content_hash: 'sha256:llm-claimed-untrusted', summary: '' },
+      ],
+      findings: [], proposed_changes: [], preserve_warnings: [],
+    }
+    const trustedHashes = new Map([['https://example.org/spec', 'sha256:deterministic']])
+    const out = applyVerdictToEntry(entry, verdict, { trustedHashes })
+    expect(out).toContain("hash: 'sha256:deterministic'")
+    expect(out).not.toContain('llm-claimed-untrusted')
+  })
+
+  it('protects "## Summary" the same way it protects "## Deep Guidance"', () => {
+    const verdict = {
+      entry_name: 'x', audit_date: '2026-05-24', model: 'claude-opus-4-7',
+      verdict: 'major-drift' as const, sources_checked: [], findings: [],
+      proposed_changes: [
+        { location: '## Summary', kind: 'delete' as const, rationale: '' },
+      ],
+      preserve_warnings: [],
+    }
+    expect(() => applyVerdictToEntry(baseEntry, verdict)).toThrow(/Summary/)
+  })
+
   it('parses unquoted ISO dates in existing entries correctly (no Date coercion)', () => {
     const entryWithUnquotedDate = `---
 name: x
@@ -1251,24 +1334,64 @@ function findHeading(body: string, location: string): { start: number; end: numb
   return null
 }
 
-export function applyVerdictToEntry(original: string, verdict: AuditVerdict): string {
+/** Strip a URL fragment/anchor so verdict sources match frontmatter sources reliably. */
+function normalizeUrl(u: string): string {
+  const idx = u.indexOf('#')
+  return idx === -1 ? u : u.slice(0, idx)
+}
+
+/** Headings the assembly engine depends on — apply must preserve them verbatim. */
+const PROTECTED_HEADINGS = new Set(['## Summary', '## Deep Guidance'])
+
+export interface ApplyOptions {
+  /**
+   * Optional map of normalized-url → fresh sha256 hash, computed deterministically
+   * by the caller (typically the CLI wrapper, which re-fetches each
+   * `verdict.sources_checked.url` before calling apply). When provided, these
+   * hashes are persisted to frontmatter instead of the LLM-claimed
+   * `content_hash` (which is not deterministically verifiable). When omitted —
+   * e.g. in unit tests — apply falls back to the LLM-claimed hash.
+   */
+  trustedHashes?: Map<string, string>
+}
+
+export function applyVerdictToEntry(
+  original: string,
+  verdict: AuditVerdict,
+  opts: ApplyOptions = {},
+): string {
+  // Enforce the spec contract: minor-drift carries findings only, no changes.
+  if ((verdict.verdict === 'current' || verdict.verdict === 'minor-drift') && verdict.proposed_changes.length > 0) {
+    throw new Error(
+      `verdict "${verdict.verdict}" must have no proposed_changes — got ${verdict.proposed_changes.length}. ` +
+      `Use "major-drift" or "superseded" if changes are needed (also gates MMR corroboration per spec §A.4).`,
+    )
+  }
+
   const lines = original.split('\n')
   if (lines[0]?.trim() !== '---') throw new Error('entry has no frontmatter')
   let close = -1
   for (let i = 1; i < lines.length; i++) if (lines[i].trim() === '---') { close = i; break }
   if (close === -1) throw new Error('frontmatter unclosed')
 
-  // Parse frontmatter with a safe schema so ISO dates stay strings (F-001).
+  // Parse frontmatter with a safe schema so ISO dates stay strings (round-1 F-001).
   const fmObj = yaml.load(lines.slice(1, close).join('\n'), { schema: yaml.JSON_SCHEMA }) as Record<string, unknown>
   fmObj['last-reviewed'] = verdict.audit_date
+
   if (Array.isArray(fmObj['sources'])) {
-    // Cast to the narrow on-disk shape so dot-notation reads/writes type-check
-    // cleanly under `tsc --strict` (Record<string, unknown> would force `s.url`
-    // to type `unknown` and break the `===` comparison below).
     const sourcesArr = fmObj['sources'] as Array<{ url?: string; hash?: string; retrieved?: string }>
     for (const s of sourcesArr) {
-      const match = verdict.sources_checked.find(c => c.url === s.url)
-      if (match) { s.hash = match.content_hash; s.retrieved = match.retrieved_at }
+      // Normalize both sides so a frontmatter `url: https://x` matches a verdict
+      // `url: https://x#fragment` (round-3 F-002).
+      const sNormalized = s.url ? normalizeUrl(s.url) : undefined
+      const match = verdict.sources_checked.find(c => normalizeUrl(c.url) === sNormalized)
+      if (match) {
+        // Prefer the caller-supplied deterministic hash (round-3 F-001); fall
+        // back to the LLM-claimed hash only when no trustedHashes map was passed.
+        const fresh = opts.trustedHashes?.get(normalizeUrl(match.url))
+        s.hash = fresh ?? match.content_hash
+        s.retrieved = match.retrieved_at
+      }
     }
   }
 
@@ -1276,14 +1399,15 @@ export function applyVerdictToEntry(original: string, verdict: AuditVerdict): st
   let body = lines.slice(close + 1).join('\n')
 
   for (const change of verdict.proposed_changes) {
-    // Protect the Deep Guidance heading: assembly engine depends on it.
-    if (change.location.trim() === '## Deep Guidance' && (change.kind === 'delete' || change.kind === 'replace')) {
-      // Allow replace, but only if new_text still begins with the heading line.
+    // Protect headings the assembly engine depends on (round-3 F-004 extends F-002
+    // to cover ## Summary as well as ## Deep Guidance, matching the meta-prompt).
+    const loc = change.location.trim()
+    if (PROTECTED_HEADINGS.has(loc)) {
       if (change.kind === 'delete') {
-        throw new Error('refusing to delete "## Deep Guidance" — assembly engine depends on it')
+        throw new Error(`refusing to delete "${loc}" — assembly engine depends on it`)
       }
-      if (change.kind === 'replace' && !(change.new_text ?? '').trim().startsWith('## Deep Guidance')) {
-        throw new Error('refusing to remove "## Deep Guidance" heading in a replace — assembly engine depends on it')
+      if (change.kind === 'replace' && !(change.new_text ?? '').trim().startsWith(loc)) {
+        throw new Error(`refusing to remove "${loc}" heading in a replace — new_text must start with the same heading line`)
       }
     }
 
@@ -1323,9 +1447,17 @@ Expected: PASS.
 
 - [ ] **Step 5: Wire CLI**
 
-Create `src/cli/commands/knowledge-freshness-audit-apply.ts` that takes two positional argv arguments — `<entry-path>` and `<verdict.json>` — in that order. Read both files, sanity-check that the verdict's `entry_name` matches the entry's frontmatter `name` (throw with a clear message if not, to catch a mismatched-pair operator error), call `applyVerdictToEntry`, write the result back to `<entry-path>`, and run `git diff <entry-path>` for the operator to see.
+Create `src/cli/commands/knowledge-freshness-audit-apply.ts` that takes two positional argv arguments — `<entry-path>` and `<verdict.json>` — in that order. Read both files, then:
 
-The signature is explicit (path first, verdict second) because the verdict schema intentionally does not carry a filesystem path — keeping the path out of LLM-emitted output preserves the safety property that the LLM cannot redirect writes to an unrelated file.
+1. Sanity-check that the verdict's `entry_name` matches the entry's frontmatter `name` (throw with a clear message if not, to catch a mismatched-pair operator error).
+2. **Compute deterministic hashes**: for each normalized URL in `verdict.sources_checked`, GET the URL, sha256 the body, build a `Map<string, string>` of `normalizedUrl → sha256:…`. This is what gets persisted to frontmatter — the LLM-claimed `content_hash` is advisory only.
+3. Call `applyVerdictToEntry(content, verdict, { trustedHashes })`.
+4. Write the result back to `<entry-path>`.
+5. Run `git diff <entry-path>` for the operator to see.
+
+The signature is explicit (path first, verdict second) because the verdict schema intentionally does not carry a filesystem path — keeping the path out of LLM-emitted output preserves the safety property that the LLM cannot redirect writes to an unrelated file. Likewise, source hashes are recomputed in Node rather than trusted from the LLM, because LLM-emitted sha256s cannot be deterministically verified.
+
+The hashing helper can be shared with the audit-prefilter (Task 6 step 5) — both want the same "fetch URL, sha256 body, return hex" primitive. Factor it into `src/knowledge-freshness/source-hash.ts` if it isn't already.
 
 - [ ] **Step 6: Commit**
 
