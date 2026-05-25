@@ -1219,14 +1219,22 @@ export async function runEntryAudit(
     'utf8',
   )
 
-  // Use replaceAll + replacer-function form so we (a) replace every occurrence
-  // — the meta-prompt references `{{entry_frontmatter}}` in the Inputs section
-  // AND the Procedure section — and (b) avoid String.replace's special-pattern
-  // handling (`$$`, `$&`, `$'`, `$1`) on values that may contain dollar signs.
-  const filled = promptTemplate
-    .replaceAll('{{entry_path}}', () => entryPath)
-    .replaceAll('{{entry_frontmatter}}', () => JSON.stringify(fmForPrompt, null, 2))
-    .replaceAll('{{entry_body}}', () => content)
+  // Single-pass substitution prevents template-collision: if one value
+  // happened to contain a later placeholder string like `{{entry_body}}`,
+  // a sequential .replaceAll chain would substitute into the substituted
+  // content. The single regex over all placeholders sidesteps that — each
+  // match site is resolved against the original template once.
+  // Replacer-function form also avoids String.replace's special-pattern
+  // handling (`$$`, `$&`, `$'`, `$1`) on values containing dollar signs.
+  const substitutions: Record<string, string> = {
+    '{{entry_path}}': entryPath,
+    '{{entry_frontmatter}}': JSON.stringify(fmForPrompt, null, 2),
+    '{{entry_body}}': content,
+  }
+  const filled = promptTemplate.replace(
+    /\{\{(entry_path|entry_frontmatter|entry_body)\}\}/g,
+    (match) => substitutions[match] ?? match,
+  )
 
   const raw = await dispatch(filled)
   const verdict = findFirstMatchingJson(raw, verdictSchema)
@@ -2001,8 +2009,8 @@ Scoped tasks; expand to bite-sized steps in the next planning round once Phase 1
 
 ## Phase 3 — Gap Detection (Lens I)
 
-- [ ] **Task 15:** Add new observability event type `knowledge_gap_signal` to `src/observability/engine/event-schemas.ts`. Acceptance: `scaffold observe event knowledge_gap_signal --topic=X --step=Y --reason=Z` writes a valid ledger entry through the existing `observe event` channel, and `SCAFFOLD_GAP_SIGNAL_QUIET=1` suppresses emission. (The existing CLI surface is `scaffold observe event <type> …` — do not invent a top-level `observe gap-signal` subcommand. The gap signal is one event among many; it routes through the same channel.)
-- [ ] **Task 16:** Wire emission into pipeline meta-prompts: append a single instruction to every pipeline step that references `knowledge-base:` telling the executing agent to call `scaffold observe event knowledge_gap_signal --topic=<slug> --step=<name> --reason=<one-line-quote>` when it can't find what it needs in the injected knowledge. Always-on per decisions-locked. Acceptance: a contrived pipeline run with a missing topic emits the event.
+- [ ] **Task 15:** Add a new observability event type `knowledge_gap_signal`. **This is a roadmap-level sketch — Phase 3 needs its own design pass before execution** because the event has to land in *both* the schema map (`src/observability/engine/event-schemas.ts`) and the discriminated union in `src/observability/engine/types.ts`, and the payload field names (`step_name` / `agent_excerpt`) need to match what the existing `scaffold observe event <type>` CLI passes through (currently `--step` and `--reason` become `step`/`reason`; reconcile by either renaming the payload fields, extending the CLI flag set, or both). Acceptance: a runnable invocation through the existing `observe event` channel writes a valid ledger entry, and `SCAFFOLD_GAP_SIGNAL_QUIET=1` suppresses emission. The exact CLI form is a Phase 3 design output.
+- [ ] **Task 16:** Wire emission into pipeline meta-prompts: append a single instruction to every pipeline step that references `knowledge-base:` telling the executing agent to call the Task-15 command on missed lookups. Always-on per decisions-locked. Acceptance: a contrived pipeline run with a missing topic emits the event.
 - [ ] **Task 17:** Implement `src/observability/checks/lens-i-knowledge-gaps.ts` — aggregates `knowledge_gap_signal` events from the ledger over a rolling 90-day window; emits findings for topics with ≥3 signals across ≥2 distinct projects (P2). Acceptance: lens runs in `scaffold observe audit` output.
 - [ ] **Task 18:** Add the `tasks/lessons.md` scanner as a secondary signal source. Acceptance: recurring patterns in lessons.md (≥3 mentions of same topic) emit gap signals.
 
