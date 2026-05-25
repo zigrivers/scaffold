@@ -323,6 +323,13 @@ Scaffold follows [semver](https://semver.org):
    - `npm info @zigrivers/scaffold version` returns the new version (npm registry propagation can take 1-5 minutes — retry after a short delay if the version doesn't appear immediately)
    - `npx @zigrivers/scaffold --version` returns the new version from a clean directory
    - `brew update && brew upgrade scaffold && scaffold --version` returns the new version
+     > The `brew update` prefix is **required**. Homebrew's `brew outdated` and
+     > `brew upgrade` both read from the local tap cache; without `brew update`
+     > the cache stays stale and a freshly-published release will report
+     > "already installed" / nothing-outdated even though the formula in the
+     > tap on GitHub points at the new version. Tell users the same when they
+     > report "I just ran `brew upgrade scaffold` and it didn't pick up
+     > vX.Y.Z." (Confirmed during the v3.28.0 ship.)
 
 ### 4.2a npm Publish Auth — NPM_TOKEN Is The Working Path (Not Trusted Publishing)
 
