@@ -1,0 +1,15 @@
+# Knowledge-freshness source allowlist (decisions-locked 2026-05-24).
+# Sources outside this list trigger a warning (not a block) in the audit gates.
+# Expand per-PR with reviewer approval.
+
+hosts:
+  - owasp.org              # OWASP Top 10, ASVS, SAMM
+  - nist.gov               # NIST SSDF, SP 800-series
+  - ietf.org/rfc           # IETF RFCs (OAuth, OIDC, HTTP, etc.)
+  - modelcontextprotocol.io # MCP specification
+  - anthropic.com/docs     # Anthropic API docs, Claude model cards
+  - platform.openai.com    # OpenAI API docs
+  - ai.google.dev          # Gemini API docs
+
+github_repos:
+  - modelcontextprotocol/specification

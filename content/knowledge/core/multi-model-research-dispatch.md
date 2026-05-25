@@ -2,6 +2,13 @@
 name: multi-model-research-dispatch
 description: Patterns for dispatching research and adversarial challenge to external AI models (Codex, Gemini) with reconciliation rules and single-model fallback
 topics: [multi-model, research, competitive-analysis, red-team, codex, gemini, dispatch, reconciliation]
+volatility: fast-moving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://platform.openai.com/docs/codex
+  - url: https://ai.google.dev/gemini-api/docs/cli
+  - url: https://docs.anthropic.com/en/docs/claude-code/cli-reference
 ---
 
 # Multi-Model Research Dispatch

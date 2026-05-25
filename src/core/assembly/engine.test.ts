@@ -98,6 +98,10 @@ function makeKBEntry(overrides: Partial<KnowledgeEntry> = {}): KnowledgeEntry {
     description: 'Test-Driven Development Patterns',
     topics: ['testing', 'tdd'],
     content: 'Write tests first, then make them pass.',
+    volatility: 'evolving',
+    lastReviewed: null,
+    versionPin: null,
+    sources: [],
     ...overrides,
   }
 }

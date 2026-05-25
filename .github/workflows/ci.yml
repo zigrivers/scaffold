@@ -13,7 +13,12 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          # 18.17+ required by undici@^6 (introduced for the
+          # knowledge-freshness audit's pinned-IP fetch). The repo's runtime
+          # already needs 18.17+ to satisfy that range; pinning CI to '18'
+          # would resolve to the latest 18.x which is fine, but we make it
+          # explicit so a regression doesn't sneak in.
+          node-version: '18.17'
           cache: 'npm'
 
       - name: Install system dependencies
@@ -27,3 +32,6 @@ jobs:
 
       - name: Run all quality gates
         run: make check-all
+
+      - name: Validate knowledge frontmatter
+        run: make validate-knowledge

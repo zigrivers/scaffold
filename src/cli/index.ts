@@ -11,6 +11,7 @@ import resetCommand from './commands/reset.js'
 import statusCommand from './commands/status.js'
 import nextCommand from './commands/next.js'
 import validateCommand from './commands/validate.js'
+import validateKnowledgeCommand from './commands/validate-knowledge.js'
 import listCommand from './commands/list.js'
 import infoCommand from './commands/info.js'
 import versionCommand from './commands/version.js'
@@ -23,6 +24,7 @@ import checkCommand from './commands/check.js'
 import completeCommand from './commands/complete.js'
 import reworkCommand from './commands/rework.js'
 import observeCommand from './commands/observe.js'
+import knowledgeFreshnessCommand from './commands/knowledge-freshness.js'
 
 export async function runCli(argv: string[]): Promise<void> {
   shutdown.install()
@@ -38,6 +40,7 @@ export async function runCli(argv: string[]): Promise<void> {
     .command(statusCommand)
     .command(nextCommand)
     .command(validateCommand)
+    .command(validateKnowledgeCommand)
     .command(listCommand)
     .command(infoCommand)
     .command(versionCommand)
@@ -50,6 +53,7 @@ export async function runCli(argv: string[]): Promise<void> {
     .command(completeCommand)
     .command(reworkCommand)
     .command(observeCommand)
+    .command(knowledgeFreshnessCommand)
     .options({
       format: {
         type: 'string',

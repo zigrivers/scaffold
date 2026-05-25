@@ -2,6 +2,12 @@
 name: api-design
 description: API design principles for REST, GraphQL, and inter-service communication
 topics: [api, rest, graphql, endpoints, contracts, versioning, error-handling, authentication]
+volatility: evolving
+last-reviewed: null
+version-pin: 'OpenAPI 3.1 / GraphQL October 2021'
+sources:
+  - url: https://spec.openapis.org/oas/v3.1.0
+  - url: https://spec.graphql.org/October2021/
 ---
 
 ## Summary

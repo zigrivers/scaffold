@@ -5,10 +5,57 @@ import yaml from 'js-yaml'
 import fs from 'node:fs'
 import path from 'node:path'
 
+type Volatility = 'stable' | 'evolving' | 'fast-moving'
+
+interface KBSource {
+  url: string
+  anchor?: string
+  retrieved?: string
+  hash?: string
+}
+
 interface KBFrontmatter {
   name: string
   description: string
   topics: string[]
+  volatility: Volatility
+  lastReviewed: string | null
+  versionPin: string | null
+  sources: KBSource[]
+}
+
+const VOLATILITIES = new Set<Volatility>(['stable', 'evolving', 'fast-moving'])
+
+function coerceVolatility(raw: unknown): Volatility {
+  return typeof raw === 'string' && VOLATILITIES.has(raw as Volatility) ? (raw as Volatility) : 'evolving'
+}
+
+/**
+ * Coerce a YAML-parsed value to an ISO date string. Accepts either a string
+ * (e.g. quoted `'2026-05-24'`) or a Date (e.g. unquoted `2026-05-24` under the
+ * default js-yaml schema, which interprets it as a timestamp).
+ */
+function coerceIsoDate(raw: unknown): string | null {
+  if (typeof raw === 'string') return raw
+  if (raw instanceof Date && !isNaN(raw.getTime())) return raw.toISOString().slice(0, 10)
+  return null
+}
+
+function coerceSources(raw: unknown): KBSource[] {
+  if (!Array.isArray(raw)) return []
+  const out: KBSource[] = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue
+    const o = item as Record<string, unknown>
+    if (typeof o.url !== 'string') continue
+    const src: KBSource = { url: o.url }
+    if (typeof o.anchor === 'string') src.anchor = o.anchor
+    const retrieved = coerceIsoDate(o.retrieved)
+    if (retrieved) src.retrieved = retrieved
+    if (typeof o.hash === 'string') src.hash = o.hash
+    out.push(src)
+  }
+  return out
 }
 
 /**
@@ -37,8 +84,11 @@ export function extractKBFrontmatter(content: string): KBFrontmatter | null {
   const yamlText = lines.slice(1, closeIdx).join('\n')
 
   let parsed: unknown
+  // Use JSON_SCHEMA so unquoted ISO dates parse as strings, not Date objects.
+  // (The default schema converts `2026-05-24` to a JS Date, which silently
+  // null'd out `last-reviewed` before this fix.)
   try {
-    parsed = yaml.load(yamlText)
+    parsed = yaml.load(yamlText, { schema: yaml.JSON_SCHEMA })
   } catch {
     return null
   }
@@ -59,6 +109,10 @@ export function extractKBFrontmatter(content: string): KBFrontmatter | null {
     topics: Array.isArray(obj['topics'])
       ? (obj['topics'] as unknown[]).filter((t): t is string => typeof t === 'string')
       : [],
+    volatility: coerceVolatility(obj['volatility']),
+    lastReviewed: coerceIsoDate(obj['last-reviewed']),
+    versionPin: typeof obj['version-pin'] === 'string' ? obj['version-pin'] : null,
+    sources: coerceSources(obj['sources']),
   }
 }
 
@@ -259,6 +313,10 @@ export function loadEntries(
         description: fm.description,
         topics: fm.topics,
         content: deepOnly ?? fullBody,
+        volatility: fm.volatility,
+        lastReviewed: fm.lastReviewed,
+        versionPin: fm.versionPin,
+        sources: fm.sources,
       })
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err)
@@ -317,6 +375,10 @@ export function loadFullEntries(
         description: fm.description,
         topics: fm.topics,
         content: extractBody(content),
+        volatility: fm.volatility,
+        lastReviewed: fm.lastReviewed,
+        versionPin: fm.versionPin,
+        sources: fm.sources,
       })
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err)

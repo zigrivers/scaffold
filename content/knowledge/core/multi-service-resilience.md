@@ -2,6 +2,11 @@
 name: multi-service-resilience
 description: Circuit breakers, bulkheads, timeout budgets, and failure isolation strategies
 topics: [circuit-breakers, bulkheads, timeout-budgets, failure-isolation, retry-storms]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/welcome.html
 ---
 
 ## Summary

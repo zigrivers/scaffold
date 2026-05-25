@@ -432,6 +432,10 @@ describe('extractKBFrontmatter', () => {
       name: 'prd-craft',
       description: 'Best practices for writing effective PRDs',
       topics: ['product', 'requirements'],
+      volatility: 'evolving',
+      lastReviewed: null,
+      versionPin: null,
+      sources: [],
     })
   })
 
@@ -789,5 +793,78 @@ describe('loadEntries vs loadFullEntries — depth behavior contrast', () => {
     const full = loadFullEntries(index, ['prd-craft'])
 
     expect(shallow.entries[0].content).toBe(full.entries[0].content)
+  })
+})
+
+describe('extractKBFrontmatter — freshness fields', () => {
+  it('parses volatility, last-reviewed, sources, version-pin when present', () => {
+    const content = `---
+name: security-best-practices
+description: OWASP Top 10 plus auth and crypto
+topics: [security]
+volatility: fast-moving
+last-reviewed: '2026-05-01'
+version-pin: 'OWASP Top 10 2021'
+sources:
+  - url: https://owasp.org/Top10/
+    anchor: '#2025-edition'
+    retrieved: '2026-05-01'
+    hash: 'sha256:abc'
+---
+body`
+    const fm = extractKBFrontmatter(content)
+    expect(fm).not.toBeNull()
+    expect(fm!.volatility).toBe('fast-moving')
+    expect(fm!.lastReviewed).toBe('2026-05-01')
+    expect(fm!.versionPin).toBe('OWASP Top 10 2021')
+    expect(fm!.sources).toHaveLength(1)
+    expect(fm!.sources![0].url).toBe('https://owasp.org/Top10/')
+    expect(fm!.sources![0].hash).toBe('sha256:abc')
+  })
+
+  it('defaults volatility to "evolving" and lastReviewed to null when absent', () => {
+    const content = `---
+name: domain-modeling
+description: DDD
+topics: [ddd]
+---
+body`
+    const fm = extractKBFrontmatter(content)
+    expect(fm!.volatility).toBe('evolving')
+    expect(fm!.lastReviewed).toBeNull()
+    expect(fm!.sources).toEqual([])
+    expect(fm!.versionPin).toBeNull()
+  })
+
+  it('coerces unknown volatility values to "evolving" silently', () => {
+    const content = `---
+name: x
+description: y
+topics: []
+volatility: urgent
+---
+body`
+    const fm = extractKBFrontmatter(content)
+    expect(fm!.volatility).toBe('evolving')
+  })
+
+  it('parses unquoted ISO dates as strings (not Date objects)', () => {
+    // js-yaml's default schema coerces unquoted YYYY-MM-DD into a JS Date.
+    // We use JSON_SCHEMA + a Date-aware coercer so lastReviewed is always
+    // a string or null — never an object.
+    const content = `---
+name: x
+description: y
+topics: []
+last-reviewed: 2026-04-01
+sources:
+  - url: https://x
+    retrieved: 2026-04-01
+---
+body`
+    const fm = extractKBFrontmatter(content)
+    expect(fm!.lastReviewed).toBe('2026-04-01')
+    expect(typeof fm!.lastReviewed).toBe('string')
+    expect(fm!.sources[0].retrieved).toBe('2026-04-01')
   })
 })

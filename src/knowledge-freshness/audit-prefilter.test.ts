@@ -1,0 +1,111 @@
+import { describe, it, expect, vi } from 'vitest'
+import { selectAuditCandidates, type FetchSourceFn } from './audit-prefilter.js'
+import type { KnowledgeEntry } from '../types/index.js'
+
+const today = new Date('2026-05-24T00:00:00Z')
+
+function entry(overrides: Partial<KnowledgeEntry>): KnowledgeEntry {
+  return {
+    name: 'x', description: '', topics: [], content: '',
+    volatility: 'evolving', lastReviewed: null, versionPin: null, sources: [],
+    ...overrides,
+  }
+}
+
+describe('selectAuditCandidates', () => {
+  it('skips entries with no sources', async () => {
+    const fetch = vi.fn() as unknown as FetchSourceFn
+    const out = await selectAuditCandidates([entry({ sources: [] })], { now: today, max: 10, fetch })
+    expect(out).toEqual([])
+  })
+
+  it('selects entries that have never been reviewed', async () => {
+    const fetch = vi.fn().mockResolvedValue({ hash: 'h1' }) as unknown as FetchSourceFn
+    const out = await selectAuditCandidates(
+      [entry({ name: 'a', sources: [{ url: 'https://x' }], lastReviewed: null })],
+      { now: today, max: 10, fetch },
+    )
+    expect(out.map(c => c.name)).toEqual(['a'])
+  })
+
+  it('selects fast-moving entries last reviewed >14d ago', async () => {
+    const fetch = vi.fn().mockResolvedValue({ hash: 'h1' }) as unknown as FetchSourceFn
+    const out = await selectAuditCandidates(
+      [entry({
+        name: 'a', volatility: 'fast-moving', lastReviewed: '2026-05-01',
+        sources: [{ url: 'https://x', hash: 'h1' }],
+      })],
+      { now: today, max: 10, fetch },
+    )
+    expect(out.map(c => c.name)).toEqual(['a'])
+  })
+
+  it('selects entries whose source hash changed', async () => {
+    const fetch = vi.fn().mockResolvedValue({ hash: 'h2' }) as unknown as FetchSourceFn
+    const out = await selectAuditCandidates(
+      [entry({ name: 'a', lastReviewed: '2026-05-23', sources: [{ url: 'https://x', hash: 'h1' }] })],
+      { now: today, max: 10, fetch },
+    )
+    expect(out.map(c => c.name)).toEqual(['a'])
+  })
+
+  it('skips stable entries within their 180d window with matching hashes', async () => {
+    const fetch = vi.fn().mockResolvedValue({ hash: 'h1' }) as unknown as FetchSourceFn
+    const out = await selectAuditCandidates(
+      [entry({
+        name: 'a', volatility: 'stable', lastReviewed: '2026-04-01',
+        sources: [{ url: 'https://x', hash: 'h1' }],
+      })],
+      { now: today, max: 10, fetch },
+    )
+    expect(out).toEqual([])
+  })
+
+  it('appends source.anchor to the fetched URL so the prefilter hashes the same target as the audit', async () => {
+    const fetch = vi.fn().mockResolvedValue({ hash: 'h1' }) as unknown as FetchSourceFn
+    await selectAuditCandidates(
+      [entry({
+        name: 'a', lastReviewed: '2026-05-23',
+        sources: [{ url: 'https://example.org/spec', anchor: '#section-2', hash: 'h1' }],
+      })],
+      { now: today, max: 10, fetch },
+    )
+    expect(fetch).toHaveBeenCalledWith('https://example.org/spec#section-2')
+  })
+
+  it('respects max ceiling', async () => {
+    const fetch = vi.fn().mockResolvedValue({ hash: 'new' }) as unknown as FetchSourceFn
+    const entries = Array.from({ length: 5 }, (_, i) =>
+      entry({ name: `e${i}`, sources: [{ url: `https://x${i}`, hash: 'old' }], lastReviewed: null }),
+    )
+    const out = await selectAuditCandidates(entries, { now: today, max: 2, fetch })
+    expect(out).toHaveLength(2)
+  })
+
+  it('treats an invalid calendar date in lastReviewed as overdue (no NaN-skip)', async () => {
+    // Round-3 F-002: "2026-99-99" passed the regex but is not a real date.
+    // Cadence math (now - new Date('2026-99-99')) is NaN; without the guard,
+    // the entry would NEVER be selected by the cadence path even when its
+    // sources don't change. Verify it now gets picked up.
+    const fetch = vi.fn().mockResolvedValue({ hash: 'h1' }) as unknown as FetchSourceFn
+    const out = await selectAuditCandidates(
+      [entry({
+        name: 'a', volatility: 'fast-moving', lastReviewed: '2026-99-99',
+        sources: [{ url: 'https://x', hash: 'h1' }],
+      })],
+      { now: today, max: 10, fetch },
+    )
+    expect(out.map((c) => c.name)).toEqual(['a'])
+  })
+
+  it('returns no candidates when max is 0, negative, or non-integer (no ceiling bypass)', async () => {
+    const fetch = vi.fn().mockResolvedValue({ hash: 'new' }) as unknown as FetchSourceFn
+    const entries = Array.from({ length: 5 }, (_, i) =>
+      entry({ name: `e${i}`, sources: [{ url: `https://x${i}`, hash: 'old' }], lastReviewed: null }),
+    )
+    // Negative would otherwise become `slice(0, -1)` → "all but last" (round-2 F-003).
+    expect(await selectAuditCandidates(entries, { now: today, max: -1, fetch })).toEqual([])
+    expect(await selectAuditCandidates(entries, { now: today, max: 0, fetch })).toEqual([])
+    expect(await selectAuditCandidates(entries, { now: today, max: 1.5, fetch })).toEqual([])
+  })
+})

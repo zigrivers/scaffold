@@ -2,6 +2,12 @@
 name: multi-service-auth
 description: Mutual TLS, service tokens, zero-trust architecture, and audience scoping
 topics: [mtls, service-tokens, zero-trust, audience-scoping, token-rotation]
+volatility: evolving
+last-reviewed: null
+version-pin: 'RFC 6749 / OIDC Core 1.0'
+sources:
+  - url: https://www.rfc-editor.org/rfc/rfc6749
+  - url: https://openid.net/specs/openid-connect-core-1_0.html
 ---
 
 ## Summary

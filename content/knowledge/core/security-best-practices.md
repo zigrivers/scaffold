@@ -2,6 +2,12 @@
 name: security-best-practices
 description: OWASP Top 10, authentication, authorization, data protection, and threat modeling
 topics: [security, owasp, authentication, authorization, threat-modeling, secrets-management, dependency-auditing]
+volatility: fast-moving
+last-reviewed: null
+version-pin: 'OWASP Top 10 2021'
+sources:
+  - url: https://owasp.org/Top10/
+    anchor: '#top-10-list'
 ---
 
 ## Summary
