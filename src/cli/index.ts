@@ -11,6 +11,7 @@ import resetCommand from './commands/reset.js'
 import statusCommand from './commands/status.js'
 import nextCommand from './commands/next.js'
 import validateCommand from './commands/validate.js'
+import validateKnowledgeCommand from './commands/validate-knowledge.js'
 import listCommand from './commands/list.js'
 import infoCommand from './commands/info.js'
 import versionCommand from './commands/version.js'
@@ -38,6 +39,7 @@ export async function runCli(argv: string[]): Promise<void> {
     .command(statusCommand)
     .command(nextCommand)
     .command(validateCommand)
+    .command(validateKnowledgeCommand)
     .command(listCommand)
     .command(infoCommand)
     .command(versionCommand)

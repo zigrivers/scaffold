@@ -1,4 +1,4 @@
-.PHONY: help test lint validate check check-all eval ts-check setup hooks dashboard-test mmr-build mmr-test mmr-check
+.PHONY: help test lint validate validate-knowledge check check-all eval ts-check setup hooks dashboard-test mmr-build mmr-test mmr-check
 
 help: ## Show available targets
 	@grep -E '^[a-z][a-z-]*:.*## ' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -12,9 +12,13 @@ lint: ## Run ShellCheck on all shell scripts
 validate: ## Validate frontmatter in pipeline and tool files
 	./scripts/validate-frontmatter.sh content/pipeline/**/*.md content/tools/*.md
 
+validate-knowledge: ## Validate frontmatter on knowledge entries (freshness fields)
+	npm run build
+	node dist/index.js validate-knowledge
+
 check: lint validate test eval ## Run bash quality gates (lint + validate + test + eval)
 
-check-all: check ts-check mmr-check ## Run all quality gates (bash + TypeScript)
+check-all: check ts-check mmr-check validate-knowledge ## Run all quality gates (bash + TypeScript + knowledge frontmatter)
 
 ts-check: ## Run TypeScript quality gates (lint + type-check + build + unit tests)
 	npm run lint

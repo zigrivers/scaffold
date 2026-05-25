@@ -27,3 +27,6 @@ jobs:
 
       - name: Run all quality gates
         run: make check-all
+
+      - name: Validate knowledge frontmatter
+        run: make validate-knowledge
