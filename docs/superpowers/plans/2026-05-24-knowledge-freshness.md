@@ -1053,18 +1053,43 @@ export async function runEntryAudit(entryPath: string, dispatch: Dispatcher): Pr
     .replaceAll('{{entry_body}}', () => content)
 
   const raw = await dispatch(filled)
-  // Extract the largest top-level `{...}` block; models occasionally emit a
-  // preamble/postamble around the JSON even when told not to. If no balanced
-  // brace pair is found, JSON.parse will throw and surface the original output.
-  const first = raw.indexOf('{')
-  const last = raw.lastIndexOf('}')
-  const candidate = first !== -1 && last > first
-    ? raw.slice(first, last + 1)
-    : raw.replace(/```json\n?|\n?```/g, '').trim()
   let parsed: unknown
-  try { parsed = JSON.parse(candidate) }
+  try { parsed = JSON.parse(extractFirstJsonObject(raw)) }
   catch (e) { throw new Error(`audit output is not valid JSON: ${(e as Error).message}`) }
   return verdictSchema.parse(parsed)
+}
+
+/**
+ * Find the first balanced `{...}` block in a string by scanning forward with
+ * brace counting. Skips over braces inside JSON string literals. This is more
+ * robust than first-`{`/last-`}` slicing when the model wraps the verdict in
+ * conversational prose that itself contains braces (round-6 F-002).
+ * Falls back to fence-stripping if no balanced object is found.
+ */
+function extractFirstJsonObject(s: string): string {
+  for (let start = 0; start < s.length; start++) {
+    if (s[start] !== '{') continue
+    let depth = 0
+    let inString = false
+    let escaped = false
+    for (let i = start; i < s.length; i++) {
+      const ch = s[i]
+      if (escaped) { escaped = false; continue }
+      if (inString) {
+        if (ch === '\\') { escaped = true; continue }
+        if (ch === '"') inString = false
+        continue
+      }
+      if (ch === '"') { inString = true; continue }
+      if (ch === '{') depth++
+      else if (ch === '}') {
+        depth--
+        if (depth === 0) return s.slice(start, i + 1)
+      }
+    }
+  }
+  // Fallback: strip a ```json fence pair if present.
+  return s.replace(/```json\n?|\n?```/g, '').trim()
 }
 ```
 
@@ -1367,6 +1392,21 @@ x
     expect(() => applyVerdictToEntry(entry, verdict, { trustedHashes })).toThrow(/trustedHashes/)
   })
 
+  it('rejects near-miss heading replacements that would break extractDeepGuidance()', () => {
+    const verdict = {
+      entry_name: 'x', audit_date: '2026-05-24', model: 'claude-opus-4-7',
+      verdict: 'major-drift' as const, sources_checked: [], findings: [],
+      proposed_changes: [
+        // "## Deep Guidance (Updated)" starts with "## Deep Guidance" but is
+        // NOT the exact heading the assembly engine matches. Must throw.
+        { location: '## Deep Guidance', kind: 'replace' as const,
+          rationale: '', new_text: '## Deep Guidance (Updated)\n\nbody' },
+      ],
+      preserve_warnings: [],
+    }
+    expect(() => applyVerdictToEntry(baseEntry, verdict)).toThrow(/must equal "## Deep Guidance" exactly/)
+  })
+
   it('protects "## Summary" the same way it protects "## Deep Guidance"', () => {
     const verdict = {
       entry_name: 'x', audit_date: '2026-05-24', model: 'claude-opus-4-7',
@@ -1522,8 +1562,18 @@ export function applyVerdictToEntry(
       if (change.kind === 'delete') {
         throw new Error(`refusing to delete "${loc}" — assembly engine depends on it`)
       }
-      if (change.kind === 'replace' && !(change.new_text ?? '').trim().startsWith(loc)) {
-        throw new Error(`refusing to remove "${loc}" heading in a replace — new_text must start with the same heading line`)
+      if (change.kind === 'replace') {
+        // First line of new_text must be EXACTLY the protected heading.
+        // `extractDeepGuidance()` matches `/^## Deep Guidance\s*$/i` — a near-miss
+        // like "## Deep Guidance (Updated)" still starts with the prefix but
+        // would break the assembly path (round-6 F-001).
+        const firstLine = (change.new_text ?? '').split('\n')[0]?.trim() ?? ''
+        if (firstLine !== loc) {
+          throw new Error(
+            `refusing to alter "${loc}" heading in a replace — new_text's first line ` +
+            `must equal "${loc}" exactly (got "${firstLine}")`,
+          )
+        }
       }
     }
 
