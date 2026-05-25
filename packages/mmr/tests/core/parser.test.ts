@@ -361,8 +361,8 @@ describe('regex-findings parser kind', () => {
     const raw = 'no review issues here'
     const cfg = {
       kind: 'regex-findings' as const,
-      pattern: '^P[0-3]\\|',
-      fields: { location: 0, description: 0 },
+      pattern: '^(P[0-3])\\|([^|]+)\\|(.+)$',
+      fields: { severity: 1, location: 2, description: 3 },
     }
     const result = parseChannelOutput(raw, cfg)
     expect(result.findings).toHaveLength(0)
