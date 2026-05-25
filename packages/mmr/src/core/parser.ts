@@ -286,9 +286,6 @@ export function buildParser(spec: OutputParserConfig): Parser {
       if (unwrapped === undefined) {
         throw new Error(`jsonpath did not match: ${spec.wrap}`)
       }
-      if (typeof unwrapped !== 'string' && typeof nextSpec === 'string') {
-        throw new Error(`unwrap-jsonpath extracted value at ${spec.wrap} is not a string`)
-      }
       const nextRaw = typeof unwrapped === 'string' ? unwrapped : JSON.stringify(unwrapped)
       return nextParser(nextRaw)
     }

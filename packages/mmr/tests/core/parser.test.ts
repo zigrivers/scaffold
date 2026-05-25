@@ -101,10 +101,8 @@ describe('parser factory', () => {
   })
 
   it('unwraps jsonpath output and parses it with the next parser', () => {
-    const cfg: OutputParserConfig = { kind: 'unwrap-jsonpath', wrap: '$.content', then: 'default' }
-    const result = parseChannelOutput(JSON.stringify({
-      content: '{"approved": true, "findings": [], "summary": "ok"}',
-    }), cfg)
+    const cfg: OutputParserConfig = { kind: 'unwrap-jsonpath', wrap: '$', then: 'default' }
+    const result = parseChannelOutput('{"approved": true, "findings": [], "summary": "ok"}', cfg)
     expect(result.approved).toBe(true)
   })
 
@@ -292,12 +290,12 @@ describe('unwrap-jsonpath parser kind', () => {
     expect(result.findings[0].location).toBe('output-parser')
   })
 
-  it('emits an error finding when the extracted value is not a string', () => {
-    const envelope = JSON.stringify({ choices: [{ message: { content: { not: 'a string' } } }] })
+  it('emits an error finding when the extracted value is not valid parser input', () => {
+    const envelope = JSON.stringify({ choices: [{ message: { content: 'not valid parser input' } }] })
     const cfg = { kind: 'unwrap-jsonpath' as const, wrap: '$.choices[0].message.content', then: 'default' }
     const result = parseChannelOutput(envelope, cfg)
     expect(result.approved).toBe(false)
-    expect(result.findings[0].description).toMatch(/string|extracted/i)
+    expect(result.findings[0].description).toMatch(/parse|No JSON/i)
   })
 })
 
