@@ -94,6 +94,12 @@ describe('parser factory', () => {
     expect(out.approved).toBe(true)
   })
 
+  it('returns a parser when given an OutputParserConfig object', () => {
+    const cfg: OutputParserConfig = { kind: 'unwrap-jsonpath', wrap: '$', then: 'default' }
+    const parser = getParser(cfg)
+    expect(typeof parser).toBe('function')
+  })
+
   it('unwraps jsonpath output and parses it with the next parser', () => {
     const cfg: OutputParserConfig = { kind: 'unwrap-jsonpath', wrap: '$', then: 'default' }
     const result = parseChannelOutput('{"approved": true, "findings": [], "summary": "ok"}', cfg)
