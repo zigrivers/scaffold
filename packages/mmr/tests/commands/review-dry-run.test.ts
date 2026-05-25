@@ -110,4 +110,57 @@ describe('mmr review --dry-run (T1-F)', () => {
     expect(output).toMatch(/ after/)
     expect(output).not.toMatch(/\{\{prompt\}\}/)
   })
+
+  it('preserves replacement-like tokens from the assembled prompt', async () => {
+    fs.writeFileSync(diffPath, [
+      'diff --git a/x.ts b/x.ts',
+      '--- a/x.ts',
+      '+++ b/x.ts',
+      '@@ -1,1 +1,2 @@',
+      ' export const foo = 1',
+      "+export const token = '$& $$ $` $\\''",
+      '',
+    ].join('\n'))
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), [
+      'version: 1',
+      'channels:',
+      '  local:',
+      '    command: local-review',
+      '    prompt_wrapper: "wrapped {{prompt}}"',
+      '    auth:',
+      '      check: "true"',
+      '      failure_exit_codes: [1]',
+      '      recovery: "x"',
+    ].join('\n'))
+    vi.resetModules()
+    vi.doMock('../../src/core/dispatcher.js', () => ({ dispatchChannel: vi.fn() }))
+    vi.doMock('../../src/core/auth.js', () => ({
+      checkInstalled: vi.fn(),
+      checkAuth: vi.fn(),
+    }))
+
+    const { reviewCommand } = await import('../../src/commands/review.js')
+    const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(tmpDir)
+    const homeSpy = vi.spyOn(os, 'homedir').mockReturnValue(tmpDir)
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never)
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await reviewCommand.handler({
+      diff: diffPath,
+      channels: ['local'],
+      'dry-run': true,
+      _: ['review'],
+      $0: 'mmr',
+    } as never)
+
+    cwdSpy.mockRestore()
+    homeSpy.mockRestore()
+    exitSpy.mockRestore()
+    const output = logSpy.mock.calls.map((c) => c.join(' ')).join('\n')
+    logSpy.mockRestore()
+    vi.doUnmock('../../src/core/dispatcher.js')
+    vi.doUnmock('../../src/core/auth.js')
+
+    expect(output).toContain("$& $$ $` $\\'")
+  })
 })

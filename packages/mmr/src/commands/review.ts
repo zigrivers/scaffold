@@ -110,9 +110,10 @@ function resolveTemplateCriteria(
 }
 
 function buildChannelPrompt(channel: ChannelConfigParsed, prompt: string): string {
-  return channel.prompt_wrapper === '{{prompt}}'
+  const wrapper = channel.prompt_wrapper ?? '{{prompt}}'
+  return wrapper === '{{prompt}}'
     ? prompt
-    : channel.prompt_wrapper.replaceAll('{{prompt}}', prompt)
+    : wrapper.replaceAll('{{prompt}}', () => prompt)
 }
 
 export const reviewCommand: CommandModule<object, ReviewArgs> = {
