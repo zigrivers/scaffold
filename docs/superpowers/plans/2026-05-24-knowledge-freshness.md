@@ -527,15 +527,17 @@ validate-knowledge:
 	node dist/index.js validate-knowledge
 ```
 
-Then update the existing `check:` line in the Makefile to include `validate-knowledge` so the new gate runs as part of `make check` and `make check-all`:
+Then update the existing `check-all:` line in the Makefile to include `validate-knowledge`. **Do not** add it to `check` — that target is documented as the bash-only / quick gate and is run by contributors without the TypeScript toolchain. `validate-knowledge` requires npm + Node + a built `dist/`, which belongs with the TypeScript heavy gates:
 
 ```makefile
 # before:
-# check: lint validate test eval ## Run bash quality gates (lint + validate + test + eval)
+# check-all: check ts-check mmr-check ## Run all quality gates (bash + TypeScript)
 
 # after:
-check: lint validate validate-knowledge test eval ## Run bash quality gates (lint + validate + validate-knowledge + test + eval)
+check-all: check ts-check mmr-check validate-knowledge ## Run all quality gates (bash + TypeScript + knowledge frontmatter)
 ```
+
+`ts-check` runs first within `check-all` and produces a fresh `dist/`; `validate-knowledge`'s own `npm run build` is then an incremental no-op (TypeScript skips unchanged inputs).
 
 The Makefile has no `build` target (build is `npm run build`, exposed via the `ts-check` target). The `validate-knowledge` recipe always runs `npm run build` first — TypeScript's incremental compile is fast, and we cannot rely on `dist/index.js` existence alone because a stale `dist/` would silently miss the newly-added `validate-knowledge` subcommand. **Do not** make `ts-check` depend on `validate-knowledge` — `ts-check` already runs `npm run build`, and adding the dependency would double-build. Confirm the CLI binary path matches `package.json` `bin.scaffold` (currently `dist/index.js`).
 
@@ -1679,14 +1681,16 @@ export function applyVerdictToEntry(
         throw new Error(`refusing to delete "${loc}" — assembly engine depends on it`)
       }
       if (change.kind === 'replace') {
-        // First line of new_text must be EXACTLY the protected heading.
+        // First non-empty line of new_text must be EXACTLY the protected heading.
         // `extractDeepGuidance()` matches `/^## Deep Guidance\s*$/i` — a near-miss
         // like "## Deep Guidance (Updated)" still starts with the prefix but
         // would break the assembly path (round-6 F-001).
-        const firstLine = (change.new_text ?? '').split('\n')[0]?.trim() ?? ''
+        // Trim leading blank lines first so a model that emits "\n## …" still
+        // passes (round-14 F-002); only the first non-empty line matters.
+        const firstLine = (change.new_text ?? '').split('\n').map(l => l.trim()).find(l => l !== '') ?? ''
         if (firstLine !== loc) {
           throw new Error(
-            `refusing to alter "${loc}" heading in a replace — new_text's first line ` +
+            `refusing to alter "${loc}" heading in a replace — new_text's first non-empty line ` +
             `must equal "${loc}" exactly (got "${firstLine}")`,
           )
         }
