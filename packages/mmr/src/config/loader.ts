@@ -169,6 +169,28 @@ function validateRunnableChannels(config: MmrConfigParsed): void {
   }
 }
 
+function validateCompensatorReference(config: MmrConfigParsed): void {
+  const compensator = config.defaults.compensator
+  if (!compensator) return
+  const ref = compensator.channel
+  const hasTarget = Object.prototype.hasOwnProperty.call(config.channels, ref)
+  const target = config.channels[ref]
+  if (!hasTarget || !target) {
+    throw new Error(
+      `defaults.compensator.channel references unknown channel "${ref}". `
+      + 'Configure a channel with this name in the channels: section, or remove the compensator block.',
+    )
+  }
+  // Abstract channels (v3.28 T1-A) are templates only: they cannot be
+  // dispatched directly and therefore cannot serve as a compensator target.
+  if (target.abstract === true) {
+    throw new Error(
+      `defaults.compensator.channel "${ref}" is marked abstract: true (T1-A). `
+      + 'Abstract channels are non-dispatchable templates; reference a concrete channel that extends it instead.',
+    )
+  }
+}
+
 function warnOnInlineSecretHeaders(config: MmrConfigParsed, warn: WarningSink): void {
   for (const [name, channel] of Object.entries(config.channels)) {
     const headers = channel.headers
@@ -233,6 +255,7 @@ function parseMergedConfig(mergedRaw: Record<string, unknown>, warn: WarningSink
   const config = MmrConfigSchema.parse(merged)
   warnOnInlineSecretHeaders(config, warn)
   validateRunnableChannels(config)
+  validateCompensatorReference(config)
   return config
 }
 
