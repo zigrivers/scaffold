@@ -178,4 +178,29 @@ describe('mmr config channels', () => {
     expect(channels.find((channel) => channel.name === 'token')?.command).toBe('<redacted>')
     expect(channels.find((channel) => channel.name === 'api')?.command).toBe('<redacted>')
   })
+
+  it('redacts space-separated header and env option values containing secrets', async () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.mmr.yaml'),
+      [
+        'version: 1',
+        'channels:',
+        '  header:',
+        '    command: "curl --header Authorization:Bearer-live"',
+        '  short_header:',
+        '    command: "curl -H Authorization:Bearer-live"',
+        '  env:',
+        '    command: "docker run --env OPENAI_API_KEY=sk-live image"',
+      ].join('\n'),
+    )
+
+    const { configCommand } = await import('../../src/commands/config.js')
+    await configCommand.handler({ action: 'channels', _: ['config'], $0: 'mmr' } as never)
+
+    const output = String(logSpy.mock.calls.at(-1)?.[0])
+    const channels = JSON.parse(output) as Array<{ name: string; command: string }>
+    expect(channels.find((channel) => channel.name === 'header')?.command).toBe('<redacted>')
+    expect(channels.find((channel) => channel.name === 'short_header')?.command).toBe('<redacted>')
+    expect(channels.find((channel) => channel.name === 'env')?.command).toBe('<redacted>')
+  })
 })
