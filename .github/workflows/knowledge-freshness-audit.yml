@@ -97,11 +97,13 @@ jobs:
             fi
             verdict=$(jq -r '.verdict' "$verdict_path")
             echo "verdict: $verdict"
+            # F-001 round-5: persist non-rewrite verdicts too. Without this,
+            # entries with `current`/`minor-drift` verdicts never get
+            # `last-reviewed`/`hash`/`retrieved` updated and stay due every
+            # day, consuming the 10-entry daily budget and starving entries
+            # behind them in the prefilter queue.
             case "$verdict" in
-              current|minor-drift)
-                echo "no PR needed for $name (verdict=$verdict)"
-                ;;
-              major-drift|superseded)
+              current|minor-drift|major-drift|superseded)
                 # F-003: run gates inline because GITHUB_TOKEN-opened PRs don't
                 # trigger the gate workflow. We apply the verdict in a transient
                 # staged state, then run the same per-file gates the workflow
@@ -111,24 +113,26 @@ jobs:
                   echo "::endgroup::"
                   continue
                 fi
-                # F-004 round-3: blocking inline gates are the NON-overridable
-                # ones (validator, link-check, deep-guidance). anti-over-rewrite
-                # is the only overridable gate (via the `override:anti-over-
-                # rewrite` label that a maintainer applies on the PR), so we
-                # run it inline only as a NOTICE — the PR still opens, the
-                # PR-gate workflow re-runs gates on label-change events and
-                # surfaces the violation if no override label is applied.
-                # lint-unsourced is advisory, never blocks.
+                # F-002 round-5: anti-over-rewrite is BLOCKING inline. The
+                # PR-gate workflow doesn't fire on GITHUB_TOKEN-opened PRs,
+                # so making the inline check advisory (round-3) opened a
+                # bypass path: cron-generated stable-entry rewrites over
+                # the 20% threshold could merge without any enforcement.
+                # Maintainers who genuinely need to push such a rewrite
+                # through should run `audit-apply --open-pr` LOCALLY (where
+                # the gate workflow fires normally on their PR via their
+                # user token) and apply the override:anti-over-rewrite
+                # label there. The cron deliberately refuses to do it.
+                # lint-unsourced remains advisory (spec §A.5 design).
                 gate_failed=0
                 node dist/index.js validate-knowledge || gate_failed=1
                 node dist/index.js knowledge-freshness link-check "$path" || gate_failed=1
                 node dist/index.js knowledge-freshness deep-guidance-check "$path" || gate_failed=1
+                node dist/index.js knowledge-freshness anti-over-rewrite "$path" --pr-labels "" || gate_failed=1
                 # Advisory-only: do not affect gate_failed.
                 node dist/index.js knowledge-freshness lint-unsourced "$path" || true
-                node dist/index.js knowledge-freshness anti-over-rewrite "$path" --pr-labels "" || \
-                  echo "::notice::anti-over-rewrite flagged $name — PR will open and surface the violation, apply override:anti-over-rewrite label to bypass"
                 if [ "$gate_failed" != "0" ]; then
-                  echo "::error::non-overridable gates failed for $name — not opening PR"
+                  echo "::error::gates failed for $name — not opening PR (anti-over-rewrite failures on stable entries: run audit-apply --open-pr locally as a maintainer with the override label applied)"
                   # Restore the file so subsequent entries aren't poisoned.
                   git checkout -- "$path"
                   echo "::endgroup::"

@@ -83,10 +83,25 @@ Each run:
 
 1. Checks out `main` with full history.
 2. Runs `audit-prefilter --max=10`, writing candidates to `/tmp/candidates.json`.
-3. For each candidate: runs `audit-run-entry`, captures the verdict JSON, and:
-   - `current` / `minor-drift` → no PR opened.
-   - `major-drift` / `superseded` → runs `audit-apply --open-pr`.
+3. For each candidate: runs `audit-run-entry`, captures the verdict JSON,
+   runs the inline gates (validator + link-check + deep-guidance +
+   anti-over-rewrite as BLOCKING; lint-unsourced as advisory), and then:
+   - All four verdicts (`current` / `minor-drift` / `major-drift` /
+     `superseded`) → runs `audit-apply --open-pr`. A `current` verdict
+     produces a small metadata-only refresh PR (frontmatter
+     `last-reviewed`, `hash`, `retrieved` updates). Without this, those
+     entries would re-enter the prefilter queue every day and starve
+     other candidates.
    - unknown verdict → logged and skipped.
+   - inline gates failing (validator / link-check / deep-guidance /
+     anti-over-rewrite) → no PR opened, error logged. For
+     anti-over-rewrite specifically (stable entry, >20% churn), the
+     cron refuses to open: the PR-gate workflow doesn't fire on
+     GITHUB_TOKEN-opened PRs, so the cron can't rely on the label-
+     based override path. Maintainers needing to push the rewrite
+     through should run `audit-apply --open-pr` locally as themselves
+     (their user token DOES trigger the gate workflow), and apply the
+     `override:anti-over-rewrite` label.
 4. Per-entry failures are isolated; the loop continues.
 
 ### The 10 PRs/day ceiling
