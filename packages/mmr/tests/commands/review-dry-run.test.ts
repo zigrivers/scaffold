@@ -163,4 +163,43 @@ describe('mmr review --dry-run (T1-F)', () => {
 
     expect(output).toContain("$& $$ $` $\\'")
   })
+
+  it('sets a failing exit code when no channel would dispatch', async () => {
+    vi.resetModules()
+    vi.doMock('../../src/core/dispatcher.js', () => ({ dispatchChannel: vi.fn() }))
+    vi.doMock('../../src/core/auth.js', () => ({
+      checkInstalled: vi.fn().mockResolvedValue(false),
+      checkAuth: vi.fn(),
+    }))
+
+    const { reviewCommand } = await import('../../src/commands/review.js')
+    const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(tmpDir)
+    const homeSpy = vi.spyOn(os, 'homedir').mockReturnValue(tmpDir)
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never)
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const previousExitCode = process.exitCode
+    process.exitCode = undefined
+
+    await reviewCommand.handler({
+      diff: diffPath,
+      channels: ['claude'],
+      'dry-run': true,
+      _: ['review'],
+      $0: 'mmr',
+    } as never)
+
+    cwdSpy.mockRestore()
+    homeSpy.mockRestore()
+    exitSpy.mockRestore()
+    const output = logSpy.mock.calls.map((c) => c.join(' ')).join('\n')
+    logSpy.mockRestore()
+    vi.doUnmock('../../src/core/dispatcher.js')
+    vi.doUnmock('../../src/core/auth.js')
+    const dryRunExitCode = process.exitCode
+    process.exitCode = previousExitCode
+
+    expect(output).toMatch(/Channels that would dispatch: \(none\)/)
+    expect(output).toMatch(/claude: not_installed/)
+    expect(dryRunExitCode).toBe(1)
+  })
 })

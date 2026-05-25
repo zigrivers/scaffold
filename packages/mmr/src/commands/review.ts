@@ -262,6 +262,9 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
         console.log(`\n--- Assembled prompt for ${name} ---`)
         console.log(buildChannelPrompt(ch, prompt))
       }
+      if (validChannels.length === 0) {
+        process.exitCode = 1
+      }
       return
     }
 
