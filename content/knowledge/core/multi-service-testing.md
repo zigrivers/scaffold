@@ -2,6 +2,11 @@
 name: multi-service-testing
 description: Consumer-driven contract testing, cross-service E2E strategies, and service test doubles
 topics: [contract-tests, pact, schema-registry, cross-service-e2e, test-doubles]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://docs.pact.io/
 ---
 
 ## Summary
