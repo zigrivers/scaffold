@@ -403,7 +403,9 @@ import { z } from 'zod'
 
 const sourceSchema = z.object({
   url: z.string().url(),
-  anchor: z.string().optional(),
+  // Anchors are appended to source.url literally by the audit meta-prompt, so
+  // they must include the leading "#" to produce a valid URL fragment.
+  anchor: z.string().regex(/^#/, 'anchor must start with "#"').optional(),
   retrieved: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   hash: z.string().optional(),
 })
@@ -909,28 +911,71 @@ This task reuses the existing LLM dispatcher (`src/observability/engine/llm-disp
 
 ```typescript
 // src/knowledge-freshness/audit-runner.test.ts
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest'
+import fs from 'node:fs'
+import path from 'node:path'
+import os from 'node:os'
 import { runEntryAudit, type Dispatcher } from './audit-runner.js'
+
+// Use temp fixtures rather than the real on-disk entry + meta-prompt so the
+// runner tests don't break when those files are edited. The runner reads two
+// files relative to cwd: the entry path passed in, and
+// `content/tools/knowledge-audit-entry.md` (the meta-prompt). Shim both.
+let tmpRoot: string
+let originalCwd: string
+
+beforeAll(() => {
+  originalCwd = process.cwd()
+  tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'runner-test-'))
+  fs.mkdirSync(path.join(tmpRoot, 'content/tools'), { recursive: true })
+  fs.writeFileSync(
+    path.join(tmpRoot, 'content/tools/knowledge-audit-entry.md'),
+    '# stub\n{{entry_path}} {{entry_frontmatter}} {{entry_body}}\n',
+  )
+  fs.writeFileSync(
+    path.join(tmpRoot, 'entry.md'),
+    '---\nname: stub\ndescription: y\n---\nbody\n',
+  )
+  process.chdir(tmpRoot)
+})
+
+afterAll(() => {
+  process.chdir(originalCwd)
+  fs.rmSync(tmpRoot, { recursive: true, force: true })
+})
+
+const entryPath = () => path.join(tmpRoot, 'entry.md')
 
 describe('runEntryAudit', () => {
   it('returns the parsed verdict on a clean dispatcher response', async () => {
     const dispatcher: Dispatcher = vi.fn().mockResolvedValue(JSON.stringify({
-      entry_name: 'security-best-practices', audit_date: '2026-05-24', model: 'claude-opus-4-7',
+      entry_name: 'stub', audit_date: '2026-05-24', model: 'claude-opus-4-7',
       verdict: 'superseded', sources_checked: [], findings: [], proposed_changes: [], preserve_warnings: [],
     }))
-    const out = await runEntryAudit('content/knowledge/core/security-best-practices.md', dispatcher)
+    const out = await runEntryAudit(entryPath(), dispatcher)
     expect(out.verdict).toBe('superseded')
-    expect(out.entry_name).toBe('security-best-practices')
+    expect(out.entry_name).toBe('stub')
+  })
+
+  it('extracts JSON when the model wraps it in conversational preamble', async () => {
+    const dispatcher: Dispatcher = vi.fn().mockResolvedValue(
+      `Here's the verdict you asked for:\n\n${JSON.stringify({
+        entry_name: 'stub', audit_date: '2026-05-24', model: 'claude-opus-4-7',
+        verdict: 'current', sources_checked: [], findings: [], proposed_changes: [], preserve_warnings: [],
+      })}\n\nLet me know if you need anything else.`,
+    )
+    const out = await runEntryAudit(entryPath(), dispatcher)
+    expect(out.verdict).toBe('current')
   })
 
   it('throws on non-JSON dispatcher output', async () => {
-    const dispatcher: Dispatcher = vi.fn().mockResolvedValue('not json')
-    await expect(runEntryAudit('content/knowledge/core/security-best-practices.md', dispatcher)).rejects.toThrow()
+    const dispatcher: Dispatcher = vi.fn().mockResolvedValue('not json at all')
+    await expect(runEntryAudit(entryPath(), dispatcher)).rejects.toThrow()
   })
 
   it('throws on missing required fields', async () => {
     const dispatcher: Dispatcher = vi.fn().mockResolvedValue(JSON.stringify({ entry_name: 'x' }))
-    await expect(runEntryAudit('content/knowledge/core/security-best-practices.md', dispatcher)).rejects.toThrow()
+    await expect(runEntryAudit(entryPath(), dispatcher)).rejects.toThrow()
   })
 })
 ```
@@ -998,18 +1043,26 @@ export async function runEntryAudit(entryPath: string, dispatch: Dispatcher): Pr
     path.resolve('content/tools/knowledge-audit-entry.md'), 'utf8',
   )
 
-  // Use replacer-function form to avoid String.replace's special-pattern
-  // handling (`$$`, `$&`, `$'`, `$1`) on values that may contain dollar signs
-  // (entry bodies routinely have shell snippets, regex examples, etc.).
+  // Use replaceAll + replacer-function form so we (a) replace every occurrence
+  // — the meta-prompt references `{{entry_frontmatter}}` in the Inputs section
+  // AND the Procedure section — and (b) avoid String.replace's special-pattern
+  // handling (`$$`, `$&`, `$'`, `$1`) on values that may contain dollar signs.
   const filled = promptTemplate
-    .replace('{{entry_path}}', () => entryPath)
-    .replace('{{entry_frontmatter}}', () => JSON.stringify(fmForPrompt, null, 2))
-    .replace('{{entry_body}}', () => content)
+    .replaceAll('{{entry_path}}', () => entryPath)
+    .replaceAll('{{entry_frontmatter}}', () => JSON.stringify(fmForPrompt, null, 2))
+    .replaceAll('{{entry_body}}', () => content)
 
   const raw = await dispatch(filled)
-  const stripped = raw.replace(/```json\n?|\n?```/g, '').trim()
+  // Extract the largest top-level `{...}` block; models occasionally emit a
+  // preamble/postamble around the JSON even when told not to. If no balanced
+  // brace pair is found, JSON.parse will throw and surface the original output.
+  const first = raw.indexOf('{')
+  const last = raw.lastIndexOf('}')
+  const candidate = first !== -1 && last > first
+    ? raw.slice(first, last + 1)
+    : raw.replace(/```json\n?|\n?```/g, '').trim()
   let parsed: unknown
-  try { parsed = JSON.parse(stripped) }
+  try { parsed = JSON.parse(candidate) }
   catch (e) { throw new Error(`audit output is not valid JSON: ${(e as Error).message}`) }
   return verdictSchema.parse(parsed)
 }
@@ -1249,10 +1302,11 @@ x
       findings: [], proposed_changes: [], preserve_warnings: [],
     }
     const out = applyVerdictToEntry(entry, verdict)
-    // yaml.dump quoting under JSON_SCHEMA is value-dependent; match by content,
-    // not exact YAML formatting.
+    // yaml.dump quoting under JSON_SCHEMA is value-dependent; match by content.
     expect(out).toMatch(/hash:\s*['"]?sha256:new['"]?/)
-    expect(out).not.toContain("'old'")
+    // Old hash must be absent in any quoting — leaving the stale value behind
+    // is the bug we're guarding against.
+    expect(out).not.toMatch(/hash:\s*['"]?old['"]?/)
   })
 
   it('prefers caller-supplied trustedHashes over LLM-claimed content_hash', () => {
