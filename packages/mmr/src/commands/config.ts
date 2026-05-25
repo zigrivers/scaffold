@@ -6,6 +6,7 @@ import { BUILTIN_CHANNELS } from '../config/defaults.js'
 import { checkInstalled, checkAuth } from '../core/auth.js'
 import { probeRuntime } from '../core/runtime-probe.js'
 import { OSS_RUNTIMES, exampleBlockFor, type OssRuntimeId } from '../core/oss-examples.js'
+import { isSecretKey, redactChannel } from '../core/redact.js'
 
 interface ConfigArgs {
   action: string
@@ -134,13 +135,52 @@ async function configTest(): Promise<void> {
 
 function configChannels(): void {
   const config = loadConfig({ projectRoot: process.cwd() })
-  const channels = Object.entries(config.channels).map(([name, ch]) => ({
-    name,
-    enabled: ch.enabled,
-    command: ch.command,
-    parser: ch.output_parser,
-  }))
+  const channels = Object.entries(config.channels).map(([name, ch]) => {
+    const display = redactChannel(ch as unknown as Record<string, unknown>)
+    const command = typeof display.command === 'string' && commandContainsInlineSecret(display.command)
+      ? '<redacted>'
+      : display.command
+    return {
+      name,
+      enabled: display.enabled,
+      command,
+      parser: display.output_parser,
+    }
+  })
   console.log(JSON.stringify(channels, null, 2))
+}
+
+function commandContainsInlineSecret(command: string): boolean {
+  const keyValueRe = /(?:^|[\s'"?&{,=])"?([A-Za-z0-9_.-]+)"?\s*[:=]/g
+  for (const match of command.matchAll(keyValueRe)) {
+    if (isCommandSecretKey(match[1])) return true
+  }
+  const nestedKeyValueRe = /[=:]"?([A-Za-z0-9_.-]+)"?\s*[:=]/g
+  for (const match of command.matchAll(nestedKeyValueRe)) {
+    if (isCommandSecretKey(match[1])) return true
+  }
+
+  const tokens = command.match(/"[^"]*"|'[^']*'|\S+/g) ?? []
+  for (let i = 0; i < tokens.length - 1; i += 1) {
+    const token = stripQuotes(tokens[i])
+    const next = stripQuotes(tokens[i + 1])
+    if (['--header', '-H', '--env', '-e'].includes(token) && commandContainsInlineSecret(next)) return true
+    if (!token.startsWith('-') || token.includes('=') || token.includes(':') || next.startsWith('-')) continue
+    if (isCommandSecretKey(token)) return true
+  }
+
+  return false
+}
+
+function stripQuotes(value: string): string {
+  return value.replace(/^['"]|['"]$/g, '')
+}
+
+function isCommandSecretKey(name: string): boolean {
+  const normalized = name.replace(/^-+/, '').toLowerCase()
+  if (normalized.endsWith('-env') || normalized.endsWith('_env')) return false
+  if (['auth-type', 'max-tokens', 'session-dir', 'token-limit', 'token-usage'].includes(normalized)) return false
+  return isSecretKey(normalized, { exemptEnvNameKeys: false })
 }
 
 export const configCommand: CommandModule<object, ConfigArgs> = {
