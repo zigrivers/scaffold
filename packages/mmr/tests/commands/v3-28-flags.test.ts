@@ -41,5 +41,6 @@ describe('v3.28 flag plumbing', () => {
     expect(args.action).toBe('channels')
     expect(args.name).toBe('show:claude')
     expect(args['no-redact']).toBe(true)
+    expect(args.redact).toBe(false)
   })
 })
