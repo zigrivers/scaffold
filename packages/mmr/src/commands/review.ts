@@ -100,6 +100,21 @@ export function resolveDispatchChannels(
     .map(([name]) => name)
 }
 
+function resolveTemplateCriteria(
+  config: ReturnType<typeof loadConfig>,
+  template: string | undefined,
+): string[] | undefined {
+  return template && config.templates?.[template]
+    ? config.templates[template].criteria
+    : undefined
+}
+
+function buildChannelPrompt(channel: ChannelConfigParsed, prompt: string): string {
+  return channel.prompt_wrapper === '{{prompt}}'
+    ? prompt
+    : channel.prompt_wrapper.replaceAll('{{prompt}}', prompt)
+}
+
 export const reviewCommand: CommandModule<object, ReviewArgs> = {
   command: 'review',
   describe: 'Dispatch a multi-model code review',
@@ -192,6 +207,25 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       process.exit(1)
     }
 
+    const templateCriteria = resolveTemplateCriteria(config, args.template)
+    const prompt = assemblePrompt({
+      diff,
+      reviewCriteria: config.review_criteria,
+      templateCriteria,
+      focus: args.focus,
+    })
+
+    if (args['dry-run']) {
+      console.log('=== DRY RUN - no channels will be dispatched ===')
+      console.log(`Channels that would dispatch: ${channelNames.join(', ') || '(none)'}`)
+      for (const name of channelNames) {
+        const ch = config.channels[name]
+        console.log(`\n--- Assembled prompt for ${name} ---`)
+        console.log(buildChannelPrompt(ch, prompt))
+      }
+      return
+    }
+
     // 4. Auth-check each channel
     const validChannels: string[] = []
     const authResults: Record<string, { status: string; recovery?: string }> = {}
@@ -233,34 +267,6 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       process.exit(1)
     }
 
-    if (args['dry-run']) {
-      const templateCriteria = args.template && config.templates?.[args.template]
-        ? config.templates[args.template].criteria
-        : undefined
-      const prompt = assemblePrompt({
-        diff,
-        reviewCriteria: config.review_criteria,
-        templateCriteria,
-        focus: args.focus,
-      })
-      console.log('=== DRY RUN - no channels will be dispatched ===')
-      console.log(`Channels that would dispatch: ${validChannels.join(', ') || '(none)'}`)
-      for (const [name, status] of Object.entries(authResults)) {
-        if (!validChannels.includes(name)) {
-          console.log(`  ${name}: ${status.status}${status.recovery ? ` — ${status.recovery}` : ''}`)
-        }
-      }
-      for (const name of validChannels) {
-        const ch = config.channels[name]
-        const wrapped = ch.prompt_wrapper === '{{prompt}}'
-          ? prompt
-          : ch.prompt_wrapper.replace('{{prompt}}', prompt)
-        console.log(`\n--- Assembled prompt for ${name} ---`)
-        console.log(wrapped)
-      }
-      return
-    }
-
     // 5. Create job
     const jobsDir = path.join(os.homedir(), '.mmr', 'jobs')
     const store = new JobStore(jobsDir)
@@ -286,18 +292,6 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       }
     }
 
-    // 6. Assemble prompt
-    const templateCriteria = args.template && config.templates?.[args.template]
-      ? config.templates[args.template].criteria
-      : undefined
-
-    const prompt = assemblePrompt({
-      diff,
-      reviewCriteria: config.review_criteria,
-      templateCriteria,
-      focus: args.focus,
-    })
-
     // 7. Save prompt + diff to job store
     store.savePrompt(job.job_id, prompt)
     store.saveDiff(job.job_id, diff)
@@ -318,7 +312,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
         dispatches.push(
           dispatchChannel(store, job.job_id, name, {
             command: chConfig.command,
-            prompt,
+            prompt: buildChannelPrompt(chConfig, prompt),
             flags: chConfig.flags,
             env: chConfig.env,
             timeout: chConfig.timeout ?? config.defaults.timeout,
@@ -342,7 +336,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
         store.updateChannel(job.job_id, name, { output_parser: chConfig.output_parser })
         await dispatchChannel(store, job.job_id, name, {
           command: chConfig.command,
-          prompt,
+          prompt: buildChannelPrompt(chConfig, prompt),
           flags: chConfig.flags,
           env: chConfig.env,
           timeout: chConfig.timeout ?? config.defaults.timeout,
