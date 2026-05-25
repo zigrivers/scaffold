@@ -11,6 +11,35 @@ const AuthConfigSchema = z.object({
   recovery: z.string(),
 })
 
+export const UnwrapJsonpathParserSchema = z.object({
+  kind: z.literal('unwrap-jsonpath'),
+  wrap: z.string(),
+  then: z.string().default('default'),
+})
+
+export const RegexFindingsParserSchema = z.object({
+  kind: z.literal('regex-findings'),
+  pattern: z.string(),
+  fields: z.object({
+    severity: z.number().int().nonnegative().optional(),
+    location: z.number().int().nonnegative(),
+    description: z.number().int().nonnegative(),
+    suggestion: z.number().int().nonnegative().optional(),
+  }),
+})
+
+export const OutputParserSchema = z.union([
+  z.string(),
+  z.discriminatedUnion('kind', [
+    UnwrapJsonpathParserSchema,
+    RegexFindingsParserSchema,
+  ]),
+])
+
+export type OutputParserConfig = z.infer<typeof OutputParserSchema>
+export type UnwrapJsonpathParserConfig = z.infer<typeof UnwrapJsonpathParserSchema>
+export type RegexFindingsParserConfig = z.infer<typeof RegexFindingsParserSchema>
+
 const ChannelConfigSchema = z.object({
   enabled: z.boolean().default(true),
   command: z.string().optional(),
@@ -19,7 +48,7 @@ const ChannelConfigSchema = z.object({
   headers: z.record(z.string()).optional(),
   auth: AuthConfigSchema.optional(),
   prompt_wrapper: z.string().default('{{prompt}}'),
-  output_parser: z.string().default('default'),
+  output_parser: OutputParserSchema.default('default'),
   stderr: z.enum(['suppress', 'capture', 'passthrough']).default('capture'),
   timeout: z.number().optional(),
   extends: z.string().optional(),
