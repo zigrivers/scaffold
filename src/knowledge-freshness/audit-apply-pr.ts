@@ -39,9 +39,12 @@ function oneSentenceSourceSummary(verdict: AuditVerdict): string {
  * cell is a single line of plain text.
  */
 function escapeCell(s: string): string {
+  // Round-7 F-004 follow-through: collapse ALL JS line terminators so
+  // table cells can't smuggle in a BREAKING CHANGE: footer via lone \r
+  // or Unicode line separators.
   return s
     .replace(/\|/g, '\\|')
-    .replace(/\r?\n+/g, ' ')
+    .replace(/[\r\n\u2028\u2029]+/g, ' ')
     .trim()
 }
 
@@ -66,21 +69,20 @@ export function renderPrTitle(verdict: AuditVerdict): string {
 }
 
 /**
- * Collapse newlines and trim LLM-controlled text before splicing into the
- * PR body. F-003 round-4: a `preserve_warnings` entry containing a literal
- * `\nBREAKING CHANGE:` would render as a new line starting with that
- * footer, which `deriveBumpKind` (now anchored to start-of-line per the
- * F-002 round-2 fix) would treat as a real major-bump signal. Collapsing
- * to a single line — and replacing the BREAKING CHANGE token itself with
- * a non-functional variant — closes that path entirely.
+ * Collapse ALL JavaScript line terminators in LLM-controlled text before
+ * splicing into the PR body. F-003 round-4 introduced this for `\r\n`/`\n`;
+ * F-002/F-003/F-004 round-7 extends it to lone `\r` and the Unicode line
+ * separators `<U+2028>` / `<U+2029>`, since JS regex multiline-mode `^` treats
+ * those as line starts. Without exhaustive sanitization, an LLM-controlled
+ * field carrying `\rBREAKING CHANGE:` or `<U+2028>BREAKING CHANGE:` would
+ * still inject a major-bump footer that the version-bump workflow honors.
  *
- * We don't sanitize Conventional Commits tokens in the BODY render itself
- * (citations of "BREAKING CHANGE:" in evidence text are legitimate); the
- * round-2 regex change ensures they only trigger major bumps when at the
- * start of a line, which collapsing newlines here also prevents.
+ * Citations of "BREAKING CHANGE:" in evidence text mid-line remain
+ * legitimate; the round-2 start-of-line anchor on deriveBumpKind plus the
+ * collapsing here ensure such mentions never become footers.
  */
 function sanitizeLlmField(s: string): string {
-  return s.replace(/\r?\n/g, ' ').trim()
+  return s.replace(/[\r\n\u2028\u2029]+/g, ' ').trim()
 }
 
 export function renderPrBody(verdict: AuditVerdict, opts: RenderPrOptions = {}): string {

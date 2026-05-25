@@ -104,75 +104,136 @@ export interface ChurnDiffResult {
 }
 
 /**
- * Parse a unified diff into per-file add/remove counts AND body-only
- * counts (excluding frontmatter changes). Round-6 F-002 requires the
- * body-only counts so a metadata-only refresh PR (frontmatter dates +
- * hashes updating) doesn't trip the stable-entry 20% threshold.
+ * Parse a unified diff into per-file add/remove counts. Returns raw counts;
+ * body-only counts are derived later by `splitChurnByRegion` because they
+ * require access to the post-change file content (to know where the
+ * frontmatter ends).
  *
- * Frontmatter detection inside a hunk uses two signals:
- *   1. Hunk header @@ -A,B +C,D @@: if new-file start C == 1, we're
- *      entering the frontmatter region (line 1 of a valid entry is `---`).
- *   2. Within a hunk, every `---` content line toggles inside ↔ after.
- * Hunks that start past the frontmatter end (newStart > 1) are assumed
- * to be in body region for the entire hunk.
+ * Round-7 F-001 replaces the round-6 state-machine approach (which
+ * incorrectly flipped on the FIRST `---` line — i.e., the opening
+ * boundary — instead of the second / closing one, miscounting most
+ * frontmatter as body churn). The line-number-based filter in
+ * splitChurnByRegion is more robust because it relies on the actual
+ * file content, not on diff-content patterns.
  */
 export function parseUnifiedDiffForChurn(diff: string): ChurnDiffResult[] {
+  const perFileHunks = parseHunks(diff)
   const out: ChurnDiffResult[] = []
+  for (const [file, hunks] of perFileHunks) {
+    let added = 0, removed = 0
+    for (const h of hunks) {
+      for (const line of h.lines) {
+        if (line.startsWith('+') && !line.startsWith('+++')) added++
+        else if (line.startsWith('-') && !line.startsWith('---')) removed++
+      }
+    }
+    out.push({
+      file,
+      addedCount: added, removedCount: removed,
+      // bodyAdded/Removed left at zero here; the caller calls
+      // splitChurnByRegion() with the new-file content to fill them in.
+      bodyAddedCount: 0, bodyRemovedCount: 0,
+    })
+  }
+  return out
+}
+
+interface Hunk { newStart: number; oldStart: number; lines: string[] }
+
+function parseHunks(diff: string): Map<string, Hunk[]> {
+  const out = new Map<string, Hunk[]>()
   const lines = diff.split('\n')
   let i = 0
+  let currentFile: string | null = null
+  let currentHunks: Hunk[] = []
   while (i < lines.length) {
     const line = lines[i]
     if (line.startsWith('diff --git ')) {
+      if (currentFile) out.set(currentFile, currentHunks)
       const m = line.match(/^diff --git a\/(.+) b\/(.+)$/)
       const file = m ? m[2] : ''
+      currentFile = (file.startsWith('content/knowledge/') && file.endsWith('.md')) ? file : null
+      currentHunks = []
       i++
-      while (i < lines.length && !lines[i].startsWith('@@') && !lines[i].startsWith('diff --git ')) i++
-      if (!file.startsWith('content/knowledge/') || !file.endsWith('.md')) continue
-      let added = 0, removed = 0
-      let bodyAdded = 0, bodyRemoved = 0
-      // 'inside': currently within the frontmatter --- ... --- block.
-      // 'after':  past the closing --- (i.e., in body region).
-      // Default to 'after'; hunk headers may flip us back to 'inside'.
-      let state: 'inside' | 'after' = 'after'
-      while (i < lines.length && !lines[i].startsWith('diff --git ')) {
-        const l = lines[i]
-        if (l.startsWith('@@')) {
-          // @@ -A,B +C,D @@ — parse new-file start C.
-          const hh = l.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)?/)
-          if (hh && parseInt(hh[1], 10) === 1) {
-            state = 'inside'
-          } else {
-            state = 'after'
-          }
-          i++
-          continue
-        }
-        const isAdded = l.startsWith('+') && !l.startsWith('+++')
-        const isRemoved = l.startsWith('-') && !l.startsWith('---')
-        const isContext = l.startsWith(' ')
-        if (isAdded) added++
-        else if (isRemoved) removed++
-        // Count BODY churn only when not inside frontmatter. The `---`
-        // delimiter line itself is metadata, not body.
-        const contentLine = (isAdded || isRemoved || isContext) ? l.slice(1) : null
-        if (state === 'after' && contentLine !== '---') {
-          if (isAdded) bodyAdded++
-          if (isRemoved) bodyRemoved++
-        }
-        // Toggle on --- boundary AFTER classifying the line itself.
-        if (contentLine === '---') {
-          state = state === 'inside' ? 'after' : 'inside'
-        }
+      continue
+    }
+    if (currentFile && line.startsWith('@@')) {
+      const hh = line.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)?/)
+      if (!hh) { i++; continue }
+      const hunk: Hunk = {
+        oldStart: parseInt(hh[1], 10),
+        newStart: parseInt(hh[2], 10),
+        lines: [],
+      }
+      i++
+      while (i < lines.length && !lines[i].startsWith('@@') && !lines[i].startsWith('diff --git ')) {
+        hunk.lines.push(lines[i])
         i++
       }
-      out.push({
-        file,
-        addedCount: added, removedCount: removed,
-        bodyAddedCount: bodyAdded, bodyRemovedCount: bodyRemoved,
-      })
-    } else {
-      i++
+      currentHunks.push(hunk)
+      continue
     }
+    i++
+  }
+  if (currentFile) out.set(currentFile, currentHunks)
+  return out
+}
+
+/**
+ * Given the raw diff and the per-file post-change content, return body-only
+ * add/remove counts. A change is "body" iff its new-file line number is
+ * past the frontmatter end line.
+ */
+export function splitChurnByRegion(
+  diff: string,
+  fileContents: Map<string, string>,
+): Map<string, { bodyAddedCount: number; bodyRemovedCount: number }> {
+  const perFile = parseHunks(diff)
+  const out = new Map<string, { bodyAddedCount: number; bodyRemovedCount: number }>()
+  for (const [file, hunks] of perFile) {
+    const content = fileContents.get(file) ?? ''
+    const frontmatterEnd = findFrontmatterEndLineNumber(content) // 1-indexed; the line OF the closing ---
+    let bodyAdded = 0, bodyRemoved = 0
+    for (const hunk of hunks) {
+      // Walk through the hunk, tracking the running line number on each
+      // side. Context lines (' ') advance both sides. '+' advances only
+      // the new side. '-' advances only the old side.
+      let newLineNo = hunk.newStart
+      let oldLineNo = hunk.oldStart
+      for (const l of hunk.lines) {
+        if (l.startsWith('+') && !l.startsWith('+++')) {
+          if (newLineNo > frontmatterEnd) bodyAdded++
+          newLineNo++
+        } else if (l.startsWith('-') && !l.startsWith('---')) {
+          // For the old side we approximate the frontmatter end using the
+          // new content's end. Freshness PRs preserve frontmatter shape so
+          // this is accurate; for any odd cases (shrinking frontmatter)
+          // the resulting count over-counts body churn, which is the safe
+          // direction (only false-positive blocks, no false-negative).
+          if (oldLineNo > frontmatterEnd) bodyRemoved++
+          oldLineNo++
+        } else if (l.startsWith(' ')) {
+          newLineNo++
+          oldLineNo++
+        }
+        // \ No newline at end of file → no line numbers consumed.
+      }
+    }
+    out.set(file, { bodyAddedCount: bodyAdded, bodyRemovedCount: bodyRemoved })
   }
   return out
+}
+
+/**
+ * Return the 1-indexed line number of the closing frontmatter `---`. If
+ * the file has no frontmatter or it's malformed, returns 0 so every
+ * line is treated as body.
+ */
+function findFrontmatterEndLineNumber(content: string): number {
+  const lines = content.split(/\r?\n/)
+  if (lines[0]?.trim() !== '---') return 0
+  for (let n = 1; n < lines.length; n++) {
+    if (lines[n].trim() === '---') return n + 1 // 1-indexed
+  }
+  return 0
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { evaluateChurn, parseUnifiedDiffForChurn } from './anti-over-rewrite.js'
+import { evaluateChurn, parseUnifiedDiffForChurn, splitChurnByRegion } from './anti-over-rewrite.js'
 
 function makeContent(volatility: string, bodyLines: number): string {
   const body = Array.from({ length: bodyLines }, (_, i) => `body line ${i + 1}`).join('\n')
@@ -80,7 +80,7 @@ describe('parseUnifiedDiffForChurn', () => {
     }])
   })
 
-  it('counts body adds/removes separately from frontmatter ones (round-6 F-002)', () => {
+  it('counts body adds/removes separately from frontmatter ones (round-6 F-002, round-7 F-001)', () => {
     // A diff where the closing --- appears, transitioning frontmatter→body.
     // Frontmatter changes (last-reviewed) should NOT count toward body churn.
     const diff = [
@@ -98,11 +98,32 @@ describe('parseUnifiedDiffForChurn', () => {
       '-old body line',
       '+new body line',
     ].join('\n')
-    const out = parseUnifiedDiffForChurn(diff)
-    expect(out).toEqual([{
+    const raw = parseUnifiedDiffForChurn(diff)
+    expect(raw).toEqual([{
       file: 'content/knowledge/core/x.md',
-      addedCount: 2, removedCount: 2,         // raw diff: 2 +, 2 -
-      bodyAddedCount: 1, bodyRemovedCount: 1, // only the body line pair
+      addedCount: 2, removedCount: 2,
+      // parseUnifiedDiffForChurn alone returns 0 here — body counts are
+      // computed by splitChurnByRegion which needs the post-change content.
+      bodyAddedCount: 0, bodyRemovedCount: 0,
     }])
+
+    // The post-change file content has the closing --- on line 5,
+    // body starts on line 6. The diff's body line (`new body line`) lands
+    // at new-file line 7 (after blank line 6).
+    const newContent = [
+      '---',
+      'name: x',
+      'description: y',
+      'last-reviewed: 2026-05-25',
+      '---',
+      '',
+      'new body line',
+    ].join('\n')
+    // F-001 round-7: splitChurnByRegion uses parseEntry-derived line
+    // numbers instead of the buggy diff-content state machine.
+    const splits = splitChurnByRegion(diff, new Map([['content/knowledge/core/x.md', newContent]]))
+    expect(splits.get('content/knowledge/core/x.md')).toEqual({
+      bodyAddedCount: 1, bodyRemovedCount: 1, // only the body line pair
+    })
   })
 })

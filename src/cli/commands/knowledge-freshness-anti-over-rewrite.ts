@@ -4,6 +4,7 @@ import type { Argv, CommandModule } from 'yargs'
 import {
   evaluateChurn,
   parseUnifiedDiffForChurn,
+  splitChurnByRegion,
 } from '../../knowledge-freshness/gates/anti-over-rewrite.js'
 import {
   resolveTargetFiles,
@@ -61,16 +62,25 @@ const antiOverRewriteCommand: CommandModule<Record<string, unknown>, AntiOverRew
     const prLabels = labelsArg ? labelsArg.split(',').map((s) => s.trim()).filter((s) => s) : []
     const churn = parseUnifiedDiffForChurn(diffText)
     const byFile = new Map(churn.map((c) => [c.file, c]))
+    // Round-7 F-001: derive body-only churn via a line-number-based split
+    // using the actual post-change content (not a diff-content state
+    // machine). Build the file-content map once.
+    const contentMap = new Map<string, string>()
+    for (const abs of files) {
+      contentMap.set(path.relative(cwd, abs), fs.readFileSync(abs, 'utf8'))
+    }
+    const bodyByFile = splitChurnByRegion(diffText, contentMap)
     const inputs = files.map((abs) => {
       const rel = path.relative(cwd, abs)
       const c = byFile.get(rel)
+      const body = bodyByFile.get(rel)
       return {
         file: rel,
-        content: fs.readFileSync(abs, 'utf8'),
+        content: contentMap.get(rel) ?? '',
         addedCount: c?.addedCount ?? 0,
         removedCount: c?.removedCount ?? 0,
-        bodyAddedCount: c?.bodyAddedCount ?? 0,
-        bodyRemovedCount: c?.bodyRemovedCount ?? 0,
+        bodyAddedCount: body?.bodyAddedCount ?? 0,
+        bodyRemovedCount: body?.bodyRemovedCount ?? 0,
       }
     })
     const results = evaluateChurn(inputs, { prLabels })

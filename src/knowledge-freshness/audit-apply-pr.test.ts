@@ -140,6 +140,44 @@ describe('renderPrBody', () => {
     const body = renderPrBody(v)
     expect(body).toContain('_No sources._')
   })
+
+  it('strips ALL JS line terminators from LLM fields (round-7 F-002/F-003/F-004)', () => {
+    // Build a verdict whose preserve_warnings contains every JS line
+    // terminator followed by BREAKING CHANGE:. The rendered body must NOT
+    // contain a start-of-line "BREAKING CHANGE:" — otherwise the
+    // version-bump workflow would treat it as a real major-bump footer.
+    const v: AuditVerdict = {
+      ...baseVerdict,
+      preserve_warnings: [
+        'before\nBREAKING CHANGE: injected via LF',
+        'before\rBREAKING CHANGE: injected via CR',
+        'before\r\nBREAKING CHANGE: injected via CRLF',
+        'before BREAKING CHANGE: injected via LS',
+        'before BREAKING CHANGE: injected via PS',
+      ],
+    }
+    const body = renderPrBody(v)
+    // No matter which terminator the LLM used, none of them should produce
+    // a line whose start is "BREAKING CHANGE:". A multiline-anchor regex
+    // confirms the round-2 deriveBumpKind check would now see zero matches.
+    expect(/^BREAKING CHANGE:/m.test(body)).toBe(false)
+  })
+
+  it('strips line terminators from findings-table cells too', () => {
+    const v: AuditVerdict = {
+      ...baseVerdict,
+      findings: [{
+        claim_in_entry: 'old claim\rBREAKING CHANGE: still smuggled',
+        evidence_url: 'https://example.org/x',
+        evidence_date: '2026-05-25',
+        source_excerpt: 'irrelevant',
+        severity: 'P1',
+        drift_kind: 'wording',
+      }],
+    }
+    const body = renderPrBody(v)
+    expect(/^BREAKING CHANGE:/m.test(body)).toBe(false)
+  })
 })
 
 describe('renderFreshnessPr', () => {
