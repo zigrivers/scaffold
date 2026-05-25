@@ -28,7 +28,11 @@ const auditPrefilterCommand: CommandModule<Record<string, unknown>, AuditPrefilt
       max: argv.max,
       fetch: fetchAndHash,
     })
-    process.stdout.write(JSON.stringify(candidates.map((c) => c.name), null, 2) + '\n')
+    // Emit `{ name, path }` so downstream `audit-run-entry` (which takes a
+    // filesystem path, not a name) can be invoked directly from this output
+    // without a separate name→path resolution step.
+    const out = candidates.map((c) => ({ name: c.name, path: kbIndex.get(c.name) ?? null }))
+    process.stdout.write(JSON.stringify(out, null, 2) + '\n')
   },
 }
 

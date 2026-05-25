@@ -113,6 +113,64 @@ keep me
     expect(() => applyVerdictToEntry(baseEntry, verdict)).toThrow(/did not match/)
   })
 
+  it('rejects an H3 (### …) location — Phase 1 supports H2 only', () => {
+    const entry = `---
+name: x
+description: y
+topics: []
+sources:
+  - url: https://x
+    hash: 'old'
+---
+
+## Deep Guidance
+
+### Some Subsection
+
+content
+`
+    const verdict = {
+      entry_name: 'x', audit_date: '2026-05-24', model: 'claude-opus-4-7',
+      verdict: 'major-drift' as const, sources_checked: [], findings: [],
+      proposed_changes: [
+        { location: '### Some Subsection', kind: 'replace' as const,
+          rationale: '', new_text: '### Some Subsection\n\nnew content' },
+      ],
+      preserve_warnings: [],
+    }
+    // H3 location → findHeading() returns null → applyVerdictToEntry throws
+    // BEFORE any disk edit. Verifies the Phase 1 "H2 only" contract.
+    expect(() => applyVerdictToEntry(entry, verdict)).toThrow(/did not match/)
+  })
+
+  it('rejects an H1 (# …) location — only "## " is a valid target', () => {
+    const entry = `---
+name: x
+description: y
+topics: []
+sources:
+  - url: https://x
+    hash: 'old'
+---
+
+# Some H1
+
+## Deep Guidance
+
+x
+`
+    const verdict = {
+      entry_name: 'x', audit_date: '2026-05-24', model: 'claude-opus-4-7',
+      verdict: 'major-drift' as const, sources_checked: [], findings: [],
+      proposed_changes: [
+        { location: '# Some H1', kind: 'replace' as const,
+          rationale: '', new_text: '# Some H1\n\nnew' },
+      ],
+      preserve_warnings: [],
+    }
+    expect(() => applyVerdictToEntry(entry, verdict)).toThrow(/did not match/)
+  })
+
   it('applies a delete kind by removing the targeted section', () => {
     const entry = `---
 name: x

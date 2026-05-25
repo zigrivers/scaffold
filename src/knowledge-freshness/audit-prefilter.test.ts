@@ -61,6 +61,18 @@ describe('selectAuditCandidates', () => {
     expect(out).toEqual([])
   })
 
+  it('appends source.anchor to the fetched URL so the prefilter hashes the same target as the audit', async () => {
+    const fetch = vi.fn().mockResolvedValue({ hash: 'h1' }) as unknown as FetchSourceFn
+    await selectAuditCandidates(
+      [entry({
+        name: 'a', lastReviewed: '2026-05-23',
+        sources: [{ url: 'https://example.org/spec', anchor: '#section-2', hash: 'h1' }],
+      })],
+      { now: today, max: 10, fetch },
+    )
+    expect(fetch).toHaveBeenCalledWith('https://example.org/spec#section-2')
+  })
+
   it('respects max ceiling', async () => {
     const fetch = vi.fn().mockResolvedValue({ hash: 'new' }) as unknown as FetchSourceFn
     const entries = Array.from({ length: 5 }, (_, i) =>

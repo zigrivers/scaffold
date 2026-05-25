@@ -25,13 +25,21 @@ export async function selectAuditCandidates(
       else {
         for (const s of e.sources) {
           if (!s.hash) continue
+          // Match the audit meta-prompt's fetch shape: source.url + source.anchor
+          // (the audit prompt's procedure step 1 says "WebFetch on source.url
+          // with source.anchor appended if present"). Hashing the same URL form
+          // keeps the prefilter's "did upstream change?" check aligned with what
+          // the audit would actually re-fetch.
+          const fetchUrl = s.url + (s.anchor ?? '')
           // Fetch errors must not crash the whole cron. Treat any error as
           // "could not verify" — leave the entry alone this run; the next
           // cadence-window expiry will pick it up.
           let hash: string
-          try { ({ hash } = await opts.fetch(s.url)) }
+          try { ({ hash } = await opts.fetch(fetchUrl)) }
           catch (err) {
-            console.warn(`[knowledge-freshness] fetch failed for ${s.url} (entry ${e.name}): ${(err as Error).message}`)
+            console.warn(
+              `[knowledge-freshness] fetch failed for ${fetchUrl} (entry ${e.name}): ${(err as Error).message}`,
+            )
             continue
           }
           if (hash !== s.hash) { select = true; priority = 75; break }
