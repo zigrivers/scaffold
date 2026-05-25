@@ -2,6 +2,14 @@
 name: adr-craft
 description: Writing effective architecture decision records including technology selection
 topics: [adr, architecture-decisions, tech-stack, decision-documentation, technology-selection]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://adr.github.io/
+    anchor: '#decision-record-templates'
+  - url: https://github.com/joelparkerhenderson/architecture-decision-record
+    anchor: '#adr-templates'
 ---
 
 ## Summary
