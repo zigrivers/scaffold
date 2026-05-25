@@ -241,6 +241,64 @@ describe('parseChannelOutput', () => {
   })
 })
 
+describe('unwrap-jsonpath parser kind', () => {
+  it('unwraps an OpenAI-chat envelope and delegates to default', () => {
+    const inner = '{"approved": false, "findings": [{"severity": "P1", "location": "f.ts:1", "description": "bug", "suggestion": "fix"}], "summary": "found bug"}'
+    const envelope = JSON.stringify({ choices: [{ message: { content: inner } }] })
+    const cfg = { kind: 'unwrap-jsonpath' as const, wrap: '$.choices[0].message.content', then: 'default' }
+    const result = parseChannelOutput(envelope, cfg)
+    expect(result.approved).toBe(false)
+    expect(result.findings).toHaveLength(1)
+    expect(result.findings[0].severity).toBe('P1')
+  })
+
+  it('defaults `then` to "default" when omitted', () => {
+    const inner = '{"approved": true, "findings": [], "summary": "ok"}'
+    const envelope = JSON.stringify({ content: inner })
+    const cfg = { kind: 'unwrap-jsonpath' as const, wrap: '$.content' }
+    const result = parseChannelOutput(envelope, cfg)
+    expect(result.approved).toBe(true)
+  })
+
+  it('serializes non-string extracted values when chaining to another structured parser', () => {
+    const inner = '{"approved": true, "findings": [], "summary": "ok"}'
+    const envelope = JSON.stringify({ outer: { inner } })
+    const cfg = {
+      kind: 'unwrap-jsonpath' as const,
+      wrap: '$.outer',
+      then: { kind: 'unwrap-jsonpath' as const, wrap: '$.inner', then: 'default' },
+    }
+    const result = parseChannelOutput(envelope, cfg)
+    expect(result.approved).toBe(true)
+  })
+
+  it('emits an error finding when the jsonpath does not resolve', () => {
+    const envelope = JSON.stringify({ choices: [] })
+    const cfg = { kind: 'unwrap-jsonpath' as const, wrap: '$.choices[0].message.content', then: 'default' }
+    const result = parseChannelOutput(envelope, cfg)
+    expect(result.approved).toBe(false)
+    expect(result.findings).toHaveLength(1)
+    expect(result.findings[0].severity).toBe('P1')
+    expect(result.findings[0].location).toBe('output-parser')
+    expect(result.findings[0].description).toMatch(/jsonpath|did not resolve|wrap/i)
+  })
+
+  it('emits an error finding when the envelope is not JSON', () => {
+    const cfg = { kind: 'unwrap-jsonpath' as const, wrap: '$.x', then: 'default' }
+    const result = parseChannelOutput('totally not json', cfg)
+    expect(result.approved).toBe(false)
+    expect(result.findings[0].location).toBe('output-parser')
+  })
+
+  it('emits an error finding when the extracted value is not valid parser input', () => {
+    const envelope = JSON.stringify({ choices: [{ message: { content: 'not valid parser input' } }] })
+    const cfg = { kind: 'unwrap-jsonpath' as const, wrap: '$.choices[0].message.content', then: 'default' }
+    const result = parseChannelOutput(envelope, cfg)
+    expect(result.approved).toBe(false)
+    expect(result.findings[0].description).toMatch(/parse|No JSON/i)
+  })
+})
+
 describe('validateFindingStrict', () => {
   it('accepts a valid finding', () => {
     const f = validateFindingStrict({ severity: 'P1', location: 'f.ts:10', description: 'bug', suggestion: 'fix' })

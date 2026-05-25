@@ -278,7 +278,8 @@ export function buildParser(spec: OutputParserConfig): Parser {
     return getParser(spec)
   }
   if (spec.kind === 'unwrap-jsonpath') {
-    const nextParser = getParser(spec.then ?? 'default')
+    const nextSpec = spec.then ?? 'default'
+    const nextParser = getParser(nextSpec)
     return (raw: string) => {
       const decoded = parseJsonFromOutput(raw)
       const unwrapped = jsonpathGet(decoded, spec.wrap)
