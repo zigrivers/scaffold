@@ -137,6 +137,17 @@ describe('parser factory', () => {
     const result = parseChannelOutput('src/a.ts:1|Needs a fix', cfg)
     expect(result.findings[0].severity).toBe('P1')
   })
+
+  it('honors regex flags from config', () => {
+    const cfg: OutputParserConfig = {
+      kind: 'regex-findings',
+      pattern: '^(src/[^|]+)\\|(.+)$',
+      flags: 'i',
+      fields: { location: 1, description: 2 },
+    }
+    const result = parseChannelOutput('SRC/A.TS:1|Needs a fix', cfg)
+    expect(result.findings[0].location).toBe('SRC/A.TS:1')
+  })
 })
 
 describe('parseChannelOutput', () => {

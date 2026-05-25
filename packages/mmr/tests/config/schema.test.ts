@@ -222,6 +222,7 @@ describe('output_parser union', () => {
           output_parser: {
             kind: 'regex-findings',
             pattern: '^([^|]+)\\|([^|]+)\\|(P[0-3])\\|([^|]+)\\|(.+)$',
+            flags: 'gim',
             fields: { id: 1, category: 2, severity: 3, location: 4, description: 5 },
           },
         },
@@ -307,6 +308,25 @@ describe('output_parser union', () => {
             kind: 'regex-findings',
             pattern: '.*',
             fields: { description: 1 },
+          },
+        },
+      },
+    }
+    const result = MmrConfigSchema.safeParse(config)
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects regex-findings capture group index 0', () => {
+    const config = {
+      version: 1,
+      channels: {
+        c1: {
+          command: 'echo',
+          auth: baseAuth,
+          output_parser: {
+            kind: 'regex-findings',
+            pattern: '.*',
+            fields: { location: 0, description: 1 },
           },
         },
       },

@@ -16,6 +16,7 @@ type SeverityConfig = z.infer<typeof Severity>
 export interface RegexFindingsParserConfig {
   kind: 'regex-findings'
   pattern: string
+  flags?: string
   default_severity?: SeverityConfig
   fields: {
     id?: number
@@ -39,17 +40,18 @@ export type OutputParserConfig =
   | RegexFindingsParserConfig
 
 const RegexFindingsFieldsSchema = z.object({
-  id: z.number().int().nonnegative().optional(),
-  category: z.number().int().nonnegative().optional(),
-  severity: z.number().int().nonnegative().optional(),
-  location: z.number().int().nonnegative(),
-  description: z.number().int().nonnegative(),
-  suggestion: z.number().int().nonnegative().optional(),
+  id: z.number().int().positive().optional(),
+  category: z.number().int().positive().optional(),
+  severity: z.number().int().positive().optional(),
+  location: z.number().int().positive(),
+  description: z.number().int().positive(),
+  suggestion: z.number().int().positive().optional(),
 }) satisfies z.ZodType<RegexFindingsParserConfig['fields']>
 
 export const RegexFindingsParserSchema = z.object({
   kind: z.literal('regex-findings'),
   pattern: z.string(),
+  flags: z.string().regex(/^[dgimsuvy]*$/).default('gm'),
   default_severity: Severity.default('P2'),
   fields: RegexFindingsFieldsSchema,
 }) satisfies z.ZodType<RegexFindingsParserConfig>

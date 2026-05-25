@@ -256,7 +256,7 @@ function parseRegexFindings(
   raw: string,
   spec: Extract<OutputParserConfig, { kind: 'regex-findings' }>,
 ): ParsedOutput {
-  const regex = new RegExp(spec.pattern, 'gm')
+  const regex = new RegExp(spec.pattern, spec.flags ?? 'gm')
   const findings: Finding[] = []
   let match: RegExpExecArray | null
 
@@ -273,6 +273,7 @@ function parseRegexFindings(
       description: field(spec.fields.description) ?? '',
       suggestion: field(spec.fields.suggestion) ?? '',
     })
+    if (!regex.global) break
     if (match[0] === '') regex.lastIndex += 1
   }
 
