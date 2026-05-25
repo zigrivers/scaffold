@@ -147,17 +147,23 @@ function configChannels(opts: { name?: string, target?: string, noRedact?: boole
   if (rawName === 'show' && opts.target) {
     return showChannel(opts.target, { noRedact: opts.noRedact === true })
   }
+  if (rawName === 'show') {
+    console.error('Usage: mmr config channels show:<channel> or mmr config channels show <channel>')
+    return false
+  }
   if (rawName && rawName.startsWith('show:')) {
     const channelName = rawName.slice('show:'.length).trim()
     return showChannel(channelName, { noRedact: opts.noRedact === true })
+  }
+  if (rawName || opts.target) {
+    console.error('Usage: mmr config channels show:<channel> or mmr config channels show <channel>')
+    return false
   }
 
   const config = loadConfig({ projectRoot: process.cwd() })
   const channels = Object.entries(config.channels).map(([name, ch]) => {
     const display = redactChannel(ch as unknown as Record<string, unknown>)
-    const command = typeof display.command === 'string' && commandContainsInlineSecret(display.command)
-      ? '<redacted>'
-      : display.command
+    const command = redactDisplayCommand(display.command)
     return {
       name,
       enabled: display.enabled,
@@ -180,10 +186,8 @@ function showChannel(name: string, opts: { noRedact: boolean }): boolean {
 
   const display = opts.noRedact
     ? { ...ch } as Record<string, unknown>
-    : redactChannel(ch as unknown as Record<string, unknown>)
-  if (!opts.noRedact && typeof display.command === 'string' && commandContainsInlineSecret(display.command)) {
-    display.command = '<redacted>'
-  }
+    : redactShowChannel(ch as unknown as Record<string, unknown>)
+  if (!opts.noRedact) display.command = redactDisplayCommand(display.command)
   if (opts.noRedact) {
     console.error('WARNING: --no-redact is enabled; secrets in env/headers are printed verbatim.')
   }
@@ -216,6 +220,30 @@ function printWithProvenance(
 function renderScalar(value: unknown): string {
   if (value === '<redacted>') return '<redacted>'
   return JSON.stringify(value)
+}
+
+function redactDisplayCommand(command: unknown): unknown {
+  return typeof command === 'string' && commandContainsInlineSecret(command) ? '<redacted>' : command
+}
+
+function redactShowChannel(channel: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(channel)) {
+    out[key] = redactShowValue(key, value)
+  }
+  return out
+}
+
+function redactShowValue(key: string, value: unknown): unknown {
+  if (Array.isArray(value)) return value.map((entry) => redactShowValue(key, entry))
+  if (value !== null && typeof value === 'object') {
+    const out: Record<string, unknown> = {}
+    for (const [nestedKey, nestedValue] of Object.entries(value as Record<string, unknown>)) {
+      out[nestedKey] = redactShowValue(nestedKey, nestedValue)
+    }
+    return out
+  }
+  return isSecretKey(key, { exemptEnvNameKeys: false }) ? '<redacted>' : value
 }
 
 function commandContainsInlineSecret(command: string): boolean {
@@ -281,6 +309,11 @@ export const configCommand: CommandModule<object, ConfigArgs> = {
         describe: 'Redact secrets for config channels show',
       }),
   handler: async (args: ArgumentsCamelCase<ConfigArgs>) => {
+    if (args.action !== 'channels' && (args.name || args.target)) {
+      console.error(`Unexpected argument for config ${args.action}: ${args.target ?? args.name}`)
+      process.exit(1)
+      return
+    }
     switch (args.action) {
     case 'init':
       await configInit({ withExamples: args['with-examples'] === true })

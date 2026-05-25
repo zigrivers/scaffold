@@ -75,6 +75,41 @@ describe('mmr config channels show <name> (T1-E)', () => {
     expect(output).not.toMatch(/sk-real-secret/)
   })
 
+  it('preserves auth object fields while redacting secret scalars', async () => {
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), [
+      'version: 1',
+      'channels:',
+      '  claude:',
+      '    auth:',
+      '      check: "claude auth status"',
+      '      timeout: 8',
+      '      failure_exit_codes: [1]',
+      '      recovery: "claude login"',
+    ].join('\n'))
+    const { configCommand } = await import('../../src/commands/config.js')
+    const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(tmpDir)
+    const homeSpy = vi.spyOn(os, 'homedir').mockReturnValue(tmpDir)
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never)
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await configCommand.handler({
+      action: 'channels',
+      name: 'show:claude',
+      _: ['config'],
+      $0: 'mmr',
+    } as never)
+
+    const output = logSpy.mock.calls.map((c) => c.join(' ')).join('\n')
+    cwdSpy.mockRestore()
+    homeSpy.mockRestore()
+    exitSpy.mockRestore()
+    logSpy.mockRestore()
+
+    expect(output).toMatch(/^auth:$/m)
+    expect(output).toMatch(/^  check: "claude auth status"\s+# from project$/m)
+    expect(output).toMatch(/^  timeout: 8\s+# from project$/m)
+  })
+
   it('redacts inline command secrets by default', async () => {
     fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), [
       'version: 1',
@@ -156,6 +191,35 @@ describe('mmr config channels show <name> (T1-E)', () => {
     logSpy.mockRestore()
 
     expect(output).toMatch(/# Channel: claude/)
+  })
+
+  it('does not redact harmless command substrings in show output', async () => {
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), [
+      'version: 1',
+      'channels:',
+      '  keyboard:',
+      '    command: "review --keyboard-layout qwerty"',
+    ].join('\n'))
+    const { configCommand } = await import('../../src/commands/config.js')
+    const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(tmpDir)
+    const homeSpy = vi.spyOn(os, 'homedir').mockReturnValue(tmpDir)
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never)
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await configCommand.handler({
+      action: 'channels',
+      name: 'show:keyboard',
+      _: ['config'],
+      $0: 'mmr',
+    } as never)
+
+    const output = logSpy.mock.calls.map((c) => c.join(' ')).join('\n')
+    cwdSpy.mockRestore()
+    homeSpy.mockRestore()
+    exitSpy.mockRestore()
+    logSpy.mockRestore()
+
+    expect(output).toMatch(/^command: "review --keyboard-layout qwerty"\s+# from project$/m)
   })
 
   it('escapes quoted string values in channel output', async () => {
@@ -244,5 +308,54 @@ describe('mmr config channels show <name> (T1-E)', () => {
     errSpy.mockRestore()
 
     expect(errOutput).toMatch(/no-such-channel/)
+  })
+
+  it('errors when channels receives an unsupported target shape', async () => {
+    const { configCommand } = await import('../../src/commands/config.js')
+    const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(tmpDir)
+    const homeSpy = vi.spyOn(os, 'homedir').mockReturnValue(tmpDir)
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never)
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await configCommand.handler({
+      action: 'channels',
+      name: 'claude',
+      _: ['config'],
+      $0: 'mmr',
+    } as never)
+
+    const errOutput = errSpy.mock.calls.map((c) => c.join(' ')).join('\n')
+    expect(exitSpy).toHaveBeenCalledWith(1)
+    cwdSpy.mockRestore()
+    homeSpy.mockRestore()
+    exitSpy.mockRestore()
+    errSpy.mockRestore()
+
+    expect(errOutput).toMatch(/show:<channel>|show <channel>/)
+  })
+
+  it('errors when non-channel actions receive extra positionals', async () => {
+    const { configCommand } = await import('../../src/commands/config.js')
+    const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(tmpDir)
+    const homeSpy = vi.spyOn(os, 'homedir').mockReturnValue(tmpDir)
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never)
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await configCommand.handler({
+      action: 'init',
+      name: 'show',
+      _: ['config'],
+      $0: 'mmr',
+    } as never)
+
+    const errOutput = errSpy.mock.calls.map((c) => c.join(' ')).join('\n')
+    expect(exitSpy).toHaveBeenCalledWith(1)
+    cwdSpy.mockRestore()
+    homeSpy.mockRestore()
+    exitSpy.mockRestore()
+    errSpy.mockRestore()
+
+    expect(errOutput).toMatch(/Unexpected argument/)
+    expect(fs.existsSync(path.join(tmpDir, '.mmr.yaml'))).toBe(false)
   })
 })

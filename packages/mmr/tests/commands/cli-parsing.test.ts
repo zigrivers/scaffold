@@ -103,4 +103,10 @@ describe('config command argv parsing', () => {
     const args = parse(configCommand, ['config', 'channels', 'show:claude', '--no-redact'])
     expect(args.redact).toBe(false)
   })
+
+  it('rejects extra positionals for config init', () => {
+    const args = parse(configCommand, ['config', 'init', 'show'])
+    expect(args.action).toBe('init')
+    expect(args.name).toBe('show')
+  })
 })
