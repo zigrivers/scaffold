@@ -4,6 +4,7 @@ import os from 'node:os'
 import yaml from 'js-yaml'
 import { MmrConfigSchema, type MmrConfigParsed } from './schema.js'
 import { DEFAULT_CONFIG } from './defaults.js'
+import { isSecretKey } from '../core/redact.js'
 
 export interface LoadConfigOptions {
   projectRoot: string
@@ -165,6 +166,22 @@ function validateRunnableChannels(config: MmrConfigParsed): void {
   }
 }
 
+function warnOnInlineSecretHeaders(config: MmrConfigParsed): void {
+  for (const [name, channel] of Object.entries(config.channels)) {
+    const headers = (channel as unknown as { headers?: Record<string, string> }).headers
+    if (!headers) continue
+    for (const headerKey of Object.keys(headers)) {
+      if (isSecretKey(headerKey)) {
+        console.error(
+          `[mmr] warning: channel "${name}" has a literal "${headerKey}" header. ` +
+          'Move the secret to an env var and reference it via api_key_env ' +
+          '(api_key_env composes with HTTP channels landing in v3.30).',
+        )
+      }
+    }
+  }
+}
+
 function loadConfigLayers(opts: LoadConfigOptions): ConfigLayers {
   const { projectRoot, cliOverrides } = opts
   const userHome = opts.userHome ?? os.homedir()
@@ -212,6 +229,7 @@ function parseMergedConfig(mergedRaw: Record<string, unknown>): MmrConfigParsed 
   }
 
   const config = MmrConfigSchema.parse(merged)
+  warnOnInlineSecretHeaders(config)
   validateRunnableChannels(config)
   return config
 }

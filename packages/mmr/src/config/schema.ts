@@ -23,7 +23,7 @@ const ChannelConfigSchema = z.object({
   timeout: z.number().optional(),
   extends: z.string().optional(),
   abstract: z.boolean().default(false),
-})
+}).passthrough()
 
 const TemplateSchema = z.object({
   criteria: z.array(z.string()).optional(),
