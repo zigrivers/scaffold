@@ -93,6 +93,10 @@ function redactList(
     if (Array.isArray(value)) {
       const key = value[0]
       const rest = value.slice(2)
+      if (typeof key === 'string' && value.length === 1) {
+        out.push([redactKeyValueString(key)])
+        continue
+      }
       if (typeof key === 'string' && isSecretKey(key, { exemptEnvNameKeys: false }) && value.length >= 2) {
         out.push([key, '<redacted>', ...redactList(rest, options)])
       } else {
