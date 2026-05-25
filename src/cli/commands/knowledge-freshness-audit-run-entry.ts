@@ -36,7 +36,13 @@ const auditRunEntryCommand: CommandModule<Record<string, unknown>, AuditRunEntry
     // direct WebFetch at arbitrary URLs — bypassing every Node-side URL
     // guard. Disabling tools eliminates that class of attack at the cost
     // of larger prompts.
-    const command = 'claude -p --tools ""'
+    //
+    // SECURITY (round-7 F-001): `--bare` mode skips repo-local hooks,
+    // CLAUDE.md auto-discovery, plugin sync, MCP config loading. Without
+    // this flag, a downstream repo's `.claude/hooks/` or CLAUDE.md could
+    // influence the audit subprocess even with `--tools ""`. `--bare`
+    // gives a clean execution context independent of cwd-local config.
+    const command = 'claude --bare -p --tools ""'
     const timeoutMs = argv.timeout * 1000
 
     const dispatcher: Dispatcher = async (prompt) => {

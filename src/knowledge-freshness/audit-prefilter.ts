@@ -32,26 +32,32 @@ export async function selectAuditCandidates(
       const window = WINDOW_DAYS[e.volatility]
       if (ageDays > window) { select = true; priority = 50 + (Number.isFinite(ageDays) ? ageDays : 1000) }
       else {
-        for (const s of e.sources) {
-          if (!s.hash) continue
-          // Match the audit meta-prompt's fetch shape: source.url + source.anchor
-          // (the audit prompt's procedure step 1 says "WebFetch on source.url
-          // with source.anchor appended if present"). Hashing the same URL form
-          // keeps the prefilter's "did upstream change?" check aligned with what
-          // the audit would actually re-fetch.
-          const fetchUrl = s.url + (s.anchor ?? '')
-          // Fetch errors must not crash the whole cron. Treat any error as
-          // "could not verify" — leave the entry alone this run; the next
-          // cadence-window expiry will pick it up.
-          let hash: string
-          try { ({ hash } = await opts.fetch(fetchUrl)) }
-          catch (err) {
-            console.warn(
-              `[knowledge-freshness] fetch failed for ${fetchUrl} (entry ${e.name}): ${(err as Error).message}`,
-            )
-            continue
-          }
-          if (hash !== s.hash) { select = true; priority = 75; break }
+        // Round-7 F-004: fetch an entry's sources concurrently so a slow
+        // upstream doesn't extend the per-entry hash-check phase linearly.
+        // Concurrency is bounded by the small per-entry source count
+        // (typically 1-3); we don't need a global limiter at Phase 1 scale.
+        const hashedSources = await Promise.all(
+          e.sources.map(async (s) => {
+            if (!s.hash) return null
+            // Match the audit meta-prompt's fetch shape: source.url + source.anchor.
+            const fetchUrl = s.url + (s.anchor ?? '')
+            try {
+              const { hash } = await opts.fetch(fetchUrl)
+              return { stored: s.hash, fetched: hash }
+            } catch (err) {
+              // Fetch errors must not crash the whole cron. Treat any error
+              // as "could not verify" — leave the entry alone this run; the
+              // next cadence-window expiry will pick it up.
+              console.warn(
+                `[knowledge-freshness] fetch failed for ${fetchUrl} (entry ${e.name}): ` +
+                  (err as Error).message,
+              )
+              return null
+            }
+          }),
+        )
+        for (const h of hashedSources) {
+          if (h && h.fetched !== h.stored) { select = true; priority = 75; break }
         }
       }
     }
