@@ -169,14 +169,22 @@ function validateRunnableChannels(config: MmrConfigParsed): void {
   }
 }
 
-function validateCompensatorReference(cfg: MmrConfigParsed): void {
-  const ref = cfg.defaults.compensator?.channel
+function validateCompensatorReference(config: MmrConfigParsed): void {
+  const ref = config.defaults.compensator?.channel
   if (!ref) return
-  const target = cfg.channels[ref]
+  const target = config.channels[ref]
   if (!target) {
     throw new Error(
       `defaults.compensator.channel references unknown channel "${ref}". `
       + 'Configure a channel with this name in the channels: section, or remove the compensator block.',
+    )
+  }
+  // Abstract channels (v3.28 T1-A) are templates only: they cannot be
+  // dispatched directly and therefore cannot serve as a compensator target.
+  if (target.abstract === true) {
+    throw new Error(
+      `defaults.compensator.channel "${ref}" is marked abstract: true (T1-A). `
+      + 'Abstract channels are non-dispatchable templates; reference a concrete channel that extends it instead.',
     )
   }
 }

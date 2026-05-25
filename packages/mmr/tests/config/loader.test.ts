@@ -212,6 +212,30 @@ channels:
     ).toThrow(/compensator.*nonexistent-local|not found|does not exist|unknown channel/i)
   })
 
+  it('rejects compensator.channel that targets an abstract channel (depends on v3.28 T1-A)', () => {
+    const projectYaml = `
+version: 1
+defaults:
+  compensator:
+    channel: ollama-base
+channels:
+  ollama-base:
+    abstract: true
+    command: ollama
+    auth:
+      check: 'true'
+      failure_exit_codes: [1]
+      recovery: 'noop'
+  qwen:
+    extends: ollama-base
+    flags: ["run", "qwen2.5-coder:32b"]
+`
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), projectYaml)
+    expect(() =>
+      loadConfig({ projectRoot: tmpDir, userHome: path.join(tmpDir, 'home') }),
+    ).toThrow(/abstract|T1-A|non-dispatchable|template/i)
+  })
+
   it('does not overwrite base values with undefined overlay values', () => {
     const config = loadConfig({
       projectRoot: tmpDir,
