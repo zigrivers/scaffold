@@ -2,6 +2,14 @@
 name: web3-security
 description: Layered security practices for smart contracts heading to mainnet — defense-in-depth, Checks-Effects-Interactions, pull payments, OpenZeppelin primitives, pause + multisig, and input validation discipline
 topics: [web3, security, solidity, openzeppelin, defense-in-depth]
+volatility: fast-moving
+last-reviewed: null
+version-pin: 'OpenZeppelin Contracts 5.x'
+sources:
+  - url: https://docs.openzeppelin.com/contracts/5.x/
+    anchor: '#security'
+  - url: https://consensys.github.io/smart-contract-best-practices/
+    anchor: '#general-philosophy'
 ---
 
 A smart contract is a public, immutable bank vault that anyone on the planet can call. The mempool is hostile, the bytecode is permanent, and the only patch deployment is a redeploy + migration that your users may or may not follow. Most exploits aren't novel cryptography — they're missed standard patterns: a state update after an external call, a `tx.origin` check that a phishing contract bypassed, a `transfer` to a contract that reverts and bricks an auction. Layered defense beats clever one-off mitigations, every time.
