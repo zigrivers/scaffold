@@ -39,3 +39,4 @@
 [2026-05-25T22:09:11Z] v3.29 Task 8: merged (PR #381, MMR rounds: 6, deferred: 2)
 [2026-05-25T22:34:08Z] v3.29 Task 9: merged (PR #382, MMR rounds: 1, deferred: 0)
 [2026-05-25T23:39:38Z] v3.29 Task 10: merged (PR #383, MMR rounds: 3, deferred: 0)
+[2026-05-25T23:44:24Z] v3.29 Task 11: merged (PR #383, MMR rounds: 0, deferred: 0; satisfied by Task 10 P1 review fix)
