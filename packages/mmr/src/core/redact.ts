@@ -66,9 +66,18 @@ function redactKeyValueString(input: string): string {
   const match = /^(\s*)([^:=\s]+)(\s*[:=]\s*)(.*)$/.exec(input)
   if (!match) return isSecretKey(input.trim(), { exemptEnvNameKeys: false }) ? '<redacted>' : input
   const [, leading, key, separator, value] = match
-  return isSecretKey(key, { exemptEnvNameKeys: false })
-    ? `${leading}${key}${separator}<redacted>`
-    : `${leading}${key}${separator}${value}`
+  if (isSecretKey(key, { exemptEnvNameKeys: false }) || containsNestedSecretKeyValue(value)) {
+    return `${leading}${key}${separator}<redacted>`
+  }
+  return `${leading}${key}${separator}${value}`
+}
+
+function containsNestedSecretKeyValue(input: string): boolean {
+  const nestedKeyValueRe = /(?:^|[=:])"?([A-Za-z0-9_.-]+)"?\s*[:=]/g
+  for (const match of input.matchAll(nestedKeyValueRe)) {
+    if (isSecretKey(match[1], { exemptEnvNameKeys: false })) return true
+  }
+  return false
 }
 
 function redactList(

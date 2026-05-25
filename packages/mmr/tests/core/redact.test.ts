@@ -168,4 +168,10 @@ describe('redactChannel (T1-E)', () => {
       env: ['<redacted>'],
     })
   })
+
+  it('redacts nested key/value secrets inside list strings', () => {
+    expect(redactChannel({ flags: ['--env=OPENAI_API_KEY=sk-live'] })).toEqual({
+      flags: ['--env=<redacted>'],
+    })
+  })
 })
