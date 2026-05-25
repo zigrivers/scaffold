@@ -220,50 +220,109 @@ export interface LoadConfigWithProvenanceResult {
   provenance: ConfigProvenance
 }
 
-function provenanceForChannel(
-  channelName: string,
-  layers: { source: ProvenanceSource, channels?: Record<string, Record<string, unknown>> }[],
-): ChannelProvenance {
+function provenanceForRecord(overlay: Record<string, unknown>, source: ProvenanceSource): ChannelProvenance {
   const result: ChannelProvenance = {}
-  const walk = (
-    target: ChannelProvenance,
-    overlay: Record<string, unknown>,
-    source: ProvenanceSource,
-  ): void => {
-    for (const [k, v] of Object.entries(overlay)) {
-      if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
-        const nested = (target[k] as ChannelProvenance | undefined) ?? {}
-        walk(nested, v as Record<string, unknown>, source)
-        target[k] = nested
-      } else {
-        target[k] = source
-      }
+  for (const [k, v] of Object.entries(overlay)) {
+    if (isPlainRecord(v)) {
+      result[k] = provenanceForRecord(v, source)
+    } else {
+      result[k] = source
     }
   }
-  for (const layer of layers) {
-    const ch = layer.channels?.[channelName]
-    if (ch) walk(result, ch, layer.source)
-  }
   return result
+}
+
+function applyProvenanceLayer(
+  base: ConfigProvenance,
+  overlay: Record<string, unknown>,
+  source: ProvenanceSource,
+): void {
+  resetExtendingChannelBases(base as unknown as Record<string, unknown>, overlay)
+  if (!isPlainRecord(overlay.channels)) return
+  for (const [name, channel] of Object.entries(overlay.channels)) {
+    if (!isPlainRecord(channel)) continue
+    base.channels[name] = deepMerge(base.channels[name] ?? {}, provenanceForRecord(channel, source))
+  }
+}
+
+function resolveChannelProvenanceExtends(
+  name: string,
+  channels: Record<string, Record<string, unknown>>,
+  provenance: Record<string, ChannelProvenance>,
+  stack: string[] = [],
+): ChannelProvenance {
+  if (stack.includes(name)) {
+    throw new Error(`Channel extends cycle detected: ${[...stack, name].join(' -> ')}`)
+  }
+  if (stack.length > MAX_EXTENDS_DEPTH) {
+    throw new Error(
+      `Channel extends depth exceeds max (${MAX_EXTENDS_DEPTH}) at ${[...stack, name].join(' -> ')}`,
+    )
+  }
+
+  const channel = channels[name]
+  if (!channel) {
+    throw new Error(`Channel "${name}" referenced by extends not found`)
+  }
+
+  const ownProvenance = structuredClone(provenance[name] ?? {}) as ChannelProvenance
+  const parentName = channel.extends
+  if (typeof parentName !== 'string') return ownProvenance
+
+  const parentResolved = resolveChannelProvenanceExtends(parentName, channels, provenance, [...stack, name])
+  delete ownProvenance.extends
+  const childDefinesAbstract = Object.prototype.hasOwnProperty.call(channel, 'abstract')
+  const merged = deepMerge(structuredClone(parentResolved) as ChannelProvenance, ownProvenance)
+  if (!childDefinesAbstract) {
+    delete merged.abstract
+  }
+  return merged
+}
+
+function fillDefaultProvenance(finalValue: unknown, provenance: ChannelProvenance): void {
+  if (!isPlainRecord(finalValue)) return
+  for (const [field, value] of Object.entries(finalValue)) {
+    if (isPlainRecord(value)) {
+      const existing = provenance[field]
+      const nested = isPlainRecord(existing) ? existing as ChannelProvenance : {}
+      provenance[field] = nested
+      fillDefaultProvenance(value, nested)
+    } else if (provenance[field] === undefined) {
+      provenance[field] = 'default'
+    }
+  }
 }
 
 export function loadConfigWithProvenance(opts: LoadConfigOptions): LoadConfigWithProvenanceResult {
   const userHome = opts.userHome ?? os.homedir()
 
-  const defaultChannels = (structuredClone(DEFAULT_CONFIG) as MmrConfigParsed).channels
+  let mergedRaw = structuredClone(DEFAULT_CONFIG) as unknown as Record<string, unknown>
   const userPath = path.join(userHome, '.mmr', 'config.yaml')
   const projectPath = path.join(opts.projectRoot, '.mmr.yaml')
   const userYaml = (loadYaml(userPath) ?? {}) as Record<string, unknown>
   const projectYaml = (loadYaml(projectPath) ?? {}) as Record<string, unknown>
 
+  const rawProvenance: ConfigProvenance = { channels: {} }
+  applyProvenanceLayer(rawProvenance, mergedRaw, 'default')
+  if (Object.keys(userYaml).length > 0) {
+    resetExtendingChannelBases(mergedRaw, userYaml)
+    mergedRaw = deepMerge(mergedRaw, userYaml)
+    applyProvenanceLayer(rawProvenance, userYaml, 'user')
+  }
+  if (Object.keys(projectYaml).length > 0) {
+    resetExtendingChannelBases(mergedRaw, projectYaml)
+    mergedRaw = deepMerge(mergedRaw, projectYaml)
+    applyProvenanceLayer(rawProvenance, projectYaml, 'project')
+  }
+
   const config = loadConfig(opts)
   const provenance: ConfigProvenance = { channels: {} }
+  const mergedChannels = isPlainRecord(mergedRaw.channels)
+    ? mergedRaw.channels as Record<string, Record<string, unknown>>
+    : {}
   for (const name of Object.keys(config.channels)) {
-    provenance.channels[name] = provenanceForChannel(name, [
-      { source: 'default', channels: defaultChannels as unknown as Record<string, Record<string, unknown>> },
-      { source: 'user', channels: userYaml.channels as Record<string, Record<string, unknown>> | undefined },
-      { source: 'project', channels: projectYaml.channels as Record<string, Record<string, unknown>> | undefined },
-    ])
+    provenance.channels[name] = resolveChannelProvenanceExtends(name, mergedChannels, rawProvenance.channels)
+    fillDefaultProvenance(config.channels[name], provenance.channels[name])
   }
   return { config, provenance }
 }

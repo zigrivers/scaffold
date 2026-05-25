@@ -42,4 +42,33 @@ describe('loadConfigWithProvenance (T1-E)', () => {
     const { provenance } = loadConfigWithProvenance({ projectRoot: tmpDir, userHome: tmpDir })
     expect(provenance.channels.claude.timeout).toBe('user')
   })
+
+  it('attributes inherited channel fields to the parent source', () => {
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), [
+      'version: 1',
+      'channels:',
+      '  strict-claude:',
+      '    extends: claude',
+      '    timeout: 600',
+    ].join('\n'))
+    const { config, provenance } = loadConfigWithProvenance({ projectRoot: tmpDir, userHome: tmpDir })
+    expect(config.channels['strict-claude']?.command).toBe('claude -p')
+    expect(provenance.channels['strict-claude']?.command).toBe('default')
+    expect(provenance.channels['strict-claude']?.timeout).toBe('project')
+  })
+
+  it('fills provenance for schema-defaulted fields on custom channels', () => {
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), [
+      'version: 1',
+      'channels:',
+      '  local:',
+      '    command: "local-review"',
+    ].join('\n'))
+    const { config, provenance } = loadConfigWithProvenance({ projectRoot: tmpDir, userHome: tmpDir })
+    expect(config.channels.local?.enabled).toBe(true)
+    expect(config.channels.local?.flags).toEqual([])
+    expect(provenance.channels.local?.command).toBe('project')
+    expect(provenance.channels.local?.enabled).toBe('default')
+    expect(provenance.channels.local?.flags).toBe('default')
+  })
 })
