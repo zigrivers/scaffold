@@ -82,4 +82,26 @@ describe('loadConfigWithProvenance (T1-E)', () => {
     expect(provenance.defaults.timeout).toBe('project')
     expect(provenance.defaults.format).toBe('default')
   })
+
+  it('attributes CLI-overridden defaults to "cli"', () => {
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), [
+      'version: 1',
+      'defaults:',
+      '  timeout: 900',
+      '  format: text',
+    ].join('\n'))
+    const { config, provenance } = loadConfigWithProvenance({
+      projectRoot: tmpDir,
+      userHome: tmpDir,
+      cliOverrides: {
+        timeout: 1200,
+        format: 'json',
+      },
+    })
+    expect(config.defaults.timeout).toBe(1200)
+    expect(config.defaults.format).toBe('json')
+    expect(provenance.defaults.timeout).toBe('cli')
+    expect(provenance.defaults.format).toBe('cli')
+    expect(provenance.defaults.fix_threshold).toBe('default')
+  })
 })

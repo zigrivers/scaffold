@@ -19,6 +19,7 @@ interface ConfigLayers {
   merged: Record<string, unknown>
   userConfig: Record<string, unknown>
   projectConfig: Record<string, unknown>
+  cliConfig: Record<string, unknown>
 }
 
 /**
@@ -184,18 +185,35 @@ function loadConfigLayers(opts: LoadConfigOptions): ConfigLayers {
     merged = deepMerge(merged, projectConfig)
   }
 
-  if (cliOverrides) {
-    const overrideDefaults: Record<string, unknown> = {}
-    if (cliOverrides.fix_threshold !== undefined) overrideDefaults.fix_threshold = cliOverrides.fix_threshold
-    if (cliOverrides.timeout !== undefined) overrideDefaults.timeout = cliOverrides.timeout
-    if (cliOverrides.format !== undefined) overrideDefaults.format = cliOverrides.format
-
-    if (Object.keys(overrideDefaults).length > 0) {
-      merged = deepMerge(merged, { defaults: overrideDefaults })
-    }
+  const cliConfig = cliOverridesToConfig(cliOverrides)
+  if (Object.keys(cliConfig).length > 0) {
+    merged = deepMerge(merged, cliConfig)
   }
 
-  return { merged, userConfig, projectConfig }
+  return { merged, userConfig, projectConfig, cliConfig }
+}
+
+function cliOverridesToConfig(cliOverrides: LoadConfigOptions['cliOverrides']): Record<string, unknown> {
+  if (!cliOverrides) return {}
+  const overrideDefaults: Record<string, unknown> = {}
+  if (cliOverrides.fix_threshold !== undefined) overrideDefaults.fix_threshold = cliOverrides.fix_threshold
+  if (cliOverrides.timeout !== undefined) overrideDefaults.timeout = cliOverrides.timeout
+  if (cliOverrides.format !== undefined) overrideDefaults.format = cliOverrides.format
+
+  return Object.keys(overrideDefaults).length > 0 ? { defaults: overrideDefaults } : {}
+}
+
+function parseMergedConfig(mergedRaw: Record<string, unknown>): MmrConfigParsed {
+  const merged = structuredClone(mergedRaw) as Record<string, unknown>
+  if (isPlainRecord(merged.channels)) {
+    merged.channels = resolveExtendsAcrossChannels(
+      merged.channels as Record<string, Record<string, unknown>>,
+    )
+  }
+
+  const config = MmrConfigSchema.parse(merged)
+  validateRunnableChannels(config)
+  return config
 }
 
 /**
@@ -211,21 +229,10 @@ function loadConfigLayers(opts: LoadConfigOptions): ConfigLayers {
  */
 export function loadConfig(opts: LoadConfigOptions): MmrConfigParsed {
   const { merged } = loadConfigLayers(opts)
-
-  if (isPlainRecord(merged.channels)) {
-    merged.channels = resolveExtendsAcrossChannels(
-      merged.channels as Record<string, Record<string, unknown>>,
-    )
-  }
-
-  // Validate through Zod schema, then enforce invariants that depend on
-  // resolved channel metadata rather than the raw channel object shape.
-  const config = MmrConfigSchema.parse(merged)
-  validateRunnableChannels(config)
-  return config
+  return parseMergedConfig(merged)
 }
 
-export type ProvenanceSource = 'default' | 'user' | 'project'
+export type ProvenanceSource = 'default' | 'user' | 'project' | 'cli'
 
 export interface ChannelProvenance {
   [field: string]: ProvenanceSource | ChannelProvenance
@@ -318,14 +325,15 @@ function fillDefaultProvenance(finalValue: unknown, provenance: ChannelProvenanc
 }
 
 export function loadConfigWithProvenance(opts: LoadConfigOptions): LoadConfigWithProvenanceResult {
-  const { merged: mergedRaw, userConfig, projectConfig } = loadConfigLayers(opts)
+  const { merged: mergedRaw, userConfig, projectConfig, cliConfig } = loadConfigLayers(opts)
 
   const rawProvenance: ConfigProvenance = { defaults: {}, channels: {} }
   applyProvenanceLayer(rawProvenance, DEFAULT_CONFIG as unknown as Record<string, unknown>, 'default')
   if (Object.keys(userConfig).length > 0) applyProvenanceLayer(rawProvenance, userConfig, 'user')
   if (Object.keys(projectConfig).length > 0) applyProvenanceLayer(rawProvenance, projectConfig, 'project')
+  if (Object.keys(cliConfig).length > 0) applyProvenanceLayer(rawProvenance, cliConfig, 'cli')
 
-  const config = loadConfig(opts)
+  const config = parseMergedConfig(mergedRaw)
   const provenance: ConfigProvenance = { defaults: rawProvenance.defaults, channels: {} }
   fillDefaultProvenance(config.defaults, provenance.defaults)
   const mergedChannels = isPlainRecord(mergedRaw.channels)
