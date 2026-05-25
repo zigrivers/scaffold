@@ -117,10 +117,17 @@ export async function fetchAndHash(
         continue
       }
 
-      if (!res.ok) throw new Error(`fetch ${current} returned HTTP ${res.status}`)
+      if (!res.ok) {
+        // Drain the error body so Agent.close() doesn't wait on an active
+        // stream (round-10 F-001). A slow or large error body would otherwise
+        // hang the cron despite the size + timeout guards on success.
+        try { await res.body?.cancel() } catch { /* noop */ }
+        throw new Error(`fetch ${current} returned HTTP ${res.status}`)
+      }
 
       // Read body with a size cap so a malicious or massive response can't
-      // exhaust memory (round-7 F-003).
+      // exhaust memory (round-7 F-003). The reader is cancelled on size
+      // overflow inside readBodyWithLimit so Agent.close() won't stall.
       const body = await readBodyWithLimit(res, maxBodyBytes, current)
       const hash = `sha256:${createHash('sha256').update(body).digest('hex')}`
       return { hash, body }
@@ -139,6 +146,7 @@ async function readBodyWithLimit(res: Response, max: number, url: string): Promi
   const reader = res.body.getReader()
   const chunks: Uint8Array[] = []
   let total = 0
+  let cancelled = false
   try {
     while (true) {
       const { done, value } = await reader.read()
@@ -146,13 +154,18 @@ async function readBodyWithLimit(res: Response, max: number, url: string): Promi
       if (value) {
         total += value.byteLength
         if (total > max) {
+          // Cancel the reader so the underlying stream closes and
+          // Agent.close() (called in the caller's finally) doesn't wait on
+          // an unbounded inflight body (round-10 F-001).
+          cancelled = true
+          try { await reader.cancel() } catch { /* noop */ }
           throw new Error(`fetch ${url} response exceeded ${max} bytes (DoS guard)`)
         }
         chunks.push(value)
       }
     }
   } finally {
-    reader.releaseLock?.()
+    if (!cancelled) reader.releaseLock?.()
   }
   return new TextDecoder('utf-8').decode(Buffer.concat(chunks))
 }
