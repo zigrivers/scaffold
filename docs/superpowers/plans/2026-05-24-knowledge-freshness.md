@@ -918,33 +918,26 @@ import os from 'node:os'
 import { runEntryAudit, type Dispatcher } from './audit-runner.js'
 
 // Use temp fixtures rather than the real on-disk entry + meta-prompt so the
-// runner tests don't break when those files are edited. The runner reads two
-// files relative to cwd: the entry path passed in, and
-// `content/tools/knowledge-audit-entry.md` (the meta-prompt). Shim both.
+// runner tests don't break when those files are edited. We inject the meta-
+// prompt path via opts.promptPath so the test never depends on cwd or on
+// scaffold's package layout.
 let tmpRoot: string
-let originalCwd: string
+let entryFile: string
+let promptFile: string
 
 beforeAll(() => {
-  originalCwd = process.cwd()
   tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'runner-test-'))
-  fs.mkdirSync(path.join(tmpRoot, 'content/tools'), { recursive: true })
-  fs.writeFileSync(
-    path.join(tmpRoot, 'content/tools/knowledge-audit-entry.md'),
-    '# stub\n{{entry_path}} {{entry_frontmatter}} {{entry_body}}\n',
-  )
-  fs.writeFileSync(
-    path.join(tmpRoot, 'entry.md'),
-    '---\nname: stub\ndescription: y\n---\nbody\n',
-  )
-  process.chdir(tmpRoot)
+  promptFile = path.join(tmpRoot, 'audit.md')
+  fs.writeFileSync(promptFile, '# stub\n{{entry_path}} {{entry_frontmatter}} {{entry_body}}\n')
+  entryFile = path.join(tmpRoot, 'entry.md')
+  fs.writeFileSync(entryFile, '---\nname: stub\ndescription: y\n---\nbody\n')
 })
 
 afterAll(() => {
-  process.chdir(originalCwd)
   fs.rmSync(tmpRoot, { recursive: true, force: true })
 })
 
-const entryPath = () => path.join(tmpRoot, 'entry.md')
+const run = (dispatcher: Dispatcher) => runEntryAudit(entryFile, dispatcher, { promptPath: promptFile })
 
 describe('runEntryAudit', () => {
   it('returns the parsed verdict on a clean dispatcher response', async () => {
@@ -952,7 +945,7 @@ describe('runEntryAudit', () => {
       entry_name: 'stub', audit_date: '2026-05-24', model: 'claude-opus-4-7',
       verdict: 'superseded', sources_checked: [], findings: [], proposed_changes: [], preserve_warnings: [],
     }))
-    const out = await runEntryAudit(entryPath(), dispatcher)
+    const out = await run(dispatcher)
     expect(out.verdict).toBe('superseded')
     expect(out.entry_name).toBe('stub')
   })
@@ -964,7 +957,7 @@ describe('runEntryAudit', () => {
         verdict: 'current', sources_checked: [], findings: [], proposed_changes: [], preserve_warnings: [],
       })}\n\nLet me know if you need anything else.`,
     )
-    const out = await runEntryAudit(entryPath(), dispatcher)
+    const out = await run(dispatcher)
     expect(out.verdict).toBe('current')
   })
 
@@ -978,7 +971,7 @@ describe('runEntryAudit', () => {
         verdict: 'minor-drift', sources_checked: [], findings: [], proposed_changes: [], preserve_warnings: [],
       })}\n`,
     )
-    const out = await runEntryAudit(entryPath(), dispatcher)
+    const out = await run(dispatcher)
     expect(out.verdict).toBe('minor-drift')
   })
 
@@ -993,18 +986,18 @@ describe('runEntryAudit', () => {
         verdict: 'superseded', sources_checked: [], findings: [], proposed_changes: [], preserve_warnings: [],
       })}\n`,
     )
-    const out = await runEntryAudit(entryPath(), dispatcher)
+    const out = await run(dispatcher)
     expect(out.verdict).toBe('superseded')
   })
 
   it('throws on non-JSON dispatcher output', async () => {
     const dispatcher: Dispatcher = vi.fn().mockResolvedValue('not json at all')
-    await expect(runEntryAudit(entryPath(), dispatcher)).rejects.toThrow()
+    await expect(run(dispatcher)).rejects.toThrow()
   })
 
   it('throws on missing required fields', async () => {
     const dispatcher: Dispatcher = vi.fn().mockResolvedValue(JSON.stringify({ entry_name: 'x' }))
-    await expect(runEntryAudit(entryPath(), dispatcher)).rejects.toThrow()
+    await expect(run(dispatcher)).rejects.toThrow()
   })
 })
 ```
@@ -1022,6 +1015,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { z } from 'zod'
 import { extractKBFrontmatter } from '../core/assembly/knowledge-loader.js'
+import { getPackageRoot } from '../utils/fs.js'
 
 export type Dispatcher = (prompt: string) => Promise<string>
 
@@ -1049,7 +1043,16 @@ const verdictSchema = z.object({
 
 export type AuditVerdict = z.infer<typeof verdictSchema>
 
-export async function runEntryAudit(entryPath: string, dispatch: Dispatcher): Promise<AuditVerdict> {
+export interface RunEntryAuditOptions {
+  /** Override the meta-prompt path. Defaults to the bundled `content/tools/knowledge-audit-entry.md`. */
+  promptPath?: string
+}
+
+export async function runEntryAudit(
+  entryPath: string,
+  dispatch: Dispatcher,
+  opts: RunEntryAuditOptions = {},
+): Promise<AuditVerdict> {
   const content = fs.readFileSync(entryPath, 'utf8')
   const fm = extractKBFrontmatter(content)
   if (!fm) throw new Error(`could not parse frontmatter at ${entryPath}`)
@@ -1068,8 +1071,13 @@ export async function runEntryAudit(entryPath: string, dispatch: Dispatcher): Pr
     sources: fm.sources,
   }
 
+  // Resolve via the package-root helper so this works when scaffold is invoked
+  // from any cwd (installed globally via npm/brew, or run from a downstream
+  // project root). Pattern matches src/core/knowledge/knowledge-update-assembler.ts.
+  // Tests can pass `opts.promptPath` to inject a fixture.
   const promptTemplate = fs.readFileSync(
-    path.resolve('content/tools/knowledge-audit-entry.md'), 'utf8',
+    opts.promptPath ?? path.join(getPackageRoot(), 'content', 'tools', 'knowledge-audit-entry.md'),
+    'utf8',
   )
 
   // Use replaceAll + replacer-function form so we (a) replace every occurrence
