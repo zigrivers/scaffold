@@ -99,7 +99,7 @@ channels:
     flags: ["--format", "pipe"]
     output_parser:
       kind: regex-findings
-      pattern: "^(P[0-3])\\|([^|]+)\\|([^|]+)(?:\\|(.+))?$"
+      pattern: '^(P[0-3])\|([^|]+)\|([^|]+)(?:\|(.+))?$'
       fields:
         severity: 1
         location: 2
