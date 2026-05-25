@@ -512,7 +512,32 @@ export async function runValidateKnowledge(): Promise<number> {
 }
 ```
 
-Wire it into the existing CLI dispatch at `src/cli/index.ts`. That file is a yargs-based dispatcher that imports each command module (e.g. `import completeCommand from './commands/complete.js'`) and chains `.command(...)` calls on the yargs builder. Mirror that pattern: import `validateKnowledgeCommand` from `./commands/validate-knowledge.js`, add the `.command(validateKnowledgeCommand)` chain, and have the command's handler call `runValidateKnowledge()` and use its return value (0 or 1) as the process exit code via `process.exit(code)`.
+Wire it into the existing CLI dispatch at `src/cli/index.ts`. That file is a yargs-based dispatcher that imports each command module (e.g. `import completeCommand from './commands/complete.js'`) and chains `.command(...)` calls on the yargs builder. Mirror that pattern.
+
+**Each new command file must export a yargs `CommandModule`** with `command`, `describe`, `builder`, and `handler` fields, plus a default export. The runner function (`runValidateKnowledge` etc.) is wrapped by `handler`. Example shape for `src/cli/commands/validate-knowledge.ts`:
+
+```typescript
+import type { CommandModule } from 'yargs'
+import { runValidateKnowledge } from '../../validation/knowledge-frontmatter-validator.js'
+
+// (The runner function itself, as shown above, lives below or in a sibling module.)
+
+const validateKnowledgeCommand: CommandModule = {
+  command: 'validate-knowledge',
+  describe: 'Validate frontmatter on all knowledge entries (volatility, last-reviewed, sources, version-pin)',
+  builder: (y) => y,
+  handler: async () => {
+    const code = await runValidateKnowledge()
+    process.exit(code)
+  },
+}
+
+export default validateKnowledgeCommand
+```
+
+Then in `src/cli/index.ts`, add an `import validateKnowledgeCommand from './commands/validate-knowledge.js'` line beside the others and `.command(validateKnowledgeCommand)` in the yargs chain.
+
+The same shape applies to the Task 6 / Task 7 / Task 8 command files (`knowledge-freshness-audit-prefilter.ts`, `knowledge-freshness-audit-run-entry.ts`, `knowledge-freshness-audit-apply.ts`). Each takes its positional arguments via the `builder` callback's `.positional(...)` chain and reads them from the `argv` parameter in `handler`. Look at an existing command like `src/cli/commands/complete.ts` for a concrete positional-args example.
 
 **Do NOT** rely on running `src/cli/commands/validate-knowledge.ts` directly — it has no top-level invocation, so `node dist/cli/commands/validate-knowledge.js` would no-op. The command must be invoked through the CLI dispatcher.
 
@@ -764,6 +789,7 @@ git commit -m "feat(knowledge-freshness): add grounded audit meta-prompt"
 ### Task 6: `scaffold knowledge-freshness audit-prefilter` CLI
 
 **Files:**
+- Create: `src/knowledge-freshness/source-hash.ts` (shared `fetchAndHash(url): Promise<{hash: string}>` helper — used by both Task 6's pre-filter and Task 8's apply)
 - Create: `src/knowledge-freshness/audit-prefilter.ts`
 - Create: `src/knowledge-freshness/audit-prefilter.test.ts`
 - Create: `src/cli/commands/knowledge-freshness-audit-prefilter.ts`
@@ -908,13 +934,14 @@ Create `src/cli/commands/knowledge-freshness-audit-prefilter.ts` — reuses `loa
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/knowledge-freshness/audit-prefilter.ts src/knowledge-freshness/audit-prefilter.test.ts \
+git add src/knowledge-freshness/source-hash.ts \
+        src/knowledge-freshness/audit-prefilter.ts src/knowledge-freshness/audit-prefilter.test.ts \
         src/cli/commands/knowledge-freshness-audit-prefilter.ts \
         src/cli/index.ts
 git commit -m "feat(knowledge-freshness): add audit pre-filter (source-hash + cadence)"
 ```
 
-`src/cli/index.ts` MUST be staged — without the dispatcher registration the built CLI has no `audit-prefilter` subcommand and Task 9's invocation fails at runtime.
+`src/cli/index.ts` MUST be staged — without the dispatcher registration the built CLI has no `audit-prefilter` subcommand and Task 9's invocation fails at runtime. `source-hash.ts` is the shared `fetchAndHash` helper that Task 8 will import; landing it here keeps Task 8's commit small.
 
 ---
 
@@ -1768,7 +1795,7 @@ Create `src/cli/commands/knowledge-freshness-audit-apply.ts` that takes two posi
 
 The signature is explicit (path first, verdict second) because the verdict schema intentionally does not carry a filesystem path — keeping the path out of LLM-emitted output preserves the safety property that the LLM cannot redirect writes to an unrelated file. Likewise, source hashes are recomputed in Node rather than trusted from the LLM, because LLM-emitted sha256s cannot be deterministically verified.
 
-The hashing helper can be shared with the audit-prefilter (Task 6 step 5) — both want the same "fetch URL, sha256 body, return hex" primitive. Factor it into `src/knowledge-freshness/source-hash.ts` if it isn't already.
+The hashing helper is the same `fetchAndHash` primitive that Task 6 created in `src/knowledge-freshness/source-hash.ts`. Import it here; no new helper file needed. (If Task 6 didn't create it yet, do so now and stage it in this task's commit instead.)
 
 - [ ] **Step 6: Commit**
 
