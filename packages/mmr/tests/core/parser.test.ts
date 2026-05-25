@@ -112,6 +112,25 @@ describe('parser factory', () => {
     expect(result.approved).toBe(true)
   })
 
+  it('unwraps root array jsonpath output before parsing', () => {
+    const cfg: OutputParserConfig = {
+      kind: 'unwrap-jsonpath',
+      wrap: '$[0]',
+      then: 'default',
+    }
+    const result = parseChannelOutput(JSON.stringify([
+      '{"approved": true, "findings": [], "summary": "ok"}',
+    ]), cfg)
+    expect(result.approved).toBe(true)
+  })
+
+  it('returns a parser error when jsonpath does not match', () => {
+    const cfg: OutputParserConfig = { kind: 'unwrap-jsonpath', wrap: '$.missing', then: 'default' }
+    const result = parseChannelOutput('{"approved": true}', cfg)
+    expect(result.approved).toBe(false)
+    expect(result.findings[0].description).toMatch(/jsonpath did not match/)
+  })
+
   it('parses regex findings', () => {
     const cfg: OutputParserConfig = {
       kind: 'regex-findings',
@@ -147,6 +166,17 @@ describe('parser factory', () => {
     }
     const result = parseChannelOutput('SRC/A.TS:1|Needs a fix', cfg)
     expect(result.findings[0].location).toBe('SRC/A.TS:1')
+  })
+
+  it('returns a parser error when required regex captures are empty', () => {
+    const cfg: OutputParserConfig = {
+      kind: 'regex-findings',
+      pattern: '^(P[0-3])\\|([^|]*)\\|(.+)$',
+      fields: { severity: 1, location: 2, description: 3 },
+    }
+    const result = parseChannelOutput('P2||Needs a fix', cfg)
+    expect(result.approved).toBe(false)
+    expect(result.findings[0].description).toMatch(/requires non-empty location and description/)
   })
 })
 

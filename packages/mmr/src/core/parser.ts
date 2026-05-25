@@ -221,6 +221,9 @@ export function buildParser(spec: OutputParserConfig): Parser {
     return (raw: string) => {
       const decoded = JSON.parse(raw) as unknown
       const unwrapped = jsonpathGet(decoded, spec.wrap)
+      if (unwrapped === undefined) {
+        throw new Error(`jsonpath did not match: ${spec.wrap}`)
+      }
       const nextRaw = typeof unwrapped === 'string' ? unwrapped : JSON.stringify(unwrapped)
       return nextParser(nextRaw)
     }
@@ -233,20 +236,30 @@ export function buildParser(spec: OutputParserConfig): Parser {
 
 function jsonpathGet(value: unknown, path: string): unknown {
   if (path === '$') return value
-  if (!path.startsWith('$.')) {
+  if (!path.startsWith('$')) {
     throw new Error('jsonpath must start with $')
   }
 
   let current = value
-  for (const segment of path.slice(2).split('.')) {
-    if (!segment) throw new Error('invalid jsonpath segment')
-    const match = /^([A-Za-z_][A-Za-z0-9_-]*)(?:\[(\d+)\])?$/.exec(segment)
-    if (!match) throw new Error(`invalid jsonpath segment: ${segment}`)
-    if (typeof current !== 'object' || current === null) return undefined
-    current = (current as Record<string, unknown>)[match[1]]
-    if (match[2] !== undefined) {
+  let cursor = 1
+  while (cursor < path.length) {
+    const char = path[cursor]
+    if (char === '.') {
+      cursor += 1
+      if (path[cursor] === '[') continue
+      const match = /^[A-Za-z_][A-Za-z0-9_-]*/.exec(path.slice(cursor))
+      if (!match) throw new Error(`invalid jsonpath segment near: ${path.slice(cursor)}`)
+      if (typeof current !== 'object' || current === null) return undefined
+      current = (current as Record<string, unknown>)[match[0]]
+      cursor += match[0].length
+    } else if (char === '[') {
+      const match = /^\[(\d+)\]/.exec(path.slice(cursor))
+      if (!match) throw new Error(`invalid jsonpath index near: ${path.slice(cursor)}`)
       if (!Array.isArray(current)) return undefined
-      current = current[Number(match[2])]
+      current = current[Number(match[1])]
+      cursor += match[0].length
+    } else {
+      throw new Error(`invalid jsonpath segment near: ${path.slice(cursor)}`)
     }
   }
   return current
@@ -263,14 +276,19 @@ function parseRegexFindings(
   while ((match = regex.exec(raw)) !== null) {
     const field = (index: number | undefined): string | undefined =>
       index === undefined ? undefined : match?.[index]
+    const location = field(spec.fields.location)
+    const description = field(spec.fields.description)
+    if (!location?.trim() || !description?.trim()) {
+      throw new Error('regex-findings parser requires non-empty location and description captures')
+    }
     const severityValue = field(spec.fields.severity)
     const severity = isSeverity(severityValue) ? severityValue : (spec.default_severity ?? 'P2')
     findings.push({
       id: field(spec.fields.id),
       category: field(spec.fields.category),
       severity,
-      location: field(spec.fields.location) ?? '',
-      description: field(spec.fields.description) ?? '',
+      location,
+      description,
       suggestion: field(spec.fields.suggestion) ?? '',
     })
     if (!regex.global) break
