@@ -527,7 +527,17 @@ validate-knowledge:
 	node dist/index.js validate-knowledge
 ```
 
-The Makefile has no `build` target (build is `npm run build`, exposed via the `ts-check` target). The recipe above always runs `npm run build` first — TypeScript's incremental compile is fast, and we cannot rely on `dist/index.js` existence alone because a stale `dist/` would silently miss the newly-added `validate-knowledge` subcommand. **Do not** make `ts-check` depend on `validate-knowledge` — `ts-check` already runs `npm run build`, and adding the dependency would double-build. Instead, invoke `make validate-knowledge` as its own CI step (Task 2 Step 6) and from `make check` directly. Confirm the CLI binary path matches `package.json` `bin.scaffold` (currently `dist/index.js`).
+Then update the existing `check:` line in the Makefile to include `validate-knowledge` so the new gate runs as part of `make check` and `make check-all`:
+
+```makefile
+# before:
+# check: lint validate test eval ## Run bash quality gates (lint + validate + test + eval)
+
+# after:
+check: lint validate validate-knowledge test eval ## Run bash quality gates (lint + validate + validate-knowledge + test + eval)
+```
+
+The Makefile has no `build` target (build is `npm run build`, exposed via the `ts-check` target). The `validate-knowledge` recipe always runs `npm run build` first — TypeScript's incremental compile is fast, and we cannot rely on `dist/index.js` existence alone because a stale `dist/` would silently miss the newly-added `validate-knowledge` subcommand. **Do not** make `ts-check` depend on `validate-knowledge` — `ts-check` already runs `npm run build`, and adding the dependency would double-build. Confirm the CLI binary path matches `package.json` `bin.scaffold` (currently `dist/index.js`).
 
 - [ ] **Step 6: Add CI step**
 
