@@ -140,6 +140,73 @@ describe('mmr config channels show <name> (T1-E)', () => {
     expect(output).not.toMatch(/sk-live/)
   })
 
+  it('redacts secret-bearing flags arrays by default', async () => {
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), [
+      'version: 1',
+      'channels:',
+      '  local:',
+      '    command: local-review',
+      '    flags: ["--api-key", "sk-real-secret", "--model", "qwen"]',
+    ].join('\n'))
+    const { configCommand } = await import('../../src/commands/config.js')
+    const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(tmpDir)
+    const homeSpy = vi.spyOn(os, 'homedir').mockReturnValue(tmpDir)
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never)
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await configCommand.handler({
+      action: 'channels',
+      name: 'show:local',
+      _: ['config'],
+      $0: 'mmr',
+    } as never)
+
+    const output = logSpy.mock.calls.map((c) => c.join(' ')).join('\n')
+    cwdSpy.mockRestore()
+    homeSpy.mockRestore()
+    exitSpy.mockRestore()
+    logSpy.mockRestore()
+
+    expect(output).toMatch(/^flags: \["--api-key","<redacted>","--model","qwen"\]\s+# from project$/m)
+    expect(output).not.toMatch(/sk-real-secret/)
+  })
+
+  it('redacts inline secrets in auth command-like fields', async () => {
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), [
+      'version: 1',
+      'channels:',
+      '  local:',
+      '    command: local-review',
+      '    auth:',
+      '      check: "auth-check --api-key sk-real-secret"',
+      '      timeout: 8',
+      '      failure_exit_codes: [1]',
+      '      recovery: "login --token secret-token"',
+    ].join('\n'))
+    const { configCommand } = await import('../../src/commands/config.js')
+    const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(tmpDir)
+    const homeSpy = vi.spyOn(os, 'homedir').mockReturnValue(tmpDir)
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never)
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await configCommand.handler({
+      action: 'channels',
+      name: 'show:local',
+      _: ['config'],
+      $0: 'mmr',
+    } as never)
+
+    const output = logSpy.mock.calls.map((c) => c.join(' ')).join('\n')
+    cwdSpy.mockRestore()
+    homeSpy.mockRestore()
+    exitSpy.mockRestore()
+    logSpy.mockRestore()
+
+    expect(output).toMatch(/^  check: <redacted>\s+# from project$/m)
+    expect(output).toMatch(/^  recovery: <redacted>\s+# from project$/m)
+    expect(output).not.toMatch(/sk-real-secret|secret-token/)
+  })
+
   it('quotes command values so provenance comments remain unambiguous', async () => {
     fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), [
       'version: 1',

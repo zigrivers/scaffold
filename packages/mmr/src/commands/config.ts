@@ -187,7 +187,9 @@ function showChannel(name: string, opts: { noRedact: boolean }): boolean {
   const display = opts.noRedact
     ? { ...ch } as Record<string, unknown>
     : redactShowChannel(ch as unknown as Record<string, unknown>)
-  if (!opts.noRedact) display.command = redactDisplayCommand(display.command)
+  if (!opts.noRedact && Object.prototype.hasOwnProperty.call(display, 'command')) {
+    display.command = redactDisplayCommand(display.command)
+  }
   if (opts.noRedact) {
     console.error('WARNING: --no-redact is enabled; secrets in env/headers are printed verbatim.')
   }
@@ -235,7 +237,7 @@ function redactShowChannel(channel: Record<string, unknown>): Record<string, unk
 }
 
 function redactShowValue(key: string, value: unknown): unknown {
-  if (Array.isArray(value)) return value.map((entry) => redactShowValue(key, entry))
+  if (Array.isArray(value)) return redactShowArray(value)
   if (value !== null && typeof value === 'object') {
     const out: Record<string, unknown> = {}
     for (const [nestedKey, nestedValue] of Object.entries(value as Record<string, unknown>)) {
@@ -243,7 +245,32 @@ function redactShowValue(key: string, value: unknown): unknown {
     }
     return out
   }
+  if (typeof value === 'string' && isCommandLikeKey(key) && commandContainsInlineSecret(value)) {
+    return '<redacted>'
+  }
   return isSecretKey(key, { exemptEnvNameKeys: false }) ? '<redacted>' : value
+}
+
+function redactShowArray(values: unknown[]): unknown[] {
+  const out: unknown[] = []
+  for (let i = 0; i < values.length; i += 1) {
+    const value = values[i]
+    if (
+      typeof value === 'string' &&
+      typeof values[i + 1] === 'string' &&
+      isCommandSecretKey(value)
+    ) {
+      out.push(value, '<redacted>')
+      i += 1
+      continue
+    }
+    out.push(redactShowValue('', value))
+  }
+  return out
+}
+
+function isCommandLikeKey(key: string): boolean {
+  return ['command', 'check', 'recovery'].includes(key)
 }
 
 function commandContainsInlineSecret(command: string): boolean {
