@@ -1,0 +1,120 @@
+name: Knowledge Freshness Version Bump
+
+# Auto-bumps content/knowledge/VERSION whenever a knowledge-freshness PR is
+# squash-merged to main. The bump kind is derived from the PR title/body
+# (Conventional Commits flavored):
+#
+#   BREAKING CHANGE: anywhere in title or body → major
+#   feat(knowledge): or feat(knowledge-freshness): title prefix → minor
+#   chore(knowledge): or chore(knowledge-freshness): title prefix → patch
+#   anything else → patch (with a ::notice:: surfaced in the logs)
+#
+# The bump commit lands on main with the prefix `chore(knowledge):` (NOT
+# `knowledge-freshness/`-style) so it does NOT itself trigger another
+# freshness-PR workflow.
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+concurrency: knowledge-freshness-version-bump
+
+jobs:
+  bump:
+    # Run only on merged PRs whose source branch was `knowledge-freshness/...`
+    # or which carry the `knowledge-freshness` label. (Closed-without-merge
+    # PRs and unrelated PRs are skipped.)
+    if: >-
+      github.event.pull_request.merged == true &&
+      (
+        startsWith(github.event.pull_request.head.ref, 'knowledge-freshness/') ||
+        contains(github.event.pull_request.labels.*.name, 'knowledge-freshness')
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.17'
+          cache: 'npm'
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build CLI
+        run: npm run build
+
+      - name: Configure git identity
+        run: |
+          git config user.name "knowledge-freshness-bot"
+          git config user.email "knowledge-freshness@users.noreply.github.com"
+
+      - name: Compute and apply VERSION bump
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+
+          VERSION_FILE="content/knowledge/VERSION"
+          CURRENT=$(tr -d '[:space:]' < "$VERSION_FILE")
+          echo "current VERSION: $CURRENT"
+
+          # Use the CLI dry-run to compute the next version. Parsing its
+          # `next: X.Y.Z` line keeps the derivation rules in one place
+          # (src/knowledge-freshness/bump-version.ts) instead of duplicating
+          # them in bash.
+          OUTPUT=$(node dist/index.js knowledge-freshness bump-version \
+            --title "$PR_TITLE" \
+            --body "$PR_BODY")
+          echo "$OUTPUT"
+
+          BUMP_KIND=$(printf '%s\n' "$OUTPUT" | awk '/^bump:/ {print $2}')
+          NEXT=$(printf '%s\n' "$OUTPUT" | awk '/^next:/ {print $2}')
+
+          if [ -z "$NEXT" ]; then
+            echo "::error::failed to parse next version from CLI output"
+            exit 1
+          fi
+
+          # Surface the default-to-patch branch as a notice so reviewers can
+          # see when a PR title didn't match any of the recognized prefixes.
+          case "$PR_TITLE" in
+            *"BREAKING CHANGE:"*) ;;
+            "feat(knowledge):"*|"feat(knowledge-freshness):"*) ;;
+            "chore(knowledge):"*|"chore(knowledge-freshness):"*) ;;
+            *)
+              if [ "$BUMP_KIND" = "patch" ]; then
+                echo "::notice::unrecognized prefix in PR title, defaulting to patch bump"
+              fi
+              ;;
+          esac
+
+          printf '%s\n' "$NEXT" > "$VERSION_FILE"
+          git add "$VERSION_FILE"
+
+          # If for some reason VERSION wasn't actually different (e.g. a
+          # follow-up merge against an already-bumped VERSION), bail without
+          # an empty commit.
+          if git diff --cached --quiet; then
+            echo "::notice::VERSION already at $NEXT — nothing to commit"
+            exit 0
+          fi
+
+          # NOTE: commit prefix is `chore(knowledge):` (NOT
+          # `knowledge-freshness/`-shaped). This workflow's filter checks the
+          # source BRANCH, and the push below goes straight to main without a
+          # branch named `knowledge-freshness/...`, so this is belt-and-braces
+          # against accidental recursion.
+          git commit -m "chore(knowledge): bump KB VERSION to $NEXT"
+          git push origin main
