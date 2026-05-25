@@ -2,6 +2,14 @@
 name: user-stories
 description: Expert knowledge for translating product requirements into well-formed user stories
 topics: [user-stories, personas, acceptance-criteria, story-splitting, INVEST, epics, traceability]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://martinfowler.com/bliki/UserStory.html
+    anchor: '#user-story'
+  - url: https://www.agilealliance.org/glossary/user-stories/
+    anchor: '#user-stories'
 ---
 
 # User Stories
