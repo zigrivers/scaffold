@@ -258,10 +258,14 @@ function redactShowArray(values: unknown[]): unknown[] {
     if (
       typeof value === 'string' &&
       typeof values[i + 1] === 'string' &&
-      isCommandSecretKey(value)
+      isStandaloneSecretKeyToken(value)
     ) {
       out.push(value, '<redacted>')
       i += 1
+      continue
+    }
+    if (typeof value === 'string' && commandContainsInlineSecret(value)) {
+      out.push('<redacted>')
       continue
     }
     out.push(redactShowValue('', value))
@@ -269,12 +273,16 @@ function redactShowArray(values: unknown[]): unknown[] {
   return out
 }
 
+function isStandaloneSecretKeyToken(value: string): boolean {
+  return !/[\s:=]/.test(value) && isCommandSecretKey(value)
+}
+
 function isCommandLikeKey(key: string): boolean {
   return ['command', 'check', 'recovery'].includes(key)
 }
 
 function commandContainsInlineSecret(command: string): boolean {
-  const keyValueRe = /(?:^|[\s'"?&{,=])"?([A-Za-z0-9_.-]+)"?\s*[:=]/g
+  const keyValueRe = /(?:^|[\s'"?&{,=])"?(-{0,2}[A-Za-z0-9_.-]+)"?\s*[:=]/g
   for (const match of command.matchAll(keyValueRe)) {
     if (isCommandSecretKey(match[1])) return true
   }
