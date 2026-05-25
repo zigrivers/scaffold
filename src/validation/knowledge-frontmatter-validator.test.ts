@@ -33,6 +33,22 @@ describe('validateKnowledgeFile', () => {
     expect(result.errors[0].message).toMatch(/last-reviewed/)
   })
 
+  it('errors when last-reviewed is shaped right but is not a real calendar date', () => {
+    // Round-3 F-002: "2026-99-99" passes the YYYY-MM-DD regex but is invalid.
+    // Cadence math (new Date(...)) becomes NaN and silently breaks selection.
+    const file = tmpFile('---\nname: x\ndescription: y\nlast-reviewed: \'2026-99-99\'\n---\nbody')
+    const result = validateKnowledgeFile(file)
+    expect(result.errors.some(e => /calendar date/.test(e.message))).toBe(true)
+  })
+
+  it('errors when source.retrieved is shaped right but is not a real calendar date', () => {
+    const file = tmpFile(
+      '---\nname: x\ndescription: y\nsources:\n  - url: https://x\n    retrieved: \'2026-13-01\'\n---\nbody',
+    )
+    const result = validateKnowledgeFile(file)
+    expect(result.errors.some(e => /calendar date/.test(e.message))).toBe(true)
+  })
+
   it('errors when a source entry is missing url', () => {
     const file = tmpFile('---\nname: x\ndescription: y\nsources:\n  - anchor: \'#a\'\n---\nbody')
     const result = validateKnowledgeFile(file)

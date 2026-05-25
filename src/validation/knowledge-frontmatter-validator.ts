@@ -2,12 +2,24 @@ import fs from 'node:fs'
 import yaml from 'js-yaml'
 import { z } from 'zod'
 
+// Strict calendar-date refinement. A regex like /^\d{4}-\d{2}-\d{2}$/ accepts
+// "2026-99-99", which then becomes NaN at `new Date(...)` and silently breaks
+// cadence math in selectAuditCandidates (round-3 F-002). Require the parsed
+// Date to round-trip back to the same string.
+const isoDateSchema = z.string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'must be YYYY-MM-DD')
+  .refine((s) => {
+    const d = new Date(s + 'T00:00:00Z')
+    if (Number.isNaN(d.getTime())) return false
+    return d.toISOString().slice(0, 10) === s
+  }, 'must be a real calendar date')
+
 const sourceSchema = z.object({
   url: z.string().url(),
   // Anchors are appended to source.url literally by the audit meta-prompt, so
   // they must include the leading "#" to produce a valid URL fragment.
   anchor: z.string().regex(/^#/, 'anchor must start with "#"').optional(),
-  retrieved: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  retrieved: isoDateSchema.optional(),
   hash: z.string().optional(),
 })
 
@@ -20,7 +32,7 @@ const kbSchema = z.object({
   description: z.string(),
   topics: z.array(z.string()).default([]),
   volatility: z.enum(['stable', 'evolving', 'fast-moving']).default('evolving'),
-  'last-reviewed': z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().default(null),
+  'last-reviewed': isoDateSchema.nullable().default(null),
   'version-pin': z.string().nullable().default(null),
   sources: z.array(sourceSchema).default([]),
 })

@@ -3,6 +3,7 @@ import path from 'node:path'
 import { z } from 'zod'
 import { extractKBFrontmatter } from '../core/assembly/knowledge-loader.js'
 import { getPackageRoot } from '../utils/fs.js'
+import { assertSafeSourceUrl } from './source-url-validator.js'
 
 export type Dispatcher = (prompt: string) => Promise<string>
 
@@ -43,6 +44,15 @@ export async function runEntryAudit(
   const content = fs.readFileSync(entryPath, 'utf8')
   const fm = extractKBFrontmatter(content)
   if (!fm) throw new Error(`could not parse frontmatter at ${entryPath}`)
+
+  // Validate each source URL against the SSRF guard BEFORE we hand them to the
+  // `claude -p` subprocess via the prompt body — the meta-prompt will WebFetch
+  // each one, and the subprocess is harder to constrain than this Node side.
+  // Round-3 F-001. (fetchAndHash also validates, but that path runs in
+  // prefilter/apply; the meta-prompt dispatch needs its own check.)
+  for (const s of fm.sources) {
+    assertSafeSourceUrl(s.url + (s.anchor ?? ''))
+  }
 
   // Re-emit the frontmatter with the same hyphenated keys the meta-prompt
   // describes (`last-reviewed`, `version-pin`). The parser's TS-side shape

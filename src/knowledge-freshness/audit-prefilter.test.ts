@@ -82,6 +82,22 @@ describe('selectAuditCandidates', () => {
     expect(out).toHaveLength(2)
   })
 
+  it('treats an invalid calendar date in lastReviewed as overdue (no NaN-skip)', async () => {
+    // Round-3 F-002: "2026-99-99" passed the regex but is not a real date.
+    // Cadence math (now - new Date('2026-99-99')) is NaN; without the guard,
+    // the entry would NEVER be selected by the cadence path even when its
+    // sources don't change. Verify it now gets picked up.
+    const fetch = vi.fn().mockResolvedValue({ hash: 'h1' }) as unknown as FetchSourceFn
+    const out = await selectAuditCandidates(
+      [entry({
+        name: 'a', volatility: 'fast-moving', lastReviewed: '2026-99-99',
+        sources: [{ url: 'https://x', hash: 'h1' }],
+      })],
+      { now: today, max: 10, fetch },
+    )
+    expect(out.map((c) => c.name)).toEqual(['a'])
+  })
+
   it('returns no candidates when max is 0, negative, or non-integer (no ceiling bypass)', async () => {
     const fetch = vi.fn().mockResolvedValue({ hash: 'new' }) as unknown as FetchSourceFn
     const entries = Array.from({ length: 5 }, (_, i) =>

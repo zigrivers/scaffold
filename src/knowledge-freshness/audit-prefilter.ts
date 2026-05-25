@@ -19,9 +19,18 @@ export async function selectAuditCandidates(
     let priority = 0
     if (!e.lastReviewed) { select = true; priority = 100 }
     else {
-      const ageDays = Math.floor((opts.now.getTime() - new Date(e.lastReviewed).getTime()) / 86400000)
+      const parsed = new Date(e.lastReviewed).getTime()
+      // If lastReviewed is malformed (e.g. "2026-99-99" passed the regex but
+      // is not a real calendar date), `new Date()` yields NaN and the cadence
+      // math would silently NOT select. Treat invalid dates as "needs audit
+      // now" rather than skipping (round-3 F-002). The frontmatter validator
+      // also rejects this on CI, but the runtime guard belongs here for the
+      // case where validator and prefilter disagree.
+      const ageDays = Number.isNaN(parsed)
+        ? Number.POSITIVE_INFINITY
+        : Math.floor((opts.now.getTime() - parsed) / 86400000)
       const window = WINDOW_DAYS[e.volatility]
-      if (ageDays > window) { select = true; priority = 50 + ageDays }
+      if (ageDays > window) { select = true; priority = 50 + (Number.isFinite(ageDays) ? ageDays : 1000) }
       else {
         for (const s of e.sources) {
           if (!s.hash) continue
