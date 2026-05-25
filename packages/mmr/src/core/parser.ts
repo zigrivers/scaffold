@@ -61,6 +61,66 @@ export function extractJson(text: string): string {
   throw new Error('Unbalanced braces in JSON output')
 }
 
+function extractJsonValue(text: string): string {
+  let firstUnbalanced: Error | undefined
+
+  for (let start = 0; start < text.length; start++) {
+    const opener = text[start]
+    if (opener !== '{' && opener !== '[') continue
+
+    try {
+      const candidate = extractBalancedJsonValue(text, start)
+      JSON.parse(fixTrailingCommas(candidate))
+      return candidate
+    } catch (err) {
+      firstUnbalanced ??= err instanceof Error ? err : new Error(String(err))
+    }
+  }
+
+  if (firstUnbalanced) throw firstUnbalanced
+  throw new Error('No JSON object or array found in output')
+}
+
+function extractBalancedJsonValue(text: string, start: number): string {
+  const opener = text[start]
+  const stack: string[] = []
+  let inString = false
+
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i]
+
+    if (inString) {
+      if (ch === '\\') {
+        i++
+      } else if (ch === '"') {
+        inString = false
+      }
+      continue
+    }
+
+    if (ch === '"') {
+      inString = true
+    } else if (ch === '{' || ch === '[') {
+      stack.push(ch)
+    } else if (ch === '}' || ch === ']') {
+      const expected = ch === '}' ? '{' : '['
+      if (stack.pop() !== expected) {
+        throw new Error(`Mismatched JSON delimiters near: ${text.slice(start, i + 1)}`)
+      }
+      if (stack.length === 0) {
+        return text.slice(start, i + 1)
+      }
+    }
+  }
+
+  throw new Error(`Unbalanced ${opener === '{' ? 'braces' : 'brackets'} in JSON output`)
+}
+
+function parseJsonFromOutput(raw: string): unknown {
+  const text = extractJsonValue(stripMarkdownFences(raw))
+  return JSON.parse(fixTrailingCommas(text))
+}
+
 /**
  * Default parser: strips markdown fences, extracts JSON from surrounding text,
  * fixes trailing commas, then JSON.parse.
@@ -219,7 +279,7 @@ export function buildParser(spec: OutputParserConfig): Parser {
   if (spec.kind === 'unwrap-jsonpath') {
     const nextParser = getParser(spec.then ?? 'default')
     return (raw: string) => {
-      const decoded = JSON.parse(raw) as unknown
+      const decoded = parseJsonFromOutput(raw)
       const unwrapped = jsonpathGet(decoded, spec.wrap)
       if (unwrapped === undefined) {
         throw new Error(`jsonpath did not match: ${spec.wrap}`)

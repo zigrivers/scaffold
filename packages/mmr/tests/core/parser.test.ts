@@ -112,6 +112,36 @@ describe('parser factory', () => {
     expect(result.approved).toBe(true)
   })
 
+  it('unwraps nested jsonpath output from fenced JSON', () => {
+    const cfg: OutputParserConfig = {
+      kind: 'unwrap-jsonpath',
+      wrap: '$.choices[0].message.content',
+      then: 'default',
+    }
+    const result = parseChannelOutput('```json\n{"choices":[{"message":{"content":"{\\"approved\\":true,\\"findings\\":[],\\"summary\\":\\"ok\\"}"}}]}\n```', cfg)
+    expect(result.approved).toBe(true)
+  })
+
+  it('unwraps nested jsonpath output from surrounding text', () => {
+    const cfg: OutputParserConfig = {
+      kind: 'unwrap-jsonpath',
+      wrap: '$.choices[0].message.content',
+      then: 'default',
+    }
+    const result = parseChannelOutput('Here is the result:\n{"choices":[{"message":{"content":"{\\"approved\\":true,\\"findings\\":[],\\"summary\\":\\"ok\\"}"}}]}\nDone.', cfg)
+    expect(result.approved).toBe(true)
+  })
+
+  it('unwraps root array jsonpath output from surrounding text', () => {
+    const cfg: OutputParserConfig = {
+      kind: 'unwrap-jsonpath',
+      wrap: '$[0]',
+      then: 'default',
+    }
+    const result = parseChannelOutput('API response:\n["{\\"approved\\":true,\\"findings\\":[],\\"summary\\":\\"ok\\"}"]', cfg)
+    expect(result.approved).toBe(true)
+  })
+
   it('unwraps root array jsonpath output before parsing', () => {
     const cfg: OutputParserConfig = {
       kind: 'unwrap-jsonpath',
