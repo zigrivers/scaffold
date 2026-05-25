@@ -178,6 +178,7 @@ function stripQuotes(value: string): string {
 
 function isCommandSecretKey(name: string): boolean {
   const normalized = name.replace(/^-+/, '').toLowerCase()
+  if (normalized.endsWith('-env') || normalized.endsWith('_env')) return false
   if (['auth-type', 'max-tokens', 'session-dir', 'token-limit', 'token-usage'].includes(normalized)) return false
   return isSecretKey(normalized, { exemptEnvNameKeys: false })
 }
