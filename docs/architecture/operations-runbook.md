@@ -324,6 +324,42 @@ Scaffold follows [semver](https://semver.org):
    - `npx @zigrivers/scaffold --version` returns the new version from a clean directory
    - `brew update && brew upgrade scaffold && scaffold --version` returns the new version
 
+### 4.2a npm Publish Auth — NPM_TOKEN Is The Working Path (Not Trusted Publishing)
+
+**Lesson learned the hard way during v3.28.0 release (PR #355).**
+
+The npm package settings at https://www.npmjs.com/package/@zigrivers/scaffold/access show a "Trusted Publisher" config bound to this repo's `publish.yml`. CLAUDE.md and earlier docs implied this was the working auth path and that the `NPM_TOKEN` secret was vestigial. **It is not.** Pure-OIDC publishing failed end-to-end during v3.28.0: the OIDC token was accepted for *provenance signing* (Sigstore log written) but the npm registry returned `404 Not Found` on the actual PUT. Removing `NODE_AUTH_TOKEN` from `publish.yml` did not fix it; only restoring `NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}` with a properly-scoped token unblocked the publish.
+
+The misleading 404 from npm hides what's really happening at the auth boundary. Three failure modes seen during v3.28.0 debugging, all with similar/identical error text:
+
+| Symptom | Root cause | Fix |
+|---|---|---|
+| `404 Not Found - PUT … 'pkg@ver' is not in this registry.` | `NPM_TOKEN` is expired (default granular-token TTL is 30 days; first failure was at 7 weeks) | Rotate the token; bump TTL to 90+ days |
+| `404 Not Found - PUT … not in this registry.` | Token authenticates but the package has "Require 2FA or bypass-token" policy and the token does NOT have "Bypass 2FA" checked | Recreate the token with **"Allow this token to bypass 2FA"** checked |
+| `403 Forbidden - You may not perform that action with these credentials.` | Token authenticates and bypasses 2FA, but its "Packages and scopes" section doesn't include this package with read+write | Recreate the token with **"Packages and scopes" → @zigrivers/scaffold → Read and write** explicitly |
+
+**Concrete checklist when creating/rotating the `NPM_TOKEN` secret:**
+
+1. Go to npm Settings → Access Tokens → Generate New Token → **Granular Access Token**.
+2. **Expiry:** at least 90 days (so it doesn't expire mid-release-cycle).
+3. **Packages and scopes:** select **`@zigrivers/scaffold`** (NOT "No packages" or "All packages") with **Read and write** permission. If `zigrivers` is an npm organization that owns the package, also grant Organizations → `zigrivers` access.
+4. **Bypass two-factor authentication:** **CHECK THIS BOX.** CI cannot do interactive OTP, and the package access policy requires 2FA-or-bypass-token.
+5. `gh secret set NPM_TOKEN` and paste the new token. Verify `gh secret list` shows a fresh timestamp.
+6. Re-trigger the publish (bounce the tag — see below) and watch `gh run list --workflow=publish.yml --limit 1`. A success looks like the workflow's last line being `+ <ver>` from the `npm publish` step (the npm notice block + a green check). A failure with code `E403` means step 4 was skipped or step 3 was wrong. A failure with code `E404` means step 3 was wrong (the token authenticates against a different scope than the package).
+
+**Re-triggering after a config change or auth fix** — bounce the tag against current `main`:
+
+```bash
+git push origin :refs/tags/v<version>        # delete remote tag
+git tag -d v<version>                        # delete local tag
+git fetch origin
+git tag -a v<version> origin/main -m "v<version>"
+git push origin v<version>                   # fires publish.yml
+gh release edit v<version> --draft=false     # if the release got drafted by tag delete
+```
+
+**On the OIDC trusted publisher:** keep the config in place — it's used to sign the provenance statement (which works regardless of registry-publish auth). When npm eventually fixes whatever boundary issue prevents the OIDC token from authorizing the actual publish PUT, this auth path may become viable; until then, NPM_TOKEN is the working channel. **Do not delete `env: NODE_AUTH_TOKEN` from `publish.yml`.**
+
 ### 4.3 Pre-Release Versions
 
 For testing before a stable release:

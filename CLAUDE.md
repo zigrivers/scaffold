@@ -105,9 +105,14 @@ Minimum checklist:
 - Merge release-prep work to `main`
 - Tag `main` with `vX.Y.Z` and push the tag
 - Create the GitHub release
-- `publish.yml` uses npm trusted publishing via GitHub OIDC; if npm publish
-  fails with auth errors, verify the trusted-publisher config in npm package
-  settings rather than looking for a repo `NPM_TOKEN` secret
+- `publish.yml` uses BOTH the OIDC trusted-publisher config (for provenance
+  signing) AND the `NPM_TOKEN` repo secret (for the actual registry PUT).
+  As of v3.28.0 the OIDC token alone is NOT sufficient to authorize the
+  publish — only `NPM_TOKEN` is. If npm publish fails, the real fix is in
+  the `NPM_TOKEN` secret (expiry, package scope, "Bypass 2FA" checkbox), not
+  the OIDC trusted-publisher config. See `docs/architecture/operations-runbook.md`
+  §4.2a for the diagnostic decision tree (the misleading 404 / 403 / E404
+  symptoms each map to a specific token-setting mistake)
 - Verify npm publish and Homebrew update workflows succeeded
 - Verify users can update with `npm update -g @zigrivers/scaffold` and
   `brew upgrade scaffold`
