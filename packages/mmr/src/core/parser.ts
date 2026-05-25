@@ -1,5 +1,6 @@
 import type { OutputParserConfig } from '../config/schema.js'
 import type { Finding } from '../types.js'
+import { jsonpathGet } from './jsonpath.js'
 
 export interface ParsedOutput {
   approved: boolean
@@ -292,37 +293,6 @@ export function buildParser(spec: OutputParserConfig): Parser {
     return (raw: string) => parseRegexFindings(raw, spec)
   }
   throw new Error(`Unsupported output_parser kind: ${(spec as { kind: string }).kind}`)
-}
-
-function jsonpathGet(value: unknown, path: string): unknown {
-  if (path === '$') return value
-  if (!path.startsWith('$')) {
-    throw new Error('jsonpath must start with $')
-  }
-
-  let current = value
-  let cursor = 1
-  while (cursor < path.length) {
-    const char = path[cursor]
-    if (char === '.') {
-      cursor += 1
-      if (path[cursor] === '[') continue
-      const match = /^[A-Za-z_][A-Za-z0-9_-]*/.exec(path.slice(cursor))
-      if (!match) throw new Error(`invalid jsonpath segment near: ${path.slice(cursor)}`)
-      if (typeof current !== 'object' || current === null) return undefined
-      current = (current as Record<string, unknown>)[match[0]]
-      cursor += match[0].length
-    } else if (char === '[') {
-      const match = /^\[(\d+)\]/.exec(path.slice(cursor))
-      if (!match) throw new Error(`invalid jsonpath index near: ${path.slice(cursor)}`)
-      if (!Array.isArray(current)) return undefined
-      current = current[Number(match[1])]
-      cursor += match[0].length
-    } else {
-      throw new Error(`invalid jsonpath segment near: ${path.slice(cursor)}`)
-    }
-  }
-  return current
 }
 
 function parseRegexFindings(
