@@ -6,7 +6,7 @@ volatility: evolving
 last-reviewed: null
 version-pin: null
 sources:
-  - https://github.com/steveyegge/beads
+  - url: https://github.com/steveyegge/beads
 ---
 
 # Multi-Agent Coordination (Beads Primitives)
