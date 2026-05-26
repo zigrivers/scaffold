@@ -380,6 +380,26 @@ describe('defaults.compensator (T1-G)', () => {
     }
   })
 
+  it('rejects an empty compensator block', () => {
+    const config = {
+      version: 1,
+      defaults: { compensator: {} },
+      channels: {},
+    }
+    const result = MmrConfigSchema.safeParse(config)
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects a compensator block with misspelled keys', () => {
+    const config = {
+      version: 1,
+      defaults: { compensator: { chanel: 'qwen-local' } },
+      channels: {},
+    }
+    const result = MmrConfigSchema.safeParse(config)
+    expect(result.success).toBe(false)
+  })
+
   it('defaults.compensator is undefined when omitted (back-compat)', () => {
     const config = { version: 1, channels: {} }
     const result = MmrConfigSchema.safeParse(config)

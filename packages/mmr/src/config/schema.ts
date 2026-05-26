@@ -94,7 +94,10 @@ const TemplateSchema = z.object({
 export const CompensatorConfigSchema = z.object({
   channel: z.string().optional(),
   channel_focus_map: z.record(z.string()).optional(),
-})
+}).strict().refine(
+  (cfg) => cfg.channel !== undefined || cfg.channel_focus_map !== undefined,
+  { message: 'defaults.compensator must define channel or channel_focus_map' },
+)
 
 export type CompensatorConfig = z.infer<typeof CompensatorConfigSchema>
 
