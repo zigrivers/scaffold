@@ -2,6 +2,12 @@
 name: research-experiment-tracking
 description: Experiment results logging including structured result formats, run comparison, reproducibility tracking, and artifact management
 topics: [research, experiment-tracking, results, comparison, reproducibility, artifacts, mlflow]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://mlflow.org/docs/latest/index.html
+  - url: https://the-turing-way.netlify.app/reproducible-research/reproducible-research.html
 ---
 
 Experiment tracking is the difference between research and random exploration. Without structured logging of what was tried, what resulted, and what was decided, a research project becomes impossible to audit, reproduce, or learn from. Tracking must capture the full context of every run: the exact config, the environment, the metrics, and the keep/discard decision with its rationale.

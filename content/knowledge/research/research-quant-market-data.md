@@ -2,6 +2,10 @@
 name: research-quant-market-data
 description: Market data sourcing including OHLCV providers, tick data, corporate actions handling, data quality checks, gap handling, and timezone normalization
 topics: [research, quant-finance, market-data, ohlcv, tick-data, corporate-actions, data-quality, alternative-data]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Market data is the foundation of every quantitative strategy. Bad data produces bad backtests, and bad backtests produce strategies that fail in production. The data pipeline must handle multiple source providers with different conventions, normalize timestamps across timezones, adjust prices for corporate actions (splits, dividends, mergers), detect and fill gaps, and validate quality before any data reaches the strategy. Data quality issues are the most common source of phantom alpha -- apparent returns that disappear when data errors are fixed.

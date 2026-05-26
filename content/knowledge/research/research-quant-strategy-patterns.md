@@ -2,6 +2,10 @@
 name: research-quant-strategy-patterns
 description: Trading strategy patterns including signal generation, entry/exit rules, position sizing methods, stop-loss patterns, and multi-asset allocation
 topics: [research, quant-finance, strategy, signals, position-sizing, kelly-criterion, stop-loss, allocation, volatility-targeting]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Trading strategies are composed of discrete building blocks that can be mixed, matched, and tested independently: signal generation (what to trade and when), entry/exit rules (how to initiate and close positions), position sizing (how much capital to allocate), and stop-loss management (how to limit downside). Treating each block as a separate, testable component enables systematic exploration of the strategy design space. Resist the temptation to build monolithic strategies -- instead, compose simple, well-tested components.

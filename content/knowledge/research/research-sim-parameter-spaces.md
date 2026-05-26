@@ -2,6 +2,10 @@
 name: research-sim-parameter-spaces
 description: Parameter space definition for simulations including continuous, discrete, and categorical dimensions, Latin Hypercube Sampling, Sobol sequences, interaction effect detection, and sensitivity analysis methods
 topics: [research, simulation, parameter-space, latin-hypercube, sobol-sequences, sensitivity-analysis, morris-method, sobol-indices, dimensionality-reduction, design-of-experiments]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Simulation parameter spaces define the landscape an optimizer must navigate. Unlike ML hyperparameter tuning where evaluations take seconds, simulation evaluations can take hours or days, making efficient space exploration critical. The challenge is threefold: define the space correctly (capturing interactions and constraints between parameters), sample it efficiently (maximizing information per simulation run), and analyze which dimensions actually matter (sensitivity analysis) to reduce the effective dimensionality before expensive optimization.

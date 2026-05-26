@@ -2,6 +2,10 @@
 name: research-experiment-loop
 description: Autonomous experiment loop patterns including hypothesis-execute-evaluate-keep/discard cycle, iteration control, budget management, and early stopping
 topics: [research, experiment-loop, autonomous, iteration, budget, early-stopping, hypothesis]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 The experiment loop is the defining pattern of research projects: an agent iteratively generates hypotheses, executes experiments, evaluates results, and makes keep/discard decisions. This loop can run autonomously (agent decides everything), with checkpoints (agent pauses for human review at intervals), or human-guided (human decides what to try, agent executes). The loop's correctness depends on proper iteration control, budget enforcement, and state management -- without these, autonomous agents will iterate forever or lose track of what has been tried.

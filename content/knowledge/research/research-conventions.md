@@ -2,6 +2,12 @@
 name: research-conventions
 description: Coding conventions for research projects including experiment branching, result naming, config management, and reproducibility standards
 topics: [research, conventions, git, branching, reproducibility, config-management]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://the-turing-way.netlify.app/reproducible-research/reproducible-research.html
+  - url: https://git-scm.com/docs
 ---
 
 Research code has a unique lifecycle: most code is written to be tried and discarded. A trading strategy that underperforms is reverted. A hyperparameter sweep that converges to a local minimum is abandoned. The conventions must make this try-and-discard cycle fast and safe while preserving a complete audit trail of what was tried and why it was kept or discarded.

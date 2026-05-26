@@ -2,6 +2,10 @@
 name: research-quant-risk
 description: Risk management for trading research including regime detection, tail risk measures, correlation breakdown, position limits, drawdown controls, and kill switches
 topics: [research, quant-finance, risk, regime-detection, tail-risk, var, cvar, correlation, drawdown-controls, kill-switch]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Risk management in quantitative finance is not an afterthought bolted onto a profitable strategy -- it is the primary constraint that determines whether a strategy survives long enough to realize its edge. Markets exhibit non-stationary behavior: correlations spike during crises, volatility clusters in ways that violate normal distribution assumptions, and tail events occur far more frequently than Gaussian models predict. A strategy without regime awareness, tail risk measurement, position limits, and automated kill switches is not a strategy -- it is a gamble.

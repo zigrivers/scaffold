@@ -2,6 +2,11 @@
 name: research-security
 description: Security for autonomous research agents including sandboxing experiment execution, resource limits, credential isolation, and code injection prevention
 topics: [research, security, sandboxing, resource-limits, credentials, code-injection, autonomous-agents]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://owasp.org/www-project-top-ten/
 ---
 
 Autonomous research agents run code, modify files, and access data without human oversight during each iteration. This creates a security surface that traditional software projects do not have: the agent can accidentally run destructive operations, consume unbounded resources, leak credentials through experiment outputs, or produce code that introduces injection vulnerabilities. Security must be enforced at the infrastructure level -- relying on the agent to "be careful" is not a security strategy.
