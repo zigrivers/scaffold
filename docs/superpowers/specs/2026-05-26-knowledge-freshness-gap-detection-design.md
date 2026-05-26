@@ -450,7 +450,7 @@ Registration touches three named locations:
 ```typescript
 export function normalizeTopic(raw: string): string {
   return raw.toLowerCase()
-    .replace(/['\\u2018\\u2019]/g, '') // ASCII apostrophe + U+2018 + U+2019 (escape syntax keeps source ASCII)
+    .replace(/['\u2018\u2019]/g, '') // ASCII apostrophe + U+2018 + U+2019 (escape syntax keeps source ASCII)
     .replace(/[_\s]+/g, '-')         // collapse underscores/whitespace to hyphens
     .replace(/-{2,}/g, '-')          // collapse repeated hyphens (e.g. "foo--bar" → "foo-bar")
     .replace(/^[-.]+|[-.]+$/g, '')   // trim leading/trailing hyphens and dots
@@ -605,10 +605,16 @@ both to a no-op:
 
 - **Ledger empty OR unreadable (lens sees `events.length === 0`).** Lens
   returns `[]` — no findings, no `lens_skipped` emission. Verdict stays
-  `pass`. This is the expected steady state for a healthy knowledge base
-  and is acceptable for read-failure too because the merged-ledger
-  summary already surfaces read errors via `AvailabilityMap.ledger`
-  (visible in the audit's availability section without bumping verdict).
+  `pass`. This is the expected steady state for a healthy knowledge base.
+  Note: `readMergedLedger()` in `src/observability/engine/synthesizer.ts`
+  currently records per-file `malformed_lines` counts but does **not**
+  emit a file-level read-error signal — fully-unreadable ledger files
+  are silently dropped. In Phase 3 that means a read failure looks
+  identical to an empty ledger from the lens's perspective. Acceptable
+  trade-off because operators can still observe the ledger's
+  `AvailabilityMap.ledger.sources` array (which will be empty in the
+  unreadable case) to investigate, and the freshness audit doesn't
+  warrant a verdict bump on read I/O alone.
 - **lessons.md missing.** Scanner returns `[]`; lens proceeds with only
   ledger signals. Not a degradation.
 - **No buckets cross the threshold.** Lens returns `[]`. Healthy.
@@ -692,11 +698,14 @@ private buildKnowledgeBaseSection(entries: KnowledgeEntry[], stepName: string): 
 }
 ```
 
-Update the call site at engine.ts:101 to pass `options.step`:
+`assemble(step, options)` is defined at engine.ts:53 — `step` is the
+**positional** first argument (the step slug, e.g. `"tech-stack"`), NOT a
+field on `options`. Update the call site at engine.ts:101 to pass that
+positional through:
 
 ```typescript
 { heading: 'Knowledge Base',
-  content: this.buildKnowledgeBaseSection(options.knowledgeEntries, options.step) }
+  content: this.buildKnowledgeBaseSection(options.knowledgeEntries, step) }
 ```
 
 *Option B — append the tail at the `assemble()` call site:*
@@ -705,7 +714,7 @@ Update the call site at engine.ts:101 to pass `options.step`:
 // in assemble(), after building the sections array at engine.ts:~108:
 const kbSection = sections.find(s => s.heading === 'Knowledge Base')
 if (kbSection && options.knowledgeEntries.length > 0) {
-  const tail = renderGapSignalTail({ stepName: options.step })
+  const tail = renderGapSignalTail({ stepName: step })  // positional `step` from assemble(step, options)
   if (tail) kbSection.content += `\n\n${tail}`
 }
 ```
@@ -925,10 +934,14 @@ The aggregator handles bucketing — the scanner does not pre-dedup.
 
 ### 4.5 Diversity-gate semantics
 
-Because every lessons signal carries `project_id = 'lessons'`, lessons
-mentions alone can never satisfy `distinct_project_count ≥ 2`. They count
-as one "project" for the gate. This is deliberate: lessons.md corroborates
-real signals, it doesn't manufacture gaps on its own.
+Every lessons signal carries `project_id = 'lessons'`. The aggregator's
+§2.4 rule applies `distinctProjects.delete('lessons')` before counting,
+so lessons signals contribute to `signal_count` but **never** to
+`distinct_project_count`. This is deliberate: lessons.md corroborates
+real signals, it doesn't manufacture gaps on its own. The earlier
+phrasing "count as one project" was incorrect — the synthetic literal
+is explicitly excluded from the diversity gate, not assigned a synthetic
+slot in it.
 
 Example (with §2.4's `delete('lessons')` rule applied):
 - 2 agent_search signals from different real `project_id`s + 1 lessons
@@ -1013,7 +1026,7 @@ All five decisions are locked. Each was confirmed by zigrivers on 2026-05-26.
 | 1 | Project distinctness axis | Explicit `project_id` payload field (sha256 of `git remote get-url origin` or cwd realpath) | Other axes (worktree_id, branch, no-axis) either conflate or omit the right unit of analysis. Project identity is what "≥2 distinct projects" needs to mean. |
 | 2 | Topic clustering | Strict slug match after light normalization (lowercase, underscores→hyphens, trim punctuation) | Predictable, fast, no LLM dependency. False negatives are reversible later via stemmed/LLM clustering if empirical rates require. False positives would be worse. |
 | 3 | lessons.md scanner shape | Inline at lens time, no ledger writes; treated as a separate signal set merged by topic | No dedup risk between scanner runs and agent events. lessons.md is the source of truth (current contents at audit time, not a snapshot). Synthetic `project_id='lessons'` keeps lessons-only topics off the P2 threshold by design — see Decision #6 for the explicit refinement of the parent plan's Task 18 acceptance. |
-| 6 | Parent plan Task 18 acceptance refinement | Lessons mentions corroborate agent-search signals; they do *not* independently emit gap signals or cross the P2 threshold | The parent plan's Task 18 acceptance reads "recurring patterns in lessons.md (≥3 mentions of same topic) emit gap signals." Phase 3 design narrows this: lessons.md mentions count as one project in the diversity gate and surface buckets only when at least one real-project signal is also present. Rationale: lessons.md is one user's curated retrospective; without external corroboration it'd let a single project manufacture gaps. The companion plan re-states Task 18's acceptance accordingly. |
+| 6 | Parent plan Task 18 acceptance refinement | Lessons mentions corroborate agent-search signals (contribute to signal_count) but are **excluded from `distinct_project_count`** by the aggregator's `delete('lessons')` rule (§2.4); they do *not* independently emit gap signals or cross the P2 threshold | The parent plan's Task 18 acceptance reads "recurring patterns in lessons.md (≥3 mentions of same topic) emit gap signals." Phase 3 design narrows this: lessons mentions count as zero real projects in the diversity gate and surface buckets only when at least two *real* projects' signals are also present. Rationale: lessons.md is one user's curated retrospective; without multi-project corroboration it'd let a single project manufacture gaps (e.g. that project's 2 CLI signals plus its own lessons mention would otherwise satisfy ≥2). The companion plan re-states Task 18's acceptance accordingly. |
 | 4 | Tail injection mechanism | Assembly-time injection via a shared `gap-signal-tail.ts` helper called from both `AssemblyEngine.buildKnowledgeBaseSection` (engine.ts) and `buildKnowledgeSection` (claude-code.ts adapter); no per-step .md file edits | One source of truth (the helper template). Reword once → both emission paths update for all 89 steps. Zero file-churn cost. `SCAFFOLD_GAP_SIGNAL_QUIET=1` suppresses cleanly via the helper. |
 | 5 | Phase 3 severity rules | Ship both P2 (≥3 signals, ≥2 projects) and P1 (≥5 signals, ≥3 projects) | Same plumbing; the P1 escalation lives in the same lens evaluator. Avoids a churn follow-up PR. |
 
