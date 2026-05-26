@@ -2,6 +2,12 @@
 name: data-science-observability
 description: Monitoring deployed DS models and pipelines — prediction logging to Parquet, scheduled evaluation, basic drift detection, and Evidently for deeper analysis
 topics: [data-science, observability, monitoring, drift, evidently]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://opentelemetry.io/docs/concepts/observability-primer/
+  - url: https://sre.google/sre-book/monitoring-distributed-systems/
 ---
 
 Models don't fail loudly. A scoring job keeps running, rows keep landing in the output table, dashboards stay green — and quietly, the predictions get worse. The world drifts away from whatever snapshot you trained on, and nobody notices until a stakeholder says "these numbers look weird." Observability for a solo DS isn't a platform; it's a small set of habits that give you a chance to catch decay before someone else does.
