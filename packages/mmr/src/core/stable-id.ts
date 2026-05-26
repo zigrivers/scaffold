@@ -124,8 +124,12 @@ function sha1(input: string): string {
  */
 export function computeFindingKey(finding: Finding): string {
   const loc = normalizeLocationForKey(finding.location)
-  const cat = finding.category ?? ''
+  const cat = (finding.category ?? '').toLowerCase()
   const descHash = sha1(normalizeDescriptionForKey(finding.description))
   const sugHash = sha1(normalizeSuggestionForKey(finding.suggestion))
-  return sha1(`${loc}|${cat}|${descHash}|${sugHash}`)
+  return sha1(`${escapeKeyPart(loc)}|${escapeKeyPart(cat)}|${descHash}|${sugHash}`)
+}
+
+function escapeKeyPart(part: string): string {
+  return part.replace(/\\/g, '\\\\').replace(/\|/g, '\\|')
 }

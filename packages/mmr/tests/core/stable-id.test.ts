@@ -212,6 +212,18 @@ describe('computeFindingKey', () => {
     expect(computeFindingKey(a)).not.toBe(computeFindingKey(b))
   })
 
+  it('normalizes category casing', () => {
+    const a: Finding = { category: 'Security', severity: 'P2', location: 'src/foo.ts:42', description: 'bug', suggestion: 'fix' }
+    const b: Finding = { category: 'security', severity: 'P2', location: 'src/foo.ts:42', description: 'bug', suggestion: 'fix' }
+    expect(computeFindingKey(a)).toBe(computeFindingKey(b))
+  })
+
+  it('escapes separators in location and category key parts', () => {
+    const a: Finding = { category: 'b|c', severity: 'P2', location: 'a', description: 'bug', suggestion: 'fix' }
+    const b: Finding = { category: 'c', severity: 'P2', location: 'a|b', description: 'bug', suggestion: 'fix' }
+    expect(computeFindingKey(a)).not.toBe(computeFindingKey(b))
+  })
+
   it('treats missing category as the same as empty-string category for keying', () => {
     const a: Finding = { severity: 'P2', location: 'src/foo.ts:42', description: 'bug', suggestion: 'fix' }
     const b: Finding = { category: '', severity: 'P2', location: 'src/foo.ts:42', description: 'bug', suggestion: 'fix' }
