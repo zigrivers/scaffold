@@ -1,18 +1,28 @@
 import type { Finding, ReconciledFinding, Severity, Agreement, Confidence, Verdict, ChannelStatus } from '../types.js'
 import { SEVERITY_ORDER } from '../types.js'
-import { computeFindingKey, descriptionShingle, jaccardSimilarity, normalizeLocationForKey } from './stable-id.js'
+import {
+  computeFindingKey,
+  descriptionShingle,
+  jaccardSimilarity,
+  normalizeLocationForKey,
+  normalizeSuggestionForKey,
+} from './stable-id.js'
 
 interface AttributedFinding extends Finding {
   source: string
   finding_key: string
   normalized_location: string
-  shingle: string[]
+  normalized_category: string
+  normalized_suggestion: string
+  shingle: ReadonlySet<string>
 }
 
 interface ReconcileGroup {
   finding_key: string
   normalized_location: string
-  shingle: string[]
+  normalized_category: string
+  normalized_suggestion: string
+  shingle: ReadonlySet<string>
   findings: AttributedFinding[]
 }
 
@@ -39,7 +49,9 @@ export function reconcile(channelFindings: Record<string, Finding[]>): Reconcile
         source,
         finding_key: computeFindingKey(finding),
         normalized_location: normalizeLocationForKey(finding.location),
-        shingle: descriptionShingle(finding.description),
+        normalized_category: (finding.category ?? '').toLowerCase(),
+        normalized_suggestion: normalizeSuggestionForKey(finding.suggestion),
+        shingle: new Set(descriptionShingle(finding.description)),
       })
     }
   }
@@ -51,23 +63,29 @@ export function reconcile(channelFindings: Record<string, Finding[]>): Reconcile
   const keyIndex = new Map<string, ReconcileGroup>()
   for (const finding of attributed) {
     const exact = keyIndex.get(finding.finding_key)
-    if (exact !== undefined) {
+    if (exact !== undefined && canJoinGroup(exact, finding)) {
       exact.findings.push(finding)
       continue
     }
 
     const fuzzy = groups.find((group) =>
+      canJoinGroup(group, finding) &&
       group.normalized_location === finding.normalized_location &&
+      group.normalized_category === finding.normalized_category &&
+      group.normalized_suggestion === finding.normalized_suggestion &&
       jaccardSimilarity(group.shingle, finding.shingle) >= 0.7,
     )
     if (fuzzy !== undefined) {
       fuzzy.findings.push(finding)
+      keyIndex.set(finding.finding_key, fuzzy)
       continue
     }
 
     const group: ReconcileGroup = {
       finding_key: finding.finding_key,
       normalized_location: finding.normalized_location,
+      normalized_category: finding.normalized_category,
+      normalized_suggestion: finding.normalized_suggestion,
       shingle: finding.shingle,
       findings: [finding],
     }
@@ -134,6 +152,12 @@ export function reconcile(channelFindings: Record<string, Finding[]>): Reconcile
   })
 
   return results
+}
+
+function canJoinGroup(group: ReconcileGroup, finding: AttributedFinding): boolean {
+  return group.findings.every((existing) =>
+    existing.source !== finding.source || existing.location === finding.location,
+  )
 }
 
 /**

@@ -97,6 +97,31 @@ describe('reconcile', () => {
     expect(result[0].description).toBe('  REGRESSION   RISK  ')
   })
 
+  it('does not collapse repeated same-source findings at different raw locations', () => {
+    const channelFindings: Record<string, Finding[]> = {
+      claude: [
+        { severity: 'P2', location: 'file.ts:10', description: 'Regression risk', suggestion: 'Add test' },
+        { severity: 'P2', location: 'file.ts:99', description: 'Regression risk', suggestion: 'Add test' },
+      ],
+    }
+    const result = reconcile(channelFindings)
+    expect(result).toHaveLength(2)
+  })
+
+  it('does not fuzzy-merge findings with different suggestions', () => {
+    const channelFindings: Record<string, Finding[]> = {
+      claude: [{ severity: 'P2', location: 'file.ts:10', description: 'Regression risk', suggestion: 'Add test' }],
+      gemini: [{
+        severity: 'P2',
+        location: 'file.ts:10',
+        description: '  REGRESSION   RISK  ',
+        suggestion: 'Add backward compatibility',
+      }],
+    }
+    const result = reconcile(channelFindings)
+    expect(result).toHaveLength(2)
+  })
+
   it('reconciles findings whose only difference is line number', () => {
     const channelFindings: Record<string, Finding[]> = {
       claude: [{ severity: 'P1', location: 'file.ts:10', description: 'bug A', suggestion: 'fix A' }],

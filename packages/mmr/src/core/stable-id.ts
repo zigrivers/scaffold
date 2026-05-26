@@ -145,9 +145,12 @@ export function descriptionShingle(description: string): string[] {
   return [...grams]
 }
 
-export function jaccardSimilarity(a: string[], b: string[]): number {
-  const left = new Set(a)
-  const right = new Set(b)
+export function jaccardSimilarity(
+  a: readonly string[] | ReadonlySet<string>,
+  b: readonly string[] | ReadonlySet<string>,
+): number {
+  const left = a instanceof Set ? a : new Set(a)
+  const right = b instanceof Set ? b : new Set(b)
   if (left.size === 0 && right.size === 0) return 1
 
   let intersection = 0
@@ -155,6 +158,6 @@ export function jaccardSimilarity(a: string[], b: string[]): number {
     if (right.has(item)) intersection += 1
   }
 
-  const union = new Set([...left, ...right])
-  return intersection / union.size
+  const unionSize = left.size + right.size - intersection
+  return intersection / unionSize
 }
