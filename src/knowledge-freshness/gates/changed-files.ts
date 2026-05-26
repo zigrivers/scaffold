@@ -71,7 +71,10 @@ export function resolveTargetFiles(args: string[], cwd: string, opts: ResolveOpt
     }
     return args.map((p) => path.resolve(cwd, p))
   }
-  const out = spawnSync('git', ['diff', '--name-only', 'origin/main...HEAD'], {
+  // Round-8 F-001: mirror the CI workflow's --diff-filter=d so a locally-
+  // deleted knowledge entry doesn't appear in the file list and crash
+  // downstream gates with ENOENT.
+  const out = spawnSync('git', ['diff', '--name-only', '--diff-filter=d', 'origin/main...HEAD'], {
     cwd, encoding: 'utf8',
   })
   if (out.status !== 0) {

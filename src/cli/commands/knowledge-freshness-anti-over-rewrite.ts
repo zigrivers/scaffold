@@ -1,10 +1,12 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { spawnSync } from 'node:child_process'
 import type { Argv, CommandModule } from 'yargs'
 import {
   evaluateChurn,
   parseUnifiedDiffForChurn,
   splitChurnByRegion,
+  type ChurnFileContent,
 } from '../../knowledge-freshness/gates/anti-over-rewrite.js'
 import {
   resolveTargetFiles,
@@ -62,12 +64,23 @@ const antiOverRewriteCommand: CommandModule<Record<string, unknown>, AntiOverRew
     const prLabels = labelsArg ? labelsArg.split(',').map((s) => s.trim()).filter((s) => s) : []
     const churn = parseUnifiedDiffForChurn(diffText)
     const byFile = new Map(churn.map((c) => [c.file, c]))
-    // Round-7 F-001: derive body-only churn via a line-number-based split
-    // using the actual post-change content (not a diff-content state
-    // machine). Build the file-content map once.
-    const contentMap = new Map<string, string>()
+    // Round-7 F-001 + round-8 F-003: derive body-only churn via a
+    // line-number-based split using BOTH the post-change content (for +
+    // lines) and the pre-change content (for - lines). audit-apply
+    // sometimes ADDS frontmatter fields, so the old frontmatter end can
+    // be earlier than the new one — using the new boundary for - lines
+    // mis-classifies the first body lines as frontmatter.
+    const contentMap = new Map<string, ChurnFileContent>()
     for (const abs of files) {
-      contentMap.set(path.relative(cwd, abs), fs.readFileSync(abs, 'utf8'))
+      const rel = path.relative(cwd, abs)
+      const newContent = fs.readFileSync(abs, 'utf8')
+      // Read the pre-change content from origin/main. Fall back to undefined
+      // if the file is new (`git show` returns non-zero) — splitChurnByRegion
+      // then uses the new boundary for both sides, which is fine for added
+      // files (no - lines exist).
+      const show = spawnSync('git', ['show', `origin/main:${rel}`], { cwd, encoding: 'utf8' })
+      const oldContent = show.status === 0 ? show.stdout : undefined
+      contentMap.set(rel, { newContent, oldContent })
     }
     const bodyByFile = splitChurnByRegion(diffText, contentMap)
     const inputs = files.map((abs) => {
@@ -76,7 +89,7 @@ const antiOverRewriteCommand: CommandModule<Record<string, unknown>, AntiOverRew
       const body = bodyByFile.get(rel)
       return {
         file: rel,
-        content: contentMap.get(rel) ?? '',
+        content: contentMap.get(rel)?.newContent ?? '',
         addedCount: c?.addedCount ?? 0,
         removedCount: c?.removedCount ?? 0,
         bodyAddedCount: body?.bodyAddedCount ?? 0,

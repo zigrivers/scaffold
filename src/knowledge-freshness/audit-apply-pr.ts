@@ -65,7 +65,14 @@ export function renderFindingsTable(verdict: AuditVerdict): string {
 }
 
 export function renderPrTitle(verdict: AuditVerdict): string {
-  return `chore(knowledge): refresh ${verdict.entry_name} against ${oneSentenceSourceSummary(verdict)}`
+  // Round-8 F-002: sanitize ALL title components — both entry_name and
+  // the source summary — so an LLM-injected `\nBREAKING CHANGE:` (via
+  // verdict.entry_name or sources_checked[*].url) cannot turn a
+  // chore-refresh title into a major-bump signal. The body sanitization
+  // alone wasn't enough; deriveBumpKind also reads the title.
+  const name = sanitizeLlmField(verdict.entry_name)
+  const summary = sanitizeLlmField(oneSentenceSourceSummary(verdict))
+  return `chore(knowledge): refresh ${name} against ${summary}`
 }
 
 /**

@@ -180,19 +180,51 @@ function parseHunks(diff: string): Map<string, Hunk[]> {
 }
 
 /**
- * Given the raw diff and the per-file post-change content, return body-only
- * add/remove counts. A change is "body" iff its new-file line number is
- * past the frontmatter end line.
+ * Per-file content pair used by `splitChurnByRegion` to derive separate
+ * frontmatter boundaries for added (new file) and removed (old file)
+ * sides of the diff. Round-8 F-003 introduced the asymmetry: when
+ * audit-apply ADDS frontmatter fields (hash / retrieved on first audit),
+ * the new frontmatter is taller than the old, so using the new boundary
+ * for `-` lines mis-classifies the first body lines as frontmatter and
+ * under-counts removal churn.
+ */
+export interface ChurnFileContent {
+  /** Post-change file content (the head / working-tree version). */
+  newContent: string
+  /** Pre-change file content (the base / origin/main version). Optional. */
+  oldContent?: string
+}
+
+/**
+ * Given the raw diff and per-file pre/post-change content, return body-only
+ * add/remove counts. An added line is "body" iff its new-file line number
+ * is past the NEW frontmatter end; a removed line is "body" iff its
+ * old-file line number is past the OLD frontmatter end.
  */
 export function splitChurnByRegion(
   diff: string,
-  fileContents: Map<string, string>,
+  fileContents: Map<string, ChurnFileContent | string>,
 ): Map<string, { bodyAddedCount: number; bodyRemovedCount: number }> {
   const perFile = parseHunks(diff)
   const out = new Map<string, { bodyAddedCount: number; bodyRemovedCount: number }>()
   for (const [file, hunks] of perFile) {
-    const content = fileContents.get(file) ?? ''
-    const frontmatterEnd = findFrontmatterEndLineNumber(content) // 1-indexed; the line OF the closing ---
+    const entry = fileContents.get(file)
+    let newContent = ''
+    let oldContent: string | undefined
+    if (typeof entry === 'string') {
+      // Back-compat shape: just the new content. Old boundary unknown;
+      // we'll fall back to the new boundary for `-` lines (round-8 F-003
+      // documented residual: this is the over-count direction, never
+      // under-count — safe).
+      newContent = entry
+    } else if (entry) {
+      newContent = entry.newContent
+      oldContent = entry.oldContent
+    }
+    const newFmEnd = findFrontmatterEndLineNumber(newContent)
+    const oldFmEnd = oldContent !== undefined
+      ? findFrontmatterEndLineNumber(oldContent)
+      : newFmEnd
     let bodyAdded = 0, bodyRemoved = 0
     for (const hunk of hunks) {
       // Walk through the hunk, tracking the running line number on each
@@ -202,15 +234,10 @@ export function splitChurnByRegion(
       let oldLineNo = hunk.oldStart
       for (const l of hunk.lines) {
         if (l.startsWith('+') && !l.startsWith('+++')) {
-          if (newLineNo > frontmatterEnd) bodyAdded++
+          if (newLineNo > newFmEnd) bodyAdded++
           newLineNo++
         } else if (l.startsWith('-') && !l.startsWith('---')) {
-          // For the old side we approximate the frontmatter end using the
-          // new content's end. Freshness PRs preserve frontmatter shape so
-          // this is accurate; for any odd cases (shrinking frontmatter)
-          // the resulting count over-counts body churn, which is the safe
-          // direction (only false-positive blocks, no false-negative).
-          if (oldLineNo > frontmatterEnd) bodyRemoved++
+          if (oldLineNo > oldFmEnd) bodyRemoved++
           oldLineNo++
         } else if (l.startsWith(' ')) {
           newLineNo++
