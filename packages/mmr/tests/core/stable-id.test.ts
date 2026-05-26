@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   normalizeDescriptionForKey,
   normalizeLocationForKey,
+  normalizeSuggestionForKey,
 } from '../../src/core/stable-id.js'
 
 describe('normalizeLocationForKey', () => {
@@ -123,5 +124,35 @@ describe('normalizeDescriptionForKey', () => {
 
   it('handles empty input', () => {
     expect(normalizeDescriptionForKey('')).toBe('')
+  })
+})
+
+describe('normalizeSuggestionForKey', () => {
+  it('lowercases prose and collapses whitespace', () => {
+    expect(normalizeSuggestionForKey('  Use   Const   instead  ')).toBe('use const instead')
+    expect(normalizeSuggestionForKey('Fix it')).toBe(normalizeSuggestionForKey('fix it'))
+  })
+
+  it('preserves punctuation and code-like tokens', () => {
+    expect(normalizeSuggestionForKey('Rename foo to bar.')).toBe('rename foo to bar.')
+    expect(normalizeSuggestionForKey('Rename `FooBar` to `fooBar`.')).toBe('rename `FooBar` to `fooBar`.')
+    expect(normalizeSuggestionForKey('Rename FooBar to fooBar.')).not.toBe(
+      normalizeSuggestionForKey('Rename foobar to foobar.'),
+    )
+    expect(normalizeSuggestionForKey('Rename HTTPServer to URLParser.')).not.toBe(
+      normalizeSuggestionForKey('Rename httpserver to urlparser.'),
+    )
+    expect(normalizeSuggestionForKey('Replace MAX_RETRIES.')).not.toBe(
+      normalizeSuggestionForKey('Replace max_retries.'),
+    )
+  })
+
+  it('does not strip description-only noise patterns', () => {
+    expect(normalizeSuggestionForKey('P1: update line 42.')).toBe('p1: update line 42.')
+    expect(normalizeSuggestionForKey('Use port at 3000.')).toBe('use port at 3000.')
+  })
+
+  it('handles empty input', () => {
+    expect(normalizeSuggestionForKey('')).toBe('')
   })
 })
