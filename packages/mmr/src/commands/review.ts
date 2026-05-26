@@ -421,15 +421,17 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     )
 
     if (compensating.length > 0) {
-      const dispatch = resolveCompensatorDispatch(config)
       const compensatorAvailability = await checkConfiguredCompensatorAvailability(config)
+      const outputParser = compensatorAvailability.status === 'ok'
+        ? resolveCompensatorDispatch(config).output_parser
+        : 'default'
       // Register compensating channels in job.json so loadJob can discover them
       for (const comp of compensating) {
         store.registerChannel(job.job_id, comp.compensatingName, {
           status: compensatorAvailability.status === 'ok' ? 'dispatched' : compensatorAvailability.status,
           auth: compensatorAvailability.auth,
           recovery: compensatorAvailability.recovery,
-          output_parser: dispatch.output_parser,
+          output_parser: outputParser,
         })
       }
       if (compensatorAvailability.status === 'ok') {
