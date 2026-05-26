@@ -75,5 +75,7 @@ function appendNormalizedPart(out: string[], part: string, spaceBefore: boolean)
 }
 
 export function normalizeSuggestionForKey(suggestion: string): string {
+  // Suggestions are intentionally distinguished by their full short text.
+  // Do not apply description noise stripping or code-span preservation here.
   return suggestion.toLowerCase().replace(/\s+/g, ' ').trim()
 }

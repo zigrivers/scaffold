@@ -135,6 +135,12 @@ describe('normalizeSuggestionForKey', () => {
   it('preserves punctuation and code-like tokens', () => {
     // No backtick handling - suggestions are short; lowercase is sufficient.
     expect(normalizeSuggestionForKey('Rename foo to bar.')).toBe('rename foo to bar.')
+    expect(normalizeSuggestionForKey('Rename `FooBar` to `fooBar`.')).toBe('rename `foobar` to `foobar`.')
+  })
+
+  it('does not strip description-only noise patterns', () => {
+    expect(normalizeSuggestionForKey('P1: update line 42.')).toBe('p1: update line 42.')
+    expect(normalizeSuggestionForKey('Use port at 3000.')).toBe('use port at 3000.')
   })
 
   it('handles empty input', () => {
