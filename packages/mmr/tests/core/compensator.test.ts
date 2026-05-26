@@ -107,6 +107,20 @@ describe('resolveCompensatorDispatch', () => {
     expect(result.output_parser).toBe('default')
   })
 
+  it('returns the hardcoded claude default when compensator has focus overrides but no channel', () => {
+    const cfg: MmrConfigParsed = {
+      ...baseConfig,
+      defaults: {
+        ...baseConfig.defaults,
+        compensator: { channel_focus_map: { codex: 'Focus on correctness.' } },
+      },
+    }
+    const result = resolveCompensatorDispatch(cfg)
+    expect(result.command).toBe('claude')
+    expect(result.flags).toEqual(['-p', '--output-format', 'json'])
+    expect(result.output_parser).toBe('default')
+  })
+
   it('uses the configured channel when defaults.compensator.channel is set', () => {
     const cfg: MmrConfigParsed = {
       ...baseConfig,

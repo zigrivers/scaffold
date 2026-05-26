@@ -52,6 +52,17 @@ export function resolveCompensatorDispatch(config: MmrConfigParsed): Compensator
   }
 
   const channelName = compConfig.channel
+  if (!channelName) {
+    return {
+      command: 'claude',
+      flags: ['-p', '--output-format', 'json'],
+      env: {},
+      timeout: config.defaults.timeout,
+      prompt_wrapper: '{{prompt}}',
+      stderr: 'capture',
+      output_parser: 'default',
+    }
+  }
   const channelConfig = config.channels[channelName]
   if (!channelConfig) {
     throw new Error(`Compensator channel "${channelName}" not found in config`)

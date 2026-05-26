@@ -92,7 +92,7 @@ const TemplateSchema = z.object({
 })
 
 export const CompensatorConfigSchema = z.object({
-  channel: z.string(),
+  channel: z.string().optional(),
   channel_focus_map: z.record(z.string()).optional(),
 })
 

@@ -173,6 +173,7 @@ function validateCompensatorReference(config: MmrConfigParsed): void {
   const compensator = config.defaults.compensator
   if (!compensator) return
   const ref = compensator.channel
+  if (ref === undefined) return
   const hasTarget = Object.prototype.hasOwnProperty.call(config.channels, ref)
   const target = config.channels[ref]
   if (!hasTarget || !target) {
