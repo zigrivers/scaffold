@@ -2,6 +2,10 @@
 name: implementation-playbook
 description: Structuring work for AI agents — task execution, coding standards, git workflow, quality gates
 topics: [playbook, agents, implementation, coding-standards, git-workflow]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 # Implementation Playbook
