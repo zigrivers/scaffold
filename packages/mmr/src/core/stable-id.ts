@@ -30,7 +30,7 @@ const VALUE_AFTER_AT_UNITS = [
   's',
 ].join('|')
 const AT_LINE_MENTION_RE =
-  new RegExp(String.raw`\bat \d+(?![.\d])\b(?!\s*(?:%|\b(?:${VALUE_AFTER_AT_UNITS})\b))`, 'gi')
+  new RegExp(String.raw`\bat \d+(?!\.\d)(?!\d)\b\.?(?!\s*(?:%|\b(?:${VALUE_AFTER_AT_UNITS})\b))`, 'gi')
 const SEVERITY_PREFIX_RE = /^\s*(?:p[0-3]|critical|high|medium|low|info)\s*:\s*/i
 const CODE_SPAN_RE = /`([^`]*)`/g
 

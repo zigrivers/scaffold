@@ -71,6 +71,11 @@ describe('normalizeDescriptionForKey', () => {
     expect(normalizeDescriptionForKey('Bug found at 42 in code')).toBe('bug found in code')
   })
 
+  it('strips "at N" mentions before sentence punctuation', () => {
+    expect(normalizeDescriptionForKey('Bug found at 42.')).toBe('bug found')
+    expect(normalizeDescriptionForKey('Bug found at 43.')).toBe('bug found')
+  })
+
   it('preserves meaningful numeric phrases after "at"', () => {
     const thirty = normalizeDescriptionForKey('Timeout at 30 seconds')
     const sixty = normalizeDescriptionForKey('Timeout at 60 seconds')
