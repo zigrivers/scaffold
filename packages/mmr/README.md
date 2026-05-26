@@ -184,7 +184,7 @@ channels:
     flags: ["run", "qwen2.5-coder:32b", "--format", "json"]
 ```
 
-With `claude`, `codex`, and `gemini` all disabled or missing, MMR runs `qwen-coder` for each compensating pass instead of `claude -p`.
+When enabled review channels such as `codex` or `gemini` are unavailable, missing, or failing, MMR runs `qwen-coder` for each compensating pass instead of `claude -p`. Channels set to `enabled: false` are intentionally skipped and do not receive compensating passes.
 
 ## Features
 
