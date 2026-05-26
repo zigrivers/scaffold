@@ -48,13 +48,29 @@ extending several details from the parent framing:
   not a subset. This makes the assembly-time injection (Section 3) the only
   practical mechanism — copy-pasting a tail into 89 files would create
   permanent drift risk.
-- **Lens scope is data-driven, not docs/code.** The existing 8-lens
-  framework partitions on `scope: 'docs' | 'code' | 'all'` based on what the
-  lens *reads* — lens H reads docs, lenses A–G read code+graph. Lens I reads
-  the ledger (which is neither). It registers under `scope: 'all'` and is
-  surfaced under `--scope=docs` via a one-line addition to the scope-routing
-  map (the docs scope is the closer semantic neighbor since gap detection is
-  about *documentation* coverage), but it does not require a new scope axis.
+- **Lens scope is not a property on the lens — it's a hardcoded set in the
+  audit API.** The existing 8-lens framework defines two `Set` literals in
+  `src/observability/engine/api.ts:67–77`:
+  `SCOPE_DOC_LENSES = new Set(['H-cross-doc'])` and a parallel
+  `SCOPE_CODE_LENSES`. `pickEnabledIds()` picks one or both based on the
+  `--scope` flag. Lens registration itself is via a `LensManifest` entry in
+  `LENS_REGISTRY` (`src/observability/engine/checks/registry.ts:25`) plus a
+  function entry in `LENS_IMPLEMENTATIONS` (registry.ts:48) or in
+  `makeLensImplementations()` (registry.ts:61) when the lens needs project
+  context. Lens I reads the ledger (cross-cutting; neither docs nor code).
+  We add it to `SCOPE_DOC_LENSES` (documentation gap detection is the
+  closer semantic neighbor) so it runs under `--scope=docs` and under
+  `--scope=all` (which unions both sets). This is *not* a "one-line" edit —
+  it touches the registry array, the implementations map, and the doc-scope
+  set.
+- **`Evidence` discriminated union has a JSON-stringify fallback.** Renderers
+  consume `Evidence` via type guards in `renderEvidence()`-style functions
+  (`src/observability/renderers/markdown.ts`). Today only `doc_disagreement`
+  has a custom format; every other variant falls through to a generic
+  `JSON.stringify(ev, null, 2)` block. Adding a new `knowledge_gap` variant
+  is safe (it'll render as JSON), but for nice formatting in markdown/
+  terminal/dashboard/mmr-findings, an explicit pretty-render case should be
+  added per renderer. This is polish, not blocking.
 - **The base event already carries `worktree_id`, `branch`, `task_id`,
   `actor_label`, `ts`.** Anything redundant with those fields stays out of
   the payload. `step_name` is *not* redundant — pipeline steps are a
@@ -285,19 +301,42 @@ a specific Beads task).
 
 ### 1.5 Project-ID computation contract
 
-`project_id` is `sha256(git remote get-url origin || realpath .)`.
-The pipeline tail-instruction embeds the shell expansion so agents don't
-have to think about it:
+`project_id` is `sha256(git remote get-url origin)` when the project has a
+git origin, falling back to `sha256(pwd -P)` otherwise. The pipeline
+tail-instruction must use a **portable** computation that works on macOS
+(no `sha256sum` in default installs), Linux (no `shasum -a 256` in
+minimal containers), and CI shells without `pipefail`.
+
+The canonical form computes the candidate first and hashes it in a single
+discrete step, so a failed origin lookup falls through to `pwd -P` rather
+than silently hashing empty input:
 
 ```bash
-PROJECT_ID=$(git remote get-url origin 2>/dev/null | sha256sum | head -c 64 \
-  || realpath . | sha256sum | head -c 64)
+PROJECT_KEY=$(git remote get-url origin 2>/dev/null || pwd -P)
+PROJECT_ID=$(printf '%s' "$PROJECT_KEY" | \
+  { command -v shasum >/dev/null 2>&1 && shasum -a 256 || sha256sum; } | \
+  awk '{print $1}')
 ```
 
-The `head -c 64` strips the trailing space + `-` that `sha256sum` appends.
+The `shasum -a 256` first / `sha256sum` second order works because macOS
+ships `shasum` by default and most Linux distros ship both (some minimal
+containers ship only `sha256sum`). The `awk '{print $1}'` strips the
+trailing `  -` token both binaries emit. A failed-to-resolve `PROJECT_KEY`
+is impossible — `pwd -P` always succeeds inside any shell.
+
+**Why not `sha256sum | head -c 64` (the form in an earlier draft):**
+
+1. `sha256sum` isn't on default macOS. The first branch of the spec's
+   earlier `||` chain therefore failed silently.
+2. Without `set -o pipefail` (which a downstream agent's shell won't have),
+   `failing-cmd | sha256sum | head -c 64` reports the *last* stage's exit
+   code — `head` exits 0 even on empty input — so the whole pipeline looked
+   "successful" while emitting an empty `project_id`.
+3. The validator would reject the empty string, the event would fail to
+   write, and the gap signal would silently disappear.
+
 Synthetic `project_id = "lessons"` is reserved for the lessons.md scanner
-(Section 4) — the validator accepts that literal as a special case so the
-scanner doesn't need a synthetic hex.
+(Section 4) and is accepted by the validator as a special case.
 
 ### 1.6 Tests
 
@@ -314,17 +353,37 @@ scanner doesn't need a synthetic hex.
 
 ## Section 2 — Lens I (`I-knowledge-gaps`) Aggregator
 
-### 2.1 Location and registration
+### 2.1 Location and registration (concrete file/line targets)
 
-**`src/observability/checks/lens-i-knowledge-gaps.ts`** — sibling to lenses
-A–H. Implements the `LensCheck` interface used by the audit runner. Adds
-itself to whatever lens-registry the audit runner uses (the exact
-registration mechanism is at the audit-runner call site; the plan will
-identify it as part of T4).
+The lens is a sibling to A–H at
+**`src/observability/engine/checks/lens-i-knowledge-gaps.ts`** (note the
+path uses the existing `engine/checks/` sibling — verified via
+`ls src/observability/engine/checks/` and the existing
+`lens-h-cross-doc.ts` neighbor).
 
-`scope: 'all'`. The audit runner's scope-to-lens routing map gets a one-line
-addition mapping the docs scope to include `I-knowledge-gaps` so
-`--scope=docs` runs it alongside lens H.
+The lens exports a `LensFn` matching the signature defined at
+`src/observability/engine/checks/registry.ts:11` (current shape:
+`(graph, ledger, context) => Finding[] | Promise<Finding[]>`). Lens I
+ignores the `graph` argument (DocGraph is irrelevant for ledger-driven
+lenses; lens H demonstrates the `_graph` underscore-discard pattern). It
+reads ledger events for `type === 'knowledge_gap_signal'` and merges in
+the lessons-scanner output before bucketing.
+
+Registration touches three named locations:
+
+1. **`LENS_REGISTRY`** in `src/observability/engine/checks/registry.ts:25`
+   — append a `LensManifest` entry: `{ id: 'I-knowledge-gaps', name:
+   'Knowledge Gaps', requiredAdapters: [], ... }` (ledger is implicit via
+   `runAudit`).
+2. **`makeLensImplementations()`** in the same file at registry.ts:61 —
+   add the entry `'I-knowledge-gaps': lensIKnowledgeGaps(projectRoot)`.
+   Use `makeLensImplementations` (not the simpler `LENS_IMPLEMENTATIONS`
+   map) because the lens needs `projectRoot` for the lessons.md path.
+3. **`SCOPE_DOC_LENSES`** in `src/observability/engine/api.ts:67` —
+   change from `new Set(['H-cross-doc'])` to
+   `new Set(['H-cross-doc', 'I-knowledge-gaps'])`. The audit runner's
+   `pickEnabledIds()` at api.ts:72 will then include Lens I under
+   `--scope=docs` and under `--scope=all` (which unions both scope sets).
 
 ### 2.2 Inputs
 
@@ -342,14 +401,21 @@ addition mapping the docs scope to include `I-knowledge-gaps` so
 ```typescript
 export function normalizeTopic(raw: string): string {
   return raw.toLowerCase()
-    .replace(/[_\s]+/g, '-')
-    .replace(/^[-.]+|[-.]+$/g, '')
+    .replace(/['']/g, '')      // strip apostrophes (smart and dumb) before slugging
+    .replace(/[_\s]+/g, '-')   // collapse underscores/whitespace to hyphens
+    .replace(/-{2,}/g, '-')    // collapse repeated hyphens (e.g. "foo--bar" → "foo-bar")
+    .replace(/^[-.]+|[-.]+$/g, '')  // trim leading/trailing hyphens and dots
 }
 ```
 
 Applied to every signal before bucketing. `"Agent-Eval-Harnesses"`,
-`"agent_eval_harnesses"`, `"agent eval harnesses"` all collapse to
-`"agent-eval-harnesses"`.
+`"agent_eval_harnesses"`, `"agent eval harnesses"`, `"agent's eval
+harnesses"`, and `"agent--eval--harnesses"` all collapse to
+`"agent-eval-harnesses"`. Other punctuation inside the slug (`!`, `?`,
+parens) is left intact — agents are instructed via the tail to use
+kebab-case slugs without such characters in the first place. Phase 3
+intentionally stops here; fuzzy or stemmed matching is a Phase 5 lever if
+empirical false-negative rates require it.
 
 ### 2.4 Aggregation
 
@@ -366,8 +432,9 @@ type Bucket = {
 
 Build buckets in one pass over the merged signal list. `first_seen` /
 `last_seen` come from the ledger event `ts` for primary signals; for
-lessons-scanner synthetics, both use the file's mtime (since lessons.md
-isn't temporal at the line level).
+lessons-scanner synthetics, both are set to the current audit timestamp
+(see §4.6 for rationale — synthetic signals are exempt from window
+expiry and reflect the live file contents).
 
 ### 2.5 Finding rules
 
@@ -380,7 +447,7 @@ isn't temporal at the line level).
 P1 takes precedence over P2 (one finding per topic, the highest applicable
 severity).
 
-### 2.6 Evidence variant
+### 2.6 Evidence variant + renderer impact
 
 Add to `src/observability/engine/types.ts:92–98`:
 
@@ -396,6 +463,27 @@ export type Evidence =
       last_seen: string
       example_excerpts: string[]    // up to 3 distinct excerpts
     }
+```
+
+**Renderer impact (non-blocking polish).** The discriminated union has a
+JSON-stringify fallback in every renderer
+(`src/observability/renderers/markdown.ts` `renderEvidence()`,
+`terminal.ts`, `dashboard.ts`, `mmr-findings.ts`), so a new variant
+renders as JSON-shaped evidence by default — functional, but ugly.
+Phase 3 ships **explicit pretty-render cases** in the markdown and
+terminal renderers (the two surfaces most operators actually read) and
+defers dashboard + mmr-findings polish to Phase 4 unless empirical
+review shows the JSON fallback is unacceptable.
+
+Pretty-render shape (markdown, suggested):
+
+```markdown
+*Topic:* `<normalized-topic>`
+*Signals:* <signal_count> across <distinct_projects.length> projects
+*Window:* <first_seen> → <last_seen>
+*Example excerpts:*
+- "<excerpt 1>"
+- "<excerpt 2>"
 ```
 
 ### 2.7 Fix hint
@@ -415,14 +503,26 @@ The lens cannot know which category the entry belongs in (`core/` vs
 field uses the category placeholder `<category>` literally so the renderer
 displays it as guidance, not as a clickable path.
 
-### 2.8 Degradation
+### 2.8 Degradation (aligned with `deriveVerdict`)
 
-- **Ledger empty or unreadable.** Emit a `lens_skipped` evidence finding
-  with `reason: 'insufficient_data'`. Audit verdict unaffected.
+The current `deriveVerdict()` in `src/observability/engine/api.ts:79–83`
+returns `degraded-pass` whenever `skipped_lenses > 0`. To avoid bumping
+every empty-ledger audit to `degraded-pass`, the lens distinguishes
+*empty* from *unreadable*:
+
+- **Ledger empty (no `knowledge_gap_signal` events in window).** Lens
+  returns `[]` — no findings, no `lens_skipped` emission. Verdict stays
+  `pass`. This is the expected steady state for a healthy knowledge base.
+- **Ledger genuinely unreadable** (I/O error, malformed JSONL the
+  synthesizer can't recover from). Lens emits a `lens_skipped` evidence
+  finding with `reason: 'adapter_unavailable'` and the verdict
+  consequently becomes `degraded-pass` (per `deriveVerdict`). This is
+  correct: the lens cannot run, so the operator should know.
 - **lessons.md missing.** Scanner returns `[]`; lens proceeds with only
-  ledger signals.
-- **No buckets cross the threshold.** Lens emits no findings. This is the
-  expected steady state for a healthy knowledge base.
+  ledger signals. Not a degradation — missing-lessons is the default
+  state for projects that don't use `bd`.
+- **No buckets cross the threshold.** Lens returns `[]`. Not a
+  degradation; this is the healthy steady state.
 
 ### 2.9 Tests
 
@@ -440,31 +540,69 @@ displays it as guidance, not as a clickable path.
 
 ## Section 3 — Assembly-Time Tail Injection
 
-### 3.1 Mechanism
+### 3.1 Mechanism — two emission paths to update
 
-In `src/core/assembly/knowledge-loader.ts`, after the function that emits
-the `## Knowledge Base` section for a step, append a fixed tail when:
+The codebase has **two separate paths** that emit knowledge content,
+verified via `grep -rn "Knowledge Base\|Domain Knowledge"`:
 
-1. The step has at least one knowledge-base entry in frontmatter (true for
-   all 89 current pipeline steps — verified via
-   `grep -rl "^knowledge-base:" content/pipeline --include='*.md'`).
-2. The environment variable `SCAFFOLD_GAP_SIGNAL_QUIET` is not set to `1`.
+1. **Runtime assembly** — `src/core/assembly/engine.ts:101` calls
+   `this.buildKnowledgeBaseSection(options.knowledgeEntries)` to build the
+   `## Knowledge Base` section for `scaffold run <step>` and related
+   commands. This is the runtime-prompt path.
+2. **Generated Claude commands** — `src/core/adapters/claude-code.ts:84`
+   has a `buildKnowledgeSection()` helper that emits a `## Domain
+   Knowledge` section (note the different heading text) when the adapter
+   generates `.claude/commands/*.md` files for downstream projects. This
+   is the generated-command path used by `scaffold init` output.
 
-The assembler exports a new helper:
+Both paths must invoke the tail-renderer or downstream agents using one
+path will be silently un-instrumented. The earlier draft pointed at
+`src/core/assembly/knowledge-loader.ts`, which only *loads* entries — it
+does not emit either section.
+
+The tail-renderer lives in a single shared helper:
 
 ```typescript
+// src/core/assembly/gap-signal-tail.ts  (new file, importable by both
+// engine.ts and claude-code.ts)
 export function renderGapSignalTail(opts: { stepName: string }): string {
+  if (process.env['SCAFFOLD_GAP_SIGNAL_QUIET'] === '1') return ''
   return GAP_SIGNAL_TAIL_TEMPLATE.replace(/\{\{step_name\}\}/g, opts.stepName)
 }
 ```
 
-The call site in the assembler:
+Call sites:
 
 ```typescript
-if (knowledgeEntries.length > 0 && process.env['SCAFFOLD_GAP_SIGNAL_QUIET'] !== '1') {
-  assembledKnowledgeBase += '\n\n' + renderGapSignalTail({ stepName: step.name })
+// in src/core/assembly/engine.ts, inside buildKnowledgeBaseSection()
+// at the end of the function, before return:
+if (knowledgeEntries.length > 0) {
+  body += '\n\n' + renderGapSignalTail({ stepName: step.name })
 }
+return body
 ```
+
+```typescript
+// in src/core/adapters/claude-code.ts, inside buildKnowledgeSection()
+// before the final return:
+const tail = knowledgeEntries.length > 0
+  ? '\n\n' + renderGapSignalTail({ stepName: input.slug })
+  : ''
+return `\n\n---\n\n## Domain Knowledge\n\n${parts.join('\n\n---\n\n')}${tail}`
+```
+
+Returning an empty string when `SCAFFOLD_GAP_SIGNAL_QUIET=1` keeps the
+call-site idempotent — concatenating `'\n\n' + ''` produces a harmless
+double newline that the markdown render trims. (Alternative: have the
+caller guard the env var. Centralizing in the helper means we only need
+to update one place if we later add suppression conditions.)
+
+Trigger conditions for both call sites are identical:
+
+1. The step has at least one knowledge-base entry in frontmatter (true
+   for all 89 current pipeline steps — verified via
+   `grep -rl "^knowledge-base:" content/pipeline --include='*.md'`).
+2. The environment variable `SCAFFOLD_GAP_SIGNAL_QUIET` is not set to `1`.
 
 ### 3.2 Tail content (canonical)
 
@@ -476,8 +614,10 @@ guidance to confidently proceed — emit a gap signal so the topic shows up
 in the knowledge-base freshness audit:
 
 ```bash
-PROJECT_ID=$(git remote get-url origin 2>/dev/null | sha256sum | head -c 64 \
-  || realpath . | sha256sum | head -c 64)
+PROJECT_KEY=$(git remote get-url origin 2>/dev/null || pwd -P)
+PROJECT_ID=$(printf '%s' "$PROJECT_KEY" \
+  | { command -v shasum >/dev/null 2>&1 && shasum -a 256 || sha256sum; } \
+  | awk '{print $1}')
 scaffold observe event knowledge_gap_signal \
   --branch="$(git rev-parse --abbrev-ref HEAD)" \
   --topic="<kebab-case-slug-of-missing-topic>" \
@@ -535,7 +675,30 @@ resolved by `findProjectRoot(process.cwd())` in the lens invocation. If the
 file doesn't exist or is empty, return `[]`. No errors thrown; missing file
 is the default expected state.
 
-### 4.3 Topic extraction (two-pass parser)
+### 4.3 Topic extraction (fence-aware line scanner + two-pass parser)
+
+The scanner reads the file once line-by-line, tracking fenced-code-block
+state via a simple toggle. Lines inside a fence are skipped for both
+passes — preventing topic extraction from shell snippets, code examples,
+and lesson-fix patches that commonly contain quoted phrases.
+
+```typescript
+// fence tracking
+let insideFence = false
+for (const line of lines) {
+  if (/^```/.test(line.trim())) {
+    insideFence = !insideFence
+    continue
+  }
+  if (insideFence) continue
+  // run Pass 1 + Pass 2 on `line` here
+}
+```
+
+The fence regex is intentionally lenient — `^\`\`\`` matches both
+language-tagged opens (` ```bash `) and bare closes (` ``` `). Mixed
+4-backtick fences are not supported (lessons.md doesn't use them in
+practice).
 
 **Pass 1 — explicit markers** (high precision):
 
@@ -557,9 +720,12 @@ const HEURISTIC_PATTERNS = [
 ```
 
 Captures are normalized through `normalizeTopic()` before being emitted as
-synthetic signals. The regex set is deliberately small (3 patterns) to
-minimize false positives — broader regexes will be added in Phase 4 only if
-empirical false-negative rates are high.
+synthetic signals. The non-greedy `(.+?)` capture stops at the next quote
+or terminal `.`, which is intentional for sentence-shaped phrases — if
+false-positive rates from runaway captures emerge in practice, Phase 4
+can tighten the terminating set. The regex set is deliberately small (3
+patterns) to minimize false positives; broader regexes are deferred to
+Phase 4.
 
 ### 4.4 Output shape
 
@@ -592,7 +758,31 @@ Example:
 - 0 agent_search signals + 3 lessons mentions of the same topic →
   `distinct_projects = {'lessons'} = 1` → P2 threshold not met.
 
-### 4.6 Tests
+### 4.6 Synthetic signals are exempt from the 90-day window
+
+The 90-day ledger window applies only to ledger-stored events. Lessons
+synthetic signals are produced in-memory at audit time and reflect the
+*current* state of `tasks/lessons.md` — they have no meaningful "age."
+If lessons.md hasn't been touched in 6 months but still contains a topic
+mention, that mention is still a live signal until the file is edited to
+remove it.
+
+Lens I applies window filtering **before** merging lessons-scanner
+output:
+
+```typescript
+const ledgerSignals = ledgerEvents
+  .filter(e => e.type === 'knowledge_gap_signal' && e.ts >= ninetyDaysAgo)
+  .map(e => e.payload as KnowledgeGapSignalPayload)
+const lessonsSignals = scanLessonsForGaps(lessonsPath)
+const allSignals = [...ledgerSignals, ...lessonsSignals]
+```
+
+`first_seen` / `last_seen` on lessons-derived bucket members are set to
+the current audit timestamp (not the lessons.md mtime) so they don't
+falsely age out of any downstream window logic.
+
+### 4.7 Tests
 
 - Returns `[]` when file doesn't exist.
 - Returns `[]` when file is empty.
@@ -601,8 +791,12 @@ Example:
 - Multiple mentions of the same topic produce multiple signals.
 - Handles UTF-8, Windows CRLF, unicode in non-slug positions without
   crashing.
-- Doesn't extract topic mentions inside fenced code blocks (skip lines
-  between ```` ``` ```` fences).
+- Does NOT extract topic mentions inside fenced code blocks (the
+  fence-aware line scanner of §4.3 skips lines between ```` ``` ````
+  fences). Fixture must include a fenced shell example containing a
+  phrase that would match Pass 2 to prove the skip works.
+- Toggling out of a fence and back in mid-file works (multiple fenced
+  blocks in one lessons.md).
 
 ## Section 5 — Risks & Mitigations
 
@@ -614,7 +808,7 @@ Example:
 | lessons.md is empty (true for many projects) | Lessons scanner returns `[]` gracefully. The system works with agent-search signals alone. |
 | Single noisy power user manufactures gaps | The diversity gate (≥2 distinct `project_id`s) prevents this by design. |
 | Ledger fills up with low-value signals | Each signal is small (~200 bytes); 90-day window bounds growth. The harvester rotates archives automatically. |
-| `project_id` computation is wrong (e.g., agents run inside a subdirectory) | `git remote get-url origin` is run from any subdirectory of a git repo; only the cwd-realpath fallback is sensitive. Documented in operations.md. |
+| `project_id` computation is non-portable | The canonical command in §1.5 uses `shasum -a 256` with `sha256sum` fallback (covers macOS and Linux), computes `PROJECT_KEY` separately before hashing (no `pipefail` dependency for fallback chain), and stays inside any subdirectory of a git repo. Documented in operations.md. Earlier draft used `sha256sum | head -c 64` which silently produced empty `project_id` on macOS — that bug is fixed in §1.5. |
 | `SCAFFOLD_GAP_SIGNAL_QUIET` accidentally set in CI | Test fixtures and CI explicitly opt out; the variable name is verbose enough to avoid collision; documented. |
 | Topic-slug regex blocks valid Unicode topics | Slug regex is intentionally ASCII-kebab. Topics in other scripts get romanized at the agent level (the agent picks the slug). |
 
@@ -636,7 +830,8 @@ All five decisions are locked. Each was confirmed by zigrivers on 2026-05-26.
 |---|---|---|---|
 | 1 | Project distinctness axis | Explicit `project_id` payload field (sha256 of `git remote get-url origin` or cwd realpath) | Other axes (worktree_id, branch, no-axis) either conflate or omit the right unit of analysis. Project identity is what "≥2 distinct projects" needs to mean. |
 | 2 | Topic clustering | Strict slug match after light normalization (lowercase, underscores→hyphens, trim punctuation) | Predictable, fast, no LLM dependency. False negatives are reversible later via stemmed/LLM clustering if empirical rates require. False positives would be worse. |
-| 3 | lessons.md scanner shape | Inline at lens time, no ledger writes; treated as a separate signal set merged by topic | No dedup risk between scanner runs and agent events. lessons.md is the source of truth (file mtime, not snapshot). Synthetic `project_id='lessons'` keeps lessons-only topics off the P2 threshold by design. |
+| 3 | lessons.md scanner shape | Inline at lens time, no ledger writes; treated as a separate signal set merged by topic | No dedup risk between scanner runs and agent events. lessons.md is the source of truth (current contents at audit time, not a snapshot). Synthetic `project_id='lessons'` keeps lessons-only topics off the P2 threshold by design — see Decision #6 for the explicit refinement of the parent plan's Task 18 acceptance. |
+| 6 | Parent plan Task 18 acceptance refinement | Lessons mentions corroborate agent-search signals; they do *not* independently emit gap signals or cross the P2 threshold | The parent plan's Task 18 acceptance reads "recurring patterns in lessons.md (≥3 mentions of same topic) emit gap signals." Phase 3 design narrows this: lessons.md mentions count as one project in the diversity gate and surface buckets only when at least one real-project signal is also present. Rationale: lessons.md is one user's curated retrospective; without external corroboration it'd let a single project manufacture gaps. The companion plan re-states Task 18's acceptance accordingly. |
 | 4 | Tail injection mechanism | Assembly-time injection at the knowledge-loader; no per-step .md file edits | One source of truth. Reword once → 89 steps update. Zero file-churn cost. `SCAFFOLD_GAP_SIGNAL_QUIET=1` suppresses cleanly. |
 | 5 | Phase 3 severity rules | Ship both P2 (≥3 signals, ≥2 projects) and P1 (≥5 signals, ≥3 projects) | Same plumbing; the P1 escalation lives in the same lens evaluator. Avoids a churn follow-up PR. |
 
@@ -664,7 +859,7 @@ All five decisions are locked. Each was confirmed by zigrivers on 2026-05-26.
 | T1 | Event type & validator (`types.ts`, `event-schemas.ts`, CLI smoke test) | Independent |
 | T2 | Assembly-time tail injection (`knowledge-loader.ts`) | Depends on T1 |
 | T3 | lessons.md scanner (pure function) | Independent |
-| T4 | Lens I aggregator + `Evidence` variant + audit-runner registration | Depends on T1, T3 |
+| T4 | Lens I aggregator + `Evidence` variant + audit-runner registration (LENS_REGISTRY entry, `makeLensImplementations` entry, `SCOPE_DOC_LENSES` update) + markdown & terminal pretty-render cases for the new evidence variant | Depends on T1, T3 |
 | T5 | End-to-end validation + `docs/knowledge-freshness/operations.md` doc update | Depends on T1–T4 |
 
 Estimated single PR `feat/knowledge-freshness-gap-detection` carrying
