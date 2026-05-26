@@ -73,3 +73,7 @@ function appendNormalizedPart(out: string[], part: string, spaceBefore: boolean)
   if (out.length > 0 && spaceBefore) out.push(' ')
   out.push(part)
 }
+
+export function normalizeSuggestionForKey(suggestion: string): string {
+  return suggestion.toLowerCase().replace(/\s+/g, ' ').trim()
+}

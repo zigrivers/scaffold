@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   normalizeDescriptionForKey,
   normalizeLocationForKey,
+  normalizeSuggestionForKey,
 } from '../../src/core/stable-id.js'
 
 describe('normalizeLocationForKey', () => {
@@ -123,5 +124,20 @@ describe('normalizeDescriptionForKey', () => {
 
   it('handles empty input', () => {
     expect(normalizeDescriptionForKey('')).toBe('')
+  })
+})
+
+describe('normalizeSuggestionForKey', () => {
+  it('lowercases and collapses whitespace', () => {
+    expect(normalizeSuggestionForKey('  Use   Const   instead  ')).toBe('use const instead')
+  })
+
+  it('preserves punctuation and code-like tokens', () => {
+    // No backtick handling - suggestions are short; lowercase is sufficient.
+    expect(normalizeSuggestionForKey('Rename foo to bar.')).toBe('rename foo to bar.')
+  })
+
+  it('handles empty input', () => {
+    expect(normalizeSuggestionForKey('')).toBe('')
   })
 })
