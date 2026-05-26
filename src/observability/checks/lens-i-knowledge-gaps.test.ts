@@ -287,8 +287,9 @@ describe('lensIKnowledgeGaps', () => {
     })
     expect(findings).toHaveLength(1)
     if (findings[0].evidence.kind !== 'knowledge_gap') throw new Error('unreachable')
-    expect(findings[0].evidence.example_excerpts.length).toBeLessThanOrEqual(3)
-    expect(findings[0].evidence.example_excerpts.length).toBeGreaterThan(0)
+    expect(findings[0].evidence.example_excerpts).toEqual([
+      'excerpt-1', 'excerpt-2', 'excerpt-3',
+    ])
   })
 
   it('uses context.cwd to locate tasks/lessons.md', async () => {
