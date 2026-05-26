@@ -20,8 +20,6 @@ export interface CompensatingChannel {
   originalChannel: string
   /** Name used for the compensating dispatch (e.g., "compensating-codex") */
   compensatingName: string
-  /** Focus prompt to prepend */
-  focusPrompt: string
 }
 
 export interface CompensatorDispatch {
@@ -113,7 +111,7 @@ export function resolveCompensatorFocus(
  */
 export function getCompensatingChannels(
   channelStatuses: Record<string, ChannelStatus>,
-  compensatorChannel = 'claude',
+  compensatorChannel: string,
 ): CompensatingChannel[] {
   const compensating: CompensatingChannel[] = []
 
@@ -126,13 +124,9 @@ export function getCompensatingChannels(
       || status === 'skipped'
       || status === 'failed'
     ) {
-      const focus = COMPENSATING_FOCUS[name]
-        ?? `Focus your review on areas typically covered by ${name}.`
-        + ` You are compensating for a missing ${name} review.`
       compensating.push({
         originalChannel: name,
         compensatingName: `compensating-${name}`,
-        focusPrompt: focus,
       })
     }
   }
