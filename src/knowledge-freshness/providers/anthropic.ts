@@ -39,7 +39,11 @@ export function buildAnthropicDispatcher(opts: BuildAnthropicDispatcherOptions):
   return async (prompt) => {
     const result = await dispatch({ prompt, command: ANTHROPIC_COMMAND, timeoutMs })
     if (!result.ok) {
-      throw new Error(`audit dispatcher failed: ${result.reason}`)
+      // Use the `anthropic dispatcher: …` prefix for consistency with
+      // `deepseek dispatcher: …` — operators can filter cron logs by a
+      // single `dispatcher:` substring across both providers
+      // (PR #393 MMR F-003).
+      throw new Error(`anthropic dispatcher: ${result.reason}`)
     }
     // Return raw stdout. The audit runner's schema-aware extractor walks
     // the full response; the dispatcher's last-→-first parser is the

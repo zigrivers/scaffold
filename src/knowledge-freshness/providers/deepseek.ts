@@ -146,8 +146,37 @@ export function buildDeepseekDispatcher(opts: BuildDeepseekDispatcherOptions): D
       // the round-6 fix only covered the initial doFetch call, leaving
       // body-read aborts and stream errors unwrapped).
       if (err instanceof Error && err.message.startsWith('deepseek dispatcher: ')) throw err
-      const reason = err instanceof Error ? err.message : String(err)
+      // Surface the underlying transport detail. undici's fetch rejects
+      // with `TypeError: fetch failed` and stashes the actionable
+      // ENOTFOUND/ECONNRESET/TLS detail in `err.cause` — without
+      // unwrapping that, cron logs would show the unhelpful
+      // "deepseek dispatcher: fetch failed: fetch failed" (PR #393 MMR
+      // F-002).
+      const reason = describeFetchError(err)
       throw new Error(`deepseek dispatcher: fetch failed: ${reason}`)
     }
   }
+}
+
+/**
+ * Pull out a useful message from a thrown fetch error. undici wraps
+ * transport-layer failures (DNS, connection reset, TLS) in a
+ * `TypeError: fetch failed` whose `cause` carries the actionable detail
+ * (ENOTFOUND, ECONNRESET, etc.). Without unwrapping `cause`, cron logs
+ * would lose that detail and show only "fetch failed" — useless for
+ * triage. We compose the outer message with the cause's `code` and
+ * `message` when present.
+ */
+function describeFetchError(err: unknown): string {
+  if (!(err instanceof Error)) return String(err)
+  const cause = (err as Error & { cause?: unknown }).cause
+  if (cause instanceof Error) {
+    const code = (cause as Error & { code?: string }).code
+    const tail = code ? `${code}: ${cause.message}` : cause.message
+    return `${err.message} (${tail})`
+  }
+  if (typeof cause === 'string' && cause) {
+    return `${err.message} (${cause})`
+  }
+  return err.message
 }

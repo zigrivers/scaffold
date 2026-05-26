@@ -77,6 +77,16 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          # Preflight: surface a missing DEEPSEEK_API_KEY immediately instead
+          # of letting every per-candidate dispatch fail in the per-entry
+          # try/catch — that path exits 0 with zero PRs opened, the same
+          # silent failure mode this provider switch is meant to eliminate
+          # (PR #393 MMR F-001).
+          if [ -z "${DEEPSEEK_API_KEY:-}" ]; then
+            echo "::error::DEEPSEEK_API_KEY repository secret is required for the deepseek provider."
+            echo "Run \`gh secret set DEEPSEEK_API_KEY\` and re-trigger the workflow."
+            exit 1
+          fi
           # jq -c streams one candidate per line so the bash loop is simple.
           # Empty array case: the loop body just never runs.
           jq -c '.[]' /tmp/candidates.json | while read -r candidate; do

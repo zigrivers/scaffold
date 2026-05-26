@@ -114,6 +114,23 @@ describe('deepseek provider — error paths', () => {
     await expect(dispatcher('x')).rejects.toThrow(/deepseek dispatcher: fetch failed.*ENOTFOUND/i)
   })
 
+  it('unwraps err.cause when undici throws TypeError + cause (PR-393 F-002)', async () => {
+    // undici's actual transport-layer rejection shape: outer
+    // `TypeError: fetch failed` with the actionable code+message in
+    // `err.cause`. Without unwrapping cause, cron logs lose the
+    // ENOTFOUND/ECONNRESET signal we need for triage.
+    const cause = Object.assign(new Error('getaddrinfo ENOTFOUND api.deepseek.com'), {
+      code: 'ENOTFOUND',
+    })
+    const outer = new TypeError('fetch failed')
+    ;(outer as Error & { cause?: unknown }).cause = cause
+    const fetchSpy: DeepseekFetch = vi.fn(async () => { throw outer }) as unknown as DeepseekFetch
+    const dispatcher = buildDeepseekDispatcher({ apiKey: 'k', timeoutSec: 60, fetchImpl: fetchSpy })
+    // The wrapped message must contain BOTH the outer "fetch failed" and
+    // the inner ENOTFOUND code, otherwise the cron log entry is useless.
+    await expect(dispatcher('x')).rejects.toThrow(/deepseek dispatcher: fetch failed.*ENOTFOUND.*api\.deepseek\.com/i)
+  })
+
   it('normalizes a body-read abort (headers OK, body hangs) → deepseek-prefixed (round-7 grok)', async () => {
     // The post-fetch phase (res.text(), JSON.parse, zod, content check) must
     // also be wrapped — a slow server that returns 200 headers fast then
