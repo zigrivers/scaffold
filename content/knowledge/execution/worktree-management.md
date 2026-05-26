@@ -2,6 +2,11 @@
 name: worktree-management
 description: Git worktree patterns for parallel multi-agent execution
 topics: [git, worktrees, multi-agent, branching]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - https://git-scm.com/docs/git-worktree
 ---
 
 # Worktree Management
