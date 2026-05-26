@@ -31,6 +31,8 @@ export interface CompensatorDispatch {
   command: string
   flags: string[]
   env: Record<string, string>
+  timeout: number
+  prompt_wrapper: string
   stderr: 'capture' | 'suppress' | 'passthrough'
   output_parser: string | OutputParserConfig
 }
@@ -42,6 +44,8 @@ export function resolveCompensatorDispatch(config: MmrConfigParsed): Compensator
       command: 'claude',
       flags: ['-p', '--output-format', 'json'],
       env: {},
+      timeout: config.defaults.timeout,
+      prompt_wrapper: '{{prompt}}',
       stderr: 'capture',
       output_parser: 'default',
     }
@@ -60,9 +64,17 @@ export function resolveCompensatorDispatch(config: MmrConfigParsed): Compensator
     command: channelConfig.command,
     flags: channelConfig.flags,
     env: channelConfig.env,
+    timeout: channelConfig.timeout ?? config.defaults.timeout,
+    prompt_wrapper: channelConfig.prompt_wrapper ?? '{{prompt}}',
     stderr: channelConfig.stderr,
     output_parser: channelConfig.output_parser,
   }
+}
+
+function applyPromptWrapper(wrapper: string, prompt: string): string {
+  return wrapper === '{{prompt}}'
+    ? prompt
+    : wrapper.replaceAll('{{prompt}}', () => prompt)
 }
 
 /**
@@ -121,20 +133,19 @@ export async function dispatchCompensatingPasses(
   jobId: string,
   prompt: string,
   compensatingChannels: CompensatingChannel[],
-  timeout: number,
   config: MmrConfigParsed,
 ): Promise<void> {
+  const dispatch = resolveCompensatorDispatch(config)
   await Promise.all(
     compensatingChannels.map((comp) => {
-      const dispatch = resolveCompensatorDispatch(config)
       const focus = resolveCompensatorFocus(config, comp.originalChannel)
-      const compensatingPrompt = `${focus}\n\n${prompt}`
+      const compensatingPrompt = applyPromptWrapper(dispatch.prompt_wrapper, `${focus}\n\n${prompt}`)
       return dispatchChannel(store, jobId, comp.compensatingName, {
         command: dispatch.command,
         prompt: compensatingPrompt,
         flags: dispatch.flags,
         env: dispatch.env,
-        timeout,
+        timeout: dispatch.timeout,
         stderr: dispatch.stderr,
       })
     }),

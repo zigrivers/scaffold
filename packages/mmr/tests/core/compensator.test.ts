@@ -101,6 +101,8 @@ describe('resolveCompensatorDispatch', () => {
     expect(result.command).toBe('claude')
     expect(result.flags).toEqual(['-p', '--output-format', 'json'])
     expect(result.env).toEqual({})
+    expect(result.timeout).toBe(300)
+    expect(result.prompt_wrapper).toBe('{{prompt}}')
     expect(result.stderr).toBe('capture')
     expect(result.output_parser).toBe('default')
   })
@@ -127,6 +129,8 @@ describe('resolveCompensatorDispatch', () => {
     expect(result.command).toBe('ollama')
     expect(result.flags).toEqual(['run', 'qwen2.5-coder:32b'])
     expect(result.env).toEqual({ OLLAMA_HOST: 'http://localhost:11434' })
+    expect(result.timeout).toBe(300)
+    expect(result.prompt_wrapper).toBe('{{prompt}}')
     expect(result.output_parser).toBe('default')
   })
 
@@ -228,7 +232,7 @@ describe('dispatchCompensatingPasses honors defaults.compensator', () => {
   ]
 
   it('dispatches via claude when defaults.compensator is unset', async () => {
-    await dispatchCompensatingPasses({} as never, 'job-1', 'review prompt', compensating, 300, baseConfig)
+    await dispatchCompensatingPasses({} as never, 'job-1', 'review prompt', compensating, baseConfig)
 
     expect(dispatchChannel).toHaveBeenCalledWith(
       {},
@@ -237,6 +241,7 @@ describe('dispatchCompensatingPasses honors defaults.compensator', () => {
       expect.objectContaining({
         command: 'claude',
         flags: ['-p', '--output-format', 'json'],
+        timeout: 300,
       }),
     )
   })
@@ -250,6 +255,7 @@ describe('dispatchCompensatingPasses honors defaults.compensator', () => {
           enabled: true,
           command: 'ollama',
           flags: ['run', 'qwen2.5'],
+          timeout: 900,
           env: { OLLAMA_HOST: 'http://localhost:11434' },
           auth: { check: 'true', timeout: 5, failure_exit_codes: [1], recovery: 'noop' },
           prompt_wrapper: '{{prompt}}',
@@ -260,7 +266,7 @@ describe('dispatchCompensatingPasses honors defaults.compensator', () => {
       },
     }
 
-    await dispatchCompensatingPasses({} as never, 'job-1', 'review prompt', compensating, 300, cfg)
+    await dispatchCompensatingPasses({} as never, 'job-1', 'review prompt', compensating, cfg)
 
     expect(dispatchChannel).toHaveBeenCalledWith(
       {},
@@ -269,12 +275,13 @@ describe('dispatchCompensatingPasses honors defaults.compensator', () => {
       expect.objectContaining({
         command: 'ollama',
         flags: ['run', 'qwen2.5'],
+        timeout: 900,
         env: { OLLAMA_HOST: 'http://localhost:11434' },
       }),
     )
   })
 
-  it('applies channel_focus_map to the prompt prefix', async () => {
+  it('applies channel_focus_map and prompt_wrapper to the prompt', async () => {
     const cfg: MmrConfigParsed = {
       ...baseConfig,
       defaults: {
@@ -291,7 +298,7 @@ describe('dispatchCompensatingPasses honors defaults.compensator', () => {
           flags: [],
           env: {},
           auth: { check: 'true', timeout: 5, failure_exit_codes: [1], recovery: 'noop' },
-          prompt_wrapper: '{{prompt}}',
+          prompt_wrapper: 'SYSTEM\n{{prompt}}\nEND',
           output_parser: 'default',
           stderr: 'capture',
           abstract: false,
@@ -299,9 +306,9 @@ describe('dispatchCompensatingPasses honors defaults.compensator', () => {
       },
     }
 
-    await dispatchCompensatingPasses({} as never, 'job-1', 'review prompt', compensating, 300, cfg)
+    await dispatchCompensatingPasses({} as never, 'job-1', 'review prompt', compensating, cfg)
 
     expect(vi.mocked(dispatchChannel).mock.calls[0][3].prompt)
-      .toBe('Focus on memory safety and async correctness.\n\nreview prompt')
+      .toBe('SYSTEM\nFocus on memory safety and async correctness.\n\nreview prompt\nEND')
   })
 })
