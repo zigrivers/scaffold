@@ -1,4 +1,5 @@
 import type { Dispatcher } from '../audit-runner.js'
+import { buildAnthropicDispatcher } from './anthropic.js'
 
 export type Provider = 'anthropic' | 'deepseek'
 
@@ -119,9 +120,9 @@ export interface BuildDispatcherOptions {
   env: Record<string, string | undefined>
 }
 
-export function buildDispatcher(provider: Provider, _opts: BuildDispatcherOptions): Dispatcher {
+export function buildDispatcher(provider: Provider, opts: BuildDispatcherOptions): Dispatcher {
   if (provider === 'anthropic') {
-    throw new Error('anthropic provider not yet wired — see Task 2')
+    return buildAnthropicDispatcher({ timeoutSec: opts.timeoutSec })
   }
   if (provider === 'deepseek') {
     throw new Error('deepseek provider not yet wired — see Task 4')
