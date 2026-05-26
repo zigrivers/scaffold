@@ -10,6 +10,7 @@ import type {
 } from '../../types/index.js'
 import type { DepthLevel, DepthProvenance } from '../../types/index.js'
 import { ExitCode } from '../../types/index.js'
+import { renderGapSignalTail } from './gap-signal-tail.js'
 
 /** Depth guidance text for each level 1-5 (ADR-045). */
 const DEPTH_GUIDANCE: Record<number, string> = {
@@ -98,7 +99,8 @@ export class AssemblyEngine {
             ? options.metaPrompt.body.replace(/\$ARGUMENTS/g, options.arguments)
             : options.metaPrompt.body,
         },
-        { heading: 'Knowledge Base', content: this.buildKnowledgeBaseSection(options.knowledgeEntries) },
+        { heading: 'Knowledge Base',
+          content: this.buildKnowledgeBaseSection(options.knowledgeEntries, step) },
         { heading: 'Project Context', content: this.buildProjectContextSection(artifacts, decisions, options) },
         { heading: 'Methodology', content: this.buildMethodologySection(depth, options.depthProvenance) },
         { heading: 'Instructions', content: this.buildInstructionsSection(options.instructions, options.reworkFix) },
@@ -169,14 +171,17 @@ export class AssemblyEngine {
     ].join('\n')
   }
 
-  private buildKnowledgeBaseSection(entries: KnowledgeEntry[]): string {
+  private buildKnowledgeBaseSection(entries: KnowledgeEntry[], stepName: string): string {
     if (entries.length === 0) {
       return '(No knowledge base entries specified for this step.)'
     }
 
-    return entries
+    const body = entries
       .map(entry => `## ${entry.name}: ${entry.description}\n\n${entry.content}`)
       .join('\n\n')
+
+    const tail = renderGapSignalTail({ stepName })
+    return tail ? `${body}\n\n${tail}` : body
   }
 
   private buildProjectContextSection(

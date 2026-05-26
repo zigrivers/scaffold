@@ -64,7 +64,7 @@ export interface RunAuditInput {
   args?: Record<string, unknown>
 }
 
-const SCOPE_DOC_LENSES = new Set(['H-cross-doc'])
+const SCOPE_DOC_LENSES = new Set(['H-cross-doc', 'I-knowledge-gaps'])
 const SCOPE_CODE_LENSES = new Set([
   'A-tdd', 'B-ac-coverage', 'C-standards', 'D-stack', 'E-design', 'F-scope', 'G-decisions',
 ])

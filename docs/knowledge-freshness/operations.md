@@ -303,3 +303,96 @@ Planned next:
 See the [design spec Part B](../superpowers/specs/2026-05-24-knowledge-freshness-design.md#part-b--detect-documentation-gaps)
 and the [implementation plan](../superpowers/plans/2026-05-24-knowledge-freshness.md)
 for the full roadmap.
+
+## Phase 3: Gap Detection
+
+The knowledge-freshness system surfaces topics agents need but the
+knowledge base doesn't yet cover. Two signal sources feed Lens I:
+
+1. **Agent-search signals** — pipeline meta-prompts include a tail
+   instruction (auto-injected at assembly time) telling the executing
+   agent to emit a `knowledge_gap_signal` event when they search the
+   injected knowledge base and find nothing. The agent runs the
+   command embedded in the tail; the event lands in the worktree's
+   `.scaffold/activity.jsonl` ledger.
+2. **Lessons scanner** — Lens I reads `tasks/lessons.md` inline at
+   audit time. Two extraction passes:
+   - Explicit markers: `<!-- gap-topic: kebab-case-slug -->`
+   - Heuristic phrases: "would have helped to have a guide on X",
+     "no knowledge entry for X", "missing knowledge: X"
+   Code-fenced blocks are skipped.
+
+Synthetic lessons signals are tagged with `project_id='lessons'`, which
+is excluded from the diversity gate's `distinct_project_count`. This
+means lessons mentions corroborate real signals but cannot
+independently manufacture a gap finding.
+
+### Suppression
+
+Set `SCAFFOLD_GAP_SIGNAL_QUIET=1` to suppress the tail in tests, CI,
+or local runs where you don't want the noise.
+
+### Severity thresholds
+
+| Severity | Threshold |
+|---|---|
+| P2 | ≥3 signals × ≥2 distinct real projects |
+| P1 | ≥5 signals × ≥3 distinct real projects |
+
+P1 takes precedence; one finding per topic at the highest applicable
+severity.
+
+### Manual validation procedure
+
+To verify the loop end-to-end in a fresh worktree:
+
+```bash
+TMPDIR_E2E=$(mktemp -d) && cd "$TMPDIR_E2E"
+git init -q && git remote add origin https://example.org/test-e2e
+mkdir -p tasks && echo 'No knowledge entry for "agent-eval-harnesses".' > tasks/lessons.md
+PROJECT_A=$(printf 'https://example.org/project-a' | shasum -a 256 | awk '{print $1}')
+PROJECT_B=$(printf 'https://example.org/project-b' | shasum -a 256 | awk '{print $1}')
+for proj in "$PROJECT_A" "$PROJECT_A" "$PROJECT_B"; do
+  scaffold observe event knowledge_gap_signal \
+    --branch=main --topic=agent-eval-harnesses --source=agent_search \
+    --project-id="$proj" --step-name=tech-stack \
+    --agent-excerpt="manual e2e test"
+done
+scaffold observe audit --scope=docs --json | jq '.findings[] | select(.lens_id=="I-knowledge-gaps")'
+```
+
+Expected: one finding with `severity=P2`, `signal_count=4` (3 ledger +
+1 lessons), `distinct_project_count=2`.
+
+### Where to find the finding
+
+`scaffold observe audit` (with no scope flag, or `--scope=all`) writes
+the audit sidecar to `docs/audits/<id>.{md,json}`. The terminal output
+also surfaces Lens I findings inline. To run just Lens I, scope to
+`--scope=docs` (it lives in `SCOPE_DOC_LENSES` alongside lens H).
+
+### Adding a knowledge entry from a Lens I finding
+
+The finding's `fix_hint.target` is `content/knowledge/<category>/<topic>.md`
+with `<category>` as a literal placeholder — categories are a human
+judgment. The `fix_hint.prompt` is a summary suitable for handing to
+a writing-knowledge agent.
+
+**What happens after the entry lands:**
+
+- *New* gap signals stop accumulating: downstream agents now find the
+  topic in the injected knowledge base and do not emit a
+  `knowledge_gap_signal` event for it.
+- *Existing* signals — the ones already in the 90-day window that drove
+  the finding — keep contributing to Lens I's bucket count until they
+  age out. The finding may therefore re-appear on subsequent audit runs
+  for up to 90 days after the entry is added.
+- To silence the finding immediately, use
+  `scaffold observe ack <finding-id>`. Acknowledged findings are
+  excluded from future audit output until they're reopened.
+
+Phase 4 adds an "existing-entry suppression" check inside Lens I that
+will close the finding automatically once
+`content/knowledge/<category>/<topic>.md` exists. See
+`docs/superpowers/deferred-findings/feat+knowledge-freshness-phase-3.md`
+(PR #397 review F-001) for the design rationale.

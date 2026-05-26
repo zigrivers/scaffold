@@ -163,6 +163,20 @@ function renderEvidence(ev: Evidence): string {
     const docs = `\`${mdEscape(ev.left_doc)}\` ↔ \`${mdEscape(ev.right_doc)}\``
     return `*Documents:* ${docs}\n\n*Conflict:* ${mdEscape(ev.conflict)}`
   }
+  if (ev.kind === 'knowledge_gap') {
+    const lines = [
+      `*Topic:* \`${mdEscape(ev.topic)}\``,
+      `*Signals:* ${ev.signal_count} across ${ev.distinct_project_count} projects`,
+      `*Window:* ${ev.first_seen} → ${ev.last_seen}`,
+    ]
+    if (ev.example_excerpts.length > 0) {
+      lines.push('*Example excerpts:*')
+      for (const ex of ev.example_excerpts) {
+        lines.push(`- "${mdEscape(ex)}"`)
+      }
+    }
+    return lines.join('\n')
+  }
   return `\`\`\`\`json\n${JSON.stringify(ev, null, 2)}\n\`\`\`\``
 }
 

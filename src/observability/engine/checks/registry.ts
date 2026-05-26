@@ -7,6 +7,7 @@ import { lensEDesign } from '../../checks/lens-e-design.js'
 import { lensFScope } from '../../checks/lens-f-scope.js'
 import { makeLensGDecisions } from '../../checks/lens-g-decisions.js'
 import { lensHCrossDoc } from '../../checks/lens-h-cross-doc.js'
+import { lensIKnowledgeGaps } from '../../checks/lens-i-knowledge-gaps.js'
 
 export type LensFn = (
   graph: DocGraph, ledger: { events: Event[] }, availability: AvailabilityMap,
@@ -39,6 +40,11 @@ export const LENS_REGISTRY: LensManifest[] = [
     required: ['git', 'pipeline_docs'], optional: [], depends_on: ['D-stack'] },
   { id: 'H-cross-doc',   name: 'Cross-doc inconsistency', profiles: ['fast', 'full'],
     required: ['pipeline_docs'], optional: [] },
+  {
+    id: 'I-knowledge-gaps', name: 'Knowledge gaps',
+    profiles: ['fast', 'full'],
+    required: [], optional: [],
+  },
 ]
 
 export function getLensManifest(id: string): LensManifest | undefined {
@@ -54,6 +60,7 @@ export const LENS_IMPLEMENTATIONS: Record<string, LensFn> = {
   'F-scope':       lensFScope,
   'G-decisions':   makeLensGDecisions(process.cwd()),
   'H-cross-doc':   lensHCrossDoc,
+  'I-knowledge-gaps': lensIKnowledgeGaps,
 }
 
 export { makeLensGDecisions }

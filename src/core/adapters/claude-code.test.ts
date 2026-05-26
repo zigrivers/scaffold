@@ -1,6 +1,13 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, beforeAll, afterAll, afterEach } from 'vitest'
 import { ClaudeCodeAdapter } from './claude-code.js'
 import type { AdapterContext, AdapterStepInput, AdapterFinalizeInput } from './adapter.js'
+
+const ORIGINAL_QUIET = process.env['SCAFFOLD_GAP_SIGNAL_QUIET']
+beforeAll(() => { process.env['SCAFFOLD_GAP_SIGNAL_QUIET'] = '1' })
+afterAll(() => {
+  if (ORIGINAL_QUIET === undefined) delete process.env['SCAFFOLD_GAP_SIGNAL_QUIET']
+  else process.env['SCAFFOLD_GAP_SIGNAL_QUIET'] = ORIGINAL_QUIET
+})
 
 const makeContext = (overrides?: Partial<AdapterContext>): AdapterContext => ({
   projectRoot: '/projects/myapp',
@@ -134,5 +141,45 @@ describe('ClaudeCodeAdapter', () => {
     adapter.initialize(makeContext())
     const output = adapter.generateStepWrapper(makeStepInput())
     expect(output.files[0].writeMode).toBe('create')
+  })
+})
+
+describe('buildKnowledgeSection — gap-signal tail', () => {
+  // The file-level beforeAll sets QUIET=1 as the stable baseline so the rest
+  // of the suite's tests don't see the tail. These inner tests need to
+  // toggle the var, but must restore the baseline (not whatever was set at
+  // module-parse time — that was always undefined before beforeAll ran).
+  beforeEach(() => { delete process.env['SCAFFOLD_GAP_SIGNAL_QUIET'] })
+  afterEach(() => { process.env['SCAFFOLD_GAP_SIGNAL_QUIET'] = '1' })
+
+  it('emits Domain Knowledge section + gap-signal tail when entries are present', () => {
+    const adapter = new ClaudeCodeAdapter()
+    const output = adapter.generateStepWrapper(makeStepInput({
+      slug: 'tech-stack',
+      knowledgeEntries: [{ name: 'tdd-patterns', description: 'd', content: 'c' }],
+    }))
+    expect(output.files[0].content).toContain('## Domain Knowledge')
+    expect(output.files[0].content).toContain('scaffold observe event knowledge_gap_signal')
+    expect(output.files[0].content).toContain('--step-name="tech-stack"')
+  })
+
+  it('omits both sections when there are no entries', () => {
+    const adapter = new ClaudeCodeAdapter()
+    const output = adapter.generateStepWrapper(makeStepInput({
+      slug: 'tech-stack', knowledgeEntries: [],
+    }))
+    expect(output.files[0].content).not.toContain('Domain Knowledge')
+    expect(output.files[0].content).not.toContain('scaffold observe event')
+  })
+
+  it('omits the tail when SCAFFOLD_GAP_SIGNAL_QUIET=1', () => {
+    process.env['SCAFFOLD_GAP_SIGNAL_QUIET'] = '1'
+    const adapter = new ClaudeCodeAdapter()
+    const output = adapter.generateStepWrapper(makeStepInput({
+      slug: 'tech-stack',
+      knowledgeEntries: [{ name: 'tdd-patterns', description: 'd', content: 'c' }],
+    }))
+    expect(output.files[0].content).toContain('## Domain Knowledge')
+    expect(output.files[0].content).not.toContain('scaffold observe event')
   })
 })
