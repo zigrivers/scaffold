@@ -250,6 +250,14 @@ describe('descriptionShingle', () => {
     expect(shingle).toEqual(['aaaaa'])
   })
 
+  it('returns empty array for strings shorter than 5 chars', () => {
+    expect(descriptionShingle('abc')).toEqual([])
+  })
+
+  it('returns single gram for strings exactly 5 chars', () => {
+    expect(descriptionShingle('abcde')).toEqual(['abcde'])
+  })
+
   it('normalizes descriptions before shingling', () => {
     expect(descriptionShingle('Bug at line 42 here')).toEqual(descriptionShingle('bug here'))
   })
@@ -268,7 +276,13 @@ describe('jaccardSimilarity', () => {
     expect(jaccardSimilarity(['a', 'b'], ['b', 'c'])).toBeCloseTo(1 / 3)
   })
 
-  it('treats two empty sets as identical', () => {
-    expect(jaccardSimilarity([], [])).toBe(1)
+  it('returns 0 for two empty sets', () => {
+    expect(jaccardSimilarity([], [])).toBe(0)
+  })
+
+  it('crosses the 0.7 threshold for near-identical phrasings', () => {
+    const a = descriptionShingle('unused variable named fooBar should be removed')
+    const b = descriptionShingle('unused variable named fooBar must be removed')
+    expect(jaccardSimilarity(a, b)).toBeGreaterThanOrEqual(0.7)
   })
 })

@@ -136,7 +136,8 @@ function escapeKeyPart(part: string): string {
 
 export function descriptionShingle(description: string): string[] {
   const normalized = normalizeDescriptionForKey(description)
-  if (normalized.length <= 5) return normalized === '' ? [] : [normalized]
+    .replace(/\b(?:must|should)\b/g, 'should')
+  if (normalized.length < 5) return []
 
   const grams = new Set<string>()
   for (let i = 0; i <= normalized.length - 5; i += 1) {
@@ -151,7 +152,7 @@ export function jaccardSimilarity(
 ): number {
   const left = a instanceof Set ? a : new Set(a)
   const right = b instanceof Set ? b : new Set(b)
-  if (left.size === 0 && right.size === 0) return 1
+  if (left.size === 0 && right.size === 0) return 0
 
   let intersection = 0
   for (const item of left) {
