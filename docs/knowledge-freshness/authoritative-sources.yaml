@@ -64,6 +64,13 @@ hosts:
   # Testing
   - docs.pact.io           # Pact (consumer-driven contract tests)
 
+  # Compliance / regulatory (fintech, payments, audit)
+  - pcisecuritystandards.org  # PCI Security Standards Council (PCI-DSS, PIN, P2PE)
+  - aicpa.org              # AICPA (SOC 2 Trust Services Criteria)
+  - www.sec.gov            # US Securities and Exchange Commission (SEC Rule 17a-4, etc.)
+  - www.finra.org          # FINRA (broker-dealer supervision rules)
+  - eur-lex.europa.eu      # EU legislation portal (canonical GDPR + EU financial regulation)
+
   # Research / data-science reproducibility
   - the-turing-way.netlify.app  # The Turing Way (Alan Turing Institute reproducible-research handbook)
 
