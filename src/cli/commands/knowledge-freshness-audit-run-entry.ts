@@ -1,10 +1,37 @@
+import { execSync } from 'node:child_process'
 import type { Argv, CommandModule } from 'yargs'
-import { dispatchLlm } from '../../observability/engine/llm-dispatcher.js'
-import { runEntryAudit, type Dispatcher } from '../../knowledge-freshness/audit-runner.js'
+import { runEntryAudit } from '../../knowledge-freshness/audit-runner.js'
+import {
+  resolveProvider,
+  buildDispatcher,
+  type Provider,
+} from '../../knowledge-freshness/providers/index.js'
 
 interface AuditRunEntryArgs {
   entryPath: string
   timeout: number
+  provider?: string
+}
+
+/**
+ * Probe whether the `claude` CLI is on PATH. Used only for rule 5 of the
+ * provider precedence chain (the "local dev with keychain auth" case).
+ *
+ * Platform-aware: POSIX systems use `command -v` (POSIX builtin, exits
+ * non-zero when the binary is missing); Windows uses `where`, which has
+ * the same exit-code semantics. The existing llm-dispatcher already
+ * special-cases Windows via `cmd.exe`, so we follow the same convention
+ * to keep rule-5 fallback working for Windows operators with Claude Code
+ * installed.
+ */
+function probeClaudeOnPath(): boolean {
+  const probe = process.platform === 'win32' ? 'where claude' : 'command -v claude'
+  try {
+    execSync(probe, { stdio: 'ignore' })
+    return true
+  } catch {
+    return false
+  }
 }
 
 const auditRunEntryCommand: CommandModule<Record<string, unknown>, AuditRunEntryArgs> = {
@@ -19,49 +46,28 @@ const auditRunEntryCommand: CommandModule<Record<string, unknown>, AuditRunEntry
     .option('timeout', {
       type: 'number',
       default: 600,
-      describe: 'Subprocess timeout in seconds (default 600s for grounded audits)',
+      describe: 'Subprocess / HTTP timeout in seconds (default 600s for grounded audits)',
+    })
+    .option('provider', {
+      type: 'string',
+      choices: ['anthropic', 'deepseek'],
+      describe:
+        'Force a specific LLM provider. Overrides KNOWLEDGE_FRESHNESS_PROVIDER and ' +
+        'auto-detection from env vars. Default: resolved from env (see ' +
+        'docs/knowledge-freshness/operations.md §4).',
     }) as Argv<AuditRunEntryArgs>,
   handler: async (argv) => {
-    // SECURITY: the dispatcher command is hardcoded to `claude -p`, never loaded
-    // from project-local config — executing a repo-controlled command string
-    // would allow arbitrary code execution when auditing untrusted repositories.
-    // Only the timeout is exposed as a flag (performance only, not code execution).
-    // Matches the security stance of src/observability/checks/lens-h-cross-doc.ts.
-    //
-    // SECURITY (round-6 F-001): the model runs with NO tools. The audit
-    // runner pre-fetches source bodies in Node (where the SSRF / DNS /
-    // redirect / timeout guards apply) and embeds them in the prompt as
-    // `{{prefetched_sources}}`. If we instead granted WebFetch here, a
-    // prompt-injection attack from the author-controlled entry body could
-    // direct WebFetch at arbitrary URLs — bypassing every Node-side URL
-    // guard. Disabling tools eliminates that class of attack at the cost
-    // of larger prompts.
-    //
-    // NB on round-7 F-001: the original finding suggested `--bare` for
-    // isolation from "untrusted downstream repo" config. But this audit
-    // subcommand only operates on scaffold's OWN `content/knowledge/`
-    // entries — it never runs from a downstream repo's context. The
-    // round-7 threat model (downstream repo .claude/hooks injection)
-    // does not apply, and `--bare` blocks keychain-based Anthropic auth
-    // which the operator typically relies on. Keeping `--tools ""` from
-    // round-6 F-001 (no model-side WebFetch — prompt-injection defense)
-    // since that one is real for any author-controlled entry body.
-    const command = 'claude -p --tools ""'
-    const timeoutMs = argv.timeout * 1000
-
-    const dispatcher: Dispatcher = async (prompt) => {
-      const result = await dispatchLlm({ prompt, command, timeoutMs })
-      if (!result.ok) {
-        // Surface the dispatcher's failure reason verbatim — it already carries
-        // useful detail (subprocess exit code, stderr hint, timeout).
-        throw new Error(`audit dispatcher failed: ${result.reason}`)
-      }
-      // Use raw stdout (not parsed) so the runner's schema-aware extractor
-      // can walk the full response. The dispatcher's last→first extractor
-      // is schema-unaware and would short-circuit on stray JSON.
-      return result.raw
-    }
-
+    // Resolve the provider FIRST so a misconfiguration fails before we
+    // do any other work (entry-file reading, frontmatter parsing, etc.).
+    const provider: Provider = resolveProvider({
+      env: process.env,
+      args: { provider: argv.provider },
+      claudeOnPath: probeClaudeOnPath(),
+    })
+    const dispatcher = buildDispatcher(provider, {
+      timeoutSec: argv.timeout,
+      env: process.env,
+    })
     const verdict = await runEntryAudit(argv.entryPath, dispatcher)
     process.stdout.write(JSON.stringify(verdict, null, 2) + '\n')
   },
