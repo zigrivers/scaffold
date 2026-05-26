@@ -2,6 +2,10 @@
 name: library-architecture
 description: Module design, dependency minimization, tree-shaking enablement, and plugin patterns for published libraries
 topics: [library, architecture, modules, tree-shaking, plugins, dependencies, design]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Library architecture is constrained by two forces that do not apply to applications: the consumer's bundle size budget and the consumer's dependency graph. Every architectural decision must account for what the library adds to consumers who import it — not just the feature complexity it solves. A well-architected library is modular by default, has minimal or zero runtime dependencies, enables tree-shaking so consumers pay only for what they use, and provides extension points that don't require forking the library.

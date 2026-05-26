@@ -2,6 +2,10 @@
 name: library-dev-environment
 description: Monorepo setup, npm link workflow, build watch mode, and local consumer testing for library development
 topics: [library, dev-environment, monorepo, npm-link, build-watch, local-testing]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Library development environment setup is distinct from application development: you are building code that will be consumed by other projects, which means your dev workflow must include a way to test the library as a consumer would — before publishing to npm. The feedback loop between changing library source and seeing the effect in a consumer application is the central challenge. Get this wrong, and you spend hours debugging issues that only surface after publish.

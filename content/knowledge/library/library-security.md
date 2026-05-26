@@ -2,6 +2,10 @@
 name: library-security
 description: Supply chain security, dependency auditing, npm provenance, SBOM, and security policy for published libraries
 topics: [library, security, supply-chain, npm-provenance, sbom, dependency-auditing, cve]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Library security is supply chain security. When a library is published to npm and installed by thousands of projects, a single compromised release or a malicious dependency can propagate vulnerabilities to all consumers simultaneously. The 2021 `ua-parser-js` incident and the 2022 `node-ipc` sabotage demonstrated that even widely-used libraries with established maintainers can be compromised. Library authors bear a responsibility to their consumers that application developers do not — a security failure in a library is a security failure for every project that depends on it.

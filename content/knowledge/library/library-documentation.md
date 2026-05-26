@@ -2,6 +2,10 @@
 name: library-documentation
 description: TypeDoc/JSDoc setup, README structure, example code, migration guides, and API reference for published libraries
 topics: [library, documentation, typedoc, jsdoc, readme, examples, migration-guides, api-reference]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Library documentation is the primary onboarding surface for new consumers and the support surface for existing ones. Poor documentation causes consumers to misuse the API, open avoidable issues, and ultimately abandon the library for better-documented alternatives. Good documentation reduces support burden, increases adoption, and communicates the library's quality and professionalism. Documentation must be treated as a first-class deliverable, not an afterthought after code is complete.

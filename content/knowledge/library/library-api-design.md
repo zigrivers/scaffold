@@ -2,6 +2,10 @@
 name: library-api-design
 description: Public surface design, method signatures, error contracts, and extension points for published library APIs
 topics: [library, api-design, public-surface, method-signatures, error-contracts, extension-points]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Library API design is the highest-leverage activity in library development. A well-designed API makes correct usage easy and incorrect usage hard, survives multiple major versions without fundamental restructuring, and communicates intent through its shape alone. Poor API design cannot be fixed without breaking changes — every naming mistake, parameter order error, and missing overload becomes permanent once consumers adopt it. Design APIs from the consumer's perspective first, implementation second.

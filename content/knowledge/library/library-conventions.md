@@ -2,6 +2,11 @@
 name: library-conventions
 description: Public API naming, deprecation patterns, changelog conventions, and export patterns for published libraries
 topics: [library, conventions, naming, deprecation, changelog, exports, api-design]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://www.conventionalcommits.org/en/v1.0.0/
 ---
 
 Library conventions are the agreements that make a library predictable, navigable, and trustworthy across versions. They cover how public APIs are named, how deprecated APIs are marked and eventually removed, how changes are communicated through changelogs, and how exports are structured. Inconsistent conventions are a tax on every consumer — they create confusion about what is stable, what is safe to use, and what changed between versions.

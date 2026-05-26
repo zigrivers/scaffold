@@ -2,6 +2,10 @@
 name: library-testing
 description: Unit tests, consumer integration tests, example app tests, snapshot testing, and type testing for published libraries
 topics: [library, testing, unit-tests, integration-tests, type-testing, tsd, snapshot-testing, consumer-testing]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Library testing has a different threat model than application testing. You are not just testing that your code works internally — you are testing that the public API works correctly from a consumer's perspective, across different environments and module systems, and that type definitions accurately reflect runtime behavior. A library with excellent unit tests but untested consumer integration can still fail spectacularly when installed in a real project. Every public API export needs test coverage that exercises it as a consumer would.
