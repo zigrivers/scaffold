@@ -59,6 +59,14 @@ describe('normalizeDescriptionForKey', () => {
     expect(normalizeDescriptionForKey('Bug found at 42 in code')).toBe('bug found in code')
   })
 
+  it('preserves meaningful numeric phrases after "at"', () => {
+    const thirty = normalizeDescriptionForKey('Timeout at 30 seconds')
+    const sixty = normalizeDescriptionForKey('Timeout at 60 seconds')
+    expect(thirty).toBe('timeout at 30 seconds')
+    expect(sixty).toBe('timeout at 60 seconds')
+    expect(thirty).not.toBe(sixty)
+  })
+
   it('strips severity-prefix filler', () => {
     expect(normalizeDescriptionForKey('P0: critical bug')).toBe('critical bug')
     expect(normalizeDescriptionForKey('Critical: real issue')).toBe('real issue')
