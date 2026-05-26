@@ -128,21 +128,22 @@ describe('normalizeDescriptionForKey', () => {
 })
 
 describe('normalizeSuggestionForKey', () => {
-  it('collapses whitespace', () => {
-    expect(normalizeSuggestionForKey('  Use   Const   instead  ')).toBe('Use Const instead')
+  it('lowercases prose and collapses whitespace', () => {
+    expect(normalizeSuggestionForKey('  Use   Const   instead  ')).toBe('use const instead')
+    expect(normalizeSuggestionForKey('Fix it')).toBe(normalizeSuggestionForKey('fix it'))
   })
 
   it('preserves punctuation and code-like tokens', () => {
-    expect(normalizeSuggestionForKey('Rename foo to bar.')).toBe('Rename foo to bar.')
-    expect(normalizeSuggestionForKey('Rename `FooBar` to `fooBar`.')).toBe('Rename `FooBar` to `fooBar`.')
+    expect(normalizeSuggestionForKey('Rename foo to bar.')).toBe('rename foo to bar.')
+    expect(normalizeSuggestionForKey('Rename `FooBar` to `fooBar`.')).toBe('rename `FooBar` to `fooBar`.')
     expect(normalizeSuggestionForKey('Rename FooBar to fooBar.')).not.toBe(
       normalizeSuggestionForKey('Rename foobar to foobar.'),
     )
   })
 
   it('does not strip description-only noise patterns', () => {
-    expect(normalizeSuggestionForKey('P1: update line 42.')).toBe('P1: update line 42.')
-    expect(normalizeSuggestionForKey('Use port at 3000.')).toBe('Use port at 3000.')
+    expect(normalizeSuggestionForKey('P1: update line 42.')).toBe('p1: update line 42.')
+    expect(normalizeSuggestionForKey('Use port at 3000.')).toBe('use port at 3000.')
   })
 
   it('handles empty input', () => {

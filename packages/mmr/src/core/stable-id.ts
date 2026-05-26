@@ -77,5 +77,30 @@ function appendNormalizedPart(out: string[], part: string, spaceBefore: boolean)
 export function normalizeSuggestionForKey(suggestion: string): string {
   // Suggestions are intentionally distinguished by their full short text.
   // Do not apply description noise stripping here.
-  return suggestion.replace(/\s+/g, ' ').trim()
+  if (suggestion === '') return ''
+  const out: string[] = []
+  let cursor = 0
+
+  for (const match of suggestion.matchAll(CODE_SPAN_RE)) {
+    const index = match.index ?? 0
+    const before = suggestion.slice(cursor, index)
+    appendNormalizedPart(out, normalizeSuggestionSegment(before), /^\s/.test(before))
+    appendNormalizedPart(out, '`' + match[1] + '`', /\s$/.test(before))
+    cursor = index + match[0].length
+  }
+
+  const tail = suggestion.slice(cursor)
+  appendNormalizedPart(out, normalizeSuggestionSegment(tail), /^\s/.test(tail))
+  return out.join('').trim()
+}
+
+function normalizeSuggestionSegment(s: string): string {
+  return s
+    .replace(/[A-Za-z][A-Za-z0-9_]*/g, (token) => (isMixedCaseIdentifier(token) ? token : token.toLowerCase()))
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function isMixedCaseIdentifier(token: string): boolean {
+  return /[a-z][A-Z]|[A-Z][a-z]+[A-Z]/.test(token)
 }
