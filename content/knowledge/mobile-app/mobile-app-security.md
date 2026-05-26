@@ -2,6 +2,14 @@
 name: mobile-app-security
 description: Secure storage (Keychain/Keystore), certificate pinning, biometric authentication, jailbreak/root detection, and data protection for mobile apps
 topics: [mobile-app, security, keychain, keystore, certificate-pinning, biometrics, jailbreak-detection, data-protection]
+volatility: fast-moving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://owasp.org/www-project-mobile-top-10/
+  - url: https://owasp.org/www-project-mobile-application-security/
+  - url: https://developer.apple.com/documentation/security/keychain_services
+  - url: https://developer.android.com/privacy-and-security/keystore
 ---
 
 Mobile apps operate in an adversarial environment: devices are lost or stolen, users jailbreak/root their devices, and network traffic is subject to interception. Security must be designed in, not bolted on. The most common mobile security failures are storing secrets in plaintext, trusting all TLS certificates (or disabling certificate validation), and failing to protect data at rest. Implement defense in depth — assume any single control will fail.

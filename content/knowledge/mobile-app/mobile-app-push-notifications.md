@@ -2,6 +2,12 @@
 name: mobile-app-push-notifications
 description: APNs and FCM setup, notification channels, rich notifications, background handling, and permission best practices for mobile apps
 topics: [mobile-app, push-notifications, apns, fcm, firebase, notification-channels, rich-notifications, background]
+volatility: fast-moving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://developer.apple.com/documentation/usernotifications
+  - url: https://developer.android.com/develop/ui/views/notifications
 ---
 
 Push notifications are a direct channel to re-engage users, but they are also the fastest way to lose them: irrelevant or excessive notifications get disabled or trigger uninstalls. The technical implementation requires setting up APNs (Apple Push Notification service) for iOS and FCM (Firebase Cloud Messaging) for Android, managing device tokens, and handling notifications in all app states (foreground, background, terminated). Get the permission request timing right — it determines your opt-in rate.
