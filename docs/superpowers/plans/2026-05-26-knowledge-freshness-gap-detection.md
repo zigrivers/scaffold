@@ -288,19 +288,29 @@ the end of the switch, immediately before the closing brace:
     reqStr('knowledge_gap_signal.payload.topic', filteredPayload.topic, errors, 80)
     if (typeof filteredPayload.topic === 'string' &&
         !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(filteredPayload.topic)) {
-      errors.push('knowledge_gap_signal.payload.topic must be kebab-case slug (lowercase, hyphen-separated)')
+      errors.push(
+        'knowledge_gap_signal.payload.topic must be kebab-case slug ' +
+        '(lowercase, hyphen-separated)',
+      )
     }
     if (!VALID_GAP_SOURCES.includes(filteredPayload.source as never)) {
-      errors.push('knowledge_gap_signal.payload.source must be agent_search | lessons | manual')
+      errors.push(
+        'knowledge_gap_signal.payload.source must be agent_search | lessons | manual',
+      )
     }
     if (typeof filteredPayload.project_id !== 'string') {
       errors.push('knowledge_gap_signal.payload.project_id required')
     } else if (filteredPayload.project_id === 'lessons') {
       if (filteredPayload.source !== 'lessons') {
-        errors.push('knowledge_gap_signal.payload.project_id="lessons" is reserved for synthetic lessons.md scanner signals; source must also be "lessons"')
+        errors.push(
+          'knowledge_gap_signal.payload.project_id="lessons" is reserved for synthetic ' +
+          'lessons.md scanner signals; source must also be "lessons"',
+        )
       }
     } else if (!/^[a-f0-9]{64}$/.test(filteredPayload.project_id)) {
-      errors.push('knowledge_gap_signal.payload.project_id must be a 64-char sha256 hex string')
+      errors.push(
+        'knowledge_gap_signal.payload.project_id must be a 64-char sha256 hex string',
+      )
     }
     optStr('knowledge_gap_signal.payload.step_name', filteredPayload.step_name, errors)
     optStr('knowledge_gap_signal.payload.agent_excerpt', filteredPayload.agent_excerpt, errors, 200)
@@ -331,35 +341,114 @@ anything breaks, it's a test that was implicitly exhaustive over
 `EventType`; either add the missing arm or filter out
 `knowledge_gap_signal` in that test as appropriate.
 
-- [ ] **Step 10: CLI smoke-test (no code changes; just proof of plumbing)**
+- [ ] **Step 10: Add an automated handleEvent integration test**
 
-The CLI accepts arbitrary `--<key>=<value>` flags via
-`src/cli/commands/observe.ts:399–408` and filters payload via
-`EVENT_PAYLOAD_KEYS[type]`. No code change is needed; verify with a
-manual invocation against a temp worktree:
+The spec's §1.6 calls for an "integration test: invoking `handleEvent`
+through the CLI flow produces a validated event in the ledger." The
+manual smoke command in Step 10b below is informational; the
+auto-running guard lives here, in `src/cli/commands/observe.test.ts`.
+
+Append a new `describe` block to `src/cli/commands/observe.test.ts`:
+
+```typescript
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import crypto from 'node:crypto'
+import { handleEvent } from './observe.js'
+
+const tmpDirs: string[] = []
+
+function makeTmpWorktree(): string {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'observe-evt-kgs-'))
+  fs.mkdirSync(path.join(dir, '.scaffold'), { recursive: true })
+  // Identity file so writeEvent doesn't bail out
+  fs.writeFileSync(path.join(dir, '.scaffold', 'identity.json'), JSON.stringify({
+    worktree_id: crypto.randomUUID(),
+    worktree_label: 'test',
+    created_at: new Date().toISOString(),
+  }))
+  tmpDirs.push(dir)
+  return dir
+}
+
+afterEach(() => {
+  while (tmpDirs.length > 0) fs.rmSync(tmpDirs.pop()!, { recursive: true, force: true })
+})
+
+describe('handleEvent — knowledge_gap_signal', () => {
+  it('persists all five payload fields through the CLI flow', async () => {
+    const cwd = makeTmpWorktree()
+    const code = await handleEvent({
+      cwd, type: 'knowledge_gap_signal', branch: 'main', taskId: null,
+      keyValues: {
+        topic: 'agent-eval-harnesses',
+        source: 'agent_search',
+        'project-id': 'a'.repeat(64),
+        'step-name': 'tech-stack',
+        'agent-excerpt': 'a manual smoke test',
+      },
+    })
+    expect(code).toBe(0)
+    const ledger = fs.readFileSync(path.join(cwd, '.scaffold', 'activity.jsonl'), 'utf8')
+    const last = JSON.parse(ledger.trim().split('\n').pop()!)
+    expect(last.type).toBe('knowledge_gap_signal')
+    expect(last.payload).toEqual({
+      topic: 'agent-eval-harnesses',
+      source: 'agent_search',
+      project_id: 'a'.repeat(64),
+      step_name: 'tech-stack',
+      agent_excerpt: 'a manual smoke test',
+    })
+  })
+
+  it('rejects project_id="lessons" with non-lessons source (round-trip of validator rule)', async () => {
+    const cwd = makeTmpWorktree()
+    const code = await handleEvent({
+      cwd, type: 'knowledge_gap_signal', branch: 'main', taskId: null,
+      keyValues: { topic: 'foo', source: 'agent_search', 'project-id': 'lessons' },
+    })
+    expect(code).toBe(2) // validation-failure exit code
+  })
+})
+```
+
+Run the test:
 
 ```bash
+npx vitest run src/cli/commands/observe.test.ts
+```
+
+Expected: PASS for both cases.
+
+- [ ] **Step 10b: Manual CLI smoke (optional, for local verification)**
+
+The automated integration test above is the load-bearing check. For
+local sanity, you can also run a manual smoke against a temp worktree
+(make sure `npm run build` has run **unconditionally** first so `dist/`
+reflects the new event type — an existing `dist/` from before T1 will
+be stale):
+
+```bash
+# From the scaffold worktree root:
+npm run build
+SCAFFOLD_BIN="$(git rev-parse --show-toplevel)/dist/index.js"
 TMPDIR=$(mktemp -d)
 cd "$TMPDIR"
 git init -q && git remote add origin https://example.org/test 2>/dev/null
-node /Users/kenallred/Developer/scaffold/.claude/worktrees/feat+knowledge-freshness/dist/index.js \
-  observe event knowledge_gap_signal \
-  --branch="main" \
-  --topic="smoke-test-topic" \
-  --source=agent_search \
+node "$SCAFFOLD_BIN" observe event knowledge_gap_signal \
+  --branch="main" --topic="smoke-test-topic" --source=agent_search \
   --project-id="$(printf 'https://example.org/test' | shasum -a 256 | awk '{print $1}')" \
-  --step-name="tech-stack" \
-  --agent-excerpt="manual smoke test"
+  --step-name="tech-stack" --agent-excerpt="manual smoke test"
 echo "exit: $?"
 cat .scaffold/activity.jsonl | tail -1
+cd - >/dev/null && rm -rf "$TMPDIR"
 ```
 
 Expected: exit 0; the JSONL line shows
 `"type":"knowledge_gap_signal","payload":{"topic":"smoke-test-topic",...}`
 with all five payload fields present.
-
-If `dist/` doesn't exist, run `npm run build` first from the worktree
-root.
 
 - [ ] **Step 11: Commit**
 
@@ -601,13 +690,25 @@ For each match, add a step-name argument like `'test-step'`.
 
 Also: existing tests likely rely on the **absence** of the tail in the
 output. The simplest way to keep them passing without rewriting them is
-to set `SCAFFOLD_GAP_SIGNAL_QUIET=1` in a top-level `beforeAll`/`beforeEach`
-in `engine.test.ts`. Add this at the top of the file (after imports):
+to set `SCAFFOLD_GAP_SIGNAL_QUIET=1` in a top-level `beforeAll`/`afterAll`
+in `engine.test.ts`. First, ensure the vitest imports at the top of the
+file include `beforeAll` and `afterAll` — if the existing import is just
+`import { describe, it, expect } from 'vitest'`, extend it. Then add
+this block after imports, BEFORE the existing `describe`s:
 
 ```typescript
+const ORIGINAL_QUIET = process.env['SCAFFOLD_GAP_SIGNAL_QUIET']
 beforeAll(() => { process.env['SCAFFOLD_GAP_SIGNAL_QUIET'] = '1' })
-afterAll(() => { delete process.env['SCAFFOLD_GAP_SIGNAL_QUIET'] })
+afterAll(() => {
+  if (ORIGINAL_QUIET === undefined) delete process.env['SCAFFOLD_GAP_SIGNAL_QUIET']
+  else process.env['SCAFFOLD_GAP_SIGNAL_QUIET'] = ORIGINAL_QUIET
+})
 ```
+
+The save-and-restore pattern matters because some CI environments may
+set `SCAFFOLD_GAP_SIGNAL_QUIET` for their own reasons; an unconditional
+`delete` would clobber that. Same pattern is used by the new dedicated
+test block below (with `beforeEach`/`afterEach` for finer scoping).
 
 Add a new dedicated test that exercises the WITH-tail path:
 
@@ -705,11 +806,23 @@ pass `slug`:
 Run: `npx vitest run src/core/adapters/claude-code.test.ts`
 Expected: Some failures because existing tests don't expect the tail.
 
-Apply the same approach as Step 7: set
-`SCAFFOLD_GAP_SIGNAL_QUIET=1` in a `beforeAll` at the top of
-`claude-code.test.ts` to keep existing tests stable, then add a
-dedicated `describe('buildKnowledgeSection — gap-signal tail')` block
-covering:
+Apply the same approach as Step 7: ensure the vitest imports at the
+top of `src/core/adapters/claude-code.test.ts` include `beforeAll`,
+`afterAll`, `beforeEach`, and `afterEach` (extend the existing import
+line). Then add the save-and-restore top-level block at the top of the
+file (after imports, before existing `describe`s):
+
+```typescript
+const ORIGINAL_QUIET = process.env['SCAFFOLD_GAP_SIGNAL_QUIET']
+beforeAll(() => { process.env['SCAFFOLD_GAP_SIGNAL_QUIET'] = '1' })
+afterAll(() => {
+  if (ORIGINAL_QUIET === undefined) delete process.env['SCAFFOLD_GAP_SIGNAL_QUIET']
+  else process.env['SCAFFOLD_GAP_SIGNAL_QUIET'] = ORIGINAL_QUIET
+})
+```
+
+This stabilizes existing claude-code tests. Then add a dedicated
+`describe('buildKnowledgeSection — gap-signal tail')` block covering:
 
 ```typescript
 describe('buildKnowledgeSection — gap-signal tail', () => {
@@ -1434,14 +1547,57 @@ describe('lensIKnowledgeGaps', () => {
   })
 
   it('collapses different surface-spellings of the same topic via normalizeTopic', async () => {
+    // Three different on-the-wire topics that all normalize to 'foo-bar'.
+    // If the lens bucketed by raw `payload.topic`, this would produce 3
+    // buckets of size 1 (no finding). If it normalizes first, it produces
+    // one bucket of size 3 with 2 distinct projects (P2 fires).
     const findings = await runLens({
       events: [
-        makeEvent({ payload: { topic: 'foo-bar', source: 'agent_search', project_id: VALID_HEX_A } }),
-        makeEvent({ payload: { topic: 'foo-bar', source: 'agent_search', project_id: VALID_HEX_A } }),
-        makeEvent({ payload: { topic: 'foo-bar', source: 'agent_search', project_id: VALID_HEX_B } }),
+        makeEvent({ payload: {
+          topic: 'foo-bar', source: 'agent_search', project_id: VALID_HEX_A,
+        } }),
+        makeEvent({ payload: {
+          topic: 'Foo_Bar', source: 'agent_search', project_id: VALID_HEX_A,
+        } }),
+        makeEvent({ payload: {
+          topic: 'foo bar', source: 'agent_search', project_id: VALID_HEX_B,
+        } }),
       ],
     })
     expect(findings).toHaveLength(1)
+    if (findings[0].evidence.kind !== 'knowledge_gap') throw new Error('unreachable')
+    expect(findings[0].evidence.topic).toBe('foo-bar')
+    expect(findings[0].evidence.signal_count).toBe(3)
+    expect(findings[0].evidence.distinct_project_count).toBe(2)
+  })
+
+  it('lessons-only signals never cross the P2 threshold (negative case)', async () => {
+    // Five lessons mentions of the same topic, no ledger signals.
+    // distinct_project_count = 0 after delete('lessons') → no finding.
+    const cwd = makeTmpProject([
+      'No knowledge entry for "lessons-only-topic".',
+      'No knowledge entry for "lessons-only-topic".',
+      'No knowledge entry for "lessons-only-topic".',
+      'No knowledge entry for "lessons-only-topic".',
+      'No knowledge entry for "lessons-only-topic".',
+    ].join('\n'))
+    const findings = await runLens({ cwd, events: [] })
+    expect(findings).toEqual([])
+  })
+
+  it('high count from a single project + lessons still fails the diversity gate', async () => {
+    // 5 CLI signals from project A + 3 lessons mentions = signal_count=8,
+    // distinct_project_count = 1 (only A; 'lessons' is excluded). No finding.
+    const cwd = makeTmpProject([
+      'No knowledge entry for "same-proj-topic".',
+      'No knowledge entry for "same-proj-topic".',
+      'No knowledge entry for "same-proj-topic".',
+    ].join('\n'))
+    const events = Array.from({ length: 5 }, () => makeEvent({ payload: {
+      topic: 'same-proj-topic', source: 'agent_search', project_id: VALID_HEX_A,
+    } }))
+    const findings = await runLens({ cwd, events })
+    expect(findings).toEqual([])
   })
 
   it('excludes ledger signals older than 90 days from window', async () => {
@@ -1627,16 +1783,21 @@ export const lensIKnowledgeGaps: LensFn = async (
 
     const projectsSample = [...bucket.realProjects].slice(0, MAX_SAMPLE_PROJECTS)
 
+    const titleSummary =
+      `${signalCount} signals across ${distinctProjectCount} projects`
     findings.push({
       id: makeFindingId([lensId, bucket.topic]),
       lens_id: lensId,
       severity,
-      title: `Knowledge base lacks coverage for "${bucket.topic}" — ${signalCount} signals across ${distinctProjectCount} projects`,
+      title:
+        `Knowledge base lacks coverage for "${bucket.topic}" — ${titleSummary}`,
       description:
-        `Downstream agents have emitted ${signalCount} ${signalCount === 1 ? 'signal' : 'signals'} ` +
+        `Downstream agents have emitted ${signalCount} ` +
+        `${signalCount === 1 ? 'signal' : 'signals'} ` +
         `for the topic "${bucket.topic}" across ${distinctProjectCount} distinct ` +
         `${distinctProjectCount === 1 ? 'project' : 'projects'} ` +
-        `in the last ${WINDOW_DAYS} days. Consider adding a knowledge entry covering this topic.`,
+        `in the last ${WINDOW_DAYS} days. ` +
+        `Consider adding a knowledge entry covering this topic.`,
       source_doc: '',
       evidence: {
         kind: 'knowledge_gap',
@@ -1655,7 +1816,10 @@ export const lensIKnowledgeGaps: LensFn = async (
       fix_hint: {
         kind: 'edit_doc',
         target: `content/knowledge/<category>/${bucket.topic}.md`,
-        prompt: `Propose a new knowledge entry for "${bucket.topic}". Evidence: ${signalCount} signals from ${distinctProjectCount} projects in the last ${WINDOW_DAYS} days.`,
+        prompt:
+          `Propose a new knowledge entry for "${bucket.topic}". ` +
+          `Evidence: ${signalCount} signals from ${distinctProjectCount} ` +
+          `projects in the last ${WINDOW_DAYS} days.`,
       },
     })
   }
@@ -1927,14 +2091,25 @@ didn't fire — verify `tasks/lessons.md` is at
 `$TMPDIR_E2E`. The lens uses `context.cwd` which `runAudit` threads
 from `primaryRoot`.
 
-- [ ] **Step 5: Run the audit in human-readable mode**
+- [ ] **Step 5: Verify the markdown sidecar pretty-renders the evidence**
+
+`observe audit` prints a compact terminal summary to stdout, but
+**terminal output does not include evidence details** (terminal/dashboard
+renderers omit evidence for every variant — see spec §2.6). The
+pretty-render lives in the markdown sidecar at `docs/audits/<id>.md`,
+which the audit writes alongside stdout.
 
 ```bash
 node "$SCAFFOLD_BIN" observe audit --scope=docs
+# Find the just-written audit markdown sidecar in the temp project:
+LATEST_AUDIT=$(ls -t docs/audits/*.md 2>/dev/null | head -1)
+echo "audit markdown at: $LATEST_AUDIT"
+cat "$LATEST_AUDIT"
 ```
 
-Expected: the finding renders with the markdown pretty-render
-template:
+Expected: the markdown report contains the pretty-rendered evidence
+block from Lens I:
+
 ```
 *Topic:* `agent-eval-harnesses`
 *Signals:* 4 across 2 projects
@@ -1944,6 +2119,18 @@ template:
 - "still nothing on eval harnesses"
 - "another project needs harness docs"
 ```
+
+If the audit doesn't write to `docs/audits/` in the temp project (the
+audit subsystem requires the project to have a recognizable scaffold
+structure), grep stdout for the finding ID instead:
+
+```bash
+node "$SCAFFOLD_BIN" observe audit --scope=docs --json | \
+  jq -r '.findings[] | select(.lens_id=="I-knowledge-gaps") | .id'
+```
+
+The terminal renderer will list the finding (title + severity) but not
+its evidence — that's expected and not a regression.
 
 - [ ] **Step 6: Negative test — same project, no diversity, should NOT fire**
 
@@ -2171,6 +2358,31 @@ in the prompt that drove this Phase 3 work. Address all findings per
 the per-PR round budget (rounds 1–5: fix every P2+; rounds 6+: P0/P1
 only, defer P2/P3 to
 `docs/superpowers/deferred-findings/feat+knowledge-freshness-phase-3.md`).
+
+- [ ] **Step 14: Final landing — sync, verify, push**
+
+After the review loop stabilizes (MMR verdict `pass` or
+`degraded-pass`, no P0/P1 findings remaining, grok prose clean), run
+the final landing sequence to make sure the branch is current and any
+review-fix commits are pushed:
+
+```bash
+make check-all                    # final guard: all gates green
+git pull --rebase origin main     # absorb any main commits since PR open
+make check-all                    # re-run gates if rebase had conflicts
+git push                          # push any review-fix commits + rebase result
+git status                        # verify "Your branch is up to date with 'origin/...'"
+gh pr checks                      # confirm CI on the open PR is green
+```
+
+If `git pull --rebase` produces conflicts, resolve them, re-run
+`make check-all`, then `git rebase --continue` and push. Do **not**
+force-push without explicit user approval — the rebase here is local
+absorption only; if the PR's commits aren't on the rebased base
+already, surface the situation rather than rewriting upstream.
+
+Only mark the PR ready for human merge once `gh pr checks` shows all
+required CI green and the review loop has hit stop conditions.
 
 ---
 
