@@ -357,49 +357,41 @@ through the CLI flow produces a validated event in the ledger." The
 manual smoke command in Step 10b below is informational; the
 auto-running guard lives here, in `src/cli/commands/observe.test.ts`.
 
-Append a new `describe` block to `src/cli/commands/observe.test.ts`.
+Append the new `describe` block to `src/cli/commands/observe.test.ts`,
+**matching the file's established pattern**: named `node:fs` imports
+(not `fs.` namespace), `ensureIdentity()` for identity bootstrap, and
+a single per-`describe` temp directory managed by `beforeEach` /
+`afterEach`. The file's existing `describe('observe event subcommand',
+...)` block at the top is the template — read it before adding the new
+block.
 
-**Imports note:** `observe.test.ts` already imports `describe`, `it`,
-`expect`, `beforeEach`, `afterEach`, and `handleEvent`. Do **not** add
-a duplicate `import ... from 'vitest'` line — pasting the snippet
-verbatim with imports would produce a TypeScript duplicate-binding
-error. If `fs`, `os`, `path`, or `crypto` aren't already imported in
-the file (check the existing imports section), merge those into the
-existing top-of-file imports. The helpers below (`tmpDirs`,
-`makeTmpWorktree`, the `afterEach` cleanup) go after any existing
-shared helpers — or immediately before the new `describe` if no
-shared section exists.
+Imports already in `observe.test.ts`:
+- `describe`, `it`, `expect`, `beforeEach`, `afterEach` from `'vitest'`
+- `mkdtempSync`, `rmSync`, `readFileSync`, `existsSync` (and others) from `'node:fs'`
+- `tmpdir` from `'node:os'`
+- `join` from `'node:path'`
+- `handleEvent` from `'./observe.js'`
+- `ensureIdentity` from `'../../observability/engine/identity.js'`
+
+You do **not** need to add any imports — the file's existing set
+covers everything the new test needs. Append the new describe block at
+the bottom of the file (after the last existing block):
 
 ```typescript
-// (Imports already in the file: describe, it, expect, beforeEach,
-//  afterEach from 'vitest'; handleEvent from './observe.js'. Add
-//  fs/os/path/crypto here only if not already present at the top
-//  of the file.)
-
-const tmpDirs: string[] = []
-
-function makeTmpWorktree(): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'observe-evt-kgs-'))
-  fs.mkdirSync(path.join(dir, '.scaffold'), { recursive: true })
-  // Identity file so writeEvent doesn't bail out
-  fs.writeFileSync(path.join(dir, '.scaffold', 'identity.json'), JSON.stringify({
-    worktree_id: crypto.randomUUID(),
-    worktree_label: 'test',
-    created_at: new Date().toISOString(),
-  }))
-  tmpDirs.push(dir)
-  return dir
-}
-
-afterEach(() => {
-  while (tmpDirs.length > 0) fs.rmSync(tmpDirs.pop()!, { recursive: true, force: true })
-})
-
 describe('handleEvent — knowledge_gap_signal', () => {
+  let dir: string
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'observe-cli-kgs-'))
+    ensureIdentity(dir, 'agent-alice')
+  })
+  afterEach(() => { rmSync(dir, { recursive: true, force: true }) })
+
   it('persists all five payload fields through the CLI flow', async () => {
-    const cwd = makeTmpWorktree()
-    const code = await handleEvent({
-      cwd, type: 'knowledge_gap_signal', branch: 'main', taskId: null,
+    const exitCode = await handleEvent({
+      cwd: dir,
+      type: 'knowledge_gap_signal',
+      branch: 'main',
+      taskId: null,
       keyValues: {
         topic: 'agent-eval-harnesses',
         source: 'agent_search',
@@ -408,11 +400,13 @@ describe('handleEvent — knowledge_gap_signal', () => {
         'agent-excerpt': 'a manual smoke test',
       },
     })
-    expect(code).toBe(0)
-    const ledger = fs.readFileSync(path.join(cwd, '.scaffold', 'activity.jsonl'), 'utf8')
-    const last = JSON.parse(ledger.trim().split('\n').pop()!)
-    expect(last.type).toBe('knowledge_gap_signal')
-    expect(last.payload).toEqual({
+    expect(exitCode).toBe(0)
+    const ledgerPath = join(dir, '.scaffold/activity.jsonl')
+    expect(existsSync(ledgerPath)).toBe(true)
+    const lastLine = readFileSync(ledgerPath, 'utf8').trim().split('\n').pop()!
+    const obj = JSON.parse(lastLine) as Record<string, unknown>
+    expect(obj['type']).toBe('knowledge_gap_signal')
+    expect(obj['payload']).toEqual({
       topic: 'agent-eval-harnesses',
       source: 'agent_search',
       project_id: 'a'.repeat(64),
@@ -421,13 +415,15 @@ describe('handleEvent — knowledge_gap_signal', () => {
     })
   })
 
-  it('rejects project_id="lessons" with non-lessons source (round-trip of validator rule)', async () => {
-    const cwd = makeTmpWorktree()
-    const code = await handleEvent({
-      cwd, type: 'knowledge_gap_signal', branch: 'main', taskId: null,
+  it('rejects project_id="lessons" with non-lessons source (validator rule)', async () => {
+    const exitCode = await handleEvent({
+      cwd: dir,
+      type: 'knowledge_gap_signal',
+      branch: 'main',
+      taskId: null,
       keyValues: { topic: 'foo', source: 'agent_search', 'project-id': 'lessons' },
     })
-    expect(code).toBe(2) // validation-failure exit code
+    expect(exitCode).toBe(2) // validation-failure exit code
   })
 })
 ```
