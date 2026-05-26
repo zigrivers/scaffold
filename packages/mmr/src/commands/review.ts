@@ -16,7 +16,7 @@ import {
   resolveCompensatorDispatch,
 } from '../core/compensator.js'
 import type { Severity, OutputFormat, ChannelStatus } from '../types.js'
-import type { ChannelConfigParsed } from '../config/schema.js'
+import type { ChannelConfigParsed, MmrConfigParsed } from '../config/schema.js'
 
 interface ReviewArgs {
   diff?: string
@@ -119,6 +119,58 @@ function buildChannelPrompt(channel: ChannelConfigParsed, prompt: string): strin
   return wrapper === '{{prompt}}'
     ? prompt
     : wrapper.replaceAll('{{prompt}}', () => prompt)
+}
+
+function channelStatusFromAuthResult(status: string): ChannelStatus {
+  return status === 'not_installed' ? 'not_installed'
+    : status === 'failed' ? 'auth_failed'
+      : status === 'timeout' ? 'timeout'
+        : 'skipped'
+}
+
+interface CompensatorAvailability {
+  status: 'ok' | ChannelStatus
+  auth: 'ok' | 'failed' | 'skipped'
+  recovery?: string
+}
+
+export async function checkConfiguredCompensatorAvailability(
+  config: MmrConfigParsed,
+): Promise<CompensatorAvailability> {
+  const channelName = config.defaults.compensator?.channel
+  if (!channelName) return { status: 'ok', auth: 'ok' }
+
+  const chConfig = config.channels[channelName]
+  if (!chConfig || chConfig.abstract || !chConfig.command) {
+    return {
+      status: 'skipped',
+      auth: 'skipped',
+      recovery: `Compensator channel "${channelName}" is not dispatchable`,
+    }
+  }
+  if (!chConfig.enabled) {
+    return {
+      status: 'skipped',
+      auth: 'skipped',
+      recovery: `Compensator channel "${channelName}" is disabled`,
+    }
+  }
+
+  const cmd = chConfig.command.split(' ')[0]
+  const installed = await checkInstalled(cmd)
+  if (!installed) {
+    return { status: 'not_installed', auth: 'failed', recovery: `${cmd} not found on PATH` }
+  }
+
+  const authResult = await checkAuth(chConfig)
+  if (authResult.status === 'ok') return { status: 'ok', auth: 'ok' }
+
+  const status = channelStatusFromAuthResult(authResult.status)
+  return {
+    status,
+    auth: status === 'skipped' ? 'skipped' : 'failed',
+    recovery: authResult.recovery,
+  }
 }
 
 export const reviewCommand: CommandModule<object, ReviewArgs> = {
@@ -294,10 +346,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     for (const name of channelNames) {
       if (!validChannels.includes(name)) {
         const authStatus = authResults[name]
-        const channelStatus: ChannelStatus = authStatus?.status === 'not_installed' ? 'not_installed'
-          : authStatus?.status === 'failed' ? 'auth_failed'
-            : authStatus?.status === 'timeout' ? 'timeout'
-              : 'skipped'
+        const channelStatus = channelStatusFromAuthResult(authStatus?.status ?? 'skipped')
         store.updateChannel(job.job_id, name, {
           status: channelStatus,
           auth: channelStatus === 'skipped' ? 'skipped' : 'failed',
@@ -373,15 +422,19 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
 
     if (compensating.length > 0) {
       const dispatch = resolveCompensatorDispatch(config)
+      const compensatorAvailability = await checkConfiguredCompensatorAvailability(config)
       // Register compensating channels in job.json so loadJob can discover them
       for (const comp of compensating) {
         store.registerChannel(job.job_id, comp.compensatingName, {
-          status: 'dispatched',
-          auth: 'ok',
+          status: compensatorAvailability.status === 'ok' ? 'dispatched' : compensatorAvailability.status,
+          auth: compensatorAvailability.auth,
+          recovery: compensatorAvailability.recovery,
           output_parser: dispatch.output_parser,
         })
       }
-      await dispatchCompensatingPasses(store, job.job_id, prompt, compensating, config)
+      if (compensatorAvailability.status === 'ok') {
+        await dispatchCompensatingPasses(store, job.job_id, prompt, compensating, config)
+      }
     }
 
     // 9. Output results
