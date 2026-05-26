@@ -6,7 +6,7 @@ describe('reconcile', () => {
   it('marks findings as consensus when 2+ channels agree on location and severity', () => {
     const channelFindings: Record<string, Finding[]> = {
       claude: [{ severity: 'P1', location: 'file.ts:10', description: 'bug A', suggestion: 'fix A' }],
-      gemini: [{ severity: 'P1', location: 'file.ts:10', description: 'bug A variant', suggestion: 'fix A alt' }],
+      gemini: [{ severity: 'P1', location: 'file.ts:10', description: 'bug A', suggestion: 'fix A' }],
     }
     const result = reconcile(channelFindings)
     expect(result).toHaveLength(1)
@@ -19,7 +19,7 @@ describe('reconcile', () => {
   it('reports at higher severity when channels disagree on severity for same location', () => {
     const channelFindings: Record<string, Finding[]> = {
       claude: [{ severity: 'P2', location: 'file.ts:10', description: 'minor', suggestion: 'fix' }],
-      gemini: [{ severity: 'P1', location: 'file.ts:10', description: 'important', suggestion: 'fix' }],
+      gemini: [{ severity: 'P1', location: 'file.ts:10', description: 'minor', suggestion: 'fix' }],
     }
     const result = reconcile(channelFindings)
     expect(result).toHaveLength(1)
@@ -89,11 +89,31 @@ describe('reconcile', () => {
 
   it('uses the finding with the longest description as representative', () => {
     const channelFindings: Record<string, Finding[]> = {
-      claude: [{ severity: 'P1', location: 'file.ts:10', description: 'short', suggestion: 'fix A' }],
-      gemini: [{ severity: 'P1', location: 'file.ts:10', description: 'this is a much longer and more detailed description of the bug', suggestion: 'fix B' }],
+      claude: [{ severity: 'P1', location: 'file.ts:10', description: 'same bug', suggestion: 'fix A' }],
+      gemini: [{ severity: 'P1', location: 'file.ts:10', description: 'same bug', suggestion: 'fix A' }],
     }
     const result = reconcile(channelFindings)
-    expect(result[0].description).toContain('much longer')
+    expect(result[0].description).toBe('same bug')
+  })
+
+  it('reconciles findings whose only difference is line number', () => {
+    const channelFindings: Record<string, Finding[]> = {
+      claude: [{ severity: 'P1', location: 'file.ts:10', description: 'bug A', suggestion: 'fix A' }],
+      gemini: [{ severity: 'P1', location: 'file.ts:99', description: 'bug A', suggestion: 'fix A' }],
+    }
+    const result = reconcile(channelFindings)
+    expect(result).toHaveLength(1)
+    expect(result[0].agreement).toBe('consensus')
+  })
+
+  it('reconciles findings whose only difference is severity', () => {
+    const channelFindings: Record<string, Finding[]> = {
+      claude: [{ severity: 'P2', location: 'file.ts:10', description: 'bug A', suggestion: 'fix A' }],
+      gemini: [{ severity: 'P1', location: 'file.ts:10', description: 'bug A', suggestion: 'fix A' }],
+    }
+    const result = reconcile(channelFindings)
+    expect(result).toHaveLength(1)
+    expect(result[0].severity).toBe('P1')
   })
 
   it('assigns high confidence to P0 even from compensating channels', () => {

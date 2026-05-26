@@ -44,7 +44,7 @@ describe('review lifecycle (unit integration)', () => {
 
     const geminiOutput = JSON.stringify({
       approved: false,
-      findings: [{ severity: 'P1', location: 'f.ts:1', description: 'Breaking change detected', suggestion: 'Add backward compat' }],
+      findings: [{ severity: 'P1', location: 'f.ts:99', description: 'Regression risk', suggestion: 'Add test coverage' }],
       summary: 'Issue found',
     })
     store.saveChannelOutput(job.job_id, 'gemini', geminiOutput)

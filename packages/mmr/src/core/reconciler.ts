@@ -1,12 +1,9 @@
 import type { Finding, ReconciledFinding, Severity, Agreement, Confidence, Verdict, ChannelStatus } from '../types.js'
 import { SEVERITY_ORDER } from '../types.js'
+import { computeFindingKey } from './stable-id.js'
 
 interface AttributedFinding extends Finding {
   source: string
-}
-
-function normalizeLocation(location: string): string {
-  return location.toLowerCase().trim()
 }
 
 function higherSeverity(a: Severity, b: Severity): Severity {
@@ -18,7 +15,7 @@ function higherSeverity(a: Severity, b: Severity): Severity {
  * consensus scoring.
  *
  * 1. Flatten all findings with source attribution
- * 2. Group by normalized location
+ * 2. Group by stable finding identity
  * 3. For each group, determine agreement, confidence, and effective severity
  * 4. Sort by severity (P0 first)
  */
@@ -33,10 +30,10 @@ export function reconcile(channelFindings: Record<string, Finding[]>): Reconcile
 
   if (attributed.length === 0) return []
 
-  // Step 2: Group by normalized location
+  // Step 2: Group by stable finding identity
   const groups = new Map<string, AttributedFinding[]>()
   for (const finding of attributed) {
-    const key = normalizeLocation(finding.location)
+    const key = computeFindingKey(finding)
     const group = groups.get(key) ?? []
     group.push(finding)
     groups.set(key, group)
