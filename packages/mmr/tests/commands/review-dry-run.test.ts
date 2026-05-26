@@ -305,4 +305,37 @@ describe('configured compensator availability', () => {
     expect(result.status).toBe('ok')
     expect(result.auth).toBe('ok')
   })
+
+  it('dispatches configured compensators when auth is skipped', async () => {
+    vi.resetModules()
+    vi.doMock('../../src/core/auth.js', () => ({
+      checkInstalled: vi.fn().mockResolvedValue(true),
+      checkAuth: vi.fn().mockResolvedValue({ status: 'skipped' }),
+    }))
+
+    const { checkConfiguredCompensatorAvailability } = await import('../../src/commands/review.js')
+    const cfg: MmrConfigParsed = {
+      ...baseConfig,
+      defaults: { ...baseConfig.defaults, compensator: { channel: 'qwen-local' } },
+      channels: {
+        'qwen-local': {
+          enabled: true,
+          command: 'qwen-review',
+          flags: [],
+          env: {},
+          prompt_wrapper: '{{prompt}}',
+          output_parser: 'default',
+          stderr: 'capture',
+          abstract: false,
+        },
+      },
+    }
+
+    const result = await checkConfiguredCompensatorAvailability(cfg)
+
+    vi.doUnmock('../../src/core/auth.js')
+
+    expect(result.status).toBe('ok')
+    expect(result.auth).toBe('skipped')
+  })
 })

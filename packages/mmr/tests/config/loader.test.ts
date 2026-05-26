@@ -252,6 +252,22 @@ channels:
     ).toThrow(/abstract|T1-A|non-dispatchable|template/i)
   })
 
+  it('rejects compensator.channel that targets a channel without command', () => {
+    const projectYaml = `
+version: 1
+defaults:
+  compensator:
+    channel: qwen
+channels:
+  qwen:
+    enabled: true
+`
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), projectYaml)
+    expect(() =>
+      loadConfig({ projectRoot: tmpDir, userHome: path.join(tmpDir, 'home') }),
+    ).toThrow(/compensator\.channel "qwen" is missing command|dispatch targets/i)
+  })
+
   it('does not overwrite base values with undefined overlay values', () => {
     const config = loadConfig({
       projectRoot: tmpDir,

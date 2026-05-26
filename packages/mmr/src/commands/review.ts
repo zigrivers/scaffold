@@ -150,6 +150,7 @@ export async function checkConfiguredCompensatorAvailability(
 
   const authResult = await checkAuth(chConfig)
   if (authResult.status === 'ok') return { status: 'ok', auth: 'ok' }
+  if ((authResult.status as string) === 'skipped') return { status: 'ok', auth: 'skipped' }
 
   const status = channelStatusFromAuthResult(authResult.status)
   return {

@@ -190,6 +190,12 @@ function validateCompensatorReference(config: MmrConfigParsed): void {
       + 'Abstract channels are non-dispatchable templates; reference a concrete channel that extends it instead.',
     )
   }
+  if (!target.command) {
+    throw new Error(
+      `defaults.compensator.channel "${ref}" is missing command. `
+      + 'Compensator channels must be concrete dispatch targets.',
+    )
+  }
 }
 
 function warnOnInlineSecretHeaders(config: MmrConfigParsed, warn: WarningSink): void {
@@ -255,8 +261,8 @@ function parseMergedConfig(mergedRaw: Record<string, unknown>, warn: WarningSink
 
   const config = MmrConfigSchema.parse(merged)
   warnOnInlineSecretHeaders(config, warn)
-  validateRunnableChannels(config)
   validateCompensatorReference(config)
+  validateRunnableChannels(config)
   return config
 }
 
