@@ -161,9 +161,10 @@ projects → P2; ≥5 signals × ≥3 projects → P1).
 │  1. scaffold knowledge build <step>                                     │
 │     │                                                                   │
 │     ▼                                                                   │
-│  2. knowledge-loader assembles `## Knowledge Base` + appends            │
-│     gap-signal tail (assembly-time injection; SCAFFOLD_GAP_SIGNAL_QUIET │
-│     suppresses)                                                         │
+│  2. AssemblyEngine.buildKnowledgeBaseSection (engine.ts:172) +          │
+│     claude-code.ts::buildKnowledgeSection emit `## Knowledge Base`/     │
+│     `## Domain Knowledge`; both append gap-signal tail via shared       │
+│     gap-signal-tail.ts helper (SCAFFOLD_GAP_SIGNAL_QUIET suppresses)    │
 │     │                                                                   │
 │     ▼                                                                   │
 │  3. Agent reads prompt, searches knowledge base, finds gap              │
@@ -266,9 +267,15 @@ case 'knowledge_gap_signal':
   }
   if (typeof filteredPayload.project_id !== 'string') {
     errors.push('knowledge_gap_signal.payload.project_id required')
-  } else if (filteredPayload.project_id !== 'lessons' &&
-             !/^[a-f0-9]{64}$/.test(filteredPayload.project_id)) {
-    errors.push('knowledge_gap_signal.payload.project_id must be a 64-char sha256 hex string (or the literal "lessons" for synthetic signals from the lessons.md scanner)')
+  } else if (filteredPayload.project_id === 'lessons') {
+    // The literal "lessons" is reserved for the lessons.md scanner's
+    // in-memory synthetic signals. CLI-emitted events with source other
+    // than 'lessons' must not use it.
+    if (filteredPayload.source !== 'lessons') {
+      errors.push('knowledge_gap_signal.payload.project_id="lessons" is reserved for synthetic lessons.md scanner signals; source must also be "lessons"')
+    }
+  } else if (!/^[a-f0-9]{64}$/.test(filteredPayload.project_id)) {
+    errors.push('knowledge_gap_signal.payload.project_id must be a 64-char sha256 hex string')
   }
   optStr('knowledge_gap_signal.payload.step_name', filteredPayload.step_name, errors)
   optStr('knowledge_gap_signal.payload.agent_excerpt', filteredPayload.agent_excerpt, errors, 200)
@@ -347,6 +354,10 @@ Synthetic `project_id = "lessons"` is reserved for the lessons.md scanner
 - Validator rejects a non-kebab-case `topic` (`"Agent Eval Harnesses"`).
 - Validator rejects a `project_id` that is neither 64-char hex nor
   the literal `"lessons"`.
+- Validator rejects `project_id="lessons"` paired with `source` other
+  than `"lessons"` (the literal is reserved for the synthetic scanner).
+- Validator accepts `project_id="lessons"` paired with `source="lessons"`
+  (round-trip safety for in-memory synthetic signals if ever serialized).
 - Validator rejects an `agent_excerpt` over 200 chars.
 - Integration test: invoking `handleEvent` through the CLI flow produces a
   validated event in the ledger.
@@ -356,18 +367,38 @@ Synthetic `project_id = "lessons"` is reserved for the lessons.md scanner
 ### 2.1 Location and registration (concrete file/line targets)
 
 The lens is a sibling to A–H at
-**`src/observability/engine/checks/lens-i-knowledge-gaps.ts`** (note the
-path uses the existing `engine/checks/` sibling — verified via
-`ls src/observability/engine/checks/` and the existing
-`lens-h-cross-doc.ts` neighbor).
+**`src/observability/checks/lens-i-knowledge-gaps.ts`** (note the path:
+the lenses live one directory up from `engine/checks/` — verified via
+`ls src/observability/checks/` showing `lens-{a-h}-*.ts` files, and via
+the imports at `src/observability/engine/checks/registry.ts:2–9` which
+use the relative path `../../checks/lens-h-cross-doc.js`).
 
 The lens exports a `LensFn` matching the signature defined at
-`src/observability/engine/checks/registry.ts:11` (current shape:
-`(graph, ledger, context) => Finding[] | Promise<Finding[]>`). Lens I
-ignores the `graph` argument (DocGraph is irrelevant for ledger-driven
-lenses; lens H demonstrates the `_graph` underscore-discard pattern). It
-reads ledger events for `type === 'knowledge_gap_signal'` and merges in
-the lessons-scanner output before bucketing.
+`src/observability/engine/checks/runner.ts:9–16` (the *real* signature
+used by registered lenses):
+
+```typescript
+export type LensFn = (
+  graph: DocGraph,
+  ledger: { events: Event[] },
+  availability: AvailabilityMap,
+  upstreamFindings: Finding[],
+  enabledIds: Set<string>,
+  context?: LensContext,         // { profile: 'fast' | 'full'; cwd: string }
+) => Promise<Finding[]>
+```
+
+Note: there is a near-identical `LensFn` type declared at `registry.ts:11`
+*without* the `context` parameter. The runner.ts variant is the canonical
+one — every registered lens (including lens H, `lens-h-cross-doc.ts:13`)
+imports `LensFn` from `runner.js`. Use that import.
+
+Lens I ignores the `graph` argument (DocGraph is irrelevant for
+ledger-driven lenses) and uses `context.cwd` to resolve `tasks/lessons.md`.
+Lens H demonstrates the underscore-discard pattern for unused params —
+`export const lensHCrossDoc: LensFn = async (graph, _ledger, _availability,
+_upstream, _enabled, context) => …` — and Lens I uses the symmetric
+inversion: discard `graph`, use `ledger` and `context`.
 
 Registration touches three named locations:
 
@@ -465,15 +496,27 @@ export type Evidence =
     }
 ```
 
-**Renderer impact (non-blocking polish).** The discriminated union has a
-JSON-stringify fallback in every renderer
-(`src/observability/renderers/markdown.ts` `renderEvidence()`,
-`terminal.ts`, `dashboard.ts`, `mmr-findings.ts`), so a new variant
-renders as JSON-shaped evidence by default — functional, but ugly.
-Phase 3 ships **explicit pretty-render cases** in the markdown and
-terminal renderers (the two surfaces most operators actually read) and
-defers dashboard + mmr-findings polish to Phase 4 unless empirical
-review shows the JSON fallback is unacceptable.
+**Renderer impact.** The actual rendering surface for `Evidence` is
+narrower than a generic "all renderers fall back to JSON" claim suggests
+(verified via `grep -n evidence src/observability/renderers/*.ts`):
+
+- **`markdown.ts`** — has a `renderEvidence()` function with a custom
+  case for `doc_disagreement` and a JSON-stringify fallback for every
+  other variant. New variant gets JSON-shaped output if no case is
+  added. ← polish only.
+- **`terminal.ts`** — does **not** render `evidence` at all today. The
+  new variant requires either explicit terminal-rendering work or an
+  explicit note that terminal output omits evidence (current behavior).
+- **`dashboard.ts`** — same as terminal: no evidence rendering today.
+- **`mmr-findings.ts`** — serializes findings into MMR's Finding shape;
+  it may pass evidence through opaquely or transform it. Audit at T4.
+
+Phase 3 ships an explicit pretty-render case in **markdown only** (the
+sidecar / persisted-report path, which is what reviewers actually open).
+Terminal and dashboard get the new variant without explicit handling —
+they already omit evidence for every variant, so no regression. The
+`mmr-findings.ts` shape is audited as part of T4 and adjusted only if
+the JSON pass-through produces unusable output downstream.
 
 Pretty-render shape (markdown, suggested):
 
@@ -571,31 +614,78 @@ export function renderGapSignalTail(opts: { stepName: string }): string {
 }
 ```
 
-Call sites:
+**Call site 1 — runtime assembly (`src/core/assembly/engine.ts`).**
+
+The current `buildKnowledgeBaseSection(entries: KnowledgeEntry[]): string`
+at engine.ts:172–180 receives only `entries` — it has no access to the
+step name. Two implementation shapes work; choose either (T2 decides):
+
+*Option A — change the method signature to receive the step name:*
 
 ```typescript
-// in src/core/assembly/engine.ts, inside buildKnowledgeBaseSection()
-// at the end of the function, before return:
-if (knowledgeEntries.length > 0) {
-  body += '\n\n' + renderGapSignalTail({ stepName: step.name })
+private buildKnowledgeBaseSection(entries: KnowledgeEntry[], stepName: string): string {
+  if (entries.length === 0) return '(No knowledge base entries specified for this step.)'
+  const body = entries
+    .map(entry => `## ${entry.name}: ${entry.description}\n\n${entry.content}`)
+    .join('\n\n')
+  const tail = renderGapSignalTail({ stepName })  // returns '' when SCAFFOLD_GAP_SIGNAL_QUIET=1
+  return tail ? `${body}\n\n${tail}` : body
 }
-return body
 ```
 
+Update the call site at engine.ts:101 to pass `options.step`:
+
 ```typescript
-// in src/core/adapters/claude-code.ts, inside buildKnowledgeSection()
-// before the final return:
-const tail = knowledgeEntries.length > 0
-  ? '\n\n' + renderGapSignalTail({ stepName: input.slug })
-  : ''
-return `\n\n---\n\n## Domain Knowledge\n\n${parts.join('\n\n---\n\n')}${tail}`
+{ heading: 'Knowledge Base',
+  content: this.buildKnowledgeBaseSection(options.knowledgeEntries, options.step) }
+```
+
+*Option B — append the tail at the `assemble()` call site:*
+
+```typescript
+// in assemble(), after building the sections array at engine.ts:~108:
+const kbSection = sections.find(s => s.heading === 'Knowledge Base')
+if (kbSection && options.knowledgeEntries.length > 0) {
+  const tail = renderGapSignalTail({ stepName: options.step })
+  if (tail) kbSection.content += `\n\n${tail}`
+}
+```
+
+Option A is preferred (the section-building method is the natural home),
+but B is acceptable if T2 finds the signature change too invasive given
+test fan-out.
+
+**Call site 2 — Claude Code adapter (`src/core/adapters/claude-code.ts`).**
+
+The current `buildKnowledgeSection(entries: …)` at claude-code.ts:74–85
+is a standalone helper that receives only `entries`. The caller
+`generateStepWrapper(input)` at claude-code.ts:22 has `input.slug` in
+scope. Same two implementation shapes apply; the preferred shape passes
+slug through:
+
+```typescript
+// new signature:
+function buildKnowledgeSection(
+  entries: Array<{ name: string; description: string; content: string }>,
+  stepSlug: string,
+): string {
+  if (entries.length === 0) return ''
+  const parts = entries.map(entry => `### ${entry.name}\n\n*${entry.description}*\n\n${entry.content.trim()}`)
+  const body = `\n\n---\n\n## Domain Knowledge\n\n${parts.join('\n\n---\n\n')}`
+  const tail = renderGapSignalTail({ stepName: stepSlug })
+  return tail ? `${body}\n\n${tail}` : body
+}
+```
+
+Update the call at claude-code.ts:32 to pass `slug`:
+
+```typescript
+const knowledgeSection = buildKnowledgeSection(knowledgeEntries, slug)
 ```
 
 Returning an empty string when `SCAFFOLD_GAP_SIGNAL_QUIET=1` keeps the
-call-site idempotent — concatenating `'\n\n' + ''` produces a harmless
-double newline that the markdown render trims. (Alternative: have the
-caller guard the env var. Centralizing in the helper means we only need
-to update one place if we later add suppression conditions.)
+call-sites idempotent. (Alternative: have callers guard the env var.
+Centralizing in the helper means rewording happens in one place.)
 
 Trigger conditions for both call sites are identical:
 
@@ -634,8 +724,10 @@ at all).
 ```
 
 The template is stored as a single multiline string constant in
-`knowledge-loader.ts`. `{{step_name}}` is the only placeholder; the
-assembler substitutes it once at render time.
+`src/core/assembly/gap-signal-tail.ts` (the new shared helper file
+introduced in §3.1). `{{step_name}}` is the only placeholder; both
+call sites pass the step's slug as `stepName`, and the helper
+substitutes it once at render time.
 
 ### 3.3 Token cost
 
@@ -670,10 +762,17 @@ side-effect state.
 
 ### 4.2 Input resolution
 
-`absPath` is `<projectRoot>/tasks/lessons.md` where `projectRoot` is
-resolved by `findProjectRoot(process.cwd())` in the lens invocation. If the
-file doesn't exist or is empty, return `[]`. No errors thrown; missing file
-is the default expected state.
+`absPath` is `<projectRoot>/tasks/lessons.md` where `projectRoot` comes
+from the `LensFn`'s `context.cwd` argument (`runner.ts:9–16` defines
+`LensContext = { profile; cwd }`). Lens I passes `context.cwd` to the
+scanner; the scanner appends `tasks/lessons.md`. This avoids
+`findProjectRoot(process.cwd())` which can resolve to the wrong tree in
+programmatic / test / subdirectory invocations — `runAudit` always
+threads the audit's `primaryRoot` through `context.cwd`, so
+`context.cwd` is the authoritative source.
+
+If the file doesn't exist or is empty, return `[]`. No errors thrown;
+missing file is the default expected state.
 
 ### 4.3 Topic extraction (fence-aware line scanner + two-pass parser)
 
@@ -832,7 +931,7 @@ All five decisions are locked. Each was confirmed by zigrivers on 2026-05-26.
 | 2 | Topic clustering | Strict slug match after light normalization (lowercase, underscores→hyphens, trim punctuation) | Predictable, fast, no LLM dependency. False negatives are reversible later via stemmed/LLM clustering if empirical rates require. False positives would be worse. |
 | 3 | lessons.md scanner shape | Inline at lens time, no ledger writes; treated as a separate signal set merged by topic | No dedup risk between scanner runs and agent events. lessons.md is the source of truth (current contents at audit time, not a snapshot). Synthetic `project_id='lessons'` keeps lessons-only topics off the P2 threshold by design — see Decision #6 for the explicit refinement of the parent plan's Task 18 acceptance. |
 | 6 | Parent plan Task 18 acceptance refinement | Lessons mentions corroborate agent-search signals; they do *not* independently emit gap signals or cross the P2 threshold | The parent plan's Task 18 acceptance reads "recurring patterns in lessons.md (≥3 mentions of same topic) emit gap signals." Phase 3 design narrows this: lessons.md mentions count as one project in the diversity gate and surface buckets only when at least one real-project signal is also present. Rationale: lessons.md is one user's curated retrospective; without external corroboration it'd let a single project manufacture gaps. The companion plan re-states Task 18's acceptance accordingly. |
-| 4 | Tail injection mechanism | Assembly-time injection at the knowledge-loader; no per-step .md file edits | One source of truth. Reword once → 89 steps update. Zero file-churn cost. `SCAFFOLD_GAP_SIGNAL_QUIET=1` suppresses cleanly. |
+| 4 | Tail injection mechanism | Assembly-time injection via a shared `gap-signal-tail.ts` helper called from both `AssemblyEngine.buildKnowledgeBaseSection` (engine.ts) and `buildKnowledgeSection` (claude-code.ts adapter); no per-step .md file edits | One source of truth (the helper template). Reword once → both emission paths update for all 89 steps. Zero file-churn cost. `SCAFFOLD_GAP_SIGNAL_QUIET=1` suppresses cleanly via the helper. |
 | 5 | Phase 3 severity rules | Ship both P2 (≥3 signals, ≥2 projects) and P1 (≥5 signals, ≥3 projects) | Same plumbing; the P1 escalation lives in the same lens evaluator. Avoids a churn follow-up PR. |
 
 ## Section 8 — Naming Reference
@@ -857,7 +956,7 @@ All five decisions are locked. Each was confirmed by zigrivers on 2026-05-26.
 | # | Task | Independence |
 |---|---|---|
 | T1 | Event type & validator (`types.ts`, `event-schemas.ts`, CLI smoke test) | Independent |
-| T2 | Assembly-time tail injection (`knowledge-loader.ts`) | Depends on T1 |
+| T2 | Assembly-time tail injection — new `src/core/assembly/gap-signal-tail.ts` helper, wired into both `AssemblyEngine.buildKnowledgeBaseSection` (engine.ts:172) and `buildKnowledgeSection` (claude-code.ts:74) with `stepName` passed through from each caller | Depends on T1 |
 | T3 | lessons.md scanner (pure function) | Independent |
 | T4 | Lens I aggregator + `Evidence` variant + audit-runner registration (LENS_REGISTRY entry, `makeLensImplementations` entry, `SCOPE_DOC_LENSES` update) + markdown & terminal pretty-render cases for the new evidence variant | Depends on T1, T3 |
 | T5 | End-to-end validation + `docs/knowledge-freshness/operations.md` doc update | Depends on T1–T4 |
