@@ -43,10 +43,17 @@ This task builds only the selection skeleton — no actual dispatchers yet. The 
 import { describe, it, expect } from 'vitest'
 import { resolveProvider } from './index.js'
 
-interface Env { ANTHROPIC_API_KEY?: string; DEEPSEEK_API_KEY?: string; KNOWLEDGE_FRESHNESS_PROVIDER?: string }
-interface Args { provider?: string }
 // `claudeOnPath` is injected so tests don't depend on the host's $PATH.
-const opts = (env: Env, args: Args = {}, claudeOnPath = false) => ({ env, args, claudeOnPath })
+// We type `env` as `Record<string, string | undefined>` directly rather
+// than via a narrow named `interface` — round-3 F-003 of the plan review:
+// a narrow interface lacks an index signature and won't satisfy the
+// `Record<string, string | undefined>` parameter of `resolveProvider` in
+// strict mode.
+const opts = (
+  env: Record<string, string | undefined>,
+  args: { provider?: string } = {},
+  claudeOnPath = false,
+) => ({ env, args, claudeOnPath })
 
 describe('resolveProvider', () => {
   it('rule 1: --provider flag wins over everything', () => {
@@ -64,8 +71,17 @@ describe('resolveProvider', () => {
     expect(resolveProvider(opts({ DEEPSEEK_API_KEY: 'd' }))).toBe('deepseek')
   })
 
-  it('rule 3b: only ANTHROPIC_API_KEY set → anthropic', () => {
-    expect(resolveProvider(opts({ ANTHROPIC_API_KEY: 'a' }))).toBe('anthropic')
+  it('rule 3b: ANTHROPIC_API_KEY set AND claude on PATH → anthropic', () => {
+    expect(resolveProvider(opts({ ANTHROPIC_API_KEY: 'a' }, {}, true))).toBe('anthropic')
+  })
+
+  it('rule 3b error: ANTHROPIC_API_KEY set but claude NOT on PATH → error', () => {
+    // Round-3 F-001: the env var alone is insufficient because the
+    // anthropic dispatcher shells out to `claude -p`. Surface this at
+    // resolveProvider time, not at first audit dispatch.
+    const call = () => resolveProvider(opts({ ANTHROPIC_API_KEY: 'a' }, {}, false))
+    expect(call).toThrow(/ANTHROPIC_API_KEY is set/)
+    expect(call).toThrow(/`claude` CLI is not on PATH/)
   })
 
   it('rule 4: both keys set without explicit choice → error with helpful message', () => {
@@ -178,14 +194,34 @@ export function resolveProvider(input: ResolveProviderInput): Provider {
     )
   }
   if (hasDeepseek) return 'deepseek'
-  if (hasAnthropic) return 'anthropic'
-  // Rule 5: PATH probe.
+  // Anthropic requires BOTH a usable key/auth path AND the `claude` CLI on
+  // PATH — the dispatcher shells out, so the env var alone isn't enough
+  // (round-3 F-001 of the plan review). The env var is meaningful when
+  // it's set (claude -p picks it up over keychain), but the CLI must
+  // exist regardless.
+  if (hasAnthropic) {
+    if (!input.claudeOnPath) {
+      throw new Error(
+        'ANTHROPIC_API_KEY is set but the `claude` CLI is not on PATH. ' +
+        'The anthropic provider invokes `claude -p` as a subprocess, so the ' +
+        'CLI is required even when the env var is set. ' +
+        'Install Claude Code (`brew install anthropic/claude-code/claude-code` ' +
+        'or `npm install -g @anthropic-ai/claude-code`), OR switch to the ' +
+        'deepseek provider (export DEEPSEEK_API_KEY and set ' +
+        'KNOWLEDGE_FRESHNESS_PROVIDER=deepseek).',
+      )
+    }
+    return 'anthropic'
+  }
+  // Rule 5: PATH probe (no env vars set, but Claude Code is installed and
+  // already authenticated via `claude /login`).
   if (input.claudeOnPath) return 'anthropic'
   // Rule 6: nothing.
   throw new Error(
     'no provider configured for the knowledge-freshness audit. Either:\n' +
-    '  - export ANTHROPIC_API_KEY (or have `claude` on PATH after `claude /login`) for the anthropic provider, OR\n' +
-    '  - export DEEPSEEK_API_KEY for the deepseek provider.\n' +
+    '  - install Claude Code and run `claude /login` (anthropic provider), OR\n' +
+    '  - export ANTHROPIC_API_KEY AND have `claude` on PATH (anthropic, env-var auth), OR\n' +
+    '  - export DEEPSEEK_API_KEY (deepseek provider, no CLI install needed).\n' +
     'See docs/knowledge-freshness/operations.md §4 for details.',
   )
 }
@@ -1020,8 +1056,10 @@ The block uses a 4-backtick outer fence so the inner ```` ``` bash ```` fences r
 Two LLM providers are supported for the per-entry audit dispatch:
 
 - **anthropic** (default for local) — invokes `claude -p` as a subprocess.
-  Auth via Claude Code's keychain integration (run `claude /login`) or
-  via `ANTHROPIC_API_KEY` env var.
+  Requires the Claude Code CLI on `$PATH`. Auth via Claude Code's
+  keychain integration (run `claude /login` once) OR via
+  `ANTHROPIC_API_KEY` env var — but in both cases the CLI must be
+  installed; the env var alone is not sufficient.
 - **deepseek** (default for the cron) — HTTPS POST to
   `api.deepseek.com/chat/completions`. Auth via `DEEPSEEK_API_KEY`
   env var. Requires no CLI install.
@@ -1070,6 +1108,7 @@ Find § 9. Add two new rows to the existing failure-modes table:
 ```markdown
 | `Error: provider selection ambiguous` | Both `ANTHROPIC_API_KEY` and `DEEPSEEK_API_KEY` are set without an explicit choice via `--provider` or `KNOWLEDGE_FRESHNESS_PROVIDER`. | Pass `--provider anthropic` or `--provider deepseek`, or set `KNOWLEDGE_FRESHNESS_PROVIDER` in env. |
 | `Error: no provider configured` | Neither API key is set, and `claude` is not on `$PATH`. | Install Claude Code locally (`brew install anthropic/claude-code/claude-code` then `claude /login`) for anthropic, or set `DEEPSEEK_API_KEY` for deepseek. |
+| `Error: ANTHROPIC_API_KEY is set but the `claude` CLI is not on PATH` | The env var alone isn't enough — the anthropic provider shells out to `claude -p`. | Install Claude Code (`brew install anthropic/claude-code/claude-code` or `npm install -g @anthropic-ai/claude-code`), OR switch to the deepseek provider. |
 | `Error: unsupported DeepSeek model "..."` | `KNOWLEDGE_FRESHNESS_DEEPSEEK_MODEL` was set to a value outside the hardcoded allowlist. | Set it to `deepseek-v4-flash` or `deepseek-v4-pro`, or unset it for the default. |
 | `Error: deepseek dispatcher: HTTP 4xx/5xx` | DeepSeek API rejected the request (auth failure, rate limit, server-side error). | Check the secret value, the DeepSeek service status, and your account's rate limits. The cron isolates per-entry failures and retries the entry the next day. |
 ```
@@ -1133,6 +1172,87 @@ Expected: a small JSON object showing the verdict + model + findings count. Comp
 Paste the verdict summary into the PR description so reviewers can see end-to-end validation happened.
 
 No commit for Task 8 — it's a manual sanity check, not a code change.
+
+---
+
+## Task 9: Land the work (REQUIRED)
+
+**Files:** none modified. This task runs the project's standard merge-prep checks and creates the PR. Per `CLAUDE.md` § "Committing and Creating PRs" and § "Mandatory Code Review", these steps are not optional.
+
+- [ ] **Step 1: Run the full quality gate**
+
+Run: `make check-all`
+Expected: green. Bash gate (lint + bats), TypeScript gate (`npm run type-check` + vitest), knowledge-frontmatter validator. If anything fails, fix it before continuing — do NOT push.
+
+- [ ] **Step 2: Rebase against latest origin/main**
+
+Run: `git fetch origin main && git rebase origin/main`
+Expected: clean rebase (no conflicts). If conflicts surface, resolve them and re-run `make check-all` before continuing.
+
+- [ ] **Step 3: Push the branch**
+
+Run: `git push -u origin HEAD`
+Expected: branch pushed, tracking set. The pre-push hook runs the full bats suite — if it fails, fix and re-push.
+
+- [ ] **Step 4: Create the PR**
+
+```bash
+gh pr create --base main \
+  --title "feat(knowledge-freshness): DeepSeek provider for the cron audit" \
+  --body "$(cat <<'EOF'
+## Summary
+
+Adds DeepSeek as an alternative LLM provider for the per-entry audit dispatch (cron). Anthropic remains the default for local dev via the rule-5 PATH probe; the cron switches to DeepSeek's HTTP API via repo secret. MMR review is intentionally untouched.
+
+## Architecture
+
+- New `src/knowledge-freshness/providers/` module: `index.ts` (Provider type, 6-rule selection chain, dispatcher factory), `anthropic.ts` (factored-out subprocess), `deepseek.ts` (new HTTP dispatcher).
+- `audit-run-entry` CLI shrinks: argv → `resolveProvider` → `buildDispatcher` → `runEntryAudit`. New `--provider <anthropic|deepseek>` flag.
+- Cron workflow: drops `npm install -g @anthropic-ai/claude-code`, adds `DEEPSEEK_API_KEY` + `KNOWLEDGE_FRESHNESS_PROVIDER=deepseek` env block.
+- Operations doc: new "Choosing a provider" subsection + 5 new failure-mode rows.
+
+## Decision-#7 invariant
+
+Both providers stay hardcoded — Anthropic command and DeepSeek URL/model-allowlist are literal constants in source, never read from project config. The threat model from the parent design's decision #7 is preserved. Unit tests assert the literal command/URL as tripwires.
+
+## Test plan
+
+- [x] `make check-all` green locally
+- [ ] CI green on this branch (check + gates workflows)
+- [ ] (Optional) Live DeepSeek smoke: set `DEEPSEEK_API_KEY` locally, run \`node dist/index.js knowledge-freshness audit-run-entry content/knowledge/core/security-best-practices.md\`, verify verdict shape
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+EOF
+)"
+```
+
+If the title needs trimming to fit GitHub's 256-char limit, the body holds the detailed summary.
+
+- [ ] **Step 5: Run MMR review on the branch diff**
+
+Per `CLAUDE.md` § "Mandatory Code Review", run all three channels:
+
+```bash
+PR_NUMBER=$(gh pr view --json number --jq .number)
+mmr review --pr "$PR_NUMBER" --sync --format json --focus \
+  "DeepSeek provider for the cron audit: provider selection logic, HTTP dispatcher correctness, hardcoded URL + model-allowlist invariant, workflow YAML changes."
+```
+
+Apply the per-PR round budget (rounds 1-5: fix every ≥P2 finding; rounds 6+: fix only P0/P1; defer the rest to `docs/superpowers/deferred-findings/<branch>.md`). Stop when the verdict is `pass` or `degraded-pass`.
+
+- [ ] **Step 6: Wait for CI to go green**
+
+Run: `gh pr checks`
+Expected: `check` and `gates` workflows pass. The gates workflow may not actually fire on this PR (it triggers on `content/knowledge/**` paths and this PR touches code/workflow only) — that's fine.
+
+- [ ] **Step 7: Verify status is clean and the branch is up-to-date with origin**
+
+Run: `git status && git log --oneline origin/main..HEAD | head -10`
+Expected: working tree clean; all local commits are pushed (no "ahead by N" message in git status).
+
+- [ ] **Step 8: Hand off**
+
+Surface to the operator: the PR URL, the MMR verdict (job ID + rounds run), any deferred-findings file path, and the next step ("ready for human review; the cron workflow will not activate until the PR merges and `DEEPSEEK_API_KEY` is set as a repo secret").
 
 ---
 

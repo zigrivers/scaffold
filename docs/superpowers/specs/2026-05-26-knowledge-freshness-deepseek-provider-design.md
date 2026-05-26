@@ -125,10 +125,11 @@ matching rule wins; subsequent rules don't run.
 |---|---|---|
 | 1 (highest) | `--provider <anthropic\|deepseek>` flag | Explicit operator override. Used for testing both paths from one dev box. |
 | 2 | `KNOWLEDGE_FRESHNESS_PROVIDER` env var | Explicit cron / CI configuration. The workflow YAML sets this to `deepseek`. |
-| 3 | Single API key present in env | Infer: only `DEEPSEEK_API_KEY` → deepseek; only `ANTHROPIC_API_KEY` → anthropic. |
+| 3 | Single API key present in env | Infer: only `DEEPSEEK_API_KEY` → deepseek; only `ANTHROPIC_API_KEY` (AND `claude` on `$PATH`) → anthropic. The anthropic dispatcher shells out to `claude -p`, so the CLI must exist regardless of the env var. |
 | 4 | Both API keys set, no explicit choice | **Fail** with a clear "please pick one via `--provider` or `KNOWLEDGE_FRESHNESS_PROVIDER`" message. |
 | 5 | Neither API key set, `claude` CLI on `$PATH` | Use **anthropic** — the subprocess delegates auth to claude's keychain integration. This is the common local-dev case. |
 | 6 (lowest) | Neither API key set, `claude` CLI absent | **Fail** with setup instructions for both providers. |
+| 3-error | `ANTHROPIC_API_KEY` set but `claude` CLI absent | **Fail** loudly at resolveProvider time so the operator hears about the CLI requirement before the first audit fails with command-not-found. |
 
 This means local development on a Mac with `claude` installed and
 `claude /login` already run continues to work without any new
@@ -143,7 +144,8 @@ inference rules 3-6 don't fire there.
 | `--provider deepseek` (regardless of env) | deepseek |
 | `KNOWLEDGE_FRESHNESS_PROVIDER=deepseek` | deepseek |
 | `DEEPSEEK_API_KEY=...` (only) | deepseek |
-| `ANTHROPIC_API_KEY=...` (only) | anthropic |
+| `ANTHROPIC_API_KEY=...` + `claude` on PATH | anthropic |
+| `ANTHROPIC_API_KEY=...` but `claude` NOT on PATH | **error**: env var set, CLI missing |
 | Both keys set, no explicit choice | error: ambiguous |
 | `claude` on PATH, no env vars (typical local dev) | anthropic (subprocess uses keychain) |
 | `claude` NOT on PATH, no env vars | error: setup instructions for both providers |
