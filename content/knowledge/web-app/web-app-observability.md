@@ -7,7 +7,6 @@ last-reviewed: null
 version-pin: null
 sources:
   - url: https://opentelemetry.io/docs/
-  - url: https://developer.chrome.com/docs/web-platform/vitals
   - url: https://www.w3.org/TR/performance-timeline/
 ---
 

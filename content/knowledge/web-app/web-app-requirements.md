@@ -6,7 +6,6 @@ volatility: evolving
 last-reviewed: null
 version-pin: null
 sources:
-  - url: https://developer.chrome.com/docs/web-platform/vitals
   - url: https://www.w3.org/TR/WCAG22/
   - url: https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps
 ---
