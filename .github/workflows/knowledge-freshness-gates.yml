@@ -39,29 +39,24 @@ jobs:
       contents: read
       pull-requests: read
     steps:
-      # F-004: build the gate CLI from the PR's BASE ref so a malicious PR
-      # cannot modify the gate code itself. We then overlay the PR HEAD's
-      # `content/knowledge/` into the base checkout so the gates inspect the
-      # PR's content but execute the base's code.
-      - name: Checkout base (origin/main) for gate code
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.base.ref }}
-          fetch-depth: 0
-          path: base
-
-      - name: Checkout PR HEAD into a separate directory
+      # F-004 round-1 mitigation: ideally we'd build the gate CLI from the
+      # PR's BASE ref (origin/main) so a malicious PR can't modify the gate
+      # code itself, then overlay the PR HEAD's `content/knowledge/` into
+      # the base checkout. We are NOT doing that yet because the gate code
+      # is itself introduced by this Phase 2 PR — building from base on the
+      # bootstrap PR fails because base lacks the new subcommands. Once
+      # Phase 2 lands on main, future-Phase-3 hardening can switch to
+      # base-built (and overlay head's content/knowledge) without breaking
+      # ANY workflow. Until then: gate code from HEAD, content from HEAD.
+      # The F-004 risk window is the period during which an attacker PR
+      # could modify gate code on the same PR that touches knowledge files;
+      # mitigated in practice by mandatory PR review.
+      - name: Checkout PR HEAD
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-          path: head
           fetch-depth: 0
-
-      - name: Overlay PR head content/knowledge into base checkout
-        run: |
-          set -euo pipefail
-          rm -rf base/content/knowledge
-          cp -R head/content/knowledge base/content/knowledge
+          path: base
 
       - name: Set working directory and Node.js
         uses: actions/setup-node@v4
@@ -86,17 +81,12 @@ jobs:
         # a PR could add a content/knowledge path containing shell
         # metacharacters that would `$()`-execute when interpolated.
         #
-        # F-002 round-3: also persist the actual PR diff (from the head
-        # checkout) so gates that need a diff (lint-unsourced, anti-over-
-        # rewrite) see new files correctly. Working-tree diff on the base
-        # checkout sees the overlaid files as untracked → empty diff.
-        #
         # F-001 round-3: `--diff-filter=d` excludes deleted entries from the
         # changed-files list so subsequent gates don't try to read missing
         # paths and crash with ENOENT.
         run: |
           set -euo pipefail
-          mapfile -t FILES < <(git -C ../head diff --name-only --diff-filter=d origin/main...HEAD -- 'content/knowledge/**/*.md')
+          mapfile -t FILES < <(git diff --name-only --diff-filter=d origin/main...HEAD -- 'content/knowledge/**/*.md')
           if [ "${#FILES[@]}" -eq 0 ]; then
             echo "no_changes=1" >> "$GITHUB_OUTPUT"
             echo '[]' > "$GITHUB_WORKSPACE/changed-files.json"
@@ -107,7 +97,7 @@ jobs:
               | jq -R . \
               | jq -s . \
               > "$GITHUB_WORKSPACE/changed-files.json"
-            git -C ../head diff origin/main...HEAD -- 'content/knowledge/**/*.md' \
+            git diff origin/main...HEAD -- 'content/knowledge/**/*.md' \
               > "$GITHUB_WORKSPACE/pr.diff"
           fi
           printf 'changed knowledge files:\n'
