@@ -80,8 +80,29 @@ describe('resolveProvider', () => {
     // anthropic dispatcher shells out to `claude -p`. Surface this at
     // resolveProvider time, not at first audit dispatch.
     const call = () => resolveProvider(opts({ ANTHROPIC_API_KEY: 'a' }, {}, false))
-    expect(call).toThrow(/ANTHROPIC_API_KEY is set/)
     expect(call).toThrow(/`claude` CLI is not on PATH/)
+  })
+
+  it('rule-1 error: --provider anthropic but claude NOT on PATH → error', () => {
+    // Round-4 F-001: the post-resolution PATH check covers EVERY anthropic
+    // selection path, not just the inferred-from-env one. An operator who
+    // explicitly forces --provider anthropic on a machine without Claude
+    // Code installed gets a clear early error instead of command-not-found
+    // at first audit.
+    const call = () => resolveProvider(opts({}, { provider: 'anthropic' }, false))
+    expect(call).toThrow(/`claude` CLI is not on PATH/)
+  })
+
+  it('rule-2 error: KNOWLEDGE_FRESHNESS_PROVIDER=anthropic but claude NOT on PATH → error', () => {
+    // Same protection on the env-var path.
+    const call = () => resolveProvider(opts({ KNOWLEDGE_FRESHNESS_PROVIDER: 'anthropic' }, {}, false))
+    expect(call).toThrow(/`claude` CLI is not on PATH/)
+  })
+
+  it('rule-1 explicit deepseek skips the PATH check entirely', () => {
+    // Sanity check: the PATH precondition is anthropic-only. deepseek
+    // doesn't need a CLI.
+    expect(resolveProvider(opts({ DEEPSEEK_API_KEY: 'd' }, { provider: 'deepseek' }, false))).toBe('deepseek')
   })
 
   it('rule 4: both keys set without explicit choice → error with helpful message', () => {
@@ -163,6 +184,35 @@ export interface ResolveProviderInput {
  * var or flag the operator should set.
  */
 export function resolveProvider(input: ResolveProviderInput): Provider {
+  const choice = pickProviderFromRules(input)
+  // Post-resolution runtime validation: ANY path that ends in 'anthropic'
+  // requires the `claude` CLI on PATH because the dispatcher shells out.
+  // This check covers BOTH inferred (rule-3b) and explicit (rule-1 flag,
+  // rule-2 env) paths so an operator can't pick anthropic via flag/env and
+  // then get a confusing command-not-found at first audit (round-4 F-001
+  // of the plan review).
+  if (choice === 'anthropic' && !input.claudeOnPath) {
+    throw new Error(
+      'anthropic provider selected but the `claude` CLI is not on PATH. ' +
+      'The dispatcher invokes `claude -p` as a subprocess, so the CLI is ' +
+      'required regardless of how the provider was chosen (--provider flag, ' +
+      'KNOWLEDGE_FRESHNESS_PROVIDER env, or ANTHROPIC_API_KEY inference). ' +
+      'Install Claude Code (`brew install anthropic/claude-code/claude-code` ' +
+      'or `npm install -g @anthropic-ai/claude-code`), OR switch to the ' +
+      'deepseek provider (export DEEPSEEK_API_KEY and set ' +
+      'KNOWLEDGE_FRESHNESS_PROVIDER=deepseek).',
+    )
+  }
+  return choice
+}
+
+/**
+ * Apply rules 1-6 to pick a Provider — does NOT enforce runtime
+ * preconditions (claudeOnPath for anthropic). The wrapper above is the
+ * single place where those preconditions are validated, so we only have
+ * to maintain that invariant in one location.
+ */
+function pickProviderFromRules(input: ResolveProviderInput): Provider {
   // Rule 1: explicit flag wins.
   if (input.args.provider) {
     if (!isKnownProvider(input.args.provider)) {
@@ -194,25 +244,7 @@ export function resolveProvider(input: ResolveProviderInput): Provider {
     )
   }
   if (hasDeepseek) return 'deepseek'
-  // Anthropic requires BOTH a usable key/auth path AND the `claude` CLI on
-  // PATH — the dispatcher shells out, so the env var alone isn't enough
-  // (round-3 F-001 of the plan review). The env var is meaningful when
-  // it's set (claude -p picks it up over keychain), but the CLI must
-  // exist regardless.
-  if (hasAnthropic) {
-    if (!input.claudeOnPath) {
-      throw new Error(
-        'ANTHROPIC_API_KEY is set but the `claude` CLI is not on PATH. ' +
-        'The anthropic provider invokes `claude -p` as a subprocess, so the ' +
-        'CLI is required even when the env var is set. ' +
-        'Install Claude Code (`brew install anthropic/claude-code/claude-code` ' +
-        'or `npm install -g @anthropic-ai/claude-code`), OR switch to the ' +
-        'deepseek provider (export DEEPSEEK_API_KEY and set ' +
-        'KNOWLEDGE_FRESHNESS_PROVIDER=deepseek).',
-      )
-    }
-    return 'anthropic'
-  }
+  if (hasAnthropic) return 'anthropic'
   // Rule 5: PATH probe (no env vars set, but Claude Code is installed and
   // already authenticated via `claude /login`).
   if (input.claudeOnPath) return 'anthropic'
@@ -1046,9 +1078,9 @@ Note the line number of the section header.
 
 - [ ] **Step 2: Add the "Choosing a provider" subsection at the top of § 4**
 
-Find the first line of section 4 (just after the `## 4. Running an audit manually (locally)` header). Insert the following block BEFORE the existing step-by-step (it becomes the new first subsection of § 4).
+Find the first line of section 4 (just after the `## 4. Running an audit manually (locally)` header). Insert the following content BEFORE the existing step-by-step (it becomes the new first subsection of § 4).
 
-The block uses a 4-backtick outer fence so the inner ```` ``` bash ```` fences render correctly. When you paste the block into `operations.md`, copy the entire 4-backtick block; the rendered markdown will contain only the inner 3-backtick fences.
+**Important:** the block below is wrapped in a 4-backtick fence purely so this plan document can show its contents (which include 3-backtick `bash` fences). When you paste into `operations.md`, copy **only the lines INSIDE the outer 4-backtick fence** — do NOT include the outer ````markdown` and ```` lines themselves. The pasted content's 3-backtick fences are part of the final rendered doc.
 
 ````markdown
 ### Choosing a provider
@@ -1100,6 +1132,65 @@ instead (slower, more expensive, more thorough chain-of-thought), set
 workflow env block (or your shell). Only the two allowlisted values
 are accepted — the dispatcher rejects any other model name at startup.
 ````
+
+- [ ] **Step 2b: Replace the existing "Auth caveat" subsection**
+
+The current `operations.md` § 4 ends with an `### Auth caveat` subsection (around line 184) that says CI sets `ANTHROPIC_API_KEY` and the subprocess uses `claude -p`. After Task 6's workflow change, that's wrong for CI — replace it with provider-aware language.
+
+Find:
+
+```markdown
+### Auth caveat
+
+The audit subprocess uses `claude -p` (per `src/observability/engine/llm-dispatcher.ts`).
+Locally this picks up your `claude` CLI's keychain auth — no env var needed.
+In CI the workflow sets `ANTHROPIC_API_KEY` from the repo secret of the same
+name; the subprocess then uses that. If you want to run the audit locally with
+an API key (e.g. against a different account), export `ANTHROPIC_API_KEY` and
+the `claude` CLI will prefer it.
+
+`--open-pr` requires `gh auth login` to have run (and `gh` to be on PATH).
+```
+
+Replace with:
+
+```markdown
+### Auth caveat
+
+Each provider has its own auth path:
+
+- **anthropic** (default for local): the audit subprocess invokes
+  `claude -p`, so Claude Code must be on `$PATH`. Locally it uses the
+  keychain auth from `claude /login` — no env var needed. If you set
+  `ANTHROPIC_API_KEY` alongside the CLI, `claude` prefers it (useful
+  for running against a different account). The env var alone is NOT
+  sufficient — the CLI must exist regardless; resolveProvider rejects
+  this combination at startup so you find out before the first audit.
+- **deepseek** (default for cron): the audit makes a direct HTTPS
+  POST to `api.deepseek.com`. Requires `DEEPSEEK_API_KEY` in env;
+  no CLI install needed.
+
+The cron workflow sets `DEEPSEEK_API_KEY` from the repo secret and
+`KNOWLEDGE_FRESHNESS_PROVIDER=deepseek` to pin the choice. Set the
+secret once with `gh secret set DEEPSEEK_API_KEY` before the first
+scheduled run.
+
+`--open-pr` requires `gh auth login` to have run (and `gh` to be on PATH).
+```
+
+- [ ] **Step 2c: Update the stale failure-mode row about `ANTHROPIC_API_KEY` in CI**
+
+Also in `operations.md` § 9, find the row that says:
+
+```markdown
+| `audit subprocess failed: exit 1` | Missing `ANTHROPIC_API_KEY` (CI) or `claude` CLI not on PATH (local). | Set the secret / install `claude` CLI. |
+```
+
+Replace with:
+
+```markdown
+| `audit subprocess failed: exit 1` | (anthropic only) `claude` CLI not on PATH, or `ANTHROPIC_API_KEY` invalid. | Install Claude Code and run `claude /login`, or switch to the deepseek provider via `DEEPSEEK_API_KEY` + `KNOWLEDGE_FRESHNESS_PROVIDER=deepseek`. The cron now uses deepseek by default — see § 4 "Choosing a provider". |
+```
 
 - [ ] **Step 3: Add new entries to § 9 (Failure modes and recovery)**
 
