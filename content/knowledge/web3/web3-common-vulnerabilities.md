@@ -8,7 +8,7 @@ version-pin: 'SWC Registry'
 sources:
   - url: https://swcregistry.io/
     anchor: '#smart-contract-weakness-classification'
-  - url: https://consensys.github.io/smart-contract-best-practices/attacks/
+  - url: https://consensys.github.io/smart-contract-best-practices/
     anchor: '#known-attacks'
 ---
 

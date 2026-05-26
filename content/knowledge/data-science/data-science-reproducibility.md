@@ -6,7 +6,7 @@ volatility: evolving
 last-reviewed: null
 version-pin: null
 sources:
-  - url: https://docs.astral.sh/uv/concepts/projects/locking/
+  - url: https://docs.astral.sh/uv/concepts/projects/
     anchor: '#uv-lock'
   - url: https://the-turing-way.netlify.app/reproducible-research/reproducible-research.html
     anchor: '#reproducible-research'
