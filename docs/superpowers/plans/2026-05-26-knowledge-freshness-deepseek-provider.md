@@ -69,8 +69,13 @@ describe('resolveProvider', () => {
   })
 
   it('rule 4: both keys set without explicit choice → error with helpful message', () => {
-    expect(() => resolveProvider(opts({ ANTHROPIC_API_KEY: 'a', DEEPSEEK_API_KEY: 'd' })))
-      .toThrow(/ambiguous.*--provider.*KNOWLEDGE_FRESHNESS_PROVIDER/i)
+    // The thrown message can list the env-var and the --provider flag in
+    // either order — assert each substring independently so a wording
+    // change to the message doesn't break the test.
+    const call = () => resolveProvider(opts({ ANTHROPIC_API_KEY: 'a', DEEPSEEK_API_KEY: 'd' }))
+    expect(call).toThrow(/ambiguous/i)
+    expect(call).toThrow(/KNOWLEDGE_FRESHNESS_PROVIDER/)
+    expect(call).toThrow(/--provider/)
   })
 
   it('rule 5: no env vars but claude on PATH → anthropic (keychain delegation)', () => {
@@ -78,8 +83,13 @@ describe('resolveProvider', () => {
   })
 
   it('rule 6: no env vars and no claude on PATH → error with setup instructions', () => {
-    expect(() => resolveProvider(opts({}, {}, false)))
-      .toThrow(/no provider configured.*DEEPSEEK_API_KEY.*ANTHROPIC_API_KEY/i)
+    // The setup-instructions message spans multiple lines — use [\s\S]* so
+    // the match crosses newlines, and assert each key substring independently
+    // since they appear in human-readable order (ANTHROPIC then DEEPSEEK).
+    const call = () => resolveProvider(opts({}, {}, false))
+    expect(call).toThrow(/no provider configured/i)
+    expect(call).toThrow(/ANTHROPIC_API_KEY/)
+    expect(call).toThrow(/DEEPSEEK_API_KEY/)
   })
 
   it('rejects an invalid --provider flag value', () => {
@@ -351,7 +361,20 @@ Expected: PASS (3 tests).
 
 - [ ] **Step 5: Wire into `index.ts` factory**
 
-Replace the "not yet wired" stub for `'anthropic'` in `src/knowledge-freshness/providers/index.ts`:
+First, drop the leading underscore from the `_opts` parameter of
+`buildDispatcher` in `src/knowledge-freshness/providers/index.ts` — the
+parameter is about to become used, so the lint suppression name is no
+longer appropriate:
+
+```typescript
+// BEFORE:
+export function buildDispatcher(provider: Provider, _opts: BuildDispatcherOptions): Dispatcher {
+
+// AFTER:
+export function buildDispatcher(provider: Provider, opts: BuildDispatcherOptions): Dispatcher {
+```
+
+Then replace the "not yet wired" stub for `'anthropic'`:
 
 ```typescript
 // src/knowledge-freshness/providers/index.ts (top imports — ADD)
@@ -359,11 +382,9 @@ import { buildAnthropicDispatcher } from './anthropic.js'
 
 // In buildDispatcher() — REPLACE the anthropic branch:
   if (provider === 'anthropic') {
-    return buildAnthropicDispatcher({ timeoutSec: _opts.timeoutSec })
+    return buildAnthropicDispatcher({ timeoutSec: opts.timeoutSec })
   }
 ```
-
-Drop the leading underscore from the `opts` parameter name (it's now used).
 
 - [ ] **Step 6: Run full vitest, confirm nothing broke**
 
@@ -766,12 +787,18 @@ interface AuditRunEntryArgs {
 /**
  * Probe whether the `claude` CLI is on PATH. Used only for rule 5 of the
  * provider precedence chain (the "local dev with keychain auth" case).
- * `command -v` is shell-portable and exits non-zero when the binary is
- * missing.
+ *
+ * Platform-aware: POSIX systems use `command -v` (POSIX builtin, exits
+ * non-zero when the binary is missing); Windows uses `where`, which has
+ * the same exit-code semantics. The existing llm-dispatcher already
+ * special-cases Windows via `cmd.exe`, so we follow the same convention
+ * to keep rule-5 fallback working for Windows operators with Claude Code
+ * installed.
  */
 function probeClaudeOnPath(): boolean {
+  const probe = process.platform === 'win32' ? 'where claude' : 'command -v claude'
   try {
-    execSync('command -v claude', { stdio: 'ignore' })
+    execSync(probe, { stdio: 'ignore' })
     return true
   } catch {
     return false
