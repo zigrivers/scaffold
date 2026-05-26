@@ -54,17 +54,19 @@ setup() {
   while IFS= read -r file; do
     grep -q '^## Deep Guidance' "$file" || continue
 
-    local total summary_lines deep_lines
-    total="$(count_lines "$file")"
+    local body summary_lines deep_lines
+    # Measure against body lines (excluding YAML frontmatter) — freshness
+    # metadata like `volatility` / `sources` is not content.
+    body="$(count_body_lines "$file")"
     summary_lines="$(lines_between_headings "$file" "## Summary" "## Deep Guidance")"
     # Deep Guidance runs from its heading to EOF
     deep_lines="$(awk '/^## Deep Guidance/{found=1; next} found{count++} END{print count+0}' "$file")"
 
-    # Deep Guidance should be at least 60% of total content
-    local threshold=$(( total * 60 / 100 ))
+    # Deep Guidance should be at least 60% of body content
+    local threshold=$(( body * 60 / 100 ))
     if [[ "$deep_lines" -lt "$threshold" ]]; then
-      local pct=$(( deep_lines * 100 / total ))
-      failures+=("$(basename "$file"): Deep Guidance is ${pct}% of file (minimum 60%) — Summary may be too large")
+      local pct=$(( deep_lines * 100 / body ))
+      failures+=("$(basename "$file"): Deep Guidance is ${pct}% of body (minimum 60%) — Summary may be too large")
     fi
   done < <(find "${PROJECT_ROOT}/content/knowledge" -name '*.md' -type f)
 

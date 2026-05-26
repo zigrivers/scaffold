@@ -37,6 +37,20 @@ count_lines() {
   wc -l < "$1" | tr -d ' '
 }
 
+# Count body lines in a markdown file — total lines minus the YAML frontmatter
+# block (between the first two `---` delimiters, inclusive). Use this for any
+# ratio that should measure "% of content" — frontmatter is metadata, not
+# content, and freshness fields like `volatility` / `sources` make every
+# entry's frontmatter grow without changing what the model reads.
+count_body_lines() {
+  awk '
+    NR == 1 && /^---[[:space:]]*$/ { fm = 1; next }
+    fm == 1 && /^---[[:space:]]*$/ { fm = 2; next }
+    fm == 2 || fm == 0 { count++ }
+    END { print count+0 }
+  ' "$1"
+}
+
 # Count fenced code block pairs (``` opening markers).
 count_code_blocks() {
   grep -c '^```' "$1" 2>/dev/null | awk '{print int($1/2)}'
