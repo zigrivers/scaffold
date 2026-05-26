@@ -254,6 +254,10 @@ describe('descriptionShingle', () => {
     expect(descriptionShingle('abc')).toEqual([])
   })
 
+  it('applies short-string cutoff before modal normalization', () => {
+    expect(descriptionShingle('must')).toEqual([])
+  })
+
   it('returns single gram for strings exactly 5 chars', () => {
     expect(descriptionShingle('abcde')).toEqual(['abcde'])
   })

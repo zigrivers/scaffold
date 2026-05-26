@@ -73,8 +73,8 @@ export function reconcile(channelFindings: Record<string, Finding[]>): Reconcile
       group.normalized_location === finding.normalized_location &&
       group.normalized_category === finding.normalized_category &&
       group.normalized_suggestion === finding.normalized_suggestion &&
-      group.shingle.size > 0 &&
-      finding.shingle.size > 0 &&
+      shingleSize(group.shingle) > 0 &&
+      shingleSize(finding.shingle) > 0 &&
       jaccardSimilarity(group.shingle, finding.shingle) >= 0.7,
     ), finding)
     if (fuzzy !== undefined) {
@@ -180,6 +180,10 @@ function addToKeyIndex(
   } else if (!groups.includes(group)) {
     groups.push(group)
   }
+}
+
+function shingleSize(shingle: readonly string[] | ReadonlySet<string>): number {
+  return 'size' in shingle ? shingle.size : shingle.length
 }
 
 /**

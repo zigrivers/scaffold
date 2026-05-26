@@ -135,12 +135,13 @@ function escapeKeyPart(part: string): string {
 }
 
 export function descriptionShingle(description: string): string[] {
-  const normalized = normalizeModalVerbsInProse(normalizeDescriptionForKey(description))
+  const normalized = normalizeDescriptionForKey(description)
   if (normalized.length < 5) return []
+  const shingleText = normalizeModalVerbsInProse(normalized)
 
   const grams = new Set<string>()
-  for (let i = 0; i <= normalized.length - 5; i += 1) {
-    grams.add(normalized.slice(i, i + 5))
+  for (let i = 0; i <= shingleText.length - 5; i += 1) {
+    grams.add(shingleText.slice(i, i + 5))
   }
   return [...grams]
 }
