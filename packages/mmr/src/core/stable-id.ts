@@ -102,5 +102,5 @@ function normalizeSuggestionSegment(s: string): string {
 }
 
 function isMixedCaseIdentifier(token: string): boolean {
-  return /[a-z][A-Z]|[A-Z][a-z]+[A-Z]/.test(token)
+  return /[a-z][A-Z]|[A-Z][a-z]+[A-Z]|[A-Z]{2,}[a-z]|^[A-Z0-9_]{3,}$/.test(token)
 }

@@ -139,6 +139,12 @@ describe('normalizeSuggestionForKey', () => {
     expect(normalizeSuggestionForKey('Rename FooBar to fooBar.')).not.toBe(
       normalizeSuggestionForKey('Rename foobar to foobar.'),
     )
+    expect(normalizeSuggestionForKey('Rename HTTPServer to URLParser.')).not.toBe(
+      normalizeSuggestionForKey('Rename httpserver to urlparser.'),
+    )
+    expect(normalizeSuggestionForKey('Replace MAX_RETRIES.')).not.toBe(
+      normalizeSuggestionForKey('Replace max_retries.'),
+    )
   })
 
   it('does not strip description-only noise patterns', () => {
