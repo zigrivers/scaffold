@@ -2,6 +2,10 @@
 name: cli-interactivity-patterns
 description: Prompt libraries, spinners, progress bars, color output, TTY detection, and graceful degradation for piped output
 topics: [cli, interactivity, prompts, spinners, progress-bars, tty-detection, color, chalk]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Interactive CLI features — prompts, spinners, progress bars, colored output — exist to help humans. They must never obstruct machines. The guiding principle is graceful degradation: detect the execution context and silently disable interactive features when they would break automation.
