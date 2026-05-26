@@ -2,6 +2,12 @@
 name: review-adr
 description: Failure modes and review passes specific to Architecture Decision Records
 topics: [adr, decisions, review]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://adr.github.io/
+  - url: https://github.com/joelparkerhenderson/architecture-decision-record
 ---
 
 # Review: Architecture Decision Records

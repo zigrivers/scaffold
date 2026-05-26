@@ -2,6 +2,10 @@
 name: review-methodology
 description: Shared process for conducting multi-pass reviews of documentation artifacts
 topics: [methodology, quality-assurance, multi-pass, review]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 # Review Methodology

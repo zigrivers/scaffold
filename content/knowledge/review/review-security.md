@@ -2,6 +2,13 @@
 name: review-security
 description: Failure modes and review passes specific to security review and documentation artifacts
 topics: [security, owasp, auth, threat-modeling, review]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://owasp.org/Top10/
+  - url: https://owasp.org/www-project-application-security-verification-standard/
+  - url: https://www.nist.gov/cyberframework
 ---
 
 # Review: Security

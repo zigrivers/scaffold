@@ -2,6 +2,11 @@
 name: review-game-ui
 description: Failure modes and review passes specific to game UI specifications — HUD hierarchy, menu navigation, controller accessibility, settings coverage, FTUE effectiveness, state machine completeness, and platform shell compliance
 topics: [game-dev, review, ui, hud, menus, controller, accessibility, ftue]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://www.w3.org/WAI/standards-guidelines/wcag/
 ---
 
 # Review: Game UI Specification

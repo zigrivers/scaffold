@@ -2,6 +2,12 @@
 name: review-ux-specification
 description: Failure modes and review passes specific to UI/UX specification artifacts
 topics: [ux, design, accessibility, responsive-design, review]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://www.w3.org/WAI/standards-guidelines/wcag/
+  - url: https://tr.designtokens.org/format/
 ---
 
 # Review: UX Specification

@@ -2,6 +2,12 @@
 name: review-system-architecture
 description: Failure modes and review passes specific to system architecture documents
 topics: [architecture, components, data-flow, modules, review]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://microservices.io/patterns/
+  - url: https://martinfowler.com/architecture/
 ---
 
 # Review: System Architecture

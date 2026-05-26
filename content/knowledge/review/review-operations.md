@@ -2,6 +2,12 @@
 name: review-operations
 description: Failure modes and review passes specific to operations and deployment runbook artifacts
 topics: [operations, deployment, monitoring, runbooks, review]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://sre.google/sre-book/table-of-contents/
+  - url: https://opentelemetry.io/docs/
 ---
 
 # Review: Operations & Deployment

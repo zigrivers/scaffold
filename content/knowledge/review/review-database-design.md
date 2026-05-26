@@ -2,6 +2,11 @@
 name: review-database-design
 description: Failure modes and review passes specific to database schema design artifacts
 topics: [database, schema, data-modeling, review]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://www.postgresql.org/docs/
 ---
 
 # Review: Database Schema

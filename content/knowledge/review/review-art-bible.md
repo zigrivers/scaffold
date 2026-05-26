@@ -2,6 +2,10 @@
 name: review-art-bible
 description: Failure modes and review passes specific to Art Bible documents — budget consistency, naming conventions, LOD coverage, and pipeline validation
 topics: [game-dev, review, art, assets, lod, naming]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 # Review: Art Bible
