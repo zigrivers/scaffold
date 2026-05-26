@@ -2,7 +2,7 @@
 name: mobile-app-push-notifications
 description: APNs and FCM setup, notification channels, rich notifications, background handling, and permission best practices for mobile apps
 topics: [mobile-app, push-notifications, apns, fcm, firebase, notification-channels, rich-notifications, background]
-volatility: fast-moving
+volatility: evolving
 last-reviewed: null
 version-pin: null
 sources:

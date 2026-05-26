@@ -4,10 +4,10 @@ description: PCI-DSS, SOC 2, SEC/FINRA regulations for consumer/B2B fintech back
 topics: [backend, fintech, compliance, pci-dss, soc2, sec, finra, audit-trail, gdpr]
 volatility: evolving
 last-reviewed: null
-version-pin: 'PCI-DSS v4.0'
+version-pin: 'PCI-DSS v4.0.1'
 sources:
   - url: https://www.pcisecuritystandards.org/document_library/
-  - url: https://www.aicpa.org/topic/audit-assurance/audit-and-assurance-greater-than-soc
+  - url: https://www.aicpa-cima.com/topic/audit-assurance
   - url: https://www.sec.gov/rules-regulations/statutes-regulations/rules-securities-exchange-act-1934
   - url: https://www.finra.org/rules-guidance/rulebooks/finra-rules
   - url: https://eur-lex.europa.eu/eli/reg/2016/679/oj

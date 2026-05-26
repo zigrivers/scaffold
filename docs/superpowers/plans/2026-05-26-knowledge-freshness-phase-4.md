@@ -167,6 +167,17 @@ hosts:
   # Testing
   - docs.pact.io           # Pact (consumer-driven contract tests)
 
+  # Research / data-science reproducibility (added during Task 0 execution)
+  - the-turing-way.netlify.app  # The Turing Way reproducible-research handbook
+
+  # Compliance / regulatory (added during PR-review round 1)
+  - pcisecuritystandards.org  # PCI Security Standards Council
+  - aicpa.org              # AICPA legacy domain
+  - aicpa-cima.com         # AICPA-CIMA post-merger combined association
+  - www.sec.gov            # US Securities and Exchange Commission
+  - www.finra.org          # FINRA
+  - eur-lex.europa.eu      # EU legislation portal (GDPR + EU financial regulation)
+
   # Mobile platform docs (add as needed)
   - developer.apple.com    # Apple developer docs
   - developer.android.com  # Android developer docs
@@ -180,6 +191,14 @@ github_repos:
   - steveyegge/beads
   - joelparkerhenderson/architecture-decision-record
 ```
+
+> **Note on snippet drift:** the snippet above shows the allowlist as
+> committed in Task 0 plus the additions made during PR-review rounds
+> (notably `the-turing-way.netlify.app` and the fintech-regulator hosts).
+> The authoritative source of truth is always
+> `docs/knowledge-freshness/authoritative-sources.yaml` itself — re-read
+> that file before extending it; this snippet is for context, not for
+> overwriting.
 
 - [ ] **Step 2: Re-run validator to confirm Phase 1–2 warnings drop to zero**
 

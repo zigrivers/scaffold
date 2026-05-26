@@ -2,7 +2,7 @@
 name: mobile-app-security
 description: Secure storage (Keychain/Keystore), certificate pinning, biometric authentication, jailbreak/root detection, and data protection for mobile apps
 topics: [mobile-app, security, keychain, keystore, certificate-pinning, biometrics, jailbreak-detection, data-protection]
-volatility: fast-moving
+volatility: evolving
 last-reviewed: null
 version-pin: null
 sources:

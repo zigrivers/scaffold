@@ -2,7 +2,7 @@
 name: mobile-app-deployment
 description: App store submission, code signing, provisioning profiles, CI/CD with Fastlane, and release management for iOS and Android
 topics: [mobile-app, deployment, app-store, google-play, code-signing, fastlane, ci-cd, release-management]
-volatility: fast-moving
+volatility: evolving
 last-reviewed: null
 version-pin: null
 sources:

@@ -2,7 +2,7 @@
 name: mobile-app-distribution
 description: TestFlight and Google Play internal track, enterprise MDM distribution, staged rollouts, beta testing programs, and OTA updates for mobile apps
 topics: [mobile-app, distribution, testflight, google-play, enterprise-mdm, staged-rollout, beta-testing, ota]
-volatility: fast-moving
+volatility: evolving
 last-reviewed: null
 version-pin: null
 sources:
