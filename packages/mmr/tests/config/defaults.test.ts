@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { BUILTIN_CHANNELS } from '../../src/config/defaults.js'
+import { BUILTIN_CHANNELS, DEFAULT_CONFIG } from '../../src/config/defaults.js'
 
 describe('BUILTIN_CHANNELS — doc-conformance', () => {
   it('exposes a doc-conformance channel', () => {
@@ -32,5 +32,11 @@ describe('BUILTIN_CHANNELS — doc-conformance', () => {
 
   it('is disabled by default (requires explicit opt-in due to 3 LLM calls)', () => {
     expect(BUILTIN_CHANNELS['doc-conformance']?.enabled).toBe(false)
+  })
+})
+
+describe('DEFAULT_CONFIG compensator (T1-G)', () => {
+  it('omits the compensator block (so back-compat resolveCompensatorDispatch kicks in)', () => {
+    expect(DEFAULT_CONFIG.defaults.compensator).toBeUndefined()
   })
 })
