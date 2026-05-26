@@ -90,6 +90,17 @@ describe('normalizeDescriptionForKey', () => {
     expect(normalizeDescriptionForKey('Threshold at 0.5 is too low')).toBe('threshold at 0.5 is too low')
   })
 
+  it('preserves bare numeric values after "at" by default', () => {
+    const status404 = normalizeDescriptionForKey('Status at 404 is expected')
+    const status500 = normalizeDescriptionForKey('Status at 500 is expected')
+    expect(status404).toBe('status at 404 is expected')
+    expect(status500).toBe('status at 500 is expected')
+    expect(status404).not.toBe(status500)
+    expect(normalizeDescriptionForKey('Port at 3000 is unavailable')).toBe('port at 3000 is unavailable')
+    expect(normalizeDescriptionForKey('Index at 0 is skipped')).toBe('index at 0 is skipped')
+    expect(normalizeDescriptionForKey('Version at 2 fails')).toBe('version at 2 fails')
+  })
+
   it('strips severity-prefix filler', () => {
     expect(normalizeDescriptionForKey('P0: critical bug')).toBe('critical bug')
     expect(normalizeDescriptionForKey('Critical: real issue')).toBe('real issue')

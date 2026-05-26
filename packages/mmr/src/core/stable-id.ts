@@ -29,8 +29,9 @@ const VALUE_AFTER_AT_UNITS = [
   'ms',
   's',
 ].join('|')
-const AT_LINE_MENTION_RE =
-  new RegExp(String.raw`\bat \d+(?!\.\d)(?!\d)\b\.?(?!\s*(?:%|\b(?:${VALUE_AFTER_AT_UNITS})\b))`, 'gi')
+const AT_INTEGER_MENTION_RE = /\bat \d+(?!\.\d)(?!\d)\b\.?/gi
+const AT_INTEGER_VALUE_AFTER_RE = new RegExp(String.raw`^\s*(?:%|\b(?:${VALUE_AFTER_AT_UNITS})\b)`, 'i')
+const AT_LOCATION_CONTEXT_BEFORE_RE = /\b(?:found|reported|detected|raised|located|declared|defined)\s+$/
 const SEVERITY_PREFIX_RE = /^\s*(?:p[0-3]|critical|high|medium|low|info)\s*:\s*/i
 const CODE_SPAN_RE = /`([^`]*)`/g
 
@@ -38,7 +39,12 @@ function normalizeNonCodeSegment(s: string): string {
   return s
     .toLowerCase()
     .replace(LINE_MENTION_RE, '')
-    .replace(AT_LINE_MENTION_RE, '')
+    .replace(AT_INTEGER_MENTION_RE, (match, offset: number, full: string) => {
+      const after = full.slice(offset + match.length)
+      if (AT_INTEGER_VALUE_AFTER_RE.test(after)) return match
+      const before = full.slice(0, offset)
+      return AT_LOCATION_CONTEXT_BEFORE_RE.test(before) ? '' : match
+    })
     .replace(SEVERITY_PREFIX_RE, '')
     .replace(/\s+/g, ' ')
     .trim()
