@@ -2,6 +2,12 @@
 name: web3-testing
 description: Testing discipline for Foundry smart contracts — unit, fuzz, invariant, and fork tests with coverage and gas snapshots wired into CI
 topics: [web3, testing, foundry, fuzz, invariants, fork-tests]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://consensys.github.io/smart-contract-best-practices/
+  - url: https://ethereum.org/en/developers/docs/smart-contracts/testing/
 ---
 
 Smart contracts must work the first time. Once deployed, a bug is a bounty for the next adversary who reads your storage layout, and "we'll patch it next sprint" is not an option when the only patch path is a migration to a brand-new address. Foundry's `forge test` runner makes property-level confidence cheap: unit tests pin known behavior, fuzz tests stress the boundaries you forgot, invariants assert the laws that must hold across every state sequence, and fork tests replay against real mainnet state. Use all four — none of them substitutes for any of the others.

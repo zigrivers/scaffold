@@ -2,6 +2,13 @@
 name: web3-architecture
 description: EVM smart-contract architecture decisions — modular vs monolithic decomposition, OpenZeppelin baseline, state minimization, library vs inheritance, diamond pattern caveats, and external-call discipline
 topics: [web3, architecture, solidity, evm, openzeppelin]
+volatility: evolving
+last-reviewed: null
+version-pin: 'OpenZeppelin Contracts 5.x; Solidity 0.8.x'
+sources:
+  - url: https://docs.openzeppelin.com/contracts/5.x/
+  - url: https://ethereum.org/en/developers/docs/smart-contracts/
+  - url: https://consensys.github.io/smart-contract-best-practices/
 ---
 
 This overlay targets **EVM** chains — Ethereum mainnet, the major L2s (Arbitrum, Optimism, Base, zkSync, Polygon zkEVM), and other EVM-compatible execution layers running Solidity 0.8.x bytecode. Non-EVM ecosystems (Solana / Anchor, Aptos and Sui / Move, Cosmos / CosmWasm) have fundamentally different storage, account, and execution models and are deliberately out of scope here; a future W3-2 overlay may cover dApp / frontend work and non-EVM runtimes. Architecture in this doc means the contract-side decisions a protocol lead makes before the first `forge build`: how to decompose, what to inherit, how state is laid out, and where the trust boundaries fall.

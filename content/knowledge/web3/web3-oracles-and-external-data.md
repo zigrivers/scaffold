@@ -2,6 +2,13 @@
 name: web3-oracles-and-external-data
 description: Oracle discipline for smart contracts — Chainlink price feeds with staleness/decimals/sign checks, TWAP for DEX prices, VRF for randomness, and fallback patterns that fail safe
 topics: [web3, oracles, chainlink, security]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://consensys.github.io/smart-contract-best-practices/
+  - url: https://swcregistry.io/
+  - url: https://ethereum.org/en/developers/docs/oracles/
 ---
 
 A smart contract is a deterministic state machine in a closed universe. The real world — ETH/USD, the weather in Lagos, the winner of last night's match, a genuinely random number — is none of those things. Oracles are the bridge between the two, and every bridge is a new attack surface with its own trust assumptions, latency, and failure modes. The job is not to remove the trust assumption (you cannot) but to make the bridge robust enough that an exploit costs more than the protocol holds. Most "oracle hacks" are not novel cryptography either — they are missed standard patterns: an unchecked staleness, a spot price used where a TWAP belonged, a `block.timestamp` standing in for entropy.

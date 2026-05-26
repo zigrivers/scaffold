@@ -2,6 +2,13 @@
 name: web3-deployment-and-verification
 description: Deploying smart contracts with forge script — broadcast artifacts as provenance, Etherscan verification, multi-chain flows, testnet rehearsals, mainnet pre-flight, post-deploy role hardening, and CREATE2 deterministic deploys
 topics: [web3, deployment, verification, forge-script, etherscan]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://ethereum.org/en/developers/docs/smart-contracts/deploying/
+  - url: https://docs.openzeppelin.com/contracts/5.x/
+  - url: https://docs.safe.global/
 ---
 
 Shipping a contract to mainnet is the most irreversible thing a smart-contract team ever does. There is no rollback, no patch deploy, no `kubectl rollout undo` — once the bytecode is live and users start interacting with it, you live with what you wrote. The instinct from web2 — "deploy fast, fix forward" — produces drained protocols on-chain. Treat deployment as a release event: every privileged operation scripted (not hand-called), every artifact archived (not transient), every step rehearsed on a testnet that mirrors mainnet, and every contract verified on Etherscan before you tell anyone the address. The cost of the discipline is half a day of process; the cost of skipping it is the entire protocol.

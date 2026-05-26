@@ -2,6 +2,13 @@
 name: web3-upgradeability
 description: Upgradeable contracts — when not to upgrade, UUPS vs Transparent vs Beacon, OpenZeppelin Upgrades with the Foundry plugin, storage gaps, ERC-7201, initializers, timelocked authorization
 topics: [web3, upgradeability, proxy, openzeppelin, storage]
+volatility: evolving
+last-reviewed: null
+version-pin: 'OpenZeppelin Contracts Upgradeable 5.x'
+sources:
+  - url: https://docs.openzeppelin.com/contracts/5.x/upgradeable
+  - url: https://docs.openzeppelin.com/contracts/5.x/api/proxy
+  - url: https://docs.safe.global/
 ---
 
 Upgradeable contracts trade simplicity for the ability to fix bugs after deployment. The cost is real: a new threat surface (the upgrade key itself), a class of storage-layout bugs that do not exist in immutable contracts, and a permanent dependency on whoever holds upgrade rights. An "upgradeable" protocol is one whose trust assumptions include a future action by an admin — every user of the protocol is implicitly trusting that admin to behave, in perpetuity. The honest default for most protocols is: do not upgrade unless you have to.
