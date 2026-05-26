@@ -35,15 +35,12 @@ export interface CompensatorDispatch {
   output_parser: string | OutputParserConfig
 }
 
-export function resolveCompensatorDispatch(
-  config: MmrConfigParsed,
-  _originalChannel: string,
-): CompensatorDispatch {
+export function resolveCompensatorDispatch(config: MmrConfigParsed): CompensatorDispatch {
   const compConfig = config.defaults.compensator
   if (!compConfig) {
     return {
-      command: 'claude -p',
-      flags: ['--output-format', 'json'],
+      command: 'claude',
+      flags: ['-p', '--output-format', 'json'],
       env: {},
       stderr: 'capture',
       output_parser: 'default',
@@ -66,6 +63,21 @@ export function resolveCompensatorDispatch(
     stderr: channelConfig.stderr,
     output_parser: channelConfig.output_parser,
   }
+}
+
+/**
+ * Resolve the focus-area prompt prefix for a compensating pass.
+ */
+export function resolveCompensatorFocus(
+  config: MmrConfigParsed,
+  originalChannel: string,
+): string {
+  const override = config.defaults.compensator?.channel_focus_map?.[originalChannel]
+  if (typeof override === 'string' && override.length > 0) return override
+  const builtin = COMPENSATING_FOCUS[originalChannel]
+  if (builtin) return builtin
+  return `Focus your review on areas typically covered by ${originalChannel}.`
+    + ` You are compensating for a missing ${originalChannel} review.`
 }
 
 /**
@@ -110,17 +122,20 @@ export async function dispatchCompensatingPasses(
   prompt: string,
   compensatingChannels: CompensatingChannel[],
   timeout: number,
+  config: MmrConfigParsed,
 ): Promise<void> {
   await Promise.all(
     compensatingChannels.map((comp) => {
-      const compensatingPrompt = `${comp.focusPrompt}\n\n${prompt}`
+      const dispatch = resolveCompensatorDispatch(config)
+      const focus = resolveCompensatorFocus(config, comp.originalChannel)
+      const compensatingPrompt = `${focus}\n\n${prompt}`
       return dispatchChannel(store, jobId, comp.compensatingName, {
-        command: 'claude -p',
+        command: dispatch.command,
         prompt: compensatingPrompt,
-        flags: ['--output-format', 'json'],
-        env: {},
+        flags: dispatch.flags,
+        env: dispatch.env,
         timeout,
-        stderr: 'capture',
+        stderr: dispatch.stderr,
       })
     }),
   )

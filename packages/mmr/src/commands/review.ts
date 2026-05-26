@@ -9,7 +9,11 @@ import { checkInstalled, checkAuth } from '../core/auth.js'
 import { assemblePrompt } from '../core/prompt.js'
 import { dispatchChannel } from '../core/dispatcher.js'
 import { runResultsPipeline } from '../core/results-pipeline.js'
-import { getCompensatingChannels, dispatchCompensatingPasses } from '../core/compensator.js'
+import {
+  getCompensatingChannels,
+  dispatchCompensatingPasses,
+  resolveCompensatorDispatch,
+} from '../core/compensator.js'
 import type { Severity, OutputFormat, ChannelStatus } from '../types.js'
 import type { ChannelConfigParsed } from '../config/schema.js'
 
@@ -366,13 +370,14 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     if (compensating.length > 0) {
       // Register compensating channels in job.json so loadJob can discover them
       for (const comp of compensating) {
+        const dispatch = resolveCompensatorDispatch(config)
         store.registerChannel(job.job_id, comp.compensatingName, {
           status: 'dispatched',
           auth: 'ok',
-          output_parser: 'default',
+          output_parser: dispatch.output_parser,
         })
       }
-      await dispatchCompensatingPasses(store, job.job_id, prompt, compensating, config.defaults.timeout)
+      await dispatchCompensatingPasses(store, job.job_id, prompt, compensating, config.defaults.timeout, config)
     }
 
     // 9. Output results

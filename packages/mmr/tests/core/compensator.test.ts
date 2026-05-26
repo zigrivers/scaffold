@@ -1,7 +1,21 @@
-import { describe, it, expect } from 'vitest'
-import { getCompensatingChannels, resolveCompensatorDispatch } from '../../src/core/compensator.js'
+import { beforeEach, describe, it, expect, vi } from 'vitest'
+import {
+  dispatchCompensatingPasses,
+  getCompensatingChannels,
+  resolveCompensatorDispatch,
+  resolveCompensatorFocus,
+} from '../../src/core/compensator.js'
+import { dispatchChannel } from '../../src/core/dispatcher.js'
 import type { MmrConfigParsed } from '../../src/config/schema.js'
 import type { ChannelStatus } from '../../src/types.js'
+
+vi.mock('../../src/core/dispatcher.js', () => ({
+  dispatchChannel: vi.fn(() => Promise.resolve()),
+}))
+
+beforeEach(() => {
+  vi.mocked(dispatchChannel).mockClear()
+})
 
 describe('getCompensatingChannels', () => {
   it('returns compensating channels for unavailable ones', () => {
@@ -83,9 +97,9 @@ describe('resolveCompensatorDispatch', () => {
   }
 
   it('returns the hardcoded claude default when no compensator block is set', () => {
-    const result = resolveCompensatorDispatch(baseConfig, 'codex')
-    expect(result.command).toBe('claude -p')
-    expect(result.flags).toEqual(['--output-format', 'json'])
+    const result = resolveCompensatorDispatch(baseConfig)
+    expect(result.command).toBe('claude')
+    expect(result.flags).toEqual(['-p', '--output-format', 'json'])
     expect(result.env).toEqual({})
     expect(result.stderr).toBe('capture')
     expect(result.output_parser).toBe('default')
@@ -109,10 +123,185 @@ describe('resolveCompensatorDispatch', () => {
         },
       },
     }
-    const result = resolveCompensatorDispatch(cfg, 'codex')
+    const result = resolveCompensatorDispatch(cfg)
     expect(result.command).toBe('ollama')
     expect(result.flags).toEqual(['run', 'qwen2.5-coder:32b'])
     expect(result.env).toEqual({ OLLAMA_HOST: 'http://localhost:11434' })
     expect(result.output_parser).toBe('default')
+  })
+
+  it('throws when the configured compensator channel is missing', () => {
+    const cfg: MmrConfigParsed = {
+      ...baseConfig,
+      defaults: { ...baseConfig.defaults, compensator: { channel: 'missing' } },
+    }
+    expect(() => resolveCompensatorDispatch(cfg)).toThrow('Compensator channel "missing" not found')
+  })
+
+  it('throws when the configured compensator channel has no command', () => {
+    const cfg: MmrConfigParsed = {
+      ...baseConfig,
+      defaults: { ...baseConfig.defaults, compensator: { channel: 'abstract-base' } },
+      channels: {
+        'abstract-base': {
+          enabled: true,
+          flags: [],
+          env: {},
+          auth: { check: 'true', timeout: 5, failure_exit_codes: [1], recovery: 'noop' },
+          prompt_wrapper: '{{prompt}}',
+          output_parser: 'default',
+          stderr: 'capture',
+          abstract: true,
+        },
+      },
+    }
+    expect(() => resolveCompensatorDispatch(cfg)).toThrow('Compensator channel "abstract-base" has no command')
+  })
+})
+
+describe('resolveCompensatorFocus', () => {
+  const baseConfig: MmrConfigParsed = {
+    version: 1,
+    defaults: {
+      fix_threshold: 'P2',
+      timeout: 300,
+      format: 'json',
+      parallel: true,
+      job_retention_days: 7,
+    },
+    channels: {},
+  }
+
+  it('returns the hardcoded focus when no compensator block is set', () => {
+    const focus = resolveCompensatorFocus(baseConfig, 'codex')
+    expect(focus).toMatch(/implementation correctness/i)
+    expect(focus).toMatch(/security/i)
+  })
+
+  it('returns the channel_focus_map override when set for the original channel', () => {
+    const cfg: MmrConfigParsed = {
+      ...baseConfig,
+      defaults: {
+        ...baseConfig.defaults,
+        compensator: {
+          channel: 'qwen-local',
+          channel_focus_map: { codex: 'Focus on memory safety and async correctness.' },
+        },
+      },
+      channels: {
+        'qwen-local': {
+          enabled: true,
+          command: 'ollama',
+          flags: [],
+          env: {},
+          auth: { check: 'true', timeout: 5, failure_exit_codes: [1], recovery: 'noop' },
+          prompt_wrapper: '{{prompt}}',
+          output_parser: 'default',
+          stderr: 'capture',
+          abstract: false,
+        },
+      },
+    }
+    expect(resolveCompensatorFocus(cfg, 'codex')).toBe('Focus on memory safety and async correctness.')
+  })
+})
+
+describe('dispatchCompensatingPasses honors defaults.compensator', () => {
+  const baseConfig: MmrConfigParsed = {
+    version: 1,
+    defaults: {
+      fix_threshold: 'P2',
+      timeout: 300,
+      format: 'json',
+      parallel: true,
+      job_retention_days: 7,
+    },
+    channels: {},
+  }
+
+  const compensating = [
+    {
+      originalChannel: 'codex',
+      compensatingName: 'compensating-codex',
+      focusPrompt: 'legacy focus',
+    },
+  ]
+
+  it('dispatches via claude when defaults.compensator is unset', async () => {
+    await dispatchCompensatingPasses({} as never, 'job-1', 'review prompt', compensating, 300, baseConfig)
+
+    expect(dispatchChannel).toHaveBeenCalledWith(
+      {},
+      'job-1',
+      'compensating-codex',
+      expect.objectContaining({
+        command: 'claude',
+        flags: ['-p', '--output-format', 'json'],
+      }),
+    )
+  })
+
+  it('dispatches via the referenced channel when defaults.compensator.channel is set', async () => {
+    const cfg: MmrConfigParsed = {
+      ...baseConfig,
+      defaults: { ...baseConfig.defaults, compensator: { channel: 'qwen-local' } },
+      channels: {
+        'qwen-local': {
+          enabled: true,
+          command: 'ollama',
+          flags: ['run', 'qwen2.5'],
+          env: { OLLAMA_HOST: 'http://localhost:11434' },
+          auth: { check: 'true', timeout: 5, failure_exit_codes: [1], recovery: 'noop' },
+          prompt_wrapper: '{{prompt}}',
+          output_parser: 'default',
+          stderr: 'capture',
+          abstract: false,
+        },
+      },
+    }
+
+    await dispatchCompensatingPasses({} as never, 'job-1', 'review prompt', compensating, 300, cfg)
+
+    expect(dispatchChannel).toHaveBeenCalledWith(
+      {},
+      'job-1',
+      'compensating-codex',
+      expect.objectContaining({
+        command: 'ollama',
+        flags: ['run', 'qwen2.5'],
+        env: { OLLAMA_HOST: 'http://localhost:11434' },
+      }),
+    )
+  })
+
+  it('applies channel_focus_map to the prompt prefix', async () => {
+    const cfg: MmrConfigParsed = {
+      ...baseConfig,
+      defaults: {
+        ...baseConfig.defaults,
+        compensator: {
+          channel: 'qwen-local',
+          channel_focus_map: { codex: 'Focus on memory safety and async correctness.' },
+        },
+      },
+      channels: {
+        'qwen-local': {
+          enabled: true,
+          command: 'ollama',
+          flags: [],
+          env: {},
+          auth: { check: 'true', timeout: 5, failure_exit_codes: [1], recovery: 'noop' },
+          prompt_wrapper: '{{prompt}}',
+          output_parser: 'default',
+          stderr: 'capture',
+          abstract: false,
+        },
+      },
+    }
+
+    await dispatchCompensatingPasses({} as never, 'job-1', 'review prompt', compensating, 300, cfg)
+
+    expect(vi.mocked(dispatchChannel).mock.calls[0][3].prompt)
+      .toBe('Focus on memory safety and async correctness.\n\nreview prompt')
   })
 })
