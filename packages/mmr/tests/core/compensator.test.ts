@@ -2,6 +2,7 @@ import { beforeEach, describe, it, expect, vi } from 'vitest'
 import {
   dispatchCompensatingPasses,
   getCompensatingChannels,
+  resolveCompensatorChannelName,
   resolveCompensatorDispatch,
   resolveCompensatorFocus,
 } from '../../src/core/compensator.js'
@@ -47,6 +48,17 @@ describe('getCompensatingChannels', () => {
     }
     const result = getCompensatingChannels(statuses)
     expect(result).toHaveLength(0) // claude skipped, codex completed
+  })
+
+  it('does not compensate for the configured compensator channel', () => {
+    const statuses: Record<string, ChannelStatus> = {
+      'qwen-local': 'failed',
+      claude: 'failed',
+      codex: 'completed',
+    }
+    const result = getCompensatingChannels(statuses, 'qwen-local')
+    expect(result).toHaveLength(1)
+    expect(result[0].originalChannel).toBe('claude')
   })
 
   it('includes focus prompt for known channels', () => {
@@ -174,6 +186,32 @@ describe('resolveCompensatorDispatch', () => {
       },
     }
     expect(() => resolveCompensatorDispatch(cfg)).toThrow('Compensator channel "abstract-base" has no command')
+  })
+})
+
+describe('resolveCompensatorChannelName', () => {
+  const baseConfig: MmrConfigParsed = {
+    version: 1,
+    defaults: {
+      fix_threshold: 'P2',
+      timeout: 300,
+      format: 'json',
+      parallel: true,
+      job_retention_days: 7,
+    },
+    channels: {},
+  }
+
+  it('defaults to claude when no compensator channel is configured', () => {
+    expect(resolveCompensatorChannelName(baseConfig)).toBe('claude')
+  })
+
+  it('returns the configured compensator channel', () => {
+    const cfg: MmrConfigParsed = {
+      ...baseConfig,
+      defaults: { ...baseConfig.defaults, compensator: { channel: 'qwen-local' } },
+    }
+    expect(resolveCompensatorChannelName(cfg)).toBe('qwen-local')
   })
 })
 

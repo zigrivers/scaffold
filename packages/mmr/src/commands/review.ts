@@ -12,6 +12,7 @@ import { runResultsPipeline } from '../core/results-pipeline.js'
 import {
   getCompensatingChannels,
   dispatchCompensatingPasses,
+  resolveCompensatorChannelName,
   resolveCompensatorDispatch,
 } from '../core/compensator.js'
 import type { Severity, OutputFormat, ChannelStatus } from '../types.js'
@@ -365,7 +366,10 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     const channelStatuses = Object.fromEntries(
       Object.entries(completedJob1.channels).map(([n, ch]) => [n, ch.status]),
     ) as Record<string, ChannelStatus>
-    const compensating = getCompensatingChannels(channelStatuses)
+    const compensating = getCompensatingChannels(
+      channelStatuses,
+      resolveCompensatorChannelName(config),
+    )
 
     if (compensating.length > 0) {
       const dispatch = resolveCompensatorDispatch(config)

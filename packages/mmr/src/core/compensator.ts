@@ -15,9 +15,6 @@ const COMPENSATING_FOCUS: Record<string, string> = {
     + ' You are compensating for a missing Gemini review.',
 }
 
-/** Channels that should NOT be compensated (e.g., claude can't compensate for itself) */
-const SKIP_COMPENSATION = new Set(['claude'])
-
 export interface CompensatingChannel {
   /** Name of the original channel being compensated */
   originalChannel: string
@@ -74,6 +71,10 @@ export function resolveCompensatorDispatch(config: MmrConfigParsed): Compensator
   }
 }
 
+export function resolveCompensatorChannelName(config: MmrConfigParsed): string {
+  return config.defaults.compensator?.channel ?? 'claude'
+}
+
 function applyPromptWrapper(wrapper: string, prompt: string): string {
   return wrapper === '{{prompt}}'
     ? prompt
@@ -101,11 +102,12 @@ export function resolveCompensatorFocus(
  */
 export function getCompensatingChannels(
   channelStatuses: Record<string, ChannelStatus>,
+  compensatorChannel = 'claude',
 ): CompensatingChannel[] {
   const compensating: CompensatingChannel[] = []
 
   for (const [name, status] of Object.entries(channelStatuses)) {
-    if (SKIP_COMPENSATION.has(name)) continue
+    if (name === compensatorChannel) continue
     if (
       status === 'not_installed'
       || status === 'auth_failed'
