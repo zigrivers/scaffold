@@ -1,0 +1,20 @@
+diff --git a/content/knowledge/test/over-rewrite-stable.md b/content/knowledge/test/over-rewrite-stable.md
+--- a/content/knowledge/test/over-rewrite-stable.md
++++ b/content/knowledge/test/over-rewrite-stable.md
+@@ -8,11 +8,11 @@
+
+ ## Summary
+
+-Short body so 50% churn is easy to construct.
++ENTIRELY REWRITTEN SUMMARY that triggers the anti-over-rewrite gate.
+
+-Line A
+-Line B
+-Line C
+-Line D
++REPLACED LINE 1
++REPLACED LINE 2
++REPLACED LINE 3
++REPLACED LINE 4
+
+ ## Deep Guidance

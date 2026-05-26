@@ -1,0 +1,158 @@
+name: Knowledge Freshness Audit
+
+# Daily grounded audit of the knowledge base.
+#
+# Each run:
+#   1. Pre-filters at most 10 entries that are due for a check (cadence + source hash).
+#   2. For each candidate, runs `audit-run-entry` to produce a verdict.
+#   3. If the verdict is `major-drift` or `superseded`, applies the verdict and
+#      opens a PR with the rendered findings table.
+#
+# MMR corroboration is intentionally NOT wired into this Phase 2 workflow. Task 11
+# will add it as a separate CI gate that fires on the freshness PR's pushed branch,
+# where the MMR CLI + channel auth context is straightforward.
+#
+# Note on the gate workflow visibility (F-003): GitHub suppresses workflow events
+# triggered by the default `GITHUB_TOKEN`, so the freshness-PR gate workflow
+# (knowledge-freshness-gates.yml) would NOT fire on PRs this cron opens unless
+# we switch to a PAT/App token. To keep the trust boundary minimal, this workflow
+# runs the SAME gate logic inline before calling `audit-apply --open-pr`; any
+# gate failure skips PR creation. The gate workflow remains the source of truth
+# for human-opened freshness PRs (which `GITHUB_TOKEN` does NOT suppress).
+
+on:
+  schedule:
+    # 09:00 UTC daily. Choose UTC so the schedule is unaffected by DST.
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+
+# Prevent two scheduled runs from racing (e.g. a manual dispatch firing while
+# the cron is still working through candidates).
+concurrency: knowledge-freshness-audit
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          # full history needed so we can branch off origin/main without
+          # the shallow-clone fetch dance.
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.17'
+          cache: 'npm'
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Install Claude CLI (audit subprocess hardcodes `claude -p`)
+        # F-002 round-4: the audit subprocess invokes `claude -p` via the
+        # LLM dispatcher. GitHub-hosted runners don't ship the Claude CLI,
+        # so without this step every candidate audit would fail with
+        # "command not found" and the cron would silently open zero PRs.
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Build CLI
+        run: npm run build
+
+      - name: Configure git identity
+        # Required for `git commit` inside `audit-apply --open-pr`.
+        run: |
+          git config user.name "knowledge-freshness-bot"
+          git config user.email "knowledge-freshness@users.noreply.github.com"
+
+      - name: Pre-filter candidates
+        run: node dist/index.js knowledge-freshness audit-prefilter --max=10 > /tmp/candidates.json
+
+      - name: Run audits and open PRs
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # jq -c streams one candidate per line so the bash loop is simple.
+          # Empty array case: the loop body just never runs.
+          jq -c '.[]' /tmp/candidates.json | while read -r candidate; do
+            name=$(printf '%s' "$candidate" | jq -r '.name')
+            path=$(printf '%s' "$candidate" | jq -r '.path')
+            if [ "$path" = "null" ] || [ -z "$path" ]; then
+              echo "skip $name: no path resolved"
+              continue
+            fi
+            echo "::group::audit $name"
+            verdict_path="/tmp/verdict-${name}.json"
+            if ! node dist/index.js knowledge-freshness audit-run-entry "$path" > "$verdict_path"; then
+              echo "audit failed for $name — moving on"
+              echo "::endgroup::"
+              continue
+            fi
+            verdict=$(jq -r '.verdict' "$verdict_path")
+            echo "verdict: $verdict"
+            # F-001 round-5: persist non-rewrite verdicts too. Without this,
+            # entries with `current`/`minor-drift` verdicts never get
+            # `last-reviewed`/`hash`/`retrieved` updated and stay due every
+            # day, consuming the 10-entry daily budget and starving entries
+            # behind them in the prefilter queue.
+            case "$verdict" in
+              current|minor-drift|major-drift|superseded)
+                # F-003: run gates inline because GITHUB_TOKEN-opened PRs don't
+                # trigger the gate workflow. We apply the verdict in a transient
+                # staged state, then run the same per-file gates the workflow
+                # would run, then either open the PR or skip the entry.
+                if ! node dist/index.js knowledge-freshness audit-apply "$path" "$verdict_path"; then
+                  echo "audit-apply (pre-gates dry-run) failed for $name"
+                  echo "::endgroup::"
+                  continue
+                fi
+                # F-002 round-5: anti-over-rewrite is BLOCKING inline. The
+                # PR-gate workflow doesn't fire on GITHUB_TOKEN-opened PRs,
+                # so making the inline check advisory (round-3) opened a
+                # bypass path: cron-generated stable-entry rewrites over
+                # the 20% threshold could merge without any enforcement.
+                # Maintainers who genuinely need to push such a rewrite
+                # through should run `audit-apply --open-pr` LOCALLY (where
+                # the gate workflow fires normally on their PR via their
+                # user token) and apply the override:anti-over-rewrite
+                # label there. The cron deliberately refuses to do it.
+                # lint-unsourced remains advisory (spec §A.5 design).
+                gate_failed=0
+                node dist/index.js validate-knowledge || gate_failed=1
+                node dist/index.js knowledge-freshness link-check "$path" || gate_failed=1
+                node dist/index.js knowledge-freshness deep-guidance-check "$path" || gate_failed=1
+                node dist/index.js knowledge-freshness anti-over-rewrite "$path" --pr-labels "" || gate_failed=1
+                # Advisory-only: do not affect gate_failed.
+                node dist/index.js knowledge-freshness lint-unsourced "$path" || true
+                if [ "$gate_failed" != "0" ]; then
+                  echo "::error::gates failed for $name — not opening PR (anti-over-rewrite failures on stable entries: run audit-apply --open-pr locally as a maintainer with the override label applied)"
+                  # Restore the file so subsequent entries aren't poisoned.
+                  git checkout -- "$path"
+                  echo "::endgroup::"
+                  continue
+                fi
+                # Restore the file so each open-pr starts from a clean main.
+                # audit-apply --open-pr re-runs the on-disk edits inside the
+                # branch it creates.
+                git checkout -- "$path"
+                if ! node dist/index.js knowledge-freshness audit-apply "$path" "$verdict_path" --open-pr; then
+                  echo "audit-apply --open-pr failed for $name"
+                fi
+                ;;
+              *)
+                echo "unknown verdict for $name: $verdict"
+                ;;
+            esac
+            # F-004: audit-apply --open-pr leaves us on the freshness PR
+            # branch. Restore main before the next iteration so each
+            # candidate's audit starts from a clean base.
+            git checkout main >/dev/null 2>&1 || true
+            echo "::endgroup::"
+          done

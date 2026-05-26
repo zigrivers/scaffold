@@ -2,6 +2,16 @@
 name: automated-review-tooling
 description: Patterns for automated code review using AI CLI tools (Codex, Gemini, Claude) — three-CLI MMR orchestration plus Superpowers 4th channel in wrappers, reconciliation, compensating passes, PR + non-PR targets, and CI integration
 topics: [code-review, automation, codex, gemini, claude, pull-requests, non-pr-review, mmr, ci-cd, review-tooling]
+volatility: fast-moving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://docs.anthropic.com/en/docs/claude-code/overview
+    anchor: '#claude-code-cli'
+  - url: https://platform.openai.com/docs/codex
+    anchor: '#codex-cli'
+  - url: https://ai.google.dev/gemini-api/docs
+    anchor: '#cli-tools'
 ---
 
 # Automated Review Tooling

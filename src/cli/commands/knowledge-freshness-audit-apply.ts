@@ -4,6 +4,7 @@ import type { Argv, CommandModule } from 'yargs'
 import yaml from 'js-yaml'
 import { applyVerdictToEntry, normalizeUrl } from '../../knowledge-freshness/audit-apply.js'
 import { fetchAndHash } from '../../knowledge-freshness/source-hash.js'
+import { openFreshnessPr, readVolatility } from '../../knowledge-freshness/audit-apply-pr.js'
 import type { AuditVerdict } from '../../knowledge-freshness/audit-runner.js'
 
 interface AuditApplyArgs {
@@ -13,7 +14,7 @@ interface AuditApplyArgs {
 
 const auditApplyCommand: CommandModule<Record<string, unknown>, AuditApplyArgs> = {
   command: 'audit-apply <entryPath> <verdictPath>',
-  describe: 'Apply a freshness audit verdict to a knowledge entry (Phase 1: no PR — operator opens it manually)',
+  describe: 'Apply a freshness audit verdict to a knowledge entry (use --open-pr to push a branch and open a PR)',
   builder: (y) => y
     .positional('entryPath', {
       type: 'string',
@@ -24,7 +25,16 @@ const auditApplyCommand: CommandModule<Record<string, unknown>, AuditApplyArgs> 
       type: 'string',
       describe: 'Path to the verdict JSON file produced by audit-run-entry',
       demandOption: true,
-    }) as Argv<AuditApplyArgs>,
+    })
+    .option('open-pr', {
+      type: 'boolean',
+      default: false,
+      describe: 'Create a branch, commit, push, and open a PR via gh (default: edit file only)',
+    })
+    .option('mmr-job-id', {
+      type: 'string',
+      describe: 'MMR corroboration job ID to reference in the PR body (optional)',
+    }) as unknown as Argv<AuditApplyArgs>,
   handler: async (argv) => {
     const content = fs.readFileSync(argv.entryPath, 'utf8')
     const verdictRaw = fs.readFileSync(argv.verdictPath, 'utf8')
@@ -65,11 +75,32 @@ const auditApplyCommand: CommandModule<Record<string, unknown>, AuditApplyArgs> 
     const updated = applyVerdictToEntry(content, verdict, { trustedHashes })
     fs.writeFileSync(argv.entryPath, updated)
 
-    // Show the operator what changed. Phase 1 stops here — the human opens
-    // the PR manually after reviewing the diff (Task 9 of the plan).
-    const diff = spawnSync('git', ['diff', '--', argv.entryPath], { encoding: 'utf8' })
-    if (diff.stdout) process.stdout.write(diff.stdout)
-    if (diff.stderr) process.stderr.write(diff.stderr)
+    // yargs exposes kebab options under both kebab and camelCase keys. Read
+    // both forms so we don't rely on a single normalization path
+    // (matches the pattern in src/cli/commands/observe.ts for --stall-check).
+    const argvAny = argv as unknown as Record<string, unknown>
+    const openPr = (argvAny['open-pr'] ?? argvAny.openPr) === true
+    const mmrJobId = (argvAny['mmr-job-id'] ?? argvAny.mmrJobId) as string | undefined
+
+    if (openPr) {
+      // Re-read the updated entry so we pull `volatility` from the post-apply
+      // frontmatter (apply never changes volatility, but reading once-after is
+      // a tidy invariant — single source of truth).
+      const updatedContent = fs.readFileSync(argv.entryPath, 'utf8')
+      const volatility = readVolatility(updatedContent)
+      const { branch, prUrl } = openFreshnessPr(verdict, {
+        entryPath: argv.entryPath,
+        volatility,
+        mmrJobId,
+      })
+      process.stdout.write(`branch: ${branch}\npr: ${prUrl}\n`)
+    } else {
+      // Show the operator what changed. Without --open-pr we stop here and let
+      // the human open the PR manually (Phase 1 behavior).
+      const diff = spawnSync('git', ['diff', '--', argv.entryPath], { encoding: 'utf8' })
+      if (diff.stdout) process.stdout.write(diff.stdout)
+      if (diff.stderr) process.stderr.write(diff.stderr)
+    }
   },
 }
 

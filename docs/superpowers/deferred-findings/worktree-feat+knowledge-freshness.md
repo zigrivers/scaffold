@@ -5,6 +5,27 @@ Phase 1 bundle). Per the execution rule for this PR, rounds 1–5 fix every
 P2-or-above finding; rounds 6+ fix only P0/P1 and defer P2/P3 here. Revisit
 during Phase 2 hardening.
 
+## Phase 2 PR #379
+
+### F-003 (Phase 2 round 9) — link-check resolves project root via cwd (P2)
+
+- **Round:** Phase 2 PR round 9
+- **MMR job_id:** mmr-c0409d95cf15
+- **Severity:** P2
+- **Sources:** gemini (unique)
+- **Location:** `src/cli/commands/knowledge-freshness-link-check.ts:35`
+- **Description:** The `link-check` command uses `process.cwd()` to locate
+  `.scaffold/observability.yaml`. If executed locally from a subdirectory
+  (e.g. inside `content/knowledge/`), it fails to load the operator skip
+  list and ignores opt-outs.
+- **Suggestion:** Use `findProjectRoot(process.cwd()) ?? process.cwd()` to
+  resolve the project root before calling `loadLinkCheckSkip()`.
+- **Defer rationale:** Pairs with the round-7 F-005 deferred-finding from
+  Phase 1 (same pattern, same fix). Both should land together during a
+  Phase 2 hardening pass. Low-severity — the CI workflow always runs from
+  the repo root via `make`, so production usage is unaffected. Skip list
+  is also empty by default.
+
 ## Task 9 live-audit corroboration
 
 ### Format — audit-apply re-serializes YAML in block style (P3/Phase 2 polish)

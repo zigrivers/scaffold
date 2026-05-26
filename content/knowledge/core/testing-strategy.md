@@ -2,6 +2,14 @@
 name: testing-strategy
 description: Test pyramid, testing patterns, coverage strategy, and quality gates
 topics: [testing, tdd, test-pyramid, quality-gates, coverage, test-data, mocking]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://martinfowler.com/articles/practical-test-pyramid.html
+    anchor: '#TheTestPyramid'
+  - url: https://martinfowler.com/bliki/TestDouble.html
+    anchor: '#test-doubles'
 ---
 
 # Testing Strategy

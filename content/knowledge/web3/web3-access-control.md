@@ -2,6 +2,14 @@
 name: web3-access-control
 description: Role-based access control for smart contracts — Ownable2Step, OpenZeppelin AccessControl, Safe multisig as admin, TimelockController on dangerous ops, role separation, and decentralization via renouncing
 topics: [web3, access-control, openzeppelin, multisig, timelock]
+volatility: fast-moving
+last-reviewed: null
+version-pin: 'OpenZeppelin Contracts 5.x'
+sources:
+  - url: https://docs.openzeppelin.com/contracts/5.x/access-control
+    anchor: '#access-control'
+  - url: https://docs.safe.global/home/what-is-safe
+    anchor: '#safe-multisig'
 ---
 
 Most contract exploits are not novel cryptography — they are either missing access-control checks ("anyone can call `setFeeRecipient`") or a single admin key getting drained, phished, or coerced. Access control is the answer to three questions: who can change what, when can they change it, and whose consent is required to authorize the change. A protocol whose answer is "the deployer EOA, immediately, alone" is a protocol one phishing email away from a post-mortem. Production-grade access control replaces each of those answers with a deliberate engineering choice: granular roles, time-locked execution windows, and multi-party signing.

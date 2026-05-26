@@ -2,6 +2,14 @@
 name: multi-service-observability
 description: Distributed tracing, correlation IDs, cross-service SLOs, and failure attribution
 topics: [distributed-tracing, correlation-ids, cross-service-slos, failure-attribution]
+volatility: evolving
+last-reviewed: null
+version-pin: 'OpenTelemetry 1.x'
+sources:
+  - url: https://opentelemetry.io/docs/specs/otel/
+    anchor: '#overview'
+  - url: https://www.w3.org/TR/trace-context/
+    anchor: '#traceparent-header'
 ---
 
 ## Summary
