@@ -7,6 +7,11 @@ import type { MmrConfigParsed, ChannelConfigParsed } from './schema.js'
  */
 export const DEFAULT_CONFIG: MmrConfigParsed = {
   version: 1,
+  // defaults.compensator is intentionally omitted here. When absent,
+  // resolveCompensatorDispatch (core/compensator.ts) falls back to
+  // `claude -p --output-format json`, preserving historical behavior.
+  // Users who want a non-Anthropic fallback set defaults.compensator in
+  // their own .mmr.yaml.
   defaults: {
     fix_threshold: 'P2',
     timeout: 300,
