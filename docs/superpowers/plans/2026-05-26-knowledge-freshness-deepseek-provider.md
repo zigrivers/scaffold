@@ -501,9 +501,13 @@ const ok = (body: unknown): Response =>
 
 describe('deepseek provider — happy path', () => {
   it('POSTs to api.deepseek.com/chat/completions with bearer auth and the prompt as user message', async () => {
-    const fetchSpy: DeepseekFetch = vi.fn(async () => ok({
+    // Keep a separate reference to the raw vi.fn() result BEFORE casting to
+    // DeepseekFetch, so we can read .mock.calls without an `as unknown as`
+    // dive into vitest internals (round-6 grok finding).
+    const rawFetchMock = vi.fn(async () => ok({
       choices: [{ message: { content: '{"verdict":"current"}' } }],
-    })) as unknown as DeepseekFetch
+    }))
+    const fetchSpy = rawFetchMock as unknown as DeepseekFetch
     const dispatcher = buildDeepseekDispatcher({
       apiKey: 'sk-test-key',
       timeoutSec: 600,
@@ -512,7 +516,7 @@ describe('deepseek provider — happy path', () => {
     const result = await dispatcher('the meta-prompt body')
     expect(result).toBe('{"verdict":"current"}')
     // Verify the request shape exactly.
-    expect(fetchSpy).toHaveBeenCalledWith(
+    expect(rawFetchMock).toHaveBeenCalledWith(
       'https://api.deepseek.com/chat/completions',
       expect.objectContaining({
         method: 'POST',
@@ -523,8 +527,8 @@ describe('deepseek provider — happy path', () => {
         body: expect.any(String),
       }),
     )
-    const call = (fetchSpy as unknown as { mock: { calls: [string, RequestInit][] } }).mock.calls[0]
-    const sentBody = JSON.parse(call[1].body as string)
+    // Parse the JSON body to verify the request shape precisely.
+    const sentBody = JSON.parse(rawFetchMock.mock.calls[0][1]!.body as string)
     expect(sentBody).toEqual({
       model: 'deepseek-v4-flash',
       messages: [{ role: 'user', content: 'the meta-prompt body' }],
@@ -538,9 +542,10 @@ describe('deepseek provider — happy path', () => {
   })
 
   it('uses the model from KNOWLEDGE_FRESHNESS_DEEPSEEK_MODEL when set (allowlist member)', async () => {
-    const fetchSpy: DeepseekFetch = vi.fn(async () => ok({
+    const rawFetchMock = vi.fn(async () => ok({
       choices: [{ message: { content: 'response' } }],
-    })) as unknown as DeepseekFetch
+    }))
+    const fetchSpy = rawFetchMock as unknown as DeepseekFetch
     const dispatcher = buildDeepseekDispatcher({
       apiKey: 'k',
       timeoutSec: 60,
@@ -548,8 +553,7 @@ describe('deepseek provider — happy path', () => {
       fetchImpl: fetchSpy,
     })
     await dispatcher('x')
-    const call = (fetchSpy as unknown as { mock: { calls: [string, RequestInit][] } }).mock.calls[0]
-    expect(JSON.parse(call[1].body as string).model).toBe('deepseek-v4-pro')
+    expect(JSON.parse(rawFetchMock.mock.calls[0][1]!.body as string).model).toBe('deepseek-v4-pro')
   })
 })
 ```
@@ -643,43 +647,74 @@ export function buildDeepseekDispatcher(opts: BuildDeepseekDispatcherOptions): D
       max_tokens: MAX_TOKENS,
       stream: false,
     })
-    const res = await doFetch(DEEPSEEK_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${opts.apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body,
-      signal: AbortSignal.timeout(timeoutMs),
-    })
-    // Always read the body as TEXT first so we can produce a useful
-    // diagnostic on both non-2xx AND malformed-JSON responses
-    // (round-2 F-004: previously `await res.json()` propagated a raw
-    // SyntaxError that masked the actual response body).
-    const rawText = await res.text().catch(() => '<unreadable>')
-    if (res.status < 200 || res.status >= 300) {
-      throw new Error(
-        `deepseek dispatcher: HTTP ${res.status} from ${DEEPSEEK_URL}. ` +
-        `Body (first 200 chars): ${rawText.slice(0, 200)}`,
-      )
-    }
-    let parsed: unknown
+    // Timeout via AbortController + setTimeout — NOT AbortSignal.timeout(),
+    // which is unavailable on the project's declared Node floor of 18.17
+    // (round-6 grok finding). Matches the pattern llm-dispatcher.ts
+    // already uses on the subprocess side.
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), timeoutMs)
+    let res: Response
     try {
-      parsed = JSON.parse(rawText)
-    } catch {
-      throw new Error(
-        `deepseek dispatcher: response was not valid JSON. ` +
-        `Body (first 200 chars): ${rawText.slice(0, 200)}`,
-      )
+      // Wrap the fetch itself in a try/catch so DNS failures, connection
+      // resets, and timeout-aborts surface as a consistent
+      // `deepseek dispatcher: …` error instead of leaking raw undici /
+      // DOMException objects up the call stack (round-6 grok finding).
+      try {
+        res = await doFetch(DEEPSEEK_URL, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${opts.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body,
+          signal: controller.signal,
+        })
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err)
+        throw new Error(`deepseek dispatcher: fetch failed: ${reason}`)
+      }
+      // Always read the body as TEXT first so we can produce a useful
+      // diagnostic on both non-2xx AND malformed-JSON responses
+      // (round-2 F-004: previously `await res.json()` propagated a raw
+      // SyntaxError that masked the actual response body).
+      const rawText = await res.text().catch(() => '<unreadable>')
+      if (res.status < 200 || res.status >= 300) {
+        throw new Error(
+          `deepseek dispatcher: HTTP ${res.status} from ${DEEPSEEK_URL}. ` +
+          `Body (first 200 chars): ${rawText.slice(0, 200)}`,
+        )
+      }
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(rawText)
+      } catch {
+        throw new Error(
+          `deepseek dispatcher: response was not valid JSON. ` +
+          `Body (first 200 chars): ${rawText.slice(0, 200)}`,
+        )
+      }
+      const result = responseSchema.safeParse(parsed)
+      if (!result.success) {
+        throw new Error(
+          `deepseek dispatcher: response missing choices[0].message.content. ` +
+          `Truncated response: ${rawText.slice(0, 200)}`,
+        )
+      }
+      const content = result.data.choices[0].message.content
+      // Round-6 grok finding: an empty-string content satisfies the zod
+      // schema but is useless to the runner's JSON extractor and produces
+      // a confusing downstream parse error. Surface the empty-response
+      // case with a clear message and the truncated body.
+      if (content.trim() === '') {
+        throw new Error(
+          `deepseek dispatcher: model returned empty content. ` +
+          `Truncated response: ${rawText.slice(0, 200)}`,
+        )
+      }
+      return content
+    } finally {
+      clearTimeout(timer)
     }
-    const result = responseSchema.safeParse(parsed)
-    if (!result.success) {
-      throw new Error(
-        `deepseek dispatcher: response missing choices[0].message.content. ` +
-        `Truncated response: ${rawText.slice(0, 200)}`,
-      )
-    }
-    return result.data.choices[0].message.content
   }
 }
 ```
@@ -765,13 +800,36 @@ describe('deepseek provider — error paths', () => {
   it('rejects construction when apiKey is empty', () => {
     expect(() => buildDeepseekDispatcher({ apiKey: '', timeoutSec: 60 })).toThrow(/DEEPSEEK_API_KEY is required/)
   })
+
+  it('normalizes transport errors (DNS / connection reset / fetch reject) into a deepseek-prefixed message (round-6 grok)', async () => {
+    // The dispatcher must wrap the fetch call so raw undici / DOMException
+    // errors don't leak to the cron logs unstyled. Mock a fetch that
+    // rejects synchronously; assert the wrapped error has the diagnostic
+    // prefix.
+    const fetchSpy: DeepseekFetch = vi.fn(async () => {
+      throw new Error('getaddrinfo ENOTFOUND api.deepseek.com')
+    }) as unknown as DeepseekFetch
+    const dispatcher = buildDeepseekDispatcher({ apiKey: 'k', timeoutSec: 60, fetchImpl: fetchSpy })
+    await expect(dispatcher('x')).rejects.toThrow(/deepseek dispatcher: fetch failed.*ENOTFOUND/i)
+  })
+
+  it('throws a diagnostic error when the model returns empty content (round-6 grok)', async () => {
+    // A 200 response with content === "" satisfies the zod schema but is
+    // useless to the runner's JSON extractor. The dispatcher must surface
+    // it with a clear message rather than handing back an empty string.
+    const fetchSpy: DeepseekFetch = vi.fn(async () =>
+      new Response(JSON.stringify({ choices: [{ message: { content: '   ' } }] }), { status: 200 }),
+    ) as unknown as DeepseekFetch
+    const dispatcher = buildDeepseekDispatcher({ apiKey: 'k', timeoutSec: 60, fetchImpl: fetchSpy })
+    await expect(dispatcher('x')).rejects.toThrow(/model returned empty content/i)
+  })
 })
 ```
 
-- [ ] **Step 2: Run tests, confirm pass (no impl changes needed — happy-path code already covers these)**
+- [ ] **Step 2: Run tests, confirm pass (no impl changes needed — Task 3's code already covers these)**
 
 Run: `npx vitest run src/knowledge-freshness/providers/deepseek.test.ts`
-Expected: PASS (2 happy-path + 5 error-path = 7 tests).
+Expected: PASS (2 happy-path + 7 error-path = 9 tests).
 
 If any error-path test fails, the Task 3 implementation has a bug — fix `deepseek.ts` so the tests pass before continuing.
 
@@ -829,7 +887,7 @@ describe('buildDispatcher — deepseek wiring', () => {
 - [ ] **Step 5: Run all tests, confirm pass**
 
 Run: `npx vitest run src/knowledge-freshness/providers/`
-Expected: PASS (9 resolver + 3 anthropic + 7 deepseek + 2 factory wiring = 21 tests).
+Expected: PASS (12 resolver + 3 anthropic + 9 deepseek + 2 factory wiring = 26 tests).
 
 - [ ] **Step 6: Commit**
 
@@ -1355,6 +1413,12 @@ Expected: working tree clean; all local commits are pushed (no "ahead by N" mess
 - [ ] **Step 8: Hand off**
 
 Surface to the operator: the PR URL, the MMR verdict (job ID + rounds run), any deferred-findings file path, and the next step ("ready for human review; the cron workflow will not activate until the PR merges and `DEEPSEEK_API_KEY` is set as a repo secret").
+
+---
+
+## Known related issue (out of scope)
+
+`src/knowledge-freshness/gates/link-check.ts` (already on main) uses the same `AbortSignal.timeout(ms)` pattern that grok flagged in round-6 review. This is a *latent* bug on Node 18.17 today — it would only surface if a gate workflow actually triggered (gate tests use mocked fetch, so the timeout path isn't exercised). Fixing it is genuinely separate work (different file, different commit history); track as a follow-up issue rather than expanding this plan's scope. The DeepSeek provider correctly uses the `AbortController + setTimeout` pattern from the start.
 
 ---
 
