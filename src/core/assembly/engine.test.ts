@@ -1,4 +1,6 @@
-import { describe, it, expect } from 'vitest'
+import {
+  describe, it, expect, beforeAll, afterAll, beforeEach, afterEach,
+} from 'vitest'
 import { AssemblyEngine } from './engine.js'
 import type {
   AssemblyOptions,
@@ -12,6 +14,13 @@ import type { ScaffoldConfig } from '../../types/index.js'
 import type { PipelineState } from '../../types/index.js'
 import type { DepthLevel } from '../../types/index.js'
 import type { DepthProvenance } from '../../types/index.js'
+
+const ORIGINAL_QUIET = process.env['SCAFFOLD_GAP_SIGNAL_QUIET']
+beforeAll(() => { process.env['SCAFFOLD_GAP_SIGNAL_QUIET'] = '1' })
+afterAll(() => {
+  if (ORIGINAL_QUIET === undefined) delete process.env['SCAFFOLD_GAP_SIGNAL_QUIET']
+  else process.env['SCAFFOLD_GAP_SIGNAL_QUIET'] = ORIGINAL_QUIET
+})
 
 // ---------------------------------------------------------------------------
 // Test fixture helpers
@@ -575,6 +584,7 @@ describe('AssemblyEngine', () => {
 
   // --- Rework Fix ---
 
+
   it('injects auto-fix instructions when reworkFix is true', () => {
     const result = engine.assemble('review-prd', makeOptions({ reworkFix: true }))
 
@@ -595,5 +605,43 @@ describe('AssemblyEngine', () => {
 
     expect(result.success).toBe(true)
     expect(result.prompt!.text).not.toContain('Rework Mode: Auto-Fix Enabled')
+  })
+})
+
+describe('AssemblyEngine — gap-signal tail injection', () => {
+  const originalQuiet = process.env['SCAFFOLD_GAP_SIGNAL_QUIET']
+
+  beforeEach(() => { delete process.env['SCAFFOLD_GAP_SIGNAL_QUIET'] })
+  afterEach(() => {
+    if (originalQuiet === undefined) delete process.env['SCAFFOLD_GAP_SIGNAL_QUIET']
+    else process.env['SCAFFOLD_GAP_SIGNAL_QUIET'] = originalQuiet
+  })
+
+  const withKnowledge = () => makeOptions({
+    knowledgeEntries: [makeKBEntry({ name: 'tdd-patterns', description: 'd', content: 'c' })],
+  })
+  const withoutKnowledge = () => makeOptions({ knowledgeEntries: [] })
+
+  it('appends gap-signal tail to Knowledge Base section when env var unset', () => {
+    const engine = new AssemblyEngine()
+    const result = engine.assemble('tech-stack', withKnowledge())
+    expect(result.success).toBe(true)
+    expect(result.prompt?.text).toContain('scaffold observe event knowledge_gap_signal')
+    expect(result.prompt?.text).toContain('--step-name="tech-stack"')
+  })
+
+  it('does NOT append tail when SCAFFOLD_GAP_SIGNAL_QUIET=1', () => {
+    process.env['SCAFFOLD_GAP_SIGNAL_QUIET'] = '1'
+    const engine = new AssemblyEngine()
+    const result = engine.assemble('tech-stack', withKnowledge())
+    expect(result.success).toBe(true)
+    expect(result.prompt?.text).not.toContain('scaffold observe event knowledge_gap_signal')
+  })
+
+  it('does NOT append tail when there are no knowledge entries (defensive)', () => {
+    const engine = new AssemblyEngine()
+    const result = engine.assemble('tech-stack', withoutKnowledge())
+    expect(result.success).toBe(true)
+    expect(result.prompt?.text).not.toContain('scaffold observe event knowledge_gap_signal')
   })
 })
