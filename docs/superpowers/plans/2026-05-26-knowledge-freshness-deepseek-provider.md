@@ -528,6 +528,9 @@ describe('deepseek provider — happy path', () => {
     expect(sentBody).toEqual({
       model: 'deepseek-v4-flash',
       messages: [{ role: 'user', content: 'the meta-prompt body' }],
+      // Round-5 F-001: thinking mode is explicitly disabled so temperature: 0
+      // takes effect and the model goes straight to the JSON verdict.
+      thinking: { type: 'disabled' },
       temperature: 0,
       max_tokens: 8192,
       stream: false,
@@ -628,6 +631,14 @@ export function buildDeepseekDispatcher(opts: BuildDeepseekDispatcherOptions): D
     const body = JSON.stringify({
       model,
       messages: [{ role: 'user', content: prompt }],
+      // Thinking mode defaults ON for v4 models and IGNORES temperature
+      // (per https://api-docs.deepseek.com/guides/thinking_mode). The
+      // audit prompt produces structured JSON via the runner's schema-
+      // aware extractor — chain-of-thought reasoning before the JSON
+      // wastes the output token budget and produces non-deterministic
+      // text. Disable thinking so temperature: 0 actually takes effect
+      // and the response goes straight to the verdict.
+      thinking: { type: 'disabled' },
       temperature: 0,
       max_tokens: MAX_TOKENS,
       stream: false,
@@ -1199,7 +1210,7 @@ Find § 9. Add two new rows to the existing failure-modes table:
 ```markdown
 | `Error: provider selection ambiguous` | Both `ANTHROPIC_API_KEY` and `DEEPSEEK_API_KEY` are set without an explicit choice via `--provider` or `KNOWLEDGE_FRESHNESS_PROVIDER`. | Pass `--provider anthropic` or `--provider deepseek`, or set `KNOWLEDGE_FRESHNESS_PROVIDER` in env. |
 | `Error: no provider configured` | Neither API key is set, and `claude` is not on `$PATH`. | Install Claude Code locally (`brew install anthropic/claude-code/claude-code` then `claude /login`) for anthropic, or set `DEEPSEEK_API_KEY` for deepseek. |
-| `Error: ANTHROPIC_API_KEY is set but the `claude` CLI is not on PATH` | The env var alone isn't enough — the anthropic provider shells out to `claude -p`. | Install Claude Code (`brew install anthropic/claude-code/claude-code` or `npm install -g @anthropic-ai/claude-code`), OR switch to the deepseek provider. |
+| ``Error: anthropic provider selected but the `claude` CLI is not on PATH`` | The anthropic dispatcher shells out to `claude -p`; the CLI must exist regardless of how the provider was chosen (`--provider anthropic`, `KNOWLEDGE_FRESHNESS_PROVIDER=anthropic`, or `ANTHROPIC_API_KEY` inference). The env var alone is not sufficient. | Install Claude Code (`brew install anthropic/claude-code/claude-code` or `npm install -g @anthropic-ai/claude-code`), OR switch to the deepseek provider. |
 | `Error: unsupported DeepSeek model "..."` | `KNOWLEDGE_FRESHNESS_DEEPSEEK_MODEL` was set to a value outside the hardcoded allowlist. | Set it to `deepseek-v4-flash` or `deepseek-v4-pro`, or unset it for the default. |
 | `Error: deepseek dispatcher: HTTP 4xx/5xx` | DeepSeek API rejected the request (auth failure, rate limit, server-side error). | Check the secret value, the DeepSeek service status, and your account's rate limits. The cron isolates per-entry failures and retries the entry the next day. |
 ```

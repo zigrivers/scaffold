@@ -179,12 +179,20 @@ Content-Type: application/json
   "messages": [
     {"role": "user", "content": "<rendered meta-prompt>"}
   ],
+  "thinking": {"type": "disabled"},
   "temperature": 0,
   "max_tokens": 8192,
   "stream": false
 }
 ```
 
+- `thinking: { type: 'disabled' }` is **required** for v4 models.
+  Thinking mode defaults ON and IGNORES `temperature` (per
+  https://api-docs.deepseek.com/guides/thinking_mode). The audit
+  prompt produces structured JSON via the runner's schema-aware
+  extractor — chain-of-thought reasoning wastes the output token
+  budget and produces non-deterministic preambles. Disabling makes
+  `temperature: 0` actually take effect.
 - `temperature: 0` matches the deterministic-output stance of the
   audit (the prompt expects structured JSON, not creative variance).
 - `max_tokens: 8192` is comfortable headroom for a verdict JSON;
