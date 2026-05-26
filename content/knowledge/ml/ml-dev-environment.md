@@ -2,6 +2,10 @@
 name: ml-dev-environment
 description: Conda/Poetry environment setup, Jupyter integration, GPU detection and configuration, and Docker for reproducible ML development
 topics: [ml, dev-environment, conda, poetry, jupyter, gpu, docker, reproducibility]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 ML development environments have more complexity than typical software projects: GPU drivers, CUDA toolkits, Python packages with native extensions, and Jupyter notebook infrastructure all need to align. A broken environment costs hours and blocks the whole team. Invest in environment standardisation upfront — the payoff is that every team member can reproduce results and that CI pipelines match local runs.

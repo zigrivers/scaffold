@@ -2,6 +2,11 @@
 name: ml-observability
 description: Model monitoring for drift and decay, prediction logging, explainability tools, and alerting on accuracy drops in production ML systems
 topics: [ml, observability, monitoring, drift, model-decay, explainability, alerting, prediction-logging]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://opentelemetry.io/docs/
 ---
 
 A model deployed to production without monitoring is a ticking clock. Models decay silently: the world changes, input distributions shift, and accuracy degrades while dashboards show green. Unlike software bugs that throw exceptions, model degradation has no stack trace — predictions simply become less useful. ML observability is the discipline of detecting these degradations before users notice them, through systematic monitoring of model inputs, outputs, and outcomes.

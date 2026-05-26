@@ -2,6 +2,10 @@
 name: ml-project-structure
 description: Standard ML project directory layout covering src/data, src/models, src/training, src/serving, notebooks, configs, and model artifact storage
 topics: [ml, project-structure, layout, organization, artifacts, notebooks]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 ML projects accumulate files faster than almost any other software domain: datasets, model checkpoints, experiment configs, notebooks, evaluation reports, and serving code. Without a deliberate directory structure, projects become disorganised within weeks and impossible to onboard new team members onto. A well-structured ML project separates concerns clearly: source code from notebooks, training from serving, configs from code, and tracked artifacts from ephemeral outputs.
