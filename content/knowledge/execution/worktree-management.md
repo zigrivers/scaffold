@@ -6,7 +6,7 @@ volatility: evolving
 last-reviewed: null
 version-pin: null
 sources:
-  - https://git-scm.com/docs/git-worktree
+  - url: https://git-scm.com/docs/git-worktree
 ---
 
 # Worktree Management
