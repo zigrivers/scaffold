@@ -272,8 +272,13 @@ describe('configured compensator availability', () => {
     expect(result.recovery).toContain('qwen-review not found')
   })
 
-  it('reports skipped for a disabled configured compensator channel', async () => {
+  it('allows a disabled configured compensator channel when explicitly referenced', async () => {
     vi.resetModules()
+    vi.doMock('../../src/core/auth.js', () => ({
+      checkInstalled: vi.fn().mockResolvedValue(true),
+      checkAuth: vi.fn().mockResolvedValue({ status: 'ok' }),
+    }))
+
     const { checkConfiguredCompensatorAvailability } = await import('../../src/commands/review.js')
     const cfg: MmrConfigParsed = {
       ...baseConfig,
@@ -295,8 +300,9 @@ describe('configured compensator availability', () => {
 
     const result = await checkConfiguredCompensatorAvailability(cfg)
 
-    expect(result.status).toBe('skipped')
-    expect(result.auth).toBe('skipped')
-    expect(result.recovery).toContain('disabled')
+    vi.doUnmock('../../src/core/auth.js')
+
+    expect(result.status).toBe('ok')
+    expect(result.auth).toBe('ok')
   })
 })

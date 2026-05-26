@@ -128,7 +128,7 @@ function channelStatusFromAuthResult(status: string): ChannelStatus {
         : 'skipped'
 }
 
-interface CompensatorAvailability {
+export interface CompensatorAvailability {
   status: 'ok' | ChannelStatus
   auth: 'ok' | 'failed' | 'skipped'
   recovery?: string
@@ -148,14 +148,6 @@ export async function checkConfiguredCompensatorAvailability(
       recovery: `Compensator channel "${channelName}" is not dispatchable`,
     }
   }
-  if (!chConfig.enabled) {
-    return {
-      status: 'skipped',
-      auth: 'skipped',
-      recovery: `Compensator channel "${channelName}" is disabled`,
-    }
-  }
-
   const cmd = chConfig.command.split(' ')[0]
   const installed = await checkInstalled(cmd)
   if (!installed) {
