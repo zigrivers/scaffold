@@ -16,8 +16,11 @@ a refresh loop, agents read stale knowledge. The freshness system:
 1. Tracks each entry's `volatility`, `last-reviewed`, `sources`, `version-pin`.
 2. Daily cron pre-filters entries whose cadence window has elapsed or whose
    source content hash has drifted.
-3. For each candidate (max 10/day), runs a grounded LLM audit (`claude -p`) that
-   fetches the sources via WebFetch and emits a structured verdict.
+3. For each candidate (max 10/day), runs a grounded LLM audit via the selected
+   provider (DeepSeek HTTP in CI by default, `claude -p` locally; see §4
+   "Choosing a provider"). The audit dispatcher pre-fetches source bodies in
+   Node and passes them into the prompt — the model itself has no tools
+   available — and emits a structured verdict.
 4. If the verdict is `major-drift` or `superseded`, opens a PR with the rewrite.
 5. PR gates enforce link health, anti-over-rewrite, Deep-Guidance preservation,
    and frontmatter validity. Humans merge.
@@ -42,7 +45,11 @@ a refresh loop, agents read stale knowledge. The freshness system:
    │ 2. Grounded audit (per entry, max 10/day)                         │
    │   `scaffold knowledge-freshness audit-run-entry <path>`           │
    │   tool meta-prompt: content/tools/knowledge-audit-entry.md        │
-   │   dispatched via the LLM dispatcher (`claude -p`)                 │
+   │   dispatched via the selected provider:                           │
+   │     - DeepSeek HTTP (cron default, requires DEEPSEEK_API_KEY)     │
+   │     - `claude -p` (local default, requires Claude Code on PATH)   │
+   │   - source bodies are pre-fetched in Node and embedded in the     │
+   │     prompt; the model runs with no tools                          │
    │   - explicit instruction: "trust the retrieved source over priors"│
    │   - emits structured verdict JSON                                 │
    └────────────────────┬──────────────────────────────────────────────┘

@@ -4,6 +4,33 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+### Added — Knowledge-freshness DeepSeek provider
+
+Adds DeepSeek as an alternative LLM provider for the per-entry audit dispatch in the daily knowledge-freshness cron. Anthropic remains the default for local development; the cron defaults to DeepSeek via repo secret. MMR review (Codex / Gemini / Claude channels) is unchanged.
+
+**New env vars / flags:**
+- `DEEPSEEK_API_KEY` — repo secret / env var; required for the deepseek provider.
+- `KNOWLEDGE_FRESHNESS_PROVIDER` — explicit provider selection (`anthropic` or `deepseek`). The cron workflow sets this to `deepseek`.
+- `KNOWLEDGE_FRESHNESS_DEEPSEEK_MODEL` — optional model override; allowlisted to `deepseek-v4-flash` (default) and `deepseek-v4-pro`.
+- `scaffold knowledge-freshness audit-run-entry --provider <anthropic|deepseek>` — explicit override for one-off runs.
+
+**Provider-selection precedence:**
+1. `--provider` flag
+2. `KNOWLEDGE_FRESHNESS_PROVIDER` env var
+3. Inferred from which API key is set
+4. Error on ambiguity (both keys set, no explicit choice)
+5. `claude` on PATH (local dev keychain auth fallthrough)
+6. Error if nothing is configured
+
+**Operational notes:**
+- Operator must set `DEEPSEEK_API_KEY` as a repo secret (`gh secret set DEEPSEEK_API_KEY`) before the first scheduled cron run.
+- Cron workflow no longer installs Claude Code globally (saves ~30s per run).
+- Cron preflight fails fast if the secret is missing, instead of silently exiting 0 with zero PRs opened.
+- Both provider error messages now use a consistent `<provider> dispatcher:` prefix for unified log filtering.
+- Decision-#7 invariant preserved: Anthropic command and DeepSeek URL/model-allowlist are literal constants in source; project config cannot redirect either dispatcher.
+
+See `docs/knowledge-freshness/operations.md` §4 "Choosing a provider" for the full operator guide.
+
 ## [3.28.0] — 2026-05-24
 
 ### Changed — Beads integration overhaul (aligns with upstream Beads v1.0.4)

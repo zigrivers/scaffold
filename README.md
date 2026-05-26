@@ -31,6 +31,8 @@ Either way, Scaffold constructs the prompt and the target AI tool does the work.
 
 **Knowledge base** — 267 domain expertise entries in `content/knowledge/` organized in nineteen categories (core, product, review, validation, finalization, execution, tools, game, web-app, backend, cli, library, mobile-app, data-pipeline, ml, browser-extension, research, data-science, web3) covering testing strategy, domain modeling, API design, security best practices, eval craft, TDD execution, task claiming, worktree management, release management, rendering strategies, data stores, CLI patterns, game engines, library bundling, mobile deployment, batch and streaming pipelines, model training and serving, browser extension manifests and service workers, data-science reproducibility and notebook discipline, smart-contract security and audit workflow, and more. These get injected into prompts based on each step's `knowledge-base` frontmatter field. Knowledge files with a `## Deep Guidance` section are optimized for CLI assembly — only the deep guidance content is loaded, avoiding redundancy with the prompt text. Teams can add project-local overrides in `.scaffold/knowledge/` that layer on top of the global entries.
 
+A daily cron audits entries against their declared authoritative sources and opens refresh PRs when they drift — see `docs/knowledge-freshness/operations.md` for the operator guide (provider selection between Anthropic and DeepSeek, secret setup, manual overrides).
+
 **Methodology presets** — Three built-in presets control which steps run and how deep the analysis goes:
 - **deep** (depth 5) — all steps enabled, exhaustive analysis
 - **mvp** (depth 1) — 7 critical steps, get to code fast
