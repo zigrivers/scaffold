@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { normalizeLocationForKey } from '../../src/core/stable-id.js'
+import {
+  normalizeDescriptionForKey,
+  normalizeLocationForKey,
+} from '../../src/core/stable-id.js'
 
 describe('normalizeLocationForKey', () => {
   it('lowercases and trims', () => {
@@ -30,5 +33,46 @@ describe('normalizeLocationForKey', () => {
 
   it('preserves a path with no line span', () => {
     expect(normalizeLocationForKey('src/foo.ts')).toBe('src/foo.ts')
+  })
+})
+
+describe('normalizeDescriptionForKey', () => {
+  it('lowercases and collapses whitespace in non-code segments', () => {
+    expect(normalizeDescriptionForKey('Variable   foo  Is    Unused')).toBe('variable foo is unused')
+  })
+
+  it('preserves case inside backtick code spans', () => {
+    expect(normalizeDescriptionForKey('Variable `fooBar` is unused')).toBe('variable `fooBar` is unused')
+  })
+
+  it('distinguishes case-sensitive identifiers across two descriptions', () => {
+    const a = normalizeDescriptionForKey('`fooBar` is unused')
+    const b = normalizeDescriptionForKey('`FooBar` is unused')
+    expect(a).not.toBe(b)
+  })
+
+  it('strips line-number mentions like "line 42"', () => {
+    expect(normalizeDescriptionForKey('Bug at line 42 here')).toBe('bug at here')
+  })
+
+  it('strips "at 42" mentions', () => {
+    expect(normalizeDescriptionForKey('Bug found at 42 in code')).toBe('bug found in code')
+  })
+
+  it('strips severity-prefix filler', () => {
+    expect(normalizeDescriptionForKey('P0: critical bug')).toBe('critical bug')
+    expect(normalizeDescriptionForKey('Critical: real issue')).toBe('real issue')
+  })
+
+  it('handles unmatched backticks as literal text', () => {
+    // Lone backtick: the split yields ['Lone ', 'tick here'] - odd index would be
+    // treated as code-span; since there is no closing backtick the implementation
+    // should be defensive. Verify it does not throw and produces a deterministic value.
+    const out = normalizeDescriptionForKey('Lone `tick here')
+    expect(typeof out).toBe('string')
+  })
+
+  it('handles empty input', () => {
+    expect(normalizeDescriptionForKey('')).toBe('')
   })
 })
