@@ -376,8 +376,23 @@ also surfaces Lens I findings inline. To run just Lens I, scope to
 The finding's `fix_hint.target` is `content/knowledge/<category>/<topic>.md`
 with `<category>` as a literal placeholder — categories are a human
 judgment. The `fix_hint.prompt` is a summary suitable for handing to
-a writing-knowledge agent. After authoring the entry, follow the
-standard knowledge-freshness workflow: add freshness frontmatter
-(`volatility`, `sources`), commit, and the next audit run will reflect
-the gap is closed (no signal accumulation if no more agents look for
-the topic without finding it).
+a writing-knowledge agent.
+
+**What happens after the entry lands:**
+
+- *New* gap signals stop accumulating: downstream agents now find the
+  topic in the injected knowledge base and do not emit a
+  `knowledge_gap_signal` event for it.
+- *Existing* signals — the ones already in the 90-day window that drove
+  the finding — keep contributing to Lens I's bucket count until they
+  age out. The finding may therefore re-appear on subsequent audit runs
+  for up to 90 days after the entry is added.
+- To silence the finding immediately, use
+  `scaffold observe ack <finding-id>`. Acknowledged findings are
+  excluded from future audit output until they're reopened.
+
+Phase 4 adds an "existing-entry suppression" check inside Lens I that
+will close the finding automatically once
+`content/knowledge/<category>/<topic>.md` exists. See
+`docs/superpowers/deferred-findings/feat+knowledge-freshness-phase-3.md`
+(PR #397 review F-001) for the design rationale.
