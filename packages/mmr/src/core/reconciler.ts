@@ -60,24 +60,24 @@ export function reconcile(channelFindings: Record<string, Finding[]>): Reconcile
 
   // Step 2: Group by exact stable identity, then location-anchored fuzzy description match.
   const groups: ReconcileGroup[] = []
-  const keyIndex = new Map<string, ReconcileGroup>()
+  const keyIndex = new Map<string, ReconcileGroup[]>()
   for (const finding of attributed) {
-    const exact = keyIndex.get(finding.finding_key)
-    if (exact !== undefined && canJoinGroup(exact, finding)) {
+    const exact = bestJoinableGroup(keyIndex.get(finding.finding_key) ?? [], finding)
+    if (exact !== undefined) {
       exact.findings.push(finding)
       continue
     }
 
-    const fuzzy = groups.find((group) =>
+    const fuzzy = bestJoinableGroup(groups.filter((group) =>
       canJoinGroup(group, finding) &&
       group.normalized_location === finding.normalized_location &&
       group.normalized_category === finding.normalized_category &&
       group.normalized_suggestion === finding.normalized_suggestion &&
       jaccardSimilarity(group.shingle, finding.shingle) >= 0.7,
-    )
+    ), finding)
     if (fuzzy !== undefined) {
       fuzzy.findings.push(finding)
-      keyIndex.set(finding.finding_key, fuzzy)
+      addToKeyIndex(keyIndex, finding.finding_key, fuzzy)
       continue
     }
 
@@ -90,7 +90,7 @@ export function reconcile(channelFindings: Record<string, Finding[]>): Reconcile
       findings: [finding],
     }
     groups.push(group)
-    keyIndex.set(finding.finding_key, group)
+    addToKeyIndex(keyIndex, finding.finding_key, group)
   }
 
   // Step 3: Reconcile each group
@@ -158,6 +158,26 @@ function canJoinGroup(group: ReconcileGroup, finding: AttributedFinding): boolea
   return group.findings.every((existing) =>
     existing.source !== finding.source || existing.location === finding.location,
   )
+}
+
+function bestJoinableGroup(groups: ReconcileGroup[], finding: AttributedFinding): ReconcileGroup | undefined {
+  const eligible = groups.filter((group) => canJoinGroup(group, finding))
+  return eligible.find((group) =>
+    group.findings.some((existing) => existing.location === finding.location),
+  ) ?? eligible[0]
+}
+
+function addToKeyIndex(
+  keyIndex: Map<string, ReconcileGroup[]>,
+  findingKey: string,
+  group: ReconcileGroup,
+): void {
+  const groups = keyIndex.get(findingKey)
+  if (groups === undefined) {
+    keyIndex.set(findingKey, [group])
+  } else if (!groups.includes(group)) {
+    groups.push(group)
+  }
 }
 
 /**

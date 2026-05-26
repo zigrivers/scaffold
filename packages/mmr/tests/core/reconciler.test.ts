@@ -108,6 +108,27 @@ describe('reconcile', () => {
     expect(result).toHaveLength(2)
   })
 
+  it('joins duplicate stable keys to the group with the matching raw location', () => {
+    const channelFindings: Record<string, Finding[]> = {
+      claude: [
+        { severity: 'P2', location: 'file.ts:10', description: 'Regression risk', suggestion: 'Add test' },
+        { severity: 'P2', location: 'file.ts:99', description: 'Regression risk', suggestion: 'Add test' },
+      ],
+      gemini: [
+        { severity: 'P1', location: 'file.ts:99', description: 'Regression risk', suggestion: 'Add test' },
+      ],
+    }
+    const result = reconcile(channelFindings)
+    expect(result).toHaveLength(2)
+
+    const line10 = result.find((finding) => finding.location === 'file.ts:10')
+    const line99 = result.find((finding) => finding.location === 'file.ts:99')
+    expect(line10?.sources).toEqual(['claude'])
+    expect(line10?.severity).toBe('P2')
+    expect(line99?.sources).toEqual(['claude', 'gemini'])
+    expect(line99?.severity).toBe('P1')
+  })
+
   it('does not fuzzy-merge findings with different suggestions', () => {
     const channelFindings: Record<string, Finding[]> = {
       claude: [{ severity: 'P2', location: 'file.ts:10', description: 'Regression risk', suggestion: 'Add test' }],
