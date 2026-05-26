@@ -2,6 +2,10 @@
 name: game-level-content-design
 description: Level metrics, greyboxing standards, flow and pacing, streaming strategies, encounter design, procedural generation, and difficulty curves
 topics: [game-dev, level-design, world-design, procedural, streaming]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Level design is the discipline of building the spaces that players inhabit and the experiences they have within those spaces. It bridges game design, environment art, and engineering — a level designer must understand player movement metrics (how high can they jump, how fast do they run, how wide is their collision capsule), pacing principles (tension-release cycles, difficulty ramps), and technical constraints (streaming budgets, draw call limits, memory footprints). Good level design is invisible: the player feels guided without feeling railroaded, challenged without feeling frustrated, and rewarded without feeling manipulated.

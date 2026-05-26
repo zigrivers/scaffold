@@ -2,6 +2,10 @@
 name: game-domain-patterns
 description: ECS vs DDD as mutually exclusive per-layer patterns, game state machines, and domain modeling for games
 topics: [game-dev, ecs, ddd, state-machines, domain-modeling]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Game software architecture differs fundamentally from business software architecture because games have two distinct layers with incompatible optimization goals: the simulation layer (real-time, data-oriented, performance-critical) and the meta-game layer (behavior-rich, event-driven, correctness-critical). Choosing the right domain modeling approach for each layer is essential. ECS and DDD are mutually exclusive paradigms — applying the wrong one to a layer creates friction that compounds throughout development.

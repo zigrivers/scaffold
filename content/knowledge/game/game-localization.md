@@ -2,6 +2,10 @@
 name: game-localization
 description: String management, font atlas pipeline, text expansion, subtitle standards, VO localization, culturalization, and LQA methodology
 topics: [game-dev, localization, l10n, lqa, fonts, rtl]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Game localization is not translation — it is the engineering and cultural adaptation required to make a game feel native in every target market. A translated string that does not fit the UI, a font that cannot render Chinese characters, a gesture that is offensive in Brazil, or a subtitle that flashes too fast for reading speed norms — each of these failures breaks immersion and signals to the player that they are an afterthought. Localization touches every layer of the stack: string management, rendering, audio, UI layout, cultural review, and QA. The cost of retrofitting localization into a game that was not designed for it is 3-5x higher than building it in from the start.

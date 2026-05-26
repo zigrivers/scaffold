@@ -2,6 +2,10 @@
 name: game-narrative-design
 description: Dialogue tree patterns, branching narrative frameworks, lore bible structure, environmental storytelling, and localization hooks
 topics: [game-dev, narrative, dialogue, branching, lore, worldbuilding]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Game narrative design is the discipline of telling stories through interactive systems. Unlike film or literature, game narrative must account for player agency — the story adapts to player choices, pacing varies with player skill, and narrative is delivered through gameplay mechanics as much as through dialogue. The narrative designer's job is to create systems that deliver story, not just write scripts. This requires understanding dialogue tree architectures, branching frameworks, environmental storytelling techniques, and the technical infrastructure that supports narrative at scale.

@@ -2,6 +2,10 @@
 name: game-liveops-analytics
 description: Data taxonomy, telemetry pipelines, A/B testing, content cadence, seasonal events, post-launch support, and KPI-driven decision making
 topics: [game-dev, analytics, liveops, telemetry, kpi, ab-testing]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Live operations (LiveOps) and analytics transform a game from a one-time product into a continuously evolving service. The core discipline is building feedback loops: instrument player behavior, analyze the data, form hypotheses, ship changes, measure results. Without robust telemetry and a clear KPI hierarchy, LiveOps teams operate blind — making content decisions based on gut feel, missing retention cliffs, and shipping events that move no needle. Games that invest in data infrastructure from early production gain a compounding advantage: every content update is informed by the last, every A/B test sharpens understanding of the player base, and every seasonal event builds on measured engagement patterns.

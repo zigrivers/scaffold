@@ -2,6 +2,10 @@
 name: game-performance-budgeting
 description: Frame budget allocation, memory budgets per platform, GPU/draw call limits, loading targets, thermal constraints, and profiling tools
 topics: [game-dev, performance, frame-budget, memory, gpu, optimization]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Performance budgeting is the discipline of allocating fixed time, memory, and GPU resource envelopes to each game subsystem and enforcing those limits throughout development. Unlike web performance where a slow page is merely annoying, a missed frame budget in a game causes visible hitches, input lag, and motion sickness in VR. Budgets must be established at project start, measured continuously with profiling tools, and treated as hard constraints — not aspirational targets.

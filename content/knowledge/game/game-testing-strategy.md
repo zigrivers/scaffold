@@ -2,6 +2,10 @@
 name: game-testing-strategy
 description: Simulation logic testing, visual and performance regression, soak testing, balance validation, playtest protocols, and CI integration
 topics: [game-dev, testing, playtesting, soak, balance, visual-regression]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Game testing spans a far wider range than typical software testing. Beyond unit and integration tests for code, games require visual regression testing (did the shader change break the look of every material?), performance regression testing (did the new particle system push frame time over budget?), soak testing (does the game crash after 48 hours of continuous play?), balance validation (is the new weapon overpowered?), and structured playtesting with real humans. Each testing layer catches a different class of defect, and skipping any layer means shipping that class of bug to players.

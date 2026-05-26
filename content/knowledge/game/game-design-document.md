@@ -2,6 +2,10 @@
 name: game-design-document
 description: GDD structure, game pillars, core loop design, mechanics documentation, and progression archetypes
 topics: [game-dev, design, gdd, mechanics, progression]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 A Game Design Document (GDD) is the authoritative source of truth for what a game is, how it plays, and why its systems exist. Unlike traditional software requirements docs, a GDD must capture the feel and fantasy of the experience alongside its mechanical specifications. A well-structured GDD prevents scope creep, aligns the team on creative vision, and serves as the contract between design, engineering, and art.

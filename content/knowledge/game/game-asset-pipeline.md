@@ -2,6 +2,10 @@
 name: game-asset-pipeline
 description: Asset naming taxonomies by engine, per-type specs (poly budgets, texture sizes, audio formats), DCC tool chains, Git LFS config, and file locking
 topics: [game-dev, assets, pipeline, naming, dcc, lfs]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 The asset pipeline is the full chain from an artist's DCC tool (Maya, Blender, Substance Painter, Houdini) through export, import, optimization, and packaging into the final game build. A well-structured pipeline enforces naming conventions, validates assets against per-type budgets on import, automates texture compression and LOD generation, and integrates with version control to prevent binary merge conflicts. Pipeline failures are insidious — a single 4K texture on a UI element or an uncompressed WAV in the audio bank can ship to players because nobody validated the asset against its budget.
