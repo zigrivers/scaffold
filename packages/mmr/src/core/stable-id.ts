@@ -135,8 +135,7 @@ function escapeKeyPart(part: string): string {
 }
 
 export function descriptionShingle(description: string): string[] {
-  const normalized = normalizeDescriptionForKey(description)
-    .replace(/\b(?:must|should)\b/g, 'should')
+  const normalized = normalizeModalVerbsInProse(normalizeDescriptionForKey(description))
   if (normalized.length < 5) return []
 
   const grams = new Set<string>()
@@ -152,7 +151,7 @@ export function jaccardSimilarity(
 ): number {
   const left = a instanceof Set ? a : new Set(a)
   const right = b instanceof Set ? b : new Set(b)
-  if (left.size === 0 && right.size === 0) return 0
+  if (left.size === 0 && right.size === 0) return 1
 
   let intersection = 0
   for (const item of left) {
@@ -161,4 +160,11 @@ export function jaccardSimilarity(
 
   const unionSize = left.size + right.size - intersection
   return intersection / unionSize
+}
+
+function normalizeModalVerbsInProse(description: string): string {
+  return description
+    .split('`')
+    .map((part, index) => index % 2 === 0 ? part.replace(/\b(?:must|should)\b/g, 'should') : part)
+    .join('`')
 }

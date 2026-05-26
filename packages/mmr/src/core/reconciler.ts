@@ -73,6 +73,8 @@ export function reconcile(channelFindings: Record<string, Finding[]>): Reconcile
       group.normalized_location === finding.normalized_location &&
       group.normalized_category === finding.normalized_category &&
       group.normalized_suggestion === finding.normalized_suggestion &&
+      group.shingle.size > 0 &&
+      finding.shingle.size > 0 &&
       jaccardSimilarity(group.shingle, finding.shingle) >= 0.7,
     ), finding)
     if (fuzzy !== undefined) {

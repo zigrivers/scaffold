@@ -261,6 +261,10 @@ describe('descriptionShingle', () => {
   it('normalizes descriptions before shingling', () => {
     expect(descriptionShingle('Bug at line 42 here')).toEqual(descriptionShingle('bug here'))
   })
+
+  it('does not normalize modal words inside code spans', () => {
+    expect(descriptionShingle('`must` is unused')).not.toEqual(descriptionShingle('`should` is unused'))
+  })
 })
 
 describe('jaccardSimilarity', () => {
@@ -276,8 +280,8 @@ describe('jaccardSimilarity', () => {
     expect(jaccardSimilarity(['a', 'b'], ['b', 'c'])).toBeCloseTo(1 / 3)
   })
 
-  it('returns 0 for two empty sets', () => {
-    expect(jaccardSimilarity([], [])).toBe(0)
+  it('returns 1 for two empty sets', () => {
+    expect(jaccardSimilarity([], [])).toBe(1)
   })
 
   it('crosses the 0.7 threshold for near-identical phrasings', () => {
