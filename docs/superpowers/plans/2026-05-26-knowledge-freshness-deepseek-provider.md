@@ -272,8 +272,10 @@ describe('anthropic provider', () => {
 
   it('builds a Dispatcher that calls dispatchLlm with the hardcoded command + timeout', async () => {
     // We can't run a real subprocess in unit tests; we mock dispatchLlm at
-    // the module level. The Dispatcher contract is "string in → string out".
-    const dispatchSpy = vi.fn().mockResolvedValue({ ok: true, raw: 'verdict json here' })
+    // the module level. The mock returns the full DispatchResult shape
+    // (`parsed: unknown` on success, `raw?: string` on failure) so the
+    // production typeof-derived DispatchLlmFn signature is satisfied.
+    const dispatchSpy = vi.fn().mockResolvedValue({ ok: true, raw: 'verdict json here', parsed: undefined })
     const dispatcher = buildAnthropicDispatcher({ timeoutSec: 600, dispatchLlmFn: dispatchSpy })
     const result = await dispatcher('hello world')
     expect(dispatchSpy).toHaveBeenCalledWith({
@@ -315,7 +317,7 @@ import type { Dispatcher } from '../audit-runner.js'
  * needs WebFetch or any other tool.
  *
  * Earlier rounds experimented with `--bare`, which broke keychain auth
- * for local devs. Reverted in Task 9 because the audit subcommand only
+ * for local devs. Reverted in Phase 1 Task 9 because the audit subcommand only
  * operates on scaffold's own content/knowledge/, never on a downstream
  * repo — so the round-7 isolation rationale doesn't apply.
  */
@@ -323,14 +325,12 @@ export const ANTHROPIC_COMMAND = 'claude -p --tools ""'
 
 /**
  * Injectable dispatch function. Production uses the real `dispatchLlm`;
- * tests inject a mock. Same shape as the production function's return
- * value to keep the type contract consistent.
+ * tests inject a mock. Typed via `typeof dispatchLlm` so the signature
+ * stays in lock-step with the production function — no `as` cast
+ * needed at the call site, and any future change to `DispatchResult`
+ * surfaces as a type error here instead of a runtime surprise.
  */
-export type DispatchLlmFn = (input: {
-  prompt: string
-  command: string
-  timeoutMs: number
-}) => Promise<{ ok: true; raw: string } | { ok: false; reason: string }>
+export type DispatchLlmFn = typeof dispatchLlm
 
 export interface BuildAnthropicDispatcherOptions {
   timeoutSec: number
@@ -339,7 +339,7 @@ export interface BuildAnthropicDispatcherOptions {
 }
 
 export function buildAnthropicDispatcher(opts: BuildAnthropicDispatcherOptions): Dispatcher {
-  const dispatch = opts.dispatchLlmFn ?? (dispatchLlm as DispatchLlmFn)
+  const dispatch = opts.dispatchLlmFn ?? dispatchLlm
   const timeoutMs = opts.timeoutSec * 1000
   return async (prompt) => {
     const result = await dispatch({ prompt, command: ANTHROPIC_COMMAND, timeoutMs })
@@ -458,7 +458,7 @@ describe('deepseek provider — happy path', () => {
     const call = (fetchSpy as unknown as { mock: { calls: [string, RequestInit][] } }).mock.calls[0]
     const sentBody = JSON.parse(call[1].body as string)
     expect(sentBody).toEqual({
-      model: 'deepseek-chat',
+      model: 'deepseek-v4-flash',
       messages: [{ role: 'user', content: 'the meta-prompt body' }],
       temperature: 0,
       max_tokens: 8192,
@@ -473,12 +473,12 @@ describe('deepseek provider — happy path', () => {
     const dispatcher = buildDeepseekDispatcher({
       apiKey: 'k',
       timeoutSec: 60,
-      model: 'deepseek-reasoner',
+      model: 'deepseek-v4-pro',
       fetchImpl: fetchSpy,
     })
     await dispatcher('x')
     const call = (fetchSpy as unknown as { mock: { calls: [string, RequestInit][] } }).mock.calls[0]
-    expect(JSON.parse(call[1].body as string).model).toBe('deepseek-reasoner')
+    expect(JSON.parse(call[1].body as string).model).toBe('deepseek-v4-pro')
   })
 })
 ```
@@ -493,6 +493,7 @@ Expected: FAIL — module not found.
 ```typescript
 // src/knowledge-freshness/providers/deepseek.ts
 import { fetch as undiciFetch } from 'undici'
+import { z } from 'zod'
 import type { Dispatcher } from '../audit-runner.js'
 
 /**
@@ -508,13 +509,27 @@ export const DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions'
 /**
  * Hardcoded allowlist of DeepSeek model names. KNOWLEDGE_FRESHNESS_DEEPSEEK_MODEL
  * may override the default, but only to a value in this set — never to
- * arbitrary text.
+ * arbitrary text. The previously-supported `deepseek-chat` and
+ * `deepseek-reasoner` IDs are deprecated and intentionally excluded.
  */
-const ALLOWED_MODELS = ['deepseek-chat', 'deepseek-reasoner'] as const
+const ALLOWED_MODELS = ['deepseek-v4-flash', 'deepseek-v4-pro'] as const
 export type DeepseekModel = typeof ALLOWED_MODELS[number]
-export const DEFAULT_DEEPSEEK_MODEL: DeepseekModel = 'deepseek-chat'
+export const DEFAULT_DEEPSEEK_MODEL: DeepseekModel = 'deepseek-v4-flash'
 
 const MAX_TOKENS = 8192
+
+/**
+ * Minimal Zod schema for the DeepSeek (OpenAI-compatible) response. We
+ * validate only the path we actually consume — `choices[0].message.content`
+ * — rather than the whole API surface. Replaces the previous inline
+ * `as { choices?: … }` cast (round-2 F-003) so the response shape is
+ * checked at parse time, not implicitly via optional-chaining-then-typeof.
+ */
+const responseSchema = z.object({
+  choices: z.array(z.object({
+    message: z.object({ content: z.string() }),
+  })).min(1),
+})
 
 /** Test-injectable fetch. Production uses undici's fetch. */
 export type DeepseekFetch = typeof undiciFetch
@@ -558,23 +573,34 @@ export function buildDeepseekDispatcher(opts: BuildDeepseekDispatcherOptions): D
       body,
       signal: AbortSignal.timeout(timeoutMs),
     })
+    // Always read the body as TEXT first so we can produce a useful
+    // diagnostic on both non-2xx AND malformed-JSON responses
+    // (round-2 F-004: previously `await res.json()` propagated a raw
+    // SyntaxError that masked the actual response body).
+    const rawText = await res.text().catch(() => '<unreadable>')
     if (res.status < 200 || res.status >= 300) {
-      const text = await res.text().catch(() => '<unreadable>')
       throw new Error(
         `deepseek dispatcher: HTTP ${res.status} from ${DEEPSEEK_URL}. ` +
-        `Body (first 200 chars): ${text.slice(0, 200)}`,
+        `Body (first 200 chars): ${rawText.slice(0, 200)}`,
       )
     }
-    const json = await res.json() as { choices?: Array<{ message?: { content?: string } }> }
-    const content = json?.choices?.[0]?.message?.content
-    if (typeof content !== 'string') {
-      const truncated = JSON.stringify(json).slice(0, 200)
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(rawText)
+    } catch {
+      throw new Error(
+        `deepseek dispatcher: response was not valid JSON. ` +
+        `Body (first 200 chars): ${rawText.slice(0, 200)}`,
+      )
+    }
+    const result = responseSchema.safeParse(parsed)
+    if (!result.success) {
       throw new Error(
         `deepseek dispatcher: response missing choices[0].message.content. ` +
-        `Truncated response: ${truncated}`,
+        `Truncated response: ${rawText.slice(0, 200)}`,
       )
     }
-    return content
+    return result.data.choices[0].message.content
   }
 }
 ```
@@ -599,8 +625,8 @@ feat(knowledge-freshness): deepseek dispatcher happy path (Task 3)
 
 POSTs the rendered meta-prompt to api.deepseek.com/chat/completions
 with Bearer auth and returns choices[0].message.content for the
-runner's JSON extractor. Model allowlist (deepseek-chat,
-deepseek-reasoner) enforced at construction time; URL is a literal
+runner's JSON extractor. Model allowlist (deepseek-v4-flash,
+deepseek-v4-pro) enforced at construction time; URL is a literal
 constant. Error-path tests follow in Task 4.
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
@@ -638,22 +664,23 @@ describe('deepseek provider — error paths', () => {
     await expect(dispatcher('x')).rejects.toThrow(/missing choices\[0\]\.message\.content/i)
   })
 
-  it('throws on a 200 response whose body is not JSON', async () => {
+  it('throws a diagnostic error on a 200 response whose body is not JSON', async () => {
+    // Round-2 F-004: must NOT propagate a bare SyntaxError. The dispatcher
+    // catches the parse failure and throws a message containing the
+    // truncated body so cron logs are actionable.
     const fetchSpy: DeepseekFetch = vi.fn(async () =>
       new Response('not json at all', {
         status: 200, headers: { 'content-type': 'application/json' },
       }),
     ) as unknown as DeepseekFetch
     const dispatcher = buildDeepseekDispatcher({ apiKey: 'k', timeoutSec: 60, fetchImpl: fetchSpy })
-    // Either undici's response.json() throws, OR we surface our missing-content error.
-    // Both are acceptable — the dispatcher must NOT swallow the failure.
-    await expect(dispatcher('x')).rejects.toThrow()
+    await expect(dispatcher('x')).rejects.toThrow(/response was not valid JSON.*not json at all/i)
   })
 
   it('rejects an unsupported model at construction time (not at fetch time)', () => {
     expect(() => buildDeepseekDispatcher({
       apiKey: 'k', timeoutSec: 60, model: 'gpt-4',
-    })).toThrow(/unsupported DeepSeek model "gpt-4".*deepseek-chat.*deepseek-reasoner/i)
+    })).toThrow(/unsupported DeepSeek model "gpt-4".*deepseek-v4-flash.*deepseek-v4-pro/i)
   })
 
   it('rejects construction when apiKey is empty', () => {
@@ -983,9 +1010,11 @@ Note the line number of the section header.
 
 - [ ] **Step 2: Add the "Choosing a provider" subsection at the top of § 4**
 
-Find the first line of section 4 (just after the `## 4. Running an audit manually (locally)` header). Insert the following block BEFORE the existing step-by-step (it becomes the new first subsection of § 4):
+Find the first line of section 4 (just after the `## 4. Running an audit manually (locally)` header). Insert the following block BEFORE the existing step-by-step (it becomes the new first subsection of § 4).
 
-```markdown
+The block uses a 4-backtick outer fence so the inner ```` ``` bash ```` fences render correctly. When you paste the block into `operations.md`, copy the entire 4-backtick block; the rendered markdown will contain only the inner 3-backtick fences.
+
+````markdown
 ### Choosing a provider
 
 Two LLM providers are supported for the per-entry audit dispatch:
@@ -1027,12 +1056,12 @@ once with `gh secret set DEEPSEEK_API_KEY`.
 
 #### DeepSeek model override
 
-The default DeepSeek model is `deepseek-chat`. To use `deepseek-reasoner`
+The default DeepSeek model is `deepseek-v4-flash`. To use `deepseek-v4-pro`
 instead (slower, more expensive, more thorough chain-of-thought), set
-`KNOWLEDGE_FRESHNESS_DEEPSEEK_MODEL=deepseek-reasoner` in the
+`KNOWLEDGE_FRESHNESS_DEEPSEEK_MODEL=deepseek-v4-pro` in the
 workflow env block (or your shell). Only the two allowlisted values
 are accepted — the dispatcher rejects any other model name at startup.
-```
+````
 
 - [ ] **Step 3: Add new entries to § 9 (Failure modes and recovery)**
 
@@ -1041,7 +1070,7 @@ Find § 9. Add two new rows to the existing failure-modes table:
 ```markdown
 | `Error: provider selection ambiguous` | Both `ANTHROPIC_API_KEY` and `DEEPSEEK_API_KEY` are set without an explicit choice via `--provider` or `KNOWLEDGE_FRESHNESS_PROVIDER`. | Pass `--provider anthropic` or `--provider deepseek`, or set `KNOWLEDGE_FRESHNESS_PROVIDER` in env. |
 | `Error: no provider configured` | Neither API key is set, and `claude` is not on `$PATH`. | Install Claude Code locally (`brew install anthropic/claude-code/claude-code` then `claude /login`) for anthropic, or set `DEEPSEEK_API_KEY` for deepseek. |
-| `Error: unsupported DeepSeek model "..."` | `KNOWLEDGE_FRESHNESS_DEEPSEEK_MODEL` was set to a value outside the hardcoded allowlist. | Set it to `deepseek-chat` or `deepseek-reasoner`, or unset it for the default. |
+| `Error: unsupported DeepSeek model "..."` | `KNOWLEDGE_FRESHNESS_DEEPSEEK_MODEL` was set to a value outside the hardcoded allowlist. | Set it to `deepseek-v4-flash` or `deepseek-v4-pro`, or unset it for the default. |
 | `Error: deepseek dispatcher: HTTP 4xx/5xx` | DeepSeek API rejected the request (auth failure, rate limit, server-side error). | Check the secret value, the DeepSeek service status, and your account's rate limits. The cron isolates per-entry failures and retries the entry the next day. |
 ```
 
@@ -1092,7 +1121,7 @@ Expected: clean build.
 - [ ] **Step 3: Run a real audit against a backfilled entry**
 
 Run: `node dist/index.js knowledge-freshness audit-run-entry content/knowledge/core/security-best-practices.md > /tmp/verdict-deepseek.json`
-Expected: exit 0; `/tmp/verdict-deepseek.json` contains a verdict object validating against the audit-runner schema. The `model` field will read something like `"deepseek-chat"` (the model self-identifies in the verdict body).
+Expected: exit 0; `/tmp/verdict-deepseek.json` contains a verdict object validating against the audit-runner schema. The `model` field will read something like `"deepseek-v4-flash"` (the model self-identifies in the verdict body).
 
 - [ ] **Step 4: Inspect the verdict**
 
@@ -1128,7 +1157,7 @@ No commit for Task 8 — it's a manual sanity check, not a code change.
 - `Dispatcher` from `audit-runner.ts` is the shared contract; both providers return that type.
 - `Provider` enum from `index.ts` matches yargs `choices` in Task 5.
 - `BuildDispatcherOptions { timeoutSec, env }` is used by both `buildAnthropicDispatcher` (which reads only timeoutSec) and `buildDeepseekDispatcher` (which reads env for the API key + optional model).
-- `DispatchLlmFn` from anthropic.ts mirrors the real `dispatchLlm` return shape (`{ ok: true, raw } | { ok: false, reason }`).
+- `DispatchLlmFn` from anthropic.ts is defined as `typeof dispatchLlm` so the test mock's resolved-value shape (`{ ok: true; parsed; raw }` / `{ ok: false; reason; raw? }`) stays in lock-step with the production return type.
 
 **Decisions coverage:** All 9 resolved decisions from the spec map to concrete tasks. #1 (cron-only scope) → all task scoping is correct. #2 (Provider abstraction shape) → Tasks 1-4. #3 (precedence) → Task 1 tests. #4 (both-keys-set fails loudly) → Task 1 rule 4 test. #5 (hardcoded URL) → Task 3 constant + Task 2-style tripwire test. #6 (model allowlist + env override) → Task 3 implementation + Task 4 test. #7 (no retries) → Task 3 has no retry logic. #8 (no streaming) → Task 3 request body `stream: false` + Task 3 test asserts it. #9 (drop claude-code install) → Task 6 step 2.
 

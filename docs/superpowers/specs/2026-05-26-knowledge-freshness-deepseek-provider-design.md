@@ -173,7 +173,7 @@ Authorization: Bearer ${DEEPSEEK_API_KEY}
 Content-Type: application/json
 
 {
-  "model": "deepseek-chat",        # or via env override (see below)
+  "model": "deepseek-v4-flash",        # or via env override (see below)
   "messages": [
     {"role": "user", "content": "<rendered meta-prompt>"}
   ],
@@ -192,12 +192,12 @@ Content-Type: application/json
 
 ### Model selection
 
-Default: `deepseek-chat`. Operators can override via
+Default: `deepseek-v4-flash`. Operators can override via
 `KNOWLEDGE_FRESHNESS_DEEPSEEK_MODEL` env var, but only to a
 **hardcoded allowlist**:
 
-- `deepseek-chat`
-- `deepseek-reasoner`
+- `deepseek-v4-flash`
+- `deepseek-v4-pro`
 
 Any other value triggers an error at provider construction (not at
 fetch time). This preserves decision #7's hardcoded-paths property:
@@ -327,24 +327,24 @@ and verify the verdict JSON validates against the schema.
 After merge, trigger `workflow_dispatch` on the cron workflow with the
 new env block. Confirm:
 1. The `npm install -g @anthropic-ai/claude-code` step is gone.
-2. The audit step runs to completion with a deepseek-chat verdict.
+2. The audit step runs to completion with a deepseek-v4-flash verdict.
 3. An end-to-end PR opens (or the candidate is dropped on `current`/`minor-drift` per the existing logic — which now persists `last-reviewed` metadata-only PRs).
 
 ## Risks & Mitigations
 
 | Risk | Mitigation |
 |---|---|
-| Quality drop from deepseek-chat producing weaker drift detection | MMR corroboration step (Codex/Gemini/Claude on the proposed diff) catches hallucinations regardless of which model produced them. Human review is the final gate. |
+| Quality drop from deepseek-v4-flash producing weaker drift detection | MMR corroboration step (Codex/Gemini/Claude on the proposed diff) catches hallucinations regardless of which model produced them. Human review is the final gate. |
 | Operator forgets to set the secret in the GitHub repo | The cron fails on the first audit step with "no provider configured" — visible immediately in the Actions tab. |
 | DeepSeek API outage or rate-limiting | Per-entry failure isolation in the cron loop means the workflow continues; no PRs open that day for affected entries; next day's cron retries. No retry layer at the provider level (avoids double-billing). |
-| Token-budget mismatch (deepseek-chat's context window is smaller than Claude's) | The audit prompt with pre-fetched bodies is bounded to 96KB per source × N sources (typically 1-3). DeepSeek-chat handles 64K context; we cap source bodies in audit-runner.ts already. If a verdict ever overruns, the cron logs the truncation; operator can shrink `MAX_SOURCE_BODY_BYTES` for DeepSeek specifically. |
+| Token-budget mismatch (deepseek-v4-flash's context window is smaller than Claude's) | The audit prompt with pre-fetched bodies is bounded to 96KB per source × N sources (typically 1-3). DeepSeek-chat handles 64K context; we cap source bodies in audit-runner.ts already. If a verdict ever overruns, the cron logs the truncation; operator can shrink `MAX_SOURCE_BODY_BYTES` for DeepSeek specifically. |
 | A future contributor reintroduces project-config-controlled provider URLs | Comment in `providers/deepseek.ts` and `providers/index.ts` explicitly documents decision #7's hardcoded-paths invariant. The unit test asserting the URL string is literal acts as a tripwire. |
 | Operator sets `KNOWLEDGE_FRESHNESS_DEEPSEEK_MODEL` to an unsupported value | Validated at provider construction against a hardcoded allowlist; fails before any HTTP request. |
 
 ## Cost & Cadence Model
 
 The Phase 1 design's "≤10 audits/day, ~2-4 steady state" budget is
-unchanged. Per-call DeepSeek pricing (deepseek-chat, May 2026) is
+unchanged. Per-call DeepSeek pricing (deepseek-v4-flash, May 2026) is
 approximately one-tenth of Claude Opus 4.7 for comparable token counts,
 so the steady-state monthly LLM-call cost drops accordingly. MMR
 corroboration costs (Codex/Gemini/Claude on the diff) are unchanged —
@@ -378,7 +378,7 @@ CLI flag introduced:
 | 3 | Provider selection precedence | Flag > env var > inferred-from-key-presence > error | Matches operator's mental model of "explicit wins, ambiguity is loud, missing is loud." |
 | 4 | Both-keys-set behavior | Fail loudly, demand explicit choice | Safer than silent guessing. Operator can `KNOWLEDGE_FRESHNESS_PROVIDER=deepseek` in their shell to disambiguate. |
 | 5 | DeepSeek URL | Hardcoded literal `https://api.deepseek.com/chat/completions` | Preserves decision #7's "no project-config override of dispatch target." |
-| 6 | DeepSeek model | Default `deepseek-chat`; env override only within a hardcoded allowlist (`deepseek-chat`, `deepseek-reasoner`) | Cheaper default; the reasoner is available for operators who want it but cannot be tricked into an unsupported model name. |
+| 6 | DeepSeek model | Default `deepseek-v4-flash`; env override only within a hardcoded allowlist (`deepseek-v4-flash`, `deepseek-v4-pro`) | Cheaper, faster default; `deepseek-v4-pro` is available for operators who want a more capable model. The previously-supported `deepseek-chat` and `deepseek-reasoner` names are deprecated per the official DeepSeek changelog and intentionally excluded from the allowlist. |
 | 7 | Retries | None at provider layer | Cron loop already isolates per-entry failures; adding retries would double-bill on transient errors. |
 | 8 | Streaming | Off (`stream: false`) | The runner's JSON extractor needs the complete response. No latency benefit from streaming for a single ~2KB verdict. |
 | 9 | CI: drop `npm install -g @anthropic-ai/claude-code`? | Yes, the cron is DeepSeek-only | Saves ~30s per run and avoids one transitive-dep risk. |
