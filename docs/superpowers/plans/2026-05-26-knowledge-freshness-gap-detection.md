@@ -707,10 +707,21 @@ For each match, add a step-name argument like `'test-step'`.
 Also: existing tests likely rely on the **absence** of the tail in the
 output. The simplest way to keep them passing without rewriting them is
 to set `SCAFFOLD_GAP_SIGNAL_QUIET=1` in a top-level `beforeAll`/`afterAll`
-in `engine.test.ts`. First, ensure the vitest imports at the top of the
-file include `beforeAll` and `afterAll` — if the existing import is just
-`import { describe, it, expect } from 'vitest'`, extend it. Then add
-this block after imports, BEFORE the existing `describe`s:
+in `engine.test.ts`. First, ensure the vitest imports at the top of
+the file include all four lifecycle hooks needed: `beforeAll`,
+`afterAll`, `beforeEach`, `afterEach` (the dedicated describe block
+below uses `beforeEach`/`afterEach` for finer scoping). The existing
+import is just `import { describe, it, expect } from 'vitest'` — extend
+it to:
+
+```typescript
+import {
+  describe, it, expect, beforeAll, afterAll, beforeEach, afterEach,
+} from 'vitest'
+```
+
+Then add this top-level block after imports, BEFORE the existing
+`describe`s:
 
 ```typescript
 const ORIGINAL_QUIET = process.env['SCAFFOLD_GAP_SIGNAL_QUIET']
@@ -1159,6 +1170,23 @@ describe('scanLessonsForGaps', () => {
     const signals = scanLessonsForGaps(p)
     expect(signals[0].topic).toBe('crlf-topic')
   })
+
+  it('drops topics exceeding the 80-char validator limit (heuristic)', () => {
+    // A runaway capture would violate the canonical
+    // KnowledgeGapSignalPayload contract; the scanner enforces the
+    // ≤80-char kebab-slug rule locally before emitting.
+    const longish = 'a'.repeat(90)
+    const p = writeTmp(`No knowledge entry for "${longish}".\n`)
+    const signals = scanLessonsForGaps(p)
+    expect(signals).toEqual([])
+  })
+
+  it('drops explicit markers whose slug exceeds 80 chars', () => {
+    const longSlug = 'a'.repeat(81)
+    const p = writeTmp(`<!-- gap-topic: ${longSlug} -->\n`)
+    const signals = scanLessonsForGaps(p)
+    expect(signals).toEqual([])
+  })
 })
 ```
 
@@ -1256,7 +1284,7 @@ export function scanLessonsForGaps(absPath: string): LessonsGapSignalPayload[] {
     let m: RegExpExecArray | null
     while ((m = EXPLICIT_MARKER_RE.exec(line)) !== null) {
       const slug = m[1]
-      if (slug) {
+      if (slug && isValidTopic(slug)) {
         out.push({
           topic: slug,
           source: 'lessons',
@@ -1271,7 +1299,7 @@ export function scanLessonsForGaps(absPath: string): LessonsGapSignalPayload[] {
       const match = re.exec(line)
       if (!match) continue
       const normalized = normalizeTopic(match[1] ?? '')
-      if (!normalized) continue
+      if (!isValidTopic(normalized)) continue
       out.push({
         topic: normalized,
         source: 'lessons',
@@ -1282,6 +1310,22 @@ export function scanLessonsForGaps(absPath: string): LessonsGapSignalPayload[] {
   }
 
   return out
+}
+
+/**
+ * Synthetic payloads from this scanner never round-trip through the
+ * runtime validator (they're consumed in-memory by Lens I), but the
+ * scanner enforces the same kebab-case-slug ≤80-chars contract here
+ * so the in-process payloads remain shape-compatible with
+ * KnowledgeGapSignalPayload from the canonical types. Drops
+ * (rather than truncates) overlong topics — an 80+ char topic is
+ * almost always a runaway regex capture, not a real gap.
+ */
+const TOPIC_MAX = 80
+const TOPIC_SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/
+
+function isValidTopic(topic: string): boolean {
+  return topic.length > 0 && topic.length <= TOPIC_MAX && TOPIC_SLUG_RE.test(topic)
 }
 ```
 
