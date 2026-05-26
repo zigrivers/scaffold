@@ -2,6 +2,10 @@
 name: data-pipeline-schema-management
 description: Schema registry, evolution patterns, breaking change detection, and contract testing for data pipeline schemas
 topics: [data-pipeline, schema-management, schema-registry, schema-evolution, breaking-changes, contract-testing, avro, protobuf]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Schema management is the discipline of controlling how the structure of data changes over time while maintaining compatibility between producers and consumers. Without schema governance, a single field rename in a source system cascades into dozens of broken downstream pipelines, dashboards, and ML models. Schema registry, evolution compatibility rules, breaking change detection, and consumer contract tests are the four pillars that make schema changes safe.

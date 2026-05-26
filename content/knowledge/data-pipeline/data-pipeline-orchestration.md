@@ -2,6 +2,10 @@
 name: data-pipeline-orchestration
 description: DAG vs event-driven vs scheduled orchestration, retry policies, SLA monitoring, and lineage tracking for data pipelines
 topics: [data-pipeline, orchestration, dag, event-driven, scheduling, retry-policies, sla-monitoring, lineage, airflow, prefect, dagster]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Pipeline orchestration is the control plane that schedules work, manages dependencies, handles failures, and provides visibility into pipeline health. The choice between schedule-driven, event-driven, and DAG-based orchestration determines operational complexity, latency characteristics, and how well the system degrades under load. Poor orchestration design — missing retries, no SLA monitoring, absent lineage — turns data pipelines into production support burdens.

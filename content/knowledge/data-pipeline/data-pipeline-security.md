@@ -2,6 +2,10 @@
 name: data-pipeline-security
 description: PII handling, encryption at rest and in transit, access control, and audit logging for data pipelines
 topics: [data-pipeline, security, pii, encryption, access-control, audit-logging, gdpr, data-masking]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Data pipelines are high-value targets for security incidents because they aggregate sensitive data from multiple systems and often run with broad service account permissions. A pipeline that ingests payment data, user PII, and health records and writes to a central warehouse becomes a single point of compromise. Security must be designed into the pipeline from the start — encryption, least-privilege access, PII handling, and audit logging cannot be retrofitted economically.

@@ -2,6 +2,10 @@
 name: data-pipeline-streaming-patterns
 description: Event time vs processing time, windowing strategies, watermarks, and exactly-once semantics for streaming data pipelines
 topics: [data-pipeline, streaming, event-time, processing-time, windowing, watermarks, exactly-once, flink, kafka-streams]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Streaming pipeline correctness depends on understanding the distinction between when an event occurred and when it was processed, handling late-arriving data with watermarks, and ensuring that each event is processed exactly once even in the face of failures. Getting these fundamentals wrong produces pipelines that appear to work but silently compute incorrect aggregations — bugs that surface only when business users notice wrong numbers weeks later.

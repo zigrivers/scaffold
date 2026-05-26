@@ -2,6 +2,10 @@
 name: data-pipeline-requirements
 description: SLA requirements (latency, throughput, freshness), data quality budgets, and regulatory compliance (PII, GDPR) for data pipelines
 topics: [data-pipeline, requirements, sla, latency, throughput, freshness, data-quality, pii, gdpr, compliance]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Data pipeline requirements must be defined in measurable terms before any architecture decision is made. Vague requirements like "fast" or "reliable" translate into untestable systems. Every pipeline needs explicit SLAs for latency, throughput, and data freshness — and a defined budget for data quality violations and regulatory compliance obligations.

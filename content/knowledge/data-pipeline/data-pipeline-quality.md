@@ -2,6 +2,10 @@
 name: data-pipeline-quality
 description: Schema validation, anomaly detection, data quality tests using Great Expectations and dbt, and reconciliation patterns
 topics: [data-pipeline, data-quality, schema-validation, anomaly-detection, great-expectations, dbt, reconciliation, testing]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Data quality failures are the most operationally damaging class of data pipeline bugs because they often go undetected until a business user notices wrong numbers. Unlike pipeline failures (which are loud and immediately visible), quality degradation is silent — data flows, pipelines succeed, but the numbers are wrong. Building quality checks directly into the pipeline, not as a separate offline process, is the only reliable defense.

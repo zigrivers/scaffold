@@ -2,6 +2,10 @@
 name: data-pipeline-conventions
 description: Naming conventions, error handling patterns, idempotency, and dead-letter queue patterns for data pipelines
 topics: [data-pipeline, conventions, naming, error-handling, idempotency, dead-letter, patterns]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Data pipeline conventions are the shared language that makes a pipeline system maintainable across teams and time. Inconsistent naming, absent idempotency guarantees, and ad-hoc error handling are the top causes of data corruption and operational incidents. Establish and enforce these conventions from day one — retrofitting them onto running production pipelines is expensive and risky.
