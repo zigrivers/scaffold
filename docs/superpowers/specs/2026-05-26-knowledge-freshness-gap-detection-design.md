@@ -176,8 +176,10 @@ projects → P2; ≥5 signals × ≥3 projects → P1).
 │         --project-id=<sha256> --step-name=<…> --agent-excerpt=<…>       │
 │     │                                                                   │
 │     ▼                                                                   │
-│  5. Event lands in worktree's `.scaffold/observability/ledger.jsonl`    │
-│     (validated against EVENT_PAYLOAD_KEYS['knowledge_gap_signal'])      │
+│  5. Event lands in worktree's ledger at the path returned by           │
+│     `ledgerPath(worktreeRoot)` (currently `.scaffold/activity.jsonl`,  │
+│     defined in src/observability/engine/ledger-writer.ts:30-31);       │
+│     validated against EVENT_PAYLOAD_KEYS['knowledge_gap_signal']        │
 └─────────────────────────────────────────────────────────────────────────┘
                                   ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -403,13 +405,29 @@ inversion: discard `graph`, use `ledger` and `context`.
 Registration touches three named locations:
 
 1. **`LENS_REGISTRY`** in `src/observability/engine/checks/registry.ts:25`
-   — append a `LensManifest` entry: `{ id: 'I-knowledge-gaps', name:
-   'Knowledge Gaps', requiredAdapters: [], ... }` (ledger is implicit via
-   `runAudit`).
-2. **`makeLensImplementations()`** in the same file at registry.ts:61 —
-   add the entry `'I-knowledge-gaps': lensIKnowledgeGaps(projectRoot)`.
-   Use `makeLensImplementations` (not the simpler `LENS_IMPLEMENTATIONS`
-   map) because the lens needs `projectRoot` for the lessons.md path.
+   — append a `LensManifest` entry. The actual interface
+   (`registry.ts:16–22`) uses `required` and `optional` arrays of
+   `AdapterId`, not `requiredAdapters`. Lens I has no required adapters
+   (the ledger is implicit via `runAudit`'s upstream call to
+   `readMergedLedger`), but the manifest still needs both array fields:
+
+   ```typescript
+   { id: 'I-knowledge-gaps', name: 'Knowledge Gaps',
+     profiles: ['fast', 'full'], required: [], optional: [] }
+   ```
+
+2. **`LENS_IMPLEMENTATIONS`** at registry.ts:48 — add the entry
+   `'I-knowledge-gaps': lensIKnowledgeGaps` (plain `LensFn`, no factory).
+   Lens H is registered the same way at registry.ts:56 — both rely on
+   `context.cwd` at run time rather than baking the project root in at
+   module-load time. (The factory pattern at `makeLensGDecisions` is the
+   exception, not the rule, and is only used when the lens needs to load
+   project-specific config eagerly.)
+
+   Because `makeLensImplementations(projectRoot)` at registry.ts:61
+   spreads `LENS_IMPLEMENTATIONS`, the new entry surfaces automatically
+   in the map returned to the runner. No edit to the factory itself.
+
 3. **`SCOPE_DOC_LENSES`** in `src/observability/engine/api.ts:67` —
    change from `new Set(['H-cross-doc'])` to
    `new Set(['H-cross-doc', 'I-knowledge-gaps'])`. The audit runner's
@@ -432,12 +450,21 @@ Registration touches three named locations:
 ```typescript
 export function normalizeTopic(raw: string): string {
   return raw.toLowerCase()
-    .replace(/['']/g, '')      // strip apostrophes (smart and dumb) before slugging
-    .replace(/[_\s]+/g, '-')   // collapse underscores/whitespace to hyphens
-    .replace(/-{2,}/g, '-')    // collapse repeated hyphens (e.g. "foo--bar" → "foo-bar")
-    .replace(/^[-.]+|[-.]+$/g, '')  // trim leading/trailing hyphens and dots
+    .replace(/['\\u2018\\u2019]/g, '') // ASCII apostrophe + U+2018 + U+2019 (escape syntax keeps source ASCII)
+    .replace(/[_\s]+/g, '-')         // collapse underscores/whitespace to hyphens
+    .replace(/-{2,}/g, '-')          // collapse repeated hyphens (e.g. "foo--bar" → "foo-bar")
+    .replace(/^[-.]+|[-.]+$/g, '')   // trim leading/trailing hyphens and dots
 }
 ```
+
+The apostrophe character class uses JavaScript Unicode escapes
+(`‘`, `’`) rather than the literal smart-quote glyphs.
+Editors and copy-paste pipelines have a long history of collapsing
+typed smart quotes back to ASCII, which would silently regress this
+fix. Implementation tests should cover at minimum: `agent's eval` →
+`agents-eval` (ASCII apostrophe), `agent’s eval` → `agents-eval`
+(right-smart quote in the input string), and a pair of smart quotes
+wrapping a word → stripped.
 
 Applied to every signal before bucketing. `"Agent-Eval-Harnesses"`,
 `"agent_eval_harnesses"`, `"agent eval harnesses"`, `"agent's eval
@@ -466,6 +493,23 @@ Build buckets in one pass over the merged signal list. `first_seen` /
 lessons-scanner synthetics, both are set to the current audit timestamp
 (see §4.6 for rationale — synthetic signals are exempt from window
 expiry and reflect the live file contents).
+
+**Diversity-gate computation.** `distinct_project_count` is the count of
+unique *real* `project_id` values in the bucket — the synthetic
+`'lessons'` literal is **excluded** from the count:
+
+```typescript
+const distinctProjects = new Set(signals.map(s => s.project_id))
+distinctProjects.delete('lessons')                  // never counts toward gate
+const distinct_project_count = distinctProjects.size
+```
+
+This preserves the original design intent: lessons.md contributes to
+`signal_count` (corroborating real signals and helping cross the P1
+threshold) but never adds diversity. A single real project's signals plus
+any number of lessons mentions still counts as one project for the
+gate — preventing a single noisy project from manufacturing a P2 finding
+by also writing a matching `tasks/lessons.md` entry.
 
 ### 2.5 Finding rules
 
@@ -508,8 +552,12 @@ narrower than a generic "all renderers fall back to JSON" claim suggests
   new variant requires either explicit terminal-rendering work or an
   explicit note that terminal output omits evidence (current behavior).
 - **`dashboard.ts`** — same as terminal: no evidence rendering today.
-- **`mmr-findings.ts`** — serializes findings into MMR's Finding shape;
-  it may pass evidence through opaquely or transform it. Audit at T4.
+- **`mmr-findings.ts`** — `findingToMmr` discards `evidence` entirely
+  when mapping to MMR's Finding shape (verified via direct read). New
+  variant has no impact on the MMR-channel output unless T4 explicitly
+  threads evidence through; defer that work to Phase 4 unless empirical
+  use shows the dropped evidence makes the doc-conformance channel
+  signal less useful.
 
 Phase 3 ships an explicit pretty-render case in **markdown only** (the
 sidecar / persisted-report path, which is what reviewers actually open).
@@ -546,26 +594,29 @@ The lens cannot know which category the entry belongs in (`core/` vs
 field uses the category placeholder `<category>` literally so the renderer
 displays it as guidance, not as a clickable path.
 
-### 2.8 Degradation (aligned with `deriveVerdict`)
+### 2.8 Degradation
 
-The current `deriveVerdict()` in `src/observability/engine/api.ts:79–83`
-returns `degraded-pass` whenever `skipped_lenses > 0`. To avoid bumping
-every empty-ledger audit to `degraded-pass`, the lens distinguishes
-*empty* from *unreadable*:
+`runAudit`'s upstream `readMergedLedger()` in
+`src/observability/engine/synthesizer.ts` swallows ledger read errors
+before the lens runs — Lens I receives `{ events: [] }` whether the
+ledger was empty or unreadable. Distinguishing these cases at the lens
+level is not possible with the current engine API, so Phase 3 collapses
+both to a no-op:
 
-- **Ledger empty (no `knowledge_gap_signal` events in window).** Lens
+- **Ledger empty OR unreadable (lens sees `events.length === 0`).** Lens
   returns `[]` — no findings, no `lens_skipped` emission. Verdict stays
-  `pass`. This is the expected steady state for a healthy knowledge base.
-- **Ledger genuinely unreadable** (I/O error, malformed JSONL the
-  synthesizer can't recover from). Lens emits a `lens_skipped` evidence
-  finding with `reason: 'adapter_unavailable'` and the verdict
-  consequently becomes `degraded-pass` (per `deriveVerdict`). This is
-  correct: the lens cannot run, so the operator should know.
+  `pass`. This is the expected steady state for a healthy knowledge base
+  and is acceptable for read-failure too because the merged-ledger
+  summary already surfaces read errors via `AvailabilityMap.ledger`
+  (visible in the audit's availability section without bumping verdict).
 - **lessons.md missing.** Scanner returns `[]`; lens proceeds with only
-  ledger signals. Not a degradation — missing-lessons is the default
-  state for projects that don't use `bd`.
-- **No buckets cross the threshold.** Lens returns `[]`. Not a
-  degradation; this is the healthy steady state.
+  ledger signals. Not a degradation.
+- **No buckets cross the threshold.** Lens returns `[]`. Healthy.
+
+A future Phase 4 enhancement could expose ledger-read failures through
+`AvailabilityMap.ledger.malformed_lines > 0` and let Lens I emit a
+`lens_skipped` finding then. Phase 3 deliberately stays inside the
+existing API surface to avoid a parallel-feature dependency.
 
 ### 2.9 Tests
 
@@ -576,9 +627,17 @@ every empty-ledger audit to `degraded-pass`, the lens distinguishes
   (diversity gate).
 - Different surface-spellings of the same topic collapse via
   `normalizeTopic`.
-- Lessons-scanner output corroborates ledger signals correctly (2 ledger
-  signals from 2 projects + 1 lessons mention = `signal_count=3,
-  distinct_projects={p1, p2, lessons}=3` → P2 fires).
+- Lessons-scanner output corroborates ledger signals correctly under
+  the §2.4 diversity-gate rule (2 ledger signals from 2 *real* projects
+  + 1 lessons mention = `signal_count=3`, `distinct_project_count=2`
+  after `'lessons'` is removed → P2 fires; lessons contributes to
+  signal_count only).
+- Lessons-only signals do NOT cross the diversity gate (5 lessons
+  mentions, 0 ledger signals = `distinct_project_count=0` after
+  `delete('lessons')` → no finding).
+- Same-project corroboration via lessons does NOT manufacture a finding
+  (3 ledger signals from project A + 2 lessons mentions of the same
+  topic = `distinct_project_count=1` → no finding).
 - Window enforcement: signals older than 90 days are excluded.
 
 ## Section 3 — Assembly-Time Tail Injection
@@ -696,7 +755,13 @@ Trigger conditions for both call sites are identical:
 
 ### 3.2 Tail content (canonical)
 
-```markdown
+The outer fence in this spec uses **four** backticks so the embedded
+triple-backtick bash block renders correctly. Implementers copying the
+tail verbatim into a TypeScript template literal can use either form;
+the markdown rendering of the spec just needs the outer fence to outlive
+the inner.
+
+````markdown
 ### When this knowledge base lacks what you need
 
 If you search this section for a topic and find nothing — and you'd want
@@ -709,7 +774,7 @@ PROJECT_ID=$(printf '%s' "$PROJECT_KEY" \
   | { command -v shasum >/dev/null 2>&1 && shasum -a 256 || sha256sum; } \
   | awk '{print $1}')
 scaffold observe event knowledge_gap_signal \
-  --branch="$(git rev-parse --abbrev-ref HEAD)" \
+  --branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)" \
   --topic="<kebab-case-slug-of-missing-topic>" \
   --source=agent_search \
   --project-id="$PROJECT_ID" \
@@ -721,7 +786,7 @@ Use a kebab-case slug like `agent-eval-harnesses`, not a full sentence.
 Skip emission if you find adequate guidance (this is not for incomplete
 coverage of a topic that IS present — it's for topics that aren't covered
 at all).
-```
+````
 
 The template is stored as a single multiline string constant in
 `src/core/assembly/gap-signal-tail.ts` (the new shared helper file
@@ -754,25 +819,37 @@ within budget for the observability value.
 **`src/observability/checks/lens-i-lessons-scanner.ts`** — pure function:
 
 ```typescript
+/** Read an absolute path to a lessons.md file (typically
+ *  `<projectRoot>/tasks/lessons.md`, resolved by Lens I via context.cwd)
+ *  and return synthetic gap-signal payloads. Reads no other paths and
+ *  writes nothing. */
 export function scanLessonsForGaps(absPath: string): KnowledgeGapSignalPayload[]
 ```
 
 Called by Lens I at audit time. Does not write to the ledger or any other
-side-effect state.
+side-effect state. Lens I owns path resolution (see §4.2); the scanner
+itself reads exactly the path it's given and falls back to `[]` if the
+path doesn't exist.
 
 ### 4.2 Input resolution
 
-`absPath` is `<projectRoot>/tasks/lessons.md` where `projectRoot` comes
-from the `LensFn`'s `context.cwd` argument (`runner.ts:9–16` defines
-`LensContext = { profile; cwd }`). Lens I passes `context.cwd` to the
-scanner; the scanner appends `tasks/lessons.md`. This avoids
-`findProjectRoot(process.cwd())` which can resolve to the wrong tree in
-programmatic / test / subdirectory invocations — `runAudit` always
-threads the audit's `primaryRoot` through `context.cwd`, so
-`context.cwd` is the authoritative source.
+**Lens I is responsible for path resolution; the scanner receives an
+absolute path.** This keeps the scanner pure and trivially testable.
 
-If the file doesn't exist or is empty, return `[]`. No errors thrown;
-missing file is the default expected state.
+```typescript
+// inside Lens I
+const lessonsPath = path.join(context.cwd, 'tasks', 'lessons.md')
+const lessonsSignals = scanLessonsForGaps(lessonsPath)
+```
+
+`context.cwd` is the audit's `primaryRoot` (threaded through the runner
+at `src/observability/engine/checks/runner.ts:9–16`'s `LensContext`).
+Using `context.cwd` avoids `findProjectRoot(process.cwd())` which can
+resolve to the wrong tree in programmatic / test / subdirectory
+invocations.
+
+If the file doesn't exist or is empty, `scanLessonsForGaps` returns
+`[]`. No errors thrown; missing file is the default expected state.
 
 ### 4.3 Topic extraction (fence-aware line scanner + two-pass parser)
 
@@ -812,19 +889,22 @@ The capture is taken verbatim. These are inserted by `bd` (when its
 
 ```javascript
 const HEURISTIC_PATTERNS = [
-  /(?:would have helped to have|missing) (?:a )?(?:guide|knowledge entry|entry) (?:on|for|about) ["`']?(.+?)["`'.]/i,
-  /no (?:knowledge|kb) entry for ["`']?(.+?)["`'.]/i,
-  /missing knowledge:\s*["`']?(.+?)["`'.]/i,
+  /(?:would have helped to have|missing) (?:a )?(?:guide|knowledge entry|entry) (?:on|for|about) ["`']?(.+?)["`.]/i,
+  /no (?:knowledge|kb) entry for ["`']?(.+?)["`.]/i,
+  /missing knowledge:\s*["`']?(.+?)["`.]/i,
 ]
 ```
 
-Captures are normalized through `normalizeTopic()` before being emitted as
-synthetic signals. The non-greedy `(.+?)` capture stops at the next quote
-or terminal `.`, which is intentional for sentence-shaped phrases — if
-false-positive rates from runaway captures emerge in practice, Phase 4
-can tighten the terminating set. The regex set is deliberately small (3
-patterns) to minimize false positives; broader regexes are deferred to
-Phase 4.
+Captures are normalized through `normalizeTopic()` before being emitted
+as synthetic signals. The opening quote class still includes `'` so the
+match can start *after* an opening apostrophe (e.g., `for 'agent eval'`),
+but the closing class deliberately excludes `'` so that an in-topic
+apostrophe (`agent's eval harnesses`) does not prematurely truncate the
+capture. The non-greedy `(.+?)` stops at the next double-quote,
+backtick, or terminal `.`. If false-positive rates from runaway captures
+emerge in practice, Phase 4 can tighten the terminating set. The regex
+set is deliberately small (3 patterns) to minimize false positives;
+broader regexes are deferred to Phase 4.
 
 ### 4.4 Output shape
 
@@ -850,12 +930,15 @@ mentions alone can never satisfy `distinct_project_count ≥ 2`. They count
 as one "project" for the gate. This is deliberate: lessons.md corroborates
 real signals, it doesn't manufacture gaps on its own.
 
-Example:
+Example (with §2.4's `delete('lessons')` rule applied):
 - 2 agent_search signals from different real `project_id`s + 1 lessons
-  mention → `distinct_projects = {p1, p2, 'lessons'} = 3` → P2 threshold
-  met (≥2).
-- 0 agent_search signals + 3 lessons mentions of the same topic →
-  `distinct_projects = {'lessons'} = 1` → P2 threshold not met.
+  mention → real distinct = {p1, p2} = 2 → P2 fires (signal_count=3,
+  distinct=2). lessons contributes to count only.
+- 5 CLI signals from project A + 3 lessons mentions → real distinct =
+  {A} = 1 → P2 does NOT fire. A single noisy project cannot manufacture
+  a gap by also writing lessons.md entries.
+- 0 agent_search signals + 5 lessons mentions → real distinct = ∅ = 0
+  → P2 does NOT fire. Lessons-only never independently surfaces a gap.
 
 ### 4.6 Synthetic signals are exempt from the 90-day window
 
@@ -958,7 +1041,7 @@ All five decisions are locked. Each was confirmed by zigrivers on 2026-05-26.
 | T1 | Event type & validator (`types.ts`, `event-schemas.ts`, CLI smoke test) | Independent |
 | T2 | Assembly-time tail injection — new `src/core/assembly/gap-signal-tail.ts` helper, wired into both `AssemblyEngine.buildKnowledgeBaseSection` (engine.ts:172) and `buildKnowledgeSection` (claude-code.ts:74) with `stepName` passed through from each caller | Depends on T1 |
 | T3 | lessons.md scanner (pure function) | Independent |
-| T4 | Lens I aggregator + `Evidence` variant + audit-runner registration (LENS_REGISTRY entry, `makeLensImplementations` entry, `SCOPE_DOC_LENSES` update) + markdown & terminal pretty-render cases for the new evidence variant | Depends on T1, T3 |
+| T4 | Lens I aggregator + `Evidence` variant + audit-runner registration (`LENS_REGISTRY` entry, `makeLensImplementations` entry, `SCOPE_DOC_LENSES` update) + markdown-renderer pretty-render case for the new evidence variant (terminal/dashboard already omit evidence for every variant — no work needed; `mmr-findings.ts::findingToMmr` audited and adjusted only if its current evidence-discard behavior is unacceptable downstream) | Depends on T1, T3 |
 | T5 | End-to-end validation + `docs/knowledge-freshness/operations.md` doc update | Depends on T1–T4 |
 
 Estimated single PR `feat/knowledge-freshness-gap-detection` carrying
