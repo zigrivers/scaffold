@@ -1,9 +1,26 @@
 # Deferred Findings — feat/knowledge-freshness-phase-3
 
-Phase 3 (gap-detection) spec review loop. Per the execution rule on
-this branch, rounds 1–5 fix every P2-or-above finding; rounds 6+ fix
-only P0/P1 and defer P2/P3 here. Revisit during T1–T5 implementation
-or in a Phase 4 hardening pass.
+Phase 3 (gap-detection) review loops. Per the execution rule on this
+branch, rounds 1–5 fix every P2-or-above finding; rounds 6+ fix only
+P0/P1 and defer P2/P3 here. Revisit during T1–T5 implementation or in
+a Phase 4 hardening pass.
+
+## Plan review loop summary (rounds 1–5)
+
+| Round | MMR verdict | MMR findings | Grok findings | Notes |
+|---|---|---|---|---|
+| 1 | blocked | 10 (5 P1, 5 P2, 1 P3) | 7 (1 P0-halluc, 2 P2, 4 P3) | 1 grok hallucination (LensFn arity) |
+| 2 | blocked | 6 (2 P1, 4 P2) | 6 (3 P1, 3 P2) | 11 distinct fixes after dedup |
+| 3 | blocked | 3 (1 P1, 2 P2) | 1 P1 (over-correction) + 1 P2 (style) | Codex-only MMR; grok caught observe.test.ts pattern mismatch |
+| 4 | blocked | 2 (1 P1, 1 P2) | 1 P1 (hallucination — wrong dir search) | engine.test.ts lifecycle imports + scanner topic validity |
+| 5 | **degraded-pass** | **0** | 1 P2 (hallucination — bare-engine.test.ts misread) | Plan stop conditions met |
+
+Total plan P0/P1/P2 fixes: ~31 across 4 review rounds. Hallucinations: 3
+(grok F-001 r1 LensFn arity claim verified false via `npm run type-check`;
+grok r4 wrong-dir search verified false via `ls src/observability/checks/`;
+grok r5 misread bare `engine.test.ts` refs as missing prefix).
+
+## Spec review loop summary
 
 ## Spec review loop summary
 
