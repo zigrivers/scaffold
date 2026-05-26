@@ -2,6 +2,12 @@
 name: web-app-ux-patterns
 description: Responsive design, loading states, error boundaries, offline patterns, optimistic updates, and accessibility (WCAG) for web apps
 topics: [web-app, ux, responsive-design, loading-states, error-handling, accessibility, wcag, offline, optimistic-updates]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://www.w3.org/TR/WCAG22/
+  - url: https://developer.mozilla.org/en-US/docs/Web/Accessibility
 ---
 
 UX patterns are the difference between an app that users trust and one they abandon. The patterns covered here are not visual design choices — they are engineering decisions about how the app communicates state, handles failure, and responds to interaction. Implement them consistently across the entire app or they create a fragmented user experience that signals poor quality.

@@ -2,6 +2,12 @@
 name: web-app-data-patterns
 description: Client-side caching, optimistic updates, real-time sync, pagination strategies, form state management, and file upload patterns
 topics: [web-app, data-fetching, caching, react-query, swr, pagination, forms, file-upload]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API
+  - url: https://developer.mozilla.org/en-US/docs/Web/HTTP/Caching
 ---
 
 Data management in web applications spans from simple fetch-and-display to complex real-time collaborative state. The wrong patterns here produce stale UIs, conflicting updates, degraded performance under load, and frustrated users. The right patterns make applications feel instantaneous even over slow networks — by understanding the difference between server state, client state, and ephemeral UI state, and applying the appropriate tool to each.
