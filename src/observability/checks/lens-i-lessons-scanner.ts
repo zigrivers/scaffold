@@ -7,8 +7,11 @@ const EXPLICIT_MARKER_RE = /<!--\s*gap-topic:\s*([a-z0-9]+(?:-[a-z0-9]+)*)\s*-->
 // whitespace or end-of-line. This preserves version-style dots inside
 // topics (e.g. "react-19.0") while still terminating real sentence
 // ends ("missing knowledge: foo." captures "foo"). Quotes/backticks
-// terminate unconditionally.
-const TERM = '(?:["`]|[.!?](?=\\s|$))'
+// terminate unconditionally. Bare $ handles unpunctuated bullets at
+// end-of-line (e.g. "No knowledge entry for retry-with-jitter" with
+// no trailing punctuation) — the line-by-line scanner makes $ anchor
+// per line.
+const TERM = '(?:["`]|[.!?](?=\\s|$)|$)'
 const HEURISTIC_PATTERNS: RegExp[] = [
   new RegExp(
     '(?:would have helped to have|missing) (?:a )?' +

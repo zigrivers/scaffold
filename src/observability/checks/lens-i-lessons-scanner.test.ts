@@ -177,4 +177,15 @@ describe('scanLessonsForGaps', () => {
     const signals = scanLessonsForGaps(p)
     expect(signals).toEqual([])
   })
+
+  it('matches unpunctuated lines at end-of-line (no trailing quote/punctuation)', () => {
+    const p = writeTmp([
+      'No knowledge entry for retry-with-jitter',
+      'Missing knowledge: circuit-breaker',
+    ].join('\n'))
+    const signals = scanLessonsForGaps(p)
+    const topics = signals.map(s => s.topic).sort()
+    expect(topics).toContain('retry-with-jitter')
+    expect(topics).toContain('circuit-breaker')
+  })
 })

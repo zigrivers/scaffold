@@ -90,3 +90,38 @@ record:
 - b836cea — round 3 fixes (shape/contract bugs)
 - 6334c2e — round 4 fixes (regex escape + var-scope + wording)
 - 2b6b812 — round 5 fixes (normalizeTopic validator-compat + TimedSignal + heuristic terminators + distinct_project_count)
+
+## PR review (PR #397)
+
+### F-001 (PR round 1) — Lens I doesn't suppress findings for already-covered topics (P1 → reclassified P2, deferred)
+
+- **Round:** PR review round 1
+- **MMR job_id:** mmr-d476a1257fa7
+- **Severity claimed:** P1 (codex)
+- **Reclassified:** P2 (UX enhancement, not correctness bug)
+- **Sources:** codex (unique)
+- **Location:** `src/observability/checks/lens-i-knowledge-gaps.ts:98`
+- **Description:** Lens I never checks whether the reported topic is
+  already covered by an existing knowledge entry, so once a topic
+  crosses the threshold it will continue emitting a gap finding for up
+  to 90 days even after `content/knowledge/<category>/<topic>.md` is
+  added.
+- **Why deferred:** The fix codex suggested (filesystem glob check for
+  `content/knowledge/**/<topic>.md`) is not trivially implementable in
+  Phase 3 because Lens I runs in a *downstream project's* `context.cwd`,
+  not the scaffold install root. The downstream project does not have
+  `content/knowledge/` — that directory lives in the scaffold install
+  the downstream was generated from. Adding an existing-entry check
+  requires designing how the knowledge-base index is distributed across
+  the scaffold-install / downstream boundary, which is properly Phase 4
+  scope. The 90-day window provides eventual self-clearance: signals
+  decay out of scope, the topic stops being emitted from the freshly-
+  populated KB, and the finding disappears in ≤90 days. Operators can
+  also use `scaffold observe ack <finding-id>` to silence the finding
+  immediately.
+- **Suggested Phase 4 design**: add a `--knowledge-root <path>` flag to
+  `scaffold observe audit` (defaults to the scaffold install's
+  `content/knowledge/` via `findScaffoldInstall()` or similar), thread
+  it through to Lens I via `context`, and skip buckets where
+  `${knowledgeRoot}/**/${topic}.md` exists. Update the operations doc
+  to reflect the new immediate-closure behavior once this lands.
