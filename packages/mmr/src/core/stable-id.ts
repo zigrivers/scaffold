@@ -54,21 +54,7 @@ function normalizeNonCodeSegment(s: string): string {
 }
 
 export function normalizeDescriptionForKey(description: string): string {
-  if (description === '') return ''
-  const out: string[] = []
-  let cursor = 0
-
-  for (const match of description.matchAll(CODE_SPAN_RE)) {
-    const index = match.index ?? 0
-    const before = description.slice(cursor, index)
-    appendNormalizedPart(out, normalizeNonCodeSegment(before), /^\s/.test(before))
-    appendNormalizedPart(out, '`' + match[1] + '`', /\s$/.test(before))
-    cursor = index + match[0].length
-  }
-
-  const tail = description.slice(cursor)
-  appendNormalizedPart(out, normalizeNonCodeSegment(tail), /^\s/.test(tail))
-  return out.join('').trim()
+  return normalizeWithCodeSpans(description, normalizeNonCodeSegment)
 }
 
 function appendNormalizedPart(out: string[], part: string, spaceBefore: boolean): void {
@@ -80,20 +66,24 @@ function appendNormalizedPart(out: string[], part: string, spaceBefore: boolean)
 export function normalizeSuggestionForKey(suggestion: string): string {
   // Suggestions are intentionally distinguished by their full short text.
   // Do not apply description noise stripping here.
-  if (suggestion === '') return ''
+  return normalizeWithCodeSpans(suggestion, normalizeSuggestionSegment)
+}
+
+function normalizeWithCodeSpans(input: string, normalizeProse: (segment: string) => string): string {
+  if (input === '') return ''
   const out: string[] = []
   let cursor = 0
 
-  for (const match of suggestion.matchAll(CODE_SPAN_RE)) {
+  for (const match of input.matchAll(CODE_SPAN_RE)) {
     const index = match.index ?? 0
-    const before = suggestion.slice(cursor, index)
-    appendNormalizedPart(out, normalizeSuggestionSegment(before), /^\s/.test(before))
+    const before = input.slice(cursor, index)
+    appendNormalizedPart(out, normalizeProse(before), /^\s/.test(before))
     appendNormalizedPart(out, '`' + match[1] + '`', /\s$/.test(before))
     cursor = index + match[0].length
   }
 
-  const tail = suggestion.slice(cursor)
-  appendNormalizedPart(out, normalizeSuggestionSegment(tail), /^\s/.test(tail))
+  const tail = input.slice(cursor)
+  appendNormalizedPart(out, normalizeProse(tail), /^\s/.test(tail))
   return out.join('').trim()
 }
 
@@ -167,18 +157,7 @@ export function shingleSize(shingle: readonly string[] | ReadonlySet<string>): n
 }
 
 function normalizeModalVerbsInProse(description: string): string {
-  const out: string[] = []
-  let cursor = 0
-
-  for (const match of description.matchAll(CODE_SPAN_RE)) {
-    const index = match.index ?? 0
-    out.push(normalizeModalVerbs(description.slice(cursor, index)))
-    out.push(match[0])
-    cursor = index + match[0].length
-  }
-
-  out.push(normalizeModalVerbs(description.slice(cursor)))
-  return out.join('')
+  return normalizeWithCodeSpans(description, normalizeModalVerbs)
 }
 
 function normalizeModalVerbs(description: string): string {
