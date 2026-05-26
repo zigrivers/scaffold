@@ -2,6 +2,10 @@
 name: prd-innovation
 description: Techniques for discovering feature-level innovation opportunities in product requirements
 topics: [innovation, prd, competitive-analysis, product-thinking, features]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 # PRD Innovation
