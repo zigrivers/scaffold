@@ -13,6 +13,7 @@ vi.mock('../../src/core/dispatcher.js', () => ({
   __calls: dispatcherMock.calls,
   dispatchChannel: vi.fn(async (_store, _jobId, channelName, opts) => {
     dispatcherMock.calls.push({ channelName, opts })
+    return 'mock-dispatch-job'
   }),
   isChannelComplete: () => true,
 }))
@@ -22,7 +23,7 @@ vi.mock('../../src/core/auth.js', () => ({
   checkAuth: vi.fn(async () => ({ status: 'ok' })),
 }))
 
-describe('review --sync compensator by reference', () => {
+describe('review compensator integration', () => {
   let originalCwd: string
   const tmpDirs: string[] = []
 
@@ -54,6 +55,7 @@ channels:
 `
     fs.writeFileSync(path.join(tmp, '.mmr.yaml'), projectYaml)
     process.chdir(tmp)
+    vi.spyOn(os, 'homedir').mockReturnValue(tmp)
 
     const diffPath = path.join(tmp, 'd.patch')
     fs.writeFileSync(
@@ -76,6 +78,56 @@ channels:
     expect(compCalls.length).toBeGreaterThan(0)
     expect(compCalls[0].opts.command).toBe('claude')
     expect(compCalls[0].opts.flags).toEqual(['-p', '--output-format', 'json'])
+
+    logSpy.mockRestore()
+    exitSpy.mockRestore()
+  })
+
+  it('uses defaults.compensator.channel when configured by reference', async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-review-ref-'))
+    tmpDirs.push(tmp)
+    const projectYaml = `
+version: 1
+defaults:
+  compensator:
+    channel: qwen-local
+channels:
+  claude:
+    command: claude -p
+    auth: { check: 'true', failure_exit_codes: [1], recovery: 'noop' }
+  codex:
+    command: codex exec
+    auth: { check: 'true', failure_exit_codes: [1], recovery: 'noop' }
+  qwen-local:
+    command: ollama
+    flags: ["run", "qwen2.5-coder:32b"]
+    auth: { check: 'true', failure_exit_codes: [1], recovery: 'noop' }
+`
+    fs.writeFileSync(path.join(tmp, '.mmr.yaml'), projectYaml)
+    process.chdir(tmp)
+    vi.spyOn(os, 'homedir').mockReturnValue(tmp)
+
+    const diffPath = path.join(tmp, 'd.patch')
+    fs.writeFileSync(
+      diffPath,
+      'diff --git a/x b/x\nindex 1..2 100644\n--- a/x\n+++ b/x\n@@ -1 +1 @@\n-a\n+b\n',
+    )
+
+    const { reviewCommand } = await import('../../src/commands/review.js')
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never)
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await reviewCommand.handler({
+      _: ['review'],
+      $0: 'mmr',
+      diff: diffPath,
+      sync: false,
+    } as unknown as Parameters<typeof reviewCommand.handler>[0])
+
+    const compCalls = dispatcherMock.calls.filter((c) => c.channelName.startsWith('compensating-'))
+    expect(compCalls.length).toBeGreaterThan(0)
+    expect(compCalls[0].opts.command).toBe('ollama')
+    expect(compCalls[0].opts.flags).toEqual(['run', 'qwen2.5-coder:32b'])
 
     logSpy.mockRestore()
     exitSpy.mockRestore()
