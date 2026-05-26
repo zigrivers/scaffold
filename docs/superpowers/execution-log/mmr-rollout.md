@@ -45,3 +45,4 @@
 [2026-05-26T04:20:54Z] v3.29 Task 14: merged (PR #384, MMR rounds: 0, deferred: 0; satisfied by Task 12 MMR review fixes)
 [2026-05-26T04:20:54Z] v3.29 Task 15: merged (PR #384, MMR rounds: 0, deferred: 0; satisfied by Task 12 MMR review fixes)
 [2026-05-26T05:25:48Z] v3.29 Task 16: merged (PR #385, MMR rounds: 3, deferred: 0)
+[2026-05-26T06:09:32Z] v3.29 Task 17: merged (PR #386, MMR rounds: 2, deferred: 0)
