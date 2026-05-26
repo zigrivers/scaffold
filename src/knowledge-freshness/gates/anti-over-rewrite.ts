@@ -239,7 +239,11 @@ export function splitChurnByRegion(
         } else if (l.startsWith('-') && !l.startsWith('---')) {
           if (oldLineNo > oldFmEnd) bodyRemoved++
           oldLineNo++
-        } else if (l.startsWith(' ')) {
+        } else if (l.startsWith(' ') || l === '') {
+          // Round-9 F-001: empty diff lines (where trailing whitespace was
+          // stripped from a blank context line) must still advance both
+          // counters. Without this, line numbers drift mid-hunk and the
+          // body/frontmatter classification breaks.
           newLineNo++
           oldLineNo++
         }

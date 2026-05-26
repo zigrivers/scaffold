@@ -242,18 +242,18 @@ export function openFreshnessPr(verdict: AuditVerdict, opts: OpenPrOptions): { b
   // they'd be carried along by `git add <entryPath>` only if the path matches,
   // but a porcelain check is the cleanest precondition.
   const porcelain = runOrThrow('git', ['status', '--porcelain']).split('\n').filter((l) => l.length > 0)
-  // Path normalization (round-4 F-001): `git status --porcelain` outputs
-  // paths relative to the GIT REPOSITORY ROOT, but the operator may pass
-  // `opts.entryPath` as either an absolute path or a relative path against
-  // the current cwd. Normalize via the repo root so the comparison is
-  // robust to either form.
+  // Path normalization (round-4 F-001 + round-9 F-002): `git status
+  // --porcelain` outputs paths relative to the GIT REPOSITORY ROOT.
+  // `opts.entryPath` can be:
+  //   - absolute → path.resolve is a no-op
+  //   - relative to cwd → resolve against process.cwd()
+  // Always resolve porcelain output against the repo root.
   const repoRoot = runOrThrow('git', ['rev-parse', '--show-toplevel']).trim()
-  const normalize = (p: string): string => path.resolve(repoRoot, p)
-  const targetEntry = normalize(opts.entryPath)
+  const targetEntry = path.resolve(process.cwd(), opts.entryPath)
   const relevant = porcelain.filter((line) => {
     // Tolerate any 2-char status (M, A, D, ??, etc.); we just need the path.
     const filePath = line.slice(3).trim()
-    return normalize(filePath) === targetEntry
+    return path.resolve(repoRoot, filePath) === targetEntry
   })
   if (porcelain.length === 0) {
     throw new Error('refusing to open PR: working tree has no changes (did you forget to apply the verdict?)')
