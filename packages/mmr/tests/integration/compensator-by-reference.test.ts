@@ -40,29 +40,21 @@ describe('review compensator integration', () => {
     vi.restoreAllMocks()
   })
 
-  it('back-compat: no compensator block -> compensating pass still uses claude -p', async () => {
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-review-bc-'))
+  function setupTestProject(prefix: string, projectYaml: string): string {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), prefix))
     tmpDirs.push(tmp)
-    const projectYaml = `
-version: 1
-channels:
-  claude:
-    command: claude -p
-    auth: { check: 'true', failure_exit_codes: [1], recovery: 'noop' }
-  codex:
-    command: codex exec
-    auth: { check: 'true', failure_exit_codes: [1], recovery: 'noop' }
-`
     fs.writeFileSync(path.join(tmp, '.mmr.yaml'), projectYaml)
-    process.chdir(tmp)
-    vi.spyOn(os, 'homedir').mockReturnValue(tmp)
-
     const diffPath = path.join(tmp, 'd.patch')
     fs.writeFileSync(
       diffPath,
       'diff --git a/x b/x\nindex 1..2 100644\n--- a/x\n+++ b/x\n@@ -1 +1 @@\n-a\n+b\n',
     )
+    process.chdir(tmp)
+    vi.spyOn(os, 'homedir').mockReturnValue(tmp)
+    return diffPath
+  }
 
+  async function runReview(diffPath: string): Promise<void> {
     const { reviewCommand } = await import('../../src/commands/review.js')
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never)
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
@@ -74,19 +66,31 @@ channels:
       sync: false,
     } as unknown as Parameters<typeof reviewCommand.handler>[0])
 
+    logSpy.mockRestore()
+    exitSpy.mockRestore()
+  }
+
+  it('back-compat: no compensator block -> compensating pass still uses claude -p', async () => {
+    const diffPath = setupTestProject('mmr-review-bc-', `
+version: 1
+channels:
+  claude:
+    command: claude -p
+    auth: { check: 'true', failure_exit_codes: [1], recovery: 'noop' }
+  codex:
+    command: codex exec
+    auth: { check: 'true', failure_exit_codes: [1], recovery: 'noop' }
+`)
+    await runReview(diffPath)
+
     const compCalls = dispatcherMock.calls.filter((c) => c.channelName.startsWith('compensating-'))
     expect(compCalls.length).toBeGreaterThan(0)
     expect(compCalls[0].opts.command).toBe('claude')
     expect(compCalls[0].opts.flags).toEqual(['-p', '--output-format', 'json'])
-
-    logSpy.mockRestore()
-    exitSpy.mockRestore()
   })
 
   it('uses defaults.compensator.channel when configured by reference', async () => {
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-review-ref-'))
-    tmpDirs.push(tmp)
-    const projectYaml = `
+    const diffPath = setupTestProject('mmr-review-ref-', `
 version: 1
 defaults:
   compensator:
@@ -102,34 +106,13 @@ channels:
     command: ollama
     flags: ["run", "qwen2.5-coder:32b"]
     auth: { check: 'true', failure_exit_codes: [1], recovery: 'noop' }
-`
-    fs.writeFileSync(path.join(tmp, '.mmr.yaml'), projectYaml)
-    process.chdir(tmp)
-    vi.spyOn(os, 'homedir').mockReturnValue(tmp)
-
-    const diffPath = path.join(tmp, 'd.patch')
-    fs.writeFileSync(
-      diffPath,
-      'diff --git a/x b/x\nindex 1..2 100644\n--- a/x\n+++ b/x\n@@ -1 +1 @@\n-a\n+b\n',
-    )
-
-    const { reviewCommand } = await import('../../src/commands/review.js')
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never)
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
-
-    await reviewCommand.handler({
-      _: ['review'],
-      $0: 'mmr',
-      diff: diffPath,
-      sync: false,
-    } as unknown as Parameters<typeof reviewCommand.handler>[0])
+`)
+    await runReview(diffPath)
 
     const compCalls = dispatcherMock.calls.filter((c) => c.channelName.startsWith('compensating-'))
     expect(compCalls.length).toBeGreaterThan(0)
     expect(compCalls[0].opts.command).toBe('ollama')
+    // Custom compensator channels use the configured channel flags verbatim.
     expect(compCalls[0].opts.flags).toEqual(['run', 'qwen2.5-coder:32b'])
-
-    logSpy.mockRestore()
-    exitSpy.mockRestore()
   })
 })
