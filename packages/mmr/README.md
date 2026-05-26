@@ -149,8 +149,8 @@ defaults:
 
 channels:
   qwen-local:
-    extends: ollama-base       # see Ollama recipe above
-    flags: ["run", "qwen2.5-coder:32b"]
+    extends: ollama-base       # see the Ollama recipe in Custom output parsers
+    flags: ["run", "qwen2.5-coder:32b", "--format", "json"]
 ```
 
 **Default behavior (when `defaults.compensator` is unset or omitted).** MMR dispatches `claude -p --output-format json` for each missing channel. This preserves the pre-v3.29 behavior so existing configs need no changes.
@@ -161,7 +161,7 @@ channels:
 
 ### Recipe — use a local model as the compensator
 
-For a fully OSS-only setup (no Anthropic CLI required), combine the `unwrap-jsonpath` parser above with a local Ollama channel referenced as the compensator:
+For a fully OSS-only setup (no Anthropic CLI required), configure a local Ollama channel and reference it as the compensator:
 
 ```yaml
 version: 1
@@ -177,10 +177,7 @@ channels:
       check: ollama list >/dev/null 2>&1
       failure_exit_codes: [1]
       recovery: Install Ollama and pull a model
-    output_parser:
-      kind: unwrap-jsonpath
-      wrap: $.response
-      then: default
+    output_parser: default     # `ollama run` writes the model response directly
 
   qwen-coder:
     extends: ollama-base
