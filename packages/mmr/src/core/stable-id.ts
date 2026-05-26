@@ -133,3 +133,28 @@ export function computeFindingKey(finding: Finding): string {
 function escapeKeyPart(part: string): string {
   return part.replace(/\\/g, '\\\\').replace(/\|/g, '\\|')
 }
+
+export function descriptionShingle(description: string): string[] {
+  const normalized = normalizeDescriptionForKey(description)
+  if (normalized.length <= 5) return normalized === '' ? [] : [normalized]
+
+  const grams = new Set<string>()
+  for (let i = 0; i <= normalized.length - 5; i += 1) {
+    grams.add(normalized.slice(i, i + 5))
+  }
+  return [...grams]
+}
+
+export function jaccardSimilarity(a: string[], b: string[]): number {
+  const left = new Set(a)
+  const right = new Set(b)
+  if (left.size === 0 && right.size === 0) return 1
+
+  let intersection = 0
+  for (const item of left) {
+    if (right.has(item)) intersection += 1
+  }
+
+  const union = new Set([...left, ...right])
+  return intersection / union.size
+}

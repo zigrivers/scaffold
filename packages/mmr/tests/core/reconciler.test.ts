@@ -89,11 +89,12 @@ describe('reconcile', () => {
 
   it('uses the finding with the longest description as representative', () => {
     const channelFindings: Record<string, Finding[]> = {
-      claude: [{ severity: 'P1', location: 'file.ts:10', description: 'same bug', suggestion: 'fix A' }],
-      gemini: [{ severity: 'P1', location: 'file.ts:10', description: 'same bug', suggestion: 'fix A' }],
+      claude: [{ severity: 'P1', location: 'file.ts:10', description: 'Regression risk', suggestion: 'Add test' }],
+      gemini: [{ severity: 'P1', location: 'file.ts:10', description: '  REGRESSION   RISK  ', suggestion: 'Add test' }],
     }
     const result = reconcile(channelFindings)
-    expect(result[0].description).toBe('same bug')
+    expect(result).toHaveLength(1)
+    expect(result[0].description).toBe('  REGRESSION   RISK  ')
   })
 
   it('reconciles findings whose only difference is line number', () => {

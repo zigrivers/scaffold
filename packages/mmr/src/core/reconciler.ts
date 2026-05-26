@@ -1,9 +1,19 @@
 import type { Finding, ReconciledFinding, Severity, Agreement, Confidence, Verdict, ChannelStatus } from '../types.js'
 import { SEVERITY_ORDER } from '../types.js'
-import { computeFindingKey } from './stable-id.js'
+import { computeFindingKey, descriptionShingle, jaccardSimilarity, normalizeLocationForKey } from './stable-id.js'
 
 interface AttributedFinding extends Finding {
   source: string
+  finding_key: string
+  normalized_location: string
+  shingle: string[]
+}
+
+interface ReconcileGroup {
+  finding_key: string
+  normalized_location: string
+  shingle: string[]
+  findings: AttributedFinding[]
 }
 
 function higherSeverity(a: Severity, b: Severity): Severity {
@@ -20,30 +30,57 @@ function higherSeverity(a: Severity, b: Severity): Severity {
  * 4. Sort by severity (P0 first)
  */
 export function reconcile(channelFindings: Record<string, Finding[]>): ReconciledFinding[] {
-  // Step 1: Flatten with source attribution
+  // Step 1: Flatten with source attribution and stable identity data
   const attributed: AttributedFinding[] = []
   for (const [source, findings] of Object.entries(channelFindings)) {
     for (const finding of findings) {
-      attributed.push({ ...finding, source })
+      attributed.push({
+        ...finding,
+        source,
+        finding_key: computeFindingKey(finding),
+        normalized_location: normalizeLocationForKey(finding.location),
+        shingle: descriptionShingle(finding.description),
+      })
     }
   }
 
   if (attributed.length === 0) return []
 
-  // Step 2: Group by stable finding identity
-  const groups = new Map<string, AttributedFinding[]>()
+  // Step 2: Group by exact stable identity, then location-anchored fuzzy description match.
+  const groups: ReconcileGroup[] = []
+  const keyIndex = new Map<string, ReconcileGroup>()
   for (const finding of attributed) {
-    const key = computeFindingKey(finding)
-    const group = groups.get(key) ?? []
-    group.push(finding)
-    groups.set(key, group)
+    const exact = keyIndex.get(finding.finding_key)
+    if (exact !== undefined) {
+      exact.findings.push(finding)
+      continue
+    }
+
+    const fuzzy = groups.find((group) =>
+      group.normalized_location === finding.normalized_location &&
+      jaccardSimilarity(group.shingle, finding.shingle) >= 0.7,
+    )
+    if (fuzzy !== undefined) {
+      fuzzy.findings.push(finding)
+      continue
+    }
+
+    const group: ReconcileGroup = {
+      finding_key: finding.finding_key,
+      normalized_location: finding.normalized_location,
+      shingle: finding.shingle,
+      findings: [finding],
+    }
+    groups.push(group)
+    keyIndex.set(finding.finding_key, group)
   }
 
   // Step 3: Reconcile each group
   const results: ReconciledFinding[] = []
-  for (const group of groups.values()) {
-    const sources = [...new Set(group.map((f) => f.source))]
-    const severities = [...new Set(group.map((f) => f.severity))]
+  for (const group of groups) {
+    const findings = group.findings
+    const sources = [...new Set(findings.map((f) => f.source))]
+    const severities = [...new Set(findings.map((f) => f.severity))]
     const effectiveSeverity = severities.reduce(higherSeverity)
 
     let agreement: Agreement
@@ -69,7 +106,7 @@ export function reconcile(channelFindings: Record<string, Finding[]>): Reconcile
     }
 
     // Use the finding with the longest description as representative (deterministic)
-    const representative = group.reduce((best, current) =>
+    const representative = findings.reduce((best, current) =>
       current.description.length > best.description.length ? current : best,
     )
 

@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
   computeFindingKey,
+  descriptionShingle,
+  jaccardSimilarity,
   normalizeDescriptionForKey,
   normalizeLocationForKey,
   normalizeSuggestionForKey,
@@ -228,5 +230,45 @@ describe('computeFindingKey', () => {
     const a: Finding = { severity: 'P2', location: 'src/foo.ts:42', description: 'bug', suggestion: 'fix' }
     const b: Finding = { category: '', severity: 'P2', location: 'src/foo.ts:42', description: 'bug', suggestion: 'fix' }
     expect(computeFindingKey(a)).toBe(computeFindingKey(b))
+  })
+})
+
+describe('descriptionShingle', () => {
+  it('returns char-5-grams from a normalized description', () => {
+    const shingle = descriptionShingle('hello world')
+    expect(shingle).toContain('hello')
+    expect(shingle).toContain('ello ')
+    expect(shingle).toContain('llo w')
+    expect(shingle).toContain('lo wo')
+    expect(shingle).toContain('o wor')
+    expect(shingle).toContain(' worl')
+    expect(shingle).toContain('world')
+  })
+
+  it('deduplicates repeated grams', () => {
+    const shingle = descriptionShingle('aaaaaaa')
+    expect(shingle).toEqual(['aaaaa'])
+  })
+
+  it('normalizes descriptions before shingling', () => {
+    expect(descriptionShingle('Bug at line 42 here')).toEqual(descriptionShingle('bug here'))
+  })
+})
+
+describe('jaccardSimilarity', () => {
+  it('returns 1 for identical sets', () => {
+    expect(jaccardSimilarity(['abc', 'def'], ['def', 'abc'])).toBe(1)
+  })
+
+  it('returns 0 for disjoint sets', () => {
+    expect(jaccardSimilarity(['abc'], ['def'])).toBe(0)
+  })
+
+  it('returns intersection over union', () => {
+    expect(jaccardSimilarity(['a', 'b'], ['b', 'c'])).toBeCloseTo(1 / 3)
+  })
+
+  it('treats two empty sets as identical', () => {
+    expect(jaccardSimilarity([], [])).toBe(1)
   })
 })
