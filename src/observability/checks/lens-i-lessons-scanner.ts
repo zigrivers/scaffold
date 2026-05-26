@@ -1,19 +1,5 @@
 import fs from 'node:fs'
-
-/**
- * Synthetic gap-signal payload produced by the lessons scanner. Mirrors
- * the KnowledgeGapSignalPayload defined in
- * src/observability/engine/types.ts but is duplicated locally so this
- * file stays in the checks/ tree alongside the lens code. T4 will
- * unify the import once the lens consumes both.
- */
-export interface LessonsGapSignalPayload {
-  topic: string
-  source: 'lessons'
-  project_id: 'lessons'
-  step_name?: string
-  agent_excerpt?: string
-}
+import type { KnowledgeGapSignalPayload } from '../engine/types.js'
 
 const EXPLICIT_MARKER_RE = /<!--\s*gap-topic:\s*([a-z0-9]+(?:-[a-z0-9]+)*)\s*-->/g
 
@@ -55,7 +41,7 @@ export function normalizeTopic(raw: string): string {
  * Lens I owns path resolution; this scanner reads exactly the path
  * it's given.
  */
-export function scanLessonsForGaps(absPath: string): LessonsGapSignalPayload[] {
+export function scanLessonsForGaps(absPath: string): KnowledgeGapSignalPayload[] {
   let content: string
   try {
     content = fs.readFileSync(absPath, 'utf8')
@@ -64,7 +50,7 @@ export function scanLessonsForGaps(absPath: string): LessonsGapSignalPayload[] {
   }
   if (content.trim() === '') return []
 
-  const out: LessonsGapSignalPayload[] = []
+  const out: KnowledgeGapSignalPayload[] = []
 
   // Normalize CRLF → LF before splitting so trailing \r doesn't leak into captures.
   const lines = content.replace(/\r\n/g, '\n').split('\n')

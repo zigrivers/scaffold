@@ -154,6 +154,37 @@ describe('renderAuditMarkdown', () => {
     expect(md).toContain('## Skipped Lenses')
     expect(md).toContain('D-stack')
   })
+
+  it('renders knowledge_gap evidence with topic / counts / window / excerpts', () => {
+    const out = JSON.parse(JSON.stringify(auditFixture)) as EngineOutput
+    out.findings = [{
+      id: 'abc1230000000000', lens_id: 'I-knowledge-gaps', severity: 'P2',
+      title: 'Knowledge base lacks coverage for "foo"',
+      description: 'desc', source_doc: '',
+      evidence: {
+        kind: 'knowledge_gap',
+        topic: 'foo', signal_count: 3, distinct_project_count: 2,
+        distinct_projects: ['a'.repeat(64), 'b'.repeat(64)],
+        first_seen: '2026-05-20T00:00:00Z', last_seen: '2026-05-26T00:00:00Z',
+        example_excerpts: ['first excerpt', 'second excerpt'],
+      },
+      confidence: 'medium',
+      first_seen: '2026-05-20T00:00:00Z', last_seen: '2026-05-26T00:00:00Z',
+      status: 'open',
+    }]
+    out.summary = {
+      total: 1, by_severity: { P0: 0, P1: 0, P2: 1, P3: 0 },
+      by_severity_status: {
+        P0: { open: 0, acknowledged: 0, skipped: 0 }, P1: { open: 0, acknowledged: 0, skipped: 0 },
+        P2: { open: 1, acknowledged: 0, skipped: 0 }, P3: { open: 0, acknowledged: 0, skipped: 0 },
+      },
+      blocking: 1, acknowledged: 0, skipped_lenses: 0,
+    }
+    const md = renderAuditMarkdown(out)
+    expect(md).toContain('*Topic:* `foo`')
+    expect(md).toContain('*Signals:* 3 across 2 projects')
+    expect(md).toContain('first excerpt')
+  })
 })
 
 describe('renderProgressMarkdown — replay + needs_attention', () => {
