@@ -420,6 +420,15 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
           })
         }
         await dispatchCompensatingPasses(store, job.job_id, prompt, compensating, config)
+      } else {
+        for (const comp of compensating) {
+          store.registerChannel(job.job_id, comp.compensatingName, {
+            status: compensatorAvailability.status,
+            auth: compensatorAvailability.auth,
+            recovery: compensatorAvailability.recovery,
+            output_parser: 'default',
+          })
+        }
       }
     }
 
