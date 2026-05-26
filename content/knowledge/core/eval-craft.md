@@ -8,8 +8,6 @@ version-pin: null
 sources:
   - url: https://docs.anthropic.com/en/docs/test-and-evaluate/eval-tool
     anchor: '#evaluation-tool'
-  - url: https://platform.openai.com/docs/guides/evals
-    anchor: '#building-evals'
 ---
 
 # Eval Craft

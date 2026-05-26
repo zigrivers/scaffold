@@ -8,8 +8,6 @@ version-pin: null
 sources:
   - url: https://docs.anthropic.com/en/docs/claude-code/overview
     anchor: '#claude-code-cli'
-  - url: https://platform.openai.com/docs/codex
-    anchor: '#codex-cli'
   - url: https://ai.google.dev/gemini-api/docs
     anchor: '#cli-tools'
 ---

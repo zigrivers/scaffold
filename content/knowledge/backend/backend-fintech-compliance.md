@@ -8,7 +8,6 @@ version-pin: 'PCI-DSS v4.0.1'
 sources:
   - url: https://www.pcisecuritystandards.org/document_library/
   - url: https://www.aicpa-cima.com/topic/audit-assurance
-  - url: https://www.sec.gov/rules-regulations/statutes-regulations/rules-securities-exchange-act-1934
   - url: https://www.finra.org/rules-guidance/rulebooks/finra-rules
   - url: https://eur-lex.europa.eu/eli/reg/2016/679/oj
 ---

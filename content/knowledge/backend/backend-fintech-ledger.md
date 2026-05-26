@@ -6,7 +6,7 @@ volatility: stable
 last-reviewed: null
 version-pin: null
 sources:
-  - url: https://martinfowler.com/eaaCatalog/accountingEntry.html
+  - url: https://martinfowler.com/eaaCatalog/
   - url: https://www.postgresql.org/docs/current/ddl-constraints.html
 ---
 

@@ -7,7 +7,7 @@ last-reviewed: null
 version-pin: null
 sources:
   - url: https://owasp.org/www-project-mobile-top-10/
-  - url: https://owasp.org/www-project-mobile-application-security/
+  - url: https://owasp.org/www-project-mobile-app-security/
   - url: https://developer.apple.com/documentation/security/keychain_services
   - url: https://developer.android.com/privacy-and-security/keystore
 ---

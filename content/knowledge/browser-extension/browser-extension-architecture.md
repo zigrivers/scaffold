@@ -6,7 +6,7 @@ volatility: evolving
 last-reviewed: null
 version-pin: 'Manifest V3'
 sources:
-  - url: https://developer.chrome.com/docs/extensions/develop/concepts/architecture-overview
+  - url: https://developer.chrome.com/docs/extensions/mv3/architecture-overview
   - url: https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Anatomy_of_a_WebExtension
 ---
 
