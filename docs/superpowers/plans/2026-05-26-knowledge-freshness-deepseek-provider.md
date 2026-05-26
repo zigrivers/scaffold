@@ -647,37 +647,33 @@ export function buildDeepseekDispatcher(opts: BuildDeepseekDispatcherOptions): D
       max_tokens: MAX_TOKENS,
       stream: false,
     })
-    // Timeout via AbortController + setTimeout — NOT AbortSignal.timeout(),
-    // which is unavailable on the project's declared Node floor of 18.17
-    // (round-6 grok finding). Matches the pattern llm-dispatcher.ts
-    // already uses on the subprocess side.
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), timeoutMs)
-    let res: Response
+    // Timeout via AbortSignal.timeout — stable since Node 16.14 / 17.3
+    // (verified at https://nodejs.org/api/globals.html#abortsignaltimeoutdelay).
+    // The same pattern is already used in source-hash.ts and link-check.ts;
+    // an earlier review-round claim that this method was unavailable on
+    // 18.17 turned out to be a hallucination.
+    //
+    // EVERY step from doFetch through response-body read is wrapped in a
+    // single try/catch that normalizes any thrown error — DNS failure,
+    // connection reset, timeout abort (whether during headers or body
+    // read), JSON parse failure, schema violation, empty content — into
+    // a `deepseek dispatcher: …` prefixed Error so cron logs are
+    // actionable and consistent with the anthropic path's error shape.
     try {
-      // Wrap the fetch itself in a try/catch so DNS failures, connection
-      // resets, and timeout-aborts surface as a consistent
-      // `deepseek dispatcher: …` error instead of leaking raw undici /
-      // DOMException objects up the call stack (round-6 grok finding).
-      try {
-        res = await doFetch(DEEPSEEK_URL, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${opts.apiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body,
-          signal: controller.signal,
-        })
-      } catch (err) {
-        const reason = err instanceof Error ? err.message : String(err)
-        throw new Error(`deepseek dispatcher: fetch failed: ${reason}`)
-      }
+      const res = await doFetch(DEEPSEEK_URL, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${opts.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body,
+        signal: AbortSignal.timeout(timeoutMs),
+      })
       // Always read the body as TEXT first so we can produce a useful
       // diagnostic on both non-2xx AND malformed-JSON responses
       // (round-2 F-004: previously `await res.json()` propagated a raw
       // SyntaxError that masked the actual response body).
-      const rawText = await res.text().catch(() => '<unreadable>')
+      const rawText = await res.text()
       if (res.status < 200 || res.status >= 300) {
         throw new Error(
           `deepseek dispatcher: HTTP ${res.status} from ${DEEPSEEK_URL}. ` +
@@ -712,8 +708,15 @@ export function buildDeepseekDispatcher(opts: BuildDeepseekDispatcherOptions): D
         )
       }
       return content
-    } finally {
-      clearTimeout(timer)
+    } catch (err) {
+      // Re-throw our own already-prefixed errors verbatim; wrap everything
+      // else (transport failures, abort errors, etc.) so cron logs see a
+      // consistent "deepseek dispatcher: …" prefix (round-7 grok finding:
+      // the round-6 fix only covered the initial doFetch call, leaving
+      // body-read aborts and stream errors unwrapped).
+      if (err instanceof Error && err.message.startsWith('deepseek dispatcher: ')) throw err
+      const reason = err instanceof Error ? err.message : String(err)
+      throw new Error(`deepseek dispatcher: fetch failed: ${reason}`)
     }
   }
 }
@@ -813,6 +816,27 @@ describe('deepseek provider — error paths', () => {
     await expect(dispatcher('x')).rejects.toThrow(/deepseek dispatcher: fetch failed.*ENOTFOUND/i)
   })
 
+  it('normalizes a body-read abort (headers OK, body hangs) into a deepseek-prefixed error (round-7 grok)', async () => {
+    // The post-fetch phase (res.text(), JSON.parse, zod, content check) must
+    // also be wrapped — a slow server that returns 200 headers fast then
+    // hangs during body read causes the AbortSignal.timeout to fire after
+    // headers but during streaming, and res.text() rejects with a raw
+    // AbortError. The dispatcher's outer catch normalizes that into a
+    // diagnostic message.
+    const fetchSpy: DeepseekFetch = vi.fn(async () => {
+      // Build a Response whose body rejects with a synthetic AbortError on
+      // read, simulating the headers-fast-body-hangs scenario.
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.error(new DOMException('The operation was aborted.', 'AbortError'))
+        },
+      })
+      return new Response(body, { status: 200 })
+    }) as unknown as DeepseekFetch
+    const dispatcher = buildDeepseekDispatcher({ apiKey: 'k', timeoutSec: 60, fetchImpl: fetchSpy })
+    await expect(dispatcher('x')).rejects.toThrow(/deepseek dispatcher: fetch failed.*[Aa]bort/i)
+  })
+
   it('throws a diagnostic error when the model returns empty content (round-6 grok)', async () => {
     // A 200 response with content === "" satisfies the zod schema but is
     // useless to the runner's JSON extractor. The dispatcher must surface
@@ -829,7 +853,7 @@ describe('deepseek provider — error paths', () => {
 - [ ] **Step 2: Run tests, confirm pass (no impl changes needed — Task 3's code already covers these)**
 
 Run: `npx vitest run src/knowledge-freshness/providers/deepseek.test.ts`
-Expected: PASS (2 happy-path + 7 error-path = 9 tests).
+Expected: PASS (2 happy-path + 8 error-path = 10 tests).
 
 If any error-path test fails, the Task 3 implementation has a bug — fix `deepseek.ts` so the tests pass before continuing.
 
@@ -887,7 +911,7 @@ describe('buildDispatcher — deepseek wiring', () => {
 - [ ] **Step 5: Run all tests, confirm pass**
 
 Run: `npx vitest run src/knowledge-freshness/providers/`
-Expected: PASS (12 resolver + 3 anthropic + 9 deepseek + 2 factory wiring = 26 tests).
+Expected: PASS (12 resolver + 3 anthropic + 10 deepseek + 2 factory wiring = 27 tests).
 
 - [ ] **Step 6: Commit**
 
@@ -1413,12 +1437,6 @@ Expected: working tree clean; all local commits are pushed (no "ahead by N" mess
 - [ ] **Step 8: Hand off**
 
 Surface to the operator: the PR URL, the MMR verdict (job ID + rounds run), any deferred-findings file path, and the next step ("ready for human review; the cron workflow will not activate until the PR merges and `DEEPSEEK_API_KEY` is set as a repo secret").
-
----
-
-## Known related issue (out of scope)
-
-`src/knowledge-freshness/gates/link-check.ts` (already on main) uses the same `AbortSignal.timeout(ms)` pattern that grok flagged in round-6 review. This is a *latent* bug on Node 18.17 today — it would only surface if a gate workflow actually triggered (gate tests use mocked fetch, so the timeout path isn't exercised). Fixing it is genuinely separate work (different file, different commit history); track as a follow-up issue rather than expanding this plan's scope. The DeepSeek provider correctly uses the `AbortController + setTimeout` pattern from the start.
 
 ---
 
