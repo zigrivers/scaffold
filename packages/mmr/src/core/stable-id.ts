@@ -1,3 +1,6 @@
+import { createHash } from 'node:crypto'
+import type { Finding } from '../types.js'
+
 /**
  * Strip end-of-string line/column spans from a location string.
  * Patterns matched (all anchored to end-of-string):
@@ -103,4 +106,58 @@ function normalizeSuggestionSegment(s: string): string {
 
 function isMixedCaseIdentifier(token: string): boolean {
   return /[a-z][A-Z]|[A-Z][a-z]+[A-Z]|[A-Z]{2,}[a-z]|^[A-Z0-9_]{3,}$/.test(token)
+}
+
+function sha1(input: string): string {
+  return createHash('sha1').update(input).digest('hex')
+}
+
+/**
+ * Compute the stable identity key per §5 decision 2:
+ *   finding_key = sha1(
+ *     normalized_location + "|" + (category ?? "") + "|" +
+ *     sha1(description_normalized) + "|" + sha1(suggestion_normalized)
+ *   )
+ *
+ * Severity is intentionally excluded — the same underlying issue surfacing at
+ * P1 vs P2 across channels should still reconcile to one key.
+ */
+export function computeFindingKey(finding: Finding): string {
+  const loc = normalizeLocationForKey(finding.location)
+  const cat = (finding.category ?? '').toLowerCase()
+  const descHash = sha1(normalizeDescriptionForKey(finding.description))
+  const sugHash = sha1(normalizeSuggestionForKey(finding.suggestion))
+  return sha1(`${escapeKeyPart(loc)}|${escapeKeyPart(cat)}|${descHash}|${sugHash}`)
+}
+
+function escapeKeyPart(part: string): string {
+  return part.replace(/\\/g, '\\\\').replace(/\|/g, '\\|')
+}
+
+export function descriptionShingle(description: string): string[] {
+  const normalized = normalizeDescriptionForKey(description)
+  if (normalized.length <= 5) return normalized === '' ? [] : [normalized]
+
+  const grams = new Set<string>()
+  for (let i = 0; i <= normalized.length - 5; i += 1) {
+    grams.add(normalized.slice(i, i + 5))
+  }
+  return [...grams]
+}
+
+export function jaccardSimilarity(
+  a: readonly string[] | ReadonlySet<string>,
+  b: readonly string[] | ReadonlySet<string>,
+): number {
+  const left = a instanceof Set ? a : new Set(a)
+  const right = b instanceof Set ? b : new Set(b)
+  if (left.size === 0 && right.size === 0) return 1
+
+  let intersection = 0
+  for (const item of left) {
+    if (right.has(item)) intersection += 1
+  }
+
+  const unionSize = left.size + right.size - intersection
+  return intersection / unionSize
 }

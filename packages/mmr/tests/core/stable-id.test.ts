@@ -1,9 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import {
+  computeFindingKey,
+  descriptionShingle,
+  jaccardSimilarity,
   normalizeDescriptionForKey,
   normalizeLocationForKey,
   normalizeSuggestionForKey,
 } from '../../src/core/stable-id.js'
+import type { Finding } from '../../src/types.js'
 
 describe('normalizeLocationForKey', () => {
   it('lowercases and trims', () => {
@@ -154,5 +158,117 @@ describe('normalizeSuggestionForKey', () => {
 
   it('handles empty input', () => {
     expect(normalizeSuggestionForKey('')).toBe('')
+  })
+})
+
+describe('computeFindingKey', () => {
+  it('produces a 40-char sha1 hex string', () => {
+    const f: Finding = {
+      severity: 'P1',
+      location: 'src/foo.ts:42',
+      description: 'bug',
+      suggestion: 'fix it',
+    }
+    const key = computeFindingKey(f)
+    expect(key).toMatch(/^[a-f0-9]{40}$/)
+  })
+
+  it('produces the same key for two findings whose only difference is line number', () => {
+    const a: Finding = { severity: 'P1', location: 'src/foo.ts:42', description: 'bug', suggestion: 'fix' }
+    const b: Finding = { severity: 'P1', location: 'src/foo.ts:99', description: 'bug', suggestion: 'fix' }
+    expect(computeFindingKey(a)).toBe(computeFindingKey(b))
+  })
+
+  it('produces the same key for two findings whose only difference is severity', () => {
+    const a: Finding = { severity: 'P0', location: 'src/foo.ts:42', description: 'bug', suggestion: 'fix' }
+    const b: Finding = { severity: 'P2', location: 'src/foo.ts:42', description: 'bug', suggestion: 'fix' }
+    expect(computeFindingKey(a)).toBe(computeFindingKey(b))
+  })
+
+  it('produces DIFFERENT keys for same-file findings with different code identifiers', () => {
+    // This is the load-bearing T2-A collision-avoidance case.
+    const a: Finding = {
+      severity: 'P2',
+      location: 'src/foo.ts:42',
+      description: 'Variable `fooBar` is unused',
+      suggestion: 'remove `fooBar`',
+    }
+    const b: Finding = {
+      severity: 'P2',
+      location: 'src/foo.ts:42',
+      description: 'Variable `bazQux` is unused',
+      suggestion: 'remove `bazQux`',
+    }
+    expect(computeFindingKey(a)).not.toBe(computeFindingKey(b))
+  })
+
+  it('produces DIFFERENT keys when only suggestion differs', () => {
+    const a: Finding = { severity: 'P2', location: 'src/foo.ts:42', description: 'bug', suggestion: 'rename to a' }
+    const b: Finding = { severity: 'P2', location: 'src/foo.ts:42', description: 'bug', suggestion: 'rename to b' }
+    expect(computeFindingKey(a)).not.toBe(computeFindingKey(b))
+  })
+
+  it('produces DIFFERENT keys when only category differs', () => {
+    const a: Finding = { category: 'security', severity: 'P2', location: 'src/foo.ts:42', description: 'bug', suggestion: 'fix' }
+    const b: Finding = { category: 'style', severity: 'P2', location: 'src/foo.ts:42', description: 'bug', suggestion: 'fix' }
+    expect(computeFindingKey(a)).not.toBe(computeFindingKey(b))
+  })
+
+  it('normalizes category casing', () => {
+    const a: Finding = { category: 'Security', severity: 'P2', location: 'src/foo.ts:42', description: 'bug', suggestion: 'fix' }
+    const b: Finding = { category: 'security', severity: 'P2', location: 'src/foo.ts:42', description: 'bug', suggestion: 'fix' }
+    expect(computeFindingKey(a)).toBe(computeFindingKey(b))
+  })
+
+  it('escapes separators in location and category key parts', () => {
+    const a: Finding = { category: 'b|c', severity: 'P2', location: 'a', description: 'bug', suggestion: 'fix' }
+    const b: Finding = { category: 'c', severity: 'P2', location: 'a|b', description: 'bug', suggestion: 'fix' }
+    expect(computeFindingKey(a)).not.toBe(computeFindingKey(b))
+  })
+
+  it('treats missing category as the same as empty-string category for keying', () => {
+    const a: Finding = { severity: 'P2', location: 'src/foo.ts:42', description: 'bug', suggestion: 'fix' }
+    const b: Finding = { category: '', severity: 'P2', location: 'src/foo.ts:42', description: 'bug', suggestion: 'fix' }
+    expect(computeFindingKey(a)).toBe(computeFindingKey(b))
+  })
+})
+
+describe('descriptionShingle', () => {
+  it('returns char-5-grams from a normalized description', () => {
+    const shingle = descriptionShingle('hello world')
+    expect(shingle).toContain('hello')
+    expect(shingle).toContain('ello ')
+    expect(shingle).toContain('llo w')
+    expect(shingle).toContain('lo wo')
+    expect(shingle).toContain('o wor')
+    expect(shingle).toContain(' worl')
+    expect(shingle).toContain('world')
+  })
+
+  it('deduplicates repeated grams', () => {
+    const shingle = descriptionShingle('aaaaaaa')
+    expect(shingle).toEqual(['aaaaa'])
+  })
+
+  it('normalizes descriptions before shingling', () => {
+    expect(descriptionShingle('Bug at line 42 here')).toEqual(descriptionShingle('bug here'))
+  })
+})
+
+describe('jaccardSimilarity', () => {
+  it('returns 1 for identical sets', () => {
+    expect(jaccardSimilarity(['abc', 'def'], ['def', 'abc'])).toBe(1)
+  })
+
+  it('returns 0 for disjoint sets', () => {
+    expect(jaccardSimilarity(['abc'], ['def'])).toBe(0)
+  })
+
+  it('returns intersection over union', () => {
+    expect(jaccardSimilarity(['a', 'b'], ['b', 'c'])).toBeCloseTo(1 / 3)
+  })
+
+  it('treats two empty sets as identical', () => {
+    expect(jaccardSimilarity([], [])).toBe(1)
   })
 })
