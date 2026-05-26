@@ -9,6 +9,7 @@ export const EVENT_PAYLOAD_KEYS: Record<EventType, string[]> = {
   pr_opened:            ['pr_number'],
   progress_heartbeat:   ['note'],
   finding_acknowledged: ['finding_id', 'status', 'note'],
+  knowledge_gap_signal: ['topic', 'source', 'project_id', 'step_name', 'agent_excerpt'],
 }
 
 export type ValidationResult =
@@ -41,6 +42,7 @@ function isValidIso(ts: string): boolean {
 const VALID_OUTCOMES = ['pr_submitted', 'dropped', 'superseded'] as const
 const VALID_BLOCKER_KINDS = ['dependency', 'ambiguity', 'external', 'environment'] as const
 const VALID_ACK_STATUSES = ['acknowledged', 'open'] as const
+const VALID_GAP_SOURCES = ['agent_search', 'lessons', 'manual'] as const
 
 function isStringArray(v: unknown): v is string[] {
   return Array.isArray(v) && v.every(x => typeof x === 'string')
@@ -171,6 +173,37 @@ export function validateEvent(input: unknown): ValidationResult {
       errors.push('finding_acknowledged.payload.status must be acknowledged | open')
     }
     optStr('finding_acknowledged.payload.note', filteredPayload.note, errors, 200)
+    break
+  case 'knowledge_gap_signal':
+    reqStr('knowledge_gap_signal.payload.topic', filteredPayload.topic, errors, 80)
+    if (typeof filteredPayload.topic === 'string' &&
+        !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(filteredPayload.topic)) {
+      errors.push(
+        'knowledge_gap_signal.payload.topic must be kebab-case slug ' +
+        '(lowercase, hyphen-separated)',
+      )
+    }
+    if (!VALID_GAP_SOURCES.includes(filteredPayload.source as never)) {
+      errors.push(
+        'knowledge_gap_signal.payload.source must be agent_search | lessons | manual',
+      )
+    }
+    if (typeof filteredPayload.project_id !== 'string') {
+      errors.push('knowledge_gap_signal.payload.project_id required')
+    } else if (filteredPayload.project_id === 'lessons') {
+      if (filteredPayload.source !== 'lessons') {
+        errors.push(
+          'knowledge_gap_signal.payload.project_id="lessons" is reserved for synthetic ' +
+          'lessons.md scanner signals; source must also be "lessons"',
+        )
+      }
+    } else if (!/^[a-f0-9]{64}$/.test(filteredPayload.project_id)) {
+      errors.push(
+        'knowledge_gap_signal.payload.project_id must be a 64-char sha256 hex string',
+      )
+    }
+    optStr('knowledge_gap_signal.payload.step_name', filteredPayload.step_name, errors)
+    optStr('knowledge_gap_signal.payload.agent_excerpt', filteredPayload.agent_excerpt, errors, 200)
     break
   }
 

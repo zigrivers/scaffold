@@ -220,3 +220,117 @@ describe('event-schemas', () => {
     if (r.ok) expect((r.event as unknown as Record<string, unknown>).extra).toBeUndefined()
   })
 })
+
+function baseEvent(overrides: Record<string, unknown>): Record<string, unknown> {
+  return {
+    event_id: '01HXXXXXXXXXXXXXXXXXXXXXX',
+    worktree_id: '00000000-0000-4000-8000-000000000000',
+    actor_label: 'test-agent',
+    branch: 'feat/test',
+    task_id: null,
+    ts: '2026-05-26T12:00:00Z',
+    ...overrides,
+  }
+}
+
+const VALID_HEX = 'a'.repeat(64)
+
+describe('validateEvent — knowledge_gap_signal', () => {
+  it('accepts a fully-populated event', () => {
+    const result = validateEvent(baseEvent({
+      type: 'knowledge_gap_signal',
+      payload: {
+        topic: 'agent-eval-harnesses',
+        source: 'agent_search',
+        project_id: VALID_HEX,
+        step_name: 'tech-stack',
+        agent_excerpt: 'I was looking for harness patterns and found nothing.',
+      },
+    }))
+    expect(result.ok).toBe(true)
+  })
+
+  it('accepts a minimal event (only required payload fields)', () => {
+    const result = validateEvent(baseEvent({
+      type: 'knowledge_gap_signal',
+      payload: { topic: 'agent-eval-harnesses', source: 'agent_search', project_id: VALID_HEX },
+    }))
+    expect(result.ok).toBe(true)
+  })
+
+  it('rejects an invalid source enum', () => {
+    const result = validateEvent(baseEvent({
+      type: 'knowledge_gap_signal',
+      payload: { topic: 'foo', source: 'bogus', project_id: VALID_HEX },
+    }))
+    expect(result.ok).toBe(false)
+    if (result.ok) throw new Error('unreachable')
+    expect(result.errors.some(e => /source/.test(e))).toBe(true)
+  })
+
+  it('rejects a non-kebab-case topic', () => {
+    const result = validateEvent(baseEvent({
+      type: 'knowledge_gap_signal',
+      payload: { topic: 'Agent Eval Harnesses', source: 'agent_search', project_id: VALID_HEX },
+    }))
+    expect(result.ok).toBe(false)
+  })
+
+  it('rejects a topic >80 chars', () => {
+    const result = validateEvent(baseEvent({
+      type: 'knowledge_gap_signal',
+      payload: { topic: 'a-' + 'b'.repeat(80), source: 'agent_search', project_id: VALID_HEX },
+    }))
+    expect(result.ok).toBe(false)
+  })
+
+  it('rejects a project_id that is neither 64-char hex nor "lessons"', () => {
+    const result = validateEvent(baseEvent({
+      type: 'knowledge_gap_signal',
+      payload: { topic: 'foo', source: 'agent_search', project_id: 'too-short' },
+    }))
+    expect(result.ok).toBe(false)
+  })
+
+  it('rejects project_id="lessons" when source != "lessons" (reserved-literal cross-field rule)', () => {
+    const result = validateEvent(baseEvent({
+      type: 'knowledge_gap_signal',
+      payload: { topic: 'foo', source: 'agent_search', project_id: 'lessons' },
+    }))
+    expect(result.ok).toBe(false)
+    if (result.ok) throw new Error('unreachable')
+    expect(result.errors.some(e => /reserved.*lessons|project_id/.test(e))).toBe(true)
+  })
+
+  it('accepts project_id="lessons" when source="lessons" (synthetic scanner round-trip safety)', () => {
+    const result = validateEvent(baseEvent({
+      type: 'knowledge_gap_signal',
+      payload: { topic: 'foo', source: 'lessons', project_id: 'lessons' },
+    }))
+    expect(result.ok).toBe(true)
+  })
+
+  it('rejects agent_excerpt over 200 chars', () => {
+    const result = validateEvent(baseEvent({
+      type: 'knowledge_gap_signal',
+      payload: {
+        topic: 'foo', source: 'agent_search', project_id: VALID_HEX,
+        agent_excerpt: 'a'.repeat(201),
+      },
+    }))
+    expect(result.ok).toBe(false)
+  })
+
+  it('filters unknown payload keys silently (matches existing data-driven shape)', () => {
+    const result = validateEvent(baseEvent({
+      type: 'knowledge_gap_signal',
+      payload: {
+        topic: 'foo', source: 'agent_search', project_id: VALID_HEX,
+        unknown_extra: 'should be dropped',
+      },
+    }))
+    expect(result.ok).toBe(true)
+    if (!result.ok) throw new Error('unreachable')
+    expect(result.dropped_fields).toContain('unknown_extra')
+  })
+})

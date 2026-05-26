@@ -506,3 +506,52 @@ describe('observe harvest --recover', () => {
     expect(captured).toMatch(/rotated 1/)
   })
 })
+
+describe('handleEvent — knowledge_gap_signal', () => {
+  let dir: string
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'observe-cli-kgs-'))
+    ensureIdentity(dir, 'agent-alice')
+  })
+  afterEach(() => { rmSync(dir, { recursive: true, force: true }) })
+
+  it('persists all five payload fields through the CLI flow', async () => {
+    const exitCode = await handleEvent({
+      cwd: dir,
+      type: 'knowledge_gap_signal',
+      branch: 'main',
+      taskId: null,
+      keyValues: {
+        topic: 'agent-eval-harnesses',
+        source: 'agent_search',
+        'project-id': 'a'.repeat(64),
+        'step-name': 'tech-stack',
+        'agent-excerpt': 'a manual smoke test',
+      },
+    })
+    expect(exitCode).toBe(0)
+    const ledgerPath = join(dir, '.scaffold/activity.jsonl')
+    expect(existsSync(ledgerPath)).toBe(true)
+    const lastLine = readFileSync(ledgerPath, 'utf8').trim().split('\n').pop()!
+    const obj = JSON.parse(lastLine) as Record<string, unknown>
+    expect(obj['type']).toBe('knowledge_gap_signal')
+    expect(obj['payload']).toEqual({
+      topic: 'agent-eval-harnesses',
+      source: 'agent_search',
+      project_id: 'a'.repeat(64),
+      step_name: 'tech-stack',
+      agent_excerpt: 'a manual smoke test',
+    })
+  })
+
+  it('rejects project_id="lessons" with non-lessons source (validator rule)', async () => {
+    const exitCode = await handleEvent({
+      cwd: dir,
+      type: 'knowledge_gap_signal',
+      branch: 'main',
+      taskId: null,
+      keyValues: { topic: 'foo', source: 'agent_search', 'project-id': 'lessons' },
+    })
+    expect(exitCode).toBe(2) // validation-failure exit code
+  })
+})
