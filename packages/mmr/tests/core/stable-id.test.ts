@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { normalizeLocationForKey } from '../../src/core/stable-id.js'
+import {
+  normalizeDescriptionForKey,
+  normalizeLocationForKey,
+  normalizeSuggestionForKey,
+} from '../../src/core/stable-id.js'
 
 describe('normalizeLocationForKey', () => {
   it('lowercases and trims', () => {
@@ -30,5 +34,125 @@ describe('normalizeLocationForKey', () => {
 
   it('preserves a path with no line span', () => {
     expect(normalizeLocationForKey('src/foo.ts')).toBe('src/foo.ts')
+  })
+})
+
+describe('normalizeDescriptionForKey', () => {
+  it('lowercases and collapses whitespace in non-code segments', () => {
+    expect(normalizeDescriptionForKey('Variable   foo  Is    Unused')).toBe('variable foo is unused')
+  })
+
+  it('preserves case inside backtick code spans', () => {
+    expect(normalizeDescriptionForKey('Variable `fooBar` is unused')).toBe('variable `fooBar` is unused')
+  })
+
+  it('preserves whitespace inside backtick code spans', () => {
+    const doubleSpace = normalizeDescriptionForKey('Value `foo  bar` differs')
+    const singleSpace = normalizeDescriptionForKey('Value `foo bar` differs')
+    expect(doubleSpace).toBe('value `foo  bar` differs')
+    expect(singleSpace).toBe('value `foo bar` differs')
+    expect(doubleSpace).not.toBe(singleSpace)
+  })
+
+  it('does not add spaces around adjacent code spans', () => {
+    expect(normalizeDescriptionForKey('Type`T`')).toBe('type`T`')
+  })
+
+  it('distinguishes case-sensitive identifiers across two descriptions', () => {
+    const a = normalizeDescriptionForKey('`fooBar` is unused')
+    const b = normalizeDescriptionForKey('`FooBar` is unused')
+    expect(a).not.toBe(b)
+  })
+
+  it('strips line-number mentions like "line 42"', () => {
+    expect(normalizeDescriptionForKey('Bug at line 42 here')).toBe('bug here')
+  })
+
+  it('normalizes "at line N" like equivalent "at N" location references', () => {
+    const withLine = normalizeDescriptionForKey('Bug found at line 42 in code')
+    const withoutLine = normalizeDescriptionForKey('Bug found at 42 in code')
+    expect(withLine).toBe('bug found in code')
+    expect(withLine).toBe(withoutLine)
+  })
+
+  it('strips "at 42" mentions', () => {
+    expect(normalizeDescriptionForKey('Bug found at 42 in code')).toBe('bug found in code')
+  })
+
+  it('strips "at N" mentions before sentence punctuation', () => {
+    expect(normalizeDescriptionForKey('Bug found at 42.')).toBe('bug found')
+    expect(normalizeDescriptionForKey('Bug found at 43.')).toBe('bug found')
+  })
+
+  it('preserves meaningful numeric phrases after "at"', () => {
+    const thirty = normalizeDescriptionForKey('Timeout at 30 seconds')
+    const sixty = normalizeDescriptionForKey('Timeout at 60 seconds')
+    expect(thirty).toBe('timeout at 30 seconds')
+    expect(sixty).toBe('timeout at 60 seconds')
+    expect(thirty).not.toBe(sixty)
+    expect(normalizeDescriptionForKey('Buffer at 64 bytes')).toBe('buffer at 64 bytes')
+    expect(normalizeDescriptionForKey('Width at 10 pixels')).toBe('width at 10 pixels')
+  })
+
+  it('preserves decimal numeric phrases after "at"', () => {
+    expect(normalizeDescriptionForKey('Threshold at 0.5 is too low')).toBe('threshold at 0.5 is too low')
+  })
+
+  it('preserves bare numeric values after "at" by default', () => {
+    const status404 = normalizeDescriptionForKey('Status at 404 is expected')
+    const status500 = normalizeDescriptionForKey('Status at 500 is expected')
+    expect(status404).toBe('status at 404 is expected')
+    expect(status500).toBe('status at 500 is expected')
+    expect(status404).not.toBe(status500)
+    expect(normalizeDescriptionForKey('Port at 3000 is unavailable')).toBe('port at 3000 is unavailable')
+    expect(normalizeDescriptionForKey('Index at 0 is skipped')).toBe('index at 0 is skipped')
+    expect(normalizeDescriptionForKey('Version at 2 fails')).toBe('version at 2 fails')
+  })
+
+  it('strips severity-prefix filler', () => {
+    expect(normalizeDescriptionForKey('P0: critical bug')).toBe('critical bug')
+    expect(normalizeDescriptionForKey('Critical: real issue')).toBe('real issue')
+  })
+
+  it('handles unmatched backticks as literal text', () => {
+    // Lone backtick: the split yields ['Lone ', 'tick here'] - odd index would be
+    // treated as code-span; since there is no closing backtick the implementation
+    // should be defensive. Verify it does not throw and produces a deterministic value.
+    expect(normalizeDescriptionForKey('Lone `tick here')).toBe('lone `tick here')
+    expect(normalizeDescriptionForKey('Unused `Foo')).toBe(normalizeDescriptionForKey('Unused `foo'))
+  })
+
+  it('handles empty input', () => {
+    expect(normalizeDescriptionForKey('')).toBe('')
+  })
+})
+
+describe('normalizeSuggestionForKey', () => {
+  it('lowercases prose and collapses whitespace', () => {
+    expect(normalizeSuggestionForKey('  Use   Const   instead  ')).toBe('use const instead')
+    expect(normalizeSuggestionForKey('Fix it')).toBe(normalizeSuggestionForKey('fix it'))
+  })
+
+  it('preserves punctuation and code-like tokens', () => {
+    expect(normalizeSuggestionForKey('Rename foo to bar.')).toBe('rename foo to bar.')
+    expect(normalizeSuggestionForKey('Rename `FooBar` to `fooBar`.')).toBe('rename `FooBar` to `fooBar`.')
+    expect(normalizeSuggestionForKey('Rename FooBar to fooBar.')).not.toBe(
+      normalizeSuggestionForKey('Rename foobar to foobar.'),
+    )
+    expect(normalizeSuggestionForKey('Rename HTTPServer to URLParser.')).not.toBe(
+      normalizeSuggestionForKey('Rename httpserver to urlparser.'),
+    )
+    expect(normalizeSuggestionForKey('Replace MAX_RETRIES.')).not.toBe(
+      normalizeSuggestionForKey('Replace max_retries.'),
+    )
+  })
+
+  it('does not strip description-only noise patterns', () => {
+    expect(normalizeSuggestionForKey('P1: update line 42.')).toBe('p1: update line 42.')
+    expect(normalizeSuggestionForKey('Use port at 3000.')).toBe('use port at 3000.')
+  })
+
+  it('handles empty input', () => {
+    expect(normalizeSuggestionForKey('')).toBe('')
   })
 })
