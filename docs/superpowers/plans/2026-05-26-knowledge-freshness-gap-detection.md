@@ -726,7 +726,10 @@ set `SCAFFOLD_GAP_SIGNAL_QUIET` for their own reasons; an unconditional
 `delete` would clobber that. Same pattern is used by the new dedicated
 test block below (with `beforeEach`/`afterEach` for finer scoping).
 
-Add a new dedicated test that exercises the WITH-tail path:
+Add a new dedicated test that exercises the WITH-tail path. The file
+already has `makeOptions()` and `makeKBEntry()` helpers near the top
+(at `engine.test.ts:81` and `engine.test.ts:95`) — reuse them
+directly:
 
 ```typescript
 describe('AssemblyEngine — gap-signal tail injection', () => {
@@ -738,11 +741,14 @@ describe('AssemblyEngine — gap-signal tail injection', () => {
     else process.env['SCAFFOLD_GAP_SIGNAL_QUIET'] = originalQuiet
   })
 
+  const withKnowledge = () => makeOptions({
+    knowledgeEntries: [makeKBEntry({ name: 'tdd-patterns', description: 'd', content: 'c' })],
+  })
+  const withoutKnowledge = () => makeOptions({ knowledgeEntries: [] })
+
   it('appends gap-signal tail to Knowledge Base section when env var unset', () => {
-    // Construct a minimal valid AssemblyOptions; reuse helpers from existing
-    // tests above this new describe block.
     const engine = new AssemblyEngine()
-    const result = engine.assemble('tech-stack', /* options with at least one knowledge entry */)
+    const result = engine.assemble('tech-stack', withKnowledge())
     expect(result.success).toBe(true)
     expect(result.prompt?.text).toContain('scaffold observe event knowledge_gap_signal')
     expect(result.prompt?.text).toContain('--step-name="tech-stack"')
@@ -751,25 +757,25 @@ describe('AssemblyEngine — gap-signal tail injection', () => {
   it('does NOT append tail when SCAFFOLD_GAP_SIGNAL_QUIET=1', () => {
     process.env['SCAFFOLD_GAP_SIGNAL_QUIET'] = '1'
     const engine = new AssemblyEngine()
-    const result = engine.assemble('tech-stack', /* same options */)
+    const result = engine.assemble('tech-stack', withKnowledge())
     expect(result.success).toBe(true)
     expect(result.prompt?.text).not.toContain('scaffold observe event knowledge_gap_signal')
   })
 
   it('does NOT append tail when there are no knowledge entries (defensive)', () => {
     const engine = new AssemblyEngine()
-    const result = engine.assemble('tech-stack', /* options with empty knowledgeEntries */)
+    const result = engine.assemble('tech-stack', withoutKnowledge())
     expect(result.success).toBe(true)
     expect(result.prompt?.text).not.toContain('scaffold observe event knowledge_gap_signal')
   })
 })
 ```
 
-Reuse the fixture-building helpers that already exist at the top of
-`engine.test.ts` — search for `makeOptions` or `defaultOptions` or
-similar. If none exists, look at an existing successful test
-(`engine.test.ts:134` for example) and clone the option-construction
-pattern verbatim.
+`makeOptions()` returns a valid `AssemblyOptions` with sensible defaults
+including a valid `metaPrompt`, depth 3, empty knowledge by default, and
+a base `ScaffoldConfig` / `PipelineState`. `makeKBEntry()` returns a
+valid `KnowledgeEntry` you can spread overrides into. Neither helper
+needs new code — they exist already.
 
 - [ ] **Step 8: Run engine tests and confirm pass**
 
@@ -1078,13 +1084,21 @@ describe('scanLessonsForGaps', () => {
   })
 
   it('normalizes punctuation to validator-compatible kebab slug (direct normalizeTopic test)', () => {
-    // The heuristic regexes terminate captures on '.', so a lessons-line
-    // containing "react-19.0" inside a sentence captures only up to the
-    // first '.'. The normalizeTopic function itself handles dots —
-    // exercise it directly, separate from the heuristic capture path.
+    // Direct test of normalizeTopic — covers cases that are independent
+    // of the heuristic capture path.
     expect(normalizeTopic('react-19.0')).toBe('react-19-0')
     expect(normalizeTopic('agent eval?')).toBe('agent-eval')
     expect(normalizeTopic('Foo_Bar')).toBe('foo-bar')
+  })
+
+  it('captures version-numbered topics through the heuristic path without truncating', () => {
+    // The closing class uses [.!?](?=\s|$) so an internal dot followed
+    // by a digit (like "react-19.0") survives the capture; only the
+    // sentence-terminating dot ends the match.
+    const p = writeTmp('No knowledge entry for "react-19.0".\n')
+    const signals = scanLessonsForGaps(p)
+    expect(signals).toHaveLength(1)
+    expect(signals[0].topic).toBe('react-19-0')
   })
 
   it('produces multiple signals when the same topic appears on different lines', () => {
@@ -1177,10 +1191,20 @@ export interface LessonsGapSignalPayload {
 
 const EXPLICIT_MARKER_RE = /<!--\s*gap-topic:\s*([a-z0-9]+(?:-[a-z0-9]+)*)\s*-->/g
 
+// Sentence-terminating . ! ? end the capture only when followed by
+// whitespace or end-of-line. This preserves version-style dots inside
+// topics (e.g. "react-19.0") while still terminating real sentence
+// ends ("missing knowledge: foo." captures "foo"). Quotes/backticks
+// terminate unconditionally.
+const TERM = `(?:["\`]|[.!?](?=\\s|$))`
 const HEURISTIC_PATTERNS: RegExp[] = [
-  /(?:would have helped to have|missing) (?:a )?(?:guide|knowledge entry|entry) (?:on|for|about) ["`']?(.+?)["`.!?]/i,
-  /no (?:knowledge|kb) entry for ["`']?(.+?)["`.!?]/i,
-  /missing knowledge:\s*["`']?(.+?)["`.!?]/i,
+  new RegExp(
+    `(?:would have helped to have|missing) (?:a )?` +
+    `(?:guide|knowledge entry|entry) (?:on|for|about) ` +
+    `["\`']?(.+?)${TERM}`, 'i',
+  ),
+  new RegExp(`no (?:knowledge|kb) entry for ["\`']?(.+?)${TERM}`, 'i'),
+  new RegExp(`missing knowledge:\\s*["\`']?(.+?)${TERM}`, 'i'),
 ]
 
 const FENCE_RE = /^\s*\`\`\`/
@@ -1738,10 +1762,6 @@ function makeFindingId(parts: string[]): string {
   return createHash('sha256').update(parts.join('::')).digest('hex').slice(0, 16)
 }
 
-function isoNDaysAgo(days: number): string {
-  return new Date(Date.now() - days * 86400 * 1000).toISOString()
-}
-
 function dedupeExcerpts(signals: TimedSignal[], cap: number): string[] {
   const seen = new Set<string>()
   const out: string[] = []
@@ -1760,11 +1780,17 @@ export const lensIKnowledgeGaps: LensFn = async (
 ) => {
   const findings: Finding[] = []
   const auditTs = new Date().toISOString()
-  const ninetyDaysAgo = isoNDaysAgo(WINDOW_DAYS)
+  // Use parsed-ms comparison rather than lexical ISO string compare.
+  // The validator accepts both UTC ('...Z') and offset ('...+05:00')
+  // timestamps, and string-compare on those can misclassify around
+  // the cutoff. Date.parse() normalizes to UTC ms.
+  const cutoffMs = Date.now() - WINDOW_DAYS * 86400 * 1000
 
   // 1. Collect signals from the ledger (windowed)
   const ledgerSignals: TimedSignal[] = ledger.events
-    .filter(e => e.type === 'knowledge_gap_signal' && e.ts >= ninetyDaysAgo)
+    .filter(e =>
+      e.type === 'knowledge_gap_signal' && Date.parse(e.ts) >= cutoffMs,
+    )
     .map(e => ({ payload: e.payload as KnowledgeGapSignalPayload, ts: e.ts }))
 
   // 2. Collect synthetic signals from tasks/lessons.md (resolved via context.cwd)
@@ -1797,8 +1823,12 @@ export const lensIKnowledgeGaps: LensFn = async (
     if (s.payload.project_id !== 'lessons') {
       bucket.realProjects.add(s.payload.project_id)
     }
-    if (s.ts < bucket.firstSeen) bucket.firstSeen = s.ts
-    if (s.ts > bucket.lastSeen) bucket.lastSeen = s.ts
+    // Parse ms for chronological comparison; keep the original ISO
+    // string in the bucket for evidence output. This handles offset
+    // timestamps consistently (UTC ms ordering is the same regardless
+    // of which timezone the ISO string was written in).
+    if (Date.parse(s.ts) < Date.parse(bucket.firstSeen)) bucket.firstSeen = s.ts
+    if (Date.parse(s.ts) > Date.parse(bucket.lastSeen)) bucket.lastSeen = s.ts
   }
 
   // 4. Apply finding rules
