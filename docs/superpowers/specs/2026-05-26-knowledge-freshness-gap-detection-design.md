@@ -451,9 +451,9 @@ Registration touches three named locations:
 export function normalizeTopic(raw: string): string {
   return raw.toLowerCase()
     .replace(/['\u2018\u2019]/g, '') // ASCII apostrophe + U+2018 + U+2019 (escape syntax keeps source ASCII)
-    .replace(/[_\s]+/g, '-')         // collapse underscores/whitespace to hyphens
+    .replace(/[^a-z0-9-]+/g, '-')    // any other non-slug char becomes a hyphen
     .replace(/-{2,}/g, '-')          // collapse repeated hyphens (e.g. "foo--bar" → "foo-bar")
-    .replace(/^[-.]+|[-.]+$/g, '')   // trim leading/trailing hyphens and dots
+    .replace(/^-+|-+$/g, '')         // trim leading/trailing hyphens
 }
 ```
 
@@ -463,8 +463,15 @@ Editors and copy-paste pipelines have a long history of collapsing
 typed smart quotes back to ASCII, which would silently regress this
 fix. Implementation tests should cover at minimum: `agent's eval` →
 `agents-eval` (ASCII apostrophe), `agent’s eval` → `agents-eval`
-(right-smart quote in the input string), and a pair of smart quotes
-wrapping a word → stripped.
+(right-smart quote), `react-19.0` → `react-19-0` (dot becomes hyphen
+separator), `agent eval?` → `agent-eval` (trailing terminator stripped),
+and a pair of smart quotes wrapping a word → stripped.
+
+The catch-all `[^a-z0-9-]+` class is what guarantees `normalizeTopic`'s
+output matches the validator's kebab-case slug regex `^[a-z0-9]+(-[a-z0-9]+)*$`
+from §1.3. Without it, heuristic captures that include `.`, `?`, `!`,
+or other punctuation would normalize to slugs the validator rejects,
+silently dropping legitimate gap signals.
 
 Applied to every signal before bucketing. `"Agent-Eval-Harnesses"`,
 `"agent_eval_harnesses"`, `"agent eval harnesses"`, `"agent's eval
@@ -533,12 +540,18 @@ export type Evidence =
   | { kind: 'knowledge_gap'
       topic: string
       signal_count: number
-      distinct_projects: string[]   // up to 5 project_ids; truncate if more
+      distinct_project_count: number   // authoritative count (after delete('lessons'))
+      distinct_projects: string[]      // sample of up to 5 project_ids; truncated for size
       first_seen: string
       last_seen: string
-      example_excerpts: string[]    // up to 3 distinct excerpts
+      example_excerpts: string[]       // up to 3 distinct excerpts
     }
 ```
+
+`distinct_project_count` is the **count**; `distinct_projects` is a
+sample for display (truncated to keep the evidence object small). Always
+render and gate on `distinct_project_count`, not `distinct_projects.length`
+— buckets with >5 projects would otherwise be under-reported.
 
 **Renderer impact.** The actual rendering surface for `Evidence` is
 narrower than a generic "all renderers fall back to JSON" claim suggests
@@ -570,12 +583,16 @@ Pretty-render shape (markdown, suggested):
 
 ```markdown
 *Topic:* `<normalized-topic>`
-*Signals:* <signal_count> across <distinct_projects.length> projects
+*Signals:* <signal_count> across <distinct_project_count> projects
 *Window:* <first_seen> → <last_seen>
 *Example excerpts:*
 - "<excerpt 1>"
 - "<excerpt 2>"
 ```
+
+Use the authoritative `distinct_project_count` field (not the truncated
+`distinct_projects.length` sample) so buckets with >5 contributing
+projects report accurately.
 
 ### 2.7 Fix hint
 
@@ -898,11 +915,18 @@ The capture is taken verbatim. These are inserted by `bd` (when its
 
 ```javascript
 const HEURISTIC_PATTERNS = [
-  /(?:would have helped to have|missing) (?:a )?(?:guide|knowledge entry|entry) (?:on|for|about) ["`']?(.+?)["`.]/i,
-  /no (?:knowledge|kb) entry for ["`']?(.+?)["`.]/i,
-  /missing knowledge:\s*["`']?(.+?)["`.]/i,
+  /(?:would have helped to have|missing) (?:a )?(?:guide|knowledge entry|entry) (?:on|for|about) ["`']?(.+?)["`.!?]/i,
+  /no (?:knowledge|kb) entry for ["`']?(.+?)["`.!?]/i,
+  /missing knowledge:\s*["`']?(.+?)["`.!?]/i,
 ]
 ```
+
+The closing class now terminates on `"`, backtick, `.`, `!`, or `?` so
+sentences ending with `!` or `?` get matched correctly. `'` is
+deliberately omitted to avoid truncating apostrophes mid-topic. Captures
+still flow through `normalizeTopic()` (§2.3), which strips trailing
+punctuation and any other non-slug characters — the closing-class
+addition is purely about *whether the heuristic matches at all*.
 
 Captures are normalized through `normalizeTopic()` before being emitted
 as synthetic signals. The opening quote class still includes `'` so the
@@ -966,16 +990,25 @@ Lens I applies window filtering **before** merging lessons-scanner
 output:
 
 ```typescript
-const ledgerSignals = ledgerEvents
+// Internal aggregation type — preserves ts so the bucketer can compute
+// first_seen/last_seen correctly. Bare KnowledgeGapSignalPayload has no
+// time component (signals carry no ts on the payload itself; the BaseEvent
+// holds it for ledger entries).
+type TimedSignal = { payload: KnowledgeGapSignalPayload; ts: string }
+
+const auditTs = new Date().toISOString()
+const ledgerSignals: TimedSignal[] = ledgerEvents
   .filter(e => e.type === 'knowledge_gap_signal' && e.ts >= ninetyDaysAgo)
-  .map(e => e.payload as KnowledgeGapSignalPayload)
-const lessonsSignals = scanLessonsForGaps(lessonsPath)
+  .map(e => ({ payload: e.payload as KnowledgeGapSignalPayload, ts: e.ts }))
+const lessonsSignals: TimedSignal[] = scanLessonsForGaps(lessonsPath)
+  .map(payload => ({ payload, ts: auditTs }))   // synthetic signals get audit timestamp
 const allSignals = [...ledgerSignals, ...lessonsSignals]
 ```
 
-`first_seen` / `last_seen` on lessons-derived bucket members are set to
-the current audit timestamp (not the lessons.md mtime) so they don't
-falsely age out of any downstream window logic.
+The aggregator (§2.4) consumes `TimedSignal[]` and derives `first_seen` /
+`last_seen` from `ts`. Lessons-derived synthetics carry the current audit
+timestamp (not the lessons.md mtime) so they don't falsely age out of any
+downstream window logic.
 
 ### 4.7 Tests
 
