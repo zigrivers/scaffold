@@ -299,4 +299,10 @@ describe('jaccardSimilarity', () => {
       descriptionShingle('unused `value must be removed'),
     )
   })
+
+  it('preserves matched code spans when a later backtick is unmatched', () => {
+    expect(descriptionShingle('`must` is unused `tail')).not.toEqual(
+      descriptionShingle('`should` is unused `tail'),
+    )
+  })
 })

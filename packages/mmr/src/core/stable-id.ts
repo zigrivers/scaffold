@@ -150,9 +150,8 @@ export function jaccardSimilarity(
   a: readonly string[] | ReadonlySet<string>,
   b: readonly string[] | ReadonlySet<string>,
 ): number {
-  const left = a instanceof Set ? a : new Set(a)
-  const right = b instanceof Set ? b : new Set(b)
-  if (left.size === 0 && right.size === 0) return 1
+  const left = isShingleSet(a) ? a : new Set(a)
+  const right = isShingleSet(b) ? b : new Set(b)
 
   let intersection = 0
   for (const item of left) {
@@ -164,15 +163,28 @@ export function jaccardSimilarity(
 }
 
 export function shingleSize(shingle: readonly string[] | ReadonlySet<string>): number {
-  return 'size' in shingle ? shingle.size : shingle.length
+  return isShingleSet(shingle) ? shingle.size : shingle.length
 }
 
 function normalizeModalVerbsInProse(description: string): string {
-  const parts = description.split('`')
-  if (parts.length % 2 === 0) {
-    return description.replace(/\b(?:must|should)\b/g, 'should')
+  const out: string[] = []
+  let cursor = 0
+
+  for (const match of description.matchAll(CODE_SPAN_RE)) {
+    const index = match.index ?? 0
+    out.push(normalizeModalVerbs(description.slice(cursor, index)))
+    out.push(match[0])
+    cursor = index + match[0].length
   }
-  return parts
-    .map((part, index) => index % 2 === 0 ? part.replace(/\b(?:must|should)\b/g, 'should') : part)
-    .join('`')
+
+  out.push(normalizeModalVerbs(description.slice(cursor)))
+  return out.join('')
+}
+
+function normalizeModalVerbs(description: string): string {
+  return description.replace(/\b(?:must|should)\b/g, 'should')
+}
+
+function isShingleSet(value: readonly string[] | ReadonlySet<string>): value is ReadonlySet<string> {
+  return 'size' in value && 'has' in value
 }
