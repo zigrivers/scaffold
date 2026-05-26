@@ -2,6 +2,10 @@
 name: prd-craft
 description: What makes a good PRD — problem framing, feature scoping, success criteria, competitive context
 topics: [prd, requirements, product, scoping]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 # PRD Craft
