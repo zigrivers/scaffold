@@ -37,32 +37,24 @@ export interface CompensatorDispatch {
   output_parser: string | OutputParserConfig
 }
 
+function defaultCompensatorDispatch(config: MmrConfigParsed): CompensatorDispatch {
+  return {
+    command: 'claude',
+    flags: ['-p', '--output-format', 'json'],
+    env: {},
+    timeout: config.defaults.timeout,
+    prompt_wrapper: '{{prompt}}',
+    stderr: 'capture',
+    output_parser: 'default',
+  }
+}
+
 export function resolveCompensatorDispatch(config: MmrConfigParsed): CompensatorDispatch {
-  const compConfig = config.defaults.compensator
-  if (!compConfig) {
-    return {
-      command: 'claude',
-      flags: ['-p', '--output-format', 'json'],
-      env: {},
-      timeout: config.defaults.timeout,
-      prompt_wrapper: '{{prompt}}',
-      stderr: 'capture',
-      output_parser: 'default',
-    }
+  const channelName = config.defaults.compensator?.channel
+  if (!channelName) {
+    return defaultCompensatorDispatch(config)
   }
 
-  const channelName = compConfig.channel
-  if (!channelName) {
-    return {
-      command: 'claude',
-      flags: ['-p', '--output-format', 'json'],
-      env: {},
-      timeout: config.defaults.timeout,
-      prompt_wrapper: '{{prompt}}',
-      stderr: 'capture',
-      output_parser: 'default',
-    }
-  }
   const channelConfig = config.channels[channelName]
   if (!channelConfig) {
     throw new Error(`Compensator channel "${channelName}" not found in config`)
