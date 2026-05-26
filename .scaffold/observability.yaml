@@ -1,0 +1,16 @@
+# Per-project observability config.
+#
+# Currently only the knowledge-freshness gate workflow reads this file.
+# Other observability features (Lens A–H) read configuration from elsewhere.
+
+knowledge_freshness:
+  link_check:
+    # Hosts (or exact URLs) the link-check gate should skip. Use sparingly:
+    # the gate is the system's authoritative "live URL" check, so blanket
+    # exemptions reduce its safety value. The hosts below block all
+    # automated requests with 403 even when the URLs are real (Cloudflare
+    # bot protection on platform.openai.com is the most common case).
+    skip:
+      # OpenAI's docs platform serves 403 to any automation. Manually
+      # verify these URLs by visiting them in a browser.
+      - platform.openai.com
