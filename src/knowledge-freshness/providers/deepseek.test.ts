@@ -102,7 +102,7 @@ describe('deepseek provider — error paths', () => {
     expect(() => buildDeepseekDispatcher({ apiKey: '', timeoutSec: 60 })).toThrow(/DEEPSEEK_API_KEY is required/)
   })
 
-  it('normalizes transport errors (DNS / connection reset / fetch reject) into a deepseek-prefixed message (round-6 grok)', async () => {
+  it('normalizes transport errors (DNS / reset / reject) → deepseek-prefixed message (round-6 grok)', async () => {
     // The dispatcher must wrap the fetch call so raw undici / DOMException
     // errors don't leak to the cron logs unstyled. Mock a fetch that
     // rejects synchronously; assert the wrapped error has the diagnostic
@@ -114,7 +114,7 @@ describe('deepseek provider — error paths', () => {
     await expect(dispatcher('x')).rejects.toThrow(/deepseek dispatcher: fetch failed.*ENOTFOUND/i)
   })
 
-  it('normalizes a body-read abort (headers OK, body hangs) into a deepseek-prefixed error (round-7 grok)', async () => {
+  it('normalizes a body-read abort (headers OK, body hangs) → deepseek-prefixed (round-7 grok)', async () => {
     // The post-fetch phase (res.text(), JSON.parse, zod, content check) must
     // also be wrapped — a slow server that returns 200 headers fast then
     // hangs during body read causes the AbortSignal.timeout to fire after

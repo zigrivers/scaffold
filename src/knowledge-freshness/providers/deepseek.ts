@@ -54,7 +54,7 @@ export function buildDeepseekDispatcher(opts: BuildDeepseekDispatcherOptions): D
   if (!(ALLOWED_MODELS as readonly string[]).includes(model)) {
     throw new Error(
       `unsupported DeepSeek model "${model}". Allowed values: ${ALLOWED_MODELS.join(', ')}. ` +
-      `Set KNOWLEDGE_FRESHNESS_DEEPSEEK_MODEL to one of those, or unset it to use the default.`,
+      'Set KNOWLEDGE_FRESHNESS_DEEPSEEK_MODEL to one of those, or unset it to use the default.',
     )
   }
   if (!opts.apiKey) {
@@ -116,14 +116,14 @@ export function buildDeepseekDispatcher(opts: BuildDeepseekDispatcherOptions): D
         parsed = JSON.parse(rawText)
       } catch {
         throw new Error(
-          `deepseek dispatcher: response was not valid JSON. ` +
+          'deepseek dispatcher: response was not valid JSON. ' +
           `Body (first 200 chars): ${rawText.slice(0, 200)}`,
         )
       }
       const result = responseSchema.safeParse(parsed)
       if (!result.success) {
         throw new Error(
-          `deepseek dispatcher: response missing choices[0].message.content. ` +
+          'deepseek dispatcher: response missing choices[0].message.content. ' +
           `Truncated response: ${rawText.slice(0, 200)}`,
         )
       }
@@ -134,7 +134,7 @@ export function buildDeepseekDispatcher(opts: BuildDeepseekDispatcherOptions): D
       // case with a clear message and the truncated body.
       if (content.trim() === '') {
         throw new Error(
-          `deepseek dispatcher: model returned empty content. ` +
+          'deepseek dispatcher: model returned empty content. ' +
           `Truncated response: ${rawText.slice(0, 200)}`,
         )
       }
