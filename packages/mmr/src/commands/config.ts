@@ -12,6 +12,7 @@ import { checkInstalled, checkAuth } from '../core/auth.js'
 import { probeRuntime } from '../core/runtime-probe.js'
 import { OSS_RUNTIMES, exampleBlockFor, type OssRuntimeId } from '../core/oss-examples.js'
 import { isSecretKey, redactChannel } from '../core/redact.js'
+import type { OutputParserConfig } from '../config/schema.js'
 
 interface ConfigArgs {
   action: string
@@ -168,11 +169,16 @@ function configChannels(opts: { name?: string, target?: string, noRedact?: boole
       name,
       enabled: display.enabled,
       command,
-      parser: display.output_parser,
+      parser: formatOutputParser(display.output_parser as OutputParserConfig | undefined),
     }
   })
   console.log(JSON.stringify(channels, null, 2))
   return true
+}
+
+function formatOutputParser(op: OutputParserConfig | undefined): string | undefined {
+  if (op === undefined) return undefined
+  return typeof op === 'string' ? op : `<${op.kind}>`
 }
 
 function isNoRedact(args: Pick<ConfigArgs, 'redact' | 'no-redact'>): boolean {
