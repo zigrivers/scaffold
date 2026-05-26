@@ -160,12 +160,19 @@ export function jaccardSimilarity(
   }
 
   const unionSize = left.size + right.size - intersection
-  return intersection / unionSize
+  return unionSize === 0 ? 1 : intersection / unionSize
+}
+
+export function shingleSize(shingle: readonly string[] | ReadonlySet<string>): number {
+  return 'size' in shingle ? shingle.size : shingle.length
 }
 
 function normalizeModalVerbsInProse(description: string): string {
-  return description
-    .split('`')
+  const parts = description.split('`')
+  if (parts.length % 2 === 0) {
+    return description.replace(/\b(?:must|should)\b/g, 'should')
+  }
+  return parts
     .map((part, index) => index % 2 === 0 ? part.replace(/\b(?:must|should)\b/g, 'should') : part)
     .join('`')
 }

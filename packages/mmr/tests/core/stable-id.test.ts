@@ -293,4 +293,10 @@ describe('jaccardSimilarity', () => {
     const b = descriptionShingle('unused variable named fooBar must be removed')
     expect(jaccardSimilarity(a, b)).toBeGreaterThanOrEqual(0.7)
   })
+
+  it('treats unmatched backticks as prose for modal normalization', () => {
+    expect(descriptionShingle('unused `value should be removed')).toEqual(
+      descriptionShingle('unused `value must be removed'),
+    )
+  })
 })

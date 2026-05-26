@@ -6,6 +6,7 @@ import {
   jaccardSimilarity,
   normalizeLocationForKey,
   normalizeSuggestionForKey,
+  shingleSize,
 } from './stable-id.js'
 
 interface AttributedFinding extends Finding {
@@ -180,10 +181,6 @@ function addToKeyIndex(
   } else if (!groups.includes(group)) {
     groups.push(group)
   }
-}
-
-function shingleSize(shingle: readonly string[] | ReadonlySet<string>): number {
-  return 'size' in shingle ? shingle.size : shingle.length
 }
 
 /**
