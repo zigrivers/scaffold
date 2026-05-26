@@ -2,6 +2,10 @@
 name: project-structure-patterns
 description: Directory layout patterns by framework, module organization, and file placement rules
 topics: [project-structure, directory-layout, module-organization, file-placement, monorepo, colocation]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 # Project Structure Patterns

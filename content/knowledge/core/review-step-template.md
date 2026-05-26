@@ -2,6 +2,10 @@
 name: review-step-template
 description: Shared template pattern for review pipeline steps including multi-model dispatch, finding severity, and resolution workflow
 topics: [review, template, multi-model, quality-gates, methodology]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 # Review Step Template
