@@ -2,6 +2,10 @@
 name: cli-output-patterns
 description: --json/--format flags, table formatting, machine-readable output, piping conventions, and --quiet flag for CLI tools
 topics: [cli, output, json, formatting, tables, piping, stdout, stderr, machine-readable]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 CLI output is a two-audience problem: humans reading in a terminal, and machines reading in a pipeline. Tools that ignore the machine audience force users to write fragile regex parsers against human-formatted output. Tools that ignore the human audience are inscrutable to debug. The solution is structured output modes with a clear default.
