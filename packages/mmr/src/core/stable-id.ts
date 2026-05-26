@@ -13,8 +13,26 @@ export function normalizeLocationForKey(location: string): string {
 }
 
 const LINE_MENTION_RE = /\bline \d+\b/gi
-const AT_LINE_MENTION_RE = /\bat \d+(?![.\d])\b(?!\s*(?:%|\b(?:seconds?|minutes?|hours?|items?|ms|s)\b))/gi
+const VALUE_AFTER_AT_UNITS = [
+  'seconds?',
+  'minutes?',
+  'hours?',
+  'items?',
+  'bytes?',
+  'kb',
+  'mb',
+  'gb',
+  'pixels?',
+  'elements?',
+  'chars?',
+  'characters?',
+  'ms',
+  's',
+].join('|')
+const AT_LINE_MENTION_RE =
+  new RegExp(String.raw`\bat \d+(?![.\d])\b(?!\s*(?:%|\b(?:${VALUE_AFTER_AT_UNITS})\b))`, 'gi')
 const SEVERITY_PREFIX_RE = /^\s*(?:p[0-3]|critical|high|medium|low|info)\s*:\s*/i
+const CODE_SPAN_RE = /`([^`]*)`/g
 
 function normalizeNonCodeSegment(s: string): string {
   return s
@@ -28,17 +46,23 @@ function normalizeNonCodeSegment(s: string): string {
 
 export function normalizeDescriptionForKey(description: string): string {
   if (description === '') return ''
-  // Split on backticks: even indices are non-code, odd indices are code-span content.
-  // Unmatched final backtick -> trailing odd segment is treated as code. That keeps
-  // the result deterministic for identical malformed input.
-  const parts = description.split('`')
   const out: string[] = []
-  for (let i = 0; i < parts.length; i++) {
-    if (i % 2 === 0) {
-      out.push(normalizeNonCodeSegment(parts[i]))
-    } else {
-      out.push('`' + parts[i] + '`')
-    }
+  let cursor = 0
+
+  for (const match of description.matchAll(CODE_SPAN_RE)) {
+    const before = description.slice(cursor, match.index)
+    appendNormalizedPart(out, normalizeNonCodeSegment(before), /^\s/.test(before))
+    appendNormalizedPart(out, '`' + match[1] + '`', /\s$/.test(before))
+    cursor = (match.index ?? 0) + match[0].length
   }
-  return out.join(' ').replace(/\s+/g, ' ').trim()
+
+  const tail = description.slice(cursor)
+  appendNormalizedPart(out, normalizeNonCodeSegment(tail), /^\s/.test(tail))
+  return out.join('').replace(/\s+/g, ' ').trim()
+}
+
+function appendNormalizedPart(out: string[], part: string, spaceBefore: boolean): void {
+  if (part === '') return
+  if (out.length > 0 && spaceBefore) out.push(' ')
+  out.push(part)
 }

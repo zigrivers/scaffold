@@ -45,6 +45,10 @@ describe('normalizeDescriptionForKey', () => {
     expect(normalizeDescriptionForKey('Variable `fooBar` is unused')).toBe('variable `fooBar` is unused')
   })
 
+  it('does not add spaces around adjacent code spans', () => {
+    expect(normalizeDescriptionForKey('Type`T`')).toBe('type`T`')
+  })
+
   it('distinguishes case-sensitive identifiers across two descriptions', () => {
     const a = normalizeDescriptionForKey('`fooBar` is unused')
     const b = normalizeDescriptionForKey('`FooBar` is unused')
@@ -65,6 +69,8 @@ describe('normalizeDescriptionForKey', () => {
     expect(thirty).toBe('timeout at 30 seconds')
     expect(sixty).toBe('timeout at 60 seconds')
     expect(thirty).not.toBe(sixty)
+    expect(normalizeDescriptionForKey('Buffer at 64 bytes')).toBe('buffer at 64 bytes')
+    expect(normalizeDescriptionForKey('Width at 10 pixels')).toBe('width at 10 pixels')
   })
 
   it('preserves decimal numeric phrases after "at"', () => {
@@ -80,8 +86,8 @@ describe('normalizeDescriptionForKey', () => {
     // Lone backtick: the split yields ['Lone ', 'tick here'] - odd index would be
     // treated as code-span; since there is no closing backtick the implementation
     // should be defensive. Verify it does not throw and produces a deterministic value.
-    const out = normalizeDescriptionForKey('Lone `tick here')
-    expect(typeof out).toBe('string')
+    expect(normalizeDescriptionForKey('Lone `tick here')).toBe('lone `tick here')
+    expect(normalizeDescriptionForKey('Unused `Foo')).toBe(normalizeDescriptionForKey('Unused `foo'))
   })
 
   it('handles empty input', () => {
