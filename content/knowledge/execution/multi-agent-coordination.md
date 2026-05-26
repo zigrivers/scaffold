@@ -13,6 +13,10 @@ sources:
 
 When multiple agents work in parallel worktrees and converge on `main`, two upstream Beads primitives prevent the most common coordination failures. Both are optional — scaffold's multi-agent flows work without them — but they meaningfully reduce coordination cost in active parallel workloads.
 
+## Deep Guidance
+
+The two primitives below (`bd merge-slot` and `bd gate`) are the load-bearing Deep Guidance for this entry; the per-command sections explain when to acquire/release each, the failure modes, and the asynchronous coordination patterns they support. Treat the rest of this document (from this heading to EOF) as the section the assembly engine injects.
+
 ## `bd merge-slot` — serialized merge resolution
 
 **Problem:** Two agents finish in-flight tasks at roughly the same time. Both rebase on `origin/main` and push. The second agent's push races with the first agent's merge — either gets `non-fast-forward` (retry) or merges a stale base (silent conflict).
