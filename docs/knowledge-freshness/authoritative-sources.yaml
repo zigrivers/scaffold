@@ -1,15 +1,81 @@
-# Knowledge-freshness source allowlist (decisions-locked 2026-05-24).
-# Sources outside this list trigger a warning (not a block) in the audit gates.
-# Expand per-PR with reviewer approval.
+# Knowledge-freshness source allowlist.
+# Sources outside this list trigger a warning (not a block) in the audit gates
+# (locked decision #4). Expand per-PR with reviewer approval.
+#
+# Host matching: bare hostname matches host and any subdomain (e.g.
+# "anthropic.com" matches "docs.anthropic.com"). A host+path entry (e.g.
+# "ietf.org/rfc") additionally requires the URL pathname to start with the
+# given prefix. Bare hostnames are preferred for vendor docs whose path
+# layout changes; path-prefixed entries are preferred for shared-tenancy
+# hosts (e.g. github.com is locked to specific repos via github_repos below).
 
 hosts:
+  # Security / risk
   - owasp.org              # OWASP Top 10, ASVS, SAMM
   - nist.gov               # NIST SSDF, SP 800-series
-  - ietf.org/rfc           # IETF RFCs (OAuth, OIDC, HTTP, etc.)
+  - ietf.org/rfc           # IETF RFCs by path
+  - www.rfc-editor.org     # canonical RFC publication host
+  - openid.net             # OpenID Connect specs
+
+  # AI / ML platform docs
   - modelcontextprotocol.io # MCP specification
-  - anthropic.com/docs     # Anthropic API docs, Claude model cards
+  - anthropic.com          # Anthropic docs (covers docs.anthropic.com)
   - platform.openai.com    # OpenAI API docs
   - ai.google.dev          # Gemini API docs
+  - mlflow.org             # MLflow tracking + registry
+  - docs.wandb.ai          # Weights & Biases
+
+  # API + spec
+  - spec.openapis.org      # OpenAPI spec
+  - spec.graphql.org       # GraphQL spec
+
+  # Web / browser / standards
+  - www.w3.org             # W3C standards (incl. trace-context, design-tokens)
+  - tr.designtokens.org    # W3C Design Tokens Community Group TR
+
+  # Cloud + ops + reliability
+  - opentelemetry.io       # OpenTelemetry spec
+  - sre.google             # Google SRE Book / Workbook
+  - docs.aws.amazon.com    # AWS Well-Architected, service docs
+
+  # Language / tooling official
+  - git-scm.com            # Git official docs/manpages
+  - peps.python.org        # Python PEPs
+  - docs.astral.sh         # uv, ruff (Astral)
+  - www.postgresql.org     # Postgres official docs
+  - www.iso.org            # ISO standards
+
+  # Patterns + practice (widely-cited maintained references)
+  - martinfowler.com       # Martin Fowler's pattern catalog
+  - microservices.io       # Chris Richardson microservices patterns
+  - conventionalcommits.org # Conventional Commits spec
+  - agilealliance.org      # Agile Alliance glossary
+  - adr.github.io          # Architecture Decision Records reference
+  - google.github.io       # Google open-source style guides
+  - thoughtworks.com       # ThoughtWorks Tech Radar
+
+  # Smart contracts / web3
+  - docs.openzeppelin.com  # OpenZeppelin Contracts
+  - docs.safe.global       # Safe (multisig) docs
+  - swcregistry.io         # Smart Contract Weakness Classification
+  - consensys.github.io    # Consensys smart-contract best practices
+  - ethereum.org           # Ethereum.org developer docs
+
+  # Testing
+  - docs.pact.io           # Pact (consumer-driven contract tests)
+
+  # Research / data-science reproducibility
+  - the-turing-way.netlify.app  # The Turing Way (Alan Turing Institute reproducible-research handbook)
+
+  # Mobile platform docs
+  - developer.apple.com    # Apple developer docs
+  - developer.android.com  # Android developer docs
+
+  # Browser extensions
+  - developer.chrome.com   # Chrome extensions / MV3
+  - developer.mozilla.org  # MDN (cross-browser reference)
 
 github_repos:
   - modelcontextprotocol/specification
+  - steveyegge/beads
+  - joelparkerhenderson/architecture-decision-record
