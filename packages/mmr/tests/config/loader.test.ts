@@ -460,4 +460,29 @@ describe('loadConfig extends inheritance (T1-A)', () => {
     expect(() => loadConfig({ projectRoot: tmpDir, userHome: tmpDir }))
       .toThrow(/command/i)
   })
+
+  it('round-trips an object-form output_parser through .mmr.yaml', () => {
+    const projectYaml = `
+version: 1
+channels:
+  qwen:
+    command: ollama
+    auth:
+      check: 'true'
+      failure_exit_codes: [1]
+      recovery: 'noop'
+    output_parser:
+      kind: unwrap-jsonpath
+      wrap: $.choices[0].message.content
+      then: default
+`
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), projectYaml)
+    const cfg = loadConfig({ projectRoot: tmpDir, userHome: path.join(tmpDir, 'home') })
+    const op = cfg.channels.qwen.output_parser
+    expect(op).toEqual({
+      kind: 'unwrap-jsonpath',
+      wrap: '$.choices[0].message.content',
+      then: 'default',
+    })
+  })
 })
