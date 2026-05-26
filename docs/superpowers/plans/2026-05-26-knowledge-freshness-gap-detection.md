@@ -249,6 +249,15 @@ export type Event =
 
 - [ ] **Step 5: Add the payload-keys entry in `EVENT_PAYLOAD_KEYS`**
 
+**This map is the source of truth for both CLI passthrough and validator
+filtering.** Per `src/observability/engine/event-schemas.ts:105–112`,
+`filteredPayload` is built by walking the incoming payload and keeping
+only keys present in `EVENT_PAYLOAD_KEYS[type]`. The switch case below
+in Step 7 will never see fields that are absent here. Forgetting this
+edit is the highest-risk silent-failure mode in T1 — all five payload
+fields would be silently dropped before validation runs, and the
+integration test in Step 10 would observe an empty `payload: {}`.
+
 In `src/observability/engine/event-schemas.ts`, extend the
 `EVENT_PAYLOAD_KEYS` record (lines 3–12) with the new entry as the last
 property:
@@ -348,15 +357,24 @@ through the CLI flow produces a validated event in the ledger." The
 manual smoke command in Step 10b below is informational; the
 auto-running guard lives here, in `src/cli/commands/observe.test.ts`.
 
-Append a new `describe` block to `src/cli/commands/observe.test.ts`:
+Append a new `describe` block to `src/cli/commands/observe.test.ts`.
+
+**Imports note:** `observe.test.ts` already imports `describe`, `it`,
+`expect`, `beforeEach`, `afterEach`, and `handleEvent`. Do **not** add
+a duplicate `import ... from 'vitest'` line — pasting the snippet
+verbatim with imports would produce a TypeScript duplicate-binding
+error. If `fs`, `os`, `path`, or `crypto` aren't already imported in
+the file (check the existing imports section), merge those into the
+existing top-of-file imports. The helpers below (`tmpDirs`,
+`makeTmpWorktree`, the `afterEach` cleanup) go after any existing
+shared helpers — or immediately before the new `describe` if no
+shared section exists.
 
 ```typescript
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import fs from 'node:fs'
-import os from 'node:os'
-import path from 'node:path'
-import crypto from 'node:crypto'
-import { handleEvent } from './observe.js'
+// (Imports already in the file: describe, it, expect, beforeEach,
+//  afterEach from 'vitest'; handleEvent from './observe.js'. Add
+//  fs/os/path/crypto here only if not already present at the top
+//  of the file.)
 
 const tmpDirs: string[] = []
 
@@ -455,14 +473,16 @@ with all five payload fields present.
 ```bash
 git add src/observability/engine/types.ts \
         src/observability/engine/event-schemas.ts \
-        src/observability/engine/event-schemas.test.ts
+        src/observability/engine/event-schemas.test.ts \
+        src/cli/commands/observe.test.ts
 git commit -m "feat(observability): add knowledge_gap_signal event type + validator
 
 Adds the new event type to the EventType union, KnowledgeGapSignalPayload
 interface, and a validation case enforcing the reserved-literal cross-
 field rule (project_id='lessons' requires source='lessons'). Zero CLI
 changes — the existing data-driven --<key>=<value> machinery handles
-the new flags via EVENT_PAYLOAD_KEYS.
+the new flags via EVENT_PAYLOAD_KEYS. Adds an automated handleEvent
+integration test in observe.test.ts proving end-to-end CLI passthrough.
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ```
@@ -770,6 +790,13 @@ of the file:
 import { renderGapSignalTail } from '../assembly/gap-signal-tail.js'
 ```
 
+**Note:** `buildKnowledgeSection` is a **local** function defined inside
+this same file (at lines 74–85), not an import from elsewhere. The edit
+in this step changes both that local function's body AND the call site
+in `generateStepWrapper` at line 32. Both live in the same file; the
+import added above is just for the new shared `renderGapSignalTail`
+helper.
+
 Change the signature of `buildKnowledgeSection` (the function at lines
 74–85) to accept a `stepSlug` parameter and append the tail:
 
@@ -973,7 +1000,7 @@ import os from 'node:os'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import { describe, it, expect, afterEach } from 'vitest'
-import { scanLessonsForGaps } from './lens-i-lessons-scanner.js'
+import { scanLessonsForGaps, normalizeTopic } from './lens-i-lessons-scanner.js'
 
 const tmpFiles: string[] = []
 
@@ -1054,10 +1081,14 @@ describe('scanLessonsForGaps', () => {
     }
   })
 
-  it('normalizes punctuation to validator-compatible kebab slug', () => {
-    const p = writeTmp('No knowledge entry for "react-19.0".\n')
-    const signals = scanLessonsForGaps(p)
-    expect(signals[0].topic).toBe('react-19-0')
+  it('normalizes punctuation to validator-compatible kebab slug (direct normalizeTopic test)', () => {
+    // The heuristic regexes terminate captures on '.', so a lessons-line
+    // containing "react-19.0" inside a sentence captures only up to the
+    // first '.'. The normalizeTopic function itself handles dots —
+    // exercise it directly, separate from the heuristic capture path.
+    expect(normalizeTopic('react-19.0')).toBe('react-19-0')
+    expect(normalizeTopic('agent eval?')).toBe('agent-eval')
+    expect(normalizeTopic('Foo_Bar')).toBe('foo-bar')
   })
 
   it('produces multiple signals when the same topic appears on different lines', () => {
@@ -1165,7 +1196,7 @@ const FENCE_RE = /^\s*\`\`\`/
  */
 export function normalizeTopic(raw: string): string {
   return raw.toLowerCase()
-    .replace(/['‘’]/g, '')        // strip ASCII + U+2018 + U+2019 smart-quote apostrophes
+    .replace(/['\u2018\u2019]/g, '')        // strip ASCII + U+2018 + U+2019 smart-quote apostrophes
     .replace(/[^a-z0-9-]+/g, '-')             // any other non-slug char becomes a hyphen
     .replace(/-{2,}/g, '-')                   // collapse repeated hyphens
     .replace(/^-+|-+$/g, '')                  // trim leading/trailing hyphens
@@ -1390,7 +1421,10 @@ function makeEvent(overrides: Partial<{
     actor_label: 'test',
     branch: 'main',
     task_id: null,
-    ts: overrides.ts ?? '2026-05-26T10:00:00Z',
+    // Default to "now" so events fall inside the lens's 90-day window
+    // regardless of when the test runs. Tests that need a specific age
+    // pass `ts` in overrides (e.g. the >90-day-old window-exclusion test).
+    ts: overrides.ts ?? new Date().toISOString(),
     type: 'knowledge_gap_signal',
     payload: overrides.payload ?? {
       topic: 'foo-bar', source: 'agent_search', project_id: VALID_HEX_A,
@@ -1867,6 +1901,24 @@ direct modification because the spread picks up the new lens
 automatically. The Lens uses `context.cwd` for path resolution rather
 than baking the project root at module-load time.
 
+**Update the registry test.** `src/observability/engine/checks/registry.test.ts`
+asserts the registry has "all eight lenses" with a literal id-array
+comparison. Adding Lens I makes it nine. Edit the test:
+
+```typescript
+// In registry.test.ts, update the existing assertion:
+it('has all nine lenses', () => {
+  const ids = LENS_REGISTRY.map((m) => m.id).sort()
+  expect(ids).toEqual([
+    'A-tdd', 'B-ac-coverage', 'C-standards', 'D-stack',
+    'E-design', 'F-scope', 'G-decisions', 'H-cross-doc', 'I-knowledge-gaps',
+  ])
+})
+```
+
+Run: `npx vitest run src/observability/engine/checks/registry.test.ts`
+Expected: PASS.
+
 - [ ] **Step 9: Add Lens I to `SCOPE_DOC_LENSES`**
 
 Edit `src/observability/engine/api.ts` line 67. Change:
@@ -1883,6 +1935,13 @@ const SCOPE_DOC_LENSES = new Set(['H-cross-doc', 'I-knowledge-gaps'])
 
 Lens I now runs under `--scope=docs` and `--scope=all` (which unions
 the doc + code sets per `pickEnabledIds` at api.ts:72).
+
+**Do NOT add Lens I to `SCOPE_CODE_LENSES`** at api.ts:68. Lens I is
+docs-only — gap detection is fundamentally about *documentation*
+coverage, not code. Adding it symmetrically would invoke the lens on
+`--scope=code` audits where it has no useful work to do, and it would
+slow down the much-larger code-scope audit runs that don't care about
+knowledge gaps.
 
 - [ ] **Step 10: Add markdown pretty-render case for the new evidence variant**
 
@@ -2030,6 +2089,19 @@ edits resolved.
 
 - [ ] **Step 2: Set up a temp project to act as "downstream"**
 
+First, capture the scaffold worktree path (the directory containing
+`package.json` and the `dist/` build output) so the rest of T5 stays
+portable:
+
+```bash
+# Run this from the scaffold worktree before cd-ing into the temp tree:
+SCAFFOLD_WORKTREE="$(git rev-parse --show-toplevel)"
+SCAFFOLD_BIN="$SCAFFOLD_WORKTREE/dist/index.js"
+[ -f "$SCAFFOLD_BIN" ] || (cd "$SCAFFOLD_WORKTREE" && npm run build)
+```
+
+Then build the temp downstream project:
+
 ```bash
 TMPDIR_E2E=$(mktemp -d)
 cd "$TMPDIR_E2E"
@@ -2043,7 +2115,6 @@ mkdir -p .scaffold
 - [ ] **Step 3: Emit 3 signals from 2 distinct project_ids**
 
 ```bash
-SCAFFOLD_BIN=/Users/kenallred/Developer/scaffold/.claude/worktrees/feat+knowledge-freshness/dist/index.js
 PROJECT_A=$(printf 'https://example.org/project-a' | shasum -a 256 | awk '{print $1}')
 PROJECT_B=$(printf 'https://example.org/project-b' | shasum -a 256 | awk '{print $1}')
 
@@ -2179,9 +2250,9 @@ because `'lessons'` is excluded from `distinct_project_count`.
 - [ ] **Step 8: Cleanup**
 
 ```bash
-cd /Users/kenallred/Developer/scaffold/.claude/worktrees/feat+knowledge-freshness
+cd "$SCAFFOLD_WORKTREE"
 rm -rf "$TMPDIR_E2E" "$TMPDIR_NEG" "$TMPDIR_LESSONS"
-unset TMPDIR_E2E TMPDIR_NEG TMPDIR_LESSONS SCAFFOLD_BIN PROJECT_A PROJECT_B
+unset TMPDIR_E2E TMPDIR_NEG TMPDIR_LESSONS SCAFFOLD_BIN SCAFFOLD_WORKTREE PROJECT_A PROJECT_B
 ```
 
 - [ ] **Step 9: Document the procedure in operations.md**
@@ -2368,18 +2439,35 @@ review-fix commits are pushed:
 
 ```bash
 make check-all                    # final guard: all gates green
-git pull --rebase origin main     # absorb any main commits since PR open
-make check-all                    # re-run gates if rebase had conflicts
-git push                          # push any review-fix commits + rebase result
+git fetch origin main             # see what's on origin/main without merging yet
+# If origin/main has new commits behind the PR head, merge it in
+# (DO NOT rebase a published branch — that requires a force-push,
+# which is forbidden per CLAUDE.md "Git Safety Protocol").
+git merge --no-edit origin/main || {
+  # If the merge produced conflicts, resolve them, then:
+  #   git add <resolved-files>
+  #   git commit --no-edit
+  # Re-run check-all after resolution.
+  echo "Merge conflict — resolve, commit, then re-run from make check-all" >&2
+  exit 1
+}
+make check-all                    # re-run after merge
+git push                          # plain push (no -f); commits are append-only
 git status                        # verify "Your branch is up to date with 'origin/...'"
 gh pr checks                      # confirm CI on the open PR is green
 ```
 
-If `git pull --rebase` produces conflicts, resolve them, re-run
-`make check-all`, then `git rebase --continue` and push. Do **not**
-force-push without explicit user approval — the rebase here is local
-absorption only; if the PR's commits aren't on the rebased base
-already, surface the situation rather than rewriting upstream.
+The reason for **merge instead of rebase**: rebasing a branch that's
+already pushed to origin rewrites those commits' SHAs. A plain
+`git push` would then be rejected because the remote has the old SHAs.
+Force-push (`--force` or `--force-with-lease`) would resolve it but is
+prohibited by CLAUDE.md's "Never force-push" rule unless the user
+explicitly authorizes it. Merging origin/main into the PR branch keeps
+history append-only and the push succeeds.
+
+If origin/main is already an ancestor of the PR head (no new commits),
+the `git merge --no-edit origin/main` is a no-op (fast-forward
+unnecessary; merge prints "Already up to date").
 
 Only mark the PR ready for human merge once `gh pr checks` shows all
 required CI green and the review loop has hit stop conditions.
