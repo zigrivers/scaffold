@@ -609,13 +609,12 @@ describe('AssemblyEngine', () => {
 })
 
 describe('AssemblyEngine — gap-signal tail injection', () => {
-  const originalQuiet = process.env['SCAFFOLD_GAP_SIGNAL_QUIET']
-
+  // The file-level beforeAll sets QUIET=1 as the stable baseline so the rest
+  // of the suite's tests don't see the tail. These inner tests need to
+  // toggle the var, but must restore the baseline (not whatever was set at
+  // module-parse time — that was always undefined before beforeAll ran).
   beforeEach(() => { delete process.env['SCAFFOLD_GAP_SIGNAL_QUIET'] })
-  afterEach(() => {
-    if (originalQuiet === undefined) delete process.env['SCAFFOLD_GAP_SIGNAL_QUIET']
-    else process.env['SCAFFOLD_GAP_SIGNAL_QUIET'] = originalQuiet
-  })
+  afterEach(() => { process.env['SCAFFOLD_GAP_SIGNAL_QUIET'] = '1' })
 
   const withKnowledge = () => makeOptions({
     knowledgeEntries: [makeKBEntry({ name: 'tdd-patterns', description: 'd', content: 'c' })],
