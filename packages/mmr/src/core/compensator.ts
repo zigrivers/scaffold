@@ -20,8 +20,6 @@ export interface CompensatingChannel {
   originalChannel: string
   /** Name used for the compensating dispatch (e.g., "compensating-codex") */
   compensatingName: string
-  /** Focus prompt to prepend */
-  focusPrompt: string
 }
 
 export interface CompensatorDispatch {
@@ -47,7 +45,8 @@ function defaultCompensatorDispatch(config: MmrConfigParsed): CompensatorDispatc
 }
 
 export function resolveCompensatorDispatch(config: MmrConfigParsed): CompensatorDispatch {
-  const channelName = config.defaults.compensator?.channel
+  const { defaults } = config
+  const channelName = defaults.compensator?.channel
   if (!channelName) {
     return defaultCompensatorDispatch(config)
   }
@@ -100,7 +99,7 @@ export function resolveCompensatorFocus(
   originalChannel: string,
 ): string {
   const override = config.defaults.compensator?.channel_focus_map?.[originalChannel]
-  if (typeof override === 'string' && override.length > 0) return override
+  if (typeof override === 'string' && override.trim().length > 0) return override
   const builtin = COMPENSATING_FOCUS[originalChannel]
   if (builtin) return builtin
   return `Focus your review on areas typically covered by ${originalChannel}.`
@@ -113,7 +112,7 @@ export function resolveCompensatorFocus(
  */
 export function getCompensatingChannels(
   channelStatuses: Record<string, ChannelStatus>,
-  compensatorChannel = 'claude',
+  compensatorChannel: string,
 ): CompensatingChannel[] {
   const compensating: CompensatingChannel[] = []
 
@@ -126,13 +125,9 @@ export function getCompensatingChannels(
       || status === 'skipped'
       || status === 'failed'
     ) {
-      const focus = COMPENSATING_FOCUS[name]
-        ?? `Focus your review on areas typically covered by ${name}.`
-        + ` You are compensating for a missing ${name} review.`
       compensating.push({
         originalChannel: name,
         compensatingName: `compensating-${name}`,
-        focusPrompt: focus,
       })
     }
   }

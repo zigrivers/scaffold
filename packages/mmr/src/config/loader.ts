@@ -174,6 +174,12 @@ function validateCompensatorReference(config: MmrConfigParsed): void {
   if (!compensator) return
   const ref = compensator.channel
   if (ref === undefined) return
+  if (ref.trim().length === 0) {
+    throw new Error(
+      'defaults.compensator.channel cannot be empty. '
+      + 'Configure a concrete channel name in the channels: section, or remove the compensator block.',
+    )
+  }
   const hasTarget = Object.prototype.hasOwnProperty.call(config.channels, ref)
   const target = config.channels[ref]
   if (!hasTarget || !target) {

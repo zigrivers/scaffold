@@ -131,6 +131,61 @@ channels:
     flags: ["run", "deepseek-coder:33b", "--format", "json"]
 ```
 
+## Configurable compensator
+
+When one of the configured channels can't run (missing CLI, auth failure, timeout, or error), MMR dispatches a **compensating pass** to keep the review degraded-but-useful. By default that pass goes to `claude -p --output-format json`. Set `defaults.compensator` to redirect it to any channel you've already configured:
+
+```yaml
+defaults:
+  compensator:
+    channel: qwen-local        # name of an existing entry in channels:
+    channel_focus_map:         # optional — override the focus preamble per-channel
+      codex: |
+        Focus on implementation correctness, memory safety, and async correctness.
+        You are compensating for a missing Codex review.
+      gemini: |
+        Focus on architectural consistency and dependency boundaries.
+        You are compensating for a missing Gemini review.
+
+channels:
+  qwen-local:
+    extends: ollama-base       # see the Ollama recipe in Custom output parsers
+    flags: ["run", "qwen2.5-coder:32b", "--format", "json"]
+```
+
+**Default behavior (when `defaults.compensator` is unset or omitted).** MMR dispatches `claude -p --output-format json` for each missing channel. This preserves the pre-v3.29 behavior so existing configs need no changes.
+
+**Validation.** The loader rejects:
+- `compensator.channel` referencing a name that does not exist in `channels:` (dangling reference).
+- `compensator.channel` pointing at a channel marked `abstract: true` — abstract channels are templates (v3.28 T1-A) and cannot be dispatched. Reference a concrete channel that `extends:` it instead.
+
+### Recipe — use a local model as the compensator
+
+For a fully OSS-only setup (no Anthropic CLI required), configure a local Ollama channel and reference it as the compensator:
+
+```yaml
+version: 1
+defaults:
+  compensator:
+    channel: qwen-coder
+
+channels:
+  ollama-base:
+    abstract: true
+    command: ollama
+    auth:
+      check: ollama list >/dev/null 2>&1
+      failure_exit_codes: [1]
+      recovery: Install Ollama and pull a model
+    output_parser: default     # `ollama run` writes the model response directly
+
+  qwen-coder:
+    extends: ollama-base
+    flags: ["run", "qwen2.5-coder:32b", "--format", "json"]
+```
+
+When enabled review channels such as `codex` or `gemini` are unavailable, missing, or failing, MMR runs `qwen-coder` for each compensating pass instead of `claude -p`. Channels set to `enabled: false` are intentionally skipped and do not receive compensating passes.
+
 ## Features
 
 - **--sync mode** — single-command entry point for agents and CI

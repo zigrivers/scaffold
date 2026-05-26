@@ -25,7 +25,7 @@ describe('getCompensatingChannels', () => {
       codex: 'not_installed',
       gemini: 'auth_failed',
     }
-    const result = getCompensatingChannels(statuses)
+    const result = getCompensatingChannels(statuses, 'claude')
     expect(result).toHaveLength(2)
     expect(result.map(c => c.compensatingName)).toContain('compensating-codex')
     expect(result.map(c => c.compensatingName)).toContain('compensating-gemini')
@@ -37,7 +37,7 @@ describe('getCompensatingChannels', () => {
       codex: 'completed',
       gemini: 'completed',
     }
-    const result = getCompensatingChannels(statuses)
+    const result = getCompensatingChannels(statuses, 'claude')
     expect(result).toHaveLength(0)
   })
 
@@ -46,7 +46,7 @@ describe('getCompensatingChannels', () => {
       claude: 'auth_failed',
       codex: 'completed',
     }
-    const result = getCompensatingChannels(statuses)
+    const result = getCompensatingChannels(statuses, 'claude')
     expect(result).toHaveLength(0) // claude skipped, codex completed
   })
 
@@ -61,17 +61,19 @@ describe('getCompensatingChannels', () => {
     expect(result[0].originalChannel).toBe('claude')
   })
 
-  it('includes focus prompt for known channels', () => {
+  it('returns descriptors for known channels without resolving focus prematurely', () => {
     const statuses: Record<string, ChannelStatus> = { codex: 'not_installed' }
-    const result = getCompensatingChannels(statuses)
-    expect(result[0].focusPrompt).toContain('security')
-    expect(result[0].focusPrompt).toContain('implementation correctness')
+    const result = getCompensatingChannels(statuses, 'claude')
+    expect(result[0]).toEqual({
+      originalChannel: 'codex',
+      compensatingName: 'compensating-codex',
+    })
   })
 
-  it('generates generic focus for unknown channels', () => {
+  it('returns descriptors for unknown channels', () => {
     const statuses: Record<string, ChannelStatus> = { 'custom-tool': 'timeout' as ChannelStatus }
-    const result = getCompensatingChannels(statuses)
-    expect(result[0].focusPrompt).toContain('custom-tool')
+    const result = getCompensatingChannels(statuses, 'claude')
+    expect(result[0].originalChannel).toBe('custom-tool')
     expect(result[0].compensatingName).toBe('compensating-custom-tool')
   })
 
@@ -80,7 +82,7 @@ describe('getCompensatingChannels', () => {
       codex: 'timeout',
       gemini: 'skipped',
     }
-    const result = getCompensatingChannels(statuses)
+    const result = getCompensatingChannels(statuses, 'claude')
     expect(result).toHaveLength(2)
   })
 
@@ -89,7 +91,7 @@ describe('getCompensatingChannels', () => {
       claude: 'completed',
       codex: 'failed',
     }
-    const result = getCompensatingChannels(statuses)
+    const result = getCompensatingChannels(statuses, 'claude')
     expect(result).toHaveLength(1)
     expect(result[0].originalChannel).toBe('codex')
   })
@@ -236,6 +238,11 @@ describe('resolveCompensatorFocus', () => {
     expect(focus).toMatch(/security/i)
   })
 
+  it('returns generic focus for unknown channels', () => {
+    const focus = resolveCompensatorFocus(baseConfig, 'custom-tool')
+    expect(focus).toContain('custom-tool')
+  })
+
   it('returns the channel_focus_map override when set for the original channel', () => {
     const cfg: MmrConfigParsed = {
       ...baseConfig,
@@ -281,7 +288,6 @@ describe('dispatchCompensatingPasses honors defaults.compensator', () => {
     {
       originalChannel: 'codex',
       compensatingName: 'compensating-codex',
-      focusPrompt: 'legacy focus',
     },
   ]
 
