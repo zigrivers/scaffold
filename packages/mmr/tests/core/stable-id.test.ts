@@ -67,6 +67,10 @@ describe('normalizeDescriptionForKey', () => {
     expect(thirty).not.toBe(sixty)
   })
 
+  it('preserves decimal numeric phrases after "at"', () => {
+    expect(normalizeDescriptionForKey('Threshold at 0.5 is too low')).toBe('threshold at 0.5 is too low')
+  })
+
   it('strips severity-prefix filler', () => {
     expect(normalizeDescriptionForKey('P0: critical bug')).toBe('critical bug')
     expect(normalizeDescriptionForKey('Critical: real issue')).toBe('real issue')

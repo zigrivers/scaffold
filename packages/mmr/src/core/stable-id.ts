@@ -13,7 +13,7 @@ export function normalizeLocationForKey(location: string): string {
 }
 
 const LINE_MENTION_RE = /\bline \d+\b/gi
-const AT_LINE_MENTION_RE = /\bat \d+\b(?!\s*(?:%|\b(?:seconds?|minutes?|hours?|items?|ms|s)\b))/gi
+const AT_LINE_MENTION_RE = /\bat \d+(?![.\d])\b(?!\s*(?:%|\b(?:seconds?|minutes?|hours?|items?|ms|s)\b))/gi
 const SEVERITY_PREFIX_RE = /^\s*(?:p[0-3]|critical|high|medium|low|info)\s*:\s*/i
 
 function normalizeNonCodeSegment(s: string): string {
