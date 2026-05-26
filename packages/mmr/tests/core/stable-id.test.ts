@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import {
+  computeFindingKey,
   normalizeDescriptionForKey,
   normalizeLocationForKey,
   normalizeSuggestionForKey,
 } from '../../src/core/stable-id.js'
+import type { Finding } from '../../src/types.js'
 
 describe('normalizeLocationForKey', () => {
   it('lowercases and trims', () => {
@@ -154,5 +156,65 @@ describe('normalizeSuggestionForKey', () => {
 
   it('handles empty input', () => {
     expect(normalizeSuggestionForKey('')).toBe('')
+  })
+})
+
+describe('computeFindingKey', () => {
+  it('produces a 40-char sha1 hex string', () => {
+    const f: Finding = {
+      severity: 'P1',
+      location: 'src/foo.ts:42',
+      description: 'bug',
+      suggestion: 'fix it',
+    }
+    const key = computeFindingKey(f)
+    expect(key).toMatch(/^[a-f0-9]{40}$/)
+  })
+
+  it('produces the same key for two findings whose only difference is line number', () => {
+    const a: Finding = { severity: 'P1', location: 'src/foo.ts:42', description: 'bug', suggestion: 'fix' }
+    const b: Finding = { severity: 'P1', location: 'src/foo.ts:99', description: 'bug', suggestion: 'fix' }
+    expect(computeFindingKey(a)).toBe(computeFindingKey(b))
+  })
+
+  it('produces the same key for two findings whose only difference is severity', () => {
+    const a: Finding = { severity: 'P0', location: 'src/foo.ts:42', description: 'bug', suggestion: 'fix' }
+    const b: Finding = { severity: 'P2', location: 'src/foo.ts:42', description: 'bug', suggestion: 'fix' }
+    expect(computeFindingKey(a)).toBe(computeFindingKey(b))
+  })
+
+  it('produces DIFFERENT keys for same-file findings with different code identifiers', () => {
+    // This is the load-bearing T2-A collision-avoidance case.
+    const a: Finding = {
+      severity: 'P2',
+      location: 'src/foo.ts:42',
+      description: 'Variable `fooBar` is unused',
+      suggestion: 'remove `fooBar`',
+    }
+    const b: Finding = {
+      severity: 'P2',
+      location: 'src/foo.ts:42',
+      description: 'Variable `bazQux` is unused',
+      suggestion: 'remove `bazQux`',
+    }
+    expect(computeFindingKey(a)).not.toBe(computeFindingKey(b))
+  })
+
+  it('produces DIFFERENT keys when only suggestion differs', () => {
+    const a: Finding = { severity: 'P2', location: 'src/foo.ts:42', description: 'bug', suggestion: 'rename to a' }
+    const b: Finding = { severity: 'P2', location: 'src/foo.ts:42', description: 'bug', suggestion: 'rename to b' }
+    expect(computeFindingKey(a)).not.toBe(computeFindingKey(b))
+  })
+
+  it('produces DIFFERENT keys when only category differs', () => {
+    const a: Finding = { category: 'security', severity: 'P2', location: 'src/foo.ts:42', description: 'bug', suggestion: 'fix' }
+    const b: Finding = { category: 'style', severity: 'P2', location: 'src/foo.ts:42', description: 'bug', suggestion: 'fix' }
+    expect(computeFindingKey(a)).not.toBe(computeFindingKey(b))
+  })
+
+  it('treats missing category as the same as empty-string category for keying', () => {
+    const a: Finding = { severity: 'P2', location: 'src/foo.ts:42', description: 'bug', suggestion: 'fix' }
+    const b: Finding = { category: '', severity: 'P2', location: 'src/foo.ts:42', description: 'bug', suggestion: 'fix' }
+    expect(computeFindingKey(a)).toBe(computeFindingKey(b))
   })
 })
