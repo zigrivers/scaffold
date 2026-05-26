@@ -1,5 +1,6 @@
 import type { Dispatcher } from '../audit-runner.js'
 import { buildAnthropicDispatcher } from './anthropic.js'
+import { buildDeepseekDispatcher } from './deepseek.js'
 
 export type Provider = 'anthropic' | 'deepseek'
 
@@ -125,7 +126,20 @@ export function buildDispatcher(provider: Provider, opts: BuildDispatcherOptions
     return buildAnthropicDispatcher({ timeoutSec: opts.timeoutSec })
   }
   if (provider === 'deepseek') {
-    throw new Error('deepseek provider not yet wired — see Task 4')
+    const apiKey = opts.env['DEEPSEEK_API_KEY']
+    if (!apiKey) {
+      throw new Error(
+        'deepseek provider selected but DEEPSEEK_API_KEY env var is not set. ' +
+        'Either export the key or pick a different provider via --provider / ' +
+        'KNOWLEDGE_FRESHNESS_PROVIDER.',
+      )
+    }
+    const modelOverride = opts.env['KNOWLEDGE_FRESHNESS_DEEPSEEK_MODEL']
+    return buildDeepseekDispatcher({
+      apiKey,
+      timeoutSec: opts.timeoutSec,
+      model: modelOverride,
+    })
   }
   // Unreachable: the type narrowing above is exhaustive.
   throw new Error(`unknown provider ${provider as string}`)

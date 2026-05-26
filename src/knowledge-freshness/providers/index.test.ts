@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resolveProvider } from './index.js'
+import { resolveProvider, buildDispatcher } from './index.js'
 
 // `claudeOnPath` is injected so tests don't depend on the host's $PATH.
 // We type `env` as `Record<string, string | undefined>` directly rather
@@ -98,5 +98,19 @@ describe('resolveProvider', () => {
   it('rejects an invalid KNOWLEDGE_FRESHNESS_PROVIDER env value', () => {
     expect(() => resolveProvider(opts({ KNOWLEDGE_FRESHNESS_PROVIDER: 'gemini' }, {}, true)))
       .toThrow(/unknown provider "gemini"/i)
+  })
+})
+
+describe('buildDispatcher — deepseek wiring', () => {
+  it('throws when deepseek is selected but DEEPSEEK_API_KEY is not in env', () => {
+    expect(() => buildDispatcher('deepseek', { timeoutSec: 60, env: {} }))
+      .toThrow(/DEEPSEEK_API_KEY env var is not set/)
+  })
+
+  it('constructs a Dispatcher when DEEPSEEK_API_KEY is set', () => {
+    // We don't call the dispatcher (no fetch mock here) — just verify
+    // construction succeeds.
+    const d = buildDispatcher('deepseek', { timeoutSec: 60, env: { DEEPSEEK_API_KEY: 'sk-x' } })
+    expect(typeof d).toBe('function')
   })
 })
