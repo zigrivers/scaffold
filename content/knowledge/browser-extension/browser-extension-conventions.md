@@ -2,6 +2,12 @@
 name: browser-extension-conventions
 description: Naming conventions for manifests, message action types, file organization, and i18n structure in browser extensions
 topics: [browser-extension, conventions, naming, i18n, file-organization, messaging]
+volatility: evolving
+last-reviewed: null
+version-pin: 'Manifest V3'
+sources:
+  - url: https://developer.chrome.com/docs/extensions/reference/manifest
+  - url: https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Internationalization
 ---
 
 Browser extensions accumulate technical debt faster than typical web apps because they span multiple execution contexts — content scripts, service workers, popup pages, options pages — each with distinct constraints. Consistent naming conventions and file organization make cross-context code navigable and reduce the cognitive overhead of working across these boundaries. Establish conventions before writing code.

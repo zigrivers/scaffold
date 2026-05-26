@@ -2,6 +2,13 @@
 name: browser-extension-security
 description: Content Security Policy for extensions, prohibitions on eval and inline scripts, host permissions principle of least privilege, and XSS prevention in extension UIs
 topics: [browser-extension, security, csp, xss, permissions, least-privilege, eval]
+volatility: evolving
+last-reviewed: null
+version-pin: 'Manifest V3'
+sources:
+  - url: https://developer.chrome.com/docs/extensions/reference/manifest/content-security-policy
+  - url: https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Content_Security_Policy
+  - url: https://owasp.org/www-community/attacks/xss/
 ---
 
 Browser extensions run with elevated browser privileges compared to ordinary web pages. A compromised extension can read browsing history, intercept network requests, steal cookies, and inject content into any page it has permission to access. Security is not optional — it is a first-class requirement enforced by the browser, the store review process, and the trust of every user who installs the extension.

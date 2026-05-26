@@ -2,6 +2,12 @@
 name: browser-extension-requirements
 description: User permissions model, store policies (Chrome Web Store, AMO), accessibility requirements, and performance budgets for browser extensions
 topics: [browser-extension, requirements, permissions, store-policies, accessibility, performance]
+volatility: evolving
+last-reviewed: null
+version-pin: 'Manifest V3'
+sources:
+  - url: https://developer.chrome.com/docs/webstore/program-policies
+  - url: https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/AMO/Policy
 ---
 
 Browser extension requirements differ fundamentally from web app requirements because the extension operates inside a user's browser with elevated trust and broad access to browsing data. Every permission requested must be justified, every store policy must be understood before writing code, and performance budgets must be set early because extensions run on every page a user visits — regressions directly degrade the entire browsing experience.
