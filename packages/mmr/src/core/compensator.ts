@@ -1,6 +1,6 @@
 import { dispatchChannel } from './dispatcher.js'
 import type { JobStore } from './job-store.js'
-import type { MmrConfigParsed, OutputParserConfig } from '../config/schema.js'
+import type { ChannelConfigParsed, MmrConfigParsed, OutputParserConfig } from '../config/schema.js'
 import type { ChannelStatus } from '../types.js'
 
 /** Focus areas for compensating passes, keyed by the channel being compensated */
@@ -52,13 +52,7 @@ export function resolveCompensatorDispatch(config: MmrConfigParsed): Compensator
     return defaultCompensatorDispatch(config)
   }
 
-  const channelConfig = config.channels[channelName]
-  if (!channelConfig) {
-    throw new Error(`Compensator channel "${channelName}" not found in config`)
-  }
-  if (!channelConfig.command) {
-    throw new Error(`Compensator channel "${channelName}" has no command`)
-  }
+  const channelConfig = getDispatchableCompensatorChannel(config, channelName)
 
   return {
     command: channelConfig.command,
@@ -73,6 +67,23 @@ export function resolveCompensatorDispatch(config: MmrConfigParsed): Compensator
 
 export function resolveCompensatorChannelName(config: MmrConfigParsed): string {
   return config.defaults.compensator?.channel ?? 'claude'
+}
+
+export function getDispatchableCompensatorChannel(
+  config: MmrConfigParsed,
+  channelName: string,
+): ChannelConfigParsed & { command: string } {
+  const channelConfig = config.channels[channelName]
+  if (!channelConfig) {
+    throw new Error(`Compensator channel "${channelName}" not found in config`)
+  }
+  if (channelConfig.abstract) {
+    throw new Error(`Compensator channel "${channelName}" is abstract and cannot be dispatched`)
+  }
+  if (!channelConfig.command) {
+    throw new Error(`Compensator channel "${channelName}" has no command`)
+  }
+  return channelConfig as ChannelConfigParsed & { command: string }
 }
 
 function applyPromptWrapper(wrapper: string, prompt: string): string {

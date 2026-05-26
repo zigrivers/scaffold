@@ -185,7 +185,9 @@ describe('resolveCompensatorDispatch', () => {
         },
       },
     }
-    expect(() => resolveCompensatorDispatch(cfg)).toThrow('Compensator channel "abstract-base" has no command')
+    expect(() => resolveCompensatorDispatch(cfg)).toThrow(
+      'Compensator channel "abstract-base" is abstract and cannot be dispatched',
+    )
   })
 })
 

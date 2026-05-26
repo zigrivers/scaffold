@@ -12,6 +12,7 @@ import { runResultsPipeline } from '../core/results-pipeline.js'
 import {
   getCompensatingChannels,
   dispatchCompensatingPasses,
+  getDispatchableCompensatorChannel,
   resolveCompensatorChannelName,
   resolveCompensatorDispatch,
 } from '../core/compensator.js'
@@ -140,14 +141,7 @@ export async function checkConfiguredCompensatorAvailability(
   const channelName = config.defaults.compensator?.channel
   if (!channelName) return { status: 'ok', auth: 'ok' }
 
-  const chConfig = config.channels[channelName]
-  if (!chConfig || chConfig.abstract || !chConfig.command) {
-    return {
-      status: 'skipped',
-      auth: 'skipped',
-      recovery: `Compensator channel "${channelName}" is not dispatchable`,
-    }
-  }
+  const chConfig = getDispatchableCompensatorChannel(config, channelName)
   const cmd = chConfig.command.split(' ')[0]
   const installed = await checkInstalled(cmd)
   if (!installed) {
@@ -414,19 +408,16 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
 
     if (compensating.length > 0) {
       const compensatorAvailability = await checkConfiguredCompensatorAvailability(config)
-      const outputParser = compensatorAvailability.status === 'ok'
-        ? resolveCompensatorDispatch(config).output_parser
-        : 'default'
-      // Register compensating channels in job.json so loadJob can discover them
-      for (const comp of compensating) {
-        store.registerChannel(job.job_id, comp.compensatingName, {
-          status: compensatorAvailability.status === 'ok' ? 'dispatched' : compensatorAvailability.status,
-          auth: compensatorAvailability.auth,
-          recovery: compensatorAvailability.recovery,
-          output_parser: outputParser,
-        })
-      }
       if (compensatorAvailability.status === 'ok') {
+        const dispatch = resolveCompensatorDispatch(config)
+        // Register compensating channels in job.json so loadJob can discover them
+        for (const comp of compensating) {
+          store.registerChannel(job.job_id, comp.compensatingName, {
+            status: 'dispatched',
+            auth: 'ok',
+            output_parser: dispatch.output_parser,
+          })
+        }
         await dispatchCompensatingPasses(store, job.job_id, prompt, compensating, config)
       }
     }
