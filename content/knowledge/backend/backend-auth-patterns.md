@@ -2,6 +2,15 @@
 name: backend-auth-patterns
 description: JWT lifecycle, OAuth2 authorization code flow, API key management, and service-to-service authentication
 topics: [backend, auth, jwt, oauth2, api-keys, mtls, security]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://www.rfc-editor.org/rfc/rfc6749
+  - url: https://www.rfc-editor.org/rfc/rfc7519
+  - url: https://www.rfc-editor.org/rfc/rfc7636
+  - url: https://openid.net/specs/openid-connect-core-1_0.html
+  - url: https://owasp.org/www-project-api-security/
 ---
 
 Authentication and authorization are the first line of defense for any backend service — mistakes here compromise the entire system, making it essential to use proven patterns like JWTs with rotation, OAuth2 with PKCE, and workload identity from the start.

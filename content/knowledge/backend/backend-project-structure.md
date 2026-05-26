@@ -2,6 +2,12 @@
 name: backend-project-structure
 description: Canonical directory layout for backend services — routes/controllers, services, models/repositories, middleware, utils, config resolution, and dependency injection patterns
 topics: [backend, project-structure, architecture, dependency-injection, layers]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://martinfowler.com/eaaCatalog/
+  - url: https://martinfowler.com/articles/injection.html
 ---
 
 A well-organized backend project is readable to a new engineer in minutes. The directory layout should communicate the architecture: which layer owns which responsibility, where to add a new feature, and where to find any piece of behavior. The most common structural failure is mixing concerns — business logic in controllers, database calls in services, HTTP parsing in repositories. Enforce boundaries through structure first, tooling second.

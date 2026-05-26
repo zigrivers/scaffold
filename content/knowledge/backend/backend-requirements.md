@@ -2,6 +2,12 @@
 name: backend-requirements
 description: API-first design principles, SLA requirements (latency p99, uptime, throughput), scalability targets, backwards compatibility commitments, and API versioning strategy
 topics: [backend, requirements, sla, api, versioning, scalability, performance]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://spec.openapis.org/oas/latest.html
+  - url: https://sre.google/sre-book/service-level-objectives/
 ---
 
 Backend requirements are the contract the service makes with its consumers — other teams, external developers, and end users. Setting explicit SLAs, versioning policies, and scalability targets before any code is written eliminates the most expensive class of late-breaking architectural changes. A backend that surprises its callers with latency spikes or breaking changes destroys trust and creates cascading toil.

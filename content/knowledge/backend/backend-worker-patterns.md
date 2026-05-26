@@ -2,6 +2,12 @@
 name: backend-worker-patterns
 description: Background job frameworks, cron scheduling, event consumers, dead letter queues, retry strategies, and graceful shutdown for workers
 topics: [backend, workers, bullmq, celery, temporal, cron, background-jobs, dlq]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://microservices.io/patterns/data/transactional-outbox.html
+  - url: https://sre.google/sre-book/handling-overload/
 ---
 
 Background workers offload time-consuming and deferred work from the request path, but they introduce their own failure modes — jobs that silently vanish, duplicate executions, and unclean shutdowns during deploys all require deliberate design to prevent.

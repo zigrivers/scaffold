@@ -2,6 +2,11 @@
 name: backend-dev-environment
 description: Docker Compose for local databases and queues, database seeding and migration scripts, API testing tools, environment variable management, and local SSL setup
 topics: [backend, dev-environment, docker, migrations, testing, environment-variables]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://www.postgresql.org/docs/current/
 ---
 
 A backend development environment that requires manual setup steps is a productivity drain and an onboarding failure. The standard should be: clone the repo, run one command, and have a fully functional local environment in under five minutes. Docker Compose is the primary tool for achieving this — it pins the exact versions of every external dependency and makes the environment reproducible across all developer machines.

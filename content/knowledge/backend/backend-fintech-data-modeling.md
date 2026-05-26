@@ -2,6 +2,12 @@
 name: backend-fintech-data-modeling
 description: Financial data models; currency handling; decimal precision; positions, trades, prices; time-series designs.
 topics: [backend, fintech, data-modeling, decimal, currency, time-series, positions, trades]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://www.postgresql.org/docs/current/datatype-numeric.html
+  - url: https://www.iso.org/iso-4217-currency-codes.html
 ---
 
 Financial data modeling is where most fintech bugs are born: a float creeps into a money field, a currency is implied instead of stored, a tick table grows unbounded, or a `current_position` column drifts from the journal. This doc covers the non-negotiable shapes of money, quantity, and price data, and the time-series and derived-view patterns that keep a trading or banking system honest at scale.

@@ -2,6 +2,12 @@
 name: backend-conventions
 description: Service and handler naming conventions, structured error handling patterns, structured logging with correlation IDs, and file organization standards for backend codebases
 topics: [backend, conventions, error-handling, logging, naming, file-organization]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://google.github.io/styleguide/
+  - url: https://martinfowler.com/tags/clean%20code.html
 ---
 
 Consistent conventions in a backend codebase reduce cognitive load, make code reviewable at a glance, and prevent entire classes of bugs. Naming, error handling, and logging are the three highest-leverage areas — they touch every layer of the stack and every engineer on the team. Establish these conventions before the first PR, codify them in linting rules where possible, and treat violations as blocking review comments.

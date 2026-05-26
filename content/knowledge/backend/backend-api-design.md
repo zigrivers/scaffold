@@ -2,6 +2,14 @@
 name: backend-api-design
 description: REST maturity levels, GraphQL schema-first design, gRPC protobuf conventions, tRPC router patterns, API versioning strategies, pagination, and filtering
 topics: [backend, api-design, rest, graphql, grpc, trpc, versioning, pagination]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://spec.openapis.org/oas/latest.html
+  - url: https://spec.graphql.org/
+  - url: https://www.rfc-editor.org/rfc/rfc9110.html
+  - url: https://martinfowler.com/articles/richardsonMaturityModel.html
 ---
 
 API design is a long-lived contract. Every structural decision — URL shape, error format, pagination scheme, versioning strategy — is expensive to change after consumers depend on it. Design APIs from the consumer's perspective first. The best API is one where new developers can predict the shape of an endpoint they have never seen before, because every other endpoint follows the same patterns.

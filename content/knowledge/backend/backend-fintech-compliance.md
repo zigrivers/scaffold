@@ -2,6 +2,10 @@
 name: backend-fintech-compliance
 description: PCI-DSS, SOC 2, SEC/FINRA regulations for consumer/B2B fintech backends; audit trail immutability; data retention; segregation of duties.
 topics: [backend, fintech, compliance, pci-dss, soc2, sec, finra, audit-trail, gdpr]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Fintech compliance is not a checklist applied at the end — it determines schema design, deployment pipelines, and system boundaries. Most regulations apply based on what a service *touches* (cards, trades, PII), so scope reduction is the single highest-leverage design decision available to engineering. This doc covers the regulatory regimes a typical US/EU fintech encounters, the audit-trail patterns they demand, and concrete implementation choices that keep audits survivable.
