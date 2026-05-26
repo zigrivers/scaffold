@@ -45,7 +45,8 @@ function defaultCompensatorDispatch(config: MmrConfigParsed): CompensatorDispatc
 }
 
 export function resolveCompensatorDispatch(config: MmrConfigParsed): CompensatorDispatch {
-  const channelName = config.defaults.compensator?.channel
+  const { defaults } = config
+  const channelName = defaults.compensator?.channel
   if (!channelName) {
     return defaultCompensatorDispatch(config)
   }
@@ -98,7 +99,7 @@ export function resolveCompensatorFocus(
   originalChannel: string,
 ): string {
   const override = config.defaults.compensator?.channel_focus_map?.[originalChannel]
-  if (typeof override === 'string' && override.length > 0) return override
+  if (typeof override === 'string' && override.trim().length > 0) return override
   const builtin = COMPENSATING_FOCUS[originalChannel]
   if (builtin) return builtin
   return `Focus your review on areas typically covered by ${originalChannel}.`
