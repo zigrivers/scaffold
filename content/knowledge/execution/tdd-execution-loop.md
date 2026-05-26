@@ -6,7 +6,7 @@ volatility: stable
 last-reviewed: null
 version-pin: null
 sources:
-  - https://martinfowler.com/bliki/TestDrivenDevelopment.html
+  - url: https://martinfowler.com/bliki/TestDrivenDevelopment.html
 ---
 
 # TDD Execution Loop
