@@ -75,6 +75,24 @@ describe('dispatchChannel', () => {
     expect(output).toContain('approved')
   })
 
+  it('executes command and flags as separate spawn arguments', async () => {
+    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['splitargs'] })
+    store.savePrompt(job.job_id, 'Review this.')
+
+    await dispatchChannel(store, job.job_id, 'splitargs', {
+      command: 'node',
+      prompt: '',
+      flags: ['-e', 'process.stdout.write(process.argv.includes("sentinel") ? "ok" : "missing")', 'sentinel'],
+      env: {},
+      timeout: 10,
+      stderr: 'capture',
+    })
+
+    const loaded = store.loadJob(job.job_id)
+    expect(loaded.channels.splitargs.status).toBe('completed')
+    expect(store.loadChannelOutput(job.job_id, 'splitargs')).toContain('ok')
+  })
+
   it('handles channel timeout', async () => {
     const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['slow'] })
     store.savePrompt(job.job_id, 'Review this.')

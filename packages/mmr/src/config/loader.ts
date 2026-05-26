@@ -173,6 +173,7 @@ function validateCompensatorReference(config: MmrConfigParsed): void {
   const compensator = config.defaults.compensator
   if (!compensator) return
   const ref = compensator.channel
+  if (ref === undefined) return
   const hasTarget = Object.prototype.hasOwnProperty.call(config.channels, ref)
   const target = config.channels[ref]
   if (!hasTarget || !target) {
@@ -187,6 +188,12 @@ function validateCompensatorReference(config: MmrConfigParsed): void {
     throw new Error(
       `defaults.compensator.channel "${ref}" is marked abstract: true (T1-A). `
       + 'Abstract channels are non-dispatchable templates; reference a concrete channel that extends it instead.',
+    )
+  }
+  if (!target.command) {
+    throw new Error(
+      `defaults.compensator.channel "${ref}" is missing command. `
+      + 'Compensator channels must be concrete dispatch targets.',
     )
   }
 }
@@ -254,8 +261,8 @@ function parseMergedConfig(mergedRaw: Record<string, unknown>, warn: WarningSink
 
   const config = MmrConfigSchema.parse(merged)
   warnOnInlineSecretHeaders(config, warn)
-  validateRunnableChannels(config)
   validateCompensatorReference(config)
+  validateRunnableChannels(config)
   return config
 }
 

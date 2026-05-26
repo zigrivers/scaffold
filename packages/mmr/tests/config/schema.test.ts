@@ -366,10 +366,34 @@ describe('defaults.compensator (T1-G)', () => {
     expect(result.success).toBe(true)
   })
 
-  it('rejects a compensator block missing the required channel field', () => {
+  it('accepts a compensator block with only channel_focus_map', () => {
+    const config = {
+      version: 1,
+      defaults: { compensator: { channel_focus_map: { codex: 'Focus on correctness' } } },
+      channels: {},
+    }
+    const result = MmrConfigSchema.safeParse(config)
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.defaults.compensator?.channel).toBeUndefined()
+      expect(result.data.defaults.compensator?.channel_focus_map?.codex).toBe('Focus on correctness')
+    }
+  })
+
+  it('rejects an empty compensator block', () => {
     const config = {
       version: 1,
       defaults: { compensator: {} },
+      channels: {},
+    }
+    const result = MmrConfigSchema.safeParse(config)
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects a compensator block with misspelled keys', () => {
+    const config = {
+      version: 1,
+      defaults: { compensator: { chanel: 'qwen-local' } },
       channels: {},
     }
     const result = MmrConfigSchema.safeParse(config)
