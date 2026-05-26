@@ -2,6 +2,10 @@
 name: cross-phase-consistency
 description: Auditing consistency across pipeline phases — naming, assumptions, data flows, interface contracts
 topics: [validation, consistency, naming, data-flow, contracts]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 # Cross-Phase Consistency
