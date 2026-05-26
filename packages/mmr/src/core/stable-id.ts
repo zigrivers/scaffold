@@ -12,7 +12,7 @@ export function normalizeLocationForKey(location: string): string {
   return location.toLowerCase().trim().replace(LOCATION_SPAN_RE, '')
 }
 
-const LINE_MENTION_RE = /\bline \d+\b/gi
+const LINE_MENTION_RE = /\b(?:at\s+)?line \d+\b/gi
 const VALUE_AFTER_AT_UNITS = [
   'seconds?',
   'minutes?',

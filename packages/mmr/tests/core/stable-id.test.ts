@@ -64,7 +64,14 @@ describe('normalizeDescriptionForKey', () => {
   })
 
   it('strips line-number mentions like "line 42"', () => {
-    expect(normalizeDescriptionForKey('Bug at line 42 here')).toBe('bug at here')
+    expect(normalizeDescriptionForKey('Bug at line 42 here')).toBe('bug here')
+  })
+
+  it('normalizes "at line N" like equivalent "at N" location references', () => {
+    const withLine = normalizeDescriptionForKey('Bug found at line 42 in code')
+    const withoutLine = normalizeDescriptionForKey('Bug found at 42 in code')
+    expect(withLine).toBe('bug found in code')
+    expect(withLine).toBe(withoutLine)
   })
 
   it('strips "at 42" mentions', () => {
