@@ -54,3 +54,4 @@
 [2026-05-26T12:12:11Z] v3.30 Task 1: merged (PR #394, MMR rounds: 1, deferred: 0; CI checks not reported by GitHub, local make check-all passed)
 [2026-05-26T17:31:27Z] v3.30 Task 2: merged (PR #395, MMR rounds: 10, deferred: 1)
 [2026-05-26T19:27:08Z] v3.30 Task 3: merged (PR #396, MMR rounds: 5, deferred: 0)
+[2026-05-26T21:47:24Z] v3.30 Task 4: merged (PR #398, MMR rounds: 6, deferred: 0)
