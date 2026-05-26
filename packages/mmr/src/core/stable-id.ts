@@ -50,15 +50,16 @@ export function normalizeDescriptionForKey(description: string): string {
   let cursor = 0
 
   for (const match of description.matchAll(CODE_SPAN_RE)) {
-    const before = description.slice(cursor, match.index)
+    const index = match.index ?? 0
+    const before = description.slice(cursor, index)
     appendNormalizedPart(out, normalizeNonCodeSegment(before), /^\s/.test(before))
     appendNormalizedPart(out, '`' + match[1] + '`', /\s$/.test(before))
-    cursor = (match.index ?? 0) + match[0].length
+    cursor = index + match[0].length
   }
 
   const tail = description.slice(cursor)
   appendNormalizedPart(out, normalizeNonCodeSegment(tail), /^\s/.test(tail))
-  return out.join('').replace(/\s+/g, ' ').trim()
+  return out.join('').trim()
 }
 
 function appendNormalizedPart(out: string[], part: string, spaceBefore: boolean): void {

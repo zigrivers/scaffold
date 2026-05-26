@@ -45,6 +45,14 @@ describe('normalizeDescriptionForKey', () => {
     expect(normalizeDescriptionForKey('Variable `fooBar` is unused')).toBe('variable `fooBar` is unused')
   })
 
+  it('preserves whitespace inside backtick code spans', () => {
+    const doubleSpace = normalizeDescriptionForKey('Value `foo  bar` differs')
+    const singleSpace = normalizeDescriptionForKey('Value `foo bar` differs')
+    expect(doubleSpace).toBe('value `foo  bar` differs')
+    expect(singleSpace).toBe('value `foo bar` differs')
+    expect(doubleSpace).not.toBe(singleSpace)
+  })
+
   it('does not add spaces around adjacent code spans', () => {
     expect(normalizeDescriptionForKey('Type`T`')).toBe('type`T`')
   })
