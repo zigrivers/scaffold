@@ -168,3 +168,49 @@ export function findScaffoldKnowledgeRoot(startDir: string): string | null {
 export function findScaffoldKnowledgeRootFromImportMeta(metaUrl: string): string | null {
   return findScaffoldKnowledgeRoot(path.dirname(fileURLToPath(metaUrl)))
 }
+
+// ─── validateKnowledgeRoot ──────────────────────────────────────────────────
+
+export type ValidateResult =
+  | { ok: true; index: Set<string> }
+  | { ok: false; reason: string }
+
+/**
+ * Validate that `candidatePath` is a real scaffold knowledge directory.
+ * Two checks:
+ *
+ *   1. The directory exists, IS a directory, and contains a `VERSION`
+ *      marker file. VERSION lives ONLY at content/knowledge/VERSION in
+ *      the scaffold repo (added in Phase 1); requiring it forecloses
+ *      "operator pointed at an ancestor" cases like
+ *      `--knowledge-root <repo>/content` that would otherwise pass an
+ *      empty-tree-loose validator (the recursive walk would find the
+ *      nested KB entries).
+ *   2. loadKnowledgeIndex(candidatePath) succeeds. An empty Set is
+ *      valid (freshly-initialized KB).
+ *
+ * Returns { ok: true, index } on success so the resolver doesn't have
+ * to walk a second time.
+ */
+export function validateKnowledgeRoot(candidatePath: string): ValidateResult {
+  let stat: fs.Stats
+  try { stat = fs.statSync(candidatePath) }
+  catch { return { ok: false, reason: `path does not exist: ${candidatePath}` } }
+  if (!stat.isDirectory()) {
+    return { ok: false, reason: `path is not a directory: ${candidatePath}` }
+  }
+  const markerPath = path.join(candidatePath, 'VERSION')
+  if (!fs.existsSync(markerPath)) {
+    return {
+      ok: false,
+      reason: `missing knowledge-base VERSION marker — path does not appear to be a scaffold knowledge directory: ${candidatePath}`,
+    }
+  }
+  let index: Set<string>
+  try { index = loadKnowledgeIndex(candidatePath) }
+  catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return { ok: false, reason: `index load failed: ${msg}` }
+  }
+  return { ok: true, index }
+}

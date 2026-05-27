@@ -176,3 +176,59 @@ describe('findScaffoldKnowledgeRoot', () => {
     expect(findScaffoldKnowledgeRoot(start)).toBe(path.join(root, 'content', 'knowledge'))
   })
 })
+
+import { validateKnowledgeRoot } from './knowledge-index.js'
+
+describe('validateKnowledgeRoot', () => {
+  it('fails when the path does not exist', () => {
+    const result = validateKnowledgeRoot('/tmp/definitely-nope-xyz-99999')
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.reason).toMatch(/does not exist/i)
+  })
+
+  it('fails when the path is a file', () => {
+    const dir = makeKbDir({ 'VERSION': '0.1.0\n' })
+    const result = validateKnowledgeRoot(path.join(dir, 'VERSION'))
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.reason).toMatch(/not a directory/i)
+  })
+
+  it('fails when VERSION marker is missing', () => {
+    const dir = makeKbDir({ 'core/x.md': '---\nname: x\n---\n' })
+    const result = validateKnowledgeRoot(dir)
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.reason).toMatch(/VERSION marker/i)
+  })
+
+  it('passes with VERSION marker and entries', () => {
+    const dir = makeKbDir({
+      'VERSION': '0.1.0\n',
+      'core/x.md': '---\nname: x\n---\n',
+      'web/y.md': '---\nname: y\n---\n',
+    })
+    const result = validateKnowledgeRoot(dir)
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.index).toEqual(new Set(['x', 'y']))
+  })
+
+  it('passes with VERSION marker but EMPTY tree (freshly initialized KB)', () => {
+    const dir = makeKbDir({ 'VERSION': '0.1.0\n' })
+    const result = validateKnowledgeRoot(dir)
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.index).toEqual(new Set())
+  })
+
+  it('fails for an enclosing dir of the KB (e.g. content/)', () => {
+    // Simulates `--knowledge-root <repo>/content` — the recursive walk
+    // would find <repo>/content/knowledge/core/*.md, but VERSION lives
+    // ONLY at <repo>/content/knowledge/VERSION, not at <repo>/content/.
+    const root = makeKbDir({
+      'knowledge/VERSION': '0.1.0\n',
+      'knowledge/core/x.md': '---\nname: x\n---\n',
+      'tools/some-tool.md': '---\nname: some-tool\n---\n',
+    })
+    const result = validateKnowledgeRoot(root)
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.reason).toMatch(/VERSION marker/i)
+  })
+})
