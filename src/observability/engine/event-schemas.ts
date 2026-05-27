@@ -44,6 +44,20 @@ const VALID_BLOCKER_KINDS = ['dependency', 'ambiguity', 'external', 'environment
 const VALID_ACK_STATUSES = ['acknowledged', 'open'] as const
 const VALID_GAP_SOURCES = ['agent_search', 'lessons', 'manual'] as const
 
+/**
+ * Type guard for "is `value` one of the strings in `values`?" against a
+ * readonly tuple. Replaces the `VALID_X.includes(value as never)` pattern
+ * — the `as never` cast bypassed `.includes`'s strict tuple typing
+ * (Phase 3 deferred-finding F-001 / workstream C). A single `as
+ * readonly string[]` widening on the array side is type-safe; the
+ * caller gets narrowing back to the tuple's union via the type predicate.
+ */
+function isOneOf<T extends readonly string[]>(
+  values: T, value: unknown,
+): value is T[number] {
+  return typeof value === 'string' && (values as readonly string[]).includes(value)
+}
+
 function isStringArray(v: unknown): v is string[] {
   return Array.isArray(v) && v.every(x => typeof x === 'string')
 }
@@ -126,7 +140,7 @@ export function validateEvent(input: unknown): ValidationResult {
     }
     break
   case 'task_completed':
-    if (!VALID_OUTCOMES.includes(filteredPayload.outcome as never)) {
+    if (!isOneOf(VALID_OUTCOMES, filteredPayload.outcome)) {
       errors.push('task_completed.payload.outcome must be pr_submitted | dropped | superseded')
     }
     if (filteredPayload.outcome === 'pr_submitted' && filteredPayload.pr_number === undefined) {
@@ -145,7 +159,7 @@ export function validateEvent(input: unknown): ValidationResult {
     optStrArr('decision_recorded.payload.links', filteredPayload.links, errors)
     break
   case 'blocker_hit':
-    if (!VALID_BLOCKER_KINDS.includes(filteredPayload.kind as never)) {
+    if (!isOneOf(VALID_BLOCKER_KINDS, filteredPayload.kind)) {
       errors.push('blocker_hit.payload.kind must be dependency | ambiguity | external | environment')
     }
     reqStr('blocker_hit.payload.summary', filteredPayload.summary, errors, 500)
@@ -169,7 +183,7 @@ export function validateEvent(input: unknown): ValidationResult {
     if (typeof filteredPayload.finding_id !== 'string') {
       errors.push('finding_acknowledged.payload.finding_id required')
     }
-    if (!VALID_ACK_STATUSES.includes(filteredPayload.status as never)) {
+    if (!isOneOf(VALID_ACK_STATUSES, filteredPayload.status)) {
       errors.push('finding_acknowledged.payload.status must be acknowledged | open')
     }
     optStr('finding_acknowledged.payload.note', filteredPayload.note, errors, 200)
@@ -183,7 +197,7 @@ export function validateEvent(input: unknown): ValidationResult {
         '(lowercase, hyphen-separated)',
       )
     }
-    if (!VALID_GAP_SOURCES.includes(filteredPayload.source as never)) {
+    if (!isOneOf(VALID_GAP_SOURCES, filteredPayload.source)) {
       errors.push(
         'knowledge_gap_signal.payload.source must be agent_search | lessons | manual',
       )
