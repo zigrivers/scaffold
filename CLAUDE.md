@@ -296,6 +296,8 @@ lenses:
     ui_glob: "src/components/**/*.{tsx,vue}"
   F-scope:
     untouched_story_grace_hours: 168
+  I-knowledge-gaps:
+    # knowledge_root: /absolute/path/to/content/knowledge   # optional; defaults to auto-detect
 disabled_lenses: []
 phase_audit:
   enabled: true

@@ -396,3 +396,43 @@ will close the finding automatically once
 `content/knowledge/<category>/<topic>.md` exists. See
 `docs/superpowers/deferred-findings/feat+knowledge-freshness-phase-3.md`
 (PR #397 review F-001) for the design rationale.
+
+## Existing-entry suppression (Lens I)
+
+Lens I (knowledge gaps) automatically suppresses gap findings for topics
+that already have an entry in `content/knowledge/`. Adding
+`content/knowledge/<category>/<slug>.md` with frontmatter `name: <slug>`
+removes the matching finding on the next audit — no need to `scaffold
+observe ack` it.
+
+**How the audit finds the knowledge base.** Three-tier resolution
+(highest precedence first):
+
+1. `scaffold observe audit --knowledge-root <path>` — operator-typed
+   CLI override; hard-errors if `<path>` doesn't exist, isn't a
+   directory, or lacks the `VERSION` marker file.
+2. `.scaffold/observability.yaml`:
+   ```yaml
+   lenses:
+     I-knowledge-gaps:
+       knowledge_root: /absolute/path/to/content/knowledge
+   ```
+   Soft-fails to auto-detect if the path is invalid.
+3. Auto-detect — walks parent directories of the running CLI module
+   looking for a `package.json` whose `name` is `@zigrivers/scaffold`
+   AND a sibling `content/knowledge/` directory.
+
+If all three tiers miss, Lens I emits exactly one warning to stderr
+(`[Lens I] knowledge-root not located; …`) and runs without
+suppression. Findings still appear; new entries just won't close
+them automatically.
+
+**`--fix` flow.** `scaffold observe audit --fix --knowledge-root <p>`
+threads the override into the initial audit, the per-finding verifier
+audits, and the postfix audit — suppression behavior is consistent
+across the whole fix run.
+
+**Relationship to `scaffold observe ack`.** Suppression is automatic
+for the mechanical case (entry exists with matching slug → no
+finding). `ack` remains the manual override for everything else
+(noise topics, stale signals, intentionally-deferred gaps).
