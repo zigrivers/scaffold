@@ -1,23 +1,32 @@
-import { describe, it, expect } from 'vitest'
+import { afterEach, describe, it, expect, vi } from 'vitest'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { execFileSync } from 'node:child_process'
+import { runCli } from '../../src/cli.js'
 
-const mmrBin = path.resolve(__dirname, '../../dist/index.js')
+class ExitError extends Error {}
+
+const originalHome = process.env.HOME
+const originalMmrHome = process.env.MMR_HOME
+
+afterEach(() => {
+  process.env.HOME = originalHome
+  process.env.MMR_HOME = originalMmrHome
+  vi.restoreAllMocks()
+})
 
 describe('review - auto-link to session', () => {
-  it('auto-creates the session and appends the job on first review', () => {
+  it('auto-creates the session and appends the job on first review', async () => {
     const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-link-'))
+    process.env.HOME = tmpHome
+    delete process.env.MMR_HOME
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.spyOn(process, 'exit').mockImplementation(((code?: string | number | null) => {
+      throw new ExitError(`process.exit(${String(code)})`)
+    }) as never)
     try {
-      try {
-        execFileSync('node', [mmrBin, 'review', '--diff', '/dev/null', '--session', 'feat-foo', '--round', '1'], {
-          encoding: 'utf-8',
-          env: { ...process.env, HOME: tmpHome, MMR_HOME: undefined },
-        })
-      } catch {
-        // expected - empty diff
-      }
+      await expect(runCli(['review', '--diff', '/dev/null', '--session', 'feat-foo', '--round', '1']))
+        .rejects.toThrow(ExitError)
       const sessionFile = path.join(tmpHome, '.mmr', 'sessions', 'feat-foo.json')
       expect(fs.existsSync(sessionFile)).toBe(true)
       const session = JSON.parse(fs.readFileSync(sessionFile, 'utf-8')) as { session_id: string; jobs: string[] }
