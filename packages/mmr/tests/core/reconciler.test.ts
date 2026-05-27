@@ -144,6 +144,42 @@ describe('reconcile', () => {
     expect(result).toHaveLength(2)
   })
 
+  it('fuzzy-merges similar descriptions even when suggestions differ', () => {
+    const channelFindings: Record<string, Finding[]> = {
+      claude: [{ severity: 'P2', location: 'file.ts:10', description: 'Regression risk in checkout flow should be covered', suggestion: 'Add test' }],
+      gemini: [{
+        severity: 'P2',
+        location: 'file.ts:10',
+        description: 'Regression risk in checkout flow must be covered',
+        suggestion: 'Add backward compatibility coverage',
+      }],
+    }
+    const result = reconcile(channelFindings)
+    expect(result).toHaveLength(1)
+    expect(result[0].sources.sort()).toEqual(['claude', 'gemini'])
+  })
+
+  it('fuzzy-merges when only one channel provides category', () => {
+    const channelFindings: Record<string, Finding[]> = {
+      claude: [{
+        category: 'tests',
+        severity: 'P2',
+        location: 'file.ts:10',
+        description: 'Regression risk in checkout flow should be covered',
+        suggestion: 'Add test',
+      }],
+      gemini: [{
+        severity: 'P2',
+        location: 'file.ts:10',
+        description: 'Regression risk in checkout flow must be covered',
+        suggestion: 'Add test',
+      }],
+    }
+    const result = reconcile(channelFindings)
+    expect(result).toHaveLength(1)
+    expect(result[0].sources.sort()).toEqual(['claude', 'gemini'])
+  })
+
   it('does not fuzzy-merge findings with empty shingles', () => {
     const channelFindings: Record<string, Finding[]> = {
       claude: [{ severity: 'P2', location: 'file.ts:10', description: 'abc', suggestion: 'Add test' }],
