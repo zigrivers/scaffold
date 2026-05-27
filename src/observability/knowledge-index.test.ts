@@ -281,3 +281,90 @@ describe('emitOnceForAudit', () => {
     expect(stderrOutput).toBe('first\nsecond\n')
   })
 })
+
+import {
+  resolveKnowledgeRoot,
+  KnowledgeRootCliInvalidError,
+} from './knowledge-index.js'
+
+describe('resolveKnowledgeRoot', () => {
+  function makeValidKb(): string {
+    return makeKbDir({
+      'VERSION': '0.1.0\n',
+      'core/x.md': '---\nname: x\n---\n',
+    })
+  }
+
+  it('returns null with attempts.auto-detect=not-found when no input matches', () => {
+    const cwd = makeKbDir({})  // no yaml file, no scaffold install above
+    const result = resolveKnowledgeRoot({ cwd })
+    expect(result.root).toBeNull()
+    expect(result.index).toBeNull()
+    const autoAttempt = result.attempts.find(a => a.source === 'auto-detect')
+    expect(autoAttempt?.outcome).toBe('not-found')
+  })
+
+  it('returns the CLI override path when valid', () => {
+    const kb = makeValidKb()
+    const cwd = makeKbDir({})
+    const result = resolveKnowledgeRoot({ override: kb, cwd })
+    expect(result.root).toBe(kb)
+    expect(result.index?.has('x')).toBe(true)
+    const cliAttempt = result.attempts.find(a => a.source === 'cli')
+    expect(cliAttempt?.outcome).toBe('used')
+  })
+
+  it('throws KnowledgeRootCliInvalidError when override is invalid', () => {
+    const cwd = makeKbDir({})
+    expect(() =>
+      resolveKnowledgeRoot({ override: '/tmp/definitely-nope-99999', cwd })
+    ).toThrow(KnowledgeRootCliInvalidError)
+  })
+
+  it('reads yaml tier when no override and yaml is present and valid', () => {
+    const kb = makeValidKb()
+    const cwd = makeKbDir({
+      '.scaffold/observability.yaml':
+        `lenses:\n  I-knowledge-gaps:\n    knowledge_root: ${kb}\n`,
+    })
+    const result = resolveKnowledgeRoot({ cwd })
+    expect(result.root).toBe(kb)
+    const yamlAttempt = result.attempts.find(a => a.source === 'yaml')
+    expect(yamlAttempt?.outcome).toBe('used')
+  })
+
+  it('falls through to auto-detect when yaml path is invalid', () => {
+    const cwd = makeKbDir({
+      '.scaffold/observability.yaml':
+        `lenses:\n  I-knowledge-gaps:\n    knowledge_root: /tmp/bogus-99999\n`,
+    })
+    const result = resolveKnowledgeRoot({ cwd })
+    expect(result.root).toBeNull()
+    const yamlAttempt = result.attempts.find(a => a.source === 'yaml')
+    expect(yamlAttempt?.outcome).toBe('invalid')
+    expect(yamlAttempt?.reason).toMatch(/path does not exist/i)
+    const autoAttempt = result.attempts.find(a => a.source === 'auto-detect')
+    expect(autoAttempt?.outcome).toBe('not-found')
+  })
+
+  it('records yaml as not-provided when cwd is omitted', () => {
+    const result = resolveKnowledgeRoot({})
+    const yamlAttempt = result.attempts.find(a => a.source === 'yaml')
+    expect(yamlAttempt?.outcome).toBe('not-provided')
+  })
+
+  it('auto-detects when scaffold install is above cwd', () => {
+    const root = makeKbDir({
+      'package.json': JSON.stringify({ name: '@zigrivers/scaffold' }),
+      'content/knowledge/VERSION': '0.1.0\n',
+      'content/knowledge/x.md': '---\nname: x\n---\n',
+    })
+    const cwd = path.join(root, 'src')
+    fs.mkdirSync(cwd, { recursive: true })
+    const result = resolveKnowledgeRoot({ cwd })
+    expect(result.root).toBe(path.join(root, 'content', 'knowledge'))
+    expect(result.index?.has('x')).toBe(true)
+    const autoAttempt = result.attempts.find(a => a.source === 'auto-detect')
+    expect(autoAttempt?.outcome).toBe('used')
+  })
+})

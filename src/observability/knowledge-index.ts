@@ -238,3 +238,123 @@ export function emitOnceForAudit(
   warnedKeys.add(key)
   process.stderr.write(message)
 }
+
+// ─── resolveKnowledgeRoot ───────────────────────────────────────────────────
+
+import { loadObservabilityConfig } from './engine/checks/observability-config.js'
+
+/** Thrown by `resolveKnowledgeRoot` when an operator-supplied CLI
+ *  override path fails validation. The CLI handler (handleAudit)
+ *  catches it and exits non-zero. */
+export class KnowledgeRootCliInvalidError extends Error {
+  constructor(public readonly path: string, public readonly reason: string) {
+    super(`--knowledge-root path '${path}' is invalid: ${reason}`)
+    this.name = 'KnowledgeRootCliInvalidError'
+  }
+}
+
+export interface KnowledgeRootAttempt {
+  source: 'cli' | 'yaml' | 'auto-detect'
+  path?: string
+  outcome: 'used' | 'invalid' | 'not-provided' | 'not-found'
+  reason?: string
+}
+
+export interface KnowledgeRootResolution {
+  /** Validated absolute path to a knowledge directory, or null. */
+  root: string | null
+  /** Pre-loaded index Set, populated by the validator. Null when root
+   *  is null. Lens I reads this directly — no re-walk. */
+  index: Set<string> | null
+  /** Audit trail of what was tried. Lens I uses this to compose a
+   *  precise warn-once message when root is null. */
+  attempts: KnowledgeRootAttempt[]
+}
+
+export interface ResolveInput {
+  /** Optional caller-supplied CLI override (operator-typed
+   *  --knowledge-root flag). Invalid paths throw
+   *  KnowledgeRootCliInvalidError. */
+  override?: string
+  /** Working directory for reading .scaffold/observability.yaml. When
+   *  undefined, the yaml tier is skipped (recorded as
+   *  outcome: 'not-provided'). Typically the audited project's root. */
+  cwd?: string
+  /** Optional starting directory for the auto-detect parent-walk.
+   *  Production callers (runAudit, runFixFlow) pass a directory
+   *  INSIDE the CLI install — typically
+   *  `dirname(fileURLToPath(import.meta.url))` of their own module —
+   *  so the walk finds the install's `package.json` and
+   *  `content/knowledge/`. When undefined, falls back to `cwd` (and
+   *  then `process.cwd()`); this fallback is intended for tests, NOT
+   *  production. Without selfLocation, auto-detect cannot succeed for
+   *  downstream users running scaffold from outside the scaffold repo. */
+  selfLocation?: string
+}
+
+/**
+ * 3-tier knowledge-root resolution per the design spec (§2):
+ *   1. CLI override (hard-errors on validation failure)
+ *   2. .scaffold/observability.yaml lenses.I-knowledge-gaps.knowledge_root
+ *      (soft-fails to auto-detect on validation failure)
+ *   3. findScaffoldKnowledgeRoot starting from cwd (returns null if no
+ *      scaffold install is above the start dir)
+ *
+ * Returns a record carrying the validated root, the pre-loaded index
+ * (eliminating the need for a second walk in Lens I), and the
+ * attempts trail (used by Lens I's warning composition).
+ */
+export function resolveKnowledgeRoot(input: ResolveInput): KnowledgeRootResolution {
+  const attempts: KnowledgeRootAttempt[] = []
+
+  // Tier 1: CLI override (resolved to absolute against process.cwd()
+  // — the operator typed it at the command line, so process.cwd() is
+  // the expected anchor for relative paths)
+  if (input.override !== undefined && input.override !== '') {
+    const absOverride = path.resolve(input.override)
+    const result = validateKnowledgeRoot(absOverride)
+    if (result.ok) {
+      attempts.push({ source: 'cli', path: absOverride, outcome: 'used' })
+      return { root: absOverride, index: result.index, attempts }
+    }
+    throw new KnowledgeRootCliInvalidError(absOverride, result.reason)
+  }
+  attempts.push({ source: 'cli', outcome: 'not-provided' })
+
+  // Tier 2: yaml config (relative paths in the yaml are resolved
+  // against input.cwd — the project root where the yaml file lives)
+  if (input.cwd === undefined) {
+    attempts.push({ source: 'yaml', outcome: 'not-provided' })
+  } else {
+    const config = loadObservabilityConfig(input.cwd)
+    const yamlPath = config.lenses['I-knowledge-gaps']?.knowledge_root
+    if (yamlPath === undefined || yamlPath === '') {
+      attempts.push({ source: 'yaml', outcome: 'not-provided' })
+    } else {
+      const absYamlPath = path.resolve(input.cwd, yamlPath)
+      const result = validateKnowledgeRoot(absYamlPath)
+      if (result.ok) {
+        attempts.push({ source: 'yaml', path: absYamlPath, outcome: 'used' })
+        return { root: absYamlPath, index: result.index, attempts }
+      }
+      attempts.push({ source: 'yaml', path: absYamlPath, outcome: 'invalid', reason: result.reason })
+    }
+  }
+
+  // Tier 3: auto-detect (starts from the CLI install's module location
+  // when production callers supply selfLocation; falls back to cwd /
+  // process.cwd() for test convenience only).
+  const startDir = input.selfLocation ?? input.cwd ?? process.cwd()
+  const autoRoot = findScaffoldKnowledgeRoot(startDir)
+  if (autoRoot === null) {
+    attempts.push({ source: 'auto-detect', outcome: 'not-found' })
+    return { root: null, index: null, attempts }
+  }
+  const result = validateKnowledgeRoot(autoRoot)
+  if (result.ok) {
+    attempts.push({ source: 'auto-detect', path: autoRoot, outcome: 'used' })
+    return { root: autoRoot, index: result.index, attempts }
+  }
+  attempts.push({ source: 'auto-detect', path: autoRoot, outcome: 'invalid', reason: result.reason })
+  return { root: null, index: null, attempts }
+}
