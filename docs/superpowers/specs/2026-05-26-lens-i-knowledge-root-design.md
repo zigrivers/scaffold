@@ -320,7 +320,34 @@ lenses:
 ```
 
 Matches the existing pattern of nesting per-lens config under
-`lenses.<lens-id>`.
+`lenses.<lens-id>` (see how `C-standards`, `E-design`, `F-scope`,
+`G-decisions`, and `H-cross-doc` are configured).
+
+**Read mechanism (decision #19):** `resolveKnowledgeRoot` reads the
+yaml tier by reusing the existing `loadObservabilityConfig(cwd)` from
+`src/observability/engine/checks/observability-config.ts:99`. This is
+the SAME function every other configurable lens uses; it returns a
+typed `ObservabilityConfig` produced by `deepMerge(DEFAULT_CONFIG,
+fileContents)` with full handling of missing/malformed yaml.
+`resolveKnowledgeRoot` reads `config.lenses['I-knowledge-gaps']?.knowledge_root`
+and treats absent or empty-string values as "not provided" (recorded
+as `{ source: 'yaml', outcome: 'not-provided' }` in the attempts
+trail). A value that's present-but-invalid (path doesn't exist, fails
+`validateKnowledgeRoot`) records `outcome: 'invalid'` with the reason.
+
+The "dependency-free" / "custom YAML extraction" language in
+Cross-Cutting Principles applies ONLY to the KB frontmatter `name:`
+walk inside `loadKnowledgeIndex` — it does NOT apply to the yaml tier,
+which delegates to the project's standard config reader (already a
+`js-yaml` consumer).
+
+**Type extension:** `ObservabilityConfig['lenses']` in
+`observability-config.ts:46` gets an optional `'I-knowledge-gaps'?: {
+knowledge_root?: string }` entry. `DEFAULT_CONFIG.lenses` at line 64
+gains `'I-knowledge-gaps': {}` for the matching default. This closes
+the deferred R3-P3 finding about untyped access; existing config tests
+continue to pass because they assert specific known keys, not
+exhaustive shape.
 
 #### Validation
 
@@ -749,3 +776,4 @@ chars with `?`, so a pathological value can't produce ragged stderr.
 | 16 | Where the index is loaded (resolver vs lens) | Resolver loads it during validation and returns the Set in `KnowledgeRootResolution.index`; Lens I uses the pre-loaded index without re-walking | Eliminates a redundant filesystem walk and removes the dead `lens-i:index-load-failed` code path (the resolver already failed if loading would fail). Single source of I/O on the knowledge tree per audit run. |
 | 17 | LensContext field optionality + test migration | The four new fields (`knowledgeRoot`, `knowledgeIndex`, `knowledgeRootAttempts`, `warnedKeys`) are all OPTIONAL on `LensContext`; existing test literals at `lens-h-cross-doc.test.ts` and `lens-i-knowledge-gaps.test.ts` keep compiling without changes | Tests that bypass `runChecks` and construct `LensContext` literals to call lens functions directly would otherwise fail TypeScript after the interface change. Optional fields + lens treating `undefined === null` for behavior makes the migration zero-cost. |
 | 18 | Operator-visible warning string hygiene | All interpolated path/reason fragments pass through `formatForStderr()` (wraps in single quotes, escapes embedded quotes, replaces newlines/control chars with `?`) | A path or reason containing unbalanced quotes or newlines would otherwise produce ragged or multiline stderr output that's hard to parse in CI logs and audit sidecars. |
+| 19 | Yaml tier read mechanism | `resolveKnowledgeRoot` reuses `loadObservabilityConfig(cwd)` (the project-wide yaml reader at `src/observability/engine/checks/observability-config.ts:99`) rather than rolling its own parse | One yaml-reader code path across the whole observability surface. Inherits the standard error handling, defaults via `deepMerge`, and `js-yaml` choice that the C/E/F/G/H lenses already use. Also extends `ObservabilityConfig['lenses']` with a typed `'I-knowledge-gaps'?: { knowledge_root?: string }` slot, closing the previously-deferred R3-P3 finding about untyped config access. The "dependency-free / custom YAML extraction" Cross-Cutting principle applies only to the KB frontmatter walk in `loadKnowledgeIndex`. |
