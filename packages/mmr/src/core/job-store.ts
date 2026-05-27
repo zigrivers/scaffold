@@ -9,6 +9,8 @@ export interface CreateJobOpts {
   fix_threshold: Severity
   format: OutputFormat
   channels: string[]
+  session_id?: string
+  round?: number
 }
 
 export class JobStore {
@@ -63,6 +65,8 @@ export class JobStore {
       created_at: new Date().toISOString(),
       channels,
     }
+    if (opts.session_id !== undefined) metadata.session_id = opts.session_id
+    if (opts.round !== undefined) metadata.round = opts.round
 
     this.saveJob(jobId, metadata)
     return metadata
