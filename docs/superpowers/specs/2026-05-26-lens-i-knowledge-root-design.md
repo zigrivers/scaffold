@@ -360,21 +360,27 @@ exhaustive shape.
 #### Validation
 
 All paths (CLI, yaml, auto-detect) refer to a knowledge directory and
-are validated by the same check. The validator combines two
-complementary signals so it cannot be fooled by an enclosing or
-sibling directory:
+are validated by the same check. The validator uses the **VERSION
+marker file** as the sole identification signal:
 
-1. **VERSION marker file.** The validator requires `<path>/VERSION` to
-   exist. This is the KB SemVer file added in Phase 1 (see parent
-   design "Version the knowledge base"); it lives ONLY at
-   `content/knowledge/VERSION` and nowhere else in the repo. An
-   operator who points at `content/` or any other ancestor fails this
-   check immediately because no `content/VERSION` exists.
-2. **Loader returns non-empty Set.** Confirms the directory actually
-   contains parseable KB-frontmatter entries.
+- The validator requires `<path>/VERSION` to exist. This is the KB
+  SemVer file added in Phase 1 (see parent design "Version the
+  knowledge base"); it lives ONLY at `content/knowledge/VERSION` and
+  nowhere else in the repo. An operator who points at `content/` or
+  any other ancestor fails this check immediately because no
+  `content/VERSION` exists.
 
-The validator also returns the loaded index, so callers don't re-walk
-the tree.
+The validator does NOT reject an empty knowledge directory. A
+newly-initialized scaffold install or a downstream project in early
+setup may have a `VERSION` file but no entries yet; the lens
+correctly treats an empty index as "nothing to suppress" (no topic
+matches), which is the right behavior. The loader's I/O is still
+exercised at validation time (so loader-level failures like
+permission-denied surface at the resolver, not at lens-time), but
+the result's size is informational, not a gate.
+
+The validator returns the loaded index (possibly empty), so callers
+don't re-walk the tree.
 
 ```
 validateKnowledgeRoot(path)
@@ -384,8 +390,7 @@ validateKnowledgeRoot(path)
   if !exists(`<path>/VERSION`)          → { ok: false, reason: 'missing knowledge-base VERSION marker — path does not appear to be a scaffold knowledge directory' }
   index = try loadKnowledgeIndex(path)
         catch e                         → { ok: false, reason: `index load failed: ${e.message}` }
-  if index.size === 0                   → { ok: false, reason: 'directory contains no knowledge entries (loader returned empty)' }
-  else                                  → { ok: true, index }
+  → { ok: true, index }   # empty index is OK; VERSION marker proves intent
 ```
 
 Two effects of this design:
@@ -770,12 +775,12 @@ chars with `?`, so a pathological value can't produce ragged stderr.
 |---|---|
 | `loadKnowledgeIndex` | empty dir → empty Set; dir with valid entries → expected slugs; dir with README.md only → empty Set; entry with no frontmatter → skipped silently; entry with `name:` that is not a slug pattern but IS a non-empty string → INCLUDED in Set (matches assembly loader, not validator); duplicate `name:` across files → deduped; symlinked subdir → followed; non-existent path → throws; path is a file → throws; permission-denied on one subdir → continues, skips it; dir of non-knowledge .md files (e.g. pipeline steps with frontmatter that has `name:`) → returns those slugs too — this is by design; the validator catches the wrong-dir case via the VERSION marker, not via the loader |
 | `findScaffoldKnowledgeRoot` | dev worktree layout (matches via `package.json#name === '@zigrivers/scaffold'`); npm-global layout under `/opt/homebrew/lib/node_modules` (matches; verifies NO homedir boundary); a sibling project with a `content/knowledge/` dir but a different `package.json#name` (does NOT match — keeps walking); no scaffold install anywhere above (returns null, walks all the way to `/`) |
-| `validateKnowledgeRoot` | exists + dir + has VERSION marker + loader returns non-empty Set → `{ ok: true, index }`; doesn't exist → fail (reason: 'path does not exist'); exists but is file → fail; exists + dir but NO `<path>/VERSION` file → fail (reason mentions the marker); exists + dir + has VERSION but loader returns empty Set → fail (reason: 'directory contains no knowledge entries'); pointing at `content/` or `content/tools/` (no VERSION file) → fail FAST on the marker check, before loader even runs; pointing at `content/knowledge/` → ok with index populated |
+| `validateKnowledgeRoot` | exists + dir + has VERSION marker + loader succeeds → `{ ok: true, index }` (index size irrelevant — empty is OK for a freshly-initialized KB); doesn't exist → fail (reason: 'path does not exist'); exists but is file → fail; exists + dir but NO `<path>/VERSION` file → fail (reason mentions the marker); exists + dir + has VERSION + empty tree (only the VERSION file, no .md entries) → `{ ok: true, index: empty Set }` (this case used to fail in early drafts but now passes — see decision #15 + the R8 fix); pointing at `content/` or `content/tools/` (no VERSION file) → fail FAST on the marker check, before loader even runs; pointing at `content/knowledge/` → ok with index populated |
 | `emitOnceForAudit` | first call with `(set, key, message)` writes to stderr and adds key to set; second call with the same set + key is no-op; second call with the same set + different key writes again; calls with a fresh set always write again (proves per-audit Set isolation works) |
 | `resolveKnowledgeRoot` (defined in `knowledge-index.ts`, called by `runAudit`) | override valid → `root: <path>`, attempts: `[{ source: 'cli', outcome: 'used' }]`; override invalid → throws `KnowledgeRootCliInvalidError`; no override, yaml valid → `root: <yamlPath>`, attempts include `{ source: 'yaml', outcome: 'used' }`; no override, yaml invalid → attempts include `{ source: 'yaml', outcome: 'invalid', reason }` + falls through; no override, no yaml, auto-detect finds it → attempts ends with `{ source: 'auto-detect', outcome: 'used' }`; no override, no yaml, auto-detect misses → `root: null`, attempts end with `{ source: 'auto-detect', outcome: 'not-found' }`; called with no `cwd` (test path) → resolves yaml from cwd undefined, treats as not-provided |
 | `lens-i-knowledge-gaps.ts` | existing tests still pass; new: bucket suppressed when topic is in `context.knowledgeIndex` (both P1 and P2 paths); bucket NOT suppressed when topic is not in the index (both severities); null `knowledgeRoot`, lens runs → one-line `lens-i:no-root` warning via `emitOnceForAudit(warnedKeys, ...)` + no suppression; null `knowledgeRoot` with yaml-was-invalid attempt → warning includes the yaml note formatted via `formatForStderr`; Lens I disabled (not in `enabledIds`) → NO warning emitted at all; two `runAudit` calls in one test → fresh `warnedKeys` per call, BOTH calls emit their respective warnings (proves fix-flow / phase-audit multi-audit case works); manual `LensContext` with `knowledgeRoot` set but `knowledgeIndex` undefined (the construction-contract violation case — should never happen in production but covered defensively) → no crash, no suppression, NO `lens-i:no-root` warning (root is non-null so the warning gate doesn't fire). |
 | Construction-contract documentation | A short prose note in the spec + a one-line invariant in the lens implementation comment: "`knowledgeRoot` and `knowledgeIndex` are paired — the resolver populates both or neither. Lens I's suppression activates only when both are set. A future test or internal caller that supplies one without the other gets silent 'no suppression' (no warning) — this is intentional defensive behavior, but exercising the path is a test-construction bug, not a production scenario." |
-| Integration | `scaffold observe audit --knowledge-root <fixture>` where the fixture is a dir containing a `VERSION` file AND `<category>/covered.md` with `name: covered` frontmatter, plus a ledger with three signals each on `covered` and `uncovered` → only `uncovered` becomes a finding (suppression of `covered` confirms the validator returned the index and Lens I consulted it); `scaffold observe audit` (no flag) in the repo's own dev worktree → auto-detect resolves the real `content/knowledge/` via the `package.json#name === '@zigrivers/scaffold'` signature; `scaffold observe audit --knowledge-root /tmp/nope` → exit non-zero with `path does not exist`; `scaffold observe audit --knowledge-root <repo>/content` → exit non-zero with `missing knowledge-base VERSION marker — path does not appear to be a scaffold knowledge directory` (the VERSION check fires BEFORE the loader runs, so the over-broad-pipeline-slugs failure mode the round-3 review surfaced is foreclosed); `scaffold observe audit --knowledge-root <fixture-with-VERSION-but-no-md-files>` → exit non-zero with `directory contains no knowledge entries` |
+| Integration | `scaffold observe audit --knowledge-root <fixture>` where the fixture is a dir containing a `VERSION` file AND `<category>/covered.md` with `name: covered` frontmatter, plus a ledger with three signals each on `covered` and `uncovered` → only `uncovered` becomes a finding (suppression of `covered` confirms the validator returned the index and Lens I consulted it); `scaffold observe audit` (no flag) in the repo's own dev worktree → auto-detect resolves the real `content/knowledge/` via the `package.json#name === '@zigrivers/scaffold'` signature; `scaffold observe audit --knowledge-root /tmp/nope` → exit non-zero with `path does not exist`; `scaffold observe audit --knowledge-root <repo>/content` → exit non-zero with `missing knowledge-base VERSION marker — path does not appear to be a scaffold knowledge directory` (the VERSION check fires BEFORE the loader runs, so the over-broad-pipeline-slugs failure mode the round-3 review surfaced is foreclosed); `scaffold observe audit --knowledge-root <fixture-with-VERSION-but-no-md-files>` → PASSES validation with an empty index (Lens I emits all unsuppressed findings) — pins the "empty KB is a valid state" decision from R8 |
 
 ## Cost & Performance
 
@@ -819,7 +824,7 @@ chars with `?`, so a pathological value can't produce ragged stderr.
 | 12 | Per-file `console.warn` for malformed entries in the loader | No | Matches the assembly loader's silent-skip behavior. The freshness validator already surfaces malformed entries; duplicating output would either leak into JSON or confuse operators about which subsystem flagged the issue. |
 | 13 | Where the 3-tier resolution lives (handler vs `runAudit`) | `resolveKnowledgeRoot` is **defined in `knowledge-index.ts`** alongside the loader and auto-detector, and **called by `runAudit`** (not by `handleAudit`) | Every `runAudit` caller benefits — CLI, `phase-audit.ts`, `fix-flow.ts` (verifier + postfix), MMR doc-conformance channel — without each having to re-implement yaml + auto-detect. The CLI flag becomes `RunAuditInput.knowledgeRootOverride`. `phase-audit.ts` doesn't supply one (state-triggered audits use yaml + auto-detect); `fix-flow.ts` forwards it through to its inner verifier and postfix `runAudit` calls per decision #20. Tests import `resolveKnowledgeRoot` directly from `knowledge-index.ts` for unit coverage. |
 | 14 | Validator slug-rule alignment with the loader | Index loader accepts any non-empty trimmed `name:` (matches `extractKBFrontmatter`); validator-style slug regex stays in `knowledge-frontmatter-validator.ts` only | Round-2 spec earlier claimed both functions enforced the slug regex; that was wrong (the regex lives only in the validator). Keeping the index loader permissive matches the assembly engine and prevents drift between which entries the assembly engine sees vs which the suppression logic sees. |
-| 15 | Validator strictness for "is this actually a knowledge directory?" | Require `<path>/VERSION` marker file (the KB SemVer file from Phase 1) in addition to a non-empty loader result | Round-3 review caught that `loadKnowledgeIndex(path).size > 0` alone passes for any ancestor of the knowledge dir, because the recursive walk finds the nested KB files (and would also accept `content/tools/`, `content/pipeline/`, etc., which have their own `name:` frontmatter). The VERSION marker exists only at `content/knowledge/VERSION` and nowhere else in the repo, so requiring it precisely identifies the knowledge dir. |
+| 15 | Validator strictness for "is this actually a knowledge directory?" | Require `<path>/VERSION` marker file (the KB SemVer file from Phase 1) as the sole identification signal; do NOT require the loader's index to be non-empty | Round-3 caught that `loadKnowledgeIndex(path).size > 0` alone passes for any ancestor of the knowledge dir (the recursive walk finds the nested KB files; would also accept `content/tools/`, `content/pipeline/`, etc.). VERSION exists only at `content/knowledge/VERSION` and nowhere else in the repo, so requiring it precisely identifies the knowledge dir. Round-8 trimmed the "loader returned non-empty" gate that an earlier draft layered on top: an empty index is a legitimate state for a freshly-initialized scaffold install or a downstream project mid-setup, and the lens correctly treats an empty index as "nothing to suppress" — no reason to fail validation on it. The loader is still exercised at validation time so I/O failures (permission-denied, etc.) surface at the resolver rather than at lens-time. |
 | 16 | Where the index is loaded (resolver vs lens) | Resolver loads it during validation and returns the Set in `KnowledgeRootResolution.index`; Lens I uses the pre-loaded index without re-walking | Eliminates a redundant filesystem walk and removes the dead `lens-i:index-load-failed` code path (the resolver already failed if loading would fail). Single source of I/O on the knowledge tree per audit run. |
 | 17 | LensContext field optionality + test migration | The four new fields (`knowledgeRoot`, `knowledgeIndex`, `knowledgeRootAttempts`, `warnedKeys`) are all OPTIONAL on `LensContext`; existing test literals at `lens-h-cross-doc.test.ts` and `lens-i-knowledge-gaps.test.ts` keep compiling without changes | Tests that bypass `runChecks` and construct `LensContext` literals to call lens functions directly would otherwise fail TypeScript after the interface change. Optional fields + lens treating `undefined === null` for behavior makes the migration zero-cost. |
 | 18 | Operator-visible warning string hygiene | All interpolated path/reason fragments pass through `formatForStderr()` (wraps in single quotes, escapes embedded quotes, replaces newlines/control chars with `?`) | A path or reason containing unbalanced quotes or newlines would otherwise produce ragged or multiline stderr output that's hard to parse in CI logs and audit sidecars. |
