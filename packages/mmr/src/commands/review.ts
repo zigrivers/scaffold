@@ -260,6 +260,12 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
         type: 'boolean',
         default: false,
         describe: 'Resolve diff and assemble prompt without dispatching channels',
+      })
+      .check((argv) => {
+        if (typeof argv.session === 'string' && !/^[a-zA-Z0-9_-]+$/.test(argv.session)) {
+          throw new Error('Invalid session id. Allowed chars: a-zA-Z0-9_-')
+        }
+        return true
       }),
   handler: async (args: ArgumentsCamelCase<ReviewArgs>) => {
     // 1. Load config with CLI overrides

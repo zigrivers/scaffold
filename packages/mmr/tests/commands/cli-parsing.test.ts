@@ -65,6 +65,25 @@ describe('review CLI - session flags', () => {
     expect(args.round).toBe(3)
     expect(args['max-rounds']).toBe(5)
   })
+
+  it('rejects invalid --session values', () => {
+    expect(() => parse(reviewCommand, ['review', '--session', '../../../etc'])).toThrow(/invalid session id/i)
+  })
+
+  it('parses trust and config-base flags', () => {
+    const args = parse(reviewCommand, [
+      'review',
+      '--accept-new-acks',
+      '--trust-project-acks',
+      '--trust-project-config',
+      '--config-base-ref',
+      'origin/main',
+    ])
+    expect(args['accept-new-acks']).toBe(true)
+    expect(args['trust-project-acks']).toBe(true)
+    expect(args['trust-project-config']).toBe(true)
+    expect(args['config-base-ref']).toBe('origin/main')
+  })
 })
 
 describe('reconcile command argv parsing', () => {
