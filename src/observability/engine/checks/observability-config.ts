@@ -18,6 +18,10 @@ export interface GLensConfig {
   keywords_file?: string
 }
 
+export interface ILensConfig {
+  knowledge_root?: string
+}
+
 export interface DLensConfig {
   path_to_layer?: Array<{ glob: string; layer: string }>
 }
@@ -53,6 +57,7 @@ export interface ObservabilityConfig {
     'F-scope'?: FLensConfig
     'G-decisions'?: GLensConfig
     'H-cross-doc'?: { skip_phase_subsets?: string[] }
+    'I-knowledge-gaps'?: ILensConfig
   }
   disabled_lenses: string[]
   stall: StallConfig
@@ -68,6 +73,7 @@ export const DEFAULT_CONFIG: ObservabilityConfig = {
     'F-scope':     { untouched_story_grace_hours: 168 },
     'G-decisions': {},
     'H-cross-doc': {},
+    'I-knowledge-gaps': {},
   },
   disabled_lenses: [],
   stall: {
