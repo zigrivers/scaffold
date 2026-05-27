@@ -70,6 +70,15 @@ describe('review CLI - session flags', () => {
     expect(() => parse(reviewCommand, ['review', '--session', '../../../etc'])).toThrow(/invalid session id/i)
   })
 
+  it('rejects non-positive --round values', () => {
+    expect(() => parse(reviewCommand, ['review', '--round', '0'])).toThrow(/round must be >= 1/i)
+  })
+
+  it('defaults --max-rounds to 5 when --session is set', () => {
+    const args = parse(reviewCommand, ['review', '--session', 'feat-foo'])
+    expect(args['max-rounds']).toBe(5)
+  })
+
   it('parses trust and config-base flags', () => {
     const args = parse(reviewCommand, [
       'review',

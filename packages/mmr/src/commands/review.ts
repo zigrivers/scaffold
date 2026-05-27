@@ -265,7 +265,18 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
         if (typeof argv.session === 'string' && !/^[a-zA-Z0-9_-]+$/.test(argv.session)) {
           throw new Error('Invalid session id. Allowed chars: a-zA-Z0-9_-')
         }
+        if (typeof argv.round === 'number' && argv.round < 1) {
+          throw new Error('round must be >= 1')
+        }
+        if (typeof argv['max-rounds'] === 'number' && argv['max-rounds'] < 1) {
+          throw new Error('max-rounds must be >= 1')
+        }
         return true
+      })
+      .middleware((argv) => {
+        if (argv.session !== undefined && argv['max-rounds'] === undefined) {
+          argv['max-rounds'] = 5
+        }
       }),
   handler: async (args: ArgumentsCamelCase<ReviewArgs>) => {
     // 1. Load config with CLI overrides
@@ -277,6 +288,13 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
         format: args.format,
       },
     })
+    const reviewControls = {
+      maxRounds: args['max-rounds'],
+      acceptNewAcks: args['accept-new-acks'] ?? false,
+      trustProjectAcks: args['trust-project-acks'] ?? false,
+      trustProjectConfig: args['trust-project-config'] ?? false,
+      configBaseRef: args['config-base-ref'],
+    }
 
     // 2. Resolve diff input
     const diff = resolveDiff(args)
@@ -371,7 +389,10 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       fix_threshold: config.defaults.fix_threshold as Severity,
       format: config.defaults.format as OutputFormat,
       channels: channelNames,
+      session_id: args.session,
+      round: args.round,
     })
+    void reviewControls
 
     // Record skipped/auth-failed channels in job metadata
     for (const name of channelNames) {
