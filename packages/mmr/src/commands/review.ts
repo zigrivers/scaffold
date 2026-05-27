@@ -31,6 +31,13 @@ interface ReviewArgs {
   timeout?: number
   template?: string
   format?: string
+  session?: string
+  round?: number
+  'max-rounds'?: number
+  'accept-new-acks'?: boolean
+  'trust-project-acks'?: boolean
+  'trust-project-config'?: boolean
+  'config-base-ref'?: string
   sync?: boolean
   'dry-run'?: boolean
 }
@@ -212,6 +219,37 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
         type: 'string',
         describe: 'Output format',
         choices: ['json', 'text', 'markdown'],
+      })
+      .option('session', {
+        type: 'string',
+        describe: 'Session id (T2-B). Allowed chars: a-zA-Z0-9_-',
+      })
+      .option('round', {
+        type: 'number',
+        describe: 'One-based round counter within the session (T2-B)',
+      })
+      .option('max-rounds', {
+        type: 'number',
+        describe: 'Hard cap on rounds. Default 5 when --session is set without --max-rounds.',
+      })
+      .option('accept-new-acks', {
+        type: 'boolean',
+        default: false,
+        describe: 'Trust ack files newly introduced in the diff under review (§5 decision 1)',
+      })
+      .option('trust-project-acks', {
+        type: 'boolean',
+        default: false,
+        describe: 'Trust working-tree project acks in non-Git / untrusted-HEAD modes (§5 decision 1)',
+      })
+      .option('trust-project-config', {
+        type: 'boolean',
+        default: false,
+        describe: 'Trust working-tree .mmr.yaml channel config in untrusted modes (§5 decision 1 P0 fix)',
+      })
+      .option('config-base-ref', {
+        type: 'string',
+        describe: 'Load project .mmr.yaml and acks from this trusted Git ref instead of HEAD',
       })
       .option('sync', {
         type: 'boolean',

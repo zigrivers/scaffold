@@ -50,6 +50,23 @@ describe('review command argv parsing', () => {
   })
 })
 
+describe('review CLI - session flags', () => {
+  it('parses --session, --round, --max-rounds', () => {
+    const args = parse(reviewCommand, [
+      'review',
+      '--session',
+      'feat-foo',
+      '--round',
+      '3',
+      '--max-rounds',
+      '5',
+    ])
+    expect(args.session).toBe('feat-foo')
+    expect(args.round).toBe(3)
+    expect(args['max-rounds']).toBe(5)
+  })
+})
+
 describe('reconcile command argv parsing', () => {
   it('accepts "--input -" (stdin) with a space separator', () => {
     const args = parse(reconcileCommand, [
