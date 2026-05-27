@@ -117,6 +117,24 @@ describe('loadKnowledgeIndex', () => {
     expect(loadKnowledgeIndex(dir)).toEqual(new Set(['Wacky_Name 1!']))
   })
 
+  it('handles quoted, commented, and nested-after-name frontmatter (js-yaml semantics)', () => {
+    const dir = makeKbDir({
+      'core/quoted.md': '---\nname: "quoted-slug"\n---\nbody\n',
+      'core/commented.md': '---\nname: with-comment  # trailing comment\ndescription: x\n---\n',
+      'core/with-list.md': '---\nname: list-after\ntopics: [a, b]\nsources:\n  - url: https://x\n---\n',
+    })
+    expect(loadKnowledgeIndex(dir)).toEqual(
+      new Set(['quoted-slug', 'with-comment', 'list-after']),
+    )
+  })
+
+  it('skips files where the frontmatter never closes', () => {
+    const dir = makeKbDir({
+      'core/unclosed.md': '---\nname: not-really-real\nlots of body\nbut no closing delimiter\n',
+    })
+    expect(loadKnowledgeIndex(dir)).toEqual(new Set())
+  })
+
   it('dedupes duplicate name: across files', () => {
     const dir = makeKbDir({
       'core/dup1.md': '---\nname: dup\n---\nbody\n',
@@ -176,25 +194,40 @@ Create `src/observability/knowledge-index.ts`:
 ```typescript
 import fs from 'node:fs'
 import path from 'node:path'
+import yaml from 'js-yaml'
 
 // ─── loadKnowledgeIndex ─────────────────────────────────────────────────────
 
 const FRONTMATTER_DELIMITER = '---'
-const NAME_LINE_RE = /^name:\s*(?:["'](.+?)["']|(.+?))\s*$/
 
+/**
+ * Extract the `name:` field from a knowledge entry's YAML frontmatter.
+ * Uses js-yaml (the same parser the assembly engine's extractKBFrontmatter
+ * and the freshness validator both use) so we accept exactly the same
+ * shapes — including comments, quoted values, and any YAML-valid form.
+ *
+ * Returns null if there is no frontmatter, no closing delimiter, the YAML
+ * fails to parse, or there is no usable `name:` (matches
+ * extractKBFrontmatter at src/core/assembly/knowledge-loader.ts:102-104:
+ * any non-empty trimmed string is accepted; slug regex enforcement stays
+ * in the freshness validator only).
+ */
 function extractName(content: string): string | null {
   const lines = content.split('\n')
   if (lines[0]?.trim() !== FRONTMATTER_DELIMITER) return null
+  let closeIdx = -1
   for (let i = 1; i < lines.length; i++) {
-    const line = lines[i]
-    if (line.trim() === FRONTMATTER_DELIMITER) return null  // closed without name:
-    const m = NAME_LINE_RE.exec(line)
-    if (m) {
-      const value = (m[1] ?? m[2] ?? '').trim()
-      return value.length > 0 ? value : null
-    }
+    if (lines[i].trim() === FRONTMATTER_DELIMITER) { closeIdx = i; break }
   }
-  return null  // unclosed frontmatter
+  if (closeIdx === -1) return null  // unclosed frontmatter
+  let parsed: unknown
+  try { parsed = yaml.load(lines.slice(1, closeIdx).join('\n'), { schema: yaml.JSON_SCHEMA }) }
+  catch { return null }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
+  const raw = (parsed as Record<string, unknown>)['name']
+  if (typeof raw !== 'string') return null
+  const trimmed = raw.trim()
+  return trimmed.length > 0 ? trimmed : null
 }
 
 function walkMarkdown(dir: string, out: string[]): void {
@@ -224,8 +257,13 @@ function walkMarkdown(dir: string, out: string[]): void {
  * validator, not here — keeping the loader permissive prevents drift
  * between what the assembly engine sees and what suppression matches.
  *
- * Does NOT import js-yaml: the line-based extractor handles every shape
- * a real KB entry uses today and keeps this module dependency-free.
+ * Uses js-yaml (already a project dependency — see
+ * src/core/assembly/knowledge-loader.ts, observability-config.ts, and
+ * knowledge-frontmatter-validator.ts) rather than a regex so we accept
+ * exactly the same shapes the assembly engine does (comments, quoted
+ * values, nested structures). The "dependency-free" Cross-Cutting
+ * principle applies only to the directory walk + file I/O — not to
+ * the frontmatter parsing.
  */
 export function loadKnowledgeIndex(knowledgeDir: string): Set<string> {
   const stat = fs.statSync(knowledgeDir)  // throws if missing
@@ -285,7 +323,25 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 ---
 
-## Task 2: `findScaffoldKnowledgeRoot` (auto-detect)
+## Task 2: `findScaffoldKnowledgeRoot` (auto-detect from CLI install)
+
+**Important pre-read on the design.** The auto-detect tier must start
+from the **CLI install's own module location**, NOT from the audited
+project's `cwd`. A downstream user running `scaffold observe audit` in
+`~/my-project/` is auditing their project — that's `cwd: ~/my-project/`
+— but the scaffold install lives elsewhere (e.g.
+`/opt/homebrew/lib/node_modules/@zigrivers/scaffold/`). The auto-detect
+walk has to start from a directory inside the install or it will never
+find the install's `package.json`.
+
+The plan threads two distinct directories into the resolver: the audited
+project's `cwd` (used for the yaml tier, to find
+`<cwd>/.scaffold/observability.yaml`) and the CLI install's `selfLocation`
+(used for auto-detect). `runAudit` and `runFixFlow` populate
+`selfLocation` from `dirname(fileURLToPath(import.meta.url))` of their
+own modules (which always live inside the install).
+
+
 
 **Files:**
 - Modify: `src/observability/knowledge-index.ts` (append)
@@ -403,8 +459,10 @@ export function findScaffoldKnowledgeRoot(startDir: string): string | null {
   }
 }
 
-/** Convenience for production callers — derives the start dir from the
- *  running module's URL. Tests should call `findScaffoldKnowledgeRoot`
+/** Convenience for production callers — derives the start dir from a
+ *  module's import.meta.url. `runAudit` and `runFixFlow` call this
+ *  with their own `import.meta.url` to anchor the auto-detect walk to
+ *  the install location. Tests should call `findScaffoldKnowledgeRoot`
  *  directly with a fixture path. */
 export function findScaffoldKnowledgeRootFromImportMeta(metaUrl: string): string | null {
   return findScaffoldKnowledgeRoot(path.dirname(fileURLToPath(metaUrl)))
@@ -945,8 +1003,18 @@ export interface ResolveInput {
   override?: string
   /** Working directory for reading .scaffold/observability.yaml. When
    *  undefined, the yaml tier is skipped (recorded as
-   *  outcome: 'not-provided'). */
+   *  outcome: 'not-provided'). Typically the audited project's root. */
   cwd?: string
+  /** Optional starting directory for the auto-detect parent-walk.
+   *  Production callers (runAudit, runFixFlow) pass a directory
+   *  INSIDE the CLI install — typically
+   *  `dirname(fileURLToPath(import.meta.url))` of their own module —
+   *  so the walk finds the install's `package.json` and
+   *  `content/knowledge/`. When undefined, falls back to `cwd` (and
+   *  then `process.cwd()`); this fallback is intended for tests, NOT
+   *  production. Without selfLocation, auto-detect cannot succeed for
+   *  downstream users running scaffold from outside the scaffold repo. */
+  selfLocation?: string
 }
 
 /**
@@ -993,8 +1061,10 @@ export function resolveKnowledgeRoot(input: ResolveInput): KnowledgeRootResoluti
     }
   }
 
-  // Tier 3: auto-detect
-  const startDir = input.cwd ?? process.cwd()
+  // Tier 3: auto-detect (starts from the CLI install's module location
+  // when production callers supply selfLocation; falls back to cwd /
+  // process.cwd() for test convenience only).
+  const startDir = input.selfLocation ?? input.cwd ?? process.cwd()
   const autoRoot = findScaffoldKnowledgeRoot(startDir)
   if (autoRoot === null) {
     attempts.push({ source: 'auto-detect', outcome: 'not-found' })
@@ -1043,11 +1113,17 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 - [ ] **Step 1: Edit the interfaces**
 
-Replace lines 4-27 of `src/observability/engine/checks/runner.ts` with:
+Two edits inside `src/observability/engine/checks/runner.ts`:
+
+(a) Add ONE new import at the top of the file, alongside the existing imports (currently `import type { Event, Finding, AvailabilityMap, AdapterId, DocGraph } from '../types.js'` and `import type { LensManifest } from './registry.js'`). The new import goes immediately after them:
 
 ```typescript
 import type { KnowledgeRootAttempt } from '../../knowledge-index.js'
+```
 
+(b) Replace the existing `LensContext` and `RunChecksInput` interface declarations (lines 4-27 of the current file — but NOT the import lines above them) with the extended versions below:
+
+```typescript
 export interface LensContext {
   profile: 'fast' | 'full'
   cwd: string
@@ -1171,7 +1247,13 @@ Add to imports near the top of the file (alongside the existing `loadObservabili
 
 ```typescript
 import { resolveKnowledgeRoot } from '../knowledge-index.js'
+import { dirname } from 'node:path'        // if not already imported
+import { fileURLToPath } from 'node:url'   // if not already imported
 ```
+
+(Note: `dirname` and `fileURLToPath` may already be imported in api.ts
+for `scaffoldVersion()`. If they are, don't re-add them — just use the
+existing imports.)
 
 Then update the `RunAuditInput` interface (around line 54) by adding the new optional field at the end:
 
@@ -1196,9 +1278,17 @@ export interface RunAuditInput {
 Then update the `runAudit` function (around line 85). After the `loadObservabilityConfig` call and before the `runChecks` call, insert the resolver invocation:
 
 ```typescript
+  // The selfLocation anchors the auto-detect parent-walk to the CLI
+  // install directory. Without it, a downstream user auditing their
+  // own project (~/my-project/) would have the walk start from
+  // ~/my-project/ and never find the scaffold install's package.json.
+  // api.ts always lives inside the install (dist/observability/engine/
+  // after build), so dirname(fileURLToPath(import.meta.url)) is the
+  // correct anchor.
   const resolution = resolveKnowledgeRoot({
     override: input.knowledgeRootOverride,
     cwd: input.primaryRoot,
+    selfLocation: dirname(fileURLToPath(import.meta.url)),
   })
   const warnedKeys = new Set<string>()
 ```
@@ -1470,15 +1560,37 @@ In `src/observability/checks/lens-i-knowledge-gaps.ts`, modify the imports at th
 import { emitOnceForAudit, formatForStderr } from '../knowledge-index.js'
 ```
 
+Then rename the lens function's 5th parameter from `_enabled` to `enabled` so it can be referenced from the new warning gate. The current signature is:
+
+```typescript
+export const lensIKnowledgeGaps: LensFn = async (
+  _graph, ledger, _availability, _upstream, _enabled, context,
+) => {
+```
+
+Change to:
+
+```typescript
+export const lensIKnowledgeGaps: LensFn = async (
+  _graph, ledger, _availability, _upstream, enabled, context,
+) => {
+```
+
 Then modify the lens body. The current loop at lines 97-150 emits a finding for every bucket above threshold. Add a suppression check inside that loop AND add a warn-once block above it. Replace the section from the start of "4. Apply finding rules" comment through the end of the for loop with:
 
 ```typescript
   // 4. Compose the warn-once message ONCE if Lens I is enabled but
   //    no knowledgeRoot was resolved. The lens still runs and emits
   //    unsuppressed findings — suppression is an enhancement, not a
-  //    contract. Gating on context && !context.knowledgeRoot means
-  //    the warning never fires for legacy callers (no context at all).
-  if (context && !context.knowledgeRoot) {
+  //    contract. Gates on:
+  //      (a) context && !context.knowledgeRoot → null root or legacy caller
+  //      (b) enabled.has(lensId) → defensive guard for tests/callers
+  //          that invoke the lens directly with an empty enabledIds set.
+  //          (runChecks already skips disabled lenses BEFORE calling the
+  //          lensFn, so this guard is redundant in production but
+  //          protects direct-call tests and any future programmatic
+  //          path that might bypass runChecks.)
+  if (context && !context.knowledgeRoot && enabled.has(lensId)) {
     const yamlAttempt = (context.knowledgeRootAttempts ?? []).find(
       a => a.source === 'yaml' && a.outcome === 'invalid',
     )
@@ -1578,7 +1690,7 @@ export interface RunFixFlowInput {
 }
 ```
 
-Update `defaultVerifier` (around line 67) to accept the override. The function currently has signature `(cwd, finding)` — change it to a closure-style factory that captures the override:
+Update `defaultVerifier` (around line 64) to accept the override. The function currently has signature `(cwd, finding)` — change it to a closure-style factory that captures the override. (No need to pass `selfLocation` here — when `runFixFlow`'s verifier calls `runAudit`, runAudit itself does the `dirname(fileURLToPath(import.meta.url))` resolution against api.ts's own module, which is correct for the auto-detect path.)
 
 ```typescript
 function makeDefaultVerifier(knowledgeRootOverride?: string): FixVerifier {
@@ -1820,8 +1932,11 @@ function makeFixtureProject(opts: {
 }): { primaryRoot: string; kbRoot?: string } {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lens-i-int-'))
   tmpDirs.push(root)
-  // Ledger
-  const ledgerDir = path.join(root, '.scaffold', 'ledger')
+  // Ledger lives at <root>/.scaffold/activity.jsonl (NOT
+  // .scaffold/ledger/events.jsonl). The path is set by ledgerPath() in
+  // src/observability/engine/ledger-writer.ts and consumed by
+  // readMergedLedger via synthesizer.ts.
+  const ledgerDir = path.join(root, '.scaffold')
   fs.mkdirSync(ledgerDir, { recursive: true })
   const now = new Date().toISOString()
   const lines = opts.events.map(ev => JSON.stringify({
@@ -1831,7 +1946,7 @@ function makeFixtureProject(opts: {
     type: 'knowledge_gap_signal',
     payload: { topic: ev.topic, source: 'agent_search', project_id: ev.project_id },
   })).join('\n') + '\n'
-  fs.writeFileSync(path.join(ledgerDir, 'events.jsonl'), lines)
+  fs.writeFileSync(path.join(ledgerDir, 'activity.jsonl'), lines)
   // Optional KB root
   let kbRoot: string | undefined
   if (opts.withKbRoot) {
