@@ -353,12 +353,13 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       return
     }
 
-    let sessionStore: SessionStore | undefined
+    let sessionLink: { store: SessionStore; id: string } | undefined
     if (args.session !== undefined) {
-      sessionStore = new SessionStore(resolveSessionRoot())
+      const sessionStore = new SessionStore(resolveSessionRoot())
       if (sessionStore.show(args.session) === undefined) {
         sessionStore.start(args.session)
       }
+      sessionLink = { store: sessionStore, id: args.session }
     }
 
     // 2. Resolve diff input
@@ -458,8 +459,8 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       round: args.round,
       review_controls: reviewControls,
     })
-    if (sessionStore && args.session !== undefined) {
-      sessionStore.addJob(args.session, job.job_id, args.round ?? 1)
+    if (sessionLink) {
+      sessionLink.store.addJob(sessionLink.id, job.job_id, args.round ?? 1)
     }
 
     // Record skipped/auth-failed channels in job metadata
