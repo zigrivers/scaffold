@@ -468,9 +468,14 @@ interface KnowledgeRootResolution {
    - `validateKnowledgeRoot` fails → **hard error**: `runAudit`
      throws a typed `KnowledgeRootCliInvalidError` carrying the path
      and reason. The CLI handler (`handleAudit`) catches it and exits
-     non-zero with a clear message. Other callers (phase-audit,
-     fix-flow) do not pass `knowledgeRootOverride`, so this branch is
-     unreachable for them.
+     non-zero with a clear message. `phase-audit.ts` doesn't pass
+     `knowledgeRootOverride` (state-transition-triggered audits never
+     supply one), so this branch is unreachable for it. `fix-flow.ts`
+     DOES forward the override when `handleAudit --fix
+     --knowledge-root <p>` runs (see decision #20), so the same
+     hard-error fires uniformly across the initial, verifier, and
+     postfix audits — they all reject an invalid CLI path early,
+     never silently differ.
 2. **Yaml config** (read from `<cwd>/.scaffold/observability.yaml`,
    path `lenses.I-knowledge-gaps.knowledge_root`, if present and
    non-empty):
@@ -550,9 +555,32 @@ The Test Surface section calls out the specific new fixtures.
 `resolveKnowledgeRoot({ override: input.knowledgeRootOverride, cwd:
 input.primaryRoot })`, then constructs a fresh `Set<string>` for
 `warnedKeys`, and passes both into `runChecks`. The internal callers
-(`phase-audit.ts`, `fix-flow.ts`) need no code change beyond accepting
-the resolution behavior — they don't pass `knowledgeRootOverride` and
-therefore get yaml + auto-detect automatically.
+`phase-audit.ts` does not need to set `knowledgeRootOverride` (its
+audits are triggered by state transitions, not by an operator-typed
+flag), so it correctly falls through to yaml + auto-detect.
+
+**`fix-flow.ts` is different — its inner audits MUST inherit the
+override.** `runFixFlow` (`src/observability/engine/fix-flow.ts`)
+calls `runAudit` multiple times in one process: an initial audit, a
+per-finding verifier audit, and a postfix audit. If
+`handleAudit --knowledge-root <path> --fix` is invoked, only the
+initial audit gets the override; the verifier and postfix audits
+would auto-detect a different knowledge tree (or yaml-resolve to
+something else), producing inconsistent suppression behavior across
+the audits in one fix run. That can:
+
+- Mark a fix as failed because the verifier audit re-surfaced a Lens I
+  finding that the initial audit's KB had suppressed.
+- Re-surface covered topics in the postfix report despite the initial
+  audit correctly suppressing them.
+
+To prevent both: `runFixFlow` accepts a new optional
+`knowledgeRootOverride?: string` on its input shape (the same shape
+the existing `--fix` plumbing already passes through), and threads it
+into every internal `runAudit` call (verifier, postfix). `handleAudit`
+populates this field from the same CLI flag it uses for
+`RunAuditInput.knowledgeRootOverride`. Internal callers of
+`runFixFlow` that don't pass the field continue to behave as today.
 
 All existing lenses ignore the new fields; only Lens I reads them.
 Existing test callers that bypass `runAudit` and call `runChecks`
@@ -794,3 +822,4 @@ chars with `?`, so a pathological value can't produce ragged stderr.
 | 17 | LensContext field optionality + test migration | The four new fields (`knowledgeRoot`, `knowledgeIndex`, `knowledgeRootAttempts`, `warnedKeys`) are all OPTIONAL on `LensContext`; existing test literals at `lens-h-cross-doc.test.ts` and `lens-i-knowledge-gaps.test.ts` keep compiling without changes | Tests that bypass `runChecks` and construct `LensContext` literals to call lens functions directly would otherwise fail TypeScript after the interface change. Optional fields + lens treating `undefined === null` for behavior makes the migration zero-cost. |
 | 18 | Operator-visible warning string hygiene | All interpolated path/reason fragments pass through `formatForStderr()` (wraps in single quotes, escapes embedded quotes, replaces newlines/control chars with `?`) | A path or reason containing unbalanced quotes or newlines would otherwise produce ragged or multiline stderr output that's hard to parse in CI logs and audit sidecars. |
 | 19 | Yaml tier read mechanism | `resolveKnowledgeRoot` reuses `loadObservabilityConfig(cwd)` (the project-wide yaml reader at `src/observability/engine/checks/observability-config.ts:99`) rather than rolling its own parse | One yaml-reader code path across the whole observability surface. Inherits the standard error handling, defaults via `deepMerge`, and `js-yaml` choice that the C/E/F/G/H lenses already use. Also extends `ObservabilityConfig['lenses']` with a typed `'I-knowledge-gaps'?: { knowledge_root?: string }` slot, closing the previously-deferred R3-P3 finding about untyped config access. The "dependency-free / custom YAML extraction" Cross-Cutting principle applies only to the KB frontmatter walk in `loadKnowledgeIndex`. |
+| 20 | `--fix` flow inherits the CLI override | `runFixFlow` accepts an optional `knowledgeRootOverride` on its input shape and threads it into the verifier and postfix `runAudit` calls; `handleAudit --fix --knowledge-root <p>` propagates the flag value to both initial and inner audits | Without this, only the initial audit would see the override; verifier and postfix audits would auto-detect/yaml-resolve a different KB, producing inconsistent Lens I suppression across audits in one fix run — fixes could be marked failed by re-surfacing topics the initial audit correctly suppressed, or covered topics could re-appear in the postfix report. The forwarding is symmetric with how the operator's intent ("use THIS knowledge root") flows through the whole fix lifecycle. |
