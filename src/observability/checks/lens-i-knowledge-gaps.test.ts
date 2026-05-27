@@ -72,7 +72,17 @@ afterEach(() => {
 })
 
 function makeContext(cwd: string): LensContext {
-  return { profile: 'fast', cwd }
+  // Set a non-null sentinel knowledgeRoot + empty knowledgeIndex so the
+  // lens-i:no-root warning gate stays quiet for suppression-insensitive
+  // tests. Empty index produces no suppression (matches decision #15
+  // "empty KB is valid"), so behavior is equivalent to "knowledge-root
+  // resolved but empty KB" — exactly what these tests want.
+  return {
+    profile: 'fast',
+    cwd,
+    knowledgeRoot: '/fake-kb',
+    knowledgeIndex: new Set(),
+  }
 }
 
 async function runLens(opts: {
@@ -304,5 +314,169 @@ describe('lensIKnowledgeGaps', () => {
     // 2 real signals from 2 projects + 1 lessons mention → signal_count=3, distinct=2 → P2
     expect(findings).toHaveLength(1)
     expect(findings[0].severity).toBe('P2')
+  })
+})
+
+describe('lensIKnowledgeGaps — existing-entry suppression', () => {
+  function makeSignals(topic: string, projectIds: string[], count: number): Event[] {
+    // Spread `count` signals across `projectIds` (cycling).
+    const events: Event[] = []
+    for (let i = 0; i < count; i++) {
+      const projectId = projectIds[i % projectIds.length]
+      events.push(makeEvent({ payload: {
+        topic, source: 'agent_search', project_id: projectId,
+      } }))
+    }
+    return events
+  }
+
+  it('suppresses a bucket whose topic is in the knowledge index (P2 threshold)', async () => {
+    const events = makeSignals('covered-topic', [VALID_HEX_A, VALID_HEX_B], 3)
+    const ctx: LensContext = {
+      profile: 'fast',
+      cwd: makeTmpProject(),
+      knowledgeRoot: '/fake/kb',
+      knowledgeIndex: new Set(['covered-topic']),
+      knowledgeRootAttempts: [],
+      warnedKeys: new Set(),
+    }
+    const findings = await lensIKnowledgeGaps(
+      emptyGraph, { events }, stubAvailability, [], new Set(['I-knowledge-gaps']), ctx,
+    )
+    expect(findings).toEqual([])
+  })
+
+  it('suppresses a bucket at P1 threshold too', async () => {
+    const events = makeSignals('covered-hot', [VALID_HEX_A, VALID_HEX_B, VALID_HEX_C], 5)
+    const ctx: LensContext = {
+      profile: 'fast', cwd: makeTmpProject(),
+      knowledgeRoot: '/fake/kb',
+      knowledgeIndex: new Set(['covered-hot']),
+      knowledgeRootAttempts: [], warnedKeys: new Set(),
+    }
+    const findings = await lensIKnowledgeGaps(
+      emptyGraph, { events }, stubAvailability, [], new Set(['I-knowledge-gaps']), ctx,
+    )
+    expect(findings).toEqual([])
+  })
+
+  it('does NOT suppress a bucket whose topic is not in the index', async () => {
+    const events = makeSignals('uncovered-topic', [VALID_HEX_A, VALID_HEX_B], 3)
+    const ctx: LensContext = {
+      profile: 'fast', cwd: makeTmpProject(),
+      knowledgeRoot: '/fake/kb',
+      knowledgeIndex: new Set(['something-else']),
+      knowledgeRootAttempts: [], warnedKeys: new Set(),
+    }
+    const findings = await lensIKnowledgeGaps(
+      emptyGraph, { events }, stubAvailability, [], new Set(['I-knowledge-gaps']), ctx,
+    )
+    expect(findings).toHaveLength(1)
+    expect(findings[0].evidence).toMatchObject({ topic: 'uncovered-topic' })
+  })
+
+  it('emits one lens-i:no-root warning when knowledgeRoot is null', async () => {
+    const events = makeSignals('orphan-topic', [VALID_HEX_A, VALID_HEX_B], 3)
+    const warnedKeys = new Set<string>()
+    const stderrChunks: string[] = []
+    const originalWrite = process.stderr.write.bind(process.stderr)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(process.stderr.write as any) = (chunk: string | Uint8Array): boolean => {
+      stderrChunks.push(typeof chunk === 'string' ? chunk : chunk.toString())
+      return true
+    }
+    try {
+      const ctx: LensContext = {
+        profile: 'fast', cwd: makeTmpProject(),
+        knowledgeRoot: null, knowledgeIndex: null,
+        knowledgeRootAttempts: [
+          { source: 'cli', outcome: 'not-provided' },
+          { source: 'yaml', outcome: 'not-provided' },
+          { source: 'auto-detect', outcome: 'not-found' },
+        ],
+        warnedKeys,
+      }
+      const findings = await lensIKnowledgeGaps(
+        emptyGraph, { events }, stubAvailability, [], new Set(['I-knowledge-gaps']), ctx,
+      )
+      expect(findings).toHaveLength(1)   // no suppression — finding still emitted
+      expect(stderrChunks.join('')).toMatch(/\[Lens I\] knowledge-root not located/)
+      // Second call with the same warnedKeys Set should NOT re-emit.
+      await lensIKnowledgeGaps(
+        emptyGraph, { events }, stubAvailability, [], new Set(['I-knowledge-gaps']), ctx,
+      )
+      expect(stderrChunks.filter(c => c.includes('[Lens I]')).length).toBe(1)
+    } finally {
+      process.stderr.write = originalWrite
+    }
+  })
+
+  it('includes the yaml-was-invalid note in the warning when applicable', async () => {
+    const events = makeSignals('orphan', [VALID_HEX_A, VALID_HEX_B], 3)
+    const warnedKeys = new Set<string>()
+    const stderrChunks: string[] = []
+    const originalWrite = process.stderr.write.bind(process.stderr)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(process.stderr.write as any) = (chunk: string | Uint8Array): boolean => {
+      stderrChunks.push(typeof chunk === 'string' ? chunk : chunk.toString())
+      return true
+    }
+    try {
+      const ctx: LensContext = {
+        profile: 'fast', cwd: makeTmpProject(),
+        knowledgeRoot: null, knowledgeIndex: null,
+        knowledgeRootAttempts: [
+          { source: 'cli', outcome: 'not-provided' },
+          {
+            source: 'yaml', path: '/tmp/bad', outcome: 'invalid',
+            reason: 'path does not exist',
+          },
+          { source: 'auto-detect', outcome: 'not-found' },
+        ],
+        warnedKeys,
+      }
+      await lensIKnowledgeGaps(
+        emptyGraph, { events }, stubAvailability, [], new Set(['I-knowledge-gaps']), ctx,
+      )
+      const combined = stderrChunks.join('')
+      expect(combined).toMatch(
+        /yaml lenses\.I-knowledge-gaps\.knowledge_root '\/tmp\/bad' was invalid: 'path does not exist'/,
+      )
+    } finally {
+      process.stderr.write = originalWrite
+    }
+  })
+
+  // Note: the lens body includes a defensive `enabled.has(lensId)` guard
+  // in the warning gate, but `runChecks` (runner.ts:81) already skips
+  // disabled lenses before they're called. A direct-call test would
+  // exercise a path that never happens in production or normal tests;
+  // dropping it keeps coverage focused on the high-value paths.
+
+  it('two consecutive lens calls with fresh warnedKeys both emit (multi-audit case)', async () => {
+    const events = makeSignals('orphan2', [VALID_HEX_A, VALID_HEX_B], 3)
+    const stderrChunks: string[] = []
+    const originalWrite = process.stderr.write.bind(process.stderr)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(process.stderr.write as any) = (chunk: string | Uint8Array): boolean => {
+      stderrChunks.push(typeof chunk === 'string' ? chunk : chunk.toString())
+      return true
+    }
+    try {
+      for (let i = 0; i < 2; i++) {
+        const ctx: LensContext = {
+          profile: 'fast', cwd: makeTmpProject(),
+          knowledgeRoot: null, knowledgeIndex: null,
+          knowledgeRootAttempts: [{ source: 'auto-detect', outcome: 'not-found' }],
+          warnedKeys: new Set(),  // fresh Set per "audit"
+        }
+        await lensIKnowledgeGaps(
+          emptyGraph, { events }, stubAvailability, [], new Set(['I-knowledge-gaps']), ctx,
+        )
+      }
+      expect(stderrChunks.filter(c => c.includes('[Lens I]')).length).toBe(2)
+    } finally {
+      process.stderr.write = originalWrite
+    }
   })
 })

@@ -24,6 +24,13 @@ export interface RunFixFlowInput {
   ghBin?: string
   bdBin?: string
   abortSnapshot?: AbortSnapshot
+  /** Forwarded from `handleAudit --fix --knowledge-root <path>`. When
+   *  set, every internal runAudit call (verifier + postfix) inherits
+   *  the same override, so Lens I suppression behavior is consistent
+   *  across the whole fix run (decision #20). Internal callers of
+   *  runFixFlow that don't pass this field continue to behave as
+   *  before (yaml + auto-detect). */
+  knowledgeRootOverride?: string
 }
 
 export interface FixFlowResult {
@@ -61,12 +68,14 @@ function buildFindingPrompt(finding: Finding): string {
   ].filter(Boolean).join('\n')
 }
 
-function defaultVerifier(cwd: string, finding: Finding): Promise<{ stillPresent: boolean }> {
-  return runAudit({
-    primaryRoot: cwd, profile: 'fast', scope: 'all',
-    sinceHours: 24, lensIds: [finding.lens_id],
-    args: { profile: 'fast', scope: 'all', lensIds: [finding.lens_id], verifying: finding.id },
-  }).then((out) => ({ stillPresent: out.findings.some((f) => f.id === finding.id) }))
+function makeDefaultVerifier(knowledgeRootOverride?: string): FixVerifier {
+  return (cwd, finding) =>
+    runAudit({
+      primaryRoot: cwd, profile: 'fast', scope: 'all',
+      sinceHours: 24, lensIds: [finding.lens_id],
+      knowledgeRootOverride,
+      args: { profile: 'fast', scope: 'all', lensIds: [finding.lens_id], verifying: finding.id },
+    }).then((out) => ({ stillPresent: out.findings.some((f) => f.id === finding.id) }))
 }
 
 function listStagedSince(cwd: string, baselineStaged: Set<string>): string[] {
@@ -108,7 +117,7 @@ export async function runFixFlow(input: RunFixFlowInput): Promise<FixFlowResult>
   const timeoutMs = (config.fix.timeout_s ?? 300) * 1000
   const maxAttempts = config.fix.per_finding_max_attempts ?? 3
   const dispatcher = input.dispatcher ?? dispatchFixAgent
-  const verifier = input.verifier ?? defaultVerifier
+  const verifier = input.verifier ?? makeDefaultVerifier(input.knowledgeRootOverride)
   const snapshot = input.abortSnapshot ?? captureSnapshot(input.primaryRoot)
 
   const plan = buildFixPlan(input.initial.findings, input.initial.fix_threshold)
@@ -128,6 +137,7 @@ export async function runFixFlow(input: RunFixFlowInput): Promise<FixFlowResult>
     primaryRoot: input.primaryRoot,
     profile: 'fast', scope: 'all', sinceHours: 24,
     ghBin: input.ghBin, bdBin: input.bdBin,
+    knowledgeRootOverride: input.knowledgeRootOverride,
     args: { profile: 'fast', scope: 'all', postfix: true },
   })
   const postfixId = `${deriveReportId(postfix)}-postfix`

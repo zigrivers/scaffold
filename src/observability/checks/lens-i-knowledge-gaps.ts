@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import type { Finding, KnowledgeGapSignalPayload } from '../engine/types.js'
 import type { LensFn } from '../engine/checks/runner.js'
 import { scanLessonsForGaps, normalizeTopic } from './lens-i-lessons-scanner.js'
+import { emitOnceForAudit, formatForStderr } from '../knowledge-index.js'
 
 const lensId = 'I-knowledge-gaps'
 const WINDOW_DAYS = 90
@@ -40,7 +41,7 @@ function dedupeExcerpts(signals: TimedSignal[], cap: number): string[] {
 }
 
 export const lensIKnowledgeGaps: LensFn = async (
-  _graph, ledger, _availability, _upstream, _enabled, context,
+  _graph, ledger, _availability, _upstream, enabled, context,
 ) => {
   const findings: Finding[] = []
   const auditTs = new Date().toISOString()
@@ -95,7 +96,50 @@ export const lensIKnowledgeGaps: LensFn = async (
     if (Date.parse(s.ts) > Date.parse(bucket.lastSeen)) bucket.lastSeen = s.ts
   }
 
-  // 4. Apply finding rules
+  // 4. Compose the warn-once message ONCE if Lens I is enabled but
+  //    no knowledgeRoot was resolved. The lens still runs and emits
+  //    unsuppressed findings — suppression is an enhancement, not a
+  //    contract. Gates on:
+  //      (a) context && !context.knowledgeRoot → null root or legacy caller
+  //      (b) enabled.has(lensId) → defensive guard for tests/callers
+  //          that invoke the lens directly with an empty enabledIds set.
+  //          (runChecks already skips disabled lenses BEFORE calling the
+  //          lensFn, so this guard is redundant in production but
+  //          protects direct-call tests and any future programmatic
+  //          path that might bypass runChecks.)
+  // Skip when context.warnedKeys is missing — without a caller-provided
+  // dedup Set, calling emitOnceForAudit with a fresh Set would orphan it
+  // and let the next direct lens call re-emit (the spec's "warn once per
+  // audit run" contract is enforced through the caller-Set, not a
+  // module-global). The runner ALWAYS provides one in production, so
+  // this branch only protects direct test/programmatic invocations.
+  if (
+    context
+    && !context.knowledgeRoot
+    && enabled.has(lensId)
+    && context.warnedKeys
+  ) {
+    const yamlAttempt = (context.knowledgeRootAttempts ?? []).find(
+      a => a.source === 'yaml' && a.outcome === 'invalid',
+    )
+    const yamlNote = yamlAttempt
+      ? ' — yaml lenses.I-knowledge-gaps.knowledge_root '
+        + formatForStderr(yamlAttempt.path)
+        + ' was invalid: '
+        + formatForStderr(yamlAttempt.reason)
+      : ''
+    emitOnceForAudit(
+      context.warnedKeys,
+      'lens-i:no-root',
+      '[Lens I] knowledge-root not located; existing-entry suppression disabled'
+        + yamlNote
+        + '. Pass --knowledge-root or set lenses.I-knowledge-gaps.knowledge_root'
+        + ' in .scaffold/observability.yaml.\n',
+    )
+  }
+
+  // 5. Apply finding rules — suppress buckets covered by the index
+  const index = context?.knowledgeIndex ?? null
   for (const bucket of buckets.values()) {
     const signalCount = bucket.signals.length
     const distinctProjectCount = bucket.realProjects.size
@@ -104,6 +148,11 @@ export const lensIKnowledgeGaps: LensFn = async (
     if (signalCount >= 5 && distinctProjectCount >= 3) severity = 'P1'
     else if (signalCount >= 3 && distinctProjectCount >= 2) severity = 'P2'
     if (!severity) continue
+
+    // Existing-entry suppression: skip both P1 and P2 paths when the
+    // topic is covered by an existing knowledge entry. Pre-loaded
+    // index from the resolver (decision #16); lens does not re-walk.
+    if (index && index.has(bucket.topic)) continue
 
     const projectsSample = [...bucket.realProjects].slice(0, MAX_SAMPLE_PROJECTS)
 
