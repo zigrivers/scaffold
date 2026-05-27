@@ -797,8 +797,14 @@ chars with `?`, so a pathological value can't produce ragged stderr.
 - Frontmatter parse per file: trivial — only the leading YAML block is
   scanned and only `name:` is extracted.
 - No LLM calls. Pure I/O + string parsing.
-- Memoized within a single audit run by virtue of being called from one
-  call-site (Lens I).
+- The walk is performed exactly once per `runAudit` invocation, inside
+  `resolveKnowledgeRoot` during validation. The resulting Set is placed
+  on `LensContext.knowledgeIndex` and consumed by Lens I — the lens
+  does NOT re-walk. Within a `--fix` run (initial + verifier + postfix
+  audits), each audit re-walks because each is a fresh `runAudit`
+  invocation with its own resolver pass; that's intentional so an
+  operator who edits the KB between audits sees consistent state per
+  audit.
 
 ## Risks and Mitigations
 
