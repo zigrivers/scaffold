@@ -21,6 +21,7 @@ import { formatJson } from '../formatters/json.js'
 import { formatText } from '../formatters/text.js'
 import { formatMarkdown } from '../formatters/markdown.js'
 import type { ChannelConfigParsed, MmrConfigParsed } from '../config/schema.js'
+import { SessionStore, resolveSessionRoot } from './sessions.js'
 
 interface ReviewArgs {
   diff?: string
@@ -352,6 +353,14 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       return
     }
 
+    let sessionStore: SessionStore | undefined
+    if (args.session !== undefined) {
+      sessionStore = new SessionStore(resolveSessionRoot())
+      if (sessionStore.show(args.session) === undefined) {
+        sessionStore.start(args.session)
+      }
+    }
+
     // 2. Resolve diff input
     const diff = resolveDiff(args)
     if (!diff.trim()) {
@@ -449,6 +458,9 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       round: args.round,
       review_controls: reviewControls,
     })
+    if (sessionStore && args.session !== undefined) {
+      sessionStore.addJob(args.session, job.job_id, args.round ?? 1)
+    }
 
     // Record skipped/auth-failed channels in job metadata
     for (const name of channelNames) {
