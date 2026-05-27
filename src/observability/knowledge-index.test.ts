@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, afterEach, beforeEach } from 'vitest'
 import { loadKnowledgeIndex, formatForStderr } from './knowledge-index.js'
 
 const tmpDirs: string[] = []
@@ -230,5 +230,54 @@ describe('validateKnowledgeRoot', () => {
     const result = validateKnowledgeRoot(root)
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.reason).toMatch(/VERSION marker/i)
+  })
+})
+
+import { emitOnceForAudit } from './knowledge-index.js'
+
+describe('emitOnceForAudit', () => {
+  let stderrOutput: string
+  let originalWrite: typeof process.stderr.write
+
+  beforeEach(() => {
+    stderrOutput = ''
+    originalWrite = process.stderr.write.bind(process.stderr)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(process.stderr.write as any) = (chunk: string | Uint8Array): boolean => {
+      stderrOutput += typeof chunk === 'string' ? chunk : chunk.toString()
+      return true
+    }
+  })
+  afterEach(() => {
+    process.stderr.write = originalWrite
+  })
+
+  it('writes to stderr on first call for a key', () => {
+    const set = new Set<string>()
+    emitOnceForAudit(set, 'key-a', 'hello\n')
+    expect(stderrOutput).toBe('hello\n')
+    expect(set.has('key-a')).toBe(true)
+  })
+
+  it('does NOT write on second call with the same key + set', () => {
+    const set = new Set<string>()
+    emitOnceForAudit(set, 'key-a', 'first\n')
+    emitOnceForAudit(set, 'key-a', 'second\n')
+    expect(stderrOutput).toBe('first\n')
+  })
+
+  it('writes again for a different key on the same set', () => {
+    const set = new Set<string>()
+    emitOnceForAudit(set, 'key-a', 'first\n')
+    emitOnceForAudit(set, 'key-b', 'second\n')
+    expect(stderrOutput).toBe('first\nsecond\n')
+  })
+
+  it('writes again when a different (fresh) Set is passed', () => {
+    const setA = new Set<string>()
+    const setB = new Set<string>()
+    emitOnceForAudit(setA, 'key-a', 'first\n')
+    emitOnceForAudit(setB, 'key-a', 'second\n')
+    expect(stderrOutput).toBe('first\nsecond\n')
   })
 })

@@ -214,3 +214,27 @@ export function validateKnowledgeRoot(candidatePath: string): ValidateResult {
   }
   return { ok: true, index }
 }
+
+// ─── emitOnceForAudit ───────────────────────────────────────────────────────
+
+/**
+ * Write `message` to process.stderr exactly once per (set, key) tuple.
+ * The dedup state lives in the caller-provided `warnedKeys` Set, NOT
+ * in module-level state — this is intentional so multiple runAudit
+ * invocations in one process (e.g. the --fix flow's initial + verifier
+ * + postfix audits, or vitest's shared-module-state tests) each get
+ * their own dedup scope. runAudit creates a fresh Set for each
+ * invocation; tests pass their own.
+ *
+ * Uses process.stderr.write directly rather than console.warn so the
+ * output never collides with JSON renders of audit output on stdout.
+ */
+export function emitOnceForAudit(
+  warnedKeys: Set<string>,
+  key: string,
+  message: string,
+): void {
+  if (warnedKeys.has(key)) return
+  warnedKeys.add(key)
+  process.stderr.write(message)
+}
