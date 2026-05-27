@@ -107,7 +107,9 @@ case (entry exists → suppress finding) as if it required human judgment.
 │                          │                                              │
 │                          ▼                                              │
 │   ┌──────────────────────────────────────────────────────────────┐    │
-│   │ resolveKnowledgeRoot (in knowledge-index.ts)                 │    │
+│   │ resolveKnowledgeRoot                                         │    │
+│   │   defined in knowledge-index.ts;                             │    │
+│   │   imported and called by runAudit (not by handleAudit)       │    │
 │   │ Three-tier; returns KnowledgeRootResolution:                 │    │
 │   │   1. CLI override → validate → use, OR throw                 │    │
 │   │      KnowledgeRootCliInvalidError (handleAudit catches       │    │
@@ -183,11 +185,22 @@ case (entry exists → suppress finding) as if it required human judgment.
 
 ## Detailed Design
 
-### 1. Knowledge-index loader (`src/observability/knowledge-index.ts`)
+### 1. Knowledge-index module (`src/observability/knowledge-index.ts`)
 
-A new, dependency-free module. Public surface: `loadKnowledgeIndex`,
-`findScaffoldKnowledgeRoot`, `emitOnceForAudit`. No private helpers
-exported.
+A new, dependency-free module. Public surface (all exported so Lens I,
+`runAudit`, and tests can import each independently):
+
+- `loadKnowledgeIndex(dir): Set<string>` — raw filesystem walk + frontmatter parse.
+- `findScaffoldKnowledgeRoot(): string | null` — auto-detect the install's knowledge dir.
+- `validateKnowledgeRoot(path): { ok: true, index } | { ok: false, reason }` — VERSION marker + loader; returns the loaded index on success.
+- `resolveKnowledgeRoot({override, cwd}): KnowledgeRootResolution` — 3-tier resolver called by `runAudit`.
+- `emitOnceForAudit(warnedKeys, key, message): void` — warn-once helper.
+- `formatForStderr(value): string` — quote/escape a value for one-line stderr output.
+
+Lens I imports `emitOnceForAudit` and `formatForStderr` from this
+module. `runAudit` imports `resolveKnowledgeRoot`. The CLI (`handleAudit`)
+imports nothing directly — it only reads the CLI flag and passes it to
+`runAudit` as `knowledgeRootOverride`.
 
 #### `loadKnowledgeIndex(knowledgeDir: string): Set<string>`
 
@@ -216,9 +229,11 @@ exported.
 - Returns a `Set<string>` of valid slugs.
 - **On unrecoverable I/O failure** (path doesn't exist, path is a file
   not a directory, permission denied at the top level): throws. The
-  caller (Lens I) catches and treats as "index unavailable".
-
-The lens calls `loadKnowledgeIndex` at most once per invocation.
+  caller is the resolver (`validateKnowledgeRoot` inside
+  `resolveKnowledgeRoot`); the resolver catches and records the error
+  as a validation failure. Lens I does NOT call `loadKnowledgeIndex`
+  itself — by design (decision #16), all I/O on the knowledge tree
+  happens once, in the resolver, during validation.
 
 #### `findScaffoldKnowledgeRoot(): string | null`
 
@@ -652,17 +667,29 @@ chars with `?`, so a pathological value can't produce ragged stderr.
   (not the resolver) so a disabled Lens I never produces spurious noise.
 - **No new dependencies.** Custom walker, custom YAML extraction. Matches
   the dependency-free style of the existing lens.
+- **Context construction contract.** `LensContext.knowledgeRoot` and
+  `LensContext.knowledgeIndex` are PAIRED — the resolver populates both
+  or neither. Production code never creates a context with one set and
+  the other null/undefined. Lens I's suppression logic (`if (index &&
+  index.has(topic))`) silently does nothing in the mismatched-pair case
+  rather than warning, because (a) a production caller can't reach that
+  state, (b) defensive behavior is the right choice for a runtime
+  consistency violation, and (c) a future test that constructs the
+  mismatch directly is exercising a test-construction bug, not a real
+  scenario. The Test Surface includes one test that pins this defensive
+  behavior so the invariant doesn't drift.
 
 ## Test Surface
 
 | Test target | Coverage |
 |---|---|
-| `loadKnowledgeIndex` | empty dir → empty Set; dir with valid entries → expected slugs; dir with README.md only → empty Set; entry with no frontmatter → skipped silently; entry with `name:` that is not a slug pattern but IS a non-empty string → INCLUDED in Set (matches assembly loader, not validator); duplicate `name:` across files → deduped; symlinked subdir → followed; non-existent path → throws; path is a file → throws; permission-denied on one subdir → continues, skips it; dir of non-knowledge .md files (e.g. pipeline steps with frontmatter that has `name:`) → returns those slugs too (caller's job to point at the right dir — validator enforces non-empty result) |
+| `loadKnowledgeIndex` | empty dir → empty Set; dir with valid entries → expected slugs; dir with README.md only → empty Set; entry with no frontmatter → skipped silently; entry with `name:` that is not a slug pattern but IS a non-empty string → INCLUDED in Set (matches assembly loader, not validator); duplicate `name:` across files → deduped; symlinked subdir → followed; non-existent path → throws; path is a file → throws; permission-denied on one subdir → continues, skips it; dir of non-knowledge .md files (e.g. pipeline steps with frontmatter that has `name:`) → returns those slugs too — this is by design; the validator catches the wrong-dir case via the VERSION marker, not via the loader |
 | `findScaffoldKnowledgeRoot` | dev worktree layout (matches via `package.json#name === '@zigrivers/scaffold'`); npm-global layout under `/opt/homebrew/lib/node_modules` (matches; verifies NO homedir boundary); a sibling project with a `content/knowledge/` dir but a different `package.json#name` (does NOT match — keeps walking); no scaffold install anywhere above (returns null, walks all the way to `/`) |
-| `validateKnowledgeRoot` | exists + dir + loader returns non-empty Set → ok; doesn't exist → fail; exists but file → fail; exists, is dir, contains only README.md → fail (loader returns empty); exists, is dir of pipeline/tool .md files (with `name:` frontmatter) but NOT a knowledge dir → fail-or-pass per loader result (acceptable: validator can't distinguish, so the operator gets a misleading "valid" — but this is the same shape as any other reusing-the-loader design, and the worst case is over-broad suppression on slugs that exist in pipeline meta-prompts; the loader returning a non-empty Set proves *some* slug-bearing tree is there) |
+| `validateKnowledgeRoot` | exists + dir + has VERSION marker + loader returns non-empty Set → `{ ok: true, index }`; doesn't exist → fail (reason: 'path does not exist'); exists but is file → fail; exists + dir but NO `<path>/VERSION` file → fail (reason mentions the marker); exists + dir + has VERSION but loader returns empty Set → fail (reason: 'directory contains no knowledge entries'); pointing at `content/` or `content/tools/` (no VERSION file) → fail FAST on the marker check, before loader even runs; pointing at `content/knowledge/` → ok with index populated |
 | `emitOnceForAudit` | first call with `(set, key, message)` writes to stderr and adds key to set; second call with the same set + key is no-op; second call with the same set + different key writes again; calls with a fresh set always write again (proves per-audit Set isolation works) |
 | `resolveKnowledgeRoot` (the helper inside `runAudit`) | override valid → `root: <path>`, attempts: `[{ source: 'cli', outcome: 'used' }]`; override invalid → throws `KnowledgeRootCliInvalidError`; no override, yaml valid → `root: <yamlPath>`, attempts include `{ source: 'yaml', outcome: 'used' }`; no override, yaml invalid → attempts include `{ source: 'yaml', outcome: 'invalid', reason }` + falls through; no override, no yaml, auto-detect finds it → attempts ends with `{ source: 'auto-detect', outcome: 'used' }`; no override, no yaml, auto-detect misses → `root: null`, attempts end with `{ source: 'auto-detect', outcome: 'not-found' }`; called with no `cwd` (test path) → resolves yaml from cwd undefined, treats as not-provided |
-| `lens-i-knowledge-gaps.ts` | existing tests still pass; new: bucket suppressed when topic is in index (both P1 and P2 paths); bucket NOT suppressed when topic is not in index (both severities); null `knowledgeRoot`, lens runs → one-line `lens-i:no-root` warning + no suppression; null `knowledgeRoot` with yaml-was-invalid attempt → warning includes the yaml note; load throws → one-line `lens-i:index-load-failed` warning + no suppression; Lens I disabled (not in `enabledIds`) → NO warning emitted at all; two `runAudit` calls in one test → fresh `warnedKeys` per call, BOTH calls emit their respective warnings (proves fix-flow / phase-audit multi-audit case works) |
+| `lens-i-knowledge-gaps.ts` | existing tests still pass; new: bucket suppressed when topic is in `context.knowledgeIndex` (both P1 and P2 paths); bucket NOT suppressed when topic is not in the index (both severities); null `knowledgeRoot`, lens runs → one-line `lens-i:no-root` warning via `emitOnceForAudit(warnedKeys, ...)` + no suppression; null `knowledgeRoot` with yaml-was-invalid attempt → warning includes the yaml note formatted via `formatForStderr`; Lens I disabled (not in `enabledIds`) → NO warning emitted at all; two `runAudit` calls in one test → fresh `warnedKeys` per call, BOTH calls emit their respective warnings (proves fix-flow / phase-audit multi-audit case works); manual `LensContext` with `knowledgeRoot` set but `knowledgeIndex` undefined (the construction-contract violation case — should never happen in production but covered defensively) → no crash, no suppression, NO `lens-i:no-root` warning (root is non-null so the warning gate doesn't fire). |
+| Construction-contract documentation | A short prose note in the spec + a one-line invariant in the lens implementation comment: "`knowledgeRoot` and `knowledgeIndex` are paired — the resolver populates both or neither. Lens I's suppression activates only when both are set. A future test or internal caller that supplies one without the other gets silent 'no suppression' (no warning) — this is intentional defensive behavior, but exercising the path is a test-construction bug, not a production scenario." |
 | Integration | `scaffold observe audit --knowledge-root <fixture>` with a fixture KB containing slug `covered` and a ledger with three signals each on `covered` and `uncovered` → only `uncovered` becomes a finding; `scaffold observe audit` (no flag) in the repo's own dev worktree → auto-detect resolves the real `content/knowledge/`; `scaffold observe audit --knowledge-root /tmp/nope` → exit non-zero with the validation error; `scaffold observe audit --knowledge-root <repo>/content` → exit non-zero (loader returns 0 KB entries when pointed at the parent dir, even though it contains .md files in pipeline/ and tools/ which lack KB-style `name:` patterns OR contain non-KB names — actually: this test pins the behavior the implementation produces, NOT what we wish it produced; if the loader accepts pipeline-step `name:` fields the validator will say "ok" and the lens will just have an over-broad index. Document this in the test as a known limitation) |
 
 ## Cost & Performance
