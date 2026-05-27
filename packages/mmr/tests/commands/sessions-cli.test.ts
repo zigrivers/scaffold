@@ -1,10 +1,15 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll } from 'vitest'
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-const mmrBin = path.resolve(__dirname, '../../dist/index.js')
+const packageRoot = path.resolve(__dirname, '../..')
+const mmrBin = path.join(packageRoot, 'dist/index.js')
+
+beforeAll(() => {
+  execFileSync('npm', ['run', 'build'], { cwd: packageRoot, stdio: 'pipe' })
+})
 
 function runMmr(args: string[], env: NodeJS.ProcessEnv = {}): { code: number; stdout: string; stderr: string } {
   try {
