@@ -75,7 +75,10 @@ export class SessionStore {
   }
 
   private waitForLockRetry(): void {
-    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, LOCK_POLL_MS)
+    const end = Date.now() + LOCK_POLL_MS
+    while (Date.now() < end) {
+      // Synchronous CLI path; lock contention should be rare and short-lived.
+    }
   }
 
   private withLock<T>(filePath: string, fn: () => T): T {
