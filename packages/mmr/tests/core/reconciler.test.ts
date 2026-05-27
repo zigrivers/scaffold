@@ -181,6 +181,27 @@ describe('reconcile', () => {
     expect(result[0].sources.sort()).toEqual(['claude', 'gemini'])
   })
 
+  it('does not fuzzy-merge different raw lines with different suggestions', () => {
+    const channelFindings: Record<string, Finding[]> = {
+      claude: [{
+        category: 'tests',
+        severity: 'P2',
+        location: 'file.ts:10',
+        description: 'Regression risk in checkout flow should be covered',
+        suggestion: 'Add test',
+      }],
+      gemini: [{
+        category: 'compatibility',
+        severity: 'P2',
+        location: 'file.ts:99',
+        description: 'Regression risk in checkout flow must be covered',
+        suggestion: 'Add backward compatibility coverage',
+      }],
+    }
+    const result = reconcile(channelFindings)
+    expect(result).toHaveLength(2)
+  })
+
   it('does not fuzzy-merge findings with empty shingles', () => {
     const channelFindings: Record<string, Finding[]> = {
       claude: [{ severity: 'P2', location: 'file.ts:10', description: 'abc', suggestion: 'Add test' }],

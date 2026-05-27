@@ -69,6 +69,9 @@ export function reconcile(channelFindings: Record<string, Finding[]>): Reconcile
   const groups: ReconcileGroup[] = []
   const keyIndex = new Map<string, ReconcileGroup[]>()
   for (const finding of attributed) {
+    // Multiple groups can share a finding_key because location normalization
+    // strips line spans. Keep same-source findings at different raw locations
+    // separate, then join later channels to the compatible raw-location group.
     const exact = bestJoinableGroup((keyIndex.get(finding.finding_key) ?? [])
       .filter((group) => canJoinGroup(group, finding)), finding)
     if (exact !== undefined) {
@@ -79,6 +82,7 @@ export function reconcile(channelFindings: Record<string, Finding[]>): Reconcile
     const fuzzy = bestJoinableGroup(groups.filter((group) =>
       canJoinGroup(group, finding) &&
       group.normalized_location === finding.normalized_location &&
+      canFuzzyJoinGroup(group, finding) &&
       shingleSize(group.shingle) > 0 &&
       shingleSize(finding.shingle) > 0 &&
       jaccardSimilarity(group.shingle, finding.shingle) >= 0.7,
@@ -183,11 +187,25 @@ function canJoinGroup(group: ReconcileGroup, finding: AttributedFinding): boolea
   )
 }
 
+function canFuzzyJoinGroup(group: ReconcileGroup, finding: AttributedFinding): boolean {
+  if (group.findings.some((existing) => existing.location === finding.location)) {
+    return true
+  }
+  return group.normalized_category === finding.normalized_category &&
+    group.normalized_suggestion === finding.normalized_suggestion
+}
+
 function bestJoinableGroup(groups: ReconcileGroup[], finding: AttributedFinding): ReconcileGroup | undefined {
-  const eligible = groups.sort((a, b) => groupMatchScore(b, finding) - groupMatchScore(a, finding))
+  const eligible = groups.sort((a, b) => compareGroupsForFinding(a, b, finding))
   return eligible.find((group) =>
     group.findings.some((existing) => existing.location === finding.location),
   ) ?? eligible[0]
+}
+
+function compareGroupsForFinding(a: ReconcileGroup, b: ReconcileGroup, finding: AttributedFinding): number {
+  return groupMatchScore(b, finding) - groupMatchScore(a, finding) ||
+    a.finding_key.localeCompare(b.finding_key) ||
+    a.normalized_location.localeCompare(b.normalized_location)
 }
 
 function groupMatchScore(group: ReconcileGroup, finding: AttributedFinding): number {
