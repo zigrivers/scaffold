@@ -1,4 +1,6 @@
+import type { CommandModule, ArgumentsCamelCase } from 'yargs'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 
 const SESSION_ID_RE = /^[a-zA-Z0-9_-]+$/
@@ -12,6 +14,11 @@ export interface SessionRecord {
   created_at: string
   jobs: string[]
   rounds: number
+}
+
+interface SessionArgs {
+  action: string
+  id?: string
 }
 
 export class SessionStore {
@@ -181,4 +188,47 @@ export class SessionStore {
       })
     })
   }
+}
+
+export const sessionsCommand: CommandModule<object, SessionArgs> = {
+  command: 'sessions <action> [id]',
+  describe: 'Manage MMR review sessions (T2-B)',
+  builder: (yargs) =>
+    yargs
+      .positional('action', {
+        type: 'string',
+        choices: ['start', 'list', 'show', 'end'] as const,
+        demandOption: true,
+      })
+      .positional('id', { type: 'string' }),
+  handler: (args: ArgumentsCamelCase<SessionArgs>) => {
+    const store = new SessionStore(os.homedir())
+    const action = args.action
+    if (action === 'list') {
+      const records = store.list()
+      console.log(JSON.stringify(records, null, 2))
+      return
+    }
+    if (!args.id) {
+      console.error(`mmr sessions ${action}: <id> argument required`)
+      process.exit(1)
+    }
+    if (action === 'start') {
+      console.log(JSON.stringify(store.start(args.id), null, 2))
+      return
+    }
+    if (action === 'show') {
+      const record = store.show(args.id)
+      if (!record) {
+        console.error(`Session not found: ${args.id}`)
+        process.exit(1)
+      }
+      console.log(JSON.stringify(record, null, 2))
+      return
+    }
+    if (action === 'end') {
+      store.end(args.id)
+      console.log(JSON.stringify({ ended: args.id }, null, 2))
+    }
+  },
 }
