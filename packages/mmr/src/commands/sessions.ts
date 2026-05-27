@@ -2,6 +2,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 const SESSION_ID_RE = /^[a-zA-Z0-9_-]+$/
+const LOCK_TIMEOUT_MS = 5000
+const LOCK_POLL_MS = 25
 
 export interface SessionRecord {
   session_id: string
@@ -54,9 +56,17 @@ export class SessionStore {
     fs.renameSync(tmpPath, filePath)
   }
 
+  private waitForLockRetry(): void {
+    const end = Date.now() + LOCK_POLL_MS
+    while (Date.now() < end) {
+      // Synchronous CLI path: keep the critical section small and avoid timers.
+    }
+  }
+
   private withLock<T>(filePath: string, fn: () => T): T {
     const lockPath = `${filePath}.lock`
-    const deadline = Date.now() + 5000
+    const deadline = Date.now() + LOCK_TIMEOUT_MS
+    fs.mkdirSync(path.dirname(filePath), { recursive: true })
     while (true) {
       try {
         fs.mkdirSync(lockPath, { recursive: false })
@@ -64,7 +74,16 @@ export class SessionStore {
       } catch (err) {
         const code = (err as NodeJS.ErrnoException).code
         if (code !== 'EEXIST' || Date.now() >= deadline) throw err
-        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25)
+        try {
+          const stat = fs.statSync(lockPath)
+          if (Date.now() - stat.mtimeMs > LOCK_TIMEOUT_MS) {
+            fs.rmSync(lockPath, { recursive: true, force: true })
+            continue
+          }
+        } catch (statErr) {
+          if ((statErr as NodeJS.ErrnoException).code !== 'ENOENT') throw statErr
+        }
+        this.waitForLockRetry()
       }
     }
     try {

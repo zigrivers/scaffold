@@ -70,6 +70,26 @@ describe('SessionStore', () => {
     expect(s.rounds).toBe(2)
   })
 
+  it('addJob() creates the sessions directory when called before start()', () => {
+    store.addJob('feat-foo', 'mmr-abc123', 1)
+    const s = store.show('feat-foo')!
+    expect(s.jobs).toEqual(['mmr-abc123'])
+    expect(s.rounds).toBe(1)
+  })
+
+  it('recovers stale session locks', () => {
+    const staleLock = path.join(tmpHome, '.mmr', 'sessions', 'feat-foo.json.lock')
+    fs.mkdirSync(staleLock, { recursive: true })
+    const staleTime = new Date(Date.now() - 10_000)
+    fs.utimesSync(staleLock, staleTime, staleTime)
+
+    store.addJob('feat-foo', 'mmr-abc123', 1)
+
+    const s = store.show('feat-foo')!
+    expect(s.jobs).toEqual(['mmr-abc123'])
+    expect(fs.existsSync(staleLock)).toBe(false)
+  })
+
   it('list() reads the session index instead of parsing every session file', () => {
     store.start('feat-foo')
     fs.writeFileSync(path.join(tmpHome, '.mmr', 'sessions', 'feat-foo.json'), '{')
