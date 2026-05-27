@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import type { ReconciledFinding } from '../../src/types.js'
+import type { JobMetadata, ReconciledFinding } from '../../src/types.js'
 
 describe('ReconciledFinding shape', () => {
   it('accepts a finding with all new T2-A/B/C/D fields populated', () => {
@@ -39,5 +39,35 @@ describe('ReconciledFinding shape', () => {
       agreement: 'unique',
     }
     expect(f.severity).toBe('P2')
+  })
+})
+
+describe('JobMetadata shape', () => {
+  it('accepts session_id and round when present', () => {
+    const j: JobMetadata = {
+      job_id: 'mmr-abcdef',
+      status: 'completed',
+      fix_threshold: 'P2',
+      format: 'json',
+      created_at: '2026-05-22T00:00:00Z',
+      channels: {},
+      session_id: 'feat-foo',
+      round: 3,
+    }
+    const restored = JSON.parse(JSON.stringify(j)) as JobMetadata
+    expect(restored.session_id).toBe('feat-foo')
+    expect(restored.round).toBe(3)
+  })
+
+  it('still accepts a job with no session linkage', () => {
+    const j: JobMetadata = {
+      job_id: 'mmr-abcdef',
+      status: 'completed',
+      fix_threshold: 'P2',
+      format: 'json',
+      created_at: '2026-05-22T00:00:00Z',
+      channels: {},
+    }
+    expect(j.session_id).toBeUndefined()
   })
 })
