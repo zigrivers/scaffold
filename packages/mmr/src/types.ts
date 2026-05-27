@@ -30,6 +30,14 @@ export type Confidence = 'high' | 'medium' | 'low'
 
 export type OutputFormat = 'json' | 'text' | 'markdown'
 
+export interface ReviewControls {
+  max_rounds?: number
+  accept_new_acks: boolean
+  trust_project_acks: boolean
+  trust_project_config: boolean
+  config_base_ref?: string
+}
+
 export const TERMINAL_STATUSES: ReadonlySet<ChannelStatus> = new Set([
   'completed', 'timeout', 'failed', 'auth_failed', 'not_installed', 'skipped',
 ])
@@ -83,6 +91,8 @@ export interface JobMetadata {
   session_id?: string
   /** One-based round counter within a session (T2-B). */
   round?: number
+  /** Parsed review loop/security controls used for this invocation. */
+  review_controls?: ReviewControls
 }
 
 export interface ChannelJobEntry {

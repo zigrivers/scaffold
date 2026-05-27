@@ -16,7 +16,10 @@ import {
   resolveCompensatorChannelName,
   resolveCompensatorDispatch,
 } from '../core/compensator.js'
-import type { Severity, OutputFormat, ChannelStatus } from '../types.js'
+import type { Severity, OutputFormat, ChannelStatus, ReconciledResults, ReviewControls } from '../types.js'
+import { formatJson } from '../formatters/json.js'
+import { formatText } from '../formatters/text.js'
+import { formatMarkdown } from '../formatters/markdown.js'
 import type { ChannelConfigParsed, MmrConfigParsed } from '../config/schema.js'
 
 interface ReviewArgs {
@@ -33,11 +36,11 @@ interface ReviewArgs {
   format?: string
   session?: string
   round?: number
-  'max-rounds'?: number
-  'accept-new-acks'?: boolean
-  'trust-project-acks'?: boolean
-  'trust-project-config'?: boolean
-  'config-base-ref'?: string
+  maxRounds?: number
+  acceptNewAcks?: boolean
+  trustProjectAcks?: boolean
+  trustProjectConfig?: boolean
+  configBaseRef?: string
   sync?: boolean
   'dry-run'?: boolean
 }
@@ -268,14 +271,14 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
         if (typeof argv.round === 'number' && argv.round < 1) {
           throw new Error('round must be >= 1')
         }
-        if (typeof argv['max-rounds'] === 'number' && argv['max-rounds'] < 1) {
+        if (typeof argv.maxRounds === 'number' && argv.maxRounds < 1) {
           throw new Error('max-rounds must be >= 1')
         }
         return true
       })
       .middleware((argv) => {
-        if (argv.session !== undefined && argv['max-rounds'] === undefined) {
-          argv['max-rounds'] = 5
+        if (argv.session !== undefined && argv.maxRounds === undefined) {
+          argv.maxRounds = 5
         }
       }),
   handler: async (args: ArgumentsCamelCase<ReviewArgs>) => {
@@ -288,12 +291,43 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
         format: args.format,
       },
     })
-    const reviewControls = {
-      maxRounds: args['max-rounds'],
-      acceptNewAcks: args['accept-new-acks'] ?? false,
-      trustProjectAcks: args['trust-project-acks'] ?? false,
-      trustProjectConfig: args['trust-project-config'] ?? false,
-      configBaseRef: args['config-base-ref'],
+    const reviewControls: ReviewControls = {
+      max_rounds: args.maxRounds,
+      accept_new_acks: args.acceptNewAcks ?? false,
+      trust_project_acks: args.trustProjectAcks ?? false,
+      trust_project_config: args.trustProjectConfig ?? false,
+      config_base_ref: args.configBaseRef,
+    }
+    if (
+      args.session !== undefined
+      && args.round !== undefined
+      && reviewControls.max_rounds !== undefined
+      && args.round > reviewControls.max_rounds
+    ) {
+      const outputFormat = (args.format ?? config.defaults.format ?? 'json') as OutputFormat
+      const results: ReconciledResults = {
+        job_id: `session-${args.session}`,
+        verdict: 'needs-user-decision',
+        fix_threshold: config.defaults.fix_threshold as Severity,
+        advisory_count: 0,
+        approved: false,
+        summary: `Review session "${args.session}" exceeded max rounds (${args.round} > ${reviewControls.max_rounds})`,
+        reconciled_findings: [],
+        per_channel: {},
+        metadata: {
+          channels_dispatched: 0,
+          channels_completed: 0,
+          channels_partial: 0,
+          total_elapsed: '0s',
+        },
+      }
+      const formatted = outputFormat === 'text'
+        ? formatText(results)
+        : outputFormat === 'markdown'
+          ? formatMarkdown(results)
+          : formatJson(results)
+      console.log(formatted)
+      process.exit(3)
     }
 
     // 2. Resolve diff input
@@ -391,8 +425,8 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       channels: channelNames,
       session_id: args.session,
       round: args.round,
+      review_controls: reviewControls,
     })
-    void reviewControls
 
     // Record skipped/auth-failed channels in job metadata
     for (const name of channelNames) {

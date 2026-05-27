@@ -76,7 +76,7 @@ describe('review CLI - session flags', () => {
 
   it('defaults --max-rounds to 5 when --session is set', () => {
     const args = parse(reviewCommand, ['review', '--session', 'feat-foo'])
-    expect(args['max-rounds']).toBe(5)
+    expect(args.maxRounds).toBe(5)
   })
 
   it('parses trust and config-base flags', () => {
