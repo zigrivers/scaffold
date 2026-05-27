@@ -79,6 +79,10 @@ export interface JobMetadata {
   format: OutputFormat
   created_at: string
   channels: Record<string, ChannelJobEntry>
+  /** Session linkage (T2-B). Optional; absent in legacy jobs. */
+  session_id?: string
+  /** One-based round counter within a session (T2-B). */
+  round?: number
 }
 
 export interface ChannelJobEntry {
