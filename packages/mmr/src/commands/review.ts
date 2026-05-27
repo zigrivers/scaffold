@@ -36,6 +36,7 @@ interface ReviewArgs {
   format?: string
   session?: string
   round?: number
+  'max-rounds'?: number
   maxRounds?: number
   acceptNewAcks?: boolean
   trustProjectAcks?: boolean
@@ -102,7 +103,7 @@ function buildMaxRoundsExceededResult(
     fix_threshold: fixThreshold,
     advisory_count: 0,
     approved: false,
-    summary: `Review session "${session}" exceeded max rounds (${round} > ${maxRounds})`,
+    summary: `max_rounds_exceeded: session="${session}" round=${round} > max_rounds=${maxRounds}`,
     reconciled_findings: [],
     per_channel: {},
     metadata: {
@@ -323,28 +324,32 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
         format: args.format,
       },
     })
+    const sessionIdRe = /^[a-zA-Z0-9_-]+$/
+    if (args.session !== undefined && !sessionIdRe.test(args.session)) {
+      console.error(`Invalid session id: ${args.session} - must match ^[a-zA-Z0-9_-]+$`)
+      process.exitCode = 1
+      return
+    }
+    const configCap = config.defaults.loop_control?.max_rounds_default ?? 5
+    const maxRounds = args['max-rounds'] ?? args.maxRounds ?? configCap
     const reviewControls: ReviewControls = {
-      max_rounds: args.maxRounds,
+      max_rounds: maxRounds,
       accept_new_acks: args.acceptNewAcks === true,
       trust_project_acks: args.trustProjectAcks === true,
       trust_project_config: args.trustProjectConfig === true,
       config_base_ref: args.configBaseRef,
     }
-    if (
-      args.session !== undefined
-      && args.round !== undefined
-      && reviewControls.max_rounds !== undefined
-      && args.round > reviewControls.max_rounds
-    ) {
+    if ((args.round ?? 1) > maxRounds) {
       const outputFormat = (args.format ?? config.defaults.format ?? 'json') as OutputFormat
       const results = buildMaxRoundsExceededResult(
-        args.session,
-        args.round,
-        reviewControls.max_rounds,
+        args.session ?? 'default',
+        args.round ?? 1,
+        maxRounds,
         config.defaults.fix_threshold as Severity,
       )
       console.log(formatReconciledResults(results, outputFormat))
-      process.exit(3)
+      process.exitCode = 3
+      return
     }
 
     // 2. Resolve diff input
