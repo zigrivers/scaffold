@@ -210,6 +210,14 @@ imports nothing directly — it only reads the CLI flag and passes it to
 - Globs `<knowledgeDir>/**/*.md` using a small custom walker
   (`fs.readdirSync` recursive; no globby dep — match the existing
   zero-runtime-dep style of `lens-i-knowledge-gaps.ts`).
+- Performs **minimal hand-rolled `name:` extraction** on each file's
+  YAML frontmatter (read until the second `---`, regex-match for
+  `^name:\s*['"]?(.+?)['"]?\s*$`). Does NOT import `js-yaml` — that's
+  the resolver's job for the yaml tier (see decision #19). Keeping
+  the loader parser-free preserves the zero-additional-dep style of
+  `lens-i-knowledge-gaps.ts` and means a future security/perf change
+  to the project's yaml reader can't accidentally regress the
+  knowledge index.
 - Excludes any file named `README.md` (matches the assembly loader at
   `src/core/assembly/knowledge-loader.ts:138-139, :186-187`).
 - For each remaining file, reads the YAML frontmatter and extracts the
@@ -703,8 +711,17 @@ chars with `?`, so a pathological value can't produce ragged stderr.
   warning paths route through a single `emitOnceForAudit` helper, keyed
   by the failure mode, with the warning emitted from inside the lens
   (not the resolver) so a disabled Lens I never produces spurious noise.
-- **No new dependencies.** Custom walker, custom YAML extraction. Matches
-  the dependency-free style of the existing lens.
+- **No new dependencies (scoped to the KB walk).** Inside
+  `loadKnowledgeIndex` only: custom recursive walker (`fs.readdirSync`,
+  no globby) and minimal hand-rolled `name:` extraction (no `js-yaml`
+  import in `knowledge-index.ts`). The "Same parser style as
+  `extractKBFrontmatter`" language elsewhere in this spec refers to
+  the *acceptance rule* (any non-empty trimmed string) and
+  silent-skip-on-malformed *behavior* — not to importing the same
+  underlying parser. The yaml-tier read inside `resolveKnowledgeRoot`
+  deliberately delegates to `loadObservabilityConfig` (js-yaml) per
+  decision #19; that's not a "new dependency" — it reuses the
+  observability engine's existing reader.
 - **Context construction contract.** `LensContext.knowledgeRoot` and
   `LensContext.knowledgeIndex` are PAIRED — the resolver populates both
   or neither. Production code never creates a context with one set and
