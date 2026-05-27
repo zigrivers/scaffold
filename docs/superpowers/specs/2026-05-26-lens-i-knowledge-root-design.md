@@ -369,12 +369,15 @@ Two effects of this design:
 
 #### Resolution architecture
 
-The 3-tier resolution does NOT live in `handleAudit`. It lives in
-`runAudit` (in a small helper `resolveKnowledgeRoot`), so EVERY
-`runAudit` caller benefits: the CLI `handleAudit`, the
-`phase-audit.ts` hook, the `fix-flow.ts` verifier and postfix audits,
-the MMR doc-conformance channel, and any future programmatic API
-consumer. Internal callers don't have to know about yaml or
+The 3-tier resolution is performed by `resolveKnowledgeRoot`, a
+function **defined in `src/observability/knowledge-index.ts`** (the
+same module that exports `loadKnowledgeIndex` and
+`findScaffoldKnowledgeRoot`). It is **called by `runAudit`**
+(`src/observability/engine/api.ts`), NOT by `handleAudit`. Every
+`runAudit` caller therefore benefits without doing the resolution
+themselves: the CLI `handleAudit`, the `phase-audit.ts` hook, the
+`fix-flow.ts` verifier and postfix audits, the MMR doc-conformance
+channel, and any future programmatic API consumer. Internal callers don't have to know about yaml or
 auto-detect; they just pass the CLI override when they have one
 (usually they don't).
 
@@ -393,7 +396,14 @@ interface RunAuditInput {
 }
 ```
 
-`resolveKnowledgeRoot(input: { override?: string, cwd: string }): KnowledgeRootResolution`:
+`resolveKnowledgeRoot(input: { override?: string, cwd?: string }): KnowledgeRootResolution`:
+
+(Both fields are optional. `cwd` is the working directory used to
+resolve `.scaffold/observability.yaml` for the yaml tier; when
+undefined, the yaml tier is skipped and the attempts trail records
+`{ source: 'yaml', outcome: 'not-provided' }`. Tests can invoke
+the resolver without a `cwd` to isolate the CLI-override and
+auto-detect tiers.)
 
 ```typescript
 interface KnowledgeRootResolution {
@@ -620,7 +630,7 @@ pollute JSON output of
 | reserved (see Validation) | `lens-i:index-load-failed` | not emitted today; the validator forecloses this path. Reserved for a future refresh-during-audit feature. |
 | Lens I DISABLED (not in `enabledIds` per the runChecks filter) | (none) | No warning — Lens I never ran, suppression has no meaning. |
 
-`resolveKnowledgeRoot` (the helper inside `runAudit`) never writes to
+`resolveKnowledgeRoot` (defined in `knowledge-index.ts`, called by `runAudit`) never writes to
 stderr. It only produces the resolution record (root + index + attempts).
 Lens I composes the warning from that record — and only if the lens
 actually ran. This solves the "Lens I disabled, spurious warning"
@@ -688,7 +698,7 @@ chars with `?`, so a pathological value can't produce ragged stderr.
 | `findScaffoldKnowledgeRoot` | dev worktree layout (matches via `package.json#name === '@zigrivers/scaffold'`); npm-global layout under `/opt/homebrew/lib/node_modules` (matches; verifies NO homedir boundary); a sibling project with a `content/knowledge/` dir but a different `package.json#name` (does NOT match — keeps walking); no scaffold install anywhere above (returns null, walks all the way to `/`) |
 | `validateKnowledgeRoot` | exists + dir + has VERSION marker + loader returns non-empty Set → `{ ok: true, index }`; doesn't exist → fail (reason: 'path does not exist'); exists but is file → fail; exists + dir but NO `<path>/VERSION` file → fail (reason mentions the marker); exists + dir + has VERSION but loader returns empty Set → fail (reason: 'directory contains no knowledge entries'); pointing at `content/` or `content/tools/` (no VERSION file) → fail FAST on the marker check, before loader even runs; pointing at `content/knowledge/` → ok with index populated |
 | `emitOnceForAudit` | first call with `(set, key, message)` writes to stderr and adds key to set; second call with the same set + key is no-op; second call with the same set + different key writes again; calls with a fresh set always write again (proves per-audit Set isolation works) |
-| `resolveKnowledgeRoot` (the helper inside `runAudit`) | override valid → `root: <path>`, attempts: `[{ source: 'cli', outcome: 'used' }]`; override invalid → throws `KnowledgeRootCliInvalidError`; no override, yaml valid → `root: <yamlPath>`, attempts include `{ source: 'yaml', outcome: 'used' }`; no override, yaml invalid → attempts include `{ source: 'yaml', outcome: 'invalid', reason }` + falls through; no override, no yaml, auto-detect finds it → attempts ends with `{ source: 'auto-detect', outcome: 'used' }`; no override, no yaml, auto-detect misses → `root: null`, attempts end with `{ source: 'auto-detect', outcome: 'not-found' }`; called with no `cwd` (test path) → resolves yaml from cwd undefined, treats as not-provided |
+| `resolveKnowledgeRoot` (defined in `knowledge-index.ts`, called by `runAudit`) | override valid → `root: <path>`, attempts: `[{ source: 'cli', outcome: 'used' }]`; override invalid → throws `KnowledgeRootCliInvalidError`; no override, yaml valid → `root: <yamlPath>`, attempts include `{ source: 'yaml', outcome: 'used' }`; no override, yaml invalid → attempts include `{ source: 'yaml', outcome: 'invalid', reason }` + falls through; no override, no yaml, auto-detect finds it → attempts ends with `{ source: 'auto-detect', outcome: 'used' }`; no override, no yaml, auto-detect misses → `root: null`, attempts end with `{ source: 'auto-detect', outcome: 'not-found' }`; called with no `cwd` (test path) → resolves yaml from cwd undefined, treats as not-provided |
 | `lens-i-knowledge-gaps.ts` | existing tests still pass; new: bucket suppressed when topic is in `context.knowledgeIndex` (both P1 and P2 paths); bucket NOT suppressed when topic is not in the index (both severities); null `knowledgeRoot`, lens runs → one-line `lens-i:no-root` warning via `emitOnceForAudit(warnedKeys, ...)` + no suppression; null `knowledgeRoot` with yaml-was-invalid attempt → warning includes the yaml note formatted via `formatForStderr`; Lens I disabled (not in `enabledIds`) → NO warning emitted at all; two `runAudit` calls in one test → fresh `warnedKeys` per call, BOTH calls emit their respective warnings (proves fix-flow / phase-audit multi-audit case works); manual `LensContext` with `knowledgeRoot` set but `knowledgeIndex` undefined (the construction-contract violation case — should never happen in production but covered defensively) → no crash, no suppression, NO `lens-i:no-root` warning (root is non-null so the warning gate doesn't fire). |
 | Construction-contract documentation | A short prose note in the spec + a one-line invariant in the lens implementation comment: "`knowledgeRoot` and `knowledgeIndex` are paired — the resolver populates both or neither. Lens I's suppression activates only when both are set. A future test or internal caller that supplies one without the other gets silent 'no suppression' (no warning) — this is intentional defensive behavior, but exercising the path is a test-construction bug, not a production scenario." |
 | Integration | `scaffold observe audit --knowledge-root <fixture>` where the fixture is a dir containing a `VERSION` file AND `<category>/covered.md` with `name: covered` frontmatter, plus a ledger with three signals each on `covered` and `uncovered` → only `uncovered` becomes a finding (suppression of `covered` confirms the validator returned the index and Lens I consulted it); `scaffold observe audit` (no flag) in the repo's own dev worktree → auto-detect resolves the real `content/knowledge/` via the `package.json#name === '@zigrivers/scaffold'` signature; `scaffold observe audit --knowledge-root /tmp/nope` → exit non-zero with `path does not exist`; `scaffold observe audit --knowledge-root <repo>/content` → exit non-zero with `missing knowledge-base VERSION marker — path does not appear to be a scaffold knowledge directory` (the VERSION check fires BEFORE the loader runs, so the over-broad-pipeline-slugs failure mode the round-3 review surfaced is foreclosed); `scaffold observe audit --knowledge-root <fixture-with-VERSION-but-no-md-files>` → exit non-zero with `directory contains no knowledge entries` |
@@ -733,7 +743,7 @@ chars with `?`, so a pathological value can't produce ragged stderr.
 | 10 | Auto-detect install signature | `package.json#name === '@zigrivers/scaffold'` (NOT presence of `content/knowledge/` alone, NOT homedir boundary) | The homedir boundary breaks npm-global/Homebrew installs (`/opt/homebrew/...`, `/usr/local/...` are outside home). Matching on the package name is precise: only actual scaffold installs match. |
 | 11 | Warn-once mechanism | `emitOnceForAudit(warnedKeys, key, message)` with **caller-provided per-audit `Set<string>`** threaded via `LensContext.warnedKeys`; called by Lens I only; resolver never writes to stderr | Module-global Set would dedup across the `--fix` flow's multiple `runAudit` calls in one process (initial + verifier + postfix), silently swallowing real warnings. Test files (vitest) share module state and would see the same swallow. Per-audit Set fixes both. Resolver-doesn't-warn keeps the warning gated on the lens actually running, preventing spurious noise when Lens I is disabled. |
 | 12 | Per-file `console.warn` for malformed entries in the loader | No | Matches the assembly loader's silent-skip behavior. The freshness validator already surfaces malformed entries; duplicating output would either leak into JSON or confuse operators about which subsystem flagged the issue. |
-| 13 | Where the 3-tier resolution lives (handler vs `runAudit`) | Inside `runAudit` via a `resolveKnowledgeRoot` helper, NOT inside `handleAudit` | Every `runAudit` caller benefits — CLI, `phase-audit.ts`, `fix-flow.ts` (verifier + postfix), MMR doc-conformance channel — without each having to re-implement yaml + auto-detect. The CLI flag becomes `RunAuditInput.knowledgeRootOverride`; internal callers leave it undefined and get yaml + auto-detect automatically. |
+| 13 | Where the 3-tier resolution lives (handler vs `runAudit`) | `resolveKnowledgeRoot` is **defined in `knowledge-index.ts`** alongside the loader and auto-detector, and **called by `runAudit`** (not by `handleAudit`) | Every `runAudit` caller benefits — CLI, `phase-audit.ts`, `fix-flow.ts` (verifier + postfix), MMR doc-conformance channel — without each having to re-implement yaml + auto-detect. The CLI flag becomes `RunAuditInput.knowledgeRootOverride`; internal callers leave it undefined and get yaml + auto-detect automatically. Tests import `resolveKnowledgeRoot` directly from `knowledge-index.ts` for unit coverage. |
 | 14 | Validator slug-rule alignment with the loader | Index loader accepts any non-empty trimmed `name:` (matches `extractKBFrontmatter`); validator-style slug regex stays in `knowledge-frontmatter-validator.ts` only | Round-2 spec earlier claimed both functions enforced the slug regex; that was wrong (the regex lives only in the validator). Keeping the index loader permissive matches the assembly engine and prevents drift between which entries the assembly engine sees vs which the suppression logic sees. |
 | 15 | Validator strictness for "is this actually a knowledge directory?" | Require `<path>/VERSION` marker file (the KB SemVer file from Phase 1) in addition to a non-empty loader result | Round-3 review caught that `loadKnowledgeIndex(path).size > 0` alone passes for any ancestor of the knowledge dir, because the recursive walk finds the nested KB files (and would also accept `content/tools/`, `content/pipeline/`, etc., which have their own `name:` frontmatter). The VERSION marker exists only at `content/knowledge/VERSION` and nowhere else in the repo, so requiring it precisely identifies the knowledge dir. |
 | 16 | Where the index is loaded (resolver vs lens) | Resolver loads it during validation and returns the Set in `KnowledgeRootResolution.index`; Lens I uses the pre-loaded index without re-walking | Eliminates a redundant filesystem walk and removes the dead `lens-i:index-load-failed` code path (the resolver already failed if loading would fail). Single source of I/O on the knowledge tree per audit run. |
