@@ -2,6 +2,10 @@
 name: review-platform-cert
 description: Failure modes and review passes specific to platform certification — TRC/TCR compliance, save data, suspend/resume, controller disconnect, and content ratings
 topics: [game-dev, review, certification, trc, tcr, compliance]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 # Review: Platform Certification

@@ -2,6 +2,10 @@
 name: game-project-structure
 description: Engine-specific directory conventions for Unity, Unreal, and Godot with asset and code organization strategies
 topics: [game-dev, project-structure, unity, unreal, godot, organization]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Game projects have fundamentally different structure requirements than web or business applications because they manage two distinct artifact types: code and content assets. Code follows software engineering conventions (modules, namespaces, tests). Content assets follow production pipeline conventions (source art, exported formats, level data, audio banks). The directory structure must serve both engineers and content creators, and it must scale from prototype to shipped product without requiring a mid-project reorganization.

@@ -2,6 +2,10 @@
 name: game-save-systems
 description: Save formats, versioning and migration, cloud save integration, auto-save design, corruption detection, and platform requirements
 topics: [game-dev, save, persistence, cloud-save, corruption, migration]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Save systems are the custodians of player investment. A corrupted save file can destroy hundreds of hours of progress and generate visceral negative reviews. A missing cloud sync can strand progress on the wrong device. A format that cannot be versioned locks the game out of future content updates. Despite this criticality, save systems are frequently under-engineered — treated as simple serialization when they are actually distributed state management with backward compatibility, corruption recovery, and platform-specific compliance requirements. Build the save system early, test it adversarially, and treat save data loss as a severity-one bug.

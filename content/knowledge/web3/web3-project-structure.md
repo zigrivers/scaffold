@@ -2,6 +2,12 @@
 name: web3-project-structure
 description: Opinionated Foundry project layout for smart-contract teams — src, test, script, lib, broadcast, foundry.toml, remappings — covering test naming, deploy provenance, and what belongs in git
 topics: [web3, project-structure, foundry, solidity]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://ethereum.org/en/developers/docs/smart-contracts/
+  - url: https://docs.openzeppelin.com/contracts/5.x/
 ---
 
 A smart-contract repository is read by more adversarial eyes than almost any other kind of codebase: auditors, MEV searchers, frontrunners, and the occasional regulator. Structure carries weight that goes beyond developer ergonomics. An auditor opening the repo for the first time should be able to find the contract under review, its tests, its deploy script, and its on-chain deployment receipts within thirty seconds. Gas snapshots and fuzz seeds need a fixed home so regressions are diffable. Broadcast logs are the audit trail tying a verified contract address back to a commit SHA — losing or muddling them turns "which version is mainnet running?" into a forensic exercise. Foundry's conventions answer most of these questions; this doc records the opinionated version a team should adopt before the first PR lands.

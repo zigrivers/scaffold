@@ -2,6 +2,10 @@
 name: game-networking
 description: Client-server and P2P architectures, tick rates, client prediction, server reconciliation, lag compensation, and anti-cheat
 topics: [game-dev, networking, netcode, multiplayer, prediction, reconciliation]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Game networking is fundamentally different from web or API networking because it must maintain a shared simulation across multiple machines with divergent latencies, all while feeling instantaneous to each player. The core tension is between responsiveness (the player's actions feel immediate) and authority (the server is the source of truth). Every multiplayer game exists on a spectrum between these two poles, and the netcode architecture determines where on that spectrum the game sits. Getting this wrong produces unplayable results — rubber-banding, ghost hits, desync, and exploitable clients.

@@ -2,6 +2,10 @@
 name: research-quant-requirements
 description: Trading system research requirements including strategy hypothesis definition, market regime assumptions, risk budgets, data requirements, and performance targets
 topics: [research, quant-finance, requirements, hypothesis, risk-budget, performance-targets, validation]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Trading strategy research requires requirements that go far beyond "find a profitable strategy." Every research project must define the strategy hypothesis with falsifiable predictions, declare market regime assumptions that bound the strategy's expected operating environment, establish risk budgets that constrain position sizing and drawdown limits, specify data requirements including quality standards and survivorship-bias-free universes, set performance targets with statistical significance thresholds, and mandate out-of-sample validation protocols. Without these constraints, a backtest will always find something that looks good on historical data -- the question is whether it will survive contact with live markets.

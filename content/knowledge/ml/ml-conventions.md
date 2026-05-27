@@ -2,6 +2,10 @@
 name: ml-conventions
 description: Experiment naming, model versioning, reproducibility via random seeds, config-as-code patterns, and team conventions for ML projects
 topics: [ml, conventions, reproducibility, versioning, config, experiments]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 ML projects without conventions degenerate into chaos within weeks: unnamed experiments with lost hyperparameters, models named `model_v2_final_FINAL.pkl`, and results that cannot be reproduced. Unlike software engineering where the compiler enforces structure, ML workflows are loose scripts and notebooks that require disciplined conventions to remain comprehensible. Establish these conventions at project start and encode them in tooling so they are followed by default, not willpower.

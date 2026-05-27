@@ -15,6 +15,7 @@ export type EventType =
   | 'pr_opened'
   | 'progress_heartbeat'
   | 'finding_acknowledged'
+  | 'knowledge_gap_signal'
 
 export interface BaseEvent {
   event_id: string         // ULID — globally unique, time-sortable
@@ -45,6 +46,14 @@ export interface HeartbeatPayload { note: string }
 // 'skipped' is engine-set only; user-writable values are 'acknowledged' | 'open'
 export interface FindingAckPayload { finding_id: string; status: 'acknowledged' | 'open'; note?: string }
 
+export interface KnowledgeGapSignalPayload {
+  topic: string                                  // required, kebab-case slug, ≤80 chars
+  source: 'agent_search' | 'lessons' | 'manual'  // required
+  project_id: string                             // required: 64-char sha256 hex OR the literal "lessons"
+  step_name?: string                             // optional, pipeline step slug
+  agent_excerpt?: string                         // optional, ≤200 chars
+}
+
 export type Event =
   | (BaseEvent & { type: 'task_claimed';        payload: TaskClaimedPayload })
   | (BaseEvent & { type: 'task_completed';      payload: TaskCompletedPayload })
@@ -54,6 +63,7 @@ export type Event =
   | (BaseEvent & { type: 'pr_opened';           payload: PrOpenedPayload })
   | (BaseEvent & { type: 'progress_heartbeat';  payload: HeartbeatPayload })
   | (BaseEvent & { type: 'finding_acknowledged'; task_id: null; payload: FindingAckPayload })
+  | (BaseEvent & { type: 'knowledge_gap_signal'; payload: KnowledgeGapSignalPayload })
 
 // ─── Adapters & availability ────────────────────────────────────────────
 export type AdapterId =
@@ -96,6 +106,16 @@ export type Evidence =
   | { kind: 'ac_not_covered'; story_id: string; ac_id: string; missing_tests: string[] }
   | { kind: 'doc_disagreement'; left_doc: string; right_doc: string; conflict: string }
   | { kind: 'lens_skipped'; reason: 'adapter_unavailable' | 'insufficient_data'; needed: string[] }
+  | {
+      kind: 'knowledge_gap'
+      topic: string
+      signal_count: number
+      distinct_project_count: number   // authoritative count (after delete('lessons'))
+      distinct_projects: string[]      // sample of up to 5 project_ids; truncated for size
+      first_seen: string
+      last_seen: string
+      example_excerpts: string[]       // up to 3 distinct excerpts
+    }
 
 export interface Finding {
   id: string

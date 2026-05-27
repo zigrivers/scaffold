@@ -2,6 +2,10 @@
 name: review-game-economy
 description: Failure modes and review passes specific to game economy design — inflation trajectories, exploit vectors, monetization ethics, and legal compliance
 topics: [game-dev, review, economy, balance, monetization, legal]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 # Review: Game Economy

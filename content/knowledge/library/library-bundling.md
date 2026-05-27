@@ -2,6 +2,10 @@
 name: library-bundling
 description: ESM/CJS dual publishing, package.json exports map, bundler configuration, and tree-shaking verification for libraries
 topics: [library, bundling, esm, cjs, dual-publishing, exports-map, tree-shaking, tsup, rollup]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Library bundling solves the problem of serving multiple module systems from one codebase. The JavaScript ecosystem is mid-transition from CommonJS to ES modules, and libraries must serve both until the transition completes. Getting bundling wrong produces libraries that fail to import in certain environments, cause dual-package hazards (two instances of the same library loaded simultaneously), or defeat tree-shaking and inflate consumer bundle sizes.

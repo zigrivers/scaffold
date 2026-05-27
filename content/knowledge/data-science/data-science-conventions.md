@@ -2,6 +2,12 @@
 name: data-science-conventions
 description: Python coding conventions for solo data-science work — ruff for lint+format, pragmatic type hints, pyproject.toml as single config source, import ordering, module layout, naming, and docstrings
 topics: [data-science, conventions, python, ruff, type-hints]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://docs.astral.sh/ruff/
+  - url: https://peps.python.org/pep-0008/
 ---
 
 Solo data-science code drifts faster than any other kind of Python: half of it lives in notebooks, the other half migrates into scripts, and nothing stays stable long enough to earn a style review. Consistent conventions are the only thing that keeps cognitive load bounded when you come back to a project after two months. Encode them in tooling (`ruff`, `pyproject.toml`) so they run on save — not on willpower — and the notebook→script promotion path stays smooth instead of becoming a cleanup tax.

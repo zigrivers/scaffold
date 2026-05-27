@@ -2,6 +2,10 @@
 name: vision-craft
 description: What makes a good product vision — strategic framing, audience definition, competitive positioning, guiding principles
 topics: [vision, strategy, product, positioning, competitive-analysis]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 # Vision Craft

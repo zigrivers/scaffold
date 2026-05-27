@@ -2,6 +2,10 @@
 name: review-prd
 description: Failure modes and review passes specific to product requirements document artifacts
 topics: [prd, requirements, completeness, clarity, nfr, constraints, review]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 # Review: Product Requirements Document

@@ -2,6 +2,10 @@
 name: enhancement-workflow
 description: Discovery and implementation workflow for adding features to existing projects
 topics: [enhancement, features, planning, discovery]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 # Enhancement Workflow

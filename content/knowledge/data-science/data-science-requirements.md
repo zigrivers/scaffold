@@ -2,6 +2,11 @@
 name: data-science-requirements
 description: Problem framing, success metrics, evaluation-test design, stakeholder contracts, and nonfunctional requirements for solo/small-team data science projects
 topics: [data-science, requirements, evaluation, success-metrics, reproducibility]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://the-turing-way.netlify.app/project-design/project-design
 ---
 
 As a solo or small-team data scientist without an existing data platform, the single biggest risk to your project is not a bad model — it is ambiguous requirements. Without a tight written spec, a DS project sprawls: the question drifts week to week, the notebook becomes unreproducible, and the stakeholder quietly reinterprets the output. This document defines what "done" looks like for an analytical pipeline, model, or report built from scratch — so you can stop work on time and defend the result.

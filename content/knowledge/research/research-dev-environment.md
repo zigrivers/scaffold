@@ -2,6 +2,12 @@
 name: research-dev-environment
 description: Development tooling for research projects including virtual environments, dependency management, GPU setup, and data access configuration
 topics: [research, dev-environment, dependencies, virtual-env, gpu, data-access, tooling]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://docs.astral.sh/uv/
+  - url: https://the-turing-way.netlify.app/reproducible-research/renv.html
 ---
 
 Research dev environments have stricter reproducibility requirements than typical application development. A trading strategy that produces different results on a different machine is useless -- the environment itself is a variable that must be controlled. At the same time, research environments need flexibility for rapid iteration: installing new packages, switching between CPU and GPU, and accessing large datasets must be frictionless.

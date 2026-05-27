@@ -2,6 +2,10 @@
 name: data-pipeline-dev-environment
 description: Local development setup with Docker, sample data generation, replay tooling, and test fixtures for data pipelines
 topics: [data-pipeline, dev-environment, docker, local-development, sample-data, replay, test-fixtures]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 A productive data pipeline development environment must run locally without requiring cloud accounts, production credentials, or access to real data. Engineers must be able to ingest, process, debug, and test the full pipeline on their laptop in under 10 minutes from a clean checkout. This requires containerized dependencies, synthetic sample data, and tooling to replay specific scenarios.

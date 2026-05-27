@@ -2,6 +2,12 @@
 name: backend-fintech-observability
 description: Trade event correlation; market-hours aware scheduling; SLOs for fintech systems; compliance logging; alerting strategy.
 topics: [backend, fintech, observability, tracing, slos, alerting, correlation-id, market-hours]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://opentelemetry.io/docs/
+  - url: https://sre.google/sre-book/service-level-objectives/
 ---
 
 Observability for a trading system is not generic APM with a finance skin — it is the ability to reconstruct any single order, end to end, across six or more services, on demand, years later, with timezone-correct timestamps and a stable correlation identifier. It is also the early-warning system that catches a sudden drop in fill rate at 09:31 ET before the desk calls. Done well it overlaps with — but does not replace — the immutable audit trail (`backend-fintech-compliance.md`).

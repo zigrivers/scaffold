@@ -2,6 +2,12 @@
 name: game-vr-ar-design
 description: VR comfort and locomotion, stereo rendering budgets, spatial UI, hand tracking, gaze interaction, motion sickness, and certification
 topics: [game-dev, vr, ar, comfort, locomotion, spatial-ui]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://developer.apple.com/visionos/
+  - url: https://developer.android.com/develop/xr
 ---
 
 VR and AR development is fundamentally constrained by human physiology in ways that flat-screen development is not. Every design decision — camera movement, UI placement, rendering performance, input method — must account for the vestibular system, visual comfort, and spatial cognition of the player. A frame drop that is a minor annoyance on a monitor becomes nausea-inducing in a headset. A UI panel that works at arm's length on a screen becomes unreadable at 0.5 meters or causes eye strain at 0.3 meters. Motion that the player did not initiate with their own body creates a sensory conflict that the brain interprets as poisoning. VR/AR design is not flat-screen design with head tracking bolted on — it requires rethinking interaction, performance, and comfort from first principles.

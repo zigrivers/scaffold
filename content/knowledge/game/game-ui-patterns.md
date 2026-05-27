@@ -2,6 +2,10 @@
 name: game-ui-patterns
 description: HUD patterns, menu hierarchy, controller-first navigation, settings screens, split-screen adaptation, and in-game commerce flows
 topics: [game-dev, ui, hud, menus, controller-navigation, settings]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Game UI serves two fundamentally different purposes simultaneously: it must convey critical gameplay information without obscuring the game world (the HUD), and it must provide navigable menu systems that work equally well with mouse, gamepad, touch, and keyboard (the menu layer). Unlike web or mobile app UI where mouse/touch is assumed, game UI must be designed controller-first for any title shipping on console — focus management, D-pad navigation flow, and button prompt adaptation are not optional features bolted on later but architectural decisions made at the start of UI development.

@@ -2,6 +2,10 @@
 name: research-architecture
 description: Experiment runner architecture including pluggable experiment and evaluation interfaces, state management patterns, and result persistence
 topics: [research, architecture, experiment-runner, state-management, interfaces, persistence]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 The experiment runner is the central architectural component of a research project. It orchestrates the loop of loading configuration, executing experiments, evaluating results, and deciding whether to keep or discard each run. The runner must be completely decoupled from the specific experiment logic (strategies, models, parameter spaces) so that it can drive any experiment without modification. This separation is what makes autonomous iteration possible -- the agent modifies experiment code while the runner infrastructure remains stable.

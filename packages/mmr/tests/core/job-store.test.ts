@@ -112,3 +112,39 @@ describe('JobStore', () => {
     expect(fs.existsSync(jobDir)).toBe(false)
   })
 })
+
+describe('JobStore - session linkage', () => {
+  let tmpDir: string
+  let store: JobStore
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-jobs-'))
+    store = new JobStore(tmpDir)
+  })
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true })
+  })
+
+  it('round-trips session_id and round in createJob/loadJob', () => {
+    const job = store.createJob({
+      fix_threshold: 'P2',
+      format: 'json',
+      channels: ['claude'],
+      session_id: 'feat-foo',
+      round: 3,
+    })
+    expect(job.session_id).toBe('feat-foo')
+    expect(job.round).toBe(3)
+
+    const loaded = store.loadJob(job.job_id)
+    expect(loaded.session_id).toBe('feat-foo')
+    expect(loaded.round).toBe(3)
+  })
+
+  it('createJob still works without session linkage', () => {
+    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['claude'] })
+    expect(job.session_id).toBeUndefined()
+    expect(job.round).toBeUndefined()
+  })
+})

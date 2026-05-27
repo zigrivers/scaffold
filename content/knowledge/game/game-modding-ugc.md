@@ -2,6 +2,10 @@
 name: game-modding-ugc
 description: Mod API design, packaging formats, sandboxing, versioning, content moderation, distribution platforms, and file-based loading
 topics: [game-dev, modding, ugc, sandbox, steam-workshop, mod-api]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Modding and user-generated content (UGC) transform a game from a finished product into a platform. The most enduring games in history — Minecraft, Skyrim, Counter-Strike (itself a mod), DOTA (a Warcraft III mod), Garry's Mod — owe their longevity to modding communities that produce content at a scale no studio can match. But modding support is not free: it requires deliberate API design, security sandboxing, compatibility management across game updates, content moderation, and distribution infrastructure. A poorly designed mod system creates more problems than it solves — crashes blamed on the base game, security exploits, copyright-infringing content, and player fragmentation. The goal is to expose enough of the game's systems to enable creativity while maintaining stability, security, and a coherent player experience.

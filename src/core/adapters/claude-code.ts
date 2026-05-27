@@ -7,6 +7,7 @@ import type {
   AdapterFinalizeInput,
   AdapterFinalizeResult,
 } from './adapter.js'
+import { renderGapSignalTail } from '../assembly/gap-signal-tail.js'
 
 export class ClaudeCodeAdapter implements PlatformAdapter {
   readonly platformId = 'claude-code'
@@ -29,7 +30,7 @@ export class ClaudeCodeAdapter implements PlatformAdapter {
     const bodyContent = buildBodyContent(body, sections)
 
     // Build knowledge section
-    const knowledgeSection = buildKnowledgeSection(knowledgeEntries)
+    const knowledgeSection = buildKnowledgeSection(knowledgeEntries, slug)
 
     // Build After This Step section
     const afterSection = buildAfterThisStep(dependsOn)
@@ -73,6 +74,7 @@ function buildBodyContent(body: string, _sections: Record<string, string>): stri
  */
 function buildKnowledgeSection(
   entries: Array<{ name: string; description: string; content: string }>,
+  stepSlug: string,
 ): string {
   if (entries.length === 0) return ''
 
@@ -81,7 +83,9 @@ function buildKnowledgeSection(
     return `${header}\n\n${entry.content.trim()}`
   })
 
-  return `\n\n---\n\n## Domain Knowledge\n\n${parts.join('\n\n---\n\n')}`
+  const body = `\n\n---\n\n## Domain Knowledge\n\n${parts.join('\n\n---\n\n')}`
+  const tail = renderGapSignalTail({ stepName: stepSlug })
+  return tail ? `${body}\n\n${tail}` : body
 }
 
 /**

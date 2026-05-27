@@ -2,6 +2,13 @@
 name: backend-data-modeling
 description: Relational vs document modeling tradeoffs, migration strategies, connection pooling, ORM vs query builder tradeoffs, multi-tenancy patterns, and eventual consistency
 topics: [backend, data-modeling, database, migrations, orm, multi-tenancy, eventual-consistency, connection-pooling]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://www.postgresql.org/docs/current/
+  - url: https://martinfowler.com/articles/evodb.html
+  - url: https://microservices.io/patterns/data/database-per-service.html
 ---
 
 Data modeling decisions have the highest reversal cost of any backend choice. A schema design that seemed reasonable at launch can become an operational crisis at scale — queries that worked at 10,000 rows fail at 100 million. The goal is to match the data model to the access patterns of the application, not to normalize for its own sake or to denormalize prematurely. Design the schema with the queries in mind from day one.

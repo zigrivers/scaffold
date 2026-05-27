@@ -2,6 +2,10 @@
 name: ml-model-evaluation
 description: Train/val/test splits, cross-validation, metrics by task type, holdout sets, and slice analysis for thorough model evaluation
 topics: [ml, evaluation, train-test-split, cross-validation, metrics, holdout, slice-analysis]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Model evaluation is the difference between knowing whether your model works and believing it works. Most ML evaluation bugs are forms of data leakage: the model has seen information during training that it would not have at inference time, making offline metrics look better than production performance. Rigorous evaluation requires careful data splitting, leak-free preprocessing, appropriate metrics for the task, and systematic analysis of where the model fails.

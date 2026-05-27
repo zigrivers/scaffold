@@ -6,8 +6,7 @@ volatility: fast-moving
 last-reviewed: null
 version-pin: null
 sources:
-  - url: https://platform.openai.com/docs/codex
-  - url: https://ai.google.dev/gemini-api/docs/cli
+  - url: https://ai.google.dev/gemini-api/docs
   - url: https://docs.anthropic.com/en/docs/claude-code/cli-reference
 ---
 

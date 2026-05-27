@@ -1,9 +1,26 @@
 import type { Event, Finding, AvailabilityMap, AdapterId, DocGraph } from '../types.js'
 import type { LensManifest } from './registry.js'
+import type { KnowledgeRootAttempt } from '../../knowledge-index.js'
 
 export interface LensContext {
   profile: 'fast' | 'full'
   cwd: string
+  /** Validated absolute path to a content/knowledge/ directory whose
+   *  entry slugs are used to suppress Lens I findings. Undefined when
+   *  no path was resolved (or when a caller bypassed runAudit). Lens I
+   *  treats undefined/null as "no suppression". */
+  knowledgeRoot?: string | null
+  /** Pre-loaded index Set, populated by resolveKnowledgeRoot during
+   *  validation. Lens I reads this directly — does NOT call
+   *  loadKnowledgeIndex itself. */
+  knowledgeIndex?: Set<string> | null
+  /** Audit trail of which knowledge-root tiers were tried. Lens I
+   *  uses this to compose a precise warn-once message when
+   *  knowledgeRoot is null. Defaults to empty when undefined. */
+  knowledgeRootAttempts?: KnowledgeRootAttempt[]
+  /** Per-audit-run Set passed to emitOnceForAudit for deduplicating
+   *  warnings. Fresh Set per runAudit invocation. */
+  warnedKeys?: Set<string>
 }
 
 export type LensFn = (
@@ -24,6 +41,19 @@ export interface RunChecksInput {
   profile: 'fast' | 'full'
   cwd?: string
   enabledIds?: Set<string>
+  /** Optional pre-computed knowledge-root resolution. When provided
+   *  the runner threads root/index/attempts into every LensContext.
+   *  runAudit populates this; tests that bypass runAudit can leave
+   *  it undefined (the lens treats that as "no suppression"). */
+  knowledgeRootResolution?: {
+    root: string | null
+    index: Set<string> | null
+    attempts: KnowledgeRootAttempt[]
+  }
+  /** Optional caller-provided warn-once Set. runAudit creates a fresh
+   *  one per invocation; tests bypassing runAudit may leave it
+   *  undefined (runChecks then creates an empty Set per call). */
+  warnedKeys?: Set<string>
 }
 
 function topoSort(registry: LensManifest[]): LensManifest[] {
@@ -74,7 +104,14 @@ export async function runChecks(input: RunChecksInput): Promise<Finding[]> {
   const enabledIds = input.enabledIds ?? new Set(
     input.registry.filter((m) => m.profiles.includes(input.profile)).map((m) => m.id),
   )
-  const context: LensContext = { profile: input.profile, cwd: input.cwd ?? process.cwd() }
+  const context: LensContext = {
+    profile: input.profile,
+    cwd: input.cwd ?? process.cwd(),
+    knowledgeRoot: input.knowledgeRootResolution?.root,
+    knowledgeIndex: input.knowledgeRootResolution?.index,
+    knowledgeRootAttempts: input.knowledgeRootResolution?.attempts ?? [],
+    warnedKeys: input.warnedKeys ?? new Set<string>(),
+  }
   const allFindings: Finding[] = []
 
   for (const manifest of sorted) {

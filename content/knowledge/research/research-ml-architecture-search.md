@@ -2,6 +2,10 @@
 name: research-ml-architecture-search
 description: Neural Architecture Search patterns including search space definition, search strategies, mutation operators, performance prediction, and multi-objective optimization
 topics: [research, ml-research, nas, architecture-search, search-space, evolutionary, darts, surrogate-model, multi-objective]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Neural Architecture Search (NAS) automates the discovery of model architectures that outperform hand-designed ones. The core challenge is navigating an exponentially large search space efficiently -- evaluating every candidate is infeasible, so search strategies must balance exploration (trying diverse architectures) with exploitation (refining promising ones). A well-designed NAS pipeline defines the search space precisely, applies an appropriate search strategy, uses performance prediction to avoid wasting compute on bad candidates, and manages the total search budget to stay within resource constraints.

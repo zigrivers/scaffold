@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
-import type { JobMetadata, ChannelJobEntry, Severity, OutputFormat } from '../types.js'
+import type { JobMetadata, ChannelJobEntry, Severity, OutputFormat, ReviewControls } from '../types.js'
 import type { ReconciledResults } from '../types.js'
 import { TERMINAL_STATUSES } from '../types.js'
 
@@ -9,6 +9,9 @@ export interface CreateJobOpts {
   fix_threshold: Severity
   format: OutputFormat
   channels: string[]
+  session_id?: string
+  round?: number
+  review_controls?: ReviewControls
 }
 
 export class JobStore {
@@ -63,6 +66,9 @@ export class JobStore {
       created_at: new Date().toISOString(),
       channels,
     }
+    if (opts.session_id !== undefined) metadata.session_id = opts.session_id
+    if (opts.round !== undefined) metadata.round = opts.round
+    if (opts.review_controls !== undefined) metadata.review_controls = opts.review_controls
 
     this.saveJob(jobId, metadata)
     return metadata

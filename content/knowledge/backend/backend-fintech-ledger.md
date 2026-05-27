@@ -2,6 +2,12 @@
 name: backend-fintech-ledger
 description: Double-entry accounting for fintech ledgers; journal vs ledger tables; idempotent posting; reconciliation patterns; balance invariants.
 topics: [backend, fintech, ledger, double-entry, accounting, reconciliation, idempotency, invariants]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://martinfowler.com/eaaCatalog/
+  - url: https://www.postgresql.org/docs/current/ddl-constraints.html
 ---
 
 A fintech ledger is the authoritative record of money movement; if it is wrong, nothing else in the system can be trusted. The discipline is borrowed intact from 700 years of double-entry bookkeeping — not a new invention, and not negotiable. This doc covers the invariants, schema shape, idempotent posting mechanics, and reconciliation patterns that keep a ledger survivable at production scale.

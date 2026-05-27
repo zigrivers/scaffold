@@ -30,6 +30,14 @@ export type Confidence = 'high' | 'medium' | 'low'
 
 export type OutputFormat = 'json' | 'text' | 'markdown'
 
+export interface ReviewControls {
+  max_rounds?: number
+  accept_new_acks: boolean
+  trust_project_acks: boolean
+  trust_project_config: boolean
+  config_base_ref?: string
+}
+
 export const TERMINAL_STATUSES: ReadonlySet<ChannelStatus> = new Set([
   'completed', 'timeout', 'failed', 'auth_failed', 'not_installed', 'skipped',
 ])
@@ -47,6 +55,21 @@ export interface ReconciledFinding extends Finding {
   confidence: Confidence
   sources: string[]
   agreement: Agreement
+  /** Stable content-hashed identity (T2-A, §5 decision 2). */
+  finding_key?: string
+  /** Char-5-gram set of normalized description for cross-round fuzzy match. */
+  description_shingle?: string[]
+  /** True when this finding has been silenced via `mmr ack` (T2-D). */
+  acknowledged?: boolean
+  ack_reason?: string
+  /** How the ack was resolved: exact key match or location-anchored Jaccard fallback. */
+  ack_match?: 'exact' | 'fuzzy'
+  /** Reserved for T2-C (v3.31): finding was auto-downgraded after repeat threshold. */
+  auto_downgraded?: boolean
+  /** Reserved for T2-C (v3.31): finding was auto-suppressed after repeat threshold. */
+  auto_suppressed?: boolean
+  /** Reserved for T2-C: how the cross-round repeat was matched. */
+  repeat_match?: 'exact' | 'fuzzy'
 }
 
 export interface ChannelResult {
@@ -64,6 +87,12 @@ export interface JobMetadata {
   format: OutputFormat
   created_at: string
   channels: Record<string, ChannelJobEntry>
+  /** Session linkage (T2-B). Optional; absent in legacy jobs. */
+  session_id?: string
+  /** One-based round counter within a session (T2-B). */
+  round?: number
+  /** Parsed review loop/security controls used for this invocation. */
+  review_controls?: ReviewControls
 }
 
 export interface ChannelJobEntry {

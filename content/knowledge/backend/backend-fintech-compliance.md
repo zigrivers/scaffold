@@ -2,13 +2,21 @@
 name: backend-fintech-compliance
 description: PCI-DSS, SOC 2, SEC/FINRA regulations for consumer/B2B fintech backends; audit trail immutability; data retention; segregation of duties.
 topics: [backend, fintech, compliance, pci-dss, soc2, sec, finra, audit-trail, gdpr]
+volatility: evolving
+last-reviewed: null
+version-pin: 'PCI-DSS v4.0.1'
+sources:
+  - url: https://www.pcisecuritystandards.org/document_library/
+  - url: https://www.aicpa-cima.com/topic/audit-assurance
+  - url: https://www.finra.org/rules-guidance/rulebooks/finra-rules
+  - url: https://eur-lex.europa.eu/eli/reg/2016/679/oj
 ---
 
 Fintech compliance is not a checklist applied at the end — it determines schema design, deployment pipelines, and system boundaries. Most regulations apply based on what a service *touches* (cards, trades, PII), so scope reduction is the single highest-leverage design decision available to engineering. This doc covers the regulatory regimes a typical US/EU fintech encounters, the audit-trail patterns they demand, and concrete implementation choices that keep audits survivable.
 
 ## Summary
 
-Which regulations apply depends on what the service handles. Handling card data (PAN, CVV, track data) triggers PCI-DSS v4.0. Storing customer PII, financial records, or operating as a service provider to regulated firms triggers SOC 2 Type II expectations from customers and GLBA obligations (US financial privacy). Executing securities trades or routing orders triggers SEC Rule 17a-4 record retention and FINRA supervisory requirements. Operating in the EU triggers GDPR and — for crypto — MiCA. Serving retail vs institutional customers changes consumer-protection obligations (Reg Z, Reg E, CFPB oversight vs institutional carve-outs).
+Which regulations apply depends on what the service handles. Handling card data (PAN, CVV, track data) triggers PCI-DSS v4.0.1. Storing customer PII, financial records, or operating as a service provider to regulated firms triggers SOC 2 Type II expectations from customers and GLBA obligations (US financial privacy). Executing securities trades or routing orders triggers SEC Rule 17a-4 record retention and FINRA supervisory requirements. Operating in the EU triggers GDPR and — for crypto — MiCA. Serving retail vs institutional customers changes consumer-protection obligations (Reg Z, Reg E, CFPB oversight vs institutional carve-outs).
 
 Compliance cost scales with scope, not with traffic. A service that never sees raw PANs is *out of scope* for most PCI-DSS controls. A microservice that only handles trade metadata (not orders themselves) may be out of the SEC 17a-4 retention perimeter. Practical scope-reduction strategies: tokenize at the edge (Stripe, Marqeta, Basis Theory) so internal services only ever see tokens; keep regulated datastores (ledger, order book, card vault) in dedicated VPCs with narrow IAM; route regulated-data logs to a separate SIEM stream so the main observability stack stays out of scope; design SDK boundaries where PII-sensitive fields are never emitted to general-purpose workers.
 
@@ -22,7 +30,7 @@ Encryption is assumed baseline: TLS 1.2+ in transit (1.3 preferred), AES-256 at 
 
 ### PCI-DSS Scoping and Tokenization
 
-PCI-DSS v4.0 applies to any system that stores, processes, or transmits cardholder data (CHD) — the Primary Account Number (PAN), cardholder name, expiration date, service code — or sensitive authentication data (full track, CVV, PIN). The cost of compliance is roughly quadratic in the scope of the "cardholder data environment" (CDE): every service inside the CDE needs quarterly ASV scans, annual penetration tests, hardened configurations, FIM, and quarterly access reviews.
+PCI-DSS v4.0.1 applies to any system that stores, processes, or transmits cardholder data (CHD) — the Primary Account Number (PAN), cardholder name, expiration date, service code — or sensitive authentication data (full track, CVV, PIN). The cost of compliance is roughly quadratic in the scope of the "cardholder data environment" (CDE): every service inside the CDE needs quarterly ASV scans, annual penetration tests, hardened configurations, FIM, and quarterly access reviews.
 
 **Scope reduction via tokenization** is the dominant pattern. Instead of your application receiving raw PANs, the card is submitted directly from the browser/mobile app to a tokenization provider (Stripe Elements, Braintree Hosted Fields, Marqeta, Basis Theory, Very Good Security) which returns an opaque token. Your backend stores only the token. The card vault is the provider's CDE; your systems are *SAQ A* eligible (the lightest form).
 

@@ -2,6 +2,11 @@
 name: release-management
 description: Release engineering patterns for semantic versioning and changelog management
 topics: [release, versioning, changelog, git]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://www.conventionalcommits.org/en/v1.0.0/
 ---
 
 # Release Management

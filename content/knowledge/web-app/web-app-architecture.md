@@ -2,6 +2,12 @@
 name: web-app-architecture
 description: Rendering strategy tradeoffs, CDN edge patterns, hydration strategies, BFF pattern, and micro-frontend considerations for web apps
 topics: [web-app, architecture, ssr, ssg, spa, hydration, bff, micro-frontends, cdn]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://martinfowler.com/articles/micro-frontends.html
+  - url: https://developer.mozilla.org/en-US/docs/Web/Performance
 ---
 
 Web application architecture is the set of decisions that are expensive to reverse: rendering strategy, client-server boundary, data fetching patterns, and infrastructure topology. These decisions must be made with explicit tradeoff acknowledgment and documented as Architecture Decision Records. The most common architectural mistake is choosing a sophisticated pattern because it is interesting, not because the problem demands it.

@@ -2,6 +2,12 @@
 name: web-app-dev-environment
 description: Dev server configuration, HMR setup, API proxy, environment variables, Docker for local services, and browser devtools for web app development
 topics: [web-app, dev-environment, vite, webpack, hmr, docker, debugging]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://developer.chrome.com/docs/devtools
+  - url: https://developer.mozilla.org/en-US/docs/Tools
 ---
 
 A fast, reliable local development environment is a force multiplier for the entire team. The goal is sub-second feedback loops for code changes and zero friction getting from a fresh checkout to a running app. Every minute spent fighting the dev environment is a minute not spent building the product.

@@ -2,6 +2,10 @@
 name: review-vision
 description: Vision-specific review passes, failure modes, and quality criteria for product vision documents
 topics: [vision, product-strategy, validation, review]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 # Review: Product Vision

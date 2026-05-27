@@ -2,6 +2,10 @@
 name: cli-testing
 description: CLI integration testing by spawning processes, snapshot testing help text, mock filesystem, environment variable testing, and CI matrix testing
 topics: [cli, testing, integration-tests, snapshot-testing, mock-filesystem, ci-matrix, exit-codes]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 CLI testing requires a different mindset than library testing. The contract being tested is behavioral: given this argv and environment, what does the tool write to stdout, what does it write to stderr, and what exit code does it return? Unit tests for business logic are necessary but not sufficient — integration tests that spawn the actual binary catch the class of bugs that only appear at the boundary between argument parsing and execution.

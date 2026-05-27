@@ -1,0 +1,169 @@
+import { createHash } from 'node:crypto'
+import type { Finding } from '../types.js'
+
+/**
+ * Strip end-of-string line/column spans from a location string.
+ * Patterns matched (all anchored to end-of-string):
+ *   - `:N` - trailing single line number
+ *   - `:N-M` - trailing line range
+ *   - `:N:M` - trailing line:column
+ *   - `(line N)` (with optional leading whitespace) - prose-style line ref
+ */
+const LOCATION_SPAN_RE = /(?::\d+(?::\d+)?(?:-\d+)?|\s*\(line \d+\))$/
+
+export function normalizeLocationForKey(location: string): string {
+  return location.toLowerCase().trim().replace(LOCATION_SPAN_RE, '')
+}
+
+const LINE_MENTION_RE = /\b(?:at\s+)?line \d+\b/gi
+const VALUE_AFTER_AT_UNITS = [
+  'seconds?',
+  'minutes?',
+  'hours?',
+  'items?',
+  'bytes?',
+  'kb',
+  'mb',
+  'gb',
+  'pixels?',
+  'elements?',
+  'chars?',
+  'characters?',
+  'ms',
+  's',
+].join('|')
+const AT_INTEGER_MENTION_RE = /\bat \d+(?!\.\d)(?!\d)\b\.?/gi
+const AT_INTEGER_VALUE_AFTER_RE = new RegExp(String.raw`^\s*(?:%|\b(?:${VALUE_AFTER_AT_UNITS})\b)`, 'i')
+const AT_LOCATION_CONTEXT_BEFORE_RE = /\b(?:found|reported|detected|raised|located|declared|defined)\s+$/
+const SEVERITY_PREFIX_RE = /^\s*(?:p[0-3]|critical|high|medium|low|info)\s*:\s*/i
+const CODE_SPAN_RE = /`([^`]*)`/g
+
+function normalizeNonCodeSegment(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(LINE_MENTION_RE, '')
+    .replace(AT_INTEGER_MENTION_RE, (match, offset: number, full: string) => {
+      const after = full.slice(offset + match.length)
+      if (AT_INTEGER_VALUE_AFTER_RE.test(after)) return match
+      const before = full.slice(0, offset)
+      return AT_LOCATION_CONTEXT_BEFORE_RE.test(before) ? '' : match
+    })
+    .replace(SEVERITY_PREFIX_RE, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+export function normalizeDescriptionForKey(description: string): string {
+  return normalizeWithCodeSpans(description, normalizeNonCodeSegment)
+}
+
+function appendNormalizedPart(out: string[], part: string, spaceBefore: boolean): void {
+  if (part === '') return
+  if (out.length > 0 && spaceBefore) out.push(' ')
+  out.push(part)
+}
+
+export function normalizeSuggestionForKey(suggestion: string): string {
+  // Suggestions are intentionally distinguished by their full short text.
+  // Do not apply description noise stripping here.
+  return normalizeWithCodeSpans(suggestion, normalizeSuggestionSegment)
+}
+
+function normalizeWithCodeSpans(input: string, normalizeProse: (segment: string) => string): string {
+  if (input === '') return ''
+  const out: string[] = []
+  let cursor = 0
+
+  for (const match of input.matchAll(CODE_SPAN_RE)) {
+    const index = match.index ?? 0
+    const before = input.slice(cursor, index)
+    appendNormalizedPart(out, normalizeProse(before), /^\s/.test(before))
+    appendNormalizedPart(out, '`' + match[1] + '`', /\s$/.test(before))
+    cursor = index + match[0].length
+  }
+
+  const tail = input.slice(cursor)
+  appendNormalizedPart(out, normalizeProse(tail), /^\s/.test(tail))
+  return out.join('').trim()
+}
+
+function normalizeSuggestionSegment(s: string): string {
+  return s
+    .replace(/[A-Za-z][A-Za-z0-9_]*/g, (token) => (isMixedCaseIdentifier(token) ? token : token.toLowerCase()))
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function isMixedCaseIdentifier(token: string): boolean {
+  return /[a-z][A-Z]|[A-Z][a-z]+[A-Z]|[A-Z]{2,}[a-z]|^[A-Z0-9_]{3,}$/.test(token)
+}
+
+function sha1(input: string): string {
+  return createHash('sha1').update(input).digest('hex')
+}
+
+/**
+ * Compute the stable identity key per §5 decision 2:
+ *   finding_key = sha1(
+ *     normalized_location + "|" + (category ?? "") + "|" +
+ *     sha1(description_normalized) + "|" + sha1(suggestion_normalized)
+ *   )
+ *
+ * Severity is intentionally excluded — the same underlying issue surfacing at
+ * P1 vs P2 across channels should still reconcile to one key.
+ */
+export function computeFindingKey(finding: Finding): string {
+  const loc = normalizeLocationForKey(finding.location)
+  const cat = (finding.category ?? '').toLowerCase()
+  const descHash = sha1(normalizeDescriptionForKey(finding.description))
+  const sugHash = sha1(normalizeSuggestionForKey(finding.suggestion))
+  return sha1(`${escapeKeyPart(loc)}|${escapeKeyPart(cat)}|${descHash}|${sugHash}`)
+}
+
+function escapeKeyPart(part: string): string {
+  return part.replace(/\\/g, '\\\\').replace(/\|/g, '\\|')
+}
+
+export function descriptionShingle(description: string): string[] {
+  const normalized = normalizeDescriptionForKey(description)
+  if (normalized.length < 5) return []
+  const shingleText = normalizeModalVerbsInProse(normalized)
+
+  const grams = new Set<string>()
+  for (let i = 0; i <= shingleText.length - 5; i += 1) {
+    grams.add(shingleText.slice(i, i + 5))
+  }
+  return [...grams]
+}
+
+export function jaccardSimilarity(
+  a: readonly string[] | ReadonlySet<string>,
+  b: readonly string[] | ReadonlySet<string>,
+): number {
+  const left = isShingleSet(a) ? a : new Set(a)
+  const right = isShingleSet(b) ? b : new Set(b)
+
+  let intersection = 0
+  for (const item of left) {
+    if (right.has(item)) intersection += 1
+  }
+
+  const unionSize = left.size + right.size - intersection
+  return unionSize === 0 ? 1 : intersection / unionSize
+}
+
+export function shingleSize(shingle: readonly string[] | ReadonlySet<string>): number {
+  return isShingleSet(shingle) ? shingle.size : shingle.length
+}
+
+function normalizeModalVerbsInProse(description: string): string {
+  return normalizeWithCodeSpans(description, normalizeModalVerbs)
+}
+
+function normalizeModalVerbs(description: string): string {
+  return description.replace(/\b(?:must|should)\b/g, 'should')
+}
+
+function isShingleSet(value: readonly string[] | ReadonlySet<string>): value is ReadonlySet<string> {
+  return 'size' in value && 'has' in value
+}

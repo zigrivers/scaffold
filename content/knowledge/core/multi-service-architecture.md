@@ -6,7 +6,7 @@ volatility: evolving
 last-reviewed: null
 version-pin: null
 sources:
-  - url: https://docs.aws.amazon.com/wellarchitected/latest/microservices-lens/microservices-lens.html
+  - url: https://docs.aws.amazon.com/whitepapers/latest/microservices-on-aws/microservices-on-aws.html
 ---
 
 ## Summary

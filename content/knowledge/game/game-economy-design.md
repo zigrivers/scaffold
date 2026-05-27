@@ -2,6 +2,10 @@
 name: game-economy-design
 description: Virtual currency design, faucet/sink balancing, loot table probability, monetization models, and ethical monetization patterns
 topics: [game-dev, economy, monetization, loot-tables, balance, f2p]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Game economy design governs how players earn, spend, and value in-game resources and how the studio monetizes those systems. A well-designed economy creates meaningful choices — players decide what to spend resources on, creating engagement. A poorly designed economy either trivializes resources (inflation makes everything cheap) or frustrates players (everything feels unattainable). Monetization layers add a second dimension: real money must integrate with virtual economies without destroying the earned-value perception that makes the economy work.

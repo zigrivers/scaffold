@@ -2,6 +2,10 @@
 name: ml-training-patterns
 description: Data loaders, training loops, distributed training with DDP and FSDP, checkpointing strategies, and hyperparameter tuning patterns
 topics: [ml, training, data-loaders, distributed-training, ddp, fsdp, checkpointing, hyperparameter-tuning]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 The training loop is the heart of every ML project, but it is also where most bugs hide: data leaking between splits, gradients not zeroed, mixed precision overflows, checkpoints saved incorrectly, and distributed training hanging on a single slow worker. These are not exotic edge cases — they are the standard bugs that every ML engineer encounters. A well-structured training pipeline prevents them through clear separation of concerns and defensive coding.

@@ -2,6 +2,10 @@
 name: research-quant-metrics
 description: Quantitative performance metrics including Sharpe ratio, Sortino ratio, Calmar ratio, maximum drawdown, profit factor, win rate, expectancy, and alpha/beta decomposition
 topics: [research, quant-finance, metrics, sharpe, sortino, calmar, drawdown, profit-factor, information-ratio, alpha, beta]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Performance metrics are the lens through which every trading strategy is evaluated. A single metric is never sufficient -- strategies must be assessed across multiple dimensions including risk-adjusted return, tail risk, consistency, and independence from market direction. The choice of which metric to optimize (primary target) versus which to constrain (guardrails) is a fundamental research design decision. Optimizing the wrong metric or ignoring important dimensions leads to strategies that look good on paper but blow up in practice.

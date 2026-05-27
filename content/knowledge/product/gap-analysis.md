@@ -2,6 +2,10 @@
 name: gap-analysis
 description: Systematic approaches to finding gaps in requirements and specifications
 topics: [gap-analysis, requirements, completeness, ambiguity, edge-cases]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 # Gap Analysis

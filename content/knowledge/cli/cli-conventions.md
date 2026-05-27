@@ -2,6 +2,10 @@
 name: cli-conventions
 description: Flag naming, subcommand patterns, help text standards, --version behavior, and NO_COLOR support for CLI tools
 topics: [cli, conventions, flags, subcommands, help-text, no-color, version]
+volatility: stable
+last-reviewed: null
+version-pin: 'POSIX.1-2017'
+sources: []
 ---
 
 CLI conventions exist because shell users build mental models across dozens of tools. When your tool follows the same conventions as `git`, `docker`, and `kubectl`, users already know how to use it before reading the documentation. Deviating from convention has a real cost: every exception must be explicitly learned.

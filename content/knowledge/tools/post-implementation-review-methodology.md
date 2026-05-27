@@ -2,6 +2,10 @@
 name: post-implementation-review-methodology
 description: Two-phase whole-codebase review methodology for post-implementation quality validation
 topics: [review, code-review, multi-model, post-implementation, methodology]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 # Post-Implementation Review Methodology

@@ -10,6 +10,7 @@ import { LENS_REGISTRY, makeLensImplementations } from './checks/registry.js'
 import { aggregate } from './checks/findings-aggregator.js'
 import { resolveFixThreshold } from './checks/fix-threshold.js'
 import { loadObservabilityConfig } from './checks/observability-config.js'
+import { resolveKnowledgeRoot } from '../knowledge-index.js'
 import { gitAdapter } from '../adapters/git.js'
 import { ghAdapter } from '../adapters/gh.js'
 import { mmrAdapter } from '../adapters/mmr.js'
@@ -62,9 +63,13 @@ export interface RunAuditInput {
   ghBin?: string
   bdBin?: string
   args?: Record<string, unknown>
+  /** Operator-supplied --knowledge-root override. Set by handleAudit
+   *  when the flag was passed; left undefined by all internal callers
+   *  except runFixFlow (which forwards from its own input). */
+  knowledgeRootOverride?: string
 }
 
-const SCOPE_DOC_LENSES = new Set(['H-cross-doc'])
+const SCOPE_DOC_LENSES = new Set(['H-cross-doc', 'I-knowledge-gaps'])
 const SCOPE_CODE_LENSES = new Set([
   'A-tdd', 'B-ac-coverage', 'C-standards', 'D-stack', 'E-design', 'F-scope', 'G-decisions',
 ])
@@ -94,6 +99,20 @@ export async function runAudit(input: RunAuditInput): Promise<EngineOutput> {
   for (const disabled of config.disabled_lenses) enabledIds.delete(disabled)
   const fix_threshold: Severity = resolveFixThreshold(input.primaryRoot, input.fixThresholdOverride)
 
+  // The selfLocation anchors the auto-detect parent-walk to the CLI
+  // install directory. Without it, a downstream user auditing their
+  // own project (~/my-project/) would have the walk start from
+  // ~/my-project/ and never find the scaffold install's package.json.
+  // api.ts always lives inside the install (dist/observability/engine/
+  // after build), so dirname(fileURLToPath(import.meta.url)) is the
+  // correct anchor.
+  const resolution = resolveKnowledgeRoot({
+    override: input.knowledgeRootOverride,
+    cwd: input.primaryRoot,
+    selfLocation: dirname(fileURLToPath(import.meta.url)),
+  })
+  const warnedKeys = new Set<string>()
+
   const rawFindings = await runChecks({
     registry: LENS_REGISTRY,
     lenses: makeLensImplementations(input.primaryRoot),
@@ -103,6 +122,8 @@ export async function runAudit(input: RunAuditInput): Promise<EngineOutput> {
     profile: input.profile,
     cwd: input.primaryRoot,
     enabledIds,
+    knowledgeRootResolution: resolution,
+    warnedKeys,
   })
   const { findings, summary } = aggregate(rawFindings, merged.events, fix_threshold)
   const verdict = deriveVerdict(summary.blocking, summary.skipped_lenses)

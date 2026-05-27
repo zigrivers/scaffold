@@ -2,6 +2,10 @@
 name: research-ml-training-patterns
 description: Training loop patterns for research iteration including fast-fail detection, curriculum exploration, hyperparameter-conditioned training, reproducibility seeding, and checkpoint warm-starting
 topics: [research, ml-research, training, fast-fail, curriculum, hyperparameter, reproducibility, checkpoint, warm-start]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Research training differs fundamentally from production training. In production, you train one model to convergence and ship it. In research, you train hundreds or thousands of configurations, most of which will fail -- the goal is to identify failures as early as possible and invest compute only in promising directions. A well-designed research training loop detects bad configurations within the first few percent of training, supports curriculum and schedule exploration without code changes, enables warm-starting from checkpoints to avoid redundant computation, and guarantees reproducibility so that any promising result can be verified.

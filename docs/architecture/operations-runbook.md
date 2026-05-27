@@ -330,6 +330,13 @@ Scaffold follows [semver](https://semver.org):
      > tap on GitHub points at the new version. Tell users the same when they
      > report "I just ran `brew upgrade scaffold` and it didn't pick up
      > vX.Y.Z." (Confirmed during the v3.28.0 ship.)
+9. **Do NOT remove `"content/"` from `package.json#files`.** The Lens I
+   knowledge-root auto-detection relies on the published npm artifact
+   shipping `content/knowledge/` so downstream projects can locate the
+   scaffold install's KB. Removing the entry would silently disable
+   existing-entry suppression for every downstream auto-detect path
+   (CLI override + yaml config would still work, but the no-flag
+   default would fall back to "knowledge-root not located" warnings).
 
 ### 4.2a npm Publish Auth — NPM_TOKEN Is The Working Path (Not Trusted Publishing)
 

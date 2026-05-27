@@ -2,6 +2,10 @@
 name: developer-onboarding
 description: What an effective onboarding guide covers — repo setup, architecture overview, key patterns
 topics: [onboarding, documentation, getting-started, developer-experience]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 # Developer Onboarding

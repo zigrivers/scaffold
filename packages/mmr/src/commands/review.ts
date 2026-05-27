@@ -16,7 +16,10 @@ import {
   resolveCompensatorChannelName,
   resolveCompensatorDispatch,
 } from '../core/compensator.js'
-import type { Severity, OutputFormat, ChannelStatus } from '../types.js'
+import type { Severity, OutputFormat, ChannelStatus, ReconciledResults, ReviewControls } from '../types.js'
+import { formatJson } from '../formatters/json.js'
+import { formatText } from '../formatters/text.js'
+import { formatMarkdown } from '../formatters/markdown.js'
 import type { ChannelConfigParsed, MmrConfigParsed } from '../config/schema.js'
 
 interface ReviewArgs {
@@ -31,6 +34,14 @@ interface ReviewArgs {
   timeout?: number
   template?: string
   format?: string
+  session?: string
+  round?: number
+  'max-rounds'?: number
+  maxRounds?: number
+  acceptNewAcks?: boolean
+  trustProjectAcks?: boolean
+  trustProjectConfig?: boolean
+  configBaseRef?: string
   sync?: boolean
   'dry-run'?: boolean
 }
@@ -72,6 +83,36 @@ function resolveDiff(args: ReviewArgs): string {
 
   // Default: unstaged changes
   return execFileSync('git', ['diff'], { encoding: 'utf-8', maxBuffer: MAX_DIFF_BUFFER })
+}
+
+function formatReconciledResults(results: ReconciledResults, outputFormat: OutputFormat): string {
+  if (outputFormat === 'text') return formatText(results)
+  if (outputFormat === 'markdown') return formatMarkdown(results)
+  return formatJson(results)
+}
+
+function buildMaxRoundsExceededResult(
+  session: string,
+  round: number,
+  maxRounds: number,
+  fixThreshold: Severity,
+): ReconciledResults {
+  return {
+    job_id: `session-${session}`,
+    verdict: 'needs-user-decision',
+    fix_threshold: fixThreshold,
+    advisory_count: 0,
+    approved: false,
+    summary: `max_rounds_exceeded: session="${session}" round=${round} > max_rounds=${maxRounds}`,
+    reconciled_findings: [],
+    per_channel: {},
+    metadata: {
+      channels_dispatched: 0,
+      channels_completed: 0,
+      channels_partial: 0,
+      total_elapsed: '0s',
+    },
+  }
 }
 
 /**
@@ -213,6 +254,37 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
         describe: 'Output format',
         choices: ['json', 'text', 'markdown'],
       })
+      .option('session', {
+        type: 'string',
+        describe: 'Session id. Allowed chars: a-zA-Z0-9_-',
+      })
+      .option('round', {
+        type: 'number',
+        describe: 'One-based round counter within the session',
+      })
+      .option('max-rounds', {
+        type: 'number',
+        describe: 'Hard cap on rounds. Default 5 when --session is set without --max-rounds.',
+      })
+      .option('accept-new-acks', {
+        type: 'boolean',
+        default: false,
+        describe: 'Trust ack files newly introduced in the diff under review',
+      })
+      .option('trust-project-acks', {
+        type: 'boolean',
+        default: false,
+        describe: 'Trust working-tree project acks in non-Git or untrusted-HEAD modes',
+      })
+      .option('trust-project-config', {
+        type: 'boolean',
+        default: false,
+        describe: 'Trust working-tree .mmr.yaml channel config in untrusted modes',
+      })
+      .option('config-base-ref', {
+        type: 'string',
+        describe: 'Load project .mmr.yaml and acks from this trusted Git ref instead of HEAD',
+      })
       .option('sync', {
         type: 'boolean',
         describe: 'Run full review pipeline: dispatch, parse, reconcile, and output results with verdict',
@@ -222,17 +294,63 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
         type: 'boolean',
         default: false,
         describe: 'Resolve diff and assemble prompt without dispatching channels',
+      })
+      .check((argv) => {
+        if (typeof argv.session === 'string' && !/^[a-zA-Z0-9_-]+$/.test(argv.session)) {
+          throw new Error('Invalid session id. Allowed chars: a-zA-Z0-9_-')
+        }
+        if (typeof argv.round === 'number' && argv.round < 1) {
+          throw new Error('round must be >= 1')
+        }
+        if (typeof argv.maxRounds === 'number' && argv.maxRounds < 1) {
+          throw new Error('max-rounds must be >= 1')
+        }
+        return true
+      })
+      .middleware((argv) => {
+        if (argv.session !== undefined && argv.maxRounds === undefined) {
+          argv.maxRounds = 5
+        }
       }),
   handler: async (args: ArgumentsCamelCase<ReviewArgs>) => {
     // 1. Load config with CLI overrides
     const config = loadConfig({
       projectRoot: process.cwd(),
+      trustProjectConfig: args.trustProjectConfig,
+      configBaseRef: args.configBaseRef,
       cliOverrides: {
         fix_threshold: args['fix-threshold'] as string | undefined,
         timeout: args.timeout,
         format: args.format,
       },
     })
+    const sessionIdRe = /^[a-zA-Z0-9_-]+$/
+    if (args.session !== undefined && !sessionIdRe.test(args.session)) {
+      console.error(`Invalid session id: ${args.session} - must match ^[a-zA-Z0-9_-]+$`)
+      process.exitCode = 1
+      return
+    }
+    const configCap = config.defaults.loop_control?.max_rounds_default ?? 5
+    const maxRounds = args['max-rounds'] ?? args.maxRounds ?? configCap
+    const reviewControls: ReviewControls = {
+      max_rounds: maxRounds,
+      accept_new_acks: args.acceptNewAcks === true,
+      trust_project_acks: args.trustProjectAcks === true,
+      trust_project_config: args.trustProjectConfig === true,
+      config_base_ref: args.configBaseRef,
+    }
+    if ((args.round ?? 1) > maxRounds) {
+      const outputFormat = (args.format ?? config.defaults.format ?? 'json') as OutputFormat
+      const results = buildMaxRoundsExceededResult(
+        args.session ?? 'default',
+        args.round ?? 1,
+        maxRounds,
+        config.defaults.fix_threshold as Severity,
+      )
+      console.log(formatReconciledResults(results, outputFormat))
+      process.exitCode = 3
+      return
+    }
 
     // 2. Resolve diff input
     const diff = resolveDiff(args)
@@ -327,6 +445,9 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       fix_threshold: config.defaults.fix_threshold as Severity,
       format: config.defaults.format as OutputFormat,
       channels: channelNames,
+      session_id: args.session,
+      round: args.round,
+      review_controls: reviewControls,
     })
 
     // Record skipped/auth-failed channels in job metadata

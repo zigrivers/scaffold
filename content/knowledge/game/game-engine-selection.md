@@ -2,6 +2,10 @@
 name: game-engine-selection
 description: Engine evaluation framework, Unity vs Unreal vs Godot comparison, middleware selection, and platform considerations
 topics: [game-dev, engine, unity, unreal, godot, middleware]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Choosing a game engine is the single most consequential technical decision in game development. It determines your rendering capabilities, supported platforms, available middleware, hiring pool, and long-term maintenance cost. Unlike web framework selection where migration is painful but possible, switching game engines mid-project is effectively starting over. This decision must be made deliberately, with explicit tradeoff acknowledgment, and documented as an ADR.

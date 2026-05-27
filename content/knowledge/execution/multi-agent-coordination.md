@@ -2,11 +2,22 @@
 name: multi-agent-coordination
 description: Upstream Beads primitives for coordinating parallel agents — bd merge-slot for serialized merge resolution and bd gate for async coordination
 topics: [beads, multi-agent, worktrees, merge-conflicts, coordination, parallel-execution]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://github.com/steveyegge/beads
 ---
 
 # Multi-Agent Coordination (Beads Primitives)
 
-When multiple agents work in parallel worktrees and converge on `main`, two upstream Beads primitives prevent the most common coordination failures. Both are optional — scaffold's multi-agent flows work without them — but they meaningfully reduce coordination cost in active parallel workloads.
+## Summary
+
+When multiple agents work in parallel worktrees and converge on `main`, two upstream Beads primitives prevent the most common coordination failures: `bd merge-slot` serializes the rebase-and-push race so two agents finishing at once don't clobber each other, and `bd gate` lets a blocked task wait on an arbitrary asynchronous event (CI green, peer review, external approval). Both are optional — scaffold's multi-agent flows work without them — but they meaningfully reduce coordination cost in active parallel workloads.
+
+## Deep Guidance
+
+The two primitives below are the load-bearing Deep Guidance for this entry. The per-command sections explain when to acquire/release each, the failure modes, and the asynchronous coordination patterns they support. Treat the rest of this document (from this heading to EOF) as the section the assembly engine injects.
 
 ## `bd merge-slot` — serialized merge resolution
 

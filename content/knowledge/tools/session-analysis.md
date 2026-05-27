@@ -2,6 +2,10 @@
 name: session-analysis
 description: Patterns for analyzing Claude Code sessions to discover automation opportunities
 topics: [analysis, automation, sessions]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 # Session Analysis

@@ -2,6 +2,11 @@
 name: research-project-structure
 description: Directory structure for research projects including src, experiments, results, configs, data, and notebooks organization
 topics: [research, project-structure, directory-layout, organization]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://the-turing-way.netlify.app/project-design/project-design.html
 ---
 
 Research projects have a dual structure that traditional software projects do not: a stable infrastructure layer (the experiment runner, evaluation framework, and data pipeline) and a volatile experiment layer (strategies, models, configs, and results) that changes with every iteration. The directory structure must make this distinction explicit so that the experiment loop can modify volatile files without risk of corrupting the infrastructure.

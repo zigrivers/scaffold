@@ -2,6 +2,12 @@
 name: browser-extension-manifest
 description: Manifest V3 schema, permissions declarations, host_permissions, content_scripts configuration, and background service_worker setup
 topics: [browser-extension, manifest, manifest-v3, permissions, content-scripts, service-worker, host-permissions]
+volatility: fast-moving
+last-reviewed: null
+version-pin: 'Manifest V3'
+sources:
+  - url: https://developer.chrome.com/docs/extensions/reference/manifest
+  - url: https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/manifest.json
 ---
 
 The `manifest.json` is the contract between your extension and the browser. Every capability your extension uses must be declared here before it can be used. Manifest V3 (MV3) is the current standard, having replaced Manifest V2 (MV2) in Chrome. Understanding the MV3 schema in depth prevents runtime errors, store rejections, and security review failures.

@@ -2,6 +2,10 @@
 name: research-sim-engine-patterns
 description: Simulation engine integration patterns including wrapping solvers as callable experiments, configuration management, mesh handling, batch job submission, and result parsing
 topics: [research, simulation, engine-integration, openfoam, fenics, simpy, solver-configuration, mesh-management, batch-jobs, result-parsing]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Simulation engines (OpenFOAM, FEniCS, SimPy, COMSOL, Ansys) are typically standalone tools with their own input/output formats, solver configurations, and execution models. Wrapping them as callable experiments requires a uniform interface that abstracts engine-specific details while preserving access to solver parameters that matter for optimization. The key design challenge is creating a thin adapter layer that makes any simulation engine look like a function from parameters to results, without hiding failure modes or losing important solver diagnostics.

@@ -2,6 +2,12 @@
 name: browser-extension-dev-environment
 description: Build tooling with Webpack/Vite, hot reload via web-ext and crx-hotreload, and browser launch configuration for extension development
 topics: [browser-extension, dev-environment, vite, webpack, hot-reload, web-ext, build]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://developer.chrome.com/docs/extensions/get-started/tutorial/hello-world
+  - url: https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Your_first_WebExtension
 ---
 
 Browser extension development requires a different local setup than web app development. There is no dev server to navigate to — the extension must be loaded into a real browser instance, and changes require either a manual reload or a dedicated hot-reload tool. Getting this setup right at the start of the project eliminates the most friction-heavy part of the development loop.

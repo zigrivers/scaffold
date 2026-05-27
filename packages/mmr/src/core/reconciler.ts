@@ -1,12 +1,30 @@
 import type { Finding, ReconciledFinding, Severity, Agreement, Confidence, Verdict, ChannelStatus } from '../types.js'
 import { SEVERITY_ORDER } from '../types.js'
+import {
+  computeFindingKey,
+  descriptionShingle,
+  jaccardSimilarity,
+  normalizeLocationForKey,
+  normalizeSuggestionForKey,
+  shingleSize,
+} from './stable-id.js'
 
 interface AttributedFinding extends Finding {
   source: string
+  finding_key: string
+  normalized_location: string
+  normalized_category: string
+  normalized_suggestion: string
+  shingle: ReadonlySet<string>
 }
 
-function normalizeLocation(location: string): string {
-  return location.toLowerCase().trim()
+interface ReconcileGroup {
+  finding_key: string
+  normalized_location: string
+  normalized_category: string
+  normalized_suggestion: string
+  shingle: ReadonlySet<string>
+  findings: AttributedFinding[]
 }
 
 function higherSeverity(a: Severity, b: Severity): Severity {
@@ -18,35 +36,76 @@ function higherSeverity(a: Severity, b: Severity): Severity {
  * consensus scoring.
  *
  * 1. Flatten all findings with source attribution
- * 2. Group by normalized location
+ * 2. Group by stable finding identity
  * 3. For each group, determine agreement, confidence, and effective severity
  * 4. Sort by severity (P0 first)
  */
 export function reconcile(channelFindings: Record<string, Finding[]>): ReconciledFinding[] {
-  // Step 1: Flatten with source attribution
+  // Step 1: Flatten with source attribution and stable identity data
   const attributed: AttributedFinding[] = []
   for (const [source, findings] of Object.entries(channelFindings)) {
     for (const finding of findings) {
-      attributed.push({ ...finding, source })
+      attributed.push({
+        ...finding,
+        source,
+        finding_key: computeFindingKey(finding),
+        normalized_location: normalizeLocationForKey(finding.location),
+        normalized_category: (finding.category ?? '').toLowerCase(),
+        normalized_suggestion: normalizeSuggestionForKey(finding.suggestion),
+        shingle: new Set(descriptionShingle(finding.description)),
+      })
     }
   }
 
   if (attributed.length === 0) return []
+  attributed.sort(compareAttributedFindings)
 
-  // Step 2: Group by normalized location
-  const groups = new Map<string, AttributedFinding[]>()
+  // Step 2: Group by exact stable identity, then location-anchored fuzzy description match.
+  const groups: ReconcileGroup[] = []
+  const keyIndex = new Map<string, ReconcileGroup[]>()
   for (const finding of attributed) {
-    const key = normalizeLocation(finding.location)
-    const group = groups.get(key) ?? []
-    group.push(finding)
-    groups.set(key, group)
+    // Multiple groups can share a finding_key because location normalization
+    // strips line spans. Keep same-source findings at different raw locations
+    // separate, then join later channels to the compatible raw-location group.
+    const exact = bestJoinableGroup((keyIndex.get(finding.finding_key) ?? [])
+      .filter((group) => canJoinGroup(group, finding)), finding)
+    if (exact !== undefined) {
+      exact.findings.push(finding)
+      continue
+    }
+
+    const fuzzy = bestJoinableGroup(groups.filter((group) =>
+      canJoinGroup(group, finding) &&
+      group.normalized_location === finding.normalized_location &&
+      canFuzzyJoinGroup(group, finding) &&
+      shingleSize(group.shingle) > 0 &&
+      shingleSize(finding.shingle) > 0 &&
+      jaccardSimilarity(group.shingle, finding.shingle) >= 0.7,
+    ), finding)
+    if (fuzzy !== undefined) {
+      fuzzy.findings.push(finding)
+      addToKeyIndex(keyIndex, finding.finding_key, fuzzy)
+      continue
+    }
+
+    const group: ReconcileGroup = {
+      finding_key: finding.finding_key,
+      normalized_location: finding.normalized_location,
+      normalized_category: finding.normalized_category,
+      normalized_suggestion: finding.normalized_suggestion,
+      shingle: finding.shingle,
+      findings: [finding],
+    }
+    groups.push(group)
+    addToKeyIndex(keyIndex, finding.finding_key, group)
   }
 
   // Step 3: Reconcile each group
   const results: ReconciledFinding[] = []
-  for (const group of groups.values()) {
-    const sources = [...new Set(group.map((f) => f.source))]
-    const severities = [...new Set(group.map((f) => f.severity))]
+  for (const group of groups) {
+    const findings = group.findings
+    const sources = [...new Set(findings.map((f) => f.source))]
+    const severities = [...new Set(findings.map((f) => f.severity))]
     const effectiveSeverity = severities.reduce(higherSeverity)
 
     let agreement: Agreement
@@ -72,7 +131,7 @@ export function reconcile(channelFindings: Record<string, Finding[]>): Reconcile
     }
 
     // Use the finding with the longest description as representative (deterministic)
-    const representative = group.reduce((best, current) =>
+    const representative = findings.reduce((best, current) =>
       current.description.length > best.description.length ? current : best,
     )
 
@@ -86,11 +145,17 @@ export function reconcile(channelFindings: Record<string, Finding[]>): Reconcile
       confidence,
       sources,
       agreement,
+      finding_key: representative.finding_key,
+      description_shingle: [...representative.shingle],
     })
   }
 
   // Step 4: Sort by severity (P0 first)
-  results.sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity])
+  results.sort((a, b) =>
+    SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity] ||
+    (a.finding_key ?? '').localeCompare(b.finding_key ?? '') ||
+    a.location.localeCompare(b.location),
+  )
 
   // Auto-generate finding IDs (only backfill when absent)
   results.forEach((f, i) => {
@@ -102,13 +167,68 @@ export function reconcile(channelFindings: Record<string, Finding[]>): Reconcile
   return results
 }
 
+function compareAttributedFindings(a: AttributedFinding, b: AttributedFinding): number {
+  return a.finding_key.localeCompare(b.finding_key) ||
+    a.source.localeCompare(b.source) ||
+    a.location.localeCompare(b.location) ||
+    a.description.localeCompare(b.description) ||
+    a.suggestion.localeCompare(b.suggestion)
+}
+
+function canJoinGroup(group: ReconcileGroup, finding: AttributedFinding): boolean {
+  return group.findings.every((existing) =>
+    existing.source !== finding.source || existing.location === finding.location,
+  )
+}
+
+function canFuzzyJoinGroup(group: ReconcileGroup, finding: AttributedFinding): boolean {
+  if (group.findings.some((existing) => existing.location === finding.location)) {
+    return true
+  }
+  return group.normalized_category === finding.normalized_category &&
+    group.normalized_suggestion === finding.normalized_suggestion
+}
+
+function bestJoinableGroup(groups: ReconcileGroup[], finding: AttributedFinding): ReconcileGroup | undefined {
+  const eligible = [...groups].sort((a, b) => compareGroupsForFinding(a, b, finding))
+  return eligible.find((group) =>
+    group.findings.some((existing) => existing.location === finding.location),
+  ) ?? eligible[0]
+}
+
+function compareGroupsForFinding(a: ReconcileGroup, b: ReconcileGroup, finding: AttributedFinding): number {
+  return groupMatchScore(b, finding) - groupMatchScore(a, finding) ||
+    a.finding_key.localeCompare(b.finding_key) ||
+    a.normalized_location.localeCompare(b.normalized_location)
+}
+
+function groupMatchScore(group: ReconcileGroup, finding: AttributedFinding): number {
+  let score = 0
+  if (group.normalized_category === finding.normalized_category) score += 1
+  if (group.normalized_suggestion === finding.normalized_suggestion) score += 1
+  return score
+}
+
+function addToKeyIndex(
+  keyIndex: Map<string, ReconcileGroup[]>,
+  findingKey: string,
+  group: ReconcileGroup,
+): void {
+  const groups = keyIndex.get(findingKey)
+  if (groups === undefined) {
+    keyIndex.set(findingKey, [group])
+  } else if (!groups.includes(group)) {
+    groups.push(group)
+  }
+}
+
 /**
  * Evaluate the quality gate: passes if no finding has severity at or above
  * the threshold (i.e., no finding with SEVERITY_ORDER <= threshold order).
  */
 export function evaluateGate(findings: ReconciledFinding[], threshold: Severity): boolean {
   const thresholdOrder = SEVERITY_ORDER[threshold]
-  return findings.every((f) => SEVERITY_ORDER[f.severity] > thresholdOrder)
+  return findings.every((f) => f.acknowledged === true || SEVERITY_ORDER[f.severity] > thresholdOrder)
 }
 
 /**

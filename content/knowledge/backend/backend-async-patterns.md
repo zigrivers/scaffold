@@ -2,6 +2,13 @@
 name: backend-async-patterns
 description: Message queue patterns, event-driven architecture, saga patterns, retry strategies, and idempotency keys
 topics: [backend, async, message-queues, event-driven, saga, retry, idempotency, cqrs]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://microservices.io/patterns/data/saga.html
+  - url: https://martinfowler.com/articles/patterns-of-distributed-systems/
+  - url: https://sre.google/sre-book/handling-overload/
 ---
 
 Asynchronous patterns decouple services in time and space, enabling systems to absorb load spikes, survive partial failures, and scale independently — but they introduce delivery guarantees and consistency tradeoffs that must be designed for explicitly from the start.

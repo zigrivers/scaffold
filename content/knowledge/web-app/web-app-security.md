@@ -2,6 +2,14 @@
 name: web-app-security
 description: XSS prevention, Content Security Policy, CSRF tokens, clickjacking, Subresource Integrity, dependency auditing, and OWASP top 10 for web apps
 topics: [web-app, security, xss, csp, csrf, clickjacking, owasp, dependency-auditing]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://owasp.org/www-project-top-ten/
+  - url: https://www.w3.org/TR/CSP3/
+  - url: https://owasp.org/www-community/attacks/xss/
+  - url: https://developer.mozilla.org/en-US/docs/Web/Security/Subresource_Integrity
 ---
 
 Web application security failures are among the most costly and common causes of data breaches. The OWASP Top 10 has catalogued the same categories of vulnerabilities for decades — not because they are new, but because they recur in every generation of frameworks and technologies. Understanding the attack vectors and their mitigations is not optional for engineers building user-facing web applications. Security must be designed in, not bolted on.

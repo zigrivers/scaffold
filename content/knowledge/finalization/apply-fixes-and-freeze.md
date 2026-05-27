@@ -2,6 +2,10 @@
 name: apply-fixes-and-freeze
 description: Guidance on prioritizing validation fixes, applying them safely, and freezing documentation for implementation
 topics: [finalization, fixes, freeze, validation, documentation-quality]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 # Apply Fixes and Freeze

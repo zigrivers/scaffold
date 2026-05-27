@@ -11,7 +11,7 @@ describe('engine types', () => {
     expectTypeOf<Verdict>().toEqualTypeOf<'pass' | 'degraded-pass' | 'blocked'>()
   })
 
-  it('EventType enum has exactly eight values', () => {
+  it('EventType enum has exactly nine values', () => {
     expectTypeOf<EventType>().toEqualTypeOf<
       | 'task_claimed'
       | 'task_completed'
@@ -21,6 +21,7 @@ describe('engine types', () => {
       | 'pr_opened'
       | 'progress_heartbeat'
       | 'finding_acknowledged'
+      | 'knowledge_gap_signal'
     >()
   })
 

@@ -2,6 +2,11 @@
 name: tdd-execution-loop
 description: Red-green-refactor execution cycle for AI agents
 topics: [tdd, execution, testing, workflow]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://martinfowler.com/bliki/TestDrivenDevelopment.html
 ---
 
 # TDD Execution Loop

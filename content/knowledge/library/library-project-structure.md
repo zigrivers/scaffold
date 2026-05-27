@@ -2,6 +2,10 @@
 name: library-project-structure
 description: Directory layout, package.json exports map, tsconfig for declarations, and examples/ structure for published libraries
 topics: [library, project-structure, package-json, tsconfig, exports, declarations]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Library project structure must serve two audiences simultaneously: contributors who need to navigate and modify the source, and consumers who install the package and expect predictable module resolution. The structure of the source directory, the `dist/` output, the `package.json` exports map, and the TypeScript configuration all interlock. Getting any one of them wrong produces libraries that fail to tree-shake, ship broken types, or cause dual-package hazards.

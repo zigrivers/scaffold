@@ -2,6 +2,10 @@
 name: research-quant-backtesting
 description: Backtesting methodology including walk-forward analysis, look-ahead bias prevention, survivorship bias, transaction cost modeling, and engine architecture
 topics: [research, quant-finance, backtesting, walk-forward, look-ahead-bias, survivorship-bias, transaction-costs, validation]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Backtesting is the core evaluation mechanism in quantitative finance research. A backtest simulates how a strategy would have performed on historical data, but the gap between a backtest and live trading is enormous. Every design decision in the backtesting engine -- how fills are modeled, whether future data leaks into past decisions, how the instrument universe is constructed, how transaction costs are estimated -- determines whether the results are meaningful or self-deceptive. The primary goal of backtesting infrastructure is not to produce impressive returns but to produce honest results that predict live performance.

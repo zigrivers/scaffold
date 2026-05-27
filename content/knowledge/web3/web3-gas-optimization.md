@@ -2,6 +2,13 @@
 name: web3-gas-optimization
 description: Practical EVM gas optimization — measure first with forge snapshot, storage packing, unchecked loops, calldata vs memory, immutable, external-call discipline, and CI regression checks
 topics: [web3, gas-optimization, solidity, foundry]
+volatility: evolving
+last-reviewed: null
+version-pin: 'Solidity 0.8.x'
+sources:
+  - url: https://ethereum.org/en/developers/docs/gas/
+  - url: https://ethereum.org/en/developers/docs/evm/opcodes/
+  - url: https://consensys.github.io/smart-contract-best-practices/
 ---
 
 Gas matters because every operation a user pays for on Ethereum mainnet is real dollars, and on L2s the calldata you post to L1 is the dominant cost driver — both directions are visible in your users' wallets. But most "optimizations" save under 1% of a transaction's gas and cost clarity in exchange; that trade is rarely worth it. The point of this doc is to give you the small set of techniques that do pay for themselves, the discipline to measure before applying them, and the CI plumbing that catches regressions before they ship. If a section here ever recommends a change that obscures the code without producing a measurable saving, ignore it.

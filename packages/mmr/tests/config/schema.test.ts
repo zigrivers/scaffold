@@ -409,3 +409,74 @@ describe('defaults.compensator (T1-G)', () => {
     }
   })
 })
+
+describe('MmrConfigSchema - loop_control', () => {
+  it('accepts a config with no loop_control (uses defaults)', () => {
+    const parsed = MmrConfigSchema.parse({ version: 1, channels: {} })
+    expect(parsed.defaults.loop_control?.max_rounds_default).toBe(5)
+    expect(parsed.defaults.loop_control?.repeat_suppression_enabled).toBe(false)
+  })
+
+  it('accepts an explicit max_rounds_default override', () => {
+    const parsed = MmrConfigSchema.parse({
+      version: 1,
+      channels: {},
+      defaults: { loop_control: { max_rounds_default: 10 } },
+    })
+    expect(parsed.defaults.loop_control?.max_rounds_default).toBe(10)
+  })
+
+  it('accepts a fully populated loop_control block', () => {
+    const parsed = MmrConfigSchema.parse({
+      version: 1,
+      channels: {},
+      defaults: {
+        loop_control: {
+          max_rounds_default: 5,
+          repeat_suppression_enabled: true,
+          repeat_downgrade_after: 2,
+          repeat_suppress_after: 3,
+        },
+      },
+    })
+    expect(parsed.defaults.loop_control?.repeat_suppression_enabled).toBe(true)
+    expect(parsed.defaults.loop_control?.repeat_downgrade_after).toBe(2)
+    expect(parsed.defaults.loop_control?.repeat_suppress_after).toBe(3)
+  })
+
+  it('REJECTS repeat_suppression_enabled: true without thresholds', () => {
+    expect(() =>
+      MmrConfigSchema.parse({
+        version: 1,
+        channels: {},
+        defaults: { loop_control: { repeat_suppression_enabled: true } },
+      }),
+    ).toThrow()
+  })
+
+  it('REJECTS repeat_suppression_enabled: true with only one threshold', () => {
+    expect(() =>
+      MmrConfigSchema.parse({
+        version: 1,
+        channels: {},
+        defaults: { loop_control: { repeat_suppression_enabled: true, repeat_downgrade_after: 2 } },
+      }),
+    ).toThrow()
+  })
+
+  it('REJECTS repeat_suppress_after before repeat_downgrade_after', () => {
+    expect(() =>
+      MmrConfigSchema.parse({
+        version: 1,
+        channels: {},
+        defaults: {
+          loop_control: {
+            repeat_suppression_enabled: true,
+            repeat_downgrade_after: 3,
+            repeat_suppress_after: 2,
+          },
+        },
+      }),
+    ).toThrow()
+  })
+})

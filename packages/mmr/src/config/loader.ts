@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
+import { execFileSync } from 'node:child_process'
 import yaml from 'js-yaml'
 import { MmrConfigSchema, type MmrConfigParsed } from './schema.js'
 import { DEFAULT_CONFIG } from './defaults.js'
@@ -10,6 +11,8 @@ export interface LoadConfigOptions {
   projectRoot: string
   userHome?: string
   onWarning?: (message: string) => void
+  trustProjectConfig?: boolean
+  configBaseRef?: string
   cliOverrides?: {
     fix_threshold?: string
     timeout?: number
@@ -83,6 +86,23 @@ function resetExtendingChannelProvenance(
 /**
  * Try to read and parse a YAML file; returns undefined if missing.
  */
+function parseYamlConfig(raw: string, label: string): Record<string, unknown> {
+  let parsed: unknown
+  try {
+    parsed = yaml.load(raw)
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    throw new Error(`Failed to parse ${label}: ${msg}`)
+  }
+  if (parsed === null || parsed === undefined || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error(`Invalid config in ${label}: expected an object, got ${typeof parsed}`)
+  }
+  return parsed as Record<string, unknown>
+}
+
+/**
+ * Try to read and parse a YAML file; returns undefined if missing.
+ */
 function loadYaml(filePath: string): Record<string, unknown> | undefined {
   if (!fs.existsSync(filePath)) return undefined
   let raw: string
@@ -91,17 +111,25 @@ function loadYaml(filePath: string): Record<string, unknown> | undefined {
   } catch {
     return undefined
   }
-  let parsed: unknown
-  try {
-    parsed = yaml.load(raw)
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    throw new Error(`Failed to parse ${filePath}: ${msg}`)
+  return parseYamlConfig(raw, filePath)
+}
+
+function loadProjectYaml(opts: LoadConfigOptions): Record<string, unknown> | undefined {
+  if (opts.configBaseRef !== undefined && opts.trustProjectConfig !== true) {
+    let raw: string
+    try {
+      raw = execFileSync(
+        'git',
+        ['-C', opts.projectRoot, 'show', `${opts.configBaseRef}:.mmr.yaml`],
+        { encoding: 'utf-8', maxBuffer: 1024 * 1024 },
+      )
+    } catch {
+      return undefined
+    }
+    return parseYamlConfig(raw, `${opts.configBaseRef}:.mmr.yaml`)
   }
-  if (parsed === null || parsed === undefined || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    throw new Error(`Invalid config in ${filePath}: expected an object, got ${typeof parsed}`)
-  }
-  return parsed as Record<string, unknown>
+
+  return loadYaml(path.join(opts.projectRoot, '.mmr.yaml'))
 }
 
 const MAX_EXTENDS_DEPTH = 4
@@ -220,7 +248,7 @@ function warnOnInlineSecretHeaders(config: MmrConfigParsed, warn: WarningSink): 
 }
 
 function loadConfigLayers(opts: LoadConfigOptions): ConfigLayers {
-  const { projectRoot, cliOverrides } = opts
+  const { cliOverrides } = opts
   const userHome = opts.userHome ?? os.homedir()
 
   let merged: Record<string, unknown> = structuredClone(DEFAULT_CONFIG) as unknown as Record<string, unknown>
@@ -232,8 +260,7 @@ function loadConfigLayers(opts: LoadConfigOptions): ConfigLayers {
     merged = deepMerge(merged, userConfig)
   }
 
-  const projectConfigPath = path.join(projectRoot, '.mmr.yaml')
-  const projectConfig = loadYaml(projectConfigPath) ?? {}
+  const projectConfig = loadProjectYaml(opts) ?? {}
   if (Object.keys(projectConfig).length > 0) {
     resetExtendingChannelBases(merged, projectConfig)
     merged = deepMerge(merged, projectConfig)

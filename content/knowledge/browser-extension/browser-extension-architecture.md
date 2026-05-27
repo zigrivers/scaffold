@@ -2,6 +2,12 @@
 name: browser-extension-architecture
 description: Component isolation across content scripts, background service workers, and popup pages; message passing patterns; and state synchronization strategies
 topics: [browser-extension, architecture, message-passing, state-synchronization, service-worker, content-scripts]
+volatility: evolving
+last-reviewed: null
+version-pin: 'Manifest V3'
+sources:
+  - url: https://developer.chrome.com/docs/extensions/mv3/architecture-overview
+  - url: https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Anatomy_of_a_WebExtension
 ---
 
 Browser extension architecture is fundamentally different from web app architecture because the application is split across multiple isolated execution environments that cannot share memory directly. Content scripts run inside host pages but in an isolated JavaScript world. Service workers run in a separate context that is terminated and re-created between events. Popup pages are ephemeral — they exist only while the popup is open. These constraints drive every architectural decision: communication is via message passing, state must be externalized to `chrome.storage`, and every component must tolerate being initialized from scratch at any time.
