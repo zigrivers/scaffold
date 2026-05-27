@@ -18,6 +18,10 @@ export const DEFAULT_CONFIG: MmrConfigParsed = {
     format: 'json',
     parallel: true,
     job_retention_days: 7,
+    loop_control: {
+      max_rounds_default: 5,
+      repeat_suppression_enabled: false,
+    },
   },
   channels: {} as Record<string, ChannelConfigParsed>, // Populated below after BUILTIN_CHANNELS definition
 }

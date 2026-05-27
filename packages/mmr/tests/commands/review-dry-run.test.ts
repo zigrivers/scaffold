@@ -214,6 +214,10 @@ describe('configured compensator availability', () => {
       format: 'json',
       parallel: true,
       job_retention_days: 7,
+      loop_control: {
+        max_rounds_default: 5,
+        repeat_suppression_enabled: false,
+      },
     },
     channels: {},
   }

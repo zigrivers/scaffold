@@ -101,12 +101,29 @@ export const CompensatorConfigSchema = z.object({
 
 export type CompensatorConfig = z.infer<typeof CompensatorConfigSchema>
 
+const LoopControlSchema = z.object({
+  max_rounds_default: z.number().int().positive().default(5),
+  repeat_suppression_enabled: z.boolean().default(false),
+  repeat_downgrade_after: z.number().int().positive().optional(),
+  repeat_suppress_after: z.number().int().positive().optional(),
+}).refine(
+  (lc) => {
+    if (!lc.repeat_suppression_enabled) return true
+    return lc.repeat_downgrade_after !== undefined && lc.repeat_suppress_after !== undefined
+  },
+  {
+    message:
+      'loop_control.repeat_suppression_enabled requires both repeat_downgrade_after and repeat_suppress_after',
+  },
+)
+
 const DefaultsSchema = z.object({
   fix_threshold: Severity.default('P2'),
   timeout: z.number().default(300),
   format: OutputFormat.default('json'),
   parallel: z.boolean().default(true),
   job_retention_days: z.number().default(7),
+  loop_control: LoopControlSchema.default({}),
   compensator: CompensatorConfigSchema.optional(),
 })
 
