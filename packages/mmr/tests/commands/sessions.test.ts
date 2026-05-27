@@ -1,0 +1,66 @@
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import { SessionStore } from '../../src/commands/sessions.js'
+
+let tmpHome: string
+let store: SessionStore
+
+beforeEach(() => {
+  tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-sessions-'))
+  store = new SessionStore(tmpHome)
+})
+
+afterEach(() => {
+  fs.rmSync(tmpHome, { recursive: true, force: true })
+})
+
+describe('SessionStore', () => {
+  it('creates a session file on start()', () => {
+    const s = store.start('feat-foo')
+    expect(s.session_id).toBe('feat-foo')
+    expect(s.jobs).toEqual([])
+    expect(s.rounds).toBe(0)
+    expect(fs.existsSync(path.join(tmpHome, '.mmr', 'sessions', 'feat-foo.json'))).toBe(true)
+  })
+
+  it('rejects an invalid session id BEFORE constructing any path', () => {
+    expect(() => store.start('../../../etc/passwd')).toThrow(/invalid session id/i)
+    expect(() => store.start('has spaces')).toThrow(/invalid session id/i)
+    expect(() => store.start('has.dots')).toThrow(/invalid session id/i)
+  })
+
+  it('lists all sessions sorted by created_at desc', () => {
+    store.start('a')
+    store.start('b')
+    const list = store.list()
+    expect(list).toHaveLength(2)
+    expect(list.map((s) => s.session_id).sort()).toEqual(['a', 'b'])
+  })
+
+  it('shows() returns the persisted session', () => {
+    store.start('feat-foo')
+    const s = store.show('feat-foo')
+    expect(s?.session_id).toBe('feat-foo')
+  })
+
+  it('show() returns undefined for missing session', () => {
+    expect(store.show('does-not-exist')).toBeUndefined()
+  })
+
+  it('end() deletes the session file', () => {
+    store.start('feat-foo')
+    store.end('feat-foo')
+    expect(fs.existsSync(path.join(tmpHome, '.mmr', 'sessions', 'feat-foo.json'))).toBe(false)
+  })
+
+  it('addJob() appends to the jobs array and increments rounds', () => {
+    store.start('feat-foo')
+    store.addJob('feat-foo', 'mmr-abc123', 1)
+    store.addJob('feat-foo', 'mmr-def456', 2)
+    const s = store.show('feat-foo')!
+    expect(s.jobs).toEqual(['mmr-abc123', 'mmr-def456'])
+    expect(s.rounds).toBe(2)
+  })
+})
