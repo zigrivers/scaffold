@@ -50,6 +50,51 @@ describe('review command argv parsing', () => {
   })
 })
 
+describe('review CLI - session flags', () => {
+  it('parses --session, --round, --max-rounds', () => {
+    const args = parse(reviewCommand, [
+      'review',
+      '--session',
+      'feat-foo',
+      '--round',
+      '3',
+      '--max-rounds',
+      '5',
+    ])
+    expect(args.session).toBe('feat-foo')
+    expect(args.round).toBe(3)
+    expect(args['max-rounds']).toBe(5)
+  })
+
+  it('rejects invalid --session values', () => {
+    expect(() => parse(reviewCommand, ['review', '--session', '../../../etc'])).toThrow(/invalid session id/i)
+  })
+
+  it('rejects non-positive --round values', () => {
+    expect(() => parse(reviewCommand, ['review', '--round', '0'])).toThrow(/round must be >= 1/i)
+  })
+
+  it('defaults --max-rounds to 5 when --session is set', () => {
+    const args = parse(reviewCommand, ['review', '--session', 'feat-foo'])
+    expect(args.maxRounds).toBe(5)
+  })
+
+  it('parses trust and config-base flags', () => {
+    const args = parse(reviewCommand, [
+      'review',
+      '--accept-new-acks',
+      '--trust-project-acks',
+      '--trust-project-config',
+      '--config-base-ref',
+      'origin/main',
+    ])
+    expect(args['accept-new-acks']).toBe(true)
+    expect(args['trust-project-acks']).toBe(true)
+    expect(args['trust-project-config']).toBe(true)
+    expect(args['config-base-ref']).toBe('origin/main')
+  })
+})
+
 describe('reconcile command argv parsing', () => {
   it('accepts "--input -" (stdin) with a space separator', () => {
     const args = parse(reconcileCommand, [
