@@ -12,11 +12,22 @@ const KB_ROOT = path.join(REPO_ROOT, 'content/knowledge')
 const ALLOWLIST_PATH = path.join(REPO_ROOT, 'docs/knowledge-freshness/authoritative-sources.yaml')
 
 // ─── KB inventory ──────────────────────────────────────────────
+// F-003 fix: convert YAML literal `null` / `~` / empty to real JS null so the
+// in-page JS treats unfilled review dates correctly. Strings that contain
+// the word "null" inside quotes still come through as the string "null".
+function coerceYamlScalar(raw) {
+  const v = raw.trim()
+  if (v === '' || v === 'null' || v === '~' || v === 'Null' || v === 'NULL') return null
+  // Strip a single layer of surrounding quotes; preserves embedded "null" string.
+  if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith('\'') && v.endsWith('\''))) {
+    return v.slice(1, -1)
+  }
+  return v
+}
 function parseFrontmatterValue(line) {
   const m = /^([a-zA-Z0-9_-]+):\s*(.*)$/.exec(line)
   if (!m) return null
-  const v = m[2].replace(/^['"]/, '').replace(/['"]$/, '').trim()
-  return { key: m[1], value: v }
+  return { key: m[1], value: coerceYamlScalar(m[2]) }
 }
 function extractFm(text) {
   const m = /^---\n([\s\S]*?)\n---/.exec(text)
@@ -37,21 +48,50 @@ function walk(dir, out = []) {
   }
   return out
 }
+// F-003 part 2: when every entry's `last-reviewed` is null (the current state
+// — Phase 4 backfilled volatility + sources but not review dates), the cadence
+// slider has nothing to scrub. We synthesize a deterministic demo date keyed
+// off the slug so the chart is meaningful even before the cron has run. The
+// page surfaces this with an explicit caveat above the chart.
+function djb2(s) {
+  let h = 5381
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h) ^ s.charCodeAt(i)
+  return h >>> 0
+}
+const DEMO_WINDOW_START = Date.UTC(2025, 9, 1)   // 2025-10-01
+const DEMO_WINDOW_END   = Date.UTC(2026, 4, 1)   // 2026-05-01
+function synthesizeReviewDate(slug) {
+  const span = DEMO_WINDOW_END - DEMO_WINDOW_START
+  const ts = DEMO_WINDOW_START + (djb2(slug) % span)
+  return new Date(ts).toISOString().slice(0, 10)
+}
 const kbFiles = walk(KB_ROOT)
 const kbEntries = []
+let realReviewedCount = 0
 for (const f of kbFiles) {
   const fm = extractFm(fs.readFileSync(f, 'utf8'))
   if (!fm.name) continue
   const rel = path.relative(KB_ROOT, f)
+  const realLast = fm['last-reviewed']
+  if (realLast) realReviewedCount++
   kbEntries.push({
     slug: fm.name,
     category: path.dirname(rel),
     volatility: fm.volatility || null,
-    lastReviewed: fm['last-reviewed'] || null,
+    lastReviewed: realLast || null,
+    // demoLastReviewed is what the cadence chart uses; lastReviewed is the
+    // ground truth from disk (may be null). The page is explicit about this.
+    demoLastReviewed: realLast || synthesizeReviewDate(fm.name),
     versionPin: fm['version-pin'] || null,
   })
 }
-const KB_INVENTORY = { total: kbEntries.length, entries: kbEntries }
+const KB_INVENTORY = {
+  total: kbEntries.length,
+  entries: kbEntries,
+  // Surfaced in the cadence caveat so the page can say
+  // "N of M entries have a real last-reviewed; the rest are synthesized for demo".
+  realReviewedCount,
+}
 
 // ─── Allowlist + categories ────────────────────────────────────
 const CATEGORY_MAP = {
@@ -179,7 +219,17 @@ const ARCH_CALLOUTS = {
   'audit-runner': { title: 'audit-run-entry (grounded LLM)', file: 'src/knowledge-freshness/audit-runner.ts + content/tools/knowledge-audit-entry.md', summary: 'Pre-fetches each source through SSRF guards (no file://, no localhost, no private IPs), embeds the bodies in the prompt, dispatches via the resolved provider. The LLM has NO web-fetch tool — all evidence must come from the prefetched bodies.', bullets: ['Verdicts: current | minor-drift | major-drift | superseded', 'Source bodies capped at 96 KiB; truncation flagged in preserve_warnings', 'Output: JSON-only, no prose'] },
   'audit-apply': { title: 'audit-apply (verdict → diff)', file: 'src/knowledge-freshness/audit-apply.ts', summary: 'Patches frontmatter (last-reviewed, hash, retrieved) and applies proposed_changes by H2 heading match. With --open-pr, creates branch knowledge-freshness/<entry>-<date> and opens a PR via gh.' },
   gates: { title: '5 PR gates', file: '.github/workflows/knowledge-freshness-gates.yml', summary: 'Fires on PRs touching content/knowledge/**. Same gate code is also run inline by the cron (GITHUB_TOKEN-opened PRs do NOT trigger workflows, so the workflow alone would skip cron PRs).', bullets: ['Gate 1: validate-knowledge', 'Gate 2: link-check', 'Gate 3: lint-unsourced (advisory)', 'Gate 4: anti-over-rewrite (blocking on stable + >20% churn)', 'Gate 5: Deep Guidance heading preserved'] },
-  merge: { title: 'Human merge → VERSION bump', file: 'src/knowledge-freshness/bump-version.ts', summary: 'On merge, Conventional Commits header drives a SemVer bump in content/knowledge/VERSION. fix(knowledge): → patch; feat(knowledge): → minor; feat(knowledge)!: → major.' },
+  merge: {
+    title: 'Human merge → VERSION bump',
+    file: '.github/workflows/knowledge-freshness-version-bump.yml + src/knowledge-freshness/bump-version.ts',
+    summary: 'A dedicated workflow fires on PR closed (merged-only) when the source branch starts with `knowledge-freshness/` OR the PR carries the `knowledge-freshness` label. It computes the next SemVer via the CLI, writes content/knowledge/VERSION, commits with `chore(knowledge):` prefix (to avoid retriggering itself), then `git pull --rebase` before pushing.',
+    bullets: [
+      'BREAKING CHANGE: anywhere in title or body → major',
+      'feat(knowledge): or feat(knowledge-freshness): title prefix → minor',
+      'chore(knowledge): or chore(knowledge-freshness): title prefix → patch',
+      'Anything else (including fix(knowledge):) → patch (with ::notice:: in log)',
+    ],
+  },
   tail: { title: 'gap-signal-tail', file: 'src/core/assembly/gap-signal-tail.ts', summary: 'Assembly-time helper that appends a short emission template to each pipeline step\'s knowledge section. One source of truth, used by both AssemblyEngine.buildKnowledgeBaseSection and buildKnowledgeSection. SCAFFOLD_GAP_SIGNAL_QUIET=1 suppresses.' },
   event: { title: 'scaffold observe event knowledge_gap_signal', file: 'src/cli/commands/observe.ts + src/observability/engine/event-schemas.ts:191-220', summary: 'CLI wrapper that validates the payload (kebab-case topic ≤80 chars, source enum, 64-char sha256 project_id) and appends one event to .scaffold/activity.jsonl.' },
   ledger: { title: 'ledger (activity.jsonl)', file: '.scaffold/activity.jsonl', summary: 'Append-only JSONL of all observability events. Lens I reads the last 90 days of knowledge_gap_signal entries, plus synthetic signals from tasks/lessons.md scanned at audit time.' },
@@ -215,10 +265,16 @@ const PYRAMID = {
   },
   ci: {
     name: 'CI gates',
-    count: '6 jobs',
+    count: '4 workflows',
     tone: 'chip-fast',
-    summary: 'GitHub Actions workflows: 1 cron + 5 PR gates. The cron also runs gates inline (GITHUB_TOKEN-opened PRs don\'t trigger workflows).',
-    files: ['.github/workflows/knowledge-freshness-audit.yml', '.github/workflows/knowledge-freshness-gates.yml', '.github/workflows/check.yml', 'make check-all'],
+    summary: 'Three knowledge-freshness-specific workflows plus the repo-wide ci.yml. The cron also runs the 5 gates inline because GITHUB_TOKEN-opened PRs do NOT trigger downstream workflows. The repo-wide bats-core suite (~100 tests at tests/*.bats) runs as part of `make check-all` and on the pre-push hook — validates frontmatter, pipeline-prompt invariants, and CLI smoke paths.',
+    files: [
+      '.github/workflows/knowledge-freshness-audit.yml — daily cron',
+      '.github/workflows/knowledge-freshness-gates.yml — 5 PR gates (paths-filtered)',
+      '.github/workflows/knowledge-freshness-version-bump.yml — auto-bump on merge',
+      '.github/workflows/ci.yml — repo-wide check job (make check-all)',
+      'tests/*.bats — bash suite (runs in ci.yml)',
+    ],
   },
 }
 
@@ -270,6 +326,7 @@ const FILE_MAP = [
     kind: 'dir', name: '.github/workflows', children: [
       { kind: 'file', name: 'knowledge-freshness-audit.yml', absPath: `${ABS}/.github/workflows/knowledge-freshness-audit.yml`, line: 23, purpose: 'daily cron at 09:00 UTC' },
       { kind: 'file', name: 'knowledge-freshness-gates.yml', absPath: `${ABS}/.github/workflows/knowledge-freshness-gates.yml`, line: 17, purpose: '5 gates fired on PRs touching content/knowledge/**' },
+      { kind: 'file', name: 'knowledge-freshness-version-bump.yml', absPath: `${ABS}/.github/workflows/knowledge-freshness-version-bump.yml`, line: 16, purpose: 'PR-closed (merged) → SemVer bump' },
     ],
   },
   {
@@ -301,29 +358,59 @@ const today = new Date().toISOString().slice(0, 10)
 const kbVersion = fs.readFileSync(path.join(KB_ROOT, 'VERSION'), 'utf8').trim()
 
 // ─── Substitute placeholders ──────────────────────────────────
+// Each baked constant is bounded by /*BAKE:KEY_START*/ … /*BAKE:KEY_END*/
+// sentinels so the build script is idempotent across re-runs (the prior
+// __PLACEHOLDER__ split-and-join approach silently no-op'd on the second
+// run because the placeholders were already consumed in the first bake).
 let html = fs.readFileSync(HTML_PATH, 'utf8')
 const subs = {
-  __KB_INVENTORY__: JSON.stringify(KB_INVENTORY),
-  __ALLOWLIST__: JSON.stringify(ALLOWLIST),
-  __TOP_HOSTS__: JSON.stringify(TOP_HOSTS),
-  __DECISIONS__: JSON.stringify(DECISIONS),
-  __DEFERRED__: JSON.stringify(DEFERRED),
-  __ARCH_CALLOUTS__: JSON.stringify(ARCH_CALLOUTS),
-  __FILE_MAP__: JSON.stringify(FILE_MAP),
-  __GATES__: JSON.stringify(GATES),
-  __PYRAMID__: JSON.stringify(PYRAMID),
+  KB_INVENTORY: JSON.stringify(KB_INVENTORY),
+  ALLOWLIST: JSON.stringify(ALLOWLIST),
+  TOP_HOSTS: JSON.stringify(TOP_HOSTS),
+  DECISIONS: JSON.stringify(DECISIONS),
+  DEFERRED: JSON.stringify(DEFERRED),
+  ARCH_CALLOUTS: JSON.stringify(ARCH_CALLOUTS),
+  FILE_MAP: JSON.stringify(FILE_MAP),
+  GATES: JSON.stringify(GATES),
+  PYRAMID: JSON.stringify(PYRAMID),
 }
+function escRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') }
 for (const [k, v] of Object.entries(subs)) {
-  // Use a function replacer to avoid $1/$& interpretation in JSON payloads
-  html = html.split(k).join(v)
+  const startTok = `/*BAKE:${k}_START*/`
+  const endTok = `/*BAKE:${k}_END*/`
+  // First-time: the file still has the legacy __PLACEHOLDER__ token; convert
+  // it into a sentinel-bounded slot so subsequent re-bakes hit the regex path.
+  if (html.includes(`__${k}__`)) {
+    html = html.split(`__${k}__`).join(`${startTok}${v}${endTok}`)
+    continue
+  }
+  // Subsequent re-bakes: regex-replace whatever is currently between sentinels
+  // with the freshly-stringified JSON. Function form avoids $&/$1 interp.
+  const re = new RegExp(escRe(startTok) + '[\\s\\S]*?' + escRe(endTok), 'g')
+  if (!re.test(html)) {
+    throw new Error(`bake slot for ${k} missing — page must contain ${startTok}…${endTok}. Re-create the slot or revert to placeholder __${k}__.`)
+  }
+  html = html.replace(re, () => `${startTok}${v}${endTok}`)
 }
-// Stamp git/date/version in the rail footer and hero
-html = html
-  .replace(/id="genDate">2026-05-27</, `id="genDate">${today}<`)
-  .replace(/id="genSha">b4bb627f</, `id="genSha">${gitSha}<`)
-  .replace(/id="kbVersion">0\.1\.0</, `id="kbVersion">${kbVersion}<`)
-  .replace(/id="statEntries">266</, `id="statEntries">${KB_INVENTORY.entries.length}<`)
-  .replace(/value="2026-05-27"/, `value="${today}"`)
+// Stamp git/date/version in the rail footer and hero. Each replacement targets
+// the id="..." anchor (idempotent across re-bakes) — the previous form
+// hardcoded the prior literal (e.g. "b4bb627f") and only worked on the first
+// run after that literal was baked, silently no-op'ing on subsequent runs as
+// the literal changed. (Gemini review finding.)
+function stampById(html, id, value) {
+  const re = new RegExp(`(id=\"${id}\">)[^<]*(<)`, 'g')
+  if (!re.test(html)) {
+    throw new Error(`stamp target id="${id}" not found in HTML`)
+  }
+  return html.replace(re, (_m, open, close) => `${open}${value}${close}`)
+}
+html = stampById(html, 'genDate', today)
+html = stampById(html, 'genSha', gitSha)
+html = stampById(html, 'kbVersion', kbVersion)
+html = stampById(html, 'statEntries', String(KB_INVENTORY.entries.length))
+// The cadence-date input's initial value uses today's date so the page opens
+// on a useful state. Also idempotent.
+html = html.replace(/(id="cadenceDate"[^>]*value=")[^"]*(")/g, `$1${today}$2`)
 
 fs.writeFileSync(HTML_PATH, html)
 console.log(`Baked reference.html: ${KB_INVENTORY.entries.length} entries, ${ALLOWLIST.hosts.length} hosts, ${DECISIONS.length} decisions. SHA=${gitSha}.`)
