@@ -29,6 +29,19 @@ describe('SessionStore', () => {
     expect(() => store.start('../../../etc/passwd')).toThrow(/invalid session id/i)
     expect(() => store.start('has spaces')).toThrow(/invalid session id/i)
     expect(() => store.start('has.dots')).toThrow(/invalid session id/i)
+    expect(() => store.start('CON')).toThrow(/invalid session id/i)
+    expect(() => store.start('com1')).toThrow(/invalid session id/i)
+  })
+
+  it('start() refuses to overwrite an existing session', () => {
+    store.start('feat-foo')
+    store.addJob('feat-foo', 'mmr-abc123', 1)
+
+    expect(() => store.start('feat-foo')).toThrow(/session already exists/i)
+
+    const s = store.show('feat-foo')!
+    expect(s.jobs).toEqual(['mmr-abc123'])
+    expect(s.rounds).toBe(1)
   })
 
   it('lists all sessions sorted by created_at desc', () => {

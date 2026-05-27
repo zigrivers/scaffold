@@ -1,8 +1,8 @@
-import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 
 const SESSION_ID_RE = /^[a-zA-Z0-9_-]+$/
+const WINDOWS_RESERVED_ID_RE = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i
 const LOCK_TIMEOUT_MS = 5000
 const LOCK_POLL_MS = 25
 
@@ -23,9 +23,13 @@ export class SessionStore {
   }
 
   private validateId(id: string): void {
-    if (!SESSION_ID_RE.test(id)) {
+    if (!SESSION_ID_RE.test(id) || WINDOWS_RESERVED_ID_RE.test(id)) {
       throw new Error(`Invalid session id: ${id} - must match ^[a-zA-Z0-9_-]+$`)
     }
+  }
+
+  private isValidId(id: string): boolean {
+    return SESSION_ID_RE.test(id) && !WINDOWS_RESERVED_ID_RE.test(id)
   }
 
   private filePath(id: string): string {
@@ -42,11 +46,13 @@ export class SessionStore {
     }
   }
 
-  private readRecord(filePath: string): SessionRecord | undefined {
+  private readRecord(filePath: string, tolerateMalformed: boolean): SessionRecord | undefined {
     try {
       return JSON.parse(fs.readFileSync(filePath, 'utf-8')) as SessionRecord
-    } catch {
-      return undefined
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined
+      if (tolerateMalformed && err instanceof SyntaxError) return undefined
+      throw err
     }
   }
 
@@ -57,10 +63,19 @@ export class SessionStore {
     fs.renameSync(tmpPath, filePath)
   }
 
+  private writeFreshJson(filePath: string, record: SessionRecord): void {
+    try {
+      fs.writeFileSync(filePath, JSON.stringify(record, null, 2), { flag: 'wx' })
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'EEXIST') {
+        throw new Error(`Session already exists: ${record.session_id}`)
+      }
+      throw err
+    }
+  }
+
   private waitForLockRetry(): void {
-    execFileSync(process.execPath, ['-e', `setTimeout(() => {}, ${LOCK_POLL_MS})`], {
-      stdio: 'ignore',
-    })
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, LOCK_POLL_MS)
   }
 
   private withLock<T>(filePath: string, fn: () => T): T {
@@ -118,7 +133,7 @@ export class SessionStore {
     const record = this.makeRecord(id)
     const fp = this.filePath(id)
     this.withLock(fp, () => {
-      this.writeJsonAtomic(fp, record)
+      this.writeFreshJson(fp, record)
       this.updateIndex((index) => {
         index[id] = record
       })
@@ -127,10 +142,9 @@ export class SessionStore {
   }
 
   show(id: string): SessionRecord | undefined {
-    if (!SESSION_ID_RE.test(id)) return undefined
+    if (!this.isValidId(id)) return undefined
     const fp = this.filePath(id)
-    if (!fs.existsSync(fp)) return undefined
-    return this.readRecord(fp)
+    return this.readRecord(fp, true)
   }
 
   list(): SessionRecord[] {
@@ -153,19 +167,14 @@ export class SessionStore {
   addJob(id: string, jobId: string, round: number): void {
     this.validateId(id)
     const fp = this.filePath(id)
-    let updated: SessionRecord | undefined
     this.withLock(fp, () => {
-      const existing = this.readRecord(fp) ?? this.makeRecord(id)
-      existing.jobs.push(jobId)
-      existing.rounds = Math.max(existing.rounds, round)
-      this.writeJsonAtomic(fp, existing)
-      updated = existing
-      if (updated) {
-        const record = updated
-        this.updateIndex((index) => {
-          index[id] = record
-        })
-      }
+      const record = this.readRecord(fp, false) ?? this.makeRecord(id)
+      record.jobs.push(jobId)
+      record.rounds = Math.max(record.rounds, round)
+      this.writeJsonAtomic(fp, record)
+      this.updateIndex((index) => {
+        index[id] = record
+      })
     })
   }
 }
