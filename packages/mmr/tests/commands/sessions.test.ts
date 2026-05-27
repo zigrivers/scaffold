@@ -49,6 +49,12 @@ describe('SessionStore', () => {
     expect(store.show('does-not-exist')).toBeUndefined()
   })
 
+  it('show() returns undefined for malformed session JSON', () => {
+    store.start('feat-foo')
+    fs.writeFileSync(path.join(tmpHome, '.mmr', 'sessions', 'feat-foo.json'), '{')
+    expect(store.show('feat-foo')).toBeUndefined()
+  })
+
   it('end() deletes the session file', () => {
     store.start('feat-foo')
     store.end('feat-foo')
@@ -62,5 +68,11 @@ describe('SessionStore', () => {
     const s = store.show('feat-foo')!
     expect(s.jobs).toEqual(['mmr-abc123', 'mmr-def456'])
     expect(s.rounds).toBe(2)
+  })
+
+  it('list() reads the session index instead of parsing every session file', () => {
+    store.start('feat-foo')
+    fs.writeFileSync(path.join(tmpHome, '.mmr', 'sessions', 'feat-foo.json'), '{')
+    expect(store.list().map((s) => s.session_id)).toEqual(['feat-foo'])
   })
 })
