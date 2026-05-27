@@ -2,6 +2,10 @@
 name: ideation-craft
 description: Questioning techniques, research methodology, lightweight expansion patterns, and brief synthesis for early-stage idea exploration
 topics: [ideation, questioning, research, competitive-analysis, brief-synthesis, socratic-method]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 # Ideation Craft

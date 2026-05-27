@@ -2,6 +2,10 @@
 name: game-ideation
 description: Game-specific ideation techniques for spark — core loop, player fantasy, retention, session design, monetization
 topics: [game-dev, ideation, core-loop, player-fantasy, retention, monetization, session-design]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Game ideation applies game-specific lenses — core loop, player fantasy, retention mechanics, session design, and monetization — to the spark tool's ideation flow. It supplements the general ideation-craft entry when a user is exploring a game idea.

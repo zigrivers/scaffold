@@ -2,6 +2,11 @@
 name: data-science-notebook-discipline
 description: Notebook discipline for reproducible data science — Marimo as primary, Jupyter plus jupytext as fallback, promoting working cells to tested modules
 topics: [data-science, notebooks, marimo, jupyter, reproducibility]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://the-turing-way.netlify.app/reproducible-research/code-quality
 ---
 
 Every data scientist has shipped a notebook that "worked for me in a session" and then produced different numbers the next morning — or worse, different numbers in a colleague's environment or a production run. The usual cause is not a bug in the code; it is hidden state. Jupyter cells can be executed in any order, re-run selectively, or silently depend on variables that were defined in a cell that has since been edited or deleted. The kernel's in-memory state becomes the real program, and the `.ipynb` file is just a partial, sometimes misleading, transcript. For solo and small-team DS work, this is the single biggest source of "it worked yesterday" pain, and it is entirely avoidable with the right tooling and habits.

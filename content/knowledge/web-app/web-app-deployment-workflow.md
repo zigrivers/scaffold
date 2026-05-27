@@ -2,6 +2,12 @@
 name: web-app-deployment-workflow
 description: Preview deploys per PR, staging environments, deployment branches, CI/CD pipeline stages, rollback strategies, and canary deployments
 topics: [web-app, deployment, ci-cd, staging, preview, rollback, canary]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://martinfowler.com/bliki/CanaryRelease.html
+  - url: https://sre.google/sre-book/release-engineering/
 ---
 
 A mature deployment workflow transforms deployment from a risky, manual event into a routine, automated step. The goal is to make every merge to main automatically and safely deliverable to production, with fast rollback when something goes wrong. The cost of building this infrastructure up front is trivially small compared to the cost of a major incident caused by a manual deploy process.

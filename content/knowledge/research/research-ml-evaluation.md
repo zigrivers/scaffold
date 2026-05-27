@@ -2,6 +2,10 @@
 name: research-ml-evaluation
 description: Research evaluation patterns including ablation studies, statistical significance testing, multiple comparison correction, effect sizes, learning curve analysis, and efficiency frontiers
 topics: [research, ml-research, evaluation, ablation, significance, bootstrap, bonferroni, effect-size, learning-curve, pareto]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Research evaluation differs fundamentally from production ML evaluation. In production, you measure a single model on held-out data and report aggregate metrics. In research, you compare multiple methods, ablate components to understand contributions, test whether differences are statistically significant rather than due to random variation, and characterize the efficiency frontier (what accuracy is achievable at what compute cost). Reporting a number without confidence intervals, without significance testing against baselines, and without ablations is not research evaluation -- it is anecdote.

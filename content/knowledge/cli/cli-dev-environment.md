@@ -2,6 +2,11 @@
 name: cli-dev-environment
 description: Local development setup for CLIs including npm link, cargo install, debug flags, manual testing workflow, and hot reload
 topics: [cli, dev-environment, npm-link, cargo, debug, hot-reload, testing-workflow]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://docs.astral.sh/uv/
 ---
 
 CLI development has a tighter feedback loop requirement than library development: you need to run the actual binary, observe its output, and verify behavior against real filesystem and network state. Setting up a fast local development workflow is not optional — a slow iteration cycle compounds across hundreds of test invocations.

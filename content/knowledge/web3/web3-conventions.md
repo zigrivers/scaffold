@@ -2,6 +2,12 @@
 name: web3-conventions
 description: Solidity style and convention discipline for smart-contract teams — forge fmt as single formatter, NatSpec on public functions, pinned pragma, custom errors over string reverts, naming and ordering rules
 topics: [web3, conventions, solidity, forge-fmt, natspec]
+volatility: stable
+last-reviewed: null
+version-pin: 'Solidity 0.8.x'
+sources:
+  - url: https://ethereum.org/en/developers/docs/smart-contracts/languages/
+  - url: https://consensys.github.io/smart-contract-best-practices/
 ---
 
 Solidity is brittle. The compiler is fast and unforgiving, the gas model rewards terseness, and the deployment surface is immutable — every style drift you tolerate during development eventually becomes a bytecode-determinism question, an audit comment, or a bug nobody can patch. The conventions below are the ones enforced by `forge fmt` and code review at every serious shop; encode them as CI gates and they stop being judgment calls.

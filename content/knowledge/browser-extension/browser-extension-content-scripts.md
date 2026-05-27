@@ -2,6 +2,12 @@
 name: browser-extension-content-scripts
 description: DOM manipulation from content scripts, isolated worlds, CSS injection, and communicating with the host page via postMessage
 topics: [browser-extension, content-scripts, dom-manipulation, isolated-worlds, css-injection, postmessage]
+volatility: fast-moving
+last-reviewed: null
+version-pin: 'Manifest V3'
+sources:
+  - url: https://developer.chrome.com/docs/extensions/develop/concepts/content-scripts
+  - url: https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Content_scripts
 ---
 
 Content scripts are the extension's interface with the web page. They run inside the page's DOM but in an isolated JavaScript world — they see the same HTML and can manipulate the same elements, but they cannot access the page's JavaScript variables or prototype chain without explicitly crossing the world boundary. Understanding this isolation is essential for writing content scripts that are both functional and secure.

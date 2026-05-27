@@ -2,6 +2,13 @@
 name: backend-security
 description: Input validation, SQL injection prevention, rate limiting, OWASP API Security Top 10, secrets management, and dependency auditing
 topics: [backend, security, validation, sql-injection, rate-limiting, owasp, secrets]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://owasp.org/www-project-api-security/
+  - url: https://owasp.org/www-project-top-ten/
+  - url: https://owasp.org/www-project-cheat-sheets/
 ---
 
 Security vulnerabilities in backend services are disproportionately expensive to fix after launch — building in input validation, injection prevention, rate limiting, and secrets hygiene from the start is always cheaper than retrofitting them under pressure after a breach.

@@ -2,6 +2,10 @@
 name: dependency-validation
 description: Verifying dependency graphs are acyclic, complete, and correctly ordered
 topics: [validation, dependencies, graphs, cycles, ordering, parallelization]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 # Dependency Validation

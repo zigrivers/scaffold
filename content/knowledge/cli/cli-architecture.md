@@ -2,6 +2,10 @@
 name: cli-architecture
 description: Command router patterns, plugin systems, middleware chains, config resolution order, and lazy loading for CLI tools
 topics: [cli, architecture, command-router, plugins, middleware, config-resolution, lazy-loading]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 CLI architecture is simpler than web architecture but has its own failure modes: slow startup, monolithic command files that resist extension, config that behaves unpredictably, and plugin systems that become security liabilities. Decisions made at the architecture level — how commands are registered, how config is resolved, how plugins hook in — determine whether the tool remains maintainable as it grows.

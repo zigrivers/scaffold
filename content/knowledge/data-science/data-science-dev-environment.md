@@ -2,6 +2,12 @@
 name: data-science-dev-environment
 description: Reproducible local Python dev environment for data science using uv, direnv, pre-commit, and pyproject.toml
 topics: [data-science, dev-environment, uv, direnv, pre-commit]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://docs.astral.sh/uv/
+  - url: https://peps.python.org/pep-0621/
 ---
 
 A data-science project that cannot be recreated in minutes is a liability. Notebooks pick up stale package versions, secrets leak into `.bashrc`, and "works on my machine" kills any chance of a collaborator (or future-you) rerunning an experiment. The fix is not complicated: one lockfile, one place for env vars, one pre-commit hook, no bespoke shell scripts. This guide is opinionated toward solo and small-team workflows where local-first beats container-first.

@@ -2,6 +2,10 @@
 name: cli-shell-integration
 description: Shell completion generation for bash/zsh/fish, man page generation, dotfile conventions, PATH management, and shell aliases
 topics: [cli, shell-integration, completion, man-pages, dotfiles, path-management, aliases]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Shell integration is the difference between a CLI that feels native and one that feels like a foreign object. Completion, man pages, and dotfile patterns are not optional polish — they are the features that determine whether power users adopt the tool or abandon it for something that respects their shell workflow.

@@ -2,6 +2,12 @@
 name: browser-extension-testing
 description: Extension testing with Puppeteer and Playwright, unit testing shared logic, and manual cross-browser smoke test procedures
 topics: [browser-extension, testing, puppeteer, playwright, unit-testing, e2e, smoke-tests, cross-browser]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://developer.chrome.com/docs/extensions/how-to/test/end-to-end-testing
+  - url: https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Testing_persistent_and_restart_features
 ---
 
 Browser extension testing is harder than web app testing because the extension runs in a privileged browser context that most test frameworks cannot easily access. The strategy is to maximize the code that lives in plain TypeScript (easily unit-tested), minimize the code that requires a real browser to test (expensive), and write targeted end-to-end tests that exercise the extension in a real browser for the scenarios that matter most.

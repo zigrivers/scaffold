@@ -2,6 +2,10 @@
 name: game-input-systems
 description: Input abstraction patterns, action mapping, dead zones, aim assist, haptic feedback, cross-play fairness, and accessibility
 topics: [game-dev, input, controls, rebinding, haptics, accessibility]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 The input system is the player's sole interface with the game world. Every millisecond of input latency, every unintuitive binding, and every inaccessible control scheme directly erodes the player's experience. A well-designed input system abstracts hardware differences behind a unified action layer, supports rebinding without code changes, handles device hotswap gracefully, and provides accessibility options that let every player engage with the game. Input systems are deceptively complex — the gap between "reading a button press" and "shipping a polished, accessible, cross-platform input system" is enormous.

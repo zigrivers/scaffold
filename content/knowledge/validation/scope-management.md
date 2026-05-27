@@ -2,6 +2,10 @@
 name: scope-management
 description: Detecting scope creep and ensuring specs stay aligned to PRD boundaries
 topics: [validation, scope, creep, prd-alignment, gold-plating]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 # Scope Management

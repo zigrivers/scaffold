@@ -2,6 +2,13 @@
 name: web3-audit-workflow
 description: Pre-audit readiness, tooling (Slither, Echidna, Halmos, Certora), CI integration, firm selection, timing, remediation, and post-launch bug bounties for protocol teams preparing for a smart-contract audit
 topics: [web3, audit, slither, echidna, halmos, security]
+volatility: fast-moving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://consensys.github.io/smart-contract-best-practices/
+  - url: https://swcregistry.io/
+  - url: https://docs.openzeppelin.com/contracts/5.x/
 ---
 
 Audits are expensive ($30k–$500k+) and time-consuming, and the meter starts the day the auditors open your repo — not the day they find their first bug. A team that hands over a half-finished spec, 40% test coverage, and a Slither report full of unaddressed mediums is paying senior security engineers to do the work the team should have done before kickoff. The protocols that get the most out of an audit treat the engagement as a final review against work already proven correct, not as a substitute for it. Maximize value by being ready before the audit starts.

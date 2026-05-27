@@ -2,6 +2,10 @@
 name: ml-architecture
 description: Training/serving architecture split, feature stores, model registry, online vs offline inference patterns, and ML system design decisions
 topics: [ml, architecture, feature-store, model-registry, inference, serving, training]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 ML systems have a fundamental architectural split that traditional software does not: the training system and the serving system are different codebases running on different infrastructure, yet they must agree on the exact same data transformations. This training-serving skew is the most common source of silent production bugs in ML. Designing the architecture to prevent skew — through shared feature stores, shared preprocessing libraries, and strict interface contracts — is the most important ML architecture decision.

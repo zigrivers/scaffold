@@ -2,6 +2,10 @@
 name: ml-serving-patterns
 description: Model serving with TorchServe, Triton, and BentoML; batch vs realtime inference patterns; A/B testing and canary deployment strategies
 topics: [ml, serving, torchserve, triton, bentoml, inference, ab-testing, canary, deployment]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Model serving is where ML meets production software engineering. A model that performs well in a notebook is worthless if it cannot serve predictions reliably at scale. Serving patterns address the gap between "it works on my machine" and "it handles 10,000 requests per second with P99 < 100ms and zero data races." The serving layer must be treated with the same engineering rigour as any production microservice.

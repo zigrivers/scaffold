@@ -2,6 +2,12 @@
 name: game-platform-certification
 description: Sony TRC, Microsoft XR, Nintendo Lotcheck, mobile store guidelines, Steam Deck compatibility review, and common failure points
 topics: [game-dev, certification, trc, tcr, xr, lotcheck, app-store]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://developer.apple.com/app-store/review/guidelines/
+  - url: https://developer.android.com/distribute/play-policies
 ---
 
 Platform certification is the gatekeeping process each platform holder uses to ensure games meet minimum technical and policy standards before release. Every platform has its own requirements document, submission process, and failure criteria. Failing certification delays launch by days to weeks per resubmission, and each failure costs time, money, and morale. Understanding common failure points and building pre-check routines into your development process is far cheaper than discovering issues during formal submission.

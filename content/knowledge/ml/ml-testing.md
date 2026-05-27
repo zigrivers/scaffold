@@ -2,6 +2,10 @@
 name: ml-testing
 description: Unit tests for data transforms, tolerance-based model tests, pipeline integration tests, and regression tests for ML systems
 topics: [ml, testing, unit-tests, model-tests, pipeline-tests, regression-tests, tdd]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 ML code is tested less rigorously than traditional software because "the model is probabilistic" feels like an excuse for skipping tests. It is not. The vast majority of ML code — data transforms, preprocessing, feature engineering, postprocessing, and serving logic — is deterministic and must be unit tested. The probabilistic parts — model weights and accuracy — require tolerance-based tests and regression baselines. Untested ML pipelines fail silently in ways that are expensive to diagnose in production.

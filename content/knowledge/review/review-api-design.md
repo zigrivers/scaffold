@@ -2,6 +2,12 @@
 name: review-api-design
 description: Failure modes and review passes specific to API contract specifications
 topics: [api, contracts, rest, graphql, review]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://spec.openapis.org/
+  - url: https://spec.graphql.org/
 ---
 
 # Review: API Contracts

@@ -2,6 +2,12 @@
 name: web3-dev-environment
 description: Reproducible local Foundry environment for smart-contract teams — pinned solc, pinned forge, anvil, forge-std, direnv, and CI parity
 topics: [web3, dev-environment, foundry, forge, anvil]
+volatility: evolving
+last-reviewed: null
+version-pin: 'Solidity 0.8.x'
+sources:
+  - url: https://ethereum.org/en/developers/docs/programming-languages/
+  - url: https://docs.openzeppelin.com/contracts/5.x/
 ---
 
 A reproducible Foundry environment is what lets every developer (and CI) get the same compile output, the same gas snapshots, and the same fork-test results. The pieces are not exotic: install Foundry through the official channel, pin the toolchain and the Solidity compiler, lean on `forge-std` for tests, push secrets out of your global shell with `direnv`, and mirror the same versions in CI. Skip any one of these and "works on my machine" creeps back in — usually as a gas-snapshot diff that nobody can reproduce.

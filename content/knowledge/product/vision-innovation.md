@@ -2,6 +2,10 @@
 name: vision-innovation
 description: Techniques for discovering strategic innovation opportunities in product vision
 topics: [innovation, vision, strategy, competitive-positioning, ecosystem, market-opportunities]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 # Vision Innovation

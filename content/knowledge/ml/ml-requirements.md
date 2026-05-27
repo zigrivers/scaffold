@@ -2,6 +2,10 @@
 name: ml-requirements
 description: Model performance metrics (accuracy, latency, throughput), business KPIs, fairness/bias requirements, and SLA definitions for ML systems
 topics: [ml, requirements, metrics, fairness, bias, sla, kpi]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 ML requirements differ from traditional software requirements because correctness is probabilistic, not absolute. Before writing a single line of training code, define the target metrics, their measurement methodology, and the business KPIs they serve. Ambiguous requirements — "make the model accurate" — are the root cause of most ML project failures. A requirements document for an ML system must specify numeric thresholds, measurement conditions, and what constitutes an acceptable production deployment.

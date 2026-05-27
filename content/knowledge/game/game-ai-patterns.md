@@ -2,6 +2,10 @@
 name: game-ai-patterns
 description: Behavior trees, GOAP, utility AI, finite state machines, NavMesh pathfinding, perception systems, and companion AI
 topics: [game-dev, ai, behavior-trees, goap, pathfinding, npc]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Game AI encompasses the systems that control non-player character behavior — from enemy combat tactics to companion pathfinding to ambient NPC routines. Unlike machine learning AI, game AI is deterministic and designed: every behavior is authored by a designer and executed by a runtime system. The goal is not intelligence but the appearance of intelligence — NPCs should behave in ways that feel believable, create interesting gameplay challenges, and respond to the player's actions in readable ways. The core trade-off in game AI is expressiveness vs. complexity: more sophisticated AI systems enable richer behavior but are harder to design, debug, and performance-tune.

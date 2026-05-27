@@ -2,6 +2,11 @@
 name: ux-specification
 description: UX documentation patterns — user flows, interaction states, component architecture, accessibility, and responsive behavior
 topics: [ux, accessibility, wireframes, user-flows, responsive-design, components, interaction-states]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://www.w3.org/WAI/standards-guidelines/wcag/
 ---
 
 # UX Specification

@@ -2,6 +2,11 @@
 name: game-binary-vcs-strategy
 description: Git LFS deep dive, Perforce and PlasticSCM comparison, large repo tuning, lock protocols, CI for binary assets, VCS selection guide
 topics: [game-dev, vcs, git-lfs, perforce, binary-assets]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://git-scm.com/docs/gitattributes
 ---
 
 Game development produces enormous volumes of binary assets — textures, meshes, audio, animations, and engine-specific formats — that fundamentally break assumptions baked into distributed version control systems like Git. A single Unreal project can exceed 100 GB of binary data that cannot be diffed, merged, or compressed efficiently. Choosing the right VCS strategy, configuring it correctly, and establishing team protocols around binary file workflows is a prerequisite for any multi-person game project. The wrong choice creates daily friction that compounds into weeks of lost productivity over a production cycle.

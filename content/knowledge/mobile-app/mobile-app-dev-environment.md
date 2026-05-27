@@ -2,6 +2,12 @@
 name: mobile-app-dev-environment
 description: Simulator and emulator setup, physical device testing, hot reload, debugging tools, and developer toolchain for iOS and Android
 topics: [mobile-app, dev-environment, simulator, emulator, debugging, xcode, android-studio, hot-reload]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://developer.apple.com/documentation/xcode
+  - url: https://developer.android.com/studio/intro
 ---
 
 Mobile development environments are significantly more complex than web development: two IDEs, two simulators, hardware-specific debugging, code signing requirements, and platform SDK updates that break builds. A well-configured dev environment reduces friction by 50% — standardize tool versions, automate simulator setup, and document the steps from clean machine to first successful build.

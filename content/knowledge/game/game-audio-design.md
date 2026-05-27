@@ -2,6 +2,10 @@
 name: game-audio-design
 description: Wwise vs FMOD selection, bus hierarchy, spatial audio, adaptive music systems, VO pipeline, and platform loudness targets
 topics: [game-dev, audio, fmod, wwise, spatial-audio, adaptive-music]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Game audio is not background decoration — it is a primary feedback channel that communicates game state, spatial awareness, emotional tone, and mechanical timing to the player. A gunshot tells the player where the enemy is, how far away they are, and what weapon they are using. Adaptive music builds tension before the player consciously recognizes danger. Missing or poorly mixed audio creates a hollow, unfinished experience that players feel even if they cannot articulate why. Audio architecture decisions (middleware, bus hierarchy, adaptive systems) must be made early because they affect content pipelines, memory budgets, and CPU budgets throughout production.

@@ -2,6 +2,10 @@
 name: test-skeleton-generation
 description: Patterns for translating acceptance criteria into framework-specific test skeleton files
 topics: [testing, test-generation, acceptance-criteria, tdd, test-skeletons]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 # Test Skeleton Generation

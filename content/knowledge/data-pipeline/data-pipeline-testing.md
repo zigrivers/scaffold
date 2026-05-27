@@ -2,6 +2,10 @@
 name: data-pipeline-testing
 description: Unit tests for transforms, integration tests, data quality tests, and performance tests for data pipelines
 topics: [data-pipeline, testing, unit-tests, integration-tests, data-quality-tests, performance-tests, tdd, pytest]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Data pipeline testing requires a layered strategy: fast unit tests for transformation logic, integration tests against containerized infrastructure, data quality tests that run inline in production, and performance tests to catch throughput regressions. The most common testing gap in pipeline projects is that DAG files and orchestration logic are tested but transformation functions — the business logic — are not. Transformation functions must be the most heavily tested component because correctness of results depends entirely on them.

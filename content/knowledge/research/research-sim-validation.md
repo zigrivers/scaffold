@@ -2,6 +2,10 @@
 name: research-sim-validation
 description: Simulation validation methodology including comparison against analytical solutions, mesh independence studies, convergence testing, Richardson extrapolation, uncertainty quantification, and the verification vs validation distinction
 topics: [research, simulation, validation, verification, mesh-independence, convergence, richardson-extrapolation, uncertainty-quantification, analytical-solutions, mms]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Simulation validation answers the fundamental question: does this simulation represent reality? Verification asks a different question: does the code correctly solve the mathematical model? Both are essential -- a perfectly verified code solving the wrong equations is useless, and an unverified code matching experiments might be right for the wrong reasons. The validation pipeline establishes trust in simulation results by systematically comparing against known solutions, demonstrating grid independence, quantifying numerical uncertainty, and documenting the conditions under which the simulation is reliable.

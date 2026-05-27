@@ -2,6 +2,10 @@
 name: cli-project-structure
 description: Directory layout, entry points, config file resolution, and plugin directory structure for CLI projects
 topics: [cli, project-structure, directory-layout, config-resolution, bin, plugins]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 A well-structured CLI project makes it easy to add subcommands, locate business logic, and onboard contributors. The structure should reflect the mental model of the tool: commands are the public API, utilities are shared infrastructure, and configuration drives runtime behavior.

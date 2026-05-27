@@ -2,6 +2,10 @@
 name: version-strategy
 description: Version file management across language ecosystems
 topics: [versioning, packages, ecosystems]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 # Version Strategy

@@ -2,6 +2,10 @@
 name: library-type-definitions
 description: Declaration files (.d.ts), type testing with tsd/expect-type, conditional types, and API surface documentation via types
 topics: [library, typescript, type-definitions, declarations, tsd, expect-type, conditional-types, dts]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Type definitions are a first-class deliverable for TypeScript libraries. They are part of the public API contract, not an afterthought. Declaration files (`.d.ts`) must be accurate, complete, and expressive — they determine whether consumers can use the library with type safety, whether IDEs provide useful completions, and whether type errors are caught at compile time rather than runtime. Inaccurate types are worse than no types because they create false confidence.

@@ -2,6 +2,12 @@
 name: web3-requirements
 description: Problem framing, invariants, threat model, trust assumptions, and success metrics for shipping smart contracts and protocols to EVM chains
 topics: [web3, requirements, invariants, threat-model, security]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://consensys.github.io/smart-contract-best-practices/
+  - url: https://ethereum.org/en/developers/docs/smart-contracts/security/
 ---
 
 A smart contract shipped to an EVM chain without a written invariant set, a threat model, and an explicit list of trust assumptions is a guessing game with adversarial counterparties and irreversible state. This document defines the acceptance spec for a contract or protocol going to Ethereum mainnet, an L2 (Optimism, Arbitrum, Base), or a compatible sidechain. The audience is a senior Solidity engineer or protocol architect who can ship code but has not yet hardened it against funded adversaries. The goal is to force, in writing, the questions an auditor will ask on day one.

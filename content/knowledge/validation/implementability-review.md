@@ -2,6 +2,10 @@
 name: implementability-review
 description: Dry-running specs as an implementing agent to catch ambiguity and missing detail
 topics: [validation, implementability, ambiguity, agent-readiness, dry-run]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 # Implementability Review

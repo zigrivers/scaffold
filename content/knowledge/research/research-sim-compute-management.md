@@ -2,6 +2,10 @@
 name: research-sim-compute-management
 description: Compute resource management for simulations including wall-clock budgets, job scheduling with SLURM and PBS, parallelization strategies, checkpoint/restart for long simulations, resource monitoring, and cost estimation
 topics: [research, simulation, compute-management, slurm, pbs, parallelization, checkpoint-restart, resource-monitoring, cost-estimation, hpc, wall-clock-budget]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Simulation-based research consumes significant compute resources -- a single CFD run can take hours, and parameter sweeps multiply that by hundreds or thousands of evaluations. Effective compute management determines whether a research budget yields 50 useful results or 500. The key challenges are: allocating wall-clock budgets across the experiment campaign, scheduling jobs efficiently on shared HPC resources, choosing the right parallelization level (across parameters vs within simulations), implementing checkpoint/restart for runs that exceed time limits, and monitoring resource usage to prevent waste.

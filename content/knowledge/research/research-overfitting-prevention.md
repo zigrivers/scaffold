@@ -2,6 +2,11 @@
 name: research-overfitting-prevention
 description: Out-of-sample validation, cross-validation strategies, statistical significance testing, and when to stop iterating to prevent overfitting
 topics: [research, overfitting, validation, cross-validation, statistical-significance, out-of-sample]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://the-turing-way.netlify.app/reproducible-research/reproducible-research.html
 ---
 
 Overfitting is the central risk of iterative research. Every time an agent evaluates a hypothesis against data and uses the result to guide the next hypothesis, it is implicitly fitting to that data. After hundreds of iterations, even random strategies will appear to perform well on the evaluation set -- this is multiple comparisons bias. Preventing overfitting requires rigorous separation of training and evaluation data, statistical significance testing, and disciplined stopping criteria.

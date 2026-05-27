@@ -2,6 +2,10 @@
 name: user-story-innovation
 description: Techniques for discovering UX enhancements and innovation opportunities in user stories
 topics: [innovation, ux-enhancements, user-stories, gap-analysis, differentiators]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 # User Story Innovation

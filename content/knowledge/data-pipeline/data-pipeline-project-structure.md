@@ -2,6 +2,10 @@
 name: data-pipeline-project-structure
 description: Canonical directory layout for data pipeline projects covering DAGs, transforms, sinks, quality checks, configuration, and tests
 topics: [data-pipeline, project-structure, dags, transforms, sinks, quality, config, tests]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 A well-organized data pipeline project separates pipeline orchestration logic from transformation logic, data sinks, and quality checks. This separation allows each concern to evolve independently and makes the codebase navigable for engineers unfamiliar with the project. The structure below is opinionated but widely applicable to Airflow, Prefect, Dagster, and similar orchestration tools.

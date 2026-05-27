@@ -2,6 +2,10 @@
 name: dev-environment
 description: Development environment setup patterns including Makefile conventions, live reload, and toolchain configuration
 topics: [dev-environment, makefile, live-reload, env-files, toolchain, ci, git-hooks, scripts]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 # Dev Environment

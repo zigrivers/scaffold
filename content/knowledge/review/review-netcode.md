@@ -2,6 +2,10 @@
 name: review-netcode
 description: Failure modes and review passes specific to netcode design — latency analysis, bandwidth ceilings, cheat surfaces, and disconnect handling
 topics: [game-dev, review, networking, latency, bandwidth, anticheat]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 # Review: Netcode Design

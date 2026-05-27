@@ -2,6 +2,10 @@
 name: game-accessibility
 description: Xbox Accessibility Guidelines as best-practice guidance, game-specific a11y categories, CVAA scope, and low-cost high-impact features
 topics: [game-dev, accessibility, xag, cvaa, colorblind, remapping]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Game accessibility is about removing barriers that prevent players with disabilities from experiencing your game. The Xbox Accessibility Guidelines (XAG) provide the most comprehensive industry framework — not as a legal compliance checklist, but as best-practice guidance that Microsoft explicitly positions as aspirational. Every feature you implement opens your game to more players, and many accessibility features (subtitles, remapping, difficulty options) benefit all players regardless of ability.

@@ -37,6 +37,32 @@ count_lines() {
   wc -l < "$1" | tr -d ' '
 }
 
+# Count body lines in a markdown file — total lines minus the YAML frontmatter
+# block (between the first two `---` delimiters, inclusive). Use this for any
+# ratio that should measure "% of content" — frontmatter is metadata, not
+# content, and freshness fields like `volatility` / `sources` make every
+# entry's frontmatter grow without changing what the model reads.
+#
+# Edge cases:
+#   - File has no leading `---` → treats whole file as body (`fm == 0` path).
+#   - File opens a `---` block but never closes it (malformed) → returns the
+#     full file's `wc -l` rather than 0, so downstream `pct = deep * 100 / body`
+#     in tests cannot divide by zero on a malformed input.
+count_body_lines() {
+  awk '
+    NR == 1 && /^---[[:space:]]*$/ { fm = 1; next }
+    fm == 1 && /^---[[:space:]]*$/ { fm = 2; next }
+    fm == 2 || fm == 0 { count++ }
+    END {
+      # Unclosed frontmatter (fm stuck at 1) → fall back to total line count
+      # so callers don'\''t divide by zero. The YAML parser will reject the
+      # file separately; the redundancy check should not crash on it.
+      if (fm == 1) print NR
+      else print count+0
+    }
+  ' "$1"
+}
+
 # Count fenced code block pairs (``` opening markers).
 count_code_blocks() {
   grep -c '^```' "$1" 2>/dev/null | awk '{print int($1/2)}'

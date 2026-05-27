@@ -2,6 +2,10 @@
 name: cli-requirements
 description: CLI UX principles, POSIX conventions, exit codes, signal handling, and progressive disclosure for command-line tools
 topics: [cli, ux, posix, exit-codes, signal-handling, progressive-disclosure]
+volatility: stable
+last-reviewed: null
+version-pin: 'POSIX.1-2017'
+sources: []
 ---
 
 CLI tools occupy a unique design space: they are used by humans typing commands, embedded in shell scripts, and piped together in pipelines. A tool that conflates these contexts fails at all of them. The guiding principle is: do one thing well, fail loudly with actionable errors, and never surprise the pipeline.

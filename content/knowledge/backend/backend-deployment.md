@@ -2,6 +2,14 @@
 name: backend-deployment
 description: Containerization best practices, serverless patterns, health check endpoints, graceful shutdown, and deployment strategies
 topics: [backend, deployment, docker, serverless, health-checks, graceful-shutdown, blue-green, canary]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://martinfowler.com/bliki/BlueGreenDeployment.html
+  - url: https://martinfowler.com/bliki/CanaryRelease.html
+  - url: https://sre.google/sre-book/release-engineering/
+  - url: https://docs.aws.amazon.com/whitepapers/latest/overview-deployment-options/welcome.html
 ---
 
 Deployment reliability is a multiplier on every other engineering investment — a well-written service that deploys poorly will cause more incidents than a mediocre service that deploys safely and rolls back cleanly.

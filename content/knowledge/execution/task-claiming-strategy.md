@@ -2,6 +2,10 @@
 name: task-claiming-strategy
 description: Task selection and management patterns for AI agent execution
 topics: [tasks, execution, agents, planning]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 # Task Claiming Strategy

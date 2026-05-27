@@ -2,6 +2,11 @@
 name: review-domain-modeling
 description: Failure modes and review passes specific to domain modeling artifacts
 topics: [domain-modeling, ddd, bounded-contexts, review]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources:
+  - url: https://martinfowler.com/bliki/BoundedContext.html
 ---
 
 # Review: Domain Modeling

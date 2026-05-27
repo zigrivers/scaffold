@@ -2,6 +2,10 @@
 name: game-milestone-definitions
 description: Standard game development milestones from concept through live ops, gate criteria, and task-wave mapping
 topics: [game-dev, milestones, production, vertical-slice, alpha, beta]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Game development milestones are the checkpoints that determine whether a project is on track, at risk, or should be cancelled. Unlike software sprints that deliver incremental value, game milestones represent qualitative gates — each one answers a fundamentally different question about the project. Missing a milestone gate criteria is a signal that should trigger re-evaluation, not just a schedule adjustment. The discipline to enforce gate criteria is what separates shipped games from cancelled ones.

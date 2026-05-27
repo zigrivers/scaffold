@@ -2,6 +2,10 @@
 name: review-game-design
 description: Failure modes and review passes specific to Game Design Documents — pillar coherence, core loop closure, mechanic clarity, and scope feasibility
 topics: [game-dev, review, gdd, pillars, mechanics, scope]
+volatility: evolving
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 # Review: Game Design Document

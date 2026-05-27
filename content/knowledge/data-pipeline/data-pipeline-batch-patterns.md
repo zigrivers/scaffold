@@ -2,6 +2,10 @@
 name: data-pipeline-batch-patterns
 description: DAG design, partitioning strategies, incremental loads, backfill strategies, and dependency management for batch data pipelines
 topics: [data-pipeline, batch, dag, partitioning, incremental-load, backfill, dependency-management, airflow]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Batch pipeline design decisions — DAG structure, partition strategy, incremental load mechanics, and backfill tooling — determine whether a pipeline is operationally maintainable or a constant source of incidents. Most batch pipeline failures stem from four root causes: missing idempotency, no backfill support, poorly managed upstream dependencies, and partitioning strategies that don't match query access patterns. Address all four up front.

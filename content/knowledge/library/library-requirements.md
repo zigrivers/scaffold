@@ -2,6 +2,10 @@
 name: library-requirements
 description: API contract stability, semver commitments, consumer compatibility, and breaking change policy for published libraries
 topics: [library, requirements, semver, api-contract, breaking-changes, compatibility]
+volatility: stable
+last-reviewed: null
+version-pin: null
+sources: []
 ---
 
 Library requirements differ fundamentally from application requirements: every public API decision becomes a contract with downstream consumers who cannot easily update. Stability, predictability, and clear communication of change are the highest-priority concerns. A library that breaks its consumers silently, or without adequate notice, loses trust permanently.
