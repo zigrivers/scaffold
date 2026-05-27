@@ -19,6 +19,7 @@ import { findProjectRoot } from '../middleware/project-root.js'
 import { runFixFlow } from '../../observability/engine/fix-flow.js'
 import { captureSnapshot, restoreSnapshot } from '../../observability/engine/abort-snapshot.js'
 import { recoverStaleArchives } from '../../observability/engine/harvester.js'
+import { KnowledgeRootCliInvalidError } from '../../observability/knowledge-index.js'
 
 async function writeMarkdownReport(
   cwd: string, out: EngineOutput, body: string, reportId: string, overridePath?: string,
@@ -219,6 +220,10 @@ export interface HandleAuditInput {
   fix?: boolean
   ghBin?: string
   bdBin?: string
+  /** Operator-supplied --knowledge-root override, forwarded to both
+   *  runAudit and runFixFlow so Lens I suppression behavior is
+   *  consistent across the whole --fix lifecycle. */
+  knowledgeRootOverride?: string
 }
 
 export async function handleAudit(input: HandleAuditInput): Promise<number> {
@@ -232,6 +237,7 @@ export async function handleAudit(input: HandleAuditInput): Promise<number> {
       fixThresholdOverride: input.fixThresholdOverride,
       ghBin: input.ghBin,
       bdBin: input.bdBin,
+      knowledgeRootOverride: input.knowledgeRootOverride,
       args: { profile: input.profile, scope: input.scope, sinceHours: input.sinceHours, lensIds: input.lensIds },
     })
     if (input.outputMode === 'mmr-findings') {
@@ -282,6 +288,7 @@ export async function handleAudit(input: HandleAuditInput): Promise<number> {
         const fixResult = await runFixFlow({
           primaryRoot: input.cwd, initial: out, abortSnapshot: snapshot,
           ghBin: input.ghBin, bdBin: input.bdBin,
+          knowledgeRootOverride: input.knowledgeRootOverride,
         })
         process.stdout.write(`[fix] fixed ${fixResult.fixed.length}, failed ${fixResult.failed.length}\n`)
         process.stdout.write(`[fix] post-fix report: ${fixResult.postfix_markdown_path}\n`)
@@ -298,6 +305,10 @@ export async function handleAudit(input: HandleAuditInput): Promise<number> {
 
     return out.verdict === 'blocked' ? 1 : 0
   } catch (err: unknown) {
+    if (err instanceof KnowledgeRootCliInvalidError) {
+      process.stderr.write(`scaffold observe audit: ${err.message}\n`)
+      return 1
+    }
     process.stderr.write(`scaffold observe audit: ${err instanceof Error ? err.message : String(err)}\n`)
     return 3
   }
@@ -488,6 +499,10 @@ const observeCommand: CommandModule<AnyArgv, AnyArgv> = {
         .option('fix', {
           type: 'boolean', default: false,
           describe: 'Dispatch the fix flow for blocking findings after audit',
+        })
+        .option('knowledge-root', {
+          type: 'string',
+          describe: 'Path to a content/knowledge directory; overrides yaml + auto-detect for Lens I existing-entry suppression',
         }),
       async (argv) => {
         const code = await handleAudit({
@@ -504,6 +519,7 @@ const observeCommand: CommandModule<AnyArgv, AnyArgv> = {
           render: argv.render as 'dashboard-fragment-audit' | undefined,
           outputMode: argv['output-mode'] as 'mmr-findings' | undefined,
           fix: !!(argv.fix),
+          knowledgeRootOverride: (argv['knowledge-root'] ?? argv.knowledgeRoot) as string | undefined,
         })
         process.exitCode = code
       },
