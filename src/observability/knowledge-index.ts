@@ -47,8 +47,14 @@ function walkMarkdown(dir: string, out: string[]): void {
   }
   for (const entry of entries) {
     const full = path.join(dir, entry.name)
-    if (entry.isDirectory()) walkMarkdown(full, out)
-    else if (entry.isFile() && entry.name.endsWith('.md') && entry.name !== 'README.md') {
+    // Use statSync (follows symlinks) rather than Dirent.is* (uses lstat)
+    // so a symlinked subdirectory or file is treated like a real one.
+    // The spec's edge-case table promises symlinked content/knowledge is
+    // "followed normally"; without this we'd quietly drop symlink trees.
+    let stat: fs.Stats
+    try { stat = fs.statSync(full) } catch { continue }
+    if (stat.isDirectory()) walkMarkdown(full, out)
+    else if (stat.isFile() && entry.name.endsWith('.md') && entry.name !== 'README.md') {
       out.push(full)
     }
   }

@@ -107,7 +107,18 @@ export const lensIKnowledgeGaps: LensFn = async (
   //          lensFn, so this guard is redundant in production but
   //          protects direct-call tests and any future programmatic
   //          path that might bypass runChecks.)
-  if (context && !context.knowledgeRoot && enabled.has(lensId)) {
+  // Skip when context.warnedKeys is missing — without a caller-provided
+  // dedup Set, calling emitOnceForAudit with a fresh Set would orphan it
+  // and let the next direct lens call re-emit (the spec's "warn once per
+  // audit run" contract is enforced through the caller-Set, not a
+  // module-global). The runner ALWAYS provides one in production, so
+  // this branch only protects direct test/programmatic invocations.
+  if (
+    context
+    && !context.knowledgeRoot
+    && enabled.has(lensId)
+    && context.warnedKeys
+  ) {
     const yamlAttempt = (context.knowledgeRootAttempts ?? []).find(
       a => a.source === 'yaml' && a.outcome === 'invalid',
     )
@@ -118,7 +129,7 @@ export const lensIKnowledgeGaps: LensFn = async (
         + formatForStderr(yamlAttempt.reason)
       : ''
     emitOnceForAudit(
-      context.warnedKeys ?? new Set<string>(),
+      context.warnedKeys,
       'lens-i:no-root',
       '[Lens I] knowledge-root not located; existing-entry suppression disabled'
         + yamlNote

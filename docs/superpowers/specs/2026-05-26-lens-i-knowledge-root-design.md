@@ -212,14 +212,19 @@ imports nothing directly — it only reads the CLI flag and passes it to
 - Globs `<knowledgeDir>/**/*.md` using a small custom walker
   (`fs.readdirSync` recursive; no globby dep — match the existing
   zero-runtime-dep style of `lens-i-knowledge-gaps.ts`).
-- Performs **minimal hand-rolled `name:` extraction** on each file's
-  YAML frontmatter (read until the second `---`, regex-match for
-  `^name:\s*['"]?(.+?)['"]?\s*$`). Does NOT import `js-yaml` — that's
-  the resolver's job for the yaml tier (see decision #19). Keeping
-  the loader parser-free preserves the zero-additional-dep style of
-  `lens-i-knowledge-gaps.ts` and means a future security/perf change
-  to the project's yaml reader can't accidentally regress the
-  knowledge index.
+- Parses each file's YAML frontmatter via `js-yaml` (already a project
+  dependency — used by `extractKBFrontmatter`, `loadObservabilityConfig`,
+  and the freshness validator). Extracts only the `name:` field; ignores
+  everything else. **Updated from the spec's earlier "hand-rolled regex"
+  design** (decision #14 + #19 originally specified no js-yaml in the
+  loader; plan review R1 caught that a regex couldn't reliably handle
+  YAML comments after the value, nested-after-name structures, or
+  unclosed frontmatter — empirical bugs in the regex draft). The
+  loader now matches `extractKBFrontmatter` exactly in acceptance rule
+  (any non-empty trimmed string) and parser choice. The
+  "dependency-free" Cross-Cutting principle still applies to the
+  directory walk (`fs.readdirSync`, no globby) — the yaml extraction
+  was the part that needed real parsing.
 - Excludes any file named `README.md` (matches the assembly loader's
   exclusion behavior — see the `entry.name === 'README.md'` guards in
   the `walkDir` and `buildIndex` paths of
@@ -754,17 +759,16 @@ chars with `?`, so a pathological value can't produce ragged stderr.
   warning paths route through a single `emitOnceForAudit` helper, keyed
   by the failure mode, with the warning emitted from inside the lens
   (not the resolver) so a disabled Lens I never produces spurious noise.
-- **No new dependencies (scoped to the KB walk).** Inside
+- **No new dependencies (scoped to the directory walk).** Inside
   `loadKnowledgeIndex` only: custom recursive walker (`fs.readdirSync`,
-  no globby) and minimal hand-rolled `name:` extraction (no `js-yaml`
-  import in `knowledge-index.ts`). The "Same parser style as
-  `extractKBFrontmatter`" language elsewhere in this spec refers to
-  the *acceptance rule* (any non-empty trimmed string) and
-  silent-skip-on-malformed *behavior* — not to importing the same
-  underlying parser. The yaml-tier read inside `resolveKnowledgeRoot`
-  deliberately delegates to `loadObservabilityConfig` (js-yaml) per
-  decision #19; that's not a "new dependency" — it reuses the
-  observability engine's existing reader.
+  no globby). Frontmatter parsing uses `js-yaml` — already a project
+  dependency (`extractKBFrontmatter`, `loadObservabilityConfig`,
+  freshness validator all use it). The earlier draft specified a
+  hand-rolled regex parser to keep the module "dependency-free" but
+  plan review R1 caught real bugs the regex couldn't handle (YAML
+  comments after values, nested structures, unclosed frontmatter).
+  Reverted to `js-yaml`; the "dependency-free" guarantee was scoped
+  down to the walker only.
 - **Context construction contract.** `LensContext.knowledgeRoot` and
   `LensContext.knowledgeIndex` are PAIRED — the resolver populates both
   or neither. Production code never creates a context with one set and
@@ -837,7 +841,7 @@ chars with `?`, so a pathological value can't produce ragged stderr.
 | 11 | Warn-once mechanism | `emitOnceForAudit(warnedKeys, key, message)` with **caller-provided per-audit `Set<string>`** threaded via `LensContext.warnedKeys`; called by Lens I only; resolver never writes to stderr | Module-global Set would dedup across the `--fix` flow's multiple `runAudit` calls in one process (initial + verifier + postfix), silently swallowing real warnings. Test files (vitest) share module state and would see the same swallow. Per-audit Set fixes both. Resolver-doesn't-warn keeps the warning gated on the lens actually running, preventing spurious noise when Lens I is disabled. |
 | 12 | Per-file `console.warn` for malformed entries in the loader | No | Matches the assembly loader's silent-skip behavior. The freshness validator already surfaces malformed entries; duplicating output would either leak into JSON or confuse operators about which subsystem flagged the issue. |
 | 13 | Where the 3-tier resolution lives (handler vs `runAudit`) | `resolveKnowledgeRoot` is **defined in `knowledge-index.ts`** alongside the loader and auto-detector, and **called by `runAudit`** (not by `handleAudit`) | Every `runAudit` caller benefits — CLI, `phase-audit.ts`, `fix-flow.ts` (verifier + postfix), MMR doc-conformance channel — without each having to re-implement yaml + auto-detect. The CLI flag becomes `RunAuditInput.knowledgeRootOverride`. `phase-audit.ts` doesn't supply one (state-triggered audits use yaml + auto-detect); `fix-flow.ts` forwards it through to its inner verifier and postfix `runAudit` calls per decision #20. Tests import `resolveKnowledgeRoot` directly from `knowledge-index.ts` for unit coverage. |
-| 14 | Validator slug-rule alignment with the loader | Index loader accepts any non-empty trimmed `name:` (matches `extractKBFrontmatter`); validator-style slug regex stays in `knowledge-frontmatter-validator.ts` only | Round-2 spec earlier claimed both functions enforced the slug regex; that was wrong (the regex lives only in the validator). Keeping the index loader permissive matches the assembly engine and prevents drift between which entries the assembly engine sees vs which the suppression logic sees. |
+| 14 | Validator slug-rule alignment with the loader | Index loader uses `js-yaml` (matching `extractKBFrontmatter`) for parsing; accepts any non-empty trimmed `name:`; validator-style slug regex stays in `knowledge-frontmatter-validator.ts` only | Round-2 spec earlier claimed both functions enforced the slug regex; that was wrong (the regex lives only in the validator). Keeping the index loader permissive matches the assembly engine and prevents drift between which entries the assembly engine sees vs which the suppression logic sees. The earlier draft specified a hand-rolled regex parser; plan review R1 caught that a regex couldn't reliably handle YAML comments after values, nested-after-name structures, or unclosed frontmatter, and the loader was switched to `js-yaml` (already a project dep). |
 | 15 | Validator strictness for "is this actually a knowledge directory?" | Require `<path>/VERSION` marker file (the KB SemVer file from Phase 1) as the sole identification signal; do NOT require the loader's index to be non-empty | Round-3 caught that `loadKnowledgeIndex(path).size > 0` alone passes for any ancestor of the knowledge dir (the recursive walk finds the nested KB files; would also accept `content/tools/`, `content/pipeline/`, etc.). VERSION exists only at `content/knowledge/VERSION` and nowhere else in the repo, so requiring it precisely identifies the knowledge dir. Round-8 trimmed the "loader returned non-empty" gate that an earlier draft layered on top: an empty index is a legitimate state for a freshly-initialized scaffold install or a downstream project mid-setup, and the lens correctly treats an empty index as "nothing to suppress" — no reason to fail validation on it. The loader is still exercised at validation time so I/O failures (permission-denied, etc.) surface at the resolver rather than at lens-time. |
 | 16 | Where the index is loaded (resolver vs lens) | Resolver loads it during validation and returns the Set in `KnowledgeRootResolution.index`; Lens I uses the pre-loaded index without re-walking | Eliminates a redundant filesystem walk and removes the dead `lens-i:index-load-failed` code path (the resolver already failed if loading would fail). Single source of I/O on the knowledge tree per audit run. |
 | 17 | LensContext field optionality + test migration | The four new fields (`knowledgeRoot`, `knowledgeIndex`, `knowledgeRootAttempts`, `warnedKeys`) are all OPTIONAL on `LensContext`; existing test literals at `lens-h-cross-doc.test.ts` and `lens-i-knowledge-gaps.test.ts` keep compiling without changes | Tests that bypass `runChecks` and construct `LensContext` literals to call lens functions directly would otherwise fail TypeScript after the interface change. Optional fields + lens treating `undefined === null` for behavior makes the migration zero-cost. |

@@ -367,4 +367,29 @@ describe('resolveKnowledgeRoot', () => {
     const autoAttempt = result.attempts.find(a => a.source === 'auto-detect')
     expect(autoAttempt?.outcome).toBe('used')
   })
+
+  it('falls through to auto-detect when yaml invalid, recording BOTH attempts', () => {
+    // Realistic deployment scenario: stale yaml override left in
+    // .scaffold/observability.yaml + a working scaffold install above
+    // the project. Auto-detect succeeds; attempts trail captures the
+    // failed yaml AND the successful auto-detect so Lens I's warning
+    // composition can mention the yaml problem even though suppression
+    // is active.
+    const root = makeKbDir({
+      'package.json': JSON.stringify({ name: '@zigrivers/scaffold' }),
+      'content/knowledge/VERSION': '0.1.0\n',
+      'content/knowledge/x.md': '---\nname: x\n---\n',
+      'project/.scaffold/observability.yaml':
+        'lenses:\n  I-knowledge-gaps:\n    knowledge_root: /tmp/bogus-99999\n',
+    })
+    const cwd = path.join(root, 'project')
+    const result = resolveKnowledgeRoot({ cwd })
+    expect(result.root).toBe(path.join(root, 'content', 'knowledge'))
+    expect(result.index?.has('x')).toBe(true)
+    const yamlAttempt = result.attempts.find(a => a.source === 'yaml')
+    expect(yamlAttempt?.outcome).toBe('invalid')
+    expect(yamlAttempt?.reason).toMatch(/path does not exist/i)
+    const autoAttempt = result.attempts.find(a => a.source === 'auto-detect')
+    expect(autoAttempt?.outcome).toBe('used')
+  })
 })
