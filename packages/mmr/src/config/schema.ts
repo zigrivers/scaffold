@@ -106,16 +106,28 @@ const LoopControlSchema = z.object({
   repeat_suppression_enabled: z.boolean().default(false),
   repeat_downgrade_after: z.number().int().positive().optional(),
   repeat_suppress_after: z.number().int().positive().optional(),
-}).refine(
-  (lc) => {
-    if (!lc.repeat_suppression_enabled) return true
-    return lc.repeat_downgrade_after !== undefined && lc.repeat_suppress_after !== undefined
-  },
-  {
-    message:
-      'loop_control.repeat_suppression_enabled requires both repeat_downgrade_after and repeat_suppress_after',
-  },
-)
+})
+  .refine(
+    (lc) => {
+      if (!lc.repeat_suppression_enabled) return true
+      return lc.repeat_downgrade_after !== undefined && lc.repeat_suppress_after !== undefined
+    },
+    {
+      message:
+        'loop_control.repeat_suppression_enabled requires both repeat_downgrade_after and repeat_suppress_after',
+    },
+  )
+  .refine(
+    (lc) => {
+      if (lc.repeat_downgrade_after === undefined || lc.repeat_suppress_after === undefined) {
+        return true
+      }
+      return lc.repeat_suppress_after >= lc.repeat_downgrade_after
+    },
+    {
+      message: 'loop_control.repeat_suppress_after must be greater than or equal to repeat_downgrade_after',
+    },
+  )
 
 const DefaultsSchema = z.object({
   fix_threshold: Severity.default('P2'),

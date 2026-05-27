@@ -463,4 +463,20 @@ describe('MmrConfigSchema - loop_control', () => {
       }),
     ).toThrow()
   })
+
+  it('REJECTS repeat_suppress_after before repeat_downgrade_after', () => {
+    expect(() =>
+      MmrConfigSchema.parse({
+        version: 1,
+        channels: {},
+        defaults: {
+          loop_control: {
+            repeat_suppression_enabled: true,
+            repeat_downgrade_after: 3,
+            repeat_suppress_after: 2,
+          },
+        },
+      }),
+    ).toThrow()
+  })
 })
