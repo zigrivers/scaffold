@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { reconcile, evaluateGate, deriveVerdict } from '../../src/core/reconciler.js'
+import { computeFindingKey } from '../../src/core/stable-id.js'
 import type { Finding, ReconciledFinding, ChannelStatus } from '../../src/types.js'
 
 describe('reconcile', () => {
@@ -234,6 +235,28 @@ describe('reconcile - T2-A stable-identity grouping', () => {
     expect(result[0].description_shingle!.length).toBeGreaterThan(0)
   })
 
+  it('uses a finding_key consistent with the reported representative finding', () => {
+    const channelFindings: Record<string, Finding[]> = {
+      gemini: [{ severity: 'P1', location: 'src/foo.ts:10', description: 'unused variable named fooBar must be removed', suggestion: 'remove it' }],
+      claude: [{ severity: 'P1', location: 'src/foo.ts:10', description: 'unused variable named fooBar should be removed now', suggestion: 'remove it' }],
+    }
+    const result = reconcile(channelFindings)
+    expect(result).toHaveLength(1)
+    expect(result[0].finding_key).toBe(computeFindingKey(result[0]))
+  })
+
+  it('produces stable fuzzy grouping keys regardless of channel iteration order', () => {
+    const first = reconcile({
+      claude: [{ severity: 'P1', location: 'src/foo.ts:10', description: 'unused variable named fooBar should be removed', suggestion: 'remove it' }],
+      gemini: [{ severity: 'P1', location: 'src/foo.ts:10', description: 'unused variable named fooBar must be removed', suggestion: 'remove it' }],
+    })
+    const second = reconcile({
+      gemini: [{ severity: 'P1', location: 'src/foo.ts:10', description: 'unused variable named fooBar must be removed', suggestion: 'remove it' }],
+      claude: [{ severity: 'P1', location: 'src/foo.ts:10', description: 'unused variable named fooBar should be removed', suggestion: 'remove it' }],
+    })
+    expect(second[0].finding_key).toBe(first[0].finding_key)
+  })
+
   it('preserves F-\\d{3} id backfill for consumers that read id', () => {
     const channelFindings: Record<string, Finding[]> = {
       claude: [{ severity: 'P1', location: 'a.ts:1', description: 'bug', suggestion: 'fix' }],
@@ -269,6 +292,28 @@ describe('evaluateGate', () => {
       severity: 'P0', location: 'f.ts:1', description: 'critical', suggestion: 'fix',
       confidence: 'high', sources: ['claude', 'gemini'], agreement: 'consensus',
     }]
+    expect(evaluateGate(findings, 'P2')).toBe(false)
+  })
+
+  it('passes when a threshold finding is acknowledged', () => {
+    const findings: ReconciledFinding[] = [{
+      severity: 'P2', location: 'f.ts:1', description: 'improvement', suggestion: 'fix',
+      confidence: 'medium', sources: ['claude'], agreement: 'unique', acknowledged: true,
+    }]
+    expect(evaluateGate(findings, 'P2')).toBe(true)
+  })
+
+  it('fails when acknowledged and unacknowledged blocking findings are mixed', () => {
+    const findings: ReconciledFinding[] = [
+      {
+        severity: 'P1', location: 'a.ts:1', description: 'acked', suggestion: 'fix',
+        confidence: 'medium', sources: ['claude'], agreement: 'unique', acknowledged: true,
+      },
+      {
+        severity: 'P2', location: 'b.ts:2', description: 'open', suggestion: 'fix',
+        confidence: 'medium', sources: ['gemini'], agreement: 'unique',
+      },
+    ]
     expect(evaluateGate(findings, 'P2')).toBe(false)
   })
 })

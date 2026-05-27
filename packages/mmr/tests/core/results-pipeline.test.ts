@@ -3,7 +3,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
 import { JobStore } from '../../src/core/job-store.js'
-import { runResultsPipeline } from '../../src/core/results-pipeline.js'
+import { isAdvisoryFinding, isBlockingFinding, runResultsPipeline } from '../../src/core/results-pipeline.js'
+import type { ReconciledFinding } from '../../src/types.js'
 
 describe('runResultsPipeline', () => {
   let tmpDir: string
@@ -270,5 +271,34 @@ describe('runResultsPipeline', () => {
     const { results } = runResultsPipeline(store, store.loadJob(job.job_id), 'json')
     expect(results.verdict).toBe('blocked')
     expect(results.advisory_count).toBe(1)
+  })
+
+  it('treats acknowledged threshold findings as visible advisory findings', () => {
+    const finding: ReconciledFinding = {
+      severity: 'P1',
+      location: 'a.ts:1',
+      description: 'acked issue',
+      suggestion: 'fix',
+      confidence: 'medium',
+      sources: ['claude'],
+      agreement: 'unique',
+      acknowledged: true,
+    }
+    expect(isBlockingFinding(finding, 'P2')).toBe(false)
+    expect(isAdvisoryFinding(finding, 'P2')).toBe(true)
+  })
+
+  it('keeps unacknowledged threshold findings blocking', () => {
+    const finding: ReconciledFinding = {
+      severity: 'P2',
+      location: 'a.ts:1',
+      description: 'open issue',
+      suggestion: 'fix',
+      confidence: 'medium',
+      sources: ['claude'],
+      agreement: 'unique',
+    }
+    expect(isBlockingFinding(finding, 'P2')).toBe(true)
+    expect(isAdvisoryFinding(finding, 'P2')).toBe(false)
   })
 })

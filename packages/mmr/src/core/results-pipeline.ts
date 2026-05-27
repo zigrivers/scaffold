@@ -9,6 +9,7 @@ import type {
   OutputFormat,
   ChannelResult,
   ReconciledResults,
+  ReconciledFinding,
   Finding,
   ChannelStatus,
 } from '../types.js'
@@ -19,6 +20,16 @@ export interface PipelineResult {
   results: ReconciledResults
   formatted: string
   exitCode: number
+}
+
+export function isBlockingFinding(finding: ReconciledFinding, threshold: Severity): boolean {
+  return finding.acknowledged !== true &&
+    SEVERITY_ORDER[finding.severity] <= SEVERITY_ORDER[threshold]
+}
+
+export function isAdvisoryFinding(finding: ReconciledFinding, threshold: Severity): boolean {
+  return finding.acknowledged === true ||
+    SEVERITY_ORDER[finding.severity] > SEVERITY_ORDER[threshold]
 }
 
 /** Maximum chars of channel-log detail to embed in the per-channel error
@@ -151,15 +162,11 @@ export function runResultsPipeline(
     : verdict === 'needs-user-decision'
       ? 'No channels completed — manual review needed'
       : (() => {
-        const blockingCount = reconciledFindings.filter(
-          (f) => SEVERITY_ORDER[f.severity] <= SEVERITY_ORDER[fixThreshold],
-        ).length
+        const blockingCount = reconciledFindings.filter((f) => isBlockingFinding(f, fixThreshold)).length
         return `Review blocked — ${blockingCount} finding(s) at or above ${fixThreshold}`
       })()
 
-  const advisoryCount = reconciledFindings.filter(
-    (f) => SEVERITY_ORDER[f.severity] > SEVERITY_ORDER[fixThreshold],
-  ).length
+  const advisoryCount = reconciledFindings.filter((f) => isAdvisoryFinding(f, fixThreshold)).length
 
   const results: ReconciledResults = {
     job_id: job.job_id,

@@ -58,6 +58,7 @@ export function reconcile(channelFindings: Record<string, Finding[]>): Reconcile
   }
 
   if (attributed.length === 0) return []
+  attributed.sort(compareAttributedFindings)
 
   // Step 2: Group by exact stable identity, then location-anchored fuzzy description match.
   const groups: ReconcileGroup[] = []
@@ -141,13 +142,17 @@ export function reconcile(channelFindings: Record<string, Finding[]>): Reconcile
       confidence,
       sources,
       agreement,
-      finding_key: group.finding_key,
-      description_shingle: [...group.shingle],
+      finding_key: representative.finding_key,
+      description_shingle: [...representative.shingle],
     })
   }
 
   // Step 4: Sort by severity (P0 first)
-  results.sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity])
+  results.sort((a, b) =>
+    SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity] ||
+    (a.finding_key ?? '').localeCompare(b.finding_key ?? '') ||
+    a.location.localeCompare(b.location),
+  )
 
   // Auto-generate finding IDs (only backfill when absent)
   results.forEach((f, i) => {
@@ -157,6 +162,14 @@ export function reconcile(channelFindings: Record<string, Finding[]>): Reconcile
   })
 
   return results
+}
+
+function compareAttributedFindings(a: AttributedFinding, b: AttributedFinding): number {
+  return a.finding_key.localeCompare(b.finding_key) ||
+    a.source.localeCompare(b.source) ||
+    a.location.localeCompare(b.location) ||
+    a.description.localeCompare(b.description) ||
+    a.suggestion.localeCompare(b.suggestion)
 }
 
 function canJoinGroup(group: ReconcileGroup, finding: AttributedFinding): boolean {
