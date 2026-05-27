@@ -92,61 +92,93 @@ case (entry exists → suppress finding) as if it required human judgment.
 ## Architecture Overview
 
 ```
-┌──────────────────────────────────────────────────────────────────────┐
-│ scaffold observe audit [--knowledge-root <path-to-knowledge-dir>]    │
-│                                                                      │
-│   ┌──────────────────────────────────────────────────────────────┐   │
-│   │ resolveKnowledgeRoot() — runs in handleAudit                 │   │
-│   │ Three-tier precedence; returns string | null:                │   │
-│   │   1. CLI --knowledge-root <p>                                │   │
-│   │        validate p exists, is a directory, and contains at    │   │
-│   │        least one .md file other than README.md → keep        │   │
-│   │        OR hard-error and exit non-zero                       │   │
-│   │   2. yaml lenses.I-knowledge-gaps.knowledge_root             │   │
-│   │        same validation; on failure, fall through (silently)  │   │
-│   │   3. findScaffoldKnowledgeRoot()                             │   │
-│   │        on failure, return null                               │   │
-└─────┴────────────────┬─────────────────────────────────────────────┴───┘
-                       │ (validated path or null)
-                       ▼
-   ┌──────────────────────────────────────────────────────────────┐
-   │ LensContext { profile, cwd, knowledgeRoot: string | null }    │
-   │  (extends the existing LensContext in                         │
-   │   src/observability/engine/checks/runner.ts:4-7)              │
-   └──────────────────────┬───────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│ scaffold observe audit [--knowledge-root <path-to-knowledge-dir>]      │
+│                                                                        │
+│   handleAudit reads the CLI flag and calls runAudit with               │
+│   RunAuditInput.knowledgeRootOverride = <flag-value-or-undefined>      │
+│                                                                        │
+│   ┌──────────────────────────────────────────────────────────────┐    │
+│   │ runAudit (src/observability/engine/api.ts)                   │    │
+│   │   - calls resolveKnowledgeRoot({ override, cwd })            │    │
+│   │   - instantiates fresh warnedKeys: Set<string>               │    │
+│   │   - passes both into runChecks                               │    │
+│   └──────────────────────┬───────────────────────────────────────┘    │
+│                          │                                              │
+│                          ▼                                              │
+│   ┌──────────────────────────────────────────────────────────────┐    │
+│   │ resolveKnowledgeRoot (in knowledge-index.ts)                 │    │
+│   │ Three-tier; returns KnowledgeRootResolution:                 │    │
+│   │   1. CLI override → validate → use, OR throw                 │    │
+│   │      KnowledgeRootCliInvalidError (handleAudit catches       │    │
+│   │      and exits non-zero)                                      │    │
+│   │   2. yaml lenses.I-knowledge-gaps.knowledge_root             │    │
+│   │      → validate → use, OR record invalid attempt + fall      │    │
+│   │      through (no stderr write)                                │    │
+│   │   3. findScaffoldKnowledgeRoot()                              │    │
+│   │      → if found, validate → use; else record not-found       │    │
+│   │ Returns { root: string|null, index: Set<string>|null,        │    │
+│   │           attempts: Attempt[] }. Validation REUSES the loader │    │
+│   │ AND requires a `<path>/VERSION` marker file (the KB SemVer   │    │
+│   │ file added in Phase 1) to distinguish the knowledge dir      │    │
+│   │ from any other dir of slug-bearing .md files.                │    │
+│   └──────────────────────┬───────────────────────────────────────┘    │
+└────────────────────────────┼──────────────────────────────────────────┘
+                             │
+                             ▼
+   ┌────────────────────────────────────────────────────────────────┐
+   │ LensContext (extends src/observability/engine/checks/runner.ts) │
+   │   profile, cwd                          (existing)               │
+   │   knowledgeRoot?:        string | null  (new, OPTIONAL)         │
+   │   knowledgeIndex?:       Set<string> | null  (new, OPTIONAL —   │
+   │                                          pre-loaded by resolver) │
+   │   knowledgeRootAttempts?: Attempt[]     (new, OPTIONAL)         │
+   │   warnedKeys?:           Set<string>    (new, OPTIONAL)         │
+   │ All four new fields default to undefined for existing test      │
+   │ literals; runChecks substitutes safe defaults before invoking   │
+   │ each lens.                                                       │
+   └──────────────────────┬─────────────────────────────────────────┘
                           │ threaded into every lens by runChecks
                           ▼
-   ┌──────────────────────────────────────────────────────────────┐
-   │ Lens I (existing aggregator) — modified                       │
-   │   - aggregate ledger signals as before                        │
-   │   - if knowledgeRoot != null, load knowledge index ONCE       │
-   │     (catch load errors; warn-once on failure; treat as null)  │
-   │   - for each bucket above either P1 or P2 threshold:          │
-   │       if index && index.has(bucket.topic): skip               │
-   │       else emit finding at the existing severity              │
-   │   - if knowledgeRoot is null AND Lens I actually ran          │
-   │     (i.e. enabled), warn-once that suppression is disabled    │
-   └──────────────────────────────────────────────────────────────┘
+   ┌────────────────────────────────────────────────────────────────┐
+   │ Lens I (existing aggregator) — modified                         │
+   │   - aggregate ledger signals as before                          │
+   │   - use context.knowledgeIndex DIRECTLY (no re-load — resolver  │
+   │     already loaded it during validation)                        │
+   │   - for each bucket at P1 (≥5×≥3) or P2 (≥3×≥2) threshold:      │
+   │       if index && index.has(bucket.topic): skip                 │
+   │       else emit finding at the existing severity                │
+   │   - if knowledgeRoot is null AND Lens I actually ran            │
+   │     (gated by enabledIds), emit ONE warning via                 │
+   │     emitOnceForAudit(warnedKeys, key, message)                  │
+   └────────────────────────────────────────────────────────────────┘
 
-           ┌──────────────────────────────────────────────────────┐
-           │ src/observability/knowledge-index.ts (new)            │
-           │                                                       │
-           │   loadKnowledgeIndex(knowledgeDir: string): Set<string>│
-           │     globs <knowledgeDir>/**/*.md, excludes README.md  │
-           │     parses YAML frontmatter, extracts `name:`         │
-           │     returns Set of slugs                              │
-           │                                                       │
-           │   findScaffoldKnowledgeRoot(): string | null          │
-           │     walks parents up from the running CLI module      │
-           │     returns the first <parent>/content/knowledge      │
-           │     for a <parent> whose package.json `name` is       │
-           │     "@zigrivers/scaffold"                             │
-           │                                                       │
-           │   emitOnceForAudit(key: string, message: string): void│
-           │     warn-once helper used by both the resolver and    │
-           │     Lens I; deduplicates by key within a single       │
-           │     audit-run process                                 │
-           └──────────────────────────────────────────────────────┘
+           ┌────────────────────────────────────────────────────────┐
+           │ src/observability/knowledge-index.ts (new)              │
+           │                                                         │
+           │   loadKnowledgeIndex(knowledgeDir): Set<string>         │
+           │     globs <knowledgeDir>/**/*.md, excludes README.md    │
+           │     parses YAML frontmatter, extracts `name:`           │
+           │     returns Set of slugs                                │
+           │                                                         │
+           │   findScaffoldKnowledgeRoot(): string | null            │
+           │     walks parents up from import.meta.url               │
+           │     returns first <parent>/content/knowledge for a      │
+           │     <parent> whose package.json `name` is               │
+           │     "@zigrivers/scaffold"                               │
+           │                                                         │
+           │   resolveKnowledgeRoot({override, cwd}):                │
+           │     KnowledgeRootResolution                             │
+           │       (3-tier; called only by runAudit)                 │
+           │                                                         │
+           │   validateKnowledgeRoot(path):                          │
+           │     { ok, index? } — exists + isDir + has VERSION       │
+           │     marker file + loader returns non-empty Set          │
+           │                                                         │
+           │   emitOnceForAudit(warnedKeys, key, message): void      │
+           │     write to stderr if !warnedKeys.has(key);             │
+           │     called ONLY from inside Lens I                      │
+           └────────────────────────────────────────────────────────┘
 ```
 
 ## Detailed Design
@@ -278,26 +310,47 @@ Matches the existing pattern of nesting per-lens config under
 #### Validation
 
 All paths (CLI, yaml, auto-detect) refer to a knowledge directory and
-are validated by the same check. The validator REUSES the loader: a
-candidate directory is valid only if `loadKnowledgeIndex(path)` returns
-a non-empty Set. A non-empty Set proves the directory actually contains
-KB-frontmatter entries (not just any `.md` files), so an operator who
-typed `--knowledge-root content/` or `--knowledge-root content/tools/`
-gets a precise failure rather than silent zero-suppression.
+are validated by the same check. The validator combines two
+complementary signals so it cannot be fooled by an enclosing or
+sibling directory:
+
+1. **VERSION marker file.** The validator requires `<path>/VERSION` to
+   exist. This is the KB SemVer file added in Phase 1 (see parent
+   design "Version the knowledge base"); it lives ONLY at
+   `content/knowledge/VERSION` and nowhere else in the repo. An
+   operator who points at `content/` or any other ancestor fails this
+   check immediately because no `content/VERSION` exists.
+2. **Loader returns non-empty Set.** Confirms the directory actually
+   contains parseable KB-frontmatter entries.
+
+The validator also returns the loaded index, so callers don't re-walk
+the tree.
 
 ```
-validateKnowledgeRoot(path) → { ok: true } | { ok: false, reason }:
-  if !path exists                           → { ok: false, reason: 'path does not exist' }
-  if !path is a directory                   → { ok: false, reason: 'path is not a directory' }
+validateKnowledgeRoot(path)
+  → { ok: true, index: Set<string> } | { ok: false, reason }:
+  if !path exists                       → { ok: false, reason: 'path does not exist' }
+  if !path is a directory               → { ok: false, reason: 'path is not a directory' }
+  if !exists(`<path>/VERSION`)          → { ok: false, reason: 'missing knowledge-base VERSION marker — path does not appear to be a scaffold knowledge directory' }
   index = try loadKnowledgeIndex(path)
-        catch e                             → { ok: false, reason: `index load failed: ${e.message}` }
-  if index.size === 0                       → { ok: false, reason: 'directory contains no knowledge entries (loader returned empty)' }
-  else                                      → { ok: true }
+        catch e                         → { ok: false, reason: `index load failed: ${e.message}` }
+  if index.size === 0                   → { ok: false, reason: 'directory contains no knowledge entries (loader returned empty)' }
+  else                                  → { ok: true, index }
 ```
 
-Reusing the loader means a path that passes validation cannot then
-fail at lens time — there is exactly one place that decides "this is a
-knowledge directory".
+Two effects of this design:
+
+- **Resolver loads the index once.** The validator returns it; the
+  resolution record carries it through `LensContext.knowledgeIndex`.
+  Lens I uses the pre-loaded index directly — no second walk.
+- **`lens-i:index-load-failed` warning is unreachable from inside the
+  lens.** Validation runs the loader and fails fast on any load error,
+  so by the time `LensContext.knowledgeRoot` is non-null the loader
+  has already succeeded. The lens code therefore does NOT include a
+  defensive try/catch around `loadKnowledgeIndex` — the index either
+  arrives in context or it does not. The `lens-i:index-load-failed`
+  warning key is reserved for future use (e.g., a hypothetical
+  refresh-during-audit path) but emits nothing today.
 
 #### Resolution architecture
 
@@ -331,6 +384,10 @@ interface RunAuditInput {
 interface KnowledgeRootResolution {
   /** Validated absolute path to a knowledge directory, or null. */
   root: string | null
+  /** Pre-loaded index of entry slugs, populated by the validator's
+   *  `loadKnowledgeIndex` call. Lens I reads this directly instead of
+   *  re-walking the tree. Null when root is null. */
+  index: Set<string> | null
   /** Audit trail of what was tried. Lens I uses this to compose a
    *  precise warn-once message when root is null but the lens
    *  actually ran. */
@@ -368,36 +425,48 @@ interface KnowledgeRootResolution {
 The resolution is placed on `RunChecksInput.knowledgeRootResolution`
 (a new optional field), which `runChecks`
 (`src/observability/engine/checks/runner.ts`) threads into
-`LensContext.knowledgeRoot` (just the `root` string-or-null) and
-`LensContext.knowledgeRootAttempts` (the audit trail). Lens I uses the
-attempts trail to format precise warnings.
+`LensContext.knowledgeRoot` (the `root` string-or-null),
+`LensContext.knowledgeIndex` (the pre-loaded Set, so Lens I doesn't
+re-walk), and `LensContext.knowledgeRootAttempts` (the audit trail
+for warning composition).
 
 ### 3. Lens I integration
 
 #### Context shape
 
 Extend the existing `LensContext` interface in
-`src/observability/engine/checks/runner.ts:4-7`:
+`src/observability/engine/checks/runner.ts:4-7`. **All four new fields
+are OPTIONAL** so existing test-side literal constructions (e.g.
+`{ profile: 'full', cwd: process.cwd() }` in
+`src/observability/checks/lens-h-cross-doc.test.ts` lines 104, 119,
+133, 158, 182, and `makeContext` in
+`src/observability/checks/lens-i-knowledge-gaps.test.ts:74-75`) keep
+compiling without modification:
 
 ```typescript
 export interface LensContext {
   profile: 'fast' | 'full'
   cwd: string
   /** Validated absolute path to a `content/knowledge/` directory whose
-   *  entry slugs (`name:` fields) should be used to suppress Lens I gap
-   *  findings whose `topic` matches. Null when no path could be
-   *  resolved. Lens I is the only current consumer; other lenses
-   *  ignore this field. */
-  knowledgeRoot: string | null
+   *  entry slugs are used to suppress Lens I findings whose `topic`
+   *  matches. Optional; undefined when no path was resolved or when
+   *  a legacy caller bypassed `runAudit` and didn't supply one.
+   *  Treated as `null` by Lens I (no suppression). */
+  knowledgeRoot?: string | null
+  /** Pre-loaded index Set, populated by the resolver during validation.
+   *  Lens I reads this directly — does NOT call `loadKnowledgeIndex`
+   *  itself. Undefined for legacy callers. */
+  knowledgeIndex?: Set<string> | null
   /** Audit trail of which knowledge-root tiers were tried during
    *  resolution. Lens I uses this to compose a precise warn-once
-   *  message when `knowledgeRoot` is null. Always present (possibly
-   *  empty if no resolution was attempted, e.g. legacy callers). */
-  knowledgeRootAttempts: KnowledgeRootResolution['attempts']
+   *  message when `knowledgeRoot` is null. Defaults to an empty
+   *  array when undefined. */
+  knowledgeRootAttempts?: KnowledgeRootResolution['attempts']
   /** Per-audit-run Set passed to `emitOnceForAudit` for deduplicating
    *  warnings. Fresh Set instantiated by `runAudit` for each
-   *  invocation; never shared across audits in the same process. */
-  warnedKeys: Set<string>
+   *  invocation; never shared across audits in the same process.
+   *  Defaults to a fresh empty Set when undefined. */
+  warnedKeys?: Set<string>
 }
 ```
 
@@ -405,8 +474,17 @@ export interface LensContext {
 KnowledgeRootResolution` field and a `warnedKeys?: Set<string>` field
 (both optional for backward compatibility with existing test callers).
 The constructor at line 77 propagates them into `LensContext`,
-defaulting `knowledgeRootResolution` to `{ root: null, attempts: [] }`
-and `warnedKeys` to a fresh empty `Set`.
+defaulting `knowledgeRootResolution` to
+`{ root: null, index: null, attempts: [] }` and `warnedKeys` to a
+fresh empty `Set`.
+
+**Test migration plan.** The existing test sites that construct
+`LensContext` literals do NOT need to be updated, because all four
+new fields are optional and Lens I treats `undefined` exactly like
+"no knowledge-root resolved". New tests that exercise the
+suppression / warning paths supply the relevant fields explicitly
+(`{ ...existing, knowledgeRoot, knowledgeIndex, warnedKeys: new Set() }`).
+The Test Surface section calls out the specific new fixtures.
 
 `runAudit` (`src/observability/engine/api.ts:85`) calls
 `resolveKnowledgeRoot({ override: input.knowledgeRootOverride, cwd:
@@ -441,31 +519,34 @@ New behavior:
 ```
 buckets = aggregate(signals, window=90d)
 
-# Load the index ONCE per invocation. Soft-fail on any error.
-# `emitOnceForAudit` here takes context.warnedKeys as its first arg.
-index = null
-if context.knowledgeRoot:
-  try:
-    index = loadKnowledgeIndex(context.knowledgeRoot)
-  catch err:
-    emitOnceForAudit(
-      context.warnedKeys,
-      'lens-i:index-load-failed',
-      `[Lens I] knowledge index could not be loaded from '${context.knowledgeRoot}': ${err.message}; existing-entry suppression disabled.`
-    )
-else:
-  # Lens I IS enabled (it's running). Compose a precise warning using
-  # the attempts trail so the operator knows whether their yaml was
-  # tried-and-failed or never existed.
-  yamlAttempt = context.knowledgeRootAttempts.find(a => a.source === 'yaml')
+# The index was already loaded by the resolver during validation and
+# arrives in context. The lens does NOT call loadKnowledgeIndex itself
+# — by design, all I/O on the knowledge tree happens once, in the
+# resolver, so a stale or unreadable tree cannot fail Lens I mid-run
+# after passing validation.
+index = context.knowledgeIndex   # Set<string> | null | undefined
+
+# If the lens is running but no root was resolved, emit one warning
+# composed from the attempts trail. The yaml-was-invalid case appends
+# context so the operator can fix the failing config without re-deriving
+# it. All interpolated path/reason strings go through formatForStderr()
+# (a small helper that escapes embedded quotes and newlines) so a
+# pathological path can't produce ragged stderr output.
+if !context.knowledgeRoot:
+  yamlAttempt = (context.knowledgeRootAttempts ?? []).find(a => a.source === 'yaml')
+  yamlNote = ''
   if yamlAttempt && yamlAttempt.outcome === 'invalid':
-    yamlNote = ` (yaml lenses.I-knowledge-gaps.knowledge_root '${yamlAttempt.path}' was invalid: ${yamlAttempt.reason})`
-  else:
-    yamlNote = ''
+    yamlNote =
+      ' — yaml lenses.I-knowledge-gaps.knowledge_root '
+      + formatForStderr(yamlAttempt.path)
+      + ' was invalid: '
+      + formatForStderr(yamlAttempt.reason)
   emitOnceForAudit(
-    context.warnedKeys,
+    context.warnedKeys ?? new Set(),
     'lens-i:no-root',
-    `[Lens I] knowledge-root not located; existing-entry suppression disabled${yamlNote}. Pass --knowledge-root or set lenses.I-knowledge-gaps.knowledge_root in .scaffold/observability.yaml.`
+    '[Lens I] knowledge-root not located; existing-entry suppression disabled'
+      + yamlNote
+      + '. Pass --knowledge-root or set lenses.I-knowledge-gaps.knowledge_root in .scaffold/observability.yaml.'
   )
 
 for bucket in buckets:
@@ -483,8 +564,32 @@ Three guarantees this preserves from the current implementation:
    findings at either severity.
 2. A null `knowledgeRoot` produces zero behavior change from
    `origin/main` (other than the one-line warning).
-3. A `loadKnowledgeIndex` exception does NOT crash the lens or the
-   audit; it produces a warn-once and falls through to "no suppression".
+3. The lens does no synchronous I/O on the knowledge tree. The
+   resolver did it once during validation; the lens reads the
+   pre-loaded index from context. This guarantees the lens cannot
+   crash on a tree that became unreadable between resolution and
+   lens-time.
+
+**`formatForStderr` helper** (in `knowledge-index.ts`):
+
+```typescript
+/** Make a value safe to interpolate into a one-line stderr message.
+ *  Wraps in single quotes; escapes embedded single quotes; replaces
+ *  newlines/control chars with the literal character "?" so multiline
+ *  paths/reasons don't break the line. Returns "'<missing>'" for
+ *  undefined or empty inputs. */
+function formatForStderr(value: string | undefined): string {
+  if (value === undefined || value === '') return "'<missing>'"
+  return "'" + value
+    .replace(/'/g, "\\'")
+    .replace(/[\r\n\t\x00-\x1f]/g, '?')
+    + "'"
+}
+```
+
+The helper exists to keep operator-visible output legible when an
+attacker-controlled or just-messy path/reason value appears in the
+attempts trail.
 
 #### Warning policy
 
@@ -495,20 +600,23 @@ pollute JSON output of
 
 | Trigger | Key | Message |
 |---|---|---|
-| Lens I enabled, `context.knowledgeRoot` is null | `lens-i:no-root` | `[Lens I] knowledge-root not located; existing-entry suppression disabled[ (yaml ... was invalid: <reason>)]. Pass --knowledge-root or set lenses.I-knowledge-gaps.knowledge_root in .scaffold/observability.yaml.` |
-| Lens I enabled, `context.knowledgeRoot` is set, but `loadKnowledgeIndex` throws | `lens-i:index-load-failed` | `[Lens I] knowledge index could not be loaded from '<path>': <reason>; existing-entry suppression disabled.` |
+| Lens I enabled, `context.knowledgeRoot` is null | `lens-i:no-root` | `[Lens I] knowledge-root not located; existing-entry suppression disabled[ — yaml lenses.I-knowledge-gaps.knowledge_root '<escaped-path>' was invalid: '<escaped-reason>']. Pass --knowledge-root or set lenses.I-knowledge-gaps.knowledge_root in .scaffold/observability.yaml.` |
+| reserved (see Validation) | `lens-i:index-load-failed` | not emitted today; the validator forecloses this path. Reserved for a future refresh-during-audit feature. |
 | Lens I DISABLED (not in `enabledIds` per the runChecks filter) | (none) | No warning — Lens I never ran, suppression has no meaning. |
 
 `resolveKnowledgeRoot` (the helper inside `runAudit`) never writes to
-stderr. It only produces the resolution record (root + attempts).
+stderr. It only produces the resolution record (root + index + attempts).
 Lens I composes the warning from that record — and only if the lens
 actually ran. This solves the "Lens I disabled, spurious warning"
 problem.
 
-The `lens-i:no-root` message conditionally includes "(yaml ... was
-invalid: <reason>)" when the attempts trail shows a yaml entry was
+The `lens-i:no-root` message conditionally appends "yaml ... was
+invalid: <reason>" when the attempts trail shows a yaml entry was
 tried and rejected, so the operator sees which input failed without
-having to re-derive it from configuration.
+having to re-derive it from configuration. Path and reason fragments
+pass through `formatForStderr` (a small helper in `knowledge-index.ts`)
+that wraps the value in single quotes and replaces newlines / control
+chars with `?`, so a pathological value can't produce ragged stderr.
 
 ### 4. CLI/operator surface updates
 
@@ -599,3 +707,7 @@ having to re-derive it from configuration.
 | 12 | Per-file `console.warn` for malformed entries in the loader | No | Matches the assembly loader's silent-skip behavior. The freshness validator already surfaces malformed entries; duplicating output would either leak into JSON or confuse operators about which subsystem flagged the issue. |
 | 13 | Where the 3-tier resolution lives (handler vs `runAudit`) | Inside `runAudit` via a `resolveKnowledgeRoot` helper, NOT inside `handleAudit` | Every `runAudit` caller benefits — CLI, `phase-audit.ts`, `fix-flow.ts` (verifier + postfix), MMR doc-conformance channel — without each having to re-implement yaml + auto-detect. The CLI flag becomes `RunAuditInput.knowledgeRootOverride`; internal callers leave it undefined and get yaml + auto-detect automatically. |
 | 14 | Validator slug-rule alignment with the loader | Index loader accepts any non-empty trimmed `name:` (matches `extractKBFrontmatter`); validator-style slug regex stays in `knowledge-frontmatter-validator.ts` only | Round-2 spec earlier claimed both functions enforced the slug regex; that was wrong (the regex lives only in the validator). Keeping the index loader permissive matches the assembly engine and prevents drift between which entries the assembly engine sees vs which the suppression logic sees. |
+| 15 | Validator strictness for "is this actually a knowledge directory?" | Require `<path>/VERSION` marker file (the KB SemVer file from Phase 1) in addition to a non-empty loader result | Round-3 review caught that `loadKnowledgeIndex(path).size > 0` alone passes for any ancestor of the knowledge dir, because the recursive walk finds the nested KB files (and would also accept `content/tools/`, `content/pipeline/`, etc., which have their own `name:` frontmatter). The VERSION marker exists only at `content/knowledge/VERSION` and nowhere else in the repo, so requiring it precisely identifies the knowledge dir. |
+| 16 | Where the index is loaded (resolver vs lens) | Resolver loads it during validation and returns the Set in `KnowledgeRootResolution.index`; Lens I uses the pre-loaded index without re-walking | Eliminates a redundant filesystem walk and removes the dead `lens-i:index-load-failed` code path (the resolver already failed if loading would fail). Single source of I/O on the knowledge tree per audit run. |
+| 17 | LensContext field optionality + test migration | The four new fields (`knowledgeRoot`, `knowledgeIndex`, `knowledgeRootAttempts`, `warnedKeys`) are all OPTIONAL on `LensContext`; existing test literals at `lens-h-cross-doc.test.ts` and `lens-i-knowledge-gaps.test.ts` keep compiling without changes | Tests that bypass `runChecks` and construct `LensContext` literals to call lens functions directly would otherwise fail TypeScript after the interface change. Optional fields + lens treating `undefined === null` for behavior makes the migration zero-cost. |
+| 18 | Operator-visible warning string hygiene | All interpolated path/reason fragments pass through `formatForStderr()` (wraps in single quotes, escapes embedded quotes, replaces newlines/control chars with `?`) | A path or reason containing unbalanced quotes or newlines would otherwise produce ragged or multiline stderr output that's hard to parse in CI logs and audit sidecars. |
