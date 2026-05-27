@@ -93,7 +93,7 @@ describe('SessionStore', () => {
   })
 
   it('recovers stale session locks', () => {
-    const staleLock = path.join(tmpHome, '.mmr', 'sessions', 'feat-foo.json.lock')
+    const staleLock = path.join(tmpHome, '.mmr', 'sessions', 'feat-foo.session-lock.lock')
     fs.mkdirSync(staleLock, { recursive: true })
     const staleTime = new Date(Date.now() - 10_000)
     fs.utimesSync(staleLock, staleTime, staleTime)
