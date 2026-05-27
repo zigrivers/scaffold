@@ -54,13 +54,6 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
-      - name: Install Claude CLI (audit subprocess hardcodes `claude -p`)
-        # F-002 round-4: the audit subprocess invokes `claude -p` via the
-        # LLM dispatcher. GitHub-hosted runners don't ship the Claude CLI,
-        # so without this step every candidate audit would fail with
-        # "command not found" and the cron would silently open zero PRs.
-        run: npm install -g @anthropic-ai/claude-code
-
       - name: Build CLI
         run: npm run build
 
@@ -75,10 +68,25 @@ jobs:
 
       - name: Run audits and open PRs
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # The cron uses the DeepSeek HTTP provider instead of `claude -p`.
+          # See docs/knowledge-freshness/operations.md §4 "Choosing a
+          # provider" for the precedence rules. The operator must set
+          # DEEPSEEK_API_KEY as a repository secret before the first run.
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          KNOWLEDGE_FRESHNESS_PROVIDER: deepseek
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          # Preflight: surface a missing DEEPSEEK_API_KEY immediately instead
+          # of letting every per-candidate dispatch fail in the per-entry
+          # try/catch — that path exits 0 with zero PRs opened, the same
+          # silent failure mode this provider switch is meant to eliminate
+          # (PR #393 MMR F-001).
+          if [ -z "${DEEPSEEK_API_KEY:-}" ]; then
+            echo "::error::DEEPSEEK_API_KEY repository secret is required for the deepseek provider."
+            echo "Run \`gh secret set DEEPSEEK_API_KEY\` and re-trigger the workflow."
+            exit 1
+          fi
           # jq -c streams one candidate per line so the bash loop is simple.
           # Empty array case: the loop body just never runs.
           jq -c '.[]' /tmp/candidates.json | while read -r candidate; do

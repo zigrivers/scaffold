@@ -16,8 +16,11 @@ a refresh loop, agents read stale knowledge. The freshness system:
 1. Tracks each entry's `volatility`, `last-reviewed`, `sources`, `version-pin`.
 2. Daily cron pre-filters entries whose cadence window has elapsed or whose
    source content hash has drifted.
-3. For each candidate (max 10/day), runs a grounded LLM audit (`claude -p`) that
-   fetches the sources via WebFetch and emits a structured verdict.
+3. For each candidate (max 10/day), runs a grounded LLM audit via the selected
+   provider (DeepSeek HTTP in CI by default, `claude -p` locally; see §4
+   "Choosing a provider"). The audit dispatcher pre-fetches source bodies in
+   Node and passes them into the prompt — the model itself has no tools
+   available — and emits a structured verdict.
 4. If the verdict is `major-drift` or `superseded`, opens a PR with the rewrite.
 5. PR gates enforce link health, anti-over-rewrite, Deep-Guidance preservation,
    and frontmatter validity. Humans merge.
@@ -42,7 +45,11 @@ a refresh loop, agents read stale knowledge. The freshness system:
    │ 2. Grounded audit (per entry, max 10/day)                         │
    │   `scaffold knowledge-freshness audit-run-entry <path>`           │
    │   tool meta-prompt: content/tools/knowledge-audit-entry.md        │
-   │   dispatched via the LLM dispatcher (`claude -p`)                 │
+   │   dispatched via the selected provider:                           │
+   │     - DeepSeek HTTP (cron default, requires DEEPSEEK_API_KEY)     │
+   │     - `claude -p` (local default, requires Claude Code on PATH)   │
+   │   - source bodies are pre-fetched in Node and embedded in the     │
+   │     prompt; the model runs with no tools                          │
    │   - explicit instruction: "trust the retrieved source over priors"│
    │   - emits structured verdict JSON                                 │
    └────────────────────┬──────────────────────────────────────────────┘
@@ -159,6 +166,55 @@ For each cron-opened PR, verify before merging:
 
 ## 4. Running an audit manually (locally)
 
+### Choosing a provider
+
+Two LLM providers are supported for the per-entry audit dispatch:
+
+- **anthropic** (default for local) — invokes `claude -p` as a subprocess.
+  Requires the Claude Code CLI on `$PATH`. Auth via Claude Code's
+  keychain integration (run `claude /login` once) OR via
+  `ANTHROPIC_API_KEY` env var — but in both cases the CLI must be
+  installed; the env var alone is not sufficient.
+- **deepseek** (default for the cron) — HTTPS POST to
+  `api.deepseek.com/chat/completions`. Auth via `DEEPSEEK_API_KEY`
+  env var. Requires no CLI install.
+
+Provider selection (highest precedence first):
+
+1. `--provider <anthropic|deepseek>` flag on `audit-run-entry`
+2. `KNOWLEDGE_FRESHNESS_PROVIDER` env var
+3. Inferred from which API key is set
+4. **Error** if both keys are set without an explicit choice
+5. Falls back to `anthropic` when `claude` is on `$PATH` (local dev case)
+6. **Error** if nothing is configured
+
+For a local one-off DeepSeek run:
+
+```bash
+DEEPSEEK_API_KEY=sk-... node dist/index.js knowledge-freshness audit-run-entry \
+  content/knowledge/core/<entry>.md
+```
+
+For a local Anthropic run when both keys happen to be set:
+
+```bash
+node dist/index.js knowledge-freshness audit-run-entry \
+  content/knowledge/core/<entry>.md \
+  --provider anthropic
+```
+
+For the cron: the secret + env block are configured in
+`.github/workflows/knowledge-freshness-audit.yml`. Set the secret
+once with `gh secret set DEEPSEEK_API_KEY`.
+
+#### DeepSeek model override
+
+The default DeepSeek model is `deepseek-v4-flash`. To use `deepseek-v4-pro`
+instead (slower, more expensive, more thorough chain-of-thought), set
+`KNOWLEDGE_FRESHNESS_DEEPSEEK_MODEL=deepseek-v4-pro` in the
+workflow env block (or your shell). Only the two allowlisted values
+are accepted — the dispatcher rejects any other model name at startup.
+
 The CLI mirrors what the cron does. Build first: `npm run build`.
 
 ```bash
@@ -183,12 +239,23 @@ node dist/index.js knowledge-freshness audit-apply \
 
 ### Auth caveat
 
-The audit subprocess uses `claude -p` (per `src/observability/engine/llm-dispatcher.ts`).
-Locally this picks up your `claude` CLI's keychain auth — no env var needed.
-In CI the workflow sets `ANTHROPIC_API_KEY` from the repo secret of the same
-name; the subprocess then uses that. If you want to run the audit locally with
-an API key (e.g. against a different account), export `ANTHROPIC_API_KEY` and
-the `claude` CLI will prefer it.
+Each provider has its own auth path:
+
+- **anthropic** (default for local): the audit subprocess invokes
+  `claude -p`, so Claude Code must be on `$PATH`. Locally it uses the
+  keychain auth from `claude /login` — no env var needed. If you set
+  `ANTHROPIC_API_KEY` alongside the CLI, `claude` prefers it (useful
+  for running against a different account). The env var alone is NOT
+  sufficient — the CLI must exist regardless; resolveProvider rejects
+  this combination at startup so you find out before the first audit.
+- **deepseek** (default for cron): the audit makes a direct HTTPS
+  POST to `api.deepseek.com`. Requires `DEEPSEEK_API_KEY` in env;
+  no CLI install needed.
+
+The cron workflow sets `DEEPSEEK_API_KEY` from the repo secret and
+`KNOWLEDGE_FRESHNESS_PROVIDER=deepseek` to pin the choice. Set the
+secret once with `gh secret set DEEPSEEK_API_KEY` before the first
+scheduled run.
 
 `--open-pr` requires `gh auth login` to have run (and `gh` to be on PATH).
 
@@ -277,7 +344,12 @@ and surface to the user when a blocking finding's hash hits 3 attempts.
 
 | Symptom | Diagnosis | Fix |
 |---|---|---|
-| `audit subprocess failed: exit 1` | Missing `ANTHROPIC_API_KEY` (CI) or `claude` CLI not on PATH (local). | Set the secret / install `claude` CLI. |
+| `audit subprocess failed: exit 1` | (anthropic only) `claude` CLI not on PATH, or `ANTHROPIC_API_KEY` invalid. | Install Claude Code and run `claude /login`, or switch to the deepseek provider via `DEEPSEEK_API_KEY` + `KNOWLEDGE_FRESHNESS_PROVIDER=deepseek`. The cron now uses deepseek by default — see § 4 "Choosing a provider". |
+| `Error: provider selection ambiguous` | Both `ANTHROPIC_API_KEY` and `DEEPSEEK_API_KEY` are set without an explicit choice via `--provider` or `KNOWLEDGE_FRESHNESS_PROVIDER`. | Pass `--provider anthropic` or `--provider deepseek`, or set `KNOWLEDGE_FRESHNESS_PROVIDER` in env. |
+| `Error: no provider configured` | Neither API key is set, and `claude` is not on `$PATH`. | Install Claude Code locally (`brew install anthropic/claude-code/claude-code` then `claude /login`) for anthropic, or set `DEEPSEEK_API_KEY` for deepseek. |
+| ``Error: anthropic provider selected but the `claude` CLI is not on PATH`` | The anthropic dispatcher shells out to `claude -p`; the CLI must exist regardless of how the provider was chosen (`--provider anthropic`, `KNOWLEDGE_FRESHNESS_PROVIDER=anthropic`, or `ANTHROPIC_API_KEY` inference). The env var alone is not sufficient. | Install Claude Code (`brew install anthropic/claude-code/claude-code` or `npm install -g @anthropic-ai/claude-code`), OR switch to the deepseek provider. |
+| `Error: unsupported DeepSeek model "..."` | `KNOWLEDGE_FRESHNESS_DEEPSEEK_MODEL` was set to a value outside the hardcoded allowlist. | Set it to `deepseek-v4-flash` or `deepseek-v4-pro`, or unset it for the default. |
+| `Error: deepseek dispatcher: HTTP 4xx/5xx` | DeepSeek API rejected the request (auth failure, rate limit, server-side error). | Check the secret value, the DeepSeek service status, and your account's rate limits. The cron isolates per-entry failures and retries the entry the next day. |
 | `fetch failed` for a source URL | Source is down OR the SSRF guard rejected it. | Hit the URL with `curl -I`; if guard-blocked, see next row. |
 | `DNS-rebinding guard: <host> resolves to blocked IP` | Source URL resolves to a private/loopback/link-local IP — usually a typo in the hostname, occasionally a misbehaving CDN. | Double-check the hostname; if legitimate, file an issue (the guard does not have an exception list by design). |
 | `verdict.sources_checked is missing entry source` | The audit subprocess dropped a source mid-run (timeout, parse error). | Re-run `audit-run-entry`. If persistent, increase `--timeout` (default 600s). |
