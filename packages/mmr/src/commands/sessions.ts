@@ -3,6 +3,7 @@ import path from 'node:path'
 
 const SESSION_ID_RE = /^[a-zA-Z0-9_-]+$/
 const WINDOWS_RESERVED_ID_RE = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i
+const SYSTEM_SESSION_ID_RE = /^(index|__proto__)$/i
 const LOCK_TIMEOUT_MS = 5000
 const LOCK_POLL_MS = 25
 
@@ -23,13 +24,13 @@ export class SessionStore {
   }
 
   private validateId(id: string): void {
-    if (!SESSION_ID_RE.test(id) || WINDOWS_RESERVED_ID_RE.test(id)) {
+    if (!this.isValidId(id)) {
       throw new Error(`Invalid session id: ${id} - must match ^[a-zA-Z0-9_-]+$`)
     }
   }
 
   private isValidId(id: string): boolean {
-    return SESSION_ID_RE.test(id) && !WINDOWS_RESERVED_ID_RE.test(id)
+    return SESSION_ID_RE.test(id) && !WINDOWS_RESERVED_ID_RE.test(id) && !SYSTEM_SESSION_ID_RE.test(id)
   }
 
   private filePath(id: string): string {

@@ -31,6 +31,8 @@ describe('SessionStore', () => {
     expect(() => store.start('has.dots')).toThrow(/invalid session id/i)
     expect(() => store.start('CON')).toThrow(/invalid session id/i)
     expect(() => store.start('com1')).toThrow(/invalid session id/i)
+    expect(() => store.start('index')).toThrow(/invalid session id/i)
+    expect(() => store.start('__proto__')).toThrow(/invalid session id/i)
   })
 
   it('start() refuses to overwrite an existing session', () => {
