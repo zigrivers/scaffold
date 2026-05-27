@@ -4,7 +4,6 @@ import {
   computeFindingKey,
   descriptionShingle,
   jaccardSimilarity,
-  normalizeDescriptionForKey,
   normalizeLocationForKey,
   normalizeSuggestionForKey,
   shingleSize,
@@ -15,7 +14,6 @@ interface AttributedFinding extends Finding {
   finding_key: string
   normalized_location: string
   normalized_category: string
-  normalized_description: string
   normalized_suggestion: string
   shingle: ReadonlySet<string>
 }
@@ -24,7 +22,6 @@ interface ReconcileGroup {
   finding_key: string
   normalized_location: string
   normalized_category: string
-  normalized_description: string
   normalized_suggestion: string
   shingle: ReadonlySet<string>
   findings: AttributedFinding[]
@@ -48,14 +45,12 @@ export function reconcile(channelFindings: Record<string, Finding[]>): Reconcile
   const attributed: AttributedFinding[] = []
   for (const [source, findings] of Object.entries(channelFindings)) {
     for (const finding of findings) {
-      const normalized_description = normalizeDescriptionForKey(finding.description)
       attributed.push({
         ...finding,
         source,
         finding_key: computeFindingKey(finding),
         normalized_location: normalizeLocationForKey(finding.location),
         normalized_category: (finding.category ?? '').toLowerCase(),
-        normalized_description,
         normalized_suggestion: normalizeSuggestionForKey(finding.suggestion),
         shingle: new Set(descriptionShingle(finding.description)),
       })
@@ -97,7 +92,6 @@ export function reconcile(channelFindings: Record<string, Finding[]>): Reconcile
       finding_key: finding.finding_key,
       normalized_location: finding.normalized_location,
       normalized_category: finding.normalized_category,
-      normalized_description: finding.normalized_description,
       normalized_suggestion: finding.normalized_suggestion,
       shingle: finding.shingle,
       findings: [finding],
@@ -196,7 +190,7 @@ function canFuzzyJoinGroup(group: ReconcileGroup, finding: AttributedFinding): b
 }
 
 function bestJoinableGroup(groups: ReconcileGroup[], finding: AttributedFinding): ReconcileGroup | undefined {
-  const eligible = groups.sort((a, b) => compareGroupsForFinding(a, b, finding))
+  const eligible = [...groups].sort((a, b) => compareGroupsForFinding(a, b, finding))
   return eligible.find((group) =>
     group.findings.some((existing) => existing.location === finding.location),
   ) ?? eligible[0]
