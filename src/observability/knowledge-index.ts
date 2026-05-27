@@ -38,7 +38,15 @@ function extractName(content: string): string | null {
   return trimmed.length > 0 ? trimmed : null
 }
 
-function walkMarkdown(dir: string, out: string[]): void {
+function walkMarkdown(dir: string, out: string[], visited: Set<string>): void {
+  // Resolve the directory's realpath up-front so a symlink cycle
+  // (`ln -s . loop` inside the KB) can't drive infinite recursion. If
+  // realpath fails (broken symlink, permission denied), skip the entry.
+  let realDir: string
+  try { realDir = fs.realpathSync(dir) } catch { return }
+  if (visited.has(realDir)) return
+  visited.add(realDir)
+
   let entries: fs.Dirent[]
   try {
     entries = fs.readdirSync(dir, { withFileTypes: true })
@@ -53,7 +61,7 @@ function walkMarkdown(dir: string, out: string[]): void {
     // "followed normally"; without this we'd quietly drop symlink trees.
     let stat: fs.Stats
     try { stat = fs.statSync(full) } catch { continue }
-    if (stat.isDirectory()) walkMarkdown(full, out)
+    if (stat.isDirectory()) walkMarkdown(full, out, visited)
     else if (stat.isFile() && entry.name.endsWith('.md') && entry.name !== 'README.md') {
       out.push(full)
     }
@@ -85,7 +93,7 @@ export function loadKnowledgeIndex(knowledgeDir: string): Set<string> {
     throw new Error(`knowledge directory is not a directory: ${knowledgeDir}`)
   }
   const files: string[] = []
-  walkMarkdown(knowledgeDir, files)
+  walkMarkdown(knowledgeDir, files, new Set<string>())
   const out = new Set<string>()
   for (const file of files) {
     let content: string

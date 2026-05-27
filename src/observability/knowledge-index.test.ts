@@ -101,6 +101,21 @@ describe('loadKnowledgeIndex', () => {
     const dir = makeKbDir({ 'oops.md': '---\nname: x\n---\n' })
     expect(() => loadKnowledgeIndex(path.join(dir, 'oops.md'))).toThrow()
   })
+
+  it('does not infinite-recurse on symlink cycles', () => {
+    // Construct a cycle: dir/sub -> .. (cycle back to parent's parent)
+    const dir = makeKbDir({
+      'core/alpha.md': '---\nname: alpha\n---\n',
+    })
+    // Add a symlink that points back inside dir → cycle. If walkMarkdown
+    // doesn't track visited realpaths, this throws RangeError (stack
+    // overflow). After the round-2 fix it should complete and return
+    // the one real file's slug.
+    try { fs.symlinkSync(dir, path.join(dir, 'loop')) }
+    catch { return /* skip on platforms without symlink permission */ }
+    expect(() => loadKnowledgeIndex(dir)).not.toThrow()
+    expect(loadKnowledgeIndex(dir)).toEqual(new Set(['alpha']))
+  })
 })
 
 describe('formatForStderr', () => {
