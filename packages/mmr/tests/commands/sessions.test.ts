@@ -95,4 +95,13 @@ describe('SessionStore', () => {
     fs.writeFileSync(path.join(tmpHome, '.mmr', 'sessions', 'feat-foo.json'), '{')
     expect(store.list().map((s) => s.session_id)).toEqual(['feat-foo'])
   })
+
+  it('does not overwrite a corrupt session index', () => {
+    const indexPath = path.join(tmpHome, '.mmr', 'sessions', 'index.json')
+    fs.mkdirSync(path.dirname(indexPath), { recursive: true })
+    fs.writeFileSync(indexPath, '{')
+
+    expect(() => store.addJob('feat-foo', 'mmr-abc123', 1)).toThrow(SyntaxError)
+    expect(fs.readFileSync(indexPath, 'utf-8')).toBe('{')
+  })
 })

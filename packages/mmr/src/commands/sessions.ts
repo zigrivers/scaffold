@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 
@@ -57,10 +58,9 @@ export class SessionStore {
   }
 
   private waitForLockRetry(): void {
-    const end = Date.now() + LOCK_POLL_MS
-    while (Date.now() < end) {
-      // Synchronous CLI path: keep the critical section small and avoid timers.
-    }
+    execFileSync(process.execPath, ['-e', `setTimeout(() => {}, ${LOCK_POLL_MS})`], {
+      stdio: 'ignore',
+    })
   }
 
   private withLock<T>(filePath: string, fn: () => T): T {
@@ -94,13 +94,13 @@ export class SessionStore {
   }
 
   private readIndex(): Record<string, SessionRecord> {
-    if (!fs.existsSync(this.indexPath)) return {}
     try {
       const parsed = JSON.parse(fs.readFileSync(this.indexPath, 'utf-8')) as unknown
       if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
       return parsed as Record<string, SessionRecord>
-    } catch {
-      return {}
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return {}
+      throw err
     }
   }
 
@@ -119,9 +119,9 @@ export class SessionStore {
     const fp = this.filePath(id)
     this.withLock(fp, () => {
       this.writeJsonAtomic(fp, record)
-    })
-    this.updateIndex((index) => {
-      index[id] = record
+      this.updateIndex((index) => {
+        index[id] = record
+      })
     })
     return record
   }
@@ -143,10 +143,10 @@ export class SessionStore {
     this.validateId(id)
     const fp = this.filePath(id)
     this.withLock(fp, () => {
-      if (fs.existsSync(fp)) fs.unlinkSync(fp)
-    })
-    this.updateIndex((index) => {
-      delete index[id]
+      fs.rmSync(fp, { force: true })
+      this.updateIndex((index) => {
+        delete index[id]
+      })
     })
   }
 
@@ -160,12 +160,12 @@ export class SessionStore {
       existing.rounds = Math.max(existing.rounds, round)
       this.writeJsonAtomic(fp, existing)
       updated = existing
+      if (updated) {
+        const record = updated
+        this.updateIndex((index) => {
+          index[id] = record
+        })
+      }
     })
-    if (updated) {
-      const record = updated
-      this.updateIndex((index) => {
-        index[id] = record
-      })
-    }
   }
 }
