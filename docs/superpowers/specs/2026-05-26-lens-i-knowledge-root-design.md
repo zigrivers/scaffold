@@ -220,8 +220,11 @@ imports nothing directly — it only reads the CLI flag and passes it to
   `lens-i-knowledge-gaps.ts` and means a future security/perf change
   to the project's yaml reader can't accidentally regress the
   knowledge index.
-- Excludes any file named `README.md` (matches the assembly loader at
-  `src/core/assembly/knowledge-loader.ts:138-139, :186-187`).
+- Excludes any file named `README.md` (matches the assembly loader's
+  exclusion behavior — see the `entry.name === 'README.md'` guards in
+  the `walkDir` and `buildIndex` paths of
+  `src/core/assembly/knowledge-loader.ts`; the specific line numbers
+  drift over time and aren't pinned here).
 - For each remaining file, reads the YAML frontmatter and extracts the
   `name:` field. Same parser style as `extractKBFrontmatter` in
   `src/core/assembly/knowledge-loader.ts` — but only `name:` is needed
@@ -742,8 +745,11 @@ chars with `?`, so a pathological value can't produce ragged stderr.
   tree. Cheap (~270 file headers parsed).
 - **Operator-provided contracts are sharp.** A `--knowledge-root` flag
   the operator typed must point at a valid knowledge directory; we
-  hard-error on it (path doesn't exist, isn't a directory, or contains
-  no entries). Auto-detect and yaml are softer.
+  hard-error on it (path doesn't exist, isn't a directory, or fails
+  validation — e.g. missing VERSION marker). An empty knowledge tree
+  with a VERSION file is NOT a failure; it's a legitimate just-
+  initialized state and the lens correctly treats an empty index as
+  "nothing to suppress". Auto-detect and yaml are softer.
 - **Warn at most once per audit run, from one place.** All three
   warning paths route through a single `emitOnceForAudit` helper, keyed
   by the failure mode, with the warning emitted from inside the lens
@@ -802,7 +808,7 @@ chars with `?`, so a pathological value can't produce ragged stderr.
 | Index drifts during a long audit run | Single-shot load at audit start. If a maintainer adds an entry mid-audit, the next run picks it up — within tolerance for a 90-day signal window. |
 | `name:` slug differs from filename basename | Loader trusts `name:` (matches assembly engine), not basename. |
 | Operator pins yaml `knowledge_root` to a stale path | Soft-fail to auto-detect; if auto-detect ALSO misses, the warning surfaces the failure and Lens I runs without suppression. |
-| Operator passes `--knowledge-root` to a parent dir (e.g. install root) by mistake | Validator's "contains at least one .md other than README.md" check fails fast with a precise error message. |
+| Operator passes `--knowledge-root` to a parent dir (e.g. install root) by mistake | Validator's VERSION-marker check (plus directory-exists + loader success) fails fast with a precise "missing knowledge-base VERSION marker" message. The loader is still exercised so I/O errors surface at resolver-time, but emptiness alone is not a failure. |
 | Scaffold installed via a wrapper that hides the package root from `import.meta.url` | `--knowledge-root` flag and yaml config are the escape hatches. Tests cover the `null`-returning case. |
 | Two installs side-by-side (e.g. dev worktree + Homebrew install) and auto-detect picks the older one | Walk picks the *nearest* parent matching the install signature. From a downstream cwd this is reliably the install whose CLI is actually running (its `import.meta.url` is rooted in that install). |
 | `package.json#files` field in a future release accidentally drops `content/` | Auto-detect silently fails; documented in the release-checklist note (see §4) as a release-time check. |
