@@ -72,7 +72,17 @@ afterEach(() => {
 })
 
 function makeContext(cwd: string): LensContext {
-  return { profile: 'fast', cwd }
+  // Set a non-null sentinel knowledgeRoot + empty knowledgeIndex so the
+  // lens-i:no-root warning gate stays quiet for suppression-insensitive
+  // tests. Empty index produces no suppression (matches decision #15
+  // "empty KB is valid"), so behavior is equivalent to "knowledge-root
+  // resolved but empty KB" — exactly what these tests want.
+  return {
+    profile: 'fast',
+    cwd,
+    knowledgeRoot: '/fake-kb',
+    knowledgeIndex: new Set(),
+  }
 }
 
 async function runLens(opts: {
