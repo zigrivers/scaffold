@@ -130,7 +130,7 @@ describe('reconcile', () => {
     expect(line99?.severity).toBe('P1')
   })
 
-  it('does not fuzzy-merge findings with different suggestions', () => {
+  it('fuzzy-merges matching descriptions even when suggestions differ', () => {
     const channelFindings: Record<string, Finding[]> = {
       claude: [{ severity: 'P2', location: 'file.ts:10', description: 'Regression risk', suggestion: 'Add test' }],
       gemini: [{
@@ -141,7 +141,8 @@ describe('reconcile', () => {
       }],
     }
     const result = reconcile(channelFindings)
-    expect(result).toHaveLength(2)
+    expect(result).toHaveLength(1)
+    expect(result[0].sources.sort()).toEqual(['claude', 'gemini'])
   })
 
   it('fuzzy-merges similar descriptions even when suggestions differ', () => {

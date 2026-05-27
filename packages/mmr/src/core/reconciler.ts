@@ -69,7 +69,8 @@ export function reconcile(channelFindings: Record<string, Finding[]>): Reconcile
   const groups: ReconcileGroup[] = []
   const keyIndex = new Map<string, ReconcileGroup[]>()
   for (const finding of attributed) {
-    const exact = bestJoinableGroup(keyIndex.get(finding.finding_key) ?? [], finding)
+    const exact = bestJoinableGroup((keyIndex.get(finding.finding_key) ?? [])
+      .filter((group) => canJoinGroup(group, finding)), finding)
     if (exact !== undefined) {
       exact.findings.push(finding)
       continue
@@ -78,7 +79,6 @@ export function reconcile(channelFindings: Record<string, Finding[]>): Reconcile
     const fuzzy = bestJoinableGroup(groups.filter((group) =>
       canJoinGroup(group, finding) &&
       group.normalized_location === finding.normalized_location &&
-      canFuzzyJoinGroup(group, finding) &&
       shingleSize(group.shingle) > 0 &&
       shingleSize(finding.shingle) > 0 &&
       jaccardSimilarity(group.shingle, finding.shingle) >= 0.7,
@@ -155,7 +155,7 @@ export function reconcile(channelFindings: Record<string, Finding[]>): Reconcile
   // Step 4: Sort by severity (P0 first)
   results.sort((a, b) =>
     SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity] ||
-    a.finding_key!.localeCompare(b.finding_key!) ||
+    (a.finding_key ?? '').localeCompare(b.finding_key ?? '') ||
     a.location.localeCompare(b.location),
   )
 
@@ -183,16 +183,8 @@ function canJoinGroup(group: ReconcileGroup, finding: AttributedFinding): boolea
   )
 }
 
-function canFuzzyJoinGroup(group: ReconcileGroup, finding: AttributedFinding): boolean {
-  return group.findings.every((existing) =>
-    existing.normalized_description !== finding.normalized_description ||
-    existing.normalized_suggestion === finding.normalized_suggestion,
-  )
-}
-
 function bestJoinableGroup(groups: ReconcileGroup[], finding: AttributedFinding): ReconcileGroup | undefined {
-  const eligible = groups.filter((group) => canJoinGroup(group, finding))
-    .sort((a, b) => groupMatchScore(b, finding) - groupMatchScore(a, finding))
+  const eligible = groups.sort((a, b) => groupMatchScore(b, finding) - groupMatchScore(a, finding))
   return eligible.find((group) =>
     group.findings.some((existing) => existing.location === finding.location),
   ) ?? eligible[0]
