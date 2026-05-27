@@ -327,10 +327,11 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     const sessionIdRe = /^[a-zA-Z0-9_-]+$/
     if (args.session !== undefined && !sessionIdRe.test(args.session)) {
       console.error(`Invalid session id: ${args.session} - must match ^[a-zA-Z0-9_-]+$`)
-      process.exit(1)
+      process.exitCode = 1
+      return
     }
     const configCap = config.defaults.loop_control?.max_rounds_default ?? 5
-    const maxRounds = args['max-rounds'] ?? configCap
+    const maxRounds = args['max-rounds'] ?? args.maxRounds ?? configCap
     const reviewControls: ReviewControls = {
       max_rounds: maxRounds,
       accept_new_acks: args.acceptNewAcks === true,
@@ -338,10 +339,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       trust_project_config: args.trustProjectConfig === true,
       config_base_ref: args.configBaseRef,
     }
-    if (
-      (args.session !== undefined || args.round !== undefined || args['max-rounds'] !== undefined)
-      && (args.round ?? 1) > maxRounds
-    ) {
+    if ((args.round ?? 1) > maxRounds) {
       const outputFormat = (args.format ?? config.defaults.format ?? 'json') as OutputFormat
       const results = buildMaxRoundsExceededResult(
         args.session ?? 'default',
@@ -350,7 +348,8 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
         config.defaults.fix_threshold as Severity,
       )
       console.log(formatReconciledResults(results, outputFormat))
-      process.exit(3)
+      process.exitCode = 3
+      return
     }
 
     // 2. Resolve diff input

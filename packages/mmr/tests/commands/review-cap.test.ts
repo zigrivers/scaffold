@@ -10,6 +10,8 @@ class ExitError extends Error {
 async function runReview(args: Record<string, unknown>): Promise<{ code: number; stdout: string; stderr: string }> {
   const stdout: string[] = []
   const stderr: string[] = []
+  const previousExitCode = process.exitCode
+  process.exitCode = undefined
   const logSpy = vi.spyOn(console, 'log').mockImplementation((...values) => {
     stdout.push(values.join(' '))
   })
@@ -25,7 +27,8 @@ async function runReview(args: Record<string, unknown>): Promise<{ code: number;
       _: ['review'],
       $0: 'mmr',
     } as never)
-    return { code: 0, stdout: stdout.join('\n'), stderr: stderr.join('\n') }
+    const code = typeof process.exitCode === 'number' ? process.exitCode : 0
+    return { code, stdout: stdout.join('\n'), stderr: stderr.join('\n') }
   } catch (err: unknown) {
     if (err instanceof ExitError) {
       return { code: err.code, stdout: stdout.join('\n'), stderr: stderr.join('\n') }
@@ -35,6 +38,7 @@ async function runReview(args: Record<string, unknown>): Promise<{ code: number;
     logSpy.mockRestore()
     errorSpy.mockRestore()
     exitSpy.mockRestore()
+    process.exitCode = previousExitCode
   }
 }
 
@@ -51,6 +55,21 @@ describe('review - cap enforcement (T2-F)', () => {
       session: 'feat-foo',
       round: 6,
       'max-rounds': 5,
+      sync: true,
+      format: 'json',
+    })
+    expect(code).toBe(3)
+    const parsed = JSON.parse(stdout)
+    expect(parsed.verdict).toBe('needs-user-decision')
+    expect(parsed.summary).toMatch(/max_rounds_exceeded/i)
+  })
+
+  it('refuses dispatch when programmatic callers pass camelCase maxRounds', async () => {
+    const { code, stdout } = await runReview({
+      diff: '/dev/null',
+      session: 'feat-foo',
+      round: 6,
+      maxRounds: 5,
       sync: true,
       format: 'json',
     })
