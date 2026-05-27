@@ -1,39 +1,57 @@
-import { describe, it, expect, beforeAll } from 'vitest'
-import { execFileSync } from 'node:child_process'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { runCli } from '../../src/cli.js'
 
-const packageRoot = path.resolve(__dirname, '../..')
-const mmrBin = path.join(packageRoot, 'dist/index.js')
+const originalHome = process.env.HOME
 
-beforeAll(() => {
-  execFileSync('npm', ['run', 'build'], { cwd: packageRoot, stdio: 'pipe' })
+afterEach(() => {
+  process.env.HOME = originalHome
+  vi.restoreAllMocks()
 })
 
-function runMmr(args: string[], env: NodeJS.ProcessEnv = {}): { code: number; stdout: string; stderr: string } {
+async function runMmr(args: string[], home: string): Promise<{ code: number; stdout: string; stderr: string }> {
+  process.env.HOME = home
+  let stdout = ''
+  let stderr = ''
+  vi.spyOn(console, 'log').mockImplementation((message?: unknown) => {
+    stdout += `${String(message)}\n`
+  })
+  vi.spyOn(console, 'error').mockImplementation((message?: unknown) => {
+    stderr += `${String(message)}\n`
+  })
   try {
-    const stdout = execFileSync('node', [mmrBin, ...args], { encoding: 'utf-8', env: { ...process.env, ...env } })
+    await runCli(args)
     return { code: 0, stdout, stderr: '' }
   } catch (err: unknown) {
-    const e = err as { status: number; stdout: string; stderr: string }
-    return { code: e.status ?? 1, stdout: e.stdout ?? '', stderr: e.stderr ?? '' }
+    return { code: 1, stdout, stderr: stderr || (err as Error).message }
   }
 }
 
 describe('mmr sessions CLI', () => {
-  it('start + list + end roundtrip persists state', () => {
+  it('start + list + end roundtrip persists state', async () => {
     const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-sessions-cli-'))
-    const env = { HOME: tmpHome }
     try {
-      runMmr(['sessions', 'start', 'feat-foo'], env)
-      const listed = runMmr(['sessions', 'list'], env)
+      await runMmr(['sessions', 'start', 'feat-foo'], tmpHome)
+      const listed = await runMmr(['sessions', 'list'], tmpHome)
       expect(listed.stdout).toMatch(/feat-foo/)
-      const shown = runMmr(['sessions', 'show', 'feat-foo'], env)
+      const shown = await runMmr(['sessions', 'show', 'feat-foo'], tmpHome)
       expect(shown.stdout).toMatch(/feat-foo/)
-      runMmr(['sessions', 'end', 'feat-foo'], env)
-      const after = runMmr(['sessions', 'list'], env)
+      await runMmr(['sessions', 'end', 'feat-foo'], tmpHome)
+      const after = await runMmr(['sessions', 'list'], tmpHome)
       expect(after.stdout).not.toMatch(/feat-foo/)
+    } finally {
+      fs.rmSync(tmpHome, { recursive: true, force: true })
+    }
+  })
+
+  it('reports failure when ending a missing session', async () => {
+    const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-sessions-cli-'))
+    try {
+      const result = await runMmr(['sessions', 'end', 'missing'], tmpHome)
+      expect(result.code).toBe(1)
+      expect(result.stderr).toMatch(/Session not found: missing/)
     } finally {
       fs.rmSync(tmpHome, { recursive: true, force: true })
     }

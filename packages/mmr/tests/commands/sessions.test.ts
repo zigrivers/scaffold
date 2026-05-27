@@ -9,7 +9,7 @@ let store: SessionStore
 
 beforeEach(() => {
   tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-sessions-'))
-  store = new SessionStore(tmpHome)
+  store = SessionStore.fromHome(tmpHome)
 })
 
 afterEach(() => {

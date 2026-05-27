@@ -25,8 +25,12 @@ export class SessionStore {
   private readonly dir: string
   private readonly indexPath: string
 
-  constructor(home: string) {
-    this.dir = path.join(home, '.mmr', 'sessions')
+  static fromHome(home: string): SessionStore {
+    return new SessionStore(path.join(home, '.mmr'))
+  }
+
+  constructor(mmrRoot: string) {
+    this.dir = path.join(mmrRoot, 'sessions')
     this.indexPath = path.join(this.dir, 'index.json')
   }
 
@@ -164,14 +168,17 @@ export class SessionStore {
     return out
   }
 
-  end(id: string): void {
+  end(id: string): boolean {
     this.validateId(id)
     const fp = this.filePath(id)
-    this.withLock(fp, () => {
+    return this.withLock(fp, () => {
+      const existed = fs.existsSync(fp)
+      if (!existed) return false
       fs.rmSync(fp, { force: true })
       this.updateIndex((index) => {
         delete index[id]
       })
+      return true
     })
   }
 
@@ -202,7 +209,7 @@ export const sessionsCommand: CommandModule<object, SessionArgs> = {
       })
       .positional('id', { type: 'string' }),
   handler: (args: ArgumentsCamelCase<SessionArgs>) => {
-    const store = new SessionStore(os.homedir())
+    const store = SessionStore.fromHome(os.homedir())
     const action = args.action
     if (action === 'list') {
       const records = store.list()
@@ -210,8 +217,7 @@ export const sessionsCommand: CommandModule<object, SessionArgs> = {
       return
     }
     if (!args.id) {
-      console.error(`mmr sessions ${action}: <id> argument required`)
-      process.exit(1)
+      throw new Error(`mmr sessions ${action}: <id> argument required`)
     }
     if (action === 'start') {
       console.log(JSON.stringify(store.start(args.id), null, 2))
@@ -220,14 +226,15 @@ export const sessionsCommand: CommandModule<object, SessionArgs> = {
     if (action === 'show') {
       const record = store.show(args.id)
       if (!record) {
-        console.error(`Session not found: ${args.id}`)
-        process.exit(1)
+        throw new Error(`Session not found: ${args.id}`)
       }
       console.log(JSON.stringify(record, null, 2))
       return
     }
     if (action === 'end') {
-      store.end(args.id)
+      if (!store.end(args.id)) {
+        throw new Error(`Session not found: ${args.id}`)
+      }
       console.log(JSON.stringify({ ended: args.id }, null, 2))
     }
   },
