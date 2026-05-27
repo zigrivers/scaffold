@@ -353,20 +353,16 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       return
     }
 
-    let sessionLink: { store: SessionStore; id: string } | undefined
-    if (args.session !== undefined) {
-      const sessionStore = new SessionStore(resolveSessionRoot())
-      if (sessionStore.show(args.session) === undefined) {
-        sessionStore.start(args.session)
-      }
-      sessionLink = { store: sessionStore, id: args.session }
-    }
-
     // 2. Resolve diff input
     const diff = resolveDiff(args)
     if (!diff.trim()) {
       console.error('No diff content found. Provide --diff, --pr, --staged, or --base/--head.')
       process.exit(1)
+    }
+
+    let sessionLink: { store: SessionStore; id: string } | undefined
+    if (args.session !== undefined) {
+      sessionLink = { store: new SessionStore(resolveSessionRoot()), id: args.session }
     }
 
     // 3. Determine enabled channels — channels_disabled applies to the default list only;
