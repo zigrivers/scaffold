@@ -54,21 +54,7 @@ function normalizeNonCodeSegment(s: string): string {
 }
 
 export function normalizeDescriptionForKey(description: string): string {
-  if (description === '') return ''
-  const out: string[] = []
-  let cursor = 0
-
-  for (const match of description.matchAll(CODE_SPAN_RE)) {
-    const index = match.index ?? 0
-    const before = description.slice(cursor, index)
-    appendNormalizedPart(out, normalizeNonCodeSegment(before), /^\s/.test(before))
-    appendNormalizedPart(out, '`' + match[1] + '`', /\s$/.test(before))
-    cursor = index + match[0].length
-  }
-
-  const tail = description.slice(cursor)
-  appendNormalizedPart(out, normalizeNonCodeSegment(tail), /^\s/.test(tail))
-  return out.join('').trim()
+  return normalizeWithCodeSpans(description, normalizeNonCodeSegment)
 }
 
 function appendNormalizedPart(out: string[], part: string, spaceBefore: boolean): void {
@@ -80,20 +66,24 @@ function appendNormalizedPart(out: string[], part: string, spaceBefore: boolean)
 export function normalizeSuggestionForKey(suggestion: string): string {
   // Suggestions are intentionally distinguished by their full short text.
   // Do not apply description noise stripping here.
-  if (suggestion === '') return ''
+  return normalizeWithCodeSpans(suggestion, normalizeSuggestionSegment)
+}
+
+function normalizeWithCodeSpans(input: string, normalizeProse: (segment: string) => string): string {
+  if (input === '') return ''
   const out: string[] = []
   let cursor = 0
 
-  for (const match of suggestion.matchAll(CODE_SPAN_RE)) {
+  for (const match of input.matchAll(CODE_SPAN_RE)) {
     const index = match.index ?? 0
-    const before = suggestion.slice(cursor, index)
-    appendNormalizedPart(out, normalizeSuggestionSegment(before), /^\s/.test(before))
+    const before = input.slice(cursor, index)
+    appendNormalizedPart(out, normalizeProse(before), /^\s/.test(before))
     appendNormalizedPart(out, '`' + match[1] + '`', /\s$/.test(before))
     cursor = index + match[0].length
   }
 
-  const tail = suggestion.slice(cursor)
-  appendNormalizedPart(out, normalizeSuggestionSegment(tail), /^\s/.test(tail))
+  const tail = input.slice(cursor)
+  appendNormalizedPart(out, normalizeProse(tail), /^\s/.test(tail))
   return out.join('').trim()
 }
 
@@ -136,11 +126,12 @@ function escapeKeyPart(part: string): string {
 
 export function descriptionShingle(description: string): string[] {
   const normalized = normalizeDescriptionForKey(description)
-  if (normalized.length <= 5) return normalized === '' ? [] : [normalized]
+  if (normalized.length < 5) return []
+  const shingleText = normalizeModalVerbsInProse(normalized)
 
   const grams = new Set<string>()
-  for (let i = 0; i <= normalized.length - 5; i += 1) {
-    grams.add(normalized.slice(i, i + 5))
+  for (let i = 0; i <= shingleText.length - 5; i += 1) {
+    grams.add(shingleText.slice(i, i + 5))
   }
   return [...grams]
 }
@@ -149,9 +140,8 @@ export function jaccardSimilarity(
   a: readonly string[] | ReadonlySet<string>,
   b: readonly string[] | ReadonlySet<string>,
 ): number {
-  const left = a instanceof Set ? a : new Set(a)
-  const right = b instanceof Set ? b : new Set(b)
-  if (left.size === 0 && right.size === 0) return 1
+  const left = isShingleSet(a) ? a : new Set(a)
+  const right = isShingleSet(b) ? b : new Set(b)
 
   let intersection = 0
   for (const item of left) {
@@ -159,5 +149,21 @@ export function jaccardSimilarity(
   }
 
   const unionSize = left.size + right.size - intersection
-  return intersection / unionSize
+  return unionSize === 0 ? 1 : intersection / unionSize
+}
+
+export function shingleSize(shingle: readonly string[] | ReadonlySet<string>): number {
+  return isShingleSet(shingle) ? shingle.size : shingle.length
+}
+
+function normalizeModalVerbsInProse(description: string): string {
+  return normalizeWithCodeSpans(description, normalizeModalVerbs)
+}
+
+function normalizeModalVerbs(description: string): string {
+  return description.replace(/\b(?:must|should)\b/g, 'should')
+}
+
+function isShingleSet(value: readonly string[] | ReadonlySet<string>): value is ReadonlySet<string> {
+  return 'size' in value && 'has' in value
 }

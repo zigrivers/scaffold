@@ -143,6 +143,15 @@ describe('reconcile', () => {
     expect(result).toHaveLength(2)
   })
 
+  it('does not fuzzy-merge findings with empty shingles', () => {
+    const channelFindings: Record<string, Finding[]> = {
+      claude: [{ severity: 'P2', location: 'file.ts:10', description: 'abc', suggestion: 'Add test' }],
+      gemini: [{ severity: 'P2', location: 'file.ts:10', description: 'def', suggestion: 'Add test' }],
+    }
+    const result = reconcile(channelFindings)
+    expect(result).toHaveLength(2)
+  })
+
   it('reconciles findings whose only difference is line number', () => {
     const channelFindings: Record<string, Finding[]> = {
       claude: [{ severity: 'P1', location: 'file.ts:10', description: 'bug A', suggestion: 'fix A' }],

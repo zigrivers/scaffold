@@ -250,8 +250,24 @@ describe('descriptionShingle', () => {
     expect(shingle).toEqual(['aaaaa'])
   })
 
+  it('returns empty array for strings shorter than 5 chars', () => {
+    expect(descriptionShingle('abc')).toEqual([])
+  })
+
+  it('applies short-string cutoff before modal normalization', () => {
+    expect(descriptionShingle('must')).toEqual([])
+  })
+
+  it('returns single gram for strings exactly 5 chars', () => {
+    expect(descriptionShingle('abcde')).toEqual(['abcde'])
+  })
+
   it('normalizes descriptions before shingling', () => {
     expect(descriptionShingle('Bug at line 42 here')).toEqual(descriptionShingle('bug here'))
+  })
+
+  it('does not normalize modal words inside code spans', () => {
+    expect(descriptionShingle('`must` is unused')).not.toEqual(descriptionShingle('`should` is unused'))
   })
 })
 
@@ -268,7 +284,25 @@ describe('jaccardSimilarity', () => {
     expect(jaccardSimilarity(['a', 'b'], ['b', 'c'])).toBeCloseTo(1 / 3)
   })
 
-  it('treats two empty sets as identical', () => {
+  it('returns 1 for two empty sets', () => {
     expect(jaccardSimilarity([], [])).toBe(1)
+  })
+
+  it('crosses the 0.7 threshold for near-identical phrasings', () => {
+    const a = descriptionShingle('unused variable named fooBar should be removed')
+    const b = descriptionShingle('unused variable named fooBar must be removed')
+    expect(jaccardSimilarity(a, b)).toBeGreaterThanOrEqual(0.7)
+  })
+
+  it('treats unmatched backticks as prose for modal normalization', () => {
+    expect(descriptionShingle('unused `value should be removed')).toEqual(
+      descriptionShingle('unused `value must be removed'),
+    )
+  })
+
+  it('preserves matched code spans when a later backtick is unmatched', () => {
+    expect(descriptionShingle('`must` is unused `tail')).not.toEqual(
+      descriptionShingle('`should` is unused `tail'),
+    )
   })
 })

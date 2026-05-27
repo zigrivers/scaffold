@@ -6,6 +6,7 @@ import {
   jaccardSimilarity,
   normalizeLocationForKey,
   normalizeSuggestionForKey,
+  shingleSize,
 } from './stable-id.js'
 
 interface AttributedFinding extends Finding {
@@ -73,6 +74,8 @@ export function reconcile(channelFindings: Record<string, Finding[]>): Reconcile
       group.normalized_location === finding.normalized_location &&
       group.normalized_category === finding.normalized_category &&
       group.normalized_suggestion === finding.normalized_suggestion &&
+      shingleSize(group.shingle) > 0 &&
+      shingleSize(finding.shingle) > 0 &&
       jaccardSimilarity(group.shingle, finding.shingle) >= 0.7,
     ), finding)
     if (fuzzy !== undefined) {
