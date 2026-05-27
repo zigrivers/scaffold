@@ -9,7 +9,7 @@ let store: SessionStore
 
 beforeEach(() => {
   tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-sessions-'))
-  store = new SessionStore(tmpHome)
+  store = SessionStore.fromHome(tmpHome)
 })
 
 afterEach(() => {
@@ -76,6 +76,14 @@ describe('SessionStore', () => {
     expect(fs.existsSync(path.join(tmpHome, '.mmr', 'sessions', 'feat-foo.json'))).toBe(false)
   })
 
+  it('end() removes stale index entries when the session file is already gone', () => {
+    store.start('feat-foo')
+    fs.rmSync(path.join(tmpHome, '.mmr', 'sessions', 'feat-foo.json'))
+
+    expect(store.end('feat-foo')).toBe(true)
+    expect(store.list()).toEqual([])
+  })
+
   it('addJob() appends to the jobs array and increments rounds', () => {
     store.start('feat-foo')
     store.addJob('feat-foo', 'mmr-abc123', 1)
@@ -93,7 +101,7 @@ describe('SessionStore', () => {
   })
 
   it('recovers stale session locks', () => {
-    const staleLock = path.join(tmpHome, '.mmr', 'sessions', 'feat-foo.json.lock')
+    const staleLock = path.join(tmpHome, '.mmr', 'sessions', 'feat-foo.session-lock.lock')
     fs.mkdirSync(staleLock, { recursive: true })
     const staleTime = new Date(Date.now() - 10_000)
     fs.utimesSync(staleLock, staleTime, staleTime)

@@ -1,4 +1,6 @@
+import type { CommandModule, ArgumentsCamelCase } from 'yargs'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 
 const SESSION_ID_RE = /^[a-zA-Z0-9_-]+$/
@@ -14,12 +16,20 @@ export interface SessionRecord {
   rounds: number
 }
 
+interface SessionIdArgs {
+  id: string
+}
+
 export class SessionStore {
   private readonly dir: string
   private readonly indexPath: string
 
-  constructor(home: string) {
-    this.dir = path.join(home, '.mmr', 'sessions')
+  static fromHome(home: string): SessionStore {
+    return new SessionStore(path.join(home, '.mmr'))
+  }
+
+  constructor(mmrRoot: string) {
+    this.dir = path.join(mmrRoot, 'sessions')
     this.indexPath = path.join(this.dir, 'index.json')
   }
 
@@ -36,6 +46,11 @@ export class SessionStore {
   private filePath(id: string): string {
     this.validateId(id)
     return path.join(this.dir, `${id}.json`)
+  }
+
+  private sessionLockPath(id: string): string {
+    this.validateId(id)
+    return path.join(this.dir, `${id}.session-lock`)
   }
 
   private makeRecord(id: string): SessionRecord {
@@ -136,7 +151,7 @@ export class SessionStore {
     fs.mkdirSync(this.dir, { recursive: true })
     const record = this.makeRecord(id)
     const fp = this.filePath(id)
-    this.withLock(fp, () => {
+    this.withLock(this.sessionLockPath(id), () => {
       this.writeFreshJson(fp, record)
       this.updateIndex((index) => {
         index[id] = record
@@ -157,21 +172,25 @@ export class SessionStore {
     return out
   }
 
-  end(id: string): void {
+  end(id: string): boolean {
     this.validateId(id)
     const fp = this.filePath(id)
-    this.withLock(fp, () => {
-      fs.rmSync(fp, { force: true })
+    return this.withLock(this.sessionLockPath(id), () => {
+      const existed = fs.existsSync(fp)
+      if (existed) fs.rmSync(fp, { force: true })
+      let indexed = false
       this.updateIndex((index) => {
+        indexed = Object.hasOwn(index, id)
         delete index[id]
       })
+      return existed || indexed
     })
   }
 
   addJob(id: string, jobId: string, round: number): void {
     this.validateId(id)
     const fp = this.filePath(id)
-    this.withLock(fp, () => {
+    this.withLock(this.sessionLockPath(id), () => {
       const record = this.readRecord(fp, false) ?? this.makeRecord(id)
       record.jobs.push(jobId)
       record.rounds = Math.max(record.rounds, round)
@@ -181,4 +200,56 @@ export class SessionStore {
       })
     })
   }
+}
+
+function resolveSessionRoot(): string {
+  return process.env.MMR_HOME ?? path.join(process.env.HOME ?? os.homedir(), '.mmr')
+}
+
+function getSessionStore(): SessionStore {
+  return new SessionStore(resolveSessionRoot())
+}
+
+export const sessionsCommand: CommandModule<object, object> = {
+  command: 'sessions <command>',
+  describe: 'Manage MMR review sessions (T2-B)',
+  builder: (yargs) =>
+    yargs
+      .command({
+        command: 'start <id>',
+        describe: 'Start an MMR review session',
+        builder: (cmd) => cmd.positional('id', { type: 'string', demandOption: true }),
+        handler: (args: ArgumentsCamelCase<SessionIdArgs>) => {
+          console.log(JSON.stringify(getSessionStore().start(args.id), null, 2))
+        },
+      })
+      .command({
+        command: 'list',
+        describe: 'List MMR review sessions',
+        handler: () => {
+          console.log(JSON.stringify(getSessionStore().list(), null, 2))
+        },
+      })
+      .command({
+        command: 'show <id>',
+        describe: 'Show an MMR review session',
+        builder: (cmd) => cmd.positional('id', { type: 'string', demandOption: true }),
+        handler: (args: ArgumentsCamelCase<SessionIdArgs>) => {
+          const record = getSessionStore().show(args.id)
+          if (!record) throw new Error(`Session not found: ${args.id}`)
+          console.log(JSON.stringify(record, null, 2))
+        },
+      })
+      .command({
+        command: 'end <id>',
+        describe: 'End an MMR review session',
+        builder: (cmd) => cmd.positional('id', { type: 'string', demandOption: true }),
+        handler: (args: ArgumentsCamelCase<SessionIdArgs>) => {
+          if (!getSessionStore().end(args.id)) throw new Error(`Session not found: ${args.id}`)
+          console.log(JSON.stringify({ ended: args.id }, null, 2))
+        },
+      })
+      .demandCommand(1, 'Run mmr sessions --help for usage')
+      .strict(),
+  handler: () => {},
 }
