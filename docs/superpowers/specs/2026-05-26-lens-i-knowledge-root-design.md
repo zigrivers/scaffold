@@ -175,7 +175,9 @@ case (entry exists → suppress finding) as if it required human judgment.
            │                                                         │
            │   validateKnowledgeRoot(path):                          │
            │     { ok, index? } — exists + isDir + has VERSION       │
-           │     marker file + loader returns non-empty Set          │
+           │     marker file; loader is exercised (so I/O errors    │
+           │     surface here) but an empty index is valid (decision │
+           │     #15 / R8 fix)                                       │
            │                                                         │
            │   emitOnceForAudit(warnedKeys, key, message): void      │
            │     write to stderr if !warnedKeys.has(key);             │
@@ -814,7 +816,7 @@ chars with `?`, so a pathological value can't produce ragged stderr.
 | 2 | KB lookup mechanism | Auto-detect via `findScaffoldKnowledgeRoot()` + `--knowledge-root` flag + yaml escape hatches | Auto-detect handles the common case (npm-global, Homebrew, local, dev worktree). Flag/yaml handle testing, pinning, air-gapped installs. Bundled-static-index adds a build step and creates drift; rejected. |
 | 3 | Match rule | Exact slug match against entry `name:` field | Deterministic. Matches how the assembly engine identifies entries. Substring/topics-array matching introduces false-positive suppression of real gaps. |
 | 4 | Auto-detect-fails fallback | Soft-fail with one-line warning (emitted from Lens I, only when the lens runs); suppression disabled, lens runs as today | Suppression is an enhancement, not a contract. Hard-failing the audit would surprise downstream projects with `scaffold observe audit` workflows. Emitting from the lens prevents spurious warnings when Lens I is disabled. |
-| 5 | CLI-override-points-at-nothing behavior | Hard error at the resolver, before any lens runs | Operator-typed contracts get sharp errors; yaml entries get soft-fail. Resolver validates by *reusing the loader* — a candidate is valid only if `loadKnowledgeIndex(path).size > 0`. This catches "pointed at the wrong dir" cases without a second predicate to maintain. |
+| 5 | CLI-override-points-at-nothing behavior | Hard error at the resolver, before any lens runs | Operator-typed contracts get sharp errors; yaml entries get soft-fail. Validation is: exists + is-directory + has `<path>/VERSION` marker + loader runs cleanly (per decision #15 + the R8 fix). An empty index is NOT rejected — a freshly-initialized KB with only the VERSION file is valid. The VERSION marker alone identifies a knowledge dir; the loader is exercised so I/O errors surface at resolver-time rather than lens-time. |
 | 6 | Index refresh cadence | Once per audit run, no caching across runs | Walk is cheap (~270 files). Cross-run cache adds invalidation complexity for no measurable gain. |
 | 7 | Match against `topics:` array (in addition to `name:`) | No | `topics:` is broad-keyword soup; would suppress real gaps. Out of scope. |
 | 8 | Bundle a static index | No | Adds a build step + drift risk between the live tree and the bundle. Direct walk is cheaper than the maintenance cost. |
