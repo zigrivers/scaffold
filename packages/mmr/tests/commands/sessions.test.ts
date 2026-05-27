@@ -76,6 +76,14 @@ describe('SessionStore', () => {
     expect(fs.existsSync(path.join(tmpHome, '.mmr', 'sessions', 'feat-foo.json'))).toBe(false)
   })
 
+  it('end() removes stale index entries when the session file is already gone', () => {
+    store.start('feat-foo')
+    fs.rmSync(path.join(tmpHome, '.mmr', 'sessions', 'feat-foo.json'))
+
+    expect(store.end('feat-foo')).toBe(true)
+    expect(store.list()).toEqual([])
+  })
+
   it('addJob() appends to the jobs array and increments rounds', () => {
     store.start('feat-foo')
     store.addJob('feat-foo', 'mmr-abc123', 1)

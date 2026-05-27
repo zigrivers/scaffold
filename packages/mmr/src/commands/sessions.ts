@@ -177,12 +177,13 @@ export class SessionStore {
     const fp = this.filePath(id)
     return this.withLock(this.sessionLockPath(id), () => {
       const existed = fs.existsSync(fp)
-      if (!existed) return false
-      fs.rmSync(fp, { force: true })
+      if (existed) fs.rmSync(fp, { force: true })
+      let indexed = false
       this.updateIndex((index) => {
+        indexed = Object.hasOwn(index, id)
         delete index[id]
       })
-      return true
+      return existed || indexed
     })
   }
 

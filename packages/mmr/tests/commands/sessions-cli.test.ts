@@ -5,14 +5,17 @@ import path from 'node:path'
 import { runCli } from '../../src/cli.js'
 
 const originalHome = process.env.HOME
+const originalMmrHome = process.env.MMR_HOME
 
 afterEach(() => {
   process.env.HOME = originalHome
+  process.env.MMR_HOME = originalMmrHome
   vi.restoreAllMocks()
 })
 
 async function runMmr(args: string[], home: string): Promise<{ code: number; stdout: string; stderr: string }> {
   process.env.HOME = home
+  delete process.env.MMR_HOME
   let stdout = ''
   let stderr = ''
   vi.spyOn(console, 'log').mockImplementation((message?: unknown) => {
