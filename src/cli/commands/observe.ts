@@ -502,7 +502,9 @@ const observeCommand: CommandModule<AnyArgv, AnyArgv> = {
         })
         .option('knowledge-root', {
           type: 'string',
-          describe: 'Path to a content/knowledge directory; overrides yaml + auto-detect for Lens I existing-entry suppression',
+          describe:
+            'Path to a content/knowledge directory; overrides yaml + auto-detect '
+            + 'for Lens I existing-entry suppression',
         }),
       async (argv) => {
         const code = await handleAudit({

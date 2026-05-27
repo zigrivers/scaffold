@@ -81,7 +81,7 @@ describe('Lens I knowledge-root integration', () => {
     })
     const gapFindings = out.findings.filter(f => f.lens_id === 'I-knowledge-gaps')
     const topics = gapFindings.map(f =>
-      (f.evidence as { topic?: string }).topic
+      (f.evidence as { topic?: string }).topic,
     )
     expect(topics).toEqual(['uncovered'])
   })

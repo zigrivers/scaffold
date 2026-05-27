@@ -105,25 +105,25 @@ describe('loadKnowledgeIndex', () => {
 
 describe('formatForStderr', () => {
   it('wraps a normal string in single quotes', () => {
-    expect(formatForStderr('hello')).toBe("'hello'")
+    expect(formatForStderr('hello')).toBe('\'hello\'')
   })
 
   it('returns the sentinel for undefined or empty input', () => {
-    expect(formatForStderr(undefined)).toBe("'<missing>'")
-    expect(formatForStderr('')).toBe("'<missing>'")
+    expect(formatForStderr(undefined)).toBe('\'<missing>\'')
+    expect(formatForStderr('')).toBe('\'<missing>\'')
   })
 
   it('escapes embedded single quotes', () => {
-    expect(formatForStderr("it's fine")).toBe("'it\\'s fine'")
+    expect(formatForStderr('it\'s fine')).toBe('\'it\\\'s fine\'')
   })
 
   it('replaces control characters and newlines with ?', () => {
     expect(formatForStderr('line1\nline2\ttab\x07bell'))
-      .toBe("'line1?line2?tab?bell'")
+      .toBe('\'line1?line2?tab?bell\'')
   })
 
   it('passes unicode through unchanged', () => {
-    expect(formatForStderr('日本語 🐢')).toBe("'日本語 🐢'")
+    expect(formatForStderr('日本語 🐢')).toBe('\'日本語 🐢\'')
   })
 })
 
@@ -317,7 +317,7 @@ describe('resolveKnowledgeRoot', () => {
   it('throws KnowledgeRootCliInvalidError when override is invalid', () => {
     const cwd = makeKbDir({})
     expect(() =>
-      resolveKnowledgeRoot({ override: '/tmp/definitely-nope-99999', cwd })
+      resolveKnowledgeRoot({ override: '/tmp/definitely-nope-99999', cwd }),
     ).toThrow(KnowledgeRootCliInvalidError)
   })
 
@@ -336,7 +336,7 @@ describe('resolveKnowledgeRoot', () => {
   it('falls through to auto-detect when yaml path is invalid', () => {
     const cwd = makeKbDir({
       '.scaffold/observability.yaml':
-        `lenses:\n  I-knowledge-gaps:\n    knowledge_root: /tmp/bogus-99999\n`,
+        'lenses:\n  I-knowledge-gaps:\n    knowledge_root: /tmp/bogus-99999\n',
     })
     const result = resolveKnowledgeRoot({ cwd })
     expect(result.root).toBeNull()

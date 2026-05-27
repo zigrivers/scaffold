@@ -102,6 +102,9 @@ export function loadKnowledgeIndex(knowledgeDir: string): Set<string> {
 
 // ─── formatForStderr ────────────────────────────────────────────────────────
 
+// Intentionally matches control characters — they're exactly what we want
+// to replace before writing a one-line stderr message.
+// eslint-disable-next-line no-control-regex
 const STDERR_UNSAFE_RE = /[\r\n\t\x00-\x1f]/g
 
 /**
@@ -113,8 +116,8 @@ const STDERR_UNSAFE_RE = /[\r\n\t\x00-\x1f]/g
  * loader-supplied error reasons.
  */
 export function formatForStderr(value: string | undefined): string {
-  if (value === undefined || value === '') return "'<missing>'"
-  return "'" + value.replace(/'/g, "\\'").replace(STDERR_UNSAFE_RE, '?') + "'"
+  if (value === undefined || value === '') return '\'<missing>\''
+  return '\'' + value.replace(/'/g, '\\\'').replace(STDERR_UNSAFE_RE, '?') + '\''
 }
 
 // ─── findScaffoldKnowledgeRoot ──────────────────────────────────────────────
@@ -203,7 +206,9 @@ export function validateKnowledgeRoot(candidatePath: string): ValidateResult {
   if (!fs.existsSync(markerPath)) {
     return {
       ok: false,
-      reason: `missing knowledge-base VERSION marker — path does not appear to be a scaffold knowledge directory: ${candidatePath}`,
+      reason:
+        'missing knowledge-base VERSION marker — path does not appear to be '
+        + `a scaffold knowledge directory: ${candidatePath}`,
     }
   }
   let index: Set<string>

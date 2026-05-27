@@ -112,12 +112,18 @@ export const lensIKnowledgeGaps: LensFn = async (
       a => a.source === 'yaml' && a.outcome === 'invalid',
     )
     const yamlNote = yamlAttempt
-      ? ` — yaml lenses.I-knowledge-gaps.knowledge_root ${formatForStderr(yamlAttempt.path)} was invalid: ${formatForStderr(yamlAttempt.reason)}`
+      ? ' — yaml lenses.I-knowledge-gaps.knowledge_root '
+        + formatForStderr(yamlAttempt.path)
+        + ' was invalid: '
+        + formatForStderr(yamlAttempt.reason)
       : ''
     emitOnceForAudit(
       context.warnedKeys ?? new Set<string>(),
       'lens-i:no-root',
-      `[Lens I] knowledge-root not located; existing-entry suppression disabled${yamlNote}. Pass --knowledge-root or set lenses.I-knowledge-gaps.knowledge_root in .scaffold/observability.yaml.\n`,
+      '[Lens I] knowledge-root not located; existing-entry suppression disabled'
+        + yamlNote
+        + '. Pass --knowledge-root or set lenses.I-knowledge-gaps.knowledge_root'
+        + ' in .scaffold/observability.yaml.\n',
     )
   }
 

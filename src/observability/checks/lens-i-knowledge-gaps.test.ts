@@ -439,7 +439,9 @@ describe('lensIKnowledgeGaps — existing-entry suppression', () => {
         emptyGraph, { events }, stubAvailability, [], new Set(['I-knowledge-gaps']), ctx,
       )
       const combined = stderrChunks.join('')
-      expect(combined).toMatch(/yaml lenses\.I-knowledge-gaps\.knowledge_root '\/tmp\/bad' was invalid: 'path does not exist'/)
+      expect(combined).toMatch(
+        /yaml lenses\.I-knowledge-gaps\.knowledge_root '\/tmp\/bad' was invalid: 'path does not exist'/,
+      )
     } finally {
       process.stderr.write = originalWrite
     }
