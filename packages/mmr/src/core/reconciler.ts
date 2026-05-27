@@ -141,6 +141,8 @@ export function reconcile(channelFindings: Record<string, Finding[]>): Reconcile
       confidence,
       sources,
       agreement,
+      finding_key: group.finding_key,
+      description_shingle: [...group.shingle],
     })
   }
 
@@ -189,7 +191,7 @@ function addToKeyIndex(
  */
 export function evaluateGate(findings: ReconciledFinding[], threshold: Severity): boolean {
   const thresholdOrder = SEVERITY_ORDER[threshold]
-  return findings.every((f) => SEVERITY_ORDER[f.severity] > thresholdOrder)
+  return findings.every((f) => f.acknowledged === true || SEVERITY_ORDER[f.severity] > thresholdOrder)
 }
 
 /**

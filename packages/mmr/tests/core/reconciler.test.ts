@@ -181,6 +181,68 @@ describe('reconcile', () => {
   })
 })
 
+describe('reconcile - T2-A stable-identity grouping', () => {
+  it('groups two channels reporting the same key into one reconciled finding', () => {
+    const channelFindings: Record<string, Finding[]> = {
+      claude: [{ severity: 'P1', location: 'src/foo.ts:10', description: 'Variable `x` unused', suggestion: 'remove `x`' }],
+      gemini: [{ severity: 'P1', location: 'src/foo.ts:42', description: 'Variable `x` unused', suggestion: 'remove `x`' }],
+    }
+    const result = reconcile(channelFindings)
+    expect(result).toHaveLength(1)
+    expect(result[0].sources.sort()).toEqual(['claude', 'gemini'])
+    expect(result[0].finding_key).toMatch(/^[a-f0-9]{40}$/)
+  })
+
+  it('keeps same-file findings with different code identifiers separate', () => {
+    const channelFindings: Record<string, Finding[]> = {
+      claude: [
+        { severity: 'P2', location: 'src/foo.ts:10', description: 'Variable `fooBar` is unused', suggestion: 'remove `fooBar`' },
+        { severity: 'P2', location: 'src/foo.ts:20', description: 'Variable `bazQux` is unused', suggestion: 'remove `bazQux`' },
+      ],
+    }
+    const result = reconcile(channelFindings)
+    expect(result).toHaveLength(2)
+    expect(result[0].finding_key).not.toBe(result[1].finding_key)
+  })
+
+  it('uses Jaccard fallback to merge same-issue findings phrased differently', () => {
+    const channelFindings: Record<string, Finding[]> = {
+      claude: [{ severity: 'P1', location: 'src/foo.ts:10', description: 'unused variable named fooBar should be removed', suggestion: 'remove it' }],
+      gemini: [{ severity: 'P1', location: 'src/foo.ts:10', description: 'unused variable named fooBar must be removed', suggestion: 'remove it' }],
+    }
+    const result = reconcile(channelFindings)
+    expect(result).toHaveLength(1)
+    expect(result[0].sources.sort()).toEqual(['claude', 'gemini'])
+  })
+
+  it('does not merge findings in different files even if descriptions are similar', () => {
+    const channelFindings: Record<string, Finding[]> = {
+      claude: [{ severity: 'P2', location: 'src/foo.ts:10', description: 'unused variable named x', suggestion: 'remove' }],
+      gemini: [{ severity: 'P2', location: 'src/bar.ts:10', description: 'unused variable named x', suggestion: 'remove' }],
+    }
+    const result = reconcile(channelFindings)
+    expect(result).toHaveLength(2)
+  })
+
+  it('persists description_shingle and finding_key on every reconciled finding', () => {
+    const channelFindings: Record<string, Finding[]> = {
+      claude: [{ severity: 'P0', location: 'src/foo.ts:1', description: 'critical bug here', suggestion: 'fix' }],
+    }
+    const result = reconcile(channelFindings)
+    expect(result[0].finding_key).toMatch(/^[a-f0-9]{40}$/)
+    expect(Array.isArray(result[0].description_shingle)).toBe(true)
+    expect(result[0].description_shingle!.length).toBeGreaterThan(0)
+  })
+
+  it('preserves F-\\d{3} id backfill for consumers that read id', () => {
+    const channelFindings: Record<string, Finding[]> = {
+      claude: [{ severity: 'P1', location: 'a.ts:1', description: 'bug', suggestion: 'fix' }],
+    }
+    const result = reconcile(channelFindings)
+    expect(result[0].id).toBe('F-001')
+  })
+})
+
 describe('evaluateGate', () => {
   it('passes when no findings exist', () => {
     expect(evaluateGate([], 'P2')).toBe(true)
