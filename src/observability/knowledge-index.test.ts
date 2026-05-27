@@ -126,3 +126,53 @@ describe('formatForStderr', () => {
     expect(formatForStderr('日本語 🐢')).toBe("'日本語 🐢'")
   })
 })
+
+import { findScaffoldKnowledgeRoot } from './knowledge-index.js'
+
+describe('findScaffoldKnowledgeRoot', () => {
+  it('returns null when no scaffold install lives above the start dir', () => {
+    const dir = makeKbDir({})  // empty dir under os.tmpdir(); no package.json above it
+    expect(findScaffoldKnowledgeRoot(dir)).toBeNull()
+  })
+
+  it('matches a parent whose package.json names @zigrivers/scaffold', () => {
+    const root = makeKbDir({
+      'package.json': JSON.stringify({ name: '@zigrivers/scaffold', version: '0.0.0' }),
+      'content/knowledge/README.md': '# readme\n',
+      'content/knowledge/core/x.md': '---\nname: x\n---\n',
+      'src/somewhere/cli.js': '// running module\n',
+    })
+    const start = path.join(root, 'src', 'somewhere')
+    const result = findScaffoldKnowledgeRoot(start)
+    expect(result).toBe(path.join(root, 'content', 'knowledge'))
+  })
+
+  it('does NOT match a parent whose package.json names something else', () => {
+    const root = makeKbDir({
+      'package.json': JSON.stringify({ name: 'some-other-project', version: '1.0' }),
+      'content/knowledge/core/x.md': '---\nname: x\n---\n',
+      'src/cli.js': '',
+    })
+    const start = path.join(root, 'src')
+    expect(findScaffoldKnowledgeRoot(start)).toBeNull()
+  })
+
+  it('does NOT match a parent that lacks content/knowledge/', () => {
+    const root = makeKbDir({
+      'package.json': JSON.stringify({ name: '@zigrivers/scaffold' }),
+      'src/cli.js': '',
+    })
+    const start = path.join(root, 'src')
+    expect(findScaffoldKnowledgeRoot(start)).toBeNull()
+  })
+
+  it('walks up multiple parents (npm-global-style nesting)', () => {
+    const root = makeKbDir({
+      'package.json': JSON.stringify({ name: '@zigrivers/scaffold' }),
+      'content/knowledge/x.md': '---\nname: x\n---\n',
+      'lib/node_modules/inner/dist/cli.js': '',
+    })
+    const start = path.join(root, 'lib', 'node_modules', 'inner', 'dist')
+    expect(findScaffoldKnowledgeRoot(start)).toBe(path.join(root, 'content', 'knowledge'))
+  })
+})

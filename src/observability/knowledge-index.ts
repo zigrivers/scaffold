@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import yaml from 'js-yaml'
 import { normalizeTopic } from './checks/lens-i-lessons-scanner.js'
 
@@ -114,4 +115,56 @@ const STDERR_UNSAFE_RE = /[\r\n\t\x00-\x1f]/g
 export function formatForStderr(value: string | undefined): string {
   if (value === undefined || value === '') return "'<missing>'"
   return "'" + value.replace(/'/g, "\\'").replace(STDERR_UNSAFE_RE, '?') + "'"
+}
+
+// ─── findScaffoldKnowledgeRoot ──────────────────────────────────────────────
+
+const SCAFFOLD_PACKAGE_NAME = '@zigrivers/scaffold'
+
+function readPackageName(packageJsonPath: string): string | null {
+  try {
+    const raw = fs.readFileSync(packageJsonPath, 'utf8')
+    const parsed = JSON.parse(raw) as { name?: unknown }
+    return typeof parsed.name === 'string' ? parsed.name : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Walk parent directories of `startDir` and return the absolute path of
+ * the first `<parent>/content/knowledge` where `<parent>/package.json`
+ * declares `name: "@zigrivers/scaffold"`. Walks to the filesystem root
+ * without any home-directory boundary (npm-global installs live in
+ * /opt/homebrew/... or /usr/local/..., outside the user's home).
+ *
+ * Returns null when no matching parent is found.
+ *
+ * The argument is the starting directory; production callers pass
+ * `path.dirname(fileURLToPath(import.meta.url))` from a module that
+ * lives inside the install. Tests can pass any directory directly.
+ */
+export function findScaffoldKnowledgeRoot(startDir: string): string | null {
+  let current = path.resolve(startDir)
+  while (true) {
+    const pkgPath = path.join(current, 'package.json')
+    if (fs.existsSync(pkgPath) && readPackageName(pkgPath) === SCAFFOLD_PACKAGE_NAME) {
+      const candidate = path.join(current, 'content', 'knowledge')
+      if (fs.existsSync(candidate) && fs.statSync(candidate).isDirectory()) {
+        return candidate
+      }
+    }
+    const parent = path.dirname(current)
+    if (parent === current) return null   // filesystem root
+    current = parent
+  }
+}
+
+/** Convenience for production callers — derives the start dir from a
+ *  module's import.meta.url. `runAudit` and `runFixFlow` call this
+ *  with their own `import.meta.url` to anchor the auto-detect walk to
+ *  the install location. Tests should call `findScaffoldKnowledgeRoot`
+ *  directly with a fixture path. */
+export function findScaffoldKnowledgeRootFromImportMeta(metaUrl: string): string | null {
+  return findScaffoldKnowledgeRoot(path.dirname(fileURLToPath(metaUrl)))
 }
