@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
+import { execFileSync } from 'node:child_process'
 import { loadConfig } from '../../src/config/loader.js'
 
 describe('loadConfig', () => {
@@ -54,6 +55,42 @@ describe('loadConfig', () => {
     expect(config.defaults.fix_threshold).toBe('P1')
     expect(config.defaults.timeout).toBe(300)
     expect(config.channels.claude.enabled).toBe(true)
+  })
+
+  it('loads project .mmr.yaml from configBaseRef unless working-tree config is trusted', () => {
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), [
+      'version: 1',
+      'defaults:',
+      '  fix_threshold: P1',
+    ].join('\n'))
+    execFileSync('git', ['init'], { cwd: tmpDir, stdio: 'ignore' })
+    execFileSync('git', ['add', '.mmr.yaml'], { cwd: tmpDir, stdio: 'ignore' })
+    execFileSync(
+      'git',
+      ['-c', 'user.name=MMR Test', '-c', 'user.email=mmr@example.test', 'commit', '-m', 'base config'],
+      { cwd: tmpDir, stdio: 'ignore' },
+    )
+
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), [
+      'version: 1',
+      'defaults:',
+      '  fix_threshold: P0',
+    ].join('\n'))
+
+    const baseConfig = loadConfig({
+      projectRoot: tmpDir,
+      userHome: tmpDir,
+      configBaseRef: 'HEAD',
+    })
+    const trustedWorkingTreeConfig = loadConfig({
+      projectRoot: tmpDir,
+      userHome: tmpDir,
+      configBaseRef: 'HEAD',
+      trustProjectConfig: true,
+    })
+
+    expect(baseConfig.defaults.fix_threshold).toBe('P1')
+    expect(trustedWorkingTreeConfig.defaults.fix_threshold).toBe('P0')
   })
 
   it('CLI overrides take precedence over config file', () => {

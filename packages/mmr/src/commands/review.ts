@@ -84,6 +84,36 @@ function resolveDiff(args: ReviewArgs): string {
   return execFileSync('git', ['diff'], { encoding: 'utf-8', maxBuffer: MAX_DIFF_BUFFER })
 }
 
+function formatReconciledResults(results: ReconciledResults, outputFormat: OutputFormat): string {
+  if (outputFormat === 'text') return formatText(results)
+  if (outputFormat === 'markdown') return formatMarkdown(results)
+  return formatJson(results)
+}
+
+function buildMaxRoundsExceededResult(
+  session: string,
+  round: number,
+  maxRounds: number,
+  fixThreshold: Severity,
+): ReconciledResults {
+  return {
+    job_id: `session-${session}`,
+    verdict: 'needs-user-decision',
+    fix_threshold: fixThreshold,
+    advisory_count: 0,
+    approved: false,
+    summary: `Review session "${session}" exceeded max rounds (${round} > ${maxRounds})`,
+    reconciled_findings: [],
+    per_channel: {},
+    metadata: {
+      channels_dispatched: 0,
+      channels_completed: 0,
+      channels_partial: 0,
+      total_elapsed: '0s',
+    },
+  }
+}
+
 /**
  * Resolve the list of channels to dispatch.
  * - Filters out abstract channels from default resolution.
@@ -225,11 +255,11 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       })
       .option('session', {
         type: 'string',
-        describe: 'Session id (T2-B). Allowed chars: a-zA-Z0-9_-',
+        describe: 'Session id. Allowed chars: a-zA-Z0-9_-',
       })
       .option('round', {
         type: 'number',
-        describe: 'One-based round counter within the session (T2-B)',
+        describe: 'One-based round counter within the session',
       })
       .option('max-rounds', {
         type: 'number',
@@ -238,17 +268,17 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       .option('accept-new-acks', {
         type: 'boolean',
         default: false,
-        describe: 'Trust ack files newly introduced in the diff under review (§5 decision 1)',
+        describe: 'Trust ack files newly introduced in the diff under review',
       })
       .option('trust-project-acks', {
         type: 'boolean',
         default: false,
-        describe: 'Trust working-tree project acks in non-Git / untrusted-HEAD modes (§5 decision 1)',
+        describe: 'Trust working-tree project acks in non-Git or untrusted-HEAD modes',
       })
       .option('trust-project-config', {
         type: 'boolean',
         default: false,
-        describe: 'Trust working-tree .mmr.yaml channel config in untrusted modes (§5 decision 1 P0 fix)',
+        describe: 'Trust working-tree .mmr.yaml channel config in untrusted modes',
       })
       .option('config-base-ref', {
         type: 'string',
@@ -285,6 +315,8 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     // 1. Load config with CLI overrides
     const config = loadConfig({
       projectRoot: process.cwd(),
+      trustProjectConfig: args.trustProjectConfig,
+      configBaseRef: args.configBaseRef,
       cliOverrides: {
         fix_threshold: args['fix-threshold'] as string | undefined,
         timeout: args.timeout,
@@ -293,9 +325,9 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     })
     const reviewControls: ReviewControls = {
       max_rounds: args.maxRounds,
-      accept_new_acks: args.acceptNewAcks ?? false,
-      trust_project_acks: args.trustProjectAcks ?? false,
-      trust_project_config: args.trustProjectConfig ?? false,
+      accept_new_acks: args.acceptNewAcks === true,
+      trust_project_acks: args.trustProjectAcks === true,
+      trust_project_config: args.trustProjectConfig === true,
       config_base_ref: args.configBaseRef,
     }
     if (
@@ -305,28 +337,13 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       && args.round > reviewControls.max_rounds
     ) {
       const outputFormat = (args.format ?? config.defaults.format ?? 'json') as OutputFormat
-      const results: ReconciledResults = {
-        job_id: `session-${args.session}`,
-        verdict: 'needs-user-decision',
-        fix_threshold: config.defaults.fix_threshold as Severity,
-        advisory_count: 0,
-        approved: false,
-        summary: `Review session "${args.session}" exceeded max rounds (${args.round} > ${reviewControls.max_rounds})`,
-        reconciled_findings: [],
-        per_channel: {},
-        metadata: {
-          channels_dispatched: 0,
-          channels_completed: 0,
-          channels_partial: 0,
-          total_elapsed: '0s',
-        },
-      }
-      const formatted = outputFormat === 'text'
-        ? formatText(results)
-        : outputFormat === 'markdown'
-          ? formatMarkdown(results)
-          : formatJson(results)
-      console.log(formatted)
+      const results = buildMaxRoundsExceededResult(
+        args.session,
+        args.round,
+        reviewControls.max_rounds,
+        config.defaults.fix_threshold as Severity,
+      )
+      console.log(formatReconciledResults(results, outputFormat))
       process.exit(3)
     }
 
