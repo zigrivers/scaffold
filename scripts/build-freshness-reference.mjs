@@ -199,10 +199,67 @@ const KROOT_DECISIONS = [
   { n: 19, t: 'Yaml tier read mechanism', c: '<code>resolveKnowledgeRoot</code> reuses <code>loadObservabilityConfig(cwd)</code>', r: 'One yaml-reader code path across the whole observability surface. Extends ObservabilityConfig with typed <code>I-knowledge-gaps?: { knowledge_root?: string }</code>.' },
   { n: 20, t: '--fix flow inherits the CLI override', c: '<code>runFixFlow</code> threads <code>knowledgeRootOverride</code> into verifier and postfix runAudit calls', r: 'Without this, only the initial audit would see the override; verifier and postfix audits would auto-detect a different KB, producing inconsistent Lens I suppression across audits in one fix run.' },
 ]
+// R2-F-010 fix: decision search vocabulary often diverges from operator
+// search terms (e.g. searching "normalize" finds nothing because GAP-DET-2
+// is titled "Topic clustering"). Add a keywords map so the renderer can
+// include operator-vocabulary search terms in the match surface.
+const DECISION_KEYWORDS = {
+  // spec-keyed: { specId, n: keywords }
+  'parent-spec': {
+    1: 'naming branding',
+    2: 'pull request strategy merge target',
+    3: 'multi-model review corroboration timing',
+    4: 'allowlist hosts authoritative sources approve',
+    5: 'backfill seed initial entries',
+    6: 'semver version pin downstream',
+    7: 'subprocess security injection llm dispatch hardcoded',
+    8: 'max-audits daily-ceiling rate limit throughput throttle',
+    9: 'env var quiet silence suppress tests ci',
+    10: 'documentation drift cleanup',
+  },
+  'gap-detection-spec': {
+    1: 'projects project-id sha256 distinctness diversity',
+    2: 'normalize normalization slug kebab-case bucketing clustering',
+    3: 'lessons.md scanner synthetic markers heuristics',
+    4: 'assembly engine tail injection pipeline steps',
+    5: 'thresholds severity p1 p2 escalation',
+    6: 'distinct projects count diversity gate aggregator',
+  },
+  'knowledge-root-spec': {
+    1: 'suppression skip emit cover existing entry',
+    2: 'auto-detect override flag yaml escape hatch',
+    3: 'name field exact match assembly engine slug',
+    4: 'soft-fail warn warning fallback',
+    5: 'cli override invalid hard error exit code throw',
+    6: 'cache invalidation refresh walk cadence',
+    7: 'topics array broad keyword soup rejected',
+    8: 'static index bundle build step drift',
+    9: 'install root knowledge directory path semantics double-append',
+    10: 'package json signature npm homebrew install global homedir',
+    11: 'warn-once dedup set fix-flow per-audit module-global',
+    12: 'console warn malformed entry loader silent skip',
+    13: 'resolver placement runAudit handleAudit api',
+    14: 'js-yaml parser validator slug regex',
+    15: 'version marker validator strict empty index',
+    16: 'index pre-loaded resolver walk redundant',
+    17: 'lens context optional fields tests migration backwards-compatible',
+    18: 'stderr formatting quotes newlines escape ci logs',
+    19: 'yaml tier load observability config reuse',
+    20: 'fix flow override propagation verifier postfix consistency',
+  },
+}
+function attachKeywords(d, specId) {
+  return {
+    number: d.n, title: d.t, choice: d.c, rationale: d.r,
+    keywords: (DECISION_KEYWORDS[specId] && DECISION_KEYWORDS[specId][d.n]) || '',
+    specId,
+    specShort: { 'parent-spec': 'PARENT', 'gap-detection-spec': 'GAP-DET', 'knowledge-root-spec': 'KROOT' }[specId],
+  }
+}
 const DECISIONS = [
-  ...PARENT_DECISIONS.map(d => ({ number: d.n, title: d.t, choice: d.c, rationale: d.r, specId: 'parent-spec', specShort: 'PARENT' })),
-  ...GAP_DECISIONS.map(d => ({ number: d.n, title: d.t, choice: d.c, rationale: d.r, specId: 'gap-detection-spec', specShort: 'GAP-DET' })),
-  ...KROOT_DECISIONS.map(d => ({ number: d.n, title: d.t, choice: d.c, rationale: d.r, specId: 'knowledge-root-spec', specShort: 'KROOT' })),
+  ...PARENT_DECISIONS.map(d => attachKeywords(d, 'parent-spec')),
+  ...GAP_DECISIONS.map(d => attachKeywords(d, 'gap-detection-spec')),
+  ...KROOT_DECISIONS.map(d => attachKeywords(d, 'knowledge-root-spec')),
 ]
 
 // ─── Deferred findings ─────────────────────────────────────────
@@ -398,16 +455,36 @@ for (const [k, v] of Object.entries(subs)) {
 // run after that literal was baked, silently no-op'ing on subsequent runs as
 // the literal changed. (Gemini review finding.)
 function stampById(html, id, value) {
-  const re = new RegExp(`(id=\"${id}\">)[^<]*(<)`, 'g')
+  // Match an element with id="<id>" followed (after any number of other
+  // attributes) by `>`, then capture the textContent up to the closing `<`.
+  // Order-independent so we don't have to keep `id` last on the tag.
+  // (Grok + Gemini both flagged the previous attr-order-brittle form.)
+  const re = new RegExp(`(<[a-zA-Z]+[^>]*\\bid="${id}"[^>]*>)([^<]*)(<)`, 'g')
   if (!re.test(html)) {
     throw new Error(`stamp target id="${id}" not found in HTML`)
   }
-  return html.replace(re, (_m, open, close) => `${open}${value}${close}`)
+  return html.replace(re, (_m, open, _old, close) => `${open}${value}${close}`)
 }
 html = stampById(html, 'genDate', today)
 html = stampById(html, 'genSha', gitSha)
 html = stampById(html, 'kbVersion', kbVersion)
 html = stampById(html, 'statEntries', String(KB_INVENTORY.entries.length))
+// R2-F-014: stamp every literal-number-in-prose so adding entries / specs /
+// hosts only requires re-running the build (not hand-editing the page).
+html = stampById(html, 'metaEntries', String(KB_INVENTORY.entries.length))
+html = stampById(html, 'metaHosts', String(ALLOWLIST.hosts.length))
+html = stampById(html, 'metaRepos', String(ALLOWLIST.github_repos.length))
+html = stampById(html, 'metaDecisions', String(DECISIONS.length))
+const specCount = new Set(DECISIONS.map((d) => d.specId)).size
+const specNames = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten']
+html = stampById(html, 'metaSpecs', specNames[specCount - 1] || String(specCount))
+html = stampById(html, 'allowlistHostCount', String(ALLOWLIST.hosts.length))
+html = stampById(html, 'allowlistRepoCount', String(ALLOWLIST.github_repos.length))
+html = stampById(html, 'statHosts', String(ALLOWLIST.hosts.length))
+html = stampById(html, 'statRepos', String(ALLOWLIST.github_repos.length))
+const totalCites = Object.values(TOP_HOSTS).reduce((a, b) => a + b, 0)
+html = stampById(html, 'statCites', String(totalCites))
+html = stampById(html, 'statUniqueHosts', String(Object.keys(TOP_HOSTS).length))
 // The cadence-date input's initial value uses today's date so the page opens
 // on a useful state. Also idempotent.
 html = html.replace(/(id="cadenceDate"[^>]*value=")[^"]*(")/g, `$1${today}$2`)
