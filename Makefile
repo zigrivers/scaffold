@@ -16,9 +16,12 @@ validate-knowledge: ## Validate frontmatter on knowledge entries (freshness fiel
 	npm run build
 	node dist/index.js validate-knowledge
 
+check-freshness-citations: ## Verify docs/knowledge-freshness/reference.html line-citations still resolve
+	node scripts/check-freshness-reference-citations.mjs
+
 check: lint validate test eval ## Run bash quality gates (lint + validate + test + eval)
 
-check-all: check ts-check mmr-check validate-knowledge ## Run all quality gates (bash + TypeScript + knowledge frontmatter)
+check-all: check ts-check mmr-check validate-knowledge check-freshness-citations ## Run all quality gates (bash + TypeScript + knowledge frontmatter + freshness-page citations)
 
 ts-check: ## Run TypeScript quality gates (lint + type-check + build + unit tests)
 	npm run lint
