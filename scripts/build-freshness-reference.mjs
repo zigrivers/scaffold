@@ -161,10 +161,10 @@ const PARENT_DECISIONS = [
   { n: 1, t: 'System name', c: 'knowledge-freshness', r: 'Names the goal not the mechanism. Avoids collision with scaffold observe audit / Lens A–H. Used in CLI subcommands, branch prefixes, GHA filename, docs directory, and the new lens.' },
   { n: 2, t: 'PR target', c: 'Direct to main, one PR per entry', r: "Matches Scaffold's existing workflow; provenance per-entry; small reviewable diffs; trivial reverts. Accepts more PR noise as the cost." },
   { n: 3, t: 'MMR channel timing', c: '<code>mmr review --diff</code> against existing channels; native channel deferred to Phase 5', r: "Phase 1 stays inside this repo and doesn't block on a sibling-package release. Native channel waits until we know what behavior is worth standardizing." },
-  { n: 4, t: 'Source-authority allowlist seed', c: 'Curated seed (47 hosts + 3 GitHub repos)', r: 'Covers security/architecture (OWASP/NIST/RFCs) and the AI/MCP fast-moving cluster (vendor docs). Out-of-list sources warn, not block. Expand per-PR.' },
+  { n: 4, t: 'Source-authority allowlist seed', c: 'Locked seed: 7 hosts (OWASP, NIST, IETF/RFC, MCP, anthropic.com/docs, OpenAI, ai.google.dev) + curated GitHub repos. Current state: 47 hosts + 3 repos after Phase 4 backfill.', r: 'Covers security/architecture (OWASP/NIST/RFCs) and the AI/MCP fast-moving cluster (vendor docs). Out-of-list sources warn, not block. Expand per-PR; the original 7-host seed grew to 47 as Phase 4 backfilled the rest of the KB and accumulated host citations.' },
   { n: 5, t: 'Initial backfill list', c: '10 entries exercising both 14-day and 60-day cadence', r: 'Validates the system in real conditions; security-best-practices.md is the primary validation target. Phase 4 then backfilled all 266 entries.' },
   { n: 6, t: 'Knowledge-base SemVer', c: 'Single number at <code>content/knowledge/VERSION</code>, bumped per Conventional Commits', r: 'Simple for downstream pinning; one number to watch. Per-entry versioning deferred as unjustified complexity at current scale.' },
-  { n: 7, t: 'LLM dispatcher', c: 'Reuse <code>src/observability/engine/llm-dispatcher.ts</code>', r: 'One subprocess-injection-defense code path to harden. Hardcoded <code>claude -p</code>; the project-config override surface is intentionally not extended to prevent command injection in untrusted repos.' },
+  { n: 7, t: 'LLM dispatcher', c: 'Reuse <code>src/observability/engine/llm-dispatcher.ts</code>', r: 'One subprocess-injection-defense code path to harden. Hardcoded <code>claude -p</code> (and hardcoded DeepSeek URL in providers/deepseek.ts); the project-config override surface is intentionally not extended. <strong>Threat model:</strong> an untrusted project\'s <code>.scaffold/observability.yaml</code> could otherwise (a) substitute an attacker-controlled command for <code>claude -p</code> (RCE in the maintainer\'s shell), or (b) redirect the LLM endpoint URL to capture API keys from request headers. Hardcoding closes both paths at the project-config boundary.' },
   { n: 8, t: 'Daily audit ceiling', c: '10 grounded audits per day; configurable via .scaffold/observability.yaml', r: '~10 audits + ~30 MMR runs daily worst case. Steady state 2–4/day. Comfortable headroom; safety valve against pre-filter bugs.' },
   { n: 9, t: 'Gap-signal emission', c: 'Always-on; <code>SCAFFOLD_GAP_SIGNAL_QUIET=1</code> silences for tests/CI', r: 'Catches gaps everywhere they occur. Small token bloat per prompt accepted in exchange for not missing signals in forgetfully-configured steps.' },
   { n: 10, t: 'CLAUDE.md drift fix', c: 'Standalone Task 0 PR off main before Phase 1 Task 1', r: 'Keeps the freshness work focused; takes ~5 minutes; removes a misleading reference for everyone.' },
@@ -183,7 +183,7 @@ const KROOT_DECISIONS = [
   { n: 3, t: 'Match rule', c: 'Exact slug match against entry <code>name:</code> field', r: 'Deterministic. Matches how the assembly engine identifies entries. Substring/topics-array matching introduces false-positive suppression of real gaps.' },
   { n: 4, t: 'Auto-detect-fails fallback', c: 'Soft-fail with one-line warning emitted from Lens I only when the lens runs; suppression disabled, lens runs as today', r: 'Suppression is an enhancement, not a contract. Emitting from the lens prevents spurious warnings when Lens I is disabled.' },
   { n: 5, t: 'CLI-override-points-at-nothing behavior', c: 'Hard error at the resolver, before any lens runs', r: 'Operator-typed contracts get sharp errors; yaml entries get soft-fail. Validation = exists + is-directory + has VERSION marker + loader runs cleanly. Empty index NOT rejected — freshly-initialized KB is valid.' },
-  { n: 6, t: 'Index refresh cadence', c: 'Once per audit run, no caching across runs', r: 'Walk is cheap (~270 files). Cross-run cache adds invalidation complexity for no measurable gain.' },
+  { n: 6, t: 'Index refresh cadence', c: 'Once per audit run, no caching across runs', r: 'Walk is fast in practice on the current ~270-file KB; cross-run cache would add invalidation complexity for no measurable gain at present scale. (Claim is unmeasured; if the KB grows past O(10k) files a benchmark would be needed.)' },
   { n: 7, t: 'Match against <code>topics:</code> array (in addition to name:)', c: 'No', r: '<code>topics:</code> is broad-keyword soup; would suppress real gaps. Out of scope.' },
   { n: 8, t: 'Bundle a static index', c: 'No', r: 'Adds a build step + drift risk between the live tree and the bundle. Direct walk is cheaper than maintenance cost.' },
   { n: 9, t: 'Semantics of knowledgeRoot (install root vs knowledge directory)', c: 'The knowledge directory itself', r: "Removes the implicit '+ /content/knowledge' append; matches what operators naturally type; eliminates double-append failure mode." },
@@ -203,48 +203,52 @@ const KROOT_DECISIONS = [
 // search terms (e.g. searching "normalize" finds nothing because GAP-DET-2
 // is titled "Topic clustering"). Add a keywords map so the renderer can
 // include operator-vocabulary search terms in the match surface.
+// R2-F-010 + R3-F-004: search vocabulary expansion. Each decision's
+// `keywords` is appended to the search haystack so operator-vocabulary
+// terms find the right decision regardless of canonical wording.
+// R3-F-004 added: "spec", "cron", "check", "ssrf" coverage where missing.
 const DECISION_KEYWORDS = {
   // spec-keyed: { specId, n: keywords }
   'parent-spec': {
-    1: 'naming branding',
-    2: 'pull request strategy merge target',
-    3: 'multi-model review corroboration timing',
-    4: 'allowlist hosts authoritative sources approve',
-    5: 'backfill seed initial entries',
+    1: 'naming branding spec specification',
+    2: 'pull request strategy merge target cron',
+    3: 'multi-model review corroboration timing mmr',
+    4: 'allowlist hosts authoritative sources approve check gate',
+    5: 'backfill seed initial entries cron',
     6: 'semver version pin downstream',
-    7: 'subprocess security injection llm dispatch hardcoded',
-    8: 'max-audits daily-ceiling rate limit throughput throttle',
+    7: 'subprocess security injection llm dispatch hardcoded ssrf adjacent',
+    8: 'max-audits daily-ceiling rate limit throughput throttle cron audit ceiling',
     9: 'env var quiet silence suppress tests ci',
-    10: 'documentation drift cleanup',
+    10: 'documentation drift cleanup spec',
   },
   'gap-detection-spec': {
-    1: 'projects project-id sha256 distinctness diversity',
-    2: 'normalize normalization slug kebab-case bucketing clustering',
-    3: 'lessons.md scanner synthetic markers heuristics',
+    1: 'projects project-id sha256 distinctness diversity check',
+    2: 'normalize normalization slug kebab-case bucketing clustering check',
+    3: 'lessons.md scanner synthetic markers heuristics check',
     4: 'assembly engine tail injection pipeline steps',
-    5: 'thresholds severity p1 p2 escalation',
-    6: 'distinct projects count diversity gate aggregator',
+    5: 'thresholds severity p1 p2 escalation check gate',
+    6: 'distinct projects count diversity gate aggregator check',
   },
   'knowledge-root-spec': {
-    1: 'suppression skip emit cover existing entry',
-    2: 'auto-detect override flag yaml escape hatch',
-    3: 'name field exact match assembly engine slug',
-    4: 'soft-fail warn warning fallback',
-    5: 'cli override invalid hard error exit code throw',
+    1: 'suppression skip emit cover existing entry check',
+    2: 'auto-detect override flag yaml escape hatch ssrf',
+    3: 'name field exact match assembly engine slug check',
+    4: 'soft-fail warn warning fallback check',
+    5: 'cli override invalid hard error exit code throw check ssrf adjacent path validation',
     6: 'cache invalidation refresh walk cadence',
     7: 'topics array broad keyword soup rejected',
     8: 'static index bundle build step drift',
     9: 'install root knowledge directory path semantics double-append',
     10: 'package json signature npm homebrew install global homedir',
     11: 'warn-once dedup set fix-flow per-audit module-global',
-    12: 'console warn malformed entry loader silent skip',
-    13: 'resolver placement runAudit handleAudit api',
-    14: 'js-yaml parser validator slug regex',
-    15: 'version marker validator strict empty index',
+    12: 'console warn malformed entry loader silent skip check',
+    13: 'resolver placement runAudit handleAudit api spec',
+    14: 'js-yaml parser validator slug regex check',
+    15: 'version marker validator strict empty index check',
     16: 'index pre-loaded resolver walk redundant',
     17: 'lens context optional fields tests migration backwards-compatible',
     18: 'stderr formatting quotes newlines escape ci logs',
-    19: 'yaml tier load observability config reuse',
+    19: 'yaml tier load observability config reuse spec',
     20: 'fix flow override propagation verifier postfix consistency',
   },
 }
@@ -293,6 +297,37 @@ const ARCH_CALLOUTS = {
   'lens-i': { title: 'Lens I — gap aggregator', file: 'src/observability/checks/lens-i-knowledge-gaps.ts', summary: 'Buckets signals by normalized topic, applies threshold matrix, suppresses buckets covered by an existing entry. Runs under --scope=docs and --scope=all.', code: "// thresholds\nif (signalCount >= 5 && distinctProjectCount >= 3) severity = 'P1'\nelse if (signalCount >= 3 && distinctProjectCount >= 2) severity = 'P2'\n// suppression\nif (index && index.has(bucket.topic)) continue" },
   finding: { title: 'Finding (P1 / P2)', file: 'src/observability/engine/types.ts', summary: 'Standard Finding shape emitted by every lens. Surfaced in the audit report; routable into MMR via the doc-conformance channel.', bullets: ['evidence.kind = "knowledge_gap"', 'evidence.signal_count, distinct_project_count, distinct_projects (sampled)', 'evidence.example_excerpts (deduped, capped at 3)', 'fix_hint.target = "content/knowledge/<category>/<slug>.md"'] },
   resolver: { title: '3-tier --knowledge-root resolver', file: 'src/observability/knowledge-index.ts:326-379', summary: 'Returns KnowledgeRootResolution { root, index, attempts }. Tier 1 (CLI) hard-errors on bad path; tier 2 (yaml) soft-fails; tier 3 (auto-detect) returns null if no scaffold install is above selfLocation.', bullets: ['Tier 1: input.override (resolved against process.cwd())', 'Tier 2: lenses["I-knowledge-gaps"].knowledge_root (resolved against input.cwd)', 'Tier 3: findScaffoldKnowledgeRoot(input.selfLocation ?? input.cwd ?? process.cwd())'] },
+  // R3-F-010: three real components that don't fit either arm of the main diagram
+  'phase-audit': {
+    title: 'phase-audit hook (StateManager.markCompleted)',
+    file: 'src/observability/engine/phase-audit.ts:63-116',
+    summary: 'Fires at every phase boundary (user-stories → tech-stack → implementation-plan → …). Runs ONLY Lens H-cross-doc (lensIds: [\'H-cross-doc\']). Phase audits do NOT trigger Lens I — see §6 "Phase audits don\'t trigger Lens I".',
+    bullets: [
+      'Trigger: StateManager.markCompleted() at end of any pipeline phase',
+      'Lens scope: Lens H only (one-line config in phase-audit.ts:77)',
+      'Implication: a downstream project\'s phase-audit showing zero findings does NOT mean Lens I is happy — Lens I never ran.',
+    ],
+  },
+  'doc-conformance-mmr': {
+    title: 'doc-conformance MMR channel',
+    file: 'src/observability/engine/api.ts (via --output-mode=mmr-findings)',
+    summary: 'Built-in MMR channel that ingests Lens I (and other --scope=docs lenses\') findings via the `mmr-findings` output mode. Disabled by default; enable per-PR with `mmr review --channels=doc-conformance`. This is the existing partial implementation of what Phase 5 will turn into a native knowledge-freshness MMR channel.',
+    bullets: [
+      'Activation: `mmr review --channels=doc-conformance`',
+      'Routes Lens I (P1/P2) gap findings into MMR reconciliation alongside Codex/Gemini/Claude',
+      'Not Phase 5 yet — Phase 5 will be a dedicated knowledge-freshness channel; doc-conformance is the interim path.',
+    ],
+  },
+  'fix-flow': {
+    title: '--fix flow (runFixFlow at fix-flow.ts:71-119)',
+    file: 'src/observability/engine/fix-flow.ts:71-119',
+    summary: 'Three-audit loop: (1) initial audit produces a fix plan; (2) for each blocking finding, dispatch a fix agent then re-audit just that finding (verifier); (3) one postfix audit runs everything for the final report. The --knowledge-root override threads into all three so Lens I suppression behavior is consistent.',
+    bullets: [
+      'Invoked via `scaffold observe audit --fix`',
+      'Each blocking finding gets up to 3 fix attempts (configurable in observability.yaml fix.per_finding_max_attempts)',
+      '--knowledge-root override (Workstream B decision #20) propagates to verifier + postfix',
+    ],
+  },
 }
 
 // ─── Gates ────────────────────────────────────────────────────
@@ -336,7 +371,16 @@ const PYRAMID = {
 }
 
 // ─── File map (clickable tree) ────────────────────────────────
-const ABS = REPO_ROOT
+// R3 follow-up: store REPO-RELATIVE paths (not absolute), so the baked
+// page is byte-identical across machines (CI vs local). The page's JS
+// renderer can prepend a configurable root for the vscode:// deep-links
+// (defaults to `/your/repo/path/here` if not configured; the operator
+// sets `data-repo-root` on <html> or via DevTools to make the links
+// resolve on their machine). Without this, the baked FILE_MAP carries
+// the machine of whoever last baked — useless for everyone else, and
+// the cause of CI failing when its absolute paths differ from the
+// developer's.
+const ABS = ''
 const FILE_MAP = [
   {
     kind: 'dir', name: 'src/observability', children: [
@@ -397,6 +441,9 @@ const FILE_MAP = [
       { kind: 'file', name: 'operations.md', absPath: `${ABS}/docs/knowledge-freshness/operations.md`, purpose: 'operator-facing playbooks' },
       { kind: 'file', name: 'authoritative-sources.yaml', absPath: `${ABS}/docs/knowledge-freshness/authoritative-sources.yaml`, purpose: 'allowlist (47 hosts + 3 GitHub repos)' },
       { kind: 'file', name: 'reference.html', absPath: `${ABS}/docs/knowledge-freshness/reference.html`, purpose: 'this page' },
+      { kind: 'file', name: 'REFERENCE-AUDIT.md', absPath: `${ABS}/docs/knowledge-freshness/REFERENCE-AUDIT.md`, purpose: 'R1 audit report (31 findings, shipped in PR #414)' },
+      { kind: 'file', name: 'REFERENCE-AUDIT-R2.md', absPath: `${ABS}/docs/knowledge-freshness/REFERENCE-AUDIT-R2.md`, purpose: 'R2 audit report (14 findings, shipped in PR #415)' },
+      { kind: 'file', name: 'REFERENCE-AUDIT-R3.md', absPath: `${ABS}/docs/knowledge-freshness/REFERENCE-AUDIT-R3.md`, purpose: 'R3 audit report (12 findings, fixed in this commit)' },
     ],
   },
   {
@@ -465,8 +512,18 @@ function stampById(html, id, value) {
   }
   return html.replace(re, (_m, open, _old, close) => `${open}${value}${close}`)
 }
-html = stampById(html, 'genDate', today)
-html = stampById(html, 'genSha', gitSha)
+// In CI, skip the date+SHA stamps so re-bakes don't diverge from the
+// committed page just because git HEAD is a synthetic merge commit
+// (PR builds) or the build runs on a different day than the bake.
+// Local bakes still stamp normally; the drift CI's "rebake-must-be-no-op"
+// check below depends on this so PR checks can pass deterministically.
+// The page's actual SHA + date are set when a maintainer rebakes locally
+// before pushing (or, in future, by a post-merge auto-rebake workflow).
+const CI = !!process.env.CI
+if (!CI) {
+  html = stampById(html, 'genDate', today)
+  html = stampById(html, 'genSha', gitSha)
+}
 html = stampById(html, 'kbVersion', kbVersion)
 html = stampById(html, 'statEntries', String(KB_INVENTORY.entries.length))
 // R2-F-014: stamp every literal-number-in-prose so adding entries / specs /
@@ -475,6 +532,10 @@ html = stampById(html, 'metaEntries', String(KB_INVENTORY.entries.length))
 html = stampById(html, 'metaHosts', String(ALLOWLIST.hosts.length))
 html = stampById(html, 'metaRepos', String(ALLOWLIST.github_repos.length))
 html = stampById(html, 'metaDecisions', String(DECISIONS.length))
+// R3-F-009: surface the real cron-audit count alongside audit-eligible.
+// Today realReviewedCount === 0; over time this will rise as the cron runs.
+html = stampById(html, 'metaRealReviewed', String(KB_INVENTORY.realReviewedCount ?? 0))
+html = stampById(html, 'statRealReviewed', String(KB_INVENTORY.realReviewedCount ?? 0))
 const specCount = new Set(DECISIONS.map((d) => d.specId)).size
 const specNames = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten']
 html = stampById(html, 'metaSpecs', specNames[specCount - 1] || String(specCount))

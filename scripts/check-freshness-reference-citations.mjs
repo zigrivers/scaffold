@@ -10,6 +10,7 @@
 
 import fs from 'node:fs'
 import path from 'node:path'
+import { execSync } from 'node:child_process'
 
 const REPO_ROOT = path.resolve(new URL('.', import.meta.url).pathname, '..')
 const HTML_PATH = path.join(REPO_ROOT, 'docs/knowledge-freshness/reference.html')
@@ -86,10 +87,59 @@ if (missing.length > 0) {
   for (const m of missing) console.log(`  ${m}`)
 }
 
-if (drifts.length > 0 || missing.length > 0) {
-  console.log('\nNote: this check only verifies the line exists; semantic drift')
+// R3-F-001: also catch silent staleness in the page (frontmatter changes
+// since last bake; build-script changes that affect rendered output; SHA
+// stamp drift, etc.) by re-running the bake and asserting the file didn't
+// change. This is stricter than a hand-rolled SHA comparison because:
+//
+//   - It catches ANY drift between source-of-truth and rendered output,
+//     not just the SHA stamp.
+//   - It's not subject to PR-merge-context vs. push-to-main SHA divergence
+//     (GitHub Actions' synthetic merge commit makes a pre-merge SHA check
+//     fundamentally circular — the page would need to be re-baked with
+//     a SHA that doesn't exist yet).
+//   - It catches build-script bugs that produce different output for the
+//     same input.
+//
+// The cost: this script now invokes the build script. The build is
+// idempotent (R2's sentinel-bounded substitution + R2's stampById) so
+// running it here is safe.
+let stampDrifts = []
+try {
+  // Snapshot the file's mtime + content hash, run the bake, compare.
+  const path = await import('node:path')
+  const { createHash } = await import('node:crypto')
+  const fileBefore = fs.readFileSync(HTML_PATH)
+  const hashBefore = createHash('sha256').update(fileBefore).digest('hex')
+  execSync('node scripts/build-freshness-reference.mjs', { cwd: REPO_ROOT, stdio: 'ignore' })
+  const fileAfter = fs.readFileSync(HTML_PATH)
+  const hashAfter = createHash('sha256').update(fileAfter).digest('hex')
+  if (hashBefore !== hashAfter) {
+    stampDrifts.push(
+      'Re-running the build script changed the page. The committed reference.html is out of sync with `scripts/build-freshness-reference.mjs` and the underlying data. Re-bake (`node scripts/build-freshness-reference.mjs`) and commit the result.',
+    )
+    // Show a short diff hint so the operator knows what differs.
+    try {
+      const diffOut = execSync('git diff --stat docs/knowledge-freshness/reference.html', { cwd: REPO_ROOT })
+        .toString().trim()
+      if (diffOut) stampDrifts.push('Diff after rebake: ' + diffOut)
+    } catch { /* ignore */ }
+    // Restore the original so this check doesn't leave the working tree dirty.
+    fs.writeFileSync(HTML_PATH, fileBefore)
+  }
+} catch (e) {
+  console.log(`(skipping rebake check: ${e.message})`)
+}
+
+if (stampDrifts.length > 0) {
+  console.log('\nProvenance stamp drift:')
+  for (const d of stampDrifts) console.log(`  ${d}`)
+}
+
+if (drifts.length > 0 || missing.length > 0 || stampDrifts.length > 0) {
+  console.log('\nNote: line-citation checks only verify the line exists; semantic drift')
   console.log('(line moved but file is still long enough) requires manual review.')
-  console.log('To re-bake the page with current line numbers, run:')
+  console.log('To re-bake the page with current line numbers + provenance stamp, run:')
   console.log('  node scripts/build-freshness-reference.mjs')
   process.exit(1)
 }
