@@ -122,6 +122,12 @@ export interface ReconciledResults {
     channels_partial: number
     total_elapsed: string
   }
+  /** Trust mode under which this review ran (§5 decision 1). */
+  trust_mode?: 'base-ref' | 'untrusted-head' | 'non-git'
+  /** Ack-file paths added/modified by the diff under review. */
+  proposed_acks?: string[]
+  /** True when `.mmr.yaml` was added/modified by the diff under review. */
+  proposed_config_change?: boolean
 }
 
 // ChannelConfig and MmrConfig are derived from Zod schemas to prevent type drift.
