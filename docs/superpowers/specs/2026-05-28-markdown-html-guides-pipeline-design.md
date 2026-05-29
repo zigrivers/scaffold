@@ -214,7 +214,7 @@ observability & knowledge-freshness.
 - `scaffold guides --list` (`--format json` for machines)
 - `scaffold guides <topic> --markdown` → print markdown; `--print-path` → path to `index.md`
 - `--no-open` honored throughout
-- `scaffold guides build [--all]` → run `lintGuides()` (hard-fail on a missing
+- `scaffold guides build` → run `lintGuides()` (hard-fail on a missing
   text-equivalent; warn past ~3 embeds), then regenerate guide HTML + the index
   page from sources. Because the drift gate runs `build`, the lint enforces on
   every regeneration — a non-compliant guide cannot reach checked-in HTML. This is
@@ -237,7 +237,7 @@ Guarantees npm and brew ship identical, audited HTML.
 **Chrome evolution.** Chrome (template + `chrome.js` + theme CSS) is shared, so a
 chrome change must regenerate *every* guide or the gate fails. Each generated file
 carries `data-chrome-version`; bumping the chrome version is the signal to run
-`scaffold guides build --all` in the same PR. With one guide in this iteration the
+`scaffold guides build` in the same PR. With one guide in this iteration the
 cost is trivial; the marker and `--all` keep it bounded as guides are added.
 
 ### Agent access

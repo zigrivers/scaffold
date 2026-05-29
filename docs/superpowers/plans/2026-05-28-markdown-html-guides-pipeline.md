@@ -1771,10 +1771,10 @@ git commit -m "feat(guides): scaffold guides command (open/list/markdown/print-p
 set -euo pipefail
 
 # Regenerate all guides and fail if the working tree changed (HTML is checked in).
-node dist/index.js guides --build --all
+node dist/index.js guides --build
 
 if ! git diff --quiet -- content/guides; then
-  echo "ERROR: generated guide HTML is stale. Run 'scaffold guides --build --all' and commit." >&2
+  echo "ERROR: generated guide HTML is stale. Run 'scaffold guides --build' and commit." >&2
   git --no-pager diff --stat -- content/guides >&2
   exit 1
 fi
@@ -1930,7 +1930,7 @@ Findings are graded :sev[P0]{level=p0} :sev[P1]{level=p1} :sev[P2]{level=p2}
 
 - [ ] **Step 2: Generate the guide HTML (requires a browser for the one mermaid diagram)**
 
-Run: `npm run build && node dist/index.js guides --build --all`
+Run: `npm run build && node dist/index.js guides --build`
 Expected: writes `content/guides/mmr/index.html`, `content/guides/index.html`, and `content/guides/mmr/.diagrams/diagram-0.svg` + `manifest.json`. If `mmdc` reports no browser, install it (`npx puppeteer browsers install chromium`) per `mmdc` docs and re-run.
 
 - [ ] **Step 3: Manual visual + functional verification via the existing Playwright MCP**
@@ -1978,7 +1978,7 @@ Human + agent reference guides live in `content/guides/<topic>/index.md`
 - Agents: read the bundled `content/guides/<topic>/index.md` — or
   `scaffold guides <topic> --markdown` / `--print-path`, and
   `scaffold guides --list --format json` for discovery. Never read the HTML.
-- Regenerate after editing a source: `scaffold guides --build --all`
+- Regenerate after editing a source: `scaffold guides --build`
   (maintainer/source-time; the drift gate enforces freshness).
 ```
 
