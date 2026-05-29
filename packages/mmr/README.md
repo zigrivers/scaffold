@@ -271,10 +271,16 @@ mmr review --pr 42 --dry-run
 
 ### Stable finding identity and sessions
 
-Each reconciled finding now carries a `finding_key` — a deterministic sha1 of
-the normalized location, category, description, and suggestion. The key is
-stable across rounds: line-number drift, severity changes, and channel-side
-phrasing tweaks no longer change the identity of the underlying issue.
+Each reconciled finding now carries a `finding_key` — a deterministic hash
+built from the **normalized** location and category plus a sha1 of the
+normalized description and suggestion (severity is intentionally *not* part of
+the key). Normalization strips trailing line/column spans from the location and
+inline `line N` mentions from the prose, and folds casing/whitespace. As a
+result, line-number drift and severity changes do not change the identity of an
+issue across rounds. The hash still depends on the description/suggestion text,
+so a substantial channel-side rewrite *will* produce a new key — that larger
+phrasing drift is absorbed by the fuzzy **ack** fallback described below
+(Jaccard ≥ 0.7 on the description shingle), not by the key itself.
 
 Sessions group related reviews. Choose a session id (matching
 `^[a-zA-Z0-9_-]+$`), register it with `mmr sessions start <id>`, then pass
@@ -350,10 +356,24 @@ Optional fields:
 - `api_key_prefix` (default `Bearer `; set to `""` for providers that
   expect a raw key)
 - `headers` — extra headers (e.g. `{ "X-Org": "..." }`)
-- `auth.check_endpoint` — explicit auth-probe URL. When unset, MMR derives the
-  probe by replacing a trailing `/chat/completions` with `/models`. If the
-  endpoint does not end in `/chat/completions`, `auth.check_endpoint` is
-  required.
+- `auth.check_endpoint` — explicit auth-probe URL, written as a `check_endpoint`
+  key nested under an `auth:` block (the `auth.` prefix is dot-notation for that
+  nesting):
+
+  ```yaml
+  channels:
+    custom:
+      kind: http
+      endpoint: https://api.example.com/v2/respond   # non-standard path
+      model: my-model
+      endpoint_convention: openai-chat
+      auth:
+        check_endpoint: https://api.example.com/v2/health
+  ```
+
+  When unset, MMR derives the probe by replacing a trailing `/chat/completions`
+  with `/models`. If the endpoint does not end in `/chat/completions`,
+  `auth.check_endpoint` is required (and config validation fails without it).
 
 #### LM Studio (local, no API key)
 
