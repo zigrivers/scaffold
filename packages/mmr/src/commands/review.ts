@@ -15,8 +15,9 @@ import {
   getCompensatingChannels,
   dispatchCompensatingPasses,
   getDispatchableCompensatorChannel,
+  getCompensatorChannel,
   resolveCompensatorChannelName,
-  resolveCompensatorDispatch,
+  resolveCompensatorOutputParser,
 } from '../core/compensator.js'
 import type { Severity, OutputFormat, ChannelStatus, ReconciledResults, ReviewControls } from '../types.js'
 import { formatJson } from '../formatters/json.js'
@@ -197,6 +198,20 @@ export async function checkConfiguredCompensatorAvailability(
 ): Promise<CompensatorAvailability> {
   const channelName = config.defaults.compensator?.channel
   if (!channelName) return { status: 'ok', auth: 'ok' }
+
+  const compChannel = getCompensatorChannel(config)
+
+  // HTTP compensator: probe over the wire (no install/command step).
+  if (compChannel && compChannel.kind === 'http') {
+    const httpAuth = await checkHttpAuth(compChannel)
+    if (httpAuth.status === 'ok') return { status: 'ok', auth: 'ok' }
+    const httpStatus = channelStatusFromAuthResult(httpAuth.status)
+    return {
+      status: httpStatus,
+      auth: httpStatus === 'skipped' ? 'skipped' : 'failed',
+      recovery: httpAuth.recovery,
+    }
+  }
 
   const chConfig = getDispatchableCompensatorChannel(config, channelName)
   const cmd = chConfig.command.split(' ')[0]
@@ -703,13 +718,14 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     if (compensating.length > 0) {
       const compensatorAvailability = await checkConfiguredCompensatorAvailability(config)
       if (compensatorAvailability.status === 'ok') {
-        const dispatch = resolveCompensatorDispatch(config)
+        // Kind-aware: the compensator may be a subprocess or an http channel.
+        const compensatorOutputParser = resolveCompensatorOutputParser(config)
         // Register compensating channels in job.json so loadJob can discover them
         for (const comp of compensating) {
           store.registerChannel(job.job_id, comp.compensatingName, {
             status: 'dispatched',
             auth: 'ok',
-            output_parser: dispatch.output_parser,
+            output_parser: compensatorOutputParser,
           })
         }
         await dispatchCompensatingPasses(store, job.job_id, prompt, compensating, config)
