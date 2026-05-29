@@ -20,7 +20,14 @@ import { formatJson } from '../formatters/json.js'
 import { formatText } from '../formatters/text.js'
 import { formatMarkdown } from '../formatters/markdown.js'
 import type { ChannelConfigParsed, MmrConfigParsed } from '../config/schema.js'
-import { getSessionStore, resolveJobsDir, isValidSessionId, SESSION_ID_RULE, type SessionStore } from './sessions.js'
+import {
+  getSessionStore,
+  resolveJobsDir,
+  resolveSessionRoot,
+  isValidSessionId,
+  SESSION_ID_RULE,
+  type SessionStore,
+} from './sessions.js'
 
 interface ReviewArgs {
   diff?: string
@@ -599,7 +606,10 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       // acks to self-suppress its own findings. The trust-mode thread adds the
       // trusted default path (project acks from a git base ref). The pipeline
       // fails safe if the acks tree is unreadable.
-      const ackStore = buildReviewAckStore({ trustProjectAcks: reviewControls.trust_project_acks })
+      const ackStore = buildReviewAckStore({
+        trustProjectAcks: reviewControls.trust_project_acks,
+        userRoot: resolveSessionRoot(),
+      })
       const { results, formatted, exitCode } = runResultsPipeline(store, completedJob, outputFormat, false, {
         ackStore,
       })

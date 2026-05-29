@@ -1,5 +1,5 @@
 import type { CommandModule, ArgumentsCamelCase } from 'yargs'
-import { resolveJobsDir } from './sessions.js'
+import { resolveJobsDir, resolveSessionRoot } from './sessions.js'
 import { JobStore } from '../core/job-store.js'
 import { runResultsPipeline } from '../core/results-pipeline.js'
 import { buildReviewAckStore } from '../core/ack-store.js'
@@ -61,7 +61,10 @@ export const resultsCommand: CommandModule<object, ResultsArgs> = {
     // review_controls) so re-running results reproduces the same suppression
     // instead of overwriting saved results with acknowledged stamps stripped.
     const outputFormat = (args.format ?? job.format ?? 'json') as OutputFormat
-    const ackStore = buildReviewAckStore({ trustProjectAcks: job.review_controls?.trust_project_acks ?? false })
+    const ackStore = buildReviewAckStore({
+      trustProjectAcks: job.review_controls?.trust_project_acks ?? false,
+      userRoot: resolveSessionRoot(),
+    })
     const { results, formatted, exitCode } = runResultsPipeline(store, job, outputFormat, args.raw, { ackStore })
     store.saveResults(job.job_id, results)
     console.log(formatted)

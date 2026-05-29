@@ -1,11 +1,11 @@
 import type { CommandModule, ArgumentsCamelCase } from 'yargs'
 import fs from 'node:fs'
-import os from 'node:os'
 import path from 'node:path'
 import { AckStore, FINDING_KEY_RE, type AckScope, type AckRecord } from '../core/ack-store.js'
 import { JobStore } from '../core/job-store.js'
 import { normalizeLocationForKey } from '../core/stable-id.js'
-import { resolveJobsDir } from './sessions.js'
+import { findProjectRoot } from '../core/project-root.js'
+import { resolveJobsDir, resolveSessionRoot } from './sessions.js'
 import type { ReconciledResults, ReconciledFinding } from '../types.js'
 
 const JOB_ID_RE = /^mmr-[a-f0-9]{12}$/
@@ -16,11 +16,6 @@ interface AckArgs {
   job?: string
   reason?: string
   scope?: string
-}
-
-/** User home resolved the same way as MMR sessions/jobs (honors HOME override). */
-function userHome(): string {
-  return process.env.HOME ?? os.homedir()
 }
 
 // Generous upper bound on a results.json read. This is trusted MMR-written
@@ -87,7 +82,9 @@ export const ackCommand: CommandModule<object, AckArgs> = {
     // The ack CLI is operator-driven on a trusted machine, so it manages both
     // project and user scopes directly (unlike the review gate, which gates
     // project acks behind trust). Scope selection is explicit via --scope.
-    const ackStore = new AckStore({ projectRoot: process.cwd(), userHome: userHome() })
+    // Project root is discovered from cwd (works from a subdirectory); user
+    // acks live under the MMR state root (resolveSessionRoot(), MMR_HOME-aware).
+    const ackStore = new AckStore({ projectRoot: findProjectRoot(), userRoot: resolveSessionRoot() })
 
     if (args.action === 'list') {
       console.log(JSON.stringify(ackStore.listAll(), null, 2))

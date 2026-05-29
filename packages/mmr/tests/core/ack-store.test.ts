@@ -14,7 +14,7 @@ let store: AckStore
 beforeEach(() => {
   tmpProject = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-ack-proj-'))
   tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-ack-home-'))
-  store = new AckStore({ projectRoot: tmpProject, userHome: tmpHome })
+  store = new AckStore({ projectRoot: tmpProject, userRoot: path.join(tmpHome, '.mmr') })
 })
 
 afterEach(() => {
@@ -247,7 +247,7 @@ describe('AckStore', () => {
   })
 
   it('disables project scope when constructed without a projectRoot', () => {
-    const userOnly = new AckStore({ userHome: tmpHome })
+    const userOnly = new AckStore({ userRoot: path.join(tmpHome, '.mmr') })
     const record: AckRecord = {
       finding_key: FAKE_KEY,
       normalized_location: 'src/foo.ts',
@@ -270,12 +270,12 @@ describe('AckStore', () => {
       created_at: '2026-05-22T00:00:00Z',
     }
     // Plant a project ack in the (untrusted) working tree.
-    new AckStore({ projectRoot: tmpProject, userHome: tmpHome }).add(record, 'project')
+    new AckStore({ projectRoot: tmpProject, userRoot: path.join(tmpHome, '.mmr') }).add(record, 'project')
 
-    const untrusted = buildReviewAckStore({ trustProjectAcks: false, cwd: tmpProject, home: tmpHome })
+    const untrusted = buildReviewAckStore({ trustProjectAcks: false, cwd: tmpProject, userRoot: path.join(tmpHome, '.mmr') })
     expect(untrusted.lookup({ finding_key: FAKE_KEY, normalized_location: 'src/foo.ts', shingle: SHINGLE })).toBeUndefined()
 
-    const trusted = buildReviewAckStore({ trustProjectAcks: true, cwd: tmpProject, home: tmpHome })
+    const trusted = buildReviewAckStore({ trustProjectAcks: true, cwd: tmpProject, userRoot: path.join(tmpHome, '.mmr') })
     expect(trusted.lookup({ finding_key: FAKE_KEY, normalized_location: 'src/foo.ts', shingle: SHINGLE })?.match).toBe('exact')
   })
 
