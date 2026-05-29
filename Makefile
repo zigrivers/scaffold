@@ -1,4 +1,4 @@
-.PHONY: help test lint validate validate-knowledge check check-all eval ts-check setup hooks dashboard-test mmr-build mmr-test mmr-check
+.PHONY: help test lint validate validate-knowledge check check-all eval ts-check setup hooks dashboard-test mmr-build mmr-test mmr-check check-reference-citations check-freshness-citations
 
 help: ## Show available targets
 	@grep -E '^[a-z][a-z-]*:.*## ' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -16,12 +16,14 @@ validate-knowledge: ## Validate frontmatter on knowledge entries (freshness fiel
 	npm run build
 	node dist/index.js validate-knowledge
 
-check-freshness-citations: ## Verify docs/knowledge-freshness/reference.html line-citations still resolve
-	node scripts/check-freshness-reference-citations.mjs
+check-reference-citations: ## Verify file:line citations in all docs/ reference pages resolve (+ rebake-no-op for generated pages)
+	node scripts/check-reference-citations.mjs
+
+check-freshness-citations: check-reference-citations ## Back-compat alias for check-reference-citations
 
 check: lint validate test eval ## Run bash quality gates (lint + validate + test + eval)
 
-check-all: check ts-check mmr-check validate-knowledge check-freshness-citations ## Run all quality gates (bash + TypeScript + knowledge frontmatter + freshness-page citations)
+check-all: check ts-check mmr-check validate-knowledge check-reference-citations ## Run all quality gates (bash + TypeScript + knowledge frontmatter + reference-page citations)
 
 ts-check: ## Run TypeScript quality gates (lint + type-check + build + unit tests)
 	npm run lint
