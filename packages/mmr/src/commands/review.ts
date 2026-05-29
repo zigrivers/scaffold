@@ -1,7 +1,6 @@
 import type { CommandModule, ArgumentsCamelCase } from 'yargs'
 import fs from 'node:fs'
 import path from 'node:path'
-import os from 'node:os'
 import { execFileSync } from 'node:child_process'
 import { loadConfig } from '../config/loader.js'
 import { JobStore } from '../core/job-store.js'
@@ -21,7 +20,7 @@ import { formatJson } from '../formatters/json.js'
 import { formatText } from '../formatters/text.js'
 import { formatMarkdown } from '../formatters/markdown.js'
 import type { ChannelConfigParsed, MmrConfigParsed } from '../config/schema.js'
-import { SessionStore, resolveSessionRoot } from './sessions.js'
+import { getSessionStore, resolveSessionRoot, type SessionStore } from './sessions.js'
 
 interface ReviewArgs {
   diff?: string
@@ -362,7 +361,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
 
     let sessionLink: { store: SessionStore; id: string } | undefined
     if (args.session !== undefined) {
-      sessionLink = { store: new SessionStore(resolveSessionRoot()), id: args.session }
+      sessionLink = { store: getSessionStore(), id: args.session }
     }
 
     // 3. Determine enabled channels — channels_disabled applies to the default list only;
@@ -445,7 +444,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     }
 
     // 5. Create job
-    const jobsDir = path.join(os.homedir(), '.mmr', 'jobs')
+    const jobsDir = path.join(resolveSessionRoot(), 'jobs')
     const store = new JobStore(jobsDir)
     const job = store.createJob({
       fix_threshold: config.defaults.fix_threshold as Severity,
@@ -456,7 +455,13 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       review_controls: reviewControls,
     })
     if (sessionLink) {
-      sessionLink.store.addJob(sessionLink.id, job.job_id, args.round ?? 1)
+      try {
+        sessionLink.store.addJob(sessionLink.id, job.job_id, args.round ?? 1)
+      } catch (err) {
+        console.error((err as Error).message)
+        process.exitCode = 1
+        return
+      }
     }
 
     // Record skipped/auth-failed channels in job metadata

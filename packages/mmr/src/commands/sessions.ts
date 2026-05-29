@@ -206,7 +206,7 @@ export function resolveSessionRoot(): string {
   return process.env.MMR_HOME ?? path.join(process.env.HOME ?? os.homedir(), '.mmr')
 }
 
-function getSessionStore(): SessionStore {
+export function getSessionStore(): SessionStore {
   return new SessionStore(resolveSessionRoot())
 }
 
