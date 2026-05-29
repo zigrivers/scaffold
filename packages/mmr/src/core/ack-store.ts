@@ -5,6 +5,9 @@ import { jaccardSimilarity } from './stable-id.js'
 
 const FUZZY_THRESHOLD = 0.7
 const FINDING_KEY_RE = /^[a-f0-9]{40}$/
+// Acks are tiny (a key, a location, a few dozen shingles). Cap reads so a
+// planted oversized file in an untrusted project tree can't OOM the review.
+const MAX_ACK_BYTES = 1024 * 1024
 
 export interface AckRecord {
   finding_key: string
@@ -142,15 +145,33 @@ export class AckStore {
   }
 
   private readDir(dir: string): AckRecord[] {
-    if (!fs.existsSync(dir)) return []
+    let entries: string[]
+    try {
+      if (!fs.existsSync(dir)) return []
+      entries = fs.readdirSync(dir)
+    } catch {
+      return [] // transient FS error (ENOENT/ENOTDIR/race) → treat as no acks
+    }
     const out: AckRecord[] = []
-    for (const entry of fs.readdirSync(dir)) {
+    for (const entry of entries) {
       if (!entry.endsWith('.json')) continue
       const keyOnly = entry.replace(/\.json$/, '')
       if (!FINDING_KEY_RE.test(keyOnly)) continue
+      const fp = path.join(dir, entry)
+      let st: fs.Stats
+      try {
+        st = fs.lstatSync(fp)
+      } catch {
+        continue
+      }
+      // Skip symlinks and oversized/non-regular files before reading. Project
+      // acks live in the untrusted reviewed tree, so a planted symlink could
+      // point readFileSync at a huge or sensitive target (DoS / disclosure) —
+      // mirror the write-side symlink hardening on the read path.
+      if (st.isSymbolicLink() || !st.isFile() || st.size > MAX_ACK_BYTES) continue
       let parsed: unknown
       try {
-        parsed = JSON.parse(fs.readFileSync(path.join(dir, entry), 'utf-8'))
+        parsed = JSON.parse(fs.readFileSync(fp, 'utf-8'))
       } catch {
         continue // best-effort: skip unreadable/malformed JSON
       }

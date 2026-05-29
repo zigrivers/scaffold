@@ -187,6 +187,41 @@ describe('AckStore', () => {
     expect(store.listAll()).toHaveLength(0)
   })
 
+  it('skips a symlinked ack entry on read (does not follow into untrusted targets)', () => {
+    const dir = path.join(tmpProject, '.mmr', 'acks')
+    fs.mkdirSync(dir, { recursive: true })
+    // A real, valid ack file the symlink points at — proves the skip is due to
+    // the symlink itself, not the content.
+    const realTarget = path.join(tmpProject, 'real-ack.json')
+    fs.writeFileSync(
+      realTarget,
+      JSON.stringify({
+        finding_key: FAKE_KEY,
+        normalized_location: 'src/foo.ts',
+        description_shingle: SHINGLE,
+        created_at: '2026-05-22T00:00:00Z',
+      }),
+    )
+    fs.symlinkSync(realTarget, path.join(dir, `${FAKE_KEY}.json`))
+    expect(store.listAll()).toHaveLength(0)
+    expect(store.lookup({ finding_key: FAKE_KEY, normalized_location: 'src/foo.ts', shingle: SHINGLE })).toBeUndefined()
+  })
+
+  it('skips an oversized ack file on read (DoS guard)', () => {
+    const dir = path.join(tmpProject, '.mmr', 'acks')
+    fs.mkdirSync(dir, { recursive: true })
+    // > 1 MiB of valid JSON (padded reason) — skipped before full parse matters.
+    const huge = {
+      finding_key: FAKE_KEY,
+      normalized_location: 'src/foo.ts',
+      description_shingle: SHINGLE,
+      reason: 'x'.repeat(1024 * 1024 + 16),
+      created_at: '2026-05-22T00:00:00Z',
+    }
+    fs.writeFileSync(path.join(dir, `${FAKE_KEY}.json`), JSON.stringify(huge))
+    expect(store.listAll()).toHaveLength(0)
+  })
+
   it('add() rejects a structurally invalid record before persisting it', () => {
     const bad = {
       finding_key: FAKE_KEY,
