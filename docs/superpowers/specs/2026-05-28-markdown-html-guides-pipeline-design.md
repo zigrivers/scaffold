@@ -104,7 +104,11 @@ the existing build already copies `knowledge-update-template.md` into `dist/`):
 `tsc && cp lib/dashboard-theme.css dist/guides/dashboard-theme.css`. The
 generator resolves the CSS via `getPackageRoot()` → `dist/guides/…`, which
 exists in dev, npm-global, and brew alike. `dist/` is already in the `files`
-array, so this is zero net packaging change.
+array, so this is zero net packaging change. **Ordering matters:** the `cp`
+must run **after** `tsc` in the same `build` invocation, and after any
+`dist/`-clean step (`rimraf dist && tsc && cp …`) — otherwise a clean would
+delete the copied CSS. The generator guards against a missing
+`dist/guides/dashboard-theme.css` with an error pointing at the build step.
 
 ### Content directive vocabulary (small, agent-readable)
 Authored with `remark-directive` (bodies stay real markdown) + one fenced block:
@@ -136,7 +140,9 @@ source. `type=bar` is the only supported type this iteration (extensible later).
   headless browser). Single chosen renderer. **Build-time only; never shipped;
   offline at view time** (output is inline `<svg>`).
 - **SVG cache (checked in):** key = hash of `mermaid source + mmdc version +
-  render options`; cached SVGs live at `partials/.mermaid-cache/<key>.svg` and are
+  render options`; cached SVGs live in a **build-internal** dir at the guide
+  root — `content/guides/<slug>/.diagrams/<key>.svg` (a dot-dir, distinct from the
+  escape-hatch `partials/`, and ignored by the escape-hatch lint) — and are
   **committed**. The build renders a diagram only on a cache miss (source or
   renderer changed), so cold-cache CI and browser-less contributors build
   successfully for unchanged diagrams; a changed diagram with no browser fails
@@ -178,10 +184,15 @@ observability & knowledge-freshness.
   `custom.css`, `custom.js` are injected by the template (outside the sanitized
   body) and are therefore the explicit, reviewed exception. The narrow-hatch lint
   (≤3 embeds, text-equivalent required) bounds their volume and forces review.
-- **CI scan:** the drift-gate job greps every generated `index.html` for
-  high-risk patterns (`<script>` outside the known chrome bundle, `on*=`
-  handlers, `javascript:`/external `src`) and fails on an unexpected match —
-  catching both an over-broad sanitize schema and a risky escape-hatch partial.
+- **CI scan with an explicit allowlist:** the drift-gate job scans every generated
+  `index.html` for high-risk patterns (`<script>`, `on*=` handlers,
+  `javascript:`/external `src`) but matches them against a known-good allowlist so
+  it can tell legitimate from risky. The allowlist = (a) the chrome bundle,
+  identified by a fixed marker comment (`<!-- scaffold:chrome vN -->`), and (b)
+  per-guide escape-hatch scripts that the guide **declares in frontmatter**
+  (`escape_scripts: [custom.js]`). Anything outside the allowlist fails the scan.
+  A test exercises a minimal `custom.js` containing a `<script>` tag: declared →
+  passes, undeclared → fails.
 
 ### CLI — `scaffold guides`
 - `scaffold guides` → open index in browser (reuse dashboard opener)
@@ -189,11 +200,14 @@ observability & knowledge-freshness.
 - `scaffold guides --list` (`--format json` for machines)
 - `scaffold guides <topic> --markdown` → print markdown; `--print-path` → path to `index.md`
 - `--no-open` honored throughout
-- `scaffold guides build [--all]` → regenerate guide HTML + the index page from
-  sources. This is a **source/maintainer-time** operation (dev, CI, and
-  brew-build-from-source all have the full tree incl. the `dist/`-copied theme
-  CSS). End users consume the **pre-built, checked-in** HTML and never invoke
-  `build`; `--all` forces regeneration of every guide (used after a chrome change).
+- `scaffold guides build [--all]` → run `lintGuides()` (hard-fail on a missing
+  text-equivalent; warn past ~3 embeds), then regenerate guide HTML + the index
+  page from sources. Because the drift gate runs `build`, the lint enforces on
+  every regeneration — a non-compliant guide cannot reach checked-in HTML. This is
+  a **source/maintainer-time** operation (dev, CI, and brew-build-from-source all
+  have the full tree incl. the `dist/`-copied theme CSS). End users consume the
+  **pre-built, checked-in** HTML and never invoke `build`; `--all` forces
+  regeneration of every guide (used after a chrome change).
 
 ### Manifest & index
 `buildGuidesIndex()` (mirrors `buildIndex()`) scans `content/guides/*/index.md`
@@ -224,7 +238,7 @@ give programmatic access; `--list --format json` gives discovery.
 | `src/guides/loader.ts` | scan `content/guides/`, parse frontmatter → manifest | fs, frontmatter parser |
 | `src/guides/render.ts` | md+directives → hast → HTML body | unified/remark/rehype |
 | `src/guides/directives.ts` | custom hast transforms for the 6 directives + embed | render.ts |
-| `src/guides/mermaid.ts` | mermaid source → cached inline SVG (build-time), fingerprinted key | `mmdc` |
+| `src/guides/mermaid.ts` | mermaid source → inline SVG (build-time), fingerprinted key, cached in `<slug>/.diagrams/` | `mmdc` |
 | `src/guides/sanitize.ts` | `rehype-sanitize` custom schema allowlisting directive output | rehype-sanitize |
 | `src/guides/template.ts` | wrap body in chrome + inline CSS/JS + `data-chrome-version` → full HTML | render.ts; `dist/guides/dashboard-theme.css` |
 | `src/guides/index-page.ts` | generate index page from manifest | loader.ts, template.ts |
@@ -245,10 +259,14 @@ give programmatic access; `--list --format json` gives discovery.
   as a **content-parity** reference, not a pixel/DOM baseline (the new pipeline's
   DOM — rehype output, auto-TOC, new chrome — differs by design, so visual identity
   to the old file would be brittle).
-- **Playwright functional verification:** against the generated guide, assert
-  behavior, not pixels vs the old file — tabs switch, filter hides rows, mermaid
-  `<svg>` is present, theme toggle works, **no console errors** — at desktop +
-  mobile, light + dark.
+- **Functional verification (increment 1 = manual, via existing Playwright MCP):**
+  the repo already exposes the Playwright MCP (per CLAUDE.md) — use it to spot-check
+  the generated MMR guide (tabs switch, filter hides rows, mermaid `<svg>` present,
+  theme toggle, **no console errors**) at desktop + mobile, light + dark, and save
+  screenshots under `tests/screenshots/current/`. This adds **no** package/CI
+  dependency. **Automated** cross-viewport Playwright tests as a CI devDependency
+  (browser provisioning, flakiness surface) are **deferred** to a follow-up once
+  chrome is stable / the second guide lands.
 - **Drift gate test:** regenerate → `git diff --exit-code` is clean; security scan passes.
 
 ## Error handling
@@ -264,12 +282,16 @@ give programmatic access; `--list --format json` gives discovery.
 ## Smallest viable first step
 Convert `docs/reference/mmr-reference.html` → `content/guides/mmr/index.md` +
 generated `content/guides/mmr/index.html`. Zero escape-hatch; exercises tabs,
-filter-table, and one mermaid diagram. Stand up `guides` command, manifest, index
-page, sanitize schema, drift gate + security scan, and Playwright functional
-verification with a committed self-golden. Migrate observability and
+filter-table, and one mermaid diagram (whose SVG is cached in
+`content/guides/mmr/.diagrams/`, not the escape-hatch `partials/` — so MMR stays
+genuinely escape-hatch-free). Stand up `guides` command, manifest, index page,
+sanitize schema, lint wired into build, drift gate + security scan, a committed
+self-golden, and a manual Playwright-MCP spot-check. Migrate observability and
 knowledge-freshness (and fix the latter's Google-Fonts violation) in follow-ups.
 
 ## Out of scope (this iteration)
 - Migrating the observability and knowledge-freshness guides.
+- **Automated** cross-viewport Playwright CI tests (increment 1 uses the existing
+  Playwright MCP for a manual spot-check; automate when chrome stabilizes).
 - A hosted docs site (GH Pages) — easy follow-up from the same markdown; bundled/offline is primary.
 - AGENTS.md creation (reference from CLAUDE.md for now).
