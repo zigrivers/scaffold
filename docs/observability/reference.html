@@ -154,6 +154,17 @@ a {
 }
 a:hover { color: var(--accent-hover); }
 
+/* Global focus ring (keyboard only) — every interactive element gets one. */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+/* Skip link — first tab stop. */
+.skip-link {
+  position: absolute; left: -999px; top: 0; z-index: 100;
+  background: var(--accent); color: #fff; padding: 8px 14px;
+  border-radius: 0 0 var(--radius-sm) 0; font-family: var(--font-mono); font-size: 12px;
+}
+.skip-link:focus { left: 0; }
+
 code, kbd, samp { font-family: var(--font-mono); font-size: 0.92em; }
 :not(pre) > code {
   background: var(--bg-inset);
@@ -164,7 +175,7 @@ code, kbd, samp { font-family: var(--font-mono); font-size: 0.92em; }
   border: 1px solid var(--border-light);
 }
 /* clickable file-path token */
-.fp { cursor: pointer; transition: color 0.15s ease, border-color 0.15s ease; }
+.fp { cursor: pointer; border-bottom: 1px dotted var(--border); transition: color 0.15s ease, border-color 0.15s ease; }
 .fp:hover { color: var(--accent); border-color: var(--accent); }
 .fp.is-copied { color: var(--sev-pass); border-color: var(--sev-pass); }
 
@@ -254,7 +265,7 @@ p { margin: 0; }
 }
 .glossary-label {
   font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.10em;
-  font-size: 10.5px; color: var(--text-faint); margin-right: var(--sp-3); white-space: nowrap;
+  font-size: 10.5px; color: var(--text-muted); margin-right: var(--sp-3); white-space: nowrap;
 }
 .glossary-chip {
   font-size: 12.5px; color: var(--text-strong); text-decoration: none;
@@ -351,7 +362,7 @@ section.s li { margin-bottom: var(--sp-1); }
 .sort-asc::after  { content: ' ↑'; color: var(--accent); }
 .sort-desc::after { content: ' ↓'; color: var(--accent); }
 .tbl-filter { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); padding: var(--sp-3); background: var(--bg-prose); border-bottom: 1px solid var(--border); }
-.tbl-filter label { font-family: var(--font-mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-faint); }
+.tbl-filter label { font-family: var(--font-mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); }
 .tbl-filter input[type=search], .tbl-filter select {
   font-family: var(--font-sans); font-size: 13px; padding: 5px 9px; border: 1px solid var(--border);
   border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text); min-width: 160px;
@@ -373,8 +384,10 @@ svg.diagram { width: 100%; height: auto; display: block; margin: var(--sp-4) 0; 
 .diagram .node-clickable { cursor: pointer; }
 .diagram .node-clickable:hover .node-bg, .diagram .node-bg.is-hot { fill: var(--accent-soft); stroke: var(--accent); }
 .diagram .node-label { fill: var(--text); font-family: var(--font-sans); font-size: 12.5px; font-weight: 600; pointer-events: none; }
-.diagram .node-sub { fill: var(--text-faint); font-family: var(--font-mono); font-size: 9.5px; pointer-events: none; }
-.diagram .lane-label { fill: var(--text-faint); font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; }
+.diagram .node-sub { fill: var(--text-muted); font-family: var(--font-mono); font-size: 9.5px; pointer-events: none; }
+.diagram .lane-label { fill: var(--text-muted); font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; }
+.diagram .node-clickable:focus-visible { outline: none; }
+.diagram .node-clickable:focus-visible .node-bg { stroke: var(--accent); stroke-width: 2.5; }
 .diagram .edge path { fill: none; stroke: var(--border); stroke-width: 1.5; }
 .diagram .edge.is-data path { stroke: var(--accent); stroke-dasharray: 4 6; animation: edge-flow 1.8s linear infinite; }
 .diagram .edge-flow { stroke-dasharray: 6 10; animation: edge-flow 2.2s linear infinite; }
@@ -509,6 +522,7 @@ svg.diagram { width: 100%; height: auto; display: block; margin: var(--sp-4) 0; 
   .diagram .edge.is-data path, .diagram .edge-flow { animation: none !important; stroke-dasharray: none; }
   .gantt-bar { width: 100%; background: var(--sev-p1); animation: none; }
   .redact .mask { clip-path: inset(0 0 0 0); opacity: 1; animation: none; }
+  .fixloop .step { animation: none !important; }
 }
 @media print {
   .rail, .theme-toggle, .mobile-toc-btn, .callout { display: none !important; }
@@ -518,7 +532,8 @@ svg.diagram { width: 100%; height: auto; display: block; margin: var(--sp-4) 0; 
 </style>
 </head>
 <body>
-<button class="mobile-toc-btn" id="mobileTocBtn" aria-label="Open contents">☰ contents</button>
+<a class="skip-link" href="#main">Skip to content</a>
+<button class="mobile-toc-btn" id="mobileTocBtn" aria-label="Open contents" aria-controls="rail" aria-expanded="false">☰ contents</button>
 
 <div class="shell">
   <aside class="rail" id="rail" aria-label="Section navigation">
@@ -548,7 +563,7 @@ svg.diagram { width: 100%; height: auto; display: block; margin: var(--sp-4) 0; 
     </div>
   </aside>
 
-  <main class="main">
+  <main class="main" id="main">
     <header class="hero">
       <div>
         <h1>Build <em>Observability</em></h1>
@@ -712,6 +727,7 @@ window.OBS_CALLOUTS = Object.assign(window.OBS_CALLOUTS || {}, {
   <li><strong>Redact</strong> the payload (<span class="fp" data-path="src/observability/engine/redact.ts"><code>redact.ts</code></span>) — see below.</li>
   <li><strong>Size-check</strong>: <code>Buffer.byteLength(line, 'utf8')</code> must be ≤ 4096, else the write throws (<span class="fp" data-path="src/observability/engine/ledger-writer.ts"><code>ledger-writer.ts:10,58</code></span>).</li>
   <li><strong>Append</strong> under a <code>proper-lockfile</code> lock (10 retries, exponential backoff) so concurrent agents serialize cleanly.</li>
+  <li><strong>Link (fail-soft)</strong>: a <code>task_claimed</code> event with a <code>task_id</code> also links the task into Beads via <code>bd</code> (<code>beadsAdapter.claimWithEvent</code>); any Beads error is swallowed — the ledger write already succeeded.</li>
 </ul>
 
 <h4>The nine event types</h4>
@@ -741,6 +757,30 @@ window.OBS_CALLOUTS = Object.assign(window.OBS_CALLOUTS || {}, {
 </div>
 <p class="fb-note">* required. Allow-lists live in <code>EVENT_PAYLOAD_KEYS</code> at <span class="fp" data-path="src/observability/engine/event-schemas.ts"><code>event-schemas.ts:3-13</code></span>.</p>
 <div class="note warn"><strong>Naming note</strong> The PR-opened event is <code>pr_opened</code> (past tense) in code, not <code>pr_open</code> as the CLAUDE.md prose abbreviates it. The ledger never emits <code>pr_open</code>.</div>
+
+<h3>Build a <code>scaffold observe event</code> command</h3>
+<p>Pick an event type to see its invocation. <code>--branch</code> is required; <code>--task-id</code> is required for task/blocker events but must be <em>omitted</em> for <code>finding_acknowledged</code> (whose <code>task_id</code> must be null). Payload keys are passed as <code>--kebab-case</code> flags, snake-cased before validation; unknown keys are dropped.</p>
+<div class="fb" data-fb="event" data-base="" aria-label="Event command builder">
+  <div class="fb-group" data-flag="event" data-type="radio" data-default="scaffold observe event task_claimed --branch &lt;branch&gt; --task-id &lt;id&gt; --task-title &quot;&lt;title&gt;&quot; [--story-id &lt;id&gt;] [--wave &lt;n&gt;] [--unplanned true]">
+    <span class="fb-q">event type</span>
+    <div class="fb-opts">
+      <button class="fb-opt" type="button" data-val="scaffold observe event task_claimed --branch &lt;branch&gt; --task-id &lt;id&gt; --task-title &quot;&lt;title&gt;&quot; [--story-id &lt;id&gt;] [--wave &lt;n&gt;] [--unplanned true]">task_claimed</button>
+      <button class="fb-opt" type="button" data-val="scaffold observe event task_completed --branch &lt;branch&gt; --task-id &lt;id&gt; --outcome pr_submitted --pr-number &lt;n&gt; [--commit-sha &lt;sha&gt;]">task_completed</button>
+      <button class="fb-opt" type="button" data-val="scaffold observe event decision_recorded --branch &lt;branch&gt; --task-id &lt;id&gt; --key &lt;key&gt; --summary &quot;&lt;text&gt;&quot; --affects &quot;src/**,docs/**&quot; [--links &quot;ADR-1,ADR-2&quot;]">decision_recorded</button>
+      <button class="fb-opt" type="button" data-val="scaffold observe event blocker_hit --branch &lt;branch&gt; --task-id &lt;id&gt; --kind dependency --summary &quot;&lt;text&gt;&quot;">blocker_hit</button>
+      <button class="fb-opt" type="button" data-val="scaffold observe event blocker_resolved --branch &lt;branch&gt; --task-id &lt;id&gt; --summary &quot;&lt;text&gt;&quot; --references &quot;ref1,ref2&quot;">blocker_resolved</button>
+      <button class="fb-opt" type="button" data-val="scaffold observe event pr_opened --branch &lt;branch&gt; --task-id &lt;id&gt; --pr-number &lt;n&gt;">pr_opened</button>
+      <button class="fb-opt" type="button" data-val="scaffold observe event progress_heartbeat --branch &lt;branch&gt; --task-id &lt;id&gt; --note &quot;&lt;text&gt;&quot;">progress_heartbeat</button>
+      <button class="fb-opt" type="button" data-val="scaffold observe event finding_acknowledged --branch &lt;branch&gt; --finding-id &lt;id&gt; --status acknowledged [--note &quot;&lt;text&gt;&quot;]">finding_acknowledged</button>
+      <button class="fb-opt" type="button" data-val="scaffold observe event knowledge_gap_signal --branch &lt;branch&gt; --topic &lt;kebab-slug&gt; --source agent_search --project-id &lt;sha256|lessons&gt; [--step-name &lt;name&gt;] [--agent-excerpt &quot;&lt;text&gt;&quot;]">knowledge_gap_signal</button>
+    </div>
+  </div>
+  <div class="fb-out">
+    <div class="code"><div class="code-bar"><span class="path">composed command</span><button class="copy-btn" data-copy="event-out">copy</button></div><pre id="event-out">scaffold observe event …</pre></div>
+    <p class="fb-note">Angle-bracketed <code>&lt;…&gt;</code> are placeholders; <code>[…]</code> flags are optional. <code>finding_acknowledged</code> is normally written by <code>scaffold observe ack</code> (<a href="#s6">§6</a>), not by hand.</p>
+  </div>
+</div>
+<div class="note"><strong>Value coercion</strong> (<span class="fp" data-path="src/cli/commands/observe.ts"><code>observe.ts</code></span>): <code>--pr-number</code> is parsed numeric (a non-number is dropped); <code>--unplanned</code> is boolean (<code>true</code> ⇒ true, anything else ⇒ false); <code>--affects</code>, <code>--links</code>, <code>--references</code> are comma-split into arrays; everything else stays a string. Exit codes: <code>0</code> written · <code>2</code> validation failed / payload &gt; 4 KiB · <code>3</code> other error (full matrix in <a href="#s6">§6</a>).</div>
 
 <h3>Redaction — write time and render time</h3>
 <p>Redaction runs twice. <strong>Write-time</strong> redaction (recursive over the payload tree) scrubs the event before it lands on disk; <strong>render-time</strong> redaction (<code>redactEngineOutput</code> / <code>redactRendered</code>) scrubs string values again before any report is shown, catching anything synthesized after the fact.</p>
@@ -813,7 +853,7 @@ window.OBS_CALLOUTS = Object.assign(window.OBS_CALLOUTS || {}, {
 <h2>The nine-lens audit</h2>
 <p class="s-lede">The audit reads the planning docs (PRD, stories, tech-stack, standards, design system, plan, playbook) into a document graph, then runs a set of independent <em>lenses</em> over the graph, the code, the ledger and adapter data. The design spec calls it the "eight-lens audit" (A–H); a ninth lens — <code>I-knowledge-gaps</code> — joined the suite after v3.26.0.</p>
 
-<div class="note diverge"><strong>8 in the spec, 9 in the code</strong> <span class="fp" data-path="docs/superpowers/specs/2026-04-30-build-observability-design.md"><code>…build-observability-design.md</code></span> titles §3 "The Eight Audit Lenses" and its <code>LENS_REGISTRY</code> stops at H. The shipped <span class="fp" data-path="src/observability/engine/checks/registry.ts"><code>registry.ts:26</code></span> adds <code>I-knowledge-gaps</code>. Treat Lens I as the ninth lens that joined the suite — documented here as a first-class member.</div>
+<div class="note diverge"><strong>8 in the spec, 9 in the code</strong> <span class="fp" data-path="docs/superpowers/specs/2026-04-30-build-observability-design.md"><code>…build-observability-design.md</code></span> titles §3 "The Eight Audit Lenses" and its <code>LENS_REGISTRY</code> stops at H. The shipped <span class="fp" data-path="src/observability/engine/checks/registry.ts"><code>registry.ts:44</code></span> adds <code>I-knowledge-gaps</code>. Treat Lens I as the ninth lens that joined the suite — documented here as a first-class member.</div>
 
 <h3>Scope, order and skips</h3>
 <ul>
@@ -821,6 +861,21 @@ window.OBS_CALLOUTS = Object.assign(window.OBS_CALLOUTS || {}, {
   <li><strong>Registry order</strong>: A → B → C → D → E → F → G → H → I. <code>G-decisions</code> declares <code>depends_on: ['D-stack']</code> so it runs after D and can consume D's unsanctioned-dependency findings.</li>
   <li><strong>Missing adapter → skip</strong>: if a lens's <em>required</em> adapters are unavailable it is skipped and emits a <code>P3</code> finding with <code>evidence.kind = lens_skipped</code>. Skipped lenses (not blocking findings) are what turn a <code>pass</code> into a <code>degraded-pass</code>.</li>
 </ul>
+
+<h4>What feeds the doc-graph</h4>
+<p>Before any lens runs, the planning docs and the working tree are parsed into a single graph (<span class="fp" data-path="src/observability/engine/doc-graph/index.ts"><code>doc-graph/index.ts</code></span>). Every lens's "Reads:" line refers to nodes and edges built here:</p>
+<div class="tbl-wrap"><table class="tbl"><thead><tr><th>source</th><th>parser / detector</th><th>graph nodes &amp; edges</th></tr></thead><tbody>
+  <tr><td>PRD</td><td><code>parseFeatures</code></td><td><code>features</code> (with priority)</td></tr>
+  <tr><td>user-stories</td><td><code>parseStories</code></td><td><code>stories</code>, <code>acceptance_criteria</code>, <code>feature_to_story</code></td></tr>
+  <tr><td>tech-stack</td><td><code>parseSanctionedComponents</code></td><td><code>components</code> (with <code>layer</code>)</td></tr>
+  <tr><td>coding-standards + tdd-standards</td><td><code>parseRules</code></td><td><code>rules</code></td></tr>
+  <tr><td>design-system</td><td><code>parseDesignTokens</code></td><td><code>tokens</code> (priority, category)</td></tr>
+  <tr><td>implementation-plan</td><td><code>parsePlanTasks</code></td><td><code>plan_tasks</code>, <code>story_to_plan_task</code></td></tr>
+  <tr><td>implementation-playbook</td><td><code>parsePlaybookTasks</code></td><td><code>playbook_tasks</code>, <code>playbook_task_to_story</code></td></tr>
+  <tr><td>ledger + repo</td><td><code>parseDecisions</code></td><td><code>decisions</code></td></tr>
+  <tr><td>working tree</td><td><code>discoverTests</code>, <code>discoverFiles</code></td><td><code>tests</code> (with <code>last_status</code>), <code>files</code>, <code>ac_to_test</code></td></tr>
+  <tr><td>source files</td><td><code>detectCss/JsxTokenUses</code>, <code>detectComponentUses</code></td><td><code>file_to_token_use</code>, <code>file_to_component_use</code></td></tr>
+</tbody></table></div>
 
 <h4>All nine at a glance</h4>
 <div class="card flush" data-table>
@@ -977,7 +1032,26 @@ window.OBS_CALLOUTS = Object.assign(window.OBS_CALLOUTS || {}, {
 <div class="note diverge"><strong>"needs-user-decision" is not an engine verdict</strong> The code review workflow has a <code>needs-user-decision</code> outcome, but that is an <em>MMR review</em> verdict, not one the audit engine emits. The audit engine's universe is exactly the three above.</div>
 
 <h4><code>fix_threshold</code></h4>
-<p>A finding is <em>blocking</em> when its status is <code>open</code> and its severity is at or above the threshold (<span class="fp" data-path="src/observability/engine/checks/fix-threshold.ts"><code>fix-threshold.ts</code></span>). Resolution order: <code>--fix-threshold</code> flag → <code>.mmr.yaml</code> (<code>audit_fix_threshold</code> / <code>fix_threshold</code>) → default <strong>P2</strong>. The threshold never <em>hides</em> findings — every finding is still reported; it only decides which ones count toward <code>blocked</code>.</p></div></section>
+<p>A finding is <em>blocking</em> when its status is <code>open</code> and its severity is at or above the threshold (<span class="fp" data-path="src/observability/engine/checks/fix-threshold.ts"><code>fix-threshold.ts</code></span>). Resolution order: <code>--fix-threshold</code> flag → <code>.mmr.yaml</code> (<code>audit_fix_threshold</code> / <code>fix_threshold</code>) → default <strong>P2</strong>. The threshold never <em>hides</em> findings — every finding is still reported; it only decides which ones count toward <code>blocked</code>.</p>
+<div class="note"><strong>How the counts are computed</strong> (<span class="fp" data-path="src/observability/engine/checks/findings-aggregator.ts"><code>findings-aggregator.ts</code></span>): <code>blocking</code> counts a finding only when <code>status === 'open'</code> <em>and</em> its severity is at or above <code>fix_threshold</code>; <code>acknowledged</code> counts only findings silenced by a <code>finding_acknowledged</code> ledger event (latest event per id wins); <code>skipped</code> findings (missing-adapter lenses) ignore acks entirely. The renderers' <code>(blocking · ack · total)</code> line is this tally.</div>
+
+<h3>Companion verb — <code>scaffold observe ack</code></h3>
+<p>Acknowledge (or reopen) a finding by ID prefix; it writes a <code>finding_acknowledged</code> event the aggregator reads on the next audit.</p>
+<div class="tbl-wrap" style="max-width:660px"><table class="tbl"><thead><tr><th>arg / flag</th><th>effect</th></tr></thead><tbody>
+  <tr><td><code>&lt;prefix-or-id&gt;</code></td><td>matched against all finding IDs in <code>docs/audits/*.json</code>; an ambiguous prefix exits <code>2</code></td></tr>
+  <tr><td><code>--status acknowledged｜open</code></td><td><code>acknowledged</code> (default) silences it; <code>open</code> reopens it</td></tr>
+  <tr><td><code>--note "…"</code></td><td>optional rationale recorded on the event</td></tr>
+</tbody></table></div>
+<p class="fb-note">Branch is auto-derived (<code>git rev-parse --abbrev-ref HEAD</code>, fallback <code>main</code>); the event's <code>task_id</code> is null.</p>
+
+<h3>Exit codes across <code>observe</code> verbs</h3>
+<div class="tbl-wrap"><table class="tbl"><thead><tr><th>verb</th><th>0</th><th>1</th><th>2</th><th>3</th></tr></thead><tbody>
+  <tr><td><code>audit</code></td><td>not blocked, or any <code>mmr-findings</code> run</td><td>blocked, or <code>--fix</code> left a blocker</td><td>—</td><td>audit error <span class="fb-note" style="display:inline">(130 on SIGINT mid-<code>--fix</code>, snapshot restored)</span></td></tr>
+  <tr><td><code>event</code></td><td>written</td><td>—</td><td>validation failed / payload &gt; 4 KiB</td><td>other error</td></tr>
+  <tr><td><code>ack</code></td><td>written</td><td>—</td><td>no match / ambiguous prefix</td><td>no audit sidecars / write error</td></tr>
+  <tr><td><code>progress</code></td><td>ok</td><td>—</td><td>—</td><td>markdown/sidecar write error (with <code>--output</code>)</td></tr>
+  <tr><td><code>harvest</code></td><td>harvested / recovered</td><td>—</td><td>—</td><td>no <code>identity.json</code>, or primary root is itself a worktree</td></tr>
+</tbody></table></div></div></section>
 
     <section class="s" id="s7"><div class="s-num">07</div><div class="s-body">
 <p class="s-eyebrow">CLI</p>
@@ -1029,7 +1103,7 @@ window.OBS_CALLOUTS = Object.assign(window.OBS_CALLOUTS || {}, {
 <p class="s-lede">Completing a planning document should re-check the docs for drift — automatically, but never blocking the build. When a pipeline step at a phase boundary is marked complete, the state manager fires a docs audit and prints a one-line summary.</p>
 
 <h3>The hook</h3>
-<p><code>StateManager.markCompleted()</code> is <strong>async</strong> (<span class="fp" data-path="src/state/state-manager.ts"><code>state-manager.ts:174</code></span>): it saves state, then awaits <code>runPhaseAudit({ primaryRoot, step })</code> for <em>every</em> completed step — the phase-boundary gate lives inside <code>runPhaseAudit</code>, which returns a no-op result unless the step is one of the six boundaries (<span class="fp" data-path="src/observability/engine/phase-subsets.ts"><code>phase-subsets.ts</code></span>):</p>
+<p><code>StateManager.markCompleted()</code> is <strong>async</strong> (<span class="fp" data-path="src/state/state-manager.ts"><code>state-manager.ts:175</code></span>): it saves state, then awaits <code>runPhaseAudit({ primaryRoot, step })</code> for <em>every</em> completed step — the phase-boundary gate lives inside <code>runPhaseAudit</code>, which returns a no-op result unless the step is one of the six boundaries (<span class="fp" data-path="src/observability/engine/phase-subsets.ts"><code>phase-subsets.ts</code></span>):</p>
 <div class="fb-opts" style="margin:var(--sp-3) 0">
   <span class="chip chip-accent">user-stories</span><span class="chip chip-accent">tech-stack</span><span class="chip chip-accent">coding-standards</span>
   <span class="chip chip-accent">design-system</span><span class="chip chip-accent">implementation-plan</span><span class="chip chip-accent">implementation-playbook</span>
@@ -1110,7 +1184,7 @@ window.OBS_CALLOUTS = Object.assign(window.OBS_CALLOUTS || {}, {
 <h2>The <code>--fix</code> flow</h2>
 <p class="s-lede"><code>scaffold observe audit --fix</code> doesn't just report blocking findings — it dispatches an agent to fix each one, verifies the fix with a single-lens re-audit, and writes a post-fix report. The loop is abort-safe: an interrupt restores the working tree to where it started.</p>
 
-<div class="fixloop" aria-label="Five-phase fix loop">
+<div class="fixloop" aria-hidden="true">
   <div class="step s1"><div class="step-n">phase 1</div><div class="step-t">audit</div><div class="step-d">collect findings + verdict</div></div>
   <div class="step s2"><div class="step-n">phase 2</div><div class="step-t">buildFixPlan</div><div class="step-d">keep open &amp; ≥ threshold; order by severity then lens</div></div>
   <div class="step s3"><div class="step-n">phase 3</div><div class="step-t">dispatchFixAgent</div><div class="step-d">subprocess, prompt on stdin</div></div>
@@ -1422,7 +1496,8 @@ window.OBS_FILE_MAP = [
 <div class="tbl-wrap"><table class="tbl"><thead><tr><th>round</th><th>date</th><th>findings</th><th>verdict</th><th>report</th><th>merged in</th></tr></thead><tbody>
   <tr><td>R1</td><td>2026-05-28</td><td>initial authoring</td><td><span class="chip chip-pass">authored</span></td><td>this page</td><td>#418</td></tr>
   <tr><td>R2</td><td>2026-05-28</td><td>18 (1&nbsp;P0&#8209;example / 6&nbsp;P2 / 11&nbsp;P3)</td><td><span class="chip chip-pass">all resolved</span></td><td>5-agent adversarial fact-check</td><td>#419</td></tr>
-  <!-- R3 row appended by the next audit, newest last -->
+  <tr><td>R3</td><td>2026-05-28</td><td>3 corrections · a11y pass · 6 coverage adds</td><td><span class="chip chip-pass">resolved + enhanced</span></td><td>2-agent audit + a11y/gap pass</td><td>(R3 PR)</td></tr>
+  <!-- R4 row appended by the next audit, newest last -->
 </tbody></table></div>
 
 <h3>What R2 changed</h3>
@@ -1435,7 +1510,16 @@ window.OBS_FILE_MAP = [
 </ul>
 <p class="fb-note">One nit accepted no-change: §13 lists <code>escalation_threshold</code> (5) and <code>llm.parallel_checks</code> (false) as consumer-side defaults rather than <code>DEFAULT_CONFIG</code> entries — covered by the section lede's "defaults come from the code" framing.</p>
 
-<h3>Divergences flagged during authoring (R2-confirmed)</h3>
+<h3>What R3 changed</h3>
+<p>R3 re-verified every claim (two agents) and added an accessibility + coverage pass. All R2 fixes held and all eight divergences were re-confirmed true. Changes:</p>
+<ul>
+  <li><strong>Correctness:</strong> removed a self-contradiction — the §16 wave-budget bullet still claimed Lens F "reads from <code>.scaffold/state.json</code>" (it reads nothing of the kind); corrected two off-by-target citations (<code>registry.ts:44</code> for the Lens I entry, <code>state-manager.ts:175</code> for <code>markCompleted</code>).</li>
+  <li><strong>Accessibility:</strong> diagram nodes, <code>.fp</code> path tokens, and sortable headers are now keyboard-operable (<code>role</code>/<code>tabindex</code>/<code>aria-sort</code> + Enter/Space); added a global <code>:focus-visible</code> ring, a skip-link, callout focus management (<code>aria-labelledby</code> + focus in/out), <code>aria-pressed</code> on flag-builder options, <code>aria-expanded</code> on the mobile toggle, live-region filter counters, a <code>fix-pulse</code> reduced-motion guard, and a contrast bump for small mono labels.</li>
+  <li><strong>Coverage:</strong> a <code>scaffold observe event</code> command builder (§3), a "what feeds the doc-graph" table (§5), an <code>observe ack</code> companion block, a cross-verb exit-code matrix, an aggregator-counting note (§6), and a Beads fail-soft linkage note (§3).</li>
+</ul>
+<div class="note"><strong>Proposed / deferred</strong> The sibling page guards its <code>file:line</code> citations in CI (<code>scripts/check-freshness-reference-citations.mjs</code>); this page has none because its citations are split (clickable path in <code>data-path</code>, <code>file:line</code> in visible text). A future round could add a sibling checker after consolidating each citation into a single <code>data-path="…:line"</code> token — tracked as a deferred enhancement.</div>
+
+<h3>Divergences flagged during authoring (R2 + R3 confirmed)</h3>
 <p>The audit's own rule — "code is ground truth where it disagrees with the spec or the docs" — surfaced these mismatches while this page was written. They are deferred findings for a future round to resolve in the code/docs, not on this page:</p>
 <ul>
   <li><strong>9 lenses, not 8.</strong> The design spec and CLAUDE.md enumerate A–H; <code>I-knowledge-gaps</code> shipped and is registered. <em>(<a href="#s5">§5</a>)</em></li>
@@ -1444,14 +1528,14 @@ window.OBS_FILE_MAP = [
   <li><strong>Fix-dispatcher security note conflated.</strong> CLAUDE.md's <code>--fix</code> note calls the dispatcher "not project-config-overridable"; in fact <code>fix.dispatcher_command</code> is configurable, while it's the <em>Lens H LLM</em> dispatcher that is hard-coded. <em>(<a href="#s10">§10</a>, <a href="#s5">§5</a>)</em></li>
   <li><strong><code>pr_review_stale</code> reserved.</strong> The sixth stall signal has a config default but is not yet emitted (deferred pending a per-PR correlation_id on the mmr adapter). <em>(<a href="#s7">§7</a>)</em></li>
   <li><strong>Inert config keys.</strong> <code>lenses.G-decisions.keywords_file</code> and <code>lenses.H-cross-doc.skip_phase_subsets</code> are typed but unread; the bundled <code>decision-keywords.txt</code> is not loaded. <em>(<a href="#s5">§5</a>, <a href="#s13">§13</a>)</em></li>
-  <li><strong>No <code>F-scope.wave_budget</code> key.</strong> CLAUDE.md implies a wave budget in <code>observability.yaml</code>; Lens F reads wave/phase budget from <code>.scaffold/state.json</code> instead. <em>(<a href="#s13">§13</a>)</em></li>
+  <li><strong>No <code>F-scope.wave_budget</code> key.</strong> CLAUDE.md implies a wave budget in <code>observability.yaml</code>; in fact no wave/phase budget is read anywhere — Lens F reads only <code>untouched_story_grace_hours</code>. <em>(<a href="#s13">§13</a>)</em></li>
   <li><strong><code>ui_glob</code> default narrower than spec.</strong> Spec default covers <code>{tsx,jsx,vue,svelte}</code> + styles; shipped default is just <code>src/components/**/*.tsx</code>. <em>(<a href="#s13">§13</a>)</em></li>
 </ul>
 <p class="fb-note">Recorded here so the next round can confirm, fix, or formally accept each one.</p></div></section>
   </main>
 </div>
 
-<aside class="callout" id="callout" role="dialog" aria-label="Detail panel" aria-modal="false">
+<aside class="callout" id="callout" role="dialog" aria-labelledby="calloutTitle" aria-modal="false">
   <div class="callout-head"><h4 id="calloutTitle"></h4><button class="callout-close" id="calloutClose" aria-label="Close detail panel">×</button></div>
   <div class="callout-body" id="calloutBody"></div>
 </aside>
@@ -1482,9 +1566,10 @@ window.OBS_FILE_MAP = [
   var rail = document.getElementById('rail');
   var mobileBtn = document.getElementById('mobileTocBtn');
   if (rail && mobileBtn) {
-    mobileBtn.addEventListener('click', function () { rail.classList.toggle('is-open'); });
+    var syncExpanded = function () { mobileBtn.setAttribute('aria-expanded', String(rail.classList.contains('is-open'))); };
+    mobileBtn.addEventListener('click', function () { rail.classList.toggle('is-open'); syncExpanded(); });
     rail.addEventListener('click', function (e) {
-      if (e.target.closest('a') && innerWidth <= 1024) rail.classList.remove('is-open');
+      if (e.target.closest('a') && innerWidth <= 1024) { rail.classList.remove('is-open'); syncExpanded(); }
     });
   }
 
@@ -1536,18 +1621,38 @@ window.OBS_FILE_MAP = [
       setTimeout(function () { fp.classList.remove('is-copied'); }, 1200);
     }
   });
+  // Make inline .fp path tokens focusable/operable (file-tree leaves are <a>,
+  // handled in renderNode). Keyboard activation is wired in the global keydown.
+  [].slice.call(document.querySelectorAll('.fp')).forEach(function (el) {
+    if (el.tagName === 'A') return;
+    el.setAttribute('tabindex', '0');
+    el.setAttribute('role', 'button');
+    var p = el.getAttribute('data-path') || el.textContent.trim();
+    el.setAttribute('aria-label', (REPO_ROOT ? 'Open ' : 'Copy path ') + p);
+    if (!el.getAttribute('title')) el.setAttribute('title', REPO_ROOT ? 'Open in editor' : 'Click to copy path');
+  });
 
   /* ── Detail callout panel (architecture diagram nodes) ─────── */
   var callout = document.getElementById('callout');
   var calloutTitle = document.getElementById('calloutTitle');
   var calloutBody = document.getElementById('calloutBody');
   var calloutClose = document.getElementById('calloutClose');
-  if (calloutClose) calloutClose.addEventListener('click', function () { callout.classList.remove('is-open'); });
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && callout) callout.classList.remove('is-open'); });
+  var lastTrigger = null;
+  function closeCallout(restoreFocus) {
+    if (!callout) return;
+    callout.classList.remove('is-open');
+    if (restoreFocus && lastTrigger && lastTrigger.focus) lastTrigger.focus();
+    lastTrigger = null;
+  }
+  if (calloutClose) calloutClose.addEventListener('click', function () { closeCallout(true); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && callout && callout.classList.contains('is-open')) closeCallout(true);
+  });
   window.OBS_CALLOUTS = window.OBS_CALLOUTS || {};
   function openCallout(key) {
     var c = window.OBS_CALLOUTS[key];
     if (!c || !callout) return;
+    lastTrigger = document.activeElement;
     calloutTitle.textContent = c.title;
     var html = '';
     if (c.file) html += '<p class="file-ref">' + c.file + '</p>';
@@ -1556,15 +1661,30 @@ window.OBS_FILE_MAP = [
     if (c.anchor) html += '<p><a href="#' + c.anchor + '" data-jump="' + c.anchor + '">Jump to section →</a></p>';
     calloutBody.innerHTML = html;
     callout.classList.add('is-open');
+    if (calloutClose) calloutClose.focus();
   }
+  // Make architecture-diagram nodes keyboard-operable.
+  [].slice.call(document.querySelectorAll('[data-arch]')).forEach(function (n) {
+    n.setAttribute('role', 'button'); n.setAttribute('tabindex', '0');
+    var c = window.OBS_CALLOUTS[n.getAttribute('data-arch')];
+    n.setAttribute('aria-label', (c && c.title ? c.title : n.getAttribute('data-arch')) + ' — open detail');
+  });
   document.addEventListener('click', function (e) {
     var node = e.target.closest('[data-arch]');
     if (node) { openCallout(node.getAttribute('data-arch')); return; }
     var jump = e.target.closest('[data-jump]');
     if (jump) {
       var t = document.getElementById(jump.getAttribute('data-jump'));
-      if (t) { callout.classList.remove('is-open'); t.scrollIntoView(); }
+      if (t) { closeCallout(false); t.scrollIntoView(); }
     }
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    if (!e.target.closest) return;
+    var node = e.target.closest('[data-arch]');
+    if (node) { e.preventDefault(); openCallout(node.getAttribute('data-arch')); return; }
+    var fp = e.target.closest('.fp');
+    if (fp) { e.preventDefault(); fp.click(); }
   });
 
   /* ── Generic filterable/sortable table engine ──────────────── */
@@ -1581,6 +1701,7 @@ window.OBS_FILE_MAP = [
     var facet = wrap.querySelector('[data-facet]');
     var count = wrap.querySelector('[data-count]');
     var facetKey = facet ? facet.getAttribute('data-facet') : null;
+    if (count && count.parentNode) { count.parentNode.setAttribute('aria-live', 'polite'); count.parentNode.setAttribute('aria-atomic', 'true'); }
 
     if (facet && facetKey) {
       var vals = {};
@@ -1616,16 +1737,23 @@ window.OBS_FILE_MAP = [
     }
     if (search) search.addEventListener('input', render);
     if (facet) facet.addEventListener('change', render);
+    function applySort(th) {
+      var key = th.getAttribute('data-sort');
+      if (sortState.key === key) sortState.dir = sortState.dir === 'asc' ? 'desc' : 'asc';
+      else { sortState.key = key; sortState.dir = 'asc'; }
+      [].slice.call(table.querySelectorAll('thead th')).forEach(function (t) {
+        t.classList.remove('sort-asc', 'sort-desc');
+        if (t.hasAttribute('data-sort')) t.setAttribute('aria-sort', 'none');
+      });
+      th.classList.add(sortState.dir === 'asc' ? 'sort-asc' : 'sort-desc');
+      th.setAttribute('aria-sort', sortState.dir === 'asc' ? 'ascending' : 'descending');
+      render();
+    }
     [].slice.call(table.querySelectorAll('thead th[data-sort]')).forEach(function (th) {
       th.classList.add('sortable');
-      th.addEventListener('click', function () {
-        var key = th.getAttribute('data-sort');
-        if (sortState.key === key) sortState.dir = sortState.dir === 'asc' ? 'desc' : 'asc';
-        else { sortState.key = key; sortState.dir = 'asc'; }
-        [].slice.call(table.querySelectorAll('thead th')).forEach(function (t) { t.classList.remove('sort-asc', 'sort-desc'); });
-        th.classList.add(sortState.dir === 'asc' ? 'sort-asc' : 'sort-desc');
-        render();
-      });
+      th.tabIndex = 0; th.setAttribute('role', 'button'); th.setAttribute('aria-sort', 'none');
+      th.addEventListener('click', function () { applySort(th); });
+      th.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); applySort(th); } });
     });
     render();
   }
@@ -1656,10 +1784,16 @@ window.OBS_FILE_MAP = [
       var type = group.getAttribute('data-type') || 'radio';
       if (type === 'toggle') state[flag] = [];
       else state[flag] = group.getAttribute('data-default') || '';
+      function syncPressed() {
+        [].slice.call(group.querySelectorAll('.fb-opt')).forEach(function (o) {
+          o.setAttribute('aria-pressed', String(o.classList.contains('is-on')));
+        });
+      }
       // reflect default selection
       [].slice.call(group.querySelectorAll('.fb-opt')).forEach(function (opt) {
         if (type === 'radio' && opt.getAttribute('data-val') === state[flag]) opt.classList.add('is-on');
       });
+      syncPressed();
       group.addEventListener('click', function (e) {
         var opt = e.target.closest('.fb-opt');
         if (!opt) return;
@@ -1673,6 +1807,7 @@ window.OBS_FILE_MAP = [
           [].slice.call(group.querySelectorAll('.fb-opt')).forEach(function (o) { o.classList.toggle('is-on', o === opt); });
           state[flag] = val;
         }
+        syncPressed();
         compose();
       });
     });
@@ -1688,7 +1823,7 @@ window.OBS_FILE_MAP = [
         if (node.kind === 'file') {
           var lineTxt = node.line ? '<span style="color:var(--text-faint)">:' + node.line + '</span>' : '';
           var dataPath = node.path + (node.line ? '' : '');
-          return '<a class="file-leaf fp" data-path="' + node.path + '" title="' + (REPO_ROOT ? 'open in editor' : 'click to copy path — set localStorage obs-repo-root for editor deep-links') + '">' +
+          return '<a class="file-leaf fp" tabindex="0" role="button" data-path="' + node.path + '" aria-label="' + (REPO_ROOT ? 'Open ' : 'Copy path ') + node.path + '" title="' + (REPO_ROOT ? 'open in editor' : 'click to copy path — set localStorage obs-repo-root for editor deep-links') + '">' +
                  '<span>' + node.name + lineTxt + '</span>' +
                  '<span class="file-purpose">' + (node.purpose || '') + '</span></a>';
         }
