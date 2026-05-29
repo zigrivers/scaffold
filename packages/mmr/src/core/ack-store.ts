@@ -3,6 +3,7 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import { jaccardSimilarity } from './stable-id.js'
 import { findProjectRoot } from './project-root.js'
+import { readFileAtRef, listFilesAtRef } from './git-show.js'
 
 const FUZZY_THRESHOLD = 0.7
 /** Canonical finding_key format: sha1 hex. Exported so the CLI can validate
@@ -12,6 +13,8 @@ export const FINDING_KEY_RE = /^[a-f0-9]{40}$/
 // Cap reads well above any realistic record so a planted oversized file in an
 // untrusted project tree can't OOM the review.
 const MAX_ACK_BYTES = 256 * 1024
+/** Repo-relative location of project-scoped acks (under <projectRoot>/). */
+const PROJECT_ACKS_REL = '.mmr/acks'
 
 export interface AckRecord {
   finding_key: string
@@ -44,6 +47,13 @@ export interface AckStoreOptions {
    * ~/.mmr), so user acks live beside jobs/ and sessions/ and honor MMR_HOME.
    */
   userRoot: string
+  /**
+   * When set, project-scope ack reads come from this Git ref via `git show`
+   * (committed blobs) instead of the working tree — the §5-decision-1 trust
+   * boundary, so an untrusted PR can't self-suppress by adding working-tree
+   * acks. User-scope reads and all writes are unaffected.
+   */
+  configBaseRef?: string
 }
 
 /**
@@ -61,10 +71,21 @@ export interface AckStoreOptions {
  * the command runs from a subdirectory. userRoot is supplied by the caller
  * (resolveSessionRoot()); cwd is injectable for tests.
  */
-export function buildReviewAckStore(opts: { trustProjectAcks: boolean; userRoot: string; cwd?: string }): AckStore {
+export function buildReviewAckStore(opts: {
+  trustProjectAcks: boolean
+  userRoot: string
+  cwd?: string
+  configBaseRef?: string
+}): AckStore {
+  // Precedence mirrors loadProjectYaml: an explicit trust opt-in reads project
+  // acks from the working tree; otherwise a base ref (when present) is the
+  // trusted source; otherwise project acks are disabled (untrusted tree).
+  const useBaseRef = !opts.trustProjectAcks && opts.configBaseRef !== undefined
+  const useProject = opts.trustProjectAcks || useBaseRef
   return new AckStore({
-    projectRoot: opts.trustProjectAcks ? findProjectRoot(opts.cwd) : undefined,
+    projectRoot: useProject ? findProjectRoot(opts.cwd) : undefined,
     userRoot: opts.userRoot,
+    configBaseRef: useBaseRef ? opts.configBaseRef : undefined,
   })
 }
 
@@ -99,6 +120,7 @@ export class AckStore {
   private readonly userDir: string
   private readonly projectRootResolved: string | undefined
   private readonly userRootResolved: string
+  private readonly configBaseRef: string | undefined
   // Per-instance lazy cache so a review that calls lookup() once per finding
   // reads each acks dir from disk at most once (avoids O(N*M) FS operations).
   private readonly loaded: Partial<Record<AckScope, LoadedScope>> = {}
@@ -111,8 +133,9 @@ export class AckStore {
     // so they honor MMR_HOME — no extra `.mmr` segment for the user scope.
     this.projectDir = this.projectRootResolved === undefined
       ? undefined
-      : path.join(this.projectRootResolved, '.mmr', 'acks')
+      : path.join(this.projectRootResolved, PROJECT_ACKS_REL)
     this.userDir = path.join(this.userRootResolved, 'acks')
+    this.configBaseRef = opts.configBaseRef
   }
 
   private validateKey(key: string): void {
@@ -267,12 +290,54 @@ export class AckStore {
     return out
   }
 
+  /**
+   * Read project-scope ack records from the configured base ref (committed
+   * blobs via git), not the working tree. Each file's embedded key must match
+   * its filename and the record must be shape-valid (isValidAckRecord), same as
+   * the working-tree path. git show returns blob content, so the FS symlink/
+   * traversal guards are unnecessary here; readFileAtRef caps the read size.
+   */
+  private readProjectRecordsFromRef(ref: string): AckRecord[] {
+    if (this.projectRootResolved === undefined) return []
+    const cwd = this.projectRootResolved
+    const out: AckRecord[] = []
+    for (const file of listFilesAtRef({ cwd, ref, dirPath: PROJECT_ACKS_REL })) {
+      const base = path.posix.basename(file)
+      if (!base.endsWith('.json')) continue
+      const keyOnly = base.replace(/\.json$/, '')
+      if (!FINDING_KEY_RE.test(keyOnly)) continue
+      const raw = readFileAtRef({ cwd, ref, filePath: `./${PROJECT_ACKS_REL}/${base}` })
+      // Bound the parse, mirroring the working-tree path's MAX_ACK_BYTES guard.
+      if (raw === undefined || raw.length > MAX_ACK_BYTES) continue
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(raw)
+      } catch {
+        continue
+      }
+      if (!isValidAckRecord(parsed, keyOnly)) continue
+      out.push(parsed)
+    }
+    return out
+  }
+
+  // NOTE: in base-ref mode the project cache is a snapshot of the ref. add()/
+  // remove() invalidate the cache and write to the working tree, but a
+  // subsequent project lookup re-reads the (unchanged) ref, not the just-
+  // written file. That's correct for review use (writes are operator actions
+  // via the ack CLI, which runs in working-tree mode), just worth noting.
   private records(scope: AckScope): LoadedScope {
     let cached = this.loaded[scope]
     if (cached === undefined) {
-      // A disabled project scope (no project root) contributes no records.
-      const dir = scope === 'project' ? this.projectDir : this.userDir
-      const records = dir === undefined ? [] : this.readDir(this.dirForScope(scope))
+      let records: AckRecord[]
+      if (scope === 'project' && this.configBaseRef !== undefined) {
+        // Trust boundary: read project acks from the base ref, not the tree.
+        records = this.readProjectRecordsFromRef(this.configBaseRef)
+      } else {
+        // A disabled project scope (no project root) contributes no records.
+        const dir = scope === 'project' ? this.projectDir : this.userDir
+        records = dir === undefined ? [] : this.readDir(this.dirForScope(scope))
+      }
       const byKey = new Map<string, AckRecord>()
       const byLocation = new Map<string, AckRecord[]>()
       for (const r of records) {

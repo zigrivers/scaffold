@@ -609,6 +609,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       const ackStore = buildReviewAckStore({
         trustProjectAcks: reviewControls.trust_project_acks,
         userRoot: resolveSessionRoot(),
+        configBaseRef: reviewControls.config_base_ref,
       })
       const { results, formatted, exitCode } = runResultsPipeline(store, completedJob, outputFormat, false, {
         ackStore,
