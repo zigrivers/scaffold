@@ -9,7 +9,7 @@ import { dispatchChannel } from '../core/dispatcher.js'
 import { runResultsPipeline } from '../core/results-pipeline.js'
 import { buildReviewAckStore } from '../core/ack-store.js'
 import { classifyTrustMode } from '../core/trust-mode.js'
-import { detectConfigChanges } from '../core/diff-introspect.js'
+import { detectConfigChanges, type ConfigChangeReport } from '../core/diff-introspect.js'
 import {
   getCompensatingChannels,
   dispatchCompensatingPasses,
@@ -92,6 +92,12 @@ function resolveDiff(args: ReviewArgs): string {
 
   // Default: unstaged changes
   return execFileSync('git', ['diff'], { encoding: 'utf-8', maxBuffer: MAX_DIFF_BUFFER })
+}
+
+/** Stamp proposed config/ack changes onto an output object (trust transparency). */
+function annotateProposedChanges(target: Record<string, unknown>, changes: ConfigChangeReport): void {
+  if (changes.ack_files_changed.length > 0) target.proposed_acks = changes.ack_files_changed
+  if (changes.config_file_changed) target.proposed_config_change = true
 }
 
 function formatReconciledResults(results: ReconciledResults, outputFormat: OutputFormat): string {
@@ -444,8 +450,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
           '--trust-project-config (.mmr.yaml) / --accept-new-acks (acks) to proceed.',
         trust_mode: trust.trust_mode,
       }
-      if (diffChanges.config_file_changed) decision.proposed_config_change = true
-      if (diffChanges.ack_files_changed.length > 0) decision.proposed_acks = diffChanges.ack_files_changed
+      annotateProposedChanges(decision, diffChanges)
       console.log(outputFormat === 'json' ? JSON.stringify(decision, null, 2) : String(decision.summary))
       // exitCode + return (not process.exit) for consistency with the early
       // guards and so the handler stays unit-testable without mocking exit.
@@ -707,8 +712,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       // surface trust_mode and any proposed config/ack changes that were opted
       // into (--accept-new-acks / --trust-project-config).
       const annotated: Record<string, unknown> = { ...results, trust_mode: trust.trust_mode }
-      if (diffChanges.ack_files_changed.length > 0) annotated.proposed_acks = diffChanges.ack_files_changed
-      if (diffChanges.config_file_changed) annotated.proposed_config_change = true
+      annotateProposedChanges(annotated, diffChanges)
 
       console.log(outputFormat === 'json' ? JSON.stringify(annotated, null, 2) : formatted)
       process.exit(exitCode)
@@ -729,8 +733,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       }
       // Surface opted-into proposed changes for transparency (the blocking case
       // already short-circuited to needs-user-decision before dispatch).
-      if (diffChanges.ack_files_changed.length > 0) result.proposed_acks = diffChanges.ack_files_changed
-      if (diffChanges.config_file_changed) result.proposed_config_change = true
+      annotateProposedChanges(result, diffChanges)
       console.log(JSON.stringify(result, null, 2))
     }
   },
