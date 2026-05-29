@@ -2,13 +2,13 @@ import type { CommandModule, ArgumentsCamelCase } from 'yargs'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { AckStore, type AckScope, type AckRecord } from '../core/ack-store.js'
+import { AckStore, FINDING_KEY_RE, type AckScope, type AckRecord } from '../core/ack-store.js'
 import { JobStore } from '../core/job-store.js'
 import { normalizeLocationForKey } from '../core/stable-id.js'
 import { resolveJobsDir } from './sessions.js'
-import type { ReconciledResults } from '../types.js'
+import type { ReconciledResults, ReconciledFinding } from '../types.js'
 
-const FINDING_KEY_RE = /^[a-f0-9]{40}$/
+const JOB_ID_RE = /^mmr-[a-f0-9]{12}$/
 
 interface AckArgs {
   action: string
@@ -42,8 +42,10 @@ function findSourceFinding(
   const sources = jobHint ? [jobHint] : store.listJobs().map((j) => j.job_id)
   for (const jobId of sources) {
     const r = loadResults(store, jobId)
-    if (!r) continue
-    for (const f of r.reconciled_findings) {
+    // Guard against a malformed results.json whose reconciled_findings is
+    // missing or not an array (would otherwise throw in the for-of below).
+    if (!r || !Array.isArray(r.reconciled_findings)) continue
+    for (const f of r.reconciled_findings as ReconciledFinding[]) {
       if (f.finding_key === key && f.description_shingle) {
         return {
           normalized_location: normalizeLocationForKey(f.location),
@@ -107,6 +109,14 @@ export const ackCommand: CommandModule<object, AckArgs> = {
       ackStore.remove(key, scope)
       console.log(JSON.stringify({ removed: key, scope }, null, 2))
       return
+    }
+
+    // Validate the optional --job hint before any path construction, mirroring
+    // the finding_key check (getJobDir also guards against escape, but reject
+    // early here for a clear operator error).
+    if (args.job !== undefined && !JOB_ID_RE.test(args.job)) {
+      console.error(`Invalid job id: ${args.job} — must match ^mmr-[a-f0-9]{12}$`)
+      process.exit(1)
     }
 
     // add: need a source finding to capture location + shingle. Jobs live under

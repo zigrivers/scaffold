@@ -5,7 +5,9 @@ import crypto from 'node:crypto'
 import { jaccardSimilarity } from './stable-id.js'
 
 const FUZZY_THRESHOLD = 0.7
-const FINDING_KEY_RE = /^[a-f0-9]{40}$/
+/** Canonical finding_key format: sha1 hex. Exported so the CLI can validate
+ *  the same way before any path construction. */
+export const FINDING_KEY_RE = /^[a-f0-9]{40}$/
 // Acks are tiny (a key, a location, a few dozen shingles, a short reason).
 // Cap reads well above any realistic record so a planted oversized file in an
 // untrusted project tree can't OOM the review.

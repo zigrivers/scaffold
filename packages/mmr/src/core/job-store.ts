@@ -43,7 +43,15 @@ export class JobStore {
 
   /** Full path to a job directory */
   getJobDir(jobId: string): string {
-    return path.join(this.jobsDir, jobId)
+    // Containment guard: a job id is a path component, never a traversal.
+    // Reject any value (absolute, or containing `..`/separators) that would
+    // resolve outside jobsDir before it reaches the filesystem.
+    const resolved = path.resolve(this.jobsDir, jobId)
+    const rel = path.relative(this.jobsDir, resolved)
+    if (rel === '' || rel.startsWith('..') || path.isAbsolute(rel)) {
+      throw new Error(`Invalid job id (path escape): ${jobId}`)
+    }
+    return resolved
   }
 
   /** Create a new job with its directory structure and initial metadata */

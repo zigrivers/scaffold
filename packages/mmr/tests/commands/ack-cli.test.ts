@@ -29,6 +29,29 @@ describe('mmr ack CLI', () => {
     }
   })
 
+  it('rejects a path-traversal --job value before any filesystem read', () => {
+    const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-ack-cli-'))
+    const tmpProj = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-ack-proj-'))
+    const validKey = 'a'.repeat(40)
+    try {
+      try {
+        execFileSync('node', [mmrBin, 'ack', 'add', validKey, '--job', '../../etc/passwd'], {
+          encoding: 'utf-8',
+          env: { ...process.env, HOME: tmpHome },
+          cwd: tmpProj,
+        })
+        throw new Error('expected nonzero exit')
+      } catch (err: unknown) {
+        const e = err as { status: number; stderr: string }
+        expect(e.status).toBeGreaterThan(0)
+        expect(e.stderr).toMatch(/invalid job id/i)
+      }
+    } finally {
+      fs.rmSync(tmpHome, { recursive: true, force: true })
+      fs.rmSync(tmpProj, { recursive: true, force: true })
+    }
+  })
+
   it('list returns [] when no acks exist', () => {
     const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-ack-cli-'))
     const tmpProj = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-ack-proj-'))
