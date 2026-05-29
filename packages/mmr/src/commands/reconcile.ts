@@ -1,8 +1,10 @@
 import type { CommandModule, ArgumentsCamelCase } from 'yargs'
+import os from 'node:os'
 import { resolveJobsDir } from './sessions.js'
 import { JobStore } from '../core/job-store.js'
 import { normalizeExternalInput, readInput } from '../core/normalize-input.js'
 import { runResultsPipeline } from '../core/results-pipeline.js'
+import { buildReviewAckStore } from '../core/ack-store.js'
 import { TERMINAL_STATUSES } from '../types.js'
 import type { OutputFormat } from '../types.js'
 
@@ -106,10 +108,17 @@ export const reconcileCommand: CommandModule<object, ReconcileArgs> = {
       completed_at: now,
     })
 
-    // 7. Re-run pipeline
+    // 7. Re-run pipeline. Apply acks under the job's persisted trust policy so
+    // reconcile reproduces the same suppression as review --sync rather than
+    // overwriting saved results with acknowledged stamps stripped.
     const updatedJob = store.loadJob(job.job_id)
     const outputFormat = (args.format ?? job.format ?? 'json') as OutputFormat
-    const { results, formatted, exitCode } = runResultsPipeline(store, updatedJob, outputFormat)
+    const ackStore = buildReviewAckStore({
+      trustProjectAcks: updatedJob.review_controls?.trust_project_acks ?? false,
+      cwd: process.cwd(),
+      home: os.homedir(),
+    })
+    const { results, formatted, exitCode } = runResultsPipeline(store, updatedJob, outputFormat, false, { ackStore })
 
     // 8. Save and output
     store.saveResults(job.job_id, results)

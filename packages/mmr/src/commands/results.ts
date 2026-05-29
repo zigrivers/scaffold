@@ -1,7 +1,9 @@
 import type { CommandModule, ArgumentsCamelCase } from 'yargs'
+import os from 'node:os'
 import { resolveJobsDir } from './sessions.js'
 import { JobStore } from '../core/job-store.js'
 import { runResultsPipeline } from '../core/results-pipeline.js'
+import { buildReviewAckStore } from '../core/ack-store.js'
 import { TERMINAL_STATUSES } from '../types.js'
 import type { OutputFormat } from '../types.js'
 
@@ -55,9 +57,17 @@ export const resultsCommand: CommandModule<object, ResultsArgs> = {
       process.exit(1)
     }
 
-    // 2. Run results pipeline (parse -> reconcile -> format)
+    // 2. Run results pipeline (parse -> reconcile -> format). Apply acks using
+    // the same trust policy the job was reviewed under (persisted in
+    // review_controls) so re-running results reproduces the same suppression
+    // instead of overwriting saved results with acknowledged stamps stripped.
     const outputFormat = (args.format ?? job.format ?? 'json') as OutputFormat
-    const { results, formatted, exitCode } = runResultsPipeline(store, job, outputFormat, args.raw)
+    const ackStore = buildReviewAckStore({
+      trustProjectAcks: job.review_controls?.trust_project_acks ?? false,
+      cwd: process.cwd(),
+      home: os.homedir(),
+    })
+    const { results, formatted, exitCode } = runResultsPipeline(store, job, outputFormat, args.raw, { ackStore })
     store.saveResults(job.job_id, results)
     console.log(formatted)
     process.exit(exitCode)

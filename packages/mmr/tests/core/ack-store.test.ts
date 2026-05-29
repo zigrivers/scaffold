@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { AckStore, type AckRecord } from '../../src/core/ack-store.js'
+import { AckStore, buildReviewAckStore, type AckRecord } from '../../src/core/ack-store.js'
 
 const FAKE_KEY = 'a'.repeat(40)
 const SHINGLE = ['hello', 'ello ', 'llo w']
@@ -244,6 +244,39 @@ describe('AckStore', () => {
     } finally {
       fs.rmSync(evil, { recursive: true, force: true })
     }
+  })
+
+  it('disables project scope when constructed without a projectRoot', () => {
+    const userOnly = new AckStore({ userHome: tmpHome })
+    const record: AckRecord = {
+      finding_key: FAKE_KEY,
+      normalized_location: 'src/foo.ts',
+      description_shingle: SHINGLE,
+      created_at: '2026-05-22T00:00:00Z',
+    }
+    userOnly.add(record, 'user')
+    // User acks still work...
+    expect(userOnly.lookup({ finding_key: FAKE_KEY, normalized_location: 'src/foo.ts', shingle: SHINGLE })?.scope).toBe('user')
+    // ...but project scope contributes nothing and writes are rejected.
+    expect(userOnly.listAll()).toHaveLength(1)
+    expect(() => userOnly.add(record, 'project')).toThrow(/project-scope acks are disabled/i)
+  })
+
+  it('buildReviewAckStore loads project acks only when trusted', () => {
+    const record: AckRecord = {
+      finding_key: FAKE_KEY,
+      normalized_location: 'src/foo.ts',
+      description_shingle: SHINGLE,
+      created_at: '2026-05-22T00:00:00Z',
+    }
+    // Plant a project ack in the (untrusted) working tree.
+    new AckStore({ projectRoot: tmpProject, userHome: tmpHome }).add(record, 'project')
+
+    const untrusted = buildReviewAckStore({ trustProjectAcks: false, cwd: tmpProject, home: tmpHome })
+    expect(untrusted.lookup({ finding_key: FAKE_KEY, normalized_location: 'src/foo.ts', shingle: SHINGLE })).toBeUndefined()
+
+    const trusted = buildReviewAckStore({ trustProjectAcks: true, cwd: tmpProject, home: tmpHome })
+    expect(trusted.lookup({ finding_key: FAKE_KEY, normalized_location: 'src/foo.ts', shingle: SHINGLE })?.match).toBe('exact')
   })
 
   it('add() rejects a structurally invalid record before persisting it', () => {
