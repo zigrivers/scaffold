@@ -98,3 +98,16 @@ export function getPackageMethodologyDir(projectRoot?: string): string {
   }
   return path.join(getPackageRoot(), 'content', 'methodology')
 }
+
+/**
+ * Resolve the guides directory.
+ * If projectRoot is provided and contains content/guides/, use that (dev/test mode).
+ * Otherwise use the package's bundled content/guides/.
+ */
+export function getPackageGuidesDir(projectRoot?: string): string {
+  if (projectRoot) {
+    const local = path.join(projectRoot, 'content', 'guides')
+    if (fs.existsSync(local)) return local
+  }
+  return path.join(getPackageRoot(), 'content', 'guides')
+}
