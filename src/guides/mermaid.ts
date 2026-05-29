@@ -28,13 +28,17 @@ export function sanitizeSvg(svg: string): string {
 // Default renderer: shells out to mmdc (build-time; needs a browser).
 export async function renderMermaid(source: string): Promise<string> {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'mmdc-'))
-  const inFile = path.join(tmp, 'in.mmd')
-  const outFile = path.join(tmp, 'out.svg')
-  fs.writeFileSync(inFile, source)
-  execFileSync('npx', ['--no-install', 'mmdc', '-i', inFile, '-o', outFile, ...RENDER_OPTS], {
-    stdio: 'pipe',
-  })
-  return fs.readFileSync(outFile, 'utf8')
+  try {
+    const inFile = path.join(tmp, 'in.mmd')
+    const outFile = path.join(tmp, 'out.svg')
+    fs.writeFileSync(inFile, source)
+    execFileSync('npx', ['--no-install', 'mmdc', '-i', inFile, '-o', outFile, ...RENDER_OPTS], {
+      stdio: 'pipe',
+    })
+    return fs.readFileSync(outFile, 'utf8')
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true })
+  }
 }
 
 export interface ResolveArgs {
@@ -51,9 +55,15 @@ export async function resolveDiagram(args: ResolveArgs): Promise<string> {
   const svgPath = path.join(cacheDir, `${diagramId}.svg`)
   const manifestPath = path.join(cacheDir, 'manifest.json')
   const fp = computeFingerprint(source)
-  const manifest: Record<string, string> = fs.existsSync(manifestPath)
-    ? JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
-    : {}
+  let manifest: Record<string, string> = {}
+  if (fs.existsSync(manifestPath)) {
+    try {
+      manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
+    } catch {
+      // Corrupt manifest (e.g. partially-written from a crashed build) — treat as empty.
+      manifest = {}
+    }
+  }
   if (manifest[diagramId] === fp && fs.existsSync(svgPath)) {
     return fs.readFileSync(svgPath, 'utf8')
   }
@@ -83,7 +93,12 @@ export function pruneDiagrams(guideDir: string, keepIds: string[]): void {
   }
   const manifestPath = path.join(cacheDir, 'manifest.json')
   if (fs.existsSync(manifestPath)) {
-    const m: Record<string, string> = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
+    let m: Record<string, string> = {}
+    try {
+      m = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
+    } catch {
+      // Corrupt manifest — self-heal by writing back an empty one after pruning.
+    }
     for (const k of Object.keys(m)) if (!keep.has(k)) delete m[k]
     fs.writeFileSync(manifestPath, JSON.stringify(m, null, 2) + '\n')
   }

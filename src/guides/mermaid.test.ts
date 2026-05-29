@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
-import { sanitizeSvg, resolveDiagram, computeFingerprint } from './mermaid.js'
+import { sanitizeSvg, resolveDiagram, computeFingerprint, pruneDiagrams } from './mermaid.js'
 
 describe('sanitizeSvg', () => {
   it('strips script, foreignObject, on* and javascript hrefs', () => {
@@ -36,5 +36,41 @@ describe('resolveDiagram', () => {
     const svg = await resolveDiagram({ guideDir: dir, diagramId: 'd0', source: 'X', render })
     expect(render).not.toHaveBeenCalled()
     expect(svg).toContain('<rect')
+  })
+})
+
+describe('pruneDiagrams', () => {
+  it('removes unlisted SVGs and drops their manifest entries, keeping listed ones', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mmd-prune-'))
+    const cacheDir = path.join(dir, '.diagrams')
+    fs.mkdirSync(cacheDir)
+    fs.writeFileSync(path.join(cacheDir, 'keep.svg'), '<svg/>')
+    fs.writeFileSync(path.join(cacheDir, 'drop.svg'), '<svg/>')
+    fs.writeFileSync(
+      path.join(cacheDir, 'manifest.json'),
+      JSON.stringify({ keep: 'fp-keep', drop: 'fp-drop' }, null, 2) + '\n',
+    )
+
+    pruneDiagrams(dir, ['keep'])
+
+    expect(fs.existsSync(path.join(cacheDir, 'keep.svg'))).toBe(true)
+    expect(fs.existsSync(path.join(cacheDir, 'drop.svg'))).toBe(false)
+
+    const manifest = JSON.parse(fs.readFileSync(path.join(cacheDir, 'manifest.json'), 'utf8'))
+    expect(manifest).toEqual({ keep: 'fp-keep' })
+  })
+
+  it('self-heals a corrupt manifest (writes a pruned-empty manifest)', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mmd-prune-corrupt-'))
+    const cacheDir = path.join(dir, '.diagrams')
+    fs.mkdirSync(cacheDir)
+    fs.writeFileSync(path.join(cacheDir, 'drop.svg'), '<svg/>')
+    fs.writeFileSync(path.join(cacheDir, 'manifest.json'), '{bad json}')
+
+    // Should not throw; drop.svg removed; manifest rewritten as {}
+    expect(() => pruneDiagrams(dir, [])).not.toThrow()
+    expect(fs.existsSync(path.join(cacheDir, 'drop.svg'))).toBe(false)
+    const manifest = JSON.parse(fs.readFileSync(path.join(cacheDir, 'manifest.json'), 'utf8'))
+    expect(manifest).toEqual({})
   })
 })

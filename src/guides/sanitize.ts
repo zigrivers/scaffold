@@ -62,10 +62,15 @@ export const guideSanitizeSchema: Schema = {
       'stroke',
       'strokeWidth',
       'markerEnd',
+      'markerStart',
+      'markerMid',
       'textAnchor',
     ],
     input: ['type', 'placeholder', 'className', 'ariaLabel'],
     // SVG root element attributes
     svg: ['viewBox', 'width', 'height', 'xmlns', 'preserveAspectRatio', 'role', 'ariaLabel'],
+    // mermaid arrowhead structure
+    marker: ['id', 'markerWidth', 'markerHeight', 'markerUnits', 'orient', 'refX', 'refY', 'viewBox', 'className'],
+    use: ['href', 'xlinkHref', 'x', 'y', 'width', 'height', 'className'],
   },
 }

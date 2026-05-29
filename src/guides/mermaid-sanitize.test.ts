@@ -30,4 +30,41 @@ describe('mermaid SVG through full render pipeline', () => {
     // figure wrapper must survive
     expect(body).toContain('class="mermaid"')
   })
+
+  it('preserves mermaid arrowhead structure (marker/use/marker-end) through sanitize', async () => {
+    // Realistic mermaid-style SVG with arrowhead wiring: <defs><marker …>, marker-end="url(#id)", <use href="#id">
+    const stubbedRender = async (_source: string) =>
+      '<svg viewBox="0 0 100 50">' +
+      '<defs>' +
+      '<marker id="arrow" markerWidth="10" markerHeight="10" orient="auto" refX="5" refY="5">' +
+      '<path d="M0,0 L10,5 L0,10 z"/>' +
+      '</marker>' +
+      '</defs>' +
+      '<path d="M0,25 L90,25" marker-end="url(#arrow)" stroke="black"/>' +
+      '<use href="#arrow"/>' +
+      '</svg>'
+
+    const md = '```mermaid\nflowchart LR\nA-->B\n```\n'
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mmd-arrow-'))
+
+    const { body } = await renderGuideBody(md, {
+      plugins: [remarkMermaid({ guideDir: dir, render: stubbedRender })],
+    })
+
+    // <marker> element and its key attributes must survive
+    expect(body).toContain('<marker')
+    expect(body).toContain('id="arrow"')
+    expect(body).toContain('orient="auto"')
+
+    // marker-end attribute wiring the path to the marker must survive
+    // hast/rehype-stringify preserves SVG presentation attributes in their original hyphenated form
+    expect(body).toContain('marker-end="url(#arrow)"')
+
+    // <use> element referencing the marker must survive
+    expect(body).toContain('<use')
+    expect(body).toContain('href="#arrow"')
+
+    // The path element itself must survive
+    expect(body).toContain('<path')
+  })
 })
