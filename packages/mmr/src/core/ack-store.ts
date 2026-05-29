@@ -113,10 +113,11 @@ export class AckStore {
     // the temp path. rename() replaces fp's directory entry without following a
     // symlink target, so readers never observe a partial record.
     const tmp = `${fp}.${crypto.randomBytes(6).toString('hex')}.tmp`
-    fs.writeFileSync(tmp, JSON.stringify(record, null, 2), { flag: 'wx' })
     try {
+      fs.writeFileSync(tmp, JSON.stringify(record, null, 2), { flag: 'wx' })
       fs.renameSync(tmp, fp)
     } catch (err) {
+      // Clean up a partial/leftover temp on any failure (write or rename).
       try {
         fs.rmSync(tmp, { force: true })
       } catch {
@@ -130,7 +131,13 @@ export class AckStore {
   remove(key: string, scope: AckScope): void {
     this.validateKey(key)
     const fp = this.filePath(key, scope)
-    if (fs.existsSync(fp)) fs.unlinkSync(fp)
+    // Unlink directly and tolerate ENOENT rather than existsSync-then-unlink
+    // (which has a TOCTOU window if the file is removed concurrently).
+    try {
+      fs.unlinkSync(fp)
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err
+    }
     this.loaded[scope] = undefined
   }
 
