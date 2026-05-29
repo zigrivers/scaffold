@@ -29,11 +29,17 @@ describe('classifyTrustMode', () => {
     expect(result.base_ref).toBe('main')
   })
 
-  it('returns base-ref with --staged in a real Git repo (HEAD is the trusted ref)', () => {
+  it('returns base-ref with --staged in a real Git repo outside CI (HEAD is the trusted ref)', () => {
     fs.mkdirSync(path.join(tmpDir, '.git'))
-    const result = classifyTrustMode({ cwd: tmpDir, args: { staged: true } })
+    const result = classifyTrustMode({ cwd: tmpDir, args: { staged: true }, isCI: false })
     expect(result.trust_mode).toBe('base-ref')
     expect(result.base_ref).toBe('HEAD')
+  })
+
+  it('fails closed for --staged in CI (HEAD may be an untrusted PR checkout)', () => {
+    fs.mkdirSync(path.join(tmpDir, '.git'))
+    const result = classifyTrustMode({ cwd: tmpDir, args: { staged: true }, isCI: true })
+    expect(result.trust_mode).toBe('untrusted-head')
   })
 
   it('returns base-ref with --pr <num> resolving to a real baseRefName', () => {

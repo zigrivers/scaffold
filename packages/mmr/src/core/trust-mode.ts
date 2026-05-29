@@ -51,8 +51,21 @@ function asBaseRef(ref: string): ClassifyResult {
 }
 
 function isGitRepo(cwd: string): boolean {
-  // Advisory filesystem check (walk up for .git). This is NOT the security
-  // boundary: a git repo with no explicit trusted ref classifies as
+  // Authoritative check first: handles worktrees, submodules, monorepo
+  // subdirs, and bare-repo edge cases correctly.
+  try {
+    const out = execFileSync('git', ['rev-parse', '--is-inside-work-tree'], {
+      cwd,
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+      timeout: 5000,
+    })
+    if (out.trim() === 'true') return true
+  } catch {
+    // git missing or not a work tree → fall through to the advisory FS check.
+  }
+  // Advisory fallback (also what the .git-fixture tests exercise). NOT the
+  // security boundary: a git repo with no explicit trusted ref classifies as
   // 'untrusted-head', and base-ref modes resolve through real git/gh which fail
   // on a planted/fake .git — so a forged .git only ever yields untrusted-head.
   return fs.existsSync(path.join(findProjectRoot(cwd), '.git'))
@@ -64,6 +77,7 @@ function defaultResolvePrBase(pr: number, cwd: string): string | undefined {
       cwd,
       encoding: 'utf-8',
       stdio: ['ignore', 'pipe', 'ignore'],
+      timeout: 10000,
     })
     const parsed = JSON.parse(raw) as { baseRefName?: string }
     if (parsed.baseRefName && parsed.baseRefName.length > 0) return parsed.baseRefName
@@ -93,7 +107,10 @@ export function classifyTrustMode(opts: ClassifyOptions): ClassifyResult {
 
   if (args.base) return asBaseRef(args.base)
 
-  if (args.staged) return asBaseRef('HEAD')
+  // --staged reviews the index against HEAD. HEAD is a trusted base locally,
+  // but in CI it may be an attacker's PR checkout, so fail closed there too —
+  // consistent with the no-flag default below.
+  if (args.staged) return isCI ? { trust_mode: 'untrusted-head' } : asBaseRef('HEAD')
 
   // Default (plain `mmr review` working tree, or `--diff`): trusting HEAD is
   // safe locally (HEAD is your committed history) but NOT in CI, where the
