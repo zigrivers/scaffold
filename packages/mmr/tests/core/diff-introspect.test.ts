@@ -53,4 +53,35 @@ describe('detectConfigChanges', () => {
     expect(r.config_file_changed).toBe(true)
     expect(r.ack_files_changed).toHaveLength(1)
   })
+
+  it('detects config changes across diff-format variants (evasion resistance)', () => {
+    // git --no-prefix (no a//b/)
+    expect(detectConfigChanges('diff --git .mmr.yaml .mmr.yaml\n--- .mmr.yaml\n+++ .mmr.yaml\n').config_file_changed).toBe(true)
+    // raw diff -u (no `diff --git` header, only ---/+++)
+    expect(detectConfigChanges('--- a/.mmr.yaml\n+++ b/.mmr.yaml\n@@ -1 +1 @@\n-x\n+y\n').config_file_changed).toBe(true)
+    // merge diff (diff --cc)
+    expect(detectConfigChanges('diff --cc .mmr.yaml\n').config_file_changed).toBe(true)
+    // casing variant on a case-insensitive filesystem
+    expect(detectConfigChanges('diff --git a/.MMR.YAML b/.MMR.YAML\n').config_file_changed).toBe(true)
+  })
+
+  it('detects ack changes across format variants and renames', () => {
+    const key = 'a'.repeat(40)
+    // --no-prefix ack
+    expect(detectConfigChanges(`diff --git .mmr/acks/${key}.json .mmr/acks/${key}.json\n`).ack_files_changed)
+      .toEqual([`.mmr/acks/${key}.json`])
+    // raw diff -u ack (no diff --git line)
+    expect(detectConfigChanges(`--- a/.mmr/acks/${key}.json\n+++ b/.mmr/acks/${key}.json\n`).ack_files_changed)
+      .toEqual([`.mmr/acks/${key}.json`])
+    // rename metadata
+    expect(detectConfigChanges(`rename from .mmr/acks/${key}.json\nrename to other.txt\n`).ack_files_changed)
+      .toEqual([`.mmr/acks/${key}.json`])
+  })
+
+  it('does not flag a benign file whose hunk content merely mentions a sentinel path', () => {
+    const r = detectConfigChanges(
+      'diff --git a/docs/readme.md b/docs/readme.md\n--- a/docs/readme.md\n+++ b/docs/readme.md\n@@ -1 +1 @@\n+see .mmr.yaml for config\n',
+    )
+    expect(r.config_file_changed).toBe(false)
+  })
 })
