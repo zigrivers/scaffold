@@ -1,6 +1,6 @@
 import type { JobStore } from './job-store.js'
 import type { HttpChannelParsed } from '../config/schema.js'
-import type { ChannelStatus } from '../types.js'
+import type { ChannelJobEntry, ChannelStatus } from '../types.js'
 
 export interface DispatchHttpOptions {
   channel: HttpChannelParsed
@@ -69,12 +69,12 @@ export async function dispatchHttpChannel(
     // Synthetic diagnostics only — surfaced by the results pipeline via the
     // channel log. NEVER the response body (secret-reflection risk).
     if (logDetail) store.saveChannelLog(jobId, channelName, logDetail)
-    store.updateChannel(jobId, channelName, {
-      status,
-      started_at: startedAt,
-      completed_at: new Date().toISOString(),
-      output_parser: channel.output_parser,
-    })
+    // Match the subprocess dispatcher's persisted shape: only completed
+    // channels carry output_parser (it drives parsing); error paths write
+    // status + completed_at only.
+    const update: Partial<ChannelJobEntry> = { status, completed_at: new Date().toISOString() }
+    if (status === 'completed') update.output_parser = channel.output_parser
+    store.updateChannel(jobId, channelName, update)
   }
 
   const headers: Record<string, string> = {
@@ -87,6 +87,13 @@ export async function dispatchHttpChannel(
       // Env-var name only — never the value (absent here anyway).
       finalize('auth_failed', `API key env var ${channel.api_key_env} not set`)
       return
+    }
+    // Drop any case-variant of the target header from `channel.headers` so the
+    // api-key header is authoritative and we never emit a duplicate (fetch
+    // implementations normalize header casing inconsistently).
+    const target = channel.api_key_header.toLowerCase()
+    for (const k of Object.keys(headers)) {
+      if (k.toLowerCase() === target) delete headers[k]
     }
     headers[channel.api_key_header] = `${channel.api_key_prefix}${value}`
   }

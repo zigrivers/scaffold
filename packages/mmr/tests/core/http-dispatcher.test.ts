@@ -103,6 +103,27 @@ describe('dispatchHttpChannel', () => {
     }
   })
 
+  it('api-key header wins over a case-variant in channel.headers (no duplicate)', async () => {
+    const { store, jobId, cleanup } = makeStore()
+    try {
+      const channel: HttpChannelParsed = {
+        ...baseChannel,
+        headers: { authorization: 'Bearer stale-static-value', 'x-trace': '1' },
+      }
+      const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ choices: [{ message: { content: '{}' } }] }), { status: 200 }),
+      )
+      await dispatchHttpChannel(store, jobId, 'groq', { channel, prompt: 'x', timeout: 30 })
+      const headers = (fetchMock.mock.calls[0][1] as RequestInit).headers as Record<string, string>
+      // The lowercase static value is dropped; only the api-key value remains.
+      expect(headers.authorization).toBeUndefined()
+      expect(headers.Authorization).toBe('Bearer sk-secret-do-not-leak')
+      expect(headers['x-trace']).toBe('1')
+    } finally {
+      cleanup()
+    }
+  })
+
   it('401 → marks channel auth_failed', async () => {
     const { store, jobId, cleanup } = makeStore()
     try {
