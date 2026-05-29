@@ -176,7 +176,7 @@ const BASE_ARGV = {
   format: undefined,
   auto: false,
   output: undefined as string | undefined,
-  'no-open': true,
+  open: false,
   'json-only': false,
 }
 
