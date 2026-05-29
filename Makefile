@@ -23,7 +23,7 @@ check-freshness-citations: check-reference-citations ## Back-compat alias for ch
 
 check: lint validate test eval ## Run bash quality gates (lint + validate + test + eval)
 
-check-all: check ts-check mmr-check validate-knowledge check-reference-citations ## Run all quality gates (bash + TypeScript + knowledge frontmatter + reference-page citations)
+check-all: check ts-check mmr-check validate-knowledge check-reference-citations guides-check ## Run all quality gates (bash + TypeScript + knowledge frontmatter + reference-page citations)
 
 ts-check: ## Run TypeScript quality gates (lint + type-check + build + unit tests)
 	npm run lint
