@@ -201,3 +201,5 @@ export const MmrConfigSchema = z.object({
 
 export type MmrConfigParsed = z.infer<typeof MmrConfigSchema>
 export type ChannelConfigParsed = z.infer<typeof ChannelConfigSchema>
+export type SubprocessChannelParsed = z.infer<typeof SubprocessChannelSchema>
+export type HttpChannelParsed = z.infer<typeof HttpChannelSchema>
