@@ -21,6 +21,7 @@ describe('checkInstalled', () => {
 describe('checkAuth', () => {
   it('returns ok when a channel has no auth check configured', async () => {
     const result = await checkAuth({
+      kind: 'subprocess' as const,
       enabled: true,
       abstract: false,
       command: 'echo',
@@ -35,6 +36,7 @@ describe('checkAuth', () => {
 
   it('returns ok for a command that exits 0', async () => {
     const result = await checkAuth({
+      kind: 'subprocess' as const,
       enabled: true,
       abstract: false,
       command: 'echo',
@@ -55,6 +57,7 @@ describe('checkAuth', () => {
 
   it('returns failed when exit code matches failure_exit_codes', async () => {
     const result = await checkAuth({
+      kind: 'subprocess' as const,
       enabled: true,
       abstract: false,
       command: 'echo',
@@ -76,6 +79,7 @@ describe('checkAuth', () => {
 
   it('returns timeout when auth check exceeds timeout', async () => {
     const result = await checkAuth({
+      kind: 'subprocess' as const,
       enabled: true,
       abstract: false,
       command: 'echo',
@@ -97,6 +101,7 @@ describe('checkAuth', () => {
   it('retries auth check once on timeout', async () => {
     const start = Date.now()
     const result = await checkAuth({
+      kind: 'subprocess' as const,
       enabled: true,
       abstract: false,
       command: 'echo',

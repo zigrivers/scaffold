@@ -72,7 +72,10 @@ export const OutputParserSchema: z.ZodType<OutputParserConfig> = z.lazy(() =>
   ]),
 )
 
-const ChannelConfigSchema = z.object({
+// Fields common to every channel kind. Shared across both discriminated-union
+// arms so existing consumers can keep reading ch.command/ch.auth/etc. off the
+// union without narrowing (they're subprocess-relevant but harmless on http).
+const CommonChannelFields = {
   enabled: z.boolean().default(true),
   command: z.string().optional(),
   flags: z.array(z.string()).default([]),
@@ -90,9 +93,46 @@ const ChannelConfigSchema = z.object({
   output_parser: OutputParserSchema.default('default'),
   stderr: z.enum(['suppress', 'capture', 'passthrough']).default('capture'),
   timeout: z.number().optional(),
+  // Channel inheritance (v3.28). command/auth stay optional so abstract bases
+  // and `extends` children (resolved before parse) validate.
   extends: z.string().optional(),
   abstract: z.boolean().default(false),
+}
+
+const SubprocessChannelSchema = z.object({
+  kind: z.literal('subprocess'),
+  ...CommonChannelFields,
 })
+
+const HttpChannelSchema = z.object({
+  kind: z.literal('http'),
+  endpoint: z.string(),
+  model: z.string(),
+  // Only the openai-chat convention ships in v3.30b (§5 decision 8).
+  endpoint_convention: z.literal('openai-chat'),
+  api_key_env: z.string().optional(),
+  api_key_header: z.string().default('Authorization'),
+  api_key_prefix: z.string().default('Bearer '),
+  ...CommonChannelFields,
+})
+
+/**
+ * Injects `kind: 'subprocess'` into any channel object missing it BEFORE the
+ * discriminatedUnion runs. Zod picks the union arm from the RAW discriminator
+ * value before defaults apply, so without this a legacy config (no `kind`)
+ * would fail to parse entirely.
+ */
+function injectSubprocessDefault(raw: unknown): unknown {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return raw
+  const obj = raw as Record<string, unknown>
+  if (obj.kind === undefined) return { ...obj, kind: 'subprocess' }
+  return obj
+}
+
+const ChannelConfigSchema = z.preprocess(
+  injectSubprocessDefault,
+  z.discriminatedUnion('kind', [SubprocessChannelSchema, HttpChannelSchema]),
+)
 
 const TemplateSchema = z.object({
   criteria: z.array(z.string()).optional(),

@@ -4,10 +4,10 @@ import type { ChannelConfigParsed } from '../../src/config/schema.js'
 
 describe('resolveDispatchChannels (T1-A)', () => {
   const sampleChannels = {
-    'ollama-base': { enabled: true, abstract: true, command: 'ollama run', flags: [], env: {}, prompt_wrapper: '{{prompt}}', output_parser: 'default', stderr: 'capture' as const },
-    qwen: { enabled: true, abstract: false, command: 'ollama run', flags: ['qwen'], env: {}, prompt_wrapper: '{{prompt}}', output_parser: 'default', stderr: 'capture' as const },
-    deepseek: { enabled: true, abstract: false, command: 'ollama run', flags: ['deepseek'], env: {}, prompt_wrapper: '{{prompt}}', output_parser: 'default', stderr: 'capture' as const },
-    disabled: { enabled: false, abstract: false, command: 'x', flags: [], env: {}, prompt_wrapper: '{{prompt}}', output_parser: 'default', stderr: 'capture' as const },
+    'ollama-base': { kind: 'subprocess' as const, enabled: true, abstract: true, command: 'ollama run', flags: [], env: {}, prompt_wrapper: '{{prompt}}', output_parser: 'default', stderr: 'capture' as const },
+    qwen: { kind: 'subprocess' as const, enabled: true, abstract: false, command: 'ollama run', flags: ['qwen'], env: {}, prompt_wrapper: '{{prompt}}', output_parser: 'default', stderr: 'capture' as const },
+    deepseek: { kind: 'subprocess' as const, enabled: true, abstract: false, command: 'ollama run', flags: ['deepseek'], env: {}, prompt_wrapper: '{{prompt}}', output_parser: 'default', stderr: 'capture' as const },
+    disabled: { kind: 'subprocess' as const, enabled: false, abstract: false, command: 'x', flags: [], env: {}, prompt_wrapper: '{{prompt}}', output_parser: 'default', stderr: 'capture' as const },
   } satisfies Record<string, ChannelConfigParsed>
 
   it('filters out channels with abstract: true from default resolution', () => {

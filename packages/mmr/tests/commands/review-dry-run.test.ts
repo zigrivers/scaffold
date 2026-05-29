@@ -257,6 +257,7 @@ describe('configured compensator availability', () => {
       defaults: { ...baseConfig.defaults, compensator: { channel: 'qwen-local' } },
       channels: {
         'qwen-local': {
+          kind: 'subprocess' as const,
           enabled: true,
           command: 'qwen-review',
           flags: [],
@@ -293,6 +294,7 @@ describe('configured compensator availability', () => {
       defaults: { ...baseConfig.defaults, compensator: { channel: 'qwen-local' } },
       channels: {
         'qwen-local': {
+          kind: 'subprocess' as const,
           enabled: false,
           command: 'qwen-review',
           flags: [],
@@ -327,6 +329,7 @@ describe('configured compensator availability', () => {
       defaults: { ...baseConfig.defaults, compensator: { channel: 'qwen-local' } },
       channels: {
         'qwen-local': {
+          kind: 'subprocess' as const,
           enabled: true,
           command: 'qwen-review',
           flags: [],
