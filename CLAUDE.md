@@ -314,6 +314,18 @@ phase_audit:
   timeout_s: 60
 ```
 
+### Reference guides
+
+Human + agent reference guides live in `content/guides/<topic>/index.md`
+(markdown is the source of truth) with generated, checked-in `index.html`.
+- Humans: `scaffold guides` (open the index), `scaffold guides <topic>` (open one guide).
+- Agents: read the bundled `content/guides/<topic>/index.md` — or
+  `scaffold guides <topic> --markdown` / `--print-path`, and
+  `scaffold guides --list --format json` for discovery. Never read the HTML.
+- Regenerate after editing a source: `scaffold guides --build` (maintainer/CI;
+  the drift gate enforces freshness). Authoring uses markdown directives
+  (`:::callout`, `::::tabs`, `:::filter-table`, `:::chart`, `:sev[...]`, ```mermaid).
+
 ## Dev Environment
 
 See `docs/dev-setup.md` for the full setup guide.
