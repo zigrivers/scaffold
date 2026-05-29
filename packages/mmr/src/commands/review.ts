@@ -3,9 +3,10 @@ import fs from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { loadConfig } from '../config/loader.js'
 import { JobStore } from '../core/job-store.js'
-import { checkInstalled, checkAuth } from '../core/auth.js'
+import { checkInstalled, checkAuth, checkHttpAuth } from '../core/auth.js'
 import { assemblePrompt } from '../core/prompt.js'
 import { dispatchChannel } from '../core/dispatcher.js'
+import { dispatchHttpChannel } from '../core/http-dispatcher.js'
 import { runResultsPipeline } from '../core/results-pipeline.js'
 import { buildReviewAckStore } from '../core/ack-store.js'
 import { classifyTrustMode } from '../core/trust-mode.js'
@@ -499,6 +500,17 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
         authResults[name] = { status: 'skipped', recovery: `Channel "${name}" is abstract and cannot run directly` }
         continue
       }
+
+      // HTTP channels have no command/install step — probe over the wire.
+      if (chConfig.kind === 'http') {
+        const authResult = await checkHttpAuth(chConfig)
+        authResults[name] = authResult
+        if (authResult.status === 'ok') {
+          validChannels.push(name)
+        }
+        continue
+      }
+
       if (!chConfig.command) {
         authResults[name] = { status: 'skipped', recovery: `Channel "${name}" is missing command` }
         continue
@@ -610,6 +622,17 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       const dispatches: Promise<void>[] = []
       for (const name of validChannels) {
         const chConfig = config.channels[name]
+        if (chConfig.kind === 'http') {
+          store.updateChannel(job.job_id, name, { output_parser: chConfig.output_parser })
+          dispatches.push(
+            dispatchHttpChannel(store, job.job_id, name, {
+              channel: chConfig,
+              prompt: buildChannelPrompt(chConfig, prompt),
+              timeout: chConfig.timeout ?? config.defaults.timeout,
+            }),
+          )
+          continue
+        }
         if (!chConfig.command) {
           store.updateChannel(job.job_id, name, {
             status: 'skipped',
@@ -636,6 +659,15 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     } else {
       for (const name of validChannels) {
         const chConfig = config.channels[name]
+        if (chConfig.kind === 'http') {
+          store.updateChannel(job.job_id, name, { output_parser: chConfig.output_parser })
+          await dispatchHttpChannel(store, job.job_id, name, {
+            channel: chConfig,
+            prompt: buildChannelPrompt(chConfig, prompt),
+            timeout: chConfig.timeout ?? config.defaults.timeout,
+          })
+          continue
+        }
         if (!chConfig.command) {
           store.updateChannel(job.job_id, name, {
             status: 'skipped',
