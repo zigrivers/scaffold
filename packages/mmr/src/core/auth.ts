@@ -84,9 +84,11 @@ async function runAuthCheck(config: AuthenticatedChannelConfig): Promise<AuthRes
  * to handle transient network issues.
  */
 export async function checkAuth(config: ChannelConfigParsed): Promise<AuthResult> {
-  // Subprocess auth only. HTTP channels are auth-probed via checkHttpAuth and
-  // routed separately (Task 34); a non-subprocess channel is a no-op here.
-  if (config.kind !== 'subprocess' || !config.auth) {
+  // Polymorphic over channel kind: HTTP channels are auth-probed over the wire.
+  if (config.kind === 'http') {
+    return checkHttpAuth(config)
+  }
+  if (!config.auth) {
     return { status: 'ok' }
   }
   const authConfig = { ...config, auth: config.auth }
@@ -133,12 +135,16 @@ export async function checkHttpAuth(channel: HttpChannelParsed): Promise<AuthRes
     if (channel.auth.check_status_ok.includes(res.status)) {
       return { status: 'ok' }
     }
+    // A non-ok HTTP response is plausibly an auth problem (401/403/…) → surface
+    // the user's auth-setup recovery guidance.
     return { status: 'failed', recovery: channel.auth.recovery }
   } catch (err: unknown) {
     if ((err as { name?: string }).name === 'AbortError') {
       return { status: 'timeout' }
     }
-    return { status: 'failed', recovery: channel.auth.recovery }
+    // Transport-level failure (DNS, connection refused, TLS) is NOT an auth
+    // problem — do not attach auth recovery text, which would mislead.
+    return { status: 'failed' }
   } finally {
     clearTimeout(timer)
   }

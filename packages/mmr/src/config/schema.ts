@@ -21,7 +21,8 @@ const HttpAuthConfigSchema = z.object({
   check_endpoint: z.string().optional(),
   check_method: z.string().default('GET'),
   check_status_ok: z.array(z.number()).default([200]),
-  timeout: z.number().default(5),
+  // Positive: a 0/negative timeout would abort the probe immediately.
+  timeout: z.number().positive().default(5),
   recovery: z.string().optional(),
 })
 
@@ -32,9 +33,11 @@ const HttpAuthConfigSchema = z.object({
  * `/chat/completions` — callers then require an explicit `auth.check_endpoint`.
  */
 export function deriveProbeUrl(endpoint: string): string | undefined {
+  // Tolerate trailing slashes (e.g. `.../chat/completions/`).
+  const trimmed = endpoint.replace(/\/+$/, '')
   const suffix = '/chat/completions'
-  if (endpoint.endsWith(suffix)) {
-    return endpoint.slice(0, -suffix.length) + '/models'
+  if (trimmed.endsWith(suffix)) {
+    return trimmed.slice(0, -suffix.length) + '/models'
   }
   return undefined
 }
@@ -174,6 +177,7 @@ const ChannelConfigSchema = z.preprocess(
   if (ch.kind === 'http' && !ch.auth.check_endpoint && !deriveProbeUrl(ch.endpoint)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
+      path: ['auth', 'check_endpoint'],
       message: `endpoint "${ch.endpoint}" does not end in /chat/completions; auth.check_endpoint is required.`,
     })
   }

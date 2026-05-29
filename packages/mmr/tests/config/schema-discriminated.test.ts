@@ -134,6 +134,21 @@ describe('http channel loader — auth.check_endpoint requirement', () => {
     expect(parsed.channels.custom.kind).toBe('http')
   })
 
+  it('REJECTS a non-positive http auth.timeout', () => {
+    expect(() => MmrConfigSchema.parse({
+      version: 1,
+      channels: {
+        groq: {
+          kind: 'http',
+          endpoint: 'https://api.groq.com/openai/v1/chat/completions',
+          model: 'm',
+          endpoint_convention: 'openai-chat',
+          auth: { timeout: 0 },
+        },
+      },
+    })).toThrow()
+  })
+
   it('accepts a standard /chat/completions endpoint with no explicit auth (probe URL derivable)', () => {
     const parsed = MmrConfigSchema.parse({
       version: 1,

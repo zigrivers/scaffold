@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { checkHttpAuth, deriveProbeUrl } from '../../src/core/auth.js'
+import { checkAuth, checkHttpAuth, deriveProbeUrl } from '../../src/core/auth.js'
 import type { HttpChannelParsed } from '../../src/config/schema.js'
 
 describe('deriveProbeUrl', () => {
@@ -13,6 +13,10 @@ describe('deriveProbeUrl', () => {
 
   it('returns undefined when endpoint does not end in /chat/completions', () => {
     expect(deriveProbeUrl('https://api.example.com/v2/predict')).toBeUndefined()
+  })
+
+  it('tolerates a trailing slash on the endpoint', () => {
+    expect(deriveProbeUrl('https://api.groq.com/openai/v1/chat/completions/')).toBe('https://api.groq.com/openai/v1/models')
   })
 })
 
@@ -75,5 +79,28 @@ describe('checkHttpAuth', () => {
     const result = await checkHttpAuth(c)
     expect(result.status).toBe('failed')
     expect(JSON.stringify(result)).not.toContain('sk-probe-secret')
+  })
+
+  it('a transport-level error → failed WITHOUT auth recovery text (not an auth problem)', async () => {
+    vi.spyOn(global, 'fetch').mockRejectedValue(new Error('ECONNREFUSED'))
+    const c: HttpChannelParsed = { ...baseChannel, auth: { ...baseChannel.auth, recovery: 'set PROBE_KEY' } }
+    const result = await checkHttpAuth(c)
+    expect(result.status).toBe('failed')
+    expect(result.recovery).toBeUndefined()
+  })
+
+  it('a non-ok HTTP response → failed WITH recovery (auth-plausible)', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValue(new Response('nope', { status: 401 }))
+    const c: HttpChannelParsed = { ...baseChannel, auth: { ...baseChannel.auth, recovery: 'set PROBE_KEY' } }
+    const result = await checkHttpAuth(c)
+    expect(result.status).toBe('failed')
+    expect(result.recovery).toBe('set PROBE_KEY')
+  })
+
+  it('checkAuth is polymorphic: an http channel is probed over the wire', async () => {
+    const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue(new Response('{}', { status: 200 }))
+    const result = await checkAuth(baseChannel)
+    expect(result.status).toBe('ok')
+    expect(fetchMock.mock.calls[0][0]).toBe('https://api.example.com/v1/models')
   })
 })
