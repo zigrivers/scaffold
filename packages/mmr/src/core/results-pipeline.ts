@@ -221,6 +221,12 @@ export function runResultsPipeline(
     },
   }
 
+  // Re-surface trust context persisted on the job at review time (§5 decision
+  // 1), so review --sync, `mmr results`, and `mmr reconcile` all carry it.
+  if (job.trust_mode !== undefined) results.trust_mode = job.trust_mode
+  if (job.proposed_acks !== undefined) results.proposed_acks = job.proposed_acks
+  if (job.proposed_config_change !== undefined) results.proposed_config_change = job.proposed_config_change
+
   let formatted: string
   switch (outputFormat) {
   case 'text':

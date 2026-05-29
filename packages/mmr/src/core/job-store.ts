@@ -12,6 +12,9 @@ export interface CreateJobOpts {
   session_id?: string
   round?: number
   review_controls?: ReviewControls
+  trust_mode?: 'base-ref' | 'untrusted-head' | 'non-git'
+  proposed_acks?: string[]
+  proposed_config_change?: boolean
 }
 
 export class JobStore {
@@ -77,6 +80,9 @@ export class JobStore {
     if (opts.session_id !== undefined) metadata.session_id = opts.session_id
     if (opts.round !== undefined) metadata.round = opts.round
     if (opts.review_controls !== undefined) metadata.review_controls = opts.review_controls
+    if (opts.trust_mode !== undefined) metadata.trust_mode = opts.trust_mode
+    if (opts.proposed_acks !== undefined) metadata.proposed_acks = opts.proposed_acks
+    if (opts.proposed_config_change !== undefined) metadata.proposed_config_change = opts.proposed_config_change
 
     this.saveJob(jobId, metadata)
     return metadata

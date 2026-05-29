@@ -27,6 +27,14 @@ export function formatText(results: ReconciledResults): string {
     `Elapsed: ${results.metadata.total_elapsed}`,
   )
   lines.push(segments.join(' | '))
+  if (results.trust_mode !== undefined) {
+    const trust = [`Trust: ${results.trust_mode}`]
+    if (results.proposed_config_change) trust.push('proposed .mmr.yaml change')
+    if (results.proposed_acks && results.proposed_acks.length > 0) {
+      trust.push(`proposed acks: ${results.proposed_acks.length}`)
+    }
+    lines.push(trust.join(' | '))
+  }
   lines.push('')
 
   if (results.reconciled_findings.length > 0) {

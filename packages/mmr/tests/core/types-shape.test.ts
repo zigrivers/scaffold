@@ -1,5 +1,42 @@
 import { describe, it, expect } from 'vitest'
-import type { JobMetadata, ReconciledFinding } from '../../src/types.js'
+import type { JobMetadata, ReconciledFinding, ReconciledResults } from '../../src/types.js'
+
+describe('ReconciledResults trust annotations', () => {
+  it('accepts trust_mode + proposed_acks + proposed_config_change as optional fields', () => {
+    const r: ReconciledResults = {
+      job_id: 'mmr-abcdef123456',
+      verdict: 'pass',
+      fix_threshold: 'P2',
+      advisory_count: 0,
+      approved: true,
+      summary: 'ok',
+      reconciled_findings: [],
+      per_channel: {},
+      metadata: { channels_dispatched: 1, channels_completed: 1, channels_partial: 0, total_elapsed: '1s' },
+      trust_mode: 'base-ref',
+      proposed_acks: ['.mmr/acks/aaa.json'],
+      proposed_config_change: true,
+    }
+    expect(r.trust_mode).toBe('base-ref')
+    expect(r.proposed_acks).toHaveLength(1)
+    expect(r.proposed_config_change).toBe(true)
+  })
+
+  it('still accepts results without the trust annotations', () => {
+    const r: ReconciledResults = {
+      job_id: 'mmr-abcdef123456',
+      verdict: 'pass',
+      fix_threshold: 'P2',
+      advisory_count: 0,
+      approved: true,
+      summary: 'ok',
+      reconciled_findings: [],
+      per_channel: {},
+      metadata: { channels_dispatched: 1, channels_completed: 1, channels_partial: 0, total_elapsed: '1s' },
+    }
+    expect(r.trust_mode).toBeUndefined()
+  })
+})
 
 describe('ReconciledFinding shape', () => {
   it('accepts a finding with all new T2-A/B/C/D fields populated', () => {

@@ -555,6 +555,10 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       session_id: args.session,
       round: args.round,
       review_controls: reviewControls,
+      // Persist trust context so the pipeline re-surfaces it on every run.
+      trust_mode: trust.trust_mode,
+      ...(diffChanges.ack_files_changed.length > 0 ? { proposed_acks: diffChanges.ack_files_changed } : {}),
+      ...(diffChanges.config_file_changed ? { proposed_config_change: true } : {}),
     })
     if (sessionLink) {
       try {
@@ -708,16 +712,11 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       const { results, formatted, exitCode } = runResultsPipeline(store, completedJob, outputFormat, false, {
         ackStore,
       })
+      // runResultsPipeline already stamped trust_mode/proposed_* onto results
+      // from the job (persisted at createJob), so results and `formatted` carry
+      // the trust context — and `mmr results`/`reconcile` reproduce it.
       store.saveResults(job.job_id, results)
-
-      // Annotate with trust context for transparency. The needs-user-decision
-      // trust gate already fired (and exited) before dispatch, so here we only
-      // surface trust_mode and any proposed config/ack changes that were opted
-      // into (--accept-new-acks / --trust-project-config).
-      const annotated: Record<string, unknown> = { ...results, trust_mode: trust.trust_mode }
-      annotateProposedChanges(annotated, diffChanges)
-
-      console.log(outputFormat === 'json' ? JSON.stringify(annotated, null, 2) : formatted)
+      console.log(formatted)
       process.exit(exitCode)
     } else {
       // Default: dispatch summary only
