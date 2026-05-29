@@ -163,6 +163,29 @@ describe('mmr review trust-boundary integration', () => {
     }
   })
 
+  it('fires the gate unconditionally — without --sync and under --dry-run (no bypass)', async () => {
+    const dir = initRepo(true)
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-int-home-'))
+    try {
+      const diffFile = writeDiff(
+        dir,
+        'add-ack.patch',
+        `diff --git a/.mmr/acks/${KEY}.json b/.mmr/acks/${KEY}.json\nnew file mode 100644\n--- /dev/null\n+++ b/.mmr/acks/${KEY}.json\n@@ -0,0 +1 @@\n+{}\n`,
+      )
+      // Default (no --sync): the gate must still fire.
+      const noSync = await runReview({ diff: diffFile, base: 'HEAD', sync: false }, { cwd: dir, home })
+      expect(noSync.output?.verdict).toBe('needs-user-decision')
+      expect(noSync.exited).toBe(2)
+      // --dry-run: the gate must still fire (not just preview).
+      const dryRun = await runReview({ diff: diffFile, base: 'HEAD', 'dry-run': true }, { cwd: dir, home })
+      expect(dryRun.output?.verdict).toBe('needs-user-decision')
+      expect(dryRun.exited).toBe(2)
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true })
+      fs.rmSync(home, { recursive: true, force: true })
+    }
+  })
+
   it('forces needs-user-decision when the diff modifies .mmr.yaml (no --trust-project-config)', async () => {
     const dir = initRepo(true)
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-int-home-'))

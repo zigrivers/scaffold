@@ -405,10 +405,43 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     //     ack files). The reviewed content is loaded from the trusted base ref,
     //     so these surface the *proposed* changes for a human to ratify.
     const diffChanges = detectConfigChanges(diff)
+    // The blocking opt-outs use the RAW flags (--trust-project-config /
+    // --accept-new-acks): they ratify the *proposed* change in the diff, which
+    // is distinct from the loading policy (effectiveTrust*, which is "n/a" in
+    // base-ref mode because config/acks load from the trusted ref).
     const blockingConfigChange =
       baseRef !== undefined && diffChanges.config_file_changed && args.trustProjectConfig !== true
     const blockingAckChange =
       baseRef !== undefined && diffChanges.ack_files_changed.length > 0 && args.acceptNewAcks !== true
+
+    // 2b. Trust gate — UNCONDITIONAL (before dry-run, job creation, and
+    //     dispatch), so it can't be bypassed by omitting --sync or using
+    //     --dry-run. A base-ref diff proposing project config/acks short-
+    //     circuits to needs-user-decision (exit 2) until a human ratifies.
+    if (blockingConfigChange || blockingAckChange) {
+      const outputFormat = (args.format ?? config.defaults.format ?? 'json') as OutputFormat
+      const reason =
+        blockingConfigChange && blockingAckChange
+          ? 'the diff proposes project config (.mmr.yaml) and ack changes'
+          : blockingConfigChange
+            ? 'the diff proposes a project config change (.mmr.yaml)'
+            : 'the diff proposes new project acks'
+      const decision: Record<string, unknown> = {
+        verdict: 'needs-user-decision',
+        fix_threshold: config.defaults.fix_threshold,
+        reconciled_findings: [],
+        advisory_count: 0,
+        approved: false,
+        summary:
+          `Needs user decision — ${reason}. Re-run with ` +
+          '--trust-project-config (.mmr.yaml) / --accept-new-acks (acks) to proceed.',
+        trust_mode: trust.trust_mode,
+      }
+      if (diffChanges.config_file_changed) decision.proposed_config_change = true
+      if (diffChanges.ack_files_changed.length > 0) decision.proposed_acks = diffChanges.ack_files_changed
+      console.log(outputFormat === 'json' ? JSON.stringify(decision, null, 2) : String(decision.summary))
+      process.exit(2)
+    }
 
     let sessionLink: { store: SessionStore; id: string } | undefined
     if (args.session !== undefined) {
@@ -656,30 +689,25 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       const { results, formatted, exitCode } = runResultsPipeline(store, completedJob, outputFormat, false, {
         ackStore,
       })
-      // Trust gate: a proposed config/ack change in the diff forces a human
-      // decision regardless of the findings verdict.
-      const forceDecision = blockingConfigChange || blockingAckChange
-      if (forceDecision) results.verdict = 'needs-user-decision'
       store.saveResults(job.job_id, results)
 
+      // Annotate with trust context for transparency. The needs-user-decision
+      // trust gate already fired (and exited) before dispatch, so here we only
+      // surface trust_mode and any proposed config/ack changes that were opted
+      // into (--accept-new-acks / --trust-project-config).
       const annotated: Record<string, unknown> = { ...results, trust_mode: trust.trust_mode }
       if (diffChanges.ack_files_changed.length > 0) annotated.proposed_acks = diffChanges.ack_files_changed
       if (diffChanges.config_file_changed) annotated.proposed_config_change = true
 
-      const out =
-        outputFormat === 'json'
-          ? JSON.stringify(annotated, null, 2)
-          : forceDecision
-            ? formatReconciledResults(results, outputFormat)
-            : formatted
-      console.log(out)
-      process.exit(forceDecision ? 2 : exitCode)
+      console.log(outputFormat === 'json' ? JSON.stringify(annotated, null, 2) : formatted)
+      process.exit(exitCode)
     } else {
       // Default: dispatch summary only
       const completedJob = store.loadJob(job.job_id)
       const result = {
         job_id: job.job_id,
         status: completedJob.status,
+        trust_mode: trust.trust_mode,
         channels: Object.fromEntries(
           channelNames.map((name) => [
             name,

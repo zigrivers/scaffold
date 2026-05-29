@@ -125,6 +125,11 @@ function loadProjectYaml(opts: LoadConfigOptions): Record<string, unknown> | und
     // Default-deny: untrusted tree with no opt-in → no project config.
     return undefined
   }
+  // Precedence note: trustProjectConfig:true intentionally overrides
+  // configBaseRef (it means "trust the working tree"). The review handler never
+  // passes both — it sends exactly one of { configBaseRef } / { trustProjectConfig }
+  // / { skipProjectConfig } per trust mode — so this combination only arises for
+  // other direct callers, who get the documented working-tree behavior.
   if (opts.configBaseRef !== undefined && opts.trustProjectConfig !== true) {
     // Trust boundary (§5 decision 1): read .mmr.yaml from the trusted base ref
     // via the shared git-show helper, never from the (possibly untrusted)
