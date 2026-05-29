@@ -328,7 +328,8 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     //    config/acks" and take precedence in ALL modes (they're an operator
     //    decision, not attacker-controllable); without them, base-ref mode
     //    loads from the trusted ref and untrusted-HEAD/non-git load nothing.
-    const trust = classifyTrustMode({ cwd: process.cwd(), args })
+    const cwd = process.cwd()
+    const trust = classifyTrustMode({ cwd, args })
     const baseRef = trust.trust_mode === 'base-ref' ? trust.base_ref : undefined
     const trustWorkingTreeConfig = args.trustProjectConfig === true
     const trustWorkingTreeAcks = args.trustProjectAcks === true
@@ -355,7 +356,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       : baseRef !== undefined
         ? { configBaseRef: baseRef }
         : { skipProjectConfig: true }
-    const config = loadConfig({ projectRoot: process.cwd(), cliOverrides, ...projectTrust })
+    const config = loadConfig({ projectRoot: cwd, cliOverrides, ...projectTrust })
     // Defense-in-depth: the yargs `.check()` rejects invalid ids on the CLI
     // path, but the handler is also invoked directly by programmatic callers
     // and tests that bypass `.check()`, so validate here too before any I/O.
@@ -406,7 +407,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     // config/acks above: passing --trust-project-config / --accept-new-acks both
     // applies the proposed change AND ratifies it (no needs-user-decision).
     const blockingConfigChange =
-      baseRef !== undefined && diffChanges.config_file_changed && args.trustProjectConfig !== true
+      baseRef !== undefined && diffChanges.config_file_changed && !trustWorkingTreeConfig
     const blockingAckChange =
       baseRef !== undefined && diffChanges.ack_files_changed.length > 0 && args.acceptNewAcks !== true
 
@@ -681,6 +682,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
         trustProjectAcks: trustWorkingTreeAcks,
         userRoot: resolveSessionRoot(),
         configBaseRef: baseRef,
+        cwd,
       })
       const { results, formatted, exitCode } = runResultsPipeline(store, completedJob, outputFormat, false, {
         ackStore,
@@ -700,7 +702,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     } else {
       // Default: dispatch summary only
       const completedJob = store.loadJob(job.job_id)
-      const result = {
+      const result: Record<string, unknown> = {
         job_id: job.job_id,
         status: completedJob.status,
         trust_mode: trust.trust_mode,
@@ -712,6 +714,10 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
         ),
         valid_channels: validChannels,
       }
+      // Surface opted-into proposed changes for transparency (the blocking case
+      // already short-circuited to needs-user-decision before dispatch).
+      if (diffChanges.ack_files_changed.length > 0) result.proposed_acks = diffChanges.ack_files_changed
+      if (diffChanges.config_file_changed) result.proposed_config_change = true
       console.log(JSON.stringify(result, null, 2))
     }
   },
