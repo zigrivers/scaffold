@@ -13,6 +13,10 @@ const COMPENSATING_FOCUS: Record<string, string> = {
     'Focus your review on: architectural patterns, design consistency,'
     + ' broad-context reasoning, separation of concerns, and dependency analysis.'
     + ' You are compensating for a missing Gemini review.',
+  grok:
+    'Focus your review on: an independent second-opinion pass over correctness'
+    + ' and code quality — edge cases, logic errors, and risky assumptions other'
+    + ' reviewers may have anchored past. You are compensating for a missing Grok review.',
 }
 
 export interface CompensatingChannel {
@@ -30,6 +34,7 @@ export interface CompensatorDispatch {
   prompt_wrapper: string
   stderr: 'capture' | 'suppress' | 'passthrough'
   output_parser: string | OutputParserConfig
+  prompt_delivery?: 'stdin' | 'prompt-file'
 }
 
 function defaultCompensatorDispatch(config: MmrConfigParsed): CompensatorDispatch {
@@ -61,6 +66,7 @@ export function resolveCompensatorDispatch(config: MmrConfigParsed): Compensator
     prompt_wrapper: channelConfig.prompt_wrapper ?? '{{prompt}}',
     stderr: channelConfig.stderr,
     output_parser: channelConfig.output_parser,
+    prompt_delivery: channelConfig.prompt_delivery,
   }
 }
 
@@ -158,6 +164,7 @@ export async function dispatchCompensatingPasses(
         env: dispatch.env,
         timeout: dispatch.timeout,
         stderr: dispatch.stderr,
+        promptDelivery: dispatch.prompt_delivery,
       })
     }),
   )

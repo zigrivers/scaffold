@@ -144,10 +144,10 @@ the next task. A PostToolUse hook on `gh pr create` will remind you.
 working tree, a branch diff, a specific diff file, or an arbitrary document.
 The MMR CLI accepts any of these — the review is not gated to PRs.
 
-**Channel model:** direct `mmr review` runs the three CLI channels (Codex,
-Gemini, Claude). The scaffold wrappers (`scaffold run review-pr` and
+**Channel model:** direct `mmr review` runs the built-in CLI channels (Codex,
+Gemini, Claude, and Grok). The scaffold wrappers (`scaffold run review-pr` and
 `scaffold run review-code`) add the Superpowers code-reviewer agent as a
-complementary 4th channel and reconcile its findings into the same MMR job.
+complementary agent channel and reconcile its findings into the same MMR job.
 (`scaffold run post-implementation-review` has its own channel layout
 documented in `content/tools/post-implementation-review.md` — consult that
 file directly rather than assuming it matches this pattern.)
@@ -184,27 +184,33 @@ reconciliation, and verdict logic. For targets not covered by a wrapper, call
 `mmr review` directly — it accepts `--focus "…" --sync --format json` the same
 way.
 
-**The three channels:**
+**The built-in channels:**
 1. **Codex CLI** — implementation correctness, security, API contracts
 2. **Gemini CLI** — architectural patterns, broad-context reasoning
 3. **Claude CLI** — plan alignment, code quality, testing
+4. **Grok CLI** — independent second-opinion pass on correctness and code
+   quality (xAI; proprietary, not open-source). Enabled by default like the
+   other three; disable with `channels_disabled: ["grok"]` in `.mmr.yaml`.
+   Unlike the others, grok requires the prompt as an arg (it ignores stdin),
+   so its built-in channel uses `prompt_delivery: prompt-file`.
 
 **Critical rules:**
-- **Foreground only** — Always run Codex, Gemini, and Claude CLI commands as
-  foreground Bash calls. Never use `run_in_background`, `&`, or `nohup`.
+- **Foreground only** — Always run Codex, Gemini, Claude, and Grok CLI commands
+  as foreground Bash calls. Never use `run_in_background`, `&`, or `nohup`.
   Background execution produces empty output. Multiple foreground calls in a
   single message are fine (the tool runner supports parallel invocations).
-- **All 3 channels are required** — A channel enters degraded mode when it is
-  not installed (`command -v` fails), auth fails and the user cannot recover,
-  or it fails during execution (non-zero exit, malformed output, timeout).
-  Run a compensating pass via `claude -p` for each missing **external**
-  channel (Codex or Gemini), focused on that channel's strength area and
-  labeled `[compensating: Codex-equivalent]` or
-  `[compensating: Gemini-equivalent]`. Compensating findings are single-source
-  confidence.
+- **All built-in channels are required** — A channel enters degraded mode when
+  it is not installed (`command -v` fails), auth fails and the user cannot
+  recover, or it fails during execution (non-zero exit, malformed output,
+  timeout). Run a compensating pass via `claude -p` for each missing
+  **external** channel (Codex, Gemini, or Grok), focused on that channel's
+  strength area and labeled `[compensating: Codex-equivalent]`,
+  `[compensating: Gemini-equivalent]`, or `[compensating: Grok-equivalent]`.
+  Compensating findings are single-source confidence.
 - **Auth failures are NOT silent** — surface to the user with recovery commands:
   - Codex: `! codex login`
   - Gemini: `! gemini -p "hello"`
+  - Grok: `! grok login`
 - **Independence** — never share one channel's output with another.
 - **Fix all blocking findings** (severity at or above `results.fix_threshold` in the verdict JSON; the project default lives in `.mmr.yaml` and is `P2` unless changed) before proceeding to the next task. Use `--fix-threshold P0|P1|P2|P3` on `scaffold run review-pr` / `review-code` to override per-invocation.
 - **Verdict handling** — proceed only on `pass` or `degraded-pass`. If the
@@ -246,15 +252,19 @@ mmr review --pr "$PR_NUMBER" --sync --format text
 # Manual fallback — installation checks
 command -v codex >/dev/null 2>&1 || echo "Codex not installed"
 command -v gemini >/dev/null 2>&1 || echo "Gemini not installed"
+command -v grok >/dev/null 2>&1 || echo "Grok not installed"
 
 # Manual fallback — auth checks
 codex login status 2>/dev/null
 NO_BROWSER=true gemini -p "respond with ok" -o json 2>&1
+grok models >/dev/null 2>&1 && echo "Grok authed" || echo "Run: grok login"
 
 # Manual fallback — review dispatch (foreground only — never run_in_background)
 codex exec --skip-git-repo-check -s read-only --ephemeral "PROMPT" 2>/dev/null
 NO_BROWSER=true gemini -p "PROMPT" --output-format json --approval-mode yolo 2>/dev/null
 claude -p "PROMPT" --output-format json 2>/dev/null
+# grok ignores stdin — pass the prompt via a file:
+grok --prompt-file PROMPT_FILE --output-format json 2>/dev/null
 ```
 
 ## Project Structure Quick Reference

@@ -35,6 +35,41 @@ describe('BUILTIN_CHANNELS — doc-conformance', () => {
   })
 })
 
+describe('BUILTIN_CHANNELS — grok', () => {
+  it('exposes a grok channel enabled by default', () => {
+    expect(BUILTIN_CHANNELS.grok).toBeDefined()
+    expect(BUILTIN_CHANNELS.grok?.enabled).toBe(true)
+  })
+
+  it('invokes the grok CLI', () => {
+    expect(BUILTIN_CHANNELS.grok?.command).toBe('grok')
+  })
+
+  it('delivers the prompt via a file (grok -p/--prompt-file requires an arg, ignores stdin)', () => {
+    expect(BUILTIN_CHANNELS.grok?.prompt_delivery).toBe('prompt-file')
+    expect(BUILTIN_CHANNELS.grok?.flags).toContain('--prompt-file')
+    expect(BUILTIN_CHANNELS.grok?.flags).toContain('{{prompt_file}}')
+  })
+
+  it('requests JSON headless output', () => {
+    expect(BUILTIN_CHANNELS.grok?.flags).toContain('--output-format')
+    expect(BUILTIN_CHANNELS.grok?.flags).toContain('json')
+  })
+
+  it('unwraps grok JSON ($.text) before the default findings parser', () => {
+    const parser = BUILTIN_CHANNELS.grok?.output_parser
+    expect(typeof parser).toBe('object')
+    if (typeof parser === 'object') {
+      expect(parser).toMatchObject({ kind: 'unwrap-jsonpath', wrap: '$.text' })
+    }
+  })
+
+  it('auth.check probes grok models and recovery points at grok login', () => {
+    expect(BUILTIN_CHANNELS.grok?.auth?.check).toMatch(/grok models/)
+    expect(BUILTIN_CHANNELS.grok?.auth?.recovery).toBe('grok login')
+  })
+})
+
 describe('DEFAULT_CONFIG compensator (T1-G)', () => {
   it('omits the compensator block (so back-compat resolveCompensatorDispatch kicks in)', () => {
     expect(DEFAULT_CONFIG.defaults.compensator).toBeUndefined()

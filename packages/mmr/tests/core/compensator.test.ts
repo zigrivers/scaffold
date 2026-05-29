@@ -166,6 +166,31 @@ describe('resolveCompensatorDispatch', () => {
     expect(result.output_parser).toBe('default')
   })
 
+  it('carries prompt_delivery from a prompt-file compensator channel (e.g. grok)', () => {
+    const cfg: MmrConfigParsed = {
+      ...baseConfig,
+      defaults: { ...baseConfig.defaults, compensator: { channel: 'grok' } },
+      channels: {
+        grok: {
+          enabled: true,
+          command: 'grok',
+          prompt_delivery: 'prompt-file',
+          flags: ['--prompt-file', '{{prompt_file}}', '--output-format', 'json'],
+          env: {},
+          auth: { check: 'grok models', timeout: 10, failure_exit_codes: [1], recovery: 'grok login' },
+          prompt_wrapper: '{{prompt}}',
+          output_parser: { kind: 'unwrap-jsonpath', wrap: '$.text', then: 'default' },
+          stderr: 'capture',
+          abstract: false,
+        },
+      },
+    }
+    const result = resolveCompensatorDispatch(cfg)
+    // Without this, a grok compensator would get the literal {{prompt_file}} flag
+    // with the prompt piped to stdin, and fail.
+    expect(result.prompt_delivery).toBe('prompt-file')
+  })
+
   it('throws when the configured compensator channel is missing', () => {
     const cfg: MmrConfigParsed = {
       ...baseConfig,
