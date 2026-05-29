@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { findProjectRoot } from './project-root.js'
+import { isSafeRef } from './git-show.js'
 
 export type TrustMode = 'base-ref' | 'untrusted-head' | 'non-git'
 
@@ -30,22 +31,9 @@ export type ClassifyResult =
   | { trust_mode: 'base-ref'; base_ref: string }
   | { trust_mode: 'untrusted-head' | 'non-git'; base_ref?: undefined }
 
-// Conservative git refname allow-list: letters, digits, and . _ - / only, and
-// none of the constructs that could smuggle surprising rev syntax into a later
-// `git show <ref>:.mmr.yaml` (':' separator, '..' ranges, '@{' reflog, leading
-// '-'/'/'). An unsafe ref fails closed to untrusted-head.
-const SAFE_REF_RE = /^[A-Za-z0-9._/~^-]+$/
-function isSafeRef(ref: string): boolean {
-  return (
-    SAFE_REF_RE.test(ref) &&
-    !ref.includes('..') &&
-    !ref.includes('@{') &&
-    !ref.startsWith('-') &&
-    !ref.startsWith('/') &&
-    !ref.endsWith('/')
-  )
-}
-
+// Ref-name validation is shared with the git-show helper (the trust boundary):
+// an unsafe ref fails closed to untrusted-head here, and readFileAtRef refuses
+// to read it there.
 function asBaseRef(ref: string): ClassifyResult {
   return isSafeRef(ref) ? { trust_mode: 'base-ref', base_ref: ref } : { trust_mode: 'untrusted-head' }
 }
