@@ -1,11 +1,13 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import os from 'node:os'
 import crypto from 'node:crypto'
 import { jaccardSimilarity } from './stable-id.js'
+import { findProjectRoot } from './project-root.js'
 
 const FUZZY_THRESHOLD = 0.7
-const FINDING_KEY_RE = /^[a-f0-9]{40}$/
+/** Canonical finding_key format: sha1 hex. Exported so the CLI can validate
+ *  the same way before any path construction. */
+export const FINDING_KEY_RE = /^[a-f0-9]{40}$/
 // Acks are tiny (a key, a location, a few dozen shingles, a short reason).
 // Cap reads well above any realistic record so a planted oversized file in an
 // untrusted project tree can't OOM the review.
@@ -29,34 +31,40 @@ export interface AckMatch {
 
 export interface AckStoreOptions {
   /**
-   * Project root whose ./.mmr/acks holds project-scoped acks. Optional: when
-   * omitted, project-scope acks are disabled entirely (lookup/listAll ignore
-   * them and add(..,'project') throws). Callers reviewing an untrusted working
-   * tree should omit it unless the project acks are explicitly trusted.
+   * Project root whose ./.mmr/acks holds project-scoped (repo-committed) acks.
+   * Optional: when omitted, project-scope acks are disabled entirely
+   * (lookup/listAll ignore them and add(..,'project') throws). Callers
+   * reviewing an untrusted working tree should omit it unless the project acks
+   * are explicitly trusted.
    */
   projectRoot?: string
-  userHome: string
+  /**
+   * The MMR state root that holds user-scoped acks at `<userRoot>/acks`. This
+   * is the same root as jobs/sessions (resolveSessionRoot(), i.e. MMR_HOME ??
+   * ~/.mmr), so user acks live beside jobs/ and sessions/ and honor MMR_HOME.
+   */
+  userRoot: string
 }
 
 /**
- * Build an AckStore for a review run. User-scope acks (~/.mmr/acks) are always
- * loaded (they live on the operator's own machine). Project-scope acks live in
- * the reviewed tree, which may be untrusted (a PR checkout in CI), so they are
- * loaded only when explicitly trusted — otherwise an attacker could commit
+ * Build an AckStore for a review run. User-scope acks (`<userRoot>/acks`,
+ * userRoot = resolveSessionRoot(), MMR_HOME-aware) are always loaded — they
+ * live on the operator's own machine. Project-scope acks live in the reviewed
+ * tree, which may be untrusted (a PR checkout in CI), so they are loaded only
+ * when explicitly trusted — otherwise an attacker could commit
  * `.mmr/acks/<sha>.json` to self-suppress their own findings. The full trusted
  * path (loading project acks from a git base ref) is added by the trust-mode
  * thread; until then this gates project acks behind trust_project_acks.
  *
- * Project root defaults to process.cwd() (the same convention loadConfig uses
- * for .mmr.yaml) and the user home to `process.env.HOME ?? os.homedir()` (the
- * same resolution as resolveSessionRoot). cwd/home are injectable for tests.
+ * The project root is discovered by walking up from `cwd` (default
+ * process.cwd()) to the repository root, so acks resolve correctly even when
+ * the command runs from a subdirectory. userRoot is supplied by the caller
+ * (resolveSessionRoot()); cwd is injectable for tests.
  */
-export function buildReviewAckStore(opts: { trustProjectAcks: boolean; cwd?: string; home?: string }): AckStore {
-  const cwd = opts.cwd ?? process.cwd()
-  const home = opts.home ?? process.env.HOME ?? os.homedir()
+export function buildReviewAckStore(opts: { trustProjectAcks: boolean; userRoot: string; cwd?: string }): AckStore {
   return new AckStore({
-    projectRoot: opts.trustProjectAcks ? cwd : undefined,
-    userHome: home,
+    projectRoot: opts.trustProjectAcks ? findProjectRoot(opts.cwd) : undefined,
+    userRoot: opts.userRoot,
   })
 }
 
@@ -90,18 +98,21 @@ export class AckStore {
   private readonly projectDir: string | undefined
   private readonly userDir: string
   private readonly projectRootResolved: string | undefined
-  private readonly userHomeResolved: string
+  private readonly userRootResolved: string
   // Per-instance lazy cache so a review that calls lookup() once per finding
   // reads each acks dir from disk at most once (avoids O(N*M) FS operations).
   private readonly loaded: Partial<Record<AckScope, LoadedScope>> = {}
 
   constructor(opts: AckStoreOptions) {
     this.projectRootResolved = opts.projectRoot === undefined ? undefined : path.resolve(opts.projectRoot)
-    this.userHomeResolved = path.resolve(opts.userHome)
+    this.userRootResolved = path.resolve(opts.userRoot)
+    // Project acks are repo-committed under <projectRoot>/.mmr/acks. User acks
+    // live under the MMR state root at <userRoot>/acks (beside jobs/sessions),
+    // so they honor MMR_HOME — no extra `.mmr` segment for the user scope.
     this.projectDir = this.projectRootResolved === undefined
       ? undefined
       : path.join(this.projectRootResolved, '.mmr', 'acks')
-    this.userDir = path.join(this.userHomeResolved, '.mmr', 'acks')
+    this.userDir = path.join(this.userRootResolved, 'acks')
   }
 
   private validateKey(key: string): void {
@@ -120,29 +131,34 @@ export class AckStore {
    */
   private dirForScope(scope: AckScope): string {
     const dir = scope === 'project' ? this.projectDir : this.userDir
-    const root = scope === 'project' ? this.projectRootResolved : this.userHomeResolved
+    const root = scope === 'project' ? this.projectRootResolved : this.userRootResolved
     if (dir === undefined || root === undefined) {
       throw new Error('project-scope acks are disabled (no project root configured)')
     }
-    let realRoot: string
-    try {
-      realRoot = fs.realpathSync(root)
-    } catch {
-      realRoot = root // root not resolvable (unusual env) → fall back to lexical
-    }
-    let probe = dir
-    while (probe !== path.dirname(probe) && !fs.existsSync(probe)) probe = path.dirname(probe)
-    let realProbe: string
-    try {
-      realProbe = fs.realpathSync(probe)
-    } catch {
-      return dir // nothing exists to escape into yet
-    }
+    // Resolve BOTH the root and the acks dir via their deepest existing
+    // ancestor, so the comparison is symlink-consistent even when the root
+    // itself does not exist yet (e.g. a fresh ~/.mmr). Comparing a realpath'd
+    // probe against an unresolved root would false-positive on platforms where
+    // a parent like /tmp is itself a symlink (/private/tmp on macOS).
+    const realRoot = this.realDeepestAncestor(root)
+    const realProbe = this.realDeepestAncestor(dir)
+    if (realRoot === undefined || realProbe === undefined) return dir
     const rel = path.relative(realRoot, realProbe)
     if (rel !== '' && (rel.startsWith('..') || path.isAbsolute(rel))) {
       throw new Error(`ack ${scope} directory escapes its root via a symlinked ancestor: ${dir}`)
     }
     return dir
+  }
+
+  /** realpath of the deepest existing ancestor of `p` (p itself if it exists). */
+  private realDeepestAncestor(p: string): string | undefined {
+    let probe = path.resolve(p)
+    while (probe !== path.dirname(probe) && !fs.existsSync(probe)) probe = path.dirname(probe)
+    try {
+      return fs.realpathSync(probe)
+    } catch {
+      return undefined
+    }
   }
 
   private filePath(key: string, scope: AckScope): string {

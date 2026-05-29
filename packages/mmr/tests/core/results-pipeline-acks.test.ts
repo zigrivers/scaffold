@@ -31,7 +31,7 @@ describe('runResultsPipeline — ack integration (T2-D)', () => {
       suggestion: 'leave it',
     }
     const key = computeFindingKey(finding)
-    const ackStore = new AckStore({ projectRoot: tmpProj, userHome: tmpHome })
+    const ackStore = new AckStore({ projectRoot: tmpProj, userRoot: path.join(tmpHome, '.mmr') })
     ackStore.add({
       finding_key: key,
       normalized_location: normalizeLocationForKey(finding.location),
@@ -70,7 +70,7 @@ describe('runResultsPipeline — ack integration (T2-D)', () => {
       description: 'real bug',
       suggestion: 'fix it',
     }
-    const ackStore = new AckStore({ projectRoot: tmpProj, userHome: tmpHome })
+    const ackStore = new AckStore({ projectRoot: tmpProj, userRoot: path.join(tmpHome, '.mmr') })
 
     const store = new JobStore(tmpJobs)
     const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['claude'] })
@@ -99,7 +99,7 @@ describe('runResultsPipeline — ack integration (T2-D)', () => {
     // AckStore.dirForScope throws on lookup.
     const evil = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-acks-evil-'))
     fs.symlinkSync(evil, path.join(tmpProj, '.mmr'))
-    const ackStore = new AckStore({ projectRoot: tmpProj, userHome: tmpHome })
+    const ackStore = new AckStore({ projectRoot: tmpProj, userRoot: path.join(tmpHome, '.mmr') })
 
     const store = new JobStore(tmpJobs)
     const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['claude'] })
