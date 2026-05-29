@@ -32,6 +32,7 @@ const baseChannel: HttpChannelParsed = {
   output_parser: 'default',
   stderr: 'capture',
   abstract: false,
+  auth: { check_method: 'GET', check_status_ok: [200], timeout: 5 },
 }
 
 describe('dispatchHttpChannel', () => {

@@ -1,4 +1,4 @@
-import type { MmrConfigParsed, ChannelConfigParsed } from './schema.js'
+import type { MmrConfigParsed, ChannelConfigParsed, SubprocessChannelParsed } from './schema.js'
 
 /**
  * Default configuration applied when no config files are present.
@@ -29,7 +29,7 @@ export const DEFAULT_CONFIG: MmrConfigParsed = {
 /**
  * Built-in channel presets. Users can override any field via config files.
  */
-export const BUILTIN_CHANNELS: Record<string, ChannelConfigParsed> = {
+export const BUILTIN_CHANNELS: Record<string, SubprocessChannelParsed> = {
   claude: {
     kind: 'subprocess',
     enabled: true,

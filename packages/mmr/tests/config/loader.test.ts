@@ -195,7 +195,11 @@ describe('loadConfig', () => {
     const config = loadConfig({ projectRoot: tmpDir, userHome: tmpDir })
     expect(config.channels['strict-claude']?.extends).toBeUndefined()
     expect(config.channels['strict-claude']?.command).toBe('claude -p')
-    expect(config.channels['strict-claude']?.auth?.check).toBe('claude -p "respond with ok" 2>/dev/null')
+    const strictClaude = config.channels['strict-claude']
+    expect(strictClaude?.kind).toBe('subprocess')
+    if (strictClaude?.kind === 'subprocess') {
+      expect(strictClaude.auth?.check).toBe('claude -p "respond with ok" 2>/dev/null')
+    }
   })
 
   it('throws when a concrete channel has no command', () => {
@@ -438,7 +442,11 @@ describe('loadConfig extends inheritance (T1-A)', () => {
     fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), yamlText)
     const config = loadConfig({ projectRoot: tmpDir, userHome: tmpDir })
     expect(config.channels.claude?.command).toBe('ollama run')
-    expect(config.channels.claude?.auth?.check).toBe('ollama list')
+    const claudeCh = config.channels.claude
+    expect(claudeCh?.kind).toBe('subprocess')
+    if (claudeCh?.kind === 'subprocess') {
+      expect(claudeCh.auth?.check).toBe('ollama list')
+    }
     expect(config.channels.claude?.flags).toEqual(['qwen2.5-coder:32b'])
   })
 

@@ -103,6 +103,57 @@ describe('ChannelConfigSchema — discriminated union on kind', () => {
   })
 })
 
+describe('http channel loader — auth.check_endpoint requirement', () => {
+  it('REJECTS an http channel whose endpoint does not end in /chat/completions and has no auth.check_endpoint', () => {
+    expect(() => MmrConfigSchema.parse({
+      version: 1,
+      channels: {
+        custom: {
+          kind: 'http',
+          endpoint: 'https://api.example.com/v2/predict',
+          model: 'm',
+          endpoint_convention: 'openai-chat',
+        },
+      },
+    })).toThrow(/check_endpoint/)
+  })
+
+  it('accepts a non-standard endpoint when auth.check_endpoint is set', () => {
+    const parsed = MmrConfigSchema.parse({
+      version: 1,
+      channels: {
+        custom: {
+          kind: 'http',
+          endpoint: 'https://api.example.com/v2/predict',
+          model: 'm',
+          endpoint_convention: 'openai-chat',
+          auth: { check_endpoint: 'https://api.example.com/health' },
+        },
+      },
+    })
+    expect(parsed.channels.custom.kind).toBe('http')
+  })
+
+  it('accepts a standard /chat/completions endpoint with no explicit auth (probe URL derivable)', () => {
+    const parsed = MmrConfigSchema.parse({
+      version: 1,
+      channels: {
+        groq: {
+          kind: 'http',
+          endpoint: 'https://api.groq.com/openai/v1/chat/completions',
+          model: 'llama3-70b',
+          endpoint_convention: 'openai-chat',
+        },
+      },
+    })
+    expect(parsed.channels.groq.kind).toBe('http')
+    if (parsed.channels.groq.kind === 'http') {
+      expect(parsed.channels.groq.auth.check_method).toBe('GET')
+      expect(parsed.channels.groq.auth.check_status_ok).toEqual([200])
+    }
+  })
+})
+
 describe('loadConfig — full round-trip with kind injection + http (back-compat)', () => {
   it('resolves a legacy kind-less extends chain and accepts an http channel without rejecting it', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-kind-rt-'))
