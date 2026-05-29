@@ -459,8 +459,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
         sessionLink.store.addJob(sessionLink.id, job.job_id, args.round ?? 1)
       } catch (err) {
         console.error((err as Error).message)
-        process.exitCode = 1
-        return
+        process.exit(1)
       }
     }
 
