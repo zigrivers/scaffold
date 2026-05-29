@@ -7,9 +7,11 @@ import path from 'node:path'
 // directly (CI does not build packages/mmr/dist).
 
 const originalHome = process.env.HOME
+const originalMmrHome = process.env.MMR_HOME
 
 afterEach(() => {
   process.env.HOME = originalHome
+  process.env.MMR_HOME = originalMmrHome
   vi.restoreAllMocks()
 })
 
