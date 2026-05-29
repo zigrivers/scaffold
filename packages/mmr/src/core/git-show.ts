@@ -54,3 +54,34 @@ export function readFileAtRef(opts: ReadFileAtRefOptions): string | undefined {
     return undefined
   }
 }
+
+export interface ListFilesAtRefOptions {
+  cwd: string
+  ref: string
+  /** Repo-relative directory to list, with leading `./` allowed. */
+  dirPath: string
+}
+
+/**
+ * List the file paths (repo-root-relative) under a directory at a Git ref via
+ * `git ls-tree`. Returns `[]` on an unsafe ref/path, a missing ref/dir, or any
+ * git error. Never throws.
+ */
+export function listFilesAtRef(opts: ListFilesAtRefOptions): string[] {
+  const cleaned = opts.dirPath.replace(/^\.\//, '').replace(/\/$/, '')
+  if (!isSafeRef(opts.ref) || !isSafePath(cleaned)) return []
+  try {
+    const out = execFileSync('git', ['-C', opts.cwd, 'ls-tree', '--name-only', opts.ref, '--', `${cleaned}/`], {
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+      maxBuffer: 10 * 1024 * 1024,
+      timeout: 10000,
+    })
+    return out
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+  } catch {
+    return []
+  }
+}
