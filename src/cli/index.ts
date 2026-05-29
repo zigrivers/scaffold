@@ -25,6 +25,7 @@ import completeCommand from './commands/complete.js'
 import reworkCommand from './commands/rework.js'
 import observeCommand from './commands/observe.js'
 import knowledgeFreshnessCommand from './commands/knowledge-freshness.js'
+import guidesCommand from './commands/guides.js'
 
 export async function runCli(argv: string[]): Promise<void> {
   shutdown.install()
@@ -46,6 +47,7 @@ export async function runCli(argv: string[]): Promise<void> {
     .command(versionCommand)
     .command(updateCommand)
     .command(dashboardCommand)
+    .command(guidesCommand)
     .command(decisionsCommand)
     .command(knowledgeCommand)
     .command(skillCommand)
