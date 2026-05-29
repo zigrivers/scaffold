@@ -145,6 +145,7 @@ describe('resolveCompensatorDispatch', () => {
       defaults: { ...baseConfig.defaults, compensator: { channel: 'qwen-local' } },
       channels: {
         'qwen-local': {
+          kind: 'subprocess' as const,
           enabled: true,
           command: 'ollama',
           flags: ['run', 'qwen2.5-coder:32b'],
@@ -172,6 +173,7 @@ describe('resolveCompensatorDispatch', () => {
       defaults: { ...baseConfig.defaults, compensator: { channel: 'grok' } },
       channels: {
         grok: {
+          kind: 'subprocess' as const,
           enabled: true,
           command: 'grok',
           prompt_delivery: 'prompt-file',
@@ -205,6 +207,7 @@ describe('resolveCompensatorDispatch', () => {
       defaults: { ...baseConfig.defaults, compensator: { channel: 'abstract-base' } },
       channels: {
         'abstract-base': {
+          kind: 'subprocess' as const,
           enabled: true,
           flags: [],
           env: {},
@@ -292,6 +295,7 @@ describe('resolveCompensatorFocus', () => {
       },
       channels: {
         'qwen-local': {
+          kind: 'subprocess' as const,
           enabled: true,
           command: 'ollama',
           flags: [],
@@ -353,6 +357,7 @@ describe('dispatchCompensatingPasses honors defaults.compensator', () => {
       defaults: { ...baseConfig.defaults, compensator: { channel: 'qwen-local' } },
       channels: {
         'qwen-local': {
+          kind: 'subprocess' as const,
           enabled: true,
           command: 'ollama',
           flags: ['run', 'qwen2.5'],
@@ -394,6 +399,7 @@ describe('dispatchCompensatingPasses honors defaults.compensator', () => {
       },
       channels: {
         'qwen-local': {
+          kind: 'subprocess' as const,
           enabled: true,
           command: 'ollama',
           flags: [],

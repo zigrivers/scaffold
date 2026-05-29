@@ -31,6 +31,7 @@ export const DEFAULT_CONFIG: MmrConfigParsed = {
  */
 export const BUILTIN_CHANNELS: Record<string, ChannelConfigParsed> = {
   claude: {
+    kind: 'subprocess',
     enabled: true,
     abstract: false,
     command: 'claude -p',
@@ -50,6 +51,7 @@ export const BUILTIN_CHANNELS: Record<string, ChannelConfigParsed> = {
     stderr: 'capture',
   },
   gemini: {
+    kind: 'subprocess',
     enabled: true,
     abstract: false,
     // No `-p` here: gemini's `-p/--prompt` flag *requires* a positional
@@ -79,6 +81,7 @@ export const BUILTIN_CHANNELS: Record<string, ChannelConfigParsed> = {
     timeout: 360,
   },
   codex: {
+    kind: 'subprocess',
     enabled: true,
     abstract: false,
     command: 'codex exec',
@@ -95,6 +98,7 @@ export const BUILTIN_CHANNELS: Record<string, ChannelConfigParsed> = {
     stderr: 'suppress',
   },
   grok: {
+    kind: 'subprocess',
     enabled: true,
     abstract: false,
     // Grok's `-p/--single` and `--prompt-file` REQUIRE the prompt as an arg
@@ -126,6 +130,7 @@ export const BUILTIN_CHANNELS: Record<string, ChannelConfigParsed> = {
   'doc-conformance': {
     // Disabled by default: runs up to 3 LLM calls (~3 min) via scaffold observe audit.
     // Enable in .mmr.yaml or pass --channels=doc-conformance to use.
+    kind: 'subprocess',
     enabled: false,
     abstract: false,
     command: 'scaffold observe audit --profile=full --scope=all --output-mode=mmr-findings',
