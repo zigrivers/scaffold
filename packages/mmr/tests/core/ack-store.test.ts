@@ -139,4 +139,72 @@ describe('AckStore', () => {
     store.remove(FAKE_KEY, 'project')
     expect(fs.existsSync(path.join(tmpProject, '.mmr', 'acks', `${FAKE_KEY}.json`))).toBe(false)
   })
+
+  it('lookup() does NOT fuzzy-match when shingle Jaccard < 0.7 (same location)', () => {
+    store.add(
+      {
+        finding_key: FAKE_KEY,
+        normalized_location: 'src/foo.ts',
+        description_shingle: ['aaaaa', 'bbbbb', 'ccccc', 'ddddd', 'eeeee'],
+        created_at: '2026-05-22T00:00:00Z',
+      },
+      'project',
+    )
+    // Share only 1 of 5 shingles → Jaccard ~0.11, below the 0.7 threshold.
+    const result = store.lookup({
+      finding_key: 'b'.repeat(40),
+      normalized_location: 'src/foo.ts',
+      shingle: ['aaaaa', 'vvvvv', 'wwwww', 'xxxxx', 'yyyyy'],
+    })
+    expect(result).toBeUndefined()
+  })
+
+  it('skips an ack whose embedded finding_key disagrees with its filename (desync)', () => {
+    // File is named FAKE_KEY but its content claims a different key.
+    const dir = path.join(tmpProject, '.mmr', 'acks')
+    fs.mkdirSync(dir, { recursive: true })
+    fs.writeFileSync(
+      path.join(dir, `${FAKE_KEY}.json`),
+      JSON.stringify({
+        finding_key: 'c'.repeat(40),
+        normalized_location: 'src/foo.ts',
+        description_shingle: SHINGLE,
+        created_at: '2026-05-22T00:00:00Z',
+      }),
+    )
+    expect(store.listAll()).toHaveLength(0)
+    expect(store.lookup({ finding_key: FAKE_KEY, normalized_location: 'src/foo.ts', shingle: SHINGLE })).toBeUndefined()
+  })
+
+  it('skips a structurally malformed ack record (missing/!typed fields)', () => {
+    const dir = path.join(tmpProject, '.mmr', 'acks')
+    fs.mkdirSync(dir, { recursive: true })
+    // Valid filename, but description_shingle is not a string[] and created_at is missing.
+    fs.writeFileSync(
+      path.join(dir, `${FAKE_KEY}.json`),
+      JSON.stringify({ finding_key: FAKE_KEY, normalized_location: 'src/foo.ts', description_shingle: 'nope' }),
+    )
+    expect(store.listAll()).toHaveLength(0)
+  })
+
+  it('refuses to write an ack through a symlink', () => {
+    const dir = path.join(tmpProject, '.mmr', 'acks')
+    fs.mkdirSync(dir, { recursive: true })
+    const target = path.join(tmpProject, 'secret.txt')
+    fs.writeFileSync(target, 'original')
+    fs.symlinkSync(target, path.join(dir, `${FAKE_KEY}.json`))
+    expect(() =>
+      store.add(
+        {
+          finding_key: FAKE_KEY,
+          normalized_location: 'src/foo.ts',
+          description_shingle: SHINGLE,
+          created_at: '2026-05-22T00:00:00Z',
+        },
+        'project',
+      ),
+    ).toThrow(/symlink/i)
+    // The symlink target must be untouched.
+    expect(fs.readFileSync(target, 'utf-8')).toBe('original')
+  })
 })
