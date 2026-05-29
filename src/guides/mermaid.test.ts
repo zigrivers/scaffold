@@ -2,7 +2,8 @@ import { describe, it, expect, vi } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
-import { sanitizeSvg, resolveDiagram, computeFingerprint, pruneDiagrams } from './mermaid.js'
+import { sanitizeSvg, resolveDiagram, computeFingerprint, pruneDiagrams, remarkMermaid } from './mermaid.js'
+import { renderGuideBody } from './render.js'
 
 describe('sanitizeSvg', () => {
   it('strips script, foreignObject, on* and javascript hrefs', () => {
@@ -74,5 +75,40 @@ describe('pruneDiagrams', () => {
     expect(fs.existsSync(path.join(cacheDir, 'drop.svg'))).toBe(false)
     const manifest = JSON.parse(fs.readFileSync(path.join(cacheDir, 'manifest.json'), 'utf8'))
     expect(manifest).toEqual({})
+  })
+})
+
+describe('remarkMermaid — sequential manifest writes', () => {
+  it('resolves two mermaid blocks and writes both entries to the manifest', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mmd-seq-'))
+    let callCount = 0
+    const render = vi.fn(async () => {
+      callCount++
+      return `<svg><rect id="r${callCount}"/></svg>`
+    })
+
+    const md = [
+      '```mermaid',
+      'flowchart LR\nA-->B',
+      '```',
+      '',
+      '```mermaid',
+      'flowchart LR\nC-->D',
+      '```',
+    ].join('\n') + '\n'
+
+    const plugin = remarkMermaid({ guideDir: dir, render })
+    const { body } = await renderGuideBody(md, { plugins: [plugin] })
+
+    // Both diagrams rendered and inlined
+    expect(body).toContain('class="mermaid"')
+    expect(render).toHaveBeenCalledTimes(2)
+
+    // Both entries written to the manifest (no clobber from race)
+    const manifestPath = path.join(dir, '.diagrams', 'manifest.json')
+    expect(fs.existsSync(manifestPath)).toBe(true)
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
+    expect(Object.keys(manifest)).toContain('diagram-0')
+    expect(Object.keys(manifest)).toContain('diagram-1')
   })
 })

@@ -6,7 +6,7 @@ import type { GuideFrontmatter, GuideEntry } from './types.js'
 export function extractGuideFrontmatter(content: string): GuideFrontmatter | null {
   const lines = content.split(/\r?\n/)
   if (lines[0]?.trim() !== '---') return null
-  const closeIdx = lines.indexOf('---', 1)
+  const closeIdx = lines.findIndex((l, i) => i > 0 && l.trim() === '---')
   if (closeIdx === -1) return null
   const yamlText = lines.slice(1, closeIdx).join('\n')
   let parsed: unknown
@@ -25,9 +25,6 @@ export function extractGuideFrontmatter(content: string): GuideFrontmatter | nul
   const fm: GuideFrontmatter = {
     title: p.title, topic: p.topic, description: p.description,
     category: p.category, order: p.order,
-  }
-  if (Array.isArray(p.escape_scripts)) {
-    fm.escape_scripts = p.escape_scripts.filter((s): s is string => typeof s === 'string')
   }
   return fm
 }

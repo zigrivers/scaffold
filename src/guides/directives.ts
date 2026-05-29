@@ -31,6 +31,8 @@ export const remarkTabs: AnyPlugin = () => (tree: any) => {
       (c: any) => c.type === 'containerDirective' && c.name === 'tab',
     )
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const others = (node.children ?? []).filter((c: any) => !(c.type === 'containerDirective' && c.name === 'tab'))
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const buttons = tabs.map((t: any, i: number) => ({
       type: 'paragraph',
       data: {
@@ -61,7 +63,7 @@ export const remarkTabs: AnyPlugin = () => (tree: any) => {
     node.data = node.data ?? {}
     node.data.hName = 'div'
     node.data.hProperties = { className: 'tabs' }
-    node.children = [tablist, ...tabs]
+    node.children = [tablist, ...tabs, ...others]
   })
 }
 
@@ -112,10 +114,12 @@ export const remarkChart: AnyPlugin = () => (tree: any) => {
       data: { hName: 'div', hProperties: { className: 'chart chart-bar' } },
       children: bars,
     }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const chartOthers = (node.children ?? []).filter((c: any) => c !== table)
     node.data = node.data ?? {}
     node.data.hName = 'div'
     node.data.hProperties = { className: 'chart-block' }
-    node.children = [chart, table]
+    node.children = [chart, table, ...chartOthers]
   })
 }
 

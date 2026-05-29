@@ -13,6 +13,14 @@ describe('remarkChart', () => {
     expect(body).toContain('<table>')
   })
 
+  it('preserves stray prose children inside a :::chart block', async () => {
+    const md = ':::chart{type=bar}\n\n| Host | Count |\n|---|---|\n| alpha | 10 |\n\nStray note inside chart\n:::\n'
+    const { body } = await renderGuideBody(md, { plugins: [remarkChart] })
+    expect(body).toContain('class="chart chart-bar"')
+    expect(body).toContain('<table>')
+    expect(body).toContain('Stray note inside chart')
+  })
+
   it('fails the build when not followed by a table', async () => {
     await expect(
       renderGuideBody(':::chart{type=bar}\nno table\n:::\n', { plugins: [remarkChart] }),

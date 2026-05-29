@@ -118,28 +118,31 @@ export function pruneDiagrams(guideDir: string, keepIds: string[]): void {
 
 // remark plugin: replace ```mermaid code blocks with the resolved inline SVG.
 // Diagram id = `diagram-<n>` by document order.
+// Diagrams are resolved SEQUENTIALLY to avoid concurrent read+write races on the
+// shared manifest.json (each resolveDiagram reads and then writes the file).
 export function remarkMermaid(opts: {
   guideDir: string
   render?: (s: string) => Promise<string>
 }): AnyPlugin {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return () => async (tree: any) => {
-    const jobs: Array<Promise<void>> = []
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const jobs: Array<{ node: any; diagramId: string; source: string }> = []
     let n = 0
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     visit(tree, 'code', (node: any) => {
       if (node.lang !== 'mermaid') return
-      const diagramId = `diagram-${n++}`
-      const source = node.value
-      jobs.push(
-        resolveDiagram({ guideDir: opts.guideDir, diagramId, source, render: opts.render }).then(
-          (svg) => {
-            node.type = 'html'
-            node.value = `<figure class="mermaid">${svg}</figure>`
-          },
-        ),
-      )
+      jobs.push({ node, diagramId: `diagram-${n++}`, source: node.value })
     })
-    await Promise.all(jobs)
+    for (const job of jobs) {
+      const svg = await resolveDiagram({
+        guideDir: opts.guideDir,
+        diagramId: job.diagramId,
+        source: job.source,
+        render: opts.render,
+      })
+      job.node.type = 'html'
+      job.node.value = `<figure class="mermaid">${svg}</figure>`
+    }
   }
 }

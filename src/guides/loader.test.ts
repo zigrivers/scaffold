@@ -78,38 +78,15 @@ describe('buildGuidesIndex', () => {
   })
 })
 
-describe('extractGuideFrontmatter — escape_scripts', () => {
-  it('parses escape_scripts array into string[]', () => {
-    const content = `---
-title: MMR Reference
-topic: mmr
-description: Multi-model review
-category: tools
-order: 10
-escape_scripts: [custom.js]
----
-
-# Body
-`
+describe('extractGuideFrontmatter — trailing-whitespace closing delimiter', () => {
+  it('parses frontmatter when closing --- has trailing whitespace', () => {
+    const lines = ['---', 'title: MMR Reference', 'topic: mmr',
+      'description: Multi-model review', 'category: tools', 'order: 10', '---   ', '', '# Body', '']
+    const content = lines.join('\n')
     const fm = extractGuideFrontmatter(content)
     expect(fm).not.toBeNull()
-    expect(fm!.escape_scripts).toEqual(['custom.js'])
-  })
-
-  it('filters out non-string entries from escape_scripts', () => {
-    const content = `---
-title: MMR Reference
-topic: mmr
-description: Multi-model review
-category: tools
-order: 10
-escape_scripts: [valid.js, 42, null, another.js]
----
-
-# Body
-`
-    const fm = extractGuideFrontmatter(content)
-    expect(fm).not.toBeNull()
-    expect(fm!.escape_scripts).toEqual(['valid.js', 'another.js'])
+    expect(fm!.title).toBe('MMR Reference')
+    expect(fm!.order).toBe(10)
   })
 })
+

@@ -163,6 +163,15 @@ channels:
 
 ### Built-in channels
 
+:::callout{type=info}
+**Why grok is different.** codex/gemini/claude all read the prompt from `stdin`.
+Grok's CLI requires the prompt as an argument and ignores stdin, so its channel
+uses `prompt_delivery: prompt-file` — the dispatcher writes the prompt to a temp
+file and passes its path via the `{{prompt_file}}` placeholder. Grok wraps its
+reply in a JSON `.text` field, which the parser unwraps before extracting
+findings.
+:::
+
 ::::tabs
 
 :::tab{title="Compare"}
@@ -173,15 +182,6 @@ channels:
 | `claude` | enabled | Plan alignment, code quality, testing | stdin | `default` |
 | `grok` | enabled | Independent second opinion (xAI; proprietary) | **prompt-file** | `unwrap $.text → default` |
 | `doc-conformance` | opt-in | PRD/stories/standards conformance (LLM-graded) | stdin | `doc-conformance` |
-
-:::callout{type=info}
-**Why grok is different.** codex/gemini/claude all read the prompt from `stdin`.
-Grok's CLI requires the prompt as an argument and ignores stdin, so its channel
-uses `prompt_delivery: prompt-file` — the dispatcher writes the prompt to a temp
-file and passes its path via the `{{prompt_file}}` placeholder. Grok wraps its
-reply in a JSON `.text` field, which the parser unwraps before extracting
-findings.
-:::
 :::
 
 :::tab{title="codex"}

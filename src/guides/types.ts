@@ -4,7 +4,6 @@ export interface GuideFrontmatter {
   description: string
   category: string
   order: number
-  escape_scripts?: string[]  // declared escape-hatch script filenames (security allowlist)
 }
 
 export interface GuideEntry {
