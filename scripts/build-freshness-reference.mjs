@@ -547,8 +547,13 @@ const totalCites = Object.values(TOP_HOSTS).reduce((a, b) => a + b, 0)
 html = stampById(html, 'statCites', String(totalCites))
 html = stampById(html, 'statUniqueHosts', String(Object.keys(TOP_HOSTS).length))
 // The cadence-date input's initial value uses today's date so the page opens
-// on a useful state. Also idempotent.
-html = html.replace(/(id="cadenceDate"[^>]*value=")[^"]*(")/g, `$1${today}$2`)
+// on a useful state. Guarded by !CI for the same reason as genDate/genSha
+// above: a wall-clock stamp would otherwise re-drift the committed page in PR
+// builds and fail the rebake-must-be-no-op drift check on any day after the
+// local bake. Local bakes still set it; the maintainer rebakes before pushing.
+if (!CI) {
+  html = html.replace(/(id="cadenceDate"[^>]*value=")[^"]*(")/g, `$1${today}$2`)
+}
 
 fs.writeFileSync(HTML_PATH, html)
 console.log(`Baked reference.html: ${KB_INVENTORY.entries.length} entries, ${ALLOWLIST.hosts.length} hosts, ${DECISIONS.length} decisions. SHA=${gitSha}.`)
