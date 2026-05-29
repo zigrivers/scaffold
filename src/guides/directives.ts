@@ -63,3 +63,23 @@ export const remarkTabs: AnyPlugin = () => (tree: any) => {
     node.children = [tablist, ...tabs]
   })
 }
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const remarkFilterTable: AnyPlugin = () => (tree: any) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  visit(tree, (node: any) => {
+    if (node.type !== 'containerDirective' || node.name !== 'filter-table') return
+    const input = {
+      type: 'paragraph',
+      data: {
+        hName: 'input',
+        hProperties: { type: 'text', className: 'filter-input', placeholder: 'Filter…', 'aria-label': 'Filter table rows' },
+      },
+      children: [],
+    }
+    node.data = node.data ?? {}
+    node.data.hName = 'div'
+    node.data.hProperties = { className: 'filter-table' }
+    node.children = [input, ...(node.children ?? [])]
+  })
+}
