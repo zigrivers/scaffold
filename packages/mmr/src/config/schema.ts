@@ -104,6 +104,10 @@ const SubprocessChannelSchema = z.object({
   ...CommonChannelFields,
 })
 
+// NOTE: endpoint/model/endpoint_convention are required unconditionally, so an
+// abstract http *template* (providing only shared headers for children to
+// extend) is not supported — http channels must be concrete. Subprocess
+// abstract templates remain supported (command is optional).
 const HttpChannelSchema = z.object({
   kind: z.literal('http'),
   endpoint: z.string(),

@@ -201,6 +201,9 @@ function resolveExtendsAcrossChannels(
 function validateRunnableChannels(config: MmrConfigParsed): void {
   for (const [name, channel] of Object.entries(config.channels)) {
     if (channel.abstract) continue
+    // http channels are runnable via endpoint/model (schema-required), not a
+    // command — only subprocess channels must define one after inheritance.
+    if (channel.kind === 'http') continue
     if (!channel.command) {
       throw new Error(`Channel "${name}" must define command after inheritance unless abstract is set`)
     }
@@ -234,7 +237,8 @@ function validateCompensatorReference(config: MmrConfigParsed): void {
       + 'Abstract channels are non-dispatchable templates; reference a concrete channel that extends it instead.',
     )
   }
-  if (!target.command) {
+  // http channels are concrete via endpoint/model rather than command.
+  if (target.kind !== 'http' && !target.command) {
     throw new Error(
       `defaults.compensator.channel "${ref}" is missing command. `
       + 'Compensator channels must be concrete dispatch targets.',
