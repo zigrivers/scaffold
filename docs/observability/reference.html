@@ -759,7 +759,7 @@ window.OBS_CALLOUTS = Object.assign(window.OBS_CALLOUTS || {}, {
 <div class="note warn"><strong>Naming note</strong> The PR-opened event is <code>pr_opened</code> (past tense) in code, not <code>pr_open</code> as the CLAUDE.md prose abbreviates it. The ledger never emits <code>pr_open</code>.</div>
 
 <h3>Build a <code>scaffold observe event</code> command</h3>
-<p>Pick an event type to see its invocation. <code>--branch</code> is required; <code>--task-id</code> is required for task/blocker events but must be <em>omitted</em> for <code>finding_acknowledged</code> (whose <code>task_id</code> must be null). Payload keys are passed as <code>--kebab-case</code> flags, snake-cased before validation; unknown keys are dropped.</p>
+<p>Pick an event type to see its invocation. <code>--branch</code> is required; <code>--task-id</code> is optional (it correlates the event to a claimed task) but must be <em>omitted</em> for <code>finding_acknowledged</code> (whose <code>task_id</code> must be null), and a <code>task_claimed</code> without one must pass <code>--unplanned true</code>. Payload keys are passed as <code>--kebab-case</code> flags, snake-cased before validation; unknown keys are dropped.</p>
 <div class="fb" data-fb="event" data-base="" aria-label="Event command builder">
   <div class="fb-group" data-flag="event" data-type="radio" data-default="scaffold observe event task_claimed --branch &lt;branch&gt; --task-id &lt;id&gt; --task-title &quot;&lt;title&gt;&quot; [--story-id &lt;id&gt;] [--wave &lt;n&gt;] [--unplanned true]">
     <span class="fb-q">event type</span>
@@ -772,7 +772,7 @@ window.OBS_CALLOUTS = Object.assign(window.OBS_CALLOUTS || {}, {
       <button class="fb-opt" type="button" data-val="scaffold observe event pr_opened --branch &lt;branch&gt; --task-id &lt;id&gt; --pr-number &lt;n&gt;">pr_opened</button>
       <button class="fb-opt" type="button" data-val="scaffold observe event progress_heartbeat --branch &lt;branch&gt; --task-id &lt;id&gt; --note &quot;&lt;text&gt;&quot;">progress_heartbeat</button>
       <button class="fb-opt" type="button" data-val="scaffold observe event finding_acknowledged --branch &lt;branch&gt; --finding-id &lt;id&gt; --status acknowledged [--note &quot;&lt;text&gt;&quot;]">finding_acknowledged</button>
-      <button class="fb-opt" type="button" data-val="scaffold observe event knowledge_gap_signal --branch &lt;branch&gt; --topic &lt;kebab-slug&gt; --source agent_search --project-id &lt;sha256|lessons&gt; [--step-name &lt;name&gt;] [--agent-excerpt &quot;&lt;text&gt;&quot;]">knowledge_gap_signal</button>
+      <button class="fb-opt" type="button" data-val="scaffold observe event knowledge_gap_signal --branch &lt;branch&gt; --topic &lt;kebab-slug&gt; --source agent_search --project-id &lt;sha256&gt; [--step-name &lt;name&gt;] [--agent-excerpt &quot;&lt;text&gt;&quot;]">knowledge_gap_signal</button>
     </div>
   </div>
   <div class="fb-out">
@@ -1751,7 +1751,7 @@ window.OBS_FILE_MAP = [
     }
     [].slice.call(table.querySelectorAll('thead th[data-sort]')).forEach(function (th) {
       th.classList.add('sortable');
-      th.tabIndex = 0; th.setAttribute('role', 'button'); th.setAttribute('aria-sort', 'none');
+      th.tabIndex = 0; th.setAttribute('aria-sort', 'none');
       th.addEventListener('click', function () { applySort(th); });
       th.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); applySort(th); } });
     });
@@ -1821,9 +1821,9 @@ window.OBS_FILE_MAP = [
     if (treeEl) {
       function renderNode(node, depth) {
         if (node.kind === 'file') {
-          var lineTxt = node.line ? '<span style="color:var(--text-faint)">:' + node.line + '</span>' : '';
-          var dataPath = node.path + (node.line ? '' : '');
-          return '<a class="file-leaf fp" tabindex="0" role="button" data-path="' + node.path + '" aria-label="' + (REPO_ROOT ? 'Open ' : 'Copy path ') + node.path + '" title="' + (REPO_ROOT ? 'open in editor' : 'click to copy path — set localStorage obs-repo-root for editor deep-links') + '">' +
+          var lineTxt = node.line ? '<span style="color:var(--text-muted)">:' + node.line + '</span>' : '';
+          var dataPath = node.path + (node.line ? ':' + node.line : '');
+          return '<a class="file-leaf fp" tabindex="0" role="button" data-path="' + dataPath + '" aria-label="' + (REPO_ROOT ? 'Open ' : 'Copy path ') + dataPath + '" title="' + (REPO_ROOT ? 'open in editor' : 'click to copy path — set localStorage obs-repo-root for editor deep-links') + '">' +
                  '<span>' + node.name + lineTxt + '</span>' +
                  '<span class="file-purpose">' + (node.purpose || '') + '</span></a>';
         }
