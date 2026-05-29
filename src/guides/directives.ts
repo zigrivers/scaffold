@@ -1,4 +1,5 @@
 import { visit } from 'unist-util-visit'
+import { toString as mdToString } from 'mdast-util-to-string'
 import type { Root } from 'mdast'
 import type { AnyPlugin } from './render.js'
 
@@ -61,6 +62,58 @@ export const remarkTabs: AnyPlugin = () => (tree: any) => {
     node.data.hName = 'div'
     node.data.hProperties = { className: 'tabs' }
     node.children = [tablist, ...tabs]
+  })
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const remarkChart: AnyPlugin = () => (tree: any) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  visit(tree, (node: any) => {
+    if (node.type !== 'containerDirective' || node.name !== 'chart') return
+    const table = (node.children ?? []).find((c: any) => c.type === 'table')
+    if (!table) throw new Error('`:::chart` must contain a GFM table')
+    const rows = table.children.slice(1) // drop header row
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const parsed = rows.map((r: any) => {
+      const cells = r.children
+      const label = mdToString(cells[0])
+      const value = Number(mdToString(cells[cells.length - 1]).trim())
+      if (!Number.isFinite(value)) throw new Error(`:::chart value column must be numeric (got "${label}")`)
+      return { label, value }
+    })
+    const max = Math.max(...parsed.map((p: any) => p.value), 0) || 1
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const bars = parsed.map((p: any) => {
+      const pct = Math.round((p.value / max) * 100)
+      return {
+        type: 'paragraph',
+        data: {
+          hName: 'div',
+          hProperties: { className: 'chart-row', 'aria-label': `${p.label}: ${p.value}` },
+        },
+        children: [
+          {
+            type: 'paragraph',
+            data: { hName: 'span', hProperties: { className: 'chart-label' } },
+            children: [{ type: 'text', value: p.label }],
+          },
+          {
+            type: 'paragraph',
+            data: { hName: 'div', hProperties: { className: 'chart-bar', style: `width:${pct}%` } },
+            children: [],
+          },
+        ],
+      }
+    })
+    const chart = {
+      type: 'paragraph',
+      data: { hName: 'div', hProperties: { className: 'chart chart-bar' } },
+      children: bars,
+    }
+    node.data = node.data ?? {}
+    node.data.hName = 'div'
+    node.data.hProperties = { className: 'chart-block' }
+    node.children = [chart, table]
   })
 }
 

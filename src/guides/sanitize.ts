@@ -7,7 +7,7 @@ export const guideSanitizeSchema: Schema = {
   tagNames: [...(defaultSchema.tagNames ?? []), 'button', 'input'],
   attributes: {
     ...defaultSchema.attributes,
-    '*': [...(defaultSchema.attributes?.['*'] ?? []), 'id', 'className', 'role', 'dataTab', 'ariaLabel'],
+    '*': [...(defaultSchema.attributes?.['*'] ?? []), 'id', 'className', 'role', 'dataTab', 'ariaLabel', 'style'],
     input: ['type', 'placeholder', 'className', 'ariaLabel'],
   },
 }
