@@ -34,6 +34,13 @@ describe('resolveJobsDir — shared MMR root for jobs', () => {
     process.env.MMR_HOME = '   '
     expect(resolveJobsDir()).toBe(path.join('/home/tester', '.mmr', 'jobs'))
   })
+
+  it('resolves a relative MMR_HOME to an absolute path (no cwd-relative state)', () => {
+    process.env.MMR_HOME = 'relative-root'
+    const resolved = resolveJobsDir()
+    expect(path.isAbsolute(resolved)).toBe(true)
+    expect(resolved).toBe(path.join(path.resolve('relative-root'), 'jobs'))
+  })
 })
 
 describe('isValidSessionId — single source of validation truth', () => {
@@ -108,6 +115,81 @@ describe('review — reserved session id is rejected before any job is created',
     } finally {
       vi.doUnmock('../../src/core/dispatcher.js')
       vi.doUnmock('../../src/core/auth.js')
+      fs.rmSync(tmpHome, { recursive: true, force: true })
+    }
+  })
+
+  it('removes the created job when session linking fails (no half-linked job)', async () => {
+    vi.resetModules()
+    const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-orphan-'))
+    const diffPath = path.join(tmpHome, 'sample.diff')
+    fs.writeFileSync(diffPath, [
+      'diff --git a/x.ts b/x.ts',
+      '--- a/x.ts',
+      '+++ b/x.ts',
+      '@@ -1,1 +1,2 @@',
+      ' export const foo = 1',
+      '+export const bar = 2',
+      '',
+    ].join('\n'))
+    fs.writeFileSync(path.join(tmpHome, '.mmr.yaml'), [
+      'version: 1',
+      'channels:',
+      '  local:',
+      '    command: local-review',
+      '    auth:',
+      '      check: "true"',
+      '      failure_exit_codes: [1]',
+      '      recovery: "x"',
+    ].join('\n'))
+    process.env.HOME = tmpHome
+    delete process.env.MMR_HOME
+    vi.doMock('../../src/core/dispatcher.js', () => ({ dispatchChannel: vi.fn().mockResolvedValue(undefined) }))
+    vi.doMock('../../src/core/auth.js', () => ({
+      checkInstalled: vi.fn().mockResolvedValue(true),
+      checkAuth: vi.fn().mockResolvedValue({ status: 'ok' }),
+    }))
+    // Keep the real validators/resolvers; force addJob to fail mid-link.
+    vi.doMock('../../src/commands/sessions.js', async (importOriginal) => {
+      const actual = (await importOriginal()) as Record<string, unknown>
+      return {
+        ...actual,
+        getSessionStore: () => ({
+          show: () => undefined,
+          start: () => undefined,
+          addJob: () => {
+            throw new Error('disk full')
+          },
+        }),
+      }
+    })
+    const { reviewCommand } = await import('../../src/commands/review.js')
+    vi.spyOn(process, 'cwd').mockReturnValue(tmpHome)
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {
+      throw new Error('process.exit')
+    }) as never)
+    try {
+      await expect(
+        reviewCommand.handler({
+          diff: diffPath,
+          channels: ['local'],
+          session: 'feat-foo',
+          round: 1,
+          _: ['review'],
+          $0: 'mmr',
+        } as never),
+      ).rejects.toThrow('process.exit')
+      const jobsDir = path.join(tmpHome, '.mmr', 'jobs')
+      const remaining = fs.existsSync(jobsDir) ? fs.readdirSync(jobsDir) : []
+      expect(remaining).toHaveLength(0)
+      expect(exitSpy).toHaveBeenCalledWith(1)
+      expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('disk full'))
+    } finally {
+      vi.doUnmock('../../src/core/dispatcher.js')
+      vi.doUnmock('../../src/core/auth.js')
+      vi.doUnmock('../../src/commands/sessions.js')
       fs.rmSync(tmpHome, { recursive: true, force: true })
     }
   })

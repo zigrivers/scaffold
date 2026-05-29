@@ -19,7 +19,7 @@ import { formatJson } from '../formatters/json.js'
 import { formatText } from '../formatters/text.js'
 import { formatMarkdown } from '../formatters/markdown.js'
 import type { ChannelConfigParsed, MmrConfigParsed } from '../config/schema.js'
-import { getSessionStore, resolveJobsDir, isValidSessionId, type SessionStore } from './sessions.js'
+import { getSessionStore, resolveJobsDir, isValidSessionId, SESSION_ID_RULE, type SessionStore } from './sessions.js'
 
 interface ReviewArgs {
   diff?: string
@@ -295,8 +295,8 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
         describe: 'Resolve diff and assemble prompt without dispatching channels',
       })
       .check((argv) => {
-        if (typeof argv.session === 'string' && !/^[a-zA-Z0-9_-]+$/.test(argv.session)) {
-          throw new Error('Invalid session id. Allowed chars: a-zA-Z0-9_-')
+        if (typeof argv.session === 'string' && !isValidSessionId(argv.session)) {
+          throw new Error(`Invalid session id. Must match ${SESSION_ID_RULE}`)
         }
         if (typeof argv.round === 'number' && argv.round < 1) {
           throw new Error('round must be >= 1')
@@ -324,10 +324,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       },
     })
     if (args.session !== undefined && !isValidSessionId(args.session)) {
-      console.error(
-        `Invalid session id: ${args.session} - must match ^[a-zA-Z0-9_-]+$ ` +
-          'and not be a reserved name (con, prn, aux, nul, com1-9, lpt1-9, index, __proto__)',
-      )
+      console.error(`Invalid session id: ${args.session} - must match ${SESSION_ID_RULE}`)
       process.exitCode = 1
       return
     }
@@ -459,6 +456,10 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       try {
         sessionLink.store.addJob(sessionLink.id, job.job_id, args.round ?? 1)
       } catch (err) {
+        // Linking failed after the job dir was created. Remove the orphaned job
+        // so the auto-link invariant holds: a job that records a session_id is
+        // always present in that session's jobs[] array (never half-linked).
+        fs.rmSync(store.getJobDir(job.job_id), { recursive: true, force: true })
         console.error(
           `Failed to link job ${job.job_id} to session ${sessionLink.id}: ` +
             (err instanceof Error ? err.message : String(err)),
