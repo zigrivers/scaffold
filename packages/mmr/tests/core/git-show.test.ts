@@ -55,4 +55,29 @@ describe('readFileAtRef', () => {
       fs.rmSync(dir, { recursive: true, force: true })
     }
   })
+
+  it('fails closed (undefined) on an unsafe ref, without reading anything', () => {
+    const dir = initRepo()
+    try {
+      const filePath = path.join(dir, '.mmr.yaml')
+      fs.writeFileSync(filePath, 'version: 1\n')
+      execFileSync('git', ['add', '.mmr.yaml'], { cwd: dir, stdio: 'ignore' })
+      execFileSync('git', ['commit', '-m', 'c'], { cwd: dir, stdio: 'ignore' })
+      // ':' would shift the rev:path boundary; '..' is a range.
+      expect(readFileAtRef({ cwd: dir, ref: 'HEAD:evil', filePath: './.mmr.yaml' })).toBeUndefined()
+      expect(readFileAtRef({ cwd: dir, ref: 'HEAD..main', filePath: './.mmr.yaml' })).toBeUndefined()
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('fails closed (undefined) on an unsafe file path', () => {
+    const dir = initRepo()
+    try {
+      expect(readFileAtRef({ cwd: dir, ref: 'HEAD', filePath: '../escape.yaml' })).toBeUndefined()
+      expect(readFileAtRef({ cwd: dir, ref: 'HEAD', filePath: 'a:b' })).toBeUndefined()
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
+  })
 })
