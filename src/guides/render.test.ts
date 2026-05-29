@@ -24,4 +24,11 @@ describe('renderGuideBody', () => {
       { depth: 3, text: 'Baz Qux', id: 'baz-qux' },
     ])
   })
+
+  it('strips frontmatter whose closing delimiter has trailing whitespace', async () => {
+    const md = '---\ntitle: Leaky\n---  \n\n## Body\n'
+    const { body } = await renderGuideBody(md)
+    expect(body).not.toContain('title:')
+    expect(body).toContain('Body')
+  })
 })

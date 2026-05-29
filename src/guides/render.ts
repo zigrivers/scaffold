@@ -17,17 +17,18 @@ import { guideSanitizeSchema } from './sanitize.js'
 export type AnyPlugin = Plugin<any[], any, any>
 
 export interface RenderOptions {
+  /** remark-phase plugins only; injected after remark-directive and before remark-rehype */
   plugins?: AnyPlugin[]
 }
 
 function slug(text: string): string {
-  return text.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-')
+  return text.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/[_\s]+/g, '-')
 }
 
 function stripFrontmatter(md: string): string {
   const lines = md.split(/\r?\n/)
   if (lines[0]?.trim() !== '---') return md
-  const close = lines.indexOf('---', 1)
+  const close = lines.findIndex((l, i) => i > 0 && l.trim() === '---')
   if (close === -1) return md
   return lines.slice(close + 1).join('\n')
 }
