@@ -7,6 +7,7 @@ import { checkInstalled, checkAuth } from '../core/auth.js'
 import { assemblePrompt } from '../core/prompt.js'
 import { dispatchChannel } from '../core/dispatcher.js'
 import { runResultsPipeline } from '../core/results-pipeline.js'
+import { buildReviewAckStore } from '../core/ack-store.js'
 import {
   getCompensatingChannels,
   dispatchCompensatingPasses,
@@ -593,7 +594,15 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       // --sync: full results pipeline (dispatch -> parse -> reconcile -> format -> exit)
       const completedJob = store.loadJob(job.job_id)
       const outputFormat = (args.format ?? completedJob.format ?? 'json') as OutputFormat
-      const { results, formatted, exitCode } = runResultsPipeline(store, completedJob, outputFormat)
+      // User-scope acks always load; project-scope acks (working tree) load
+      // only when explicitly trusted, so an untrusted PR checkout can't commit
+      // acks to self-suppress its own findings. The trust-mode thread adds the
+      // trusted default path (project acks from a git base ref). The pipeline
+      // fails safe if the acks tree is unreadable.
+      const ackStore = buildReviewAckStore({ trustProjectAcks: reviewControls.trust_project_acks })
+      const { results, formatted, exitCode } = runResultsPipeline(store, completedJob, outputFormat, false, {
+        ackStore,
+      })
       store.saveResults(job.job_id, results)
       console.log(formatted)
       process.exit(exitCode)

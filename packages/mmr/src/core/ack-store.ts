@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import os from 'node:os'
 import crypto from 'node:crypto'
 import { jaccardSimilarity } from './stable-id.js'
 
@@ -27,8 +28,36 @@ export interface AckMatch {
 }
 
 export interface AckStoreOptions {
-  projectRoot: string
+  /**
+   * Project root whose ./.mmr/acks holds project-scoped acks. Optional: when
+   * omitted, project-scope acks are disabled entirely (lookup/listAll ignore
+   * them and add(..,'project') throws). Callers reviewing an untrusted working
+   * tree should omit it unless the project acks are explicitly trusted.
+   */
+  projectRoot?: string
   userHome: string
+}
+
+/**
+ * Build an AckStore for a review run. User-scope acks (~/.mmr/acks) are always
+ * loaded (they live on the operator's own machine). Project-scope acks live in
+ * the reviewed tree, which may be untrusted (a PR checkout in CI), so they are
+ * loaded only when explicitly trusted — otherwise an attacker could commit
+ * `.mmr/acks/<sha>.json` to self-suppress their own findings. The full trusted
+ * path (loading project acks from a git base ref) is added by the trust-mode
+ * thread; until then this gates project acks behind trust_project_acks.
+ *
+ * Project root defaults to process.cwd() (the same convention loadConfig uses
+ * for .mmr.yaml) and the user home to `process.env.HOME ?? os.homedir()` (the
+ * same resolution as resolveSessionRoot). cwd/home are injectable for tests.
+ */
+export function buildReviewAckStore(opts: { trustProjectAcks: boolean; cwd?: string; home?: string }): AckStore {
+  const cwd = opts.cwd ?? process.cwd()
+  const home = opts.home ?? process.env.HOME ?? os.homedir()
+  return new AckStore({
+    projectRoot: opts.trustProjectAcks ? cwd : undefined,
+    userHome: home,
+  })
 }
 
 /**
@@ -58,18 +87,20 @@ interface LoadedScope {
 }
 
 export class AckStore {
-  private readonly projectDir: string
+  private readonly projectDir: string | undefined
   private readonly userDir: string
-  private readonly projectRootResolved: string
+  private readonly projectRootResolved: string | undefined
   private readonly userHomeResolved: string
   // Per-instance lazy cache so a review that calls lookup() once per finding
   // reads each acks dir from disk at most once (avoids O(N*M) FS operations).
   private readonly loaded: Partial<Record<AckScope, LoadedScope>> = {}
 
   constructor(opts: AckStoreOptions) {
-    this.projectRootResolved = path.resolve(opts.projectRoot)
+    this.projectRootResolved = opts.projectRoot === undefined ? undefined : path.resolve(opts.projectRoot)
     this.userHomeResolved = path.resolve(opts.userHome)
-    this.projectDir = path.join(this.projectRootResolved, '.mmr', 'acks')
+    this.projectDir = this.projectRootResolved === undefined
+      ? undefined
+      : path.join(this.projectRootResolved, '.mmr', 'acks')
     this.userDir = path.join(this.userHomeResolved, '.mmr', 'acks')
   }
 
@@ -90,6 +121,9 @@ export class AckStore {
   private dirForScope(scope: AckScope): string {
     const dir = scope === 'project' ? this.projectDir : this.userDir
     const root = scope === 'project' ? this.projectRootResolved : this.userHomeResolved
+    if (dir === undefined || root === undefined) {
+      throw new Error('project-scope acks are disabled (no project root configured)')
+    }
     let realRoot: string
     try {
       realRoot = fs.realpathSync(root)
@@ -220,7 +254,9 @@ export class AckStore {
   private records(scope: AckScope): LoadedScope {
     let cached = this.loaded[scope]
     if (cached === undefined) {
-      const records = this.readDir(this.dirForScope(scope))
+      // A disabled project scope (no project root) contributes no records.
+      const dir = scope === 'project' ? this.projectDir : this.userDir
+      const records = dir === undefined ? [] : this.readDir(this.dirForScope(scope))
       const byKey = new Map<string, AckRecord>()
       const byLocation = new Map<string, AckRecord[]>()
       for (const r of records) {
