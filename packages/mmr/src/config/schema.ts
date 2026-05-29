@@ -11,6 +11,37 @@ const AuthConfigSchema = z.object({
   recovery: z.string(),
 })
 
+// Auth-probe config for HTTP channels (T1-C). Distinct from the subprocess
+// AuthConfigSchema: an HTTP probe is an HTTP request (method + accepted status
+// codes), not a spawned command. `check_endpoint` is optional — when absent,
+// the probe URL is derived from `endpoint` via `deriveProbeUrl` (a trailing
+// `/chat/completions` → `/models`); the schema rejects http channels where
+// neither is available.
+const HttpAuthConfigSchema = z.object({
+  check_endpoint: z.string().optional(),
+  check_method: z.string().default('GET'),
+  check_status_ok: z.array(z.number()).default([200]),
+  // Positive: a 0/negative timeout would abort the probe immediately.
+  timeout: z.number().positive().default(5),
+  recovery: z.string().optional(),
+})
+
+/**
+ * Derive the auth-probe URL from an openai-chat endpoint by replacing a
+ * trailing `/chat/completions` with `/models` (handles both `.../v1/chat/...`
+ * and bare `.../chat/...` shapes). Returns undefined when there is no trailing
+ * `/chat/completions` — callers then require an explicit `auth.check_endpoint`.
+ */
+export function deriveProbeUrl(endpoint: string): string | undefined {
+  // Tolerate trailing slashes (e.g. `.../chat/completions/`).
+  const trimmed = endpoint.replace(/\/+$/, '')
+  const suffix = '/chat/completions'
+  if (trimmed.endsWith(suffix)) {
+    return trimmed.slice(0, -suffix.length) + '/models'
+  }
+  return undefined
+}
+
 type SeverityConfig = z.infer<typeof Severity>
 
 export interface RegexFindingsParserConfig {
@@ -81,7 +112,6 @@ const CommonChannelFields = {
   flags: z.array(z.string()).default([]),
   env: z.record(z.string()).default({}),
   headers: z.record(z.string()).optional(),
-  auth: AuthConfigSchema.optional(),
   prompt_wrapper: z.string().default('{{prompt}}'),
   // How the dispatcher hands the prompt to the channel process:
   //   'stdin'       — pipe the prompt to stdin (default; claude/gemini/codex)
@@ -101,6 +131,8 @@ const CommonChannelFields = {
 
 const SubprocessChannelSchema = z.object({
   kind: z.literal('subprocess'),
+  // Subprocess auth is a spawned command (check + failure_exit_codes).
+  auth: AuthConfigSchema.optional(),
   ...CommonChannelFields,
 })
 
@@ -117,6 +149,9 @@ const HttpChannelSchema = z.object({
   api_key_env: z.string().optional(),
   api_key_header: z.string().default('Authorization'),
   api_key_prefix: z.string().default('Bearer '),
+  // HTTP auth is an HTTP probe (GET <endpoint→/models>), always defaulted so
+  // the dispatcher/auth-probe can read auth.check_method/check_status_ok.
+  auth: HttpAuthConfigSchema.default({}),
   ...CommonChannelFields,
 })
 
@@ -136,7 +171,17 @@ function injectSubprocessDefault(raw: unknown): unknown {
 const ChannelConfigSchema = z.preprocess(
   injectSubprocessDefault,
   z.discriminatedUnion('kind', [SubprocessChannelSchema, HttpChannelSchema]),
-)
+).superRefine((ch, ctx) => {
+  // An http channel must have a probeable auth endpoint: either an explicit
+  // auth.check_endpoint, or a derivable one (endpoint ends in /chat/completions).
+  if (ch.kind === 'http' && !ch.auth.check_endpoint && !deriveProbeUrl(ch.endpoint)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['auth', 'check_endpoint'],
+      message: `endpoint "${ch.endpoint}" does not end in /chat/completions; auth.check_endpoint is required.`,
+    })
+  }
+})
 
 const TemplateSchema = z.object({
   criteria: z.array(z.string()).optional(),
@@ -203,3 +248,4 @@ export type MmrConfigParsed = z.infer<typeof MmrConfigSchema>
 export type ChannelConfigParsed = z.infer<typeof ChannelConfigSchema>
 export type SubprocessChannelParsed = z.infer<typeof SubprocessChannelSchema>
 export type HttpChannelParsed = z.infer<typeof HttpChannelSchema>
+export type HttpAuthConfigParsed = z.infer<typeof HttpAuthConfigSchema>

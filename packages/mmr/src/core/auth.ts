@@ -1,8 +1,12 @@
 import { spawn } from 'node:child_process'
-import type { ChannelConfigParsed } from '../config/schema.js'
+import type { ChannelConfigParsed, HttpChannelParsed, SubprocessChannelParsed } from '../config/schema.js'
+import { deriveProbeUrl } from '../config/schema.js'
 
-type AuthenticatedChannelConfig = ChannelConfigParsed & {
-  auth: NonNullable<ChannelConfigParsed['auth']>
+// Re-exported so callers (and tests) can derive an http probe URL from auth.ts.
+export { deriveProbeUrl }
+
+type AuthenticatedChannelConfig = SubprocessChannelParsed & {
+  auth: NonNullable<SubprocessChannelParsed['auth']>
 }
 
 export interface AuthResult {
@@ -80,6 +84,10 @@ async function runAuthCheck(config: AuthenticatedChannelConfig): Promise<AuthRes
  * to handle transient network issues.
  */
 export async function checkAuth(config: ChannelConfigParsed): Promise<AuthResult> {
+  // Polymorphic over channel kind: HTTP channels are auth-probed over the wire.
+  if (config.kind === 'http') {
+    return checkHttpAuth(config)
+  }
   if (!config.auth) {
     return { status: 'ok' }
   }
@@ -90,4 +98,54 @@ export async function checkAuth(config: ChannelConfigParsed): Promise<AuthResult
     return runAuthCheck(authConfig)
   }
   return result
+}
+
+/**
+ * Auth-probe an HTTP (openai-chat) channel: GET the configured (or derived)
+ * probe URL with the channel's full request context and map the status to
+ * ok/failed/timeout. The API key value is read only to build the request
+ * header — it is NEVER logged or returned in the result.
+ */
+export async function checkHttpAuth(channel: HttpChannelParsed): Promise<AuthResult> {
+  const probeUrl = channel.auth.check_endpoint ?? deriveProbeUrl(channel.endpoint)
+  if (!probeUrl) {
+    return { status: 'failed', recovery: channel.auth.recovery }
+  }
+  const headers: Record<string, string> = { ...(channel.headers ?? {}) }
+  if (channel.api_key_env) {
+    const value = process.env[channel.api_key_env]
+    if (!value) {
+      return { status: 'failed', recovery: channel.auth.recovery }
+    }
+    // Drop any case-variant of the target header so the api-key header wins.
+    const target = channel.api_key_header.toLowerCase()
+    for (const k of Object.keys(headers)) {
+      if (k.toLowerCase() === target) delete headers[k]
+    }
+    headers[channel.api_key_header] = `${channel.api_key_prefix}${value}`
+  }
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), channel.auth.timeout * 1000)
+  try {
+    const res = await fetch(probeUrl, {
+      method: channel.auth.check_method,
+      headers,
+      signal: controller.signal,
+    })
+    if (channel.auth.check_status_ok.includes(res.status)) {
+      return { status: 'ok' }
+    }
+    // A non-ok HTTP response is plausibly an auth problem (401/403/…) → surface
+    // the user's auth-setup recovery guidance.
+    return { status: 'failed', recovery: channel.auth.recovery }
+  } catch (err: unknown) {
+    if ((err as { name?: string }).name === 'AbortError') {
+      return { status: 'timeout' }
+    }
+    // Transport-level failure (DNS, connection refused, TLS) is NOT an auth
+    // problem — do not attach auth recovery text, which would mislead.
+    return { status: 'failed' }
+  } finally {
+    clearTimeout(timer)
+  }
 }
