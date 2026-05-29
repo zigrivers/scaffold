@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
+import { restoreEnv } from '../helpers/env.js'
 
 // Drives reviewCommand.handler directly (CI does not build packages/mmr/dist).
 // dispatcher/auth are mocked so a real review never runs; process.exit is
@@ -37,9 +38,11 @@ function initRepo(withConfig: boolean): string {
 }
 
 const originalHome = process.env.HOME
+const originalMmrHome = process.env.MMR_HOME
 
 afterEach(() => {
-  process.env.HOME = originalHome
+  restoreEnv('HOME', originalHome)
+  restoreEnv('MMR_HOME', originalMmrHome)
   vi.restoreAllMocks()
 })
 

@@ -3,14 +3,15 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { resolveJobsDir, resolveSessionRoot, isValidSessionId } from '../../src/commands/sessions.js'
+import { restoreEnv } from '../helpers/env.js'
 
 const originalHome = process.env.HOME
 const originalMmrHome = process.env.MMR_HOME
 const originalExitCode = process.exitCode
 
 afterEach(() => {
-  process.env.HOME = originalHome
-  process.env.MMR_HOME = originalMmrHome
+  restoreEnv('HOME', originalHome)
+  restoreEnv('MMR_HOME', originalMmrHome)
   process.exitCode = originalExitCode
   vi.restoreAllMocks()
 })
