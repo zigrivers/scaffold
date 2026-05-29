@@ -147,9 +147,12 @@ Claude CLI handles its own auth. Focus: plan alignment, code quality, testing.
 ```bash
 command -v grok >/dev/null 2>&1 || echo "Grok not installed"
 grok models >/dev/null 2>&1 && echo "Grok authed" || echo "Run: grok login"
-# grok ignores stdin — the prompt MUST be passed via a file (or the -p arg):
-printf '%s' "REVIEW_PROMPT" > /tmp/grok-review-prompt.txt
-grok --prompt-file /tmp/grok-review-prompt.txt --output-format json 2>/dev/null
+# grok ignores stdin — the prompt MUST be passed via a file (or the -p arg).
+# Use mktemp (never a predictable /tmp path) and clean up afterward:
+PROMPT_FILE=$(mktemp)
+printf '%s' "REVIEW_PROMPT" > "$PROMPT_FILE"
+grok --prompt-file "$PROMPT_FILE" --output-format json 2>/dev/null
+rm -f "$PROMPT_FILE"
 ```
 
 Grok's JSON wraps the reply in `.text`. If not installed or auth fails, queue a

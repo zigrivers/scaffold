@@ -78,7 +78,9 @@ export async function dispatchChannel(
   const promptDelivery = opts.promptDelivery ?? 'stdin'
   if (promptDelivery === 'prompt-file') {
     const promptFile = path.join(channelsDir, `${channelName}.prompt.txt`)
-    fs.writeFileSync(promptFile, opts.prompt)
+    // Async write: prompts can carry large diffs and channels dispatch in
+    // parallel, so avoid blocking the event loop.
+    await fs.promises.writeFile(promptFile, opts.prompt)
     args = args.some((a) => a.includes(PROMPT_FILE_PLACEHOLDER))
       ? args.map((a) => a.split(PROMPT_FILE_PLACEHOLDER).join(promptFile))
       : [...args, promptFile]

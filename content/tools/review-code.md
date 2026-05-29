@@ -346,6 +346,7 @@ Grok ignores stdin — pass the prompt via a file, and unwrap the reply from `.t
 PROMPT_FILE=$(mktemp)
 # ...write the full review prompt to "$PROMPT_FILE"...
 grok --prompt-file "$PROMPT_FILE" --output-format json 2>/dev/null
+rm -f "$PROMPT_FILE"   # clean up the temp prompt file
 ```
 
 If the CLI exits with a non-zero code, produces malformed/unparseable output, or is killed by the tool runner timeout, record root-cause `failed` and queue a compensating pass for that channel.
