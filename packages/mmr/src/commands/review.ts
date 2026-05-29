@@ -475,7 +475,11 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
           `Failed to link job ${job.job_id} to session ${sessionLink.id}: ` +
             (err instanceof Error ? err.message : String(err)),
         )
-        process.exit(1)
+        // Set the exit code and return rather than process.exit(1): it lets
+        // stderr flush, and keeps the handler unit-testable without mocking
+        // process.exit. Returning aborts before channel dispatch, as intended.
+        process.exitCode = 1
+        return
       }
     }
 

@@ -6,10 +6,12 @@ import { resolveJobsDir, resolveSessionRoot, isValidSessionId } from '../../src/
 
 const originalHome = process.env.HOME
 const originalMmrHome = process.env.MMR_HOME
+const originalExitCode = process.exitCode
 
 afterEach(() => {
   process.env.HOME = originalHome
   process.env.MMR_HOME = originalMmrHome
+  process.exitCode = originalExitCode
   vi.restoreAllMocks()
 })
 
@@ -167,24 +169,21 @@ describe('review — reserved session id is rejected before any job is created',
     vi.spyOn(process, 'cwd').mockReturnValue(tmpHome)
     vi.spyOn(console, 'log').mockImplementation(() => {})
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {
-      throw new Error('process.exit')
-    }) as never)
     try {
-      await expect(
-        reviewCommand.handler({
-          diff: diffPath,
-          channels: ['local'],
-          session: 'feat-foo',
-          round: 1,
-          _: ['review'],
-          $0: 'mmr',
-        } as never),
-      ).rejects.toThrow('process.exit')
+      // The handler sets process.exitCode and returns (no process.exit), so it
+      // can be awaited directly without mocking process-level termination.
+      await reviewCommand.handler({
+        diff: diffPath,
+        channels: ['local'],
+        session: 'feat-foo',
+        round: 1,
+        _: ['review'],
+        $0: 'mmr',
+      } as never)
       const jobsDir = path.join(tmpHome, '.mmr', 'jobs')
       const remaining = fs.existsSync(jobsDir) ? fs.readdirSync(jobsDir) : []
       expect(remaining).toHaveLength(0)
-      expect(exitSpy).toHaveBeenCalledWith(1)
+      expect(process.exitCode).toBe(1)
       expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('disk full'))
     } finally {
       vi.doUnmock('../../src/core/dispatcher.js')

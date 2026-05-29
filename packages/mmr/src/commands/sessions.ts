@@ -219,6 +219,11 @@ export function isValidSessionId(id: string): boolean {
   return SESSION_ID_RE.test(id) && !WINDOWS_RESERVED_ID_RE.test(id) && !SYSTEM_SESSION_ID_RE.test(id)
 }
 
+/**
+ * Resolves the MMR state root. MMR_HOME, when set, may be absolute or
+ * cwd-relative (resolved to absolute here); a leading `~` is not expanded —
+ * rely on the shell to expand it, as with any other path env var.
+ */
 export function resolveSessionRoot(): string {
   const mmrHome = process.env.MMR_HOME
   if (mmrHome !== undefined && mmrHome.trim() !== '') return path.resolve(mmrHome)
