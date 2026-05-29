@@ -136,3 +136,18 @@ export const remarkFilterTable: AnyPlugin = () => (tree: any) => {
     node.children = [input, ...(node.children ?? [])]
   })
 }
+
+const SEV_LEVELS = new Set(['p0', 'p1', 'p2', 'p3', 'pass'])
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const remarkSev: AnyPlugin = () => (tree: any) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  visit(tree, (node: any) => {
+    if (node.type !== 'textDirective' || node.name !== 'sev') return
+    const level = String(node.attributes?.level ?? 'p2').toLowerCase()
+    const safe = SEV_LEVELS.has(level) ? level : 'p2'
+    node.data = node.data ?? {}
+    node.data.hName = 'span'
+    node.data.hProperties = { className: `sev sev-${safe}` }
+  })
+}
