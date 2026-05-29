@@ -7,6 +7,8 @@ import { checkInstalled, checkAuth } from '../core/auth.js'
 import { assemblePrompt } from '../core/prompt.js'
 import { dispatchChannel } from '../core/dispatcher.js'
 import { runResultsPipeline } from '../core/results-pipeline.js'
+import { AckStore } from '../core/ack-store.js'
+import os from 'node:os'
 import {
   getCompensatingChannels,
   dispatchCompensatingPasses,
@@ -593,7 +595,13 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       // --sync: full results pipeline (dispatch -> parse -> reconcile -> format -> exit)
       const completedJob = store.loadJob(job.job_id)
       const outputFormat = (args.format ?? completedJob.format ?? 'json') as OutputFormat
-      const { results, formatted, exitCode } = runResultsPipeline(store, completedJob, outputFormat)
+      // Default behavior loads acks from the working-tree project and the user
+      // home. Group H (trust mode) replaces the project root with base-ref
+      // loading for untrusted HEADs; AckStore itself fails safe if unreadable.
+      const ackStore = new AckStore({ projectRoot: process.cwd(), userHome: os.homedir() })
+      const { results, formatted, exitCode } = runResultsPipeline(store, completedJob, outputFormat, false, {
+        ackStore,
+      })
       store.saveResults(job.job_id, results)
       console.log(formatted)
       process.exit(exitCode)
