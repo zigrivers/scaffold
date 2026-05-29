@@ -52,7 +52,14 @@ const CONFIG_YAML = [
   '',
 ].join('\n')
 
-async function runMixed(dir: string, home: string): Promise<Record<string, unknown> | undefined> {
+interface MixedResult {
+  output: Record<string, unknown> | undefined
+  /** channel names that went through the REAL subprocess / http dispatchers. */
+  subDispatched: string[]
+  httpDispatched: string[]
+}
+
+async function runMixed(dir: string, home: string): Promise<MixedResult> {
   vi.resetModules()
   process.env.HOME = home
   delete process.env.MMR_HOME
@@ -62,6 +69,31 @@ async function runMixed(dir: string, home: string): Promise<Record<string, unkno
     checkAuth: vi.fn().mockResolvedValue({ status: 'ok' }),
     checkHttpAuth: vi.fn().mockResolvedValue({ status: 'ok' }),
   }))
+  // Spy-and-call-through on BOTH dispatchers: this is the positive control that
+  // routing was driven by `kind` (not just that both transports failed). The
+  // real implementations still run (real spawn / real fetch).
+  const subDispatched: string[] = []
+  const httpDispatched: string[] = []
+  vi.doMock('../../src/core/dispatcher.js', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('../../src/core/dispatcher.js')>()
+    return {
+      ...actual,
+      dispatchChannel: (store: never, jobId: string, name: string, opts: never) => {
+        subDispatched.push(name)
+        return actual.dispatchChannel(store, jobId, name, opts)
+      },
+    }
+  })
+  vi.doMock('../../src/core/http-dispatcher.js', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('../../src/core/http-dispatcher.js')>()
+    return {
+      ...actual,
+      dispatchHttpChannel: (store: never, jobId: string, name: string, opts: never) => {
+        httpDispatched.push(name)
+        return actual.dispatchHttpChannel(store, jobId, name, opts)
+      },
+    }
+  })
   const { reviewCommand } = await import('../../src/commands/review.js')
   vi.spyOn(process, 'cwd').mockReturnValue(dir)
   const logs: string[] = []
@@ -82,10 +114,19 @@ async function runMixed(dir: string, home: string): Promise<Record<string, unkno
     if ((e as Error).message !== 'process.exit') throw e
   } finally {
     vi.doUnmock('../../src/core/auth.js')
+    vi.doUnmock('../../src/core/dispatcher.js')
+    vi.doUnmock('../../src/core/http-dispatcher.js')
     process.exitCode = prevExitCode
   }
-  const json = logs.find((l) => l.trim().startsWith('{'))
-  return json ? JSON.parse(json) as Record<string, unknown> : undefined
+  // Take the LAST line that parses as JSON (the final --format json result),
+  // robust to any earlier object-shaped log lines.
+  const jsonLines = logs.filter((l) => l.trim().startsWith('{'))
+  const json = jsonLines.length > 0 ? jsonLines[jsonLines.length - 1] : undefined
+  return {
+    output: json ? JSON.parse(json) as Record<string, unknown> : undefined,
+    subDispatched,
+    httpDispatched,
+  }
 }
 
 describe('mixed subprocess + HTTP channel review', () => {
@@ -98,20 +139,29 @@ describe('mixed subprocess + HTTP channel review', () => {
       execFileSync('git', ['add', '.'], { cwd: dir, stdio: 'ignore' })
       execFileSync('git', ['commit', '-m', 'baseline'], { cwd: dir, stdio: 'ignore' })
 
-      const out = await runMixed(dir, home)
-      const perChannel = out?.per_channel as Record<string, { status: string; error?: string }> | undefined
+      const { output, subDispatched, httpDispatched } = await runMixed(dir, home)
+      const perChannel = output?.per_channel as Record<string, { status: string; error?: string }> | undefined
       expect(perChannel).toBeDefined()
 
-      // Subprocess channel went through dispatchChannel (real spawn → ENOENT).
+      // Positive control: routing was driven by `kind`. The subprocess channel
+      // went through dispatchChannel; the http channel went through the http
+      // dispatcher; neither was sent to the other's dispatcher. (subDispatched
+      // also contains the default-compensator passes for the two failed
+      // channels — themselves correctly subprocess-routed.)
+      expect(subDispatched).toContain('fake-sub')
+      expect(subDispatched).not.toContain('fake-http')
+      expect(httpDispatched).toEqual(['fake-http'])
+
+      // Secondary evidence: each failed in its transport-specific way.
+      // Subprocess channel → real spawn → ENOENT.
       expect(perChannel!['fake-sub'].status).toBe('failed')
       expect(perChannel!['fake-sub'].error ?? '').toMatch(/ENOENT|nonexistent-cli-binary-xyz/)
-
-      // HTTP channel went through dispatchHttpChannel (real fetch → refused).
+      // HTTP channel → real fetch → connection refused.
       expect(['failed', 'timeout']).toContain(perChannel!['fake-http'].status)
       expect(perChannel!['fake-http'].error ?? '').toMatch(/request failed|timed out/)
 
       // A verdict was produced from the mixed review.
-      expect(out?.verdict).toBeDefined()
+      expect(output?.verdict).toBeDefined()
     } finally {
       fs.rmSync(dir, { recursive: true, force: true })
       fs.rmSync(home, { recursive: true, force: true })
