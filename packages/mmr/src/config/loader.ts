@@ -13,6 +13,12 @@ export interface LoadConfigOptions {
   onWarning?: (message: string) => void
   trustProjectConfig?: boolean
   configBaseRef?: string
+  /**
+   * When true, project `.mmr.yaml` is not loaded at all (built-in + user config
+   * only). Used by the review pipeline in untrusted-HEAD / non-git mode without
+   * an explicit trust opt-in, so an untrusted working-tree config is never read.
+   */
+  skipProjectConfig?: boolean
   cliOverrides?: {
     fix_threshold?: string
     timeout?: number
@@ -115,6 +121,10 @@ function loadYaml(filePath: string): Record<string, unknown> | undefined {
 }
 
 function loadProjectYaml(opts: LoadConfigOptions): Record<string, unknown> | undefined {
+  if (opts.skipProjectConfig === true) {
+    // Default-deny: untrusted tree with no opt-in → no project config.
+    return undefined
+  }
   if (opts.configBaseRef !== undefined && opts.trustProjectConfig !== true) {
     // Trust boundary (§5 decision 1): read .mmr.yaml from the trusted base ref
     // via the shared git-show helper, never from the (possibly untrusted)

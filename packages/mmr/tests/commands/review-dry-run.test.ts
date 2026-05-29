@@ -44,6 +44,7 @@ describe('mmr review --dry-run (T1-F)', () => {
     await reviewCommand.handler({
       diff: diffPath,
       'dry-run': true,
+      trustProjectConfig: true,
       _: ['review'],
       $0: 'mmr',
     } as never)
@@ -94,6 +95,7 @@ describe('mmr review --dry-run (T1-F)', () => {
       diff: diffPath,
       channels: ['local'],
       'dry-run': true,
+      trustProjectConfig: true,
       _: ['review'],
       $0: 'mmr',
     } as never)
@@ -150,6 +152,7 @@ describe('mmr review --dry-run (T1-F)', () => {
       diff: diffPath,
       channels: ['local'],
       'dry-run': true,
+      trustProjectConfig: true,
       _: ['review'],
       $0: 'mmr',
     } as never)
@@ -185,6 +188,7 @@ describe('mmr review --dry-run (T1-F)', () => {
       diff: diffPath,
       channels: ['claude'],
       'dry-run': true,
+      trustProjectConfig: true,
       _: ['review'],
       $0: 'mmr',
     } as never)

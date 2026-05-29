@@ -60,6 +60,7 @@ describe('review compensator integration', () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
 
     await reviewCommand.handler({
+      trustProjectConfig: true,
       _: ['review'],
       $0: 'mmr',
       diff: diffPath,
