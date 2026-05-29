@@ -76,25 +76,24 @@ async function runMixed(dir: string, home: string): Promise<MixedResult> {
   const httpDispatched: string[] = []
   vi.doMock('../../src/core/dispatcher.js', async (importOriginal) => {
     const actual = await importOriginal<typeof import('../../src/core/dispatcher.js')>()
-    return {
-      ...actual,
-      dispatchChannel: (store: never, jobId: string, name: string, opts: never) => {
-        subDispatched.push(name)
-        return actual.dispatchChannel(store, jobId, name, opts)
-      },
+    // Preserve the real signature so a future arg change is a compile error here.
+    const dispatchChannel = (...args: Parameters<typeof actual.dispatchChannel>) => {
+      subDispatched.push(args[2])
+      return actual.dispatchChannel(...args)
     }
+    return { ...actual, dispatchChannel }
   })
   vi.doMock('../../src/core/http-dispatcher.js', async (importOriginal) => {
     const actual = await importOriginal<typeof import('../../src/core/http-dispatcher.js')>()
-    return {
-      ...actual,
-      dispatchHttpChannel: (store: never, jobId: string, name: string, opts: never) => {
-        httpDispatched.push(name)
-        return actual.dispatchHttpChannel(store, jobId, name, opts)
-      },
+    const dispatchHttpChannel = (...args: Parameters<typeof actual.dispatchHttpChannel>) => {
+      httpDispatched.push(args[2])
+      return actual.dispatchHttpChannel(...args)
     }
+    return { ...actual, dispatchHttpChannel }
   })
   const { reviewCommand } = await import('../../src/commands/review.js')
+  // cwd is read at handler runtime (not at module load), so spying after the
+  // import is sufficient — consistent with the other handler-level tests.
   vi.spyOn(process, 'cwd').mockReturnValue(dir)
   const logs: string[] = []
   vi.spyOn(console, 'log').mockImplementation((...m: unknown[]) => { logs.push(m.map(String).join(' ')) })
@@ -148,9 +147,12 @@ describe('mixed subprocess + HTTP channel review', () => {
       // dispatcher; neither was sent to the other's dispatcher. (subDispatched
       // also contains the default-compensator passes for the two failed
       // channels — themselves correctly subprocess-routed.)
+      // Asserted as contain/not-contain (rather than exact arrays) so the proof
+      // of primary-channel routing is decoupled from compensator selection.
       expect(subDispatched).toContain('fake-sub')
       expect(subDispatched).not.toContain('fake-http')
-      expect(httpDispatched).toEqual(['fake-http'])
+      expect(httpDispatched).toContain('fake-http')
+      expect(httpDispatched).not.toContain('fake-sub')
 
       // Secondary evidence: each failed in its transport-specific way.
       // Subprocess channel → real spawn → ENOENT.
