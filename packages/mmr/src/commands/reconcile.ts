@@ -1,5 +1,4 @@
 import type { CommandModule, ArgumentsCamelCase } from 'yargs'
-import os from 'node:os'
 import { resolveJobsDir } from './sessions.js'
 import { JobStore } from '../core/job-store.js'
 import { normalizeExternalInput, readInput } from '../core/normalize-input.js'
@@ -113,11 +112,7 @@ export const reconcileCommand: CommandModule<object, ReconcileArgs> = {
     // overwriting saved results with acknowledged stamps stripped.
     const updatedJob = store.loadJob(job.job_id)
     const outputFormat = (args.format ?? job.format ?? 'json') as OutputFormat
-    const ackStore = buildReviewAckStore({
-      trustProjectAcks: updatedJob.review_controls?.trust_project_acks ?? false,
-      cwd: process.cwd(),
-      home: os.homedir(),
-    })
+    const ackStore = buildReviewAckStore({ trustProjectAcks: updatedJob.review_controls?.trust_project_acks ?? false })
     const { results, formatted, exitCode } = runResultsPipeline(store, updatedJob, outputFormat, false, { ackStore })
 
     // 8. Save and output

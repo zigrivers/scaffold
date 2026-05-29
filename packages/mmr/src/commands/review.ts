@@ -8,7 +8,6 @@ import { assemblePrompt } from '../core/prompt.js'
 import { dispatchChannel } from '../core/dispatcher.js'
 import { runResultsPipeline } from '../core/results-pipeline.js'
 import { buildReviewAckStore } from '../core/ack-store.js'
-import os from 'node:os'
 import {
   getCompensatingChannels,
   dispatchCompensatingPasses,
@@ -600,11 +599,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       // acks to self-suppress its own findings. The trust-mode thread adds the
       // trusted default path (project acks from a git base ref). The pipeline
       // fails safe if the acks tree is unreadable.
-      const ackStore = buildReviewAckStore({
-        trustProjectAcks: reviewControls.trust_project_acks,
-        cwd: process.cwd(),
-        home: os.homedir(),
-      })
+      const ackStore = buildReviewAckStore({ trustProjectAcks: reviewControls.trust_project_acks })
       const { results, formatted, exitCode } = runResultsPipeline(store, completedJob, outputFormat, false, {
         ackStore,
       })

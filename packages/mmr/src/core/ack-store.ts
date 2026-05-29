@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import os from 'node:os'
 import crypto from 'node:crypto'
 import { jaccardSimilarity } from './stable-id.js'
 
@@ -45,11 +46,17 @@ export interface AckStoreOptions {
  * `.mmr/acks/<sha>.json` to self-suppress their own findings. The full trusted
  * path (loading project acks from a git base ref) is added by the trust-mode
  * thread; until then this gates project acks behind trust_project_acks.
+ *
+ * Project root defaults to process.cwd() (the same convention loadConfig uses
+ * for .mmr.yaml) and the user home to `process.env.HOME ?? os.homedir()` (the
+ * same resolution as resolveSessionRoot). cwd/home are injectable for tests.
  */
-export function buildReviewAckStore(opts: { trustProjectAcks: boolean; cwd: string; home: string }): AckStore {
+export function buildReviewAckStore(opts: { trustProjectAcks: boolean; cwd?: string; home?: string }): AckStore {
+  const cwd = opts.cwd ?? process.cwd()
+  const home = opts.home ?? process.env.HOME ?? os.homedir()
   return new AckStore({
-    projectRoot: opts.trustProjectAcks ? opts.cwd : undefined,
-    userHome: opts.home,
+    projectRoot: opts.trustProjectAcks ? cwd : undefined,
+    userHome: home,
   })
 }
 
