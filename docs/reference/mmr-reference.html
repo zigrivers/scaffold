@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scaffold Multi-Model Review (MMR) — Reference</title>
+<style>
+/* ── Design tokens (mirrored from lib/dashboard-theme.css) ───────────────── */
+:root{
+  --bg:#f5f6fa; --bg-card:#fff; --bg-hover:#eef0f6; --bg-inset:#e8eaf2;
+  --text:#1a1d2e; --text-muted:#6b7294; --text-faint:#9ba1c0;
+  --border:#dde0ed; --border-light:#eceef5; --radius:10px; --radius-sm:6px;
+  --accent:#4f46e5; --accent-hover:#4338ca; --accent-glow:rgba(79,70,229,.10);
+  --green:#059669; --green-bg:#ecfdf5; --green-border:#a7f3d0;
+  --blue:#2563eb; --blue-bg:#eff6ff; --blue-border:#bfdbfe;
+  --yellow:#d97706; --yellow-bg:#fffbeb; --yellow-border:#fde68a;
+  --gray:#9ca3af; --gray-bg:#f3f4f6; --gray-border:#e5e7eb;
+  --shadow-sm:0 1px 2px rgba(30,34,60,.04);
+  --shadow:0 1px 3px rgba(30,34,60,.07),0 1px 2px rgba(30,34,60,.04);
+  --shadow-md:0 4px 12px rgba(30,34,60,.08),0 1px 3px rgba(30,34,60,.05);
+  --sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:20px;--sp-6:24px;--sp-8:32px;--sp-10:40px;
+  --font-sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen,Ubuntu,Cantarell,sans-serif;
+  --font-mono:"SF Mono","Cascadia Code","Fira Code","JetBrains Mono",Menlo,Consolas,monospace;
+  --text-xs:.75rem;--text-sm:.8125rem;--text-base:.9375rem;--text-lg:1.125rem;--text-xl:1.375rem;--text-2xl:1.75rem;
+  --lh-normal:1.5;--lh-relaxed:1.625;--fw-medium:500;--fw-semi:600;--fw-bold:700;
+  --sev-p0:#dc2626;--sev-p1:#ea580c;--sev-p2:#ca8a04;--sev-p3:#2563eb;--sev-pass:#16a34a;
+  --max-w:1180px;
+}
+[data-theme="dark"]{
+  --bg:#0f1117; --bg-card:#1a1d2e; --bg-hover:#252940; --bg-inset:#141724;
+  --text:#e2e5f0; --text-muted:#7c82a8; --text-faint:#555c80;
+  --border:#2a2f45; --border-light:#21253a;
+  --accent:#818cf8; --accent-hover:#a5b4fc; --accent-glow:rgba(129,140,248,.12);
+  --green:#34d399; --green-bg:rgba(6,78,59,.25); --green-border:rgba(52,211,153,.25);
+  --blue:#60a5fa; --blue-bg:rgba(30,58,95,.30); --blue-border:rgba(96,165,250,.25);
+  --yellow:#fbbf24; --yellow-bg:rgba(120,53,15,.25); --yellow-border:rgba(251,191,36,.20);
+  --gray:#6b7294; --gray-bg:#252940; --gray-border:#363c58;
+  --sev-p0:#f87171;--sev-p1:#fb923c;--sev-p2:#facc15;--sev-p3:#60a5fa;--sev-pass:#4ade80;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans);
+  font-size:var(--text-base);line-height:var(--lh-normal);-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{font-family:var(--font-mono);font-size:.85em;background:var(--bg-inset);
+  padding:.12em .4em;border-radius:var(--radius-sm)}
+
+/* ── Layout ──────────────────────────────────────────────────────────────── */
+.layout{display:grid;grid-template-columns:280px minmax(0,1fr);max-width:var(--max-w);
+  margin:0 auto;gap:var(--sp-8);padding:0 var(--sp-6)}
+.sidebar{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;
+  padding:var(--sp-6) 0;border-right:1px solid var(--border-light)}
+.brand{font-weight:var(--fw-bold);font-size:var(--text-lg);letter-spacing:-.01em;
+  padding:0 var(--sp-3) var(--sp-4);display:flex;align-items:center;gap:var(--sp-2)}
+.brand .dot{width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px var(--accent-glow)}
+nav.toc a{display:block;padding:6px var(--sp-3);color:var(--text-muted);font-size:var(--text-sm);
+  border-left:2px solid transparent;border-radius:0 var(--radius-sm) var(--radius-sm) 0}
+nav.toc a:hover{background:var(--bg-hover);color:var(--text);text-decoration:none}
+nav.toc a.active{color:var(--accent);border-left-color:var(--accent);background:var(--accent-glow);font-weight:var(--fw-medium)}
+nav.toc .group{font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;
+  color:var(--text-faint);padding:var(--sp-4) var(--sp-3) var(--sp-1);font-weight:var(--fw-semi)}
+main{padding:var(--sp-8) 0 120px;min-width:0}
+
+/* ── Topbar ──────────────────────────────────────────────────────────────── */
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3);
+  margin-bottom:var(--sp-6);flex-wrap:wrap}
+.topbar h1{font-size:var(--text-2xl);margin:0;letter-spacing:-.02em}
+.topbar .sub{color:var(--text-muted);font-size:var(--text-sm);margin-top:2px}
+.controls{display:flex;gap:var(--sp-2);align-items:center}
+button.ctl{background:var(--bg-card);border:1px solid var(--border);color:var(--text);
+  border-radius:var(--radius-sm);padding:6px 12px;font-size:var(--text-sm);cursor:pointer;font-family:inherit}
+button.ctl:hover{background:var(--bg-hover);border-color:var(--accent)}
+.menu-toggle{display:none}
+
+/* ── Cards / sections ────────────────────────────────────────────────────── */
+section{scroll-margin-top:var(--sp-5)}
+.card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);
+  box-shadow:var(--shadow-sm);padding:var(--sp-6);margin:var(--sp-5) 0}
+h2{font-size:var(--text-xl);letter-spacing:-.015em;margin:var(--sp-10) 0 var(--sp-2);
+  padding-bottom:var(--sp-2);border-bottom:1px solid var(--border-light)}
+h2 .n{color:var(--text-faint);font-weight:var(--fw-medium);margin-right:8px}
+h3{font-size:var(--text-lg);margin:var(--sp-5) 0 var(--sp-2)}
+p{margin:var(--sp-2) 0}
+.lead{color:var(--text-muted);max-width:70ch}
+
+/* ── Collapsible ─────────────────────────────────────────────────────────── */
+details.collap{border:1px solid var(--border);border-radius:var(--radius);margin:var(--sp-3) 0;
+  background:var(--bg-card);overflow:hidden}
+details.collap>summary{cursor:pointer;padding:var(--sp-3) var(--sp-4);font-weight:var(--fw-semi);
+  list-style:none;display:flex;align-items:center;gap:var(--sp-2);user-select:none}
+details.collap>summary::-webkit-details-marker{display:none}
+details.collap>summary::before{content:"›";color:var(--text-faint);font-size:1.2em;transition:transform .15s;display:inline-block}
+details.collap[open]>summary::before{transform:rotate(90deg)}
+details.collap>summary:hover{background:var(--bg-hover)}
+details.collap .body{padding:0 var(--sp-4) var(--sp-4)}
+
+/* ── Tables ──────────────────────────────────────────────────────────────── */
+table{width:100%;border-collapse:collapse;font-size:var(--text-sm);margin:var(--sp-2) 0}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border-light);vertical-align:top}
+th{color:var(--text-muted);font-weight:var(--fw-semi);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.04em}
+tbody tr:hover{background:var(--bg-hover)}
+td code{white-space:nowrap}
+
+/* ── Code blocks + copy ──────────────────────────────────────────────────── */
+.code{position:relative;background:var(--bg-inset);border:1px solid var(--border-light);
+  border-radius:var(--radius-sm);margin:var(--sp-2) 0}
+.code pre{margin:0;padding:var(--sp-3) var(--sp-4);overflow-x:auto;font-family:var(--font-mono);
+  font-size:var(--text-sm);line-height:var(--lh-relaxed)}
+.code .copy{position:absolute;top:6px;right:6px;background:var(--bg-card);border:1px solid var(--border);
+  color:var(--text-muted);border-radius:var(--radius-sm);font-size:var(--text-xs);padding:3px 8px;cursor:pointer;opacity:.85}
+.code .copy:hover{color:var(--accent);border-color:var(--accent);opacity:1}
+.code .copy.done{color:var(--green);border-color:var(--green)}
+
+/* ── Badges / chips ──────────────────────────────────────────────────────── */
+.chip{display:inline-block;font-size:var(--text-xs);font-weight:var(--fw-semi);padding:2px 8px;
+  border-radius:999px;border:1px solid var(--border);background:var(--bg-inset);color:var(--text-muted);white-space:nowrap}
+.chip.ok{color:var(--green);background:var(--green-bg);border-color:var(--green-border)}
+.chip.info{color:var(--blue);background:var(--blue-bg);border-color:var(--blue-border)}
+.chip.warn{color:var(--yellow);background:var(--yellow-bg);border-color:var(--yellow-border)}
+.sev{display:inline-block;font-family:var(--font-mono);font-weight:var(--fw-bold);font-size:var(--text-xs);
+  padding:2px 7px;border-radius:var(--radius-sm);color:#fff}
+.sev.p0{background:var(--sev-p0)}.sev.p1{background:var(--sev-p1)}
+.sev.p2{background:var(--sev-p2)}.sev.p3{background:var(--sev-p3)}
+
+/* ── Tabs ────────────────────────────────────────────────────────────────── */
+.tabs{display:flex;gap:var(--sp-1);border-bottom:1px solid var(--border);margin-bottom:var(--sp-3);flex-wrap:wrap}
+.tabs button{background:none;border:none;border-bottom:2px solid transparent;color:var(--text-muted);
+  padding:8px 12px;cursor:pointer;font-family:inherit;font-size:var(--text-sm);font-weight:var(--fw-medium);margin-bottom:-1px}
+.tabs button:hover{color:var(--text)}
+.tabs button.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tabpane{display:none}.tabpane.active{display:block}
+
+/* ── Filter input ────────────────────────────────────────────────────────── */
+.filter{width:100%;max-width:360px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);
+  background:var(--bg-card);color:var(--text);font-family:inherit;font-size:var(--text-sm);margin-bottom:var(--sp-2)}
+tr.hidden{display:none}
+
+/* ── Callouts ────────────────────────────────────────────────────────────── */
+.note{border-left:3px solid var(--accent);background:var(--accent-glow);padding:var(--sp-3) var(--sp-4);
+  border-radius:0 var(--radius-sm) var(--radius-sm) 0;margin:var(--sp-3) 0;font-size:var(--text-sm)}
+.note.warn{border-left-color:var(--yellow);background:var(--yellow-bg)}
+.note.danger{border-left-color:var(--sev-p0);background:var(--yellow-bg)}
+.note b{color:var(--text)}
+
+/* ── Flow diagram (inline SVG) ───────────────────────────────────────────── */
+.flow{width:100%;height:auto;max-width:100%;display:block}
+.flow .box{fill:var(--bg-card);stroke:var(--border)}
+.flow .accent{fill:var(--accent-glow);stroke:var(--accent)}
+.flow text{fill:var(--text);font-family:var(--font-sans);font-size:13px}
+.flow text.sm{fill:var(--text-muted);font-size:10.5px}
+.flow .edge{stroke:var(--text-faint);stroke-width:1.5;fill:none;marker-end:url(#arrow)}
+.flow marker path{fill:var(--text-faint)}
+
+.kv{display:grid;grid-template-columns:160px 1fr;gap:6px var(--sp-4);font-size:var(--text-sm);margin:var(--sp-2) 0}
+.kv dt{color:var(--text-muted);font-weight:var(--fw-medium)}
+.kv dd{margin:0}
+ul.tight{margin:var(--sp-2) 0;padding-left:var(--sp-5)}ul.tight li{margin:3px 0}
+.footer{max-width:var(--max-w);margin:0 auto;padding:var(--sp-8) var(--sp-6);color:var(--text-faint);
+  font-size:var(--text-xs);border-top:1px solid var(--border-light)}
+
+@media (max-width:880px){
+  .layout{grid-template-columns:1fr;gap:0}
+  .sidebar{position:fixed;z-index:40;left:0;top:0;width:82%;max-width:320px;height:100vh;background:var(--bg-card);
+    box-shadow:var(--shadow-md);transform:translateX(-105%);transition:transform .2s;padding:var(--sp-5);border-right:1px solid var(--border)}
+  .sidebar.open{transform:translateX(0)}
+  .menu-toggle{display:inline-flex}
+  main{padding:var(--sp-5) 0 100px}
+  .scrim{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:30}
+  .scrim.open{display:block}
+  .kv{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="scrim" id="scrim" onclick="closeNav()"></div>
+<div class="layout">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand"><span class="dot"></span> MMR Reference</div>
+    <nav class="toc" id="toc">
+      <div class="group">Concepts</div>
+      <a href="#overview">1 · Overview</a>
+      <a href="#flow">2 · End-to-end flow</a>
+      <div class="group">CLI</div>
+      <a href="#review">3 · mmr review flags</a>
+      <a href="#subcommands">4 · Subcommands</a>
+      <div class="group">Internals</div>
+      <a href="#channels">5 · Channel architecture</a>
+      <a href="#wrappers">6 · Scaffold wrappers</a>
+      <a href="#findings">7 · Findings &amp; verdicts</a>
+      <a href="#degraded">8 · Degraded mode &amp; auth</a>
+      <a href="#config">9 · Configuration</a>
+    </nav>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <div>
+        <h1><button class="ctl menu-toggle" onclick="openNav()" aria-label="Open navigation">☰</button> Multi-Model Review (MMR)</h1>
+        <div class="sub">How Scaffold runs independent AI reviewers, reconciles their findings, and gates your changes · <code>mmr</code> CLI + <code>scaffold run</code> wrappers</div>
+      </div>
+      <div class="controls">
+        <button class="ctl" id="themeBtn" onclick="toggleTheme()">🌙 Dark</button>
+        <button class="ctl" onclick="toggleAll(true)">Expand all</button>
+        <button class="ctl" onclick="toggleAll(false)">Collapse all</button>
+      </div>
+    </div>
+
+    <!-- ════════════════ 1. OVERVIEW ════════════════ -->
+    <section id="overview">
+      <h2><span class="n">1</span>What MMR is</h2>
+      <p class="lead">Multi-Model Review runs your changes past several <b>independent</b> AI code reviewers
+      ("channels"), then <b>reconciles</b> their findings into a single de-duplicated list and a
+      <b>verdict</b> that gates the work. No channel ever sees another channel's output — agreement
+      between them is what raises confidence, and disagreement is what surfaces ambiguity.</p>
+
+      <div class="card">
+        <h3>The core idea in five moves</h3>
+        <dl class="kv">
+          <dt>1 · Resolve a diff</dt><dd>From a PR, staged changes, a branch range, or a piped diff.</dd>
+          <dt>2 · Dispatch channels</dt><dd>Each channel is a separate subprocess given the same prompt, run in parallel and isolated.</dd>
+          <dt>3 · Parse</dt><dd>Each channel's raw output is parsed into a common <code>Finding</code> shape.</dd>
+          <dt>4 · Reconcile</dt><dd>Findings are grouped by a stable key, de-duplicated, and scored for agreement/confidence.</dd>
+          <dt>5 · Verdict</dt><dd>A severity gate yields <span class="chip ok">pass</span> <span class="chip">degraded-pass</span> <span class="chip warn">blocked</span> <span class="chip info">needs-user-decision</span>.</dd>
+        </dl>
+      </div>
+
+      <div class="note"><b>Two layers, one mental model.</b> The <code>mmr</code> CLI is the engine that
+      dispatches the built-in channels and computes the verdict. The <code>scaffold run review-pr</code> /
+      <code>review-code</code> wrappers sit on top: they add a Superpowers code-reviewer <em>agent</em>
+      channel via <code>mmr reconcile</code>, handle auth recovery, and drive the fix loop.</div>
+    </section>
+
+    <!-- ════════════════ 2. FLOW ════════════════ -->
+    <section id="flow">
+      <h2><span class="n">2</span>End-to-end flow</h2>
+      <p class="lead">A single <code>mmr review … --sync</code> run walks the whole pipeline. Channels fan
+      out in parallel; everything converges at reconciliation.</p>
+      <div class="card">
+        <svg class="flow" viewBox="0 0 900 360" role="img" aria-label="MMR pipeline flow diagram">
+          <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker></defs>
+          <!-- resolve -->
+          <rect class="box" x="20" y="150" width="120" height="58" rx="8"/>
+          <text x="80" y="174" text-anchor="middle">Resolve diff</text>
+          <text class="sm" x="80" y="192" text-anchor="middle">--pr / --staged</text>
+          <text class="sm" x="80" y="204" text-anchor="middle">--diff / --base</text>
+          <!-- prompt -->
+          <rect class="box" x="175" y="150" width="120" height="58" rx="8"/>
+          <text x="235" y="174" text-anchor="middle">Build prompt</text>
+          <text class="sm" x="235" y="192" text-anchor="middle">+ focus, criteria</text>
+          <text class="sm" x="235" y="204" text-anchor="middle">prompt_wrapper</text>
+          <!-- channels fan out -->
+          <rect class="box" x="345" y="30" width="150" height="40" rx="8"/><text x="420" y="55" text-anchor="middle">codex</text>
+          <rect class="box" x="345" y="90" width="150" height="40" rx="8"/><text x="420" y="115" text-anchor="middle">gemini</text>
+          <rect class="box" x="345" y="150" width="150" height="40" rx="8"/><text x="420" y="175" text-anchor="middle">claude</text>
+          <rect class="box" x="345" y="210" width="150" height="40" rx="8"/><text x="420" y="235" text-anchor="middle">grok</text>
+          <rect class="box" x="345" y="270" width="150" height="40" rx="8"/><text x="420" y="290" text-anchor="middle" class="sm">doc-conformance</text><text x="420" y="303" text-anchor="middle" class="sm">(opt-in)</text>
+          <!-- parse -->
+          <rect class="box" x="545" y="150" width="110" height="58" rx="8"/>
+          <text x="600" y="174" text-anchor="middle">Parse</text>
+          <text class="sm" x="600" y="192" text-anchor="middle">→ Finding[]</text>
+          <!-- reconcile -->
+          <rect class="accent" x="685" y="150" width="110" height="58" rx="8"/>
+          <text x="740" y="174" text-anchor="middle">Reconcile</text>
+          <text class="sm" x="740" y="192" text-anchor="middle">dedupe + score</text>
+          <!-- verdict -->
+          <rect class="accent" x="685" y="255" width="110" height="58" rx="8"/>
+          <text x="740" y="279" text-anchor="middle">Verdict</text>
+          <text class="sm" x="740" y="297" text-anchor="middle">gate + exit code</text>
+          <!-- edges -->
+          <path class="edge" d="M140,179 L173,179"/>
+          <path class="edge" d="M295,170 L343,55"/>
+          <path class="edge" d="M295,176 L343,110"/>
+          <path class="edge" d="M295,179 L343,170"/>
+          <path class="edge" d="M295,186 L343,230"/>
+          <path class="edge" d="M295,190 L343,288"/>
+          <path class="edge" d="M495,55 L543,168"/>
+          <path class="edge" d="M495,110 L543,172"/>
+          <path class="edge" d="M495,170 L543,178"/>
+          <path class="edge" d="M495,230 L543,188"/>
+          <path class="edge" d="M495,288 L543,192"/>
+          <path class="edge" d="M655,179 L683,179"/>
+          <path class="edge" d="M740,208 L740,253"/>
+        </svg>
+      </div>
+      <div class="note">Compensating passes (see §8) are injected <em>after</em> the first dispatch round
+      for any channel that was unavailable, then folded back into the same reconcile step.</div>
+    </section>
+
+    <!-- ════════════════ 3. REVIEW FLAGS ════════════════ -->
+    <section id="review">
+      <h2><span class="n">3</span>The <code>mmr review</code> command</h2>
+      <p class="lead">One command, several input modes. Pick the flag that matches your target; everything
+      else is control and output options. Type to filter the table.</p>
+      <input class="filter" id="flagFilter" placeholder="Filter flags… (e.g. session, pr, trust)" oninput="filterFlags(this.value)">
+      <div class="card" style="padding:var(--sp-3)">
+      <table id="flagTable">
+        <thead><tr><th>Flag</th><th>Group</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td><code>--diff &lt;path|-&gt;</code></td><td>input</td><td>Read a unified diff from a file, or <code>-</code> for stdin. Highest-priority input mode.</td></tr>
+          <tr><td><code>--pr &lt;n&gt;</code></td><td>input</td><td>Fetch the PR diff via <code>gh pr diff</code>.</td></tr>
+          <tr><td><code>--staged</code></td><td>input</td><td>Review staged changes (<code>git diff --cached</code>).</td></tr>
+          <tr><td><code>--base &lt;ref&gt; [--head &lt;ref&gt;]</code></td><td>input</td><td>Review a branch range (<code>git diff base...head</code>, head defaults to HEAD).</td></tr>
+          <tr><td><em>(no input flag)</em></td><td>input</td><td>Falls back to unstaged working-tree changes (<code>git diff</code>).</td></tr>
+          <tr><td><code>--focus &lt;text&gt;</code></td><td>control</td><td>Free-text focus areas appended to every channel prompt.</td></tr>
+          <tr><td><code>--fix-threshold &lt;P0|P1|P2|P3&gt;</code></td><td>control</td><td>Severity gate. Findings at or above this block. Default <span class="sev p2">P2</span> (from <code>.mmr.yaml</code>).</td></tr>
+          <tr><td><code>--channels &lt;names…&gt;</code></td><td>control</td><td>Run only these channels, overriding config defaults. Abstract channels are filtered out.</td></tr>
+          <tr><td><code>--timeout &lt;seconds&gt;</code></td><td>control</td><td>Per-channel timeout override.</td></tr>
+          <tr><td><code>--template &lt;name&gt;</code></td><td>control</td><td>Use a named review-criteria template from config.</td></tr>
+          <tr><td><code>--format &lt;json|text|markdown&gt;</code></td><td>output</td><td>Output format. Default <code>json</code>.</td></tr>
+          <tr><td><code>--sync</code></td><td>mode</td><td>Run the full pipeline (dispatch → parse → reconcile → verdict) and return results. Without it, dispatch is fire-and-forget.</td></tr>
+          <tr><td><code>--dry-run</code></td><td>mode</td><td>Resolve the diff and assemble the prompt without dispatching any channel.</td></tr>
+          <tr><td><code>--session &lt;id&gt;</code></td><td>rounds</td><td>Link this run into a multi-round session (<code>[A-Za-z0-9_-]</code>).</td></tr>
+          <tr><td><code>--round &lt;n&gt;</code></td><td>rounds</td><td>1-based round counter within a session.</td></tr>
+          <tr><td><code>--max-rounds &lt;n&gt;</code></td><td>rounds</td><td>Hard cap on rounds. Defaults to 5 when <code>--session</code> is set without it.</td></tr>
+          <tr><td><code>--accept-new-acks</code></td><td>trust</td><td>Trust acknowledgment files newly introduced by the diff.</td></tr>
+          <tr><td><code>--trust-project-acks</code></td><td>trust</td><td>Trust working-tree project acks in non-Git / untrusted modes.</td></tr>
+          <tr><td><code>--trust-project-config</code></td><td>trust</td><td>Trust working-tree <code>.mmr.yaml</code> in untrusted modes.</td></tr>
+          <tr><td><code>--config-base-ref &lt;ref&gt;</code></td><td>trust</td><td>Load <code>.mmr.yaml</code> and acks from a trusted Git ref instead of HEAD.</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <h3>Copy-paste commands by target</h3>
+      <div data-code><pre># PR review (full pipeline, JSON out)
+mmr review --pr 123 --sync --format json</pre></div>
+      <div data-code><pre># Staged changes before commit
+mmr review --staged --sync --format json</pre></div>
+      <div data-code><pre># All tracked uncommitted changes (no untracked)
+git diff HEAD | mmr review --diff - --sync --format json</pre></div>
+      <div data-code><pre># Branch range
+mmr review --base main --head "$BRANCH" --sync --format json</pre></div>
+      <div data-code><pre># A single file's current contents, as an "all-added" diff
+(diff -u /dev/null path/to/file.ts || true) | mmr review --diff - --sync --format json</pre></div>
+      <div data-code><pre># Only specific channels (e.g. just grok + claude)
+mmr review --pr 123 --channels grok claude --sync --format json</pre></div>
+    </section>
+
+    <!-- ════════════════ 4. SUBCOMMANDS ════════════════ -->
+    <section id="subcommands">
+      <h2><span class="n">4</span>Other subcommands</h2>
+      <table>
+        <thead><tr><th>Command</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td><code>mmr reconcile &lt;job-id&gt; --channel &lt;name&gt; --input &lt;data&gt;</code></td><td>Inject an external channel's findings (e.g. the Superpowers agent) into an existing job and re-run the results pipeline. Input is a file, <code>-</code> for stdin, or inline JSON.</td></tr>
+          <tr><td><code>mmr status &lt;job-id&gt;</code></td><td>Per-channel status and elapsed time. Exit 0 = all complete, 1 = running, 2 = a channel failed, 5 = not found.</td></tr>
+          <tr><td><code>mmr results &lt;job-id&gt; [--raw]</code></td><td>Re-run parse → reconcile → format on a completed job. Exit code reflects the verdict.</td></tr>
+          <tr><td><code>mmr jobs &lt;list|prune&gt;</code></td><td>List jobs, or prune old ones per <code>job_retention_days</code>.</td></tr>
+          <tr><td><code>mmr sessions &lt;start|list|show|end&gt; &lt;id&gt;</code></td><td>Manage multi-round review sessions (stored under <code>~/.mmr/sessions/</code>).</td></tr>
+          <tr><td><code>mmr config &lt;init|show|validate…&gt;</code></td><td>Scaffold and inspect <code>.mmr.yaml</code> (including OSS-runtime example blocks).</td></tr>
+          <tr><td><code>mmr ack &lt;add|list|rm|prune&gt;</code></td><td>Sticky acknowledgments — silence a finding by its stable key so it stops blocking across rounds.</td></tr>
+        </tbody>
+      </table>
+      <div data-code><pre># Capture a job_id from a review, then fold in an agent channel:
+mmr reconcile "$JOB_ID" --channel superpowers --input findings.json</pre></div>
+    </section>
+
+    <!-- ════════════════ 5. CHANNELS ════════════════ -->
+    <section id="channels">
+      <h2><span class="n">5</span>Channel architecture</h2>
+      <p class="lead">A channel is <b>pure config data</b> — there is no per-channel code. The dispatcher runs
+      whatever <code>command</code> the channel defines, hands it the prompt, and parses its output with the
+      configured parser. Adding a channel is normally a <code>.mmr.yaml</code> edit, not a code change.</p>
+
+      <h3>The channel config shape</h3>
+      <div data-code><pre>channels:
+  &lt;name&gt;:
+    enabled: true                 # run by default?
+    command: "codex exec"         # whitespace-split, spawned WITHOUT a shell
+    flags: ["--ephemeral"]        # appended after the command tokens
+    env: { KEY: value }           # extra environment
+    prompt_delivery: stdin        # stdin (default) | prompt-file
+    prompt_wrapper: "{{prompt}}"  # template wrapped around the prompt
+    output_parser: default        # default | gemini | doc-conformance | {kind:…}
+    stderr: capture               # capture | suppress | passthrough
+    timeout: 300                  # seconds (falls back to defaults.timeout)
+    auth: { check, timeout, failure_exit_codes, recovery }
+    extends: base-channel         # inherit from another channel (≤4 levels)
+    abstract: false               # template-only; never dispatched directly</pre></div>
+
+      <h3>Built-in channels</h3>
+      <div class="tabs" id="chTabs">
+        <button class="active" onclick="tab('ch','compare',event)">Compare</button>
+        <button onclick="tab('ch','codex',event)">codex</button>
+        <button onclick="tab('ch','gemini',event)">gemini</button>
+        <button onclick="tab('ch','claude',event)">claude</button>
+        <button onclick="tab('ch','grok',event)">grok</button>
+        <button onclick="tab('ch','doc',event)">doc-conformance</button>
+      </div>
+      <div class="tabpane active" data-pane="ch-compare">
+        <table>
+          <thead><tr><th>Channel</th><th>Default</th><th>Strength</th><th>Prompt delivery</th><th>Parser</th></tr></thead>
+          <tbody>
+            <tr><td><code>codex</code></td><td><span class="chip ok">enabled</span></td><td>Correctness, security, API contracts</td><td>stdin</td><td><code>default</code></td></tr>
+            <tr><td><code>gemini</code></td><td><span class="chip ok">enabled</span></td><td>Architecture, broad-context reasoning</td><td>stdin</td><td><code>gemini</code></td></tr>
+            <tr><td><code>claude</code></td><td><span class="chip ok">enabled</span></td><td>Plan alignment, code quality, testing</td><td>stdin</td><td><code>default</code></td></tr>
+            <tr><td><code>grok</code></td><td><span class="chip ok">enabled</span></td><td>Independent second opinion (xAI; proprietary)</td><td><b>prompt-file</b></td><td><code>unwrap $.text → default</code></td></tr>
+            <tr><td><code>doc-conformance</code></td><td><span class="chip">opt-in</span></td><td>PRD/stories/standards conformance (LLM-graded)</td><td>stdin</td><td><code>doc-conformance</code></td></tr>
+          </tbody>
+        </table>
+        <div class="note"><b>Why grok is different.</b> codex/gemini/claude all read the prompt from
+        <code>stdin</code>. Grok's CLI requires the prompt as an argument and ignores stdin, so its channel
+        uses <code>prompt_delivery: prompt-file</code> — the dispatcher writes the prompt to a temp file and
+        passes its path via the <code>{{prompt_file}}</code> placeholder. Grok wraps its reply in a JSON
+        <code>.text</code> field, which the parser unwraps before extracting findings.</div>
+      </div>
+      <div class="tabpane" data-pane="ch-codex"><div data-code><pre>command: codex exec
+flags: [--skip-git-repo-check, -s, read-only, --ephemeral]
+auth.check: codex login status        # local file check (fast, 5s)
+recovery: codex login
+output_parser: default
+stderr: suppress</pre></div></div>
+      <div class="tabpane" data-pane="ch-gemini"><div data-code><pre>command: gemini                       # NO -p: gemini reads stdin natively
+flags: [--output-format, json]
+env: { NO_BROWSER: "true" }
+auth.check: NO_BROWSER=true gemini -p "respond with ok" -o json   # LLM round-trip, 20s
+recovery: gemini -p "hello"
+output_parser: gemini                 # unwraps { "response": "…" }
+timeout: 360</pre></div></div>
+      <div class="tabpane" data-pane="ch-claude"><div data-code><pre>command: claude -p
+flags: [--output-format, json]
+auth.check: claude -p "respond with ok"   # LLM round-trip, 20s
+recovery: claude login
+output_parser: default</pre></div></div>
+      <div class="tabpane" data-pane="ch-grok"><div data-code><pre>command: grok
+prompt_delivery: prompt-file
+flags: [--prompt-file, "{{prompt_file}}", --output-format, json]
+auth.check: grok models                # lists models / login state (no round-trip)
+recovery: grok login
+output_parser: { kind: unwrap-jsonpath, wrap: "$.text", then: default }</pre></div>
+      <p>Grok is proprietary (xAI), not open-source — it joins the standard set mechanically as a 4th CLI
+      channel. Disable it with <code>channels_disabled: ["grok"]</code>.</p></div>
+      <div class="tabpane" data-pane="ch-doc"><div data-code><pre>enabled: false                         # opt-in: runs up to 3 LLM calls (~3 min)
+command: scaffold observe audit --profile=full --scope=all --output-mode=mmr-findings
+output_parser: doc-conformance         # expects a JSON array of findings
+timeout: 240</pre></div>
+      <p>Enable with <code>--channels doc-conformance</code> or in <code>.mmr.yaml</code>.</p></div>
+
+      <h3>The dispatcher</h3>
+      <ul class="tight">
+        <li><b>Isolation.</b> Each channel is spawned as its own detached subprocess writing to its own
+        output file; channels run in parallel and never share output.</li>
+        <li><b>Prompt delivery.</b> <code>stdin</code> mode pipes the prompt and closes stdin (avoids
+        <code>E2BIG</code> on large diffs). <code>prompt-file</code> mode writes the prompt to
+        <code>&lt;channel&gt;.prompt.txt</code> and substitutes <code>{{prompt_file}}</code> in the flags.</li>
+        <li><b>Timeout.</b> A per-channel timer SIGKILLs the whole process group and marks the channel
+        <code>timeout</code>.</li>
+        <li><b>Command parsing.</b> <code>command</code> is split on whitespace and spawned without a shell —
+        so quoting/pipelines in <code>command</code> won't work; that's exactly why arg-only CLIs like grok
+        use <code>prompt_delivery</code> rather than a shell shim.</li>
+      </ul>
+
+      <details class="collap"><summary>Adding a new channel — where it's clean vs. hard-coded</summary>
+        <div class="body">
+          <p><b>Clean (config only):</b> a new subprocess channel (<code>command</code> + <code>flags</code> +
+          <code>auth</code> + <code>output_parser</code>), output reshaping via the
+          <code>unwrap-jsonpath</code> or <code>regex-findings</code> parser kinds, disabling/timeout
+          overrides, and pointing the compensator at a different channel — all pure <code>.mmr.yaml</code>.</p>
+          <p><b>Needs code:</b> a brand-new <em>named</em> parser must be registered in
+          <code>core/parser.ts</code>; HTTP-endpoint channels (<code>kind: http</code>) need the planned
+          http-dispatcher; and the <code>COMPENSATING_FOCUS</code> map carries per-channel focus text (falls
+          back gracefully if absent).</p>
+        </div>
+      </details>
+    </section>
+
+    <!-- ════════════════ 6. WRAPPERS ════════════════ -->
+    <section id="wrappers">
+      <h2><span class="n">6</span>Scaffold wrappers</h2>
+      <p class="lead">Direct <code>mmr review</code> runs the built-in CLI channels. The
+      <code>scaffold run</code> wrappers add orchestration on top.</p>
+      <table>
+        <thead><tr><th>Wrapper</th><th>Target</th><th>Adds on top of <code>mmr review</code></th></tr></thead>
+        <tbody>
+          <tr><td><code>scaffold run review-pr</code></td><td>A PR (<code>--pr</code>)</td><td>Auth checks, the Superpowers code-reviewer <em>agent</em> channel via <code>mmr reconcile</code>, consensus/verdict handling, the 3-strike-per-finding round bookkeeping, optional Beads issue bridge.</td></tr>
+          <tr><td><code>scaffold run review-code</code></td><td>Local pre-push</td><td>Synthesizes a "delivery candidate" diff (committed + staged + unstaged), gathers file & standards context for the file-blind CLIs, then the same agent channel + round bounding. <em>Untracked files aren't covered.</em></td></tr>
+          <tr><td><code>scaffold run post-implementation-review</code></td><td>Full codebase</td><td>Two phases — systemic review + per-story functional review via parallel agents — with its own report under <code>docs/reviews/</code>. (See its own doc for the exact channel layout.)</td></tr>
+        </tbody>
+      </table>
+      <div class="note">The wrappers' manual fallback runs Codex, Gemini, Claude, and Grok as foreground
+      Bash calls when the <code>mmr</code> CLI isn't available — never in the background (background
+      execution produces empty output).</div>
+    </section>
+
+    <!-- ════════════════ 7. FINDINGS ════════════════ -->
+    <section id="findings">
+      <h2><span class="n">7</span>Findings, reconciliation &amp; verdicts</h2>
+      <h3>The Finding shape</h3>
+      <div data-code><pre>{
+  "id": "F-001",                    // optional; back-filled if missing
+  "category": "security",           // optional
+  "severity": "P0",                 // P0 | P1 | P2 | P3
+  "location": "src/auth.ts:42",
+  "description": "…",
+  "suggestion": "…"
+}</pre></div>
+      <p>After reconciliation, each finding also carries <code>confidence</code>, <code>sources[]</code>,
+      <code>agreement</code>, a stable <code>finding_key</code>, a <code>description_shingle</code> (for fuzzy
+      cross-round matching), and <code>acknowledged</code>.</p>
+
+      <h3>Stable identity (<code>finding_key</code>)</h3>
+      <div data-code><pre>finding_key = sha1( normLocation | category | sha1(normDescription) | sha1(normSuggestion) )</pre></div>
+      <p>Line numbers are stripped from the location and severity is <em>excluded</em>, so the same issue at
+      P1 vs P2 collapses to one key. A character-5-gram shingle backs a Jaccard ≥ 0.7 fuzzy match when wording
+      drifts between rounds.</p>
+
+      <h3>Agreement &amp; confidence</h3>
+      <table>
+        <thead><tr><th>Sources</th><th>Severity</th><th>Agreement</th><th>Confidence</th></tr></thead>
+        <tbody>
+          <tr><td>2+</td><td>same</td><td>consensus</td><td><span class="chip ok">high</span></td></tr>
+          <tr><td>2+</td><td>differ</td><td>majority</td><td><span class="chip warn">medium</span></td></tr>
+          <tr><td>1</td><td><span class="sev p0">P0</span></td><td>unique</td><td><span class="chip ok">high</span></td></tr>
+          <tr><td>1</td><td><code>compensating-*</code></td><td>unique</td><td><span class="chip">low</span></td></tr>
+          <tr><td>1</td><td>other</td><td>unique</td><td><span class="chip warn">medium</span></td></tr>
+        </tbody>
+      </table>
+
+      <h3>The gate &amp; the four verdicts</h3>
+      <p>The gate <b>passes</b> when every unacknowledged finding is <em>below</em> the
+      <code>fix_threshold</code> (default <span class="sev p2">P2</span>).</p>
+      <table>
+        <thead><tr><th>Verdict</th><th>Condition</th><th>Exit</th></tr></thead>
+        <tbody>
+          <tr><td><span class="chip ok">pass</span></td><td>Gate passed, all channels completed</td><td>0</td></tr>
+          <tr><td><span class="chip">degraded-pass</span></td><td>Gate passed, but some channels failed / timed out / weren't installed</td><td>0</td></tr>
+          <tr><td><span class="chip warn">blocked</span></td><td>An unacknowledged finding sits at or above the threshold</td><td>2</td></tr>
+          <tr><td><span class="chip info">needs-user-decision</span></td><td>No channel completed (can't make a determination)</td><td>3</td></tr>
+        </tbody>
+      </table>
+      <div class="note">Proceed only on <b>pass</b> or <b>degraded-pass</b>. On <b>blocked</b> or
+      <b>needs-user-decision</b>, surface the verdict and findings — don't merge automatically.</div>
+    </section>
+
+    <!-- ════════════════ 8. DEGRADED ════════════════ -->
+    <section id="degraded">
+      <h2><span class="n">8</span>Degraded mode, compensation &amp; auth</h2>
+      <p class="lead">A channel is "degraded" when it's <code>not_installed</code> (no binary),
+      <code>auth_failed</code>, <code>timeout</code>, <code>skipped</code>, or <code>failed</code>. The review
+      doesn't stop — it compensates and tells you how to recover.</p>
+      <ul class="tight">
+        <li><b>Compensating pass.</b> For each degraded external channel, a <code>claude -p</code> pass runs
+        with that channel's focus area, labeled e.g. <code>[compensating: Grok-equivalent]</code>. These
+        findings are single-source, <span class="chip">low</span> confidence. The compensator channel is
+        configurable via <code>defaults.compensator.channel</code>.</li>
+        <li><b>Auth recovery</b> is surfaced, never silent:</li>
+      </ul>
+      <table>
+        <thead><tr><th>Channel</th><th>Auth check</th><th>Recovery</th></tr></thead>
+        <tbody>
+          <tr><td><code>codex</code></td><td><code>codex login status</code></td><td><code>! codex login</code></td></tr>
+          <tr><td><code>gemini</code></td><td><code>gemini -p "respond with ok"</code></td><td><code>! gemini -p "hello"</code></td></tr>
+          <tr><td><code>claude</code></td><td><code>claude -p "respond with ok"</code></td><td><code>! claude login</code></td></tr>
+          <tr><td><code>grok</code></td><td><code>grok models</code></td><td><code>! grok login</code></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ════════════════ 9. CONFIG ════════════════ -->
+    <section id="config">
+      <h2><span class="n">9</span>Configuration (<code>.mmr.yaml</code>)</h2>
+      <p class="lead">Config is layered: built-in defaults → <code>~/.mmr/config.yaml</code> →
+      project <code>.mmr.yaml</code> → CLI flags. Arrays replace; objects deep-merge.</p>
+      <div data-code><pre>version: 1
+defaults:
+  fix_threshold: P2          # gate severity
+  timeout: 300               # default per-channel timeout (s)
+  parallel: true
+channels_disabled: ["grok"]  # opt OUT of a built-in (e.g. no grok installed)
+channels:
+  doc-conformance:
+    enabled: true            # opt IN to a default-off channel
+  # Bring-your-own model via channel inheritance:
+  qwen-local:
+    command: ollama run
+    flags: ["qwen2.5-coder:32b", "--format", "json"]
+    output_parser: { kind: unwrap-jsonpath, wrap: "$.response", then: default }
+    auth: { check: "ollama list", timeout: 5, failure_exit_codes: [1], recovery: "ollama serve" }</pre></div>
+      <div class="kv">
+        <dt><code>channels_disabled</code></dt><dd>Skip these built-ins in the default dispatch (ignored when you pass an explicit <code>--channels</code> list).</dd>
+        <dt><code>enabled: false</code></dt><dd>Per-channel off switch (how <code>doc-conformance</code> ships).</dd>
+        <dt><code>extends</code></dt><dd>Inherit from another channel (≤ 4 levels, cycle-checked); child fields override the parent.</dd>
+        <dt><code>fix_threshold</code></dt><dd>Project gate; override per-run with <code>--fix-threshold</code>.</dd>
+      </div>
+      <div class="note warn"><b>Trust boundary.</b> When reviewing a diff, project <code>.mmr.yaml</code> and
+      acks should be read from the diff's <em>base ref</em>, not the working tree — otherwise a PR could add a
+      channel that exfiltrates secrets or self-acknowledge its own findings. Use <code>--config-base-ref</code>
+      / the <code>--trust-project-*</code> flags to control this in untrusted (e.g. CI) contexts.</div>
+    </section>
+  </main>
+</div>
+
+<div class="footer">Scaffold · Multi-Model Review reference · generated from <code>packages/mmr</code> +
+<code>content/tools/review-*.md</code>. Behavior described here is verified against the source; when in doubt,
+the code is authoritative.</div>
+
+<script>
+// Theme: respect stored choice, else OS preference.
+(function(){
+  var saved=null; try{saved=localStorage.getItem('mmr-theme')}catch(e){}
+  var dark = saved ? saved==='dark' : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.setAttribute('data-theme', dark?'dark':'light');
+})();
+function toggleTheme(){
+  var el=document.documentElement, dark=el.getAttribute('data-theme')!=='dark';
+  el.setAttribute('data-theme', dark?'dark':'light');
+  try{localStorage.setItem('mmr-theme', dark?'dark':'light')}catch(e){}
+  syncThemeBtn();
+}
+function syncThemeBtn(){
+  var dark=document.documentElement.getAttribute('data-theme')==='dark';
+  document.getElementById('themeBtn').textContent = dark ? '☀️ Light' : '🌙 Dark';
+}
+
+// Build code blocks with copy buttons from [data-code] wrappers.
+document.querySelectorAll('[data-code]').forEach(function(w){
+  var pre=w.querySelector('pre'); if(!pre) return;
+  w.classList.add('code'); w.removeAttribute('data-code');
+  var btn=document.createElement('button'); btn.className='copy'; btn.type='button'; btn.textContent='Copy';
+  btn.addEventListener('click', function(){
+    var text=pre.innerText;
+    var done=function(){btn.textContent='Copied'; btn.classList.add('done'); setTimeout(function(){btn.textContent='Copy';btn.classList.remove('done')},1400)};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(done,done)}
+    else{try{var t=document.createElement('textarea');t.value=text;document.body.appendChild(t);t.select();document.execCommand('copy');document.body.removeChild(t);done()}catch(e){}}
+  });
+  w.appendChild(btn);
+});
+
+// Tabs
+function tab(group,name,ev){
+  document.querySelectorAll('#'+group+'Tabs button').forEach(function(b){b.classList.remove('active')});
+  if(ev&&ev.target)ev.target.classList.add('active');
+  document.querySelectorAll('[data-pane^="'+group+'-"]').forEach(function(p){p.classList.remove('active')});
+  var pane=document.querySelector('[data-pane="'+group+'-'+name+'"]'); if(pane)pane.classList.add('active');
+}
+
+// Collapsible expand/collapse all
+function toggleAll(open){document.querySelectorAll('details.collap').forEach(function(d){d.open=open})}
+
+// Flag table filter
+function filterFlags(q){
+  q=q.trim().toLowerCase();
+  document.querySelectorAll('#flagTable tbody tr').forEach(function(tr){
+    tr.classList.toggle('hidden', q && tr.innerText.toLowerCase().indexOf(q)===-1);
+  });
+}
+
+// Mobile nav
+function openNav(){document.getElementById('sidebar').classList.add('open');document.getElementById('scrim').classList.add('open')}
+function closeNav(){document.getElementById('sidebar').classList.remove('open');document.getElementById('scrim').classList.remove('open')}
+
+// Scrollspy for TOC + close nav on click (mobile)
+var links=[].slice.call(document.querySelectorAll('nav.toc a'));
+var sections=links.map(function(a){return document.querySelector(a.getAttribute('href'))}).filter(Boolean);
+links.forEach(function(a){a.addEventListener('click',closeNav)});
+function spy(){
+  var top=window.scrollY+120, cur=sections[0];
+  sections.forEach(function(s){if(s.offsetTop<=top)cur=s});
+  links.forEach(function(a){a.classList.toggle('active', a.getAttribute('href')==='#'+(cur&&cur.id))});
+}
+window.addEventListener('scroll',spy,{passive:true});
+syncThemeBtn(); spy();
+</script>
+</body>
+</html>
