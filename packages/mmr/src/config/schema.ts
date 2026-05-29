@@ -80,6 +80,13 @@ const ChannelConfigSchema = z.object({
   headers: z.record(z.string()).optional(),
   auth: AuthConfigSchema.optional(),
   prompt_wrapper: z.string().default('{{prompt}}'),
+  // How the dispatcher hands the prompt to the channel process:
+  //   'stdin'       — pipe the prompt to stdin (default; claude/gemini/codex)
+  //   'prompt-file' — write the prompt to a temp file and pass its path via a
+  //                   {{prompt_file}} placeholder in flags (or appended), for
+  //                   CLIs like grok whose prompt flag requires an arg value
+  //                   and ignore stdin. Omitted ⇒ stdin.
+  prompt_delivery: z.enum(['stdin', 'prompt-file']).optional(),
   output_parser: OutputParserSchema.default('default'),
   stderr: z.enum(['suppress', 'capture', 'passthrough']).default('capture'),
   timeout: z.number().optional(),

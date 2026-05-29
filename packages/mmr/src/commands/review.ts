@@ -490,6 +490,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
             stderr: chConfig.stderr === 'passthrough' ? 'passthrough'
               : chConfig.stderr === 'suppress' ? 'suppress'
                 : 'capture',
+            promptDelivery: chConfig.prompt_delivery,
           }),
         )
       }
@@ -514,6 +515,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
           stderr: chConfig.stderr === 'passthrough' ? 'passthrough'
             : chConfig.stderr === 'suppress' ? 'suppress'
               : 'capture',
+          promptDelivery: chConfig.prompt_delivery,
         })
       }
     }

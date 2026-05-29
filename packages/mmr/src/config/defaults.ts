@@ -94,6 +94,35 @@ export const BUILTIN_CHANNELS: Record<string, ChannelConfigParsed> = {
     output_parser: 'default',
     stderr: 'suppress',
   },
+  grok: {
+    enabled: true,
+    abstract: false,
+    // Grok's `-p/--single` and `--prompt-file` REQUIRE the prompt as an arg
+    // value; unlike claude/gemini/codex, grok does NOT read the prompt from
+    // stdin (`grok -p` with no value errors: "a value is required for
+    // '--single <PROMPT>'"). We therefore deliver the prompt via a temp file
+    // (prompt_delivery: 'prompt-file') and reference its path with the
+    // {{prompt_file}} placeholder in --prompt-file.
+    command: 'grok',
+    prompt_delivery: 'prompt-file',
+    flags: ['--prompt-file', '{{prompt_file}}', '--output-format', 'json'],
+    env: {},
+    auth: {
+      // `grok models` lists models and prints the login state; it does not
+      // make an LLM round-trip, so a short timeout is fine. Exit 1 ⇒ not
+      // authenticated / CLI error.
+      check: 'grok models >/dev/null 2>&1',
+      timeout: 10,
+      failure_exit_codes: [1],
+      recovery: 'grok login',
+    },
+    prompt_wrapper: '{{prompt}}',
+    // `grok --output-format json` wraps the reply as { "text": "<reply>",
+    // "thought": "...", ... }. Unwrap $.text, then run the default findings
+    // parser over the model's reply (same shape as the gemini unwrap).
+    output_parser: { kind: 'unwrap-jsonpath', wrap: '$.text', then: 'default' },
+    stderr: 'capture',
+  },
   'doc-conformance': {
     // Disabled by default: runs up to 3 LLM calls (~3 min) via scaffold observe audit.
     // Enable in .mmr.yaml or pass --channels=doc-conformance to use.

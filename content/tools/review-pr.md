@@ -108,7 +108,7 @@ The CLI supports multiple input modes:
 
 **Manual fallback** (when MMR CLI is not installed):
 
-Run Codex, Gemini, and Claude CLI commands individually as foreground Bash calls.
+Run Codex, Gemini, Claude, and Grok CLI commands individually as foreground Bash calls.
 Never use `run_in_background`, `&`, or `nohup`.
 
 #### Channel 1: Codex CLI
@@ -141,9 +141,23 @@ claude -p "REVIEW_PROMPT" --output-format json 2>/dev/null
 
 Claude CLI handles its own auth. Focus: plan alignment, code quality, testing.
 
+#### Channel 4: Grok CLI
+
+```bash
+command -v grok >/dev/null 2>&1 || echo "Grok not installed"
+grok models >/dev/null 2>&1 && echo "Grok authed" || echo "Run: grok login"
+# grok ignores stdin — the prompt MUST be passed via a file (or the -p arg):
+printf '%s' "REVIEW_PROMPT" > /tmp/grok-review-prompt.txt
+grok --prompt-file /tmp/grok-review-prompt.txt --output-format json 2>/dev/null
+```
+
+Grok's JSON wraps the reply in `.text`. If not installed or auth fails, queue a
+compensating pass focused on an independent second opinion over correctness and code
+quality. Auth failure recovery: `! grok login`.
+
 **After all channels:** Run any queued compensating passes as additional `claude -p`
-dispatches with focused prompts. Label findings as `[compensating: Codex-equivalent]`
-or `[compensating: Gemini-equivalent]`.
+dispatches with focused prompts. Label findings as `[compensating: Codex-equivalent]`,
+`[compensating: Gemini-equivalent]`, or `[compensating: Grok-equivalent]`.
 
 ### Step 3: Run Agent Code Review (4th channel)
 

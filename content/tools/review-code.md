@@ -257,11 +257,11 @@ Format the changed-file context like:
 [full file contents]
 ```
 
-### Step 4: Run All Three Review Channels
+### Step 4: Run All Built-in Review Channels
 
 Each channel reviews independently. Do NOT share one channel's output with another.
 
-**Foreground only:** Always run Codex and Gemini CLI commands as foreground Bash calls. Never use `run_in_background`, `&`, or `nohup`. Background execution produces empty output. Multiple foreground calls in a single message are fine.
+**Foreground only:** Always run Codex, Gemini, and Grok CLI commands as foreground Bash calls. Never use `run_in_background`, `&`, or `nohup`. Background execution produces empty output. Multiple foreground calls in a single message are fine.
 
 #### Channel 1: Codex CLI
 
@@ -324,6 +324,30 @@ Dispatch via `claude -p` with the review prompt.
 
 This channel must review the same local delivery candidate, even when no PR or
 clean ref range exists.
+
+#### Channel 4: Grok CLI
+
+Check installation and auth:
+
+```bash
+command -v grok >/dev/null 2>&1
+grok models >/dev/null 2>&1
+```
+
+- If `grok` is not installed: skip this channel and record root-cause `not_installed`
+- If auth fails: tell the user to run `! grok login`, retry after recovery, and if recovery is not possible, record root-cause `auth_failed` and continue with the remaining channels
+
+If auth cannot be recovered, or if Grok is not installed, queue a compensating Claude self-review pass focused on an independent second opinion over correctness and code quality. Label findings as `[compensating: Grok-equivalent]`.
+
+Grok ignores stdin — pass the prompt via a file, and unwrap the reply from `.text`:
+
+```bash
+PROMPT_FILE=$(mktemp)
+# ...write the full review prompt to "$PROMPT_FILE"...
+grok --prompt-file "$PROMPT_FILE" --output-format json 2>/dev/null
+```
+
+If the CLI exits with a non-zero code, produces malformed/unparseable output, or is killed by the tool runner timeout, record root-cause `failed` and queue a compensating pass for that channel.
 
 **After all channels:** Run any queued compensating passes as foreground Claude self-review passes. Each compensating pass uses the same review prompt as the missing channel, focusing on that channel's strength area.
 

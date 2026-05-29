@@ -2,6 +2,37 @@ import { describe, it, expect } from 'vitest'
 import type { OutputParserConfig } from '../../src/config/schema.js'
 import { parseChannelOutput, getParser, validateFindingStrict, validateParsedOutputStrict } from '../../src/core/parser.js'
 
+describe('grok channel output_parser (unwrap $.text → default)', () => {
+  // Exercises the exact parser config used by BUILTIN_CHANNELS.grok against a
+  // real-shaped `grok --output-format json` payload: the findings JSON lives
+  // as a string inside $.text, alongside thought/stopReason/etc.
+  const grokParser = getParser({ kind: 'unwrap-jsonpath', wrap: '$.text', then: 'default' })
+
+  it('unwraps $.text and parses the findings JSON inside it', () => {
+    const raw = JSON.stringify({
+      text: '{"approved": false, "findings": [{"severity":"P0","location":"x.js:1","description":"eval on user input","suggestion":"remove eval"}], "summary": "RCE"}',
+      stopReason: 'EndTurn',
+      sessionId: '019e-...',
+      thought: 'The task is to act as a code reviewer...',
+    })
+    const result = grokParser(raw)
+    expect(result.approved).toBe(false)
+    expect(result.findings).toHaveLength(1)
+    expect(result.findings[0].severity).toBe('P0')
+    expect(result.findings[0].location).toBe('x.js:1')
+  })
+
+  it('does not leak grok thought text into findings', () => {
+    const raw = JSON.stringify({
+      text: '{"approved": true, "findings": [], "summary": "ok"}',
+      thought: 'I should respond with findings: P0 something something',
+    })
+    const result = grokParser(raw)
+    expect(result.approved).toBe(true)
+    expect(result.findings).toEqual([])
+  })
+})
+
 describe('default parser', () => {
   const parse = getParser('default')
 

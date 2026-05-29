@@ -12,7 +12,17 @@ export interface DispatchOptions {
   env: Record<string, string>
   timeout: number
   stderr: 'capture' | 'suppress' | 'passthrough'
+  /**
+   * How to hand the prompt to the process. 'stdin' (default) pipes it to
+   * stdin. 'prompt-file' writes it to a file in the channel dir and passes
+   * the path via a {{prompt_file}} placeholder in flags (or appended when no
+   * placeholder is present), for CLIs that require the prompt as an arg.
+   */
+  promptDelivery?: 'stdin' | 'prompt-file'
 }
+
+/** Placeholder token replaced with the prompt-file path in prompt-file mode. */
+const PROMPT_FILE_PLACEHOLDER = '{{prompt_file}}'
 
 /** Track active child PIDs for cleanup on parent exit */
 const activeChildren = new Set<number>()
@@ -60,7 +70,19 @@ export async function dispatchChannel(
 
   // Split multi-word commands (e.g. "claude -p" → ["claude", "-p"])
   const [cmd, ...cmdArgs] = opts.command.split(/\s+/)
-  const args = [...cmdArgs, ...opts.flags]
+  let args = [...cmdArgs, ...opts.flags]
+
+  // In prompt-file mode, write the prompt to a file in the channel dir and
+  // substitute its path for the {{prompt_file}} placeholder (or append it).
+  // The prompt is NOT piped to stdin in this mode.
+  const promptDelivery = opts.promptDelivery ?? 'stdin'
+  if (promptDelivery === 'prompt-file') {
+    const promptFile = path.join(channelsDir, `${channelName}.prompt.txt`)
+    fs.writeFileSync(promptFile, opts.prompt)
+    args = args.some((a) => a.includes(PROMPT_FILE_PLACEHOLDER))
+      ? args.map((a) => a.split(PROMPT_FILE_PLACEHOLDER).join(promptFile))
+      : [...args, promptFile]
+  }
 
   // Update channel to running
   store.updateChannel(jobId, channelName, {
@@ -88,8 +110,11 @@ export async function dispatchChannel(
     // Swallow EPIPE — the close handler will deal with the process exit
   })
 
-  // Write prompt to stdin
-  proc.stdin!.write(opts.prompt)
+  // Write prompt to stdin (stdin delivery only; prompt-file mode passes the
+  // prompt as an arg). Always end stdin so processes that read it don't hang.
+  if (promptDelivery === 'stdin') {
+    proc.stdin!.write(opts.prompt)
+  }
   proc.stdin!.end()
 
   // Write PID file
