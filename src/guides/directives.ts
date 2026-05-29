@@ -17,84 +17,49 @@ export const remarkCallout: AnyPlugin = () => (tree: Root) => {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function buildTabsNode(tabNodes: any[]): any {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const buttons = tabNodes.map((t: any, i: number) => ({
-    type: 'paragraph',
-    data: {
-      hName: 'button',
-      hProperties: {
-        className: 'tab-btn' + (i === 0 ? ' active' : ''),
-        role: 'tab',
-        'data-tab': String(i),
-      },
-    },
-    children: [{ type: 'text', value: String(t.attributes?.title ?? `Tab ${i + 1}`) }],
-  }))
-  const tablist = {
-    type: 'paragraph',
-    data: { hName: 'div', hProperties: { className: 'tablist', role: 'tablist' } },
-    children: buttons,
-  }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const panes = tabNodes.map((t: any, i: number) => ({
-    type: 'containerDirective',
-    name: 'tab',
-    data: {
-      hName: 'div',
-      hProperties: { className: 'tabpane' + (i === 0 ? ' active' : ''), 'data-tab': String(i) },
-    },
-    children: t.children ?? [],
-    attributes: t.attributes,
-  }))
-  return {
-    type: 'containerDirective',
-    name: 'tabs',
-    data: { hName: 'div', hProperties: { className: 'tabs' } },
-    children: [tablist, ...panes],
-  }
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const remarkTabs: AnyPlugin = () => (tree: any) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   visit(tree, (node: any) => {
-    if (!node.children) return
+    if (node.type !== 'containerDirective' || node.name !== 'tabs') return
+    // With a 4-colon outer fence (::::tabs) wrapping 3-colon (:::tab) children,
+    // remark-directive nests tab nodes directly inside node.children — no sibling
+    // collection needed, no stray ::: paragraph produced.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const newChildren: any[] = []
-    let i = 0
-    while (i < node.children.length) {
-      const child = node.children[i]
-      if (child.type !== 'containerDirective' || child.name !== 'tabs') {
-        newChildren.push(child)
-        i++
-        continue
-      }
-      // Collect tab nodes: first look inside the tabs node's own children,
-      // then consume any immediately following sibling tab directives.
-      // remark-directive only nests the first tab; subsequent tabs become siblings.
+    const tabs = (node.children ?? []).filter(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const tabNodes: any[] = []
-      // tabs' direct children that are tab directives
-      for (const c of child.children ?? []) {
-        if (c.type === 'containerDirective' && c.name === 'tab') {
-          tabNodes.push(c)
-        }
-      }
-      // consume sibling tab directives
-      let j = i + 1
-      while (j < node.children.length) {
-        const sib = node.children[j]
-        if (sib.type === 'containerDirective' && sib.name === 'tab') {
-          tabNodes.push(sib)
-          j++
-        } else {
-          break
-        }
-      }
-      newChildren.push(buildTabsNode(tabNodes))
-      i = j
+      (c: any) => c.type === 'containerDirective' && c.name === 'tab',
+    )
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const buttons = tabs.map((t: any, i: number) => ({
+      type: 'paragraph',
+      data: {
+        hName: 'button',
+        hProperties: {
+          className: 'tab-btn' + (i === 0 ? ' active' : ''),
+          role: 'tab',
+          'data-tab': String(i),
+        },
+      },
+      children: [{ type: 'text', value: String(t.attributes?.title ?? `Tab ${i + 1}`) }],
+    }))
+    const tablist = {
+      type: 'paragraph',
+      data: { hName: 'div', hProperties: { className: 'tablist', role: 'tablist' } },
+      children: buttons,
     }
-    node.children = newChildren
+    // Mutate each tab node in place: assign hast properties and keep its children.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    tabs.forEach((t: any, i: number) => {
+      t.data = t.data ?? {}
+      t.data.hName = 'div'
+      t.data.hProperties = {
+        className: 'tabpane' + (i === 0 ? ' active' : ''),
+        'data-tab': String(i),
+      }
+    })
+    node.data = node.data ?? {}
+    node.data.hName = 'div'
+    node.data.hProperties = { className: 'tabs' }
+    node.children = [tablist, ...tabs]
   })
 }
