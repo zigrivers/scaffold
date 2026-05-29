@@ -220,8 +220,9 @@ observability & knowledge-freshness.
   every regeneration — a non-compliant guide cannot reach checked-in HTML. This is
   a **source/maintainer-time** operation (dev, CI, and brew-build-from-source all
   have the full tree incl. the `dist/`-copied theme CSS). End users consume the
-  **pre-built, checked-in** HTML and never invoke `build`; `--all` forces
-  regeneration of every guide (used after a chrome change).
+  **pre-built, checked-in** HTML and never invoke `build`. `build` always
+  regenerates every guide + the index (the simple, drift-safe behavior; there is
+  no per-guide flag).
 
 ### Manifest & index
 `buildGuidesIndex()` (mirrors `buildIndex()`) scans `content/guides/*/index.md`
@@ -238,7 +239,8 @@ Guarantees npm and brew ship identical, audited HTML.
 chrome change must regenerate *every* guide or the gate fails. Each generated file
 carries `data-chrome-version`; bumping the chrome version is the signal to run
 `scaffold guides build` in the same PR. With one guide in this iteration the
-cost is trivial; the marker and `--all` keep it bounded as guides are added.
+cost is trivial; the marker keeps it bounded as guides are added (and `build`
+always regenerates all of them).
 
 ### Agent access
 Reference the guide set from `CLAUDE.md` (and `AGENTS.md` if added): agents read the
