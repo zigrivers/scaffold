@@ -323,41 +323,38 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       }),
   handler: async (args: ArgumentsCamelCase<ReviewArgs>) => {
     // 0. Classify the trust mode (§5 decision 1) and derive the project
-    //    config/ack loading policy. In base-ref mode the trusted ref is the
-    //    source and the working-tree --trust-project-* flags don't apply
-    //    ("n/a" in the matrix); they take effect only in untrusted-HEAD/non-git
-    //    mode, with a noisy banner, and otherwise project config/acks are not
-    //    loaded at all (default-deny).
+    //    config/ack loading policy. The explicit --trust-project-config /
+    //    --trust-project-acks opt-ins mean "honor the working-tree (diff)
+    //    config/acks" and take precedence in ALL modes (they're an operator
+    //    decision, not attacker-controllable); without them, base-ref mode
+    //    loads from the trusted ref and untrusted-HEAD/non-git load nothing.
     const trust = classifyTrustMode({ cwd: process.cwd(), args })
     const baseRef = trust.trust_mode === 'base-ref' ? trust.base_ref : undefined
-    const effectiveTrustConfig = baseRef === undefined && args.trustProjectConfig === true
-    const effectiveTrustAcks = baseRef === undefined && args.trustProjectAcks === true
-    if (effectiveTrustConfig) {
-      console.error(
-        '[mmr] warning: --trust-project-config is honoring the working-tree .mmr.yaml in ' +
-          `${trust.trust_mode} mode; prefer --config-base-ref <ref>.`,
-      )
+    const trustWorkingTreeConfig = args.trustProjectConfig === true
+    const trustWorkingTreeAcks = args.trustProjectAcks === true
+    const refHint =
+      trust.trust_mode === 'non-git'
+        ? ' (non-git: no base ref to compare against).'
+        : '; prefer --config-base-ref <ref> for a trusted source.'
+    if (trustWorkingTreeConfig) {
+      console.error(`[mmr] warning: --trust-project-config is honoring the working-tree .mmr.yaml${refHint}`)
     }
-    if (effectiveTrustAcks) {
-      console.error(
-        '[mmr] warning: --trust-project-acks is honoring working-tree .mmr/acks/ in ' +
-          `${trust.trust_mode} mode; prefer --config-base-ref <ref>.`,
-      )
+    if (trustWorkingTreeAcks) {
+      console.error(`[mmr] warning: --trust-project-acks is honoring working-tree .mmr/acks/${refHint}`)
     }
 
-    // 1. Load config per the trust policy: base ref → git show; trusted working
-    //    tree → read it; otherwise skip project config entirely.
+    // 1. Load config per the trust policy: explicit opt-in → working tree;
+    //    else base ref → git show; else skip project config entirely.
     const cliOverrides = {
       fix_threshold: args['fix-threshold'] as string | undefined,
       timeout: args.timeout,
       format: args.format,
     }
-    const projectTrust =
-      baseRef !== undefined
+    const projectTrust = trustWorkingTreeConfig
+      ? { trustProjectConfig: true }
+      : baseRef !== undefined
         ? { configBaseRef: baseRef }
-        : effectiveTrustConfig
-          ? { trustProjectConfig: true }
-          : { skipProjectConfig: true }
+        : { skipProjectConfig: true }
     const config = loadConfig({ projectRoot: process.cwd(), cliOverrides, ...projectTrust })
     // Defense-in-depth: the yargs `.check()` rejects invalid ids on the CLI
     // path, but the handler is also invoked directly by programmatic callers
@@ -375,8 +372,8 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     const reviewControls: ReviewControls = {
       max_rounds: maxRounds,
       accept_new_acks: args.acceptNewAcks === true,
-      trust_project_acks: effectiveTrustAcks,
-      trust_project_config: effectiveTrustConfig,
+      trust_project_acks: trustWorkingTreeAcks,
+      trust_project_config: trustWorkingTreeConfig,
       config_base_ref: baseRef,
     }
     if ((args.round ?? 1) > maxRounds) {
@@ -405,10 +402,9 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     //     ack files). The reviewed content is loaded from the trusted base ref,
     //     so these surface the *proposed* changes for a human to ratify.
     const diffChanges = detectConfigChanges(diff)
-    // The blocking opt-outs use the RAW flags (--trust-project-config /
-    // --accept-new-acks): they ratify the *proposed* change in the diff, which
-    // is distinct from the loading policy (effectiveTrust*, which is "n/a" in
-    // base-ref mode because config/acks load from the trusted ref).
+    // The gate opt-outs are the same explicit flags that honor the working-tree
+    // config/acks above: passing --trust-project-config / --accept-new-acks both
+    // applies the proposed change AND ratifies it (no needs-user-decision).
     const blockingConfigChange =
       baseRef !== undefined && diffChanges.config_file_changed && args.trustProjectConfig !== true
     const blockingAckChange =
@@ -682,7 +678,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       // trusted default path (project acks from a git base ref). The pipeline
       // fails safe if the acks tree is unreadable.
       const ackStore = buildReviewAckStore({
-        trustProjectAcks: effectiveTrustAcks,
+        trustProjectAcks: trustWorkingTreeAcks,
         userRoot: resolveSessionRoot(),
         configBaseRef: baseRef,
       })
