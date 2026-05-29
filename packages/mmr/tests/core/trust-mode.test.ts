@@ -90,6 +90,15 @@ describe('classifyTrustMode', () => {
     expect(result.trust_mode).toBe('untrusted-head')
   })
 
+  it('allows safe relative-rev syntax (HEAD~1, HEAD^) as a base ref', () => {
+    fs.mkdirSync(path.join(tmpDir, '.git'))
+    expect(classifyTrustMode({ cwd: tmpDir, args: { base: 'HEAD~1' } })).toEqual({
+      trust_mode: 'base-ref',
+      base_ref: 'HEAD~1',
+    })
+    expect(classifyTrustMode({ cwd: tmpDir, args: { base: 'origin/main^' } }).trust_mode).toBe('base-ref')
+  })
+
   it('returns untrusted-head when --pr resolution fails', () => {
     fs.mkdirSync(path.join(tmpDir, '.git'))
     const result = classifyTrustMode({

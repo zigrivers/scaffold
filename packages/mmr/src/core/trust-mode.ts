@@ -34,7 +34,7 @@ export type ClassifyResult =
 // none of the constructs that could smuggle surprising rev syntax into a later
 // `git show <ref>:.mmr.yaml` (':' separator, '..' ranges, '@{' reflog, leading
 // '-'/'/'). An unsafe ref fails closed to untrusted-head.
-const SAFE_REF_RE = /^[A-Za-z0-9._/-]+$/
+const SAFE_REF_RE = /^[A-Za-z0-9._/~^-]+$/
 function isSafeRef(ref: string): boolean {
   return (
     SAFE_REF_RE.test(ref) &&
@@ -48,6 +48,25 @@ function isSafeRef(ref: string): boolean {
 
 function asBaseRef(ref: string): ClassifyResult {
   return isSafeRef(ref) ? { trust_mode: 'base-ref', base_ref: ref } : { trust_mode: 'untrusted-head' }
+}
+
+/**
+ * Broad CI detection — must err toward "yes" because misdetecting CI as local
+ * re-opens the self-trust hole. Almost every CI sets CI to a truthy value
+ * (GitHub/GitLab/CircleCI/Travis/Buildkite/Vercel/Netlify set CI=true; some use
+ * CI=1); a few that don't are covered by their own markers.
+ */
+function detectCI(): boolean {
+  const ci = process.env.CI
+  if (ci !== undefined && ci !== '' && ci.toLowerCase() !== 'false' && ci !== '0') return true
+  return Boolean(
+    process.env.GITHUB_ACTIONS ||
+      process.env.GITLAB_CI ||
+      process.env.BUILDKITE ||
+      process.env.TF_BUILD || // Azure Pipelines
+      process.env.JENKINS_URL ||
+      process.env.TEAMCITY_VERSION,
+  )
 }
 
 function isGitRepo(cwd: string): boolean {
@@ -90,7 +109,7 @@ function defaultResolvePrBase(pr: number, cwd: string): string | undefined {
 export function classifyTrustMode(opts: ClassifyOptions): ClassifyResult {
   const { cwd, args } = opts
   const resolvePrBase = opts.resolvePrBase ?? defaultResolvePrBase
-  const isCI = opts.isCI ?? (process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true')
+  const isCI = opts.isCI ?? detectCI()
 
   // Explicit operator override always wins.
   if (args['config-base-ref']) return asBaseRef(args['config-base-ref'])
