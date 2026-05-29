@@ -424,8 +424,11 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     // applies the proposed change AND ratifies it (no needs-user-decision).
     const blockingConfigChange =
       baseRef !== undefined && diffChanges.config_file_changed && !trustWorkingTreeConfig
+    // Bypassed by EITHER ack opt-in: --accept-new-acks (accept the diff's acks)
+    // or --trust-project-acks (trust all working-tree acks, which implies the
+    // new ones) — aligned with honorWorkingTreeAcks so the gate matches loading.
     const blockingAckChange =
-      baseRef !== undefined && diffChanges.ack_files_changed.length > 0 && args.acceptNewAcks !== true
+      baseRef !== undefined && diffChanges.ack_files_changed.length > 0 && !honorWorkingTreeAcks
 
     // 2b. Trust gate — UNCONDITIONAL (before dry-run, job creation, and
     //     dispatch), so it can't be bypassed by omitting --sync or using
