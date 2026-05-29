@@ -729,7 +729,7 @@ window.OBS_CALLOUTS = Object.assign(window.OBS_CALLOUTS || {}, {
         <tr data-type="task_claimed"><td><code>task_claimed</code></td><td><code>task_title</code>*, <code>story_id</code>, <code>wave</code>, <code>unplanned</code></td><td>if <code>task_id</code> is null, <code>unplanned</code> must be true</td></tr>
         <tr data-type="task_completed"><td><code>task_completed</code></td><td><code>outcome</code>*, <code>pr_number</code>, <code>commit_sha</code></td><td>outcome ∈ {pr_submitted, dropped, superseded}; <code>pr_number</code> required if pr_submitted</td></tr>
         <tr data-type="decision_recorded"><td><code>decision_recorded</code></td><td><code>key</code>*, <code>summary</code>*, <code>affects</code>* (string[]), <code>links</code></td><td>summary ≤ 500 chars; consumed by Lens G</td></tr>
-        <tr data-type="blocker_hit"><td><code>blocker_hit</code></td><td><code>kind</code>*, <code>summary</code>*</td><td>kind ∈ {dependency, ambiguity, external, environment}</td></tr>
+        <tr data-type="blocker_hit"><td><code>blocker_hit</code></td><td><code>kind</code>*, <code>summary</code>*</td><td>kind ∈ {dependency, ambiguity, external, environment}; summary ≤ 500 chars</td></tr>
         <tr data-type="blocker_resolved"><td><code>blocker_resolved</code></td><td><code>summary</code>*, <code>references</code>* (string[])</td><td>closes a prior blocker_hit</td></tr>
         <tr data-type="pr_opened"><td><code>pr_opened</code></td><td><code>pr_number</code>*</td><td>positive integer</td></tr>
         <tr data-type="progress_heartbeat"><td><code>progress_heartbeat</code></td><td><code>note</code>*</td><td>note ≤ 200 chars; resets task_stale clock</td></tr>
@@ -745,15 +745,16 @@ window.OBS_CALLOUTS = Object.assign(window.OBS_CALLOUTS || {}, {
 <h3>Redaction — write time and render time</h3>
 <p>Redaction runs twice. <strong>Write-time</strong> redaction (recursive over the payload tree) scrubs the event before it lands on disk; <strong>render-time</strong> redaction (<code>redactEngineOutput</code> / <code>redactRendered</code>) scrubs string values again before any report is shown, catching anything synthesized after the fact.</p>
 <p style="margin:var(--sp-4) 0">Watch a secret get masked:
-  &nbsp;<code>token=<span class="redact"><span class="secret">ghp_aB3kQ9…36chars</span><span class="mask">[REDACTED:github-token]</span></span></code>
+  &nbsp;<code><span class="redact"><span class="secret">ghp_aB3kQ9…36chars</span><span class="mask">[REDACTED:github-token]</span></span></code>
   &nbsp;<code>/Users/<span class="redact"><span class="secret">alice</span><span class="mask">~</span></span>/repo</code>
 </p>
+<p class="fb-note">Order matters: a bare <code>ghp_…</code> matches the GitHub-token pattern, but inside a <code>token=…</code> pair the key/value rule wins first — so <code>token=ghp_…</code> redacts to <code>[REDACTED:kv-secret]</code>, not <code>[REDACTED:github-token]</code> (leftmost-match alternation, <span class="fp" data-path="src/observability/engine/redact.ts"><code>redact.ts:16</code></span>).</p>
 <div class="tbl-wrap"><table class="tbl"><thead><tr><th>pattern</th><th>matches</th><th>replacement</th></tr></thead><tbody>
   <tr><td>AWS key</td><td><code>AKIA[0-9A-Z]{16}</code></td><td><code>[REDACTED:aws-key]</code></td></tr>
   <tr><td>GitHub token</td><td><code>gh[pousr]_[A-Za-z0-9]{36,}</code></td><td><code>[REDACTED:github-token]</code></td></tr>
   <tr><td>key/value secret</td><td>key matches <code>secret|token|password|api[_-]?key</code></td><td><code>[REDACTED:kv-secret]</code> (key + separator preserved)</td></tr>
   <tr><td>sensitive object key</td><td>object key matches the same pattern</td><td>all descendant primitive values masked</td></tr>
-  <tr><td>home path</td><td><code>/Users/&lt;name&gt;</code>, <code>/home/&lt;name&gt;</code>, <code>C:\Users\&lt;name&gt;</code></td><td><code>~</code></td></tr>
+  <tr><td>home path</td><td><code>/Users/&lt;name&gt;</code>, <code>/home/&lt;name&gt;</code>, <code>C:\Users\&lt;name&gt;</code></td><td><code>~</code> (Windows keeps the drive: <code>C:\~</code>)</td></tr>
 </tbody></table></div>
 
 <h4>A redacted <code>decision_recorded</code> event on disk</h4>
@@ -768,7 +769,7 @@ window.OBS_CALLOUTS = Object.assign(window.OBS_CALLOUTS || {}, {
   <span class="tok-k">"ts"</span>:           <span class="tok-s">"2026-05-04T12:00:00Z"</span>,
   <span class="tok-k">"payload"</span>: {
     <span class="tok-k">"key"</span>:     <span class="tok-s">"cache-backend"</span>,
-    <span class="tok-k">"summary"</span>: <span class="tok-s">"Switched to Redis; token=[REDACTED:github-token]"</span>,
+    <span class="tok-k">"summary"</span>: <span class="tok-s">"Switched to Redis; token=[REDACTED:kv-secret]"</span>,
     <span class="tok-k">"affects"</span>: [<span class="tok-s">"~/repo/src/cache/**"</span>],   <span class="tok-c">// /Users/alice → ~</span>
     <span class="tok-k">"links"</span>:   [<span class="tok-s">"ADR-021"</span>]
   }
@@ -782,12 +783,12 @@ window.OBS_CALLOUTS = Object.assign(window.OBS_CALLOUTS || {}, {
 <h2>Adapters</h2>
 <p class="s-lede">The ledger only holds what agents <em>chose</em> to record. Adapters fill in the rest by synthesizing events from the surrounding tools — commits, PRs, MMR jobs, pipeline state, test runs. There are eight adapters (<code>AdapterId</code> at <span class="fp" data-path="src/observability/engine/types.ts"><code>types.ts:69</code></span>), but only five emit events into the timeline; the other three are availability probes / trend helpers.</p>
 
-<div class="note"><strong>Five emit, three probe</strong> <code>git</code>, <code>gh</code>, <code>mmr</code>, <code>state</code>, <code>tests</code> each implement <code>replayEvents()</code> and appear in the source-priority chain. <code>pipeline_docs</code> (probes for the 9 canonical planning docs), <code>beads</code> (task-tracker linkage), and <code>audit_history</code> (reads <code>docs/audits/*.json</code> for trends + lens-skip streaks) do <em>not</em> emit replay events.</div>
+<div class="note"><strong>Five emit, three probe</strong> <code>git</code>, <code>gh</code>, <code>mmr</code>, <code>state</code>, <code>tests</code> each implement <code>replayEvents()</code> and appear in the source-priority chain. <code>pipeline_docs</code> (probes 9 planning-doc roles; 5 of them are the canonical-required set that gates available vs degraded), <code>beads</code> (task-tracker linkage), and <code>audit_history</code> (reads <code>docs/audits/*.json</code> for trends + lens-skip streaks) do <em>not</em> emit replay events.</div>
 
 <div class="tbl-wrap"><table class="tbl"><thead><tr><th>adapter</th><th>source of truth</th><th>emits</th><th>correlation_id / dedup</th></tr></thead><tbody>
   <tr><td><code>git</code></td><td><code>git log</code>, <code>git worktree list</code> (30 s timeout)</td><td><code>commit</code></td><td>none (<code>null</code>); per-SHA seen-set within the window</td></tr>
   <tr><td><code>gh</code></td><td><code>gh pr list --state {open,merged,closed}</code> (needs auth)</td><td><code>pr_opened</code>, <code>pr_merged</code>, <code>pr_closed</code></td><td><code>pr:&lt;n&gt;:&lt;state&gt;</code> — dedups against the ledger's own PR events</td></tr>
-  <tr><td><code>mmr</code></td><td><code>.mmr/jobs/*/result.json</code> (by mtime)</td><td><code>job_completed</code></td><td>none</td></tr>
+  <tr><td><code>mmr</code></td><td><code>.mmr/jobs/*/result.json</code> (replay keyed on each job's <code>completed_at</code>)</td><td><code>job_completed</code></td><td>none</td></tr>
   <tr><td><code>state</code></td><td><code>.scaffold/state.json</code> + <code>services/*/state.json</code></td><td><code>step_completed</code>, <code>step_in_progress</code></td><td>none; per-step timestamp, mtime fallback</td></tr>
   <tr><td><code>tests</code></td><td><code>.scaffold/last-test-run.json</code></td><td><code>test_run_completed</code>, <code>test_run_failed</code></td><td>none</td></tr>
   <tr><td><code>pipeline_docs</code></td><td>candidate <code>docs/*.md</code> artifact paths</td><td>— (probe: available / degraded / unavailable)</td><td>n/a</td></tr>
@@ -862,7 +863,7 @@ window.OBS_CALLOUTS = Object.assign(window.OBS_CALLOUTS || {}, {
 
 <div class="lens-card"><span class="lens-id">C-standards</span><h4>Coding-standards drift</h4>
 <p class="lens-q"><em>Are coding standards being violated across files?</em> — <span class="fp" data-path="src/observability/checks/lens-c-standards.ts"><code>lens-c-standards.ts</code></span></p>
-<p><strong>Reads:</strong> graph <code>rules</code> + <code>files</code>. <strong>Tunes:</strong> <code>lenses.C-standards.rule_overrides</code> (per-rule severity), <code>escalation_threshold</code> (default 5 — more than N violations of a rule escalates to P1), <code>enforce_via_linter</code>. <strong>Severity:</strong> rule-specific <span class="chip chip-p0">P0</span>–<span class="chip chip-p3">P3</span>.</p>
+<p><strong>Reads:</strong> graph <code>rules</code> + <code>files</code>. <strong>Tunes:</strong> <code>lenses.C-standards.rule_overrides</code> (per-rule severity), <code>escalation_threshold</code> (default 5 — more than N violations of a rule escalates to P1). (<code>enforce_via_linter</code> is accepted in config but not read by the lens.) <strong>Severity:</strong> rule-specific <span class="chip chip-p0">P0</span>–<span class="chip chip-p3">P3</span>.</p>
 <p class="fb-note">Example: rule <code>no-console-log</code> violated at <code>src/index.ts:42</code>, 8 occurrences → escalated P1.</p></div>
 
 <div class="lens-card"><span class="lens-id">D-stack</span><h4>Tech-stack drift</h4>
@@ -885,7 +886,7 @@ window.OBS_CALLOUTS = Object.assign(window.OBS_CALLOUTS || {}, {
 
 <div class="lens-card"><span class="lens-id">H-cross-doc</span><h4>Cross-doc inconsistency</h4>
 <p class="lens-q"><em>Are features, stories, plans, playbook and decisions internally consistent?</em> — <span class="fp" data-path="src/observability/checks/lens-h-cross-doc.ts"><code>lens-h-cross-doc.ts</code></span></p>
-<p><strong>Reads:</strong> the full structural doc-graph + unresolved globs. <strong>Severity:</strong> <span class="chip chip-p0">P0</span> decision supersedes a non-existent decision; <span class="chip chip-p1">P1</span> feature with no story / orphan story / uncovered story; <span class="chip chip-p2">P2</span> plan task not in playbook, unresolved glob.</p></div>
+<p><strong>Reads:</strong> the full structural doc-graph + unresolved globs. <strong>Severity:</strong> <span class="chip chip-p0">P0</span> decision supersedes a non-existent decision, or a <em>must</em>-priority story uncovered by plan/playbook; <span class="chip chip-p1">P1</span> feature with no story / orphan story / <em>should</em>-priority uncovered story; <span class="chip chip-p2">P2</span> plan task not in playbook, unresolved glob.</p></div>
 
 <div class="note"><strong>Lens H — LLM-graded full-profile sub-checks</strong> Under <code>--profile=full</code> only, Lens H runs three extra checks via an LLM dispatcher (all silently return <code>[]</code> if the dispatcher fails, so the audit never breaks):
 <ul style="margin-top:var(--sp-2)">
@@ -893,7 +894,7 @@ window.OBS_CALLOUTS = Object.assign(window.OBS_CALLOUTS || {}, {
   <li><strong>PRD → stories coverage</strong> — a prose feature with no covering story (<span class="chip chip-p1">P1</span>).</li>
   <li><strong>terminology drift</strong> — one concept named inconsistently across docs (<span class="chip chip-p2">P2</span>).</li>
 </ul></div>
-<div class="note security"><strong>Security — the LLM dispatcher command is hard-coded</strong> The Lens H dispatcher (<span class="fp" data-path="src/observability/engine/llm-dispatcher.ts"><code>llm-dispatcher.ts</code></span>) always invokes <code>claude -p</code> through a fixed shell; it is <em>deliberately not</em> project-config-overridable, because the audit may run against untrusted third-party repos and a repo-controlled command would be arbitrary code execution. Only <code>llm.timeout_s</code> (and <code>llm.parallel_checks</code>) are configurable. <em>Contrast the <code>--fix</code> dispatcher, which is configurable — see <a href="#s10">§10</a>.</em></div>
+<div class="note security"><strong>Security — the LLM dispatcher command is hard-coded</strong> Lens H passes the literal <code>claude -p</code> (<span class="fp" data-path="src/observability/checks/lens-h-cross-doc.ts"><code>lens-h-cross-doc.ts:164</code></span>) into the shared dispatcher (<span class="fp" data-path="src/observability/engine/llm-dispatcher.ts"><code>llm-dispatcher.ts</code></span>, which runs it through a fixed shell). The command is <em>deliberately not</em> project-config-overridable, because the audit may run against untrusted third-party repos and a repo-controlled command would be arbitrary code execution. Only <code>llm.timeout_s</code> (and <code>llm.parallel_checks</code>) are configurable. <em>Contrast the <code>--fix</code> dispatcher, which is configurable — see <a href="#s10">§10</a>.</em></div>
 
 <div class="lens-card"><span class="lens-id">I-knowledge-gaps</span><h4>Knowledge gaps — the ninth lens</h4>
 <p class="lens-q"><em>What topics have agents repeatedly needed (over a 90-day window) with no knowledge-base entry?</em> — <span class="fp" data-path="src/observability/checks/lens-i-knowledge-gaps.ts"><code>lens-i-knowledge-gaps.ts</code></span></p>
@@ -984,7 +985,7 @@ window.OBS_CALLOUTS = Object.assign(window.OBS_CALLOUTS || {}, {
 <p class="s-lede"><code>scaffold observe progress</code> shows what's in flight. With <code>--replay</code> it fuses the ledger with synthesized git/gh/mmr/state/tests events into one timeline; stall detection runs at every command boundary and surfaces a "Needs Attention" panel.</p>
 
 <h3>Fusion — how the timeline is built</h3>
-<p>The synthesizer (<span class="fp" data-path="src/observability/engine/synthesizer.ts"><code>synthesizer.ts:254</code></span>) converts each ledger <code>Event</code> to a <code>ReplayEvent</code>, concatenates the adapter events, filters to the time window, then dedups:</p>
+<p>The synthesizer's <code>composeReplay</code> (<span class="fp" data-path="src/observability/engine/synthesizer.ts"><code>synthesizer.ts:294</code></span>) converts each ledger <code>Event</code> to a <code>ReplayEvent</code>, concatenates the adapter events, filters to the time window, then dedups:</p>
 <ul>
   <li>Events with a <code>null</code> <code>correlation_id</code> pass through untouched.</li>
   <li>Events that share a <code>correlation_id</code> collapse to one — the synthesizer keeps the lowest <code>SOURCE_PRIORITY</code> number (<code>ledger</code> 0 → <code>tests</code> 5; see <a href="#s4">§4</a>), breaking ties by earliest <code>ts</code>.</li>
@@ -998,7 +999,7 @@ window.OBS_CALLOUTS = Object.assign(window.OBS_CALLOUTS || {}, {
   <tr><td><code>task_stale</code></td><td>task claimed, no commit/heartbeat/completion since</td><td><code>stall.task_stale</code> · <code>4h</code></td></tr>
   <tr><td><code>pr_stale</code></td><td>PR opened, not merged/closed</td><td><code>stall.pr_stale</code> · <code>48h</code></td></tr>
   <tr><td><code>blocker_unaddressed</code></td><td><code>blocker_hit</code> with no <code>blocker_resolved</code></td><td><code>stall.blocker_unaddressed</code> · <code>2h</code></td></tr>
-  <tr><td><code>audit_findings_unresolved</code></td><td>open finding ≥ threshold age and ≤ fix_threshold severity</td><td><code>stall.audit_findings_unresolved</code> · <code>24h</code></td></tr>
+  <tr><td><code>audit_findings_unresolved</code></td><td>open finding past threshold age, severity at or above <code>fix_threshold</code></td><td><code>stall.audit_findings_unresolved</code> · <code>24h</code></td></tr>
   <tr><td><code>lens_skipped_repeatedly</code></td><td>a lens skipped on ≥3 consecutive audits</td><td>hard-coded streak ≥ 3 (no config key)</td></tr>
   <tr><td><code>pr_review_stale</code> <span class="chip chip-warn">reserved</span></td><td>— not yet emitted —</td><td><code>stall.pr_review_stale</code> · <code>24h</code> (defined, unused)</td></tr>
 </tbody></table></div>
@@ -1028,7 +1029,7 @@ window.OBS_CALLOUTS = Object.assign(window.OBS_CALLOUTS || {}, {
 <p class="s-lede">Completing a planning document should re-check the docs for drift — automatically, but never blocking the build. When a pipeline step at a phase boundary is marked complete, the state manager fires a docs audit and prints a one-line summary.</p>
 
 <h3>The hook</h3>
-<p><code>StateManager.markCompleted()</code> is <strong>async</strong> (<span class="fp" data-path="src/state/state-manager.ts"><code>state-manager.ts:174</code></span>): it saves state, then — if the completed step is a phase boundary — awaits <code>runPhaseAudit({ primaryRoot, step })</code>. The six boundary steps (<span class="fp" data-path="src/observability/engine/phase-subsets.ts"><code>phase-subsets.ts</code></span>):</p>
+<p><code>StateManager.markCompleted()</code> is <strong>async</strong> (<span class="fp" data-path="src/state/state-manager.ts"><code>state-manager.ts:174</code></span>): it saves state, then awaits <code>runPhaseAudit({ primaryRoot, step })</code> for <em>every</em> completed step — the phase-boundary gate lives inside <code>runPhaseAudit</code>, which returns a no-op result unless the step is one of the six boundaries (<span class="fp" data-path="src/observability/engine/phase-subsets.ts"><code>phase-subsets.ts</code></span>):</p>
 <div class="fb-opts" style="margin:var(--sp-3) 0">
   <span class="chip chip-accent">user-stories</span><span class="chip chip-accent">tech-stack</span><span class="chip chip-accent">coding-standards</span>
   <span class="chip chip-accent">design-system</span><span class="chip chip-accent">implementation-plan</span><span class="chip chip-accent">implementation-playbook</span>
@@ -1052,7 +1053,7 @@ window.OBS_CALLOUTS = Object.assign(window.OBS_CALLOUTS || {}, {
 <h4>The stdout line</h4>
 <div class="code"><div class="code-bar"><span class="path">formatPhaseAuditLine — phase-audit.ts</span></div>
 <pre><span class="tok-c"># normal</span>
-[audit] 3 findings (1 blocking, verdict=blocked) — see docs/audits/audit-…-fast-docs.md
+[audit] 3 findings (1 blocking, verdict=blocked) — see docs/audits/audit-…-fast-all.md
 <span class="tok-c"># detached (fire-and-forget)</span>
 [audit] dispatched in background (step: tech-stack)
 <span class="tok-c"># timed out</span>
@@ -1075,9 +1076,9 @@ window.OBS_CALLOUTS = Object.assign(window.OBS_CALLOUTS || {}, {
 <p>The composite <code>location</code> — <code>&lt;source_doc&gt;::&lt;lens_id&gt;::&lt;short_id&gt;</code> — gives each finding a stable identity across audit runs, so MMR can track the same defect over time.</p>
 <div class="tbl-wrap"><table class="tbl"><thead><tr><th>MMR field</th><th>derived from</th></tr></thead><tbody>
   <tr><td><code>severity</code></td><td><code>finding.severity</code> (P0–P3)</td></tr>
-  <tr><td><code>location</code></td><td><code>${source_doc ?? '(no-source-doc)'}::${lens_id}::${id.slice(0,8)}</code></td></tr>
+  <tr><td><code>location</code></td><td><code>${source_doc || '(no-source-doc)'}::${lens_id}::${id.slice(0,8)}</code></td></tr>
   <tr><td><code>description</code></td><td><code>[doc-conformance/${lens_id}] ${title}</code> + optional <code>— ${description}</code></td></tr>
-  <tr><td><code>suggestion</code></td><td><code>fix_hint.prompt ?? fix_hint.target ?? ''</code></td></tr>
+  <tr><td><code>suggestion</code></td><td><code>fix_hint?.prompt ?? fix_hint?.target ?? ''</code></td></tr>
   <tr><td><code>category</code></td><td>literal <code>'doc-conformance'</code></td></tr>
 </tbody></table></div>
 
@@ -1191,14 +1192,24 @@ verdict: <span class="term-blocked">blocked</span>
 **Verdict:** blocked
 
 ## Summary
-1 finding · 1 blocking · 0 acked
+1 findings · 1 blocking
+(at or above P2) · 0
+acknowledged · 0 skipped
 
-### [P0] B-ac-coverage —
-AC has failing test
-`3a8c1f02` · src:
-docs/user-stories.md#user-auth-1
+### Severity P0 (1)
 
-**Fix hint:** Re-enable the test</pre></div>
+### [P0] B-ac-coverage — AC
+has failing test
+
+`3a8c1f02` · *source:*
+`…#user-auth-1` ·
+*confidence:* high
+
+**Fix hint:**
+```json
+{ "prompt": "Re-enable…",
+  "target": "…test.spec.ts" }
+```</pre></div>
   <div class="rcard"><div class="rhead">dashboard fragment — HTML</div>
 <pre>&lt;section id="build-audit"
   class="panel"
@@ -1270,7 +1281,7 @@ docs/user-stories.md#user-auth-1
   </div>
 </div>
 
-<div class="note diverge"><strong>No <code>llm.dispatcher_command</code>, no <code>fix.wave_budget</code></strong> Two keys you might expect are deliberately absent. The Lens H LLM command is hard-coded (security, <a href="#s5">§5</a>) — there is no <code>llm.dispatcher_command</code> key. And Lens F's "wave/phase budget" is read from <code>.scaffold/state.json</code>, not from this file — there is no <code>F-scope.wave_budget</code> key, despite CLAUDE.md implying one. Both flagged in <a href="#s16">§16</a>.</div>
+<div class="note diverge"><strong>No <code>llm.dispatcher_command</code>, no <code>F-scope.wave_budget</code></strong> Two keys you might expect are deliberately absent. The Lens H LLM command is hard-coded (security, <a href="#s5">§5</a>) — there is no <code>llm.dispatcher_command</code> key. And there is no wave/phase-budget key at all: <code>F-scope</code> reads only <code>untouched_story_grace_hours</code> from this file, so the "wave budget" CLAUDE.md implies does not exist in the config. Both flagged in <a href="#s16">§16</a>.</div>
 
 <h4>Example</h4>
 <div class="code"><div class="code-bar"><span class="path">.scaffold/observability.yaml</span><button class="copy-btn" data-copy="cfgEx">copy</button></div>
@@ -1375,7 +1386,7 @@ window.OBS_FILE_MAP = [
     <section class="s" id="s15"><div class="s-num">15</div><div class="s-body">
 <p class="s-eyebrow">Provenance</p>
 <h2>Shipping history</h2>
-<p class="s-lede">Build Observability shipped as eight plans (Foundation → Fix-flow), released together as <code>v3.26.0 — Build Observability</code> on 2026-05-07, with Lens I and refinements following after. The mapping below is seeded from <code>docs/superpowers/observability-worktree-status.md</code> and verified against <code>git log</code>.</p>
+<p class="s-lede">Build Observability shipped as eight plans (Foundation → Fix-flow), released together as <code>v3.26.0 — Build Observability</code> on 2026-05-07, with Lens I and refinements following after. The mapping below is seeded from the worktree-teardown audit (authored on the <code>feat/observability-worktree-audit-report</code> branch, not yet on <code>main</code>) and independently verified against <code>git log</code>.</p>
 <div class="tbl-wrap" data-table>
   <div class="tbl-filter">
     <label for="shipSearch">filter</label>
@@ -1400,7 +1411,7 @@ window.OBS_FILE_MAP = [
     </tbody>
   </table>
 </div>
-<p class="fb-note">All eight workspaces are recorded <code>safe-to-teardown</code> in the worktree-status doc; none ever wrote an <code>activity.jsonl</code>, so their harvests are clean no-ops.</p></div></section>
+<p class="fb-note">All five observability worktrees are recorded <code>safe-to-teardown</code> in that audit; none ever wrote an <code>activity.jsonl</code>, so their harvests are clean no-ops.</p></div></section>
 
     <section class="s" id="s16"><div class="s-num">16</div><div class="s-body">
 <p class="s-eyebrow">Self-audit</p>
@@ -1408,11 +1419,22 @@ window.OBS_FILE_MAP = [
 <p class="s-lede">Like its sibling, this page is meant to be audited in rounds (R2, R3, …) that fact-check every claim against the code and append their results here. The table starts empty — the first row lands when R2 runs, in the same shape PRs #415 and #416 used for the knowledge-freshness reference.</p>
 
 <div class="tbl-wrap"><table class="tbl"><thead><tr><th>round</th><th>date</th><th>findings</th><th>verdict</th><th>report</th><th>merged in</th></tr></thead><tbody>
-  <tr><td>R1</td><td>2026-05-28</td><td>initial authoring</td><td><span class="chip chip-pass">authored</span></td><td>this page</td><td>(PR pending)</td></tr>
-  <!-- R2/R3 rows appended by future audits, newest verdict last -->
+  <tr><td>R1</td><td>2026-05-28</td><td>initial authoring</td><td><span class="chip chip-pass">authored</span></td><td>this page</td><td>#418</td></tr>
+  <tr><td>R2</td><td>2026-05-29</td><td>18 (1&nbsp;P0&#8209;example / 6&nbsp;P2 / 11&nbsp;P3)</td><td><span class="chip chip-pass">all resolved</span></td><td>5-agent adversarial fact-check</td><td>(R2 PR)</td></tr>
+  <!-- R3 row appended by the next audit, newest last -->
 </tbody></table></div>
 
-<h3>Divergences flagged during authoring</h3>
+<h3>What R2 changed</h3>
+<p>R2 ran five independent agents that re-derived every claim from <code>src/observability/</code> and tried to break it. No code bugs surfaced and all eight divergences below were re-confirmed true. The fixes were documentation-precision corrections:</p>
+<ul>
+  <li><strong>Worked-example correctness:</strong> the redaction sample/animation showed <code>token=ghp_…</code> → <code>[REDACTED:github-token]</code>; leftmost-match alternation actually yields <code>[REDACTED:kv-secret]</code> for a <code>token=</code> pair (<a href="#s3">§3</a>). The MMR markdown mockup now matches the real renderer (single-line heading, <code>*source:*</code>/<code>*confidence:*</code> meta, fenced-JSON fix hint) (<a href="#s12">§12</a>).</li>
+  <li><strong>Severity/precision:</strong> Lens H emits <span class="chip chip-p0">P0</span> (not P1) for a must-priority uncovered story (<a href="#s5">§5</a>); the MMR <code>location</code> mapping uses <code>||</code> not <code>??</code> (<a href="#s9">§9</a>); the phase-audit report filename is <code>…-fast-all.md</code> (scope isn't forwarded into the report id) (<a href="#s8">§8</a>).</li>
+  <li><strong>Removed an unsupported claim:</strong> Lens F's "wave budget" is not read from <code>.scaffold/state.json</code> — there is no such key anywhere (<a href="#s13">§13</a>). And <code>enforce_via_linter</code> is accepted in config but not read by Lens C (<a href="#s5">§5</a>).</li>
+  <li><strong>Citations/wording:</strong> softened the §15 pointer to the worktree-status doc (not yet on <code>main</code>); attributed the hard-coded <code>claude -p</code> to <code>lens-h-cross-doc.ts:164</code>; corrected the <code>composeReplay</code> line anchor, the mmr "completed_at" window label, the Windows <code>C:\~</code> path, the <code>blocker_hit</code> summary cap, and the markCompleted control-flow description.</li>
+</ul>
+<p class="fb-note">One nit accepted no-change: §13 lists <code>escalation_threshold</code> (5) and <code>llm.parallel_checks</code> (false) as consumer-side defaults rather than <code>DEFAULT_CONFIG</code> entries — covered by the section lede's "defaults come from the code" framing.</p>
+
+<h3>Divergences flagged during authoring (R2-confirmed)</h3>
 <p>The audit's own rule — "code is ground truth where it disagrees with the spec or the docs" — surfaced these mismatches while this page was written. They are deferred findings for a future round to resolve in the code/docs, not on this page:</p>
 <ul>
   <li><strong>9 lenses, not 8.</strong> The design spec and CLAUDE.md enumerate A–H; <code>I-knowledge-gaps</code> shipped and is registered. <em>(<a href="#s5">§5</a>)</em></li>
