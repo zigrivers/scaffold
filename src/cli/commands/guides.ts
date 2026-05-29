@@ -116,8 +116,12 @@ const guidesCommand: CommandModule<Record<string, unknown>, GuidesArgs> = {
       process.exit(0)
     }
 
-    if (argv.open) openInBrowser(guide.htmlPath)
-    output.info(`Opened ${guide.htmlPath}`)
+    if (argv.open) {
+      openInBrowser(guide.htmlPath)
+      output.info(`Opened ${guide.htmlPath}`)
+    } else {
+      output.info(`Guide: ${guide.htmlPath} (not opened)`)
+    }
     process.exit(0)
   },
 }

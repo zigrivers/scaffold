@@ -14,4 +14,11 @@ describe('remarkCallout', () => {
     const { body } = await renderGuideBody(':::callout\ntext\n:::\n', { plugins: [remarkCallout] })
     expect(body).toContain('class="callout callout-note"')
   })
+
+  it('lowercases the type attribute before allowlist check', async () => {
+    const md = ':::callout{type=Warning}\nWatch out.\n:::\n'
+    const { body } = await renderGuideBody(md, { plugins: [remarkCallout] })
+    expect(body).toContain('class="callout callout-warning"')
+    expect(body).not.toContain('class="callout callout-note"')
+  })
 })
