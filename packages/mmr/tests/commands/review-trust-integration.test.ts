@@ -75,6 +75,8 @@ async function runReview(args: Record<string, unknown>, dirs: { cwd: string; hom
   const logs: string[] = []
   vi.spyOn(console, 'log').mockImplementation((m?: unknown) => { logs.push(String(m)) })
   vi.spyOn(console, 'error').mockImplementation(() => {})
+  const prevExitCode = process.exitCode
+  process.exitCode = undefined
   let exited: number | undefined
   vi.spyOn(process, 'exit').mockImplementation(((code?: number) => {
     exited = code ?? 0
@@ -95,6 +97,10 @@ async function runReview(args: Record<string, unknown>, dirs: { cwd: string; hom
     vi.doUnmock('../../src/core/dispatcher.js')
     vi.doUnmock('../../src/core/auth.js')
   }
+  // The trust gate exits via exitCode+return (no process.exit), so fall back to
+  // process.exitCode when the exit mock wasn't triggered.
+  if (exited === undefined && typeof process.exitCode === 'number') exited = process.exitCode
+  process.exitCode = prevExitCode
   const json = logs.find((l) => l.trim().startsWith('{'))
   return { output: json ? (JSON.parse(json) as Record<string, unknown>) : undefined, exited }
 }

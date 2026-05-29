@@ -336,7 +336,12 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     // --accept-new-acks means "honor the ack files added in the diff", so it
     // must also LOAD the working-tree acks (not merely skip the gate) — else an
     // accepted new ack would be ratified but never applied (loaded from the
-    // base ref, which doesn't have it).
+    // base ref, which doesn't have it). This loads the whole working-tree acks
+    // dir, but in base-ref/PR review the working tree IS the head (= base +
+    // the diff under review), so that's exactly "base acks + the accepted new
+    // acks" — not arbitrary over-trust — and it reproduces in results/reconcile
+    // via the persisted policy. The flag is an operator decision, not
+    // attacker-controllable.
     const honorWorkingTreeAcks = trustWorkingTreeAcks || args.acceptNewAcks === true
     const refHint =
       trust.trust_mode === 'non-git'
@@ -427,7 +432,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
           ? 'the diff proposes project config (.mmr.yaml) and ack changes'
           : blockingConfigChange
             ? 'the diff proposes a project config change (.mmr.yaml)'
-            : 'the diff proposes new project acks'
+            : 'the diff proposes project ack changes (.mmr/acks/)'
       const decision: Record<string, unknown> = {
         verdict: 'needs-user-decision',
         fix_threshold: config.defaults.fix_threshold,
@@ -442,7 +447,10 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       if (diffChanges.config_file_changed) decision.proposed_config_change = true
       if (diffChanges.ack_files_changed.length > 0) decision.proposed_acks = diffChanges.ack_files_changed
       console.log(outputFormat === 'json' ? JSON.stringify(decision, null, 2) : String(decision.summary))
-      process.exit(2)
+      // exitCode + return (not process.exit) for consistency with the early
+      // guards and so the handler stays unit-testable without mocking exit.
+      process.exitCode = 2
+      return
     }
 
     let sessionLink: { store: SessionStore; id: string } | undefined
