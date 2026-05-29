@@ -37,7 +37,7 @@ interface DashboardArgs {
   root?: string
   force?: boolean
   output?: string
-  'no-open'?: boolean
+  open?: boolean
   'json-only'?: boolean
   service?: string
 }
@@ -59,7 +59,7 @@ function writeAndOpenDashboard(
   fs.mkdirSync(path.dirname(outputPath), { recursive: true })
   atomicWriteFile(outputPath, html)
 
-  if (!argv['no-open']) {
+  if (argv.open) {
     try {
       if (process.platform === 'darwin') execFileSync('open', [outputPath])
       else if (process.platform === 'win32') execFileSync('cmd', ['/c', 'start', '', outputPath])
@@ -82,10 +82,10 @@ const dashboardCommand: CommandModule<Record<string, unknown>, DashboardArgs> = 
         type: 'string',
         description: 'Output path for HTML file',
       })
-      .option('no-open', {
+      .option('open', {
         type: 'boolean',
-        description: 'Skip opening in browser',
-        default: false,
+        description: 'Open in browser (use --no-open to suppress)',
+        default: true,
       })
       .option('json-only', {
         type: 'boolean',

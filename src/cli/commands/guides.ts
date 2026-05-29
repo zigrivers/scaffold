@@ -46,7 +46,7 @@ interface GuidesArgs {
   list?: boolean
   markdown?: boolean
   'print-path'?: boolean
-  'no-open'?: boolean
+  open?: boolean
   build?: boolean
   format?: string
   auto?: boolean
@@ -62,7 +62,7 @@ const guidesCommand: CommandModule<Record<string, unknown>, GuidesArgs> = {
       .option('list', { type: 'boolean', default: false, describe: 'List available guides' })
       .option('markdown', { type: 'boolean', default: false, describe: 'Print the guide markdown source' })
       .option('print-path', { type: 'boolean', default: false, describe: 'Print the guide\'s markdown path' })
-      .option('no-open', { type: 'boolean', default: false, describe: 'Do not open a browser' })
+      .option('open', { type: 'boolean', default: true, describe: 'Open in browser (use --no-open to suppress)' })
       .option('build', {
         type: 'boolean', default: false, describe: 'Regenerate ALL guide HTML from sources (maintainer/CI)',
       }) as Argv<GuidesArgs>,
@@ -91,7 +91,7 @@ const guidesCommand: CommandModule<Record<string, unknown>, GuidesArgs> = {
 
     if (!argv.topic) {
       const indexHtml = `${getPackageGuidesDir(projectRoot)}/index.html`
-      if (!argv['no-open'] && fs.existsSync(indexHtml)) openInBrowser(indexHtml)
+      if (argv.open && fs.existsSync(indexHtml)) openInBrowser(indexHtml)
       output.info(`Guides index: ${indexHtml}`)
       process.exit(0)
     }
@@ -116,7 +116,7 @@ const guidesCommand: CommandModule<Record<string, unknown>, GuidesArgs> = {
       process.exit(0)
     }
 
-    if (!argv['no-open']) openInBrowser(guide.htmlPath)
+    if (argv.open) openInBrowser(guide.htmlPath)
     output.info(`Opened ${guide.htmlPath}`)
     process.exit(0)
   },

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
+import { execFileSync } from 'node:child_process'
 import { listGuides, resolveGuide } from '../cli/commands/guides.js'
 
 const FM = '---\ntitle: MMR\ntopic: mmr\ndescription: review\ncategory: tools\norder: 10\n---\n# x\n'
@@ -14,6 +15,15 @@ function fixture(): string {
   fs.writeFileSync(path.join(dir, 'index.html'), '<html></html>')
   return root
 }
+
+describe('--no-open flag (yargs strict regression)', () => {
+  it('accepts --no-open without a strict-mode rejection', () => {
+    const cli = path.resolve('dist/index.js')
+    const out = execFileSync('node', [cli, 'guides', '--no-open', '--list', '--format', 'json'], { encoding: 'utf8' })
+    const parsed = JSON.parse(out) as { success: boolean }
+    expect(parsed.success).toBe(true)
+  })
+})
 
 describe('listGuides', () => {
   it('returns guide summaries sorted by order', () => {
