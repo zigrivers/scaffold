@@ -35,3 +35,6 @@ jobs:
 
       - name: Validate knowledge frontmatter
         run: make validate-knowledge
+
+      - name: Guides drift + security gate
+        run: make guides-check
