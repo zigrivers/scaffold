@@ -202,7 +202,7 @@ export async function checkConfiguredCompensatorAvailability(
   const compChannel = getCompensatorChannel(config)
 
   // HTTP compensator: probe over the wire (no install/command step).
-  if (compChannel && compChannel.kind === 'http') {
+  if (compChannel?.kind === 'http') {
     const httpAuth = await checkHttpAuth(compChannel)
     if (httpAuth.status === 'ok') return { status: 'ok', auth: 'ok' }
     const httpStatus = channelStatusFromAuthResult(httpAuth.status)
