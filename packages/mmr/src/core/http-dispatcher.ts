@@ -16,10 +16,33 @@ function classifyStatus(status: number): ChannelStatus {
   return 'failed'
 }
 
-/** True when the channel's parser implies JSON output, so we ask for response_format. */
+/**
+ * True when the channel's parser consumes JSON, so we request
+ * `response_format: {type:'json_object'}`. `regex-findings` is a text scanner
+ * (it runs a RegExp over prose output), so it must NOT force JSON.
+ */
 function impliesJsonOutput(parser: HttpChannelParsed['output_parser']): boolean {
-  if (typeof parser !== 'string') return true // structured parsers (regex/jsonpath) consume JSON
-  return parser === 'default' || parser === 'gemini' || parser === 'doc-conformance'
+  if (typeof parser === 'string') {
+    return parser === 'default' || parser === 'gemini' || parser === 'doc-conformance'
+  }
+  return parser.kind === 'unwrap-jsonpath'
+}
+
+/**
+ * Extract the assistant message from an openai-chat completion envelope so the
+ * saved channel output matches what a subprocess channel writes (the model's
+ * direct text), letting the existing parsers consume it unchanged. Falls back
+ * to the raw body if the response is not the expected envelope shape.
+ */
+function extractOpenAiContent(body: string): string {
+  try {
+    const parsed = JSON.parse(body) as { choices?: Array<{ message?: { content?: unknown } }> }
+    const content = parsed?.choices?.[0]?.message?.content
+    if (typeof content === 'string') return content
+  } catch {
+    // Not JSON / not the expected shape — fall through to the raw body.
+  }
+  return body
 }
 
 /**
@@ -27,10 +50,10 @@ function impliesJsonOutput(parser: HttpChannelParsed['output_parser']): boolean 
  *
  * Security invariant (T1-C / §5 decision 1): the API key value read from
  * `process.env[api_key_env]` is used ONLY to build the request header. It is
- * NEVER persisted to the job store or included in any error marker. On any
- * non-200 status we save a body-free marker (`{"error":"HTTP <code>"}`) because
- * a misconfigured or hostile endpoint can reflect the Authorization header back
- * in its response body — saving that body would leak the secret to disk.
+ * NEVER persisted or logged. Failure diagnostics are SYNTHETIC strings derived
+ * from the status code / error name — never the response body, because a
+ * misconfigured or hostile endpoint can reflect the Authorization header back
+ * in its body, and persisting that would leak the secret to disk.
  */
 export async function dispatchHttpChannel(
   store: JobStore,
@@ -42,6 +65,18 @@ export async function dispatchHttpChannel(
   const startedAt = new Date().toISOString()
   store.updateChannel(jobId, channelName, { status: 'running', started_at: startedAt })
 
+  const finalize = (status: ChannelStatus, logDetail?: string): void => {
+    // Synthetic diagnostics only — surfaced by the results pipeline via the
+    // channel log. NEVER the response body (secret-reflection risk).
+    if (logDetail) store.saveChannelLog(jobId, channelName, logDetail)
+    store.updateChannel(jobId, channelName, {
+      status,
+      started_at: startedAt,
+      completed_at: new Date().toISOString(),
+      output_parser: channel.output_parser,
+    })
+  }
+
   const headers: Record<string, string> = {
     'content-type': 'application/json',
     ...(channel.headers ?? {}),
@@ -49,18 +84,8 @@ export async function dispatchHttpChannel(
   if (channel.api_key_env) {
     const value = process.env[channel.api_key_env]
     if (!value) {
-      // Env-var name only — never the value (which is absent here anyway).
-      store.saveChannelOutput(
-        jobId,
-        channelName,
-        JSON.stringify({ error: `API key env var ${channel.api_key_env} not set` }),
-      )
-      store.updateChannel(jobId, channelName, {
-        status: 'auth_failed',
-        started_at: startedAt,
-        completed_at: new Date().toISOString(),
-        output_parser: channel.output_parser,
-      })
+      // Env-var name only — never the value (absent here anyway).
+      finalize('auth_failed', `API key env var ${channel.api_key_env} not set`)
       return
     }
     headers[channel.api_key_header] = `${channel.api_key_prefix}${value}`
@@ -77,7 +102,6 @@ export async function dispatchHttpChannel(
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), Math.max(0, timeout * 1000))
 
-  let status: ChannelStatus
   try {
     const res = await fetch(channel.endpoint, {
       method: 'POST',
@@ -85,27 +109,22 @@ export async function dispatchHttpChannel(
       body: JSON.stringify(body),
       signal: controller.signal,
     })
-    status = classifyStatus(res.status)
+    const status = classifyStatus(res.status)
     if (status === 'completed') {
-      store.saveChannelOutput(jobId, channelName, await res.text())
+      // Save the model's direct output (unwrapped from the envelope) so the
+      // existing parsers consume it exactly like subprocess stdout.
+      store.saveChannelOutput(jobId, channelName, extractOpenAiContent(await res.text()))
+      finalize('completed')
     } else {
-      // Body-free marker: a misconfigured endpoint can echo the Authorization
-      // header in its body, so we never persist the response body on failure.
-      store.saveChannelOutput(jobId, channelName, JSON.stringify({ error: `HTTP ${res.status}` }))
+      finalize(status, `HTTP ${res.status}`)
     }
   } catch (err: unknown) {
-    status = (err as { name?: string }).name === 'AbortError' ? 'timeout' : 'failed'
-    // Generic marker only — the underlying error can carry request details
-    // (including the header value) so we never serialize it.
-    store.saveChannelOutput(jobId, channelName, JSON.stringify({ error: status }))
+    if ((err as { name?: string }).name === 'AbortError') {
+      finalize('timeout', `request timed out after ${timeout}s`)
+    } else {
+      finalize('failed', 'request failed')
+    }
   } finally {
     clearTimeout(timer)
   }
-
-  store.updateChannel(jobId, channelName, {
-    status,
-    started_at: startedAt,
-    completed_at: new Date().toISOString(),
-    output_parser: channel.output_parser,
-  })
 }

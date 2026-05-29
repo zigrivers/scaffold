@@ -4,6 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { JobStore } from '../../src/core/job-store.js'
 import { dispatchHttpChannel } from '../../src/core/http-dispatcher.js'
+import { parseChannelOutput } from '../../src/core/parser.js'
 import type { HttpChannelParsed } from '../../src/config/schema.js'
 
 function makeStore(): { store: JobStore; jobId: string; cleanup: () => void } {
@@ -43,10 +44,12 @@ describe('dispatchHttpChannel', () => {
     vi.restoreAllMocks()
   })
 
-  it('200 → saves response body and marks channel completed', async () => {
+  it('200 → unwraps the openai-chat envelope, saves the model content, marks completed', async () => {
     const { store, jobId, cleanup } = makeStore()
     try {
-      const responseBody = JSON.stringify({ choices: [{ message: { content: '{"findings": []}' } }] })
+      // The model's direct output (what a subprocess channel writes as stdout).
+      const modelContent = JSON.stringify({ findings: [], approved: true, summary: 'ok' })
+      const responseBody = JSON.stringify({ choices: [{ message: { content: modelContent } }] })
       const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue(
         new Response(responseBody, { status: 200, headers: { 'content-type': 'application/json' } }),
       )
@@ -58,6 +61,43 @@ describe('dispatchHttpChannel', () => {
       const callInit = fetchMock.mock.calls[0][1] as RequestInit
       const headers = callInit.headers as Record<string, string>
       expect(headers.Authorization).toBe('Bearer sk-secret-do-not-leak')
+      // request body asks for JSON for the default parser
+      expect(JSON.parse(callInit.body as string).response_format).toEqual({ type: 'json_object' })
+      // Saved output is the UNWRAPPED content (not the envelope) and parses cleanly.
+      const stored = JSON.parse(store.loadChannelOutput(jobId, 'groq')) as string
+      expect(stored).toBe(modelContent)
+      const parsed = parseChannelOutput(stored, 'default')
+      expect(parsed.findings).toEqual([])
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('does NOT force response_format for a regex-findings (text-scanning) parser', async () => {
+    const { store, jobId, cleanup } = makeStore()
+    try {
+      const channel: HttpChannelParsed = {
+        ...baseChannel,
+        output_parser: { kind: 'regex-findings', pattern: '(?<sev>P\\d)', flags: 'gm', default_severity: 'P2', fields: { location: 1, description: 1, severity: 1 } },
+      }
+      const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ choices: [{ message: { content: 'P2 foo bar' } }] }), { status: 200 }),
+      )
+      await dispatchHttpChannel(store, jobId, 'groq', { channel, prompt: 'x', timeout: 30 })
+      const callInit = fetchMock.mock.calls[0][1] as RequestInit
+      expect(JSON.parse(callInit.body as string).response_format).toBeUndefined()
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('surfaces a synthetic failure reason via the channel log (not the response body)', async () => {
+    const { store, jobId, cleanup } = makeStore()
+    try {
+      vi.spyOn(global, 'fetch').mockResolvedValue(new Response('rate limited, retry later', { status: 429 }))
+      await dispatchHttpChannel(store, jobId, 'groq', { channel: baseChannel, prompt: 'x', timeout: 30 })
+      const log = store.loadChannelLog(jobId, 'groq')
+      expect(log).toBe('HTTP 429')
     } finally {
       cleanup()
     }
