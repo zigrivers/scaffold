@@ -1,11 +1,11 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
-import { execFileSync } from 'node:child_process'
 import yaml from 'js-yaml'
 import { MmrConfigSchema, type MmrConfigParsed } from './schema.js'
 import { DEFAULT_CONFIG } from './defaults.js'
 import { isSecretKey } from '../core/redact.js'
+import { readFileAtRef } from '../core/git-show.js'
 
 export interface LoadConfigOptions {
   projectRoot: string
@@ -116,16 +116,11 @@ function loadYaml(filePath: string): Record<string, unknown> | undefined {
 
 function loadProjectYaml(opts: LoadConfigOptions): Record<string, unknown> | undefined {
   if (opts.configBaseRef !== undefined && opts.trustProjectConfig !== true) {
-    let raw: string
-    try {
-      raw = execFileSync(
-        'git',
-        ['-C', opts.projectRoot, 'show', `${opts.configBaseRef}:.mmr.yaml`],
-        { encoding: 'utf-8', maxBuffer: 1024 * 1024 },
-      )
-    } catch {
-      return undefined
-    }
+    // Trust boundary (§5 decision 1): read .mmr.yaml from the trusted base ref
+    // via the shared git-show helper, never from the (possibly untrusted)
+    // working tree. Missing file/ref → no project config (built-in defaults).
+    const raw = readFileAtRef({ cwd: opts.projectRoot, ref: opts.configBaseRef, filePath: './.mmr.yaml' })
+    if (raw === undefined) return undefined
     return parseYamlConfig(raw, `${opts.configBaseRef}:.mmr.yaml`)
   }
 
