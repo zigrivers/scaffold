@@ -272,9 +272,13 @@ mmr review --pr 42 --dry-run
 ### Stable finding identity and sessions
 
 Each reconciled finding now carries a `finding_key` — a deterministic hash
-built from the **normalized** location and category plus a sha1 of the
+built from the **normalized** location and category plus a SHA-1 of the
 normalized description and suggestion (severity is intentionally *not* part of
-the key). Normalization strips trailing line/column spans from the location and
+the key). The SHA-1 here is a fast **content-identity** digest for
+deduplicating findings across rounds — not a security primitive — so its
+collision resistance is irrelevant (a chance collision would merely merge two
+unrelated findings, which is both astronomically unlikely and harmless).
+Normalization strips trailing line/column spans from the location and
 inline `line N` mentions from the prose, and folds casing/whitespace. As a
 result, line-number drift and severity changes do not change the identity of an
 issue across rounds. The hash still depends on the description/suggestion text,
@@ -353,8 +357,9 @@ Optional fields:
 - `api_key_env` — the NAME of the env var holding the API key. The literal
   value is never written to `.mmr.yaml`.
 - `api_key_header` (default `Authorization`)
-- `api_key_prefix` (default `Bearer `; set to `""` for providers that
-  expect a raw key)
+- `api_key_prefix` — prepended to the key value in the auth header. The
+  default is the four characters `Bearer` followed by a single space. Set it to
+  an empty string (`""`) for providers that expect a raw key with no prefix.
 - `headers` — extra headers (e.g. `{ "X-Org": "..." }`)
 - `auth.check_endpoint` — explicit auth-probe URL, written as a `check_endpoint`
   key nested under an `auth:` block (the `auth.` prefix is dot-notation for that
