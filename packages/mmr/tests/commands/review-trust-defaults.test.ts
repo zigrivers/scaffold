@@ -9,9 +9,16 @@ import path from 'node:path'
 const originalHome = process.env.HOME
 const originalMmrHome = process.env.MMR_HOME
 
+// Restore (or delete when originally absent) — a plain `= undefined` would set
+// the literal string 'undefined', which resolveSessionRoot treats as a path.
+function restoreEnv(key: string, value: string | undefined): void {
+  if (value === undefined) delete process.env[key]
+  else process.env[key] = value
+}
+
 afterEach(() => {
-  process.env.HOME = originalHome
-  process.env.MMR_HOME = originalMmrHome
+  restoreEnv('HOME', originalHome)
+  restoreEnv('MMR_HOME', originalMmrHome)
   vi.restoreAllMocks()
 })
 

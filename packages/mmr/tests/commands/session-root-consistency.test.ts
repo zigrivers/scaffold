@@ -9,8 +9,11 @@ const originalMmrHome = process.env.MMR_HOME
 const originalExitCode = process.exitCode
 
 afterEach(() => {
-  process.env.HOME = originalHome
-  process.env.MMR_HOME = originalMmrHome
+  // delete-when-undefined: a plain `= undefined` sets the string 'undefined'.
+  if (originalHome === undefined) delete process.env.HOME
+  else process.env.HOME = originalHome
+  if (originalMmrHome === undefined) delete process.env.MMR_HOME
+  else process.env.MMR_HOME = originalMmrHome
   process.exitCode = originalExitCode
   vi.restoreAllMocks()
 })
