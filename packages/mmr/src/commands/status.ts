@@ -1,6 +1,5 @@
 import type { CommandModule, ArgumentsCamelCase } from 'yargs'
-import path from 'node:path'
-import os from 'node:os'
+import { resolveJobsDir } from './sessions.js'
 import { JobStore } from '../core/job-store.js'
 import { TERMINAL_STATUSES } from '../types.js'
 
@@ -18,7 +17,7 @@ export const statusCommand: CommandModule<object, StatusArgs> = {
       describe: 'Job ID (e.g. mmr-abc123)',
     }),
   handler: (args: ArgumentsCamelCase<StatusArgs>) => {
-    const jobsDir = path.join(os.homedir(), '.mmr', 'jobs')
+    const jobsDir = resolveJobsDir()
     const store = new JobStore(jobsDir)
 
     let job

@@ -1,6 +1,5 @@
 import type { CommandModule, ArgumentsCamelCase } from 'yargs'
 import fs from 'node:fs'
-import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { loadConfig } from '../config/loader.js'
 import { JobStore } from '../core/job-store.js'
@@ -20,7 +19,7 @@ import { formatJson } from '../formatters/json.js'
 import { formatText } from '../formatters/text.js'
 import { formatMarkdown } from '../formatters/markdown.js'
 import type { ChannelConfigParsed, MmrConfigParsed } from '../config/schema.js'
-import { getSessionStore, resolveSessionRoot, type SessionStore } from './sessions.js'
+import { getSessionStore, resolveJobsDir, isValidSessionId, type SessionStore } from './sessions.js'
 
 interface ReviewArgs {
   diff?: string
@@ -324,9 +323,11 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
         format: args.format,
       },
     })
-    const sessionIdRe = /^[a-zA-Z0-9_-]+$/
-    if (args.session !== undefined && !sessionIdRe.test(args.session)) {
-      console.error(`Invalid session id: ${args.session} - must match ^[a-zA-Z0-9_-]+$`)
+    if (args.session !== undefined && !isValidSessionId(args.session)) {
+      console.error(
+        `Invalid session id: ${args.session} - must match ^[a-zA-Z0-9_-]+$ ` +
+          'and not be a reserved name (con, prn, aux, nul, com1-9, lpt1-9, index, __proto__)',
+      )
       process.exitCode = 1
       return
     }
@@ -444,7 +445,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     }
 
     // 5. Create job
-    const jobsDir = path.join(resolveSessionRoot(), 'jobs')
+    const jobsDir = resolveJobsDir()
     const store = new JobStore(jobsDir)
     const job = store.createJob({
       fix_threshold: config.defaults.fix_threshold as Severity,
@@ -458,7 +459,10 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       try {
         sessionLink.store.addJob(sessionLink.id, job.job_id, args.round ?? 1)
       } catch (err) {
-        console.error((err as Error).message)
+        console.error(
+          `Failed to link job ${job.job_id} to session ${sessionLink.id}: ` +
+            (err instanceof Error ? err.message : String(err)),
+        )
         process.exit(1)
       }
     }

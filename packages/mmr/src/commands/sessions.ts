@@ -40,7 +40,7 @@ export class SessionStore {
   }
 
   private isValidId(id: string): boolean {
-    return SESSION_ID_RE.test(id) && !WINDOWS_RESERVED_ID_RE.test(id) && !SYSTEM_SESSION_ID_RE.test(id)
+    return isValidSessionId(id)
   }
 
   private filePath(id: string): string {
@@ -202,8 +202,29 @@ export class SessionStore {
   }
 }
 
+/**
+ * Validates a session id against the same rules SessionStore enforces:
+ * the allowed-character regex plus Windows-reserved and system-reserved names
+ * that would otherwise pass the bare regex. Exported so callers (e.g. the
+ * review command) can reject invalid ids up front, before any side effects.
+ */
+export function isValidSessionId(id: string): boolean {
+  return SESSION_ID_RE.test(id) && !WINDOWS_RESERVED_ID_RE.test(id) && !SYSTEM_SESSION_ID_RE.test(id)
+}
+
 export function resolveSessionRoot(): string {
-  return process.env.MMR_HOME ?? path.join(process.env.HOME ?? os.homedir(), '.mmr')
+  const mmrHome = process.env.MMR_HOME
+  if (mmrHome !== undefined && mmrHome.trim() !== '') return mmrHome
+  return path.join(process.env.HOME ?? os.homedir(), '.mmr')
+}
+
+/**
+ * The jobs directory, resolved under the same root as sessions so that
+ * `mmr review` (which writes jobs) and the rest of the job lifecycle
+ * (`mmr jobs|status|results|reconcile`) all honor MMR_HOME consistently.
+ */
+export function resolveJobsDir(): string {
+  return path.join(resolveSessionRoot(), 'jobs')
 }
 
 export function getSessionStore(): SessionStore {
