@@ -64,6 +64,7 @@ export const resultsCommand: CommandModule<object, ResultsArgs> = {
     const ackStore = buildReviewAckStore({
       trustProjectAcks: job.review_controls?.trust_project_acks ?? false,
       userRoot: resolveSessionRoot(),
+      configBaseRef: job.review_controls?.config_base_ref,
     })
     const { results, formatted, exitCode } = runResultsPipeline(store, job, outputFormat, args.raw, { ackStore })
     store.saveResults(job.job_id, results)

@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
-import { readFileAtRef } from '../../src/core/git-show.js'
+import { readFileAtRef, listFilesAtRef } from '../../src/core/git-show.js'
 
 function initRepo(): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-gitshow-'))
@@ -76,6 +76,37 @@ describe('readFileAtRef', () => {
     try {
       expect(readFileAtRef({ cwd: dir, ref: 'HEAD', filePath: '../escape.yaml' })).toBeUndefined()
       expect(readFileAtRef({ cwd: dir, ref: 'HEAD', filePath: 'a:b' })).toBeUndefined()
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('listFilesAtRef', () => {
+  it('lists committed files under a directory at the ref', () => {
+    const dir = initRepo()
+    try {
+      const acks = path.join(dir, '.mmr', 'acks')
+      fs.mkdirSync(acks, { recursive: true })
+      fs.writeFileSync(path.join(acks, `${'a'.repeat(40)}.json`), '{}')
+      fs.writeFileSync(path.join(acks, `${'b'.repeat(40)}.json`), '{}')
+      execFileSync('git', ['add', '.mmr/acks'], { cwd: dir, stdio: 'ignore' })
+      execFileSync('git', ['commit', '-m', 'acks'], { cwd: dir, stdio: 'ignore' })
+      const files = listFilesAtRef({ cwd: dir, ref: 'HEAD', dirPath: '.mmr/acks' })
+      expect(files.sort()).toEqual([`.mmr/acks/${'a'.repeat(40)}.json`, `.mmr/acks/${'b'.repeat(40)}.json`])
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('returns [] for a missing directory or unsafe ref', () => {
+    const dir = initRepo()
+    try {
+      fs.writeFileSync(path.join(dir, 'x'), 'x')
+      execFileSync('git', ['add', 'x'], { cwd: dir, stdio: 'ignore' })
+      execFileSync('git', ['commit', '-m', 'i'], { cwd: dir, stdio: 'ignore' })
+      expect(listFilesAtRef({ cwd: dir, ref: 'HEAD', dirPath: '.mmr/acks' })).toEqual([])
+      expect(listFilesAtRef({ cwd: dir, ref: 'HEAD..x', dirPath: '.mmr/acks' })).toEqual([])
     } finally {
       fs.rmSync(dir, { recursive: true, force: true })
     }

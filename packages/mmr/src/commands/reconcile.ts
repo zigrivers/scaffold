@@ -115,6 +115,7 @@ export const reconcileCommand: CommandModule<object, ReconcileArgs> = {
     const ackStore = buildReviewAckStore({
       trustProjectAcks: updatedJob.review_controls?.trust_project_acks ?? false,
       userRoot: resolveSessionRoot(),
+      configBaseRef: updatedJob.review_controls?.config_base_ref,
     })
     const { results, formatted, exitCode } = runResultsPipeline(store, updatedJob, outputFormat, false, { ackStore })
 
