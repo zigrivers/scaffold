@@ -87,4 +87,35 @@ describe('runResultsPipeline — ack integration (T2-D)', () => {
     expect(results.reconciled_findings[0].acknowledged).toBeUndefined()
     expect(results.verdict).toBe('blocked')
   })
+
+  it('fails safe when the ack store throws (poisoned acks tree) — no suppression, no crash', () => {
+    const finding: Finding = {
+      severity: 'P1',
+      location: 'src/foo.ts:10',
+      description: 'real bug',
+      suggestion: 'fix it',
+    }
+    // Poison the project acks tree: make .mmr a symlink escaping the root so
+    // AckStore.dirForScope throws on lookup.
+    const evil = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-acks-evil-'))
+    fs.symlinkSync(evil, path.join(tmpProj, '.mmr'))
+    const ackStore = new AckStore({ projectRoot: tmpProj, userHome: tmpHome })
+
+    const store = new JobStore(tmpJobs)
+    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['claude'] })
+    store.updateChannel(job.job_id, 'claude', {
+      status: 'completed',
+      started_at: '2026-05-22T00:00:00Z',
+      completed_at: '2026-05-22T00:00:01Z',
+      output_parser: 'default',
+    })
+    store.saveChannelOutput(job.job_id, 'claude', JSON.stringify({ findings: [finding] }))
+
+    const loaded = store.loadJob(job.job_id)
+    // Must not throw; the unreadable ack store yields no suppression.
+    const { results } = runResultsPipeline(store, loaded, 'json', false, { ackStore })
+    expect(results.reconciled_findings[0].acknowledged).toBeUndefined()
+    expect(results.verdict).toBe('blocked')
+    fs.rmSync(evil, { recursive: true, force: true })
+  })
 })

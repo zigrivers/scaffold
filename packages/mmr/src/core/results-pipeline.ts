@@ -152,18 +152,26 @@ export function runResultsPipeline(
   // isAdvisoryFinding already treat acknowledged findings as advisory-only, so
   // the gate (evaluateGate) skips them when computing the verdict.
   if (opts.ackStore) {
-    for (const f of reconciledFindings) {
-      if (f.finding_key === undefined || f.description_shingle === undefined) continue
-      const match = opts.ackStore.lookup({
-        finding_key: f.finding_key,
-        normalized_location: normalizeLocationForKey(f.location),
-        shingle: f.description_shingle,
-      })
-      if (match) {
-        f.acknowledged = true
-        f.ack_match = match.match
-        if (match.record.reason !== undefined) f.ack_reason = match.record.reason
+    try {
+      for (const f of reconciledFindings) {
+        // Only finding_key is required: AckStore.lookup's exact path is
+        // key-only; the fuzzy fallback early-returns on an empty shingle.
+        if (f.finding_key === undefined) continue
+        const match = opts.ackStore.lookup({
+          finding_key: f.finding_key,
+          normalized_location: normalizeLocationForKey(f.location),
+          shingle: f.description_shingle ?? [],
+        })
+        if (match) {
+          f.acknowledged = true
+          f.ack_match = match.match
+          if (match.record.reason !== undefined) f.ack_reason = match.record.reason
+        }
       }
+    } catch {
+      // Fail safe: if the ack store can't be read (e.g. a poisoned or
+      // symlinked .mmr/acks tree makes lookup throw), apply no suppression.
+      // Findings stay blocking, which is the safe direction for a gate.
     }
   }
 
