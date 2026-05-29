@@ -52,6 +52,7 @@ describe('review - auto-link to session', () => {
         channels: ['local'],
         session: 'feat-foo',
         round: 1,
+        trustProjectConfig: true,
         _: ['review'],
         $0: 'mmr',
       } as never)

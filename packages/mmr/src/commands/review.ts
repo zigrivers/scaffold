@@ -8,6 +8,8 @@ import { assemblePrompt } from '../core/prompt.js'
 import { dispatchChannel } from '../core/dispatcher.js'
 import { runResultsPipeline } from '../core/results-pipeline.js'
 import { buildReviewAckStore } from '../core/ack-store.js'
+import { classifyTrustMode } from '../core/trust-mode.js'
+import { detectConfigChanges, type ConfigChangeReport } from '../core/diff-introspect.js'
 import {
   getCompensatingChannels,
   dispatchCompensatingPasses,
@@ -90,6 +92,12 @@ function resolveDiff(args: ReviewArgs): string {
 
   // Default: unstaged changes
   return execFileSync('git', ['diff'], { encoding: 'utf-8', maxBuffer: MAX_DIFF_BUFFER })
+}
+
+/** Stamp proposed config/ack changes onto an output object (trust transparency). */
+function annotateProposedChanges(target: Record<string, unknown>, changes: ConfigChangeReport): void {
+  if (changes.ack_files_changed.length > 0) target.proposed_acks = changes.ack_files_changed
+  if (changes.config_file_changed) target.proposed_config_change = true
 }
 
 function formatReconciledResults(results: ReconciledResults, outputFormat: OutputFormat): string {
@@ -320,17 +328,51 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
         }
       }),
   handler: async (args: ArgumentsCamelCase<ReviewArgs>) => {
-    // 1. Load config with CLI overrides
-    const config = loadConfig({
-      projectRoot: process.cwd(),
-      trustProjectConfig: args.trustProjectConfig,
-      configBaseRef: args.configBaseRef,
-      cliOverrides: {
-        fix_threshold: args['fix-threshold'] as string | undefined,
-        timeout: args.timeout,
-        format: args.format,
-      },
-    })
+    // 0. Classify the trust mode (§5 decision 1) and derive the project
+    //    config/ack loading policy. The explicit --trust-project-config /
+    //    --trust-project-acks opt-ins mean "honor the working-tree (diff)
+    //    config/acks" and take precedence in ALL modes (they're an operator
+    //    decision, not attacker-controllable); without them, base-ref mode
+    //    loads from the trusted ref and untrusted-HEAD/non-git load nothing.
+    const cwd = process.cwd()
+    const trust = classifyTrustMode({ cwd, args })
+    const baseRef = trust.trust_mode === 'base-ref' ? trust.base_ref : undefined
+    const trustWorkingTreeConfig = args.trustProjectConfig === true
+    const trustWorkingTreeAcks = args.trustProjectAcks === true
+    // --accept-new-acks means "honor the ack files added in the diff", so it
+    // must also LOAD the working-tree acks (not merely skip the gate) — else an
+    // accepted new ack would be ratified but never applied (loaded from the
+    // base ref, which doesn't have it). This loads the whole working-tree acks
+    // dir, but in base-ref/PR review the working tree IS the head (= base +
+    // the diff under review), so that's exactly "base acks + the accepted new
+    // acks" — not arbitrary over-trust — and it reproduces in results/reconcile
+    // via the persisted policy. The flag is an operator decision, not
+    // attacker-controllable.
+    const honorWorkingTreeAcks = trustWorkingTreeAcks || args.acceptNewAcks === true
+    const refHint =
+      trust.trust_mode === 'non-git'
+        ? ' (non-git: no base ref to compare against).'
+        : '; prefer --config-base-ref <ref> for a trusted source.'
+    if (trustWorkingTreeConfig) {
+      console.error(`[mmr] warning: --trust-project-config is honoring the working-tree .mmr.yaml${refHint}`)
+    }
+    if (trustWorkingTreeAcks) {
+      console.error(`[mmr] warning: --trust-project-acks is honoring working-tree .mmr/acks/${refHint}`)
+    }
+
+    // 1. Load config per the trust policy: explicit opt-in → working tree;
+    //    else base ref → git show; else skip project config entirely.
+    const cliOverrides = {
+      fix_threshold: args['fix-threshold'] as string | undefined,
+      timeout: args.timeout,
+      format: args.format,
+    }
+    const projectTrust = trustWorkingTreeConfig
+      ? { trustProjectConfig: true }
+      : baseRef !== undefined
+        ? { configBaseRef: baseRef }
+        : { skipProjectConfig: true }
+    const config = loadConfig({ projectRoot: cwd, cliOverrides, ...projectTrust })
     // Defense-in-depth: the yargs `.check()` rejects invalid ids on the CLI
     // path, but the handler is also invoked directly by programmatic callers
     // and tests that bypass `.check()`, so validate here too before any I/O.
@@ -341,12 +383,15 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     }
     const configCap = config.defaults.loop_control?.max_rounds_default ?? 5
     const maxRounds = args['max-rounds'] ?? args.maxRounds ?? configCap
+    // Persist the EFFECTIVE policy (not the raw flags) so `mmr results`/
+    // `reconcile` rebuild the ack store the same way: base-ref mode → base ref;
+    // untrusted mode → only the working-tree trust opt-ins that actually applied.
     const reviewControls: ReviewControls = {
       max_rounds: maxRounds,
       accept_new_acks: args.acceptNewAcks === true,
-      trust_project_acks: args.trustProjectAcks === true,
-      trust_project_config: args.trustProjectConfig === true,
-      config_base_ref: args.configBaseRef,
+      trust_project_acks: honorWorkingTreeAcks,
+      trust_project_config: trustWorkingTreeConfig,
+      config_base_ref: baseRef,
     }
     if ((args.round ?? 1) > maxRounds) {
       const outputFormat = (args.format ?? config.defaults.format ?? 'json') as OutputFormat
@@ -366,6 +411,54 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     if (!diff.trim()) {
       console.error('No diff content found. Provide --diff, --pr, --staged, or --base/--head.')
       process.exit(1)
+    }
+
+    // 2a. In base-ref mode, a diff that proposes new project config/acks must
+    //     not be auto-applied: force needs-user-decision unless the caller
+    //     opts in (--trust-project-config for .mmr.yaml, --accept-new-acks for
+    //     ack files). The reviewed content is loaded from the trusted base ref,
+    //     so these surface the *proposed* changes for a human to ratify.
+    const diffChanges = detectConfigChanges(diff)
+    // The gate opt-outs are the same explicit flags that honor the working-tree
+    // config/acks above: passing --trust-project-config / --accept-new-acks both
+    // applies the proposed change AND ratifies it (no needs-user-decision).
+    const blockingConfigChange =
+      baseRef !== undefined && diffChanges.config_file_changed && !trustWorkingTreeConfig
+    // Bypassed by EITHER ack opt-in: --accept-new-acks (accept the diff's acks)
+    // or --trust-project-acks (trust all working-tree acks, which implies the
+    // new ones) — aligned with honorWorkingTreeAcks so the gate matches loading.
+    const blockingAckChange =
+      baseRef !== undefined && diffChanges.ack_files_changed.length > 0 && !honorWorkingTreeAcks
+
+    // 2b. Trust gate — UNCONDITIONAL (before dry-run, job creation, and
+    //     dispatch), so it can't be bypassed by omitting --sync or using
+    //     --dry-run. A base-ref diff proposing project config/acks short-
+    //     circuits to needs-user-decision (exit 2) until a human ratifies.
+    if (blockingConfigChange || blockingAckChange) {
+      const outputFormat = (args.format ?? config.defaults.format ?? 'json') as OutputFormat
+      const reason =
+        blockingConfigChange && blockingAckChange
+          ? 'the diff proposes project config (.mmr.yaml) and ack changes'
+          : blockingConfigChange
+            ? 'the diff proposes a project config change (.mmr.yaml)'
+            : 'the diff proposes project ack changes (.mmr/acks/)'
+      const decision: Record<string, unknown> = {
+        verdict: 'needs-user-decision',
+        fix_threshold: config.defaults.fix_threshold,
+        reconciled_findings: [],
+        advisory_count: 0,
+        approved: false,
+        summary:
+          `Needs user decision — ${reason}. Re-run with ` +
+          '--trust-project-config (.mmr.yaml) / --accept-new-acks (acks) to proceed.',
+        trust_mode: trust.trust_mode,
+      }
+      annotateProposedChanges(decision, diffChanges)
+      console.log(outputFormat === 'json' ? JSON.stringify(decision, null, 2) : String(decision.summary))
+      // exitCode + return (not process.exit) for consistency with the early
+      // guards and so the handler stays unit-testable without mocking exit.
+      process.exitCode = 2
+      return
     }
 
     let sessionLink: { store: SessionStore; id: string } | undefined
@@ -607,22 +700,32 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       // trusted default path (project acks from a git base ref). The pipeline
       // fails safe if the acks tree is unreadable.
       const ackStore = buildReviewAckStore({
-        trustProjectAcks: reviewControls.trust_project_acks,
+        trustProjectAcks: honorWorkingTreeAcks,
         userRoot: resolveSessionRoot(),
-        configBaseRef: reviewControls.config_base_ref,
+        configBaseRef: baseRef,
+        cwd,
       })
       const { results, formatted, exitCode } = runResultsPipeline(store, completedJob, outputFormat, false, {
         ackStore,
       })
       store.saveResults(job.job_id, results)
-      console.log(formatted)
+
+      // Annotate with trust context for transparency. The needs-user-decision
+      // trust gate already fired (and exited) before dispatch, so here we only
+      // surface trust_mode and any proposed config/ack changes that were opted
+      // into (--accept-new-acks / --trust-project-config).
+      const annotated: Record<string, unknown> = { ...results, trust_mode: trust.trust_mode }
+      annotateProposedChanges(annotated, diffChanges)
+
+      console.log(outputFormat === 'json' ? JSON.stringify(annotated, null, 2) : formatted)
       process.exit(exitCode)
     } else {
       // Default: dispatch summary only
       const completedJob = store.loadJob(job.job_id)
-      const result = {
+      const result: Record<string, unknown> = {
         job_id: job.job_id,
         status: completedJob.status,
+        trust_mode: trust.trust_mode,
         channels: Object.fromEntries(
           channelNames.map((name) => [
             name,
@@ -631,6 +734,9 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
         ),
         valid_channels: validChannels,
       }
+      // Surface opted-into proposed changes for transparency (the blocking case
+      // already short-circuited to needs-user-decision before dispatch).
+      annotateProposedChanges(result, diffChanges)
       console.log(JSON.stringify(result, null, 2))
     }
   },
