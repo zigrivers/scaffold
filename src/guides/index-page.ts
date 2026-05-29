@@ -1,12 +1,12 @@
 import type { GuideEntry } from './types.js'
-import { wrapInChrome } from './template.js'
+import { wrapInChrome, esc } from './template.js'
 
 export function renderIndexPage(entries: GuideEntry[], css: string): string {
   const sorted = [...entries].sort((a, b) => a.frontmatter.order - b.frontmatter.order)
   const items = sorted.map((e) =>
-    `<li><a href="${e.topic}/index.html"><strong>${e.frontmatter.title}</strong></a>` +
-    `<span class="cat">${e.frontmatter.category}</span>` +
-    `<p>${e.frontmatter.description}</p></li>`,
+    `<li><a href="${e.topic}/index.html"><strong>${esc(e.frontmatter.title)}</strong></a>` +
+    `<span class="cat">${esc(e.frontmatter.category)}</span>` +
+    `<p>${esc(e.frontmatter.description)}</p></li>`,
   ).join('')
   return wrapInChrome({
     title: 'Scaffold Guides',

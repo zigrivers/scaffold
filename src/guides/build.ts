@@ -39,6 +39,7 @@ export async function buildGuide(args: BuildGuideArgs): Promise<{ lint: LintResu
       remarkMermaid({ guideDir: args.guideDir, render: args.mermaidRender }),
     ],
   })
+  // TODO: derive diagram ids from the remark plugin output instead of a regex count (regex can overcount but never undercount, so prune is safe; this keeps coupling explicit).
   const diagramCount = (md.match(/```mermaid/g) ?? []).length
   pruneDiagrams(args.guideDir, Array.from({ length: diagramCount }, (_, i) => `diagram-${i}`))
   const html = wrapInChrome({ title: fm.title, body, headings, css: args.css })

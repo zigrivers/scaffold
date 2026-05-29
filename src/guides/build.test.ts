@@ -60,4 +60,13 @@ describe('renderIndexPage', () => {
     expect(html).toContain('MMR')
     expect(html).toContain('review')
   })
+
+  it('escapes < and & in frontmatter fields', () => {
+    const html = renderIndexPage([
+      { topic: 'x', frontmatter: { title: 'A & B', topic: 'x', description: '<script>x</script>', category: 'c', order: 1 } } as any,
+    ], ':root{}')
+    expect(html).toContain('A &amp; B')
+    expect(html).not.toContain('<script>x</script>')
+    expect(html).toContain('&lt;script&gt;')
+  })
 })
