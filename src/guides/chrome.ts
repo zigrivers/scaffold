@@ -5,7 +5,10 @@
  * first paint, eliminating flash-of-unstyled-theme (FOUC) for dark-mode users.
  * Must run synchronously in <head>; no toggle logic here.
  */
-export const THEME_INIT_JS: string = `(function(){try{var t=localStorage.getItem('guide-theme');if(!t&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)t='dark';if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})();`
+export const THEME_INIT_JS: string =
+  '(function(){try{var t=localStorage.getItem(\'guide-theme\');' +
+  'if(!t&&window.matchMedia&&matchMedia(\'(prefers-color-scheme: dark)\').matches)t=\'dark\';' +
+  'if(t)document.documentElement.setAttribute(\'data-theme\',t);}catch(e){}})();'
 
 /**
  * CHROME_JS — self-contained IIFE for guide pages (end-of-body).

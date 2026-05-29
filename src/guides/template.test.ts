@@ -34,11 +34,11 @@ describe('wrapInChrome', () => {
   it('injects theme-init script in <head> to prevent FOUC', () => {
     const html = wrapInChrome(args)
     // Theme-init read-and-apply logic must be present
-    expect(html).toContain("getItem('guide-theme')")
+    expect(html).toContain('getItem(\'guide-theme\')')
     // Must appear before </head> (i.e., inside the <head> block)
     const headEnd = html.indexOf('</head>')
     expect(headEnd).toBeGreaterThan(-1)
-    const themeInitPos = html.indexOf("getItem('guide-theme')")
+    const themeInitPos = html.indexOf('getItem(\'guide-theme\')')
     expect(themeInitPos).toBeGreaterThan(-1)
     expect(themeInitPos).toBeLessThan(headEnd)
   })

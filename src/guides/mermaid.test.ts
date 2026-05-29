@@ -6,7 +6,9 @@ import { sanitizeSvg, resolveDiagram, computeFingerprint, pruneDiagrams } from '
 
 describe('sanitizeSvg', () => {
   it('strips script, foreignObject, on* and javascript hrefs', () => {
-    const dirty = `<svg><script>x()</script><foreignObject></foreignObject><a xlink:href="javascript:x()" onclick="y()"><rect/></a></svg>`
+    const dirty =
+      '<svg><script>x()</script><foreignObject></foreignObject>' +
+      '<a xlink:href="javascript:x()" onclick="y()"><rect/></a></svg>'
     const clean = sanitizeSvg(dirty)
     expect(clean).not.toContain('<script')
     expect(clean).not.toContain('foreignObject')

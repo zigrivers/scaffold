@@ -13,7 +13,9 @@ import type { LintResult } from './lint.js'
 export function loadThemeCss(): string {
   const p = path.join(getPackageRoot(), 'dist', 'guides', 'dashboard-theme.css')
   if (!fs.existsSync(p)) {
-    throw new Error(`Missing ${p} — run \`npm run build\` (the build copies lib/dashboard-theme.css into dist/guides/).`)
+    throw new Error(
+      `Missing ${p} — run \`npm run build\` (the build copies lib/dashboard-theme.css into dist/guides/).`,
+    )
   }
   return fs.readFileSync(p, 'utf8')
 }
@@ -39,7 +41,8 @@ export async function buildGuide(args: BuildGuideArgs): Promise<{ lint: LintResu
       remarkMermaid({ guideDir: args.guideDir, render: args.mermaidRender }),
     ],
   })
-  // TODO: derive diagram ids from the remark plugin output instead of a regex count (regex can overcount but never undercount, so prune is safe; this keeps coupling explicit).
+  // TODO: derive diagram ids from the remark plugin output instead of a regex count
+  // (regex can overcount but never undercount, so prune is safe; this keeps coupling explicit).
   const diagramCount = (md.match(/```mermaid/g) ?? []).length
   pruneDiagrams(args.guideDir, Array.from({ length: diagramCount }, (_, i) => `diagram-${i}`))
   const html = wrapInChrome({ title: fm.title, body, headings, css: args.css })

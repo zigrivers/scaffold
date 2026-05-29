@@ -6,14 +6,21 @@ const ALL = [remarkCallout, remarkTabs, remarkFilterTable, remarkChart, remarkSe
 
 describe('guideSanitizeSchema', () => {
   it('passes legitimate directive output', async () => {
-    const md = `:::callout{type=tip}\nok :sev[P1]{level=p1}\n:::\n`
+    const md = ':::callout{type=tip}\nok :sev[P1]{level=p1}\n:::\n'
     const { body } = await renderGuideBody(md, { plugins: ALL })
     expect(body).toContain('callout-tip')
     expect(body).toContain('sev-p1')
   })
 
   it('strips script, event handlers, and iframes from prose', async () => {
-    const md = `text\n\n<script>alert(1)</script>\n\n<a href="javascript:alert(1)" onclick="x()">x</a>\n\n<iframe src="http://evil"></iframe>\n`
+    const md = `text
+
+<script>alert(1)</script>
+
+<a href="javascript:alert(1)" onclick="x()">x</a>
+
+<iframe src="http://evil"></iframe>
+`
     const { body } = await renderGuideBody(md, { plugins: ALL })
     expect(body).not.toContain('<script')
     expect(body).not.toContain('onclick')
@@ -25,7 +32,7 @@ describe('guideSanitizeSchema', () => {
     // NOTE: the sanitize schema allows `style` globally (for chart bars). This test documents
     // that an arbitrary style DOES currently pass sanitize, so the Task 15 CI scan is required.
     // Assert the CURRENT behavior so a future schema tightening is a deliberate, test-visible change.
-    const md = `<div style="color:red">x</div>\n`
+    const md = '<div style="color:red">x</div>\n'
     const { body } = await renderGuideBody(md, { plugins: ALL })
     // Document current reality: style survives sanitize (CI scan catches non-width styles).
     expect(body).toContain('style="color:red"')

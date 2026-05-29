@@ -25,7 +25,7 @@ export const remarkTabs: AnyPlugin = () => (tree: any) => {
     // With a 4-colon outer fence (::::tabs) wrapping 3-colon (:::tab) children,
     // remark-directive nests tab nodes directly inside node.children — no sibling
     // collection needed, no stray ::: paragraph produced.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const tabs = (node.children ?? []).filter(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (c: any) => c.type === 'containerDirective' && c.name === 'tab',
@@ -70,6 +70,7 @@ export const remarkChart: AnyPlugin = () => (tree: any) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   visit(tree, (node: any) => {
     if (node.type !== 'containerDirective' || node.name !== 'chart') return
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const table = (node.children ?? []).find((c: any) => c.type === 'table')
     if (!table) throw new Error('`:::chart` must contain a GFM table')
     const rows = table.children.slice(1) // drop header row
@@ -81,6 +82,7 @@ export const remarkChart: AnyPlugin = () => (tree: any) => {
       if (!Number.isFinite(value)) throw new Error(`:::chart value column must be numeric (got "${label}")`)
       return { label, value }
     })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const max = Math.max(...parsed.map((p: any) => p.value), 0) || 1
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const bars = parsed.map((p: any) => {
@@ -126,7 +128,9 @@ export const remarkFilterTable: AnyPlugin = () => (tree: any) => {
       type: 'paragraph',
       data: {
         hName: 'input',
-        hProperties: { type: 'text', className: 'filter-input', placeholder: 'Filter…', 'aria-label': 'Filter table rows' },
+        hProperties: {
+          type: 'text', className: 'filter-input', placeholder: 'Filter…', 'aria-label': 'Filter table rows',
+        },
       },
       children: [],
     }

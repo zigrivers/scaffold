@@ -3,7 +3,22 @@ import { renderGuideBody } from './render.js'
 
 describe('renderGuideBody', () => {
   it('renders headings, paragraphs, and a GFM table; strips frontmatter', async () => {
-    const md = `---\ntitle: T\ntopic: t\ndescription: d\ncategory: c\norder: 1\n---\n\n## Section One\n\nHello **world**.\n\n| A | B |\n|---|---|\n| 1 | 2 |\n`
+    const md = `---
+title: T
+topic: t
+description: d
+category: c
+order: 1
+---
+
+## Section One
+
+Hello **world**.
+
+| A | B |
+|---|---|
+| 1 | 2 |
+`
     const { body, headings } = await renderGuideBody(md)
     expect(body).toContain('<h2')
     expect(body).toContain('Section One')

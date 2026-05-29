@@ -72,7 +72,8 @@ export async function resolveDiagram(args: ResolveArgs): Promise<string> {
     raw = await render(source)
   } catch (e) {
     throw new Error(
-      `mermaid render failed for "${diagramId}" (no browser? install per dev-setup.md). Cache: ${svgPath}\n${String(e)}`,
+      `mermaid render failed for "${diagramId}" ` +
+        `(no browser? install per dev-setup.md). Cache: ${svgPath}\n${String(e)}`,
     )
   }
   const clean = sanitizeSvg(raw)
@@ -110,9 +111,11 @@ export function remarkMermaid(opts: {
   guideDir: string
   render?: (s: string) => Promise<string>
 }): AnyPlugin {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return () => async (tree: any) => {
     const jobs: Array<Promise<void>> = []
     let n = 0
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     visit(tree, 'code', (node: any) => {
       if (node.lang !== 'mermaid') return
       const diagramId = `diagram-${n++}`

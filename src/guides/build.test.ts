@@ -54,7 +54,11 @@ describe('buildGuide', () => {
 describe('renderIndexPage', () => {
   it('lists guides by order with links', () => {
     const html = renderIndexPage([
-      { topic: 'mmr', frontmatter: { title: 'MMR', topic: 'mmr', description: 'review', category: 'tools', order: 10 } } as any,
+      /* eslint-disable @typescript-eslint/no-explicit-any */
+      ({ topic: 'mmr', frontmatter: {
+        title: 'MMR', topic: 'mmr', description: 'review', category: 'tools', order: 10,
+      } }) as any,
+      /* eslint-enable @typescript-eslint/no-explicit-any */
     ], CSS)
     expect(html).toContain('href="mmr/index.html"')
     expect(html).toContain('MMR')
@@ -63,7 +67,11 @@ describe('renderIndexPage', () => {
 
   it('escapes < and & in frontmatter fields', () => {
     const html = renderIndexPage([
-      { topic: 'x', frontmatter: { title: 'A & B', topic: 'x', description: '<script>x</script>', category: 'c', order: 1 } } as any,
+      /* eslint-disable @typescript-eslint/no-explicit-any */
+      ({ topic: 'x', frontmatter: {
+        title: 'A & B', topic: 'x', description: '<script>x</script>', category: 'c', order: 1,
+      } }) as any,
+      /* eslint-enable @typescript-eslint/no-explicit-any */
     ], ':root{}')
     expect(html).toContain('A &amp; B')
     expect(html).not.toContain('<script>x</script>')

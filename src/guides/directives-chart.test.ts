@@ -4,7 +4,7 @@ import { remarkChart } from './directives.js'
 
 describe('remarkChart', () => {
   it('renders static bars from the following table and keeps the table', async () => {
-    const md = `:::chart{type=bar}\n\n| Host | Count |\n|---|---|\n| github.com | 40 |\n| npmjs.com | 10 |\n:::\n`
+    const md = ':::chart{type=bar}\n\n| Host | Count |\n|---|---|\n| github.com | 40 |\n| npmjs.com | 10 |\n:::\n'
     const { body } = await renderGuideBody(md, { plugins: [remarkChart] })
     expect(body).toContain('class="chart chart-bar"')
     expect(body).toContain('width:100%')
