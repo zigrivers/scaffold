@@ -15,6 +15,21 @@ Patterns and anti-patterns discovered during development. Review before starting
   leaves a dead import that the focused test won't catch but ESLint (and CI) will. Caught on
   PR #413 / Task 17: dropping `os.homedir()` from `review.ts` orphaned `import os from 'node:os'`.
 
+- When you change how ONE command resolves a shared on-disk path, audit EVERY command that
+  constructs the same path and centralize them on one helper. PR #413 made only `review.ts`
+  honor `MMR_HOME` for the jobs dir while `jobs`/`status`/`results`/`reconcile` still read
+  hardcoded `~/.mmr/jobs` — a split-brain where linked jobs were invisible to the rest of the
+  lifecycle. Grep for the hardcoded path (`grep -rn "homedir()" src/commands`) before assuming a
+  path change is local. Two independent review channels (Gemini + Grok) caught this — cross-channel
+  consensus is a strong real-bug signal; weight it above single-source style nits.
+
+- Treat review findings as claims to verify, not orders. PR #413 round 5: Gemini raised a P1
+  "createJob lacks session_id" — false (the call passes it and JobStore persists it). Verify
+  against source before "fixing"; document the waiver with evidence. Also watch for a finding that
+  recurs while the reviewer flip-flops on the fix (exit-strategy here oscillated process.exit vs
+  exitCode+return across rounds 1/3/5) — settle it once on engineering merit (testability) and stop
+  re-litigating regardless of later wording.
+
 - Do not try to use Beads or `bd` commands in this repository's day-to-day workflow. Legacy `.beads/` artifacts and old docs may still exist, but current work should not assume Beads is an active dependency.
 
 ## Common Gotchas
