@@ -97,12 +97,16 @@ describe('remarkMermaid — sequential manifest writes', () => {
       '```',
     ].join('\n') + '\n'
 
-    const plugin = remarkMermaid({ guideDir: dir, render })
+    const collected: string[] = []
+    const plugin = remarkMermaid({ guideDir: dir, render, collect: collected })
     const { body } = await renderGuideBody(md, { plugins: [plugin] })
 
     // Both diagrams rendered and inlined
     expect(body).toContain('class="mermaid"')
     expect(render).toHaveBeenCalledTimes(2)
+
+    // collect receives the exact ids the plugin assigned, in order
+    expect(collected).toEqual(['diagram-0', 'diagram-1'])
 
     // Both entries written to the manifest (no clobber from race)
     const manifestPath = path.join(dir, '.diagrams', 'manifest.json')
@@ -110,5 +114,11 @@ describe('remarkMermaid — sequential manifest writes', () => {
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
     expect(Object.keys(manifest)).toContain('diagram-0')
     expect(Object.keys(manifest)).toContain('diagram-1')
+
+    // pruneDiagrams with the collected ids keeps both SVGs (no accidental deletion)
+    const { pruneDiagrams: prune } = await import('./mermaid.js')
+    prune(dir, collected)
+    expect(fs.existsSync(path.join(dir, '.diagrams', 'diagram-0.svg'))).toBe(true)
+    expect(fs.existsSync(path.join(dir, '.diagrams', 'diagram-1.svg'))).toBe(true)
   })
 })

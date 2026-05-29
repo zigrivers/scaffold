@@ -35,16 +35,14 @@ export async function buildGuide(args: BuildGuideArgs): Promise<{ lint: LintResu
   for (const w of lint.warnings) process.stderr.write(`warning: ${w}\n`)
   const fm = extractGuideFrontmatter(md)
   if (!fm) throw new Error(`invalid or missing frontmatter in ${path.join(args.guideDir, 'index.md')}`)
+  const diagramIds: string[] = []
   const { body, headings } = await renderGuideBody(md, {
     plugins: [
       remarkCallout, remarkTabs, remarkFilterTable, remarkChart, remarkSev,
-      remarkMermaid({ guideDir: args.guideDir, render: args.mermaidRender }),
+      remarkMermaid({ guideDir: args.guideDir, render: args.mermaidRender, collect: diagramIds }),
     ],
   })
-  // TODO: derive diagram ids from the remark plugin output instead of a regex count
-  // (regex can overcount but never undercount, so prune is safe; this keeps coupling explicit).
-  const diagramCount = (md.match(/```mermaid/g) ?? []).length
-  pruneDiagrams(args.guideDir, Array.from({ length: diagramCount }, (_, i) => `diagram-${i}`))
+  pruneDiagrams(args.guideDir, diagramIds)
   const html = wrapInChrome({ title: fm.title, body, headings, css: args.css })
   atomicWriteFile(path.join(args.guideDir, 'index.html'), html)
   return { lint }

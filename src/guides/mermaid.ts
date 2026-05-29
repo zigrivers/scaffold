@@ -41,8 +41,9 @@ export async function renderMermaid(source: string): Promise<string> {
     const cfgFile = path.join(tmp, 'config.json')
     fs.writeFileSync(inFile, source)
     fs.writeFileSync(cfgFile, MERMAID_CONFIG)
+    const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx'
     execFileSync(
-      'npx',
+      npx,
       ['--no-install', 'mmdc', '-i', inFile, '-o', outFile, '-c', cfgFile, ...RENDER_OPTS],
       { stdio: 'pipe' },
     )
@@ -123,6 +124,7 @@ export function pruneDiagrams(guideDir: string, keepIds: string[]): void {
 export function remarkMermaid(opts: {
   guideDir: string
   render?: (s: string) => Promise<string>
+  collect?: string[]
 }): AnyPlugin {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return () => async (tree: any) => {
@@ -132,7 +134,9 @@ export function remarkMermaid(opts: {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     visit(tree, 'code', (node: any) => {
       if (node.lang !== 'mermaid') return
-      jobs.push({ node, diagramId: `diagram-${n++}`, source: node.value })
+      const diagramId = `diagram-${n++}`
+      if (opts.collect) opts.collect.push(diagramId)
+      jobs.push({ node, diagramId, source: node.value })
     })
     for (const job of jobs) {
       const svg = await resolveDiagram({
