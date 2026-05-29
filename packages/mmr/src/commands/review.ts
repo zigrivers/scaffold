@@ -14,9 +14,9 @@ import { detectConfigChanges, type ConfigChangeReport } from '../core/diff-intro
 import {
   getCompensatingChannels,
   dispatchCompensatingPasses,
-  getDispatchableCompensatorChannel,
+  getCompensatorChannel,
   resolveCompensatorChannelName,
-  resolveCompensatorDispatch,
+  resolveCompensatorOutputParser,
 } from '../core/compensator.js'
 import type { Severity, OutputFormat, ChannelStatus, ReconciledResults, ReviewControls } from '../types.js'
 import { formatJson } from '../formatters/json.js'
@@ -195,17 +195,33 @@ export interface CompensatorAvailability {
 export async function checkConfiguredCompensatorAvailability(
   config: MmrConfigParsed,
 ): Promise<CompensatorAvailability> {
-  const channelName = config.defaults.compensator?.channel
-  if (!channelName) return { status: 'ok', auth: 'ok' }
+  // undefined when no compensator is configured (default `claude -p` fallback).
+  const compChannel = getCompensatorChannel(config)
+  if (!compChannel) return { status: 'ok', auth: 'ok' }
 
-  const chConfig = getDispatchableCompensatorChannel(config, channelName)
-  const cmd = chConfig.command.split(' ')[0]
+  // HTTP compensator: probe over the wire (no install/command step).
+  if (compChannel.kind === 'http') {
+    const httpAuth = await checkHttpAuth(compChannel)
+    if (httpAuth.status === 'ok') return { status: 'ok', auth: 'ok' }
+    const httpStatus = channelStatusFromAuthResult(httpAuth.status)
+    return {
+      status: httpStatus,
+      auth: httpStatus === 'skipped' ? 'skipped' : 'failed',
+      recovery: httpAuth.recovery,
+    }
+  }
+
+  // Subprocess compensator.
+  if (!compChannel.command) {
+    return { status: 'skipped', auth: 'skipped', recovery: 'Compensator channel has no command' }
+  }
+  const cmd = compChannel.command.split(' ')[0]
   const installed = await checkInstalled(cmd)
   if (!installed) {
     return { status: 'not_installed', auth: 'failed', recovery: `${cmd} not found on PATH` }
   }
 
-  const authResult = await checkAuth(chConfig)
+  const authResult = await checkAuth(compChannel)
   if (authResult.status === 'ok') return { status: 'ok', auth: 'ok' }
   if ((authResult.status as string) === 'skipped') return { status: 'ok', auth: 'skipped' }
 
@@ -703,13 +719,14 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     if (compensating.length > 0) {
       const compensatorAvailability = await checkConfiguredCompensatorAvailability(config)
       if (compensatorAvailability.status === 'ok') {
-        const dispatch = resolveCompensatorDispatch(config)
+        // Kind-aware: the compensator may be a subprocess or an http channel.
+        const compensatorOutputParser = resolveCompensatorOutputParser(config)
         // Register compensating channels in job.json so loadJob can discover them
         for (const comp of compensating) {
           store.registerChannel(job.job_id, comp.compensatingName, {
             status: 'dispatched',
             auth: 'ok',
-            output_parser: dispatch.output_parser,
+            output_parser: compensatorOutputParser,
           })
         }
         await dispatchCompensatingPasses(store, job.job_id, prompt, compensating, config)

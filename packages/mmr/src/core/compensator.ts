@@ -1,4 +1,5 @@
 import { dispatchChannel } from './dispatcher.js'
+import { dispatchHttpChannel } from './http-dispatcher.js'
 import type { JobStore } from './job-store.js'
 import type { ChannelConfigParsed, MmrConfigParsed, OutputParserConfig } from '../config/schema.js'
 import type { ChannelStatus } from '../types.js'
@@ -72,6 +73,31 @@ export function resolveCompensatorDispatch(config: MmrConfigParsed): Compensator
 
 export function resolveCompensatorChannelName(config: MmrConfigParsed): string {
   return config.defaults.compensator?.channel ?? 'claude'
+}
+
+/**
+ * Resolve the configured compensator channel config (any kind), or undefined
+ * when none is configured (the default `claude -p` subprocess fallback applies).
+ * Throws only for a missing / abstract reference. Unlike
+ * getDispatchableCompensatorChannel this does NOT require a `command`, so it is
+ * safe for http compensators.
+ */
+export function getCompensatorChannel(config: MmrConfigParsed): ChannelConfigParsed | undefined {
+  const channelName = config.defaults.compensator?.channel
+  if (!channelName) return undefined
+  const channelConfig = config.channels[channelName]
+  if (!channelConfig) {
+    throw new Error(`Compensator channel "${channelName}" not found in config`)
+  }
+  if (channelConfig.abstract) {
+    throw new Error(`Compensator channel "${channelName}" is abstract and cannot be dispatched`)
+  }
+  return channelConfig
+}
+
+/** Output parser for the configured compensator channel (any kind); 'default' when none. */
+export function resolveCompensatorOutputParser(config: MmrConfigParsed): string | OutputParserConfig {
+  return getCompensatorChannel(config)?.output_parser ?? 'default'
 }
 
 export function getDispatchableCompensatorChannel(
@@ -152,6 +178,28 @@ export async function dispatchCompensatingPasses(
   compensatingChannels: CompensatingChannel[],
   config: MmrConfigParsed,
 ): Promise<void> {
+  const compChannel = getCompensatorChannel(config)
+
+  // HTTP compensator: route each pass through the HTTP dispatcher.
+  if (compChannel && compChannel.kind === 'http') {
+    await Promise.all(
+      compensatingChannels.map((comp) => {
+        const focus = resolveCompensatorFocus(config, comp.originalChannel)
+        const compensatingPrompt = applyPromptWrapper(
+          compChannel.prompt_wrapper ?? '{{prompt}}',
+          `${focus}\n\n${prompt}`,
+        )
+        return dispatchHttpChannel(store, jobId, comp.compensatingName, {
+          channel: compChannel,
+          prompt: compensatingPrompt,
+          timeout: compChannel.timeout ?? config.defaults.timeout,
+        })
+      }),
+    )
+    return
+  }
+
+  // Subprocess compensator (default `claude -p` or a configured command).
   const dispatch = resolveCompensatorDispatch(config)
   await Promise.all(
     compensatingChannels.map((comp) => {
