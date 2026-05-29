@@ -9,10 +9,63 @@ export const guideSanitizeSchema: Schema = {
   // links). Safe here because guide content is in-repo and passes code review —
   // DOM-clobber protection on our own generated heading ids is unnecessary.
   clobberPrefix: '',
-  tagNames: [...(defaultSchema.tagNames ?? []), 'button', 'input'],
+  tagNames: [
+    ...(defaultSchema.tagNames ?? []),
+    'button',
+    'input',
+    // mermaid inline SVG support
+    'figure',
+    'svg',
+    'g',
+    'path',
+    'rect',
+    'circle',
+    'line',
+    'polygon',
+    'polyline',
+    'text',
+    'tspan',
+    'marker',
+    'defs',
+    'use',
+  ],
   attributes: {
     ...defaultSchema.attributes,
-    '*': [...(defaultSchema.attributes?.['*'] ?? []), 'id', 'className', 'role', 'dataTab', 'ariaLabel', 'style'],
+    // Global: add directive attrs + SVG geometry/presentation attrs.
+    // hast-util-sanitize only supports '*' as a wildcard key (no '*svg' etc.).
+    // Geometry and presentation attrs (d, fill, stroke, transform, etc.) are
+    // harmless — they carry no script execution risk.
+    '*': [
+      ...(defaultSchema.attributes?.['*'] ?? []),
+      'id',
+      'className',
+      'role',
+      'dataTab',
+      'ariaLabel',
+      'style',
+      // SVG geometry & presentation (safe; no execution risk)
+      'd',
+      'x',
+      'y',
+      'x1',
+      'y1',
+      'x2',
+      'y2',
+      'cx',
+      'cy',
+      'r',
+      'rx',
+      'ry',
+      'points',
+      'transform',
+      'fill',
+      'stroke',
+      'strokeWidth',
+      'markerEnd',
+      'textAnchor',
+    ],
     input: ['type', 'placeholder', 'className', 'ariaLabel'],
+    // SVG root element attributes
+    svg: ['viewBox', 'width', 'height', 'xmlns', 'preserveAspectRatio', 'role', 'ariaLabel'],
   },
 }
