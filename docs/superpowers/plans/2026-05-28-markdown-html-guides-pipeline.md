@@ -1879,7 +1879,7 @@ flowchart LR
 
 ## Channels
 
-:::tabs
+::::tabs
 
 :::tab{title="Compare"}
 All four built-in channels run independently; findings are reconciled by
@@ -1902,7 +1902,7 @@ Plan alignment, code quality, testing.
 Independent second opinion on correctness and code quality (xAI).
 :::
 
-:::
+::::
 
 ## CLI flags
 

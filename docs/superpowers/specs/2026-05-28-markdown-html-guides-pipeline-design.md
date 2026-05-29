@@ -116,7 +116,7 @@ Authored with `remark-directive` (bodies stay real markdown) + one fenced block:
 | Directive | Renders |
 |---|---|
 | `:::callout{type=warning}` … `:::` | admonition box |
-| `:::tabs` / `:::tab{title="…"}` … `:::` | tab group (compiles to `data-pane` + `tab()`) |
+| `::::tabs` / `:::tab{title="…"}` … `:::` … `::::` | tab group (4-colon outer fence nests 3-colon tabs; compiles to `data-tab` + tab JS) |
 | `:::filter-table` wrapping a GFM table | filter input + `.hidden` JS |
 | `:::chart{type=bar}` immediately preceding a GFM table | build-time static HTML/CSS bars (see Charts) |
 | `:sev[P0]{level=p0}` (inline) | severity badge/chip |
