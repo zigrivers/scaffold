@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import crypto from 'node:crypto'
 import { jaccardSimilarity } from './stable-id.js'
 
 const FUZZY_THRESHOLD = 0.7
@@ -86,7 +87,14 @@ export class AckStore {
   }
 
   add(record: AckRecord, scope: AckScope): void {
-    this.validateKey(record.finding_key)
+    const key = record.finding_key
+    this.validateKey(key)
+    // Enforce the full shape on write so every persisted record is guaranteed
+    // loadable; otherwise an invalid record could be written then silently
+    // dropped by the load-side integrity check (write/read asymmetry).
+    if (!isValidAckRecord(record, key)) {
+      throw new Error(`Invalid ack record for ${key}: missing or mistyped fields`)
+    }
     const dir = this.dirForScope(scope)
     fs.mkdirSync(dir, { recursive: true })
     const fp = this.filePath(record.finding_key, scope)
@@ -99,10 +107,23 @@ export class AckStore {
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err
     }
-    // Atomic write: temp file + rename so readers never observe a partial record.
-    const tmp = `${fp}.${process.pid}.tmp`
-    fs.writeFileSync(tmp, JSON.stringify(record, null, 2))
-    fs.renameSync(tmp, fp)
+    // Atomic write: write to a fresh temp then rename. The temp name uses a
+    // random suffix and the 'wx' (O_CREAT|O_EXCL) flag, which fails if the path
+    // already exists — including a pre-planted symlink — closing the TOCTOU on
+    // the temp path. rename() replaces fp's directory entry without following a
+    // symlink target, so readers never observe a partial record.
+    const tmp = `${fp}.${crypto.randomBytes(6).toString('hex')}.tmp`
+    fs.writeFileSync(tmp, JSON.stringify(record, null, 2), { flag: 'wx' })
+    try {
+      fs.renameSync(tmp, fp)
+    } catch (err) {
+      try {
+        fs.rmSync(tmp, { force: true })
+      } catch {
+        // ignore cleanup failure; surface the original error
+      }
+      throw err
+    }
     this.loaded[scope] = undefined
   }
 
@@ -169,16 +190,22 @@ export class AckStore {
     const exactUser = user.byKey.get(finding.finding_key)
     if (exactUser) return { record: exactUser, match: 'exact', scope: 'user' }
     // Fuzzy fallback — location must match exactly, shingle Jaccard ≥ 0.7.
+    // Scan project then user in place (no intermediate array) so project wins.
     if (finding.shingle.length === 0) return undefined
-    const candidates = [
-      ...project.records.map((r) => ({ r, scope: 'project' as const })),
-      ...user.records.map((r) => ({ r, scope: 'user' as const })),
-    ]
-    for (const { r, scope } of candidates) {
+    const projectFuzzy = this.fuzzyScan(project.records, finding)
+    if (projectFuzzy) return { record: projectFuzzy, match: 'fuzzy', scope: 'project' }
+    const userFuzzy = this.fuzzyScan(user.records, finding)
+    if (userFuzzy) return { record: userFuzzy, match: 'fuzzy', scope: 'user' }
+    return undefined
+  }
+
+  private fuzzyScan(
+    records: AckRecord[],
+    finding: { normalized_location: string; shingle: string[] },
+  ): AckRecord | undefined {
+    for (const r of records) {
       if (r.normalized_location !== finding.normalized_location) continue
-      if (jaccardSimilarity(r.description_shingle, finding.shingle) >= FUZZY_THRESHOLD) {
-        return { record: r, match: 'fuzzy', scope }
-      }
+      if (jaccardSimilarity(r.description_shingle, finding.shingle) >= FUZZY_THRESHOLD) return r
     }
     return undefined
   }

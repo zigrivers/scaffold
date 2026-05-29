@@ -187,6 +187,16 @@ describe('AckStore', () => {
     expect(store.listAll()).toHaveLength(0)
   })
 
+  it('add() rejects a structurally invalid record before persisting it', () => {
+    const bad = {
+      finding_key: FAKE_KEY,
+      normalized_location: 'src/foo.ts',
+      // description_shingle missing; created_at missing
+    } as unknown as AckRecord
+    expect(() => store.add(bad, 'project')).toThrow(/invalid ack record/i)
+    expect(fs.existsSync(path.join(tmpProject, '.mmr', 'acks', `${FAKE_KEY}.json`))).toBe(false)
+  })
+
   it('refuses to write an ack through a symlink', () => {
     const dir = path.join(tmpProject, '.mmr', 'acks')
     fs.mkdirSync(dir, { recursive: true })
