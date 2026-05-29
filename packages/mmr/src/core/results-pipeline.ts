@@ -15,11 +15,17 @@ import type {
 } from '../types.js'
 import { SEVERITY_ORDER } from '../types.js'
 import type { JobStore } from './job-store.js'
+import type { AckStore } from './ack-store.js'
+import { normalizeLocationForKey } from './stable-id.js'
 
 export interface PipelineResult {
   results: ReconciledResults
   formatted: string
   exitCode: number
+}
+
+export interface PipelineOptions {
+  ackStore?: AckStore
 }
 
 export function isBlockingFinding(finding: ReconciledFinding, threshold: Severity): boolean {
@@ -73,6 +79,7 @@ export function runResultsPipeline(
   job: JobMetadata,
   outputFormat: OutputFormat,
   includeRaw = false,
+  opts: PipelineOptions = {},
 ): PipelineResult {
   const channelFindings: Record<string, Finding[]> = {}
   const perChannel: Record<string, ChannelResult> = {}
@@ -139,6 +146,26 @@ export function runResultsPipeline(
   }
 
   const reconciledFindings = reconcile(channelFindings)
+
+  // Apply ack lookup (T2-D): stamp acknowledged/ack_match/ack_reason on matched
+  // findings, preserving agreement/confidence/sources. isBlockingFinding and
+  // isAdvisoryFinding already treat acknowledged findings as advisory-only, so
+  // the gate (evaluateGate) skips them when computing the verdict.
+  if (opts.ackStore) {
+    for (const f of reconciledFindings) {
+      if (f.finding_key === undefined || f.description_shingle === undefined) continue
+      const match = opts.ackStore.lookup({
+        finding_key: f.finding_key,
+        normalized_location: normalizeLocationForKey(f.location),
+        shingle: f.description_shingle,
+      })
+      if (match) {
+        f.acknowledged = true
+        f.ack_match = match.match
+        if (match.record.reason !== undefined) f.ack_reason = match.record.reason
+      }
+    }
+  }
 
   const fixThreshold = job.fix_threshold as Severity
   const completedChannels = Object.values(job.channels)
