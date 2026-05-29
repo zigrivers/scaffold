@@ -1,10 +1,20 @@
 /**
- * CHROME_JS — self-contained IIFE for guide pages.
+ * THEME_INIT_JS — tiny blocking script for <head>.
+ *
+ * Reads saved theme or OS preference and sets [data-theme] on <html> before
+ * first paint, eliminating flash-of-unstyled-theme (FOUC) for dark-mode users.
+ * Must run synchronously in <head>; no toggle logic here.
+ */
+export const THEME_INIT_JS: string = `(function(){try{var t=localStorage.getItem('guide-theme');if(!t&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)t='dark';if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})();`
+
+/**
+ * CHROME_JS — self-contained IIFE for guide pages (end-of-body).
  *
  * Dark mode: keyed on [data-theme="dark"] on <html>, matching dashboard-theme.css.
+ * Initial theme application is handled by THEME_INIT_JS in <head>.
  *
  * Behaviours:
- *  - theme     : restore saved theme or OS preference on load; [data-action=theme] toggles + persists
+ *  - theme     : [data-action=theme] toggles current data-theme + persists to localStorage
  *  - mobile nav: [data-action=nav] toggles .open on .rail
  *  - copy      : wrap every <pre> in <div class="code">, prepend <button class="copy-btn">Copy</button>
  *  - tabs      : click .tab-btn → activate matching .tabpane within same .tabs group
@@ -12,21 +22,10 @@
  *  - scrollspy : IntersectionObserver on h2[id],h3[id]; marks .toc a[href="#id"] active
  */
 export const CHROME_JS: string = /* js */ `(function(){
-  // ─── Theme ────────────────────────────────────────────────────────────────
   var LS_KEY = 'guide-theme';
   function applyTheme(t) {
     document.documentElement.setAttribute('data-theme', t);
   }
-  (function initTheme() {
-    var saved = localStorage.getItem(LS_KEY);
-    if (saved === 'dark' || saved === 'light') {
-      applyTheme(saved);
-    } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      applyTheme('dark');
-    } else {
-      applyTheme('light');
-    }
-  })();
 
   document.addEventListener('DOMContentLoaded', function() {
     // ─── Theme toggle ────────────────────────────────────────────────────────
@@ -49,6 +48,7 @@ export const CHROME_JS: string = /* js */ `(function(){
 
     // ─── Copy buttons ─────────────────────────────────────────────────────────
     document.querySelectorAll('pre').forEach(function(pre) {
+      if (!pre.parentNode) return;
       var wrapper = document.createElement('div');
       wrapper.className = 'code';
       pre.parentNode.insertBefore(wrapper, pre);

@@ -1,5 +1,5 @@
 import type { TocHeading } from './types.js'
-import { CHROME_JS } from './chrome.js'
+import { CHROME_JS, THEME_INIT_JS } from './chrome.js'
 
 export const CHROME_VERSION = 1
 
@@ -30,6 +30,7 @@ export function wrapInChrome({ title, body, headings, css }: WrapArgs): string {
 <title>${esc(title)}</title>
 <!-- scaffold:chrome v${CHROME_VERSION} -->
 <style>${css}</style>
+<script>${THEME_INIT_JS}</script>
 </head>
 <body>
 <header class="topbar">
