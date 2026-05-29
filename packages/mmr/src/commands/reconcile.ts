@@ -1,6 +1,5 @@
 import type { CommandModule, ArgumentsCamelCase } from 'yargs'
-import path from 'node:path'
-import os from 'node:os'
+import { resolveJobsDir } from './sessions.js'
 import { JobStore } from '../core/job-store.js'
 import { normalizeExternalInput, readInput } from '../core/normalize-input.js'
 import { runResultsPipeline } from '../core/results-pipeline.js'
@@ -41,7 +40,7 @@ export const reconcileCommand: CommandModule<object, ReconcileArgs> = {
         choices: ['json', 'text', 'markdown'],
       }),
   handler: (args: ArgumentsCamelCase<ReconcileArgs>) => {
-    const jobsDir = path.join(os.homedir(), '.mmr', 'jobs')
+    const jobsDir = resolveJobsDir()
     const store = new JobStore(jobsDir)
 
     // 1. Load job

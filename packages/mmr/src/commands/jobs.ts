@@ -1,15 +1,14 @@
 import type { CommandModule, ArgumentsCamelCase } from 'yargs'
-import path from 'node:path'
-import os from 'node:os'
 import { JobStore } from '../core/job-store.js'
 import { loadConfig } from '../config/loader.js'
+import { resolveJobsDir } from './sessions.js'
 
 interface JobsArgs {
   action: string
 }
 
 function jobsList(): void {
-  const jobsDir = path.join(os.homedir(), '.mmr', 'jobs')
+  const jobsDir = resolveJobsDir()
   const store = new JobStore(jobsDir)
   const jobs = store.listJobs()
 
@@ -27,7 +26,7 @@ function jobsPrune(): void {
   const config = loadConfig({ projectRoot: process.cwd() })
   const retentionDays = config.defaults.job_retention_days
 
-  const jobsDir = path.join(os.homedir(), '.mmr', 'jobs')
+  const jobsDir = resolveJobsDir()
   const store = new JobStore(jobsDir)
   const pruned = store.pruneJobs(retentionDays)
 

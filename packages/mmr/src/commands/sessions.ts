@@ -6,6 +6,13 @@ import path from 'node:path'
 const SESSION_ID_RE = /^[a-zA-Z0-9_-]+$/
 const WINDOWS_RESERVED_ID_RE = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i
 const SYSTEM_SESSION_ID_RE = /^(index|__proto__)$/i
+/**
+ * Human-readable description of the session-id rules, shared by every
+ * validation error message so the CLI surfaces one consistent explanation
+ * (the bare regex plus the reserved-name rejections).
+ */
+export const SESSION_ID_RULE =
+  '^[a-zA-Z0-9_-]+$ and not a reserved name (con, prn, aux, nul, com1-9, lpt1-9, index, __proto__)'
 const LOCK_TIMEOUT_MS = 5000
 const LOCK_POLL_MS = 25
 
@@ -35,12 +42,12 @@ export class SessionStore {
 
   private validateId(id: string): void {
     if (!this.isValidId(id)) {
-      throw new Error(`Invalid session id: ${id} - must match ^[a-zA-Z0-9_-]+$`)
+      throw new Error(`Invalid session id: ${id} - must match ${SESSION_ID_RULE}`)
     }
   }
 
   private isValidId(id: string): boolean {
-    return SESSION_ID_RE.test(id) && !WINDOWS_RESERVED_ID_RE.test(id) && !SYSTEM_SESSION_ID_RE.test(id)
+    return isValidSessionId(id)
   }
 
   private filePath(id: string): string {
@@ -202,11 +209,37 @@ export class SessionStore {
   }
 }
 
-function resolveSessionRoot(): string {
-  return process.env.MMR_HOME ?? path.join(process.env.HOME ?? os.homedir(), '.mmr')
+/**
+ * Validates a session id against the same rules SessionStore enforces:
+ * the allowed-character regex plus Windows-reserved and system-reserved names
+ * that would otherwise pass the bare regex. Exported so callers (e.g. the
+ * review command) can reject invalid ids up front, before any side effects.
+ */
+export function isValidSessionId(id: string): boolean {
+  return SESSION_ID_RE.test(id) && !WINDOWS_RESERVED_ID_RE.test(id) && !SYSTEM_SESSION_ID_RE.test(id)
 }
 
-function getSessionStore(): SessionStore {
+/**
+ * Resolves the MMR state root. MMR_HOME, when set, may be absolute or
+ * cwd-relative (resolved to absolute here); a leading `~` is not expanded —
+ * rely on the shell to expand it, as with any other path env var.
+ */
+export function resolveSessionRoot(): string {
+  const mmrHome = process.env.MMR_HOME
+  if (mmrHome !== undefined && mmrHome.trim() !== '') return path.resolve(mmrHome)
+  return path.join(process.env.HOME ?? os.homedir(), '.mmr')
+}
+
+/**
+ * The jobs directory, resolved under the same root as sessions so that
+ * `mmr review` (which writes jobs) and the rest of the job lifecycle
+ * (`mmr jobs|status|results|reconcile`) all honor MMR_HOME consistently.
+ */
+export function resolveJobsDir(): string {
+  return path.join(resolveSessionRoot(), 'jobs')
+}
+
+export function getSessionStore(): SessionStore {
   return new SessionStore(resolveSessionRoot())
 }
 

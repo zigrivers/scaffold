@@ -1,6 +1,5 @@
 import type { CommandModule, ArgumentsCamelCase } from 'yargs'
-import path from 'node:path'
-import os from 'node:os'
+import { resolveJobsDir } from './sessions.js'
 import { JobStore } from '../core/job-store.js'
 import { runResultsPipeline } from '../core/results-pipeline.js'
 import { TERMINAL_STATUSES } from '../types.js'
@@ -33,7 +32,7 @@ export const resultsCommand: CommandModule<object, ResultsArgs> = {
         default: false,
       }),
   handler: (args: ArgumentsCamelCase<ResultsArgs>) => {
-    const jobsDir = path.join(os.homedir(), '.mmr', 'jobs')
+    const jobsDir = resolveJobsDir()
     const store = new JobStore(jobsDir)
 
     // 1. Load job

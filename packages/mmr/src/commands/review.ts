@@ -1,7 +1,5 @@
 import type { CommandModule, ArgumentsCamelCase } from 'yargs'
 import fs from 'node:fs'
-import path from 'node:path'
-import os from 'node:os'
 import { execFileSync } from 'node:child_process'
 import { loadConfig } from '../config/loader.js'
 import { JobStore } from '../core/job-store.js'
@@ -21,6 +19,7 @@ import { formatJson } from '../formatters/json.js'
 import { formatText } from '../formatters/text.js'
 import { formatMarkdown } from '../formatters/markdown.js'
 import type { ChannelConfigParsed, MmrConfigParsed } from '../config/schema.js'
+import { getSessionStore, resolveJobsDir, isValidSessionId, SESSION_ID_RULE, type SessionStore } from './sessions.js'
 
 interface ReviewArgs {
   diff?: string
@@ -256,7 +255,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       })
       .option('session', {
         type: 'string',
-        describe: 'Session id. Allowed chars: a-zA-Z0-9_-',
+        describe: 'Session id (letters, digits, _ and -; reserved names like con/index/__proto__ are rejected)',
       })
       .option('round', {
         type: 'number',
@@ -296,8 +295,8 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
         describe: 'Resolve diff and assemble prompt without dispatching channels',
       })
       .check((argv) => {
-        if (typeof argv.session === 'string' && !/^[a-zA-Z0-9_-]+$/.test(argv.session)) {
-          throw new Error('Invalid session id. Allowed chars: a-zA-Z0-9_-')
+        if (typeof argv.session === 'string' && !isValidSessionId(argv.session)) {
+          throw new Error(`Invalid session id. Must match ${SESSION_ID_RULE}`)
         }
         if (typeof argv.round === 'number' && argv.round < 1) {
           throw new Error('round must be >= 1')
@@ -324,9 +323,11 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
         format: args.format,
       },
     })
-    const sessionIdRe = /^[a-zA-Z0-9_-]+$/
-    if (args.session !== undefined && !sessionIdRe.test(args.session)) {
-      console.error(`Invalid session id: ${args.session} - must match ^[a-zA-Z0-9_-]+$`)
+    // Defense-in-depth: the yargs `.check()` rejects invalid ids on the CLI
+    // path, but the handler is also invoked directly by programmatic callers
+    // and tests that bypass `.check()`, so validate here too before any I/O.
+    if (args.session !== undefined && !isValidSessionId(args.session)) {
+      console.error(`Invalid session id: ${args.session} - must match ${SESSION_ID_RULE}`)
       process.exitCode = 1
       return
     }
@@ -357,6 +358,11 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     if (!diff.trim()) {
       console.error('No diff content found. Provide --diff, --pr, --staged, or --base/--head.')
       process.exit(1)
+    }
+
+    let sessionLink: { store: SessionStore; id: string } | undefined
+    if (args.session !== undefined) {
+      sessionLink = { store: getSessionStore(), id: args.session }
     }
 
     // 3. Determine enabled channels — channels_disabled applies to the default list only;
@@ -439,7 +445,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     }
 
     // 5. Create job
-    const jobsDir = path.join(os.homedir(), '.mmr', 'jobs')
+    const jobsDir = resolveJobsDir()
     const store = new JobStore(jobsDir)
     const job = store.createJob({
       fix_threshold: config.defaults.fix_threshold as Severity,
@@ -449,6 +455,33 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       round: args.round,
       review_controls: reviewControls,
     })
+    if (sessionLink) {
+      try {
+        sessionLink.store.addJob(sessionLink.id, job.job_id, args.round ?? 1)
+      } catch (err) {
+        // Linking failed after the job dir was created. Remove the orphaned job
+        // so the auto-link invariant holds: a job that records a session_id is
+        // always present in that session's jobs[] array (never half-linked).
+        // The invariant covers in-process failures; abrupt termination (SIGKILL,
+        // OOM) between createJob and addJob can still leave a half-linked job,
+        // but its job.json carries session_id so it remains traceable.
+        // Guard the cleanup so a failed rmSync can't mask the original error.
+        try {
+          fs.rmSync(store.getJobDir(job.job_id), { recursive: true, force: true })
+        } catch {
+          // best-effort cleanup; fall through to report the original failure
+        }
+        console.error(
+          `Failed to link job ${job.job_id} to session ${sessionLink.id}: ` +
+            (err instanceof Error ? err.message : String(err)),
+        )
+        // Set the exit code and return rather than process.exit(1): it lets
+        // stderr flush, and keeps the handler unit-testable without mocking
+        // process.exit. Returning aborts before channel dispatch, as intended.
+        process.exitCode = 1
+        return
+      }
+    }
 
     // Record skipped/auth-failed channels in job metadata
     for (const name of channelNames) {
