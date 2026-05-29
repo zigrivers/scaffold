@@ -36,3 +36,27 @@ TEARDOWN_SCRIPT="$BATS_TEST_DIRNAME/../scripts/teardown-agent-worktree.sh"
     [ "$status" -eq 1 ]
     [[ "$output" == *"does not exist"* ]]
 }
+
+@test "teardown-agent-worktree.sh refuses to delete the default branch (main)" {
+    # Move the primary repo off main so main can be checked out in a worktree —
+    # this reproduces what 'gh pr merge --delete-branch' does: it switches the
+    # merged worktree onto the default branch before deleting the feature branch.
+    git checkout -q -b some-other-branch
+    git worktree add "${SANDBOX}-testagent" main 2>/dev/null
+    run bash "$TEARDOWN_SCRIPT" "${SANDBOX}-testagent"
+    [ "$status" -eq 0 ]
+    # The worktree is still removed...
+    [ ! -d "${SANDBOX}-testagent" ]
+    # ...but main MUST survive.
+    [ -n "$(git branch --list main)" ]
+    [[ "$output" == *"efus"* ]]
+}
+
+@test "teardown-agent-worktree.sh refuses to delete master when it is the default branch" {
+    git branch -m main master
+    git checkout -q -b some-other-branch
+    git worktree add "${SANDBOX}-testagent" master 2>/dev/null
+    run bash "$TEARDOWN_SCRIPT" "${SANDBOX}-testagent"
+    [ "$status" -eq 0 ]
+    [ -n "$(git branch --list master)" ]
+}

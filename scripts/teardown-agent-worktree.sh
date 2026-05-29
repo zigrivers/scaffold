@@ -50,16 +50,34 @@ fi
 git -C "$REPO_DIR" worktree remove "$worktree_dir"
 echo "Removed worktree: $worktree_dir"
 
+# ─── Resolve the repo's default branch (to protect it) ──────
+# A merged worktree is often left sitting on the default branch by
+# `gh pr merge --delete-branch` (it switches the worktree off the now-deleted
+# feature branch). Deleting that branch here would nuke local main/master, so
+# never delete the default branch regardless of what the worktree was on.
+default_branch="$(git -C "$REPO_DIR" symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's@^origin/@@' || true)"
+if [ -z "$default_branch" ]; then
+    for cand in main master; do
+        if git -C "$REPO_DIR" show-ref --verify --quiet "refs/heads/$cand"; then
+            default_branch="$cand"
+            break
+        fi
+    done
+fi
+
 # ─── Optional branch cleanup ────────────────────────────────
 
 if [ -n "$branch_name" ]; then
     primary_branch="$(git -C "$REPO_DIR" branch --show-current 2>/dev/null || true)"
-    if [ "$branch_name" != "$primary_branch" ]; then
-        if git -C "$REPO_DIR" branch -D "$branch_name" 2>/dev/null; then
-            echo "Deleted branch: $branch_name"
-        else
-            echo "Note: branch '$branch_name' not deleted (may be checked out elsewhere or already gone)"
-        fi
+    if [ "$branch_name" = "$primary_branch" ]; then
+        : # never delete the branch the primary repo currently has checked out
+    elif [ "$branch_name" = "$default_branch" ] || [ "$branch_name" = "main" ] || [ "$branch_name" = "master" ]; then
+        echo "Refusing to delete default branch '$branch_name' — the worktree was on the repo's main branch" \
+            "(likely switched there by 'gh pr merge --delete-branch'). Leaving it intact."
+    elif git -C "$REPO_DIR" branch -D "$branch_name" 2>/dev/null; then
+        echo "Deleted branch: $branch_name"
+    else
+        echo "Note: branch '$branch_name' not deleted (may be checked out elsewhere or already gone)"
     fi
 fi
 
