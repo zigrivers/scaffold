@@ -15,6 +15,12 @@ Patterns and anti-patterns discovered during development. Review before starting
   leaves a dead import that the focused test won't catch but ESLint (and CI) will. Caught on
   PR #413 / Task 17: dropping `os.homedir()` from `review.ts` orphaned `import os from 'node:os'`.
 
+- After merging a task PR you land back on `main` (the merge/pull leaves you there). CREATE THE
+  NEXT TASK'S BRANCH **before** writing or committing anything — `git checkout -b feat/...` first.
+  On v3.30 Task 26 I committed a test straight to `main` and pushed it; `ci.yml` triggers only on
+  `pull_request`, so that push bypassed CI entirely (caught it, it was test-only + locally green +
+  reviewed). Habit: first action of every task = branch.
+
 - MMR tests must NOT execute `packages/mmr/dist/index.js` — CI runs the vitest suite WITHOUT
   building the mmr dist, so any `execFileSync('node', [dist/index.js, ...])` test passes locally
   (after a build) but fails CI with "Cannot find module …/dist/index.js". Exercise the command's
