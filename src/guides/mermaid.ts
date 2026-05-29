@@ -6,12 +6,19 @@ import { execFileSync } from 'node:child_process'
 import { visit } from 'unist-util-visit'
 import type { AnyPlugin } from './render.js'
 
-const MMDC_VERSION_FINGERPRINT = 'mmdc11' // bump when render options/version change
+const MMDC_VERSION_FINGERPRINT = 'mmdc12' // bump when render options/version change
 const RENDER_OPTS = ['-t', 'neutral', '-b', 'transparent']
+
+// Mermaid config passed to mmdc via `-c`. `htmlLabels: false` forces node/edge
+// labels to render as native SVG <text>/<tspan> instead of <foreignObject> HTML.
+// This is REQUIRED: sanitizeSvg() strips <foreignObject> for security, so with
+// the mmdc default (HTML labels) every node label would vanish, leaving empty
+// boxes. The fingerprint includes this JSON so cache invalidates when it changes.
+const MERMAID_CONFIG = JSON.stringify({ htmlLabels: false, flowchart: { htmlLabels: false } })
 
 export function computeFingerprint(source: string): string {
   return createHash('sha256')
-    .update(`${MMDC_VERSION_FINGERPRINT}\n${RENDER_OPTS.join(' ')}\n${source}`)
+    .update(`${MMDC_VERSION_FINGERPRINT}\n${RENDER_OPTS.join(' ')}\n${MERMAID_CONFIG}\n${source}`)
     .digest('hex')
     .slice(0, 16)
 }
@@ -31,10 +38,14 @@ export async function renderMermaid(source: string): Promise<string> {
   try {
     const inFile = path.join(tmp, 'in.mmd')
     const outFile = path.join(tmp, 'out.svg')
+    const cfgFile = path.join(tmp, 'config.json')
     fs.writeFileSync(inFile, source)
-    execFileSync('npx', ['--no-install', 'mmdc', '-i', inFile, '-o', outFile, ...RENDER_OPTS], {
-      stdio: 'pipe',
-    })
+    fs.writeFileSync(cfgFile, MERMAID_CONFIG)
+    execFileSync(
+      'npx',
+      ['--no-install', 'mmdc', '-i', inFile, '-o', outFile, '-c', cfgFile, ...RENDER_OPTS],
+      { stdio: 'pipe' },
+    )
     return fs.readFileSync(outFile, 'utf8')
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true })

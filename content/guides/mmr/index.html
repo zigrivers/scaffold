@@ -1,0 +1,1727 @@
+<!DOCTYPE html>
+<html lang="en" data-chrome-version="1">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MMR Reference</title>
+<!-- scaffold:chrome v1 -->
+<style>/* Scaffold Dashboard Theme
+ * All CSS for the generated pipeline dashboard.
+ * Embedded into HTML by scripts/generate-dashboard.sh.
+ * Design system reference: docs/design-system.md
+ *
+ * Aesthetic: "Precision Industrial" — Swiss-typographic control room.
+ * Deep navy dark mode with indigo accents, clean cool-white light mode.
+ */
+
+/* ─── Design Tokens (Light Mode) ──────────────── */
+:root {
+    /* Surface */
+    --bg:           #f5f6fa;
+    --bg-card:      #ffffff;
+    --bg-hover:     #eef0f6;
+    --bg-inset:     #e8eaf2;
+
+    /* Text */
+    --text:         #1a1d2e;
+    --text-muted:   #6b7294;
+    --text-faint:   #9ba1c0;
+
+    /* Borders & Structure */
+    --border:       #dde0ed;
+    --border-light: #eceef5;
+    --radius:       10px;
+    --radius-sm:    6px;
+
+    /* Accent */
+    --accent:       #4f46e5;
+    --accent-hover: #4338ca;
+    --accent-glow:  rgba(79, 70, 229, 0.10);
+
+    /* Semantic: Status */
+    --green:        #059669;
+    --green-bg:     #ecfdf5;
+    --green-border: #a7f3d0;
+    --blue:         #2563eb;
+    --blue-bg:      #eff6ff;
+    --blue-border:  #bfdbfe;
+    --yellow:       #d97706;
+    --yellow-bg:    #fffbeb;
+    --yellow-border:#fde68a;
+    --gray:         #9ca3af;
+    --gray-bg:      #f3f4f6;
+    --gray-border:  #e5e7eb;
+
+    /* Semantic: Next Banner */
+    --next-bg:      #eef2ff;
+    --next-border:  #4f46e5;
+    --next-glow:    rgba(79, 70, 229, 0.06);
+
+    /* Semantic: Progress */
+    --progress-bg:  #e5e7eb;
+    --progress-h:   10px;
+
+    /* Depth */
+    --shadow-sm:    0 1px 2px rgba(30, 34, 60, 0.04);
+    --shadow:       0 1px 3px rgba(30, 34, 60, 0.07), 0 1px 2px rgba(30, 34, 60, 0.04);
+    --shadow-md:    0 4px 12px rgba(30, 34, 60, 0.08), 0 1px 3px rgba(30, 34, 60, 0.05);
+    --shadow-lg:    0 8px 24px rgba(30, 34, 60, 0.10), 0 2px 6px rgba(30, 34, 60, 0.04);
+
+    /* Spacing scale (4px base) */
+    --sp-1: 4px;
+    --sp-2: 8px;
+    --sp-3: 12px;
+    --sp-4: 16px;
+    --sp-5: 20px;
+    --sp-6: 24px;
+    --sp-8: 32px;
+    --sp-10: 40px;
+
+    /* Typography */
+    --font-sans:  -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    --font-mono:  "SF Mono", "Cascadia Code", "Fira Code", "JetBrains Mono", Menlo, Consolas, monospace;
+    --text-xs:    0.75rem;
+    --text-sm:    0.8125rem;
+    --text-base:  0.9375rem;
+    --text-lg:    1.125rem;
+    --text-xl:    1.375rem;
+    --text-2xl:   1.75rem;
+    --lh-tight:   1.25;
+    --lh-normal:  1.5;
+    --lh-relaxed: 1.625;
+    --ls-tight:   -0.01em;
+    --ls-wide:    0.025em;
+    --fw-normal:  400;
+    --fw-medium:  500;
+    --fw-semi:    600;
+    --fw-bold:    700;
+
+    /* Layout */
+    --max-w:      960px;
+    --page-pad:   24px;
+}
+
+/* ─── Design Tokens (Dark Mode) ───────────────── */
+[data-theme="dark"] {
+    /* Surface */
+    --bg:           #0f1117;
+    --bg-card:      #1a1d2e;
+    --bg-hover:     #252940;
+    --bg-inset:     #141724;
+
+    /* Text */
+    --text:         #e2e5f0;
+    --text-muted:   #7c82a8;
+    --text-faint:   #555c80;
+
+    /* Borders & Structure */
+    --border:       #2a2f45;
+    --border-light: #21253a;
+
+    /* Accent */
+    --accent:       #818cf8;
+    --accent-hover: #a5b4fc;
+    --accent-glow:  rgba(129, 140, 248, 0.12);
+
+    /* Semantic: Status */
+    --green:        #34d399;
+    --green-bg:     rgba(6, 78, 59, 0.25);
+    --green-border: rgba(52, 211, 153, 0.25);
+    --blue:         #60a5fa;
+    --blue-bg:      rgba(30, 58, 95, 0.30);
+    --blue-border:  rgba(96, 165, 250, 0.25);
+    --yellow:       #fbbf24;
+    --yellow-bg:    rgba(120, 53, 15, 0.25);
+    --yellow-border:rgba(251, 191, 36, 0.20);
+    --gray:         #6b7294;
+    --gray-bg:      #252940;
+    --gray-border:  #363c58;
+
+    /* Semantic: Next Banner */
+    --next-bg:      rgba(30, 27, 75, 0.50);
+    --next-border:  #818cf8;
+    --next-glow:    rgba(129, 140, 248, 0.08);
+
+    /* Semantic: Progress */
+    --progress-bg:  #1f2337;
+
+    /* Depth */
+    --shadow-sm:    0 1px 2px rgba(0, 0, 0, 0.20);
+    --shadow:       0 1px 3px rgba(0, 0, 0, 0.30), 0 1px 2px rgba(0, 0, 0, 0.15);
+    --shadow-md:    0 4px 12px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.20);
+    --shadow-lg:    0 8px 24px rgba(0, 0, 0, 0.40), 0 2px 6px rgba(0, 0, 0, 0.20);
+}
+
+/* ─── Theme Toggle ───────────────────────────── */
+.theme-toggle {
+    background: var(--bg-inset);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: var(--sp-1) var(--sp-2);
+    cursor: pointer;
+    font-size: var(--text-base);
+    line-height: 1;
+    color: var(--text-muted);
+    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+    display: flex;
+    align-items: center;
+    margin-left: auto;
+}
+
+.theme-toggle:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-glow);
+}
+
+/* ─── Base ────────────────────────────────────── */
+*, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: var(--lh-normal);
+    color: var(--text);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Layout ──────────────────────────────────── */
+.wrap {
+    max-width: var(--max-w);
+    margin: 0 auto;
+    padding: var(--sp-8) var(--page-pad);
+}
+
+/* ─── Header ──────────────────────────────────── */
+.header {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-2);
+    flex-wrap: wrap;
+}
+
+h1 {
+    font-size: var(--text-2xl);
+    font-weight: var(--fw-bold);
+    letter-spacing: var(--ls-tight);
+    line-height: var(--lh-tight);
+}
+
+h2 {
+    font-size: var(--text-lg);
+    font-weight: var(--fw-semi);
+    letter-spacing: var(--ls-tight);
+    line-height: var(--lh-tight);
+    margin-bottom: var(--sp-3);
+}
+
+.header-meta {
+    font-size: var(--text-xs);
+    color: var(--text-faint);
+    margin-bottom: var(--sp-6);
+    letter-spacing: var(--ls-wide);
+    text-transform: uppercase;
+}
+
+/* ─── Badge ───────────────────────────────────── */
+.badge {
+    display: inline-block;
+    padding: 2px var(--sp-2);
+    border-radius: 99px;
+    font-size: var(--text-xs);
+    font-weight: var(--fw-semi);
+    letter-spacing: var(--ls-wide);
+    background: var(--accent);
+    color: #fff;
+    text-transform: uppercase;
+}
+
+.badge-optional {
+    background: var(--yellow-bg);
+    color: var(--yellow);
+    border: 1px solid var(--yellow-border);
+}
+
+/* ─── Progress Bar ────────────────────────────── */
+.progress-bar {
+    width: 100%;
+    height: var(--progress-h);
+    background: var(--progress-bg);
+    border-radius: 99px;
+    overflow: hidden;
+    margin-bottom: var(--sp-6);
+    display: flex;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.progress-bar .seg-done {
+    background: linear-gradient(135deg, var(--green), #10b981);
+    box-shadow: 0 0 8px rgba(5, 150, 105, 0.3);
+}
+
+.progress-bar .seg-likely {
+    background: linear-gradient(135deg, var(--blue), #3b82f6);
+    box-shadow: 0 0 8px rgba(37, 99, 235, 0.25);
+}
+
+.progress-bar .seg-skip {
+    background: var(--gray);
+    opacity: 0.7;
+}
+
+/* ─── Summary Cards ───────────────────────────── */
+.cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-6);
+}
+
+.card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: var(--sp-4) var(--sp-5);
+    box-shadow: var(--shadow);
+    transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+}
+
+.card-num {
+    font-size: var(--text-2xl);
+    font-weight: var(--fw-bold);
+    font-family: var(--font-mono);
+    letter-spacing: var(--ls-tight);
+    line-height: 1;
+}
+
+.card-lbl {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    margin-top: var(--sp-1);
+    letter-spacing: var(--ls-wide);
+    text-transform: uppercase;
+    font-weight: var(--fw-medium);
+}
+
+/* ─── What's Next Banner ──────────────────────── */
+.next-banner {
+    background: var(--next-bg);
+    border: 1px solid var(--next-border);
+    border-left: 4px solid var(--next-border);
+    border-radius: var(--radius);
+    padding: var(--sp-5) var(--sp-6);
+    margin-bottom: var(--sp-6);
+    box-shadow: 0 0 0 1px var(--next-glow), var(--shadow);
+    position: relative;
+    overflow: hidden;
+}
+
+.next-banner::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: var(--next-border);
+    animation: pulse-border 2.5s ease-in-out infinite;
+}
+
+@keyframes pulse-border {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.5; }
+}
+
+.next-banner h2 {
+    color: var(--accent);
+    margin-bottom: var(--sp-1);
+    font-size: var(--text-base);
+    font-weight: var(--fw-semi);
+    letter-spacing: var(--ls-wide);
+    text-transform: uppercase;
+}
+
+.next-banner p {
+    color: var(--text);
+    font-size: var(--text-base);
+}
+
+.next-cmd {
+    font-family: var(--font-mono);
+    background: var(--bg-card);
+    padding: var(--sp-1) var(--sp-3);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-top: var(--sp-3);
+    border: 1px solid var(--border);
+}
+
+/* ─── Phase Headers (Collapsible) ─────────────── */
+.phase {
+    margin-bottom: var(--sp-6);
+}
+
+.phase-hdr {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    cursor: pointer;
+    padding: var(--sp-2) 0;
+    user-select: none;
+    border-bottom: 2px solid var(--border);
+    margin-bottom: var(--sp-3);
+    transition: border-color 0.15s ease;
+}
+
+.phase-hdr:hover {
+    border-bottom-color: var(--accent);
+}
+
+.phase-hdr:hover h2 {
+    color: var(--accent);
+}
+
+.phase-hdr h2 {
+    transition: color 0.15s ease;
+}
+
+.phase-hdr .arr {
+    transition: transform 0.2s ease;
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+}
+
+.phase-hdr.closed .arr {
+    transform: rotate(-90deg);
+}
+
+.phase-cnt {
+    font-size: var(--text-xs);
+    font-family: var(--font-mono);
+    color: var(--text-faint);
+    margin-left: auto;
+    letter-spacing: var(--ls-wide);
+}
+
+/* ─── Prompt List ─────────────────────────────── */
+.plist {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+}
+
+/* ─── Prompt Cards ────────────────────────────── */
+.pcard {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: var(--sp-3) var(--sp-4);
+    box-shadow: var(--shadow-sm);
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: var(--sp-2) var(--sp-3);
+    align-items: start;
+    transition: box-shadow 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
+}
+
+.pcard:hover {
+    box-shadow: var(--shadow);
+    transform: translateY(-1px);
+    border-color: var(--accent-glow);
+}
+
+/* ─── Status Badges ──────────────────────────── */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    font-size: var(--text-xs);
+    font-weight: var(--fw-medium);
+    padding: 2px var(--sp-2);
+    border-radius: 99px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    letter-spacing: var(--ls-wide);
+    line-height: var(--lh-tight);
+}
+
+.st-completed {
+    background: var(--green-bg);
+    color: var(--green);
+    border: 1px solid var(--green-border);
+}
+
+.st-likely-completed {
+    background: var(--blue-bg);
+    color: var(--blue);
+    border: 1px solid var(--blue-border);
+}
+
+.st-skipped {
+    background: var(--gray-bg);
+    color: var(--gray);
+    border: 1px solid var(--gray-border);
+}
+
+.st-pending {
+    background: var(--bg-inset);
+    color: var(--text-faint);
+    border: 1px solid var(--border);
+}
+
+/* ─── Status Legend ──────────────────────────── */
+.status-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    margin-bottom: var(--sp-4);
+    padding: var(--sp-2) 0;
+}
+
+.status-legend .status-badge {
+    cursor: default;
+}
+
+/* ─── Prompt Card Inner ───────────────────────── */
+.pinfo {
+    min-width: 0;
+}
+
+.pname {
+    font-weight: var(--fw-semi);
+    font-size: var(--text-base);
+}
+
+.pstep {
+    font-size: var(--text-xs);
+    font-family: var(--font-mono);
+    color: var(--text-faint);
+    letter-spacing: var(--ls-wide);
+}
+
+.pdesc {
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+    margin-top: 2px;
+    line-height: var(--lh-relaxed);
+}
+
+.pdesc-long {
+    font-size: var(--text-xs);
+    color: var(--text-faint);
+    margin-top: 2px;
+}
+
+.pdeps {
+    font-size: var(--text-xs);
+    color: var(--yellow);
+    margin-top: var(--sp-1);
+    font-weight: var(--fw-medium);
+}
+
+/* ─── Copy Command Button ─────────────────────── */
+.pcmd {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    background: var(--bg-inset);
+    padding: 3px var(--sp-2);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    border: 1px solid var(--border);
+    white-space: nowrap;
+    align-self: center;
+    color: var(--text-muted);
+    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+    letter-spacing: var(--ls-wide);
+}
+
+.pcmd:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-glow);
+}
+
+.pcmd.copied {
+    border-color: var(--green);
+    color: var(--green);
+    background: var(--green-bg);
+}
+
+/* ─── Prompt Modal ────────────────────────────── */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: var(--sp-4);
+}
+
+.modal {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    max-width: 720px;
+    width: 100%;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    padding: var(--sp-4) var(--sp-5);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.modal-header h3 {
+    font-size: var(--text-lg);
+    font-weight: var(--fw-semi);
+    flex: 1;
+    min-width: 0;
+}
+
+.modal-close {
+    background: var(--bg-inset);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: var(--sp-1) var(--sp-2);
+    cursor: pointer;
+    font-size: var(--text-base);
+    color: var(--text-muted);
+    line-height: 1;
+    transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.modal-close:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.modal-body {
+    padding: var(--sp-5);
+    overflow-y: auto;
+    flex: 1;
+}
+
+.modal-body pre {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    line-height: var(--lh-relaxed);
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--text);
+}
+
+.modal-body pre .md-heading {
+    font-weight: var(--fw-bold);
+    color: var(--accent);
+}
+
+.modal-body pre .md-code {
+    background: var(--bg-inset);
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: var(--text-xs);
+}
+
+.modal-footer {
+    display: flex;
+    gap: var(--sp-2);
+    padding: var(--sp-3) var(--sp-5);
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.modal-copy-btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: var(--sp-2) var(--sp-4);
+    font-size: var(--text-sm);
+    font-weight: var(--fw-medium);
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.modal-copy-btn:hover {
+    background: var(--accent-hover);
+}
+
+.modal-copy-btn.copied {
+    background: var(--green);
+}
+
+/* ─── Beads Task Section ─────────────────────── */
+.beads-section {
+    margin-top: var(--sp-8);
+    margin-bottom: var(--sp-6);
+}
+
+.beads-filters {
+    display: flex;
+    gap: var(--sp-2);
+    margin-bottom: var(--sp-3);
+}
+
+.beads-filter {
+    background: var(--bg-inset);
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    padding: var(--sp-1) var(--sp-3);
+    font-size: var(--text-xs);
+    font-weight: var(--fw-medium);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+    letter-spacing: var(--ls-wide);
+}
+
+.beads-filter:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.beads-filter.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+}
+
+/* ─── Beads Status Badges ────────────────────── */
+.st-bead-open {
+    background: var(--accent-glow);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+}
+
+.st-bead-progress {
+    background: var(--blue-bg);
+    color: var(--blue);
+    border: 1px solid var(--blue-border);
+}
+
+.st-bead-blocked {
+    background: var(--yellow-bg);
+    color: var(--yellow);
+    border: 1px solid var(--yellow-border);
+}
+
+.st-bead-deferred {
+    background: var(--gray-bg);
+    color: var(--gray);
+    border: 1px solid var(--gray-border);
+}
+
+.st-bead-closed {
+    background: var(--green-bg);
+    color: var(--green);
+    border: 1px solid var(--green-border);
+}
+
+/* ─── Beads Filter Separator ─────────────────── */
+.beads-filter-sep {
+    width: 1px;
+    background: var(--border);
+    align-self: stretch;
+    margin: 0 var(--sp-1);
+}
+
+/* ─── Beads Priority Filter ──────────────────── */
+.beads-prio-filter {
+    background: var(--bg-inset);
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    padding: var(--sp-1) var(--sp-3);
+    font-size: var(--text-xs);
+    font-weight: var(--fw-medium);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+    letter-spacing: var(--ls-wide);
+}
+
+.beads-prio-filter:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.beads-prio-filter.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+}
+
+/* ─── Beads Task Detail Modal ────────────────── */
+.bead-meta-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--sp-3);
+    padding: var(--sp-4) 0;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.bead-meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.bead-meta-label {
+    font-size: var(--text-xs);
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: var(--ls-wide);
+    font-weight: var(--fw-medium);
+}
+
+.bead-meta-value {
+    font-size: var(--text-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text);
+}
+
+.bead-description {
+    padding: var(--sp-4) 0;
+    border-bottom: 1px solid var(--border-light);
+    white-space: pre-wrap;
+    font-size: var(--text-sm);
+    line-height: var(--lh-relaxed);
+    color: var(--text-muted);
+}
+
+.bead-deps {
+    padding: var(--sp-4) 0;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.bead-dep-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-bottom: var(--sp-2);
+}
+
+.bead-dep-group:last-child {
+    margin-bottom: 0;
+}
+
+.bead-dep-label {
+    font-size: var(--text-xs);
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: var(--ls-wide);
+    font-weight: var(--fw-medium);
+    min-width: 80px;
+}
+
+.bead-dep-link {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    padding: 2px var(--sp-2);
+    border-radius: 99px;
+    background: var(--accent-glow);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+    text-decoration: none;
+}
+
+.bead-dep-link:hover {
+    background: var(--accent);
+    color: #fff;
+}
+
+.bead-timestamps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-4);
+    padding: var(--sp-4) 0;
+}
+
+.bead-ts-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.bead-ts-label {
+    font-size: var(--text-xs);
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: var(--ls-wide);
+    font-weight: var(--fw-medium);
+}
+
+.bead-ts-value {
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+}
+
+.bead-ts-value[title] {
+    border-bottom: 1px dotted var(--text-faint);
+    cursor: help;
+}
+
+/* ─── Standalone Commands Section ─────────────── */
+.ongoing {
+    margin-top: var(--sp-10);
+}
+
+.ongoing h2 {
+    letter-spacing: var(--ls-wide);
+    text-transform: uppercase;
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+    margin-bottom: var(--sp-4);
+    border-bottom: 2px solid var(--border);
+    padding-bottom: var(--sp-2);
+}
+
+/* ─── Footer ──────────────────────────────────── */
+.footer {
+    text-align: center;
+    font-size: var(--text-xs);
+    color: var(--text-faint);
+    margin-top: var(--sp-10);
+    padding-top: var(--sp-4);
+    border-top: 1px solid var(--border-light);
+    letter-spacing: var(--ls-wide);
+}
+
+/* ─── Utilities ───────────────────────────────── */
+.hidden {
+    display: none;
+}
+
+/* Build-observability severity + verdict tokens (Plan 4) */
+:root {
+  --sev-p0: #dc2626;        /* red 600 */
+  --sev-p1: #ea580c;        /* orange 600 */
+  --sev-p2: #ca8a04;        /* yellow 600 */
+  --sev-p3: #2563eb;        /* blue 600 */
+  --sev-pass: #16a34a;      /* green 600 */
+}
+[data-theme="dark"] {
+  --sev-p0: #f87171;
+  --sev-p1: #fb923c;
+  --sev-p2: #facc15;
+  --sev-p3: #60a5fa;
+  --sev-pass: #4ade80;
+}
+
+/* Build-observability panel layout */
+.panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: var(--sp-4) var(--sp-6);
+    margin-bottom: var(--sp-6);
+}
+.panel > header {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-4);
+    flex-wrap: wrap;
+}
+.panel > header h2 {
+    margin: 0;
+    font-size: var(--text-base);
+    font-weight: var(--fw-semi);
+}
+.panel .meta {
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+}
+.grid { display: grid; gap: var(--sp-4); }
+.grid-2 { grid-template-columns: repeat(2, 1fr); }
+@media (max-width: 640px) { .grid-2 { grid-template-columns: 1fr; } }
+
+/* Finding filters */
+.finding-filters {
+    display: flex;
+    gap: var(--sp-2);
+    flex-wrap: wrap;
+    margin-bottom: var(--sp-4);
+}
+.finding-filters button {
+    padding: var(--sp-1) var(--sp-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-inset);
+    color: var(--text);
+    font-size: var(--text-sm);
+    cursor: pointer;
+}
+.finding-filters button:hover,
+.finding-filters button.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+}
+
+/* Findings list */
+.findings {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+}
+.finding {
+    background: var(--bg-inset);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    padding: var(--sp-3) var(--sp-4);
+}
+.finding header {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    flex-wrap: wrap;
+    margin-bottom: var(--sp-2);
+}
+.finding-id {
+    font-family: var(--font-mono, monospace);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px var(--sp-1);
+}
+.finding .lens {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+}
+.finding .title {
+    font-size: var(--text-sm);
+    font-weight: var(--fw-semi);
+    flex: 1;
+}
+.finding p { margin: 0; font-size: var(--text-sm); color: var(--text-muted); }
+.empty { color: var(--text-muted); font-size: var(--text-sm); text-align: center; padding: var(--sp-4); }
+
+/* ── Mermaid diagrams ─────────────────────────────────────────────────────────
+   The build renders mermaid to inline SVG via mmdc, then sanitizeSvg() +
+   rehype-sanitize strip the SVG's own <script>, <foreignObject>, AND <style>
+   for security. Stripping <style> means the diagram arrives unstyled (nodes
+   default to a black fill). These theme-token rules restyle the SVG so nodes,
+   edges, arrowheads, and labels render correctly — and follow light/dark mode.
+   Authors must render with htmlLabels:false (the generator forces this) so node
+   labels are native <text>/<tspan> rather than stripped <foreignObject> HTML. */
+figure.mermaid { margin: var(--sp-5) 0; text-align: center; }
+figure.mermaid svg { max-width: 100%; height: auto; }
+/* Node shapes */
+figure.mermaid svg .node rect,
+figure.mermaid svg .node circle,
+figure.mermaid svg .node ellipse,
+figure.mermaid svg .node polygon,
+figure.mermaid svg .node path {
+    fill: var(--bg-inset);
+    stroke: var(--border);
+    stroke-width: 1px;
+}
+/* Background helper rects mermaid emits behind labels */
+figure.mermaid svg .node .label-container { fill: var(--bg-inset); stroke: var(--border); }
+figure.mermaid svg rect.background { fill: none; stroke: none; }
+/* Labels (rendered as <text>/<tspan> when htmlLabels:false) */
+figure.mermaid svg .nodeLabel,
+figure.mermaid svg .node text,
+figure.mermaid svg text.nodeLabel,
+figure.mermaid svg .label text,
+figure.mermaid svg span.nodeLabel {
+    fill: var(--text);
+    color: var(--text);
+    font-family: var(--font-sans);
+}
+/* Edges: thin strokes, not filled blobs */
+figure.mermaid svg .edgePath path,
+figure.mermaid svg path.flowchart-link,
+figure.mermaid svg .flowchart-link {
+    fill: none;
+    stroke: var(--text-faint);
+    stroke-width: 1.5px;
+}
+/* Arrowheads */
+figure.mermaid svg marker path,
+figure.mermaid svg .marker {
+    fill: var(--text-faint);
+    stroke: var(--text-faint);
+}
+figure.mermaid svg .edgeLabel,
+figure.mermaid svg .edgeLabel text { fill: var(--text-muted); color: var(--text-muted); }
+</style>
+<script>(function(){try{var t=localStorage.getItem('guide-theme');if(!t&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)t='dark';if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+</head>
+<body>
+<header class="topbar">
+  <button data-action="nav" class="nav-toggle" aria-label="Toggle navigation">☰</button>
+  <h1>MMR Reference</h1>
+  <button data-action="theme" class="theme-toggle" aria-label="Toggle theme">◐</button>
+</header>
+<div class="layout">
+  <aside class="rail"><nav class="toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#what-mmr-is">What MMR is</a></li><li class="toc-3"><a href="#the-core-idea-in-five-moves">The core idea in five moves</a></li><li class="toc-2"><a href="#end-to-end-flow">End-to-end flow</a></li><li class="toc-2"><a href="#the-mmr-review-command">The mmr review command</a></li><li class="toc-3"><a href="#copy-paste-commands-by-target">Copy-paste commands by target</a></li><li class="toc-2"><a href="#other-subcommands">Other subcommands</a></li><li class="toc-2"><a href="#channel-architecture">Channel architecture</a></li><li class="toc-3"><a href="#the-channel-config-shape">The channel config shape</a></li><li class="toc-3"><a href="#built-in-channels">Built-in channels</a></li><li class="toc-3"><a href="#the-dispatcher">The dispatcher</a></li><li class="toc-2"><a href="#scaffold-wrappers">Scaffold wrappers</a></li><li class="toc-2"><a href="#findings-reconciliation-verdicts">Findings, reconciliation &amp; verdicts</a></li><li class="toc-3"><a href="#the-finding-shape">The Finding shape</a></li><li class="toc-3"><a href="#stable-identity-finding-key">Stable identity (finding_key)</a></li><li class="toc-3"><a href="#agreement-confidence">Agreement &amp; confidence</a></li><li class="toc-3"><a href="#the-gate-the-four-verdicts">The gate &amp; the four verdicts</a></li><li class="toc-2"><a href="#degraded-mode-compensation-auth">Degraded mode, compensation &amp; auth</a></li><li class="toc-2"><a href="#configuration-mmryaml">Configuration (.mmr.yaml)</a></li></ul></nav></aside>
+  <main class="content"><h2 id="what-mmr-is">What MMR is</h2>
+<p>Multi-Model Review runs your changes past several <strong>independent</strong> AI code
+reviewers ("channels"), then <strong>reconciles</strong> their findings into a single
+de-duplicated list and a <strong>verdict</strong> that gates the work. No channel ever sees
+another channel's output — agreement between them is what raises confidence, and
+disagreement is what surfaces ambiguity.</p>
+<h3 id="the-core-idea-in-five-moves">The core idea in five moves</h3>
+<ol>
+<li><strong>Resolve a diff</strong> — from a PR, staged changes, a branch range, or a piped diff.</li>
+<li><strong>Dispatch channels</strong> — each channel is a separate subprocess given the same
+prompt, run in parallel and isolated.</li>
+<li><strong>Parse</strong> — each channel's raw output is parsed into a common <code>Finding</code> shape.</li>
+<li><strong>Reconcile</strong> — findings are grouped by a stable key, de-duplicated, and
+scored for agreement and confidence.</li>
+<li><strong>Verdict</strong> — a severity gate yields <code>pass</code>, <code>degraded-pass</code>, <code>blocked</code>, or
+<code>needs-user-decision</code>.</li>
+</ol>
+<div class="callout callout-tip"><p><strong>Two layers, one mental model.</strong> The <code>mmr</code> CLI is the engine that dispatches
+the built-in channels and computes the verdict. The <code>scaffold run review-pr</code> /
+<code>review-code</code> wrappers sit on top: they add a Superpowers code-reviewer <em>agent</em>
+channel via <code>mmr reconcile</code>, handle auth recovery, and drive the fix loop.</p></div>
+<h2 id="end-to-end-flow">End-to-end flow</h2>
+<p>A single <code>mmr review … --sync</code> run walks the whole pipeline. Channels fan out in
+parallel; everything converges at reconciliation.</p>
+<figure class="mermaid"><svg id="my-svg" width="100%" xmlns="http://www.w3.org/2000/svg" class="flowchart" style="max-width: 1307.42px; background-color: transparent;" viewBox="0 0 1307.421875 478.6000061035156" role="graphics-document document">#my-svg{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;fill:#000000;}@keyframes edge-animation-frame{from{stroke-dashoffset:0;}}@keyframes dash{to{stroke-dashoffset:0;}}#my-svg .edge-animation-slow{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 50s linear infinite;stroke-linecap:round;}#my-svg .edge-animation-fast{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 20s linear infinite;stroke-linecap:round;}#my-svg .error-icon{fill:#552222;}#my-svg .error-text{fill:#552222;stroke:#552222;}#my-svg .edge-thickness-normal{stroke-width:1px;}#my-svg .edge-thickness-thick{stroke-width:3.5px;}#my-svg .edge-pattern-solid{stroke-dasharray:0;}#my-svg .edge-thickness-invisible{stroke-width:0;fill:none;}#my-svg .edge-pattern-dashed{stroke-dasharray:3;}#my-svg .edge-pattern-dotted{stroke-dasharray:2;}#my-svg .marker{fill:#666;stroke:#666;}#my-svg .marker.cross{stroke:#666;}#my-svg svg{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;}#my-svg p{margin:0;}#my-svg .label{font-family:"trebuchet ms",verdana,arial,sans-serif;color:#000000;}#my-svg .cluster-label text{fill:#333;}#my-svg .cluster-label span{color:#333;}#my-svg .cluster-label span p{background-color:transparent;}#my-svg .label text,#my-svg span{fill:#000000;color:#000000;}#my-svg .node rect,#my-svg .node circle,#my-svg .node ellipse,#my-svg .node polygon,#my-svg .node path{fill:#eee;stroke:#999;stroke-width:1px;}#my-svg .rough-node .label text,#my-svg .node .label text,#my-svg .image-shape .label,#my-svg .icon-shape .label{text-anchor:middle;}#my-svg .node .katex path{fill:#000;stroke:#000;stroke-width:1px;}#my-svg .rough-node .label,#my-svg .node .label,#my-svg .image-shape .label,#my-svg .icon-shape .label{text-align:center;}#my-svg .node.clickable{cursor:pointer;}#my-svg .root .anchor path{fill:#666!important;stroke-width:0;stroke:#666;}#my-svg .arrowheadPath{fill:#333333;}#my-svg .edgePath .path{stroke:#666;stroke-width:1px;}#my-svg .flowchart-link{stroke:#666;fill:none;}#my-svg .edgeLabel{background-color:white;text-align:center;}#my-svg .edgeLabel p{background-color:white;}#my-svg .edgeLabel rect{opacity:0.5;background-color:white;fill:white;}#my-svg .labelBkg{background-color:rgba(255, 255, 255, 0.5);}#my-svg .cluster rect{fill:hsl(0, 0%, 98.9215686275%);stroke:#707070;stroke-width:1px;}#my-svg .cluster text{fill:#333;}#my-svg .cluster span{color:#333;}#my-svg div.mermaidTooltip{position:absolute;text-align:center;max-width:200px;padding:2px;font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:12px;background:hsl(-160, 0%, 93.3333333333%);border:1px solid #707070;border-radius:2px;pointer-events:none;z-index:100;}#my-svg .flowchartTitleText{text-anchor:middle;font-size:18px;fill:#000000;}#my-svg rect.text{fill:none;stroke-width:0;}#my-svg .icon-shape,#my-svg .image-shape{background-color:white;text-align:center;}#my-svg .icon-shape p,#my-svg .image-shape p{background-color:white;padding:2px;}#my-svg .icon-shape .label rect,#my-svg .image-shape .label rect{opacity:0.5;background-color:white;fill:white;}#my-svg .label-icon{display:inline-block;height:1em;overflow:visible;vertical-align:-0.125em;}#my-svg .node .label-icon path{fill:currentColor;stroke:revert;stroke-width:revert;}#my-svg .node .neo-node{stroke:#999;}#my-svg [data-look="neo"].node rect,#my-svg [data-look="neo"].cluster rect,#my-svg [data-look="neo"].node polygon{stroke:url(#my-svg-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#my-svg [data-look="neo"].node path{stroke:url(#my-svg-gradient);stroke-width:1px;}#my-svg [data-look="neo"].node .outer-path{filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#my-svg [data-look="neo"].node .neo-line path{stroke:#999;filter:none;}#my-svg [data-look="neo"].node circle{stroke:url(#my-svg-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#my-svg [data-look="neo"].node circle .state-start{fill:#000000;}#my-svg [data-look="neo"].icon-shape .icon{fill:url(#my-svg-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#my-svg [data-look="neo"].icon-shape .icon-neo path{stroke:url(#my-svg-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#my-svg :root{--mermaid-font-family:"trebuchet ms",verdana,arial,sans-serif;}<g><marker id="my-svg_flowchart-v2-pointEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"></path></marker><marker id="my-svg_flowchart-v2-pointStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="4.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 5 L 10 10 L 10 0 z" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"></path></marker><marker id="my-svg_flowchart-v2-pointEnd-margin" class="marker flowchart-v2" viewBox="0 0 11.5 14" refX="11.5" refY="7" markerUnits="userSpaceOnUse" markerWidth="10.5" markerHeight="14" orient="auto"><path d="M 0 0 L 11.5 7 L 0 14 z" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"></path></marker><marker id="my-svg_flowchart-v2-pointStart-margin" class="marker flowchart-v2" viewBox="0 0 11.5 14" refX="1" refY="7" markerUnits="userSpaceOnUse" markerWidth="11.5" markerHeight="14" orient="auto"><polygon points="0,7 11.5,14 11.5,0" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"></polygon></marker><marker id="my-svg_flowchart-v2-circleEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"></circle></marker><marker id="my-svg_flowchart-v2-circleStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="-1" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"></circle></marker><marker id="my-svg_flowchart-v2-circleEnd-margin" class="marker flowchart-v2" viewBox="0 0 10 10" refY="5" refX="12.25" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"></circle></marker><marker id="my-svg_flowchart-v2-circleStart-margin" class="marker flowchart-v2" viewBox="0 0 10 10" refX="-2" refY="5" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"></circle></marker><marker id="my-svg_flowchart-v2-crossEnd" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="12" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" style="stroke-width: 2; stroke-dasharray: 1, 0;"></path></marker><marker id="my-svg_flowchart-v2-crossStart" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="-1" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" style="stroke-width: 2; stroke-dasharray: 1, 0;"></path></marker><marker id="my-svg_flowchart-v2-crossEnd-margin" class="marker cross flowchart-v2" viewBox="0 0 15 15" refX="17.7" refY="7.5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto"><path d="M 1,1 L 14,14 M 1,14 L 14,1" class="arrowMarkerPath" style="stroke-width: 2.5;"></path></marker><marker id="my-svg_flowchart-v2-crossStart-margin" class="marker cross flowchart-v2" viewBox="0 0 15 15" refX="-3.5" refY="7.5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto"><path d="M 1,1 L 14,14 M 1,14 L 14,1" class="arrowMarkerPath" style="stroke-width: 2.5; stroke-dasharray: 1, 0;"></path></marker><g class="root"><g class="clusters"></g><g class="edgePaths"><path d="M177.453,230.5L181.62,230.5C185.786,230.5,194.12,230.5,201.786,230.5C209.453,230.5,216.453,230.5,219.953,230.5L223.453,230.5" id="my-svg-L_R_B_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M340.454,197.2L356.831,169.75C373.209,142.3,405.964,87.4,432.689,59.95C459.414,32.5,480.109,32.5,490.457,32.5L500.805,32.5" id="my-svg-L_B_C1_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M360.322,197.2L373.388,186.25C386.454,175.3,412.586,153.4,435.522,142.45C458.458,131.5,478.198,131.5,488.068,131.5L497.938,131.5" id="my-svg-L_B_C2_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M413.719,230.5L417.885,230.5C422.052,230.5,430.385,230.5,444.461,230.5C458.536,230.5,478.354,230.5,488.263,230.5L498.172,230.5" id="my-svg-L_B_C3_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M360.322,263.8L373.388,274.75C386.454,285.7,412.586,307.6,436.939,318.55C461.292,329.5,483.865,329.5,495.151,329.5L506.438,329.5" id="my-svg-L_B_C4_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M339.608,263.8L356.127,292.717C372.645,321.633,405.682,379.467,425.7,408.383C445.719,437.3,452.719,437.3,456.219,437.3L459.719,437.3" id="my-svg-L_B_C5_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M606.977,32.5L617.991,32.5C629.005,32.5,651.034,32.5,674.439,59.345C697.844,86.189,722.625,139.879,735.016,166.724L747.407,193.568" id="my-svg-L_C1_P_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M609.844,131.5L620.38,131.5C630.917,131.5,651.99,131.5,672.182,141.96C692.375,152.42,711.687,173.341,721.343,183.801L730.999,194.261" id="my-svg-L_C2_P_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M609.609,230.5L620.185,230.5C630.76,230.5,651.911,230.5,665.987,230.5C680.063,230.5,687.063,230.5,690.563,230.5L694.063,230.5" id="my-svg-L_C3_P_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M601.344,329.5L613.297,329.5C625.25,329.5,649.156,329.5,670.766,319.04C692.375,308.58,711.687,287.659,721.343,277.199L730.999,266.739" id="my-svg-L_C4_P_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M648.063,437.3L652.229,437.3C656.396,437.3,664.729,437.3,681.405,408.993C698.082,380.686,723.101,324.072,735.61,295.766L748.12,267.459" id="my-svg-L_C5_P_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M830.844,230.5L835.01,230.5C839.177,230.5,847.51,230.5,855.177,230.5C862.844,230.5,869.844,230.5,873.344,230.5L876.844,230.5" id="my-svg-L_P_RC_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M1061.5,230.5L1065.667,230.5C1069.833,230.5,1078.167,230.5,1085.833,230.5C1093.5,230.5,1100.5,230.5,1104,230.5L1107.5,230.5" id="my-svg-L_RC_V_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path></g><g class="edgeLabels"><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g></g><g class="nodes"><g class="node default" id="my-svg-flowchart-R-0" transform="translate(92.7265625, 230.5)"><rect class="basic label-container" style="" x="-84.7265625" y="-42.099998474121094" width="169.453125" height="84.19999694824219"></rect><g class="label" style="" transform="translate(0, -27.099998474121094)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">Resolve</tspan><tspan class="text-inner-tspan"> diff</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">(--pr</tspan><tspan class="text-inner-tspan"> /</tspan><tspan class="text-inner-tspan"> --staged</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="2.1em"><tspan class="text-inner-tspan">--diff</tspan><tspan class="text-inner-tspan"> /</tspan><tspan class="text-inner-tspan"> --base)</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-B-1" transform="translate(320.5859375, 230.5)"><rect class="basic label-container" style="" x="-93.1328125" y="-33.29999923706055" width="186.265625" height="66.5999984741211"></rect><g class="label" style="" transform="translate(0, -18.299999237060547)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">Build</tspan><tspan class="text-inner-tspan"> prompt</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">(+</tspan><tspan class="text-inner-tspan"> focus,</tspan><tspan class="text-inner-tspan"> criteria)</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-C1-3" transform="translate(555.890625, 32.5)"><rect class="basic label-container" style="" x="-51.0859375" y="-24.5" width="102.171875" height="49"></rect><g class="label" style="" transform="translate(0, -9.5)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">codex</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-C2-5" transform="translate(555.890625, 131.5)"><rect class="basic label-container" style="" x="-53.953125" y="-24.5" width="107.90625" height="49"></rect><g class="label" style="" transform="translate(0, -9.5)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">gemini</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-C3-7" transform="translate(555.890625, 230.5)"><rect class="basic label-container" style="" x="-53.71875" y="-24.5" width="107.4375" height="49"></rect><g class="label" style="" transform="translate(0, -9.5)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">claude</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-C4-9" transform="translate(555.890625, 329.5)"><rect class="basic label-container" style="" x="-45.453125" y="-24.5" width="90.90625" height="49"></rect><g class="label" style="" transform="translate(0, -9.5)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">grok</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-C5-11" transform="translate(555.890625, 437.29999923706055)"><rect class="basic label-container" style="" x="-92.171875" y="-33.29999923706055" width="184.34375" height="66.5999984741211"></rect><g class="label" style="" transform="translate(0, -18.299999237060547)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">doc-conformance</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">(opt-in)</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-P-13" transform="translate(764.453125, 230.5)"><rect class="basic label-container" style="" x="-66.390625" y="-33.29999923706055" width="132.78125" height="66.5999984741211"></rect><g class="label" style="" transform="translate(0, -18.299999237060547)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">Parse</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">→</tspan><tspan class="text-inner-tspan"> Finding</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-RC-23" transform="translate(971.171875, 230.5)"><rect class="basic label-container" style="" x="-90.328125" y="-33.29999923706055" width="180.65625" height="66.5999984741211"></rect><g class="label" style="" transform="translate(0, -18.299999237060547)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">Reconcile</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">(dedupe</tspan><tspan class="text-inner-tspan"> +</tspan><tspan class="text-inner-tspan"> score)</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-V-25" transform="translate(1205.4609375, 230.5)"><rect class="basic label-container" style="" x="-93.9609375" y="-33.29999923706055" width="187.921875" height="66.5999984741211"></rect><g class="label" style="" transform="translate(0, -18.299999237060547)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">Verdict</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">(gate</tspan><tspan class="text-inner-tspan"> +</tspan><tspan class="text-inner-tspan"> exit</tspan><tspan class="text-inner-tspan"> code)</tspan></tspan></text></g></g></g></g></g></g><defs></defs><defs></defs></svg></figure>
+<p>Compensating passes (see <em>Degraded mode</em> below) are injected <em>after</em> the first
+dispatch round for any channel that was unavailable, then folded back into the
+same reconcile step.</p>
+<h2 id="the-mmr-review-command">The <code>mmr review</code> command</h2>
+<p>One command, several input modes. Pick the flag that matches your target;
+everything else is control and output options. Type in the box to filter the
+table.</p>
+<div class="filter-table"><input type="text" class="filter-input" placeholder="Filter…" aria-label="Filter table rows" disabled>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Flag</th><th>Group</th><th>Description</th></tr></thead><tbody><tr><td><code>--diff &#x3C;path|-></code></td><td>input</td><td>Read a unified diff from a file, or <code>-</code> for stdin. Highest-priority input mode.</td></tr><tr><td><code>--pr &#x3C;n></code></td><td>input</td><td>Fetch the PR diff via <code>gh pr diff</code>.</td></tr><tr><td><code>--staged</code></td><td>input</td><td>Review staged changes (<code>git diff --cached</code>).</td></tr><tr><td><code>--base &#x3C;ref> [--head &#x3C;ref>]</code></td><td>input</td><td>Review a branch range (<code>git diff base...head</code>, head defaults to HEAD).</td></tr><tr><td><em>(no input flag)</em></td><td>input</td><td>Falls back to unstaged working-tree changes (<code>git diff</code>).</td></tr><tr><td><code>--focus &#x3C;text></code></td><td>control</td><td>Free-text focus areas appended to every channel prompt.</td></tr><tr><td><code>--fix-threshold &#x3C;P0|P1|P2|P3></code></td><td>control</td><td>Severity gate. Findings at or above this block. Default P2 (from <code>.mmr.yaml</code>).</td></tr><tr><td><code>--channels &#x3C;names…></code></td><td>control</td><td>Run only these channels, overriding config defaults. Abstract channels are filtered out.</td></tr><tr><td><code>--timeout &#x3C;seconds></code></td><td>control</td><td>Per-channel timeout override.</td></tr><tr><td><code>--template &#x3C;name></code></td><td>control</td><td>Use a named review-criteria template from config.</td></tr><tr><td><code>--format &#x3C;json|text|markdown></code></td><td>output</td><td>Output format. Default <code>json</code>.</td></tr><tr><td><code>--sync</code></td><td>mode</td><td>Run the full pipeline (dispatch → parse → reconcile → verdict) and return results. Without it, dispatch is fire-and-forget.</td></tr><tr><td><code>--dry-run</code></td><td>mode</td><td>Resolve the diff and assemble the prompt without dispatching any channel.</td></tr><tr><td><code>--session &#x3C;id></code></td><td>rounds</td><td>Link this run into a multi-round session (<code>[A-Za-z0-9_-]</code>).</td></tr><tr><td><code>--round &#x3C;n></code></td><td>rounds</td><td>1-based round counter within a session.</td></tr><tr><td><code>--max-rounds &#x3C;n></code></td><td>rounds</td><td>Hard cap on rounds. Defaults to 5 when <code>--session</code> is set without it.</td></tr><tr><td><code>--accept-new-acks</code></td><td>trust</td><td>Trust acknowledgment files newly introduced by the diff.</td></tr><tr><td><code>--trust-project-acks</code></td><td>trust</td><td>Trust working-tree project acks in non-Git / untrusted modes.</td></tr><tr><td><code>--trust-project-config</code></td><td>trust</td><td>Trust working-tree <code>.mmr.yaml</code> in untrusted modes.</td></tr><tr><td><code>--config-base-ref &#x3C;ref></code></td><td>trust</td><td>Load <code>.mmr.yaml</code> and acks from a trusted Git ref instead of HEAD.</td></tr></tbody></table></div>
+<h3 id="copy-paste-commands-by-target">Copy-paste commands by target</h3>
+<pre><code class="language-bash"># PR review (full pipeline, JSON out)
+mmr review --pr 123 --sync --format json
+
+# Staged changes before commit
+mmr review --staged --sync --format json
+
+# All tracked uncommitted changes (no untracked)
+git diff HEAD | mmr review --diff - --sync --format json
+
+# Branch range
+mmr review --base main --head "$BRANCH" --sync --format json
+
+# A single file's current contents, as an "all-added" diff
+(diff -u /dev/null path/to/file.ts || true) | mmr review --diff - --sync --format json
+
+# Only specific channels (e.g. just grok + claude)
+mmr review --pr 123 --channels grok claude --sync --format json
+</code></pre>
+<h2 id="other-subcommands">Other subcommands</h2>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Command</th><th>Purpose</th></tr></thead><tbody><tr><td><code>mmr reconcile &#x3C;job-id> --channel &#x3C;name> --input &#x3C;data></code></td><td>Inject an external channel's findings (e.g. the Superpowers agent) into an existing job and re-run the results pipeline. Input is a file, <code>-</code> for stdin, or inline JSON.</td></tr><tr><td><code>mmr status &#x3C;job-id></code></td><td>Per-channel status and elapsed time. Exit 0 = all complete, 1 = running, 2 = a channel failed, 5 = not found.</td></tr><tr><td><code>mmr results &#x3C;job-id> [--raw]</code></td><td>Re-run parse → reconcile → format on a completed job. Exit code reflects the verdict.</td></tr><tr><td><code>mmr jobs &#x3C;list|prune></code></td><td>List jobs, or prune old ones per <code>job_retention_days</code>.</td></tr><tr><td><code>mmr sessions &#x3C;start|list|show|end> &#x3C;id></code></td><td>Manage multi-round review sessions (stored under <code>~/.mmr/sessions/</code>).</td></tr><tr><td><code>mmr config &#x3C;init|show|validate…></code></td><td>Scaffold and inspect <code>.mmr.yaml</code> (including OSS-runtime example blocks).</td></tr><tr><td><code>mmr ack &#x3C;add|list|rm|prune></code></td><td>Sticky acknowledgments — silence a finding by its stable key so it stops blocking across rounds.</td></tr></tbody></table>
+<pre><code class="language-bash"># Capture a job_id from a review, then fold in an agent channel:
+mmr reconcile "$JOB_ID" --channel superpowers --input findings.json
+</code></pre>
+<h2 id="channel-architecture">Channel architecture</h2>
+<p>A channel is <strong>pure config data</strong> — there is no per-channel code. The dispatcher
+runs whatever <code>command</code> the channel defines, hands it the prompt, and parses its
+output with the configured parser. Adding a channel is normally a <code>.mmr.yaml</code>
+edit, not a code change.</p>
+<h3 id="the-channel-config-shape">The channel config shape</h3>
+<pre><code class="language-yaml">channels:
+  &#x3C;name>:
+    enabled: true                 # run by default?
+    command: "codex exec"         # whitespace-split, spawned WITHOUT a shell
+    flags: ["--ephemeral"]        # appended after the command tokens
+    env: { KEY: value }           # extra environment
+    prompt_delivery: stdin        # stdin (default) | prompt-file
+    prompt_wrapper: "{{prompt}}"  # template wrapped around the prompt
+    output_parser: default        # default | gemini | doc-conformance | {kind:…}
+    stderr: capture               # capture | suppress | passthrough
+    timeout: 300                  # seconds (falls back to defaults.timeout)
+    auth: { check, timeout, failure_exit_codes, recovery }
+    extends: base-channel         # inherit from another channel (≤4 levels)
+    abstract: false               # template-only; never dispatched directly
+</code></pre>
+<h3 id="built-in-channels">Built-in channels</h3>
+<div class="tabs"><div class="tablist" role="tablist"><button class="tab-btn active" role="tab" data-tab="0">Compare</button><button class="tab-btn" role="tab" data-tab="1">codex</button><button class="tab-btn" role="tab" data-tab="2">gemini</button><button class="tab-btn" role="tab" data-tab="3">claude</button><button class="tab-btn" role="tab" data-tab="4">grok</button><button class="tab-btn" role="tab" data-tab="5">doc-conformance</button></div><div class="tabpane active" data-tab="0">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Channel</th><th>Default</th><th>Strength</th><th>Prompt delivery</th><th>Parser</th></tr></thead><tbody><tr><td><code>codex</code></td><td>enabled</td><td>Correctness, security, API contracts</td><td>stdin</td><td><code>default</code></td></tr><tr><td><code>gemini</code></td><td>enabled</td><td>Architecture, broad-context reasoning</td><td>stdin</td><td><code>gemini</code></td></tr><tr><td><code>claude</code></td><td>enabled</td><td>Plan alignment, code quality, testing</td><td>stdin</td><td><code>default</code></td></tr><tr><td><code>grok</code></td><td>enabled</td><td>Independent second opinion (xAI; proprietary)</td><td><strong>prompt-file</strong></td><td><code>unwrap $.text → default</code></td></tr><tr><td><code>doc-conformance</code></td><td>opt-in</td><td>PRD/stories/standards conformance (LLM-graded)</td><td>stdin</td><td><code>doc-conformance</code></td></tr></tbody></table><div class="callout callout-info"><p><strong>Why grok is different.</strong> codex/gemini/claude all read the prompt from <code>stdin</code>.
+Grok's CLI requires the prompt as an argument and ignores stdin, so its channel
+uses <code>prompt_delivery: prompt-file</code> — the dispatcher writes the prompt to a temp
+file and passes its path via the <code>{{prompt_file}}</code> placeholder. Grok wraps its
+reply in a JSON <code>.text</code> field, which the parser unwraps before extracting
+findings.</p></div></div><div class="tabpane" data-tab="1"><pre><code class="language-yaml">command: codex exec
+flags: [--skip-git-repo-check, -s, read-only, --ephemeral]
+auth.check: codex login status        # local file check (fast, 5s)
+recovery: codex login
+output_parser: default
+stderr: suppress
+</code></pre></div><div class="tabpane" data-tab="2"><pre><code class="language-yaml">command: gemini                       # NO -p: gemini reads stdin natively
+flags: [--output-format, json]
+env: { NO_BROWSER: "true" }
+auth.check: NO_BROWSER=true gemini -p "respond with ok" -o json   # LLM round-trip, 20s
+recovery: gemini -p "hello"
+output_parser: gemini                 # unwraps { "response": "…" }
+timeout: 360
+</code></pre></div><div class="tabpane" data-tab="3"><pre><code class="language-yaml">command: claude -p
+flags: [--output-format, json]
+auth.check: claude -p "respond with ok"   # LLM round-trip, 20s
+recovery: claude login
+output_parser: default
+</code></pre></div><div class="tabpane" data-tab="4"><pre><code class="language-yaml">command: grok
+prompt_delivery: prompt-file
+flags: [--prompt-file, "{{prompt_file}}", --output-format, json]
+auth.check: grok models                # lists models / login state (no round-trip)
+recovery: grok login
+output_parser: { kind: unwrap-jsonpath, wrap: "$.text", then: default }
+</code></pre><p>Grok is proprietary (xAI), not open-source — it joins the standard set
+mechanically as a 4th CLI channel. Disable it with
+<code>channels_disabled: ["grok"]</code>.</p></div><div class="tabpane" data-tab="5"><pre><code class="language-yaml">enabled: false                         # opt-in: runs up to 3 LLM calls (~3 min)
+command: scaffold observe audit --profile=full --scope=all --output-mode=mmr-findings
+output_parser: doc-conformance         # expects a JSON array of findings
+timeout: 240
+</code></pre><p>Enable with <code>--channels doc-conformance</code> or in <code>.mmr.yaml</code>.</p></div></div>
+<h3 id="the-dispatcher">The dispatcher</h3>
+<ul>
+<li><strong>Isolation.</strong> Each channel is spawned as its own detached subprocess writing
+to its own output file; channels run in parallel and never share output.</li>
+<li><strong>Prompt delivery.</strong> <code>stdin</code> mode pipes the prompt and closes stdin (avoids
+<code>E2BIG</code> on large diffs). <code>prompt-file</code> mode writes the prompt to
+<code>&#x3C;channel>.prompt.txt</code> and substitutes <code>{{prompt_file}}</code> in the flags.</li>
+<li><strong>Timeout.</strong> A per-channel timer SIGKILLs the whole process group and marks
+the channel <code>timeout</code>.</li>
+<li><strong>Command parsing.</strong> <code>command</code> is split on whitespace and spawned without a
+shell — so quoting/pipelines in <code>command</code> won't work; that's exactly why
+arg-only CLIs like grok use <code>prompt_delivery</code> rather than a shell shim.</li>
+</ul>
+<p><strong>Adding a new channel — where it's clean vs. hard-coded.</strong> <em>Clean (config
+only):</em> a new subprocess channel (<code>command</code> + <code>flags</code> + <code>auth</code> +
+<code>output_parser</code>), output reshaping via the <code>unwrap-jsonpath</code> or
+<code>regex-findings</code> parser kinds, disabling/timeout overrides, and pointing the
+compensator at a different channel — all pure <code>.mmr.yaml</code>. <em>Needs code:</em> a
+brand-new <em>named</em> parser must be registered in <code>core/parser.ts</code>; HTTP-endpoint
+channels (<code>kind: http</code>) need the planned http-dispatcher; and the
+<code>COMPENSATING_FOCUS</code> map carries per-channel focus text (falls back gracefully
+if absent).</p>
+<h2 id="scaffold-wrappers">Scaffold wrappers</h2>
+<p>Direct <code>mmr review</code> runs the built-in CLI channels. The <code>scaffold run</code> wrappers
+add orchestration on top.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Wrapper</th><th>Target</th><th>Adds on top of <code>mmr review</code></th></tr></thead><tbody><tr><td><code>scaffold run review-pr</code></td><td>A PR (<code>--pr</code>)</td><td>Auth checks, the Superpowers code-reviewer <em>agent</em> channel via <code>mmr reconcile</code>, consensus/verdict handling, the 3-strike-per-finding round bookkeeping, optional Beads issue bridge.</td></tr><tr><td><code>scaffold run review-code</code></td><td>Local pre-push</td><td>Synthesizes a "delivery candidate" diff (committed + staged + unstaged), gathers file &#x26; standards context for the file-blind CLIs, then the same agent channel + round bounding. <em>Untracked files aren't covered.</em></td></tr><tr><td><code>scaffold run post-implementation-review</code></td><td>Full codebase</td><td>Two phases — systemic review + per-story functional review via parallel agents — with its own report under <code>docs/reviews/</code>. (See its own doc for the exact channel layout.)</td></tr></tbody></table>
+<div class="callout callout-warning"><p><strong>Foreground only.</strong> The wrappers' manual fallback runs Codex, Gemini, Claude,
+and Grok as foreground Bash calls when the <code>mmr</code> CLI isn't available — never in
+the background. Background execution produces empty output.</p></div>
+<h2 id="findings-reconciliation-verdicts">Findings, reconciliation &#x26; verdicts</h2>
+<h3 id="the-finding-shape">The Finding shape</h3>
+<pre><code class="language-json">{
+  "id": "F-001",
+  "category": "security",
+  "severity": "P0",
+  "location": "src/auth.ts:42",
+  "description": "…",
+  "suggestion": "…"
+}
+</code></pre>
+<p>After reconciliation, each finding also carries <code>confidence</code>, <code>sources[]</code>,
+<code>agreement</code>, a stable <code>finding_key</code>, a <code>description_shingle</code> (for fuzzy
+cross-round matching), and <code>acknowledged</code>.</p>
+<h3 id="stable-identity-finding-key">Stable identity (<code>finding_key</code>)</h3>
+<pre><code class="language-text">finding_key = sha1( normLocation | category | sha1(normDescription) | sha1(normSuggestion) )
+</code></pre>
+<p>Line numbers are stripped from the location and severity is <em>excluded</em>, so the
+same issue at P1 vs P2 collapses to one key. A character-5-gram shingle backs a
+Jaccard ≥ 0.7 fuzzy match when wording drifts between rounds.</p>
+<h3 id="agreement-confidence">Agreement &#x26; confidence</h3>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Sources</th><th>Severity</th><th>Agreement</th><th>Confidence</th></tr></thead><tbody><tr><td>2+</td><td>same</td><td>consensus</td><td>high</td></tr><tr><td>2+</td><td>differ</td><td>majority</td><td>medium</td></tr><tr><td>1</td><td><span class="sev sev-p0">P0</span></td><td>unique</td><td>high</td></tr><tr><td>1</td><td><code>compensating-*</code></td><td>unique</td><td>low</td></tr><tr><td>1</td><td>other</td><td>unique</td><td>medium</td></tr></tbody></table>
+<h3 id="the-gate-the-four-verdicts">The gate &#x26; the four verdicts</h3>
+<p>The gate <strong>passes</strong> when every unacknowledged finding is <em>below</em> the
+<code>fix_threshold</code> (default <span class="sev sev-p2">P2</span>). Severity tiers run
+<span class="sev sev-p0">P0</span> (highest) → <span class="sev sev-p1">P1</span> → <span class="sev sev-p2">P2</span> →
+<span class="sev sev-p3">P3</span> (lowest).</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Verdict</th><th>Condition</th><th>Exit</th></tr></thead><tbody><tr><td><code>pass</code></td><td>Gate passed, all channels completed</td><td>0</td></tr><tr><td><code>degraded-pass</code></td><td>Gate passed, but some channels failed / timed out / weren't installed</td><td>0</td></tr><tr><td><code>blocked</code></td><td>An unacknowledged finding sits at or above the threshold</td><td>2</td></tr><tr><td><code>needs-user-decision</code></td><td>No channel completed (can't make a determination)</td><td>3</td></tr></tbody></table>
+<div class="callout callout-warning"><p>Proceed only on <strong>pass</strong> or <strong>degraded-pass</strong>. On <strong>blocked</strong> or
+<strong>needs-user-decision</strong>, surface the verdict and findings — don't merge
+automatically.</p></div>
+<h2 id="degraded-mode-compensation-auth">Degraded mode, compensation &#x26; auth</h2>
+<p>A channel is "degraded" when it's <code>not_installed</code> (no binary), <code>auth_failed</code>,
+<code>timeout</code>, <code>skipped</code>, or <code>failed</code>. The review doesn't stop — it compensates and
+tells you how to recover.</p>
+<ul>
+<li><strong>Compensating pass.</strong> For each degraded external channel, a <code>claude -p</code> pass
+runs with that channel's focus area, labeled e.g.
+<code>[compensating: Grok-equivalent]</code>. These findings are single-source, low
+confidence. The compensator channel is configurable via
+<code>defaults.compensator.channel</code>.</li>
+<li><strong>Auth recovery</strong> is surfaced, never silent.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Channel</th><th>Auth check</th><th>Recovery</th></tr></thead><tbody><tr><td><code>codex</code></td><td><code>codex login status</code></td><td><code>codex login</code></td></tr><tr><td><code>gemini</code></td><td><code>gemini -p "respond with ok"</code></td><td><code>gemini -p "hello"</code></td></tr><tr><td><code>claude</code></td><td><code>claude -p "respond with ok"</code></td><td><code>claude login</code></td></tr><tr><td><code>grok</code></td><td><code>grok models</code></td><td><code>grok login</code></td></tr></tbody></table>
+<h2 id="configuration-mmryaml">Configuration (<code>.mmr.yaml</code>)</h2>
+<p>Config is layered: built-in defaults → <code>~/.mmr/config.yaml</code> → project
+<code>.mmr.yaml</code> → CLI flags. Arrays replace; objects deep-merge.</p>
+<pre><code class="language-yaml">version: 1
+defaults:
+  fix_threshold: P2          # gate severity
+  timeout: 300               # default per-channel timeout (s)
+  parallel: true
+channels_disabled: ["grok"]  # opt OUT of a built-in (e.g. no grok installed)
+channels:
+  doc-conformance:
+    enabled: true            # opt IN to a default-off channel
+  # Bring-your-own model via channel inheritance:
+  qwen-local:
+    command: ollama run
+    flags: ["qwen2.5-coder:32b", "--format", "json"]
+    output_parser: { kind: unwrap-jsonpath, wrap: "$.response", then: default }
+    auth: { check: "ollama list", timeout: 5, failure_exit_codes: [1], recovery: "ollama serve" }
+</code></pre>
+<ul>
+<li><code>channels_disabled</code> — skip these built-ins in the default dispatch (ignored
+when you pass an explicit <code>--channels</code> list).</li>
+<li><code>enabled: false</code> — per-channel off switch (how <code>doc-conformance</code> ships).</li>
+<li><code>extends</code> — inherit from another channel (≤ 4 levels, cycle-checked); child
+fields override the parent.</li>
+<li><code>fix_threshold</code> — project gate; override per-run with <code>--fix-threshold</code>.</li>
+</ul>
+<div class="callout callout-danger"><p><strong>Trust boundary.</strong> When reviewing a diff, project <code>.mmr.yaml</code> and acks should
+be read from the diff's <em>base ref</em>, not the working tree — otherwise a PR could
+add a channel that exfiltrates secrets or self-acknowledge its own findings. Use
+<code>--config-base-ref</code> / the <code>--trust-project-*</code> flags to control this in untrusted
+(e.g. CI) contexts.</p></div></main>
+</div>
+<script>(function(){
+  var LS_KEY = 'guide-theme';
+  function applyTheme(t) {
+    document.documentElement.setAttribute('data-theme', t);
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    // ─── Theme toggle ────────────────────────────────────────────────────────
+    document.querySelectorAll('[data-action="theme"]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var current = document.documentElement.getAttribute('data-theme');
+        var next = current === 'dark' ? 'light' : 'dark';
+        applyTheme(next);
+        try { localStorage.setItem(LS_KEY, next); } catch(e) {}
+      });
+    });
+
+    // ─── Mobile nav ──────────────────────────────────────────────────────────
+    document.querySelectorAll('[data-action="nav"]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var rail = document.querySelector('.rail');
+        if (rail) rail.classList.toggle('open');
+      });
+    });
+
+    // ─── Copy buttons ─────────────────────────────────────────────────────────
+    document.querySelectorAll('pre').forEach(function(pre) {
+      if (!pre.parentNode) return;
+      var wrapper = document.createElement('div');
+      wrapper.className = 'code';
+      pre.parentNode.insertBefore(wrapper, pre);
+      wrapper.appendChild(pre);
+      var btn = document.createElement('button');
+      btn.className = 'copy-btn';
+      btn.textContent = 'Copy';
+      btn.addEventListener('click', function() {
+        var text = pre.textContent || '';
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(function() {
+            btn.textContent = 'Copied';
+            setTimeout(function() { btn.textContent = 'Copy'; }, 1200);
+          }, function() {
+            btn.textContent = 'Copy';
+          });
+        }
+      });
+      wrapper.insertBefore(btn, pre);
+    });
+
+    // ─── Tabs ─────────────────────────────────────────────────────────────────
+    document.querySelectorAll('.tabs').forEach(function(group) {
+      group.querySelectorAll('.tab-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var idx = btn.getAttribute('data-tab');
+          group.querySelectorAll('.tab-btn').forEach(function(b) {
+            b.classList.toggle('active', b === btn);
+          });
+          group.querySelectorAll('.tabpane').forEach(function(pane) {
+            pane.classList.toggle('active', pane.getAttribute('data-tab') === idx);
+          });
+        });
+      });
+    });
+
+    // ─── Filter tables ────────────────────────────────────────────────────────
+    document.querySelectorAll('.filter-input').forEach(function(input) {
+      input.addEventListener('input', function() {
+        var q = input.value.toLowerCase();
+        var container = input.closest('.filter-table');
+        if (!container) return;
+        container.querySelectorAll('tbody tr').forEach(function(row) {
+          var text = (row.textContent || '').toLowerCase();
+          row.style.display = text.includes(q) ? '' : 'none';
+        });
+      });
+    });
+
+    // ─── Scrollspy ────────────────────────────────────────────────────────────
+    if (typeof IntersectionObserver === 'undefined') return;
+    var headings = document.querySelectorAll('h2[id],h3[id]');
+    if (!headings.length) return;
+    var observer = new IntersectionObserver(function(entries) {
+      entries.forEach(function(entry) {
+        if (!entry.isIntersecting) return;
+        var id = entry.target.getAttribute('id');
+        document.querySelectorAll('.toc a').forEach(function(a) {
+          a.classList.toggle('active', a.getAttribute('href') === '#' + id);
+        });
+      });
+    }, { rootMargin: '0px 0px -70% 0px', threshold: 0 });
+    headings.forEach(function(h) { observer.observe(h); });
+  });
+})();</script>
+</body>
+</html>

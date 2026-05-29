@@ -1021,3 +1021,53 @@ h2 {
 }
 .finding p { margin: 0; font-size: var(--text-sm); color: var(--text-muted); }
 .empty { color: var(--text-muted); font-size: var(--text-sm); text-align: center; padding: var(--sp-4); }
+
+/* ── Mermaid diagrams ─────────────────────────────────────────────────────────
+   The build renders mermaid to inline SVG via mmdc, then sanitizeSvg() +
+   rehype-sanitize strip the SVG's own <script>, <foreignObject>, AND <style>
+   for security. Stripping <style> means the diagram arrives unstyled (nodes
+   default to a black fill). These theme-token rules restyle the SVG so nodes,
+   edges, arrowheads, and labels render correctly — and follow light/dark mode.
+   Authors must render with htmlLabels:false (the generator forces this) so node
+   labels are native <text>/<tspan> rather than stripped <foreignObject> HTML. */
+figure.mermaid { margin: var(--sp-5) 0; text-align: center; }
+figure.mermaid svg { max-width: 100%; height: auto; }
+/* Node shapes */
+figure.mermaid svg .node rect,
+figure.mermaid svg .node circle,
+figure.mermaid svg .node ellipse,
+figure.mermaid svg .node polygon,
+figure.mermaid svg .node path {
+    fill: var(--bg-inset);
+    stroke: var(--border);
+    stroke-width: 1px;
+}
+/* Background helper rects mermaid emits behind labels */
+figure.mermaid svg .node .label-container { fill: var(--bg-inset); stroke: var(--border); }
+figure.mermaid svg rect.background { fill: none; stroke: none; }
+/* Labels (rendered as <text>/<tspan> when htmlLabels:false) */
+figure.mermaid svg .nodeLabel,
+figure.mermaid svg .node text,
+figure.mermaid svg text.nodeLabel,
+figure.mermaid svg .label text,
+figure.mermaid svg span.nodeLabel {
+    fill: var(--text);
+    color: var(--text);
+    font-family: var(--font-sans);
+}
+/* Edges: thin strokes, not filled blobs */
+figure.mermaid svg .edgePath path,
+figure.mermaid svg path.flowchart-link,
+figure.mermaid svg .flowchart-link {
+    fill: none;
+    stroke: var(--text-faint);
+    stroke-width: 1.5px;
+}
+/* Arrowheads */
+figure.mermaid svg marker path,
+figure.mermaid svg .marker {
+    fill: var(--text-faint);
+    stroke: var(--text-faint);
+}
+figure.mermaid svg .edgeLabel,
+figure.mermaid svg .edgeLabel text { fill: var(--text-muted); color: var(--text-muted); }
