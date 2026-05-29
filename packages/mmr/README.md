@@ -358,8 +358,9 @@ Optional fields:
   value is never written to `.mmr.yaml`.
 - `api_key_header` (default `Authorization`)
 - `api_key_prefix` — prepended to the key value in the auth header. The
-  default is the four characters `Bearer` followed by a single space. Set it to
-  an empty string (`""`) for providers that expect a raw key with no prefix.
+  default is the word `Bearer` followed by a single trailing space (the
+  seven-character string `Bearer `). Set it to an empty string (`""`) for
+  providers that expect a raw key with no prefix.
 - `headers` — extra headers (e.g. `{ "X-Org": "..." }`)
 - `auth.check_endpoint` — explicit auth-probe URL, written as a `check_endpoint`
   key nested under an `auth:` block (the `auth.` prefix is dot-notation for that
