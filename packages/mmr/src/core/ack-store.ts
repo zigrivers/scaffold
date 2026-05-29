@@ -5,9 +5,10 @@ import { jaccardSimilarity } from './stable-id.js'
 
 const FUZZY_THRESHOLD = 0.7
 const FINDING_KEY_RE = /^[a-f0-9]{40}$/
-// Acks are tiny (a key, a location, a few dozen shingles). Cap reads so a
-// planted oversized file in an untrusted project tree can't OOM the review.
-const MAX_ACK_BYTES = 1024 * 1024
+// Acks are tiny (a key, a location, a few dozen shingles, a short reason).
+// Cap reads well above any realistic record so a planted oversized file in an
+// untrusted project tree can't OOM the review.
+const MAX_ACK_BYTES = 256 * 1024
 
 export interface AckRecord {
   finding_key: string
@@ -53,18 +54,23 @@ function isValidAckRecord(value: unknown, expectedKey: string): value is AckReco
 interface LoadedScope {
   records: AckRecord[]
   byKey: Map<string, AckRecord>
+  byLocation: Map<string, AckRecord[]>
 }
 
 export class AckStore {
   private readonly projectDir: string
   private readonly userDir: string
+  private readonly projectRootResolved: string
+  private readonly userHomeResolved: string
   // Per-instance lazy cache so a review that calls lookup() once per finding
   // reads each acks dir from disk at most once (avoids O(N*M) FS operations).
   private readonly loaded: Partial<Record<AckScope, LoadedScope>> = {}
 
   constructor(opts: AckStoreOptions) {
-    this.projectDir = path.resolve(opts.projectRoot, '.mmr', 'acks')
-    this.userDir = path.resolve(opts.userHome, '.mmr', 'acks')
+    this.projectRootResolved = path.resolve(opts.projectRoot)
+    this.userHomeResolved = path.resolve(opts.userHome)
+    this.projectDir = path.join(this.projectRootResolved, '.mmr', 'acks')
+    this.userDir = path.join(this.userHomeResolved, '.mmr', 'acks')
   }
 
   private validateKey(key: string): void {
@@ -73,8 +79,36 @@ export class AckStore {
     }
   }
 
+  /**
+   * Returns the acks dir for a scope after verifying it does not escape its
+   * root via a symlinked ancestor. A leaf-only symlink check is not enough:
+   * project acks live in the untrusted reviewed tree, where `.mmr` or
+   * `.mmr/acks` could itself be a symlink redirecting every mkdir/read/write/
+   * unlink out of the sandbox. We realpath the deepest existing ancestor of
+   * the acks dir and require it to stay within the (realpath'd) root.
+   */
   private dirForScope(scope: AckScope): string {
-    return scope === 'project' ? this.projectDir : this.userDir
+    const dir = scope === 'project' ? this.projectDir : this.userDir
+    const root = scope === 'project' ? this.projectRootResolved : this.userHomeResolved
+    let realRoot: string
+    try {
+      realRoot = fs.realpathSync(root)
+    } catch {
+      realRoot = root // root not resolvable (unusual env) → fall back to lexical
+    }
+    let probe = dir
+    while (probe !== path.dirname(probe) && !fs.existsSync(probe)) probe = path.dirname(probe)
+    let realProbe: string
+    try {
+      realProbe = fs.realpathSync(probe)
+    } catch {
+      return dir // nothing exists to escape into yet
+    }
+    const rel = path.relative(realRoot, realProbe)
+    if (rel !== '' && (rel.startsWith('..') || path.isAbsolute(rel))) {
+      throw new Error(`ack ${scope} directory escapes its root via a symlinked ancestor: ${dir}`)
+    }
+    return dir
   }
 
   private filePath(key: string, scope: AckScope): string {
@@ -188,8 +222,14 @@ export class AckStore {
     if (cached === undefined) {
       const records = this.readDir(this.dirForScope(scope))
       const byKey = new Map<string, AckRecord>()
-      for (const r of records) byKey.set(r.finding_key, r)
-      cached = { records, byKey }
+      const byLocation = new Map<string, AckRecord[]>()
+      for (const r of records) {
+        byKey.set(r.finding_key, r)
+        const bucket = byLocation.get(r.normalized_location)
+        if (bucket) bucket.push(r)
+        else byLocation.set(r.normalized_location, [r])
+      }
+      cached = { records, byKey, byLocation }
       this.loaded[scope] = cached
     }
     return cached
@@ -218,21 +258,23 @@ export class AckStore {
     const exactUser = user.byKey.get(finding.finding_key)
     if (exactUser) return { record: exactUser, match: 'exact', scope: 'user' }
     // Fuzzy fallback — location must match exactly, shingle Jaccard ≥ 0.7.
-    // Scan project then user in place (no intermediate array) so project wins.
+    // Use the per-location index so only same-location acks (usually 0–1) are
+    // scored, not every record. Project scope wins over user.
     if (finding.shingle.length === 0) return undefined
-    const projectFuzzy = this.fuzzyScan(project.records, finding)
+    const projectFuzzy = this.fuzzyScan(project, finding)
     if (projectFuzzy) return { record: projectFuzzy, match: 'fuzzy', scope: 'project' }
-    const userFuzzy = this.fuzzyScan(user.records, finding)
+    const userFuzzy = this.fuzzyScan(user, finding)
     if (userFuzzy) return { record: userFuzzy, match: 'fuzzy', scope: 'user' }
     return undefined
   }
 
   private fuzzyScan(
-    records: AckRecord[],
+    scope: LoadedScope,
     finding: { normalized_location: string; shingle: string[] },
   ): AckRecord | undefined {
-    for (const r of records) {
-      if (r.normalized_location !== finding.normalized_location) continue
+    const candidates = scope.byLocation.get(finding.normalized_location)
+    if (!candidates) return undefined
+    for (const r of candidates) {
       if (jaccardSimilarity(r.description_shingle, finding.shingle) >= FUZZY_THRESHOLD) return r
     }
     return undefined

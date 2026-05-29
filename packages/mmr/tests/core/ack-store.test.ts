@@ -222,6 +222,30 @@ describe('AckStore', () => {
     expect(store.listAll()).toHaveLength(0)
   })
 
+  it('rejects operations when .mmr is a symlinked ancestor escaping the root', () => {
+    // Attacker checkout: project/.mmr is a symlink to a dir outside the root.
+    const evil = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-ack-evil-'))
+    try {
+      fs.symlinkSync(evil, path.join(tmpProject, '.mmr'))
+      expect(() => store.listAll()).toThrow(/escapes its root/i)
+      expect(() =>
+        store.add(
+          {
+            finding_key: FAKE_KEY,
+            normalized_location: 'src/foo.ts',
+            description_shingle: SHINGLE,
+            created_at: '2026-05-22T00:00:00Z',
+          },
+          'project',
+        ),
+      ).toThrow(/escapes its root/i)
+      // Nothing was written into the escape target.
+      expect(fs.existsSync(path.join(evil, 'acks'))).toBe(false)
+    } finally {
+      fs.rmSync(evil, { recursive: true, force: true })
+    }
+  })
+
   it('add() rejects a structurally invalid record before persisting it', () => {
     const bad = {
       finding_key: FAKE_KEY,
