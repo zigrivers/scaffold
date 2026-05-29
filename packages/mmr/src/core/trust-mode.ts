@@ -10,7 +10,6 @@ export interface TrustModeArgs {
   pr?: number
   staged?: boolean
   base?: string
-  head?: string
   'config-base-ref'?: string
 }
 
@@ -19,17 +18,43 @@ export interface ClassifyOptions {
   args: TrustModeArgs
   /** Hook for tests to stub gh; defaults to live gh CLI. */
   resolvePrBase?: (pr: number, cwd: string) => string | undefined
+  /** Whether we're in CI; defaults to env detection. Injectable for tests. */
+  isCI?: boolean
 }
 
-export interface ClassifyResult {
-  trust_mode: TrustMode
-  /** When trust_mode === 'base-ref', the resolved trusted ref. */
-  base_ref?: string
+/**
+ * Discriminated so a `base-ref` result always carries a `base_ref` and the
+ * other modes never do — consumers get this for free from the union.
+ */
+export type ClassifyResult =
+  | { trust_mode: 'base-ref'; base_ref: string }
+  | { trust_mode: 'untrusted-head' | 'non-git'; base_ref?: undefined }
+
+// Conservative git refname allow-list: letters, digits, and . _ - / only, and
+// none of the constructs that could smuggle surprising rev syntax into a later
+// `git show <ref>:.mmr.yaml` (':' separator, '..' ranges, '@{' reflog, leading
+// '-'/'/'). An unsafe ref fails closed to untrusted-head.
+const SAFE_REF_RE = /^[A-Za-z0-9._/-]+$/
+function isSafeRef(ref: string): boolean {
+  return (
+    SAFE_REF_RE.test(ref) &&
+    !ref.includes('..') &&
+    !ref.includes('@{') &&
+    !ref.startsWith('-') &&
+    !ref.startsWith('/') &&
+    !ref.endsWith('/')
+  )
+}
+
+function asBaseRef(ref: string): ClassifyResult {
+  return isSafeRef(ref) ? { trust_mode: 'base-ref', base_ref: ref } : { trust_mode: 'untrusted-head' }
 }
 
 function isGitRepo(cwd: string): boolean {
-  // findProjectRoot walks up for .git and falls back to cwd; this is a Git repo
-  // only when the resolved root actually contains a .git entry.
+  // Advisory filesystem check (walk up for .git). This is NOT the security
+  // boundary: a git repo with no explicit trusted ref classifies as
+  // 'untrusted-head', and base-ref modes resolve through real git/gh which fail
+  // on a planted/fake .git — so a forged .git only ever yields untrusted-head.
   return fs.existsSync(path.join(findProjectRoot(cwd), '.git'))
 }
 
@@ -51,36 +76,33 @@ function defaultResolvePrBase(pr: number, cwd: string): string | undefined {
 export function classifyTrustMode(opts: ClassifyOptions): ClassifyResult {
   const { cwd, args } = opts
   const resolvePrBase = opts.resolvePrBase ?? defaultResolvePrBase
+  const isCI = opts.isCI ?? (process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true')
 
-  // Explicit caller override always wins.
-  if (args['config-base-ref']) {
-    return { trust_mode: 'base-ref', base_ref: args['config-base-ref'] }
-  }
+  // Explicit operator override always wins.
+  if (args['config-base-ref']) return asBaseRef(args['config-base-ref'])
 
-  if (!isGitRepo(cwd)) {
-    return { trust_mode: 'non-git' }
-  }
+  if (!isGitRepo(cwd)) return { trust_mode: 'non-git' }
 
-  if (args.base) {
-    return { trust_mode: 'base-ref', base_ref: args.base }
-  }
-
-  if (args.staged) {
-    return { trust_mode: 'base-ref', base_ref: 'HEAD' }
-  }
-
+  // --pr resolves the PR's UPSTREAM base branch via gh, so it determines trust
+  // even when a (possibly malicious) --base is also present — matching
+  // resolveDiff, which reviews the PR diff. Resolution failure fails closed.
   if (args.pr !== undefined) {
-    const baseRef = resolvePrBase(args.pr, cwd)
-    if (baseRef) return { trust_mode: 'base-ref', base_ref: baseRef }
-    return { trust_mode: 'untrusted-head' }
+    const resolved = resolvePrBase(args.pr, cwd)
+    return resolved ? asBaseRef(resolved) : { trust_mode: 'untrusted-head' }
   }
 
-  // --diff (file or stdin) with no --base in a Git repo → untrusted-head.
-  if (args.diff !== undefined) {
-    return { trust_mode: 'untrusted-head' }
-  }
+  if (args.base) return asBaseRef(args.base)
 
-  // Default: `mmr review` with no flags reviews working-tree unstaged changes
-  // against HEAD — HEAD is the trust base.
-  return { trust_mode: 'base-ref', base_ref: 'HEAD' }
+  if (args.staged) return asBaseRef('HEAD')
+
+  // Default (plain `mmr review` working tree, or `--diff`): trusting HEAD is
+  // safe locally (HEAD is your committed history) but NOT in CI, where the
+  // working tree may be an attacker's PR checkout. So `--diff` is always
+  // untrusted, and the no-flags default trusts HEAD only outside CI; in CI it
+  // fails closed and requires an explicit trusted ref (--pr/--base/
+  // --config-base-ref). NOTE: this is stricter than the original plan, which
+  // returned base-ref:HEAD unconditionally — changed to close a CI
+  // self-trust hole (see Group H note).
+  if (args.diff !== undefined || isCI) return { trust_mode: 'untrusted-head' }
+  return asBaseRef('HEAD')
 }

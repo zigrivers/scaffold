@@ -49,9 +49,39 @@ describe('classifyTrustMode', () => {
 
   it('returns untrusted-head when --diff is used in a Git repo with no --base', () => {
     fs.mkdirSync(path.join(tmpDir, '.git'))
-    const result = classifyTrustMode({ cwd: tmpDir, args: { diff: '-' } })
+    const result = classifyTrustMode({ cwd: tmpDir, args: { diff: '-' }, isCI: false })
     expect(result.trust_mode).toBe('untrusted-head')
     expect(result.base_ref).toBeUndefined()
+  })
+
+  it('defaults to base-ref:HEAD for a no-flag review in a Git repo when NOT in CI', () => {
+    fs.mkdirSync(path.join(tmpDir, '.git'))
+    const result = classifyTrustMode({ cwd: tmpDir, args: {}, isCI: false })
+    expect(result.trust_mode).toBe('base-ref')
+    expect(result.base_ref).toBe('HEAD')
+  })
+
+  it('fails closed to untrusted-head for a no-flag review in CI (PR checkout may be untrusted)', () => {
+    fs.mkdirSync(path.join(tmpDir, '.git'))
+    const result = classifyTrustMode({ cwd: tmpDir, args: {}, isCI: true })
+    expect(result.trust_mode).toBe('untrusted-head')
+  })
+
+  it('lets --pr win over a stray --base (trusts the resolved PR base, not the supplied ref)', () => {
+    fs.mkdirSync(path.join(tmpDir, '.git'))
+    const result = classifyTrustMode({
+      cwd: tmpDir,
+      args: { pr: 123, base: 'attacker-controlled' },
+      resolvePrBase: () => 'main',
+    })
+    expect(result.trust_mode).toBe('base-ref')
+    expect(result.base_ref).toBe('main')
+  })
+
+  it('fails closed when a base ref contains unsafe characters', () => {
+    fs.mkdirSync(path.join(tmpDir, '.git'))
+    const result = classifyTrustMode({ cwd: tmpDir, args: { base: 'evil:../../etc' } })
+    expect(result.trust_mode).toBe('untrusted-head')
   })
 
   it('returns untrusted-head when --pr resolution fails', () => {
