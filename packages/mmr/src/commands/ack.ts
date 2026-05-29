@@ -23,13 +23,18 @@ function userHome(): string {
   return process.env.HOME ?? os.homedir()
 }
 
+// Generous upper bound on a results.json read. This is trusted MMR-written
+// state under the user's MMR root, but cap it well above any realistic file
+// so a pathological size can't be slurped whole into memory.
+const MAX_RESULTS_BYTES = 16 * 1024 * 1024
+
 function loadResults(store: JobStore, jobId: string): ReconciledResults | undefined {
   const fp = path.join(store.getJobDir(jobId), 'results.json')
-  if (!fs.existsSync(fp)) return undefined
   try {
+    if (fs.statSync(fp).size > MAX_RESULTS_BYTES) return undefined
     return JSON.parse(fs.readFileSync(fp, 'utf-8')) as ReconciledResults
   } catch {
-    return undefined
+    return undefined // missing, oversized, or malformed → no source finding here
   }
 }
 
@@ -46,7 +51,9 @@ function findSourceFinding(
     // missing or not an array (would otherwise throw in the for-of below).
     if (!r || !Array.isArray(r.reconciled_findings)) continue
     for (const f of r.reconciled_findings as ReconciledFinding[]) {
-      if (f.finding_key === key && f.description_shingle) {
+      // Require a string location too: normalizeLocationForKey would throw on a
+      // missing/undefined location in a malformed record.
+      if (f.finding_key === key && typeof f.location === 'string' && f.description_shingle) {
         return {
           normalized_location: normalizeLocationForKey(f.location),
           description_shingle: f.description_shingle,
