@@ -88,6 +88,33 @@ describe('runResultsPipeline — ack integration (T2-D)', () => {
     expect(results.verdict).toBe('blocked')
   })
 
+  it('re-surfaces trust context persisted on the job (so results/reconcile reproduce it)', () => {
+    const finding: Finding = { severity: 'P3', location: 'src/x.ts:1', description: 'note', suggestion: 'n/a' }
+    const store = new JobStore(tmpJobs)
+    const job = store.createJob({
+      fix_threshold: 'P2',
+      format: 'json',
+      channels: ['claude'],
+      trust_mode: 'base-ref',
+      proposed_acks: ['.mmr/acks/aaa.json'],
+      proposed_config_change: true,
+    })
+    store.updateChannel(job.job_id, 'claude', {
+      status: 'completed',
+      started_at: '2026-05-22T00:00:00Z',
+      completed_at: '2026-05-22T00:00:01Z',
+      output_parser: 'default',
+    })
+    store.saveChannelOutput(job.job_id, 'claude', JSON.stringify({ findings: [finding] }))
+
+    // No diff/trust-classification here (as in `mmr results`/`reconcile`): the
+    // pipeline must stamp the trust context from the persisted job.
+    const { results } = runResultsPipeline(store, store.loadJob(job.job_id), 'json', false)
+    expect(results.trust_mode).toBe('base-ref')
+    expect(results.proposed_acks).toEqual(['.mmr/acks/aaa.json'])
+    expect(results.proposed_config_change).toBe(true)
+  })
+
   it('fails safe when the ack store throws (poisoned acks tree) — no suppression, no crash', () => {
     const finding: Finding = {
       severity: 'P1',

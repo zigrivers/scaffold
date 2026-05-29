@@ -93,6 +93,14 @@ export interface JobMetadata {
   round?: number
   /** Parsed review loop/security controls used for this invocation. */
   review_controls?: ReviewControls
+  /**
+   * Trust context captured at review time (§5 decision 1), persisted so the
+   * results pipeline re-surfaces it on every run (review --sync, results,
+   * reconcile) rather than only the original stdout.
+   */
+  trust_mode?: 'base-ref' | 'untrusted-head' | 'non-git'
+  proposed_acks?: string[]
+  proposed_config_change?: boolean
 }
 
 export interface ChannelJobEntry {
