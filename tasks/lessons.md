@@ -15,6 +15,12 @@ Patterns and anti-patterns discovered during development. Review before starting
   leaves a dead import that the focused test won't catch but ESLint (and CI) will. Caught on
   PR #413 / Task 17: dropping `os.homedir()` from `review.ts` orphaned `import os from 'node:os'`.
 
+- MMR tests must NOT execute `packages/mmr/dist/index.js` — CI runs the vitest suite WITHOUT
+  building the mmr dist, so any `execFileSync('node', [dist/index.js, ...])` test passes locally
+  (after a build) but fails CI with "Cannot find module …/dist/index.js". Exercise the command's
+  exported `handler` directly instead (mock `process.exit`/`console`, set `process.env.HOME` and
+  spy `process.cwd`), as `review-session-link.test.ts` does. Bit PR #427 (Task 21 ack-cli).
+
 - When you change how ONE command resolves a shared on-disk path, audit EVERY command that
   constructs the same path and centralize them on one helper. PR #413 made only `review.ts`
   honor `MMR_HOME` for the jobs dir while `jobs`/`status`/`results`/`reconcile` still read
