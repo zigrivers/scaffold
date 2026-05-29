@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
+import { restoreEnv } from '../helpers/env.js'
 
 // Drives reviewCommand.handler directly (CI does not build packages/mmr/dist).
 // dispatcher/auth are mocked so a real review never runs; process.exit is
@@ -40,11 +41,8 @@ const originalHome = process.env.HOME
 const originalMmrHome = process.env.MMR_HOME
 
 afterEach(() => {
-  // delete-when-undefined: a plain `= undefined` sets the string 'undefined'.
-  if (originalHome === undefined) delete process.env.HOME
-  else process.env.HOME = originalHome
-  if (originalMmrHome === undefined) delete process.env.MMR_HOME
-  else process.env.MMR_HOME = originalMmrHome
+  restoreEnv('HOME', originalHome)
+  restoreEnv('MMR_HOME', originalMmrHome)
   vi.restoreAllMocks()
 })
 

@@ -2,19 +2,13 @@ import { afterEach, describe, it, expect, vi } from 'vitest'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { restoreEnv } from '../helpers/env.js'
 
 // Validates Task 27's default-deny under non-git mode, driving the handler
 // directly (CI does not build packages/mmr/dist).
 
 const originalHome = process.env.HOME
 const originalMmrHome = process.env.MMR_HOME
-
-// Restore (or delete when originally absent) — a plain `= undefined` would set
-// the literal string 'undefined', which resolveSessionRoot treats as a path.
-function restoreEnv(key: string, value: string | undefined): void {
-  if (value === undefined) delete process.env[key]
-  else process.env[key] = value
-}
 
 afterEach(() => {
   restoreEnv('HOME', originalHome)
@@ -46,7 +40,7 @@ async function runReview(args: Record<string, unknown>, dirs: { cwd: string; hom
   const { reviewCommand } = await import('../../src/commands/review.js')
   vi.spyOn(process, 'cwd').mockReturnValue(dirs.cwd)
   const logs: string[] = []
-  vi.spyOn(console, 'log').mockImplementation((m?: unknown) => { logs.push(String(m)) })
+  vi.spyOn(console, 'log').mockImplementation((...m: unknown[]) => { logs.push(m.map(String).join(' ')) })
   vi.spyOn(console, 'error').mockImplementation(() => {})
   const prevExitCode = process.exitCode
   process.exitCode = undefined
