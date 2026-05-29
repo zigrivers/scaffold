@@ -333,6 +333,11 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     const baseRef = trust.trust_mode === 'base-ref' ? trust.base_ref : undefined
     const trustWorkingTreeConfig = args.trustProjectConfig === true
     const trustWorkingTreeAcks = args.trustProjectAcks === true
+    // --accept-new-acks means "honor the ack files added in the diff", so it
+    // must also LOAD the working-tree acks (not merely skip the gate) — else an
+    // accepted new ack would be ratified but never applied (loaded from the
+    // base ref, which doesn't have it).
+    const honorWorkingTreeAcks = trustWorkingTreeAcks || args.acceptNewAcks === true
     const refHint =
       trust.trust_mode === 'non-git'
         ? ' (non-git: no base ref to compare against).'
@@ -373,7 +378,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     const reviewControls: ReviewControls = {
       max_rounds: maxRounds,
       accept_new_acks: args.acceptNewAcks === true,
-      trust_project_acks: trustWorkingTreeAcks,
+      trust_project_acks: honorWorkingTreeAcks,
       trust_project_config: trustWorkingTreeConfig,
       config_base_ref: baseRef,
     }
@@ -679,7 +684,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       // trusted default path (project acks from a git base ref). The pipeline
       // fails safe if the acks tree is unreadable.
       const ackStore = buildReviewAckStore({
-        trustProjectAcks: trustWorkingTreeAcks,
+        trustProjectAcks: honorWorkingTreeAcks,
         userRoot: resolveSessionRoot(),
         configBaseRef: baseRef,
         cwd,
