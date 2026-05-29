@@ -1,7 +1,7 @@
 ---
 name: review-code
 description: Run all configured code review channels on local code before commit or push
-summary: "Review the current local delivery candidate with the three MMR CLI channels (Codex CLI, Gemini CLI, Claude CLI) plus the Superpowers code-reviewer agent as a complementary 4th channel reconciled into the same MMR job, before committing or pushing. Supports staged changes, an explicit ref range, or the full local delivery candidate (committed branch diff + staged + unstaged); untracked files are not included."
+summary: "Review the current local delivery candidate with the four built-in MMR CLI channels (Codex CLI, Gemini CLI, Claude CLI, Grok CLI) plus the Superpowers code-reviewer agent as a complementary agent channel reconciled into the same MMR job, before committing or pushing. Supports staged changes, an explicit ref range, or the full local delivery candidate (committed branch diff + staged + unstaged); untracked files are not included."
 phase: null
 order: null
 dependencies: []
@@ -15,19 +15,20 @@ argument-hint: "[--base <ref>] [--head <ref>] [--staged] [--report-only] [--fix-
 
 ## Purpose
 
-Run the same review stack used by `review-pr` (three MMR CLI channels plus
-the Superpowers code-reviewer agent as a complementary 4th channel), but on
-local code before commit or push. This is the preflight review entry point
+Run the same review stack used by `review-pr` (four built-in MMR CLI channels
+plus the Superpowers code-reviewer agent as a complementary agent channel), but
+on local code before commit or push. This is the preflight review entry point
 for bug fixes, small features, and quick tasks when the user wants
 multi-model review before anything leaves the machine.
 
-The three CLI channels are:
+The built-in CLI channels are:
 1. **Codex CLI** — implementation correctness, security, API contracts
 2. **Gemini CLI** — architectural patterns, broad-context reasoning
 3. **Claude CLI** — code quality, tests, and plan alignment
+4. **Grok CLI** — xAI's independent second opinion (correctness, code quality; proprietary)
 
-Plus the 4th channel:
-4. **Superpowers code-reviewer** — agent-based review dispatched via the
+Plus the complementary agent channel:
+5. **Superpowers code-reviewer** — agent-based review dispatched via the
    `superpowers:code-reviewer` skill, reconciled into the same MMR job via
    `mmr reconcile` for a unified verdict.
 
@@ -53,7 +54,7 @@ brand-new files.
 
 ## Expected Outputs
 
-- A reconciled four-channel review summary for the local delivery candidate (three MMR CLI channels + Superpowers code-reviewer)
+- A reconciled multi-channel review summary for the local delivery candidate (four built-in MMR CLI channels + Superpowers code-reviewer)
 - One of these verdicts: `pass`, `degraded-pass`, `blocked`, `needs-user-decision`
 - Fixed code when findings are resolved in normal mode
 
@@ -792,8 +793,9 @@ Output a concise summary in this format:
 ### Channels Executed
 - Codex CLI — root cause: [completed / not_installed / auth_failed / timeout / failed], coverage: [full / compensating (Codex-equivalent)]
 - Gemini CLI — root cause: [completed / not_installed / auth_failed / timeout / failed], coverage: [full / compensating (Gemini-equivalent)]
-- Claude CLI — root cause: [completed / not_installed / auth_failed / timeout / failed], coverage: [full / none (Claude is never compensated — it IS the compensator for Codex/Gemini)]
-- Agent review (Superpowers code-reviewer, 4th channel) — [completed / skipped], injected via `mmr reconcile`
+- Claude CLI — root cause: [completed / not_installed / auth_failed / timeout / failed], coverage: [full / none (Claude is never compensated — it IS the compensator for Codex/Gemini/Grok)]
+- Grok CLI — root cause: [completed / not_installed / auth_failed / timeout / failed], coverage: [full / compensating (Grok-equivalent)]
+- Agent review (Superpowers code-reviewer, agent channel) — [completed / skipped], injected via `mmr reconcile`
 
 ### Findings
 [consensus findings first, then single-source findings]
@@ -807,8 +809,8 @@ for the next delivery step (commit, push, or PR creation).
 
 ## Process Rules
 
-1. **Foreground only** — Always run Codex and Gemini CLI commands as foreground Bash calls. Never use `run_in_background`, `&`, or `nohup`.
-2. **All 3 channels are mandatory** — skip only when a tool is genuinely not installed, never by choice.
+1. **Foreground only** — Always run Codex, Gemini, and Grok CLI commands as foreground Bash calls. Never use `run_in_background`, `&`, or `nohup`.
+2. **All built-in CLI channels are mandatory** — skip only when a tool is genuinely not installed, never by choice.
 3. **Auth failures are not silent** — always surface to the user with recovery instructions.
 4. **Independence** — never share one channel's output with another.
 5. **Fix before proceeding** — findings at or above `fix_threshold` must be resolved before moving to the next task.

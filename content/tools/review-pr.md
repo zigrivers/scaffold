@@ -14,11 +14,11 @@ argument-hint: "<PR# or blank> [--fix-threshold P0|P1|P2|P3]"
 
 ## Purpose
 
-Run the three CLI review channels (Codex, Gemini, Claude) on a pull request
-**plus** the Superpowers code-reviewer agent as a complementary 4th channel,
-and reconcile all findings through MMR. This is the single entry point for
-**PR-scoped** code review — agents call this once instead of remembering four
-separate review invocations.
+Run the four built-in CLI review channels (Codex, Gemini, Claude, Grok) on a
+pull request **plus** the Superpowers code-reviewer agent as a complementary
+agent channel, and reconcile all findings through MMR. This is the single entry
+point for **PR-scoped** code review — agents call this once instead of
+remembering separate review invocations.
 
 **For non-PR targets**, don't use this tool. Call `mmr review` directly with
 the appropriate input mode, or use `scaffold run review-code` for local
@@ -34,13 +34,14 @@ pre-commit review:
   under `set -o pipefail`)
 
 The `--diff` flag expects diff-format content; it does not read raw document
-content. The three-channel review itself is not PR-specific — this tool is
+content. The built-in CLI review itself is not PR-specific — this tool is
 just the PR wrapper around the more general `mmr review` CLI.
 
-The three channels are:
+The built-in CLI channels are:
 1. **Codex CLI** — OpenAI's code analysis (implementation correctness, security, API contracts)
 2. **Gemini CLI** — Google's design reasoning (architectural patterns, broad context)
 3. **Claude CLI** — Anthropic's code review (plan alignment, code quality, testing)
+4. **Grok CLI** — xAI's independent second opinion (correctness, code quality; proprietary)
 
 ## Inputs
 
@@ -53,7 +54,7 @@ in the review criteria config rather than read at dispatch time.
 
 ## Expected Outputs
 
-- All three CLI review channels executed (or fallback documented) plus the Superpowers code-reviewer 4th channel reconciled via `mmr reconcile`
+- All built-in CLI review channels executed (or fallback documented) plus the Superpowers code-reviewer agent channel reconciled via `mmr reconcile`
 - findings at or above the configured `fix_threshold` fixed before proceeding (read from `results.fix_threshold` in the verdict JSON; default `P2`)
 - Review summary with per-channel results and reconciliation
 
@@ -159,7 +160,7 @@ quality. Auth failure recovery: `! grok login`.
 dispatches with focused prompts. Label findings as `[compensating: Codex-equivalent]`,
 `[compensating: Gemini-equivalent]`, or `[compensating: Grok-equivalent]`.
 
-### Step 3: Run Agent Code Review (4th channel)
+### Step 3: Run Agent Code Review (complementary agent channel)
 
 Dispatch your platform's code-reviewer skill for a complementary review:
 - **Claude Code:** dispatch `superpowers:code-reviewer` subagent with the PR diff and review criteria
@@ -628,8 +629,8 @@ In either path, output the message and stop. Do NOT proceed to the next task wit
 
 ## Process Rules
 
-1. **Foreground only** — Always run Codex, Gemini, and Claude CLI commands as foreground Bash calls. Never use `run_in_background`, `&`, or `nohup`.
-2. **All three CLI channels are mandatory** — Codex CLI, Gemini CLI, and Claude CLI. Plus the Superpowers code-reviewer agent as a complementary 4th channel reconciled via `mmr reconcile` (Step 3). Skip a CLI channel only when a tool is genuinely not installed or auth cannot be recovered (in which case MMR emits a compensating pass for missing Codex/Gemini channels; a missing Claude CLI has no compensator). Never skip by choice.
+1. **Foreground only** — Always run Codex, Gemini, Claude, and Grok CLI commands as foreground Bash calls. Never use `run_in_background`, `&`, or `nohup`.
+2. **All built-in CLI channels are mandatory** — Codex CLI, Gemini CLI, Claude CLI, and Grok CLI. Plus the Superpowers code-reviewer agent as a complementary agent channel reconciled via `mmr reconcile` (Step 3). Skip a CLI channel only when a tool is genuinely not installed or auth cannot be recovered (in which case MMR emits a compensating pass for missing Codex/Gemini/Grok channels; a missing Claude CLI has no compensator). Never skip by choice.
 3. **Auth failures are not silent** — always surface to the user with the exact recovery command.
 4. **Independence** — never share one channel's output with another. Each reviews the diff independently.
 5. **Fix before proceeding** — findings at or above `fix_threshold` must be resolved before moving to the next task.

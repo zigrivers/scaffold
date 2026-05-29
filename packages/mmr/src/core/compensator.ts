@@ -34,6 +34,7 @@ export interface CompensatorDispatch {
   prompt_wrapper: string
   stderr: 'capture' | 'suppress' | 'passthrough'
   output_parser: string | OutputParserConfig
+  prompt_delivery?: 'stdin' | 'prompt-file'
 }
 
 function defaultCompensatorDispatch(config: MmrConfigParsed): CompensatorDispatch {
@@ -65,6 +66,7 @@ export function resolveCompensatorDispatch(config: MmrConfigParsed): Compensator
     prompt_wrapper: channelConfig.prompt_wrapper ?? '{{prompt}}',
     stderr: channelConfig.stderr,
     output_parser: channelConfig.output_parser,
+    prompt_delivery: channelConfig.prompt_delivery,
   }
 }
 
@@ -162,6 +164,7 @@ export async function dispatchCompensatingPasses(
         env: dispatch.env,
         timeout: dispatch.timeout,
         stderr: dispatch.stderr,
+        promptDelivery: dispatch.prompt_delivery,
       })
     }),
   )
