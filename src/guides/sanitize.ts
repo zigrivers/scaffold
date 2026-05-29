@@ -20,6 +20,7 @@ export const guideSanitizeSchema: Schema = {
     'path',
     'rect',
     'circle',
+    'ellipse',
     'line',
     'polygon',
     'polyline',

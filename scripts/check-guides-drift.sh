@@ -37,7 +37,7 @@ while IFS= read -r html; do
   if grep -qiE '\son[a-z]+=' <<<"${body}"; then echo "FAIL ${html}: inline event handler"; fail=1; fi
   if grep -qiE 'javascript:' <<<"${body}"; then echo "FAIL ${html}: javascript: uri"; fail=1; fi
   if grep -qiE 'src="https?:' <<<"${body}"; then echo "FAIL ${html}: external src"; fail=1; fi
-  if grep -oiE 'style="[^"]*"' <<<"${body}" | grep -qiE 'url\(|expression|javascript:|@import'; then
+  if grep -oiE 'style="[^"]*"' <<<"${body}" | grep -qiE 'url\(|expression|javascript:|@import|position\s*:\s*(fixed|absolute)'; then
     echo "FAIL ${html}: dangerous style attribute content"; fail=1; fi
 done < <(find content/guides -name '*.html' || true)
 
