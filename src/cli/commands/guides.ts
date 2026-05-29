@@ -8,6 +8,7 @@ import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
 import type { GuideEntry } from '../../guides/types.js'
+import { ExitCode } from '../../types/enums.js'
 
 export interface GuideSummary {
   topic: string
@@ -33,14 +34,11 @@ export function resolveGuide(projectRoot: string | undefined, topic: string): Gu
 }
 
 function openInBrowser(file: string): void {
-  let opener = 'xdg-open'
-  if (process.platform === 'darwin') opener = 'open'
-  if (process.platform === 'win32') opener = 'start'
   try {
-    execFileSync(opener, [file])
-  } catch {
-    // Ignore errors when opening browser
-  }
+    if (process.platform === 'darwin') execFileSync('open', [file])
+    else if (process.platform === 'win32') execFileSync('cmd', ['/c', 'start', '', file])
+    else execFileSync('xdg-open', [file])
+  } catch { /* ignore */ }
 }
 
 interface GuidesArgs {
@@ -50,7 +48,6 @@ interface GuidesArgs {
   'print-path'?: boolean
   'no-open'?: boolean
   build?: boolean
-  all?: boolean
   format?: string
   auto?: boolean
   root?: string
@@ -67,13 +64,11 @@ const guidesCommand: CommandModule<Record<string, unknown>, GuidesArgs> = {
       .option('print-path', { type: 'boolean', default: false, describe: 'Print the guide\'s markdown path' })
       .option('no-open', { type: 'boolean', default: false, describe: 'Do not open a browser' })
       .option('build', {
-        type: 'boolean', default: false, describe: 'Regenerate guide HTML from sources (maintainer)',
-      })
-      .option('all', {
-        type: 'boolean', default: false, describe: 'With --build, regenerate every guide',
+        type: 'boolean', default: false, describe: 'Regenerate ALL guide HTML from sources (maintainer/CI)',
       }) as Argv<GuidesArgs>,
   handler: async (argv) => {
-    const output = createOutputContext(resolveOutputMode(argv))
+    const outputMode = resolveOutputMode(argv)
+    const output = createOutputContext(outputMode)
     const projectRoot = argv.root ?? findProjectRoot(process.cwd()) ?? undefined
 
     if (argv.build) {
@@ -84,7 +79,7 @@ const guidesCommand: CommandModule<Record<string, unknown>, GuidesArgs> = {
 
     if (argv.list) {
       const guides = listGuides(projectRoot)
-      if (resolveOutputMode(argv) === 'json') {
+      if (outputMode === 'json') {
         output.result(guides)
       } else {
         for (const g of guides) {
@@ -103,7 +98,11 @@ const guidesCommand: CommandModule<Record<string, unknown>, GuidesArgs> = {
 
     const guide = resolveGuide(projectRoot, argv.topic)
     if (!guide) {
-      output.error({ code: 'GUIDE_NOT_FOUND', message: `No guide named "${argv.topic}"`, exitCode: 1 })
+      output.error({
+        code: 'GUIDE_NOT_FOUND',
+        message: `No guide named "${argv.topic}"`,
+        exitCode: ExitCode.ValidationError,
+      })
       process.exit(1)
     }
 

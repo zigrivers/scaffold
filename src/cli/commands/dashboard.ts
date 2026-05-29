@@ -60,11 +60,10 @@ function writeAndOpenDashboard(
   atomicWriteFile(outputPath, html)
 
   if (!argv['no-open']) {
-    let opener = 'xdg-open'
-    if (process.platform === 'darwin') opener = 'open'
-    if (process.platform === 'win32') opener = 'start'
     try {
-      execFileSync(opener, [outputPath])
+      if (process.platform === 'darwin') execFileSync('open', [outputPath])
+      else if (process.platform === 'win32') execFileSync('cmd', ['/c', 'start', '', outputPath])
+      else execFileSync('xdg-open', [outputPath])
     } catch {
       // Ignore errors when opening browser
     }
