@@ -46,7 +46,7 @@ harvester (`src/observability/engine/harvester.ts`) and
   via the MMR `doc-conformance` channel.
 
 The system ships **9 durable event types**, **8 adapters** fusing external
-signals, a **9-lens audit (A–I)**, and **6 stall signals** on the "Needs
+signals, a **9-lens audit (A–I)**, and **5 active stall signals** (a 6th reserved) on the "Needs
 Attention" surface.
 
 :::callout{type=note}
@@ -354,7 +354,7 @@ single graph (`src/observability/engine/doc-graph/index.ts`). Every lens's
 | design-system | `parseDesignTokens` | `tokens` (priority, category) |
 | implementation-plan | `parsePlanTasks` | `plan_tasks`, `story_to_plan_task` |
 | implementation-playbook | `parsePlaybookTasks` | `playbook_tasks`, `playbook_task_to_story` |
-| ledger + repo | `parseDecisions` | `decisions` |
+| decision docs (`decisions.jsonl`, `docs/decisions/*.md`) | `parseDecisions` | `decisions` |
 | working tree | `discoverTests`, `discoverFiles` | `tests` (with `last_status`), `files`, `ac_to_test` |
 | source files | `detectCss/JsxTokenUses`, `detectComponentUses` | `file_to_token_use`, `file_to_component_use` |
 
@@ -580,8 +580,9 @@ event's `task_id` is null.
 ## Progress, replay & stall
 
 `scaffold observe progress` shows what's in flight. With `--replay` it fuses the
-ledger with synthesized git/gh/mmr/state/tests events into one timeline; stall
-detection runs at every command boundary and surfaces a "Needs Attention" panel.
+ledger with synthesized git/gh/mmr/state/tests events into one timeline; when
+`scaffold observe progress` runs it also evaluates stall detection and surfaces a
+"Needs Attention" panel (suppress with `--no-stall-check`).
 
 ### Fusion — how the timeline is built
 
@@ -602,8 +603,9 @@ outranks `gh` (2).
 
 ### Stall detection — the six signals
 
-At every command boundary the engine checks for staleness and builds
-`needs_attention` (`src/observability/engine/stall.ts`). The type declares six
+When `scaffold observe progress` runs (unless `--no-stall-check`) the engine
+checks for staleness and builds `needs_attention`
+(`src/observability/engine/stall.ts`). The type declares six
 signals; **five fire today** — `pr_review_stale` is reserved (deferred pending a
 per-PR correlation_id on the mmr adapter,
 :cite[src/observability/engine/stall.ts:119]). Thresholds accept `'Nh'`, `'Nd'`,
@@ -612,7 +614,7 @@ or `'off'` under `stall.*`:
 | signal | fires when | config key · default |
 | --- | --- | --- |
 | `task_stale` | task claimed, no commit/heartbeat/completion since | `stall.task_stale` · `4h` |
-| `pr_stale` | PR opened, not merged/closed | `stall.pr_stale` · `48h` |
+| `pr_stale` | ledger `pr_opened` recorded, PR not merged/closed since | `stall.pr_stale` · `48h` |
 | `blocker_unaddressed` | `blocker_hit` with no `blocker_resolved` | `stall.blocker_unaddressed` · `2h` |
 | `audit_findings_unresolved` | open finding past threshold age, severity at or above `fix_threshold` | `stall.audit_findings_unresolved` · `24h` |
 | `lens_skipped_repeatedly` | a lens skipped on ≥3 consecutive audits | hard-coded streak ≥ 3 (no config key) |
@@ -668,7 +670,7 @@ The stdout line:
 
 ```text
 # normal
-[audit] 3 findings (1 blocking, verdict=blocked) — see docs/audits/audit-…-fast-all.md
+[audit] 3 findings (1 blocking, verdict=blocked) — see docs/audits/audit-…-fast-lens-H-cross-doc-….md
 # detached (fire-and-forget)
 [audit] dispatched in background (step: tech-stack)
 # timed out
@@ -745,8 +747,8 @@ globally enabled you can opt a project out via
 mmr review --channels=doc-conformance --diff <(git diff main...HEAD) --sync --format json
 ```
 
-Under the hood the channel runs `scaffold observe audit
---output-mode=mmr-findings` and parses its stdout. See the MMR guide
+Under the hood the built-in channel runs `scaffold observe audit --profile=full
+--scope=all --output-mode=mmr-findings` and parses its stdout. See the MMR guide
 ([../mmr/index.md](../mmr/index.md)) for the channel architecture this plugs
 into.
 
@@ -754,8 +756,9 @@ into.
 
 `scaffold observe audit --fix` doesn't just report blocking findings — it
 dispatches an agent to fix each one, verifies the fix with a single-lens
-re-audit, and writes a post-fix report. The loop is abort-safe: an interrupt
-restores the working tree to where it started.
+re-audit, and writes a post-fix report. The loop is abort-aware: an interrupt
+un-stages what the loop staged and re-applies the original stash (see the
+limitation in [Abort safety](#abort-safety)).
 
 ```mermaid
 flowchart LR
@@ -791,8 +794,11 @@ docs/audits/id-postfix.{md,json}"]
 Before dispatching, `captureSnapshot`
 (`src/observability/engine/abort-snapshot.ts`) records a `git stash create` SHA
 plus the set of pre-existing staged files. Newly staged paths are tracked per
-attempt. On `SIGINT`, `restoreSnapshot` un-stages what the loop staged and
-re-applies the stash — so an interrupted fix leaves a clean, WIP-preserving tree.
+attempt. On `SIGINT`, `restoreSnapshot` un-stages the paths the loop recorded as
+newly staged and re-applies the original stash tree. **Limitation:** edits the
+dispatcher made but that the loop did not record as staged are not actively
+reverted and may need manual cleanup — recovery is scoped to the recorded
+staged paths plus the stash, not a guaranteed full reset.
 
 ### Config — the `fix:` block
 
@@ -926,7 +932,7 @@ from the code, which is ground truth.
 :::filter-table
 | key | type | default | read by |
 | --- | --- | --- | --- |
-| `lenses.C-standards.enforce_via_linter` | boolean | `true` | lenses · Lens C |
+| `lenses.C-standards.enforce_via_linter` | boolean | `true` | (accepted, not read) |
 | `lenses.C-standards.rule_overrides` | map<rule, P0–P3> | `{}` | lenses · Lens C |
 | `lenses.C-standards.escalation_threshold` | number | `5` | lenses · Lens C |
 | `lenses.D-stack.path_to_layer` | {glob,layer}[] | 7 default mappings | lenses · Lens D |
@@ -1072,9 +1078,11 @@ the code/docs:
   `pr_open`; the code only emits `pr_opened`.
 - **Three engine verdicts, not four.** `needs-user-decision` is an MMR review
   verdict; the audit engine emits only `pass` / `degraded-pass` / `blocked`.
-- **Fix-dispatcher security note conflated.** CLAUDE.md's `--fix` note calls the
-  dispatcher "not project-config-overridable"; in fact `fix.dispatcher_command`
-  is configurable, while it's the *Lens H LLM* dispatcher that is hard-coded.
+- **Two dispatchers — don't conflate them.** CLAUDE.md's "not
+  project-config-overridable" note is about the **Lens H LLM dispatcher**
+  (`llm-dispatcher.ts`, hard-coded `claude -p` by design). It does **not** apply
+  to the separate **`--fix` agent dispatcher**, whose `fix.dispatcher_command`
+  *is* project-configurable. The divergence is that the two are easy to conflate.
 - **`pr_review_stale` reserved.** The sixth stall signal has a config default but
   is not yet emitted (deferred pending a per-PR correlation_id on the mmr
   adapter).
