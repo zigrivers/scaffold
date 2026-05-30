@@ -286,10 +286,11 @@ so a substantial channel-side rewrite *will* produce a new key — that larger
 phrasing drift is absorbed by the fuzzy **ack** fallback described below
 (Jaccard ≥ 0.7 on the description shingle), not by the key itself.
 
-Sessions group related reviews. Choose a session id (matching
-`^[a-zA-Z0-9_-]+$`), register it with `mmr sessions start <id>`, then pass
-`--session <id>` and `--round N` (one-based) to link a review to its
-predecessors:
+Sessions group related reviews. Choose a session id matching
+`^[a-zA-Z0-9_-]+$` that is not a reserved name (`con`, `prn`, `aux`, `nul`,
+`com1`–`com9`, `lpt1`–`lpt9`, `index`, `__proto__`), register it with
+`mmr sessions start <id>`, then pass `--session <id>` and `--round N`
+(one-based) to link a review to its predecessors:
 
     mmr sessions start my-feature
     # → session record printed (includes the id)
@@ -347,7 +348,10 @@ and Fireworks without writing a shell wrapper.
 Required fields for an HTTP channel:
 
 - `kind: http`
-- `endpoint` — the full request URL including `/v1/chat/completions`
+- `endpoint` — the full chat-completions request URL, normally ending in
+  `/v1/chat/completions`. Non-standard paths are allowed, but then you must
+  also supply an explicit `auth.check_endpoint` (see below), since the
+  auth-probe URL can only be derived from a `/chat/completions` suffix.
 - `model` — the model string the endpoint expects
 - `endpoint_convention: openai-chat` — the only convention supported in
   v3.30; `generic` is rejected and reserved for a future release.
@@ -422,10 +426,15 @@ request, but is NEVER written to logs or persisted job state.
 
 ### Security considerations
 
-When MMR reviews a diff (`--pr`, `--base/--head`, `--staged`, or `--diff`
-inside a Git repo with a resolvable base), both `.mmr.yaml` and
-`./.mmr/acks/` are loaded from the **base ref**, not from the working
-tree. This closes two attack surfaces:
+When MMR resolves a trusted **base ref** for a review — `--pr` with a
+successfully resolved upstream base, an explicit `--base`, an explicit
+`--config-base-ref`, or the local non-CI default of `HEAD` — both `.mmr.yaml`
+and `./.mmr/acks/` are loaded *exclusively from that ref* (via `git show`),
+never from the working tree. In the other modes (`trust_mode` of
+`untrusted-head` — e.g. `--staged`/`--diff`/unresolvable `--pr` under CI — or
+`non-git`), project config and project acks are **not loaded at all** unless
+you pass the corresponding trust flag below; user-scope config/acks always
+load. This base-ref rule closes two attack surfaces:
 
 1. **Ack self-suppression.** Without the rule, a PR could add a
    `./.mmr/acks/<key>.json` file in the same diff that introduces the
