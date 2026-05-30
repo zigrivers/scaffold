@@ -109,8 +109,18 @@ export const BUILTIN_CHANNELS: Record<string, SubprocessChannelParsed> = {
     // {{prompt_file}} placeholder in --prompt-file.
     command: 'grok',
     prompt_delivery: 'prompt-file',
-    flags: ['--prompt-file', '{{prompt_file}}', '--output-format', 'json'],
-    env: {},
+    // Closed-book review: no cross-session memory, web-only tool allowlist
+    // (denies filesystem reads), isolated HOME/cwd strips host config —
+    // skills, MCP servers, hooks, and project instructions are all excluded.
+    cwd: '{{neutral_cwd}}',
+    env: { HOME: '{{neutral_home}}', XDG_CONFIG_HOME: '{{neutral_home}}' },
+    flags: [
+      '--prompt-file', '{{prompt_file}}',
+      '--output-format', 'json',
+      '--no-memory',
+      '--tools', 'web_search,web_fetch',
+      '--no-subagents', '--no-plan',
+    ],
     auth: {
       // `grok models` lists models and prints the login state; it does not
       // make an LLM round-trip, so a short timeout is fine. Exit 1 ⇒ not
