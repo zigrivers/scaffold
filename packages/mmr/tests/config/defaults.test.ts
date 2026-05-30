@@ -68,6 +68,34 @@ describe('BUILTIN_CHANNELS — grok', () => {
     expect(BUILTIN_CHANNELS.grok?.auth?.check).toMatch(/grok models/)
     expect(BUILTIN_CHANNELS.grok?.auth?.recovery).toBe('grok login')
   })
+
+  it('disables cross-session memory', () => {
+    expect(BUILTIN_CHANNELS.grok?.flags).toContain('--no-memory')
+  })
+
+  it('locks tools to a web-only allowlist (no filesystem tools)', () => {
+    const flags = BUILTIN_CHANNELS.grok?.flags ?? []
+    const i = flags.indexOf('--tools')
+    expect(i).toBeGreaterThanOrEqual(0)
+    const value = flags[i + 1] ?? ''
+    expect(value.split(',')).toEqual(['web_search', 'web_fetch'])
+    expect(value).not.toMatch(/read_file|write_file/)
+  })
+
+  it('disables agentic subagents and planning for determinism', () => {
+    expect(BUILTIN_CHANNELS.grok?.flags).toContain('--no-subagents')
+    expect(BUILTIN_CHANNELS.grok?.flags).toContain('--no-plan')
+  })
+
+  it('isolates host config via neutral HOME/XDG and cwd', () => {
+    expect(BUILTIN_CHANNELS.grok?.env?.HOME).toBe('{{neutral_home}}')
+    expect(BUILTIN_CHANNELS.grok?.env?.XDG_CONFIG_HOME).toBe('{{neutral_home}}')
+    expect((BUILTIN_CHANNELS.grok as { cwd?: string }).cwd).toBe('{{neutral_cwd}}')
+  })
+
+  it('does NOT disable web search (web stays available by default)', () => {
+    expect(BUILTIN_CHANNELS.grok?.flags).not.toContain('--disable-web-search')
+  })
 })
 
 describe('DEFAULT_CONFIG compensator (T1-G)', () => {
