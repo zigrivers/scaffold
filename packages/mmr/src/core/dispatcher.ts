@@ -115,12 +115,18 @@ export async function dispatchChannel(
   const posture = withNeutralPosture(opts.env, opts.cwd)
 
   // Pipe prompt via stdin to avoid E2BIG on large diffs
-  const proc = spawn(cmd, args, {
-    detached: true,
-    stdio: ['pipe', 'pipe', stderrStdio],
-    env: { ...process.env, ...posture.env },
-    cwd: posture.cwd,   // undefined ⇒ inherit parent cwd (unchanged for non-isolated channels)
-  })
+  let proc: ReturnType<typeof spawn>
+  try {
+    proc = spawn(cmd, args, {
+      detached: true,
+      stdio: ['pipe', 'pipe', stderrStdio],
+      env: { ...process.env, ...posture.env },
+      cwd: posture.cwd,   // undefined ⇒ inherit parent cwd (unchanged for non-isolated channels)
+    })
+  } catch (err) {
+    posture.cleanup()
+    throw err
+  }
 
   if (proc.pid) activeChildren.add(proc.pid)
 

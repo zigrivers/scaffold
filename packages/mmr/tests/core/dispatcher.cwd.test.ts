@@ -30,16 +30,18 @@ describe('dispatcher — neutral posture', () => {
 
       // dispatchChannel resolves after close — no polling needed
       const [pwdRaw, homeRaw] = fs.readFileSync(out, 'utf8').split('|')
-      // Normalize symlinks at path level (no stat needed): macOS /tmp → /private/tmp.
-      // Resolve via os.tmpdir() which gives the same canonical base both sides use.
-      const tmp = os.tmpdir()
-      const normalizeTmpPath = (p: string) => {
-        // Replace both /tmp/... and /private/tmp/... variants with a common base
-        return p.replace(/^\/private\/tmp\//, '/tmp/')
+      // Resolve symlinks on the tmpdir root (e.g. macOS /tmp → /private/tmp)
+      // then reconstruct each path using the canonical root so comparisons are
+      // exact without relying on string substitution. The isolated dirs have
+      // already been cleaned up by posture.cleanup() at this point, so we
+      // cannot realpathSync the full path — resolving the parent is sufficient.
+      const canonicalTmpdir = fs.realpathSync(os.tmpdir())
+      const canonicalize = (p: string) => {
+        const base = path.basename(p)
+        return path.join(canonicalTmpdir, base)
       }
-      const pwd = normalizeTmpPath(pwdRaw)
-      const home = normalizeTmpPath(homeRaw)
-      void tmp // used indirectly for documentation
+      const pwd = canonicalize(pwdRaw)
+      const home = canonicalize(homeRaw)
       expect(pwd).toContain('mmr-grok-')
       expect(home).toBe(pwd)
       expect(pwdRaw).not.toContain('{{')
