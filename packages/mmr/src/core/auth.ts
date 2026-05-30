@@ -37,49 +37,52 @@ export async function checkInstalled(command: string): Promise<boolean> {
  */
 async function runAuthCheck(config: AuthenticatedChannelConfig): Promise<AuthResult> {
   const { auth, env } = config
-  const posture = withNeutralPosture(env, (config as { cwd?: string }).cwd)
+  const posture = withNeutralPosture(env, config.cwd)
+  try {
+    return await new Promise<AuthResult>((resolve) => {
+      let settled = false
+      let timedOut = false
 
-  return new Promise<AuthResult>((resolve) => {
-    let settled = false
-    let timedOut = false
+      const child = spawn('sh', ['-c', auth.check], {
+        env: { ...process.env, ...posture.env },
+        cwd: posture.cwd,
+        stdio: 'ignore',
+      })
 
-    const child = spawn('sh', ['-c', auth.check], {
-      env: { ...process.env, ...posture.env },
-      cwd: posture.cwd,
-      stdio: 'ignore',
-    })
+      const timer = setTimeout(() => {
+        timedOut = true
+        child.kill('SIGKILL')
+      }, auth.timeout * 1000)
 
-    const timer = setTimeout(() => {
-      timedOut = true
-      child.kill('SIGKILL')
-    }, auth.timeout * 1000)
+      child.on('close', (code) => {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
 
-    child.on('close', (code) => {
-      if (settled) return
-      settled = true
-      clearTimeout(timer)
+        if (timedOut) {
+          resolve({ status: 'timeout' })
+          return
+        }
 
-      if (timedOut) {
-        resolve({ status: 'timeout' })
-        return
-      }
+        if (code !== null && auth.failure_exit_codes.includes(code)) {
+          resolve({ status: 'failed', recovery: auth.recovery })
+          return
+        }
 
-      if (code !== null && auth.failure_exit_codes.includes(code)) {
+        // Exit code 0 or any code not in failure_exit_codes -> ok (transient)
+        resolve({ status: 'ok' })
+      })
+
+      child.on('error', () => {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
         resolve({ status: 'failed', recovery: auth.recovery })
-        return
-      }
-
-      // Exit code 0 or any code not in failure_exit_codes -> ok (transient)
-      resolve({ status: 'ok' })
+      })
     })
-
-    child.on('error', () => {
-      if (settled) return
-      settled = true
-      clearTimeout(timer)
-      resolve({ status: 'failed', recovery: auth.recovery })
-    })
-  }).finally(() => posture.cleanup())
+  } finally {
+    posture.cleanup()
+  }
 }
 
 /**

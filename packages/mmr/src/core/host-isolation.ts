@@ -30,6 +30,19 @@ export function withNeutralPosture(env: Record<string, string>, cwd?: string): N
     return { env, cwd, cleanup: () => {} }
   }
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), PREFIX))
+
+  // Preserve grok's file-backed credentials so an isolated HOME doesn't break
+  // auth on non-keychain platforms (Linux/CI store creds at ~/.grok/auth.json).
+  // We symlink ONLY auth.json — NOT config.toml/skills/, so host config stays empty.
+  try {
+    const realHome = process.env.HOME || os.homedir()
+    const cred = path.join(realHome, '.grok', 'auth.json')
+    if (fs.existsSync(cred)) {
+      fs.mkdirSync(path.join(dir, '.grok'), { recursive: true })
+      fs.symlinkSync(cred, path.join(dir, '.grok', 'auth.json'))
+    }
+  } catch { /* best effort — keychain platforms don't need it */ }
+
   const outEnv: Record<string, string> = {}
   for (const [k, v] of Object.entries(env)) {
     outEnv[k] = v === NEUTRAL_HOME_PLACEHOLDER ? dir : v
@@ -61,7 +74,7 @@ export function sweepStaleNeutralDirs(maxAgeMs = 6 * 60 * 60 * 1000): void {
     const full = path.join(tmp, name)
     try {
       const st = fs.statSync(full)
-      if (now - st.mtimeMs > maxAgeMs) fs.rmSync(full, { recursive: true, force: true })
+      if (st.isDirectory() && now - st.mtimeMs > maxAgeMs) fs.rmSync(full, { recursive: true, force: true })
     } catch { /* best effort */ }
   }
 }

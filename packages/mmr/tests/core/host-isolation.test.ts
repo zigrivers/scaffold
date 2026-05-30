@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, afterEach, beforeEach } from 'vitest'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -44,6 +44,55 @@ describe('withNeutralPosture', () => {
     r.cleanup()
     expect(fs.existsSync(dir)).toBe(false)
   })
+
+  describe('grok credential preservation', () => {
+    let fakeHome: string
+    let origHome: string | undefined
+
+    beforeEach(() => {
+      origHome = process.env.HOME
+      fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-test-home-'))
+      // Create a .grok dir with auth.json AND config.toml AND skills/
+      fs.mkdirSync(path.join(fakeHome, '.grok', 'skills'), { recursive: true })
+      fs.writeFileSync(path.join(fakeHome, '.grok', 'auth.json'), '{"token":"test"}')
+      fs.writeFileSync(path.join(fakeHome, '.grok', 'config.toml'), '[settings]')
+      fs.writeFileSync(path.join(fakeHome, '.grok', 'skills', 'x'), 'skill-x')
+      process.env.HOME = fakeHome
+    })
+
+    afterEach(() => {
+      if (origHome === undefined) {
+        delete process.env.HOME
+      } else {
+        process.env.HOME = origHome
+      }
+      try { fs.rmSync(fakeHome, { recursive: true, force: true }) } catch { /* best effort */ }
+    })
+
+    it('symlinks only auth.json into the neutral dir — not config.toml or skills/', () => {
+      const r = withNeutralPosture({ HOME: NEUTRAL_HOME_PLACEHOLDER }, NEUTRAL_CWD_PLACEHOLDER)
+      const neutralDir = r.cwd!
+      made.push(neutralDir)
+
+      // auth.json must be present (symlinked)
+      expect(fs.existsSync(path.join(neutralDir, '.grok', 'auth.json'))).toBe(true)
+      // config.toml must NOT be present
+      expect(fs.existsSync(path.join(neutralDir, '.grok', 'config.toml'))).toBe(false)
+      // skills/ must NOT be present
+      expect(fs.existsSync(path.join(neutralDir, '.grok', 'skills'))).toBe(false)
+
+      r.cleanup()
+      // cleanup removes the symlink, NOT the original credential file
+      expect(fs.existsSync(path.join(fakeHome, '.grok', 'auth.json'))).toBe(true)
+    })
+
+    it('is a no-op when no placeholder is present (non-isolated channels unaffected)', () => {
+      const r = withNeutralPosture({ HOME: fakeHome }, '/some/cwd')
+      // Non-isolated: returned env unchanged, no neutral dir created
+      expect(r.env.HOME).toBe(fakeHome)
+      r.cleanup()
+    })
+  })
 })
 
 describe('sweepStaleNeutralDirs', () => {
@@ -78,5 +127,22 @@ describe('sweepStaleNeutralDirs', () => {
     expect(fs.existsSync(staleDir)).toBe(false)
     expect(fs.existsSync(freshDir)).toBe(true)
     expect(fs.existsSync(otherDir)).toBe(true)
+  })
+
+  it('does NOT remove a stale FILE named mmr-grok-something (only dirs are swept)', () => {
+    const tmp = os.tmpdir()
+
+    // Create a file (not a directory) with an mmr-grok-* name
+    const staleFile = path.join(tmp, 'mmr-grok-stale-file-test')
+    fs.writeFileSync(staleFile, 'not a dir')
+    created.push(staleFile)
+    // Set mtime to 2 hours in the past
+    const oldTime = new Date(Date.now() - 2 * 60 * 60 * 1000)
+    fs.utimesSync(staleFile, oldTime, oldTime)
+
+    // Sweep with 1-hour max age — file should survive because it's not a directory
+    sweepStaleNeutralDirs(60 * 60 * 1000)
+
+    expect(fs.existsSync(staleFile)).toBe(true)
   })
 })
