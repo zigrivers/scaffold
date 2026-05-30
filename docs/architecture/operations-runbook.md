@@ -539,6 +539,23 @@ Each scenario follows: **Symptoms** → **Diagnosis** → **Resolution** → **V
 - *Resolution*: Fix the failing workflow or tap formula, rerun the workflow if possible, and verify the tap points at the correct `v<version>` source tarball.
 - *Verification*: `brew update && brew upgrade scaffold && scaffold --version` returns the expected version.
 
+> **Lesson — concurrent-tag-push tap race (seen during the v3.29.0 + mmr-v1.4.0 dual release, 2026-05-30).**
+> `update-homebrew.yml` triggers on **both** `v*` and `mmr-v*` tags and commits the
+> updated formula to the **same** branch (`main`) of the shared `zigrivers/homebrew-scaffold`
+> tap. When the scaffold and mmr tags are pushed **together** (e.g. `git push origin v3.29.0 mmr-v1.4.0`),
+> both workflow runs fire concurrently, each commits its formula, and the one that
+> pushes second is **rejected non-fast-forward** (`! [rejected] main -> main (fetch first)`).
+> The formula change itself committed fine locally in the failing run — it just lost the push race.
+> - *Symptom in the log*: the "Commit and push" step fails with
+>   `! [rejected] main -> main (fetch first)` / `Updates were rejected because the remote contains work that you do not have locally`.
+> - *Fix*: simply **re-run the failed workflow** (`gh run rerun <id>`). On the retry it
+>   checks out the now-advanced tap `main` (which already has the other formula's commit)
+>   and fast-forwards cleanly. No formula edit or tap surgery is needed.
+> - *Avoidance*: push the two release tags **a minute apart** (let the first `update-homebrew`
+>   run finish its tap push before triggering the second), rather than in a single `git push`.
+> This race is benign — npm publishes are unaffected (different workflows, no shared push target);
+> only the tap update needs the re-run.
+
 ---
 
 ## 6. Security Practices
