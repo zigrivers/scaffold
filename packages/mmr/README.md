@@ -275,9 +275,10 @@ Each reconciled finding now carries a `finding_key` — a deterministic hash
 built from the **normalized** location and category plus a SHA-1 of the
 normalized description and suggestion (severity is intentionally *not* part of
 the key). The SHA-1 here is a **content-identity** digest for
-deduplicating findings across rounds — not a security primitive — so its
-collision resistance is irrelevant (a chance collision would merely merge two
-unrelated findings, which is both astronomically unlikely and harmless).
+deduplicating findings across rounds — not a security primitive — so
+cryptographic collision resistance is not a requirement here (a chance
+collision would merely merge two unrelated findings, which is both
+astronomically unlikely and harmless).
 Normalization strips trailing line/column spans from the location and
 inline `line N` mentions from the prose, and folds casing/whitespace. As a
 result, line-number drift and severity changes do not change the identity of an
