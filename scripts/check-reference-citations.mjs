@@ -27,6 +27,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
 import { execSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 
 const REPO_ROOT = path.resolve(new URL('.', import.meta.url).pathname, '..')
 
@@ -81,6 +82,29 @@ const PAGES = [
     rebake: null,
   },
 ]
+
+// Guides (content/guides/*/index.html) are discovered dynamically rather than
+// hard-coded in PAGES, so every newly authored guide is automatically covered by
+// the citation gate (R2-1). Guides emit `:cite[path:line]` as <span class="fp"
+// data-path="…"> markup, so they use the `fp` extraction strategy.
+export function discoverGuidePages(guidesDir, repoRoot = REPO_ROOT) {
+  if (!fs.existsSync(guidesDir)) return []
+  const out = []
+  for (const entry of fs.readdirSync(guidesDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue
+    const indexHtml = path.join(guidesDir, entry.name, 'index.html')
+    if (!fs.existsSync(indexHtml)) continue
+    out.push({
+      name: `guide:${entry.name}`,
+      path: path.relative(repoRoot, indexHtml),
+      fp: true,
+      fileMap: false,
+      text: false,
+      rebake: null,
+    })
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name))
+}
 
 const esc = (s) => s.replace(/[.+*?^${}()|[\]\\]/g, '\\$&')
 
@@ -201,35 +225,41 @@ function rebakeNoop(page) {
   }
 }
 
-let failed = false
-for (const page of PAGES) {
-  const abs = path.join(REPO_ROOT, page.path)
-  if (!fs.existsSync(abs)) {
-    console.log(`\n${page.name}: SKIP — ${page.path} not found`)
-    continue
+function main() {
+  let failed = false
+  const pages = [...PAGES, ...discoverGuidePages(path.join(REPO_ROOT, 'content/guides'), REPO_ROOT)]
+  for (const page of pages) {
+    const abs = path.join(REPO_ROOT, page.path)
+    if (!fs.existsSync(abs)) {
+      console.log(`\n${page.name}: SKIP — ${page.path} not found`)
+      continue
+    }
+    const html = fs.readFileSync(abs, 'utf8')
+    const cites = collect(html, page)
+    const { drifts, missing } = validate(cites)
+    const rebake = rebakeNoop(page)
+    const ok = cites.size - drifts.length - missing.length
+
+    console.log(`\n${page.name} (${page.path})`)
+    console.log(
+      `  ${cites.size} citations · ${ok} ok · ${drifts.length} out-of-range · ${missing.length} missing` +
+        (page.rebake ? ` · rebake ${rebake.ok ? 'clean' : 'DRIFT'}` : ''),
+    )
+    for (const d of drifts) console.log(`  out-of-range: ${d}`)
+    for (const m of missing) console.log(`  missing: ${m}`)
+    for (const n of rebake.notes) console.log(`  ${n}`)
+
+    if (drifts.length || missing.length || !rebake.ok) failed = true
   }
-  const html = fs.readFileSync(abs, 'utf8')
-  const cites = collect(html, page)
-  const { drifts, missing } = validate(cites)
-  const rebake = rebakeNoop(page)
-  const ok = cites.size - drifts.length - missing.length
 
-  console.log(`\n${page.name} (${page.path})`)
-  console.log(
-    `  ${cites.size} citations · ${ok} ok · ${drifts.length} out-of-range · ${missing.length} missing` +
-      (page.rebake ? ` · rebake ${rebake.ok ? 'clean' : 'DRIFT'}` : ''),
-  )
-  for (const d of drifts) console.log(`  out-of-range: ${d}`)
-  for (const m of missing) console.log(`  missing: ${m}`)
-  for (const n of rebake.notes) console.log(`  ${n}`)
-
-  if (drifts.length || missing.length || !rebake.ok) failed = true
+  if (failed) {
+    console.log('\nLine-citation checks only verify the line exists, not that it still')
+    console.log('points at the right symbol — semantic drift needs manual review.')
+    process.exit(1)
+  }
+  console.log('\nAll reference-page citations resolve.')
+  process.exit(0)
 }
 
-if (failed) {
-  console.log('\nLine-citation checks only verify the line exists, not that it still')
-  console.log('points at the right symbol — semantic drift needs manual review.')
-  process.exit(1)
-}
-console.log('\nAll reference-page citations resolve.')
-process.exit(0)
+const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+if (isMain) main()
