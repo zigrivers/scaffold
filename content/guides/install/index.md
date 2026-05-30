@@ -22,8 +22,9 @@ Maintainers releasing Scaffold itself follow a separate flow in
 
 :::callout{type=note}
 **Prerequisite — Node.js 18.17+.** The CLI requires Node.js `>=18.17.0`
-(:cite[package.json:34]). The Homebrew formula bundles its own runtime; the npm
-install uses your system Node.
+(:cite[package.json:34]). The Homebrew formula installs and manages Node as a
+dependency, so you don't install Node separately; the npm install uses your
+system Node.
 :::
 
 ## Installing
@@ -44,8 +45,8 @@ system Node and updates with `npm update -g`.
 brew tap zigrivers/scaffold
 brew install scaffold
 ```
-The formula bundles a runtime, so no separate Node install is needed. Verify
-with `scaffold version`.
+The formula installs and manages Node as a dependency, so no separate Node
+install is needed. Verify with `scaffold version`.
 :::
 :::tab{title=Claude Code plugin}
 Inside a Claude Code session:
@@ -72,6 +73,11 @@ running the install for you — Homebrew installs map to `brew upgrade scaffold`
 `npm update -g @zigrivers/scaffold` (:cite[src/cli/commands/update.ts:51]), and
 anything else falls back to `npx @zigrivers/scaffold@latest`
 (:cite[src/cli/commands/update.ts:55]).
+
+The Homebrew command it prints is exactly `brew upgrade scaffold` — it does
+**not** include the `brew update` prefix. Homebrew users must prepend it
+themselves and run `brew update && brew upgrade scaffold`, or the upgrade can
+silently no-op against a stale tap cache (see the danger callout below).
 
 Run the upgrade for your channel:
 
@@ -150,8 +156,10 @@ up the pipeline at the first incomplete step.
 
 :::callout{type=tip}
 **`scaffold: command not found` after npm install.** Your global npm `bin`
-directory isn't on `PATH`. Check it with `npm bin -g` and add that directory to
-your shell `PATH`, or reinstall with a prefix that's already on `PATH`.
+directory isn't on `PATH`. Find it with `echo "$(npm prefix -g)/bin"` (the
+binaries live in the `bin` subdirectory of `npm prefix -g`) and add that
+directory to your shell `PATH`, or reinstall with a prefix that's already on
+`PATH`.
 :::
 
 - **Homebrew says "already installed" after a release.** You skipped
@@ -161,7 +169,8 @@ your shell `PATH`, or reinstall with a prefix that's already on `PATH`.
   version, Node version, platform, and the latest registry version side by
   side. If two installs collide (e.g. both npm-global and Homebrew), remove one.
 - **Node too old.** The CLI needs Node 18.17+ (:cite[package.json:34]). Upgrade
-  Node, or use the Homebrew install, which bundles its own runtime.
+  Node, or use the Homebrew install, which installs and manages Node as a
+  dependency.
 - **`scaffold update` only prints a command.** That's intentional — it never
   runs installs for you. Copy the printed upgrade command for your channel and
   run it yourself.

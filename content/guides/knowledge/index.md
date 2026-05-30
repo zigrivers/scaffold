@@ -40,8 +40,8 @@ the step's Knowledge Base section.
 flowchart TB
   STEP["pipeline step
 frontmatter: knowledge-base: [names]"] --> SELECT
-  OVERLAY["overlay.knowledge[step]
-(optional override)"] --> SELECT
+  OVERLAY["resolved overlay.knowledge[step]
+(or step frontmatter)"] --> SELECT
   SELECT["loadEntries(index, names)"] --> RENDER
   INDEX["buildIndexWithOverrides
 global + .scaffold/knowledge"] --> SELECT
@@ -108,7 +108,7 @@ Use the `scaffold knowledge` subcommands to inspect and manage the effective set
 | `scaffold knowledge list` | List every entry — global plus local overrides — with a `global` / `local override` source label and description. `--format json` for machine output. | :cite[src/cli/commands/knowledge.ts:45] |
 | `scaffold knowledge show <name>` | Print the *effective* content of an entry (the local override if present, else the global entry), prefixed with its source path. | :cite[src/cli/commands/knowledge.ts:109] |
 | `scaffold knowledge reset <name>` | Remove a local override, reverting to the global entry. Refuses to delete a dirty override unless `--auto` is passed. | :cite[src/cli/commands/knowledge.ts:167] |
-| `scaffold knowledge update <target> [instructions..]` | Assemble a knowledge-update prompt for one entry or every entry in a pipeline step (`--step`). | :cite[src/cli/commands/knowledge.ts:251] |
+| `scaffold knowledge update <target> [instructions..]` | Assemble a knowledge-update prompt for one entry or every entry in a pipeline step (`--step`). Unlike the other subcommands, it resolves targets from the **global** KB index and reads step lists from **base step frontmatter** — not local-only overrides or pipeline overlays. | :cite[src/cli/commands/knowledge.ts:251] |
 :::
 
 To author a local override, create `.scaffold/knowledge/<category>/<name>.md`
@@ -144,7 +144,7 @@ or the `scaffold knowledge` subcommands. Its three-tier resolution
 5. **Wire it into a step** by adding the `name` to that pipeline step's
    `knowledge-base:` frontmatter list (or a pipeline overlay).
 6. **Validate**: `make validate-knowledge` runs the frontmatter validator over
-   every entry (:cite[src/cli/commands/validate-knowledge.ts:21]).
+   every entry (:cite[src/cli/commands/validate-knowledge.ts:20]).
 
 ### Frontmatter fields
 
@@ -159,7 +159,7 @@ Only `name` is strictly required for an entry to be indexed at all
 | --- | --- | --- | --- |
 | `name` | yes | `/^[a-z][a-z0-9-]*$/` (must start with a letter) | The index key. Steps reference entries by this. An entry with no `name` is silently dropped from the index. |
 | `description` | yes | string | Rendered into the `## <name>: <description>` heading at injection. The validator warns past ~200 chars but does not fail. |
-| `topics` | no | string[] (default `[]`) | Free-form tags used for discovery/auto-selection. |
+| `topics` | no | string[] (default `[]`) | Free-form tags carried as discovery and audit metadata. They are parsed and stored on the entry but do **not** drive selection — injection is always by explicit `name` (see above). |
 | `volatility` | no | `stable｜evolving｜fast-moving` (default `evolving`) | Drives the freshness cadence — see the freshness guide. |
 | `last-reviewed` | no | `YYYY-MM-DD` or `null` | ISO date; unquoted dates are coerced to strings. Audited entries advance this on a `current`/drift verdict. |
 | `version-pin` | no | string or `null` | Pins the entry to an edition (e.g. `"OWASP Top 10 2021"`). |

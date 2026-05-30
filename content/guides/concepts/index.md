@@ -82,8 +82,9 @@ actually writing code. See [the pipeline guide](../pipeline/index.md#the-mental-
 
 ### `dependencies` (hard gate)
 A step's frontmatter `dependencies` :cite[src/types/frontmatter.ts:114] are
-**hard gates**: `scaffold run` refuses a step whose dependencies aren't
-`completed` or `skipped`. Contrast `reads`. See
+**hard gates**: `scaffold run` refuses a step until each dependency is
+`completed`, `skipped`, or disabled by the resolved pipeline/overlay (a disabled
+dep counts as satisfied). Contrast `reads`. See
 [Why a step is blocked](../pipeline/index.md#why-a-step-is-blocked).
 
 ### `reads` (soft reference)
@@ -116,20 +117,22 @@ is what makes planning phases safe to iterate. See
 ### Methodology preset
 *Which* steps are enabled. Three presets ship — `mvp`, `custom` (balanced), and
 `deep` (the schema default and most thorough). Presets are layered with
-**overlays**. See [Methodology & depth](../pipeline/index.md#methodology--depth).
+**overlays**. See [Methodology & depth](../pipeline/index.md#methodology-depth).
 
 ### Depth (1–5)
 *How thorough* each enabled step's output is, on a 1–5 scale from Minimal to
 Exhaustive (depth 3 is the recommended default). Orthogonal to the preset:
 the preset picks the steps, depth dials each one's detail. At depth 4–5 some
 review/validation steps add external- or multi-model dispatch. See
-[Depth](../pipeline/index.md#depth-1-5).
+[Depth](../pipeline/index.md#depth-15).
 
 ### Overlay
-A project-type layer (`content/methodology/*-overlay.yml`) applied on top of a
-preset. Most overlays only **inject domain knowledge** into existing steps
-(web-app, mobile, CLI, library); a few **enable whole step families** (game,
-multi-service). See
+A preset layer (`content/methodology/*-overlay.yml`) applied on top of a
+preset. Overlays are either **project-type** (keyed by `project-type`, e.g.
+web-app, mobile, CLI, library) or **structural** (e.g. `multi-service`, which
+has no `project-type` and is activated by the presence of `services[]` in
+config). Most overlays only **inject domain knowledge** into existing steps; a
+few **enable whole step families** (game, multi-service). See
 [Project-type playbooks](../pipeline/index.md#project-type-playbooks).
 
 ## Observability concepts
@@ -167,7 +170,7 @@ consistency, and knowledge gaps. Lenses A–G run under `--scope code`, H and I
 under `--scope docs`. See
 [The nine-lens audit](../observability/index.md#the-nine-lens-audit). **Lens I**
 (`I-knowledge-gaps`) lives in the audit but reasons about the knowledge base —
-its full behavior is in [the knowledge-freshness guide](../knowledge-freshness/index.md#lens-i-gap-detection--suppression).
+its full behavior is in [the knowledge-freshness guide](../knowledge-freshness/index.md#lens-i-gap-detection-suppression).
 
 ### Finding
 A single issue a lens reports, carrying a severity (`P0`–`P3`), a title, a
@@ -189,8 +192,8 @@ The severity cutoff that decides which findings count as *blocking*. A finding
 blocks when its status is `open` and its severity is at or above the threshold
 (default **P2**). The threshold never hides findings — it only decides which
 ones drive a `blocked` verdict. The same name and default govern the MMR gate.
-See [`fix_threshold`](../observability/index.md#fix_threshold) and the
-[MMR gate](../mmr/index.md#the-gate--the-four-verdicts).
+See [`fix_threshold`](../observability/index.md#verdict-taxonomy) and the
+[MMR gate](../mmr/index.md#the-gate-the-four-verdicts).
 
 ### `--fix` flow
 `scaffold observe audit --fix` doesn't just report blocking findings — it
@@ -204,7 +207,7 @@ A staleness alert raised on the "Needs Attention" surface when
 a PR that hasn't merged, an unaddressed blocker. Six signals are defined; five
 fire today. Thresholds are configurable under `stall:` in
 `.scaffold/observability.yaml`. See
-[Stall detection](../observability/index.md#stall-detection--the-six-signals).
+[Stall detection](../observability/index.md#stall-detection-the-six-signals).
 
 ### Phase-boundary audit
 A non-gating cross-document audit that fires automatically when a planning
@@ -267,7 +270,7 @@ not per-channel code. See [Channel architecture](../mmr/index.md#channel-archite
 When a channel is degraded (not installed, auth-failed, timed out), MMR runs a
 `claude -p` pass focused on that channel's strength area, labeled e.g.
 `[compensating: Grok-equivalent]`. These findings are single-source and
-low-confidence. See [Degraded mode](../mmr/index.md#degraded-mode-compensation--auth).
+low-confidence. See [Degraded mode](../mmr/index.md#degraded-mode-compensation-auth).
 
 ### Reconcile
 The step that groups every channel's findings by a stable key, de-duplicates
@@ -275,14 +278,14 @@ them, and scores each group for agreement and confidence — producing the singl
 list and verdict. Agreement *between* channels raises confidence; disagreement
 surfaces ambiguity. `mmr reconcile` also folds an external agent channel's
 findings into an existing job. See
-[Findings, reconciliation & verdicts](../mmr/index.md#findings-reconciliation--verdicts).
+[Findings, reconciliation & verdicts](../mmr/index.md#findings-reconciliation-verdicts).
 
 ### `finding_key`
 The stable identity MMR computes for a finding so the same issue can be tracked
 across rounds and acknowledgments. Line numbers are stripped from the location
 and severity is excluded, so the same issue at P1 vs. P2 collapses to one key;
 a character-5-gram shingle backs a fuzzy match for re-worded findings. See
-[Stable identity](../mmr/index.md#stable-identity-finding_key).
+[Stable identity](../mmr/index.md#stable-identity-finding-key).
 
 ### MMR verdict
 The gate result of a review. MMR computes **four** verdicts: `pass`,
@@ -294,7 +297,7 @@ Proceed only on `pass` or `degraded-pass`.
 *four* verdicts (the fourth, `needs-user-decision`, fires when no channel
 completes). The Build Observability audit engine emits only *three* —
 `needs-user-decision` is **not** an audit-engine verdict. See
-[the MMR gate](../mmr/index.md#the-gate--the-four-verdicts) and
+[the MMR gate](../mmr/index.md#the-gate-the-four-verdicts) and
 [the audit verdict taxonomy](../observability/index.md#verdict-taxonomy).
 :::
 
@@ -320,16 +323,18 @@ every event's `worktree_id`. See
 ### Ledger harvest
 Copying a worktree's local ledger into the primary repo's archive *before* the
 worktree is removed, so the build's reasoning survives teardown.
-`harvest --recover` separately sweeps up ledgers whose worktrees vanished
-without being harvested. See
-[Harvest, recover & teardown](../observability/index.md#harvest-recover--teardown).
+`harvest --recover` separately rotates already-harvested stale entries from
+`.scaffold/activity-archive/active/` into the monthly `YYYY-MM.jsonl` archives
+when their worktree is no longer live — it does **not** rescue an unharvested
+ledger; that ledger is lost once the worktree is removed. See
+[Harvest, recover & teardown](../observability/index.md#harvest-recover-teardown).
 
 ### Teardown
 Removing a finished worktree the safe way — `scripts/teardown-agent-worktree.sh`
 harvests the ledger first, then runs `git worktree remove`, then deletes the
 workspace branch. Harvesting before removal is what closes the
 decisions-die-at-teardown gap. See
-[Harvest, recover & teardown](../observability/index.md#harvest-recover--teardown).
+[Harvest, recover & teardown](../observability/index.md#harvest-recover-teardown).
 
 ## See also
 

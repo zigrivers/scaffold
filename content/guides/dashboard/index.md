@@ -8,27 +8,35 @@ order: 50
 
 ## What the dashboard is
 
-The dashboard is a single, self-contained HTML file that visualizes where a
-Scaffold build stands: which pipeline steps are done, what to run next, the
-in-flight Beads tasks, and — when Build Observability is wired up — live
-build-progress and audit panels. Everything is inlined (CSS, JS, data); there
-are no CDN fonts, stylesheets, or scripts, so the file works offline and renders
-identically wherever you open it.
+Each dashboard is a single, self-contained HTML file that visualizes where a
+Scaffold build stands: which pipeline steps are done and what to run next.
+Everything is inlined (CSS, JS, data); there are no CDN fonts, stylesheets, or
+scripts, so the file works offline and renders identically wherever you open it.
 
-Open it with `scaffold dashboard`. The CLI assembles the dashboard data, writes
-the HTML to a temp file (or `--output <path>`), and opens it in your system
-browser via `open` / `xdg-open` / `start`
-(:cite[src/cli/commands/dashboard.ts:64-66]). The companion generator —
-`scripts/generate-dashboard.sh` — produces the same surface and additionally
-injects the two Build-Observability panels; it is what `make dashboard-test`
-runs so you can verify rendering before shipping a change.
+:::callout{type=warning}
+**Two different producers — this guide documents the bash generator.** Scaffold
+has two distinct dashboard surfaces that do **not** share markup, CSS, or
+features:
 
-:::callout{type=note}
-**Two producers, one design system.** The TypeScript `scaffold dashboard`
-command and the bash `scripts/generate-dashboard.sh` both emit the same markup
-and both embed `lib/dashboard-theme.css`. This guide cites the bash generator for
-panel structure and inline JS because it is the visual-test entry point; the
-design tokens it relies on are defined once in `lib/dashboard-theme.css`.
+- **`scaffold dashboard`** (the user-facing CLI) renders HTML from
+  `src/dashboard/template.ts` + `generator.ts`. It has its own inline `<style>`
+  block (classes like `.container`, `.phase-header`, `.summary-cards`), a
+  **Decision Log** section, and standalone-command cards. It does **not** read
+  `lib/dashboard-theme.css`, has **no** Beads task section, and does **not**
+  inject the Build-Observability panels. The CLI writes the HTML to a temp file
+  (or `--output <path>`) and opens it via `open` / `xdg-open` / `start`
+  (:cite[src/cli/commands/dashboard.ts:64-66]).
+- **`scripts/generate-dashboard.sh`** is the visual-test fixture that
+  `make dashboard-test` runs. It embeds `lib/dashboard-theme.css`, renders a
+  Beads task section, and injects the two Build-Observability panels. Its
+  classes (`.phase-hdr`, `.pcard`, `.beads-section`) and design tokens are
+  exclusive to this surface.
+
+The rest of this guide documents the **`scripts/generate-dashboard.sh`**
+surface — the one used for visual verification and the one that carries the
+`lib/dashboard-theme.css` token system. The panels, classes, design tokens, and
+inline JS described below belong to that generator, **not** to the
+`scaffold dashboard` CLI command.
 :::
 
 ## Reading the dashboard
@@ -44,7 +52,7 @@ the header down:
 | Summary cards | `.cards`, `.card`, `.card-num` | Counts: completed, likely, skipped, pending, total, Beads-open |
 | What's Next | `.next-banner`, `.next-cmd` | The recommended next command, with a copy button |
 | Phases | `.phase`, `.phase-hdr`, `.pcard` | Collapsible phase sections, one prompt card per step |
-| Beads Tasks | `.beads-section`, `.beads-filter` | Filterable task list (status + priority), cards open a detail modal |
+| Beads Tasks | `.beads-section`, `.beads-filters` (container), `.beads-filter` (buttons) | Filterable task list (status + priority), cards open a detail modal |
 | Build Progress / Audit | `#build-progress`, `#build-audit` | The two Build-Observability panels (only when populated) |
 
 The header, legend, progress bar, summary cards, and What's Next banner are all
@@ -85,9 +93,13 @@ functions are inlined at the foot of the generated HTML:
   `filterBeadsPrio()` toggles priority filters; cards carry `data-bead-status`
   and `data-bead-priority` so the filters can show/hide them
   (:cite[scripts/generate-dashboard.sh:733-741]).
-- **Task / prompt detail modals** — `openBeadModal(id)` builds a
-  `.modal-overlay` detail view for a task; close via the X, Escape, or a
-  backdrop click.
+- **Beads task detail modal** — `openBeadModal(id)` builds a `.modal-overlay`
+  detail view for a Beads task (status, priority, deps, timestamps); close via
+  the X, Escape, or a backdrop click
+  (:cite[scripts/generate-dashboard.sh:756-816]).
+- **Prompt detail modal** — clicking a prompt card calls `openModal(slug)`,
+  which renders the full prompt content for that pipeline step in the same
+  `.modal-overlay` shell (:cite[scripts/generate-dashboard.sh:693-710]).
 - **Audit finding filters** — on load, `initAuditFilters()` finds the
   `#build-audit` section, reads its `data-threshold`, and wires the
   `[data-filter]` buttons to show/hide `.finding` rows by severity rank
@@ -95,10 +107,15 @@ functions are inlined at the foot of the generated HTML:
 
 ## The design-token system
 
-Every color, space, size, and radius the dashboard uses is a CSS custom property
-defined in `lib/dashboard-theme.css`. Component styles reference tokens via
-`var(--token)` and never hardcode raw values — that is what keeps light and dark
-mode in lockstep and the surface coherent.
+`lib/dashboard-theme.css` defines a shared set of CSS custom properties for
+colors, spacing, sizes, and radii. Component styles should prefer these tokens
+via `var(--token)` — that is what keeps light and dark mode in lockstep and the
+surface coherent. The contract is "prefer tokens," not "tokens only": the file
+still contains some component-level raw values (e.g. `#fff`, gradient stop hex
+colors, `rgba(...)`, and a few one-off pixel values like `99px`, `720px`, and
+`130px`). Promote a raw value to a token when it needs light/dark parity or
+reuse; leave genuinely one-off structural values inline rather than minting a
+single-use token.
 
 ### Colors — light + dark parity
 
@@ -127,6 +144,15 @@ lighter for contrast on dark surfaces.
 Each status color (`--green`, `--blue`, `--yellow`, `--gray`) also has `-bg` and
 `-border` companions used by badges and status dots, so a status reads correctly
 on both card and inset surfaces.
+
+:::callout{type=note}
+The table above is a high-level subset of the most visible status and surface
+tokens — not the complete set. `lib/dashboard-theme.css` (and
+`docs/design-system.md` §2) also define many component-specific semantic tokens
+such as `--bg-hover`, `--text-faint`, the `--next-*`, `--progress-*`,
+`--shadow-*`, `--accent-hover` / `--accent-glow`, and `--border-light`. Consult
+the CSS file and §2 for the full system.
+:::
 
 ### Spacing — the `--sp-*` scale
 
@@ -161,13 +187,16 @@ with `--shadow-lg` reserved for modals and overlays
 ## Customizing the dashboard safely
 
 The dashboard's coherence is enforced by convention, not by a build step — so the
-rules in `docs/design-system.md` are load-bearing. Follow the documented add-a-
-token / add-a-component flow and stay inside the token system.
+rules in `docs/design-system.md` are load-bearing (with the §6.1 caveat noted
+below). Follow the add-a-token / add-a-component flow and stay inside the token
+system.
 
 :::callout{type=warning}
-**Two rules that are never optional.** (1) **Use only defined tokens** — never
-hardcode a hex color, pixel value, or font name in a component style; if you need
-a value that doesn't exist, add a *token* first. (2) **Always ship both modes** —
+**Two rules that are never optional.** (1) **Prefer tokens for anything that
+needs light/dark parity** — never hardcode a color, theme-dependent value, or
+font name in a component style; if you need a value that doesn't exist, add a
+*token* first. (Purely structural one-offs may stay inline — see the token
+section above.) (2) **Always ship both modes** —
 every new color token needs a `:root` value *and* a `[data-theme="dark"]`
 override, and every change must be checked in light *and* dark. Skipping the dark
 override leaves the token undefined in dark mode and breaks the surface.
@@ -175,8 +204,11 @@ override leaves the token undefined in dark mode and breaks the surface.
 
 To add a token: declare it on `:root` in the light section of
 `lib/dashboard-theme.css`, add the dark override under `[data-theme="dark"]`,
-document both values in `docs/design-system.md` §2, then reference it as
-`var(--token)`. To add a component: add its styles to the right section of the
+then reference it as `var(--token)`. Note that `docs/design-system.md` §6.1 is
+stale here — it still says to add the dark override to a
+`@media (prefers-color-scheme: dark)` block, but no such block exists in
+`lib/dashboard-theme.css`; the dark tokens live only under the `[data-theme="dark"]`
+attribute selector. Follow the code, not §6.1. To add a component: add its styles to the right section of the
 theme file, reuse existing tokens (add new ones first if needed), wire its markup
 into the generator JS, and document it in §3. New components should reuse
 established patterns — for example, collapsible sections reuse the same
@@ -186,9 +218,11 @@ reuse `.modal-overlay`.
 Also avoid: `!important` (restructure selectors instead), any second theme
 mechanism (the `[data-theme]` toggle is the only one), and external resource
 references — the generated HTML must stay self-contained. Dark mode is driven by
-the inline bootstrap that reads `localStorage('scaffold-theme')`, falling back to
-`prefers-color-scheme` on first visit (:cite[scripts/generate-dashboard.sh:438]),
-and the `.theme-toggle` button flips and persists the choice
+the inline bootstrap that reads `localStorage.getItem('scaffold-theme')`, falling
+back to `prefers-color-scheme` on first visit
+(:cite[scripts/generate-dashboard.sh:438]), and the `.theme-toggle` button flips
+the `[data-theme]` attribute and persists the choice via
+`localStorage.setItem('scaffold-theme', …)`
 (:cite[scripts/generate-dashboard.sh:817-823]).
 
 ## Visual testing
@@ -205,7 +239,13 @@ make dashboard-test   # writes tests/screenshots/dashboard-test.html
 
 Then drive Playwright MCP over the generated file: `browser_navigate` to its
 `file://` path, `browser_resize` to 1280×800 then 375×812, take a
-`browser_take_screenshot` at each, emulate dark mode and repeat, exercise the
+`browser_take_screenshot` at each. For dark mode, don't rely on emulating
+`prefers-color-scheme` after the page has loaded — the inline bootstrap reads it
+only once, so the page stays on whatever `[data-theme]` is already set. Instead,
+either set `localStorage('scaffold-theme', 'dark')` and reload, or click the
+`.theme-toggle` button; then confirm
+`document.documentElement.dataset.theme === 'dark'` **before** capturing the
+dark screenshots (and clear/set the key back for light shots). Also exercise the
 interactive bits (expand/collapse a phase, a Beads filter, a modal), and
 `browser_snapshot` to sanity-check accessibility.
 

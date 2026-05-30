@@ -1090,24 +1090,31 @@ figure.mermaid svg .edgeLabel text { fill: var(--text-muted); color: var(--text-
 <div class="layout">
   <aside class="rail"><nav class="toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#what-the-dashboard-is">What the dashboard is</a></li><li class="toc-2"><a href="#reading-the-dashboard">Reading the dashboard</a></li><li class="toc-3"><a href="#the-build-observability-panels">The Build-Observability panels</a></li><li class="toc-3"><a href="#filters-and-modals-the-inline-js">Filters and modals (the inline JS)</a></li><li class="toc-2"><a href="#the-design-token-system">The design-token system</a></li><li class="toc-3"><a href="#colors-light-dark-parity">Colors — light + dark parity</a></li><li class="toc-3"><a href="#spacing-the---sp--scale">Spacing — the --sp-* scale</a></li><li class="toc-3"><a href="#typography-radius-layout">Typography, radius &amp; layout</a></li><li class="toc-2"><a href="#customizing-the-dashboard-safely">Customizing the dashboard safely</a></li><li class="toc-2"><a href="#visual-testing">Visual testing</a></li></ul></nav></aside>
   <main class="content"><h2 id="what-the-dashboard-is">What the dashboard is</h2>
-<p>The dashboard is a single, self-contained HTML file that visualizes where a
-Scaffold build stands: which pipeline steps are done, what to run next, the
-in-flight Beads tasks, and — when Build Observability is wired up — live
-build-progress and audit panels. Everything is inlined (CSS, JS, data); there
-are no CDN fonts, stylesheets, or scripts, so the file works offline and renders
-identically wherever you open it.</p>
-<p>Open it with <code>scaffold dashboard</code>. The CLI assembles the dashboard data, writes
-the HTML to a temp file (or <code>--output &#x3C;path></code>), and opens it in your system
-browser via <code>open</code> / <code>xdg-open</code> / <code>start</code>
-(<span class="fp" data-path="src/cli/commands/dashboard.ts:64-66">src/cli/commands/dashboard.ts:64-66</span>). The companion generator —
-<code>scripts/generate-dashboard.sh</code> — produces the same surface and additionally
-injects the two Build-Observability panels; it is what <code>make dashboard-test</code>
-runs so you can verify rendering before shipping a change.</p>
-<div class="callout callout-note"><p><strong>Two producers, one design system.</strong> The TypeScript <code>scaffold dashboard</code>
-command and the bash <code>scripts/generate-dashboard.sh</code> both emit the same markup
-and both embed <code>lib/dashboard-theme.css</code>. This guide cites the bash generator for
-panel structure and inline JS because it is the visual-test entry point; the
-design tokens it relies on are defined once in <code>lib/dashboard-theme.css</code>.</p></div>
+<p>Each dashboard is a single, self-contained HTML file that visualizes where a
+Scaffold build stands: which pipeline steps are done and what to run next.
+Everything is inlined (CSS, JS, data); there are no CDN fonts, stylesheets, or
+scripts, so the file works offline and renders identically wherever you open it.</p>
+<div class="callout callout-warning"><p><strong>Two different producers — this guide documents the bash generator.</strong> Scaffold
+has two distinct dashboard surfaces that do <strong>not</strong> share markup, CSS, or
+features:</p><ul>
+<li><strong><code>scaffold dashboard</code></strong> (the user-facing CLI) renders HTML from
+<code>src/dashboard/template.ts</code> + <code>generator.ts</code>. It has its own inline <code>&#x3C;style></code>
+block (classes like <code>.container</code>, <code>.phase-header</code>, <code>.summary-cards</code>), a
+<strong>Decision Log</strong> section, and standalone-command cards. It does <strong>not</strong> read
+<code>lib/dashboard-theme.css</code>, has <strong>no</strong> Beads task section, and does <strong>not</strong>
+inject the Build-Observability panels. The CLI writes the HTML to a temp file
+(or <code>--output &#x3C;path></code>) and opens it via <code>open</code> / <code>xdg-open</code> / <code>start</code>
+(<span class="fp" data-path="src/cli/commands/dashboard.ts:64-66">src/cli/commands/dashboard.ts:64-66</span>).</li>
+<li><strong><code>scripts/generate-dashboard.sh</code></strong> is the visual-test fixture that
+<code>make dashboard-test</code> runs. It embeds <code>lib/dashboard-theme.css</code>, renders a
+Beads task section, and injects the two Build-Observability panels. Its
+classes (<code>.phase-hdr</code>, <code>.pcard</code>, <code>.beads-section</code>) and design tokens are
+exclusive to this surface.</li>
+</ul><p>The rest of this guide documents the <strong><code>scripts/generate-dashboard.sh</code></strong>
+surface — the one used for visual verification and the one that carries the
+<code>lib/dashboard-theme.css</code> token system. The panels, classes, design tokens, and
+inline JS described below belong to that generator, <strong>not</strong> to the
+<code>scaffold dashboard</code> CLI command.</p></div>
 <h2 id="reading-the-dashboard">Reading the dashboard</h2>
 <p>The page is built top-to-bottom by the inline renderer in the generator. From
 the header down:</p>
@@ -1161,7 +1168,7 @@ the header down:</p>
 
 
 
-<table><thead><tr><th>Region</th><th>Classes</th><th>What it shows</th></tr></thead><tbody><tr><td>Header</td><td><code>.header</code>, <code>.header-meta</code>, <code>.theme-toggle</code></td><td>Title, profile badge, project name + timestamp, light/dark toggle</td></tr><tr><td>Status legend</td><td><code>.status-legend</code></td><td>The four pipeline status badges (Done / Likely Done / Skipped / Pending)</td></tr><tr><td>Progress bar</td><td><code>.progress-bar</code>, <code>.seg-done</code>, <code>.seg-likely</code>, <code>.seg-skip</code></td><td>Proportional completion rail</td></tr><tr><td>Summary cards</td><td><code>.cards</code>, <code>.card</code>, <code>.card-num</code></td><td>Counts: completed, likely, skipped, pending, total, Beads-open</td></tr><tr><td>What's Next</td><td><code>.next-banner</code>, <code>.next-cmd</code></td><td>The recommended next command, with a copy button</td></tr><tr><td>Phases</td><td><code>.phase</code>, <code>.phase-hdr</code>, <code>.pcard</code></td><td>Collapsible phase sections, one prompt card per step</td></tr><tr><td>Beads Tasks</td><td><code>.beads-section</code>, <code>.beads-filter</code></td><td>Filterable task list (status + priority), cards open a detail modal</td></tr><tr><td>Build Progress / Audit</td><td><code>#build-progress</code>, <code>#build-audit</code></td><td>The two Build-Observability panels (only when populated)</td></tr></tbody></table>
+<table><thead><tr><th>Region</th><th>Classes</th><th>What it shows</th></tr></thead><tbody><tr><td>Header</td><td><code>.header</code>, <code>.header-meta</code>, <code>.theme-toggle</code></td><td>Title, profile badge, project name + timestamp, light/dark toggle</td></tr><tr><td>Status legend</td><td><code>.status-legend</code></td><td>The four pipeline status badges (Done / Likely Done / Skipped / Pending)</td></tr><tr><td>Progress bar</td><td><code>.progress-bar</code>, <code>.seg-done</code>, <code>.seg-likely</code>, <code>.seg-skip</code></td><td>Proportional completion rail</td></tr><tr><td>Summary cards</td><td><code>.cards</code>, <code>.card</code>, <code>.card-num</code></td><td>Counts: completed, likely, skipped, pending, total, Beads-open</td></tr><tr><td>What's Next</td><td><code>.next-banner</code>, <code>.next-cmd</code></td><td>The recommended next command, with a copy button</td></tr><tr><td>Phases</td><td><code>.phase</code>, <code>.phase-hdr</code>, <code>.pcard</code></td><td>Collapsible phase sections, one prompt card per step</td></tr><tr><td>Beads Tasks</td><td><code>.beads-section</code>, <code>.beads-filters</code> (container), <code>.beads-filter</code> (buttons)</td><td>Filterable task list (status + priority), cards open a detail modal</td></tr><tr><td>Build Progress / Audit</td><td><code>#build-progress</code>, <code>#build-audit</code></td><td>The two Build-Observability panels (only when populated)</td></tr></tbody></table>
 <p>The header, legend, progress bar, summary cards, and What's Next banner are all
 emitted in sequence by the renderer (<span class="fp" data-path="scripts/generate-dashboard.sh:505-544">scripts/generate-dashboard.sh:505-544</span>).</p>
 <h3 id="the-build-observability-panels">The Build-Observability panels</h3>
@@ -1193,19 +1200,28 @@ sibling list (<span class="fp" data-path="scripts/generate-dashboard.sh:825-828"
 <code>filterBeadsPrio()</code> toggles priority filters; cards carry <code>data-bead-status</code>
 and <code>data-bead-priority</code> so the filters can show/hide them
 (<span class="fp" data-path="scripts/generate-dashboard.sh:733-741">scripts/generate-dashboard.sh:733-741</span>).</li>
-<li><strong>Task / prompt detail modals</strong> — <code>openBeadModal(id)</code> builds a
-<code>.modal-overlay</code> detail view for a task; close via the X, Escape, or a
-backdrop click.</li>
+<li><strong>Beads task detail modal</strong> — <code>openBeadModal(id)</code> builds a <code>.modal-overlay</code>
+detail view for a Beads task (status, priority, deps, timestamps); close via
+the X, Escape, or a backdrop click
+(<span class="fp" data-path="scripts/generate-dashboard.sh:756-816">scripts/generate-dashboard.sh:756-816</span>).</li>
+<li><strong>Prompt detail modal</strong> — clicking a prompt card calls <code>openModal(slug)</code>,
+which renders the full prompt content for that pipeline step in the same
+<code>.modal-overlay</code> shell (<span class="fp" data-path="scripts/generate-dashboard.sh:693-710">scripts/generate-dashboard.sh:693-710</span>).</li>
 <li><strong>Audit finding filters</strong> — on load, <code>initAuditFilters()</code> finds the
 <code>#build-audit</code> section, reads its <code>data-threshold</code>, and wires the
 <code>[data-filter]</code> buttons to show/hide <code>.finding</code> rows by severity rank
 (<span class="fp" data-path="scripts/generate-dashboard.sh:839-863">scripts/generate-dashboard.sh:839-863</span>).</li>
 </ul>
 <h2 id="the-design-token-system">The design-token system</h2>
-<p>Every color, space, size, and radius the dashboard uses is a CSS custom property
-defined in <code>lib/dashboard-theme.css</code>. Component styles reference tokens via
-<code>var(--token)</code> and never hardcode raw values — that is what keeps light and dark
-mode in lockstep and the surface coherent.</p>
+<p><code>lib/dashboard-theme.css</code> defines a shared set of CSS custom properties for
+colors, spacing, sizes, and radii. Component styles should prefer these tokens
+via <code>var(--token)</code> — that is what keeps light and dark mode in lockstep and the
+surface coherent. The contract is "prefer tokens," not "tokens only": the file
+still contains some component-level raw values (e.g. <code>#fff</code>, gradient stop hex
+colors, <code>rgba(...)</code>, and a few one-off pixel values like <code>99px</code>, <code>720px</code>, and
+<code>130px</code>). Promote a raw value to a token when it needs light/dark parity or
+reuse; leave genuinely one-off structural values inline rather than minting a
+single-use token.</p>
 <h3 id="colors-light-dark-parity">Colors — light + dark parity</h3>
 <p>The light palette is declared on <code>:root</code> (<span class="fp" data-path="lib/dashboard-theme.css:11-35">lib/dashboard-theme.css:11-35</span>),
 and every color token has a matching override under <code>[data-theme="dark"]</code>
@@ -1293,6 +1309,12 @@ lighter for contrast on dark surfaces.</p>
 <p>Each status color (<code>--green</code>, <code>--blue</code>, <code>--yellow</code>, <code>--gray</code>) also has <code>-bg</code> and
 <code>-border</code> companions used by badges and status dots, so a status reads correctly
 on both card and inset surfaces.</p>
+<div class="callout callout-note"><p>The table above is a high-level subset of the most visible status and surface
+tokens — not the complete set. <code>lib/dashboard-theme.css</code> (and
+<code>docs/design-system.md</code> §2) also define many component-specific semantic tokens
+such as <code>--bg-hover</code>, <code>--text-faint</code>, the <code>--next-*</code>, <code>--progress-*</code>,
+<code>--shadow-*</code>, <code>--accent-hover</code> / <code>--accent-glow</code>, and <code>--border-light</code>. Consult
+the CSS file and §2 for the full system.</p></div>
 <h3 id="spacing-the---sp--scale">Spacing — the <code>--sp-*</code> scale</h3>
 <p>All spacing comes from an 8-step scale on a 4px base
 (<span class="fp" data-path="lib/dashboard-theme.css:63-71">lib/dashboard-theme.css:63-71</span>). There are no ad-hoc margins or paddings;
@@ -1361,18 +1383,24 @@ with <code>--shadow-lg</code> reserved for modals and overlays
 (<span class="fp" data-path="lib/dashboard-theme.css:61">lib/dashboard-theme.css:61</span>).</p>
 <h2 id="customizing-the-dashboard-safely">Customizing the dashboard safely</h2>
 <p>The dashboard's coherence is enforced by convention, not by a build step — so the
-rules in <code>docs/design-system.md</code> are load-bearing. Follow the documented add-a-
-token / add-a-component flow and stay inside the token system.</p>
-<div class="callout callout-warning"><p><strong>Two rules that are never optional.</strong> (1) <strong>Use only defined tokens</strong> — never
-hardcode a hex color, pixel value, or font name in a component style; if you need
-a value that doesn't exist, add a <em>token</em> first. (2) <strong>Always ship both modes</strong> —
+rules in <code>docs/design-system.md</code> are load-bearing (with the §6.1 caveat noted
+below). Follow the add-a-token / add-a-component flow and stay inside the token
+system.</p>
+<div class="callout callout-warning"><p><strong>Two rules that are never optional.</strong> (1) <strong>Prefer tokens for anything that
+needs light/dark parity</strong> — never hardcode a color, theme-dependent value, or
+font name in a component style; if you need a value that doesn't exist, add a
+<em>token</em> first. (Purely structural one-offs may stay inline — see the token
+section above.) (2) <strong>Always ship both modes</strong> —
 every new color token needs a <code>:root</code> value <em>and</em> a <code>[data-theme="dark"]</code>
 override, and every change must be checked in light <em>and</em> dark. Skipping the dark
 override leaves the token undefined in dark mode and breaks the surface.</p></div>
 <p>To add a token: declare it on <code>:root</code> in the light section of
 <code>lib/dashboard-theme.css</code>, add the dark override under <code>[data-theme="dark"]</code>,
-document both values in <code>docs/design-system.md</code> §2, then reference it as
-<code>var(--token)</code>. To add a component: add its styles to the right section of the
+then reference it as <code>var(--token)</code>. Note that <code>docs/design-system.md</code> §6.1 is
+stale here — it still says to add the dark override to a
+<code>@media (prefers-color-scheme: dark)</code> block, but no such block exists in
+<code>lib/dashboard-theme.css</code>; the dark tokens live only under the <code>[data-theme="dark"]</code>
+attribute selector. Follow the code, not §6.1. To add a component: add its styles to the right section of the
 theme file, reuse existing tokens (add new ones first if needed), wire its markup
 into the generator JS, and document it in §3. New components should reuse
 established patterns — for example, collapsible sections reuse the same
@@ -1381,9 +1409,11 @@ reuse <code>.modal-overlay</code>.</p>
 <p>Also avoid: <code>!important</code> (restructure selectors instead), any second theme
 mechanism (the <code>[data-theme]</code> toggle is the only one), and external resource
 references — the generated HTML must stay self-contained. Dark mode is driven by
-the inline bootstrap that reads <code>localStorage('scaffold-theme')</code>, falling back to
-<code>prefers-color-scheme</code> on first visit (<span class="fp" data-path="scripts/generate-dashboard.sh:438">scripts/generate-dashboard.sh:438</span>),
-and the <code>.theme-toggle</code> button flips and persists the choice
+the inline bootstrap that reads <code>localStorage.getItem('scaffold-theme')</code>, falling
+back to <code>prefers-color-scheme</code> on first visit
+(<span class="fp" data-path="scripts/generate-dashboard.sh:438">scripts/generate-dashboard.sh:438</span>), and the <code>.theme-toggle</code> button flips
+the <code>[data-theme]</code> attribute and persists the choice via
+<code>localStorage.setItem('scaffold-theme', …)</code>
 (<span class="fp" data-path="scripts/generate-dashboard.sh:817-823">scripts/generate-dashboard.sh:817-823</span>).</p>
 <h2 id="visual-testing">Visual testing</h2>
 <p>Reference guides are verified manually with a screenshot, and the dashboard
@@ -1395,7 +1425,13 @@ an agent driving Playwright MCP) confirms the rendering.</p>
 </code></pre>
 <p>Then drive Playwright MCP over the generated file: <code>browser_navigate</code> to its
 <code>file://</code> path, <code>browser_resize</code> to 1280×800 then 375×812, take a
-<code>browser_take_screenshot</code> at each, emulate dark mode and repeat, exercise the
+<code>browser_take_screenshot</code> at each. For dark mode, don't rely on emulating
+<code>prefers-color-scheme</code> after the page has loaded — the inline bootstrap reads it
+only once, so the page stays on whatever <code>[data-theme]</code> is already set. Instead,
+either set <code>localStorage('scaffold-theme', 'dark')</code> and reload, or click the
+<code>.theme-toggle</code> button; then confirm
+<code>document.documentElement.dataset.theme === 'dark'</code> <strong>before</strong> capturing the
+dark screenshots (and clear/set the key back for light shots). Also exercise the
 interactive bits (expand/collapse a phase, a Beads filter, a modal), and
 <code>browser_snapshot</code> to sanity-check accessibility.</p>
 <p>The minimum coverage for any dashboard change is desktop + mobile in both light

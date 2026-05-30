@@ -57,8 +57,11 @@ one parallel agent. Given a name like `alpha`, it:
    (the agent slug), and `created_at`
    :cite[scripts/setup-agent-worktree.sh:71].
 4. **Re-syncs Beads** with a fail-soft `bd doctor --fix` when a `.beads/`
-   directory is present :cite[scripts/setup-agent-worktree.sh:88], so the
-   worktree shares the main repo's task DB.
+   directory is present :cite[scripts/setup-agent-worktree.sh:88], reconciling the
+   worktree's Beads git hooks and project config against the installed `bd`
+   version. (Beads DB sharing is automatic — worktrees discover the main repo's
+   task DB via git's common directory, so there is nothing for `bd doctor` to
+   register.)
 
 The `worktree_id` is what later lets the harvester tell one worktree's ledger
 from another's — see the [observability guide](../observability/index.md) for
@@ -139,7 +142,7 @@ footprint small and its branches short. The conflict-prevention rules from
   and again before you open the PR.
 - **Avoid high-contention files in parallel.** `CLAUDE.md` and shared libraries
   are read or edited by every agent; serialize work on them and rebase first
-  rather than editing concurrently :cite[docs/git-workflow.md:125]{mode=advisory}.
+  rather than editing concurrently :cite[docs/git-workflow.md:126]{mode=advisory}.
 - **Don't reformat files you aren't otherwise changing** — gratuitous diffs turn
   into needless conflicts.
 
@@ -195,18 +198,20 @@ The script refuses to delete a branch that would harm the primary repo:
 
 ### Recovering orphaned ledgers — `--recover`
 
-If a worktree is removed *without* teardown — `git worktree remove` by hand, a
-deleted directory, a crashed machine — its ledger may have been harvested into
-the active archive but never finalized, or never harvested at all. Run
-`scaffold observe harvest --recover` from the primary repo to sweep up the
-strays: it lists the live worktrees, then rotates any active-archive entry whose
-worktree is no longer live into the monthly archive. See the
+`scaffold observe harvest --recover` only **finalizes already-harvested**
+active-archive entries whose worktree is no longer live. Run it from the primary
+repo: it lists the live worktrees, then rotates any active-archive entry whose
+worktree has gone away into the monthly archive. It does **not** recover a ledger
+that was never harvested — if a worktree's `.scaffold/activity.jsonl` was deleted
+with the worktree before any harvest ran (`git worktree remove` by hand, a deleted
+directory, a crashed machine), that ledger is gone and cannot be recovered. This
+is why teardown must always harvest first. See the
 [observability guide](../observability/index.md) for the active-vs-monthly
 archive mechanics.
 
 `scaffold observe harvest` must run from the **primary** repo, not from inside a
 worktree — the CLI rejects a worktree primary root
-:cite[src/cli/commands/observe.ts:187] and warns when the target worktree has no
+:cite[src/cli/commands/observe.ts:191] and warns when the target worktree has no
 `identity.json` to key the archive on :cite[src/cli/commands/observe.ts:194].
 
 :::callout{type=note}

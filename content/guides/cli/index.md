@@ -13,7 +13,7 @@ This is a terse index of the whole `scaffold` command surface. It tells you
 earns its own page. For the full mental model of a subsystem, follow the links:
 
 - **Pipeline navigation** (`next`, `run`, `complete`, `rework`, `skip`,
-  `reset`) is the day-to-day loop — see the [Pipeline guide](../pipeline/index.md).
+  `reset`, `check`) is the day-to-day loop — see the [Pipeline guide](../pipeline/index.md).
 - **Observability** (`observe event｜progress｜harvest｜audit｜ack`) is its own
   large surface — see the [Build Observability guide](../observability/index.md).
 
@@ -44,7 +44,7 @@ Commands are registered on a single yargs root
 | `scaffold observe event <type>` | Observability | Write a ledger event |
 | `scaffold observe progress` | Observability | Show the build-progress snapshot (with `--replay`) |
 | `scaffold observe audit` | Observability | Run the audit lenses and report findings |
-| `scaffold observe ack <id>` | Observability | Acknowledge or reopen a finding by ID prefix |
+| `scaffold observe ack <prefix-or-id>` | Observability | Acknowledge or reopen a finding by ID prefix |
 | `scaffold observe harvest` | Observability | Flush a worktree ledger to the primary archive |
 | `scaffold knowledge <subcommand>` | Knowledge | Manage knowledge entries (list｜show｜update｜reset) |
 | `scaffold knowledge-freshness <command>` | Knowledge | Run knowledge-base freshness audits |
@@ -130,11 +130,11 @@ and config.
 :::filter-table
 | Subcommand | What it does |
 | --- | --- |
-| `observe event <type>` | Write one ledger event (`task_claimed`, `decision_recorded`, `blocker_hit`, …) |
+| `observe event <type> --branch <branch> [--task-id <id>] [payload flags]` | Write one ledger event (`task_claimed`, `decision_recorded`, `blocker_hit`, …); `--branch` is required |
 | `observe progress` | Snapshot of in-flight/completed work; `--replay` fuses git/gh/mmr/state/tests |
 | `observe audit` | Run the audit lenses; exits `1` when blocked |
 | `observe ack <prefix-or-id>` | Acknowledge or reopen a finding by ID prefix |
-| `observe harvest` | Copy a worktree ledger into the primary archive; `--recover` sweeps stale ones |
+| `observe harvest` | Flush a worktree ledger to the primary archive; `--recover` sweeps stale ones |
 :::
 
 ```bash
@@ -154,7 +154,8 @@ Two distinct command trees: `knowledge` manages the entries themselves;
   for global entries and local overrides.
 - **`scaffold knowledge-freshness <command>`**
   (:cite[src/cli/commands/knowledge-freshness.ts:12]) — the freshness-audit
-  family (prefilter, run-entry, apply, link-check, lint-unsourced, and more).
+  family: `audit-prefilter`, `audit-run-entry`, `audit-apply`, `link-check`,
+  `lint-unsourced`, `anti-over-rewrite`, `deep-guidance-check`, `bump-version`.
 
 ```bash
 scaffold knowledge list

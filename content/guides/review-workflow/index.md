@@ -17,18 +17,23 @@ Read that guide for "what is a channel"; read this one for "I have a change, now
 what do I run."
 
 :::callout{type=tip}
-**Two layers.** `mmr review` is the engine. The `scaffold run review-pr` /
-`review-code` / `post-implementation-review` wrappers are the *workflow* on top
-— they pick the input mode, add the Superpowers code-reviewer agent channel via
-`mmr reconcile`, handle auth recovery, and bound the fix loop. This guide is
-about driving the wrappers; the engine details are in
+**Two layers.** `mmr review` is the engine. `scaffold run review-pr` and
+`review-code` are *workflow wrappers* on top — they pick the input mode, add the
+Superpowers code-reviewer agent channel via `mmr reconcile`, handle auth
+recovery, and bound the fix loop. `post-implementation-review` is a separate,
+release-time full-codebase review with its own flow (see Step 1). This guide is
+about driving those entry points; the engine details are in
 [the MMR reference](../mmr/index.md).
 :::
 
 ## Step 1 — Pick the entry point
 
-Three wrappers cover three review situations. They share the same engine and the
-same verdict semantics; they differ in *scope* and *what they synthesize*.
+Two of these are wrappers over `mmr review` — `review-pr` and `review-code` —
+sharing the same engine and verdict semantics, differing in *scope* and *what
+they synthesize*. `post-implementation-review` is **not** a `mmr review` wrapper:
+it's an independent release-time review of the whole codebase that runs its own
+channel flow and writes its own report under `docs/reviews/`, with MMR
+reconciliation only as an optional add-on. Consult its own doc for specifics.
 
 ```mermaid
 flowchart TD
@@ -45,11 +50,11 @@ after all tasks land]
 (two-phase: systemic + per-story)"]
 ```
 
-| Entry point | Target | What it adds over a bare `mmr review` |
+| Entry point | Target | Notes |
 | --- | --- | --- |
-| `scaffold run review-pr` | One PR (`--pr N`, auto-detected from the branch) | Auth checks, the Superpowers agent channel, the per-finding round bookkeeping, an opt-in Beads bridge. |
-| `scaffold run review-code` | Local pre-push: committed branch diff + staged + unstaged, as one synthesized "delivery candidate" | The same agent channel + round bounding, plus file & standards context for the file-blind CLIs. **Untracked files are not covered.** |
-| `scaffold run post-implementation-review` | The full implemented codebase against stories + standards | Two phases — a systemic cross-cutting sweep and a per-story functional review via parallel agents — with its own report under `docs/reviews/`. Different channel layout; consult its own doc. |
+| `scaffold run review-pr` | One PR (`--pr N`, auto-detected from the branch) | **MMR wrapper.** Adds auth checks, the Superpowers agent channel, the per-finding round bookkeeping, an opt-in Beads bridge over a bare `mmr review`. |
+| `scaffold run review-code` | Local pre-push: committed branch diff + staged + unstaged, as one synthesized "delivery candidate" | **MMR wrapper.** Adds the same agent channel + round bounding, plus file & standards context for the file-blind CLIs. **Untracked files are not covered.** |
+| `scaffold run post-implementation-review` | The full implemented codebase against stories + standards | **Independent, not an MMR wrapper.** A release-time review (systemic sweep + per-story functional review via parallel agents) with its own report under `docs/reviews/`; MMR injection is optional. Consult its own doc. |
 
 :::callout{type=note}
 **The mandatory one.** After `gh pr create`, running `review-pr` is mandatory
@@ -118,27 +123,22 @@ a diff first.
 
 ## Step 3 — Read the verdict, then act
 
-Every review collapses to exactly one of four verdicts
-:cite[packages/mmr/src/types.ts:25]. The verdict, not the raw findings, is what
-decides whether you proceed.
+Every review collapses to exactly one of four verdicts. The verdict, not the raw
+findings, is what decides whether you proceed. The
+[MMR reference](../mmr/index.md) defines the gate, the severity tiers, and the
+exact derivation algorithm; this table is the *action* you take for each outcome.
 
-| Verdict | Meaning | Exit | Do |
-| --- | --- | --- | --- |
-| `pass` | Gate passed; every channel completed | 0 | **Proceed** — merge / push / next task. |
-| `degraded-pass` | Gate passed, but a channel was skipped, timed out, or ran as a compensating pass | 0 | **Proceed**, noting reduced coverage. The max achievable verdict once any channel was compensated. |
-| `blocked` | An unacknowledged finding sits at or above the fix threshold | 2 | **Stop.** Fix the blocking findings (Step 4), then re-review. Do not merge. |
-| `needs-user-decision` | No channel completed, or reviewers contradict each other | 3 | **Stop and surface to the user.** Automated iteration can't resolve this. |
+| Verdict | Exit | Do |
+| --- | --- | --- |
+| `pass` | 0 | **Proceed** — merge / push / next task. |
+| `degraded-pass` | 0 | **Proceed**, noting reduced coverage. The max achievable verdict once any channel was compensated. |
+| `blocked` | 2 | **Stop.** Fix the blocking findings (Step 4), then re-review. Do not merge. |
+| `needs-user-decision` | 3 | **Stop and surface to the user.** Automated iteration can't resolve this. |
 
-The gate **passes** when every unacknowledged finding is *below* the fix
-threshold — :sev[P2]{level=p2} by default
-:cite[packages/mmr/src/config/defaults.ts:16], override per-run with
-`--fix-threshold`. Severity tiers run :sev[P0]{level=p0} (highest) →
-:sev[P1]{level=p1} → :sev[P2]{level=p2} → :sev[P3]{level=p3}. The verdict
-algorithm checks the no-channels case first (it outranks `blocked`), then the
-gate, then channel health: zero completed → `needs-user-decision`
-:cite[packages/mmr/src/core/reconciler.ts:247]; else a failed gate → `blocked`
-:cite[packages/mmr/src/core/reconciler.ts:250]; else any incomplete channel →
-`degraded-pass` :cite[packages/mmr/src/core/reconciler.ts:253]; else `pass`.
+A review is `blocked` when any unacknowledged finding sits at or above the fix
+threshold (:sev[P2]{level=p2} by default; override per-run with
+`--fix-threshold`). See the [MMR reference](../mmr/index.md) for how the verdict
+is derived from gate result + channel health.
 
 :::callout{type=warning}
 **Proceed only on `pass` or `degraded-pass`.** On `blocked` or
@@ -162,10 +162,10 @@ surfaces *genuinely new* findings is healthy iteration — keep going. The loop
 stops only when one specific finding has been attempted three times without
 resolution.
 
-A "finding" here is its **stable identity**, not its wording. Identity is
-derived from four normalized components — `location`, `category`, `description`,
-`suggestion` — so a re-worded report of the same defect still counts against the
-same finding :cite[content/tools/review-pr.md:640]. Co-equal stop conditions:
+A "finding" here is its **stable identity**, not its wording, so a re-worded
+report of the same defect still counts against the same finding. (The
+[MMR reference](../mmr/index.md) covers how that identity is computed.) Co-equal
+stop conditions:
 
 - A finding's identity reaches 3 recorded attempts.
 - The same underlying defect recurs across 3 rounds even if the reviewer's
@@ -208,30 +208,31 @@ strike count. For a very noisy loop you may narrow the gate for one run with
 A review never silently runs with fewer reviewers. A channel is *degraded* when
 its binary isn't installed, auth fails, it times out, or it errors out. The
 workflow's response is to **compensate and tell you how to recover**, then cap
-the verdict at `degraded-pass`.
+the verdict at `degraded-pass`. The mechanics — how compensation runs and the
+per-channel auth checks — live in the [MMR reference](../mmr/index.md); below is
+what it means for *your* workflow.
 
-- **Compensating pass.** For each degraded *external* channel, a `claude -p` pass
-  runs focused on that channel's strength area, labeled e.g.
-  `[compensating: Grok-equivalent]` :cite[packages/mmr/src/core/compensator.ts:43].
-  These findings are single-source, low confidence. Claude is the compensator,
-  so a missing Claude CLI has no compensator of its own.
+- **Compensating pass.** For each degraded *external* channel, MMR runs a
+  compensating pass focused on that channel's strength area and records the
+  source as `compensating-<channel>` :cite[packages/mmr/src/core/compensator.ts:162].
+  The compensator defaults to `claude -p` unless `defaults.compensator.channel`
+  overrides it :cite[packages/mmr/src/core/compensator.ts:74]. These findings
+  are single-source, low confidence. With the default compensator, a missing
+  Claude CLI has no compensator of its own. (The bracket labels like
+  `[compensating: Grok-equivalent]` you'll see are the *manual fallback* summary
+  wording, distinct from the engine's `compensating-<channel>` source name.)
 - **Auth recovery is never silent.** The workflow surfaces the exact recovery
   command for the failed channel; the channel's `recovery` string drives this
-  :cite[packages/mmr/src/core/auth.ts:65].
-
-| Channel | Recovery command |
-| --- | --- |
-| `codex` | `codex login` |
-| `gemini` | `gemini -p "hello"` |
-| `claude` | `claude login` |
-| `grok` | `grok login` |
+  :cite[packages/mmr/src/core/auth.ts:65]. See the
+  [MMR reference](../mmr/index.md) for the per-channel auth-check + recovery
+  table.
 
 :::callout{type=warning}
 **Foreground only.** When the `mmr` CLI is unavailable and a wrapper falls back
 to invoking Codex / Gemini / Claude / Grok directly, run them as **foreground**
 Bash calls — never with `run_in_background`, `&`, or `nohup`. Background
 execution produces empty output, which the parser then reads as a degraded
-channel :cite[content/tools/review-code.md:813].
+channel :cite[content/tools/review-code.md:265].
 :::
 
 Once any channel was compensated, the best possible verdict is

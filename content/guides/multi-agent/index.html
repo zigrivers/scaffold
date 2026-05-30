@@ -1130,8 +1130,11 @@ identity file exists yet, writes <code>worktree_id</code> (a UUID), <code>worktr
 (the agent slug), and <code>created_at</code>
 <span class="fp" data-path="scripts/setup-agent-worktree.sh:71">scripts/setup-agent-worktree.sh:71</span>.</li>
 <li><strong>Re-syncs Beads</strong> with a fail-soft <code>bd doctor --fix</code> when a <code>.beads/</code>
-directory is present <span class="fp" data-path="scripts/setup-agent-worktree.sh:88">scripts/setup-agent-worktree.sh:88</span>, so the
-worktree shares the main repo's task DB.</li>
+directory is present <span class="fp" data-path="scripts/setup-agent-worktree.sh:88">scripts/setup-agent-worktree.sh:88</span>, reconciling the
+worktree's Beads git hooks and project config against the installed <code>bd</code>
+version. (Beads DB sharing is automatic — worktrees discover the main repo's
+task DB via git's common directory, so there is nothing for <code>bd doctor</code> to
+register.)</li>
 </ol>
 <p>The <code>worktree_id</code> is what later lets the harvester tell one worktree's ledger
 from another's — see the <a href="../observability/index.md">observability guide</a> for
@@ -1177,7 +1180,7 @@ more <code>main</code> drifts underneath it.</li>
 and again before you open the PR.</li>
 <li><strong>Avoid high-contention files in parallel.</strong> <code>CLAUDE.md</code> and shared libraries
 are read or edited by every agent; serialize work on them and rebase first
-rather than editing concurrently <span class="cite-advisory" data-path="docs/git-workflow.md:125">docs/git-workflow.md:125</span>.</li>
+rather than editing concurrently <span class="cite-advisory" data-path="docs/git-workflow.md:126">docs/git-workflow.md:126</span>.</li>
 <li><strong>Don't reformat files you aren't otherwise changing</strong> — gratuitous diffs turn
 into needless conflicts.</li>
 </ul>
@@ -1224,17 +1227,19 @@ sitting on the default branch — deleting it here would nuke local <code>main</
 elsewhere, already gone) it just notes it and exits cleanly.</li>
 </ul>
 <h3 id="recovering-orphaned-ledgers---recover">Recovering orphaned ledgers — <code>--recover</code></h3>
-<p>If a worktree is removed <em>without</em> teardown — <code>git worktree remove</code> by hand, a
-deleted directory, a crashed machine — its ledger may have been harvested into
-the active archive but never finalized, or never harvested at all. Run
-<code>scaffold observe harvest --recover</code> from the primary repo to sweep up the
-strays: it lists the live worktrees, then rotates any active-archive entry whose
-worktree is no longer live into the monthly archive. See the
+<p><code>scaffold observe harvest --recover</code> only <strong>finalizes already-harvested</strong>
+active-archive entries whose worktree is no longer live. Run it from the primary
+repo: it lists the live worktrees, then rotates any active-archive entry whose
+worktree has gone away into the monthly archive. It does <strong>not</strong> recover a ledger
+that was never harvested — if a worktree's <code>.scaffold/activity.jsonl</code> was deleted
+with the worktree before any harvest ran (<code>git worktree remove</code> by hand, a deleted
+directory, a crashed machine), that ledger is gone and cannot be recovered. This
+is why teardown must always harvest first. See the
 <a href="../observability/index.md">observability guide</a> for the active-vs-monthly
 archive mechanics.</p>
 <p><code>scaffold observe harvest</code> must run from the <strong>primary</strong> repo, not from inside a
 worktree — the CLI rejects a worktree primary root
-<span class="fp" data-path="src/cli/commands/observe.ts:187">src/cli/commands/observe.ts:187</span> and warns when the target worktree has no
+<span class="fp" data-path="src/cli/commands/observe.ts:191">src/cli/commands/observe.ts:191</span> and warns when the target worktree has no
 <code>identity.json</code> to key the archive on <span class="fp" data-path="src/cli/commands/observe.ts:194">src/cli/commands/observe.ts:194</span>.</p>
 <div class="callout callout-note"><p><strong>Empty ledgers are fine.</strong> A worktree that never recorded an event has no
 <code>activity.jsonl</code>; harvest is a clean no-op and teardown proceeds normally.</p></div>

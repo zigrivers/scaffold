@@ -1101,8 +1101,9 @@ knowledge entries, and skills (<span class="fp" data-path="package.json:27">pack
 Maintainers releasing Scaffold itself follow a separate flow in
 <code>docs/architecture/operations-runbook.md</code> <span class="cite-advisory" data-path="docs/architecture/operations-runbook.md:326">docs/architecture/operations-runbook.md:326</span>.</p>
 <div class="callout callout-note"><p><strong>Prerequisite — Node.js 18.17+.</strong> The CLI requires Node.js <code>>=18.17.0</code>
-(<span class="fp" data-path="package.json:34">package.json:34</span>). The Homebrew formula bundles its own runtime; the npm
-install uses your system Node.</p></div>
+(<span class="fp" data-path="package.json:34">package.json:34</span>). The Homebrew formula installs and manages Node as a
+dependency, so you don't install Node separately; the npm install uses your
+system Node.</p></div>
 <h2 id="installing">Installing</h2>
 <p>Pick one of the three surfaces below. The npm and Homebrew tabs install the CLI;
 the plugin tab adds the optional Claude Code skills on top.</p>
@@ -1110,8 +1111,8 @@ the plugin tab adds the optional Claude Code skills on top.</p>
 </code></pre><p>Verify with <code>scaffold version</code>. This is the recommended path — it uses your
 system Node and updates with <code>npm update -g</code>.</p></div><div class="tabpane" data-tab="1"><pre><code class="language-bash">brew tap zigrivers/scaffold
 brew install scaffold
-</code></pre><p>The formula bundles a runtime, so no separate Node install is needed. Verify
-with <code>scaffold version</code>.</p></div><div class="tabpane" data-tab="2"><p>Inside a Claude Code session:</p><pre><code class="language-text">/plugin marketplace add zigrivers/scaffold
+</code></pre><p>The formula installs and manages Node as a dependency, so no separate Node
+install is needed. Verify with <code>scaffold version</code>.</p></div><div class="tabpane" data-tab="2"><p>Inside a Claude Code session:</p><pre><code class="language-text">/plugin marketplace add zigrivers/scaffold
 /plugin install scaffold@zigrivers-scaffold
 </code></pre><p>This is <strong>optional</strong> and complements the CLI — it auto-activates the Scaffold
 Runner and pipeline-reference skills for interactive guidance. Everything the
@@ -1128,6 +1129,10 @@ running the install for you — Homebrew installs map to <code>brew upgrade scaf
 <code>npm update -g @zigrivers/scaffold</code> (<span class="fp" data-path="src/cli/commands/update.ts:51">src/cli/commands/update.ts:51</span>), and
 anything else falls back to <code>npx @zigrivers/scaffold@latest</code>
 (<span class="fp" data-path="src/cli/commands/update.ts:55">src/cli/commands/update.ts:55</span>).</p>
+<p>The Homebrew command it prints is exactly <code>brew upgrade scaffold</code> — it does
+<strong>not</strong> include the <code>brew update</code> prefix. Homebrew users must prepend it
+themselves and run <code>brew update &#x26;&#x26; brew upgrade scaffold</code>, or the upgrade can
+silently no-op against a stale tap cache (see the danger callout below).</p>
 <p>Run the upgrade for your channel:</p>
 <div class="tabs"><div class="tablist" role="tablist"><button class="tab-btn active" role="tab" data-tab="0">npm</button><button class="tab-btn" role="tab" data-tab="1">Homebrew</button><button class="tab-btn" role="tab" data-tab="2">Claude</button></div><div class="tabpane active" data-tab="0"><pre><code class="language-bash">npm update -g @zigrivers/scaffold
 </code></pre></div><div class="tabpane" data-tab="1"><pre><code class="language-bash">brew update &#x26;&#x26; brew upgrade scaffold
@@ -1169,8 +1174,10 @@ and state), then <code>scaffold adopt</code> (backfill state from existing docs)
 up the pipeline at the first incomplete step.</p>
 <h2 id="troubleshooting">Troubleshooting</h2>
 <div class="callout callout-tip"><p><strong><code>scaffold: command not found</code> after npm install.</strong> Your global npm <code>bin</code>
-directory isn't on <code>PATH</code>. Check it with <code>npm bin -g</code> and add that directory to
-your shell <code>PATH</code>, or reinstall with a prefix that's already on <code>PATH</code>.</p></div>
+directory isn't on <code>PATH</code>. Find it with <code>echo "$(npm prefix -g)/bin"</code> (the
+binaries live in the <code>bin</code> subdirectory of <code>npm prefix -g</code>) and add that
+directory to your shell <code>PATH</code>, or reinstall with a prefix that's already on
+<code>PATH</code>.</p></div>
 <ul>
 <li><strong>Homebrew says "already installed" after a release.</strong> You skipped
 <code>brew update</code>. Run <code>brew update &#x26;&#x26; brew upgrade scaffold</code> (see the danger
@@ -1179,7 +1186,8 @@ callout above).</li>
 version, Node version, platform, and the latest registry version side by
 side. If two installs collide (e.g. both npm-global and Homebrew), remove one.</li>
 <li><strong>Node too old.</strong> The CLI needs Node 18.17+ (<span class="fp" data-path="package.json:34">package.json:34</span>). Upgrade
-Node, or use the Homebrew install, which bundles its own runtime.</li>
+Node, or use the Homebrew install, which installs and manages Node as a
+dependency.</li>
 <li><strong><code>scaffold update</code> only prints a command.</strong> That's intentional — it never
 runs installs for you. Copy the printed upgrade command for your channel and
 run it yourself.</li>
