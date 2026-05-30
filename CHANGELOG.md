@@ -16,9 +16,9 @@ This release adds two headline subsystems — the reference-guides pipeline and 
 - **Audit Lens I — knowledge gaps (`I-knowledge-gaps`).** Extends the build-observability audit suite (A–H) with a lessons-scanner that detects missing knowledge entries, with existing-entry suppression and a `--knowledge-root` flag (also `lenses.I-knowledge-gaps.knowledge_root` in `.scaffold/observability.yaml`).
 - **Reference-page citation-drift check — `make check-reference-citations`** (alias `make check-freshness-citations`). Verifies that `file:line` citations across `docs/` reference pages resolve and that generated pages rebake to a no-op. Part of `make check-all`.
 
-#### DeepSeek provider for the knowledge-freshness cron
+**DeepSeek provider for the knowledge-freshness cron.**
 
-Adds DeepSeek as an alternative LLM provider for the per-entry audit dispatch in the daily knowledge-freshness cron. Anthropic remains the default for local development; the cron defaults to DeepSeek via repo secret. MMR review (Codex / Gemini / Claude channels) is unchanged.
+Adds DeepSeek as an alternative LLM provider for the per-entry audit dispatch in the daily knowledge-freshness cron. Anthropic remains the default for local development; the cron defaults to DeepSeek via repo secret. This provider applies only to the knowledge-freshness cron — MMR code review is independent of it (and ships its own changes separately in `@zigrivers/mmr` 1.4.0).
 
 **New env vars / flags:**
 - `DEEPSEEK_API_KEY` — repo secret / env var; required for the deepseek provider.
