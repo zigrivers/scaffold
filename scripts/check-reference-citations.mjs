@@ -53,14 +53,9 @@ const FRESHNESS_BARE_MAP = {
 }
 
 const PAGES = [
-  {
-    name: 'observability',
-    path: 'docs/observability/reference.html',
-    fp: true,
-    fileMap: true,
-    text: false,
-    rebake: null,
-  },
+  // NOTE: docs/observability/reference.html was migrated to the guide system
+  // (content/guides/observability/) and retired to a redirect shim — it is now
+  // validated via discoverGuidePages, not here.
   {
     name: 'knowledge-freshness',
     path: 'docs/knowledge-freshness/reference.html',
