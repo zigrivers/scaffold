@@ -88,7 +88,7 @@ const PAGES = [
 // the citation gate (R2-1). Guides emit `:cite[path:line]` as <span class="fp"
 // data-path="…"> markup, so they use the `fp` extraction strategy.
 export function discoverGuidePages(guidesDir, repoRoot = REPO_ROOT) {
-  if (!fs.existsSync(guidesDir)) return []
+  if (!fs.existsSync(guidesDir) || !fs.statSync(guidesDir).isDirectory()) return []
   const out = []
   for (const entry of fs.readdirSync(guidesDir, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue
@@ -100,6 +100,10 @@ export function discoverGuidePages(guidesDir, repoRoot = REPO_ROOT) {
       fp: true,
       fileMap: false,
       text: false,
+      // strictCites: a guide :cite always targets a real repo file, so validate
+      // every fp data-path with a known extension — even repo-root files like
+      // CLAUDE.md / package.json that fall outside SOURCE_PATH_RE (R2 P1-C).
+      strictCites: true,
       rebake: null,
     })
   }
@@ -114,12 +118,18 @@ const esc = (s) => s.replace(/[.+*?^${}()|[\]\\]/g, '\\$&')
 const SOURCE_PATH_RE = /^(?:src|tests|scripts|content|docs|lib|packages|\.github)\//
 const isSourcePath = (p) => SOURCE_PATH_RE.test(p)
 
-// Collect a Set of `relPath|a|b` keys. a/b empty ⇒ existence-only check.
-function collect(html, page) {
+// Collect `{ cites, advisory }`, each a Set of `relPath|a|b` keys (a/b empty ⇒
+// existence-only). `cites` are blocking; `advisory` warn-only (cite-advisory).
+export function collect(html, page) {
   const cites = new Set()
+  const advisory = new Set()
   // .fp tokens live in body markup; strip <script> so JS templates that build
   // markup at runtime (renderNode's `data-path="' + dataPath + '"`) don't match.
   const bodyHtml = html.replace(/<script\b[\s\S]*?<\/script>/g, '')
+  // strictCites (guide pages): a :cite always targets a real repo file, so accept
+  // any path with a known extension, not just the standard source dirs.
+  const accept = (p) => page.strictCites || isSourcePath(p)
+  const DP_LINE_RE = new RegExp('^(.*\\.(?:' + EXT + ')):(\\d+)(?:[-–](\\d+))?$')
 
   if (page.fp) {
     const FP_RE = /<(?:span|a)\b[^>]*\bclass="[^"]*\bfp\b[^"]*"[^>]*\bdata-path="([^"]+)"[^>]*>([\s\S]*?)<\/(?:span|a)>/g
@@ -127,17 +137,28 @@ function collect(html, page) {
       let p = m[1]
       const inner = m[2]
       // data-path may itself carry a trailing :line (file-tree leaves).
-      const dpm = p.match(new RegExp('^(.*\\.(?:' + EXT + ')):(\\d+)(?:[-–](\\d+))?$'))
+      const dpm = p.match(DP_LINE_RE)
       if (dpm) {
         p = dpm[1]
-        if (isSourcePath(p)) cites.add(`${p}|${dpm[2]}|${dpm[3] ?? ''}`)
-      } else if (isSourcePath(p)) {
+        if (accept(p)) cites.add(`${p}|${dpm[2]}|${dpm[3] ?? ''}`)
+      } else if (accept(p)) {
         cites.add(`${p}||`) // existence-only
       }
-      if (!isSourcePath(p)) continue
+      if (!accept(p)) continue
       const base = p.split('/').pop()
       const lineRe = new RegExp('\\b' + esc(base) + ':(\\d+)(?:[-–](\\d+))?', 'g')
       for (const im of inner.matchAll(lineRe)) cites.add(`${p}|${im[1]}|${im[2] ?? ''}`)
+    }
+
+    // Advisory citations (cite-advisory) are validated but warn-only — they back
+    // "see also" pointers, not normative claims (P0-a / R2 P2-D).
+    if (page.strictCites) {
+      const ADV_RE = /<(?:span|a)\b[^>]*\bclass="[^"]*\bcite-advisory\b[^"]*"[^>]*\bdata-path="([^"]+)"[^>]*>[\s\S]*?<\/(?:span|a)>/g
+      for (const m of bodyHtml.matchAll(ADV_RE)) {
+        const dpm = m[1].match(DP_LINE_RE)
+        if (dpm) advisory.add(`${dpm[1]}|${dpm[2]}|${dpm[3] ?? ''}`)
+        else advisory.add(`${m[1]}||`)
+      }
     }
   }
 
@@ -174,7 +195,7 @@ function collect(html, page) {
     }
   }
 
-  return cites
+  return { cites, advisory }
 }
 
 function validate(cites) {
@@ -235,18 +256,22 @@ function main() {
       continue
     }
     const html = fs.readFileSync(abs, 'utf8')
-    const cites = collect(html, page)
+    const { cites, advisory } = collect(html, page)
     const { drifts, missing } = validate(cites)
+    const adv = validate(advisory) // warn-only
     const rebake = rebakeNoop(page)
     const ok = cites.size - drifts.length - missing.length
 
     console.log(`\n${page.name} (${page.path})`)
     console.log(
       `  ${cites.size} citations · ${ok} ok · ${drifts.length} out-of-range · ${missing.length} missing` +
+        (advisory.size ? ` · ${advisory.size} advisory` : '') +
         (page.rebake ? ` · rebake ${rebake.ok ? 'clean' : 'DRIFT'}` : ''),
     )
     for (const d of drifts) console.log(`  out-of-range: ${d}`)
     for (const m of missing) console.log(`  missing: ${m}`)
+    for (const d of adv.drifts) console.log(`  advisory out-of-range (warn): ${d}`)
+    for (const m of adv.missing) console.log(`  advisory missing (warn): ${m}`)
     for (const n of rebake.notes) console.log(`  ${n}`)
 
     if (drifts.length || missing.length || !rebake.ok) failed = true
@@ -261,5 +286,15 @@ function main() {
   process.exit(0)
 }
 
-const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
-if (isMain) main()
+// Robust entry-point detection: resolve symlinks + canonical on-disk casing on
+// both sides so the gate is never silently skipped (R2 P2-E). A false negative
+// here would bypass the entire citation check.
+function isMainModule() {
+  if (!process.argv[1]) return false
+  try {
+    return fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(import.meta.url))
+  } catch {
+    return false
+  }
+}
+if (isMainModule()) main()

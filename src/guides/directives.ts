@@ -159,9 +159,11 @@ export const remarkCite: AnyPlugin = () => (tree: any) => {
     const advisory = String(node.attributes?.mode ?? '').toLowerCase() === 'advisory'
     node.data = node.data ?? {}
     node.data.hName = 'span'
+    // camelCase `dataPath` matches the hast property convention and the
+    // sanitize allowlist (sanitize.ts) — serializes to the data-path attribute.
     node.data.hProperties = {
       className: advisory ? 'cite-advisory' : 'fp',
-      'data-path': path,
+      dataPath: path,
     }
     node.children = [{ type: 'text', value: path }]
   })

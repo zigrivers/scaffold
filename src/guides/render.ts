@@ -25,7 +25,7 @@ function slug(text: string): string {
   return text.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/[_\s]+/g, '-')
 }
 
-function stripFrontmatter(md: string): string {
+export function stripFrontmatter(md: string): string {
   const lines = md.split(/\r?\n/)
   if (lines[0]?.trim() !== '---') return md
   const close = lines.findIndex((l, i) => i > 0 && l.trim() === '---')

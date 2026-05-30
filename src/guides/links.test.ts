@@ -49,4 +49,36 @@ describe('findBrokenRelativeLinks (R2-9: inter-guide links must resolve)', () =>
     fs.writeFileSync(path.join(root, 'concepts', 'index.md'), '# c')
     expect(findBrokenRelativeLinks('[c](../concepts/index.md#worktree)', dir)).toEqual([])
   })
+
+  it('catches broken reference-style links (definitions)', () => {
+    const dir = tmpdir()
+    const md = 'See [concepts][c].\n\n[c]: ../concepts/index.md\n'
+    expect(findBrokenRelativeLinks(md, dir)).toEqual(['../concepts/index.md'])
+  })
+
+  it('ignores links inside fenced code blocks', () => {
+    const dir = tmpdir()
+    const md = 'Example:\n\n```\n[x](../nope/index.md)\n```\n'
+    expect(findBrokenRelativeLinks(md, dir)).toEqual([])
+  })
+
+  it('ignores link-like text inside frontmatter', () => {
+    const dir = tmpdir()
+    const md = '---\ntitle: T\ndescription: see [x](../nope/index.md)\n---\n\n# Body\n'
+    expect(findBrokenRelativeLinks(md, dir)).toEqual([])
+  })
+
+  it('handles parentheses in the link target', () => {
+    const root = tmpdir()
+    const dir = path.join(root, 'g')
+    fs.mkdirSync(dir, { recursive: true })
+    fs.writeFileSync(path.join(dir, 'file(1).md'), 'x')
+    expect(findBrokenRelativeLinks('[x](<file(1).md>)', dir)).toEqual([])
+  })
+
+  it('decodes percent-encoded targets before resolving', () => {
+    const dir = tmpdir()
+    fs.writeFileSync(path.join(dir, 'with space.md'), 'x')
+    expect(findBrokenRelativeLinks('[x](with%20space.md)', dir)).toEqual([])
+  })
 })
