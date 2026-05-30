@@ -2,6 +2,51 @@
 
 ## [Unreleased]
 
+## [1.4.1] — 2026-05-30
+
+Reliability hardening for the built-in **grok** review channel. A grok review
+could silently answer from the *wrong* context — it is agentic and could ignore
+the supplied prompt/diff, read the working tree, or latch onto a prior session's
+cross-session memory (observed: a review of one repo's doc that instead reviewed
+an unrelated repo and reported that repo's findings). The grok channel now runs
+**closed-book** by construction. Web search stays on by default; this is a
+fix/security change, not a feature.
+
+### Fixed
+
+- **Grok channel context bleed (P1).** The built-in `grok` channel now invokes
+  grok with `--no-memory` (no cross-session memory), a deny-by-default web-only
+  tool allowlist `--tools web_search,web_fetch` (blocks `read_file` and other
+  filesystem tools while keeping web search), and `--no-subagents --no-plan`.
+- **Host-config injection.** The channel runs grok under an isolated `HOME` /
+  `XDG_CONFIG_HOME` and a neutral working directory (a per-run temp dir), so a
+  review is no longer seeded with the host's grok skills, MCP servers, hooks,
+  permission rules, or the project's `Claude.md` / `Agents.md`. Verified via
+  `grok inspect` (all host-config sources empty under the hardened posture).
+- **File-based auth preserved.** Only `~/.grok/auth.json` is symlinked into the
+  isolated HOME, so auth keeps working on file-credential platforms (Linux/CI)
+  without re-introducing host config. (macOS keychain auth was already
+  unaffected.)
+- **Temp-dir lifecycle.** Per-run isolated dirs are cleaned up on every dispatch
+  termination path (close/error/timeout/synchronous-throw) and on SIGINT/SIGTERM,
+  with a startup sweep backstop for orphans; created `0700`; cwd-pointing env
+  vars (`PWD`/`OLDPWD`/`INIT_CWD`) pinned to the neutral dir.
+
+### Changed
+
+- The same hardened posture is inherited by the **compensator** path when grok
+  is the configured compensator channel (a new optional `cwd` flows through the
+  channel config, dispatcher, auth probe, and compensator dispatch).
+
+### Notes
+
+- To run grok **closed-book** (no web access), override `channels.grok.flags` in
+  `.mmr.yaml`. Because config merge replaces arrays, the override must restate
+  the full hardened flags array and add `--disable-web-search`; any file-path
+  flag must be absolute (the channel runs in a neutral cwd). See the README. An
+  existing `channels.grok.flags` override **replaces** the new hardened defaults
+  — restate the full array to keep the protections.
+
 ## [1.4.0] — 2026-05-30
 
 A large feature wave spanning channel ergonomics, the review loop (sessions +
