@@ -1,0 +1,2426 @@
+<!DOCTYPE html>
+<html lang="en" data-chrome-version="1">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Knowledge Freshness</title>
+<!-- scaffold:chrome v1 -->
+<style>/* Scaffold Dashboard Theme
+ * All CSS for the generated pipeline dashboard.
+ * Embedded into HTML by scripts/generate-dashboard.sh.
+ * Design system reference: docs/design-system.md
+ *
+ * Aesthetic: "Precision Industrial" — Swiss-typographic control room.
+ * Deep navy dark mode with indigo accents, clean cool-white light mode.
+ */
+
+/* ─── Design Tokens (Light Mode) ──────────────── */
+:root {
+    /* Surface */
+    --bg:           #f5f6fa;
+    --bg-card:      #ffffff;
+    --bg-hover:     #eef0f6;
+    --bg-inset:     #e8eaf2;
+
+    /* Text */
+    --text:         #1a1d2e;
+    --text-muted:   #6b7294;
+    --text-faint:   #9ba1c0;
+
+    /* Borders & Structure */
+    --border:       #dde0ed;
+    --border-light: #eceef5;
+    --radius:       10px;
+    --radius-sm:    6px;
+
+    /* Accent */
+    --accent:       #4f46e5;
+    --accent-hover: #4338ca;
+    --accent-glow:  rgba(79, 70, 229, 0.10);
+
+    /* Semantic: Status */
+    --green:        #059669;
+    --green-bg:     #ecfdf5;
+    --green-border: #a7f3d0;
+    --blue:         #2563eb;
+    --blue-bg:      #eff6ff;
+    --blue-border:  #bfdbfe;
+    --yellow:       #d97706;
+    --yellow-bg:    #fffbeb;
+    --yellow-border:#fde68a;
+    --gray:         #9ca3af;
+    --gray-bg:      #f3f4f6;
+    --gray-border:  #e5e7eb;
+
+    /* Semantic: Next Banner */
+    --next-bg:      #eef2ff;
+    --next-border:  #4f46e5;
+    --next-glow:    rgba(79, 70, 229, 0.06);
+
+    /* Semantic: Progress */
+    --progress-bg:  #e5e7eb;
+    --progress-h:   10px;
+
+    /* Depth */
+    --shadow-sm:    0 1px 2px rgba(30, 34, 60, 0.04);
+    --shadow:       0 1px 3px rgba(30, 34, 60, 0.07), 0 1px 2px rgba(30, 34, 60, 0.04);
+    --shadow-md:    0 4px 12px rgba(30, 34, 60, 0.08), 0 1px 3px rgba(30, 34, 60, 0.05);
+    --shadow-lg:    0 8px 24px rgba(30, 34, 60, 0.10), 0 2px 6px rgba(30, 34, 60, 0.04);
+
+    /* Spacing scale (4px base) */
+    --sp-1: 4px;
+    --sp-2: 8px;
+    --sp-3: 12px;
+    --sp-4: 16px;
+    --sp-5: 20px;
+    --sp-6: 24px;
+    --sp-8: 32px;
+    --sp-10: 40px;
+
+    /* Typography */
+    --font-sans:  -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    --font-mono:  "SF Mono", "Cascadia Code", "Fira Code", "JetBrains Mono", Menlo, Consolas, monospace;
+    --text-xs:    0.75rem;
+    --text-sm:    0.8125rem;
+    --text-base:  0.9375rem;
+    --text-lg:    1.125rem;
+    --text-xl:    1.375rem;
+    --text-2xl:   1.75rem;
+    --lh-tight:   1.25;
+    --lh-normal:  1.5;
+    --lh-relaxed: 1.625;
+    --ls-tight:   -0.01em;
+    --ls-wide:    0.025em;
+    --fw-normal:  400;
+    --fw-medium:  500;
+    --fw-semi:    600;
+    --fw-bold:    700;
+
+    /* Layout */
+    --max-w:      960px;
+    --page-pad:   24px;
+}
+
+/* ─── Design Tokens (Dark Mode) ───────────────── */
+[data-theme="dark"] {
+    /* Surface */
+    --bg:           #0f1117;
+    --bg-card:      #1a1d2e;
+    --bg-hover:     #252940;
+    --bg-inset:     #141724;
+
+    /* Text */
+    --text:         #e2e5f0;
+    --text-muted:   #7c82a8;
+    --text-faint:   #555c80;
+
+    /* Borders & Structure */
+    --border:       #2a2f45;
+    --border-light: #21253a;
+
+    /* Accent */
+    --accent:       #818cf8;
+    --accent-hover: #a5b4fc;
+    --accent-glow:  rgba(129, 140, 248, 0.12);
+
+    /* Semantic: Status */
+    --green:        #34d399;
+    --green-bg:     rgba(6, 78, 59, 0.25);
+    --green-border: rgba(52, 211, 153, 0.25);
+    --blue:         #60a5fa;
+    --blue-bg:      rgba(30, 58, 95, 0.30);
+    --blue-border:  rgba(96, 165, 250, 0.25);
+    --yellow:       #fbbf24;
+    --yellow-bg:    rgba(120, 53, 15, 0.25);
+    --yellow-border:rgba(251, 191, 36, 0.20);
+    --gray:         #6b7294;
+    --gray-bg:      #252940;
+    --gray-border:  #363c58;
+
+    /* Semantic: Next Banner */
+    --next-bg:      rgba(30, 27, 75, 0.50);
+    --next-border:  #818cf8;
+    --next-glow:    rgba(129, 140, 248, 0.08);
+
+    /* Semantic: Progress */
+    --progress-bg:  #1f2337;
+
+    /* Depth */
+    --shadow-sm:    0 1px 2px rgba(0, 0, 0, 0.20);
+    --shadow:       0 1px 3px rgba(0, 0, 0, 0.30), 0 1px 2px rgba(0, 0, 0, 0.15);
+    --shadow-md:    0 4px 12px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.20);
+    --shadow-lg:    0 8px 24px rgba(0, 0, 0, 0.40), 0 2px 6px rgba(0, 0, 0, 0.20);
+}
+
+/* ─── Theme Toggle ───────────────────────────── */
+.theme-toggle {
+    background: var(--bg-inset);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: var(--sp-1) var(--sp-2);
+    cursor: pointer;
+    font-size: var(--text-base);
+    line-height: 1;
+    color: var(--text-muted);
+    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+    display: flex;
+    align-items: center;
+    margin-left: auto;
+}
+
+.theme-toggle:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-glow);
+}
+
+/* ─── Base ────────────────────────────────────── */
+*, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: var(--lh-normal);
+    color: var(--text);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Layout ──────────────────────────────────── */
+.wrap {
+    max-width: var(--max-w);
+    margin: 0 auto;
+    padding: var(--sp-8) var(--page-pad);
+}
+
+/* ─── Header ──────────────────────────────────── */
+.header {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-2);
+    flex-wrap: wrap;
+}
+
+h1 {
+    font-size: var(--text-2xl);
+    font-weight: var(--fw-bold);
+    letter-spacing: var(--ls-tight);
+    line-height: var(--lh-tight);
+}
+
+h2 {
+    font-size: var(--text-lg);
+    font-weight: var(--fw-semi);
+    letter-spacing: var(--ls-tight);
+    line-height: var(--lh-tight);
+    margin-bottom: var(--sp-3);
+}
+
+.header-meta {
+    font-size: var(--text-xs);
+    color: var(--text-faint);
+    margin-bottom: var(--sp-6);
+    letter-spacing: var(--ls-wide);
+    text-transform: uppercase;
+}
+
+/* ─── Badge ───────────────────────────────────── */
+.badge {
+    display: inline-block;
+    padding: 2px var(--sp-2);
+    border-radius: 99px;
+    font-size: var(--text-xs);
+    font-weight: var(--fw-semi);
+    letter-spacing: var(--ls-wide);
+    background: var(--accent);
+    color: #fff;
+    text-transform: uppercase;
+}
+
+.badge-optional {
+    background: var(--yellow-bg);
+    color: var(--yellow);
+    border: 1px solid var(--yellow-border);
+}
+
+/* ─── Progress Bar ────────────────────────────── */
+.progress-bar {
+    width: 100%;
+    height: var(--progress-h);
+    background: var(--progress-bg);
+    border-radius: 99px;
+    overflow: hidden;
+    margin-bottom: var(--sp-6);
+    display: flex;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.progress-bar .seg-done {
+    background: linear-gradient(135deg, var(--green), #10b981);
+    box-shadow: 0 0 8px rgba(5, 150, 105, 0.3);
+}
+
+.progress-bar .seg-likely {
+    background: linear-gradient(135deg, var(--blue), #3b82f6);
+    box-shadow: 0 0 8px rgba(37, 99, 235, 0.25);
+}
+
+.progress-bar .seg-skip {
+    background: var(--gray);
+    opacity: 0.7;
+}
+
+/* ─── Summary Cards ───────────────────────────── */
+.cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-6);
+}
+
+.card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: var(--sp-4) var(--sp-5);
+    box-shadow: var(--shadow);
+    transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+}
+
+.card-num {
+    font-size: var(--text-2xl);
+    font-weight: var(--fw-bold);
+    font-family: var(--font-mono);
+    letter-spacing: var(--ls-tight);
+    line-height: 1;
+}
+
+.card-lbl {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    margin-top: var(--sp-1);
+    letter-spacing: var(--ls-wide);
+    text-transform: uppercase;
+    font-weight: var(--fw-medium);
+}
+
+/* ─── What's Next Banner ──────────────────────── */
+.next-banner {
+    background: var(--next-bg);
+    border: 1px solid var(--next-border);
+    border-left: 4px solid var(--next-border);
+    border-radius: var(--radius);
+    padding: var(--sp-5) var(--sp-6);
+    margin-bottom: var(--sp-6);
+    box-shadow: 0 0 0 1px var(--next-glow), var(--shadow);
+    position: relative;
+    overflow: hidden;
+}
+
+.next-banner::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: var(--next-border);
+    animation: pulse-border 2.5s ease-in-out infinite;
+}
+
+@keyframes pulse-border {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.5; }
+}
+
+.next-banner h2 {
+    color: var(--accent);
+    margin-bottom: var(--sp-1);
+    font-size: var(--text-base);
+    font-weight: var(--fw-semi);
+    letter-spacing: var(--ls-wide);
+    text-transform: uppercase;
+}
+
+.next-banner p {
+    color: var(--text);
+    font-size: var(--text-base);
+}
+
+.next-cmd {
+    font-family: var(--font-mono);
+    background: var(--bg-card);
+    padding: var(--sp-1) var(--sp-3);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-top: var(--sp-3);
+    border: 1px solid var(--border);
+}
+
+/* ─── Phase Headers (Collapsible) ─────────────── */
+.phase {
+    margin-bottom: var(--sp-6);
+}
+
+.phase-hdr {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    cursor: pointer;
+    padding: var(--sp-2) 0;
+    user-select: none;
+    border-bottom: 2px solid var(--border);
+    margin-bottom: var(--sp-3);
+    transition: border-color 0.15s ease;
+}
+
+.phase-hdr:hover {
+    border-bottom-color: var(--accent);
+}
+
+.phase-hdr:hover h2 {
+    color: var(--accent);
+}
+
+.phase-hdr h2 {
+    transition: color 0.15s ease;
+}
+
+.phase-hdr .arr {
+    transition: transform 0.2s ease;
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+}
+
+.phase-hdr.closed .arr {
+    transform: rotate(-90deg);
+}
+
+.phase-cnt {
+    font-size: var(--text-xs);
+    font-family: var(--font-mono);
+    color: var(--text-faint);
+    margin-left: auto;
+    letter-spacing: var(--ls-wide);
+}
+
+/* ─── Prompt List ─────────────────────────────── */
+.plist {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+}
+
+/* ─── Prompt Cards ────────────────────────────── */
+.pcard {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: var(--sp-3) var(--sp-4);
+    box-shadow: var(--shadow-sm);
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: var(--sp-2) var(--sp-3);
+    align-items: start;
+    transition: box-shadow 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
+}
+
+.pcard:hover {
+    box-shadow: var(--shadow);
+    transform: translateY(-1px);
+    border-color: var(--accent-glow);
+}
+
+/* ─── Status Badges ──────────────────────────── */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    font-size: var(--text-xs);
+    font-weight: var(--fw-medium);
+    padding: 2px var(--sp-2);
+    border-radius: 99px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    letter-spacing: var(--ls-wide);
+    line-height: var(--lh-tight);
+}
+
+.st-completed {
+    background: var(--green-bg);
+    color: var(--green);
+    border: 1px solid var(--green-border);
+}
+
+.st-likely-completed {
+    background: var(--blue-bg);
+    color: var(--blue);
+    border: 1px solid var(--blue-border);
+}
+
+.st-skipped {
+    background: var(--gray-bg);
+    color: var(--gray);
+    border: 1px solid var(--gray-border);
+}
+
+.st-pending {
+    background: var(--bg-inset);
+    color: var(--text-faint);
+    border: 1px solid var(--border);
+}
+
+/* ─── Status Legend ──────────────────────────── */
+.status-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    margin-bottom: var(--sp-4);
+    padding: var(--sp-2) 0;
+}
+
+.status-legend .status-badge {
+    cursor: default;
+}
+
+/* ─── Prompt Card Inner ───────────────────────── */
+.pinfo {
+    min-width: 0;
+}
+
+.pname {
+    font-weight: var(--fw-semi);
+    font-size: var(--text-base);
+}
+
+.pstep {
+    font-size: var(--text-xs);
+    font-family: var(--font-mono);
+    color: var(--text-faint);
+    letter-spacing: var(--ls-wide);
+}
+
+.pdesc {
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+    margin-top: 2px;
+    line-height: var(--lh-relaxed);
+}
+
+.pdesc-long {
+    font-size: var(--text-xs);
+    color: var(--text-faint);
+    margin-top: 2px;
+}
+
+.pdeps {
+    font-size: var(--text-xs);
+    color: var(--yellow);
+    margin-top: var(--sp-1);
+    font-weight: var(--fw-medium);
+}
+
+/* ─── Copy Command Button ─────────────────────── */
+.pcmd {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    background: var(--bg-inset);
+    padding: 3px var(--sp-2);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    border: 1px solid var(--border);
+    white-space: nowrap;
+    align-self: center;
+    color: var(--text-muted);
+    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+    letter-spacing: var(--ls-wide);
+}
+
+.pcmd:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-glow);
+}
+
+.pcmd.copied {
+    border-color: var(--green);
+    color: var(--green);
+    background: var(--green-bg);
+}
+
+/* ─── Prompt Modal ────────────────────────────── */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: var(--sp-4);
+}
+
+.modal {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    max-width: 720px;
+    width: 100%;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    padding: var(--sp-4) var(--sp-5);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.modal-header h3 {
+    font-size: var(--text-lg);
+    font-weight: var(--fw-semi);
+    flex: 1;
+    min-width: 0;
+}
+
+.modal-close {
+    background: var(--bg-inset);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: var(--sp-1) var(--sp-2);
+    cursor: pointer;
+    font-size: var(--text-base);
+    color: var(--text-muted);
+    line-height: 1;
+    transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.modal-close:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.modal-body {
+    padding: var(--sp-5);
+    overflow-y: auto;
+    flex: 1;
+}
+
+.modal-body pre {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    line-height: var(--lh-relaxed);
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--text);
+}
+
+.modal-body pre .md-heading {
+    font-weight: var(--fw-bold);
+    color: var(--accent);
+}
+
+.modal-body pre .md-code {
+    background: var(--bg-inset);
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: var(--text-xs);
+}
+
+.modal-footer {
+    display: flex;
+    gap: var(--sp-2);
+    padding: var(--sp-3) var(--sp-5);
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.modal-copy-btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: var(--sp-2) var(--sp-4);
+    font-size: var(--text-sm);
+    font-weight: var(--fw-medium);
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.modal-copy-btn:hover {
+    background: var(--accent-hover);
+}
+
+.modal-copy-btn.copied {
+    background: var(--green);
+}
+
+/* ─── Beads Task Section ─────────────────────── */
+.beads-section {
+    margin-top: var(--sp-8);
+    margin-bottom: var(--sp-6);
+}
+
+.beads-filters {
+    display: flex;
+    gap: var(--sp-2);
+    margin-bottom: var(--sp-3);
+}
+
+.beads-filter {
+    background: var(--bg-inset);
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    padding: var(--sp-1) var(--sp-3);
+    font-size: var(--text-xs);
+    font-weight: var(--fw-medium);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+    letter-spacing: var(--ls-wide);
+}
+
+.beads-filter:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.beads-filter.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+}
+
+/* ─── Beads Status Badges ────────────────────── */
+.st-bead-open {
+    background: var(--accent-glow);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+}
+
+.st-bead-progress {
+    background: var(--blue-bg);
+    color: var(--blue);
+    border: 1px solid var(--blue-border);
+}
+
+.st-bead-blocked {
+    background: var(--yellow-bg);
+    color: var(--yellow);
+    border: 1px solid var(--yellow-border);
+}
+
+.st-bead-deferred {
+    background: var(--gray-bg);
+    color: var(--gray);
+    border: 1px solid var(--gray-border);
+}
+
+.st-bead-closed {
+    background: var(--green-bg);
+    color: var(--green);
+    border: 1px solid var(--green-border);
+}
+
+/* ─── Beads Filter Separator ─────────────────── */
+.beads-filter-sep {
+    width: 1px;
+    background: var(--border);
+    align-self: stretch;
+    margin: 0 var(--sp-1);
+}
+
+/* ─── Beads Priority Filter ──────────────────── */
+.beads-prio-filter {
+    background: var(--bg-inset);
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    padding: var(--sp-1) var(--sp-3);
+    font-size: var(--text-xs);
+    font-weight: var(--fw-medium);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+    letter-spacing: var(--ls-wide);
+}
+
+.beads-prio-filter:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.beads-prio-filter.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+}
+
+/* ─── Beads Task Detail Modal ────────────────── */
+.bead-meta-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--sp-3);
+    padding: var(--sp-4) 0;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.bead-meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.bead-meta-label {
+    font-size: var(--text-xs);
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: var(--ls-wide);
+    font-weight: var(--fw-medium);
+}
+
+.bead-meta-value {
+    font-size: var(--text-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text);
+}
+
+.bead-description {
+    padding: var(--sp-4) 0;
+    border-bottom: 1px solid var(--border-light);
+    white-space: pre-wrap;
+    font-size: var(--text-sm);
+    line-height: var(--lh-relaxed);
+    color: var(--text-muted);
+}
+
+.bead-deps {
+    padding: var(--sp-4) 0;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.bead-dep-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-bottom: var(--sp-2);
+}
+
+.bead-dep-group:last-child {
+    margin-bottom: 0;
+}
+
+.bead-dep-label {
+    font-size: var(--text-xs);
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: var(--ls-wide);
+    font-weight: var(--fw-medium);
+    min-width: 80px;
+}
+
+.bead-dep-link {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    padding: 2px var(--sp-2);
+    border-radius: 99px;
+    background: var(--accent-glow);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+    text-decoration: none;
+}
+
+.bead-dep-link:hover {
+    background: var(--accent);
+    color: #fff;
+}
+
+.bead-timestamps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-4);
+    padding: var(--sp-4) 0;
+}
+
+.bead-ts-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.bead-ts-label {
+    font-size: var(--text-xs);
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: var(--ls-wide);
+    font-weight: var(--fw-medium);
+}
+
+.bead-ts-value {
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+}
+
+.bead-ts-value[title] {
+    border-bottom: 1px dotted var(--text-faint);
+    cursor: help;
+}
+
+/* ─── Standalone Commands Section ─────────────── */
+.ongoing {
+    margin-top: var(--sp-10);
+}
+
+.ongoing h2 {
+    letter-spacing: var(--ls-wide);
+    text-transform: uppercase;
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+    margin-bottom: var(--sp-4);
+    border-bottom: 2px solid var(--border);
+    padding-bottom: var(--sp-2);
+}
+
+/* ─── Footer ──────────────────────────────────── */
+.footer {
+    text-align: center;
+    font-size: var(--text-xs);
+    color: var(--text-faint);
+    margin-top: var(--sp-10);
+    padding-top: var(--sp-4);
+    border-top: 1px solid var(--border-light);
+    letter-spacing: var(--ls-wide);
+}
+
+/* ─── Utilities ───────────────────────────────── */
+.hidden {
+    display: none;
+}
+
+/* Build-observability severity + verdict tokens (Plan 4) */
+:root {
+  --sev-p0: #dc2626;        /* red 600 */
+  --sev-p1: #ea580c;        /* orange 600 */
+  --sev-p2: #ca8a04;        /* yellow 600 */
+  --sev-p3: #2563eb;        /* blue 600 */
+  --sev-pass: #16a34a;      /* green 600 */
+}
+[data-theme="dark"] {
+  --sev-p0: #f87171;
+  --sev-p1: #fb923c;
+  --sev-p2: #facc15;
+  --sev-p3: #60a5fa;
+  --sev-pass: #4ade80;
+}
+
+/* Build-observability panel layout */
+.panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: var(--sp-4) var(--sp-6);
+    margin-bottom: var(--sp-6);
+}
+.panel > header {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-4);
+    flex-wrap: wrap;
+}
+.panel > header h2 {
+    margin: 0;
+    font-size: var(--text-base);
+    font-weight: var(--fw-semi);
+}
+.panel .meta {
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+}
+.grid { display: grid; gap: var(--sp-4); }
+.grid-2 { grid-template-columns: repeat(2, 1fr); }
+@media (max-width: 640px) { .grid-2 { grid-template-columns: 1fr; } }
+
+/* Finding filters */
+.finding-filters {
+    display: flex;
+    gap: var(--sp-2);
+    flex-wrap: wrap;
+    margin-bottom: var(--sp-4);
+}
+.finding-filters button {
+    padding: var(--sp-1) var(--sp-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-inset);
+    color: var(--text);
+    font-size: var(--text-sm);
+    cursor: pointer;
+}
+.finding-filters button:hover,
+.finding-filters button.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+}
+
+/* Findings list */
+.findings {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+}
+.finding {
+    background: var(--bg-inset);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    padding: var(--sp-3) var(--sp-4);
+}
+.finding header {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    flex-wrap: wrap;
+    margin-bottom: var(--sp-2);
+}
+.finding-id {
+    font-family: var(--font-mono, monospace);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px var(--sp-1);
+}
+.finding .lens {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+}
+.finding .title {
+    font-size: var(--text-sm);
+    font-weight: var(--fw-semi);
+    flex: 1;
+}
+.finding p { margin: 0; font-size: var(--text-sm); color: var(--text-muted); }
+.empty { color: var(--text-muted); font-size: var(--text-sm); text-align: center; padding: var(--sp-4); }
+
+/* ── Mermaid diagrams ─────────────────────────────────────────────────────────
+   The build renders mermaid to inline SVG via mmdc, then sanitizeSvg() +
+   rehype-sanitize strip the SVG's own <script>, <foreignObject>, AND <style>
+   for security. Stripping <style> means the diagram arrives unstyled (nodes
+   default to a black fill). These theme-token rules restyle the SVG so nodes,
+   edges, arrowheads, and labels render correctly — and follow light/dark mode.
+   Authors must render with htmlLabels:false (the generator forces this) so node
+   labels are native <text>/<tspan> rather than stripped <foreignObject> HTML. */
+figure.mermaid { margin: var(--sp-5) 0; text-align: center; }
+figure.mermaid svg { max-width: 100%; height: auto; }
+/* Node shapes */
+figure.mermaid svg .node rect,
+figure.mermaid svg .node circle,
+figure.mermaid svg .node ellipse,
+figure.mermaid svg .node polygon,
+figure.mermaid svg .node path {
+    fill: var(--bg-inset);
+    stroke: var(--border);
+    stroke-width: 1px;
+}
+/* Background helper rects mermaid emits behind labels */
+figure.mermaid svg .node .label-container { fill: var(--bg-inset); stroke: var(--border); }
+figure.mermaid svg rect.background { fill: none; stroke: none; }
+/* Labels (rendered as <text>/<tspan> when htmlLabels:false) */
+figure.mermaid svg .nodeLabel,
+figure.mermaid svg .node text,
+figure.mermaid svg text.nodeLabel,
+figure.mermaid svg .label text,
+figure.mermaid svg span.nodeLabel {
+    fill: var(--text);
+    color: var(--text);
+    font-family: var(--font-sans);
+}
+/* Edges: thin strokes, not filled blobs */
+figure.mermaid svg .edgePath path,
+figure.mermaid svg path.flowchart-link,
+figure.mermaid svg .flowchart-link {
+    fill: none;
+    stroke: var(--text-faint);
+    stroke-width: 1.5px;
+}
+/* Arrowheads */
+figure.mermaid svg marker path,
+figure.mermaid svg .marker {
+    fill: var(--text-faint);
+    stroke: var(--text-faint);
+}
+figure.mermaid svg .edgeLabel,
+figure.mermaid svg .edgeLabel text { fill: var(--text-muted); color: var(--text-muted); }
+</style>
+<script>(function(){try{var t=localStorage.getItem('guide-theme');if(!t&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)t='dark';if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+</head>
+<body>
+<header class="topbar">
+  <button data-action="nav" class="nav-toggle" aria-label="Toggle navigation">☰</button>
+  <h1>Knowledge Freshness</h1>
+  <button data-action="theme" class="theme-toggle" aria-label="Toggle theme">◐</button>
+</header>
+<div class="layout">
+  <aside class="rail"><nav class="toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#what-this-system-does">What this system does</a></li><li class="toc-3"><a href="#how-a-gap-closes">How a gap closes</a></li><li class="toc-2"><a href="#system-map">System map</a></li><li class="toc-2"><a href="#frontmatter-signals-and-resolution">Frontmatter, signals, and resolution</a></li><li class="toc-3"><a href="#frontmatter-schema">Frontmatter schema</a></li><li class="toc-3"><a href="#cadence-model">Cadence model</a></li><li class="toc-3"><a href="#adding-a-new-entry-to-the-kb">Adding a new entry to the KB</a></li><li class="toc-3"><a href="#gap-signal-payload">Gap-signal payload</a></li><li class="toc-3"><a href="#knowledgerootresolution-shape">KnowledgeRootResolution shape</a></li><li class="toc-2"><a href="#from-candidate-to-merged-pr">From candidate to merged PR</a></li><li class="toc-3"><a href="#prefilter">Prefilter</a></li><li class="toc-3"><a href="#audit-verdicts">Audit verdicts</a></li><li class="toc-3"><a href="#pr-generation">PR generation</a></li><li class="toc-3"><a href="#mmr-corroboration-manual">MMR corroboration (manual)</a></li><li class="toc-2"><a href="#the-five-pr-gates">The five PR gates</a></li><li class="toc-2"><a href="#lens-i-gap-detection-suppression">Lens I — gap detection + suppression</a></li><li class="toc-3"><a href="#threshold-matrix">Threshold matrix</a></li><li class="toc-3"><a href="#topic-normalization">Topic normalization</a></li><li class="toc-3"><a href="#what-the-lessonsmd-scanner-sees">What the lessons.md scanner sees</a></li><li class="toc-3"><a href="#3-tier---knowledge-root-resolution">3-tier --knowledge-root resolution</a></li><li class="toc-3"><a href="#warning-policy">Warning policy</a></li><li class="toc-3"><a href="#what-a-lens-i-finding-looks-like">What a Lens I finding looks like</a></li><li class="toc-2"><a href="#the-allowlist">The allowlist</a></li><li class="toc-3"><a href="#most-cited-hosts">Most-cited hosts</a></li><li class="toc-3"><a href="#the-full-allowlist">The full allowlist</a></li><li class="toc-3"><a href="#kb-inventory">KB inventory</a></li><li class="toc-3"><a href="#how-to-expand-the-allowlist">How to expand the allowlist</a></li><li class="toc-2"><a href="#anthropic-vs-deepseek-cron-uses-deepseek">Anthropic vs DeepSeek (cron uses DeepSeek)</a></li><li class="toc-2"><a href="#every-command-that-touches-the-system">Every command that touches the system</a></li><li class="toc-3"><a href="#refresh-arm-commands">Refresh-arm commands</a></li><li class="toc-3"><a href="#gap-arm-commands">Gap-arm commands</a></li><li class="toc-3"><a href="#gate-side-subcommands-also-runnable-locally-for-triage">Gate-side subcommands (also runnable locally for triage)</a></li><li class="toc-2"><a href="#operations-cheat-sheet">Operations cheat sheet</a></li><li class="toc-3"><a href="#an-entrys-audit-failed-in-the-cron">An entry's audit failed in the cron</a></li><li class="toc-3"><a href="#lens-i-keeps-surfacing-a-topic-the-kb-already-covers">Lens I keeps surfacing a topic the KB already covers</a></li><li class="toc-3"><a href="#downstream-auto-detect-cant-find-the-kb">Downstream auto-detect can't find the KB</a></li><li class="toc-3"><a href="#yaml-knowledge-root-stops-working-after-an-upgrade">Yaml knowledge_root stops working after an upgrade</a></li><li class="toc-3"><a href="#a-source-url-fetches-in-curl-but-the-cron-rejects-it">A source URL fetches in curl but the cron rejects it</a></li><li class="toc-3"><a href="#--knowledge-root-resolves-to-a-path-you-didnt-expect">--knowledge-root resolves to a path you didn't expect</a></li><li class="toc-2"><a href="#config-reference">Config reference</a></li><li class="toc-2"><a href="#roadmap-and-known-divergences">Roadmap and known divergences</a></li><li class="toc-3"><a href="#phase-5-planned">Phase 5 (planned)</a></li><li class="toc-3"><a href="#known-divergences">Known divergences</a></li></ul></nav></aside>
+  <main class="content"><h2 id="what-this-system-does">What this system does</h2>
+<p>Knowledge entries under <code>content/knowledge/</code> declare a <code>volatility</code> tier and a
+list of <code>sources</code>. A daily cron prefilters at most ten entries that are <em>due</em> —
+by cadence or by a changed source hash — runs a grounded LLM audit against the
+prefetched source bodies, opens one PR per drifted entry, and gates that PR on
+five checks. In parallel, downstream agents emit <code>knowledge_gap_signal</code> events
+when they hit a topic the KB does not cover; <strong>Lens I</strong> aggregates those signals
+into P1/P2 audit findings, suppressing any topic an entry already covers.</p>
+<p>Two arms, two outcomes:</p>
+<ul>
+<li>The <strong>refresh arm</strong> chases <em>known</em> sources for drift. It ends in a PR that
+<em>updates</em> an entry.</li>
+<li>The <strong>gap arm</strong> surfaces <em>unknown</em> topics. It ends in a PR that <em>creates</em> an
+entry.</li>
+</ul>
+<p>Both terminate in a human-merged PR.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Surface</th><th>Value</th><th>Notes</th></tr></thead><tbody><tr><td>Volatility tiers</td><td>3</td><td><code>fast-moving</code> / <code>evolving</code> / <code>stable</code></td></tr><tr><td>Audit verdicts</td><td>4</td><td><code>current</code> / <code>minor-drift</code> / <code>major-drift</code> / <code>superseded</code></td></tr><tr><td>Daily audit ceiling</td><td>10</td><td>set by <code>--max=10</code> in the cron workflow; not a yaml knob</td></tr><tr><td>PR gates</td><td>5</td><td>4 blocking + 1 advisory</td></tr><tr><td>Signal window</td><td>90 days</td><td>rolling; drives Lens I aggregation</td></tr></tbody></table>
+<div class="callout callout-note"><p><strong>Two subsystems, one config file.</strong> Knowledge Freshness and the separate
+<a href="../observability/index.md">Build Observability</a> system both read
+<code>.scaffold/observability.yaml</code>. This guide documents Knowledge Freshness;
+Lens I is the seam where the two meet (it lives in the observability audit but
+reasons about the KB).</p></div>
+<h3 id="how-a-gap-closes">How a gap closes</h3>
+<p>The full lifecycle, end to end:</p>
+<ol>
+<li>Downstream agents emit signals; they accumulate in the rolling 90-day window.</li>
+<li>A topic's signal count and distinct-project count cross the threshold.</li>
+<li>Lens I emits a P1/P2 finding.</li>
+<li>An operator adds <code>content/knowledge/&#x3C;category>/&#x3C;slug>.md</code>.</li>
+<li>The next audit's knowledge index covers the slug and Lens I <strong>suppresses</strong> the
+bucket — the finding disappears.</li>
+</ol>
+<p>Signals are <em>not</em> purged when the entry is added. The window is rolling, so
+yesterday's signals still aggregate tomorrow; suppression filters the <em>emit</em>
+step, not the aggregation step (<span class="fp" data-path="src/observability/checks/lens-i-knowledge-gaps.ts:155">src/observability/checks/lens-i-knowledge-gaps.ts:155</span>).
+Signals only fade as they age out of the 90-day window naturally.</p>
+<h2 id="system-map">System map</h2>
+<figure class="mermaid"><svg id="my-svg" width="100%" xmlns="http://www.w3.org/2000/svg" class="flowchart" style="max-width: 951.219px; background-color: transparent;" viewBox="0 0 951.21875 1057" role="graphics-document document">#my-svg{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;fill:#000000;}@keyframes edge-animation-frame{from{stroke-dashoffset:0;}}@keyframes dash{to{stroke-dashoffset:0;}}#my-svg .edge-animation-slow{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 50s linear infinite;stroke-linecap:round;}#my-svg .edge-animation-fast{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 20s linear infinite;stroke-linecap:round;}#my-svg .error-icon{fill:#552222;}#my-svg .error-text{fill:#552222;stroke:#552222;}#my-svg .edge-thickness-normal{stroke-width:1px;}#my-svg .edge-thickness-thick{stroke-width:3.5px;}#my-svg .edge-pattern-solid{stroke-dasharray:0;}#my-svg .edge-thickness-invisible{stroke-width:0;fill:none;}#my-svg .edge-pattern-dashed{stroke-dasharray:3;}#my-svg .edge-pattern-dotted{stroke-dasharray:2;}#my-svg .marker{fill:#666;stroke:#666;}#my-svg .marker.cross{stroke:#666;}#my-svg svg{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;}#my-svg p{margin:0;}#my-svg .label{font-family:"trebuchet ms",verdana,arial,sans-serif;color:#000000;}#my-svg .cluster-label text{fill:#333;}#my-svg .cluster-label span{color:#333;}#my-svg .cluster-label span p{background-color:transparent;}#my-svg .label text,#my-svg span{fill:#000000;color:#000000;}#my-svg .node rect,#my-svg .node circle,#my-svg .node ellipse,#my-svg .node polygon,#my-svg .node path{fill:#eee;stroke:#999;stroke-width:1px;}#my-svg .rough-node .label text,#my-svg .node .label text,#my-svg .image-shape .label,#my-svg .icon-shape .label{text-anchor:middle;}#my-svg .node .katex path{fill:#000;stroke:#000;stroke-width:1px;}#my-svg .rough-node .label,#my-svg .node .label,#my-svg .image-shape .label,#my-svg .icon-shape .label{text-align:center;}#my-svg .node.clickable{cursor:pointer;}#my-svg .root .anchor path{fill:#666!important;stroke-width:0;stroke:#666;}#my-svg .arrowheadPath{fill:#333333;}#my-svg .edgePath .path{stroke:#666;stroke-width:1px;}#my-svg .flowchart-link{stroke:#666;fill:none;}#my-svg .edgeLabel{background-color:white;text-align:center;}#my-svg .edgeLabel p{background-color:white;}#my-svg .edgeLabel rect{opacity:0.5;background-color:white;fill:white;}#my-svg .labelBkg{background-color:rgba(255, 255, 255, 0.5);}#my-svg .cluster rect{fill:hsl(0, 0%, 98.9215686275%);stroke:#707070;stroke-width:1px;}#my-svg .cluster text{fill:#333;}#my-svg .cluster span{color:#333;}#my-svg div.mermaidTooltip{position:absolute;text-align:center;max-width:200px;padding:2px;font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:12px;background:hsl(-160, 0%, 93.3333333333%);border:1px solid #707070;border-radius:2px;pointer-events:none;z-index:100;}#my-svg .flowchartTitleText{text-anchor:middle;font-size:18px;fill:#000000;}#my-svg rect.text{fill:none;stroke-width:0;}#my-svg .icon-shape,#my-svg .image-shape{background-color:white;text-align:center;}#my-svg .icon-shape p,#my-svg .image-shape p{background-color:white;padding:2px;}#my-svg .icon-shape .label rect,#my-svg .image-shape .label rect{opacity:0.5;background-color:white;fill:white;}#my-svg .label-icon{display:inline-block;height:1em;overflow:visible;vertical-align:-0.125em;}#my-svg .node .label-icon path{fill:currentColor;stroke:revert;stroke-width:revert;}#my-svg .node .neo-node{stroke:#999;}#my-svg [data-look="neo"].node rect,#my-svg [data-look="neo"].cluster rect,#my-svg [data-look="neo"].node polygon{stroke:url(#my-svg-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#my-svg [data-look="neo"].node path{stroke:url(#my-svg-gradient);stroke-width:1px;}#my-svg [data-look="neo"].node .outer-path{filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#my-svg [data-look="neo"].node .neo-line path{stroke:#999;filter:none;}#my-svg [data-look="neo"].node circle{stroke:url(#my-svg-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#my-svg [data-look="neo"].node circle .state-start{fill:#000000;}#my-svg [data-look="neo"].icon-shape .icon{fill:url(#my-svg-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#my-svg [data-look="neo"].icon-shape .icon-neo path{stroke:url(#my-svg-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#my-svg :root{--mermaid-font-family:"trebuchet ms",verdana,arial,sans-serif;}<g><marker id="my-svg_flowchart-v2-pointEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"></path></marker><marker id="my-svg_flowchart-v2-pointStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="4.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 5 L 10 10 L 10 0 z" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"></path></marker><marker id="my-svg_flowchart-v2-pointEnd-margin" class="marker flowchart-v2" viewBox="0 0 11.5 14" refX="11.5" refY="7" markerUnits="userSpaceOnUse" markerWidth="10.5" markerHeight="14" orient="auto"><path d="M 0 0 L 11.5 7 L 0 14 z" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"></path></marker><marker id="my-svg_flowchart-v2-pointStart-margin" class="marker flowchart-v2" viewBox="0 0 11.5 14" refX="1" refY="7" markerUnits="userSpaceOnUse" markerWidth="11.5" markerHeight="14" orient="auto"><polygon points="0,7 11.5,14 11.5,0" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"></polygon></marker><marker id="my-svg_flowchart-v2-circleEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"></circle></marker><marker id="my-svg_flowchart-v2-circleStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="-1" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"></circle></marker><marker id="my-svg_flowchart-v2-circleEnd-margin" class="marker flowchart-v2" viewBox="0 0 10 10" refY="5" refX="12.25" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"></circle></marker><marker id="my-svg_flowchart-v2-circleStart-margin" class="marker flowchart-v2" viewBox="0 0 10 10" refX="-2" refY="5" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"></circle></marker><marker id="my-svg_flowchart-v2-crossEnd" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="12" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" style="stroke-width: 2; stroke-dasharray: 1, 0;"></path></marker><marker id="my-svg_flowchart-v2-crossStart" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="-1" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" style="stroke-width: 2; stroke-dasharray: 1, 0;"></path></marker><marker id="my-svg_flowchart-v2-crossEnd-margin" class="marker cross flowchart-v2" viewBox="0 0 15 15" refX="17.7" refY="7.5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto"><path d="M 1,1 L 14,14 M 1,14 L 14,1" class="arrowMarkerPath" style="stroke-width: 2.5;"></path></marker><marker id="my-svg_flowchart-v2-crossStart-margin" class="marker cross flowchart-v2" viewBox="0 0 15 15" refX="-3.5" refY="7.5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto"><path d="M 1,1 L 14,14 M 1,14 L 14,1" class="arrowMarkerPath" style="stroke-width: 2.5; stroke-dasharray: 1, 0;"></path></marker><g class="root"><g class="clusters"><g class="cluster" id="my-svg-gap"><rect style="" x="390.40625" y="8" width="552.8125" height="625.5999908447266"></rect><g class="cluster-label" transform="translate(636.375, 8)"><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">Gap</tspan><tspan class="text-inner-tspan"> arm</tspan></tspan></text></g></g></g><g class="cluster" id="my-svg-refresh"><rect style="" x="8" y="266.1999969482422" width="362.40625" height="782.7999877929688"></rect><g class="cluster-label" transform="translate(146.1015625, 266.1999969482422)"><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">Refresh</tspan><tspan class="text-inner-tspan"> arm</tspan></tspan></text></g></g></g></g><g class="edgePaths"><path d="M132.684,366.6L132.684,372.233C132.684,377.867,132.684,389.133,132.684,398.267C132.684,407.4,132.684,414.4,132.684,417.9L132.684,421.4" id="my-svg-L_CRON_PF_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M132.684,492L132.684,496.167C132.684,500.333,132.684,508.667,132.684,516.333C132.684,524,132.684,531,132.684,534.5L132.684,538" id="my-svg-L_PF_RUN_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M132.684,608.6L132.684,612.767C132.684,616.933,132.684,625.267,132.684,638.45C132.684,651.633,132.684,669.667,138.29,687.144C143.897,704.622,155.11,721.544,160.716,730.005L166.323,738.466" id="my-svg-L_RUN_APPLY_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M190.598,808.4L190.598,812.567C190.598,816.733,190.598,825.067,190.598,832.733C190.598,840.4,190.598,847.4,190.598,850.9L190.598,854.4" id="my-svg-L_APPLY_GATES_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M190.598,907.4L190.598,911.567C190.598,915.733,190.598,924.067,190.598,931.733C190.598,939.4,190.598,946.4,190.598,949.9L190.598,953.4" id="my-svg-L_GATES_MERGE_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M536.594,99.6L536.594,103.767C536.594,107.933,536.594,116.267,536.594,123.933C536.594,131.6,536.594,138.6,536.594,142.1L536.594,145.6" id="my-svg-L_TAIL_EVENT_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M536.594,216.2L536.594,220.367C536.594,224.533,536.594,232.867,536.594,241.2C536.594,249.533,536.594,257.867,536.594,267C536.594,276.133,536.594,286.067,536.594,291.033L536.594,296" id="my-svg-L_EVENT_LEDGER_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M536.594,366.6L536.594,372.233C536.594,377.867,536.594,389.133,544.883,398.65C553.172,408.168,569.751,415.935,578.04,419.819L586.329,423.703" id="my-svg-L_LEDGER_LENSI_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M661.023,492L661.023,496.167C661.023,500.333,661.023,508.667,661.023,516.333C661.023,524,661.023,531,661.023,534.5L661.023,538" id="my-svg-L_LENSI_FINDING_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M785.453,375.4L785.453,379.567C785.453,383.733,785.453,392.067,777.164,400.117C768.875,408.168,752.296,415.935,744.007,419.819L735.718,423.703" id="my-svg-L_RESOLVER_LENSI_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M661.023,608.6L661.023,612.767C661.023,616.933,661.023,625.267,592.271,638.45C523.52,651.633,386.016,669.667,311.657,687.144C237.299,704.622,226.086,721.544,220.479,730.005L214.873,738.466" id="my-svg-L_FINDING_APPLY_0" class="edge-thickness-normal edge-pattern-dotted edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path></g><g class="edgeLabels"><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel" transform="translate(434.98731, 663.24413)"><g class="label" transform="translate(0, -28.099998474121094)"><g><rect class="background" style="" x="-95.828125" y="-1" width="191.65625" height="58.19999694824219"></rect><text y="-10.1" text-anchor="middle" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"><tspan class="text-inner-tspan">operator</tspan><tspan class="text-inner-tspan"> adds</tspan><tspan class="text-inner-tspan"> an</tspan><tspan class="text-inner-tspan"> entry</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em" text-anchor="middle"><tspan class="text-inner-tspan">whose</tspan><tspan class="text-inner-tspan"> name:</tspan><tspan class="text-inner-tspan"> matches</tspan><tspan class="text-inner-tspan"> the</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="2.1em" text-anchor="middle"><tspan class="text-inner-tspan">bucket</tspan></tspan></text></g></g></g></g><g class="nodes"><g class="node default" id="my-svg-flowchart-CRON-0" transform="translate(132.68359375, 333.2999954223633)"><rect class="basic label-container" style="" x="-86.40625" y="-33.29999923706055" width="172.8125" height="66.5999984741211"></rect><g class="label" style="" transform="translate(0, -18.299999237060547)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">cron</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">09:00</tspan><tspan class="text-inner-tspan"> UTC</tspan><tspan class="text-inner-tspan"> daily</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-PF-1" transform="translate(132.68359375, 458.6999931335449)"><rect class="basic label-container" style="" x="-81.59375" y="-33.29999923706055" width="163.1875" height="66.5999984741211"></rect><g class="label" style="" transform="translate(0, -18.299999237060547)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">audit-prefilter</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">--max=10</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-RUN-3" transform="translate(132.68359375, 575.299991607666)"><rect class="basic label-container" style="" x="-85.171875" y="-33.29999923706055" width="170.34375" height="66.5999984741211"></rect><g class="label" style="" transform="translate(0, -18.299999237060547)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">audit-run-entry</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">grounded</tspan><tspan class="text-inner-tspan"> LLM</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-APPLY-5" transform="translate(190.59765625, 775.0999870300293)"><rect class="basic label-container" style="" x="-70.84375" y="-33.29999923706055" width="141.6875" height="66.5999984741211"></rect><g class="label" style="" transform="translate(0, -18.299999237060547)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">audit-apply</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">--open-pr</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-GATES-7" transform="translate(190.59765625, 882.8999862670898)"><rect class="basic label-container" style="" x="-67.1328125" y="-24.5" width="134.265625" height="49"></rect><g class="label" style="" transform="translate(0, -9.5)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">5</tspan><tspan class="text-inner-tspan"> PR</tspan><tspan class="text-inner-tspan"> gates</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-MERGE-9" transform="translate(190.59765625, 990.6999855041504)"><rect class="basic label-container" style="" x="-92.9609375" y="-33.29999923706055" width="185.921875" height="66.5999984741211"></rect><g class="label" style="" transform="translate(0, -18.299999237060547)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">human</tspan><tspan class="text-inner-tspan"> merge</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">→</tspan><tspan class="text-inner-tspan"> VERSION</tspan><tspan class="text-inner-tspan"> bump</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-TAIL-10" transform="translate(536.59375, 66.29999923706055)"><rect class="basic label-container" style="" x="-90.6171875" y="-33.29999923706055" width="181.234375" height="66.5999984741211"></rect><g class="label" style="" transform="translate(0, -18.299999237060547)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">gap-signal-tail</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">89</tspan><tspan class="text-inner-tspan"> pipeline</tspan><tspan class="text-inner-tspan"> steps</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-EVENT-11" transform="translate(536.59375, 182.89999771118164)"><rect class="basic label-container" style="" x="-111.1875" y="-33.29999923706055" width="222.375" height="66.5999984741211"></rect><g class="label" style="" transform="translate(0, -18.299999237060547)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">scaffold</tspan><tspan class="text-inner-tspan"> observe</tspan><tspan class="text-inner-tspan"> event</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">knowledge_gap_signal</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-LEDGER-13" transform="translate(536.59375, 333.2999954223633)"><rect class="basic label-container" style="" x="-76.09375" y="-33.29999923706055" width="152.1875" height="66.5999984741211"></rect><g class="label" style="" transform="translate(0, -18.299999237060547)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">ledger</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">activity.jsonl</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-LENSI-15" transform="translate(661.0234375, 458.6999931335449)"><rect class="basic label-container" style="" x="-83.65625" y="-33.29999923706055" width="167.3125" height="66.5999984741211"></rect><g class="label" style="" transform="translate(0, -18.299999237060547)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">Lens</tspan><tspan class="text-inner-tspan"> I</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">90-day</tspan><tspan class="text-inner-tspan"> window</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-FINDING-17" transform="translate(661.0234375, 575.299991607666)"><rect class="basic label-container" style="" x="-56.3359375" y="-33.29999923706055" width="112.671875" height="66.5999984741211"></rect><g class="label" style="" transform="translate(0, -18.299999237060547)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">finding</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">P1</tspan><tspan class="text-inner-tspan"> /</tspan><tspan class="text-inner-tspan"> P2</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-RESOLVER-18" transform="translate(785.453125, 333.2999954223633)"><rect class="basic label-container" style="" x="-122.765625" y="-42.099998474121094" width="245.53125" height="84.19999694824219"></rect><g class="label" style="" transform="translate(0, -27.099998474121094)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">3-tier</tspan><tspan class="text-inner-tspan"> --knowledge-root</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">resolver</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="2.1em"><tspan class="text-inner-tspan">suppresses</tspan><tspan class="text-inner-tspan"> covered</tspan><tspan class="text-inner-tspan"> topics</tspan></tspan></text></g></g></g></g></g></g><defs></defs><defs></defs></svg></figure>
+<p>Three real hooks sit beside the two arms: the <strong>phase-audit hook</strong> (runs Lens H
+only, never Lens I), the <strong>doc-conformance MMR channel</strong> (routes Lens I findings
+into MMR), and the <strong><code>--fix</code> flow</strong> (initial + verifier + postfix audit). They
+are covered below.</p>
+<div class="callout callout-warning"><p><strong>Doc drift on MMR-in-cron.</strong> Three docs frame MMR-in-cron differently. The
+parent spec's locked decision #3 is authoritative: a native
+<code>knowledge-freshness</code> MMR channel is deferred to Phase 5. The cron today runs
+only inline gates. Two interim paths give reviewers MMR signal on a freshness
+PR: (1) the built-in <code>doc-conformance</code> MMR channel (disabled by default; enable
+with <code>mmr review --channels=doc-conformance</code>); (2) the manual <code>mmr review --diff -</code> command in <a href="#from-candidate-to-merged-pr">From candidate to merged PR</a>.</p></div>
+<h2 id="frontmatter-signals-and-resolution">Frontmatter, signals, and resolution</h2>
+<h3 id="frontmatter-schema">Frontmatter schema</h3>
+<p>Every knowledge entry's frontmatter is a Zod-validated object with four
+freshness-relevant fields. The schema is the source of truth and runs as Gate 1
+of the PR CI (<span class="fp" data-path="src/validation/knowledge-frontmatter-validator.ts:42-50">src/validation/knowledge-frontmatter-validator.ts:42-50</span>);
+runtime readers tolerate missing optional fields.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Validation</th><th>Read by</th></tr></thead><tbody><tr><td><code>name</code></td><td>string</td><td>required</td><td>regex <code>/^[a-z][a-z0-9-]*$/</code></td><td>assembly-loader, Lens I suppression</td></tr><tr><td><code>description</code></td><td>string</td><td>required</td><td>warns if > 200 chars</td><td>assembly-loader (TOC), audit prompt</td></tr><tr><td><code>topics</code></td><td>string[]</td><td><code>[]</code></td><td>any string</td><td>assembly-loader (auto-selection)</td></tr><tr><td><code>volatility</code></td><td>enum</td><td><code>evolving</code></td><td><code>stable｜evolving｜fast-moving</code></td><td>prefilter cadence</td></tr><tr><td><code>last-reviewed</code></td><td>ISO date</td><td><code>null</code></td><td><code>YYYY-MM-DD</code> &#x26; real calendar date</td><td>prefilter cadence</td></tr><tr><td><code>version-pin</code></td><td>string</td><td><code>null</code></td><td>any string (e.g. <code>"OWASP Top 10 2021"</code>)</td><td>audit prompt; <code>superseded</code> verdict signals it must advance manually</td></tr><tr><td><code>sources[]</code></td><td>object[]</td><td><code>[]</code></td><td>each: <code>url</code> (SSRF-checked at fetch), <code>anchor</code> (optional, starts with <code>#</code>), <code>retrieved</code> (ISO date), <code>hash</code> (sha256)</td><td>prefilter (hash + cadence), audit runner (prefetch)</td></tr></tbody></table>
+<div class="callout callout-note"><p><strong>Anchor semantics.</strong> Put fragments in <code>anchor</code>, never inside <code>url</code>. The audit
+fetches <code>url + (anchor ?? '')</code> and hashes that body; the coverage check
+(<span class="fp" data-path="src/knowledge-freshness/audit-apply.ts:82-101">src/knowledge-freshness/audit-apply.ts:82-101</span>) matches the same combined
+string. Splitting prevents hash drift from spurious URL re-encodings and lets two
+sources at the same base URL with different <code>#anchor</code>s be tracked independently.</p></div>
+<h3 id="cadence-model">Cadence model</h3>
+<p>Three tiers, three windows — <strong>14 / 60 / 180</strong> days for <code>fast-moving</code> /
+<code>evolving</code> / <code>stable</code> (<span class="fp" data-path="src/knowledge-freshness/audit-prefilter.ts:5-7">src/knowledge-freshness/audit-prefilter.ts:5-7</span>).
+An entry with no <code>last-reviewed</code> always counts as due. Sources with a changed
+hash also become candidates regardless of age, but the hash check only runs for
+entries still <em>inside</em> their cadence window.</p>
+<h4>Which tier does an entry belong in?</h4>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Provenance</th><th>Change frequency</th><th>Recommended tier</th></tr></thead><tbody><tr><td>vendor SDK / API docs</td><td>quarterly or faster</td><td><code>fast-moving</code></td></tr><tr><td>standards / RFCs, vendor docs</td><td>yearly-ish</td><td><code>evolving</code></td></tr><tr><td>canonical pattern reference</td><td>multi-year</td><td><code>stable</code></td></tr></tbody></table>
+<p>Rule of thumb: if a version bump <em>often breaks</em> downstream guidance, lean
+<code>fast-moving</code>; if drift is <em>extremely rare</em>, <code>stable</code>; otherwise <code>evolving</code>
+(the default).</p>
+<h3 id="adding-a-new-entry-to-the-kb">Adding a new entry to the KB</h3>
+<ol>
+<li><strong>Choose a category directory</strong> under <code>content/knowledge/&#x3C;category>/</code>. Many
+categories exist today (<code>backend</code>, <code>core</code>, <code>cli</code>, <code>research</code>, <code>web-app</code>,
+<code>web3</code>, …); prefer placing into an existing one. Creating a new category is a
+separate PR.</li>
+<li><strong>File name = entry slug + <code>.md</code>.</strong> The basename must match the <code>name:</code> field
+(e.g. <code>retry-with-jitter.md</code> ↔ <code>name: retry-with-jitter</code>). Lens I's
+suppression match reads <code>name:</code> only, not the filename — a mismatch silently
+breaks suppression.</li>
+<li><strong>Required frontmatter:</strong> <code>name</code>, <code>description</code>. Add <code>volatility</code> + <code>sources[]</code>
+if you want the cron to audit it — an entry with no <code>sources[]</code> is skipped by
+the prefilter (<span class="fp" data-path="src/knowledge-freshness/audit-prefilter.ts:17">src/knowledge-freshness/audit-prefilter.ts:17</span>).</li>
+<li><strong>Validate locally:</strong> <code>make validate-knowledge</code>.</li>
+<li><strong>Confirm the prefilter will pick it up.</strong> A fresh entry has no
+<code>last-reviewed</code>, so it should appear at priority 100:
+<pre><code class="language-bash">node dist/index.js knowledge-freshness audit-prefilter --max=10 \
+  | jq '.[] | select(.name=="&#x3C;your-new-slug>")'
+</code></pre>
+The daily ceiling is 10, so a flood of new entries may queue past the first day.</li>
+</ol>
+<h3 id="gap-signal-payload">Gap-signal payload</h3>
+<p>A gap signal is a ledger event validated by
+<span class="fp" data-path="src/observability/engine/event-schemas.ts:191-220">src/observability/engine/event-schemas.ts:191-220</span> (payload allow-list at
+<span class="fp" data-path="src/observability/engine/event-schemas.ts:12">src/observability/engine/event-schemas.ts:12</span>):</p>
+<pre><code class="language-json">{
+  "event_id":    "&#x3C;uuid>",
+  "worktree_id": "&#x3C;sha>",
+  "actor_label": "agent | bot | …",
+  "branch":      "&#x3C;branch>",
+  "task_id":     null,
+  "type":        "knowledge_gap_signal",
+  "ts":          "&#x3C;ISO-8601>",
+  "payload": {
+    "topic":         "&#x3C;kebab-slug>",
+    "source":        "agent_search",
+    "project_id":    "&#x3C;sha256-hex>",
+    "step_name":     "tech-stack",
+    "agent_excerpt": "…"
+  }
+}
+</code></pre>
+<p><code>topic</code> is ≤80 chars matching <code>/^[a-z0-9]+(-[a-z0-9]+)*$/</code>; <code>source</code> ∈
+{<code>agent_search</code>, <code>lessons</code>, <code>manual</code>}; <code>project_id</code> is 64-char sha256 hex (or the
+literal <code>lessons</code> when <code>source=lessons</code>); <code>step_name</code> and <code>agent_excerpt</code> (≤200
+chars) are optional.</p>
+<div class="callout callout-tip"><p><strong>Suppressing emission in tests/CI.</strong> Set <code>SCAFFOLD_GAP_SIGNAL_QUIET=1</code>. The
+assembly-time tail (<code>src/core/assembly/gap-signal-tail.ts</code>) then renders no
+emission template into the pipeline step. Default is always-on (locked decision
+#9) — catch gaps everywhere they occur.</p></div>
+<h3 id="knowledgerootresolution-shape">KnowledgeRootResolution shape</h3>
+<p>The resolver returns a three-field record that threads through the audit run
+(<span class="fp" data-path="src/observability/knowledge-index.ts:275-291">src/observability/knowledge-index.ts:275-291</span>):</p>
+<pre><code class="language-ts">export interface KnowledgeRootResolution {
+  /** Validated absolute path to a knowledge directory, or null. */
+  root: string | null
+  /** Pre-loaded index Set, populated by the validator. Null when root is null.
+      Lens I reads this directly — no re-walk. */
+  index: Set&#x3C;string> | null
+  /** Audit trail of what was tried. Lens I uses this to compose a precise
+      warn-once message when root is null. */
+  attempts: KnowledgeRootAttempt[]
+}
+</code></pre>
+<h2 id="from-candidate-to-merged-pr">From candidate to merged PR</h2>
+<p>The cron is a thin bash loop — the brains live in three CLI subcommands and a
+meta-prompt that runs a grounded LLM against pre-fetched source bodies.</p>
+<h3 id="prefilter">Prefilter</h3>
+<p>An entry becomes a candidate when (1) it has at least one source, AND (2) either
+its <code>last-reviewed</code> is older than the cadence window, OR a source's prefetched
+hash differs from the stored one. Priority orders newest-first; the top <code>--max</code>
+win (<span class="fp" data-path="src/knowledge-freshness/audit-prefilter.ts:14-72">src/knowledge-freshness/audit-prefilter.ts:14-72</span>):</p>
+<pre><code class="language-ts">for (const e of entries) {
+  if (e.sources.length === 0) continue            // no sources = no audit
+  if (!e.lastReviewed)        { select = true; priority = 100 }
+  else if (ageDays > window)  { select = true; priority = 50 + ageDays }
+  else {
+    // hash check — Promise.all over a small per-entry list (1-3 sources)
+    if (anyHashChanged) { select = true; priority = 75 }
+  }
+}
+candidates.sort((a, b) => b.priority - a.priority)
+return candidates.slice(0, max)
+</code></pre>
+<p>The hash check is a tiebreaker, not a baseline. Entries already <em>past</em> their
+window are selected immediately at priority <code>50 + ageDays</code> — no network cost.
+The hash check only runs in the <code>else</code> branch (still <em>inside</em> the window), runs
+<code>Promise.all</code> over the entry's 1–3 sources, and swallows fetch errors so a slow
+upstream doesn't crash the cron.</p>
+<h3 id="audit-verdicts">Audit verdicts</h3>
+<p>The meta-prompt at <code>content/tools/knowledge-audit-entry.md</code> instructs the LLM to
+read pre-fetched source bodies (no web tool available) and emit one of four
+verdicts. <strong>Every verdict opens a PR</strong> — the dry-run apply runs first so gates
+can inspect the proposed diff, then <code>--open-pr</code> creates the branch.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Verdict</th><th>What the PR contains</th></tr></thead><tbody><tr><td><code>current</code></td><td>Frontmatter-only: bumps <code>last-reviewed</code>, <code>sources[*].hash</code>, <code>sources[*].retrieved</code> so the entry exits the queue. Verdict JSON embedded for provenance.</td></tr><tr><td><code>minor-drift</code></td><td>Frontmatter persistence + findings table as commentary. <code>applyVerdictToEntry</code> refuses any <code>proposed_changes</code> on this verdict (<span class="fp" data-path="src/knowledge-freshness/audit-apply.ts:54-58">src/knowledge-freshness/audit-apply.ts:54-58</span>); no body edits.</td></tr><tr><td><code>major-drift</code></td><td>Body edits land via <code>proposed_changes</code> (H2-heading-anchored splices). Gate 4 blocks if a stable entry's diff exceeds 20% churn without the override label.</td></tr><tr><td><code>superseded</code></td><td>A new edition shipped; <code>version-pin</code> must advance. <code>last-reviewed</code> does <strong>not</strong> advance (<span class="fp" data-path="src/knowledge-freshness/audit-apply.ts:103-118">src/knowledge-freshness/audit-apply.ts:103-118</span>) — only <code>hash</code>/<code>retrieved</code> update, so the entry stays due until a human re-audits. Prevents a known-stale entry from looking fresh.</td></tr></tbody></table>
+<h3 id="pr-generation">PR generation</h3>
+<p>Branch: <code>knowledge-freshness/&#x3C;entry>-&#x3C;YYYY-MM-DD></code>. The body embeds the verdict
+JSON, the findings table, and a per-source confirmation row. Each candidate gets
+its own PR off <code>origin/main</code> — the cron <code>git checkout main</code> between iterations
+and restores the entry between the dry-run apply (for gates) and the final
+<code>--open-pr</code> call. PRs do not stack; failures isolate per-candidate.</p>
+<h4>VERSION bump on merge</h4>
+<p>A dedicated workflow
+(<span class="fp" data-path=".github/workflows/knowledge-freshness-version-bump.yml:16">.github/workflows/knowledge-freshness-version-bump.yml:16</span>) fires on PR
+<code>closed</code> (merged-only) when the source branch starts with <code>knowledge-freshness/</code>
+<em>or</em> the PR carries the <code>knowledge-freshness</code> label. It computes the next SemVer
+from the PR title and body, writes <code>content/knowledge/VERSION</code>, commits with the
+prefix <code>chore(knowledge):</code> (deliberately not <code>knowledge-freshness/*</code>) so the
+commit doesn't re-trigger itself, then <code>git pull --rebase</code> before pushing. Bump
+rules (<span class="fp" data-path="src/knowledge-freshness/bump-version.ts:26-45">src/knowledge-freshness/bump-version.ts:26-45</span>):</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Match</th><th>Bump</th><th>Notes</th></tr></thead><tbody><tr><td><code>BREAKING CHANGE:</code> anywhere in title, or start-of-line in body</td><td>major</td><td>Wins over every other prefix</td></tr><tr><td><code>feat(knowledge):</code> / <code>feat(knowledge-freshness):</code> title prefix</td><td>minor</td><td>Case-sensitive</td></tr><tr><td><code>chore(knowledge):</code> / <code>chore(knowledge-freshness):</code> title prefix</td><td>patch</td><td>Used by the bump commit itself</td></tr><tr><td>Anything else (including <code>fix(knowledge):</code>)</td><td>patch</td><td>Logs a <code>::notice::</code> for unrecognized prefixes</td></tr></tbody></table>
+<p>The start-of-line anchor on the BREAKING CHANGE body match (<code>/^BREAKING CHANGE:/m</code>) is deliberate — a freshness PR's body embeds an LLM-generated
+findings table whose evidence excerpts could otherwise mention "BREAKING CHANGE:"
+and trigger an accidental major bump.</p>
+<h3 id="mmr-corroboration-manual">MMR corroboration (manual)</h3>
+<p>The cron does <em>not</em> dispatch MMR today — the workflow only runs inline gates. To
+corroborate a freshness PR locally:</p>
+<pre><code class="language-bash">git diff origin/main...HEAD -- 'content/knowledge/**/*.md' \
+  | mmr review --diff - --focus knowledge-freshness --sync --format json
+</code></pre>
+<p>A native <code>knowledge-freshness</code> MMR channel is the Phase 5 plan. See the
+<a href="../mmr/index.md">MMR guide</a> for the channel architecture.</p>
+<h2 id="the-five-pr-gates">The five PR gates</h2>
+<p>The cron's <code>GITHUB_TOKEN</code>-opened PRs don't fire downstream workflows, so the
+cron also runs the gate code inline (same CLI surface). Human-opened freshness
+PRs get gated by the workflow at
+<span class="fp" data-path=".github/workflows/knowledge-freshness-gates.yml:17">.github/workflows/knowledge-freshness-gates.yml:17</span>.</p>
+<div class="filter-table"><input type="text" class="filter-input" placeholder="Filter…" aria-label="Filter table rows" disabled>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>#</th><th>Gate</th><th>What it checks</th><th>Mode</th><th>Source</th></tr></thead><tbody><tr><td>1</td><td>Frontmatter validator</td><td>Zod schema parse over every entry (excludes README). Strict calendar-date refinement; SSRF guard on source URLs.</td><td><span class="sev sev-p0">blocking</span></td><td><span class="fp" data-path="src/validation/knowledge-frontmatter-validator.ts:42-50">src/validation/knowledge-frontmatter-validator.ts:42-50</span></td></tr><tr><td>2</td><td>Source link-check</td><td>Every <code>sources[*].url</code> returns 2xx. Operates on the changed-files list via <code>--files-from</code>.</td><td><span class="sev sev-p0">blocking</span></td><td><span class="fp" data-path=".github/workflows/knowledge-freshness-gates.yml:117-123">.github/workflows/knowledge-freshness-gates.yml:117-123</span></td></tr><tr><td>3</td><td>Unsourced-claims lint</td><td>New normative claims must have a <code>sources[]</code> entry. Runs even when 1/2 failed.</td><td><span class="sev sev-p3">advisory</span></td><td><span class="fp" data-path=".github/workflows/knowledge-freshness-gates.yml:126-135">.github/workflows/knowledge-freshness-gates.yml:126-135</span></td></tr><tr><td>4</td><td>Anti-over-rewrite</td><td>Stable entries reject diffs deleting >20% of lines unless the <code>override:anti-over-rewrite</code> label is applied. Cron-opened <code>knowledge-freshness/*</code> branches only.</td><td><span class="sev sev-p1">blocking</span></td><td><span class="fp" data-path=".github/workflows/knowledge-freshness-gates.yml:137-152">.github/workflows/knowledge-freshness-gates.yml:137-152</span></td></tr><tr><td>5</td><td>Deep Guidance preserved</td><td>Literal <code>## Deep Guidance</code> heading must survive — the assembly engine pulls just that section.</td><td><span class="sev sev-p0">blocking</span></td><td><span class="fp" data-path=".github/workflows/knowledge-freshness-gates.yml:154-160">.github/workflows/knowledge-freshness-gates.yml:154-160</span></td></tr></tbody></table></div>
+<div class="callout callout-warning"><p><strong>Spec drift on the Gate 4 override.</strong> The parent spec describes the override as
+a marker in the PR <em>description</em>; the shipped mechanism
+(<span class="fp" data-path=".github/workflows/knowledge-freshness-gates.yml:148-152">.github/workflows/knowledge-freshness-gates.yml:148-152</span>) reads a
+maintainer-applied PR <em>label</em> (<code>override:anti-over-rewrite</code>) via <code>--pr-labels</code>.
+The shipped behavior is authoritative; the spec text is stale.</p></div>
+<div class="callout callout-note"><p><strong>Anti-tamper checkout (known gap).</strong> The gate workflow builds the gate code from
+HEAD, not from <code>origin/main</code>
+(<span class="fp" data-path=".github/workflows/knowledge-freshness-gates.yml:42-53">.github/workflows/knowledge-freshness-gates.yml:42-53</span>). The hardening —
+build from base, overlay only PR HEAD's <code>content/knowledge/</code> — is deferred
+because the bootstrap PR introduced the gate code itself. Risk is mitigated by
+mandatory PR review until a follow-up flips the checkout strategy.</p></div>
+<h2 id="lens-i-gap-detection-suppression">Lens I — gap detection + suppression</h2>
+<p>Lens I runs under <code>--scope=docs</code> and <code>--scope=all</code>
+(<span class="fp" data-path="src/observability/checks/lens-i-knowledge-gaps.ts:43">src/observability/checks/lens-i-knowledge-gaps.ts:43</span>). It collects
+signals from the ledger (rolling 90-day window,
+<span class="fp" data-path="src/observability/checks/lens-i-knowledge-gaps.ts:52">src/observability/checks/lens-i-knowledge-gaps.ts:52</span>) plus synthetic
+signals from <code>tasks/lessons.md</code>, buckets them by normalized topic, applies the
+threshold matrix, and suppresses buckets whose topic an entry already covers.</p>
+<div class="callout callout-note"><p><strong>Where Lens I sits in the taxonomy.</strong> "Lens" is scaffold's name for an audit
+check function inside <code>scaffold observe audit</code>. The full set is A–I; Lens I
+(<code>I-knowledge-gaps</code>) is this one. The other seven plus Lens H are documented in
+the <a href="../observability/index.md">Build Observability guide</a>.</p></div>
+<h3 id="threshold-matrix">Threshold matrix</h3>
+<p>The rules (<span class="fp" data-path="src/observability/checks/lens-i-knowledge-gaps.ts:148-149">src/observability/checks/lens-i-knowledge-gaps.ts:148-149</span>):</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>signal_count</th><th>distinct_projects</th><th>Severity</th></tr></thead><tbody><tr><td>≥ 5</td><td>≥ 3</td><td><span class="sev sev-p1">P1</span></td></tr><tr><td>≥ 3</td><td>≥ 2</td><td><span class="sev sev-p2">P2</span></td></tr><tr><td>below both</td><td>—</td><td>no finding</td></tr></tbody></table>
+<h3 id="topic-normalization">Topic normalization</h3>
+<p>Lens I normalizes the raw topic before bucketing, then validates the result.
+Two distinct steps: <code>normalizeTopic</code>
+(<span class="fp" data-path="src/observability/checks/lens-i-lessons-scanner.ts:32-38">src/observability/checks/lens-i-lessons-scanner.ts:32-38</span>) always
+produces a (possibly empty) string; <code>isValidTopic</code>
+(<span class="fp" data-path="src/observability/checks/lens-i-lessons-scanner.ts:114-116">src/observability/checks/lens-i-lessons-scanner.ts:114-116</span>) decides
+whether to accept it. Normalization lowercases, strips apostrophes, replaces
+every other non-slug run with a single hyphen, collapses repeats, and trims. The
+validator additionally enforces ≤ 80 chars and <code>/^[a-z0-9]+(-[a-z0-9]+)*$/</code>.
+So <code>Agent Eval Harnesses!</code> → <code>agent-eval-harnesses</code> (valid), but <code>!!!</code> → `` (rejected).</p>
+<h3 id="what-the-lessonsmd-scanner-sees">What the lessons.md scanner sees</h3>
+<p>Lens I synthesizes signals from <code>tasks/lessons.md</code> at audit time (read inline, no
+ledger writes) via two passes per non-fenced line — code-fenced blocks are
+skipped (<span class="fp" data-path="src/observability/checks/lens-i-lessons-scanner.ts:4">src/observability/checks/lens-i-lessons-scanner.ts:4</span>):</p>
+<ol>
+<li><strong>Explicit marker</strong> — <code>&#x3C;!-- gap-topic: &#x3C;slug> --></code> (slug must already be
+kebab-case; the marker regex enforces it).</li>
+<li><strong>Heuristic phrases</strong> (case-insensitive): <em>"would have helped to have a guide
+on X"</em>, <em>"missing knowledge entry for X"</em>, <em>"no knowledge entry for X"</em> /
+<em>"no kb entry for X"</em>, <em>"missing knowledge: X"</em>.</li>
+</ol>
+<p>Captured topics run through the same <code>normalizeTopic</code> / <code>isValidTopic</code>.
+Synthetic signals carry <code>project_id: "lessons"</code> and are <strong>excluded</strong> from the
+distinct-projects count by the aggregator's <code>delete('lessons')</code> rule (decision
+#6) — they corroborate but don't independently satisfy the threshold.</p>
+<h3 id="3-tier---knowledge-root-resolution">3-tier <code>--knowledge-root</code> resolution</h3>
+<p>Lens I must know where the KB lives to skip already-covered topics. The resolver
+(<code>resolveKnowledgeRoot</code> at <span class="fp" data-path="src/observability/knowledge-index.ts:326-379">src/observability/knowledge-index.ts:326-379</span>)
+tries three tiers in order:</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Tier</th><th>Source</th><th>On failure</th></tr></thead><tbody><tr><td>1</td><td><code>--knowledge-root</code> CLI flag (resolved against <code>process.cwd()</code>)</td><td><strong>hard error</strong> before any lens runs (<code>KnowledgeRootCliInvalidError</code>)</td></tr><tr><td>2</td><td><code>lenses.I-knowledge-gaps.knowledge_root</code> in yaml (resolved against cwd)</td><td>soft-fail; records <code>{outcome: 'invalid', reason}</code> in the attempts trail</td></tr><tr><td>3</td><td>auto-detect — <code>findScaffoldKnowledgeRoot</code> walks parents for <code>package.json#name === '@zigrivers/scaffold'</code> (<span class="fp" data-path="src/observability/knowledge-index.ts:164-178">src/observability/knowledge-index.ts:164-178</span>)</td><td>returns <code>null</code> if no install is found</td></tr></tbody></table>
+<p>The sharp asymmetry is intentional: an operator who <em>typed</em> a <code>--knowledge-root</code>
+gets a hard error on a bad path; yaml and auto-detect soft-fail so suppression
+degrades gracefully. The most instructive case: yaml invalid + auto-detect found
+— the trail records the yaml failure <em>and</em> the auto-detect success, root is the
+auto-detect path, and a one-line stderr note points at the stale yaml. This is
+what an operator sees when <code>npm update -g @zigrivers/scaffold</code> moved the install
+out from under a pinned yaml path.</p>
+<h3 id="warning-policy">Warning policy</h3>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Key</th><th>Status</th><th>When emitted</th></tr></thead><tbody><tr><td><code>lens-i:no-root</code></td><td>active</td><td>Lens I runs, no root resolved, lens enabled. Per-audit deduped via <code>warnedKeys: Set&#x3C;string></code>. If yaml failed validation, the message gains a clause quoting the bad path + reason.</td></tr><tr><td><code>lens-i:index-load-failed</code></td><td>reserved</td><td>Never emitted today — <code>validateKnowledgeRoot</code> exercises the loader at resolution time, foreclosing this path.</td></tr><tr><td>(none)</td><td>no-warn</td><td>Lens I disabled — resolver runs but no warning surfaces (decisions #4 / #11).</td></tr></tbody></table>
+<p><code>emitOnceForAudit</code> (<span class="fp" data-path="src/observability/knowledge-index.ts:251-259">src/observability/knowledge-index.ts:251-259</span>) reads a
+caller-provided <code>Set</code> created fresh in each <code>runAudit</code>
+(<span class="fp" data-path="src/observability/engine/api.ts:114">src/observability/engine/api.ts:114</span>), so the <code>--fix</code> flow's three
+internal audits each get their own dedup scope.</p>
+<h3 id="what-a-lens-i-finding-looks-like">What a Lens I finding looks like</h3>
+<p>A single finding excerpt from the audit sidecar (<code>docs/audits/&#x3C;id>.json</code>):</p>
+<pre><code class="language-json">{
+  "id": "a3f2c1d4...",
+  "lens_id": "I-knowledge-gaps",
+  "severity": "P2",
+  "title": "Knowledge base lacks coverage for \"agent-eval-harnesses\" — 4 signals across 2 projects",
+  "source_doc": "",
+  "evidence": {
+    "kind": "knowledge_gap",
+    "topic": "agent-eval-harnesses",
+    "signal_count": 4,
+    "distinct_project_count": 2,
+    "distinct_projects": ["a3f2...", "1c4e..."],
+    "first_seen": "2026-04-12T09:00:00Z",
+    "last_seen": "2026-05-21T14:30:00Z",
+    "example_excerpts": ["No knowledge entry for agent eval harnesses"]
+  },
+  "confidence": "medium",
+  "fix_hint": {
+    "kind": "edit_doc",
+    "target": "content/knowledge/&#x3C;category>/agent-eval-harnesses.md",
+    "prompt": "Propose a new knowledge entry for \"agent-eval-harnesses\". Evidence: 4 signals from 2 projects in the last 90 days."
+  }
+}
+</code></pre>
+<div class="callout callout-warning"><p><strong>Phase audits don't trigger Lens I.</strong> The phase-boundary hook
+(<code>StateManager.markCompleted</code> → <code>runPhaseAudit</code> at
+<span class="fp" data-path="src/observability/engine/phase-audit.ts:63">src/observability/engine/phase-audit.ts:63</span>) fires only Lens H-cross-doc
+(<code>lensIds: ['H-cross-doc']</code> at <span class="fp" data-path="src/observability/engine/phase-audit.ts:77">src/observability/engine/phase-audit.ts:77</span>).
+Lens I never runs at phase boundaries. A phase-audit run that surfaces zero
+findings does <strong>not</strong> mean Lens I is happy — it means Lens I never ran. To see
+Lens I findings, invoke <code>scaffold observe audit --scope=docs</code> (or <code>--scope=all</code>)
+explicitly, or run it through <code>--fix</code>.</p></div>
+<h2 id="the-allowlist">The allowlist</h2>
+<p>Out-of-allowlist sources warn but don't block (decision #4). Bare hostnames
+match subdomains; <code>host/path</code> entries additionally require the URL path to start
+with the prefix; <code>github_repos</code> is locked to specific <code>owner/repo</code>.</p>
+<p>The allowlist gates <strong>only</strong> Gate 3 (<code>lint-unsourced</code>), which is advisory.
+Off-allowlist sources still get fetched, hashed, and audited — they just warn.
+It is <strong>not</strong> a security boundary: the SSRF guard
+(<code>src/knowledge-freshness/source-url-validator.ts</code>) runs independently, so a new
+host never unlocks private-IP fetches. The editorial bar is: "would the
+maintainers want this URL to be the verbatim grounding for a P0/P1 finding?"</p>
+<h3 id="most-cited-hosts">Most-cited hosts</h3>
+<p>Counted live from every entry's <code>sources[*].url</code> at build time.</p>
+
+<div class="chart-block"><div class="chart chart-bar"><div class="chart-row" aria-label="martinfowler.com: 37"><span class="chart-label">martinfowler.com</span><div class="chart-bar" style="width:100%"></div></div><div class="chart-row" aria-label="developer.mozilla.org: 24"><span class="chart-label">developer.mozilla.org</span><div class="chart-bar" style="width:65%"></div></div><div class="chart-row" aria-label="owasp.org: 17"><span class="chart-label">owasp.org</span><div class="chart-bar" style="width:46%"></div></div><div class="chart-row" aria-label="developer.android.com: 15"><span class="chart-label">developer.android.com</span><div class="chart-bar" style="width:41%"></div></div><div class="chart-row" aria-label="the-turing-way.netlify.app: 15"><span class="chart-label">the-turing-way.netlify.app</span><div class="chart-bar" style="width:41%"></div></div><div class="chart-row" aria-label="developer.apple.com: 14"><span class="chart-label">developer.apple.com</span><div class="chart-bar" style="width:38%"></div></div><div class="chart-row" aria-label="developer.chrome.com: 14"><span class="chart-label">developer.chrome.com</span><div class="chart-bar" style="width:38%"></div></div><div class="chart-row" aria-label="sre.google: 12"><span class="chart-label">sre.google</span><div class="chart-bar" style="width:32%"></div></div><div class="chart-row" aria-label="w3.org: 12"><span class="chart-label">w3.org</span><div class="chart-bar" style="width:32%"></div></div><div class="chart-row" aria-label="microservices.io: 11"><span class="chart-label">microservices.io</span><div class="chart-bar" style="width:30%"></div></div><div class="chart-row" aria-label="ethereum.org: 10"><span class="chart-label">ethereum.org</span><div class="chart-bar" style="width:27%"></div></div><div class="chart-row" aria-label="rfc-editor.org: 10"><span class="chart-label">rfc-editor.org</span><div class="chart-bar" style="width:27%"></div></div><div class="chart-row" aria-label="consensys.github.io: 9"><span class="chart-label">consensys.github.io</span><div class="chart-bar" style="width:24%"></div></div><div class="chart-row" aria-label="docs.openzeppelin.com: 9"><span class="chart-label">docs.openzeppelin.com</span><div class="chart-bar" style="width:24%"></div></div><div class="chart-row" aria-label="opentelemetry.io: 9"><span class="chart-label">opentelemetry.io</span><div class="chart-bar" style="width:24%"></div></div></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Host</th><th>Citations</th></tr></thead><tbody><tr><td>martinfowler.com</td><td>37</td></tr><tr><td>developer.mozilla.org</td><td>24</td></tr><tr><td>owasp.org</td><td>17</td></tr><tr><td>developer.android.com</td><td>15</td></tr><tr><td>the-turing-way.netlify.app</td><td>15</td></tr><tr><td>developer.apple.com</td><td>14</td></tr><tr><td>developer.chrome.com</td><td>14</td></tr><tr><td>sre.google</td><td>12</td></tr><tr><td>w3.org</td><td>12</td></tr><tr><td>microservices.io</td><td>11</td></tr><tr><td>ethereum.org</td><td>10</td></tr><tr><td>rfc-editor.org</td><td>10</td></tr><tr><td>consensys.github.io</td><td>9</td></tr><tr><td>docs.openzeppelin.com</td><td>9</td></tr><tr><td>opentelemetry.io</td><td>9</td></tr></tbody></table></div>
+
+<h3 id="the-full-allowlist">The full allowlist</h3>
+<p>Every host plus its category, and the pinned GitHub repos.</p>
+
+<p>47 allowlisted hosts and 3 GitHub repos. Out-of-list sources warn (they do not block).</p>
+<div class="filter-table"><input type="text" class="filter-input" placeholder="Filter…" aria-label="Filter table rows" disabled>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Host</th><th>Category</th></tr></thead><tbody><tr><td><code>ai.google.dev</code></td><td>ai-ml</td></tr><tr><td><code>anthropic.com</code></td><td>ai-ml</td></tr><tr><td><code>docs.wandb.ai</code></td><td>ai-ml</td></tr><tr><td><code>mlflow.org</code></td><td>ai-ml</td></tr><tr><td><code>modelcontextprotocol.io</code></td><td>ai-ml</td></tr><tr><td><code>platform.openai.com</code></td><td>ai-ml</td></tr><tr><td><code>spec.graphql.org</code></td><td>api</td></tr><tr><td><code>spec.openapis.org</code></td><td>api</td></tr><tr><td><code>developer.chrome.com</code></td><td>browser-ext</td></tr><tr><td><code>docs.aws.amazon.com</code></td><td>cloud-ops</td></tr><tr><td><code>opentelemetry.io</code></td><td>cloud-ops</td></tr><tr><td><code>sre.google</code></td><td>cloud-ops</td></tr><tr><td><code>aicpa-cima.com</code></td><td>compliance</td></tr><tr><td><code>aicpa.org</code></td><td>compliance</td></tr><tr><td><code>eur-lex.europa.eu</code></td><td>compliance</td></tr><tr><td><code>pcisecuritystandards.org</code></td><td>compliance</td></tr><tr><td><code>www.finra.org</code></td><td>compliance</td></tr><tr><td><code>www.sec.gov</code></td><td>compliance</td></tr><tr><td><code>developer.android.com</code></td><td>mobile</td></tr><tr><td><code>developer.apple.com</code></td><td>mobile</td></tr><tr><td><code>adr.github.io</code></td><td>patterns</td></tr><tr><td><code>agilealliance.org</code></td><td>patterns</td></tr><tr><td><code>conventionalcommits.org</code></td><td>patterns</td></tr><tr><td><code>google.github.io</code></td><td>patterns</td></tr><tr><td><code>martinfowler.com</code></td><td>patterns</td></tr><tr><td><code>microservices.io</code></td><td>patterns</td></tr><tr><td><code>thoughtworks.com</code></td><td>patterns</td></tr><tr><td><code>the-turing-way.netlify.app</code></td><td>research</td></tr><tr><td><code>nist.gov</code></td><td>security</td></tr><tr><td><code>openid.net</code></td><td>security</td></tr><tr><td><code>owasp.org</code></td><td>security</td></tr><tr><td><code>consensys.github.io</code></td><td>smart-contracts</td></tr><tr><td><code>docs.openzeppelin.com</code></td><td>smart-contracts</td></tr><tr><td><code>docs.safe.global</code></td><td>smart-contracts</td></tr><tr><td><code>ethereum.org</code></td><td>smart-contracts</td></tr><tr><td><code>swcregistry.io</code></td><td>smart-contracts</td></tr><tr><td><code>ietf.org/rfc</code></td><td>standards</td></tr><tr><td><code>www.iso.org</code></td><td>standards</td></tr><tr><td><code>www.rfc-editor.org</code></td><td>standards</td></tr><tr><td><code>docs.pact.io</code></td><td>testing</td></tr><tr><td><code>docs.astral.sh</code></td><td>tooling</td></tr><tr><td><code>git-scm.com</code></td><td>tooling</td></tr><tr><td><code>peps.python.org</code></td><td>tooling</td></tr><tr><td><code>www.postgresql.org</code></td><td>tooling</td></tr><tr><td><code>developer.mozilla.org</code></td><td>web-standards</td></tr><tr><td><code>tr.designtokens.org</code></td><td>web-standards</td></tr><tr><td><code>www.w3.org</code></td><td>web-standards</td></tr></tbody></table></div>
+<p><strong>GitHub repos:</strong> <code>modelcontextprotocol/specification</code>, <code>steveyegge/beads</code>, <code>joelparkerhenderson/architecture-decision-record</code></p>
+
+<h3 id="kb-inventory">KB inventory</h3>
+<p>Totals over <code>content/knowledge/</code>, broken down per category.</p>
+
+<p><strong>266 entries</strong> across 19 categories:</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Category</th><th>Entries</th></tr></thead><tbody><tr><td>core</td><td>35</td></tr><tr><td>game</td><td>25</td></tr><tr><td>research</td><td>25</td></tr><tr><td>backend</td><td>22</td></tr><tr><td>review</td><td>20</td></tr><tr><td>web-app</td><td>17</td></tr><tr><td>web3</td><td>14</td></tr><tr><td>data-science</td><td>13</td></tr><tr><td>browser-extension</td><td>12</td></tr><tr><td>data-pipeline</td><td>12</td></tr><tr><td>library</td><td>12</td></tr><tr><td>ml</td><td>12</td></tr><tr><td>mobile-app</td><td>12</td></tr><tr><td>cli</td><td>10</td></tr><tr><td>validation</td><td>7</td></tr><tr><td>product</td><td>6</td></tr><tr><td>execution</td><td>5</td></tr><tr><td>tools</td><td>4</td></tr><tr><td>finalization</td><td>3</td></tr></tbody></table>
+
+<h3 id="how-to-expand-the-allowlist">How to expand the allowlist</h3>
+<p>Adding a host is a one-line PR to
+<code>docs/knowledge-freshness/authoritative-sources.yaml</code>:</p>
+<pre><code class="language-diff"> hosts:
+   - owasp.org
++  - developers.cloudflare.com
+   - nist.gov
+</code></pre>
+<ol>
+<li><strong>Pick the form.</strong> Bare hostname for vendor docs whose path layout changes;
+<code>host/path</code> prefix for shared-tenancy hosts where you only trust a sub-path;
+<code>owner/repo</code> under <code>github_repos:</code> for specific GitHub repos. Skip <code>www.</code>
+(bare entries auto-match subdomains).</li>
+<li><strong>Verify the host is live</strong> — <code>curl -sI https://&#x3C;host>/&#x3C;path></code> should return
+2xx (or a 3xx that ultimately resolves).</li>
+<li><strong>Open a normal PR.</strong> Allowlist additions are not a separate trust delegation;
+any maintainer can review.</li>
+</ol>
+<h2 id="anthropic-vs-deepseek-cron-uses-deepseek">Anthropic vs DeepSeek (cron uses DeepSeek)</h2>
+<p>The cron switched to DeepSeek HTTP to remove the local <code>claude</code> CLI dependency
+from CI. Local audits keep using whichever provider is configured. Precedence is
+resolved by <code>resolveProvider</code> (<span class="fp" data-path="src/knowledge-freshness/providers/index.ts:36">src/knowledge-freshness/providers/index.ts:36</span>):</p>
+<ol>
+<li><code>--provider &#x3C;name></code> — explicit flag, operator override</li>
+<li><code>KNOWLEDGE_FRESHNESS_PROVIDER</code> env var</li>
+<li>A single API key in env — inferred</li>
+<li>Both API keys present → error (ambiguous)</li>
+<li>No env, <code>claude</code> on PATH → anthropic (subprocess uses keychain)</li>
+<li>Nothing → error (no provider configured)</li>
+</ol>
+<div class="tabs"><div class="tablist" role="tablist"><button class="tab-btn active" role="tab" data-tab="0">Anthropic</button><button class="tab-btn" role="tab" data-tab="1">DeepSeek</button></div><div class="tabpane active" data-tab="0"><p>Subprocess: <code>claude -p --tools ""</code> (empty-tools disables WebFetch so the model
+can only read the prefetched bodies). <strong>Requires the <code>claude</code> CLI on PATH
+regardless of how the provider was chosen</strong> — the resolver throws
+(<span class="fp" data-path="src/knowledge-freshness/providers/index.ts:44-56">src/knowledge-freshness/providers/index.ts:44-56</span>) if anthropic is
+picked via flag, env, or API-key inference and <code>claude</code> isn't installed.
+<code>ANTHROPIC_API_KEY</code> alone is <em>not</em> sufficient. Source:
+<code>src/knowledge-freshness/providers/anthropic.ts</code>.</p></div><div class="tabpane" data-tab="1"><p>HTTP. No subprocess; works in CI without the Claude CLI.</p><ul>
+<li><strong>Auth:</strong> requires <code>DEEPSEEK_API_KEY</code>.</li>
+<li><strong>Default model:</strong> <code>deepseek-v4-flash</code>.</li>
+<li><strong>Override:</strong> set <code>KNOWLEDGE_FRESHNESS_DEEPSEEK_MODEL</code> to <code>deepseek-v4-pro</code>.
+Other values throw at dispatcher-build time
+(<span class="fp" data-path="src/knowledge-freshness/providers/deepseek.ts:54-58">src/knowledge-freshness/providers/deepseek.ts:54-58</span>).</li>
+<li><strong>Thinking mode:</strong> hardcoded <code>thinking: { type: 'disabled' }</code>.</li>
+<li><strong>URL:</strong> hardcoded to <code>https://api.deepseek.com/chat/completions</code>;
+project-local config cannot redirect (decision #7 invariant).</li>
+</ul></div></div>
+<div class="callout callout-danger"><p><strong>Why the DeepSeek URL is hardcoded.</strong> An untrusted project's
+<code>.scaffold/observability.yaml</code> could otherwise redirect the LLM dispatcher at an
+attacker-controlled host that captures <code>DEEPSEEK_API_KEY</code> from request headers.
+Hardcoding closes that exfiltration path — the same threat model that hardcodes
+Lens H's <code>claude -p</code> command in the Build Observability audit.</p></div>
+<p>The cron wires DeepSeek explicitly
+(<span class="fp" data-path=".github/workflows/knowledge-freshness-audit.yml:70">.github/workflows/knowledge-freshness-audit.yml:70</span>):</p>
+<pre><code class="language-yaml">env:
+  DEEPSEEK_API_KEY:              ${{ secrets.DEEPSEEK_API_KEY }}
+  KNOWLEDGE_FRESHNESS_PROVIDER:  deepseek
+  GH_TOKEN:                      ${{ secrets.GITHUB_TOKEN }}
+</code></pre>
+<p>A missing <code>DEEPSEEK_API_KEY</code> fails the run loudly at preflight rather than
+silently exiting 0 with zero PRs.</p>
+<h2 id="every-command-that-touches-the-system">Every command that touches the system</h2>
+<p>All commands ship in the published CLI.</p>
+<h3 id="refresh-arm-commands">Refresh-arm commands</h3>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Command</th><th>Purpose</th></tr></thead><tbody><tr><td><code>scaffold knowledge-freshness audit-prefilter [--max=N]</code></td><td>Walk <code>content/knowledge/</code>, apply cadence + hash check, print a JSON candidate array. <code>--max</code> default 10 (<span class="fp" data-path="src/cli/commands/knowledge-freshness-audit-prefilter.ts:18">src/cli/commands/knowledge-freshness-audit-prefilter.ts:18</span>); the CLI emits only <code>{ name, path }</code> per candidate (<span class="fp" data-path="src/cli/commands/knowledge-freshness-audit-prefilter.ts:43">src/cli/commands/knowledge-freshness-audit-prefilter.ts:43</span>).</td></tr><tr><td><code>scaffold knowledge-freshness audit-run-entry &#x3C;path></code></td><td>Pre-fetch each source through SSRF guards, dispatch the grounded audit, print verdict JSON. <code>--provider anthropic|deepseek</code> overrides env precedence.</td></tr><tr><td><code>scaffold knowledge-freshness audit-apply &#x3C;path> &#x3C;verdict.json> [--open-pr]</code></td><td>Patch frontmatter + apply <code>proposed_changes</code> by H2 heading. The wrapper re-fetches every checked URL and computes its own sha256 (<span class="fp" data-path="src/knowledge-freshness/audit-apply.ts:82-101">src/knowledge-freshness/audit-apply.ts:82-101</span>), so persisted hashes are deterministic, not the LLM's claim. Refuses to advance <code>last-reviewed</code> unless every declared source is covered.</td></tr><tr><td><code>make validate-knowledge</code></td><td>Gate 1 — runs the Zod validator over every entry (README excluded).</td></tr></tbody></table>
+<h3 id="gap-arm-commands">Gap-arm commands</h3>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Command</th><th>Purpose</th></tr></thead><tbody><tr><td><code>scaffold observe audit --lens I-knowledge-gaps [--knowledge-root &#x3C;path>] [--fix]</code></td><td>Run the gap-detection lens against the local ledger + <code>tasks/lessons.md</code>. <code>--knowledge-root</code> overrides yaml + auto-detect for suppression. <code>--fix</code> dispatches the fix flow; the override threads through all three audits.</td></tr><tr><td><code>scaffold observe event knowledge_gap_signal --topic=&#x3C;slug> --source=&#x3C;…> --project-id=&#x3C;sha> …</code></td><td>Write one validated gap signal to the ledger. Used by the assembly-time tail and by operators backfilling synthetic signals.</td></tr><tr><td><code>scaffold observe ack &#x3C;prefix-or-id></code></td><td>Acknowledge (or reopen) a finding so it stops surfacing. Use when a Lens I topic is deliberately out of scope.</td></tr></tbody></table>
+<p>The <code>--fix</code> flow (<code>runFixFlow</code> at <span class="fp" data-path="src/observability/engine/fix-flow.ts:71">src/observability/engine/fix-flow.ts:71</span>)
+runs a three-audit loop: (1) the initial audit produces a fix plan; (2) for each
+blocking finding, dispatch a fix agent then re-audit just that finding (the
+verifier); (3) one postfix audit runs everything for the final report. The
+<code>--knowledge-root</code> override threads into all three (decision #20) so suppression
+is consistent throughout.</p>
+<h3 id="gate-side-subcommands-also-runnable-locally-for-triage">Gate-side subcommands (also runnable locally for triage)</h3>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Command</th><th>Gate</th><th>Purpose</th></tr></thead><tbody><tr><td><code>knowledge-freshness link-check [&#x3C;path>] [--files-from &#x3C;json>]</code></td><td>2</td><td>HTTP-HEAD every <code>sources[*].url</code>; 2xx passes, else exit 1.</td></tr><tr><td><code>knowledge-freshness lint-unsourced [&#x3C;path>] [--files-from &#x3C;json>] [--diff &#x3C;patch>]</code></td><td>3</td><td>Heuristic scan for normative language in new lines without a <code>sources[]</code> reference. Advisory: prints findings but always exits 0.</td></tr><tr><td><code>knowledge-freshness anti-over-rewrite [--files-from &#x3C;json>] [--diff &#x3C;patch>] [--pr-labels &#x3C;csv>]</code></td><td>4</td><td>For each changed <code>stable</code> entry, compare deleted-line count to 20% of the body; exit 1 if crossed without <code>override:anti-over-rewrite</code>. The cron passes <code>--pr-labels ""</code> (it can't self-apply labels).</td></tr><tr><td><code>knowledge-freshness deep-guidance-check [&#x3C;path>] [--files-from &#x3C;json>]</code></td><td>5</td><td>Assert each changed entry still contains a <code>## Deep Guidance</code> heading (case-sensitive).</td></tr><tr><td><code>knowledge-freshness bump-version --title &#x3C;str> --body &#x3C;str></code></td><td>—</td><td>Pure-function dry-run of <code>deriveBumpKind</code> + <code>bumpSemver</code>; prints <code>bump:</code> and <code>next:</code> lines parsed by the version-bump workflow.</td></tr></tbody></table>
+<h2 id="operations-cheat-sheet">Operations cheat sheet</h2>
+<h3 id="an-entrys-audit-failed-in-the-cron">An entry's audit failed in the cron</h3>
+<p>The cron logs <code>audit failed for &#x3C;name> — moving on</code> and continues; the entry
+stays in tomorrow's queue. Causes: provider auth (key rotated), source URL now
+404s, source body too large (96 KiB cap), LLM timeout. Reproduce locally:</p>
+<pre><code class="language-bash">DEEPSEEK_API_KEY=sk-… node dist/index.js knowledge-freshness \
+  audit-run-entry content/knowledge/&#x3C;cat>/&#x3C;name>.md
+# read stderr to see if it's a URL issue or a provider issue
+</code></pre>
+<h3 id="lens-i-keeps-surfacing-a-topic-the-kb-already-covers">Lens I keeps surfacing a topic the KB already covers</h3>
+<p>Suppression didn't match. Either the resolver returned <code>root: null</code> (look for
+<code>[Lens I] knowledge-root not located</code> in stderr) or the entry's <code>name:</code> doesn't
+normalize to the same slug as the bucket topic — the match is exact and
+post-normalize.</p>
+<pre><code class="language-bash">scaffold observe audit --lens I-knowledge-gaps --json \
+  --knowledge-root /path/to/content/knowledge \
+  | jq '.findings[] | select(.lens_id=="I-knowledge-gaps")'
+grep -A1 "^---" content/knowledge/&#x3C;cat>/&#x3C;slug>.md | grep "^name:"
+</code></pre>
+<h3 id="downstream-auto-detect-cant-find-the-kb">Downstream auto-detect can't find the KB</h3>
+<p><code>findScaffoldKnowledgeRoot</code> walks parents from the CLI install's module location
+looking for <code>package.json#name === '@zigrivers/scaffold'</code>. Symlinked or
+repackaged installs may miss. Pin it via the tier-2 yaml:</p>
+<pre><code class="language-yaml">lenses:
+  I-knowledge-gaps:
+    knowledge_root: /opt/homebrew/lib/node_modules/@zigrivers/scaffold/content/knowledge
+</code></pre>
+<h3 id="yaml-knowledge-root-stops-working-after-an-upgrade">Yaml <code>knowledge_root</code> stops working after an upgrade</h3>
+<p>The yaml tier soft-fails and records the reason in the attempts trail; Lens I
+appends it to the warning. Validation requires all four: the path exists, is a
+directory, contains a <code>&#x3C;path>/VERSION</code> marker, and <code>loadKnowledgeIndex</code> runs
+without throwing (an empty index is OK). The usual cause after an upgrade is a
+moved install path:</p>
+<pre><code class="language-bash">find / -name VERSION -path '*content/knowledge*' 2>/dev/null
+</code></pre>
+<p>Then update <code>lenses.I-knowledge-gaps.knowledge_root</code> to the new path.</p>
+<h3 id="a-source-url-fetches-in-curl-but-the-cron-rejects-it">A source URL fetches in <code>curl</code> but the cron rejects it</h3>
+<p>The SSRF guard re-resolves the hostname at fetch time and rejects any IP in a
+non-globally-routable range (RFC1918, link-local, loopback, CGNAT, ULA,
+IPv4-mapped IPv6, …). Common cause: an internal DNS view returning a private IP
+for an outwardly-public hostname.</p>
+<pre><code class="language-bash">node -e 'require("node:dns").promises.lookup("&#x3C;host>", { all: true }).then(console.log)'
+</code></pre>
+<p>Fix: move the source to a globally-routable host, or remove it. Allowlisting does
+<strong>not</strong> bypass the SSRF guard.</p>
+<h3 id="--knowledge-root-resolves-to-a-path-you-didnt-expect"><code>--knowledge-root</code> resolves to a path you didn't expect</h3>
+<p>Auto-detect may pick a stale npm-global install. The successful-resolution path
+doesn't log its <code>attempts</code> trail today (only the failure path warns), so pin and
+compare:</p>
+<pre><code class="language-bash">scaffold observe audit --lens I-knowledge-gaps --json \
+  --knowledge-root /path/you/expected/content/knowledge \
+  | jq '.findings[] | select(.lens_id=="I-knowledge-gaps") | .evidence.topic'
+# compare against the unset behavior; if the lists differ, auto-detect picked a different KB
+</code></pre>
+<p>Fix: pin <code>lenses.I-knowledge-gaps.knowledge_root</code> in
+<code>.scaffold/observability.yaml</code>. A pinned yaml path takes precedence over
+auto-detect.</p>
+<h2 id="config-reference">Config reference</h2>
+<p>Everything operator-tunable lives in <code>.scaffold/observability.yaml</code>. Anything
+outside this list is hardcoded (decision #7 invariant) so an untrusted project
+can't redirect dispatch commands or LLM URLs.</p>
+<pre><code class="language-yaml">lenses:
+  I-knowledge-gaps:
+    knowledge_root: /path/to/content/knowledge   # tier-2 resolver override
+
+disabled_lenses: [I-knowledge-gaps]              # opt-out
+
+phase_audit:
+  enabled: true                                  # default
+  timeout_s: 60
+  detached: false                                # fire-and-forget when true
+
+fix:
+  dispatcher_command: "claude -p"                # default
+  timeout_s: 300
+  per_finding_max_attempts: 3
+</code></pre>
+<div class="callout callout-warning"><p><strong>The daily audit ceiling is NOT in yaml.</strong> The parent spec's decision #8 reads
+"10 grounded audits per day; configurable via <code>.scaffold/observability.yaml</code>",
+but the yaml knob was never implemented. The ceiling is the <code>--max=10</code> flag in
+<span class="fp" data-path=".github/workflows/knowledge-freshness-audit.yml:67">.github/workflows/knowledge-freshness-audit.yml:67</span>; the CLI default at
+<span class="fp" data-path="src/cli/commands/knowledge-freshness-audit-prefilter.ts:18">src/cli/commands/knowledge-freshness-audit-prefilter.ts:18</span> is the only
+fallback. To lower it for your fork, edit the workflow — nothing in yaml will help.</p></div>
+<h2 id="roadmap-and-known-divergences">Roadmap and known divergences</h2>
+<h3 id="phase-5-planned">Phase 5 (planned)</h3>
+<ul>
+<li><strong>Native MMR <code>knowledge-freshness</code> channel</strong> — runs automatically on freshness
+PRs (today the cron dispatches no MMR).</li>
+<li><strong>Frontier scan</strong> — augment cadence/hash triggers with a model-driven check:
+"has the underlying technology meaningfully changed since <code>last-reviewed</code>?"</li>
+<li><strong>Taxonomy cross-reference</strong> — detect when two entries assert contradictory
+facts and route to a reviewer.</li>
+</ul>
+<h3 id="known-divergences">Known divergences</h3>
+<p>The reference page's own audits surfaced these doc-vs-code mismatches; the code
+is ground truth:</p>
+<ul>
+<li><strong>MMR-in-cron framing</strong> — three docs describe it differently; decision #3
+(Phase 5 deferral) is authoritative.</li>
+<li><strong>Gate 4 override</strong> — spec says PR-description marker; code reads a PR <em>label</em>.</li>
+<li><strong>Daily ceiling</strong> — spec implies a yaml knob; only the <code>--max</code> flag exists.</li>
+<li><strong><code>operations.md</code> lags</strong> — labels the native MMR channel "Phase 4" and
+describes suppression in future tense; both have shipped.</li>
+<li><strong><code>www.</code> prefix inconsistency</strong> (P3) — mixed <code>www.</code> use in the allowlist; bare
+entries already auto-match subdomains, so the prefix is redundant.</li>
+</ul></main>
+</div>
+<script>(function(){
+  var LS_KEY = 'guide-theme';
+  function applyTheme(t) {
+    document.documentElement.setAttribute('data-theme', t);
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    // ─── Theme toggle ────────────────────────────────────────────────────────
+    document.querySelectorAll('[data-action="theme"]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var current = document.documentElement.getAttribute('data-theme');
+        var next = current === 'dark' ? 'light' : 'dark';
+        applyTheme(next);
+        try { localStorage.setItem(LS_KEY, next); } catch(e) {}
+      });
+    });
+
+    // ─── Mobile nav ──────────────────────────────────────────────────────────
+    document.querySelectorAll('[data-action="nav"]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var rail = document.querySelector('.rail');
+        if (rail) rail.classList.toggle('open');
+      });
+    });
+
+    // ─── Copy buttons ─────────────────────────────────────────────────────────
+    document.querySelectorAll('pre').forEach(function(pre) {
+      if (!pre.parentNode) return;
+      var wrapper = document.createElement('div');
+      wrapper.className = 'code';
+      pre.parentNode.insertBefore(wrapper, pre);
+      wrapper.appendChild(pre);
+      var btn = document.createElement('button');
+      btn.className = 'copy-btn';
+      btn.textContent = 'Copy';
+      btn.addEventListener('click', function() {
+        var text = pre.textContent || '';
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(function() {
+            btn.textContent = 'Copied';
+            setTimeout(function() { btn.textContent = 'Copy'; }, 1200);
+          }, function() {
+            btn.textContent = 'Copy';
+          });
+        }
+      });
+      wrapper.insertBefore(btn, pre);
+    });
+
+    // ─── Tabs ─────────────────────────────────────────────────────────────────
+    document.querySelectorAll('.tabs').forEach(function(group) {
+      group.querySelectorAll('.tab-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var idx = btn.getAttribute('data-tab');
+          group.querySelectorAll('.tab-btn').forEach(function(b) {
+            b.classList.toggle('active', b === btn);
+          });
+          group.querySelectorAll('.tabpane').forEach(function(pane) {
+            pane.classList.toggle('active', pane.getAttribute('data-tab') === idx);
+          });
+        });
+      });
+    });
+
+    // ─── Filter tables ────────────────────────────────────────────────────────
+    document.querySelectorAll('.filter-input').forEach(function(input) {
+      input.addEventListener('input', function() {
+        var q = input.value.toLowerCase();
+        var container = input.closest('.filter-table');
+        if (!container) return;
+        container.querySelectorAll('tbody tr').forEach(function(row) {
+          var text = (row.textContent || '').toLowerCase();
+          row.style.display = text.includes(q) ? '' : 'none';
+        });
+      });
+    });
+
+    // ─── Scrollspy ────────────────────────────────────────────────────────────
+    if (typeof IntersectionObserver === 'undefined') return;
+    var headings = document.querySelectorAll('h2[id],h3[id]');
+    if (!headings.length) return;
+    var observer = new IntersectionObserver(function(entries) {
+      entries.forEach(function(entry) {
+        if (!entry.isIntersecting) return;
+        var id = entry.target.getAttribute('id');
+        document.querySelectorAll('.toc a').forEach(function(a) {
+          a.classList.toggle('active', a.getAttribute('href') === '#' + id);
+        });
+      });
+    }, { rootMargin: '0px 0px -70% 0px', threshold: 0 });
+    headings.forEach(function(h) { observer.observe(h); });
+  });
+})();</script>
+</body>
+</html>

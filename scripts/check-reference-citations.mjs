@@ -34,36 +34,21 @@ const REPO_ROOT = path.resolve(new URL('.', import.meta.url).pathname, '..')
 const EXT = 'ts|tsx|js|mjs|md|yml|yaml|json|sh|css|html'
 const DEFAULT_PREFIX = 'src|tests|scripts|content|docs|\\.github'
 
-// Re-folded verbatim from check-freshness-reference-citations.mjs: bare
-// filenames the freshness page uses in JS comments without a path prefix.
-const FRESHNESS_BARE_MAP = {
-  'api.ts': 'src/observability/engine/api.ts',
-  'audit-apply.ts': 'src/knowledge-freshness/audit-apply.ts',
-  'audit-prefilter.ts': 'src/knowledge-freshness/audit-prefilter.ts',
-  'audit.yml': '.github/workflows/knowledge-freshness-audit.yml',
-  'gates.yml': '.github/workflows/knowledge-freshness-gates.yml',
-  'lens-i-lessons-scanner.ts': 'src/observability/checks/lens-i-lessons-scanner.ts',
-  'lens-i-knowledge-gaps.ts': 'src/observability/checks/lens-i-knowledge-gaps.ts',
-  'knowledge-index.ts': 'src/observability/knowledge-index.ts',
-  'bump-version.ts': 'src/knowledge-freshness/bump-version.ts',
-  'providers/deepseek.ts': 'src/knowledge-freshness/providers/deepseek.ts',
-  'providers/index.ts': 'src/knowledge-freshness/providers/index.ts',
-  'observability-config.ts': 'src/observability/engine/checks/observability-config.ts',
-  'phase-audit.ts': 'src/observability/engine/phase-audit.ts',
-}
-
 const PAGES = [
   // NOTE: docs/observability/reference.html was migrated to the guide system
   // (content/guides/observability/) and retired to a redirect shim — it is now
   // validated via discoverGuidePages, not here.
   {
+    // Migrated to the guide system; the generator now regenerates the guide's
+    // gen:* data blocks (the markdown), so rebake checks the .md, not the .html.
     name: 'knowledge-freshness',
-    path: 'docs/knowledge-freshness/reference.html',
-    fp: false,
+    path: 'content/guides/knowledge-freshness/index.html',
+    fp: true,
     fileMap: false,
-    text: true,
-    bareMap: FRESHNESS_BARE_MAP,
+    text: false,
+    strictCites: true,
     rebake: 'node scripts/build-freshness-reference.mjs',
+    rebakeTarget: 'content/guides/knowledge-freshness/index.md',
   },
   {
     name: 'mmr-reference',
@@ -216,7 +201,9 @@ function validate(cites) {
 // Generated pages: re-run the build and assert the committed page is a no-op.
 function rebakeNoop(page) {
   if (!page.rebake) return { ok: true, notes: [] }
-  const abs = path.join(REPO_ROOT, page.path)
+  // The rebake command may regenerate a different file than the one we scan for
+  // citations (e.g. the freshness generator edits the guide .md, not the .html).
+  const abs = path.join(REPO_ROOT, page.rebakeTarget || page.path)
   const before = fs.readFileSync(abs)
   const hashBefore = createHash('sha256').update(before).digest('hex')
   try {
@@ -229,7 +216,7 @@ function rebakeNoop(page) {
   if (hashBefore === hashAfter) return { ok: true, notes: [] }
   let diff = ''
   try {
-    diff = execSync(`git diff --stat ${page.path}`, { cwd: REPO_ROOT }).toString().trim()
+    diff = execSync(`git diff --stat ${page.rebakeTarget || page.path}`, { cwd: REPO_ROOT }).toString().trim()
   } catch { /* ignore */ }
   fs.writeFileSync(abs, before) // restore — don't leave the tree dirty
   return {
@@ -243,7 +230,12 @@ function rebakeNoop(page) {
 
 function main() {
   let failed = false
-  const pages = [...PAGES, ...discoverGuidePages(path.join(REPO_ROOT, 'content/guides'), REPO_ROOT)]
+  // Skip discovered guides already covered by an explicit PAGES entry (e.g. the
+  // freshness guide, which needs a rebake check) to avoid validating it twice.
+  const staticPaths = new Set(PAGES.map((p) => p.path))
+  const discovered = discoverGuidePages(path.join(REPO_ROOT, 'content/guides'), REPO_ROOT)
+    .filter((g) => !staticPaths.has(g.path))
+  const pages = [...PAGES, ...discovered]
   for (const page of pages) {
     const abs = path.join(REPO_ROOT, page.path)
     if (!fs.existsSync(abs)) {
