@@ -51,3 +51,22 @@ Patterns and anti-patterns discovered during development. Review before starting
 - Historical docs may still mention Beads. Treat those references as stale unless the user explicitly asks to restore Beads support.
 
 - When backfilling release notes for config surface changes (e.g. `loop_control.*` fields in mmr 1.4.0), verify runtime consumption (review.ts, results-pipeline, reconciler, etc.) — not just schema presence + tests. Schema-only or partial features must be described precisely ("config shape for future X; only Y is wired") rather than as delivered behavior. Caught in 3.29.0 / 1.4.0 release-prep round 2 review.
+
+- Hardening the agentic grok review channel (2026-05-30): a grok review can answer
+  from the wrong context via THREE independent vectors — (1) cross-session memory,
+  (2) filesystem `read_file` roaming, (3) host-config injection (it auto-loads
+  `~/.grok` skills/MCP/hooks/permissions + cwd `Claude.md`/`Agents.md`). A neutral
+  `--cwd` clears ONLY projectInstructions; an isolated `HOME` (+`XDG_CONFIG_HOME`)
+  is the lever that zeroes ALL of skills/MCP/hooks/permissions/instructions (verify
+  with `grok inspect --json`). Verified hardened tuple on grok 0.2.11/grok-build:
+  `--no-memory --tools web_search,web_fetch --no-subagents --no-plan` with
+  `HOME`/`XDG_CONFIG_HOME` + neutral cwd pointed at a per-run temp dir. `--tools` is
+  a deny-by-default allowlist: it genuinely denies `read_file` (a sentinel-file read
+  returned NO_FILE_ACCESS) while keeping web search. `--no-subagents --no-plan` do
+  NOT change the JSON envelope (`{"text":...}` parser unchanged). Auth survived
+  isolated HOME on macOS (keychain-backed); on Linux/CI auth is file-based in
+  `~/.grok/auth.json` so isolated HOME may break it — symlink just `auth.json` into
+  the isolated dir if so (verify per platform before shipping). If a future grok
+  rejects `--tools`, the fallback must FAIL CLOSED (disable the channel), never run
+  FS-open. Spec + plan went through 10 rounds of 4-channel MMR review before a clean
+  pass. See `docs/superpowers/specs/2026-05-30-mmr-grok-channel-hardening-design.md`.

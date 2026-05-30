@@ -4,6 +4,7 @@ import path from 'node:path'
 import { TERMINAL_STATUSES } from '../types.js'
 import type { ChannelStatus } from '../types.js'
 import type { JobStore } from './job-store.js'
+import { withNeutralPosture, sweepStaleNeutralDirs } from './host-isolation.js'
 
 export interface DispatchOptions {
   command: string
@@ -19,6 +20,9 @@ export interface DispatchOptions {
    * placeholder is present), for CLIs that require the prompt as an arg.
    */
   promptDelivery?: 'stdin' | 'prompt-file'
+  /** Working directory for the spawned process. {{neutral_cwd}} is expanded
+   *  (with {{neutral_home}} in env) into a per-run isolated dir before spawn. */
+  cwd?: string
 }
 
 /** Placeholder token replaced with the prompt-file path in prompt-file mode. */
@@ -26,6 +30,13 @@ const PROMPT_FILE_PLACEHOLDER = '{{prompt_file}}'
 
 /** Track active child PIDs for cleanup on parent exit */
 const activeChildren = new Set<number>()
+
+/**
+ * Track per-dispatch neutral-posture cleanups so a SIGINT/SIGTERM that
+ * terminates the run also removes the isolated HOME/cwd temp dirs (which hold a
+ * grok auth symlink). Each entry is removed once its own dispatch settles.
+ */
+const activePostureCleanups = new Set<() => void>()
 
 function cleanupChildren(): void {
   for (const pid of activeChildren) {
@@ -36,6 +47,12 @@ function cleanupChildren(): void {
     }
   }
   activeChildren.clear()
+  // Remove any neutral-posture temp dirs from interrupted dispatches. Snapshot
+  // first: a cleanup callback (or a settling dispatch) could mutate the live Set.
+  for (const cleanup of [...activePostureCleanups]) {
+    try { cleanup() } catch { /* best effort */ }
+  }
+  activePostureCleanups.clear()
 }
 
 // Register cleanup once
@@ -45,6 +62,14 @@ function ensureCleanupRegistered(): void {
   cleanupRegistered = true
   process.on('SIGINT', () => { cleanupChildren(); process.exit(130) })
   process.on('SIGTERM', () => { cleanupChildren(); process.exit(143) })
+}
+
+// Sweep stale neutral dirs once at process start
+let sweepDone = false
+function ensureSweepOnce(): void {
+  if (sweepDone) return
+  sweepDone = true
+  try { sweepStaleNeutralDirs() } catch { /* best effort — never block dispatch */ }
 }
 
 /** Check whether a channel status represents a terminal (done) state */
@@ -60,6 +85,7 @@ export async function dispatchChannel(
   opts: DispatchOptions,
 ): Promise<void> {
   ensureCleanupRegistered()
+  ensureSweepOnce()
 
   if (!/^[a-zA-Z0-9._-]+$/.test(channelName)) {
     throw new Error(`Unsafe channel name: ${channelName}`)
@@ -97,31 +123,53 @@ export async function dispatchChannel(
     : opts.stderr === 'capture' ? 'pipe'
       : 'ignore'  // suppress
 
-  // Pipe prompt via stdin to avoid E2BIG on large diffs
-  const proc = spawn(cmd, args, {
-    detached: true,
-    stdio: ['pipe', 'pipe', stderrStdio],
-    env: { ...process.env, ...opts.env },
-  })
-
-  if (proc.pid) activeChildren.add(proc.pid)
-
-  // Handle stdin pipe errors (child may close stdin early)
-  // stdin is always 'pipe' so proc.stdin is guaranteed non-null
-  proc.stdin!.on('error', () => {
-    // Swallow EPIPE — the close handler will deal with the process exit
-  })
-
-  // Write prompt to stdin (stdin delivery only; prompt-file mode passes the
-  // prompt as an arg). Always end stdin so processes that read it don't hang.
-  if (promptDelivery === 'stdin') {
-    proc.stdin!.write(opts.prompt)
+  // Expand neutral posture placeholders ({{neutral_home}}, {{neutral_cwd}});
+  // for channels without placeholders, withNeutralPosture is a passthrough.
+  const posture = withNeutralPosture(opts.env, opts.cwd)
+  // Register for SIGINT/SIGTERM cleanup, and remove + run once this dispatch
+  // settles. cleanup is idempotent, so a signal firing alongside a terminal
+  // handler is safe.
+  activePostureCleanups.add(posture.cleanup)
+  const runPostureCleanup = (): void => {
+    activePostureCleanups.delete(posture.cleanup)
+    posture.cleanup()
   }
-  proc.stdin!.end()
 
-  // Write PID file
-  const pidFile = path.join(channelsDir, `${channelName}.pid`)
-  fs.writeFileSync(pidFile, String(proc.pid))
+  // Spawn + all synchronous setup (stdin, PID file) in one guarded block: any
+  // throw between dir creation and the async close/error handlers being armed
+  // would otherwise leak the per-run temp dir.
+  let proc: ReturnType<typeof spawn>
+  try {
+    // Pipe prompt via stdin to avoid E2BIG on large diffs
+    proc = spawn(cmd, args, {
+      detached: true,
+      stdio: ['pipe', 'pipe', stderrStdio],
+      env: { ...process.env, ...posture.env },
+      cwd: posture.cwd,   // undefined ⇒ inherit parent cwd (unchanged for non-isolated channels)
+    })
+
+    if (proc.pid) activeChildren.add(proc.pid)
+
+    // Handle stdin pipe errors (child may close stdin early)
+    // stdin is always 'pipe' so proc.stdin is guaranteed non-null
+    proc.stdin!.on('error', () => {
+      // Swallow EPIPE — the close handler will deal with the process exit
+    })
+
+    // Write prompt to stdin (stdin delivery only; prompt-file mode passes the
+    // prompt as an arg). Always end stdin so processes that read it don't hang.
+    if (promptDelivery === 'stdin') {
+      proc.stdin!.write(opts.prompt)
+    }
+    proc.stdin!.end()
+
+    // Write PID file
+    const pidFile = path.join(channelsDir, `${channelName}.pid`)
+    fs.writeFileSync(pidFile, String(proc.pid))
+  } catch (err) {
+    runPostureCleanup()
+    throw err
+  }
 
   // Collect stdout and stderr
   let stdout = ''
@@ -164,6 +212,7 @@ export async function dispatchChannel(
       if (stderr) {
         store.saveChannelLog(jobId, channelName, stderr)
       }
+      runPostureCleanup()
       resolve()
     }, timeoutMs)
 
@@ -191,6 +240,7 @@ export async function dispatchChannel(
           completed_at: completedAt,
         })
       }
+      runPostureCleanup()
       resolve()
     })
 
@@ -205,6 +255,7 @@ export async function dispatchChannel(
         completed_at: new Date().toISOString(),
       })
       store.saveChannelLog(jobId, channelName, err.message)
+      runPostureCleanup()
       resolve()
     })
   })

@@ -410,6 +410,26 @@ describe('defaults.compensator (T1-G)', () => {
   })
 })
 
+describe('channel schema — cwd', () => {
+  it('accepts an optional cwd on a subprocess channel', () => {
+    const parsed = MmrConfigSchema.parse({
+      version: 1,
+      channels: {
+        grok: { kind: 'subprocess', command: 'grok', cwd: '{{neutral_cwd}}' },
+      },
+    })
+    expect((parsed.channels.grok as { cwd?: string }).cwd).toBe('{{neutral_cwd}}')
+  })
+
+  it('leaves cwd undefined when omitted', () => {
+    const parsed = MmrConfigSchema.parse({
+      version: 1,
+      channels: { grok: { kind: 'subprocess', command: 'grok' } },
+    })
+    expect((parsed.channels.grok as { cwd?: string }).cwd).toBeUndefined()
+  })
+})
+
 describe('MmrConfigSchema - loop_control', () => {
   it('accepts a config with no loop_control (uses defaults)', () => {
     const parsed = MmrConfigSchema.parse({ version: 1, channels: {} })

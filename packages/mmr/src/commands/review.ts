@@ -668,6 +668,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
               : chConfig.stderr === 'suppress' ? 'suppress'
                 : 'capture',
             promptDelivery: chConfig.prompt_delivery,
+            cwd: chConfig.cwd,
           }),
         )
       }
@@ -702,6 +703,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
             : chConfig.stderr === 'suppress' ? 'suppress'
               : 'capture',
           promptDelivery: chConfig.prompt_delivery,
+          cwd: chConfig.cwd,
         })
       }
     }
