@@ -55,7 +55,7 @@ See `docs/knowledge-freshness/operations.md` §4 "Choosing a provider" for the f
 ### Security
 
 - **Generated guide HTML is sanitized.** Untrusted guide markdown is rendered through `rehype-sanitize` plus a dedicated mermaid sanitizer, and the `guides-check` gate includes a security scan of the output — relevant because guide HTML is checked into the repo and opened in a browser.
-- **Knowledge-freshness source fetching is SSRF-guarded** by an authoritative-source allowlist applied at both validate and fetch time; the DeepSeek dispatcher's URL and model allowlist are literal source constants that project config cannot redirect.
+- **Knowledge-freshness source fetching is SSRF-guarded.** Source URLs are validated at schema time and re-checked at fetch time — with a DNS-rebinding guard that pins resolved IPs — rejecting non-HTTP(S) schemes and loopback, private, link-local, CGNAT, ULA, multicast, and reserved address ranges. Separately, an advisory `docs/knowledge-freshness/authoritative-sources.yaml` allowlist emits validate-time *warnings* for declared freshness sources (a freshness-policy check, not the security boundary). The DeepSeek dispatcher's URL and model allowlist are literal source constants that project config cannot redirect.
 
 ## [3.28.0] — 2026-05-24
 
