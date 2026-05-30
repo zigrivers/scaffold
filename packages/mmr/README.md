@@ -281,7 +281,11 @@ unrelated findings, which is both astronomically unlikely and harmless).
 Normalization strips trailing line/column spans from the location and
 inline `line N` mentions from the prose, and folds casing/whitespace. As a
 result, line-number drift and severity changes do not change the identity of an
-issue across rounds. The hash still depends on the description/suggestion text,
+issue across rounds. This line-independent, case-folded identity is
+intentional: a single ack then covers the same issue as it recurs at shifted
+lines (or across case-variant paths), and any incidental merge of two findings
+is harmless because the key is only a dedup/identity handle. The hash still
+depends on the description/suggestion text,
 so a substantial channel-side rewrite *will* produce a new key — that larger
 phrasing drift is absorbed by the fuzzy **ack** fallback described below
 (Jaccard ≥ 0.7 on the description shingle), not by the key itself.
@@ -382,8 +386,9 @@ Optional fields:
   ```
 
   When unset, MMR derives the probe by replacing a trailing `/chat/completions`
-  with `/models`. If the endpoint does not end in `/chat/completions`,
-  `auth.check_endpoint` is required (and config validation fails without it).
+  with `/models` (a single trailing slash on the endpoint is tolerated). If the
+  endpoint does not end in `/chat/completions`, `auth.check_endpoint` is
+  required (and config validation fails without it).
 
 #### LM Studio (local, no API key)
 
