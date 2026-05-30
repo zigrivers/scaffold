@@ -18,12 +18,12 @@ disagreement is what surfaces ambiguity.
 
 1. **Resolve a diff** — from a PR, staged changes, a branch range, or a piped diff.
 2. **Dispatch channels** — each channel is a separate subprocess given the same
-   prompt, run in parallel and isolated.
+   prompt, run in parallel and isolated :cite[packages/mmr/src/commands/review.ts:636].
 3. **Parse** — each channel's raw output is parsed into a common `Finding` shape.
 4. **Reconcile** — findings are grouped by a stable key, de-duplicated, and
-   scored for agreement and confidence.
+   scored for agreement and confidence :cite[packages/mmr/src/core/reconciler.ts:43].
 5. **Verdict** — a severity gate yields `pass`, `degraded-pass`, `blocked`, or
-   `needs-user-decision`.
+   `needs-user-decision` :cite[packages/mmr/src/types.ts:25].
 
 :::callout{type=tip}
 **Two layers, one mental model.** The `mmr` CLI is the engine that dispatches
@@ -87,7 +87,7 @@ table.
 | `--format <json\|text\|markdown>` | output | Output format. Default `json`. |
 | `--sync` | mode | Run the full pipeline (dispatch → parse → reconcile → verdict) and return results. Without it, dispatch is fire-and-forget. |
 | `--dry-run` | mode | Resolve the diff and assemble the prompt without dispatching any channel. |
-| `--session <id>` | rounds | Link this run into a multi-round session (`[A-Za-z0-9_-]`). |
+| `--session <id>` | rounds | Link this run into a multi-round session; the id must match `^[A-Za-z0-9_-]+$` and not be a reserved name :cite[packages/mmr/src/commands/sessions.ts:15]. |
 | `--round <n>` | rounds | 1-based round counter within a session. |
 | `--max-rounds <n>` | rounds | Hard cap on rounds. Defaults to 5 when `--session` is set without it. |
 | `--accept-new-acks` | trust | Trust acknowledgment files newly introduced by the diff. |
@@ -122,7 +122,7 @@ mmr review --pr 123 --channels grok claude --sync --format json
 
 | Command | Purpose |
 | --- | --- |
-| `mmr reconcile <job-id> --channel <name> --input <data>` | Inject an external channel's findings (e.g. the Superpowers agent) into an existing job and re-run the results pipeline. Input is a file, `-` for stdin, or inline JSON. |
+| `mmr reconcile <job-id> --channel <name> --input <data>` | Inject an external channel's findings (e.g. the Superpowers agent) into an existing job and re-run the results pipeline. Input is a file, `-` for stdin, or inline JSON. :cite[packages/mmr/src/commands/reconcile.ts:17] |
 | `mmr status <job-id>` | Per-channel status and elapsed time. Exit 0 = all complete, 1 = running, 2 = a channel failed, 5 = not found. |
 | `mmr results <job-id> [--raw]` | Re-run parse → reconcile → format on a completed job. Exit code reflects the verdict. |
 | `mmr jobs <list\|prune>` | List jobs, or prune old ones per `job_retention_days`. |
@@ -175,6 +175,8 @@ findings.
 ::::tabs
 
 :::tab{title="Compare"}
+The defaults, commands, and parsers below are the built-in presets :cite[packages/mmr/src/config/defaults.ts:32].
+
 | Channel | Default | Strength | Prompt delivery | Parser |
 | --- | --- | --- | --- | --- |
 | `codex` | enabled | Correctness, security, API contracts | stdin | `default` |
@@ -251,7 +253,8 @@ Enable with `--channels doc-conformance` or in `.mmr.yaml`.
   to its own output file; channels run in parallel and never share output.
 - **Prompt delivery.** `stdin` mode pipes the prompt and closes stdin (avoids
   `E2BIG` on large diffs). `prompt-file` mode writes the prompt to
-  `<channel>.prompt.txt` and substitutes `{{prompt_file}}` in the flags.
+  `<channel>.prompt.txt` and substitutes `{{prompt_file}}` in the flags
+  :cite[packages/mmr/src/core/dispatcher.ts:79].
 - **Timeout.** A per-channel timer SIGKILLs the whole process group and marks
   the channel `timeout`.
 - **Command parsing.** `command` is split on whitespace and spawned without a
@@ -263,10 +266,12 @@ only):* a new subprocess channel (`command` + `flags` + `auth` +
 `output_parser`), output reshaping via the `unwrap-jsonpath` or
 `regex-findings` parser kinds, disabling/timeout overrides, and pointing the
 compensator at a different channel — all pure `.mmr.yaml`. *Needs code:* a
-brand-new *named* parser must be registered in `core/parser.ts`; HTTP-endpoint
-channels (`kind: http`) need the planned http-dispatcher; and the
+brand-new *named* parser must be registered in `core/parser.ts`
+:cite[packages/mmr/src/core/parser.ts:257]{mode=advisory}; and the
 `COMPENSATING_FOCUS` map carries per-channel focus text (falls back gracefully
-if absent).
+if absent). HTTP-endpoint channels (`kind: http`) are already supported via
+`dispatchHttpChannel` — pure `.mmr.yaml`, no extra code
+:cite[packages/mmr/src/config/schema.ts:144].
 
 ## Scaffold wrappers
 
@@ -289,6 +294,9 @@ the background. Background execution produces empty output.
 
 ### The Finding shape
 
+Every channel's output parses into this common shape
+:cite[packages/mmr/src/types.ts:45].
+
 ```json
 {
   "id": "F-001",
@@ -300,9 +308,10 @@ the background. Background execution produces empty output.
 }
 ```
 
-After reconciliation, each finding also carries `confidence`, `sources[]`,
-`agreement`, a stable `finding_key`, a `description_shingle` (for fuzzy
-cross-round matching), and `acknowledged`.
+The `location` above (`src/auth.ts:42`) is illustrative. After reconciliation,
+each finding also carries `confidence`, `sources[]`, `agreement`, a stable
+`finding_key`, a `description_shingle` (for fuzzy cross-round matching), and
+`acknowledged` :cite[packages/mmr/src/types.ts:54].
 
 ### Stable identity (`finding_key`)
 
@@ -311,10 +320,17 @@ finding_key = sha1( normLocation | category | sha1(normDescription) | sha1(normS
 ```
 
 Line numbers are stripped from the location and severity is *excluded*, so the
-same issue at P1 vs P2 collapses to one key. A character-5-gram shingle backs a
-Jaccard ≥ 0.7 fuzzy match when wording drifts between rounds.
+same issue at P1 vs P2 collapses to one key
+:cite[packages/mmr/src/core/stable-id.ts:115]. A character-5-gram shingle backs
+a Jaccard ≥ 0.7 fuzzy match. Intra-run, findings group by fuzzy shingle overlap
+:cite[packages/mmr/src/core/reconciler.ts:83]; across rounds, the ack store reuses
+the same threshold so a re-worded finding still matches a prior ack
+:cite[packages/mmr/src/core/ack-store.ts:8].
 
 ### Agreement & confidence
+
+Agreement and confidence are derived per group during reconciliation
+:cite[packages/mmr/src/core/reconciler.ts:114].
 
 | Sources | Severity | Agreement | Confidence |
 | --- | --- | --- | --- |
@@ -327,9 +343,16 @@ Jaccard ≥ 0.7 fuzzy match when wording drifts between rounds.
 ### The gate & the four verdicts
 
 The gate **passes** when every unacknowledged finding is *below* the
-`fix_threshold` (default :sev[P2]{level=p2}). Severity tiers run
+`fix_threshold` :cite[packages/mmr/src/core/reconciler.ts:229] (default
+:sev[P2]{level=p2} :cite[packages/mmr/src/config/defaults.ts:16]). Severity tiers run
 :sev[P0]{level=p0} (highest) → :sev[P1]{level=p1} → :sev[P2]{level=p2} →
 :sev[P3]{level=p3} (lowest).
+
+The verdict is derived from gate result + channel health, in this branch order:
+**zero channels completed → `needs-user-decision`**; else a failed gate →
+`blocked`; else some channels incomplete → `degraded-pass`; else `pass`
+:cite[packages/mmr/src/core/reconciler.ts:247]. (The no-completed-channels case
+short-circuits first, so it outranks `blocked`.)
 
 | Verdict | Condition | Exit |
 | --- | --- | --- |
@@ -391,7 +414,7 @@ channels:
   when you pass an explicit `--channels` list).
 - `enabled: false` — per-channel off switch (how `doc-conformance` ships).
 - `extends` — inherit from another channel (≤ 4 levels, cycle-checked); child
-  fields override the parent.
+  fields override the parent :cite[packages/mmr/src/config/loader.ts:145].
 - `fix_threshold` — project gate; override per-run with `--fix-threshold`.
 
 :::callout{type=danger}

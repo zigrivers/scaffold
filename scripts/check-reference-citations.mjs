@@ -27,60 +27,60 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
 import { execSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 
 const REPO_ROOT = path.resolve(new URL('.', import.meta.url).pathname, '..')
 
 const EXT = 'ts|tsx|js|mjs|md|yml|yaml|json|sh|css|html'
 const DEFAULT_PREFIX = 'src|tests|scripts|content|docs|\\.github'
 
-// Re-folded verbatim from check-freshness-reference-citations.mjs: bare
-// filenames the freshness page uses in JS comments without a path prefix.
-const FRESHNESS_BARE_MAP = {
-  'api.ts': 'src/observability/engine/api.ts',
-  'audit-apply.ts': 'src/knowledge-freshness/audit-apply.ts',
-  'audit-prefilter.ts': 'src/knowledge-freshness/audit-prefilter.ts',
-  'audit.yml': '.github/workflows/knowledge-freshness-audit.yml',
-  'gates.yml': '.github/workflows/knowledge-freshness-gates.yml',
-  'lens-i-lessons-scanner.ts': 'src/observability/checks/lens-i-lessons-scanner.ts',
-  'lens-i-knowledge-gaps.ts': 'src/observability/checks/lens-i-knowledge-gaps.ts',
-  'knowledge-index.ts': 'src/observability/knowledge-index.ts',
-  'bump-version.ts': 'src/knowledge-freshness/bump-version.ts',
-  'providers/deepseek.ts': 'src/knowledge-freshness/providers/deepseek.ts',
-  'providers/index.ts': 'src/knowledge-freshness/providers/index.ts',
-  'observability-config.ts': 'src/observability/engine/checks/observability-config.ts',
-  'phase-audit.ts': 'src/observability/engine/phase-audit.ts',
-}
-
 const PAGES = [
+  // NOTE: docs/observability/reference.html was migrated to the guide system
+  // (content/guides/observability/) and retired to a redirect shim — it is now
+  // validated via discoverGuidePages, not here.
   {
-    name: 'observability',
-    path: 'docs/observability/reference.html',
-    fp: true,
-    fileMap: true,
-    text: false,
-    rebake: null,
-  },
-  {
+    // Migrated to the guide system; the generator now regenerates the guide's
+    // gen:* data blocks (the markdown), so rebake checks the .md, not the .html.
     name: 'knowledge-freshness',
-    path: 'docs/knowledge-freshness/reference.html',
-    fp: false,
+    path: 'content/guides/knowledge-freshness/index.html',
+    fp: true,
     fileMap: false,
-    text: true,
-    bareMap: FRESHNESS_BARE_MAP,
+    text: false,
+    strictCites: true,
     rebake: 'node scripts/build-freshness-reference.mjs',
+    rebakeTarget: 'content/guides/knowledge-freshness/index.md',
   },
-  {
-    name: 'mmr-reference',
-    path: 'docs/reference/mmr-reference.html',
-    fp: false,
-    fileMap: false,
-    text: true,
-    // packages/ is in the prefix so future packages/mmr/* citations are caught.
-    prefix: 'src|tests|scripts|content|docs|\\.github|lib|packages',
-    ignore: ['src/auth.ts'], // fictional example finding (src/auth.ts:42)
-    rebake: null,
-  },
+  // docs/reference/mmr-reference.html was the legacy twin of content/guides/mmr;
+  // it was reconciled into that guide and retired to a redirect shim. The guide
+  // is validated via discoverGuidePages.
 ]
+
+// Guides (content/guides/*/index.html) are discovered dynamically rather than
+// hard-coded in PAGES, so every newly authored guide is automatically covered by
+// the citation gate (R2-1). Guides emit `:cite[path:line]` as <span class="fp"
+// data-path="…"> markup, so they use the `fp` extraction strategy.
+export function discoverGuidePages(guidesDir, repoRoot = REPO_ROOT) {
+  if (!fs.existsSync(guidesDir) || !fs.statSync(guidesDir).isDirectory()) return []
+  const out = []
+  for (const entry of fs.readdirSync(guidesDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue
+    const indexHtml = path.join(guidesDir, entry.name, 'index.html')
+    if (!fs.existsSync(indexHtml)) continue
+    out.push({
+      name: `guide:${entry.name}`,
+      path: path.relative(repoRoot, indexHtml),
+      fp: true,
+      fileMap: false,
+      text: false,
+      // strictCites: a guide :cite always targets a real repo file, so validate
+      // every fp data-path with a known extension — even repo-root files like
+      // CLAUDE.md / package.json that fall outside SOURCE_PATH_RE (R2 P1-C).
+      strictCites: true,
+      rebake: null,
+    })
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name))
+}
 
 const esc = (s) => s.replace(/[.+*?^${}()|[\]\\]/g, '\\$&')
 
@@ -90,12 +90,18 @@ const esc = (s) => s.replace(/[.+*?^${}()|[\]\\]/g, '\\$&')
 const SOURCE_PATH_RE = /^(?:src|tests|scripts|content|docs|lib|packages|\.github)\//
 const isSourcePath = (p) => SOURCE_PATH_RE.test(p)
 
-// Collect a Set of `relPath|a|b` keys. a/b empty ⇒ existence-only check.
-function collect(html, page) {
+// Collect `{ cites, advisory }`, each a Set of `relPath|a|b` keys (a/b empty ⇒
+// existence-only). `cites` are blocking; `advisory` warn-only (cite-advisory).
+export function collect(html, page) {
   const cites = new Set()
+  const advisory = new Set()
   // .fp tokens live in body markup; strip <script> so JS templates that build
   // markup at runtime (renderNode's `data-path="' + dataPath + '"`) don't match.
   const bodyHtml = html.replace(/<script\b[\s\S]*?<\/script>/g, '')
+  // strictCites (guide pages): a :cite always targets a real repo file, so accept
+  // any path with a known extension, not just the standard source dirs.
+  const accept = (p) => page.strictCites || isSourcePath(p)
+  const DP_LINE_RE = new RegExp('^(.*\\.(?:' + EXT + ')):(\\d+)(?:[-–](\\d+))?$')
 
   if (page.fp) {
     const FP_RE = /<(?:span|a)\b[^>]*\bclass="[^"]*\bfp\b[^"]*"[^>]*\bdata-path="([^"]+)"[^>]*>([\s\S]*?)<\/(?:span|a)>/g
@@ -103,17 +109,28 @@ function collect(html, page) {
       let p = m[1]
       const inner = m[2]
       // data-path may itself carry a trailing :line (file-tree leaves).
-      const dpm = p.match(new RegExp('^(.*\\.(?:' + EXT + ')):(\\d+)(?:[-–](\\d+))?$'))
+      const dpm = p.match(DP_LINE_RE)
       if (dpm) {
         p = dpm[1]
-        if (isSourcePath(p)) cites.add(`${p}|${dpm[2]}|${dpm[3] ?? ''}`)
-      } else if (isSourcePath(p)) {
+        if (accept(p)) cites.add(`${p}|${dpm[2]}|${dpm[3] ?? ''}`)
+      } else if (accept(p)) {
         cites.add(`${p}||`) // existence-only
       }
-      if (!isSourcePath(p)) continue
+      if (!accept(p)) continue
       const base = p.split('/').pop()
       const lineRe = new RegExp('\\b' + esc(base) + ':(\\d+)(?:[-–](\\d+))?', 'g')
       for (const im of inner.matchAll(lineRe)) cites.add(`${p}|${im[1]}|${im[2] ?? ''}`)
+    }
+
+    // Advisory citations (cite-advisory) are validated but warn-only — they back
+    // "see also" pointers, not normative claims (P0-a / R2 P2-D).
+    if (page.strictCites) {
+      const ADV_RE = /<(?:span|a)\b[^>]*\bclass="[^"]*\bcite-advisory\b[^"]*"[^>]*\bdata-path="([^"]+)"[^>]*>[\s\S]*?<\/(?:span|a)>/g
+      for (const m of bodyHtml.matchAll(ADV_RE)) {
+        const dpm = m[1].match(DP_LINE_RE)
+        if (dpm) advisory.add(`${dpm[1]}|${dpm[2]}|${dpm[3] ?? ''}`)
+        else advisory.add(`${m[1]}||`)
+      }
     }
   }
 
@@ -150,7 +167,7 @@ function collect(html, page) {
     }
   }
 
-  return cites
+  return { cites, advisory }
 }
 
 function validate(cites) {
@@ -176,7 +193,9 @@ function validate(cites) {
 // Generated pages: re-run the build and assert the committed page is a no-op.
 function rebakeNoop(page) {
   if (!page.rebake) return { ok: true, notes: [] }
-  const abs = path.join(REPO_ROOT, page.path)
+  // The rebake command may regenerate a different file than the one we scan for
+  // citations (e.g. the freshness generator edits the guide .md, not the .html).
+  const abs = path.join(REPO_ROOT, page.rebakeTarget || page.path)
   const before = fs.readFileSync(abs)
   const hashBefore = createHash('sha256').update(before).digest('hex')
   try {
@@ -189,7 +208,7 @@ function rebakeNoop(page) {
   if (hashBefore === hashAfter) return { ok: true, notes: [] }
   let diff = ''
   try {
-    diff = execSync(`git diff --stat ${page.path}`, { cwd: REPO_ROOT }).toString().trim()
+    diff = execSync(`git diff --stat ${page.rebakeTarget || page.path}`, { cwd: REPO_ROOT }).toString().trim()
   } catch { /* ignore */ }
   fs.writeFileSync(abs, before) // restore — don't leave the tree dirty
   return {
@@ -201,35 +220,60 @@ function rebakeNoop(page) {
   }
 }
 
-let failed = false
-for (const page of PAGES) {
-  const abs = path.join(REPO_ROOT, page.path)
-  if (!fs.existsSync(abs)) {
-    console.log(`\n${page.name}: SKIP — ${page.path} not found`)
-    continue
+function main() {
+  let failed = false
+  // Skip discovered guides already covered by an explicit PAGES entry (e.g. the
+  // freshness guide, which needs a rebake check) to avoid validating it twice.
+  const staticPaths = new Set(PAGES.map((p) => p.path))
+  const discovered = discoverGuidePages(path.join(REPO_ROOT, 'content/guides'), REPO_ROOT)
+    .filter((g) => !staticPaths.has(g.path))
+  const pages = [...PAGES, ...discovered]
+  for (const page of pages) {
+    const abs = path.join(REPO_ROOT, page.path)
+    if (!fs.existsSync(abs)) {
+      console.log(`\n${page.name}: SKIP — ${page.path} not found`)
+      continue
+    }
+    const html = fs.readFileSync(abs, 'utf8')
+    const { cites, advisory } = collect(html, page)
+    const { drifts, missing } = validate(cites)
+    const adv = validate(advisory) // warn-only
+    const rebake = rebakeNoop(page)
+    const ok = cites.size - drifts.length - missing.length
+
+    console.log(`\n${page.name} (${page.path})`)
+    console.log(
+      `  ${cites.size} citations · ${ok} ok · ${drifts.length} out-of-range · ${missing.length} missing` +
+        (advisory.size ? ` · ${advisory.size} advisory` : '') +
+        (page.rebake ? ` · rebake ${rebake.ok ? 'clean' : 'DRIFT'}` : ''),
+    )
+    for (const d of drifts) console.log(`  out-of-range: ${d}`)
+    for (const m of missing) console.log(`  missing: ${m}`)
+    for (const d of adv.drifts) console.log(`  advisory out-of-range (warn): ${d}`)
+    for (const m of adv.missing) console.log(`  advisory missing (warn): ${m}`)
+    for (const n of rebake.notes) console.log(`  ${n}`)
+
+    if (drifts.length || missing.length || !rebake.ok) failed = true
   }
-  const html = fs.readFileSync(abs, 'utf8')
-  const cites = collect(html, page)
-  const { drifts, missing } = validate(cites)
-  const rebake = rebakeNoop(page)
-  const ok = cites.size - drifts.length - missing.length
 
-  console.log(`\n${page.name} (${page.path})`)
-  console.log(
-    `  ${cites.size} citations · ${ok} ok · ${drifts.length} out-of-range · ${missing.length} missing` +
-      (page.rebake ? ` · rebake ${rebake.ok ? 'clean' : 'DRIFT'}` : ''),
-  )
-  for (const d of drifts) console.log(`  out-of-range: ${d}`)
-  for (const m of missing) console.log(`  missing: ${m}`)
-  for (const n of rebake.notes) console.log(`  ${n}`)
-
-  if (drifts.length || missing.length || !rebake.ok) failed = true
+  if (failed) {
+    console.log('\nLine-citation checks only verify the line exists, not that it still')
+    console.log('points at the right symbol — semantic drift needs manual review.')
+    process.exit(1)
+  }
+  console.log('\nAll reference-page citations resolve.')
+  process.exit(0)
 }
 
-if (failed) {
-  console.log('\nLine-citation checks only verify the line exists, not that it still')
-  console.log('points at the right symbol — semantic drift needs manual review.')
-  process.exit(1)
+// Robust entry-point detection: resolve symlinks + canonical on-disk casing on
+// both sides so the gate is never silently skipped (R2 P2-E). A false negative
+// here would bypass the entire citation check.
+function isMainModule() {
+  if (!process.argv[1]) return false
+  try {
+    return fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(import.meta.url))
+  } catch {
+    return false
+  }
 }
-console.log('\nAll reference-page citations resolve.')
-process.exit(0)
+if (isMainModule()) main()

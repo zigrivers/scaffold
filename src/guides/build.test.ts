@@ -49,6 +49,16 @@ describe('buildGuide', () => {
     await expect(buildGuide({ guideDir: dir, css: CSS, mermaidRender: async () => '' }))
       .rejects.toThrow(/text-equivalent/i)
   })
+
+  it('throws when a relative link target does not resolve', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gb-'))
+    const dir = path.join(root, 'mmr')
+    fs.mkdirSync(dir, { recursive: true })
+    fs.writeFileSync(path.join(dir, 'index.md'),
+      GUIDE_MD + '\nSee [concepts](../concepts/index.md).\n')
+    await expect(buildGuide({ guideDir: dir, css: CSS, mermaidRender: async () => '' }))
+      .rejects.toThrow(/broken relative link/i)
+  })
 })
 
 describe('renderIndexPage', () => {

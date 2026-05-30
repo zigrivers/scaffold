@@ -145,6 +145,30 @@ export const remarkFilterTable: AnyPlugin = () => (tree: any) => {
   })
 }
 
+// `:cite[path:line]` (blocking) / `:cite[path:line]{mode=advisory}` (warns).
+// Blocking citations render as `<span class="fp" data-path="…">` so the existing
+// citation-drift checker (scripts/check-reference-citations.mjs FP_RE) verifies
+// the file:line still exists. Advisory citations use a non-`fp` class so the
+// checker's `\bfp\b` match ignores them (the gate never blocks on them).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const remarkCite: AnyPlugin = () => (tree: any) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  visit(tree, (node: any) => {
+    if (node.type !== 'textDirective' || node.name !== 'cite') return
+    const path = mdToString(node).trim()
+    const advisory = String(node.attributes?.mode ?? '').toLowerCase() === 'advisory'
+    node.data = node.data ?? {}
+    node.data.hName = 'span'
+    // camelCase `dataPath` matches the hast property convention and the
+    // sanitize allowlist (sanitize.ts) — serializes to the data-path attribute.
+    node.data.hProperties = {
+      className: advisory ? 'cite-advisory' : 'fp',
+      dataPath: path,
+    }
+    node.children = [{ type: 'text', value: path }]
+  })
+}
+
 const SEV_LEVELS = new Set(['p0', 'p1', 'p2', 'p3', 'pass'])
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

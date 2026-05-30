@@ -1,0 +1,1632 @@
+<!DOCTYPE html>
+<html lang="en" data-chrome-version="1">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Scaffold Pipeline</title>
+<!-- scaffold:chrome v1 -->
+<style>/* Scaffold Dashboard Theme
+ * All CSS for the generated pipeline dashboard.
+ * Embedded into HTML by scripts/generate-dashboard.sh.
+ * Design system reference: docs/design-system.md
+ *
+ * Aesthetic: "Precision Industrial" — Swiss-typographic control room.
+ * Deep navy dark mode with indigo accents, clean cool-white light mode.
+ */
+
+/* ─── Design Tokens (Light Mode) ──────────────── */
+:root {
+    /* Surface */
+    --bg:           #f5f6fa;
+    --bg-card:      #ffffff;
+    --bg-hover:     #eef0f6;
+    --bg-inset:     #e8eaf2;
+
+    /* Text */
+    --text:         #1a1d2e;
+    --text-muted:   #6b7294;
+    --text-faint:   #9ba1c0;
+
+    /* Borders & Structure */
+    --border:       #dde0ed;
+    --border-light: #eceef5;
+    --radius:       10px;
+    --radius-sm:    6px;
+
+    /* Accent */
+    --accent:       #4f46e5;
+    --accent-hover: #4338ca;
+    --accent-glow:  rgba(79, 70, 229, 0.10);
+
+    /* Semantic: Status */
+    --green:        #059669;
+    --green-bg:     #ecfdf5;
+    --green-border: #a7f3d0;
+    --blue:         #2563eb;
+    --blue-bg:      #eff6ff;
+    --blue-border:  #bfdbfe;
+    --yellow:       #d97706;
+    --yellow-bg:    #fffbeb;
+    --yellow-border:#fde68a;
+    --gray:         #9ca3af;
+    --gray-bg:      #f3f4f6;
+    --gray-border:  #e5e7eb;
+
+    /* Semantic: Next Banner */
+    --next-bg:      #eef2ff;
+    --next-border:  #4f46e5;
+    --next-glow:    rgba(79, 70, 229, 0.06);
+
+    /* Semantic: Progress */
+    --progress-bg:  #e5e7eb;
+    --progress-h:   10px;
+
+    /* Depth */
+    --shadow-sm:    0 1px 2px rgba(30, 34, 60, 0.04);
+    --shadow:       0 1px 3px rgba(30, 34, 60, 0.07), 0 1px 2px rgba(30, 34, 60, 0.04);
+    --shadow-md:    0 4px 12px rgba(30, 34, 60, 0.08), 0 1px 3px rgba(30, 34, 60, 0.05);
+    --shadow-lg:    0 8px 24px rgba(30, 34, 60, 0.10), 0 2px 6px rgba(30, 34, 60, 0.04);
+
+    /* Spacing scale (4px base) */
+    --sp-1: 4px;
+    --sp-2: 8px;
+    --sp-3: 12px;
+    --sp-4: 16px;
+    --sp-5: 20px;
+    --sp-6: 24px;
+    --sp-8: 32px;
+    --sp-10: 40px;
+
+    /* Typography */
+    --font-sans:  -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    --font-mono:  "SF Mono", "Cascadia Code", "Fira Code", "JetBrains Mono", Menlo, Consolas, monospace;
+    --text-xs:    0.75rem;
+    --text-sm:    0.8125rem;
+    --text-base:  0.9375rem;
+    --text-lg:    1.125rem;
+    --text-xl:    1.375rem;
+    --text-2xl:   1.75rem;
+    --lh-tight:   1.25;
+    --lh-normal:  1.5;
+    --lh-relaxed: 1.625;
+    --ls-tight:   -0.01em;
+    --ls-wide:    0.025em;
+    --fw-normal:  400;
+    --fw-medium:  500;
+    --fw-semi:    600;
+    --fw-bold:    700;
+
+    /* Layout */
+    --max-w:      960px;
+    --page-pad:   24px;
+}
+
+/* ─── Design Tokens (Dark Mode) ───────────────── */
+[data-theme="dark"] {
+    /* Surface */
+    --bg:           #0f1117;
+    --bg-card:      #1a1d2e;
+    --bg-hover:     #252940;
+    --bg-inset:     #141724;
+
+    /* Text */
+    --text:         #e2e5f0;
+    --text-muted:   #7c82a8;
+    --text-faint:   #555c80;
+
+    /* Borders & Structure */
+    --border:       #2a2f45;
+    --border-light: #21253a;
+
+    /* Accent */
+    --accent:       #818cf8;
+    --accent-hover: #a5b4fc;
+    --accent-glow:  rgba(129, 140, 248, 0.12);
+
+    /* Semantic: Status */
+    --green:        #34d399;
+    --green-bg:     rgba(6, 78, 59, 0.25);
+    --green-border: rgba(52, 211, 153, 0.25);
+    --blue:         #60a5fa;
+    --blue-bg:      rgba(30, 58, 95, 0.30);
+    --blue-border:  rgba(96, 165, 250, 0.25);
+    --yellow:       #fbbf24;
+    --yellow-bg:    rgba(120, 53, 15, 0.25);
+    --yellow-border:rgba(251, 191, 36, 0.20);
+    --gray:         #6b7294;
+    --gray-bg:      #252940;
+    --gray-border:  #363c58;
+
+    /* Semantic: Next Banner */
+    --next-bg:      rgba(30, 27, 75, 0.50);
+    --next-border:  #818cf8;
+    --next-glow:    rgba(129, 140, 248, 0.08);
+
+    /* Semantic: Progress */
+    --progress-bg:  #1f2337;
+
+    /* Depth */
+    --shadow-sm:    0 1px 2px rgba(0, 0, 0, 0.20);
+    --shadow:       0 1px 3px rgba(0, 0, 0, 0.30), 0 1px 2px rgba(0, 0, 0, 0.15);
+    --shadow-md:    0 4px 12px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.20);
+    --shadow-lg:    0 8px 24px rgba(0, 0, 0, 0.40), 0 2px 6px rgba(0, 0, 0, 0.20);
+}
+
+/* ─── Theme Toggle ───────────────────────────── */
+.theme-toggle {
+    background: var(--bg-inset);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: var(--sp-1) var(--sp-2);
+    cursor: pointer;
+    font-size: var(--text-base);
+    line-height: 1;
+    color: var(--text-muted);
+    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+    display: flex;
+    align-items: center;
+    margin-left: auto;
+}
+
+.theme-toggle:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-glow);
+}
+
+/* ─── Base ────────────────────────────────────── */
+*, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: var(--lh-normal);
+    color: var(--text);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Layout ──────────────────────────────────── */
+.wrap {
+    max-width: var(--max-w);
+    margin: 0 auto;
+    padding: var(--sp-8) var(--page-pad);
+}
+
+/* ─── Header ──────────────────────────────────── */
+.header {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-2);
+    flex-wrap: wrap;
+}
+
+h1 {
+    font-size: var(--text-2xl);
+    font-weight: var(--fw-bold);
+    letter-spacing: var(--ls-tight);
+    line-height: var(--lh-tight);
+}
+
+h2 {
+    font-size: var(--text-lg);
+    font-weight: var(--fw-semi);
+    letter-spacing: var(--ls-tight);
+    line-height: var(--lh-tight);
+    margin-bottom: var(--sp-3);
+}
+
+.header-meta {
+    font-size: var(--text-xs);
+    color: var(--text-faint);
+    margin-bottom: var(--sp-6);
+    letter-spacing: var(--ls-wide);
+    text-transform: uppercase;
+}
+
+/* ─── Badge ───────────────────────────────────── */
+.badge {
+    display: inline-block;
+    padding: 2px var(--sp-2);
+    border-radius: 99px;
+    font-size: var(--text-xs);
+    font-weight: var(--fw-semi);
+    letter-spacing: var(--ls-wide);
+    background: var(--accent);
+    color: #fff;
+    text-transform: uppercase;
+}
+
+.badge-optional {
+    background: var(--yellow-bg);
+    color: var(--yellow);
+    border: 1px solid var(--yellow-border);
+}
+
+/* ─── Progress Bar ────────────────────────────── */
+.progress-bar {
+    width: 100%;
+    height: var(--progress-h);
+    background: var(--progress-bg);
+    border-radius: 99px;
+    overflow: hidden;
+    margin-bottom: var(--sp-6);
+    display: flex;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.progress-bar .seg-done {
+    background: linear-gradient(135deg, var(--green), #10b981);
+    box-shadow: 0 0 8px rgba(5, 150, 105, 0.3);
+}
+
+.progress-bar .seg-likely {
+    background: linear-gradient(135deg, var(--blue), #3b82f6);
+    box-shadow: 0 0 8px rgba(37, 99, 235, 0.25);
+}
+
+.progress-bar .seg-skip {
+    background: var(--gray);
+    opacity: 0.7;
+}
+
+/* ─── Summary Cards ───────────────────────────── */
+.cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-6);
+}
+
+.card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: var(--sp-4) var(--sp-5);
+    box-shadow: var(--shadow);
+    transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+}
+
+.card-num {
+    font-size: var(--text-2xl);
+    font-weight: var(--fw-bold);
+    font-family: var(--font-mono);
+    letter-spacing: var(--ls-tight);
+    line-height: 1;
+}
+
+.card-lbl {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    margin-top: var(--sp-1);
+    letter-spacing: var(--ls-wide);
+    text-transform: uppercase;
+    font-weight: var(--fw-medium);
+}
+
+/* ─── What's Next Banner ──────────────────────── */
+.next-banner {
+    background: var(--next-bg);
+    border: 1px solid var(--next-border);
+    border-left: 4px solid var(--next-border);
+    border-radius: var(--radius);
+    padding: var(--sp-5) var(--sp-6);
+    margin-bottom: var(--sp-6);
+    box-shadow: 0 0 0 1px var(--next-glow), var(--shadow);
+    position: relative;
+    overflow: hidden;
+}
+
+.next-banner::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: var(--next-border);
+    animation: pulse-border 2.5s ease-in-out infinite;
+}
+
+@keyframes pulse-border {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.5; }
+}
+
+.next-banner h2 {
+    color: var(--accent);
+    margin-bottom: var(--sp-1);
+    font-size: var(--text-base);
+    font-weight: var(--fw-semi);
+    letter-spacing: var(--ls-wide);
+    text-transform: uppercase;
+}
+
+.next-banner p {
+    color: var(--text);
+    font-size: var(--text-base);
+}
+
+.next-cmd {
+    font-family: var(--font-mono);
+    background: var(--bg-card);
+    padding: var(--sp-1) var(--sp-3);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-top: var(--sp-3);
+    border: 1px solid var(--border);
+}
+
+/* ─── Phase Headers (Collapsible) ─────────────── */
+.phase {
+    margin-bottom: var(--sp-6);
+}
+
+.phase-hdr {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    cursor: pointer;
+    padding: var(--sp-2) 0;
+    user-select: none;
+    border-bottom: 2px solid var(--border);
+    margin-bottom: var(--sp-3);
+    transition: border-color 0.15s ease;
+}
+
+.phase-hdr:hover {
+    border-bottom-color: var(--accent);
+}
+
+.phase-hdr:hover h2 {
+    color: var(--accent);
+}
+
+.phase-hdr h2 {
+    transition: color 0.15s ease;
+}
+
+.phase-hdr .arr {
+    transition: transform 0.2s ease;
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+}
+
+.phase-hdr.closed .arr {
+    transform: rotate(-90deg);
+}
+
+.phase-cnt {
+    font-size: var(--text-xs);
+    font-family: var(--font-mono);
+    color: var(--text-faint);
+    margin-left: auto;
+    letter-spacing: var(--ls-wide);
+}
+
+/* ─── Prompt List ─────────────────────────────── */
+.plist {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+}
+
+/* ─── Prompt Cards ────────────────────────────── */
+.pcard {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: var(--sp-3) var(--sp-4);
+    box-shadow: var(--shadow-sm);
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: var(--sp-2) var(--sp-3);
+    align-items: start;
+    transition: box-shadow 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
+}
+
+.pcard:hover {
+    box-shadow: var(--shadow);
+    transform: translateY(-1px);
+    border-color: var(--accent-glow);
+}
+
+/* ─── Status Badges ──────────────────────────── */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    font-size: var(--text-xs);
+    font-weight: var(--fw-medium);
+    padding: 2px var(--sp-2);
+    border-radius: 99px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    letter-spacing: var(--ls-wide);
+    line-height: var(--lh-tight);
+}
+
+.st-completed {
+    background: var(--green-bg);
+    color: var(--green);
+    border: 1px solid var(--green-border);
+}
+
+.st-likely-completed {
+    background: var(--blue-bg);
+    color: var(--blue);
+    border: 1px solid var(--blue-border);
+}
+
+.st-skipped {
+    background: var(--gray-bg);
+    color: var(--gray);
+    border: 1px solid var(--gray-border);
+}
+
+.st-pending {
+    background: var(--bg-inset);
+    color: var(--text-faint);
+    border: 1px solid var(--border);
+}
+
+/* ─── Status Legend ──────────────────────────── */
+.status-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    margin-bottom: var(--sp-4);
+    padding: var(--sp-2) 0;
+}
+
+.status-legend .status-badge {
+    cursor: default;
+}
+
+/* ─── Prompt Card Inner ───────────────────────── */
+.pinfo {
+    min-width: 0;
+}
+
+.pname {
+    font-weight: var(--fw-semi);
+    font-size: var(--text-base);
+}
+
+.pstep {
+    font-size: var(--text-xs);
+    font-family: var(--font-mono);
+    color: var(--text-faint);
+    letter-spacing: var(--ls-wide);
+}
+
+.pdesc {
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+    margin-top: 2px;
+    line-height: var(--lh-relaxed);
+}
+
+.pdesc-long {
+    font-size: var(--text-xs);
+    color: var(--text-faint);
+    margin-top: 2px;
+}
+
+.pdeps {
+    font-size: var(--text-xs);
+    color: var(--yellow);
+    margin-top: var(--sp-1);
+    font-weight: var(--fw-medium);
+}
+
+/* ─── Copy Command Button ─────────────────────── */
+.pcmd {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    background: var(--bg-inset);
+    padding: 3px var(--sp-2);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    border: 1px solid var(--border);
+    white-space: nowrap;
+    align-self: center;
+    color: var(--text-muted);
+    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+    letter-spacing: var(--ls-wide);
+}
+
+.pcmd:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-glow);
+}
+
+.pcmd.copied {
+    border-color: var(--green);
+    color: var(--green);
+    background: var(--green-bg);
+}
+
+/* ─── Prompt Modal ────────────────────────────── */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: var(--sp-4);
+}
+
+.modal {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    max-width: 720px;
+    width: 100%;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    padding: var(--sp-4) var(--sp-5);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.modal-header h3 {
+    font-size: var(--text-lg);
+    font-weight: var(--fw-semi);
+    flex: 1;
+    min-width: 0;
+}
+
+.modal-close {
+    background: var(--bg-inset);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: var(--sp-1) var(--sp-2);
+    cursor: pointer;
+    font-size: var(--text-base);
+    color: var(--text-muted);
+    line-height: 1;
+    transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.modal-close:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.modal-body {
+    padding: var(--sp-5);
+    overflow-y: auto;
+    flex: 1;
+}
+
+.modal-body pre {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    line-height: var(--lh-relaxed);
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--text);
+}
+
+.modal-body pre .md-heading {
+    font-weight: var(--fw-bold);
+    color: var(--accent);
+}
+
+.modal-body pre .md-code {
+    background: var(--bg-inset);
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: var(--text-xs);
+}
+
+.modal-footer {
+    display: flex;
+    gap: var(--sp-2);
+    padding: var(--sp-3) var(--sp-5);
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.modal-copy-btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: var(--sp-2) var(--sp-4);
+    font-size: var(--text-sm);
+    font-weight: var(--fw-medium);
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.modal-copy-btn:hover {
+    background: var(--accent-hover);
+}
+
+.modal-copy-btn.copied {
+    background: var(--green);
+}
+
+/* ─── Beads Task Section ─────────────────────── */
+.beads-section {
+    margin-top: var(--sp-8);
+    margin-bottom: var(--sp-6);
+}
+
+.beads-filters {
+    display: flex;
+    gap: var(--sp-2);
+    margin-bottom: var(--sp-3);
+}
+
+.beads-filter {
+    background: var(--bg-inset);
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    padding: var(--sp-1) var(--sp-3);
+    font-size: var(--text-xs);
+    font-weight: var(--fw-medium);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+    letter-spacing: var(--ls-wide);
+}
+
+.beads-filter:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.beads-filter.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+}
+
+/* ─── Beads Status Badges ────────────────────── */
+.st-bead-open {
+    background: var(--accent-glow);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+}
+
+.st-bead-progress {
+    background: var(--blue-bg);
+    color: var(--blue);
+    border: 1px solid var(--blue-border);
+}
+
+.st-bead-blocked {
+    background: var(--yellow-bg);
+    color: var(--yellow);
+    border: 1px solid var(--yellow-border);
+}
+
+.st-bead-deferred {
+    background: var(--gray-bg);
+    color: var(--gray);
+    border: 1px solid var(--gray-border);
+}
+
+.st-bead-closed {
+    background: var(--green-bg);
+    color: var(--green);
+    border: 1px solid var(--green-border);
+}
+
+/* ─── Beads Filter Separator ─────────────────── */
+.beads-filter-sep {
+    width: 1px;
+    background: var(--border);
+    align-self: stretch;
+    margin: 0 var(--sp-1);
+}
+
+/* ─── Beads Priority Filter ──────────────────── */
+.beads-prio-filter {
+    background: var(--bg-inset);
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    padding: var(--sp-1) var(--sp-3);
+    font-size: var(--text-xs);
+    font-weight: var(--fw-medium);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+    letter-spacing: var(--ls-wide);
+}
+
+.beads-prio-filter:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.beads-prio-filter.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+}
+
+/* ─── Beads Task Detail Modal ────────────────── */
+.bead-meta-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--sp-3);
+    padding: var(--sp-4) 0;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.bead-meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.bead-meta-label {
+    font-size: var(--text-xs);
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: var(--ls-wide);
+    font-weight: var(--fw-medium);
+}
+
+.bead-meta-value {
+    font-size: var(--text-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text);
+}
+
+.bead-description {
+    padding: var(--sp-4) 0;
+    border-bottom: 1px solid var(--border-light);
+    white-space: pre-wrap;
+    font-size: var(--text-sm);
+    line-height: var(--lh-relaxed);
+    color: var(--text-muted);
+}
+
+.bead-deps {
+    padding: var(--sp-4) 0;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.bead-dep-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-bottom: var(--sp-2);
+}
+
+.bead-dep-group:last-child {
+    margin-bottom: 0;
+}
+
+.bead-dep-label {
+    font-size: var(--text-xs);
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: var(--ls-wide);
+    font-weight: var(--fw-medium);
+    min-width: 80px;
+}
+
+.bead-dep-link {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    padding: 2px var(--sp-2);
+    border-radius: 99px;
+    background: var(--accent-glow);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+    text-decoration: none;
+}
+
+.bead-dep-link:hover {
+    background: var(--accent);
+    color: #fff;
+}
+
+.bead-timestamps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-4);
+    padding: var(--sp-4) 0;
+}
+
+.bead-ts-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.bead-ts-label {
+    font-size: var(--text-xs);
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: var(--ls-wide);
+    font-weight: var(--fw-medium);
+}
+
+.bead-ts-value {
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+}
+
+.bead-ts-value[title] {
+    border-bottom: 1px dotted var(--text-faint);
+    cursor: help;
+}
+
+/* ─── Standalone Commands Section ─────────────── */
+.ongoing {
+    margin-top: var(--sp-10);
+}
+
+.ongoing h2 {
+    letter-spacing: var(--ls-wide);
+    text-transform: uppercase;
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+    margin-bottom: var(--sp-4);
+    border-bottom: 2px solid var(--border);
+    padding-bottom: var(--sp-2);
+}
+
+/* ─── Footer ──────────────────────────────────── */
+.footer {
+    text-align: center;
+    font-size: var(--text-xs);
+    color: var(--text-faint);
+    margin-top: var(--sp-10);
+    padding-top: var(--sp-4);
+    border-top: 1px solid var(--border-light);
+    letter-spacing: var(--ls-wide);
+}
+
+/* ─── Utilities ───────────────────────────────── */
+.hidden {
+    display: none;
+}
+
+/* Build-observability severity + verdict tokens (Plan 4) */
+:root {
+  --sev-p0: #dc2626;        /* red 600 */
+  --sev-p1: #ea580c;        /* orange 600 */
+  --sev-p2: #ca8a04;        /* yellow 600 */
+  --sev-p3: #2563eb;        /* blue 600 */
+  --sev-pass: #16a34a;      /* green 600 */
+}
+[data-theme="dark"] {
+  --sev-p0: #f87171;
+  --sev-p1: #fb923c;
+  --sev-p2: #facc15;
+  --sev-p3: #60a5fa;
+  --sev-pass: #4ade80;
+}
+
+/* Build-observability panel layout */
+.panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: var(--sp-4) var(--sp-6);
+    margin-bottom: var(--sp-6);
+}
+.panel > header {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-4);
+    flex-wrap: wrap;
+}
+.panel > header h2 {
+    margin: 0;
+    font-size: var(--text-base);
+    font-weight: var(--fw-semi);
+}
+.panel .meta {
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+}
+.grid { display: grid; gap: var(--sp-4); }
+.grid-2 { grid-template-columns: repeat(2, 1fr); }
+@media (max-width: 640px) { .grid-2 { grid-template-columns: 1fr; } }
+
+/* Finding filters */
+.finding-filters {
+    display: flex;
+    gap: var(--sp-2);
+    flex-wrap: wrap;
+    margin-bottom: var(--sp-4);
+}
+.finding-filters button {
+    padding: var(--sp-1) var(--sp-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-inset);
+    color: var(--text);
+    font-size: var(--text-sm);
+    cursor: pointer;
+}
+.finding-filters button:hover,
+.finding-filters button.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+}
+
+/* Findings list */
+.findings {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+}
+.finding {
+    background: var(--bg-inset);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    padding: var(--sp-3) var(--sp-4);
+}
+.finding header {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    flex-wrap: wrap;
+    margin-bottom: var(--sp-2);
+}
+.finding-id {
+    font-family: var(--font-mono, monospace);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px var(--sp-1);
+}
+.finding .lens {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+}
+.finding .title {
+    font-size: var(--text-sm);
+    font-weight: var(--fw-semi);
+    flex: 1;
+}
+.finding p { margin: 0; font-size: var(--text-sm); color: var(--text-muted); }
+.empty { color: var(--text-muted); font-size: var(--text-sm); text-align: center; padding: var(--sp-4); }
+
+/* ── Mermaid diagrams ─────────────────────────────────────────────────────────
+   The build renders mermaid to inline SVG via mmdc, then sanitizeSvg() +
+   rehype-sanitize strip the SVG's own <script>, <foreignObject>, AND <style>
+   for security. Stripping <style> means the diagram arrives unstyled (nodes
+   default to a black fill). These theme-token rules restyle the SVG so nodes,
+   edges, arrowheads, and labels render correctly — and follow light/dark mode.
+   Authors must render with htmlLabels:false (the generator forces this) so node
+   labels are native <text>/<tspan> rather than stripped <foreignObject> HTML. */
+figure.mermaid { margin: var(--sp-5) 0; text-align: center; }
+figure.mermaid svg { max-width: 100%; height: auto; }
+/* Node shapes */
+figure.mermaid svg .node rect,
+figure.mermaid svg .node circle,
+figure.mermaid svg .node ellipse,
+figure.mermaid svg .node polygon,
+figure.mermaid svg .node path {
+    fill: var(--bg-inset);
+    stroke: var(--border);
+    stroke-width: 1px;
+}
+/* Background helper rects mermaid emits behind labels */
+figure.mermaid svg .node .label-container { fill: var(--bg-inset); stroke: var(--border); }
+figure.mermaid svg rect.background { fill: none; stroke: none; }
+/* Labels (rendered as <text>/<tspan> when htmlLabels:false) */
+figure.mermaid svg .nodeLabel,
+figure.mermaid svg .node text,
+figure.mermaid svg text.nodeLabel,
+figure.mermaid svg .label text,
+figure.mermaid svg span.nodeLabel {
+    fill: var(--text);
+    color: var(--text);
+    font-family: var(--font-sans);
+}
+/* Edges: thin strokes, not filled blobs */
+figure.mermaid svg .edgePath path,
+figure.mermaid svg path.flowchart-link,
+figure.mermaid svg .flowchart-link {
+    fill: none;
+    stroke: var(--text-faint);
+    stroke-width: 1.5px;
+}
+/* Arrowheads */
+figure.mermaid svg marker path,
+figure.mermaid svg .marker {
+    fill: var(--text-faint);
+    stroke: var(--text-faint);
+}
+figure.mermaid svg .edgeLabel,
+figure.mermaid svg .edgeLabel text { fill: var(--text-muted); color: var(--text-muted); }
+</style>
+<script>(function(){try{var t=localStorage.getItem('guide-theme');if(!t&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)t='dark';if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+</head>
+<body>
+<header class="topbar">
+  <button data-action="nav" class="nav-toggle" aria-label="Toggle navigation">☰</button>
+  <h1>The Scaffold Pipeline</h1>
+  <button data-action="theme" class="theme-toggle" aria-label="Toggle theme">◐</button>
+</header>
+<div class="layout">
+  <aside class="rail"><nav class="toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#the-mental-model">The mental model</a></li><li class="toc-2"><a href="#the-16-phases-at-a-glance">The 16 phases at a glance</a></li><li class="toc-2"><a href="#methodology-depth">Methodology &amp; depth</a></li><li class="toc-3"><a href="#depth-15">Depth (1–5)</a></li><li class="toc-3"><a href="#the-three-presets">The three presets</a></li><li class="toc-2"><a href="#project-type-playbooks">Project-type playbooks</a></li><li class="toc-2"><a href="#navigating-the-pipeline">Navigating the pipeline</a></li><li class="toc-2"><a href="#why-a-step-is-blocked">Why a step is blocked</a></li><li class="toc-3"><a href="#conditional-if-needed-steps">Conditional (&quot;if-needed&quot;) steps</a></li><li class="toc-3"><a href="#a-representative-dependency-slice">A representative dependency slice</a></li><li class="toc-2"><a href="#create-vs-update-mode">CREATE vs UPDATE mode</a></li><li class="toc-2"><a href="#phase-boundary-audits">Phase-boundary audits</a></li><li class="toc-2"><a href="#where-it-all-lives">Where it all lives</a></li></ul></nav></aside>
+  <main class="content"><h2 id="the-mental-model">The mental model</h2>
+<p>Scaffold is a <strong>prompt pipeline</strong>: a curated, ordered sequence of structured
+meta-prompts that turn an idea into a fully-specified, build-ready project. Each
+meta-prompt is a markdown file under <code>content/pipeline/</code>; the CLI assembles one
+into a full prompt at runtime (injecting upstream artifacts, knowledge entries,
+and depth instructions) and hands it to Claude Code or another AI tool.</p>
+<p>The pipeline divides cleanly into two regimes:</p>
+<ul>
+<li><strong>Planning (phases 0–14)</strong> — <em>stateful</em>, <em>sequential</em> steps. Each produces a
+durable artifact (a vision doc, a PRD, a tech-stack doc, an implementation
+plan…). The CLI tracks completion in <code>.scaffold/state.json</code>, enforces
+dependencies, and detects when you re-run a step (UPDATE mode). You run each
+step roughly once, in dependency order, working <em>toward</em> a frozen spec.</li>
+<li><strong>Build (phase 15)</strong> — <em>stateless</em>, <em>on-demand</em> steps. These are the execution
+loops (single-agent, multi-agent), the resume commands, quick-task, and
+new-enhancement. They carry no completion state and can be run repeatedly
+(<code>stateless: true</code> in frontmatter — <span class="fp" data-path="src/types/frontmatter.ts:126">src/types/frontmatter.ts:126</span>). You
+run these <em>over and over</em> while actually writing code.</li>
+</ul>
+<p>The 16 phases are the single source of truth in code: the <code>PHASES</code> constant
+(<span class="fp" data-path="src/types/frontmatter.ts:6">src/types/frontmatter.ts:6</span>) defines every slug, number, and display
+name. Everything in this guide is anchored to it.</p>
+<div class="callout callout-note"><p><strong>89 meta-prompts, not 89 steps you run.</strong> The pipeline directory holds 89 files
+across 16 phase directories, but most projects run only a fraction. Game,
+multi-service, and platform-specific steps are disabled unless an overlay turns
+them on, and many steps are conditional (see <a href="#methodology--depth">Methodology &#x26; depth</a>).</p></div>
+<h2 id="the-16-phases-at-a-glance">The 16 phases at a glance</h2>
+<p>Phase numbers and display names below are quoted verbatim from the <code>PHASES</code>
+constant (<span class="fp" data-path="src/types/frontmatter.ts:6">src/types/frontmatter.ts:6</span>). Phases 0–14 are planning; phase 15
+is the stateless build phase.</p>
+<div class="filter-table"><input type="text" class="filter-input" placeholder="Filter…" aria-label="Filter table rows" disabled>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>#</th><th>slug</th><th>name</th><th>what it produces</th></tr></thead><tbody><tr><td>0</td><td><code>vision</code></td><td>Product Vision</td><td>A strategic vision document — who it's for, what's different, what success looks like</td></tr><tr><td>1</td><td><code>pre</code></td><td>Product Definition</td><td>The PRD, then user stories with testable acceptance criteria</td></tr><tr><td>2</td><td><code>foundation</code></td><td>Project Foundation</td><td>Tech-stack decisions, coding standards (+ linter configs), TDD strategy, project structure</td></tr><tr><td>3</td><td><code>environment</code></td><td>Development Environment</td><td>One-command dev env, design system (web), git workflow + CI, optional PR review, AI memory</td></tr><tr><td>4</td><td><code>integration</code></td><td>Testing Integration</td><td>E2E setup — Playwright (web) or Maestro (mobile); auto-skips for backend-only</td></tr><tr><td>5</td><td><code>modeling</code></td><td>Domain Modeling</td><td>Core entities, relationships, invariants, domain events — a shared vocabulary</td></tr><tr><td>6</td><td><code>decisions</code></td><td>Architecture Decisions</td><td>An ADR per significant technology/design decision, with alternatives + rationale</td></tr><tr><td>7</td><td><code>architecture</code></td><td>System Architecture</td><td>The system blueprint — components, data flow, where code lives, extension points</td></tr><tr><td>8</td><td><code>specification</code></td><td>Specifications</td><td>Per-layer interface specs — DB schema, API contracts, UX spec (each conditional)</td></tr><tr><td>9</td><td><code>quality</code></td><td>Quality Gates</td><td>Testing review, test skeletons, evals, operations/deploy plan, security review</td></tr><tr><td>10</td><td><code>parity</code></td><td>Platform Parity</td><td>Cross-platform gap audit (multi-platform only; auto-skips otherwise)</td></tr><tr><td>11</td><td><code>consolidation</code></td><td>Consolidation</td><td>CLAUDE.md optimization + workflow-doc consistency audit</td></tr><tr><td>12</td><td><code>planning</code></td><td>Planning</td><td>The implementation plan — stories decomposed into small, dependency-ordered tasks</td></tr><tr><td>13</td><td><code>validation</code></td><td>Validation</td><td>Seven cross-cutting pre-implementation audits (scope, cycles, traceability, …)</td></tr><tr><td>14</td><td><code>finalization</code></td><td>Finalization</td><td>Apply validation fixes, freeze docs, onboarding guide, implementation playbook</td></tr><tr><td>15</td><td><code>build</code></td><td>Build</td><td>Stateless execution loops — single/multi-agent, resume, quick-task, new-enhancement</td></tr></tbody></table></div>
+<p>Each step's <code>order</code> is phase-aligned: phase N occupies the N00–N99 band
+(<code>tech-stack</code> is <code>220</code>, <code>coding-standards</code> is <code>230</code>, <code>single-agent-start</code> is
+<code>1510</code>). The order field is the primary tiebreaker in the topological sort, so
+within a phase steps run in <code>order</code> sequence.</p>
+<figure class="mermaid"><svg id="my-svg" width="100%" xmlns="http://www.w3.org/2000/svg" class="flowchart" style="max-width: 3938.14px; background-color: transparent;" viewBox="0 0 3938.140625 100.19999694824219" role="graphics-document document">#my-svg{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;fill:#000000;}@keyframes edge-animation-frame{from{stroke-dashoffset:0;}}@keyframes dash{to{stroke-dashoffset:0;}}#my-svg .edge-animation-slow{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 50s linear infinite;stroke-linecap:round;}#my-svg .edge-animation-fast{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 20s linear infinite;stroke-linecap:round;}#my-svg .error-icon{fill:#552222;}#my-svg .error-text{fill:#552222;stroke:#552222;}#my-svg .edge-thickness-normal{stroke-width:1px;}#my-svg .edge-thickness-thick{stroke-width:3.5px;}#my-svg .edge-pattern-solid{stroke-dasharray:0;}#my-svg .edge-thickness-invisible{stroke-width:0;fill:none;}#my-svg .edge-pattern-dashed{stroke-dasharray:3;}#my-svg .edge-pattern-dotted{stroke-dasharray:2;}#my-svg .marker{fill:#666;stroke:#666;}#my-svg .marker.cross{stroke:#666;}#my-svg svg{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;}#my-svg p{margin:0;}#my-svg .label{font-family:"trebuchet ms",verdana,arial,sans-serif;color:#000000;}#my-svg .cluster-label text{fill:#333;}#my-svg .cluster-label span{color:#333;}#my-svg .cluster-label span p{background-color:transparent;}#my-svg .label text,#my-svg span{fill:#000000;color:#000000;}#my-svg .node rect,#my-svg .node circle,#my-svg .node ellipse,#my-svg .node polygon,#my-svg .node path{fill:#eee;stroke:#999;stroke-width:1px;}#my-svg .rough-node .label text,#my-svg .node .label text,#my-svg .image-shape .label,#my-svg .icon-shape .label{text-anchor:middle;}#my-svg .node .katex path{fill:#000;stroke:#000;stroke-width:1px;}#my-svg .rough-node .label,#my-svg .node .label,#my-svg .image-shape .label,#my-svg .icon-shape .label{text-align:center;}#my-svg .node.clickable{cursor:pointer;}#my-svg .root .anchor path{fill:#666!important;stroke-width:0;stroke:#666;}#my-svg .arrowheadPath{fill:#333333;}#my-svg .edgePath .path{stroke:#666;stroke-width:1px;}#my-svg .flowchart-link{stroke:#666;fill:none;}#my-svg .edgeLabel{background-color:white;text-align:center;}#my-svg .edgeLabel p{background-color:white;}#my-svg .edgeLabel rect{opacity:0.5;background-color:white;fill:white;}#my-svg .labelBkg{background-color:rgba(255, 255, 255, 0.5);}#my-svg .cluster rect{fill:hsl(0, 0%, 98.9215686275%);stroke:#707070;stroke-width:1px;}#my-svg .cluster text{fill:#333;}#my-svg .cluster span{color:#333;}#my-svg div.mermaidTooltip{position:absolute;text-align:center;max-width:200px;padding:2px;font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:12px;background:hsl(-160, 0%, 93.3333333333%);border:1px solid #707070;border-radius:2px;pointer-events:none;z-index:100;}#my-svg .flowchartTitleText{text-anchor:middle;font-size:18px;fill:#000000;}#my-svg rect.text{fill:none;stroke-width:0;}#my-svg .icon-shape,#my-svg .image-shape{background-color:white;text-align:center;}#my-svg .icon-shape p,#my-svg .image-shape p{background-color:white;padding:2px;}#my-svg .icon-shape .label rect,#my-svg .image-shape .label rect{opacity:0.5;background-color:white;fill:white;}#my-svg .label-icon{display:inline-block;height:1em;overflow:visible;vertical-align:-0.125em;}#my-svg .node .label-icon path{fill:currentColor;stroke:revert;stroke-width:revert;}#my-svg .node .neo-node{stroke:#999;}#my-svg [data-look="neo"].node rect,#my-svg [data-look="neo"].cluster rect,#my-svg [data-look="neo"].node polygon{stroke:url(#my-svg-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#my-svg [data-look="neo"].node path{stroke:url(#my-svg-gradient);stroke-width:1px;}#my-svg [data-look="neo"].node .outer-path{filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#my-svg [data-look="neo"].node .neo-line path{stroke:#999;filter:none;}#my-svg [data-look="neo"].node circle{stroke:url(#my-svg-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#my-svg [data-look="neo"].node circle .state-start{fill:#000000;}#my-svg [data-look="neo"].icon-shape .icon{fill:url(#my-svg-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#my-svg [data-look="neo"].icon-shape .icon-neo path{stroke:url(#my-svg-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#my-svg :root{--mermaid-font-family:"trebuchet ms",verdana,arial,sans-serif;}<g><marker id="my-svg_flowchart-v2-pointEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"></path></marker><marker id="my-svg_flowchart-v2-pointStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="4.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 5 L 10 10 L 10 0 z" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"></path></marker><marker id="my-svg_flowchart-v2-pointEnd-margin" class="marker flowchart-v2" viewBox="0 0 11.5 14" refX="11.5" refY="7" markerUnits="userSpaceOnUse" markerWidth="10.5" markerHeight="14" orient="auto"><path d="M 0 0 L 11.5 7 L 0 14 z" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"></path></marker><marker id="my-svg_flowchart-v2-pointStart-margin" class="marker flowchart-v2" viewBox="0 0 11.5 14" refX="1" refY="7" markerUnits="userSpaceOnUse" markerWidth="11.5" markerHeight="14" orient="auto"><polygon points="0,7 11.5,14 11.5,0" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"></polygon></marker><marker id="my-svg_flowchart-v2-circleEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"></circle></marker><marker id="my-svg_flowchart-v2-circleStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="-1" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"></circle></marker><marker id="my-svg_flowchart-v2-circleEnd-margin" class="marker flowchart-v2" viewBox="0 0 10 10" refY="5" refX="12.25" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"></circle></marker><marker id="my-svg_flowchart-v2-circleStart-margin" class="marker flowchart-v2" viewBox="0 0 10 10" refX="-2" refY="5" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"></circle></marker><marker id="my-svg_flowchart-v2-crossEnd" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="12" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" style="stroke-width: 2; stroke-dasharray: 1, 0;"></path></marker><marker id="my-svg_flowchart-v2-crossStart" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="-1" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" style="stroke-width: 2; stroke-dasharray: 1, 0;"></path></marker><marker id="my-svg_flowchart-v2-crossEnd-margin" class="marker cross flowchart-v2" viewBox="0 0 15 15" refX="17.7" refY="7.5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto"><path d="M 1,1 L 14,14 M 1,14 L 14,1" class="arrowMarkerPath" style="stroke-width: 2.5;"></path></marker><marker id="my-svg_flowchart-v2-crossStart-margin" class="marker cross flowchart-v2" viewBox="0 0 15 15" refX="-3.5" refY="7.5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto"><path d="M 1,1 L 14,14 M 1,14 L 14,1" class="arrowMarkerPath" style="stroke-width: 2.5; stroke-dasharray: 1, 0;"></path></marker><g class="root"><g class="clusters"></g><g class="edgePaths"><path d="M132.688,50.1L136.854,50.1C141.021,50.1,149.354,50.1,157.021,50.1C164.688,50.1,171.688,50.1,175.188,50.1L178.688,50.1" id="my-svg-L_P0_P1_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M336.172,50.1L340.339,50.1C344.505,50.1,352.839,50.1,360.505,50.1C368.172,50.1,375.172,50.1,378.672,50.1L382.172,50.1" id="my-svg-L_P1_P2_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M641.344,50.1L645.51,50.1C649.677,50.1,658.01,50.1,665.677,50.1C673.344,50.1,680.344,50.1,683.844,50.1L687.344,50.1" id="my-svg-L_P2_P3_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M865.766,50.1L869.932,50.1C874.099,50.1,882.432,50.1,890.099,50.1C897.766,50.1,904.766,50.1,908.266,50.1L911.766,50.1" id="my-svg-L_P3_P4_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M1098.266,50.1L1102.432,50.1C1106.599,50.1,1114.932,50.1,1122.599,50.1C1130.266,50.1,1137.266,50.1,1140.766,50.1L1144.266,50.1" id="my-svg-L_P4_P5_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M1297.75,50.1L1301.917,50.1C1306.083,50.1,1314.417,50.1,1322.083,50.1C1329.75,50.1,1336.75,50.1,1340.25,50.1L1343.75,50.1" id="my-svg-L_P5_P6_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M1496.641,50.1L1500.807,50.1C1504.974,50.1,1513.307,50.1,1520.974,50.1C1528.641,50.1,1535.641,50.1,1539.141,50.1L1542.641,50.1" id="my-svg-L_P6_P7_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M1719.438,50.1L1723.604,50.1C1727.771,50.1,1736.104,50.1,1743.771,50.1C1751.438,50.1,1758.438,50.1,1761.938,50.1L1765.438,50.1" id="my-svg-L_P7_P8_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M2018.641,50.1L2022.807,50.1C2026.974,50.1,2035.307,50.1,2042.974,50.1C2050.641,50.1,2057.641,50.1,2061.141,50.1L2064.641,50.1" id="my-svg-L_P8_P9_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M2202.141,50.1L2206.307,50.1C2210.474,50.1,2218.807,50.1,2226.474,50.1C2234.141,50.1,2241.141,50.1,2244.641,50.1L2248.141,50.1" id="my-svg-L_P9_P10_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M2483.438,50.1L2487.604,50.1C2491.771,50.1,2500.104,50.1,2507.771,50.1C2515.438,50.1,2522.438,50.1,2525.938,50.1L2529.438,50.1" id="my-svg-L_P10_P11_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M2720.891,50.1L2725.057,50.1C2729.224,50.1,2737.557,50.1,2745.224,50.1C2752.891,50.1,2759.891,50.1,2763.391,50.1L2766.891,50.1" id="my-svg-L_P11_P12_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M2981.484,50.1L2985.651,50.1C2989.818,50.1,2998.151,50.1,3005.818,50.1C3013.484,50.1,3020.484,50.1,3023.984,50.1L3027.484,50.1" id="my-svg-L_P12_P13_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M3194.875,50.1L3199.042,50.1C3203.208,50.1,3211.542,50.1,3219.208,50.1C3226.875,50.1,3233.875,50.1,3237.375,50.1L3240.875,50.1" id="my-svg-L_P13_P14_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M3418.328,50.1L3429.715,50.1C3441.102,50.1,3463.875,50.1,3485.982,50.1C3508.089,50.1,3529.529,50.1,3540.249,50.1L3550.969,50.1" id="my-svg-L_P14_P15_0" class="edge-thickness-thick edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M3719.781,36.654L3723.948,35.974C3728.115,35.294,3736.448,33.935,3744.781,33.255C3753.115,32.575,3761.448,32.575,3765.615,32.575L3769.781,32.575" id="my-svg-P15-cyclic-special-1" class="edge-thickness-normal edge-pattern-dotted edge-thickness-normal edge-pattern-solid flowchart-link" style=";"></path><path d="M3769.881,32.575L3783.224,32.575C3796.566,32.575,3823.251,32.575,3849.936,35.494C3876.621,38.413,3903.306,44.251,3916.648,47.17L3929.991,50.089" id="my-svg-P15-cyclic-special-mid" class="edge-thickness-normal edge-pattern-dotted edge-thickness-normal edge-pattern-solid flowchart-link" style=";"></path><path d="M3929.991,50.111L3916.648,53.03C3903.306,55.949,3876.621,61.787,3849.928,64.706C3823.234,67.625,3796.533,67.625,3779.007,67.625C3761.481,67.625,3753.131,67.625,3745.448,67.052C3737.764,66.48,3730.746,65.335,3727.238,64.763L3723.729,64.19" id="my-svg-P15-cyclic-special-2" class="edge-thickness-normal edge-pattern-dotted edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path></g><g class="edgeLabels"><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel" transform="translate(3486.6484375, 50.099998474121094)"><g class="label" transform="translate(0, -10.5)"><g><rect class="background" style="" x="-43.3203125" y="-1" width="86.640625" height="23"></rect><text y="-10.1" text-anchor="middle" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"><tspan class="text-inner-tspan">frozen</tspan><tspan class="text-inner-tspan"> spec</tspan></tspan></text></g></g></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel" transform="translate(3849.93593750149, 32.574998473748565)"><g class="label" transform="translate(0, -10.5)"><g><rect class="background" style="" x="-55.0546875" y="-1" width="110.109375" height="23"></rect><text y="-10.1" text-anchor="middle" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"><tspan class="text-inner-tspan">run</tspan><tspan class="text-inner-tspan"> repeatedly</tspan></tspan></text></g></g></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g></g><g class="nodes"><g class="node default" id="my-svg-flowchart-P0-0" transform="translate(70.34375, 50.099998474121094)"><rect class="basic label-container" style="" x="-62.34375" y="-24.5" width="124.6875" height="49"></rect><g class="label" style="" transform="translate(0, -9.5)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">0</tspan><tspan class="text-inner-tspan"> ·</tspan><tspan class="text-inner-tspan"> vision</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-P1-1" transform="translate(259.4296875, 50.099998474121094)"><rect class="basic label-container" style="" x="-76.7421875" y="-33.29999923706055" width="153.484375" height="66.5999984741211"></rect><g class="label" style="" transform="translate(0, -18.299999237060547)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">1</tspan><tspan class="text-inner-tspan"> ·</tspan><tspan class="text-inner-tspan"> pre</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">PRD</tspan><tspan class="text-inner-tspan"> +</tspan><tspan class="text-inner-tspan"> stories</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-P2-3" transform="translate(513.7578125, 50.099998474121094)"><rect class="basic label-container" style="" x="-127.5859375" y="-42.099998474121094" width="255.171875" height="84.19999694824219"></rect><g class="label" style="" transform="translate(0, -27.099998474121094)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">2</tspan><tspan class="text-inner-tspan"> ·</tspan><tspan class="text-inner-tspan"> foundation</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">tech-stack,</tspan><tspan class="text-inner-tspan"> standards,</tspan><tspan class="text-inner-tspan"> tdd,</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="2.1em"><tspan class="text-inner-tspan">structure</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-P3-5" transform="translate(778.5546875, 50.099998474121094)"><rect class="basic label-container" style="" x="-87.2109375" y="-24.5" width="174.421875" height="49"></rect><g class="label" style="" transform="translate(0, -9.5)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">3</tspan><tspan class="text-inner-tspan"> ·</tspan><tspan class="text-inner-tspan"> environment</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-P4-7" transform="translate(1007.015625, 50.099998474121094)"><rect class="basic label-container" style="" x="-91.25" y="-33.29999923706055" width="182.5" height="66.5999984741211"></rect><g class="label" style="" transform="translate(0, -18.299999237060547)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">4</tspan><tspan class="text-inner-tspan"> ·</tspan><tspan class="text-inner-tspan"> integration</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">e2e</tspan><tspan class="text-inner-tspan"> (conditional)</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-P5-9" transform="translate(1223.0078125, 50.099998474121094)"><rect class="basic label-container" style="" x="-74.7421875" y="-24.5" width="149.484375" height="49"></rect><g class="label" style="" transform="translate(0, -9.5)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">5</tspan><tspan class="text-inner-tspan"> ·</tspan><tspan class="text-inner-tspan"> modeling</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-P6-11" transform="translate(1422.1953125, 50.099998474121094)"><rect class="basic label-container" style="" x="-74.4453125" y="-33.29999923706055" width="148.890625" height="66.5999984741211"></rect><g class="label" style="" transform="translate(0, -18.299999237060547)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">6</tspan><tspan class="text-inner-tspan"> ·</tspan><tspan class="text-inner-tspan"> decisions</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">ADRs</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-P7-13" transform="translate(1633.0390625, 50.099998474121094)"><rect class="basic label-container" style="" x="-86.3984375" y="-24.5" width="172.796875" height="49"></rect><g class="label" style="" transform="translate(0, -9.5)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">7</tspan><tspan class="text-inner-tspan"> ·</tspan><tspan class="text-inner-tspan"> architecture</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-P8-15" transform="translate(1894.0390625, 50.099998474121094)"><rect class="basic label-container" style="" x="-124.6015625" y="-33.29999923706055" width="249.203125" height="66.5999984741211"></rect><g class="label" style="" transform="translate(0, -18.299999237060547)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">8</tspan><tspan class="text-inner-tspan"> ·</tspan><tspan class="text-inner-tspan"> specification</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">db</tspan><tspan class="text-inner-tspan"> /</tspan><tspan class="text-inner-tspan"> api</tspan><tspan class="text-inner-tspan"> /</tspan><tspan class="text-inner-tspan"> ux</tspan><tspan class="text-inner-tspan"> (conditional)</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-P9-17" transform="translate(2135.390625, 50.099998474121094)"><rect class="basic label-container" style="" x="-66.75" y="-24.5" width="133.5" height="49"></rect><g class="label" style="" transform="translate(0, -9.5)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">9</tspan><tspan class="text-inner-tspan"> ·</tspan><tspan class="text-inner-tspan"> quality</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-P10-19" transform="translate(2367.7890625, 50.099998474121094)"><rect class="basic label-container" style="" x="-115.6484375" y="-24.5" width="231.296875" height="49"></rect><g class="label" style="" transform="translate(0, -9.5)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">10</tspan><tspan class="text-inner-tspan"> ·</tspan><tspan class="text-inner-tspan"> parity</tspan><tspan class="text-inner-tspan"> (conditional)</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-P11-21" transform="translate(2627.1640625, 50.099998474121094)"><rect class="basic label-container" style="" x="-93.7265625" y="-24.5" width="187.453125" height="49"></rect><g class="label" style="" transform="translate(0, -9.5)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">11</tspan><tspan class="text-inner-tspan"> ·</tspan><tspan class="text-inner-tspan"> consolidation</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-P12-23" transform="translate(2876.1875, 50.099998474121094)"><rect class="basic label-container" style="" x="-105.296875" y="-33.29999923706055" width="210.59375" height="66.5999984741211"></rect><g class="label" style="" transform="translate(0, -18.299999237060547)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">12</tspan><tspan class="text-inner-tspan"> ·</tspan><tspan class="text-inner-tspan"> planning</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">implementation-plan</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-P13-25" transform="translate(3113.1796875, 50.099998474121094)"><rect class="basic label-container" style="" x="-81.6953125" y="-33.29999923706055" width="163.390625" height="66.5999984741211"></rect><g class="label" style="" transform="translate(0, -18.299999237060547)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">13</tspan><tspan class="text-inner-tspan"> ·</tspan><tspan class="text-inner-tspan"> validation</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">7</tspan><tspan class="text-inner-tspan"> audits</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-P14-27" transform="translate(3331.6015625, 50.099998474121094)"><rect class="basic label-container" style="" x="-86.7265625" y="-33.29999923706055" width="173.453125" height="66.5999984741211"></rect><g class="label" style="" transform="translate(0, -18.299999237060547)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">14</tspan><tspan class="text-inner-tspan"> ·</tspan><tspan class="text-inner-tspan"> finalization</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">playbook</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-P15-29" transform="translate(3637.375, 50.099998474121094)"><rect class="basic label-container" style="" x="-82.40625" y="-33.29999923706055" width="164.8125" height="66.5999984741211"></rect><g class="label" style="" transform="translate(0, -18.299999237060547)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">15</tspan><tspan class="text-inner-tspan"> ·</tspan><tspan class="text-inner-tspan"> build</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">stateless</tspan><tspan class="text-inner-tspan"> loops</tspan></tspan></text></g></g></g><g class="label edgeLabel" id="P15---P15---1" transform="translate(3769.831250000745, 32.574998473748565)"><rect width="0.1" height="0.1"></rect><g class="label" style="" transform="translate(0, 0)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"></tspan></text></g></g></g><g class="label edgeLabel" id="P15---P15---2" transform="translate(3930.040625002235, 50.099998474121094)"><rect width="0.1" height="0.1"></rect><g class="label" style="" transform="translate(0, 0)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"></tspan></text></g></g></g></g></g></g><defs></defs><defs></defs></svg></figure>
+<p>The arrows show the <em>phase</em> progression, not the exact step-level dependency
+graph — a single step usually depends on one upstream step, not its whole
+phase. See <a href="#why-a-step-is-blocked">Why a step is blocked</a> for how dependencies
+actually gate execution.</p>
+<h2 id="methodology-depth">Methodology &#x26; depth</h2>
+<p>Two orthogonal knobs control how much of the pipeline runs and how thoroughly:</p>
+<ol>
+<li><strong>Preset</strong> — <em>which</em> steps are enabled. Three presets ship
+(<code>content/methodology/</code>): <code>mvp</code>, <code>custom</code> (balanced, depth 3), and <code>deep</code> (the
+schema default).</li>
+<li><strong>Depth</strong> — <em>how thorough</em> each enabled step's output is, on a 1–5 scale.</li>
+</ol>
+<h3 id="depth-15">Depth (1–5)</h3>
+<p>Every depth level dials the same step from a sketch to an exhaustive document.
+Each step's <code>## Methodology Scaling</code> section spells out its behavior per level —
+<code>coding-standards</code> at depth 1 is "core naming conventions, commit format, import
+ordering, 1–2 pages"; at depth 5 it's "full suite with all sections, custom
+linter rules, and code review checklist, 15–20 pages."</p>
+<div class="filter-table"><input type="text" class="filter-input" placeholder="Filter…" aria-label="Filter table rows" disabled>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>depth</th><th>name</th><th>what you get</th></tr></thead><tbody><tr><td>1</td><td>Minimal</td><td>Bare minimum to start building</td></tr><tr><td>2</td><td>Light</td><td>Slightly more detail; still speed-first</td></tr><tr><td>3</td><td>Balanced</td><td>Recommended default — good coverage, no excess</td></tr><tr><td>4</td><td>Thorough</td><td>Comprehensive; review/validation steps add external-model validation (Codex/Gemini) where their Methodology Scaling declares it</td></tr><tr><td>5</td><td>Exhaustive</td><td>Maximum detail; multi-model reconciliation on the steps that opt into it; for critical/regulated work</td></tr></tbody></table></div>
+<p>External-model / multi-model dispatch at depth 4–5 is <strong>step-specific</strong> — it
+applies to the prompts whose <code>## Methodology Scaling</code> section declares it
+(chiefly the <code>review-*</code> / <code>innovate-*</code> / validation steps). For most authoring
+steps, higher depth just means a more thorough single-model output.</p>
+<p>Depth 3 is the inflection point where steps start adding structure,
+cross-references, and validation beyond the basics. Override depth per run with
+<code>scaffold run &#x3C;step> --depth N</code>.</p>
+<h3 id="the-three-presets">The three presets</h3>
+<div class="tabs"><div class="tablist" role="tablist"></div><p>:::tab{title=mvp (depth 1)}
+<strong>Ship fast with minimal ceremony.</strong> Only the essential planning steps are
+enabled: vision, PRD + stories (with reviews), tech-stack, coding-standards,
+tdd, project-structure, dev-env-setup, implementation-plan, and
+implementation-playbook — then the build loops. Everything else (domain
+modeling, ADRs, architecture, specs, quality gates, validation) is <strong>disabled</strong>.
+This is the <em>minimum safe depth</em>: still enough spec to TDD against, but no
+ceremony you'd skip on a weekend project.
+:::
+:::tab{title=custom (depth 3)}
+<strong>Balanced.</strong> Most steps are enabled at depth 3. The exceptions:
+the three <code>innovate-*</code> steps and <code>automated-pr-review</code> are off by default, and
+the conditional steps (<code>beads</code>, <code>design-system</code>, <code>add-e2e-testing</code>, the spec
+steps, <code>platform-parity-review</code>) are enabled-but-<code>if-needed</code>. You override
+individual steps to taste.
+:::
+:::tab{title=deep (depth 5)}
+<strong>Maximum quality — and the schema default</strong> (<code>methodology</code> defaults to <code>deep</code>
+<span class="fp" data-path="src/config/schema.ts:272">src/config/schema.ts:272</span>; the resolver also falls back to <code>deep</code>). <em>Every</em>
+planning step is enabled, including the
+<code>innovate-*</code> steps (as <code>if-needed</code>), domain modeling, ADRs, full architecture,
+all specs, every quality gate, all seven validation audits, and the full
+finalization phase. External-model dispatch kicks in at depth 4+. Best for
+complex or regulated systems.
+:::</p></div>
+<div class="callout callout-note"><p><strong>Game / multi-service / platform steps are off in all three presets.</strong> The 24
+game steps and 5 cross-service steps are <code>enabled: false</code> in <code>mvp</code>, <code>custom</code>,
+<em>and</em> <code>deep</code>. They only switch on via a <strong>project-type overlay</strong> — see the
+playbooks below.</p></div>
+<h2 id="project-type-playbooks">Project-type playbooks</h2>
+<p>Overlays (<code>content/methodology/*-overlay.yml</code>) layer onto a preset. Most overlays
+only <strong>inject domain knowledge</strong> into existing steps (so a web-app build pulls in
+<code>web-app-auth-patterns</code> during <code>tech-stack</code>, <code>security</code>, etc.); a few also
+<strong>enable whole step families</strong>.</p>
+<div class="tabs"><div class="tablist" role="tablist"><button class="tab-btn active" role="tab" data-tab="0">Web</button><button class="tab-btn" role="tab" data-tab="1">Game</button><button class="tab-btn" role="tab" data-tab="2">Multi-service</button></div><div class="tabpane active" data-tab="0"><p><code>web-app-overlay.yml</code> is knowledge-only — it appends web-app expertise to
+~25 steps (rendering strategies + deployment + auth into <code>tech-stack</code>, UX
+patterns into <code>ux-spec</code>, the design system into <code>design-system</code>, and so on). The
+spec steps you'll actually use: <code>database-schema</code>, <code>api-contracts</code>, <code>ux-spec</code>
+(all conditional). <code>add-e2e-testing</code> configures <strong>Playwright</strong>.</p></div><div class="tabpane" data-tab="1"><p><code>game-overlay.yml</code> is the heavyweight: it <strong>enables a whole phase family</strong> via
+<code>step-overrides</code>. On come <code>game-design-document</code>, <code>review-gdd</code>,
+<code>performance-budgets</code>, <code>narrative-bible</code>, <code>netcode-spec</code>, <code>ai-behavior-design</code>,
+<code>art-bible</code>, <code>audio-design</code>, <code>economy-design</code>, <code>save-system-spec</code>,
+<code>game-ui-spec</code>, <code>playtest-plan</code>, <code>platform-cert-prep</code>, and more — many as
+<code>if-needed</code>. These live across the <code>pre</code>, <code>architecture</code>, <code>specification</code>, and
+<code>quality</code> phases.</p></div><div class="tabpane" data-tab="2"><p><code>multi-service-overlay.yml</code> activates when <code>services[]</code> is present in config. It
+enables five cross-service steps (<code>service-ownership-map</code>,
+<code>inter-service-contracts</code>, <code>cross-service-auth</code>, <code>cross-service-observability</code>,
+<code>integration-test-plan</code>) and — crucially — adds <strong>dependency-overrides</strong> and
+<strong>reads-overrides</strong> so downstream steps wait for and consume those cross-service
+artifacts. Use <code>scaffold next --service &#x3C;name></code> to drive a single service.</p></div><p>:::tab{title=Mobile / Expo}
+<code>mobile-app-overlay.yml</code> injects mobile knowledge the same way. The distinctive
+piece is <code>add-e2e-testing</code>, which auto-detects the platform and wires up
+<strong>Maestro</strong> for mobile/Expo instead of Playwright (phase 4 — <code>integration</code>).
+:::</p><p>:::tab{title=CLI / library}
+<code>cli-overlay.yml</code> (and <code>library-overlay.yml</code>) are knowledge-only. They append
+CLI expertise — command parsing, distribution, shell integration, output
+formatting — into <code>tech-stack</code>, <code>system-architecture</code>, <code>api-contracts</code>,
+<code>operations</code>, etc. No extra steps are enabled; you mostly skip the UX/design and
+(often) the database spec steps.
+:::</p></div>
+<p>Other shipped overlays include backend, data-pipeline, data-science, ML,
+web3, browser-extension, and several research presets — all under
+<code>content/methodology/</code>.</p>
+<h2 id="navigating-the-pipeline">Navigating the pipeline</h2>
+<p>The CLI is your driver. Every command lives in <code>src/cli/commands/</code>.</p>
+<div class="filter-table"><input type="text" class="filter-input" placeholder="Filter…" aria-label="Filter table rows" disabled>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>command</th><th>what it does</th><th>source</th></tr></thead><tbody><tr><td><code>scaffold next</code></td><td>Show the next eligible step(s) — what's unblocked right now</td><td><span class="fp" data-path="src/cli/commands/next.ts:28-29">src/cli/commands/next.ts:28-29</span></td></tr><tr><td><code>scaffold run &#x3C;step></code></td><td>Assemble + run a step; on completion, advances state</td><td><span class="fp" data-path="src/cli/commands/run.ts:45">src/cli/commands/run.ts:45</span></td></tr><tr><td><code>scaffold complete &#x3C;step></code></td><td>Mark a step done that you ran outside <code>scaffold run</code></td><td><span class="fp" data-path="src/cli/commands/complete.ts:28">src/cli/commands/complete.ts:28</span></td></tr><tr><td><code>scaffold skip &#x3C;step..></code></td><td>Skip one or more steps (treated as satisfied for deps)</td><td><span class="fp" data-path="src/cli/commands/skip.ts:35">src/cli/commands/skip.ts:35</span></td></tr><tr><td><code>scaffold rework</code></td><td>Re-run steps <strong>by phase</strong> for depth improvement or cleanup</td><td><span class="fp" data-path="src/cli/commands/rework.ts:39-40">src/cli/commands/rework.ts:39-40</span></td></tr><tr><td><code>scaffold reset [step]</code></td><td>Reset one step to pending, or wipe all pipeline state</td><td><span class="fp" data-path="src/cli/commands/reset.ts:32">src/cli/commands/reset.ts:32</span></td></tr><tr><td><code>scaffold status</code></td><td>Show overall progress and per-step statuses</td><td><span class="fp" data-path="src/cli/commands/status.ts:80-81">src/cli/commands/status.ts:80-81</span></td></tr></tbody></table></div>
+<p>A typical loop: <code>scaffold next</code> to see what's unblocked → <code>scaffold run &#x3C;step></code>
+→ repeat. <code>next</code> is a pure read — it derives eligibility live from the graph +
+state and deliberately does <em>not</em> mutate <code>state.json</code>, so running it after an
+upgrade won't churn committed state.</p>
+<p><strong><code>rework</code></strong> is phase-scoped: <code>scaffold rework --through 5</code> re-runs phases 1–5,
+<code>--phases 2,7</code> re-runs just those, <code>--exclude 3</code> drops a phase, <code>--depth 5</code>
+bumps depth for the batch. It batch-resets the selected steps to <code>pending</code> and
+creates a rework session the runner skill walks through.</p>
+<p>For build-phase work you don't touch <code>next</code>/<code>complete</code> — the stateless steps
+(<code>single-agent-start</code>, <code>multi-agent-start</code>, the resume commands, <code>quick-task</code>,
+<code>new-enhancement</code>) are run on demand and never tracked. See the
+<a href="../concepts/index.md">concepts guide</a>{mode=advisory} and the
+<a href="../cli/index.md">CLI reference</a>{mode=advisory} for the full command surface.</p>
+<h2 id="why-a-step-is-blocked">Why a step is blocked</h2>
+<p>A step becomes <em>eligible</em> only when its <strong>dependencies</strong> are satisfied. The
+frontmatter distinguishes two relationships, and they behave very differently:</p>
+<ul>
+<li><strong><code>dependencies</code></strong> (<span class="fp" data-path="src/types/frontmatter.ts:114">src/types/frontmatter.ts:114</span>) — <strong>hard gates.</strong>
+<code>scaffold run</code> refuses a step whose deps aren't <code>completed</code> or <code>skipped</code>,
+exiting with <code>DEP_UNMET</code> (<span class="fp" data-path="src/cli/commands/run.ts:262-281">src/cli/commands/run.ts:262-281</span>). <code>coding-standards</code>
+declares <code>dependencies: [tech-stack]</code>, so you can't write standards before you
+pick a stack.</li>
+<li><strong><code>reads</code></strong> (<span class="fp" data-path="src/types/frontmatter.ts:122">src/types/frontmatter.ts:122</span>) — <strong>soft references.</strong> A step
+<em>reads</em> an upstream artifact if it's available, but a missing/incomplete read
+never blocks execution — the assembler silently skips it
+(<span class="fp" data-path="src/cli/commands/run.ts:413-421">src/cli/commands/run.ts:413-421</span>). <code>coding-standards</code> <em>reads</em>
+<code>create-prd</code> so the domain informs which patterns matter, but a missing PRD
+won't stop it.</li>
+</ul>
+<div class="callout callout-warning"><p><strong><code>reads</code> ≠ <code>dependencies</code> — and that trips people up.</strong> Because reads don't gate
+execution, a step can run "successfully" while silently missing context it would
+have benefited from. If you <code>skip</code> an upstream step, downstream steps that only
+<em>read</em> it proceed without warning. When ordering matters, an overlay can promote
+a read into a <code>dependency</code> (the multi-service overlay does exactly this with its
+<code>dependency-overrides</code>).</p></div>
+<h3 id="conditional-if-needed-steps">Conditional ("if-needed") steps</h3>
+<p>A step with <code>conditional: 'if-needed'</code>
+(<span class="fp" data-path="src/types/frontmatter.ts:118">src/types/frontmatter.ts:118</span>) is enabled but only <em>applies</em> to certain
+project shapes. <code>database-schema</code> is <code>conditional: "if-needed"</code>
+(<span class="fp" data-path="content/pipeline/specification/database-schema.md:10">content/pipeline/specification/database-schema.md:10</span>) — it runs only if
+your project has a database layer. The spec steps (<code>database-schema</code>,
+<code>api-contracts</code>, <code>ux-spec</code>), <code>add-e2e-testing</code>, <code>design-system</code>, <code>beads</code>, and
+<code>platform-parity-review</code> are all conditional in the default presets.</p>
+<div class="callout callout-warning"><p><strong>The silent-skip trap.</strong> Conditional steps that don't apply, and steps you
+<code>skip</code> manually, both count as "satisfied" for dependency purposes — so the
+pipeline keeps flowing and <code>scaffold next</code> shows green. That's by design, but it
+means <em>the pipeline won't warn you that you skipped something important.</em> If
+<code>ux-spec</code> is skipped on a project that genuinely has a UI, nothing downstream
+will block; the gap only surfaces in phase 13 validation (or the build
+observability audit). Run <code>scaffold status</code> to see what was actually
+skipped vs completed.</p></div>
+<h3 id="a-representative-dependency-slice">A representative dependency slice</h3>
+<p>The phase-2 foundation steps show the gating in miniature: <code>tech-stack</code> has no
+dependencies (it kicks off the foundation), and <code>coding-standards</code> depends on it.</p>
+<figure class="mermaid"><svg id="my-svg" width="100%" xmlns="http://www.w3.org/2000/svg" class="flowchart" style="max-width: 1087.61px; background-color: transparent;" viewBox="0 0 1087.609375 216.79998779296875" role="graphics-document document">#my-svg{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;fill:#000000;}@keyframes edge-animation-frame{from{stroke-dashoffset:0;}}@keyframes dash{to{stroke-dashoffset:0;}}#my-svg .edge-animation-slow{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 50s linear infinite;stroke-linecap:round;}#my-svg .edge-animation-fast{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 20s linear infinite;stroke-linecap:round;}#my-svg .error-icon{fill:#552222;}#my-svg .error-text{fill:#552222;stroke:#552222;}#my-svg .edge-thickness-normal{stroke-width:1px;}#my-svg .edge-thickness-thick{stroke-width:3.5px;}#my-svg .edge-pattern-solid{stroke-dasharray:0;}#my-svg .edge-thickness-invisible{stroke-width:0;fill:none;}#my-svg .edge-pattern-dashed{stroke-dasharray:3;}#my-svg .edge-pattern-dotted{stroke-dasharray:2;}#my-svg .marker{fill:#666;stroke:#666;}#my-svg .marker.cross{stroke:#666;}#my-svg svg{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;}#my-svg p{margin:0;}#my-svg .label{font-family:"trebuchet ms",verdana,arial,sans-serif;color:#000000;}#my-svg .cluster-label text{fill:#333;}#my-svg .cluster-label span{color:#333;}#my-svg .cluster-label span p{background-color:transparent;}#my-svg .label text,#my-svg span{fill:#000000;color:#000000;}#my-svg .node rect,#my-svg .node circle,#my-svg .node ellipse,#my-svg .node polygon,#my-svg .node path{fill:#eee;stroke:#999;stroke-width:1px;}#my-svg .rough-node .label text,#my-svg .node .label text,#my-svg .image-shape .label,#my-svg .icon-shape .label{text-anchor:middle;}#my-svg .node .katex path{fill:#000;stroke:#000;stroke-width:1px;}#my-svg .rough-node .label,#my-svg .node .label,#my-svg .image-shape .label,#my-svg .icon-shape .label{text-align:center;}#my-svg .node.clickable{cursor:pointer;}#my-svg .root .anchor path{fill:#666!important;stroke-width:0;stroke:#666;}#my-svg .arrowheadPath{fill:#333333;}#my-svg .edgePath .path{stroke:#666;stroke-width:1px;}#my-svg .flowchart-link{stroke:#666;fill:none;}#my-svg .edgeLabel{background-color:white;text-align:center;}#my-svg .edgeLabel p{background-color:white;}#my-svg .edgeLabel rect{opacity:0.5;background-color:white;fill:white;}#my-svg .labelBkg{background-color:rgba(255, 255, 255, 0.5);}#my-svg .cluster rect{fill:hsl(0, 0%, 98.9215686275%);stroke:#707070;stroke-width:1px;}#my-svg .cluster text{fill:#333;}#my-svg .cluster span{color:#333;}#my-svg div.mermaidTooltip{position:absolute;text-align:center;max-width:200px;padding:2px;font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:12px;background:hsl(-160, 0%, 93.3333333333%);border:1px solid #707070;border-radius:2px;pointer-events:none;z-index:100;}#my-svg .flowchartTitleText{text-anchor:middle;font-size:18px;fill:#000000;}#my-svg rect.text{fill:none;stroke-width:0;}#my-svg .icon-shape,#my-svg .image-shape{background-color:white;text-align:center;}#my-svg .icon-shape p,#my-svg .image-shape p{background-color:white;padding:2px;}#my-svg .icon-shape .label rect,#my-svg .image-shape .label rect{opacity:0.5;background-color:white;fill:white;}#my-svg .label-icon{display:inline-block;height:1em;overflow:visible;vertical-align:-0.125em;}#my-svg .node .label-icon path{fill:currentColor;stroke:revert;stroke-width:revert;}#my-svg .node .neo-node{stroke:#999;}#my-svg [data-look="neo"].node rect,#my-svg [data-look="neo"].cluster rect,#my-svg [data-look="neo"].node polygon{stroke:url(#my-svg-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#my-svg [data-look="neo"].node path{stroke:url(#my-svg-gradient);stroke-width:1px;}#my-svg [data-look="neo"].node .outer-path{filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#my-svg [data-look="neo"].node .neo-line path{stroke:#999;filter:none;}#my-svg [data-look="neo"].node circle{stroke:url(#my-svg-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#my-svg [data-look="neo"].node circle .state-start{fill:#000000;}#my-svg [data-look="neo"].icon-shape .icon{fill:url(#my-svg-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#my-svg [data-look="neo"].icon-shape .icon-neo path{stroke:url(#my-svg-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#my-svg :root{--mermaid-font-family:"trebuchet ms",verdana,arial,sans-serif;}<g><marker id="my-svg_flowchart-v2-pointEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"></path></marker><marker id="my-svg_flowchart-v2-pointStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="4.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 5 L 10 10 L 10 0 z" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"></path></marker><marker id="my-svg_flowchart-v2-pointEnd-margin" class="marker flowchart-v2" viewBox="0 0 11.5 14" refX="11.5" refY="7" markerUnits="userSpaceOnUse" markerWidth="10.5" markerHeight="14" orient="auto"><path d="M 0 0 L 11.5 7 L 0 14 z" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"></path></marker><marker id="my-svg_flowchart-v2-pointStart-margin" class="marker flowchart-v2" viewBox="0 0 11.5 14" refX="1" refY="7" markerUnits="userSpaceOnUse" markerWidth="11.5" markerHeight="14" orient="auto"><polygon points="0,7 11.5,14 11.5,0" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"></polygon></marker><marker id="my-svg_flowchart-v2-circleEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"></circle></marker><marker id="my-svg_flowchart-v2-circleStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="-1" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"></circle></marker><marker id="my-svg_flowchart-v2-circleEnd-margin" class="marker flowchart-v2" viewBox="0 0 10 10" refY="5" refX="12.25" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"></circle></marker><marker id="my-svg_flowchart-v2-circleStart-margin" class="marker flowchart-v2" viewBox="0 0 10 10" refX="-2" refY="5" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"></circle></marker><marker id="my-svg_flowchart-v2-crossEnd" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="12" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" style="stroke-width: 2; stroke-dasharray: 1, 0;"></path></marker><marker id="my-svg_flowchart-v2-crossStart" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="-1" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" style="stroke-width: 2; stroke-dasharray: 1, 0;"></path></marker><marker id="my-svg_flowchart-v2-crossEnd-margin" class="marker cross flowchart-v2" viewBox="0 0 15 15" refX="17.7" refY="7.5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto"><path d="M 1,1 L 14,14 M 1,14 L 14,1" class="arrowMarkerPath" style="stroke-width: 2.5;"></path></marker><marker id="my-svg_flowchart-v2-crossStart-margin" class="marker cross flowchart-v2" viewBox="0 0 15 15" refX="-3.5" refY="7.5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto"><path d="M 1,1 L 14,14 M 1,14 L 14,1" class="arrowMarkerPath" style="stroke-width: 2.5; stroke-dasharray: 1, 0;"></path></marker><g class="root"><g class="clusters"></g><g class="edgePaths"><path d="M144.266,103.386L151.995,106.555C159.724,109.724,175.182,116.062,189.974,119.231C204.766,122.4,218.891,122.4,225.953,122.4L233.016,122.4" id="my-svg-L_PRD_TS_0" class="edge-thickness-normal edge-pattern-dotted edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M144.266,45.759L151.995,42.391C159.724,39.023,175.182,32.286,201.876,28.918C228.57,25.55,266.5,25.55,308.385,25.55C350.271,25.55,396.112,25.55,430.054,26.6C463.996,27.651,486.038,29.751,497.059,30.802L508.081,31.852" id="my-svg-L_PRD_CS_0" class="edge-thickness-normal edge-pattern-dotted edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M371.844,105.66L383.529,102.758C395.214,99.856,418.583,94.053,441.312,88.014C464.04,81.975,486.128,75.701,497.171,72.563L508.215,69.426" id="my-svg-L_TS_CS_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M702.375,41.3L714.06,41.3C725.745,41.3,749.115,41.3,771.818,41.3C794.521,41.3,816.557,41.3,827.576,41.3L838.594,41.3" id="my-svg-L_CS_TDD_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M371.844,130.121L383.529,131.459C395.214,132.797,418.583,135.474,457.813,136.812C497.042,138.15,552.13,138.15,607.219,138.15C662.307,138.15,717.396,138.15,759.858,140.408C802.32,142.666,832.155,147.182,847.073,149.44L861.99,151.698" id="my-svg-L_TS_PS_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M647.864,74.6L668.634,91.617C689.404,108.633,730.944,142.667,766.625,158.893C802.307,175.119,832.129,173.538,847.04,172.747L861.951,171.957" id="my-svg-L_CS_PS_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path></g><g class="edgeLabels"><g class="edgeLabel" transform="translate(190.640625, 122.39999771118164)"><g class="label" transform="translate(0, -10.5)"><g><rect class="background" style="" x="-21.375" y="-1" width="42.75" height="23"></rect><text y="-10.1" text-anchor="middle" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"><tspan class="text-inner-tspan">reads</tspan></tspan></text></g></g></g><g class="edgeLabel" transform="translate(304.4296875, 25.549999237060547)"><g class="label" transform="translate(0, -10.5)"><g><rect class="background" style="" x="-21.375" y="-1" width="42.75" height="23"></rect><text y="-10.1" text-anchor="middle" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"><tspan class="text-inner-tspan">reads</tspan></tspan></text></g></g></g><g class="edgeLabel" transform="translate(441.953125, 88.24999809265137)"><g class="label" transform="translate(0, -10.5)"><g><rect class="background" style="" x="-45.109375" y="-1" width="90.21875" height="23"></rect><text y="-10.1" text-anchor="middle" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"><tspan class="text-inner-tspan">dependency</tspan></tspan></text></g></g></g><g class="edgeLabel" transform="translate(772.484375, 41.29999923706055)"><g class="label" transform="translate(0, -10.5)"><g><rect class="background" style="" x="-45.109375" y="-1" width="90.21875" height="23"></rect><text y="-10.1" text-anchor="middle" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"><tspan class="text-inner-tspan">dependency</tspan></tspan></text></g></g></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g></g><g class="nodes"><g class="node default" id="my-svg-flowchart-PRD-0" transform="translate(76.1328125, 75.44999885559082)"><rect class="basic label-container" style="" x="-68.1328125" y="-33.29999923706055" width="136.265625" height="66.5999984741211"></rect><g class="label" style="" transform="translate(0, -18.299999237060547)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">create-prd</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">(phase</tspan><tspan class="text-inner-tspan"> 1)</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-TS-1" transform="translate(304.4296875, 122.39999771118164)"><rect class="basic label-container" style="" x="-67.4140625" y="-33.29999923706055" width="134.828125" height="66.5999984741211"></rect><g class="label" style="" transform="translate(0, -18.299999237060547)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">tech-stack</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">deps:</tspan><tspan class="text-inner-tspan"> []</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-CS-3" transform="translate(607.21875, 41.29999923706055)"><rect class="basic label-container" style="" x="-95.15625" y="-33.29999923706055" width="190.3125" height="66.5999984741211"></rect><g class="label" style="" transform="translate(0, -18.299999237060547)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">coding-standards</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">deps:</tspan><tspan class="text-inner-tspan"> [tech-stack]</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-TDD-7" transform="translate(961.1015625, 41.29999923706055)"><rect class="basic label-container" style="" x="-118.5078125" y="-33.29999923706055" width="237.015625" height="66.5999984741211"></rect><g class="label" style="" transform="translate(0, -18.299999237060547)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">tdd</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">deps:</tspan><tspan class="text-inner-tspan"> [coding-standards]</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-PS-9" transform="translate(961.1015625, 166.6999969482422)"><rect class="basic label-container" style="" x="-95.15625" y="-42.099998474121094" width="190.3125" height="84.19999694824219"></rect><g class="label" style="" transform="translate(0, -27.099998474121094)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">project-structure</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">deps:</tspan><tspan class="text-inner-tspan"> [tech-stack,</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="2.1em"><tspan class="text-inner-tspan">coding-standards]</tspan></tspan></text></g></g></g></g></g></g><defs></defs><defs></defs></svg></figure>
+<p>Solid arrows are hard <code>dependencies</code> (block until done); dashed arrows are soft
+<code>reads</code> (used if present, never block).</p>
+<h2 id="create-vs-update-mode">CREATE vs UPDATE mode</h2>
+<p>Running a planning step a second time doesn't blindly overwrite its artifact.
+Every document-creating prompt carries a <strong>Mode Detection</strong> block: if the output
+file already exists, the step runs in <strong>UPDATE mode</strong> instead of CREATE mode.</p>
+<p><code>scaffold run</code> detects this and (unless <code>--force</code>) confirms before re-running a
+completed step, and warns on a depth <em>downgrade</em> (re-running at a lower depth
+than last time). In UPDATE mode the prompt is instructed to <strong>preserve</strong>
+human/team customizations and only change what genuinely needs to change. From
+<code>coding-standards</code>'s Mode Detection block
+(<span class="fp" data-path="content/pipeline/foundation/coding-standards.md:57">content/pipeline/foundation/coding-standards.md:57</span>):</p>
+<blockquote>
+<p>Update mode if <code>docs/coding-standards.md</code> exists. In update mode: preserve
+naming conventions, lint rule customizations, commit message format, and
+project-specific patterns.</p>
+</blockquote>
+<p>So re-running <code>coding-standards</code> after you've hand-tuned its linter config keeps
+your overrides; it doesn't reset them. This is what makes the planning phases
+safe to iterate — you can <code>rework</code> a phase at higher depth and get richer
+output without losing the decisions you've already made.</p>
+<div class="callout callout-note"><p><strong>Phase-15 steps don't use the planning CREATE-vs-UPDATE semantics.</strong> They produce
+no persistent planning doc, so the document Mode Detection block doesn't apply.
+Each build prompt instead declares its own execution mode: the agent loops just
+execute, <code>single-agent-resume</code>/<code>multi-agent-resume</code> run in RESUME mode,
+<code>quick-task</code> in CREATE mode, and <code>new-enhancement</code> in ENHANCEMENT mode.</p></div>
+<h2 id="phase-boundary-audits">Phase-boundary audits</h2>
+<p>Completing certain planning docs automatically triggers a non-gating
+cross-document audit. Six steps are <strong>phase boundaries</strong>
+(<span class="fp" data-path="src/observability/engine/phase-subsets.ts:1-8">src/observability/engine/phase-subsets.ts:1-8</span>): <code>user-stories</code>,
+<code>tech-stack</code>, <code>coding-standards</code>, <code>design-system</code>, <code>implementation-plan</code>, and
+<code>implementation-playbook</code>. When you <code>complete</code> one of these, the state manager
+fires an <code>H-cross-doc</code> audit and prints a one-line summary — catching doc drift
+the moment a planning phase closes, without ever blocking the transition. See
+the <a href="../observability/index.md">build observability guide</a>{mode=advisory} for
+how that audit works and what the nine lenses check.</p>
+<h2 id="where-it-all-lives">Where it all lives</h2>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>path</th><th>what it holds</th></tr></thead><tbody><tr><td><code>content/pipeline/&#x3C;phase>/*.md</code></td><td>The 89 meta-prompt files, one directory per phase</td></tr><tr><td><code>content/methodology/*.yml</code></td><td>Presets (<code>mvp</code>, <code>custom-defaults</code>, <code>deep</code>) + project-type overlays</td></tr><tr><td><code>content/knowledge/</code></td><td>Domain entries injected into prompts during assembly</td></tr><tr><td><code>src/types/frontmatter.ts</code></td><td>The canonical <code>PHASES</code> constant + frontmatter schema</td></tr><tr><td><code>src/cli/commands/</code></td><td><code>next</code>, <code>run</code>, <code>complete</code>, <code>skip</code>, <code>rework</code>, <code>reset</code>, <code>status</code></td></tr><tr><td><code>.scaffold/state.json</code></td><td>Per-step completion state (planning phases only)</td></tr></tbody></table>
+<p>The phase list, ordering, and slugs are defined exactly once, in <code>PHASES</code>
+(<span class="fp" data-path="src/types/frontmatter.ts:6">src/types/frontmatter.ts:6</span>); every doc, skill, and command resolves
+against it.</p></main>
+</div>
+<script>(function(){
+  var LS_KEY = 'guide-theme';
+  function applyTheme(t) {
+    document.documentElement.setAttribute('data-theme', t);
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    // ─── Theme toggle ────────────────────────────────────────────────────────
+    document.querySelectorAll('[data-action="theme"]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var current = document.documentElement.getAttribute('data-theme');
+        var next = current === 'dark' ? 'light' : 'dark';
+        applyTheme(next);
+        try { localStorage.setItem(LS_KEY, next); } catch(e) {}
+      });
+    });
+
+    // ─── Mobile nav ──────────────────────────────────────────────────────────
+    document.querySelectorAll('[data-action="nav"]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var rail = document.querySelector('.rail');
+        if (rail) rail.classList.toggle('open');
+      });
+    });
+
+    // ─── Copy buttons ─────────────────────────────────────────────────────────
+    document.querySelectorAll('pre').forEach(function(pre) {
+      if (!pre.parentNode) return;
+      var wrapper = document.createElement('div');
+      wrapper.className = 'code';
+      pre.parentNode.insertBefore(wrapper, pre);
+      wrapper.appendChild(pre);
+      var btn = document.createElement('button');
+      btn.className = 'copy-btn';
+      btn.textContent = 'Copy';
+      btn.addEventListener('click', function() {
+        var text = pre.textContent || '';
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(function() {
+            btn.textContent = 'Copied';
+            setTimeout(function() { btn.textContent = 'Copy'; }, 1200);
+          }, function() {
+            btn.textContent = 'Copy';
+          });
+        }
+      });
+      wrapper.insertBefore(btn, pre);
+    });
+
+    // ─── Tabs ─────────────────────────────────────────────────────────────────
+    document.querySelectorAll('.tabs').forEach(function(group) {
+      group.querySelectorAll('.tab-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var idx = btn.getAttribute('data-tab');
+          group.querySelectorAll('.tab-btn').forEach(function(b) {
+            b.classList.toggle('active', b === btn);
+          });
+          group.querySelectorAll('.tabpane').forEach(function(pane) {
+            pane.classList.toggle('active', pane.getAttribute('data-tab') === idx);
+          });
+        });
+      });
+    });
+
+    // ─── Filter tables ────────────────────────────────────────────────────────
+    document.querySelectorAll('.filter-input').forEach(function(input) {
+      input.addEventListener('input', function() {
+        var q = input.value.toLowerCase();
+        var container = input.closest('.filter-table');
+        if (!container) return;
+        container.querySelectorAll('tbody tr').forEach(function(row) {
+          var text = (row.textContent || '').toLowerCase();
+          row.style.display = text.includes(q) ? '' : 'none';
+        });
+      });
+    });
+
+    // ─── Scrollspy ────────────────────────────────────────────────────────────
+    if (typeof IntersectionObserver === 'undefined') return;
+    var headings = document.querySelectorAll('h2[id],h3[id]');
+    if (!headings.length) return;
+    var observer = new IntersectionObserver(function(entries) {
+      entries.forEach(function(entry) {
+        if (!entry.isIntersecting) return;
+        var id = entry.target.getAttribute('id');
+        document.querySelectorAll('.toc a').forEach(function(a) {
+          a.classList.toggle('active', a.getAttribute('href') === '#' + id);
+        });
+      });
+    }, { rootMargin: '0px 0px -70% 0px', threshold: 0 });
+    headings.forEach(function(h) { observer.observe(h); });
+  });
+})();</script>
+</body>
+</html>

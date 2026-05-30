@@ -1099,12 +1099,12 @@ disagreement is what surfaces ambiguity.</p>
 <ol>
 <li><strong>Resolve a diff</strong> — from a PR, staged changes, a branch range, or a piped diff.</li>
 <li><strong>Dispatch channels</strong> — each channel is a separate subprocess given the same
-prompt, run in parallel and isolated.</li>
+prompt, run in parallel and isolated <span class="fp" data-path="packages/mmr/src/commands/review.ts:636">packages/mmr/src/commands/review.ts:636</span>.</li>
 <li><strong>Parse</strong> — each channel's raw output is parsed into a common <code>Finding</code> shape.</li>
 <li><strong>Reconcile</strong> — findings are grouped by a stable key, de-duplicated, and
-scored for agreement and confidence.</li>
+scored for agreement and confidence <span class="fp" data-path="packages/mmr/src/core/reconciler.ts:43">packages/mmr/src/core/reconciler.ts:43</span>.</li>
 <li><strong>Verdict</strong> — a severity gate yields <code>pass</code>, <code>degraded-pass</code>, <code>blocked</code>, or
-<code>needs-user-decision</code>.</li>
+<code>needs-user-decision</code> <span class="fp" data-path="packages/mmr/src/types.ts:25">packages/mmr/src/types.ts:25</span>.</li>
 </ol>
 <div class="callout callout-tip"><p><strong>Two layers, one mental model.</strong> The <code>mmr</code> CLI is the engine that dispatches
 the built-in channels and computes the verdict. The <code>scaffold run review-pr</code> /
@@ -1231,7 +1231,7 @@ table.</p>
 
 
 
-<table><thead><tr><th>Flag</th><th>Group</th><th>Description</th></tr></thead><tbody><tr><td><code>--diff &#x3C;path|-></code></td><td>input</td><td>Read a unified diff from a file, or <code>-</code> for stdin. Highest-priority input mode.</td></tr><tr><td><code>--pr &#x3C;n></code></td><td>input</td><td>Fetch the PR diff via <code>gh pr diff</code>.</td></tr><tr><td><code>--staged</code></td><td>input</td><td>Review staged changes (<code>git diff --cached</code>).</td></tr><tr><td><code>--base &#x3C;ref> [--head &#x3C;ref>]</code></td><td>input</td><td>Review a branch range (<code>git diff base...head</code>, head defaults to HEAD).</td></tr><tr><td><em>(no input flag)</em></td><td>input</td><td>Falls back to unstaged working-tree changes (<code>git diff</code>).</td></tr><tr><td><code>--focus &#x3C;text></code></td><td>control</td><td>Free-text focus areas appended to every channel prompt.</td></tr><tr><td><code>--fix-threshold &#x3C;P0|P1|P2|P3></code></td><td>control</td><td>Severity gate. Findings at or above this block. Default P2 (from <code>.mmr.yaml</code>).</td></tr><tr><td><code>--channels &#x3C;names…></code></td><td>control</td><td>Run only these channels, overriding config defaults. Abstract channels are filtered out.</td></tr><tr><td><code>--timeout &#x3C;seconds></code></td><td>control</td><td>Per-channel timeout override.</td></tr><tr><td><code>--template &#x3C;name></code></td><td>control</td><td>Use a named review-criteria template from config.</td></tr><tr><td><code>--format &#x3C;json|text|markdown></code></td><td>output</td><td>Output format. Default <code>json</code>.</td></tr><tr><td><code>--sync</code></td><td>mode</td><td>Run the full pipeline (dispatch → parse → reconcile → verdict) and return results. Without it, dispatch is fire-and-forget.</td></tr><tr><td><code>--dry-run</code></td><td>mode</td><td>Resolve the diff and assemble the prompt without dispatching any channel.</td></tr><tr><td><code>--session &#x3C;id></code></td><td>rounds</td><td>Link this run into a multi-round session (<code>[A-Za-z0-9_-]</code>).</td></tr><tr><td><code>--round &#x3C;n></code></td><td>rounds</td><td>1-based round counter within a session.</td></tr><tr><td><code>--max-rounds &#x3C;n></code></td><td>rounds</td><td>Hard cap on rounds. Defaults to 5 when <code>--session</code> is set without it.</td></tr><tr><td><code>--accept-new-acks</code></td><td>trust</td><td>Trust acknowledgment files newly introduced by the diff.</td></tr><tr><td><code>--trust-project-acks</code></td><td>trust</td><td>Trust working-tree project acks in non-Git / untrusted modes.</td></tr><tr><td><code>--trust-project-config</code></td><td>trust</td><td>Trust working-tree <code>.mmr.yaml</code> in untrusted modes.</td></tr><tr><td><code>--config-base-ref &#x3C;ref></code></td><td>trust</td><td>Load <code>.mmr.yaml</code> and acks from a trusted Git ref instead of HEAD.</td></tr></tbody></table></div>
+<table><thead><tr><th>Flag</th><th>Group</th><th>Description</th></tr></thead><tbody><tr><td><code>--diff &#x3C;path|-></code></td><td>input</td><td>Read a unified diff from a file, or <code>-</code> for stdin. Highest-priority input mode.</td></tr><tr><td><code>--pr &#x3C;n></code></td><td>input</td><td>Fetch the PR diff via <code>gh pr diff</code>.</td></tr><tr><td><code>--staged</code></td><td>input</td><td>Review staged changes (<code>git diff --cached</code>).</td></tr><tr><td><code>--base &#x3C;ref> [--head &#x3C;ref>]</code></td><td>input</td><td>Review a branch range (<code>git diff base...head</code>, head defaults to HEAD).</td></tr><tr><td><em>(no input flag)</em></td><td>input</td><td>Falls back to unstaged working-tree changes (<code>git diff</code>).</td></tr><tr><td><code>--focus &#x3C;text></code></td><td>control</td><td>Free-text focus areas appended to every channel prompt.</td></tr><tr><td><code>--fix-threshold &#x3C;P0|P1|P2|P3></code></td><td>control</td><td>Severity gate. Findings at or above this block. Default P2 (from <code>.mmr.yaml</code>).</td></tr><tr><td><code>--channels &#x3C;names…></code></td><td>control</td><td>Run only these channels, overriding config defaults. Abstract channels are filtered out.</td></tr><tr><td><code>--timeout &#x3C;seconds></code></td><td>control</td><td>Per-channel timeout override.</td></tr><tr><td><code>--template &#x3C;name></code></td><td>control</td><td>Use a named review-criteria template from config.</td></tr><tr><td><code>--format &#x3C;json|text|markdown></code></td><td>output</td><td>Output format. Default <code>json</code>.</td></tr><tr><td><code>--sync</code></td><td>mode</td><td>Run the full pipeline (dispatch → parse → reconcile → verdict) and return results. Without it, dispatch is fire-and-forget.</td></tr><tr><td><code>--dry-run</code></td><td>mode</td><td>Resolve the diff and assemble the prompt without dispatching any channel.</td></tr><tr><td><code>--session &#x3C;id></code></td><td>rounds</td><td>Link this run into a multi-round session; the id must match <code>^[A-Za-z0-9_-]+$</code> and not be a reserved name <span class="fp" data-path="packages/mmr/src/commands/sessions.ts:15">packages/mmr/src/commands/sessions.ts:15</span>.</td></tr><tr><td><code>--round &#x3C;n></code></td><td>rounds</td><td>1-based round counter within a session.</td></tr><tr><td><code>--max-rounds &#x3C;n></code></td><td>rounds</td><td>Hard cap on rounds. Defaults to 5 when <code>--session</code> is set without it.</td></tr><tr><td><code>--accept-new-acks</code></td><td>trust</td><td>Trust acknowledgment files newly introduced by the diff.</td></tr><tr><td><code>--trust-project-acks</code></td><td>trust</td><td>Trust working-tree project acks in non-Git / untrusted modes.</td></tr><tr><td><code>--trust-project-config</code></td><td>trust</td><td>Trust working-tree <code>.mmr.yaml</code> in untrusted modes.</td></tr><tr><td><code>--config-base-ref &#x3C;ref></code></td><td>trust</td><td>Load <code>.mmr.yaml</code> and acks from a trusted Git ref instead of HEAD.</td></tr></tbody></table></div>
 <h3 id="copy-paste-commands-by-target">Copy-paste commands by target</h3>
 <pre><code class="language-bash"># PR review (full pipeline, JSON out)
 mmr review --pr 123 --sync --format json
@@ -1289,7 +1289,7 @@ mmr review --pr 123 --channels grok claude --sync --format json
 
 
 
-<table><thead><tr><th>Command</th><th>Purpose</th></tr></thead><tbody><tr><td><code>mmr reconcile &#x3C;job-id> --channel &#x3C;name> --input &#x3C;data></code></td><td>Inject an external channel's findings (e.g. the Superpowers agent) into an existing job and re-run the results pipeline. Input is a file, <code>-</code> for stdin, or inline JSON.</td></tr><tr><td><code>mmr status &#x3C;job-id></code></td><td>Per-channel status and elapsed time. Exit 0 = all complete, 1 = running, 2 = a channel failed, 5 = not found.</td></tr><tr><td><code>mmr results &#x3C;job-id> [--raw]</code></td><td>Re-run parse → reconcile → format on a completed job. Exit code reflects the verdict.</td></tr><tr><td><code>mmr jobs &#x3C;list|prune></code></td><td>List jobs, or prune old ones per <code>job_retention_days</code>.</td></tr><tr><td><code>mmr sessions &#x3C;start|list|show|end> &#x3C;id></code></td><td>Manage multi-round review sessions (stored under <code>~/.mmr/sessions/</code>).</td></tr><tr><td><code>mmr config &#x3C;init|show|validate…></code></td><td>Scaffold and inspect <code>.mmr.yaml</code> (including OSS-runtime example blocks).</td></tr><tr><td><code>mmr ack &#x3C;add|list|rm|prune></code></td><td>Sticky acknowledgments — silence a finding by its stable key so it stops blocking across rounds.</td></tr></tbody></table>
+<table><thead><tr><th>Command</th><th>Purpose</th></tr></thead><tbody><tr><td><code>mmr reconcile &#x3C;job-id> --channel &#x3C;name> --input &#x3C;data></code></td><td>Inject an external channel's findings (e.g. the Superpowers agent) into an existing job and re-run the results pipeline. Input is a file, <code>-</code> for stdin, or inline JSON. <span class="fp" data-path="packages/mmr/src/commands/reconcile.ts:17">packages/mmr/src/commands/reconcile.ts:17</span></td></tr><tr><td><code>mmr status &#x3C;job-id></code></td><td>Per-channel status and elapsed time. Exit 0 = all complete, 1 = running, 2 = a channel failed, 5 = not found.</td></tr><tr><td><code>mmr results &#x3C;job-id> [--raw]</code></td><td>Re-run parse → reconcile → format on a completed job. Exit code reflects the verdict.</td></tr><tr><td><code>mmr jobs &#x3C;list|prune></code></td><td>List jobs, or prune old ones per <code>job_retention_days</code>.</td></tr><tr><td><code>mmr sessions &#x3C;start|list|show|end> &#x3C;id></code></td><td>Manage multi-round review sessions (stored under <code>~/.mmr/sessions/</code>).</td></tr><tr><td><code>mmr config &#x3C;init|show|validate…></code></td><td>Scaffold and inspect <code>.mmr.yaml</code> (including OSS-runtime example blocks).</td></tr><tr><td><code>mmr ack &#x3C;add|list|rm|prune></code></td><td>Sticky acknowledgments — silence a finding by its stable key so it stops blocking across rounds.</td></tr></tbody></table>
 <pre><code class="language-bash"># Capture a job_id from a review, then fold in an agent channel:
 mmr reconcile "$JOB_ID" --channel superpowers --input findings.json
 </code></pre>
@@ -1321,7 +1321,7 @@ uses <code>prompt_delivery: prompt-file</code> — the dispatcher writes the pro
 file and passes its path via the <code>{{prompt_file}}</code> placeholder. Grok wraps its
 reply in a JSON <code>.text</code> field, which the parser unwraps before extracting
 findings.</p></div>
-<div class="tabs"><div class="tablist" role="tablist"><button class="tab-btn active" role="tab" data-tab="0">Compare</button><button class="tab-btn" role="tab" data-tab="1">codex</button><button class="tab-btn" role="tab" data-tab="2">gemini</button><button class="tab-btn" role="tab" data-tab="3">claude</button><button class="tab-btn" role="tab" data-tab="4">grok</button><button class="tab-btn" role="tab" data-tab="5">doc-conformance</button></div><div class="tabpane active" data-tab="0">
+<div class="tabs"><div class="tablist" role="tablist"><button class="tab-btn active" role="tab" data-tab="0">Compare</button><button class="tab-btn" role="tab" data-tab="1">codex</button><button class="tab-btn" role="tab" data-tab="2">gemini</button><button class="tab-btn" role="tab" data-tab="3">claude</button><button class="tab-btn" role="tab" data-tab="4">grok</button><button class="tab-btn" role="tab" data-tab="5">doc-conformance</button></div><div class="tabpane active" data-tab="0"><p>The defaults, commands, and parsers below are the built-in presets <span class="fp" data-path="packages/mmr/src/config/defaults.ts:32">packages/mmr/src/config/defaults.ts:32</span>.</p>
 
 
 
@@ -1405,7 +1405,8 @@ timeout: 240
 to its own output file; channels run in parallel and never share output.</li>
 <li><strong>Prompt delivery.</strong> <code>stdin</code> mode pipes the prompt and closes stdin (avoids
 <code>E2BIG</code> on large diffs). <code>prompt-file</code> mode writes the prompt to
-<code>&#x3C;channel>.prompt.txt</code> and substitutes <code>{{prompt_file}}</code> in the flags.</li>
+<code>&#x3C;channel>.prompt.txt</code> and substitutes <code>{{prompt_file}}</code> in the flags
+<span class="fp" data-path="packages/mmr/src/core/dispatcher.ts:79">packages/mmr/src/core/dispatcher.ts:79</span>.</li>
 <li><strong>Timeout.</strong> A per-channel timer SIGKILLs the whole process group and marks
 the channel <code>timeout</code>.</li>
 <li><strong>Command parsing.</strong> <code>command</code> is split on whitespace and spawned without a
@@ -1417,10 +1418,12 @@ only):</em> a new subprocess channel (<code>command</code> + <code>flags</code> 
 <code>output_parser</code>), output reshaping via the <code>unwrap-jsonpath</code> or
 <code>regex-findings</code> parser kinds, disabling/timeout overrides, and pointing the
 compensator at a different channel — all pure <code>.mmr.yaml</code>. <em>Needs code:</em> a
-brand-new <em>named</em> parser must be registered in <code>core/parser.ts</code>; HTTP-endpoint
-channels (<code>kind: http</code>) need the planned http-dispatcher; and the
+brand-new <em>named</em> parser must be registered in <code>core/parser.ts</code>
+<span class="cite-advisory" data-path="packages/mmr/src/core/parser.ts:257">packages/mmr/src/core/parser.ts:257</span>; and the
 <code>COMPENSATING_FOCUS</code> map carries per-channel focus text (falls back gracefully
-if absent).</p>
+if absent). HTTP-endpoint channels (<code>kind: http</code>) are already supported via
+<code>dispatchHttpChannel</code> — pure <code>.mmr.yaml</code>, no extra code
+<span class="fp" data-path="packages/mmr/src/config/schema.ts:144">packages/mmr/src/config/schema.ts:144</span>.</p>
 <h2 id="scaffold-wrappers">Scaffold wrappers</h2>
 <p>Direct <code>mmr review</code> runs the built-in CLI channels. The <code>scaffold run</code> wrappers
 add orchestration on top.</p>
@@ -1455,6 +1458,8 @@ and Grok as foreground Bash calls when the <code>mmr</code> CLI isn't available 
 the background. Background execution produces empty output.</p></div>
 <h2 id="findings-reconciliation-verdicts">Findings, reconciliation &#x26; verdicts</h2>
 <h3 id="the-finding-shape">The Finding shape</h3>
+<p>Every channel's output parses into this common shape
+<span class="fp" data-path="packages/mmr/src/types.ts:45">packages/mmr/src/types.ts:45</span>.</p>
 <pre><code class="language-json">{
   "id": "F-001",
   "category": "security",
@@ -1464,16 +1469,23 @@ the background. Background execution produces empty output.</p></div>
   "suggestion": "…"
 }
 </code></pre>
-<p>After reconciliation, each finding also carries <code>confidence</code>, <code>sources[]</code>,
-<code>agreement</code>, a stable <code>finding_key</code>, a <code>description_shingle</code> (for fuzzy
-cross-round matching), and <code>acknowledged</code>.</p>
+<p>The <code>location</code> above (<code>src/auth.ts:42</code>) is illustrative. After reconciliation,
+each finding also carries <code>confidence</code>, <code>sources[]</code>, <code>agreement</code>, a stable
+<code>finding_key</code>, a <code>description_shingle</code> (for fuzzy cross-round matching), and
+<code>acknowledged</code> <span class="fp" data-path="packages/mmr/src/types.ts:54">packages/mmr/src/types.ts:54</span>.</p>
 <h3 id="stable-identity-finding-key">Stable identity (<code>finding_key</code>)</h3>
 <pre><code class="language-text">finding_key = sha1( normLocation | category | sha1(normDescription) | sha1(normSuggestion) )
 </code></pre>
 <p>Line numbers are stripped from the location and severity is <em>excluded</em>, so the
-same issue at P1 vs P2 collapses to one key. A character-5-gram shingle backs a
-Jaccard ≥ 0.7 fuzzy match when wording drifts between rounds.</p>
+same issue at P1 vs P2 collapses to one key
+<span class="fp" data-path="packages/mmr/src/core/stable-id.ts:115">packages/mmr/src/core/stable-id.ts:115</span>. A character-5-gram shingle backs
+a Jaccard ≥ 0.7 fuzzy match. Intra-run, findings group by fuzzy shingle overlap
+<span class="fp" data-path="packages/mmr/src/core/reconciler.ts:83">packages/mmr/src/core/reconciler.ts:83</span>; across rounds, the ack store reuses
+the same threshold so a re-worded finding still matches a prior ack
+<span class="fp" data-path="packages/mmr/src/core/ack-store.ts:8">packages/mmr/src/core/ack-store.ts:8</span>.</p>
 <h3 id="agreement-confidence">Agreement &#x26; confidence</h3>
+<p>Agreement and confidence are derived per group during reconciliation
+<span class="fp" data-path="packages/mmr/src/core/reconciler.ts:114">packages/mmr/src/core/reconciler.ts:114</span>.</p>
 
 
 
@@ -1518,9 +1530,15 @@ Jaccard ≥ 0.7 fuzzy match when wording drifts between rounds.</p>
 <table><thead><tr><th>Sources</th><th>Severity</th><th>Agreement</th><th>Confidence</th></tr></thead><tbody><tr><td>2+</td><td>same</td><td>consensus</td><td>high</td></tr><tr><td>2+</td><td>differ</td><td>majority</td><td>medium</td></tr><tr><td>1</td><td><span class="sev sev-p0">P0</span></td><td>unique</td><td>high</td></tr><tr><td>1</td><td><code>compensating-*</code></td><td>unique</td><td>low</td></tr><tr><td>1</td><td>other</td><td>unique</td><td>medium</td></tr></tbody></table>
 <h3 id="the-gate-the-four-verdicts">The gate &#x26; the four verdicts</h3>
 <p>The gate <strong>passes</strong> when every unacknowledged finding is <em>below</em> the
-<code>fix_threshold</code> (default <span class="sev sev-p2">P2</span>). Severity tiers run
+<code>fix_threshold</code> <span class="fp" data-path="packages/mmr/src/core/reconciler.ts:229">packages/mmr/src/core/reconciler.ts:229</span> (default
+<span class="sev sev-p2">P2</span> <span class="fp" data-path="packages/mmr/src/config/defaults.ts:16">packages/mmr/src/config/defaults.ts:16</span>). Severity tiers run
 <span class="sev sev-p0">P0</span> (highest) → <span class="sev sev-p1">P1</span> → <span class="sev sev-p2">P2</span> →
 <span class="sev sev-p3">P3</span> (lowest).</p>
+<p>The verdict is derived from gate result + channel health, in this branch order:
+<strong>zero channels completed → <code>needs-user-decision</code></strong>; else a failed gate →
+<code>blocked</code>; else some channels incomplete → <code>degraded-pass</code>; else <code>pass</code>
+<span class="fp" data-path="packages/mmr/src/core/reconciler.ts:247">packages/mmr/src/core/reconciler.ts:247</span>. (The no-completed-channels case
+short-circuits first, so it outranks <code>blocked</code>.)</p>
 
 
 
@@ -1622,7 +1640,7 @@ channels:
 when you pass an explicit <code>--channels</code> list).</li>
 <li><code>enabled: false</code> — per-channel off switch (how <code>doc-conformance</code> ships).</li>
 <li><code>extends</code> — inherit from another channel (≤ 4 levels, cycle-checked); child
-fields override the parent.</li>
+fields override the parent <span class="fp" data-path="packages/mmr/src/config/loader.ts:145">packages/mmr/src/config/loader.ts:145</span>.</li>
 <li><code>fix_threshold</code> — project gate; override per-run with <code>--fix-threshold</code>.</li>
 </ul>
 <div class="callout callout-danger"><p><strong>Trust boundary.</strong> When reviewing a diff, project <code>.mmr.yaml</code> and acks should

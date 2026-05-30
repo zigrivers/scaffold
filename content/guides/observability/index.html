@@ -1,0 +1,2904 @@
+<!DOCTYPE html>
+<html lang="en" data-chrome-version="1">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Build Observability</title>
+<!-- scaffold:chrome v1 -->
+<style>/* Scaffold Dashboard Theme
+ * All CSS for the generated pipeline dashboard.
+ * Embedded into HTML by scripts/generate-dashboard.sh.
+ * Design system reference: docs/design-system.md
+ *
+ * Aesthetic: "Precision Industrial" — Swiss-typographic control room.
+ * Deep navy dark mode with indigo accents, clean cool-white light mode.
+ */
+
+/* ─── Design Tokens (Light Mode) ──────────────── */
+:root {
+    /* Surface */
+    --bg:           #f5f6fa;
+    --bg-card:      #ffffff;
+    --bg-hover:     #eef0f6;
+    --bg-inset:     #e8eaf2;
+
+    /* Text */
+    --text:         #1a1d2e;
+    --text-muted:   #6b7294;
+    --text-faint:   #9ba1c0;
+
+    /* Borders & Structure */
+    --border:       #dde0ed;
+    --border-light: #eceef5;
+    --radius:       10px;
+    --radius-sm:    6px;
+
+    /* Accent */
+    --accent:       #4f46e5;
+    --accent-hover: #4338ca;
+    --accent-glow:  rgba(79, 70, 229, 0.10);
+
+    /* Semantic: Status */
+    --green:        #059669;
+    --green-bg:     #ecfdf5;
+    --green-border: #a7f3d0;
+    --blue:         #2563eb;
+    --blue-bg:      #eff6ff;
+    --blue-border:  #bfdbfe;
+    --yellow:       #d97706;
+    --yellow-bg:    #fffbeb;
+    --yellow-border:#fde68a;
+    --gray:         #9ca3af;
+    --gray-bg:      #f3f4f6;
+    --gray-border:  #e5e7eb;
+
+    /* Semantic: Next Banner */
+    --next-bg:      #eef2ff;
+    --next-border:  #4f46e5;
+    --next-glow:    rgba(79, 70, 229, 0.06);
+
+    /* Semantic: Progress */
+    --progress-bg:  #e5e7eb;
+    --progress-h:   10px;
+
+    /* Depth */
+    --shadow-sm:    0 1px 2px rgba(30, 34, 60, 0.04);
+    --shadow:       0 1px 3px rgba(30, 34, 60, 0.07), 0 1px 2px rgba(30, 34, 60, 0.04);
+    --shadow-md:    0 4px 12px rgba(30, 34, 60, 0.08), 0 1px 3px rgba(30, 34, 60, 0.05);
+    --shadow-lg:    0 8px 24px rgba(30, 34, 60, 0.10), 0 2px 6px rgba(30, 34, 60, 0.04);
+
+    /* Spacing scale (4px base) */
+    --sp-1: 4px;
+    --sp-2: 8px;
+    --sp-3: 12px;
+    --sp-4: 16px;
+    --sp-5: 20px;
+    --sp-6: 24px;
+    --sp-8: 32px;
+    --sp-10: 40px;
+
+    /* Typography */
+    --font-sans:  -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    --font-mono:  "SF Mono", "Cascadia Code", "Fira Code", "JetBrains Mono", Menlo, Consolas, monospace;
+    --text-xs:    0.75rem;
+    --text-sm:    0.8125rem;
+    --text-base:  0.9375rem;
+    --text-lg:    1.125rem;
+    --text-xl:    1.375rem;
+    --text-2xl:   1.75rem;
+    --lh-tight:   1.25;
+    --lh-normal:  1.5;
+    --lh-relaxed: 1.625;
+    --ls-tight:   -0.01em;
+    --ls-wide:    0.025em;
+    --fw-normal:  400;
+    --fw-medium:  500;
+    --fw-semi:    600;
+    --fw-bold:    700;
+
+    /* Layout */
+    --max-w:      960px;
+    --page-pad:   24px;
+}
+
+/* ─── Design Tokens (Dark Mode) ───────────────── */
+[data-theme="dark"] {
+    /* Surface */
+    --bg:           #0f1117;
+    --bg-card:      #1a1d2e;
+    --bg-hover:     #252940;
+    --bg-inset:     #141724;
+
+    /* Text */
+    --text:         #e2e5f0;
+    --text-muted:   #7c82a8;
+    --text-faint:   #555c80;
+
+    /* Borders & Structure */
+    --border:       #2a2f45;
+    --border-light: #21253a;
+
+    /* Accent */
+    --accent:       #818cf8;
+    --accent-hover: #a5b4fc;
+    --accent-glow:  rgba(129, 140, 248, 0.12);
+
+    /* Semantic: Status */
+    --green:        #34d399;
+    --green-bg:     rgba(6, 78, 59, 0.25);
+    --green-border: rgba(52, 211, 153, 0.25);
+    --blue:         #60a5fa;
+    --blue-bg:      rgba(30, 58, 95, 0.30);
+    --blue-border:  rgba(96, 165, 250, 0.25);
+    --yellow:       #fbbf24;
+    --yellow-bg:    rgba(120, 53, 15, 0.25);
+    --yellow-border:rgba(251, 191, 36, 0.20);
+    --gray:         #6b7294;
+    --gray-bg:      #252940;
+    --gray-border:  #363c58;
+
+    /* Semantic: Next Banner */
+    --next-bg:      rgba(30, 27, 75, 0.50);
+    --next-border:  #818cf8;
+    --next-glow:    rgba(129, 140, 248, 0.08);
+
+    /* Semantic: Progress */
+    --progress-bg:  #1f2337;
+
+    /* Depth */
+    --shadow-sm:    0 1px 2px rgba(0, 0, 0, 0.20);
+    --shadow:       0 1px 3px rgba(0, 0, 0, 0.30), 0 1px 2px rgba(0, 0, 0, 0.15);
+    --shadow-md:    0 4px 12px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.20);
+    --shadow-lg:    0 8px 24px rgba(0, 0, 0, 0.40), 0 2px 6px rgba(0, 0, 0, 0.20);
+}
+
+/* ─── Theme Toggle ───────────────────────────── */
+.theme-toggle {
+    background: var(--bg-inset);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: var(--sp-1) var(--sp-2);
+    cursor: pointer;
+    font-size: var(--text-base);
+    line-height: 1;
+    color: var(--text-muted);
+    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+    display: flex;
+    align-items: center;
+    margin-left: auto;
+}
+
+.theme-toggle:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-glow);
+}
+
+/* ─── Base ────────────────────────────────────── */
+*, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: var(--lh-normal);
+    color: var(--text);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Layout ──────────────────────────────────── */
+.wrap {
+    max-width: var(--max-w);
+    margin: 0 auto;
+    padding: var(--sp-8) var(--page-pad);
+}
+
+/* ─── Header ──────────────────────────────────── */
+.header {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-2);
+    flex-wrap: wrap;
+}
+
+h1 {
+    font-size: var(--text-2xl);
+    font-weight: var(--fw-bold);
+    letter-spacing: var(--ls-tight);
+    line-height: var(--lh-tight);
+}
+
+h2 {
+    font-size: var(--text-lg);
+    font-weight: var(--fw-semi);
+    letter-spacing: var(--ls-tight);
+    line-height: var(--lh-tight);
+    margin-bottom: var(--sp-3);
+}
+
+.header-meta {
+    font-size: var(--text-xs);
+    color: var(--text-faint);
+    margin-bottom: var(--sp-6);
+    letter-spacing: var(--ls-wide);
+    text-transform: uppercase;
+}
+
+/* ─── Badge ───────────────────────────────────── */
+.badge {
+    display: inline-block;
+    padding: 2px var(--sp-2);
+    border-radius: 99px;
+    font-size: var(--text-xs);
+    font-weight: var(--fw-semi);
+    letter-spacing: var(--ls-wide);
+    background: var(--accent);
+    color: #fff;
+    text-transform: uppercase;
+}
+
+.badge-optional {
+    background: var(--yellow-bg);
+    color: var(--yellow);
+    border: 1px solid var(--yellow-border);
+}
+
+/* ─── Progress Bar ────────────────────────────── */
+.progress-bar {
+    width: 100%;
+    height: var(--progress-h);
+    background: var(--progress-bg);
+    border-radius: 99px;
+    overflow: hidden;
+    margin-bottom: var(--sp-6);
+    display: flex;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.progress-bar .seg-done {
+    background: linear-gradient(135deg, var(--green), #10b981);
+    box-shadow: 0 0 8px rgba(5, 150, 105, 0.3);
+}
+
+.progress-bar .seg-likely {
+    background: linear-gradient(135deg, var(--blue), #3b82f6);
+    box-shadow: 0 0 8px rgba(37, 99, 235, 0.25);
+}
+
+.progress-bar .seg-skip {
+    background: var(--gray);
+    opacity: 0.7;
+}
+
+/* ─── Summary Cards ───────────────────────────── */
+.cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-6);
+}
+
+.card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: var(--sp-4) var(--sp-5);
+    box-shadow: var(--shadow);
+    transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+}
+
+.card-num {
+    font-size: var(--text-2xl);
+    font-weight: var(--fw-bold);
+    font-family: var(--font-mono);
+    letter-spacing: var(--ls-tight);
+    line-height: 1;
+}
+
+.card-lbl {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    margin-top: var(--sp-1);
+    letter-spacing: var(--ls-wide);
+    text-transform: uppercase;
+    font-weight: var(--fw-medium);
+}
+
+/* ─── What's Next Banner ──────────────────────── */
+.next-banner {
+    background: var(--next-bg);
+    border: 1px solid var(--next-border);
+    border-left: 4px solid var(--next-border);
+    border-radius: var(--radius);
+    padding: var(--sp-5) var(--sp-6);
+    margin-bottom: var(--sp-6);
+    box-shadow: 0 0 0 1px var(--next-glow), var(--shadow);
+    position: relative;
+    overflow: hidden;
+}
+
+.next-banner::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: var(--next-border);
+    animation: pulse-border 2.5s ease-in-out infinite;
+}
+
+@keyframes pulse-border {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.5; }
+}
+
+.next-banner h2 {
+    color: var(--accent);
+    margin-bottom: var(--sp-1);
+    font-size: var(--text-base);
+    font-weight: var(--fw-semi);
+    letter-spacing: var(--ls-wide);
+    text-transform: uppercase;
+}
+
+.next-banner p {
+    color: var(--text);
+    font-size: var(--text-base);
+}
+
+.next-cmd {
+    font-family: var(--font-mono);
+    background: var(--bg-card);
+    padding: var(--sp-1) var(--sp-3);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-top: var(--sp-3);
+    border: 1px solid var(--border);
+}
+
+/* ─── Phase Headers (Collapsible) ─────────────── */
+.phase {
+    margin-bottom: var(--sp-6);
+}
+
+.phase-hdr {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    cursor: pointer;
+    padding: var(--sp-2) 0;
+    user-select: none;
+    border-bottom: 2px solid var(--border);
+    margin-bottom: var(--sp-3);
+    transition: border-color 0.15s ease;
+}
+
+.phase-hdr:hover {
+    border-bottom-color: var(--accent);
+}
+
+.phase-hdr:hover h2 {
+    color: var(--accent);
+}
+
+.phase-hdr h2 {
+    transition: color 0.15s ease;
+}
+
+.phase-hdr .arr {
+    transition: transform 0.2s ease;
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+}
+
+.phase-hdr.closed .arr {
+    transform: rotate(-90deg);
+}
+
+.phase-cnt {
+    font-size: var(--text-xs);
+    font-family: var(--font-mono);
+    color: var(--text-faint);
+    margin-left: auto;
+    letter-spacing: var(--ls-wide);
+}
+
+/* ─── Prompt List ─────────────────────────────── */
+.plist {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+}
+
+/* ─── Prompt Cards ────────────────────────────── */
+.pcard {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: var(--sp-3) var(--sp-4);
+    box-shadow: var(--shadow-sm);
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: var(--sp-2) var(--sp-3);
+    align-items: start;
+    transition: box-shadow 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
+}
+
+.pcard:hover {
+    box-shadow: var(--shadow);
+    transform: translateY(-1px);
+    border-color: var(--accent-glow);
+}
+
+/* ─── Status Badges ──────────────────────────── */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    font-size: var(--text-xs);
+    font-weight: var(--fw-medium);
+    padding: 2px var(--sp-2);
+    border-radius: 99px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    letter-spacing: var(--ls-wide);
+    line-height: var(--lh-tight);
+}
+
+.st-completed {
+    background: var(--green-bg);
+    color: var(--green);
+    border: 1px solid var(--green-border);
+}
+
+.st-likely-completed {
+    background: var(--blue-bg);
+    color: var(--blue);
+    border: 1px solid var(--blue-border);
+}
+
+.st-skipped {
+    background: var(--gray-bg);
+    color: var(--gray);
+    border: 1px solid var(--gray-border);
+}
+
+.st-pending {
+    background: var(--bg-inset);
+    color: var(--text-faint);
+    border: 1px solid var(--border);
+}
+
+/* ─── Status Legend ──────────────────────────── */
+.status-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    margin-bottom: var(--sp-4);
+    padding: var(--sp-2) 0;
+}
+
+.status-legend .status-badge {
+    cursor: default;
+}
+
+/* ─── Prompt Card Inner ───────────────────────── */
+.pinfo {
+    min-width: 0;
+}
+
+.pname {
+    font-weight: var(--fw-semi);
+    font-size: var(--text-base);
+}
+
+.pstep {
+    font-size: var(--text-xs);
+    font-family: var(--font-mono);
+    color: var(--text-faint);
+    letter-spacing: var(--ls-wide);
+}
+
+.pdesc {
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+    margin-top: 2px;
+    line-height: var(--lh-relaxed);
+}
+
+.pdesc-long {
+    font-size: var(--text-xs);
+    color: var(--text-faint);
+    margin-top: 2px;
+}
+
+.pdeps {
+    font-size: var(--text-xs);
+    color: var(--yellow);
+    margin-top: var(--sp-1);
+    font-weight: var(--fw-medium);
+}
+
+/* ─── Copy Command Button ─────────────────────── */
+.pcmd {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    background: var(--bg-inset);
+    padding: 3px var(--sp-2);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    border: 1px solid var(--border);
+    white-space: nowrap;
+    align-self: center;
+    color: var(--text-muted);
+    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+    letter-spacing: var(--ls-wide);
+}
+
+.pcmd:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-glow);
+}
+
+.pcmd.copied {
+    border-color: var(--green);
+    color: var(--green);
+    background: var(--green-bg);
+}
+
+/* ─── Prompt Modal ────────────────────────────── */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: var(--sp-4);
+}
+
+.modal {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    max-width: 720px;
+    width: 100%;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    padding: var(--sp-4) var(--sp-5);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.modal-header h3 {
+    font-size: var(--text-lg);
+    font-weight: var(--fw-semi);
+    flex: 1;
+    min-width: 0;
+}
+
+.modal-close {
+    background: var(--bg-inset);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: var(--sp-1) var(--sp-2);
+    cursor: pointer;
+    font-size: var(--text-base);
+    color: var(--text-muted);
+    line-height: 1;
+    transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.modal-close:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.modal-body {
+    padding: var(--sp-5);
+    overflow-y: auto;
+    flex: 1;
+}
+
+.modal-body pre {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    line-height: var(--lh-relaxed);
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--text);
+}
+
+.modal-body pre .md-heading {
+    font-weight: var(--fw-bold);
+    color: var(--accent);
+}
+
+.modal-body pre .md-code {
+    background: var(--bg-inset);
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: var(--text-xs);
+}
+
+.modal-footer {
+    display: flex;
+    gap: var(--sp-2);
+    padding: var(--sp-3) var(--sp-5);
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.modal-copy-btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: var(--sp-2) var(--sp-4);
+    font-size: var(--text-sm);
+    font-weight: var(--fw-medium);
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.modal-copy-btn:hover {
+    background: var(--accent-hover);
+}
+
+.modal-copy-btn.copied {
+    background: var(--green);
+}
+
+/* ─── Beads Task Section ─────────────────────── */
+.beads-section {
+    margin-top: var(--sp-8);
+    margin-bottom: var(--sp-6);
+}
+
+.beads-filters {
+    display: flex;
+    gap: var(--sp-2);
+    margin-bottom: var(--sp-3);
+}
+
+.beads-filter {
+    background: var(--bg-inset);
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    padding: var(--sp-1) var(--sp-3);
+    font-size: var(--text-xs);
+    font-weight: var(--fw-medium);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+    letter-spacing: var(--ls-wide);
+}
+
+.beads-filter:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.beads-filter.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+}
+
+/* ─── Beads Status Badges ────────────────────── */
+.st-bead-open {
+    background: var(--accent-glow);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+}
+
+.st-bead-progress {
+    background: var(--blue-bg);
+    color: var(--blue);
+    border: 1px solid var(--blue-border);
+}
+
+.st-bead-blocked {
+    background: var(--yellow-bg);
+    color: var(--yellow);
+    border: 1px solid var(--yellow-border);
+}
+
+.st-bead-deferred {
+    background: var(--gray-bg);
+    color: var(--gray);
+    border: 1px solid var(--gray-border);
+}
+
+.st-bead-closed {
+    background: var(--green-bg);
+    color: var(--green);
+    border: 1px solid var(--green-border);
+}
+
+/* ─── Beads Filter Separator ─────────────────── */
+.beads-filter-sep {
+    width: 1px;
+    background: var(--border);
+    align-self: stretch;
+    margin: 0 var(--sp-1);
+}
+
+/* ─── Beads Priority Filter ──────────────────── */
+.beads-prio-filter {
+    background: var(--bg-inset);
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    padding: var(--sp-1) var(--sp-3);
+    font-size: var(--text-xs);
+    font-weight: var(--fw-medium);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+    letter-spacing: var(--ls-wide);
+}
+
+.beads-prio-filter:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.beads-prio-filter.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+}
+
+/* ─── Beads Task Detail Modal ────────────────── */
+.bead-meta-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--sp-3);
+    padding: var(--sp-4) 0;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.bead-meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.bead-meta-label {
+    font-size: var(--text-xs);
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: var(--ls-wide);
+    font-weight: var(--fw-medium);
+}
+
+.bead-meta-value {
+    font-size: var(--text-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text);
+}
+
+.bead-description {
+    padding: var(--sp-4) 0;
+    border-bottom: 1px solid var(--border-light);
+    white-space: pre-wrap;
+    font-size: var(--text-sm);
+    line-height: var(--lh-relaxed);
+    color: var(--text-muted);
+}
+
+.bead-deps {
+    padding: var(--sp-4) 0;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.bead-dep-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-bottom: var(--sp-2);
+}
+
+.bead-dep-group:last-child {
+    margin-bottom: 0;
+}
+
+.bead-dep-label {
+    font-size: var(--text-xs);
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: var(--ls-wide);
+    font-weight: var(--fw-medium);
+    min-width: 80px;
+}
+
+.bead-dep-link {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    padding: 2px var(--sp-2);
+    border-radius: 99px;
+    background: var(--accent-glow);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+    text-decoration: none;
+}
+
+.bead-dep-link:hover {
+    background: var(--accent);
+    color: #fff;
+}
+
+.bead-timestamps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-4);
+    padding: var(--sp-4) 0;
+}
+
+.bead-ts-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.bead-ts-label {
+    font-size: var(--text-xs);
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: var(--ls-wide);
+    font-weight: var(--fw-medium);
+}
+
+.bead-ts-value {
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+}
+
+.bead-ts-value[title] {
+    border-bottom: 1px dotted var(--text-faint);
+    cursor: help;
+}
+
+/* ─── Standalone Commands Section ─────────────── */
+.ongoing {
+    margin-top: var(--sp-10);
+}
+
+.ongoing h2 {
+    letter-spacing: var(--ls-wide);
+    text-transform: uppercase;
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+    margin-bottom: var(--sp-4);
+    border-bottom: 2px solid var(--border);
+    padding-bottom: var(--sp-2);
+}
+
+/* ─── Footer ──────────────────────────────────── */
+.footer {
+    text-align: center;
+    font-size: var(--text-xs);
+    color: var(--text-faint);
+    margin-top: var(--sp-10);
+    padding-top: var(--sp-4);
+    border-top: 1px solid var(--border-light);
+    letter-spacing: var(--ls-wide);
+}
+
+/* ─── Utilities ───────────────────────────────── */
+.hidden {
+    display: none;
+}
+
+/* Build-observability severity + verdict tokens (Plan 4) */
+:root {
+  --sev-p0: #dc2626;        /* red 600 */
+  --sev-p1: #ea580c;        /* orange 600 */
+  --sev-p2: #ca8a04;        /* yellow 600 */
+  --sev-p3: #2563eb;        /* blue 600 */
+  --sev-pass: #16a34a;      /* green 600 */
+}
+[data-theme="dark"] {
+  --sev-p0: #f87171;
+  --sev-p1: #fb923c;
+  --sev-p2: #facc15;
+  --sev-p3: #60a5fa;
+  --sev-pass: #4ade80;
+}
+
+/* Build-observability panel layout */
+.panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: var(--sp-4) var(--sp-6);
+    margin-bottom: var(--sp-6);
+}
+.panel > header {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-4);
+    flex-wrap: wrap;
+}
+.panel > header h2 {
+    margin: 0;
+    font-size: var(--text-base);
+    font-weight: var(--fw-semi);
+}
+.panel .meta {
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+}
+.grid { display: grid; gap: var(--sp-4); }
+.grid-2 { grid-template-columns: repeat(2, 1fr); }
+@media (max-width: 640px) { .grid-2 { grid-template-columns: 1fr; } }
+
+/* Finding filters */
+.finding-filters {
+    display: flex;
+    gap: var(--sp-2);
+    flex-wrap: wrap;
+    margin-bottom: var(--sp-4);
+}
+.finding-filters button {
+    padding: var(--sp-1) var(--sp-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-inset);
+    color: var(--text);
+    font-size: var(--text-sm);
+    cursor: pointer;
+}
+.finding-filters button:hover,
+.finding-filters button.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+}
+
+/* Findings list */
+.findings {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+}
+.finding {
+    background: var(--bg-inset);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    padding: var(--sp-3) var(--sp-4);
+}
+.finding header {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    flex-wrap: wrap;
+    margin-bottom: var(--sp-2);
+}
+.finding-id {
+    font-family: var(--font-mono, monospace);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px var(--sp-1);
+}
+.finding .lens {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+}
+.finding .title {
+    font-size: var(--text-sm);
+    font-weight: var(--fw-semi);
+    flex: 1;
+}
+.finding p { margin: 0; font-size: var(--text-sm); color: var(--text-muted); }
+.empty { color: var(--text-muted); font-size: var(--text-sm); text-align: center; padding: var(--sp-4); }
+
+/* ── Mermaid diagrams ─────────────────────────────────────────────────────────
+   The build renders mermaid to inline SVG via mmdc, then sanitizeSvg() +
+   rehype-sanitize strip the SVG's own <script>, <foreignObject>, AND <style>
+   for security. Stripping <style> means the diagram arrives unstyled (nodes
+   default to a black fill). These theme-token rules restyle the SVG so nodes,
+   edges, arrowheads, and labels render correctly — and follow light/dark mode.
+   Authors must render with htmlLabels:false (the generator forces this) so node
+   labels are native <text>/<tspan> rather than stripped <foreignObject> HTML. */
+figure.mermaid { margin: var(--sp-5) 0; text-align: center; }
+figure.mermaid svg { max-width: 100%; height: auto; }
+/* Node shapes */
+figure.mermaid svg .node rect,
+figure.mermaid svg .node circle,
+figure.mermaid svg .node ellipse,
+figure.mermaid svg .node polygon,
+figure.mermaid svg .node path {
+    fill: var(--bg-inset);
+    stroke: var(--border);
+    stroke-width: 1px;
+}
+/* Background helper rects mermaid emits behind labels */
+figure.mermaid svg .node .label-container { fill: var(--bg-inset); stroke: var(--border); }
+figure.mermaid svg rect.background { fill: none; stroke: none; }
+/* Labels (rendered as <text>/<tspan> when htmlLabels:false) */
+figure.mermaid svg .nodeLabel,
+figure.mermaid svg .node text,
+figure.mermaid svg text.nodeLabel,
+figure.mermaid svg .label text,
+figure.mermaid svg span.nodeLabel {
+    fill: var(--text);
+    color: var(--text);
+    font-family: var(--font-sans);
+}
+/* Edges: thin strokes, not filled blobs */
+figure.mermaid svg .edgePath path,
+figure.mermaid svg path.flowchart-link,
+figure.mermaid svg .flowchart-link {
+    fill: none;
+    stroke: var(--text-faint);
+    stroke-width: 1.5px;
+}
+/* Arrowheads */
+figure.mermaid svg marker path,
+figure.mermaid svg .marker {
+    fill: var(--text-faint);
+    stroke: var(--text-faint);
+}
+figure.mermaid svg .edgeLabel,
+figure.mermaid svg .edgeLabel text { fill: var(--text-muted); color: var(--text-muted); }
+</style>
+<script>(function(){try{var t=localStorage.getItem('guide-theme');if(!t&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)t='dark';if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+</head>
+<body>
+<header class="topbar">
+  <button data-action="nav" class="nav-toggle" aria-label="Toggle navigation">☰</button>
+  <h1>Build Observability</h1>
+  <button data-action="theme" class="theme-toggle" aria-label="Toggle theme">◐</button>
+</header>
+<div class="layout">
+  <aside class="rail"><nav class="toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#why-build-observability-exists">Why Build Observability exists</a></li><li class="toc-3"><a href="#what-goes-wrong-without-it">What goes wrong without it</a></li><li class="toc-3"><a href="#what-good-build-observability-produces">What good build observability produces</a></li><li class="toc-2"><a href="#system-map">System map</a></li><li class="toc-2"><a href="#the-ledger">The ledger</a></li><li class="toc-3"><a href="#how-a-write-happens">How a write happens</a></li><li class="toc-3"><a href="#the-nine-event-types">The nine event types</a></li><li class="toc-3"><a href="#building-a-scaffold-observe-event-command">Building a scaffold observe event command</a></li><li class="toc-3"><a href="#redaction-write-time-and-render-time">Redaction — write time and render time</a></li><li class="toc-3"><a href="#worktree-identity">Worktree identity</a></li><li class="toc-2"><a href="#adapters">Adapters</a></li><li class="toc-3"><a href="#source-priority">Source priority</a></li><li class="toc-2"><a href="#the-nine-lens-audit">The nine-lens audit</a></li><li class="toc-3"><a href="#scope-order-and-skips">Scope, order and skips</a></li><li class="toc-3"><a href="#what-feeds-the-doc-graph">What feeds the doc-graph</a></li><li class="toc-3"><a href="#all-nine-at-a-glance">All nine at a glance</a></li><li class="toc-3"><a href="#lens-by-lens">Lens by lens</a></li><li class="toc-2"><a href="#the-observe-audit-cli">The observe audit CLI</a></li><li class="toc-3"><a href="#every-flag">Every flag</a></li><li class="toc-3"><a href="#verdict-taxonomy">Verdict taxonomy</a></li><li class="toc-3"><a href="#companion-verb-scaffold-observe-ack">Companion verb — scaffold observe ack</a></li><li class="toc-3"><a href="#exit-codes-across-observe-verbs">Exit codes across observe verbs</a></li><li class="toc-2"><a href="#progress-replay-stall">Progress, replay &amp; stall</a></li><li class="toc-3"><a href="#fusion-how-the-timeline-is-built">Fusion — how the timeline is built</a></li><li class="toc-3"><a href="#stall-detection-the-six-signals">Stall detection — the six signals</a></li><li class="toc-3"><a href="#flags">Flags</a></li><li class="toc-2"><a href="#phase-boundary-triggers">Phase-boundary triggers</a></li><li class="toc-3"><a href="#the-hook">The hook</a></li><li class="toc-3"><a href="#config-timestamps">Config &amp; timestamps</a></li><li class="toc-2"><a href="#mmr-doc-conformance-channel">MMR doc-conformance channel</a></li><li class="toc-3"><a href="#finding-translation">Finding translation</a></li><li class="toc-3"><a href="#enabling-it">Enabling it</a></li><li class="toc-2"><a href="#the---fix-flow">The --fix flow</a></li><li class="toc-3"><a href="#the-five-phases">The five phases</a></li><li class="toc-3"><a href="#abort-safety">Abort safety</a></li><li class="toc-3"><a href="#config-the-fix-block">Config — the fix: block</a></li><li class="toc-2"><a href="#harvest-recover-teardown">Harvest, recover &amp; teardown</a></li><li class="toc-3"><a href="#commands">Commands</a></li><li class="toc-2"><a href="#renderers">Renderers</a></li><li class="toc-2"><a href="#config-reference">Config reference</a></li><li class="toc-2"><a href="#where-it-lives">Where it lives</a></li><li class="toc-2"><a href="#shipping-history">Shipping history</a></li><li class="toc-2"><a href="#known-divergences">Known divergences</a></li></ul></nav></aside>
+  <main class="content"><h2 id="why-build-observability-exists">Why Build Observability exists</h2>
+<p>When several agents (and humans) build a project in parallel worktrees, the
+<em>reasoning</em> behind the build evaporates. A decision gets made in a throwaway
+branch, a blocker is hit and worked around, a story is silently dropped — and
+none of it survives the squash-merge. The docs say one thing; the code drifts to
+another. Build Observability turns those ephemeral moments into a durable,
+queryable record, then audits the record against the planning docs.</p>
+<h3 id="what-goes-wrong-without-it">What goes wrong without it</h3>
+<ul>
+<li><strong>Decisions die at teardown.</strong> An agent records "we switched the cache to
+Redis" in its head, opens a PR, the worktree is removed — and the rationale is
+gone. The next agent re-litigates it.</li>
+<li><strong>Blockers go unaddressed.</strong> A dependency block is hit at hour 0 and nobody
+notices it is still open at hour 6.</li>
+<li><strong>Phase boundaries pass unaudited.</strong> <code>tech-stack.md</code> is marked complete while
+it still contradicts the PRD; the contradiction is found three phases later.</li>
+<li><strong>Doc/code drift accumulates.</strong> A component is used outside its declared
+layer; an acceptance criterion never gets a test; a coding-standard erodes
+file by file.</li>
+</ul>
+<p>The classic failure mode is a worktree teardown that takes the ledger with it:
+an agent worktree's <code>.scaffold/activity.jsonl</code> is lost the moment the worktree
+is removed, <em>unless</em> it is harvested into the primary archive first. The
+harvester (<code>src/observability/engine/harvester.ts</code>) and
+<code>scripts/teardown-agent-worktree.sh</code> exist precisely to close this gap — see
+<a href="#harvest-recover--teardown">Harvest, recover &#x26; teardown</a>.</p>
+<h3 id="what-good-build-observability-produces">What good build observability produces</h3>
+<ul>
+<li><strong>Decisions captured</strong> the moment they're made (<code>decision_recorded</code>),
+surviving teardown via harvest.</li>
+<li><strong>Blockers surfaced</strong> when they linger past a threshold (stall detection).</li>
+<li><strong>Phase-boundary audits</strong> that run automatically when a planning doc is
+completed, non-gating so they never block progress.</li>
+<li><strong>Doc/code drift caught</strong> by the nine-lens audit and routed into code review
+via the MMR <code>doc-conformance</code> channel.</li>
+</ul>
+<p>The system ships <strong>9 durable event types</strong>, <strong>8 adapters</strong> fusing external
+signals, a <strong>9-lens audit (A–I)</strong>, and <strong>5 active stall signals</strong> (a 6th reserved) on the "Needs
+Attention" surface.</p>
+<div class="callout callout-note"><p><strong>Two subsystems, one config file.</strong> Build Observability and the separate
+<em>knowledge-freshness</em> system both read <code>.scaffold/observability.yaml</code>. This guide
+documents Build Observability; the shared config keys are reconciled in
+<a href="#config-reference">Config reference</a>.</p></div>
+<h2 id="system-map">System map</h2>
+<p>One write path, one fusion point, two read paths. Agents write events to the
+append-only ledger; adapters synthesize events from git, GitHub, MMR and
+pipeline state; the synthesizer fuses them with correlation-id dedup; the engine
+API drives the audit lenses and the progress timeline; renderers emit terminal,
+markdown, dashboard and MMR-findings output.</p>
+<figure class="mermaid"><svg id="my-svg" width="100%" xmlns="http://www.w3.org/2000/svg" class="flowchart" style="max-width: 2427.98px; background-color: transparent;" viewBox="0 0 2427.984375 825.7999877929688" role="graphics-document document">#my-svg{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;fill:#000000;}@keyframes edge-animation-frame{from{stroke-dashoffset:0;}}@keyframes dash{to{stroke-dashoffset:0;}}#my-svg .edge-animation-slow{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 50s linear infinite;stroke-linecap:round;}#my-svg .edge-animation-fast{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 20s linear infinite;stroke-linecap:round;}#my-svg .error-icon{fill:#552222;}#my-svg .error-text{fill:#552222;stroke:#552222;}#my-svg .edge-thickness-normal{stroke-width:1px;}#my-svg .edge-thickness-thick{stroke-width:3.5px;}#my-svg .edge-pattern-solid{stroke-dasharray:0;}#my-svg .edge-thickness-invisible{stroke-width:0;fill:none;}#my-svg .edge-pattern-dashed{stroke-dasharray:3;}#my-svg .edge-pattern-dotted{stroke-dasharray:2;}#my-svg .marker{fill:#666;stroke:#666;}#my-svg .marker.cross{stroke:#666;}#my-svg svg{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;}#my-svg p{margin:0;}#my-svg .label{font-family:"trebuchet ms",verdana,arial,sans-serif;color:#000000;}#my-svg .cluster-label text{fill:#333;}#my-svg .cluster-label span{color:#333;}#my-svg .cluster-label span p{background-color:transparent;}#my-svg .label text,#my-svg span{fill:#000000;color:#000000;}#my-svg .node rect,#my-svg .node circle,#my-svg .node ellipse,#my-svg .node polygon,#my-svg .node path{fill:#eee;stroke:#999;stroke-width:1px;}#my-svg .rough-node .label text,#my-svg .node .label text,#my-svg .image-shape .label,#my-svg .icon-shape .label{text-anchor:middle;}#my-svg .node .katex path{fill:#000;stroke:#000;stroke-width:1px;}#my-svg .rough-node .label,#my-svg .node .label,#my-svg .image-shape .label,#my-svg .icon-shape .label{text-align:center;}#my-svg .node.clickable{cursor:pointer;}#my-svg .root .anchor path{fill:#666!important;stroke-width:0;stroke:#666;}#my-svg .arrowheadPath{fill:#333333;}#my-svg .edgePath .path{stroke:#666;stroke-width:1px;}#my-svg .flowchart-link{stroke:#666;fill:none;}#my-svg .edgeLabel{background-color:white;text-align:center;}#my-svg .edgeLabel p{background-color:white;}#my-svg .edgeLabel rect{opacity:0.5;background-color:white;fill:white;}#my-svg .labelBkg{background-color:rgba(255, 255, 255, 0.5);}#my-svg .cluster rect{fill:hsl(0, 0%, 98.9215686275%);stroke:#707070;stroke-width:1px;}#my-svg .cluster text{fill:#333;}#my-svg .cluster span{color:#333;}#my-svg div.mermaidTooltip{position:absolute;text-align:center;max-width:200px;padding:2px;font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:12px;background:hsl(-160, 0%, 93.3333333333%);border:1px solid #707070;border-radius:2px;pointer-events:none;z-index:100;}#my-svg .flowchartTitleText{text-anchor:middle;font-size:18px;fill:#000000;}#my-svg rect.text{fill:none;stroke-width:0;}#my-svg .icon-shape,#my-svg .image-shape{background-color:white;text-align:center;}#my-svg .icon-shape p,#my-svg .image-shape p{background-color:white;padding:2px;}#my-svg .icon-shape .label rect,#my-svg .image-shape .label rect{opacity:0.5;background-color:white;fill:white;}#my-svg .label-icon{display:inline-block;height:1em;overflow:visible;vertical-align:-0.125em;}#my-svg .node .label-icon path{fill:currentColor;stroke:revert;stroke-width:revert;}#my-svg .node .neo-node{stroke:#999;}#my-svg [data-look="neo"].node rect,#my-svg [data-look="neo"].cluster rect,#my-svg [data-look="neo"].node polygon{stroke:url(#my-svg-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#my-svg [data-look="neo"].node path{stroke:url(#my-svg-gradient);stroke-width:1px;}#my-svg [data-look="neo"].node .outer-path{filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#my-svg [data-look="neo"].node .neo-line path{stroke:#999;filter:none;}#my-svg [data-look="neo"].node circle{stroke:url(#my-svg-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#my-svg [data-look="neo"].node circle .state-start{fill:#000000;}#my-svg [data-look="neo"].icon-shape .icon{fill:url(#my-svg-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#my-svg [data-look="neo"].icon-shape .icon-neo path{stroke:url(#my-svg-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#my-svg :root{--mermaid-font-family:"trebuchet ms",verdana,arial,sans-serif;}<g><marker id="my-svg_flowchart-v2-pointEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"></path></marker><marker id="my-svg_flowchart-v2-pointStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="4.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 5 L 10 10 L 10 0 z" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"></path></marker><marker id="my-svg_flowchart-v2-pointEnd-margin" class="marker flowchart-v2" viewBox="0 0 11.5 14" refX="11.5" refY="7" markerUnits="userSpaceOnUse" markerWidth="10.5" markerHeight="14" orient="auto"><path d="M 0 0 L 11.5 7 L 0 14 z" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"></path></marker><marker id="my-svg_flowchart-v2-pointStart-margin" class="marker flowchart-v2" viewBox="0 0 11.5 14" refX="1" refY="7" markerUnits="userSpaceOnUse" markerWidth="11.5" markerHeight="14" orient="auto"><polygon points="0,7 11.5,14 11.5,0" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"></polygon></marker><marker id="my-svg_flowchart-v2-circleEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"></circle></marker><marker id="my-svg_flowchart-v2-circleStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="-1" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"></circle></marker><marker id="my-svg_flowchart-v2-circleEnd-margin" class="marker flowchart-v2" viewBox="0 0 10 10" refY="5" refX="12.25" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"></circle></marker><marker id="my-svg_flowchart-v2-circleStart-margin" class="marker flowchart-v2" viewBox="0 0 10 10" refX="-2" refY="5" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"></circle></marker><marker id="my-svg_flowchart-v2-crossEnd" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="12" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" style="stroke-width: 2; stroke-dasharray: 1, 0;"></path></marker><marker id="my-svg_flowchart-v2-crossStart" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="-1" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" style="stroke-width: 2; stroke-dasharray: 1, 0;"></path></marker><marker id="my-svg_flowchart-v2-crossEnd-margin" class="marker cross flowchart-v2" viewBox="0 0 15 15" refX="17.7" refY="7.5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto"><path d="M 1,1 L 14,14 M 1,14 L 14,1" class="arrowMarkerPath" style="stroke-width: 2.5;"></path></marker><marker id="my-svg_flowchart-v2-crossStart-margin" class="marker cross flowchart-v2" viewBox="0 0 15 15" refX="-3.5" refY="7.5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto"><path d="M 1,1 L 14,14 M 1,14 L 14,1" class="arrowMarkerPath" style="stroke-width: 2.5; stroke-dasharray: 1, 0;"></path></marker><g class="root"><g class="clusters"><g class="cluster" id="my-svg-render"><rect style="" x="400.88671875" y="701.1999969482422" width="949.5" height="116.5999984741211"></rect><g class="cluster-label" transform="translate(851.86328125, 701.1999969482422)"><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">render</tspan></tspan></text></g></g></g><g class="cluster" id="my-svg-adapters"><rect style="" x="566.125" y="149.5999984741211" width="1853.859375" height="116.5999984741211"></rect><g class="cluster-label" transform="translate(1461.8515625, 149.5999984741211)"><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">adapters</tspan></tspan></text></g></g></g><g class="cluster" id="my-svg-write"><rect style="" x="8" y="8" width="538.125" height="258.1999969482422"></rect><g class="cluster-label" transform="translate(258.1796875, 8)"><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">write</tspan></tspan></text></g></g></g></g><g class="edgePaths"><path d="M169.445,99.6L169.445,103.767C169.445,107.933,169.445,116.267,169.445,124.6C169.445,132.933,169.445,141.267,186.561,149.956C203.677,158.645,237.909,167.691,255.025,172.213L272.141,176.736" id="my-svg-L_LW_LF_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M418.023,99.6L418.023,103.767C418.023,107.933,418.023,116.267,418.023,124.6C418.023,132.933,418.023,141.267,416.314,148.999C414.605,156.731,411.187,163.862,409.478,167.427L407.769,170.993" id="my-svg-L_HV_LF_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M390.078,241.2L390.078,245.367C390.078,249.533,390.078,257.867,390.078,266.2C390.078,274.533,390.078,282.867,472.673,297.313C555.268,311.759,720.458,332.317,803.053,342.597L885.648,352.876" id="my-svg-L_LF_SY_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M681.617,232.4L681.617,238.033C681.617,243.667,681.617,254.933,681.617,264.733C681.617,274.533,681.617,282.867,715.635,295.145C749.654,307.423,817.69,323.645,851.708,331.756L885.726,339.868" id="my-svg-L_A1_SY_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M891.523,232.4L891.523,238.033C891.523,243.667,891.523,254.933,891.523,264.733C891.523,274.533,891.523,282.867,896.929,290.818C902.334,298.769,913.145,306.337,918.551,310.122L923.956,313.906" id="my-svg-L_A2_SY_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M1108.352,232.4L1108.352,238.033C1108.352,243.667,1108.352,254.933,1108.352,264.733C1108.352,274.533,1108.352,282.867,1102.946,290.818C1097.541,298.769,1086.73,306.337,1081.324,310.122L1075.919,313.906" id="my-svg-L_A3_SY_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M1334.938,232.4L1334.938,238.033C1334.938,243.667,1334.938,254.933,1334.938,264.733C1334.938,274.533,1334.938,282.867,1298.141,295.37C1261.345,307.874,1187.752,324.547,1150.955,332.884L1114.159,341.221" id="my-svg-L_A4_SY_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M1562.32,232.4L1562.32,238.033C1562.32,243.667,1562.32,254.933,1562.32,264.733C1562.32,274.533,1562.32,282.867,1487.637,297.113C1412.954,311.359,1263.588,331.517,1188.905,341.597L1114.222,351.676" id="my-svg-L_A5_SY_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M999.938,418L999.938,422.167C999.938,426.333,999.938,434.667,999.938,442.333C999.938,450,999.938,457,999.938,460.5L999.938,464" id="my-svg-L_SY_API_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M1109.859,519.139L1151.412,525.882C1192.965,532.626,1276.07,546.113,1317.623,556.356C1359.176,566.6,1359.176,573.6,1359.176,577.1L1359.176,580.6" id="my-svg-L_API_LENS_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M1437.91,651.2L1447.761,655.367C1457.613,659.533,1477.316,667.867,1487.168,676.2C1497.02,684.533,1497.02,692.867,1497.02,700.533C1497.02,708.2,1497.02,715.2,1497.02,718.7L1497.02,722.2" id="my-svg-L_LENS_FIX_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M890.016,514.642L828.281,522.135C766.546,529.628,643.076,544.614,581.34,561.824C519.605,579.033,519.605,598.467,519.605,617.9C519.605,637.333,519.605,656.767,519.605,670.65C519.605,684.533,519.605,692.867,519.605,702C519.605,711.133,519.605,721.067,519.605,726.033L519.605,731" id="my-svg-L_API_R1_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M890.016,527.466L867.516,532.821C845.017,538.177,800.018,548.889,777.519,563.961C755.02,579.033,755.02,598.467,755.02,617.9C755.02,637.333,755.02,656.767,755.02,670.65C755.02,684.533,755.02,692.867,755.02,702C755.02,711.133,755.02,721.067,755.02,726.033L755.02,731" id="my-svg-L_API_R2_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M1004.969,534.6L1005.598,538.767C1006.228,542.933,1007.487,551.267,1008.117,565.15C1008.746,579.033,1008.746,598.467,1008.746,617.9C1008.746,637.333,1008.746,656.767,1008.746,670.65C1008.746,684.533,1008.746,692.867,1008.746,702C1008.746,711.133,1008.746,721.067,1008.746,726.033L1008.746,731" id="my-svg-L_API_R3_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M1290.009,651.2L1281.355,655.367C1272.7,659.533,1255.391,667.867,1246.737,676.2C1238.082,684.533,1238.082,692.867,1238.082,702C1238.082,711.133,1238.082,721.067,1238.082,726.033L1238.082,731" id="my-svg-L_LENS_R4_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path></g><g class="edgeLabels"><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g></g><g class="nodes"><g class="node default" id="my-svg-flowchart-LW-0" transform="translate(169.4453125, 66.29999923706055)"><rect class="basic label-container" style="" x="-126.4453125" y="-33.29999923706055" width="252.890625" height="66.5999984741211"></rect><g class="label" style="" transform="translate(0, -18.299999237060547)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">ledger</tspan><tspan class="text-inner-tspan"> writer</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">ledger-writer.ts</tspan><tspan class="text-inner-tspan"> ·</tspan><tspan class="text-inner-tspan"> 4</tspan><tspan class="text-inner-tspan"> KiB</tspan><tspan class="text-inner-tspan"> cap</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-HV-1" transform="translate(418.0234375, 66.29999923706055)"><rect class="basic label-container" style="" x="-72.1328125" y="-33.29999923706055" width="144.265625" height="66.5999984741211"></rect><g class="label" style="" transform="translate(0, -18.299999237060547)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">harvester</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">harvester.ts</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-LF-2" transform="translate(390.078125, 207.89999771118164)"><rect class="basic label-container" style="" x="-114.0703125" y="-33.29999923706055" width="228.140625" height="66.5999984741211"></rect><g class="label" style="" transform="translate(0, -18.299999237060547)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">.scaffold/activity.jsonl</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">append-only</tspan><tspan class="text-inner-tspan"> ·</tspan><tspan class="text-inner-tspan"> redacted</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-A1-3" transform="translate(681.6171875, 207.89999771118164)"><rect class="basic label-container" style="" x="-80.4921875" y="-24.5" width="160.984375" height="49"></rect><g class="label" style="" transform="translate(0, -9.5)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">git</tspan><tspan class="text-inner-tspan"> ·</tspan><tspan class="text-inner-tspan"> priority</tspan><tspan class="text-inner-tspan"> 3</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-A2-4" transform="translate(891.5234375, 207.89999771118164)"><rect class="basic label-container" style="" x="-79.4140625" y="-24.5" width="158.828125" height="49"></rect><g class="label" style="" transform="translate(0, -9.5)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">gh</tspan><tspan class="text-inner-tspan"> ·</tspan><tspan class="text-inner-tspan"> priority</tspan><tspan class="text-inner-tspan"> 2</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-A3-5" transform="translate(1108.3515625, 207.89999771118164)"><rect class="basic label-container" style="" x="-87.4140625" y="-24.5" width="174.828125" height="49"></rect><g class="label" style="" transform="translate(0, -9.5)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">mmr</tspan><tspan class="text-inner-tspan"> ·</tspan><tspan class="text-inner-tspan"> priority</tspan><tspan class="text-inner-tspan"> 1</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-A4-6" transform="translate(1334.9375, 207.89999771118164)"><rect class="basic label-container" style="" x="-89.171875" y="-24.5" width="178.34375" height="49"></rect><g class="label" style="" transform="translate(0, -9.5)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">state</tspan><tspan class="text-inner-tspan"> ·</tspan><tspan class="text-inner-tspan"> priority</tspan><tspan class="text-inner-tspan"> 4</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-A5-7" transform="translate(1562.3203125, 207.89999771118164)"><rect class="basic label-container" style="" x="-88.2109375" y="-24.5" width="176.421875" height="49"></rect><g class="label" style="" transform="translate(0, -9.5)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">tests</tspan><tspan class="text-inner-tspan"> ·</tspan><tspan class="text-inner-tspan"> priority</tspan><tspan class="text-inner-tspan"> 5</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-A6-8" transform="translate(1808.0546875, 207.89999771118164)"><rect class="basic label-container" style="" x="-107.5234375" y="-24.5" width="215.046875" height="49"></rect><g class="label" style="" transform="translate(0, -9.5)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">pipeline_docs</tspan><tspan class="text-inner-tspan"> ·</tspan><tspan class="text-inner-tspan"> probe</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-A7-9" transform="translate(2044.7421875, 207.89999771118164)"><rect class="basic label-container" style="" x="-79.1640625" y="-24.5" width="158.328125" height="49"></rect><g class="label" style="" transform="translate(0, -9.5)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">beads</tspan><tspan class="text-inner-tspan"> ·</tspan><tspan class="text-inner-tspan"> probe</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-A8-10" transform="translate(2279.4453125, 207.89999771118164)"><rect class="basic label-container" style="" x="-105.5390625" y="-24.5" width="211.078125" height="49"></rect><g class="label" style="" transform="translate(0, -9.5)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">audit_history</tspan><tspan class="text-inner-tspan"> ·</tspan><tspan class="text-inner-tspan"> probe</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-SY-11" transform="translate(999.9375, 367.0999984741211)"><rect class="basic label-container" style="" x="-110.3203125" y="-50.900001525878906" width="220.640625" height="101.80000305175781"></rect><g class="label" style="" transform="translate(0, -35.900001525878906)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">synthesizer</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">composeReplay</tspan><tspan class="text-inner-tspan"> ·</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="2.1em"><tspan class="text-inner-tspan">correlation_id</tspan><tspan class="text-inner-tspan"> dedup</tspan><tspan class="text-inner-tspan"> ·</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="3.2em"><tspan class="text-inner-tspan">source</tspan><tspan class="text-inner-tspan"> priority</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-API-12" transform="translate(999.9375, 501.29999923706055)"><rect class="basic label-container" style="" x="-109.921875" y="-33.29999923706055" width="219.84375" height="66.5999984741211"></rect><g class="label" style="" transform="translate(0, -18.299999237060547)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">engine</tspan><tspan class="text-inner-tspan"> API</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">runAudit</tspan><tspan class="text-inner-tspan"> ·</tspan><tspan class="text-inner-tspan"> runProgress</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-LENS-13" transform="translate(1359.17578125, 617.8999977111816)"><rect class="basic label-container" style="" x="-98.4140625" y="-33.29999923706055" width="196.828125" height="66.5999984741211"></rect><g class="label" style="" transform="translate(0, -18.299999237060547)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">checks</tspan><tspan class="text-inner-tspan"> —</tspan><tspan class="text-inner-tspan"> lenses</tspan><tspan class="text-inner-tspan"> A–I</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">registry</tspan><tspan class="text-inner-tspan"> ·</tspan><tspan class="text-inner-tspan"> runner</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-FIX-14" transform="translate(1497.01953125, 759.4999961853027)"><rect class="basic label-container" style="" x="-111.6328125" y="-33.29999923706055" width="223.265625" height="66.5999984741211"></rect><g class="label" style="" transform="translate(0, -18.299999237060547)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">--fix</tspan><tspan class="text-inner-tspan"> loop</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">plan</tspan><tspan class="text-inner-tspan"> ·</tspan><tspan class="text-inner-tspan"> dispatch</tspan><tspan class="text-inner-tspan"> ·</tspan><tspan class="text-inner-tspan"> verify</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-R1-15" transform="translate(519.60546875, 759.4999961853027)"><rect class="basic label-container" style="" x="-83.71875" y="-24.5" width="167.4375" height="49"></rect><g class="label" style="" transform="translate(0, -9.5)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">terminal</tspan><tspan class="text-inner-tspan"> ·</tspan><tspan class="text-inner-tspan"> ANSI</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-R2-16" transform="translate(755.01953125, 759.4999961853027)"><rect class="basic label-container" style="" x="-101.6953125" y="-24.5" width="203.390625" height="49"></rect><g class="label" style="" transform="translate(0, -9.5)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">markdown</tspan><tspan class="text-inner-tspan"> +</tspan><tspan class="text-inner-tspan"> sidecar</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-R3-17" transform="translate(1008.74609375, 759.4999961853027)"><rect class="basic label-container" style="" x="-102.03125" y="-24.5" width="204.0625" height="49"></rect><g class="label" style="" transform="translate(0, -9.5)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">dashboard</tspan><tspan class="text-inner-tspan"> fragment</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-R4-18" transform="translate(1238.08203125, 759.4999961853027)"><rect class="basic label-container" style="" x="-77.3046875" y="-24.5" width="154.609375" height="49"></rect><g class="label" style="" transform="translate(0, -9.5)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">mmr-findings</tspan></tspan></text></g></g></g></g></g></g><defs></defs><defs></defs></svg></figure>
+<p>The boxes labelled <em>probe</em> (<code>pipeline_docs</code>, <code>beads</code>, <code>audit_history</code>)
+contribute availability checks — and, for <code>audit_history</code>, trend data — but do
+not emit events into the replay timeline. The five remaining adapters (<code>git</code>,
+<code>gh</code>, <code>mmr</code>, <code>state</code>, <code>tests</code>) synthesize replay events that flow into the
+synthesizer.</p>
+<h2 id="the-ledger">The ledger</h2>
+<p>Every durable observation is one JSON object on one line of
+<code>.scaffold/activity.jsonl</code>. Writes are append-only and lock-guarded so parallel
+worktrees never corrupt the file; each event is capped at <strong>4 KiB</strong>; and secrets
+and home-directory paths are scrubbed both when the event is written and again
+when output is rendered.</p>
+<h3 id="how-a-write-happens">How a write happens</h3>
+<ul>
+<li><strong>Validate</strong> against the per-type payload allow-list
+(<code>src/observability/engine/event-schemas.ts</code>). Unknown payload keys are dropped
+(reported in <code>dropped_fields</code>); a bad <code>ts</code> or missing required field rejects
+the event.</li>
+<li><strong>Redact</strong> the payload (<code>src/observability/engine/redact.ts</code>) — see below.</li>
+<li><strong>Size-check</strong>: <code>Buffer.byteLength(line, 'utf8')</code> must be ≤ 4096, else the
+write throws (<span class="fp" data-path="src/observability/engine/ledger-writer.ts:10">src/observability/engine/ledger-writer.ts:10</span>,
+<span class="fp" data-path="src/observability/engine/ledger-writer.ts:58">src/observability/engine/ledger-writer.ts:58</span>).</li>
+<li><strong>Append</strong> under a <code>proper-lockfile</code> lock (10 retries, exponential backoff) so
+concurrent agents serialize cleanly.</li>
+<li><strong>Link (fail-soft)</strong>: a <code>task_claimed</code> event with a <code>task_id</code> also links the
+task into Beads via <code>bd</code> (<code>beadsAdapter.claimWithEvent</code>); any Beads error is
+swallowed — the ledger write already succeeded.</li>
+</ul>
+<h3 id="the-nine-event-types">The nine event types</h3>
+<p>Each event carries a common envelope — <code>event_id</code> (ULID), <code>worktree_id</code>,
+<code>actor_label</code>, <code>branch</code>, <code>task_id</code> (string <em>or null</em>), <code>type</code>, <code>ts</code> (ISO-8601
+UTC) — plus a type-specific <code>payload</code>. The CLI verb is
+<code>scaffold observe event &#x3C;type> …</code>.</p>
+<div class="filter-table"><input type="text" class="filter-input" placeholder="Filter…" aria-label="Filter table rows" disabled>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>event_type</th><th>payload fields</th><th>key constraints</th></tr></thead><tbody><tr><td><code>task_claimed</code></td><td><code>task_title</code>*, <code>story_id</code>, <code>wave</code>, <code>unplanned</code></td><td>if <code>task_id</code> is null, <code>unplanned</code> must be true</td></tr><tr><td><code>task_completed</code></td><td><code>outcome</code>*, <code>pr_number</code>, <code>commit_sha</code></td><td>outcome ∈ {pr_submitted, dropped, superseded}; <code>pr_number</code> required if pr_submitted</td></tr><tr><td><code>decision_recorded</code></td><td><code>key</code><em>, <code>summary</code></em>, <code>affects</code>* (string[]), <code>links</code></td><td>summary ≤ 500 chars; consumed by Lens G</td></tr><tr><td><code>blocker_hit</code></td><td><code>kind</code><em>, <code>summary</code></em></td><td>kind ∈ {dependency, ambiguity, external, environment}; summary ≤ 500 chars</td></tr><tr><td><code>blocker_resolved</code></td><td><code>summary</code><em>, <code>references</code></em> (string[])</td><td>closes a prior blocker_hit</td></tr><tr><td><code>pr_opened</code></td><td><code>pr_number</code>*</td><td>positive integer</td></tr><tr><td><code>progress_heartbeat</code></td><td><code>note</code>*</td><td>note ≤ 200 chars; resets task_stale clock</td></tr><tr><td><code>finding_acknowledged</code></td><td><code>finding_id</code><em>, <code>status</code></em>, <code>note</code></td><td>task_id must be null; status ∈ {acknowledged, open}; written by <code>observe ack</code></td></tr><tr><td><code>knowledge_gap_signal</code></td><td><code>topic</code><em>, <code>source</code></em>, <code>project_id</code>*, <code>step_name</code>, <code>agent_excerpt</code></td><td>topic kebab-case ≤ 80 chars; consumed by Lens I</td></tr></tbody></table></div>
+<p><code>*</code> marks required fields. Allow-lists live in <code>EVENT_PAYLOAD_KEYS</code> at
+<span class="fp" data-path="src/observability/engine/event-schemas.ts:3-13">src/observability/engine/event-schemas.ts:3-13</span>.</p>
+<div class="callout callout-warning"><p><strong>Naming note.</strong> The PR-opened event is <code>pr_opened</code> (past tense) in code, not
+<code>pr_open</code> as the CLAUDE.md prose abbreviates it. The ledger never emits
+<code>pr_open</code>.</p></div>
+<h3 id="building-a-scaffold-observe-event-command">Building a <code>scaffold observe event</code> command</h3>
+<p><code>--branch</code> is required; <code>--task-id</code> is optional (it correlates the event to a
+claimed task) but must be <em>omitted</em> for <code>finding_acknowledged</code> (whose <code>task_id</code>
+must be null), and a <code>task_claimed</code> without one must pass <code>--unplanned true</code>.
+Payload keys are passed as <code>--kebab-case</code> flags, snake-cased before validation;
+unknown keys are dropped.</p>
+<pre><code class="language-bash">scaffold observe event task_claimed --branch &#x3C;branch> --task-id &#x3C;id> \
+  --task-title "&#x3C;title>" [--story-id &#x3C;id>] [--wave &#x3C;n>] [--unplanned true]
+scaffold observe event task_completed --branch &#x3C;branch> --task-id &#x3C;id> \
+  --outcome pr_submitted --pr-number &#x3C;n> [--commit-sha &#x3C;sha>]
+scaffold observe event decision_recorded --branch &#x3C;branch> --task-id &#x3C;id> \
+  --key &#x3C;key> --summary "&#x3C;text>" --affects "src/**,docs/**" [--links "ADR-1,ADR-2"]
+scaffold observe event blocker_hit --branch &#x3C;branch> --task-id &#x3C;id> \
+  --kind dependency --summary "&#x3C;text>"
+scaffold observe event blocker_resolved --branch &#x3C;branch> --task-id &#x3C;id> \
+  --summary "&#x3C;text>" --references "ref1,ref2"
+scaffold observe event pr_opened --branch &#x3C;branch> --task-id &#x3C;id> --pr-number &#x3C;n>
+scaffold observe event progress_heartbeat --branch &#x3C;branch> --task-id &#x3C;id> --note "&#x3C;text>"
+scaffold observe event finding_acknowledged --branch &#x3C;branch> \
+  --finding-id &#x3C;id> --status acknowledged [--note "&#x3C;text>"]
+scaffold observe event knowledge_gap_signal --branch &#x3C;branch> \
+  --topic &#x3C;kebab-slug> --source agent_search --project-id &#x3C;sha256> \
+  [--step-name &#x3C;name>] [--agent-excerpt "&#x3C;text>"]
+</code></pre>
+<p><code>finding_acknowledged</code> is normally written by <code>scaffold observe ack</code>, not by
+hand.</p>
+<div class="callout callout-note"><p><strong>Value coercion</strong> (<code>src/cli/commands/observe.ts</code>): <code>--pr-number</code> is parsed
+numeric (a non-number is dropped); <code>--unplanned</code> is boolean (<code>true</code> ⇒ true,
+anything else ⇒ false); <code>--affects</code>, <code>--links</code>, <code>--references</code> are comma-split
+into arrays; everything else stays a string. Exit codes: <code>0</code> written · <code>2</code>
+validation failed / payload > 4 KiB · <code>3</code> other error.</p></div>
+<h3 id="redaction-write-time-and-render-time">Redaction — write time and render time</h3>
+<p>Redaction runs twice. <strong>Write-time</strong> redaction (recursive over the payload tree)
+scrubs the event before it lands on disk; <strong>render-time</strong> redaction
+(<code>redactEngineOutput</code> / <code>redactRendered</code>) scrubs string values again before any
+report is shown, catching anything synthesized after the fact.</p>
+<p>Order matters: a bare <code>ghp_…</code> matches the GitHub-token pattern, but inside a
+<code>token=…</code> pair the key/value rule wins first — so <code>token=ghp_…</code> redacts to
+<code>[REDACTED:kv-secret]</code>, not <code>[REDACTED:github-token]</code> (leftmost-match
+alternation, <span class="fp" data-path="src/observability/engine/redact.ts:16">src/observability/engine/redact.ts:16</span>).</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>pattern</th><th>matches</th><th>replacement</th></tr></thead><tbody><tr><td>AWS key</td><td><code>AKIA[0-9A-Z]{16}</code></td><td><code>[REDACTED:aws-key]</code></td></tr><tr><td>GitHub token</td><td><code>gh[pousr]_[A-Za-z0-9]{36,}</code></td><td><code>[REDACTED:github-token]</code></td></tr><tr><td>key/value secret</td><td>key matches <code>secret|token|password|api[_-]?key</code></td><td><code>[REDACTED:kv-secret]</code> (key + separator preserved)</td></tr><tr><td>sensitive object key</td><td>object key matches the same pattern</td><td>all descendant primitive values masked</td></tr><tr><td>home path</td><td><code>/Users/&#x3C;name></code>, <code>/home/&#x3C;name></code>, <code>C:\Users\&#x3C;name></code></td><td><code>~</code> (Windows keeps the drive: <code>C:\~</code>)</td></tr></tbody></table>
+<p>A redacted <code>decision_recorded</code> event on disk (one line, shown pretty-printed):</p>
+<pre><code class="language-json">{
+  "event_id":    "01H5ZABCDEFGHJKMNPQRSTVWX",
+  "worktree_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "actor_label": "agent-alice",
+  "branch":      "alice-feat/cache",
+  "task_id":     "T-014",
+  "type":        "decision_recorded",
+  "ts":          "2026-05-04T12:00:00Z",
+  "payload": {
+    "key":     "cache-backend",
+    "summary": "Switched to Redis; token=[REDACTED:kv-secret]",
+    "affects": ["~/repo/src/cache/**"],
+    "links":   ["ADR-021"]
+  }
+}
+</code></pre>
+<h3 id="worktree-identity">Worktree identity</h3>
+<p>Each worktree gets a stable identity on first write — <code>.scaffold/identity.json</code>
+holds <code>worktree_id</code> (a UUID), <code>worktree_label</code> (derived from the directory name,
+or <code>primary</code>), and <code>created_at</code> (<code>src/observability/engine/identity.ts</code>). The id
+is what lets the harvester tell one worktree's events from another's, and what
+stamps every event's <code>worktree_id</code>.</p>
+<h2 id="adapters">Adapters</h2>
+<p>The ledger only holds what agents <em>chose</em> to record. Adapters fill in the rest by
+synthesizing events from the surrounding tools — commits, PRs, MMR jobs, pipeline
+state, test runs. There are eight adapters (<code>AdapterId</code> at
+<span class="fp" data-path="src/observability/engine/types.ts:69">src/observability/engine/types.ts:69</span>), but only five emit events into the
+timeline; the other three are availability probes / trend helpers.</p>
+<div class="callout callout-note"><p><strong>Five emit, three probe.</strong> <code>git</code>, <code>gh</code>, <code>mmr</code>, <code>state</code>, <code>tests</code> each implement
+<code>replayEvents()</code> and appear in the source-priority chain. <code>pipeline_docs</code>
+(probes 9 planning-doc roles; 5 of them are the canonical-required set that gates
+available vs degraded), <code>beads</code> (task-tracker linkage), and <code>audit_history</code>
+(reads <code>docs/audits/*.json</code> for trends + lens-skip streaks) do <em>not</em> emit replay
+events.</p></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>adapter</th><th>source of truth</th><th>emits</th><th>correlation_id / dedup</th></tr></thead><tbody><tr><td><code>git</code></td><td><code>git log</code>, <code>git worktree list</code> (30 s timeout)</td><td><code>commit</code></td><td>none (<code>null</code>); per-SHA seen-set within the window</td></tr><tr><td><code>gh</code></td><td><code>gh pr list --state {open,merged,closed}</code> (needs auth)</td><td><code>pr_opened</code>, <code>pr_merged</code>, <code>pr_closed</code></td><td><code>pr:&#x3C;n>:&#x3C;state></code> — dedups against the ledger's own PR events</td></tr><tr><td><code>mmr</code></td><td><code>.mmr/jobs/*/result.json</code> (replay keyed on each job's <code>completed_at</code>)</td><td><code>job_completed</code></td><td>none</td></tr><tr><td><code>state</code></td><td><code>.scaffold/state.json</code> + <code>services/*/state.json</code></td><td><code>step_completed</code>, <code>step_in_progress</code></td><td>none; per-step timestamp, mtime fallback</td></tr><tr><td><code>tests</code></td><td><code>.scaffold/last-test-run.json</code></td><td><code>test_run_completed</code>, <code>test_run_failed</code></td><td>none</td></tr><tr><td><code>pipeline_docs</code></td><td>candidate <code>docs/*.md</code> artifact paths</td><td>— (probe: available / degraded / unavailable)</td><td>n/a</td></tr><tr><td><code>beads</code></td><td><code>.beads/</code> + <code>bd</code> CLI (≥ v1.0.0)</td><td>— (task claim ↔ event-id linkage)</td><td>n/a</td></tr><tr><td><code>audit_history</code></td><td><code>docs/audits/*.json</code> (≤ 100 scanned)</td><td>— (trends + <code>lensSkippedStreaks</code>)</td><td>n/a</td></tr></tbody></table>
+<h3 id="source-priority">Source priority</h3>
+<p>When two events describe the same thing (same <code>correlation_id</code>), the synthesizer
+keeps the one from the most authoritative source. The order is fixed in
+<code>SOURCE_PRIORITY</code> at <span class="fp" data-path="src/observability/engine/synthesizer.ts:254">src/observability/engine/synthesizer.ts:254</span> — lower
+number wins, ties broken by earliest <code>ts</code>:</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>rank</th><th>source</th><th>why it wins</th></tr></thead><tbody><tr><td><code>0</code></td><td><code>ledger</code></td><td>the agent said so — first-party intent</td></tr><tr><td><code>1</code></td><td><code>mmr</code></td><td>authoritative build verdict</td></tr><tr><td><code>2</code></td><td><code>gh</code></td><td>GitHub PR state of record</td></tr><tr><td><code>3</code></td><td><code>git</code></td><td>local commit history</td></tr><tr><td><code>4</code></td><td><code>state</code></td><td>pipeline step status</td></tr><tr><td><code>5</code></td><td><code>tests</code></td><td>cached test run</td></tr></tbody></table>
+<p>The three probe-only adapters are intentionally absent from this table — they
+never produce a replay event to dedup.</p>
+<h2 id="the-nine-lens-audit">The nine-lens audit</h2>
+<p>The audit reads the planning docs (PRD, stories, tech-stack, standards, design
+system, plan, playbook) into a document graph, then runs a set of independent
+<em>lenses</em> over the graph, the code, the ledger and adapter data. The design spec
+calls it the "eight-lens audit" (A–H); a ninth lens — <code>I-knowledge-gaps</code> —
+joined the suite after v3.26.0.</p>
+<div class="callout callout-note"><p><strong>8 in the spec, 9 in the code.</strong>
+<code>docs/superpowers/specs/2026-04-30-build-observability-design.md</code> titles §3 "The
+Eight Audit Lenses" and its <code>LENS_REGISTRY</code> stops at H. The shipped
+<span class="fp" data-path="src/observability/engine/checks/registry.ts:44">src/observability/engine/checks/registry.ts:44</span> adds <code>I-knowledge-gaps</code>.
+Treat Lens I as the ninth lens that joined the suite — documented here as a
+first-class member.</p></div>
+<h3 id="scope-order-and-skips">Scope, order and skips</h3>
+<ul>
+<li><strong>Scope → lenses</strong> (<span class="fp" data-path="src/observability/engine/api.ts:72">src/observability/engine/api.ts:72</span>): <code>--scope code</code>
+runs <strong>A–G</strong>; <code>--scope docs</code> runs <strong>H, I</strong>; <code>--scope all</code> runs all nine. An
+explicit <code>--lens &#x3C;id></code> overrides the scope selection.</li>
+<li><strong>Registry order</strong>: A → B → C → D → E → F → G → H → I. <code>G-decisions</code> declares
+<code>depends_on: ['D-stack']</code> so it runs after D and can consume D's
+unsanctioned-dependency findings.</li>
+<li><strong>Missing adapter → skip</strong>: if a lens's <em>required</em> adapters are unavailable it
+is skipped and emits a <span class="sev sev-p3">P3</span> finding with
+<code>evidence.kind = lens_skipped</code>. Skipped lenses (not blocking findings) are what
+turn a <code>pass</code> into a <code>degraded-pass</code>.</li>
+</ul>
+<h3 id="what-feeds-the-doc-graph">What feeds the doc-graph</h3>
+<p>Before any lens runs, the planning docs and the working tree are parsed into a
+single graph (<code>src/observability/engine/doc-graph/index.ts</code>). Every lens's
+"Reads:" line refers to nodes and edges built here:</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>source</th><th>parser / detector</th><th>graph nodes &#x26; edges</th></tr></thead><tbody><tr><td>PRD</td><td><code>parseFeatures</code></td><td><code>features</code> (with priority)</td></tr><tr><td>user-stories</td><td><code>parseStories</code></td><td><code>stories</code>, <code>acceptance_criteria</code>, <code>feature_to_story</code></td></tr><tr><td>tech-stack</td><td><code>parseSanctionedComponents</code></td><td><code>components</code> (with <code>layer</code>)</td></tr><tr><td>coding-standards + tdd-standards</td><td><code>parseRules</code></td><td><code>rules</code></td></tr><tr><td>design-system</td><td><code>parseDesignTokens</code></td><td><code>tokens</code> (priority, category)</td></tr><tr><td>implementation-plan</td><td><code>parsePlanTasks</code></td><td><code>plan_tasks</code>, <code>story_to_plan_task</code></td></tr><tr><td>implementation-playbook</td><td><code>parsePlaybookTasks</code></td><td><code>playbook_tasks</code>, <code>playbook_task_to_story</code></td></tr><tr><td>decision docs (<code>decisions.jsonl</code>, <code>docs/decisions/*.md</code>)</td><td><code>parseDecisions</code></td><td><code>decisions</code></td></tr><tr><td>working tree</td><td><code>discoverTests</code>, <code>discoverFiles</code></td><td><code>tests</code> (with <code>last_status</code>), <code>files</code>, <code>ac_to_test</code></td></tr><tr><td>source files</td><td><code>detectCss/JsxTokenUses</code>, <code>detectComponentUses</code></td><td><code>file_to_token_use</code>, <code>file_to_component_use</code></td></tr></tbody></table>
+<h3 id="all-nine-at-a-glance">All nine at a glance</h3>
+<div class="filter-table"><input type="text" class="filter-input" placeholder="Filter…" aria-label="Filter table rows" disabled>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>lens</th><th>question</th><th>scope</th><th>severities</th><th>ships in</th></tr></thead><tbody><tr><td><code>A-tdd</code></td><td>Are tests being skipped?</td><td>code</td><td>P0 P1</td><td>#331</td></tr><tr><td><code>B-ac-coverage</code></td><td>Is every AC covered by a passing test?</td><td>code</td><td>P0 P1</td><td>#331</td></tr><tr><td><code>C-standards</code></td><td>Are coding standards being violated?</td><td>code</td><td>P0–P3</td><td>#332</td></tr><tr><td><code>D-stack</code></td><td>Unsanctioned deps / out-of-layer use?</td><td>code</td><td>P0 P1</td><td>#332</td></tr><tr><td><code>E-design</code></td><td>Ad-hoc values bypassing design tokens?</td><td>code</td><td>P0 P1</td><td>#332</td></tr><tr><td><code>F-scope</code></td><td>High-priority work without a story/plan?</td><td>code</td><td>P0 P1 P2</td><td>#332</td></tr><tr><td><code>G-decisions</code></td><td>Decisions made but not documented?</td><td>code</td><td>P0 P1 P2</td><td>#332</td></tr><tr><td><code>H-cross-doc</code></td><td>Are the docs internally consistent?</td><td>docs</td><td>P0 P1 P2</td><td>#331 · #336</td></tr><tr><td><code>I-knowledge-gaps</code></td><td>Repeated needs with no KB entry?</td><td>docs</td><td>P1 P2</td><td>#397 · #406</td></tr></tbody></table></div>
+<h3 id="lens-by-lens">Lens by lens</h3>
+<p><strong>A-tdd — TDD violations</strong> (<code>src/observability/checks/lens-a-tdd.ts</code>). <em>Are there
+skipped tests?</em> <strong>Reads:</strong> the doc-graph's discovered tests (with <code>last_status</code>),
+ACs, stories, and <code>ac_to_test</code> edges. <strong>Tunes:</strong> none. <strong>Severity:</strong>
+<span class="sev sev-p0">P0</span> skipped test on a must-priority story; <span class="sev sev-p1">P1</span>
+otherwise.</p>
+<p><strong>B-ac-coverage — AC completion</strong>
+(<code>src/observability/checks/lens-b-ac-coverage.ts</code>). <em>Is every acceptance
+criterion covered by a passing test?</em> <strong>Reads:</strong> ACs, tests, <code>ac_to_test</code> edges;
+optional <code>tests</code> adapter for live status. <strong>Tunes:</strong> none. <strong>Severity:</strong>
+<span class="sev sev-p0">P0</span> AC's test is failing; <span class="sev sev-p1">P1</span> AC has no test edge
+or unknown status.</p>
+<p><strong>C-standards — coding-standards drift</strong>
+(<code>src/observability/checks/lens-c-standards.ts</code>). <em>Are coding standards being
+violated across files?</em> <strong>Reads:</strong> graph <code>rules</code> + <code>files</code>. <strong>Tunes:</strong>
+<code>lenses.C-standards.rule_overrides</code> (per-rule severity), <code>escalation_threshold</code>
+(default 5 — more than N violations of a rule escalates to P1).
+(<code>enforce_via_linter</code> is accepted in config but not read by the lens.)
+<strong>Severity:</strong> rule-specific <span class="sev sev-p0">P0</span>–<span class="sev sev-p3">P3</span>.</p>
+<p><strong>D-stack — tech-stack drift</strong>
+(<code>src/observability/checks/lens-d-stack.ts</code>). <em>Unsanctioned dependencies, or
+components used outside their layer?</em> <strong>Reads:</strong> <code>file_to_component_use</code> edges,
+components (with <code>layer</code>), and <code>decision_recorded</code> ledger events (which can
+sanction a dependency). <strong>Tunes:</strong> <code>lenses.D-stack.path_to_layer</code> (default 7
+glob→layer mappings). <strong>Severity:</strong> <span class="sev sev-p0">P0</span> unsanctioned dependency;
+<span class="sev sev-p1">P1</span> out-of-layer use.</p>
+<p><strong>E-design — design-system drift</strong>
+(<code>src/observability/checks/lens-e-design.ts</code>). <em>Are ad-hoc design values
+bypassing tokens?</em> <strong>Reads:</strong> <code>file_to_token_use</code> edges, tokens (with priority +
+category). <strong>Tunes:</strong> <code>lenses.E-design.ad_hoc_token_threshold</code> (default 3),
+<code>ui_glob</code> (default <code>src/components/**/*.tsx</code>, consumed by the doc-graph builder).
+<strong>Severity:</strong> <span class="sev sev-p1">P1</span> ad-hoc count over threshold; <span class="sev sev-p0">P0</span>
+must-priority token category bypassed.</p>
+<p><strong>F-scope — missing scope</strong> (<code>src/observability/checks/lens-f-scope.ts</code>). <em>Is
+high-priority work missing stories/plans, or are planned stories untouched?</em>
+<strong>Reads:</strong> features, stories, plan-tasks and their edges; <code>task_claimed</code> ledger
+events; optional <code>state</code> adapter. <strong>Tunes:</strong>
+<code>lenses.F-scope.untouched_story_grace_hours</code> (default 168 = 7 days). <strong>Severity:</strong>
+<span class="sev sev-p0">P0</span> must-feature without story/plan; <span class="sev sev-p1">P1</span>
+should-feature; <span class="sev sev-p2">P2</span> planned-but-untouched story past grace.</p>
+<p><strong>G-decisions — undocumented decisions</strong>
+(<code>src/observability/checks/lens-g-decisions.ts</code>). <em>Decisions made in the
+ledger/commits but not documented (or vice versa)?</em> <strong>Reads:</strong> graph decisions,
+<code>decision_recorded</code> events, recent git commits (keyword scan), and D-stack's
+findings. <strong>Tunes:</strong> none effective (see note). <strong>Severity:</strong> <span class="sev sev-p0">P0</span>
+unsanctioned dep from D with no decision; <span class="sev sev-p1">P1</span> ledger↔doc mismatch;
+<span class="sev sev-p2">P2</span> decision-keyword commit with no event/doc.</p>
+<div class="callout callout-warning"><p><strong>Inert override.</strong> The spec advertises a <code>lenses.G-decisions.keywords_file</code>
+override and ships <code>src/observability/checks/data/decision-keywords.txt</code>, but
+<code>loadKeywords()</code> hard-codes its keyword list and never reads the config key or
+the file. The override and the bundled file are currently inert.</p></div>
+<p><strong>H-cross-doc — cross-doc inconsistency</strong>
+(<code>src/observability/checks/lens-h-cross-doc.ts</code>). <em>Are features, stories, plans,
+playbook and decisions internally consistent?</em> <strong>Reads:</strong> the full structural
+doc-graph + unresolved globs. <strong>Severity:</strong> <span class="sev sev-p0">P0</span> decision supersedes
+a non-existent decision, or a <em>must</em>-priority story uncovered by plan/playbook;
+<span class="sev sev-p1">P1</span> feature with no story / orphan story / <em>should</em>-priority
+uncovered story; <span class="sev sev-p2">P2</span> plan task not in playbook, unresolved glob.</p>
+<p>Under <code>--profile=full</code> only, Lens H runs three extra checks via an LLM dispatcher
+(all silently return <code>[]</code> if the dispatcher fails, so the audit never breaks):</p>
+<ul>
+<li><strong>tech-stack ↔ PRD</strong> — contradictions (<span class="sev sev-p0">P0</span>) or tensions
+(<span class="sev sev-p2">P2</span>) between PRD prose and the chosen stack.</li>
+<li><strong>PRD → stories coverage</strong> — a prose feature with no covering story
+(<span class="sev sev-p1">P1</span>).</li>
+<li><strong>terminology drift</strong> — one concept named inconsistently across docs
+(<span class="sev sev-p2">P2</span>).</li>
+</ul>
+<div class="callout callout-danger"><p><strong>Security — the LLM dispatcher command is hard-coded.</strong> Lens H passes the
+literal <code>claude -p</code> (<span class="fp" data-path="src/observability/checks/lens-h-cross-doc.ts:164">src/observability/checks/lens-h-cross-doc.ts:164</span>) into
+the shared dispatcher (<code>src/observability/engine/llm-dispatcher.ts</code>, which runs
+it through a fixed subprocess). The command is <em>deliberately not</em>
+project-config-overridable, because the audit may run against untrusted
+third-party repos and a repo-controlled command would be arbitrary code
+execution. Only <code>llm.timeout_s</code> (and <code>llm.parallel_checks</code>) are configurable.
+Contrast the <code>--fix</code> dispatcher, which <em>is</em> configurable — see
+<a href="#the---fix-flow">The --fix flow</a>.</p></div>
+<p><strong>I-knowledge-gaps — the ninth lens</strong>
+(<code>src/observability/checks/lens-i-knowledge-gaps.ts</code>). <em>What topics have agents
+repeatedly needed (over a 90-day window) with no knowledge-base entry?</em> <strong>Reads:</strong>
+<code>knowledge_gap_signal</code> ledger events + synthetic signals scanned from
+<code>tasks/lessons.md</code> (<code>src/observability/checks/lens-i-lessons-scanner.ts</code>).
+<strong>Severity:</strong> <span class="sev sev-p1">P1</span> ≥5 signals from ≥3 projects; <span class="sev sev-p2">P2</span>
+≥3 signals from ≥2 projects.</p>
+<div class="callout callout-note"><p><strong>Lens I — <code>--knowledge-root</code> and existing-entry suppression.</strong> The lens resolves
+the knowledge directory in three tiers (<code>src/observability/knowledge-index.ts</code>):
+the <code>--knowledge-root</code> CLI flag → <code>lenses.I-knowledge-gaps.knowledge_root</code> in
+config → auto-detect by walking up for <code>content/knowledge/</code>. If a gap's topic
+slug already exists in the resolved knowledge index, the finding is
+<strong>suppressed</strong> (no P1/P2). If no root resolves, suppression is disabled and the
+lens warns once per audit. Shipped in #397 (lens + lessons scanner) and #406
+(<code>--knowledge-root</code> + suppression).</p></div>
+<h2 id="the-observe-audit-cli">The <code>observe audit</code> CLI</h2>
+<p>One command runs the lenses and reports findings. Its exit code is the verdict
+gate: <code>0</code> on a non-blocked verdict (or any <code>mmr-findings</code> run), <code>1</code> when blocked
+or when a <code>--fix</code> pass still failed, <code>3</code> on an audit error.</p>
+<h3 id="every-flag">Every flag</h3>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>flag</th><th>values / default</th><th>effect</th></tr></thead><tbody><tr><td><code>--scope</code></td><td><code>code</code> · <code>docs</code> · <code>all</code> (default <code>all</code>)</td><td>which lens set runs</td></tr><tr><td><code>--lens &#x3C;id></code></td><td>repeatable</td><td>run exactly these lenses, overriding scope</td></tr><tr><td><code>--profile</code></td><td><code>fast</code> (default) · <code>full</code></td><td><code>full</code> enables Lens H's LLM-graded sub-checks</td></tr><tr><td><code>--fix</code></td><td>flag</td><td>after auditing, dispatch the fix loop for blocking findings</td></tr><tr><td><code>--fix-threshold</code></td><td><code>P0</code>–<code>P3</code></td><td>override the blocking cutoff for this run</td></tr><tr><td><code>--output=&#x3C;path></code></td><td>path</td><td>override markdown destination (sidecar unaffected)</td></tr><tr><td><code>--render</code></td><td><code>dashboard-fragment-audit</code></td><td>emit HTML to stdout; skip markdown + sidecar</td></tr><tr><td><code>--output-mode</code></td><td><code>mmr-findings</code></td><td>emit MMR Finding JSON to stdout (always exit 0); skip markdown + sidecar</td></tr><tr><td><code>--knowledge-root=&#x3C;path></code></td><td>path</td><td>tier-1 knowledge dir for Lens I suppression</td></tr><tr><td><code>--json</code> · <code>--mask-paths</code> · <code>--show-acknowledged</code> · <code>--since-hours</code></td><td>flags / N</td><td>raw JSON output · redact paths · include acked findings · activity window</td></tr></tbody></table>
+<pre><code class="language-bash"># A docs-only full audit including LLM-graded checks
+scaffold observe audit --scope docs --profile full
+
+# Audit, then dispatch a fix agent for each blocking finding
+scaffold observe audit --fix --fix-threshold P1
+
+# Lens I only, with an explicit knowledge root for suppression
+scaffold observe audit --lens I-knowledge-gaps --knowledge-root content/knowledge
+</code></pre>
+<h3 id="verdict-taxonomy">Verdict taxonomy</h3>
+<p>The engine computes exactly three verdicts (<code>Verdict</code> at
+<span class="fp" data-path="src/observability/engine/types.ts:6">src/observability/engine/types.ts:6</span>):</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>verdict</th><th>when</th><th>exit</th></tr></thead><tbody><tr><td><span class="sev sev-pass">pass</span></td><td>no blocking findings, no skipped lenses</td><td><code>0</code></td></tr><tr><td><span class="sev sev-p2">degraded-pass</span></td><td>no blocking findings, but ≥1 lens skipped (missing required adapter)</td><td><code>0</code></td></tr><tr><td><span class="sev sev-p0">blocked</span></td><td>≥1 <em>open</em> finding at or above <code>fix_threshold</code></td><td><code>1</code></td></tr></tbody></table>
+<div class="callout callout-note"><p><strong>"needs-user-decision" is not an engine verdict.</strong> The code-review workflow has
+a <code>needs-user-decision</code> outcome, but that is an <em>MMR review</em> verdict, not one the
+audit engine emits. The audit engine's universe is exactly the three above.</p></div>
+<h4><code>fix_threshold</code></h4>
+<p>A finding is <em>blocking</em> when its status is <code>open</code> and its severity is at or above
+the threshold (<code>src/observability/engine/checks/fix-threshold.ts</code>). Resolution
+order: <code>--fix-threshold</code> flag → <code>.mmr.yaml</code>
+(<code>audit_fix_threshold</code> / <code>fix_threshold</code>) → default <strong>P2</strong>. The threshold never
+<em>hides</em> findings — every finding is still reported; it only decides which ones
+count toward <code>blocked</code>.</p>
+<div class="callout callout-note"><p><strong>How the counts are computed</strong>
+(<code>src/observability/engine/checks/findings-aggregator.ts</code>): <code>blocking</code> counts a
+finding only when <code>status === 'open'</code> <em>and</em> its severity is at or above
+<code>fix_threshold</code>; <code>acknowledged</code> counts only findings silenced by a
+<code>finding_acknowledged</code> ledger event (latest event per id wins); <code>skipped</code>
+findings (missing-adapter lenses) ignore acks entirely. The renderers'
+<code>(blocking · ack · total)</code> line is this tally.</p></div>
+<h3 id="companion-verb-scaffold-observe-ack">Companion verb — <code>scaffold observe ack</code></h3>
+<p>Acknowledge (or reopen) a finding by ID prefix; it writes a
+<code>finding_acknowledged</code> event the aggregator reads on the next audit.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>arg / flag</th><th>effect</th></tr></thead><tbody><tr><td><code>&#x3C;prefix-or-id></code></td><td>matched against all finding IDs in <code>docs/audits/*.json</code>; an ambiguous prefix exits <code>2</code></td></tr><tr><td><code>--status acknowledged｜open</code></td><td><code>acknowledged</code> (default) silences it; <code>open</code> reopens it</td></tr><tr><td><code>--note "…"</code></td><td>optional rationale recorded on the event</td></tr></tbody></table>
+<p>Branch is auto-derived (<code>git rev-parse --abbrev-ref HEAD</code>, fallback <code>main</code>); the
+event's <code>task_id</code> is null.</p>
+<h3 id="exit-codes-across-observe-verbs">Exit codes across <code>observe</code> verbs</h3>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>verb</th><th>0</th><th>1</th><th>2</th><th>3</th></tr></thead><tbody><tr><td><code>audit</code></td><td>not blocked, or any <code>mmr-findings</code> run</td><td>blocked, or <code>--fix</code> left a blocker</td><td>—</td><td>audit error (130 on SIGINT mid-<code>--fix</code>, snapshot restored)</td></tr><tr><td><code>event</code></td><td>written</td><td>—</td><td>validation failed / payload > 4 KiB</td><td>other error</td></tr><tr><td><code>ack</code></td><td>written</td><td>—</td><td>no match / ambiguous prefix</td><td>no audit sidecars / write error</td></tr><tr><td><code>progress</code></td><td>ok</td><td>—</td><td>—</td><td>markdown/sidecar write error (with <code>--output</code>)</td></tr><tr><td><code>harvest</code></td><td>harvested / recovered</td><td>—</td><td>—</td><td>no <code>identity.json</code>, or primary root is itself a worktree</td></tr></tbody></table>
+<h2 id="progress-replay-stall">Progress, replay &#x26; stall</h2>
+<p><code>scaffold observe progress</code> shows what's in flight. With <code>--replay</code> it fuses the
+ledger with synthesized git/gh/mmr/state/tests events into one timeline; when
+<code>scaffold observe progress</code> runs it also evaluates stall detection and surfaces a
+"Needs Attention" panel (suppress with <code>--no-stall-check</code>).</p>
+<h3 id="fusion-how-the-timeline-is-built">Fusion — how the timeline is built</h3>
+<p>The synthesizer's <code>composeReplay</code>
+(<span class="fp" data-path="src/observability/engine/synthesizer.ts:294">src/observability/engine/synthesizer.ts:294</span>) converts each ledger <code>Event</code>
+to a <code>ReplayEvent</code>, concatenates the adapter events, filters to the time window,
+then dedups:</p>
+<ul>
+<li>Events with a <code>null</code> <code>correlation_id</code> pass through untouched.</li>
+<li>Events that share a <code>correlation_id</code> collapse to one — the synthesizer keeps
+the lowest <code>SOURCE_PRIORITY</code> number (<code>ledger</code> 0 → <code>tests</code> 5), breaking ties by
+earliest <code>ts</code>.</li>
+<li>The surviving events sort by <code>(ts, source-priority, sort_id)</code>.</li>
+</ul>
+<p>So a PR that the agent recorded (<code>pr_opened</code> in the ledger) and that the <code>gh</code>
+adapter also reports collapses to the single ledger event, because <code>ledger</code> (0)
+outranks <code>gh</code> (2).</p>
+<h3 id="stall-detection-the-six-signals">Stall detection — the six signals</h3>
+<p>When <code>scaffold observe progress</code> runs (unless <code>--no-stall-check</code>) the engine
+checks for staleness and builds <code>needs_attention</code>
+(<code>src/observability/engine/stall.ts</code>). The type declares six
+signals; <strong>five fire today</strong> — <code>pr_review_stale</code> is reserved (deferred pending a
+per-PR correlation_id on the mmr adapter,
+<span class="fp" data-path="src/observability/engine/stall.ts:119">src/observability/engine/stall.ts:119</span>). Thresholds accept <code>'Nh'</code>, <code>'Nd'</code>,
+or <code>'off'</code> under <code>stall.*</code>:</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>signal</th><th>fires when</th><th>config key · default</th></tr></thead><tbody><tr><td><code>task_stale</code></td><td>task claimed, no commit/heartbeat/completion since</td><td><code>stall.task_stale</code> · <code>4h</code></td></tr><tr><td><code>pr_stale</code></td><td>ledger <code>pr_opened</code> recorded, PR not merged/closed since</td><td><code>stall.pr_stale</code> · <code>48h</code></td></tr><tr><td><code>blocker_unaddressed</code></td><td><code>blocker_hit</code> with no <code>blocker_resolved</code></td><td><code>stall.blocker_unaddressed</code> · <code>2h</code></td></tr><tr><td><code>audit_findings_unresolved</code></td><td>open finding past threshold age, severity at or above <code>fix_threshold</code></td><td><code>stall.audit_findings_unresolved</code> · <code>24h</code></td></tr><tr><td><code>lens_skipped_repeatedly</code></td><td>a lens skipped on ≥3 consecutive audits</td><td>hard-coded streak ≥ 3 (no config key)</td></tr><tr><td><code>pr_review_stale</code> (reserved)</td><td>— not yet emitted —</td><td><code>stall.pr_review_stale</code> · <code>24h</code> (defined, unused)</td></tr></tbody></table>
+<h3 id="flags">Flags</h3>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>flag</th><th>effect</th></tr></thead><tbody><tr><td><code>--replay</code></td><td>include the fused timeline in the output</td></tr><tr><td><code>--no-stall-check</code></td><td>suppress the "Needs Attention" surface (empty <code>needs_attention</code>)</td></tr><tr><td><code>--render=dashboard-fragment</code></td><td>emit the progress HTML panel to stdout; skip markdown + sidecar</td></tr><tr><td><code>--output=&#x3C;path></code> · <code>--json</code> · <code>--since-hours N</code></td><td>override markdown path · raw JSON · activity window (default 24)</td></tr></tbody></table>
+<p>Stall thresholds are configurable under <code>stall:</code> in
+<code>.scaffold/observability.yaml</code> — see <a href="#config-reference">Config reference</a>.</p>
+<h2 id="phase-boundary-triggers">Phase-boundary triggers</h2>
+<p>Completing a planning document should re-check the docs for drift —
+automatically, but never blocking the build. When a pipeline step at a phase
+boundary is marked complete, the state manager fires a docs audit and prints a
+one-line summary.</p>
+<h3 id="the-hook">The hook</h3>
+<p><code>StateManager.markCompleted()</code> is <strong>async</strong>
+(<span class="fp" data-path="src/state/state-manager.ts:175">src/state/state-manager.ts:175</span>): it saves state, then awaits
+<code>runPhaseAudit({ primaryRoot, step })</code> for <em>every</em> completed step — the
+phase-boundary gate lives inside <code>runPhaseAudit</code>, which returns a no-op result
+unless the step is one of the six boundaries
+(<code>src/observability/engine/phase-subsets.ts</code>): <code>user-stories</code>, <code>tech-stack</code>,
+<code>coding-standards</code>, <code>design-system</code>, <code>implementation-plan</code>,
+<code>implementation-playbook</code>.</p>
+<figure class="mermaid"><svg id="my-svg" width="100%" xmlns="http://www.w3.org/2000/svg" class="flowchart" style="max-width: 1273.34px; background-color: transparent;" viewBox="0 0 1273.34375 190.39999389648438" role="graphics-document document">#my-svg{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;fill:#000000;}@keyframes edge-animation-frame{from{stroke-dashoffset:0;}}@keyframes dash{to{stroke-dashoffset:0;}}#my-svg .edge-animation-slow{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 50s linear infinite;stroke-linecap:round;}#my-svg .edge-animation-fast{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 20s linear infinite;stroke-linecap:round;}#my-svg .error-icon{fill:#552222;}#my-svg .error-text{fill:#552222;stroke:#552222;}#my-svg .edge-thickness-normal{stroke-width:1px;}#my-svg .edge-thickness-thick{stroke-width:3.5px;}#my-svg .edge-pattern-solid{stroke-dasharray:0;}#my-svg .edge-thickness-invisible{stroke-width:0;fill:none;}#my-svg .edge-pattern-dashed{stroke-dasharray:3;}#my-svg .edge-pattern-dotted{stroke-dasharray:2;}#my-svg .marker{fill:#666;stroke:#666;}#my-svg .marker.cross{stroke:#666;}#my-svg svg{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;}#my-svg p{margin:0;}#my-svg .label{font-family:"trebuchet ms",verdana,arial,sans-serif;color:#000000;}#my-svg .cluster-label text{fill:#333;}#my-svg .cluster-label span{color:#333;}#my-svg .cluster-label span p{background-color:transparent;}#my-svg .label text,#my-svg span{fill:#000000;color:#000000;}#my-svg .node rect,#my-svg .node circle,#my-svg .node ellipse,#my-svg .node polygon,#my-svg .node path{fill:#eee;stroke:#999;stroke-width:1px;}#my-svg .rough-node .label text,#my-svg .node .label text,#my-svg .image-shape .label,#my-svg .icon-shape .label{text-anchor:middle;}#my-svg .node .katex path{fill:#000;stroke:#000;stroke-width:1px;}#my-svg .rough-node .label,#my-svg .node .label,#my-svg .image-shape .label,#my-svg .icon-shape .label{text-align:center;}#my-svg .node.clickable{cursor:pointer;}#my-svg .root .anchor path{fill:#666!important;stroke-width:0;stroke:#666;}#my-svg .arrowheadPath{fill:#333333;}#my-svg .edgePath .path{stroke:#666;stroke-width:1px;}#my-svg .flowchart-link{stroke:#666;fill:none;}#my-svg .edgeLabel{background-color:white;text-align:center;}#my-svg .edgeLabel p{background-color:white;}#my-svg .edgeLabel rect{opacity:0.5;background-color:white;fill:white;}#my-svg .labelBkg{background-color:rgba(255, 255, 255, 0.5);}#my-svg .cluster rect{fill:hsl(0, 0%, 98.9215686275%);stroke:#707070;stroke-width:1px;}#my-svg .cluster text{fill:#333;}#my-svg .cluster span{color:#333;}#my-svg div.mermaidTooltip{position:absolute;text-align:center;max-width:200px;padding:2px;font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:12px;background:hsl(-160, 0%, 93.3333333333%);border:1px solid #707070;border-radius:2px;pointer-events:none;z-index:100;}#my-svg .flowchartTitleText{text-anchor:middle;font-size:18px;fill:#000000;}#my-svg rect.text{fill:none;stroke-width:0;}#my-svg .icon-shape,#my-svg .image-shape{background-color:white;text-align:center;}#my-svg .icon-shape p,#my-svg .image-shape p{background-color:white;padding:2px;}#my-svg .icon-shape .label rect,#my-svg .image-shape .label rect{opacity:0.5;background-color:white;fill:white;}#my-svg .label-icon{display:inline-block;height:1em;overflow:visible;vertical-align:-0.125em;}#my-svg .node .label-icon path{fill:currentColor;stroke:revert;stroke-width:revert;}#my-svg .node .neo-node{stroke:#999;}#my-svg [data-look="neo"].node rect,#my-svg [data-look="neo"].cluster rect,#my-svg [data-look="neo"].node polygon{stroke:url(#my-svg-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#my-svg [data-look="neo"].node path{stroke:url(#my-svg-gradient);stroke-width:1px;}#my-svg [data-look="neo"].node .outer-path{filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#my-svg [data-look="neo"].node .neo-line path{stroke:#999;filter:none;}#my-svg [data-look="neo"].node circle{stroke:url(#my-svg-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#my-svg [data-look="neo"].node circle .state-start{fill:#000000;}#my-svg [data-look="neo"].icon-shape .icon{fill:url(#my-svg-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#my-svg [data-look="neo"].icon-shape .icon-neo path{stroke:url(#my-svg-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#my-svg :root{--mermaid-font-family:"trebuchet ms",verdana,arial,sans-serif;}<g><marker id="my-svg_flowchart-v2-pointEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"></path></marker><marker id="my-svg_flowchart-v2-pointStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="4.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 5 L 10 10 L 10 0 z" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"></path></marker><marker id="my-svg_flowchart-v2-pointEnd-margin" class="marker flowchart-v2" viewBox="0 0 11.5 14" refX="11.5" refY="7" markerUnits="userSpaceOnUse" markerWidth="10.5" markerHeight="14" orient="auto"><path d="M 0 0 L 11.5 7 L 0 14 z" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"></path></marker><marker id="my-svg_flowchart-v2-pointStart-margin" class="marker flowchart-v2" viewBox="0 0 11.5 14" refX="1" refY="7" markerUnits="userSpaceOnUse" markerWidth="11.5" markerHeight="14" orient="auto"><polygon points="0,7 11.5,14 11.5,0" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"></polygon></marker><marker id="my-svg_flowchart-v2-circleEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"></circle></marker><marker id="my-svg_flowchart-v2-circleStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="-1" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"></circle></marker><marker id="my-svg_flowchart-v2-circleEnd-margin" class="marker flowchart-v2" viewBox="0 0 10 10" refY="5" refX="12.25" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"></circle></marker><marker id="my-svg_flowchart-v2-circleStart-margin" class="marker flowchart-v2" viewBox="0 0 10 10" refX="-2" refY="5" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"></circle></marker><marker id="my-svg_flowchart-v2-crossEnd" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="12" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" style="stroke-width: 2; stroke-dasharray: 1, 0;"></path></marker><marker id="my-svg_flowchart-v2-crossStart" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="-1" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" style="stroke-width: 2; stroke-dasharray: 1, 0;"></path></marker><marker id="my-svg_flowchart-v2-crossEnd-margin" class="marker cross flowchart-v2" viewBox="0 0 15 15" refX="17.7" refY="7.5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto"><path d="M 1,1 L 14,14 M 1,14 L 14,1" class="arrowMarkerPath" style="stroke-width: 2.5;"></path></marker><marker id="my-svg_flowchart-v2-crossStart-margin" class="marker cross flowchart-v2" viewBox="0 0 15 15" refX="-3.5" refY="7.5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto"><path d="M 1,1 L 14,14 M 1,14 L 14,1" class="arrowMarkerPath" style="stroke-width: 2.5; stroke-dasharray: 1, 0;"></path></marker><g class="root"><g class="clusters"></g><g class="edgePaths"><path d="M196.906,104L201.073,104C205.24,104,213.573,104,221.24,104C228.906,104,235.906,104,239.406,104L242.906,104" id="my-svg-L_CLI_MC_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M476.688,78.291L497.685,73.593C518.682,68.894,560.677,59.497,602.005,54.799C643.333,50.1,683.995,50.1,704.326,50.1L724.656,50.1" id="my-svg-L_MC_RPA_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M962.078,50.1L966.245,50.1C970.411,50.1,978.745,50.1,986.411,50.1C994.078,50.1,1001.078,50.1,1004.578,50.1L1008.078,50.1" id="my-svg-L_RPA_OUT_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M476.688,129.709L497.685,134.407C518.682,139.106,560.677,148.503,610.118,153.201C659.56,157.9,716.448,157.9,744.892,157.9L773.336,157.9" id="my-svg-L_MC_NG_0" class="edge-thickness-normal edge-pattern-dotted edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path></g><g class="edgeLabels"><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel" transform="translate(602.671875, 157.89999771118164)"><g class="label" transform="translate(0, -19.299999237060547)"><g><rect class="background" style="" x="-100.984375" y="-1" width="201.96875" height="40.599998474121094"></rect><text y="-10.1" text-anchor="middle" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"><tspan class="text-inner-tspan">state</tspan><tspan class="text-inner-tspan"> already</tspan><tspan class="text-inner-tspan"> saved</tspan><tspan class="text-inner-tspan"> —</tspan><tspan class="text-inner-tspan"> audit</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em" text-anchor="middle"><tspan class="text-inner-tspan">error</tspan><tspan class="text-inner-tspan"> never</tspan><tspan class="text-inner-tspan"> rolls</tspan><tspan class="text-inner-tspan"> it</tspan><tspan class="text-inner-tspan"> back</tspan></tspan></text></g></g></g></g><g class="nodes"><g class="node default" id="my-svg-flowchart-CLI-0" transform="translate(102.453125, 103.99999809265137)"><rect class="basic label-container" style="" x="-94.453125" y="-24.5" width="188.90625" height="49"></rect><g class="label" style="" transform="translate(0, -9.5)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">scaffold</tspan><tspan class="text-inner-tspan"> complete</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-MC-1" transform="translate(361.796875, 103.99999809265137)"><rect class="basic label-container" style="" x="-114.890625" y="-42.099998474121094" width="229.78125" height="84.19999694824219"></rect><g class="label" style="" transform="translate(0, -27.099998474121094)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">markCompleted</tspan><tspan class="text-inner-tspan"> (async)</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">saveState</tspan><tspan class="text-inner-tspan"> →</tspan><tspan class="text-inner-tspan"> set</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="2.1em"><tspan class="text-inner-tspan">completed_at</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-RPA-3" transform="translate(845.3671875, 50.099998474121094)"><rect class="basic label-container" style="" x="-116.7109375" y="-33.29999923706055" width="233.421875" height="66.5999984741211"></rect><g class="label" style="" transform="translate(0, -18.299999237060547)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">runPhaseAudit</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">H-cross-doc</tspan><tspan class="text-inner-tspan"> ·</tspan><tspan class="text-inner-tspan"> docs</tspan><tspan class="text-inner-tspan"> ·</tspan><tspan class="text-inner-tspan"> fast</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-OUT-5" transform="translate(1138.7109375, 50.099998474121094)"><rect class="basic label-container" style="" x="-126.6328125" y="-42.099998474121094" width="253.265625" height="84.19999694824219"></rect><g class="label" style="" transform="translate(0, -27.099998474121094)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">docs/audits/id.md</tspan><tspan class="text-inner-tspan"> +</tspan><tspan class="text-inner-tspan"> .json</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">PhaseAuditResult</tspan><tspan class="text-inner-tspan"> →</tspan><tspan class="text-inner-tspan"> stdout</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="2.1em"><tspan class="text-inner-tspan">line</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-NG-7" transform="translate(845.3671875, 157.89999771118164)"><rect class="basic label-container" style="" x="-68.03125" y="-24.5" width="136.0625" height="49"></rect><g class="label" style="" transform="translate(0, -9.5)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">non-gating</tspan></tspan></text></g></g></g></g></g></g><defs></defs><defs></defs></svg></figure>
+<p>The audit is fixed to <code>H-cross-doc</code>, <code>scope=docs</code>, <code>profile=fast</code>
+(<code>src/observability/engine/phase-audit.ts</code>). It is <strong>non-gating</strong>:
+<code>markCompleted</code> catches any audit error and returns a result object, so a state
+transition never fails because of the audit.</p>
+<p>The stdout line:</p>
+<pre><code class="language-text"># normal
+[audit] 3 findings (1 blocking, verdict=blocked) — see docs/audits/audit-…-fast-lens-H-cross-doc-….md
+# detached (fire-and-forget)
+[audit] dispatched in background (step: tech-stack)
+# timed out
+[audit] timed out after 60500ms — partial findings may not be written
+</code></pre>
+<h3 id="config-timestamps">Config &#x26; timestamps</h3>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>key</th><th>default</th><th>effect</th></tr></thead><tbody><tr><td><code>phase_audit.enabled</code></td><td><code>true</code></td><td>master switch</td></tr><tr><td><code>phase_audit.timeout_s</code></td><td><code>60</code></td><td>race budget; over → <code>timed_out</code></td></tr><tr><td><code>phase_audit.detached</code></td><td><code>false</code></td><td>fire-and-forget when true</td></tr></tbody></table>
+<p>Step state (<code>src/types/state.ts</code>) now carries <code>completed_at</code> (set once, on first
+completion) and <code>in_progress_started_at</code> (set on first entry to in-progress). The
+<code>state</code> adapter's <code>replayEvents</code> prefers these per-step timestamps and only falls
+back to the file's mtime when they're absent — so the timeline reflects when each
+step actually transitioned, not when the file was last written.</p>
+<h2 id="mmr-doc-conformance-channel">MMR <code>doc-conformance</code> channel</h2>
+<p>The audit plugs into multi-model review as a built-in channel.
+<code>scaffold observe audit --output-mode=mmr-findings</code> emits findings in MMR's
+<code>Finding</code> shape (<code>src/observability/renderers/mmr-findings.ts</code>), always exiting 0
+so the dispatcher captures stdout regardless of verdict. Only <code>open</code> findings are
+emitted (acknowledged and skipped are dropped).</p>
+<h3 id="finding-translation">Finding translation</h3>
+<p>The composite <code>location</code> — <code>&#x3C;source_doc>::&#x3C;lens_id>::&#x3C;short_id></code> — gives each
+finding a stable identity across audit runs, so MMR can track the same defect
+over time.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>MMR field</th><th>derived from</th></tr></thead><tbody><tr><td><code>severity</code></td><td><code>finding.severity</code> (P0–P3)</td></tr><tr><td><code>location</code></td><td><code>${source_doc || '(no-source-doc)'}::${lens_id}::${id.slice(0,8)}</code></td></tr><tr><td><code>description</code></td><td><code>[doc-conformance/${lens_id}] ${title}</code> + optional <code>— ${description}</code></td></tr><tr><td><code>suggestion</code></td><td><code>fix_hint?.prompt ?? fix_hint?.target ?? ''</code></td></tr><tr><td><code>category</code></td><td>literal <code>'doc-conformance'</code></td></tr></tbody></table>
+<p>A Lens-B engine <code>Finding</code> like this:</p>
+<pre><code class="language-json">{
+  "id": "3a8c1f0211223344", "lens_id": "B-ac-coverage", "severity": "P0",
+  "title": "AC has failing test", "description": "Test refresh.spec.ts is failing.",
+  "source_doc": "docs/user-stories.md#user-auth-1",
+  "fix_hint": { "prompt": "Re-enable the test", "target": "src/auth/test.spec.ts" }
+}
+</code></pre>
+<p>translates to this MMR Finding:</p>
+<pre><code class="language-json">{
+  "location":    "docs/user-stories.md#user-auth-1::B-ac-coverage::3a8c1f02",
+  "severity":    "P0",
+  "description": "[doc-conformance/B-ac-coverage] AC has failing test — Test refresh.spec.ts is failing.",
+  "suggestion":  "Re-enable the test",
+  "category":    "doc-conformance"
+}
+</code></pre>
+<h3 id="enabling-it">Enabling it</h3>
+<p>The <code>doc-conformance</code> channel is <strong>disabled by default</strong>. Enable it per-project in
+<code>.mmr.yaml</code> or for a single run with <code>--channels=doc-conformance</code>; if it's
+globally enabled you can opt a project out via
+<code>channels_disabled: ["doc-conformance"]</code>.</p>
+<pre><code class="language-bash">mmr review --channels=doc-conformance --diff &#x3C;(git diff main...HEAD) --sync --format json
+</code></pre>
+<p>Under the hood the built-in channel runs <code>scaffold observe audit --profile=full --scope=all --output-mode=mmr-findings</code> and parses its stdout. See the MMR guide
+(<a href="../mmr/index.md">../mmr/index.md</a>) for the channel architecture this plugs
+into.</p>
+<h2 id="the---fix-flow">The <code>--fix</code> flow</h2>
+<p><code>scaffold observe audit --fix</code> doesn't just report blocking findings — it
+dispatches an agent to fix each one, verifies the fix with a single-lens
+re-audit, and writes a post-fix report. The loop is abort-aware: an interrupt
+un-stages what the loop staged and re-applies the original stash (see the
+limitation in <a href="#abort-safety">Abort safety</a>).</p>
+<figure class="mermaid"><svg id="my-svg" width="100%" xmlns="http://www.w3.org/2000/svg" class="flowchart" style="max-width: 1433.47px; background-color: transparent;" viewBox="0 0 1433.46875 100.19999694824219" role="graphics-document document">#my-svg{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;fill:#000000;}@keyframes edge-animation-frame{from{stroke-dashoffset:0;}}@keyframes dash{to{stroke-dashoffset:0;}}#my-svg .edge-animation-slow{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 50s linear infinite;stroke-linecap:round;}#my-svg .edge-animation-fast{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 20s linear infinite;stroke-linecap:round;}#my-svg .error-icon{fill:#552222;}#my-svg .error-text{fill:#552222;stroke:#552222;}#my-svg .edge-thickness-normal{stroke-width:1px;}#my-svg .edge-thickness-thick{stroke-width:3.5px;}#my-svg .edge-pattern-solid{stroke-dasharray:0;}#my-svg .edge-thickness-invisible{stroke-width:0;fill:none;}#my-svg .edge-pattern-dashed{stroke-dasharray:3;}#my-svg .edge-pattern-dotted{stroke-dasharray:2;}#my-svg .marker{fill:#666;stroke:#666;}#my-svg .marker.cross{stroke:#666;}#my-svg svg{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;}#my-svg p{margin:0;}#my-svg .label{font-family:"trebuchet ms",verdana,arial,sans-serif;color:#000000;}#my-svg .cluster-label text{fill:#333;}#my-svg .cluster-label span{color:#333;}#my-svg .cluster-label span p{background-color:transparent;}#my-svg .label text,#my-svg span{fill:#000000;color:#000000;}#my-svg .node rect,#my-svg .node circle,#my-svg .node ellipse,#my-svg .node polygon,#my-svg .node path{fill:#eee;stroke:#999;stroke-width:1px;}#my-svg .rough-node .label text,#my-svg .node .label text,#my-svg .image-shape .label,#my-svg .icon-shape .label{text-anchor:middle;}#my-svg .node .katex path{fill:#000;stroke:#000;stroke-width:1px;}#my-svg .rough-node .label,#my-svg .node .label,#my-svg .image-shape .label,#my-svg .icon-shape .label{text-align:center;}#my-svg .node.clickable{cursor:pointer;}#my-svg .root .anchor path{fill:#666!important;stroke-width:0;stroke:#666;}#my-svg .arrowheadPath{fill:#333333;}#my-svg .edgePath .path{stroke:#666;stroke-width:1px;}#my-svg .flowchart-link{stroke:#666;fill:none;}#my-svg .edgeLabel{background-color:white;text-align:center;}#my-svg .edgeLabel p{background-color:white;}#my-svg .edgeLabel rect{opacity:0.5;background-color:white;fill:white;}#my-svg .labelBkg{background-color:rgba(255, 255, 255, 0.5);}#my-svg .cluster rect{fill:hsl(0, 0%, 98.9215686275%);stroke:#707070;stroke-width:1px;}#my-svg .cluster text{fill:#333;}#my-svg .cluster span{color:#333;}#my-svg div.mermaidTooltip{position:absolute;text-align:center;max-width:200px;padding:2px;font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:12px;background:hsl(-160, 0%, 93.3333333333%);border:1px solid #707070;border-radius:2px;pointer-events:none;z-index:100;}#my-svg .flowchartTitleText{text-anchor:middle;font-size:18px;fill:#000000;}#my-svg rect.text{fill:none;stroke-width:0;}#my-svg .icon-shape,#my-svg .image-shape{background-color:white;text-align:center;}#my-svg .icon-shape p,#my-svg .image-shape p{background-color:white;padding:2px;}#my-svg .icon-shape .label rect,#my-svg .image-shape .label rect{opacity:0.5;background-color:white;fill:white;}#my-svg .label-icon{display:inline-block;height:1em;overflow:visible;vertical-align:-0.125em;}#my-svg .node .label-icon path{fill:currentColor;stroke:revert;stroke-width:revert;}#my-svg .node .neo-node{stroke:#999;}#my-svg [data-look="neo"].node rect,#my-svg [data-look="neo"].cluster rect,#my-svg [data-look="neo"].node polygon{stroke:url(#my-svg-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#my-svg [data-look="neo"].node path{stroke:url(#my-svg-gradient);stroke-width:1px;}#my-svg [data-look="neo"].node .outer-path{filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#my-svg [data-look="neo"].node .neo-line path{stroke:#999;filter:none;}#my-svg [data-look="neo"].node circle{stroke:url(#my-svg-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#my-svg [data-look="neo"].node circle .state-start{fill:#000000;}#my-svg [data-look="neo"].icon-shape .icon{fill:url(#my-svg-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#my-svg [data-look="neo"].icon-shape .icon-neo path{stroke:url(#my-svg-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#my-svg :root{--mermaid-font-family:"trebuchet ms",verdana,arial,sans-serif;}<g><marker id="my-svg_flowchart-v2-pointEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"></path></marker><marker id="my-svg_flowchart-v2-pointStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="4.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 5 L 10 10 L 10 0 z" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"></path></marker><marker id="my-svg_flowchart-v2-pointEnd-margin" class="marker flowchart-v2" viewBox="0 0 11.5 14" refX="11.5" refY="7" markerUnits="userSpaceOnUse" markerWidth="10.5" markerHeight="14" orient="auto"><path d="M 0 0 L 11.5 7 L 0 14 z" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"></path></marker><marker id="my-svg_flowchart-v2-pointStart-margin" class="marker flowchart-v2" viewBox="0 0 11.5 14" refX="1" refY="7" markerUnits="userSpaceOnUse" markerWidth="11.5" markerHeight="14" orient="auto"><polygon points="0,7 11.5,14 11.5,0" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"></polygon></marker><marker id="my-svg_flowchart-v2-circleEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"></circle></marker><marker id="my-svg_flowchart-v2-circleStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="-1" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"></circle></marker><marker id="my-svg_flowchart-v2-circleEnd-margin" class="marker flowchart-v2" viewBox="0 0 10 10" refY="5" refX="12.25" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"></circle></marker><marker id="my-svg_flowchart-v2-circleStart-margin" class="marker flowchart-v2" viewBox="0 0 10 10" refX="-2" refY="5" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"></circle></marker><marker id="my-svg_flowchart-v2-crossEnd" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="12" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" style="stroke-width: 2; stroke-dasharray: 1, 0;"></path></marker><marker id="my-svg_flowchart-v2-crossStart" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="-1" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" style="stroke-width: 2; stroke-dasharray: 1, 0;"></path></marker><marker id="my-svg_flowchart-v2-crossEnd-margin" class="marker cross flowchart-v2" viewBox="0 0 15 15" refX="17.7" refY="7.5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto"><path d="M 1,1 L 14,14 M 1,14 L 14,1" class="arrowMarkerPath" style="stroke-width: 2.5;"></path></marker><marker id="my-svg_flowchart-v2-crossStart-margin" class="marker cross flowchart-v2" viewBox="0 0 15 15" refX="-3.5" refY="7.5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto"><path d="M 1,1 L 14,14 M 1,14 L 14,1" class="arrowMarkerPath" style="stroke-width: 2.5; stroke-dasharray: 1, 0;"></path></marker><g class="root"><g class="clusters"></g><g class="edgePaths"><path d="M246.266,50.1L250.432,50.1C254.599,50.1,262.932,50.1,270.599,50.1C278.266,50.1,285.266,50.1,288.766,50.1L292.266,50.1" id="my-svg-L_P1_P2_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M549.031,50.1L553.198,50.1C557.365,50.1,565.698,50.1,573.365,50.1C581.031,50.1,588.031,50.1,591.531,50.1L595.031,50.1" id="my-svg-L_P2_P3_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M821.594,50.1L825.76,50.1C829.927,50.1,838.26,50.1,845.927,50.1C853.594,50.1,860.594,50.1,864.094,50.1L867.594,50.1" id="my-svg-L_P3_P4_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M1121.234,50.1L1125.401,50.1C1129.568,50.1,1137.901,50.1,1145.568,50.1C1153.234,50.1,1160.234,50.1,1163.734,50.1L1167.234,50.1" id="my-svg-L_P4_P5_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path></g><g class="edgeLabels"><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g></g><g class="nodes"><g class="node default" id="my-svg-flowchart-P1-0" transform="translate(127.1328125, 50.099998474121094)"><rect class="basic label-container" style="" x="-119.1328125" y="-33.29999923706055" width="238.265625" height="66.5999984741211"></rect><g class="label" style="" transform="translate(0, -18.299999237060547)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">1</tspan><tspan class="text-inner-tspan"> ·</tspan><tspan class="text-inner-tspan"> audit</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">collect</tspan><tspan class="text-inner-tspan"> findings</tspan><tspan class="text-inner-tspan"> +</tspan><tspan class="text-inner-tspan"> verdict</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-P2-1" transform="translate(422.6484375, 50.099998474121094)"><rect class="basic label-container" style="" x="-126.3828125" y="-42.099998474121094" width="252.765625" height="84.19999694824219"></rect><g class="label" style="" transform="translate(0, -27.099998474121094)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">2</tspan><tspan class="text-inner-tspan"> ·</tspan><tspan class="text-inner-tspan"> buildFixPlan</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">keep</tspan><tspan class="text-inner-tspan"> open</tspan><tspan class="text-inner-tspan"> &#x26;</tspan><tspan class="text-inner-tspan"> ≥</tspan><tspan class="text-inner-tspan"> threshold;</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="2.1em"><tspan class="text-inner-tspan">order</tspan><tspan class="text-inner-tspan"> by</tspan><tspan class="text-inner-tspan"> severity</tspan><tspan class="text-inner-tspan"> then</tspan><tspan class="text-inner-tspan"> lens</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-P3-3" transform="translate(710.3125, 50.099998474121094)"><rect class="basic label-container" style="" x="-111.28125" y="-42.099998474121094" width="222.5625" height="84.19999694824219"></rect><g class="label" style="" transform="translate(0, -27.099998474121094)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">3</tspan><tspan class="text-inner-tspan"> ·</tspan><tspan class="text-inner-tspan"> dispatchFixAgent</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">subprocess,</tspan><tspan class="text-inner-tspan"> prompt</tspan><tspan class="text-inner-tspan"> on</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="2.1em"><tspan class="text-inner-tspan">stdin</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-P4-5" transform="translate(996.4140625, 50.099998474121094)"><rect class="basic label-container" style="" x="-124.8203125" y="-42.099998474121094" width="249.640625" height="84.19999694824219"></rect><g class="label" style="" transform="translate(0, -27.099998474121094)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">4</tspan><tspan class="text-inner-tspan"> ·</tspan><tspan class="text-inner-tspan"> verify</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">re-run</tspan><tspan class="text-inner-tspan"> that</tspan><tspan class="text-inner-tspan"> one</tspan><tspan class="text-inner-tspan"> lens;</tspan><tspan class="text-inner-tspan"> retry</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="2.1em"><tspan class="text-inner-tspan">≤</tspan><tspan class="text-inner-tspan"> 3</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-P5-7" transform="translate(1298.3515625, 50.099998474121094)"><rect class="basic label-container" style="" x="-127.1171875" y="-42.099998474121094" width="254.234375" height="84.19999694824219"></rect><g class="label" style="" transform="translate(0, -27.099998474121094)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">5</tspan><tspan class="text-inner-tspan"> ·</tspan><tspan class="text-inner-tspan"> post-fix</tspan><tspan class="text-inner-tspan"> report</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">docs/audits/id-postfix.{md</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="2.1em"><tspan class="text-inner-tspan">,json}</tspan></tspan></text></g></g></g></g></g></g><defs></defs><defs></defs></svg></figure>
+<h3 id="the-five-phases">The five phases</h3>
+<ul>
+<li><strong>1 · audit</strong> — run the audit to get findings and the verdict
+(<code>src/observability/engine/fix-flow.ts</code>).</li>
+<li><strong>2 · <code>buildFixPlan</code></strong> (<code>src/observability/engine/fix-plan.ts</code>) — keep findings
+that are <code>open</code> and at/above <code>fix_threshold</code>, ordered by severity ascending (P0
+first) then <code>lens_id</code>.</li>
+<li><strong>3 · <code>dispatchFixAgent</code></strong> (<code>src/observability/engine/fix-agent-dispatcher.ts</code>)
+— spawn the dispatcher command, write the per-finding prompt to stdin, stream
+stdout/stderr to the user.</li>
+<li><strong>4 · single-lens verify</strong> — re-run only the finding's lens; if the finding is
+gone, mark fixed; else retry, up to <code>per_finding_max_attempts</code> (default 3).</li>
+<li><strong>5 · post-fix report</strong> — a final <code>scope=all</code> audit, written to
+<code>docs/audits/&#x3C;id>-postfix.{md,json}</code>.</li>
+</ul>
+<h3 id="abort-safety">Abort safety</h3>
+<p>Before dispatching, <code>captureSnapshot</code>
+(<code>src/observability/engine/abort-snapshot.ts</code>) records a <code>git stash create</code> SHA
+plus the set of pre-existing staged files. Newly staged paths are tracked per
+attempt. On <code>SIGINT</code>, <code>restoreSnapshot</code> un-stages the paths the loop recorded as
+newly staged and re-applies the original stash tree. <strong>Limitation:</strong> edits the
+dispatcher made but that the loop did not record as staged are not actively
+reverted and may need manual cleanup — recovery is scoped to the recorded
+staged paths plus the stash, not a guaranteed full reset.</p>
+<h3 id="config-the-fix-block">Config — the <code>fix:</code> block</h3>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>key</th><th>default</th><th>effect</th></tr></thead><tbody><tr><td><code>fix.dispatcher_command</code></td><td><code>claude -p</code></td><td>the agent command (configurable — see note)</td></tr><tr><td><code>fix.timeout_s</code></td><td><code>300</code></td><td>per-finding subprocess budget</td></tr><tr><td><code>fix.per_finding_max_attempts</code></td><td><code>3</code></td><td>verify retries before giving up</td></tr></tbody></table>
+<div class="callout callout-note"><p><strong>The fix dispatcher IS configurable — unlike Lens H's.</strong>
+<code>fix.dispatcher_command</code> is read from project config because the fix loop only
+runs against the maintainer's own repo, not untrusted third-party code
+(<code>src/observability/engine/fix-agent-dispatcher.ts</code>). This is the opposite of the
+Lens H LLM dispatcher, which hard-codes its command for untrusted-repo safety.
+CLAUDE.md's <code>--fix</code> note describing the dispatcher as "not
+project-config-overridable" conflates the two.</p></div>
+<p>Exit code: <code>1</code> if any blocking finding survived the loop, else <code>0</code>.</p>
+<h2 id="harvest-recover-teardown">Harvest, recover &#x26; teardown</h2>
+<p>A worktree's ledger is local to that worktree. Harvest copies it into the primary
+repo's archive before the worktree is removed; recover sweeps up ledgers whose
+worktrees vanished without being harvested; teardown does the whole dance in one
+command.</p>
+<figure class="mermaid"><svg id="my-svg" width="100%" xmlns="http://www.w3.org/2000/svg" class="flowchart" style="max-width: 1087.94px; background-color: transparent;" viewBox="0 0 1087.9375 100.19999694824219" role="graphics-document document">#my-svg{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;fill:#000000;}@keyframes edge-animation-frame{from{stroke-dashoffset:0;}}@keyframes dash{to{stroke-dashoffset:0;}}#my-svg .edge-animation-slow{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 50s linear infinite;stroke-linecap:round;}#my-svg .edge-animation-fast{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 20s linear infinite;stroke-linecap:round;}#my-svg .error-icon{fill:#552222;}#my-svg .error-text{fill:#552222;stroke:#552222;}#my-svg .edge-thickness-normal{stroke-width:1px;}#my-svg .edge-thickness-thick{stroke-width:3.5px;}#my-svg .edge-pattern-solid{stroke-dasharray:0;}#my-svg .edge-thickness-invisible{stroke-width:0;fill:none;}#my-svg .edge-pattern-dashed{stroke-dasharray:3;}#my-svg .edge-pattern-dotted{stroke-dasharray:2;}#my-svg .marker{fill:#666;stroke:#666;}#my-svg .marker.cross{stroke:#666;}#my-svg svg{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;}#my-svg p{margin:0;}#my-svg .label{font-family:"trebuchet ms",verdana,arial,sans-serif;color:#000000;}#my-svg .cluster-label text{fill:#333;}#my-svg .cluster-label span{color:#333;}#my-svg .cluster-label span p{background-color:transparent;}#my-svg .label text,#my-svg span{fill:#000000;color:#000000;}#my-svg .node rect,#my-svg .node circle,#my-svg .node ellipse,#my-svg .node polygon,#my-svg .node path{fill:#eee;stroke:#999;stroke-width:1px;}#my-svg .rough-node .label text,#my-svg .node .label text,#my-svg .image-shape .label,#my-svg .icon-shape .label{text-anchor:middle;}#my-svg .node .katex path{fill:#000;stroke:#000;stroke-width:1px;}#my-svg .rough-node .label,#my-svg .node .label,#my-svg .image-shape .label,#my-svg .icon-shape .label{text-align:center;}#my-svg .node.clickable{cursor:pointer;}#my-svg .root .anchor path{fill:#666!important;stroke-width:0;stroke:#666;}#my-svg .arrowheadPath{fill:#333333;}#my-svg .edgePath .path{stroke:#666;stroke-width:1px;}#my-svg .flowchart-link{stroke:#666;fill:none;}#my-svg .edgeLabel{background-color:white;text-align:center;}#my-svg .edgeLabel p{background-color:white;}#my-svg .edgeLabel rect{opacity:0.5;background-color:white;fill:white;}#my-svg .labelBkg{background-color:rgba(255, 255, 255, 0.5);}#my-svg .cluster rect{fill:hsl(0, 0%, 98.9215686275%);stroke:#707070;stroke-width:1px;}#my-svg .cluster text{fill:#333;}#my-svg .cluster span{color:#333;}#my-svg div.mermaidTooltip{position:absolute;text-align:center;max-width:200px;padding:2px;font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:12px;background:hsl(-160, 0%, 93.3333333333%);border:1px solid #707070;border-radius:2px;pointer-events:none;z-index:100;}#my-svg .flowchartTitleText{text-anchor:middle;font-size:18px;fill:#000000;}#my-svg rect.text{fill:none;stroke-width:0;}#my-svg .icon-shape,#my-svg .image-shape{background-color:white;text-align:center;}#my-svg .icon-shape p,#my-svg .image-shape p{background-color:white;padding:2px;}#my-svg .icon-shape .label rect,#my-svg .image-shape .label rect{opacity:0.5;background-color:white;fill:white;}#my-svg .label-icon{display:inline-block;height:1em;overflow:visible;vertical-align:-0.125em;}#my-svg .node .label-icon path{fill:currentColor;stroke:revert;stroke-width:revert;}#my-svg .node .neo-node{stroke:#999;}#my-svg [data-look="neo"].node rect,#my-svg [data-look="neo"].cluster rect,#my-svg [data-look="neo"].node polygon{stroke:url(#my-svg-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#my-svg [data-look="neo"].node path{stroke:url(#my-svg-gradient);stroke-width:1px;}#my-svg [data-look="neo"].node .outer-path{filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#my-svg [data-look="neo"].node .neo-line path{stroke:#999;filter:none;}#my-svg [data-look="neo"].node circle{stroke:url(#my-svg-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#my-svg [data-look="neo"].node circle .state-start{fill:#000000;}#my-svg [data-look="neo"].icon-shape .icon{fill:url(#my-svg-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#my-svg [data-look="neo"].icon-shape .icon-neo path{stroke:url(#my-svg-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#my-svg :root{--mermaid-font-family:"trebuchet ms",verdana,arial,sans-serif;}<g><marker id="my-svg_flowchart-v2-pointEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"></path></marker><marker id="my-svg_flowchart-v2-pointStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="4.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 5 L 10 10 L 10 0 z" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"></path></marker><marker id="my-svg_flowchart-v2-pointEnd-margin" class="marker flowchart-v2" viewBox="0 0 11.5 14" refX="11.5" refY="7" markerUnits="userSpaceOnUse" markerWidth="10.5" markerHeight="14" orient="auto"><path d="M 0 0 L 11.5 7 L 0 14 z" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"></path></marker><marker id="my-svg_flowchart-v2-pointStart-margin" class="marker flowchart-v2" viewBox="0 0 11.5 14" refX="1" refY="7" markerUnits="userSpaceOnUse" markerWidth="11.5" markerHeight="14" orient="auto"><polygon points="0,7 11.5,14 11.5,0" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"></polygon></marker><marker id="my-svg_flowchart-v2-circleEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"></circle></marker><marker id="my-svg_flowchart-v2-circleStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="-1" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"></circle></marker><marker id="my-svg_flowchart-v2-circleEnd-margin" class="marker flowchart-v2" viewBox="0 0 10 10" refY="5" refX="12.25" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"></circle></marker><marker id="my-svg_flowchart-v2-circleStart-margin" class="marker flowchart-v2" viewBox="0 0 10 10" refX="-2" refY="5" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"></circle></marker><marker id="my-svg_flowchart-v2-crossEnd" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="12" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" style="stroke-width: 2; stroke-dasharray: 1, 0;"></path></marker><marker id="my-svg_flowchart-v2-crossStart" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="-1" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" style="stroke-width: 2; stroke-dasharray: 1, 0;"></path></marker><marker id="my-svg_flowchart-v2-crossEnd-margin" class="marker cross flowchart-v2" viewBox="0 0 15 15" refX="17.7" refY="7.5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto"><path d="M 1,1 L 14,14 M 1,14 L 14,1" class="arrowMarkerPath" style="stroke-width: 2.5;"></path></marker><marker id="my-svg_flowchart-v2-crossStart-margin" class="marker cross flowchart-v2" viewBox="0 0 15 15" refX="-3.5" refY="7.5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto"><path d="M 1,1 L 14,14 M 1,14 L 14,1" class="arrowMarkerPath" style="stroke-width: 2.5; stroke-dasharray: 1, 0;"></path></marker><g class="root"><g class="clusters"></g><g class="edgePaths"><path d="M231.297,50.1L240.193,50.1C249.089,50.1,266.88,50.1,284.005,50.1C301.13,50.1,317.589,50.1,325.818,50.1L334.047,50.1" id="my-svg-L_WT_AA_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path><path d="M596,50.1L615.043,50.1C634.086,50.1,672.172,50.1,709.591,50.1C747.01,50.1,783.763,50.1,802.139,50.1L820.516,50.1" id="my-svg-L_AA_MA_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" marker-end="url(#my-svg_flowchart-v2-pointEnd)"></path></g><g class="edgeLabels"><g class="edgeLabel" transform="translate(284.671875, 50.099998474121094)"><g class="label" transform="translate(0, -10.5)"><g><rect class="background" style="" x="-28.375" y="-1" width="56.75" height="23"></rect><text y="-10.1" text-anchor="middle" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"><tspan class="text-inner-tspan">harvest</tspan></tspan></text></g></g></g><g class="edgeLabel" transform="translate(710.2578125, 50.099998474121094)"><g class="label" transform="translate(0, -10.5)"><g><rect class="background" style="" x="-89.2578125" y="-1" width="178.515625" height="23"></rect><text y="-10.1" text-anchor="middle" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em" text-anchor="middle"><tspan class="text-inner-tspan">recover</tspan><tspan class="text-inner-tspan"> (worktree</tspan><tspan class="text-inner-tspan"> gone)</tspan></tspan></text></g></g></g></g><g class="nodes"><g class="node default" id="my-svg-flowchart-WT-0" transform="translate(119.6484375, 50.099998474121094)"><rect class="basic label-container" style="" x="-111.6484375" y="-33.29999923706055" width="223.296875" height="66.5999984741211"></rect><g class="label" style="" transform="translate(0, -18.299999237060547)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">worktree</tspan><tspan class="text-inner-tspan"> ledger</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">.scaffold/activity.jsonl</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-AA-1" transform="translate(467.0234375, 50.099998474121094)"><rect class="basic label-container" style="" x="-128.9765625" y="-42.099998474121094" width="257.953125" height="84.19999694824219"></rect><g class="label" style="" transform="translate(0, -27.099998474121094)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">active-archive</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">activity-archive/active/id.j</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="2.1em"><tspan class="text-inner-tspan">sonl</tspan></tspan></text></g></g></g><g class="node default" id="my-svg-flowchart-MA-3" transform="translate(952.2265625, 50.099998474121094)"><rect class="basic label-container" style="" x="-127.7109375" y="-42.099998474121094" width="255.421875" height="84.19999694824219"></rect><g class="label" style="" transform="translate(0, -27.099998474121094)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em"><tspan class="text-inner-tspan">monthly</tspan><tspan class="text-inner-tspan"> archive</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em"><tspan class="text-inner-tspan">activity-archive/YYYY-MM.j</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="2.1em"><tspan class="text-inner-tspan">sonl</tspan></tspan></text></g></g></g></g></g></g><defs></defs><defs></defs></svg></figure>
+<h3 id="commands">Commands</h3>
+<ul>
+<li><strong><code>scaffold observe harvest --worktree=&#x3C;path></code></strong> — read the worktree's
+<code>identity.json</code>, then copy its <code>activity.jsonl</code> to
+<code>.scaffold/activity-archive/active/&#x3C;worktree_id>.jsonl</code> in the primary repo
+(atomic temp-file + rename under a lock; keyed by <code>worktree_id</code>, idempotent
+full-file replace). Requires the primary root to be a real repo, not itself a
+worktree.</li>
+<li><strong><code>scaffold observe harvest --recover</code></strong> — list live worktrees
+(<code>git worktree list --porcelain</code>), read each one's <code>worktree_id</code>, then scan
+<code>active/</code> for entries whose worktree is no longer live and rotate each into
+<code>activity-archive/&#x3C;YYYY-MM>.jsonl</code> (bucketed by the file's mtime), deleting the
+active entry. Returns the rotated ids.</li>
+<li><strong><code>scripts/teardown-agent-worktree.sh &#x3C;path></code></strong> — derives the primary repo via
+<code>git -C &#x3C;path> rev-parse --git-common-dir</code> (so it works from anywhere),
+harvests (fail-soft), runs <code>git worktree remove</code>, then deletes the workspace
+branch if it differs from the primary HEAD.</li>
+</ul>
+<div class="callout callout-note"><p><strong>Empty ledgers are fine.</strong> If a worktree never wrote an <code>activity.jsonl</code>,
+harvest is a clean no-op and teardown proceeds.</p></div>
+<h2 id="renderers">Renderers</h2>
+<p>One <code>EngineOutput</code>, several surfaces. The terminal renderer is for humans at a
+prompt; the markdown renderer writes a durable report plus a machine-readable
+JSON sidecar; the dashboard-fragment renderer emits an HTML panel that
+<code>scripts/generate-dashboard.sh</code> injects at named anchors.</p>
+<p>Default audit/progress runs write both a markdown report and a JSON sidecar:
+audits to <code>docs/audits/&#x3C;id>.{md,json}</code>, progress to
+<code>docs/build-status/&#x3C;id>.{md,json}</code> (<code>src/observability/renderers/sidecar.ts</code>).
+<code>--render</code> and <code>--output-mode</code> bypass the files and print to stdout instead.</p>
+<p>The same blocked audit renders three ways. As terminal ANSI:</p>
+<pre><code class="language-text">build observability — audit
+(profile: fast · scope: all)
+
+  [P0] AC has failing test
+       lens: B-ac-coverage
+       fix:  Re-enable the test
+
+verdict: blocked
+(blocking 1 · ack 0 · total 1)
+</code></pre>
+<p>As markdown (<code>docs/audits/&#x3C;id>.md</code>):</p>
+<pre><code class="language-text"># Build Observability — Audit
+
+**Verdict:** blocked
+
+## Summary
+1 findings · 1 blocking (at or above P2) · 0 acknowledged · 0 skipped lenses
+
+### [P0] B-ac-coverage — AC has failing test
+`3a8c1f02` · *source:* `…#user-auth-1` · *confidence:* high
+</code></pre>
+<p>As a dashboard fragment, an HTML <code>&#x3C;section id="build-audit" data-verdict="blocked"></code>
+panel injected into the dashboard.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>renderer</th><th>file</th><th>destination</th><th>notes</th></tr></thead><tbody><tr><td>terminal</td><td><code>src/observability/renderers/terminal.ts</code></td><td>stdout</td><td>ANSI, "Needs Attention" banner + timeline</td></tr><tr><td>markdown</td><td><code>src/observability/renderers/markdown.ts</code></td><td><code>docs/audits/</code> · <code>docs/build-status/</code></td><td>full findings, evidence, fix hints</td></tr><tr><td>sidecar JSON</td><td><code>src/observability/renderers/sidecar.ts</code></td><td>alongside the markdown</td><td>redacted <code>EngineOutput</code>; read by the <code>audit_history</code> adapter</td></tr><tr><td>dashboard fragment</td><td><code>src/observability/renderers/dashboard.ts</code></td><td>stdout → dashboard</td><td>sections <code>build-progress</code> / <code>build-audit</code> injected by <code>scripts/generate-dashboard.sh</code></td></tr><tr><td>mmr-findings</td><td><code>src/observability/renderers/mmr-findings.ts</code></td><td>stdout</td><td>MMR Finding shape</td></tr></tbody></table>
+<h2 id="config-reference">Config reference</h2>
+<p>All tunables live in <code>.scaffold/observability.yaml</code>. The file is optional — when
+absent, <code>DEFAULT_CONFIG</code> applies wholesale
+(<code>src/observability/engine/checks/observability-config.ts</code>). A malformed or
+unreadable file <em>silently</em> falls back to defaults. Merging is a deep merge where
+objects merge key-by-key but <strong>arrays and scalars replace wholesale</strong> — so
+setting <code>disabled_lenses</code> or <code>rule_overrides</code> overwrites the default rather than
+extending it.</p>
+<div class="callout callout-warning"><p><strong>The shipped example file is misleading.</strong> The repo's
+<code>.scaffold/observability.yaml</code> contains only <code>knowledge_freshness.link_check.skip</code>
+and a comment claiming "other observability features read configuration from
+elsewhere." In fact the code reads many more keys — the example file simply omits
+them because they all have working defaults. The defaults documented here come
+from the code, which is ground truth.</p></div>
+<div class="filter-table"><input type="text" class="filter-input" placeholder="Filter…" aria-label="Filter table rows" disabled>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>key</th><th>type</th><th>default</th><th>read by</th></tr></thead><tbody><tr><td><code>lenses.C-standards.enforce_via_linter</code></td><td>boolean</td><td><code>true</code></td><td>(accepted, not read)</td></tr><tr><td><code>lenses.C-standards.rule_overrides</code></td><td>map&#x3C;rule, P0–P3></td><td><code>{}</code></td><td>lenses · Lens C</td></tr><tr><td><code>lenses.C-standards.escalation_threshold</code></td><td>number</td><td><code>5</code></td><td>lenses · Lens C</td></tr><tr><td><code>lenses.D-stack.path_to_layer</code></td><td>{glob,layer}[]</td><td>7 default mappings</td><td>lenses · Lens D</td></tr><tr><td><code>lenses.E-design.ad_hoc_token_threshold</code></td><td>number</td><td><code>3</code></td><td>lenses · Lens E</td></tr><tr><td><code>lenses.E-design.ui_glob</code></td><td>glob</td><td><code>src/components/**/*.tsx</code></td><td>lenses · doc-graph builder</td></tr><tr><td><code>lenses.F-scope.untouched_story_grace_hours</code></td><td>number</td><td><code>168</code></td><td>lenses · Lens F</td></tr><tr><td><code>lenses.G-decisions.keywords_file</code></td><td>path</td><td>— (inert)</td><td>lenses · (no reader)</td></tr><tr><td><code>lenses.H-cross-doc.skip_phase_subsets</code></td><td>string[]</td><td>— (inert)</td><td>lenses · (no reader)</td></tr><tr><td><code>lenses.I-knowledge-gaps.knowledge_root</code></td><td>path</td><td>auto-detect</td><td>lenses · Lens I</td></tr><tr><td><code>disabled_lenses</code></td><td>string[]</td><td><code>[]</code></td><td>lenses · runner</td></tr><tr><td><code>phase_audit.enabled</code></td><td>boolean</td><td><code>true</code></td><td>phase_audit</td></tr><tr><td><code>phase_audit.timeout_s</code></td><td>number</td><td><code>60</code></td><td>phase_audit</td></tr><tr><td><code>phase_audit.detached</code></td><td>boolean</td><td><code>false</code></td><td>phase_audit</td></tr><tr><td><code>stall.task_stale</code></td><td>'Nh'·'Nd'·'off'</td><td><code>4h</code></td><td>stall</td></tr><tr><td><code>stall.pr_stale</code></td><td>'Nh'·'Nd'·'off'</td><td><code>48h</code></td><td>stall</td></tr><tr><td><code>stall.pr_review_stale</code></td><td>'Nh'·'Nd'·'off'</td><td><code>24h</code> (reserved)</td><td>stall (signal not yet emitted)</td></tr><tr><td><code>stall.blocker_unaddressed</code></td><td>'Nh'·'Nd'·'off'</td><td><code>2h</code></td><td>stall</td></tr><tr><td><code>stall.audit_findings_unresolved</code></td><td>'Nh'·'Nd'·'off'</td><td><code>24h</code></td><td>stall</td></tr><tr><td><code>llm.timeout_s</code></td><td>number</td><td><code>60</code></td><td>llm · Lens H dispatcher</td></tr><tr><td><code>llm.parallel_checks</code></td><td>boolean</td><td><code>false</code></td><td>llm · Lens H</td></tr><tr><td><code>fix.dispatcher_command</code></td><td>shell command</td><td><code>claude -p</code></td><td>fix · dispatcher</td></tr><tr><td><code>fix.timeout_s</code></td><td>number</td><td><code>300</code></td><td>fix</td></tr><tr><td><code>fix.per_finding_max_attempts</code></td><td>number</td><td><code>3</code></td><td>fix</td></tr><tr><td><code>knowledge_freshness.link_check.skip</code></td><td>string[]</td><td><code>[]</code></td><td>knowledge-freshness (separate loader)</td></tr></tbody></table></div>
+<div class="callout callout-note"><p><strong>No <code>llm.dispatcher_command</code>, no <code>F-scope.wave_budget</code>.</strong> Two keys you might
+expect are deliberately absent. The Lens H LLM command is hard-coded (security) —
+there is no <code>llm.dispatcher_command</code> key. And there is no wave/phase-budget key at
+all: <code>F-scope</code> reads only <code>untouched_story_grace_hours</code> from this file, so the
+"wave budget" CLAUDE.md implies does not exist in the config.</p></div>
+<p>Example:</p>
+<pre><code class="language-yaml">lenses:
+  C-standards:
+    enforce_via_linter: true
+    rule_overrides:
+      no-console: P1
+  E-design:
+    ad_hoc_token_threshold: 5
+disabled_lenses: []
+phase_audit:
+  enabled: true
+  timeout_s: 60
+stall:
+  task_stale: '6h'
+fix:
+  per_finding_max_attempts: 3
+# shared with the knowledge-freshness subsystem
+knowledge_freshness:
+  link_check:
+    skip:
+      - platform.openai.com
+</code></pre>
+<h2 id="where-it-lives">Where it lives</h2>
+<p>The whole system lives under <code>src/observability/</code>, plus the state-manager hook
+and two shell scripts.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>file</th><th>purpose</th></tr></thead><tbody><tr><td><code>src/observability/engine/ledger-writer.ts</code></td><td>validate → redact → 4 KiB check → locked append</td></tr><tr><td><code>src/observability/engine/event-schemas.ts</code></td><td>per-type payload allow-lists + validation</td></tr><tr><td><code>src/observability/engine/redact.ts</code></td><td>write-time + render-time secret/path scrubbing</td></tr><tr><td><code>src/observability/engine/identity.ts</code></td><td>worktree identity.json</td></tr><tr><td><code>src/observability/engine/harvester.ts</code></td><td>harvest worktree ledger + <code>--recover</code> rotation</td></tr><tr><td><code>src/observability/engine/synthesizer.ts</code></td><td>composeReplay: fuse + correlation_id dedup + source priority</td></tr><tr><td><code>src/observability/engine/api.ts</code></td><td>runAudit / runProgress; scope→lens; verdict</td></tr><tr><td><code>src/observability/engine/stall.ts</code></td><td>the stall signals + Needs-Attention surface</td></tr><tr><td><code>src/observability/engine/phase-audit.ts</code></td><td>runPhaseAudit + formatPhaseAuditLine</td></tr><tr><td><code>src/observability/engine/phase-subsets.ts</code></td><td>PHASE_BOUNDARY_STEPS + isPhaseBoundary</td></tr><tr><td><code>src/observability/engine/fix-flow.ts</code></td><td>the five-phase <code>--fix</code> loop</td></tr><tr><td><code>src/observability/engine/fix-plan.ts</code></td><td>buildFixPlan: filter + order findings</td></tr><tr><td><code>src/observability/engine/fix-agent-dispatcher.ts</code></td><td>configurable subprocess fix dispatcher</td></tr><tr><td><code>src/observability/engine/abort-snapshot.ts</code></td><td>capture/restore git stash on SIGINT</td></tr><tr><td><code>src/observability/engine/llm-dispatcher.ts</code></td><td>hard-coded <code>claude -p</code> for Lens H full profile</td></tr><tr><td><code>src/observability/engine/types.ts</code></td><td>Verdict, AdapterId, EngineOutput, Finding</td></tr><tr><td><code>src/observability/engine/checks/registry.ts</code></td><td>LENS_REGISTRY (A–I) + implementations</td></tr><tr><td><code>src/observability/engine/checks/fix-threshold.ts</code></td><td>resolve fix_threshold (default P2)</td></tr><tr><td><code>src/observability/engine/checks/findings-aggregator.ts</code></td><td>tally blocking/acked; compute verdict</td></tr><tr><td><code>src/observability/engine/checks/observability-config.ts</code></td><td>DEFAULT_CONFIG + deep-merge loader</td></tr><tr><td><code>src/observability/engine/doc-graph/index.ts</code></td><td>build the doc graph from planning docs</td></tr><tr><td><code>src/observability/checks/lens-a-tdd.ts</code></td><td>A · skipped tests</td></tr><tr><td><code>src/observability/checks/lens-b-ac-coverage.ts</code></td><td>B · AC ↔ test coverage</td></tr><tr><td><code>src/observability/checks/lens-c-standards.ts</code></td><td>C · coding-standards drift</td></tr><tr><td><code>src/observability/checks/lens-d-stack.ts</code></td><td>D · tech-stack drift</td></tr><tr><td><code>src/observability/checks/lens-e-design.ts</code></td><td>E · design-system drift</td></tr><tr><td><code>src/observability/checks/lens-f-scope.ts</code></td><td>F · missing scope</td></tr><tr><td><code>src/observability/checks/lens-g-decisions.ts</code></td><td>G · undocumented decisions</td></tr><tr><td><code>src/observability/checks/lens-h-cross-doc.ts</code></td><td>H · cross-doc consistency + LLM checks</td></tr><tr><td><code>src/observability/checks/lens-i-knowledge-gaps.ts</code></td><td>I · knowledge gaps</td></tr><tr><td><code>src/observability/checks/lens-i-lessons-scanner.ts</code></td><td>scan tasks/lessons.md for gap signals</td></tr><tr><td><code>src/observability/knowledge-index.ts</code></td><td>resolveKnowledgeRoot (3 tiers) + index for Lens I</td></tr><tr><td><code>src/observability/renderers/terminal.ts</code></td><td>ANSI output</td></tr><tr><td><code>src/observability/renderers/markdown.ts</code></td><td>markdown report</td></tr><tr><td><code>src/observability/renderers/dashboard.ts</code></td><td>build-progress / build-audit HTML fragments</td></tr><tr><td><code>src/observability/renderers/sidecar.ts</code></td><td>JSON sidecar + report-id derivation</td></tr><tr><td><code>src/observability/renderers/mmr-findings.ts</code></td><td>MMR Finding shape</td></tr><tr><td><code>src/state/state-manager.ts</code></td><td>async markCompleted → runPhaseAudit hook</td></tr><tr><td><code>scripts/teardown-agent-worktree.sh</code></td><td>harvest → remove → delete branch</td></tr><tr><td><code>scripts/generate-dashboard.sh</code></td><td>injects the dashboard fragments</td></tr></tbody></table>
+<p>The full design lives in
+<code>docs/superpowers/specs/2026-04-30-build-observability-design.md</code>.</p>
+<h2 id="shipping-history">Shipping history</h2>
+<p>Build Observability shipped as eight plans (Foundation → Fix-flow), released
+together as <code>v3.26.0 — Build Observability</code> on 2026-05-07, with Lens I and
+refinements following after.</p>
+<div class="filter-table"><input type="text" class="filter-input" placeholder="Filter…" aria-label="Filter table rows" disabled>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>plan</th><th>subsystem</th><th>squash</th><th>PR</th><th>added to the on-disk surface</th></tr></thead><tbody><tr><td>spec + plans</td><td>design doc + 8 plans</td><td><code>5cf689c4</code></td><td>#319</td><td><code>docs/superpowers/specs</code> + 8 plan files</td></tr><tr><td>1 · Foundation</td><td>identity, validation, redaction, ledger, harvester, adapters, synthesizer, API, CLI, renderers</td><td><code>21124010</code> (+ #320–328)</td><td>#320–329</td><td>most of <code>src/observability/engine</code>, <code>adapters</code>, <code>renderers</code>; <code>scaffold observe</code></td></tr><tr><td>2 · Audit MVP</td><td>doc-graph, checks framework, lenses A/B/H, <code>audit</code>+<code>ack</code></td><td><code>8eb70986</code></td><td>#331</td><td><code>engine/doc-graph</code>, <code>engine/checks</code>, <code>lens-a/b/h</code></td></tr><tr><td>3 · Full lens suite</td><td>lenses C/D/E/F/G + registry + config</td><td><code>bd014634</code></td><td>#332</td><td><code>lens-c…g</code>, <code>registry.ts</code>, <code>.scaffold/observability.yaml</code></td></tr><tr><td>4 · Renderers + history</td><td>markdown, JSON sidecars, dashboard fragments, audit-history</td><td><code>37f63ae4</code></td><td>#333</td><td><code>docs/build-status</code>, <code>docs/audits</code>, <code>audit-history</code> adapter</td></tr><tr><td>5 · Replay + stall</td><td>replay timeline, stall detection, Lens G keyword scan</td><td><code>cdbfd1de</code></td><td>#334</td><td><code>synthesizer.composeReplay</code>, <code>stall.ts</code>, Needs-Attention surfaces</td></tr><tr><td>6 · Phase triggers</td><td><code>markCompleted</code> async → <code>runPhaseAudit</code></td><td><code>ff04a1a6</code></td><td>#335</td><td><code>phase-audit.ts</code>, <code>phase-subsets.ts</code>, step timestamps</td></tr><tr><td>7 · MMR channel</td><td><code>doc-conformance</code> channel + Lens H full-profile LLM checks</td><td><code>8b723617</code></td><td>#336</td><td><code>mmr-findings.ts</code>, <code>llm-dispatcher.ts</code>, Lens H sub-checks</td></tr><tr><td>8 · Fix flow + teardown</td><td><code>--fix</code> loop, <code>harvest --recover</code>, teardown script</td><td><code>06fca3ef</code> (v3.26.0)</td><td>#337</td><td><code>fix-flow.ts</code>, <code>fix-plan.ts</code>, <code>fix-agent-dispatcher.ts</code>, <code>abort-snapshot.ts</code>, <code>teardown-agent-worktree.sh</code></td></tr><tr><td>follow-on</td><td>Lens I — knowledge gaps + lessons scanner</td><td><code>31e45f03</code></td><td>#397</td><td><code>lens-i-knowledge-gaps.ts</code>, <code>lens-i-lessons-scanner.ts</code></td></tr><tr><td>follow-on</td><td>Lens I — <code>--knowledge-root</code> + existing-entry suppression</td><td><code>46a47037</code></td><td>#406</td><td><code>knowledge-index.ts</code> resolver tiers</td></tr><tr><td>follow-on</td><td>TypeScript cleanup (<code>as never</code> → typed <code>isOneOf</code>)</td><td><code>362c7f93</code></td><td>#411</td><td>type-safety refactor across observability</td></tr></tbody></table></div>
+<h2 id="known-divergences">Known divergences</h2>
+<p>The audit's own rule — "code is ground truth where it disagrees with the spec or
+the docs" — surfaced these mismatches. They are deferred findings to resolve in
+the code/docs:</p>
+<ul>
+<li><strong>9 lenses, not 8.</strong> The design spec and CLAUDE.md enumerate A–H;
+<code>I-knowledge-gaps</code> shipped and is registered.</li>
+<li><strong><code>pr_opened</code> vs <code>pr_open</code>.</strong> CLAUDE.md abbreviates the event type as
+<code>pr_open</code>; the code only emits <code>pr_opened</code>.</li>
+<li><strong>Three engine verdicts, not four.</strong> <code>needs-user-decision</code> is an MMR review
+verdict; the audit engine emits only <code>pass</code> / <code>degraded-pass</code> / <code>blocked</code>.</li>
+<li><strong>Two dispatchers — don't conflate them.</strong> CLAUDE.md's "not
+project-config-overridable" note is about the <strong>Lens H LLM dispatcher</strong>
+(<code>llm-dispatcher.ts</code>, hard-coded <code>claude -p</code> by design). It does <strong>not</strong> apply
+to the separate <strong><code>--fix</code> agent dispatcher</strong>, whose <code>fix.dispatcher_command</code>
+<em>is</em> project-configurable. The divergence is that the two are easy to conflate.</li>
+<li><strong><code>pr_review_stale</code> reserved.</strong> The sixth stall signal has a config default but
+is not yet emitted (deferred pending a per-PR correlation_id on the mmr
+adapter).</li>
+<li><strong>Inert config keys.</strong> <code>lenses.G-decisions.keywords_file</code> and
+<code>lenses.H-cross-doc.skip_phase_subsets</code> are typed but unread; the bundled
+<code>decision-keywords.txt</code> is not loaded.</li>
+<li><strong>No <code>F-scope.wave_budget</code> key.</strong> CLAUDE.md implies a wave budget in
+<code>observability.yaml</code>; in fact no wave/phase budget is read anywhere — Lens F
+reads only <code>untouched_story_grace_hours</code>.</li>
+<li><strong><code>ui_glob</code> default narrower than spec.</strong> Spec default covers
+<code>{tsx,jsx,vue,svelte}</code> + styles; shipped default is just
+<code>src/components/**/*.tsx</code>.</li>
+</ul></main>
+</div>
+<script>(function(){
+  var LS_KEY = 'guide-theme';
+  function applyTheme(t) {
+    document.documentElement.setAttribute('data-theme', t);
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    // ─── Theme toggle ────────────────────────────────────────────────────────
+    document.querySelectorAll('[data-action="theme"]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var current = document.documentElement.getAttribute('data-theme');
+        var next = current === 'dark' ? 'light' : 'dark';
+        applyTheme(next);
+        try { localStorage.setItem(LS_KEY, next); } catch(e) {}
+      });
+    });
+
+    // ─── Mobile nav ──────────────────────────────────────────────────────────
+    document.querySelectorAll('[data-action="nav"]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var rail = document.querySelector('.rail');
+        if (rail) rail.classList.toggle('open');
+      });
+    });
+
+    // ─── Copy buttons ─────────────────────────────────────────────────────────
+    document.querySelectorAll('pre').forEach(function(pre) {
+      if (!pre.parentNode) return;
+      var wrapper = document.createElement('div');
+      wrapper.className = 'code';
+      pre.parentNode.insertBefore(wrapper, pre);
+      wrapper.appendChild(pre);
+      var btn = document.createElement('button');
+      btn.className = 'copy-btn';
+      btn.textContent = 'Copy';
+      btn.addEventListener('click', function() {
+        var text = pre.textContent || '';
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(function() {
+            btn.textContent = 'Copied';
+            setTimeout(function() { btn.textContent = 'Copy'; }, 1200);
+          }, function() {
+            btn.textContent = 'Copy';
+          });
+        }
+      });
+      wrapper.insertBefore(btn, pre);
+    });
+
+    // ─── Tabs ─────────────────────────────────────────────────────────────────
+    document.querySelectorAll('.tabs').forEach(function(group) {
+      group.querySelectorAll('.tab-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var idx = btn.getAttribute('data-tab');
+          group.querySelectorAll('.tab-btn').forEach(function(b) {
+            b.classList.toggle('active', b === btn);
+          });
+          group.querySelectorAll('.tabpane').forEach(function(pane) {
+            pane.classList.toggle('active', pane.getAttribute('data-tab') === idx);
+          });
+        });
+      });
+    });
+
+    // ─── Filter tables ────────────────────────────────────────────────────────
+    document.querySelectorAll('.filter-input').forEach(function(input) {
+      input.addEventListener('input', function() {
+        var q = input.value.toLowerCase();
+        var container = input.closest('.filter-table');
+        if (!container) return;
+        container.querySelectorAll('tbody tr').forEach(function(row) {
+          var text = (row.textContent || '').toLowerCase();
+          row.style.display = text.includes(q) ? '' : 'none';
+        });
+      });
+    });
+
+    // ─── Scrollspy ────────────────────────────────────────────────────────────
+    if (typeof IntersectionObserver === 'undefined') return;
+    var headings = document.querySelectorAll('h2[id],h3[id]');
+    if (!headings.length) return;
+    var observer = new IntersectionObserver(function(entries) {
+      entries.forEach(function(entry) {
+        if (!entry.isIntersecting) return;
+        var id = entry.target.getAttribute('id');
+        document.querySelectorAll('.toc a').forEach(function(a) {
+          a.classList.toggle('active', a.getAttribute('href') === '#' + id);
+        });
+      });
+    }, { rootMargin: '0px 0px -70% 0px', threshold: 0 });
+    headings.forEach(function(h) { observer.observe(h); });
+  });
+})();</script>
+</body>
+</html>

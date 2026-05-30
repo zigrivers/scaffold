@@ -366,6 +366,13 @@ After any change to:
 - `lib/dashboard-theme.css` (styles, theme tokens)
 - Dashboard-related bats tests that affect rendered output
 
+This Playwright flow covers the **dashboard** only. **Reference guides**
+(`scaffold guides`, `content/guides/`) are not part of this harness: verify a
+guide visually by **opening its generated `index.html` and attaching a
+screenshot (desktop + mobile, light + dark) to the PR that first introduces a
+new shared directive or theme change**. Routine guide content edits need no
+visual check. See `content/guides/AUTHORING.md`.
+
 ### Setup & Verification Process
 
 ```bash

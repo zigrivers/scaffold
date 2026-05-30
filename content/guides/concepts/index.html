@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Scaffold Guides</title>
+<title>Concepts &amp; Glossary</title>
 <!-- scaffold:chrome v1 -->
 <style>/* Scaffold Dashboard Theme
  * All CSS for the generated pipeline dashboard.
@@ -1084,12 +1084,441 @@ figure.mermaid svg .edgeLabel text { fill: var(--text-muted); color: var(--text-
 <body>
 <header class="topbar">
   <button data-action="nav" class="nav-toggle" aria-label="Toggle navigation">☰</button>
-  <h1>Scaffold Guides</h1>
+  <h1>Concepts &amp; Glossary</h1>
   <button data-action="theme" class="theme-toggle" aria-label="Toggle theme">◐</button>
 </header>
 <div class="layout">
-  <aside class="rail"><nav class="toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#guides">Guides</a></li></ul></nav></aside>
-  <main class="content"><h2 id="guides">Guides</h2><ul class="guide-index"><li><a href="concepts/index.html"><strong>Concepts &amp; Glossary</strong></a><span class="cat">concepts</span><p>The shared vocabulary — worktrees, phases, lenses, verdicts, and the rest — that the other guides assume</p></li><li><a href="mmr/index.html"><strong>MMR Reference</strong></a><span class="cat">tools</span><p>Multi-Model Review — independent AI reviewers, reconciliation, and verdict gating</p></li><li><a href="pipeline/index.html"><strong>The Scaffold Pipeline</strong></a><span class="cat">concepts</span><p>The 16-phase meta-prompt pipeline — phases, dependencies, conditional steps, methodology depth, and how to navigate it</p></li><li><a href="cli/index.html"><strong>Scaffold CLI Reference</strong></a><span class="cat">reference</span><p>Every scaffold command grouped by purpose — setup, navigation, observability, knowledge, validation, version</p></li><li><a href="install/index.html"><strong>Install, Update &amp; Adopt</strong></a><span class="cat">reference</span><p>Installing via npm/Homebrew/plugin, keeping current, and adopting scaffold into a new or existing project</p></li><li><a href="review-workflow/index.html"><strong>The Code-Review Workflow</strong></a><span class="cat">workflows</span><p>When and how to run multi-model review — entry points, input modes, verdicts, the round limit, and degraded mode</p></li><li><a href="observability/index.html"><strong>Build Observability</strong></a><span class="cat">tools</span><p>A durable ledger of build decisions, fused with git/GitHub/MMR/state and audited against the planning docs by nine lenses</p></li><li><a href="knowledge-freshness/index.html"><strong>Knowledge Freshness</strong></a><span class="cat">tools</span><p>How knowledge entries stay current, how coverage gaps surface as Lens-I findings, and how the daily cron, five PR gates, and source allowlist keep the KB grounded</p></li><li><a href="multi-agent/index.html"><strong>Parallel Agents &amp; Worktrees</strong></a><span class="cat">workflows</span><p>Running agents in parallel — worktree setup/teardown, the ledger-harvest coupling, and the build-phase entry points</p></li><li><a href="dashboard/index.html"><strong>Dashboard &amp; Design System</strong></a><span class="cat">tools</span><p>The pipeline dashboard, its panels, the design-token system, and how to customize it safely</p></li><li><a href="knowledge/index.html"><strong>Knowledge Base</strong></a><span class="cat">reference</span><p>What the knowledge base is, how entries are injected during assembly, and how to author or override them</p></li></ul></main>
+  <aside class="rail"><nav class="toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#how-to-read-this-guide">How to read this guide</a></li><li class="toc-2"><a href="#pipeline-concepts">Pipeline concepts</a></li><li class="toc-3"><a href="#phase">Phase</a></li><li class="toc-3"><a href="#planning-vs-build-regime">Planning vs. build regime</a></li><li class="toc-3"><a href="#dependencies-hard-gate">dependencies (hard gate)</a></li><li class="toc-3"><a href="#reads-soft-reference">reads (soft reference)</a></li><li class="toc-3"><a href="#conditional-if-needed">Conditional / if-needed</a></li><li class="toc-3"><a href="#stateless-step">Stateless step</a></li><li class="toc-3"><a href="#create-vs-update-mode">CREATE vs. UPDATE mode</a></li><li class="toc-3"><a href="#methodology-preset">Methodology preset</a></li><li class="toc-3"><a href="#depth-15">Depth (1–5)</a></li><li class="toc-3"><a href="#overlay">Overlay</a></li><li class="toc-2"><a href="#observability-concepts">Observability concepts</a></li><li class="toc-3"><a href="#ledger">Ledger</a></li><li class="toc-3"><a href="#event">Event</a></li><li class="toc-3"><a href="#adapter">Adapter</a></li><li class="toc-3"><a href="#lens-ai">Lens (A–I)</a></li><li class="toc-3"><a href="#finding">Finding</a></li><li class="toc-3"><a href="#audit-verdict">Audit verdict</a></li><li class="toc-3"><a href="#fix-threshold">fix_threshold</a></li><li class="toc-3"><a href="#--fix-flow">--fix flow</a></li><li class="toc-3"><a href="#stall-signal">Stall signal</a></li><li class="toc-3"><a href="#phase-boundary-audit">Phase-boundary audit</a></li><li class="toc-3"><a href="#doc-conformance-channel">doc-conformance channel</a></li><li class="toc-2"><a href="#knowledge-concepts">Knowledge concepts</a></li><li class="toc-3"><a href="#knowledge-entry">Knowledge entry</a></li><li class="toc-3"><a href="#volatility-tier">Volatility tier</a></li><li class="toc-3"><a href="#knowledge-gap-signal">Knowledge-gap signal</a></li><li class="toc-2"><a href="#review-concepts">Review concepts</a></li><li class="toc-3"><a href="#channel">Channel</a></li><li class="toc-3"><a href="#compensating-pass">Compensating pass</a></li><li class="toc-3"><a href="#reconcile">Reconcile</a></li><li class="toc-3"><a href="#finding-key">finding_key</a></li><li class="toc-3"><a href="#mmr-verdict">MMR verdict</a></li><li class="toc-2"><a href="#multi-agent-concepts">Multi-agent concepts</a></li><li class="toc-3"><a href="#worktree">Worktree</a></li><li class="toc-3"><a href="#worktree-identity">Worktree identity</a></li><li class="toc-3"><a href="#ledger-harvest">Ledger harvest</a></li><li class="toc-3"><a href="#teardown">Teardown</a></li><li class="toc-2"><a href="#see-also">See also</a></li></ul></nav></aside>
+  <main class="content"><h2 id="how-to-read-this-guide">How to read this guide</h2>
+<p>Scaffold's other guides each go deep on one system; this one is the <strong>map of the
+vocabulary</strong> they share. Every term below gets a short definition and a link to
+the guide that owns the full story. When two guides use the same word slightly
+differently (a "verdict" in MMR vs. in the audit engine; a "lens" that lives in
+the audit but reasons about the knowledge base), this guide is where the seam is
+named.</p>
+<p>Terms cluster into four families:</p>
+<ul>
+<li><strong>Pipeline</strong> — how an idea becomes a build-ready spec.</li>
+<li><strong>Observability</strong> — the durable record of what the build actually did.</li>
+<li><strong>Review</strong> — how independent models gate changes.</li>
+<li><strong>Multi-agent</strong> — how parallel worktrees coordinate without stepping on each other.</li>
+</ul>
+<div class="filter-table"><input type="text" class="filter-input" placeholder="Filter…" aria-label="Filter table rows" disabled>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Term</th><th>Cluster</th><th>See also</th></tr></thead><tbody><tr><td>Phase</td><td>Pipeline</td><td><a href="../pipeline/index.md">pipeline</a></td></tr><tr><td>Planning vs. build regime</td><td>Pipeline</td><td><a href="../pipeline/index.md">pipeline</a></td></tr><tr><td><code>dependencies</code> (hard gate)</td><td>Pipeline</td><td><a href="../pipeline/index.md">pipeline</a></td></tr><tr><td><code>reads</code> (soft reference)</td><td>Pipeline</td><td><a href="../pipeline/index.md">pipeline</a></td></tr><tr><td>Conditional / <code>if-needed</code></td><td>Pipeline</td><td><a href="../pipeline/index.md">pipeline</a></td></tr><tr><td>Stateless step</td><td>Pipeline</td><td><a href="../pipeline/index.md">pipeline</a></td></tr><tr><td>CREATE vs. UPDATE mode</td><td>Pipeline</td><td><a href="../pipeline/index.md">pipeline</a></td></tr><tr><td>Methodology preset</td><td>Pipeline</td><td><a href="../pipeline/index.md">pipeline</a></td></tr><tr><td>Depth (1–5)</td><td>Pipeline</td><td><a href="../pipeline/index.md">pipeline</a></td></tr><tr><td>Overlay</td><td>Pipeline</td><td><a href="../pipeline/index.md">pipeline</a></td></tr><tr><td>Ledger</td><td>Observability</td><td><a href="../observability/index.md">observability</a></td></tr><tr><td>Event</td><td>Observability</td><td><a href="../observability/index.md">observability</a></td></tr><tr><td>Adapter</td><td>Observability</td><td><a href="../observability/index.md">observability</a></td></tr><tr><td>Lens (A–I)</td><td>Observability</td><td><a href="../observability/index.md">observability</a> · <a href="../knowledge-freshness/index.md">knowledge-freshness</a></td></tr><tr><td>Finding</td><td>Observability</td><td><a href="../observability/index.md">observability</a></td></tr><tr><td>Audit verdict</td><td>Observability</td><td><a href="../observability/index.md">observability</a></td></tr><tr><td><code>fix_threshold</code></td><td>Observability · Review</td><td><a href="../observability/index.md">observability</a> · <a href="../mmr/index.md">mmr</a></td></tr><tr><td><code>--fix</code> flow</td><td>Observability</td><td><a href="../observability/index.md">observability</a></td></tr><tr><td>Stall signal</td><td>Observability</td><td><a href="../observability/index.md">observability</a></td></tr><tr><td>Phase-boundary audit</td><td>Observability · Pipeline</td><td><a href="../observability/index.md">observability</a> · <a href="../pipeline/index.md">pipeline</a></td></tr><tr><td><code>doc-conformance</code> channel</td><td>Observability · Review</td><td><a href="../observability/index.md">observability</a> · <a href="../mmr/index.md">mmr</a></td></tr><tr><td>Knowledge entry</td><td>Knowledge</td><td><a href="../knowledge-freshness/index.md">knowledge-freshness</a> · <a href="../knowledge/index.md">knowledge</a></td></tr><tr><td>Volatility tier</td><td>Knowledge</td><td><a href="../knowledge-freshness/index.md">knowledge-freshness</a></td></tr><tr><td>Knowledge-gap signal</td><td>Knowledge</td><td><a href="../knowledge-freshness/index.md">knowledge-freshness</a></td></tr><tr><td>Channel</td><td>Review</td><td><a href="../mmr/index.md">mmr</a> · <a href="../review-workflow/index.md">review-workflow</a></td></tr><tr><td>Compensating pass</td><td>Review</td><td><a href="../mmr/index.md">mmr</a></td></tr><tr><td>Reconcile</td><td>Review</td><td><a href="../mmr/index.md">mmr</a></td></tr><tr><td><code>finding_key</code></td><td>Review</td><td><a href="../mmr/index.md">mmr</a></td></tr><tr><td>MMR verdict</td><td>Review</td><td><a href="../mmr/index.md">mmr</a></td></tr><tr><td>Worktree</td><td>Multi-agent</td><td><a href="../multi-agent/index.md">multi-agent</a> · <a href="../observability/index.md">observability</a></td></tr><tr><td>Worktree identity</td><td>Multi-agent</td><td><a href="../observability/index.md">observability</a></td></tr><tr><td>Ledger harvest</td><td>Multi-agent</td><td><a href="../observability/index.md">observability</a></td></tr><tr><td>Teardown</td><td>Multi-agent</td><td><a href="../observability/index.md">observability</a></td></tr></tbody></table></div>
+<h2 id="pipeline-concepts">Pipeline concepts</h2>
+<p>These describe the meta-prompt pipeline that turns an idea into a frozen,
+build-ready spec. Full treatment: <a href="../pipeline/index.md">the pipeline guide</a>.</p>
+<h3 id="phase">Phase</h3>
+<p>One of the <strong>16 ordered stages</strong> the pipeline divides into, numbered 0 (vision)
+through 15 (build). The phase list, slugs, numbers, and display names are defined
+exactly once, in the <code>PHASES</code> constant
+<span class="fp" data-path="src/types/frontmatter.ts:6">src/types/frontmatter.ts:6</span>; every doc, skill, and command resolves
+against it. Steps within a phase run in <code>order</code> sequence (phase N occupies the
+N00–N99 band). See <a href="../pipeline/index.md#the-16-phases-at-a-glance">the pipeline guide</a>.</p>
+<h3 id="planning-vs-build-regime">Planning vs. build regime</h3>
+<p>The pipeline splits into two regimes. <strong>Planning</strong> (phases 0–14) is <em>stateful</em>
+and <em>sequential</em> — each step produces a durable artifact and is run roughly once,
+in dependency order, working toward a frozen spec. <strong>Build</strong> (phase 15) is
+<em>stateless</em> and <em>on-demand</em> — the execution loops you run repeatedly while
+actually writing code. See <a href="../pipeline/index.md#the-mental-model">the pipeline guide</a>.</p>
+<h3 id="dependencies-hard-gate"><code>dependencies</code> (hard gate)</h3>
+<p>A step's frontmatter <code>dependencies</code> <span class="fp" data-path="src/types/frontmatter.ts:114">src/types/frontmatter.ts:114</span> are
+<strong>hard gates</strong>: <code>scaffold run</code> refuses a step until each dependency is
+<code>completed</code>, <code>skipped</code>, or disabled by the resolved pipeline/overlay (a disabled
+dep counts as satisfied). Contrast <code>reads</code>. See
+<a href="../pipeline/index.md#why-a-step-is-blocked">Why a step is blocked</a>.</p>
+<h3 id="reads-soft-reference"><code>reads</code> (soft reference)</h3>
+<p>A step's <code>reads</code> <span class="fp" data-path="src/types/frontmatter.ts:122">src/types/frontmatter.ts:122</span> are <strong>soft references</strong> — a
+step uses an upstream artifact if it's present, but a missing read never blocks
+execution (the assembler silently skips it). The
+<a href="../pipeline/index.md#why-a-step-is-blocked">pipeline guide</a> explains why
+<code>reads ≠ dependencies</code> is a common trip-up.</p>
+<h3 id="conditional-if-needed">Conditional / <code>if-needed</code></h3>
+<p>A step marked <code>conditional: 'if-needed'</code> <span class="fp" data-path="src/types/frontmatter.ts:118">src/types/frontmatter.ts:118</span> is
+enabled but only <em>applies</em> to certain project shapes (e.g. <code>database-schema</code>
+runs only if your project has a database layer). Conditional steps that don't
+apply count as "satisfied" for dependency purposes. See
+<a href="../pipeline/index.md#conditional-if-needed-steps">Conditional steps</a>.</p>
+<h3 id="stateless-step">Stateless step</h3>
+<p>A phase-15 build step with <code>stateless: true</code> <span class="fp" data-path="src/types/frontmatter.ts:126">src/types/frontmatter.ts:126</span>
+— it carries no completion state and can be run over and over (the agent loops,
+resume commands, <code>quick-task</code>, <code>new-enhancement</code>). The pipeline never tracks or
+gates these. See <a href="../pipeline/index.md#the-mental-model">the pipeline guide</a>.</p>
+<h3 id="create-vs-update-mode">CREATE vs. UPDATE mode</h3>
+<p>Every document-creating prompt detects whether its output file already exists. On
+first run it's <strong>CREATE mode</strong>; on a re-run it's <strong>UPDATE mode</strong>, which preserves
+human/team customizations and changes only what genuinely needs to change. This
+is what makes planning phases safe to iterate. See
+<a href="../pipeline/index.md#create-vs-update-mode">CREATE vs UPDATE mode</a>.</p>
+<h3 id="methodology-preset">Methodology preset</h3>
+<p><em>Which</em> steps are enabled. Three presets ship — <code>mvp</code>, <code>custom</code> (balanced), and
+<code>deep</code> (the schema default and most thorough). Presets are layered with
+<strong>overlays</strong>. See <a href="../pipeline/index.md#methodology-depth">Methodology &#x26; depth</a>.</p>
+<h3 id="depth-15">Depth (1–5)</h3>
+<p><em>How thorough</em> each enabled step's output is, on a 1–5 scale from Minimal to
+Exhaustive (depth 3 is the recommended default). Orthogonal to the preset:
+the preset picks the steps, depth dials each one's detail. At depth 4–5 some
+review/validation steps add external- or multi-model dispatch. See
+<a href="../pipeline/index.md#depth-15">Depth</a>.</p>
+<h3 id="overlay">Overlay</h3>
+<p>A preset layer (<code>content/methodology/*-overlay.yml</code>) applied on top of a
+preset. Overlays are either <strong>project-type</strong> (keyed by <code>project-type</code>, e.g.
+web-app, mobile, CLI, library) or <strong>structural</strong> (e.g. <code>multi-service</code>, which
+has no <code>project-type</code> and is activated by the presence of <code>services[]</code> in
+config). Most overlays only <strong>inject domain knowledge</strong> into existing steps; a
+few <strong>enable whole step families</strong> (game, multi-service). See
+<a href="../pipeline/index.md#project-type-playbooks">Project-type playbooks</a>.</p>
+<h2 id="observability-concepts">Observability concepts</h2>
+<p>These describe Build Observability — the durable record of what the build did,
+and the audit that checks it against the planning docs. Full treatment:
+<a href="../observability/index.md">the build observability guide</a>.</p>
+<h3 id="ledger">Ledger</h3>
+<p>The append-only <code>.scaffold/activity.jsonl</code> file where every durable observation
+lands as one JSON object per line. Writes are lock-guarded so parallel worktrees
+never corrupt it, each event is capped at 4 KiB, and secrets and home paths are
+redacted on the way in and out. See <a href="../observability/index.md#the-ledger">The ledger</a>.</p>
+<h3 id="event">Event</h3>
+<p>One typed entry in the ledger, written via <code>scaffold observe event &#x3C;type> …</code>.
+There are <strong>nine event types</strong> <span class="fp" data-path="src/observability/engine/types.ts:9">src/observability/engine/types.ts:9</span>
+(<code>task_claimed</code>, <code>task_completed</code>, <code>decision_recorded</code>, <code>blocker_hit</code>,
+<code>blocker_resolved</code>, <code>pr_opened</code>, <code>progress_heartbeat</code>, <code>finding_acknowledged</code>,
+<code>knowledge_gap_signal</code>), each with its own payload allow-list. See
+<a href="../observability/index.md#the-nine-event-types">The nine event types</a>.</p>
+<h3 id="adapter">Adapter</h3>
+<p>A component that <em>synthesizes</em> events from the surrounding tools (git, GitHub,
+MMR jobs, pipeline state, test runs) so the timeline reflects more than what
+agents chose to record. Eight adapters exist
+<span class="fp" data-path="src/observability/engine/types.ts:69">src/observability/engine/types.ts:69</span>; five emit replay events, three are
+availability probes. See <a href="../observability/index.md#adapters">Adapters</a>.</p>
+<h3 id="lens-ai">Lens (A–I)</h3>
+<p>An independent audit check function inside <code>scaffold observe audit</code>. The suite
+runs <strong>nine lenses, A through I</strong> — TDD coverage, AC coverage, coding-standards
+drift, tech-stack drift, design-system drift, scope, decisions, cross-doc
+consistency, and knowledge gaps. Lenses A–G run under <code>--scope code</code>, H and I
+under <code>--scope docs</code>. See
+<a href="../observability/index.md#the-nine-lens-audit">The nine-lens audit</a>. <strong>Lens I</strong>
+(<code>I-knowledge-gaps</code>) lives in the audit but reasons about the knowledge base —
+its full behavior is in <a href="../knowledge-freshness/index.md#lens-i-gap-detection-suppression">the knowledge-freshness guide</a>.</p>
+<h3 id="finding">Finding</h3>
+<p>A single issue a lens reports, carrying a severity (<code>P0</code>–<code>P3</code>), a title, a
+source doc, and an optional fix hint. Findings can be <code>open</code>, <code>acknowledged</code>
+(silenced via <code>scaffold observe ack</code>), or <code>skipped</code> (a lens whose required
+adapter was missing). See
+<a href="../observability/index.md#the-nine-lens-audit">The nine-lens audit</a>.</p>
+<h3 id="audit-verdict">Audit verdict</h3>
+<p>The overall result of an audit run. The engine computes exactly <strong>three</strong>
+verdicts <span class="fp" data-path="src/observability/engine/types.ts:6">src/observability/engine/types.ts:6</span>: <code>pass</code> (no blocking
+findings, no skipped lenses), <code>degraded-pass</code> (no blocking findings but ≥1 lens
+skipped), and <code>blocked</code> (≥1 open finding at or above <code>fix_threshold</code>). Note
+this is <strong>not</strong> the same set as MMR's four verdicts — see <a href="#mmr-verdict">MMR verdict</a>.
+See <a href="../observability/index.md#verdict-taxonomy">Verdict taxonomy</a>.</p>
+<h3 id="fix-threshold"><code>fix_threshold</code></h3>
+<p>The severity cutoff that decides which findings count as <em>blocking</em>. A finding
+blocks when its status is <code>open</code> and its severity is at or above the threshold
+(default <strong>P2</strong>). The threshold never hides findings — it only decides which
+ones drive a <code>blocked</code> verdict. The same name and default govern the MMR gate.
+See <a href="../observability/index.md#verdict-taxonomy"><code>fix_threshold</code></a> and the
+<a href="../mmr/index.md#the-gate-the-four-verdicts">MMR gate</a>.</p>
+<h3 id="--fix-flow"><code>--fix</code> flow</h3>
+<p><code>scaffold observe audit --fix</code> doesn't just report blocking findings — it
+dispatches an agent to fix each one, verifies the fix with a single-lens
+re-audit, and writes a post-fix report, all under abort-safe stashing. See
+<a href="../observability/index.md#the---fix-flow">The --fix flow</a>.</p>
+<h3 id="stall-signal">Stall signal</h3>
+<p>A staleness alert raised on the "Needs Attention" surface when
+<code>scaffold observe progress</code> runs — e.g. a claimed task with no recent activity,
+a PR that hasn't merged, an unaddressed blocker. Six signals are defined; five
+fire today. Thresholds are configurable under <code>stall:</code> in
+<code>.scaffold/observability.yaml</code>. See
+<a href="../observability/index.md#stall-detection-the-six-signals">Stall detection</a>.</p>
+<h3 id="phase-boundary-audit">Phase-boundary audit</h3>
+<p>A non-gating cross-document audit that fires automatically when a planning
+document at a phase boundary is marked complete. It runs only the <code>H-cross-doc</code>
+lens at <code>scope=docs</code>, prints a one-line summary, and never blocks the state
+transition. The six boundary steps are <code>user-stories</code>, <code>tech-stack</code>,
+<code>coding-standards</code>, <code>design-system</code>, <code>implementation-plan</code>, and
+<code>implementation-playbook</code>. See
+<a href="../observability/index.md#phase-boundary-triggers">Phase-boundary triggers</a> and
+the <a href="../pipeline/index.md#phase-boundary-audits">pipeline view</a>.</p>
+<h3 id="doc-conformance-channel"><code>doc-conformance</code> channel</h3>
+<p>The seam where the audit plugs into multi-model review: a built-in MMR channel
+that runs <code>scaffold observe audit --output-mode=mmr-findings</code> and emits findings
+in MMR's <code>Finding</code> shape. Disabled by default; enable with
+<code>--channels=doc-conformance</code>. See
+<a href="../observability/index.md#mmr-doc-conformance-channel">MMR doc-conformance channel</a>
+and the <a href="../mmr/index.md#channel-architecture">MMR channel architecture</a>.</p>
+<h2 id="knowledge-concepts">Knowledge concepts</h2>
+<p>These describe the knowledge base and how it stays current. Full treatment:
+<a href="../knowledge-freshness/index.md">the knowledge-freshness guide</a> and
+<a href="../knowledge/index.md">the knowledge guide</a>.</p>
+<h3 id="knowledge-entry">Knowledge entry</h3>
+<p>A domain-expertise document under <code>content/knowledge/&#x3C;category>/&#x3C;slug>.md</code>,
+injected into prompts during assembly. Each declares a <code>name</code>, <code>volatility</code>
+tier, and a list of <code>sources</code>. See
+<a href="../knowledge/index.md">the knowledge guide</a> and
+<a href="../knowledge-freshness/index.md#adding-a-new-entry-to-the-kb">Adding a new entry</a>.</p>
+<h3 id="volatility-tier">Volatility tier</h3>
+<p>How often an entry is expected to drift, on a three-tier scale — <code>fast-moving</code>,
+<code>evolving</code> (default), <code>stable</code> — which sets the daily cron's re-audit cadence
+(14 / 60 / 180 days). See
+<a href="../knowledge-freshness/index.md#cadence-model">the cadence model</a>.</p>
+<h3 id="knowledge-gap-signal">Knowledge-gap signal</h3>
+<p>A <code>knowledge_gap_signal</code> ledger event emitted when an agent hits a topic the KB
+doesn't cover. <strong>Lens I</strong> aggregates these over a rolling 90-day window into
+P1/P2 findings, suppressing any topic an entry already covers. This is where the
+observability and knowledge-freshness systems meet. See
+<a href="../knowledge-freshness/index.md#how-a-gap-closes">How a gap closes</a>.</p>
+<h2 id="review-concepts">Review concepts</h2>
+<p>These describe Multi-Model Review (MMR). Full treatment:
+<a href="../mmr/index.md">the MMR guide</a> and
+<a href="../review-workflow/index.md">the review-workflow guide</a>.</p>
+<h3 id="channel">Channel</h3>
+<p>One independent AI reviewer in an MMR run — a separate subprocess given the same
+prompt and run in isolation. The built-in channels are <code>codex</code>, <code>gemini</code>,
+<code>claude</code>, <code>grok</code>, and the opt-in <code>doc-conformance</code>; the <code>scaffold run</code> wrappers
+add a Superpowers code-reviewer <em>agent</em> channel. A channel is pure config data,
+not per-channel code. See <a href="../mmr/index.md#channel-architecture">Channel architecture</a>.</p>
+<h3 id="compensating-pass">Compensating pass</h3>
+<p>When a channel is degraded (not installed, auth-failed, timed out), MMR runs a
+<code>claude -p</code> pass focused on that channel's strength area, labeled e.g.
+<code>[compensating: Grok-equivalent]</code>. These findings are single-source and
+low-confidence. See <a href="../mmr/index.md#degraded-mode-compensation-auth">Degraded mode</a>.</p>
+<h3 id="reconcile">Reconcile</h3>
+<p>The step that groups every channel's findings by a stable key, de-duplicates
+them, and scores each group for agreement and confidence — producing the single
+list and verdict. Agreement <em>between</em> channels raises confidence; disagreement
+surfaces ambiguity. <code>mmr reconcile</code> also folds an external agent channel's
+findings into an existing job. See
+<a href="../mmr/index.md#findings-reconciliation-verdicts">Findings, reconciliation &#x26; verdicts</a>.</p>
+<h3 id="finding-key"><code>finding_key</code></h3>
+<p>The stable identity MMR computes for a finding so the same issue can be tracked
+across rounds and acknowledgments. Line numbers are stripped from the location
+and severity is excluded, so the same issue at P1 vs. P2 collapses to one key;
+a character-5-gram shingle backs a fuzzy match for re-worded findings. See
+<a href="../mmr/index.md#stable-identity-finding-key">Stable identity</a>.</p>
+<h3 id="mmr-verdict">MMR verdict</h3>
+<p>The gate result of a review. MMR computes <strong>four</strong> verdicts: <code>pass</code>,
+<code>degraded-pass</code>, <code>blocked</code>, and <code>needs-user-decision</code> (no channel completed).
+Proceed only on <code>pass</code> or <code>degraded-pass</code>.</p>
+<div class="callout callout-warning"><p><strong>Two verdict vocabularies — don't conflate them.</strong> The MMR review gate has
+<em>four</em> verdicts (the fourth, <code>needs-user-decision</code>, fires when no channel
+completes). The Build Observability audit engine emits only <em>three</em> —
+<code>needs-user-decision</code> is <strong>not</strong> an audit-engine verdict. See
+<a href="../mmr/index.md#the-gate-the-four-verdicts">the MMR gate</a> and
+<a href="../observability/index.md#verdict-taxonomy">the audit verdict taxonomy</a>.</p></div>
+<h2 id="multi-agent-concepts">Multi-agent concepts</h2>
+<p>These describe how parallel agents share a repo without colliding. Full
+treatment: <a href="../multi-agent/index.md">the multi-agent guide</a>, with the durable
+record covered in <a href="../observability/index.md">the observability guide</a>.</p>
+<h3 id="worktree">Worktree</h3>
+<p>An isolated git working tree used for parallel agent execution, so multiple
+agents (and humans) can build different parts of a project at once without
+sharing a checkout. Each worktree has its own ledger. See
+<a href="../multi-agent/index.md">the multi-agent guide</a>.</p>
+<h3 id="worktree-identity">Worktree identity</h3>
+<p>The stable per-worktree identity recorded in <code>.scaffold/identity.json</code> on first
+write — a <code>worktree_id</code> (UUID), a <code>worktree_label</code>, and <code>created_at</code>. It's what
+lets the harvester tell one worktree's events from another's, and what stamps
+every event's <code>worktree_id</code>. See
+<a href="../observability/index.md#worktree-identity">Worktree identity</a>.</p>
+<h3 id="ledger-harvest">Ledger harvest</h3>
+<p>Copying a worktree's local ledger into the primary repo's archive <em>before</em> the
+worktree is removed, so the build's reasoning survives teardown.
+<code>harvest --recover</code> separately rotates already-harvested stale entries from
+<code>.scaffold/activity-archive/active/</code> into the monthly <code>YYYY-MM.jsonl</code> archives
+when their worktree is no longer live — it does <strong>not</strong> rescue an unharvested
+ledger; that ledger is lost once the worktree is removed. See
+<a href="../observability/index.md#harvest-recover-teardown">Harvest, recover &#x26; teardown</a>.</p>
+<h3 id="teardown">Teardown</h3>
+<p>Removing a finished worktree the safe way — <code>scripts/teardown-agent-worktree.sh</code>
+harvests the ledger first, then runs <code>git worktree remove</code>, then deletes the
+workspace branch. Harvesting before removal is what closes the
+decisions-die-at-teardown gap. See
+<a href="../observability/index.md#harvest-recover-teardown">Harvest, recover &#x26; teardown</a>.</p>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="../pipeline/index.md">The Scaffold Pipeline</a> — phases, dependencies, presets, depth.</li>
+<li><a href="../observability/index.md">Build Observability</a> — ledger, events, the nine lenses, verdicts, <code>--fix</code>.</li>
+<li><a href="../knowledge-freshness/index.md">Knowledge Freshness</a> — volatility tiers, gap signals, Lens I.</li>
+<li><a href="../mmr/index.md">MMR Reference</a> — channels, reconciliation, the four verdicts.</li>
+<li><a href="../multi-agent/index.md">Multi-agent</a> — worktrees and parallel execution.</li>
+<li><a href="../review-workflow/index.md">Review workflow</a> — running reviews end to end.</li>
+<li><a href="../cli/index.md">CLI reference</a> — the full command surface.</li>
+</ul></main>
 </div>
 <script>(function(){
   var LS_KEY = 'guide-theme';

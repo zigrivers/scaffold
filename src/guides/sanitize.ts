@@ -42,6 +42,7 @@ export const guideSanitizeSchema: Schema = {
       'className',
       'role',
       'dataTab',
+      'dataPath',
       'ariaLabel',
       'style',
       // SVG geometry & presentation (safe; no execution risk)
