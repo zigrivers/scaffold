@@ -263,8 +263,13 @@ grok models >/dev/null 2>&1 && echo "Grok authed" || echo "Run: grok login"
 codex exec --skip-git-repo-check -s read-only --ephemeral "PROMPT" 2>/dev/null
 NO_BROWSER=true gemini -p "PROMPT" --output-format json --approval-mode yolo 2>/dev/null
 claude -p "PROMPT" --output-format json 2>/dev/null
-# grok ignores stdin — pass the prompt via a file:
-grok --prompt-file PROMPT_FILE --output-format json 2>/dev/null
+# grok ignores stdin — pass an ABSOLUTE prompt-file path. Hardened review posture:
+# isolated HOME/cwd (strips host config: skills/MCP/hooks/instructions), no
+# cross-session memory, web-only tools (denies filesystem reads).
+# NOTE: --prompt-file must be ABSOLUTE — a neutral HOME/cwd breaks relative paths.
+HOME="$(mktemp -d)" XDG_CONFIG_HOME="$HOME" grok --prompt-file "$PROMPT_FILE" \
+  --output-format json --no-memory --tools web_search,web_fetch \
+  --no-subagents --no-plan 2>/dev/null
 ```
 
 ## Project Structure Quick Reference

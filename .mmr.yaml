@@ -20,6 +20,9 @@
 # round-trips that routinely take 9-14s in practice, well over the
 # legacy 5s default. Codex's check (`codex login status`) is a local
 # file probe and stays at the default.
+# To override grok channel flags (e.g. for closed-book / no-web mode), you must
+# restate the ENTIRE flags array — MMR replaces arrays, it does not append them.
+# See packages/mmr/README.md § "Grok channel — closed-book override" for the full example.
 channels:
   claude:
     auth:

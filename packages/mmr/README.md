@@ -497,3 +497,23 @@ unnecessary; if a review returns `needs-user-decision` (e.g. the diff touches
 re-run with the appropriate trust flag above yourself.
 
 Full documentation: [scaffold README](https://github.com/zigrivers/scaffold#mmr--multi-model-review-cli)
+
+## Grok channel — closed-book override
+
+By default the built-in grok channel keeps web search **on** (`--tools web_search,web_fetch`). To run grok closed-book (no web access), you must override `channels.grok.flags` in `.mmr.yaml`. Because MMR's config merge **replaces arrays** (not appends), a `flags` override must restate the **entire** hardened array and add `--disable-web-search`. Any file-path flag you add must be **absolute** — the channel runs in a neutral `cwd`, so relative paths silently break.
+
+```yaml
+channels:
+  grok:
+    flags:
+      - --prompt-file
+      - '{{prompt_file}}'
+      - --output-format
+      - json
+      - --no-memory
+      - --tools
+      - web_search,web_fetch
+      - --no-subagents
+      - --no-plan
+      - --disable-web-search   # closed-book: no web
+```
