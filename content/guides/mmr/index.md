@@ -87,7 +87,7 @@ table.
 | `--format <json\|text\|markdown>` | output | Output format. Default `json`. |
 | `--sync` | mode | Run the full pipeline (dispatch → parse → reconcile → verdict) and return results. Without it, dispatch is fire-and-forget. |
 | `--dry-run` | mode | Resolve the diff and assemble the prompt without dispatching any channel. |
-| `--session <id>` | rounds | Link this run into a multi-round session (`[A-Za-z0-9_-]`) :cite[packages/mmr/src/commands/review.ts:289]. |
+| `--session <id>` | rounds | Link this run into a multi-round session; the id must match `^[A-Za-z0-9_-]+$` and not be a reserved name :cite[packages/mmr/src/commands/sessions.ts:15]. |
 | `--round <n>` | rounds | 1-based round counter within a session. |
 | `--max-rounds <n>` | rounds | Hard cap on rounds. Defaults to 5 when `--session` is set without it. |
 | `--accept-new-acks` | trust | Trust acknowledgment files newly introduced by the diff. |
@@ -267,10 +267,11 @@ only):* a new subprocess channel (`command` + `flags` + `auth` +
 `regex-findings` parser kinds, disabling/timeout overrides, and pointing the
 compensator at a different channel — all pure `.mmr.yaml`. *Needs code:* a
 brand-new *named* parser must be registered in `core/parser.ts`
-:cite[packages/mmr/src/core/parser.ts:257]{mode=advisory}; HTTP-endpoint
-channels (`kind: http`) need the planned http-dispatcher; and the
+:cite[packages/mmr/src/core/parser.ts:257]{mode=advisory}; and the
 `COMPENSATING_FOCUS` map carries per-channel focus text (falls back gracefully
-if absent).
+if absent). HTTP-endpoint channels (`kind: http`) are already supported via
+`dispatchHttpChannel` — pure `.mmr.yaml`, no extra code
+:cite[packages/mmr/src/config/schema.ts:144].
 
 ## Scaffold wrappers
 
@@ -321,8 +322,10 @@ finding_key = sha1( normLocation | category | sha1(normDescription) | sha1(normS
 Line numbers are stripped from the location and severity is *excluded*, so the
 same issue at P1 vs P2 collapses to one key
 :cite[packages/mmr/src/core/stable-id.ts:115]. A character-5-gram shingle backs
-a Jaccard ≥ 0.7 fuzzy match when wording drifts between rounds
-:cite[packages/mmr/src/core/reconciler.ts:83].
+a Jaccard ≥ 0.7 fuzzy match. Intra-run, findings group by fuzzy shingle overlap
+:cite[packages/mmr/src/core/reconciler.ts:83]; across rounds, the ack store reuses
+the same threshold so a re-worded finding still matches a prior ack
+:cite[packages/mmr/src/core/ack-store.ts:8].
 
 ### Agreement & confidence
 
@@ -345,9 +348,11 @@ The gate **passes** when every unacknowledged finding is *below* the
 :sev[P0]{level=p0} (highest) → :sev[P1]{level=p1} → :sev[P2]{level=p2} →
 :sev[P3]{level=p3} (lowest).
 
-The verdict is derived from gate result + channel health, priority `blocked` >
-`needs-user-decision` > `degraded-pass` > `pass`
-:cite[packages/mmr/src/core/reconciler.ts:239].
+The verdict is derived from gate result + channel health, in this branch order:
+**zero channels completed → `needs-user-decision`**; else a failed gate →
+`blocked`; else some channels incomplete → `degraded-pass`; else `pass`
+:cite[packages/mmr/src/core/reconciler.ts:247]. (The no-completed-channels case
+short-circuits first, so it outranks `blocked`.)
 
 | Verdict | Condition | Exit |
 | --- | --- | --- |
