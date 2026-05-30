@@ -3,7 +3,7 @@ import path from 'node:path'
 import { atomicWriteFile, getPackageRoot, getPackageGuidesDir } from '../utils/fs.js'
 import { buildGuidesIndex, extractGuideFrontmatter } from './loader.js'
 import { renderGuideBody } from './render.js'
-import { remarkCallout, remarkTabs, remarkFilterTable, remarkChart, remarkSev } from './directives.js'
+import { remarkCallout, remarkTabs, remarkFilterTable, remarkChart, remarkSev, remarkCite } from './directives.js'
 import { remarkMermaid, pruneDiagrams } from './mermaid.js'
 import { wrapInChrome } from './template.js'
 import { renderIndexPage } from './index-page.js'
@@ -38,7 +38,7 @@ export async function buildGuide(args: BuildGuideArgs): Promise<{ lint: LintResu
   const diagramIds: string[] = []
   const { body, headings } = await renderGuideBody(md, {
     plugins: [
-      remarkCallout, remarkTabs, remarkFilterTable, remarkChart, remarkSev,
+      remarkCallout, remarkTabs, remarkFilterTable, remarkChart, remarkSev, remarkCite,
       remarkMermaid({ guideDir: args.guideDir, render: args.mermaidRender, collect: diagramIds }),
     ],
   })
