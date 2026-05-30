@@ -22,7 +22,8 @@ const GUIDE_MD = path.join(REPO_ROOT, 'content/guides/knowledge-freshness/index.
 
 // ─── KB inventory ──────────────────────────────────────────────
 function extractFrontmatter(text) {
-  const m = /^---\n([\s\S]*?)\n---/.exec(text)
+  // CRLF-tolerant so Windows checkouts don't silently parse 0 entries.
+  const m = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text)
   if (!m) return null
   const out = {}
   for (const line of m[1].split('\n')) {
@@ -51,7 +52,7 @@ for (const f of kbFiles) {
   totalEntries++
   const category = path.dirname(path.relative(KB_ROOT, f)) || '.'
   categoryCount[category] = (categoryCount[category] || 0) + 1
-  const fmBlock = /^---\n([\s\S]*?)\n---/.exec(text)?.[1] ?? ''
+  const fmBlock = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text)?.[1] ?? ''
   for (const um of fmBlock.matchAll(/url:\s*['"]?(https?:\/\/[^'"\s]+)/g)) {
     try {
       const h = new URL(um[1]).hostname.replace(/^www\./, '')
@@ -61,6 +62,9 @@ for (const f of kbFiles) {
 }
 
 // ─── Allowlist + categories ────────────────────────────────────
+// MAINTENANCE: CATEGORY_MAP is a parallel source of truth to
+// authoritative-sources.yaml. A host added to the YAML renders as 'other' in the
+// generated allowlist table until it is also added here. Keep them in sync.
 const CATEGORY_MAP = {
   'owasp.org': 'security', 'nist.gov': 'security', 'ietf.org/rfc': 'standards',
   'www.rfc-editor.org': 'standards', 'openid.net': 'security',
@@ -165,7 +169,8 @@ for (const [name, body] of Object.entries(BLOCKS)) {
     console.error(`ERROR: marker block "${name}" not found in ${path.relative(REPO_ROOT, GUIDE_MD)}`)
     process.exit(1)
   }
-  md = md.replace(re, `${open}\n${body}\n${close}`)
+  // Replacer function guarantees literal insertion (a `$&`/`$1` in body is inert).
+  md = md.replace(re, () => `${open}\n${body}\n${close}`)
 }
 fs.writeFileSync(GUIDE_MD, md)
 console.log(

@@ -86,7 +86,7 @@ P1 / P2"]
     RESOLVER["3-tier --knowledge-root resolver
 suppresses covered topics"] --> LENSI
   end
-  FINDING -.->|operator adds an entry whose name: matches the bucket| APPLY
+  FINDING -.->|operator adds an entry whose name: matches the bucket → PR| GATES
 ```
 
 Three real hooks sit beside the two arms: the **phase-audit hook** (runs Lens H
@@ -122,6 +122,14 @@ runtime readers tolerate missing optional fields.
 | `last-reviewed` | ISO date | `null` | `YYYY-MM-DD` & real calendar date | prefilter cadence |
 | `version-pin` | string | `null` | any string (e.g. `"OWASP Top 10 2021"`) | audit prompt; `superseded` verdict signals it must advance manually |
 | `sources[]` | object[] | `[]` | each: `url` (SSRF-checked at fetch), `anchor` (optional, starts with `#`), `retrieved` (ISO date), `hash` (sha256) | prefilter (hash + cadence), audit runner (prefetch) |
+
+:::callout{type=warning}
+**`name` vs. gap-topic regex.** An entry `name` must start with a letter
+(`/^[a-z][a-z0-9-]*$/`), but Lens I gap *topics* allow a leading digit
+(`/^[a-z0-9]+(-[a-z0-9]+)*$/`). So a gap signalled for a topic like `3d-rendering`
+cannot be suppressed by an entry of the same name — pick a letter-leading `name`
+(and list the numeric form under `topics`) when closing such a gap.
+:::
 
 :::callout{type=note}
 **Anchor semantics.** Put fragments in `anchor`, never inside `url`. The audit
@@ -237,7 +245,9 @@ meta-prompt that runs a grounded LLM against pre-fetched source bodies.
 
 An entry becomes a candidate when (1) it has at least one source, AND (2) either
 its `last-reviewed` is older than the cadence window, OR a source's prefetched
-hash differs from the stored one. Priority orders newest-first; the top `--max`
+hash differs from the stored one. Priority orders highest-score first: unreviewed
+entries (100), then overdue entries (`50 + ageDays`, so the oldest rank highest),
+with in-window hash changes at 75; the top `--max`
 win (:cite[src/knowledge-freshness/audit-prefilter.ts:14-72]):
 
 ```ts
@@ -269,15 +279,16 @@ can inspect the proposed diff, then `--open-pr` creates the branch.
 
 | Verdict | What the PR contains |
 | --- | --- |
-| `current` | Frontmatter-only: bumps `last-reviewed`, `sources[*].hash`, `sources[*].retrieved` so the entry exits the queue. Verdict JSON embedded for provenance. |
+| `current` | Frontmatter-only: bumps `last-reviewed`, `sources[*].hash`, `sources[*].retrieved` so the entry exits the queue. |
 | `minor-drift` | Frontmatter persistence + findings table as commentary. `applyVerdictToEntry` refuses any `proposed_changes` on this verdict (:cite[src/knowledge-freshness/audit-apply.ts:54-58]); no body edits. |
 | `major-drift` | Body edits land via `proposed_changes` (H2-heading-anchored splices). Gate 4 blocks if a stable entry's diff exceeds 20% churn without the override label. |
 | `superseded` | A new edition shipped; `version-pin` must advance. `last-reviewed` does **not** advance (:cite[src/knowledge-freshness/audit-apply.ts:103-118]) — only `hash`/`retrieved` update, so the entry stays due until a human re-audits. Prevents a known-stale entry from looking fresh. |
 
 ### PR generation
 
-Branch: `knowledge-freshness/<entry>-<YYYY-MM-DD>`. The body embeds the verdict
-JSON, the findings table, and a per-source confirmation row. Each candidate gets
+Branch: `knowledge-freshness/<entry>-<YYYY-MM-DD>`. `renderPrBody` renders a
+summary, the verdict fields, a findings table, the sources, and any preserve
+warnings (it does not embed the raw verdict JSON). Each candidate gets
 its own PR off `origin/main` — the cron `git checkout main` between iterations
 and restores the entry between the dry-run apply (for gates) and the final
 `--open-pr` call. PRs do not stack; failures isolate per-candidate.
@@ -487,8 +498,11 @@ Out-of-allowlist sources warn but don't block (decision #4). Bare hostnames
 match subdomains; `host/path` entries additionally require the URL path to start
 with the prefix; `github_repos` is locked to specific `owner/repo`.
 
-The allowlist gates **only** Gate 3 (`lint-unsourced`), which is advisory.
-Off-allowlist sources still get fetched, hashed, and audited — they just warn.
+The off-allowlist warning is **advisory** and is surfaced by the
+frontmatter-validation path (`validateKnowledgeFile`), not by a gate. Gate 3
+(`lint-unsourced`) is a separate advisory check that flags nearby links not
+covered by the entry's declared `sources[]` domains. Off-allowlist sources still
+get fetched, hashed, and audited — they just warn.
 It is **not** a security boundary: the SSRF guard
 (`src/knowledge-freshness/source-url-validator.ts`) runs independently, so a new
 host never unlocks private-IP fetches. The editorial bar is: "would the
@@ -631,7 +645,10 @@ Adding a host is a one-line PR to
    (bare entries auto-match subdomains).
 2. **Verify the host is live** — `curl -sI https://<host>/<path>` should return
    2xx (or a 3xx that ultimately resolves).
-3. **Open a normal PR.** Allowlist additions are not a separate trust delegation;
+3. **Mirror the category** in `CATEGORY_MAP` in
+   `scripts/build-freshness-reference.mjs` — otherwise the regenerated allowlist
+   table shows the new host as `other`.
+4. **Open a normal PR.** Allowlist additions are not a separate trust delegation;
    any maintainer can review.
 
 ## Anthropic vs DeepSeek (cron uses DeepSeek)
@@ -736,7 +753,9 @@ is consistent throughout.
 
 The cron logs `audit failed for <name> — moving on` and continues; the entry
 stays in tomorrow's queue. Causes: provider auth (key rotated), source URL now
-404s, source body too large (96 KiB cap), LLM timeout. Reproduce locally:
+404s, a fetch/HTTP error or the 5 MiB fetch-and-hash cap, dispatcher error, or
+LLM timeout. (A source body over the 96 KiB embed cap is **truncated** and
+flagged `truncated: true` — it does not fail the audit.) Reproduce locally:
 
 ```bash
 DEEPSEEK_API_KEY=sk-… node dist/index.js knowledge-freshness \
