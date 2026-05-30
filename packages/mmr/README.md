@@ -274,7 +274,7 @@ mmr review --pr 42 --dry-run
 Each reconciled finding now carries a `finding_key` — a deterministic hash
 built from the **normalized** location and category plus a SHA-1 of the
 normalized description and suggestion (severity is intentionally *not* part of
-the key). The SHA-1 here is a fast **content-identity** digest for
+the key). The SHA-1 here is a **content-identity** digest for
 deduplicating findings across rounds — not a security primitive — so its
 collision resistance is irrelevant (a chance collision would merely merge two
 unrelated findings, which is both astronomically unlikely and harmless).
