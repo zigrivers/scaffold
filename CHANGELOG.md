@@ -4,9 +4,21 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
-### Added — Knowledge-freshness DeepSeek provider
+## [3.29.0] — 2026-05-30
 
-Adds DeepSeek as an alternative LLM provider for the per-entry audit dispatch in the daily knowledge-freshness cron. Anthropic remains the default for local development; the cron defaults to DeepSeek via repo secret. MMR review (Codex / Gemini / Claude channels) is unchanged.
+This release adds two headline subsystems — the reference-guides pipeline and the daily knowledge-freshness audit cron — plus a new build-observability audit lens and a `validate-knowledge` command. All changes are additive; the only compatibility note is a Node engine floor bump. (The MMR CLI ships separately as `@zigrivers/mmr` 1.4.0 — see `packages/mmr/CHANGELOG.md`.)
+
+### Added
+
+- **Reference guides — `scaffold guides`.** A markdown-source → checked-in-HTML reference-guide system under `content/guides/<topic>/index.md`. `scaffold guides` opens the index, `scaffold guides <topic>` opens a guide, `scaffold guides --list [--format json]` discovers topics, and `scaffold guides <topic> --markdown` / `--print-path` give agents the source. Authoring uses markdown directives (`:::callout`, `::::tabs`, `:::filter-table`, `:::chart`, `:sev[...]`, fenced `mermaid`). Maintainers regenerate with `scaffold guides --build`; a `make guides-check` drift gate (regenerate + verify-no-drift + HTML sanitize scan) is part of `make check-all`.
+- **Knowledge-freshness audit subsystem — `scaffold knowledge-freshness …`.** A daily cron audits each knowledge entry against its declared authoritative sources and opens refresh PRs when entries drift. New subcommands: `audit-prefilter`, `audit-run-entry`, `audit-apply`, `link-check`, `lint-unsourced`, `anti-over-rewrite`, `deep-guidance-check`, `bump-version`. Knowledge entries gain four frontmatter fields — `volatility`, `last-reviewed`, `version-pin`, `sources` — backfilled across the knowledge base, and a tracked `content/knowledge/VERSION`. Ships three GitHub Actions workflows (`knowledge-freshness-audit`, `-gates`, `-version-bump`).
+- **`scaffold validate-knowledge`.** Validates the new freshness frontmatter on every knowledge entry (including an advisory check that source hosts appear in `docs/knowledge-freshness/authoritative-sources.yaml`). Wired into `make validate-knowledge` and `make check-all`.
+- **Audit Lens I — knowledge gaps (`I-knowledge-gaps`).** Extends the build-observability audit suite (A–H) with a lessons-scanner that detects missing knowledge entries, with existing-entry suppression and a `--knowledge-root` flag (also `lenses.I-knowledge-gaps.knowledge_root` in `.scaffold/observability.yaml`).
+- **Reference-page citation-drift check — `make check-reference-citations`** (alias `make check-freshness-citations`). Verifies that `file:line` citations across `docs/` reference pages resolve and that generated pages rebake to a no-op. Part of `make check-all`.
+
+**DeepSeek provider for the knowledge-freshness cron.**
+
+Adds DeepSeek as an alternative LLM provider for the per-entry audit dispatch in the daily knowledge-freshness cron. Anthropic remains the default for local development; the cron defaults to DeepSeek via repo secret. This provider applies only to the knowledge-freshness cron — MMR code review is independent of it (and ships its own changes separately in `@zigrivers/mmr` 1.4.0).
 
 **New env vars / flags:**
 - `DEEPSEEK_API_KEY` — repo secret / env var; required for the deepseek provider.
@@ -30,6 +42,20 @@ Adds DeepSeek as an alternative LLM provider for the per-entry audit dispatch in
 - Decision-#7 invariant preserved: Anthropic command and DeepSeek URL/model-allowlist are literal constants in source; project config cannot redirect either dispatcher.
 
 See `docs/knowledge-freshness/operations.md` §4 "Choosing a provider" for the full operator guide.
+
+### Changed
+
+- **`make check-all` is stricter.** It now also runs `validate-knowledge`, `check-reference-citations`, and `guides-check`. Builds that previously passed may surface new gate failures until brought into conformance.
+- **`engines.node` raised from `>=18` to `>=18.17.0`.** Node 18.0–18.16 installs no longer satisfy the engine constraint; upgrade to Node 18.17+ (or a current LTS).
+
+### Fixed
+
+- **`scripts/teardown-agent-worktree.sh` refuses to delete the repository's default branch**, preventing accidental loss of `main` during agent-worktree teardown.
+
+### Security
+
+- **Generated guide HTML is sanitized.** Untrusted guide markdown is rendered through `rehype-sanitize` plus a dedicated mermaid sanitizer, and the `guides-check` gate includes a security scan of the output — relevant because guide HTML is checked into the repo and opened in a browser.
+- **Knowledge-freshness source fetching is SSRF-guarded.** Source URLs are validated at schema time and re-checked at fetch time — with a DNS-rebinding guard that pins resolved IPs — rejecting non-HTTP(S) schemes and loopback, private, link-local, CGNAT, ULA, multicast, and reserved address ranges. Separately, an advisory `docs/knowledge-freshness/authoritative-sources.yaml` allowlist emits validate-time *warnings* for declared freshness sources (a freshness-policy check, not the security boundary). The DeepSeek dispatcher's URL and model allowlist are literal source constants that project config cannot redirect.
 
 ## [3.28.0] — 2026-05-24
 

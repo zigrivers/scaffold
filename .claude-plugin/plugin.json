@@ -1,6 +1,6 @@
 {
   "name": "scaffold",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "description": "AI-powered software project scaffolding — CLI pipeline with auto-activated skills for Claude Code",
   "author": {
     "name": "zigrivers"
