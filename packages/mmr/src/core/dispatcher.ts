@@ -4,6 +4,7 @@ import path from 'node:path'
 import { TERMINAL_STATUSES } from '../types.js'
 import type { ChannelStatus } from '../types.js'
 import type { JobStore } from './job-store.js'
+import { withNeutralPosture, sweepStaleNeutralDirs } from './host-isolation.js'
 
 export interface DispatchOptions {
   command: string
@@ -19,6 +20,9 @@ export interface DispatchOptions {
    * placeholder is present), for CLIs that require the prompt as an arg.
    */
   promptDelivery?: 'stdin' | 'prompt-file'
+  /** Working directory for the spawned process. {{neutral_cwd}} is expanded
+   *  (with {{neutral_home}} in env) into a per-run isolated dir before spawn. */
+  cwd?: string
 }
 
 /** Placeholder token replaced with the prompt-file path in prompt-file mode. */
@@ -47,6 +51,14 @@ function ensureCleanupRegistered(): void {
   process.on('SIGTERM', () => { cleanupChildren(); process.exit(143) })
 }
 
+// Sweep stale neutral dirs once at process start
+let sweepDone = false
+function ensureSweepOnce(): void {
+  if (sweepDone) return
+  sweepDone = true
+  try { sweepStaleNeutralDirs() } catch { /* best effort — never block dispatch */ }
+}
+
 /** Check whether a channel status represents a terminal (done) state */
 export function isChannelComplete(status: ChannelStatus): boolean {
   return TERMINAL_STATUSES.has(status)
@@ -60,6 +72,7 @@ export async function dispatchChannel(
   opts: DispatchOptions,
 ): Promise<void> {
   ensureCleanupRegistered()
+  ensureSweepOnce()
 
   if (!/^[a-zA-Z0-9._-]+$/.test(channelName)) {
     throw new Error(`Unsafe channel name: ${channelName}`)
@@ -97,11 +110,16 @@ export async function dispatchChannel(
     : opts.stderr === 'capture' ? 'pipe'
       : 'ignore'  // suppress
 
+  // Expand neutral posture placeholders ({{neutral_home}}, {{neutral_cwd}});
+  // for channels without placeholders, withNeutralPosture is a passthrough.
+  const posture = withNeutralPosture(opts.env, opts.cwd)
+
   // Pipe prompt via stdin to avoid E2BIG on large diffs
   const proc = spawn(cmd, args, {
     detached: true,
     stdio: ['pipe', 'pipe', stderrStdio],
-    env: { ...process.env, ...opts.env },
+    env: { ...process.env, ...posture.env },
+    cwd: posture.cwd,   // undefined ⇒ inherit parent cwd (unchanged for non-isolated channels)
   })
 
   if (proc.pid) activeChildren.add(proc.pid)
@@ -164,6 +182,7 @@ export async function dispatchChannel(
       if (stderr) {
         store.saveChannelLog(jobId, channelName, stderr)
       }
+      posture.cleanup()
       resolve()
     }, timeoutMs)
 
@@ -191,6 +210,7 @@ export async function dispatchChannel(
           completed_at: completedAt,
         })
       }
+      posture.cleanup()
       resolve()
     })
 
@@ -205,6 +225,7 @@ export async function dispatchChannel(
         completed_at: new Date().toISOString(),
       })
       store.saveChannelLog(jobId, channelName, err.message)
+      posture.cleanup()
       resolve()
     })
   })
