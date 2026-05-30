@@ -120,6 +120,10 @@ const CommonChannelFields = {
   //                   CLIs like grok whose prompt flag requires an arg value
   //                   and ignore stdin. Omitted ⇒ stdin.
   prompt_delivery: z.enum(['stdin', 'prompt-file']).optional(),
+  // Working directory for the spawned process. Used by host-isolation to run a
+  // channel in a neutral cwd (clears grok's cwd-scoped projectInstructions).
+  // Supports the {{neutral_cwd}} placeholder expanded at dispatch/auth time.
+  cwd: z.string().optional(),
   output_parser: OutputParserSchema.default('default'),
   stderr: z.enum(['suppress', 'capture', 'passthrough']).default('capture'),
   timeout: z.number().optional(),
