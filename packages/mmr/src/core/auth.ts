@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process'
 import type { ChannelConfigParsed, HttpChannelParsed, SubprocessChannelParsed } from '../config/schema.js'
 import { deriveProbeUrl } from '../config/schema.js'
+import { withNeutralPosture } from './host-isolation.js'
 
 // Re-exported so callers (and tests) can derive an http probe URL from auth.ts.
 export { deriveProbeUrl }
@@ -36,13 +37,15 @@ export async function checkInstalled(command: string): Promise<boolean> {
  */
 async function runAuthCheck(config: AuthenticatedChannelConfig): Promise<AuthResult> {
   const { auth, env } = config
+  const posture = withNeutralPosture(env, (config as { cwd?: string }).cwd)
 
-  return new Promise((resolve) => {
+  return new Promise<AuthResult>((resolve) => {
     let settled = false
     let timedOut = false
 
     const child = spawn('sh', ['-c', auth.check], {
-      env: { ...process.env, ...env },
+      env: { ...process.env, ...posture.env },
+      cwd: posture.cwd,
       stdio: 'ignore',
     })
 
@@ -76,7 +79,7 @@ async function runAuthCheck(config: AuthenticatedChannelConfig): Promise<AuthRes
       clearTimeout(timer)
       resolve({ status: 'failed', recovery: auth.recovery })
     })
-  })
+  }).finally(() => posture.cleanup())
 }
 
 /**
