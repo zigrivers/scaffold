@@ -49,3 +49,5 @@ Patterns and anti-patterns discovered during development. Review before starting
 <!-- Add gotchas specific to this project -->
 
 - Historical docs may still mention Beads. Treat those references as stale unless the user explicitly asks to restore Beads support.
+
+- When backfilling release notes for config surface changes (e.g. `loop_control.*` fields in mmr 1.4.0), verify runtime consumption (review.ts, results-pipeline, reconciler, etc.) — not just schema presence + tests. Schema-only or partial features must be described precisely ("config shape for future X; only Y is wired") rather than as delivered behavior. Caught in 3.29.0 / 1.4.0 release-prep round 2 review.

@@ -80,10 +80,11 @@ default-deny called out under **Changed** and **Migration** below.
   flags; a `trust_mode` field (`'base-ref' | 'untrusted-head' | 'non-git'`) on
   review output; and `proposed_acks` / `proposed_config_change` reporting (see
   **Security** and **Changed**).
-- **Loop-control config (`defaults.loop_control`).** Opt-in cross-round repeat
-  suppression: `repeat_suppression_enabled` (default `false`),
-  `repeat_downgrade_after`, `repeat_suppress_after`. With `--session` and no
-  explicit `--max-rounds`, a 5-round default cap applies.
+- **Loop-control config (`defaults.loop_control`).** `max_rounds_default` (default 5)
+  supplies the automatic `--max-rounds` cap when `--session` is used without an
+  explicit value. The `repeat_suppression_enabled` / `repeat_downgrade_after` /
+  `repeat_suppress_after` fields are accepted and validated for future use (T2-C)
+  but do not yet affect review or reconciliation behavior.
 - **`doc-conformance` built-in channel** running
   `scaffold observe audit --output-mode=mmr-findings` and mapping audit-engine
   findings into MMR's Finding shape. Disabled by default; enable via
