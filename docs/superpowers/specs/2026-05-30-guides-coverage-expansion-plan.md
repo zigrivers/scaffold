@@ -286,27 +286,32 @@ sensibly alongside `mmr`.
    coverage test that **fails** when a generated guide containing `:cite`
    citations is not covered by the checker. Wire into `make check-all` alongside
    `guides-check`.
-3. **Structured-data directive for baked content** (resolves R1-2). Define a
-   first-class **`:::data-chart` / `:::data-table`** directive whose body is
-   **YAML** (R2-6) — structured data, not raw HTML — so the retooled freshness
-   generator (D2) has a stable, non-HTML emission target. Prove this directive
-   with **dedicated Phase 0 fixtures + integration tests** (R2-8), *not* by
-   forcing synthetic content into the observability guide; its first real
-   consumer is `knowledge-freshness` (Phase 1). The narrow escape hatch from the
-   pipeline spec remains for genuinely one-off interactivity. *(The observability
-   slice still stress-tests mermaid + `:::filter-table` + `:sev` early, which it
-   genuinely uses — see Phase 1.)*
+3. **Structured-data target for baked content** (resolves R1-2). **Execution
+   reconciliation:** the renderer **already has** a `:::chart` directive whose
+   body is a **GFM table** (label column + trailing numeric value column) — its
+   tests literally render baked host-count bars (`directives-chart.test.ts`). So
+   inventing a new `:::data-chart`/`:::data-table` directive would duplicate it.
+   **Decision: reuse `:::chart` (GFM-table body) for charts and GFM /
+   `:::filter-table` for tabular baked data** as the freshness generator's stable,
+   non-HTML emission target. R2-6's "format" = the GFM-table body contract
+   (documented in `AUTHORING.md`); R2-8 is satisfied because that contract is
+   already proven by `directives-chart.test.ts` (we do **not** rely on the
+   observability migration to prove it). The narrow escape hatch from the pipeline
+   spec remains for genuinely one-off interactivity (the freshness page's
+   date-picker / decision-search). *(The observability slice still stress-tests
+   mermaid + `:::filter-table` + `:sev` early — see Phase 1.)*
 4. **Authoring spec + governance** (R2-7). Produce **`content/guides/AUTHORING.md`**:
-   the single source of truth for the guides markdown dialect (existing
-   directives + the new `:cite`/`:cite{mode=advisory}`/`:::data-chart`/
-   `:::data-table`), escaping rules, error behavior, the citation-gate contract
-   (P0-a), and the process for proposing new directives. Required reading in the
-   Phase 3 authoring checklist.
+   the single source of truth for the guides markdown dialect (existing directives
+   — `:::callout`/`::::tabs`/`:::filter-table`/`:::chart`/`:sev` — plus the new
+   `:cite`/`:cite{mode=advisory}`), the `:::chart` GFM-table body contract,
+   escaping rules, error behavior, the citation-gate contract (P0-a), and the
+   process for proposing new directives. Required reading in the Phase 3 authoring
+   checklist.
 5. **Reconcile the two build paths** (D2). Decide the markdown contract so
    `build-freshness-reference.mjs` emits `content/guides/knowledge-freshness/
-   index.md` (using `:::data-chart`/`:::data-table` for baked values) and lets
-   `scaffold guides --build` render the HTML (the citation checker's existing
-   `rebake:` no-op pattern carries to the new location).
+   index.md` (using `:::chart` GFM-table blocks + GFM/`:::filter-table` for baked
+   values) and lets `scaffold guides --build` render the HTML (the citation
+   checker's existing `rebake:` no-op pattern carries to the new location).
 
 **Phase-0 decisions to lock:**
 - **P0-a (citation gate granularity).** `:cite[...]` is **blocking** (drift
@@ -461,9 +466,9 @@ findings, all **accepted** and folded into Phase 0/1/2/3 + testing strategy:
 | R2-3 | P1 | `:cite?[…]` is incompatible with remark-directive parser | Accepted → advisory tier uses `:cite[…]{mode=advisory}` (Phase 0.1) |
 | R2-4 | P2 | `concepts` hub cross-links dangle across sequential PRs | Accepted → stub-first all Phase 3 guides (Phase 3) |
 | R2-5 | P2 | Retiring legacy HTML breaks bookmarks/external refs | Accepted → redirect shims at retired paths (Phase 1/2) |
-| R2-6 | P2 | `:::data-chart`/`:::data-table` body format unspecified | Accepted → YAML body (Phase 0.3) |
+| R2-6 | P2 | `:::data-chart`/`:::data-table` body format unspecified | Accepted → **reconciled in execution**: reuse existing `:::chart` (GFM-table body) + GFM/`:::filter-table`; no new directive. Format documented in AUTHORING.md (Phase 0.3) |
 | R2-7 | P2 | No source-of-truth dialect spec / governance | Accepted → `content/guides/AUTHORING.md` (Phase 0.4) |
-| R2-8 | P2 | Proving the data directive via observability is ambiguous | Accepted → dedicated Phase 0 fixtures; first real use in `knowledge-freshness` (Phase 0.3) |
+| R2-8 | P2 | Proving the data directive via observability is ambiguous | Accepted → moot after reconciliation: `:::chart` is already proven by `directives-chart.test.ts` (baked host-counts); observability migration is not the proof (Phase 0.3) |
 | R2-9 | P2 | No internal relative-link verification between guides | Accepted → relative-link validator in `guides-check` (Phase 0 / Phase 3) |
 
 **Assessment:** R2 surfaced no conceptual/scoping flaws — only execution-readiness
