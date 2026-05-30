@@ -50,17 +50,9 @@ const PAGES = [
     rebake: 'node scripts/build-freshness-reference.mjs',
     rebakeTarget: 'content/guides/knowledge-freshness/index.md',
   },
-  {
-    name: 'mmr-reference',
-    path: 'docs/reference/mmr-reference.html',
-    fp: false,
-    fileMap: false,
-    text: true,
-    // packages/ is in the prefix so future packages/mmr/* citations are caught.
-    prefix: 'src|tests|scripts|content|docs|\\.github|lib|packages',
-    ignore: ['src/auth.ts'], // fictional example finding (src/auth.ts:42)
-    rebake: null,
-  },
+  // docs/reference/mmr-reference.html was the legacy twin of content/guides/mmr;
+  // it was reconciled into that guide and retired to a redirect shim. The guide
+  // is validated via discoverGuidePages.
 ]
 
 // Guides (content/guides/*/index.html) are discovered dynamically rather than
