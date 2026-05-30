@@ -4,6 +4,11 @@ import path from 'node:path'
 
 export const NEUTRAL_HOME_PLACEHOLDER = '{{neutral_home}}'
 export const NEUTRAL_CWD_PLACEHOLDER = '{{neutral_cwd}}'
+// This helper is grok-specific in practice: the only channel that opts into the
+// neutral-posture placeholders is the builtin `grok` channel, and the
+// credential-preservation step below knows about grok's `~/.grok/auth.json`.
+// Hence the `mmr-grok-` temp-dir prefix. If another agentic CLI ever needs
+// isolation, generalize the prefix + credential path together.
 const PREFIX = 'mmr-grok-'
 
 export interface NeutralPosture {
