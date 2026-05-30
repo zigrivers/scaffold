@@ -35,6 +35,9 @@ export function withNeutralPosture(env: Record<string, string>, cwd?: string): N
     return { env, cwd, cleanup: () => {} }
   }
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), PREFIX))
+  // mkdtemp already creates 0700, but enforce it explicitly: this dir holds a
+  // credential symlink and whatever grok writes to its HOME during a review.
+  try { fs.chmodSync(dir, 0o700) } catch { /* best effort */ }
 
   // Preserve grok's file-backed credentials so an isolated HOME doesn't break
   // auth on non-keychain platforms (Linux/CI store creds at ~/.grok/auth.json).
@@ -43,8 +46,10 @@ export function withNeutralPosture(env: Record<string, string>, cwd?: string): N
     const realHome = process.env.HOME || os.homedir()
     const cred = path.join(realHome, '.grok', 'auth.json')
     if (fs.existsSync(cred)) {
-      fs.mkdirSync(path.join(dir, '.grok'), { recursive: true })
-      fs.symlinkSync(cred, path.join(dir, '.grok', 'auth.json'))
+      const grokDir = path.join(dir, '.grok')
+      fs.mkdirSync(grokDir, { recursive: true })
+      fs.chmodSync(grokDir, 0o700)
+      fs.symlinkSync(cred, path.join(grokDir, 'auth.json'))
     }
   } catch { /* best effort — keychain platforms don't need it */ }
 
@@ -53,6 +58,16 @@ export function withNeutralPosture(env: Record<string, string>, cwd?: string): N
     outEnv[k] = v === NEUTRAL_HOME_PLACEHOLDER ? dir : v
   }
   const outCwd = cwd === NEUTRAL_CWD_PLACEHOLDER ? dir : cwd
+  // When we neutralize the cwd, also override the inherited cwd-pointing env
+  // vars. The dispatcher/auth spawn with `cwd: outCwd` (a real chdir), but
+  // PWD/OLDPWD/INIT_CWD still flow from process.env and would otherwise point
+  // at the original working tree — tools that trust $PWD over getcwd() could
+  // then read the repo. Pin them all to the neutral dir.
+  if (outCwd === dir) {
+    outEnv.PWD = dir
+    outEnv.OLDPWD = dir
+    outEnv.INIT_CWD = dir
+  }
   let removed = false
   return {
     env: outEnv,
@@ -68,8 +83,10 @@ export function withNeutralPosture(env: Record<string, string>, cwd?: string): N
 /**
  * Backstop for dirs orphaned by SIGKILL/crashes: remove stale mmr-grok-* temp
  * dirs older than `maxAgeMs`. Call once at process start. Best-effort/sync.
+ * Default is 24h — comfortably longer than any plausible review timeout, so the
+ * sweep never reaps the HOME/cwd of a still-running long review.
  */
-export function sweepStaleNeutralDirs(maxAgeMs = 6 * 60 * 60 * 1000): void {
+export function sweepStaleNeutralDirs(maxAgeMs = 24 * 60 * 60 * 1000): void {
   const tmp = os.tmpdir()
   let entries: string[] = []
   try { entries = fs.readdirSync(tmp) } catch { return }

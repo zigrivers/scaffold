@@ -45,6 +45,22 @@ describe('withNeutralPosture', () => {
     expect(fs.existsSync(dir)).toBe(false)
   })
 
+  it('pins cwd-pointing env vars (PWD/OLDPWD/INIT_CWD) to the neutral dir when cwd is neutralized', () => {
+    const r = withNeutralPosture({ HOME: NEUTRAL_HOME_PLACEHOLDER }, NEUTRAL_CWD_PLACEHOLDER)
+    made.push(r.cwd!)
+    expect(r.env.PWD).toBe(r.cwd)
+    expect(r.env.OLDPWD).toBe(r.cwd)
+    expect(r.env.INIT_CWD).toBe(r.cwd)
+    r.cleanup()
+  })
+
+  it('does NOT inject PWD when cwd is not neutralized (HOME-only isolation)', () => {
+    const r = withNeutralPosture({ HOME: NEUTRAL_HOME_PLACEHOLDER }, undefined)
+    made.push(r.env.HOME!)
+    expect(r.env.PWD).toBeUndefined()
+    r.cleanup()
+  })
+
   describe('grok credential preservation', () => {
     let fakeHome: string
     let origHome: string | undefined

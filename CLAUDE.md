@@ -267,9 +267,10 @@ claude -p "PROMPT" --output-format json 2>/dev/null
 # isolated HOME/cwd (strips host config: skills/MCP/hooks/instructions), no
 # cross-session memory, web-only tools (denies filesystem reads).
 # NOTE: --prompt-file must be ABSOLUTE — a neutral HOME/cwd breaks relative paths.
-D="$(mktemp -d)"; HOME="$D" XDG_CONFIG_HOME="$D" grok --cwd "$D" --prompt-file "$PROMPT_FILE" \
+D="$(mktemp -d)"; trap 'rm -rf "$D"' EXIT INT TERM   # cleanup even on Ctrl-C/early exit
+HOME="$D" XDG_CONFIG_HOME="$D" grok --cwd "$D" --prompt-file "$PROMPT_FILE" \
   --output-format json --no-memory --tools web_search,web_fetch \
-  --no-subagents --no-plan 2>/dev/null; rm -rf "$D"
+  --no-subagents --no-plan 2>/dev/null
 ```
 
 ## Project Structure Quick Reference
