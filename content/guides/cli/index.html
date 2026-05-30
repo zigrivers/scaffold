@@ -1088,9 +1088,321 @@ figure.mermaid svg .edgeLabel text { fill: var(--text-muted); color: var(--text-
   <button data-action="theme" class="theme-toggle" aria-label="Toggle theme">◐</button>
 </header>
 <div class="layout">
-  <aside class="rail"><nav class="toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#overview">Overview</a></li></ul></nav></aside>
+  <aside class="rail"><nav class="toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#overview">Overview</a></li><li class="toc-2"><a href="#all-commands-at-a-glance">All commands at a glance</a></li><li class="toc-2"><a href="#setup-adoption">Setup &amp; adoption</a></li><li class="toc-2"><a href="#pipeline-navigation">Pipeline navigation</a></li><li class="toc-2"><a href="#status-dashboard">Status &amp; dashboard</a></li><li class="toc-2"><a href="#observability-scaffold-observe-">Observability — scaffold observe …</a></li><li class="toc-2"><a href="#knowledge">Knowledge</a></li><li class="toc-2"><a href="#validation">Validation</a></li><li class="toc-2"><a href="#version-update">Version &amp; update</a></li><li class="toc-2"><a href="#platform-skills">Platform &amp; skills</a></li><li class="toc-2"><a href="#see-also">See also</a></li></ul></nav></aside>
   <main class="content"><h2 id="overview">Overview</h2>
-<p>A grouped reference for the scaffold CLI surface. <em>This guide is being authored.</em></p></main>
+<p>This is a terse index of the whole <code>scaffold</code> command surface. It tells you
+<em>which</em> command does <em>what</em> and points to the deep guides where a subsystem
+earns its own page. For the full mental model of a subsystem, follow the links:</p>
+<ul>
+<li><strong>Pipeline navigation</strong> (<code>next</code>, <code>run</code>, <code>complete</code>, <code>rework</code>, <code>skip</code>,
+<code>reset</code>) is the day-to-day loop — see the <a href="../pipeline/index.md">Pipeline guide</a>.</li>
+<li><strong>Observability</strong> (<code>observe event｜progress｜harvest｜audit｜ack</code>) is its own
+large surface — see the <a href="../observability/index.md">Build Observability guide</a>.</li>
+</ul>
+<p>Commands are registered on a single yargs root
+(<span class="fp" data-path="src/cli/index.ts:30">src/cli/index.ts:30</span>) and every command accepts the global options
+<code>--format json</code>, <code>--auto</code>, <code>--verbose</code>, <code>--root &#x3C;dir></code>, and <code>--force</code>
+(<span class="fp" data-path="src/cli/index.ts:59">src/cli/index.ts:59</span>).</p>
+<h2 id="all-commands-at-a-glance">All commands at a glance</h2>
+<div class="filter-table"><input type="text" class="filter-input" placeholder="Filter…" aria-label="Filter table rows" disabled>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Command</th><th>Group</th><th>What it does</th></tr></thead><tbody><tr><td><code>scaffold init</code></td><td>Setup &#x26; adoption</td><td>Initialize scaffold for this project</td></tr><tr><td><code>scaffold adopt</code></td><td>Setup &#x26; adoption</td><td>Adopt an existing project into scaffold</td></tr><tr><td><code>scaffold next</code></td><td>Pipeline navigation</td><td>Show next eligible step(s)</td></tr><tr><td><code>scaffold run &#x3C;step></code></td><td>Pipeline navigation</td><td>Run a pipeline step (assemble + emit the prompt)</td></tr><tr><td><code>scaffold complete &#x3C;step></code></td><td>Pipeline navigation</td><td>Mark a step done (for steps run outside <code>scaffold run</code>)</td></tr><tr><td><code>scaffold rework</code></td><td>Pipeline navigation</td><td>Re-run steps by phase for depth/cleanup</td></tr><tr><td><code>scaffold skip &#x3C;step..></code></td><td>Pipeline navigation</td><td>Skip one or more steps</td></tr><tr><td><code>scaffold reset [step]</code></td><td>Pipeline navigation</td><td>Reset a step (or the whole pipeline) to pending</td></tr><tr><td><code>scaffold check &#x3C;step></code></td><td>Pipeline navigation</td><td>Check whether a conditional step applies here</td></tr><tr><td><code>scaffold status</code></td><td>Status &#x26; dashboard</td><td>Show pipeline progress and step statuses</td></tr><tr><td><code>scaffold info [step]</code></td><td>Status &#x26; dashboard</td><td>Show project info, or detail on one step</td></tr><tr><td><code>scaffold list</code></td><td>Status &#x26; dashboard</td><td>List methodologies, platform adapters, and tools</td></tr><tr><td><code>scaffold decisions</code></td><td>Status &#x26; dashboard</td><td>Show recorded decisions</td></tr><tr><td><code>scaffold dashboard</code></td><td>Status &#x26; dashboard</td><td>Open the visual pipeline dashboard in a browser</td></tr><tr><td><code>scaffold observe event &#x3C;type></code></td><td>Observability</td><td>Write a ledger event</td></tr><tr><td><code>scaffold observe progress</code></td><td>Observability</td><td>Show the build-progress snapshot (with <code>--replay</code>)</td></tr><tr><td><code>scaffold observe audit</code></td><td>Observability</td><td>Run the audit lenses and report findings</td></tr><tr><td><code>scaffold observe ack &#x3C;id></code></td><td>Observability</td><td>Acknowledge or reopen a finding by ID prefix</td></tr><tr><td><code>scaffold observe harvest</code></td><td>Observability</td><td>Flush a worktree ledger to the primary archive</td></tr><tr><td><code>scaffold knowledge &#x3C;subcommand></code></td><td>Knowledge</td><td>Manage knowledge entries (list｜show｜update｜reset)</td></tr><tr><td><code>scaffold knowledge-freshness &#x3C;command></code></td><td>Knowledge</td><td>Run knowledge-base freshness audits</td></tr><tr><td><code>scaffold validate</code></td><td>Validation</td><td>Validate meta-prompts and config</td></tr><tr><td><code>scaffold validate-knowledge</code></td><td>Validation</td><td>Validate frontmatter on all knowledge entries</td></tr><tr><td><code>scaffold version</code></td><td>Version &#x26; update</td><td>Show version and check for updates</td></tr><tr><td><code>scaffold update</code></td><td>Version &#x26; update</td><td>Check for and display CLI updates</td></tr><tr><td><code>scaffold build</code></td><td>Platform &#x26; skills</td><td>Generate platform adapter output files</td></tr><tr><td><code>scaffold skill &#x3C;action></code></td><td>Platform &#x26; skills</td><td>Manage scaffold skills for Claude Code / shared agents</td></tr><tr><td><code>scaffold guides [topic]</code></td><td>Platform &#x26; skills</td><td>Open, list, or build the reference guides</td></tr></tbody></table></div>
+<h2 id="setup-adoption">Setup &#x26; adoption</h2>
+<p>Two entry points: <code>init</code> for a fresh project, <code>adopt</code> for an existing codebase.</p>
+<ul>
+<li><strong><code>scaffold init</code></strong> (<span class="fp" data-path="src/cli/commands/init.ts:151">src/cli/commands/init.ts:151</span>) — scaffold a new
+project: writes <code>.scaffold/</code> state and config. <code>--force</code> backs up and
+reinitializes if <code>.scaffold/</code> already exists.</li>
+<li><strong><code>scaffold adopt</code></strong> (<span class="fp" data-path="src/cli/commands/adopt.ts:168">src/cli/commands/adopt.ts:168</span>) — bring an
+existing project under scaffold. <code>--dry-run</code> previews without writing.</li>
+</ul>
+<pre><code class="language-bash">scaffold init
+scaffold adopt --dry-run    # preview what adoption would write
+</code></pre>
+<h2 id="pipeline-navigation">Pipeline navigation</h2>
+<p>The core loop. <code>next</code> tells you what's eligible, <code>run</code> emits the assembled
+prompt, <code>complete</code> records work done outside the CLI, and <code>rework</code>/<code>skip</code>/<code>reset</code>
+adjust state. See the <a href="../pipeline/index.md">Pipeline guide</a> for phase ordering
+and dependencies.</p>
+<ul>
+<li><strong><code>scaffold next</code></strong> (<span class="fp" data-path="src/cli/commands/next.ts:28">src/cli/commands/next.ts:28</span>) — show the next
+eligible step(s) given current state and dependencies.</li>
+<li><strong><code>scaffold run &#x3C;step></code></strong> (<span class="fp" data-path="src/cli/commands/run.ts:45">src/cli/commands/run.ts:45</span>) — assemble and
+emit a pipeline step's prompt. <code>--depth</code>, <code>--instructions</code>, and <code>--service</code>
+refine the run.</li>
+<li><strong><code>scaffold complete &#x3C;step></code></strong> (<span class="fp" data-path="src/cli/commands/complete.ts:28">src/cli/commands/complete.ts:28</span>) — mark
+a step completed for work executed outside <code>scaffold run</code> (this is the hook
+that fires phase-boundary audits — see the
+<a href="../observability/index.md">Observability guide</a>).</li>
+<li><strong><code>scaffold rework</code></strong> (<span class="fp" data-path="src/cli/commands/rework.ts:39">src/cli/commands/rework.ts:39</span>) — re-run steps by
+phase for depth improvement or cleanup. <code>--phases</code>, <code>--through N</code>, <code>--exclude</code>.</li>
+<li><strong><code>scaffold skip &#x3C;step..></code></strong> (<span class="fp" data-path="src/cli/commands/skip.ts:35">src/cli/commands/skip.ts:35</span>) — skip one
+or more steps; <code>--reason</code> records why.</li>
+<li><strong><code>scaffold reset [step]</code></strong> (<span class="fp" data-path="src/cli/commands/reset.ts:32">src/cli/commands/reset.ts:32</span>) — reset one
+step, or the whole pipeline (guarded by <code>--confirm-reset</code>).</li>
+<li><strong><code>scaffold check &#x3C;step></code></strong> (<span class="fp" data-path="src/cli/commands/check.ts:115">src/cli/commands/check.ts:115</span>) — report
+whether a conditional step applies to this project type.</li>
+</ul>
+<pre><code class="language-bash">scaffold next                 # what can I run now?
+scaffold run user-stories     # emit the prompt for a step
+scaffold rework --through 3   # re-run phases 1 through 3
+</code></pre>
+<h2 id="status-dashboard">Status &#x26; dashboard</h2>
+<p>Read-only views of project and pipeline state.</p>
+<ul>
+<li><strong><code>scaffold status</code></strong> (<span class="fp" data-path="src/cli/commands/status.ts:80">src/cli/commands/status.ts:80</span>) — pipeline
+progress and per-step status.</li>
+<li><strong><code>scaffold info [step]</code></strong> (<span class="fp" data-path="src/cli/commands/info.ts:26">src/cli/commands/info.ts:26</span>) — project
+summary, or detail on a single step.</li>
+<li><strong><code>scaffold list</code></strong> (<span class="fp" data-path="src/cli/commands/list.ts:74">src/cli/commands/list.ts:74</span>) — available
+methodologies, platform adapters, and tools.</li>
+<li><strong><code>scaffold decisions</code></strong> (<span class="fp" data-path="src/cli/commands/decisions.ts:23">src/cli/commands/decisions.ts:23</span>) — recorded
+decisions for the project.</li>
+<li><strong><code>scaffold dashboard</code></strong> (<span class="fp" data-path="src/cli/commands/dashboard.ts:77">src/cli/commands/dashboard.ts:77</span>) — generate
+and open the visual pipeline dashboard.</li>
+</ul>
+<h2 id="observability-scaffold-observe-">Observability — <code>scaffold observe …</code></h2>
+<p><code>observe</code> is the build-observability surface: a durable event ledger, a fused
+progress timeline, a multi-lens audit, and worktree-ledger harvesting. It
+demands a subcommand (<span class="fp" data-path="src/cli/commands/observe.ts:398">src/cli/commands/observe.ts:398</span>). This guide only
+lists the verbs — the <a href="../observability/index.md">Build Observability guide</a>
+documents the event schemas, the nine audit lenses, verdicts, stall signals,
+and config.</p>
+<div class="filter-table"><input type="text" class="filter-input" placeholder="Filter…" aria-label="Filter table rows" disabled>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Subcommand</th><th>What it does</th></tr></thead><tbody><tr><td><code>observe event &#x3C;type></code></td><td>Write one ledger event (<code>task_claimed</code>, <code>decision_recorded</code>, <code>blocker_hit</code>, …)</td></tr><tr><td><code>observe progress</code></td><td>Snapshot of in-flight/completed work; <code>--replay</code> fuses git/gh/mmr/state/tests</td></tr><tr><td><code>observe audit</code></td><td>Run the audit lenses; exits <code>1</code> when blocked</td></tr><tr><td><code>observe ack &#x3C;prefix-or-id></code></td><td>Acknowledge or reopen a finding by ID prefix</td></tr><tr><td><code>observe harvest</code></td><td>Copy a worktree ledger into the primary archive; <code>--recover</code> sweeps stale ones</td></tr></tbody></table></div>
+<pre><code class="language-bash">scaffold observe progress --replay
+scaffold observe audit --scope docs --profile full
+scaffold observe ack 3a8c1f02 --status acknowledged --note "tracked in #412"
+scaffold observe harvest --worktree ../wt-alice
+</code></pre>
+<h2 id="knowledge">Knowledge</h2>
+<p>Two distinct command trees: <code>knowledge</code> manages the entries themselves;
+<code>knowledge-freshness</code> audits them for staleness.</p>
+<ul>
+<li><strong><code>scaffold knowledge &#x3C;subcommand></code></strong> (<span class="fp" data-path="src/cli/commands/knowledge.ts:417">src/cli/commands/knowledge.ts:417</span>)
+— <code>list</code>, <code>show &#x3C;name></code>, <code>update &#x3C;target> [instructions..]</code>, <code>reset &#x3C;name></code>
+for global entries and local overrides.</li>
+<li><strong><code>scaffold knowledge-freshness &#x3C;command></code></strong>
+(<span class="fp" data-path="src/cli/commands/knowledge-freshness.ts:12">src/cli/commands/knowledge-freshness.ts:12</span>) — the freshness-audit
+family (prefilter, run-entry, apply, link-check, lint-unsourced, and more).</li>
+</ul>
+<pre><code class="language-bash">scaffold knowledge list
+scaffold knowledge show react-state-management
+</code></pre>
+<h2 id="validation">Validation</h2>
+<ul>
+<li><strong><code>scaffold validate</code></strong> (<span class="fp" data-path="src/cli/commands/validate.ts:19">src/cli/commands/validate.ts:19</span>) — validate
+meta-prompt frontmatter and config (the <code>make validate</code> gate).</li>
+<li><strong><code>scaffold validate-knowledge</code></strong> (<span class="fp" data-path="src/cli/commands/validate-knowledge.ts:20">src/cli/commands/validate-knowledge.ts:20</span>)
+— validate frontmatter on all knowledge entries (volatility, last-reviewed,
+sources, version-pin).</li>
+</ul>
+<h2 id="version-update">Version &#x26; update</h2>
+<ul>
+<li><strong><code>scaffold version</code></strong> (<span class="fp" data-path="src/cli/commands/version.ts:78">src/cli/commands/version.ts:78</span>) — show the
+installed version and check for a newer one.</li>
+<li><strong><code>scaffold update</code></strong> (<span class="fp" data-path="src/cli/commands/update.ts:93">src/cli/commands/update.ts:93</span>) — check for and
+display available CLI updates.</li>
+</ul>
+<h2 id="platform-skills">Platform &#x26; skills</h2>
+<ul>
+<li><strong><code>scaffold build</code></strong> (<span class="fp" data-path="src/cli/commands/build.ts:40">src/cli/commands/build.ts:40</span>) — generate the
+platform adapter output files from pipeline content.</li>
+<li><strong><code>scaffold skill &#x3C;action></code></strong> (<span class="fp" data-path="src/cli/commands/skill.ts:31">src/cli/commands/skill.ts:31</span>) — manage
+scaffold skills for Claude Code and shared agents.</li>
+<li><strong><code>scaffold guides [topic]</code></strong> (<span class="fp" data-path="src/cli/commands/guides.ts:57">src/cli/commands/guides.ts:57</span>) — open,
+list, or build the reference guides. <code>--list --format json</code> for discovery,
+<code>--markdown</code> / <code>--print-path</code> for agents, <code>--build</code> to regenerate the HTML.</li>
+</ul>
+<pre><code class="language-bash">scaffold guides --list --format json   # discover guides (agents)
+scaffold guides cli --markdown         # read this guide's source
+scaffold guides --build                # regenerate index.html (maintainer/CI)
+</code></pre>
+<div class="callout callout-note"><p><strong>Agents read markdown, never HTML.</strong> Use <code>scaffold guides &#x3C;topic> --markdown</code>
+or read the bundled <code>content/guides/&#x3C;topic>/index.md</code> directly. The generated
+<code>index.html</code> is for humans.</p></div>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="../pipeline/index.md">Pipeline guide</a> — phase ordering and the navigation loop.</li>
+<li><a href="../observability/index.md">Build Observability guide</a> — the full <code>observe</code>
+subsystem.</li>
+</ul></main>
 </div>
 <script>(function(){
   var LS_KEY = 'guide-theme';
