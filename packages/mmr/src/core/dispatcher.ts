@@ -47,8 +47,9 @@ function cleanupChildren(): void {
     }
   }
   activeChildren.clear()
-  // Remove any neutral-posture temp dirs from interrupted dispatches.
-  for (const cleanup of activePostureCleanups) {
+  // Remove any neutral-posture temp dirs from interrupted dispatches. Snapshot
+  // first: a cleanup callback (or a settling dispatch) could mutate the live Set.
+  for (const cleanup of [...activePostureCleanups]) {
     try { cleanup() } catch { /* best effort */ }
   }
   activePostureCleanups.clear()
