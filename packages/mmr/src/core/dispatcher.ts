@@ -31,6 +31,13 @@ const PROMPT_FILE_PLACEHOLDER = '{{prompt_file}}'
 /** Track active child PIDs for cleanup on parent exit */
 const activeChildren = new Set<number>()
 
+/**
+ * Track per-dispatch neutral-posture cleanups so a SIGINT/SIGTERM that
+ * terminates the run also removes the isolated HOME/cwd temp dirs (which hold a
+ * grok auth symlink). Each entry is removed once its own dispatch settles.
+ */
+const activePostureCleanups = new Set<() => void>()
+
 function cleanupChildren(): void {
   for (const pid of activeChildren) {
     try {
@@ -40,6 +47,11 @@ function cleanupChildren(): void {
     }
   }
   activeChildren.clear()
+  // Remove any neutral-posture temp dirs from interrupted dispatches.
+  for (const cleanup of activePostureCleanups) {
+    try { cleanup() } catch { /* best effort */ }
+  }
+  activePostureCleanups.clear()
 }
 
 // Register cleanup once
@@ -113,39 +125,50 @@ export async function dispatchChannel(
   // Expand neutral posture placeholders ({{neutral_home}}, {{neutral_cwd}});
   // for channels without placeholders, withNeutralPosture is a passthrough.
   const posture = withNeutralPosture(opts.env, opts.cwd)
+  // Register for SIGINT/SIGTERM cleanup, and remove + run once this dispatch
+  // settles. cleanup is idempotent, so a signal firing alongside a terminal
+  // handler is safe.
+  activePostureCleanups.add(posture.cleanup)
+  const runPostureCleanup = (): void => {
+    activePostureCleanups.delete(posture.cleanup)
+    posture.cleanup()
+  }
 
-  // Pipe prompt via stdin to avoid E2BIG on large diffs
+  // Spawn + all synchronous setup (stdin, PID file) in one guarded block: any
+  // throw between dir creation and the async close/error handlers being armed
+  // would otherwise leak the per-run temp dir.
   let proc: ReturnType<typeof spawn>
   try {
+    // Pipe prompt via stdin to avoid E2BIG on large diffs
     proc = spawn(cmd, args, {
       detached: true,
       stdio: ['pipe', 'pipe', stderrStdio],
       env: { ...process.env, ...posture.env },
       cwd: posture.cwd,   // undefined ⇒ inherit parent cwd (unchanged for non-isolated channels)
     })
+
+    if (proc.pid) activeChildren.add(proc.pid)
+
+    // Handle stdin pipe errors (child may close stdin early)
+    // stdin is always 'pipe' so proc.stdin is guaranteed non-null
+    proc.stdin!.on('error', () => {
+      // Swallow EPIPE — the close handler will deal with the process exit
+    })
+
+    // Write prompt to stdin (stdin delivery only; prompt-file mode passes the
+    // prompt as an arg). Always end stdin so processes that read it don't hang.
+    if (promptDelivery === 'stdin') {
+      proc.stdin!.write(opts.prompt)
+    }
+    proc.stdin!.end()
+
+    // Write PID file
+    const pidFile = path.join(channelsDir, `${channelName}.pid`)
+    fs.writeFileSync(pidFile, String(proc.pid))
   } catch (err) {
-    posture.cleanup()
+    runPostureCleanup()
     throw err
   }
-
-  if (proc.pid) activeChildren.add(proc.pid)
-
-  // Handle stdin pipe errors (child may close stdin early)
-  // stdin is always 'pipe' so proc.stdin is guaranteed non-null
-  proc.stdin!.on('error', () => {
-    // Swallow EPIPE — the close handler will deal with the process exit
-  })
-
-  // Write prompt to stdin (stdin delivery only; prompt-file mode passes the
-  // prompt as an arg). Always end stdin so processes that read it don't hang.
-  if (promptDelivery === 'stdin') {
-    proc.stdin!.write(opts.prompt)
-  }
-  proc.stdin!.end()
-
-  // Write PID file
-  const pidFile = path.join(channelsDir, `${channelName}.pid`)
-  fs.writeFileSync(pidFile, String(proc.pid))
 
   // Collect stdout and stderr
   let stdout = ''
@@ -188,7 +211,7 @@ export async function dispatchChannel(
       if (stderr) {
         store.saveChannelLog(jobId, channelName, stderr)
       }
-      posture.cleanup()
+      runPostureCleanup()
       resolve()
     }, timeoutMs)
 
@@ -216,7 +239,7 @@ export async function dispatchChannel(
           completed_at: completedAt,
         })
       }
-      posture.cleanup()
+      runPostureCleanup()
       resolve()
     })
 
@@ -231,7 +254,7 @@ export async function dispatchChannel(
         completed_at: new Date().toISOString(),
       })
       store.saveChannelLog(jobId, channelName, err.message)
-      posture.cleanup()
+      runPostureCleanup()
       resolve()
     })
   })

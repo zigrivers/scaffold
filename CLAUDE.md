@@ -268,6 +268,8 @@ claude -p "PROMPT" --output-format json 2>/dev/null
 # cross-session memory, web-only tools (denies filesystem reads).
 # NOTE: --prompt-file must be ABSOLUTE — a neutral HOME/cwd breaks relative paths.
 D="$(mktemp -d)"; trap 'rm -rf "$D"' EXIT INT TERM   # cleanup even on Ctrl-C/early exit
+# Preserve ONLY file-based creds (Linux/CI) — keeps auth, not skills/MCP/config:
+mkdir -p "$D/.grok"; ln -s "$HOME/.grok/auth.json" "$D/.grok/auth.json" 2>/dev/null || true
 HOME="$D" XDG_CONFIG_HOME="$D" grok --cwd "$D" --prompt-file "$PROMPT_FILE" \
   --output-format json --no-memory --tools web_search,web_fetch \
   --no-subagents --no-plan 2>/dev/null
