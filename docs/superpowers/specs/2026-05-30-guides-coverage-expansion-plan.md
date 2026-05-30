@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-30
 **Branch:** `docs/guides-coverage-expansion-plan`
-**Status:** Reviewed (R1 + R2 folded in; all 4 channels passed in R2); open questions settled — **ready to execute**
+**Status:** **Executed** (all 4 phases shipped on `feat/guides-system-expansion`). 11 guides in `scaffold guides`; the 3 legacy `docs/**/reference.html` pages retired to redirect shims; citation gate green (the freshness rebake drift that kept `make check-all` red is fixed). Each phase was MMR-reviewed (4 channels) with findings folded in. Reviewed R1 + R2 pre-execution; open questions settled.
 **Builds on:** [`2026-05-28-markdown-html-guides-pipeline-design.md`](./2026-05-28-markdown-html-guides-pipeline-design.md) (the markdown→HTML guides *pipeline*; this plan is the *content coverage + migration* follow-on)
 
 ## Problem
