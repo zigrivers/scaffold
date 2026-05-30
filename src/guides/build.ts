@@ -9,6 +9,7 @@ import { wrapInChrome } from './template.js'
 import { renderIndexPage } from './index-page.js'
 import { lintGuide } from './lint.js'
 import type { LintResult } from './lint.js'
+import { findBrokenRelativeLinks } from './links.js'
 
 export function loadThemeCss(): string {
   const p = path.join(getPackageRoot(), 'dist', 'guides', 'dashboard-theme.css')
@@ -33,6 +34,10 @@ export async function buildGuide(args: BuildGuideArgs): Promise<{ lint: LintResu
     throw new Error(`guide lint failed:\n  ${lint.errors.join('\n  ')}`)
   }
   for (const w of lint.warnings) process.stderr.write(`warning: ${w}\n`)
+  const brokenLinks = findBrokenRelativeLinks(md, args.guideDir)
+  if (brokenLinks.length) {
+    throw new Error(`guide has broken relative link(s):\n  ${brokenLinks.join('\n  ')}`)
+  }
   const fm = extractGuideFrontmatter(md)
   if (!fm) throw new Error(`invalid or missing frontmatter in ${path.join(args.guideDir, 'index.md')}`)
   const diagramIds: string[] = []
