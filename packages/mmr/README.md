@@ -488,9 +488,12 @@ The threat scenario the design closes:
 > the verdict is `needs-user-decision` until Bob explicitly opts in
 > with `--trust-project-config`.
 
-If you run MMR via Scaffold's wrappers (`scaffold run review-pr`,
-`scaffold run review-code`), the trust flags are set for you based
-on context. Manual `mmr review` callers must pick the right flag
-combination.
+Scaffold's wrappers (`scaffold run review-pr`, `scaffold run review-code`)
+pick the **input mode** for you (`--pr`, `--staged`, `--base/--head`,
+`--diff`) but do **not** pass the trust flags. For a `--pr` review the
+base-ref boundary applies automatically, so the trust flags are usually
+unnecessary; if a review returns `needs-user-decision` (e.g. the diff touches
+`.mmr.yaml` or `./.mmr/acks/`, or you are in an untrusted-head/non-git mode),
+re-run with the appropriate trust flag above yourself.
 
 Full documentation: [scaffold README](https://github.com/zigrivers/scaffold#mmr--multi-model-review-cli)
