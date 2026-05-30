@@ -2,10 +2,172 @@
 
 ## [Unreleased]
 
+## [1.4.0] — 2026-05-30
+
+A large feature wave spanning channel ergonomics, the review loop (sessions +
+sticky acks), a security trust boundary, and HTTP-endpoint channels. Almost
+everything is additive and opt-in; the one behavior change is the trust
+default-deny called out under **Changed** and **Migration** below.
+
 ### Added
-- **`mmr review --dry-run` preview mode.** Resolves the target diff,
-  validates channel install/auth status, and prints the assembled prompt
-  each valid channel would receive without spawning review subprocesses.
+
+- **Channel inheritance — `extends:` and `abstract:` templates.** Define an
+  abstract parent channel once and inherit it per model; the parent is
+  deep-merged into the child (child overrides win). Abstract channels are
+  templates and never dispatch. Cycle detection rejects `A→B→A` loops, the
+  maximum `extends` depth is 4, and concrete channels must resolve a `command`
+  after merge.
+- **`mmr config init` local-runtime probing.** Probes for `ollama`, `lms`
+  (LM Studio), `llama-server` (llama.cpp), and `local-ai-delegate` (1s
+  per-probe timeout) and emits commented example channel blocks for detected
+  runtimes. `--with-examples` emits the full OSS catalog regardless of
+  detection.
+- **`mmr config channels show <name>`.** Prints the fully merged config for one
+  channel with per-field provenance (`# from default | user | project`).
+  Secrets in `env`/`headers` are redacted by default; `--no-redact` prints them
+  verbatim with a stderr warning banner.
+- **Custom output parsers (object form for `output_parser`).** In addition to
+  string parser names, `output_parser` now accepts a structured object:
+  `kind: unwrap-jsonpath` (extract the model output from an envelope via a
+  `wrap:` JSONPath selector, then run `then:`) and `kind: regex-findings`
+  (one finding per regex match via `pattern` + a `fields` index mapping).
+- **Configurable compensator.** `defaults.compensator.channel` redirects
+  compensating passes from the built-in `claude -p` default to any configured
+  channel, and `defaults.compensator.channel_focus_map` overrides the focus
+  preamble per channel. Enables a fully OSS compensator. (Default behavior is
+  unchanged when `defaults.compensator` is unset.)
+- **Grok built-in review channel.** Enabled by default alongside Codex, Gemini,
+  and Claude. Disable with `channels_disabled: ["grok"]`.
+- **Per-channel `prompt_delivery: stdin | prompt-file`.** First-class support
+  for arg-only CLIs that ignore stdin (e.g. Grok): writes the prompt to a temp
+  file and substitutes a `{{prompt_file}}` placeholder in flags. Defaults to
+  `stdin`.
+- **`mmr review --dry-run` preview mode.** Resolves the target diff, runs
+  install/auth checks, and prints the assembled prompt each valid channel would
+  receive — without spawning review subprocesses.
+- **Sessions — `mmr sessions start | list | show | end`.** Group related review
+  rounds. `mmr review` gains `--session <id>`, `--round N` (one-based), and
+  `--max-rounds`. Review jobs auto-link to session state. Session ids must match
+  `^[a-zA-Z0-9_-]+$` and exclude reserved names (`con`, `prn`, `aux`, `nul`,
+  `com1`–`com9`, `lpt1`–`lpt9`, `index`, `__proto__`).
+- **Stable `finding_key`.** Each reconciled finding carries a deterministic
+  identity hash from the normalized location + category + a SHA-1 of the
+  normalized description/suggestion (severity excluded). Normalization strips
+  trailing line/column spans and inline `line N` mentions and folds
+  case/whitespace, so line drift and severity changes don't change a finding's
+  identity across rounds. The reconciler now groups by stable identity rather
+  than location alone.
+- **Sticky acks — `mmr ack add | list | rm | prune`.** Acknowledge an
+  intentional finding so later reviews surface it as advisory instead of
+  blocking. Keyed by `finding_key` with a location-anchored fuzzy fallback
+  (Jaccard ≥ 0.7 on the description shingle) that survives small phrasing
+  changes. `add` takes `--reason`; `--scope project` (default, committed at
+  `./.mmr/acks/<key>.json`) or `--scope user` (`~/.mmr/acks/`). Acked findings
+  stay visible with `acknowledged: true` and `ack_match: 'exact' | 'fuzzy'`.
+- **HTTP-endpoint channels (`kind: http`).** POST reviews to OpenAI-compatible
+  `/v1/chat/completions` endpoints (LM Studio, vLLM, llama-server, the Ollama
+  shim, Groq, Together.ai, Anyscale, Fireworks) without a shell wrapper. Fields:
+  `endpoint`, `model`, `endpoint_convention: openai-chat` (the only convention
+  in this release; `generic` is rejected), `api_key_env`, `api_key_header`
+  (default `Authorization`), `api_key_prefix` (default `Bearer `; set `""` for
+  raw keys), and `headers`. The auth-probe derives a `/models` URL from a
+  trailing `/chat/completions` or uses an explicit `auth.check_endpoint`. Status
+  mapping: 200→completed, 401→auth_failed, 429/5xx→failed, timeout→timeout.
+  Review and compensator dispatch route by channel kind. The API key value is
+  sent per request but never logged or persisted.
+- **Trust-boundary flags and reporting.** New `--accept-new-acks`,
+  `--trust-project-config`, `--trust-project-acks`, and `--config-base-ref <ref>`
+  flags; a `trust_mode` field (`'base-ref' | 'untrusted-head' | 'non-git'`) on
+  review output; and `proposed_acks` / `proposed_config_change` reporting (see
+  **Security** and **Changed**).
+- **Loop-control config (`defaults.loop_control`).** Opt-in cross-round repeat
+  suppression: `repeat_suppression_enabled` (default `false`),
+  `repeat_downgrade_after`, `repeat_suppress_after`. With `--session` and no
+  explicit `--max-rounds`, a 5-round default cap applies.
+- **`doc-conformance` built-in channel** running
+  `scaffold observe audit --output-mode=mmr-findings` and mapping audit-engine
+  findings into MMR's Finding shape. Disabled by default; enable via
+  `--channels=doc-conformance` or `.mmr.yaml`.
+- **Interactive HTML MMR reference** (`docs/reference/mmr-reference.html`)
+  covering the flag surface, channel architecture, Finding/verdict model, and
+  `.mmr.yaml` configuration.
+
+### Changed
+
+- **Default-deny for working-tree project config/acks (behavior change).** In
+  `untrusted-head` mode (`--staged`, `--diff`, an unresolvable `--pr` under CI)
+  and `non-git` mode, project `.mmr.yaml` and `./.mmr/acks/` are **no longer
+  loaded** unless you pass `--trust-project-config` / `--trust-project-acks`
+  (or supply `--config-base-ref`). Previously they were auto-loaded from the
+  working tree. A diff that adds or modifies `.mmr.yaml` or `./.mmr/acks/`
+  returns `verdict: 'needs-user-decision'` until the operator opts in. See
+  **Migration**.
+- **Discriminated channel schema on `kind`.** `ChannelConfigSchema` is now a
+  discriminated union (`kind: 'subprocess' | 'http'`); a `z.preprocess` injects
+  `kind: 'subprocess'` for legacy configs that omit the field, so existing
+  subprocess configs keep parsing unchanged.
+- **Per-arm auth schema.** `auth` is split per channel kind: subprocess keeps
+  the existing `check` / `failure_exit_codes` / `recovery` shape; http uses a
+  new auth-probe shape (`check_endpoint?` / `check_method` / `check_status_ok` /
+  `timeout`). HTTP channels with a non-standard `endpoint` path now require
+  `auth.check_endpoint`. Subprocess configs are unaffected.
+- **`--max-rounds` cap.** With `--session` set, exceeding the round cap exits
+  early with `verdict: 'needs-user-decision'` and a `summary` of
+  `max_rounds_exceeded: …`.
+- **Reconciler groups findings by stable `finding_key`** instead of by location.
+- **`output_parser` widened** to `string | OutputParserConfig` across the
+  loader, parser factory, and results pipeline (string form remains valid).
+- **`JobMetadata` / `ReconciledResults`** gained optional fields: `session_id`,
+  `round`, `finding_key`, ack/suppression fields, and persisted `trust_mode` /
+  `proposed_acks` / `proposed_config_change` (so `results` and `reconcile`
+  reproduce trust/ack context without re-deriving it). Text and markdown
+  formatters render trust context.
+
+### Fixed
+
+- **`MMR_HOME` is now honored everywhere.** Previously only `review`'s jobs dir
+  honored `MMR_HOME`; `jobs`/`status`/`results`/`reconcile` read a hardcoded
+  `~/.mmr/jobs`. All commands now resolve through a single `resolveJobsDir()`.
+- **`results`/`reconcile` no longer strip ack and trust context** by re-running
+  the pipeline and overwriting saved results; they rebuild from persisted job
+  state so acknowledged/trust stamping survives.
+- **`mmr config channels show`** now renders object-form `output_parser` as its
+  `kind` instead of an empty/incorrect value.
+- **Secret-redaction hardening** in config introspection (inline secret-shaped
+  header detection and warnings; env-var-name pointers such as `api_key_env`
+  treated as non-secret).
+
+### Security
+
+- **P0 — HTTP-channel secret exfiltration fix (load-bearing).** A PR adding a
+  `kind: http` channel to `.mmr.yaml` (e.g. pointed at an attacker endpoint with
+  `api_key_env: OPENAI_API_KEY`) could otherwise exfiltrate CI secrets and diff
+  content when a maintainer's CI ran `mmr review --pr` on the untrusted head.
+  Closed by base-ref config/ack loading plus a pre-dispatch trust gate, with a
+  dedicated regression test.
+- **Base-ref trust boundary.** When a trusted base ref is resolved (`--pr` with
+  a resolved upstream base, explicit `--base`, explicit `--config-base-ref`, or
+  the local non-CI `HEAD` default), `.mmr.yaml` and `./.mmr/acks/` are loaded
+  exclusively from that ref via `git show`, never from the working tree. Closes
+  ack self-suppression (a PR acking findings it introduces in the same diff) and
+  the HTTP exfiltration above. The gate is hoisted before dry-run / job creation
+  / dispatch; base refs are validated against a safe-refname allow-list. User-
+  scope config/acks (`~/.mmr/...`) are trusted unconditionally in every mode.
+- **AckStore path hardening.** Strict SHA-1 `finding_key` validation,
+  filename==key + shape integrity checks, write-side symlink rejection with
+  `O_EXCL` atomic temp writes (TOCTOU), read-side `lstat`/size/symlink skipping,
+  realpath ancestor containment, and fail-safe degradation (a poisoned acks tree
+  degrades to no-suppression rather than crashing).
+
+### Migration
+
+- **Default-deny trust boundary.** If you review with `--staged`, `--diff`, an
+  unresolvable `--pr` under CI, or in a non-git directory and relied on an
+  auto-loaded working-tree `.mmr.yaml` or `./.mmr/acks/`, those are no longer
+  loaded automatically. Either run against a trusted base ref (`--pr` with a
+  resolvable base, `--base`, or `--config-base-ref <ref>`) or opt in explicitly
+  with `--trust-project-config` / `--trust-project-acks` / `--accept-new-acks`.
+  The common `--pr`-with-resolvable-base and local-`HEAD` flows are unchanged.
 
 ## [1.3.0] — 2026-04-28
 

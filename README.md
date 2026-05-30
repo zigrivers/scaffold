@@ -33,6 +33,8 @@ Either way, Scaffold constructs the prompt and the target AI tool does the work.
 
 A daily cron audits entries against their declared authoritative sources and opens refresh PRs when they drift — see `docs/knowledge-freshness/operations.md` for the operator guide (provider selection between Anthropic and DeepSeek, secret setup, manual overrides).
 
+**Reference guides** — Human- and agent-readable reference guides live under `content/guides/<topic>/` (markdown source + generated HTML). Run `scaffold guides` to open the index or `scaffold guides <topic>` to open a specific guide in your browser; agents read the source via `scaffold guides <topic> --markdown` and discover topics with `scaffold guides --list --format json`.
+
 **Methodology presets** — Three built-in presets control which steps run and how deep the analysis goes:
 - **deep** (depth 5) — all steps enabled, exhaustive analysis
 - **mvp** (depth 1) — 7 critical steps, get to code fast
@@ -50,7 +52,7 @@ A daily cron audits entries against their declared authoritative sources and ope
 
 ### Required
 
-**Node.js** (v18 or later)
+**Node.js** (v18.17 or later)
 - Install: https://nodejs.org or `brew install node`
 - Verify: `node --version`
 
