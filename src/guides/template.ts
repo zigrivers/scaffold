@@ -18,7 +18,7 @@ function toc(headings: TocHeading[]): string {
   const items = headings
     .map((h) => `<li class="toc-${h.depth}"><a href="#${esc(h.id)}">${esc(h.text)}</a></li>`)
     .join('')
-  return `<nav class="toc" id="guide-toc" aria-label="Table of contents"><ul>${items}</ul></nav>`
+  return `<nav class="toc" aria-label="Table of contents"><ul>${items}</ul></nav>`
 }
 
 export function wrapInChrome({ title, body, headings, css }: WrapArgs): string {
@@ -40,7 +40,7 @@ export function wrapInChrome({ title, body, headings, css }: WrapArgs): string {
   <button data-action="theme" class="theme-toggle" aria-label="Toggle theme">◐</button>
 </header>
 <div class="layout">
-  <aside class="rail">${toc(headings)}</aside>
+  <aside class="rail" id="guide-toc"><button class="rail-close" data-action="nav" aria-label="Close navigation">✕</button>${toc(headings)}</aside>
   <main class="content">${body}</main>
   <div class="rail-backdrop" data-action="nav" aria-hidden="true"></div>
 </div>

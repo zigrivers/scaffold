@@ -1165,6 +1165,8 @@ nav.toc a:focus-visible,
 
 /* Backdrop behind the mobile drawer (toggled with the rail via chrome.ts). */
 .rail-backdrop { display: none; }
+/* In-drawer close button — hidden on desktop (the rail is a static sidebar). */
+.rail-close { display: none; }
 
 /* ── Table of contents (scrollspy marks a.active) ────────────────────────── */
 nav.toc ul { list-style: none; margin: 0; padding: 0; }
@@ -1338,6 +1340,14 @@ nav.toc li.toc-3 a { padding-left: var(--sp-6); font-size: var(--text-xs); }
     visibility: hidden; pointer-events: none;
   }
   .rail.open { transform: translateX(0); visibility: visible; pointer-events: auto; }
+  .rail-close {
+    display: block; margin-left: auto; margin-bottom: var(--sp-2);
+    background: var(--bg-card); border: 1px solid var(--border); color: var(--text);
+    border-radius: var(--radius-sm); padding: var(--sp-1) var(--sp-3); font-size: var(--text-base);
+    line-height: 1; cursor: pointer; font-family: inherit;
+  }
+  .rail-close:hover { background: var(--bg-hover); border-color: var(--accent); }
+  .rail-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .rail-backdrop {
     display: block; position: fixed; inset: var(--topbar-h) 0 0 0;
     background: var(--scrim); z-index: 49;
@@ -1356,7 +1366,7 @@ nav.toc li.toc-3 a { padding-left: var(--sp-6); font-size: var(--text-xs); }
   <button data-action="theme" class="theme-toggle" aria-label="Toggle theme">◐</button>
 </header>
 <div class="layout">
-  <aside class="rail"><nav class="toc" id="guide-toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#what-the-knowledge-base-is">What the knowledge base is</a></li><li class="toc-2"><a href="#how-entries-are-injected-during-assembly">How entries are injected during assembly</a></li><li class="toc-3"><a href="#deep-guidance-vs-summary-the-dual-channel-split">Deep Guidance vs. Summary (the dual-channel split)</a></li><li class="toc-3"><a href="#the-gap-signal-tail">The gap-signal tail</a></li><li class="toc-2"><a href="#browsing-and-overriding-entries">Browsing and overriding entries</a></li><li class="toc-3"><a href="#--knowledge-root-a-separate-resolver">--knowledge-root (a separate resolver)</a></li><li class="toc-2"><a href="#authoring-a-new-entry">Authoring a new entry</a></li><li class="toc-3"><a href="#frontmatter-fields">Frontmatter fields</a></li><li class="toc-2"><a href="#see-also">See also</a></li></ul></nav></aside>
+  <aside class="rail" id="guide-toc"><button class="rail-close" data-action="nav" aria-label="Close navigation">✕</button><nav class="toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#what-the-knowledge-base-is">What the knowledge base is</a></li><li class="toc-2"><a href="#how-entries-are-injected-during-assembly">How entries are injected during assembly</a></li><li class="toc-3"><a href="#deep-guidance-vs-summary-the-dual-channel-split">Deep Guidance vs. Summary (the dual-channel split)</a></li><li class="toc-3"><a href="#the-gap-signal-tail">The gap-signal tail</a></li><li class="toc-2"><a href="#browsing-and-overriding-entries">Browsing and overriding entries</a></li><li class="toc-3"><a href="#--knowledge-root-a-separate-resolver">--knowledge-root (a separate resolver)</a></li><li class="toc-2"><a href="#authoring-a-new-entry">Authoring a new entry</a></li><li class="toc-3"><a href="#frontmatter-fields">Frontmatter fields</a></li><li class="toc-2"><a href="#see-also">See also</a></li></ul></nav></aside>
   <main class="content"><h2 id="what-the-knowledge-base-is">What the knowledge base is</h2>
 <p>The knowledge base (KB) is a curated library of domain-expertise entries under
 <code>content/knowledge/</code>, organized into category directories (<code>backend</code>, <code>core</code>,

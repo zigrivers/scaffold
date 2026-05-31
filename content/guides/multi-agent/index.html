@@ -1165,6 +1165,8 @@ nav.toc a:focus-visible,
 
 /* Backdrop behind the mobile drawer (toggled with the rail via chrome.ts). */
 .rail-backdrop { display: none; }
+/* In-drawer close button — hidden on desktop (the rail is a static sidebar). */
+.rail-close { display: none; }
 
 /* ── Table of contents (scrollspy marks a.active) ────────────────────────── */
 nav.toc ul { list-style: none; margin: 0; padding: 0; }
@@ -1338,6 +1340,14 @@ nav.toc li.toc-3 a { padding-left: var(--sp-6); font-size: var(--text-xs); }
     visibility: hidden; pointer-events: none;
   }
   .rail.open { transform: translateX(0); visibility: visible; pointer-events: auto; }
+  .rail-close {
+    display: block; margin-left: auto; margin-bottom: var(--sp-2);
+    background: var(--bg-card); border: 1px solid var(--border); color: var(--text);
+    border-radius: var(--radius-sm); padding: var(--sp-1) var(--sp-3); font-size: var(--text-base);
+    line-height: 1; cursor: pointer; font-family: inherit;
+  }
+  .rail-close:hover { background: var(--bg-hover); border-color: var(--accent); }
+  .rail-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .rail-backdrop {
     display: block; position: fixed; inset: var(--topbar-h) 0 0 0;
     background: var(--scrim); z-index: 49;
@@ -1356,7 +1366,7 @@ nav.toc li.toc-3 a { padding-left: var(--sp-6); font-size: var(--text-xs); }
   <button data-action="theme" class="theme-toggle" aria-label="Toggle theme">◐</button>
 </header>
 <div class="layout">
-  <aside class="rail"><nav class="toc" id="guide-toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#why-worktrees-not-just-branches">Why worktrees, not just branches</a></li><li class="toc-2"><a href="#setup-setup-agent-worktreesh">Setup — setup-agent-worktree.sh</a></li><li class="toc-2"><a href="#which-build-phase-entry-point">Which build-phase entry point?</a></li><li class="toc-2"><a href="#working-in-parallel">Working in parallel</a></li><li class="toc-2"><a href="#teardown-harvest">Teardown &amp; harvest</a></li><li class="toc-3"><a href="#the-branch-deletion-guards">The branch-deletion guards</a></li><li class="toc-3"><a href="#recovering-orphaned-ledgers---recover">Recovering orphaned ledgers — --recover</a></li><li class="toc-2"><a href="#resuming-after-a-break">Resuming after a break</a></li><li class="toc-2"><a href="#see-also">See also</a></li></ul></nav></aside>
+  <aside class="rail" id="guide-toc"><button class="rail-close" data-action="nav" aria-label="Close navigation">✕</button><nav class="toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#why-worktrees-not-just-branches">Why worktrees, not just branches</a></li><li class="toc-2"><a href="#setup-setup-agent-worktreesh">Setup — setup-agent-worktree.sh</a></li><li class="toc-2"><a href="#which-build-phase-entry-point">Which build-phase entry point?</a></li><li class="toc-2"><a href="#working-in-parallel">Working in parallel</a></li><li class="toc-2"><a href="#teardown-harvest">Teardown &amp; harvest</a></li><li class="toc-3"><a href="#the-branch-deletion-guards">The branch-deletion guards</a></li><li class="toc-3"><a href="#recovering-orphaned-ledgers---recover">Recovering orphaned ledgers — --recover</a></li><li class="toc-2"><a href="#resuming-after-a-break">Resuming after a break</a></li><li class="toc-2"><a href="#see-also">See also</a></li></ul></nav></aside>
   <main class="content"><h2 id="why-worktrees-not-just-branches">Why worktrees, not just branches</h2>
 <p>Several agents implementing the same project at once need two things: a clean
 checkout each can build and test in, and a shared history they all merge back

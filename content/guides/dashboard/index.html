@@ -1165,6 +1165,8 @@ nav.toc a:focus-visible,
 
 /* Backdrop behind the mobile drawer (toggled with the rail via chrome.ts). */
 .rail-backdrop { display: none; }
+/* In-drawer close button — hidden on desktop (the rail is a static sidebar). */
+.rail-close { display: none; }
 
 /* ── Table of contents (scrollspy marks a.active) ────────────────────────── */
 nav.toc ul { list-style: none; margin: 0; padding: 0; }
@@ -1338,6 +1340,14 @@ nav.toc li.toc-3 a { padding-left: var(--sp-6); font-size: var(--text-xs); }
     visibility: hidden; pointer-events: none;
   }
   .rail.open { transform: translateX(0); visibility: visible; pointer-events: auto; }
+  .rail-close {
+    display: block; margin-left: auto; margin-bottom: var(--sp-2);
+    background: var(--bg-card); border: 1px solid var(--border); color: var(--text);
+    border-radius: var(--radius-sm); padding: var(--sp-1) var(--sp-3); font-size: var(--text-base);
+    line-height: 1; cursor: pointer; font-family: inherit;
+  }
+  .rail-close:hover { background: var(--bg-hover); border-color: var(--accent); }
+  .rail-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .rail-backdrop {
     display: block; position: fixed; inset: var(--topbar-h) 0 0 0;
     background: var(--scrim); z-index: 49;
@@ -1356,7 +1366,7 @@ nav.toc li.toc-3 a { padding-left: var(--sp-6); font-size: var(--text-xs); }
   <button data-action="theme" class="theme-toggle" aria-label="Toggle theme">◐</button>
 </header>
 <div class="layout">
-  <aside class="rail"><nav class="toc" id="guide-toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#what-the-dashboard-is">What the dashboard is</a></li><li class="toc-2"><a href="#reading-the-dashboard">Reading the dashboard</a></li><li class="toc-3"><a href="#the-build-observability-panels">The Build-Observability panels</a></li><li class="toc-3"><a href="#filters-and-modals-the-inline-js">Filters and modals (the inline JS)</a></li><li class="toc-2"><a href="#the-design-token-system">The design-token system</a></li><li class="toc-3"><a href="#colors-light-dark-parity">Colors — light + dark parity</a></li><li class="toc-3"><a href="#spacing-the---sp--scale">Spacing — the --sp-* scale</a></li><li class="toc-3"><a href="#typography-radius-layout">Typography, radius &amp; layout</a></li><li class="toc-2"><a href="#customizing-the-dashboard-safely">Customizing the dashboard safely</a></li><li class="toc-2"><a href="#visual-testing">Visual testing</a></li></ul></nav></aside>
+  <aside class="rail" id="guide-toc"><button class="rail-close" data-action="nav" aria-label="Close navigation">✕</button><nav class="toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#what-the-dashboard-is">What the dashboard is</a></li><li class="toc-2"><a href="#reading-the-dashboard">Reading the dashboard</a></li><li class="toc-3"><a href="#the-build-observability-panels">The Build-Observability panels</a></li><li class="toc-3"><a href="#filters-and-modals-the-inline-js">Filters and modals (the inline JS)</a></li><li class="toc-2"><a href="#the-design-token-system">The design-token system</a></li><li class="toc-3"><a href="#colors-light-dark-parity">Colors — light + dark parity</a></li><li class="toc-3"><a href="#spacing-the---sp--scale">Spacing — the --sp-* scale</a></li><li class="toc-3"><a href="#typography-radius-layout">Typography, radius &amp; layout</a></li><li class="toc-2"><a href="#customizing-the-dashboard-safely">Customizing the dashboard safely</a></li><li class="toc-2"><a href="#visual-testing">Visual testing</a></li></ul></nav></aside>
   <main class="content"><h2 id="what-the-dashboard-is">What the dashboard is</h2>
 <p>Each dashboard is a single, self-contained HTML file that visualizes where a
 Scaffold build stands: which pipeline steps are done and what to run next.

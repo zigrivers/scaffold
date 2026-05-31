@@ -1165,6 +1165,8 @@ nav.toc a:focus-visible,
 
 /* Backdrop behind the mobile drawer (toggled with the rail via chrome.ts). */
 .rail-backdrop { display: none; }
+/* In-drawer close button — hidden on desktop (the rail is a static sidebar). */
+.rail-close { display: none; }
 
 /* ── Table of contents (scrollspy marks a.active) ────────────────────────── */
 nav.toc ul { list-style: none; margin: 0; padding: 0; }
@@ -1338,6 +1340,14 @@ nav.toc li.toc-3 a { padding-left: var(--sp-6); font-size: var(--text-xs); }
     visibility: hidden; pointer-events: none;
   }
   .rail.open { transform: translateX(0); visibility: visible; pointer-events: auto; }
+  .rail-close {
+    display: block; margin-left: auto; margin-bottom: var(--sp-2);
+    background: var(--bg-card); border: 1px solid var(--border); color: var(--text);
+    border-radius: var(--radius-sm); padding: var(--sp-1) var(--sp-3); font-size: var(--text-base);
+    line-height: 1; cursor: pointer; font-family: inherit;
+  }
+  .rail-close:hover { background: var(--bg-hover); border-color: var(--accent); }
+  .rail-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .rail-backdrop {
     display: block; position: fixed; inset: var(--topbar-h) 0 0 0;
     background: var(--scrim); z-index: 49;
@@ -1356,7 +1366,7 @@ nav.toc li.toc-3 a { padding-left: var(--sp-6); font-size: var(--text-xs); }
   <button data-action="theme" class="theme-toggle" aria-label="Toggle theme">◐</button>
 </header>
 <div class="layout">
-  <aside class="rail"><nav class="toc" id="guide-toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#the-mental-model">The mental model</a></li><li class="toc-2"><a href="#the-16-phases-at-a-glance">The 16 phases at a glance</a></li><li class="toc-2"><a href="#methodology-depth">Methodology &amp; depth</a></li><li class="toc-3"><a href="#depth-15">Depth (1–5)</a></li><li class="toc-3"><a href="#the-three-presets">The three presets</a></li><li class="toc-2"><a href="#project-type-playbooks">Project-type playbooks</a></li><li class="toc-2"><a href="#navigating-the-pipeline">Navigating the pipeline</a></li><li class="toc-2"><a href="#why-a-step-is-blocked">Why a step is blocked</a></li><li class="toc-3"><a href="#conditional-if-needed-steps">Conditional (&quot;if-needed&quot;) steps</a></li><li class="toc-3"><a href="#a-representative-dependency-slice">A representative dependency slice</a></li><li class="toc-2"><a href="#create-vs-update-mode">CREATE vs UPDATE mode</a></li><li class="toc-2"><a href="#phase-boundary-audits">Phase-boundary audits</a></li><li class="toc-2"><a href="#where-it-all-lives">Where it all lives</a></li></ul></nav></aside>
+  <aside class="rail" id="guide-toc"><button class="rail-close" data-action="nav" aria-label="Close navigation">✕</button><nav class="toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#the-mental-model">The mental model</a></li><li class="toc-2"><a href="#the-16-phases-at-a-glance">The 16 phases at a glance</a></li><li class="toc-2"><a href="#methodology-depth">Methodology &amp; depth</a></li><li class="toc-3"><a href="#depth-15">Depth (1–5)</a></li><li class="toc-3"><a href="#the-three-presets">The three presets</a></li><li class="toc-2"><a href="#project-type-playbooks">Project-type playbooks</a></li><li class="toc-2"><a href="#navigating-the-pipeline">Navigating the pipeline</a></li><li class="toc-2"><a href="#why-a-step-is-blocked">Why a step is blocked</a></li><li class="toc-3"><a href="#conditional-if-needed-steps">Conditional (&quot;if-needed&quot;) steps</a></li><li class="toc-3"><a href="#a-representative-dependency-slice">A representative dependency slice</a></li><li class="toc-2"><a href="#create-vs-update-mode">CREATE vs UPDATE mode</a></li><li class="toc-2"><a href="#phase-boundary-audits">Phase-boundary audits</a></li><li class="toc-2"><a href="#where-it-all-lives">Where it all lives</a></li></ul></nav></aside>
   <main class="content"><h2 id="the-mental-model">The mental model</h2>
 <p>Scaffold is a <strong>prompt pipeline</strong>: a curated, ordered sequence of structured
 meta-prompts that turn an idea into a fully-specified, build-ready project. Each
