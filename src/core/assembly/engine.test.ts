@@ -643,4 +643,36 @@ describe('AssemblyEngine — gap-signal tail injection', () => {
     expect(result.success).toBe(true)
     expect(result.prompt?.text).not.toContain('scaffold observe event knowledge_gap_signal')
   })
+
+  describe('$ARGUMENTS substitution', () => {
+    it('substitutes $ARGUMENTS with the provided value', () => {
+      const engine = new AssemblyEngine()
+      const metaPrompt = makeMetaPrompt({ body: 'PR is $ARGUMENTS now.' })
+      const result = engine.assemble('create-prd', makeOptions({ metaPrompt, arguments: '376' }))
+      expect(result.prompt!.text).toContain('PR is 376 now.')
+    })
+
+    it('substitutes values containing $-replacement patterns verbatim', () => {
+      const engine = new AssemblyEngine()
+      const metaPrompt = makeMetaPrompt({ body: 'ARG=[$ARGUMENTS]' })
+      // $&, $1, backtick-$, and a command-substitution-looking token must pass through unchanged
+      const tricky = '$& $1 ${HOME} $(echo hi)'
+      const result = engine.assemble('create-prd', makeOptions({ metaPrompt, arguments: tricky }))
+      expect(result.prompt!.text).toContain('ARG=[' + tricky + ']')
+    })
+
+    it('removes the $ARGUMENTS token when arguments is an empty string', () => {
+      const engine = new AssemblyEngine()
+      const metaPrompt = makeMetaPrompt({ body: 'X$ARGUMENTSY' })
+      const result = engine.assemble('create-prd', makeOptions({ metaPrompt, arguments: '' }))
+      expect(result.prompt!.text).toContain('XY')
+    })
+
+    it('removes the $ARGUMENTS token when arguments is undefined', () => {
+      const engine = new AssemblyEngine()
+      const metaPrompt = makeMetaPrompt({ body: 'X$ARGUMENTSY' })
+      const result = engine.assemble('create-prd', makeOptions({ metaPrompt })) // no arguments
+      expect(result.prompt!.text).toContain('XY')
+    })
+  })
 })

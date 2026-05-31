@@ -95,9 +95,12 @@ export class AssemblyEngine {
         { heading: 'System', content: this.buildSystemSection(step, options) },
         {
           heading: 'Meta-Prompt',
-          content: options.arguments != null
-            ? options.metaPrompt.body.replace(/\$ARGUMENTS/g, options.arguments)
-            : options.metaPrompt.body,
+          // Functional replacer: no special-pattern interpretation of $&, $1, `$\``, `$'`
+          // in the argument value, and a '' default so a literal $ARGUMENTS never leaks.
+          content: options.metaPrompt.body.replace(
+            /\$ARGUMENTS/g,
+            () => options.arguments ?? '',
+          ),
         },
         { heading: 'Knowledge Base',
           content: this.buildKnowledgeBaseSection(options.knowledgeEntries, step) },
