@@ -168,15 +168,18 @@ feature's implementation plan.
   (title/description/priority/parent/wave/risk) of issues in a **not-started**
   stored status (`open`/`blocked`/`deferred`), and **never touches the content
   fields or execution status** of issues in a **started** status
-  (`in_progress`/`closed`). The one **narrow, explicit exception** is *join-key
-  metadata cleanup*: Pass 0a may `--unset-metadata <join-key>` on a started
-  *non-canonical duplicate* (to restore the one-key invariant), and Pass 3 may
-  unset it on a *closed, removed-from-plan* issue (to keep it out of future
-  fetches). These cleanups change **only** the `plan_*_id` tag — never content,
-  status, claims, or assignees — and are always reported. (Per verified
-  semantics, a dependency-blocked task stays stored `open` — dependency blockers
-  affect *computed readiness*, not stored status; a stored `blocked`/`deferred`
-  is an explicit signal.)
+  (`in_progress`/`closed`). There are two **narrow, explicit metadata-only
+  exceptions** (content fields, status, claims, and assignees are still never
+  touched on started issues): **(a) join-key cleanup** — Pass 0a may
+  `--unset-metadata <join-key>` on a started *non-canonical duplicate* (one-key
+  invariant) and Pass 3 on a *closed, removed-from-plan* issue (drop from future
+  fetches); **(b) AC-drift bookkeeping** — Pass 1 may `--set-metadata
+  ac_warn_hash=…` on an `in_progress` issue whose plan AC changed, so the warning
+  comment posts once per distinct change, not every run. Each touches **only** a
+  single metadata tag and is reported. (Per verified semantics, a
+  dependency-blocked task stays stored `open` — dependency blockers affect
+  *computed readiness*, not stored status; a stored `blocked`/`deferred` is an
+  explicit signal.)
 
 This mirrors the update-mode contract already used by `implementation-plan.md`
 and `implementation-playbook.md`.
@@ -326,16 +329,17 @@ the **exactly-one-issue-per-key invariant** that every later bulk fetch, map,
 dep reconcile, stale pass, and the scoped claim loop depend on:
 
 1. **Pick the canonical issue** for the key, preferring **active** work so it is
-   never detached from the plan-derived set:
-   - if any duplicate is `in_progress` → canonical is the oldest `in_progress`
-     one (active work wins over a stale `closed` copy);
+   never detached from the plan-derived set. The ordering is total and
+   unambiguous:
+   - if **exactly one** duplicate is `in_progress` → it is canonical (active work
+     wins over any `closed` or not-started copy);
    - else if any is `closed` → canonical is the oldest `closed` one;
    - else the oldest not-started issue (lowest `created_at`, ties by `id`).
 
-   If duplicates carry **conflicting started statuses that can't be ordered
-   safely** (e.g. one `in_progress` *and* one `closed` for the same plan ID),
-   **fail closed** and report rather than guessing — auto-detaching the wrong one
-   could let the completion check call a task done while active work is orphaned.
+   The **only** unorderable case is **two or more `in_progress` duplicates** for
+   the same plan ID (e.g. two agents independently claimed copies) — there is no
+   safe way to pick which active effort to detach, so **fail closed** and report.
+   An `in_progress` + `closed` mix is *not* a conflict: `in_progress` wins.
 2. **Not-started non-canonical duplicates** → retire them per the **Retire
    convention** (close → `stale:duplicate` label → unset the issue's own
    `<join-key>`), so they leave the plan-derived set and are never re-detected.
