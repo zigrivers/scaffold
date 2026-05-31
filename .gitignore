@@ -31,6 +31,10 @@ node_modules/
 # Git worktrees
 .worktrees/
 
+# Claude Code transient runtime locks
+.claude/scheduled_tasks.lock
+.claude/*.lock
+
 # Playwright MCP test artifacts
 tests/screenshots/current/
 tests/screenshots/diff/
