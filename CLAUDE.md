@@ -93,6 +93,21 @@ When modifying prompts:
 
 See `docs/git-workflow.md` for the full workflow.
 
+> **`git push` runs a multi-minute `pre-push` hook — a "hang" is usually the
+> test suite, not the network.** `make hooks` installs a `pre-push` hook that
+> runs the full bats/test suite (minutes) BEFORE the upload. A push that sits
+> with no output is almost always the hook running tests, not a network/auth
+> problem — do **not** kill it after a short wait, and do not start diagnosing
+> HTTP/2, proxies, or credentials. Confirm with `GIT_TRACE=1 git push`: you'll
+> see the receive-pack advertisement succeed, then
+> `run_command: .git/hooks/pre-push …` followed by `1..N  ok 1 …` bats output.
+> (Note: this repo is public, so `git fetch`/`ls-remote` need no auth and return
+> instantly — that contrast can make a slow push look network-specific when it
+> isn't.) When you have **already run `make check-all` green on the exact commit
+> being pushed**, the hook's run is redundant — use `git push --no-verify` to
+> skip it and the upload completes in seconds. Otherwise, just let the hook
+> finish (allow several minutes).
+
 ### Scaffold Release Workflow
 
 The generic `/scaffold:release` command is for downstream projects. When
