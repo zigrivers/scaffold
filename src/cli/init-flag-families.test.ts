@@ -3,7 +3,7 @@ import {
   PROJECT_TYPE_FLAG,
   GAME_FLAGS, WEB_FLAGS, BACKEND_FLAGS, CLI_TYPE_FLAGS,
   LIB_FLAGS, MOBILE_FLAGS, PIPELINE_FLAGS, ML_FLAGS, EXT_FLAGS,
-  RESEARCH_FLAGS,
+  RESEARCH_FLAGS, MCP_SERVER_FLAGS,
   applyFlagFamilyValidation,
   buildFlagOverrides,
 } from './init-flag-families.js'
@@ -408,5 +408,36 @@ describe('flag family type preservation (as const survives extraction)', () => {
     expectTypeOf<typeof RESEARCH_FLAGS[number]>().toEqualTypeOf<
       'research-driver' | 'research-interaction' | 'research-domain' | 'research-tracking'
     >()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// mcp-server flag family
+// ---------------------------------------------------------------------------
+
+describe('mcp-server flag family', () => {
+  it('buildFlagOverrides maps --mcp-* to McpServerConfig partial', () => {
+    const out = buildFlagOverrides({
+      'mcp-language': 'python', 'mcp-transport': 'streamable-http', 'mcp-auth': 'oauth',
+    })
+    expect(out).toEqual({
+      type: 'mcp-server',
+      partial: { language: 'python', transport: 'streamable-http', auth: 'oauth' },
+    })
+  })
+
+  it('rejects mixing --mcp-* with another family', () => {
+    expect(() => applyFlagFamilyValidation({ 'mcp-language': 'python', 'web-rendering': 'spa' }))
+      .toThrow(/multiple project types/)
+  })
+
+  it('rejects --mcp-* with a conflicting --project-type', () => {
+    expect(() => applyFlagFamilyValidation({ 'mcp-language': 'python', 'project-type': 'cli' }))
+      .toThrow(/--project-type mcp-server/)
+  })
+
+  it('MCP_SERVER_FLAGS preserves its literal members', () => {
+    const f: typeof MCP_SERVER_FLAGS[number] = 'mcp-language'
+    expect(MCP_SERVER_FLAGS).toContain(f)
   })
 })

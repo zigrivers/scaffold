@@ -22,6 +22,7 @@ import type {
   MlConfigSchema,
   BrowserExtensionConfigSchema,
   ResearchConfigSchema,
+  McpServerConfigSchema,
 } from '../config/schema.js'
 
 // Local type aliases keep the `buildFlagOverrides` cast sites readable
@@ -36,6 +37,7 @@ type DataPipelineConfig = z.infer<typeof DataPipelineConfigSchema>
 type MlConfig = z.infer<typeof MlConfigSchema>
 type BrowserExtensionConfig = z.infer<typeof BrowserExtensionConfigSchema>
 type ResearchConfig = z.infer<typeof ResearchConfigSchema>
+type McpServerConfig = z.infer<typeof McpServerConfigSchema>
 
 // ---------------------------------------------------------------------------
 // Flag family constants (verbatim from init.ts)
@@ -82,6 +84,9 @@ export const EXT_FLAGS = ['ext-manifest', 'ext-ui-surfaces', 'ext-content-script
 export const RESEARCH_FLAGS = [
   'research-driver', 'research-interaction', 'research-domain', 'research-tracking',
 ] as const
+export const MCP_SERVER_FLAGS = [
+  'mcp-language', 'mcp-transport', 'mcp-primitives', 'mcp-auth', 'mcp-deployment', 'mcp-stateful',
+] as const
 
 // ---------------------------------------------------------------------------
 // Discriminated-union payload for adopt's merge pipeline
@@ -98,6 +103,7 @@ export type PartialConfigOverrides =
   | { type: 'ml'; partial: Partial<MlConfig> }
   | { type: 'browser-extension'; partial: Partial<BrowserExtensionConfig> }
   | { type: 'research'; partial: Partial<ResearchConfig> }
+  | { type: 'mcp-server'; partial: Partial<McpServerConfig> }
   | undefined
 
 // ---------------------------------------------------------------------------
@@ -130,6 +136,7 @@ function detectFamily(
   | 'ml'
   | 'browser-extension'
   | 'research'
+  | 'mcp-server'
   | undefined {
   if (GAME_FLAGS.some((f) => argv[f] !== undefined)) return 'game'
   if (WEB_FLAGS.some((f) => argv[f] !== undefined)) return 'web-app'
@@ -141,6 +148,7 @@ function detectFamily(
   if (ML_FLAGS.some((f) => argv[f] !== undefined)) return 'ml'
   if (EXT_FLAGS.some((f) => argv[f] !== undefined)) return 'browser-extension'
   if (RESEARCH_FLAGS.some((f) => argv[f] !== undefined)) return 'research'
+  if (MCP_SERVER_FLAGS.some((f) => argv[f] !== undefined)) return 'mcp-server'
   return undefined
 }
 
@@ -215,19 +223,20 @@ export function applyFlagFamilyValidation(argv: Record<string, unknown>): true |
   const hasMlFlag = ML_FLAGS.some((f) => argv[f] !== undefined)
   const hasExtFlag = EXT_FLAGS.some((f) => argv[f] !== undefined)
   const hasResearchFlag = RESEARCH_FLAGS.some((f) => argv[f] !== undefined)
+  const hasMcpServerFlag = MCP_SERVER_FLAGS.some((f) => argv[f] !== undefined)
 
   // Reject mixed-family flags
   const typeCount = [
     hasGameFlag, hasWebFlag, hasBackendFlag,
     hasCliFlag, hasLibFlag, hasMobileFlag,
     hasPipelineFlag, hasMlFlag, hasExtFlag,
-    hasResearchFlag,
+    hasResearchFlag, hasMcpServerFlag,
   ].filter(Boolean).length
   if (typeCount > 1) {
     throw new Error(
       'Cannot mix flags from multiple project types'
       + ' (--web-*, --backend-*, --cli-*, --lib-*, --mobile-*, --pipeline-*,'
-      + ' --ml-*, --research-*, --ext-*, game flags)',
+      + ' --ml-*, --research-*, --ext-*, --mcp-*, game flags)',
     )
   }
 
@@ -262,6 +271,12 @@ export function applyFlagFamilyValidation(argv: Record<string, unknown>): true |
   // Cross-field: notebook-driven + autonomous
   if (argv['research-driver'] === 'notebook-driven' && argv['research-interaction'] === 'autonomous') {
     throw new Error('Notebook-driven execution cannot be fully autonomous')
+  }
+  if (hasMcpServerFlag && argv['project-type'] !== undefined && argv['project-type'] !== 'mcp-server') {
+    throw new Error('--mcp-* flags require --project-type mcp-server')
+  }
+  if (argv['mcp-transport'] === 'stdio' && argv['mcp-auth'] !== undefined && argv['mcp-auth'] !== 'none') {
+    throw new Error('stdio transport cannot use network auth (set --mcp-auth none or use a non-stdio transport)')
   }
 
   // CSV enum validation for array flags
@@ -540,6 +555,16 @@ export function buildFlagOverrides(argv: Record<string, unknown>): PartialConfig
       partial.hasExperimentTracking = argv['research-tracking'] as boolean
     }
     return { type: 'research', partial }
+  }
+  case 'mcp-server': {
+    const partial: Partial<McpServerConfig> = {}
+    if (argv['mcp-language'] !== undefined) partial.language = argv['mcp-language'] as McpServerConfig['language']
+    if (argv['mcp-transport'] !== undefined) partial.transport = argv['mcp-transport'] as McpServerConfig['transport']
+    if (argv['mcp-primitives'] !== undefined) partial.primitives = argv['mcp-primitives'] as McpServerConfig['primitives']
+    if (argv['mcp-auth'] !== undefined) partial.auth = argv['mcp-auth'] as McpServerConfig['auth']
+    if (argv['mcp-deployment'] !== undefined) partial.deployment = argv['mcp-deployment'] as McpServerConfig['deployment']
+    if (argv['mcp-stateful'] !== undefined) partial.stateful = argv['mcp-stateful'] as boolean
+    return { type: 'mcp-server', partial }
   }
   default:
     return undefined
