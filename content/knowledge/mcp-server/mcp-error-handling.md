@@ -36,7 +36,7 @@ A protocol error is a JSON-RPC error response object. It replaces the `result` f
 
 Use protocol errors for:
 - **Method not found** (`-32601`): the client called a method the server does not implement.
-- **Invalid params** (`-32602`): required parameters are missing, have wrong types, or fail schema validation. Also used for unknown tool names in `tools/call`, missing required prompt arguments, invalid resource URIs.
+- **Invalid params** (`-32602`): structural/wire-level request problems that prevent dispatch entirely — unknown tool name in `tools/call`, unknown method, missing required prompt arguments to `prompts/get`, invalid resource URI in `resources/read`, malformed params shape at the JSON-RPC level. **Do NOT use `-32602` for a tool that dispatched successfully but whose arguments fail the tool's own `inputSchema` or business validation** — those are tool execution errors (see `isError` below).
 - **Internal error** (`-32603`): unhandled exception or server bug. Include enough detail in `message` to diagnose, but sanitize sensitive data.
 - **Parse error** (`-32700`): malformed JSON received. The SDK handles this automatically.
 - **Invalid request** (`-32600`): request is not valid JSON-RPC 2.0 structure. Also SDK-handled.
@@ -73,13 +73,14 @@ When a tool runs but the operation it performs fails, return the failure as a no
 ```
 
 Use `isError: true` for:
+- **Tool input/schema validation failures** — when a tool dispatches but its arguments fail the tool's own `inputSchema` or business validation rules (wrong value, out-of-range number, unsupported enum value, failed cross-field constraint). Per SEP-1303 (2025-11-25), these MUST be `isError: true` so the model can self-correct, NOT `-32602`.
 - External API failures (HTTP 4xx/5xx from downstream services)
 - Resource not found in a domain sense (file doesn't exist at the path the user specified)
 - Business logic rejections (insufficient permissions in the target system, invalid state for the operation)
 - Network timeouts when calling downstream services
 - Partial failures where the overall result is a failure
 
-**Why this distinction matters**: when `isError: true`, the result is a successful JSON-RPC response — the protocol layer worked correctly. The LLM receives the content and can read the error message, decide to retry with different parameters, inform the user, or take an alternative approach. Protocol errors, on the other hand, are invisible to the LLM in most client implementations — they're handled at the transport/client layer. The 2025-11-25 spec revision (SEP-1303) explicitly directs that input validation errors SHOULD be returned as Tool Execution Errors (`isError: true`) rather than Protocol Errors, specifically to enable model self-correction — reinforcing this guidance.
+**Why this distinction matters**: when `isError: true`, the result is a successful JSON-RPC response — the protocol layer worked correctly. The LLM receives the content and can read the error message, decide to retry with different parameters, inform the user, or take an alternative approach. Protocol errors, on the other hand, are invisible to the LLM in most client implementations — they're handled at the transport/client layer. The 2025-11-25 spec revision (SEP-1303) explicitly directs that tool input validation errors MUST be returned as Tool Execution Errors (`isError: true`) rather than Protocol Errors (`-32602`), specifically to enable model self-correction. This applies to any argument that dispatches to a real tool but fails schema/business validation once there.
 
 ### Error message quality
 

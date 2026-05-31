@@ -678,7 +678,7 @@ Overlays are composable with methodology presets. An MVP web-app gets fewer step
 | Project Type | Overlay | Knowledge Entries | Config Options |
 |-------------|---------|-------------------|----------------|
 | `web-app` | `web-app-overlay.yml` | 17 entries (rendering, state management, auth, SSR, deploy targets, real-time, PWA, testing) | Rendering strategy, deploy target, real-time, auth flow |
-| `backend` | `backend-overlay.yml` | 14 entries (API design, data stores, auth, messaging, observability, deploy, caching, rate limiting) | API style, data store(s), auth, messaging, deploy target |
+| `backend` | `backend-overlay.yml` | 22 entries (API design, data stores, auth, messaging, observability, deploy, caching, rate limiting) | API style, data store(s), auth, messaging, deploy target |
 | `cli` | `cli-overlay.yml` | 10 entries (argument parsing, config management, output formatting, distribution, testing, error handling) | Interactivity model, distribution channels, structured output |
 | `library` | `library-overlay.yml` | 12 entries (API design, bundling, type definitions, versioning, documentation, testing, security) | Visibility, runtime target, bundle format, type definitions, documentation level |
 | `mobile-app` | `mobile-app-overlay.yml` | 12 entries (architecture, offline patterns, push notifications, deployment, distribution, testing, security) | Platform, distribution model, offline support, push notifications |
@@ -688,7 +688,7 @@ Overlays are composable with methodology presets. An MVP web-app gets fewer step
 | `research` | `research-overlay.yml` + domain sub-overlays | 25 entries (experiment loop, tracking, overfitting prevention, backtesting, risk metrics, architecture search, simulation) | Experiment driver, interaction mode, domain, experiment tracking |
 | `data-science` | `data-science-overlay.yml` | 13 entries (reproducibility, experiment tracking, notebook discipline, model evaluation, data versioning, dev environment, observability, project structure, conventions, requirements, security, testing, architecture) | Audience (`solo` default; `platform` reserved for DS-2) |
 | `web3` | `web3-overlay.yml` | 14 entries (Foundry tooling, smart-contract security, upgradeability, gas optimization, oracles, audit workflow, deployment, testing patterns, EVM fundamentals, ABI/interface design, event/log indexing, supply-chain) | Scope (`contracts` default; `dapp` reserved for W3-2) |
-| `game` | `game-overlay.yml` | 24 entries (engines, networking, audio, VR/AR, economy, save systems, certification) | Engine, multiplayer, platforms, economy, narrative, and 6 more |
+| `game` | `game-overlay.yml` | 25 entries (engines, networking, audio, VR/AR, economy, save systems, certification) | Engine, multiplayer, platforms, economy, narrative, and 6 more |
 | `mcp-server` | `mcp-server-overlay.yml` | 12 entries (protocol fundamentals, tool design, resource design, transport patterns, SDK selection, auth, error handling, testing, observability, deployment, versioning, prompt primitives) | Language, transport, primitives, auth, deployment, stateful |
 
 ### Game Development

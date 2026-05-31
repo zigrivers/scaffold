@@ -43,8 +43,9 @@ knowledge-overrides:
   # Specifications
   api-contracts:
     append: [mcp-tool-design, mcp-resource-design, mcp-error-handling]
-  mcp-tool-resource-contract:
-    append: [mcp-tool-design, mcp-resource-design, mcp-prompt-primitives, mcp-error-handling]
+  # mcp-tool-resource-contract knowledge is already declared in the step's own
+  # frontmatter knowledge-base ([mcp-tool-design, mcp-resource-design,
+  # mcp-prompt-primitives, mcp-error-handling]); no overlay override needed.
   database-schema:
     append: [mcp-resource-design]
 

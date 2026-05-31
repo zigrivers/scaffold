@@ -85,11 +85,11 @@ Write tests that verify correct JSON-RPC behavior at the protocol level. Use the
 
 Key protocol behaviors to test:
 - `initialize` returns declared capabilities matching what the server actually supports.
-- Calling `tools/call` with an unknown tool name returns a protocol error (not `isError`).
-- Calling `tools/call` with missing required parameters returns `-32602`.
-- Tools that fail domain-level return `isError: true`, not a JSON-RPC error.
+- Calling `tools/call` with an unknown tool name returns a protocol error `-32602` (not `isError`) — the request could not be dispatched at all.
+- Calling `tools/call` with arguments that fail the tool's `inputSchema` or business validation returns `isError: true` (SEP-1303), NOT `-32602` — the tool dispatched but the inputs were invalid, so the model can self-correct.
+- Tools that fail domain-level (API errors, rate limits, resource not found) return `isError: true`, not a JSON-RPC error.
 - `resources/read` with a nonexistent URI returns `-32002`.
-- `prompts/get` with a missing required argument returns `-32602`.
+- `prompts/get` with a missing required argument returns `-32602` (structural dispatch failure, not a tool execution).
 - `notifications/tools/list_changed` is sent when the tool list changes (if `listChanged: true` was declared).
 
 ### Testing isError paths

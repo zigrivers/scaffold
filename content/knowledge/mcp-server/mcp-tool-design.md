@@ -98,9 +98,9 @@ If the tool declares an `outputSchema`, it MUST also provide structured content 
 
 MCP distinguishes two error reporting paths:
 
-**Protocol errors** (JSON-RPC errors) are for cases where the call itself could not be processed: unknown tool name, invalid argument types, server crashes. These return a JSON-RPC error response with a negative integer `code`. The LLM cannot generally recover from protocol errors.
+**Protocol errors** (JSON-RPC errors) are for structural/wire-level failures where the call could not be dispatched at all: unknown tool name in `tools/call`, malformed JSON-RPC structure, server crashes. These return a JSON-RPC error response with a negative integer `code`. The LLM cannot generally recover from protocol errors.
 
-**Tool execution errors** use `isError: true` in the result. Use this for expected domain failures: API rate limits, resource not found, invalid business logic, network timeouts. Return `isError: true` with a descriptive TextContent explaining what went wrong. The LLM can read the error message and decide to retry, report to the user, or try a different approach.
+**Tool execution errors** use `isError: true` in the result. Use this for any failure that occurs after the tool dispatches — including tool `inputSchema` validation failures, business validation rejections, API rate limits, resource not found, and network timeouts. Per the 2025-11-25 spec (SEP-1303), tool input validation failures MUST use `isError: true` (not `-32602`) so the model can read the error and self-correct. Return `isError: true` with a descriptive TextContent explaining what went wrong and, when possible, what the caller should do differently.
 
 ```json
 {
@@ -114,7 +114,7 @@ MCP distinguishes two error reporting paths:
 }
 ```
 
-Never raise a JSON-RPC protocol error for domain-level failures that a well-behaved caller might encounter. Reserve protocol errors for programming errors (wrong method name, missing required params). When in doubt, use `isError: true` — it keeps the LLM in the loop about what went wrong.
+Never raise a JSON-RPC protocol error for domain-level failures that a well-behaved caller might encounter. Reserve protocol errors for structural dispatch failures (wrong method name, unknown tool). When in doubt, use `isError: true` — it keeps the LLM in the loop about what went wrong.
 
 ### Partial failures
 
