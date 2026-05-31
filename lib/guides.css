@@ -242,12 +242,16 @@ nav.toc li.toc-3 a { padding-left: var(--sp-6); font-size: var(--text-xs); }
   .rail {
     position: fixed; top: var(--topbar-h); left: 0; bottom: 0; width: var(--drawer-w); z-index: 50;
     height: auto; background: var(--bg-card); border-right: 1px solid var(--border);
-    padding: var(--sp-4); transform: translateX(-100%); transition: transform 0.2s ease;
-    box-shadow: var(--shadow-lg);
+    padding: var(--sp-4); box-shadow: var(--shadow-lg);
+    transform: translateX(-100%); transition: transform 0.2s ease, visibility 0.2s ease;
+    /* Closed drawer is off-screen AND removed from tab order / pointer events. */
+    visibility: hidden; pointer-events: none;
   }
-  .rail.open { transform: translateX(0); }
-  .rail.open ~ .rail-backdrop {
+  .rail.open { transform: translateX(0); visibility: visible; pointer-events: auto; }
+  .rail-backdrop {
     display: block; position: fixed; inset: var(--topbar-h) 0 0 0;
     background: var(--scrim); z-index: 49;
+    opacity: 0; pointer-events: none; transition: opacity 0.2s ease;
   }
+  .rail.open ~ .rail-backdrop { opacity: 1; pointer-events: auto; }
 }

@@ -41,12 +41,27 @@ export const CHROME_JS: string = /* js */ `(function(){
       });
     });
 
-    // ─── Mobile nav ──────────────────────────────────────────────────────────
+    // ─── Mobile nav (drawer + backdrop; aria-expanded + Escape-to-close) ──────
+    function setNav(open) {
+      var rail = document.querySelector('.rail');
+      if (rail) rail.classList.toggle('open', open);
+      var toggle = document.querySelector('.nav-toggle');
+      if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
     document.querySelectorAll('[data-action="nav"]').forEach(function(btn) {
       btn.addEventListener('click', function() {
         var rail = document.querySelector('.rail');
-        if (rail) rail.classList.toggle('open');
+        setNav(!(rail && rail.classList.contains('open')));
       });
+    });
+    document.addEventListener('keydown', function(e) {
+      if (e.key !== 'Escape') return;
+      var rail = document.querySelector('.rail');
+      if (rail && rail.classList.contains('open')) {
+        setNav(false);
+        var toggle = document.querySelector('.nav-toggle');
+        if (toggle) toggle.focus();
+      }
     });
 
     // ─── Copy buttons ─────────────────────────────────────────────────────────
@@ -73,17 +88,31 @@ export const CHROME_JS: string = /* js */ `(function(){
       wrapper.insertBefore(btn, pre);
     });
 
-    // ─── Tabs ─────────────────────────────────────────────────────────────────
+    // ─── Tabs (ARIA pattern: aria-selected + roving tabindex + arrow keys) ────
+    function activateTab(group, btn, focus) {
+      var idx = btn.getAttribute('data-tab');
+      group.querySelectorAll('.tab-btn').forEach(function(b) {
+        var on = b === btn;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-selected', on ? 'true' : 'false');
+        b.setAttribute('tabindex', on ? '0' : '-1');
+      });
+      group.querySelectorAll('.tabpane').forEach(function(pane) {
+        pane.classList.toggle('active', pane.getAttribute('data-tab') === idx);
+      });
+      if (focus) btn.focus();
+    }
     document.querySelectorAll('.tabs').forEach(function(group) {
-      group.querySelectorAll('.tab-btn').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-          var idx = btn.getAttribute('data-tab');
-          group.querySelectorAll('.tab-btn').forEach(function(b) {
-            b.classList.toggle('active', b === btn);
-          });
-          group.querySelectorAll('.tabpane').forEach(function(pane) {
-            pane.classList.toggle('active', pane.getAttribute('data-tab') === idx);
-          });
+      var btns = [].slice.call(group.querySelectorAll('.tab-btn'));
+      btns.forEach(function(btn, i) {
+        btn.addEventListener('click', function() { activateTab(group, btn, false); });
+        btn.addEventListener('keydown', function(e) {
+          var ni = -1;
+          if (e.key === 'ArrowRight' || e.key === 'ArrowDown') ni = (i + 1) % btns.length;
+          else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') ni = (i - 1 + btns.length) % btns.length;
+          else if (e.key === 'Home') ni = 0;
+          else if (e.key === 'End') ni = btns.length - 1;
+          if (ni >= 0) { e.preventDefault(); activateTab(group, btns[ni], true); }
         });
       });
     });

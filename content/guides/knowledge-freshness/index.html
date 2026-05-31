@@ -1331,26 +1331,31 @@ nav.toc li.toc-3 a { padding-left: var(--sp-6); font-size: var(--text-xs); }
   .rail {
     position: fixed; top: var(--topbar-h); left: 0; bottom: 0; width: var(--drawer-w); z-index: 50;
     height: auto; background: var(--bg-card); border-right: 1px solid var(--border);
-    padding: var(--sp-4); transform: translateX(-100%); transition: transform 0.2s ease;
-    box-shadow: var(--shadow-lg);
+    padding: var(--sp-4); box-shadow: var(--shadow-lg);
+    transform: translateX(-100%); transition: transform 0.2s ease, visibility 0.2s ease;
+    /* Closed drawer is off-screen AND removed from tab order / pointer events. */
+    visibility: hidden; pointer-events: none;
   }
-  .rail.open { transform: translateX(0); }
-  .rail.open ~ .rail-backdrop {
+  .rail.open { transform: translateX(0); visibility: visible; pointer-events: auto; }
+  .rail-backdrop {
     display: block; position: fixed; inset: var(--topbar-h) 0 0 0;
     background: var(--scrim); z-index: 49;
+    opacity: 0; pointer-events: none; transition: opacity 0.2s ease;
   }
+  .rail.open ~ .rail-backdrop { opacity: 1; pointer-events: auto; }
 }
 </style>
 <script>(function(){try{var t=localStorage.getItem('guide-theme');if(!t&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)t='dark';if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 </head>
 <body>
 <header class="topbar">
-  <button data-action="nav" class="nav-toggle" aria-label="Toggle navigation">☰</button>
+  <button data-action="nav" class="nav-toggle" aria-label="Toggle navigation"
+    aria-expanded="false" aria-controls="guide-toc">☰</button>
   <h1>Knowledge Freshness</h1>
   <button data-action="theme" class="theme-toggle" aria-label="Toggle theme">◐</button>
 </header>
 <div class="layout">
-  <aside class="rail"><nav class="toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#what-this-system-does">What this system does</a></li><li class="toc-3"><a href="#how-a-gap-closes">How a gap closes</a></li><li class="toc-2"><a href="#system-map">System map</a></li><li class="toc-2"><a href="#frontmatter-signals-and-resolution">Frontmatter, signals, and resolution</a></li><li class="toc-3"><a href="#frontmatter-schema">Frontmatter schema</a></li><li class="toc-3"><a href="#cadence-model">Cadence model</a></li><li class="toc-3"><a href="#adding-a-new-entry-to-the-kb">Adding a new entry to the KB</a></li><li class="toc-3"><a href="#gap-signal-payload">Gap-signal payload</a></li><li class="toc-3"><a href="#knowledgerootresolution-shape">KnowledgeRootResolution shape</a></li><li class="toc-2"><a href="#from-candidate-to-merged-pr">From candidate to merged PR</a></li><li class="toc-3"><a href="#prefilter">Prefilter</a></li><li class="toc-3"><a href="#audit-verdicts">Audit verdicts</a></li><li class="toc-3"><a href="#pr-generation">PR generation</a></li><li class="toc-3"><a href="#mmr-corroboration-manual">MMR corroboration (manual)</a></li><li class="toc-2"><a href="#the-five-pr-gates">The five PR gates</a></li><li class="toc-2"><a href="#lens-i-gap-detection-suppression">Lens I — gap detection + suppression</a></li><li class="toc-3"><a href="#threshold-matrix">Threshold matrix</a></li><li class="toc-3"><a href="#topic-normalization">Topic normalization</a></li><li class="toc-3"><a href="#what-the-lessonsmd-scanner-sees">What the lessons.md scanner sees</a></li><li class="toc-3"><a href="#3-tier---knowledge-root-resolution">3-tier --knowledge-root resolution</a></li><li class="toc-3"><a href="#warning-policy">Warning policy</a></li><li class="toc-3"><a href="#what-a-lens-i-finding-looks-like">What a Lens I finding looks like</a></li><li class="toc-2"><a href="#the-allowlist">The allowlist</a></li><li class="toc-3"><a href="#most-cited-hosts">Most-cited hosts</a></li><li class="toc-3"><a href="#the-full-allowlist">The full allowlist</a></li><li class="toc-3"><a href="#kb-inventory">KB inventory</a></li><li class="toc-3"><a href="#how-to-expand-the-allowlist">How to expand the allowlist</a></li><li class="toc-2"><a href="#anthropic-vs-deepseek-cron-uses-deepseek">Anthropic vs DeepSeek (cron uses DeepSeek)</a></li><li class="toc-2"><a href="#every-command-that-touches-the-system">Every command that touches the system</a></li><li class="toc-3"><a href="#refresh-arm-commands">Refresh-arm commands</a></li><li class="toc-3"><a href="#gap-arm-commands">Gap-arm commands</a></li><li class="toc-3"><a href="#gate-side-subcommands-also-runnable-locally-for-triage">Gate-side subcommands (also runnable locally for triage)</a></li><li class="toc-2"><a href="#operations-cheat-sheet">Operations cheat sheet</a></li><li class="toc-3"><a href="#an-entrys-audit-failed-in-the-cron">An entry's audit failed in the cron</a></li><li class="toc-3"><a href="#lens-i-keeps-surfacing-a-topic-the-kb-already-covers">Lens I keeps surfacing a topic the KB already covers</a></li><li class="toc-3"><a href="#downstream-auto-detect-cant-find-the-kb">Downstream auto-detect can't find the KB</a></li><li class="toc-3"><a href="#yaml-knowledge-root-stops-working-after-an-upgrade">Yaml knowledge_root stops working after an upgrade</a></li><li class="toc-3"><a href="#a-source-url-fetches-in-curl-but-the-cron-rejects-it">A source URL fetches in curl but the cron rejects it</a></li><li class="toc-3"><a href="#--knowledge-root-resolves-to-a-path-you-didnt-expect">--knowledge-root resolves to a path you didn't expect</a></li><li class="toc-2"><a href="#config-reference">Config reference</a></li><li class="toc-2"><a href="#roadmap-and-known-divergences">Roadmap and known divergences</a></li><li class="toc-3"><a href="#phase-5-planned">Phase 5 (planned)</a></li><li class="toc-3"><a href="#known-divergences">Known divergences</a></li></ul></nav></aside>
+  <aside class="rail"><nav class="toc" id="guide-toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#what-this-system-does">What this system does</a></li><li class="toc-3"><a href="#how-a-gap-closes">How a gap closes</a></li><li class="toc-2"><a href="#system-map">System map</a></li><li class="toc-2"><a href="#frontmatter-signals-and-resolution">Frontmatter, signals, and resolution</a></li><li class="toc-3"><a href="#frontmatter-schema">Frontmatter schema</a></li><li class="toc-3"><a href="#cadence-model">Cadence model</a></li><li class="toc-3"><a href="#adding-a-new-entry-to-the-kb">Adding a new entry to the KB</a></li><li class="toc-3"><a href="#gap-signal-payload">Gap-signal payload</a></li><li class="toc-3"><a href="#knowledgerootresolution-shape">KnowledgeRootResolution shape</a></li><li class="toc-2"><a href="#from-candidate-to-merged-pr">From candidate to merged PR</a></li><li class="toc-3"><a href="#prefilter">Prefilter</a></li><li class="toc-3"><a href="#audit-verdicts">Audit verdicts</a></li><li class="toc-3"><a href="#pr-generation">PR generation</a></li><li class="toc-3"><a href="#mmr-corroboration-manual">MMR corroboration (manual)</a></li><li class="toc-2"><a href="#the-five-pr-gates">The five PR gates</a></li><li class="toc-2"><a href="#lens-i-gap-detection-suppression">Lens I — gap detection + suppression</a></li><li class="toc-3"><a href="#threshold-matrix">Threshold matrix</a></li><li class="toc-3"><a href="#topic-normalization">Topic normalization</a></li><li class="toc-3"><a href="#what-the-lessonsmd-scanner-sees">What the lessons.md scanner sees</a></li><li class="toc-3"><a href="#3-tier---knowledge-root-resolution">3-tier --knowledge-root resolution</a></li><li class="toc-3"><a href="#warning-policy">Warning policy</a></li><li class="toc-3"><a href="#what-a-lens-i-finding-looks-like">What a Lens I finding looks like</a></li><li class="toc-2"><a href="#the-allowlist">The allowlist</a></li><li class="toc-3"><a href="#most-cited-hosts">Most-cited hosts</a></li><li class="toc-3"><a href="#the-full-allowlist">The full allowlist</a></li><li class="toc-3"><a href="#kb-inventory">KB inventory</a></li><li class="toc-3"><a href="#how-to-expand-the-allowlist">How to expand the allowlist</a></li><li class="toc-2"><a href="#anthropic-vs-deepseek-cron-uses-deepseek">Anthropic vs DeepSeek (cron uses DeepSeek)</a></li><li class="toc-2"><a href="#every-command-that-touches-the-system">Every command that touches the system</a></li><li class="toc-3"><a href="#refresh-arm-commands">Refresh-arm commands</a></li><li class="toc-3"><a href="#gap-arm-commands">Gap-arm commands</a></li><li class="toc-3"><a href="#gate-side-subcommands-also-runnable-locally-for-triage">Gate-side subcommands (also runnable locally for triage)</a></li><li class="toc-2"><a href="#operations-cheat-sheet">Operations cheat sheet</a></li><li class="toc-3"><a href="#an-entrys-audit-failed-in-the-cron">An entry's audit failed in the cron</a></li><li class="toc-3"><a href="#lens-i-keeps-surfacing-a-topic-the-kb-already-covers">Lens I keeps surfacing a topic the KB already covers</a></li><li class="toc-3"><a href="#downstream-auto-detect-cant-find-the-kb">Downstream auto-detect can't find the KB</a></li><li class="toc-3"><a href="#yaml-knowledge-root-stops-working-after-an-upgrade">Yaml knowledge_root stops working after an upgrade</a></li><li class="toc-3"><a href="#a-source-url-fetches-in-curl-but-the-cron-rejects-it">A source URL fetches in curl but the cron rejects it</a></li><li class="toc-3"><a href="#--knowledge-root-resolves-to-a-path-you-didnt-expect">--knowledge-root resolves to a path you didn't expect</a></li><li class="toc-2"><a href="#config-reference">Config reference</a></li><li class="toc-2"><a href="#roadmap-and-known-divergences">Roadmap and known divergences</a></li><li class="toc-3"><a href="#phase-5-planned">Phase 5 (planned)</a></li><li class="toc-3"><a href="#known-divergences">Known divergences</a></li></ul></nav></aside>
   <main class="content"><h2 id="what-this-system-does">What this system does</h2>
 <p>Knowledge entries under <code>content/knowledge/</code> declare a <code>volatility</code> tier and a
 list of <code>sources</code>. A daily cron prefilters at most ten entries that are <em>due</em> —
@@ -2373,13 +2378,13 @@ resolved by <code>resolveProvider</code> (<span class="fp" data-path="src/knowle
 <li>No env, <code>claude</code> on PATH → anthropic (subprocess uses keychain)</li>
 <li>Nothing → error (no provider configured)</li>
 </ol>
-<div class="tabs"><div class="tablist" role="tablist"><button class="tab-btn active" role="tab" data-tab="0">Anthropic</button><button class="tab-btn" role="tab" data-tab="1">DeepSeek</button></div><div class="tabpane active" data-tab="0"><p>Subprocess: <code>claude -p --tools ""</code> (empty-tools disables WebFetch so the model
+<div class="tabs"><div class="tablist" role="tablist"><button id="tab-0-0" class="tab-btn active" role="tab" data-tab="0" aria-controls="tabpane-0-0" aria-selected="true" tabindex="0">Anthropic</button><button id="tab-0-1" class="tab-btn" role="tab" data-tab="1" aria-controls="tabpane-0-1" aria-selected="false" tabindex="-1">DeepSeek</button></div><div id="tabpane-0-0" class="tabpane active" role="tabpanel" data-tab="0" tabindex="0"><p>Subprocess: <code>claude -p --tools ""</code> (empty-tools disables WebFetch so the model
 can only read the prefetched bodies). <strong>Requires the <code>claude</code> CLI on PATH
 regardless of how the provider was chosen</strong> — the resolver throws
 (<span class="fp" data-path="src/knowledge-freshness/providers/index.ts:44-56">src/knowledge-freshness/providers/index.ts:44-56</span>) if anthropic is
 picked via flag, env, or API-key inference and <code>claude</code> isn't installed.
 <code>ANTHROPIC_API_KEY</code> alone is <em>not</em> sufficient. Source:
-<code>src/knowledge-freshness/providers/anthropic.ts</code>.</p></div><div class="tabpane" data-tab="1"><p>HTTP. No subprocess; works in CI without the Claude CLI.</p><ul>
+<code>src/knowledge-freshness/providers/anthropic.ts</code>.</p></div><div id="tabpane-0-1" class="tabpane" role="tabpanel" data-tab="1" tabindex="0"><p>HTTP. No subprocess; works in CI without the Claude CLI.</p><ul>
 <li><strong>Auth:</strong> requires <code>DEEPSEEK_API_KEY</code>.</li>
 <li><strong>Default model:</strong> <code>deepseek-v4-flash</code>.</li>
 <li><strong>Override:</strong> set <code>KNOWLEDGE_FRESHNESS_DEEPSEEK_MODEL</code> to <code>deepseek-v4-pro</code>.
@@ -2625,12 +2630,27 @@ entries already auto-match subdomains, so the prefix is redundant.</li>
       });
     });
 
-    // ─── Mobile nav ──────────────────────────────────────────────────────────
+    // ─── Mobile nav (drawer + backdrop; aria-expanded + Escape-to-close) ──────
+    function setNav(open) {
+      var rail = document.querySelector('.rail');
+      if (rail) rail.classList.toggle('open', open);
+      var toggle = document.querySelector('.nav-toggle');
+      if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
     document.querySelectorAll('[data-action="nav"]').forEach(function(btn) {
       btn.addEventListener('click', function() {
         var rail = document.querySelector('.rail');
-        if (rail) rail.classList.toggle('open');
+        setNav(!(rail && rail.classList.contains('open')));
       });
+    });
+    document.addEventListener('keydown', function(e) {
+      if (e.key !== 'Escape') return;
+      var rail = document.querySelector('.rail');
+      if (rail && rail.classList.contains('open')) {
+        setNav(false);
+        var toggle = document.querySelector('.nav-toggle');
+        if (toggle) toggle.focus();
+      }
     });
 
     // ─── Copy buttons ─────────────────────────────────────────────────────────
@@ -2657,17 +2677,31 @@ entries already auto-match subdomains, so the prefix is redundant.</li>
       wrapper.insertBefore(btn, pre);
     });
 
-    // ─── Tabs ─────────────────────────────────────────────────────────────────
+    // ─── Tabs (ARIA pattern: aria-selected + roving tabindex + arrow keys) ────
+    function activateTab(group, btn, focus) {
+      var idx = btn.getAttribute('data-tab');
+      group.querySelectorAll('.tab-btn').forEach(function(b) {
+        var on = b === btn;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-selected', on ? 'true' : 'false');
+        b.setAttribute('tabindex', on ? '0' : '-1');
+      });
+      group.querySelectorAll('.tabpane').forEach(function(pane) {
+        pane.classList.toggle('active', pane.getAttribute('data-tab') === idx);
+      });
+      if (focus) btn.focus();
+    }
     document.querySelectorAll('.tabs').forEach(function(group) {
-      group.querySelectorAll('.tab-btn').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-          var idx = btn.getAttribute('data-tab');
-          group.querySelectorAll('.tab-btn').forEach(function(b) {
-            b.classList.toggle('active', b === btn);
-          });
-          group.querySelectorAll('.tabpane').forEach(function(pane) {
-            pane.classList.toggle('active', pane.getAttribute('data-tab') === idx);
-          });
+      var btns = [].slice.call(group.querySelectorAll('.tab-btn'));
+      btns.forEach(function(btn, i) {
+        btn.addEventListener('click', function() { activateTab(group, btn, false); });
+        btn.addEventListener('keydown', function(e) {
+          var ni = -1;
+          if (e.key === 'ArrowRight' || e.key === 'ArrowDown') ni = (i + 1) % btns.length;
+          else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') ni = (i - 1 + btns.length) % btns.length;
+          else if (e.key === 'Home') ni = 0;
+          else if (e.key === 'End') ni = btns.length - 1;
+          if (ni >= 0) { e.preventDefault(); activateTab(group, btns[ni], true); }
         });
       });
     });

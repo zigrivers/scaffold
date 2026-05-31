@@ -1331,26 +1331,31 @@ nav.toc li.toc-3 a { padding-left: var(--sp-6); font-size: var(--text-xs); }
   .rail {
     position: fixed; top: var(--topbar-h); left: 0; bottom: 0; width: var(--drawer-w); z-index: 50;
     height: auto; background: var(--bg-card); border-right: 1px solid var(--border);
-    padding: var(--sp-4); transform: translateX(-100%); transition: transform 0.2s ease;
-    box-shadow: var(--shadow-lg);
+    padding: var(--sp-4); box-shadow: var(--shadow-lg);
+    transform: translateX(-100%); transition: transform 0.2s ease, visibility 0.2s ease;
+    /* Closed drawer is off-screen AND removed from tab order / pointer events. */
+    visibility: hidden; pointer-events: none;
   }
-  .rail.open { transform: translateX(0); }
-  .rail.open ~ .rail-backdrop {
+  .rail.open { transform: translateX(0); visibility: visible; pointer-events: auto; }
+  .rail-backdrop {
     display: block; position: fixed; inset: var(--topbar-h) 0 0 0;
     background: var(--scrim); z-index: 49;
+    opacity: 0; pointer-events: none; transition: opacity 0.2s ease;
   }
+  .rail.open ~ .rail-backdrop { opacity: 1; pointer-events: auto; }
 }
 </style>
 <script>(function(){try{var t=localStorage.getItem('guide-theme');if(!t&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)t='dark';if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 </head>
 <body>
 <header class="topbar">
-  <button data-action="nav" class="nav-toggle" aria-label="Toggle navigation">☰</button>
+  <button data-action="nav" class="nav-toggle" aria-label="Toggle navigation"
+    aria-expanded="false" aria-controls="guide-toc">☰</button>
   <h1>Scaffold CLI Reference</h1>
   <button data-action="theme" class="theme-toggle" aria-label="Toggle theme">◐</button>
 </header>
 <div class="layout">
-  <aside class="rail"><nav class="toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#overview">Overview</a></li><li class="toc-2"><a href="#all-commands-at-a-glance">All commands at a glance</a></li><li class="toc-2"><a href="#setup-adoption">Setup &amp; adoption</a></li><li class="toc-2"><a href="#pipeline-navigation">Pipeline navigation</a></li><li class="toc-2"><a href="#status-dashboard">Status &amp; dashboard</a></li><li class="toc-2"><a href="#observability-scaffold-observe-">Observability — scaffold observe …</a></li><li class="toc-2"><a href="#knowledge">Knowledge</a></li><li class="toc-2"><a href="#validation">Validation</a></li><li class="toc-2"><a href="#version-update">Version &amp; update</a></li><li class="toc-2"><a href="#platform-skills">Platform &amp; skills</a></li><li class="toc-2"><a href="#see-also">See also</a></li></ul></nav></aside>
+  <aside class="rail"><nav class="toc" id="guide-toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#overview">Overview</a></li><li class="toc-2"><a href="#all-commands-at-a-glance">All commands at a glance</a></li><li class="toc-2"><a href="#setup-adoption">Setup &amp; adoption</a></li><li class="toc-2"><a href="#pipeline-navigation">Pipeline navigation</a></li><li class="toc-2"><a href="#status-dashboard">Status &amp; dashboard</a></li><li class="toc-2"><a href="#observability-scaffold-observe-">Observability — scaffold observe …</a></li><li class="toc-2"><a href="#knowledge">Knowledge</a></li><li class="toc-2"><a href="#validation">Validation</a></li><li class="toc-2"><a href="#version-update">Version &amp; update</a></li><li class="toc-2"><a href="#platform-skills">Platform &amp; skills</a></li><li class="toc-2"><a href="#see-also">See also</a></li></ul></nav></aside>
   <main class="content"><h2 id="overview">Overview</h2>
 <p>This is a terse index of the whole <code>scaffold</code> command surface. It tells you
 <em>which</em> command does <em>what</em> and points to the deep guides where a subsystem
@@ -1685,12 +1690,27 @@ subsystem.</li>
       });
     });
 
-    // ─── Mobile nav ──────────────────────────────────────────────────────────
+    // ─── Mobile nav (drawer + backdrop; aria-expanded + Escape-to-close) ──────
+    function setNav(open) {
+      var rail = document.querySelector('.rail');
+      if (rail) rail.classList.toggle('open', open);
+      var toggle = document.querySelector('.nav-toggle');
+      if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
     document.querySelectorAll('[data-action="nav"]').forEach(function(btn) {
       btn.addEventListener('click', function() {
         var rail = document.querySelector('.rail');
-        if (rail) rail.classList.toggle('open');
+        setNav(!(rail && rail.classList.contains('open')));
       });
+    });
+    document.addEventListener('keydown', function(e) {
+      if (e.key !== 'Escape') return;
+      var rail = document.querySelector('.rail');
+      if (rail && rail.classList.contains('open')) {
+        setNav(false);
+        var toggle = document.querySelector('.nav-toggle');
+        if (toggle) toggle.focus();
+      }
     });
 
     // ─── Copy buttons ─────────────────────────────────────────────────────────
@@ -1717,17 +1737,31 @@ subsystem.</li>
       wrapper.insertBefore(btn, pre);
     });
 
-    // ─── Tabs ─────────────────────────────────────────────────────────────────
+    // ─── Tabs (ARIA pattern: aria-selected + roving tabindex + arrow keys) ────
+    function activateTab(group, btn, focus) {
+      var idx = btn.getAttribute('data-tab');
+      group.querySelectorAll('.tab-btn').forEach(function(b) {
+        var on = b === btn;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-selected', on ? 'true' : 'false');
+        b.setAttribute('tabindex', on ? '0' : '-1');
+      });
+      group.querySelectorAll('.tabpane').forEach(function(pane) {
+        pane.classList.toggle('active', pane.getAttribute('data-tab') === idx);
+      });
+      if (focus) btn.focus();
+    }
     document.querySelectorAll('.tabs').forEach(function(group) {
-      group.querySelectorAll('.tab-btn').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-          var idx = btn.getAttribute('data-tab');
-          group.querySelectorAll('.tab-btn').forEach(function(b) {
-            b.classList.toggle('active', b === btn);
-          });
-          group.querySelectorAll('.tabpane').forEach(function(pane) {
-            pane.classList.toggle('active', pane.getAttribute('data-tab') === idx);
-          });
+      var btns = [].slice.call(group.querySelectorAll('.tab-btn'));
+      btns.forEach(function(btn, i) {
+        btn.addEventListener('click', function() { activateTab(group, btn, false); });
+        btn.addEventListener('keydown', function(e) {
+          var ni = -1;
+          if (e.key === 'ArrowRight' || e.key === 'ArrowDown') ni = (i + 1) % btns.length;
+          else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') ni = (i - 1 + btns.length) % btns.length;
+          else if (e.key === 'Home') ni = 0;
+          else if (e.key === 'End') ni = btns.length - 1;
+          if (ni >= 0) { e.preventDefault(); activateTab(group, btns[ni], true); }
         });
       });
     });

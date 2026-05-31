@@ -1331,26 +1331,31 @@ nav.toc li.toc-3 a { padding-left: var(--sp-6); font-size: var(--text-xs); }
   .rail {
     position: fixed; top: var(--topbar-h); left: 0; bottom: 0; width: var(--drawer-w); z-index: 50;
     height: auto; background: var(--bg-card); border-right: 1px solid var(--border);
-    padding: var(--sp-4); transform: translateX(-100%); transition: transform 0.2s ease;
-    box-shadow: var(--shadow-lg);
+    padding: var(--sp-4); box-shadow: var(--shadow-lg);
+    transform: translateX(-100%); transition: transform 0.2s ease, visibility 0.2s ease;
+    /* Closed drawer is off-screen AND removed from tab order / pointer events. */
+    visibility: hidden; pointer-events: none;
   }
-  .rail.open { transform: translateX(0); }
-  .rail.open ~ .rail-backdrop {
+  .rail.open { transform: translateX(0); visibility: visible; pointer-events: auto; }
+  .rail-backdrop {
     display: block; position: fixed; inset: var(--topbar-h) 0 0 0;
     background: var(--scrim); z-index: 49;
+    opacity: 0; pointer-events: none; transition: opacity 0.2s ease;
   }
+  .rail.open ~ .rail-backdrop { opacity: 1; pointer-events: auto; }
 }
 </style>
 <script>(function(){try{var t=localStorage.getItem('guide-theme');if(!t&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)t='dark';if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 </head>
 <body>
 <header class="topbar">
-  <button data-action="nav" class="nav-toggle" aria-label="Toggle navigation">☰</button>
+  <button data-action="nav" class="nav-toggle" aria-label="Toggle navigation"
+    aria-expanded="false" aria-controls="guide-toc">☰</button>
   <h1>Scaffold Guides</h1>
   <button data-action="theme" class="theme-toggle" aria-label="Toggle theme">◐</button>
 </header>
 <div class="layout">
-  <aside class="rail"><nav class="toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#cat-concepts">Concepts</a></li><li class="toc-2"><a href="#cat-reference">Reference</a></li><li class="toc-2"><a href="#cat-workflows">Workflows</a></li><li class="toc-2"><a href="#cat-tools">Tools</a></li></ul></nav></aside>
+  <aside class="rail"><nav class="toc" id="guide-toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#cat-concepts">Concepts</a></li><li class="toc-2"><a href="#cat-reference">Reference</a></li><li class="toc-2"><a href="#cat-workflows">Workflows</a></li><li class="toc-2"><a href="#cat-tools">Tools</a></li></ul></nav></aside>
   <main class="content"><p class="lead">Reference guides for Scaffold — human- and agent-readable. Open a guide to read it in your browser; agents read the markdown source with <code>scaffold guides &lt;topic&gt; --markdown</code>.</p><h2 id="cat-concepts">Concepts</h2><div class="guide-cards"><a class="guide-card" href="concepts/index.html"><span class="guide-card-title">Concepts &amp; Glossary</span><span class="guide-card-desc">The shared vocabulary — worktrees, phases, lenses, verdicts, and the rest — that the other guides assume</span></a><a class="guide-card" href="pipeline/index.html"><span class="guide-card-title">The Scaffold Pipeline</span><span class="guide-card-desc">The 16-phase meta-prompt pipeline — phases, dependencies, conditional steps, methodology depth, and how to navigate it</span></a></div><h2 id="cat-reference">Reference</h2><div class="guide-cards"><a class="guide-card" href="cli/index.html"><span class="guide-card-title">Scaffold CLI Reference</span><span class="guide-card-desc">Every scaffold command grouped by purpose — setup, navigation, observability, knowledge, validation, version</span></a><a class="guide-card" href="install/index.html"><span class="guide-card-title">Install, Update &amp; Adopt</span><span class="guide-card-desc">Installing via npm/Homebrew/plugin, keeping current, and adopting scaffold into a new or existing project</span></a><a class="guide-card" href="knowledge/index.html"><span class="guide-card-title">Knowledge Base</span><span class="guide-card-desc">What the knowledge base is, how entries are injected during assembly, and how to author or override them</span></a></div><h2 id="cat-workflows">Workflows</h2><div class="guide-cards"><a class="guide-card" href="review-workflow/index.html"><span class="guide-card-title">The Code-Review Workflow</span><span class="guide-card-desc">When and how to run multi-model review — entry points, input modes, verdicts, the round limit, and degraded mode</span></a><a class="guide-card" href="multi-agent/index.html"><span class="guide-card-title">Parallel Agents &amp; Worktrees</span><span class="guide-card-desc">Running agents in parallel — worktree setup/teardown, the ledger-harvest coupling, and the build-phase entry points</span></a></div><h2 id="cat-tools">Tools</h2><div class="guide-cards"><a class="guide-card" href="mmr/index.html"><span class="guide-card-title">MMR Reference</span><span class="guide-card-desc">Multi-Model Review — independent AI reviewers, reconciliation, and verdict gating</span></a><a class="guide-card" href="observability/index.html"><span class="guide-card-title">Build Observability</span><span class="guide-card-desc">A durable ledger of build decisions, fused with git/GitHub/MMR/state and audited against the planning docs by nine lenses</span></a><a class="guide-card" href="knowledge-freshness/index.html"><span class="guide-card-title">Knowledge Freshness</span><span class="guide-card-desc">How knowledge entries stay current, how coverage gaps surface as Lens-I findings, and how the daily cron, five PR gates, and source allowlist keep the KB grounded</span></a><a class="guide-card" href="dashboard/index.html"><span class="guide-card-title">Dashboard &amp; Design System</span><span class="guide-card-desc">The pipeline dashboard, its panels, the design-token system, and how to customize it safely</span></a></div></main>
   <div class="rail-backdrop" data-action="nav" aria-hidden="true"></div>
 </div>
@@ -1371,12 +1376,27 @@ nav.toc li.toc-3 a { padding-left: var(--sp-6); font-size: var(--text-xs); }
       });
     });
 
-    // ─── Mobile nav ──────────────────────────────────────────────────────────
+    // ─── Mobile nav (drawer + backdrop; aria-expanded + Escape-to-close) ──────
+    function setNav(open) {
+      var rail = document.querySelector('.rail');
+      if (rail) rail.classList.toggle('open', open);
+      var toggle = document.querySelector('.nav-toggle');
+      if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
     document.querySelectorAll('[data-action="nav"]').forEach(function(btn) {
       btn.addEventListener('click', function() {
         var rail = document.querySelector('.rail');
-        if (rail) rail.classList.toggle('open');
+        setNav(!(rail && rail.classList.contains('open')));
       });
+    });
+    document.addEventListener('keydown', function(e) {
+      if (e.key !== 'Escape') return;
+      var rail = document.querySelector('.rail');
+      if (rail && rail.classList.contains('open')) {
+        setNav(false);
+        var toggle = document.querySelector('.nav-toggle');
+        if (toggle) toggle.focus();
+      }
     });
 
     // ─── Copy buttons ─────────────────────────────────────────────────────────
@@ -1403,17 +1423,31 @@ nav.toc li.toc-3 a { padding-left: var(--sp-6); font-size: var(--text-xs); }
       wrapper.insertBefore(btn, pre);
     });
 
-    // ─── Tabs ─────────────────────────────────────────────────────────────────
+    // ─── Tabs (ARIA pattern: aria-selected + roving tabindex + arrow keys) ────
+    function activateTab(group, btn, focus) {
+      var idx = btn.getAttribute('data-tab');
+      group.querySelectorAll('.tab-btn').forEach(function(b) {
+        var on = b === btn;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-selected', on ? 'true' : 'false');
+        b.setAttribute('tabindex', on ? '0' : '-1');
+      });
+      group.querySelectorAll('.tabpane').forEach(function(pane) {
+        pane.classList.toggle('active', pane.getAttribute('data-tab') === idx);
+      });
+      if (focus) btn.focus();
+    }
     document.querySelectorAll('.tabs').forEach(function(group) {
-      group.querySelectorAll('.tab-btn').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-          var idx = btn.getAttribute('data-tab');
-          group.querySelectorAll('.tab-btn').forEach(function(b) {
-            b.classList.toggle('active', b === btn);
-          });
-          group.querySelectorAll('.tabpane').forEach(function(pane) {
-            pane.classList.toggle('active', pane.getAttribute('data-tab') === idx);
-          });
+      var btns = [].slice.call(group.querySelectorAll('.tab-btn'));
+      btns.forEach(function(btn, i) {
+        btn.addEventListener('click', function() { activateTab(group, btn, false); });
+        btn.addEventListener('keydown', function(e) {
+          var ni = -1;
+          if (e.key === 'ArrowRight' || e.key === 'ArrowDown') ni = (i + 1) % btns.length;
+          else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') ni = (i - 1 + btns.length) % btns.length;
+          else if (e.key === 'Home') ni = 0;
+          else if (e.key === 'End') ni = btns.length - 1;
+          if (ni >= 0) { e.preventDefault(); activateTab(group, btns[ni], true); }
         });
       });
     });

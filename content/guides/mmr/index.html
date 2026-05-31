@@ -1331,26 +1331,31 @@ nav.toc li.toc-3 a { padding-left: var(--sp-6); font-size: var(--text-xs); }
   .rail {
     position: fixed; top: var(--topbar-h); left: 0; bottom: 0; width: var(--drawer-w); z-index: 50;
     height: auto; background: var(--bg-card); border-right: 1px solid var(--border);
-    padding: var(--sp-4); transform: translateX(-100%); transition: transform 0.2s ease;
-    box-shadow: var(--shadow-lg);
+    padding: var(--sp-4); box-shadow: var(--shadow-lg);
+    transform: translateX(-100%); transition: transform 0.2s ease, visibility 0.2s ease;
+    /* Closed drawer is off-screen AND removed from tab order / pointer events. */
+    visibility: hidden; pointer-events: none;
   }
-  .rail.open { transform: translateX(0); }
-  .rail.open ~ .rail-backdrop {
+  .rail.open { transform: translateX(0); visibility: visible; pointer-events: auto; }
+  .rail-backdrop {
     display: block; position: fixed; inset: var(--topbar-h) 0 0 0;
     background: var(--scrim); z-index: 49;
+    opacity: 0; pointer-events: none; transition: opacity 0.2s ease;
   }
+  .rail.open ~ .rail-backdrop { opacity: 1; pointer-events: auto; }
 }
 </style>
 <script>(function(){try{var t=localStorage.getItem('guide-theme');if(!t&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)t='dark';if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 </head>
 <body>
 <header class="topbar">
-  <button data-action="nav" class="nav-toggle" aria-label="Toggle navigation">☰</button>
+  <button data-action="nav" class="nav-toggle" aria-label="Toggle navigation"
+    aria-expanded="false" aria-controls="guide-toc">☰</button>
   <h1>MMR Reference</h1>
   <button data-action="theme" class="theme-toggle" aria-label="Toggle theme">◐</button>
 </header>
 <div class="layout">
-  <aside class="rail"><nav class="toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#what-mmr-is">What MMR is</a></li><li class="toc-3"><a href="#the-core-idea-in-five-moves">The core idea in five moves</a></li><li class="toc-2"><a href="#end-to-end-flow">End-to-end flow</a></li><li class="toc-2"><a href="#the-mmr-review-command">The mmr review command</a></li><li class="toc-3"><a href="#copy-paste-commands-by-target">Copy-paste commands by target</a></li><li class="toc-2"><a href="#other-subcommands">Other subcommands</a></li><li class="toc-2"><a href="#channel-architecture">Channel architecture</a></li><li class="toc-3"><a href="#the-channel-config-shape">The channel config shape</a></li><li class="toc-3"><a href="#built-in-channels">Built-in channels</a></li><li class="toc-3"><a href="#the-dispatcher">The dispatcher</a></li><li class="toc-2"><a href="#scaffold-wrappers">Scaffold wrappers</a></li><li class="toc-2"><a href="#findings-reconciliation-verdicts">Findings, reconciliation &amp; verdicts</a></li><li class="toc-3"><a href="#the-finding-shape">The Finding shape</a></li><li class="toc-3"><a href="#stable-identity-finding-key">Stable identity (finding_key)</a></li><li class="toc-3"><a href="#agreement-confidence">Agreement &amp; confidence</a></li><li class="toc-3"><a href="#the-gate-the-four-verdicts">The gate &amp; the four verdicts</a></li><li class="toc-2"><a href="#degraded-mode-compensation-auth">Degraded mode, compensation &amp; auth</a></li><li class="toc-2"><a href="#configuration-mmryaml">Configuration (.mmr.yaml)</a></li></ul></nav></aside>
+  <aside class="rail"><nav class="toc" id="guide-toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#what-mmr-is">What MMR is</a></li><li class="toc-3"><a href="#the-core-idea-in-five-moves">The core idea in five moves</a></li><li class="toc-2"><a href="#end-to-end-flow">End-to-end flow</a></li><li class="toc-2"><a href="#the-mmr-review-command">The mmr review command</a></li><li class="toc-3"><a href="#copy-paste-commands-by-target">Copy-paste commands by target</a></li><li class="toc-2"><a href="#other-subcommands">Other subcommands</a></li><li class="toc-2"><a href="#channel-architecture">Channel architecture</a></li><li class="toc-3"><a href="#the-channel-config-shape">The channel config shape</a></li><li class="toc-3"><a href="#built-in-channels">Built-in channels</a></li><li class="toc-3"><a href="#the-dispatcher">The dispatcher</a></li><li class="toc-2"><a href="#scaffold-wrappers">Scaffold wrappers</a></li><li class="toc-2"><a href="#findings-reconciliation-verdicts">Findings, reconciliation &amp; verdicts</a></li><li class="toc-3"><a href="#the-finding-shape">The Finding shape</a></li><li class="toc-3"><a href="#stable-identity-finding-key">Stable identity (finding_key)</a></li><li class="toc-3"><a href="#agreement-confidence">Agreement &amp; confidence</a></li><li class="toc-3"><a href="#the-gate-the-four-verdicts">The gate &amp; the four verdicts</a></li><li class="toc-2"><a href="#degraded-mode-compensation-auth">Degraded mode, compensation &amp; auth</a></li><li class="toc-2"><a href="#configuration-mmryaml">Configuration (.mmr.yaml)</a></li></ul></nav></aside>
   <main class="content"><h2 id="what-mmr-is">What MMR is</h2>
 <p>Multi-Model Review runs your changes past several <strong>independent</strong> AI code
 reviewers ("channels"), then <strong>reconciles</strong> their findings into a single
@@ -1583,7 +1588,7 @@ uses <code>prompt_delivery: prompt-file</code> — the dispatcher writes the pro
 file and passes its path via the <code>{{prompt_file}}</code> placeholder. Grok wraps its
 reply in a JSON <code>.text</code> field, which the parser unwraps before extracting
 findings.</p></div>
-<div class="tabs"><div class="tablist" role="tablist"><button class="tab-btn active" role="tab" data-tab="0">Compare</button><button class="tab-btn" role="tab" data-tab="1">codex</button><button class="tab-btn" role="tab" data-tab="2">gemini</button><button class="tab-btn" role="tab" data-tab="3">claude</button><button class="tab-btn" role="tab" data-tab="4">grok</button><button class="tab-btn" role="tab" data-tab="5">doc-conformance</button></div><div class="tabpane active" data-tab="0"><p>The defaults, commands, and parsers below are the built-in presets <span class="fp" data-path="packages/mmr/src/config/defaults.ts:32">packages/mmr/src/config/defaults.ts:32</span>.</p>
+<div class="tabs"><div class="tablist" role="tablist"><button id="tab-0-0" class="tab-btn active" role="tab" data-tab="0" aria-controls="tabpane-0-0" aria-selected="true" tabindex="0">Compare</button><button id="tab-0-1" class="tab-btn" role="tab" data-tab="1" aria-controls="tabpane-0-1" aria-selected="false" tabindex="-1">codex</button><button id="tab-0-2" class="tab-btn" role="tab" data-tab="2" aria-controls="tabpane-0-2" aria-selected="false" tabindex="-1">gemini</button><button id="tab-0-3" class="tab-btn" role="tab" data-tab="3" aria-controls="tabpane-0-3" aria-selected="false" tabindex="-1">claude</button><button id="tab-0-4" class="tab-btn" role="tab" data-tab="4" aria-controls="tabpane-0-4" aria-selected="false" tabindex="-1">grok</button><button id="tab-0-5" class="tab-btn" role="tab" data-tab="5" aria-controls="tabpane-0-5" aria-selected="false" tabindex="-1">doc-conformance</button></div><div id="tabpane-0-0" class="tabpane active" role="tabpanel" data-tab="0" tabindex="0"><p>The defaults, commands, and parsers below are the built-in presets <span class="fp" data-path="packages/mmr/src/config/defaults.ts:32">packages/mmr/src/config/defaults.ts:32</span>.</p>
 
 
 
@@ -1630,25 +1635,25 @@ findings.</p></div>
 
 
 
-<table><thead><tr><th>Channel</th><th>Default</th><th>Strength</th><th>Prompt delivery</th><th>Parser</th></tr></thead><tbody><tr><td><code>codex</code></td><td>enabled</td><td>Correctness, security, API contracts</td><td>stdin</td><td><code>default</code></td></tr><tr><td><code>gemini</code></td><td>enabled</td><td>Architecture, broad-context reasoning</td><td>stdin</td><td><code>gemini</code></td></tr><tr><td><code>claude</code></td><td>enabled</td><td>Plan alignment, code quality, testing</td><td>stdin</td><td><code>default</code></td></tr><tr><td><code>grok</code></td><td>enabled</td><td>Independent second opinion (xAI; proprietary)</td><td><strong>prompt-file</strong></td><td><code>unwrap $.text → default</code></td></tr><tr><td><code>doc-conformance</code></td><td>opt-in</td><td>PRD/stories/standards conformance (LLM-graded)</td><td>stdin</td><td><code>doc-conformance</code></td></tr></tbody></table></div><div class="tabpane" data-tab="1"><pre><code class="language-yaml">command: codex exec
+<table><thead><tr><th>Channel</th><th>Default</th><th>Strength</th><th>Prompt delivery</th><th>Parser</th></tr></thead><tbody><tr><td><code>codex</code></td><td>enabled</td><td>Correctness, security, API contracts</td><td>stdin</td><td><code>default</code></td></tr><tr><td><code>gemini</code></td><td>enabled</td><td>Architecture, broad-context reasoning</td><td>stdin</td><td><code>gemini</code></td></tr><tr><td><code>claude</code></td><td>enabled</td><td>Plan alignment, code quality, testing</td><td>stdin</td><td><code>default</code></td></tr><tr><td><code>grok</code></td><td>enabled</td><td>Independent second opinion (xAI; proprietary)</td><td><strong>prompt-file</strong></td><td><code>unwrap $.text → default</code></td></tr><tr><td><code>doc-conformance</code></td><td>opt-in</td><td>PRD/stories/standards conformance (LLM-graded)</td><td>stdin</td><td><code>doc-conformance</code></td></tr></tbody></table></div><div id="tabpane-0-1" class="tabpane" role="tabpanel" data-tab="1" tabindex="0"><pre><code class="language-yaml">command: codex exec
 flags: [--skip-git-repo-check, -s, read-only, --ephemeral]
 auth.check: codex login status        # local file check (fast, 5s)
 recovery: codex login
 output_parser: default
 stderr: suppress
-</code></pre></div><div class="tabpane" data-tab="2"><pre><code class="language-yaml">command: gemini                       # NO -p: gemini reads stdin natively
+</code></pre></div><div id="tabpane-0-2" class="tabpane" role="tabpanel" data-tab="2" tabindex="0"><pre><code class="language-yaml">command: gemini                       # NO -p: gemini reads stdin natively
 flags: [--output-format, json]
 env: { NO_BROWSER: "true" }
 auth.check: NO_BROWSER=true gemini -p "respond with ok" -o json   # LLM round-trip, 20s
 recovery: gemini -p "hello"
 output_parser: gemini                 # unwraps { "response": "…" }
 timeout: 360
-</code></pre></div><div class="tabpane" data-tab="3"><pre><code class="language-yaml">command: claude -p
+</code></pre></div><div id="tabpane-0-3" class="tabpane" role="tabpanel" data-tab="3" tabindex="0"><pre><code class="language-yaml">command: claude -p
 flags: [--output-format, json]
 auth.check: claude -p "respond with ok"   # LLM round-trip, 20s
 recovery: claude login
 output_parser: default
-</code></pre></div><div class="tabpane" data-tab="4"><pre><code class="language-yaml">command: grok
+</code></pre></div><div id="tabpane-0-4" class="tabpane" role="tabpanel" data-tab="4" tabindex="0"><pre><code class="language-yaml">command: grok
 prompt_delivery: prompt-file
 flags: [--prompt-file, "{{prompt_file}}", --output-format, json]
 auth.check: grok models                # lists models / login state (no round-trip)
@@ -1656,7 +1661,7 @@ recovery: grok login
 output_parser: { kind: unwrap-jsonpath, wrap: "$.text", then: default }
 </code></pre><p>Grok is proprietary (xAI), not open-source — it joins the standard set
 mechanically as a 4th CLI channel. Disable it with
-<code>channels_disabled: ["grok"]</code>.</p></div><div class="tabpane" data-tab="5"><pre><code class="language-yaml">enabled: false                         # opt-in: runs up to 3 LLM calls (~3 min)
+<code>channels_disabled: ["grok"]</code>.</p></div><div id="tabpane-0-5" class="tabpane" role="tabpanel" data-tab="5" tabindex="0"><pre><code class="language-yaml">enabled: false                         # opt-in: runs up to 3 LLM calls (~3 min)
 command: scaffold observe audit --profile=full --scope=all --output-mode=mmr-findings
 output_parser: doc-conformance         # expects a JSON array of findings
 timeout: 240
@@ -1929,12 +1934,27 @@ add a channel that exfiltrates secrets or self-acknowledge its own findings. Use
       });
     });
 
-    // ─── Mobile nav ──────────────────────────────────────────────────────────
+    // ─── Mobile nav (drawer + backdrop; aria-expanded + Escape-to-close) ──────
+    function setNav(open) {
+      var rail = document.querySelector('.rail');
+      if (rail) rail.classList.toggle('open', open);
+      var toggle = document.querySelector('.nav-toggle');
+      if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
     document.querySelectorAll('[data-action="nav"]').forEach(function(btn) {
       btn.addEventListener('click', function() {
         var rail = document.querySelector('.rail');
-        if (rail) rail.classList.toggle('open');
+        setNav(!(rail && rail.classList.contains('open')));
       });
+    });
+    document.addEventListener('keydown', function(e) {
+      if (e.key !== 'Escape') return;
+      var rail = document.querySelector('.rail');
+      if (rail && rail.classList.contains('open')) {
+        setNav(false);
+        var toggle = document.querySelector('.nav-toggle');
+        if (toggle) toggle.focus();
+      }
     });
 
     // ─── Copy buttons ─────────────────────────────────────────────────────────
@@ -1961,17 +1981,31 @@ add a channel that exfiltrates secrets or self-acknowledge its own findings. Use
       wrapper.insertBefore(btn, pre);
     });
 
-    // ─── Tabs ─────────────────────────────────────────────────────────────────
+    // ─── Tabs (ARIA pattern: aria-selected + roving tabindex + arrow keys) ────
+    function activateTab(group, btn, focus) {
+      var idx = btn.getAttribute('data-tab');
+      group.querySelectorAll('.tab-btn').forEach(function(b) {
+        var on = b === btn;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-selected', on ? 'true' : 'false');
+        b.setAttribute('tabindex', on ? '0' : '-1');
+      });
+      group.querySelectorAll('.tabpane').forEach(function(pane) {
+        pane.classList.toggle('active', pane.getAttribute('data-tab') === idx);
+      });
+      if (focus) btn.focus();
+    }
     document.querySelectorAll('.tabs').forEach(function(group) {
-      group.querySelectorAll('.tab-btn').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-          var idx = btn.getAttribute('data-tab');
-          group.querySelectorAll('.tab-btn').forEach(function(b) {
-            b.classList.toggle('active', b === btn);
-          });
-          group.querySelectorAll('.tabpane').forEach(function(pane) {
-            pane.classList.toggle('active', pane.getAttribute('data-tab') === idx);
-          });
+      var btns = [].slice.call(group.querySelectorAll('.tab-btn'));
+      btns.forEach(function(btn, i) {
+        btn.addEventListener('click', function() { activateTab(group, btn, false); });
+        btn.addEventListener('keydown', function(e) {
+          var ni = -1;
+          if (e.key === 'ArrowRight' || e.key === 'ArrowDown') ni = (i + 1) % btns.length;
+          else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') ni = (i - 1 + btns.length) % btns.length;
+          else if (e.key === 'Home') ni = 0;
+          else if (e.key === 'End') ni = btns.length - 1;
+          if (ni >= 0) { e.preventDefault(); activateTab(group, btns[ni], true); }
         });
       });
     });

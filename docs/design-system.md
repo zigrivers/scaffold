@@ -159,6 +159,23 @@ Multi-layer shadows for natural depth:
 
 The `.wrap` container centers content and applies max-width + padding. All dashboard content lives inside `.wrap`.
 
+### 2.7 Reference guides (`scaffold guides`)
+
+The reference guides reuse these tokens via `lib/guides.css` (paired with
+`lib/dashboard-theme.css`). Two notes for maintainers:
+
+- **Guide-local layout constants.** `guides.css` declares a few structural
+  custom properties at the top — `--topbar-h` (52px), `--rail-w` (260px),
+  `--drawer-w` (280px), `--card-min`, `--chart-label-w`. These are layout
+  dimensions, not part of the shared `--sp-*` scale; change them in `guides.css`.
+- **The 860px mobile breakpoint is literal** (CSS media queries can't read custom
+  properties). If the topbar height or sidebar width changes, revisit that
+  breakpoint and the `--topbar-h` sticky offsets together.
+
+`--red` / `--red-bg` / `--red-border` (danger callouts) and `--scrim` (mobile
+drawer backdrop) were added to the palette for guides; they carry light + dark
+values like every other color token.
+
 ## 3. Components
 
 ### 3.1 Progress Bar

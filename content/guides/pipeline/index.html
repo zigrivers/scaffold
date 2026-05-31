@@ -1331,26 +1331,31 @@ nav.toc li.toc-3 a { padding-left: var(--sp-6); font-size: var(--text-xs); }
   .rail {
     position: fixed; top: var(--topbar-h); left: 0; bottom: 0; width: var(--drawer-w); z-index: 50;
     height: auto; background: var(--bg-card); border-right: 1px solid var(--border);
-    padding: var(--sp-4); transform: translateX(-100%); transition: transform 0.2s ease;
-    box-shadow: var(--shadow-lg);
+    padding: var(--sp-4); box-shadow: var(--shadow-lg);
+    transform: translateX(-100%); transition: transform 0.2s ease, visibility 0.2s ease;
+    /* Closed drawer is off-screen AND removed from tab order / pointer events. */
+    visibility: hidden; pointer-events: none;
   }
-  .rail.open { transform: translateX(0); }
-  .rail.open ~ .rail-backdrop {
+  .rail.open { transform: translateX(0); visibility: visible; pointer-events: auto; }
+  .rail-backdrop {
     display: block; position: fixed; inset: var(--topbar-h) 0 0 0;
     background: var(--scrim); z-index: 49;
+    opacity: 0; pointer-events: none; transition: opacity 0.2s ease;
   }
+  .rail.open ~ .rail-backdrop { opacity: 1; pointer-events: auto; }
 }
 </style>
 <script>(function(){try{var t=localStorage.getItem('guide-theme');if(!t&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)t='dark';if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 </head>
 <body>
 <header class="topbar">
-  <button data-action="nav" class="nav-toggle" aria-label="Toggle navigation">☰</button>
+  <button data-action="nav" class="nav-toggle" aria-label="Toggle navigation"
+    aria-expanded="false" aria-controls="guide-toc">☰</button>
   <h1>The Scaffold Pipeline</h1>
   <button data-action="theme" class="theme-toggle" aria-label="Toggle theme">◐</button>
 </header>
 <div class="layout">
-  <aside class="rail"><nav class="toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#the-mental-model">The mental model</a></li><li class="toc-2"><a href="#the-16-phases-at-a-glance">The 16 phases at a glance</a></li><li class="toc-2"><a href="#methodology-depth">Methodology &amp; depth</a></li><li class="toc-3"><a href="#depth-15">Depth (1–5)</a></li><li class="toc-3"><a href="#the-three-presets">The three presets</a></li><li class="toc-2"><a href="#project-type-playbooks">Project-type playbooks</a></li><li class="toc-2"><a href="#navigating-the-pipeline">Navigating the pipeline</a></li><li class="toc-2"><a href="#why-a-step-is-blocked">Why a step is blocked</a></li><li class="toc-3"><a href="#conditional-if-needed-steps">Conditional (&quot;if-needed&quot;) steps</a></li><li class="toc-3"><a href="#a-representative-dependency-slice">A representative dependency slice</a></li><li class="toc-2"><a href="#create-vs-update-mode">CREATE vs UPDATE mode</a></li><li class="toc-2"><a href="#phase-boundary-audits">Phase-boundary audits</a></li><li class="toc-2"><a href="#where-it-all-lives">Where it all lives</a></li></ul></nav></aside>
+  <aside class="rail"><nav class="toc" id="guide-toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#the-mental-model">The mental model</a></li><li class="toc-2"><a href="#the-16-phases-at-a-glance">The 16 phases at a glance</a></li><li class="toc-2"><a href="#methodology-depth">Methodology &amp; depth</a></li><li class="toc-3"><a href="#depth-15">Depth (1–5)</a></li><li class="toc-3"><a href="#the-three-presets">The three presets</a></li><li class="toc-2"><a href="#project-type-playbooks">Project-type playbooks</a></li><li class="toc-2"><a href="#navigating-the-pipeline">Navigating the pipeline</a></li><li class="toc-2"><a href="#why-a-step-is-blocked">Why a step is blocked</a></li><li class="toc-3"><a href="#conditional-if-needed-steps">Conditional (&quot;if-needed&quot;) steps</a></li><li class="toc-3"><a href="#a-representative-dependency-slice">A representative dependency slice</a></li><li class="toc-2"><a href="#create-vs-update-mode">CREATE vs UPDATE mode</a></li><li class="toc-2"><a href="#phase-boundary-audits">Phase-boundary audits</a></li><li class="toc-2"><a href="#where-it-all-lives">Where it all lives</a></li></ul></nav></aside>
   <main class="content"><h2 id="the-mental-model">The mental model</h2>
 <p>Scaffold is a <strong>prompt pipeline</strong>: a curated, ordered sequence of structured
 meta-prompts that turn an idea into a fully-specified, build-ready project. Each
@@ -1590,17 +1595,17 @@ playbooks below.</p></div>
 only <strong>inject domain knowledge</strong> into existing steps (so a web-app build pulls in
 <code>web-app-auth-patterns</code> during <code>tech-stack</code>, <code>security</code>, etc.); a few also
 <strong>enable whole step families</strong>.</p>
-<div class="tabs"><div class="tablist" role="tablist"><button class="tab-btn active" role="tab" data-tab="0">Web</button><button class="tab-btn" role="tab" data-tab="1">Game</button><button class="tab-btn" role="tab" data-tab="2">Multi-service</button></div><div class="tabpane active" data-tab="0"><p><code>web-app-overlay.yml</code> is knowledge-only — it appends web-app expertise to
+<div class="tabs"><div class="tablist" role="tablist"><button id="tab-1-0" class="tab-btn active" role="tab" data-tab="0" aria-controls="tabpane-1-0" aria-selected="true" tabindex="0">Web</button><button id="tab-1-1" class="tab-btn" role="tab" data-tab="1" aria-controls="tabpane-1-1" aria-selected="false" tabindex="-1">Game</button><button id="tab-1-2" class="tab-btn" role="tab" data-tab="2" aria-controls="tabpane-1-2" aria-selected="false" tabindex="-1">Multi-service</button></div><div id="tabpane-1-0" class="tabpane active" role="tabpanel" data-tab="0" tabindex="0"><p><code>web-app-overlay.yml</code> is knowledge-only — it appends web-app expertise to
 ~25 steps (rendering strategies + deployment + auth into <code>tech-stack</code>, UX
 patterns into <code>ux-spec</code>, the design system into <code>design-system</code>, and so on). The
 spec steps you'll actually use: <code>database-schema</code>, <code>api-contracts</code>, <code>ux-spec</code>
-(all conditional). <code>add-e2e-testing</code> configures <strong>Playwright</strong>.</p></div><div class="tabpane" data-tab="1"><p><code>game-overlay.yml</code> is the heavyweight: it <strong>enables a whole phase family</strong> via
+(all conditional). <code>add-e2e-testing</code> configures <strong>Playwright</strong>.</p></div><div id="tabpane-1-1" class="tabpane" role="tabpanel" data-tab="1" tabindex="0"><p><code>game-overlay.yml</code> is the heavyweight: it <strong>enables a whole phase family</strong> via
 <code>step-overrides</code>. On come <code>game-design-document</code>, <code>review-gdd</code>,
 <code>performance-budgets</code>, <code>narrative-bible</code>, <code>netcode-spec</code>, <code>ai-behavior-design</code>,
 <code>art-bible</code>, <code>audio-design</code>, <code>economy-design</code>, <code>save-system-spec</code>,
 <code>game-ui-spec</code>, <code>playtest-plan</code>, <code>platform-cert-prep</code>, and more — many as
 <code>if-needed</code>. These live across the <code>pre</code>, <code>architecture</code>, <code>specification</code>, and
-<code>quality</code> phases.</p></div><div class="tabpane" data-tab="2"><p><code>multi-service-overlay.yml</code> activates when <code>services[]</code> is present in config. It
+<code>quality</code> phases.</p></div><div id="tabpane-1-2" class="tabpane" role="tabpanel" data-tab="2" tabindex="0"><p><code>multi-service-overlay.yml</code> activates when <code>services[]</code> is present in config. It
 enables five cross-service steps (<code>service-ownership-map</code>,
 <code>inter-service-contracts</code>, <code>cross-service-auth</code>, <code>cross-service-observability</code>,
 <code>integration-test-plan</code>) and — crucially — adds <strong>dependency-overrides</strong> and
@@ -1815,12 +1820,27 @@ against it.</p></main>
       });
     });
 
-    // ─── Mobile nav ──────────────────────────────────────────────────────────
+    // ─── Mobile nav (drawer + backdrop; aria-expanded + Escape-to-close) ──────
+    function setNav(open) {
+      var rail = document.querySelector('.rail');
+      if (rail) rail.classList.toggle('open', open);
+      var toggle = document.querySelector('.nav-toggle');
+      if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
     document.querySelectorAll('[data-action="nav"]').forEach(function(btn) {
       btn.addEventListener('click', function() {
         var rail = document.querySelector('.rail');
-        if (rail) rail.classList.toggle('open');
+        setNav(!(rail && rail.classList.contains('open')));
       });
+    });
+    document.addEventListener('keydown', function(e) {
+      if (e.key !== 'Escape') return;
+      var rail = document.querySelector('.rail');
+      if (rail && rail.classList.contains('open')) {
+        setNav(false);
+        var toggle = document.querySelector('.nav-toggle');
+        if (toggle) toggle.focus();
+      }
     });
 
     // ─── Copy buttons ─────────────────────────────────────────────────────────
@@ -1847,17 +1867,31 @@ against it.</p></main>
       wrapper.insertBefore(btn, pre);
     });
 
-    // ─── Tabs ─────────────────────────────────────────────────────────────────
+    // ─── Tabs (ARIA pattern: aria-selected + roving tabindex + arrow keys) ────
+    function activateTab(group, btn, focus) {
+      var idx = btn.getAttribute('data-tab');
+      group.querySelectorAll('.tab-btn').forEach(function(b) {
+        var on = b === btn;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-selected', on ? 'true' : 'false');
+        b.setAttribute('tabindex', on ? '0' : '-1');
+      });
+      group.querySelectorAll('.tabpane').forEach(function(pane) {
+        pane.classList.toggle('active', pane.getAttribute('data-tab') === idx);
+      });
+      if (focus) btn.focus();
+    }
     document.querySelectorAll('.tabs').forEach(function(group) {
-      group.querySelectorAll('.tab-btn').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-          var idx = btn.getAttribute('data-tab');
-          group.querySelectorAll('.tab-btn').forEach(function(b) {
-            b.classList.toggle('active', b === btn);
-          });
-          group.querySelectorAll('.tabpane').forEach(function(pane) {
-            pane.classList.toggle('active', pane.getAttribute('data-tab') === idx);
-          });
+      var btns = [].slice.call(group.querySelectorAll('.tab-btn'));
+      btns.forEach(function(btn, i) {
+        btn.addEventListener('click', function() { activateTab(group, btn, false); });
+        btn.addEventListener('keydown', function(e) {
+          var ni = -1;
+          if (e.key === 'ArrowRight' || e.key === 'ArrowDown') ni = (i + 1) % btns.length;
+          else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') ni = (i - 1 + btns.length) % btns.length;
+          else if (e.key === 'Home') ni = 0;
+          else if (e.key === 'End') ni = btns.length - 1;
+          if (ni >= 0) { e.preventDefault(); activateTab(group, btns[ni], true); }
         });
       });
     });

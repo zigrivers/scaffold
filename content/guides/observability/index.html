@@ -1331,26 +1331,31 @@ nav.toc li.toc-3 a { padding-left: var(--sp-6); font-size: var(--text-xs); }
   .rail {
     position: fixed; top: var(--topbar-h); left: 0; bottom: 0; width: var(--drawer-w); z-index: 50;
     height: auto; background: var(--bg-card); border-right: 1px solid var(--border);
-    padding: var(--sp-4); transform: translateX(-100%); transition: transform 0.2s ease;
-    box-shadow: var(--shadow-lg);
+    padding: var(--sp-4); box-shadow: var(--shadow-lg);
+    transform: translateX(-100%); transition: transform 0.2s ease, visibility 0.2s ease;
+    /* Closed drawer is off-screen AND removed from tab order / pointer events. */
+    visibility: hidden; pointer-events: none;
   }
-  .rail.open { transform: translateX(0); }
-  .rail.open ~ .rail-backdrop {
+  .rail.open { transform: translateX(0); visibility: visible; pointer-events: auto; }
+  .rail-backdrop {
     display: block; position: fixed; inset: var(--topbar-h) 0 0 0;
     background: var(--scrim); z-index: 49;
+    opacity: 0; pointer-events: none; transition: opacity 0.2s ease;
   }
+  .rail.open ~ .rail-backdrop { opacity: 1; pointer-events: auto; }
 }
 </style>
 <script>(function(){try{var t=localStorage.getItem('guide-theme');if(!t&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)t='dark';if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 </head>
 <body>
 <header class="topbar">
-  <button data-action="nav" class="nav-toggle" aria-label="Toggle navigation">☰</button>
+  <button data-action="nav" class="nav-toggle" aria-label="Toggle navigation"
+    aria-expanded="false" aria-controls="guide-toc">☰</button>
   <h1>Build Observability</h1>
   <button data-action="theme" class="theme-toggle" aria-label="Toggle theme">◐</button>
 </header>
 <div class="layout">
-  <aside class="rail"><nav class="toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#why-build-observability-exists">Why Build Observability exists</a></li><li class="toc-3"><a href="#what-goes-wrong-without-it">What goes wrong without it</a></li><li class="toc-3"><a href="#what-good-build-observability-produces">What good build observability produces</a></li><li class="toc-2"><a href="#system-map">System map</a></li><li class="toc-2"><a href="#the-ledger">The ledger</a></li><li class="toc-3"><a href="#how-a-write-happens">How a write happens</a></li><li class="toc-3"><a href="#the-nine-event-types">The nine event types</a></li><li class="toc-3"><a href="#building-a-scaffold-observe-event-command">Building a scaffold observe event command</a></li><li class="toc-3"><a href="#redaction-write-time-and-render-time">Redaction — write time and render time</a></li><li class="toc-3"><a href="#worktree-identity">Worktree identity</a></li><li class="toc-2"><a href="#adapters">Adapters</a></li><li class="toc-3"><a href="#source-priority">Source priority</a></li><li class="toc-2"><a href="#the-nine-lens-audit">The nine-lens audit</a></li><li class="toc-3"><a href="#scope-order-and-skips">Scope, order and skips</a></li><li class="toc-3"><a href="#what-feeds-the-doc-graph">What feeds the doc-graph</a></li><li class="toc-3"><a href="#all-nine-at-a-glance">All nine at a glance</a></li><li class="toc-3"><a href="#lens-by-lens">Lens by lens</a></li><li class="toc-2"><a href="#the-observe-audit-cli">The observe audit CLI</a></li><li class="toc-3"><a href="#every-flag">Every flag</a></li><li class="toc-3"><a href="#verdict-taxonomy">Verdict taxonomy</a></li><li class="toc-3"><a href="#companion-verb-scaffold-observe-ack">Companion verb — scaffold observe ack</a></li><li class="toc-3"><a href="#exit-codes-across-observe-verbs">Exit codes across observe verbs</a></li><li class="toc-2"><a href="#progress-replay-stall">Progress, replay &amp; stall</a></li><li class="toc-3"><a href="#fusion-how-the-timeline-is-built">Fusion — how the timeline is built</a></li><li class="toc-3"><a href="#stall-detection-the-six-signals">Stall detection — the six signals</a></li><li class="toc-3"><a href="#flags">Flags</a></li><li class="toc-2"><a href="#phase-boundary-triggers">Phase-boundary triggers</a></li><li class="toc-3"><a href="#the-hook">The hook</a></li><li class="toc-3"><a href="#config-timestamps">Config &amp; timestamps</a></li><li class="toc-2"><a href="#mmr-doc-conformance-channel">MMR doc-conformance channel</a></li><li class="toc-3"><a href="#finding-translation">Finding translation</a></li><li class="toc-3"><a href="#enabling-it">Enabling it</a></li><li class="toc-2"><a href="#the---fix-flow">The --fix flow</a></li><li class="toc-3"><a href="#the-five-phases">The five phases</a></li><li class="toc-3"><a href="#abort-safety">Abort safety</a></li><li class="toc-3"><a href="#config-the-fix-block">Config — the fix: block</a></li><li class="toc-2"><a href="#harvest-recover-teardown">Harvest, recover &amp; teardown</a></li><li class="toc-3"><a href="#commands">Commands</a></li><li class="toc-2"><a href="#renderers">Renderers</a></li><li class="toc-2"><a href="#config-reference">Config reference</a></li><li class="toc-2"><a href="#where-it-lives">Where it lives</a></li><li class="toc-2"><a href="#shipping-history">Shipping history</a></li><li class="toc-2"><a href="#known-divergences">Known divergences</a></li></ul></nav></aside>
+  <aside class="rail"><nav class="toc" id="guide-toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#why-build-observability-exists">Why Build Observability exists</a></li><li class="toc-3"><a href="#what-goes-wrong-without-it">What goes wrong without it</a></li><li class="toc-3"><a href="#what-good-build-observability-produces">What good build observability produces</a></li><li class="toc-2"><a href="#system-map">System map</a></li><li class="toc-2"><a href="#the-ledger">The ledger</a></li><li class="toc-3"><a href="#how-a-write-happens">How a write happens</a></li><li class="toc-3"><a href="#the-nine-event-types">The nine event types</a></li><li class="toc-3"><a href="#building-a-scaffold-observe-event-command">Building a scaffold observe event command</a></li><li class="toc-3"><a href="#redaction-write-time-and-render-time">Redaction — write time and render time</a></li><li class="toc-3"><a href="#worktree-identity">Worktree identity</a></li><li class="toc-2"><a href="#adapters">Adapters</a></li><li class="toc-3"><a href="#source-priority">Source priority</a></li><li class="toc-2"><a href="#the-nine-lens-audit">The nine-lens audit</a></li><li class="toc-3"><a href="#scope-order-and-skips">Scope, order and skips</a></li><li class="toc-3"><a href="#what-feeds-the-doc-graph">What feeds the doc-graph</a></li><li class="toc-3"><a href="#all-nine-at-a-glance">All nine at a glance</a></li><li class="toc-3"><a href="#lens-by-lens">Lens by lens</a></li><li class="toc-2"><a href="#the-observe-audit-cli">The observe audit CLI</a></li><li class="toc-3"><a href="#every-flag">Every flag</a></li><li class="toc-3"><a href="#verdict-taxonomy">Verdict taxonomy</a></li><li class="toc-3"><a href="#companion-verb-scaffold-observe-ack">Companion verb — scaffold observe ack</a></li><li class="toc-3"><a href="#exit-codes-across-observe-verbs">Exit codes across observe verbs</a></li><li class="toc-2"><a href="#progress-replay-stall">Progress, replay &amp; stall</a></li><li class="toc-3"><a href="#fusion-how-the-timeline-is-built">Fusion — how the timeline is built</a></li><li class="toc-3"><a href="#stall-detection-the-six-signals">Stall detection — the six signals</a></li><li class="toc-3"><a href="#flags">Flags</a></li><li class="toc-2"><a href="#phase-boundary-triggers">Phase-boundary triggers</a></li><li class="toc-3"><a href="#the-hook">The hook</a></li><li class="toc-3"><a href="#config-timestamps">Config &amp; timestamps</a></li><li class="toc-2"><a href="#mmr-doc-conformance-channel">MMR doc-conformance channel</a></li><li class="toc-3"><a href="#finding-translation">Finding translation</a></li><li class="toc-3"><a href="#enabling-it">Enabling it</a></li><li class="toc-2"><a href="#the---fix-flow">The --fix flow</a></li><li class="toc-3"><a href="#the-five-phases">The five phases</a></li><li class="toc-3"><a href="#abort-safety">Abort safety</a></li><li class="toc-3"><a href="#config-the-fix-block">Config — the fix: block</a></li><li class="toc-2"><a href="#harvest-recover-teardown">Harvest, recover &amp; teardown</a></li><li class="toc-3"><a href="#commands">Commands</a></li><li class="toc-2"><a href="#renderers">Renderers</a></li><li class="toc-2"><a href="#config-reference">Config reference</a></li><li class="toc-2"><a href="#where-it-lives">Where it lives</a></li><li class="toc-2"><a href="#shipping-history">Shipping history</a></li><li class="toc-2"><a href="#known-divergences">Known divergences</a></li></ul></nav></aside>
   <main class="content"><h2 id="why-build-observability-exists">Why Build Observability exists</h2>
 <p>When several agents (and humans) build a project in parallel worktrees, the
 <em>reasoning</em> behind the build evaporates. A decision gets made in a throwaway
@@ -3087,12 +3092,27 @@ reads only <code>untouched_story_grace_hours</code>.</li>
       });
     });
 
-    // ─── Mobile nav ──────────────────────────────────────────────────────────
+    // ─── Mobile nav (drawer + backdrop; aria-expanded + Escape-to-close) ──────
+    function setNav(open) {
+      var rail = document.querySelector('.rail');
+      if (rail) rail.classList.toggle('open', open);
+      var toggle = document.querySelector('.nav-toggle');
+      if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
     document.querySelectorAll('[data-action="nav"]').forEach(function(btn) {
       btn.addEventListener('click', function() {
         var rail = document.querySelector('.rail');
-        if (rail) rail.classList.toggle('open');
+        setNav(!(rail && rail.classList.contains('open')));
       });
+    });
+    document.addEventListener('keydown', function(e) {
+      if (e.key !== 'Escape') return;
+      var rail = document.querySelector('.rail');
+      if (rail && rail.classList.contains('open')) {
+        setNav(false);
+        var toggle = document.querySelector('.nav-toggle');
+        if (toggle) toggle.focus();
+      }
     });
 
     // ─── Copy buttons ─────────────────────────────────────────────────────────
@@ -3119,17 +3139,31 @@ reads only <code>untouched_story_grace_hours</code>.</li>
       wrapper.insertBefore(btn, pre);
     });
 
-    // ─── Tabs ─────────────────────────────────────────────────────────────────
+    // ─── Tabs (ARIA pattern: aria-selected + roving tabindex + arrow keys) ────
+    function activateTab(group, btn, focus) {
+      var idx = btn.getAttribute('data-tab');
+      group.querySelectorAll('.tab-btn').forEach(function(b) {
+        var on = b === btn;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-selected', on ? 'true' : 'false');
+        b.setAttribute('tabindex', on ? '0' : '-1');
+      });
+      group.querySelectorAll('.tabpane').forEach(function(pane) {
+        pane.classList.toggle('active', pane.getAttribute('data-tab') === idx);
+      });
+      if (focus) btn.focus();
+    }
     document.querySelectorAll('.tabs').forEach(function(group) {
-      group.querySelectorAll('.tab-btn').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-          var idx = btn.getAttribute('data-tab');
-          group.querySelectorAll('.tab-btn').forEach(function(b) {
-            b.classList.toggle('active', b === btn);
-          });
-          group.querySelectorAll('.tabpane').forEach(function(pane) {
-            pane.classList.toggle('active', pane.getAttribute('data-tab') === idx);
-          });
+      var btns = [].slice.call(group.querySelectorAll('.tab-btn'));
+      btns.forEach(function(btn, i) {
+        btn.addEventListener('click', function() { activateTab(group, btn, false); });
+        btn.addEventListener('keydown', function(e) {
+          var ni = -1;
+          if (e.key === 'ArrowRight' || e.key === 'ArrowDown') ni = (i + 1) % btns.length;
+          else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') ni = (i - 1 + btns.length) % btns.length;
+          else if (e.key === 'Home') ni = 0;
+          else if (e.key === 'End') ni = btns.length - 1;
+          if (ni >= 0) { e.preventDefault(); activateTab(group, btns[ni], true); }
         });
       });
     });
