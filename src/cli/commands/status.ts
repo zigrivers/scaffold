@@ -114,6 +114,24 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
 
     // 3. Load pipeline context and resolve overlay/graph
     const context = loadPipelineContext(projectRoot)
+
+    // Defense-in-depth: if no pipeline meta-prompts were discovered at all, the
+    // pipeline content could not be resolved (broken install, or a
+    // project-local content/ directory shadowing the bundled pipeline). The
+    // resolved graph then collapses to just the completed state entries, so
+    // progress below would otherwise read a misleading "100% complete". Warn
+    // loudly so the figure is never silently trusted.
+    if (context.metaPrompts.size === 0) {
+      output.warn(
+        'No pipeline content resolved — scaffold could not find its pipeline ' +
+        'meta-prompts. The progress below is unreliable (the project may look ' +
+        '"100% complete" when the pipeline is simply missing). This usually ' +
+        'means a broken scaffold install, or a project-local content/ directory ' +
+        'shadowing the bundled pipeline. Reinstall scaffold or run from a clean ' +
+        'checkout, then re-run `scaffold status`.',
+      )
+    }
+
     const service = argv.service as string | undefined
     const pipeline = resolvePipeline(context, { output, serviceId: service })
 
