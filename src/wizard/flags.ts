@@ -19,7 +19,7 @@
 import type {
   GameConfig, WebAppConfig, BackendConfig, CliConfig, LibraryConfig,
   MobileAppConfig, DataPipelineConfig, MlConfig, BrowserExtensionConfig,
-  ResearchConfig,
+  ResearchConfig, McpServerConfig,
 } from '../types/index.js'
 
 export interface GameFlags {
@@ -100,4 +100,13 @@ export interface ResearchFlags {
   researchInteraction?: ResearchConfig['interactionMode']
   researchDomain?: ResearchConfig['domain']
   researchTracking?: ResearchConfig['hasExperimentTracking']
+}
+
+export interface McpServerFlags {
+  mcpLanguage?: McpServerConfig['language']
+  mcpTransport?: McpServerConfig['transport']
+  mcpPrimitives?: McpServerConfig['primitives']
+  mcpAuth?: McpServerConfig['auth']
+  mcpDeployment?: McpServerConfig['deployment']
+  mcpStateful?: McpServerConfig['stateful']
 }
