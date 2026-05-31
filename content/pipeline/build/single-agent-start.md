@@ -98,18 +98,75 @@ Before writing any code, verify the environment is ready:
 
 ### Beads Detection
 
-Check if `.beads/` directory exists.
+The implementation plan is materialized into Beads issues by
+`/scaffold:materialize-plan-to-beads` before the build phase. This block is the
+**defensive preflight** that guarantees the tracker is populated and current
+before any work is claimed — it never claims against an empty or stale tracker.
 
-**If Beads is configured:**
-- Atomically claim the next ready task: `TASK=$(bd ready --claim --json | jq -r '.id')`
-  - This sets `assignee=$BEADS_ACTOR` (or your git user.name) and `status=in_progress` in a single round-trip — no race window vs other agents.
-  - If you need a specific task by ID instead, use `bd update <id> --claim`.
-  - If `bd ready --claim` returns no task, you're done — exit the loop.
-- Implement following the TDD workflow below
-- After PR is merged, run `bd close <id>`
-- Repeat (`bd ready --claim --json`) until no tasks remain
+**Step 1 — compute `beads_usable`.** `beads_usable` is true only when **all**
+hold: `.beads/` exists, `bd` is on `PATH`, `bd version` parses to **≥ 1.0.5**
+(using a macOS/BSD-safe numeric compare — split major/minor/patch and compare
+numerically, never rely on GNU `sort -V`), and `jq` is on `PATH`. Never write
+`[ -d .beads ] && bd …` as a whole command — it returns exit 1 when `.beads/` is
+absent and breaks callers under `set -e`; use an `if`.
 
-**Without Beads:**
+**Step 2 — route on the decision table** (this is what prevents the "empty
+tracker looks done" bug):
+
+| Condition | Action |
+|---|---|
+| `.beads/` **absent** | Non-Beads project → drive the loop from the markdown playbook/plan (see "Markdown fallback" below). Do **not** call `bd`. |
+| `.beads/` present but `beads_usable` is false (`bd`/`jq` missing or `bd` < 1.0.5) | **Fail closed.** Stop and tell the user to install/upgrade `bd` (≥ v1.0.5) and `jq`. Do **not** markdown-fall-back — Beads may already hold execution state, and a markdown re-run would re-execute completed work. |
+| `beads_usable`, but the plan has **no** stable task IDs **and** Beads holds no plan-derived issues and no non-bootstrap claimed/closed work | Genuinely legacy plan → markdown loop, and emit "re-run planning to assign stable task IDs". Do **not** claim. |
+| `beads_usable`, plan has no stable IDs **but** Beads already holds plausible build work (claimed/closed non-bootstrap issues) | **Fail closed** — markdown would bypass existing execution state. Require re-running planning + materialization. |
+| `beads_usable`, contract **partially present or malformed** (some IDs present, or plan-derived issues already exist, but the contract doesn't fully parse) | **Fail closed.** Do **not** markdown-fall-back (would bypass existing plan-derived issues and diverge). Require planning to be re-run/fixed. |
+| `beads_usable` **and a valid stable-ID contract** | **Always materialize first, then claim** (see Step 3). |
+
+**Step 3 — `beads_usable` + valid contract → materialize, then claim:**
+
+1. **Always invoke the canonical materializer:** `/scaffold:materialize-plan-to-beads`.
+   Run it unconditionally — do **not** gate it on a count or ID-set comparison
+   (every such gate misses content-only edits, partial imports, or stale deps).
+   The materializer is idempotent and a cheap no-op when already in sync; it is
+   the single source of the four-pass reconcile logic — this prompt **invokes**
+   it, it does not duplicate it. If the materializer returns non-zero (mid-run
+   failure), **fail closed** — stop and surface the error; do **not** claim and
+   do **not** markdown-fall-back past existing Beads state.
+2. **Run the scoped claim loop.** Atomically claim the next ready **plan** task:
+   `TASK=$(bd ready --claim --has-metadata-key plan_task_id --json | jq -r '.id')`
+   - Scoping to `plan_task_id` keeps the loop from ever claiming the bootstrap
+     "initialize Beads" bead or a manually-created issue.
+   - This sets `assignee=$BEADS_ACTOR` (or your git user.name) and
+     `status=in_progress` in a single round-trip — no race window.
+   - If you need a specific task by ID instead, use `bd update <id> --claim`.
+3. Implement following the TDD workflow below.
+4. After the PR is merged, run `bd close <id>`.
+5. Repeat the scoped claim (`bd ready --claim --has-metadata-key plan_task_id --json`)
+   until it returns no ready task, then run the **completion check**.
+
+**Completion check (empty `bd ready` ≠ done).** An empty scoped-ready result does
+**not** mean the build is finished — every remaining task could be blocked. On an
+empty result, fetch all plan-derived tasks
+(`bd list --all --limit 0 --has-metadata-key plan_task_id --json`) and classify
+the remaining non-`closed` tasks:
+
+- **All plan tasks `closed`** → genuinely **done**; exit gracefully.
+- Otherwise classify **each** remaining non-`closed` task independently — do
+  **not** short-circuit on "any task is `in_progress`". Resolve blocker statuses
+  from an **unfiltered** `bd list --all --limit 0 --json` (manual blockers carry
+  no `plan_task_id`):
+  - **advancing** — the task is itself `in_progress`, **or** at least one of its
+    **transitive** blockers (walk the chain; bound the walk and reuse
+    `bd dep cycles` as a guard) is `in_progress`.
+  - **stalled** — not `in_progress` and **no** transitive blocker is
+    `in_progress` (open-but-unready behind inactive blockers, manually `blocked`,
+    or `deferred`).
+- **All remaining tasks advancing** → exit gracefully.
+- **Any task stalled** → **stop and report the stalled subset**, grouped by why
+  (open dependency, manual `blocked`, `deferred`), so the user can unblock them.
+
+**Markdown fallback** (only when `.beads/` is **absent**, or for a genuinely
+legacy plan per the table — never past existing Beads state):
 1. Read `docs/implementation-playbook.md` as the primary task execution reference.
    Fall back to `docs/implementation-plan.md` when no playbook is present.
 2. Pick the first uncompleted task that has no unfinished dependencies.
