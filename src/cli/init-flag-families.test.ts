@@ -436,6 +436,11 @@ describe('mcp-server flag family', () => {
       .toThrow(/--project-type mcp-server/)
   })
 
+  it('rejects --mcp-auth other than none with stdio transport', () => {
+    expect(() => applyFlagFamilyValidation({ 'mcp-transport': 'stdio', 'mcp-auth': 'oauth' }))
+      .toThrow(/stdio transport cannot use network auth/)
+  })
+
   it('MCP_SERVER_FLAGS preserves its literal members', () => {
     const f: typeof MCP_SERVER_FLAGS[number] = 'mcp-language'
     expect(MCP_SERVER_FLAGS).toContain(f)
