@@ -48,17 +48,17 @@ one parallel agent. Given a name like `alpha`, it:
    under the primary repo: `.worktrees/<slug>`. It also ensures `.worktrees/` is
    gitignored so the worktree's checkout is never accidentally committed.
 2. **Creates the workspace branch** `<slug>-workspace` if it does not already
-   exist :cite[scripts/setup-agent-worktree.sh:57], then adds the worktree on
-   that branch :cite[scripts/setup-agent-worktree.sh:60]. Re-running for an
+   exist :cite[scripts/setup-agent-worktree.sh:62], then adds the worktree on
+   that branch :cite[scripts/setup-agent-worktree.sh:65]. Re-running for an
    existing worktree is a safe no-op.
 3. **Writes `.scaffold/identity.json`** — the stable identity that build
    observability stamps onto every event this worktree records. The script
-   creates `.scaffold/` :cite[scripts/setup-agent-worktree.sh:68] and, only if no
+   creates `.scaffold/` :cite[scripts/setup-agent-worktree.sh:73] and, only if no
    identity file exists yet, writes `worktree_id` (a UUID), `worktree_label`
    (the agent slug), and `created_at`
-   :cite[scripts/setup-agent-worktree.sh:87].
+   :cite[scripts/setup-agent-worktree.sh:92].
 4. **Re-syncs Beads** with a fail-soft `bd doctor --fix` when a `.beads/`
-   directory is present :cite[scripts/setup-agent-worktree.sh:104], reconciling the
+   directory is present :cite[scripts/setup-agent-worktree.sh:109], reconciling the
    worktree's Beads git hooks and project config against the installed `bd`
    version. (Beads DB sharing is automatic — worktrees discover the main repo's
    task DB via git's common directory, so there is nothing for `bd doctor` to

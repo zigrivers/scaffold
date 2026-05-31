@@ -1402,17 +1402,17 @@ one parallel agent. Given a name like <code>alpha</code>, it:</p>
 under the primary repo: <code>.worktrees/&#x3C;slug></code>. It also ensures <code>.worktrees/</code> is
 gitignored so the worktree's checkout is never accidentally committed.</li>
 <li><strong>Creates the workspace branch</strong> <code>&#x3C;slug>-workspace</code> if it does not already
-exist <span class="fp" data-path="scripts/setup-agent-worktree.sh:57">scripts/setup-agent-worktree.sh:57</span>, then adds the worktree on
-that branch <span class="fp" data-path="scripts/setup-agent-worktree.sh:60">scripts/setup-agent-worktree.sh:60</span>. Re-running for an
+exist <span class="fp" data-path="scripts/setup-agent-worktree.sh:62">scripts/setup-agent-worktree.sh:62</span>, then adds the worktree on
+that branch <span class="fp" data-path="scripts/setup-agent-worktree.sh:65">scripts/setup-agent-worktree.sh:65</span>. Re-running for an
 existing worktree is a safe no-op.</li>
 <li><strong>Writes <code>.scaffold/identity.json</code></strong> — the stable identity that build
 observability stamps onto every event this worktree records. The script
-creates <code>.scaffold/</code> <span class="fp" data-path="scripts/setup-agent-worktree.sh:68">scripts/setup-agent-worktree.sh:68</span> and, only if no
+creates <code>.scaffold/</code> <span class="fp" data-path="scripts/setup-agent-worktree.sh:73">scripts/setup-agent-worktree.sh:73</span> and, only if no
 identity file exists yet, writes <code>worktree_id</code> (a UUID), <code>worktree_label</code>
 (the agent slug), and <code>created_at</code>
-<span class="fp" data-path="scripts/setup-agent-worktree.sh:87">scripts/setup-agent-worktree.sh:87</span>.</li>
+<span class="fp" data-path="scripts/setup-agent-worktree.sh:92">scripts/setup-agent-worktree.sh:92</span>.</li>
 <li><strong>Re-syncs Beads</strong> with a fail-soft <code>bd doctor --fix</code> when a <code>.beads/</code>
-directory is present <span class="fp" data-path="scripts/setup-agent-worktree.sh:104">scripts/setup-agent-worktree.sh:104</span>, reconciling the
+directory is present <span class="fp" data-path="scripts/setup-agent-worktree.sh:109">scripts/setup-agent-worktree.sh:109</span>, reconciling the
 worktree's Beads git hooks and project config against the installed <code>bd</code>
 version. (Beads DB sharing is automatic — worktrees discover the main repo's
 task DB via git's common directory, so there is nothing for <code>bd doctor</code> to

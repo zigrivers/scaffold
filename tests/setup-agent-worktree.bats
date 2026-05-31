@@ -55,7 +55,7 @@ teardown() {
 @test "ensures .worktrees/ is gitignored" {
     run "$CLONE_DIR/scripts/setup-agent-worktree.sh" "agent-alpha"
     [ "$status" -eq 0 ]
-    run git -C "$CLONE_DIR" check-ignore -q .worktrees
+    run git -C "$CLONE_DIR" check-ignore -q .worktrees/
     [ "$status" -eq 0 ]
 }
 
