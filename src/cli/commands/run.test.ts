@@ -1770,6 +1770,57 @@ describe('run command handler', () => {
   })
 })
 
+describe('run command — $ARGUMENTS wiring', () => {
+  it('binds trailing positionals into arguments', async () => {
+    vi.mocked(resolveOutputMode).mockReturnValue('auto')
+    await invokeHandler({ step: 'create-prd', _: ['run'], args: ['376'], auto: true })
+    expect(AssemblyEngine.prototype.assemble).toHaveBeenCalledWith(
+      'create-prd',
+      expect.objectContaining({ arguments: '376' }),
+    )
+  })
+
+  it('joins multiple trailing tokens with single spaces', async () => {
+    vi.mocked(resolveOutputMode).mockReturnValue('auto')
+    await invokeHandler({
+      step: 'create-prd', _: ['run'], args: [376, '--fix-threshold', 'P1'], auto: true,
+    })
+    expect(AssemblyEngine.prototype.assemble).toHaveBeenCalledWith(
+      'create-prd',
+      expect.objectContaining({ arguments: '376 --fix-threshold P1' }),
+    )
+  })
+
+  it('falls back to --instructions when no positionals are given', async () => {
+    vi.mocked(resolveOutputMode).mockReturnValue('auto')
+    await invokeHandler({ step: 'create-prd', _: ['run'], instructions: 'foo', auto: true })
+    expect(AssemblyEngine.prototype.assemble).toHaveBeenCalledWith(
+      'create-prd',
+      expect.objectContaining({ arguments: 'foo' }),
+    )
+  })
+
+  it('lets positionals win when both positionals and --instructions are present', async () => {
+    vi.mocked(resolveOutputMode).mockReturnValue('auto')
+    await invokeHandler({
+      step: 'create-prd', _: ['run'], args: ['376'], instructions: 'foo', auto: true,
+    })
+    expect(AssemblyEngine.prototype.assemble).toHaveBeenCalledWith(
+      'create-prd',
+      expect.objectContaining({ arguments: '376' }),
+    )
+  })
+
+  it('defaults arguments to empty string when neither is given', async () => {
+    vi.mocked(resolveOutputMode).mockReturnValue('auto')
+    await invokeHandler({ step: 'create-prd', _: ['run'], auto: true })
+    expect(AssemblyEngine.prototype.assemble).toHaveBeenCalledWith(
+      'create-prd',
+      expect.objectContaining({ arguments: '' }),
+    )
+  })
+})
+
 // ---------------------------------------------------------------------------
 // Parse-level tests: prove the run builder captures trailing args under the
 // root .strict(), and that .strict(false) does NOT leak to sibling commands.

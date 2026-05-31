@@ -503,6 +503,11 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
             // -----------------------------------------------------------------------
             // Step 9: Assemble prompt
             // -----------------------------------------------------------------------
+            // Trailing positionals bind to $ARGUMENTS; --instructions is the
+            // backward-compatible fallback; '' default so the token is always
+            // substituted (never leaks as a literal).
+            const toolArgs = (argv.args ?? []).map(String).join(' ').trim()
+            const boundArguments = toolArgs !== '' ? toolArgs : (argv.instructions ?? '')
             const engine = new AssemblyEngine()
             const assemblyResult = engine.assemble(step, {
               config,
@@ -510,7 +515,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
               metaPrompt,
               knowledgeEntries,
               instructions,
-              arguments: argv.instructions,
+              arguments: boundArguments,
               depth,
               depthProvenance: provenance,
               updateMode: updateModeResult.isUpdateMode,
