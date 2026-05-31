@@ -108,6 +108,41 @@ describe('withNeutralPosture', () => {
       expect(r.env.HOME).toBe(fakeHome)
       r.cleanup()
     })
+
+    it('does NOT symlink grok creds for a cwd-only neutral posture (no HOME neutralization)', () => {
+      // antigravity's posture: neutral cwd, real HOME (env has no HOME placeholder).
+      const r = withNeutralPosture({}, NEUTRAL_CWD_PLACEHOLDER)
+      const neutralDir = r.cwd!
+      made.push(neutralDir)
+
+      // The neutral cwd must be genuinely empty — no .grok dir at all.
+      expect(fs.existsSync(path.join(neutralDir, '.grok'))).toBe(false)
+      // PWD pinning still applies for cwd neutralization.
+      expect(r.env.PWD).toBe(neutralDir)
+
+      r.cleanup()
+      // Original credential untouched.
+      expect(fs.existsSync(path.join(fakeHome, '.grok', 'auth.json'))).toBe(true)
+    })
+
+    it('still symlinks grok creds when HOME is neutralized (grok-style posture unaffected)', () => {
+      const r = withNeutralPosture(
+        { HOME: NEUTRAL_HOME_PLACEHOLDER, XDG_CONFIG_HOME: NEUTRAL_HOME_PLACEHOLDER },
+        NEUTRAL_CWD_PLACEHOLDER,
+      )
+      made.push(r.cwd!)
+      expect(fs.existsSync(path.join(r.cwd!, '.grok', 'auth.json'))).toBe(true)
+      r.cleanup()
+    })
+
+    it('does NOT symlink grok creds when only XDG_CONFIG_HOME is neutralized (HOME left real)', () => {
+      // Locks the documented invariant: the gate keys on the HOME env var, so an
+      // isolation that neutralizes only XDG_CONFIG_HOME must not inherit grok's creds.
+      const r = withNeutralPosture({ XDG_CONFIG_HOME: NEUTRAL_HOME_PLACEHOLDER }, undefined)
+      made.push(r.env.XDG_CONFIG_HOME!)
+      expect(fs.existsSync(path.join(r.env.XDG_CONFIG_HOME!, '.grok'))).toBe(false)
+      r.cleanup()
+    })
   })
 })
 
