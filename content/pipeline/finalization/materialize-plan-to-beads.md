@@ -52,20 +52,48 @@ corresponding epics, stories, tasks, and dependency edges in Beads.
 - This step writes **no markdown documents** (`outputs: []`); its product is the
   state of the Beads database plus the printed summary.
 
+## Quality Criteria
+- (mvp) Every plan task carrying a stable ID maps to exactly one not-started
+  Beads issue after a run (joined on `plan_task_id`).
+- (mvp) The reconcile is idempotent — a second run over an unchanged plan
+  creates nothing and updates nothing (`materialize: 0 created, 0 updated, …`).
+- (mvp) Only plan-derived issues are claimable: the build claim loop is scoped by
+  `--has-metadata-key plan_task_id`, so the bootstrap bead and manual issues are
+  never claimed.
+- (mvp) Started issues (`in_progress`/`closed`) are never mutated except the two
+  narrow metadata-only exceptions (join-key cleanup, `ac_warn_hash`).
+- (mvp) `bd dep cycles` reports no cycle after a run.
+- (deep) Story/epic containers are created top-down (epics, then stories) with
+  correct `--parent` links; a depth-4 story with no epic parent is valid.
+- (deep) Dependency edges reconcile to the plan: missing plan edges added, stale
+  `plan_deps`-owned edges removed, manual/external edges preserved.
+- (deep) Tasks removed from the plan are retired when not-started; completed
+  (`closed`) issues stay linked for revert-safety.
+
 ## Methodology Scaling
 Structure is a function of **methodology/depth only** — read it from scaffold
 state, never probe `bd` for type availability. Both `-t story` and `-t epic` are
 usable directly on the supported `bd` (≥ v1.0.5); mvp stays flat as a deliberate
-*simplicity* choice, not because the type is unavailable.
+*simplicity* choice, not because the type is unavailable. **Dependencies are
+materialized at every depth** (the plan is a DAG even at mvp); depth scales only
+the container hierarchy and `wave`/`risk` metadata.
 
-- **mvp / depth 1–3** → flat `-t task` issues **plus dependencies**. No
-  story/epic containers, no `--parent`. (Depth 3 vs 1–2 differs only in upstream
-  plan sizing/detail, not in what is materialized.) Skip Pass 0b.
-- **depth 4** → tasks parented to **stories** (`-t story`) + `wave` metadata.
-  Stories have **no** epic parent (`--parent` omitted — a missing epic ref is
-  valid, not a dangling ref). Pass 0b creates stories only.
-- **depth 5** → full **epic → story → task** hierarchy + `risk` metadata + full
-  traceability; stories carry an epic `--parent`.
+- **mvp** → flat `-t task` issues **plus dependencies**. No story/epic
+  containers, no `--parent`; skip Pass 0b. Priority defaults to `-p 2`.
+- **deep** → full container hierarchy + `wave`/`risk` metadata + wave-biased
+  priority. At depth 4, tasks are parented to **stories** (`-t story`) and
+  stories have no epic parent; at depth 5, the full **epic → story → task**
+  hierarchy with stories carrying an epic `--parent`.
+- **custom:depth(1-5)** → dials between the two:
+  - Depth 1: flat `-t task` issues + dependencies; skip Pass 0b. Priority `-p 2`.
+  - Depth 2: flat `-t task` issues + dependencies; skip Pass 0b (sizing detail
+    differs upstream only). Priority `-p 2`.
+  - Depth 3: flat `-t task` issues + dependencies; skip Pass 0b. Wave-biased
+    priority if the plan assigns waves.
+  - Depth 4: tasks under `-t story` parents + `wave` metadata; a missing epic ref
+    on a story is valid, not a dangling ref. Pass 0b creates stories.
+  - Depth 5: full epic → story → task hierarchy + `risk` metadata + full
+    traceability; stories carry an epic `--parent`.
 
 **Priority is wave-biased** so `bd ready` surfaces work in playbook order:
 
