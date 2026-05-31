@@ -50,7 +50,7 @@ import { loadOverlay } from '../core/assembly/overlay-loader.js'
 import { getPackagePipelineDir, getPackageMethodologyDir } from '../utils/fs.js'
 import type { MetaPromptFile } from '../types/index.js'
 import type { OverlayState } from '../core/assembly/overlay-state-resolver.js'
-import type { BackendConfig, ResearchConfig } from '../types/config.js'
+import type { BackendConfig, ResearchConfig, McpServerConfig } from '../types/config.js'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -1938,5 +1938,64 @@ describe('web3 overlay integration', () => {
     expect(overlay).not.toBeNull()
     expect(Object.keys(overlay!.stepOverrides)).toHaveLength(0)
     expect(Object.keys(overlay!.crossReadsOverrides)).toHaveLength(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Tests — MCP Server
+// ---------------------------------------------------------------------------
+
+describe('mcp-server overlay integration', () => {
+  /**
+   * Resolve the mcp-server overlay with a minimal valid McpServerConfig.
+   * Cannot use the generic resolveProjectOverlay helper because 'mcp-server'
+   * is not in its union and requires mcpServerConfig.
+   */
+  async function resolveMcpServerOverlay(): Promise<OverlayState> {
+    const mcpServerConfig: McpServerConfig = {
+      language: 'typescript',
+      transport: 'stdio',
+      primitives: ['tools'],
+      auth: 'none',
+      deployment: 'local',
+      stateful: false,
+    }
+    const methodologyDir = getPackageMethodologyDir()
+    const realMetaPrompts = await discoverRealMetaPrompts()
+    const knownSteps = [...realMetaPrompts.keys()]
+    const presets = loadAllPresets(methodologyDir, knownSteps)
+    const output = createMockOutput()
+
+    const preset = presets.deep
+    return resolveOverlayState({
+      config: {
+        version: 2,
+        methodology: 'deep',
+        platforms: ['claude-code'],
+        project: {
+          projectType: 'mcp-server',
+          mcpServerConfig,
+        },
+      },
+      methodologyDir,
+      metaPrompts: realMetaPrompts,
+      presetSteps: preset?.steps ?? {},
+      output,
+    })
+  }
+
+  it('overlay disables design-system, ux-spec, and review-ux steps', async () => {
+    const state = await resolveMcpServerOverlay()
+
+    expect(state.steps['design-system']?.enabled).toBe(false)
+    expect(state.steps['ux-spec']?.enabled).toBe(false)
+    expect(state.steps['review-ux']?.enabled).toBe(false)
+  })
+
+  it('overlay keeps database-schema enabled with conditional if-needed', async () => {
+    const state = await resolveMcpServerOverlay()
+
+    expect(state.steps['database-schema']?.enabled).toBe(true)
+    expect(state.steps['database-schema']?.conditional).toBe('if-needed')
   })
 })

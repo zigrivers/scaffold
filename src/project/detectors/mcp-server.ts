@@ -16,7 +16,8 @@ const PY_ENTRYPOINTS = [
 
 // eslint-disable-next-line max-len
 const TS_REGISTER = /McpServer\s*\(|new Server\s*\(|\.registerTool\s*\(|\.registerResource\s*\(|\.registerPrompt\s*\(|setRequestHandler\s*\(/
-const PY_REGISTER = /FastMCP\s*\(|@mcp\.tool|@mcp\.resource|@mcp\.prompt|@server\.call_tool|@server\.list_tools/
+// eslint-disable-next-line max-len
+const PY_REGISTER = /FastMCP\s*\(|@\w+\.tool|@\w+\.resource|@\w+\.prompt|@\w+\.(call_tool|list_tools|read_resource|list_resources|get_prompt|list_prompts)/
 
 type Transport = NonNullable<McpServerMatch['partialConfig']['transport']>
 type Primitive = 'tools' | 'resources' | 'prompts'
@@ -30,9 +31,9 @@ function inferTransport(text: string): Transport | undefined {
 
 function inferPrimitives(text: string): Primitive[] {
   const p: Primitive[] = []
-  if (/registerTool|@mcp\.tool|list_tools|call_tool|\.tool\s*\(/.test(text)) p.push('tools')
-  if (/registerResource|@mcp\.resource|list_resources|read_resource/.test(text)) p.push('resources')
-  if (/registerPrompt|@mcp\.prompt|list_prompts|get_prompt/.test(text)) p.push('prompts')
+  if (/registerTool|@\w+\.tool|list_tools|call_tool|\.tool\s*\(/.test(text)) p.push('tools')
+  if (/registerResource|@\w+\.resource|list_resources|read_resource/.test(text)) p.push('resources')
+  if (/registerPrompt|@\w+\.prompt|list_prompts|get_prompt/.test(text)) p.push('prompts')
   return p
 }
 

@@ -90,4 +90,18 @@ describe('detectMcpServer', () => {
     expect(m!.confidence).toBe('high')
     expect(m!.partialConfig.language).toBe('python')
   })
+
+  it('high: Python fastmcp dep + custom variable name @app.tool', () => {
+    const ctx = createFakeSignalContext({
+      pyprojectToml: { project: { name: 's', dependencies: ['fastmcp'] } },
+      files: {
+        'server.py': 'from fastmcp import FastMCP\napp = FastMCP("s")\n@app.tool\ndef greet(): ...\n',
+      },
+    })
+    const m = detectMcpServer(ctx)
+    expect(m).not.toBeNull()
+    expect(m!.confidence).toBe('high')
+    expect(m!.partialConfig.language).toBe('python')
+    expect(m!.partialConfig.primitives).toContain('tools')
+  })
 })
