@@ -4,6 +4,31 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.31.0] — 2026-05-31
+
+Styles the reference-guide UI. The guides previously rendered with design tokens
+but no component CSS — an unstyled wall of TOC links and edge-to-edge prose. This
+release adds the missing stylesheet, so all 11 guides get a proper reading layout.
+
+### Added
+
+- **`lib/guides.css` — the guide component + layout stylesheet** (token-only;
+  light + dark). Styles the chrome and every markdown directive: a sticky
+  **sidebar table of contents with scrollspy**, reading-width content, callouts,
+  severity chips, citations, tables + filter inputs, `:::chart` bars, tabs, code
+  blocks with a copy button, and mermaid framing. The build inlines
+  `dashboard-theme.css` + `guides.css` into each self-contained guide page.
+- **Mobile: an accessible off-canvas TOC drawer** — backdrop scrim, focus
+  containment (background `inert` + Tab focus-trap), an in-drawer Close button,
+  Escape / backdrop / link-click dismissal, and `aria-expanded` on the toggle.
+- **Full ARIA tabs pattern** (`role=tab`/`tabpanel`, `aria-selected`,
+  `aria-controls`/`aria-labelledby`, roving `tabindex`, arrow-key navigation) and
+  `:focus-visible` styles across all interactive controls.
+- The guides **index page** is regrouped into **category cards** (Concepts /
+  Reference / Workflows / Tools).
+- New palette tokens for guides: `--red` / `--red-bg` / `--red-border` (danger
+  callouts) and `--scrim` (drawer backdrop), with light + dark values.
+
 ## [3.30.0] — 2026-05-30
 
 Expands the reference-guides system from a single proving-ground guide to **11 guides** covering every major subsystem, and adds verifiable file:line citation provenance across the whole guide system. All changes are additive.
