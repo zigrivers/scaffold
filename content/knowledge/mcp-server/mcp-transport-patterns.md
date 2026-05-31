@@ -87,3 +87,36 @@ This is **deprecated** as of spec 2025-03-26 and replaced by Streamable HTTP. Fo
 **Choose Streamable HTTP when**: the server is shared across multiple clients or users, you need centralized deployment and updates, the server integrates with remote APIs or databases, or you need to run the server independently of any specific client lifecycle.
 
 Custom transports are allowed by the spec — any bidirectional communication channel that preserves JSON-RPC message format and lifecycle requirements can be used. Document custom transports thoroughly.
+
+### Connection lifecycle and error handling
+
+Both transports follow the same JSON-RPC 2.0 lifecycle:
+
+1. **Initialize**: client sends `initialize` request with protocol version and capabilities; server responds with its own capabilities.
+2. **Initialized notification**: client sends `notifications/initialized` to signal readiness.
+3. **Normal operation**: bidirectional request/response and notifications.
+4. **Shutdown**: client sends `notifications/cancelled` for in-flight requests, then closes the transport.
+
+**Common transport errors and remediation**:
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| Parse errors on stdio | Non-JSON written to stdout (e.g., debug prints) | Redirect all non-protocol output to stderr |
+| `400 Bad Request` on HTTP | Missing or invalid `MCP-Protocol-Version` header | Ensure client sends the header after initialization |
+| `404` on HTTP | Client using old HTTP+SSE transport path | Detect and support both paths during migration |
+| Session `410 Gone` | Session expired or server restarted | Client should re-initialize and re-establish session |
+
+### Testing transport behavior
+
+```typescript
+// Test stdio transport with in-process transport for unit tests
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+
+const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+const client = new Client({ name: "test-client", version: "1.0.0" });
+await client.connect(clientTransport);
+// server connects to serverTransport in parallel
+```
+
+For HTTP transport integration tests, use a real HTTP server bound to a random port (`listen(0)`) and tear it down after each test. Never share server state between tests.

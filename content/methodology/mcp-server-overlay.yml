@@ -3,7 +3,11 @@ name: mcp-server
 description: >
   MCP Server overlay — an MCP server has no UI, so the design-system and UX
   steps are disabled. database-schema/review-database stay available
-  (if-needed) for servers that persist resources/state.
+  (if-needed) for servers that persist resources/state. The
+  mcp-tool-resource-contract step is enabled (if-needed) for specifying MCP
+  tool/resource/prompt schemas. MCP domain knowledge (protocol, SDK, transport,
+  tool/resource design, auth, testing, deployment, observability, versioning)
+  is injected into the relevant pipeline steps.
 project-type: mcp-server
 
 step-overrides:
@@ -14,3 +18,50 @@ step-overrides:
   # Stateful servers may persist resources; keep available but skippable.
   database-schema: { enabled: true, conditional: "if-needed" }
   review-database: { enabled: true, conditional: "if-needed" }
+  # MCP-specific spec step — enabled for mcp-server projects.
+  mcp-tool-resource-contract: { enabled: true, conditional: "if-needed" }
+
+# ---------------------------------------------------------------------------
+# knowledge-overrides
+# ---------------------------------------------------------------------------
+# Inject MCP domain expertise into existing pipeline steps so that MCP
+# protocol, SDK, transport, tool/resource design, auth, testing, deployment,
+# observability, and versioning knowledge is available during prompt assembly.
+knowledge-overrides:
+  # Foundation
+  tech-stack:
+    append: [mcp-protocol-fundamentals, mcp-sdk-selection, mcp-transport-patterns]
+  tdd:
+    append: [mcp-testing-strategies]
+
+  # Architecture & Decisions
+  system-architecture:
+    append: [mcp-protocol-fundamentals, mcp-transport-patterns, mcp-tool-design, mcp-resource-design]
+  adrs:
+    append: [mcp-sdk-selection, mcp-transport-patterns]
+
+  # Specifications
+  api-contracts:
+    append: [mcp-tool-design, mcp-resource-design, mcp-error-handling]
+  mcp-tool-resource-contract:
+    append: [mcp-tool-design, mcp-resource-design, mcp-prompt-primitives, mcp-error-handling]
+  database-schema:
+    append: [mcp-resource-design]
+
+  # Testing
+  add-e2e-testing:
+    append: [mcp-testing-strategies]
+
+  # Quality Gates
+  security:
+    append: [mcp-authentication]
+  review-security:
+    append: [mcp-authentication]
+  operations:
+    append: [mcp-deployment-patterns, mcp-observability, mcp-versioning]
+  review-operations:
+    append: [mcp-deployment-patterns, mcp-observability]
+
+  # Reviews
+  review-architecture:
+    append: [mcp-transport-patterns, mcp-tool-design, mcp-resource-design]

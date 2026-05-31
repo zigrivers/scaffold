@@ -86,3 +86,30 @@ For servers that only need to support the latest spec, target `2025-06-18` and d
 ### Spec evolution cadence
 
 The MCP spec has evolved on roughly a quarterly cadence: `2024-11-05` (initial), `2025-03-26` (Streamable HTTP introduction), `2025-06-18` (current). Major changes between versions: `2024-11-05 → 2025-03-26` introduced Streamable HTTP, deprecating HTTP+SSE. `2025-03-26 → 2025-06-18` added `outputSchema` for tools, `structuredContent`, audio content type, `title` fields, and the `elicitation` client capability. Watch the spec changelog (https://modelcontextprotocol.io) for new capabilities that may benefit your server.
+
+### Backwards compatibility checklist
+
+When releasing a new server version, verify these backwards compatibility invariants before shipping:
+
+1. **No renamed tools**: renaming a tool (e.g., `search_files` → `find_files`) is a breaking change. Existing clients with auto-approved tool calls will fail silently. Use the old name as an alias or bump major version with advance notice.
+2. **No removed required input fields**: removing a required field from `inputSchema` is non-breaking (callers can stop providing it); adding a new required field IS breaking (callers that don't provide it will receive validation errors).
+3. **No resource URI pattern changes**: changing `file://{path}` to `file://workspace/{path}` breaks all existing resource subscriptions and saved URIs. Treat as a major version change.
+4. **No prompt argument removals**: removing a declared prompt argument breaks clients that pass that argument.
+5. **No capability downgrades without communication**: removing `resources: { subscribe: true }` when clients have active subscriptions causes silent failures.
+
+For patch and minor releases, adding new optional tool parameters, new tools, new resources, or new prompts is always backwards compatible — existing callers ignore what they don't use.
+
+### Version signaling in serverInfo
+
+Use the `serverInfo.version` field as a machine-readable signal for clients that cache schemas:
+
+```json
+{
+  "serverInfo": {
+    "name": "my-mcp-server",
+    "version": "2.1.0"
+  }
+}
+```
+
+Clients can cache tool/resource schemas keyed by `(serverInfo.name, serverInfo.version)`. When the server bumps its version, clients re-fetch schemas rather than serving stale cached definitions. This pattern is especially important for IDE integrations and agent frameworks that pre-load tool definitions at startup.

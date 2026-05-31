@@ -6,7 +6,7 @@ phase: "planning"
 order: 1210
 dependencies: [tdd, operations, security, review-architecture, create-evals]
 outputs: [docs/implementation-plan.md]
-reads: [create-prd, story-tests, database-schema, api-contracts, ux-spec]
+reads: [create-prd, story-tests, database-schema, api-contracts, mcp-tool-resource-contract, ux-spec]
 conditional: null
 knowledge-base: [task-decomposition, system-architecture]
 ---
@@ -28,6 +28,7 @@ The primary mapping is Story → Task(s), with PRD as the traceability root.
 - docs/security-review.md (optional) — security requirements to incorporate into tasks
 - docs/database-schema.md (optional) — data layer tasks
 - docs/api-contracts.md (optional) — API implementation tasks
+- docs/mcp-contract.md (optional) — MCP tool/resource/prompt implementation tasks
 - docs/ux-spec.md (optional) — frontend tasks
 - tests/acceptance/ (optional) — test skeletons to reference in task descriptions
 - docs/story-tests-map.md (optional) — AC-to-test mapping for task coverage verification
