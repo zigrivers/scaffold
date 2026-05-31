@@ -38,7 +38,7 @@
     "scaffold": "dist/index.js"
   },
   "scripts": {
-    "build": "tsc && cp src/core/knowledge/knowledge-update-template.md dist/core/knowledge/knowledge-update-template.md && mkdir -p dist/guides && cp lib/dashboard-theme.css dist/guides/dashboard-theme.css",
+    "build": "tsc && cp src/core/knowledge/knowledge-update-template.md dist/core/knowledge/knowledge-update-template.md && mkdir -p dist/guides && cp lib/dashboard-theme.css dist/guides/dashboard-theme.css && cp lib/guides.css dist/guides/guides.css",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",

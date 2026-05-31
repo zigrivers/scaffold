@@ -12,13 +12,20 @@ import type { LintResult } from './lint.js'
 import { findBrokenRelativeLinks } from './links.js'
 
 export function loadThemeCss(): string {
-  const p = path.join(getPackageRoot(), 'dist', 'guides', 'dashboard-theme.css')
-  if (!fs.existsSync(p)) {
-    throw new Error(
-      `Missing ${p} — run \`npm run build\` (the build copies lib/dashboard-theme.css into dist/guides/).`,
-    )
-  }
-  return fs.readFileSync(p, 'utf8')
+  // The guide stylesheet is the design tokens (dashboard-theme.css) followed by
+  // the guide-specific layout + component styles (guides.css). Both are inlined
+  // into each guide's <style> so the output stays self-contained.
+  const dir = path.join(getPackageRoot(), 'dist', 'guides')
+  const parts = ['dashboard-theme.css', 'guides.css'].map((name) => {
+    const p = path.join(dir, name)
+    if (!fs.existsSync(p)) {
+      throw new Error(
+        `Missing ${p} — run \`npm run build\` (the build copies lib/${name} into dist/guides/).`,
+      )
+    }
+    return fs.readFileSync(p, 'utf8')
+  })
+  return parts.join('\n')
 }
 
 export interface BuildGuideArgs {
