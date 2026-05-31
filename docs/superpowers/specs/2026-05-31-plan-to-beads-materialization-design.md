@@ -380,8 +380,9 @@ dep reconcile, stale pass, and the scoped claim loop depend on:
    safe way to pick which active effort to detach, so **fail closed** and report.
    An `in_progress` + `closed` mix is *not* a conflict: `in_progress` wins.
 2. **Not-started non-canonical duplicates** → retire them per the **Retire
-   convention** (close → `stale:duplicate` label → unset the issue's own
-   `<join-key>`), so they leave the plan-derived set and are never re-detected.
+   convention** (`stale:duplicate` label → close → unset the issue's own
+   `<join-key>`, in that order), so they leave the plan-derived set and are
+   never re-detected.
 3. **Started non-canonical duplicates** → do not close or mutate fields; only
    **unset the `<join-key>`** (`bd update <id> --unset-metadata <join-key>`) to
    restore key uniqueness, and **report** them for human review.
@@ -516,10 +517,11 @@ List every plan-derived issue
 `plan_story_id`/`plan_epic_id`) and diff IDs against the current plan:
 
 - ID no longer in the plan and issue **not started** (`open`/`blocked`/
-  `deferred`) → **retire it** per the Retire convention (close with reason
-  `"Removed from implementation plan (was <id>)"` → `stale:removed-from-plan`
-  label → unset the issue's own `<join-key>`), so it drops out of future queries
-  and can never be misread as "started/dropped" later.
+  `deferred`) → **retire it** per the Retire convention (in order:
+  `stale:removed-from-plan` label → close with reason
+  `"Removed from implementation plan (was <id>)"` → unset the issue's own
+  `<join-key>`), so it drops out of future queries and can never be misread as
+  "started/dropped" later.
 - Such an issue **`in_progress`** → **do not auto-close**; report it in the
   summary for human attention (it may be mid-flight work the plan dropped by
   mistake). Leave its join key intact so it stays visible until a human decides.
@@ -577,7 +579,8 @@ correct and acceptable. Decision table:
 |---|---|
 | `.beads/` **absent** | Non-Beads project → markdown playbook loop. Do **not** call `bd`. |
 | `.beads/` present but `bd`/`jq` missing or too old (`beads_usable` false) | **Fail closed** — tell the user to install/upgrade `bd` (≥ v1.0.5) + `jq`. Do **not** markdown-fallback (Beads may hold state). |
-| Usable; plan has **no** stable IDs **and** no plan-derived issues exist in Beads | Genuinely legacy plan → markdown loop + emit "re-run planning to assign task IDs". Do **not** claim. |
+| Usable; plan has **no** stable IDs **and** Beads holds no build execution state (no plan-derived issues, and no non-bootstrap/non-manual claimed/closed work) | Genuinely legacy plan → markdown loop + emit "re-run planning to assign task IDs". Do **not** claim. |
+| Usable; plan has no stable IDs **but** Beads already holds plausible build work (claimed/closed non-bootstrap issues) | **Fail closed** — markdown would bypass existing execution state and re-run completed/in-progress work. Require re-running planning + materialization. |
 | Usable; contract **partially present or malformed** (some IDs present, or plan-derived issues already exist, but the contract doesn't fully parse) | **Fail closed.** Do **not** markdown-fallback (would bypass existing plan-derived issues and diverge). Require planning to be re-run/fixed. |
 | Usable; valid stable-ID contract | **Always materialize** via the canonical command (see Invocation) → scoped claim loop `bd ready --claim --has-metadata-key plan_task_id --json` → completion check. |
 | Usable; materialize returns non-zero | **Fail closed.** Stop and surface the error; do **not** claim **and do not** silently markdown-fallback. |
@@ -611,26 +614,24 @@ the prompt queries all plan-derived tasks (`bd list --all --limit 0
 tasks:
 
 - **All `closed`** → genuinely **done**.
-- **Some `in_progress`** (and the rest blocked behind them) → **active execution
-  by another agent**, not a deadlock. This is the normal multi-agent case: the
-  worker **exits gracefully** (its own work is done; others are still running) —
-  it must **not** report a failure or halt the build.
-- **No plan-derived task `in_progress`, but some non-closed remain**
-  (`open`-but-unready / `blocked` / `deferred`) → before declaring a stall, check
-  whether the **actual blockers of those remaining tasks** are active. A plan
-  task can be blocked by a **manually-created** task (no `plan_task_id`) that
-  another agent is working. Walk the **transitive** blocker chains of the
-  remaining tasks (not just immediate blockers — a plan task may be blocked by a
-  manual task that is itself blocked by an `in_progress` task), resolving each
-  blocker's **status** from an **unfiltered** fetch (`bd list --all --limit 0
-  --json`) since manual blockers carry no `plan_task_id`. If **any** transitive
-  blocker is `in_progress` → exit gracefully (the chain is advancing). Only when
-  **no transitive blocker of any remaining task is `in_progress`** is it a **true
-  stall**: the
-  prompt **stops and reports** the remaining tasks grouped by why they aren't
-  ready (open dependency — plan or manual, manual `blocked`, `deferred`) so the
-  user can unblock them. (Unrelated global `in_progress` work that doesn't block
-  any remaining task does **not** suppress the stall report.)
+- **Some remain non-closed** → do **not** short-circuit on "any task is
+  `in_progress`." Classify **each** remaining non-closed task independently,
+  resolving blocker statuses from an **unfiltered** `bd list --all --limit 0
+  --json` (manual blockers carry no `plan_task_id`):
+  - **advancing** — the task is itself `in_progress`, **or** at least one of its
+    **transitive** blockers (walk the full chain — a plan task may be blocked by
+    a manual task that is itself blocked by an `in_progress` task) is
+    `in_progress`.
+  - **stalled** — not `in_progress`, and **no** transitive blocker is
+    `in_progress` (open-but-unready behind inactive blockers, manually `blocked`,
+    or `deferred`).
+
+  If **every** remaining task is *advancing* → exit gracefully (the relevant work
+  is moving; normal multi-agent case). If **any** task is *stalled* → **stop and
+  report the stalled subset** (grouped by why — open dependency plan/manual,
+  manual `blocked`, `deferred`) so the user can unblock them, even while other
+  tasks advance concurrently. Unrelated global `in_progress` work that blocks
+  none of the stalled tasks does **not** suppress the report.
 
 For multi-agent, "always materialize" still means **once per wave** — the
 orchestrator runs it under the lock before fan-out (see Concurrency); workers do
@@ -693,14 +694,18 @@ create duplicates. The implementation must satisfy **all** of these requirements
    `git user.name` → `$USER`, never empty) for `bd ready --claim` and the resume
    lookup. If `BEADS_ACTOR` must be overridden for the lock, scope that override
    to the lock commands and restore the stable actor before claiming.
-5. **Workers wait on a persistent completion signal, not just slot release.** A
-   released slot (`holder: null`) does not prove the orchestrator ran — a worker
-   could acquire/release before the orchestrator even started. The orchestrator
-   sets a durable **materialization-complete signal** on success (e.g. a metadata
-   flag on the project merge-slot/bootstrap bead such as `materialized_at`, or a
-   workspace marker file); workers **block until that signal is present** before
-   their first claim. The lock serializes the *write*; the signal gates the
-   *readers*.
+5. **Workers wait on a *run-specific* completion signal, not just slot release.**
+   A released slot (`holder: null`) does not prove the orchestrator ran — a
+   worker could acquire/release before the orchestrator even started. The
+   orchestrator sets a durable **materialization-complete signal** on success
+   (e.g. a metadata flag on the project merge-slot/bootstrap bead, or a workspace
+   marker file). The signal **must be run-specific** — carry a `run_id` or the
+   current plan hash — and the orchestrator **clears/overwrites it before
+   acquiring the lock**, so a stale signal left from a *previous* pipeline run (or
+   a pre-update plan) can't let workers race ahead of a fresh re-materialization.
+   Workers block until a signal matching **this run's** id/hash is present before
+   their first claim. The lock serializes the *write*; the run-stamped signal
+   gates the *readers*.
 6. **Run the materializer inside the lock** — once ownership is confirmed, run
    the (idempotent) materializer, set the completion signal, then release. The
    lock exists so the
@@ -804,6 +809,28 @@ prompt.
   closed** with an install/upgrade message; do **not** markdown-fall-back past
   possibly-existing Beads state, and never `bd ready --claim` an unsupported
   tracker. (`.beads/` absent is the only no-Beads → markdown path.)
+
+## Open Implementation Concerns
+
+A few areas are specified here at the **invariant level** (what must be true)
+rather than as finished shell — they are inherently distributed-coordination
+problems and must be validated **empirically with the bats tests in the
+implementation prompt**, where real `bd` behavior can be exercised:
+
+- **Multi-agent lock + completion signal** (Concurrency §): the exact merge-slot
+  acquire/verify/release loop, the run-stamped completion-signal mechanism, and
+  the worker wait are specified as requirements; the concrete handshake (and its
+  failure/timeout behavior) is implemented and tested against live `bd`.
+- **Completion-check graph traversal**: transitive-blocker classification is
+  defined; the traversal's depth bound / cycle guard is an implementation detail
+  (the plan DAG is acyclic, but manual edges could introduce a cycle — bound the
+  walk and reuse `bd dep cycles`).
+- **Retirement crash-safety**: the label-first ordering makes retirement
+  resumable in principle; the implementation must prove resumability with a test
+  that interrupts between steps.
+
+These are flagged so they are not mistaken for settled shell — they are settled
+*intent*.
 
 ## Verification Checklist (confirm during implementation)
 
