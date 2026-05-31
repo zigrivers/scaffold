@@ -20,6 +20,22 @@ describe('detectMcpServer', () => {
     expect(m!.partialConfig.primitives).toContain('tools')
   })
 
+  it('high: SDK dep + built JS entrypoint registering a tool (dist/index.js)', () => {
+    const ctx = createFakeSignalContext({
+      packageJson: { name: 's', dependencies: { '@modelcontextprotocol/sdk': '^1.0.0' } },
+      files: {
+        'dist/index.js': 'const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js")\n'
+          + 'const server = new McpServer({ name: "s", version: "1" })\n'
+          + 'server.registerTool("greet", {}, async () => ({ content: [] }))\n',
+      },
+    })
+    const m = detectMcpServer(ctx)
+    expect(m).not.toBeNull()
+    expect(m!.confidence).toBe('high')
+    expect(m!.partialConfig.language).toBe('typescript')
+    expect(m!.partialConfig.primitives).toContain('tools')
+  })
+
   it('high: Python fastmcp dep + FastMCP entrypoint', () => {
     const ctx = createFakeSignalContext({
       pyprojectToml: { project: { name: 's', dependencies: ['fastmcp'] } },

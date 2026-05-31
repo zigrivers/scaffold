@@ -6,8 +6,13 @@ const TS_SDK_DEPS = ['@modelcontextprotocol/sdk'] as const
 const PY_MCP_DEPS = ['mcp', 'fastmcp'] as const
 
 const TS_ENTRYPOINTS = [
+  // TypeScript sources
   'src/index.ts', 'src/server.ts', 'index.ts', 'server.ts', 'src/mcp.ts',
   'src/mcp/index.ts', 'mcp.ts', 'src/cli.ts', 'src/main.ts', 'main.ts',
+  // Plain / built JavaScript (the @modelcontextprotocol/sdk API + registration
+  // markers are identical in JS, so a JS MCP server should also reach high).
+  'src/index.js', 'index.js', 'server.js', 'src/server.js',
+  'dist/index.js', 'build/index.js', 'bin/server.js',
 ] as const
 const PY_ENTRYPOINTS = [
   'server.py', 'main.py', 'src/server.py', 'app.py', 'mcp_server.py',
