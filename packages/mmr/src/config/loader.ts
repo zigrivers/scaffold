@@ -279,7 +279,10 @@ function normalizeOverlayChannelKeys(
     const canonical = normalizeChannelName(key)
     if (canonical !== key) {
       if (Object.prototype.hasOwnProperty.call(src, canonical)) {
-        warn(`mmr: config channel "${key}" is an alias for "${canonical}"; "${canonical}" is also set — ignoring "${key}"`)
+        warn(
+          `mmr: config channel "${key}" is an alias for "${canonical}"; `
+          + `"${canonical}" is also set — ignoring "${key}"`,
+        )
         continue
       }
       warn(`mmr: config channel "${key}" is an alias for "${canonical}"; using "${canonical}"`)

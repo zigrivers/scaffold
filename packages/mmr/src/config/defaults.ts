@@ -172,7 +172,10 @@ export const BUILTIN_CHANNELS: Record<string, SubprocessChannelParsed> = {
       // rather than trust the exit code. Two distinct auth-failure outputs exist:
       // "Authentication required …" and "Error: authentication timed out" — match
       // both. Runs under `sh -c` (auth.ts), so the pipeline + exit codes work.
-      check: 'agy -p "respond with ok" --print-timeout 12s 2>&1 | grep -qiE "authentication required|authentication timed out" && exit 41 || exit 0',
+      check:
+        'agy -p "respond with ok" --print-timeout 12s 2>&1'
+        + ' | grep -qiE "authentication required|authentication timed out"'
+        + ' && exit 41 || exit 0',
       timeout: 20,
       failure_exit_codes: [41],
       recovery: 'agy -p "hello"   # then open the printed Google OAuth URL and paste the code',
