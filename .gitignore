@@ -15,7 +15,10 @@ dist/
 coverage/
 
 # Node.js / TypeScript v2
-node_modules/
+# Bare pattern (no trailing slash) so a top-level `node_modules` *symlink* — the
+# git-worktree dev trick of linking to the primary checkout's deps — is ignored
+# too. A `node_modules/` (dir-only) pattern would not match the symlink.
+node_modules
 
 # Temp files (atomic writes)
 *.tmp
