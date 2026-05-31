@@ -44,9 +44,11 @@
 > - `bd version` prints e.g. `bd version 1.0.5 (Homebrew)` — parseable for a
 >   version gate.
 >
-> The **minimum supported `bd` version is v1.0.5**. Below it, the feature
-> degrades by handing the build phase back to the markdown plan (see
-> "Version gating & graceful degradation").
+> The **minimum supported `bd` version is v1.0.5**. If `.beads/` is absent the
+> build simply uses the markdown plan; but if `.beads/` exists while `bd`/`jq`
+> are missing or too old, the build **fails closed** (it must not re-run
+> possibly-completed work via markdown) — see "Version gating & graceful
+> degradation".
 
 ## Problem
 
@@ -172,8 +174,9 @@ feature's implementation plan.
   exceptions** (content fields, status, claims, and assignees are still never
   touched on started issues): **(a) join-key cleanup** — Pass 0a may
   `--unset-metadata <join-key>` on a started *non-canonical duplicate* (one-key
-  invariant) and Pass 3 on a *closed, removed-from-plan* issue (drop from future
-  fetches); **(b) AC-drift bookkeeping** — Pass 1 may `--set-metadata
+  invariant). (Pass 3 does **not** unset keys on `closed` removed-from-plan
+  issues — they stay linked for revert-safety.) **(b) AC-drift bookkeeping** —
+  Pass 1 may `--set-metadata
   ac_warn_hash=…` on an `in_progress` issue whose plan AC changed, so the warning
   comment posts once per distinct change, not every run. Each touches **only** a
   single metadata tag and is reported. (Per verified semantics, a
@@ -194,10 +197,13 @@ Phase 14 (finalization)
   materialize-plan-to-beads.md   ←    (order 1440, NEW, conditional: "if-needed")
                                        Reads plan + playbook → upserts bd issues
 Phase 15 (build)
-  single-agent-start.md / multi-agent-start.md (order 1510+)
-    Beads Detection block          ←  ADD preflight: "if Beads usable and plan
-                                       has IDs but no plan-derived issues exist →
-                                       materialize first, then claim"
+  single/multi-agent-start.md + single/multi-agent-resume.md (order 1510+)
+    Beads Detection block          ←  ADD preflight: "if beads_usable and a valid
+                                       stable-ID contract → ALWAYS invoke
+                                       /scaffold:materialize-plan-to-beads, then
+                                       run the scoped claim loop + completion
+                                       check (else markdown / fail-closed per the
+                                       Build Preflight decision table)"
 ```
 
 Because pipeline steps auto-expose as slash commands, the new step is also
@@ -239,12 +245,21 @@ Never write `[ -d .beads ] && bd ...` as a whole command — it returns exit 1
 when `.beads/` is absent and breaks callers under `set -e` (the trap documented
 at `single-agent-start.md:164`).
 
-**When `bd` is missing, too old, or `.beads/` is absent:** the materializer
-prints a clear message and skips. Critically, the **build prompts must then
-treat Beads as absent** and drive the loop from the markdown plan/playbook —
-they must NOT fall through to `bd ready --claim` against an empty/unsupported
-tracker (that would reproduce the exact false-done bug this spec fixes). The
-Beads Detection block is therefore gated on `beads_usable`, not on `[ -d .beads ]`.
+**Degradation splits on whether `.beads/` exists** — markdown only when there is
+no Beads state to diverge from:
+
+- **`.beads/` absent** → genuinely a non-Beads project → drive the loop from the
+  markdown plan/playbook. Safe: there is no tracker state to contradict.
+- **`.beads/` present but `bd`/`jq` missing or too old** → **fail closed**, do
+  **not** markdown-fallback. The tracker may already hold execution state
+  (claimed/closed tasks); running the markdown loop would re-execute completed
+  work and diverge Beads from reality. The prompt stops and tells the user to
+  install/upgrade `bd` (≥ v1.0.5) and `jq`.
+
+In neither case may the prompt fall through to `bd ready --claim` against an
+empty/unsupported tracker (that would reproduce the false-done bug). The Beads
+Detection block keys off both `beads_usable` **and** the presence of `.beads/`,
+not `[ -d .beads ]` alone.
 
 ## The Mapping (methodology-scaled)
 
@@ -484,11 +499,14 @@ List every plan-derived issue
 - Such an issue **`in_progress`** → **do not auto-close**; report it in the
   summary for human attention (it may be mid-flight work the plan dropped by
   mistake). Leave its join key intact so it stays visible until a human decides.
-- Such an issue **`closed`** (already done) → **unset its own `<join-key>`**
-  (`bd update <id> --unset-metadata <join-key>`) so it drops out of future
-  bulk-fetch queries; no close needed, excluded from the "dropped work" report.
-  Without this, a closed-and-removed item is re-fetched on every later run
-  (harmless but unbounded growth).
+- Such an issue **`closed`** (already done) → **leave it entirely untouched**
+  (do **not** unset its join key). Plan IDs are never reused, so if the removal
+  is later reverted (e.g. `git revert` restores the task), Pass 1 must still find
+  this issue by its `plan_task_id` and recognize it as already `closed` — not
+  recreate a fresh `open` issue and force the agent to redo completed work.
+  Keeping the key means closed-and-removed items are re-fetched on later runs
+  (bounded by total historical tasks — accepted for revert-safety); they are
+  excluded from the "dropped work" report.
 
 ### Summary report
 
@@ -504,14 +522,17 @@ materialize: C created, U updated, K unchanged,
 Extend the **Beads Detection** block in both build prompts. The decisive
 **control-flow rule** (it is what prevents reintroducing the false-done bug):
 
-> **When Beads is usable and the plan has stable IDs, the materializer runs
-> first (unconditionally), and only then does the claim loop run — scoped to
-> plan-derived issues:** `bd ready --claim --has-metadata-key plan_task_id
-> --json`. Scoping by `plan_task_id` keeps the loop from ever claiming the
-> bootstrap "initialize Beads" bead or any manually-created issue. In every
-> other branch (Beads unusable, or the plan has no stable IDs) the prompt drives
-> the loop from the markdown playbook/plan — it must never fall through to a
-> claim against an empty, partially-materialized, or unsupported tracker.
+> **When `beads_usable` and a valid stable-ID contract are present, the
+> materializer runs first (unconditionally, via the canonical command), and only
+> then does the scoped claim loop run:** `bd ready --claim --has-metadata-key
+> plan_task_id --json` — scoping keeps it from ever claiming the bootstrap bead
+> or a manual issue. Markdown fallback is used **only when `.beads/` is absent**
+> (a non-Beads project) or for a genuinely legacy plan (usable Beads, no IDs,
+> no plan-derived issues). Every other case — `.beads/` present but `bd`/`jq`
+> unusable, a partial/malformed contract, or a mid-run materialize failure —
+> **fails closed**; it must never fall through to a claim against an empty,
+> partially-materialized, or unsupported tracker, nor markdown-fall-back past
+> existing Beads state.
 
 **The materializer is the correctness mechanism, and the preflight always runs
 it — there is no skip/fast-path.** Earlier drafts tried to gate materialization
@@ -528,10 +549,11 @@ correct and acceptable. Decision table:
 
 | Condition | Action |
 |---|---|
-| `beads_usable` false (no `.beads/`, no/old `bd`, no `jq`) | Markdown playbook loop. Do **not** call `bd`. |
-| Usable; plan has **no** stable IDs **and** no plan-derived issues exist in Beads | Legacy/pre-prerequisite plan → markdown loop + emit "re-run planning to assign task IDs". Do **not** claim. |
-| Usable; contract **partially present or malformed** (some IDs present, or plan-derived issues already exist, but the contract doesn't fully parse) | **Fail closed.** Do **not** markdown-fallback (that would bypass existing plan-derived issues and diverge Beads from work). Require planning to be re-run/fixed. |
-| Usable; plan has a valid stable-ID contract | **Always materialize** by invoking the canonical procedure (see Invocation, below) → scoped claim loop `bd ready --claim --has-metadata-key plan_task_id --json`. |
+| `.beads/` **absent** | Non-Beads project → markdown playbook loop. Do **not** call `bd`. |
+| `.beads/` present but `bd`/`jq` missing or too old (`beads_usable` false) | **Fail closed** — tell the user to install/upgrade `bd` (≥ v1.0.5) + `jq`. Do **not** markdown-fallback (Beads may hold state). |
+| Usable; plan has **no** stable IDs **and** no plan-derived issues exist in Beads | Genuinely legacy plan → markdown loop + emit "re-run planning to assign task IDs". Do **not** claim. |
+| Usable; contract **partially present or malformed** (some IDs present, or plan-derived issues already exist, but the contract doesn't fully parse) | **Fail closed.** Do **not** markdown-fallback (would bypass existing plan-derived issues and diverge). Require planning to be re-run/fixed. |
+| Usable; valid stable-ID contract | **Always materialize** via the canonical command (see Invocation) → scoped claim loop `bd ready --claim --has-metadata-key plan_task_id --json` → completion check. |
 | Usable; materialize returns non-zero | **Fail closed.** Stop and surface the error; do **not** claim **and do not** silently markdown-fallback. |
 
 **Markdown fallback is only safe for a genuinely legacy plan** — no stable IDs
@@ -567,10 +589,16 @@ tasks:
   by another agent**, not a deadlock. This is the normal multi-agent case: the
   worker **exits gracefully** (its own work is done; others are still running) —
   it must **not** report a failure or halt the build.
-- **None `in_progress`, but some non-closed remain** (`open`-but-unready /
-  `blocked` / `deferred`) → a **true stall**: nothing is advancing. The prompt
+- **No plan-derived task `in_progress`, but some non-closed remain**
+  (`open`-but-unready / `blocked` / `deferred`) → check for **any global active
+  work** first (`bd list --status in_progress --limit 1 --json`), because a plan
+  task can be blocked by a **manually-created** task (no `plan_task_id`) that
+  another agent is actively working. If global `in_progress` work exists → exit
+  gracefully (something is advancing that may unblock the remaining tasks). Only
+  when **nothing anywhere is `in_progress`** is it a **true stall**: the prompt
   **stops and reports** the remaining tasks grouped by why they aren't ready
-  (open dependency, manual `blocked`, `deferred`) so the user can unblock them.
+  (open dependency — plan or manual, manual `blocked`, `deferred`) so the user
+  can unblock them.
 
 For multi-agent, "always materialize" still means **once per wave** — the
 orchestrator runs it under the lock before fan-out (see Concurrency); workers do
@@ -646,7 +674,8 @@ prompt.
   refs, canonical serialization).
 - **Edit:** `content/pipeline/planning/implementation-plan-review.md` — validate
   the full contract: task **and** container (story/epic) ID presence, uniqueness,
-  and stability; that all `story`/`epic` parent refs resolve (no dangling refs);
+  and stability; that all `story`/`epic` parent refs **and all `depends_on`
+  refs** resolve (no dangling refs); that the **dependency graph is acyclic**;
   and that the per-task and per-container field blocks parse.
 - **Edit:** `content/pipeline/build/single-agent-start.md` — `beads_usable`-gated
   Beads Detection that **invokes `/scaffold:materialize-plan-to-beads`** (the
@@ -660,8 +689,15 @@ prompt.
   `content/pipeline/build/multi-agent-resume.md` — **the resume prompts run the
   same Beads loop and must get the identical treatment** (`beads_usable` gate,
   invoke `/scaffold:materialize-plan-to-beads`, scoped claim, completion check,
-  fail-closed). Without this, a *resumed* build would still claim non-plan beads
-  or false-complete. (Multi-agent-resume keeps the orchestrator-only lock.)
+  fail-closed). Two resume-specific additions:
+  - **Resume the actor's own in-flight task first.** Before claiming anything new,
+    a resuming agent must check for a task already `in_progress` assigned to it
+    (`bd list --status in_progress --assignee <actor> --json`) and continue that
+    one — otherwise it would leave its prior task half-done and claim a second.
+  - **Workers wait for materialization.** In `multi-agent-resume.md`, a worker
+    must not claim until the orchestrator's materialization has completed —
+    block on the merge-slot (or a completion signal) the same way the start flow
+    does, so no one claims against a transient/partially-materialized tracker.
 - **Edit:** `content/pipeline/foundation/beads.md` — one line noting the plan is
   materialized into Beads later, so users aren't surprised Beads starts empty.
 - **Edit:** `content/methodology/*.yml` presets/overlays — enable the new step
@@ -701,22 +737,20 @@ prompt.
   claims a dropped task; the unset also keeps it out of future runs.
 - **More than 50 plan tasks** → `--limit 0` ensures stale/preflight passes see
   the full set (default page size is 50).
-- **Plan missing task IDs** (pre-prerequisite plan or hand-edited/corrupted) →
-  the materializer emits a clear error pointing to re-running the planning phase;
-  the preflight also gates on ID presence and falls back to the markdown loop
-  rather than importing with no join key.
+- **Plan missing task IDs** → if it's a genuinely legacy plan (no IDs **and** no
+  plan-derived issues in Beads) the prompt emits "re-run planning" and uses the
+  markdown loop; if any IDs or plan-derived issues are present (partial/corrupted
+  contract) it **fails closed** rather than importing with no join key.
 - **Stale bootstrap bead** → the "initialize Beads" bootstrap task carries no
   `plan_task_id`, so it is excluded from every count and never masks an empty
   import.
 - **mvp** → flat `-t task` issues with story linkage in metadata/body. This is a
   deliberate simplicity choice; `-t story` is available on v1.0.5 but
   intentionally unused at mvp depth.
-- **`bd` missing/older than v1.0.5** → materializer skips with a message **and**
-  build prompts drive from the markdown plan (no `bd ready --claim` on an
-  empty/unsupported tracker).
-- **`jq` missing** → `beads_usable` returns false, so the build prompt drives
-  from the markdown plan rather than attempting (and failing) a `bd`+`jq`
-  pipeline; the materialize prompt notes `jq` as a dependency.
+- **`.beads/` present but `bd`/`jq` missing or older than v1.0.5** → **fail
+  closed** with an install/upgrade message; do **not** markdown-fall-back past
+  possibly-existing Beads state, and never `bd ready --claim` an unsupported
+  tracker. (`.beads/` absent is the only no-Beads → markdown path.)
 
 ## Verification Checklist (confirm during implementation)
 
@@ -834,5 +868,15 @@ prompts use, against the project's installed `bd`:
 - **Concurrency**: two simulated agents hitting the `multi-agent-start.md`
   preflight against an unmaterialized plan produce exactly one import
   (orchestrator-only + ownership-verified lock), no duplicate issues.
-- **Degradation**: with `bd` absent/older than v1.0.5, the build prompt drives
-  from the markdown playbook and never calls `bd ready --claim`.
+- **Degradation split**: with `.beads/` absent the build uses the markdown
+  playbook (never calls `bd`); with `.beads/` **present** but `bd`/`jq`
+  missing/too old the build **fails closed** (no markdown fallback, no
+  `bd ready --claim`).
+- **Revert-safety**: a `closed` task removed from the plan keeps its
+  `plan_task_id`; after the removal is reverted, the materializer recognizes it
+  as `closed` and does **not** recreate an `open` issue (no redone work).
+- **Manual-blocker active execution**: a plan task blocked by a manually-created
+  task that is `in_progress` (no `plan_task_id`) → empty `bd ready` triggers a
+  graceful exit (global `in_progress` work exists), **not** a true-stall report.
+- **Resume own task**: a resuming agent with an existing `in_progress` task
+  assigned to it continues that task before claiming a new one.
