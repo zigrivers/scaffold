@@ -3,12 +3,12 @@ import type {
   ProjectType, GameConfig, WebAppConfig, BackendConfig,
   CliConfig, LibraryConfig, MobileAppConfig,
   DataPipelineConfig, MlConfig, BrowserExtensionConfig,
-  ResearchConfig, DataScienceConfig, Web3Config,
+  ResearchConfig, DataScienceConfig, Web3Config, McpServerConfig,
 } from '../types/index.js'
 import type {
   GameFlags, WebAppFlags, BackendFlags, CliFlags, LibraryFlags,
   MobileAppFlags, DataPipelineFlags, MlFlags, BrowserExtensionFlags,
-  ResearchFlags,
+  ResearchFlags, McpServerFlags,
 } from './flags.js'
 import { GameConfigSchema, ProjectTypeSchema } from '../config/schema.js'
 import { coreCopy, getCopyForType, optionsFromCopy } from './copy/index.js'
@@ -31,6 +31,7 @@ export interface WizardAnswers {
   researchConfig?: ResearchConfig
   dataScienceConfig?: DataScienceConfig
   web3Config?: Web3Config
+  mcpServerConfig?: McpServerConfig
 }
 
 /**
@@ -57,6 +58,7 @@ export async function askWizardQuestions(options: {
   mlFlags?: MlFlags
   browserExtensionFlags?: BrowserExtensionFlags
   researchFlags?: ResearchFlags
+  mcpServerFlags?: McpServerFlags
 }): Promise<WizardAnswers> {
   const { output, suggestion, auto } = options
 
@@ -530,6 +532,48 @@ export async function askWizardQuestions(options: {
     researchConfig = { experimentDriver, interactionMode, domain, hasExperimentTracking }
   }
 
+  // MCP server configuration
+  let mcpServerConfig: McpServerConfig | undefined
+  if (projectType === 'mcp-server') {
+    const copy = getCopyForType('mcp-server')
+    showBannerOnce()
+
+    if (auto && !options.mcpServerFlags?.mcpLanguage) {
+      throw new Error('--mcp-language is required in auto mode for mcp-server projects')
+    }
+
+    const language: McpServerConfig['language'] = options.mcpServerFlags?.mcpLanguage
+      ?? await output.select('Implementation language?',
+        optionsFromCopy(copy.language.options, ['typescript', 'python']),
+        'typescript', copy.language) as McpServerConfig['language']
+
+    const transport: McpServerConfig['transport'] = options.mcpServerFlags?.mcpTransport
+      ?? (!auto ? await output.select('Transport?',
+        optionsFromCopy(copy.transport.options, ['stdio', 'streamable-http', 'sse']),
+        'stdio', copy.transport) as McpServerConfig['transport'] : 'stdio')
+
+    const primitives: McpServerConfig['primitives'] = options.mcpServerFlags?.mcpPrimitives
+      ?? (!auto ? await output.multiSelect('Primitives exposed?',
+        optionsFromCopy(copy.primitives.options, ['tools', 'resources', 'prompts']),
+        ['tools'], copy.primitives) as McpServerConfig['primitives'] : ['tools'])
+
+    const auth: McpServerConfig['auth'] = options.mcpServerFlags?.mcpAuth
+      ?? (!auto && transport !== 'stdio' ? await output.select('Auth?',
+        optionsFromCopy(copy.auth.options, ['none', 'oauth', 'apikey']),
+        'none', copy.auth) as McpServerConfig['auth'] : 'none')
+
+    const deployment: McpServerConfig['deployment'] = options.mcpServerFlags?.mcpDeployment
+      ?? (transport === 'stdio' ? 'local'
+        : (!auto ? await output.select('Deployment?',
+          optionsFromCopy(copy.deployment.options, ['local', 'hosted']),
+          'hosted', copy.deployment) as McpServerConfig['deployment'] : 'hosted'))
+
+    const stateful = options.mcpServerFlags?.mcpStateful
+      ?? (!auto ? await output.confirm('Does the server persist state/resources?', false, copy.stateful) : false)
+
+    mcpServerConfig = { language, transport, primitives, auth, deployment, stateful }
+  }
+
   // Data science configuration
   let dataScienceConfig: DataScienceConfig | undefined
   if (projectType === 'data-science') {
@@ -734,5 +778,6 @@ export async function askWizardQuestions(options: {
     webAppConfig, backendConfig, cliConfig,
     libraryConfig, mobileAppConfig, dataPipelineConfig,
     mlConfig, browserExtensionConfig, researchConfig, dataScienceConfig, web3Config, gameConfig,
+    mcpServerConfig,
   }
 }

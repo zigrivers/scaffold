@@ -1053,3 +1053,34 @@ describe('web3 wizard questions', () => {
     expect(output.confirm).not.toHaveBeenCalled()
   })
 })
+
+describe('mcp-server wizard (auto mode)', () => {
+  it('throws when --mcp-language missing in auto mode', async () => {
+    const output = makeOutputContext()
+
+    await expect(askWizardQuestions({
+      output, suggestion: 'deep', auto: true,
+      methodology: 'deep',
+      projectType: 'mcp-server',
+    })).rejects.toThrow(/--mcp-language is required/)
+  })
+
+  it('produces mcpServerConfig from flags with defaults', async () => {
+    const output = makeOutputContext()
+
+    const answers = await askWizardQuestions({
+      output, suggestion: 'deep', auto: true,
+      methodology: 'deep',
+      projectType: 'mcp-server',
+      mcpServerFlags: { mcpLanguage: 'python' },
+    })
+    expect(answers.mcpServerConfig).toEqual({
+      language: 'python', transport: 'stdio', primitives: ['tools'],
+      auth: 'none', deployment: 'local', stateful: false,
+    })
+    // No interactive calls in auto mode
+    expect(output.select).not.toHaveBeenCalled()
+    expect(output.confirm).not.toHaveBeenCalled()
+    expect(output.multiSelect).not.toHaveBeenCalled()
+  })
+})
