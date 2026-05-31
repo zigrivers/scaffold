@@ -47,7 +47,7 @@ function buildRunHeader(step: string, boundArgs: string): string {
 
 interface RunArgs {
   step: string
-  args?: (string | number)[]
+  args?: string[]
   depth?: number
   instructions?: string
   force?: boolean
@@ -75,6 +75,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
         demandOption: true,
       })
       .positional('args', {
+        type: 'string',
         array: true,
         description: 'Trailing arguments bound to $ARGUMENTS in the step prompt',
       })

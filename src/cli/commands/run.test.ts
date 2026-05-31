@@ -1783,7 +1783,7 @@ describe('run command — $ARGUMENTS wiring', () => {
   it('joins multiple trailing tokens with single spaces', async () => {
     vi.mocked(resolveOutputMode).mockReturnValue('auto')
     await invokeHandler({
-      step: 'create-prd', _: ['run'], args: [376, '--fix-threshold', 'P1'], auto: true,
+      step: 'create-prd', _: ['run'], args: ['376', '--fix-threshold', 'P1'], auto: true,
     })
     expect(AssemblyEngine.prototype.assemble).toHaveBeenCalledWith(
       'create-prd',
@@ -1899,34 +1899,39 @@ describe('run command — argument capture (parse-level)', () => {
 
   it('captures a bare positional into args', async () => {
     const { captured } = await parseRun('run review-pr 376')
-    expect(captured?.['args']).toEqual([376])
+    expect(captured?.['args']).toEqual(['376'])
   })
 
   it('captures an unknown flag and its value into args', async () => {
     const { captured } = await parseRun('run review-pr 376 --fix-threshold P1')
-    expect(captured?.['args']).toEqual([376, '--fix-threshold', 'P1'])
+    expect(captured?.['args']).toEqual(['376', '--fix-threshold', 'P1'])
   })
 
   it('captures the = form of an unknown flag as a single token', async () => {
     const { captured } = await parseRun('run review-pr 376 --fix-threshold=P1')
-    expect(captured?.['args']).toEqual([376, '--fix-threshold=P1'])
+    expect(captured?.['args']).toEqual(['376', '--fix-threshold=P1'])
   })
 
   it('consumes a known global flag instead of capturing it (trailing)', async () => {
     const { captured } = await parseRun('run review-pr 376 --format json')
-    expect(captured?.['args']).toEqual([376])
+    expect(captured?.['args']).toEqual(['376'])
     expect(captured?.['format']).toBe('json')
   })
 
   it('consumes a known global flag instead of capturing it (interleaved)', async () => {
     const { captured } = await parseRun('run --format json review-pr 376')
-    expect(captured?.['args']).toEqual([376])
+    expect(captured?.['args']).toEqual(['376'])
     expect(captured?.['format']).toBe('json')
   })
 
   it('captures no args when none are given', async () => {
     const { captured } = await parseRun('run review-pr')
     expect(captured?.['args']).toEqual([])
+  })
+
+  it('preserves leading-zero / exponent-looking tokens as strings (no numeric coercion)', async () => {
+    const { captured } = await parseRun('run review-pr 00123')
+    expect(captured?.['args']).toEqual(['00123'])
   })
 
   it('does NOT leak .strict(false) to sibling commands', async () => {
