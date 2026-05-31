@@ -8,7 +8,7 @@ Repository-oriented map of the Scaffold codebase and generated project runtime l
 ```
 scaffold/
 ├── content/                   # Build inputs (source of truth for all content)
-│   ├── pipeline/              # 60 meta-prompt files organized by 16 phases
+│   ├── pipeline/              # 90 meta-prompt files organized by 16 phases
 │   │   ├── vision/
 │   │   ├── pre/
 │   │   ├── foundation/
@@ -25,7 +25,7 @@ scaffold/
 │   │   ├── validation/
 │   │   ├── finalization/
 │   │   └── build/
-│   ├── tools/                 # 11 tool meta-prompts (stateless, category: tool)
+│   ├── tools/                 # 12 tool meta-prompts (stateless, category: tool)
 │   ├── knowledge/             # 64 domain expertise entries in 7 categories
 │   │   ├── core/
 │   │   ├── product/

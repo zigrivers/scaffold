@@ -1779,8 +1779,8 @@ All build inputs live under `content/`:
 
 ```
 content/
-├── pipeline/         # 60 meta-prompts organized by 16 phases (phases 0-15, including build)
-├── tools/            # 10 tool meta-prompts (stateless, category: tool)
+├── pipeline/         # 90 meta-prompts organized by 16 phases (phases 0-15, including build)
+├── tools/            # 12 tool meta-prompts (stateless, category: tool)
 ├── knowledge/        # 278 domain expertise entries (core, product, review, validation, finalization, execution, tools, game, web-app, backend, cli, library, mobile-app, data-pipeline, ml, browser-extension, research, data-science, web3, mcp-server)
 ├── methodology/      # 3 YAML presets (deep, mvp, custom)
 └── skills/           # Skill templates with {{markers}} for multi-platform resolution (includes mmr)
