@@ -41,12 +41,69 @@ export const CHROME_JS: string = /* js */ `(function(){
       });
     });
 
-    // ─── Mobile nav ──────────────────────────────────────────────────────────
+    // ─── Mobile nav (drawer + backdrop; aria-expanded + Escape-to-close) ──────
+    function setNav(open) {
+      var rail = document.querySelector('.rail');
+      if (rail) rail.classList.toggle('open', open);
+      var toggle = document.querySelector('.nav-toggle');
+      if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      // Modal-drawer focus containment: while open, make the page content inert
+      // (out of tab order + a11y tree) and move focus into the drawer; on close,
+      // restore content and return focus to the toggle.
+      var main = document.querySelector('.content');
+      if (main) main.inert = open;
+      if (open) {
+        var first = rail && rail.querySelector('a, button, [tabindex]:not([tabindex="-1"])');
+        if (first) first.focus();
+        else if (rail) { rail.setAttribute('tabindex', '-1'); rail.focus(); }
+      } else if (toggle) {
+        toggle.focus();
+      }
+    }
+    // If the viewport grows past the mobile breakpoint while the drawer is open,
+    // the rail becomes the desktop sidebar and the toggle hides — clear the open
+    // state so .content doesn't stay inert with no way to close it.
+    if (window.matchMedia) {
+      var mq = window.matchMedia('(max-width: 860px)');
+      var onMq = function() {
+        if (mq.matches) return;
+        var rail = document.querySelector('.rail');
+        if (rail) rail.classList.remove('open');
+        var toggle = document.querySelector('.nav-toggle');
+        if (toggle) toggle.setAttribute('aria-expanded', 'false');
+        var main = document.querySelector('.content');
+        if (main) main.inert = false;
+      };
+      if (mq.addEventListener) mq.addEventListener('change', onMq);
+      else if (mq.addListener) mq.addListener(onMq);
+    }
     document.querySelectorAll('[data-action="nav"]').forEach(function(btn) {
       btn.addEventListener('click', function() {
         var rail = document.querySelector('.rail');
-        if (rail) rail.classList.toggle('open');
+        setNav(!(rail && rail.classList.contains('open')));
       });
+    });
+    // Selecting a TOC link closes the drawer (so the now-active content isn't
+    // left inert behind the panel) before the anchor navigation scrolls.
+    var drawerRail = document.querySelector('.rail');
+    if (drawerRail) {
+      drawerRail.querySelectorAll('a').forEach(function(a) {
+        a.addEventListener('click', function() {
+          if (drawerRail.classList.contains('open')) setNav(false);
+        });
+      });
+    }
+    document.addEventListener('keydown', function(e) {
+      var rail = document.querySelector('.rail');
+      if (!rail || !rail.classList.contains('open')) return;
+      if (e.key === 'Escape') { setNav(false); return; } // setNav restores focus to the toggle
+      // Trap Tab within the open drawer (modal pattern).
+      if (e.key !== 'Tab') return;
+      var f = rail.querySelectorAll('a[href], button, [tabindex]:not([tabindex="-1"])');
+      if (!f.length) return;
+      var first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
     });
 
     // ─── Copy buttons ─────────────────────────────────────────────────────────
@@ -73,17 +130,31 @@ export const CHROME_JS: string = /* js */ `(function(){
       wrapper.insertBefore(btn, pre);
     });
 
-    // ─── Tabs ─────────────────────────────────────────────────────────────────
+    // ─── Tabs (ARIA pattern: aria-selected + roving tabindex + arrow keys) ────
+    function activateTab(group, btn, focus) {
+      var idx = btn.getAttribute('data-tab');
+      group.querySelectorAll('.tab-btn').forEach(function(b) {
+        var on = b === btn;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-selected', on ? 'true' : 'false');
+        b.setAttribute('tabindex', on ? '0' : '-1');
+      });
+      group.querySelectorAll('.tabpane').forEach(function(pane) {
+        pane.classList.toggle('active', pane.getAttribute('data-tab') === idx);
+      });
+      if (focus) btn.focus();
+    }
     document.querySelectorAll('.tabs').forEach(function(group) {
-      group.querySelectorAll('.tab-btn').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-          var idx = btn.getAttribute('data-tab');
-          group.querySelectorAll('.tab-btn').forEach(function(b) {
-            b.classList.toggle('active', b === btn);
-          });
-          group.querySelectorAll('.tabpane').forEach(function(pane) {
-            pane.classList.toggle('active', pane.getAttribute('data-tab') === idx);
-          });
+      var btns = [].slice.call(group.querySelectorAll('.tab-btn'));
+      btns.forEach(function(btn, i) {
+        btn.addEventListener('click', function() { activateTab(group, btn, false); });
+        btn.addEventListener('keydown', function(e) {
+          var ni = -1;
+          if (e.key === 'ArrowRight' || e.key === 'ArrowDown') ni = (i + 1) % btns.length;
+          else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') ni = (i - 1 + btns.length) % btns.length;
+          else if (e.key === 'Home') ni = 0;
+          else if (e.key === 'End') ni = btns.length - 1;
+          if (ni >= 0) { e.preventDefault(); activateTab(group, btns[ni], true); }
         });
       });
     });

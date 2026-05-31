@@ -143,7 +143,7 @@ cross-references, and validation beyond the basics. Override depth per run with
 ### The three presets
 
 ::::tabs
-:::tab{title=mvp (depth 1)}
+:::tab{title="mvp (depth 1)"}
 **Ship fast with minimal ceremony.** Only the essential planning steps are
 enabled: vision, PRD + stories (with reviews), tech-stack, coding-standards,
 tdd, project-structure, dev-env-setup, implementation-plan, and
@@ -152,14 +152,14 @@ modeling, ADRs, architecture, specs, quality gates, validation) is **disabled**.
 This is the *minimum safe depth*: still enough spec to TDD against, but no
 ceremony you'd skip on a weekend project.
 :::
-:::tab{title=custom (depth 3)}
+:::tab{title="custom (depth 3)"}
 **Balanced.** Most steps are enabled at depth 3. The exceptions:
 the three `innovate-*` steps and `automated-pr-review` are off by default, and
 the conditional steps (`beads`, `design-system`, `add-e2e-testing`, the spec
 steps, `platform-parity-review`) are enabled-but-`if-needed`. You override
 individual steps to taste.
 :::
-:::tab{title=deep (depth 5)}
+:::tab{title="deep (depth 5)"}
 **Maximum quality — and the schema default** (`methodology` defaults to `deep`
 :cite[src/config/schema.ts:272]; the resolver also falls back to `deep`). *Every*
 planning step is enabled, including the
@@ -185,19 +185,19 @@ only **inject domain knowledge** into existing steps (so a web-app build pulls i
 **enable whole step families**.
 
 ::::tabs
-:::tab{title=Web app}
+:::tab{title="Web app"}
 `web-app-overlay.yml` is knowledge-only — it appends web-app expertise to
 ~25 steps (rendering strategies + deployment + auth into `tech-stack`, UX
 patterns into `ux-spec`, the design system into `design-system`, and so on). The
 spec steps you'll actually use: `database-schema`, `api-contracts`, `ux-spec`
 (all conditional). `add-e2e-testing` configures **Playwright**.
 :::
-:::tab{title=Mobile / Expo}
+:::tab{title="Mobile / Expo"}
 `mobile-app-overlay.yml` injects mobile knowledge the same way. The distinctive
 piece is `add-e2e-testing`, which auto-detects the platform and wires up
 **Maestro** for mobile/Expo instead of Playwright (phase 4 — `integration`).
 :::
-:::tab{title=Game}
+:::tab{title="Game"}
 `game-overlay.yml` is the heavyweight: it **enables a whole phase family** via
 `step-overrides`. On come `game-design-document`, `review-gdd`,
 `performance-budgets`, `narrative-bible`, `netcode-spec`, `ai-behavior-design`,
@@ -206,7 +206,7 @@ piece is `add-e2e-testing`, which auto-detects the platform and wires up
 `if-needed`. These live across the `pre`, `architecture`, `specification`, and
 `quality` phases.
 :::
-:::tab{title=Multi-service}
+:::tab{title="Multi-service"}
 `multi-service-overlay.yml` activates when `services[]` is present in config. It
 enables five cross-service steps (`service-ownership-map`,
 `inter-service-contracts`, `cross-service-auth`, `cross-service-observability`,
@@ -214,7 +214,7 @@ enables five cross-service steps (`service-ownership-map`,
 **reads-overrides** so downstream steps wait for and consume those cross-service
 artifacts. Use `scaffold next --service <name>` to drive a single service.
 :::
-:::tab{title=CLI / library}
+:::tab{title="CLI / library"}
 `cli-overlay.yml` (and `library-overlay.yml`) are knowledge-only. They append
 CLI expertise — command parsing, distribution, shell integration, output
 formatting — into `tech-stack`, `system-architecture`, `api-contracts`,

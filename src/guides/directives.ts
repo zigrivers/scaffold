@@ -19,28 +19,38 @@ export const remarkCallout: AnyPlugin = () => (tree: Root) => {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const remarkTabs: AnyPlugin = () => (tree: any) => {
+  let group = 0 // unique id base per tabs group (document order → deterministic)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   visit(tree, (node: any) => {
     if (node.type !== 'containerDirective' || node.name !== 'tabs') return
     // With a 4-colon outer fence (::::tabs) wrapping 3-colon (:::tab) children,
     // remark-directive nests tab nodes directly inside node.children — no sibling
     // collection needed, no stray ::: paragraph produced.
-     
+    const g = group++
+    const tabId = (i: number) => `tab-${g}-${i}`
+    const paneId = (i: number) => `tabpane-${g}-${i}`
+
     const tabs = (node.children ?? []).filter(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (c: any) => c.type === 'containerDirective' && c.name === 'tab',
     )
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const others = (node.children ?? []).filter((c: any) => !(c.type === 'containerDirective' && c.name === 'tab'))
+    // Full ARIA tabs pattern: each button controls its pane; roving tabindex +
+    // aria-selected track the active tab (chrome.ts updates them on click/arrow).
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const buttons = tabs.map((t: any, i: number) => ({
       type: 'paragraph',
       data: {
         hName: 'button',
         hProperties: {
+          id: tabId(i),
           className: 'tab-btn' + (i === 0 ? ' active' : ''),
           role: 'tab',
           'data-tab': String(i),
+          'aria-controls': paneId(i),
+          'aria-selected': i === 0 ? 'true' : 'false',
+          tabindex: i === 0 ? '0' : '-1',
         },
       },
       children: [{ type: 'text', value: String(t.attributes?.title ?? `Tab ${i + 1}`) }],
@@ -56,8 +66,12 @@ export const remarkTabs: AnyPlugin = () => (tree: any) => {
       t.data = t.data ?? {}
       t.data.hName = 'div'
       t.data.hProperties = {
+        id: paneId(i),
         className: 'tabpane' + (i === 0 ? ' active' : ''),
+        role: 'tabpanel',
         'data-tab': String(i),
+        'aria-labelledby': tabId(i),
+        tabindex: '0',
       }
     })
     node.data = node.data ?? {}

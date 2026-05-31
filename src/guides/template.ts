@@ -34,13 +34,18 @@ export function wrapInChrome({ title, body, headings, css }: WrapArgs): string {
 </head>
 <body>
 <header class="topbar">
-  <button data-action="nav" class="nav-toggle" aria-label="Toggle navigation">☰</button>
+  <button data-action="nav" class="nav-toggle" aria-label="Toggle navigation"
+    aria-expanded="false" aria-controls="guide-toc">☰</button>
   <h1>${esc(title)}</h1>
   <button data-action="theme" class="theme-toggle" aria-label="Toggle theme">◐</button>
 </header>
 <div class="layout">
-  <aside class="rail">${toc(headings)}</aside>
+  <aside class="rail" id="guide-toc">
+    <button class="rail-close" data-action="nav" aria-label="Close navigation">✕</button>
+    ${toc(headings)}
+  </aside>
   <main class="content">${body}</main>
+  <div class="rail-backdrop" data-action="nav" aria-hidden="true"></div>
 </div>
 <script>${CHROME_JS}</script>
 </body>
