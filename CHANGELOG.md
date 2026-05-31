@@ -16,7 +16,10 @@ All notable changes to Scaffold are documented here.
   agent `start`/`resume`) now invoke it and claim only plan-derived issues. This
   requires a stable-ID **Plan Output Contract** added to the planning step. The
   step is enabled (conditional on Beads) in the `deep` and `custom` methodologies
-  and off in `mvp`.
+  and off in `mvp`. For Beads-enabled projects, the build prompts now **fail
+  closed** (rather than silently falling back to the markdown plan and re-running
+  completed work) when a `.beads/` tracker exists but `bd`/`jq` is missing or
+  older than v1.0.5 — install/upgrade `bd` (≥ v1.0.5) and `jq` to proceed.
 
 ## [3.31.1] — 2026-05-31
 

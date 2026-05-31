@@ -78,6 +78,10 @@ usable directly on the supported `bd` (≥ v1.0.5); mvp stays flat as a delibera
 materialized at every depth** (the plan is a DAG even at mvp); depth scales only
 the container hierarchy and `wave`/`risk` metadata.
 
+(Note: the **`mvp` methodology preset disables this step entirely** — it doesn't
+use Beads. The "mvp" rules below therefore apply to a **custom** low-depth build
+that has Beads enabled, not to the mvp preset.)
+
 - **mvp** → flat `-t task` issues **plus dependencies**. No story/epic
   containers, no `--parent`; skip Pass 0b. Priority defaults to `-p 2`.
 - **deep** → full container hierarchy + `wave`/`risk` metadata + wave-biased
