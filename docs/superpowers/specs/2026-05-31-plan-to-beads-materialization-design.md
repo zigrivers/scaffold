@@ -271,19 +271,22 @@ result-set pagination (default 50) hides records.
 
 ### Pass 0 — Container upsert (deep only), top-down
 
-Process **epics first, then stories**, capturing each created/looked-up Beads ID
-so children can reference it via `--parent`:
+**Bulk-fetch containers once** (like Pass 1 — avoid a `bd list` per container):
+two queries, `bd list --all --limit 0 --has-metadata-key plan_epic_id --json`
+and `… plan_story_id …`, build in-memory `plan_epic_id → id` and
+`plan_story_id → id` maps. Then process **epics first, then stories**, so each
+child can reference its parent's resolved Beads ID via `--parent`:
 
 ```bash
-# Epic E-001
-ID=$(bd list --all --limit 0 --metadata-field "plan_epic_id=E-001" --json | jq -r '.[0].id // empty')
+# Epic E-001: look up in the in-memory epic map; create if absent
+ID=$(printf '%s' "$EPIC_MAP_JSON" | jq -r '."E-001" // empty')
 [ -z "$ID" ] && ID=$(bd create "<epic title>" -t epic \
   --metadata '{"plan_epic_id":"E-001"}' --external-ref "plan:E-001" --json | jq -r '.id')
-# Story S-001 (parent = resolved epic ID), same lookup-or-create with plan_story_id
+# Story S-001 (parent = resolved epic ID): same lookup-or-create against the story map
 ```
 
-Story/epic upsert follows the same open-vs-non-open rules as tasks (below);
-reparenting an `open` container uses `bd update <id> --parent <new>`.
+Story/epic upsert follows the same not-started-vs-started rules as tasks (below);
+reparenting a not-started container uses `bd update <id> --parent <new>`.
 
 ### Pass 1 — Task upsert
 
@@ -325,7 +328,13 @@ resolved by Pass 0), look it up in that map:
 
 ### Pass 2 — Dependency reconcile
 
-Run after all issues exist (forward references resolved).
+Run after all issues exist (forward references resolved). **Read existing edges
+from the single bulk fetch, not per task:** `bd list --all --limit 0 --json`
+includes a `dependencies` array inline on each issue (verified on v1.0.5 —
+records carry `depends_on_id` and `type`), plus `dependency_count`. Reconcile
+in-memory against the plan's `depends_on` lists; only the mutating
+`bd dep add`/`bd dep remove` calls need per-edge invocations (an unavoidable CLI
+cost, scoped to actual changes — not one read per task).
 
 - **Add** missing edges, but only when the dependent issue is **`open`,
   `blocked`, or `deferred`** (never add edges to `in_progress` or `closed`
@@ -333,11 +342,13 @@ Run after all issues exist (forward references resolved).
   `bd dep add <blocked-id> <blocker-id>` (re-adding is a no-op).
 - **Remove** stale edges (in the plan no longer) for dependents in
   **`open`, `blocked`, or `deferred`** state; only `in_progress`/`closed` are
-  exempt: `bd dep remove <blocked-id> <blocker-id>`. Read the dependent's current
-  blockers via `bd dep list <id> --direction down --json` — **verified
-  empirically on v1.0.5**: `--direction down` returns *what `<id>` depends on*
-  (its blockers/upstream), which is exactly the edge set to reconcile; `up`
-  would return *dependents* (downstream) and is the wrong direction here.
+  exempt: `bd dep remove <blocked-id> <blocker-id>`. The dependent's current
+  blockers come from the bulk fetch's inline `dependencies` array
+  (`depends_on_id` entries). If a per-issue read is ever needed instead, use
+  `bd dep list <id> --direction down --json` — **verified empirically on
+  v1.0.5**: `--direction down` returns *what `<id>` depends on* (its
+  blockers/upstream), exactly the edge set to reconcile; `up` returns
+  *dependents* (downstream) and is the wrong direction here.
 - **No manual status reconciliation is needed** after add/remove. Readiness is
   computed from open blockers (verified): removing the last blocker makes a task
   ready again on its own; adding a blocker excludes it from `bd ready` while
@@ -385,32 +396,44 @@ Extend the **Beads Detection** block in both build prompts. The decisive
 > playbook/plan instead — it must never fall through to a claim against an empty
 > or **partially-materialized** tracker.
 
-The gate is a **set comparison, not a count.** A positive count is *not* proof
-the current plan is materialized — a partially-failed import, a stale Beads DB
-from an older plan, or a plan update that added task IDs all leave count > 0
-while current-plan tasks are missing, which would silently skip work. So the
-preflight compares:
+**The materializer is the correctness mechanism; the preflight just runs it.**
+A count — or even a one-way subset — is *not* a safe gate. Consider the two
+failure directions:
 
-- `PLAN_IDS` = the stable task IDs in the current `docs/implementation-plan.md`.
-- `MAT_IDS` = the `plan_task_id` values across Beads issues
-  (`bd list --all --limit 0 --has-metadata-key plan_task_id --json`).
+- **Missing** (`PLAN_IDS ⊄ MAT_IDS`): a partial/failed import or a plan update
+  that added task IDs leaves count > 0 while current tasks are absent — claiming
+  now skips unmaterialized work.
+- **Stale** (extra in Beads): a task removed from the plan stays `open` in Beads
+  and is still in `MAT_IDS`, so a subset check `PLAN_IDS ⊆ MAT_IDS` *passes* —
+  but the scoped claim loop would then claim that stale task, because the
+  preflight skipped Pass 3 stale-reconcile.
 
-If `PLAN_IDS ⊆ MAT_IDS` (every current task already exists) → claim loop.
-Otherwise → (re-)materialize, which is idempotent and also reconciles
-extras/stale, then re-evaluate. Decision table:
+So the rule is: **when Beads is engaged for build, run the idempotent
+materializer** (it creates missing, updates not-started, reconciles deps, and
+closes stale not-started issues), *then* enter the scoped claim loop. Define:
+
+- `PLAN_IDS` = stable task IDs in the current `docs/implementation-plan.md`.
+- `READY_IDS` = `plan_task_id` of **not-started** (`open`/`blocked`/`deferred`)
+  plan-derived Beads issues — i.e. the set the scoped claim loop could surface
+  (`bd list --all --limit 0 --has-metadata-key plan_task_id --json`, filtered to
+  not-started in `jq`).
+
+An implementation MAY take a fast-path and skip the materializer **only when
+`READY_IDS == PLAN_IDS` exactly** (no missing, no stale — bidirectional
+equality). Any difference in either direction → materialize. Decision table:
 
 | Condition | Action |
 |---|---|
 | `beads_usable` false (no `.beads/`, no/old `bd`, no `jq`) | Markdown playbook loop. Do **not** call `bd`. |
 | Usable; plan has **no** stable task IDs | Markdown loop + emit "re-run planning to assign task IDs". Do **not** claim. |
-| Usable; `PLAN_IDS ⊆ MAT_IDS` | Scoped claim loop: `bd ready --claim --has-metadata-key plan_task_id --json`. |
-| Usable; `PLAN_IDS ⊄ MAT_IDS` | Materialize (locked — see Concurrency), then re-check; if now `⊆` → claim loop, else markdown loop. |
-| Usable; materialize command returns non-zero | Markdown loop + surface the error. Do **not** claim. |
+| Usable; `READY_IDS == PLAN_IDS` | Fast-path: scoped claim loop `bd ready --claim --has-metadata-key plan_task_id --json`. |
+| Usable; `READY_IDS != PLAN_IDS` (missing **or** stale) | Materialize (locked — see Concurrency); on success → scoped claim loop. |
+| Usable; materialize returns non-zero | Markdown loop + surface the error. Do **not** claim. |
 
-`PLAN_IDS`/`MAT_IDS` are built with `jq`; any `jq`/`bd` failure routes to the
-markdown loop (never a blind claim). The preflight is idempotent — re-import is
-a no-op when the sets already match. The exact, tested shell lives in the
-implementation prompt; this spec fixes the routing rule above.
+The sets are built with `jq`; any `jq`/`bd` failure routes to the markdown loop
+(never a blind claim). Re-running the materializer is a no-op when already in
+sync. The exact, tested shell lives in the implementation prompt; this spec
+fixes the routing rule above.
 
 ### Concurrency (multi-agent)
 
@@ -438,8 +461,9 @@ create duplicates. The implementation must satisfy **all** of these requirements
    and each assume they hold the slot. The identity fallback must also match
    `bd`'s own actor resolution (`BEADS_ACTOR` → `git user.name` → `$USER`) so the
    ownership check can't compare against an empty string.
-5. **Re-check inside the lock** — re-count `plan_task_id` after acquiring and
-   import only if still 0, then release.
+5. **Re-check inside the lock** — after acquiring, recompute `PLAN_IDS` and
+   `READY_IDS` and run the materializer whenever `READY_IDS != PLAN_IDS` (the
+   same bidirectional check as the preflight — never a bare count), then release.
 
 `single-agent-start.md` has no concurrency concern and uses the plain preflight.
 The exact locking shell is authored and bats-tested in the implementation
@@ -485,12 +509,18 @@ prompt.
   open/blocked/deferred dependents (so blocked tasks can be unblocked).
 - **AC/description changed while in_progress** → fields untouched; a single
   `bd comment` warning posted per distinct change (`ac_warn_hash` guards spam).
-- **All plan tasks closed** → every `PLAN_IDS` member is in `MAT_IDS` (the count
-  uses `--all --limit 0`), so the preflight sees the plan as fully materialized
-  and does not falsely re-import completed work.
-- **Partial/failed prior import, or plan update adding task IDs** → `PLAN_IDS ⊄
-  MAT_IDS`, so the preflight re-materializes the missing tasks rather than
-  trusting a positive count and skipping unmaterialized work.
+- **All plan tasks closed** → `READY_IDS` is empty (no not-started issues), so
+  the fast-path is skipped and the materializer runs as a **no-op**: every task
+  is found by `plan_task_id` (looked up with `--all`) in `closed` state and left
+  untouched — never recreated. The scoped claim loop then finds nothing ready and
+  the build correctly concludes it is done.
+- **Partial/failed prior import, or plan update adding task IDs** → a current
+  task is missing from `READY_IDS`, so `READY_IDS != PLAN_IDS` and the preflight
+  re-materializes rather than trusting a positive count and skipping work.
+- **Task removed from the plan but still `open` in Beads** → that ID is in
+  `READY_IDS` but not `PLAN_IDS`, so `READY_IDS != PLAN_IDS` triggers the
+  materializer, whose Pass 3 closes the stale issue **before** the claim loop can
+  grab it (a one-way subset check would have missed this).
 - **More than 50 plan tasks** → `--limit 0` ensures stale/preflight passes see
   the full set (default page size is 50).
 - **Plan missing task IDs** (pre-prerequisite plan or hand-edited/corrupted) →
@@ -569,8 +599,11 @@ prompts use, against the project's installed `bd`:
   test asserting no truncation at the default page size.
 - **`--all` visibility**: an all-`closed` plan is not re-imported by the preflight.
 - **Drift / partial import**: a plan with a task ID absent from Beads
-  (`PLAN_IDS ⊄ MAT_IDS`) triggers re-materialization even though count > 0; the
-  build does not enter the claim loop with that task missing.
+  (`READY_IDS != PLAN_IDS`) triggers re-materialization even though count > 0;
+  the build does not enter the claim loop with that task missing.
+- **Stale-claim prevention**: a task removed from the plan but left `open` in
+  Beads is detected (`READY_IDS != PLAN_IDS`) and closed by Pass 3 before the
+  scoped claim loop runs — the build never claims a dropped task.
 - **Claim scoping**: with a bootstrap bead (no `plan_task_id`) plus materialized
   plan tasks present, the build loop's `bd ready --claim --has-metadata-key
   plan_task_id` never claims the bootstrap bead or a manually-created issue.
