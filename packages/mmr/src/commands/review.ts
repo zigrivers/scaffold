@@ -163,9 +163,14 @@ export function resolveDispatchChannels(
   }
 
   if (explicit !== undefined) {
-    return explicit
-      .map(normalizeChannelName)
-      .filter((name) => isDispatchable(name, true))
+    // Dedupe after normalization: an alias and its canonical (e.g. `agy` +
+    // `antigravity`) collapse to one name, so `--channels=agy,antigravity` must
+    // dispatch the channel once, not twice. `new Set` preserves first-seen order.
+    return [...new Set(
+      explicit
+        .map(normalizeChannelName)
+        .filter((name) => isDispatchable(name, true)),
+    )]
   }
   return Object.entries(channels)
     .filter(([name, ch]) => ch.enabled && !normalizedDisabled.has(name) && !ch.abstract)

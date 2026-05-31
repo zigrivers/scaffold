@@ -60,4 +60,14 @@ describe('resolveDispatchChannels (T1-A)', () => {
     expect(names).not.toContain('antigravity')
     expect(names).toContain('qwen')
   })
+
+  it('dedupes an alias + its canonical requested together (no double dispatch)', () => {
+    const names = resolveDispatchChannels(sampleChannels, ['agy', 'antigravity'], new Set())
+    expect(names).toEqual(['antigravity'])
+  })
+
+  it('dedupes a plainly repeated explicit channel', () => {
+    const names = resolveDispatchChannels(sampleChannels, ['qwen', 'qwen'], new Set())
+    expect(names).toEqual(['qwen'])
+  })
 })
