@@ -14,10 +14,8 @@ hosts:
   - owasp.org              # OWASP Top 10, ASVS, SAMM
   - nist.gov               # NIST SSDF, SP 800-series
   - ietf.org/rfc           # IETF RFCs by path
-  - datatracker.ietf.org   # IETF Datatracker (RFCs + drafts, e.g. OAuth 2.1)
   - www.rfc-editor.org     # canonical RFC publication host
   - openid.net             # OpenID Connect specs
-  - www.jsonrpc.org        # JSON-RPC 2.0 spec (MCP wire format)
 
   # AI / ML platform docs
   - modelcontextprotocol.io # MCP specification
@@ -30,7 +28,6 @@ hosts:
   # API + spec
   - spec.openapis.org      # OpenAPI spec
   - spec.graphql.org       # GraphQL spec
-  - json-schema.org        # JSON Schema (MCP tool inputSchema/outputSchema)
 
   # Web / browser / standards
   - www.w3.org             # W3C standards (incl. trace-context, design-tokens)
@@ -88,8 +85,5 @@ hosts:
 
 github_repos:
   - modelcontextprotocol/specification
-  - modelcontextprotocol/typescript-sdk
-  - modelcontextprotocol/python-sdk
-  - modelcontextprotocol/inspector
   - steveyegge/beads
   - joelparkerhenderson/architecture-decision-record
