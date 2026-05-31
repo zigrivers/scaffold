@@ -277,10 +277,14 @@ type-availability probe:
   with story linkage in metadata/body) as a deliberate *simplicity* choice, not
   because the type is unavailable.
 
-| Plan element | mvp (flat) | deep (hierarchical) |
+The table's two columns are the **flat** and **full-hierarchy** endpoints; the
+**per-depth rules below the table are authoritative** for exactly what each depth
+emits (the columns are not "use one or the other at every depth"):
+
+| Plan element | flat | full hierarchy |
 |---|---|---|
 | Task | `bd create -t task` | `bd create -t task --parent <story-id>` |
-| Story | — (linkage in metadata/body) | `bd create -t story --parent <epic-id>` (`story` usable directly on v1.0.5) |
+| Story | — (linkage in metadata/body) | `bd create -t story [--parent <epic-id>]` (`story` usable directly on v1.0.5; epic parent only when an epic exists) |
 | Epic | — | `bd create -t epic -p <n>` (title/desc/wave/risk like tasks) |
 | Priority / order | `-p <n>` (wave-biased default) | `-p <n>` (wave-biased default) |
 | Dependencies (DAG) | `bd dep add <blocked> <blocker>` | `bd dep add <blocked> <blocker>` |
@@ -288,17 +292,23 @@ type-availability probe:
 | Wave / risk | — | metadata `wave=N`, `risk=<type>` |
 | Traceability | metadata `plan_task_id` (+ body note) | metadata `plan_task_id`/`plan_story_id`/`plan_epic_id` + `--parent` links |
 
-- **Dependencies are always materialized** whenever Beads is enabled, at every
-  depth (including mvp / depth 1–2). The plan is a DAG at every depth
+**Per-depth behavior (authoritative):**
+
+- **mvp / depth 1–3** → flat `-t task` issues **plus dependencies**; no
+  story/epic containers, no `--parent`. (Depth 3 vs 1–2 differs only in plan
+  sizing/detail upstream, not in what is materialized.)
+- **depth 4** → tasks parented to **stories** (`-t story`) + wave metadata;
+  stories have **no** epic parent (`--parent` omitted). Pass 0b creates stories
+  only.
+- **depth 5** → full `epic → story → task` hierarchy + risk metadata + full
+  traceability; stories carry an epic `--parent`.
+
+- **Dependencies are always materialized** whenever Beads is enabled, at **every**
+  depth (including mvp). The plan is a DAG at every depth
   (`implementation-plan.md` requires a valid DAG even at mvp), and without the
   `bd dep add` edges the scoped `bd ready --claim` would expose dependent tasks
-  out of order. Depth scaling governs only **hierarchy** (story/epic parents),
-  **wave**, and **risk** metadata — never whether dependencies exist.
-- **custom:depth(1-5)** therefore dials the *structure around* the always-present
-  task+dependency graph: depth 1–2 flat tasks + deps; depth 3 adds nothing new
-  for deps (already present) but tightens sizing; depth 4 adds story parents +
-  wave metadata; depth 5 adds epic grandparents, risk metadata, and full
-  traceability.
+  out of order. Depth governs only **hierarchy** (story/epic parents), **wave**,
+  and **risk** — never whether dependencies exist.
 
 ### Priority mapping (wave-biased)
 
@@ -327,13 +337,25 @@ order, against the issue's **own** join key — `<join-key>` is `plan_task_id` f
 a task, `plan_story_id` for a story, `plan_epic_id` for an epic (resolved from
 the issue's type, never hardcoded):
 
-1. `bd close <id> --reason "…"` (skip for an already-`closed` issue)
-2. `bd label add <id> <stale-label>` (e.g. `stale:duplicate` / `stale:removed-from-plan`)
-3. **then** `bd update <id> --unset-metadata <join-key>`
+1. `bd label add <id> <stale-label>` (e.g. `stale:duplicate` /
+   `stale:removed-from-plan`) — the label is applied **first** and is what marks
+   the issue as *retired-by-the-materializer* (vs. closed as completed work).
+2. `bd close <id> --reason "…"` (skipped if already `closed`).
+3. **then** `bd update <id> --unset-metadata <join-key>`.
 
-Unset is **last** so that if the close/label step fails (hook error, timeout),
-the issue keeps its join key and the next run retries the retirement instead of
-orphaning an open issue that has lost its key.
+The key is unset **last** so a failure at any step is resumable: the issue keeps
+its join key (so it's still found next run) and carries the stale label (so it's
+recognized as retire-pending, not as completed work). **Retirement is therefore
+idempotent and resumable** — each run re-applies whatever steps are missing
+(close, then unset) for any issue bearing a `stale:*` label that still has a
+join key, until both are done. Because the **`stale:*` label distinguishes a
+retired close from a genuine completion**, two later rules key off it: (a)
+duplicate canonical selection (Pass 0a) **excludes any `stale:*`-labelled issue**
+— a partially-retired closed duplicate can never win over the real canonical;
+and (b) Pass 3's "leave a completed `closed` issue untouched for revert-safety"
+applies **only to closed issues *without* a `stale:*` label** — a
+`stale:removed-from-plan` closed issue is still retire-pending and gets its key
+unset.
 
 ### Pass 0a — Duplicate guard (always)
 
@@ -345,8 +367,9 @@ the **exactly-one-issue-per-key invariant** that every later bulk fetch, map,
 dep reconcile, stale pass, and the scoped claim loop depend on:
 
 1. **Pick the canonical issue** for the key, preferring **active** work so it is
-   never detached from the plan-derived set. The ordering is total and
-   unambiguous:
+   never detached from the plan-derived set. First **exclude any issue already
+   bearing a `stale:*` label** — those are retire-pending leftovers and must
+   never be chosen as canonical. Among the rest, the ordering is total:
    - if **exactly one** duplicate is `in_progress` → it is canonical (active work
      wins over any `closed` or not-started copy);
    - else if any is `closed` → canonical is the oldest `closed` one;
@@ -500,14 +523,16 @@ List every plan-derived issue
 - Such an issue **`in_progress`** → **do not auto-close**; report it in the
   summary for human attention (it may be mid-flight work the plan dropped by
   mistake). Leave its join key intact so it stays visible until a human decides.
-- Such an issue **`closed`** (already done) → **leave it entirely untouched**
-  (do **not** unset its join key). Plan IDs are never reused, so if the removal
-  is later reverted (e.g. `git revert` restores the task), Pass 1 must still find
-  this issue by its `plan_task_id` and recognize it as already `closed` — not
-  recreate a fresh `open` issue and force the agent to redo completed work.
-  Keeping the key means closed-and-removed items are re-fetched on later runs
-  (bounded by total historical tasks — accepted for revert-safety); they are
-  excluded from the "dropped work" report.
+- Such an issue **`closed` as genuinely-completed work** (no `stale:*` label) →
+  **leave it entirely untouched** (do **not** unset its join key). Plan IDs are
+  never reused, so if the removal is later reverted (e.g. `git revert` restores
+  the task), Pass 1 must still find this issue by its `plan_task_id` and
+  recognize it as already `closed` — not recreate a fresh `open` issue and force
+  the agent to redo completed work. Keeping the key means completed-and-removed
+  items are re-fetched on later runs (bounded by total historical tasks —
+  accepted for revert-safety); they are excluded from the "dropped work" report.
+  (A `closed` issue that **does** carry `stale:removed-from-plan` is instead a
+  retire-pending leftover — the Retire convention finishes unsetting its key.)
 
 ### Summary report
 
@@ -594,13 +619,14 @@ tasks:
   (`open`-but-unready / `blocked` / `deferred`) → before declaring a stall, check
   whether the **actual blockers of those remaining tasks** are active. A plan
   task can be blocked by a **manually-created** task (no `plan_task_id`) that
-  another agent is working. Collect the remaining tasks' blocker IDs from their
-  inline `dependencies` (`depends_on_id`), then resolve each blocker's **status**
-  from an **unfiltered** fetch (`bd list --all --limit 0 --json`) — the plan-
-  scoped query would miss manual blockers, which carry no `plan_task_id`. If any
-  blocker is `in_progress` → exit gracefully (the thing that will unblock them is
-  advancing). Only when **none of the remaining tasks' blockers is
-  `in_progress`** is it a **true stall**: the
+  another agent is working. Walk the **transitive** blocker chains of the
+  remaining tasks (not just immediate blockers — a plan task may be blocked by a
+  manual task that is itself blocked by an `in_progress` task), resolving each
+  blocker's **status** from an **unfiltered** fetch (`bd list --all --limit 0
+  --json`) since manual blockers carry no `plan_task_id`. If **any** transitive
+  blocker is `in_progress` → exit gracefully (the chain is advancing). Only when
+  **no transitive blocker of any remaining task is `in_progress`** is it a **true
+  stall**: the
   prompt **stops and reports** the remaining tasks grouped by why they aren't
   ready (open dependency — plan or manual, manual `blocked`, `deferred`) so the
   user can unblock them. (Unrelated global `in_progress` work that doesn't block
@@ -656,14 +682,28 @@ create duplicates. The implementation must satisfy **all** of these requirements
    promotes a waiter.
 3. **`set -e`-safe** — the queued/held `acquire` returns non-zero, so guard it
    (`|| true`) and release via a `trap … EXIT INT TERM`.
-4. **Per-process unique identity** — set a unique holder
-   (e.g. `BEADS_ACTOR="agent-$$"` or a UUID) **before** acquiring; otherwise two
-   local agents sharing one `git config user.name` both see `holder == <name>`
-   and each assume they hold the slot. The identity fallback must also match
-   `bd`'s own actor resolution (`BEADS_ACTOR` → `git user.name` → `$USER`) so the
-   ownership check can't compare against an empty string.
-5. **Run the materializer inside the lock** — once ownership is confirmed, run
-   the (idempotent) materializer, then release. The lock exists so the
+4. **Two distinct identities — lock holder vs. claim actor.** The merge-slot
+   needs a *per-process unique* holder (e.g. a UUID or `agent-$$`) so two local
+   agents sharing one `git config user.name` don't both think they hold the slot.
+   But the **task-claim/resume actor must be stable per worktree/session** —
+   otherwise a restarted/resumed agent gets a new identity and can't find its own
+   prior `in_progress` task (work stranded). So: use the unique value **only**
+   for `bd merge-slot acquire/check/release`, and keep the **stable**
+   `BEADS_ACTOR` (persisted per worktree/session, resolving `BEADS_ACTOR` →
+   `git user.name` → `$USER`, never empty) for `bd ready --claim` and the resume
+   lookup. If `BEADS_ACTOR` must be overridden for the lock, scope that override
+   to the lock commands and restore the stable actor before claiming.
+5. **Workers wait on a persistent completion signal, not just slot release.** A
+   released slot (`holder: null`) does not prove the orchestrator ran — a worker
+   could acquire/release before the orchestrator even started. The orchestrator
+   sets a durable **materialization-complete signal** on success (e.g. a metadata
+   flag on the project merge-slot/bootstrap bead such as `materialized_at`, or a
+   workspace marker file); workers **block until that signal is present** before
+   their first claim. The lock serializes the *write*; the signal gates the
+   *readers*.
+6. **Run the materializer inside the lock** — once ownership is confirmed, run
+   the (idempotent) materializer, set the completion signal, then release. The
+   lock exists so the
    orchestrator's single run can't race a worker; workers never materialize.
 
 `single-agent-start.md` has no concurrency concern and uses the plain preflight.
@@ -705,10 +745,11 @@ prompt.
     prevents resuming onto an unrelated manual/bootstrap issue assigned to the
     same actor; any such non-plan in-progress work is ignored here (reported
     separately, not resumed as build work).
-  - **Workers wait for materialization.** In `multi-agent-resume.md`, a worker
-    must not claim until the orchestrator's materialization has completed —
-    block on the merge-slot (or a completion signal) the same way the start flow
-    does, so no one claims against a transient/partially-materialized tracker.
+  - **Workers wait for the completion signal.** In `multi-agent-resume.md`, a
+    worker must not claim until the orchestrator's **materialization-complete
+    signal** is present (Concurrency requirement 5) — blocking on slot release
+    alone is insufficient (a worker could acquire/release before the orchestrator
+    started), so no one claims against a transient/partially-materialized tracker.
 - **Edit:** `content/pipeline/foundation/beads.md` — one line noting the plan is
   materialized into Beads later, so users aren't surprised Beads starts empty.
 - **Edit:** `content/methodology/*.yml` presets/overlays — enable the new step
