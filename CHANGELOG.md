@@ -4,6 +4,25 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.30.0] — 2026-05-30
+
+Expands the reference-guides system from a single proving-ground guide to **11 guides** covering every major subsystem, and adds verifiable file:line citation provenance across the whole guide system. All changes are additive.
+
+### Added
+
+- **Eight new authored guides + two migrated.** `scaffold guides` now ships `pipeline`, `concepts`, `cli`, `install`, `review-workflow`, `multi-agent`, `dashboard`, and `knowledge` guides, plus migrated **Build Observability** and **Knowledge Freshness** references — joining the existing `mmr` guide for **11 total**.
+- **`:cite` citation directive.** `:cite[path:line]` (blocking) and `:cite[path:line]{mode=advisory}` (warn-only) anchor guide claims to source. The citation-drift gate (`make check-reference-citations`) now discovers `content/guides/*/index.html` dynamically, so every guide's citations are verified by `make check-all`.
+- **`content/guides/AUTHORING.md`** — the guides markdown-dialect spec (frontmatter, directives, the `:cite` contract) and the new-directive proposal process.
+- **Inter-guide relative-link validation** in the guide build — broken cross-links fail `make guides-check`.
+
+### Changed
+
+- **`build-freshness-reference.mjs` retooled** to deterministically regenerate the knowledge-freshness *guide's* live-data blocks (host citations, source allowlist, KB inventory) instead of baking a timestamp + HEAD sha into a standalone HTML page. This **fixes the long-standing rebake-noop citation-drift** that kept `make check-all` red.
+
+### Migrated / removed
+
+- The three legacy `docs/**/reference.html` pages (Build Observability, Knowledge Freshness, MMR) were migrated into the guide system and **retired to redirect shims** so existing links don't 404.
+
 ## [3.29.0] — 2026-05-30
 
 This release adds two headline subsystems — the reference-guides pipeline and the daily knowledge-freshness audit cron — plus a new build-observability audit lens and a `validate-knowledge` command. All changes are additive; the only compatibility note is a Node engine floor bump. (The MMR CLI ships separately as `@zigrivers/mmr` 1.4.0 — see `packages/mmr/CHANGELOG.md`.)

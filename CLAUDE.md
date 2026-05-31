@@ -227,8 +227,11 @@ way.
   different findings with *new* hashes is healthy review/fix iteration — keep
   going. Other stop conditions: a finding is genuinely ambiguous or channels
   contradict each other; the user explicitly asks to stop. This wrapper-side
-  bookkeeping is a stopgap until MMR v3.30 ships native `--session` and stable
-  `finding_key` (see
+  bookkeeping predates MMR's native round-bounding. As of mmr 1.4.0 the engine
+  ships native `--session`/`--round`/`--max-rounds` and a stable `finding_key`
+  (`packages/mmr/src/core/stable-id.ts`), so the wrappers can migrate to native
+  sessions — until they do, the `.scaffold/review-attempts/` bookkeeping above
+  remains the active mechanism (see
   `docs/superpowers/specs/2026-05-22-mmr-config-ux-and-round-bounding-design.md`).
 
 **Quick reference** (when `scaffold run` is unavailable):
