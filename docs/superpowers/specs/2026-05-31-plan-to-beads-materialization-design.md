@@ -4,17 +4,35 @@
 **Status:** Approved (brainstorm complete; pending implementation plan)
 **Author:** Scaffold maintainers
 
-> **Command-surface note.** All `bd` command claims in this spec were verified
-> against **Beads v1.0.5** (the version under test) and the repo's existing
-> integration docs (`content/tools/review-pr.md`,
-> `docs/audits/beads-integration-audit-2026-05-24.md`). Key verified facts:
-> `bd list` has **no** `--external-ref` filter, but **does** support
-> `--all`, `--status {open,in_progress,blocked,deferred,closed}`,
-> `--json`, `--has-metadata-key`, and `--metadata-field key=value`.
-> `bd create` accepts `--external-ref`, `--metadata`, `--deps`. `epic` is a
-> built-in type; `story` requires `types.custom`. `bd dep cycles` detects
-> dependency cycles. The minimum supported `bd` version for this feature is
-> **v1.0.5**; degrade gracefully (skip with a message) below it.
+> **Command-surface note.** Every `bd` command and flag in this spec was verified
+> against the installed **Beads v1.0.5** CLI (`--help` output) and the repo's
+> existing integration docs (`content/tools/review-pr.md`,
+> `docs/audits/beads-integration-audit-2026-05-24.md`). Verified facts used below:
+>
+> - `bd list` has **no** `--external-ref` filter. It **does** support `--all`
+>   (include closed), `-n/--limit int` (**default 50; `0` = unlimited**),
+>   `-s/--status {open,in_progress,blocked,deferred,closed}`, `--json`,
+>   `--has-metadata-key`, `--metadata-field key=value`.
+> - `bd create` accepts `-t/--type`, `-p/--priority`, `--metadata`,
+>   `--external-ref`, `--description`, `--parent <id>`, `--deps`.
+> - `bd update <id>` accepts `--title`, `-d/--description`, `-p/--priority`,
+>   `-s/--status`, `--parent <id>` (`--parent ""` removes parent), `--claim`.
+> - `epic` is a **built-in** type (`bug|feature|task|epic|chore|decision`);
+>   `story` requires `bd config set types.custom`.
+> - `bd dep add <blocked> <blocker>` / `bd dep remove`; `bd dep list <id> --json`
+>   (`--direction down|up`); `bd dep cycles` detects cycles.
+> - `bd close <id> --reason "..."`; `bd comment <id> "..."` (list via
+>   `bd comments <id>`); `bd label add <id> <label>`.
+> - `bd merge-slot {acquire,check,release}`. **Caveat:** `acquire --wait` only
+>   *adds the caller to the waiters queue* if the slot is held — it does **not**
+>   guarantee the caller holds the slot on return. Ownership must be re-verified
+>   via `bd merge-slot check` before proceeding.
+> - `bd version` prints e.g. `bd version 1.0.5 (Homebrew)` — parseable for a
+>   version gate.
+>
+> The **minimum supported `bd` version is v1.0.5**. Below it, the feature
+> degrades by handing the build phase back to the markdown plan (see
+> "Version gating & graceful degradation").
 
 ## Problem
 
@@ -69,38 +87,54 @@ There is no such command today. This spec adds one.
   Beads (`tasks/lessons.md` explicitly discourages it). This feature is for
   downstream generated projects.
 
-## Prerequisite: Stable Plan Task IDs
+## Prerequisite: the Plan Output Contract
 
-The materializer needs a reliable join key to upsert idempotently. Today
-`implementation-plan.md` only says to *preserve* existing task IDs in update
-mode — it does not require fresh plans to assign IDs or define their format.
-That is insufficient. This feature therefore depends on a small, prerequisite
-change to the planning step:
+The materializer parses `docs/implementation-plan.md` and needs a **defined,
+machine-readable structure** to read from — and a stable join key to upsert
+idempotently. Today `implementation-plan.md` leaves both underspecified. This
+feature therefore depends on a prerequisite change to the planning step that
+ships **before** the materializer can rely on it.
 
-- **`content/pipeline/planning/implementation-plan.md`** must require every task
-  to carry a **stable, unique task ID** with a defined format (e.g. `T-001`,
-  `T-002`, …, monotonic, never reused), assigned when the plan is first written
-  and preserved verbatim across update-mode runs.
-- The implementation-plan review step should validate that IDs exist, are
-  unique, and are stable across updates.
+`content/pipeline/planning/implementation-plan.md` (and its review step) must
+require every plan to emit the following contract:
 
-This prerequisite is part of this feature's implementation plan (it ships
-before the materializer can rely on the key). Without it, the join key is
-undefined and idempotency cannot hold.
+1. **Stable task IDs.** Every task carries a unique, format-defined ID
+   (`T-001`, `T-002`, … monotonic, never reused), assigned in fresh mode and
+   preserved verbatim across update-mode runs.
+2. **Stable container IDs (deep only).** Every story carries `S-001`… and every
+   epic `E-001`…, same stability rules. These become the `plan_story_id` /
+   `plan_epic_id` join keys so re-runs don't duplicate parents.
+3. **Per-task fields, in a parseable block:**
+   - `id`, `title`
+   - `priority` (optional; `P0`–`P3`)
+   - `wave` (deep; integer)
+   - `risk` (deep; short type string)
+   - `story` / `epic` parent IDs (deep)
+   - `depends_on` — list of task IDs (the DAG edges)
+   - `acceptance_criteria` — a delimited block copied verbatim into the issue
+     body
+4. **A canonical serialization.** The exact markdown shape (e.g. a per-task
+   heading plus a fenced `yaml`/key-value metadata block) is defined in the
+   `implementation-plan.md` edit so the materializer has unambiguous parsing
+   rules. The implementation-plan **review** step validates that every task has
+   an ID, IDs are unique and stable, and the contract fields parse.
+
+Without this contract the join key is undefined and the materializer has no
+parsing rules; both are prerequisites, tracked as the first tasks of this
+feature's implementation plan.
 
 ## Source-of-Truth Contract
 
 - The **markdown plan/playbook** are the design source of truth — version
-  controlled, reviewed, and already supporting an update-mode philosophy.
-  They own *what* the tasks are: scope, dependencies, acceptance criteria, and
-  the set of tasks that exist.
+  controlled, reviewed, already supporting an update-mode philosophy. They own
+  *what* the tasks are: scope, dependencies, acceptance criteria, and the set of
+  tasks/stories/epics that exist.
 - **Beads** owns *execution state*: open / in_progress / blocked / deferred /
   closed, plus claims and assignees.
-- The materializer is a **one-way reconcile**: plan → Beads. It never reads
-  Beads state back into the markdown. Each run performs three passes:
-  **upsert** (create/update), **dependency reconcile**, and **stale reconcile**
-  (handle tasks/deps removed from the plan) — all while never overwriting an
-  issue that has left the `open` state.
+- The materializer is a **one-way reconcile**: plan → Beads. Each run performs
+  ordered passes — **container upsert → task upsert → dependency reconcile →
+  stale reconcile** — and never overwrites an issue that has left the `open`
+  state (with narrow, explicitly-listed exceptions for dependency edges, below).
 
 This mirrors the update-mode contract already used by `implementation-plan.md`
 and `implementation-playbook.md`.
@@ -116,150 +150,183 @@ Phase 14 (finalization)
                                        Reads plan + playbook → upserts bd issues
 Phase 15 (build)
   single-agent-start.md / multi-agent-start.md (order 1510+)
-    Beads Detection block          ←  ADD preflight: "if .beads/ exists but holds
-                                       no plan-derived issues and the plan exists →
-                                       run materialization first, then claim"
+    Beads Detection block          ←  ADD preflight: "if Beads usable and plan
+                                       has IDs but no plan-derived issues exist →
+                                       materialize first, then claim"
 ```
 
 Because pipeline steps auto-expose as slash commands, the new step is also
 invocable as **`/scaffold:materialize-plan-to-beads`**, which doubles as the
 manual re-import command after a plan update.
 
-### Gating
+### Enablement & gating
 
 - Frontmatter `conditional: "if-needed"` keeps it out of non-Beads pipelines.
-- A runtime guard makes execution a clean no-op when Beads is absent or `bd`
-  is not on the PATH:
-
-  ```bash
-  if [ -d .beads ] && command -v bd >/dev/null 2>&1; then
-    # materialize
-  else
-    echo "Beads not configured — skipping plan materialization."
-  fi
-  ```
-
-  Never write `[ -d .beads ] && bd ...` as the whole command — it returns
-  exit 1 when `.beads/` is absent and breaks any caller under `set -e` (the same
-  trap already documented in `single-agent-start.md:164`).
-
+- **Methodology presets must enable it.** Pipeline steps are enumerated in
+  `content/methodology/*.yml`; the new step is added to the relevant presets/
+  overlays, conditionally enabled for Beads-capable configurations, so it
+  actually appears in the assembled pipeline (validated by an assembly test —
+  see Testing Strategy).
 - `dependencies: [implementation-playbook]` so it runs after the plan is
   finalized.
 
+### Version gating & graceful degradation
+
+The runtime guard checks **both** that `bd` exists **and** that it is new enough
+(`command -v bd` alone is insufficient — an old `bd` would run and fail on
+unsupported flags):
+
+```bash
+beads_usable() {
+  [ -d .beads ] || return 1
+  command -v bd >/dev/null 2>&1 || return 1
+  v=$(bd version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+  [ -n "$v" ] || return 1
+  # bd >= 1.0.5  ⇔  the smallest of {v, 1.0.5} under version-sort is 1.0.5
+  [ "$(printf '%s\n1.0.5\n' "$v" | sort -V | head -1)" = "1.0.5" ]
+}
+```
+
+Never write `[ -d .beads ] && bd ...` as a whole
+command — it returns exit 1 when `.beads/` is absent and breaks callers under
+`set -e` (the trap documented at `single-agent-start.md:164`).
+
+**When `bd` is missing, too old, or `.beads/` is absent:** the materializer
+prints a clear message and skips. Critically, the **build prompts must then
+treat Beads as absent** and drive the loop from the markdown plan/playbook —
+they must NOT fall through to `bd ready --claim` against an empty/unsupported
+tracker (that would reproduce the exact false-done bug this spec fixes). The
+Beads Detection block is therefore gated on `beads_usable`, not on `[ -d .beads ]`.
+
 ## The Mapping (methodology-scaled)
 
-Follows scaffold's existing methodology-scaling convention.
+### Depth detection
+
+The prompt determines structure from the project, not assumption:
+
+- **Methodology/depth** comes from scaffold state (`.scaffold/config.yml` /
+  methodology preset) the same way other prompts read it.
+- **Whether `-t story` is usable** is detected at runtime:
+  `bd config get types.custom` — if it includes `story`, use `-t story`;
+  otherwise fall back to `-t task` and record story linkage in metadata/body.
+  (`epic` is built-in and always available.)
 
 | Plan element | mvp (flat) | deep (hierarchical) |
 |---|---|---|
-| Task | `bd create -t task` | `bd create -t task`, parented to its story |
-| User story | — (tasks reference it in body) | `bd create -t story` as parent |
-| Epic (large grouping) | — | `bd create -t epic` as grandparent |
+| Task | `bd create -t task` | `bd create -t task --parent <story-id>` |
+| Story | — (linkage in metadata/body) | `bd create -t story --parent <epic-id>` (if `story` in types.custom; else `-t task`) |
+| Epic | — | `bd create -t epic` |
 | Priority / order | `-p <n>` (wave-biased default) | `-p <n>` (wave-biased default) |
 | Dependencies (DAG) | `bd dep add <blocked> <blocker>` | `bd dep add <blocked> <blocker>` |
 | Acceptance criteria | issue body | issue body |
-| Wave assignment | — | metadata `wave=N` |
-| Risk flag | — | metadata `risk=<type>` |
-| PRD / story traceability | body note + metadata | parent link + metadata |
+| Wave / risk | — | metadata `wave=N`, `risk=<type>` |
+| Traceability | metadata `plan_task_id` (+ body note) | metadata `plan_task_id`/`plan_story_id`/`plan_epic_id` + `--parent` links |
 
-**Type notes (verified against `bd create --help`, v1.0.5):**
-
-- `epic` is a **built-in** Beads type — `bug|feature|task|epic|chore|decision`.
-  It does **not** require `types.custom`.
-- `story` is **not** a built-in CLI type; it requires
-  `bd config set types.custom '[...]'`. `foundation/beads.md` enables exactly
-  `["story","milestone","spike"]` at deep depth, so `-t story` is available in
-  deep projects only. mvp projects must fall back to `-t task` (or `-t feature`)
-  and record the story linkage in metadata/body instead of using `-t story`.
 - **custom:depth(1-5)** dials between flat and hierarchical: depth 1–2 flat,
   depth 3 adds dependencies, depth 4 adds story parents + wave metadata, depth 5
   adds epic grandparents, risk metadata, and full traceability.
 
 ### Priority mapping (wave-biased)
 
-The plan orders tasks, assigns waves (deep), and may flag explicit priority.
-Map to Beads `-p`:
+1. **Explicit plan priority wins**: `P0`→`-p 0` … `P3`→`-p 3`.
+2. **Otherwise bias by wave** so `bd ready` surfaces work in playbook order:
+   Wave 1 → `-p 1`, Wave 2 → `-p 2`, Wave 3+ → `-p 3` (clamp at 3).
+   Dependencies still gate readiness; the bias only orders among ready tasks.
+3. **No priority and no waves** (mvp) → default `-p 2`, rely on dependencies.
 
-1. **Explicit plan priority wins**: `P0`→`-p 0`, `P1`→`-p 1`, `P2`→`-p 2`,
-   `P3`→`-p 3`.
-2. **Otherwise bias by wave** so `bd ready` surfaces work in the playbook's
-   intended order: Wave 1 → `-p 1`, Wave 2 → `-p 2`, Wave 3+ → `-p 3`
-   (clamp at 3). Dependencies still gate readiness; the priority bias only
-   orders among ready tasks.
-3. **No priority and no waves** (mvp) → default `-p 2`, rely on dependencies for
-   ordering.
+## Idempotency & Reconcile Algorithm
 
-## Idempotency
+Join keys are **Beads metadata** — natively filterable
+(`--has-metadata-key`, `--metadata-field key=value`): `plan_task_id` for tasks,
+`plan_story_id` for stories, `plan_epic_id` for epics. Title prefixes are **not**
+used as join keys (retitling would sever the link → duplicates).
+`--external-ref "plan:<id>"` is stamped at create for human traceability only
+(`bd list` has no external-ref filter in v1.0.5).
 
-The join key is **Beads metadata `plan_task_id`** — a natively filterable field
-(`bd list --has-metadata-key`, `--metadata-field key=value`). Title prefixes are
-**not** used as the join key (a human/agent retitling an issue would sever the
-link and cause duplicates). `--external-ref "plan:<task-id>"` is also stamped at
-create time, but only for human traceability — `bd list` has no external-ref
-filter in v1.0.5, so it is never relied on for lookup.
+**All full-set queries use `--all --limit 0`** so neither closed issues nor
+result-set pagination (default 50) hides records.
 
-### Pass 1 — Upsert
+### Pass 0 — Container upsert (deep only), top-down
 
-For each plan task (stable `<task-id>` from the prerequisite):
+Process **epics first, then stories**, capturing each created/looked-up Beads ID
+so children can reference it via `--parent`:
 
-1. **Look up** the existing issue (note `--all` so closed issues are visible):
-   ```bash
-   bd list --all --metadata-field "plan_task_id=<task-id>" --json
-   ```
-2. **Create** if absent:
+```bash
+# Epic E-001
+ID=$(bd list --all --limit 0 --metadata-field "plan_epic_id=E-001" --json | jq -r '.[0].id // empty')
+[ -z "$ID" ] && ID=$(bd create "<epic title>" -t epic \
+  --metadata '{"plan_epic_id":"E-001"}' --external-ref "plan:E-001" --json | jq -r '.id')
+# Story S-001 (parent = resolved epic ID), same lookup-or-create with plan_story_id
+```
+
+Story/epic upsert follows the same open-vs-non-open rules as tasks (below);
+reparenting an `open` container uses `bd update <id> --parent <new>`.
+
+### Pass 1 — Task upsert
+
+For each plan task (`<task-id>`), parent IDs already resolved by Pass 0:
+
+1. **Look up:** `bd list --all --limit 0 --metadata-field "plan_task_id=<task-id>" --json`
+2. **Create if absent:**
    ```bash
    bd create "<title>" -t <type> -p <prio> \
+     --parent "<resolved-story-or-epic-id>" \
      --metadata '{"plan_task_id":"<task-id>","wave":"<n>","risk":"<type>"}' \
      --external-ref "plan:<task-id>" \
      --description "<body incl. acceptance criteria + traceability>"
    ```
-3. **If present, branch on stored status** (the full set is
-   `open, in_progress, blocked, deferred, closed`):
-   - **`open`** → update title / body / priority / parent to match the plan.
-   - **`in_progress`, `blocked`, `deferred`** → **do not mutate fields**
-     (execution-managed state). If the plan's description/AC changed since the
-     issue was written, **post a warning** so the agent doesn't build against a
-     stale spec:
+3. **If present, branch on stored status:**
+   - **`open`** → update to match the plan:
      ```bash
-     bd comment <id> "⚠️ Plan/AC changed after work started — re-read docs/implementation-plan.md task <task-id> before continuing."
+     bd update <id> --title "<title>" -d "<body>" -p <prio> --parent "<parent-id>"
      ```
-   - **`closed`** → leave entirely untouched (work is done).
+   - **`in_progress` / `blocked` / `deferred`** → **do not mutate fields**
+     (execution-managed). If the plan's AC/description changed, post a warning —
+     **idempotently** (don't spam a comment every run): store a hash of the
+     last-warned plan text in metadata `ac_warn_hash` and only comment when it
+     differs:
+     ```bash
+     NEW=$(printf '%s' "<plan AC text>" | shasum | cut -d' ' -f1)
+     OLD=$(bd list --all --limit 0 --metadata-field "plan_task_id=<task-id>" --json | jq -r '.[0].metadata.ac_warn_hash // empty')
+     if [ "$NEW" != "$OLD" ]; then
+       bd comment <id> "⚠️ Plan/AC changed after work started — re-read docs/implementation-plan.md task <task-id> before continuing."
+       bd update <id> --metadata "{\"ac_warn_hash\":\"$NEW\"}"   # merge, not replace
+     fi
+     ```
+   - **`closed`** → leave entirely untouched.
 
 ### Pass 2 — Dependency reconcile
 
-Run **after** all issues exist (two-pass) so a task can depend on a sibling
-created in the same run.
+Run after all issues exist (forward references resolved).
 
-- **Add** missing edges: `bd dep add <blocked-id> <blocker-id>` (re-adding an
-  existing edge is a no-op).
-- **Remove** stale edges: for each plan-derived issue, diff its current Beads
-  dependencies (`bd dep list <id> --json`) against the plan's declared deps and
-  `bd dep remove` any edge no longer in the plan — **only** when the dependent
-  issue is still `open` (never rewire in-progress/closed work).
+- **Add** missing edges, but only when the dependent issue is **`open`,
+  `blocked`, or `deferred`** (never add edges to `in_progress` or `closed`
+  work, which could disrupt execution invariants):
+  `bd dep add <blocked-id> <blocker-id>` (re-adding is a no-op).
+- **Remove** stale edges (in the plan no longer) for dependents in
+  **`open`, `blocked`, or `deferred`** state — `blocked`/`deferred` are
+  explicitly included so removing a dependency can actually **unblock** a task;
+  only `in_progress`/`closed` are exempt: `bd dep remove <blocked-id> <blocker-id>`.
+  Compare current edges via `bd dep list <id> --json --direction down`.
 - **Detect cycles** after applying: `bd dep cycles` — surface any cycle as an
-  error. (The plan's own DAG is validated upstream by
-  `implementation-plan.md`, but the playbook or a manual edit could reintroduce
-  one, so verify here too.)
+  error (the plan DAG is validated upstream, but a manual edit could reintroduce
+  one).
 
-### Pass 3 — Stale reconcile (tasks removed from the plan)
+### Pass 3 — Stale reconcile (tasks/containers removed from the plan)
 
-List every plan-derived issue (`bd list --all --has-metadata-key plan_task_id
---json`) and diff its `plan_task_id` against the set of IDs currently in the
-plan:
+List every plan-derived issue
+(`bd list --all --limit 0 --has-metadata-key plan_task_id --json`, likewise for
+`plan_story_id`/`plan_epic_id`) and diff IDs against the current plan:
 
-- A plan-derived issue whose ID is **no longer in the plan** and is still
-  `open` → close it with a reason and label it stale:
+- ID no longer in the plan and issue still **`open`** → close + label:
   ```bash
-  bd close <id> --reason "Removed from implementation plan (no task <task-id>)"
+  bd close <id> --reason "Removed from implementation plan (no <id-kind> <id>)"
   bd label add <id> stale:removed-from-plan
   ```
-- If such an issue is `in_progress`/`blocked`/`deferred`/`closed` → **do not
-  auto-close**; instead report it in the summary for human attention (it may be
-  mid-flight work the plan dropped by mistake).
+- Such an issue in `in_progress`/`blocked`/`deferred`/`closed` → **do not
+  auto-close**; report it in the summary for human attention.
 
 ### Summary report
-
-Every run prints a deterministic summary:
 
 ```
 materialize: C created, U updated, K unchanged,
@@ -270,133 +337,171 @@ materialize: C created, U updated, K unchanged,
 
 ## Build Preflight
 
-In both `single-agent-start.md` and `multi-agent-start.md`, extend the **Beads
-Detection** block. The count uses `--all` (so an all-closed project is not
-misread as empty) and the native metadata-key filter:
+Extend the **Beads Detection** block in both build prompts. The block is gated
+on `beads_usable` (version-checked), counts with `--all --limit 0`, guards `jq`,
+and never crashes the shell under `set -e`:
 
 ```bash
-if [ -d .beads ] && command -v bd >/dev/null 2>&1; then
-  COUNT=$(bd list --all --has-metadata-key plan_task_id --json 2>/dev/null | jq 'length')
+if beads_usable; then
+  command -v jq >/dev/null 2>&1 || { echo "jq required for Beads preflight"; }
+  COUNT=$(bd list --all --limit 0 --has-metadata-key plan_task_id --json 2>/dev/null | jq 'length' 2>/dev/null || echo 0)
   if [ "${COUNT:-0}" -eq 0 ] && [ -f docs/implementation-plan.md ]; then
-    # run /scaffold:materialize-plan-to-beads (or its inline steps) first
-    :
+    if grep -qE '(^|[^[:alnum:]])T-[0-9]+' docs/implementation-plan.md; then
+      : # run /scaffold:materialize-plan-to-beads (or inline steps), then claim
+    else
+      echo "Plan has no stable task IDs — re-run the planning phase before build."
+      # treat as: cannot materialize; fall back to markdown plan loop
+    fi
   fi
-  # then proceed with bd ready --claim as today
+  # proceed with bd ready --claim
+else
+  : # Beads not usable → drive the loop from docs/implementation-playbook.md (markdown fallback)
 fi
 ```
 
 This guarantees correctness even if Beads was enabled *after* planning, or the
 finalization step was skipped. The preflight is itself idempotent (re-import is
-a no-op when issues already exist).
+a no-op once issues exist).
 
 ### Concurrency (multi-agent)
 
 The **primary** materialization path is the sequential finalization step, which
 runs **once** before any build wave fans out — so the preflight is normally a
-no-op. The defensive preflight in `multi-agent-start.md` must still be safe
-under concurrency, because multiple agents can evaluate `COUNT=0` simultaneously
-(a TOCTOU race that would create duplicate issues). Mitigations, both required:
+no-op. The defensive preflight in `multi-agent-start.md` must still be safe under
+concurrency: multiple agents can read `COUNT=0` simultaneously (TOCTOU) and
+create duplicates. Two mitigations, both required:
 
 1. **Orchestrator-only:** only the wave orchestrator / first agent runs the
-   defensive import; worker agents wait for it to finish before their first
-   `bd ready --claim`.
-2. **Locked:** wrap the entire import in the existing project merge-slot lock so
-   even a mis-sequenced worker serializes:
+   defensive import; workers wait for it before their first `bd ready --claim`.
+2. **Locked with ownership re-verification:** because
+   `bd merge-slot acquire --wait` only *queues* the caller (verified in the
+   command-surface note), the import must (a) acquire, (b) confirm ownership via
+   `bd merge-slot check` before doing anything, (c) re-check `COUNT` inside the
+   lock, (d) import only if still 0, (e) release in a `trap` so the slot frees
+   even on early exit / `set -e`:
+
    ```bash
    bd merge-slot acquire --wait
-   #   re-check COUNT, import if still 0
-   bd merge-slot release
+   trap 'bd merge-slot release 2>/dev/null || true' EXIT INT TERM
+   # block until WE are the holder
+   until bd merge-slot check --json 2>/dev/null | jq -e --arg me "${BEADS_ACTOR:-$(git config user.name)}" '.holder == $me' >/dev/null; do sleep 1; done
+   # re-check COUNT, import only if still 0, then release via trap
    ```
 
-`single-agent-start.md` has no concurrency concern and needs only the plain
-preflight.
+   (Exact holder-field name and check syntax are confirmed against `bd
+   merge-slot check --json` during implementation.) `single-agent-start.md` has
+   no concurrency concern and uses the plain preflight.
 
 ## Files to Touch
 
 - **New:** `content/pipeline/finalization/materialize-plan-to-beads.md`
-  — includes the mandatory Mode Detection + Update Mode Specifics blocks,
-  methodology scaling, gating guard, three-pass reconcile logic, idempotency
-  summary.
+  — Mode Detection + Update Mode Specifics blocks, methodology scaling, depth
+  detection, version guard, four-pass reconcile, idempotency summary.
 - **Edit (prerequisite):** `content/pipeline/planning/implementation-plan.md`
-  — require a stable, unique, format-defined task ID per task (assign in fresh
-  mode, preserve in update mode).
+  — define and require the Plan Output Contract (stable task/story/epic IDs,
+  per-task field block, canonical serialization).
 - **Edit:** `content/pipeline/planning/implementation-plan-review.md` — validate
-  task IDs exist, are unique, and are stable.
-- **Edit:** `content/pipeline/build/single-agent-start.md` — Beads Detection
-  preflight (plain).
-- **Edit:** `content/pipeline/build/multi-agent-start.md` — Beads Detection
-  preflight (orchestrator-only + merge-slot lock).
-- **Edit:** `content/pipeline/foundation/beads.md` — one line noting that the
-  plan is materialized into Beads later, so users aren't surprised Beads starts
-  empty.
+  ID presence/uniqueness/stability and that the contract parses.
+- **Edit:** `content/pipeline/build/single-agent-start.md` — `beads_usable`-gated
+  Beads Detection + plain preflight + markdown fallback when Beads unusable.
+- **Edit:** `content/pipeline/build/multi-agent-start.md` — same, plus
+  orchestrator-only + ownership-verified merge-slot lock.
+- **Edit:** `content/pipeline/foundation/beads.md` — one line noting the plan is
+  materialized into Beads later, so users aren't surprised Beads starts empty.
+- **Edit:** `content/methodology/*.yml` presets/overlays — enable the new step
+  for Beads-capable configurations.
 - **Edit (if required):** `src/types/frontmatter.ts` — only if the validator
-  needs the new prompt registered beyond its frontmatter. The `finalization`
-  phase already exists, so the change is likely just the new file + passing
-  `make validate`.
+  needs the new prompt registered beyond its frontmatter (the `finalization`
+  phase already exists).
 - **Tests:** bats coverage (see Testing Strategy).
 - **Docs:** note the new step in the pipeline reference and `CHANGELOG.md`.
 
 ## Edge Cases
 
-- **Beads enabled after planning** → build preflight catches it and imports
-  before the first claim.
-- **Plan updated post-import** → re-run upserts changed tasks, reconciles
-  added/removed deps, closes stale-but-open issues, preserves
+- **Beads enabled after planning** → preflight materializes before first claim.
+- **Plan updated post-import** → upserts changed tasks, reconciles added/removed
+  deps, closes stale-but-open issues, preserves
   in_progress/blocked/deferred/closed state.
-- **Task deleted from the plan** → Pass 3 closes it if still `open`; flags it
-  for review if it had already entered execution.
-- **Dependency deleted from the plan** → Pass 2 removes the stale edge for
-  `open` dependents only.
-- **AC/description changed while a task is in_progress** → issue fields are not
-  mutated, but a `bd comment` warning is posted so the agent re-reads the spec.
-- **All plan tasks closed** → `--all` count is non-zero, so the preflight does
-  not falsely re-import completed work.
-- **Stale bootstrap bead** → the "initialize Beads" bootstrap task from
-  `foundation/beads.md` carries no `plan_task_id` metadata, so it is excluded
-  from every plan-issue count and never masks an empty import.
-- **mvp without custom types** → `-t story` is unavailable; tasks use `-t task`
-  and record story linkage in metadata/body.
-- **`bd` older than v1.0.5** → degrade gracefully: print a message and skip
-  (the build loop still works off the markdown plan).
+- **Task/container removed from plan** → Pass 3 closes if still `open`; flags for
+  review if already in execution.
+- **Dependency removed from plan** → Pass 2 removes the edge for
+  open/blocked/deferred dependents (so blocked tasks can be unblocked).
+- **AC/description changed while in_progress** → fields untouched; a single
+  `bd comment` warning posted per distinct change (`ac_warn_hash` guards spam).
+- **All plan tasks closed** → `--all --limit 0` count is non-zero, so the
+  preflight does not falsely re-import completed work.
+- **More than 50 plan tasks** → `--limit 0` ensures stale/preflight passes see
+  the full set (default page size is 50).
+- **Plan missing task IDs** (pre-prerequisite plan or hand-edited/corrupted) →
+  the materializer emits a clear error pointing to re-running the planning phase;
+  the preflight also gates on ID presence and falls back to the markdown loop
+  rather than importing with no join key.
+- **Stale bootstrap bead** → the "initialize Beads" bootstrap task carries no
+  `plan_task_id`, so it is excluded from every count and never masks an empty
+  import.
+- **mvp without custom types** → `-t story` unavailable (detected via
+  `bd config get types.custom`); tasks use `-t task` with story linkage in
+  metadata/body.
+- **`bd` missing/older than v1.0.5** → materializer skips with a message **and**
+  build prompts drive from the markdown plan (no `bd ready --claim` on an
+  empty/unsupported tracker).
+- **`jq` missing** → preflight count falls back to `0`/message without crashing
+  under `set -e`; the materialize prompt notes `jq` as a dependency.
 
-## Open Questions / Risks
+## Verification Checklist (confirm during implementation)
 
-- **Exact `bd dep list` / `bd label` JSON shapes** must be confirmed against the
-  installed `bd` during implementation; the three-pass logic assumes
-  `bd dep list <id> --json` and `bd label add` exist (present in v1.0.5; verify
-  the minimum-version floor before shipping).
-- **Metadata value typing.** `wave`/`risk` are stored as metadata strings;
-  confirm the dashboard's Beads section reads them consistently if it surfaces
-  waves.
+Confirm the exact invocation/JSON shape of **every** subcommand the final
+prompts use, against the project's installed `bd`:
+
+- `bd list --all --limit 0 --has-metadata-key … --metadata-field …=… --json`
+  (filtering + JSON `.metadata` shape)
+- `bd create … --parent --metadata --external-ref --description --json`
+  (returned `.id`)
+- `bd update <id> --title -d -p --parent --metadata` (metadata **merge** vs
+  replace semantics — confirm whether `--metadata` merges or overwrites; if it
+  overwrites, read-merge-write)
+- `bd dep add` / `bd dep remove` / `bd dep list <id> --json` / `bd dep cycles`
+- `bd close <id> --reason`, `bd comment <id>` / `bd comments <id>`,
+  `bd label add <id> <label>`
+- `bd merge-slot acquire --wait` / `bd merge-slot check --json` (holder field) /
+  `bd merge-slot release`, and that the trap-release pattern matches the safe
+  usage documented at `single-agent-start.md:164`
+- `bd version` string format for the `>= 1.0.5` gate
+- `bd config get types.custom` output shape for `story` detection
 
 ## Testing Strategy
 
-- **Frontmatter validation** (bats): the new prompt passes `make validate` with
-  the correct `finalization` phase, `order: 1440`, `conditional: "if-needed"`,
-  and `dependencies: [implementation-playbook]`.
-- **Task-ID prerequisite** (bats): `implementation-plan.md` requires and
-  documents a stable task-ID format; the review step validates uniqueness and
-  stability.
-- **Mapping checks**: given a sample `docs/implementation-plan.md`, the emitted
-  `bd` command sequence matches expectations for mvp (flat, `-t task`, no
-  story) and deep (hierarchical, `-t story`/`-t epic`, wave-biased priority),
-  asserted via a dry-run / command-capture harness.
-- **Idempotency**: running the materialize steps twice over the same plan yields
-  `C created` then `0 created, 0 updated` — no duplicates (join on
-  `plan_task_id`).
-- **State preservation**: an issue marked `in_progress` (and one `blocked`, one
-  `closed`) is left field-untouched on re-run even when its plan description
-  changed; an `in_progress` issue with changed AC receives a `bd comment`
-  warning.
-- **Stale reconcile**: removing a task from the plan closes the corresponding
-  `open` issue with a reason + `stale:removed-from-plan` label; removing it
-  while in_progress flags it for review instead of closing.
-- **Dependency reconcile**: removing a plan dependency removes the stale Beads
-  edge for an `open` dependent; `bd dep cycles` reports no cycle after a valid
+- **Frontmatter validation** (bats): new prompt passes `make validate` with
+  `finalization` phase, `order: 1440`, `conditional: "if-needed"`,
+  `dependencies: [implementation-playbook]`.
+- **Pipeline assembly** (bats): with a Beads-capable methodology preset, the
+  assembled pipeline includes `materialize-plan-to-beads` positioned after
+  `implementation-playbook`; with Beads disabled, it does not appear.
+- **Plan Output Contract** (bats): `implementation-plan.md` requires/defines the
+  contract; the review step rejects a plan with missing/duplicate/unstable IDs
+  and accepts a conformant one.
+- **Mapping checks**: a sample plan yields the expected `bd` command sequence for
+  mvp (flat, `-t task`, no story, default `-p 2`) and deep (epic→story→task
+  order, `--parent` wiring, wave-biased priority), via a dry-run/command-capture
+  harness.
+- **Idempotency**: running twice over the same plan yields `C created` then
+  `0 created, 0 updated` — no duplicate tasks **or** containers (`plan_*_id`
+  joins).
+- **State preservation**: `in_progress`, `blocked`, `closed` issues are
+  field-untouched on re-run even when plan text changed; an `in_progress` issue
+  with changed AC gets exactly **one** `bd comment` per change (`ac_warn_hash`),
+  not one per run.
+- **Stale reconcile**: removing a task closes the `open` issue with reason +
+  `stale:removed-from-plan`; removing it while in_progress flags for review.
+- **Dependency reconcile**: removing a plan dep removes the edge for an `open`
+  **and** a `blocked` dependent (unblocking it); deps are not added to
+  `in_progress`/`closed` issues; `bd dep cycles` reports no cycle after a valid
   run.
-- **`--all` visibility**: a project whose plan tasks are all `closed` is not
-  re-imported by the preflight (count via `--has-metadata-key plan_task_id`
-  includes closed issues).
+- **Scale**: a plan with >50 tasks is fully reconciled (`--limit 0`), with a
+  test asserting no truncation at the default page size.
+- **`--all` visibility**: an all-`closed` plan is not re-imported by the preflight.
 - **Concurrency**: two simulated agents hitting the `multi-agent-start.md`
   preflight with `COUNT=0` produce exactly one import (orchestrator-only +
-  merge-slot lock), no duplicate issues.
+  ownership-verified lock), no duplicates.
+- **Degradation**: with `bd` absent/older than v1.0.5, the build prompt drives
+  from the markdown playbook and never calls `bd ready --claim`.
