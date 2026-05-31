@@ -47,6 +47,7 @@
     --gray:         #9ca3af;
     --gray-bg:      #f3f4f6;
     --gray-border:  #e5e7eb;
+    --scrim:        rgba(15, 17, 23, 0.45);
 
     /* Semantic: Next Banner */
     --next-bg:      #eef2ff;
@@ -135,6 +136,7 @@
     --gray:         #6b7294;
     --gray-bg:      #252940;
     --gray-border:  #363c58;
+    --scrim:        rgba(0, 0, 0, 0.6);
 
     /* Semantic: Next Banner */
     --next-bg:      rgba(30, 27, 75, 0.50);

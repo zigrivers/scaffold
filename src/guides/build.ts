@@ -11,7 +11,7 @@ import { lintGuide } from './lint.js'
 import type { LintResult } from './lint.js'
 import { findBrokenRelativeLinks } from './links.js'
 
-export function loadThemeCss(): string {
+export function loadGuideStyles(): string {
   // The guide stylesheet is the design tokens (dashboard-theme.css) followed by
   // the guide-specific layout + component styles (guides.css). Both are inlined
   // into each guide's <style> so the output stays self-contained.
@@ -61,7 +61,7 @@ export async function buildGuide(args: BuildGuideArgs): Promise<{ lint: LintResu
 }
 
 export async function buildAllGuides(projectRoot?: string): Promise<void> {
-  const css = loadThemeCss()
+  const css = loadGuideStyles()
   const guidesDir = getPackageGuidesDir(projectRoot)
   const index = buildGuidesIndex(guidesDir)
   for (const entry of index.values()) {

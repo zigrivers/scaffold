@@ -41,6 +41,7 @@ export function wrapInChrome({ title, body, headings, css }: WrapArgs): string {
 <div class="layout">
   <aside class="rail">${toc(headings)}</aside>
   <main class="content">${body}</main>
+  <div class="rail-backdrop" data-action="nav" aria-hidden="true"></div>
 </div>
 <script>${CHROME_JS}</script>
 </body>
