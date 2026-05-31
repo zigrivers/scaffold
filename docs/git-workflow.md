@@ -149,13 +149,13 @@ Quality gates run both locally (`make check-all`) and in CI. The CI workflow is 
 
 ## 7. Advanced: Parallel Agents (Worktrees)
 
-For parallel development, each agent gets a git worktree — an independent working directory sharing the same `.git` repository.
+For parallel development, each agent gets a git worktree — an independent working directory sharing the same `.git` repository. Worktrees live project-local under `.worktrees/` for a single, consistent location:
 
 ```
-~/projects/
-├── scaffold/                  # Main repo
-├── scaffold-agent-1/          # Worktree for agent 1
-└── scaffold-agent-2/          # Worktree for agent 2
+scaffold/                      # Main repo
+└── .worktrees/                # Agent worktrees (gitignored)
+    ├── agent-1/               # Worktree for agent 1
+    └── agent-2/               # Worktree for agent 2
 ```
 
 ### Creating Worktrees
@@ -164,7 +164,9 @@ For parallel development, each agent gets a git worktree — an independent work
 scripts/setup-agent-worktree.sh <agent-name>
 ```
 
-This creates `../<repo-name>-<agent-suffix>` with a workspace branch.
+This creates `.worktrees/<agent-suffix>` with a workspace branch. The script
+also ensures `.worktrees/` is gitignored so worktree checkouts are never
+accidentally committed.
 
 ### Worktree Workflow
 
@@ -178,6 +180,6 @@ Each agent follows the same PR workflow (section 3) from its worktree. Additiona
 
 ```bash
 git worktree list                          # List all worktrees
-git worktree remove ../scaffold-<agent>    # Remove a worktree
+git worktree remove .worktrees/<agent>     # Remove a worktree
 git worktree prune                         # Prune stale references
 ```

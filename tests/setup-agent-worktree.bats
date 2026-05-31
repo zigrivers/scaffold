@@ -29,9 +29,10 @@ setup() {
 }
 
 teardown() {
+    # Worktrees now live inside the repo at <repo>/.worktrees/, so removing
+    # CLONE_DIR also removes them. Prune any stale registrations first.
+    git -C "$CLONE_DIR" worktree prune 2>/dev/null || true
     rm -rf "$ORIG_DIR" "$CLONE_DIR"
-    # Clean up any worktrees that were created
-    rm -rf "$RESOLVED_TMPDIR"/scaffold-$$-*
 }
 
 @test "exits 1 with usage message when no arguments provided" {
@@ -40,10 +41,23 @@ teardown() {
     [[ "$output" == *"Usage:"* ]]
 }
 
-@test "creates worktree at expected path" {
+@test "creates worktree under <repo>/.worktrees/<name>" {
     run "$CLONE_DIR/scripts/setup-agent-worktree.sh" "agent-alpha"
     [ "$status" -eq 0 ]
-    [ -d "$RESOLVED_TMPDIR/scaffold-$$-agent-alpha" ]
+    [ -d "$CLONE_DIR/.worktrees/agent-alpha" ]
+}
+
+@test "does not create a sibling worktree directory" {
+    run "$CLONE_DIR/scripts/setup-agent-worktree.sh" "agent-alpha"
+    [ "$status" -eq 0 ]
+    [ ! -d "$RESOLVED_TMPDIR/scaffold-$$-agent-alpha" ]
+}
+
+@test "ensures .worktrees/ is gitignored" {
+    run "$CLONE_DIR/scripts/setup-agent-worktree.sh" "agent-alpha"
+    [ "$status" -eq 0 ]
+    run git -C "$CLONE_DIR" check-ignore -q .worktrees
+    [ "$status" -eq 0 ]
 }
 
 @test "idempotent: succeeds if worktree already exists" {
@@ -60,14 +74,14 @@ teardown() {
 @test "normalizes agent name to lowercase with hyphens" {
     run "$CLONE_DIR/scripts/setup-agent-worktree.sh" "Agent_Charlie"
     [ "$status" -eq 0 ]
-    [ -d "$RESOLVED_TMPDIR/scaffold-$$-agent-charlie" ]
+    [ -d "$CLONE_DIR/.worktrees/agent-charlie" ]
 }
 
 @test "creates workspace branch for the agent" {
     run "$CLONE_DIR/scripts/setup-agent-worktree.sh" "agent-delta"
     [ "$status" -eq 0 ]
     # Check that the branch exists in the worktree
-    local worktree_dir="$RESOLVED_TMPDIR/scaffold-$$-agent-delta"
+    local worktree_dir="$CLONE_DIR/.worktrees/agent-delta"
     run git -C "$worktree_dir" branch --show-current
     [ "$output" = "agent-delta-workspace" ]
 }

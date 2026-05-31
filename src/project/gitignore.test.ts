@@ -36,6 +36,7 @@ describe('ensureScaffoldGitignore', () => {
     expect(content).toContain('.scaffold/lock.json')
     expect(content).toContain('.scaffold/*.tmp')
     expect(content).toContain('.scaffold/**/*.tmp')
+    expect(content).toContain('.worktrees/')
   })
 
   it('updates existing managed block idempotently without changing user content', () => {
