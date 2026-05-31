@@ -254,8 +254,10 @@ keys — and `mmr config` displays the canonical name.
 Add `antigravity` to `COMPENSATING_FOCUS` in `src/core/compensator.ts` with the
 Google-family strength area (architectural patterns, design consistency,
 broad-context reasoning — the same lane `gemini` occupies). If `agy` is unavailable
-(not installed / auth failed / timeout / error), a `claude -p` compensating pass
-fires with that focus, labeled `compensating-antigravity`.
+(not installed / auth failed / timeout / error) **and a job was created (≥1 selected
+channel passed auth)**, a `claude -p` compensating pass fires with that focus,
+labeled `compensating-antigravity`. See Error handling for the all-channels-down
+early-exit caveat (`review.ts:568-573`).
 
 ## Architecture
 
@@ -349,7 +351,18 @@ antigravity: {
 ## Error handling
 
 MMR fires the compensator only for **unavailable** channels (not_installed /
-auth_failed / timeout / failed) — see `review.ts:711-723` and `getCompensatingChannels`.
+auth_failed / timeout / failed) — see `review.ts:711-723` and `getCompensatingChannels`
+— **and only when at least one selected channel passed auth so a job was created.**
+If *every* selected channel is unavailable, the flow exits early at
+`review.ts:568-573` (`validChannels.length === 0` → "No channels passed auth check"
+→ `process.exit(1)`), which is *before* `createJob` (`:579`) and compensation
+(`:716`). So `--channels=agy` with agy down (or any run where all channels fail
+auth) produces **no** `compensating-antigravity` pass — the run just errors out.
+In the default config agy runs alongside gemini/claude/codex/grok, so in normal
+operation at least one channel passes and compensation for a down agy fires as
+described. This is existing MMR behavior affecting all channels equally, not
+agy-specific, and is **not** changed by this work.
+
 The dispatcher decides status at `dispatcher.ts:228`: `code === 0 && stdout` →
 `completed` (raw stdout saved); **anything else → `failed`** (so exit 0 with *empty*
 stdout is `failed`, not completed). The cases map as follows:
