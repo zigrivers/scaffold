@@ -507,7 +507,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
             // backward-compatible fallback; '' default so the token is always
             // substituted (never leaks as a literal).
             const toolArgs = (argv.args ?? []).map(String).join(' ').trim()
-            const boundArguments = toolArgs !== '' ? toolArgs : (argv.instructions ?? '')
+            const boundArguments = toolArgs !== '' ? toolArgs : (argv.instructions ?? '').trim()
             const engine = new AssemblyEngine()
             const assemblyResult = engine.assemble(step, {
               config,

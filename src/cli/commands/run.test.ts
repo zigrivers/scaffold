@@ -1819,6 +1819,15 @@ describe('run command — $ARGUMENTS wiring', () => {
       expect.objectContaining({ arguments: '' }),
     )
   })
+
+  it('trims a whitespace-only --instructions fallback to empty string', async () => {
+    vi.mocked(resolveOutputMode).mockReturnValue('auto')
+    await invokeHandler({ step: 'create-prd', _: ['run'], instructions: '   ', auto: true })
+    expect(AssemblyEngine.prototype.assemble).toHaveBeenCalledWith(
+      'create-prd',
+      expect.objectContaining({ arguments: '' }),
+    )
+  })
 })
 
 // ---------------------------------------------------------------------------
