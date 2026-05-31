@@ -8,7 +8,7 @@ import {
   LibraryConfigSchema, MobileAppConfigSchema,
   DataPipelineConfigSchema, MlConfigSchema, BrowserExtensionConfigSchema,
   ResearchConfigSchema, ServiceSchema, ProjectSchema,
-  backendRealDomains, researchRealDomains,
+  backendRealDomains, researchRealDomains, McpServerConfigSchema,
 } from './schema.js'
 
 describe('ProjectTypeSchema', () => {
@@ -1338,5 +1338,44 @@ describe('domain field — multi-domain union', () => {
     if (result.success) {
       expect(result.data.project?.backendConfig?.domain).toEqual(['fintech'])
     }
+  })
+})
+
+describe('McpServerConfigSchema', () => {
+  it("'mcp-server' is a member of ProjectTypeSchema", () => {
+    expect(ProjectTypeSchema.options).toContain('mcp-server')
+  })
+
+  it('accepts a valid full config', () => {
+    const r = McpServerConfigSchema.safeParse({
+      language: 'typescript', transport: 'stdio', primitives: ['tools'],
+      auth: 'none', deployment: 'local', stateful: false,
+    })
+    expect(r.success).toBe(true)
+  })
+
+  it('applies defaults; language is required', () => {
+    const r = McpServerConfigSchema.safeParse({ language: 'python' })
+    expect(r.success).toBe(true)
+    if (r.success) {
+      expect(r.data.transport).toBe('stdio')
+      expect(r.data.primitives).toEqual(['tools'])
+      expect(r.data.auth).toBe('none')
+      expect(r.data.deployment).toBe('local')
+      expect(r.data.stateful).toBe(false)
+    }
+    expect(McpServerConfigSchema.safeParse({}).success).toBe(false)
+  })
+
+  it('rejects unknown keys (.strict) and an empty primitives array', () => {
+    expect(McpServerConfigSchema.safeParse({ language: 'python', bogus: 1 }).success).toBe(false)
+    expect(McpServerConfigSchema.safeParse({ language: 'python', primitives: [] }).success).toBe(false)
+  })
+
+  it('couples mcpServerConfig to projectType at the project level', () => {
+    const bad = ProjectSchema.safeParse({
+      projectType: 'cli', mcpServerConfig: { language: 'python' },
+    })
+    expect(bad.success).toBe(false)
   })
 })

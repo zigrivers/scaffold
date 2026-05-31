@@ -5,7 +5,7 @@ import {
   CliConfigSchema, LibraryConfigSchema, MobileAppConfigSchema,
   DataPipelineConfigSchema, MlConfigSchema, BrowserExtensionConfigSchema,
   GameConfigSchema, ResearchConfigSchema, DataScienceConfigSchema,
-  Web3ConfigSchema,
+  Web3ConfigSchema, McpServerConfigSchema,
 } from '../config/schema.js'
 
 /** Step enablement entry used in presets and overlays. */
@@ -62,6 +62,9 @@ export type DataScienceConfig = z.infer<typeof DataScienceConfigSchema>
 /** Web3 (smart-contract / EVM protocol) configuration — derived from Zod schema (single source of truth). */
 export type Web3Config = z.infer<typeof Web3ConfigSchema>
 
+/** MCP server configuration — derived from Zod schema (single source of truth). */
+export type McpServerConfig = z.infer<typeof McpServerConfigSchema>
+
 /**
  * Game-specific configuration — derived from Zod schema (single source of truth).
  * Only valid when projectType === 'game'.
@@ -89,6 +92,7 @@ export type DetectedConfig =
   | { type: 'research'; config: ResearchConfig }
   | { type: 'data-science'; config: DataScienceConfig }
   | { type: 'web3'; config: Web3Config }
+  | { type: 'mcp-server'; config: McpServerConfig }
 
 /** Override entry for knowledge injection. */
 export interface KnowledgeOverride {
@@ -141,6 +145,7 @@ export interface ServiceConfig {
   browserExtensionConfig?: BrowserExtensionConfig
   dataScienceConfig?: DataScienceConfig
   web3Config?: Web3Config
+  mcpServerConfig?: McpServerConfig
   path?: string
   /** Pipeline step slugs this service exposes for cross-service reference. Closed by default. */
   exports?: Array<{ step: string }>
@@ -163,6 +168,7 @@ export interface ProjectConfig {
   researchConfig?: ResearchConfig
   dataScienceConfig?: DataScienceConfig
   web3Config?: Web3Config
+  mcpServerConfig?: McpServerConfig
   services?: ServiceConfig[]
   [key: string]: unknown  // forward compatibility
 }
