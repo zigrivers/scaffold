@@ -39,11 +39,11 @@ ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/.." && pwd)"
 }
 
 @test "multi-agent-start.md validates the agent name to a safe token" {
-  grep -q '\[A-Za-z0-9_-\]' "$ROOT/content/pipeline/build/multi-agent-start.md"
+  grep -qF '^[A-Za-z0-9_-]+$' "$ROOT/content/pipeline/build/multi-agent-start.md"
 }
 
 @test "multi-agent-resume.md validates the agent name to a safe token" {
-  grep -q '\[A-Za-z0-9_-\]' "$ROOT/content/pipeline/build/multi-agent-resume.md"
+  grep -qF '^[A-Za-z0-9_-]+$' "$ROOT/content/pipeline/build/multi-agent-resume.md"
 }
 
 @test "multi-agent-start.md quotes setup-agent-worktree.sh argument" {
