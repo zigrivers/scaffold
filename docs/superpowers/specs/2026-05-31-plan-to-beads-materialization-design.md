@@ -142,10 +142,11 @@ feature's implementation plan.
   closed, plus claims and assignees.
 - The materializer is a **one-way reconcile**: plan → Beads. Each run performs
   ordered passes — **container upsert → task upsert → dependency reconcile →
-  stale reconcile**. It freely updates issues that have **not started**
-  (`open`/`blocked`/`deferred` — `blocked` is just a task with unmet
-  dependencies), and never mutates issues that have **started**
-  (`in_progress`/`closed`).
+  stale reconcile**. It freely updates issues in a **not-started** stored status
+  (`open`/`blocked`/`deferred`), and never mutates issues in a **started** status
+  (`in_progress`/`closed`). (Per verified semantics, a dependency-blocked task
+  stays stored `open` — dependency blockers affect *computed readiness*, not
+  stored status; a stored `blocked`/`deferred` is an explicit signal.)
 
 This mirrors the update-mode contract already used by `implementation-plan.md`
 and `implementation-playbook.md`.
@@ -236,9 +237,17 @@ The prompt determines structure from the project, not assumption:
 | Wave / risk | — | metadata `wave=N`, `risk=<type>` |
 | Traceability | metadata `plan_task_id` (+ body note) | metadata `plan_task_id`/`plan_story_id`/`plan_epic_id` + `--parent` links |
 
-- **custom:depth(1-5)** dials between flat and hierarchical: depth 1–2 flat,
-  depth 3 adds dependencies, depth 4 adds story parents + wave metadata, depth 5
-  adds epic grandparents, risk metadata, and full traceability.
+- **Dependencies are always materialized** whenever Beads is enabled, at every
+  depth (including mvp / depth 1–2). The plan is a DAG at every depth
+  (`implementation-plan.md` requires a valid DAG even at mvp), and without the
+  `bd dep add` edges the scoped `bd ready --claim` would expose dependent tasks
+  out of order. Depth scaling governs only **hierarchy** (story/epic parents),
+  **wave**, and **risk** metadata — never whether dependencies exist.
+- **custom:depth(1-5)** therefore dials the *structure around* the always-present
+  task+dependency graph: depth 1–2 flat tasks + deps; depth 3 adds nothing new
+  for deps (already present) but tightens sizing; depth 4 adds story parents +
+  wave metadata; depth 5 adds epic grandparents, risk metadata, and full
+  traceability.
 
 ### Priority mapping (wave-biased)
 
@@ -278,10 +287,13 @@ reparenting an `open` container uses `bd update <id> --parent <new>`.
 
 ### Pass 1 — Task upsert
 
-For each plan task (`<task-id>`), parent IDs already resolved by Pass 0:
+**Fetch the existing plan-derived issues once**, not per task — a single
+`bd list --all --limit 0 --has-metadata-key plan_task_id --json` builds an
+in-memory `plan_task_id → issue` map (via `jq`), avoiding one `bd` process per
+task for large plans. Then, for each plan task (`<task-id>`, parent IDs already
+resolved by Pass 0), look it up in that map:
 
-1. **Look up:** `bd list --all --limit 0 --metadata-field "plan_task_id=<task-id>" --json`
-2. **Create if absent:**
+1. **Create if absent:**
    ```bash
    bd create "<title>" -t <type> -p <prio> \
      --parent "<resolved-story-or-epic-id>" \
@@ -289,15 +301,20 @@ For each plan task (`<task-id>`), parent IDs already resolved by Pass 0:
      --external-ref "plan:<task-id>" \
      --description "<body incl. acceptance criteria + traceability>"
    ```
-3. **If present, branch on stored status.** The key distinction is
+2. **If present, branch on stored status.** The key distinction is
    **not-yet-started vs. started**, not "open vs. everything else":
-   - **`open`, `blocked`, `deferred`** → **update fields to match the plan**
-     (`bd update <id> --title … -d … -p … --parent …`). These are all
-     *not-started* states, so mutating their fields (title/body/priority/parent)
-     is safe — it never changes execution status or readiness. Note (verified):
-     dependency-blocked tasks stay `open`, **not** `blocked`; a stored
-     `blocked`/`deferred` status is an explicit human/agent signal, and updating
-     its descriptive fields neither unblocks it nor disturbs that signal.
+   - **`open`, `blocked`, `deferred`** → **update fields to match the plan**,
+     **including wave/risk metadata** so nothing drifts:
+     ```bash
+     bd update <id> --title "<title>" -d "<body>" -p <prio> --parent "<parent-id>" \
+       --set-metadata wave=<n> --set-metadata risk=<type>
+     ```
+     These are all *not-started* states, so mutating their fields
+     (title/body/priority/parent/wave/risk) is safe — it never changes execution
+     status or readiness. Note (verified): dependency-blocked tasks stay `open`,
+     **not** `blocked`; a stored `blocked`/`deferred` status is an explicit
+     human/agent signal, and updating its descriptive fields neither unblocks it
+     nor disturbs that signal.
    - **`in_progress`** → **do not mutate fields** (work is underway). If the
      plan's AC/description changed, post a warning — **idempotently**: store a
      hash of the last-warned plan text in metadata `ac_warn_hash` (set with the
@@ -515,7 +532,8 @@ prompts use, against the project's installed `bd`:
 - **Mapping checks**: a sample plan yields the expected `bd` command sequence for
   mvp (flat, `-t task`, no story, default `-p 2`) and deep (epic→story→task
   order, `--parent` wiring, wave-biased priority), via a dry-run/command-capture
-  harness.
+  harness. **mvp/depth-1–2 must still emit `bd dep add` edges** — assert
+  dependencies are materialized even at the flattest depth.
 - **Idempotency**: running twice over the same plan yields `C created` then
   `0 created, 0 updated` — no duplicate tasks **or** containers (`plan_*_id`
   joins).
