@@ -65,3 +65,23 @@ knowledge-overrides:
   # Reviews
   review-architecture:
     append: [mcp-transport-patterns, mcp-tool-design, mcp-resource-design]
+
+# ---------------------------------------------------------------------------
+# reads-overrides
+# ---------------------------------------------------------------------------
+# Wire docs/mcp-contract.md (output of mcp-tool-resource-contract) into
+# downstream steps that need MCP auth/validation/error contracts.
+# Uses append-only so non-MCP steps are unaffected when the overlay is absent.
+reads-overrides:
+  # Security review: MCP auth/error contracts are security-relevant
+  security:
+    append: [mcp-tool-resource-contract]
+  review-security:
+    append: [mcp-tool-resource-contract]
+  # Test generation: test the tools/resources against the contract
+  create-evals:
+    append: [mcp-tool-resource-contract]
+  story-tests:
+    append: [mcp-tool-resource-contract]
+  tdd:
+    append: [mcp-tool-resource-contract]

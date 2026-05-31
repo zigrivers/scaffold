@@ -1553,16 +1553,16 @@ scaffold dashboard
 
 Scaffold ships with 278 domain expertise entries organized in twenty categories:
 
-- **core/** (26 entries) — eval craft, testing strategy, domain modeling, API design, database design, system architecture, ADR craft, security best practices, operations, task decomposition, user stories, UX specification, design system tokens, user story innovation, AI memory management, coding conventions, tech stack selection, project structure patterns, task tracking, CLAUDE.md patterns, multi-model review dispatch, review step template, dev environment, git workflow patterns, automated review tooling, vision craft
-- **product/** (5 entries) — PRD craft, PRD innovation, gap analysis, vision craft, vision innovation
+- **core/** (35 entries) — eval craft, testing strategy, domain modeling, API design, database design, system architecture, ADR craft, security best practices, operations, task decomposition, user stories, UX specification, design system tokens, user story innovation, AI memory management, coding conventions, tech stack selection, project structure patterns, task tracking, CLAUDE.md patterns, multi-model review dispatch, review step template, dev environment, git workflow patterns, automated review tooling, vision craft
+- **product/** (6 entries) — PRD craft, PRD innovation, gap analysis, vision craft, vision innovation
 - **review/** (20 entries) — review methodology (shared), plus domain-specific review passes for PRD, user stories, domain modeling, ADRs, architecture, API design, database design, UX specification, testing, security, operations, implementation tasks, game design, game economy, game UI, netcode, and more
 - **validation/** (7 entries) — critical path analysis, cross-phase consistency, scope management, traceability, implementability, decision completeness, dependency validation
 - **finalization/** (3 entries) — implementation playbook, developer onboarding, apply-fixes-and-freeze
-- **execution/** (4 entries) — TDD execution loop, task claiming strategy, worktree management, enhancement workflow
+- **execution/** (5 entries) — TDD execution loop, task claiming strategy, worktree management, enhancement workflow
 - **tools/** (4 entries) — release management, version strategy, session analysis, and more
-- **game/** (24 entries) — game engines, networking/netcode, audio middleware, save systems, input patterns, VR/AR, localization, modding/UGC, live operations, platform certification, economy design, AI/behavior, level design, performance, accessibility
+- **game/** (25 entries) — game engines, networking/netcode, audio middleware, save systems, input patterns, VR/AR, localization, modding/UGC, live operations, platform certification, economy design, AI/behavior, level design, performance, accessibility
 - **web-app/** (17 entries) — rendering strategies (SSR/SSG/SPA), state management, authentication, deploy targets, real-time patterns, PWA, performance, security, testing, session patterns, UX patterns, caching, API integration, accessibility
-- **backend/** (14 entries) — API design patterns, data store selection, authentication mechanisms, messaging/event systems, observability, deploy strategies, caching, rate limiting, error handling, database migrations, testing, security
+- **backend/** (22 entries) — API design patterns, data store selection, authentication mechanisms, messaging/event systems, observability, deploy strategies, caching, rate limiting, error handling, database migrations, testing, security
 - **cli/** (10 entries) — argument parsing, config management, output formatting, distribution channels, testing patterns, error handling, plugin architecture, shell integration, structured output, interactive prompts
 - **library/** (12 entries) — visibility (public/internal), bundle formats (ESM/CJS/dual), type definitions, documentation levels, semver discipline, supply chain security, runtime targets
 - **mobile-app/** (12 entries) — platform-specific patterns (iOS/Android/cross-platform), distribution models (app store/enterprise), offline support, push notifications, mobile testing

@@ -6,6 +6,7 @@ phase: "specification"
 order: 835
 dependencies: [review-architecture]
 outputs: [docs/mcp-contract.md]
+reads: [system-architecture, domain-modeling]
 conditional: "if-needed"
 knowledge-base: [mcp-tool-design, mcp-resource-design, mcp-prompt-primitives, mcp-error-handling]
 ---
@@ -30,7 +31,7 @@ enabling client integration to proceed in parallel with server implementation.
 
 ## Quality Criteria
 - (mvp) Only primitive types listed in `mcpServerConfig.primitives` are specified; omit sections for absent types
-- (mvp) Every tool documents: `name` (kebab-case), input JSON Schema (required/optional properties, types, constraints), success output shape, and at least 2 domain-specific error codes with human-readable reason phrases (e.g., `resource_not_found`, `invalid_query_parameter`)
+- (mvp) Every tool documents: `name` (snake_case), input JSON Schema (required/optional properties, types, constraints), success output shape, and at least 2 domain-specific error codes with human-readable reason phrases (e.g., `resource_not_found`, `invalid_query_parameter`)
 - (mvp) Every resource documents: URI template (RFC 6570), MIME type, whether the resource is listable (`resources/list`), and a concrete example URI
 - (mvp) Every prompt documents: `name`, each argument (name, description, required/optional), and a representative invocation example
 - (mvp) Capability set in the contract matches `mcpServerConfig.primitives` (no undeclared capabilities advertised)

@@ -30,13 +30,15 @@ Adds first-class support for MCP (Model Context Protocol) server projects.
   FastMCP), authentication (OAuth 2.1/API keys), error handling, testing
   strategies, observability, deployment patterns, versioning and
   compatibility, and prompt primitives.
-- **`mcp-tool-resource-contract` pipeline step** — New Phase 2 step (between
-  `tech-stack` and `coding-standards`) that produces an explicit contract
-  document defining MCP tool schemas, resource URI patterns, prompt
-  templates, and transport constraints. The step includes a coupling
-  validator that enforces stdio cross-field rules (e.g., stdio transport
-  must use `none` auth), ensuring the contract is coherent before coding
-  begins. Only activates for `mcp-server` projects.
+- **`mcp-tool-resource-contract` pipeline step** — New specification-phase
+  step (order 835, alongside `api-contracts` at order 830) that produces an
+  explicit contract document defining MCP tool schemas, resource URI patterns,
+  prompt templates, and transport constraints. Analogous to `api-contracts`
+  but scoped to MCP primitives (tools/resources/prompts) rather than HTTP
+  endpoints. The step includes a coupling validator that enforces stdio
+  cross-field rules (e.g., stdio transport must use `none` auth), ensuring the
+  contract is coherent before coding begins. Only activates for `mcp-server`
+  projects.
 - **Conservative `mcp-server` detector** — The project-type auto-detector
   looks for `@modelcontextprotocol/sdk`, `mcp`, or `fastmcp` dependencies
   paired with an entrypoint that registers tools or resources; a lone MCP
