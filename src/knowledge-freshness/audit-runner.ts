@@ -161,20 +161,24 @@ export async function runEntryAudit(
  * the MMR-corroboration and anti-over-rewrite gates that major-drift requires.
  */
 export function normalizeVerdict(verdict: AuditVerdict): AuditVerdict {
+  // Defensive: although runEntryAudit's Zod parse guarantees these arrays,
+  // this function is exported as the sanitizer for non-conforming output, so
+  // it must tolerate a hand-built verdict that omits them rather than throw.
+  const proposed = verdict.proposed_changes ?? []
   const carriesNoEdits = verdict.verdict === 'current' || verdict.verdict === 'minor-drift'
-  if (!carriesNoEdits || verdict.proposed_changes.length === 0) return verdict
+  if (!carriesNoEdits || proposed.length === 0) return verdict
 
-  const demoted = verdict.proposed_changes.map(
+  const demoted = proposed.map(
     (c) => `[demoted from proposed_changes — ${verdict.verdict} carries no edits] ${c.location}: ${c.rationale}`,
   )
   process.stderr.write(
-    `[audit-runner] verdict "${verdict.verdict}" returned ${verdict.proposed_changes.length} ` +
+    `[audit-runner] verdict "${verdict.verdict}" returned ${proposed.length} ` +
     'proposed_changes; demoting to preserve_warnings (advisory) per spec contract.\n',
   )
   return {
     ...verdict,
     proposed_changes: [],
-    preserve_warnings: [...verdict.preserve_warnings, ...demoted],
+    preserve_warnings: [...(verdict.preserve_warnings ?? []), ...demoted],
   }
 }
 

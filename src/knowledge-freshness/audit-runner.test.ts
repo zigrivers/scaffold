@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
-import { runEntryAudit, type Dispatcher } from './audit-runner.js'
+import { runEntryAudit, normalizeVerdict, type Dispatcher } from './audit-runner.js'
+import type { AuditVerdict } from './audit-runner.js'
 
 // Use temp fixtures rather than the real on-disk entry + meta-prompt so the
 // runner tests don't break when those files are edited. We inject the meta-
@@ -210,5 +211,32 @@ describe('runEntryAudit', () => {
     expect(out.verdict).toBe('major-drift')
     expect(out.proposed_changes).toEqual([change])
     expect(out.preserve_warnings).toEqual([])
+  })
+})
+
+describe('normalizeVerdict', () => {
+  // normalizeVerdict is exported as the sanitizer for non-conforming model
+  // output. Although runEntryAudit's Zod parse guarantees these arrays are
+  // present before it ever reaches here, the function must not throw on a
+  // hand-built verdict missing them — that is exactly the malformed shape it
+  // exists to absorb (round-2 review: grok/antigravity).
+  const base = {
+    entry_name: 'x', audit_date: '2026-05-24', model: 'm',
+    verdict: 'minor-drift' as const, sources_checked: [], findings: [],
+  }
+
+  it('demotes without throwing when preserve_warnings is missing', () => {
+    const v = {
+      ...base,
+      proposed_changes: [{ location: '## X', kind: 'replace', rationale: 'r' }],
+    } as unknown as AuditVerdict
+    const out = normalizeVerdict(v)
+    expect(out.proposed_changes).toEqual([])
+    expect(out.preserve_warnings.some((w) => w.includes('r'))).toBe(true)
+  })
+
+  it('does not throw when proposed_changes is missing', () => {
+    const v = { ...base } as unknown as AuditVerdict
+    expect(() => normalizeVerdict(v)).not.toThrow()
   })
 })
