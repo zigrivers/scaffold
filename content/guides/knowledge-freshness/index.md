@@ -519,6 +519,7 @@ Counted live from every entry's `sources[*].url` at build time.
 | --- | --- |
 | martinfowler.com | 37 |
 | developer.mozilla.org | 24 |
+| modelcontextprotocol.io | 19 |
 | owasp.org | 17 |
 | developer.android.com | 15 |
 | the-turing-way.netlify.app | 15 |
@@ -527,11 +528,10 @@ Counted live from every entry's `sources[*].url` at build time.
 | sre.google | 12 |
 | w3.org | 12 |
 | microservices.io | 11 |
+| rfc-editor.org | 11 |
 | ethereum.org | 10 |
-| rfc-editor.org | 10 |
 | consensys.github.io | 9 |
 | docs.openzeppelin.com | 9 |
-| opentelemetry.io | 9 |
 :::
 <!-- /gen:host-citations -->
 
@@ -540,7 +540,7 @@ Counted live from every entry's `sources[*].url` at build time.
 Every host plus its category, and the pinned GitHub repos.
 
 <!-- gen:allowlist -->
-47 allowlisted hosts and 3 GitHub repos. Out-of-list sources warn (they do not block).
+50 allowlisted hosts and 6 GitHub repos. Out-of-list sources warn (they do not block).
 
 :::filter-table
 | Host | Category |
@@ -565,6 +565,9 @@ Every host plus its category, and the pinned GitHub repos.
 | `www.sec.gov` | compliance |
 | `developer.android.com` | mobile |
 | `developer.apple.com` | mobile |
+| `datatracker.ietf.org` | other |
+| `json-schema.org` | other |
+| `www.jsonrpc.org` | other |
 | `adr.github.io` | patterns |
 | `agilealliance.org` | patterns |
 | `conventionalcommits.org` | patterns |
@@ -594,7 +597,7 @@ Every host plus its category, and the pinned GitHub repos.
 | `www.w3.org` | web-standards |
 :::
 
-**GitHub repos:** `modelcontextprotocol/specification`, `steveyegge/beads`, `joelparkerhenderson/architecture-decision-record`
+**GitHub repos:** `modelcontextprotocol/specification`, `modelcontextprotocol/typescript-sdk`, `modelcontextprotocol/python-sdk`, `modelcontextprotocol/inspector`, `steveyegge/beads`, `joelparkerhenderson/architecture-decision-record`
 <!-- /gen:allowlist -->
 
 ### KB inventory
@@ -602,7 +605,7 @@ Every host plus its category, and the pinned GitHub repos.
 Totals over `content/knowledge/`, broken down per category.
 
 <!-- gen:kb-inventory -->
-**266 entries** across 19 categories:
+**278 entries** across 20 categories:
 
 | Category | Entries |
 | --- | --- |
@@ -617,6 +620,7 @@ Totals over `content/knowledge/`, broken down per category.
 | browser-extension | 12 |
 | data-pipeline | 12 |
 | library | 12 |
+| mcp-server | 12 |
 | ml | 12 |
 | mobile-app | 12 |
 | cli | 10 |
