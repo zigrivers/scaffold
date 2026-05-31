@@ -318,7 +318,10 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
     if (outputMode === 'json') {
       const result: Record<string, unknown> = {
         pipeline: { methodology, total, completed, skipped, pending, inProgress },
-        progress: { completed, skipped, pending, inProgress, total, percentage: pct },
+        // percentage is null when the pipeline didn't resolve — the computed
+        // value would be a misleading 100%. Self-defending so consumers keying
+        // off `percentage` alone aren't misled even if they ignore the flag below.
+        progress: { completed, skipped, pending, inProgress, total, percentage: pipelineUnresolved ? null : pct },
         phases: phasesData,
         nextEligible: validatedEligible,
         orphaned_entries: [],

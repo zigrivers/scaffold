@@ -287,6 +287,26 @@ describe('status command', () => {
     expect(stdout).toMatch(/unavailable/i)
   })
 
+  it('JSON output reports null percentage and pipelineContentResolved=false when unresolved', async () => {
+    mockResolveOutputMode.mockReturnValue('json')
+    mockDiscoverMetaPrompts.mockReturnValue(new Map()) // no content resolved
+    mockOverlayEnabled([])
+    const steps = {
+      'create-vision': { status: 'completed', source: 'pipeline', produces: [] },
+    }
+    mockStateWith(MockStateManager, steps, { next_eligible: [] })
+
+    await statusCommand.handler(defaultArgv())
+
+    const envelope = JSON.parse(writtenLines.join(''))
+    const parsed = (envelope.data ?? envelope) as {
+      progress: { percentage: number | null }
+      pipelineContentResolved: boolean
+    }
+    expect(parsed.pipelineContentResolved).toBe(false)
+    expect(parsed.progress.percentage).toBeNull()
+  })
+
   it('does not warn about unresolved pipeline content when steps are discovered', async () => {
     const stderrLines: string[] = []
     vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
