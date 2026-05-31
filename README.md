@@ -689,7 +689,7 @@ Overlays are composable with methodology presets. An MVP web-app gets fewer step
 | `data-science` | `data-science-overlay.yml` | 13 entries (reproducibility, experiment tracking, notebook discipline, model evaluation, data versioning, dev environment, observability, project structure, conventions, requirements, security, testing, architecture) | Audience (`solo` default; `platform` reserved for DS-2) |
 | `web3` | `web3-overlay.yml` | 14 entries (Foundry tooling, smart-contract security, upgradeability, gas optimization, oracles, audit workflow, deployment, testing patterns, EVM fundamentals, ABI/interface design, event/log indexing, supply-chain) | Scope (`contracts` default; `dapp` reserved for W3-2) |
 | `game` | `game-overlay.yml` | 24 entries (engines, networking, audio, VR/AR, economy, save systems, certification) | Engine, multiplayer, platforms, economy, narrative, and 6 more |
-| `mcp-server` | `mcp-server-overlay.yml` | — (knowledge injection layered separately) | Language, transport, primitives, auth, deployment, stateful |
+| `mcp-server` | `mcp-server-overlay.yml` | — (step overrides only: disables UI steps) | Language, transport, primitives, auth, deployment, stateful |
 
 ### Game Development
 

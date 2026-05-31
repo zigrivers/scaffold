@@ -299,21 +299,20 @@ export function applyFlagFamilyValidation(argv: Record<string, unknown>): true |
   }
 
   const validPrimitives = ['tools', 'resources', 'prompts']
-  if (argv['mcp-primitives']) {
-    const invalid = (argv['mcp-primitives'] as string[]).filter(
-      (v: string) => !validPrimitives.includes(v),
-    )
+  if (argv['mcp-primitives'] !== undefined) {
+    // Normalize to an array — yargs coerce yields an array, but guard against a
+    // bare string passed programmatically (bypassing yargs) to avoid a TypeError.
+    const rawPrim = argv['mcp-primitives']
+    const prims = Array.isArray(rawPrim) ? rawPrim as string[] : [rawPrim as string]
+    const invalid = prims.filter((v: string) => !validPrimitives.includes(v))
     if (invalid.length) {
       throw new Error(
         `Invalid --mcp-primitives value(s): ${invalid.join(', ')}. Valid: ${validPrimitives.join(', ')}`,
       )
     }
-  }
-  if (
-    argv['mcp-primitives'] &&
-    (argv['mcp-primitives'] as string[]).length === 0
-  ) {
-    throw new Error('--mcp-primitives requires at least one value')
+    if (prims.length === 0) {
+      throw new Error('--mcp-primitives requires at least one value')
+    }
   }
 
   // CSV enum validation for array flags
