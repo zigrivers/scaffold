@@ -125,7 +125,8 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
     // a reassuring completion percentage. `next`/`check`/`run` surface explicit
     // errors instead (no eligible steps / DEP_TARGET_MISSING), which are not
     // falsely reassuring, so they don't need this guard.
-    if (context.metaPrompts.size === 0) {
+    const pipelineUnresolved = context.metaPrompts.size === 0
+    if (pipelineUnresolved) {
       output.warn(
         'No pipeline content resolved — scaffold could not find its bundled ' +
         'pipeline meta-prompts. The progress below is unreliable: a project with ' +
@@ -322,6 +323,10 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
         nextEligible: validatedEligible,
         orphaned_entries: [],
         staleCommands: staleCommandCount,
+        // When true, no pipeline content resolved and the totals/percentage
+        // above are unreliable (see the stderr warning). Consumers should not
+        // treat percentage:100 as "complete" in this state.
+        pipelineContentResolved: !pipelineUnresolved,
       }
       if (isCompact) {
         result.compact = true
@@ -345,11 +350,19 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
       }
       output.result(result)
     } else {
+      // When no pipeline content resolved, do NOT render a percentage — the
+      // figure would be a misleading "100%" computed from state alone. Show an
+      // explicit unresolved marker instead (the warning above has the detail).
+      const progressLine = pipelineUnresolved
+        ? `Pipeline: ${methodology} | Progress: unavailable (pipeline content not resolved)`
+        : `Pipeline: ${methodology} | Progress: ${pct}% (${completed}/${total})`
       if (isCompact) {
-        output.info(`Pipeline: ${methodology} | Progress: ${pct}% (${completed}/${total})`)
-        output.info(`  ${completed} completed, ${skipped} skipped, ${pending} pending, ${inProgress} in progress`)
+        output.info(progressLine)
+        if (!pipelineUnresolved) {
+          output.info(`  ${completed} completed, ${skipped} skipped, ${pending} pending, ${inProgress} in progress`)
+        }
       } else {
-        output.info(`Pipeline: ${methodology} | Progress: ${pct}% (${completed}/${total})`)
+        output.info(progressLine)
       }
 
       const statusIcons: Record<string, string> = {
