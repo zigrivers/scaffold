@@ -7,7 +7,7 @@ const PY_MCP_DEPS = ['mcp', 'fastmcp'] as const
 
 const TS_ENTRYPOINTS = [
   'src/index.ts', 'src/server.ts', 'index.ts', 'server.ts', 'src/mcp.ts',
-  'src/mcp/index.ts', 'mcp.ts', 'src/cli.ts',
+  'src/mcp/index.ts', 'mcp.ts', 'src/cli.ts', 'src/main.ts', 'main.ts',
 ] as const
 const PY_ENTRYPOINTS = [
   'server.py', 'main.py', 'src/server.py', 'app.py', 'mcp_server.py',
