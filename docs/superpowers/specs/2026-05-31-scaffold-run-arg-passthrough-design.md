@@ -134,11 +134,20 @@ Behavior:
 > relax strictness for sibling commands. **No `process.argv` fallback is part of
 > this design** — the previous draft's fallback is removed as unviable.
 >
-> If, contrary to the `observe event` precedent, `.strict(false)` scoping is
-> found to leak to sibling commands in the CLI-level parse tests (§Testing), the
-> remedy is the `observe event` collection pattern: keep `.strict(false)` and
-> reconstruct `argv.args` from the leftover `argv` keys minus the known-option
-> skip-set — still entirely at the `run` builder, never from `process.argv`.
+> **The scoping is an invariant the tests must prove, not assume.** The
+> §Testing plan asserts two things together: (a) `run` captures unknown trailing
+> flags, and (b) a *sibling* command (e.g. `scaffold validate --bogus`) still
+> errors under root `.strict()`. If assertion (b) ever fails — i.e.
+> `.strict(false)` on the `run` builder leaks and disarms strictness for siblings
+> in this yargs version — then **this approach is non-viable** and must be
+> replaced, not patched. The alternatives in that case are: keep root `.strict()`
+> and add a dedicated locally-strict capture (root `.strict(false)` paired with
+> per-command `.strict(true)` on every sibling), or capture trailing tokens via a
+> `run`-scoped middleware. The `observe event` collection pattern only re-derives
+> `argv.args` for `run`; it does **not** restore sibling strictness, so it is not
+> a remedy for a (b) failure. We expect (b) to hold (the `observe event` command
+> relies on exactly this scoping today), so these alternatives are documented for
+> completeness, not planned work.
 
 ### 2. Engine substitution correctness — `src/core/assembly/engine.ts`
 
@@ -150,17 +159,19 @@ positionals) corrupts the output. Trailing CLI args are exactly the kind of text
 that can contain `$`.
 
 Fix: use the **functional replacement form**, which performs no special-pattern
-interpretation:
+interpretation, and substitute **unconditionally** (defaulting to `''`) so the
+literal token can never leak for callers that pass `null`/`undefined`:
 
 ```ts
-content: options.arguments != null
-  ? options.metaPrompt.body.replace(/\$ARGUMENTS/g, () => options.arguments as string)
-  : options.metaPrompt.body,
+content: options.metaPrompt.body.replace(/\$ARGUMENTS/g, () => options.arguments ?? ''),
 ```
 
-(The `!= null` guard interacts with the empty-string default in §3 — with the
-new default the truthy branch always runs, but the guard is kept for any caller
-that still passes `null`.)
+This drops the previous `options.arguments != null` guard. The guard was the
+last path by which a literal `$ARGUMENTS` could survive into output (any caller
+omitting `arguments`); removing it makes the `''`-default behavior in §3 hold for
+*all* callers, not just `run.ts`. The empty-string-default safety analysis in §3
+(grep of every `content/` usage) covers this — no consumer relies on the literal
+token surviving.
 
 ### 3. Wiring — `src/cli/commands/run.ts` (~line 502)
 
@@ -203,7 +214,7 @@ banner:
 ═══ scaffold run: review-pr — EXECUTE NOW ═══
 This is a runnable workflow, not reference text.
 ARGUMENTS: 376
-Follow every step below in order. Do not substitute an ad-hoc command (e.g. a bare `mmr review`).
+Follow every step below in order. Do not substitute an ad-hoc shortcut for the workflow.
 ════════════════════════════════════════════
 ```
 
@@ -237,6 +248,15 @@ span, then reduces the remainder to digits via `tr -d '[:space:]'`, so only a
 numeric PR id ever reaches the `mmr` invocation regardless of what else was in
 `$ARGUMENTS`. The phrasing reads cleanly when `$ARGUMENTS` is empty.
 
+**Accept the `=` separator form.** Under the space-free-token contract,
+`--fix-threshold=P1` (a single token) is *more* natural than the space-separated
+form, but the current parsing regexes only match a space:
+`--fix-threshold[[:space:]]+(P[0-3])`. Update the threshold-parsing regex in
+`review-pr.md`, `review-code.md`, and `post-implementation-review.md` to accept
+either separator — `--fix-threshold([[:space:]]|=)+(P[0-3])` — and strip the
+matched span the same way. This keeps both `--fix-threshold P1` and
+`--fix-threshold=P1` working once passthrough lands.
+
 ## Security considerations
 
 `$ARGUMENTS` is substituted as text into a prompt the agent then executes, and
@@ -245,15 +265,27 @@ therefore **untrusted input** in the threat model where an agent might pass
 through values it read from an untrusted source (a PR title/description, an
 issue body). The design mitigates this on three levels:
 
-1. **Per-tool input validation is the real boundary.** The shell snippets that
-   consume `$ARGUMENTS` parse it with anchored regexes and reduce it to a narrow
-   shape before use — e.g. `review-pr` extracts only `P[0-3]` and a digit run;
-   `review-code` / `post-implementation-review` match
-   `--fix-threshold[[:space:]]+(P[0-3])` and specific literal flags. Arbitrary
-   injected prose does not survive into an executed command. New tools that
-   consume `$ARGUMENTS` in shell MUST validate/reduce it the same way and quote
-   every expansion (`"$ARGUMENTS"`), never interpolate it into an `eval` or an
-   unquoted command position.
+1. **The `review-*` tools validate at the boundary; not every tool does today.**
+   The `review-pr` snippet extracts only `P[0-3]` and a digit run; `review-code`
+   / `post-implementation-review` match `--fix-threshold[[:space:]]+(P[0-3])` and
+   specific literal flags — arbitrary injected prose does not survive into the
+   executed command. **However, an audit at design time found tools that
+   interpolate `$ARGUMENTS` *unquoted* into shell command examples** the agent is
+   told to run — specifically `multi-agent-start.md` / `multi-agent-resume.md`
+   (`scripts/setup-agent-worktree.sh $ARGUMENTS`, `bd list --assignee $ARGUMENTS`,
+   `echo … should show $ARGUMENTS`). There `$ARGUMENTS` is an agent name, but an
+   unquoted expansion is a shell-injection position if a space/metacharacter-laden
+   value reaches it. This design therefore carries a concrete remediation
+   requirement (not just guidance):
+   - **Quote every shell expansion** of `$ARGUMENTS` in those two files
+     (`"$ARGUMENTS"`), so a value with spaces/metacharacters cannot split into
+     extra words or commands.
+   - Add an **implementation pre-flight audit** (and, if cheap, an eval/grep gate)
+     that flags any `$ARGUMENTS` appearing in an unquoted shell command position
+     across `content/`, so future tools can't reintroduce the pattern.
+   - New tools that consume `$ARGUMENTS` in shell MUST validate/reduce it to a
+     narrow token shape and quote every expansion; never `eval` it or place it in
+     an unquoted command position.
 2. **Prompt-injection framing.** Tool prompts that surface `$ARGUMENTS` to the
    agent wrap it in a `<arguments>…</arguments>` delimiter (§5) and label it as
    literal data, reducing the chance the model reinterprets argument text as
@@ -263,7 +295,9 @@ issue body). The design mitigates this on three levels:
 
 The space-free-token contract (Known limitations) further shrinks the surface:
 values with embedded spaces/quotes are out of scope and not silently re-tokenized
-into multiple shell words.
+into multiple shell words — but that contract is a *convention*, not an
+enforcement, which is exactly why the unquoted-expansion remediation above is
+required rather than assumed.
 
 ## Known limitations
 
@@ -295,8 +329,12 @@ command) and assert the value passed to a stubbed `AssemblyEngine.assemble`:
   `run --format text review-pr 376` → `--format` consumed by scaffold,
   `arguments: '376'` (proves global flags are not swallowed into `args`, and
   `.strict(false)` does not leak)
-- a sibling strict command still rejects an unknown flag (e.g.
-  `run status --bogus` style) → proves `.strict(false)` is scoped to `run`
+- a **sibling** command still rejects an unknown flag — e.g.
+  `runCli(['validate', '--bogus'])` rejects (throws / non-zero) → proves
+  `.strict(false)` is scoped to `run` and does not leak to other commands.
+  (Note: `run status --bogus` would NOT test this — `status` binds to the `step`
+  positional and `--bogus` is absorbed into `run`'s `[args..]`; it must be a
+  genuinely different top-level command.)
 - `run review-pr` (no args) → `arguments: ''`
 - `run create-prd --instructions "foo"` (no positionals) → `arguments: 'foo'`
   (backward compat)
@@ -309,10 +347,18 @@ command) and assert the value passed to a stubbed `AssemblyEngine.assemble`:
 - **`$`-pattern safety:** an argument value containing `$&`, `$1`, and a literal
   `$VAR` is substituted verbatim (guards the functional-replacer fix in §2).
 
-**Pre-flight checklist item (not a unit test):** before changing the engine
-default to `''`, re-run `grep -rn '\$ARGUMENTS' content/` and confirm no usage
-embeds the token in an unquoted structured-format position. (Captured at design
-time; re-verify at implementation time in case content changed.)
+**Pre-flight checklist items (not unit tests):**
+
+- Before changing the engine default to `''`, re-run `grep -rn '\$ARGUMENTS'
+  content/` and confirm no usage embeds the token in an unquoted
+  structured-format (JSON/YAML) position. (Captured at design time; re-verify at
+  implementation time in case content changed.)
+- **Shell-quoting audit (security).** Grep `content/` for `$ARGUMENTS` in an
+  *unquoted shell command position* and confirm each is either quoted
+  (`"$ARGUMENTS"`) or reduced to a validated token before use. Known offenders at
+  design time: `multi-agent-start.md`, `multi-agent-resume.md` — these must be
+  quoted as part of this change. If feasible, encode this grep as a repeatable
+  check (eval/`make validate` rule) so the pattern can't be reintroduced.
 
 **bats** (optional, only if vitest leaves an integration gap): `scaffold run
 review-pr 376` output contains `376` and the EXECUTE NOW header.
@@ -325,17 +371,25 @@ review-pr 376` output contains `376` and the EXECUTE NOW header.
   parse tests
 - `src/core/assembly/engine.ts` — functional replacer
 - `src/core/assembly/engine.test.ts` — substitution + `$`-pattern tests
-- `content/tools/review-pr.md` — preamble + `<arguments>` delimiter
+- `content/tools/review-pr.md` — preamble + `<arguments>` delimiter +
+  `=`-separator regex
+- `content/tools/review-code.md`, `content/tools/post-implementation-review.md`
+  — `=`-separator regex for `--fix-threshold`
+- `content/pipeline/build/multi-agent-start.md`,
+  `content/pipeline/build/multi-agent-resume.md` — quote every shell expansion of
+  `$ARGUMENTS` (`"$ARGUMENTS"`) (security remediation)
 - `CHANGELOG.md` — note the null→`''` substitution cleanup and the new
   `run <step> [args..]` passthrough
 
 ## Risks
 
 - **`.strict(false)` scope.** Could in principle affect sibling commands if
-  yargs scoping leaked. Mitigated by following the `observe event` precedent and
-  by an explicit CLI-level test asserting a sibling command still rejects unknown
-  flags. The `observe event` collection pattern is the documented remedy if a
-  leak is observed.
+  yargs scoping leaked. Treated as a tested invariant: a CLI-level test asserts a
+  *sibling* command (e.g. `scaffold validate --bogus`) still rejects unknown
+  flags. If that assertion fails the approach is non-viable and is replaced
+  (per-command strict, or a `run`-scoped middleware) — not patched with a
+  capture-only workaround. We expect it to hold, since `observe event` relies on
+  the same builder-scoped `.strict(false)` today.
 - **Empty-string default change.** Steps that previously relied on a literal
   `$ARGUMENTS` surviving in output would now see it removed. Grep confirms no
   current consumer relies on that; engine tests guard the substitution contract;
