@@ -4,6 +4,46 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+Adds first-class support for MCP (Model Context Protocol) server projects.
+
+### Added
+
+- **`mcp-server` project type** — Scaffold now supports building MCP servers
+  with a rich configuration surface: language (`typescript`/`python`),
+  transport (`stdio`/`sse`/`http`/`streamable-http`), primitive mix
+  (tools/resources/prompts), auth strategy (`none`/`oauth2`/`api-key`),
+  deployment target (`local`/`cloud`/`edge`/`container`), and statefulness.
+  Enabled via `--project-type mcp-server` or auto-detected when any
+  `--mcp-*` CLI flag is supplied.
+- **`--mcp-*` CLI flags** — `--mcp-language`, `--mcp-transport`,
+  `--mcp-primitives`, `--mcp-auth`, `--mcp-deployment`, and `--mcp-stateful`
+  configure the MCP server project; any of these flags also auto-sets
+  `--project-type mcp-server`.
+- **`mcp-server-overlay.yml`** — Project-type overlay that disables
+  UI-focused pipeline steps (`design-system`, `ux-spec`, `review-ux`) and
+  marks `database-schema`/`review-database` as if-needed, since MCP servers
+  have no UI layer. Injects all 12 `content/knowledge/mcp-server/` entries
+  into the relevant pipeline steps.
+- **`content/knowledge/mcp-server/`** — 12 new domain expertise entries
+  covering MCP protocol fundamentals, tool design patterns, resource design,
+  transport patterns (stdio/SSE/HTTP), SDK selection (TypeScript/Python/
+  FastMCP), authentication (OAuth 2.1/API keys), error handling, testing
+  strategies, observability, deployment patterns, versioning and
+  compatibility, and prompt primitives.
+- **`mcp-tool-resource-contract` pipeline step** — New Phase 2 step (between
+  `tech-stack` and `coding-standards`) that produces an explicit contract
+  document defining MCP tool schemas, resource URI patterns, prompt
+  templates, and transport constraints. The step includes a coupling
+  validator that enforces stdio cross-field rules (e.g., stdio transport
+  must use `none` auth), ensuring the contract is coherent before coding
+  begins. Only activates for `mcp-server` projects.
+- **Conservative `mcp-server` detector** — The project-type auto-detector
+  looks for `@modelcontextprotocol/sdk`, `mcp`, or `fastmcp` dependencies
+  paired with an entrypoint that registers tools or resources; a lone MCP
+  client dependency does not trigger detection, avoiding false positives.
+- **Knowledge base grows to 278 entries across 20 categories** — the new
+  `mcp-server` category joins the existing nineteen.
+
 ## [3.32.1] — 2026-05-31
 
 Standardizes where parallel-agent git worktrees are created. Previously

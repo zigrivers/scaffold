@@ -29,7 +29,7 @@ Either way, Scaffold constructs the prompt and the target AI tool does the work.
 
 **Assembly engine** — At execution time, Scaffold builds a 7-section prompt from: system metadata, the meta-prompt, knowledge base entries, project context (artifacts from prior steps), methodology settings, layered instructions, and depth-specific execution guidance.
 
-**Knowledge base** — 267 domain expertise entries in `content/knowledge/` organized in nineteen categories (core, product, review, validation, finalization, execution, tools, game, web-app, backend, cli, library, mobile-app, data-pipeline, ml, browser-extension, research, data-science, web3) covering testing strategy, domain modeling, API design, security best practices, eval craft, TDD execution, task claiming, worktree management, release management, rendering strategies, data stores, CLI patterns, game engines, library bundling, mobile deployment, batch and streaming pipelines, model training and serving, browser extension manifests and service workers, data-science reproducibility and notebook discipline, smart-contract security and audit workflow, and more. These get injected into prompts based on each step's `knowledge-base` frontmatter field. Knowledge files with a `## Deep Guidance` section are optimized for CLI assembly — only the deep guidance content is loaded, avoiding redundancy with the prompt text. Teams can add project-local overrides in `.scaffold/knowledge/` that layer on top of the global entries.
+**Knowledge base** — 278 domain expertise entries in `content/knowledge/` organized in twenty categories (core, product, review, validation, finalization, execution, tools, game, web-app, backend, cli, library, mobile-app, data-pipeline, ml, browser-extension, research, data-science, web3, mcp-server) covering testing strategy, domain modeling, API design, security best practices, eval craft, TDD execution, task claiming, worktree management, release management, rendering strategies, data stores, CLI patterns, game engines, library bundling, mobile deployment, batch and streaming pipelines, model training and serving, browser extension manifests and service workers, data-science reproducibility and notebook discipline, smart-contract security and audit workflow, MCP protocol fundamentals, tool and resource design, transport patterns, and more. These get injected into prompts based on each step's `knowledge-base` frontmatter field. Knowledge files with a `## Deep Guidance` section are optimized for CLI assembly — only the deep guidance content is loaded, avoiding redundancy with the prompt text. Teams can add project-local overrides in `.scaffold/knowledge/` that layer on top of the global entries.
 
 A daily cron audits entries against their declared authoritative sources and opens refresh PRs when they drift — see `docs/knowledge-freshness/operations.md` for the operator guide (provider selection between Anthropic and DeepSeek, secret setup, manual overrides).
 
@@ -689,7 +689,7 @@ Overlays are composable with methodology presets. An MVP web-app gets fewer step
 | `data-science` | `data-science-overlay.yml` | 13 entries (reproducibility, experiment tracking, notebook discipline, model evaluation, data versioning, dev environment, observability, project structure, conventions, requirements, security, testing, architecture) | Audience (`solo` default; `platform` reserved for DS-2) |
 | `web3` | `web3-overlay.yml` | 14 entries (Foundry tooling, smart-contract security, upgradeability, gas optimization, oracles, audit workflow, deployment, testing patterns, EVM fundamentals, ABI/interface design, event/log indexing, supply-chain) | Scope (`contracts` default; `dapp` reserved for W3-2) |
 | `game` | `game-overlay.yml` | 24 entries (engines, networking, audio, VR/AR, economy, save systems, certification) | Engine, multiplayer, platforms, economy, narrative, and 6 more |
-| `mcp-server` | `mcp-server-overlay.yml` | — (step overrides only: disables UI steps) | Language, transport, primitives, auth, deployment, stateful |
+| `mcp-server` | `mcp-server-overlay.yml` | 12 entries (protocol fundamentals, tool design, resource design, transport patterns, SDK selection, auth, error handling, testing, observability, deployment, versioning, prompt primitives) | Language, transport, primitives, auth, deployment, stateful |
 
 ### Game Development
 
@@ -1551,7 +1551,7 @@ scaffold dashboard
 
 ## Knowledge System
 
-Scaffold ships with 267 domain expertise entries organized in nineteen categories:
+Scaffold ships with 278 domain expertise entries organized in twenty categories:
 
 - **core/** (26 entries) — eval craft, testing strategy, domain modeling, API design, database design, system architecture, ADR craft, security best practices, operations, task decomposition, user stories, UX specification, design system tokens, user story innovation, AI memory management, coding conventions, tech stack selection, project structure patterns, task tracking, CLAUDE.md patterns, multi-model review dispatch, review step template, dev environment, git workflow patterns, automated review tooling, vision craft
 - **product/** (5 entries) — PRD craft, PRD innovation, gap analysis, vision craft, vision innovation
@@ -1572,6 +1572,7 @@ Scaffold ships with 267 domain expertise entries organized in nineteen categorie
 - **research/** (25 entries) — experiment loop architecture, parameter optimization, overfitting prevention, experiment tracking, security/sandboxing; domain knowledge for quant-finance (backtesting, risk metrics, market data, strategy patterns), ML-research (architecture search, ablation studies, evaluation), and simulation (engine integration, parameter spaces, compute management)
 - **data-science/** (13 entries) — reproducibility, experiment tracking, notebook discipline, model evaluation, data versioning, dev environment (Marimo/Jupyter/Hex), observability, project structure, conventions, requirements, security, testing, architecture
 - **web3/** (14 entries) — Foundry tooling and dev environment, smart-contract security and common vulnerabilities, upgradeability patterns, gas optimization, oracles and external data, audit workflow, deployment and verification, testing patterns, access control, EVM/contract architecture, conventions, project structure, requirements
+- **mcp-server/** (12 entries) — MCP protocol fundamentals, tool design patterns, resource design, transport patterns (stdio/SSE/HTTP), SDK selection (TypeScript/Python/FastMCP), authentication (OAuth 2.1/API keys), error handling, testing strategies, observability, deployment patterns, versioning and compatibility, prompt primitives
 
 Each pipeline step declares which knowledge entries it needs in its frontmatter. The assembly engine injects them automatically. Knowledge files with a `## Deep Guidance` section are optimized for the CLI — only the deep guidance content is loaded into the assembled prompt, skipping the summary to avoid redundancy with the prompt text.
 
@@ -1780,7 +1781,7 @@ All build inputs live under `content/`:
 content/
 ├── pipeline/         # 60 meta-prompts organized by 16 phases (phases 0-15, including build)
 ├── tools/            # 10 tool meta-prompts (stateless, category: tool)
-├── knowledge/        # 267 domain expertise entries (core, product, review, validation, finalization, execution, tools, game, web-app, backend, cli, library, mobile-app, data-pipeline, ml, browser-extension, research, data-science, web3)
+├── knowledge/        # 278 domain expertise entries (core, product, review, validation, finalization, execution, tools, game, web-app, backend, cli, library, mobile-app, data-pipeline, ml, browser-extension, research, data-science, web3, mcp-server)
 ├── methodology/      # 3 YAML presets (deep, mvp, custom)
 └── skills/           # Skill templates with {{markers}} for multi-platform resolution (includes mmr)
 ```
