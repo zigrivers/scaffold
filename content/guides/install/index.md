@@ -33,14 +33,14 @@ Pick one of the three surfaces below. The npm and Homebrew tabs install the CLI;
 the plugin tab adds the optional Claude Code skills on top.
 
 ::::tabs
-:::tab{title=npm}
+:::tab{title="npm"}
 ```bash
 npm install -g @zigrivers/scaffold
 ```
 Verify with `scaffold version`. This is the recommended path — it uses your
 system Node and updates with `npm update -g`.
 :::
-:::tab{title=Homebrew}
+:::tab{title="Homebrew"}
 ```bash
 brew tap zigrivers/scaffold
 brew install scaffold
@@ -48,7 +48,7 @@ brew install scaffold
 The formula installs and manages Node as a dependency, so no separate Node
 install is needed. Verify with `scaffold version`.
 :::
-:::tab{title=Claude Code plugin}
+:::tab{title="Claude Code plugin"}
 Inside a Claude Code session:
 ```text
 /plugin marketplace add zigrivers/scaffold
@@ -82,17 +82,17 @@ silently no-op against a stale tap cache (see the danger callout below).
 Run the upgrade for your channel:
 
 ::::tabs
-:::tab{title=npm}
+:::tab{title="npm"}
 ```bash
 npm update -g @zigrivers/scaffold
 ```
 :::
-:::tab{title=Homebrew}
+:::tab{title="Homebrew"}
 ```bash
 brew update && brew upgrade scaffold
 ```
 :::
-:::tab{title=Claude Code plugin}
+:::tab{title="Claude Code plugin"}
 ```text
 /plugin marketplace update zigrivers-scaffold
 ```

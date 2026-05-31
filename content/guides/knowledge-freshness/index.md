@@ -665,7 +665,7 @@ resolved by `resolveProvider` (:cite[src/knowledge-freshness/providers/index.ts:
 6. Nothing → error (no provider configured)
 
 ::::tabs
-:::tab{title=Anthropic}
+:::tab{title="Anthropic"}
 Subprocess: `claude -p --tools ""` (empty-tools disables WebFetch so the model
 can only read the prefetched bodies). **Requires the `claude` CLI on PATH
 regardless of how the provider was chosen** — the resolver throws
@@ -674,7 +674,7 @@ picked via flag, env, or API-key inference and `claude` isn't installed.
 `ANTHROPIC_API_KEY` alone is *not* sufficient. Source:
 `src/knowledge-freshness/providers/anthropic.ts`.
 :::
-:::tab{title=DeepSeek}
+:::tab{title="DeepSeek"}
 HTTP. No subprocess; works in CI without the Claude CLI.
 
 - **Auth:** requires `DEEPSEEK_API_KEY`.

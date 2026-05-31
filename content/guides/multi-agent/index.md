@@ -94,7 +94,7 @@ flowchart TD
 ```
 
 ::::tabs
-:::tab{title=Planned work}
+:::tab{title="Planned work"}
 **`single-agent-start`** — one agent claims the next planned task, runs the
 red-green-refactor loop, opens a PR, repeats. The default entry point when one
 agent works the plan sequentially.
@@ -110,7 +110,7 @@ git state, in-progress work, merged PRs — and continue the loop. The
 multi-agent variant additionally verifies the worktree and syncs with main
 before resuming.
 :::
-:::tab{title=Unplanned work}
+:::tab{title="Unplanned work"}
 **`quick-task <description>`** — a single, well-scoped task for a bug fix,
 refactor, perf tweak, or small refinement that is *not* in the plan. Produces
 one task with acceptance criteria and a TDD test plan; a complexity gate

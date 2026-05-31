@@ -1561,31 +1561,23 @@ steps, higher depth just means a more thorough single-model output.</p>
 cross-references, and validation beyond the basics. Override depth per run with
 <code>scaffold run &#x3C;step> --depth N</code>.</p>
 <h3 id="the-three-presets">The three presets</h3>
-<div class="tabs"><div class="tablist" role="tablist"></div><p>:::tab{title=mvp (depth 1)}
-<strong>Ship fast with minimal ceremony.</strong> Only the essential planning steps are
+<div class="tabs"><div class="tablist" role="tablist"><button id="tab-0-0" class="tab-btn active" role="tab" data-tab="0" aria-controls="tabpane-0-0" aria-selected="true" tabindex="0">mvp (depth 1)</button><button id="tab-0-1" class="tab-btn" role="tab" data-tab="1" aria-controls="tabpane-0-1" aria-selected="false" tabindex="-1">custom (depth 3)</button><button id="tab-0-2" class="tab-btn" role="tab" data-tab="2" aria-controls="tabpane-0-2" aria-selected="false" tabindex="-1">deep (depth 5)</button></div><div id="tabpane-0-0" class="tabpane active" role="tabpanel" data-tab="0" aria-labelledby="tab-0-0" tabindex="0"><p><strong>Ship fast with minimal ceremony.</strong> Only the essential planning steps are
 enabled: vision, PRD + stories (with reviews), tech-stack, coding-standards,
 tdd, project-structure, dev-env-setup, implementation-plan, and
 implementation-playbook — then the build loops. Everything else (domain
 modeling, ADRs, architecture, specs, quality gates, validation) is <strong>disabled</strong>.
 This is the <em>minimum safe depth</em>: still enough spec to TDD against, but no
-ceremony you'd skip on a weekend project.
-:::
-:::tab{title=custom (depth 3)}
-<strong>Balanced.</strong> Most steps are enabled at depth 3. The exceptions:
+ceremony you'd skip on a weekend project.</p></div><div id="tabpane-0-1" class="tabpane" role="tabpanel" data-tab="1" aria-labelledby="tab-0-1" tabindex="0"><p><strong>Balanced.</strong> Most steps are enabled at depth 3. The exceptions:
 the three <code>innovate-*</code> steps and <code>automated-pr-review</code> are off by default, and
 the conditional steps (<code>beads</code>, <code>design-system</code>, <code>add-e2e-testing</code>, the spec
 steps, <code>platform-parity-review</code>) are enabled-but-<code>if-needed</code>. You override
-individual steps to taste.
-:::
-:::tab{title=deep (depth 5)}
-<strong>Maximum quality — and the schema default</strong> (<code>methodology</code> defaults to <code>deep</code>
+individual steps to taste.</p></div><div id="tabpane-0-2" class="tabpane" role="tabpanel" data-tab="2" aria-labelledby="tab-0-2" tabindex="0"><p><strong>Maximum quality — and the schema default</strong> (<code>methodology</code> defaults to <code>deep</code>
 <span class="fp" data-path="src/config/schema.ts:272">src/config/schema.ts:272</span>; the resolver also falls back to <code>deep</code>). <em>Every</em>
 planning step is enabled, including the
 <code>innovate-*</code> steps (as <code>if-needed</code>), domain modeling, ADRs, full architecture,
 all specs, every quality gate, all seven validation audits, and the full
 finalization phase. External-model dispatch kicks in at depth 4+. Best for
-complex or regulated systems.
-:::</p></div>
+complex or regulated systems.</p></div></div>
 <div class="callout callout-note"><p><strong>Game / multi-service / platform steps are off in all three presets.</strong> The 24
 game steps and 5 cross-service steps are <code>enabled: false</code> in <code>mvp</code>, <code>custom</code>,
 <em>and</em> <code>deep</code>. They only switch on via a <strong>project-type overlay</strong> — see the
@@ -1595,32 +1587,28 @@ playbooks below.</p></div>
 only <strong>inject domain knowledge</strong> into existing steps (so a web-app build pulls in
 <code>web-app-auth-patterns</code> during <code>tech-stack</code>, <code>security</code>, etc.); a few also
 <strong>enable whole step families</strong>.</p>
-<div class="tabs"><div class="tablist" role="tablist"><button id="tab-1-0" class="tab-btn active" role="tab" data-tab="0" aria-controls="tabpane-1-0" aria-selected="true" tabindex="0">Web</button><button id="tab-1-1" class="tab-btn" role="tab" data-tab="1" aria-controls="tabpane-1-1" aria-selected="false" tabindex="-1">Game</button><button id="tab-1-2" class="tab-btn" role="tab" data-tab="2" aria-controls="tabpane-1-2" aria-selected="false" tabindex="-1">Multi-service</button></div><div id="tabpane-1-0" class="tabpane active" role="tabpanel" data-tab="0" aria-labelledby="tab-1-0" tabindex="0"><p><code>web-app-overlay.yml</code> is knowledge-only — it appends web-app expertise to
+<div class="tabs"><div class="tablist" role="tablist"><button id="tab-1-0" class="tab-btn active" role="tab" data-tab="0" aria-controls="tabpane-1-0" aria-selected="true" tabindex="0">Web app</button><button id="tab-1-1" class="tab-btn" role="tab" data-tab="1" aria-controls="tabpane-1-1" aria-selected="false" tabindex="-1">Mobile / Expo</button><button id="tab-1-2" class="tab-btn" role="tab" data-tab="2" aria-controls="tabpane-1-2" aria-selected="false" tabindex="-1">Game</button><button id="tab-1-3" class="tab-btn" role="tab" data-tab="3" aria-controls="tabpane-1-3" aria-selected="false" tabindex="-1">Multi-service</button><button id="tab-1-4" class="tab-btn" role="tab" data-tab="4" aria-controls="tabpane-1-4" aria-selected="false" tabindex="-1">CLI / library</button></div><div id="tabpane-1-0" class="tabpane active" role="tabpanel" data-tab="0" aria-labelledby="tab-1-0" tabindex="0"><p><code>web-app-overlay.yml</code> is knowledge-only — it appends web-app expertise to
 ~25 steps (rendering strategies + deployment + auth into <code>tech-stack</code>, UX
 patterns into <code>ux-spec</code>, the design system into <code>design-system</code>, and so on). The
 spec steps you'll actually use: <code>database-schema</code>, <code>api-contracts</code>, <code>ux-spec</code>
-(all conditional). <code>add-e2e-testing</code> configures <strong>Playwright</strong>.</p></div><div id="tabpane-1-1" class="tabpane" role="tabpanel" data-tab="1" aria-labelledby="tab-1-1" tabindex="0"><p><code>game-overlay.yml</code> is the heavyweight: it <strong>enables a whole phase family</strong> via
+(all conditional). <code>add-e2e-testing</code> configures <strong>Playwright</strong>.</p></div><div id="tabpane-1-1" class="tabpane" role="tabpanel" data-tab="1" aria-labelledby="tab-1-1" tabindex="0"><p><code>mobile-app-overlay.yml</code> injects mobile knowledge the same way. The distinctive
+piece is <code>add-e2e-testing</code>, which auto-detects the platform and wires up
+<strong>Maestro</strong> for mobile/Expo instead of Playwright (phase 4 — <code>integration</code>).</p></div><div id="tabpane-1-2" class="tabpane" role="tabpanel" data-tab="2" aria-labelledby="tab-1-2" tabindex="0"><p><code>game-overlay.yml</code> is the heavyweight: it <strong>enables a whole phase family</strong> via
 <code>step-overrides</code>. On come <code>game-design-document</code>, <code>review-gdd</code>,
 <code>performance-budgets</code>, <code>narrative-bible</code>, <code>netcode-spec</code>, <code>ai-behavior-design</code>,
 <code>art-bible</code>, <code>audio-design</code>, <code>economy-design</code>, <code>save-system-spec</code>,
 <code>game-ui-spec</code>, <code>playtest-plan</code>, <code>platform-cert-prep</code>, and more — many as
 <code>if-needed</code>. These live across the <code>pre</code>, <code>architecture</code>, <code>specification</code>, and
-<code>quality</code> phases.</p></div><div id="tabpane-1-2" class="tabpane" role="tabpanel" data-tab="2" aria-labelledby="tab-1-2" tabindex="0"><p><code>multi-service-overlay.yml</code> activates when <code>services[]</code> is present in config. It
+<code>quality</code> phases.</p></div><div id="tabpane-1-3" class="tabpane" role="tabpanel" data-tab="3" aria-labelledby="tab-1-3" tabindex="0"><p><code>multi-service-overlay.yml</code> activates when <code>services[]</code> is present in config. It
 enables five cross-service steps (<code>service-ownership-map</code>,
 <code>inter-service-contracts</code>, <code>cross-service-auth</code>, <code>cross-service-observability</code>,
 <code>integration-test-plan</code>) and — crucially — adds <strong>dependency-overrides</strong> and
 <strong>reads-overrides</strong> so downstream steps wait for and consume those cross-service
-artifacts. Use <code>scaffold next --service &#x3C;name></code> to drive a single service.</p></div><p>:::tab{title=Mobile / Expo}
-<code>mobile-app-overlay.yml</code> injects mobile knowledge the same way. The distinctive
-piece is <code>add-e2e-testing</code>, which auto-detects the platform and wires up
-<strong>Maestro</strong> for mobile/Expo instead of Playwright (phase 4 — <code>integration</code>).
-:::</p><p>:::tab{title=CLI / library}
-<code>cli-overlay.yml</code> (and <code>library-overlay.yml</code>) are knowledge-only. They append
+artifacts. Use <code>scaffold next --service &#x3C;name></code> to drive a single service.</p></div><div id="tabpane-1-4" class="tabpane" role="tabpanel" data-tab="4" aria-labelledby="tab-1-4" tabindex="0"><p><code>cli-overlay.yml</code> (and <code>library-overlay.yml</code>) are knowledge-only. They append
 CLI expertise — command parsing, distribution, shell integration, output
 formatting — into <code>tech-stack</code>, <code>system-architecture</code>, <code>api-contracts</code>,
 <code>operations</code>, etc. No extra steps are enabled; you mostly skip the UX/design and
-(often) the database spec steps.
-:::</p></div>
+(often) the database spec steps.</p></div></div>
 <p>Other shipped overlays include backend, data-pipeline, data-science, ML,
 web3, browser-extension, and several research presets — all under
 <code>content/methodology/</code>.</p>

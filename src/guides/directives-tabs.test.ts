@@ -79,4 +79,24 @@ describe('remarkTabs', () => {
     expect(body).toContain('aria-labelledby="tab-0-0"')
     expect(body).toContain('id="tabpane-0-1"')
   })
+
+  it('renders quoted titles with punctuation without leaking directive text', async () => {
+    const md = [
+      '::::tabs',
+      '',
+      ':::tab{title="mvp (depth 1)"}',
+      'A body',
+      ':::',
+      '',
+      ':::tab{title="CLI / library"}',
+      'B body',
+      ':::',
+      '',
+      '::::',
+    ].join('\n') + '\n'
+    const { body } = await renderGuideBody(md, { plugins: [remarkTabs] })
+    expect(body).toContain('mvp (depth 1)')
+    expect(body).toContain('CLI / library')
+    expect(body).not.toContain(':::tab') // no leaked raw directive text
+  })
 })

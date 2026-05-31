@@ -72,15 +72,18 @@ Teardown harvests the ledger **before** `git worktree remove`.
 :::
 ```
 
-### `::::tabs` / `:::tab{title=…}`
-Use a **4-colon** outer fence wrapping 3-colon tabs:
+### `::::tabs` / `:::tab{title="…"}`
+Use a **4-colon** outer fence wrapping 3-colon tabs. **Always quote the title** —
+an unquoted title with parentheses, slashes, or other punctuation (e.g.
+`{title=mvp (depth 1)}` or `{title=CLI / library}`) fails to parse and leaks the
+raw `:::tab{…}` text into the page:
 ```
 ::::tabs
-:::tab{title=npm}
+:::tab{title="npm"}
 `npm install -g @zigrivers/scaffold`
 :::
-:::tab{title=Homebrew}
-`brew install scaffold`
+:::tab{title="CLI / library"}
+…
 :::
 ::::
 ```
