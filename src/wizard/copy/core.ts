@@ -38,6 +38,10 @@ export const coreCopy: CoreCopy = {
         label: 'Web3 / smart contracts',
         short: 'Smart-contract or protocol projects on EVM chains (Foundry / Hardhat).',
       },
+      'mcp-server': {
+        label: 'MCP server',
+        short: 'Model Context Protocol server exposing tools/resources/prompts to AI clients.',
+      },
     },
   },
   methodology: {
