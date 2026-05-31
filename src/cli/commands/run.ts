@@ -29,6 +29,20 @@ import { ensureV3Migration } from '../../state/ensure-v3-migration.js'
 import type { DepthLevel } from '../../types/enums.js'
 import type { ArtifactEntry } from '../../types/assembly.js'
 
+/** Build the interactive-mode "EXECUTE NOW" banner prepended to an emitted prompt. */
+function buildRunHeader(step: string, boundArgs: string): string {
+  const argsLine = boundArgs.trim() !== '' ? boundArgs : '(none — auto-detect)'
+  return [
+    `═══ scaffold run: ${step} — EXECUTE NOW ═══`,
+    'This is a runnable workflow, not reference text.',
+    `ARGUMENTS: ${argsLine}`,
+    'Follow every step below in order. Do not substitute an ad-hoc shortcut for the workflow.',
+    '════════════════════════════════════════════',
+    '',
+    '',
+  ].join('\n')
+}
+
 interface RunArgs {
   step: string
   args?: (string | number)[]
@@ -565,7 +579,12 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
               return
             }
 
-            // Write assembled prompt to stdout (raw, for AI consumption in interactive mode)
+            // Write assembled prompt to stdout (raw, for AI consumption in interactive mode).
+            // Prepend the EXECUTE NOW header so agents treat it as a runnable workflow.
+            // (Suppressed in auto/json, which return before reaching here.)
+            if (outputMode === 'interactive') {
+              process.stdout.write(buildRunHeader(step, boundArguments))
+            }
             process.stdout.write(assemblyResult.prompt!.text)
 
             // Interactive mode: prompt user for completion

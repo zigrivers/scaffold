@@ -1830,6 +1830,39 @@ describe('run command — $ARGUMENTS wiring', () => {
   })
 })
 
+describe('run command — EXECUTE NOW header', () => {
+  it('prepends the header in interactive mode with the bound arguments', async () => {
+    vi.mocked(resolveOutputMode).mockReturnValue('interactive')
+    mockOutput.confirm = vi.fn().mockResolvedValue(true) // let the stateful step complete cleanly
+    await invokeHandler({ step: 'create-prd', _: ['run'], args: ['376'] })
+    const written = stdoutSpy.mock.calls.map((c) => String(c[0]))
+    expect(written.some((s) => s.includes('EXECUTE NOW'))).toBe(true)
+    expect(written.some((s) => s.includes('ARGUMENTS: 376'))).toBe(true)
+  })
+
+  it('shows the auto-detect hint when no arguments are bound', async () => {
+    vi.mocked(resolveOutputMode).mockReturnValue('interactive')
+    mockOutput.confirm = vi.fn().mockResolvedValue(true)
+    await invokeHandler({ step: 'create-prd', _: ['run'] })
+    const written = stdoutSpy.mock.calls.map((c) => String(c[0]))
+    expect(written.some((s) => s.includes('ARGUMENTS: (none — auto-detect)'))).toBe(true)
+  })
+
+  it('suppresses the header under --format json', async () => {
+    vi.mocked(resolveOutputMode).mockReturnValue('json')
+    await invokeHandler({ step: 'create-prd', _: ['run'], args: ['376'], format: 'json' })
+    const written = stdoutSpy.mock.calls.map((c) => String(c[0]))
+    expect(written.some((s) => s.includes('EXECUTE NOW'))).toBe(false)
+  })
+
+  it('suppresses the header under --auto', async () => {
+    vi.mocked(resolveOutputMode).mockReturnValue('auto')
+    await invokeHandler({ step: 'create-prd', _: ['run'], args: ['376'], auto: true })
+    const written = stdoutSpy.mock.calls.map((c) => String(c[0]))
+    expect(written.some((s) => s.includes('EXECUTE NOW'))).toBe(false)
+  })
+})
+
 // ---------------------------------------------------------------------------
 // Parse-level tests: prove the run builder captures trailing args under the
 // root .strict(), and that .strict(false) does NOT leak to sibling commands.
