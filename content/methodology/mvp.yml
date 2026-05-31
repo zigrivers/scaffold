@@ -74,6 +74,7 @@ steps:
   apply-fixes-and-freeze: { enabled: false }
   developer-onboarding-guide: { enabled: false }
   implementation-playbook: { enabled: true }
+  materialize-plan-to-beads: { enabled: false }
   # Phase 15 — Build (build) — stateless, on-demand execution steps
   single-agent-start: { enabled: true }
   single-agent-resume: { enabled: true }

@@ -46,7 +46,32 @@ and produce a structured coverage matrix and review summary.
 - (deep) Every task has verb-first description, >= 1 input file reference, >= 1 acceptance criterion, and defined output artifact
 - (mvp) Every task complies with agent executability rules (3-file, 150-line, single-concern, decision-free, test co-location)
 - (mvp) Tasks exceeding limits have explicit `<!-- agent-size-exception -->` justification
+- (mvp) Plan Output Contract holds: every task and container has an ID; IDs are unique and stable; all parent and `depends_on` refs resolve; the dependency graph is acyclic; field blocks parse
 - (depth 4+) Independent model reviews completed and reconciled
+
+## Plan Output Contract Validation
+
+The plan is consumed by an automated materializer that needs stable join keys
+and a parseable structure (see the **Plan Output Contract** section in
+`implementation-plan.md`). This review MUST verify that contract holds, rejecting
+any plan that violates it:
+
+- **ID presence** — every task has a `T-NNN` ID, and (deep) every story has an
+  `S-NNN` ID and every epic an `E-NNN` ID. Flag any item missing an ID.
+- **Uniqueness and stability** — task, story, and epic IDs are each **unique**
+  and **stable** (no two items share an ID; no ID changed for an item that
+  already existed in a prior plan revision; IDs are never reused for a different
+  task/container).
+- **Referential integrity (no dangling refs)** — every `story` / `epic` parent
+  reference **and every `depends_on` reference** **resolves** to a declared ID in
+  the plan. Report any **dangling** ref (a parent or `depends_on` entry that does
+  not resolve to a declared ID) as a blocking finding. A story with no `epic`
+  parent is valid, not dangling.
+- **Acyclicity** — the dependency graph formed by all `depends_on` edges is a
+  **DAG**: there are **no cycles**. Walk the graph and report any cycle.
+- **Parseability** — every per-task and per-container fenced metadata block
+  parses cleanly under the canonical serialization (well-formed key/value block
+  with the required fields present).
 
 ## Methodology Scaling
 - **deep**: Full multi-pass review with multi-model validation. AC coverage
