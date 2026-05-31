@@ -591,15 +591,17 @@ tasks:
   worker **exits gracefully** (its own work is done; others are still running) —
   it must **not** report a failure or halt the build.
 - **No plan-derived task `in_progress`, but some non-closed remain**
-  (`open`-but-unready / `blocked` / `deferred`) → check for **any global active
-  work** first (`bd list --status in_progress --limit 1 --json`), because a plan
+  (`open`-but-unready / `blocked` / `deferred`) → before declaring a stall, check
+  whether the **actual blockers of those remaining tasks** are active. A plan
   task can be blocked by a **manually-created** task (no `plan_task_id`) that
-  another agent is actively working. If global `in_progress` work exists → exit
-  gracefully (something is advancing that may unblock the remaining tasks). Only
-  when **nothing anywhere is `in_progress`** is it a **true stall**: the prompt
-  **stops and reports** the remaining tasks grouped by why they aren't ready
-  (open dependency — plan or manual, manual `blocked`, `deferred`) so the user
-  can unblock them.
+  another agent is working. Compute the remaining tasks' blockers from their
+  inline `dependencies` and see if any blocker is `in_progress`; if so → exit
+  gracefully (the thing that will unblock them is advancing). Only when **none of
+  the remaining tasks' blockers is `in_progress`** is it a **true stall**: the
+  prompt **stops and reports** the remaining tasks grouped by why they aren't
+  ready (open dependency — plan or manual, manual `blocked`, `deferred`) so the
+  user can unblock them. (Unrelated global `in_progress` work that doesn't block
+  any remaining task does **not** suppress the stall report.)
 
 For multi-agent, "always materialize" still means **once per wave** — the
 orchestrator runs it under the lock before fan-out (see Concurrency); workers do
@@ -622,13 +624,14 @@ single authoritative definition of duplicate resolution lives in Pass 0a; this
 section does not restate it (to avoid drift). The preflight simply relies on
 Pass 0a having run as part of "always materialize."
 
-The sets are built with `jq`. A `jq`/`bd` failure routes to the markdown loop
-**only while still in the pre-materialization gate** (building `beads_usable` /
-the ID sets); **once the materializer has started writing**, any `jq`/`bd`
-failure must propagate as non-zero and **fail closed** (per the control-flow
-rule above) — never markdown-fallback past a partially-updated tracker. The
-exact, tested shell lives in the implementation prompt; this spec fixes the
-routing rule above.
+The sets are built with `jq`. Markdown fallback on a `jq`/`bd` failure is
+allowed **only when `.beads/` is absent**. If `.beads/` exists, **any** `jq`/`bd`
+failure — whether while building `beads_usable` / the ID sets or after the
+materializer has started writing — must **fail closed** (per the control-flow
+rule and decision table): the prompt cannot prove the tracker is legacy, so
+markdown-falling-back would risk bypassing existing Beads state and
+re-executing completed work. The exact, tested shell lives in the implementation
+prompt; this spec fixes the routing rule above.
 
 ### Concurrency (multi-agent)
 
@@ -691,10 +694,14 @@ prompt.
   same Beads loop and must get the identical treatment** (`beads_usable` gate,
   invoke `/scaffold:materialize-plan-to-beads`, scoped claim, completion check,
   fail-closed). Two resume-specific additions:
-  - **Resume the actor's own in-flight task first.** Before claiming anything new,
-    a resuming agent must check for a task already `in_progress` assigned to it
-    (`bd list --status in_progress --assignee <actor> --json`) and continue that
-    one — otherwise it would leave its prior task half-done and claim a second.
+  - **Resume the actor's own in-flight *plan* task first.** Before claiming
+    anything new, a resuming agent must check for a **plan-derived** task already
+    `in_progress` assigned to it — scoped exactly like claiming:
+    `bd list --status in_progress --assignee <actor> --has-metadata-key
+    plan_task_id --json` — and continue that one. Scoping to `plan_task_id`
+    prevents resuming onto an unrelated manual/bootstrap issue assigned to the
+    same actor; any such non-plan in-progress work is ignored here (reported
+    separately, not resumed as build work).
   - **Workers wait for materialization.** In `multi-agent-resume.md`, a worker
     must not claim until the orchestrator's materialization has completed —
     block on the merge-slot (or a completion signal) the same way the start flow
