@@ -17,7 +17,7 @@ Expert knowledge for managing git worktrees to enable parallel multi-agent execu
 
 ### Setup
 
-Use `scripts/setup-agent-worktree.sh <agent-name>` to create a worktree at `../<project>-<agent-name>/`. Each agent gets its own isolated working directory and workspace branch.
+Use `scripts/setup-agent-worktree.sh <agent-name>` to create a worktree at `.worktrees/<agent-name>/` (project-local). Each agent gets its own isolated working directory and workspace branch.
 
 ### Branching Conventions
 
@@ -40,12 +40,12 @@ After all agents finish, remove worktrees and prune stale references. Delete mer
 scripts/setup-agent-worktree.sh agent-1
 
 # This creates:
-#   ../<project>-agent-1/     (working directory)
+#   .worktrees/agent-1/        (working directory, project-local)
 #   Branch: agent-1-workspace  (workspace branch)
 ```
 
 **What the setup script does:**
-1. Creates a new worktree directory adjacent to the main repo
+1. Creates a new worktree directory project-local under `.worktrees/`
 2. Creates a workspace branch for the agent
 3. Sets up the working directory with a clean state
 4. Installs dependencies if a package manager is detected
@@ -154,7 +154,7 @@ git rebase origin/main
 
 ```bash
 # From the main repository (not from inside the worktree)
-git worktree remove ../<project>-agent-1
+git worktree remove .worktrees/agent-1
 ```
 
 **Pruning stale worktree references:**

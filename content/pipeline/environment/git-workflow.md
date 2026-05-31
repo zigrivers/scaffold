@@ -26,7 +26,11 @@ parallel agents, CI pipeline, branch protection, and conflict prevention rules.
 - docs/git-workflow.md — branching strategy, commit standards, rebase strategy,
   PR workflow (8 sub-steps), task closure, agent crash recovery, branch protection,
   conflict prevention, and worktree documentation
-- scripts/setup-agent-worktree.sh — permanent worktree creation script
+- scripts/setup-agent-worktree.sh — permanent worktree creation script. Create
+  worktrees project-local at `<repo>/.worktrees/<agent-slug>` (a single,
+  consistent location — never as repo siblings like `../<repo>-<agent>`). The
+  script must ensure `.worktrees/` is gitignored before creating the worktree so
+  the worktree's checkout is never accidentally committed.
 - .github/workflows/ci.yml — CI workflow with lint and test jobs
 - .github/pull_request_template.md — PR template with task ID format
 - CLAUDE.md updated with Committing/PR Workflow, Task Closure, Parallel Sessions,
@@ -37,7 +41,9 @@ parallel agents, CI pipeline, branch protection, and conflict prevention rules.
 - (mvp) Commit format is consistent (Beads: [bd-<id>] type(scope): desc. Non-Beads: type(scope): desc)
 - (deep) PR workflow includes all 8 sub-steps (commit, AI review, rebase, push, create,
   auto-merge with --delete-branch, watch CI, confirm merge)
-- (deep) Worktree script creates permanent worktrees with workspace branches
+- (deep) Worktree script creates permanent worktrees with workspace branches at
+  the project-local path `<repo>/.worktrees/<agent-slug>` and ensures
+  `.worktrees/` is gitignored
 - (deep) If Beads: BEADS_ACTOR environment variable documented for agent identity
 - (deep) CI workflow job name matches branch protection context
 - (mvp) Branch cleanup documented for both single-agent and worktree-agent variants

@@ -11,6 +11,10 @@ const MANAGED_LINES = [
   '.scaffold/lock.json',
   '.scaffold/*.tmp',
   '.scaffold/**/*.tmp',
+  // Parallel-agent worktrees live at <repo>/.worktrees/<agent>; ignore so a
+  // worktree's full checkout is never accidentally committed (see
+  // scripts/setup-agent-worktree.sh and docs/git-workflow.md §7).
+  '.worktrees/',
 ]
 
 const DANGEROUS_RULES = new Set([
