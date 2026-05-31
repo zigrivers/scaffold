@@ -40,7 +40,10 @@ export function wrapInChrome({ title, body, headings, css }: WrapArgs): string {
   <button data-action="theme" class="theme-toggle" aria-label="Toggle theme">◐</button>
 </header>
 <div class="layout">
-  <aside class="rail" id="guide-toc"><button class="rail-close" data-action="nav" aria-label="Close navigation">✕</button>${toc(headings)}</aside>
+  <aside class="rail" id="guide-toc">
+    <button class="rail-close" data-action="nav" aria-label="Close navigation">✕</button>
+    ${toc(headings)}
+  </aside>
   <main class="content">${body}</main>
   <div class="rail-backdrop" data-action="nav" aria-hidden="true"></div>
 </div>
