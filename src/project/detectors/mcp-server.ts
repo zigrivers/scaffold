@@ -8,6 +8,7 @@ const PY_MCP_DEPS = ['mcp', 'fastmcp'] as const
 const TS_ENTRYPOINTS = ['src/index.ts', 'src/server.ts', 'index.ts', 'server.ts', 'src/mcp.ts'] as const
 const PY_ENTRYPOINTS = ['server.py', 'main.py', 'src/server.py', 'app.py', 'mcp_server.py'] as const
 
+// eslint-disable-next-line max-len
 const TS_REGISTER = /McpServer\s*\(|new Server\s*\(|\.registerTool\s*\(|\.registerResource\s*\(|\.registerPrompt\s*\(|setRequestHandler\s*\(/
 const PY_REGISTER = /FastMCP\s*\(|@mcp\.tool|@mcp\.resource|@mcp\.prompt|@server\.call_tool|@server\.list_tools/
 

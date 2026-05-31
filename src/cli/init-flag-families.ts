@@ -560,9 +560,11 @@ export function buildFlagOverrides(argv: Record<string, unknown>): PartialConfig
     const partial: Partial<McpServerConfig> = {}
     if (argv['mcp-language'] !== undefined) partial.language = argv['mcp-language'] as McpServerConfig['language']
     if (argv['mcp-transport'] !== undefined) partial.transport = argv['mcp-transport'] as McpServerConfig['transport']
-    if (argv['mcp-primitives'] !== undefined) partial.primitives = argv['mcp-primitives'] as McpServerConfig['primitives']
+    if (argv['mcp-primitives'] !== undefined)
+      partial.primitives = argv['mcp-primitives'] as McpServerConfig['primitives']
     if (argv['mcp-auth'] !== undefined) partial.auth = argv['mcp-auth'] as McpServerConfig['auth']
-    if (argv['mcp-deployment'] !== undefined) partial.deployment = argv['mcp-deployment'] as McpServerConfig['deployment']
+    if (argv['mcp-deployment'] !== undefined)
+      partial.deployment = argv['mcp-deployment'] as McpServerConfig['deployment']
     if (argv['mcp-stateful'] !== undefined) partial.stateful = argv['mcp-stateful'] as boolean
     return { type: 'mcp-server', partial }
   }

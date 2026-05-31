@@ -45,8 +45,12 @@ describe('detectMcpServer', () => {
     const ctx = createFakeSignalContext({
       packageJson: { name: 's', dependencies: { '@modelcontextprotocol/sdk': '^1.0.0' } },
       files: {
-        'src/server.ts': 'import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js"\n'
-          + 'const server = new McpServer({})\nserver.registerTool("x", {}, async () => ({content:[]}))\n',
+        'src/server.ts': [
+          'import { StreamableHTTPServerTransport } from',
+          ' "@modelcontextprotocol/sdk/server/streamableHttp.js"',
+          '\nconst server = new McpServer({})',
+          '\nserver.registerTool("x", {}, async () => ({content:[]}))\n',
+        ].join(''),
       },
     })
     const m = detectMcpServer(ctx)

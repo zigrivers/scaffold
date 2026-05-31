@@ -9,7 +9,10 @@ export const mcpServerCopy: McpServerCopy = {
   },
   transport: {
     options: {
-      'stdio':           { label: 'stdio',           short: 'Local subprocess over stdin/stdout (e.g. Claude Desktop).' },
+      'stdio': {
+        label: 'stdio',
+        short: 'Local subprocess over stdin/stdout (e.g. Claude Desktop).',
+      },
       'streamable-http': { label: 'Streamable HTTP', short: 'Remote HTTP endpoint (current spec transport).' },
       'sse':             { label: 'SSE (legacy)',    short: 'Deprecated HTTP+SSE — prefer streamable-http.' },
     },

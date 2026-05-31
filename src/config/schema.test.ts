@@ -1343,7 +1343,7 @@ describe('domain field — multi-domain union', () => {
 })
 
 describe('McpServerConfigSchema', () => {
-  it("'mcp-server' is a member of ProjectTypeSchema", () => {
+  it('\'mcp-server\' is a member of ProjectTypeSchema', () => {
     expect(ProjectTypeSchema.options).toContain('mcp-server')
   })
 

@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import { z } from 'zod'
 import { mcpServerCouplingValidator } from './mcp-server.js'
-import type { McpServerConfig } from '../../types/config.js'
+import type { McpServerConfig, ProjectType } from '../../types/config.js'
 
-function runValidate(projectType: any, config: Partial<McpServerConfig> | undefined) {
+function runValidate(projectType: ProjectType | undefined, config: Partial<McpServerConfig> | undefined) {
   const issues: { path: (string | number)[]; message: string }[] = []
   const ctx = {
-    addIssue: (i: any) => issues.push({ path: i.path, message: i.message }),
+    addIssue: (i: { path: (string | number)[]; message: string }) => issues.push({ path: i.path, message: i.message }),
   } as unknown as z.RefinementCtx
   mcpServerCouplingValidator.validate(ctx, [], projectType, config as McpServerConfig | undefined)
   return issues
