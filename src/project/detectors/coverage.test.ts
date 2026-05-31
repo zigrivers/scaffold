@@ -18,6 +18,7 @@ describe('detector registry completeness', () => {
           next: '^14.0.0',
           'react-native': '^0.72.0',
           commander: '^11.0.0',
+          '@modelcontextprotocol/sdk': '^1.0.0',
         },
         scripts: { build: 'tsc' },
       },

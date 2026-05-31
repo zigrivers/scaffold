@@ -20,7 +20,12 @@ export interface DisambiguateResult {
 //   'no-eligible-matches' — disambiguate() called with empty matches
 
 export const PROJECT_TYPE_PREFERENCE: readonly ProjectType[] = [
-  'web-app', 'backend', 'cli', 'library', 'mobile-app',
+  'web-app', 'backend',
+  // mcp-server ranks just after backend and above cli/library because it is
+  // a service-like type. A repo with both an MCP SDK dep + registration and a
+  // generic CLI entrypoint should resolve to mcp-server rather than cli.
+  'mcp-server',
+  'cli', 'library', 'mobile-app',
   'data-pipeline', 'ml', 'research', 'data-science',
   'browser-extension', 'game', 'web3',
 ]

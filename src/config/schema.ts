@@ -18,7 +18,7 @@ const CustomSchema = z.object({
 export const ProjectTypeSchema = z.enum([
   'web-app', 'mobile-app', 'backend', 'cli', 'library', 'game',
   'data-pipeline', 'ml', 'browser-extension', 'research',
-  'data-science', 'web3',
+  'data-science', 'web3', 'mcp-server',
 ])
 
 export const WebAppConfigSchema = z.object({
@@ -129,6 +129,30 @@ export const Web3ConfigSchema = z.object({
   scope: z.enum(['contracts']).default('contracts'),
 }).strict()
 
+export const McpServerConfigSchema = z.object({
+  language: z.enum(['typescript', 'python']),
+  transport: z.enum(['stdio', 'streamable-http', 'sse']).default('stdio'),
+  primitives: z.array(z.enum(['tools', 'resources', 'prompts'])).min(1).default(['tools']),
+  auth: z.enum(['none', 'oauth', 'apikey']).default('none'),
+  deployment: z.enum(['local', 'hosted']).default('local'),
+  stateful: z.boolean().default(false),
+}).strict().superRefine((cfg, ctx) => {
+  if (cfg.transport === 'stdio' && cfg.auth !== 'none') {
+    ctx.addIssue({
+      path: ['auth'],
+      code: 'custom',
+      message: 'stdio transport cannot use network auth (set auth: none or use a non-stdio transport)',
+    })
+  }
+  if (cfg.transport === 'stdio' && cfg.deployment === 'hosted') {
+    ctx.addIssue({
+      path: ['deployment'],
+      code: 'custom',
+      message: 'stdio transport runs locally and cannot be hosted (set deployment: local or use a non-stdio transport)',
+    })
+  }
+})
+
 export const ResearchConfigSchema = z.object({
   experimentDriver: z.enum([
     'code-driven', 'config-driven', 'api-driven', 'notebook-driven',
@@ -176,6 +200,7 @@ export const ServiceSchema = z.object({
   browserExtensionConfig: BrowserExtensionConfigSchema.optional(),
   dataScienceConfig: DataScienceConfigSchema.optional(),
   web3Config: Web3ConfigSchema.optional(),
+  mcpServerConfig: McpServerConfigSchema.optional(),
   path: z.string().optional(),
   exports: z.array(
     z.object({ step: z.string().regex(/^[a-z][a-z0-9-]*$/, 'exports.step must be kebab-case') }),
@@ -212,6 +237,7 @@ export const ProjectSchema = z.object({
   researchConfig: ResearchConfigSchema.optional(),
   dataScienceConfig: DataScienceConfigSchema.optional(),
   web3Config: Web3ConfigSchema.optional(),
+  mcpServerConfig: McpServerConfigSchema.optional(),
   services: z.array(ServiceSchema).min(1).optional(),
 }).passthrough()  // allow unknown fields per ADR-033
   .superRefine((data, ctx) => {

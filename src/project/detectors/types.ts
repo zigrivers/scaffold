@@ -4,7 +4,7 @@ import type {
   WebAppConfigSchema, BackendConfigSchema, CliConfigSchema, LibraryConfigSchema,
   MobileAppConfigSchema, DataPipelineConfigSchema, MlConfigSchema, ResearchConfigSchema,
   BrowserExtensionConfigSchema, GameConfigSchema, DataScienceConfigSchema,
-  Web3ConfigSchema,
+  Web3ConfigSchema, McpServerConfigSchema,
 } from '../../config/schema.js'
 
 export type Confidence = 'high' | 'medium' | 'low'
@@ -68,11 +68,15 @@ export interface Web3Match extends BaseMatch {
   readonly projectType: 'web3'
   readonly partialConfig: Partial<z.infer<typeof Web3ConfigSchema>>
 }
+export interface McpServerMatch extends BaseMatch {
+  readonly projectType: 'mcp-server'
+  readonly partialConfig: Partial<z.infer<typeof McpServerConfigSchema>>
+}
 
 export type DetectionMatch =
   | WebAppMatch | BackendMatch | CliMatch | LibraryMatch | MobileAppMatch
   | DataPipelineMatch | MlMatch | ResearchMatch | BrowserExtensionMatch | GameMatch
-  | DataScienceMatch | Web3Match
+  | DataScienceMatch | Web3Match | McpServerMatch
 
 export type Detector = (ctx: import('./context.js').SignalContext) => DetectionMatch | null
 

@@ -15,7 +15,7 @@ import { ProjectTypeSchema } from '../../config/schema.js'
 import { coerceCSV } from '../utils/coerce.js'
 import {
   LIB_FLAGS, MOBILE_FLAGS, PIPELINE_FLAGS, ML_FLAGS, EXT_FLAGS,
-  RESEARCH_FLAGS, applyFlagFamilyValidation, buildFlagOverrides,
+  RESEARCH_FLAGS, MCP_SERVER_FLAGS, applyFlagFamilyValidation, buildFlagOverrides,
 } from '../init-flag-families.js'
 import type { ProjectType } from '../../types/index.js'
 import { asScaffoldError } from '../../utils/errors.js'
@@ -380,6 +380,37 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
         type: 'boolean',
         describe: 'Experiment tracking',
       })
+      // MCP Server Configuration
+      .option('mcp-language', {
+        type: 'string',
+        describe: 'MCP server language',
+        choices: ['typescript', 'python'] as const,
+      })
+      .option('mcp-transport', {
+        type: 'string',
+        describe: 'MCP transport',
+        choices: ['stdio', 'streamable-http', 'sse'] as const,
+      })
+      .option('mcp-primitives', {
+        type: 'string',
+        array: true,
+        describe: 'MCP primitives exposed (tools,resources,prompts)',
+        coerce: coerceCSV,
+      })
+      .option('mcp-auth', {
+        type: 'string',
+        describe: 'MCP auth',
+        choices: ['none', 'oauth', 'apikey'] as const,
+      })
+      .option('mcp-deployment', {
+        type: 'string',
+        describe: 'MCP deployment',
+        choices: ['local', 'hosted'] as const,
+      })
+      .option('mcp-stateful', {
+        type: 'boolean',
+        describe: 'MCP server persists state',
+      })
       // Game configuration options
       .option('engine', {
         type: 'string',
@@ -463,6 +494,7 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
       .group([...ML_FLAGS], 'ML Configuration:')
       .group([...EXT_FLAGS], 'Browser Extension Configuration:')
       .group([...RESEARCH_FLAGS], 'Research Configuration:')
+      .group([...MCP_SERVER_FLAGS], 'MCP Server Configuration:')
       .group([
         'game-engine', 'game-multiplayer', 'game-target-platforms', 'game-online-services',
         'game-content-structure', 'game-economy', 'game-narrative', 'game-locales',

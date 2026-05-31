@@ -1053,3 +1053,123 @@ describe('web3 wizard questions', () => {
     expect(output.confirm).not.toHaveBeenCalled()
   })
 })
+
+describe('mcp-server wizard (interactive mode)', () => {
+  it('stdio transport skips auth + deployment prompts and forces auth=none, deployment=local', async () => {
+    const output = makeOutputContext()
+    vi.mocked(output.confirm)
+      .mockResolvedValueOnce(false)   // Codex
+      .mockResolvedValueOnce(false)   // Gemini
+      .mockResolvedValueOnce(false)   // web
+      .mockResolvedValueOnce(false)   // mobile
+      .mockResolvedValueOnce(false)   // stateful
+    vi.mocked(output.select)
+      .mockResolvedValueOnce('typescript')  // language
+      .mockResolvedValueOnce('stdio')       // transport
+    vi.mocked(output.multiSelect)
+      .mockResolvedValueOnce(['tools'])     // primitives
+
+    const answers = await askWizardQuestions({
+      output,
+      suggestion: 'deep',
+      methodology: 'deep',
+      auto: false,
+      projectType: 'mcp-server',
+    })
+
+    expect(answers.mcpServerConfig).toBeDefined()
+    expect(answers.mcpServerConfig!.transport).toBe('stdio')
+    // stdio transport forces these — no prompts should have been called
+    expect(answers.mcpServerConfig!.auth).toBe('none')
+    expect(answers.mcpServerConfig!.deployment).toBe('local')
+    // Verify auth and deployment select prompts were NOT called
+    const selectLabels = vi.mocked(output.select).mock.calls.map(c => c[0])
+    expect(selectLabels).not.toContain('Auth?')
+    expect(selectLabels).not.toContain('Deployment?')
+  })
+})
+
+describe('mcp-server wizard (interactive mode — empty primitives)', () => {
+  it('throws when user selects no primitives', async () => {
+    const output = makeOutputContext()
+    vi.mocked(output.confirm)
+      .mockResolvedValueOnce(false)   // Codex
+      .mockResolvedValueOnce(false)   // Gemini
+      .mockResolvedValueOnce(false)   // web
+      .mockResolvedValueOnce(false)   // mobile
+    vi.mocked(output.select)
+      .mockResolvedValueOnce('typescript')  // language
+      .mockResolvedValueOnce('stdio')       // transport
+    vi.mocked(output.multiSelect)
+      .mockResolvedValueOnce([])            // primitives — empty selection
+
+    await expect(askWizardQuestions({
+      output,
+      suggestion: 'deep',
+      methodology: 'deep',
+      auto: false,
+      projectType: 'mcp-server',
+    })).rejects.toThrow('Select at least one MCP primitive (tools, resources, or prompts).')
+  })
+})
+
+describe('mcp-server wizard (auto mode)', () => {
+  it('throws when --mcp-language missing in auto mode', async () => {
+    const output = makeOutputContext()
+
+    await expect(askWizardQuestions({
+      output, suggestion: 'deep', auto: true,
+      methodology: 'deep',
+      projectType: 'mcp-server',
+    })).rejects.toThrow(/--mcp-language is required/)
+  })
+
+  it('produces mcpServerConfig from flags with defaults', async () => {
+    const output = makeOutputContext()
+
+    const answers = await askWizardQuestions({
+      output, suggestion: 'deep', auto: true,
+      methodology: 'deep',
+      projectType: 'mcp-server',
+      mcpServerFlags: { mcpLanguage: 'python' },
+    })
+    expect(answers.mcpServerConfig).toEqual({
+      language: 'python', transport: 'stdio', primitives: ['tools'],
+      auth: 'none', deployment: 'local', stateful: false,
+    })
+    // No interactive calls in auto mode
+    expect(output.select).not.toHaveBeenCalled()
+    expect(output.confirm).not.toHaveBeenCalled()
+    expect(output.multiSelect).not.toHaveBeenCalled()
+  })
+
+  // Fix 2(a): auto + streamable-http transport + no deployment flag → deployment defaults to 'local'
+  it('auto + streamable-http transport with no --mcp-deployment flag defaults deployment to local', async () => {
+    const output = makeOutputContext()
+
+    const answers = await askWizardQuestions({
+      output, suggestion: 'deep', auto: true,
+      methodology: 'deep',
+      projectType: 'mcp-server',
+      mcpServerFlags: { mcpLanguage: 'typescript', mcpTransport: 'streamable-http' },
+    })
+    expect(answers.mcpServerConfig).toEqual({
+      language: 'typescript', transport: 'streamable-http', primitives: ['tools'],
+      auth: 'none', deployment: 'local', stateful: false,
+    })
+    expect(output.select).not.toHaveBeenCalled()
+    expect(output.confirm).not.toHaveBeenCalled()
+  })
+
+  // Fix 2(b): auto + mcpAuth:'oauth' (transport defaults stdio) → wizard throws stdio/auth error
+  it('auto + --mcp-auth oauth with no --mcp-transport throws stdio/auth contradiction', async () => {
+    const output = makeOutputContext()
+
+    await expect(askWizardQuestions({
+      output, suggestion: 'deep', auto: true,
+      methodology: 'deep',
+      projectType: 'mcp-server',
+      mcpServerFlags: { mcpLanguage: 'typescript', mcpAuth: 'oauth' },
+    })).rejects.toThrow(/stdio transport cannot use network auth/)
+  })
+})

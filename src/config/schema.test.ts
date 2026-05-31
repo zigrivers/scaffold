@@ -8,7 +8,7 @@ import {
   LibraryConfigSchema, MobileAppConfigSchema,
   DataPipelineConfigSchema, MlConfigSchema, BrowserExtensionConfigSchema,
   ResearchConfigSchema, ServiceSchema, ProjectSchema,
-  backendRealDomains, researchRealDomains,
+  backendRealDomains, researchRealDomains, McpServerConfigSchema,
 } from './schema.js'
 
 describe('ProjectTypeSchema', () => {
@@ -17,9 +17,10 @@ describe('ProjectTypeSchema', () => {
       expect.arrayContaining([
         'web-app', 'mobile-app', 'backend', 'cli', 'library', 'game',
         'data-pipeline', 'ml', 'browser-extension', 'research', 'data-science', 'web3',
+        'mcp-server',
       ]),
     )
-    expect(ProjectTypeSchema.options).toHaveLength(12)
+    expect(ProjectTypeSchema.options).toHaveLength(13)
   })
 })
 
@@ -1338,5 +1339,91 @@ describe('domain field — multi-domain union', () => {
     if (result.success) {
       expect(result.data.project?.backendConfig?.domain).toEqual(['fintech'])
     }
+  })
+})
+
+describe('McpServerConfigSchema', () => {
+  it('\'mcp-server\' is a member of ProjectTypeSchema', () => {
+    expect(ProjectTypeSchema.options).toContain('mcp-server')
+  })
+
+  it('accepts a valid full config', () => {
+    const r = McpServerConfigSchema.safeParse({
+      language: 'typescript', transport: 'stdio', primitives: ['tools'],
+      auth: 'none', deployment: 'local', stateful: false,
+    })
+    expect(r.success).toBe(true)
+  })
+
+  it('applies defaults; language is required', () => {
+    const r = McpServerConfigSchema.safeParse({ language: 'python' })
+    expect(r.success).toBe(true)
+    if (r.success) {
+      expect(r.data.transport).toBe('stdio')
+      expect(r.data.primitives).toEqual(['tools'])
+      expect(r.data.auth).toBe('none')
+      expect(r.data.deployment).toBe('local')
+      expect(r.data.stateful).toBe(false)
+    }
+    expect(McpServerConfigSchema.safeParse({}).success).toBe(false)
+  })
+
+  it('rejects unknown keys (.strict) and an empty primitives array', () => {
+    expect(McpServerConfigSchema.safeParse({ language: 'python', bogus: 1 }).success).toBe(false)
+    expect(McpServerConfigSchema.safeParse({ language: 'python', primitives: [] }).success).toBe(false)
+  })
+
+  it('couples mcpServerConfig to projectType at the project level', () => {
+    const bad = ProjectSchema.safeParse({
+      projectType: 'cli', mcpServerConfig: { language: 'python' },
+    })
+    expect(bad.success).toBe(false)
+  })
+
+  it('rejects stdio transport with non-none auth (superRefine defense-in-depth)', () => {
+    const result = McpServerConfigSchema.safeParse({
+      language: 'python', transport: 'stdio', auth: 'oauth',
+    })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      const msgs = result.error.issues.map(i => i.message)
+      expect(msgs).toContain(
+        'stdio transport cannot use network auth (set auth: none or use a non-stdio transport)',
+      )
+    }
+  })
+
+  it('accepts streamable-http transport with oauth auth', () => {
+    const result = McpServerConfigSchema.safeParse({
+      language: 'python', transport: 'streamable-http', auth: 'oauth',
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects stdio transport with hosted deployment (superRefine defense-in-depth)', () => {
+    const result = McpServerConfigSchema.safeParse({
+      language: 'python', transport: 'stdio', deployment: 'hosted',
+    })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      const msgs = result.error.issues.map(i => i.message)
+      expect(msgs).toContain(
+        'stdio transport runs locally and cannot be hosted (set deployment: local or use a non-stdio transport)',
+      )
+    }
+  })
+
+  it('accepts streamable-http transport with hosted deployment', () => {
+    const result = McpServerConfigSchema.safeParse({
+      language: 'python', transport: 'streamable-http', deployment: 'hosted',
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts stdio transport with local deployment', () => {
+    const result = McpServerConfigSchema.safeParse({
+      language: 'python', transport: 'stdio', deployment: 'local',
+    })
+    expect(result.success).toBe(true)
   })
 })

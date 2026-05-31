@@ -3,7 +3,7 @@ import {
   PROJECT_TYPE_FLAG,
   GAME_FLAGS, WEB_FLAGS, BACKEND_FLAGS, CLI_TYPE_FLAGS,
   LIB_FLAGS, MOBILE_FLAGS, PIPELINE_FLAGS, ML_FLAGS, EXT_FLAGS,
-  RESEARCH_FLAGS,
+  RESEARCH_FLAGS, MCP_SERVER_FLAGS,
   applyFlagFamilyValidation,
   buildFlagOverrides,
 } from './init-flag-families.js'
@@ -408,5 +408,106 @@ describe('flag family type preservation (as const survives extraction)', () => {
     expectTypeOf<typeof RESEARCH_FLAGS[number]>().toEqualTypeOf<
       'research-driver' | 'research-interaction' | 'research-domain' | 'research-tracking'
     >()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// mcp-server flag family
+// ---------------------------------------------------------------------------
+
+describe('mcp-server auto-detect via flag', () => {
+  it('--mcp-language typescript with no --project-type detects mcp-server family', () => {
+    // buildFlagOverrides delegates to detectFamily internally; asserting its output
+    // is the canonical way to verify family detection without exporting detectFamily.
+    const result = buildFlagOverrides({ 'mcp-language': 'typescript' })
+    expect(result).toEqual({
+      type: 'mcp-server',
+      partial: { language: 'typescript' },
+    })
+  })
+})
+
+describe('mcp-server flag family', () => {
+  it('buildFlagOverrides maps --mcp-* to McpServerConfig partial', () => {
+    const out = buildFlagOverrides({
+      'mcp-language': 'python', 'mcp-transport': 'streamable-http', 'mcp-auth': 'oauth',
+    })
+    expect(out).toEqual({
+      type: 'mcp-server',
+      partial: { language: 'python', transport: 'streamable-http', auth: 'oauth' },
+    })
+  })
+
+  it('rejects mixing --mcp-* with another family', () => {
+    expect(() => applyFlagFamilyValidation({ 'mcp-language': 'python', 'web-rendering': 'spa' }))
+      .toThrow(/multiple project types/)
+  })
+
+  it('rejects --mcp-* with a conflicting --project-type', () => {
+    expect(() => applyFlagFamilyValidation({ 'mcp-language': 'python', 'project-type': 'cli' }))
+      .toThrow(/--project-type mcp-server/)
+  })
+
+  it('rejects --mcp-auth other than none with explicit --mcp-transport stdio', () => {
+    // Explicit stdio + non-none auth must be rejected at flag-validation time
+    expect(() => applyFlagFamilyValidation({ 'mcp-transport': 'stdio', 'mcp-auth': 'oauth' }))
+      .toThrow(/stdio transport cannot use network auth/)
+  })
+
+  it('does NOT reject --mcp-auth oauth when --mcp-transport is absent (wizard resolves transport)', () => {
+    // Absent transport means the wizard will prompt for or default the transport.
+    // Flag validation must NOT pre-reject: the user might pick streamable-http interactively.
+    // (Round-1 test INVERTED: was "throws", now "does not throw".)
+    expect(() => applyFlagFamilyValidation({ 'mcp-language': 'typescript', 'mcp-auth': 'oauth' }))
+      .not.toThrow()
+  })
+
+  it('accepts --mcp-auth oauth with --mcp-transport streamable-http', () => {
+    const argv = { 'mcp-language': 'typescript', 'mcp-transport': 'streamable-http', 'mcp-auth': 'oauth' }
+    expect(() => applyFlagFamilyValidation(argv)).not.toThrow()
+  })
+
+  it('does NOT reject --mcp-deployment hosted when --mcp-transport is absent (wizard resolves transport)', () => {
+    // Absent transport means the wizard will prompt for or default the transport.
+    // Flag validation must NOT pre-reject. (Round-2 test INVERTED: was "throws", now "does not throw".)
+    expect(() => applyFlagFamilyValidation({ 'mcp-language': 'typescript', 'mcp-deployment': 'hosted' }))
+      .not.toThrow()
+  })
+
+  it('rejects --mcp-deployment hosted with explicit --mcp-transport stdio', () => {
+    // Explicit stdio + hosted deployment must still be rejected at flag-validation time
+    expect(() => applyFlagFamilyValidation({ 'mcp-transport': 'stdio', 'mcp-deployment': 'hosted' }))
+      .toThrow(/hosted deployment requires a non-stdio transport/)
+  })
+
+  it('accepts --mcp-deployment hosted with --mcp-transport streamable-http', () => {
+    const argv = { 'mcp-language': 'typescript', 'mcp-transport': 'streamable-http', 'mcp-deployment': 'hosted' }
+    expect(() => applyFlagFamilyValidation(argv)).not.toThrow()
+  })
+
+  it('MCP_SERVER_FLAGS preserves its literal members', () => {
+    const f: typeof MCP_SERVER_FLAGS[number] = 'mcp-language'
+    expect(MCP_SERVER_FLAGS).toContain(f)
+  })
+
+  // Fix 5: --mcp-primitives enum validation
+  it('rejects invalid --mcp-primitives value', () => {
+    expect(() => applyFlagFamilyValidation({ 'mcp-language': 'typescript', 'mcp-primitives': ['bogus'] }))
+      .toThrow(/Invalid --mcp-primitives value/)
+  })
+
+  it('rejects mixed valid+invalid --mcp-primitives values', () => {
+    expect(() => applyFlagFamilyValidation({ 'mcp-language': 'typescript', 'mcp-primitives': ['tools', 'bogus'] }))
+      .toThrow(/Invalid --mcp-primitives value/)
+  })
+
+  it('accepts valid --mcp-primitives values', () => {
+    expect(() => applyFlagFamilyValidation({ 'mcp-language': 'typescript', 'mcp-primitives': ['tools', 'resources'] }))
+      .not.toThrow()
+  })
+
+  it('accepts single valid --mcp-primitives value', () => {
+    expect(() => applyFlagFamilyValidation({ 'mcp-language': 'typescript', 'mcp-primitives': ['prompts'] }))
+      .not.toThrow()
   })
 })
