@@ -577,7 +577,8 @@ export async function askWizardQuestions(options: {
     // validation no longer pre-rejects because --mcp-transport was absent).
     if (transport === 'stdio' && auth !== 'none') {
       throw new Error(
-        'stdio transport cannot use network auth — omit --mcp-auth or choose a non-stdio transport (streamable-http).',
+        'stdio transport cannot use network auth — omit --mcp-auth or '
+        + 'choose a non-stdio transport (streamable-http).',
       )
     }
     if (transport === 'stdio' && deployment === 'hosted') {
