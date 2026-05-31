@@ -95,6 +95,15 @@ describe('getCompensatingChannels', () => {
     expect(result).toHaveLength(1)
     expect(result[0].originalChannel).toBe('codex')
   })
+
+  it('compensates for an unavailable antigravity channel', () => {
+    const statuses: Record<string, ChannelStatus> = {
+      claude: 'completed',
+      antigravity: 'auth_failed',
+    }
+    const result = getCompensatingChannels(statuses, 'claude')
+    expect(result.map(c => c.compensatingName)).toContain('compensating-antigravity')
+  })
 })
 
 describe('resolveCompensatorDispatch', () => {
@@ -309,6 +318,13 @@ describe('resolveCompensatorFocus', () => {
       },
     }
     expect(resolveCompensatorFocus(cfg, 'codex')).toBe('Focus on memory safety and async correctness.')
+  })
+
+  it('returns the Google-family focus for the antigravity channel', () => {
+    const focus = resolveCompensatorFocus(baseConfig, 'antigravity')
+    expect(focus).toMatch(/architectural patterns/i)
+    expect(focus).toMatch(/broad-context reasoning/i)
+    expect(focus).toMatch(/Antigravity/i)
   })
 })
 
