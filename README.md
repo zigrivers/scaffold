@@ -1403,7 +1403,7 @@ When running parallel agents in separate worktrees, collect their activity befor
 
 ```bash
 # Harvest a live worktree's ledger into the central archive
-scaffold observe harvest --worktree=../my-feature-worktree
+scaffold observe harvest --worktree=.worktrees/my-feature
 
 # Rotate stale archive entries (worktrees that no longer exist)
 scaffold observe harvest --recover
