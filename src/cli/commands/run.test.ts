@@ -1836,8 +1836,11 @@ describe('run command — argument capture (parse-level)', () => {
   })
 
   it('does NOT leak .strict(false) to sibling commands', async () => {
-    const { error, sibling } = await parseRun('sibling --bogus')
-    expect(sibling).toBe(false)
+    // The leak discriminator is whether the sibling REJECTS an unknown flag.
+    // (yargs 17 still invokes the handler after .fail with exitProcess(false),
+    // so we assert on the strict error, not on whether the handler ran.)
+    const { error } = await parseRun('sibling --bogus')
+    expect(error).not.toBeNull()
     expect(error).toContain('Unknown argument')
   })
 })
