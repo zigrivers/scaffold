@@ -37,3 +37,21 @@ ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/.." && pwd)"
   grep -q 'fix-threshold\[\[:space:\]=\]+(P\[0-3\])' "$ROOT/content/tools/post-implementation-review.md"
   ! grep -q 'fix-threshold\[\[:space:\]\]+(P\[0-3\])' "$ROOT/content/tools/post-implementation-review.md"
 }
+
+@test "multi-agent-start.md validates the agent name to a safe token" {
+  grep -q '\[A-Za-z0-9_-\]' "$ROOT/content/pipeline/build/multi-agent-start.md"
+}
+
+@test "multi-agent-resume.md validates the agent name to a safe token" {
+  grep -q '\[A-Za-z0-9_-\]' "$ROOT/content/pipeline/build/multi-agent-resume.md"
+}
+
+@test "multi-agent-start.md quotes setup-agent-worktree.sh argument" {
+  grep -q 'setup-agent-worktree.sh "\$ARGUMENTS"' "$ROOT/content/pipeline/build/multi-agent-start.md"
+  ! grep -q 'setup-agent-worktree.sh \$ARGUMENTS' "$ROOT/content/pipeline/build/multi-agent-start.md"
+}
+
+@test "multi-agent-resume.md quotes shell expansions of the agent name" {
+  ! grep -q 'setup-agent-worktree.sh \$ARGUMENTS' "$ROOT/content/pipeline/build/multi-agent-resume.md"
+  ! grep -q 'bd list --assignee \$ARGUMENTS' "$ROOT/content/pipeline/build/multi-agent-resume.md"
+}

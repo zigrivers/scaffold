@@ -75,6 +75,12 @@ a persistent document.
 
 You are **$ARGUMENTS**.
 
+**Validate your agent name before running any command.** Your agent name is
+`$ARGUMENTS`. It MUST match `^[A-Za-z0-9_-]+$` (letters, digits, underscore,
+hyphen). If it contains spaces, quotes, or any shell metacharacter, STOP
+immediately and report the invalid name — do not run any command that includes
+it.
+
 ### Pre-Flight Verification
 
 Before writing any code, verify the worktree environment:
@@ -82,7 +88,7 @@ Before writing any code, verify the worktree environment:
 1. **Worktree confirmation**
    - `git rev-parse --git-dir` — output should contain `/worktrees/` (confirms you are in a worktree, not the main repo)
    - If NOT in a worktree, stop and instruct the user to set one up:
-     > Run `scripts/setup-agent-worktree.sh $ARGUMENTS` from the main repo to create a worktree for this agent.
+     > Run `scripts/setup-agent-worktree.sh "$ARGUMENTS"` from the main repo to create a worktree for this agent.
 
 2. **Git state check**
    - `git status` — working tree should be clean
@@ -221,7 +227,7 @@ For each task:
 ### Recovery Procedures
 
 **Worktree not set up:**
-- Instruct the user to run: `scripts/setup-agent-worktree.sh $ARGUMENTS`
+- Instruct the user to run: `scripts/setup-agent-worktree.sh "$ARGUMENTS"`
 - Or reference `docs/git-workflow.md` section 7 for manual worktree setup
 
 **`git checkout main` fails:**
