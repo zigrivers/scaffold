@@ -9,6 +9,9 @@ const FM = '---\ntitle: MMR\ntopic: mmr\ndescription: review\ncategory: tools\no
 
 function fixture(): string {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cli-'))
+  // Declare this fixture as a scaffold content tree so getPackageGuidesDir uses
+  // its local content/ override (gated on package.json name; see utils/fs.ts).
+  fs.writeFileSync(path.join(root, 'package.json'), '{"name":"@zigrivers/scaffold"}', 'utf8')
   const dir = path.join(root, 'content', 'guides', 'mmr')
   fs.mkdirSync(dir, { recursive: true })
   fs.writeFileSync(path.join(dir, 'index.md'), FM)

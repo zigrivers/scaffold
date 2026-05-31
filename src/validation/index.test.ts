@@ -24,6 +24,9 @@ function makeProjectRoot(opts: {
 } = {}): string {
   const root = makeTmpDir()
   fs.mkdirSync(path.join(root, '.scaffold'), { recursive: true })
+  // Declare this fixture as a scaffold content tree so getPackage*Dir uses its
+  // local content/ override (gated on package.json name; see utils/fs.ts).
+  fs.writeFileSync(path.join(root, 'package.json'), '{"name":"@zigrivers/scaffold"}', 'utf8')
 
   if (opts.configContent !== undefined && opts.configContent !== null) {
     fs.writeFileSync(path.join(root, '.scaffold', 'config.yml'), opts.configContent, 'utf8')

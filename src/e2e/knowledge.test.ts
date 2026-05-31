@@ -74,6 +74,11 @@ function setupProject(dir: string) {
       'extra-steps': [],
     }),
   )
+  // Declare this fixture as a scaffold content tree so the project-local
+  // content/ override applies (gated on package.json name; see utils/fs.ts).
+  // Without it, the symlinks below would be ignored and the resolver would fall
+  // back to bundled content — silently testing the wrong path.
+  fs.writeFileSync(path.join(dir, 'package.json'), '{"name":"@zigrivers/scaffold"}', 'utf8')
   // Symlink knowledge and pipeline from source (read-only)
   fs.mkdirSync(path.join(dir, 'content'), { recursive: true })
   fs.symlinkSync(KNOWLEDGE_SRC, path.join(dir, 'content', 'knowledge'))

@@ -258,6 +258,81 @@ describe('status command', () => {
     expect(exitSpy).toHaveBeenCalledWith(1)
   })
 
+  it('warns when no pipeline content is resolved instead of silently reporting completion', async () => {
+    // Regression: when the pipeline content can't be discovered (broken
+    // install, or a project-local content/ dir shadowing the bundled
+    // pipeline), the resolved graph collapses to just the completed state
+    // entries and status would otherwise report a misleading "100% complete".
+    const stderrLines: string[] = []
+    vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+      stderrLines.push(String(chunk))
+      return true
+    })
+    mockDiscoverMetaPrompts.mockReturnValue(new Map()) // no content resolved
+    mockOverlayEnabled([]) // nothing enabled in the overlay
+    const steps = {
+      'create-vision': { status: 'completed', source: 'pipeline', produces: [] },
+    }
+    mockStateWith(MockStateManager, steps, { next_eligible: [] })
+
+    await statusCommand.handler(defaultArgv())
+
+    const stderr = stderrLines.join('')
+    expect(stderr).toMatch(/pipeline content/i)
+    expect(stderr).toMatch(/unreliable|misleading|missing|broken/i)
+
+    // And the misleading "100%" progress line must NOT be rendered.
+    const stdout = writtenLines.join('')
+    expect(stdout).not.toContain('100%')
+    expect(stdout).toMatch(/unavailable/i)
+  })
+
+  it('JSON output reports null percentage and pipelineContentResolved=false when unresolved', async () => {
+    mockResolveOutputMode.mockReturnValue('json')
+    mockDiscoverMetaPrompts.mockReturnValue(new Map()) // no content resolved
+    mockOverlayEnabled([])
+    const steps = {
+      'create-vision': { status: 'completed', source: 'pipeline', produces: [] },
+    }
+    mockStateWith(MockStateManager, steps, { next_eligible: [] })
+
+    await statusCommand.handler(defaultArgv())
+
+    const envelope = JSON.parse(writtenLines.join(''))
+    const parsed = (envelope.data ?? envelope) as {
+      progress: { percentage: number | null }
+      pipelineContentResolved: boolean
+    }
+    expect(parsed.pipelineContentResolved).toBe(false)
+    expect(parsed.progress.percentage).toBeNull()
+  })
+
+  it('does not warn about unresolved pipeline content when steps are discovered', async () => {
+    const stderrLines: string[] = []
+    vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+      stderrLines.push(String(chunk))
+      return true
+    })
+    const metaPrompts = new Map([
+      ['step-a', makeFrontmatter('step-a', 'pre', 1)],
+      ['step-b', makeFrontmatter('step-b', 'pre', 2)],
+    ])
+    mockDiscoverMetaPrompts.mockReturnValue(
+      metaPrompts as unknown as ReturnType<typeof discoverMetaPrompts>,
+    )
+    mockOverlayEnabled(['step-a', 'step-b'])
+    const steps = {
+      'step-a': { status: 'completed', source: 'pipeline', produces: [] },
+      'step-b': { status: 'pending', source: 'pipeline', produces: [] },
+    }
+    mockStateWith(MockStateManager, steps, { next_eligible: [] })
+
+    await statusCommand.handler(defaultArgv())
+
+    const stderr = stderrLines.join('')
+    expect(stderr).not.toMatch(/no pipeline content/i)
+  })
+
   it('outputs progress percentage to stdout', async () => {
     const metaPrompts = new Map([
       ['step-a', makeFrontmatter('step-a', 'pre', 1)],
@@ -412,11 +487,15 @@ describe('status command', () => {
     expect(allOutput).toContain('Next eligible')
   })
 
-  it('handles empty pipeline with 0% and shows none for next eligible', async () => {
+  it('shows progress as unavailable (not a percentage) when no pipeline content resolves', async () => {
+    // An empty meta-prompt map means content could not be resolved; rendering a
+    // percentage here (0% or, with completed state entries, a misleading 100%)
+    // would imply the pipeline is understood when it isn't.
     mockStateWith(MockStateManager, {}, { next_eligible: [] })
     await statusCommand.handler(defaultArgv())
     const allOutput = writtenLines.join('')
-    expect(allOutput).toContain('0%')
+    expect(allOutput).toMatch(/unavailable/i)
+    expect(allOutput).not.toContain('0%')
     expect(allOutput).toContain('none')
     expect(exitSpy).toHaveBeenCalledWith(0)
   })

@@ -48,6 +48,19 @@ Patterns and anti-patterns discovered during development. Review before starting
 
 <!-- Add gotchas specific to this project -->
 
+- A slow/quiet `git push` in THIS repo is the `pre-push` hook running the full
+  bats suite (85+ tests, several minutes), NOT a network/auth/credential hang.
+  Do not kill it early or start diagnosing HTTP/credentials. Signs you're
+  watching the hook, not a hang: output shows `1..N` then `ok 1 …` (bats TAP).
+  If `make check-all` is already green on the exact commit, push with
+  `git push --no-verify`; otherwise let it finish. A trailing
+  `osxkeychain store: No such file or directory` line is a separate, NON-FATAL
+  credential-CACHING warning (a broken `credential.helper = /usr/bin/osxkeychain`
+  entry in `~/.gitconfig`); the working homebrew `osxkeychain` helper still
+  authenticates, so it never blocks the push. Documented in CLAUDE.md +
+  docs/git-workflow.md by commit d1817e8. I misdiagnosed this once and killed a
+  healthy push (exit 144), then routed deletions through `gh api` unnecessarily.
+
 - Historical docs may still mention Beads. Treat those references as stale unless the user explicitly asks to restore Beads support.
 
 - When backfilling release notes for config surface changes (e.g. `loop_control.*` fields in mmr 1.4.0), verify runtime consumption (review.ts, results-pipeline, reconciler, etc.) — not just schema presence + tests. Schema-only or partial features must be described precisely ("config shape for future X; only Y is wired") rather than as delivered behavior. Caught in 3.29.0 / 1.4.0 release-prep round 2 review.

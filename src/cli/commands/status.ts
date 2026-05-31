@@ -114,6 +114,29 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
 
     // 3. Load pipeline context and resolve overlay/graph
     const context = loadPipelineContext(projectRoot)
+
+    // Defense-in-depth: if no pipeline meta-prompts were discovered at all, the
+    // pipeline content could not be resolved. The resolved graph then collapses
+    // to just the completed state entries, so progress below would otherwise
+    // read a misleading "100% complete". Warn loudly so the figure is never
+    // silently trusted.
+    //
+    // Scoped to `status` deliberately: it is the only read command that renders
+    // a reassuring completion percentage. `next`/`check`/`run` surface explicit
+    // errors instead (no eligible steps / DEP_TARGET_MISSING), which are not
+    // falsely reassuring, so they don't need this guard.
+    const pipelineUnresolved = context.metaPrompts.size === 0
+    if (pipelineUnresolved) {
+      output.warn(
+        'No pipeline content resolved — scaffold could not find its bundled ' +
+        'pipeline meta-prompts. The progress below is unreliable: a project with ' +
+        'no resolvable pipeline can otherwise read as "100% complete". This ' +
+        'usually means a broken or incomplete scaffold installation. Reinstall ' +
+        'scaffold (`npm i -g @zigrivers/scaffold` or `brew reinstall scaffold`) ' +
+        'and re-run `scaffold status`.',
+      )
+    }
+
     const service = argv.service as string | undefined
     const pipeline = resolvePipeline(context, { output, serviceId: service })
 
@@ -295,11 +318,18 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
     if (outputMode === 'json') {
       const result: Record<string, unknown> = {
         pipeline: { methodology, total, completed, skipped, pending, inProgress },
-        progress: { completed, skipped, pending, inProgress, total, percentage: pct },
+        // percentage is null when the pipeline didn't resolve — the computed
+        // value would be a misleading 100%. Self-defending so consumers keying
+        // off `percentage` alone aren't misled even if they ignore the flag below.
+        progress: { completed, skipped, pending, inProgress, total, percentage: pipelineUnresolved ? null : pct },
         phases: phasesData,
         nextEligible: validatedEligible,
         orphaned_entries: [],
         staleCommands: staleCommandCount,
+        // When true, no pipeline content resolved and the totals/percentage
+        // above are unreliable (see the stderr warning). Consumers should not
+        // treat percentage:100 as "complete" in this state.
+        pipelineContentResolved: !pipelineUnresolved,
       }
       if (isCompact) {
         result.compact = true
@@ -323,11 +353,19 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
       }
       output.result(result)
     } else {
+      // When no pipeline content resolved, do NOT render a percentage — the
+      // figure would be a misleading "100%" computed from state alone. Show an
+      // explicit unresolved marker instead (the warning above has the detail).
+      const progressLine = pipelineUnresolved
+        ? `Pipeline: ${methodology} | Progress: unavailable (pipeline content not resolved)`
+        : `Pipeline: ${methodology} | Progress: ${pct}% (${completed}/${total})`
       if (isCompact) {
-        output.info(`Pipeline: ${methodology} | Progress: ${pct}% (${completed}/${total})`)
-        output.info(`  ${completed} completed, ${skipped} skipped, ${pending} pending, ${inProgress} in progress`)
+        output.info(progressLine)
+        if (!pipelineUnresolved) {
+          output.info(`  ${completed} completed, ${skipped} skipped, ${pending} pending, ${inProgress} in progress`)
+        }
       } else {
-        output.info(`Pipeline: ${methodology} | Progress: ${pct}% (${completed}/${total})`)
+        output.info(progressLine)
       }
 
       const statusIcons: Record<string, string> = {
