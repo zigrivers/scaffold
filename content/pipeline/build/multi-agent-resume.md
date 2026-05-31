@@ -76,6 +76,12 @@ a persistent document.
 
 You are **$ARGUMENTS**.
 
+**Validate your agent name before running any command.** Your agent name is
+`$ARGUMENTS`. It MUST match `^[A-Za-z0-9_-]+$` (letters, digits, underscore,
+hyphen). If it contains spaces, quotes, or any shell metacharacter, STOP
+immediately and report the invalid name — do not run any command that includes
+it.
+
 ### Worktree Verification
 
 Before doing anything else, confirm the environment:
@@ -114,7 +120,7 @@ Recover your context by checking the current state of work:
 ### Beads Recovery
 
 **If Beads is configured** (`.beads/` exists):
-- `bd list --assignee $ARGUMENTS` — check for tasks with `in_progress` status owned by this agent
+- `bd list --assignee "$ARGUMENTS"` — check for tasks with `in_progress` status owned by this agent
 - If a PR shows as merged, close the corresponding task: `bd close <id>`
 - If there is in-progress work, finish it (see "Resume In-Progress Work" below)
 - Otherwise, clean up and start fresh:
@@ -220,7 +226,7 @@ Once in-progress work is complete (or if there was none):
 
 **Worktree not found or corrupted:**
 - Check `git worktree list` from the main repo to see if the worktree exists
-- If missing: `scripts/setup-agent-worktree.sh $ARGUMENTS` to recreate
+- If missing: `scripts/setup-agent-worktree.sh "$ARGUMENTS"` to recreate
 - If corrupted: `git worktree remove <path>` then recreate
 
 **Uncommitted changes on a feature branch:**

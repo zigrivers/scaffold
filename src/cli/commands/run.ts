@@ -29,8 +29,25 @@ import { ensureV3Migration } from '../../state/ensure-v3-migration.js'
 import type { DepthLevel } from '../../types/enums.js'
 import type { ArtifactEntry } from '../../types/assembly.js'
 
+/** Build the interactive-mode "EXECUTE NOW" banner prepended to an emitted prompt. */
+function buildRunHeader(step: string, boundArgs: string): string {
+  const argsLine = boundArgs.trim() !== '' ? boundArgs : '(none — auto-detect)'
+  const title = `═══ scaffold run: ${step} — EXECUTE NOW ═══`
+  const rule = '═'.repeat(title.length)
+  return [
+    title,
+    'This is a runnable workflow, not reference text.',
+    `ARGUMENTS: ${argsLine}`,
+    'Follow every step below in order. Do not substitute an ad-hoc shortcut for the workflow.',
+    rule,
+    '',
+    '',
+  ].join('\n')
+}
+
 interface RunArgs {
   step: string
+  args?: string[]
   depth?: number
   instructions?: string
   force?: boolean
@@ -42,14 +59,25 @@ interface RunArgs {
 }
 
 const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
-  command: 'run <step>',
-  describe: 'Run a pipeline step',
+  command: 'run <step> [args..]',
+  describe: 'Run a pipeline step (trailing args bind to $ARGUMENTS)',
   builder: (yargs: Argv<Record<string, unknown>>): Argv<RunArgs> => {
     return yargs
+      .usage('$0 run <step> [args..]')
+      // Capture arbitrary trailing tokens (bare values AND unknown flags) for
+      // $ARGUMENTS passthrough. .strict(false) is scoped to THIS builder (same
+      // pattern as `observe event`) so the root .strict() still guards siblings.
+      .strict(false)
+      .parserConfiguration({ 'unknown-options-as-args': true })
       .positional('step', {
         type: 'string',
         description: 'Step name to run',
         demandOption: true,
+      })
+      .positional('args', {
+        type: 'string',
+        array: true,
+        description: 'Trailing arguments bound to $ARGUMENTS in the step prompt',
       })
       .option('depth', {
         type: 'number',
@@ -492,6 +520,11 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
             // -----------------------------------------------------------------------
             // Step 9: Assemble prompt
             // -----------------------------------------------------------------------
+            // Trailing positionals bind to $ARGUMENTS; --instructions is the
+            // backward-compatible fallback; '' default so the token is always
+            // substituted (never leaks as a literal).
+            const toolArgs = (argv.args ?? []).map(String).join(' ').trim()
+            const boundArguments = toolArgs !== '' ? toolArgs : (argv.instructions ?? '').trim()
             const engine = new AssemblyEngine()
             const assemblyResult = engine.assemble(step, {
               config,
@@ -499,7 +532,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
               metaPrompt,
               knowledgeEntries,
               instructions,
-              arguments: argv.instructions,
+              arguments: boundArguments,
               depth,
               depthProvenance: provenance,
               updateMode: updateModeResult.isUpdateMode,
@@ -549,7 +582,12 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
               return
             }
 
-            // Write assembled prompt to stdout (raw, for AI consumption in interactive mode)
+            // Write assembled prompt to stdout (raw, for AI consumption in interactive mode).
+            // Prepend the EXECUTE NOW header so agents treat it as a runnable workflow.
+            // (Suppressed in auto/json, which return before reaching here.)
+            if (outputMode === 'interactive') {
+              process.stdout.write(buildRunHeader(step, boundArguments))
+            }
             process.stdout.write(assemblyResult.prompt!.text)
 
             // Interactive mode: prompt user for completion
