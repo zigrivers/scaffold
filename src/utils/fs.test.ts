@@ -3,7 +3,10 @@ import os from 'node:os'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import { describe, it, expect, afterEach } from 'vitest'
-import { atomicWriteFile, fileExists, ensureDir, getPackageSkillsDir, getPackageMethodologyDir } from './fs.js'
+import {
+  atomicWriteFile, fileExists, ensureDir,
+  getPackageSkillsDir, getPackageMethodologyDir, getPackagePipelineDir,
+} from './fs.js'
 
 const tmpFiles: string[] = []
 const tmpDirs: string[] = []
@@ -149,5 +152,22 @@ describe('getPackageMethodologyDir', () => {
   it('uses a project-local content/methodology directory when the project IS scaffold itself', () => {
     const { root, local } = makeProjectWithContent('methodology', { asScaffold: true })
     expect(getPackageMethodologyDir(root)).toBe(local)
+  })
+})
+
+describe('getPackagePipelineDir', () => {
+  // Guards the shared resolveContentDir contract for a third subdir, so a
+  // future refactor that splits the implementation can't silently lose the
+  // gate for the pipeline resolver (the one whose collapse caused the bug).
+  it('ignores a project-local content/pipeline directory for a downstream project (not scaffold)', () => {
+    const { root, local } = makeProjectWithContent('pipeline', { asScaffold: false })
+    const resolved = getPackagePipelineDir(root)
+    expect(resolved).not.toBe(local)
+    expect(resolved).toBe(getPackagePipelineDir()) // bundled fallback
+  })
+
+  it('uses a project-local content/pipeline directory when the project IS scaffold itself', () => {
+    const { root, local } = makeProjectWithContent('pipeline', { asScaffold: true })
+    expect(getPackagePipelineDir(root)).toBe(local)
   })
 })
