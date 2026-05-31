@@ -75,7 +75,7 @@ grounded LLM"]
   end
   subgraph gap[Gap arm]
     TAIL["gap-signal-tail
-89 pipeline steps"] --> EVENT["scaffold observe event
+90 pipeline steps"] --> EVENT["scaffold observe event
 knowledge_gap_signal"]
     EVENT --> LEDGER["ledger
 activity.jsonl"]

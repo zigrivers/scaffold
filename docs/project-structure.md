@@ -26,7 +26,7 @@ scaffold/
 │   │   ├── finalization/
 │   │   └── build/
 │   ├── tools/                 # 12 tool meta-prompts (stateless, category: tool)
-│   ├── knowledge/             # 64 domain expertise entries in 7 categories
+│   ├── knowledge/             # 278 domain expertise entries in 20 categories
 │   │   ├── core/
 │   │   ├── product/
 │   │   ├── review/
@@ -159,7 +159,7 @@ Scaffold uses a **role-based** organization. Each directory has a single clear p
 |------|-----------|----------|
 | Pipeline meta-prompts | `content/pipeline/` | 60 `.md` files organized by 16 phases |
 | Tool meta-prompts | `content/tools/` | 10 stateless tool `.md` files |
-| Knowledge base | `content/knowledge/` | 64 domain expertise entries in 7 categories |
+| Knowledge base | `content/knowledge/` | 278 domain expertise entries in 20 categories |
 | Methodology presets | `content/methodology/` | YAML preset configs (deep, mvp, custom) |
 | Skill templates | `content/skills/` | Skill sources with `{{markers}}` for multi-platform resolution |
 | TypeScript CLI | `src/` | CLI commands, assembly engine, state management |
