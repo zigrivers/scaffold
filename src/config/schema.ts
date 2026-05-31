@@ -136,7 +136,15 @@ export const McpServerConfigSchema = z.object({
   auth: z.enum(['none', 'oauth', 'apikey']).default('none'),
   deployment: z.enum(['local', 'hosted']).default('local'),
   stateful: z.boolean().default(false),
-}).strict()
+}).strict().superRefine((cfg, ctx) => {
+  if (cfg.transport === 'stdio' && cfg.auth !== 'none') {
+    ctx.addIssue({
+      path: ['auth'],
+      code: 'custom',
+      message: 'stdio transport cannot use network auth (set auth: none or use a non-stdio transport)',
+    })
+  }
+})
 
 export const ResearchConfigSchema = z.object({
   experimentDriver: z.enum([

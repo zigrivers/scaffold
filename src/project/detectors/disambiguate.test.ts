@@ -164,3 +164,25 @@ describe('PROJECT_TYPE_PREFERENCE completeness', () => {
     }
   })
 })
+
+describe('PROJECT_TYPE_PREFERENCE mcp-server vs cli ordering', () => {
+  it('mcp-server ranks before cli when confidence and evidence are equal', async () => {
+    const { select } = await import('@inquirer/prompts') as { select: any }
+    let choicesArg: any[] = []
+    vi.mocked(select).mockImplementationOnce(async ({ choices }: any) => {
+      choicesArg = choices
+      return choices[0].value
+    })
+    // Two matches with identical confidence and evidence count — only preference order differs
+    await disambiguate(
+      [
+        mockMatch('cli', 'high', 2),
+        mockMatch('mcp-server', 'high', 2),
+      ],
+      { interactive: true, acceptLowConfidence: false },
+    )
+    // mcp-server must appear before cli in the sorted choices
+    const types = choicesArg.filter(c => c.value !== null).map((c: any) => c.value.projectType)
+    expect(types.indexOf('mcp-server')).toBeLessThan(types.indexOf('cli'))
+  })
+})

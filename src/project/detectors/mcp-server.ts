@@ -5,8 +5,14 @@ import { evidence } from './types.js'
 const TS_SDK_DEPS = ['@modelcontextprotocol/sdk'] as const
 const PY_MCP_DEPS = ['mcp', 'fastmcp'] as const
 
-const TS_ENTRYPOINTS = ['src/index.ts', 'src/server.ts', 'index.ts', 'server.ts', 'src/mcp.ts'] as const
-const PY_ENTRYPOINTS = ['server.py', 'main.py', 'src/server.py', 'app.py', 'mcp_server.py'] as const
+const TS_ENTRYPOINTS = [
+  'src/index.ts', 'src/server.ts', 'index.ts', 'server.ts', 'src/mcp.ts',
+  'src/mcp/index.ts', 'mcp.ts', 'src/cli.ts',
+] as const
+const PY_ENTRYPOINTS = [
+  'server.py', 'main.py', 'src/server.py', 'app.py', 'mcp_server.py',
+  'src/main.py', '__main__.py', 'src/__main__.py', 'app/main.py',
+] as const
 
 // eslint-disable-next-line max-len
 const TS_REGISTER = /McpServer\s*\(|new Server\s*\(|\.registerTool\s*\(|\.registerResource\s*\(|\.registerPrompt\s*\(|setRequestHandler\s*\(/

@@ -1089,6 +1089,30 @@ describe('mcp-server wizard (interactive mode)', () => {
   })
 })
 
+describe('mcp-server wizard (interactive mode — empty primitives)', () => {
+  it('throws when user selects no primitives', async () => {
+    const output = makeOutputContext()
+    vi.mocked(output.confirm)
+      .mockResolvedValueOnce(false)   // Codex
+      .mockResolvedValueOnce(false)   // Gemini
+      .mockResolvedValueOnce(false)   // web
+      .mockResolvedValueOnce(false)   // mobile
+    vi.mocked(output.select)
+      .mockResolvedValueOnce('typescript')  // language
+      .mockResolvedValueOnce('stdio')       // transport
+    vi.mocked(output.multiSelect)
+      .mockResolvedValueOnce([])            // primitives — empty selection
+
+    await expect(askWizardQuestions({
+      output,
+      suggestion: 'deep',
+      methodology: 'deep',
+      auto: false,
+      projectType: 'mcp-server',
+    })).rejects.toThrow('Select at least one MCP primitive (tools, resources, or prompts).')
+  })
+})
+
 describe('mcp-server wizard (auto mode)', () => {
   it('throws when --mcp-language missing in auto mode', async () => {
     const output = makeOutputContext()

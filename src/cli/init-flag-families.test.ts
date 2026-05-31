@@ -415,6 +415,18 @@ describe('flag family type preservation (as const survives extraction)', () => {
 // mcp-server flag family
 // ---------------------------------------------------------------------------
 
+describe('mcp-server auto-detect via flag', () => {
+  it('--mcp-language typescript with no --project-type detects mcp-server family', () => {
+    // buildFlagOverrides delegates to detectFamily internally; asserting its output
+    // is the canonical way to verify family detection without exporting detectFamily.
+    const result = buildFlagOverrides({ 'mcp-language': 'typescript' })
+    expect(result).toEqual({
+      type: 'mcp-server',
+      partial: { language: 'typescript' },
+    })
+  })
+})
+
 describe('mcp-server flag family', () => {
   it('buildFlagOverrides maps --mcp-* to McpServerConfig partial', () => {
     const out = buildFlagOverrides({
@@ -439,6 +451,17 @@ describe('mcp-server flag family', () => {
   it('rejects --mcp-auth other than none with stdio transport', () => {
     expect(() => applyFlagFamilyValidation({ 'mcp-transport': 'stdio', 'mcp-auth': 'oauth' }))
       .toThrow(/stdio transport cannot use network auth/)
+  })
+
+  it('rejects --mcp-auth oauth when --mcp-transport is absent (defaults to stdio)', () => {
+    // --mcp-transport absent means the default is stdio — auth check must still fire
+    expect(() => applyFlagFamilyValidation({ 'mcp-language': 'typescript', 'mcp-auth': 'oauth' }))
+      .toThrow(/stdio transport cannot use network auth/)
+  })
+
+  it('accepts --mcp-auth oauth with --mcp-transport streamable-http', () => {
+    const argv = { 'mcp-language': 'typescript', 'mcp-transport': 'streamable-http', 'mcp-auth': 'oauth' }
+    expect(() => applyFlagFamilyValidation(argv)).not.toThrow()
   })
 
   it('MCP_SERVER_FLAGS preserves its literal members', () => {

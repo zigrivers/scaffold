@@ -64,4 +64,30 @@ describe('detectMcpServer', () => {
     })
     expect(detectMcpServer(ctx)).toBeNull()
   })
+
+  it('high: TS SDK dep + expanded entrypoint src/mcp/index.ts', () => {
+    const ctx = createFakeSignalContext({
+      packageJson: { name: 's', dependencies: { '@modelcontextprotocol/sdk': '^1.0.0' } },
+      files: {
+        'src/mcp/index.ts': 'const s = new McpServer({})\ns.registerTool("x", {}, async () => ({content:[]}))\n',
+      },
+    })
+    const m = detectMcpServer(ctx)
+    expect(m).not.toBeNull()
+    expect(m!.confidence).toBe('high')
+  })
+
+  it('high: Python mcp dep + __main__.py entrypoint', () => {
+    const ctx = createFakeSignalContext({
+      pyprojectToml: { project: { name: 's', dependencies: ['mcp'] } },
+      files: {
+        '__main__.py': 'from mcp.server import Server\nserver = Server("s")\n'
+          + '@server.list_tools()\nasync def list(): ...\n',
+      },
+    })
+    const m = detectMcpServer(ctx)
+    expect(m).not.toBeNull()
+    expect(m!.confidence).toBe('high')
+    expect(m!.partialConfig.language).toBe('python')
+  })
 })

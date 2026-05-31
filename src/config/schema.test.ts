@@ -1379,4 +1379,24 @@ describe('McpServerConfigSchema', () => {
     })
     expect(bad.success).toBe(false)
   })
+
+  it('rejects stdio transport with non-none auth (superRefine defense-in-depth)', () => {
+    const result = McpServerConfigSchema.safeParse({
+      language: 'python', transport: 'stdio', auth: 'oauth',
+    })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      const msgs = result.error.issues.map(i => i.message)
+      expect(msgs).toContain(
+        'stdio transport cannot use network auth (set auth: none or use a non-stdio transport)',
+      )
+    }
+  })
+
+  it('accepts streamable-http transport with oauth auth', () => {
+    const result = McpServerConfigSchema.safeParse({
+      language: 'python', transport: 'streamable-http', auth: 'oauth',
+    })
+    expect(result.success).toBe(true)
+  })
 })

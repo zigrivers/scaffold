@@ -275,8 +275,17 @@ export function applyFlagFamilyValidation(argv: Record<string, unknown>): true |
   if (hasMcpServerFlag && argv['project-type'] !== undefined && argv['project-type'] !== 'mcp-server') {
     throw new Error('--mcp-* flags require --project-type mcp-server')
   }
-  if (argv['mcp-transport'] === 'stdio' && argv['mcp-auth'] !== undefined && argv['mcp-auth'] !== 'none') {
-    throw new Error('stdio transport cannot use network auth (set --mcp-auth none or use a non-stdio transport)')
+  if (hasMcpServerFlag) {
+    // auth is only meaningful for non-stdio transports; transport defaults to stdio when unset.
+    const mcpTransport = argv['mcp-transport']
+    const mcpAuth = argv['mcp-auth']
+    const transportIsStdio = mcpTransport === undefined || mcpTransport === 'stdio'
+    if (mcpAuth !== undefined && mcpAuth !== 'none' && transportIsStdio) {
+      throw new Error(
+        'stdio transport cannot use network auth'
+        + ' (set --mcp-auth none, or pass --mcp-transport streamable-http)',
+      )
+    }
   }
 
   const validPrimitives = ['tools', 'resources', 'prompts']

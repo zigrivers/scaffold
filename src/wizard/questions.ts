@@ -557,6 +557,10 @@ export async function askWizardQuestions(options: {
         optionsFromCopy(copy.primitives.options, ['tools', 'resources', 'prompts']),
         ['tools'], copy.primitives) as McpServerConfig['primitives'] : ['tools'])
 
+    if (primitives.length === 0) {
+      throw new Error('Select at least one MCP primitive (tools, resources, or prompts).')
+    }
+
     const auth: McpServerConfig['auth'] = options.mcpServerFlags?.mcpAuth
       ?? (!auto && transport !== 'stdio' ? await output.select('Auth?',
         optionsFromCopy(copy.auth.options, ['none', 'oauth', 'apikey']),
