@@ -1054,6 +1054,41 @@ describe('web3 wizard questions', () => {
   })
 })
 
+describe('mcp-server wizard (interactive mode)', () => {
+  it('stdio transport skips auth + deployment prompts and forces auth=none, deployment=local', async () => {
+    const output = makeOutputContext()
+    vi.mocked(output.confirm)
+      .mockResolvedValueOnce(false)   // Codex
+      .mockResolvedValueOnce(false)   // Gemini
+      .mockResolvedValueOnce(false)   // web
+      .mockResolvedValueOnce(false)   // mobile
+      .mockResolvedValueOnce(false)   // stateful
+    vi.mocked(output.select)
+      .mockResolvedValueOnce('typescript')  // language
+      .mockResolvedValueOnce('stdio')       // transport
+    vi.mocked(output.multiSelect)
+      .mockResolvedValueOnce(['tools'])     // primitives
+
+    const answers = await askWizardQuestions({
+      output,
+      suggestion: 'deep',
+      methodology: 'deep',
+      auto: false,
+      projectType: 'mcp-server',
+    })
+
+    expect(answers.mcpServerConfig).toBeDefined()
+    expect(answers.mcpServerConfig!.transport).toBe('stdio')
+    // stdio transport forces these — no prompts should have been called
+    expect(answers.mcpServerConfig!.auth).toBe('none')
+    expect(answers.mcpServerConfig!.deployment).toBe('local')
+    // Verify auth and deployment select prompts were NOT called
+    const selectLabels = vi.mocked(output.select).mock.calls.map(c => c[0])
+    expect(selectLabels).not.toContain('Auth?')
+    expect(selectLabels).not.toContain('Deployment?')
+  })
+})
+
 describe('mcp-server wizard (auto mode)', () => {
   it('throws when --mcp-language missing in auto mode', async () => {
     const output = makeOutputContext()

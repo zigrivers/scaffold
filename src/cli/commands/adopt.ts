@@ -392,9 +392,10 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
         choices: ['stdio', 'streamable-http', 'sse'] as const,
       })
       .option('mcp-primitives', {
-        type: 'array',
-        describe: 'MCP primitives exposed',
-        choices: ['tools', 'resources', 'prompts'] as const,
+        type: 'string',
+        array: true,
+        describe: 'MCP primitives exposed (tools,resources,prompts)',
+        coerce: coerceCSV,
       })
       .option('mcp-auth', {
         type: 'string',

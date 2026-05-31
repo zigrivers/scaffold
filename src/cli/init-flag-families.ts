@@ -279,6 +279,24 @@ export function applyFlagFamilyValidation(argv: Record<string, unknown>): true |
     throw new Error('stdio transport cannot use network auth (set --mcp-auth none or use a non-stdio transport)')
   }
 
+  const validPrimitives = ['tools', 'resources', 'prompts']
+  if (argv['mcp-primitives']) {
+    const invalid = (argv['mcp-primitives'] as string[]).filter(
+      (v: string) => !validPrimitives.includes(v),
+    )
+    if (invalid.length) {
+      throw new Error(
+        `Invalid --mcp-primitives value(s): ${invalid.join(', ')}. Valid: ${validPrimitives.join(', ')}`,
+      )
+    }
+  }
+  if (
+    argv['mcp-primitives'] &&
+    (argv['mcp-primitives'] as string[]).length === 0
+  ) {
+    throw new Error('--mcp-primitives requires at least one value')
+  }
+
   // CSV enum validation for array flags
   const validDataStores = ['relational', 'document', 'key-value']
   if (argv['backend-data-store']) {
