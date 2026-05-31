@@ -23,6 +23,7 @@ import { formatJson } from '../formatters/json.js'
 import { formatText } from '../formatters/text.js'
 import { formatMarkdown } from '../formatters/markdown.js'
 import type { ChannelConfigParsed, MmrConfigParsed } from '../config/schema.js'
+import { normalizeChannelName } from '../config/channel-aliases.js'
 import {
   getSessionStore,
   resolveJobsDir,
@@ -143,6 +144,12 @@ export function resolveDispatchChannels(
   explicit: string[] | undefined,
   disabled: Set<string>,
 ): string[] {
+  // Normalize aliases up front so every downstream decision (existence check,
+  // abstract filter, disabled membership) operates on canonical names. This is
+  // the single chokepoint — centralizing here means no caller can bypass alias
+  // handling by passing the raw `disabled` set or an aliased `--channels` value.
+  const normalizedDisabled = new Set([...disabled].map(normalizeChannelName))
+
   const isDispatchable = (name: string, explicitRequest = false): boolean => {
     const ch = channels[name]
     if (!ch) throw new Error(`Channel "${name}" not found in config`)
@@ -156,10 +163,17 @@ export function resolveDispatchChannels(
   }
 
   if (explicit !== undefined) {
-    return explicit.filter((name) => isDispatchable(name, true))
+    // Dedupe after normalization: an alias and its canonical (e.g. `agy` +
+    // `antigravity`) collapse to one name, so `--channels=agy,antigravity` must
+    // dispatch the channel once, not twice. `new Set` preserves first-seen order.
+    return [...new Set(
+      explicit
+        .map(normalizeChannelName)
+        .filter((name) => isDispatchable(name, true)),
+    )]
   }
   return Object.entries(channels)
-    .filter(([name, ch]) => ch.enabled && !disabled.has(name) && !ch.abstract)
+    .filter(([name, ch]) => ch.enabled && !normalizedDisabled.has(name) && !ch.abstract)
     .map(([name]) => name)
 }
 

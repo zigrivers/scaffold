@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
@@ -529,5 +529,45 @@ channels:
       wrap: '$.choices[0].message.content',
       then: 'default',
     })
+  })
+})
+
+describe('channel-key alias normalization', () => {
+  let aliasTmp: string
+  beforeEach(() => { aliasTmp = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-alias-')) })
+  afterEach(() => { fs.rmSync(aliasTmp, { recursive: true, force: true }) })
+
+  it('merges an "agy:" config override onto the canonical antigravity channel', () => {
+    const yaml = [
+      'version: 1',
+      'channels:',
+      '  agy:',
+      '    timeout: 99',
+    ].join('\n')
+    fs.writeFileSync(path.join(aliasTmp, '.mmr.yaml'), yaml)
+
+    // Pass a warn sink so the alias-remap notice doesn't leak to stderr in CI.
+    const config = loadConfig({ projectRoot: aliasTmp, userHome: aliasTmp, onWarning: vi.fn() })
+    expect(config.channels.agy).toBeUndefined()            // no phantom channel
+    expect(config.channels.antigravity?.timeout).toBe(99)  // merged onto canonical
+    expect(config.channels.antigravity?.command).toBe('agy') // base fields preserved
+  })
+
+  it('prefers the canonical key and warns when both agy and antigravity are set', () => {
+    const yaml = [
+      'version: 1',
+      'channels:',
+      '  agy:',
+      '    timeout: 11',
+      '  antigravity:',
+      '    timeout: 22',
+    ].join('\n')
+    fs.writeFileSync(path.join(aliasTmp, '.mmr.yaml'), yaml)
+
+    const warn = vi.fn()
+    const config = loadConfig({ projectRoot: aliasTmp, userHome: aliasTmp, onWarning: warn })
+    expect(config.channels.antigravity?.timeout).toBe(22)  // canonical wins
+    expect(config.channels.agy).toBeUndefined()
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('alias for "antigravity"'))
   })
 })

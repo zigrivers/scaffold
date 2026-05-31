@@ -137,6 +137,54 @@ export const BUILTIN_CHANNELS: Record<string, SubprocessChannelParsed> = {
     output_parser: { kind: 'unwrap-jsonpath', wrap: '$.text', then: 'default' },
     stderr: 'capture',
   },
+  antigravity: {
+    kind: 'subprocess',
+    enabled: true,
+    abstract: false,
+    // Google's Antigravity CLI (terminal command `agy`) — the forward replacement
+    // for the deprecating Gemini CLI (Gemini CLI stops serving Pro/Ultra
+    // 2026-06-18). Runs alongside the `gemini` channel until that sunset.
+    // Verified on agy 1.0.2: `agy --print` reads the prompt from stdin and writes
+    // the model reply to stdout (exit 0). There is NO `--output-format json` flag,
+    // so the reply is plain text and the review prompt's findings JSON is handled
+    // by the `default` parser (same as codex).
+    command: 'agy',
+    prompt_delivery: 'stdin',
+    // Neutral cwd strips project-local AGENTS.md/.agents/mcp_config.json and denies
+    // the repo as a workspace (agy reviews only the diff in the prompt). HOME is
+    // intentionally NOT overridden: agy stores credentials under $HOME, so a
+    // neutral HOME breaks auth (verified) and there is no clean auth-only file to
+    // symlink. env must be present ({}) — BUILTIN_CHANNELS is SubprocessChannelParsed.
+    cwd: '{{neutral_cwd}}',
+    env: {},
+    // --sandbox: OS sandbox (sandbox-exec/nsjail). --dangerously-skip-permissions:
+    // auto-approve so a headless tool call can't hang to --print-timeout; isolation
+    // comes from the empty neutral cwd, not from approval prompts (mirrors gemini's
+    // --approval-mode yolo). --print-timeout bounds a hung run.
+    flags: [
+      '--print',
+      '--sandbox',
+      '--dangerously-skip-permissions',
+      '--print-timeout', '300s',
+    ],
+    auth: {
+      // agy exits 0 even on auth failure (verified), so detect the sentinel strings
+      // rather than trust the exit code. Two distinct auth-failure outputs exist:
+      // "Authentication required …" and "Error: authentication timed out" — match
+      // both. Runs under `sh -c` (auth.ts), so the pipeline + exit codes work.
+      check:
+        'agy -p "respond with ok" --print-timeout 12s 2>&1'
+        + ' | grep -qiE "authentication required|authentication timed out"'
+        + ' && exit 41 || exit 0',
+      timeout: 20,
+      failure_exit_codes: [41],
+      recovery: 'agy -p "hello"   # then open the printed Google OAuth URL and paste the code',
+    },
+    prompt_wrapper: '{{prompt}}',
+    output_parser: 'default',
+    stderr: 'capture',
+    timeout: 360,
+  },
   'doc-conformance': {
     // Disabled by default: runs up to 3 LLM calls (~3 min) via scaffold observe audit.
     // Enable in .mmr.yaml or pass --channels=doc-conformance to use.

@@ -98,6 +98,50 @@ describe('BUILTIN_CHANNELS — grok', () => {
   })
 })
 
+describe('BUILTIN_CHANNELS — antigravity', () => {
+  const ch = () => BUILTIN_CHANNELS.antigravity
+
+  it('exposes an antigravity channel enabled by default', () => {
+    expect(ch()).toBeDefined()
+    expect(ch()?.enabled).toBe(true)
+  })
+
+  it('invokes the agy CLI in print mode', () => {
+    expect(ch()?.command).toBe('agy')
+    expect(ch()?.flags).toContain('--print')
+  })
+
+  it('delivers the prompt via stdin', () => {
+    expect(ch()?.prompt_delivery).toBe('stdin')
+  })
+
+  it('runs in a neutral cwd but does NOT override HOME/XDG (agy creds live under real HOME)', () => {
+    expect(ch()?.cwd).toBe('{{neutral_cwd}}')
+    expect(ch()?.env).toEqual({})
+    expect(ch()?.env).not.toHaveProperty('HOME')
+    expect(ch()?.env).not.toHaveProperty('XDG_CONFIG_HOME')
+  })
+
+  it('is hardened with --sandbox and auto-approve, with a bounded print timeout', () => {
+    expect(ch()?.flags).toContain('--sandbox')
+    expect(ch()?.flags).toContain('--dangerously-skip-permissions')
+    expect(ch()?.flags).toContain('--print-timeout')
+    expect(ch()?.flags).toContain('300s') // guard the bound value, not just the flag
+  })
+
+  it('parses plain model output with the default findings parser', () => {
+    expect(ch()?.output_parser).toBe('default')
+  })
+
+  it('auth.check matches BOTH auth-failure sentinels and recovery triggers the OAuth flow', () => {
+    const check = ch()?.auth?.check ?? ''
+    expect(check).toMatch(/authentication required/i)
+    expect(check).toMatch(/authentication timed out/i)
+    expect(ch()?.auth?.failure_exit_codes).toContain(41)
+    expect(ch()?.auth?.recovery).toMatch(/agy -p/)
+  })
+})
+
 describe('DEFAULT_CONFIG compensator (T1-G)', () => {
   it('omits the compensator block (so back-compat resolveCompensatorDispatch kicks in)', () => {
     expect(DEFAULT_CONFIG.defaults.compensator).toBeUndefined()

@@ -4,11 +4,12 @@ import path from 'node:path'
 
 export const NEUTRAL_HOME_PLACEHOLDER = '{{neutral_home}}'
 export const NEUTRAL_CWD_PLACEHOLDER = '{{neutral_cwd}}'
-// This helper is grok-specific in practice: the only channel that opts into the
-// neutral-posture placeholders is the builtin `grok` channel, and the
-// credential-preservation step below knows about grok's `~/.grok/auth.json`.
-// Hence the `mmr-grok-` temp-dir prefix. If another agentic CLI ever needs
-// isolation, generalize the prefix + credential path together.
+// The neutral-posture placeholders are used by the builtin `grok` channel (HOME +
+// cwd) and the `antigravity` channel (cwd only). The credential-preservation step
+// below is gated on HOME neutralization, so only grok's HOME-isolated posture pulls
+// in ~/.grok/auth.json. The `mmr-grok-` temp-dir prefix is retained (shared by both
+// channels; sweepStaleNeutralDirs matches it). Generalize the prefix + credential
+// path together if a third isolated CLI is added.
 const PREFIX = 'mmr-grok-'
 
 export interface NeutralPosture {
@@ -39,19 +40,26 @@ export function withNeutralPosture(env: Record<string, string>, cwd?: string): N
   // credential symlink and whatever grok writes to its HOME during a review.
   try { fs.chmodSync(dir, 0o700) } catch { /* best effort */ }
 
-  // Preserve grok's file-backed credentials so an isolated HOME doesn't break
-  // auth on non-keychain platforms (Linux/CI store creds at ~/.grok/auth.json).
-  // We symlink ONLY auth.json — NOT config.toml/skills/, so host config stays empty.
-  try {
-    const realHome = process.env.HOME || os.homedir()
-    const cred = path.join(realHome, '.grok', 'auth.json')
-    if (fs.existsSync(cred)) {
-      const grokDir = path.join(dir, '.grok')
-      fs.mkdirSync(grokDir, { recursive: true })
-      fs.chmodSync(grokDir, 0o700)
-      fs.symlinkSync(cred, path.join(grokDir, 'auth.json'))
-    }
-  } catch { /* best effort — keychain platforms don't need it */ }
+  // Preserve grok's file-backed credentials ONLY when HOME itself is neutralized
+  // (grok's posture). For a cwd-only posture (e.g. the antigravity channel) HOME is
+  // real, so creds are found normally and a symlink here would be both pointless
+  // and harmful — it would put a grok credential inside the neutral cwd. Check the
+  // HOME key specifically, not "any env value === placeholder", so a future
+  // XDG-only neutralization does not inherit grok's creds either.
+  const homeNeutralized = env.HOME === NEUTRAL_HOME_PLACEHOLDER
+  if (homeNeutralized) {
+    // We symlink ONLY auth.json — NOT config.toml/skills/, so host config stays empty.
+    try {
+      const realHome = process.env.HOME || os.homedir()
+      const cred = path.join(realHome, '.grok', 'auth.json')
+      if (fs.existsSync(cred)) {
+        const grokDir = path.join(dir, '.grok')
+        fs.mkdirSync(grokDir, { recursive: true })
+        fs.chmodSync(grokDir, 0o700)
+        fs.symlinkSync(cred, path.join(grokDir, 'auth.json'))
+      }
+    } catch { /* best effort — keychain platforms don't need it */ }
+  }
 
   const outEnv: Record<string, string> = {}
   for (const [k, v] of Object.entries(env)) {

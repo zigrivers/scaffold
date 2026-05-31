@@ -6,6 +6,7 @@ import { MmrConfigSchema, type MmrConfigParsed } from './schema.js'
 import { DEFAULT_CONFIG } from './defaults.js'
 import { isSecretKey } from '../core/redact.js'
 import { readFileAtRef } from '../core/git-show.js'
+import { normalizeChannelName } from './channel-aliases.js'
 
 export interface LoadConfigOptions {
   projectRoot: string
@@ -261,20 +262,51 @@ function warnOnInlineSecretHeaders(config: MmrConfigParsed, warn: WarningSink): 
   }
 }
 
+/**
+ * Remap alias channel-map keys (e.g. `agy`) to their canonical key
+ * (`antigravity`) in a single config overlay, BEFORE it is deep-merged. When an
+ * overlay declares both an alias and its canonical key, the canonical wins and a
+ * warning is emitted. Overlays without a `channels` map pass through unchanged.
+ */
+function normalizeOverlayChannelKeys(
+  overlay: Record<string, unknown>,
+  warn: WarningSink,
+): Record<string, unknown> {
+  if (!isPlainRecord(overlay.channels)) return overlay
+  const src = overlay.channels as Record<string, unknown>
+  const out: Record<string, unknown> = {}
+  for (const [key, val] of Object.entries(src)) {
+    const canonical = normalizeChannelName(key)
+    if (canonical !== key) {
+      if (Object.prototype.hasOwnProperty.call(src, canonical)) {
+        warn(
+          `mmr: config channel "${key}" is an alias for "${canonical}"; `
+          + `"${canonical}" is also set — ignoring "${key}"`,
+        )
+        continue
+      }
+      warn(`mmr: config channel "${key}" is an alias for "${canonical}"; using "${canonical}"`)
+    }
+    out[canonical] = val
+  }
+  return { ...overlay, channels: out }
+}
+
 function loadConfigLayers(opts: LoadConfigOptions): ConfigLayers {
   const { cliOverrides } = opts
   const userHome = opts.userHome ?? os.homedir()
+  const warn: WarningSink = opts.onWarning ?? console.warn
 
   let merged: Record<string, unknown> = structuredClone(DEFAULT_CONFIG) as unknown as Record<string, unknown>
 
   const userConfigPath = path.join(userHome, '.mmr', 'config.yaml')
-  const userConfig = loadYaml(userConfigPath) ?? {}
+  const userConfig = normalizeOverlayChannelKeys(loadYaml(userConfigPath) ?? {}, warn)
   if (Object.keys(userConfig).length > 0) {
     resetExtendingChannelBases(merged, userConfig)
     merged = deepMerge(merged, userConfig)
   }
 
-  const projectConfig = loadProjectYaml(opts) ?? {}
+  const projectConfig = normalizeOverlayChannelKeys(loadProjectYaml(opts) ?? {}, warn)
   if (Object.keys(projectConfig).length > 0) {
     resetExtendingChannelBases(merged, projectConfig)
     merged = deepMerge(merged, projectConfig)

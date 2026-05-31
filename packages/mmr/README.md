@@ -2,7 +2,14 @@
 
 Automated multi-model code review with dispatch, reconciliation, and severity gating.
 
-Dispatches reviews to Claude CLI, Codex CLI, and Gemini CLI. Reconciles findings with consensus scoring. Gates on configurable severity thresholds.
+Dispatches reviews to Claude CLI, Codex CLI, Gemini CLI, Grok CLI, and Antigravity CLI. Reconciles findings with consensus scoring. Gates on configurable severity thresholds.
+
+Built-in channels:
+
+- **Antigravity CLI** (`agy`) — Google's forward replacement for the deprecating
+  Gemini CLI. Enabled by default; runs hardened (neutral cwd, `--sandbox`,
+  auto-approve). The channel key is `antigravity`; `agy` is accepted as an alias
+  in `--channels`, `channels_disabled`, and `channels:` config keys.
 
 ## Install
 
@@ -64,6 +71,8 @@ channels:
   codex:
     enabled: true
   gemini:
+    enabled: true
+  antigravity:        # alias: agy
     enabled: true
 ```
 

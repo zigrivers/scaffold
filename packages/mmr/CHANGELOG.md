@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+## [1.5.0] — 2026-05-30
+
+### Added
+- New built-in `antigravity` review channel running Google's `agy` CLI (the
+  forward replacement for the deprecating Gemini CLI), enabled by default and
+  running in parallel with the `gemini` channel until Gemini's 2026-06-18 sunset. Runs
+  hardened: neutral cwd (strips project config + denies repo access), `--sandbox`,
+  auto-approve to avoid headless hangs; real HOME (agy creds live under `$HOME`).
+- `agy` accepted as an alias for the canonical `antigravity` channel name in
+  `--channels`, `channels_disabled`, and `channels:` config keys.
+
+### Fixed
+- Host isolation: the grok credential symlink is now gated on HOME neutralization,
+  so a cwd-only neutral posture (the antigravity channel) no longer creates a
+  `.grok/auth.json` symlink in its working directory.
+
 ## [1.4.1] — 2026-05-30
 
 Reliability hardening for the built-in **grok** review channel. A grok review
