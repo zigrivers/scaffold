@@ -40,7 +40,12 @@ branch_name="${agent_suffix}-workspace"
 # Critical: a project-local worktree dir must be ignored or its contents (a full
 # checkout) would show as untracked and could be committed. Add the rule if the
 # repo does not already ignore it.
-if ! git -C "$REPO_DIR" check-ignore -q .worktrees 2>/dev/null; then
+#
+# Use the trailing-slash path ('.worktrees/') in the check: a directory-only
+# pattern like '.worktrees/' only matches a path git knows to be a directory.
+# Without the slash, `git check-ignore` false-negatives here because this runs
+# *before* the worktree dir exists, which would append a duplicate ignore rule.
+if ! git -C "$REPO_DIR" check-ignore -q .worktrees/ 2>/dev/null; then
     gitignore_file="$REPO_DIR/.gitignore"
     if [ -f "$gitignore_file" ] && [ -s "$gitignore_file" ] && [ "$(tail -c1 "$gitignore_file")" != "" ]; then
         printf '\n' >> "$gitignore_file"

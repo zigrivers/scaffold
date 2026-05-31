@@ -30,8 +30,7 @@ setup() {
 
 teardown() {
     # Worktrees now live inside the repo at <repo>/.worktrees/, so removing
-    # CLONE_DIR also removes them. Prune any stale registrations first.
-    git -C "$CLONE_DIR" worktree prune 2>/dev/null || true
+    # CLONE_DIR (including its .git and worktree metadata) also removes them.
     rm -rf "$ORIG_DIR" "$CLONE_DIR"
 }
 
@@ -58,6 +57,17 @@ teardown() {
     [ "$status" -eq 0 ]
     run git -C "$CLONE_DIR" check-ignore -q .worktrees
     [ "$status" -eq 0 ]
+}
+
+@test "does not duplicate .worktrees/ when it is already gitignored" {
+    # .worktrees/ already ignored, but the directory does not exist yet — the
+    # check must use the trailing-slash form or it false-negatives and appends
+    # a duplicate rule. Regression guard for that.
+    printf '.worktrees/\n' > "$CLONE_DIR/.gitignore"
+    run "$CLONE_DIR/scripts/setup-agent-worktree.sh" "agent-echo"
+    [ "$status" -eq 0 ]
+    run grep -c '^\.worktrees/$' "$CLONE_DIR/.gitignore"
+    [ "$output" = "1" ]
 }
 
 @test "idempotent: succeeds if worktree already exists" {
