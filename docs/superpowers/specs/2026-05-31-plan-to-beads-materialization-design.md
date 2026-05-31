@@ -333,8 +333,11 @@ Run after all issues exist (forward references resolved).
   `bd dep add <blocked-id> <blocker-id>` (re-adding is a no-op).
 - **Remove** stale edges (in the plan no longer) for dependents in
   **`open`, `blocked`, or `deferred`** state; only `in_progress`/`closed` are
-  exempt: `bd dep remove <blocked-id> <blocker-id>`. Compare current edges via
-  `bd dep list <id> --json --direction down`.
+  exempt: `bd dep remove <blocked-id> <blocker-id>`. Read the dependent's current
+  blockers via `bd dep list <id> --direction down --json` — **verified
+  empirically on v1.0.5**: `--direction down` returns *what `<id>` depends on*
+  (its blockers/upstream), which is exactly the edge set to reconcile; `up`
+  would return *dependents* (downstream) and is the wrong direction here.
 - **No manual status reconciliation is needed** after add/remove. Readiness is
   computed from open blockers (verified): removing the last blocker makes a task
   ready again on its own; adding a blocker excludes it from `bd ready` while
@@ -373,31 +376,41 @@ materialize: C created, U updated, K unchanged,
 Extend the **Beads Detection** block in both build prompts. The decisive
 **control-flow rule** (it is what prevents reintroducing the false-done bug):
 
-> **The claim loop is reached only when a confirmed, positive count of
-> `plan_task_id` issues exists, and it claims only plan-derived issues:**
+> **The claim loop is reached only when every current plan task is present in
+> Beads, and it claims only plan-derived issues:**
 > `bd ready --claim --has-metadata-key plan_task_id --json`. Scoping by
 > `plan_task_id` is required so the loop never claims the bootstrap "initialize
 > Beads" bead or any manually-created issue — only materialized plan tasks.
 > In every other branch the prompt drives the loop from the markdown
 > playbook/plan instead — it must never fall through to a claim against an empty
-> or unpopulated tracker.
+> or **partially-materialized** tracker.
 
-Decision table for the Beads Detection block:
+The gate is a **set comparison, not a count.** A positive count is *not* proof
+the current plan is materialized — a partially-failed import, a stale Beads DB
+from an older plan, or a plan update that added task IDs all leave count > 0
+while current-plan tasks are missing, which would silently skip work. So the
+preflight compares:
+
+- `PLAN_IDS` = the stable task IDs in the current `docs/implementation-plan.md`.
+- `MAT_IDS` = the `plan_task_id` values across Beads issues
+  (`bd list --all --limit 0 --has-metadata-key plan_task_id --json`).
+
+If `PLAN_IDS ⊆ MAT_IDS` (every current task already exists) → claim loop.
+Otherwise → (re-)materialize, which is idempotent and also reconciles
+extras/stale, then re-evaluate. Decision table:
 
 | Condition | Action |
 |---|---|
 | `beads_usable` false (no `.beads/`, no/old `bd`, no `jq`) | Markdown playbook loop. Do **not** call `bd`. |
-| Usable; `plan_task_id` count > 0 | Scoped claim loop: `bd ready --claim --has-metadata-key plan_task_id --json`. |
-| Usable; count = 0; plan exists **with** stable task IDs | Materialize (locked — see Concurrency), re-count; if now > 0 → claim loop, else markdown loop. |
-| Usable; count = 0; plan exists **without** stable task IDs | Markdown loop + emit "re-run planning to assign task IDs". Do **not** claim. |
-| Usable; count = 0; materialize command returns non-zero | Markdown loop + surface the error. Do **not** claim. |
+| Usable; plan has **no** stable task IDs | Markdown loop + emit "re-run planning to assign task IDs". Do **not** claim. |
+| Usable; `PLAN_IDS ⊆ MAT_IDS` | Scoped claim loop: `bd ready --claim --has-metadata-key plan_task_id --json`. |
+| Usable; `PLAN_IDS ⊄ MAT_IDS` | Materialize (locked — see Concurrency), then re-check; if now `⊆` → claim loop, else markdown loop. |
+| Usable; materialize command returns non-zero | Markdown loop + surface the error. Do **not** claim. |
 
-The count is taken with `bd list --all --limit 0 --has-metadata-key
-plan_task_id --json | jq 'length'`, with `jq`/`bd` failures defaulting the count
-to a sentinel that routes to the markdown loop (never to a blind claim). The
-preflight is idempotent — re-import is a no-op once issues exist. The exact,
-tested shell lives in the implementation prompt; this spec fixes the routing
-rule above.
+`PLAN_IDS`/`MAT_IDS` are built with `jq`; any `jq`/`bd` failure routes to the
+markdown loop (never a blind claim). The preflight is idempotent — re-import is
+a no-op when the sets already match. The exact, tested shell lives in the
+implementation prompt; this spec fixes the routing rule above.
 
 ### Concurrency (multi-agent)
 
@@ -472,8 +485,12 @@ prompt.
   open/blocked/deferred dependents (so blocked tasks can be unblocked).
 - **AC/description changed while in_progress** → fields untouched; a single
   `bd comment` warning posted per distinct change (`ac_warn_hash` guards spam).
-- **All plan tasks closed** → `--all --limit 0` count is non-zero, so the
-  preflight does not falsely re-import completed work.
+- **All plan tasks closed** → every `PLAN_IDS` member is in `MAT_IDS` (the count
+  uses `--all --limit 0`), so the preflight sees the plan as fully materialized
+  and does not falsely re-import completed work.
+- **Partial/failed prior import, or plan update adding task IDs** → `PLAN_IDS ⊄
+  MAT_IDS`, so the preflight re-materializes the missing tasks rather than
+  trusting a positive count and skipping unmaterialized work.
 - **More than 50 plan tasks** → `--limit 0` ensures stale/preflight passes see
   the full set (default page size is 50).
 - **Plan missing task IDs** (pre-prerequisite plan or hand-edited/corrupted) →
@@ -551,6 +568,9 @@ prompts use, against the project's installed `bd`:
 - **Scale**: a plan with >50 tasks is fully reconciled (`--limit 0`), with a
   test asserting no truncation at the default page size.
 - **`--all` visibility**: an all-`closed` plan is not re-imported by the preflight.
+- **Drift / partial import**: a plan with a task ID absent from Beads
+  (`PLAN_IDS ⊄ MAT_IDS`) triggers re-materialization even though count > 0; the
+  build does not enter the claim loop with that task missing.
 - **Claim scoping**: with a bootstrap bead (no `plan_task_id`) plus materialized
   plan tasks present, the build loop's `bd ready --claim --has-metadata-key
   plan_task_id` never claims the bootstrap bead or a manually-created issue.
