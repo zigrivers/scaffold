@@ -342,8 +342,7 @@ resolved by Pass 0), look it up in that map:
    - **`in_progress`** → **do not mutate fields** (work is underway). If the
      plan's AC/description changed, post a warning — **idempotently**: store a
      hash of the last-warned plan text in metadata `ac_warn_hash` (set with the
-     verified targeted flag `bd update <id> --set-metadata ac_warn_hash=<hash>`,
-     **not** `--metadata`, which replaces the whole object) and post the
+     targeted `bd update <id> --set-metadata ac_warn_hash=<hash>`) and post the
      `bd comment` only when the hash differs, so re-runs don't spam comments.
    - **`closed`** → leave entirely untouched.
 
@@ -365,22 +364,28 @@ agent could add an execution blocker between two plan tasks during the build,
 and deleting it just because it's absent from the markdown plan would corrupt
 Beads-owned execution state and make work claimable too early. So:
 
-- **Add** edges in the plan's `depends_on` that are not already present, only
-  when the dependent is **`open`/`blocked`/`deferred`** (never mutate
-  `in_progress`/`closed`): `bd dep add <blocked-id> <blocker-id>` (re-adding is a
-  no-op). Record the new owned set in `plan_deps`
-  (`bd update <id> --set-metadata plan_deps=<csv>`).
+For each **`open`/`blocked`/`deferred`** dependent (never mutate
+`in_progress`/`closed`), reconcile against the plan's `depends_on` list:
+
+- **Add** plan edges not already present: `bd dep add <blocked-id> <blocker-id>`
+  (re-adding is a no-op).
 - **Remove** an edge only when it is **in the prior `plan_deps`** (materializer
-  created it) **and** is **absent from the current plan** `depends_on` — and the
-  dependent is `open`/`blocked`/`deferred`: `bd dep remove <blocked-id>
-  <blocker-id>`. Edges **not** in `plan_deps` (manual/external blockers) are
-  preserved untouched; if a manual edge happens to collide with a plan edge,
-  keep it and note it in the summary rather than deleting. The dependent's
-  current edges come from the bulk fetch's inline `dependencies` array
-  (`depends_on_id`, `type`); a per-issue read, if needed, is
-  `bd dep list <id> --direction down --json` — **verified on v1.0.5**:
-  `--direction down` returns *what `<id>` depends on* (its blockers/upstream),
-  exactly the edge set to reconcile; `up` returns *dependents* and is wrong here.
+  created it) **and** is **absent from the current plan** `depends_on`:
+  `bd dep remove <blocked-id> <blocker-id>`. Edges **not** in `plan_deps`
+  (manual/external blockers) are preserved untouched; a manual edge colliding
+  with a plan edge is kept and noted in the summary, not deleted.
+- **Rewrite `plan_deps` authoritatively at the end** of each issue's reconcile:
+  `bd update <id> --set-metadata plan_deps=<current-plan-owned-csv>` (or
+  `--unset-metadata plan_deps` when the set is now empty). This is required so a
+  later manual re-add of a previously-removed blocker is **not** misclassified as
+  materializer-owned on the next run — `plan_deps` must always reflect exactly
+  the current plan-owned edges, not the historical union.
+
+The dependent's current edges come from the bulk fetch's inline `dependencies`
+array (`depends_on_id`, `type`); a per-issue read, if needed, is
+`bd dep list <id> --direction down --json` — **verified on v1.0.5**:
+`--direction down` returns *what `<id>` depends on* (its blockers/upstream),
+exactly the edge set to reconcile; `up` returns *dependents* and is wrong here.
 - **No manual status reconciliation is needed** after add/remove. Readiness is
   computed from open blockers (verified): removing the last blocker makes a task
   ready again on its own; adding a blocker excludes it from `bd ready` while
@@ -452,7 +457,14 @@ correct and acceptable. Decision table:
 | `beads_usable` false (no `.beads/`, no/old `bd`, no `jq`) | Markdown playbook loop. Do **not** call `bd`. |
 | Usable; plan has **no** stable task IDs | Markdown loop + emit "re-run planning to assign task IDs". Do **not** claim. |
 | Usable; plan has stable IDs | **Always materialize** (locked — see Concurrency): Pass 0a duplicate guard → 0b/1/2/3 reconcile. On success → scoped claim loop `bd ready --claim --has-metadata-key plan_task_id --json`. |
-| Usable; materialize returns non-zero | Markdown loop + surface the error. Do **not** claim. |
+| Usable; materialize returns non-zero | **Fail closed.** Stop and surface the error; do **not** claim **and do not** silently markdown-fallback. |
+
+**Markdown fallback is only safe *before* materialization is attempted** (Beads
+unusable, or the plan has no stable IDs). Once materialization starts on a usable
+Beads tracker, earlier passes may already have created/updated/closed issues — so
+a mid-run failure must **fail closed**: stop the build and require the error to be
+fixed, rather than dropping to the markdown loop (which bypasses scoped claiming
+and would let Beads and the actual work diverge).
 
 For multi-agent, "always materialize" still means **once per wave** — the
 orchestrator runs it under the lock before fan-out (see Concurrency); workers do
@@ -607,10 +619,11 @@ prompts use, against the project's installed `bd`:
   (filtering + JSON `.metadata` shape)
 - `bd create … --parent --metadata --external-ref --description --json`
   (returned `.id`)
-- `bd update <id> --title -d -p --parent --set-metadata key=value` — use the
-  **targeted** `--set-metadata` (verified present in v1.0.5) for single-key
-  writes like `ac_warn_hash`; `--metadata` **replaces** the whole object and
-  must not be used for partial updates
+- `bd update <id> --title -d -p --parent --set-metadata key=value` — prefer the
+  **targeted** `--set-metadata` for single-key writes like `ac_warn_hash`/
+  `plan_deps` (clearest intent). Note (verified on v1.0.5): `--metadata '{…}'`
+  does a **shallow key merge**, not a full replace — existing keys survive — so
+  it is also safe, but `--set-metadata`/`--unset-metadata` are the precise tools
 - `bd ready --claim --has-metadata-key plan_task_id --json` (scoped claim —
   verified to accept the filter and exclude non-plan issues on v1.0.5)
 - `bd dep add` / `bd dep remove` / `bd dep list <id> --json` / `bd dep cycles`
@@ -658,6 +671,13 @@ prompts use, against the project's installed `bd`:
   plan-derived tasks (not in the plan, not in `plan_deps`) survives a materializer
   run — only edges recorded in `plan_deps` and absent from the current plan are
   removed.
+- **Remove-then-manual-readd**: remove a dep from the plan (materializer removes
+  the edge and rewrites `plan_deps`); then manually re-add the same blocker; a
+  subsequent materializer run must **not** delete it (it is no longer in
+  `plan_deps`).
+- **Fail-closed on materialize error**: if a pass errors after some issues were
+  written, the build stops with the error surfaced — it does **not** drop to the
+  markdown loop or enter the claim loop.
 - **Scale**: a plan with >50 tasks is fully reconciled (`--limit 0`), with a
   test asserting no truncation at the default page size.
 - **`--all` visibility**: an all-`closed` plan is a materializer no-op (closed
