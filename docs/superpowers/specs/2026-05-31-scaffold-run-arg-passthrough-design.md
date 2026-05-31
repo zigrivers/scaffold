@@ -132,8 +132,8 @@ Behavior (empirically verified against yargs 17.7.2 with root `.strict()` + the
 | `scaffold run review-pr 376` | `[376]` |
 | `scaffold run review-pr 376 --fix-threshold P1` | `[376, '--fix-threshold', 'P1']` |
 | `scaffold run review-pr 376 --fix-threshold=P1` | `[376, '--fix-threshold=P1']` |
-| `scaffold run review-pr 376 --format text` | `[376]` (`--format` consumed; `argv.format='text'`) |
-| `scaffold run --format text review-pr 376` | `[376]` (interleaved global flag consumed) |
+| `scaffold run review-pr 376 --format json` | `[376]` (`--format` consumed; `argv.format='json'`) |
+| `scaffold run --format json review-pr 376` | `[376]` (interleaved global flag consumed) |
 | `scaffold run create-prd --force` | `[]` (`--force` is a known option, consumed) |
 | `scaffold run review-pr` | `[]` |
 | sibling `scaffold validate --bogus` | n/a — **still rejected** (`Unknown argument: bogus`); `.strict(false)` does not leak |
@@ -357,10 +357,12 @@ template would.
 **This PR therefore ships:** the arg-binding fix, the §2 functional-replacer, the
 per-tool mitigations above (multi-agent agent-name validation, `<arguments>`
 delimiter, `=`-separator regex), and the shell-quoting **audit** (so no *new*
-unquoted usages land). **Follow-up:** open a separate spec for a proper
-engine-side safe-transport / CLI-boundary sanitization of `$ARGUMENTS` for shell
-contexts, deciding there how to reconcile it with free-text prose steps. Until
-then, the residual injection risk for self-supplied args is **accepted**.
+unquoted usages land). **Follow-up:** tracked as
+[zigrivers/scaffold#459](https://github.com/zigrivers/scaffold/issues/459) — a
+separate spec for a proper engine-side safe-transport / CLI-boundary sanitization
+of `$ARGUMENTS` for shell contexts, deciding there how to reconcile it with
+free-text prose steps. Until then, the residual injection risk for self-supplied
+args is **accepted**.
 
 The space-free-token contract (Known limitations) further shrinks the surface:
 values with embedded spaces/quotes are out of scope and not silently re-tokenized
@@ -394,8 +396,8 @@ command) and assert the value passed to a stubbed `AssemblyEngine.assemble`:
 
 - `run review-pr 376` → `arguments: '376'`
 - `run review-pr 376 --fix-threshold P1` → `arguments: '376 --fix-threshold P1'`
-- known global flag interleaved: `run review-pr 376 --format text` and
-  `run --format text review-pr 376` → `--format` consumed by scaffold,
+- known global flag interleaved: `run review-pr 376 --format json` and
+  `run --format json review-pr 376` → `--format` consumed by scaffold,
   `arguments: '376'` (proves global flags are not swallowed into `args`, and
   `.strict(false)` does not leak)
 - a **sibling** command still rejects an unknown flag — e.g.
