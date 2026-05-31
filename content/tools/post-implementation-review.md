@@ -65,7 +65,7 @@ REPORT_ONLY=false
 
 # Detect --fix-threshold flag
 FIX_THRESHOLD=""
-if [[ "$ARGUMENTS" =~ (^|[[:space:]])--fix-threshold[[:space:]]+(P[0-3])($|[[:space:]]) ]]; then
+if [[ "$ARGUMENTS" =~ (^|[[:space:]])--fix-threshold[[:space:]=]+(P[0-3])($|[[:space:]]) ]]; then
   FIX_THRESHOLD="${BASH_REMATCH[2]}"
 fi
 

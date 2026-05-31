@@ -6,8 +6,24 @@ All notable changes to Scaffold are documented here.
 
 ### Fixed
 
+- `scaffold run <step> <args…>` now binds trailing arguments into the
+  `$ARGUMENTS` placeholder. Previously trailing tokens were dropped and only
+  `--instructions` populated `$ARGUMENTS`, so `scaffold run review-pr 376` emitted
+  an unbound `$ARGUMENTS` and agents fell back to raw `mmr` commands.
+- The `$ARGUMENTS` substitution now uses a functional replacer, so argument
+  values containing `$`-patterns (`$&`, `$1`, `${VAR}`) are inserted verbatim, and
+  a literal `$ARGUMENTS` token is never left in the output (it now resolves to an
+  empty string when no arguments are supplied — a behavioral cleanup; no pipeline
+  step relied on the literal surviving).
 - **Knowledge-freshness cron is now robust to non-conforming model output.** A model that pairs a no-edit verdict (`current`/`minor-drift`) with proposed changes — observed with the DeepSeek provider — no longer hard-fails and strands the entry; the stray changes are demoted to advisory notes so the entry is still reviewed-stamped, keeping the daily audit budget flowing. Internal CI tooling only; no package release required.
 - **`.gitignore` ignores a top-level `node_modules` symlink**, not just the directory.
+
+### Changed
+
+- `--fix-threshold=P1` (the `=` form) is now accepted by `review-pr`,
+  `review-code`, and `post-implementation-review`, alongside `--fix-threshold P1`.
+- `multi-agent-start` / `multi-agent-resume` prompts now validate the agent name
+  to `^[A-Za-z0-9_-]+$` and quote its shell expansions.
 
 ## [3.31.1] — 2026-05-31
 
