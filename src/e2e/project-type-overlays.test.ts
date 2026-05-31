@@ -2005,4 +2005,40 @@ describe('mcp-server overlay integration', () => {
     expect(state.steps['review-database']?.enabled).toBe(true)
     expect(state.steps['review-database']?.conditional).toBe('if-needed')
   })
+
+  it('overlay enables mcp-tool-resource-contract step', async () => {
+    const state = await resolveMcpServerOverlay()
+
+    expect(state.steps['mcp-tool-resource-contract']?.enabled).toBe(true)
+  })
+
+  it('overlay injects mcp-server knowledge into system-architecture step', async () => {
+    const state = await resolveMcpServerOverlay()
+
+    expect(state.knowledge['system-architecture']).toBeDefined()
+    expect(state.knowledge['system-architecture']).toContain('mcp-transport-patterns')
+    expect(state.knowledge['system-architecture']).toContain('mcp-tool-design')
+  })
+
+  it('overlay injects mcp-authentication into security step', async () => {
+    const state = await resolveMcpServerOverlay()
+
+    expect(state.knowledge['security']).toBeDefined()
+    expect(state.knowledge['security']).toContain('mcp-authentication')
+  })
+
+  it('overlay injects mcp-testing-strategies into tdd step', async () => {
+    const state = await resolveMcpServerOverlay()
+
+    expect(state.knowledge['tdd']).toBeDefined()
+    expect(state.knowledge['tdd']).toContain('mcp-testing-strategies')
+  })
+
+  it('overlay injects mcp-deployment-patterns and mcp-versioning into operations step', async () => {
+    const state = await resolveMcpServerOverlay()
+
+    expect(state.knowledge['operations']).toBeDefined()
+    expect(state.knowledge['operations']).toContain('mcp-deployment-patterns')
+    expect(state.knowledge['operations']).toContain('mcp-versioning')
+  })
 })
