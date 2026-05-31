@@ -19,8 +19,11 @@ const PY_ENTRYPOINTS = [
   'src/main.py', '__main__.py', 'src/__main__.py', 'app/main.py',
 ] as const
 
+// MCP-specific markers only. Bare `new Server(` is intentionally excluded — it
+// is generic (Socket.IO, Apollo, http) and would false-positive when the SDK is
+// merely a dependency. Low-level MCP servers still match via `setRequestHandler`.
 // eslint-disable-next-line max-len
-const TS_REGISTER = /McpServer\s*\(|new Server\s*\(|\.registerTool\s*\(|\.registerResource\s*\(|\.registerPrompt\s*\(|setRequestHandler\s*\(/
+const TS_REGISTER = /McpServer\s*\(|\.registerTool\s*\(|\.registerResource\s*\(|\.registerPrompt\s*\(|setRequestHandler\s*\(/
 // eslint-disable-next-line max-len
 const PY_REGISTER = /FastMCP\s*\(|@\w+\.tool|@\w+\.resource|@\w+\.prompt|@\w+\.(call_tool|list_tools|read_resource|list_resources|get_prompt|list_prompts)/
 
