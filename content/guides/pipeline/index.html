@@ -1392,7 +1392,7 @@ run these <em>over and over</em> while actually writing code.</li>
 <p>The 16 phases are the single source of truth in code: the <code>PHASES</code> constant
 (<span class="fp" data-path="src/types/frontmatter.ts:6">src/types/frontmatter.ts:6</span>) defines every slug, number, and display
 name. Everything in this guide is anchored to it.</p>
-<div class="callout callout-note"><p><strong>89 meta-prompts, not 89 steps you run.</strong> The pipeline directory holds 89 files
+<div class="callout callout-note"><p><strong>90 meta-prompts, not 90 steps you run.</strong> The pipeline directory holds 90 files
 across 16 phase directories, but most projects run only a fraction. Game,
 multi-service, and platform-specific steps are disabled unless an overlay turns
 them on, and many steps are conditional (see <a href="#methodology--depth">Methodology &#x26; depth</a>).</p></div>
@@ -1799,7 +1799,7 @@ how that audit works and what the nine lenses check.</p>
 
 
 
-<table><thead><tr><th>path</th><th>what it holds</th></tr></thead><tbody><tr><td><code>content/pipeline/&#x3C;phase>/*.md</code></td><td>The 89 meta-prompt files, one directory per phase</td></tr><tr><td><code>content/methodology/*.yml</code></td><td>Presets (<code>mvp</code>, <code>custom-defaults</code>, <code>deep</code>) + project-type overlays</td></tr><tr><td><code>content/knowledge/</code></td><td>Domain entries injected into prompts during assembly</td></tr><tr><td><code>src/types/frontmatter.ts</code></td><td>The canonical <code>PHASES</code> constant + frontmatter schema</td></tr><tr><td><code>src/cli/commands/</code></td><td><code>next</code>, <code>run</code>, <code>complete</code>, <code>skip</code>, <code>rework</code>, <code>reset</code>, <code>status</code></td></tr><tr><td><code>.scaffold/state.json</code></td><td>Per-step completion state (planning phases only)</td></tr></tbody></table>
+<table><thead><tr><th>path</th><th>what it holds</th></tr></thead><tbody><tr><td><code>content/pipeline/&#x3C;phase>/*.md</code></td><td>The 90 meta-prompt files, one directory per phase</td></tr><tr><td><code>content/methodology/*.yml</code></td><td>Presets (<code>mvp</code>, <code>custom-defaults</code>, <code>deep</code>) + project-type overlays</td></tr><tr><td><code>content/knowledge/</code></td><td>Domain entries injected into prompts during assembly</td></tr><tr><td><code>src/types/frontmatter.ts</code></td><td>The canonical <code>PHASES</code> constant + frontmatter schema</td></tr><tr><td><code>src/cli/commands/</code></td><td><code>next</code>, <code>run</code>, <code>complete</code>, <code>skip</code>, <code>rework</code>, <code>reset</code>, <code>status</code></td></tr><tr><td><code>.scaffold/state.json</code></td><td>Per-step completion state (planning phases only)</td></tr></tbody></table>
 <p>The phase list, ordering, and slugs are defined exactly once, in <code>PHASES</code>
 (<span class="fp" data-path="src/types/frontmatter.ts:6">src/types/frontmatter.ts:6</span>); every doc, skill, and command resolves
 against it.</p></main>

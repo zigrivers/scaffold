@@ -20,6 +20,54 @@ All notable changes to Scaffold are documented here.
   closed** (rather than silently falling back to the markdown plan and re-running
   completed work) when a `.beads/` tracker exists but `bd`/`jq` is missing or
   older than v1.0.5 — install/upgrade `bd` (≥ v1.0.5) and `jq` to proceed.
+- **`mcp-server` project type** — Scaffold now supports building MCP servers
+  with a rich configuration surface: language (`typescript`/`python`),
+  transport (`stdio`/`streamable-http`/`sse`), primitive mix
+  (tools/resources/prompts), auth strategy (`none`/`oauth`/`apikey`),
+  deployment target (`local`/`hosted`), and statefulness.
+  Enabled via `--project-type mcp-server` or auto-detected when any
+  `--mcp-*` CLI flag is supplied.
+- **`--mcp-*` CLI flags** — `--mcp-language`, `--mcp-transport`,
+  `--mcp-primitives`, `--mcp-auth`, `--mcp-deployment`, and `--mcp-stateful`
+  configure the MCP server project; any of these flags also auto-sets
+  `--project-type mcp-server`.
+- **`mcp-server-overlay.yml`** — Project-type overlay that disables
+  UI-focused pipeline steps (`design-system`, `ux-spec`, `review-ux`) and
+  marks `database-schema`/`review-database` as if-needed, since MCP servers
+  have no UI layer. Injects all 12 `content/knowledge/mcp-server/` entries
+  into the relevant pipeline steps.
+- **`content/knowledge/mcp-server/`** — 12 new domain expertise entries
+  covering MCP protocol fundamentals, tool design patterns, resource design,
+  transport patterns (stdio/SSE/HTTP), SDK selection (TypeScript/Python/
+  FastMCP), authentication (OAuth 2.1/API keys), error handling, testing
+  strategies, observability, deployment patterns, versioning and
+  compatibility, and prompt primitives.
+- **`mcp-tool-resource-contract` pipeline step** — New specification-phase
+  step (order 835, alongside `api-contracts` at order 830) that produces an
+  explicit contract document defining MCP tool schemas, resource URI patterns,
+  and prompt templates. Analogous to `api-contracts` but scoped to MCP
+  primitives (tools/resources/prompts) rather than HTTP endpoints. Only
+  activates for `mcp-server` projects (enabled via the overlay; declared
+  disabled in the base presets). Its output (`docs/mcp-contract.md`) is wired
+  into the downstream implementation-plan, security, eval, and test steps.
+  (The stdio cross-field invariants — e.g. stdio transport must use `none`
+  auth, and cannot be `hosted` — are enforced separately at config-parse time
+  by `McpServerConfigSchema` + the coupling validator, not by this step.)
+- **Conservative `mcp-server` detector** — The project-type auto-detector
+  looks for `@modelcontextprotocol/sdk`, `mcp`, or `fastmcp` dependencies
+  paired with an entrypoint that registers tools or resources; a lone MCP
+  client dependency does not trigger detection, avoiding false positives.
+- **Knowledge base grows to 278 entries across 20 categories** — the new
+  `mcp-server` category joins the existing nineteen.
+
+### Fixed
+
+- **README knowledge-base counts reconciled** — the hand-maintained
+  per-category entry counts in the README had drifted from the live inventory
+  over prior releases (e.g. `core` 26→35, `backend` 14→22). Realigned them with
+  the authoritative `content/guides/knowledge-freshness/` inventory while adding
+  the `mcp-server` category, so the README totals/breakdown now match the
+  generated source of truth.
 
 ## [3.32.1] — 2026-05-31
 

@@ -42,6 +42,7 @@ steps:
   database-schema: { enabled: false }
   review-database: { enabled: false }
   api-contracts: { enabled: false }
+  mcp-tool-resource-contract: { enabled: false }
   review-api: { enabled: false }
   ux-spec: { enabled: false }
   review-ux: { enabled: false }

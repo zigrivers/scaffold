@@ -75,7 +75,7 @@ grounded LLM"]
   end
   subgraph gap[Gap arm]
     TAIL["gap-signal-tail
-89 pipeline steps"] --> EVENT["scaffold observe event
+90 pipeline steps"] --> EVENT["scaffold observe event
 knowledge_gap_signal"]
     EVENT --> LEDGER["ledger
 activity.jsonl"]
@@ -519,6 +519,7 @@ Counted live from every entry's `sources[*].url` at build time.
 | --- | --- |
 | martinfowler.com | 37 |
 | developer.mozilla.org | 24 |
+| modelcontextprotocol.io | 19 |
 | owasp.org | 17 |
 | developer.android.com | 15 |
 | the-turing-way.netlify.app | 15 |
@@ -527,11 +528,10 @@ Counted live from every entry's `sources[*].url` at build time.
 | sre.google | 12 |
 | w3.org | 12 |
 | microservices.io | 11 |
+| rfc-editor.org | 11 |
 | ethereum.org | 10 |
-| rfc-editor.org | 10 |
 | consensys.github.io | 9 |
 | docs.openzeppelin.com | 9 |
-| opentelemetry.io | 9 |
 :::
 <!-- /gen:host-citations -->
 
@@ -602,7 +602,7 @@ Every host plus its category, and the pinned GitHub repos.
 Totals over `content/knowledge/`, broken down per category.
 
 <!-- gen:kb-inventory -->
-**266 entries** across 19 categories:
+**278 entries** across 20 categories:
 
 | Category | Entries |
 | --- | --- |
@@ -617,6 +617,7 @@ Totals over `content/knowledge/`, broken down per category.
 | browser-extension | 12 |
 | data-pipeline | 12 |
 | library | 12 |
+| mcp-server | 12 |
 | ml | 12 |
 | mobile-app | 12 |
 | cli | 10 |

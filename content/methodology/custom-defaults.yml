@@ -43,6 +43,7 @@ steps:
   database-schema: { enabled: true, conditional: "if-needed" }
   review-database: { enabled: true, conditional: "if-needed" }
   api-contracts: { enabled: true, conditional: "if-needed" }
+  mcp-tool-resource-contract: { enabled: false }
   review-api: { enabled: true, conditional: "if-needed" }
   ux-spec: { enabled: true, conditional: "if-needed" }
   review-ux: { enabled: true, conditional: "if-needed" }
