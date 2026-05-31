@@ -280,6 +280,11 @@ describe('status command', () => {
     const stderr = stderrLines.join('')
     expect(stderr).toMatch(/pipeline content/i)
     expect(stderr).toMatch(/unreliable|misleading|missing|broken/i)
+
+    // And the misleading "100%" progress line must NOT be rendered.
+    const stdout = writtenLines.join('')
+    expect(stdout).not.toContain('100%')
+    expect(stdout).toMatch(/unavailable/i)
   })
 
   it('does not warn about unresolved pipeline content when steps are discovered', async () => {
@@ -462,11 +467,15 @@ describe('status command', () => {
     expect(allOutput).toContain('Next eligible')
   })
 
-  it('handles empty pipeline with 0% and shows none for next eligible', async () => {
+  it('shows progress as unavailable (not a percentage) when no pipeline content resolves', async () => {
+    // An empty meta-prompt map means content could not be resolved; rendering a
+    // percentage here (0% or, with completed state entries, a misleading 100%)
+    // would imply the pipeline is understood when it isn't.
     mockStateWith(MockStateManager, {}, { next_eligible: [] })
     await statusCommand.handler(defaultArgv())
     const allOutput = writtenLines.join('')
-    expect(allOutput).toContain('0%')
+    expect(allOutput).toMatch(/unavailable/i)
+    expect(allOutput).not.toContain('0%')
     expect(allOutput).toContain('none')
     expect(exitSpy).toHaveBeenCalledWith(0)
   })
