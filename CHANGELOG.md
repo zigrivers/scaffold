@@ -4,10 +4,43 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.32.1] — 2026-05-31
+
+Standardizes where parallel-agent git worktrees are created. Previously
+`setup-agent-worktree.sh` placed each worktree as a repo *sibling*
+(`../<repo>-<agent>`), scattering them outside the project; they now live
+project-local under `<repo>/.worktrees/<agent>` — one consistent location that
+matches the `using-git-worktrees` convention. New projects scaffolded by the
+`git-workflow` step inherit the same convention.
+
+### Changed
+
+- **Agent worktrees are created under `<repo>/.worktrees/<agent>`** instead of as
+  repo siblings. `setup-agent-worktree.sh` now also ensures `.worktrees/` is
+  gitignored before creating the worktree, so a worktree's checkout is never
+  accidentally committed.
+- The `git-workflow` meta-prompt instructs downstream-generated worktree scripts
+  to use the `.worktrees/` convention and the gitignore guard, so newly
+  scaffolded projects are consistent with Scaffold itself.
+
+### Added
+
+- `.worktrees/` is added to the Scaffold-managed `.gitignore` block, so projects
+  scaffolded going forward ignore agent worktrees automatically.
+
 ### Fixed
 
-- **Knowledge-freshness cron is now robust to non-conforming model output.** A model that pairs a no-edit verdict (`current`/`minor-drift`) with proposed changes — observed with the DeepSeek provider — no longer hard-fails and strands the entry; the stray changes are demoted to advisory notes so the entry is still reviewed-stamped, keeping the daily audit budget flowing. Internal CI tooling only; no package release required.
+- **Knowledge-freshness cron is now robust to non-conforming model output.** A model that pairs a no-edit verdict (`current`/`minor-drift`) with proposed changes — observed with the DeepSeek provider — no longer hard-fails and strands the entry; the stray changes are demoted to advisory notes so the entry is still reviewed-stamped, keeping the daily audit budget flowing.
 - **`.gitignore` ignores a top-level `node_modules` symlink**, not just the directory.
+
+### Migration
+
+- Existing sibling worktrees are **not** auto-migrated and keep working where
+  they are; only newly created worktrees use `.worktrees/`. If you re-run
+  `setup-agent-worktree.sh <agent>` for an agent that still has an old sibling
+  worktree checked out, tear the old one down first
+  (`scripts/teardown-agent-worktree.sh <path>`) — the workspace branch can only
+  be checked out in one worktree at a time.
 
 ## [3.32.0] — 2026-05-31
 
