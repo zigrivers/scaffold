@@ -32,12 +32,14 @@ import type { ArtifactEntry } from '../../types/assembly.js'
 /** Build the interactive-mode "EXECUTE NOW" banner prepended to an emitted prompt. */
 function buildRunHeader(step: string, boundArgs: string): string {
   const argsLine = boundArgs.trim() !== '' ? boundArgs : '(none — auto-detect)'
+  const title = `═══ scaffold run: ${step} — EXECUTE NOW ═══`
+  const rule = '═'.repeat(title.length)
   return [
-    `═══ scaffold run: ${step} — EXECUTE NOW ═══`,
+    title,
     'This is a runnable workflow, not reference text.',
     `ARGUMENTS: ${argsLine}`,
     'Follow every step below in order. Do not substitute an ad-hoc shortcut for the workflow.',
-    '════════════════════════════════════════════',
+    rule,
     '',
     '',
   ].join('\n')
