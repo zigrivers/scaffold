@@ -1631,6 +1631,17 @@ the <code>finding_key</code>, verdict internals, and <code>.mmr.yaml</code>.</li
       if (rail) rail.classList.toggle('open', open);
       var toggle = document.querySelector('.nav-toggle');
       if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      // Modal-drawer focus containment: while open, make the page content inert
+      // (out of tab order + a11y tree) and move focus into the drawer; on close,
+      // restore content and return focus to the toggle.
+      var main = document.querySelector('.content');
+      if (main) main.inert = open;
+      if (open) {
+        var first = rail && rail.querySelector('a');
+        if (first) first.focus();
+      } else if (toggle) {
+        toggle.focus();
+      }
     }
     document.querySelectorAll('[data-action="nav"]').forEach(function(btn) {
       btn.addEventListener('click', function() {
