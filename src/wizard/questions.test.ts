@@ -1142,4 +1142,34 @@ describe('mcp-server wizard (auto mode)', () => {
     expect(output.confirm).not.toHaveBeenCalled()
     expect(output.multiSelect).not.toHaveBeenCalled()
   })
+
+  // Fix 2(a): auto + streamable-http transport + no deployment flag → deployment defaults to 'local'
+  it('auto + streamable-http transport with no --mcp-deployment flag defaults deployment to local', async () => {
+    const output = makeOutputContext()
+
+    const answers = await askWizardQuestions({
+      output, suggestion: 'deep', auto: true,
+      methodology: 'deep',
+      projectType: 'mcp-server',
+      mcpServerFlags: { mcpLanguage: 'typescript', mcpTransport: 'streamable-http' },
+    })
+    expect(answers.mcpServerConfig).toEqual({
+      language: 'typescript', transport: 'streamable-http', primitives: ['tools'],
+      auth: 'none', deployment: 'local', stateful: false,
+    })
+    expect(output.select).not.toHaveBeenCalled()
+    expect(output.confirm).not.toHaveBeenCalled()
+  })
+
+  // Fix 2(b): auto + mcpAuth:'oauth' (transport defaults stdio) → wizard throws stdio/auth error
+  it('auto + --mcp-auth oauth with no --mcp-transport throws stdio/auth contradiction', async () => {
+    const output = makeOutputContext()
+
+    await expect(askWizardQuestions({
+      output, suggestion: 'deep', auto: true,
+      methodology: 'deep',
+      projectType: 'mcp-server',
+      mcpServerFlags: { mcpLanguage: 'typescript', mcpAuth: 'oauth' },
+    })).rejects.toThrow(/stdio transport cannot use network auth/)
+  })
 })

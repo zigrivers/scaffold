@@ -276,18 +276,21 @@ export function applyFlagFamilyValidation(argv: Record<string, unknown>): true |
     throw new Error('--mcp-* flags require --project-type mcp-server')
   }
   if (hasMcpServerFlag) {
-    // auth and deployment are only meaningful for non-stdio transports; transport defaults to stdio when unset.
+    // Cross-field guards fire only when --mcp-transport is EXPLICITLY 'stdio'.
+    // An absent --mcp-transport means the wizard will resolve or prompt the
+    // transport interactively, so rejecting upfront would break valid usage
+    // such as: scaffold init --project-type mcp-server --mcp-auth oauth
+    // (user will pick streamable-http in the wizard).
     const mcpTransport = argv['mcp-transport']
     const mcpAuth = argv['mcp-auth']
-    const transportIsStdio = mcpTransport === undefined || mcpTransport === 'stdio'
-    if (mcpAuth !== undefined && mcpAuth !== 'none' && transportIsStdio) {
+    if (mcpTransport === 'stdio' && mcpAuth !== undefined && mcpAuth !== 'none') {
       throw new Error(
         'stdio transport cannot use network auth'
         + ' (set --mcp-auth none, or pass --mcp-transport streamable-http)',
       )
     }
     const mcpDeployment = argv['mcp-deployment']
-    if (mcpDeployment === 'hosted' && transportIsStdio) {
+    if (mcpTransport === 'stdio' && mcpDeployment === 'hosted') {
       throw new Error(
         'hosted deployment requires a non-stdio transport'
         + ' (stdio runs locally; pass --mcp-transport streamable-http)',

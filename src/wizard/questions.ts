@@ -570,7 +570,21 @@ export async function askWizardQuestions(options: {
       ?? (transport === 'stdio' ? 'local'
         : (!auto ? await output.select('Deployment?',
           optionsFromCopy(copy.deployment.options, ['local', 'hosted']),
-          'hosted', copy.deployment) as McpServerConfig['deployment'] : 'hosted'))
+          'local', copy.deployment) as McpServerConfig['deployment'] : 'local'))
+
+    // Cross-field contradiction guards (defense-in-depth: catches auto-mode
+    // defaults and interactive transport-choice contradictions that flag
+    // validation no longer pre-rejects because --mcp-transport was absent).
+    if (transport === 'stdio' && auth !== 'none') {
+      throw new Error(
+        'stdio transport cannot use network auth — omit --mcp-auth or choose a non-stdio transport (streamable-http).',
+      )
+    }
+    if (transport === 'stdio' && deployment === 'hosted') {
+      throw new Error(
+        'stdio transport runs locally and cannot be hosted — omit --mcp-deployment or choose a non-stdio transport.',
+      )
+    }
 
     const stateful = options.mcpServerFlags?.mcpStateful
       ?? (!auto ? await output.confirm('Does the server persist state/resources?', false, copy.stateful) : false)

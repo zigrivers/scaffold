@@ -1998,4 +1998,11 @@ describe('mcp-server overlay integration', () => {
     expect(state.steps['database-schema']?.enabled).toBe(true)
     expect(state.steps['database-schema']?.conditional).toBe('if-needed')
   })
+
+  it('overlay keeps review-database enabled with conditional if-needed', async () => {
+    const state = await resolveMcpServerOverlay()
+
+    expect(state.steps['review-database']?.enabled).toBe(true)
+    expect(state.steps['review-database']?.conditional).toBe('if-needed')
+  })
 })

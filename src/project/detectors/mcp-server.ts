@@ -62,6 +62,11 @@ export function detectMcpServer(ctx: SignalContext): McpServerMatch | null {
   let confidence: McpServerMatch['confidence']
 
   if (registeredText && registeredFile) {
+    // High confidence: SDK server class instantiation (McpServer/FastMCP/Server)
+    // is strong evidence this is an MCP server project. Either bare instantiation
+    // OR a primitive-registration call (registerTool/registerResource/registerPrompt
+    // and their decorator equivalents) justifies high confidence. When no
+    // primitives are inferred from source, the schema default (['tools']) applies.
     confidence = 'high'
     ev.push(evidence('mcp-registration', registeredFile, 'registers MCP primitives'))
     const transport = inferTransport(registeredText)
