@@ -143,6 +143,17 @@ Fallback: GitHub web UI (Settings > Branches > Add rule).
 
 These are local-only. Each developer/agent runs `make hooks` after cloning.
 
+> **Heads-up for AI agents: a slow `git push` is the pre-push hook, not a hung
+> network.** The pre-push hook runs the full test suite (several minutes) before
+> the upload, with little/no output. Do **not** interpret a quiet push as a
+> network/auth/HTTP-2 failure and kill it early or start diagnosing connectivity
+> — this repo is public, so `git fetch`/`ls-remote` need no auth and return
+> instantly, which can make a slow push look network-specific when it's just the
+> hook. Verify with `GIT_TRACE=1 git push` (you'll see `run_command:
+> .git/hooks/pre-push …` then `1..N  ok 1 …`). If you have **already run
+> `make check-all` green on the exact commit**, skip the redundant run with
+> `git push --no-verify`; otherwise let the hook finish.
+
 ### CI by Design
 
 Quality gates run both locally (`make check-all`) and in CI. The CI workflow is the authoritative gate — local hooks are a convenience.
