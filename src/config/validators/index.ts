@@ -3,6 +3,7 @@ import type { ProjectType } from '../../types/config.js'
 import { backendCouplingValidator } from './backend.js'
 import { webAppCouplingValidator } from './web-app.js'
 import { researchCouplingValidator } from './research.js'
+import { mcpServerCouplingValidator } from './mcp-server.js'
 import { cliCouplingValidator } from './cli.js'
 import { libraryCouplingValidator } from './library.js'
 import { mobileAppCouplingValidator } from './mobile-app.js'
@@ -17,6 +18,7 @@ export const ALL_COUPLING_VALIDATORS: readonly CouplingValidator<unknown>[] = [
   backendCouplingValidator as CouplingValidator<unknown>,
   webAppCouplingValidator as CouplingValidator<unknown>,
   researchCouplingValidator as CouplingValidator<unknown>,
+  mcpServerCouplingValidator as CouplingValidator<unknown>,
   cliCouplingValidator as CouplingValidator<unknown>,
   libraryCouplingValidator as CouplingValidator<unknown>,
   mobileAppCouplingValidator as CouplingValidator<unknown>,
