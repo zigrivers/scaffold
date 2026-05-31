@@ -13,12 +13,22 @@ export const mcpServerCouplingValidator: CouplingValidator<McpServerConfig> = {
       })
     }
     if (config) {
-      const { transport, auth } = config
-      if (auth !== undefined && auth !== 'none' && transport === 'stdio') {
+      const { transport, auth, deployment } = config
+      const transportIsStdio = transport === undefined || transport === 'stdio'
+      if (auth !== undefined && auth !== 'none' && transportIsStdio) {
         ctx.addIssue({
           path: [...path, 'mcpServerConfig', 'auth'],
           code: 'custom',
           message: 'stdio transport cannot use network auth (set auth: none or use a non-stdio transport)',
+        })
+      }
+      if (deployment === 'hosted' && transportIsStdio) {
+        ctx.addIssue({
+          path: [...path, 'mcpServerConfig', 'deployment'],
+          code: 'custom',
+          message:
+            'stdio transport runs locally and cannot be hosted'
+            + ' (set deployment: local or use a non-stdio transport)',
         })
       }
     }

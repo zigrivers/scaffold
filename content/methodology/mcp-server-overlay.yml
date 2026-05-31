@@ -3,8 +3,8 @@ name: mcp-server
 description: >
   MCP Server overlay — an MCP server has no UI, so the design-system and UX
   steps are disabled. database-schema stays available (if-needed) for servers
-  that persist resources/state. Knowledge injection and the
-  mcp-tool-resource-contract step are added in PR2.
+  that persist resources/state. Knowledge injection and an MCP tool/resource
+  contract step are layered on separately.
 project-type: mcp-server
 
 step-overrides:

@@ -1399,4 +1399,31 @@ describe('McpServerConfigSchema', () => {
     })
     expect(result.success).toBe(true)
   })
+
+  it('rejects stdio transport with hosted deployment (superRefine defense-in-depth)', () => {
+    const result = McpServerConfigSchema.safeParse({
+      language: 'python', transport: 'stdio', deployment: 'hosted',
+    })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      const msgs = result.error.issues.map(i => i.message)
+      expect(msgs).toContain(
+        'stdio transport runs locally and cannot be hosted (set deployment: local or use a non-stdio transport)',
+      )
+    }
+  })
+
+  it('accepts streamable-http transport with hosted deployment', () => {
+    const result = McpServerConfigSchema.safeParse({
+      language: 'python', transport: 'streamable-http', deployment: 'hosted',
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts stdio transport with local deployment', () => {
+    const result = McpServerConfigSchema.safeParse({
+      language: 'python', transport: 'stdio', deployment: 'local',
+    })
+    expect(result.success).toBe(true)
+  })
 })

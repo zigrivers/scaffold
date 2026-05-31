@@ -33,4 +33,20 @@ describe('mcpServerCouplingValidator', () => {
       language: 'typescript', transport: 'streamable-http', auth: 'oauth',
     })).toHaveLength(0)
   })
+
+  it('rejects hosted deployment on stdio transport', () => {
+    const issues = runValidate('mcp-server', { language: 'python', transport: 'stdio', deployment: 'hosted' })
+    expect(issues.some(i => /stdio.*cannot be hosted|cannot be hosted/i.test(i.message))).toBe(true)
+  })
+
+  it('rejects hosted deployment when transport is undefined (treated as stdio)', () => {
+    const issues = runValidate('mcp-server', { language: 'python', deployment: 'hosted' })
+    expect(issues.some(i => /stdio.*cannot be hosted|cannot be hosted/i.test(i.message))).toBe(true)
+  })
+
+  it('allows hosted deployment on a non-stdio transport', () => {
+    expect(runValidate('mcp-server', {
+      language: 'typescript', transport: 'streamable-http', deployment: 'hosted',
+    })).toHaveLength(0)
+  })
 })

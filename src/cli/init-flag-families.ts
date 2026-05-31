@@ -276,7 +276,7 @@ export function applyFlagFamilyValidation(argv: Record<string, unknown>): true |
     throw new Error('--mcp-* flags require --project-type mcp-server')
   }
   if (hasMcpServerFlag) {
-    // auth is only meaningful for non-stdio transports; transport defaults to stdio when unset.
+    // auth and deployment are only meaningful for non-stdio transports; transport defaults to stdio when unset.
     const mcpTransport = argv['mcp-transport']
     const mcpAuth = argv['mcp-auth']
     const transportIsStdio = mcpTransport === undefined || mcpTransport === 'stdio'
@@ -284,6 +284,13 @@ export function applyFlagFamilyValidation(argv: Record<string, unknown>): true |
       throw new Error(
         'stdio transport cannot use network auth'
         + ' (set --mcp-auth none, or pass --mcp-transport streamable-http)',
+      )
+    }
+    const mcpDeployment = argv['mcp-deployment']
+    if (mcpDeployment === 'hosted' && transportIsStdio) {
+      throw new Error(
+        'hosted deployment requires a non-stdio transport'
+        + ' (stdio runs locally; pass --mcp-transport streamable-http)',
       )
     }
   }

@@ -464,6 +464,21 @@ describe('mcp-server flag family', () => {
     expect(() => applyFlagFamilyValidation(argv)).not.toThrow()
   })
 
+  it('rejects --mcp-deployment hosted when --mcp-transport is absent (defaults to stdio)', () => {
+    expect(() => applyFlagFamilyValidation({ 'mcp-language': 'typescript', 'mcp-deployment': 'hosted' }))
+      .toThrow(/hosted deployment requires a non-stdio transport/)
+  })
+
+  it('rejects --mcp-deployment hosted with explicit --mcp-transport stdio', () => {
+    expect(() => applyFlagFamilyValidation({ 'mcp-transport': 'stdio', 'mcp-deployment': 'hosted' }))
+      .toThrow(/hosted deployment requires a non-stdio transport/)
+  })
+
+  it('accepts --mcp-deployment hosted with --mcp-transport streamable-http', () => {
+    const argv = { 'mcp-language': 'typescript', 'mcp-transport': 'streamable-http', 'mcp-deployment': 'hosted' }
+    expect(() => applyFlagFamilyValidation(argv)).not.toThrow()
+  })
+
   it('MCP_SERVER_FLAGS preserves its literal members', () => {
     const f: typeof MCP_SERVER_FLAGS[number] = 'mcp-language'
     expect(MCP_SERVER_FLAGS).toContain(f)

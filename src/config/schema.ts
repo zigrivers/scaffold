@@ -144,6 +144,13 @@ export const McpServerConfigSchema = z.object({
       message: 'stdio transport cannot use network auth (set auth: none or use a non-stdio transport)',
     })
   }
+  if (cfg.transport === 'stdio' && cfg.deployment === 'hosted') {
+    ctx.addIssue({
+      path: ['deployment'],
+      code: 'custom',
+      message: 'stdio transport runs locally and cannot be hosted (set deployment: local or use a non-stdio transport)',
+    })
+  }
 })
 
 export const ResearchConfigSchema = z.object({
