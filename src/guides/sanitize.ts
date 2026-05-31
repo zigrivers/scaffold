@@ -46,7 +46,7 @@ export const guideSanitizeSchema: Schema = {
       'ariaLabel',
       'ariaSelected',
       'ariaControls',
-      'ariaLabelledby',
+      'ariaLabelledBy',
       'tabIndex',
       'style',
       // SVG geometry & presentation (safe; no execution risk)

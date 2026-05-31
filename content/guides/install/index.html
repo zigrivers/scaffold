@@ -1374,12 +1374,12 @@ system Node.</p></div>
 <h2 id="installing">Installing</h2>
 <p>Pick one of the three surfaces below. The npm and Homebrew tabs install the CLI;
 the plugin tab adds the optional Claude Code skills on top.</p>
-<div class="tabs"><div class="tablist" role="tablist"><button id="tab-0-0" class="tab-btn active" role="tab" data-tab="0" aria-controls="tabpane-0-0" aria-selected="true" tabindex="0">npm</button><button id="tab-0-1" class="tab-btn" role="tab" data-tab="1" aria-controls="tabpane-0-1" aria-selected="false" tabindex="-1">Homebrew</button><button id="tab-0-2" class="tab-btn" role="tab" data-tab="2" aria-controls="tabpane-0-2" aria-selected="false" tabindex="-1">Claude</button></div><div id="tabpane-0-0" class="tabpane active" role="tabpanel" data-tab="0" tabindex="0"><pre><code class="language-bash">npm install -g @zigrivers/scaffold
+<div class="tabs"><div class="tablist" role="tablist"><button id="tab-0-0" class="tab-btn active" role="tab" data-tab="0" aria-controls="tabpane-0-0" aria-selected="true" tabindex="0">npm</button><button id="tab-0-1" class="tab-btn" role="tab" data-tab="1" aria-controls="tabpane-0-1" aria-selected="false" tabindex="-1">Homebrew</button><button id="tab-0-2" class="tab-btn" role="tab" data-tab="2" aria-controls="tabpane-0-2" aria-selected="false" tabindex="-1">Claude</button></div><div id="tabpane-0-0" class="tabpane active" role="tabpanel" data-tab="0" aria-labelledby="tab-0-0" tabindex="0"><pre><code class="language-bash">npm install -g @zigrivers/scaffold
 </code></pre><p>Verify with <code>scaffold version</code>. This is the recommended path — it uses your
-system Node and updates with <code>npm update -g</code>.</p></div><div id="tabpane-0-1" class="tabpane" role="tabpanel" data-tab="1" tabindex="0"><pre><code class="language-bash">brew tap zigrivers/scaffold
+system Node and updates with <code>npm update -g</code>.</p></div><div id="tabpane-0-1" class="tabpane" role="tabpanel" data-tab="1" aria-labelledby="tab-0-1" tabindex="0"><pre><code class="language-bash">brew tap zigrivers/scaffold
 brew install scaffold
 </code></pre><p>The formula installs and manages Node as a dependency, so no separate Node
-install is needed. Verify with <code>scaffold version</code>.</p></div><div id="tabpane-0-2" class="tabpane" role="tabpanel" data-tab="2" tabindex="0"><p>Inside a Claude Code session:</p><pre><code class="language-text">/plugin marketplace add zigrivers/scaffold
+install is needed. Verify with <code>scaffold version</code>.</p></div><div id="tabpane-0-2" class="tabpane" role="tabpanel" data-tab="2" aria-labelledby="tab-0-2" tabindex="0"><p>Inside a Claude Code session:</p><pre><code class="language-text">/plugin marketplace add zigrivers/scaffold
 /plugin install scaffold@zigrivers-scaffold
 </code></pre><p>This is <strong>optional</strong> and complements the CLI — it auto-activates the Scaffold
 Runner and pipeline-reference skills for interactive guidance. Everything the
@@ -1401,9 +1401,9 @@ anything else falls back to <code>npx @zigrivers/scaffold@latest</code>
 themselves and run <code>brew update &#x26;&#x26; brew upgrade scaffold</code>, or the upgrade can
 silently no-op against a stale tap cache (see the danger callout below).</p>
 <p>Run the upgrade for your channel:</p>
-<div class="tabs"><div class="tablist" role="tablist"><button id="tab-1-0" class="tab-btn active" role="tab" data-tab="0" aria-controls="tabpane-1-0" aria-selected="true" tabindex="0">npm</button><button id="tab-1-1" class="tab-btn" role="tab" data-tab="1" aria-controls="tabpane-1-1" aria-selected="false" tabindex="-1">Homebrew</button><button id="tab-1-2" class="tab-btn" role="tab" data-tab="2" aria-controls="tabpane-1-2" aria-selected="false" tabindex="-1">Claude</button></div><div id="tabpane-1-0" class="tabpane active" role="tabpanel" data-tab="0" tabindex="0"><pre><code class="language-bash">npm update -g @zigrivers/scaffold
-</code></pre></div><div id="tabpane-1-1" class="tabpane" role="tabpanel" data-tab="1" tabindex="0"><pre><code class="language-bash">brew update &#x26;&#x26; brew upgrade scaffold
-</code></pre></div><div id="tabpane-1-2" class="tabpane" role="tabpanel" data-tab="2" tabindex="0"><pre><code class="language-text">/plugin marketplace update zigrivers-scaffold
+<div class="tabs"><div class="tablist" role="tablist"><button id="tab-1-0" class="tab-btn active" role="tab" data-tab="0" aria-controls="tabpane-1-0" aria-selected="true" tabindex="0">npm</button><button id="tab-1-1" class="tab-btn" role="tab" data-tab="1" aria-controls="tabpane-1-1" aria-selected="false" tabindex="-1">Homebrew</button><button id="tab-1-2" class="tab-btn" role="tab" data-tab="2" aria-controls="tabpane-1-2" aria-selected="false" tabindex="-1">Claude</button></div><div id="tabpane-1-0" class="tabpane active" role="tabpanel" data-tab="0" aria-labelledby="tab-1-0" tabindex="0"><pre><code class="language-bash">npm update -g @zigrivers/scaffold
+</code></pre></div><div id="tabpane-1-1" class="tabpane" role="tabpanel" data-tab="1" aria-labelledby="tab-1-1" tabindex="0"><pre><code class="language-bash">brew update &#x26;&#x26; brew upgrade scaffold
+</code></pre></div><div id="tabpane-1-2" class="tabpane" role="tabpanel" data-tab="2" aria-labelledby="tab-1-2" tabindex="0"><pre><code class="language-text">/plugin marketplace update zigrivers-scaffold
 </code></pre></div></div>
 <div class="callout callout-danger"><p><strong>Homebrew: run <code>brew update</code> <em>before</em> <code>brew upgrade</code>.</strong> <code>brew outdated</code> and
 <code>brew upgrade</code> both read from the local tap cache. Without a preceding

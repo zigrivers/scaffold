@@ -1588,7 +1588,7 @@ uses <code>prompt_delivery: prompt-file</code> — the dispatcher writes the pro
 file and passes its path via the <code>{{prompt_file}}</code> placeholder. Grok wraps its
 reply in a JSON <code>.text</code> field, which the parser unwraps before extracting
 findings.</p></div>
-<div class="tabs"><div class="tablist" role="tablist"><button id="tab-0-0" class="tab-btn active" role="tab" data-tab="0" aria-controls="tabpane-0-0" aria-selected="true" tabindex="0">Compare</button><button id="tab-0-1" class="tab-btn" role="tab" data-tab="1" aria-controls="tabpane-0-1" aria-selected="false" tabindex="-1">codex</button><button id="tab-0-2" class="tab-btn" role="tab" data-tab="2" aria-controls="tabpane-0-2" aria-selected="false" tabindex="-1">gemini</button><button id="tab-0-3" class="tab-btn" role="tab" data-tab="3" aria-controls="tabpane-0-3" aria-selected="false" tabindex="-1">claude</button><button id="tab-0-4" class="tab-btn" role="tab" data-tab="4" aria-controls="tabpane-0-4" aria-selected="false" tabindex="-1">grok</button><button id="tab-0-5" class="tab-btn" role="tab" data-tab="5" aria-controls="tabpane-0-5" aria-selected="false" tabindex="-1">doc-conformance</button></div><div id="tabpane-0-0" class="tabpane active" role="tabpanel" data-tab="0" tabindex="0"><p>The defaults, commands, and parsers below are the built-in presets <span class="fp" data-path="packages/mmr/src/config/defaults.ts:32">packages/mmr/src/config/defaults.ts:32</span>.</p>
+<div class="tabs"><div class="tablist" role="tablist"><button id="tab-0-0" class="tab-btn active" role="tab" data-tab="0" aria-controls="tabpane-0-0" aria-selected="true" tabindex="0">Compare</button><button id="tab-0-1" class="tab-btn" role="tab" data-tab="1" aria-controls="tabpane-0-1" aria-selected="false" tabindex="-1">codex</button><button id="tab-0-2" class="tab-btn" role="tab" data-tab="2" aria-controls="tabpane-0-2" aria-selected="false" tabindex="-1">gemini</button><button id="tab-0-3" class="tab-btn" role="tab" data-tab="3" aria-controls="tabpane-0-3" aria-selected="false" tabindex="-1">claude</button><button id="tab-0-4" class="tab-btn" role="tab" data-tab="4" aria-controls="tabpane-0-4" aria-selected="false" tabindex="-1">grok</button><button id="tab-0-5" class="tab-btn" role="tab" data-tab="5" aria-controls="tabpane-0-5" aria-selected="false" tabindex="-1">doc-conformance</button></div><div id="tabpane-0-0" class="tabpane active" role="tabpanel" data-tab="0" aria-labelledby="tab-0-0" tabindex="0"><p>The defaults, commands, and parsers below are the built-in presets <span class="fp" data-path="packages/mmr/src/config/defaults.ts:32">packages/mmr/src/config/defaults.ts:32</span>.</p>
 
 
 
@@ -1635,25 +1635,25 @@ findings.</p></div>
 
 
 
-<table><thead><tr><th>Channel</th><th>Default</th><th>Strength</th><th>Prompt delivery</th><th>Parser</th></tr></thead><tbody><tr><td><code>codex</code></td><td>enabled</td><td>Correctness, security, API contracts</td><td>stdin</td><td><code>default</code></td></tr><tr><td><code>gemini</code></td><td>enabled</td><td>Architecture, broad-context reasoning</td><td>stdin</td><td><code>gemini</code></td></tr><tr><td><code>claude</code></td><td>enabled</td><td>Plan alignment, code quality, testing</td><td>stdin</td><td><code>default</code></td></tr><tr><td><code>grok</code></td><td>enabled</td><td>Independent second opinion (xAI; proprietary)</td><td><strong>prompt-file</strong></td><td><code>unwrap $.text → default</code></td></tr><tr><td><code>doc-conformance</code></td><td>opt-in</td><td>PRD/stories/standards conformance (LLM-graded)</td><td>stdin</td><td><code>doc-conformance</code></td></tr></tbody></table></div><div id="tabpane-0-1" class="tabpane" role="tabpanel" data-tab="1" tabindex="0"><pre><code class="language-yaml">command: codex exec
+<table><thead><tr><th>Channel</th><th>Default</th><th>Strength</th><th>Prompt delivery</th><th>Parser</th></tr></thead><tbody><tr><td><code>codex</code></td><td>enabled</td><td>Correctness, security, API contracts</td><td>stdin</td><td><code>default</code></td></tr><tr><td><code>gemini</code></td><td>enabled</td><td>Architecture, broad-context reasoning</td><td>stdin</td><td><code>gemini</code></td></tr><tr><td><code>claude</code></td><td>enabled</td><td>Plan alignment, code quality, testing</td><td>stdin</td><td><code>default</code></td></tr><tr><td><code>grok</code></td><td>enabled</td><td>Independent second opinion (xAI; proprietary)</td><td><strong>prompt-file</strong></td><td><code>unwrap $.text → default</code></td></tr><tr><td><code>doc-conformance</code></td><td>opt-in</td><td>PRD/stories/standards conformance (LLM-graded)</td><td>stdin</td><td><code>doc-conformance</code></td></tr></tbody></table></div><div id="tabpane-0-1" class="tabpane" role="tabpanel" data-tab="1" aria-labelledby="tab-0-1" tabindex="0"><pre><code class="language-yaml">command: codex exec
 flags: [--skip-git-repo-check, -s, read-only, --ephemeral]
 auth.check: codex login status        # local file check (fast, 5s)
 recovery: codex login
 output_parser: default
 stderr: suppress
-</code></pre></div><div id="tabpane-0-2" class="tabpane" role="tabpanel" data-tab="2" tabindex="0"><pre><code class="language-yaml">command: gemini                       # NO -p: gemini reads stdin natively
+</code></pre></div><div id="tabpane-0-2" class="tabpane" role="tabpanel" data-tab="2" aria-labelledby="tab-0-2" tabindex="0"><pre><code class="language-yaml">command: gemini                       # NO -p: gemini reads stdin natively
 flags: [--output-format, json]
 env: { NO_BROWSER: "true" }
 auth.check: NO_BROWSER=true gemini -p "respond with ok" -o json   # LLM round-trip, 20s
 recovery: gemini -p "hello"
 output_parser: gemini                 # unwraps { "response": "…" }
 timeout: 360
-</code></pre></div><div id="tabpane-0-3" class="tabpane" role="tabpanel" data-tab="3" tabindex="0"><pre><code class="language-yaml">command: claude -p
+</code></pre></div><div id="tabpane-0-3" class="tabpane" role="tabpanel" data-tab="3" aria-labelledby="tab-0-3" tabindex="0"><pre><code class="language-yaml">command: claude -p
 flags: [--output-format, json]
 auth.check: claude -p "respond with ok"   # LLM round-trip, 20s
 recovery: claude login
 output_parser: default
-</code></pre></div><div id="tabpane-0-4" class="tabpane" role="tabpanel" data-tab="4" tabindex="0"><pre><code class="language-yaml">command: grok
+</code></pre></div><div id="tabpane-0-4" class="tabpane" role="tabpanel" data-tab="4" aria-labelledby="tab-0-4" tabindex="0"><pre><code class="language-yaml">command: grok
 prompt_delivery: prompt-file
 flags: [--prompt-file, "{{prompt_file}}", --output-format, json]
 auth.check: grok models                # lists models / login state (no round-trip)
@@ -1661,7 +1661,7 @@ recovery: grok login
 output_parser: { kind: unwrap-jsonpath, wrap: "$.text", then: default }
 </code></pre><p>Grok is proprietary (xAI), not open-source — it joins the standard set
 mechanically as a 4th CLI channel. Disable it with
-<code>channels_disabled: ["grok"]</code>.</p></div><div id="tabpane-0-5" class="tabpane" role="tabpanel" data-tab="5" tabindex="0"><pre><code class="language-yaml">enabled: false                         # opt-in: runs up to 3 LLM calls (~3 min)
+<code>channels_disabled: ["grok"]</code>.</p></div><div id="tabpane-0-5" class="tabpane" role="tabpanel" data-tab="5" aria-labelledby="tab-0-5" tabindex="0"><pre><code class="language-yaml">enabled: false                         # opt-in: runs up to 3 LLM calls (~3 min)
 command: scaffold observe audit --profile=full --scope=all --output-mode=mmr-findings
 output_parser: doc-conformance         # expects a JSON array of findings
 timeout: 240

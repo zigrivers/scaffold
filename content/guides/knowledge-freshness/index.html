@@ -2378,13 +2378,13 @@ resolved by <code>resolveProvider</code> (<span class="fp" data-path="src/knowle
 <li>No env, <code>claude</code> on PATH → anthropic (subprocess uses keychain)</li>
 <li>Nothing → error (no provider configured)</li>
 </ol>
-<div class="tabs"><div class="tablist" role="tablist"><button id="tab-0-0" class="tab-btn active" role="tab" data-tab="0" aria-controls="tabpane-0-0" aria-selected="true" tabindex="0">Anthropic</button><button id="tab-0-1" class="tab-btn" role="tab" data-tab="1" aria-controls="tabpane-0-1" aria-selected="false" tabindex="-1">DeepSeek</button></div><div id="tabpane-0-0" class="tabpane active" role="tabpanel" data-tab="0" tabindex="0"><p>Subprocess: <code>claude -p --tools ""</code> (empty-tools disables WebFetch so the model
+<div class="tabs"><div class="tablist" role="tablist"><button id="tab-0-0" class="tab-btn active" role="tab" data-tab="0" aria-controls="tabpane-0-0" aria-selected="true" tabindex="0">Anthropic</button><button id="tab-0-1" class="tab-btn" role="tab" data-tab="1" aria-controls="tabpane-0-1" aria-selected="false" tabindex="-1">DeepSeek</button></div><div id="tabpane-0-0" class="tabpane active" role="tabpanel" data-tab="0" aria-labelledby="tab-0-0" tabindex="0"><p>Subprocess: <code>claude -p --tools ""</code> (empty-tools disables WebFetch so the model
 can only read the prefetched bodies). <strong>Requires the <code>claude</code> CLI on PATH
 regardless of how the provider was chosen</strong> — the resolver throws
 (<span class="fp" data-path="src/knowledge-freshness/providers/index.ts:44-56">src/knowledge-freshness/providers/index.ts:44-56</span>) if anthropic is
 picked via flag, env, or API-key inference and <code>claude</code> isn't installed.
 <code>ANTHROPIC_API_KEY</code> alone is <em>not</em> sufficient. Source:
-<code>src/knowledge-freshness/providers/anthropic.ts</code>.</p></div><div id="tabpane-0-1" class="tabpane" role="tabpanel" data-tab="1" tabindex="0"><p>HTTP. No subprocess; works in CI without the Claude CLI.</p><ul>
+<code>src/knowledge-freshness/providers/anthropic.ts</code>.</p></div><div id="tabpane-0-1" class="tabpane" role="tabpanel" data-tab="1" aria-labelledby="tab-0-1" tabindex="0"><p>HTTP. No subprocess; works in CI without the Claude CLI.</p><ul>
 <li><strong>Auth:</strong> requires <code>DEEPSEEK_API_KEY</code>.</li>
 <li><strong>Default model:</strong> <code>deepseek-v4-flash</code>.</li>
 <li><strong>Override:</strong> set <code>KNOWLEDGE_FRESHNESS_DEEPSEEK_MODEL</code> to <code>deepseek-v4-pro</code>.

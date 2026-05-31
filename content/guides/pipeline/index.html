@@ -1595,17 +1595,17 @@ playbooks below.</p></div>
 only <strong>inject domain knowledge</strong> into existing steps (so a web-app build pulls in
 <code>web-app-auth-patterns</code> during <code>tech-stack</code>, <code>security</code>, etc.); a few also
 <strong>enable whole step families</strong>.</p>
-<div class="tabs"><div class="tablist" role="tablist"><button id="tab-1-0" class="tab-btn active" role="tab" data-tab="0" aria-controls="tabpane-1-0" aria-selected="true" tabindex="0">Web</button><button id="tab-1-1" class="tab-btn" role="tab" data-tab="1" aria-controls="tabpane-1-1" aria-selected="false" tabindex="-1">Game</button><button id="tab-1-2" class="tab-btn" role="tab" data-tab="2" aria-controls="tabpane-1-2" aria-selected="false" tabindex="-1">Multi-service</button></div><div id="tabpane-1-0" class="tabpane active" role="tabpanel" data-tab="0" tabindex="0"><p><code>web-app-overlay.yml</code> is knowledge-only — it appends web-app expertise to
+<div class="tabs"><div class="tablist" role="tablist"><button id="tab-1-0" class="tab-btn active" role="tab" data-tab="0" aria-controls="tabpane-1-0" aria-selected="true" tabindex="0">Web</button><button id="tab-1-1" class="tab-btn" role="tab" data-tab="1" aria-controls="tabpane-1-1" aria-selected="false" tabindex="-1">Game</button><button id="tab-1-2" class="tab-btn" role="tab" data-tab="2" aria-controls="tabpane-1-2" aria-selected="false" tabindex="-1">Multi-service</button></div><div id="tabpane-1-0" class="tabpane active" role="tabpanel" data-tab="0" aria-labelledby="tab-1-0" tabindex="0"><p><code>web-app-overlay.yml</code> is knowledge-only — it appends web-app expertise to
 ~25 steps (rendering strategies + deployment + auth into <code>tech-stack</code>, UX
 patterns into <code>ux-spec</code>, the design system into <code>design-system</code>, and so on). The
 spec steps you'll actually use: <code>database-schema</code>, <code>api-contracts</code>, <code>ux-spec</code>
-(all conditional). <code>add-e2e-testing</code> configures <strong>Playwright</strong>.</p></div><div id="tabpane-1-1" class="tabpane" role="tabpanel" data-tab="1" tabindex="0"><p><code>game-overlay.yml</code> is the heavyweight: it <strong>enables a whole phase family</strong> via
+(all conditional). <code>add-e2e-testing</code> configures <strong>Playwright</strong>.</p></div><div id="tabpane-1-1" class="tabpane" role="tabpanel" data-tab="1" aria-labelledby="tab-1-1" tabindex="0"><p><code>game-overlay.yml</code> is the heavyweight: it <strong>enables a whole phase family</strong> via
 <code>step-overrides</code>. On come <code>game-design-document</code>, <code>review-gdd</code>,
 <code>performance-budgets</code>, <code>narrative-bible</code>, <code>netcode-spec</code>, <code>ai-behavior-design</code>,
 <code>art-bible</code>, <code>audio-design</code>, <code>economy-design</code>, <code>save-system-spec</code>,
 <code>game-ui-spec</code>, <code>playtest-plan</code>, <code>platform-cert-prep</code>, and more — many as
 <code>if-needed</code>. These live across the <code>pre</code>, <code>architecture</code>, <code>specification</code>, and
-<code>quality</code> phases.</p></div><div id="tabpane-1-2" class="tabpane" role="tabpanel" data-tab="2" tabindex="0"><p><code>multi-service-overlay.yml</code> activates when <code>services[]</code> is present in config. It
+<code>quality</code> phases.</p></div><div id="tabpane-1-2" class="tabpane" role="tabpanel" data-tab="2" aria-labelledby="tab-1-2" tabindex="0"><p><code>multi-service-overlay.yml</code> activates when <code>services[]</code> is present in config. It
 enables five cross-service steps (<code>service-ownership-map</code>,
 <code>inter-service-contracts</code>, <code>cross-service-auth</code>, <code>cross-service-observability</code>,
 <code>integration-test-plan</code>) and — crucially — adds <strong>dependency-overrides</strong> and
