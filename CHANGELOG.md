@@ -6,8 +6,8 @@ All notable changes to Scaffold are documented here.
 
 ### Fixed
 
-- **Knowledge-freshness cron: `current`/`minor-drift` verdicts with stray `proposed_changes` no longer hard-fail.** A non-conforming model (observed with the DeepSeek provider) could classify an entry as `current` or `minor-drift` yet still return `proposed_changes`, which `audit-apply` rejects — leaving the entry un-stamped so it re-appeared every day and starved the 10-entry daily audit budget. `normalizeVerdict()` now demotes those stray changes to advisory `preserve_warnings` (rather than upgrading to `major-drift`, which would bypass the MMR-corroboration and anti-over-rewrite gates), and the `knowledge-audit-entry` prompt states the empty-`proposed_changes` contract explicitly. Internal CI tooling only — the cron builds from `main`, so no package release is required. (Surfaced by the first live DeepSeek cron run.)
-- **`.gitignore` now ignores a top-level `node_modules` symlink**, not just the directory — the previous `node_modules/` (directory-only) pattern let a worktree dev-symlink slip through `git add -A`.
+- **Knowledge-freshness cron is now robust to non-conforming model output.** A model that pairs a no-edit verdict (`current`/`minor-drift`) with proposed changes — observed with the DeepSeek provider — no longer hard-fails and strands the entry; the stray changes are demoted to advisory notes so the entry is still reviewed-stamped, keeping the daily audit budget flowing. Internal CI tooling only; no package release required.
+- **`.gitignore` ignores a top-level `node_modules` symlink**, not just the directory.
 
 ## [3.31.1] — 2026-05-31
 
