@@ -23,6 +23,15 @@
 >   (`--direction down|up`); `bd dep cycles` detects cycles.
 > - `bd close <id> --reason "..."`; `bd comment <id> "..."` (list via
 >   `bd comments <id>`); `bd label add <id> <label>`.
+> - **Readiness is computed, not a stored `blocked` status** (verified
+>   empirically on v1.0.5): adding a dependency leaves the dependent at
+>   status `open`; `bd ready` simply *excludes* issues that have an open blocker,
+>   and removing the last blocker makes the issue ready again automatically — no
+>   manual status flip needed. A stored `blocked`/`deferred` status is therefore
+>   an explicit, deliberate signal, never an automatic by-product of deps.
+> - `bd ready` accepts `--claim`, `--has-metadata-key`, `--metadata-field`,
+>   `-l/--label`, `-a/--assignee` (so the claim loop can be scoped to
+>   plan-derived issues).
 > - `bd merge-slot {acquire,check,release}`. **Caveat:** `acquire --wait` only
 >   *adds the caller to the waiters queue* if the slot is held — it does **not**
 >   guarantee the caller holds the slot on return. Ownership must be re-verified
@@ -283,12 +292,12 @@ For each plan task (`<task-id>`), parent IDs already resolved by Pass 0:
 3. **If present, branch on stored status.** The key distinction is
    **not-yet-started vs. started**, not "open vs. everything else":
    - **`open`, `blocked`, `deferred`** → **update fields to match the plan**
-     (`bd update <id> --title … -d … -p … --parent …`). A `blocked` task is
-     *pre-execution* — Pass 2 puts every task with unmet dependencies into
-     `blocked`, so this is the normal state for most of a DAG. Refusing to
-     update `blocked`/`deferred` would break idempotent sync for the majority of
-     tasks. None of these states is execution-managed, so mutating their fields
-     is safe.
+     (`bd update <id> --title … -d … -p … --parent …`). These are all
+     *not-started* states, so mutating their fields (title/body/priority/parent)
+     is safe — it never changes execution status or readiness. Note (verified):
+     dependency-blocked tasks stay `open`, **not** `blocked`; a stored
+     `blocked`/`deferred` status is an explicit human/agent signal, and updating
+     its descriptive fields neither unblocks it nor disturbs that signal.
    - **`in_progress`** → **do not mutate fields** (work is underway). If the
      plan's AC/description changed, post a warning — **idempotently**: store a
      hash of the last-warned plan text in metadata `ac_warn_hash` (set with the
@@ -306,10 +315,13 @@ Run after all issues exist (forward references resolved).
   work, which could disrupt execution invariants):
   `bd dep add <blocked-id> <blocker-id>` (re-adding is a no-op).
 - **Remove** stale edges (in the plan no longer) for dependents in
-  **`open`, `blocked`, or `deferred`** state — `blocked`/`deferred` are
-  explicitly included so removing a dependency can actually **unblock** a task;
-  only `in_progress`/`closed` are exempt: `bd dep remove <blocked-id> <blocker-id>`.
-  Compare current edges via `bd dep list <id> --json --direction down`.
+  **`open`, `blocked`, or `deferred`** state; only `in_progress`/`closed` are
+  exempt: `bd dep remove <blocked-id> <blocker-id>`. Compare current edges via
+  `bd dep list <id> --json --direction down`.
+- **No manual status reconciliation is needed** after add/remove. Readiness is
+  computed from open blockers (verified): removing the last blocker makes a task
+  ready again on its own; adding a blocker excludes it from `bd ready` while
+  leaving its stored status `open`.
 - **Detect cycles** after applying: `bd dep cycles` — surface any cycle as an
   error (the plan DAG is validated upstream, but a manual edit could reintroduce
   one).
@@ -344,17 +356,21 @@ materialize: C created, U updated, K unchanged,
 Extend the **Beads Detection** block in both build prompts. The decisive
 **control-flow rule** (it is what prevents reintroducing the false-done bug):
 
-> **`bd ready --claim` is reached only when a confirmed, positive count of
-> `plan_task_id` issues exists.** In every other branch the prompt drives the
-> loop from the markdown playbook/plan instead — it must never fall through to
-> `bd ready --claim` against an empty or unpopulated tracker.
+> **The claim loop is reached only when a confirmed, positive count of
+> `plan_task_id` issues exists, and it claims only plan-derived issues:**
+> `bd ready --claim --has-metadata-key plan_task_id --json`. Scoping by
+> `plan_task_id` is required so the loop never claims the bootstrap "initialize
+> Beads" bead or any manually-created issue — only materialized plan tasks.
+> In every other branch the prompt drives the loop from the markdown
+> playbook/plan instead — it must never fall through to a claim against an empty
+> or unpopulated tracker.
 
 Decision table for the Beads Detection block:
 
 | Condition | Action |
 |---|---|
 | `beads_usable` false (no `.beads/`, no/old `bd`, no `jq`) | Markdown playbook loop. Do **not** call `bd`. |
-| Usable; `plan_task_id` count > 0 | `bd ready --claim` loop (today's path). |
+| Usable; `plan_task_id` count > 0 | Scoped claim loop: `bd ready --claim --has-metadata-key plan_task_id --json`. |
 | Usable; count = 0; plan exists **with** stable task IDs | Materialize (locked — see Concurrency), re-count; if now > 0 → claim loop, else markdown loop. |
 | Usable; count = 0; plan exists **without** stable task IDs | Markdown loop + emit "re-run planning to assign task IDs". Do **not** claim. |
 | Usable; count = 0; materialize command returns non-zero | Markdown loop + surface the error. Do **not** claim. |
@@ -410,9 +426,12 @@ prompt.
 - **Edit:** `content/pipeline/planning/implementation-plan-review.md` — validate
   ID presence/uniqueness/stability and that the contract parses.
 - **Edit:** `content/pipeline/build/single-agent-start.md` — `beads_usable`-gated
-  Beads Detection + plain preflight + markdown fallback when Beads unusable.
-- **Edit:** `content/pipeline/build/multi-agent-start.md` — same, plus
-  orchestrator-only + ownership-verified merge-slot lock.
+  Beads Detection + plain preflight + markdown fallback when Beads unusable;
+  **change the existing `bd ready --claim` to the scoped
+  `bd ready --claim --has-metadata-key plan_task_id --json`** so only plan tasks
+  are claimed.
+- **Edit:** `content/pipeline/build/multi-agent-start.md` — same (incl. scoped
+  claim), plus orchestrator-only + ownership-verified merge-slot lock.
 - **Edit:** `content/pipeline/foundation/beads.md` — one line noting the plan is
   materialized into Beads later, so users aren't surprised Beads starts empty.
 - **Edit:** `content/methodology/*.yml` presets/overlays — enable the new step
@@ -470,6 +489,8 @@ prompts use, against the project's installed `bd`:
   **targeted** `--set-metadata` (verified present in v1.0.5) for single-key
   writes like `ac_warn_hash`; `--metadata` **replaces** the whole object and
   must not be used for partial updates
+- `bd ready --claim --has-metadata-key plan_task_id --json` (scoped claim —
+  verified to accept the filter and exclude non-plan issues on v1.0.5)
 - `bd dep add` / `bd dep remove` / `bd dep list <id> --json` / `bd dep cycles`
 - `bd close <id> --reason`, `bd comment <id>` / `bd comments <id>`,
   `bd label add <id> <label>`
@@ -512,6 +533,9 @@ prompts use, against the project's installed `bd`:
 - **Scale**: a plan with >50 tasks is fully reconciled (`--limit 0`), with a
   test asserting no truncation at the default page size.
 - **`--all` visibility**: an all-`closed` plan is not re-imported by the preflight.
+- **Claim scoping**: with a bootstrap bead (no `plan_task_id`) plus materialized
+  plan tasks present, the build loop's `bd ready --claim --has-metadata-key
+  plan_task_id` never claims the bootstrap bead or a manually-created issue.
 - **Concurrency**: two simulated agents hitting the `multi-agent-start.md`
   preflight with `COUNT=0` produce exactly one import (orchestrator-only +
   ownership-verified lock), no duplicates.
