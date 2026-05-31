@@ -41,7 +41,7 @@ Use protocol errors for:
 - **Parse error** (`-32700`): malformed JSON received. The SDK handles this automatically.
 - **Invalid request** (`-32600`): request is not valid JSON-RPC 2.0 structure. Also SDK-handled.
 
-Custom server-defined error codes MUST be in the range `-32000` to `-32099` (server error range). Standard resource error code: `-32002` (resource not found).
+Custom server-defined error codes MUST be in the JSON-RPC server-error range `-32099` to `-32000` (most-negative to least-negative). Standard resource error code: `-32002` (resource not found).
 
 The `error` object MAY include a `data` field with additional structured context:
 ```json
