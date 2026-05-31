@@ -4,6 +4,8 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.33.0] — 2026-05-31
+
 ### Added
 
 - **`materialize-plan-to-beads` finalization step (and build-phase preflight)**
