@@ -1400,14 +1400,27 @@ nav.toc li.toc-3 a { padding-left: var(--sp-6); font-size: var(--text-xs); }
         setNav(!(rail && rail.classList.contains('open')));
       });
     });
+    // Selecting a TOC link closes the drawer (so the now-active content isn't
+    // left inert behind the panel) before the anchor navigation scrolls.
+    var drawerRail = document.querySelector('.rail');
+    if (drawerRail) {
+      drawerRail.querySelectorAll('a').forEach(function(a) {
+        a.addEventListener('click', function() {
+          if (drawerRail.classList.contains('open')) setNav(false);
+        });
+      });
+    }
     document.addEventListener('keydown', function(e) {
-      if (e.key !== 'Escape') return;
       var rail = document.querySelector('.rail');
-      if (rail && rail.classList.contains('open')) {
-        setNav(false);
-        var toggle = document.querySelector('.nav-toggle');
-        if (toggle) toggle.focus();
-      }
+      if (!rail || !rail.classList.contains('open')) return;
+      if (e.key === 'Escape') { setNav(false); return; } // setNav restores focus to the toggle
+      // Trap Tab within the open drawer (modal pattern).
+      if (e.key !== 'Tab') return;
+      var f = rail.querySelectorAll('a[href], button, [tabindex]:not([tabindex="-1"])');
+      if (!f.length) return;
+      var first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
     });
 
     // ─── Copy buttons ─────────────────────────────────────────────────────────
