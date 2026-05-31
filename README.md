@@ -1466,7 +1466,7 @@ You can change methodology mid-pipeline with `scaffold init --methodology <prese
 | Command | What It Does |
 |---------|-------------|
 | `scaffold init` | Initialize `.scaffold/` state, then auto-build hidden adapter artifacts |
-| `scaffold run <step>` | Execute a pipeline step (assembles and outputs the full prompt) |
+| `scaffold run <step> [args…]` | Execute a pipeline step (assembles and outputs the full prompt). Trailing args bind to the step's `$ARGUMENTS` (e.g. `scaffold run review-pr 376 --fix-threshold P1`) |
 | `scaffold build` | Generate hidden adapter output under `.scaffold/generated/` and update the managed `.gitignore` block |
 | `scaffold adopt` | Bootstrap state from existing artifacts (brownfield projects) |
 | `scaffold skip <step> [<step2>...]` | Skip one or more steps with a reason |

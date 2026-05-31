@@ -4,6 +4,21 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.32.0] — 2026-05-31
+
+Makes `scaffold run <step> <args…>` bind trailing CLI arguments to the step's
+`$ARGUMENTS` placeholder. Previously `scaffold run review-pr 376` dropped the
+`376`, emitted an unbound `$ARGUMENTS`, and agents fell back to raw `mmr`
+commands — losing the Superpowers agent channel, reconciliation, and verdict
+logic. Also hardens the tools that consume `$ARGUMENTS`.
+
+### Added
+
+- **An "EXECUTE NOW" header** prepended to `scaffold run` output in interactive
+  mode (suppressed under `--auto` / `--format json`), framing the emitted prompt
+  as a runnable workflow and showing the bound arguments — so agents execute the
+  step instead of shortcutting to an ad-hoc command.
+
 ### Fixed
 
 - `scaffold run <step> <args…>` now binds trailing arguments into the
