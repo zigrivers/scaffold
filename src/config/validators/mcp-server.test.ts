@@ -39,9 +39,13 @@ describe('mcpServerCouplingValidator', () => {
     expect(issues.some(i => /stdio.*cannot be hosted|cannot be hosted/i.test(i.message))).toBe(true)
   })
 
-  it('rejects hosted deployment when transport is undefined (treated as stdio)', () => {
+  it('allows hosted deployment when transport is undefined (schema superRefine handles the default case)', () => {
+    // The coupling validator only fires on EXPLICIT transport: 'stdio'.
+    // When transport is undefined the schema-level superRefine (which runs
+    // after Zod applies the 'stdio' default) catches the violation instead,
+    // so the coupling validator should not raise a duplicate issue here.
     const issues = runValidate('mcp-server', { language: 'python', deployment: 'hosted' })
-    expect(issues.some(i => /stdio.*cannot be hosted|cannot be hosted/i.test(i.message))).toBe(true)
+    expect(issues.some(i => /stdio.*cannot be hosted|cannot be hosted/i.test(i.message))).toBe(false)
   })
 
   it('allows hosted deployment on a non-stdio transport', () => {

@@ -14,7 +14,11 @@ export const mcpServerCouplingValidator: CouplingValidator<McpServerConfig> = {
     }
     if (config) {
       const { transport, auth, deployment } = config
-      const transportIsStdio = transport === undefined || transport === 'stdio'
+      // Only check EXPLICIT stdio — undefined transport is already handled by the
+      // schema-level superRefine (which runs after Zod applies the 'stdio' default).
+      // Checking undefined here would produce misleading errors for configs that
+      // never specified a transport at all.
+      const transportIsStdio = transport === 'stdio'
       if (auth !== undefined && auth !== 'none' && transportIsStdio) {
         ctx.addIssue({
           path: [...path, 'mcpServerConfig', 'auth'],

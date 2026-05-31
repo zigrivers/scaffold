@@ -790,7 +790,7 @@ These answers control which conditional steps activate. A single-player puzzle g
 | `research` | `program.md` + `results.tsv`, backtest/strategy files with trading deps, optimization deps + experiment dirs, simulation framework deps |
 | `data-science` | Marimo signals required (`marimo` dep or `.marimo.toml`); DVC (`dvc.yaml`, `.dvc/config`, `dvc` py dep) is supplementary evidence only. Low-tier; defers to `ml` / `research` / `data-pipeline` when those match at medium/high tier |
 | `web3` | `foundry.toml` or `hardhat.config.{ts,js,cjs,mjs}` (medium-tier); `remappings.txt`, `lib/forge-std` are supplementary low-tier signals. EVM-only scope. Library-collision boundary pinned by tiebreak (high-tier `library` wins over medium-tier `web3` for published-library Hardhat projects) |
-| `mcp-server` | `@modelcontextprotocol/sdk` / `mcp` / `fastmcp` dep = medium; dep + entrypoint registering tools/resources = high |
+| `mcp-server` | `@modelcontextprotocol/sdk` / `mcp` / `fastmcp` dep = low (MCP clients share these deps — avoids mis-adopting a client as a server); dep + entrypoint registering tools/resources = high |
 
 Each detector returns a confidence tier (high/medium/low) with evidence trails. Override detection with `--project-type <type>`.
 

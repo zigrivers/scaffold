@@ -47,13 +47,13 @@ describe('detectMcpServer', () => {
     expect(m!.partialConfig.language).toBe('python')
   })
 
-  it('medium: SDK dep present but no registration entrypoint (could be a client)', () => {
+  it('low: SDK dep present but no registration (could be a client or unusual layout)', () => {
     const ctx = createFakeSignalContext({
       packageJson: { name: 'c', dependencies: { '@modelcontextprotocol/sdk': '^1.0.0' } },
     })
     const m = detectMcpServer(ctx)
     expect(m).not.toBeNull()
-    expect(m!.confidence).toBe('medium')
+    expect(m!.confidence).toBe('low')
     expect(m!.partialConfig.language).toBe('typescript')
   })
 

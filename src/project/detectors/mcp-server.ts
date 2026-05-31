@@ -79,7 +79,11 @@ export function detectMcpServer(ctx: SignalContext): McpServerMatch | null {
     const primitives = inferPrimitives(registeredText)
     if (primitives.length > 0) partialConfig.primitives = primitives
   } else {
-    confidence = 'medium'
+    // Dep-alone is LOW, not medium: MCP *client* projects also depend on the SDK
+    // but don't register anything. Low confidence routes to interactive
+    // disambiguation rather than auto-adopt, which is the correct conservative
+    // behaviour when we cannot distinguish a server from a client.
+    confidence = 'low'
   }
 
   return { projectType: 'mcp-server', confidence, partialConfig, evidence: ev }
