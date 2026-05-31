@@ -40,6 +40,31 @@ the token is co-mingled in `~/.gemini/antigravity-cli/` alongside `settings.json
 `mcp_config.json`, `plugins/`, `knowledge/`). This is why agy cannot reach grok's
 closed-book posture (see Decision D3).
 
+### Source-verified integration facts (MMR side, checked 2026-05-30)
+
+These were confirmed by reading the current MMR source on this branch, to close
+the assumptions the first draft left open:
+
+- **Auth checks run under a shell.** `runAuthCheck` spawns `sh -c <auth.check>`
+  (`packages/mmr/src/core/auth.ts:46`), so a pipeline (`agy … 2>&1 | grep … && exit
+  41 || exit 0`) is valid — the existing `gemini` auth check already relies on
+  `2>&1`. Exit code 0 ⇒ ok; a code in `failure_exit_codes` ⇒ failed; SIGKILL on
+  timeout ⇒ timeout (`auth.ts:57-81`).
+- **`withNeutralPosture` triggers on cwd alone.** `needsIsolation`
+  (`host-isolation.ts:21-24`) returns true when `cwd === '{{neutral_cwd}}'` even
+  with no HOME placeholder, and the resulting posture pins `PWD`/`OLDPWD`/`INIT_CWD`
+  to the temp dir (`host-isolation.ts:66-70`). So cwd-only neutralization works.
+- **BUT the grok credential symlink is currently unconditional.**
+  `host-isolation.ts:45-54` symlinks `~/.grok/auth.json` into the temp dir whenever
+  *any* isolation triggers — including agy's cwd-only case. Left unchanged, agy's
+  "neutral" cwd would contain a `.grok/auth.json` symlink (not empty, and a grok
+  credential exposed to an auto-approved agy run). **This requires a targeted
+  host-isolation change** — see Decision D3. The first draft's claim that no
+  host-isolation change was needed was wrong.
+- **`env` is required on built-in channel entries.** `BUILTIN_CHANNELS` is typed
+  `Record<string, SubprocessChannelParsed>` and every entry sets `env`
+  (`defaults.ts:32-139`). The channel definition must include `env: {}`.
+
 ## Goals
 
 1. Add a built-in `antigravity` channel to MMR, **enabled by default**, that runs
@@ -106,30 +131,63 @@ closed-book posture. The spawn cwd is isolated, but global host config can still
 influence the run. Tracked as Follow-up F2 — revisit when agy ships either discrete
 `--no-memory`/`--no-subagents`/web-allowlist flags or an auth-only credential file.
 
-> **Implementation note:** the existing `withNeutralPosture(env, cwd)` in
-> `src/core/host-isolation.ts` already supports cwd-only neutralization. The `grok`
-> channel triggers it via both `{{neutral_home}}` and `{{neutral_cwd}}`; the
-> `antigravity` channel triggers it via `{{neutral_cwd}}` alone. **No host-isolation
-> code change is required.** (Confirm with a unit test that cwd-only posture creates
-> the temp dir, pins `PWD`/`OLDPWD`/`INIT_CWD`, and performs **no** credential
-> symlink.)
+> **Implementation note (host-isolation change required):** `withNeutralPosture`
+> already supports cwd-only neutralization (`grok` triggers it via both
+> `{{neutral_home}}` and `{{neutral_cwd}}`; `antigravity` triggers it via
+> `{{neutral_cwd}}` alone). **However**, the grok credential-preservation step
+> (`host-isolation.ts:45-54`) currently symlinks `~/.grok/auth.json` into the temp
+> dir on *every* isolation, including cwd-only. For agy that would put a grok
+> credential symlink inside the supposedly-empty neutral cwd. We must **gate the
+> symlink on HOME neutralization**, since preserving file-backed creds only matters
+> when HOME is replaced:
+>
+> ```ts
+> // host-isolation.ts — only preserve grok creds when HOME is actually neutralized
+> const homeNeutralized = Object.values(env).some((v) => v === NEUTRAL_HOME_PLACEHOLDER)
+> if (homeNeutralized) {
+>   // ...existing ~/.grok/auth.json symlink block...
+> }
+> ```
+>
+> This leaves `grok` unaffected (it neutralizes HOME, so `homeNeutralized` is true)
+> and makes agy's cwd-only posture genuinely empty (`homeNeutralized` is false → no
+> symlink). The shared `mmr-grok-` temp-dir prefix and its comment should be updated
+> to note the machinery is now used by both `grok` and `antigravity` (the
+> `sweepStaleNeutralDirs` prefix match still covers both). A regression test must
+> assert: with a fake `~/.grok/auth.json` present, cwd-only neutralization creates
+> **no** `.grok/auth.json` symlink and the temp dir is empty, while HOME-neutral
+> (grok-style) still creates it.
 
 ### D4 — Auth check: sentinel-string detection, short timeout
 
 agy exits 0 even when unauthenticated (finding #7), so the auth probe must detect
-the `Authentication required` sentinel rather than trust the exit code:
+the auth-failure **sentinel strings** rather than trust the exit code. Critically,
+finding #7 documents **two** distinct auth-failure outputs — `Authentication
+required …` *and* `Error: authentication timed out` — so the probe must match both
+(matching only the first would treat a timed-out login as authenticated):
 
 ```
-agy -p "respond with ok" --print-timeout 12s 2>&1 | grep -qi "authentication required" && exit 41 || exit 0
+agy -p "respond with ok" --print-timeout 12s 2>&1 | grep -qiE "authentication required|authentication timed out" && exit 41 || exit 0
 ```
 
 with `failure_exit_codes: [41]`, `auth.timeout: 20`, and
 `recovery: 'agy -p "hello"   # then open the printed Google OAuth URL and paste the code'`.
 
-This is a lightweight model round-trip (tiny prompt) — consistent with the existing
-`gemini` channel, whose auth probe is also a round-trip. The auth check runs with
+The probe runs under `sh -c` (verified — `auth.ts:46`), so the pipeline and
+`&& exit 41 || exit 0` resolve to deterministic exit codes (41 = auth failure, 0 =
+otherwise). It is a lightweight model round-trip (tiny prompt) — consistent with the
+existing `gemini` channel, whose auth probe is also a round-trip. The check runs with
 **real HOME** (the channel does not neutralize HOME), so the credential store is
 visible and the probe is accurate.
+
+> **Fail-closed limitation (accepted):** because agy returns exit 0 on *all*
+> outcomes, the probe can only fail on the known auth sentinels above; a novel
+> CLI-error string would be read as "ok" at auth time and then surface as a failed
+> channel at *dispatch* time (the dispatcher captures non-zero exit / malformed
+> output, and the compensator fires — Decision D6). The sentinel list is the
+> pragmatic detection surface and should be widened if agy introduces new auth
+> messages. A future agy `auth status` subcommand would let this become a precise,
+> zero-quota local check (Follow-up F2).
 
 > agy has no `login`/`whoami`/`auth status` subcommand (verified via `agy help`),
 > so a purely local file-existence check is not reliably available. If agy later
@@ -154,15 +212,27 @@ export function normalizeChannelName(name: string): string {
 }
 ```
 
-Applied in `src/commands/review.ts` to each `--channels` entry and to each
-`channels_disabled` entry **before** `resolveDispatchChannels` runs. The
+**Normalization is centralized inside `resolveDispatchChannels`** rather than
+sprinkled at call sites. The function already receives both channel-name inputs —
+the explicit `--channels` list (`explicit`) and the `disabled` set built from
+`channels_disabled` — and is the single chokepoint where names become dispatch
+decisions (`review.ts:489-490`). It will `normalizeChannelName` each explicit entry
+and test disabled-set membership against the normalized name, so `agy` and
+`antigravity` behave identically on both surfaces and **no future caller can bypass
+the alias** by going through the resolver.
+
+A source audit confirmed these are the **only** channel-name selection inputs:
+there is no env-var channel selector and no other `resolveDispatchChannels` caller
+(`grep` for `args.channels` / `channels_disabled` / `resolveDispatchChannels` in
+`src/` returns only `review.ts:489-490` plus the schema declaration). The
 `config.channels` map keeps the single canonical key `antigravity` — the channel is
 **not** duplicated.
 
 **Boundary (documented):** config *overrides* in `.mmr.yaml` (`channels:` map keys)
 must use the canonical key `antigravity`. The alias applies only to selection
-(`--channels`, `channels_disabled`), not to override-map keys. This avoids
-merge-key collisions and keeps the loader simple.
+(`--channels`, `channels_disabled`), not to override-map keys — this avoids
+merge-key collisions and keeps the loader simple. The `mmr config` channel-display
+paths likewise key by the canonical name.
 
 ### D6 — Compensator focus
 
@@ -174,10 +244,13 @@ fires with that focus, labeled `compensating-antigravity`.
 
 ## Architecture
 
-This is almost entirely a **`defaults.ts` + docs** change plus a tiny alias module.
-No schema, dispatcher, host-isolation, or parser code changes are required — every
-capability the channel needs (stdin delivery, `{{neutral_cwd}}` neutralization,
-`default` parser, sentinel-string auth check) already exists.
+The change set is small and targeted: a new `defaults.ts` channel entry, a tiny
+alias module, alias normalization centralized in `resolveDispatchChannels`, a
+`COMPENSATING_FOCUS` entry, **one host-isolation fix** (gate the grok credential
+symlink on HOME neutralization — D3), and docs. **No schema or parser changes are
+required** — stdin delivery, the `default` parser, the `sh -c` auth-check mechanism,
+and cwd-only `{{neutral_cwd}}` neutralization already exist; the only code MMR lacks
+is the symlink gating, which the first draft missed (now D3).
 
 ### Channel definition (`src/config/defaults.ts`, `BUILTIN_CHANNELS.antigravity`)
 
@@ -189,6 +262,7 @@ antigravity: {
   command: 'agy',
   prompt_delivery: 'stdin',            // verified: agy --print reads stdin
   cwd: '{{neutral_cwd}}',              // neutral cwd; HOME intentionally NOT overridden
+  env: {},                             // required by SubprocessChannelParsed; NO HOME/XDG override
   flags: [
     '--print',
     '--sandbox',
@@ -196,7 +270,7 @@ antigravity: {
     '--print-timeout', '300s',
   ],
   auth: {
-    check: 'agy -p "respond with ok" --print-timeout 12s 2>&1 | grep -qi "authentication required" && exit 41 || exit 0',
+    check: 'agy -p "respond with ok" --print-timeout 12s 2>&1 | grep -qiE "authentication required|authentication timed out" && exit 41 || exit 0',
     timeout: 20,
     failure_exit_codes: [41],
     recovery: 'agy -p "hello"   # then open the printed Google OAuth URL and paste the code',
@@ -227,13 +301,22 @@ antigravity: {
 
 **Modified:**
 - `packages/mmr/src/config/defaults.ts` — add `BUILTIN_CHANNELS.antigravity`.
-- `packages/mmr/src/commands/review.ts` — apply `normalizeChannelName` to `--channels`
-  entries and `channels_disabled` entries before `resolveDispatchChannels`.
+- `packages/mmr/src/core/host-isolation.ts` — gate the `~/.grok/auth.json` symlink
+  block (`:45-54`) behind `homeNeutralized` (D3); update the `mmr-grok-` prefix
+  comment to note shared grok + antigravity use.
+- `packages/mmr/src/commands/review.ts` — import `normalizeChannelName`; apply it
+  inside `resolveDispatchChannels` to each explicit `--channels` entry and to
+  disabled-set membership tests (centralized — D5). The `disabledSet` at
+  `review.ts:489` is built from already-normalized names.
 - `packages/mmr/src/core/compensator.ts` — add `antigravity` to `COMPENSATING_FOCUS`.
 - `packages/mmr/tests/config/defaults.test.ts` — assert the `antigravity` channel shape.
+- `packages/mmr/tests/core/host-isolation.test.ts` — add the cwd-only-no-symlink
+  regression test (D3) alongside the existing grok HOME-neutral symlink test.
 - `packages/mmr/tests/core/compensator.test.ts` — assert the `antigravity` focus entry.
-- `packages/mmr/tests/commands/review*.test.ts` (or nearest existing) — assert
-  `agy`→`antigravity` alias resolution in `--channels` and `channels_disabled`.
+- `packages/mmr/tests/commands/cli-parsing.test.ts` — assert `agy`→`antigravity`
+  alias resolution in `--channels` and `channels_disabled` (this is the existing
+  file that exercises CLI channel-flag parsing; `tests/commands/review-abstract-filter.test.ts`
+  covers `resolveDispatchChannels` filtering and may gain a companion assertion).
 - `packages/mmr/CHANGELOG.md` — new minor-version entry.
 - `packages/mmr/package.json` — version bump (minor — new feature).
 - `packages/mmr/README.md` — channel list + config example mention agy.
@@ -256,19 +339,28 @@ Live `agy` round-trips are **not** run in CI (no creds; costs scarce quota) — 
 were covered by the manual smoke tests recorded in this spec. Automated tests are
 config/logic-level:
 
-1. `defaults.test.ts` — `antigravity` channel: `command === 'agy'`,
-   `prompt_delivery === 'stdin'`, `cwd === '{{neutral_cwd}}'`, **no** `HOME`/
-   `XDG_CONFIG_HOME` in `env`, flags include `--print`/`--sandbox`/
+1. `tests/config/defaults.test.ts` — `antigravity` channel: `command === 'agy'`,
+   `prompt_delivery === 'stdin'`, `cwd === '{{neutral_cwd}}'`, `env` is `{}` (asserts
+   **no** `HOME`/`XDG_CONFIG_HOME` key), flags include `--print`/`--sandbox`/
    `--dangerously-skip-permissions`/`--print-timeout`, `output_parser === 'default'`,
-   `enabled === true`, auth `failure_exit_codes` includes 41.
-2. `channel-aliases.test.ts` — `normalizeChannelName('agy') === 'antigravity'`,
-   identity for unknown/canonical names.
-3. `review` alias test — `--channels=agy` dispatches the `antigravity` channel;
-   `channels_disabled: ['agy']` disables it; canonical name still works.
-4. `compensator.test.ts` — `COMPENSATING_FOCUS.antigravity` exists and resolves.
-5. host-isolation regression — cwd-only neutral posture (no HOME placeholder)
-   creates the temp dir, pins `PWD`/`OLDPWD`/`INIT_CWD`, performs **no** credential
-   symlink (guards the D3 "real HOME" assumption).
+   `enabled === true`, auth `failure_exit_codes` includes 41, and the auth `check`
+   string matches both auth sentinels (`authentication required`/`authentication
+   timed out`).
+2. `tests/config/channel-aliases.test.ts` — `normalizeChannelName('agy') ===
+   'antigravity'`, identity for unknown and canonical names.
+3. `tests/commands/cli-parsing.test.ts` — `--channels=agy` dispatches the
+   `antigravity` channel; `channels_disabled: ['agy']` disables it; the canonical
+   name still works on both surfaces (exercises the centralized normalization in
+   `resolveDispatchChannels`).
+4. `tests/core/compensator.test.ts` — `COMPENSATING_FOCUS.antigravity` exists and
+   resolves to a `claude -p` compensating pass labeled `compensating-antigravity`.
+5. `tests/core/host-isolation.test.ts` — **D3 regression (write the failing test
+   first):** with a fake `~/.grok/auth.json` staged under a temp HOME, cwd-only
+   neutral posture (`withNeutralPosture({}, '{{neutral_cwd}}')`) creates the temp
+   dir, pins `PWD`/`OLDPWD`/`INIT_CWD`, and creates **no** `.grok/auth.json`
+   symlink (temp dir is empty); the existing grok HOME-neutral case still creates
+   the symlink. This test fails against current `host-isolation.ts` and passes after
+   the gating fix.
 6. Full gate: `make check-all` (run `npm install` at the worktree root first — a
    known worktree dependency gap).
 
