@@ -27,3 +27,13 @@ ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/.." && pwd)"
   [[ "$s2" =~ $re ]]
   [ "${BASH_REMATCH[2]}" = "P2" ]
 }
+
+@test "review-code.md threshold regex uses the [[:space:]=] character class" {
+  grep -q 'fix-threshold\[\[:space:\]=\]+(P\[0-3\])' "$ROOT/content/tools/review-code.md"
+  ! grep -q 'fix-threshold\[\[:space:\]\]+(P\[0-3\])' "$ROOT/content/tools/review-code.md"
+}
+
+@test "post-implementation-review.md threshold regex uses the [[:space:]=] character class" {
+  grep -q 'fix-threshold\[\[:space:\]=\]+(P\[0-3\])' "$ROOT/content/tools/post-implementation-review.md"
+  ! grep -q 'fix-threshold\[\[:space:\]\]+(P\[0-3\])' "$ROOT/content/tools/post-implementation-review.md"
+}
