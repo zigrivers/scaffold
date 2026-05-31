@@ -219,7 +219,7 @@ describe('normalizeVerdict', () => {
   // output. Although runEntryAudit's Zod parse guarantees these arrays are
   // present before it ever reaches here, the function must not throw on a
   // hand-built verdict missing them — that is exactly the malformed shape it
-  // exists to absorb (round-2 review: grok/antigravity).
+  // exists to absorb.
   const base = {
     entry_name: 'x', audit_date: '2026-05-24', model: 'm',
     verdict: 'minor-drift' as const, sources_checked: [], findings: [],
