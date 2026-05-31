@@ -6,8 +6,8 @@ volatility: evolving
 last-reviewed: null
 version-pin: null
 sources:
-  - url: https://modelcontextprotocol.io/specification/2025-06-18/basic/transports
-  - url: https://modelcontextprotocol.io/specification/2025-06-18/basic/lifecycle
+  - url: https://modelcontextprotocol.io/specification/2025-11-25/basic/transports
+  - url: https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle
   - url: https://modelcontextprotocol.io/docs/develop/connect-local-servers
 ---
 

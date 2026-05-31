@@ -4,27 +4,27 @@ description: MCP protocol version negotiation, MCP-Protocol-Version HTTP header,
 topics: [mcp, versioning, protocol-version, backwards-compatibility, capability-negotiation]
 volatility: stable
 last-reviewed: null
-version-pin: 'MCP spec 2025-06-18'
+version-pin: 'MCP spec 2025-11-25'
 sources:
-  - url: https://modelcontextprotocol.io/specification/2025-06-18/basic/lifecycle
-  - url: https://modelcontextprotocol.io/specification/2025-06-18/basic/transports
+  - url: https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle
+  - url: https://modelcontextprotocol.io/specification/2025-11-25/basic/transports
 ---
 
 MCP uses calendar-versioned protocol strings and capability-based feature detection. Understand both mechanisms to build servers that work with current clients and remain compatible as the spec evolves.
 
 ## Summary
 
-Protocol versions are date strings (e.g., `2025-06-18`). The client proposes a version in `initialize`; the server echoes it or responds with its preferred version. If versions are incompatible, the client disconnects. HTTP clients MUST include `MCP-Protocol-Version: <negotiated-version>` on all subsequent requests. Feature availability is determined by capability negotiation, not version numbers alone. For your server's own versioning, use semantic versioning; keep the `serverInfo.version` field current and stable across protocol version changes.
+Protocol versions are date strings (e.g., `2025-11-25`). The client proposes a version in `initialize`; the server echoes it or responds with its preferred version. If versions are incompatible, the client disconnects. HTTP clients MUST include `MCP-Protocol-Version: <negotiated-version>` on all subsequent requests. Feature availability is determined by capability negotiation, not version numbers alone. For your server's own versioning, use semantic versioning; keep the `serverInfo.version` field current and stable across protocol version changes.
 
 ## Deep Guidance
 
 ### Protocol version strings
 
-MCP protocol versions are ISO 8601 calendar dates: `2025-06-18`, `2025-03-26`, `2024-11-05`. Current production version is `2025-06-18`. Always send the latest version you support in the `initialize` request — the server will downgrade if needed.
+MCP protocol versions are ISO 8601 calendar dates: `2025-11-25`, `2025-06-18`, `2025-03-26`, `2024-11-05`. Current production version is `2025-11-25`. Always send the latest version you support in the `initialize` request — the server will downgrade if needed.
 
 Version negotiation in the `initialize` handshake:
-1. Client sends `"protocolVersion": "2025-06-18"` (its latest supported version).
-2. If the server supports `2025-06-18`, it responds with `"protocolVersion": "2025-06-18"`.
+1. Client sends `"protocolVersion": "2025-11-25"` (its latest supported version).
+2. If the server supports `2025-11-25`, it responds with `"protocolVersion": "2025-11-25"`.
 3. If the server only supports `2025-03-26`, it responds with `"protocolVersion": "2025-03-26"`.
 4. The client checks if it supports the server's response version. If not, it disconnects.
 
@@ -39,7 +39,7 @@ POST /mcp HTTP/1.1
 Host: mcp.example.com
 Content-Type: application/json
 Accept: application/json, text/event-stream
-MCP-Protocol-Version: 2025-06-18
+MCP-Protocol-Version: 2025-11-25
 Mcp-Session-Id: abc123
 ```
 
@@ -47,7 +47,7 @@ Servers use this header to handle requests differently based on protocol version
 
 ### Capability-based feature detection
 
-Do not version-gate features solely on protocol version numbers. Use capability negotiation instead. A server supporting `2025-06-18` may not declare the `prompts` capability — that means prompts are not available regardless of protocol version.
+Do not version-gate features solely on protocol version numbers. Use capability negotiation instead. A server supporting `2025-11-25` may not declare the `prompts` capability — that means prompts are not available regardless of protocol version.
 
 The correct pattern for clients: check whether the server declared the capability before calling the corresponding methods. A client that calls `tools/list` without checking whether the server declared `tools` capability will receive a protocol error. The `initialize` response is the authoritative source of truth for what a server supports.
 
@@ -76,16 +76,16 @@ Breaking changes in tool `inputSchema` or resource URI patterns are breaking cha
 
 ### Supporting multiple protocol versions simultaneously
 
-If you need to serve both old (2024-11-05 HTTP+SSE) and new (2025-06-18 Streamable HTTP) clients:
+If you need to serve both old (2024-11-05 HTTP+SSE) and new (2025-11-25 Streamable HTTP) clients:
 - Keep the old SSE GET endpoint and POST endpoint running alongside the new MCP endpoint.
 - Use the `MCP-Protocol-Version` header to route behavior within the Streamable HTTP path.
 - Set a deprecation date for old transport support and communicate it in the `serverInfo` description or via documentation.
 
-For servers that only need to support the latest spec, target `2025-06-18` and do not implement the deprecated HTTP+SSE transport. New clients target the current spec; support for the old transport is only needed if you have existing clients that have not yet migrated.
+For servers that only need to support the latest spec, target `2025-11-25` and do not implement the deprecated HTTP+SSE transport. New clients target the current spec; support for the old transport is only needed if you have existing clients that have not yet migrated.
 
 ### Spec evolution cadence
 
-The MCP spec has evolved on roughly a quarterly cadence: `2024-11-05` (initial), `2025-03-26` (Streamable HTTP introduction), `2025-06-18` (current). Major changes between versions: `2024-11-05 → 2025-03-26` introduced Streamable HTTP, deprecating HTTP+SSE. `2025-03-26 → 2025-06-18` added `outputSchema` for tools, `structuredContent`, audio content type, `title` fields, and the `elicitation` client capability. Watch the spec changelog (https://modelcontextprotocol.io) for new capabilities that may benefit your server.
+The MCP spec has evolved on roughly a quarterly cadence: `2024-11-05` (initial), `2025-03-26` (Streamable HTTP introduction), `2025-06-18`, `2025-11-25` (current). Major changes between versions: `2024-11-05 → 2025-03-26` introduced Streamable HTTP, deprecating HTTP+SSE. `2025-03-26 → 2025-06-18` added `outputSchema` for tools, `structuredContent`, audio content type, `title` fields, and the `elicitation` client capability. `2025-06-18 → 2025-11-25` added OIDC Discovery 1.0 support; aligned OAuth Protected Resource Metadata to RFC 9728 (`WWW-Authenticate` header now optional with `.well-known` fallback); incremental scope consent and Client ID Metadata Documents for client registration; `icons` metadata on tools/resources/prompts; JSON Schema 2020-12 as the default dialect; input validation errors explicitly directed as Tool Execution Errors (`isError`) for model self-correction; Streamable HTTP servers MUST respond HTTP 403 for invalid Origin headers; stdio servers MAY use stderr for all logging; elicitation gains URL-mode, titled/untitled enums, and primitive default values; sampling gains `tools`/`toolChoice` support; experimental `tasks` feature for durable requests with polling. Watch the spec changelog (https://modelcontextprotocol.io) for new capabilities that may benefit your server.
 
 ### Backwards compatibility checklist
 

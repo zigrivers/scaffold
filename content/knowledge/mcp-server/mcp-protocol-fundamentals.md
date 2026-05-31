@@ -4,10 +4,10 @@ description: MCP client/server model, JSON-RPC 2.0 message format, capability ne
 topics: [mcp, protocol, json-rpc, lifecycle, capability-negotiation]
 volatility: fast-moving
 last-reviewed: null
-version-pin: 'MCP spec 2025-06-18'
+version-pin: 'MCP spec 2025-11-25'
 sources:
-  - url: https://modelcontextprotocol.io/specification/2025-06-18/
-  - url: https://modelcontextprotocol.io/specification/2025-06-18/basic/lifecycle
+  - url: https://modelcontextprotocol.io/specification/2025-11-25/
+  - url: https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle
   - url: https://www.jsonrpc.org/specification
 ---
 
@@ -74,7 +74,7 @@ After a successful response, the client MUST send an `initialized` notification 
   "id": 1,
   "method": "initialize",
   "params": {
-    "protocolVersion": "2025-06-18",
+    "protocolVersion": "2025-11-25",
     "capabilities": {
       "roots": { "listChanged": true },
       "sampling": {},
@@ -88,7 +88,7 @@ After a successful response, the client MUST send an `initialized` notification 
 The server responds with its capabilities. Example server capability declaration:
 ```json
 {
-  "protocolVersion": "2025-06-18",
+  "protocolVersion": "2025-11-25",
   "capabilities": {
     "tools": { "listChanged": true },
     "resources": { "subscribe": true, "listChanged": true },
@@ -101,7 +101,7 @@ The server responds with its capabilities. Example server capability declaration
 
 ### Version negotiation
 
-The client sends the latest protocol version it supports. If the server supports it, it echoes the same version. If the server does not support the requested version, it responds with the latest version it does support. If the client cannot handle the server's version, it should disconnect. The currently active spec version is `2025-06-18`; clients sending this should receive it back from any compliant modern server.
+The client sends the latest protocol version it supports. If the server supports it, it echoes the same version. If the server does not support the requested version, it responds with the latest version it does support. If the client cannot handle the server's version, it should disconnect. The currently active spec version is `2025-11-25`; clients sending this should receive it back from any compliant modern server.
 
 ### Capability negotiation
 

@@ -4,10 +4,10 @@ description: MCP protocol errors (JSON-RPC error codes) vs tool execution errors
 topics: [mcp, error-handling, json-rpc, tool-errors, protocol-errors]
 volatility: evolving
 last-reviewed: null
-version-pin: 'MCP spec 2025-06-18'
+version-pin: 'MCP spec 2025-11-25'
 sources:
-  - url: https://modelcontextprotocol.io/specification/2025-06-18/server/tools
-  - url: https://modelcontextprotocol.io/specification/2025-06-18/basic/lifecycle
+  - url: https://modelcontextprotocol.io/specification/2025-11-25/server/tools
+  - url: https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle
   - url: https://www.jsonrpc.org/specification
 ---
 
@@ -79,7 +79,7 @@ Use `isError: true` for:
 - Network timeouts when calling downstream services
 - Partial failures where the overall result is a failure
 
-**Why this distinction matters**: when `isError: true`, the result is a successful JSON-RPC response — the protocol layer worked correctly. The LLM receives the content and can read the error message, decide to retry with different parameters, inform the user, or take an alternative approach. Protocol errors, on the other hand, are invisible to the LLM in most client implementations — they're handled at the transport/client layer.
+**Why this distinction matters**: when `isError: true`, the result is a successful JSON-RPC response — the protocol layer worked correctly. The LLM receives the content and can read the error message, decide to retry with different parameters, inform the user, or take an alternative approach. Protocol errors, on the other hand, are invisible to the LLM in most client implementations — they're handled at the transport/client layer. The 2025-11-25 spec revision (SEP-1303) explicitly directs that input validation errors SHOULD be returned as Tool Execution Errors (`isError: true`) rather than Protocol Errors, specifically to enable model self-correction — reinforcing this guidance.
 
 ### Error message quality
 

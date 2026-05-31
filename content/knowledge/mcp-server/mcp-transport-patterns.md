@@ -4,9 +4,9 @@ description: MCP stdio and Streamable HTTP transports, deprecated HTTP+SSE migra
 topics: [mcp, transport, stdio, http, sse, session-management]
 volatility: fast-moving
 last-reviewed: null
-version-pin: 'MCP spec 2025-06-18'
+version-pin: 'MCP spec 2025-11-25'
 sources:
-  - url: https://modelcontextprotocol.io/specification/2025-06-18/basic/transports
+  - url: https://modelcontextprotocol.io/specification/2025-11-25/basic/transports
 ---
 
 MCP defines two standard transports: **stdio** (local subprocess) and **Streamable HTTP** (network-accessible). The old HTTP+SSE transport from spec version 2024-11-05 is deprecated. Transport choice is a deployment decision that shapes your server's authentication model, scalability, and operational complexity.
@@ -57,7 +57,7 @@ The Streamable HTTP transport runs the server as an independent HTTP service. A 
 
 ### MCP-Protocol-Version header
 
-After initialization, HTTP clients MUST include `MCP-Protocol-Version: <negotiated-version>` on all requests. Example: `MCP-Protocol-Version: 2025-06-18`. If a server receives no version header, it SHOULD assume `2025-03-26` for backwards compatibility. Servers MUST reject requests with unsupported versions with `400 Bad Request`.
+After initialization, HTTP clients MUST include `MCP-Protocol-Version: <negotiated-version>` on all requests. Example: `MCP-Protocol-Version: 2025-11-25`. If a server receives no version header, it SHOULD assume `2025-03-26` for backwards compatibility. Servers MUST reject requests with unsupported versions with `400 Bad Request`. As of 2025-11-25, servers MUST also respond with HTTP 403 Forbidden when an incoming connection carries an invalid `Origin` header (previously the response code was not specified).
 
 ### Deprecated HTTP+SSE transport
 

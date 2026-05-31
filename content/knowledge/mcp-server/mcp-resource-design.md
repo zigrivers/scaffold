@@ -4,9 +4,9 @@ description: MCP resource URIs, URI templates (RFC 6570), MIME types, resources/
 topics: [mcp, resources, uri-templates, mime-types, subscriptions]
 volatility: evolving
 last-reviewed: null
-version-pin: 'MCP spec 2025-06-18'
+version-pin: 'MCP spec 2025-11-25'
 sources:
-  - url: https://modelcontextprotocol.io/specification/2025-06-18/server/resources
+  - url: https://modelcontextprotocol.io/specification/2025-11-25/server/resources
   - url: https://datatracker.ietf.org/doc/html/rfc6570
   - url: https://datatracker.ietf.org/doc/html/rfc3986
 ---

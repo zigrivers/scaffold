@@ -7,7 +7,7 @@ last-reviewed: null
 version-pin: null
 sources:
   - url: https://modelcontextprotocol.io/docs/tools/debugging
-  - url: https://modelcontextprotocol.io/specification/2025-06-18/server/utilities/logging
+  - url: https://modelcontextprotocol.io/specification/2025-11-25/server/utilities/logging
 ---
 
 Good observability in an MCP server means you can diagnose problems without attaching a debugger. The fundamental constraint is the stdio transport's stdout-is-protocol-only rule, which makes naive logging dangerous. Structured logging to the right channel is non-negotiable.

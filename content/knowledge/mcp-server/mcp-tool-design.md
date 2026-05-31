@@ -4,9 +4,9 @@ description: MCP tool naming conventions, JSON Schema inputSchema design, idempo
 topics: [mcp, tools, json-schema, tool-design, error-handling]
 volatility: evolving
 last-reviewed: null
-version-pin: 'MCP spec 2025-06-18'
+version-pin: 'MCP spec 2025-11-25'
 sources:
-  - url: https://modelcontextprotocol.io/specification/2025-06-18/server/tools
+  - url: https://modelcontextprotocol.io/specification/2025-11-25/server/tools
   - url: https://json-schema.org/draft/2020-12/schema
 ---
 
@@ -20,13 +20,13 @@ Each MCP tool has a `name`, optional `description`, a JSON Schema `inputSchema`,
 
 ### Tool naming conventions
 
-Tool names must be unique within a server. Use `snake_case` for tool names to be consistent with the conventions used by official MCP reference servers and to avoid ambiguity in LLM-generated calls. Names should be short verb-noun phrases that describe what the tool does: `get_weather`, `create_issue`, `search_documents`. Avoid generic names like `execute` or `run` that give the LLM no signal about the tool's purpose.
+Tool names must be unique within a server. Use `snake_case` for tool names — the 2025-11-25 spec revision (SEP-986) formally reinforces this convention. Names should be short verb-noun phrases that describe what the tool does: `get_weather`, `create_issue`, `search_documents`. Avoid generic names like `execute` or `run` that give the LLM no signal about the tool's purpose.
 
 The `description` field is critical — it is the primary signal the LLM uses to decide when to invoke a tool. Be specific about what the tool does, what inputs it expects, and when it should be used. A poor description leads to misuse. A good description includes the domain, the action, any preconditions, and the output shape in plain English.
 
 ### JSON Schema inputSchema
 
-Every tool MUST declare an `inputSchema` as a valid JSON Schema object. The schema serves two purposes: runtime validation and LLM guidance. Best practices:
+Every tool MUST declare an `inputSchema` as a valid JSON Schema object. MCP uses **JSON Schema 2020-12** as its default schema dialect (established in the 2025-11-25 revision). The schema serves two purposes: runtime validation and LLM guidance. Best practices:
 
 - Use `type: "object"` at the root with named `properties`.
 - List required parameters in the `required` array. Do not list optional parameters there.

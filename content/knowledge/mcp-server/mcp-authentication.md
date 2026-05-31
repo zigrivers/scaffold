@@ -4,9 +4,9 @@ description: MCP authentication patterns — stdio local trust model, OAuth 2.1 
 topics: [mcp, authentication, oauth, security, authorization]
 volatility: evolving
 last-reviewed: null
-version-pin: 'MCP spec 2025-06-18; OAuth 2.1 draft-ietf-oauth-v2-1-13'
+version-pin: 'MCP spec 2025-11-25; OAuth 2.1 draft-ietf-oauth-v2-1-13'
 sources:
-  - url: https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization
+  - url: https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization
   - url: https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-13
   - url: https://datatracker.ietf.org/doc/html/rfc7591
   - url: https://www.rfc-editor.org/rfc/rfc8707.html
@@ -45,13 +45,13 @@ The spec is explicit: implementations using stdio SHOULD NOT follow the OAuth sp
 
 For Streamable HTTP servers accessible over a network, the spec defines an OAuth 2.1 authorization flow. The server acts as an OAuth 2.1 **resource server**; a separate authorization server handles token issuance.
 
-**Discovery flow:**
+**Discovery flow (updated in 2025-11-25 per RFC 9728 and OIDC Discovery 1.0):**
 1. Client sends an unauthenticated MCP request.
-2. Server responds `401 Unauthorized` with a `WWW-Authenticate` header pointing to the resource server metadata URL.
-3. Client fetches `/.well-known/oauth-protected-resource` to get the authorization server URL.
-4. Client fetches the authorization server's metadata at `/.well-known/oauth-authorization-server`.
-5. Client completes the OAuth 2.1 authorization code flow with PKCE.
-6. Client presents `Authorization: Bearer <token>` on all subsequent requests.
+2. Server MAY respond `401 Unauthorized` with a `WWW-Authenticate` header pointing to the resource server metadata URL; however, the `WWW-Authenticate` header is now OPTIONAL — clients MUST fall back to fetching `/.well-known/oauth-protected-resource` directly if no header is present.
+3. Client fetches `/.well-known/oauth-protected-resource` (RFC 9728) to get the authorization server URL.
+4. Client fetches the authorization server's metadata. Authorization servers that support OpenID Connect SHOULD publish an OIDC Discovery document (`/.well-known/openid-configuration`) in addition to `/.well-known/oauth-authorization-server`.
+5. Client completes the OAuth 2.1 authorization code flow with PKCE. Clients SHOULD use OAuth Client ID Metadata Documents (a recommended client registration mechanism in 2025-11-25) where supported by the authorization server.
+6. Client presents `Authorization: Bearer <token>` on all subsequent requests. Servers MAY issue incremental scope consent via the `WWW-Authenticate` header on subsequent `403` responses.
 
 **PKCE is mandatory** for public clients (MCP clients cannot keep secrets). The authorization server MUST support PKCE. The client generates a `code_verifier` (random string), hashes it to `code_challenge`, includes the challenge in the authorization request, and presents the verifier in the token request.
 
@@ -68,7 +68,7 @@ NEVER accept tokens issued for a different resource. NEVER forward a received to
 
 ### Dynamic client registration
 
-Authorization servers and clients SHOULD support OAuth 2.0 Dynamic Client Registration (RFC 7591). Without it, MCP clients must be pre-registered with every authorization server, which creates friction for discovering and connecting to new servers. Dynamic registration lets a client auto-register on first connection:
+Authorization servers and clients SHOULD support OAuth 2.0 Dynamic Client Registration (RFC 7591). As of 2025-11-25, OAuth Client ID Metadata Documents are the recommended client registration mechanism — they allow clients to declare their identity via a URL rather than requiring a registration round-trip. Without dynamic registration support, MCP clients must be pre-registered with every authorization server, which creates friction for discovering and connecting to new servers. Dynamic registration lets a client auto-register on first connection:
 
 ```
 POST /register

@@ -4,7 +4,7 @@ description: TypeScript @modelcontextprotocol/sdk vs Python SDK and FastMCP — 
 topics: [mcp, sdk, typescript, python, fastmcp]
 volatility: fast-moving
 last-reviewed: null
-version-pin: 'MCP spec 2025-06-18; @modelcontextprotocol/sdk 1.x; mcp[cli] Python 1.2.0+'
+version-pin: 'MCP spec 2025-11-25; @modelcontextprotocol/sdk 1.x; mcp[cli] Python 1.2.0+'
 sources:
   - url: https://modelcontextprotocol.io/docs/develop/build-server
   - url: https://github.com/modelcontextprotocol/typescript-sdk

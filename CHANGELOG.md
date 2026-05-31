@@ -10,9 +10,9 @@ Adds first-class support for MCP (Model Context Protocol) server projects.
 
 - **`mcp-server` project type** — Scaffold now supports building MCP servers
   with a rich configuration surface: language (`typescript`/`python`),
-  transport (`stdio`/`sse`/`http`/`streamable-http`), primitive mix
-  (tools/resources/prompts), auth strategy (`none`/`oauth2`/`api-key`),
-  deployment target (`local`/`cloud`/`edge`/`container`), and statefulness.
+  transport (`stdio`/`streamable-http`/`sse`), primitive mix
+  (tools/resources/prompts), auth strategy (`none`/`oauth`/`apikey`),
+  deployment target (`local`/`hosted`), and statefulness.
   Enabled via `--project-type mcp-server` or auto-detected when any
   `--mcp-*` CLI flag is supplied.
 - **`--mcp-*` CLI flags** — `--mcp-language`, `--mcp-transport`,

@@ -4,9 +4,9 @@ description: MCP prompts as user-controlled primitives, prompts/list and prompts
 topics: [mcp, prompts, ux, slash-commands, prompt-templates]
 volatility: evolving
 last-reviewed: null
-version-pin: 'MCP spec 2025-06-18'
+version-pin: 'MCP spec 2025-11-25'
 sources:
-  - url: https://modelcontextprotocol.io/specification/2025-06-18/server/prompts
+  - url: https://modelcontextprotocol.io/specification/2025-11-25/server/prompts
 ---
 
 Prompts in MCP are structured, reusable message templates that users explicitly select. They are different from tools (model-controlled, automatic) and resources (application-controlled, passive context). Understanding the distinction shapes how you expose server capabilities.
