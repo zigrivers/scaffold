@@ -193,10 +193,16 @@ way.
    other three; disable with `channels_disabled: ["grok"]` in `.mmr.yaml`.
    Unlike the others, grok requires the prompt as an arg (it ignores stdin),
    so its built-in channel uses `prompt_delivery: prompt-file`.
+5. **Antigravity CLI** (`agy`) — Google's forward replacement for the
+   sunsetting Gemini CLI (Gemini stops serving Pro/Ultra on 2026-06-18; agy
+   runs in parallel with `gemini` until then). Enabled by default; runs
+   hardened (neutral cwd, `--sandbox`, auto-approve, real HOME). The channel
+   key is `antigravity`; `agy` is accepted as an alias in `--channels`,
+   `channels_disabled`, and `channels:` config keys.
 
 **Critical rules:**
-- **Foreground only** — Always run Codex, Gemini, Claude, and Grok CLI commands
-  as foreground Bash calls. Never use `run_in_background`, `&`, or `nohup`.
+- **Foreground only** — Always run Codex, Gemini, Claude, Grok, and Antigravity
+  (`agy`) CLI commands as foreground Bash calls. Never use `run_in_background`, `&`, or `nohup`.
   Background execution produces empty output. Multiple foreground calls in a
   single message are fine (the tool runner supports parallel invocations).
 - **All built-in channels are required** — A channel enters degraded mode when
@@ -211,6 +217,7 @@ way.
   - Codex: `! codex login`
   - Gemini: `! gemini -p "hello"`
   - Grok: `! grok login`
+  - Antigravity: `! agy -p "hello"`   (then open the printed Google OAuth URL)
 - **Independence** — never share one channel's output with another.
 - **Fix all blocking findings** (severity at or above `results.fix_threshold` in the verdict JSON; the project default lives in `.mmr.yaml` and is `P2` unless changed) before proceeding to the next task. Use `--fix-threshold P0|P1|P2|P3` on `scaffold run review-pr` / `review-code` to override per-invocation.
 - **Verdict handling** — proceed only on `pass` or `degraded-pass`. If the
@@ -256,11 +263,13 @@ mmr review --pr "$PR_NUMBER" --sync --format text
 command -v codex >/dev/null 2>&1 || echo "Codex not installed"
 command -v gemini >/dev/null 2>&1 || echo "Gemini not installed"
 command -v grok >/dev/null 2>&1 || echo "Grok not installed"
+command -v agy >/dev/null 2>&1 || echo "Antigravity (agy) not installed"
 
 # Manual fallback — auth checks
 codex login status 2>/dev/null
 NO_BROWSER=true gemini -p "respond with ok" -o json 2>&1
 grok models >/dev/null 2>&1 && echo "Grok authed" || echo "Run: grok login"
+agy -p "respond with ok" 2>&1   # auth fails → printed Google OAuth URL; run: agy -p "hello"
 
 # Manual fallback — review dispatch (foreground only — never run_in_background)
 codex exec --skip-git-repo-check -s read-only --ephemeral "PROMPT" 2>/dev/null
@@ -276,6 +285,12 @@ mkdir -p "$D/.grok"; ln -s "$HOME/.grok/auth.json" "$D/.grok/auth.json" 2>/dev/n
 HOME="$D" XDG_CONFIG_HOME="$D" grok --cwd "$D" --prompt-file "$PROMPT_FILE" \
   --output-format json --no-memory --tools web_search,web_fetch \
   --no-subagents --no-plan 2>/dev/null
+# agy (Antigravity) — hardened review posture: neutral cwd (strips project
+# AGENTS.md/.agents/mcp_config.json + denies repo access), OS sandbox, auto-approve
+# to avoid headless approval hangs. Real HOME (agy creds live under $HOME).
+NCWD="$(mktemp -d)"; trap 'rm -rf "$D" "$NCWD"' EXIT INT TERM   # extend cleanup; don't clobber the grok trap above
+printf '%s' "$PROMPT" | ( cd "$NCWD" && agy --print --sandbox \
+  --dangerously-skip-permissions --print-timeout 300s 2>/dev/null )
 ```
 
 ## Project Structure Quick Reference
