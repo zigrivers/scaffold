@@ -594,10 +594,13 @@ tasks:
   (`open`-but-unready / `blocked` / `deferred`) → before declaring a stall, check
   whether the **actual blockers of those remaining tasks** are active. A plan
   task can be blocked by a **manually-created** task (no `plan_task_id`) that
-  another agent is working. Compute the remaining tasks' blockers from their
-  inline `dependencies` and see if any blocker is `in_progress`; if so → exit
-  gracefully (the thing that will unblock them is advancing). Only when **none of
-  the remaining tasks' blockers is `in_progress`** is it a **true stall**: the
+  another agent is working. Collect the remaining tasks' blocker IDs from their
+  inline `dependencies` (`depends_on_id`), then resolve each blocker's **status**
+  from an **unfiltered** fetch (`bd list --all --limit 0 --json`) — the plan-
+  scoped query would miss manual blockers, which carry no `plan_task_id`. If any
+  blocker is `in_progress` → exit gracefully (the thing that will unblock them is
+  advancing). Only when **none of the remaining tasks' blockers is
+  `in_progress`** is it a **true stall**: the
   prompt **stops and reports** the remaining tasks grouped by why they aren't
   ready (open dependency — plan or manual, manual `blocked`, `deferred`) so the
   user can unblock them. (Unrelated global `in_progress` work that doesn't block
