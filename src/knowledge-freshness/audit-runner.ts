@@ -144,7 +144,38 @@ export async function runEntryAudit(
       'Check that the dispatcher returned the meta-prompt\'s expected shape.',
     )
   }
-  return verdict
+  return normalizeVerdict(verdict)
+}
+
+/**
+ * Make a verdict self-consistent with the spec contract (enforced in
+ * audit-apply.ts; spec §A.4): `current` and `minor-drift` carry findings only,
+ * never edits. A non-conforming
+ * model — observed with DeepSeek, which follows the constraint less strictly
+ * than Claude — can return `proposed_changes` alongside one of those verdicts.
+ * Hard-failing there leaves the entry perpetually "due" and starves the
+ * 10-entry daily audit budget. Instead, demote the changes to advisory
+ * `preserve_warnings` so the verdict applies cleanly and the entry gets
+ * reviewed-stamped. Demoting (not upgrading to major-drift) is deliberate:
+ * upgrading would push unexpected rewrites of stable entries through, bypassing
+ * the MMR-corroboration and anti-over-rewrite gates that major-drift requires.
+ */
+export function normalizeVerdict(verdict: AuditVerdict): AuditVerdict {
+  const carriesNoEdits = verdict.verdict === 'current' || verdict.verdict === 'minor-drift'
+  if (!carriesNoEdits || verdict.proposed_changes.length === 0) return verdict
+
+  const demoted = verdict.proposed_changes.map(
+    (c) => `[demoted from proposed_changes — ${verdict.verdict} carries no edits] ${c.location}: ${c.rationale}`,
+  )
+  process.stderr.write(
+    `[audit-runner] verdict "${verdict.verdict}" returned ${verdict.proposed_changes.length} ` +
+    'proposed_changes; demoting to preserve_warnings (advisory) per spec contract.\n',
+  )
+  return {
+    ...verdict,
+    proposed_changes: [],
+    preserve_warnings: [...verdict.preserve_warnings, ...demoted],
+  }
 }
 
 /**
