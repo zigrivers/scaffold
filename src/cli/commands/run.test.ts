@@ -1777,12 +1777,10 @@ describe('run command handler', () => {
 describe('run command — argument capture (parse-level)', () => {
   async function parseRun(line: string): Promise<{
     captured: Record<string, unknown> | null
-    sibling: boolean
     error: string | null
   }> {
     const runCmd = await importHandler() // the runCommand CommandModule (default export)
     let captured: Record<string, unknown> | null = null
-    let sibling = false
     let error: string | null = null
     await yargs(line.split(' ').filter(Boolean))
       .command({ ...runCmd, handler: (a) => { captured = a as Record<string, unknown> } })
@@ -1790,17 +1788,20 @@ describe('run command — argument capture (parse-level)', () => {
         command: 'sibling',
         describe: 'strict sibling',
         builder: (y) => y,
-        handler: () => { sibling = true },
+        handler: () => {},
       })
       .options({
         format: { type: 'string', choices: ['json'] as const },
         auto: { type: 'boolean', default: false },
+        verbose: { type: 'boolean', default: false },
+        root: { type: 'string' },
+        force: { type: 'boolean', default: false },
       })
       .strict()
       .exitProcess(false)
       .fail((msg: string) => { error = msg })
       .parseAsync()
-    return { captured, sibling, error }
+    return { captured, error }
   }
 
   it('captures a bare positional into args', async () => {
