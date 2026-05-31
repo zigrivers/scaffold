@@ -224,9 +224,10 @@ manual re-import command after a plan update.
 ### Version gating & graceful degradation
 
 Both the materializer and the build prompts gate on a single shared
-**`beads_usable`** check. It must return false (→ markdown fallback) unless
-**all** of the following hold, so the build never attempts `bd` against a
-tracker it cannot correctly drive:
+**`beads_usable`** check. It must return false (→ markdown fallback **or**
+fail-closed, depending on whether `.beads/` is present — see the degradation
+split below) unless **all** of the following hold, so the build never attempts
+`bd` against a tracker it cannot correctly drive:
 
 1. `.beads/` exists.
 2. `bd` is on the PATH (`command -v bd`) — `command -v bd` alone is insufficient
@@ -715,8 +716,9 @@ prompt.
   (`open`/`blocked`/`deferred`), reconciles added/removed deps, closes
   stale-but-not-started issues, preserves **started** (`in_progress`/`closed`)
   state.
-- **Task/container removed from plan** → Pass 3 closes if not started
-  (`open`/`blocked`/`deferred`); flags for review if started.
+- **Task/container removed from plan** → Pass 3 closes + unsets the key if not
+  started (`open`/`blocked`/`deferred`); flags for review if `in_progress`;
+  leaves a `closed` issue untouched (key kept for revert-safety).
 - **Dependency removed from plan** → Pass 2 removes the edge for
   open/blocked/deferred dependents (so blocked tasks can be unblocked).
 - **AC/description changed while in_progress** → fields untouched; a single
