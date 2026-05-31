@@ -1,7 +1,9 @@
 # Design: argument passthrough for `scaffold run`
 
 **Date:** 2026-05-31
-**Status:** Approved (revised after multi-model spec review)
+**Status:** Approved (4 rounds of multi-model spec review; residual shell-injection
+risk for self-supplied args accepted as out-of-scope per maintainer — see
+"Residual risk and scope decision")
 **Branch:** `worktree-scaffold-run-arg-passthrough`
 
 ## Problem
@@ -326,6 +328,40 @@ issue body). The design mitigates this on three levels:
 3. **Substitution safety.** The functional-replacer fix (§2) prevents `$`-pattern
    corruption from turning argument text into unintended output.
 
+### Residual risk and scope decision (accepted)
+
+A deeper property remains: because `$ARGUMENTS` is **text-substituted into prompt
+markdown before any shell runs**, a value containing `$( … )` or backticks placed
+into *any* shell line — including the review-\* tools' own
+`ARGS_REMAINING="$ARGUMENTS"` / `[[ "$ARGUMENTS" =~ … ]]` lines — would be
+command-substituted by the shell **before** that tool's regex/`tr` validation
+executes. Neither template quoting (textual substitution defeats it) nor
+post-substitution validation (it runs too late) fully closes this; only a
+boundary that sanitizes or safely transports the value *before* it reaches any
+template would.
+
+**Decision (maintainer, 2026-05-31): this is out of scope for this PR.** Rationale:
+
+- The vector is **pre-existing**, not introduced here — `$ARGUMENTS` already
+  reached these same shell snippets via `--instructions`. This change only adds
+  *positional* args as another path to an existing surface.
+- The realistic threat model is narrow: args are normally **self-supplied** by
+  the invoking agent; exploitation requires an agent to forward untrusted text
+  (e.g. a PR title) verbatim as an arg.
+- A correct, general fix (a CLI-boundary allowlist, or context-aware engine-side
+  shell-escaping) has real costs — a blunt allowlist would reject legitimate
+  free-text for the prose steps (`spark`, `new-enhancement`, `quick-task`), and a
+  context-aware transport is a materially larger design. Neither belongs in a
+  focused arg-binding bugfix.
+
+**This PR therefore ships:** the arg-binding fix, the §2 functional-replacer, the
+per-tool mitigations above (multi-agent agent-name validation, `<arguments>`
+delimiter, `=`-separator regex), and the shell-quoting **audit** (so no *new*
+unquoted usages land). **Follow-up:** open a separate spec for a proper
+engine-side safe-transport / CLI-boundary sanitization of `$ARGUMENTS` for shell
+contexts, deciding there how to reconcile it with free-text prose steps. Until
+then, the residual injection risk for self-supplied args is **accepted**.
+
 The space-free-token contract (Known limitations) further shrinks the surface:
 values with embedded spaces/quotes are out of scope and not silently re-tokenized
 into multiple shell words — but that contract is a *convention*, not an
@@ -433,7 +469,11 @@ review-pr 376` output contains `376` and the EXECUTE NOW header.
   affected.
 - **Prompt-injection vector.** Untrusted arg text reaches an executed prompt.
   Bounded by per-tool input validation, the `<arguments>` delimiter, and the
-  functional-replacer fix; documented in Security considerations.
+  functional-replacer fix. A deeper residual (command-substitution at the textual
+  substitution point, ahead of per-tool validation) is **explicitly accepted as
+  out-of-scope** for this PR and deferred to a follow-up spec — see "Residual risk
+  and scope decision." Justified by: pre-existing surface, self-supplied args, and
+  the cost of a correct general fix.
 - **Header length / token budget.** The EXECUTE NOW banner adds a few lines to
   text-mode output only; negligible against full meta-prompt size and suppressed
   in machine output.
