@@ -258,6 +258,56 @@ describe('status command', () => {
     expect(exitSpy).toHaveBeenCalledWith(1)
   })
 
+  it('warns when no pipeline content is resolved instead of silently reporting completion', async () => {
+    // Regression: when the pipeline content can't be discovered (broken
+    // install, or a project-local content/ dir shadowing the bundled
+    // pipeline), the resolved graph collapses to just the completed state
+    // entries and status would otherwise report a misleading "100% complete".
+    const stderrLines: string[] = []
+    vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+      stderrLines.push(String(chunk))
+      return true
+    })
+    mockDiscoverMetaPrompts.mockReturnValue(new Map()) // no content resolved
+    mockOverlayEnabled([]) // nothing enabled in the overlay
+    const steps = {
+      'create-vision': { status: 'completed', source: 'pipeline', produces: [] },
+    }
+    mockStateWith(MockStateManager, steps, { next_eligible: [] })
+
+    await statusCommand.handler(defaultArgv())
+
+    const stderr = stderrLines.join('')
+    expect(stderr).toMatch(/pipeline content/i)
+    expect(stderr).toMatch(/unreliable|misleading|missing|broken/i)
+  })
+
+  it('does not warn about unresolved pipeline content when steps are discovered', async () => {
+    const stderrLines: string[] = []
+    vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+      stderrLines.push(String(chunk))
+      return true
+    })
+    const metaPrompts = new Map([
+      ['step-a', makeFrontmatter('step-a', 'pre', 1)],
+      ['step-b', makeFrontmatter('step-b', 'pre', 2)],
+    ])
+    mockDiscoverMetaPrompts.mockReturnValue(
+      metaPrompts as unknown as ReturnType<typeof discoverMetaPrompts>,
+    )
+    mockOverlayEnabled(['step-a', 'step-b'])
+    const steps = {
+      'step-a': { status: 'completed', source: 'pipeline', produces: [] },
+      'step-b': { status: 'pending', source: 'pipeline', produces: [] },
+    }
+    mockStateWith(MockStateManager, steps, { next_eligible: [] })
+
+    await statusCommand.handler(defaultArgv())
+
+    const stderr = stderrLines.join('')
+    expect(stderr).not.toMatch(/no pipeline content/i)
+  })
+
   it('outputs progress percentage to stdout', async () => {
     const metaPrompts = new Map([
       ['step-a', makeFrontmatter('step-a', 'pre', 1)],
