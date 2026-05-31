@@ -53,11 +53,29 @@ export const CHROME_JS: string = /* js */ `(function(){
       var main = document.querySelector('.content');
       if (main) main.inert = open;
       if (open) {
-        var first = rail && rail.querySelector('a');
+        var first = rail && rail.querySelector('a, button, [tabindex]:not([tabindex="-1"])');
         if (first) first.focus();
+        else if (rail) { rail.setAttribute('tabindex', '-1'); rail.focus(); }
       } else if (toggle) {
         toggle.focus();
       }
+    }
+    // If the viewport grows past the mobile breakpoint while the drawer is open,
+    // the rail becomes the desktop sidebar and the toggle hides — clear the open
+    // state so .content doesn't stay inert with no way to close it.
+    if (window.matchMedia) {
+      var mq = window.matchMedia('(max-width: 860px)');
+      var onMq = function() {
+        if (mq.matches) return;
+        var rail = document.querySelector('.rail');
+        if (rail) rail.classList.remove('open');
+        var toggle = document.querySelector('.nav-toggle');
+        if (toggle) toggle.setAttribute('aria-expanded', 'false');
+        var main = document.querySelector('.content');
+        if (main) main.inert = false;
+      };
+      if (mq.addEventListener) mq.addEventListener('change', onMq);
+      else if (mq.addListener) mq.addListener(onMq);
     }
     document.querySelectorAll('[data-action="nav"]').forEach(function(btn) {
       btn.addEventListener('click', function() {

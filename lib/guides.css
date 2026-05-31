@@ -235,7 +235,8 @@ nav.toc li.toc-3 a { padding-left: var(--sp-6); font-size: var(--text-xs); }
 .guide-card-desc { color: var(--text-muted); font-size: var(--text-sm); line-height: var(--lh-normal); }
 
 /* ── Responsive: TOC becomes an off-canvas drawer (chrome.ts toggles .open) ──*/
-/* 860px breakpoint is literal — media queries cannot read custom properties. */
+/* 860px is literal — media queries cannot read custom properties. Revisit it if
+   --topbar-h / --rail-w / --drawer-w change (the drawer sticky offsets key off them). */
 @media (max-width: 860px) {
   .nav-toggle { display: inline-flex; align-items: center; }
   .layout { grid-template-columns: 1fr; gap: 0; }

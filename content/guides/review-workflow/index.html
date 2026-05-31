@@ -1324,7 +1324,8 @@ nav.toc li.toc-3 a { padding-left: var(--sp-6); font-size: var(--text-xs); }
 .guide-card-desc { color: var(--text-muted); font-size: var(--text-sm); line-height: var(--lh-normal); }
 
 /* ── Responsive: TOC becomes an off-canvas drawer (chrome.ts toggles .open) ──*/
-/* 860px breakpoint is literal — media queries cannot read custom properties. */
+/* 860px is literal — media queries cannot read custom properties. Revisit it if
+   --topbar-h / --rail-w / --drawer-w change (the drawer sticky offsets key off them). */
 @media (max-width: 860px) {
   .nav-toggle { display: inline-flex; align-items: center; }
   .layout { grid-template-columns: 1fr; gap: 0; }
@@ -1637,11 +1638,29 @@ the <code>finding_key</code>, verdict internals, and <code>.mmr.yaml</code>.</li
       var main = document.querySelector('.content');
       if (main) main.inert = open;
       if (open) {
-        var first = rail && rail.querySelector('a');
+        var first = rail && rail.querySelector('a, button, [tabindex]:not([tabindex="-1"])');
         if (first) first.focus();
+        else if (rail) { rail.setAttribute('tabindex', '-1'); rail.focus(); }
       } else if (toggle) {
         toggle.focus();
       }
+    }
+    // If the viewport grows past the mobile breakpoint while the drawer is open,
+    // the rail becomes the desktop sidebar and the toggle hides — clear the open
+    // state so .content doesn't stay inert with no way to close it.
+    if (window.matchMedia) {
+      var mq = window.matchMedia('(max-width: 860px)');
+      var onMq = function() {
+        if (mq.matches) return;
+        var rail = document.querySelector('.rail');
+        if (rail) rail.classList.remove('open');
+        var toggle = document.querySelector('.nav-toggle');
+        if (toggle) toggle.setAttribute('aria-expanded', 'false');
+        var main = document.querySelector('.content');
+        if (main) main.inert = false;
+      };
+      if (mq.addEventListener) mq.addEventListener('change', onMq);
+      else if (mq.addListener) mq.addListener(onMq);
     }
     document.querySelectorAll('[data-action="nav"]').forEach(function(btn) {
       btn.addEventListener('click', function() {

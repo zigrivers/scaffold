@@ -98,6 +98,24 @@ describe('renderIndexPage', () => {
     expect(html.indexOf('cat-concepts')).toBeLessThan(html.indexOf('cat-reference'))
   })
 
+  it('appends unknown categories after the known ones with a capitalized label', () => {
+    const html = renderIndexPage([
+      /* eslint-disable @typescript-eslint/no-explicit-any */
+      ({ topic: 'odd', frontmatter: {
+        title: 'Odd', topic: 'odd', description: 'misc', category: 'experimental', order: 5,
+      } }) as any,
+      ({ topic: 'cli', frontmatter: {
+        title: 'CLI', topic: 'cli', description: 'commands', category: 'reference', order: 20,
+      } }) as any,
+      /* eslint-enable @typescript-eslint/no-explicit-any */
+    ], CSS)
+    // Unknown 'experimental' category gets a capitalized label and an id…
+    expect(html).toContain('id="cat-experimental"')
+    expect(html).toContain('>Experimental<')
+    // …and sorts AFTER the known 'reference' category despite a lower order
+    expect(html.indexOf('cat-reference')).toBeLessThan(html.indexOf('cat-experimental'))
+  })
+
   it('escapes < and & in frontmatter fields', () => {
     const html = renderIndexPage([
       /* eslint-disable @typescript-eslint/no-explicit-any */
