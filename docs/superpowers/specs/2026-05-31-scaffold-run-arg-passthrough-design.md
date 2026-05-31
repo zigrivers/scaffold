@@ -114,16 +114,30 @@ Changes to the `run` command builder:
 
 `scaffold`'s own defined flags (`--depth`, `--instructions`, `--force`,
 `--service`, `--root`, `--format`) remain recognized and consumed; only unknown
-tokens fall through into `args`. The `RunArgs` interface gains `args?: string[]`.
+tokens fall through into `args`. The `RunArgs` interface gains
+`args?: (string | number)[]` (yargs coerces bare numeric tokens like `376` to a
+`number`; the §3 `.join(' ')` stringifies them, so this is transparent).
 
-Behavior:
+The command string uses **two** dots — `[args..]` — which is yargs' canonical
+variadic-positional syntax (yargs 17.7.2, the pinned version). Three dots is not
+required and is not the documented form.
+
+Behavior (empirically verified against yargs 17.7.2 with root `.strict()` + the
+`run`-scoped `.strict(false)` + `unknown-options-as-args`):
 
 | Invocation | `argv.args` captured |
 |---|---|
-| `scaffold run review-pr 376` | `['376']` |
-| `scaffold run review-pr 376 --fix-threshold P1` | `['376', '--fix-threshold', 'P1']` |
+| `scaffold run review-pr 376` | `[376]` |
+| `scaffold run review-pr 376 --fix-threshold P1` | `[376, '--fix-threshold', 'P1']` |
+| `scaffold run review-pr 376 --fix-threshold=P1` | `[376, '--fix-threshold=P1']` |
+| `scaffold run review-pr 376 --format text` | `[376]` (`--format` consumed; `argv.format='text'`) |
+| `scaffold run --format text review-pr 376` | `[376]` (interleaved global flag consumed) |
 | `scaffold run create-prd --force` | `[]` (`--force` is a known option, consumed) |
 | `scaffold run review-pr` | `[]` |
+| sibling `scaffold validate --bogus` | n/a — **still rejected** (`Unknown argument: bogus`); `.strict(false)` does not leak |
+
+This table is the fixed observable contract; the implementation tests assert it
+verbatim.
 
 > **Why `.strict(false)` + `unknown-options-as-args` and not a `process.argv`
 > reconstruction.** The root parser runs `.strict()` *before* the `run` handler
@@ -253,9 +267,14 @@ numeric PR id ever reaches the `mmr` invocation regardless of what else was in
 form, but the current parsing regexes only match a space:
 `--fix-threshold[[:space:]]+(P[0-3])`. Update the threshold-parsing regex in
 `review-pr.md`, `review-code.md`, and `post-implementation-review.md` to accept
-either separator — `--fix-threshold([[:space:]]|=)+(P[0-3])` — and strip the
-matched span the same way. This keeps both `--fix-threshold P1` and
-`--fix-threshold=P1` working once passthrough lands.
+either separator using a **character class** (not an alternation group):
+`--fix-threshold[[:space:]=]+(P[0-3])`. A character class is required — an
+alternation group like `([[:space:]]|=)+` would insert a new capture group and
+shift the existing `(P[0-3])` and trailing groups by one, breaking the
+`BASH_REMATCH[2]` (threshold) / `BASH_REMATCH[0]` (span) indices the snippets
+rely on. The character-class form adds no group, so all `BASH_REMATCH` indices
+stay as they are. This keeps both `--fix-threshold P1` and `--fix-threshold=P1`
+working once passthrough lands.
 
 ## Security considerations
 
@@ -275,17 +294,31 @@ issue body). The design mitigates this on three levels:
    (`scripts/setup-agent-worktree.sh $ARGUMENTS`, `bd list --assignee $ARGUMENTS`,
    `echo … should show $ARGUMENTS`). There `$ARGUMENTS` is an agent name, but an
    unquoted expansion is a shell-injection position if a space/metacharacter-laden
-   value reaches it. This design therefore carries a concrete remediation
-   requirement (not just guidance):
-   - **Quote every shell expansion** of `$ARGUMENTS` in those two files
-     (`"$ARGUMENTS"`), so a value with spaces/metacharacters cannot split into
-     extra words or commands.
+   value reaches it.
+
+   **Crucially, `$ARGUMENTS` is substituted into the prompt text *before* any
+   shell runs — it is not a shell variable expanded at runtime.** So wrapping the
+   placeholder in double quotes in the template (`"$ARGUMENTS"`) is **not** a
+   sufficient boundary: a value containing a `"`, a backtick, or `$( … )` is
+   pasted verbatim and can close the quote and inject a command. Quoting only
+   helps benign space-bearing values; it is defense-in-depth, not the boundary.
+   This design therefore carries a concrete remediation requirement (not just
+   guidance):
+   - **Validate/reduce to a safe token at the point of use — this is the real
+     boundary.** For `multi-agent-start.md` / `multi-agent-resume.md` the value
+     is an agent name; the prompt must constrain it to `^[A-Za-z0-9_-]+$` and
+     instruct the agent to **stop** if it does not match, *before* the name
+     appears in any executed command (mirroring how `review-pr` reduces its arg
+     to digits).
+   - **Quote every shell expansion** of `$ARGUMENTS` (`"$ARGUMENTS"`) as
+     defense-in-depth, so a benign space-bearing value cannot split into extra
+     words even ahead of validation.
    - Add an **implementation pre-flight audit** (and, if cheap, an eval/grep gate)
      that flags any `$ARGUMENTS` appearing in an unquoted shell command position
      across `content/`, so future tools can't reintroduce the pattern.
    - New tools that consume `$ARGUMENTS` in shell MUST validate/reduce it to a
-     narrow token shape and quote every expansion; never `eval` it or place it in
-     an unquoted command position.
+     narrow token shape (the boundary) and quote every expansion (defense in
+     depth); never `eval` it or place it in an unquoted command position.
 2. **Prompt-injection framing.** Tool prompts that surface `$ARGUMENTS` to the
    agent wrap it in a `<arguments>…</arguments>` delimiter (§5) and label it as
    literal data, reducing the chance the model reinterprets argument text as
@@ -376,8 +409,9 @@ review-pr 376` output contains `376` and the EXECUTE NOW header.
 - `content/tools/review-code.md`, `content/tools/post-implementation-review.md`
   — `=`-separator regex for `--fix-threshold`
 - `content/pipeline/build/multi-agent-start.md`,
-  `content/pipeline/build/multi-agent-resume.md` — quote every shell expansion of
-  `$ARGUMENTS` (`"$ARGUMENTS"`) (security remediation)
+  `content/pipeline/build/multi-agent-resume.md` — validate the agent name to
+  `^[A-Za-z0-9_-]+$` (stop if it doesn't match) and quote every shell expansion
+  of `$ARGUMENTS` as defense-in-depth (security remediation)
 - `CHANGELOG.md` — note the null→`''` substitution cleanup and the new
   `run <step> [args..]` passthrough
 
