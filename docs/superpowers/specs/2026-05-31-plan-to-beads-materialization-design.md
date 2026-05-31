@@ -287,6 +287,20 @@ used as join keys (retitling would sever the link → duplicates).
 **All full-set queries use `--all --limit 0`** so neither closed issues nor
 result-set pagination (default 50) hides records.
 
+**Retire convention** (used by Pass 0a duplicate close and Pass 3 stale close).
+Whenever a pass removes an issue from the plan-derived set, it does so in this
+order, against the issue's **own** join key — `<join-key>` is `plan_task_id` for
+a task, `plan_story_id` for a story, `plan_epic_id` for an epic (resolved from
+the issue's type, never hardcoded):
+
+1. `bd close <id> --reason "…"` (skip for an already-`closed` issue)
+2. `bd label add <id> <stale-label>` (e.g. `stale:duplicate` / `stale:removed-from-plan`)
+3. **then** `bd update <id> --unset-metadata <join-key>`
+
+Unset is **last** so that if the close/label step fails (hook error, timeout),
+the issue keeps its join key and the next run retries the retirement instead of
+orphaning an open issue that has lost its key.
+
 ### Pass 0a — Duplicate guard (always)
 
 Before any upsert, fetch the plan-derived issues once
@@ -300,13 +314,12 @@ dep reconcile, stale pass, and the scoped claim loop depend on:
    (`in_progress`/`closed`), the canonical is the oldest *started* one (work has
    already begun on it — never start a fresh copy); otherwise the oldest issue
    overall (lowest `created_at`, ties by `id`).
-2. **For every non-canonical duplicate** (started **or** not-started),
-   **unset its join key** (`bd update <id> --unset-metadata plan_task_id`) so it
-   drops out of all future `--has-metadata-key` queries — this is the only change
-   made to a *started* non-canonical issue (its execution state/fields are not
-   touched), and it is **reported** for human review.
-3. **Additionally close + label** the **not-started** non-canonical duplicates
-   (`bd close <id> --reason …` → label `stale:duplicate`).
+2. **Not-started non-canonical duplicates** → retire them per the **Retire
+   convention** (close → `stale:duplicate` label → unset the issue's own
+   `<join-key>`), so they leave the plan-derived set and are never re-detected.
+3. **Started non-canonical duplicates** → do not close or mutate fields; only
+   **unset the `<join-key>`** (`bd update <id> --unset-metadata <join-key>`) to
+   restore key uniqueness, and **report** them for human review.
 
 This guarantees a single canonical issue retains each `plan_*_id` after Pass 0a,
 so the claim loop can never surface a duplicate of an already-started item.
@@ -438,23 +451,18 @@ List every plan-derived issue
 `plan_story_id`/`plan_epic_id`) and diff IDs against the current plan:
 
 - ID no longer in the plan and issue **not started** (`open`/`blocked`/
-  `deferred`) → **unset the join key, then close + label** (unsetting is required
-  so the closed issue drops out of future `--has-metadata-key plan_task_id`
-  queries and is not re-evaluated — and so it can never be misread as
-  "started/dropped" on a later run):
-  ```bash
-  bd update <id> --unset-metadata plan_task_id
-  bd close  <id> --reason "Removed from implementation plan (was <task-id>)"
-  bd label  add <id> stale:removed-from-plan
-  ```
+  `deferred`) → **retire it** per the Retire convention (close with reason
+  `"Removed from implementation plan (was <id>)"` → `stale:removed-from-plan`
+  label → unset the issue's own `<join-key>`), so it drops out of future queries
+  and can never be misread as "started/dropped" later.
 - Such an issue **`in_progress`** → **do not auto-close**; report it in the
   summary for human attention (it may be mid-flight work the plan dropped by
-  mistake).
-- Such an issue **`closed`** (already done) → **unset its join key** so it drops
-  out of future bulk-fetch queries (`bd update <id> --unset-metadata
-  plan_task_id`); it needs no close and is excluded from the "dropped work"
-  report. Without this, a closed-and-removed task would be re-fetched on every
-  later run (harmless but unbounded growth).
+  mistake). Leave its join key intact so it stays visible until a human decides.
+- Such an issue **`closed`** (already done) → **unset its own `<join-key>`**
+  (`bd update <id> --unset-metadata <join-key>`) so it drops out of future
+  bulk-fetch queries; no close needed, excluded from the "dropped work" report.
+  Without this, a closed-and-removed item is re-fetched on every later run
+  (harmless but unbounded growth).
 
 ### Summary report
 
@@ -518,26 +526,14 @@ skip gate:
 - `READY_IDS` = `plan_task_id` of **not-started** (`open`/`blocked`/`deferred`)
   plan-derived issues.
 
-**Duplicate guard** (the materializer's first step, Pass 0a). Check for any
-`plan_task_id` (also `plan_story_id`/`plan_epic_id`) held by more than one Beads
-issue — a failed, manual, or concurrent prior import can create these, and a
-bare set check would pass while `bd ready --claim` claims duplicate work.
-Resolution is deterministic: keep the oldest issue (lowest `created_at`, ties
-broken by `id`); for each discarded **not-started** duplicate, **strip its join
-key and close it** so it can never be re-matched or re-detected on a later run:
-
-```bash
-bd update <dup-id> --unset-metadata plan_task_id   # (or plan_story_id/plan_epic_id)
-bd close  <dup-id> --reason "duplicate of <kept-id> for plan <task-id>"
-bd label  add <dup-id> stale:duplicate
-```
-
-Unsetting the join key is what removes the discarded issue from every future
-`--has-metadata-key plan_task_id` query — without it, the closed duplicate would
-be re-fetched forever and misread as a "started duplicate." **Started
-duplicates** (`in_progress`/`closed` that are *not* the kept issue) are reported
-for human review rather than touched; if one can't be auto-resolved, fail before
-the claim loop.
+**Duplicate guard.** Because a bare set check collapses duplicates, the
+materializer's first step (**Pass 0a**, defined in the reconcile algorithm
+below) restores the one-issue-per-join-key invariant before any other logic
+runs — a failed/manual/concurrent prior import can otherwise leave two issues
+with the same `plan_*_id` and let `bd ready --claim` claim duplicate work. The
+single authoritative definition of duplicate resolution lives in Pass 0a; this
+section does not restate it (to avoid drift). The preflight simply relies on
+Pass 0a having run as part of "always materialize."
 
 The sets are built with `jq`. A `jq`/`bd` failure routes to the markdown loop
 **only while still in the pre-materialization gate** (building `beads_usable` /
