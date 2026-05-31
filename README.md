@@ -372,7 +372,7 @@ Every `scaffold init` wizard question can be answered via CLI flags, making scaf
 | `--depth` | 1-5 | Custom methodology depth (requires `--methodology custom`) |
 | `--adapters` | comma-sep | AI adapters: claude-code, codex, gemini |
 | `--traits` | comma-sep | Project traits: web, mobile |
-| `--project-type` | string | web-app, mobile-app, backend, cli, library, game, data-pipeline, ml, browser-extension, research, data-science, web3 |
+| `--project-type` | string | web-app, mobile-app, backend, cli, library, game, data-pipeline, ml, browser-extension, research, data-science, web3, mcp-server |
 | `--auto` | boolean | Non-interactive mode (uses Zod defaults for unset flags) |
 
 #### Web-App Config Flags (require `--project-type web-app` or auto-set it)
@@ -461,6 +461,17 @@ Every `scaffold init` wizard question can be answered via CLI flags, making scaf
 | `--research-domain` | string | none, quant-finance, ml-research, simulation |
 | `--research-tracking` | boolean | `--research-tracking` / `--no-research-tracking` |
 
+#### MCP Server Config Flags (require `--project-type mcp-server` or auto-set it)
+
+| Flag | Type | Values |
+|------|------|--------|
+| `--mcp-language` | string | typescript, python |
+| `--mcp-transport` | string | stdio, streamable-http, sse |
+| `--mcp-primitives` | comma-sep | tools, resources, prompts |
+| `--mcp-auth` | string | none, oauth, apikey |
+| `--mcp-deployment` | string | local, hosted |
+| `--mcp-stateful` | boolean | `--mcp-stateful` / `--no-mcp-stateful` |
+
 #### Data Science Config (`--project-type data-science`)
 
 Data science has one forward-compatible config field in the schema, defaulted automatically — no CLI flags are needed in v1:
@@ -526,9 +537,9 @@ during assembly.
 
 - **Flag > auto > interactive**: Flags always take highest precedence. `--auto --engine unreal` uses defaults for everything except engine.
 - **Partial flags + interactive**: Provide some flags and the wizard asks only the remaining questions. `scaffold init --project-type game --engine unreal` prompts interactively for multiplayer, platforms, etc.
-- **Type-specific flags auto-set project type**: `--engine unity` automatically sets `--project-type game`, `--web-rendering ssr` sets `--project-type web-app`, `--backend-api-style rest` sets `--project-type backend`, `--cli-interactivity hybrid` sets `--project-type cli`, `--lib-visibility public` sets `--project-type library`, `--mobile-platform ios` sets `--project-type mobile-app`, `--pipeline-processing batch` sets `--project-type data-pipeline`, `--ml-phase training` sets `--project-type ml`, `--ext-manifest 3` sets `--project-type browser-extension`, `--research-driver code-driven` sets `--project-type research`. Error if conflicting type. (Data science and web3 currently have no dedicated CLI flags — pass `--project-type data-science` or `--project-type web3` directly.)
-- **Cannot mix flag families**: `--web-rendering ssr --backend-api-style rest` is an error. Each flag family (`--web-*`, `--backend-*`, `--cli-*`, `--lib-*`, `--mobile-*`, `--pipeline-*`, `--ml-*`, `--research-*`, `--ext-*`, game) is exclusive.
-- **Validation**: `--depth` requires `--methodology custom`. `--online-services` requires `--multiplayer online` or `hybrid`. SSR/hybrid rendering is incompatible with static deploy target. Session auth requires server state (not static). ML inference projects must specify a serving pattern. Browser extensions must declare at least one capability (UI surface, content script, or background worker). Notebook-driven research cannot be fully autonomous.
+- **Type-specific flags auto-set project type**: `--engine unity` automatically sets `--project-type game`, `--web-rendering ssr` sets `--project-type web-app`, `--backend-api-style rest` sets `--project-type backend`, `--cli-interactivity hybrid` sets `--project-type cli`, `--lib-visibility public` sets `--project-type library`, `--mobile-platform ios` sets `--project-type mobile-app`, `--pipeline-processing batch` sets `--project-type data-pipeline`, `--ml-phase training` sets `--project-type ml`, `--ext-manifest 3` sets `--project-type browser-extension`, `--research-driver code-driven` sets `--project-type research`, `--mcp-language typescript` sets `--project-type mcp-server`. Error if conflicting type. (Data science and web3 currently have no dedicated CLI flags — pass `--project-type data-science` or `--project-type web3` directly.)
+- **Cannot mix flag families**: `--web-rendering ssr --backend-api-style rest` is an error. Each flag family (`--web-*`, `--backend-*`, `--cli-*`, `--lib-*`, `--mobile-*`, `--pipeline-*`, `--ml-*`, `--research-*`, `--ext-*`, `--mcp-*`, game) is exclusive.
+- **Validation**: `--depth` requires `--methodology custom`. `--online-services` requires `--multiplayer online` or `hybrid`. SSR/hybrid rendering is incompatible with static deploy target. Session auth requires server state (not static). ML inference projects must specify a serving pattern. Browser extensions must declare at least one capability (UI surface, content script, or background worker). Notebook-driven research cannot be fully autonomous. `stdio` transport cannot use network auth (`--mcp-auth` must be `none` with `--mcp-transport stdio`). `stdio` transport runs locally and cannot use hosted deployment (`--mcp-deployment` must be `local` with `--mcp-transport stdio`).
 
 #### CI Examples
 
@@ -625,6 +636,15 @@ scaffold init --auto --methodology deep --project-type data-science
 # Web3 smart-contract / protocol project (Foundry / Hardhat on EVM)
 scaffold init --auto --methodology deep --project-type web3
 
+# MCP server — TypeScript, streamable-http transport, tools + resources
+scaffold init --auto --methodology deep --project-type mcp-server \
+  --mcp-language typescript --mcp-transport streamable-http \
+  --mcp-primitives tools,resources --mcp-auth oauth --mcp-deployment hosted
+
+# MCP server — Python, stdio transport (local tooling, no auth)
+scaffold init --auto --methodology mvp --project-type mcp-server \
+  --mcp-language python --mcp-transport stdio --mcp-auth none
+
 # Multiplayer mobile game with Unity
 scaffold init --project-type game --methodology deep --auto \
   --engine unity --multiplayer online --target-platforms ios,android \
@@ -651,7 +671,7 @@ Scaffold supports **project-type overlays** — domain-specific knowledge and pi
 
 - **Injects domain knowledge** into existing pipeline steps (e.g., SSR caching strategies into `tech-stack`, API pagination patterns into `coding-standards`)
 
-The game overlay additionally adjusts step enablement, remaps artifact references, and adds dependency overrides (because game development has fundamentally different artifacts). The web-app, backend, CLI, library, mobile-app, data-pipeline, ML, browser-extension, research, data-science, and web3 overlays are **knowledge-only** — they inject domain expertise into existing steps without changing which steps run or how they depend on each other. The research type additionally supports **domain sub-overlays** (quant-finance, ml-research, simulation) that layer domain-specific knowledge on top of the core research overlay, and the backend type supports a `fintech` sub-overlay. Both research and backend accept `domain` as either a single string or an array (e.g. `domain: ['quant-finance', 'simulation']`) for stacking multiple sub-overlays; the wizard and CLI flags remain single-select in v1, so multi-domain stacking requires hand-editing `.scaffold/config.yml`.
+The game overlay additionally adjusts step enablement, remaps artifact references, and adds dependency overrides (because game development has fundamentally different artifacts). Like the game overlay, the **mcp-server overlay** also adjusts step enablement — it disables the UI-focused steps (design-system, ux-spec, review-ux) since an MCP server has no UI, and marks database-schema/review-database as if-needed. The web-app, backend, CLI, library, mobile-app, data-pipeline, ML, browser-extension, research, data-science, and web3 overlays are **knowledge-only** — they inject domain expertise into existing steps without changing which steps run or how they depend on each other. The research type additionally supports **domain sub-overlays** (quant-finance, ml-research, simulation) that layer domain-specific knowledge on top of the core research overlay, and the backend type supports a `fintech` sub-overlay. Both research and backend accept `domain` as either a single string or an array (e.g. `domain: ['quant-finance', 'simulation']`) for stacking multiple sub-overlays; the wizard and CLI flags remain single-select in v1, so multi-domain stacking requires hand-editing `.scaffold/config.yml`.
 
 Overlays are composable with methodology presets. An MVP web-app gets fewer steps at lower depth; a deep backend project gets exhaustive analysis of every architectural decision.
 
@@ -669,6 +689,7 @@ Overlays are composable with methodology presets. An MVP web-app gets fewer step
 | `data-science` | `data-science-overlay.yml` | 13 entries (reproducibility, experiment tracking, notebook discipline, model evaluation, data versioning, dev environment, observability, project structure, conventions, requirements, security, testing, architecture) | Audience (`solo` default; `platform` reserved for DS-2) |
 | `web3` | `web3-overlay.yml` | 14 entries (Foundry tooling, smart-contract security, upgradeability, gas optimization, oracles, audit workflow, deployment, testing patterns, EVM fundamentals, ABI/interface design, event/log indexing, supply-chain) | Scope (`contracts` default; `dapp` reserved for W3-2) |
 | `game` | `game-overlay.yml` | 24 entries (engines, networking, audio, VR/AR, economy, save systems, certification) | Engine, multiplayer, platforms, economy, narrative, and 6 more |
+| `mcp-server` | `mcp-server-overlay.yml` | — (step overrides only: disables UI steps) | Language, transport, primitives, auth, deployment, stateful |
 
 ### Game Development
 
@@ -753,7 +774,7 @@ These answers control which conditional steps activate. A single-player puzzle g
 
 #### Multi-type Detection
 
-`scaffold adopt` detects 12 project types from manifest files and directory layouts:
+`scaffold adopt` detects 13 project types from manifest files and directory layouts:
 
 | Type | Key Signals |
 |------|-------------|
@@ -769,6 +790,7 @@ These answers control which conditional steps activate. A single-player puzzle g
 | `research` | `program.md` + `results.tsv`, backtest/strategy files with trading deps, optimization deps + experiment dirs, simulation framework deps |
 | `data-science` | Marimo signals required (`marimo` dep or `.marimo.toml`); DVC (`dvc.yaml`, `.dvc/config`, `dvc` py dep) is supplementary evidence only. Low-tier; defers to `ml` / `research` / `data-pipeline` when those match at medium/high tier |
 | `web3` | `foundry.toml` or `hardhat.config.{ts,js,cjs,mjs}` (medium-tier); `remappings.txt`, `lib/forge-std` are supplementary low-tier signals. EVM-only scope. Library-collision boundary pinned by tiebreak (high-tier `library` wins over medium-tier `web3` for published-library Hardhat projects) |
+| `mcp-server` | `@modelcontextprotocol/sdk` / `mcp` / `fastmcp` dep = low (MCP clients share these deps — avoids mis-adopting a client as a server); dep + entrypoint registering tools/resources = high |
 
 Each detector returns a confidence tier (high/medium/low) with evidence trails. Override detection with `--project-type <type>`.
 
@@ -1403,7 +1425,7 @@ When running parallel agents in separate worktrees, collect their activity befor
 
 ```bash
 # Harvest a live worktree's ledger into the central archive
-scaffold observe harvest --worktree=../my-feature-worktree
+scaffold observe harvest --worktree=.worktrees/my-feature
 
 # Rotate stale archive entries (worktrees that no longer exist)
 scaffold observe harvest --recover
@@ -1466,7 +1488,7 @@ You can change methodology mid-pipeline with `scaffold init --methodology <prese
 | Command | What It Does |
 |---------|-------------|
 | `scaffold init` | Initialize `.scaffold/` state, then auto-build hidden adapter artifacts |
-| `scaffold run <step>` | Execute a pipeline step (assembles and outputs the full prompt) |
+| `scaffold run <step> [args…]` | Execute a pipeline step (assembles and outputs the full prompt). Trailing args bind to the step's `$ARGUMENTS` (e.g. `scaffold run review-pr 376 --fix-threshold P1`) |
 | `scaffold build` | Generate hidden adapter output under `.scaffold/generated/` and update the managed `.gitignore` block |
 | `scaffold adopt` | Bootstrap state from existing artifacts (brownfield projects) |
 | `scaffold skip <step> [<step2>...]` | Skip one or more steps with a reason |

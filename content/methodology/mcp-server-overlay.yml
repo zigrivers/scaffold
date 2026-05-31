@@ -1,0 +1,16 @@
+# methodology/mcp-server-overlay.yml
+name: mcp-server
+description: >
+  MCP Server overlay — an MCP server has no UI, so the design-system and UX
+  steps are disabled. database-schema/review-database stay available
+  (if-needed) for servers that persist resources/state.
+project-type: mcp-server
+
+step-overrides:
+  # No UI surface — disable design/UX steps entirely.
+  design-system: { enabled: false }
+  ux-spec: { enabled: false }
+  review-ux: { enabled: false }
+  # Stateful servers may persist resources; keep available but skippable.
+  database-schema: { enabled: true, conditional: "if-needed" }
+  review-database: { enabled: true, conditional: "if-needed" }

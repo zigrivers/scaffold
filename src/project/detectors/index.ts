@@ -9,6 +9,7 @@ import { detectWebApp } from './web-app.js'
 import { detectBackend } from './backend.js'
 import { detectMl } from './ml.js'
 import { detectResearch } from './research.js'
+import { detectMcpServer } from './mcp-server.js'
 import { detectDataScience } from './data-science.js'
 import { detectWeb3 } from './web3.js'
 import { detectCli } from './cli.js'
@@ -20,7 +21,7 @@ export const ALL_DETECTORS: readonly Detector[] = [
   // Tier 1: distinctive root-file detectors (cheap distinctive failures)
   detectGame, detectBrowserExtension, detectMobileApp, detectDataPipeline,
   // Tier 2: dep-heavy detectors
-  detectWebApp, detectBackend, detectMl, detectResearch, detectCli,
+  detectWebApp, detectBackend, detectMl, detectResearch, detectMcpServer, detectCli,
   // Tier 3: catch-all
   detectDataScience,
   detectWeb3,

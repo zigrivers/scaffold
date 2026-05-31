@@ -1380,11 +1380,11 @@ test run.</p>
 <p>A <strong>git worktree</strong> solves this: it is an independent working directory backed by
 the <em>same</em> <code>.git</code> repository. Each agent gets its own files and its own checked-out
 branch, but commits, refs and history are shared. The layout is one primary
-checkout plus one sibling directory per agent:</p>
-<pre><code class="language-text">~/projects/
-├── scaffold/                  # primary checkout (you work here)
-├── scaffold-alpha/            # worktree for agent "alpha"
-└── scaffold-beta/             # worktree for agent "beta"
+checkout with all agent worktrees project-local under <code>.worktrees/</code>:</p>
+<pre><code class="language-text">scaffold/                      # primary checkout (you work here)
+└── .worktrees/                # agent worktrees (gitignored)
+    ├── alpha/                 # worktree for agent "alpha"
+    └── beta/                  # worktree for agent "beta"
 </code></pre>
 <p>So worktrees give you <strong>filesystem isolation with a shared object store</strong>:
 agents never overwrite each other's working files, but a PR merged from one
@@ -1398,20 +1398,21 @@ branch.</p></div>
 one parallel agent. Given a name like <code>alpha</code>, it:</p>
 <ol>
 <li><strong>Normalizes the name</strong> to a lowercase, hyphenated, alphanumeric slug (so
-<code>Agent_1</code> becomes <code>agent-1</code>), then derives the worktree directory as a
-<em>sibling</em> of the primary repo: <code>../&#x3C;repo-name>-&#x3C;slug></code>.</li>
+<code>Agent_1</code> becomes <code>agent-1</code>), then derives the worktree directory project-local
+under the primary repo: <code>.worktrees/&#x3C;slug></code>. It also ensures <code>.worktrees/</code> is
+gitignored so the worktree's checkout is never accidentally committed.</li>
 <li><strong>Creates the workspace branch</strong> <code>&#x3C;slug>-workspace</code> if it does not already
-exist <span class="fp" data-path="scripts/setup-agent-worktree.sh:40">scripts/setup-agent-worktree.sh:40</span>, then adds the worktree on
-that branch <span class="fp" data-path="scripts/setup-agent-worktree.sh:44">scripts/setup-agent-worktree.sh:44</span>. Re-running for an
+exist <span class="fp" data-path="scripts/setup-agent-worktree.sh:62">scripts/setup-agent-worktree.sh:62</span>, then adds the worktree on
+that branch <span class="fp" data-path="scripts/setup-agent-worktree.sh:65">scripts/setup-agent-worktree.sh:65</span>. Re-running for an
 existing worktree is a safe no-op.</li>
 <li><strong>Writes <code>.scaffold/identity.json</code></strong> — the stable identity that build
 observability stamps onto every event this worktree records. The script
-creates <code>.scaffold/</code> <span class="fp" data-path="scripts/setup-agent-worktree.sh:52">scripts/setup-agent-worktree.sh:52</span> and, only if no
+creates <code>.scaffold/</code> <span class="fp" data-path="scripts/setup-agent-worktree.sh:73">scripts/setup-agent-worktree.sh:73</span> and, only if no
 identity file exists yet, writes <code>worktree_id</code> (a UUID), <code>worktree_label</code>
 (the agent slug), and <code>created_at</code>
-<span class="fp" data-path="scripts/setup-agent-worktree.sh:71">scripts/setup-agent-worktree.sh:71</span>.</li>
+<span class="fp" data-path="scripts/setup-agent-worktree.sh:92">scripts/setup-agent-worktree.sh:92</span>.</li>
 <li><strong>Re-syncs Beads</strong> with a fail-soft <code>bd doctor --fix</code> when a <code>.beads/</code>
-directory is present <span class="fp" data-path="scripts/setup-agent-worktree.sh:88">scripts/setup-agent-worktree.sh:88</span>, reconciling the
+directory is present <span class="fp" data-path="scripts/setup-agent-worktree.sh:109">scripts/setup-agent-worktree.sh:109</span>, reconciling the
 worktree's Beads git hooks and project config against the installed <code>bd</code>
 version. (Beads DB sharing is automatic — worktrees discover the main repo's
 task DB via git's common directory, so there is nothing for <code>bd doctor</code> to
@@ -1467,8 +1468,8 @@ into needless conflicts.</li>
 </ul>
 <p>Each agent otherwise follows the standard PR workflow from its own worktree:
 branch, commit, push, <code>gh pr create</code>, wait for CI, squash-merge. The shared
-object store means a merge from <code>scaffold-alpha</code> is on <code>main</code> for everyone the
-moment it lands.</p>
+object store means a merge from agent <code>alpha</code>'s worktree is on <code>main</code> for
+everyone the moment it lands.</p>
 <h2 id="teardown-harvest">Teardown &#x26; harvest</h2>
 <p>When an agent's work is merged, retire its worktree. The single command for this
 is <code>scripts/teardown-agent-worktree.sh &#x3C;worktree-path></code>, and the <strong>order of
@@ -1529,7 +1530,7 @@ worktree — the CLI rejects a worktree primary root
 morning — does <strong>not</strong> mean re-running setup. The worktree and its
 <code>identity.json</code> persist on disk. Instead:</p>
 <ol>
-<li>Return to the agent's worktree directory (<code>../&#x3C;repo>-&#x3C;agent></code>).</li>
+<li>Return to the agent's worktree directory (<code>.worktrees/&#x3C;agent></code>).</li>
 <li>Run <strong><code>multi-agent-resume &#x3C;agent-name></code></strong> (or <code>single-agent-resume</code> for the
 non-worktree case). It verifies the worktree environment, syncs with <code>main</code>,
 reconciles task status against any PRs merged while you were away, and

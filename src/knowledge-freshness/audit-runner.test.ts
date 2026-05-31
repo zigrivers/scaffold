@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
-import { runEntryAudit, type Dispatcher } from './audit-runner.js'
+import { runEntryAudit, normalizeVerdict, type Dispatcher } from './audit-runner.js'
+import type { AuditVerdict } from './audit-runner.js'
 
 // Use temp fixtures rather than the real on-disk entry + meta-prompt so the
 // runner tests don't break when those files are edited. We inject the meta-
@@ -154,5 +155,88 @@ describe('runEntryAudit', () => {
     } finally {
       fs.rmSync(tmp, { recursive: true, force: true })
     }
+  })
+
+  it('demotes proposed_changes on a minor-drift verdict to advisory preserve_warnings', async () => {
+    // A non-conforming model (observed with DeepSeek) classifies an entry as
+    // minor-drift yet still returns proposed_changes. The spec contract
+    // (audit-apply.ts) forbids that combination; rather than hard-failing the
+    // daily budget, the runner normalizes the verdict to be self-consistent:
+    // drop the changes and keep their rationales as advisory notes.
+    const dispatcher: Dispatcher = vi.fn().mockResolvedValue(JSON.stringify({
+      entry_name: 'stub', audit_date: '2026-05-24', model: 'deepseek-v4-flash',
+      verdict: 'minor-drift', sources_checked: [], findings: [],
+      proposed_changes: [
+        {
+          location: '## Deep Guidance', kind: 'replace',
+          rationale: 'tighten outdated wording', new_text: '## Deep Guidance\nx',
+        },
+      ],
+      preserve_warnings: ['pre-existing warning'],
+    }))
+    const out = await run(dispatcher)
+    expect(out.verdict).toBe('minor-drift')
+    expect(out.proposed_changes).toEqual([])
+    // The original warning survives and the dropped change's rationale is kept.
+    expect(out.preserve_warnings).toContain('pre-existing warning')
+    expect(out.preserve_warnings.some((w) => w.includes('tighten outdated wording'))).toBe(true)
+  })
+
+  it('demotes proposed_changes on a current verdict to advisory preserve_warnings', async () => {
+    const dispatcher: Dispatcher = vi.fn().mockResolvedValue(JSON.stringify({
+      entry_name: 'stub', audit_date: '2026-05-24', model: 'deepseek-v4-flash',
+      verdict: 'current', sources_checked: [], findings: [],
+      proposed_changes: [
+        { location: '## Summary', kind: 'insert', rationale: 'add a missing note', new_text: 'note' },
+      ],
+      preserve_warnings: [],
+    }))
+    const out = await run(dispatcher)
+    expect(out.verdict).toBe('current')
+    expect(out.proposed_changes).toEqual([])
+    expect(out.preserve_warnings.some((w) => w.includes('add a missing note'))).toBe(true)
+  })
+
+  it('leaves proposed_changes untouched on a major-drift verdict', async () => {
+    const change = {
+      location: '## Deep Guidance', kind: 'replace',
+      rationale: 'claim is now wrong', new_text: '## Deep Guidance\nfixed',
+    }
+    const dispatcher: Dispatcher = vi.fn().mockResolvedValue(JSON.stringify({
+      entry_name: 'stub', audit_date: '2026-05-24', model: 'deepseek-v4-flash',
+      verdict: 'major-drift', sources_checked: [], findings: [],
+      proposed_changes: [change], preserve_warnings: [],
+    }))
+    const out = await run(dispatcher)
+    expect(out.verdict).toBe('major-drift')
+    expect(out.proposed_changes).toEqual([change])
+    expect(out.preserve_warnings).toEqual([])
+  })
+})
+
+describe('normalizeVerdict', () => {
+  // normalizeVerdict is exported as the sanitizer for non-conforming model
+  // output. Although runEntryAudit's Zod parse guarantees these arrays are
+  // present before it ever reaches here, the function must not throw on a
+  // hand-built verdict missing them — that is exactly the malformed shape it
+  // exists to absorb.
+  const base = {
+    entry_name: 'x', audit_date: '2026-05-24', model: 'm',
+    verdict: 'minor-drift' as const, sources_checked: [], findings: [],
+  }
+
+  it('demotes without throwing when preserve_warnings is missing', () => {
+    const v = {
+      ...base,
+      proposed_changes: [{ location: '## X', kind: 'replace', rationale: 'r' }],
+    } as unknown as AuditVerdict
+    const out = normalizeVerdict(v)
+    expect(out.proposed_changes).toEqual([])
+    expect(out.preserve_warnings.some((w) => w.includes('r'))).toBe(true)
+  })
+
+  it('does not throw when proposed_changes is missing', () => {
+    const v = { ...base } as unknown as AuditVerdict
+    expect(() => normalizeVerdict(v)).not.toThrow()
   })
 })

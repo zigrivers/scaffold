@@ -28,6 +28,7 @@ You are auditing a single Scaffold knowledge entry against its declared authorit
    - `minor-drift` — wording or examples slightly outdated; no substantive claims wrong.
    - `major-drift` — substantive claims now inaccurate; structural revision needed.
    - `superseded` — the source has shipped a new edition/version that changes the taxonomy; `version-pin` no longer applies.
+4. Populate `proposed_changes` **only** for `major-drift` or `superseded`. For `current` and `minor-drift`, `proposed_changes` **MUST** be an empty array (`[]`) — those verdicts carry no edits. Record any minor observations in `findings` or `preserve_warnings` instead. (A verdict that pairs `current`/`minor-drift` with non-empty `proposed_changes` violates the apply contract; the changes will be dropped to advisory notes.)
 
 ## CRITICAL: Grounding Rules
 

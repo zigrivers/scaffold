@@ -25,6 +25,7 @@ export type {
   MlFlags,
   BrowserExtensionFlags,
   ResearchFlags,
+  McpServerFlags,
 } from './flags.js'
 
 import type {
@@ -38,6 +39,7 @@ import type {
   MlFlags,
   BrowserExtensionFlags,
   ResearchFlags,
+  McpServerFlags,
 } from './flags.js'
 
 export interface WizardOptions {
@@ -63,6 +65,7 @@ export interface WizardOptions {
   mlFlags?: MlFlags
   browserExtensionFlags?: BrowserExtensionFlags
   researchFlags?: ResearchFlags
+  mcpServerFlags?: McpServerFlags
 }
 
 export interface WizardResult {
@@ -92,7 +95,7 @@ export async function collectWizardAnswers(
     depth, adapters, traits,
     gameFlags, webAppFlags, backendFlags, cliFlags, libraryFlags,
     mobileAppFlags, dataPipelineFlags, mlFlags, browserExtensionFlags,
-    researchFlags,
+    researchFlags, mcpServerFlags,
   } = options
 
   // Detect project
@@ -125,6 +128,7 @@ export async function collectWizardAnswers(
     mlFlags,
     browserExtensionFlags,
     researchFlags,
+    mcpServerFlags,
   })
 
   // Build config — methodology is a top-level string per the real ScaffoldConfig schema
@@ -147,6 +151,7 @@ export async function collectWizardAnswers(
       ...(answers.researchConfig && { researchConfig: answers.researchConfig }),
       ...(answers.dataScienceConfig && { dataScienceConfig: answers.dataScienceConfig }),
       ...(answers.web3Config && { web3Config: answers.web3Config }),
+      ...(answers.mcpServerConfig && { mcpServerConfig: answers.mcpServerConfig }),
     },
   }
 

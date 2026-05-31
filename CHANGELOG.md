@@ -21,6 +21,78 @@ All notable changes to Scaffold are documented here.
   completed work) when a `.beads/` tracker exists but `bd`/`jq` is missing or
   older than v1.0.5 — install/upgrade `bd` (≥ v1.0.5) and `jq` to proceed.
 
+## [3.32.1] — 2026-05-31
+
+Standardizes where parallel-agent git worktrees are created. Previously
+`setup-agent-worktree.sh` placed each worktree as a repo *sibling*
+(`../<repo>-<agent>`), scattering them outside the project; they now live
+project-local under `<repo>/.worktrees/<agent>` — one consistent location that
+matches the `using-git-worktrees` convention. New projects scaffolded by the
+`git-workflow` step inherit the same convention.
+
+### Changed
+
+- **Agent worktrees are created under `<repo>/.worktrees/<agent>`** instead of as
+  repo siblings. `setup-agent-worktree.sh` now also ensures `.worktrees/` is
+  gitignored before creating the worktree, so a worktree's checkout is never
+  accidentally committed.
+- The `git-workflow` meta-prompt instructs downstream-generated worktree scripts
+  to use the `.worktrees/` convention and the gitignore guard, so newly
+  scaffolded projects are consistent with Scaffold itself.
+
+### Added
+
+- `.worktrees/` is added to the Scaffold-managed `.gitignore` block, so projects
+  scaffolded going forward ignore agent worktrees automatically.
+
+### Fixed
+
+- **Knowledge-freshness cron is now robust to non-conforming model output.** A model that pairs a no-edit verdict (`current`/`minor-drift`) with proposed changes — observed with the DeepSeek provider — no longer hard-fails and strands the entry; the stray changes are demoted to advisory notes so the entry is still reviewed-stamped, keeping the daily audit budget flowing.
+- **`.gitignore` ignores a top-level `node_modules` symlink**, not just the directory.
+
+### Migration
+
+- Existing sibling worktrees are **not** auto-migrated and keep working where
+  they are; only newly created worktrees use `.worktrees/`. If you re-run
+  `setup-agent-worktree.sh <agent>` for an agent that still has an old sibling
+  worktree checked out, tear the old one down first
+  (`scripts/teardown-agent-worktree.sh <path>`) — the workspace branch can only
+  be checked out in one worktree at a time.
+
+## [3.32.0] — 2026-05-31
+
+Makes `scaffold run <step> <args…>` bind trailing CLI arguments to the step's
+`$ARGUMENTS` placeholder. Previously `scaffold run review-pr 376` dropped the
+`376`, emitted an unbound `$ARGUMENTS`, and agents fell back to raw `mmr`
+commands — losing the Superpowers agent channel, reconciliation, and verdict
+logic. Also hardens the tools that consume `$ARGUMENTS`.
+
+### Added
+
+- **An "EXECUTE NOW" header** prepended to `scaffold run` output in interactive
+  mode (suppressed under `--auto` / `--format json`), framing the emitted prompt
+  as a runnable workflow and showing the bound arguments — so agents execute the
+  step instead of shortcutting to an ad-hoc command.
+
+### Fixed
+
+- `scaffold run <step> <args…>` now binds trailing arguments into the
+  `$ARGUMENTS` placeholder. Previously trailing tokens were dropped and only
+  `--instructions` populated `$ARGUMENTS`, so `scaffold run review-pr 376` emitted
+  an unbound `$ARGUMENTS` and agents fell back to raw `mmr` commands.
+- The `$ARGUMENTS` substitution now uses a functional replacer, so argument
+  values containing `$`-patterns (`$&`, `$1`, `${VAR}`) are inserted verbatim, and
+  a literal `$ARGUMENTS` token is never left in the output (it now resolves to an
+  empty string when no arguments are supplied — a behavioral cleanup; no pipeline
+  step relied on the literal surviving).
+
+### Changed
+
+- `--fix-threshold=P1` (the `=` form) is now accepted by `review-pr`,
+  `review-code`, and `post-implementation-review`, alongside `--fix-threshold P1`.
+- `multi-agent-start` / `multi-agent-resume` prompts now validate the agent name
+  to `^[A-Za-z0-9_-]+$` and quote its shell expansions.
+
 ## [3.31.1] — 2026-05-31
 
 ### Fixed

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { MockInstance } from 'vitest'
 import path from 'node:path'
+import yargs from 'yargs'
 import type { PipelineState } from '../../types/state.js'
 import type { StepStateEntry } from '../../types/state.js'
 import type { MetaPromptFile, MetaPromptFrontmatter } from '../../types/frontmatter.js'
@@ -1766,5 +1767,179 @@ describe('run command handler', () => {
       // it returns the preset steps unchanged
       expect(resolveOverlayState).toHaveBeenCalled()
     })
+  })
+})
+
+describe('run command — $ARGUMENTS wiring', () => {
+  it('binds trailing positionals into arguments', async () => {
+    vi.mocked(resolveOutputMode).mockReturnValue('auto')
+    await invokeHandler({ step: 'create-prd', _: ['run'], args: ['376'], auto: true })
+    expect(AssemblyEngine.prototype.assemble).toHaveBeenCalledWith(
+      'create-prd',
+      expect.objectContaining({ arguments: '376' }),
+    )
+  })
+
+  it('joins multiple trailing tokens with single spaces', async () => {
+    vi.mocked(resolveOutputMode).mockReturnValue('auto')
+    await invokeHandler({
+      step: 'create-prd', _: ['run'], args: ['376', '--fix-threshold', 'P1'], auto: true,
+    })
+    expect(AssemblyEngine.prototype.assemble).toHaveBeenCalledWith(
+      'create-prd',
+      expect.objectContaining({ arguments: '376 --fix-threshold P1' }),
+    )
+  })
+
+  it('falls back to --instructions when no positionals are given', async () => {
+    vi.mocked(resolveOutputMode).mockReturnValue('auto')
+    await invokeHandler({ step: 'create-prd', _: ['run'], instructions: 'foo', auto: true })
+    expect(AssemblyEngine.prototype.assemble).toHaveBeenCalledWith(
+      'create-prd',
+      expect.objectContaining({ arguments: 'foo' }),
+    )
+  })
+
+  it('lets positionals win when both positionals and --instructions are present', async () => {
+    vi.mocked(resolveOutputMode).mockReturnValue('auto')
+    await invokeHandler({
+      step: 'create-prd', _: ['run'], args: ['376'], instructions: 'foo', auto: true,
+    })
+    expect(AssemblyEngine.prototype.assemble).toHaveBeenCalledWith(
+      'create-prd',
+      expect.objectContaining({ arguments: '376' }),
+    )
+  })
+
+  it('defaults arguments to empty string when neither is given', async () => {
+    vi.mocked(resolveOutputMode).mockReturnValue('auto')
+    await invokeHandler({ step: 'create-prd', _: ['run'], auto: true })
+    expect(AssemblyEngine.prototype.assemble).toHaveBeenCalledWith(
+      'create-prd',
+      expect.objectContaining({ arguments: '' }),
+    )
+  })
+
+  it('trims a whitespace-only --instructions fallback to empty string', async () => {
+    vi.mocked(resolveOutputMode).mockReturnValue('auto')
+    await invokeHandler({ step: 'create-prd', _: ['run'], instructions: '   ', auto: true })
+    expect(AssemblyEngine.prototype.assemble).toHaveBeenCalledWith(
+      'create-prd',
+      expect.objectContaining({ arguments: '' }),
+    )
+  })
+})
+
+describe('run command — EXECUTE NOW header', () => {
+  it('prepends the header in interactive mode with the bound arguments', async () => {
+    vi.mocked(resolveOutputMode).mockReturnValue('interactive')
+    mockOutput.confirm = vi.fn().mockResolvedValue(true) // let the stateful step complete cleanly
+    await invokeHandler({ step: 'create-prd', _: ['run'], args: ['376'] })
+    const written = stdoutSpy.mock.calls.map((c) => String(c[0]))
+    expect(written.some((s) => s.includes('EXECUTE NOW'))).toBe(true)
+    expect(written.some((s) => s.includes('ARGUMENTS: 376'))).toBe(true)
+  })
+
+  it('shows the auto-detect hint when no arguments are bound', async () => {
+    vi.mocked(resolveOutputMode).mockReturnValue('interactive')
+    mockOutput.confirm = vi.fn().mockResolvedValue(true)
+    await invokeHandler({ step: 'create-prd', _: ['run'] })
+    const written = stdoutSpy.mock.calls.map((c) => String(c[0]))
+    expect(written.some((s) => s.includes('ARGUMENTS: (none — auto-detect)'))).toBe(true)
+  })
+
+  it('suppresses the header under --format json', async () => {
+    vi.mocked(resolveOutputMode).mockReturnValue('json')
+    await invokeHandler({ step: 'create-prd', _: ['run'], args: ['376'], format: 'json' })
+    const written = stdoutSpy.mock.calls.map((c) => String(c[0]))
+    expect(written.some((s) => s.includes('EXECUTE NOW'))).toBe(false)
+  })
+
+  it('suppresses the header under --auto', async () => {
+    vi.mocked(resolveOutputMode).mockReturnValue('auto')
+    await invokeHandler({ step: 'create-prd', _: ['run'], args: ['376'], auto: true })
+    const written = stdoutSpy.mock.calls.map((c) => String(c[0]))
+    expect(written.some((s) => s.includes('EXECUTE NOW'))).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Parse-level tests: prove the run builder captures trailing args under the
+// root .strict(), and that .strict(false) does NOT leak to sibling commands.
+// ---------------------------------------------------------------------------
+describe('run command — argument capture (parse-level)', () => {
+  async function parseRun(line: string): Promise<{
+    captured: Record<string, unknown> | null
+    error: string | null
+  }> {
+    const runCmd = await importHandler() // the runCommand CommandModule (default export)
+    let captured: Record<string, unknown> | null = null
+    let error: string | null = null
+    await yargs(line.split(' ').filter(Boolean))
+      .command({ ...runCmd, handler: (a) => { captured = a as Record<string, unknown> } })
+      .command({
+        command: 'sibling',
+        describe: 'strict sibling',
+        builder: (y) => y,
+        handler: () => {},
+      })
+      .options({
+        format: { type: 'string', choices: ['json'] as const },
+        auto: { type: 'boolean', default: false },
+        verbose: { type: 'boolean', default: false },
+        root: { type: 'string' },
+        force: { type: 'boolean', default: false },
+      })
+      .strict()
+      .exitProcess(false)
+      .fail((msg: string) => { error = msg })
+      .parseAsync()
+    return { captured, error }
+  }
+
+  it('captures a bare positional into args', async () => {
+    const { captured } = await parseRun('run review-pr 376')
+    expect(captured?.['args']).toEqual(['376'])
+  })
+
+  it('captures an unknown flag and its value into args', async () => {
+    const { captured } = await parseRun('run review-pr 376 --fix-threshold P1')
+    expect(captured?.['args']).toEqual(['376', '--fix-threshold', 'P1'])
+  })
+
+  it('captures the = form of an unknown flag as a single token', async () => {
+    const { captured } = await parseRun('run review-pr 376 --fix-threshold=P1')
+    expect(captured?.['args']).toEqual(['376', '--fix-threshold=P1'])
+  })
+
+  it('consumes a known global flag instead of capturing it (trailing)', async () => {
+    const { captured } = await parseRun('run review-pr 376 --format json')
+    expect(captured?.['args']).toEqual(['376'])
+    expect(captured?.['format']).toBe('json')
+  })
+
+  it('consumes a known global flag instead of capturing it (interleaved)', async () => {
+    const { captured } = await parseRun('run --format json review-pr 376')
+    expect(captured?.['args']).toEqual(['376'])
+    expect(captured?.['format']).toBe('json')
+  })
+
+  it('captures no args when none are given', async () => {
+    const { captured } = await parseRun('run review-pr')
+    expect(captured?.['args']).toEqual([])
+  })
+
+  it('preserves leading-zero / exponent-looking tokens as strings (no numeric coercion)', async () => {
+    const { captured } = await parseRun('run review-pr 00123')
+    expect(captured?.['args']).toEqual(['00123'])
+  })
+
+  it('does NOT leak .strict(false) to sibling commands', async () => {
+    // The leak discriminator is whether the sibling REJECTS an unknown flag.
+    // (yargs 17 still invokes the handler after .fail with exitProcess(false),
+    // so we assert on the strict error, not on whether the handler ran.)
+    const { error } = await parseRun('sibling --bogus')
+    expect(error).not.toBeNull()
+    expect(error).toContain('Unknown argument')
   })
 })
