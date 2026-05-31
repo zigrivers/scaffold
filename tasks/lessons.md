@@ -21,6 +21,18 @@ Patterns and anti-patterns discovered during development. Review before starting
   `pull_request`, so that push bypassed CI entirely (caught it, it was test-only + locally green +
   reviewed). Habit: first action of every task = branch.
 
+- NEVER bundle `git push` with `gh pr merge` (or any merge that reads the remote branch) in the
+  same step when the branch has unpushed commits. This repo's `pre-push` hook runs the full bats
+  suite (minutes), so a backgrounded/slow `git push` may not have finished when the merge reads the
+  remote ref — the unpushed commit silently won't be in the squash. Shipping v3.32.0 I bundled
+  `git push && gh pr merge --squash` for the release-prep version-bump commit; the push lagged
+  behind the hook, the squash merged the branch WITHOUT the bump, and `main` briefly carried the
+  new feature at the OLD version string (3.31.1). Caught it immediately (`main` still showed
+  3.31.1), redid release-prep on a clean branch (PR #464), then tagged — but it cost an extra
+  release-prep PR. Habit: `git push` as its OWN step, CONFIRM the ref landed
+  (`git ls-remote origin <branch>` shows your local HEAD SHA), THEN `gh pr merge`. Same caution for
+  tag pushes feeding `publish.yml`. Related: the slow-push gotcha under "Common Gotchas".
+
 - MMR tests must NOT execute `packages/mmr/dist/index.js` — CI runs the vitest suite WITHOUT
   building the mmr dist, so any `execFileSync('node', [dist/index.js, ...])` test passes locally
   (after a build) but fails CI with "Cannot find module …/dist/index.js". Exercise the command's
