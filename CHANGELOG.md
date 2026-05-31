@@ -4,6 +4,8 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.31.1] — 2026-05-31
+
 ### Fixed
 
 - **Project-local `content/` no longer shadows scaffold's bundled pipeline.** The content resolvers (`getPackagePipelineDir`, `getPackageMethodologyDir`, and siblings) previously treated *any* project containing a `content/pipeline/` or `content/methodology/` directory as a scaffold content source. A downstream project that legitimately has such a directory — e.g. a scaffold-like CLI tool whose `project-structure` step generates `content/methodology/` — would silently shadow the installed pipeline, collapsing the resolved graph. The project-local override is now gated on the project actually being scaffold itself (`package.json` name `@zigrivers/scaffold`), so installed runs always use the bundled content. This fixes the symptom where `scaffold status` reported a misleading **"100% complete"** and `scaffold check <step>` returned `DEP_TARGET_MISSING` for steps that are part of the methodology.
