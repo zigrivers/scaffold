@@ -51,6 +51,7 @@ describe('detectMcpServer', () => {
     })
     const m = detectMcpServer(ctx)
     expect(m!.partialConfig.transport).toBe('streamable-http')
+    expect(m!.confidence).toBe('high')
   })
 
   it('null: no MCP deps and no markers', () => {

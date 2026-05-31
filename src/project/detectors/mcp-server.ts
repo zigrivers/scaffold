@@ -16,8 +16,8 @@ type Primitive = 'tools' | 'resources' | 'prompts'
 
 function inferTransport(text: string): Transport | undefined {
   if (/StreamableHTTP|streamableHttp|streamable_http/.test(text)) return 'streamable-http'
-  if (/SSEServerTransport|sse/i.test(text)) return 'sse'
-  if (/StdioServerTransport|stdio/i.test(text)) return 'stdio'
+  if (/SSEServerTransport/.test(text)) return 'sse'
+  if (/StdioServerTransport/.test(text)) return 'stdio'
   return undefined
 }
 
