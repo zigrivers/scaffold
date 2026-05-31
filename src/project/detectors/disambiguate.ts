@@ -20,7 +20,7 @@ export interface DisambiguateResult {
 //   'no-eligible-matches' — disambiguate() called with empty matches
 
 export const PROJECT_TYPE_PREFERENCE: readonly ProjectType[] = [
-  'web-app', 'backend', 'cli', 'library', 'mobile-app',
+  'web-app', 'backend', 'mcp-server', 'cli', 'library', 'mobile-app',
   'data-pipeline', 'ml', 'research', 'data-science',
   'browser-extension', 'game', 'web3',
 ]
