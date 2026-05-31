@@ -137,11 +137,15 @@ require every plan to emit the following contract:
    heading plus a fenced `yaml`/key-value metadata block) is defined in the
    `implementation-plan.md` edit so the materializer has unambiguous parsing
    rules for tasks **and** containers.
-6. **Referential integrity.** Every `story`/`epic` reference on a task (and every
-   `epic` parent on a story) must resolve to a declared container ID — no
-   dangling refs. The implementation-plan **review** step validates: every task
-   has an ID; task/story/epic IDs are unique and stable; all parent refs resolve;
-   and the contract fields parse for both tasks and containers.
+6. **Referential integrity.** Every `story`/`epic` parent reference (on a task,
+   and the `epic` parent on a story) **and every `depends_on` entry** must
+   resolve to a declared ID — no dangling refs in either the hierarchy or the
+   dependency graph (a dangling `depends_on` would make Pass 2 fail after partial
+   writes or silently skip an edge, letting tasks be claimed out of order). The
+   implementation-plan **review** step validates: every task has an ID;
+   task/story/epic IDs are unique and stable; all parent refs **and all
+   `depends_on` refs** resolve; the dependency graph is acyclic; and the contract
+   fields parse for both tasks and containers.
 
 Without this contract the join key is undefined and the materializer has no
 parsing rules; both are prerequisites, tracked as the first tasks of this
@@ -514,6 +518,18 @@ a mid-run failure must **fail closed**: stop the build and require the error to 
 fixed, rather than dropping to the markdown loop (which bypasses scoped claiming
 and would let Beads and the actual work diverge).
 
+**Completion check (empty `bd ready` ≠ done).** The scoped claim loop ends when
+`bd ready --claim --has-metadata-key plan_task_id` returns nothing — but an empty
+*ready* set does **not** mean the build is finished. Because the design preserves
+manual blockers and stored `blocked`/`deferred` states, an empty ready set can
+mean *every remaining task is blocked*, not *all done* — which would reintroduce
+a false-complete path. So on an empty ready result, the prompt must query all
+plan-derived tasks (`bd list --all --limit 0 --has-metadata-key plan_task_id
+--json`) and conclude **done only when every one is `closed`**. Otherwise it
+**stops and reports** the remaining non-closed tasks grouped by why they aren't
+ready (blocked by an open dependency, manually `blocked`, or `deferred`) so the
+user can unblock them — it does not silently declare success.
+
 For multi-agent, "always materialize" still means **once per wave** — the
 orchestrator runs it under the lock before fan-out (see Concurrency); workers do
 not re-run it, they just claim. The set definitions below are used **inside the
@@ -690,8 +706,13 @@ prompts use, against the project's installed `bd`:
   `implementation-playbook`; with Beads disabled, it does not appear.
 - **Plan Output Contract** (bats): `implementation-plan.md` requires/defines the
   contract; the review step rejects a plan with missing/duplicate/unstable IDs
-  (task **or** container) or a **dangling** story/epic parent ref, and accepts a
-  conformant one with parseable task and container blocks.
+  (task **or** container), a **dangling** story/epic parent ref, **or a dangling
+  `depends_on` ref**, and accepts a conformant one with parseable task and
+  container blocks.
+- **Completion check**: with every plan task `closed`, an empty `bd ready`
+  concludes done; with a remaining task in `blocked`/`deferred` (or blocked by an
+  open dep), an empty `bd ready` instead **reports** the remaining tasks and does
+  not declare success.
 - **Mapping checks**: a sample plan yields the expected `bd` command sequence for
   mvp (flat, `-t task`, no story, default `-p 2`) and deep (epic→story→task
   order, `--parent` wiring, wave-biased priority), via a dry-run/command-capture
