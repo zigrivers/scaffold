@@ -17,8 +17,13 @@
 >   `--external-ref`, `--description`, `--parent <id>`, `--deps`.
 > - `bd update <id>` accepts `--title`, `-d/--description`, `-p/--priority`,
 >   `-s/--status`, `--parent <id>` (`--parent ""` removes parent), `--claim`.
-> - `epic` is a **built-in** type (`bug|feature|task|epic|chore|decision`);
->   `story` requires `bd config set types.custom`.
+> - `epic` **and** `story` are usable as `-t` types directly on v1.0.5 — verified
+>   empirically: `bd create -t story` (and `-t epic`) succeed and store
+>   `issue_type` accordingly **without** `types.custom` set. (The `bd create
+>   --help` parenthetical lists only `bug|feature|task|epic|chore|decision` and
+>   is stale; an older v1.0.4 audit claimed `story` needed `types.custom` — both
+>   are superseded by the v1.0.5 runtime behavior.) No runtime type-availability
+>   probe or `-t task` fallback is needed.
 > - `bd dep add <blocked> <blocker>` / `bd dep remove`; `bd dep list <id> --json`
 >   (`--direction down|up`); `bd dep cycles` detects cycles.
 > - `bd close <id> --reason "..."`; `bd comment <id> "..."` (list via
@@ -217,19 +222,21 @@ Beads Detection block is therefore gated on `beads_usable`, not on `[ -d .beads 
 
 ### Depth detection
 
-The prompt determines structure from the project, not assumption:
+Structure is a function of **methodology/depth only** — there is no runtime
+type-availability probe:
 
 - **Methodology/depth** comes from scaffold state (`.scaffold/config.yml` /
   methodology preset) the same way other prompts read it.
-- **Whether `-t story` is usable** is detected at runtime:
-  `bd config get types.custom` — if it includes `story`, use `-t story`;
-  otherwise fall back to `-t task` and record story linkage in metadata/body.
-  (`epic` is built-in and always available.)
+- **Both `-t story` and `-t epic` are usable directly** on the supported `bd`
+  (≥ v1.0.5, verified) — no `bd config get types.custom` check or `-t task`
+  fallback. Deep builds the epic/story/task hierarchy; mvp stays flat (`-t task`
+  with story linkage in metadata/body) as a deliberate *simplicity* choice, not
+  because the type is unavailable.
 
 | Plan element | mvp (flat) | deep (hierarchical) |
 |---|---|---|
 | Task | `bd create -t task` | `bd create -t task --parent <story-id>` |
-| Story | — (linkage in metadata/body) | `bd create -t story --parent <epic-id>` (if `story` in types.custom; else `-t task`) |
+| Story | — (linkage in metadata/body) | `bd create -t story --parent <epic-id>` (`story` usable directly on v1.0.5) |
 | Epic | — | `bd create -t epic` |
 | Priority / order | `-p <n>` (wave-biased default) | `-p <n>` (wave-biased default) |
 | Dependencies (DAG) | `bd dep add <blocked> <blocker>` | `bd dep add <blocked> <blocker>` |
@@ -261,7 +268,8 @@ The prompt determines structure from the project, not assumption:
 
 Join keys are **Beads metadata** — natively filterable
 (`--has-metadata-key`, `--metadata-field key=value`): `plan_task_id` for tasks,
-`plan_story_id` for stories, `plan_epic_id` for epics. Title prefixes are **not**
+`plan_story_id` for stories, `plan_epic_id` for epics. A companion key
+`plan_deps` records the blocker set the materializer owns per issue (see Pass 2). Title prefixes are **not**
 used as join keys (retitling would sever the link → duplicates).
 `--external-ref "plan:<id>"` is stamped at create for human traceability only
 (`bd list` has no external-ref filter in v1.0.5).
@@ -349,26 +357,30 @@ in-memory against the plan's `depends_on` lists; only the mutating
 `bd dep add`/`bd dep remove` calls need per-edge invocations (an unavoidable CLI
 cost, scoped to actual changes — not one read per task).
 
-- **Add** missing edges, but only when the dependent issue is **`open`,
-  `blocked`, or `deferred`** (never add edges to `in_progress` or `closed`
-  work, which could disrupt execution invariants):
-  `bd dep add <blocked-id> <blocker-id>` (re-adding is a no-op).
-- **Remove** stale edges, but only **materializer-owned** ones: an edge is
-  removable only when **both endpoints are plan-derived task issues** (each
-  carries a `plan_task_id`) **and** that edge is absent from the current plan's
-  `depends_on` lists. This preserves manual/external blockers that an agent or
-  human added during execution (e.g. "blocked on an infra ticket") — clobbering
-  those would corrupt Beads-owned execution state and could make work claimable
-  too early. Removal is further limited to dependents in **`open`/`blocked`/
-  `deferred`** state (`in_progress`/`closed` exempt):
-  `bd dep remove <blocked-id> <blocker-id>`. The dependent's current blockers
-  come from the bulk fetch's inline `dependencies` array (each record has
-  `depends_on_id` and `type`); cross-check each blocker's `plan_task_id` before
-  removing. If a per-issue read is ever needed, use
-  `bd dep list <id> --direction down --json` — **verified empirically on
-  v1.0.5**: `--direction down` returns *what `<id>` depends on* (its
-  blockers/upstream), exactly the edge set to reconcile; `up` returns
-  *dependents* (downstream) and is the wrong direction here.
+**Materializer-owned edges are tracked explicitly**, not inferred from endpoint
+types. Each dependent issue stores the set of blocker task IDs the materializer
+applied in a metadata key `plan_deps` (a sorted list, e.g. `"T-003,T-007"`).
+"Both endpoints are plan-derived" is *not* sufficient proof of ownership — an
+agent could add an execution blocker between two plan tasks during the build,
+and deleting it just because it's absent from the markdown plan would corrupt
+Beads-owned execution state and make work claimable too early. So:
+
+- **Add** edges in the plan's `depends_on` that are not already present, only
+  when the dependent is **`open`/`blocked`/`deferred`** (never mutate
+  `in_progress`/`closed`): `bd dep add <blocked-id> <blocker-id>` (re-adding is a
+  no-op). Record the new owned set in `plan_deps`
+  (`bd update <id> --set-metadata plan_deps=<csv>`).
+- **Remove** an edge only when it is **in the prior `plan_deps`** (materializer
+  created it) **and** is **absent from the current plan** `depends_on` — and the
+  dependent is `open`/`blocked`/`deferred`: `bd dep remove <blocked-id>
+  <blocker-id>`. Edges **not** in `plan_deps` (manual/external blockers) are
+  preserved untouched; if a manual edge happens to collide with a plan edge,
+  keep it and note it in the summary rather than deleting. The dependent's
+  current edges come from the bulk fetch's inline `dependencies` array
+  (`depends_on_id`, `type`); a per-issue read, if needed, is
+  `bd dep list <id> --direction down --json` — **verified on v1.0.5**:
+  `--direction down` returns *what `<id>` depends on* (its blockers/upstream),
+  exactly the edge set to reconcile; `up` returns *dependents* and is wrong here.
 - **No manual status reconciliation is needed** after add/remove. Readiness is
   computed from open blockers (verified): removing the last blocker makes a task
   ready again on its own; adding a blocker excludes it from `bd ready` while
@@ -576,9 +588,9 @@ prompt.
 - **Stale bootstrap bead** → the "initialize Beads" bootstrap task carries no
   `plan_task_id`, so it is excluded from every count and never masks an empty
   import.
-- **mvp without custom types** → `-t story` unavailable (detected via
-  `bd config get types.custom`); tasks use `-t task` with story linkage in
-  metadata/body.
+- **mvp** → flat `-t task` issues with story linkage in metadata/body. This is a
+  deliberate simplicity choice; `-t story` is available on v1.0.5 but
+  intentionally unused at mvp depth.
 - **`bd` missing/older than v1.0.5** → materializer skips with a message **and**
   build prompts drive from the markdown plan (no `bd ready --claim` on an
   empty/unsupported tracker).
@@ -609,7 +621,8 @@ prompts use, against the project's installed `bd`:
   matches the safe usage documented at `single-agent-start.md:164`
 - `bd version` string parsing for the `>= 1.0.5` gate, using a **macOS/BSD-safe**
   numeric compare (no GNU `sort -V` dependency)
-- `bd config get types.custom` output shape for `story` detection
+- that `bd create -t story` / `-t epic` succeed without `types.custom` (verified
+  on v1.0.5; re-confirm against the project's installed `bd` floor)
 
 ## Testing Strategy
 
@@ -641,6 +654,10 @@ prompts use, against the project's installed `bd`:
   **and** a `blocked` dependent (unblocking it); deps are not added to
   `in_progress`/`closed` issues; `bd dep cycles` reports no cycle after a valid
   run.
+- **Manual-blocker preservation**: a human/agent-added blocker between two
+  plan-derived tasks (not in the plan, not in `plan_deps`) survives a materializer
+  run — only edges recorded in `plan_deps` and absent from the current plan are
+  removed.
 - **Scale**: a plan with >50 tasks is fully reconciled (`--limit 0`), with a
   test asserting no truncation at the default page size.
 - **`--all` visibility**: an all-`closed` plan is a materializer no-op (closed
