@@ -8,6 +8,7 @@ describe('resolveDispatchChannels (T1-A)', () => {
     qwen: { kind: 'subprocess' as const, enabled: true, abstract: false, command: 'ollama run', flags: ['qwen'], env: {}, prompt_wrapper: '{{prompt}}', output_parser: 'default', stderr: 'capture' as const },
     deepseek: { kind: 'subprocess' as const, enabled: true, abstract: false, command: 'ollama run', flags: ['deepseek'], env: {}, prompt_wrapper: '{{prompt}}', output_parser: 'default', stderr: 'capture' as const },
     disabled: { kind: 'subprocess' as const, enabled: false, abstract: false, command: 'x', flags: [], env: {}, prompt_wrapper: '{{prompt}}', output_parser: 'default', stderr: 'capture' as const },
+    antigravity: { kind: 'subprocess' as const, enabled: true, abstract: false, command: 'agy', flags: [], env: {}, prompt_wrapper: '{{prompt}}', output_parser: 'default', stderr: 'capture' as const },
   } satisfies Record<string, ChannelConfigParsed>
 
   it('filters out channels with abstract: true from default resolution', () => {
@@ -42,5 +43,21 @@ describe('resolveDispatchChannels (T1-A)', () => {
   it('excludes disabled channels', () => {
     const names = resolveDispatchChannels(sampleChannels, undefined, new Set())
     expect(names).not.toContain('disabled')
+  })
+
+  it('resolves the agy alias to the canonical antigravity channel when explicitly requested', () => {
+    const names = resolveDispatchChannels(sampleChannels, ['agy'], new Set())
+    expect(names).toEqual(['antigravity'])
+  })
+
+  it('treats a canonical antigravity request the same as the alias', () => {
+    const names = resolveDispatchChannels(sampleChannels, ['antigravity'], new Set())
+    expect(names).toEqual(['antigravity'])
+  })
+
+  it('honors channels_disabled given as the agy alias (default resolution)', () => {
+    const names = resolveDispatchChannels(sampleChannels, undefined, new Set(['agy']))
+    expect(names).not.toContain('antigravity')
+    expect(names).toContain('qwen')
   })
 })
