@@ -133,8 +133,10 @@ feature's implementation plan.
   closed, plus claims and assignees.
 - The materializer is a **one-way reconcile**: plan → Beads. Each run performs
   ordered passes — **container upsert → task upsert → dependency reconcile →
-  stale reconcile** — and never overwrites an issue that has left the `open`
-  state (with narrow, explicitly-listed exceptions for dependency edges, below).
+  stale reconcile**. It freely updates issues that have **not started**
+  (`open`/`blocked`/`deferred` — `blocked` is just a task with unmet
+  dependencies), and never mutates issues that have **started**
+  (`in_progress`/`closed`).
 
 This mirrors the update-mode contract already used by `implementation-plan.md`
 and `implementation-playbook.md`.
@@ -172,24 +174,27 @@ manual re-import command after a plan update.
 
 ### Version gating & graceful degradation
 
-The runtime guard checks **both** that `bd` exists **and** that it is new enough
-(`command -v bd` alone is insufficient — an old `bd` would run and fail on
-unsupported flags):
+Both the materializer and the build prompts gate on a single shared
+**`beads_usable`** check. It must return false (→ markdown fallback) unless
+**all** of the following hold, so the build never attempts `bd` against a
+tracker it cannot correctly drive:
 
-```bash
-beads_usable() {
-  [ -d .beads ] || return 1
-  command -v bd >/dev/null 2>&1 || return 1
-  v=$(bd version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-  [ -n "$v" ] || return 1
-  # bd >= 1.0.5  ⇔  the smallest of {v, 1.0.5} under version-sort is 1.0.5
-  [ "$(printf '%s\n1.0.5\n' "$v" | sort -V | head -1)" = "1.0.5" ]
-}
-```
+1. `.beads/` exists.
+2. `bd` is on the PATH (`command -v bd`) — `command -v bd` alone is insufficient
+   because an old `bd` would run and fail on unsupported flags, hence (3).
+3. `bd version` parses to **≥ 1.0.5**, using a **portable** numeric compare that
+   does **not** depend on GNU `sort -V` (Scaffold runs on macOS/BSD where `-V`
+   may be absent) — split major/minor/patch and compare numerically, or use a
+   repo-provided helper.
+4. `jq` is on the PATH (every count/lookup pipes through `jq`; without it the
+   preflight would fail rather than degrade).
 
-Never write `[ -d .beads ] && bd ...` as a whole
-command — it returns exit 1 when `.beads/` is absent and breaks callers under
-`set -e` (the trap documented at `single-agent-start.md:164`).
+The exact, tested shell for `beads_usable` is authored in the implementation
+prompt and its bats tests — this spec fixes the **contract** (the four
+conditions and the macOS-portable compare), not a copy-pasteable snippet.
+Never write `[ -d .beads ] && bd ...` as a whole command — it returns exit 1
+when `.beads/` is absent and breaks callers under `set -e` (the trap documented
+at `single-agent-start.md:164`).
 
 **When `bd` is missing, too old, or `.beads/` is absent:** the materializer
 prints a clear message and skips. Critically, the **build prompts must then
@@ -275,24 +280,21 @@ For each plan task (`<task-id>`), parent IDs already resolved by Pass 0:
      --external-ref "plan:<task-id>" \
      --description "<body incl. acceptance criteria + traceability>"
    ```
-3. **If present, branch on stored status:**
-   - **`open`** → update to match the plan:
-     ```bash
-     bd update <id> --title "<title>" -d "<body>" -p <prio> --parent "<parent-id>"
-     ```
-   - **`in_progress` / `blocked` / `deferred`** → **do not mutate fields**
-     (execution-managed). If the plan's AC/description changed, post a warning —
-     **idempotently** (don't spam a comment every run): store a hash of the
-     last-warned plan text in metadata `ac_warn_hash` and only comment when it
-     differs:
-     ```bash
-     NEW=$(printf '%s' "<plan AC text>" | shasum | cut -d' ' -f1)
-     OLD=$(bd list --all --limit 0 --metadata-field "plan_task_id=<task-id>" --json | jq -r '.[0].metadata.ac_warn_hash // empty')
-     if [ "$NEW" != "$OLD" ]; then
-       bd comment <id> "⚠️ Plan/AC changed after work started — re-read docs/implementation-plan.md task <task-id> before continuing."
-       bd update <id> --metadata "{\"ac_warn_hash\":\"$NEW\"}"   # merge, not replace
-     fi
-     ```
+3. **If present, branch on stored status.** The key distinction is
+   **not-yet-started vs. started**, not "open vs. everything else":
+   - **`open`, `blocked`, `deferred`** → **update fields to match the plan**
+     (`bd update <id> --title … -d … -p … --parent …`). A `blocked` task is
+     *pre-execution* — Pass 2 puts every task with unmet dependencies into
+     `blocked`, so this is the normal state for most of a DAG. Refusing to
+     update `blocked`/`deferred` would break idempotent sync for the majority of
+     tasks. None of these states is execution-managed, so mutating their fields
+     is safe.
+   - **`in_progress`** → **do not mutate fields** (work is underway). If the
+     plan's AC/description changed, post a warning — **idempotently**: store a
+     hash of the last-warned plan text in metadata `ac_warn_hash` (set with the
+     verified targeted flag `bd update <id> --set-metadata ac_warn_hash=<hash>`,
+     **not** `--metadata`, which replaces the whole object) and post the
+     `bd comment` only when the hash differs, so re-runs don't spam comments.
    - **`closed`** → leave entirely untouched.
 
 ### Pass 2 — Dependency reconcile
@@ -318,79 +320,84 @@ List every plan-derived issue
 (`bd list --all --limit 0 --has-metadata-key plan_task_id --json`, likewise for
 `plan_story_id`/`plan_epic_id`) and diff IDs against the current plan:
 
-- ID no longer in the plan and issue still **`open`** → close + label:
+- ID no longer in the plan and issue **not started** (`open`/`blocked`/
+  `deferred`) → close + label:
   ```bash
   bd close <id> --reason "Removed from implementation plan (no <id-kind> <id>)"
   bd label add <id> stale:removed-from-plan
   ```
-- Such an issue in `in_progress`/`blocked`/`deferred`/`closed` → **do not
-  auto-close**; report it in the summary for human attention.
+- Such an issue **started** (`in_progress`/`closed`) → **do not auto-close**;
+  report it in the summary for human attention (it may be mid-flight work the
+  plan dropped by mistake).
 
 ### Summary report
 
 ```
 materialize: C created, U updated, K unchanged,
-             S skipped (in_progress/blocked/deferred/closed),
+             S skipped (in_progress/closed — started, not mutated),
              D deps added, R deps removed,
              X stale closed, W stale flagged for review
 ```
 
 ## Build Preflight
 
-Extend the **Beads Detection** block in both build prompts. The block is gated
-on `beads_usable` (version-checked), counts with `--all --limit 0`, guards `jq`,
-and never crashes the shell under `set -e`:
+Extend the **Beads Detection** block in both build prompts. The decisive
+**control-flow rule** (it is what prevents reintroducing the false-done bug):
 
-```bash
-if beads_usable; then
-  command -v jq >/dev/null 2>&1 || { echo "jq required for Beads preflight"; }
-  COUNT=$(bd list --all --limit 0 --has-metadata-key plan_task_id --json 2>/dev/null | jq 'length' 2>/dev/null || echo 0)
-  if [ "${COUNT:-0}" -eq 0 ] && [ -f docs/implementation-plan.md ]; then
-    if grep -qE '(^|[^[:alnum:]])T-[0-9]+' docs/implementation-plan.md; then
-      : # run /scaffold:materialize-plan-to-beads (or inline steps), then claim
-    else
-      echo "Plan has no stable task IDs — re-run the planning phase before build."
-      # treat as: cannot materialize; fall back to markdown plan loop
-    fi
-  fi
-  # proceed with bd ready --claim
-else
-  : # Beads not usable → drive the loop from docs/implementation-playbook.md (markdown fallback)
-fi
-```
+> **`bd ready --claim` is reached only when a confirmed, positive count of
+> `plan_task_id` issues exists.** In every other branch the prompt drives the
+> loop from the markdown playbook/plan instead — it must never fall through to
+> `bd ready --claim` against an empty or unpopulated tracker.
 
-This guarantees correctness even if Beads was enabled *after* planning, or the
-finalization step was skipped. The preflight is itself idempotent (re-import is
-a no-op once issues exist).
+Decision table for the Beads Detection block:
+
+| Condition | Action |
+|---|---|
+| `beads_usable` false (no `.beads/`, no/old `bd`, no `jq`) | Markdown playbook loop. Do **not** call `bd`. |
+| Usable; `plan_task_id` count > 0 | `bd ready --claim` loop (today's path). |
+| Usable; count = 0; plan exists **with** stable task IDs | Materialize (locked — see Concurrency), re-count; if now > 0 → claim loop, else markdown loop. |
+| Usable; count = 0; plan exists **without** stable task IDs | Markdown loop + emit "re-run planning to assign task IDs". Do **not** claim. |
+| Usable; count = 0; materialize command returns non-zero | Markdown loop + surface the error. Do **not** claim. |
+
+The count is taken with `bd list --all --limit 0 --has-metadata-key
+plan_task_id --json | jq 'length'`, with `jq`/`bd` failures defaulting the count
+to a sentinel that routes to the markdown loop (never to a blind claim). The
+preflight is idempotent — re-import is a no-op once issues exist. The exact,
+tested shell lives in the implementation prompt; this spec fixes the routing
+rule above.
 
 ### Concurrency (multi-agent)
 
 The **primary** materialization path is the sequential finalization step, which
 runs **once** before any build wave fans out — so the preflight is normally a
 no-op. The defensive preflight in `multi-agent-start.md` must still be safe under
-concurrency: multiple agents can read `COUNT=0` simultaneously (TOCTOU) and
-create duplicates. Two mitigations, both required:
+concurrency: multiple agents can read `count = 0` simultaneously (TOCTOU) and
+create duplicates. The implementation must satisfy **all** of these requirements
+(verified against `bd merge-slot` v1.0.5 semantics — `acquire --wait` only
+*queues* the caller and returns non-zero while queued; release leaves
+`holder: null` rather than auto-promoting the next waiter):
 
-1. **Orchestrator-only:** only the wave orchestrator / first agent runs the
+1. **Orchestrator-only** — only the wave orchestrator / first agent runs the
    defensive import; workers wait for it before their first `bd ready --claim`.
-2. **Locked with ownership re-verification:** because
-   `bd merge-slot acquire --wait` only *queues* the caller (verified in the
-   command-surface note), the import must (a) acquire, (b) confirm ownership via
-   `bd merge-slot check` before doing anything, (c) re-check `COUNT` inside the
-   lock, (d) import only if still 0, (e) release in a `trap` so the slot frees
-   even on early exit / `set -e`:
+2. **Real acquisition loop, not a status poll** — loop on
+   `bd merge-slot acquire` itself (re-attempt until it succeeds and reports the
+   caller as holder via `bd merge-slot check --json`); a loop that only *checks*
+   status deadlocks, because a released slot is `holder: null` and never
+   promotes a waiter.
+3. **`set -e`-safe** — the queued/held `acquire` returns non-zero, so guard it
+   (`|| true`) and release via a `trap … EXIT INT TERM`.
+4. **Per-process unique identity** — set a unique holder
+   (e.g. `BEADS_ACTOR="agent-$$"` or a UUID) **before** acquiring; otherwise two
+   local agents sharing one `git config user.name` both see `holder == <name>`
+   and each assume they hold the slot. The identity fallback must also match
+   `bd`'s own actor resolution (`BEADS_ACTOR` → `git user.name` → `$USER`) so the
+   ownership check can't compare against an empty string.
+5. **Re-check inside the lock** — re-count `plan_task_id` after acquiring and
+   import only if still 0, then release.
 
-   ```bash
-   bd merge-slot acquire --wait
-   trap 'bd merge-slot release 2>/dev/null || true' EXIT INT TERM
-   # block until WE are the holder
-   until bd merge-slot check --json 2>/dev/null | jq -e --arg me "${BEADS_ACTOR:-$(git config user.name)}" '.holder == $me' >/dev/null; do sleep 1; done
-   # re-check COUNT, import only if still 0, then release via trap
-   ```
-
-   (Exact holder-field name and check syntax are confirmed against `bd
-   merge-slot check --json` during implementation.) `single-agent-start.md` has
-   no concurrency concern and uses the plain preflight.
+`single-agent-start.md` has no concurrency concern and uses the plain preflight.
+The exact locking shell is authored and bats-tested in the implementation
+prompt.
 
 ## Files to Touch
 
@@ -419,11 +426,12 @@ create duplicates. Two mitigations, both required:
 ## Edge Cases
 
 - **Beads enabled after planning** → preflight materializes before first claim.
-- **Plan updated post-import** → upserts changed tasks, reconciles added/removed
-  deps, closes stale-but-open issues, preserves
-  in_progress/blocked/deferred/closed state.
-- **Task/container removed from plan** → Pass 3 closes if still `open`; flags for
-  review if already in execution.
+- **Plan updated post-import** → upserts not-started tasks
+  (`open`/`blocked`/`deferred`), reconciles added/removed deps, closes
+  stale-but-not-started issues, preserves **started** (`in_progress`/`closed`)
+  state.
+- **Task/container removed from plan** → Pass 3 closes if not started
+  (`open`/`blocked`/`deferred`); flags for review if started.
 - **Dependency removed from plan** → Pass 2 removes the edge for
   open/blocked/deferred dependents (so blocked tasks can be unblocked).
 - **AC/description changed while in_progress** → fields untouched; a single
@@ -445,8 +453,9 @@ create duplicates. Two mitigations, both required:
 - **`bd` missing/older than v1.0.5** → materializer skips with a message **and**
   build prompts drive from the markdown plan (no `bd ready --claim` on an
   empty/unsupported tracker).
-- **`jq` missing** → preflight count falls back to `0`/message without crashing
-  under `set -e`; the materialize prompt notes `jq` as a dependency.
+- **`jq` missing** → `beads_usable` returns false, so the build prompt drives
+  from the markdown plan rather than attempting (and failing) a `bd`+`jq`
+  pipeline; the materialize prompt notes `jq` as a dependency.
 
 ## Verification Checklist (confirm during implementation)
 
@@ -457,16 +466,18 @@ prompts use, against the project's installed `bd`:
   (filtering + JSON `.metadata` shape)
 - `bd create … --parent --metadata --external-ref --description --json`
   (returned `.id`)
-- `bd update <id> --title -d -p --parent --metadata` (metadata **merge** vs
-  replace semantics — confirm whether `--metadata` merges or overwrites; if it
-  overwrites, read-merge-write)
+- `bd update <id> --title -d -p --parent --set-metadata key=value` — use the
+  **targeted** `--set-metadata` (verified present in v1.0.5) for single-key
+  writes like `ac_warn_hash`; `--metadata` **replaces** the whole object and
+  must not be used for partial updates
 - `bd dep add` / `bd dep remove` / `bd dep list <id> --json` / `bd dep cycles`
 - `bd close <id> --reason`, `bd comment <id>` / `bd comments <id>`,
   `bd label add <id> <label>`
-- `bd merge-slot acquire --wait` / `bd merge-slot check --json` (holder field) /
-  `bd merge-slot release`, and that the trap-release pattern matches the safe
-  usage documented at `single-agent-start.md:164`
-- `bd version` string format for the `>= 1.0.5` gate
+- `bd merge-slot acquire` / `bd merge-slot check --json` (holder field) /
+  `bd merge-slot release`, and that the trap-release + acquisition-loop pattern
+  matches the safe usage documented at `single-agent-start.md:164`
+- `bd version` string parsing for the `>= 1.0.5` gate, using a **macOS/BSD-safe**
+  numeric compare (no GNU `sort -V` dependency)
 - `bd config get types.custom` output shape for `story` detection
 
 ## Testing Strategy
@@ -487,10 +498,11 @@ prompts use, against the project's installed `bd`:
 - **Idempotency**: running twice over the same plan yields `C created` then
   `0 created, 0 updated` — no duplicate tasks **or** containers (`plan_*_id`
   joins).
-- **State preservation**: `in_progress`, `blocked`, `closed` issues are
-  field-untouched on re-run even when plan text changed; an `in_progress` issue
-  with changed AC gets exactly **one** `bd comment` per change (`ac_warn_hash`),
-  not one per run.
+- **State preservation**: `in_progress` and `closed` issues are field-untouched
+  on re-run even when plan text changed; a `blocked` issue (not started) **is**
+  updated to match the plan; an `in_progress` issue with changed AC gets exactly
+  **one** `bd comment` per change (`ac_warn_hash` via `--set-metadata`), not one
+  per run.
 - **Stale reconcile**: removing a task closes the `open` issue with reason +
   `stale:removed-from-plan`; removing it while in_progress flags for review.
 - **Dependency reconcile**: removing a plan dep removes the edge for an `open`
