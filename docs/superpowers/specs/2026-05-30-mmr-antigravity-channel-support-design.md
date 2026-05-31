@@ -187,11 +187,13 @@ visible and the probe is accurate.
 
 > **Fail-closed limitation (accepted):** because agy returns exit 0 on *all*
 > outcomes, the probe can only fail on the known auth sentinels above. A novel
-> auth-error string would be read as "ok" at auth time and then reach dispatch,
-> where agy "completes" (exit 0) with a non-conforming body — which MMR records as
-> a `completed` channel with **zero findings**, *not* a failure, and so does **not**
-> trigger compensation (see Error handling). The mitigation is therefore to keep the
-> sentinel list complete: widen it whenever agy introduces a new auth message. A
+> auth-error string would be read as "ok" at auth time and then reach dispatch. The
+> outcome depends on what agy writes: if it prints the auth-error text to stdout and
+> exits 0, MMR records `completed` and `parseChannelOutput` emits a visible P1
+> `output-parser` finding (so the failure is surfaced, not silent); if it exits 0
+> with empty stdout, the dispatcher marks it `failed` and the compensator fires (see
+> Error handling). Either way it is not silently dropped. The mitigation is to keep
+> the sentinel list complete: widen it whenever agy introduces a new auth message. A
 > future agy `auth status` subcommand would let this become a precise, zero-quota
 > local check that removes the exit-0 ambiguity entirely (Follow-up F2).
 
@@ -348,23 +350,28 @@ antigravity: {
 
 MMR fires the compensator only for **unavailable** channels (not_installed /
 auth_failed / timeout / failed) — see `review.ts:711-723` and `getCompensatingChannels`.
-A channel that **completes** (exit 0 with stdout) is *not* compensated, even if its
-output doesn't parse: `results-pipeline.ts:113-128` catches the parse error and
-returns `findings: []` with status `completed`. The cases map as follows:
+The dispatcher decides status at `dispatcher.ts:228`: `code === 0 && stdout` →
+`completed` (raw stdout saved); **anything else → `failed`** (so exit 0 with *empty*
+stdout is `failed`, not completed). The cases map as follows:
 
 - **agy not installed** → `not_installed`; compensator fires (D6).
 - **Auth failure** → caught **pre-dispatch** by the D4 auth probe (sentinel match →
   exit 41 → `auth_failed`), recovery surfaced; compensator fires. This is why the
   auth check must catch auth failure — agy itself exits 0 on auth failure, so it
-  would otherwise reach dispatch and "complete" with a useless body.
-- **Timeout / spawn error** → `timeout` / `failed`; compensator fires. The 300s
-  channel timeout bounds a hung run; the dispatcher's existing posture cleanup
-  removes the neutral cwd temp dir on close/error/timeout/SIGINT.
-- **Completed but non-conforming output** (authed agy emits prose, a refusal, or
-  otherwise non-findings-JSON) → status `completed`, `findings: []`, **no
-  compensation**. This is a genuine residual risk shared by all model-output
-  channels (claude/codex behave the same), not specific to agy. It surfaces as a
-  channel that contributed zero findings, not as a failure. Accepted; see D4.
+  would otherwise reach dispatch.
+- **Timeout / spawn error / exit 0 with empty stdout** → `timeout` / `failed`;
+  compensator fires. The 300s channel timeout bounds a hung run; the dispatcher's
+  existing posture cleanup removes the neutral cwd temp dir on
+  close/error/timeout/SIGINT.
+- **Completed (exit 0 + stdout) but non-conforming body** (authed agy emits prose,
+  a refusal, or otherwise non-findings-JSON) → status stays `completed` and **no
+  compensation fires**, but the output is **not** silently dropped:
+  `parseChannelOutput` (`parser.ts:343-361`) catches the parse failure and emits a
+  synthetic **P1 finding at `location: 'output-parser'`** ("Failed to parse channel
+  output: …"). So a malformed agy run surfaces as a *visible* P1 finding in the
+  reconciled results, not a silent zero-findings gap. This is shared behavior across
+  all model-output channels (claude/codex parse the same way), not agy-specific.
+  Accepted; see D4.
 
 ## Testing (TDD)
 
