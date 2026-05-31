@@ -15,16 +15,16 @@
 ## ⚠️ Branch context (read first)
 
 This worktree (`/Users/kenallred/Developer/scaffold-mmr-antigravity`, branch
-`feat/mmr-antigravity-channel`) was created off `feat/guides-system-expansion`,
-which **has since been merged into `main` and deleted**. Two consequences:
+`feat/mmr-antigravity-channel`) is now based **directly on `origin/main`** (the 6
+doc commits were `git rebase --onto origin/main`'d off their original
+`feat/guides-system-expansion` base, which is *unmerged, actively-developed* work in
+another worktree — keep this branch off it to avoid conflicts).
 
-1. **The diff base is the SHA `93370f90`, not a branch name.** Use
-   `git diff 93370f90..HEAD` / `mmr review --base 93370f90` for branch-scoped diffs.
-2. **`package.json` here reads `1.4.0`, but `main` is at `1.4.1`** (the grok-hardening
-   release landed on main after this fork point). **Before the release-prep task
-   (Task 7), rebase this branch onto `origin/main`** so the version bump and CHANGELOG
-   are accurate, then bump to `1.5.0` (new feature ⇒ minor). Do the rebase as the
-   first action of Task 7, not mid-implementation.
+1. **Diff base is `origin/main`.** Use `git diff origin/main..HEAD` /
+   `mmr review --base origin/main` for branch-scoped diffs.
+2. **`package.json` is at `1.4.1`** (current main). Task 7 bumps it to `1.5.0` (new
+   feature ⇒ minor). No upfront rebase is needed — it is already done.
+3. **The PR targets `main`.**
 
 Run all commands from `packages/mmr/` unless a path says otherwise. If `npm`
 commands report missing root deps, run `npm install` at the **worktree root**
@@ -749,17 +749,18 @@ git commit -m "feat(mmr): add antigravity compensator focus (Google-family lane)
 **Files:**
 - Modify: `packages/mmr/README.md`, root `CLAUDE.md`, `packages/mmr/CHANGELOG.md`, `packages/mmr/package.json`
 
-- [ ] **Step 1: Rebase onto main (base branch was deleted)**
+- [ ] **Step 1: Confirm the branch is current with origin/main**
+
+The branch is already rebased onto `origin/main` (see Branch context). Just confirm
+no drift before release prep:
 
 ```bash
 git fetch origin
-git rebase origin/main
+git log --oneline origin/main..HEAD   # should show ONLY this feature's commits
 ```
 
-Resolve any conflicts (the spec/plan docs are new files, so conflicts are unlikely;
-`package.json`/`CHANGELOG.md` may need a manual merge — keep main's 1.4.1 history and
-add the new entry on top in Step 4). Re-run `npx vitest run` after rebase to confirm
-green before continuing.
+If `origin/main` has advanced, rebase onto it (`git rebase origin/main`) and re-run
+`npx vitest run` before continuing.
 
 - [ ] **Step 2: Update `packages/mmr/README.md`**
 
