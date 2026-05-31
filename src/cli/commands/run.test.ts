@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { MockInstance } from 'vitest'
 import path from 'node:path'
+import yargs from 'yargs'
 import type { PipelineState } from '../../types/state.js'
 import type { StepStateEntry } from '../../types/state.js'
 import type { MetaPromptFile, MetaPromptFrontmatter } from '../../types/frontmatter.js'
@@ -1766,5 +1767,77 @@ describe('run command handler', () => {
       // it returns the preset steps unchanged
       expect(resolveOverlayState).toHaveBeenCalled()
     })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Parse-level tests: prove the run builder captures trailing args under the
+// root .strict(), and that .strict(false) does NOT leak to sibling commands.
+// ---------------------------------------------------------------------------
+describe('run command — argument capture (parse-level)', () => {
+  async function parseRun(line: string): Promise<{
+    captured: Record<string, unknown> | null
+    sibling: boolean
+    error: string | null
+  }> {
+    const runCmd = await importHandler() // the runCommand CommandModule (default export)
+    let captured: Record<string, unknown> | null = null
+    let sibling = false
+    let error: string | null = null
+    await yargs(line.split(' ').filter(Boolean))
+      .command({ ...runCmd, handler: (a) => { captured = a as Record<string, unknown> } })
+      .command({
+        command: 'sibling',
+        describe: 'strict sibling',
+        builder: (y) => y,
+        handler: () => { sibling = true },
+      })
+      .options({
+        format: { type: 'string', choices: ['json'] as const },
+        auto: { type: 'boolean', default: false },
+      })
+      .strict()
+      .exitProcess(false)
+      .fail((msg: string) => { error = msg })
+      .parseAsync()
+    return { captured, sibling, error }
+  }
+
+  it('captures a bare positional into args', async () => {
+    const { captured } = await parseRun('run review-pr 376')
+    expect(captured?.['args']).toEqual([376])
+  })
+
+  it('captures an unknown flag and its value into args', async () => {
+    const { captured } = await parseRun('run review-pr 376 --fix-threshold P1')
+    expect(captured?.['args']).toEqual([376, '--fix-threshold', 'P1'])
+  })
+
+  it('captures the = form of an unknown flag as a single token', async () => {
+    const { captured } = await parseRun('run review-pr 376 --fix-threshold=P1')
+    expect(captured?.['args']).toEqual([376, '--fix-threshold=P1'])
+  })
+
+  it('consumes a known global flag instead of capturing it (trailing)', async () => {
+    const { captured } = await parseRun('run review-pr 376 --format json')
+    expect(captured?.['args']).toEqual([376])
+    expect(captured?.['format']).toBe('json')
+  })
+
+  it('consumes a known global flag instead of capturing it (interleaved)', async () => {
+    const { captured } = await parseRun('run --format json review-pr 376')
+    expect(captured?.['args']).toEqual([376])
+    expect(captured?.['format']).toBe('json')
+  })
+
+  it('captures no args when none are given', async () => {
+    const { captured } = await parseRun('run review-pr')
+    expect(captured?.['args']).toEqual([])
+  })
+
+  it('does NOT leak .strict(false) to sibling commands', async () => {
+    const { error, sibling } = await parseRun('sibling --bogus')
+    expect(sibling).toBe(false)
+    expect(error).toContain('Unknown argument')
   })
 })

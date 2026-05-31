@@ -31,6 +31,7 @@ import type { ArtifactEntry } from '../../types/assembly.js'
 
 interface RunArgs {
   step: string
+  args?: (string | number)[]
   depth?: number
   instructions?: string
   force?: boolean
@@ -42,14 +43,24 @@ interface RunArgs {
 }
 
 const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
-  command: 'run <step>',
-  describe: 'Run a pipeline step',
+  command: 'run <step> [args..]',
+  describe: 'Run a pipeline step (trailing args bind to $ARGUMENTS)',
   builder: (yargs: Argv<Record<string, unknown>>): Argv<RunArgs> => {
     return yargs
+      .usage('$0 run <step> [args..]')
+      // Capture arbitrary trailing tokens (bare values AND unknown flags) for
+      // $ARGUMENTS passthrough. .strict(false) is scoped to THIS builder (same
+      // pattern as `observe event`) so the root .strict() still guards siblings.
+      .strict(false)
+      .parserConfiguration({ 'unknown-options-as-args': true })
       .positional('step', {
         type: 'string',
         description: 'Step name to run',
         demandOption: true,
+      })
+      .positional('args', {
+        array: true,
+        description: 'Trailing arguments bound to $ARGUMENTS in the step prompt',
       })
       .option('depth', {
         type: 'number',
