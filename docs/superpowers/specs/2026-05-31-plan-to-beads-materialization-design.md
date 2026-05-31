@@ -292,13 +292,24 @@ result-set pagination (default 50) hides records.
 Before any upsert, fetch the plan-derived issues once
 (`bd list --all --limit 0 --has-metadata-key plan_task_id --json`, plus the
 `plan_story_id`/`plan_epic_id` queries) and group by each `plan_*_id`. For any
-key held by more than one issue (failed/manual/concurrent prior import): keep the
-oldest (lowest `created_at`, ties by `id`); for each discarded **not-started**
-duplicate, **unset its join key then close it** (`bd update <id>
---unset-metadata plan_task_id` → `bd close <id> --reason …` → label
-`stale:duplicate`) so it is excluded from all future `--has-metadata-key`
-queries and never re-detected. **Report** started (`in_progress`/`closed`)
-duplicates for human review — never silently mutate started work.
+key held by more than one issue (failed/manual/concurrent prior import), restore
+the **exactly-one-issue-per-key invariant** that every later bulk fetch, map,
+dep reconcile, stale pass, and the scoped claim loop depend on:
+
+1. **Pick the canonical issue** for the key: if any duplicate is **started**
+   (`in_progress`/`closed`), the canonical is the oldest *started* one (work has
+   already begun on it — never start a fresh copy); otherwise the oldest issue
+   overall (lowest `created_at`, ties by `id`).
+2. **For every non-canonical duplicate** (started **or** not-started),
+   **unset its join key** (`bd update <id> --unset-metadata plan_task_id`) so it
+   drops out of all future `--has-metadata-key` queries — this is the only change
+   made to a *started* non-canonical issue (its execution state/fields are not
+   touched), and it is **reported** for human review.
+3. **Additionally close + label** the **not-started** non-canonical duplicates
+   (`bd close <id> --reason …` → label `stale:duplicate`).
+
+This guarantees a single canonical issue retains each `plan_*_id` after Pass 0a,
+so the claim loop can never surface a duplicate of an already-started item.
 
 ### Pass 0b — Container upsert (deep only), top-down
 
@@ -392,12 +403,20 @@ For each **`open`/`blocked`/`deferred`** dependent (never mutate
   `bd dep remove <blocked-id> <blocker-id>`. Edges **not** in `plan_deps`
   (manual/external blockers) are preserved untouched; a manual edge colliding
   with a plan edge is kept and noted in the summary, not deleted.
-- **Rewrite `plan_deps` authoritatively at the end** of each issue's reconcile:
-  `bd update <id> --set-metadata plan_deps=<current-plan-owned-csv>` (or
-  `--unset-metadata plan_deps` when the set is now empty). This is required so a
-  later manual re-add of a previously-removed blocker is **not** misclassified as
-  materializer-owned on the next run — `plan_deps` must always reflect exactly
-  the current plan-owned edges, not the historical union.
+- **Rewrite `plan_deps` authoritatively at the end** of each issue's reconcile.
+  Its new value is defined precisely as:
+
+  > `plan_deps' = (prior plan_deps ∩ current-plan deps) ∪ (edges this run added)`
+
+  i.e. keep the still-valid owned edges, add the ones the materializer just
+  created, and **explicitly exclude any pre-existing edge that was *not* already
+  in `plan_deps`** — even when it collides with a current plan dep. That edge was
+  a manual/external blocker that happens to match the plan; it must stay
+  manual-owned so a later plan removal never deletes it. Write with
+  `bd update <id> --set-metadata plan_deps=<csv>` (or `--unset-metadata
+  plan_deps` when empty). This keeps `plan_deps` reflecting exactly the
+  materializer-owned edges, never the historical union and never absorbing manual
+  edges.
 
 The dependent's current edges come from the bulk fetch's inline `dependencies`
 array (`depends_on_id`, `type`); a per-issue read, if needed, is
@@ -428,11 +447,14 @@ List every plan-derived issue
   bd close  <id> --reason "Removed from implementation plan (was <task-id>)"
   bd label  add <id> stale:removed-from-plan
   ```
-- Such an issue **started** (`in_progress`) → **do not auto-close**; report it in
-  the summary for human attention (it may be mid-flight work the plan dropped by
-  mistake). A **`closed`** issue removed from the plan needs nothing — it is done;
-  it is excluded from the "dropped work" report (a `stale:removed-from-plan`
-  label, if present from a prior pass, also marks it as already-handled).
+- Such an issue **`in_progress`** → **do not auto-close**; report it in the
+  summary for human attention (it may be mid-flight work the plan dropped by
+  mistake).
+- Such an issue **`closed`** (already done) → **unset its join key** so it drops
+  out of future bulk-fetch queries (`bd update <id> --unset-metadata
+  plan_task_id`); it needs no close and is excluded from the "dropped work"
+  report. Without this, a closed-and-removed task would be re-fetched on every
+  later run (harmless but unbounded growth).
 
 ### Summary report
 
@@ -701,6 +723,14 @@ prompts use, against the project's installed `bd`:
   the edge and rewrites `plan_deps`); then manually re-add the same blocker; a
   subsequent materializer run must **not** delete it (it is no longer in
   `plan_deps`).
+- **Manual-edge collides with later plan edge**: a manual blocker exists (not in
+  `plan_deps`); the plan is then edited to add that same edge; later the plan
+  removes it — the manual edge must **survive** (it was never absorbed into
+  `plan_deps` per the `plan_deps'` formula).
+- **Duplicate-key uniqueness**: seed three issues with one `plan_task_id`
+  (one `in_progress`, two `open`); after Pass 0a exactly one issue (the
+  `in_progress` canonical) retains the key, the two `open` ones are closed +
+  `stale:duplicate`, and no further run re-detects a duplicate.
 - **Fail-closed on materialize error**: if a pass errors after some issues were
   written, the build stops with the error surfaced — it does **not** drop to the
   markdown loop or enter the claim loop.
