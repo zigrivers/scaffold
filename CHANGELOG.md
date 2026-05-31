@@ -4,6 +4,11 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Project-local `content/` no longer shadows scaffold's bundled pipeline.** The content resolvers (`getPackagePipelineDir`, `getPackageMethodologyDir`, and siblings) previously treated *any* project containing a `content/pipeline/` or `content/methodology/` directory as a scaffold content source. A downstream project that legitimately has such a directory — e.g. a scaffold-like CLI tool whose `project-structure` step generates `content/methodology/` — would silently shadow the installed pipeline, collapsing the resolved graph. The project-local override is now gated on the project actually being scaffold itself (`package.json` name `@zigrivers/scaffold`), so installed runs always use the bundled content. This fixes the symptom where `scaffold status` reported a misleading **"100% complete"** and `scaffold check <step>` returned `DEP_TARGET_MISSING` for steps that are part of the methodology.
+- **`scaffold status` warns instead of silently reporting completion when no pipeline content resolves.** If zero pipeline meta-prompts are discovered (broken install, or the shadowing above), status now emits a prominent warning that the progress figure is unreliable, rather than presenting a collapsed graph as "100% complete."
+
 ## [3.30.0] — 2026-05-30
 
 Expands the reference-guides system from a single proving-ground guide to **11 guides** covering every major subsystem, and adds verifiable file:line citation provenance across the whole guide system. All changes are additive.

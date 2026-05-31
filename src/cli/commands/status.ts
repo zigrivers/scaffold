@@ -114,6 +114,28 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
 
     // 3. Load pipeline context and resolve overlay/graph
     const context = loadPipelineContext(projectRoot)
+
+    // Defense-in-depth: if no pipeline meta-prompts were discovered at all, the
+    // pipeline content could not be resolved. The resolved graph then collapses
+    // to just the completed state entries, so progress below would otherwise
+    // read a misleading "100% complete". Warn loudly so the figure is never
+    // silently trusted.
+    //
+    // Scoped to `status` deliberately: it is the only read command that renders
+    // a reassuring completion percentage. `next`/`check`/`run` surface explicit
+    // errors instead (no eligible steps / DEP_TARGET_MISSING), which are not
+    // falsely reassuring, so they don't need this guard.
+    if (context.metaPrompts.size === 0) {
+      output.warn(
+        'No pipeline content resolved — scaffold could not find its bundled ' +
+        'pipeline meta-prompts. The progress below is unreliable: a project with ' +
+        'no resolvable pipeline can otherwise read as "100% complete". This ' +
+        'usually means a broken or incomplete scaffold installation. Reinstall ' +
+        'scaffold (`npm i -g @zigrivers/scaffold` or `brew reinstall scaffold`) ' +
+        'and re-run `scaffold status`.',
+      )
+    }
+
     const service = argv.service as string | undefined
     const pipeline = resolvePipeline(context, { output, serviceId: service })
 

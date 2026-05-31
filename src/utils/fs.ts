@@ -34,80 +34,96 @@ export function getPackageRoot(): string {
   return path.resolve(path.dirname(thisFile), '..', '..')
 }
 
+/** Read the `name` field from `<dir>/package.json`, or null if absent/unreadable. */
+function readPackageName(dir: string): string | null {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'))
+    return typeof pkg?.name === 'string' ? pkg.name : null
+  } catch {
+    return null
+  }
+}
+
 /**
- * Resolve the pipeline directory.
- * If projectRoot is provided and contains pipeline/, use that (dev/test mode).
- * Otherwise use the package's bundled pipeline/.
+ * The npm package name of the *running* scaffold, read once from its own
+ * package.json (with a literal fallback). Deriving it — rather than hardcoding
+ * — means the gate below reads "is projectRoot the same package as the scaffold
+ * that's running", which also stays correct for forks/renames.
  */
+let cachedOwnPackageName: string | undefined
+function ownPackageName(): string {
+  if (cachedOwnPackageName === undefined) {
+    cachedOwnPackageName = readPackageName(getPackageRoot()) ?? '@zigrivers/scaffold'
+  }
+  return cachedOwnPackageName
+}
+
+/**
+ * True only when `dir` is scaffold's own source/install tree, detected by its
+ * package.json name matching the running scaffold's. This gates the dev-mode
+ * content override so that a downstream project which merely happens to have a
+ * `content/` directory (e.g. a scaffold-like CLI tool, whose project-structure
+ * step generates `content/pipeline/` + `content/methodology/`) does NOT shadow
+ * scaffold's bundled content. Without this gate the resolved pipeline silently
+ * collapses. Result is memoized per directory — this runs for every
+ * getPackage*Dir call (6+ per command) and scaffold is a short-lived process.
+ *
+ * Note: only the exact `dir` passed is checked (no upward walk). Callers pass
+ * the project root that holds `.scaffold/` and, for scaffold itself, its
+ * package.json + content/ sit at that same root.
+ */
+const scaffoldRootCache = new Map<string, boolean>()
+function isScaffoldPackageRoot(dir: string): boolean {
+  let cached = scaffoldRootCache.get(dir)
+  if (cached === undefined) {
+    cached = readPackageName(dir) === ownPackageName()
+    scaffoldRootCache.set(dir, cached)
+  }
+  return cached
+}
+
+/**
+ * Resolve a `content/<subdir>` directory.
+ *
+ * The project-local override (`<projectRoot>/content/<subdir>`) is used ONLY
+ * when running scaffold against scaffold's own source tree — i.e. developing
+ * scaffold itself with a globally-installed binary. For every other project,
+ * and when installed, the package's bundled `content/<subdir>` is used.
+ */
+function resolveContentDir(subdir: string, projectRoot?: string): string {
+  if (projectRoot && isScaffoldPackageRoot(projectRoot)) {
+    const local = path.join(projectRoot, 'content', subdir)
+    if (fs.existsSync(local)) return local
+  }
+  return path.join(getPackageRoot(), 'content', subdir)
+}
+
+/** Resolve the pipeline directory (bundled, unless running against scaffold itself). */
 export function getPackagePipelineDir(projectRoot?: string): string {
-  if (projectRoot) {
-    const local = path.join(projectRoot, 'content', 'pipeline')
-    if (fs.existsSync(local)) return local
-  }
-  return path.join(getPackageRoot(), 'content', 'pipeline')
+  return resolveContentDir('pipeline', projectRoot)
 }
 
-/**
- * Resolve the knowledge directory.
- * If projectRoot is provided and contains knowledge/, use that (dev/test mode).
- * Otherwise use the package's bundled knowledge/.
- */
+/** Resolve the knowledge directory (bundled, unless running against scaffold itself). */
 export function getPackageKnowledgeDir(projectRoot?: string): string {
-  if (projectRoot) {
-    const local = path.join(projectRoot, 'content', 'knowledge')
-    if (fs.existsSync(local)) return local
-  }
-  return path.join(getPackageRoot(), 'content', 'knowledge')
+  return resolveContentDir('knowledge', projectRoot)
 }
 
-/**
- * Resolve the tools directory.
- * If projectRoot is provided and contains tools/, use that (dev/test mode).
- * Otherwise use the package's bundled tools/.
- */
+/** Resolve the tools directory (bundled, unless running against scaffold itself). */
 export function getPackageToolsDir(projectRoot?: string): string {
-  if (projectRoot) {
-    const local = path.join(projectRoot, 'content', 'tools')
-    if (fs.existsSync(local)) return local
-  }
-  return path.join(getPackageRoot(), 'content', 'tools')
+  return resolveContentDir('tools', projectRoot)
 }
 
-/**
- * Resolve the skills template directory.
- * If projectRoot is provided and contains content/skills/, use that (dev/test mode).
- * Otherwise use the package's bundled content/skills/.
- */
+/** Resolve the skills template directory (bundled, unless running against scaffold itself). */
 export function getPackageSkillsDir(projectRoot?: string): string {
-  if (projectRoot) {
-    const local = path.join(projectRoot, 'content', 'skills')
-    if (fs.existsSync(local)) return local
-  }
-  return path.join(getPackageRoot(), 'content', 'skills')
+  return resolveContentDir('skills', projectRoot)
 }
 
-/**
- * Resolve the methodology directory.
- * If projectRoot is provided and contains methodology/, use that (dev/test mode).
- * Otherwise use the package's bundled methodology/.
- */
+/** Resolve the methodology directory (bundled, unless running against scaffold itself). */
 export function getPackageMethodologyDir(projectRoot?: string): string {
-  if (projectRoot) {
-    const local = path.join(projectRoot, 'content', 'methodology')
-    if (fs.existsSync(local)) return local
-  }
-  return path.join(getPackageRoot(), 'content', 'methodology')
+  return resolveContentDir('methodology', projectRoot)
 }
 
-/**
- * Resolve the guides directory.
- * If projectRoot is provided and contains content/guides/, use that (dev/test mode).
- * Otherwise use the package's bundled content/guides/.
- */
+/** Resolve the guides directory (bundled, unless running against scaffold itself). */
 export function getPackageGuidesDir(projectRoot?: string): string {
-  if (projectRoot) {
-    const local = path.join(projectRoot, 'content', 'guides')
-    if (fs.existsSync(local)) return local
-  }
-  return path.join(getPackageRoot(), 'content', 'guides')
+  return resolveContentDir('guides', projectRoot)
 }
