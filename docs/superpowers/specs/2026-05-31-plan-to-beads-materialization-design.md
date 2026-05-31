@@ -131,8 +131,11 @@ require every plan to emit the following contract:
    Pass 0b creates/updates epics and stories with the same `bd create/update
    --parent -p --description --set-metadata` surface as tasks, each epic/story
    block must carry: `id`, `title`, `priority` (optional), `wave`/`risk` (if
-   assigned), `description`/AC (the container body), and — for stories — the
-   `epic` parent ID. Same stability and canonical-serialization rules as tasks.
+   assigned), and `description`/AC (the container body). A story's `epic` parent
+   is **optional** — epics appear only at depth 5, so a depth-4 plan has stories
+   with **no** epic parent. Pass 0b wires `--parent` only when an epic ref is
+   present; a missing epic ref on a story is valid, not a dangling ref. Same
+   stability and canonical-serialization rules as tasks.
 5. **A canonical serialization.** The exact markdown shape (e.g. a per-item
    heading plus a fenced `yaml`/key-value metadata block) is defined in the
    `implementation-plan.md` edit so the materializer has unambiguous parsing
@@ -161,11 +164,19 @@ feature's implementation plan.
   closed, plus claims and assignees.
 - The materializer is a **one-way reconcile**: plan → Beads. Each run performs
   ordered passes — **container upsert → task upsert → dependency reconcile →
-  stale reconcile**. It freely updates issues in a **not-started** stored status
-  (`open`/`blocked`/`deferred`), and never mutates issues in a **started** status
-  (`in_progress`/`closed`). (Per verified semantics, a dependency-blocked task
-  stays stored `open` — dependency blockers affect *computed readiness*, not
-  stored status; a stored `blocked`/`deferred` is an explicit signal.)
+  stale reconcile**. It freely updates the **content fields**
+  (title/description/priority/parent/wave/risk) of issues in a **not-started**
+  stored status (`open`/`blocked`/`deferred`), and **never touches the content
+  fields or execution status** of issues in a **started** status
+  (`in_progress`/`closed`). The one **narrow, explicit exception** is *join-key
+  metadata cleanup*: Pass 0a may `--unset-metadata <join-key>` on a started
+  *non-canonical duplicate* (to restore the one-key invariant), and Pass 3 may
+  unset it on a *closed, removed-from-plan* issue (to keep it out of future
+  fetches). These cleanups change **only** the `plan_*_id` tag — never content,
+  status, claims, or assignees — and are always reported. (Per verified
+  semantics, a dependency-blocked task stays stored `open` — dependency blockers
+  affect *computed readiness*, not stored status; a stored `blocked`/`deferred`
+  is an explicit signal.)
 
 This mirrors the update-mode contract already used by `implementation-plan.md`
 and `implementation-playbook.md`.
@@ -314,10 +325,17 @@ key held by more than one issue (failed/manual/concurrent prior import), restore
 the **exactly-one-issue-per-key invariant** that every later bulk fetch, map,
 dep reconcile, stale pass, and the scoped claim loop depend on:
 
-1. **Pick the canonical issue** for the key: if any duplicate is **started**
-   (`in_progress`/`closed`), the canonical is the oldest *started* one (work has
-   already begun on it — never start a fresh copy); otherwise the oldest issue
-   overall (lowest `created_at`, ties by `id`).
+1. **Pick the canonical issue** for the key, preferring **active** work so it is
+   never detached from the plan-derived set:
+   - if any duplicate is `in_progress` → canonical is the oldest `in_progress`
+     one (active work wins over a stale `closed` copy);
+   - else if any is `closed` → canonical is the oldest `closed` one;
+   - else the oldest not-started issue (lowest `created_at`, ties by `id`).
+
+   If duplicates carry **conflicting started statuses that can't be ordered
+   safely** (e.g. one `in_progress` *and* one `closed` for the same plan ID),
+   **fail closed** and report rather than guessing — auto-detaching the wrong one
+   could let the completion check call a task done while active work is orphaned.
 2. **Not-started non-canonical duplicates** → retire them per the **Retire
    convention** (close → `stale:duplicate` label → unset the issue's own
    `<join-key>`), so they leave the plan-derived set and are never re-detected.
@@ -507,28 +525,48 @@ correct and acceptable. Decision table:
 | Condition | Action |
 |---|---|
 | `beads_usable` false (no `.beads/`, no/old `bd`, no `jq`) | Markdown playbook loop. Do **not** call `bd`. |
-| Usable; plan has **no** stable task IDs | Markdown loop + emit "re-run planning to assign task IDs". Do **not** claim. |
-| Usable; plan has stable IDs | **Always materialize** (locked — see Concurrency): Pass 0a duplicate guard → 0b/1/2/3 reconcile. On success → scoped claim loop `bd ready --claim --has-metadata-key plan_task_id --json`. |
+| Usable; plan has **no** stable IDs **and** no plan-derived issues exist in Beads | Legacy/pre-prerequisite plan → markdown loop + emit "re-run planning to assign task IDs". Do **not** claim. |
+| Usable; contract **partially present or malformed** (some IDs present, or plan-derived issues already exist, but the contract doesn't fully parse) | **Fail closed.** Do **not** markdown-fallback (that would bypass existing plan-derived issues and diverge Beads from work). Require planning to be re-run/fixed. |
+| Usable; plan has a valid stable-ID contract | **Always materialize** by invoking the canonical procedure (see Invocation, below) → scoped claim loop `bd ready --claim --has-metadata-key plan_task_id --json`. |
 | Usable; materialize returns non-zero | **Fail closed.** Stop and surface the error; do **not** claim **and do not** silently markdown-fallback. |
 
-**Markdown fallback is only safe *before* materialization is attempted** (Beads
-unusable, or the plan has no stable IDs). Once materialization starts on a usable
-Beads tracker, earlier passes may already have created/updated/closed issues — so
-a mid-run failure must **fail closed**: stop the build and require the error to be
-fixed, rather than dropping to the markdown loop (which bypasses scoped claiming
-and would let Beads and the actual work diverge).
+**Markdown fallback is only safe for a genuinely legacy plan** — no stable IDs
+*and* no existing plan-derived Beads issues. A *partial/malformed* contract on a
+usable tracker (any IDs present, or any plan-derived issues already in Beads)
+**fails closed** rather than falling back, because markdown execution would
+bypass the existing Beads issues and let the two diverge. And once materialization
+*starts*, a mid-run failure also fails closed (earlier passes may already have
+written issues).
+
+### Invocation of the materializer from build prompts
+
+There is **one** canonical materializer procedure — the finalization prompt
+`materialize-plan-to-beads.md`, exposed as the slash command
+`/scaffold:materialize-plan-to-beads`. The build prompts do **not** duplicate the
+four-pass logic; their Beads Detection block **invokes
+`/scaffold:materialize-plan-to-beads`** (the same way build prompts already
+reference `/scaffold:single-agent-resume`, `/scaffold:review-pr`, etc.). This
+keeps a single source of truth: the finalization step and the defensive build
+preflight run identical reconcile logic, and a fix to the procedure updates both.
 
 **Completion check (empty `bd ready` ≠ done).** The scoped claim loop ends when
 `bd ready --claim --has-metadata-key plan_task_id` returns nothing — but an empty
 *ready* set does **not** mean the build is finished. Because the design preserves
 manual blockers and stored `blocked`/`deferred` states, an empty ready set can
-mean *every remaining task is blocked*, not *all done* — which would reintroduce
-a false-complete path. So on an empty ready result, the prompt must query all
-plan-derived tasks (`bd list --all --limit 0 --has-metadata-key plan_task_id
---json`) and conclude **done only when every one is `closed`**. Otherwise it
-**stops and reports** the remaining non-closed tasks grouped by why they aren't
-ready (blocked by an open dependency, manually `blocked`, or `deferred`) so the
-user can unblock them — it does not silently declare success.
+mean *every remaining task is blocked*, not *all done*. On an empty ready result,
+the prompt queries all plan-derived tasks (`bd list --all --limit 0
+--has-metadata-key plan_task_id --json`) and classifies the remaining non-closed
+tasks:
+
+- **All `closed`** → genuinely **done**.
+- **Some `in_progress`** (and the rest blocked behind them) → **active execution
+  by another agent**, not a deadlock. This is the normal multi-agent case: the
+  worker **exits gracefully** (its own work is done; others are still running) —
+  it must **not** report a failure or halt the build.
+- **None `in_progress`, but some non-closed remain** (`open`-but-unready /
+  `blocked` / `deferred`) → a **true stall**: nothing is advancing. The prompt
+  **stops and reports** the remaining tasks grouped by why they aren't ready
+  (open dependency, manual `blocked`, `deferred`) so the user can unblock them.
 
 For multi-agent, "always materialize" still means **once per wave** — the
 orchestrator runs it under the lock before fan-out (see Concurrency); workers do
@@ -607,12 +645,19 @@ prompt.
   and stability; that all `story`/`epic` parent refs resolve (no dangling refs);
   and that the per-task and per-container field blocks parse.
 - **Edit:** `content/pipeline/build/single-agent-start.md` — `beads_usable`-gated
-  Beads Detection + plain preflight + markdown fallback when Beads unusable;
-  **change the existing `bd ready --claim` to the scoped
-  `bd ready --claim --has-metadata-key plan_task_id --json`** so only plan tasks
-  are claimed.
-- **Edit:** `content/pipeline/build/multi-agent-start.md` — same (incl. scoped
-  claim), plus orchestrator-only + ownership-verified merge-slot lock.
+  Beads Detection that **invokes `/scaffold:materialize-plan-to-beads`** (the
+  canonical procedure, not a copy) per the decision table, then the **scoped**
+  `bd ready --claim --has-metadata-key plan_task_id --json` claim loop with the
+  empty-ready **completion check**; markdown fallback only for a genuinely legacy
+  plan, fail-closed otherwise.
+- **Edit:** `content/pipeline/build/multi-agent-start.md` — same, plus
+  orchestrator-only + ownership-verified merge-slot lock around the invocation.
+- **Edit:** `content/pipeline/build/single-agent-resume.md` and
+  `content/pipeline/build/multi-agent-resume.md` — **the resume prompts run the
+  same Beads loop and must get the identical treatment** (`beads_usable` gate,
+  invoke `/scaffold:materialize-plan-to-beads`, scoped claim, completion check,
+  fail-closed). Without this, a *resumed* build would still claim non-plan beads
+  or false-complete. (Multi-agent-resume keeps the orchestrator-only lock.)
 - **Edit:** `content/pipeline/foundation/beads.md` — one line noting the plan is
   materialized into Beads later, so users aren't surprised Beads starts empty.
 - **Edit:** `content/methodology/*.yml` presets/overlays — enable the new step
@@ -709,10 +754,21 @@ prompts use, against the project's installed `bd`:
   (task **or** container), a **dangling** story/epic parent ref, **or a dangling
   `depends_on` ref**, and accepts a conformant one with parseable task and
   container blocks.
-- **Completion check**: with every plan task `closed`, an empty `bd ready`
-  concludes done; with a remaining task in `blocked`/`deferred` (or blocked by an
-  open dep), an empty `bd ready` instead **reports** the remaining tasks and does
-  not declare success.
+- **Completion check (3-way)**: empty `bd ready` with all tasks `closed` → done;
+  with some task `in_progress` (others blocked behind it) → graceful exit, **no**
+  failure (multi-agent active execution); with **no** `in_progress` but
+  `blocked`/`deferred`/unready tasks remaining → **true stall reported**, not
+  success.
+- **Malformed-plan fail-closed**: a usable tracker with existing plan-derived
+  issues but a partially-parseable contract fails closed (does not markdown-
+  fallback); a genuinely legacy plan (no IDs, no plan-derived issues) does fall
+  back to markdown.
+- **Canonical prefers active**: duplicates of one key with an `in_progress` and a
+  `closed` member → the `in_progress` one is canonical (or, if statuses are
+  unorderable, the guard fails closed) — active work is never detached.
+- **Resume parity**: `single-agent-resume.md` / `multi-agent-resume.md` apply the
+  same scoped claim + completion check + materialize-invocation as the start
+  prompts (a resumed build neither claims non-plan beads nor false-completes).
 - **Mapping checks**: a sample plan yields the expected `bd` command sequence for
   mvp (flat, `-t task`, no story, default `-p 2`) and deep (epic→story→task
   order, `--parent` wiring, wave-biased priority), via a dry-run/command-capture
