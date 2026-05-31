@@ -127,11 +127,21 @@ require every plan to emit the following contract:
    - `depends_on` — list of task IDs (the DAG edges)
    - `acceptance_criteria` — a delimited block copied verbatim into the issue
      body
-4. **A canonical serialization.** The exact markdown shape (e.g. a per-task
+4. **Per-container fields (deep only), in the same parseable form** — because
+   Pass 0b creates/updates epics and stories with the same `bd create/update
+   --parent -p --description --set-metadata` surface as tasks, each epic/story
+   block must carry: `id`, `title`, `priority` (optional), `wave`/`risk` (if
+   assigned), `description`/AC (the container body), and — for stories — the
+   `epic` parent ID. Same stability and canonical-serialization rules as tasks.
+5. **A canonical serialization.** The exact markdown shape (e.g. a per-item
    heading plus a fenced `yaml`/key-value metadata block) is defined in the
    `implementation-plan.md` edit so the materializer has unambiguous parsing
-   rules. The implementation-plan **review** step validates that every task has
-   an ID, IDs are unique and stable, and the contract fields parse.
+   rules for tasks **and** containers.
+6. **Referential integrity.** Every `story`/`epic` reference on a task (and every
+   `epic` parent on a story) must resolve to a declared container ID — no
+   dangling refs. The implementation-plan **review** step validates: every task
+   has an ID; task/story/epic IDs are unique and stable; all parent refs resolve;
+   and the contract fields parse for both tasks and containers.
 
 Without this contract the join key is undefined and the materializer has no
 parsing rules; both are prerequisites, tracked as the first tasks of this
@@ -237,7 +247,7 @@ type-availability probe:
 |---|---|---|
 | Task | `bd create -t task` | `bd create -t task --parent <story-id>` |
 | Story | — (linkage in metadata/body) | `bd create -t story --parent <epic-id>` (`story` usable directly on v1.0.5) |
-| Epic | — | `bd create -t epic` |
+| Epic | — | `bd create -t epic -p <n>` (title/desc/wave/risk like tasks) |
 | Priority / order | `-p <n>` (wave-biased default) | `-p <n>` (wave-biased default) |
 | Dependencies (DAG) | `bd dep add <blocked> <blocker>` | `bd dep add <blocked> <blocker>` |
 | Acceptance criteria | issue body | issue body |
@@ -299,15 +309,23 @@ and `… plan_story_id …`, build in-memory `plan_epic_id → id` and
 child can reference its parent's resolved Beads ID via `--parent`:
 
 ```bash
-# Epic E-001: look up in the in-memory epic map; create if absent
+# Epic E-001: look up in the in-memory epic map; create if absent.
+# Containers carry the SAME fields as tasks — title, wave-biased -p, description/AC,
+# and (for stories) --parent — per the Mapping table and the per-container contract.
 ID=$(printf '%s' "$EPIC_MAP_JSON" | jq -r '."E-001" // empty')
-[ -z "$ID" ] && ID=$(bd create "<epic title>" -t epic \
-  --metadata '{"plan_epic_id":"E-001"}' --external-ref "plan:E-001" --json | jq -r '.id')
-# Story S-001 (parent = resolved epic ID): same lookup-or-create against the story map
+[ -z "$ID" ] && ID=$(bd create "<epic title>" -t epic -p <prio> \
+  --description "<epic body>" \
+  --metadata '{"plan_epic_id":"E-001","wave":"<n>","risk":"<type>"}' \
+  --external-ref "plan:E-001" --json | jq -r '.id')
+# Story S-001: same lookup-or-create against the story map, with --parent <epic-id>
 ```
 
-Story/epic upsert follows the same not-started-vs-started rules as tasks (below);
-reparenting a not-started container uses `bd update <id> --parent <new>`.
+Container upsert obeys the **same not-started-vs-started rules as tasks** (Pass
+1): a not-started (`open`/`blocked`/`deferred`) epic/story is updated to match
+the plan — `bd update <id> --title … -d … -p … --parent … --set-metadata
+wave=… risk=…`; a started (`in_progress`/`closed`) container is left untouched
+(no field changes). Reparenting a not-started story uses
+`bd update <id> --parent <new>`.
 
 ### Pass 1 — Task upsert
 
@@ -499,9 +517,13 @@ duplicates** (`in_progress`/`closed` that are *not* the kept issue) are reported
 for human review rather than touched; if one can't be auto-resolved, fail before
 the claim loop.
 
-The sets are built with `jq`; any `jq`/`bd` failure routes to the markdown loop
-(never a blind claim). The exact, tested shell lives in the implementation
-prompt; this spec fixes the routing rule above.
+The sets are built with `jq`. A `jq`/`bd` failure routes to the markdown loop
+**only while still in the pre-materialization gate** (building `beads_usable` /
+the ID sets); **once the materializer has started writing**, any `jq`/`bd`
+failure must propagate as non-zero and **fail closed** (per the control-flow
+rule above) — never markdown-fallback past a partially-updated tracker. The
+exact, tested shell lives in the implementation prompt; this spec fixes the
+routing rule above.
 
 ### Concurrency (multi-agent)
 
@@ -544,9 +566,12 @@ prompt.
   detection, version guard, four-pass reconcile, idempotency summary.
 - **Edit (prerequisite):** `content/pipeline/planning/implementation-plan.md`
   — define and require the Plan Output Contract (stable task/story/epic IDs,
-  per-task field block, canonical serialization).
+  per-task **and per-container** field blocks, referential integrity of parent
+  refs, canonical serialization).
 - **Edit:** `content/pipeline/planning/implementation-plan-review.md` — validate
-  ID presence/uniqueness/stability and that the contract parses.
+  the full contract: task **and** container (story/epic) ID presence, uniqueness,
+  and stability; that all `story`/`epic` parent refs resolve (no dangling refs);
+  and that the per-task and per-container field blocks parse.
 - **Edit:** `content/pipeline/build/single-agent-start.md` — `beads_usable`-gated
   Beads Detection + plain preflight + markdown fallback when Beads unusable;
   **change the existing `bd ready --claim` to the scoped
@@ -647,7 +672,8 @@ prompts use, against the project's installed `bd`:
   `implementation-playbook`; with Beads disabled, it does not appear.
 - **Plan Output Contract** (bats): `implementation-plan.md` requires/defines the
   contract; the review step rejects a plan with missing/duplicate/unstable IDs
-  and accepts a conformant one.
+  (task **or** container) or a **dangling** story/epic parent ref, and accepts a
+  conformant one with parseable task and container blocks.
 - **Mapping checks**: a sample plan yields the expected `bd` command sequence for
   mvp (flat, `-t task`, no story, default `-p 2`) and deep (epic→story→task
   order, `--parent` wiring, wave-biased priority), via a dry-run/command-capture
