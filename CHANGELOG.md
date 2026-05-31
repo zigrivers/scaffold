@@ -4,6 +4,11 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Knowledge-freshness cron is now robust to non-conforming model output.** A model that pairs a no-edit verdict (`current`/`minor-drift`) with proposed changes — observed with the DeepSeek provider — no longer hard-fails and strands the entry; the stray changes are demoted to advisory notes so the entry is still reviewed-stamped, keeping the daily audit budget flowing. Internal CI tooling only; no package release required.
+- **`.gitignore` ignores a top-level `node_modules` symlink**, not just the directory.
+
 ## [3.32.0] — 2026-05-31
 
 Makes `scaffold run <step> <args…>` bind trailing CLI arguments to the step's
@@ -30,8 +35,6 @@ logic. Also hardens the tools that consume `$ARGUMENTS`.
   a literal `$ARGUMENTS` token is never left in the output (it now resolves to an
   empty string when no arguments are supplied — a behavioral cleanup; no pipeline
   step relied on the literal surviving).
-- **Knowledge-freshness cron is now robust to non-conforming model output.** A model that pairs a no-edit verdict (`current`/`minor-drift`) with proposed changes — observed with the DeepSeek provider — no longer hard-fails and strands the entry; the stray changes are demoted to advisory notes so the entry is still reviewed-stamped, keeping the daily audit budget flowing. Internal CI tooling only; no package release required.
-- **`.gitignore` ignores a top-level `node_modules` symlink**, not just the directory.
 
 ### Changed
 
