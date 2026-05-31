@@ -4,6 +4,13 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.31.1] — 2026-05-31
+
+### Fixed
+
+- **Project-local `content/` no longer shadows scaffold's bundled pipeline.** The content resolvers (`getPackagePipelineDir`, `getPackageMethodologyDir`, and siblings) previously treated *any* project containing a `content/pipeline/` or `content/methodology/` directory as a scaffold content source. A downstream project that legitimately has such a directory — e.g. a scaffold-like CLI tool whose `project-structure` step generates `content/methodology/` — would silently shadow the installed pipeline, collapsing the resolved graph. The project-local override is now gated on the project actually being scaffold itself (`package.json` name `@zigrivers/scaffold`), so installed runs always use the bundled content. This fixes the symptom where `scaffold status` reported a misleading **"100% complete"** and `scaffold check <step>` returned `DEP_TARGET_MISSING` for steps that are part of the methodology.
+- **`scaffold status` no longer reports a misleading "100% complete" when no pipeline content resolves.** If zero pipeline meta-prompts are discovered (broken install, or the shadowing above), status now emits a prominent warning **and** renders progress as `unavailable (pipeline content not resolved)` instead of a percentage. JSON output gains a `pipelineContentResolved` boolean so machine consumers won't treat `percentage: 100` as done.
+
 ## [3.31.0] — 2026-05-31
 
 Styles the reference-guide UI. The guides previously rendered with design tokens
@@ -28,7 +35,6 @@ release adds the missing stylesheet, so all 11 guides get a proper reading layou
   Reference / Workflows / Tools).
 - New palette tokens for guides: `--red` / `--red-bg` / `--red-border` (danger
   callouts) and `--scrim` (drawer backdrop), with light + dark values.
-
 ## [3.30.0] — 2026-05-30
 
 Expands the reference-guides system from a single proving-ground guide to **11 guides** covering every major subsystem, and adds verifiable file:line citation provenance across the whole guide system. All changes are additive.

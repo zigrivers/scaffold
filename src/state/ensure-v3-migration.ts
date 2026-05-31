@@ -28,8 +28,10 @@ export function ensureV3Migration(
 
   if (raw['schema-version'] !== 2) return
 
-  // Compute globalSteps if not provided (for commands that skip resolvePipeline)
-  const effectiveGlobalSteps = globalSteps ?? loadGlobalStepSlugs(getPackageMethodologyDir())
+  // Compute globalSteps if not provided (for commands that skip resolvePipeline).
+  // Pass projectRoot so the methodology dir resolves consistently with the rest
+  // of the pipeline (uses the local content tree when running scaffold itself).
+  const effectiveGlobalSteps = globalSteps ?? loadGlobalStepSlugs(getPackageMethodologyDir(projectRoot))
 
   migrateV2ToV3({
     projectRoot,
