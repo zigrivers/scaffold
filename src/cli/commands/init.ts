@@ -18,13 +18,13 @@ import {
 import {
   GAME_FLAGS, WEB_FLAGS, BACKEND_FLAGS, CLI_TYPE_FLAGS,
   LIB_FLAGS, MOBILE_FLAGS, PIPELINE_FLAGS, ML_FLAGS, EXT_FLAGS,
-  RESEARCH_FLAGS, applyFlagFamilyValidation,
+  RESEARCH_FLAGS, MCP_SERVER_FLAGS, applyFlagFamilyValidation,
 } from '../init-flag-families.js'
 import type { ScaffoldConfig } from '../../types/index.js'
 import type {
   GameFlags, WebAppFlags, BackendFlags, CliFlags, LibraryFlags,
   MobileAppFlags, DataPipelineFlags, MlFlags, BrowserExtensionFlags,
-  ResearchFlags,
+  ResearchFlags, McpServerFlags,
 } from '../../wizard/flags.js'
 
 interface InitArgs {
@@ -99,6 +99,13 @@ interface InitArgs {
   'research-interaction'?: string
   'research-domain'?: string
   'research-tracking'?: boolean
+  // MCP server flags
+  'mcp-language'?: string
+  'mcp-transport'?: string
+  'mcp-primitives'?: string[]
+  'mcp-auth'?: string
+  'mcp-deployment'?: string
+  'mcp-stateful'?: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -109,7 +116,7 @@ export const CONFIG_SETTING_FLAGS: readonly string[] = [
   'methodology', 'depth', 'adapters', 'traits', 'project-type', 'idea',
   ...GAME_FLAGS, ...WEB_FLAGS, ...BACKEND_FLAGS, ...CLI_TYPE_FLAGS,
   ...LIB_FLAGS, ...MOBILE_FLAGS, ...PIPELINE_FLAGS, ...ML_FLAGS,
-  ...EXT_FLAGS, ...RESEARCH_FLAGS,
+  ...EXT_FLAGS, ...RESEARCH_FLAGS, ...MCP_SERVER_FLAGS,
 ]
 
 // ---------------------------------------------------------------------------
@@ -390,6 +397,36 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
         type: 'boolean',
         describe: 'Experiment tracking',
       })
+      // MCP Server Configuration
+      .option('mcp-language', {
+        type: 'string',
+        describe: 'MCP server language',
+        choices: ['typescript', 'python'] as const,
+      })
+      .option('mcp-transport', {
+        type: 'string',
+        describe: 'MCP transport',
+        choices: ['stdio', 'streamable-http', 'sse'] as const,
+      })
+      .option('mcp-primitives', {
+        type: 'array',
+        describe: 'MCP primitives exposed',
+        choices: ['tools', 'resources', 'prompts'] as const,
+      })
+      .option('mcp-auth', {
+        type: 'string',
+        describe: 'MCP auth',
+        choices: ['none', 'oauth', 'apikey'] as const,
+      })
+      .option('mcp-deployment', {
+        type: 'string',
+        describe: 'MCP deployment',
+        choices: ['local', 'hosted'] as const,
+      })
+      .option('mcp-stateful', {
+        type: 'boolean',
+        describe: 'MCP server persists state',
+      })
       // Game configuration options
       .option('engine', {
         type: 'string',
@@ -511,6 +548,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       .group([...ML_FLAGS], 'ML Configuration:')
       .group([...EXT_FLAGS], 'Browser Extension Configuration:')
       .group([...RESEARCH_FLAGS], 'Research Configuration:')
+      .group([...MCP_SERVER_FLAGS], 'MCP Server Configuration:')
       .group([
         'game-engine', 'game-multiplayer', 'game-target-platforms', 'game-online-services',
         'game-content-structure', 'game-economy', 'game-narrative', 'game-locales',
@@ -569,6 +607,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
           const hasMlFlag = ML_FLAGS.some((f) => argv[f] !== undefined)
           const hasExtFlag = EXT_FLAGS.some((f) => argv[f] !== undefined)
           const hasResearchFlag = RESEARCH_FLAGS.some((f) => argv[f] !== undefined)
+          const hasMcpServerFlag = MCP_SERVER_FLAGS.some((f) => argv[f] !== undefined)
 
           const detectedType = hasGameFlag
             ? 'game'
@@ -590,7 +629,9 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
                             ? 'browser-extension'
                             : hasResearchFlag
                               ? 'research'
-                              : undefined
+                              : hasMcpServerFlag
+                                ? 'mcp-server'
+                                : undefined
           const projectType = argv['project-type'] ?? detectedType
 
           result = await shutdown.withPrompt(async () => runWizard({
@@ -675,6 +716,14 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
               researchInteraction: argv['research-interaction'] as ResearchFlags['researchInteraction'],
               researchDomain: argv['research-domain'] as ResearchFlags['researchDomain'],
               researchTracking: argv['research-tracking'],
+            } : undefined,
+            mcpServerFlags: hasMcpServerFlag ? {
+              mcpLanguage: argv['mcp-language'] as McpServerFlags['mcpLanguage'],
+              mcpTransport: argv['mcp-transport'] as McpServerFlags['mcpTransport'],
+              mcpPrimitives: argv['mcp-primitives'] as McpServerFlags['mcpPrimitives'],
+              mcpAuth: argv['mcp-auth'] as McpServerFlags['mcpAuth'],
+              mcpDeployment: argv['mcp-deployment'] as McpServerFlags['mcpDeployment'],
+              mcpStateful: argv['mcp-stateful'] as McpServerFlags['mcpStateful'],
             } : undefined,
           }))
 
