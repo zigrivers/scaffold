@@ -33,18 +33,29 @@ Adds first-class support for MCP (Model Context Protocol) server projects.
 - **`mcp-tool-resource-contract` pipeline step** — New specification-phase
   step (order 835, alongside `api-contracts` at order 830) that produces an
   explicit contract document defining MCP tool schemas, resource URI patterns,
-  prompt templates, and transport constraints. Analogous to `api-contracts`
-  but scoped to MCP primitives (tools/resources/prompts) rather than HTTP
-  endpoints. The step includes a coupling validator that enforces stdio
-  cross-field rules (e.g., stdio transport must use `none` auth), ensuring the
-  contract is coherent before coding begins. Only activates for `mcp-server`
-  projects.
+  and prompt templates. Analogous to `api-contracts` but scoped to MCP
+  primitives (tools/resources/prompts) rather than HTTP endpoints. Only
+  activates for `mcp-server` projects (enabled via the overlay; declared
+  disabled in the base presets). Its output (`docs/mcp-contract.md`) is wired
+  into the downstream implementation-plan, security, eval, and test steps.
+  (The stdio cross-field invariants — e.g. stdio transport must use `none`
+  auth, and cannot be `hosted` — are enforced separately at config-parse time
+  by `McpServerConfigSchema` + the coupling validator, not by this step.)
 - **Conservative `mcp-server` detector** — The project-type auto-detector
   looks for `@modelcontextprotocol/sdk`, `mcp`, or `fastmcp` dependencies
   paired with an entrypoint that registers tools or resources; a lone MCP
   client dependency does not trigger detection, avoiding false positives.
 - **Knowledge base grows to 278 entries across 20 categories** — the new
   `mcp-server` category joins the existing nineteen.
+
+### Fixed
+
+- **README knowledge-base counts reconciled** — the hand-maintained
+  per-category entry counts in the README had drifted from the live inventory
+  over prior releases (e.g. `core` 26→35, `backend` 14→22). Realigned them with
+  the authoritative `content/guides/knowledge-freshness/` inventory while adding
+  the `mcp-server` category, so the README totals/breakdown now match the
+  generated source of truth.
 
 ## [3.32.1] — 2026-05-31
 
