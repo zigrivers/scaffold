@@ -60,7 +60,7 @@ knowledge-overrides:
   operations:
     append: [mcp-deployment-patterns, mcp-observability, mcp-versioning]
   review-operations:
-    append: [mcp-deployment-patterns, mcp-observability]
+    append: [mcp-deployment-patterns, mcp-observability, mcp-versioning]
 
   # Reviews
   review-architecture:
