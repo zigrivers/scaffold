@@ -34,27 +34,52 @@ export function getPackageRoot(): string {
   return path.resolve(path.dirname(thisFile), '..', '..')
 }
 
+/** Read the `name` field from `<dir>/package.json`, or null if absent/unreadable. */
+function readPackageName(dir: string): string | null {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'))
+    return typeof pkg?.name === 'string' ? pkg.name : null
+  } catch {
+    return null
+  }
+}
+
 /**
- * The npm package name of scaffold itself. Used to gate the project-local
- * content override (see resolveContentDir).
+ * The npm package name of the *running* scaffold, read once from its own
+ * package.json (with a literal fallback). Deriving it — rather than hardcoding
+ * — means the gate below reads "is projectRoot the same package as the scaffold
+ * that's running", which also stays correct for forks/renames.
  */
-const SCAFFOLD_PACKAGE_NAME = '@zigrivers/scaffold'
+let cachedOwnPackageName: string | undefined
+function ownPackageName(): string {
+  if (cachedOwnPackageName === undefined) {
+    cachedOwnPackageName = readPackageName(getPackageRoot()) ?? '@zigrivers/scaffold'
+  }
+  return cachedOwnPackageName
+}
 
 /**
  * True only when `dir` is scaffold's own source/install tree, detected by its
- * package.json name. This gates the dev-mode content override so that a
- * downstream project which merely happens to have a `content/` directory
- * (e.g. a scaffold-like CLI tool, whose project-structure step generates
- * `content/pipeline/` + `content/methodology/`) does NOT shadow scaffold's
- * bundled content. Without this gate the resolved pipeline silently collapses.
+ * package.json name matching the running scaffold's. This gates the dev-mode
+ * content override so that a downstream project which merely happens to have a
+ * `content/` directory (e.g. a scaffold-like CLI tool, whose project-structure
+ * step generates `content/pipeline/` + `content/methodology/`) does NOT shadow
+ * scaffold's bundled content. Without this gate the resolved pipeline silently
+ * collapses. Result is memoized per directory — this runs for every
+ * getPackage*Dir call (6+ per command) and scaffold is a short-lived process.
+ *
+ * Note: only the exact `dir` passed is checked (no upward walk). Callers pass
+ * the project root that holds `.scaffold/` and, for scaffold itself, its
+ * package.json + content/ sit at that same root.
  */
+const scaffoldRootCache = new Map<string, boolean>()
 function isScaffoldPackageRoot(dir: string): boolean {
-  try {
-    const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'))
-    return pkg?.name === SCAFFOLD_PACKAGE_NAME
-  } catch {
-    return false
+  let cached = scaffoldRootCache.get(dir)
+  if (cached === undefined) {
+    cached = readPackageName(dir) === ownPackageName()
+    scaffoldRootCache.set(dir, cached)
   }
+  return cached
 }
 
 /**
