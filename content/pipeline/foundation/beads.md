@@ -178,6 +178,12 @@ Enable when: project uses Beads task tracking methodology (user selects Beads du
 setup), or user explicitly enables structured task management. Skip when: user prefers
 GitHub Issues, Linear, or another task tracker, or explicitly declines Beads setup.
 
+Note: this step only initializes the tracker — it does **not** create your
+implementation tasks. Beads stays empty of plan tasks until the finalization step
+`/scaffold:materialize-plan-to-beads` converts `docs/implementation-plan.md` into
+Beads issues just before the build phase. An empty `bd ready` right after this
+step is therefore expected, not a problem.
+
 ## Mode Detection
 Update mode if `.beads/` contains a populated database (look for `.beads/embeddeddolt/`
 in the default embedded-Dolt layout, `.beads/dolt/` in server mode, or any `.beads/*.db`

@@ -4,6 +4,23 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **`materialize-plan-to-beads` finalization step (and build-phase preflight)**
+  that converts `docs/implementation-plan.md` into Beads issues before the build
+  phase, so Beads-enabled projects no longer reach the build phase with an empty
+  tracker (previously the build loop would either falsely report "no work" or
+  improvise issues task-by-task). The materializer runs an idempotent reconcile
+  (create/update tasks, stories, epics and their dependencies; retire removed
+  tasks; preserve in-progress/closed work) and the build prompts (`single`/`multi`
+  agent `start`/`resume`) now invoke it and claim only plan-derived issues. This
+  requires a stable-ID **Plan Output Contract** added to the planning step. The
+  step is enabled (conditional on Beads) in the `deep` and `custom` methodologies
+  and off in `mvp`. For Beads-enabled projects, the build prompts now **fail
+  closed** (rather than silently falling back to the markdown plan and re-running
+  completed work) when a `.beads/` tracker exists but `bd`/`jq` is missing or
+  older than v1.0.5 — install/upgrade `bd` (≥ v1.0.5) and `jq` to proceed.
+
 ## [3.32.1] — 2026-05-31
 
 Standardizes where parallel-agent git worktrees are created. Previously

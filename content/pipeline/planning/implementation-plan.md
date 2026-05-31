@@ -36,6 +36,79 @@ The primary mapping is Story → Task(s), with PRD as the traceability root.
 - docs/implementation-plan.md — task list with dependencies, sizing, and
   assignment recommendations
 
+## Plan Output Contract
+
+The plan is consumed not only by humans but by an automated materializer that
+upserts it into a task tracker (Beads). That tool needs **stable join keys** and
+a **machine-readable structure** to parse and reconcile against. Every plan
+therefore MUST satisfy the following contract. These rules apply at all depths
+unless a clause is explicitly marked **(deep)** — container IDs, waves, and risk
+are deep-only; stable task IDs, the per-task block, and referential integrity are
+required at **every** depth.
+
+1. **Stable task IDs.** Every task carries a unique, format-defined ID of the
+   form `T-001`, `T-002`, … (zero-padded, monotonically increasing). IDs are
+   assigned fresh in initial mode and are **never reused** — once `T-007`
+   exists, that number is retired even if the task is later removed. In update
+   mode, existing task IDs are **preserved verbatim**; new tasks take the next
+   unused number. The ID is the stable join key the materializer uses to upsert
+   idempotently, so retitling or reordering a task must never change its ID.
+
+2. **Stable container IDs (deep).** Every story carries an ID of the form
+   `S-001`, `S-002`, … and every epic an ID of the form `E-001`, `E-002`, …,
+   under the same stability rules as task IDs (unique, monotonic, never reused,
+   preserved across update-mode runs). These become the `plan_story_id` /
+   `plan_epic_id` join keys so re-runs reconcile rather than duplicate parents.
+
+3. **Per-task field block.** Each task is serialized with a per-task heading
+   plus a fenced metadata block carrying these fields:
+   - `id` — the task's `T-NNN` ID
+   - `title` — a short verb-first task name
+   - `priority` — optional; one of `P0`–`P3`
+   - `wave` — (deep) integer wave number
+   - `risk` — (deep) short risk-type string
+   - `story` / `epic` — (deep) the parent container ID(s) this task belongs to
+   - `depends_on` — list of task IDs this task depends on (the DAG edges); empty
+     list if none
+   - `acceptance_criteria` — a delimited block copied verbatim into the tracker
+     issue body
+
+4. **Per-container field block (deep).** Each story and epic is serialized in
+   the same parseable form as tasks, with a per-container heading plus a fenced
+   metadata block carrying: `id` (its `S-NNN` / `E-NNN` ID), `title`, `priority`
+   (optional), `wave` / `risk` (if assigned), and a `description` / acceptance
+   block (the container body). A story's `epic` parent is **optional** — epics
+   appear only in the deepest hierarchy, so a plan with stories but no epics has
+   stories with no `epic` parent, which is valid (not a dangling ref).
+
+5. **Canonical serialization.** Use one unambiguous markdown shape for every
+   item so the materializer has a single parsing rule: a per-item heading
+   followed immediately by a fenced key/value (e.g. `yaml`) metadata block
+   containing the fields above. Apply the identical shape to tasks **and**
+   containers. Example task block:
+
+   ```yaml
+   id: T-001
+   title: Create users table migration
+   priority: P1
+   wave: 1
+   risk: data-loss
+   story: S-002
+   depends_on: []
+   acceptance_criteria: |
+     - Migration creates a `users` table with id, email, created_at
+     - Rolling the migration back drops the table cleanly
+   ```
+
+6. **Referential integrity.** Every `story` / `epic` parent reference (on a
+   task, and the optional `epic` parent on a story) **and every `depends_on`
+   entry** must **resolve to a declared ID** in this plan — there must be **no
+   dangling refs** in either the hierarchy or the dependency graph. A dangling
+   `depends_on` would let the materializer silently skip an edge and allow tasks
+   to be claimed out of order; a dangling parent ref would orphan a task. The
+   implementation-plan **review** step validates this referential integrity (see
+   `implementation-plan-review.md`).
+
 ## Quality Criteria
 - (deep) Every architecture component has implementation tasks
 - (mvp) Every user story has implementation tasks

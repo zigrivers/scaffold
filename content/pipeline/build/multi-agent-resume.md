@@ -119,17 +119,113 @@ Recover your context by checking the current state of work:
 
 ### Beads Recovery
 
-**If Beads is configured** (`.beads/` exists):
-- `bd list --assignee "$ARGUMENTS"` — check for tasks with `in_progress` status owned by this agent
-- If a PR shows as merged, close the corresponding task: `bd close <id>`
-- If there is in-progress work, finish it (see "Resume In-Progress Work" below)
-- Otherwise, clean up and start fresh:
-  - `git fetch origin --prune && git clean -fd`
-  - Run the install command from CLAUDE.md Key Commands
-  - Atomically claim the next ready task: `TASK=$(bd ready --claim --json | jq -r '.id')` (sets `assignee=$BEADS_ACTOR` + `status=in_progress`; no race window between agents).
-- Continue working until `bd ready --claim --json` returns no task.
+The implementation plan is materialized into Beads issues by
+`/scaffold:materialize-plan-to-beads` before the build phase. A resumed build
+runs the **same defensive preflight** as the start prompt — it never claims
+against an empty or stale tracker. Under multi-agent concurrency,
+materialization is **orchestrator-only** and runs **once per wave under a
+merge-slot lock**; workers never materialize and must wait for a run-stamped
+completion signal before their first claim.
 
-**Without Beads:**
+**Step 1 — compute `beads_usable`.** `beads_usable` is true only when **all**
+hold: `.beads/` exists, `bd` is on `PATH`, `bd version` parses to **≥ 1.0.5**
+(using a macOS/BSD-safe numeric compare — split major/minor/patch and compare
+numerically, never rely on GNU `sort -V`), and `jq` is on `PATH`. Never write
+`[ -d .beads ] && bd …` as a whole command — it returns exit 1 when `.beads/` is
+absent and breaks callers under `set -e`; use an `if`.
+
+**Step 2 — route on the decision table** (this is what prevents the "empty
+tracker looks done" bug):
+
+| Condition | Action |
+|---|---|
+| `.beads/` **absent** | Non-Beads project → drive the loop from the markdown playbook/plan (see "Markdown fallback" below). Do **not** call `bd`. |
+| `.beads/` present but `beads_usable` is false (`bd`/`jq` missing or `bd` < 1.0.5) | **Fail closed.** Stop and tell the user to install/upgrade `bd` (≥ v1.0.5) and `jq`. Do **not** markdown-fall-back — Beads may already hold execution state. |
+| `beads_usable`, plan has **no** stable IDs **and** Beads holds no plan-derived issues and no non-bootstrap claimed/closed work | Genuinely legacy plan → markdown loop, emit "re-run planning to assign stable task IDs". Do **not** claim. |
+| `beads_usable`, plan has no stable IDs **but** Beads already holds plausible build work | **Fail closed** — markdown would bypass existing execution state. |
+| `beads_usable`, contract **partially present or malformed** | **Fail closed.** Do **not** markdown-fall-back. Require planning to be re-run/fixed. |
+| `beads_usable` **and a valid stable-ID contract** | **Resume your own task; orchestrator materializes once under the lock; workers wait; then claim** (see Step 3). |
+
+**Step 3 — `beads_usable` + valid contract:**
+
+**Two distinct identities.** The merge-slot needs a **per-process unique** holder
+(e.g. `agent-$$` or a UUID) so two local agents sharing one `git user.name` don't
+both think they hold the slot. The **claim/resume actor must stay stable** per
+worktree/session — resolve `BEADS_ACTOR` → `git user.name` → `$USER` (never
+empty). Use the unique value **only** for `bd merge-slot acquire/check/release`;
+keep the stable `BEADS_ACTOR` for the resume lookup and `bd ready --claim`.
+
+1. **Resume the actor's own in-flight *plan* task first.** Before claiming
+   anything new — and using the **stable** claim actor, not the per-process lock
+   identity — check for a **plan-derived** task already `in_progress` assigned to
+   you, scoped exactly like claiming:
+   `bd list --status in_progress --assignee <actor> --has-metadata-key plan_task_id --json`.
+   If one exists, continue it (see "Resume In-Progress Work" below). Scoping to
+   `plan_task_id` prevents resuming onto an unrelated manual/bootstrap issue
+   assigned to the same actor; any such non-plan in-progress work is reported
+   separately, not resumed as build work.
+2. **Reconcile merged PRs.** If a PR shows as merged, close the corresponding
+   task: `bd close <id>`.
+3. **Orchestrator-only materialization under the merge-slot lock.** Only the wave
+   orchestrator (the first agent resuming the wave) runs the materializer;
+   workers skip to step 4. The orchestrator:
+   - **Clears/overwrites any stale completion signal before acquiring the lock**,
+     so a signal left from a previous pipeline run (or a pre-update plan) can't
+     let workers race ahead of a fresh re-materialization. The **completion
+     signal must be run-stamped** — carry a `run_id` or the current plan hash
+     (e.g. a metadata flag on the project merge-slot/bootstrap bead, or a
+     workspace marker recording `run_id` / `materialized_at`).
+   - **Acquires the lock with a real acquisition loop, not a status poll** — loop
+     on `bd merge-slot acquire` itself and re-verify ownership via
+     `bd merge-slot check --json` (a released slot is `holder: null` and never
+     auto-promotes a waiter). Guard the non-zero/queued return with `|| true` and
+     release via a `trap … EXIT INT TERM`.
+   - **Once ownership is confirmed, invokes `/scaffold:materialize-plan-to-beads`**
+     (the canonical procedure — do not duplicate the four-pass logic). It is
+     idempotent and a cheap no-op when in sync. If it returns non-zero, **fail
+     closed** (do not set the signal, do not claim, do not markdown-fall-back).
+   - On success, **sets the run-stamped completion signal**, then **releases**
+     the slot.
+4. **Workers block on the run-stamped completion signal before their first
+   claim.** A released slot (`holder: null`) does **not** prove the orchestrator
+   ran — blocking on slot release alone is insufficient (a worker could
+   acquire/release before the orchestrator started). Workers wait until a signal
+   matching **this run's** `run_id`/plan-hash is present, then proceed.
+5. **Clean up and run the scoped claim loop** (using the **stable** `BEADS_ACTOR`,
+   not the per-process lock identity):
+   - `git fetch origin --prune && git clean -fd`
+   - Run the install command from CLAUDE.md Key Commands
+   - Atomically claim the next ready **plan** task:
+     `TASK=$(bd ready --claim --has-metadata-key plan_task_id --json | jq -r '.id')`
+     - Scoping to `plan_task_id` keeps the loop from ever claiming the bootstrap
+       "initialize Beads" bead or a manually-created issue.
+     - This sets `assignee=$BEADS_ACTOR` + `status=in_progress` in a single
+       round-trip — no race window between agents.
+6. Continue until the scoped claim
+   (`bd ready --claim --has-metadata-key plan_task_id --json`) returns no ready
+   task, then run the **completion check**.
+
+**Completion check (empty `bd ready` ≠ done).** An empty scoped-ready result does
+**not** mean the build is finished. On an empty result, fetch all plan-derived
+tasks (`bd list --all --limit 0 --has-metadata-key plan_task_id --json`) and
+classify the remaining non-`closed` tasks:
+
+- **All plan tasks `closed`** → genuinely **done**; exit gracefully.
+- Otherwise classify **each** remaining non-`closed` task independently — do
+  **not** short-circuit on "any task is `in_progress`". Resolve blocker statuses
+  from an **unfiltered** `bd list --all --limit 0 --json` (manual blockers carry
+  no `plan_task_id`):
+  - **advancing** — the task is itself `in_progress`, **or** a **transitive**
+    blocker (walk the chain; bound the walk, reuse `bd dep cycles`) is
+    `in_progress`.
+  - **stalled** — not `in_progress` and no transitive blocker is `in_progress`.
+- **All remaining advancing** → exit gracefully (normal multi-agent case). **Any
+  stalled** → **stop and report the stalled subset**, grouped by why (open
+  dependency, manual `blocked`, `deferred`). Unrelated global `in_progress` work
+  that blocks none of the stalled tasks does **not** suppress the report.
+
+**Markdown fallback** (only when `.beads/` is **absent**, or for a genuinely
+legacy plan per the table — never past existing Beads state):
 - Read `docs/implementation-playbook.md` as the primary task reference.
   Fall back to `docs/implementation-plan.md` when no playbook is present.
 - If a PR shows as merged, mark the corresponding task as complete in the plan/playbook
