@@ -1,15 +1,33 @@
 ---
 name: backend-api-design
-description: REST maturity levels, GraphQL schema-first design, gRPC protobuf conventions, tRPC router patterns, API versioning strategies, pagination, and filtering
-topics: [backend, api-design, rest, graphql, grpc, trpc, versioning, pagination]
+description: >-
+  REST maturity levels, GraphQL schema-first design, gRPC protobuf conventions, tRPC router patterns, API versioning
+  strategies, pagination, and filtering
+topics:
+  - backend
+  - api-design
+  - rest
+  - graphql
+  - grpc
+  - trpc
+  - versioning
+  - pagination
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2025-04-08
 version-pin: null
 sources:
   - url: https://spec.openapis.org/oas/latest.html
+    hash: sha256:15f12e539a3ac811c5f18950bc9cff296b43a22ad4d50b4db8d533f37ebc1d23
+    retrieved: 2025-04-08
   - url: https://spec.graphql.org/
+    hash: sha256:14221cbb56b50b8179803abd08a5f801ebbca98c2d97eb86b47469284a3b88cf
+    retrieved: 2025-04-08
   - url: https://www.rfc-editor.org/rfc/rfc9110.html
+    hash: sha256:d431760660ea44e130f6e919dab216df2d0b3a490567a98089267523368fe1e5
+    retrieved: 2025-04-08
   - url: https://martinfowler.com/articles/richardsonMaturityModel.html
+    hash: sha256:67fe98bd0c4572223f6973109e515fade396e29a3fc6ccb2323409392c91b501
+    retrieved: 2025-04-08
 ---
 
 API design is a long-lived contract. Every structural decision — URL shape, error format, pagination scheme, versioning strategy — is expensive to change after consumers depend on it. Design APIs from the consumer's perspective first. The best API is one where new developers can predict the shape of an endpoint they have never seen before, because every other endpoint follows the same patterns.
