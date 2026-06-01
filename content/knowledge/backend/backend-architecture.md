@@ -1,15 +1,33 @@
 ---
 name: backend-architecture
-description: Monolith vs microservices decision framework, layered architecture patterns, CQRS, event sourcing, hexagonal architecture, and service mesh considerations
-topics: [backend, architecture, microservices, monolith, cqrs, event-sourcing, hexagonal, clean-architecture]
+description: >-
+  Monolith vs microservices decision framework, layered architecture patterns, CQRS, event sourcing, hexagonal
+  architecture, and service mesh considerations
+topics:
+  - backend
+  - architecture
+  - microservices
+  - monolith
+  - cqrs
+  - event-sourcing
+  - hexagonal
+  - clean-architecture
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2025-07-17
 version-pin: null
 sources:
   - url: https://microservices.io/patterns/
+    hash: sha256:fa1ff9ebd46faa3f90ad25e7f536a78019167c61e03186be6cbb08c46367db5d
+    retrieved: 2025-07-17
   - url: https://martinfowler.com/bliki/CQRS.html
+    hash: sha256:11cf46ce308805e94e4b110016b09d004fbf8c47669a7041080f661c798b2f29
+    retrieved: 2025-07-17
   - url: https://martinfowler.com/eaaDev/EventSourcing.html
+    hash: sha256:8c266ad1f81881deac8a59d86f429a594497eac3243aa1bd5b40202ccfada596
+    retrieved: 2025-07-17
   - url: https://martinfowler.com/bliki/MonolithFirst.html
+    hash: sha256:722d8d78beddd9e0f6ff3e856eec94dfa2b9fa3bebcaaf4c9e80ccdd3c0e1446
+    retrieved: 2025-07-17
 ---
 
 Backend architecture is the set of structural decisions that determine how the system scales, how teams work independently, and how expensive future changes will be. The single most common backend architecture mistake is choosing microservices before the problem demands them. Start with the simplest architecture that solves the current problem, and evolve to complexity only when specific pain points — not hypothetical future ones — force the change.
