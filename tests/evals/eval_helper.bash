@@ -5,18 +5,32 @@ PROJECT_ROOT="${BATS_TEST_DIRNAME}/../.."
 
 # Extract a YAML frontmatter field value from a .md file.
 # Usage: extract_field "file.md" "name"
-# Returns the raw value after "fieldname: " (strips quotes).
+# Returns the raw value after "fieldname: " (strips quotes). When the field
+# has no inline value and is followed by a block-style list (e.g. "topics:"
+# then indented "  - foo" lines), the list items are returned one per line.
 extract_field() {
   local file="$1" field="$2"
   awk -v f="$field" '
-    /^---$/ { fm++; next }
+    /^---$/ { fm++; if (fm >= 2) exit; next }
     fm == 1 && $0 ~ "^"f":" {
-      sub("^"f":[ ]*", "")
-      gsub(/^["'\'']|["'\'']$/, "")
-      print
+      val = $0
+      sub("^"f":[ \t]*", "", val)
+      gsub(/^["'\'']|["'\'']$/, "", val)
+      if (val != "") { print val; exit }
+      # No inline value: collect block-style list items ("  - item").
+      while ((getline nl) > 0) {
+        if (nl ~ /^---$/) exit
+        if (nl ~ /^[[:space:]]+-[[:space:]]/) {
+          item = nl
+          sub(/^[[:space:]]+-[[:space:]]*/, "", item)
+          gsub(/^["'\'']|["'\'']$/, "", item)
+          print item
+        } else if (nl ~ /^[^[:space:]]/) {
+          exit
+        }
+      }
       exit
     }
-    fm >= 2 { exit }
   ' "$file"
 }
 
