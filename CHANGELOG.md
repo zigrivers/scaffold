@@ -4,6 +4,27 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.33.1] — 2026-06-02
+
+### Changed
+
+- **Knowledge base refresh** — re-verified 10 backend knowledge entries
+  (`backend-api-design`, `backend-architecture`, `backend-async-patterns`,
+  `backend-auth-patterns`, `backend-conventions`, `backend-data-modeling`,
+  `backend-deployment`, `backend-dev-environment`,
+  `backend-fintech-broker-integration`, `backend-fintech-compliance`) against
+  their upstream sources via the knowledge-freshness engine: stamped
+  `last-reviewed` dates and recorded per-source content hashes and retrieval
+  dates in frontmatter. Guidance content is unchanged. KB `VERSION` → 0.1.2.
+
+### Fixed
+
+- **Eval helper `extract_field`** now parses block-style YAML lists (e.g.
+  `topics:` followed by indented `- item` lines), not just inline flow arrays.
+  The freshness engine normalizes `topics` to block style, which previously
+  tripped the `knowledge-quality` eval into reporting "missing topics" for
+  refreshed entries. Inline and flow-array fields are unaffected.
+
 ## [3.33.0] — 2026-05-31
 
 ### Added
