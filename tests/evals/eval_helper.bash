@@ -17,12 +17,13 @@ extract_field() {
       sub("^"f":[ \t]*", "", val)
       gsub(/^["'\'']|["'\'']$/, "", val)
       if (val != "") { print val; exit }
-      # No inline value: collect block-style list items ("  - item").
+      # No inline value: collect block-style list items ("  - item" or,
+      # for zero-indent YAML block sequences, "- item" at column 0).
       while ((getline nl) > 0) {
         if (nl ~ /^---$/) exit
-        if (nl ~ /^[[:space:]]+-[[:space:]]/) {
+        if (nl ~ /^[[:space:]]*-[[:space:]]/) {
           item = nl
-          sub(/^[[:space:]]+-[[:space:]]*/, "", item)
+          sub(/^[[:space:]]*-[[:space:]]*/, "", item)
           gsub(/^["'\'']|["'\'']$/, "", item)
           print item
         } else if (nl ~ /^[^[:space:]]/) {
