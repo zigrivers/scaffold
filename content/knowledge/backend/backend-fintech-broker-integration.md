@@ -1,13 +1,25 @@
 ---
 name: backend-fintech-broker-integration
 description: Multi-broker adapter pattern; credential rotation; error harmonization; rate-limit management; broker-side quirks.
-topics: [backend, fintech, brokers, integration, adapter-pattern, rate-limits, credentials, retry]
+topics:
+  - backend
+  - fintech
+  - brokers
+  - integration
+  - adapter-pattern
+  - rate-limits
+  - credentials
+  - retry
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2025-04-08
 version-pin: null
 sources:
   - url: https://microservices.io/patterns/reliability/circuit-breaker.html
+    hash: sha256:a117f72fc0d279ea99d4234ea8a8cc7bdf23d7ed59d94effc6129d613518a6fa
+    retrieved: 2025-04-08
   - url: https://martinfowler.com/bliki/CircuitBreaker.html
+    hash: sha256:73239948ec03887430a4d139e384e94bc640fec894fb1dce53b56abe579c5da4
+    retrieved: 2025-04-08
 ---
 
 A fintech backend that routes orders or reads positions across more than one broker inherits the union of every broker's quirks, outages, auth schemes, and undocumented behaviors. The broker-integration layer exists to hide that mess behind one normalized internal contract so the rest of the system — risk, order lifecycle, ledger, UI — can stay clean. This doc covers the adapter contract, credential handling, error harmonization, rate-limit strategy, and the specific pitfalls that recur regardless of which brokers you connect.
