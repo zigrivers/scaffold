@@ -1,14 +1,30 @@
 ---
 name: backend-data-modeling
-description: Relational vs document modeling tradeoffs, migration strategies, connection pooling, ORM vs query builder tradeoffs, multi-tenancy patterns, and eventual consistency
-topics: [backend, data-modeling, database, migrations, orm, multi-tenancy, eventual-consistency, connection-pooling]
+description: >-
+  Relational vs document modeling tradeoffs, migration strategies, connection pooling, ORM vs query builder tradeoffs,
+  multi-tenancy patterns, and eventual consistency
+topics:
+  - backend
+  - data-modeling
+  - database
+  - migrations
+  - orm
+  - multi-tenancy
+  - eventual-consistency
+  - connection-pooling
 volatility: stable
-last-reviewed: null
+last-reviewed: 2026-05-15
 version-pin: null
 sources:
   - url: https://www.postgresql.org/docs/current/
+    hash: sha256:5fc8b49295f6c1c6a80ddab08d20f6aa2395e9804353fc4e8e8f57e77564d3f2
+    retrieved: 2026-05-15
   - url: https://martinfowler.com/articles/evodb.html
+    hash: sha256:77d7c85db8a99f4b194e89bec6e0cd14e860cce0f54475326823894ce5b3a289
+    retrieved: 2026-05-15
   - url: https://microservices.io/patterns/data/database-per-service.html
+    hash: sha256:014afb315804d3d1464b1ac4c021c0abe9ab215ee6c49745a4ed57f542b35de6
+    retrieved: 2026-05-15
 ---
 
 Data modeling decisions have the highest reversal cost of any backend choice. A schema design that seemed reasonable at launch can become an operational crisis at scale — queries that worked at 10,000 rows fail at 100 million. The goal is to match the data model to the access patterns of the application, not to normalize for its own sake or to denormalize prematurely. Design the schema with the queries in mind from day one.
