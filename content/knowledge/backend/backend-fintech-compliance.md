@@ -19,16 +19,16 @@ version-pin: PCI-DSS v4.0.1
 sources:
   - url: https://www.pcisecuritystandards.org/document_library/
     hash: sha256:60f358c5e84edcf42b22d4fac7743c26fc7993c3966d1b7d05b822068158207d
-    retrieved: 2025-06-01
+    retrieved: 2026-06-03
   - url: https://www.aicpa-cima.com/topic/audit-assurance
     hash: sha256:542f04762277b74c561607773ec55cf516701c8949effaba77a520370208ca93
-    retrieved: 2025-06-01
+    retrieved: 2026-06-03
   - url: https://www.finra.org/rules-guidance/rulebooks/finra-rules
     hash: sha256:c7fd4d25fb9d2afa323de2804858dca1f15d903c41f20857951cfd26c3fe8e74
-    retrieved: 2025-06-01
+    retrieved: 2026-06-03
   - url: https://eur-lex.europa.eu/eli/reg/2016/679/oj
     hash: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-    retrieved: 2025-06-01
+    retrieved: 2026-06-03
 ---
 
 Fintech compliance is not a checklist applied at the end — it determines schema design, deployment pipelines, and system boundaries. Most regulations apply based on what a service *touches* (cards, trades, PII), so scope reduction is the single highest-leverage design decision available to engineering. This doc covers the regulatory regimes a typical US/EU fintech encounters, the audit-trail patterns they demand, and concrete implementation choices that keep audits survivable.

@@ -15,19 +15,19 @@ version-pin: null
 sources:
   - url: https://www.rfc-editor.org/rfc/rfc6749
     hash: sha256:02ae92a3648e42ca4d613847f80748bb4833942332b8bdd9715ab8bd6de9be86
-    retrieved: 2025-05-27
+    retrieved: 2026-06-03
   - url: https://www.rfc-editor.org/rfc/rfc7519
     hash: sha256:87d39b15cf0a734dd8f39e51012fb240cf556c9327775c0101d45e5f4a9462ad
-    retrieved: 2025-05-27
+    retrieved: 2026-06-03
   - url: https://www.rfc-editor.org/rfc/rfc7636
     hash: sha256:d1a33b4db47d72168925010713fccd79fd18f4a1b7d79a7e90dc91910b344a63
-    retrieved: 2025-05-27
+    retrieved: 2026-06-03
   - url: https://openid.net/specs/openid-connect-core-1_0.html
     hash: sha256:4d016752a645e8a3c259baa4173b5a90cb6c82898ce868fc8444adde262a5aed
-    retrieved: 2025-05-27
+    retrieved: 2026-06-03
   - url: https://owasp.org/www-project-api-security/
     hash: sha256:c1ec2c9a026e41ea315128a03486f8d454ec3624c4307d38f398510e8992f846
-    retrieved: 2025-05-27
+    retrieved: 2026-06-03
 ---
 
 Authentication and authorization are the first line of defense for any backend service — mistakes here compromise the entire system, making it essential to use proven patterns like JWTs with rotation, OAuth2 with PKCE, and workload identity from the start.

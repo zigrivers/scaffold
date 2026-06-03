@@ -138,12 +138,19 @@ export function applyVerdictToEntry(
             )
           }
           s.hash = fresh
+          // The deterministic hash was just (re)computed from a fresh fetch
+          // performed DURING this audit run, so `retrieved` must reflect that
+          // fetch — the run date — rather than echoing the LLM-claimed
+          // `retrieved_at`, which can be stale. Echoing it left a freshly
+          // changed hash paired with an old retrieval date, corrupting the
+          // provenance audit trail (v3.33.2 review finding).
+          s.retrieved = verdict.audit_date
         } else {
           // Test mode (or callers that explicitly accept LLM-claimed hashes):
           // fall back to the LLM-claimed value.
           s.hash = match.content_hash
+          s.retrieved = match.retrieved_at
         }
-        s.retrieved = match.retrieved_at
       }
     }
   }
