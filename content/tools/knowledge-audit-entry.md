@@ -44,13 +44,13 @@ You are auditing a single Scaffold knowledge entry against its declared authorit
 ```json
 {
   "entry_name": "<from frontmatter>",
-  "audit_date": "<today's ISO date>",
+  "audit_date": "PENDING (harness overwrites this with the real run date — emit the literal string PENDING)",
   "model": "<your model identifier>",
   "verdict": "current | minor-drift | major-drift | superseded",
   "sources_checked": [
     {
       "url": "<exact url from {{prefetched_sources}}>",
-      "retrieved_at": "<today's ISO date>",
+      "retrieved_at": "PENDING (harness overwrites this with the real fetch date — emit the literal string PENDING)",
       "content_hash": "<exact hash from the matching {{prefetched_sources}} entry — do not recompute or invent>",
       "summary": "<one sentence summary of what the source currently says>"
     }

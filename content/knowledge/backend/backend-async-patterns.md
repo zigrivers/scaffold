@@ -11,18 +11,18 @@ topics:
   - idempotency
   - cqrs
 volatility: evolving
-last-reviewed: 2025-04-08
+last-reviewed: 2026-06-02
 version-pin: null
 sources:
   - url: https://microservices.io/patterns/data/saga.html
     hash: sha256:c42eac244bf94f8db7767ba131c1715066a2dd10beb1cd6f01e5f92e19d2f0b3
-    retrieved: 2025-04-08
+    retrieved: 2026-06-02
   - url: https://martinfowler.com/articles/patterns-of-distributed-systems/
     hash: sha256:93092f76ea34af4d60c068180a063d9fde27ab6c7b604ba42337aeed023cab86
-    retrieved: 2025-04-08
+    retrieved: 2026-06-02
   - url: https://sre.google/sre-book/handling-overload/
     hash: sha256:8ca912a82390e7f61e8bbae7baab3a74489f5068d71dee1ff24aed99375e0373
-    retrieved: 2025-04-08
+    retrieved: 2026-06-02
 ---
 
 Asynchronous patterns decouple services in time and space, enabling systems to absorb load spikes, survive partial failures, and scale independently — but they introduce delivery guarantees and consistency tradeoffs that must be designed for explicitly from the start.

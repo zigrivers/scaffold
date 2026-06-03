@@ -11,15 +11,15 @@ topics:
   - positions
   - trades
 volatility: stable
-last-reviewed: 2026-05-15
+last-reviewed: 2026-06-03
 version-pin: null
 sources:
   - url: https://www.postgresql.org/docs/current/datatype-numeric.html
     hash: sha256:1267f14a5a637a44fc5bca1eeae354212578564013e16b9db7ed41ee87bc0e08
-    retrieved: 2026-05-15
+    retrieved: 2026-06-03
   - url: https://www.iso.org/iso-4217-currency-codes.html
     hash: sha256:d0983be3fa2b0d527e3e495e83857b8bc2434f4515669a6f6bb1a45b0c6559a5
-    retrieved: 2026-05-15
+    retrieved: 2026-06-03
 ---
 
 Financial data modeling is where most fintech bugs are born: a float creeps into a money field, a currency is implied instead of stored, a tick table grows unbounded, or a `current_position` column drifts from the journal. This doc covers the non-negotiable shapes of money, quantity, and price data, and the time-series and derived-view patterns that keep a trading or banking system honest at scale.

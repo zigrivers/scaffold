@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
-import { runEntryAudit, normalizeVerdict, type Dispatcher } from './audit-runner.js'
+import { runEntryAudit, normalizeVerdict, stampVerdictRunDates, type Dispatcher } from './audit-runner.js'
 import type { AuditVerdict } from './audit-runner.js'
 
 // Use temp fixtures rather than the real on-disk entry + meta-prompt so the
@@ -238,5 +238,47 @@ describe('normalizeVerdict', () => {
   it('does not throw when proposed_changes is missing', () => {
     const v = { ...base } as unknown as AuditVerdict
     expect(() => normalizeVerdict(v)).not.toThrow()
+  })
+})
+
+describe('stampVerdictRunDates', () => {
+  it('overwrites audit_date and every source retrieved_at with the run date, leaving other fields untouched', () => {
+    const verdict: AuditVerdict = {
+      entry_name: 'x', audit_date: '2025-01-01', model: 'm',
+      verdict: 'current',
+      sources_checked: [
+        { url: 'https://a', retrieved_at: '2025-01-01', content_hash: 'h1', summary: 's1' },
+        { url: 'https://b', retrieved_at: '2024-12-31', content_hash: 'h2', summary: 's2' },
+      ],
+      findings: [], proposed_changes: [], preserve_warnings: [],
+    }
+    const out = stampVerdictRunDates(verdict, '2026-06-04')
+    expect(out.audit_date).toBe('2026-06-04')
+    expect(out.sources_checked.map((s) => s.retrieved_at)).toEqual(['2026-06-04', '2026-06-04'])
+    // Non-date fields are preserved.
+    expect(out.sources_checked.map((s) => s.content_hash)).toEqual(['h1', 'h2'])
+    expect(out.sources_checked.map((s) => s.url)).toEqual(['https://a', 'https://b'])
+    expect(out.verdict).toBe('current')
+  })
+})
+
+describe('runEntryAudit date stamping', () => {
+  it('stamps the real run date over LLM-claimed audit_date / retrieved_at', async () => {
+    // The model is asked for "<today's ISO date>" but cannot know it; the
+    // harness must overwrite both audit_date and each source retrieved_at with
+    // the actual run date so provenance (and the cadence prefilter) is truthful.
+    const dispatcher: Dispatcher = vi.fn().mockResolvedValue(JSON.stringify({
+      entry_name: 'stub', audit_date: '2025-03-09', model: 'm',
+      verdict: 'superseded',
+      sources_checked: [
+        { url: 'https://x', retrieved_at: '2025-03-09', content_hash: 'h', summary: '' },
+      ],
+      findings: [], proposed_changes: [], preserve_warnings: [],
+    }))
+    const out = await runEntryAudit(entryFile, dispatcher, {
+      promptPath: promptFile, skipPrefetch: true, now: new Date('2026-06-04T12:00:00Z'),
+    })
+    expect(out.audit_date).toBe('2026-06-04')
+    expect(out.sources_checked[0].retrieved_at).toBe('2026-06-04')
   })
 })
