@@ -18,13 +18,13 @@ last-reviewed: 2025-06-01
 version-pin: PCI-DSS v4.0.1
 sources:
   - url: https://www.pcisecuritystandards.org/document_library/
-    hash: sha256:9cb04202115fe2c3275274d93a4eb506c0f97648af0dcee12dc1da0faec0bcbf
+    hash: sha256:60f358c5e84edcf42b22d4fac7743c26fc7993c3966d1b7d05b822068158207d
     retrieved: 2025-06-01
   - url: https://www.aicpa-cima.com/topic/audit-assurance
-    hash: sha256:08d2df6fd46adb5e0c62200435b8619d9dd67228ef1c9ce5cbe19e87f048a667
+    hash: sha256:542f04762277b74c561607773ec55cf516701c8949effaba77a520370208ca93
     retrieved: 2025-06-01
   - url: https://www.finra.org/rules-guidance/rulebooks/finra-rules
-    hash: sha256:0ddd688189c919aeb3903adf06a0a727b515c9a51482c62bf9fdb77f53980e14
+    hash: sha256:c7fd4d25fb9d2afa323de2804858dca1f15d903c41f20857951cfd26c3fe8e74
     retrieved: 2025-06-01
   - url: https://eur-lex.europa.eu/eli/reg/2016/679/oj
     hash: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
