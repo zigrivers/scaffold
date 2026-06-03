@@ -5,6 +5,7 @@ import { extractKBFrontmatter } from '../core/assembly/knowledge-loader.js'
 import { getPackageRoot } from '../utils/fs.js'
 import { defaultResolver, type Resolver } from './source-url-validator.js'
 import { fetchAndHash, type FetchImpl } from './source-hash.js'
+import { todayUtcYmd } from './today.js'
 
 /**
  * Max body bytes injected per source. Caps prompt size and keeps a malicious
@@ -52,6 +53,11 @@ export interface RunEntryAuditOptions {
    * about the prefetched-sources payload. Defaults to running the prefetch.
    */
   skipPrefetch?: boolean
+  /**
+   * Override "now" for date stamping. Tests pin this for determinism; in
+   * production it defaults to the real current date. See `stampVerdictRunDates`.
+   */
+  now?: Date
 }
 
 export async function runEntryAudit(
@@ -144,7 +150,33 @@ export async function runEntryAudit(
       'Check that the dispatcher returned the meta-prompt\'s expected shape.',
     )
   }
-  return normalizeVerdict(verdict)
+  // The meta-prompt has the model emit the literal `PENDING` for audit_date /
+  // retrieved_at — it cannot know the real date, and earlier (when asked for
+  // "today's date") it emitted plausible-but-wrong values anchored near its
+  // training cutoff, varying run-to-run. Overwrite both with the actual run
+  // date so `last-reviewed` / `retrieved` provenance — and the cadence
+  // prefilter that keys off them — are truthful and deterministic.
+  return stampVerdictRunDates(normalizeVerdict(verdict), todayUtcYmd(opts?.now))
+}
+
+/**
+ * Replace the LLM-claimed `audit_date` and every `sources_checked[].retrieved_at`
+ * with the harness-measured run date (`ymd`, a UTC YYYY-MM-DD). Other fields —
+ * including each finding's `evidence_date`, which describes the external
+ * evidence rather than our review — are left untouched.
+ *
+ * INVARIANT: `runEntryAudit` prefetches every source in a single pass (see the
+ * prefetch loop above), so all sources share one fetch date and stamping them
+ * with the single run date is accurate. If a future code path ever fetches
+ * sources across day boundaries or reuses cached fetches, switch to stamping
+ * each source with its own captured fetch timestamp instead of one run date.
+ */
+export function stampVerdictRunDates(verdict: AuditVerdict, ymd: string): AuditVerdict {
+  return {
+    ...verdict,
+    audit_date: ymd,
+    sources_checked: verdict.sources_checked.map((s) => ({ ...s, retrieved_at: ymd })),
+  }
 }
 
 /**

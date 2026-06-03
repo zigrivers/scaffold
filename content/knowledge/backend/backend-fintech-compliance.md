@@ -14,7 +14,7 @@ topics:
   - audit-trail
   - gdpr
 volatility: evolving
-last-reviewed: 2025-06-01
+last-reviewed: 2026-06-02
 version-pin: PCI-DSS v4.0.1
 sources:
   - url: https://www.pcisecuritystandards.org/document_library/

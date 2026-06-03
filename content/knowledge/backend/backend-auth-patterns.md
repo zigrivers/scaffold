@@ -10,7 +10,7 @@ topics:
   - mtls
   - security
 volatility: evolving
-last-reviewed: 2025-05-27
+last-reviewed: 2026-06-02
 version-pin: null
 sources:
   - url: https://www.rfc-editor.org/rfc/rfc6749

@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process'
 import path from 'node:path'
 import yaml from 'js-yaml'
 import type { AuditVerdict } from './audit-runner.js'
+import { todayUtcYmd } from './today.js'
 
 /**
  * Pure rendering of the PR title/body for a freshness audit. Kept separate
@@ -148,13 +149,11 @@ export function renderPrBody(verdict: AuditVerdict, opts: RenderPrOptions = {}):
   ].join('\n')
 }
 
-/** UTC YYYY-MM-DD for branch naming. Separate so tests can pin the date. */
-export function todayUtcYmd(now: Date = new Date()): string {
-  const y = now.getUTCFullYear().toString().padStart(4, '0')
-  const m = (now.getUTCMonth() + 1).toString().padStart(2, '0')
-  const d = now.getUTCDate().toString().padStart(2, '0')
-  return `${y}-${m}-${d}`
-}
+// `todayUtcYmd` now lives in ./today.ts so the audit runner can share it
+// without importing this module (which would create a cycle via the
+// AuditVerdict type import). Imported above for local use; re-exported here
+// for existing importers.
+export { todayUtcYmd }
 
 /**
  * Sanitize an entry name for use as a git branch component. We never

@@ -4,6 +4,31 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.33.3] — 2026-06-03
+
+### Fixed
+
+- **Knowledge-freshness dates are now measured, not guessed.** The audit
+  meta-prompt asked the model to emit `audit_date` and per-source `retrieved_at`
+  as "today's ISO date", but the model is never told the real date and emitted
+  plausible-but-wrong values (often anchored a year+ in the past, varying
+  run-to-run). Because `last-reviewed` and `retrieved` both derive from
+  `audit_date`, the entire date provenance was unreliable — and the cadence
+  prefilter keys off `last-reviewed`, so a hallucinated past date made an entry
+  permanently "overdue" at high priority, letting already-audited entries
+  monopolize the daily audit budget and starve never-audited ones. The audit
+  runner now overwrites `audit_date` and every `retrieved_at` with the real run
+  date (`stampVerdictRunDates` + the shared `todayUtcYmd`); the meta-prompt no
+  longer asks the model for dates. `evidence_date` (a claim about external
+  evidence, not our review) is untouched.
+- **Backfilled the 12 already-audited knowledge entries** whose `last-reviewed`
+  / source `retrieved` dates were model-hallucinated, resetting them to the
+  git-verified date each was actually audited/merged (2026-06-02 for ten,
+  2026-06-03 for the two fintech entries; `backend-auth-patterns` and
+  `backend-fintech-compliance` keep their 2026-06-03 source `retrieved` from the
+  superseded re-fetch while `last-reviewed` stays 2026-06-02). KB `VERSION` →
+  0.1.6.
+
 ## [3.33.2] — 2026-06-03
 
 ### Fixed
