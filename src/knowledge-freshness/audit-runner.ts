@@ -161,10 +161,15 @@ export async function runEntryAudit(
 
 /**
  * Replace the LLM-claimed `audit_date` and every `sources_checked[].retrieved_at`
- * with the harness-measured run date (`ymd`, a UTC YYYY-MM-DD). Every source is
- * fetched during this single audit run, so they all share the run date. Other
- * fields — including each finding's `evidence_date`, which describes the
- * external evidence rather than our review — are left untouched.
+ * with the harness-measured run date (`ymd`, a UTC YYYY-MM-DD). Other fields —
+ * including each finding's `evidence_date`, which describes the external
+ * evidence rather than our review — are left untouched.
+ *
+ * INVARIANT: `runEntryAudit` prefetches every source in a single pass (see the
+ * prefetch loop above), so all sources share one fetch date and stamping them
+ * with the single run date is accurate. If a future code path ever fetches
+ * sources across day boundaries or reuses cached fetches, switch to stamping
+ * each source with its own captured fetch timestamp instead of one run date.
  */
 export function stampVerdictRunDates(verdict: AuditVerdict, ymd: string): AuditVerdict {
   return {

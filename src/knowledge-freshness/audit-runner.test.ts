@@ -283,4 +283,25 @@ describe('runEntryAudit date stamping', () => {
     expect(out.audit_date).toBe('2026-06-04')
     expect(out.sources_checked[0].retrieved_at).toBe('2026-06-04')
   })
+
+  it('accepts the literal PENDING placeholder and never lets it reach the output', async () => {
+    // The meta-prompt instructs the model to emit `PENDING` (not a date). The
+    // verdict schema validates these as plain strings (no ISO enforcement), so
+    // PENDING parses cleanly and is overwritten — it must never survive to the
+    // returned verdict (and thus never reach frontmatter).
+    const dispatcher: Dispatcher = vi.fn().mockResolvedValue(JSON.stringify({
+      entry_name: 'stub', audit_date: 'PENDING', model: 'm',
+      verdict: 'superseded',
+      sources_checked: [
+        { url: 'https://x', retrieved_at: 'PENDING', content_hash: 'h', summary: '' },
+      ],
+      findings: [], proposed_changes: [], preserve_warnings: [],
+    }))
+    const out = await runEntryAudit(entryFile, dispatcher, {
+      promptPath: promptFile, skipPrefetch: true, now: new Date('2026-06-04T00:00:00Z'),
+    })
+    expect(out.audit_date).toBe('2026-06-04')
+    expect(out.sources_checked[0].retrieved_at).toBe('2026-06-04')
+    expect(JSON.stringify(out)).not.toContain('PENDING')
+  })
 })
