@@ -4,6 +4,33 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.33.2] — 2026-06-03
+
+### Fixed
+
+- **Knowledge-freshness provenance** — in the audit-apply path, when source
+  hashes are recomputed deterministically (strict mode, the production path), a
+  source's `retrieved` date now advances to the audit run date instead of
+  echoing the model-claimed `retrieved_at`. Previously a freshly-changed hash
+  could be paired with a stale retrieval date, corrupting the provenance audit
+  trail. The `retrieved` dates on `backend-auth-patterns` and
+  `backend-fintech-compliance` (whose source hashes changed in the 2026-06-03
+  run) are corrected to match.
+
+### Changed
+
+- **Knowledge base refresh** — the knowledge-freshness engine processed four
+  backend entries. `backend-fintech-data-modeling` and `backend-fintech-ledger`
+  received their first review stamp (frontmatter normalized to block-style
+  `topics`, `last-reviewed` set, per-source `hash`/`retrieved` recorded). For
+  `backend-auth-patterns` and `backend-fintech-compliance` the engine detected
+  upstream source drift and refreshed only their source `hash`/`retrieved`
+  fingerprints to flag the change — per the superseded-source policy,
+  `last-reviewed` is intentionally left unadvanced so these entries stay queued
+  for a human re-review against the new source editions (a fingerprint refresh
+  is a drift signal, not a completed re-verification). Guidance content is
+  unchanged. KB `VERSION` → 0.1.5.
+
 ## [3.33.1] — 2026-06-02
 
 ### Changed

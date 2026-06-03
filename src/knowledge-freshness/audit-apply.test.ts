@@ -382,6 +382,43 @@ x
     expect(out).not.toContain('llm-claimed-untrusted')
   })
 
+  it('advances source retrieved to verdict.audit_date in strict mode (not the LLM-claimed retrieved_at)', () => {
+    // Regression (v3.33.2 review): strict mode recomputes each source hash from
+    // a deterministic fetch performed DURING this audit run, but `retrieved`
+    // was still echoing the LLM's `retrieved_at` — which can be stale. The
+    // result was a freshly-changed hash paired with an old retrieval date,
+    // corrupting the provenance audit trail. In strict mode `retrieved` must
+    // reflect the run date (verdict.audit_date).
+    const entry = `---
+name: x
+description: y
+topics: []
+sources:
+  - url: https://example.org/spec
+    hash: 'sha256:old'
+    retrieved: '2025-01-01'
+---
+
+## Deep Guidance
+
+x
+`
+    const verdict = {
+      entry_name: 'x', audit_date: '2026-06-03', model: 'claude-opus-4-7',
+      verdict: 'current' as const,
+      sources_checked: [
+        { url: 'https://example.org/spec', retrieved_at: '2025-01-01',
+          content_hash: 'sha256:llm', summary: '' },
+      ],
+      findings: [], proposed_changes: [], preserve_warnings: [],
+    }
+    const trustedHashes = new Map([['https://example.org/spec', 'sha256:fresh']])
+    const out = applyVerdictToEntry(entry, verdict, { trustedHashes })
+    expect(out).toMatch(/hash:\s*['"]?sha256:fresh['"]?/)
+    expect(out).toMatch(/retrieved:\s*['"]?2026-06-03['"]?/)
+    expect(out).not.toMatch(/retrieved:\s*['"]?2025-01-01['"]?/)
+  })
+
   it('throws when trustedHashes is supplied but is missing a verdict source URL', () => {
     const entry = `---
 name: x
