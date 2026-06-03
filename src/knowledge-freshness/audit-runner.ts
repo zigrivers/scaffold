@@ -155,7 +155,7 @@ export async function runEntryAudit(
   // (anchored near its training cutoff, varying run-to-run). Overwrite both
   // with the actual run date so `last-reviewed` / `retrieved` provenance — and
   // the cadence prefilter that keys off them — are truthful and deterministic.
-  return stampVerdictRunDates(normalizeVerdict(verdict), todayUtcYmd(opts.now))
+  return stampVerdictRunDates(normalizeVerdict(verdict), todayUtcYmd(opts?.now))
 }
 
 /**

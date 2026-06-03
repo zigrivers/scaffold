@@ -41,16 +41,20 @@ You are auditing a single Scaffold knowledge entry against its declared authorit
 
 ## Output (JSON only — no prose)
 
+Emit `audit_date` and every source `retrieved_at` as the exact literal string
+`PENDING` — do not guess a date. The harness measures the real run/fetch date
+and overwrites both fields after you respond.
+
 ```json
 {
   "entry_name": "<from frontmatter>",
-  "audit_date": "PENDING (harness overwrites this with the real run date — emit the literal string PENDING)",
+  "audit_date": "PENDING",
   "model": "<your model identifier>",
   "verdict": "current | minor-drift | major-drift | superseded",
   "sources_checked": [
     {
       "url": "<exact url from {{prefetched_sources}}>",
-      "retrieved_at": "PENDING (harness overwrites this with the real fetch date — emit the literal string PENDING)",
+      "retrieved_at": "PENDING",
       "content_hash": "<exact hash from the matching {{prefetched_sources}} entry — do not recompute or invent>",
       "summary": "<one sentence summary of what the source currently says>"
     }
