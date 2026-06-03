@@ -264,9 +264,11 @@ describe('stampVerdictRunDates', () => {
 
 describe('runEntryAudit date stamping', () => {
   it('stamps the real run date over LLM-claimed audit_date / retrieved_at', async () => {
-    // The model is asked for "<today's ISO date>" but cannot know it; the
-    // harness must overwrite both audit_date and each source retrieved_at with
-    // the actual run date so provenance (and the cadence prefilter) is truthful.
+    // The model emits the literal `PENDING` for these (it cannot know the
+    // date); the harness must overwrite both audit_date and each source
+    // retrieved_at with the actual run date so provenance (and the cadence
+    // prefilter) is truthful. Here the dispatcher returns stale dates to prove
+    // the overwrite happens regardless of what the model emits.
     const dispatcher: Dispatcher = vi.fn().mockResolvedValue(JSON.stringify({
       entry_name: 'stub', audit_date: '2025-03-09', model: 'm',
       verdict: 'superseded',

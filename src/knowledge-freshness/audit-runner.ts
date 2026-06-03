@@ -150,11 +150,12 @@ export async function runEntryAudit(
       'Check that the dispatcher returned the meta-prompt\'s expected shape.',
     )
   }
-  // The model is asked for "<today's ISO date>" in audit_date / retrieved_at,
-  // but it cannot know the real date and emits plausible-but-wrong values
-  // (anchored near its training cutoff, varying run-to-run). Overwrite both
-  // with the actual run date so `last-reviewed` / `retrieved` provenance — and
-  // the cadence prefilter that keys off them — are truthful and deterministic.
+  // The meta-prompt has the model emit the literal `PENDING` for audit_date /
+  // retrieved_at — it cannot know the real date, and earlier (when asked for
+  // "today's date") it emitted plausible-but-wrong values anchored near its
+  // training cutoff, varying run-to-run. Overwrite both with the actual run
+  // date so `last-reviewed` / `retrieved` provenance — and the cadence
+  // prefilter that keys off them — are truthful and deterministic.
   return stampVerdictRunDates(normalizeVerdict(verdict), todayUtcYmd(opts?.now))
 }
 
