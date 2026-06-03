@@ -14,19 +14,19 @@ last-reviewed: 2025-05-27
 version-pin: null
 sources:
   - url: https://www.rfc-editor.org/rfc/rfc6749
-    hash: sha256:728b767bd41293b9fc83f233f9f115f4aea0b044e370084d29fb1269e09615aa
+    hash: sha256:02ae92a3648e42ca4d613847f80748bb4833942332b8bdd9715ab8bd6de9be86
     retrieved: 2025-05-27
   - url: https://www.rfc-editor.org/rfc/rfc7519
-    hash: sha256:9d96b6f50503146ef45359bb95d559edca5e73924ac97790c0bf19a707644774
+    hash: sha256:87d39b15cf0a734dd8f39e51012fb240cf556c9327775c0101d45e5f4a9462ad
     retrieved: 2025-05-27
   - url: https://www.rfc-editor.org/rfc/rfc7636
-    hash: sha256:c98037dc067089b2fe04e4383f2b6356c70ccb9568dd654a15c5f31f5a0ef1eb
+    hash: sha256:d1a33b4db47d72168925010713fccd79fd18f4a1b7d79a7e90dc91910b344a63
     retrieved: 2025-05-27
   - url: https://openid.net/specs/openid-connect-core-1_0.html
     hash: sha256:4d016752a645e8a3c259baa4173b5a90cb6c82898ce868fc8444adde262a5aed
     retrieved: 2025-05-27
   - url: https://owasp.org/www-project-api-security/
-    hash: sha256:08a9c96c69b3707a812ef8f919284e21890ec73fdcea50783ce868c9d546c1bd
+    hash: sha256:c1ec2c9a026e41ea315128a03486f8d454ec3624c4307d38f398510e8992f846
     retrieved: 2025-05-27
 ---
 
