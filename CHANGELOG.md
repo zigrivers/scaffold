@@ -4,6 +4,19 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.33.2] — 2026-06-03
+
+### Changed
+
+- **Knowledge base refresh** — the knowledge-freshness engine re-verified four
+  backend entries against their upstream sources. `backend-fintech-data-modeling`
+  and `backend-fintech-ledger` received their first review stamp (frontmatter
+  normalized to block-style `topics`, `last-reviewed` set, per-source
+  `hash`/`retrieved` recorded). `backend-auth-patterns` and
+  `backend-fintech-compliance` had their recorded source content hashes
+  refreshed after upstream pages changed. Guidance content is unchanged.
+  KB `VERSION` → 0.1.4.
+
 ## [3.33.1] — 2026-06-02
 
 ### Changed
