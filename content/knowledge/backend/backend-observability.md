@@ -1,14 +1,28 @@
 ---
 name: backend-observability
 description: Structured logging, distributed tracing, RED method metrics, SLO-based alerting, and operational dashboards
-topics: [backend, observability, logging, tracing, metrics, alerting, opentelemetry, slo]
+topics:
+  - backend
+  - observability
+  - logging
+  - tracing
+  - metrics
+  - alerting
+  - opentelemetry
+  - slo
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-06-04
 version-pin: null
 sources:
   - url: https://opentelemetry.io/docs/
+    hash: sha256:706e97cb13d09d70eee19f203147c630bd13148cb8c5d60fd2a9f4452dbf1559
+    retrieved: 2026-06-04
   - url: https://sre.google/sre-book/service-level-objectives/
+    hash: sha256:449fb54ce65e05102fac46c797a08b86c5ab93ade2c70c63ae25e7648d687d7d
+    retrieved: 2026-06-04
   - url: https://sre.google/sre-book/monitoring-distributed-systems/
+    hash: sha256:ea5268bca492024a399730734132c7513b4412b10098a207f2e3090eeae1a6fe
+    retrieved: 2026-06-04
 ---
 
 Observability is the ability to answer arbitrary questions about a system's behavior using its outputs alone — without deploying new code. Investing in structured logging, distributed tracing, and SLO-based alerting before the first incident makes the difference between a 5-minute diagnosis and a 5-hour outage.
