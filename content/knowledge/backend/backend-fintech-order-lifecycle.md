@@ -1,13 +1,27 @@
 ---
 name: backend-fintech-order-lifecycle
-description: Order state machine; fills, partial fills, cancellation; event-driven order tracking; idempotency; handling "unknown" states.
-topics: [backend, fintech, orders, state-machine, fills, partial-fills, event-driven, webhooks]
+description: >-
+  Order state machine; fills, partial fills, cancellation; event-driven order tracking; idempotency; handling "unknown"
+  states.
+topics:
+  - backend
+  - fintech
+  - orders
+  - state-machine
+  - fills
+  - partial-fills
+  - event-driven
+  - webhooks
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-06-04
 version-pin: null
 sources:
   - url: https://microservices.io/patterns/data/saga.html
+    hash: sha256:c42eac244bf94f8db7767ba131c1715066a2dd10beb1cd6f01e5f92e19d2f0b3
+    retrieved: 2026-06-04
   - url: https://martinfowler.com/articles/patterns-of-distributed-systems/
+    hash: sha256:93092f76ea34af4d60c068180a063d9fde27ab6c7b604ba42337aeed023cab86
+    retrieved: 2026-06-04
 ---
 
 Orders in a trading system are long-lived, asynchronous, externally mutated objects — the exact shape of problem a disciplined state machine is built for. This doc covers the canonical states and transitions, how fills and partial fills land, why "unknown" is a real state you cannot wish away, and the reconciliation posture that keeps internal bookkeeping aligned with the broker of record.
