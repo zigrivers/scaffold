@@ -129,11 +129,27 @@ mmr review --pr 123 --channels grok claude --sync --format json
 | `mmr sessions <start\|list\|show\|end> <id>` | Manage multi-round review sessions (stored under `~/.mmr/sessions/`). |
 | `mmr config <init\|show\|validate…>` | Scaffold and inspect `.mmr.yaml` (including OSS-runtime example blocks). |
 | `mmr ack <add\|list\|rm\|prune>` | Sticky acknowledgments — silence a finding by its stable key so it stops blocking across rounds. |
+| `mmr skill install --platform <name> \| --all` | Install a "use MMR for code review" skill into a project per agent CLI: Cursor (`.cursor/rules/mmr-review.mdc`), Gemini (`GEMINI.md`), Codex + Antigravity (shared `AGENTS.md` managed block). Supports `--dry-run`, `--force`, and `--dir`. :cite[packages/mmr/src/commands/skill.ts:85] |
 
 ```bash
 # Capture a job_id from a review, then fold in an agent channel:
 mmr reconcile "$JOB_ID" --channel superpowers --input findings.json
+
+# Install the MMR review skill into the current project for one or all agent CLIs:
+mmr skill install --platform cursor
+mmr skill install --all --dry-run
 ```
+
+:::callout{type=info}
+**Each agent CLI reads its own instruction file**, so `mmr skill install` writes the
+skill in the matching convention: a dedicated `.cursor/rules/mmr-review.mdc` for
+Cursor, and an idempotent managed block (delimited by `<!-- BEGIN mmr-skill -->` and `<!-- END mmr-skill -->`) in `GEMINI.md`
+(Gemini) or `AGENTS.md` (Codex and Antigravity share the `AGENTS.md` standard, so
+both resolve to the same block). For the block-mode files, re-running rewrites only
+the managed block and leaves the rest of the file intact; the dedicated Cursor file
+is created fresh and needs `--force` to overwrite. The skill bodies are bundled with
+the package under `packages/mmr/templates/skills/` :cite[packages/mmr/templates/skills/agents/mmr-review.md:1].
+:::
 
 ## Channel architecture
 
