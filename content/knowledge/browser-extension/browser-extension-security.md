@@ -1,14 +1,29 @@
 ---
 name: browser-extension-security
-description: Content Security Policy for extensions, prohibitions on eval and inline scripts, host permissions principle of least privilege, and XSS prevention in extension UIs
-topics: [browser-extension, security, csp, xss, permissions, least-privilege, eval]
+description: >-
+  Content Security Policy for extensions, prohibitions on eval and inline scripts, host permissions principle of least
+  privilege, and XSS prevention in extension UIs
+topics:
+  - browser-extension
+  - security
+  - csp
+  - xss
+  - permissions
+  - least-privilege
+  - eval
 volatility: evolving
-last-reviewed: null
-version-pin: 'Manifest V3'
+last-reviewed: 2026-06-05
+version-pin: Manifest V3
 sources:
   - url: https://developer.chrome.com/docs/extensions/reference/manifest/content-security-policy
+    hash: sha256:e4c7c42933e4e917edd5cf2b5aa3e3d6a13f07ebdfad927d4bda567f6c8c175f
+    retrieved: 2026-06-05
   - url: https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Content_Security_Policy
+    hash: sha256:d06e2e28a6173edd2dfd58b02f2d5c5e0665a76da98dea2b4f9a8f07c2ecfb4d
+    retrieved: 2026-06-05
   - url: https://owasp.org/www-community/attacks/xss/
+    hash: sha256:e2d634a57647ee73a8aced85e0950560020e44324931468de07e36d1bba49c1d
+    retrieved: 2026-06-05
 ---
 
 Browser extensions run with elevated browser privileges compared to ordinary web pages. A compromised extension can read browsing history, intercept network requests, steal cookies, and inject content into any page it has permission to access. Security is not optional — it is a first-class requirement enforced by the browser, the store review process, and the trust of every user who installs the extension.
