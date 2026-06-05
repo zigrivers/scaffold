@@ -143,7 +143,7 @@ mmr skill install --all --dry-run
 :::callout{type=info}
 **Each agent CLI reads its own instruction file**, so `mmr skill install` writes the
 skill in the matching convention: a dedicated `.cursor/rules/mmr-review.mdc` for
-Cursor, and an idempotent `<!-- BEGIN/END mmr-skill -->` managed block in `GEMINI.md`
+Cursor, and an idempotent managed block (delimited by `<!-- BEGIN mmr-skill -->` and `<!-- END mmr-skill -->`) in `GEMINI.md`
 (Gemini) or `AGENTS.md` (Codex and Antigravity share the `AGENTS.md` standard, so
 both resolve to the same block). For the block-mode files, re-running rewrites only
 the managed block and leaves the rest of the file intact; the dedicated Cursor file
