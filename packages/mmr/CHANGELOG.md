@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [1.6.0] — 2026-06-04
+
+### Added
+- `mmr skill install` — install a "use MMR for code review" skill into a project in
+  the native convention of each agent CLI: Cursor (`.cursor/rules/mmr-review.mdc`),
+  Gemini (`GEMINI.md`), Codex and Antigravity (`AGENTS.md`). Supports `--platform`
+  (repeatable), `--all`, `--dir`, `--force`, and `--dry-run`.
+- Block-mode targets (`GEMINI.md`, `AGENTS.md`) are managed idempotently between
+  `<!-- BEGIN mmr-skill -->` / `<!-- END mmr-skill -->` delimiters, preserving
+  surrounding user content; Codex and Antigravity share the `AGENTS.md` block (the
+  install dedupes by resolved path and reports both). Skill templates are bundled
+  under `templates/skills/` and published with the package.
+
 ## [1.5.0] — 2026-05-30
 
 ### Added
