@@ -1,13 +1,26 @@
 ---
 name: browser-extension-cross-browser
-description: Using webextension-polyfill for API compatibility, manifest differences between Chrome and Firefox, browser-specific APIs, and managing a multi-browser build matrix
-topics: [browser-extension, cross-browser, firefox, chrome, webextension-polyfill, compatibility, build-matrix]
+description: >-
+  Using webextension-polyfill for API compatibility, manifest differences between Chrome and Firefox, browser-specific
+  APIs, and managing a multi-browser build matrix
+topics:
+  - browser-extension
+  - cross-browser
+  - firefox
+  - chrome
+  - webextension-polyfill
+  - compatibility
+  - build-matrix
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-06-05
 version-pin: null
 sources:
   - url: https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Browser_support_for_JavaScript_APIs
+    hash: sha256:4b0a8d2d7f7db598b7c1b745e49b32e5408a7ca6a58a99450aea1e3bd01fde60
+    retrieved: 2026-06-05
   - url: https://developer.chrome.com/docs/extensions/develop/migrate
+    hash: sha256:63ca45e8137178af34a42b750639120fe28502a27a59c476cfc77fb778f14b14
+    retrieved: 2026-06-05
 ---
 
 Browser extensions that target both Chrome and Firefox share most of their codebase, but the differences between the two platforms are significant enough to require explicit management. API namespaces differ, manifest syntax diverges in subtle ways, and some APIs exist only in Chrome or only in Firefox. A systematic cross-browser strategy prevents the "works in Chrome, broken in Firefox" class of bugs.
