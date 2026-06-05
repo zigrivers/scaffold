@@ -1,13 +1,24 @@
 ---
 name: browser-extension-project-structure
-description: Directory layout for browser extensions covering src/popup, src/content, src/background, src/options, public/icons, and _locales
-topics: [browser-extension, project-structure, file-organization, build, icons]
+description: >-
+  Directory layout for browser extensions covering src/popup, src/content, src/background, src/options, public/icons,
+  and _locales
+topics:
+  - browser-extension
+  - project-structure
+  - file-organization
+  - build
+  - icons
 volatility: evolving
-last-reviewed: null
-version-pin: 'Manifest V3'
+last-reviewed: 2026-06-05
+version-pin: Manifest V3
 sources:
   - url: https://developer.chrome.com/docs/extensions/develop
+    hash: sha256:fc24f69c0d484d9806c95229ddf1c29a1fd9a03cc81ccc9f837548725171a5ef
+    retrieved: 2026-06-05
   - url: https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Anatomy_of_a_WebExtension
+    hash: sha256:25478eeaaec350aa31f533f52c1c34042cd13a133bd5add6d23f567265ce862b
+    retrieved: 2026-06-05
 ---
 
 Browser extension project structure must account for multiple compilation targets (one bundle per execution context), static assets that bypass the build pipeline, and locale files consumed by the WebExtensions runtime. A well-organized project structure makes build configuration straightforward, keeps context-specific code isolated, and prevents accidentally importing browser APIs that are unavailable in a given context.
