@@ -1,13 +1,27 @@
 ---
 name: backend-fintech-risk-management
-description: Position limits, drawdown caps, circuit breakers, kill switches; pre-trade and post-trade risk checks; operational risk controls.
-topics: [backend, fintech, risk, position-limits, drawdown, circuit-breakers, kill-switch, pre-trade-checks]
+description: >-
+  Position limits, drawdown caps, circuit breakers, kill switches; pre-trade and post-trade risk checks; operational
+  risk controls.
+topics:
+  - backend
+  - fintech
+  - risk
+  - position-limits
+  - drawdown
+  - circuit-breakers
+  - kill-switch
+  - pre-trade-checks
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-06-04
 version-pin: null
 sources:
   - url: https://martinfowler.com/bliki/CircuitBreaker.html
+    hash: sha256:73239948ec03887430a4d139e384e94bc640fec894fb1dce53b56abe579c5da4
+    retrieved: 2026-06-04
   - url: https://microservices.io/patterns/reliability/circuit-breaker.html
+    hash: sha256:a117f72fc0d279ea99d4234ea8a8cc7bdf23d7ed59d94effc6129d613518a6fa
+    retrieved: 2026-06-04
 ---
 
 Risk management in a trading system is the set of controls that stops a bad day from becoming a catastrophic one. It lives in two places: *before* an order goes to the broker (pre-trade checks that block) and *after* fills land (post-trade monitoring that alerts, throttles, or halts). Neither half is optional, and both are exercised continuously, not just during incidents.
