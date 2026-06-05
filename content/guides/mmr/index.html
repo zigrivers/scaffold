@@ -1570,10 +1570,25 @@ mmr review --pr 123 --channels grok claude --sync --format json
 
 
 
-<table><thead><tr><th>Command</th><th>Purpose</th></tr></thead><tbody><tr><td><code>mmr reconcile &#x3C;job-id> --channel &#x3C;name> --input &#x3C;data></code></td><td>Inject an external channel's findings (e.g. the Superpowers agent) into an existing job and re-run the results pipeline. Input is a file, <code>-</code> for stdin, or inline JSON. <span class="fp" data-path="packages/mmr/src/commands/reconcile.ts:17">packages/mmr/src/commands/reconcile.ts:17</span></td></tr><tr><td><code>mmr status &#x3C;job-id></code></td><td>Per-channel status and elapsed time. Exit 0 = all complete, 1 = running, 2 = a channel failed, 5 = not found.</td></tr><tr><td><code>mmr results &#x3C;job-id> [--raw]</code></td><td>Re-run parse → reconcile → format on a completed job. Exit code reflects the verdict.</td></tr><tr><td><code>mmr jobs &#x3C;list|prune></code></td><td>List jobs, or prune old ones per <code>job_retention_days</code>.</td></tr><tr><td><code>mmr sessions &#x3C;start|list|show|end> &#x3C;id></code></td><td>Manage multi-round review sessions (stored under <code>~/.mmr/sessions/</code>).</td></tr><tr><td><code>mmr config &#x3C;init|show|validate…></code></td><td>Scaffold and inspect <code>.mmr.yaml</code> (including OSS-runtime example blocks).</td></tr><tr><td><code>mmr ack &#x3C;add|list|rm|prune></code></td><td>Sticky acknowledgments — silence a finding by its stable key so it stops blocking across rounds.</td></tr></tbody></table>
+
+
+
+
+<table><thead><tr><th>Command</th><th>Purpose</th></tr></thead><tbody><tr><td><code>mmr reconcile &#x3C;job-id> --channel &#x3C;name> --input &#x3C;data></code></td><td>Inject an external channel's findings (e.g. the Superpowers agent) into an existing job and re-run the results pipeline. Input is a file, <code>-</code> for stdin, or inline JSON. <span class="fp" data-path="packages/mmr/src/commands/reconcile.ts:17">packages/mmr/src/commands/reconcile.ts:17</span></td></tr><tr><td><code>mmr status &#x3C;job-id></code></td><td>Per-channel status and elapsed time. Exit 0 = all complete, 1 = running, 2 = a channel failed, 5 = not found.</td></tr><tr><td><code>mmr results &#x3C;job-id> [--raw]</code></td><td>Re-run parse → reconcile → format on a completed job. Exit code reflects the verdict.</td></tr><tr><td><code>mmr jobs &#x3C;list|prune></code></td><td>List jobs, or prune old ones per <code>job_retention_days</code>.</td></tr><tr><td><code>mmr sessions &#x3C;start|list|show|end> &#x3C;id></code></td><td>Manage multi-round review sessions (stored under <code>~/.mmr/sessions/</code>).</td></tr><tr><td><code>mmr config &#x3C;init|show|validate…></code></td><td>Scaffold and inspect <code>.mmr.yaml</code> (including OSS-runtime example blocks).</td></tr><tr><td><code>mmr ack &#x3C;add|list|rm|prune></code></td><td>Sticky acknowledgments — silence a finding by its stable key so it stops blocking across rounds.</td></tr><tr><td><code>mmr skill install &#x3C;--platform … | --all></code></td><td>Install a "use MMR for code review" skill into a project per agent CLI: Cursor (<code>.cursor/rules/mmr-review.mdc</code>), Gemini (<code>GEMINI.md</code>), Codex + Antigravity (shared <code>AGENTS.md</code> managed block). Supports <code>--dry-run</code>, <code>--force</code>, and <code>--dir</code>. <span class="fp" data-path="packages/mmr/src/commands/skill.ts:85">packages/mmr/src/commands/skill.ts:85</span></td></tr></tbody></table>
 <pre><code class="language-bash"># Capture a job_id from a review, then fold in an agent channel:
 mmr reconcile "$JOB_ID" --channel superpowers --input findings.json
+
+# Install the MMR review skill into the current project for one or all agent CLIs:
+mmr skill install --platform cursor
+mmr skill install --all --dry-run
 </code></pre>
+<div class="callout callout-info"><p><strong>Cursor, Codex, Gemini, and Antigravity each read a different instruction file.</strong>
+<code>mmr skill install</code> writes the skill in each one's native convention — a dedicated
+<code>.cursor/rules/*.mdc</code> for Cursor, and an idempotent <code>&#x3C;!-- BEGIN/END mmr-skill --></code>
+managed block in <code>GEMINI.md</code> (Gemini) or <code>AGENTS.md</code> (Codex and Antigravity, which
+share the <code>AGENTS.md</code> standard). Re-running only rewrites the managed block, so your
+own edits are preserved. The skill bodies are bundled with the package under
+<code>templates/skills/</code> <span class="fp" data-path="packages/mmr/src/core/skill-install.ts:35">packages/mmr/src/core/skill-install.ts:35</span>.</p></div>
 <h2 id="channel-architecture">Channel architecture</h2>
 <p>A channel is <strong>pure config data</strong> — there is no per-channel code. The dispatcher
 runs whatever <code>command</code> the channel defines, hands it the prompt, and parses its
