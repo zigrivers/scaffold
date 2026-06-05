@@ -53,11 +53,14 @@ are in Codex, `antigravity` (`agy`) when you are in Antigravity — plus every o
 installed CLI. Scope out the channel you are already running to avoid a redundant
 nested review:
 
+Pass channels space-separated (the `--channels` flag is a list, not a
+comma-separated string):
+
 ```bash
 # From Codex:
-mmr review --pr <number> --channels gemini,claude,grok,antigravity --sync --format json
+mmr review --pr <number> --channels gemini claude grok antigravity --sync --format json
 # From Antigravity (agy):
-mmr review --pr <number> --channels codex,gemini,claude,grok --sync --format json
+mmr review --pr <number> --channels codex gemini claude grok --sync --format json
 # or set channels_disabled: ["codex"] / ["antigravity"] in .mmr.yaml
 ```
 

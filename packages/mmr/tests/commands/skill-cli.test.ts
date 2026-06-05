@@ -100,6 +100,19 @@ describe('mmr skill install CLI', () => {
     }
   })
 
+  it('errors when --dir points at a file, not a directory', () => {
+    const dir = tmpDir()
+    try {
+      const filePath = path.join(dir, 'not-a-dir')
+      fs.writeFileSync(filePath, 'x')
+      const { err, exited } = runSkill({ action: 'install', dir: filePath, all: true })
+      expect(exited).toBe(1)
+      expect(err.join('\n')).toMatch(/not a directory/i)
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
   it('--all installs every platform and is idempotent', () => {
     const dir = tmpDir()
     try {

@@ -1,4 +1,6 @@
 import type { CommandModule, ArgumentsCamelCase } from 'yargs'
+import { existsSync, statSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { findProjectRoot } from '../core/project-root.js'
 import {
   SKILL_PLATFORMS,
@@ -52,7 +54,12 @@ function skillInstall(args: ArgumentsCamelCase<SkillArgs>): void {
     return
   }
 
-  const projectRoot = args.dir ? args.dir : findProjectRoot()
+  const projectRoot = args.dir ? resolve(args.dir) : findProjectRoot()
+  if (args.dir && existsSync(projectRoot) && !statSync(projectRoot).isDirectory()) {
+    console.error(`--dir is not a directory: ${projectRoot}`)
+    process.exit(1)
+    return
+  }
   const dryRun = args['dry-run'] === true
   const plan = planSkillInstall({ projectRoot, platforms, force: args.force === true })
 

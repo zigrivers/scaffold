@@ -47,15 +47,16 @@ Proceed only on `pass` or `degraded-pass`; fix blocking findings on `blocked`.
 `mmr review …` prints a job id → `mmr status <job-id>` until complete →
 `mmr results <job-id> --format markdown`.
 
-## Avoid the nested self-review
+## Scoping channels
 
-`mmr review` includes a channel for **Cursor's own underlying models** and every
-other installed CLI. When you trigger it from inside an agent, scope out the channel
-you are already running to avoid a redundant nested review:
+`mmr review` dispatches to every installed channel (Claude, Codex, Gemini, Grok,
+Antigravity). Cursor itself is not a separate channel, so there is no Cursor channel
+to exclude. To limit the review to specific channels, pass them space-separated (the
+`--channels` flag is a list, not a comma-separated string):
 
 ```bash
-mmr review --pr <number> --channels codex,gemini,claude --sync --format json
-# or set channels_disabled: [...] in .mmr.yaml
+mmr review --pr <number> --channels claude codex gemini --sync --format json
+# or set channels_disabled: ["grok"] in .mmr.yaml
 ```
 
 ## Auth

@@ -47,10 +47,11 @@ Proceed only on `pass` or `degraded-pass`; fix blocking findings on `blocked`.
 
 `mmr review` includes a channel for **Gemini** and every other installed CLI. When
 you trigger it from inside the Gemini CLI, scope out the Gemini channel to avoid a
-redundant nested review:
+redundant nested review. Pass channels space-separated (the `--channels` flag is a
+list, not a comma-separated string):
 
 ```bash
-mmr review --pr <number> --channels codex,claude,grok --sync --format json
+mmr review --pr <number> --channels codex claude grok antigravity --sync --format json
 # or set channels_disabled: ["gemini"] in .mmr.yaml
 ```
 

@@ -67,8 +67,11 @@ export function renderManagedBlock(body: string): string {
   return `${MANAGED_BEGIN}\n${body.trimEnd()}\n${MANAGED_END}\n`
 }
 
+// Greedy span from the first BEGIN to the LAST END so the whole managed region is
+// replaced even if a body documents the markers or an earlier run left duplicates;
+// `\r?` tolerates CRLF files so re-runs still match (the rewritten block uses LF).
 const blockRe = new RegExp(
-  `${escapeRe(MANAGED_BEGIN)}[\\s\\S]*?${escapeRe(MANAGED_END)}\\n?`,
+  `${escapeRe(MANAGED_BEGIN)}[\\s\\S]*${escapeRe(MANAGED_END)}\\r?\\n?`,
 )
 
 function escapeRe(s: string): string {
@@ -83,7 +86,9 @@ function escapeRe(s: string): string {
 export function upsertManagedBlock(existing: string, body: string): string {
   const block = renderManagedBlock(body)
   if (blockRe.test(existing)) {
-    return existing.replace(blockRe, block)
+    // Replacer function (not a raw string) so `$&`, `$$`, `$1`… in the body are
+    // inserted literally rather than interpreted as replacement patterns.
+    return existing.replace(blockRe, () => block)
   }
   if (existing.trim() === '') return block
   const separator = existing.endsWith('\n') ? '\n' : '\n\n'

@@ -65,6 +65,29 @@ describe('managed block helpers', () => {
     expect(second).not.toContain('v1')
     expect(second).toContain('# Notes')
   })
+
+  it('inserts body containing $-patterns literally (no replacement interpolation)', () => {
+    const body = 'price is $& and $1 and $$ literally'
+    const out = upsertManagedBlock(upsertManagedBlock('# n\n', 'old'), body)
+    expect(out).toContain('price is $& and $1 and $$ literally')
+  })
+
+  it('collapses accidental duplicate blocks into one (greedy span)', () => {
+    const dup =
+      `${MANAGED_BEGIN}\nstale-1\n${MANAGED_END}\n\nuser note\n\n${MANAGED_BEGIN}\nstale-2\n${MANAGED_END}\n`
+    const out = upsertManagedBlock(dup, 'fresh')
+    expect(out.match(new RegExp(MANAGED_BEGIN, 'g'))?.length).toBe(1)
+    expect(out).toContain('fresh')
+    expect(out).not.toContain('stale-1')
+    expect(out).not.toContain('stale-2')
+  })
+
+  it('re-matches its own block on a CRLF file (idempotent)', () => {
+    const crlf = '# Notes\r\n'
+    const first = upsertManagedBlock(crlf, 'body')
+    const second = upsertManagedBlock(first, 'body')
+    expect(second.match(new RegExp(MANAGED_BEGIN, 'g'))?.length).toBe(1)
+  })
 })
 
 describe('planSkillInstall', () => {
