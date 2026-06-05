@@ -4,6 +4,19 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.33.5] — 2026-06-05
+
+### Changed
+
+- **Knowledge freshness refresh (10 browser-extension entries).** Refreshed against
+  current upstream sources (Chrome and MDN extension docs) with measured
+  review/retrieval dates and source hashes: `browser-extension-architecture`,
+  `browser-extension-content-scripts`, `browser-extension-conventions`,
+  `browser-extension-cross-browser`, `browser-extension-dev-environment`,
+  `browser-extension-manifest`, `browser-extension-project-structure`,
+  `browser-extension-requirements`, `browser-extension-security`, and
+  `browser-extension-service-workers`. KB `VERSION` → 0.1.10.
+
 ## [3.33.4] — 2026-06-04
 
 ### Added
