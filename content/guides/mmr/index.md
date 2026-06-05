@@ -129,7 +129,7 @@ mmr review --pr 123 --channels grok claude --sync --format json
 | `mmr sessions <start\|list\|show\|end> <id>` | Manage multi-round review sessions (stored under `~/.mmr/sessions/`). |
 | `mmr config <init\|show\|validate…>` | Scaffold and inspect `.mmr.yaml` (including OSS-runtime example blocks). |
 | `mmr ack <add\|list\|rm\|prune>` | Sticky acknowledgments — silence a finding by its stable key so it stops blocking across rounds. |
-| `mmr skill install <--platform … \| --all>` | Install a "use MMR for code review" skill into a project per agent CLI: Cursor (`.cursor/rules/mmr-review.mdc`), Gemini (`GEMINI.md`), Codex + Antigravity (shared `AGENTS.md` managed block). Supports `--dry-run`, `--force`, and `--dir`. :cite[packages/mmr/src/commands/skill.ts:85] |
+| `mmr skill install --platform <name> \| --all` | Install a "use MMR for code review" skill into a project per agent CLI: Cursor (`.cursor/rules/mmr-review.mdc`), Gemini (`GEMINI.md`), Codex + Antigravity (shared `AGENTS.md` managed block). Supports `--dry-run`, `--force`, and `--dir`. :cite[packages/mmr/src/commands/skill.ts:85] |
 
 ```bash
 # Capture a job_id from a review, then fold in an agent channel:
@@ -148,7 +148,7 @@ Cursor, and an idempotent `<!-- BEGIN/END mmr-skill -->` managed block in `GEMIN
 both resolve to the same block). For the block-mode files, re-running rewrites only
 the managed block and leaves the rest of the file intact; the dedicated Cursor file
 is created fresh and needs `--force` to overwrite. The skill bodies are bundled with
-the package under `templates/skills/` :cite[packages/mmr/src/core/skill-install.ts:6].
+the package under `packages/mmr/templates/skills/` :cite[packages/mmr/templates/skills/agents/mmr-review.md:1].
 :::
 
 ## Channel architecture
