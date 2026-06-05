@@ -4,6 +4,29 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.33.4] — 2026-06-04
+
+### Added
+
+- **`mmr skill install` documented in the `mmr` reference guide.** The MMR CLI can
+  now install a "use MMR for code review" skill into a project for Cursor, Codex,
+  Gemini, and Antigravity (shipped in `@zigrivers/mmr` v1.6.0). The guide's
+  subcommand reference and a new callout cover the per-platform targets
+  (`.cursor/rules/mmr-review.mdc`; `GEMINI.md`; shared `AGENTS.md` managed block for
+  Codex + Antigravity) and the idempotent managed-block behavior. The bundled `mmr`
+  skill (`content/skills/mmr`) gains a scope note cross-referencing it and records
+  that `packages/mmr/templates/skills/` is the source of truth for those platforms.
+
+### Changed
+
+- **Knowledge freshness refresh (10 backend entries).** Refreshed against current
+  upstream sources with measured review/retrieval dates and source hashes:
+  `backend-worker-patterns`, `backend-testing`, `backend-security`,
+  `backend-requirements`, `backend-project-structure`, `backend-observability`,
+  `backend-fintech-testing`, `backend-fintech-risk-management`,
+  `backend-fintech-order-lifecycle`, and `backend-fintech-observability`.
+  KB `VERSION` → 0.1.8.
+
 ## [3.33.3] — 2026-06-03
 
 ### Fixed
