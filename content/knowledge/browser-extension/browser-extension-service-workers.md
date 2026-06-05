@@ -1,13 +1,26 @@
 ---
 name: browser-extension-service-workers
-description: Extension service worker lifecycle (install/activate), event-driven programming model, alarms API for recurring tasks, and persistent state via chrome.storage
-topics: [browser-extension, service-worker, lifecycle, alarms, chrome-storage, event-driven, background]
+description: >-
+  Extension service worker lifecycle (install/activate), event-driven programming model, alarms API for recurring tasks,
+  and persistent state via chrome.storage
+topics:
+  - browser-extension
+  - service-worker
+  - lifecycle
+  - alarms
+  - chrome-storage
+  - event-driven
+  - background
 volatility: fast-moving
-last-reviewed: null
-version-pin: 'Manifest V3'
+last-reviewed: 2026-06-05
+version-pin: Manifest V3
 sources:
   - url: https://developer.chrome.com/docs/extensions/develop/concepts/service-workers
+    hash: sha256:088fdeebf41909724c31ae64f779d25853ce91dab3d30d48fe6876beb697984a
+    retrieved: 2026-06-05
   - url: https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Background_scripts
+    hash: sha256:74c09f9ce0e40ed769c4c1128493ee5749df7b9d5359b7a815c6dfbd18069aff
+    retrieved: 2026-06-05
 ---
 
 The Manifest V3 background service worker is the most architecturally disruptive change from MV2. The persistent background page that could hold state indefinitely is gone. Service workers are event-driven and ephemeral — Chrome terminates them when idle and restarts them when events arrive. Every design decision for background logic must account for this constraint.
