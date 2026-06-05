@@ -46,6 +46,7 @@ mmr reconcile <job-id> --channel superpowers --input findings.json
 | `mmr jobs list` | List recent review jobs |
 | `mmr jobs prune` | Remove old jobs |
 | `mmr reconcile <job-id>` | Inject external findings and re-reconcile |
+| `mmr skill install` | Install a platform-specific MMR review skill into a project |
 
 ## Verdict System
 
@@ -75,6 +76,33 @@ channels:
   antigravity:        # alias: agy
     enabled: true
 ```
+
+## Installable skills
+
+`mmr skill install` drops a "use MMR for code review" skill into a project, written
+in the native convention of whichever agent CLI you run:
+
+| Platform | Target | Format |
+|----------|--------|--------|
+| `cursor` | `.cursor/rules/mmr-review.mdc` | dedicated Cursor rule file |
+| `gemini` | `GEMINI.md` | idempotent managed block |
+| `codex` | `AGENTS.md` | idempotent managed block |
+| `antigravity` | `AGENTS.md` | idempotent managed block |
+
+```bash
+mmr skill install --platform cursor        # one platform
+mmr skill install --all                     # every supported platform
+mmr skill install --all --dry-run           # preview without writing
+mmr skill install --platform cursor --force # overwrite an existing dedicated file
+```
+
+Codex and Antigravity both follow the [`AGENTS.md`](https://agents.md) standard, so
+they share one managed block in `AGENTS.md`; installing either manages the same block.
+Block-mode targets (`GEMINI.md`, `AGENTS.md`) are updated in place between
+`<!-- BEGIN mmr-skill -->` / `<!-- END mmr-skill -->` delimiters, so re-running never
+disturbs your own content. Dedicated files (Cursor) are created fresh and require
+`--force` to overwrite. By default `mmr skill install` writes into the detected project
+root (nearest `.git`); override with `--dir <path>`.
 
 ## Custom output parsers
 
