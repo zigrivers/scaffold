@@ -1,14 +1,27 @@
 ---
 name: backend-testing
 description: API integration tests, contract testing, database testing patterns, mocking external services, and load testing
-topics: [backend, testing, integration-tests, contract-testing, database-testing, mocking, load-testing]
+topics:
+  - backend
+  - testing
+  - integration-tests
+  - contract-testing
+  - database-testing
+  - mocking
+  - load-testing
 volatility: stable
-last-reviewed: null
+last-reviewed: 2026-06-04
 version-pin: null
 sources:
   - url: https://docs.pact.io/
+    hash: sha256:404a36a35476bc730dc8b0bc66ecde4eb1295c63dd9c357f30d7c60aa24e960e
+    retrieved: 2026-06-04
   - url: https://martinfowler.com/articles/practical-test-pyramid.html
+    hash: sha256:d5f669995439f1c7bb7109a8f5e52044f1b7f39e92115679518d2b762ca39eff
+    retrieved: 2026-06-04
   - url: https://martinfowler.com/bliki/ContractTest.html
+    hash: sha256:0be8475d7f5e37f771ded4b200f1ee0dadbc35480fc4a5b1b2430748922e11c8
+    retrieved: 2026-06-04
 ---
 
 Backend testing strategy determines how much confidence you have before every deploy — a well-layered test suite catches regressions at the fastest possible feedback loop while still exercising the real data layer and honoring API contracts with consumers.
