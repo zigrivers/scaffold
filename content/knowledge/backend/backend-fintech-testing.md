@@ -1,13 +1,25 @@
 ---
 name: backend-fintech-testing
 description: Deterministic backtests; financial-accuracy tests; broker sandbox testing; regulatory edge-case coverage.
-topics: [backend, fintech, testing, determinism, backtesting, sandbox, accuracy, property-based]
+topics:
+  - backend
+  - fintech
+  - testing
+  - determinism
+  - backtesting
+  - sandbox
+  - accuracy
+  - property-based
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-06-04
 version-pin: null
 sources:
   - url: https://docs.pact.io/
+    hash: sha256:404a36a35476bc730dc8b0bc66ecde4eb1295c63dd9c357f30d7c60aa24e960e
+    retrieved: 2026-06-04
   - url: https://martinfowler.com/articles/practical-test-pyramid.html
+    hash: sha256:d5f669995439f1c7bb7109a8f5e52044f1b7f39e92115679518d2b762ca39eff
+    retrieved: 2026-06-04
 ---
 
 Fintech tests have unusual requirements: bit-exact numeric accuracy, full determinism across runs and hosts, rich regulatory edge-case coverage, and realistic multi-session flows that span market-hours boundaries. A flakey fintech test is worse than no test — it hides the exact race conditions that cause real money to move incorrectly. This doc covers the patterns that keep backtests reproducible, numeric tests honest, broker integrations verifiable, and regulatory behavior exercised before it becomes an incident.
