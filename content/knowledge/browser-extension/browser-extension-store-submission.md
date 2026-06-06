@@ -1,13 +1,26 @@
 ---
 name: browser-extension-store-submission
-description: Chrome Web Store review process, AMO submission, screenshot and promotional image requirements, listing optimization, and managing version updates
-topics: [browser-extension, store-submission, chrome-web-store, amo, listing-optimization, review-process, screenshots]
+description: >-
+  Chrome Web Store review process, AMO submission, screenshot and promotional image requirements, listing optimization,
+  and managing version updates
+topics:
+  - browser-extension
+  - store-submission
+  - chrome-web-store
+  - amo
+  - listing-optimization
+  - review-process
+  - screenshots
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-06-06
 version-pin: null
 sources:
   - url: https://developer.chrome.com/docs/webstore/publish
+    hash: sha256:2007432d16c0c2815b35216b88bb385dc43f20d9890b26d86919e3a137b65db5
+    retrieved: 2026-06-06
   - url: https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/Distribution
+    hash: sha256:36cf6edeaf11509b684bdf7b21d78cb5fe0330697a34acff91903d70d33430e7
+    retrieved: 2026-06-06
 ---
 
 Store submission is the deployment step for browser extensions. Unlike web applications where you push to a server, extensions must pass store review before reaching users. Review timelines, policy requirements, and listing quality directly affect user acquisition and approval success. Understanding the process before writing the first line of code prevents costly late-stage pivots.
