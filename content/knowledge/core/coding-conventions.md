@@ -1,15 +1,25 @@
 ---
 name: coding-conventions
 description: Universal coding standards patterns across languages and linter/formatter configuration
-topics: [coding-standards, linting, formatting, naming, error-handling, code-style]
+topics:
+  - coding-standards
+  - linting
+  - formatting
+  - naming
+  - error-handling
+  - code-style
 volatility: stable
-last-reviewed: null
+last-reviewed: 2026-06-06
 version-pin: null
 sources:
   - url: https://google.github.io/styleguide/
     anchor: '#language-style-guides'
+    hash: sha256:250a15511160da60547e0daa20d398c1d0210ee4164a63001b0cc8272e3984ed
+    retrieved: 2026-06-06
   - url: https://peps.python.org/pep-0008/
     anchor: '#code-lay-out'
+    hash: sha256:8ed37af31c6b19c1384ef5c0cce501bd16d1a55d7984aed4a7d47c037ed5e7d5
+    retrieved: 2026-06-06
 ---
 
 # Coding Conventions
