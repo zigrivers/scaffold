@@ -1,15 +1,26 @@
 ---
 name: claude-md-patterns
-description: Patterns for structuring CLAUDE.md files including section organization, rule authoring, pointer patterns, and merge strategies
-topics: [claude-md, ai-configuration, rule-files, memory-management, project-setup]
+description: >-
+  Patterns for structuring CLAUDE.md files including section organization, rule authoring, pointer patterns, and merge
+  strategies
+topics:
+  - claude-md
+  - ai-configuration
+  - rule-files
+  - memory-management
+  - project-setup
 volatility: fast-moving
-last-reviewed: null
+last-reviewed: 2026-06-06
 version-pin: null
 sources:
   - url: https://docs.anthropic.com/en/docs/claude-code/memory
     anchor: '#claude-md-files'
+    hash: sha256:3353cd08f3839a74aff9f4c7622a2a75d34faac0defa4ad068fcc4e3ab3661ef
+    retrieved: 2026-06-06
   - url: https://docs.anthropic.com/en/docs/claude-code/settings
     anchor: '#configuration-precedence'
+    hash: sha256:d379bc64128b7682b55ddf28da6694e993880cb722f3c4f5f07d2468e6bbb3c0
+    retrieved: 2026-06-06
 ---
 
 # CLAUDE.md Patterns
