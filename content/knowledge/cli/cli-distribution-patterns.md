@@ -1,12 +1,25 @@
 ---
 name: cli-distribution-patterns
-description: npm, pip, and cargo publishing, Homebrew formulae, standalone binaries, Docker images, and GitHub Releases with checksums
-topics: [cli, distribution, npm, homebrew, cargo, pip, standalone-binaries, github-releases, checksums]
+description: >-
+  npm, pip, and cargo publishing, Homebrew formulae, standalone binaries, Docker images, and GitHub Releases with
+  checksums
+topics:
+  - cli
+  - distribution
+  - npm
+  - homebrew
+  - cargo
+  - pip
+  - standalone-binaries
+  - github-releases
+  - checksums
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-06-07
 version-pin: null
 sources:
   - url: https://peps.python.org/pep-0621/
+    hash: sha256:7a37a1354520a9a9f31ff547e6318d8f06fbf3c02c435caf41d3cb9306989995
+    retrieved: 2026-06-07
 ---
 
 Distribution is where many CLI projects fail: the tool works perfectly in development but is painful to install, update, or run in different environments. A well-distributed CLI reaches users through multiple channels (package manager, direct download, container) and handles updates gracefully.
