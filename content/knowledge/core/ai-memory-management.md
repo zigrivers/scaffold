@@ -1,13 +1,29 @@
 ---
 name: ai-memory-management
-description: AI memory and context management patterns for Claude Code projects including modular rules, MCP memory servers, lifecycle hooks, decision logging, and external context integration
-topics: [ai-memory, claude-code, claude-rules, mcp-servers, lifecycle-hooks, context-management, session-handoff, decision-logging, mcp-knowledge-graph, context7]
+description: >-
+  AI memory and context management patterns for Claude Code projects including modular rules, MCP memory servers,
+  lifecycle hooks, decision logging, and external context integration
+topics:
+  - ai-memory
+  - claude-code
+  - claude-rules
+  - mcp-servers
+  - lifecycle-hooks
+  - context-management
+  - session-handoff
+  - decision-logging
+  - mcp-knowledge-graph
+  - context7
 volatility: fast-moving
-last-reviewed: null
+last-reviewed: 2026-06-07
 version-pin: null
 sources:
   - url: https://modelcontextprotocol.io/specification
+    hash: sha256:ebe289f5f9ad3d8fd9eb09105a74bff6f5efdfc4cd383759f6f82cf57f3ba724
+    retrieved: 2026-06-07
   - url: https://docs.anthropic.com/en/docs/build-with-claude/memory
+    hash: sha256:e246d2cd069bcb9c7b78d437ffc1672ce45d6ae2393571c00d436e9f7e494f0f
+    retrieved: 2026-06-07
 ---
 
 # AI Memory Management
@@ -101,6 +117,163 @@ globs: ["src/**/*.ts", "src/**/*.tsx"]
 After creating rules, CLAUDE.md should use the pointer pattern:
 
 ```markdown
+## Coding Conventions
+See `docs/coding-standards.md` for full reference. Key rules in `.claude/rules/code-style.md`.
+```
+
+This replaces inline convention blocks, keeping CLAUDE.md under 200 lines (the empirically-validated adherence threshold).
+
+### Tier 2: Persistent Memory
+
+#### MCP Memory Servers
+
+The Model Context Protocol (MCP) specification (https://modelcontextprotocol.io/specification) defines the protocol for servers that provide context and capabilities to LLM applications. The specification covers server features including Resources, Prompts, and Tools, but does not prescribe specific MCP server implementations.
+
+**Configuration pattern** (`.claude/settings.json`):
+```json
+{
+  "mcpServers": {
+    "memory": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-memory"],
+      "env": {
+        "MEMORY_FILE_PATH": ".claude/memory-graph.json"
+      }
+    }
+  }
+}
+```
+
+#### Lifecycle Hooks
+
+Hooks automate memory capture at key session events:
+
+**PreCompact** (highest value) — Triggers before context compression. Logs when compaction occurs for debugging context loss.
+
+```json
+{
+  "hooks": {
+    "PreCompact": [{
+      "type": "command",
+      "command": "echo \"$(date '+%Y-%m-%d %H:%M:%S') — Context compacting\" >> .claude/compaction-log.txt",
+      "timeout": 5000
+    }]
+  }
+}
+```
+
+File-logging for compaction events:
+```json
+{
+  "hooks": {
+    "PreCompact": [{
+      "type": "command",
+      "command": "date '+%Y-%m-%d %H:%M' >> .claude/compaction-log.txt && echo 'Context compacted' >> .claude/compaction-log.txt",
+      "timeout": 5000
+    }]
+  }
+}
+```
+
+**Stop** — Triggers when a session ends. Good for capturing session-level summaries.
+
+**PreToolUse** — Triggers before tool calls. Can log decisions about file modifications. Use sparingly — high frequency means high overhead.
+
+**Hook selection guidance:**
+- Start with PreCompact only — it captures the most value with least noise
+- Hook commands must produce a side effect (write to MCP server, append to file) — echoing to `/dev/null` provides zero value
+- Add Stop if sessions frequently end with unrecorded decisions
+- Avoid PreToolUse unless you have a specific logging need — it fires constantly
+
+#### Decision Logging
+
+Decisions are the highest-value memory type because they cannot be derived from code. A decision log captures what was chosen, what was rejected, and why.
+
+**Structure:**
+```
+docs/decisions/
+  DECISIONS.md          # Index of all decisions
+  001-auth-strategy.md  # Individual decision records
+  002-database-choice.md
+```
+
+**Decision entry format:**
+```markdown
+## DEC-001: JWT over session cookies for auth
+
+**Date:** 2026-03-27
+**Context:** Need stateless auth for API-first architecture
+**Decision:** Use JWT with short-lived access tokens + refresh tokens
+**Rejected:** Session cookies (requires sticky sessions), OAuth-only (too complex for MVP)
+**Consequences:** Need token refresh logic in frontend, need secure token storage
+```
+
+This complements ADRs (which cover architecture-level decisions) by capturing day-to-day implementation decisions that would otherwise be lost between sessions.
+
+#### Session Handoff Patterns
+
+When context hits limits, structured handoff preserves continuity:
+
+1. **Before compaction**: Save current task state, open questions, and recent decisions
+2. **After compaction**: Claude Code auto-reloads CLAUDE.md and auto-memory, but loses working context
+3. **Recovery**: Agent reads decision log and memory server to reconstruct working state
+
+The `/compact` command is the natural handoff point. A PreCompact hook that saves session state ensures nothing critical is lost.
+
+### Tier 3: External Context
+
+#### Library Documentation Servers
+
+AI agents hallucinate APIs — they generate plausible but incorrect function signatures, especially for rapidly-evolving libraries. External doc servers solve this by providing current, version-specific documentation on demand.
+
+**Context7** (by Upstash) — Most popular, fetches current library docs via MCP
+- Covers major frameworks (React, Next.js, Vue, Angular, etc.)
+- Free tier: 1,000 requests/month
+- Caution: had a security vulnerability (patched) — review before enabling
+
+**Nia** (by Nozomio) — Indexes codebases + 3,000+ pre-indexed packages
+- Cross-session context persistence
+- Deep research agent for complex questions
+- Y Combinator backed, more comprehensive than Context7
+
+**Docfork** — 9,000+ libraries, MIT license
+- "Cabinets" for project-specific documentation isolation
+- Self-hostable
+
+**Configuration pattern:**
+```json
+{
+  "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp@latest"]
+    }
+  }
+}
+```
+
+**When to enable:** Projects with 3+ external dependencies, especially rapidly-evolving frameworks (React, Next.js, Svelte). Skip for standard library-only projects or well-established stable APIs.
+
+### Anti-Patterns
+
+| Anti-Pattern | Why It Fails | Instead |
+|-------------|-------------|---------|
+| Dumping entire codebase into context | Drowns signal in noise, costs tokens | Let the agent read files on demand |
+| Storing code patterns in memory | Duplicates what's in the code; goes stale | Store decisions and rationale only |
+| Huge CLAUDE.md (500+ lines) | Adherence drops sharply above 200 lines | Use .claude/rules/ for specifics |
+| Memory without structure | Unstructured notes become unsearchable noise | Use categories (decision, lesson, error) |
+| Capturing everything | Token cost with diminishing returns | Capture what can't be derived from code |
+| Multiple overlapping memory tools | Conflicting context, duplicated entries | Pick one MCP server, use it consistently |
+
+### Integration with Beads
+
+When Beads is configured, memory complements task tracking:
+- **Beads** tracks what work to do (tasks, dependencies, status)
+- **Memory** tracks how to do work better (patterns, decisions, lessons)
+- Decision log entries can reference Beads task IDs for traceability
+- `tasks/lessons.md` remains the cross-session learning file; MCP memory adds structured queryability
+- Don't duplicate: if a pattern is in `tasks/lessons.md`, don't also store it in the MCP server
+
 ## Coding Conventions
 See `docs/coding-standards.md` for full reference. Key rules in `.claude/rules/code-style.md`.
 ```
