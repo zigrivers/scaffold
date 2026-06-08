@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [1.6.1] — 2026-06-08
+
+### Fixed
+
+- **`doc-conformance` channel auth check always failed.** The auth probe ran
+  `scaffold --version`, which exits 1 on scaffold installs that don't expose a
+  `--version` flag — and 1 is in the channel's `failure_exit_codes`, so the `&&`
+  chain reported auth failure even when scaffold and Claude were both installed and
+  working. Switched the probe to the `scaffold version` subcommand, which works on
+  every scaffold release. (The channel is disabled by default, so impact was
+  limited to configs that enable `doc-conformance`.)
+
 ## [1.6.0] — 2026-06-04
 
 ### Added

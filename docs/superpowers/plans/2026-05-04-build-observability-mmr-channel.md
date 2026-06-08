@@ -491,7 +491,7 @@ Add to `BUILTIN_CHANNELS` in `packages/mmr/src/config/defaults.ts`:
     command: 'scaffold observe audit --profile=fast --scope=all --output-mode=mmr-findings',
     timeout_ms: 60_000,
     auth: {
-      check: 'scaffold --version >/dev/null 2>&1',
+      check: 'scaffold version >/dev/null 2>&1',
       recovery: 'npm install -g @zigrivers/scaffold',
     },
     output_parser: 'doc-conformance',

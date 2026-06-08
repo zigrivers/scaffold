@@ -14,7 +14,7 @@ import validateCommand from './commands/validate.js'
 import validateKnowledgeCommand from './commands/validate-knowledge.js'
 import listCommand from './commands/list.js'
 import infoCommand from './commands/info.js'
-import versionCommand from './commands/version.js'
+import versionCommand, { readPackageVersion } from './commands/version.js'
 import updateCommand from './commands/update.js'
 import dashboardCommand from './commands/dashboard.js'
 import decisionsCommand from './commands/decisions.js'
@@ -85,7 +85,11 @@ export async function runCli(argv: string[]): Promise<void> {
     .strict()
     .demandCommand(1, 'You must specify a command')
     .help()
-    .version(false)
+    // `--version` is a documented global flag (PRD F-030 / CLI contract) and a
+    // standard CLI convention. yargs handles it before demandCommand, so
+    // `scaffold --version` prints the version and exits 0. The richer `scaffold
+    // version` subcommand (latest-check, --format json) remains available.
+    .version(readPackageVersion())
     .argv
 }
 

@@ -1461,7 +1461,7 @@ The audit's PR-gate role is delivered as a 5th built-in MMR channel using MMR's 
 **Adding the doc-conformance channel:**
 - Add a new `BUILTIN_CHANNELS["doc-conformance"]` entry with:
   - `command: 'scaffold observe audit --profile=fast --scope=all --json --output-mode=mmr-findings'`
-  - `auth.check: 'scaffold --version >/dev/null 2>&1'` (no external auth)
+  - `auth.check: 'scaffold version >/dev/null 2>&1'` (no external auth)
   - `auth.recovery: 'npm install -g @zigrivers/scaffold'`
   - `output_parser: 'doc-conformance'` (a new parser added to `packages/mmr/src/parsers/`)
 - The new `--output-mode=mmr-findings` flag on `scaffold observe audit` emits the engine's `Finding[]` directly in MMR's `Finding` shape (location, severity, description, suggestion) as a JSON array on stdout. This avoids inventing a packaged channel interface and reuses MMR's existing dispatcher.
