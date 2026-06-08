@@ -1,13 +1,24 @@
 ---
 name: domain-modeling
 description: Domain-driven design patterns for identifying and modeling project domains
-topics: [ddd, domain-modeling, entities, aggregates, bounded-contexts, domain-events, value-objects]
+topics:
+  - ddd
+  - domain-modeling
+  - entities
+  - aggregates
+  - bounded-contexts
+  - domain-events
+  - value-objects
 volatility: stable
-last-reviewed: null
+last-reviewed: 2026-06-08
 version-pin: null
 sources:
   - url: https://martinfowler.com/bliki/BoundedContext.html
+    hash: sha256:5f6bbdd9567aeb45cb81d536a9e01a7636f2792ba41fa0abeff5603b74d46184
+    retrieved: 2026-06-08
   - url: https://martinfowler.com/bliki/DDD_Aggregate.html
+    hash: sha256:d0b5b35deca4e224e7c4dc131b6d15b3ae471bfb63a00aa8d96a27253540b91a
+    retrieved: 2026-06-08
 ---
 
 ## Summary
