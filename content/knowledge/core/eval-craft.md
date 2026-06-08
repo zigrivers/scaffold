@@ -1,13 +1,23 @@
 ---
 name: eval-craft
 description: Writing effective project evals that verify AI-generated code meets documented standards
-topics: [evals, verification, coverage, adherence, consistency, structure, code-quality, standards-compliance]
+topics:
+  - evals
+  - verification
+  - coverage
+  - adherence
+  - consistency
+  - structure
+  - code-quality
+  - standards-compliance
 volatility: fast-moving
-last-reviewed: null
+last-reviewed: 2026-06-08
 version-pin: null
 sources:
   - url: https://docs.anthropic.com/en/docs/test-and-evaluate/eval-tool
     anchor: '#evaluation-tool'
+    hash: sha256:422a4935ddde89b5ae96896a83b9a19043c6316ff77bb6c94067e194b818bae0
+    retrieved: 2026-06-08
 ---
 
 # Eval Craft
