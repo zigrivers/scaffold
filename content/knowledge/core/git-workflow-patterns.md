@@ -1,15 +1,28 @@
 ---
 name: git-workflow-patterns
-description: Git branching strategies, commit conventions, PR workflows, merge policies, and CI integration patterns for AI-agent-driven development
-topics: [git, branching, commits, pull-requests, ci-cd, merge-strategy, worktrees]
+description: >-
+  Git branching strategies, commit conventions, PR workflows, merge policies, and CI integration patterns for
+  AI-agent-driven development
+topics:
+  - git
+  - branching
+  - commits
+  - pull-requests
+  - ci-cd
+  - merge-strategy
+  - worktrees
 volatility: stable
-last-reviewed: null
+last-reviewed: 2026-06-08
 version-pin: null
 sources:
   - url: https://git-scm.com/docs/git-worktree
     anchor: '#_description'
+    hash: sha256:ab586ee537518edb32bab0c05a161fb2e37eaae0a0af82b99bca3e579fbd1a4b
+    retrieved: 2026-06-08
   - url: https://www.conventionalcommits.org/en/v1.0.0/
     anchor: '#specification'
+    hash: sha256:1f02d0f99e4a830daafa4cc75d92e1fe4aef50984c6c398aabd50d7c1214091f
+    retrieved: 2026-06-08
 ---
 
 # Git Workflow Patterns
