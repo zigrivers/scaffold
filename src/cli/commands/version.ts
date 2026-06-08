@@ -18,23 +18,29 @@ interface VersionArgs {
 }
 
 export function readPackageVersion(): string {
-  const __dirname = path.dirname(fileURLToPath(import.meta.url))
-  // In dist/cli/commands/version.js, package.json is at ../../package.json
-  // In src/cli/commands/version.ts (dev/test), package.json is at ../../../package.json
-  const candidates = [
-    path.resolve(__dirname, '../../package.json'),
-    path.resolve(__dirname, '../../../package.json'),
-  ]
-  for (const pkgPath of candidates) {
-    if (!fs.existsSync(pkgPath)) continue
-    try {
-      const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8')) as { version?: string }
-      if (pkg.version) return pkg.version
-    } catch {
-      // Malformed/unreadable package.json (or a mocked fs in tests): fall through
-      // to the next candidate, then to the 'unknown' fallback. readPackageVersion
-      // now feeds yargs `.version()` on every CLI invocation, so it must never throw.
+  // readPackageVersion feeds yargs `.version()` on every CLI invocation, so the
+  // entire body is guarded — including `fileURLToPath(import.meta.url)` — and any
+  // failure (malformed/unreadable package.json, mocked fs, exotic loader) falls
+  // back to 'unknown' rather than throwing.
+  try {
+    const __dirname = path.dirname(fileURLToPath(import.meta.url))
+    // In dist/cli/commands/version.js, package.json is at ../../package.json
+    // In src/cli/commands/version.ts (dev/test), package.json is at ../../../package.json
+    const candidates = [
+      path.resolve(__dirname, '../../package.json'),
+      path.resolve(__dirname, '../../../package.json'),
+    ]
+    for (const pkgPath of candidates) {
+      if (!fs.existsSync(pkgPath)) continue
+      try {
+        const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8')) as { version?: string }
+        if (pkg.version) return pkg.version
+      } catch {
+        // Malformed/unreadable/mocked candidate: try the next one.
+      }
     }
+  } catch {
+    // Outer guard for fileURLToPath/path resolution in exotic loaders.
   }
   return 'unknown'
 }

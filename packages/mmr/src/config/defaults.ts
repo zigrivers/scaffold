@@ -196,8 +196,10 @@ export const BUILTIN_CHANNELS: Record<string, SubprocessChannelParsed> = {
     env: {},
     auth: {
       // Full-profile checks invoke claude -p; verify it responds, not just that it's installed.
-      // Use the `version` subcommand: the scaffold CLI disables the `--version` flag
-      // (`.version(false)`), so `scaffold --version` exits 1 and would always fail this `&&` chain.
+      // Use the `version` subcommand (not `scaffold --version`): the subcommand works on
+      // every scaffold release, including older installs that predate the `--version` flag.
+      // (A bare `scaffold --version` exits 1 on those, which is in failure_exit_codes and
+      // would make this `&&` chain always report auth failure.)
       check: 'scaffold version >/dev/null 2>&1 && claude -p "respond with ok" 2>/dev/null',
       timeout: 20,
       failure_exit_codes: [1, 127], // 127 = command not found (scaffold or claude missing)

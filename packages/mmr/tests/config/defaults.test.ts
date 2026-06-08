@@ -22,11 +22,10 @@ describe('BUILTIN_CHANNELS — doc-conformance', () => {
     expect(BUILTIN_CHANNELS['doc-conformance']?.auth?.check).toMatch(/claude -p/)
   })
 
-  it('auth.check uses the working `scaffold version` subcommand, not the disabled `--version` flag', () => {
-    // The scaffold CLI disables the yargs version flag (`.version(false)` +
-    // `.demandCommand(1)`), so `scaffold --version` exits 1 — which is in
-    // failure_exit_codes, making the `&&` auth chain ALWAYS fail even when
-    // scaffold is installed. The check must use the `version` subcommand.
+  it('auth.check uses the cross-version `scaffold version` subcommand, not `scaffold --version`', () => {
+    // The `version` subcommand works on every scaffold release; `scaffold --version`
+    // exits 1 on older installs that predate the `--version` flag — which is in
+    // failure_exit_codes, so the `&&` auth chain would always report failure there.
     const check = BUILTIN_CHANNELS['doc-conformance']?.auth?.check ?? ''
     expect(check).not.toMatch(/scaffold\s+--version/)
     expect(check).toMatch(/scaffold version/)
