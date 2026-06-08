@@ -136,7 +136,8 @@ Minimum checklist:
   formula. Confirmed during the v3.28.0 ship. Newer Homebrew also refuses
   untrusted taps — if `brew upgrade scaffold` errors with "Refusing to load
   formula … from untrusted tap zigrivers/scaffold", run `brew trust
-  zigrivers/scaffold` once (it's the user's own tap), then re-run the upgrade.
+  zigrivers/scaffold` once (it's Scaffold's own official tap), then re-run the
+  upgrade.
   This is a local-machine policy, not a release defect; the authoritative
   success signals remain `update-homebrew.yml` green + `npm info` + `scaffold
   version`. First hit during the v3.33.7 ship.

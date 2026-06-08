@@ -321,8 +321,8 @@ Scaffold follows [semver](https://semver.org):
    - `publish.yml` succeeds in GitHub Actions
    - `update-homebrew.yml` succeeds in GitHub Actions
    - `npm info @zigrivers/scaffold version` returns the new version (npm registry propagation can take 1-5 minutes — retry after a short delay if the version doesn't appear immediately)
-   - `npx @zigrivers/scaffold --version` returns the new version from a clean directory
-   - `brew update && brew upgrade scaffold && scaffold --version` returns the new version
+   - `npx @zigrivers/scaffold version` returns the new version from a clean directory
+   - `brew update && brew upgrade scaffold && scaffold version` returns the new version
      > The `brew update` prefix is **required**. Homebrew's `brew outdated` and
      > `brew upgrade` both read from the local tap cache; without `brew update`
      > the cache stays stale and a freshly-published release will report
@@ -438,7 +438,7 @@ After publishing, verify the zero-install experience:
 ```bash
 # From a directory with no scaffold installation
 cd $(mktemp -d)
-npx @zigrivers/scaffold --version     # Should print version
+npx @zigrivers/scaffold version     # Should print version
 npx @zigrivers/scaffold init --help   # Should print init help
 ```
 
@@ -453,7 +453,7 @@ Scaffold now handles the Homebrew tap update automatically via
 
 1. Verify `publish.yml` succeeded for the tagged version
 2. Verify `update-homebrew.yml` succeeded for the same tag
-3. Verify `brew update && brew upgrade scaffold && scaffold --version` matches the npm version
+3. Verify `brew update && brew upgrade scaffold && scaffold version` matches the npm version
 
 If the Homebrew workflow fails, fix the tap update immediately or treat it as a release incident before announcing the release.
 
@@ -547,7 +547,7 @@ Each scenario follows: **Symptoms** → **Diagnosis** → **Resolution** → **V
 - *Symptoms*: The tag push succeeds and npm publish may be live, but the Homebrew workflow fails or the tap does not update.
 - *Diagnosis*: Check the `update-homebrew.yml` logs. Common causes: bad tap credentials, SHA mismatch, or a formula/install regression in `zigrivers/homebrew-scaffold`.
 - *Resolution*: Fix the failing workflow or tap formula, rerun the workflow if possible, and verify the tap points at the correct `v<version>` source tarball.
-- *Verification*: `brew update && brew upgrade scaffold && scaffold --version` returns the expected version.
+- *Verification*: `brew update && brew upgrade scaffold && scaffold version` returns the expected version.
 
 > **Lesson — concurrent-tag-push tap race (seen during the v3.29.0 + mmr-v1.4.0 dual release, 2026-05-30).**
 > `update-homebrew.yml` triggers on **both** `v*` and `mmr-v*` tags and commits the
@@ -623,7 +623,7 @@ Scaffold is a CLI tool — there is no runtime to monitor. Release health is tra
 | CI workflow health | GitHub Actions tab — check for failures on `main` | After each push to main |
 
 **Post-release verification** (within 48 hours of a release):
-1. Verify `npx @zigrivers/scaffold --version` from a clean temp directory returns the new version
+1. Verify `npx @zigrivers/scaffold version` from a clean temp directory returns the new version
 2. Run `scaffold init --help` to confirm the CLI loads without errors
 3. Check GitHub Issues for reports tagged with the new version
 4. Monitor npm download stats — a sudden drop may indicate a broken release
