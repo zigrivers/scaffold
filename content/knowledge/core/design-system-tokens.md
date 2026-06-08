@@ -1,15 +1,29 @@
 ---
 name: design-system-tokens
-description: Design token definitions, base component visual specs, dark mode patterns, and pattern library for building consistent UIs
-topics: [design-system, tokens, colors, typography, spacing, components, dark-mode, pattern-library]
+description: >-
+  Design token definitions, base component visual specs, dark mode patterns, and pattern library for building consistent
+  UIs
+topics:
+  - design-system
+  - tokens
+  - colors
+  - typography
+  - spacing
+  - components
+  - dark-mode
+  - pattern-library
 volatility: evolving
-last-reviewed: null
-version-pin: 'W3C Design Tokens Community Group Draft'
+last-reviewed: 2026-06-08
+version-pin: W3C Design Tokens Community Group Draft
 sources:
   - url: https://www.w3.org/community/design-tokens/
     anchor: '#format-module'
+    hash: sha256:a93801d1790645cc06a056d8e7b56a82fc509fc34b983f61a9d0c7c855b40679
+    retrieved: 2026-06-08
   - url: https://tr.designtokens.org/format/
     anchor: '#design-token-format'
+    hash: sha256:dc549a478159addede4fa9983998c05d3f8ca4b737a19cec738b618ddc8c46e4
+    retrieved: 2026-06-08
 ---
 
 ## Summary
