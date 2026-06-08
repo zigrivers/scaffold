@@ -767,7 +767,7 @@ The command-line interface framework. T-019 can start as soon as T-002 and T-003
 **Acceptance Criteria**:
 - [ ] `scaffold --help` lists all 15 commands with descriptions
 - [ ] `scaffold status --help` shows command-specific help
-- [ ] `scaffold --version` prints version from package.json
+- [ ] `scaffold version` prints version from package.json
 - [ ] `scaffold unknown` produces "Unknown command" error (exit code 1)
 - [ ] Global flags (--format, --auto, --verbose, --root, --force) are parsed and available to handlers
 - [ ] Each command stub handler is callable and returns exit code 0
@@ -1687,7 +1687,7 @@ Final integration testing, packaging, and validation against performance budgets
 - Create: `.npmignore`
 - Create: `scripts/prepublish.sh`
 
-**Description**: Configure npm package for distribution. Set `package.json` fields: `name` (`@scaffold-cli/scaffold`), `files` (dist/, pipeline/, knowledge/, methodology/), `bin.scaffold`, `publishConfig`, `repository`, `keywords`, `license`. Create `.npmignore` excluding tests, docs, source TypeScript. Prepublish script runs build + test. Ensure all content files (meta-prompts, KB, presets) are included in npm package. Verify `npx scaffold --version` works from fresh install. Package name `@scaffold-cli/scaffold` is provisional — confirm availability on npm before publish. CI: Create `.github/workflows/ci.yml` with jobs for lint, test, and `npm pack --dry-run` validation.
+**Description**: Configure npm package for distribution. Set `package.json` fields: `name` (`@scaffold-cli/scaffold`), `files` (dist/, pipeline/, knowledge/, methodology/), `bin.scaffold`, `publishConfig`, `repository`, `keywords`, `license`. Create `.npmignore` excluding tests, docs, source TypeScript. Prepublish script runs build + test. Ensure all content files (meta-prompts, KB, presets) are included in npm package. Verify `npx scaffold version` works from fresh install. Package name `@scaffold-cli/scaffold` is provisional — confirm availability on npm before publish. CI: Create `.github/workflows/ci.yml` with jobs for lint, test, and `npm pack --dry-run` validation.
 
 **Acceptance Criteria**:
 - [ ] `npm pack` creates tarball with dist/, pipeline/, knowledge/, methodology/
@@ -1696,7 +1696,7 @@ Final integration testing, packaging, and validation against performance budgets
 - [ ] `engines.node >= 18` specified
 - [ ] Prepublish script runs build and tests
 - [ ] Package installs and runs with `npx`
-- [ ] Distribution smoke test: `npm install -g` from packed tarball, `scaffold --version` succeeds
+- [ ] Distribution smoke test: `npm install -g` from packed tarball, `scaffold version` succeeds
 - [ ] CI job validates `npm pack --dry-run` output (no dev artifacts, all content dirs present)
 
 ---

@@ -22,6 +22,16 @@ describe('BUILTIN_CHANNELS — doc-conformance', () => {
     expect(BUILTIN_CHANNELS['doc-conformance']?.auth?.check).toMatch(/claude -p/)
   })
 
+  it('auth.check uses the working `scaffold version` subcommand, not the disabled `--version` flag', () => {
+    // The scaffold CLI disables the yargs version flag (`.version(false)` +
+    // `.demandCommand(1)`), so `scaffold --version` exits 1 — which is in
+    // failure_exit_codes, making the `&&` auth chain ALWAYS fail even when
+    // scaffold is installed. The check must use the `version` subcommand.
+    const check = BUILTIN_CHANNELS['doc-conformance']?.auth?.check ?? ''
+    expect(check).not.toMatch(/scaffold\s+--version/)
+    expect(check).toMatch(/scaffold version/)
+  })
+
   it('auth timeout is 20s to accommodate a live LLM probe', () => {
     expect(BUILTIN_CHANNELS['doc-conformance']?.auth?.timeout).toBe(20)
   })

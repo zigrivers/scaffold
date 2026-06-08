@@ -921,8 +921,8 @@ Run as part of the CI pipeline after the build step:
 | Pack dry-run | `npm pack --dry-run` | Output includes `dist/`, `pipeline/`, `knowledge/`, `methodology/`; excludes `tests/`, `docs/`, `src/*.ts` |
 | Bin entry | `npm pack --dry-run --json \| jq '.[0].files'` | `dist/cli.js` (or equivalent entry point) is present |
 | No dev artifacts | `npm pack --dry-run` | No `.env`, `.beads/`, `.scaffold/`, `.github/` in output |
-| Install smoke test | `npm install -g ./scaffold-*.tgz && scaffold --version` | Exit code 0, prints version matching `package.json` |
-| npx zero-install | `npx ./scaffold-*.tgz --version` | Exit code 0 |
+| Install smoke test | `npm install -g ./scaffold-*.tgz && scaffold version` | Exit code 0, prints version matching `package.json` |
+| npx zero-install | `npx ./scaffold-*.tgz version` | Exit code 0 |
 
 ### Homebrew Formula Verification (If Applicable)
 
@@ -936,7 +936,7 @@ If a Homebrew tap is maintained:
 ### Implementation Notes
 
 - The `npm pack` dry-run tests are fast (< 2s) and run in every CI build.
-- The install smoke test creates a temp directory, runs `npm install -g` from the packed tarball, invokes `scaffold --version`, and cleans up. This catches missing files, broken bin links, and missing runtime dependencies.
+- The install smoke test creates a temp directory, runs `npm install -g` from the packed tarball, invokes `scaffold version`, and cleans up. This catches missing files, broken bin links, and missing runtime dependencies.
 - Homebrew formula verification runs only when the tap repo is updated (separate CI).
 
 ---
