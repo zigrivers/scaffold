@@ -1,12 +1,20 @@
 ---
 name: multi-service-architecture
 description: Service boundary design, communication patterns, service discovery, and networking topology
-topics: [service-boundaries, communication-patterns, service-discovery, networking-topology, data-ownership, sync-vs-async]
+topics:
+  - service-boundaries
+  - communication-patterns
+  - service-discovery
+  - networking-topology
+  - data-ownership
+  - sync-vs-async
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-06-08
 version-pin: null
 sources:
   - url: https://docs.aws.amazon.com/whitepapers/latest/microservices-on-aws/microservices-on-aws.html
+    hash: sha256:4d499bab739ac9e54cda4a1678f1f9157d4edb75b3eaff33f31b3eef6b1a8112
+    retrieved: 2026-06-08
 ---
 
 ## Summary
