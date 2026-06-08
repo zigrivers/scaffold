@@ -235,7 +235,7 @@ jobs:
           npm pack
           tar tzf *.tgz | grep -E '^package/(dist|pipeline|knowledge|methodology)/' || exit 1
       - name: Verify CLI entry point
-        run: node dist/index.js --version
+        run: node dist/index.js version
 
   security-audit:
     runs-on: ubuntu-latest
