@@ -52,14 +52,14 @@ jobs:
       # could modify gate code on the same PR that touches knowledge files;
       # mitigated in practice by mandatory PR review.
       - name: Checkout PR HEAD
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           path: base
 
       - name: Set working directory and Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '18.17'
           cache: 'npm'
