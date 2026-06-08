@@ -14,13 +14,10 @@ All notable changes to Scaffold are documented here.
   `multi-model-research-dispatch`, `multi-model-review-dispatch`,
   `multi-service-api-contracts`, `multi-service-architecture`, and `multi-service-auth`.
   KB `VERSION` → 0.1.14.
-
-### Internal
-
-- **CI: Node 24 readiness.** Bumped `actions/checkout` and `actions/setup-node` from v4
-  to v5 across all seven workflow files ahead of GitHub's 2026-06-16 Node 20 → Node 24
-  default switch (#555, closes #468). No effect on the published package (workflow files
-  are dev-only).
+- **CI: Node 24 readiness (internal).** Bumped `actions/checkout` and `actions/setup-node`
+  from v4 to v5 across all seven workflow files ahead of GitHub's 2026-06-16 Node 20 →
+  Node 24 default switch (#555, closes #468). No effect on the published package (workflow
+  files are dev-only).
 
 ## [3.33.6] — 2026-06-07
 

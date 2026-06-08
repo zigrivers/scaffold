@@ -330,6 +330,16 @@ Scaffold follows [semver](https://semver.org):
      > tap on GitHub points at the new version. Tell users the same when they
      > report "I just ran `brew upgrade scaffold` and it didn't pick up
      > vX.Y.Z." (Confirmed during the v3.28.0 ship.)
+     >
+     > **One-time tap trust (newer Homebrew).** Recent Homebrew refuses to load
+     > formulae from third-party taps until they are trusted, so `brew upgrade
+     > scaffold` can fail with `Error: Refusing to load formula
+     > zigrivers/scaffold/scaffold from untrusted tap zigrivers/scaffold`. This
+     > is a **local-machine policy, not a release defect** — the authoritative
+     > success signals are `update-homebrew.yml` green, `npm info` showing the
+     > new version, and `scaffold version` reporting it as the latest available.
+     > Fix it once per machine with `brew trust zigrivers/scaffold`, then re-run
+     > `brew upgrade scaffold`. (First hit during the v3.33.7 ship.)
 9. **Do NOT remove `"content/"` from `package.json#files`.** The Lens I
    knowledge-root auto-detection relies on the published npm artifact
    shipping `content/knowledge/` so downstream projects can locate the
