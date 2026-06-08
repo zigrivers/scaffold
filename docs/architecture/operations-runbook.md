@@ -331,9 +331,9 @@ Scaffold follows [semver](https://semver.org):
      > report "I just ran `brew upgrade scaffold` and it didn't pick up
      > vX.Y.Z." (Confirmed during the v3.28.0 ship.)
      >
-     > **One-time tap trust (newer Homebrew).** Recent Homebrew refuses to load
-     > formulae from third-party taps until they are trusted, so `brew upgrade
-     > scaffold` can fail with `Error: Refusing to load formula
+     > **One-time tap trust (newer Homebrew).** Newer Homebrew can refuse to load
+     > a formula from an untrusted third-party tap, so `brew upgrade
+     > scaffold` may fail with `Error: Refusing to load formula
      > zigrivers/scaffold/scaffold from untrusted tap zigrivers/scaffold`. This
      > is a **local-machine policy, not a release defect** — the authoritative
      > success signals are `update-homebrew.yml` green, `npm info` showing the
