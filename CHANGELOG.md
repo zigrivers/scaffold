@@ -4,6 +4,18 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.33.6] — 2026-06-07
+
+### Changed
+
+- **Knowledge freshness refresh (10 entries across core, cli, and browser-extension).**
+  Refreshed against current upstream sources with measured review/retrieval dates and
+  source hashes: `adr-craft`, `ai-memory-management`, `api-design`,
+  `automated-review-tooling`, `claude-md-patterns`, `coding-conventions`,
+  `cli-dev-environment`, `cli-distribution-patterns`,
+  `browser-extension-store-submission`, and `browser-extension-testing`.
+  KB `VERSION` → 0.1.12.
+
 ## [3.33.5] — 2026-06-05
 
 ### Changed
