@@ -133,7 +133,14 @@ Minimum checklist:
   `brew update && brew upgrade scaffold` — the `brew update` prefix is REQUIRED:
   without it, `brew outdated` and `brew upgrade` read from the local tap cache
   and report "already installed" even when the tap on GitHub has a newer
-  formula. Confirmed during the v3.28.0 ship.
+  formula. Confirmed during the v3.28.0 ship. Newer Homebrew can also refuse a
+  formula from an untrusted tap — if `brew upgrade scaffold` errors with "Refusing to load
+  formula … from untrusted tap zigrivers/scaffold", run `brew trust
+  zigrivers/scaffold` once (it's Scaffold's own official tap), then re-run the
+  upgrade.
+  This is a local-machine policy, not a release defect; the authoritative
+  success signals remain `update-homebrew.yml` green + `npm info` + `scaffold
+  version`. First hit during the v3.33.7 ship.
 
 ## Self-Improvement
 
