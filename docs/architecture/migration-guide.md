@@ -209,7 +209,7 @@ brew install scaffold
 Verify installation:
 
 ```bash
-scaffold version
+scaffold --version
 ```
 
 ### Step 2 — Navigate to your project directory

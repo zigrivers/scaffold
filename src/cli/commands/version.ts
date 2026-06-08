@@ -17,7 +17,7 @@ interface VersionArgs {
   _fetchLatestVersion?: (name: string) => Promise<string | null>
 }
 
-function readPackageVersion(): string {
+export function readPackageVersion(): string {
   const __dirname = path.dirname(fileURLToPath(import.meta.url))
   // In dist/cli/commands/version.js, package.json is at ../../package.json
   // In src/cli/commands/version.ts (dev/test), package.json is at ../../../package.json
@@ -26,9 +26,14 @@ function readPackageVersion(): string {
     path.resolve(__dirname, '../../../package.json'),
   ]
   for (const pkgPath of candidates) {
-    if (fs.existsSync(pkgPath)) {
+    if (!fs.existsSync(pkgPath)) continue
+    try {
       const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8')) as { version?: string }
       if (pkg.version) return pkg.version
+    } catch {
+      // Malformed/unreadable package.json (or a mocked fs in tests): fall through
+      // to the next candidate, then to the 'unknown' fallback. readPackageVersion
+      // now feeds yargs `.version()` on every CLI invocation, so it must never throw.
     }
   }
   return 'unknown'

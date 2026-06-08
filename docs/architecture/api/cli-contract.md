@@ -45,6 +45,7 @@ Every command accepts the following flags in addition to its own command-specifi
 | `--auto` | boolean | Suppress all interactive prompts. Resolve decisions using safe defaults. Does **not** imply `--force` ([ADR-036](../adrs/ADR-036-auto-does-not-imply-force.md)). |
 | `--verbose` | boolean | Emit additional diagnostic output. In build commands: resolution trace (which step resolved from which layer), dependency graph edges. In runtime commands: assembly engine steps, state machine transitions, lock acquisition/release events, artifact check paths. Verbose output always goes to stderr; in `--format json` mode it appears under the `verbose` key in the JSON envelope. |
 | `--help` | boolean | Show command usage, flags, and examples. Always exits 0. |
+| `--version` | boolean | Show scaffold version string. Alias for `scaffold version`. |
 | `--root <path>` | string | Override project root detection. Uses specified directory as `.scaffold/` parent instead of searching upward. See domain model 09 Algorithm 1. |
 | `--force` | boolean | Override advisory lock contention. Usable independently of `--auto` in both interactive and non-interactive contexts. Does **not** override reset/overwrite protections — those require `--confirm-reset`. |
 
@@ -1034,6 +1035,7 @@ In JSON mode, `data` contains `{ version: string, node_version: string, platform
 
 ```bash
 scaffold version
+scaffold --version   # Global flag alias
 scaffold version --format json
 ```
 
