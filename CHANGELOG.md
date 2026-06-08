@@ -4,6 +4,17 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.34.0] — 2026-06-08
+
+### Added
+
+- **`scaffold --version` global flag.** The CLI now supports the documented
+  `--version` flag (PRD F-030 / CLI contract): `scaffold --version` prints the
+  package version and exits 0. Previously the flag was disabled (`.version(false)`),
+  so it fell through to "You must specify a command" and exited 1. The richer
+  `scaffold version` subcommand (Node version, update check, `--format json`)
+  is unchanged.
+
 ## [3.33.7] — 2026-06-08
 
 ### Changed
