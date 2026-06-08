@@ -1,13 +1,25 @@
 ---
 name: multi-model-review-dispatch
-description: Patterns for dispatching reviews to AI CLI tools (Codex, Gemini, Claude), including fallback strategies and finding reconciliation
-topics: [multi-model, code-review, codex, gemini, claude, review-synthesis]
+description: >-
+  Patterns for dispatching reviews to AI CLI tools (Codex, Gemini, Claude), including fallback strategies and finding
+  reconciliation
+topics:
+  - multi-model
+  - code-review
+  - codex
+  - gemini
+  - claude
+  - review-synthesis
 volatility: fast-moving
-last-reviewed: null
+last-reviewed: 2026-06-08
 version-pin: null
 sources:
   - url: https://ai.google.dev/gemini-api/docs
+    hash: sha256:7039ac6e2ce9e12c83e0a6d2d48b94dde4fd498ee213582ea4fee57c30bf11bf
+    retrieved: 2026-06-08
   - url: https://docs.anthropic.com/en/docs/claude-code/cli-reference
+    hash: sha256:5bb925357a3d47aa312938c71d8ea742cf89ef77ad3727142e603cf3f7d0f096
+    retrieved: 2026-06-08
 ---
 
 # Multi-Model Review Dispatch
