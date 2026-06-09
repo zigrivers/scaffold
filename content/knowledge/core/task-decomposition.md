@@ -1,12 +1,21 @@
 ---
 name: task-decomposition
 description: Breaking architecture into implementable tasks with dependency analysis and agent context
-topics: [tasks, decomposition, dependencies, user-stories, parallelization, sizing, critical-path]
+topics:
+  - tasks
+  - decomposition
+  - dependencies
+  - user-stories
+  - parallelization
+  - sizing
+  - critical-path
 volatility: stable
-last-reviewed: null
+last-reviewed: 2026-06-09
 version-pin: null
 sources:
   - url: https://github.com/steveyegge/beads
+    hash: sha256:0e5d40a6a1521276e0d8d65a234b8b448bcd1fc62d3cc54aabeae3a25843104d
+    retrieved: 2026-06-09
 ---
 
 # Task Decomposition
