@@ -1,15 +1,23 @@
 ---
 name: multi-service-task-decomposition
 description: Breaking multi-service work into per-service implementation waves
-topics: [per-service-waves, dependency-ordering, parallel-implementation, shared-infrastructure-first]
+topics:
+  - per-service-waves
+  - dependency-ordering
+  - parallel-implementation
+  - shared-infrastructure-first
 volatility: stable
-last-reviewed: null
+last-reviewed: 2026-06-09
 version-pin: null
 sources:
   - url: https://martinfowler.com/articles/microservices.html
     anchor: '#OrganizedAroundBusinessCapabilities'
+    hash: sha256:233a8191fa608095d40dbf461497b8f23601cdec9b1b7f08639e8b085abea7b0
+    retrieved: 2026-06-09
   - url: https://microservices.io/patterns/decomposition/decompose-by-business-capability.html
     anchor: '#solution'
+    hash: sha256:c5ae7c88e4a4796b192a7abf72808094372ff7ba425ecd2c81ea5433fc113889
+    retrieved: 2026-06-09
 ---
 
 ## Summary
