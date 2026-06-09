@@ -1,15 +1,24 @@
 ---
 name: multi-service-data-ownership
 description: Table ownership, shared-nothing data patterns, and event-driven synchronization
-topics: [table-ownership, shared-nothing, event-driven-sync, data-partitioning, eventual-consistency]
+topics:
+  - table-ownership
+  - shared-nothing
+  - event-driven-sync
+  - data-partitioning
+  - eventual-consistency
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-06-09
 version-pin: null
 sources:
   - url: https://martinfowler.com/articles/microservices.html
     anchor: '#DecentralizedDataManagement'
+    hash: sha256:233a8191fa608095d40dbf461497b8f23601cdec9b1b7f08639e8b085abea7b0
+    retrieved: 2026-06-09
   - url: https://microservices.io/patterns/data/database-per-service.html
     anchor: '#solution'
+    hash: sha256:014afb315804d3d1464b1ac4c021c0abe9ab215ee6c49745a4ed57f542b35de6
+    retrieved: 2026-06-09
 ---
 
 ## Summary
