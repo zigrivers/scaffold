@@ -1,13 +1,23 @@
 ---
 name: system-architecture
 description: Architecture patterns, component design, and project structure
-topics: [architecture, components, modules, data-flow, project-structure, state-management]
+topics:
+  - architecture
+  - components
+  - modules
+  - data-flow
+  - project-structure
+  - state-management
 volatility: stable
-last-reviewed: null
+last-reviewed: 2026-06-10
 version-pin: null
 sources:
   - url: https://martinfowler.com/articles/microservices.html
+    hash: sha256:233a8191fa608095d40dbf461497b8f23601cdec9b1b7f08639e8b085abea7b0
+    retrieved: 2026-06-10
   - url: https://microservices.io/patterns/index.html
+    hash: sha256:fa1ff9ebd46faa3f90ad25e7f536a78019167c61e03186be6cbb08c46367db5d
+    retrieved: 2026-06-10
 ---
 
 ## Summary
