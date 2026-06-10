@@ -7,6 +7,7 @@ import { deriveBumpKind, bumpSemver } from '../../knowledge-freshness/bump-versi
 interface BumpVersionArgs {
   title: string
   body: string
+  count: number
 }
 
 // Local-only explainability subcommand. Reads content/knowledge/VERSION, derives
@@ -26,15 +27,23 @@ const bumpVersionCommand: CommandModule<Record<string, unknown>, BumpVersionArgs
         type: 'string',
         default: '',
         describe: 'Simulated PR body (defaults to empty)',
+      })
+      .option('count', {
+        type: 'number',
+        default: 1,
+        describe:
+          'Catch-up multiplier for patch bumps (number of un-bumped refresh ' +
+          'commits this run owes). Ignored for minor/major.',
       }) as unknown as Argv<BumpVersionArgs>,
   handler: (argv) => {
     const cwd = findProjectRoot(process.cwd()) ?? process.cwd()
     const versionPath = join(cwd, 'content', 'knowledge', 'VERSION')
     const current = readFileSync(versionPath, 'utf8').trim()
     const kind = deriveBumpKind(argv.title, argv.body)
-    const next = bumpSemver(current, kind)
+    const next = bumpSemver(current, kind, argv.count)
     process.stdout.write(`current: ${current}\n`)
     process.stdout.write(`bump:    ${kind}\n`)
+    process.stdout.write(`count:   ${argv.count}\n`)
     process.stdout.write(`next:    ${next}\n`)
   },
 }

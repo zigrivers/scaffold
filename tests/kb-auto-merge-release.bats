@@ -88,6 +88,21 @@ JSON
   echo "$output" | jq -e '.merge[0].number == 2'
 }
 
+@test "plan: ALLOW_AUTHOR is a space-separated allowlist (accepts app/github-actions OR github-actions[bot])" {
+  # The Actions bot login renders as either form across gh versions/contexts;
+  # both must be accepted, while a non-listed author is still rejected.
+  run env ALLOW_AUTHOR='app/github-actions github-actions[bot]' bash "$PLAN" <<'JSON'
+[
+  {"number":1,"headRefName":"knowledge-freshness/a-2026-06-09","createdAt":"2026-06-09T00:00:00Z","author":{"login":"app/github-actions"}},
+  {"number":2,"headRefName":"knowledge-freshness/b-2026-06-09","createdAt":"2026-06-09T00:00:00Z","author":{"login":"github-actions[bot]"}},
+  {"number":3,"headRefName":"knowledge-freshness/c-2026-06-09","createdAt":"2026-06-09T00:00:00Z","author":{"login":"mallory"}}
+]
+JSON
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '[.merge[].number] | sort == [1,2]'
+  echo "$output" | jq -e '[.merge[],.close[]] | map(.number) | index(3) == null'
+}
+
 @test "plan: filters FAIL CLOSED — a set filter rejects a PR missing that field" {
   # BASE is set but PR #1 has no baseRefName (null/absent) → must be rejected,
   # not allowed through. PR #2 has the matching field.

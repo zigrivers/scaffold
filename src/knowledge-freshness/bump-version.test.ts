@@ -76,6 +76,23 @@ describe('bumpSemver', () => {
     expect(() => bumpSemver('vNotASemver', 'patch')).toThrow(/invalid SemVer/)
     expect(() => bumpSemver('', 'patch')).toThrow(/invalid SemVer/)
   })
+
+  it('catches up patch by count (rapid batch where intermediate bump runs were cancelled)', () => {
+    expect(bumpSemver('0.1.14', 'patch', 9)).toBe('0.1.23')
+    expect(bumpSemver('1.2.3', 'patch', 1)).toBe('1.2.4')
+    expect(bumpSemver('0.1.0', 'patch', 4)).toBe('0.1.4')
+  })
+
+  it('ignores count for minor and major (reset semantics make a multiplier meaningless)', () => {
+    expect(bumpSemver('0.1.5', 'minor', 9)).toBe('0.2.0')
+    expect(bumpSemver('0.1.5', 'major', 9)).toBe('1.0.0')
+  })
+
+  it('rejects a non-positive or non-integer count', () => {
+    expect(() => bumpSemver('0.1.0', 'patch', 0)).toThrow(/count must be a positive integer/)
+    expect(() => bumpSemver('0.1.0', 'patch', -3)).toThrow(/count must be a positive integer/)
+    expect(() => bumpSemver('0.1.0', 'patch', 1.5)).toThrow(/count must be a positive integer/)
+  })
 })
 
 describe('end-to-end fixture: simulated merged PR title → version diff', () => {

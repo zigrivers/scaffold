@@ -16,7 +16,10 @@
 #
 # Trust filters (set by the workflow; empty = filter disabled, for tests):
 #   BASE          require .baseRefName == "$BASE"            (e.g. main)
-#   ALLOW_AUTHOR  require .author.login == "$ALLOW_AUTHOR"   (the freshness bot)
+#   ALLOW_AUTHOR  require .author.login ∈ "$ALLOW_AUTHOR" (space-separated
+#                 allowlist; the Actions bot is rendered as `app/github-actions`
+#                 OR `github-actions[bot]` depending on gh version/context, so
+#                 the default lists both)
 #   OWNER         require .headRepositoryOwner.login==$OWNER (same-repo, not a fork)
 # These stop the release token from auto-merging an arbitrary PR that merely
 # adopts the `knowledge-freshness/` branch name (critical because no-check bot
@@ -29,7 +32,8 @@
 #
 # Usage:
 #   gh pr list --json number,title,headRefName,createdAt,baseRefName,author,headRepositoryOwner \
-#     | BASE=main ALLOW_AUTHOR='github-actions[bot]' OWNER=zigrivers bash scripts/kb-auto-merge-plan.sh
+#     | BASE=main ALLOW_AUTHOR='app/github-actions github-actions[bot]' OWNER=zigrivers \
+#       bash scripts/kb-auto-merge-plan.sh
 
 set -euo pipefail
 
@@ -37,11 +41,13 @@ jq \
   --arg base "${BASE:-}" \
   --arg author "${ALLOW_AUTHOR:-}" \
   --arg owner "${OWNER:-}" '
-  [ .[]
+  # Case-folded allowlist of acceptable author logins (whitespace-separated).
+  ($author | ascii_downcase | split(" ") | map(select(length > 0))) as $authors
+  | [ .[]
     | select(.headRefName | startswith("knowledge-freshness/"))
     | select( $base   == "" or ((.baseRefName // "") == $base) )
     # GitHub logins are case-insensitive — compare author/owner case-folded.
-    | select( $author == "" or ((.author.login // "")            | ascii_downcase) == ($author | ascii_downcase) )
+    | select( $author == "" or (((.author.login // "") | ascii_downcase) | IN($authors[])) )
     | select( $owner  == "" or ((.headRepositoryOwner.login // "") | ascii_downcase) == ($owner  | ascii_downcase) )
     | .topic = ( .headRefName
                  | sub("^knowledge-freshness/"; "")

@@ -70,13 +70,30 @@ jobs:
           CURRENT=$(tr -d '[:space:]' < "$VERSION_FILE")
           echo "current VERSION: $CURRENT"
 
-          # Use the CLI dry-run to compute the next version. Parsing its
-          # `next: X.Y.Z` line keeps the derivation rules in one place
+          # Catch-up count: this workflow has a single global concurrency group,
+          # so when several refresh PRs merge in a rapid batch GitHub cancels the
+          # intermediate (pending) runs. A surviving run therefore owes one patch
+          # bump per un-bumped refresh commit, not just one. Count the refresh
+          # commits (touch content/knowledge/ but not VERSION) since the last
+          # bump commit; the CLI applies this as a patch multiplier (ignored for
+          # minor/major). Fall back to 1 if no prior bump commit is found.
+          LAST_BUMP=$(git log -1 --format=%H -F --grep='chore(knowledge): bump KB VERSION' HEAD 2>/dev/null || true)
+          if [ -n "$LAST_BUMP" ]; then
+            COUNT=$(git log --format=%H "${LAST_BUMP}..HEAD" -- content/knowledge/ ':(exclude)content/knowledge/VERSION' | grep -c . || true)
+          else
+            COUNT=1
+          fi
+          [ "${COUNT:-0}" -lt 1 ] && COUNT=1
+          echo "un-bumped refresh commits since last bump: $COUNT"
+
+          # Use the CLI to compute the next version. Parsing its `next: X.Y.Z`
+          # line keeps the derivation rules in one place
           # (src/knowledge-freshness/bump-version.ts) instead of duplicating
           # them in bash.
           OUTPUT=$(node dist/index.js knowledge-freshness bump-version \
             --title "$PR_TITLE" \
-            --body "$PR_BODY")
+            --body "$PR_BODY" \
+            --count "$COUNT")
           echo "$OUTPUT"
 
           BUMP_KIND=$(printf '%s\n' "$OUTPUT" | awk '/^bump:/ {print $2}')
