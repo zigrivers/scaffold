@@ -92,6 +92,19 @@ wait_version_bump_idle() {
   echo "::warning::version-bump runs still active or unverifiable after wait; KB VERSION may lag"
 }
 
+# ── Step 0: preflight ─────────────────────────────────────────────
+# Merge serialization polls `gh run list`, which needs the Actions:read scope.
+# Verify it ONCE up front (live runs only) and fail fast with an actionable
+# message, rather than discovering it mid-loop and burning the retry budget on
+# every merge.
+if [ "$DRY_RUN" != "true" ]; then
+  if ! gh run list --workflow=knowledge-freshness-version-bump.yml --limit 1 \
+        --json status >/dev/null 2>&1; then
+    echo "::error::RELEASE_BOT_TOKEN cannot read Actions runs (needs the Actions:read scope), required for merge serialization. Add the scope and re-run."
+    exit 1
+  fi
+fi
+
 # ── Step 1: plan ──────────────────────────────────────────────────
 log "Surveying open knowledge-freshness PRs (base=$BASE author=$ALLOW_AUTHOR owner=$OWNER)"
 PRS_JSON="$(gh pr list --state open --limit 100 \
@@ -199,20 +212,35 @@ if [ "$DO_RELEASE" != "true" ]; then
 fi
 
 # ── Step 4: cut the batched release ───────────────────────────────
-# Per-merge serialization above already waited for each bump; a final idle check
-# covers any straggler before we read VERSION.
-log "Releasing: confirming KB VERSION bumps have settled"
-[ "$DRY_RUN" = "true" ] || wait_version_bump_idle
-
 git fetch --quiet origin main
-git reset --hard origin/main
 
-# Recompute the entry list against settled main (VERSION bumps now landed).
+# Read settled values straight from origin/main via `git show`/`git diff` so we
+# never touch the working tree until we are committed to a LIVE release. The
+# entry list is recomputed against settled main (VERSION bumps now landed).
 ENTRIES="$(git diff --name-only --diff-filter=d "$RANGE" -- content/knowledge/ \
   | { grep '\.md$' || true; } \
   | sed -E 's#.*/([^/]+)\.md$#\1#' \
   | sort -u)"
-KB_VERSION="$(tr -d '[:space:]' < content/knowledge/VERSION)"
+KB_VERSION="$(git show origin/main:content/knowledge/VERSION | tr -d '[:space:]')"
+RELEASE_DATE="$(date -u +%F)"
+
+# Dry-run is strictly read-only: no reset, no file writes, no npm version, no
+# git mutations. Preview the planned version + CHANGELOG block, then stop.
+if [ "$DRY_RUN" = "true" ]; then
+  NEW_VERSION="$(node -e 'const [a,b,c]=require("./package.json").version.split(".").map(Number); console.log(`${a}.${b}.${c+1}`)')"
+  log "(dry-run) would release scaffold v$NEW_VERSION (KB VERSION $KB_VERSION, $RELEASE_DATE) covering $TOPIC_COUNT topic(s)"
+  echo "──── (dry-run) CHANGELOG block that would be inserted ────"
+  printf '%s\n' "$ENTRIES" | bash "$SCRIPT_DIR/kb-release-changelog.sh" \
+    --version "$NEW_VERSION" --date "$RELEASE_DATE" \
+    --kb-version "$KB_VERSION" --changelog CHANGELOG.md \
+    | sed -n "/^## \\[$NEW_VERSION\\]/,/KB .VERSION/p"
+  log "(dry-run) no merge/commit/tag/push performed. Done."
+  exit 0
+fi
+
+# ── live release (mutations from here) ────────────────────────────
+wait_version_bump_idle
+git reset --hard origin/main
 
 # Validate EXACTLY as publish.yml will, so a tag we push always publishes clean.
 log "Validating release tree (build + test) before tagging"
@@ -222,7 +250,6 @@ npm test
 # Bump scaffold's patch version (package.json + lockfile; no git tag/commit).
 npm version patch --no-git-tag-version >/dev/null
 NEW_VERSION="$(node -p "require('./package.json').version")"
-RELEASE_DATE="$(date -u +%F)"
 log "New scaffold version: $NEW_VERSION (KB VERSION $KB_VERSION, $RELEASE_DATE)"
 
 # Write the CHANGELOG block.
@@ -237,11 +264,11 @@ git --no-pager diff -- package.json CHANGELOG.md | head -60
 # Commit to main and push the tag (PAT → triggers publish.yml + homebrew).
 git config user.name "$BOT_NAME"
 git config user.email "$BOT_EMAIL"
-run git add package.json package-lock.json CHANGELOG.md
-run git commit -m "release: scaffold v$NEW_VERSION — knowledge freshness batch ($RELEASE_DATE)"
-run git pull --rebase origin main
-run git push origin HEAD:main
-run git tag "v$NEW_VERSION"
-run git push origin "v$NEW_VERSION"
+git add package.json package-lock.json CHANGELOG.md
+git commit -m "release: scaffold v$NEW_VERSION — knowledge freshness batch ($RELEASE_DATE)"
+git pull --rebase origin main
+git push origin HEAD:main
+git tag "v$NEW_VERSION"
+git push origin "v$NEW_VERSION"
 
 log "Release v$NEW_VERSION pushed. publish.yml + update-homebrew.yml will run on the tag."
