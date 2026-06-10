@@ -149,6 +149,12 @@ JSON
   [[ "$output" == release:* ]]
 }
 
+@test "decision: rejects a non-numeric argument with exit 2" {
+  run bash "$DECIDE" --dow Monday --unreleased-topics 3
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"non-negative integer"* ]]
+}
+
 # ─── kb-release-changelog.sh ──────────────────────────────────────
 
 setup() {

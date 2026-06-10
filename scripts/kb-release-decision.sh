@@ -43,6 +43,17 @@ if [ -z "$dow" ] || [ -z "$topics" ]; then
   exit 2
 fi
 
+# Validate all numeric inputs before using integer operators, so a malformed
+# value fails loudly instead of crashing mid-comparison under `set -e`.
+for _n in "$dow" "$topics" "$threshold" "$release_dow"; do
+  case "$_n" in
+    ''|*[!0-9]*)
+      echo "kb-release-decision: expected a non-negative integer, got '$_n'" >&2
+      exit 2
+      ;;
+  esac
+done
+
 if [ "$topics" -le 0 ]; then
   echo "defer:no-unreleased-changes"
   exit 0

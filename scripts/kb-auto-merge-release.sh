@@ -262,34 +262,64 @@ LATEST_BUMP="$(gh run list --workflow=knowledge-freshness-version-bump.yml \
 if [ "$LATEST_BUMP" = "failure" ]; then
   echo "::warning::latest knowledge-freshness version-bump run FAILED — KB VERSION may be stale in this release"
 fi
-git reset --hard origin/main
 
-# Validate EXACTLY as publish.yml will, so a tag we push always publishes clean.
-log "Validating release tree (build + test) before tagging"
-npm run build
-npm test
-
-# Bump scaffold's patch version (package.json + lockfile; no git tag/commit).
-npm version patch --no-git-tag-version >/dev/null
-NEW_VERSION="$(node -p "require('./package.json').version")"
-log "New scaffold version: $NEW_VERSION (KB VERSION $KB_VERSION, $RELEASE_DATE)"
-
-# Write the CHANGELOG block.
-printf '%s\n' "$ENTRIES" | bash "$SCRIPT_DIR/kb-release-changelog.sh" \
-  --version "$NEW_VERSION" --date "$RELEASE_DATE" \
-  --kb-version "$KB_VERSION" --changelog CHANGELOG.md > CHANGELOG.md.new
-mv CHANGELOG.md.new CHANGELOG.md
-
-echo "──── release diff preview ────"
-git --no-pager diff -- package.json CHANGELOG.md | head -60
-
-# Commit to main and push the tag (PAT → triggers publish.yml + homebrew).
 git config user.name "$BOT_NAME"
 git config user.email "$BOT_EMAIL"
-git add package.json package-lock.json CHANGELOG.md
-git commit -m "release: scaffold v$NEW_VERSION — knowledge freshness batch ($RELEASE_DATE)"
-git pull --rebase origin main
-git push origin HEAD:main
+
+# Build the release commit on the current settled main and push it
+# FAST-FORWARD-ONLY, so the commit we tag is exactly the tree we built and
+# validated. If main advanced meanwhile (e.g. a late version-bump), the push is
+# rejected — we re-sync, re-validate, and retry rather than rebasing unvalidated
+# content under the tag (a plain `git pull --rebase` would do exactly that).
+# Bounded so a pathological race can't loop forever.
+attempt=0
+while :; do
+  attempt=$((attempt + 1))
+  git fetch --quiet origin
+  git reset --hard origin/main
+
+  # Recompute against the just-synced main (entries + KB VERSION may have moved).
+  ENTRIES="$(git diff --name-only --diff-filter=d "$RANGE" -- content/knowledge/ \
+    | { grep '\.md$' || true; } \
+    | sed -E 's#.*/([^/]+)\.md$#\1#' \
+    | sort -u)"
+  KB_VERSION="$(tr -d '[:space:]' < content/knowledge/VERSION)"
+
+  # Validate EXACTLY as publish.yml will, so a tag we push always publishes clean.
+  log "Validating release tree (build + test) before tagging (attempt $attempt)"
+  npm run build
+  npm test
+
+  # Bump scaffold's patch version (package.json + lockfile; no git tag/commit).
+  npm version patch --no-git-tag-version >/dev/null
+  NEW_VERSION="$(node -p "require('./package.json').version")"
+  log "New scaffold version: $NEW_VERSION (KB VERSION $KB_VERSION, $RELEASE_DATE)"
+
+  printf '%s\n' "$ENTRIES" | bash "$SCRIPT_DIR/kb-release-changelog.sh" \
+    --version "$NEW_VERSION" --date "$RELEASE_DATE" \
+    --kb-version "$KB_VERSION" --changelog CHANGELOG.md > CHANGELOG.md.new
+  mv CHANGELOG.md.new CHANGELOG.md
+
+  echo "──── release diff preview ────"
+  git --no-pager diff -- package.json CHANGELOG.md | head -60
+
+  git add package.json package-lock.json CHANGELOG.md
+  git commit -m "release: scaffold v$NEW_VERSION — knowledge freshness batch ($RELEASE_DATE)"
+
+  # Fast-forward-only push: succeeds only if main is still at the commit we
+  # validated on top of.
+  if git push origin HEAD:main; then
+    break
+  fi
+  if [ "$attempt" -ge 3 ]; then
+    echo "::error::main kept advancing during release after $attempt attempts — aborting before tagging"
+    exit 1
+  fi
+  log "main advanced during release — re-syncing and re-validating"
+done
+
+# Tag the exact commit we just validated and pushed (now main's HEAD), so
+# publish.yml + update-homebrew.yml build the validated tree.
 git tag "v$NEW_VERSION"
 git push origin "v$NEW_VERSION"
 
