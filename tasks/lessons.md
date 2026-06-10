@@ -95,3 +95,29 @@ Patterns and anti-patterns discovered during development. Review before starting
   rejects `--tools`, the fallback must FAIL CLOSED (disable the channel), never run
   FS-open. Spec + plan went through 10 rounds of 4-channel MMR review before a clean
   pass. See `docs/superpowers/specs/2026-05-30-mmr-grok-channel-hardening-design.md`.
+
+## 2026-06-10 — Durable knowledge auto-merge/release workflow (trial-run findings)
+
+- **Freshness PR author is `app/github-actions`, not `github-actions[bot]`.** The
+  durable workflow `knowledge-auto-merge-release.yml` defaults
+  `ALLOW_AUTHOR='github-actions[bot]'` with FAIL-CLOSED filters, so as shipped it
+  would reject every real freshness PR. Fix the default (accept both author forms,
+  or key on `is_bot` + branch prefix) before setting `RELEASE_BOT_TOKEN`. The
+  in-session trial sweep caught this precisely because the manual path skips the
+  author filter while the durable path enforces it. See memory
+  `freshness-pr-author-login`.
+- **Rapid batch merges undercount KB VERSION.** `knowledge-freshness-version-bump.yml`
+  has a single global concurrency group; merging 9 PRs back-to-back cancelled most
+  bump runs (KB VERSION 0.1.14 → 0.1.18, not +9). Cosmetic (VERSION lags), not a
+  break. The durable workflow's per-merge `wait_version_bump_idle` serialization
+  prevents this; the manual sweep does not — so expect VERSION undercount when
+  merging a backlog by hand.
+- **`gh` GraphQL 401s flap under burst usage.** During a 9-PR merge loop, `gh pr
+  view`/`gh pr merge` (GraphQL) intermittently returned `HTTP 401: Requires
+  authentication` while REST calls and the token (keyring) stayed valid; retried
+  with backoff and all recovered. Treat a lone 401 mid-burst as transient — retry
+  with `gh pr view --json state` confirming MERGED, don't escalate to re-auth.
+- **Content-quality gate earns its keep:** the freshness automation produced a
+  duplicated `## OWASP Top 10` section in security-best-practices (#566). The
+  `gh pr diff` skim (Step 2) caught it; held the PR for a human. Watch the
+  outlier-sized diff in a batch (+180 lines vs the usual +10).
