@@ -67,9 +67,6 @@ export function bumpSemver(current: string, kind: BumpKind, count = 1): string {
   if (!match) {
     throw new Error(`bumpSemver: invalid SemVer "${current}" (expected X.Y.Z)`)
   }
-  if (!Number.isInteger(count) || count < 1) {
-    throw new Error(`bumpSemver: count must be a positive integer (got ${count})`)
-  }
   const major = Number(match[1])
   const minor = Number(match[2])
   const patch = Number(match[3])
@@ -79,6 +76,11 @@ export function bumpSemver(current: string, kind: BumpKind, count = 1): string {
   case 'minor':
     return `${major}.${minor + 1}.0`
   case 'patch':
+    // count is only meaningful for patch — validate it here so a minor/major
+    // bump with an unused/invalid count is ignored rather than throwing.
+    if (!Number.isInteger(count) || count < 1) {
+      throw new Error(`bumpSemver: count must be a positive integer (got ${count})`)
+    }
     return `${major}.${minor}.${patch + count}`
   }
 }

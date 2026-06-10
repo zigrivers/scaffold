@@ -156,9 +156,11 @@ if [ -n "$MERGE_NUMS" ]; then
 
     # In scope: every changed file must live under content/knowledge/. A gh
     # failure here must not abort the whole run (set -e) — skip this PR instead.
+    # No 2>/dev/null: let gh_retry's retry notices and gh's own errors reach the
+    # log for observability. The `|| echo error` still captures a hard failure.
     OUT_OF_SCOPE="$(gh_retry pr view "$num" --json files \
       --jq '[.files[].path | select(startswith("content/knowledge/") | not)] | length' \
-      2>/dev/null || echo "error")"
+      || echo "error")"
     if [ "$OUT_OF_SCOPE" = "error" ]; then
       echo "::notice::could not read files for #$num — skipping this run"
       continue
@@ -171,7 +173,7 @@ if [ -n "$MERGE_NUMS" ]; then
     # Only merge a PR GitHub reports as cleanly MERGEABLE. CONFLICTING is skipped;
     # UNKNOWN (GitHub still computing) is also skipped so we don't merge blind —
     # the next daily run retries once the state settles.
-    MERGEABLE="$(gh_retry pr view "$num" --json mergeable --jq '.mergeable' 2>/dev/null || echo UNKNOWN)"
+    MERGEABLE="$(gh_retry pr view "$num" --json mergeable --jq '.mergeable' || echo UNKNOWN)"
     if [ "$MERGEABLE" != "MERGEABLE" ]; then
       echo "::notice::PR #$num mergeable=$MERGEABLE — skipping this run"
       continue
@@ -187,7 +189,7 @@ if [ -n "$MERGE_NUMS" ]; then
       elif any(.statusCheckRollup[];
                ((.conclusion // .state // "") | ascii_upcase) as $c
                | ($c != "SUCCESS" and $c != "NEUTRAL" and $c != "SKIPPED"))
-      then "not-green" else "green" end' 2>/dev/null || echo "unknown")"
+      then "not-green" else "green" end' || echo "unknown")"
     if [ "$CHECK_STATE" = "not-green" ] || [ "$CHECK_STATE" = "unknown" ]; then
       echo "::notice::PR #$num checks not green yet ($CHECK_STATE) — skipping this run"
       continue

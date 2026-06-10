@@ -88,7 +88,12 @@ describe('bumpSemver', () => {
     expect(bumpSemver('0.1.5', 'major', 9)).toBe('1.0.0')
   })
 
-  it('rejects a non-positive or non-integer count', () => {
+  it('does NOT throw on an invalid count for minor/major (count is unused there)', () => {
+    expect(bumpSemver('0.1.5', 'minor', 0)).toBe('0.2.0')
+    expect(bumpSemver('0.1.5', 'major', Number.NaN)).toBe('1.0.0')
+  })
+
+  it('rejects a non-positive or non-integer count for PATCH bumps', () => {
     expect(() => bumpSemver('0.1.0', 'patch', 0)).toThrow(/count must be a positive integer/)
     expect(() => bumpSemver('0.1.0', 'patch', -3)).toThrow(/count must be a positive integer/)
     expect(() => bumpSemver('0.1.0', 'patch', 1.5)).toThrow(/count must be a positive integer/)

@@ -3,11 +3,13 @@ import { join } from 'node:path'
 import type { Argv, CommandModule } from 'yargs'
 import { findProjectRoot } from '../middleware/project-root.js'
 import { deriveBumpKind, bumpSemver } from '../../knowledge-freshness/bump-version.js'
+import type { BumpKind } from '../../knowledge-freshness/bump-version.js'
 
 interface BumpVersionArgs {
   title: string
   body: string
   count: number
+  kind?: string
 }
 
 // Local-only explainability subcommand. Reads content/knowledge/VERSION, derives
@@ -34,12 +36,20 @@ const bumpVersionCommand: CommandModule<Record<string, unknown>, BumpVersionArgs
         describe:
           'Catch-up multiplier for patch bumps (number of un-bumped refresh ' +
           'commits this run owes). Ignored for minor/major.',
+      })
+      .option('kind', {
+        type: 'string',
+        choices: ['patch', 'minor', 'major'],
+        describe:
+          'Override the bump kind (defaults to deriving it from --title/--body). ' +
+          'The catch-up path passes this when the un-bumped range contains a ' +
+          'feat/BREAKING commit, so the batch is not flattened to patches.',
       }) as unknown as Argv<BumpVersionArgs>,
   handler: (argv) => {
     const cwd = findProjectRoot(process.cwd()) ?? process.cwd()
     const versionPath = join(cwd, 'content', 'knowledge', 'VERSION')
     const current = readFileSync(versionPath, 'utf8').trim()
-    const kind = deriveBumpKind(argv.title, argv.body)
+    const kind: BumpKind = (argv.kind as BumpKind | undefined) ?? deriveBumpKind(argv.title, argv.body)
     const next = bumpSemver(current, kind, argv.count)
     process.stdout.write(`current: ${current}\n`)
     process.stdout.write(`bump:    ${kind}\n`)
