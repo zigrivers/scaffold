@@ -117,7 +117,7 @@ wait_version_bump_idle() {
 # every merge.
 if [ "$DRY_RUN" != "true" ]; then
   if ! gh_retry run list --workflow=knowledge-freshness-version-bump.yml --limit 1 \
-        --json status >/dev/null 2>&1; then
+        --json status >/dev/null; then
     echo "::error::RELEASE_BOT_TOKEN cannot read Actions runs (needs the Actions:read scope), required for merge serialization. Add the scope and re-run."
     exit 1
   fi

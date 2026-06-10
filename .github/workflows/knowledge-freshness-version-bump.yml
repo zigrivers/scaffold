@@ -67,93 +67,91 @@ jobs:
           set -euo pipefail
 
           VERSION_FILE="content/knowledge/VERSION"
-          CURRENT=$(tr -d '[:space:]' < "$VERSION_FILE")
-          echo "current VERSION: $CURRENT"
 
-          # Catch-up count: this workflow has a single global concurrency group,
-          # so when several refresh PRs merge in a rapid batch GitHub cancels the
-          # intermediate (pending) runs. A surviving run therefore owes one patch
-          # bump per un-bumped refresh commit, not just one. Count the refresh
-          # commits (touch content/knowledge/ but not VERSION) since the last bump
-          # commit; the CLI derives the bump KIND from this PR's title/body (single
-          # source of truth) and applies the count as a patch multiplier (ignored
-          # for minor/major). Note: minor/major knowledge PRs are deliberate and
-          # merge individually — they aren't part of the rapid batches that cancel
-          # bump runs — so they don't need range-wide kind elevation.
-          LAST_BUMP=$(git log -1 --format=%H -F --grep='chore(knowledge): bump KB VERSION' HEAD 2>/dev/null || true)
-          # Guard against a LAST_BUMP that isn't reachable in this clone (shouldn't
-          # happen — the checkout above is fetch-depth: 0 — but never let a bad
-          # range abort the bump).
-          if [ -n "$LAST_BUMP" ] && ! git cat-file -e "${LAST_BUMP}^{commit}" 2>/dev/null; then
-            echo "::warning::last bump commit $LAST_BUMP unreachable; treating as first bump"
-            LAST_BUMP=""
-          fi
-          if [ -n "$LAST_BUMP" ]; then
-            COUNT=$(git rev-list --count "${LAST_BUMP}..HEAD" -- content/knowledge/ ':(exclude)content/knowledge/VERSION')
-            # COUNT==0 means a prior catch-up run already bumped past this PR's
-            # commit. Bumping again would OVER-count, so stop here.
-            if [ "${COUNT:-0}" -lt 1 ]; then
-              echo "::notice::no un-bumped refresh commits since last bump — nothing to bump"
+          # Compute the catch-up count and the bump against the SAME main we push
+          # onto, retrying if a concurrent merge advances main in between. This
+          # single global concurrency group means a rapid batch of refresh PRs
+          # cancels the intermediate (pending) bump runs, so a surviving run owes
+          # one patch bump per un-bumped refresh commit, not just one. Recomputing
+          # COUNT on the latest main each attempt (instead of computing once then
+          # rebasing the commit onto a newer main) closes the race where a PR that
+          # merges mid-run would otherwise never increment VERSION. The CLI derives
+          # the bump KIND from this PR's title/body (single source of truth) and
+          # applies COUNT as a patch multiplier (ignored for minor/major); minor/
+          # major knowledge PRs are deliberate and merge individually, so they
+          # aren't part of the batches that need catch-up.
+          for attempt in 1 2 3; do
+            git fetch --quiet origin
+            git reset --hard origin/main   # discard any prior attempt; start on latest main
+            CURRENT=$(tr -d '[:space:]' < "$VERSION_FILE")
+            echo "attempt $attempt — current VERSION: $CURRENT"
+
+            LAST_BUMP=$(git log -1 --format=%H -F --grep='chore(knowledge): bump KB VERSION' HEAD 2>/dev/null || true)
+            # Guard a LAST_BUMP not reachable in this clone (shouldn't happen —
+            # checkout is fetch-depth: 0 — but never let a bad range abort).
+            if [ -n "$LAST_BUMP" ] && ! git cat-file -e "${LAST_BUMP}^{commit}" 2>/dev/null; then
+              echo "::warning::last bump commit $LAST_BUMP unreachable; treating as first bump"
+              LAST_BUMP=""
+            fi
+            if [ -n "$LAST_BUMP" ]; then
+              COUNT=$(git rev-list --count "${LAST_BUMP}..HEAD" -- content/knowledge/ ':(exclude)content/knowledge/VERSION')
+              # COUNT==0 means a prior run already bumped past this PR's commit.
+              # Bumping again would OVER-count, so stop.
+              if [ "${COUNT:-0}" -lt 1 ]; then
+                echo "::notice::no un-bumped refresh commits since last bump — nothing to bump"
+                exit 0
+              fi
+            else
+              COUNT=1   # first bump ever
+            fi
+            echo "un-bumped refresh commits since last bump: $COUNT"
+
+            OUTPUT=$(node dist/index.js knowledge-freshness bump-version \
+              --title "$PR_TITLE" \
+              --body "$PR_BODY" \
+              --count "$COUNT")
+            echo "$OUTPUT"
+            BUMP_KIND=$(printf '%s\n' "$OUTPUT" | awk '/^bump:/ {print $2}')
+            NEXT=$(printf '%s\n' "$OUTPUT" | awk '/^next:/ {print $2}')
+            if [ -z "$NEXT" ]; then
+              echo "::error::failed to parse next version from CLI output"
+              exit 1
+            fi
+
+            # Surface the default-to-patch branch as a notice so reviewers can
+            # see when a PR title didn't match any of the recognized prefixes.
+            case "$PR_TITLE" in
+              *"BREAKING CHANGE:"*) ;;
+              "feat(knowledge):"*|"feat(knowledge-freshness):"*) ;;
+              "chore(knowledge):"*|"chore(knowledge-freshness):"*) ;;
+              *)
+                if [ "$BUMP_KIND" = "patch" ]; then
+                  echo "::notice::unrecognized prefix in PR title, defaulting to patch bump"
+                fi
+                ;;
+            esac
+
+            printf '%s\n' "$NEXT" > "$VERSION_FILE"
+            git add "$VERSION_FILE"
+            if git diff --cached --quiet; then
+              echo "::notice::VERSION already at $NEXT — nothing to commit"
               exit 0
             fi
-          else
-            # No prior bump commit found (first bump ever): a single bump.
-            COUNT=1
-          fi
-          echo "un-bumped refresh commits since last bump: $COUNT"
 
-          # Use the CLI to compute the next version. Parsing its `next: X.Y.Z`
-          # line keeps the derivation rules in one place
-          # (src/knowledge-freshness/bump-version.ts) instead of duplicating
-          # them in bash. --count is the patch catch-up (ignored for minor/major).
-          OUTPUT=$(node dist/index.js knowledge-freshness bump-version \
-            --title "$PR_TITLE" \
-            --body "$PR_BODY" \
-            --count "$COUNT")
-          echo "$OUTPUT"
-
-          BUMP_KIND=$(printf '%s\n' "$OUTPUT" | awk '/^bump:/ {print $2}')
-          NEXT=$(printf '%s\n' "$OUTPUT" | awk '/^next:/ {print $2}')
-
-          if [ -z "$NEXT" ]; then
-            echo "::error::failed to parse next version from CLI output"
-            exit 1
-          fi
-
-          # Surface the default-to-patch branch as a notice so reviewers can
-          # see when a PR title didn't match any of the recognized prefixes.
-          case "$PR_TITLE" in
-            *"BREAKING CHANGE:"*) ;;
-            "feat(knowledge):"*|"feat(knowledge-freshness):"*) ;;
-            "chore(knowledge):"*|"chore(knowledge-freshness):"*) ;;
-            *)
-              if [ "$BUMP_KIND" = "patch" ]; then
-                echo "::notice::unrecognized prefix in PR title, defaulting to patch bump"
-              fi
-              ;;
-          esac
-
-          printf '%s\n' "$NEXT" > "$VERSION_FILE"
-          git add "$VERSION_FILE"
-
-          # If for some reason VERSION wasn't actually different (e.g. a
-          # follow-up merge against an already-bumped VERSION), bail without
-          # an empty commit.
-          if git diff --cached --quiet; then
-            echo "::notice::VERSION already at $NEXT — nothing to commit"
-            exit 0
-          fi
-
-          # NOTE: commit prefix is `chore(knowledge):` (NOT
-          # `knowledge-freshness/`-shaped). This workflow's filter checks the
-          # source BRANCH, and the push below goes straight to main without a
-          # branch named `knowledge-freshness/...`, so this is belt-and-braces
-          # against accidental recursion.
-          git commit -m "chore(knowledge): bump KB VERSION to $NEXT"
-          # F-006: rebase before push so a concurrent main update doesn't
-          # cause a non-fast-forward push failure. If branch protection
-          # rejects the direct push, the workflow surfaces the error and
-          # the maintainer needs to grant the bot bypass on `main` (or
-          # adapt to land via PR). Documented in operations.md.
-          git pull --rebase origin main
-          git push origin main
+            # NOTE: commit prefix is `chore(knowledge):` (NOT
+            # `knowledge-freshness/`-shaped). This workflow's filter checks the
+            # source BRANCH, and the push goes straight to main without such a
+            # branch, so this is belt-and-braces against accidental recursion.
+            git commit -m "chore(knowledge): bump KB VERSION to $NEXT"
+            # Fast-forward-only push: succeeds only if main is still at the commit
+            # we counted against. If a concurrent merge advanced main, the push is
+            # rejected and we loop — recomputing COUNT so the racing commit is also
+            # counted (rather than rebasing past it and losing its bump).
+            if git push origin HEAD:main; then
+              echo "pushed KB VERSION $NEXT"
+              exit 0
+            fi
+            echo "::notice::main advanced during bump (attempt $attempt) — recomputing"
+          done
+          echo "::error::could not push KB VERSION bump after 3 attempts (main kept advancing)"
+          exit 1
