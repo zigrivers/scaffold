@@ -147,7 +147,9 @@ if [ -n "$CLOSE_LINES" ]; then
     run gh_retry pr close "$num" \
       --comment "Superseded by #$winner (newer freshness run for the same topic)."
     if [ -n "$branch" ] && [ "$DRY_RUN" != "true" ]; then
-      if gh api --method DELETE "repos/{owner}/{repo}/git/refs/heads/$branch" >/dev/null 2>&1; then
+      # gh_retry so a transient 401/5xx doesn't leave an orphan branch; still
+      # best-effort overall (an already-gone/undeletable branch just logs).
+      if gh_retry api --method DELETE "repos/{owner}/{repo}/git/refs/heads/$branch" >/dev/null; then
         log "  deleted branch $branch"
       else
         log "  (branch $branch already gone or undeletable — skipping)"

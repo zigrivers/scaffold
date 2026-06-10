@@ -93,48 +93,38 @@ jobs:
               echo "::warning::last bump commit $LAST_BUMP unreachable; treating as first bump"
               LAST_BUMP=""
             fi
-            if [ -n "$LAST_BUMP" ]; then
-              COUNT=$(git rev-list --count "${LAST_BUMP}..HEAD" -- content/knowledge/ ':(exclude)content/knowledge/VERSION')
-              # COUNT==0 means a prior run already bumped past this PR's commit.
-              # Bumping again would OVER-count, so stop.
-              if [ "${COUNT:-0}" -lt 1 ]; then
-                echo "::notice::no un-bumped refresh commits since last bump — nothing to bump"
-                exit 0
-              fi
-            else
-              COUNT=1   # first bump ever
-            fi
-            echo "un-bumped refresh commits since last bump: $COUNT"
 
-            OUTPUT=$(node dist/index.js knowledge-freshness bump-version \
-              --title "$PR_TITLE" \
-              --body "$PR_BODY" \
-              --count "$COUNT")
+            # Compute NEXT by REPLAYING the per-commit bump kind of every un-bumped
+            # refresh commit since the last bump (NUL-separated %B → the CLI applies
+            # deriveBumpKind to each and folds with bumpSemver). This is correct for
+            # a mixed batch — a feat (minor) resets patch, later chores add to it —
+            # and an empty range yields NEXT==current, caught by the diff guard below
+            # (so a prior run that already caught up doesn't over-bump). No prior bump
+            # commit (first bump ever) → single derivation from this PR.
+            if [ -n "$LAST_BUMP" ]; then
+              OUTPUT=$(git log -z --format=%B "${LAST_BUMP}..HEAD" -- content/knowledge/ ':(exclude)content/knowledge/VERSION' \
+                | node dist/index.js knowledge-freshness bump-version --replay-stdin --title "$PR_TITLE" --body "$PR_BODY")
+            else
+              OUTPUT=$(node dist/index.js knowledge-freshness bump-version --title "$PR_TITLE" --body "$PR_BODY")
+            fi
             echo "$OUTPUT"
-            BUMP_KIND=$(printf '%s\n' "$OUTPUT" | awk '/^bump:/ {print $2}')
             NEXT=$(printf '%s\n' "$OUTPUT" | awk '/^next:/ {print $2}')
             if [ -z "$NEXT" ]; then
               echo "::error::failed to parse next version from CLI output"
               exit 1
             fi
 
-            # Surface the default-to-patch branch as a notice so reviewers can
-            # see when a PR title didn't match any of the recognized prefixes.
+            # Surface an unrecognized PR-title prefix (each commit's kind is derived
+            # by the CLI; this is just a heads-up for reviewers).
             case "$PR_TITLE" in
-              *"BREAKING CHANGE:"*) ;;
-              "feat(knowledge):"*|"feat(knowledge-freshness):"*) ;;
-              "chore(knowledge):"*|"chore(knowledge-freshness):"*) ;;
-              *)
-                if [ "$BUMP_KIND" = "patch" ]; then
-                  echo "::notice::unrecognized prefix in PR title, defaulting to patch bump"
-                fi
-                ;;
+              *"BREAKING CHANGE:"*|"feat(knowledge):"*|"feat(knowledge-freshness):"*|"chore(knowledge):"*|"chore(knowledge-freshness):"*) ;;
+              *) echo "::notice::unrecognized prefix in PR title: $PR_TITLE" ;;
             esac
 
             printf '%s\n' "$NEXT" > "$VERSION_FILE"
             git add "$VERSION_FILE"
             if git diff --cached --quiet; then
-              echo "::notice::VERSION already at $NEXT — nothing to commit"
+              echo "::notice::VERSION already at $NEXT — nothing to bump"
               exit 0
             fi
 
@@ -144,9 +134,9 @@ jobs:
             # branch, so this is belt-and-braces against accidental recursion.
             git commit -m "chore(knowledge): bump KB VERSION to $NEXT"
             # Fast-forward-only push: succeeds only if main is still at the commit
-            # we counted against. If a concurrent merge advanced main, the push is
-            # rejected and we loop — recomputing COUNT so the racing commit is also
-            # counted (rather than rebasing past it and losing its bump).
+            # we replayed against. If a concurrent merge advanced main, the push is
+            # rejected and we loop — re-replaying so the racing commit's bump is
+            # also applied (rather than rebasing past it and losing its bump).
             if git push origin HEAD:main; then
               echo "pushed KB VERSION $NEXT"
               exit 0
