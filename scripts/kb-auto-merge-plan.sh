@@ -47,7 +47,9 @@ jq \
     | select(.headRefName | startswith("knowledge-freshness/"))
     | select( $base   == "" or ((.baseRefName // "") == $base) )
     # GitHub logins are case-insensitive — compare author/owner case-folded.
-    | select( $author == "" or (((.author.login // "") | ascii_downcase) | IN($authors[])) )
+    # `index` (not jq 1.6+ `IN`) for portability; bind the login first so `.`
+    # inside index() still refers to the allowlist array, not the PR object.
+    | select( $author == "" or (((.author.login // "") | ascii_downcase) as $lg | ($authors | index($lg)) != null) )
     | select( $owner  == "" or ((.headRepositoryOwner.login // "") | ascii_downcase) == ($owner  | ascii_downcase) )
     | .topic = ( .headRefName
                  | sub("^knowledge-freshness/"; "")
@@ -60,7 +62,7 @@ jq \
                | (max_by(.createdAt).number) as $winner
                | .[]
                | select(.number != $winner)
-               | {number, topic, supersededBy: $winner}
+               | {number, topic, supersededBy: $winner, headRefName}
              ]
     }
 '

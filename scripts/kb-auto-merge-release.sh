@@ -132,17 +132,27 @@ PLAN="$(printf '%s' "$PRS_JSON" \
     bash "$SCRIPT_DIR/kb-auto-merge-plan.sh")"
 
 MERGE_NUMS="$(printf '%s' "$PLAN" | jq -r '.merge[].number')"
-CLOSE_LINES="$(printf '%s' "$PLAN" | jq -r '.close[] | "\(.number) \(.supersededBy)"')"
+CLOSE_LINES="$(printf '%s' "$PLAN" | jq -r '.close[] | "\(.number) \(.supersededBy) \(.headRefName // "")"')"
 
 # ── Step 2a: close superseded dupes ───────────────────────────────
 if [ -n "$CLOSE_LINES" ]; then
-  while IFS=' ' read -r num winner; do
+  while IFS=' ' read -r num winner branch; do
     [ -z "$num" ] && continue
     log "Closing #$num as superseded by #$winner"
-    # --delete-branch so a closed dupe doesn't leave a stale remote branch
-    # (GitHub's auto-delete only fires on MERGE, not on close).
-    run gh_retry pr close "$num" --delete-branch \
+    # Close (retriable) and delete the head branch SEPARATELY: bundling
+    # --delete-branch into the close would make gh_retry retry the whole call if
+    # the branch is already gone or undeletable (fork). The branch delete is
+    # best-effort — never retried, never fatal (GitHub's auto-delete only fires
+    # on merge, not close, so we clean up superseded dupes here).
+    run gh_retry pr close "$num" \
       --comment "Superseded by #$winner (newer freshness run for the same topic)."
+    if [ -n "$branch" ] && [ "$DRY_RUN" != "true" ]; then
+      if gh api --method DELETE "repos/{owner}/{repo}/git/refs/heads/$branch" >/dev/null 2>&1; then
+        log "  deleted branch $branch"
+      else
+        log "  (branch $branch already gone or undeletable — skipping)"
+      fi
+    fi
   done <<< "$CLOSE_LINES"
 else
   log "No duplicate PRs to close"
