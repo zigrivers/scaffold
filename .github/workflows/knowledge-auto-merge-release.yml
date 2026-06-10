@@ -1,0 +1,97 @@
+name: Knowledge Auto-Merge & Batched Release
+
+# Durable, server-side counterpart to the in-session /loop sweep: merges the
+# nightly knowledge-freshness PRs and cuts a BATCHED release on a cadence.
+#
+#   * Merge daily — newest-per-topic; close superseded dupes; only merge PRs
+#     whose checks are green AND that touch only content/knowledge/**.
+#   * Release weekly (Sunday UTC) OR early when >= RELEASE_THRESHOLD topics
+#     accumulate; never on an empty batch.
+#
+# All deterministic logic lives in scripts/kb-*.sh (unit-tested in
+# tests/kb-auto-merge-release.bats); this workflow is thin glue around
+# scripts/kb-auto-merge-release.sh.
+#
+# ACTIVATION REQUIREMENT — RELEASE_BOT_TOKEN:
+#   GitHub suppresses workflow triggers for actions taken with the default
+#   GITHUB_TOKEN. If this job merged PRs / pushed tags with GITHUB_TOKEN, the
+#   knowledge-freshness-version-bump and publish/homebrew workflows would NOT
+#   fire. It therefore uses a PAT (or GitHub App token) in the RELEASE_BOT_TOKEN
+#   secret for every gh call and the tag push. Until that secret is set, the job
+#   logs a notice and no-ops (it never half-runs). Required scopes (fine-grained
+#   PAT on this repo): Contents: read/write, Pull requests: read/write,
+#   Actions: read (the merge serialization polls `gh run list`).
+
+on:
+  schedule:
+    # 12:17 UTC daily — comfortably after the 09:00 UTC freshness audit opens
+    # PRs and the freshness gates finish. Off-minute to avoid the :00 stampede.
+    - cron: '17 12 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Plan + validate only — do not merge, commit, tag, or publish'
+        type: boolean
+        default: true
+      force_release:
+        description: 'Cut a release now if any changes are pending (ignore cadence)'
+        type: boolean
+        default: false
+
+# Never let two sweeps race (a manual dispatch firing during the scheduled run).
+concurrency: knowledge-auto-merge-release
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Preflight — require RELEASE_BOT_TOKEN
+        id: preflight
+        env:
+          RELEASE_BOT_TOKEN: ${{ secrets.RELEASE_BOT_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${RELEASE_BOT_TOKEN:-}" ]; then
+            echo "::notice::RELEASE_BOT_TOKEN not set — auto-merge/release is dormant. Add the secret to activate (see workflow header)."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout main
+        if: steps.preflight.outputs.enabled == 'true'
+        uses: actions/checkout@v5
+        with:
+          ref: main
+          fetch-depth: 0
+          # PAT so the tag push below triggers publish.yml + update-homebrew.yml.
+          token: ${{ secrets.RELEASE_BOT_TOKEN }}
+
+      - name: Set up Node.js
+        if: steps.preflight.outputs.enabled == 'true'
+        uses: actions/setup-node@v5
+        with:
+          # Match publish.yml so the pre-tag build+test validates the exact tree
+          # the publish job will see.
+          node-version: '22'
+          cache: 'npm'
+
+      # jq is preinstalled on ubuntu-latest runners — no install step needed.
+
+      - name: Install npm dependencies
+        if: steps.preflight.outputs.enabled == 'true'
+        run: npm ci
+
+      - name: Auto-merge knowledge PRs + batched release
+        if: steps.preflight.outputs.enabled == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_BOT_TOKEN }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || 'false' }}
+          FORCE_RELEASE: ${{ github.event_name == 'workflow_dispatch' && inputs.force_release || 'false' }}
+          RELEASE_THRESHOLD: '10'
+          RELEASE_DOW: '0'   # Sunday (UTC)
+        run: bash scripts/kb-auto-merge-release.sh

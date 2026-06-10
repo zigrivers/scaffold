@@ -151,9 +151,14 @@ CI runs on `ubuntu-latest`. Known divergences:
 
 ```
 .github/workflows/
-  ci.yml              # PR checks and main branch pushes
-  publish.yml          # npm publish on version tag push
-  update-homebrew.yml  # Homebrew tap update on version tag push
+  ci.yml                                # PR checks and main branch pushes
+  publish.yml                           # npm publish on v* tag push
+  publish-mmr.yml                       # npm publish on mmr-v* tag push
+  update-homebrew.yml                   # Homebrew tap update on tag push
+  knowledge-freshness-audit.yml         # nightly KB audit → opens freshness PRs
+  knowledge-freshness-gates.yml         # CI gates for freshness PRs
+  knowledge-freshness-version-bump.yml  # bumps content/knowledge/VERSION on merge
+  knowledge-auto-merge-release.yml      # autonomous merge of freshness PRs + batched release (§3.5)
 ```
 
 ### 3.2 CI Workflow (`ci.yml`)
@@ -286,6 +291,72 @@ Configure on the `main` branch:
 - No direct pushes to main (except tags)
 
 GitHub sends email notifications to the commit author on workflow failure by default. For team-wide visibility, configure a repository webhook or GitHub Actions notification to a shared channel.
+
+### 3.5 Knowledge Auto-Merge & Batched Release (autonomous)
+
+`knowledge-auto-merge-release.yml` is the durable, server-side counterpart to
+the in-session `/loop` sweep. It runs daily (12:17 UTC, after the 09:00 UTC
+freshness audit) and:
+
+1. **Merges daily** — plans the open `knowledge-freshness/*` PRs
+   newest-per-topic (`scripts/kb-auto-merge-plan.sh`), closes superseded dupes,
+   and squash-merges each newest PR only when it passes a trust gate:
+   targets `main`, same-repo (not a fork), opened by the freshness bot
+   (`github-actions[bot]`), touches **only** `content/knowledge/**`, has no
+   merge conflict, and its checks are green — *or absent* (nightly bot PRs have
+   no check runs because GitHub suppresses `GITHUB_TOKEN`-authored workflow
+   events; they are gated inline at audit time, and the author/base/same-repo
+   filters are what make "no checks" safe to merge). Anything failing the gate
+   is left for human review. Merges are serialized so the per-merge
+   `version-bump` runs can't cancel each other.
+2. **Releases on a cadence** — after merges it decides
+   (`scripts/kb-release-decision.sh`) whether to cut a batched release: on
+   **Sunday (UTC)**, or early when **≥ 10 topics** have accumulated since the
+   last `v*` tag, and never on an empty batch.
+3. **Cuts the release** — waits for in-flight `version-bump` runs to settle,
+   validates the tree exactly as `publish.yml` will (`npm run build && npm
+   test`) so a pushed tag always publishes clean, bumps scaffold's **patch**
+   version, writes the CHANGELOG block
+   (`scripts/kb-release-changelog.sh`), commits to `main`, and pushes a `v*`
+   tag — which fires `publish.yml` + `update-homebrew.yml`.
+
+The deterministic logic is unit-tested in
+`tests/kb-auto-merge-release.bats`; the orchestration glue is
+`scripts/kb-auto-merge-release.sh`.
+
+**Activation — `RELEASE_BOT_TOKEN` (required).** GitHub suppresses workflow
+triggers for actions taken with the default `GITHUB_TOKEN`. If this job merged
+PRs and pushed tags with `GITHUB_TOKEN`, neither `version-bump` nor
+`publish.yml`/`update-homebrew.yml` would fire. It therefore uses a **PAT (or
+GitHub App token)** in the `RELEASE_BOT_TOKEN` secret for every `gh` call and
+the tag push. Until the secret is set the job logs a notice and **no-ops** (it
+never half-runs).
+
+Create a **fine-grained PAT** scoped to this repo with **Contents: read/write**,
+**Pull requests: read/write**, and **Actions: read** (the merge serialization
+polls `gh run list` for in-flight `version-bump` runs), then:
+
+```bash
+gh secret set RELEASE_BOT_TOKEN   # paste the token when prompted
+```
+
+**Safe first run.** Trigger manually with the default `dry_run: true` to see the
+full plan + release preview (git diff) without merging, tagging, or publishing:
+
+```bash
+gh workflow run knowledge-auto-merge-release.yml          # dry-run (default)
+gh workflow run knowledge-auto-merge-release.yml -f dry_run=false   # live
+gh workflow run knowledge-auto-merge-release.yml -f dry_run=false -f force_release=true  # release now
+```
+
+**Tuning** lives in the workflow's `env:` — `RELEASE_THRESHOLD` (surge valve,
+default 10) and `RELEASE_DOW` (cadence day, default 0=Sunday UTC).
+
+**Relationship to the in-session `/loop` cron.** The `/loop` sweep runs full
+multi-model MMR review locally and is good for hands-on days; this workflow runs
+unattended and leans on the freshness PRs' existing gates (the content was
+already LLM-vetted at audit time). Run one or the other — not both on the same
+day — to avoid double-merging.
 
 ---
 
