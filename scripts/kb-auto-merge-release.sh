@@ -189,7 +189,9 @@ log "Merged $MERGED_COUNT PR(s) this run"
 # FETCH_HEAD, which would let us read a pre-merge origin/main.
 git fetch --quiet --tags origin
 LAST_TAG="$(git tag --list 'v*' --sort=-version:refname | head -1)"
-EMPTY_TREE="4b825dc642cb6eb9a0ff3e489513474fbd011014"  # git's well-known empty tree
+# Compute the empty-tree hash for this repo's object format (works for both
+# SHA-1 and a SHA-256 repo) rather than hardcoding the SHA-1 constant.
+EMPTY_TREE="$(git hash-object -t tree /dev/null)"
 if [ -n "$LAST_TAG" ]; then RANGE="$LAST_TAG..origin/main"; else RANGE="$EMPTY_TREE..origin/main"; fi
 
 # Distinct knowledge entry slugs changed since the last release tag. The slug is
