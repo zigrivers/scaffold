@@ -332,8 +332,9 @@ GitHub App token)** in the `RELEASE_BOT_TOKEN` secret for every `gh` call and
 the tag push. Until the secret is set the job logs a notice and **no-ops** (it
 never half-runs).
 
-Create a **fine-grained PAT** scoped to this repo with **Contents: read/write**
-and **Pull requests: read/write**, then:
+Create a **fine-grained PAT** scoped to this repo with **Contents: read/write**,
+**Pull requests: read/write**, and **Actions: read** (the merge serialization
+polls `gh run list` for in-flight `version-bump` runs), then:
 
 ```bash
 gh secret set RELEASE_BOT_TOKEN   # paste the token when prompted

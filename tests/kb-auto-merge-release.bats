@@ -88,6 +88,20 @@ JSON
   echo "$output" | jq -e '.merge[0].number == 2'
 }
 
+@test "plan: filters FAIL CLOSED — a set filter rejects a PR missing that field" {
+  # BASE is set but PR #1 has no baseRefName (null/absent) → must be rejected,
+  # not allowed through. PR #2 has the matching field.
+  run env BASE=main bash "$PLAN" <<'JSON'
+[
+  {"number":1,"headRefName":"knowledge-freshness/a-2026-06-09","createdAt":"2026-06-09T00:00:00Z","author":{"login":"x"}},
+  {"number":2,"headRefName":"knowledge-freshness/b-2026-06-09","createdAt":"2026-06-09T00:00:00Z","baseRefName":"main"}
+]
+JSON
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.merge | length == 1'
+  echo "$output" | jq -e '.merge[0].number == 2'
+}
+
 @test "plan: OWNER filter rejects a cross-repo (fork) PR" {
   run env OWNER=zigrivers bash "$PLAN" <<'JSON'
 [

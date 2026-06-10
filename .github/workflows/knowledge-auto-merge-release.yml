@@ -19,7 +19,8 @@ name: Knowledge Auto-Merge & Batched Release
 #   fire. It therefore uses a PAT (or GitHub App token) in the RELEASE_BOT_TOKEN
 #   secret for every gh call and the tag push. Until that secret is set, the job
 #   logs a notice and no-ops (it never half-runs). Required scopes (fine-grained
-#   PAT on this repo): Contents: read/write, Pull requests: read/write.
+#   PAT on this repo): Contents: read/write, Pull requests: read/write,
+#   Actions: read (the merge serialization polls `gh run list`).
 
 on:
   schedule:

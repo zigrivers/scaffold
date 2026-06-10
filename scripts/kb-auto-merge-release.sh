@@ -67,20 +67,29 @@ log() { echo "── $*"; }
 # Wait until no knowledge-freshness version-bump runs are queued/in-progress.
 # Called after each merge so the version-bump workflow's single concurrency
 # group can't cancel an intermediate bump (which would undercount KB VERSION).
+#
+# A failed `gh run list` (transient API error, or a token lacking Actions:read)
+# must NOT be read as "0 active runs" — that would silently skip serialization.
+# We distinguish failure (retry until the deadline) from a real idle result, and
+# only proceed past the deadline with an explicit warning.
 wait_version_bump_idle() {
   local deadline
   deadline=$(( $(date +%s) + 360 ))
   sleep 15  # let the just-triggered bump run register
   while [ "$(date +%s)" -lt "$deadline" ]; do
-    local active
+    local active rc
     active="$(gh run list --workflow=knowledge-freshness-version-bump.yml --json status \
-      --jq '[.[] | select(.status=="queued" or .status=="in_progress")] | length' \
-      2>/dev/null || echo 0)"
+      --jq '[.[] | select(.status=="queued" or .status=="in_progress")] | length')" && rc=0 || rc=$?
+    if [ "${rc:-1}" -ne 0 ]; then
+      echo "::warning::could not query version-bump runs (gh exit ${rc}; RELEASE_BOT_TOKEN needs Actions:read) — retrying"
+      sleep 15
+      continue
+    fi
     [ "${active:-0}" -eq 0 ] && return 0
     log "…waiting for $active version-bump run(s) to finish"
     sleep 15
   done
-  echo "::warning::version-bump still active after wait; KB VERSION may lag"
+  echo "::warning::version-bump runs still active or unverifiable after wait; KB VERSION may lag"
 }
 
 # ── Step 1: plan ──────────────────────────────────────────────────
@@ -162,10 +171,10 @@ if [ -n "$LAST_TAG" ]; then RANGE="$LAST_TAG..origin/main"; else RANGE="$EMPTY_T
 # Distinct knowledge entry slugs changed since the last release tag. The slug is
 # the .md filename stem (e.g. content/knowledge/core/database-design.md →
 # database-design), which matches the freshness branch topic.
-ENTRIES="$(git diff --name-only "$RANGE" -- content/knowledge/ \
-  | grep '\.md$' \
+ENTRIES="$(git diff --name-only --diff-filter=d "$RANGE" -- content/knowledge/ \
+  | { grep '\.md$' || true; } \
   | sed -E 's#.*/([^/]+)\.md$#\1#' \
-  | sort -u || true)"
+  | sort -u)"
 TOPIC_COUNT="$(printf '%s' "$ENTRIES" | grep -c '^' || true)"
 log "Unreleased knowledge topics since ${LAST_TAG:-<no tag>}: $TOPIC_COUNT"
 
@@ -199,10 +208,10 @@ git fetch --quiet origin main
 git reset --hard origin/main
 
 # Recompute the entry list against settled main (VERSION bumps now landed).
-ENTRIES="$(git diff --name-only "$RANGE" -- content/knowledge/ \
-  | grep '\.md$' \
+ENTRIES="$(git diff --name-only --diff-filter=d "$RANGE" -- content/knowledge/ \
+  | { grep '\.md$' || true; } \
   | sed -E 's#.*/([^/]+)\.md$#\1#' \
-  | sort -u || true)"
+  | sort -u)"
 KB_VERSION="$(tr -d '[:space:]' < content/knowledge/VERSION)"
 
 # Validate EXACTLY as publish.yml will, so a tag we push always publishes clean.

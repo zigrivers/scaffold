@@ -88,9 +88,11 @@ block="## [$version] — $date
 # which rejects embedded newlines in a -v variable.
 inserted=0
 while IFS= read -r cl_line || [ -n "$cl_line" ]; do
+  # Normalize any trailing CR so the output is uniformly LF (no mixed endings if
+  # the input is CRLF) and the heading compare below is exact.
+  cl_line="${cl_line%$'\r'}"
   printf '%s\n' "$cl_line"
-  # Tolerate CRLF changelogs: strip a trailing CR before the heading compare.
-  if [ "$inserted" -eq 0 ] && [ "${cl_line%$'\r'}" = "## [Unreleased]" ]; then
+  if [ "$inserted" -eq 0 ] && [ "$cl_line" = "## [Unreleased]" ]; then
     printf '\n%s\n' "$block"
     inserted=1
   fi
