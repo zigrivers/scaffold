@@ -42,6 +42,16 @@ RELEASE_DOW="${RELEASE_DOW:-0}"
 BOT_NAME="${BOT_NAME:-knowledge-release-bot}"
 BOT_EMAIL="${BOT_EMAIL:-knowledge-freshness@users.noreply.github.com}"
 
+# Trust filters for which PRs are eligible to auto-merge (passed to the plan).
+# Defaults match the nightly freshness automation: same-repo, base main, opened
+# by github-actions[bot]. OWNER falls back to the Actions-provided owner, then gh.
+BASE="${BASE:-main}"
+ALLOW_AUTHOR="${ALLOW_AUTHOR:-github-actions[bot]}"
+OWNER="${OWNER:-${GITHUB_REPOSITORY_OWNER:-}}"
+if [ -z "$OWNER" ]; then
+  OWNER="$(gh repo view --json owner --jq '.owner.login' 2>/dev/null || echo '')"
+fi
+
 # Echo a command, then run it unless DRY_RUN — used for every mutating action.
 run() {
   echo "+ $*"
@@ -54,11 +64,32 @@ run() {
 
 log() { echo "── $*"; }
 
+# Wait until no knowledge-freshness version-bump runs are queued/in-progress.
+# Called after each merge so the version-bump workflow's single concurrency
+# group can't cancel an intermediate bump (which would undercount KB VERSION).
+wait_version_bump_idle() {
+  local deadline
+  deadline=$(( $(date +%s) + 360 ))
+  sleep 15  # let the just-triggered bump run register
+  while [ "$(date +%s)" -lt "$deadline" ]; do
+    local active
+    active="$(gh run list --workflow=knowledge-freshness-version-bump.yml --json status \
+      --jq '[.[] | select(.status=="queued" or .status=="in_progress")] | length' \
+      2>/dev/null || echo 0)"
+    [ "${active:-0}" -eq 0 ] && return 0
+    log "…waiting for $active version-bump run(s) to finish"
+    sleep 15
+  done
+  echo "::warning::version-bump still active after wait; KB VERSION may lag"
+}
+
 # ── Step 1: plan ──────────────────────────────────────────────────
-log "Surveying open knowledge-freshness PRs"
+log "Surveying open knowledge-freshness PRs (base=$BASE author=$ALLOW_AUTHOR owner=$OWNER)"
 PRS_JSON="$(gh pr list --state open --limit 100 \
-  --json number,title,headRefName,createdAt)"
-PLAN="$(printf '%s' "$PRS_JSON" | bash "$SCRIPT_DIR/kb-auto-merge-plan.sh")"
+  --json number,title,headRefName,createdAt,baseRefName,author,headRepositoryOwner)"
+PLAN="$(printf '%s' "$PRS_JSON" \
+  | BASE="$BASE" ALLOW_AUTHOR="$ALLOW_AUTHOR" OWNER="$OWNER" \
+    bash "$SCRIPT_DIR/kb-auto-merge-plan.sh")"
 
 MERGE_NUMS="$(printf '%s' "$PLAN" | jq -r '.merge[].number')"
 CLOSE_LINES="$(printf '%s' "$PLAN" | jq -r '.close[] | "\(.number) \(.supersededBy)"')"
@@ -89,15 +120,34 @@ if [ -n "$MERGE_NUMS" ]; then
       continue
     fi
 
-    # Green: gh pr checks exits non-zero if any check is failing or pending.
-    if ! gh pr checks "$num" >/dev/null 2>&1; then
-      echo "::notice::PR #$num checks not green yet — skipping this run"
+    # Skip PRs with merge conflicts.
+    MERGEABLE="$(gh pr view "$num" --json mergeable --jq '.mergeable' 2>/dev/null || echo UNKNOWN)"
+    if [ "$MERGEABLE" = "CONFLICTING" ]; then
+      echo "::notice::PR #$num has merge conflicts — skipping"
       continue
     fi
 
-    log "Merging #$num (squash)"
+    # Check state. Nightly freshness PRs are opened with GITHUB_TOKEN, whose
+    # events GitHub suppresses, so they legitimately have NO check runs (they are
+    # gated inline at audit time). Accept "none"; require any present checks to be
+    # green; skip while any are failing or still pending. The trust filters above
+    # (base/author/owner) are what keep "no checks" safe to merge.
+    CHECK_STATE="$(gh pr view "$num" --json statusCheckRollup --jq '
+      if (.statusCheckRollup | length) == 0 then "none"
+      elif any(.statusCheckRollup[];
+               ((.conclusion // .state // "") | ascii_upcase) as $c
+               | ($c != "SUCCESS" and $c != "NEUTRAL" and $c != "SKIPPED"))
+      then "not-green" else "green" end' 2>/dev/null || echo "unknown")"
+    if [ "$CHECK_STATE" = "not-green" ] || [ "$CHECK_STATE" = "unknown" ]; then
+      echo "::notice::PR #$num checks not green yet ($CHECK_STATE) — skipping this run"
+      continue
+    fi
+
+    log "Merging #$num (squash; checks=$CHECK_STATE)"
     if run gh pr merge "$num" --squash --delete-branch; then
       MERGED_COUNT=$((MERGED_COUNT + 1))
+      # Serialize bumps: wait for this PR's VERSION-bump run before the next merge.
+      [ "$DRY_RUN" = "true" ] || wait_version_bump_idle
     fi
   done <<< "$MERGE_NUMS"
 fi
@@ -106,7 +156,8 @@ log "Merged $MERGED_COUNT PR(s) this run"
 # ── Step 3: release decision ──────────────────────────────────────
 git fetch --quiet --tags origin main
 LAST_TAG="$(git tag --list 'v*' --sort=-version:refname | head -1)"
-if [ -n "$LAST_TAG" ]; then RANGE="$LAST_TAG..origin/main"; else RANGE="origin/main"; fi
+EMPTY_TREE="4b825dc642cb6eb9a0ff3e489513474fbd011014"  # git's well-known empty tree
+if [ -n "$LAST_TAG" ]; then RANGE="$LAST_TAG..origin/main"; else RANGE="$EMPTY_TREE..origin/main"; fi
 
 # Distinct knowledge entry slugs changed since the last release tag. The slug is
 # the .md filename stem (e.g. content/knowledge/core/database-design.md →
@@ -115,8 +166,7 @@ ENTRIES="$(git diff --name-only "$RANGE" -- content/knowledge/ \
   | grep '\.md$' \
   | sed -E 's#.*/([^/]+)\.md$#\1#' \
   | sort -u || true)"
-TOPIC_COUNT=0
-[ -n "$ENTRIES" ] && TOPIC_COUNT="$(printf '%s\n' "$ENTRIES" | grep -c .)"
+TOPIC_COUNT="$(printf '%s' "$ENTRIES" | grep -c '^' || true)"
 log "Unreleased knowledge topics since ${LAST_TAG:-<no tag>}: $TOPIC_COUNT"
 
 DOW="$(date -u +%w)"
@@ -140,18 +190,10 @@ if [ "$DO_RELEASE" != "true" ]; then
 fi
 
 # ── Step 4: cut the batched release ───────────────────────────────
-log "Releasing: waiting for in-flight KB VERSION bumps to settle"
-DEADLINE=$(( $(date +%s) + 720 ))   # up to 12 minutes
-sleep 20  # let just-merged PRs' bump runs register
-while [ "$(date +%s)" -lt "$DEADLINE" ]; do
-  ACTIVE="$(gh run list --workflow=knowledge-freshness-version-bump.yml \
-    --json status \
-    --jq '[.[] | select(.status=="queued" or .status=="in_progress")] | length' \
-    2>/dev/null || echo 0)"
-  [ "${ACTIVE:-0}" -eq 0 ] && break
-  log "…$ACTIVE version-bump run(s) still active; waiting"
-  sleep 20
-done
+# Per-merge serialization above already waited for each bump; a final idle check
+# covers any straggler before we read VERSION.
+log "Releasing: confirming KB VERSION bumps have settled"
+[ "$DRY_RUN" = "true" ] || wait_version_bump_idle
 
 git fetch --quiet origin main
 git reset --hard origin/main

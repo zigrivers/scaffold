@@ -14,15 +14,33 @@
 # so `knowledge-freshness/multi-service-api-contracts-2026-06-09` → topic
 # `multi-service-api-contracts`.
 #
+# Trust filters (set by the workflow; empty = filter disabled, for tests):
+#   BASE          require .baseRefName == "$BASE"            (e.g. main)
+#   ALLOW_AUTHOR  require .author.login == "$ALLOW_AUTHOR"   (the freshness bot)
+#   OWNER         require .headRepositoryOwner.login==$OWNER (same-repo, not a fork)
+# These stop the release token from auto-merging an arbitrary PR that merely
+# adopts the `knowledge-freshness/` branch name (critical because no-check bot
+# PRs are otherwise eligible). When a field is absent on an input PR the filter
+# is skipped for that PR, so the workflow must request the fields and set the
+# env vars to enforce them.
+#
 # Pure: no network, no side effects. The workflow executes the plan.
 #
-# Usage: gh pr list --json number,title,headRefName,createdAt | bash scripts/kb-auto-merge-plan.sh
+# Usage:
+#   gh pr list --json number,title,headRefName,createdAt,baseRefName,author,headRepositoryOwner \
+#     | BASE=main ALLOW_AUTHOR='github-actions[bot]' OWNER=zigrivers bash scripts/kb-auto-merge-plan.sh
 
 set -euo pipefail
 
-jq '
+jq \
+  --arg base "${BASE:-}" \
+  --arg author "${ALLOW_AUTHOR:-}" \
+  --arg owner "${OWNER:-}" '
   [ .[]
     | select(.headRefName | startswith("knowledge-freshness/"))
+    | select( $base   == "" or (.baseRefName == null)              or (.baseRefName == $base) )
+    | select( $author == "" or (.author == null)                   or ((.author.login // "") == $author) )
+    | select( $owner  == "" or (.headRepositoryOwner == null)      or ((.headRepositoryOwner.login // "") == $owner) )
     | .topic = ( .headRefName
                  | sub("^knowledge-freshness/"; "")
                  | sub("-[0-9]{4}-[0-9]{2}-[0-9]{2}$"; "") )

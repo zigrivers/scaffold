@@ -79,9 +79,7 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
-      - name: Install jq
-        if: steps.preflight.outputs.enabled == 'true'
-        run: sudo apt-get update && sudo apt-get install -y jq
+      # jq is preinstalled on ubuntu-latest runners — no install step needed.
 
       - name: Install npm dependencies
         if: steps.preflight.outputs.enabled == 'true'

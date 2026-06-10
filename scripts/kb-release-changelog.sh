@@ -89,7 +89,8 @@ block="## [$version] — $date
 inserted=0
 while IFS= read -r cl_line || [ -n "$cl_line" ]; do
   printf '%s\n' "$cl_line"
-  if [ "$inserted" -eq 0 ] && [ "$cl_line" = "## [Unreleased]" ]; then
+  # Tolerate CRLF changelogs: strip a trailing CR before the heading compare.
+  if [ "$inserted" -eq 0 ] && [ "${cl_line%$'\r'}" = "## [Unreleased]" ]; then
     printf '\n%s\n' "$block"
     inserted=1
   fi

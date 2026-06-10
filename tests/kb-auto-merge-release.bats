@@ -64,6 +64,42 @@ JSON
   echo "$output" | jq -e '.merge == [] and .close == []'
 }
 
+@test "plan: BASE filter rejects a PR targeting a branch other than the configured base" {
+  run env BASE=main bash "$PLAN" <<'JSON'
+[
+  {"number":1,"headRefName":"knowledge-freshness/a-2026-06-09","createdAt":"2026-06-09T00:00:00Z","baseRefName":"develop"},
+  {"number":2,"headRefName":"knowledge-freshness/b-2026-06-09","createdAt":"2026-06-09T00:00:00Z","baseRefName":"main"}
+]
+JSON
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.merge | length == 1'
+  echo "$output" | jq -e '.merge[0].number == 2'
+}
+
+@test "plan: ALLOW_AUTHOR filter rejects a PR from an unexpected author" {
+  run env ALLOW_AUTHOR='github-actions[bot]' bash "$PLAN" <<'JSON'
+[
+  {"number":1,"headRefName":"knowledge-freshness/a-2026-06-09","createdAt":"2026-06-09T00:00:00Z","author":{"login":"mallory"}},
+  {"number":2,"headRefName":"knowledge-freshness/b-2026-06-09","createdAt":"2026-06-09T00:00:00Z","author":{"login":"github-actions[bot]"}}
+]
+JSON
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.merge | length == 1'
+  echo "$output" | jq -e '.merge[0].number == 2'
+}
+
+@test "plan: OWNER filter rejects a cross-repo (fork) PR" {
+  run env OWNER=zigrivers bash "$PLAN" <<'JSON'
+[
+  {"number":1,"headRefName":"knowledge-freshness/a-2026-06-09","createdAt":"2026-06-09T00:00:00Z","headRepositoryOwner":{"login":"forker"}},
+  {"number":2,"headRefName":"knowledge-freshness/b-2026-06-09","createdAt":"2026-06-09T00:00:00Z","headRepositoryOwner":{"login":"zigrivers"}}
+]
+JSON
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.merge | length == 1'
+  echo "$output" | jq -e '.merge[0].number == 2'
+}
+
 # ─── kb-release-decision.sh ───────────────────────────────────────
 
 @test "decision: zero unreleased topics always defers (even on Sunday)" {
