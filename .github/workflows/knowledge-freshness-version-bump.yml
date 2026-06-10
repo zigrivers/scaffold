@@ -102,7 +102,11 @@ jobs:
             # (so a prior run that already caught up doesn't over-bump). No prior bump
             # commit (first bump ever) → single derivation from this PR.
             if [ -n "$LAST_BUMP" ]; then
-              OUTPUT=$(git log -z --format=%B "${LAST_BUMP}..HEAD" -- content/knowledge/ ':(exclude)content/knowledge/VERSION' \
+              # --reverse: oldest→newest. bumpSemverReplay is order-sensitive (a
+              # feat/minor mid-sequence resets the patch field), so the commits
+              # MUST replay in chronological/merge order, not git log's default
+              # newest-first order.
+              OUTPUT=$(git log -z --reverse --format=%B "${LAST_BUMP}..HEAD" -- content/knowledge/ ':(exclude)content/knowledge/VERSION' \
                 | node dist/index.js knowledge-freshness bump-version --replay-stdin --title "$PR_TITLE" --body "$PR_BODY")
             else
               OUTPUT=$(node dist/index.js knowledge-freshness bump-version --title "$PR_TITLE" --body "$PR_BODY")

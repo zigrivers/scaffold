@@ -147,9 +147,12 @@ if [ -n "$CLOSE_LINES" ]; then
     run gh_retry pr close "$num" \
       --comment "Superseded by #$winner (newer freshness run for the same topic)."
     if [ -n "$branch" ] && [ "$DRY_RUN" != "true" ]; then
-      # gh_retry so a transient 401/5xx doesn't leave an orphan branch; still
-      # best-effort overall (an already-gone/undeletable branch just logs).
-      if gh_retry api --method DELETE "repos/{owner}/{repo}/git/refs/heads/$branch" >/dev/null; then
+      # Best-effort, single attempt (NOT gh_retry): an already-gone branch (the
+      # common case on a re-run) or a fork ref returns 4xx, and retrying that 4×
+      # with backoff would waste ~30s per dupe for nothing. A rare transient
+      # failure just leaves an orphan for the periodic prune — acceptable for
+      # cosmetic cleanup. GitHub's auto-delete-on-merge covers the merge path.
+      if gh api --method DELETE "repos/{owner}/{repo}/git/refs/heads/$branch" >/dev/null 2>&1; then
         log "  deleted branch $branch"
       else
         log "  (branch $branch already gone or undeletable — skipping)"
