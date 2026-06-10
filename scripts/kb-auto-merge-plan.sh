@@ -39,9 +39,10 @@ jq \
   --arg owner "${OWNER:-}" '
   [ .[]
     | select(.headRefName | startswith("knowledge-freshness/"))
-    | select( $base   == "" or ((.baseRefName // "")              == $base) )
-    | select( $author == "" or ((.author.login // "")            == $author) )
-    | select( $owner  == "" or ((.headRepositoryOwner.login // "") == $owner) )
+    | select( $base   == "" or ((.baseRefName // "") == $base) )
+    # GitHub logins are case-insensitive — compare author/owner case-folded.
+    | select( $author == "" or ((.author.login // "")            | ascii_downcase) == ($author | ascii_downcase) )
+    | select( $owner  == "" or ((.headRepositoryOwner.login // "") | ascii_downcase) == ($owner  | ascii_downcase) )
     | .topic = ( .headRefName
                  | sub("^knowledge-freshness/"; "")
                  | sub("-[0-9]{4}-[0-9]{2}-[0-9]{2}$"; "") )

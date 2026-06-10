@@ -134,18 +134,26 @@ if [ -n "$MERGE_NUMS" ]; then
   while IFS= read -r num; do
     [ -z "$num" ] && continue
 
-    # In scope: every changed file must live under content/knowledge/.
+    # In scope: every changed file must live under content/knowledge/. A gh
+    # failure here must not abort the whole run (set -e) — skip this PR instead.
     OUT_OF_SCOPE="$(gh pr view "$num" --json files \
-      --jq '[.files[].path | select(startswith("content/knowledge/") | not)] | length')"
-    if [ "${OUT_OF_SCOPE:-0}" -ne 0 ]; then
+      --jq '[.files[].path | select(startswith("content/knowledge/") | not)] | length' \
+      2>/dev/null || echo "error")"
+    if [ "$OUT_OF_SCOPE" = "error" ]; then
+      echo "::notice::could not read files for #$num — skipping this run"
+      continue
+    fi
+    if [ "$OUT_OF_SCOPE" -ne 0 ]; then
       echo "::warning::PR #$num touches files outside content/knowledge/ — skipping (needs human review)"
       continue
     fi
 
-    # Skip PRs with merge conflicts.
+    # Only merge a PR GitHub reports as cleanly MERGEABLE. CONFLICTING is skipped;
+    # UNKNOWN (GitHub still computing) is also skipped so we don't merge blind —
+    # the next daily run retries once the state settles.
     MERGEABLE="$(gh pr view "$num" --json mergeable --jq '.mergeable' 2>/dev/null || echo UNKNOWN)"
-    if [ "$MERGEABLE" = "CONFLICTING" ]; then
-      echo "::notice::PR #$num has merge conflicts — skipping"
+    if [ "$MERGEABLE" != "MERGEABLE" ]; then
+      echo "::notice::PR #$num mergeable=$MERGEABLE — skipping this run"
       continue
     fi
 
@@ -176,7 +184,10 @@ fi
 log "Merged $MERGED_COUNT PR(s) this run"
 
 # ── Step 3: release decision ──────────────────────────────────────
-git fetch --quiet --tags origin main
+# Fetch without an explicit branch so the origin/main remote-tracking ref (and
+# tags) are reliably updated — `git fetch origin main` only guarantees
+# FETCH_HEAD, which would let us read a pre-merge origin/main.
+git fetch --quiet --tags origin
 LAST_TAG="$(git tag --list 'v*' --sort=-version:refname | head -1)"
 EMPTY_TREE="4b825dc642cb6eb9a0ff3e489513474fbd011014"  # git's well-known empty tree
 if [ -n "$LAST_TAG" ]; then RANGE="$LAST_TAG..origin/main"; else RANGE="$EMPTY_TREE..origin/main"; fi
@@ -212,7 +223,7 @@ if [ "$DO_RELEASE" != "true" ]; then
 fi
 
 # ── Step 4: cut the batched release ───────────────────────────────
-git fetch --quiet origin main
+git fetch --quiet origin   # update origin/main tracking ref (not just FETCH_HEAD)
 
 # Read settled values straight from origin/main via `git show`/`git diff` so we
 # never touch the working tree until we are committed to a LIVE release. The
@@ -227,7 +238,7 @@ RELEASE_DATE="$(date -u +%F)"
 # Dry-run is strictly read-only: no reset, no file writes, no npm version, no
 # git mutations. Preview the planned version + CHANGELOG block, then stop.
 if [ "$DRY_RUN" = "true" ]; then
-  NEW_VERSION="$(node -e 'const [a,b,c]=require("./package.json").version.split(".").map(Number); console.log(`${a}.${b}.${c+1}`)')"
+  NEW_VERSION="$(node -e 'const m=require("./package.json").version.match(/^(\d+)\.(\d+)\.(\d+)/); if(!m){console.error("unparseable version");process.exit(1)} console.log(`${m[1]}.${m[2]}.${+m[3]+1}`)')"
   log "(dry-run) would release scaffold v$NEW_VERSION (KB VERSION $KB_VERSION, $RELEASE_DATE) covering $TOPIC_COUNT topic(s)"
   echo "──── (dry-run) CHANGELOG block that would be inserted ────"
   printf '%s\n' "$ENTRIES" | bash "$SCRIPT_DIR/kb-release-changelog.sh" \
@@ -240,6 +251,15 @@ fi
 
 # ── live release (mutations from here) ────────────────────────────
 wait_version_bump_idle
+# Surface (don't abort on) a failed latest VERSION bump: the release still works,
+# but KB VERSION may lag. A `cancelled` run is expected under the concurrency
+# group and is not treated as a failure.
+LATEST_BUMP="$(gh run list --workflow=knowledge-freshness-version-bump.yml \
+  --status completed --limit 1 --json conclusion --jq '.[0].conclusion // ""' \
+  2>/dev/null || echo "")"
+if [ "$LATEST_BUMP" = "failure" ]; then
+  echo "::warning::latest knowledge-freshness version-bump run FAILED — KB VERSION may be stale in this release"
+fi
 git reset --hard origin/main
 
 # Validate EXACTLY as publish.yml will, so a tag we push always publishes clean.
