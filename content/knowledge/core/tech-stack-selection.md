@@ -1,15 +1,25 @@
 ---
 name: tech-stack-selection
 description: Framework evaluation methodology, decision matrices, and technology tradeoff analysis
-topics: [tech-stack, framework-selection, decision-matrix, tradeoffs, scalability, ecosystem]
+topics:
+  - tech-stack
+  - framework-selection
+  - decision-matrix
+  - tradeoffs
+  - scalability
+  - ecosystem
 volatility: fast-moving
-last-reviewed: null
+last-reviewed: 2026-06-11
 version-pin: null
 sources:
   - url: https://www.thoughtworks.com/radar
     anchor: '#technology-radar'
+    hash: sha256:9bcf300c85a9a2762f5f3c9673e01b11ca1b35776e142a93805da0872ab03f14
+    retrieved: 2026-06-11
   - url: https://martinfowler.com/articles/microservice-trade-offs.html
     anchor: '#evaluating'
+    hash: sha256:5968d48d377a99647ea007654e1c13765722f55035d6432d7c8675a2a3f6518a
+    retrieved: 2026-06-11
 ---
 
 # Tech Stack Selection
