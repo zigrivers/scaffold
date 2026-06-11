@@ -1,20 +1,33 @@
 ---
 name: security-best-practices
 description: OWASP Top 10, authentication, authorization, data protection, and threat modeling
-topics: [security, owasp, authentication, authorization, threat-modeling, secrets-management, dependency-auditing]
+topics:
+  - security
+  - owasp
+  - authentication
+  - authorization
+  - threat-modeling
+  - secrets-management
+  - dependency-auditing
 volatility: fast-moving
 last-reviewed: null
-version-pin: 'OWASP Top 10 2021'
+version-pin: OWASP Top 10 2021
 sources:
   - url: https://owasp.org/Top10/
     anchor: '#top-10-list'
+    hash: sha256:cf318bf6e49239cd034bdfcdf41ca87eab4036c34f8991be2d2a24e52647a12b
+    retrieved: 2026-06-11
 ---
 
 ## Summary
 
+## OWASP Top 10:2025
+
+The OWASP Top 10:2025 represents the most critical security risks to web applications. Every project should evaluate each risk and implement appropriate mitigations.
+
 ## OWASP Top 10
 
-The OWASP Top 10 represents the most critical security risks to web applications. Every project should evaluate each risk and implement appropriate mitigations.
+The OWASP Top 10 represents the most critical security risks to web applications. Every project should evaluate each risk and implement appropriate mitigations. The current edition is the [OWASP Top 10:2025](https://owasp.org/Top10/2025/en/).
 
 ### A01: Broken Access Control
 
@@ -62,6 +75,170 @@ Sensitive data exposed due to weak or missing encryption.
 - Use TLS 1.2+ for all data in transit (HTTPS everywhere, no mixed content)
 - Hash passwords with bcrypt, scrypt, or Argon2 (NEVER MD5 or SHA-256 for passwords)
 - Don't store sensitive data you don't need — the safest data is data you don't have
+
+### A03: Injection
+
+Untrusted data sent to an interpreter as part of a command or query, causing unintended execution.
+
+**SQL injection:**
+
+```typescript
+// BAD: String concatenation — vulnerable
+const query = `SELECT * FROM users WHERE email = '${email}'`;
+
+// GOOD: Parameterized query — safe
+const query = `SELECT * FROM users WHERE email = $1`;
+const result = await db.query(query, [email]);
+
+// GOOD: ORM with parameterized API — safe
+const user = await db.users.findFirst({ where: { email } });
+```
+
+**NoSQL injection:**
+
+```typescript
+// BAD: User input directly in query object
+db.users.find({ email: req.body.email, password: req.body.password });
+// Attacker sends: { "password": { "$ne": "" } } — bypasses password check
+
+// GOOD: Validate and sanitize input types before use
+const email = String(req.body.email);
+const passwordHash = await hash(String(req.body.password));
+db.users.find({ email, passwordHash });
+```
+
+**Command injection:**
+
+```typescript
+// BAD: User input in shell command
+exec(`convert ${userFilename} output.png`);
+
+// GOOD: Use library APIs instead of shell commands
+sharp(userFilePath).toFile('output.png');
+```
+
+**Prevention rules:**
+- Use parameterized queries for all database access
+- Use ORM/query builders that parameterize automatically
+- Validate and sanitize all user input at the boundary
+- Never construct shell commands from user input
+
+### A04: Insecure Design
+
+Security flaws from missing or ineffective control design, as opposed to implementation bugs. These are architectural problems.
+
+**Examples:**
+- Password reset via security questions (attackable)
+- No rate limiting on login endpoint (brute force possible)
+- No account lockout policy (unlimited password attempts)
+- Returning different error messages for "user not found" vs. "wrong password" (user enumeration)
+
+**Mitigations:**
+- Threat model during design phase, not after implementation
+- Use established security patterns (don't invent custom auth)
+- Rate limit all authentication endpoints
+- Return generic error messages for auth failures ("Invalid credentials" for both wrong email and wrong password)
+- Require MFA for sensitive operations
+
+### A05: Security Misconfiguration
+
+Default credentials, unnecessary features enabled, verbose error messages, missing security headers.
+
+**Common misconfigurations:**
+- Debug mode enabled in production (stack traces exposed)
+- Default database passwords unchanged
+- Directory listing enabled on web server
+- Unnecessary HTTP methods enabled (TRACE, OPTIONS returning too much)
+- Missing security headers (CSP, X-Frame-Options, X-Content-Type-Options)
+
+**Mitigations:**
+- Hardened configuration for each environment (dev uses relaxed settings; production uses strict settings)
+- Remove default accounts and sample data before deployment
+- Disable stack traces and verbose error messages in production
+- Set security headers on all responses:
+
+```
+Content-Security-Policy: default-src 'self'; script-src 'self'
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+Referrer-Policy: strict-origin-when-cross-origin
+Permissions-Policy: camera=(), microphone=(), geolocation=()
+```
+
+### A06: Vulnerable and Outdated Components
+
+Using libraries with known vulnerabilities.
+
+**Mitigations:**
+- Run dependency audit on every CI build (`npm audit`, `pip audit`, `cargo audit`)
+- Subscribe to security advisories for critical dependencies
+- Update dependencies regularly (weekly for patch versions, monthly for minor)
+- Pin dependency versions (use lockfiles: `package-lock.json`, `poetry.lock`)
+- Remove unused dependencies
+- Prefer dependencies with active maintenance and security response processes
+
+### A07: Identification and Authentication Failures
+
+Broken authentication mechanisms that allow attackers to assume identities.
+
+**Common failures:**
+- Permitting weak passwords ("123456", "password")
+- Storing passwords in plaintext or with reversible encryption
+- Missing brute-force protection
+- Session tokens in URLs (exposed in logs and browser history)
+- Session not invalidated after logout or password change
+
+**Mitigations:**
+- Enforce password complexity requirements (minimum 8 characters, no common passwords list)
+- Hash passwords with Argon2id, bcrypt (cost factor 12+), or scrypt
+- Rate limit login attempts (5 failures per minute per IP and per account)
+- Implement account lockout (lock after 10 consecutive failures, unlock after 30 minutes)
+- Invalidate all sessions when password changes
+- Use secure, HttpOnly, SameSite cookies for session tokens
+- Implement MFA for sensitive applications
+
+### A08: Software and Data Integrity Failures
+
+Code and infrastructure that doesn't verify integrity: unverified CI/CD pipelines, auto-updated dependencies, unsigned software.
+
+**Mitigations:**
+- Verify dependency integrity (lockfile checksums)
+- Use signed commits for critical code paths
+- Review CI/CD pipeline configuration changes with the same rigor as application code
+- Don't auto-merge dependency updates without CI verification
+- Use Subresource Integrity (SRI) for CDN-loaded scripts
+
+### A09: Security Logging and Monitoring Failures
+
+Insufficient logging to detect, investigate, or alert on attacks.
+
+**What to log:**
+- All authentication attempts (success and failure, with IP and user agent)
+- Authorization failures (user tried to access something they shouldn't)
+- Input validation failures (potential injection attempts)
+- Changes to user permissions or roles
+- Administrative actions (user creation, role changes, config changes)
+- Application errors (5xx responses with context)
+
+**What NEVER to log:**
+- Passwords (even failed ones — they might be the correct password for a different account)
+- Session tokens, API keys, or JWT tokens
+- Credit card numbers, SSNs, or other PII
+- Full request bodies of sensitive endpoints (login, payment)
+
+**Log format:** Use structured logging (JSON) with correlation IDs for request tracing. Include timestamp, severity, source, action, actor, target, and result.
+
+### A10: Server-Side Request Forgery (SSRF)
+
+The application fetches a URL provided by the user, allowing the attacker to make requests from the server's network position (accessing internal services, cloud metadata endpoints).
+
+**Mitigations:**
+- Validate and whitelist allowed URL schemes (only `https://`)
+- Block requests to internal IP ranges (10.x, 172.16-31.x, 192.168.x, 169.254.x, localhost)
+- Block requests to cloud metadata endpoints (169.254.169.254)
+- Use a URL parser to normalize and validate before fetching
+- Run URL-fetching services in an isolated network segment
 
 ## Deep Guidance
 
