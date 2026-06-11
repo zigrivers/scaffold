@@ -121,3 +121,27 @@ Patterns and anti-patterns discovered during development. Review before starting
   duplicated `## OWASP Top 10` section in security-best-practices (#566). The
   `gh pr diff` skim (Step 2) caught it; held the PR for a human. Watch the
   outlier-sized diff in a batch (+180 lines vs the usual +10).
+
+## 2026-06-11 — Freshness automation fixes validated in production + first batched release
+
+- **Replay catch-up (#2) works:** merging 9 refresh PRs in a rapid batch advanced
+  KB VERSION 0.1.18 → **0.1.27 (+9 exact)**. The day before, the same 9-merge
+  batch only reached +4 (concurrency-group cancellations). The version-bump
+  workflow's replay (oldest→newest `git log --reverse | bump-version
+  --replay-stdin`) recovered every cancelled bump. `git log` is newest-first by
+  default — `--reverse` is REQUIRED because bumpSemverReplay is order-sensitive
+  (a feat/minor mid-batch resets patch).
+- **Branch auto-delete works:** after enabling `delete_branch_on_merge` + the
+  glue's dupe-close `gh api DELETE`, the 9 merged branches were gone immediately;
+  no manual prune needed.
+- **First batched release fired on the surge valve:** 18 unreleased topics ≥ 10
+  threshold → cut v3.34.1 (patch, content-only) mid-week (Thursday), not waiting
+  for Sunday. kb-release-changelog.sh generated the 18-entry block cleanly;
+  publish + homebrew + npm all green.
+- **Author login is multi-form:** `gh --json author` → `app/github-actions`;
+  REST `.user.login` → `github-actions[bot]` for the SAME bot, on consecutive
+  days. The ALLOW_AUTHOR allowlist (#579) handles both; don't assume one form.
+- **security-best-practices keeps producing flawed refreshes** (held #566 + #580)
+  — see memory `security-best-practices-refresh-defect`. The +180 size is the
+  tell; the automation adds a parallel OWASP-2025 section instead of updating in
+  place and never reconciles version-pin.
