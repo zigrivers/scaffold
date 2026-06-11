@@ -49,9 +49,18 @@ export function deriveBumpKind(prTitle: string, prBody: string): BumpKind {
  *
  *  - `major`: `X.Y.Z` → `(X+1).0.0`
  *  - `minor`: `X.Y.Z` → `X.(Y+1).0`
- *  - `patch`: `X.Y.Z` → `X.Y.(Z+1)`
+ *  - `patch`: `X.Y.Z` → `X.Y.(Z+count)`
+ *
+ * `count` is a CATCH-UP multiplier for patch bumps: when several
+ * `chore(knowledge): refresh` PRs merge in a rapid batch, the version-bump
+ * workflow's single concurrency group cancels the intermediate runs, so a
+ * surviving run must advance VERSION by all the patch bumps it owes (one per
+ * un-bumped refresh commit) instead of just one. `count` applies ONLY to
+ * `patch` — `minor`/`major` are deliberate, single, and reset the lower fields,
+ * so a catch-up count is meaningless for them and is ignored. Defaults to 1,
+ * preserving the original single-bump behavior.
  */
-export function bumpSemver(current: string, kind: BumpKind): string {
+export function bumpSemver(current: string, kind: BumpKind, count = 1): string {
   // Trim because VERSION files routinely have a trailing newline.
   const trimmed = current.trim()
   const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(trimmed)
@@ -67,6 +76,27 @@ export function bumpSemver(current: string, kind: BumpKind): string {
   case 'minor':
     return `${major}.${minor + 1}.0`
   case 'patch':
-    return `${major}.${minor}.${patch + 1}`
+    // count is only meaningful for patch — validate it here so a minor/major
+    // bump with an unused/invalid count is ignored rather than throwing.
+    if (!Number.isInteger(count) || count < 1) {
+      throw new Error(`bumpSemver: count must be a positive integer (got ${count})`)
+    }
+    return `${major}.${minor}.${patch + count}`
   }
+}
+
+/**
+ * Replay a sequence of bump kinds against a starting version, in order.
+ *
+ * This is the catch-up primitive when several knowledge PRs merged in a rapid
+ * batch and the version-bump workflow's single concurrency group cancelled the
+ * intermediate runs: a surviving run replays the per-commit kind of EVERY
+ * un-bumped commit (oldest→newest), so a mixed batch is handled correctly — a
+ * `feat` (minor) in the middle resets the patch field, a later `chore` (patch)
+ * adds to it. Replaying N patch bumps is equivalent to `bumpSemver(_, 'patch',
+ * N)`, so this subsumes the count multiplier. An empty list returns the
+ * (trimmed) input unchanged.
+ */
+export function bumpSemverReplay(current: string, kinds: BumpKind[]): string {
+  return kinds.reduce((version, kind) => bumpSemver(version, kind), current.trim())
 }

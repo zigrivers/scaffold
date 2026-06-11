@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { deriveBumpKind, bumpSemver } from './bump-version.js'
+import { deriveBumpKind, bumpSemver, bumpSemverReplay } from './bump-version.js'
 
 describe('deriveBumpKind', () => {
   it('returns major when BREAKING CHANGE appears in title', () => {
@@ -75,6 +75,48 @@ describe('bumpSemver', () => {
     expect(() => bumpSemver('1.0.0-beta', 'patch')).toThrow(/invalid SemVer/)
     expect(() => bumpSemver('vNotASemver', 'patch')).toThrow(/invalid SemVer/)
     expect(() => bumpSemver('', 'patch')).toThrow(/invalid SemVer/)
+  })
+
+  it('catches up patch by count (rapid batch where intermediate bump runs were cancelled)', () => {
+    expect(bumpSemver('0.1.14', 'patch', 9)).toBe('0.1.23')
+    expect(bumpSemver('1.2.3', 'patch', 1)).toBe('1.2.4')
+    expect(bumpSemver('0.1.0', 'patch', 4)).toBe('0.1.4')
+  })
+
+  it('ignores count for minor and major (reset semantics make a multiplier meaningless)', () => {
+    expect(bumpSemver('0.1.5', 'minor', 9)).toBe('0.2.0')
+    expect(bumpSemver('0.1.5', 'major', 9)).toBe('1.0.0')
+  })
+
+  it('does NOT throw on an invalid count for minor/major (count is unused there)', () => {
+    expect(bumpSemver('0.1.5', 'minor', 0)).toBe('0.2.0')
+    expect(bumpSemver('0.1.5', 'major', Number.NaN)).toBe('1.0.0')
+  })
+
+  it('rejects a non-positive or non-integer count for PATCH bumps', () => {
+    expect(() => bumpSemver('0.1.0', 'patch', 0)).toThrow(/count must be a positive integer/)
+    expect(() => bumpSemver('0.1.0', 'patch', -3)).toThrow(/count must be a positive integer/)
+    expect(() => bumpSemver('0.1.0', 'patch', 1.5)).toThrow(/count must be a positive integer/)
+  })
+})
+
+describe('bumpSemverReplay', () => {
+  it('replays N patch bumps (equivalent to the count multiplier)', () => {
+    expect(bumpSemverReplay('0.1.14', ['patch', 'patch', 'patch'])).toBe('0.1.17')
+  })
+
+  it('handles a mixed batch in order — a minor resets patch, later patches add to it', () => {
+    // 0.1.5 → patch 0.1.6 → minor 0.2.0 → patch 0.2.1 → patch 0.2.2
+    expect(bumpSemverReplay('0.1.5', ['patch', 'minor', 'patch', 'patch'])).toBe('0.2.2')
+  })
+
+  it('handles a major in the batch (resets minor + patch)', () => {
+    // 0.1.5 → patch 0.1.6 → major 1.0.0 → patch 1.0.1
+    expect(bumpSemverReplay('0.1.5', ['patch', 'major', 'patch'])).toBe('1.0.1')
+  })
+
+  it('returns the trimmed input unchanged for an empty batch', () => {
+    expect(bumpSemverReplay('0.1.18\n', [])).toBe('0.1.18')
   })
 })
 

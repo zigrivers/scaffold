@@ -299,16 +299,23 @@ the in-session `/loop` sweep. It runs daily (12:17 UTC, after the 09:00 UTC
 freshness audit) and:
 
 1. **Merges daily** — plans the open `knowledge-freshness/*` PRs
-   newest-per-topic (`scripts/kb-auto-merge-plan.sh`), closes superseded dupes,
-   and squash-merges each newest PR only when it passes a trust gate:
-   targets `main`, same-repo (not a fork), opened by the freshness bot
-   (`github-actions[bot]`), touches **only** `content/knowledge/**`, has no
-   merge conflict, and its checks are green — *or absent* (nightly bot PRs have
-   no check runs because GitHub suppresses `GITHUB_TOKEN`-authored workflow
-   events; they are gated inline at audit time, and the author/base/same-repo
-   filters are what make "no checks" safe to merge). Anything failing the gate
-   is left for human review. Merges are serialized so the per-merge
-   `version-bump` runs can't cancel each other.
+   newest-per-topic (`scripts/kb-auto-merge-plan.sh`), closes superseded dupes
+   (with `--delete-branch`, since GitHub's auto-delete only fires on merge), and
+   squash-merges each newest PR only when it passes a trust gate: targets
+   `main`, same-repo (not a fork), opened by the freshness bot (login
+   `app/github-actions` **or** `github-actions[bot]` — the `ALLOW_AUTHOR`
+   allowlist names both, since gh renders the Actions actor either way), touches
+   **only** `content/knowledge/**`, has no merge conflict, and its checks are
+   green — *or absent* (nightly bot PRs have no check runs because GitHub
+   suppresses `GITHUB_TOKEN`-authored workflow events; they are gated inline at
+   audit time, and the author/base/same-repo filters are what make "no checks"
+   safe to merge). Anything failing the gate is left for human review. Merges
+   are serialized so the per-merge `version-bump` runs can't cancel each other;
+   transient `gh` GraphQL 401s under burst usage are retried with backoff
+   (`gh_retry`). As a backstop, `knowledge-freshness-version-bump.yml` also
+   **catches up** — a surviving bump run advances `VERSION` by one patch per
+   un-bumped refresh commit since the last bump — so even an un-serialized rapid
+   batch (e.g. a manual sweep) doesn't undercount KB `VERSION`.
 2. **Releases on a cadence** — after merges it decides
    (`scripts/kb-release-decision.sh`) whether to cut a batched release: on
    **Sunday (UTC)**, or early when **≥ 10 topics** have accumulated since the

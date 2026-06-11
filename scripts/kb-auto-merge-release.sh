@@ -44,9 +44,11 @@ BOT_EMAIL="${BOT_EMAIL:-knowledge-freshness@users.noreply.github.com}"
 
 # Trust filters for which PRs are eligible to auto-merge (passed to the plan).
 # Defaults match the nightly freshness automation: same-repo, base main, opened
-# by github-actions[bot]. OWNER falls back to the Actions-provided owner, then gh.
+# by the Actions bot. The bot's login is rendered as `app/github-actions` OR
+# `github-actions[bot]` across gh versions/contexts, so the allowlist names both.
+# OWNER falls back to the Actions-provided owner, then gh.
 BASE="${BASE:-main}"
-ALLOW_AUTHOR="${ALLOW_AUTHOR:-github-actions[bot]}"
+ALLOW_AUTHOR="${ALLOW_AUTHOR:-app/github-actions github-actions[bot]}"
 OWNER="${OWNER:-${GITHUB_REPOSITORY_OWNER:-}}"
 if [ -z "$OWNER" ]; then
   OWNER="$(gh repo view --json owner --jq '.owner.login' 2>/dev/null || echo '')"
@@ -63,6 +65,22 @@ run() {
 }
 
 log() { echo "── $*"; }
+
+# Run a `gh` command with retry/backoff. GitHub's GraphQL endpoint intermittently
+# returns transient `HTTP 401`/5xx under burst usage even with a valid token;
+# a lone failure mid-batch should be retried, not fatal. Retries up to 4 times
+# with linear backoff. Used for the network-y gh calls (reads, merge, close) —
+# NOT for calls whose non-zero exit is meaningful (e.g. `gh pr checks`).
+gh_retry() {
+  local n=0 max=4
+  while :; do
+    if gh "$@"; then return 0; fi
+    n=$((n + 1))
+    [ "$n" -ge "$max" ] && { echo "::warning::gh $* failed after $max attempts" >&2; return 1; }
+    echo "  (gh transient failure; retry $n/$((max - 1)) after $((n * 5))s)" >&2
+    sleep $((n * 5))
+  done
+}
 
 # Wait until no knowledge-freshness version-bump runs are queued/in-progress.
 # Called after each merge so the version-bump workflow's single concurrency
@@ -98,8 +116,8 @@ wait_version_bump_idle() {
 # message, rather than discovering it mid-loop and burning the retry budget on
 # every merge.
 if [ "$DRY_RUN" != "true" ]; then
-  if ! gh run list --workflow=knowledge-freshness-version-bump.yml --limit 1 \
-        --json status >/dev/null 2>&1; then
+  if ! gh_retry run list --workflow=knowledge-freshness-version-bump.yml --limit 1 \
+        --json status >/dev/null; then
     echo "::error::RELEASE_BOT_TOKEN cannot read Actions runs (needs the Actions:read scope), required for merge serialization. Add the scope and re-run."
     exit 1
   fi
@@ -107,22 +125,39 @@ fi
 
 # ── Step 1: plan ──────────────────────────────────────────────────
 log "Surveying open knowledge-freshness PRs (base=$BASE author=$ALLOW_AUTHOR owner=$OWNER)"
-PRS_JSON="$(gh pr list --state open --limit 100 \
+PRS_JSON="$(gh_retry pr list --state open --limit 100 \
   --json number,title,headRefName,createdAt,baseRefName,author,headRepositoryOwner)"
 PLAN="$(printf '%s' "$PRS_JSON" \
   | BASE="$BASE" ALLOW_AUTHOR="$ALLOW_AUTHOR" OWNER="$OWNER" \
     bash "$SCRIPT_DIR/kb-auto-merge-plan.sh")"
 
 MERGE_NUMS="$(printf '%s' "$PLAN" | jq -r '.merge[].number')"
-CLOSE_LINES="$(printf '%s' "$PLAN" | jq -r '.close[] | "\(.number) \(.supersededBy)"')"
+CLOSE_LINES="$(printf '%s' "$PLAN" | jq -r '.close[] | "\(.number) \(.supersededBy) \(.headRefName // "")"')"
 
 # ── Step 2a: close superseded dupes ───────────────────────────────
 if [ -n "$CLOSE_LINES" ]; then
-  while IFS=' ' read -r num winner; do
+  while IFS=' ' read -r num winner branch; do
     [ -z "$num" ] && continue
     log "Closing #$num as superseded by #$winner"
-    run gh pr close "$num" \
+    # Close (retriable) and delete the head branch SEPARATELY: bundling
+    # --delete-branch into the close would make gh_retry retry the whole call if
+    # the branch is already gone or undeletable (fork). The branch delete is
+    # best-effort — never retried, never fatal (GitHub's auto-delete only fires
+    # on merge, not close, so we clean up superseded dupes here).
+    run gh_retry pr close "$num" \
       --comment "Superseded by #$winner (newer freshness run for the same topic)."
+    if [ -n "$branch" ] && [ "$DRY_RUN" != "true" ]; then
+      # Best-effort, single attempt (NOT gh_retry): an already-gone branch (the
+      # common case on a re-run) or a fork ref returns 4xx, and retrying that 4×
+      # with backoff would waste ~30s per dupe for nothing. A rare transient
+      # failure just leaves an orphan for the periodic prune — acceptable for
+      # cosmetic cleanup. GitHub's auto-delete-on-merge covers the merge path.
+      if gh api --method DELETE "repos/{owner}/{repo}/git/refs/heads/$branch" >/dev/null 2>&1; then
+        log "  deleted branch $branch"
+      else
+        log "  (branch $branch already gone or undeletable — skipping)"
+      fi
+    fi
   done <<< "$CLOSE_LINES"
 else
   log "No duplicate PRs to close"
@@ -136,9 +171,11 @@ if [ -n "$MERGE_NUMS" ]; then
 
     # In scope: every changed file must live under content/knowledge/. A gh
     # failure here must not abort the whole run (set -e) — skip this PR instead.
-    OUT_OF_SCOPE="$(gh pr view "$num" --json files \
+    # No 2>/dev/null: let gh_retry's retry notices and gh's own errors reach the
+    # log for observability. The `|| echo error` still captures a hard failure.
+    OUT_OF_SCOPE="$(gh_retry pr view "$num" --json files \
       --jq '[.files[].path | select(startswith("content/knowledge/") | not)] | length' \
-      2>/dev/null || echo "error")"
+      || echo "error")"
     if [ "$OUT_OF_SCOPE" = "error" ]; then
       echo "::notice::could not read files for #$num — skipping this run"
       continue
@@ -151,7 +188,7 @@ if [ -n "$MERGE_NUMS" ]; then
     # Only merge a PR GitHub reports as cleanly MERGEABLE. CONFLICTING is skipped;
     # UNKNOWN (GitHub still computing) is also skipped so we don't merge blind —
     # the next daily run retries once the state settles.
-    MERGEABLE="$(gh pr view "$num" --json mergeable --jq '.mergeable' 2>/dev/null || echo UNKNOWN)"
+    MERGEABLE="$(gh_retry pr view "$num" --json mergeable --jq '.mergeable' || echo UNKNOWN)"
     if [ "$MERGEABLE" != "MERGEABLE" ]; then
       echo "::notice::PR #$num mergeable=$MERGEABLE — skipping this run"
       continue
@@ -162,19 +199,19 @@ if [ -n "$MERGE_NUMS" ]; then
     # gated inline at audit time). Accept "none"; require any present checks to be
     # green; skip while any are failing or still pending. The trust filters above
     # (base/author/owner) are what keep "no checks" safe to merge.
-    CHECK_STATE="$(gh pr view "$num" --json statusCheckRollup --jq '
+    CHECK_STATE="$(gh_retry pr view "$num" --json statusCheckRollup --jq '
       if (.statusCheckRollup | length) == 0 then "none"
       elif any(.statusCheckRollup[];
                ((.conclusion // .state // "") | ascii_upcase) as $c
                | ($c != "SUCCESS" and $c != "NEUTRAL" and $c != "SKIPPED"))
-      then "not-green" else "green" end' 2>/dev/null || echo "unknown")"
+      then "not-green" else "green" end' || echo "unknown")"
     if [ "$CHECK_STATE" = "not-green" ] || [ "$CHECK_STATE" = "unknown" ]; then
       echo "::notice::PR #$num checks not green yet ($CHECK_STATE) — skipping this run"
       continue
     fi
 
     log "Merging #$num (squash; checks=$CHECK_STATE)"
-    if run gh pr merge "$num" --squash --delete-branch; then
+    if run gh_retry pr merge "$num" --squash --delete-branch; then
       MERGED_COUNT=$((MERGED_COUNT + 1))
       # Serialize bumps: wait for this PR's VERSION-bump run before the next merge.
       [ "$DRY_RUN" = "true" ] || wait_version_bump_idle
