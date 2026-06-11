@@ -1,12 +1,21 @@
 ---
 name: data-science-architecture
-description: Local-first architecture for solo and small-team data science — notebook exploration, src/ promotion, idempotent entrypoint pipelines, Polars vs Pandas choice, and artifact separation
-topics: [data-science, architecture, polars, pandas, notebook-promotion]
+description: >-
+  Local-first architecture for solo and small-team data science — notebook exploration, src/ promotion, idempotent
+  entrypoint pipelines, Polars vs Pandas choice, and artifact separation
+topics:
+  - data-science
+  - architecture
+  - polars
+  - pandas
+  - notebook-promotion
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-06-11
 version-pin: null
 sources:
   - url: https://the-turing-way.netlify.app/reproducible-research/reproducible-research
+    hash: sha256:b72d714d334ec50ff9931dd330030cf049f0aa40ef1c725445b6f537fdc27793
+    retrieved: 2026-06-11
 ---
 
 "Architecture" sounds heavy for a single analyst opening a notebook, but it is the one decision that separates work a collaborator can rerun tomorrow from a pile of ad-hoc scripts that only you can coax back to life. Solo DS work is local-first, reproducibility-first, and almost never needs Airflow or a Kubernetes cluster. What it needs is a coherent shape that scales from "a single notebook" to "a pipeline a teammate can clone and run" — and a clear story about where raw data, intermediate data, models, and reports each live. This doc lays out that shape and the small set of conventions that make it hold together.
