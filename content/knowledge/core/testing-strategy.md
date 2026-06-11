@@ -1,15 +1,26 @@
 ---
 name: testing-strategy
 description: Test pyramid, testing patterns, coverage strategy, and quality gates
-topics: [testing, tdd, test-pyramid, quality-gates, coverage, test-data, mocking]
+topics:
+  - testing
+  - tdd
+  - test-pyramid
+  - quality-gates
+  - coverage
+  - test-data
+  - mocking
 volatility: stable
-last-reviewed: null
+last-reviewed: 2026-06-11
 version-pin: null
 sources:
   - url: https://martinfowler.com/articles/practical-test-pyramid.html
     anchor: '#TheTestPyramid'
+    hash: sha256:d5f669995439f1c7bb7109a8f5e52044f1b7f39e92115679518d2b762ca39eff
+    retrieved: 2026-06-11
   - url: https://martinfowler.com/bliki/TestDouble.html
     anchor: '#test-doubles'
+    hash: sha256:df386df096b661a2f070becacf3d513c7bed4045a6d515be91bd2c3d83eb96a2
+    retrieved: 2026-06-11
 ---
 
 # Testing Strategy
