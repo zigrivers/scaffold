@@ -4,6 +4,12 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.34.1] — 2026-06-11
+
+### Changed
+
+- **Knowledge freshness refresh (18 entries).** Refreshed against current upstream sources with measured review/retrieval dates and source hashes: `data-pipeline-architecture`, `data-science-architecture`, `data-science-conventions`, `data-science-data-versioning`, `data-science-dev-environment`, `multi-service-data-ownership`, `multi-service-observability`, `multi-service-resilience`, `multi-service-task-decomposition`, `multi-service-testing`, `operations-runbook`, `system-architecture`, `task-decomposition`, `task-tracking`, `tech-stack-selection`, `testing-strategy`, `user-stories`, and `ux-specification`. KB `VERSION` → 0.1.27.
+
 ## [3.34.0] — 2026-06-08
 
 ### Added
