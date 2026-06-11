@@ -1,12 +1,24 @@
 ---
 name: data-pipeline-architecture
-description: Lambda vs Kappa architecture tradeoffs, medallion architecture (bronze/silver/gold), and CDC patterns for data pipelines
-topics: [data-pipeline, architecture, lambda, kappa, medallion, bronze-silver-gold, cdc, change-data-capture]
+description: >-
+  Lambda vs Kappa architecture tradeoffs, medallion architecture (bronze/silver/gold), and CDC patterns for data
+  pipelines
+topics:
+  - data-pipeline
+  - architecture
+  - lambda
+  - kappa
+  - medallion
+  - bronze-silver-gold
+  - cdc
+  - change-data-capture
 volatility: stable
-last-reviewed: null
+last-reviewed: 2026-06-11
 version-pin: null
 sources:
   - url: https://martinfowler.com/bliki/DataLake.html
+    hash: sha256:fd084f327f5902c956c1f1d27510969bf2ef51d6a0e17beb1f7d4ebf4ef8db58
+    retrieved: 2026-06-11
 ---
 
 Data pipeline architecture is the set of structural decisions that determine how data flows from sources to consumers, how it is stored at each stage, and how historical data is reprocessed when logic changes. The wrong architecture creates systems that are either operationally complex (Lambda), too rigid for historical reprocessing (pure streaming), or without clear data quality boundaries (no medallion layers). These decisions are expensive to reverse and must be made explicitly.
