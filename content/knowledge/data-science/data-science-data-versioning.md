@@ -1,13 +1,22 @@
 ---
 name: data-science-data-versioning
 description: When and how to version data for reproducibility — size-based rule for choosing between git+Parquet, git-lfs, and DVC
-topics: [data-science, data-versioning, dvc, parquet, git-lfs]
+topics:
+  - data-science
+  - data-versioning
+  - dvc
+  - parquet
+  - git-lfs
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-06-11
 version-pin: null
 sources:
   - url: https://the-turing-way.netlify.app/reproducible-research/vcs
+    hash: sha256:3e8505d957099d0150dae4901e848d94b3c6cb6651963ec6d5e349f8ea08c375
+    retrieved: 2026-06-11
   - url: https://git-scm.com/docs/gitattributes
+    hash: sha256:de672be56c9a2364e5a068b66ca2cdc17c55c97e9f4ef73a65bd9c6ec355fd90
+    retrieved: 2026-06-11
 ---
 
 If you can't answer "what data produced this result", you can't reproduce it.
