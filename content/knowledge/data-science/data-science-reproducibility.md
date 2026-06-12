@@ -1,15 +1,26 @@
 ---
 name: data-science-reproducibility
-description: Reproducibility for solo/small-team DS — pin deps with uv lock, seed everything, set PYTHONHASHSEED, and reach for Docker only at OS boundaries
-topics: [data-science, reproducibility, determinism, uv, docker]
+description: >-
+  Reproducibility for solo/small-team DS — pin deps with uv lock, seed everything, set PYTHONHASHSEED, and reach for
+  Docker only at OS boundaries
+topics:
+  - data-science
+  - reproducibility
+  - determinism
+  - uv
+  - docker
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-06-12
 version-pin: null
 sources:
   - url: https://docs.astral.sh/uv/concepts/projects/
     anchor: '#uv-lock'
+    hash: sha256:33d8b641388441faebb7dd3d81a198a2d2b970c65b7fa6551bacb9a9dbc42b1b
+    retrieved: 2026-06-12
   - url: https://the-turing-way.netlify.app/reproducible-research/reproducible-research.html
     anchor: '#reproducible-research'
+    hash: sha256:b72d714d334ec50ff9931dd330030cf049f0aa40ef1c725445b6f537fdc27793
+    retrieved: 2026-06-12
 ---
 
 You show a result in Monday's meeting. Six months later, on a new laptop, you can't reproduce it. Three things usually cause this: dependencies drifted (a minor NumPy release changed a default), randomness wasn't pinned (a shuffle or init picked a different seed), or the data changed underneath you. Reproducibility is the discipline of eliminating all three so the same inputs always produce the same numbers.
