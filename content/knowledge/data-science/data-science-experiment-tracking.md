@@ -1,15 +1,26 @@
 ---
 name: data-science-experiment-tracking
-description: Local MLflow setup, run instrumentation, git commit tagging, and run comparison for solo and small-team data science work
-topics: [data-science, experiment-tracking, mlflow, weights-and-biases, reproducibility]
+description: >-
+  Local MLflow setup, run instrumentation, git commit tagging, and run comparison for solo and small-team data science
+  work
+topics:
+  - data-science
+  - experiment-tracking
+  - mlflow
+  - weights-and-biases
+  - reproducibility
 volatility: fast-moving
-last-reviewed: null
-version-pin: 'MLflow 2.x'
+last-reviewed: 2026-06-12
+version-pin: MLflow 2.x
 sources:
   - url: https://mlflow.org/docs/latest/tracking.html
     anchor: '#tracking-quickstart'
+    hash: sha256:909e1b263ed6eff4fc57609c641bec03947eb0037caacb2140a98994b8f51ed2
+    retrieved: 2026-06-12
   - url: https://docs.wandb.ai/guides/track
     anchor: '#track-experiments'
+    hash: sha256:e0ea94e96c0ba3ba9635500fc79842dd226384c08667c01183ca78475512128d
+    retrieved: 2026-06-12
 ---
 
 Without experiment tracking, data science becomes archaeology: three weeks after a promising result, a stakeholder asks "which config produced that number?" and answering it turns into a forensic exercise — sifting through notebook history, Slack messages, and commented-out cells. A lightweight experiment tracker fixes this with one discipline: every run logs its hyperparameters, metrics, artifacts, and the git commit SHA that produced it. For a solo DS or small team, you do not need a shared server or a cloud account — a local MLflow instance on SQLite is enough to get the full benefit, and you can graduate to a shared deployment later without changing the instrumentation.
