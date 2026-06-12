@@ -1,12 +1,21 @@
 ---
 name: data-science-model-evaluation
-description: Honest model evaluation for solo/small-team DS — metric choice, one-shot holdout, cross-validation, calibration, and error slicing with sklearn
-topics: [data-science, evaluation, sklearn, cross-validation, calibration]
+description: >-
+  Honest model evaluation for solo/small-team DS — metric choice, one-shot holdout, cross-validation, calibration, and
+  error slicing with sklearn
+topics:
+  - data-science
+  - evaluation
+  - sklearn
+  - cross-validation
+  - calibration
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-06-12
 version-pin: null
 sources:
   - url: https://the-turing-way.netlify.app/reproducible-research/testing
+    hash: sha256:ae24f66b1fd58326f9c3799550c6fe803aa57441324fba3b2468bc56312355b9
+    retrieved: 2026-06-12
 ---
 
 Every solo DS project produces a moment where a notebook prints `0.92 accuracy` on a test set and the author quietly believes the model works. Then it ships — and recall on the minority class is 0.12, the probabilities are miscalibrated, and a single region drives half the error. Evaluation discipline is the only thing separating a model that works from a model that looked like it worked on a single split. At solo scale you do not have an ML platform team checking your work, which makes the discipline entirely your responsibility.
