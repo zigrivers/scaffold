@@ -1,12 +1,19 @@
 ---
 name: data-science-project-structure
-description: Opinionated directory layout for solo and small-team data-science projects — notebooks, src, data, models, reports, tests, configs — with a promotion path from exploration to tested modules
-topics: [data-science, project-structure, layout]
+description: >-
+  Opinionated directory layout for solo and small-team data-science projects — notebooks, src, data, models, reports,
+  tests, configs — with a promotion path from exploration to tested modules
+topics:
+  - data-science
+  - project-structure
+  - layout
 volatility: stable
-last-reviewed: null
+last-reviewed: 2026-06-12
 version-pin: null
 sources:
   - url: https://the-turing-way.netlify.app/project-design/project-design
+    hash: sha256:1ad66e84299086ed9767978007beba0751593d7b012d3933587cb16b8caf5c40
+    retrieved: 2026-06-12
 ---
 
 A solo data-science project accumulates artifacts faster than most software: half-finished notebooks, CSV dumps, parquet caches, serialized models, PNG charts, and the occasional markdown write-up. Without a deliberate directory structure, the project turns into a folder of 40 loose files within a month and a new contributor — including future-you — cannot tell what is canonical, what is scratch, and what is safe to delete. A clear layout fixes three problems at once: discoverability (where does X live?), git hygiene (what is tracked vs generated?), and the promotion path (how does throwaway notebook code become tested library code?).
