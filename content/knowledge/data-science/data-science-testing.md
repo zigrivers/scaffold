@@ -1,12 +1,20 @@
 ---
 name: data-science-testing
-description: Testing strategy for solo DS code — pytest for pure functions, pandera for DataFrame schemas at test time and at ingest boundaries, and committed CSV fixtures for deterministic tests
-topics: [data-science, testing, pytest, pandera]
+description: >-
+  Testing strategy for solo DS code — pytest for pure functions, pandera for DataFrame schemas at test time and at
+  ingest boundaries, and committed CSV fixtures for deterministic tests
+topics:
+  - data-science
+  - testing
+  - pytest
+  - pandera
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-06-12
 version-pin: null
 sources:
   - url: https://the-turing-way.netlify.app/reproducible-research/testing
+    hash: sha256:ae24f66b1fd58326f9c3799550c6fe803aa57441324fba3b2468bc56312355b9
+    retrieved: 2026-06-12
 ---
 
 Data-science code rots quietly. A notebook cell that worked on Tuesday's snapshot silently breaks on Friday's because an upstream column was renamed, a dtype shifted from `int64` to `float64`, or a categorical grew a new level nobody tested for. Refactors that move feature logic out of a notebook into `src/` routinely regress because there was no test pinning the old behavior. Tests catch these failures at the line that introduced them instead of at the end of a three-hour pipeline run.
