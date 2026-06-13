@@ -1,15 +1,30 @@
 ---
 name: mcp-authentication
-description: MCP authentication patterns — stdio local trust model, OAuth 2.1 for HTTP transports, PKCE, dynamic client registration, API key alternatives, and token validation
-topics: [mcp, authentication, oauth, security, authorization]
+description: >-
+  MCP authentication patterns — stdio local trust model, OAuth 2.1 for HTTP transports, PKCE, dynamic client
+  registration, API key alternatives, and token validation
+topics:
+  - mcp
+  - authentication
+  - oauth
+  - security
+  - authorization
 volatility: evolving
-last-reviewed: null
-version-pin: 'MCP spec 2025-11-25; OAuth 2.1 draft-ietf-oauth-v2-1-13'
+last-reviewed: 2026-06-13
+version-pin: MCP spec 2025-11-25; OAuth 2.1 draft-ietf-oauth-v2-1-13
 sources:
   - url: https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization
+    hash: sha256:1e8f4b53f5651140a37fc942366d0e6da5b79abefde809d666c9d9c6e58abfc0
+    retrieved: 2026-06-13
   - url: https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-13
+    hash: sha256:0769ca50de5d2dd2964baf71f430c27fbaadb387c66366b606f31598a22848d7
+    retrieved: 2026-06-13
   - url: https://datatracker.ietf.org/doc/html/rfc7591
+    hash: sha256:ea80945236b43973725e0bbfa2ce4714db599747a08ad76b80075cc2a0e04bf4
+    retrieved: 2026-06-13
   - url: https://www.rfc-editor.org/rfc/rfc8707.html
+    hash: sha256:d085d9b8e5665995a3c9702ffb1458ac93c51855624f1109e2c81e467f3e82dd
+    retrieved: 2026-06-13
 ---
 
 Authentication in MCP is transport-dependent. stdio servers rely on OS process isolation (no network auth needed). HTTP servers should use OAuth 2.1 for multi-user or multi-tenant scenarios, or simpler API key patterns for internal/single-tenant deployments.
