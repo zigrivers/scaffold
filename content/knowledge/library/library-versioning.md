@@ -1,12 +1,21 @@
 ---
 name: library-versioning
 description: Semver discipline, breaking change detection, release automation, and changelog management for published libraries
-topics: [library, versioning, semver, breaking-changes, release-automation, changelog, changesets]
+topics:
+  - library
+  - versioning
+  - semver
+  - breaking-changes
+  - release-automation
+  - changelog
+  - changesets
 volatility: stable
-last-reviewed: null
+last-reviewed: 2026-06-13
 version-pin: null
 sources:
   - url: https://www.conventionalcommits.org/en/v1.0.0/
+    hash: sha256:1f02d0f99e4a830daafa4cc75d92e1fe4aef50984c6c398aabd50d7c1214091f
+    retrieved: 2026-06-13
 ---
 
 Library versioning is a communication protocol with consumers. Semver (Semantic Versioning) is not merely a numbering scheme — it is a contract about backward compatibility. Breaking that contract without a major version bump is one of the most damaging things a library can do. Consumers set version ranges expecting that minor updates are safe to take automatically. Violating that expectation causes production incidents for real applications. Versioning discipline must be enforced by tooling, not willpower.
