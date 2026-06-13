@@ -4,6 +4,12 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.34.2] — 2026-06-13
+
+### Changed
+
+- **Knowledge freshness refresh (18 entries).** Refreshed against current upstream sources with measured review/retrieval dates and source hashes: `data-science-experiment-tracking`, `data-science-model-evaluation`, `data-science-notebook-discipline`, `data-science-observability`, `data-science-project-structure`, `data-science-reproducibility`, `data-science-requirements`, `data-science-security`, `data-science-testing`, `game-binary-vcs-strategy`, `game-platform-certification`, `game-vr-ar-design`, `library-conventions`, `library-versioning`, `mcp-authentication`, `multi-agent-coordination`, `tdd-execution-loop`, and `worktree-management`. KB `VERSION` → 0.1.45.
+
 ## [3.34.1] — 2026-06-11
 
 ### Changed
