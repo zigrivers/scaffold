@@ -1,12 +1,22 @@
 ---
 name: multi-agent-coordination
-description: Upstream Beads primitives for coordinating parallel agents — bd merge-slot for serialized merge resolution and bd gate for async coordination
-topics: [beads, multi-agent, worktrees, merge-conflicts, coordination, parallel-execution]
+description: >-
+  Upstream Beads primitives for coordinating parallel agents — bd merge-slot for serialized merge resolution and bd gate
+  for async coordination
+topics:
+  - beads
+  - multi-agent
+  - worktrees
+  - merge-conflicts
+  - coordination
+  - parallel-execution
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-06-13
 version-pin: null
 sources:
   - url: https://github.com/steveyegge/beads
+    hash: sha256:23168e15ff7d87da33261f6257b5113192bf600ee6d80bb15688d99de1c80194
+    retrieved: 2026-06-13
 ---
 
 # Multi-Agent Coordination (Beads Primitives)
