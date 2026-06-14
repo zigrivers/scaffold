@@ -1,67 +1,29 @@
 ---
 name: security-best-practices
 description: OWASP Top 10, authentication, authorization, data protection, and threat modeling
-topics: [security, owasp, authentication, authorization, threat-modeling, secrets-management, dependency-auditing]
+topics:
+  - security
+  - owasp
+  - authentication
+  - authorization
+  - threat-modeling
+  - secrets-management
+  - dependency-auditing
 volatility: fast-moving
 last-reviewed: null
-version-pin: 'OWASP Top 10 2021'
+version-pin: OWASP Top 10 2021
 sources:
   - url: https://owasp.org/Top10/
     anchor: '#top-10-list'
+    hash: sha256:cf318bf6e49239cd034bdfcdf41ca87eab4036c34f8991be2d2a24e52647a12b
+    retrieved: 2026-06-14
 ---
 
 ## Summary
 
 ## OWASP Top 10
 
-The OWASP Top 10 represents the most critical security risks to web applications. Every project should evaluate each risk and implement appropriate mitigations.
-
-### A01: Broken Access Control
-
-Users act outside their intended permissions: accessing other users' data, modifying records they shouldn't, escalating privileges.
-
-**Attack patterns:**
-- Modifying URL parameters to access another user's resource (`/api/users/123` -> `/api/users/456`)
-- Bypassing access control checks by sending requests directly to the API (skipping frontend checks)
-- Privilege escalation by manipulating JWT claims or session data
-- Accessing admin endpoints without admin role
-
-**Mitigations:**
-- Deny by default: every endpoint requires explicit permission grants
-- Verify resource ownership on every request, not just at the UI level
-- Use parameterized access control (the user can access records where `owner_id = authenticated_user_id`)
-- Server-side enforcement — never rely on client-side checks alone
-- Log and alert on access control failures
-
-```typescript
-// BAD: Only checks if user is authenticated, not if they own the resource
-app.get('/api/orders/:id', requireAuth, async (req, res) => {
-  const order = await db.orders.findById(req.params.id);
-  res.json(order);
-});
-
-// GOOD: Verifies the authenticated user owns the requested resource
-app.get('/api/orders/:id', requireAuth, async (req, res) => {
-  const order = await db.orders.findById(req.params.id);
-  if (!order || order.userId !== req.user.id) {
-    return res.status(404).json({ error: { code: 'NOT_FOUND' } });
-  }
-  res.json(order);
-});
-```
-
-### A02: Cryptographic Failures
-
-Sensitive data exposed due to weak or missing encryption.
-
-**At-risk data:** Passwords, credit card numbers, health records, personal data, API keys, session tokens.
-
-**Mitigations:**
-- Classify data by sensitivity (public, internal, confidential, restricted)
-- Encrypt sensitive data at rest (database encryption, encrypted backups)
-- Use TLS 1.2+ for all data in transit (HTTPS everywhere, no mixed content)
-- Hash passwords with bcrypt, scrypt, or Argon2 (NEVER MD5 or SHA-256 for passwords)
-- Don't store sensitive data you don't need — the safest data is data you don't have
+The OWASP Top 10 represents the most critical security risks to web applications. Every project should evaluate each risk and implement appropriate mitigations. As of the latest audit, the OWASP Top 10 has been updated to the 2025 edition (see [OWASP Top 10:2025](https://owasp.org/Top10/2025/en/)). The categories and rankings below reflect the 2021 edition; the entry should be revised to align with the 2025 taxonomy once the full source content is retrieved.
 
 ## Deep Guidance
 
