@@ -117,6 +117,16 @@ export function applyVerdictToEntry(
     fmObj['last-reviewed'] = verdict.audit_date
   }
 
+  // Reconcile `version-pin` on an edition upgrade. The audit emits
+  // `proposed_version_pin` when the source shipped a new edition that changes the
+  // pinned taxonomy (e.g. OWASP Top 10 2021 → "OWASP Top 10:2025"). Without this,
+  // a body rewritten to the new edition would be left paired with a stale pin —
+  // the inconsistency that made the security-best-practices refreshes incoherent.
+  // A null/absent/blank value leaves the existing pin untouched.
+  if (typeof verdict.proposed_version_pin === 'string' && verdict.proposed_version_pin.trim() !== '') {
+    fmObj['version-pin'] = verdict.proposed_version_pin.trim()
+  }
+
   if (Array.isArray(fmObj['sources'])) {
     const sourcesArr = fmObj['sources'] as Array<{ url?: string; hash?: string; retrieved?: string }>
     for (const s of sourcesArr) {
@@ -157,6 +167,7 @@ export function applyVerdictToEntry(
 
   const newFm = yaml.dump(fmObj, { lineWidth: 120, schema: yaml.JSON_SCHEMA }).trimEnd()
   let body = lines.slice(close + 1).join('\n')
+  const originalBody = body
 
   for (const change of verdict.proposed_changes) {
     // Protect headings the assembly engine depends on (round-3 F-004 extends F-002
@@ -220,5 +231,43 @@ export function applyVerdictToEntry(
     }
   }
 
+  // Structural backstop: refuse to emit a result that INTRODUCED a duplicate
+  // H2/H3 heading. The cheap audit model has repeatedly proposed insert/replace
+  // edits that duplicate an existing section (e.g. a second copy of every
+  // "### A0x" OWASP section, or a parallel "## OWASP Top 10" heading). A
+  // well-formed entry never has two identical headings; this guards the apply
+  // regardless of model behavior. Pre-existing duplicates (rare) are tolerated —
+  // we only block duplicates this apply created.
+  const introduced = newlyDuplicatedHeading(originalBody, body)
+  if (introduced) {
+    throw new Error(
+      `apply would create a duplicate heading "${introduced}" — refusing to emit a malformed entry ` +
+      '(the proposed_changes likely used "insert" to revise an existing section, or re-stated ' +
+      'existing subsections; use "replace" with the full section instead)',
+    )
+  }
+
   return `---\n${newFm}\n---\n${body}`
+}
+
+/** Count each H2/H3 heading line (exactly `##`/`###`, not H4+). */
+function headingCounts(body: string): Map<string, number> {
+  const counts = new Map<string, number>()
+  for (const raw of body.split('\n')) {
+    const line = raw.trim()
+    if (/^#{2,3}\s+\S/.test(line)) counts.set(line, (counts.get(line) ?? 0) + 1)
+  }
+  return counts
+}
+
+/**
+ * Return the first heading that appears ≥2× in `after` AND more times than it did
+ * in `before` (i.e. a duplicate this apply introduced), or null if none.
+ */
+export function newlyDuplicatedHeading(before: string, after: string): string | null {
+  const beforeCounts = headingCounts(before)
+  for (const [heading, n] of headingCounts(after)) {
+    if (n >= 2 && n > (beforeCounts.get(heading) ?? 0)) return heading
+  }
+  return null
 }

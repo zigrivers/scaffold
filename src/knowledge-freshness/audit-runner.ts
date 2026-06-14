@@ -35,6 +35,9 @@ const verdictSchema = z.object({
     location: z.string(), kind: z.enum(['replace', 'insert', 'delete']),
     rationale: z.string(), new_text: z.string().optional(),
   })),
+  // New value for the frontmatter `version-pin` when an edition upgrade changes
+  // the pinned taxonomy (e.g. "OWASP Top 10:2025"); null/absent leaves it as-is.
+  proposed_version_pin: z.string().nullable().optional(),
   preserve_warnings: z.array(z.string()),
 })
 

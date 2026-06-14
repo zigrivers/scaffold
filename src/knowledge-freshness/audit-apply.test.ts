@@ -538,4 +538,124 @@ Old content.
     expect(out).toContain('last-reviewed: 2026-05-24')
     expect(out).not.toContain('[object Object]')
   })
+
+  describe('proposed_version_pin reconciliation', () => {
+    const pinnedEntry = `---
+name: x
+description: y
+topics: []
+volatility: fast-moving
+last-reviewed: null
+version-pin: 'OWASP Top 10 2021'
+sources:
+  - url: https://x
+    hash: 'old'
+---
+
+## Summary
+
+## OWASP Top 10
+
+The 2021 list.
+
+## Deep Guidance
+
+Old content.
+`
+
+    it('updates version-pin when proposed_version_pin is set', () => {
+      const verdict = {
+        entry_name: 'x', audit_date: '2026-05-24', model: 'm',
+        verdict: 'superseded' as const, sources_checked: baseEntryChecked, findings: [],
+        proposed_version_pin: 'OWASP Top 10:2025',
+        proposed_changes: [], preserve_warnings: [],
+      }
+      const out = applyVerdictToEntry(pinnedEntry, verdict)
+      expect(out).toContain('version-pin: OWASP Top 10:2025')
+      expect(out).not.toContain('version-pin: OWASP Top 10 2021')
+    })
+
+    it('leaves version-pin untouched when proposed_version_pin is null/absent/blank', () => {
+      const base = {
+        entry_name: 'x', audit_date: '2026-05-24', model: 'm',
+        verdict: 'current' as const, sources_checked: baseEntryChecked, findings: [],
+        proposed_changes: [], preserve_warnings: [],
+      }
+      for (const pin of [null, undefined, '   ']) {
+        const out = applyVerdictToEntry(pinnedEntry, { ...base, proposed_version_pin: pin })
+        expect(out).toContain('version-pin: OWASP Top 10 2021')
+      }
+    })
+  })
+
+  describe('duplicate-heading backstop', () => {
+    const owaspEntry = `---
+name: x
+description: y
+topics: []
+volatility: fast-moving
+last-reviewed: null
+sources:
+  - url: https://x
+    hash: 'old'
+---
+
+## Summary
+
+## OWASP Top 10
+
+### A01: Broken Access Control
+
+Body.
+
+## Deep Guidance
+
+Old content.
+`
+
+    it('throws when an insert duplicates an existing section heading', () => {
+      const verdict = {
+        entry_name: 'x', audit_date: '2026-05-24', model: 'm',
+        verdict: 'major-drift' as const, sources_checked: baseEntryChecked, findings: [],
+        proposed_changes: [
+          // Using insert to "update" — re-states the same heading → duplicate.
+          { location: '## OWASP Top 10', kind: 'insert' as const, rationale: 'r',
+            new_text: '## OWASP Top 10\n\n### A01: Broken Access Control\n\nUpdated.' },
+        ],
+        preserve_warnings: [],
+      }
+      expect(() => applyVerdictToEntry(owaspEntry, verdict)).toThrow(/duplicate heading/)
+    })
+
+    it('throws when a replace re-states an existing subsection heading (duplicated ###)', () => {
+      const verdict = {
+        entry_name: 'x', audit_date: '2026-05-24', model: 'm',
+        verdict: 'major-drift' as const, sources_checked: baseEntryChecked, findings: [],
+        proposed_changes: [
+          { location: '## OWASP Top 10', kind: 'replace' as const, rationale: 'r',
+            new_text:
+              '## OWASP Top 10\n\n### A01: Broken Access Control\n\nOne.\n\n' +
+              '### A01: Broken Access Control\n\nTwo.' },
+        ],
+        preserve_warnings: [],
+      }
+      expect(() => applyVerdictToEntry(owaspEntry, verdict)).toThrow(/duplicate heading/)
+    })
+
+    it('allows a clean in-place replace that keeps each heading unique', () => {
+      const verdict = {
+        entry_name: 'x', audit_date: '2026-05-24', model: 'm',
+        verdict: 'major-drift' as const, sources_checked: baseEntryChecked, findings: [],
+        proposed_changes: [
+          { location: '## OWASP Top 10', kind: 'replace' as const, rationale: 'r',
+            new_text: '## OWASP Top 10\n\nThe 2025 list.\n\n### A01: Broken Access Control\n\nUpdated body.' },
+        ],
+        preserve_warnings: [],
+      }
+      const out = applyVerdictToEntry(owaspEntry, verdict)
+      expect(out).toContain('The 2025 list.')
+      expect((out.match(/^## OWASP Top 10$/gm) ?? []).length).toBe(1)
+      expect((out.match(/^### A01: Broken Access Control$/gm) ?? []).length).toBe(1)
+    })
+  })
 })
