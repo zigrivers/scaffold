@@ -126,8 +126,13 @@ export function applyVerdictToEntry(
   // verdicts may change it: `current`/`minor-drift` carry no edits (same contract
   // as proposed_changes above), so a stray pin on those is ignored.
   const carriesEdits = verdict.verdict === 'major-drift' || verdict.verdict === 'superseded'
-  if (carriesEdits && typeof verdict.proposed_version_pin === 'string' && verdict.proposed_version_pin.trim() !== '') {
-    fmObj['version-pin'] = verdict.proposed_version_pin.trim()
+  const pin = typeof verdict.proposed_version_pin === 'string' ? verdict.proposed_version_pin.trim() : ''
+  // Guard the literal JSON-template artifacts: a model that fills the template
+  // with the string "null"/"undefined" instead of real JSON null must not
+  // overwrite a real version-pin with that literal.
+  const pinIsReal = pin !== '' && !/^(null|undefined)$/i.test(pin)
+  if (carriesEdits && pinIsReal) {
+    fmObj['version-pin'] = pin
   }
 
   if (Array.isArray(fmObj['sources'])) {
@@ -250,6 +255,16 @@ export function applyVerdictToEntry(
     )
   }
 
+  // Also refuse an edition-parallel H2 (e.g. "## OWASP Top 10:2025" added beside
+  // "## OWASP Top 10") — update the existing section in place instead.
+  const parallel = newlyParallelH2(originalBody, body)
+  if (parallel) {
+    throw new Error(
+      `apply would create an edition-parallel heading "${parallel}" beside an existing same-topic ` +
+      'section — update the existing "## " section in place (replace) instead of adding a new edition heading',
+    )
+  }
+
   return `---\n${newFm}\n---\n${body}`
 }
 
@@ -257,31 +272,50 @@ export function applyVerdictToEntry(
 // appears in markdown headings, so it can't collide with real text.
 const SCOPE_SEP = '\u0000'
 
+interface HeadingHit { level: 2 | 3; line: string; parentH2: string }
+
 /**
- * Count heading occurrences as duplicate-detection keys, skipping fenced code
- * blocks (so a `## foo` line inside a ``` block isn't mistaken for a heading).
+ * Collect H2/H3 headings, skipping fenced code blocks (so a `## foo` line inside
+ * a ``` block isn't mistaken for a heading). H4+ is ignored.
  *
- * H2 headings are keyed globally (they must be unique across the entry). H3
- * headings are keyed PER PARENT H2 section (`<## parent>\0<### heading>`),
- * because entries legitimately repeat an H3 name like `### What to Check` under
- * different H2 sections — only a repeat WITHIN the same section is a defect.
- * H4+ is ignored.
+ * Fence tracking is CommonMark-aware: it records the opening fence's marker char
+ * and length and closes only on a line of the SAME char with length ≥ the
+ * opener, so a ``` inside a ```` block doesn't prematurely close it.
  */
-function headingKeyCounts(body: string): Map<string, number> {
-  const counts = new Map<string, number>()
-  let inFence = false
+function collectHeadings(body: string): HeadingHit[] {
+  const hits: HeadingHit[] = []
+  let fenceChar = ''
+  let fenceLen = 0
   let currentH2 = ''
   for (const raw of body.split('\n')) {
     const line = raw.trim()
-    if (/^(```|~~~)/.test(line)) { inFence = !inFence; continue }
-    if (inFence) continue
-    if (/^##\s+\S/.test(line)) {
-      currentH2 = line
-      counts.set(line, (counts.get(line) ?? 0) + 1)
-    } else if (/^###\s+\S/.test(line)) {
-      const key = `${currentH2}${SCOPE_SEP}${line}`
-      counts.set(key, (counts.get(key) ?? 0) + 1)
+    const fence = line.match(/^(`{3,}|~{3,})/)
+    if (fenceChar === '') {
+      if (fence) { fenceChar = fence[1][0]; fenceLen = fence[1].length; continue }
+    } else {
+      if (fence && fence[1][0] === fenceChar && fence[1].length >= fenceLen) {
+        fenceChar = ''
+        fenceLen = 0
+      }
+      continue
     }
+    if (/^##\s+\S/.test(line)) { currentH2 = line; hits.push({ level: 2, line, parentH2: line }) }
+    else if (/^###\s+\S/.test(line)) hits.push({ level: 3, line, parentH2: currentH2 })
+  }
+  return hits
+}
+
+/**
+ * Duplicate-detection keys. H2 headings are keyed globally (unique across the
+ * entry); H3 headings are keyed PER PARENT H2 section (`<## parent>\0<### h>`),
+ * because entries legitimately repeat an H3 name like `### What to Check` under
+ * different H2 sections — only a repeat WITHIN the same section is a defect.
+ */
+function headingKeyCounts(body: string): Map<string, number> {
+  const counts = new Map<string, number>()
+  for (const h of collectHeadings(body)) {
+    const key = h.level === 2 ? h.line : `${h.parentH2}${SCOPE_SEP}${h.line}`
+    counts.set(key, (counts.get(key) ?? 0) + 1)
   }
   return counts
 }
@@ -299,6 +333,44 @@ export function newlyDuplicatedHeading(before: string, after: string): string | 
       const sep = key.indexOf(SCOPE_SEP)
       return sep === -1 ? key : key.slice(sep + SCOPE_SEP.length)
     }
+  }
+  return null
+}
+
+/**
+ * Normalize an H2 by stripping a trailing EDITION marker — a colon-delimited
+ * token (`:2025`, `:v2`, `:2.0`) or a space + 4-digit year (` 2025`). Deliberately
+ * narrow: it does NOT strip bare trailing numbers that are part of a name (e.g.
+ * "OWASP Top 10" keeps its "10"), so it won't falsely merge unrelated sections.
+ */
+function h2EditionBase(h2: string): string {
+  return h2.replace(/(?::\S+|\s+20\d\d)\s*$/, '').trim().toLowerCase()
+}
+
+/** Group distinct H2 heading lines by their edition base. */
+function h2sByEditionBase(body: string): Map<string, Set<string>> {
+  const byBase = new Map<string, Set<string>>()
+  for (const h of collectHeadings(body)) {
+    if (h.level !== 2) continue
+    const base = h2EditionBase(h.line)
+    if (!byBase.has(base)) byBase.set(base, new Set())
+    byBase.get(base)!.add(h.line)
+  }
+  return byBase
+}
+
+/**
+ * Return the first H2 that is a NEWLY-INTRODUCED edition-parallel of another H2 —
+ * two distinct H2s sharing an edition base (e.g. "## OWASP Top 10" and
+ * "## OWASP Top 10:2025") where that collision wasn't already in `before`.
+ * Catches the edition-upgrade failure mode the prompt forbids; null if none.
+ */
+export function newlyParallelH2(before: string, after: string): string | null {
+  const tolerated = new Set(
+    [...h2sByEditionBase(before)].filter(([, set]) => set.size >= 2).map(([base]) => base),
+  )
+  for (const [base, set] of h2sByEditionBase(after)) {
+    if (set.size >= 2 && !tolerated.has(base)) return [...set][set.size - 1]
   }
   return null
 }

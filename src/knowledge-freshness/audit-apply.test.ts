@@ -599,6 +599,18 @@ Old content.
         expect(out).not.toContain('OWASP Top 10:2025')
       }
     })
+
+    it('ignores the literal string "null"/"undefined" (JSON-template artifacts)', () => {
+      for (const pin of ['null', 'NULL', 'undefined']) {
+        const out = applyVerdictToEntry(pinnedEntry, {
+          entry_name: 'x', audit_date: '2026-05-24', model: 'm',
+          verdict: 'superseded' as const, sources_checked: baseEntryChecked, findings: [],
+          proposed_version_pin: pin, proposed_changes: [], preserve_warnings: [],
+        })
+        expect(out).toContain('version-pin: OWASP Top 10 2021')
+        expect(out).not.toMatch(/version-pin:\s*(null|undefined)\b/i)
+      }
+    })
   })
 
   describe('duplicate-heading backstop', () => {
@@ -746,6 +758,92 @@ g
       }
       const out = applyVerdictToEntry(entry, verdict)
       expect(out).toContain('## not-a-heading')
+    })
+
+    it('rejects an edition-parallel H2 inserted beside an existing same-topic section', () => {
+      const verdict = {
+        entry_name: 'x', audit_date: '2026-05-24', model: 'm',
+        verdict: 'superseded' as const, sources_checked: baseEntryChecked, findings: [],
+        proposed_changes: [
+          // Inserts a new parallel "## OWASP Top 10:2025" beside "## OWASP Top 10".
+          { location: '## Summary', kind: 'insert' as const, rationale: 'r',
+            new_text: '## OWASP Top 10:2025\n\nThe new edition.' },
+        ],
+        preserve_warnings: [],
+      }
+      expect(() => applyVerdictToEntry(owaspEntry, verdict)).toThrow(/edition-parallel/)
+    })
+
+    it('does not flag distinct H2 sections that merely share a word (no false parallel)', () => {
+      const entry = `---
+name: x
+description: y
+topics: []
+volatility: fast-moving
+last-reviewed: null
+sources:
+  - url: https://x
+    hash: 'old'
+---
+
+## Summary
+
+## Testing
+
+t
+
+## Deep Guidance
+
+g
+`
+      const verdict = {
+        entry_name: 'x', audit_date: '2026-05-24', model: 'm',
+        verdict: 'major-drift' as const, sources_checked: baseEntryChecked, findings: [],
+        proposed_changes: [
+          { location: '## Testing', kind: 'insert' as const, rationale: 'r',
+            new_text: '## Testing Strategy\n\nNew section.' },
+        ],
+        preserve_warnings: [],
+      }
+      const out = applyVerdictToEntry(entry, verdict)
+      expect(out).toContain('## Testing Strategy')
+    })
+
+    it('does not miscount headings inside a nested fence (``` within ````)', () => {
+      const entry = `---
+name: x
+description: y
+topics: []
+volatility: fast-moving
+last-reviewed: null
+sources:
+  - url: https://x
+    hash: 'old'
+---
+
+## Summary
+
+## Examples
+
+old
+
+## Deep Guidance
+
+g
+`
+      // Outer ```` block contains an inner ``` block whose lines include a
+      // duplicated "## x" — the simple toggle would mis-close and flag it.
+      const verdict = {
+        entry_name: 'x', audit_date: '2026-05-24', model: 'm',
+        verdict: 'major-drift' as const, sources_checked: baseEntryChecked, findings: [],
+        proposed_changes: [
+          { location: '## Examples', kind: 'replace' as const, rationale: 'r',
+            new_text: '## Examples\n\n````md\n```\n## x\n```\n## x\n````' },
+        ],
+        preserve_warnings: [],
+      }
+      const out = applyVerdictToEntry(entry, verdict)
+      expect(out).toContain('## Examples')
     })
   })
 })
