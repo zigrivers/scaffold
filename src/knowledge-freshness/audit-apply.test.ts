@@ -61,8 +61,9 @@ keep me
       entry_name: 'x', audit_date: '2026-05-24', model: 'claude-opus-4-7',
       verdict: 'major-drift' as const, sources_checked: baseEntryChecked, findings: [],
       proposed_changes: [
+        // insert adds a brand-new section (must lead with its own heading).
         { location: '## OWASP Top 10', kind: 'insert' as const,
-          rationale: '', new_text: '> 2025 edition adds A11 Software Supply Chain Failures.' },
+          rationale: '', new_text: '## A11: Supply Chain\n\n2025 edition adds A11 Software Supply Chain Failures.' },
       ],
       preserve_warnings: [],
     }
@@ -72,7 +73,7 @@ keep me
     expect(out).toContain('2025 edition adds A11')
     expect(out).toContain('## Deep Guidance')
     expect(out).toContain('keep me')
-    // The insert must land between the OWASP section and the next H2,
+    // The inserted section must land between the OWASP section and the next H2,
     // not after the entire file.
     const idxOwasp = out.indexOf('## OWASP Top 10')
     const idxInsert = out.indexOf('2025 edition')
@@ -882,6 +883,57 @@ g
       }
       const out = applyVerdictToEntry(entry, verdict)
       expect(out).toContain('## Examples')
+    })
+  })
+
+  describe('edit contract enforcement', () => {
+    const entry = `---
+name: x
+description: y
+topics: []
+volatility: fast-moving
+last-reviewed: null
+sources:
+  - url: https://x
+    hash: 'old'
+---
+
+## Summary
+
+## OWASP Top 10
+
+The 2021 list.
+
+## Deep Guidance
+
+g
+`
+
+    it('rejects a non-protected replace that drops/renames its own H2 heading', () => {
+      const verdict = {
+        entry_name: 'x', audit_date: '2026-05-24', model: 'm',
+        verdict: 'major-drift' as const, sources_checked: baseEntryChecked, findings: [],
+        proposed_changes: [
+          // new_text does not start with "## OWASP Top 10" → section boundary lost.
+          { location: '## OWASP Top 10', kind: 'replace' as const, rationale: 'r',
+            new_text: 'The 2025 list (no heading).' },
+        ],
+        preserve_warnings: [],
+      }
+      expect(() => applyVerdictToEntry(entry, verdict)).toThrow(/must keep the section heading/)
+    })
+
+    it('rejects an insert whose new_text does not lead with a heading (append stale prose)', () => {
+      const verdict = {
+        entry_name: 'x', audit_date: '2026-05-24', model: 'm',
+        verdict: 'major-drift' as const, sources_checked: baseEntryChecked, findings: [],
+        proposed_changes: [
+          { location: '## OWASP Top 10', kind: 'insert' as const, rationale: 'r',
+            new_text: 'Just some extra prose with no heading.' },
+        ],
+        preserve_warnings: [],
+      }
+      expect(() => applyVerdictToEntry(entry, verdict)).toThrow(/must add a NEW section/)
     })
   })
 })

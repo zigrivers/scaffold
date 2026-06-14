@@ -181,25 +181,12 @@ export function applyVerdictToEntry(
     // Protect headings the assembly engine depends on (round-3 F-004 extends F-002
     // to cover ## Summary as well as ## Deep Guidance, matching the meta-prompt).
     const loc = change.location.trim()
-    if (PROTECTED_HEADINGS.has(loc)) {
-      if (change.kind === 'delete') {
-        throw new Error(`refusing to delete "${loc}" — assembly engine depends on it`)
-      }
-      if (change.kind === 'replace') {
-        // First non-empty line of new_text must be EXACTLY the protected heading.
-        // `extractDeepGuidance()` matches `/^## Deep Guidance\s*$/i` — a near-miss
-        // like "## Deep Guidance (Updated)" still starts with the prefix but
-        // would break the assembly path (round-6 F-001).
-        // Trim leading blank lines first so a model that emits "\n## …" still
-        // passes (round-14 F-002); only the first non-empty line matters.
-        const firstLine = (change.new_text ?? '').split('\n').map(l => l.trim()).find(l => l !== '') ?? ''
-        if (firstLine !== loc) {
-          throw new Error(
-            `refusing to alter "${loc}" heading in a replace — new_text's first non-empty line ` +
-            `must equal "${loc}" exactly (got "${firstLine}")`,
-          )
-        }
-      }
+    // Headings the assembly engine depends on may never be deleted. (The
+    // "replace must keep its own heading" rule below now applies to ALL sections,
+    // protected or not, so the prior protected-only first-line check is folded in
+    // there — this just blocks deletion of ## Summary / ## Deep Guidance.)
+    if (PROTECTED_HEADINGS.has(loc) && change.kind === 'delete') {
+      throw new Error(`refusing to delete "${loc}" — assembly engine depends on it`)
     }
 
     const region = findHeading(body, change.location)
@@ -225,11 +212,34 @@ export function applyVerdictToEntry(
 
     if (change.kind === 'replace') {
       if (!change.new_text) throw new Error(`replace change at "${change.location}" missing new_text`)
+      // Every replace must keep the section's own heading as its first line —
+      // not just protected ones. Otherwise a model can omit/rename the H2 and
+      // silently merge the section into the previous one (the protected-heading
+      // check above only covers ## Summary / ## Deep Guidance).
+      const firstReplaceLine = change.new_text.split('\n').map(l => l.trim()).find(l => l !== '') ?? ''
+      if (firstReplaceLine !== loc) {
+        throw new Error(
+          `replace at "${loc}" must keep the section heading — new_text's first non-empty line ` +
+          `must equal "${loc}" exactly (got "${firstReplaceLine}")`,
+        )
+      }
       // Verbatim splice instead of String.replace to avoid `$&`/`$1`/`$$` interpolation in new_text (F-004).
       const replacement = change.new_text.trim().split('\n')
       body = splice(before, replacement, after)
     } else if (change.kind === 'insert') {
       if (!change.new_text) throw new Error(`insert change at "${change.location}" missing new_text`)
+      // `insert` is only for a brand-new section, so its new_text must LEAD with a
+      // heading (## or ###). This blocks the "append headingless prose under an
+      // existing section, leaving the stale prose in place" failure mode — that
+      // should be a `replace` of the full section instead. (The duplicate/parallel
+      // guards below then reject an insert whose heading isn't actually new.)
+      const firstInsertLine = change.new_text.split('\n').map(l => l.trim()).find(l => l !== '') ?? ''
+      if (!/^#{2,3}\s+\S/.test(firstInsertLine)) {
+        throw new Error(
+          `insert at "${loc}" must add a NEW section — new_text's first non-empty line must be a ` +
+          `"## " or "### " heading (got "${firstInsertLine}"). To revise existing content, use replace.`,
+        )
+      }
       const originalRegion = bodyLines.slice(region.start, region.end)
       const insertion = change.new_text.trim().split('\n')
       body = splice(before, originalRegion, insertion, after)
@@ -288,6 +298,9 @@ function collectHeadings(body: string): HeadingHit[] {
   let fenceLen = 0
   let currentH2 = ''
   for (const raw of body.split('\n')) {
+    // A line indented ≥4 spaces (or a tab) is a markdown indented code block, not
+    // a heading or fence — skip it so a "## x" code line isn't counted.
+    if (/^(\t| {4,})/.test(raw)) continue
     const line = raw.trim()
     const fence = line.match(/^(`{3,}|~{3,})/)
     if (fenceChar === '') {
@@ -344,7 +357,15 @@ export function newlyDuplicatedHeading(before: string, after: string): string | 
  * "OWASP Top 10" keeps its "10"), so it won't falsely merge unrelated sections.
  */
 function h2EditionBase(h2: string): string {
-  return h2.replace(/(?::\S+|\s+20\d\d)\s*$/, '').trim().toLowerCase()
+  return h2
+    // Colon-introduced edition token — requires a DIGIT (optionally `v`) after the
+    // colon, so ":2025" / ": 2025" / ":v2" strip but a real subtitle ": Bar" does not.
+    .replace(/\s*:\s*v?\d[\w.]*\s*$/i, '')
+    // Space-introduced 4-digit year or v-version (" 2025", " v2025"). A bare
+    // trailing number that's part of a name (" 10") is NOT matched.
+    .replace(/\s+(?:20\d\d|v\d[\w.]*)\s*$/i, '')
+    .trim()
+    .toLowerCase()
 }
 
 /** Group distinct H2 heading lines by their edition base. */
