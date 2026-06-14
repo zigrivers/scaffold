@@ -1,13 +1,24 @@
 ---
 name: mcp-tool-design
-description: MCP tool naming conventions, JSON Schema inputSchema design, idempotency, output content blocks, isError for tool-level errors, outputSchema, and annotations
-topics: [mcp, tools, json-schema, tool-design, error-handling]
+description: >-
+  MCP tool naming conventions, JSON Schema inputSchema design, idempotency, output content blocks, isError for
+  tool-level errors, outputSchema, and annotations
+topics:
+  - mcp
+  - tools
+  - json-schema
+  - tool-design
+  - error-handling
 volatility: evolving
-last-reviewed: null
-version-pin: 'MCP spec 2025-11-25'
+last-reviewed: 2026-06-14
+version-pin: MCP spec 2025-11-25
 sources:
   - url: https://modelcontextprotocol.io/specification/2025-11-25/server/tools
+    hash: sha256:56188ddfba568ea5f5f2b066708772a00fc8073d41fa96449bf408477403ae6c
+    retrieved: 2026-06-14
   - url: https://json-schema.org/draft/2020-12/schema
+    hash: sha256:41da76f5afb7ce062d248f762463a92f7ca47e4e0f905b224ba6afeef91ded0f
+    retrieved: 2026-06-14
 ---
 
 Tools are the primary mechanism by which MCP servers expose executable capabilities to LLM clients. A well-designed tool is discoverable, predictable, safe to retry, and explicit about its failure modes.
