@@ -1,14 +1,27 @@
 ---
 name: mcp-resource-design
-description: MCP resource URIs, URI templates (RFC 6570), MIME types, resources/list + resources/read + resources/subscribe, listChanged notifications, annotations, pagination
-topics: [mcp, resources, uri-templates, mime-types, subscriptions]
+description: >-
+  MCP resource URIs, URI templates (RFC 6570), MIME types, resources/list + resources/read + resources/subscribe,
+  listChanged notifications, annotations, pagination
+topics:
+  - mcp
+  - resources
+  - uri-templates
+  - mime-types
+  - subscriptions
 volatility: evolving
-last-reviewed: null
-version-pin: 'MCP spec 2025-11-25'
+last-reviewed: 2026-06-14
+version-pin: MCP spec 2025-11-25
 sources:
   - url: https://modelcontextprotocol.io/specification/2025-11-25/server/resources
+    hash: sha256:e27ec503512a2e01ecfe901e820b05186f9d1d308e7b17ca8b04351fb9b3e8ae
+    retrieved: 2026-06-14
   - url: https://datatracker.ietf.org/doc/html/rfc6570
+    hash: sha256:152245a68be4a147ae5c74664fc4b9b1f458f9b41b576c90d813859c4f142868
+    retrieved: 2026-06-14
   - url: https://datatracker.ietf.org/doc/html/rfc3986
+    hash: sha256:cac01baecfbc486273e2d808102f71ff5f1d046e24e6d8294ff4e1b699095bc8
+    retrieved: 2026-06-14
 ---
 
 Resources are the MCP primitive for exposing data that provides context to LLMs — files, database records, API responses, or any addressable content. Unlike tools, resources are application-driven (the host decides what to expose), not model-driven.
