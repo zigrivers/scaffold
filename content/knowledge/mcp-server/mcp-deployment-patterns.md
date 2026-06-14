@@ -1,14 +1,28 @@
 ---
 name: mcp-deployment-patterns
-description: MCP server deployment — local stdio subprocess, hosted container/serverless, lifecycle management, environment config, and operational patterns for each deployment model
-topics: [mcp, deployment, stdio, container, serverless, operations]
+description: >-
+  MCP server deployment — local stdio subprocess, hosted container/serverless, lifecycle management, environment config,
+  and operational patterns for each deployment model
+topics:
+  - mcp
+  - deployment
+  - stdio
+  - container
+  - serverless
+  - operations
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-06-14
 version-pin: null
 sources:
   - url: https://modelcontextprotocol.io/specification/2025-11-25/basic/transports
+    hash: sha256:1bb4c8555bedcd79c1056d509b696b977d595b768427644844d1740ec4c36e18
+    retrieved: 2026-06-14
   - url: https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle
+    hash: sha256:47ebbfb1444f76e6e204746ec03b0808d4bfc197e17c0ebcaffe548cd9f7aa17
+    retrieved: 2026-06-14
   - url: https://modelcontextprotocol.io/docs/develop/connect-local-servers
+    hash: sha256:d5096022f9720170fbaf1acb5a62232d3c58f92195980fd2b40f62e2c9cc9e87
+    retrieved: 2026-06-14
 ---
 
 MCP server deployment splits into two fundamentally different models: local subprocess (stdio) installed on the user's machine, and hosted service (container or serverless) running independently. Each has different lifecycle, configuration, update, and security characteristics.
