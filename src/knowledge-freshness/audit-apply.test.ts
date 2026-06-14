@@ -586,6 +586,19 @@ Old content.
         expect(out).toContain('version-pin: OWASP Top 10 2021')
       }
     })
+
+    it('ignores proposed_version_pin on current/minor-drift (no-edits contract)', () => {
+      for (const v of ['current', 'minor-drift'] as const) {
+        const out = applyVerdictToEntry(pinnedEntry, {
+          entry_name: 'x', audit_date: '2026-05-24', model: 'm',
+          verdict: v, sources_checked: baseEntryChecked, findings: [],
+          proposed_version_pin: 'OWASP Top 10:2025',
+          proposed_changes: [], preserve_warnings: [],
+        })
+        expect(out).toContain('version-pin: OWASP Top 10 2021')
+        expect(out).not.toContain('OWASP Top 10:2025')
+      }
+    })
   })
 
   describe('duplicate-heading backstop', () => {
@@ -656,6 +669,83 @@ Old content.
       expect(out).toContain('The 2025 list.')
       expect((out.match(/^## OWASP Top 10$/gm) ?? []).length).toBe(1)
       expect((out.match(/^### A01: Broken Access Control$/gm) ?? []).length).toBe(1)
+    })
+
+    it('allows the same H3 name under different H2 sections (H3 scoped per section)', () => {
+      const entry = `---
+name: x
+description: y
+topics: []
+volatility: fast-moving
+last-reviewed: null
+sources:
+  - url: https://x
+    hash: 'old'
+---
+
+## Summary
+
+## Section A
+
+### What to Check
+
+a
+
+## Deep Guidance
+
+g
+`
+      // Insert a brand-new "## Section B" that ALSO has a "### What to Check" —
+      // legitimate (different parent H2), must NOT be flagged as a duplicate.
+      const verdict = {
+        entry_name: 'x', audit_date: '2026-05-24', model: 'm',
+        verdict: 'major-drift' as const, sources_checked: baseEntryChecked, findings: [],
+        proposed_changes: [
+          { location: '## Section A', kind: 'insert' as const, rationale: 'r',
+            new_text: '## Section B\n\n### What to Check\n\nb' },
+        ],
+        preserve_warnings: [],
+      }
+      const out = applyVerdictToEntry(entry, verdict)
+      expect((out.match(/^### What to Check$/gm) ?? []).length).toBe(2) // one per section, allowed
+      expect(out).toContain('## Section B')
+    })
+
+    it('does not treat "##" lines inside fenced code blocks as headings', () => {
+      const entry = `---
+name: x
+description: y
+topics: []
+volatility: fast-moving
+last-reviewed: null
+sources:
+  - url: https://x
+    hash: 'old'
+---
+
+## Summary
+
+## Examples
+
+old
+
+## Deep Guidance
+
+g
+`
+      // new_text replaces "## Examples" and contains a fenced block with a
+      // duplicated "## not-a-heading" comment line — must NOT trip the guard.
+      const verdict = {
+        entry_name: 'x', audit_date: '2026-05-24', model: 'm',
+        verdict: 'major-drift' as const, sources_checked: baseEntryChecked, findings: [],
+        proposed_changes: [
+          { location: '## Examples', kind: 'replace' as const, rationale: 'r',
+            new_text: '## Examples\n\n```sh\n## not-a-heading\necho 1\n## not-a-heading\n```' },
+        ],
+        preserve_warnings: [],
+      }
+      const out = applyVerdictToEntry(entry, verdict)
+      expect(out).toContain('## not-a-heading')
     })
   })
 })

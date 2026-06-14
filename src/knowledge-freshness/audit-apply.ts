@@ -122,8 +122,11 @@ export function applyVerdictToEntry(
   // pinned taxonomy (e.g. OWASP Top 10 2021 → "OWASP Top 10:2025"). Without this,
   // a body rewritten to the new edition would be left paired with a stale pin —
   // the inconsistency that made the security-best-practices refreshes incoherent.
-  // A null/absent/blank value leaves the existing pin untouched.
-  if (typeof verdict.proposed_version_pin === 'string' && verdict.proposed_version_pin.trim() !== '') {
+  // A null/absent/blank value leaves the existing pin untouched. Only edit-carrying
+  // verdicts may change it: `current`/`minor-drift` carry no edits (same contract
+  // as proposed_changes above), so a stray pin on those is ignored.
+  const carriesEdits = verdict.verdict === 'major-drift' || verdict.verdict === 'superseded'
+  if (carriesEdits && typeof verdict.proposed_version_pin === 'string' && verdict.proposed_version_pin.trim() !== '') {
     fmObj['version-pin'] = verdict.proposed_version_pin.trim()
   }
 
@@ -250,24 +253,52 @@ export function applyVerdictToEntry(
   return `---\n${newFm}\n---\n${body}`
 }
 
-/** Count each H2/H3 heading line (exactly `##`/`###`, not H4+). */
-function headingCounts(body: string): Map<string, number> {
+// Separator between a scoped key's parent-H2 and the H3 heading. NUL never
+// appears in markdown headings, so it can't collide with real text.
+const SCOPE_SEP = '\u0000'
+
+/**
+ * Count heading occurrences as duplicate-detection keys, skipping fenced code
+ * blocks (so a `## foo` line inside a ``` block isn't mistaken for a heading).
+ *
+ * H2 headings are keyed globally (they must be unique across the entry). H3
+ * headings are keyed PER PARENT H2 section (`<## parent>\0<### heading>`),
+ * because entries legitimately repeat an H3 name like `### What to Check` under
+ * different H2 sections — only a repeat WITHIN the same section is a defect.
+ * H4+ is ignored.
+ */
+function headingKeyCounts(body: string): Map<string, number> {
   const counts = new Map<string, number>()
+  let inFence = false
+  let currentH2 = ''
   for (const raw of body.split('\n')) {
     const line = raw.trim()
-    if (/^#{2,3}\s+\S/.test(line)) counts.set(line, (counts.get(line) ?? 0) + 1)
+    if (/^(```|~~~)/.test(line)) { inFence = !inFence; continue }
+    if (inFence) continue
+    if (/^##\s+\S/.test(line)) {
+      currentH2 = line
+      counts.set(line, (counts.get(line) ?? 0) + 1)
+    } else if (/^###\s+\S/.test(line)) {
+      const key = `${currentH2}${SCOPE_SEP}${line}`
+      counts.set(key, (counts.get(key) ?? 0) + 1)
+    }
   }
   return counts
 }
 
 /**
  * Return the first heading that appears ≥2× in `after` AND more times than it did
- * in `before` (i.e. a duplicate this apply introduced), or null if none.
+ * in `before` (i.e. a duplicate this apply introduced), or null if none. H3s are
+ * compared within their parent H2 section; the returned string is the bare
+ * heading line.
  */
 export function newlyDuplicatedHeading(before: string, after: string): string | null {
-  const beforeCounts = headingCounts(before)
-  for (const [heading, n] of headingCounts(after)) {
-    if (n >= 2 && n > (beforeCounts.get(heading) ?? 0)) return heading
+  const beforeCounts = headingKeyCounts(before)
+  for (const [key, n] of headingKeyCounts(after)) {
+    if (n >= 2 && n > (beforeCounts.get(key) ?? 0)) {
+      const sep = key.indexOf(SCOPE_SEP)
+      return sep === -1 ? key : key.slice(sep + SCOPE_SEP.length)
+    }
   }
   return null
 }
