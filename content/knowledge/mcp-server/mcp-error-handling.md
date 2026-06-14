@@ -1,14 +1,27 @@
 ---
 name: mcp-error-handling
-description: MCP protocol errors (JSON-RPC error codes) vs tool execution errors (isError content), partial failures, error message design, and client recovery patterns
-topics: [mcp, error-handling, json-rpc, tool-errors, protocol-errors]
+description: >-
+  MCP protocol errors (JSON-RPC error codes) vs tool execution errors (isError content), partial failures, error message
+  design, and client recovery patterns
+topics:
+  - mcp
+  - error-handling
+  - json-rpc
+  - tool-errors
+  - protocol-errors
 volatility: evolving
-last-reviewed: null
-version-pin: 'MCP spec 2025-11-25'
+last-reviewed: 2026-06-14
+version-pin: MCP spec 2025-11-25
 sources:
   - url: https://modelcontextprotocol.io/specification/2025-11-25/server/tools
+    hash: sha256:56188ddfba568ea5f5f2b066708772a00fc8073d41fa96449bf408477403ae6c
+    retrieved: 2026-06-14
   - url: https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle
+    hash: sha256:47ebbfb1444f76e6e204746ec03b0808d4bfc197e17c0ebcaffe548cd9f7aa17
+    retrieved: 2026-06-14
   - url: https://www.jsonrpc.org/specification
+    hash: sha256:8fe1edfdca511d309e712e47447457ea5159b728ec02071a84593aed692aefeb
+    retrieved: 2026-06-14
 ---
 
 MCP has two distinct error channels. Mixing them up is one of the most common MCP server bugs: using protocol errors for domain failures causes the LLM to lose context about what went wrong; using isError for protocol failures breaks client error-handling logic.
