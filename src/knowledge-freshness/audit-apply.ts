@@ -366,11 +366,14 @@ function h2sByEditionBase(body: string): Map<string, Set<string>> {
  * Catches the edition-upgrade failure mode the prompt forbids; null if none.
  */
 export function newlyParallelH2(before: string, after: string): string | null {
-  const tolerated = new Set(
-    [...h2sByEditionBase(before)].filter(([, set]) => set.size >= 2).map(([base]) => base),
-  )
+  const beforeBy = h2sByEditionBase(before)
   for (const [base, set] of h2sByEditionBase(after)) {
-    if (set.size >= 2 && !tolerated.has(base)) return [...set][set.size - 1]
+    // Flag when this apply INCREASED the number of distinct parallel H2s sharing
+    // a base (count comparison, not a binary tolerate-set) — so adding a 3rd
+    // parallel to an entry that already had 2 is still caught, while a
+    // pre-existing collision left untouched is not.
+    const beforeCount = beforeBy.get(base)?.size ?? 0
+    if (set.size >= 2 && set.size > beforeCount) return [...set][set.size - 1]
   }
   return null
 }

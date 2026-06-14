@@ -774,6 +774,44 @@ g
       expect(() => applyVerdictToEntry(owaspEntry, verdict)).toThrow(/edition-parallel/)
     })
 
+    it('catches a 3rd parallel H2 even when 2 already exist (count-based, not binary)', () => {
+      const entry = `---
+name: x
+description: y
+topics: []
+volatility: fast-moving
+last-reviewed: null
+sources:
+  - url: https://x
+    hash: 'old'
+---
+
+## Summary
+
+## OWASP Top 10
+
+a
+
+## OWASP Top 10:2025
+
+b
+
+## Deep Guidance
+
+g
+`
+      const verdict = {
+        entry_name: 'x', audit_date: '2026-05-24', model: 'm',
+        verdict: 'superseded' as const, sources_checked: baseEntryChecked, findings: [],
+        proposed_changes: [
+          { location: '## Summary', kind: 'insert' as const, rationale: 'r',
+            new_text: '## OWASP Top 10:2026\n\nThe newest edition.' },
+        ],
+        preserve_warnings: [],
+      }
+      expect(() => applyVerdictToEntry(entry, verdict)).toThrow(/edition-parallel/)
+    })
+
     it('does not flag distinct H2 sections that merely share a word (no false parallel)', () => {
       const entry = `---
 name: x
