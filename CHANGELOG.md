@@ -4,6 +4,12 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.34.3] — 2026-06-14
+
+### Changed
+
+- **Knowledge freshness refresh (9 entries).** Refreshed against current upstream sources with measured review/retrieval dates and source hashes: `mcp-deployment-patterns`, `mcp-error-handling`, `mcp-observability`, `mcp-prompt-primitives`, `mcp-protocol-fundamentals`, `mcp-resource-design`, `mcp-sdk-selection`, `mcp-testing-strategies`, and `mcp-tool-design`. KB `VERSION` → 0.1.54.
+
 ## [3.34.2] — 2026-06-13
 
 ### Changed
