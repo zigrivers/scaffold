@@ -1,14 +1,27 @@
 ---
 name: mcp-protocol-fundamentals
-description: MCP client/server model, JSON-RPC 2.0 message format, capability negotiation, initialize handshake, connection lifecycle, and host/client/server roles
-topics: [mcp, protocol, json-rpc, lifecycle, capability-negotiation]
+description: >-
+  MCP client/server model, JSON-RPC 2.0 message format, capability negotiation, initialize handshake, connection
+  lifecycle, and host/client/server roles
+topics:
+  - mcp
+  - protocol
+  - json-rpc
+  - lifecycle
+  - capability-negotiation
 volatility: fast-moving
-last-reviewed: null
-version-pin: 'MCP spec 2025-11-25'
+last-reviewed: 2026-06-14
+version-pin: MCP spec 2025-11-25
 sources:
   - url: https://modelcontextprotocol.io/specification/2025-11-25/
+    hash: sha256:b602d146ce2921b135e0b0ff7e40297cd5f8cd80cae1a0ea453229be2e23bf81
+    retrieved: 2026-06-14
   - url: https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle
+    hash: sha256:47ebbfb1444f76e6e204746ec03b0808d4bfc197e17c0ebcaffe548cd9f7aa17
+    retrieved: 2026-06-14
   - url: https://www.jsonrpc.org/specification
+    hash: sha256:8fe1edfdca511d309e712e47447457ea5159b728ec02071a84593aed692aefeb
+    retrieved: 2026-06-14
 ---
 
 The Model Context Protocol (MCP) is a JSON-RPC 2.0 based protocol that standardizes how LLM applications connect to external data sources and tools. Understanding the three-role model and the initialize handshake is prerequisite knowledge for every other MCP concept.
