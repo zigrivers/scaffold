@@ -775,6 +775,58 @@ g
       expect(() => applyVerdictToEntry(owaspEntry, verdict)).toThrow(/edition-parallel/)
     })
 
+    it('catches edition-parallel variants: "(2025)" and "2025 Edition" (format-agnostic)', () => {
+      for (const heading of ['## OWASP Top 10 (2025)', '## OWASP Top 10 2025 Edition', '## OWASP Top 10 2025']) {
+        const verdict = {
+          entry_name: 'x', audit_date: '2026-05-24', model: 'm',
+          verdict: 'superseded' as const, sources_checked: baseEntryChecked, findings: [],
+          proposed_changes: [
+            { location: '## Summary', kind: 'insert' as const, rationale: 'r',
+              new_text: `${heading}\n\nThe new edition.` },
+          ],
+          preserve_warnings: [],
+        }
+        expect(() => applyVerdictToEntry(owaspEntry, verdict)).toThrow(/edition-parallel/)
+      }
+    })
+
+    it('does not treat an info-string fence (```js) as a closing fence', () => {
+      const entry = `---
+name: x
+description: y
+topics: []
+volatility: fast-moving
+last-reviewed: null
+sources:
+  - url: https://x
+    hash: 'old'
+---
+
+## Summary
+
+## Examples
+
+old
+
+## Deep Guidance
+
+g
+`
+      // The ```js opener must not be read as a close; the duplicated "## dup"
+      // lines live inside the block and must not be counted as headings.
+      const verdict = {
+        entry_name: 'x', audit_date: '2026-05-24', model: 'm',
+        verdict: 'major-drift' as const, sources_checked: baseEntryChecked, findings: [],
+        proposed_changes: [
+          { location: '## Examples', kind: 'replace' as const, rationale: 'r',
+            new_text: '## Examples\n\n```js\n// ## dup\nconst x = 1\n// ## dup\n```' },
+        ],
+        preserve_warnings: [],
+      }
+      const out = applyVerdictToEntry(entry, verdict)
+      expect(out).toContain('## Examples')
+    })
+
     it('catches a 3rd parallel H2 even when 2 already exist (count-based, not binary)', () => {
       const entry = `---
 name: x

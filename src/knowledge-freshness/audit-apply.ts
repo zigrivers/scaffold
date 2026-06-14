@@ -302,11 +302,16 @@ function collectHeadings(body: string): HeadingHit[] {
     // a heading or fence — skip it so a "## x" code line isn't counted.
     if (/^(\t| {4,})/.test(raw)) continue
     const line = raw.trim()
-    const fence = line.match(/^(`{3,}|~{3,})/)
     if (fenceChar === '') {
-      if (fence) { fenceChar = fence[1][0]; fenceLen = fence[1].length; continue }
+      // An opening fence may carry an info string (e.g. ```js).
+      const open = line.match(/^(`{3,}|~{3,})/)
+      if (open) { fenceChar = open[1][0]; fenceLen = open[1].length; continue }
     } else {
-      if (fence && fence[1][0] === fenceChar && fence[1].length >= fenceLen) {
+      // CommonMark: a closing fence is the same marker char, length ≥ the
+      // opener, and ONLY trailing whitespace after it (no info string). So a
+      // ```js line inside a block is NOT a close.
+      const close = line.match(/^(`{3,}|~{3,})\s*$/)
+      if (close && close[1][0] === fenceChar && close[1].length >= fenceLen) {
         fenceChar = ''
         fenceLen = 0
       }
@@ -351,50 +356,37 @@ export function newlyDuplicatedHeading(before: string, after: string): string | 
 }
 
 /**
- * Normalize an H2 by stripping a trailing EDITION marker — a colon-delimited
- * token (`:2025`, `:v2`, `:2.0`) or a space + 4-digit year (` 2025`). Deliberately
- * narrow: it does NOT strip bare trailing numbers that are part of a name (e.g.
- * "OWASP Top 10" keeps its "10"), so it won't falsely merge unrelated sections.
+ * The set of H2 headings that are an EDITION-PARALLEL of another H2 in the same
+ * body — i.e. some other H2 is a strict prefix of it and the remaining suffix
+ * begins with a separator (space / `:` / `(`) AND contains a digit. This is
+ * format-agnostic: "## OWASP Top 10" makes "## OWASP Top 10:2025",
+ * "## OWASP Top 10 2025", "## OWASP Top 10 (2025)", and "## OWASP Top 10 2025
+ * Edition" all parallels, while a legitimate longer sibling with no digit (e.g.
+ * "## Testing" → "## Testing Strategy") is NOT flagged.
  */
-function h2EditionBase(h2: string): string {
-  return h2
-    // Colon-introduced edition token — requires a DIGIT (optionally `v`) after the
-    // colon, so ":2025" / ": 2025" / ":v2" strip but a real subtitle ": Bar" does not.
-    .replace(/\s*:\s*v?\d[\w.]*\s*$/i, '')
-    // Space-introduced 4-digit year or v-version (" 2025", " v2025"). A bare
-    // trailing number that's part of a name (" 10") is NOT matched.
-    .replace(/\s+(?:20\d\d|v\d[\w.]*)\s*$/i, '')
-    .trim()
-    .toLowerCase()
-}
-
-/** Group distinct H2 heading lines by their edition base. */
-function h2sByEditionBase(body: string): Map<string, Set<string>> {
-  const byBase = new Map<string, Set<string>>()
-  for (const h of collectHeadings(body)) {
-    if (h.level !== 2) continue
-    const base = h2EditionBase(h.line)
-    if (!byBase.has(base)) byBase.set(base, new Set())
-    byBase.get(base)!.add(h.line)
+function editionParallels(body: string): Set<string> {
+  const h2s = [...new Set(collectHeadings(body).filter(h => h.level === 2).map(h => h.line))]
+  const parallels = new Set<string>()
+  for (const child of h2s) {
+    for (const base of h2s) {
+      if (child === base || !child.startsWith(base)) continue
+      const rest = child.slice(base.length)
+      if (/^[\s:(]/.test(rest) && /\d/.test(rest)) { parallels.add(child); break }
+    }
   }
-  return byBase
+  return parallels
 }
 
 /**
- * Return the first H2 that is a NEWLY-INTRODUCED edition-parallel of another H2 —
- * two distinct H2s sharing an edition base (e.g. "## OWASP Top 10" and
- * "## OWASP Top 10:2025") where that collision wasn't already in `before`.
- * Catches the edition-upgrade failure mode the prompt forbids; null if none.
+ * Return the first H2 that is a NEWLY-INTRODUCED edition-parallel of another H2
+ * (e.g. "## OWASP Top 10:2025" added beside "## OWASP Top 10") — one not already
+ * parallel in `before`. Catches the edition-upgrade failure mode the prompt
+ * forbids; null if none.
  */
 export function newlyParallelH2(before: string, after: string): string | null {
-  const beforeBy = h2sByEditionBase(before)
-  for (const [base, set] of h2sByEditionBase(after)) {
-    // Flag when this apply INCREASED the number of distinct parallel H2s sharing
-    // a base (count comparison, not a binary tolerate-set) — so adding a 3rd
-    // parallel to an entry that already had 2 is still caught, while a
-    // pre-existing collision left untouched is not.
-    const beforeCount = beforeBy.get(base)?.size ?? 0
-    if (set.size >= 2 && set.size > beforeCount) return [...set][set.size - 1]
+  const had = editionParallels(before)
+  for (const child of editionParallels(after)) {
+    if (!had.has(child)) return child
   }
   return null
 }
