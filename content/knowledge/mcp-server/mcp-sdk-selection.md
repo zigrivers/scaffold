@@ -1,14 +1,27 @@
 ---
 name: mcp-sdk-selection
-description: TypeScript @modelcontextprotocol/sdk vs Python SDK and FastMCP — trade-offs, SDK patterns, McpServer class, decorator-based registration, and when to use each
-topics: [mcp, sdk, typescript, python, fastmcp]
+description: >-
+  TypeScript @modelcontextprotocol/sdk vs Python SDK and FastMCP — trade-offs, SDK patterns, McpServer class,
+  decorator-based registration, and when to use each
+topics:
+  - mcp
+  - sdk
+  - typescript
+  - python
+  - fastmcp
 volatility: fast-moving
-last-reviewed: null
-version-pin: 'MCP spec 2025-11-25; @modelcontextprotocol/sdk 1.x; mcp[cli] Python 1.2.0+'
+last-reviewed: 2026-06-14
+version-pin: MCP spec 2025-11-25; @modelcontextprotocol/sdk 1.x; mcp[cli] Python 1.2.0+
 sources:
   - url: https://modelcontextprotocol.io/docs/develop/build-server
+    hash: sha256:b2887073aa974911f5808bb599125a6b48d5c53833de33d0c71e8c8f2ae6094c
+    retrieved: 2026-06-14
   - url: https://github.com/modelcontextprotocol/typescript-sdk
+    hash: sha256:7874c2b028c9dac59add95925dc498d1817ab9948af9e3f89f2bcf2c9a860043
+    retrieved: 2026-06-14
   - url: https://github.com/modelcontextprotocol/python-sdk
+    hash: sha256:08f99f12eca6e599c90379e35fe2ea85c78d39a65fef0211327fad7b644c5641
+    retrieved: 2026-06-14
 ---
 
 Three SDK options cover the majority of MCP server implementations: the official TypeScript SDK (`@modelcontextprotocol/sdk`), the official Python SDK (`mcp`), and FastMCP (a higher-level Python wrapper bundled with the Python SDK). Choose based on your team's language, the server's complexity, and how much boilerplate you want to manage.
