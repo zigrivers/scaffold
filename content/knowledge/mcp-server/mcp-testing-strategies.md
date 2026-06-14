@@ -1,13 +1,24 @@
 ---
 name: mcp-testing-strategies
-description: MCP server testing — MCP Inspector for interactive testing, client mocks, unit tests for handlers, protocol compliance tests, and integration testing patterns
-topics: [mcp, testing, mcp-inspector, protocol-compliance, integration-testing]
+description: >-
+  MCP server testing — MCP Inspector for interactive testing, client mocks, unit tests for handlers, protocol compliance
+  tests, and integration testing patterns
+topics:
+  - mcp
+  - testing
+  - mcp-inspector
+  - protocol-compliance
+  - integration-testing
 volatility: stable
-last-reviewed: null
+last-reviewed: 2026-06-14
 version-pin: null
 sources:
   - url: https://modelcontextprotocol.io/docs/tools/inspector
+    hash: sha256:6572a55af0e4c9a89a612c5fe35fe23502c0cd11a8a2695740c4317f44c6d9f6
+    retrieved: 2026-06-14
   - url: https://github.com/modelcontextprotocol/inspector
+    hash: sha256:72f1c7b932a553354403b6b5b31425015abc8e2806a75bbeb19593ec82de32de
+    retrieved: 2026-06-14
 ---
 
 Testing MCP servers requires verifying two distinct layers: the protocol layer (correct JSON-RPC framing, capability negotiation, lifecycle) and the domain layer (tool logic, resource content, prompt rendering). The MCP Inspector handles the protocol layer interactively; unit and integration tests handle the domain layer.
