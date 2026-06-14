@@ -117,6 +117,24 @@ export function applyVerdictToEntry(
     fmObj['last-reviewed'] = verdict.audit_date
   }
 
+  // Reconcile `version-pin` on an edition upgrade. The audit emits
+  // `proposed_version_pin` when the source shipped a new edition that changes the
+  // pinned taxonomy (e.g. OWASP Top 10 2021 → "OWASP Top 10:2025"). Without this,
+  // a body rewritten to the new edition would be left paired with a stale pin —
+  // the inconsistency that made the security-best-practices refreshes incoherent.
+  // A null/absent/blank value leaves the existing pin untouched. Only edit-carrying
+  // verdicts may change it: `current`/`minor-drift` carry no edits (same contract
+  // as proposed_changes above), so a stray pin on those is ignored.
+  const carriesEdits = verdict.verdict === 'major-drift' || verdict.verdict === 'superseded'
+  const pin = typeof verdict.proposed_version_pin === 'string' ? verdict.proposed_version_pin.trim() : ''
+  // Guard the literal JSON-template artifacts: a model that fills the template
+  // with the string "null"/"undefined" instead of real JSON null must not
+  // overwrite a real version-pin with that literal.
+  const pinIsReal = pin !== '' && !/^(null|undefined)$/i.test(pin)
+  if (carriesEdits && pinIsReal) {
+    fmObj['version-pin'] = pin
+  }
+
   if (Array.isArray(fmObj['sources'])) {
     const sourcesArr = fmObj['sources'] as Array<{ url?: string; hash?: string; retrieved?: string }>
     for (const s of sourcesArr) {
@@ -157,30 +175,18 @@ export function applyVerdictToEntry(
 
   const newFm = yaml.dump(fmObj, { lineWidth: 120, schema: yaml.JSON_SCHEMA }).trimEnd()
   let body = lines.slice(close + 1).join('\n')
+  const originalBody = body
 
   for (const change of verdict.proposed_changes) {
     // Protect headings the assembly engine depends on (round-3 F-004 extends F-002
     // to cover ## Summary as well as ## Deep Guidance, matching the meta-prompt).
     const loc = change.location.trim()
-    if (PROTECTED_HEADINGS.has(loc)) {
-      if (change.kind === 'delete') {
-        throw new Error(`refusing to delete "${loc}" — assembly engine depends on it`)
-      }
-      if (change.kind === 'replace') {
-        // First non-empty line of new_text must be EXACTLY the protected heading.
-        // `extractDeepGuidance()` matches `/^## Deep Guidance\s*$/i` — a near-miss
-        // like "## Deep Guidance (Updated)" still starts with the prefix but
-        // would break the assembly path (round-6 F-001).
-        // Trim leading blank lines first so a model that emits "\n## …" still
-        // passes (round-14 F-002); only the first non-empty line matters.
-        const firstLine = (change.new_text ?? '').split('\n').map(l => l.trim()).find(l => l !== '') ?? ''
-        if (firstLine !== loc) {
-          throw new Error(
-            `refusing to alter "${loc}" heading in a replace — new_text's first non-empty line ` +
-            `must equal "${loc}" exactly (got "${firstLine}")`,
-          )
-        }
-      }
+    // Headings the assembly engine depends on may never be deleted. (The
+    // "replace must keep its own heading" rule below now applies to ALL sections,
+    // protected or not, so the prior protected-only first-line check is folded in
+    // there — this just blocks deletion of ## Summary / ## Deep Guidance.)
+    if (PROTECTED_HEADINGS.has(loc) && change.kind === 'delete') {
+      throw new Error(`refusing to delete "${loc}" — assembly engine depends on it`)
     }
 
     const region = findHeading(body, change.location)
@@ -206,11 +212,34 @@ export function applyVerdictToEntry(
 
     if (change.kind === 'replace') {
       if (!change.new_text) throw new Error(`replace change at "${change.location}" missing new_text`)
+      // Every replace must keep the section's own heading as its first line —
+      // not just protected ones. Otherwise a model can omit/rename the H2 and
+      // silently merge the section into the previous one (the protected-heading
+      // check above only covers ## Summary / ## Deep Guidance).
+      const firstReplaceLine = change.new_text.split('\n').map(l => l.trim()).find(l => l !== '') ?? ''
+      if (firstReplaceLine !== loc) {
+        throw new Error(
+          `replace at "${loc}" must keep the section heading — new_text's first non-empty line ` +
+          `must equal "${loc}" exactly (got "${firstReplaceLine}")`,
+        )
+      }
       // Verbatim splice instead of String.replace to avoid `$&`/`$1`/`$$` interpolation in new_text (F-004).
       const replacement = change.new_text.trim().split('\n')
       body = splice(before, replacement, after)
     } else if (change.kind === 'insert') {
       if (!change.new_text) throw new Error(`insert change at "${change.location}" missing new_text`)
+      // `insert` is only for a brand-new section, so its new_text must LEAD with a
+      // heading (## or ###). This blocks the "append headingless prose under an
+      // existing section, leaving the stale prose in place" failure mode — that
+      // should be a `replace` of the full section instead. (The duplicate/parallel
+      // guards below then reject an insert whose heading isn't actually new.)
+      const firstInsertLine = change.new_text.split('\n').map(l => l.trim()).find(l => l !== '') ?? ''
+      if (!/^#{2,3}\s+\S/.test(firstInsertLine)) {
+        throw new Error(
+          `insert at "${loc}" must add a NEW section — new_text's first non-empty line must be a ` +
+          `"## " or "### " heading (got "${firstInsertLine}"). To revise existing content, use replace.`,
+        )
+      }
       const originalRegion = bodyLines.slice(region.start, region.end)
       const insertion = change.new_text.trim().split('\n')
       body = splice(before, originalRegion, insertion, after)
@@ -220,5 +249,144 @@ export function applyVerdictToEntry(
     }
   }
 
+  // Structural backstop: refuse to emit a result that INTRODUCED a duplicate
+  // H2/H3 heading. The cheap audit model has repeatedly proposed insert/replace
+  // edits that duplicate an existing section (e.g. a second copy of every
+  // "### A0x" OWASP section, or a parallel "## OWASP Top 10" heading). A
+  // well-formed entry never has two identical headings; this guards the apply
+  // regardless of model behavior. Pre-existing duplicates (rare) are tolerated —
+  // we only block duplicates this apply created.
+  const introduced = newlyDuplicatedHeading(originalBody, body)
+  if (introduced) {
+    throw new Error(
+      `apply would create a duplicate heading "${introduced}" — refusing to emit a malformed entry ` +
+      '(the proposed_changes likely used "insert" to revise an existing section, or re-stated ' +
+      'existing subsections; use "replace" with the full section instead)',
+    )
+  }
+
+  // Also refuse an edition-parallel H2 (e.g. "## OWASP Top 10:2025" added beside
+  // "## OWASP Top 10") — update the existing section in place instead.
+  const parallel = newlyParallelH2(originalBody, body)
+  if (parallel) {
+    throw new Error(
+      `apply would create an edition-parallel heading "${parallel}" beside an existing same-topic ` +
+      'section — update the existing "## " section in place (replace) instead of adding a new edition heading',
+    )
+  }
+
   return `---\n${newFm}\n---\n${body}`
+}
+
+// Separator between a scoped key's parent-H2 and the H3 heading. NUL never
+// appears in markdown headings, so it can't collide with real text.
+const SCOPE_SEP = '\u0000'
+
+interface HeadingHit { level: 2 | 3; line: string; parentH2: string }
+
+/**
+ * Collect H2/H3 headings, skipping fenced code blocks (so a `## foo` line inside
+ * a ``` block isn't mistaken for a heading). H4+ is ignored.
+ *
+ * Fence tracking is CommonMark-aware: it records the opening fence's marker char
+ * and length and closes only on a line of the SAME char with length ≥ the
+ * opener, so a ``` inside a ```` block doesn't prematurely close it.
+ */
+function collectHeadings(body: string): HeadingHit[] {
+  const hits: HeadingHit[] = []
+  let fenceChar = ''
+  let fenceLen = 0
+  let currentH2 = ''
+  for (const raw of body.split('\n')) {
+    // A line indented ≥4 spaces (or a tab) is a markdown indented code block, not
+    // a heading or fence — skip it so a "## x" code line isn't counted.
+    if (/^(\t| {4,})/.test(raw)) continue
+    const line = raw.trim()
+    if (fenceChar === '') {
+      // An opening fence may carry an info string (e.g. ```js).
+      const open = line.match(/^(`{3,}|~{3,})/)
+      if (open) { fenceChar = open[1][0]; fenceLen = open[1].length; continue }
+    } else {
+      // CommonMark: a closing fence is the same marker char, length ≥ the
+      // opener, and ONLY trailing whitespace after it (no info string). So a
+      // ```js line inside a block is NOT a close.
+      const close = line.match(/^(`{3,}|~{3,})\s*$/)
+      if (close && close[1][0] === fenceChar && close[1].length >= fenceLen) {
+        fenceChar = ''
+        fenceLen = 0
+      }
+      continue
+    }
+    if (/^##\s+\S/.test(line)) { currentH2 = line; hits.push({ level: 2, line, parentH2: line }) }
+    else if (/^###\s+\S/.test(line)) hits.push({ level: 3, line, parentH2: currentH2 })
+  }
+  return hits
+}
+
+/**
+ * Duplicate-detection keys. H2 headings are keyed globally (unique across the
+ * entry); H3 headings are keyed PER PARENT H2 section (`<## parent>\0<### h>`),
+ * because entries legitimately repeat an H3 name like `### What to Check` under
+ * different H2 sections — only a repeat WITHIN the same section is a defect.
+ */
+function headingKeyCounts(body: string): Map<string, number> {
+  const counts = new Map<string, number>()
+  for (const h of collectHeadings(body)) {
+    const key = h.level === 2 ? h.line : `${h.parentH2}${SCOPE_SEP}${h.line}`
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  return counts
+}
+
+/**
+ * Return the first heading that appears ≥2× in `after` AND more times than it did
+ * in `before` (i.e. a duplicate this apply introduced), or null if none. H3s are
+ * compared within their parent H2 section; the returned string is the bare
+ * heading line.
+ */
+export function newlyDuplicatedHeading(before: string, after: string): string | null {
+  const beforeCounts = headingKeyCounts(before)
+  for (const [key, n] of headingKeyCounts(after)) {
+    if (n >= 2 && n > (beforeCounts.get(key) ?? 0)) {
+      const sep = key.indexOf(SCOPE_SEP)
+      return sep === -1 ? key : key.slice(sep + SCOPE_SEP.length)
+    }
+  }
+  return null
+}
+
+/**
+ * The set of H2 headings that are an EDITION-PARALLEL of another H2 in the same
+ * body — i.e. some other H2 is a strict prefix of it and the remaining suffix
+ * begins with a separator (space / `:` / `(`) AND contains a digit. This is
+ * format-agnostic: "## OWASP Top 10" makes "## OWASP Top 10:2025",
+ * "## OWASP Top 10 2025", "## OWASP Top 10 (2025)", and "## OWASP Top 10 2025
+ * Edition" all parallels, while a legitimate longer sibling with no digit (e.g.
+ * "## Testing" → "## Testing Strategy") is NOT flagged.
+ */
+function editionParallels(body: string): Set<string> {
+  const h2s = [...new Set(collectHeadings(body).filter(h => h.level === 2).map(h => h.line))]
+  const parallels = new Set<string>()
+  for (const child of h2s) {
+    for (const base of h2s) {
+      if (child === base || !child.startsWith(base)) continue
+      const rest = child.slice(base.length)
+      if (/^[\s:(]/.test(rest) && /\d/.test(rest)) { parallels.add(child); break }
+    }
+  }
+  return parallels
+}
+
+/**
+ * Return the first H2 that is a NEWLY-INTRODUCED edition-parallel of another H2
+ * (e.g. "## OWASP Top 10:2025" added beside "## OWASP Top 10") — one not already
+ * parallel in `before`. Catches the edition-upgrade failure mode the prompt
+ * forbids; null if none.
+ */
+export function newlyParallelH2(before: string, after: string): string | null {
+  const had = editionParallels(before)
+  for (const child of editionParallels(after)) {
+    if (!had.has(child)) return child
+  }
+  return null
 }

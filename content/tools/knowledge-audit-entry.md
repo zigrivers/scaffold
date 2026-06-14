@@ -39,6 +39,41 @@ You are auditing a single Scaffold knowledge entry against its declared authorit
 - Preserve the `## Summary` and `## Deep Guidance` headings exactly — the assembly engine depends on them.
 - You have NO tools available. Do not attempt to call WebFetch, Bash, Read, or any other tool. All evidence must come from `{{prefetched_sources}}` and the entry body.
 
+## CRITICAL: How to construct `proposed_changes` (avoid duplication and data loss)
+
+The apply step splices each change into the entry by its `## ` heading. It does
+NOT merge intelligently — it does exactly what `kind` says. Follow these rules or
+you will silently duplicate or delete content:
+
+- **Update existing content with `replace`, never `insert`.** To change anything
+  inside a section that already exists (including any of its `### ` subsections),
+  use `kind: replace` on that section's `## ` heading. `insert` KEEPS the existing
+  section and adds your text after it — using `insert` to "update" a section
+  produces TWO copies of it.
+- **`replace` is whole-section and destructive — include EVERYTHING that stays.**
+  `new_text` for a `replace` becomes the entire new section. Every paragraph and
+  every `### ` subsection you want to keep MUST be present in `new_text`. Anything
+  you omit is DELETED. Before emitting a `replace`, re-read the original section
+  and confirm `new_text` still contains all subsections that should survive
+  (e.g. if a section has `### A01`…`### A10`, all ten must be in `new_text` unless
+  a finding explicitly justifies removing one).
+- **`insert` is ONLY for a brand-new section.** Use it solely to add a section
+  whose `## ` heading does not already appear anywhere in the entry. Never use it
+  to revise, expand, or re-state existing content.
+- **Never create a parallel or edition-suffixed heading.** When a standard ships a
+  new edition (e.g. OWASP Top 10 2021 → 2025), UPDATE the existing section in
+  place — keep its exact `## ` heading text and rewrite the body via `replace`. Do
+  NOT add a second heading like `## OWASP Top 10:2025` beside the existing
+  `## OWASP Top 10`, and do NOT duplicate its subsections. Two identical or
+  near-identical headings is always a bug; the apply step will reject a result
+  that introduces a duplicate heading.
+- **Reconcile `version-pin` on an edition upgrade.** If the source has moved to a
+  new edition that changes the taxonomy the entry pins (`version-pin`), set the
+  top-level `proposed_version_pin` field to the new value (e.g.
+  `"OWASP Top 10:2025"`). Leave it `null` when `version-pin` is unaffected. A
+  `superseded`/`edition-upgrade` change whose body now describes the new edition
+  but leaves `version-pin` on the old one is internally inconsistent.
+
 ## Output (JSON only — no prose)
 
 Emit `audit_date` and every source `retrieved_at` as the exact literal string
@@ -69,12 +104,13 @@ and overwrites both fields after you respond.
       "drift_kind": "edition-upgrade | wording | new-category | obsolete-recommendation | factual-error"
     }
   ],
+  "proposed_version_pin": "<new version-pin value when the source shipped a new edition that changes the pinned taxonomy (e.g. \"OWASP Top 10:2025\"); otherwise null>",
   "proposed_changes": [
     {
-      "location": "<exact existing top-level \"## \" heading line, e.g. \"## Deep Guidance\" or \"## OWASP Top 10\" — MUST be a verbatim H2 heading currently present in the entry. Phase 1 does not support targeting H3 or deeper subsections; if a change needs to land inside a subsection, replace or update the enclosing H2 section instead.>",
+      "location": "<exact existing top-level \"## \" heading line, e.g. \"## Deep Guidance\" or \"## OWASP Top 10\" — MUST be a verbatim H2 heading currently present in the entry. Phase 1 does not support targeting H3 or deeper subsections; to change content inside a subsection, `replace` the enclosing H2 section with new_text that contains ALL of its subsections (changed and unchanged).>",
       "kind": "replace | insert | delete",
       "rationale": "<one sentence pointing at the finding(s) this resolves>",
-      "new_text": "<the proposed replacement or insertion text, with markdown link citations to retrieved sources. For `replace`, the new section's heading line (the same \"## \" heading) must be included as the first line. Omit this field for `delete`.>"
+      "new_text": "<the proposed replacement or insertion text, with markdown link citations to retrieved sources. For `replace`, the FULL new section — its \"## \" heading line first, then every paragraph/subsection that should remain (omitted content is deleted). For `insert` (brand-new sections only), the new section to add after the target. Omit this field for `delete`.>"
     }
   ],
   "preserve_warnings": [
