@@ -1,13 +1,25 @@
 ---
 name: mcp-observability
-description: MCP server structured logging, stderr discipline for stdio transport, log message notifications, request tracing, debugging with MCP Inspector, and performance monitoring
-topics: [mcp, observability, logging, tracing, debugging, monitoring]
+description: >-
+  MCP server structured logging, stderr discipline for stdio transport, log message notifications, request tracing,
+  debugging with MCP Inspector, and performance monitoring
+topics:
+  - mcp
+  - observability
+  - logging
+  - tracing
+  - debugging
+  - monitoring
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-06-14
 version-pin: null
 sources:
   - url: https://modelcontextprotocol.io/docs/tools/debugging
+    hash: sha256:3f9e2e6a4dc66bec775eadc473478d9c8475164c4f61e99315349faeadf17b68
+    retrieved: 2026-06-14
   - url: https://modelcontextprotocol.io/specification/2025-11-25/server/utilities/logging
+    hash: sha256:21e45cf3257b8859a79082615d6e83e37bd26e82d27a2bbf7284feff5755c950
+    retrieved: 2026-06-14
 ---
 
 Good observability in an MCP server means you can diagnose problems without attaching a debugger. The fundamental constraint is the stdio transport's stdout-is-protocol-only rule, which makes naive logging dangerous. Structured logging to the right channel is non-negotiable.
