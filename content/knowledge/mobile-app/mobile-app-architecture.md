@@ -1,13 +1,27 @@
 ---
 name: mobile-app-architecture
-description: MVVM/MVI/TCA patterns, navigation architecture, dependency injection, and state management for iOS and Android mobile apps
-topics: [mobile-app, architecture, mvvm, mvi, tca, navigation, dependency-injection, state-management]
+description: >-
+  MVVM/MVI/TCA patterns, navigation architecture, dependency injection, and state management for iOS and Android mobile
+  apps
+topics:
+  - mobile-app
+  - architecture
+  - mvvm
+  - mvi
+  - tca
+  - navigation
+  - dependency-injection
+  - state-management
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-06-15
 version-pin: null
 sources:
   - url: https://developer.apple.com/documentation/swiftui
+    hash: sha256:3b873e29d028c43557b37008a2f3338707212cd9304e26ff1324981a9c56c7d7
+    retrieved: 2026-06-15
   - url: https://developer.android.com/topic/architecture
+    hash: sha256:02052f3a009c527c73905ea677ba689f8d65d9f62840d3f14de22375a17853b6
+    retrieved: 2026-06-15
 ---
 
 Mobile app architecture determines testability, scalability, and developer velocity. The wrong architecture is expensive to reverse — a monolithic ViewController or God Activity becomes unmaintainable at scale. Both iOS and Android ecosystems have converged on unidirectional data flow patterns: TCA and MVVM+Combine/async for iOS, MVI and MVVM+Flow for Android. Choose the pattern that matches your team's size and complexity requirements, not the most sophisticated available option.
