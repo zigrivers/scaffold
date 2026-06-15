@@ -1,12 +1,23 @@
 ---
 name: ml-security
-description: ML-specific threats including adversarial attacks and data poisoning, PII handling in training data, model IP protection, and access control for ML systems
-topics: [ml, security, adversarial-attacks, data-poisoning, pii, model-ip, access-control]
+description: >-
+  ML-specific threats including adversarial attacks and data poisoning, PII handling in training data, model IP
+  protection, and access control for ML systems
+topics:
+  - ml
+  - security
+  - adversarial-attacks
+  - data-poisoning
+  - pii
+  - model-ip
+  - access-control
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-06-15
 version-pin: null
 sources:
   - url: https://owasp.org/www-project-machine-learning-security-top-10/
+    hash: sha256:5714e7c17fdea436ebd90fbd71ce0b10ab93b20b57e4cbb0873abd6733ffaa59
+    retrieved: 2026-06-15
 ---
 
 ML systems introduce a new class of security threats that traditional application security does not address. A model trained on poisoned data may behave normally on most inputs but trigger on specific attacker-controlled patterns. A model served via API leaks information about its training data to membership inference attacks. These are not theoretical — they are exploited in production systems. ML security requires defence-in-depth across the data pipeline, training process, and serving infrastructure.
