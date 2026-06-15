@@ -1,13 +1,27 @@
 ---
 name: mobile-app-deployment
-description: App store submission, code signing, provisioning profiles, CI/CD with Fastlane, and release management for iOS and Android
-topics: [mobile-app, deployment, app-store, google-play, code-signing, fastlane, ci-cd, release-management]
+description: >-
+  App store submission, code signing, provisioning profiles, CI/CD with Fastlane, and release management for iOS and
+  Android
+topics:
+  - mobile-app
+  - deployment
+  - app-store
+  - google-play
+  - code-signing
+  - fastlane
+  - ci-cd
+  - release-management
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-06-15
 version-pin: null
 sources:
   - url: https://developer.apple.com/app-store/review/guidelines/
+    hash: sha256:f05423159ad4129808c8242c623c5871f69d70380c945bd884968a4eb33f8923
+    retrieved: 2026-06-15
   - url: https://developer.android.com/studio/publish
+    hash: sha256:19c6b6382e2d080813d472e885633952893e6d3a8016967a294c56a8f6923152
+    retrieved: 2026-06-15
 ---
 
 Mobile app deployment is significantly more complex than web deployment: code signing creates a cryptographic chain of trust, app store review is a human process with 24–48 hour latency, and binary deployment means bugs cannot be hot-patched without a full submission cycle. Automate as much of this as possible with Fastlane — manual signing and upload processes are error-prone and do not scale to frequent releases.
