@@ -1,13 +1,26 @@
 ---
 name: mobile-app-conventions
-description: Platform naming conventions, accessibility patterns, navigation patterns, and code style for iOS and Android mobile apps
-topics: [mobile-app, conventions, swift, kotlin, naming, accessibility, navigation]
+description: >-
+  Platform naming conventions, accessibility patterns, navigation patterns, and code style for iOS and Android mobile
+  apps
+topics:
+  - mobile-app
+  - conventions
+  - swift
+  - kotlin
+  - naming
+  - accessibility
+  - navigation
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-06-15
 version-pin: null
 sources:
   - url: https://developer.apple.com/design/human-interface-guidelines
+    hash: sha256:8e5e77e4e2d06cfda5fc95269f31e863222c44fdf1712072d022cf350d05b7dc
+    retrieved: 2026-06-15
   - url: https://developer.android.com/design
+    hash: sha256:714f0d12ffaeb027f24179b273bad74a2bb0826481aed99c257735157d9d126e
+    retrieved: 2026-06-15
 ---
 
 Mobile platform conventions exist for consistency across the ecosystem, toolchain compatibility, and team readability. iOS and Android have distinct naming conventions, navigation paradigms, and accessibility implementation patterns. Mixing conventions or importing web/backend naming styles into mobile code creates cognitive friction and breaks tooling assumptions (SwiftUI previews, Android Studio refactoring, lint rules).
