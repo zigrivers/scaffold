@@ -1,12 +1,22 @@
 ---
 name: mcp-transport-patterns
-description: MCP stdio and Streamable HTTP transports, deprecated HTTP+SSE migration, session management, MCP-Protocol-Version header, and transport selection guidance
-topics: [mcp, transport, stdio, http, sse, session-management]
+description: >-
+  MCP stdio and Streamable HTTP transports, deprecated HTTP+SSE migration, session management, MCP-Protocol-Version
+  header, and transport selection guidance
+topics:
+  - mcp
+  - transport
+  - stdio
+  - http
+  - sse
+  - session-management
 volatility: fast-moving
-last-reviewed: null
-version-pin: 'MCP spec 2025-11-25'
+last-reviewed: 2026-06-15
+version-pin: MCP spec 2025-11-25
 sources:
   - url: https://modelcontextprotocol.io/specification/2025-11-25/basic/transports
+    hash: sha256:44526a7f05567e3fb8d8928ffbd2794a5bdb4661f1030e3f00be99a806163d08
+    retrieved: 2026-06-15
 ---
 
 MCP defines two standard transports: **stdio** (local subprocess) and **Streamable HTTP** (network-accessible). The old HTTP+SSE transport from spec version 2024-11-05 is deprecated. Transport choice is a deployment decision that shapes your server's authentication model, scalability, and operational complexity.
