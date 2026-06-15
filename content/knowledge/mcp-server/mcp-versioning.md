@@ -1,13 +1,24 @@
 ---
 name: mcp-versioning
-description: MCP protocol version negotiation, MCP-Protocol-Version HTTP header, capability-based feature detection, server versioning strategy, and backwards compatibility
-topics: [mcp, versioning, protocol-version, backwards-compatibility, capability-negotiation]
+description: >-
+  MCP protocol version negotiation, MCP-Protocol-Version HTTP header, capability-based feature detection, server
+  versioning strategy, and backwards compatibility
+topics:
+  - mcp
+  - versioning
+  - protocol-version
+  - backwards-compatibility
+  - capability-negotiation
 volatility: stable
-last-reviewed: null
-version-pin: 'MCP spec 2025-11-25'
+last-reviewed: 2026-06-15
+version-pin: MCP spec 2025-11-25
 sources:
   - url: https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle
+    hash: sha256:cfaae30c50df7dd39a3210d57b179d2a1f91707332a0867e8a1e39d432d90a70
+    retrieved: 2026-06-15
   - url: https://modelcontextprotocol.io/specification/2025-11-25/basic/transports
+    hash: sha256:44526a7f05567e3fb8d8928ffbd2794a5bdb4661f1030e3f00be99a806163d08
+    retrieved: 2026-06-15
 ---
 
 MCP uses calendar-versioned protocol strings and capability-based feature detection. Understand both mechanisms to build servers that work with current clients and remain compatible as the spec evolves.
