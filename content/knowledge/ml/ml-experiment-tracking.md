@@ -1,13 +1,26 @@
 ---
 name: ml-experiment-tracking
-description: MLflow and Weights & Biases integration, artifact storage, experiment run comparison, and hyperparameter sweep management
-topics: [ml, experiment-tracking, mlflow, wandb, artifacts, sweeps, reproducibility]
+description: >-
+  MLflow and Weights & Biases integration, artifact storage, experiment run comparison, and hyperparameter sweep
+  management
+topics:
+  - ml
+  - experiment-tracking
+  - mlflow
+  - wandb
+  - artifacts
+  - sweeps
+  - reproducibility
 volatility: fast-moving
-last-reviewed: null
+last-reviewed: 2026-06-15
 version-pin: null
 sources:
   - url: https://mlflow.org/docs/latest/index.html
+    hash: sha256:980caef5cc44926b85e81446a6eb124b1912194a1b5fdc5558d489c6ca4d9e0e
+    retrieved: 2026-06-15
   - url: https://docs.wandb.ai/
+    hash: sha256:d08dabd02723240dd2a4d12f4c8c01a5bd36d6d4d6f0f937b7c3c33aaa7b2ba3
+    retrieved: 2026-06-15
 ---
 
 Without experiment tracking, ML development is archaeology: "which config produced that result?" is answered by digging through notebook history, chat logs, and failing memory. Experiment tracking tools are version control for training runs — every metric, every hyperparameter, every artifact, linked to the code that produced it. The discipline of logging everything during training pays dividends when a stakeholder asks "how does this model compare to what we had six months ago?"
