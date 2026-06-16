@@ -4,6 +4,12 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.34.4] — 2026-06-16
+
+### Changed
+
+- **Knowledge freshness refresh (18 entries).** Refreshed against current upstream sources with measured review/retrieval dates and source hashes: `mcp-transport-patterns`, `mcp-versioning`, `ml-experiment-tracking`, `ml-observability`, `ml-security`, `mobile-app-architecture`, `mobile-app-conventions`, `mobile-app-deployment`, `mobile-app-dev-environment`, `mobile-app-distribution`, `mobile-app-observability`, `mobile-app-offline-patterns`, `mobile-app-project-structure`, `mobile-app-push-notifications`, `mobile-app-requirements`, `mobile-app-security`, `mobile-app-testing`, and `research-conventions`. KB `VERSION` → 0.1.72.
+
 ## [3.34.3] — 2026-06-14
 
 ### Changed
