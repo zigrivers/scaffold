@@ -1,13 +1,27 @@
 ---
 name: mobile-app-distribution
-description: TestFlight and Google Play internal track, enterprise MDM distribution, staged rollouts, beta testing programs, and OTA updates for mobile apps
-topics: [mobile-app, distribution, testflight, google-play, enterprise-mdm, staged-rollout, beta-testing, ota]
+description: >-
+  TestFlight and Google Play internal track, enterprise MDM distribution, staged rollouts, beta testing programs, and
+  OTA updates for mobile apps
+topics:
+  - mobile-app
+  - distribution
+  - testflight
+  - google-play
+  - enterprise-mdm
+  - staged-rollout
+  - beta-testing
+  - ota
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-06-16
 version-pin: null
 sources:
   - url: https://developer.apple.com/testflight/
+    hash: sha256:c6b3d3fa10feed3e8d1e1bdb9c06f2e810c7fde0575eafbc7af6aecf99d0024a
+    retrieved: 2026-06-16
   - url: https://developer.android.com/distribute
+    hash: sha256:a99758486b9d00537eb1cfc9f12fd044054b2333b8af07ed3e08461a60b66133
+    retrieved: 2026-06-16
 ---
 
 Mobile app distribution has more complexity than web deployment: app store review introduces unpredictable latency, staged rollouts require monitoring and rollback planning, enterprise distribution requires MDM infrastructure, and React Native/Expo apps have limited OTA update options for business logic. Design the distribution pipeline before writing code — it affects app architecture (feature flags, forced update logic) and CI/CD setup.
