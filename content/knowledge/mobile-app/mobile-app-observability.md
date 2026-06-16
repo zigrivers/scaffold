@@ -1,14 +1,30 @@
 ---
 name: mobile-app-observability
-description: Crash reporting (Crashlytics/Sentry), analytics, performance monitoring, network tracing, and structured logging for mobile apps
-topics: [mobile-app, observability, crashlytics, sentry, analytics, performance-monitoring, network-tracing, logging]
+description: >-
+  Crash reporting (Crashlytics/Sentry), analytics, performance monitoring, network tracing, and structured logging for
+  mobile apps
+topics:
+  - mobile-app
+  - observability
+  - crashlytics
+  - sentry
+  - analytics
+  - performance-monitoring
+  - network-tracing
+  - logging
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-06-16
 version-pin: null
 sources:
   - url: https://opentelemetry.io/docs/
+    hash: sha256:03e8d8684924cefc16eefc6fcc359f55fcdaa649831654760534b3125c7ab271
+    retrieved: 2026-06-16
   - url: https://developer.apple.com/documentation/metrickit
+    hash: sha256:1dd9e7e0279e6d1ea799d3babb0b5ec44c0f128f55f735568beae72acd537157
+    retrieved: 2026-06-16
   - url: https://developer.android.com/topic/performance
+    hash: sha256:f773ad78663d043296cc82acdad66983c69941a9491a47c727ba040b2ce9f1f0
+    retrieved: 2026-06-16
 ---
 
 Mobile observability is harder than server observability: you cannot SSH into a user's phone, crashes happen on thousands of device/OS combinations you cannot reproduce locally, and performance issues manifest differently across network conditions and hardware tiers. The goal is to know about problems before users report them, understand why they occurred, and have enough context to reproduce and fix them.
