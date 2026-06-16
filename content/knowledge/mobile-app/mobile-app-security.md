@@ -1,15 +1,33 @@
 ---
 name: mobile-app-security
-description: Secure storage (Keychain/Keystore), certificate pinning, biometric authentication, jailbreak/root detection, and data protection for mobile apps
-topics: [mobile-app, security, keychain, keystore, certificate-pinning, biometrics, jailbreak-detection, data-protection]
+description: >-
+  Secure storage (Keychain/Keystore), certificate pinning, biometric authentication, jailbreak/root detection, and data
+  protection for mobile apps
+topics:
+  - mobile-app
+  - security
+  - keychain
+  - keystore
+  - certificate-pinning
+  - biometrics
+  - jailbreak-detection
+  - data-protection
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-06-16
 version-pin: null
 sources:
   - url: https://owasp.org/www-project-mobile-top-10/
+    hash: sha256:bbdbfde7ebf1859e4cf4150ef13be9e8274e581e91892fab12e00f721f13f581
+    retrieved: 2026-06-16
   - url: https://owasp.org/www-project-mobile-app-security/
+    hash: sha256:143746feb2aba988c7a404548905f6e3f912b57617f614a6fad5e1d298e36d8a
+    retrieved: 2026-06-16
   - url: https://developer.apple.com/documentation/security/keychain_services
+    hash: sha256:76f612f62e1e29c9fd59dd79c3ccb5341ffcb547c6d742f0138babf6fea65a9c
+    retrieved: 2026-06-16
   - url: https://developer.android.com/privacy-and-security/keystore
+    hash: sha256:27bfb480d899f71aa7d3cc87f73faf91beff4fb481377e8aca68bc8f66225ec4
+    retrieved: 2026-06-16
 ---
 
 Mobile apps operate in an adversarial environment: devices are lost or stolen, users jailbreak/root their devices, and network traffic is subject to interception. Security must be designed in, not bolted on. The most common mobile security failures are storing secrets in plaintext, trusting all TLS certificates (or disabling certificate validation), and failing to protect data at rest. Implement defense in depth — assume any single control will fail.
