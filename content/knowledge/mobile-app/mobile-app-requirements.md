@@ -1,14 +1,29 @@
 ---
 name: mobile-app-requirements
-description: Platform guidelines (Apple HIG, Material Design), performance budgets, device matrix, and accessibility requirements for mobile apps
-topics: [mobile-app, requirements, hig, material-design, accessibility, performance, device-matrix]
+description: >-
+  Platform guidelines (Apple HIG, Material Design), performance budgets, device matrix, and accessibility requirements
+  for mobile apps
+topics:
+  - mobile-app
+  - requirements
+  - hig
+  - material-design
+  - accessibility
+  - performance
+  - device-matrix
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-06-16
 version-pin: null
 sources:
   - url: https://developer.apple.com/design/human-interface-guidelines
+    hash: sha256:8e5e77e4e2d06cfda5fc95269f31e863222c44fdf1712072d022cf350d05b7dc
+    retrieved: 2026-06-16
   - url: https://developer.android.com/design
+    hash: sha256:2c98d3a4cea17c063ba5770ae36e3e8c2edeebecfbc792e8bff24a152ed1bbcd
+    retrieved: 2026-06-16
   - url: https://www.w3.org/WAI/standards-guidelines/wcag/
+    hash: sha256:8d9215469d5837d344ab1b3356cb4e5d8c0ffb5b167e9872dd24da7d3dce4b97
+    retrieved: 2026-06-16
 ---
 
 Mobile app requirements differ fundamentally from web requirements: platform guidelines are design law, not suggestions; performance budgets are stricter because CPU and battery are finite; accessibility is both a legal obligation and a market expansion. Define all of these explicitly before writing code — changing navigation patterns or accessibility models mid-project is expensive.
