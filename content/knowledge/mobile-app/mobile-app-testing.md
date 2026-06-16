@@ -1,13 +1,27 @@
 ---
 name: mobile-app-testing
-description: Unit tests, UI tests (XCTest/Espresso/Detox), snapshot tests, accessibility testing, and test architecture for iOS and Android
-topics: [mobile-app, testing, xctest, espresso, detox, snapshot-testing, accessibility-testing, unit-tests]
+description: >-
+  Unit tests, UI tests (XCTest/Espresso/Detox), snapshot tests, accessibility testing, and test architecture for iOS and
+  Android
+topics:
+  - mobile-app
+  - testing
+  - xctest
+  - espresso
+  - detox
+  - snapshot-testing
+  - accessibility-testing
+  - unit-tests
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-06-16
 version-pin: null
 sources:
   - url: https://developer.apple.com/documentation/xctest
+    hash: sha256:0a81a5c4267b97c5a7b5a982f40de39f7bcdecd292e26d6249589b6ea1cf3e11
+    retrieved: 2026-06-16
   - url: https://developer.android.com/training/testing
+    hash: sha256:57e4d264949b42719ed1d1fd4fd267885dadd906f675d60cbb4c55e81770abb8
+    retrieved: 2026-06-16
 ---
 
 Mobile testing requires a multi-layer strategy: unit tests for business logic, integration tests for repository and network layers, UI tests for critical user flows, and snapshot tests for visual regression. The test pyramid applies — fast unit tests outnumber slow UI tests. Mobile UI tests are inherently fragile (timing, simulator state, animations) — structure them to minimize flakiness and run only the highest-value flows in CI.
