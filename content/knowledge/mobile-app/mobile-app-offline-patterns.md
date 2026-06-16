@@ -1,14 +1,30 @@
 ---
 name: mobile-app-offline-patterns
-description: Local storage (SQLite/Room/Core Data), sync engines, conflict resolution, and background sync for offline-capable mobile apps
-topics: [mobile-app, offline, sqlite, room, core-data, sync, conflict-resolution, background-sync]
+description: >-
+  Local storage (SQLite/Room/Core Data), sync engines, conflict resolution, and background sync for offline-capable
+  mobile apps
+topics:
+  - mobile-app
+  - offline
+  - sqlite
+  - room
+  - core-data
+  - sync
+  - conflict-resolution
+  - background-sync
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-06-16
 version-pin: null
 sources:
   - url: https://developer.apple.com/documentation/coredata
+    hash: sha256:291064d20b3eab74eba35ec973c217370434abdc9588d5f7094a1643e413294b
+    retrieved: 2026-06-16
   - url: https://developer.android.com/training/data-storage/room
+    hash: sha256:db610e8cc5ba2981770ac2f30d04aa9ff37005d23d4d4f2d9daa62d9326ee69a
+    retrieved: 2026-06-16
   - url: https://developer.android.com/topic/libraries/architecture/workmanager
+    hash: sha256:55d73d1ad4dfb7c4d57769491fe0237b9d403b2b24e6c3e836842c0500ad77f6
+    retrieved: 2026-06-16
 ---
 
 Offline capability is not optional for mobile apps — cellular networks are unreliable, users enter tunnels and basements, and users expect their data to persist between sessions. The complexity of offline architecture scales with sync complexity: read-only cache is trivial; bidirectional sync with conflict resolution is one of the hardest problems in software. Define your offline model explicitly before implementing persistence.
