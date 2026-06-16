@@ -1,13 +1,26 @@
 ---
 name: mobile-app-project-structure
-description: Platform directory layout, shared code modules, asset management, and per-environment configuration for iOS and Android mobile apps
-topics: [mobile-app, project-structure, ios, android, assets, configuration, modules]
+description: >-
+  Platform directory layout, shared code modules, asset management, and per-environment configuration for iOS and
+  Android mobile apps
+topics:
+  - mobile-app
+  - project-structure
+  - ios
+  - android
+  - assets
+  - configuration
+  - modules
 volatility: stable
-last-reviewed: null
+last-reviewed: 2026-06-16
 version-pin: null
 sources:
   - url: https://developer.apple.com/documentation/xcode/managing-files-and-folders-in-your-xcode-project
+    hash: sha256:76bb5fcefcdcffe5837dcbda1be41c32e95a0f4de552c493f700f9fbe19acdf5
+    retrieved: 2026-06-16
   - url: https://developer.android.com/studio/projects
+    hash: sha256:274149b887134b5cc7e957353fbabe2d3b8a896166ceda79625dbec9cf94c355
+    retrieved: 2026-06-16
 ---
 
 Mobile project structure decisions affect build times, code sharing, onboarding velocity, and refactoring safety. iOS and Android have platform-mandated directory conventions that tools expect — deviating from them breaks Xcode file resolution, Android Gradle source sets, and code-generation tooling. Within those constraints, module boundaries and shared-code strategies deserve explicit design.
