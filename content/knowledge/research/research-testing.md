@@ -1,12 +1,23 @@
 ---
 name: research-testing
-description: Testing experiment loops including determinism tests, result validation, integration tests for experiment pipelines, and regression baselines
-topics: [research, testing, determinism, validation, integration-tests, regression, tdd]
+description: >-
+  Testing experiment loops including determinism tests, result validation, integration tests for experiment pipelines,
+  and regression baselines
+topics:
+  - research
+  - testing
+  - determinism
+  - validation
+  - integration-tests
+  - regression
+  - tdd
 volatility: stable
-last-reviewed: null
+last-reviewed: 2026-06-17
 version-pin: null
 sources:
   - url: https://the-turing-way.netlify.app/reproducible-research/testing.html
+    hash: sha256:ad353f9f51415033e8cadc2fa6e2cb488f01e4fa24fa202f092f38294ceb1a2f
+    retrieved: 2026-06-17
 ---
 
 Research code is notoriously undertested because "the results are stochastic" feels like an excuse. It is not. The experiment runner, evaluation framework, data pipeline, and state management are all deterministic and must be tested rigorously. The stochastic parts (experiment outcomes) require seed-based determinism tests and statistical validation. Untested experiment loops produce unreliable results that waste compute and mislead researchers.
