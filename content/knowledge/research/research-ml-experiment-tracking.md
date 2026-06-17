@@ -1,13 +1,28 @@
 ---
 name: research-ml-experiment-tracking
-description: Lightweight experiment tracking for ML research including W&B and MLflow integration, experiment tagging, parallel coordinate plots, run comparison dashboards, and checkpoint strategies
-topics: [research, ml-research, experiment-tracking, wandb, mlflow, parallel-coordinates, checkpointing, comparison, tagging]
+description: >-
+  Lightweight experiment tracking for ML research including W&B and MLflow integration, experiment tagging, parallel
+  coordinate plots, run comparison dashboards, and checkpoint strategies
+topics:
+  - research
+  - ml-research
+  - experiment-tracking
+  - wandb
+  - mlflow
+  - parallel-coordinates
+  - checkpointing
+  - comparison
+  - tagging
 volatility: fast-moving
-last-reviewed: null
+last-reviewed: 2026-06-17
 version-pin: null
 sources:
   - url: https://docs.wandb.ai/
+    hash: sha256:c49c22c617354dadba6aac03deeafbad270ca84fa0f79d4652423a428beaca35
+    retrieved: 2026-06-17
   - url: https://mlflow.org/docs/latest/index.html
+    hash: sha256:026aadeaf20e51594f59470c3700096c6760824244eeb84bf07f463b41787ae5
+    retrieved: 2026-06-17
 ---
 
 ML research experiment tracking prioritizes rapid iteration and comparison over production-grade audit trails. The goal is to answer "which of my 200 runs was best and why?" within seconds, not to maintain a production model registry. This means lightweight setup (local or cloud-hosted, not self-managed infrastructure), aggressive tagging and grouping for filtering, visualization tools that reveal patterns across many runs simultaneously, and checkpoint strategies that keep what matters and discard the rest to avoid filling storage with abandoned experiments.
