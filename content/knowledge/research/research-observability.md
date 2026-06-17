@@ -1,12 +1,23 @@
 ---
 name: research-observability
-description: Monitoring experiment loops including anomaly detection, resource tracking, progress dashboards, and alert thresholds for research projects
-topics: [research, observability, monitoring, anomaly-detection, resource-tracking, dashboards, alerts]
+description: >-
+  Monitoring experiment loops including anomaly detection, resource tracking, progress dashboards, and alert thresholds
+  for research projects
+topics:
+  - research
+  - observability
+  - monitoring
+  - anomaly-detection
+  - resource-tracking
+  - dashboards
+  - alerts
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-06-17
 version-pin: null
 sources:
   - url: https://opentelemetry.io/docs/
+    hash: sha256:44ba4d43dfae9fa274234585036b603387ba62832b811bedbf941033e434f392
+    retrieved: 2026-06-17
 ---
 
 Autonomous experiment loops can run for hours or days without human attention. Without observability, a loop can waste compute on a converged metric, silently produce garbage after a data pipeline failure, or exhaust disk space without anyone noticing. Observability for research is not about uptime SLAs -- it is about experiment health: is the loop making progress, are the results valid, and are resources being consumed at a reasonable rate.
