@@ -1,12 +1,22 @@
 ---
 name: research-requirements
-description: Research project requirements including experiment goals, success metrics, iteration budgets, stopping criteria, and hypothesis documentation
-topics: [research, requirements, experiment-goals, metrics, stopping-criteria, hypothesis]
+description: >-
+  Research project requirements including experiment goals, success metrics, iteration budgets, stopping criteria, and
+  hypothesis documentation
+topics:
+  - research
+  - requirements
+  - experiment-goals
+  - metrics
+  - stopping-criteria
+  - hypothesis
 volatility: stable
-last-reviewed: null
+last-reviewed: 2026-06-17
 version-pin: null
 sources:
   - url: https://the-turing-way.netlify.app/project-design/project-design.html
+    hash: sha256:e53183f504b2fe78e55dfbfce035252bc3df6d83f5dff116207078a150909368
+    retrieved: 2026-06-17
 ---
 
 Research projects differ from product engineering in a fundamental way: the requirements are not a list of features to build but a set of questions to answer. A research PRD defines the hypothesis space, the metrics that will determine success or failure, the computational and time budgets for exploration, and the stopping criteria that prevent infinite iteration. Without these constraints, autonomous experiment loops run forever and produce nothing actionable.
