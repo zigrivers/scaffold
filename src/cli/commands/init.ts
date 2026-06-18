@@ -437,13 +437,33 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
         describe: 'MCP server persists state',
       })
       // macOS-Native Configuration
-      .option('macos-ui-framework', { type: 'string', describe: 'UI framework', choices: ['swiftui', 'appkit', 'hybrid'] as const })
-      .option('macos-app-style', { type: 'string', describe: 'App style', choices: ['standard', 'menu-bar', 'agent'] as const })
+      .option('macos-ui-framework', {
+        type: 'string',
+        describe: 'UI framework',
+        choices: ['swiftui', 'appkit', 'hybrid'] as const,
+      })
+      .option('macos-app-style', {
+        type: 'string',
+        describe: 'App style',
+        choices: ['standard', 'menu-bar', 'agent'] as const,
+      })
       .option('macos-min-version', { type: 'string', describe: 'Minimum macOS version (e.g. 15.0)' })
-      .option('macos-distribution', { type: 'string', describe: 'Distribution', choices: ['developer-id', 'mac-app-store', 'both'] as const })
+      .option('macos-distribution', {
+        type: 'string',
+        describe: 'Distribution',
+        choices: ['developer-id', 'mac-app-store', 'both'] as const,
+      })
       .option('macos-sandboxed', { type: 'boolean', describe: 'Enable App Sandbox' })
-      .option('macos-persistence', { type: 'string', describe: 'Local persistence', choices: ['none', 'sqlite', 'core-data', 'swiftdata'] as const })
-      .option('macos-auto-update', { type: 'string', describe: 'Auto-update mechanism', choices: ['none', 'sparkle'] as const })
+      .option('macos-persistence', {
+        type: 'string',
+        describe: 'Local persistence',
+        choices: ['none', 'sqlite', 'core-data', 'swiftdata'] as const,
+      })
+      .option('macos-auto-update', {
+        type: 'string',
+        describe: 'Auto-update mechanism',
+        choices: ['none', 'sparkle'] as const,
+      })
       // Game configuration options
       .option('engine', {
         type: 'string',

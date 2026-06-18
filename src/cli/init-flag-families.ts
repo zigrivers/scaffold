@@ -630,13 +630,18 @@ export function buildFlagOverrides(argv: Record<string, unknown>): PartialConfig
   }
   case 'macos-native': {
     const partial: Partial<MacosNativeConfig> = {}
-    if (argv['macos-ui-framework'] !== undefined) partial.uiFramework = argv['macos-ui-framework'] as MacosNativeConfig['uiFramework']
-    if (argv['macos-app-style'] !== undefined) partial.appStyle = argv['macos-app-style'] as MacosNativeConfig['appStyle']
+    if (argv['macos-ui-framework'] !== undefined)
+      partial.uiFramework = argv['macos-ui-framework'] as MacosNativeConfig['uiFramework']
+    if (argv['macos-app-style'] !== undefined)
+      partial.appStyle = argv['macos-app-style'] as MacosNativeConfig['appStyle']
     if (argv['macos-min-version'] !== undefined) partial.minMacosVersion = argv['macos-min-version'] as string
-    if (argv['macos-distribution'] !== undefined) partial.distribution = argv['macos-distribution'] as MacosNativeConfig['distribution']
+    if (argv['macos-distribution'] !== undefined)
+      partial.distribution = argv['macos-distribution'] as MacosNativeConfig['distribution']
     if (argv['macos-sandboxed'] !== undefined) partial.sandboxed = argv['macos-sandboxed'] as boolean
-    if (argv['macos-persistence'] !== undefined) partial.persistence = argv['macos-persistence'] as MacosNativeConfig['persistence']
-    if (argv['macos-auto-update'] !== undefined) partial.autoUpdate = argv['macos-auto-update'] as MacosNativeConfig['autoUpdate']
+    if (argv['macos-persistence'] !== undefined)
+      partial.persistence = argv['macos-persistence'] as MacosNativeConfig['persistence']
+    if (argv['macos-auto-update'] !== undefined)
+      partial.autoUpdate = argv['macos-auto-update'] as MacosNativeConfig['autoUpdate']
     return { type: 'macos-native', partial }
   }
   default:

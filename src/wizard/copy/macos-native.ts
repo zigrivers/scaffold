@@ -30,7 +30,10 @@ export const macosNativeCopy: MacosNativeCopy = {
       + 'both ships two variants.',
     options: {
       'developer-id':  { label: 'Developer ID (direct download)', short: 'Notarized DMG/pkg outside the App Store.' },
-      'mac-app-store': { label: 'Mac App Store',                  short: 'Distributed via the App Store (sandbox required).' },
+      'mac-app-store': {
+        label: 'Mac App Store',
+        short: 'Distributed via the App Store (sandbox required).',
+      },
       both:            { label: 'Both',                           short: 'Direct download AND Mac App Store builds.' },
     },
   },
