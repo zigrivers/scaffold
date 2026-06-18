@@ -79,11 +79,12 @@ For a polished DMG with a custom background and icon layout, use `create-dmg` (o
 
 ```bash
 # Simple component package (signs inline with Developer ID Installer):
+# Note: pkgbuild does not support --timestamp; secure timestamping is applied
+# by productsign --timestamp (re-sign) or productbuild --timestamp (product archive).
 pkgbuild \
   --component MyApp.app \
   --install-location /Applications \
   --sign "Developer ID Installer: Your Name (TEAMID)" \
-  --timestamp \
   MyApp-component.pkg
 
 # Full product archive (requires a distribution.xml):

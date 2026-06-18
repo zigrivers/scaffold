@@ -1139,6 +1139,28 @@ describe('macos-native wizard branch', () => {
   })
 })
 
+describe('macos-native minMacosVersion format validation', () => {
+  it('falls back to 15.0 and warns when macosMinVersion is a non-numeric string (e.g. "Sonoma")', async () => {
+    const output = makeOutputContext()
+
+    const answers = await askWizardQuestions({
+      output,
+      suggestion: 'deep',
+      projectType: 'macos-native',
+      auto: true,
+      macosNativeFlags: {
+        macosMinVersion: 'Sonoma',
+      },
+    })
+
+    expect(answers.macosNativeConfig).toBeDefined()
+    expect(answers.macosNativeConfig!.minMacosVersion).toBe('15.0')
+    expect(output.warn).toHaveBeenCalledWith(
+      expect.stringContaining('Invalid minMacosVersion'),
+    )
+  })
+})
+
 describe('macos-native SwiftData ⇒ macOS 14 guard', () => {
   it('bumps minMacosVersion to 14.0 and emits a warning when persistence=swiftdata and version<14', async () => {
     const output = makeOutputContext()

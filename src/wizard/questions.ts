@@ -444,8 +444,19 @@ export async function askWizardQuestions(options: {
             'none', copy.autoUpdate) as MacosNativeConfig['autoUpdate']
           : 'none'))
 
-    // SwiftData requires macOS 14+. If the user picked swiftdata with an older floor, bump it.
+    // Validate minMacosVersion format — must match /^\d+(\.\d+){0,2}$/ (same as schema).
+    // A free-string flag like --macos-min-version Sonoma bypasses yargs enum validation,
+    // so we guard here and fall back to '15.0' with a warning.
+    const VERSION_RE = /^\d+(\.\d+){0,2}$/
     let effectiveMinMacosVersion = minMacosVersion
+    if (!VERSION_RE.test(effectiveMinMacosVersion)) {
+      output.warn(
+        `Invalid minMacosVersion "${effectiveMinMacosVersion}" (expected "15" or "15.0"). Defaulting to 15.0.`,
+      )
+      effectiveMinMacosVersion = '15.0'
+    }
+
+    // SwiftData requires macOS 14+. If the user picked swiftdata with an older floor, bump it.
     if (persistence === 'swiftdata') {
       const majorVersion = parseInt(effectiveMinMacosVersion.split('.')[0] ?? '0', 10)
       if (majorVersion < 14) {
