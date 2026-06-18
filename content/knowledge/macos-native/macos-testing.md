@@ -27,7 +27,7 @@ macOS apps have three testing layers: unit tests (XCTest or Swift Testing), UI a
 
 ## Deep Guidance
 
-### Swift Testing (Xcode 16 / Swift 6, macOS 12+)
+### Swift Testing (Xcode 16 / Swift 6, macOS 12+; async features effectively require macOS 13+)
 
 Swift Testing is a first-party framework built into the Swift toolchain — no SPM dependency required for Apple platform targets. Tests do not need to subclass `XCTestCase` or use the `test` prefix.
 
@@ -234,12 +234,23 @@ final class ContentViewSnapshotTests: XCTestCase {
 
 **Update reference snapshots:**
 
-```bash
-# Run tests with record mode to overwrite all snapshots:
-RECORD_MODE=all xcodebuild test -scheme MyApp -destination 'platform=macOS'
+swift-snapshot-testing v1.17+ uses the `withSnapshotTesting(record:)` API — there is no `RECORD_MODE` environment variable. Use one of:
+
+```swift
+// Re-record all snapshots in a scope (v1.17+):
+withSnapshotTesting(record: .all) {
+    assertSnapshot(of: view, as: .image(size: CGSize(width: 400, height: 300)))
+}
+
+// Per-assertion record flag (works in all supported versions):
+assertSnapshot(of: view, as: .image(size: CGSize(width: 400, height: 300)), record: .all)
+
+// Suite-level (v1.17+):
+@Suite(.snapshots(record: .failed))  // only re-record on failure
+struct MySnapshotTests { ... }
 ```
 
-Or set `isRecording = true` on a specific test case temporarily.
+The older `isRecording = true` property (set on `XCTestCase` subclass) is a legacy pre-v1.17 approach. Some versions also supported a `SNAPSHOT_RECORD_MODE` environment variable; the current recommended API is `withSnapshotTesting(record:)`. Always check the [swift-snapshot-testing README](https://github.com/pointfreeco/swift-snapshot-testing) for the version you are using.
 
 Commit snapshot files (`__Snapshots__/`) to the repo so diffs appear in code review. Never `.gitignore` them — they are the regression baseline.
 

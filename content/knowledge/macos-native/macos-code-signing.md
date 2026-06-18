@@ -128,15 +128,16 @@ codesign --force --sign "Developer ID Application: Your Name (TEAMID)" \
 Use `Developer ID Installer` (not `Developer ID Application`) for `.pkg` files. Sign at build time via `pkgbuild` or after the fact via `productsign`:
 
 ```bash
-# Sign at build time:
+# Sign at build time (pkgbuild does NOT accept --timestamp; secure timestamping
+# is applied when signing the .app bundle with codesign and when signing the
+# finished package with productsign):
 pkgbuild \
   --component MyApp.app \
   --install-location /Applications \
   --sign "Developer ID Installer: Your Name (TEAMID)" \
-  --timestamp \
   MyApp.pkg
 
-# Or sign an already-built pkg:
+# Or sign an already-built pkg (productsign DOES support --timestamp):
 productsign \
   --sign "Developer ID Installer: Your Name (TEAMID)" \
   --timestamp \

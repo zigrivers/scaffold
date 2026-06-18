@@ -102,25 +102,38 @@ Key macOS-specific review points (subject to change — consult current guidelin
 
 **Xcode Organizer (GUI):** Archive (`Product → Archive`), then click Distribute App → App Store Connect.
 
-**Transporter CLI (command-line upload):**
+**Validate the artifact before upload:**
 ```bash
-# Install from Mac App Store or:
-xcrun altool --validate-app -f MyApp.ipa -t osx --apiKey KEY_ID --apiIssuer ISSUER_ID
-# Note: altool is deprecated for uploads; use Transporter.app or xcrun altool is still
-# technically available but Transporter CLI is the Apple-recommended path.
-
-# Transporter CLI (requires Transporter.app from Mac App Store):
-xcrun Transporter -m upload -f MyApp.pkg -apiKey KEY_ID -apiIssuer ISSUER_ID
+# Validate a .pkg before submitting (altool --validate-app is still functional for validation):
+xcrun altool --validate-app -f MyApp.pkg -t osx --apiKey KEY_ID --apiIssuer ISSUER_ID
 ```
 
-**App Store Connect API key upload (via `altool` — still functional but deprecated):**
+**Transporter CLI (recommended command-line upload path):**
+
+Transporter is available as a standalone app from the Mac App Store. When installed, its CLI binary (`iTMSTransporter`) is invoked via `xcrun iTMSTransporter` (Xcode 11–13) or directly from the Transporter app bundle (Xcode 14+ removed the embedded copy). Note: `.pkg` is the macOS App Store artifact format — never `.ipa` (that is the iOS format).
+
+```bash
+# Upload a signed .pkg using App Store Connect API key authentication:
+xcrun iTMSTransporter -m upload \
+  -assetFile MyApp.pkg \
+  -apiKey KEY_ID \
+  -apiIssuer ISSUER_ID
+
+# Username/password authentication (app-specific password if 2FA is enabled):
+xcrun iTMSTransporter -m upload \
+  -assetFile MyApp.pkg \
+  -u you@example.com \
+  -p xxxx-xxxx-xxxx-xxxx
+```
+
+**Legacy path (`altool` — deprecated for uploads):**
 ```bash
 xcrun altool --upload-app -f MyApp.pkg -t osx \
   --apiKey KEY_ID \
   --apiIssuer ISSUER_ID
 ```
 
-`altool` for notarization was retired in November 2023; for App Store uploads, `altool` still works as of this writing but Apple recommends migrating to Transporter or the App Store Connect API directly. Check Apple's current documentation for the current-recommended upload path before setting up new CI pipelines.
+`altool` for notarization was retired in November 2023; for App Store uploads, Apple recommends migrating to `iTMSTransporter` (via the Transporter app) or the App Store Connect API directly. Check Apple's current documentation for the current-recommended upload path before setting up new CI pipelines.
 
 ### Receipt Validation and In-App Purchase
 
@@ -159,7 +172,7 @@ for await result in Transaction.currentEntitlements {
 }
 ```
 
-**Avoid raw receipt parsing:** Parsing `Bundle.main.appStoreReceiptURL` and verifying the receipt cryptographically yourself (the older approach) is complex and fragile. StoreKit 2's `Transaction` API handles this on-device. Only use server-side receipt validation (`/verifyReceipt`) if you must support macOS 11 or below, and even then use StoreKit's server-to-server notifications where possible.
+**Avoid raw receipt parsing:** Parsing `Bundle.main.appStoreReceiptURL` and verifying the receipt cryptographically yourself (the older approach) is complex and fragile. StoreKit 2's `Transaction` API handles this on-device. Only use server-side receipt validation (`/verifyReceipt`) if you must support macOS 11 or below — and note that Apple deprecated the `/verifyReceipt` endpoint in 2023; prefer the App Store Server API or StoreKit 2 server notifications for any new server-side validation work. `/verifyReceipt` is a narrow legacy fallback only.
 
 ### TestFlight for macOS
 

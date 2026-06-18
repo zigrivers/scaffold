@@ -63,7 +63,7 @@ xcrun notarytool submit MyApp.dmg \
 
 ### Submitting for Notarization
 
-The artifact must be a zip archive (for `.app`), a `.dmg`, or a `.pkg`. Xcode 13+ produces a zip automatically. For manual submission:
+The artifact must be a zip archive (for `.app`), a `.dmg`, or a `.pkg`. The Xcode Organizer GUI (Distribute App flow) creates and submits the archive for you automatically. From the CLI you must zip the `.app` manually before submission (or submit a `.dmg` or `.pkg` directly — those do not need to be zipped):
 
 ```bash
 # Zip the .app (ditto preserves extended attributes):

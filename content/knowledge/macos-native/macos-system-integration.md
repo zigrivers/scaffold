@@ -71,8 +71,8 @@ let stream = FSEventStreamCreate(
     )
 )!
 
-// Schedule on a dispatch queue (preferred over RunLoop since macOS 10.6;
-// FSEventStreamScheduleWithRunLoop is deprecated as of macOS 13):
+// Schedule on a dispatch queue (FSEventStreamSetDispatchQueue available since macOS 10.6;
+// FSEventStreamScheduleWithRunLoop is deprecated as of macOS 13 — prefer dispatch queue):
 FSEventStreamSetDispatchQueue(stream, DispatchQueue.global(qos: .utility))
 FSEventStreamStart(stream)
 

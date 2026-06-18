@@ -138,12 +138,12 @@ lane :release do
   sh("codesign --force --sign 'Developer ID Application: Name (TEAMID)' --timestamp ./dist/MyApp.dmg")
 
   # 3. Notarize (fastlane notarize action wraps notarytool)
+  # api_key_path: path to an App Store Connect API Key JSON file (contains key_id, issuer_id, key)
+  # Alternatively pass api_key: with a hash: { key_id:, issuer_id:, key: }
   notarize(
     package: "./dist/MyApp.dmg",
     bundle_id: "com.example.MyApp",
-    api_key_path: "~/.private_keys/AuthKey_#{ENV['ASC_KEY_ID']}.p8",
-    api_key: ENV["ASC_KEY_ID"],
-    api_issuer: ENV["ASC_ISSUER_ID"]
+    api_key_path: ENV["ASC_API_KEY_JSON_PATH"]
   )
   # fastlane notarize calls xcrun notarytool submit --wait and xcrun stapler staple automatically
 
