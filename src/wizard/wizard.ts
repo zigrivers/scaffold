@@ -26,6 +26,7 @@ export type {
   BrowserExtensionFlags,
   ResearchFlags,
   McpServerFlags,
+  MacosNativeFlags,
 } from './flags.js'
 
 import type {
@@ -40,6 +41,7 @@ import type {
   BrowserExtensionFlags,
   ResearchFlags,
   McpServerFlags,
+  MacosNativeFlags,
 } from './flags.js'
 
 export interface WizardOptions {
@@ -66,6 +68,7 @@ export interface WizardOptions {
   browserExtensionFlags?: BrowserExtensionFlags
   researchFlags?: ResearchFlags
   mcpServerFlags?: McpServerFlags
+  macosNativeFlags?: MacosNativeFlags
 }
 
 export interface WizardResult {
@@ -95,7 +98,7 @@ export async function collectWizardAnswers(
     depth, adapters, traits,
     gameFlags, webAppFlags, backendFlags, cliFlags, libraryFlags,
     mobileAppFlags, dataPipelineFlags, mlFlags, browserExtensionFlags,
-    researchFlags, mcpServerFlags,
+    researchFlags, mcpServerFlags, macosNativeFlags,
   } = options
 
   // Detect project
@@ -129,6 +132,7 @@ export async function collectWizardAnswers(
     browserExtensionFlags,
     researchFlags,
     mcpServerFlags,
+    macosNativeFlags,
   })
 
   // Build config — methodology is a top-level string per the real ScaffoldConfig schema

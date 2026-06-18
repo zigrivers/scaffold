@@ -427,6 +427,25 @@ describe('mcp-server auto-detect via flag', () => {
   })
 })
 
+describe('macos-native flags', () => {
+  it('rejects macos flags with a non-macos project type', () => {
+    expect(() => applyFlagFamilyValidation({ 'macos-ui-framework': 'swiftui', 'project-type': 'web-app' }))
+      .toThrow(/macos/i)
+  })
+  it('rejects mac-app-store + sparkle', () => {
+    expect(() => applyFlagFamilyValidation({ 'macos-distribution': 'mac-app-store', 'macos-auto-update': 'sparkle' }))
+      .toThrow(/App Store/i)
+  })
+  it('rejects swiftdata below macOS 14', () => {
+    expect(() => applyFlagFamilyValidation({ 'macos-persistence': 'swiftdata', 'macos-min-version': '13.0' }))
+      .toThrow(/SwiftData/i)
+  })
+  it('maps flags into a macos-native partial', () => {
+    const out = buildFlagOverrides({ 'macos-ui-framework': 'hybrid', 'macos-distribution': 'developer-id' })
+    expect(out).toEqual({ type: 'macos-native', partial: { uiFramework: 'hybrid', distribution: 'developer-id' } })
+  })
+})
+
 describe('mcp-server flag family', () => {
   it('buildFlagOverrides maps --mcp-* to McpServerConfig partial', () => {
     const out = buildFlagOverrides({

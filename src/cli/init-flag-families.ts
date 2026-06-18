@@ -23,6 +23,7 @@ import type {
   BrowserExtensionConfigSchema,
   ResearchConfigSchema,
   McpServerConfigSchema,
+  MacosNativeConfigSchema,
 } from '../config/schema.js'
 
 // Local type aliases keep the `buildFlagOverrides` cast sites readable
@@ -38,6 +39,7 @@ type MlConfig = z.infer<typeof MlConfigSchema>
 type BrowserExtensionConfig = z.infer<typeof BrowserExtensionConfigSchema>
 type ResearchConfig = z.infer<typeof ResearchConfigSchema>
 type McpServerConfig = z.infer<typeof McpServerConfigSchema>
+type MacosNativeConfig = z.infer<typeof MacosNativeConfigSchema>
 
 // ---------------------------------------------------------------------------
 // Flag family constants (verbatim from init.ts)
@@ -88,6 +90,11 @@ export const MCP_SERVER_FLAGS = [
   'mcp-language', 'mcp-transport', 'mcp-primitives', 'mcp-auth', 'mcp-deployment', 'mcp-stateful',
 ] as const
 
+export const MACOS_NATIVE_FLAGS = [
+  'macos-ui-framework', 'macos-app-style', 'macos-min-version',
+  'macos-distribution', 'macos-sandboxed', 'macos-persistence', 'macos-auto-update',
+] as const
+
 // ---------------------------------------------------------------------------
 // Discriminated-union payload for adopt's merge pipeline
 // ---------------------------------------------------------------------------
@@ -104,6 +111,7 @@ export type PartialConfigOverrides =
   | { type: 'browser-extension'; partial: Partial<BrowserExtensionConfig> }
   | { type: 'research'; partial: Partial<ResearchConfig> }
   | { type: 'mcp-server'; partial: Partial<McpServerConfig> }
+  | { type: 'macos-native'; partial: Partial<MacosNativeConfig> }
   | undefined
 
 // ---------------------------------------------------------------------------
@@ -137,6 +145,7 @@ function detectFamily(
   | 'browser-extension'
   | 'research'
   | 'mcp-server'
+  | 'macos-native'
   | undefined {
   if (GAME_FLAGS.some((f) => argv[f] !== undefined)) return 'game'
   if (WEB_FLAGS.some((f) => argv[f] !== undefined)) return 'web-app'
@@ -149,6 +158,7 @@ function detectFamily(
   if (EXT_FLAGS.some((f) => argv[f] !== undefined)) return 'browser-extension'
   if (RESEARCH_FLAGS.some((f) => argv[f] !== undefined)) return 'research'
   if (MCP_SERVER_FLAGS.some((f) => argv[f] !== undefined)) return 'mcp-server'
+  if (MACOS_NATIVE_FLAGS.some((f) => argv[f] !== undefined)) return 'macos-native'
   return undefined
 }
 
@@ -224,19 +234,20 @@ export function applyFlagFamilyValidation(argv: Record<string, unknown>): true |
   const hasExtFlag = EXT_FLAGS.some((f) => argv[f] !== undefined)
   const hasResearchFlag = RESEARCH_FLAGS.some((f) => argv[f] !== undefined)
   const hasMcpServerFlag = MCP_SERVER_FLAGS.some((f) => argv[f] !== undefined)
+  const hasMacosNativeFlag = MACOS_NATIVE_FLAGS.some((f) => argv[f] !== undefined)
 
   // Reject mixed-family flags
   const typeCount = [
     hasGameFlag, hasWebFlag, hasBackendFlag,
     hasCliFlag, hasLibFlag, hasMobileFlag,
     hasPipelineFlag, hasMlFlag, hasExtFlag,
-    hasResearchFlag, hasMcpServerFlag,
+    hasResearchFlag, hasMcpServerFlag, hasMacosNativeFlag,
   ].filter(Boolean).length
   if (typeCount > 1) {
     throw new Error(
       'Cannot mix flags from multiple project types'
       + ' (--web-*, --backend-*, --cli-*, --lib-*, --mobile-*, --pipeline-*,'
-      + ' --ml-*, --research-*, --ext-*, --mcp-*, game flags)',
+      + ' --ml-*, --research-*, --ext-*, --mcp-*, --macos-*, game flags)',
     )
   }
 
@@ -274,6 +285,19 @@ export function applyFlagFamilyValidation(argv: Record<string, unknown>): true |
   }
   if (hasMcpServerFlag && argv['project-type'] !== undefined && argv['project-type'] !== 'mcp-server') {
     throw new Error('--mcp-* flags require --project-type mcp-server')
+  }
+  if (hasMacosNativeFlag && argv['project-type'] !== undefined && argv['project-type'] !== 'macos-native') {
+    throw new Error('--macos-* flags require --project-type macos-native')
+  }
+  if (hasMacosNativeFlag) {
+    if (argv['macos-distribution'] === 'mac-app-store' && argv['macos-auto-update'] !== undefined
+        && argv['macos-auto-update'] !== 'none') {
+      throw new Error('Mac App Store builds cannot bundle Sparkle (set --macos-auto-update none)')
+    }
+    if (argv['macos-persistence'] === 'swiftdata' && argv['macos-min-version'] !== undefined) {
+      const major = parseInt(String(argv['macos-min-version']).split('.')[0] ?? '', 10)
+      if (major < 14) throw new Error('SwiftData requires --macos-min-version 14.0 or later')
+    }
   }
   if (hasMcpServerFlag) {
     // Cross-field guards fire only when --mcp-transport is EXPLICITLY 'stdio'.
@@ -603,6 +627,17 @@ export function buildFlagOverrides(argv: Record<string, unknown>): PartialConfig
       partial.deployment = argv['mcp-deployment'] as McpServerConfig['deployment']
     if (argv['mcp-stateful'] !== undefined) partial.stateful = argv['mcp-stateful'] as boolean
     return { type: 'mcp-server', partial }
+  }
+  case 'macos-native': {
+    const partial: Partial<MacosNativeConfig> = {}
+    if (argv['macos-ui-framework'] !== undefined) partial.uiFramework = argv['macos-ui-framework'] as MacosNativeConfig['uiFramework']
+    if (argv['macos-app-style'] !== undefined) partial.appStyle = argv['macos-app-style'] as MacosNativeConfig['appStyle']
+    if (argv['macos-min-version'] !== undefined) partial.minMacosVersion = argv['macos-min-version'] as string
+    if (argv['macos-distribution'] !== undefined) partial.distribution = argv['macos-distribution'] as MacosNativeConfig['distribution']
+    if (argv['macos-sandboxed'] !== undefined) partial.sandboxed = argv['macos-sandboxed'] as boolean
+    if (argv['macos-persistence'] !== undefined) partial.persistence = argv['macos-persistence'] as MacosNativeConfig['persistence']
+    if (argv['macos-auto-update'] !== undefined) partial.autoUpdate = argv['macos-auto-update'] as MacosNativeConfig['autoUpdate']
+    return { type: 'macos-native', partial }
   }
   default:
     return undefined
