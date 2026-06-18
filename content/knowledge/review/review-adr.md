@@ -1,13 +1,20 @@
 ---
 name: review-adr
 description: Failure modes and review passes specific to Architecture Decision Records
-topics: [adr, decisions, review]
+topics:
+  - adr
+  - decisions
+  - review
 volatility: stable
-last-reviewed: null
+last-reviewed: 2026-06-18
 version-pin: null
 sources:
   - url: https://adr.github.io/
+    hash: sha256:54cfbd863e081fb8f8d4ef6ba49620c1ba66a69baa6b88d75df2081d4567df19
+    retrieved: 2026-06-18
   - url: https://github.com/joelparkerhenderson/architecture-decision-record
+    hash: sha256:e9ae0f9127a35f6dad8526dede0b1ec72780d4d4bbc123b9e096f6bc1aafaf7b
+    retrieved: 2026-06-18
 ---
 
 # Review: Architecture Decision Records
