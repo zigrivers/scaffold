@@ -103,7 +103,7 @@ WindowGroup { ContentView() }
     .windowToolbarStyle(.unified(showsTitle: true))
 ```
 
-For user-customizable toolbars in AppKit-backed windows, implement `NSToolbarDelegate` and vend `NSToolbarItem` objects; SwiftUI toolbars are not yet user-customizable via system UI as of macOS 15.
+For user-customizable toolbars, SwiftUI gained `customizationID` on `ToolbarItem` and `ToolbarCustomizationBehavior` in macOS 13 — add a `customizationID` string to each item to opt it into user drag-and-drop customization. SwiftUI toolbar customization covers common cases but is narrower than the full `NSToolbarDelegate` model; fall back to AppKit (`NSToolbarDelegate`, vending `NSToolbarItem` objects) when you need fully custom drag-and-drop toolbar editing, custom item views, or fine-grained control over the allowed/default item sets.
 
 ### Sidebar and Source List
 
@@ -215,7 +215,7 @@ macOS defaults to a denser layout than iOS. Targets:
 - Row heights in lists: **22–24 pt** on macOS (vs 44 pt on iOS).
 - Padding inside cells: **4–8 pt** horizontal, **2–4 pt** vertical.
 
-Respect the user's preferred density from System Settings → Accessibility → Display → "Reduce Motion", "Increase Contrast", and (if you implement it) "Use larger text." In SwiftUI, `.controlSize(.regular)` is the default; use `.controlSize(.small)` for compact secondary controls.
+Respect the user's preferred density from System Settings → Accessibility → Display → "Increase Contrast" and (if you implement it) "Use larger text." In SwiftUI, `.controlSize(.regular)` is the default; use `.controlSize(.small)` for compact secondary controls. For motion/animation preferences ("Reduce Motion"), see the motion guidance in `[[macos-accessibility]]`.
 
 ### Menu-Bar Extras (Status Items)
 

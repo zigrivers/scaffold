@@ -236,7 +236,7 @@ By default, each app's Keychain items are scoped to its own bundle ID. To share 
 
 ```xml
 <!-- MyApp.entitlements -->
-<key>keychain-access-groups</key>
+<key>com.apple.security.keychain-access-groups</key>
 <array>
     <string>$(AppIdentifierPrefix)com.mycompany.shared</string>
 </array>
@@ -296,4 +296,4 @@ func generateSecureEnclaveKey(tag: String) throws -> SecKey {
 }
 ```
 
-The Secure Enclave is available on Macs with Apple Silicon and on Macs with the T1/T2 chip. Fall back to software-backed keys on older Intel hardware without T2. Use `kSecAttrTokenIDSecureEnclave` only when `LAContext().canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil)` returns true.
+The Secure Enclave is available on Macs with Apple Silicon and on Macs with the T1/T2 chip. Fall back to software-backed keys on older Intel hardware without T2. Gate `kSecAttrTokenIDSecureEnclave` usage on `SecureEnclave.isAvailable` (CryptoKit, macOS 11+) — this correctly tests for hardware Secure Enclave presence. Do not use `LAContext().canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil)` for this check: that tests whether Touch ID is *enrolled*, not whether a Secure Enclave exists (a Mac can have a Secure Enclave without enrolled biometrics, and vice versa). Biometric enrollment is a separate concern relevant to `.biometryCurrentSet`/`.biometryAny` access control flags, not to hardware availability.

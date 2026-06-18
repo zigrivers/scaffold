@@ -186,20 +186,29 @@ class DocumentViewModel {
 In SwiftUI, access `UndoManager` via the environment:
 
 ```swift
+// Undo registration requires a stable reference-type target.
+// Use an NSObject/ObservableObject view-model as the target, not a value type or binding.
+class TitleViewModel: NSObject, ObservableObject {
+    @Published var title: String = ""
+
+    func setTitle(_ new: String, undoManager: UndoManager?) {
+        let old = title
+        undoManager?.registerUndo(withTarget: self) { target in
+            target.setTitle(old, undoManager: undoManager)
+        }
+        undoManager?.setActionName("Edit Title")
+        title = new
+    }
+}
+
 struct TitleField: View {
-    @Binding var title: String
+    @StateObject private var viewModel = TitleViewModel()
     @Environment(\.undoManager) var undoManager
 
     var body: some View {
         TextField("Title", text: Binding(
-            get: { title },
-            set: { new in
-                let old = title
-                undoManager?.registerUndo(withTarget: AnyObject.self as AnyObject) { _ in
-                    title = old
-                }
-                title = new
-            }
+            get: { viewModel.title },
+            set: { viewModel.setTitle($0, undoManager: undoManager) }
         ))
     }
 }

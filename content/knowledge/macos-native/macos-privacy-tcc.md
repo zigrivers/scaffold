@@ -41,7 +41,7 @@ All usage description values must appear in the app target's `Info.plist`. Value
 | Photos (write) | `NSPhotoLibraryAddUsageDescription` | `PHPhotoLibrary` write-only |
 | Location (always) | `NSLocationAlwaysAndWhenInUseUsageDescription` | `CLLocationManager` always |
 | Location (when in use) | `NSLocationWhenInUseUsageDescription` | `CLLocationManager` WhenInUse |
-| Screen Recording | `NSScreenCaptureUsageDescription` | `CGWindowList`, `AVScreenCapture` |
+| Screen Recording | *(no NS…UsageDescription key)* | macOS Screen Recording is gated by a system TCC consent dialog (ScreenCaptureKit, macOS 13+), NOT an Info.plist usage-description string. Check with `CGPreflightScreenCaptureAccess()`; prompt via `CGRequestScreenCaptureAccess()`. |
 | Desktop folder | `NSDesktopFolderUsageDescription` | Sandbox file access to Desktop |
 | Documents folder | `NSDocumentsFolderUsageDescription` | Sandbox file access to Documents |
 | Downloads folder | `NSDownloadsFolderUsageDescription` | Sandbox file access to Downloads |
@@ -171,7 +171,7 @@ func bookmark(url: URL) throws -> Data {
 }
 
 // Persist bookmark data (container-safe location)
-let key = "bookmark-\(url.path.hashValue)"
+let key = "bookmark-\(url.path)"  // use the path string directly — hashValue is randomized per-process and not stable across launches
 UserDefaults.standard.set(try bookmark(url: url), forKey: key)
 
 // Restore on next launch

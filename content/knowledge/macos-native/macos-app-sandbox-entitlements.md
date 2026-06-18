@@ -69,12 +69,7 @@ Hardened Runtime is required for notarization (and thus for any signed software 
 - Disables unsigned code loading (re-enable: `com.apple.security.cs.disable-library-validation`).
 - Disables access to the `task_for_pid` debugging interface.
 
-Most apps need only:
-
-```xml
-<key>com.apple.security.cs.allow-unsigned-executable-memory</key>
-<false/>
-```
+Most apps need no Hardened Runtime exception entitlements at all — simply omit any exception key you do not need. Boolean entitlements set to `<false/>` are a no-op; do not include them. Add exception entitlements only when your app genuinely requires the capability:
 
 If your app loads plug-ins or third-party frameworks not signed by your team, add:
 
@@ -98,8 +93,8 @@ If your app loads plug-ins or third-party frameworks not signed by your team, ad
 
 **What it restricts:**
 - `/opt/homebrew/bin/git` — NOT a system path; requires a security-scoped bookmark or a temporary exception.
-- `~/.ssh/` — the user's SSH directory is outside the container; accessing it requires either the `com.apple.security.network.client` entitlement (not sufficient alone) plus user-granted access or a temporary exception.
-- `~/.gitconfig`, `~/.config/git/config` — same restriction.
+- `~/.ssh/` — the user's SSH directory is outside the container. Reading SSH key *files* requires a user-granted security-scoped bookmark (obtained via `NSOpenPanel`) or a `com.apple.security.temporary-exception.files.home-relative-path.read-only` entitlement. `com.apple.security.network.client` is orthogonal — it grants outbound *socket* (network) access and does NOT grant file-system access to `~/.ssh/`. These are two separate, independent requirements: one for file access, one for the network connection.
+- `~/.gitconfig`, `~/.config/git/config` — same file-access restriction; requires bookmark or temporary exception.
 
 **Using `Process` (Foundation) to exec a subprocess:**
 
@@ -140,10 +135,21 @@ func runGit(arguments: [String], workingDirectory: URL) async throws -> String {
 }
 
 func gitExecutableURL() throws -> URL {
-    // Try the system git shim first (always available on macOS with CLT)
-    let systemGit = URL(fileURLWithPath: "/usr/bin/git")
-    if FileManager.default.isExecutableFile(atPath: systemGit.path) {
-        return systemGit
+    // /usr/bin/git is the Xcode Command Line Tools (CLT) stub — NOT always available.
+    // CAUTION: isExecutableFile(atPath:) returns true for the stub even when CLT are
+    // NOT installed. Without CLT, executing /usr/bin/git triggers a system dialog
+    // prompting the user to install CLT. That dialog is NOT suppressible via
+    // GIT_TERMINAL_PROMPT and will hang a sandboxed or headless subprocess.
+    // Detect CLT presence before trusting this path:
+    let cltProbe = URL(fileURLWithPath: "/Library/Developer/CommandLineTools/usr/bin/git")
+    if FileManager.default.isExecutableFile(atPath: cltProbe.path) {
+        return URL(fileURLWithPath: "/usr/bin/git")  // real CLT git available via stub
+    }
+    // Homebrew git is outside the default sandbox path; requires security-scoped
+    // bookmark or a temporary-exception entitlement:
+    let homebrewGit = URL(fileURLWithPath: "/opt/homebrew/bin/git")
+    if FileManager.default.isExecutableFile(atPath: homebrewGit.path) {
+        return homebrewGit
     }
     throw GitError.notFound
 }
@@ -237,7 +243,7 @@ func resolveBookmark(data: Data) throws -> URL {
 defer { url.stopAccessingSecurityScopedResource() }
 ```
 
-**Important:** `startAccessingSecurityScopedResource()` / `stopAccessingSecurityScopedResource()` must be balanced. Leaking start calls exhausts the kernel's token limit (finite; ~5000 active at once on recent macOS).
+**Important:** `startAccessingSecurityScopedResource()` / `stopAccessingSecurityScopedResource()` must be balanced. The kernel enforces a per-process limit on active security-scoped access tokens (exact value is undocumented and subject to change); leaking start calls will eventually exhaust this limit and cause access failures. Always pair with `defer { url.stopAccessingSecurityScopedResource() }` to prevent leaks.
 
 The **Powerbox** is the system process behind `NSOpenPanel` and `NSSavePanel`. It runs outside the sandbox and can access any user-visible path. The result URL it returns is automatically granted to the sandboxed app for the session. Security-scoped bookmarks extend that grant across sessions.
 
