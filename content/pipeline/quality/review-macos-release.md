@@ -5,11 +5,13 @@ summary: "Single gate over docs/macos-distribution.md and docs/macos-entitlement
 phase: "quality"
 order: 937
 dependencies: [macos-distribution-spec, macos-entitlements-privacy-spec]
-outputs: [docs/reviews/review-macos-release.md]
+outputs: [docs/reviews/review-macos-release.md, docs/reviews/macos-release/review-summary.md, docs/reviews/macos-release/codex-review.json, docs/reviews/macos-release/gemini-review.json]
 conditional: null
 reads: [macos-distribution-spec, macos-entitlements-privacy-spec]
 knowledge-base: [macos-code-signing, macos-app-sandbox-entitlements]
 ---
+
+This step performs a combined cross-spec ship-readiness review of the macOS distribution and entitlements/privacy specifications, treating them as a single coherent gate rather than independent documents. Because signing, sandboxing, TCC privacy strings, and update-mechanism choices are tightly coupled across both specs, a joint review catches consistency failures — missing hardened-runtime exceptions, Sparkle in a Mac App Store build — that per-spec review misses entirely.
 
 ## Purpose
 Review the macOS distribution and entitlements/privacy specifications together
