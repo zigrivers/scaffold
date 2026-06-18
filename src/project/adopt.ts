@@ -16,6 +16,7 @@ import {
   MobileAppConfigSchema, DataPipelineConfigSchema, MlConfigSchema,
   BrowserExtensionConfigSchema, GameConfigSchema, ResearchConfigSchema,
   DataScienceConfigSchema, Web3ConfigSchema, McpServerConfigSchema,
+  MacosNativeConfigSchema,
 } from '../config/schema.js'
 import { ExitCode } from '../types/enums.js'
 import { configParseError, configNotObject } from '../utils/errors.js'
@@ -37,6 +38,7 @@ const TYPE_KEY: Record<ProjectType, string> = {
   'data-science':      'dataScienceConfig',
   'web3':              'web3Config',
   'mcp-server':        'mcpServerConfig',
+  'macos-native':      'macosNativeConfig',
 }
 
 // Exported for use by CLI handler's writeOrUpdateConfig
@@ -58,6 +60,7 @@ function schemaForType(type: ProjectType): z.ZodType {
   case 'data-science':      return DataScienceConfigSchema
   case 'web3':              return Web3ConfigSchema
   case 'mcp-server':        return McpServerConfigSchema
+  case 'macos-native':      return MacosNativeConfigSchema
   default: return assertNever(type as never)
   }
 }
