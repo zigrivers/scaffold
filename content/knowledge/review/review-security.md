@@ -1,14 +1,25 @@
 ---
 name: review-security
 description: Failure modes and review passes specific to security review and documentation artifacts
-topics: [security, owasp, auth, threat-modeling, review]
+topics:
+  - security
+  - owasp
+  - auth
+  - threat-modeling
+  - review
 volatility: evolving
 last-reviewed: null
-version-pin: null
+version-pin: OWASP Top 10:2025
 sources:
   - url: https://owasp.org/Top10/
+    hash: sha256:cf318bf6e49239cd034bdfcdf41ca87eab4036c34f8991be2d2a24e52647a12b
+    retrieved: 2026-06-18
   - url: https://owasp.org/www-project-application-security-verification-standard/
+    hash: sha256:1ee883d4b4de87ec590a925f72c2e13cab5e3d436749a2728bc7f5b1b1528a8f
+    retrieved: 2026-06-18
   - url: https://www.nist.gov/cyberframework
+    hash: sha256:34b3ce4b387b98e7634c3d7fbdb3a8b89c2a06d57643c97719dfd6ffad2acfbc
+    retrieved: 2026-06-18
 ---
 
 # Review: Security
@@ -19,7 +30,7 @@ Follows the review process defined in `review-methodology.md`.
 
 ## Summary
 
-- **Pass 1 — OWASP Coverage**: Every OWASP Top 10 category addressed with project-specific analysis, not generic checklist advice.
+- **Pass 1 — OWASP Coverage**: Every OWASP Top 10:2025 category addressed with project-specific analysis, not generic checklist advice.
 - **Pass 2 — Auth/AuthZ Boundary Alignment**: Security boundaries align with API contract auth requirements; no access control gaps between security review and API enforcement.
 - **Pass 3 — Secrets Management**: No secrets in code or version control; rotation strategy exists; vault/secrets manager integration specified for all secret categories.
 - **Pass 4 — Dependency Audit Coverage**: Vulnerability scanning integrated into CI covering direct and transitive dependencies; response policy for discovered vulnerabilities.
@@ -35,7 +46,7 @@ Follows the review process defined in `review-methodology.md`.
 
 ### What to Check
 
-Each OWASP Top 10 category is addressed for this specific project. The assessment is project-specific (not generic), identifying which categories are relevant, what the project's exposure is, and what mitigations are in place or planned.
+Each OWASP Top 10:2025 category is addressed for this specific project. The assessment is project-specific (not generic), identifying which categories are relevant, what the project's exposure is, and what mitigations are in place or planned.
 
 ### Why This Matters
 
@@ -43,7 +54,7 @@ The OWASP Top 10 represents the most common and impactful web application securi
 
 ### How to Check
 
-1. Verify all 10 OWASP categories are addressed (Broken Access Control, Cryptographic Failures, Injection, Insecure Design, Security Misconfiguration, Vulnerable Components, Identity/Auth Failures, Data Integrity Failures, Logging Failures, SSRF)
+1. Verify all OWASP Top 10:2025 categories are addressed (Broken Access Control, Cryptographic Failures, Injection, Insecure Design, Security Misconfiguration, Vulnerable and Outdated Components, Identification and Authentication Failures, Software and Data Integrity Failures, Security Logging and Monitoring Failures, Server-Side Request Forgery)
 2. For each category, check that the assessment is project-specific: which components are affected? What is the attack surface?
 3. Verify that mitigations reference specific architecture components, not generic advice ("use an ORM" vs. "the OrderRepository uses Prisma with parameterized queries by default")
 4. Check for categories marked "not applicable" — is the rationale valid? (SSRF is not applicable only if the system never fetches external URLs)
@@ -56,8 +67,6 @@ The OWASP Top 10 represents the most common and impactful web application securi
 - P0: "Broken Access Control category is marked 'mitigated' but the API contracts show several endpoints with no authorization specification (see API review Pass 3). The mitigation claim is unverified."
 - P1: "Cryptographic Failures category says 'use HTTPS' but does not address data encryption at rest, password hashing algorithm, or token generation security."
 - P2: "Security Misconfiguration category provides generic advice. Should reference the project's specific infrastructure (Docker, Kubernetes, cloud provider) and their configuration risks."
-
----
 
 ## Pass 2: Auth/AuthZ Boundary Alignment
 
@@ -165,6 +174,7 @@ A threat model that says "attackers may try to compromise the system" is not a t
 6. Check that mitigations are mapped to threats: which mitigation addresses which threat?
 7. Verify that residual risk is documented: threats with no mitigation or partial mitigation
 8. Check for insider threat scenarios: what if a developer, admin, or service account is compromised?
+9. Consider aligning the threat model with the NIST Cybersecurity Framework (CSF) 2.0 functions (Govern, Identify, Protect, Detect, Respond, Recover) to ensure comprehensive coverage.
 
 ### What a Finding Looks Like
 
@@ -172,8 +182,6 @@ A threat model that says "attackers may try to compromise the system" is not a t
 - P1: "Threat model covers client-to-server boundary but ignores service-to-service trust boundaries. Internal services communicate without authentication — an attacker who compromises one service has unrestricted access to all others."
 - P1: "Threat model identifies threats but does not map them to mitigations. It is unclear whether identified threats are mitigated, partially mitigated, or accepted risks."
 - P2: "Insider threat is not addressed. What happens if a developer's machine is compromised and their credentials are stolen?"
-
----
 
 ## Pass 6: Data Classification
 
