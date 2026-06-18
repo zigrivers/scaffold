@@ -1113,6 +1113,30 @@ describe('mcp-server wizard (interactive mode — empty primitives)', () => {
   })
 })
 
+describe('macos-native wizard branch', () => {
+  it('produces a valid macosNativeConfig in auto mode from flags', async () => {
+    const answers = await askWizardQuestions({
+      output: makeOutputContext(),       // existing helper in this test file
+      suggestion: 'deep',
+      projectType: 'macos-native',
+      auto: true,
+      macosNativeFlags: {
+        macosUiFramework: 'hybrid', macosDistribution: 'developer-id',
+        macosPersistence: 'sqlite', macosAutoUpdate: 'sparkle',
+      },
+    })
+    expect(answers.macosNativeConfig).toEqual({
+      uiFramework: 'hybrid',
+      appStyle: 'standard',
+      minMacosVersion: '15.0',
+      distribution: 'developer-id',
+      sandboxed: false,
+      persistence: 'sqlite',
+      autoUpdate: 'sparkle',
+    })
+  })
+})
+
 describe('mcp-server wizard (auto mode)', () => {
   it('throws when --mcp-language missing in auto mode', async () => {
     const output = makeOutputContext()
