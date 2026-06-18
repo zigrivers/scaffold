@@ -145,7 +145,12 @@ The Swift Observation framework (`@Observable`, macOS 14 / iOS 17) eliminates th
 ```swift
 import Observation
 
-@Observable
+// @MainActor is required for UI-bound @Observable view models under Swift 6
+// strict concurrency: without it, mutations to observed properties from an
+// async method are data races. The @MainActor annotation ensures all property
+// accesses and method calls happen on the main actor; `await store.save(...)`
+// still works — Swift hops off and back on the actor automatically.
+@MainActor @Observable
 final class DocumentViewModel {
     var title: String = ""
     var content: String = ""

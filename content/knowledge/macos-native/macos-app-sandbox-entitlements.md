@@ -127,14 +127,22 @@ func runGit(arguments: [String], workingDirectory: URL) async throws -> String {
     process.standardError = stderr
 
     try process.run()
-    // IMPORTANT: read all pipe data BEFORE calling waitUntilExit().
-    // Reading after waitUntilExit() can deadlock: if the child fills its pipe
-    // buffer and blocks waiting for the parent to drain it, but the parent is
-    // blocked in waitUntilExit() waiting for the child to exit — neither side
-    // makes progress. Drain stdout and stderr first, then wait.
-    let data = stdout.fileHandleForReading.readDataToEndOfFile()
-    let errData = stderr.fileHandleForReading.readDataToEndOfFile()
+    // IMPORTANT: drain stdout AND stderr concurrently before calling
+    // waitUntilExit(). Sequential reads deadlock: if the child fills the
+    // stderr pipe buffer (~64 KB) while the parent is still draining stdout,
+    // the child blocks on stderr, stdout never reaches EOF, and both sides
+    // wait forever. Reading both pipes on concurrent queues avoids this.
+    var data = Data()
+    var errData = Data()
+    let group = DispatchGroup()
+    DispatchQueue.global().async(group: group) {
+        data = stdout.fileHandleForReading.readDataToEndOfFile()
+    }
+    DispatchQueue.global().async(group: group) {
+        errData = stderr.fileHandleForReading.readDataToEndOfFile()
+    }
     process.waitUntilExit()
+    group.wait()
 
     guard process.terminationStatus == 0 else {
         throw GitError.nonZeroExit(
