@@ -43,12 +43,13 @@ describe('detector registry completeness', () => {
         'next.config.mjs': 'export default { output: "standalone" }',
         'experiment.py': '# experiment',
         'foundry.toml': '[profile.default]\n',
+        'Package.swift': 'platforms: [.macOS(.v15)],\n.executable(name: "app", targets: ["App"])',
       },
       dirs: ['src/routes', 'experiments', 'ios', 'android', 'lib/forge-std'],
       rootEntries: [
         'package.json', 'pyproject.toml', 'Cargo.toml', 'dvc.yaml',
         'manifest.json', 'analysis.ipynb', 'next.config.mjs', 'pubspec.yaml',
-        'experiment.py', 'dbt_project.yml', 'foundry.toml',
+        'experiment.py', 'dbt_project.yml', 'foundry.toml', 'Package.swift',
       ],
     })
 

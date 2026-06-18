@@ -4,6 +4,7 @@ import type { Detector, DetectionMatch } from './types.js'
 import { detectGame } from './game.js'
 import { detectBrowserExtension } from './browser-extension.js'
 import { detectMobileApp } from './mobile-app.js'
+import { detectMacosNative } from './macos-native.js'
 import { detectDataPipeline } from './data-pipeline.js'
 import { detectWebApp } from './web-app.js'
 import { detectBackend } from './backend.js'
@@ -19,7 +20,7 @@ import { detectLibrary } from './library.js'
 // — all matches are collected and disambiguated per Section 3 Case A-G.
 export const ALL_DETECTORS: readonly Detector[] = [
   // Tier 1: distinctive root-file detectors (cheap distinctive failures)
-  detectGame, detectBrowserExtension, detectMobileApp, detectDataPipeline,
+  detectGame, detectBrowserExtension, detectMobileApp, detectMacosNative, detectDataPipeline,
   // Tier 2: dep-heavy detectors
   detectWebApp, detectBackend, detectMl, detectResearch, detectMcpServer, detectCli,
   // Tier 3: catch-all
