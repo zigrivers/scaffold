@@ -1134,6 +1134,8 @@ describe('macos-native wizard branch', () => {
       persistence: 'sqlite',
       autoUpdate: 'sparkle',
     })
+    // macos-native must record the desktop platform (→ project.platforms: ['desktop'])
+    expect(answers.traits).toContain('desktop')
   })
 })
 

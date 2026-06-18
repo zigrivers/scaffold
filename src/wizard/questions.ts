@@ -391,6 +391,8 @@ export async function askWizardQuestions(options: {
   // macOS-native configuration
   let macosNativeConfig: MacosNativeConfig | undefined
   if (projectType === 'macos-native') {
+    // macOS-native is a desktop platform — ensure project.platforms records it (spec §2/§7).
+    if (!traits.includes('desktop')) traits.push('desktop')
     const copy = getCopyForType('macos-native')
     showBannerOnce()
     const mf = options.macosNativeFlags
