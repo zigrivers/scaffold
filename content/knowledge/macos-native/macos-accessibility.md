@@ -65,7 +65,6 @@ RoundedRectangle(cornerRadius: 8)
     .frame(width: 100, height: 36)
     .overlay(Text("Commit").foregroundStyle(.white))
     .accessibilityLabel("Commit changes")
-    .accessibilityRole(.button)
     .accessibilityAddTraits(.isButton)
     .onTapGesture { commit() }
 ```
@@ -87,7 +86,7 @@ Text("Repository name")
 
 Never hardcode point sizes for body text. Use the semantic font roles: `.largeTitle`, `.title`, `.headline`, `.subheadline`, `.body`, `.callout`, `.footnote`, `.caption`. For code or monospaced display, `.system(.body, design: .monospaced)`.
 
-For AppKit custom views, read the current preferred size at render time via `NSFont.systemFont(ofSize: NSFont.systemFontSize)`. Note: macOS has no system-wide Dynamic Type notification equivalent to iOS's `UIContentSizeCategory.didChangeNotification`. `NSFontDidChangeNotification` fires for Font Panel font changes (i.e., the user picked a font in the Font Panel), not for the Accessibility "Large Text" preference — do not use it to respond to accessibility text-size changes. Instead, read the preference at layout/render time and redraw when relevant `NSWorkspace` accessibility notifications fire (e.g., `accessibilityDisplayShouldIncreaseContrastDidChangeNotification` for contrast; there is no equivalent for large-text changes, so read the preference on demand).
+For AppKit custom views, read the current preferred size at render time via `NSFont.systemFont(ofSize: NSFont.systemFontSize)`. Note: macOS has no system-wide Dynamic Type notification equivalent to iOS's `UIContentSizeCategory.didChangeNotification`. `NSFontDidChangeNotification` fires for Font Panel font changes (i.e., the user picked a font in the Font Panel), not for the Accessibility "Large Text" preference — do not use it to respond to accessibility text-size changes. Instead, read the preference at layout/render time and redraw when relevant `NSWorkspace` accessibility notifications fire (e.g., observe `NSWorkspace.shared.notificationCenter` for `NSWorkspace.accessibilityDisplayOptionsDidChangeNotification` and query `NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast` — this single notification covers all accessibility display option changes including contrast, reduce motion, and differentiate-without-color; there is no separate notification for large-text changes, so read the preference on demand).
 
 ### Reduce Motion
 
@@ -158,7 +157,7 @@ Canvas { context, size in
         Rectangle()
             .frame(width: item.frame.width, height: item.frame.height)
             .accessibilityLabel(item.name)
-            .accessibilityRole(.button)
+            .accessibilityAddTraits(.isButton)
             .accessibilityAction { selectItem(item) }
     }
 }

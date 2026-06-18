@@ -415,6 +415,67 @@ describe('runWizard', () => {
 })
 
 // ---------------------------------------------------------------------------
+// Fix 1 regression: macosNativeConfig must be persisted into config.yml
+// ---------------------------------------------------------------------------
+
+describe('macosNativeConfig persistence', () => {
+  const mockDetectProjectMode = vi.mocked(detectProjectMode)
+  let tmpDir: string
+
+  beforeEach(() => {
+    tmpDir = makeTempDir()
+    mockDetectProjectMode.mockReturnValue({
+      mode: 'greenfield',
+      signals: [],
+      methodologySuggestion: 'deep',
+      sourceFileCount: 0,
+    })
+  })
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+    vi.restoreAllMocks()
+  })
+
+  it('writes all 7 macosNativeConfig fields to config.yml when projectType is macos-native', async () => {
+    const output = makeOutputContext()
+    const result = await runWizard({
+      projectRoot: tmpDir,
+      auto: true,
+      force: false,
+      projectType: 'macos-native',
+      macosNativeFlags: {
+        macosUiFramework: 'appkit',
+        macosAppStyle: 'menu-bar',
+        macosMinVersion: '14.0',
+        macosDistribution: 'developer-id',
+        macosSandboxed: false,
+        macosPersistence: 'sqlite',
+        macosAutoUpdate: 'sparkle',
+      },
+      output,
+    })
+
+    expect(result.success).toBe(true)
+    const configPath = path.join(tmpDir, '.scaffold', 'config.yml')
+    const parsed = yaml.load(fs.readFileSync(configPath, 'utf8')) as Record<string, unknown>
+    const project = parsed['project'] as Record<string, unknown>
+
+    expect(project['projectType']).toBe('macos-native')
+    expect(project['macosNativeConfig']).toBeDefined()
+
+    const mnc = project['macosNativeConfig'] as Record<string, unknown>
+    expect(mnc['uiFramework']).toBe('appkit')
+    expect(mnc['appStyle']).toBe('menu-bar')
+    expect(mnc['minMacosVersion']).toBe('14.0')
+    expect(mnc['distribution']).toBe('developer-id')
+    expect(mnc['sandboxed']).toBe(false)
+    expect(mnc['persistence']).toBe('sqlite')
+    expect(mnc['autoUpdate']).toBe('sparkle')
+  })
+})
+
+// ---------------------------------------------------------------------------
 // collectWizardAnswers — seam split tests
 // ---------------------------------------------------------------------------
 

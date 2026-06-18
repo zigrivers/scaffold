@@ -472,13 +472,34 @@ Every `scaffold init` wizard question can be answered via CLI flags, making scaf
 | `--mcp-deployment` | string | local, hosted |
 | `--mcp-stateful` | boolean | `--mcp-stateful` / `--no-mcp-stateful` |
 
-#### macOS-Native Config (`--project-type macos-native`)
+#### macOS-Native Config Flags (require `--project-type macos-native` or auto-set it)
 
-macOS-native has one forward-compatible config field in the schema, defaulted automatically — no CLI flags are needed in v1:
-
-| Config field | Values | Notes |
+| Flag | Type | Values |
 |------|------|--------|
-| `macosNativeConfig.uiFramework` | `swiftui` | Default (applied by the wizard and `--auto`). Covers the MN-1 audience (SwiftUI / AppKit native macOS apps). Future releases may extend with additional options additively, without breaking existing configs. |
+| `--macos-ui-framework` | string | swiftui, appkit, hybrid |
+| `--macos-app-style` | string | standard, menu-bar, agent |
+| `--macos-min-version` | string | e.g. 14.0, 15.0 |
+| `--macos-distribution` | string | developer-id, mac-app-store, both |
+| `--macos-sandboxed` | boolean | `--macos-sandboxed` / `--no-macos-sandboxed` |
+| `--macos-persistence` | string | none, sqlite, core-data, swiftdata |
+| `--macos-auto-update` | string | none, sparkle |
+
+The full `macosNativeConfig` object written to `.scaffold/config.yml`:
+
+| Config field | Default | Notes |
+|------|------|--------|
+| `macosNativeConfig.uiFramework` | `swiftui` | UI toolkit: `swiftui`, `appkit`, or `hybrid` |
+| `macosNativeConfig.appStyle` | `standard` | App style: `standard`, `menu-bar`, or `agent` |
+| `macosNativeConfig.minMacosVersion` | `15.0` | Minimum macOS deployment target (string, e.g. `"15.0"`) |
+| `macosNativeConfig.distribution` | `developer-id` | Distribution channel: `developer-id`, `mac-app-store`, or `both` |
+| `macosNativeConfig.sandboxed` | `false` | Whether the App Sandbox is enabled |
+| `macosNativeConfig.persistence` | `none` | Local persistence: `none`, `sqlite`, `core-data`, or `swiftdata` |
+| `macosNativeConfig.autoUpdate` | `none` | Auto-update mechanism: `none` or `sparkle` |
+
+**Coupling constraints:**
+- `distribution: mac-app-store` or `both` → `sandboxed` is forced to `true` (Mac App Store requirement).
+- `distribution: mac-app-store` → `autoUpdate` is forced to `none` (App Store builds cannot bundle Sparkle).
+- `persistence: swiftdata` → `minMacosVersion` is bumped to `14.0` if a lower value is provided (SwiftData requires macOS 14+).
 
 #### Data Science Config (`--project-type data-science`)
 

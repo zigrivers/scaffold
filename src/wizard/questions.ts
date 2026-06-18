@@ -444,7 +444,22 @@ export async function askWizardQuestions(options: {
             'none', copy.autoUpdate) as MacosNativeConfig['autoUpdate']
           : 'none'))
 
-    macosNativeConfig = { uiFramework, appStyle, minMacosVersion, distribution, sandboxed, persistence, autoUpdate }
+    // SwiftData requires macOS 14+. If the user picked swiftdata with an older floor, bump it.
+    let effectiveMinMacosVersion = minMacosVersion
+    if (persistence === 'swiftdata') {
+      const majorVersion = parseInt(effectiveMinMacosVersion.split('.')[0] ?? '0', 10)
+      if (majorVersion < 14) {
+        effectiveMinMacosVersion = '14.0'
+        output.warn(
+          `SwiftData requires macOS 14.0+. Minimum macOS version bumped from ${minMacosVersion} to 14.0.`,
+        )
+      }
+    }
+
+    macosNativeConfig = {
+      uiFramework, appStyle, minMacosVersion: effectiveMinMacosVersion,
+      distribution, sandboxed, persistence, autoUpdate,
+    }
   }
 
   // Data pipeline configuration

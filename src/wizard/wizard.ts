@@ -156,6 +156,7 @@ export async function collectWizardAnswers(
       ...(answers.dataScienceConfig && { dataScienceConfig: answers.dataScienceConfig }),
       ...(answers.web3Config && { web3Config: answers.web3Config }),
       ...(answers.mcpServerConfig && { mcpServerConfig: answers.mcpServerConfig }),
+      ...(answers.macosNativeConfig && { macosNativeConfig: answers.macosNativeConfig }),
     },
   }
 
