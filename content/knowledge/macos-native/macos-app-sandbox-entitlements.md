@@ -107,8 +107,15 @@ func runGit(arguments: [String], workingDirectory: URL) async throws -> String {
     process.arguments = arguments
     process.currentDirectoryURL = workingDirectory
 
-    // Inherit only a safe environment — strip secrets and sensitive vars
-    var env = ProcessInfo.processInfo.environment
+    // Build a minimal allow-listed environment rather than inheriting the full
+    // parent environment. Copying the entire parent env risks leaking secrets
+    // (API keys, tokens) that the parent process picked up from its own env.
+    // PATH and HOME are needed by git for tool resolution and config lookup.
+    var env: [String: String] = [:]
+    let parentEnv = ProcessInfo.processInfo.environment
+    for key in ["PATH", "HOME", "USER", "TMPDIR", "LANG", "LC_ALL"] {
+        if let val = parentEnv[key] { env[key] = val }
+    }
     env["GIT_TERMINAL_PROMPT"] = "0"  // disable interactive prompts
     env["GIT_PAGER"] = ""             // disable pager (subprocess would hang)
     env["GIT_ASKPASS"] = ""           // disable credential helper UI
@@ -120,17 +127,22 @@ func runGit(arguments: [String], workingDirectory: URL) async throws -> String {
     process.standardError = stderr
 
     try process.run()
+    // IMPORTANT: read all pipe data BEFORE calling waitUntilExit().
+    // Reading after waitUntilExit() can deadlock: if the child fills its pipe
+    // buffer and blocks waiting for the parent to drain it, but the parent is
+    // blocked in waitUntilExit() waiting for the child to exit — neither side
+    // makes progress. Drain stdout and stderr first, then wait.
+    let data = stdout.fileHandleForReading.readDataToEndOfFile()
+    let errData = stderr.fileHandleForReading.readDataToEndOfFile()
     process.waitUntilExit()
 
     guard process.terminationStatus == 0 else {
-        let errData = stderr.fileHandleForReading.readDataToEndOfFile()
         throw GitError.nonZeroExit(
             code: process.terminationStatus,
             stderr: String(data: errData, encoding: .utf8) ?? ""
         )
     }
 
-    let data = stdout.fileHandleForReading.readDataToEndOfFile()
     return String(data: data, encoding: .utf8) ?? ""
 }
 
@@ -146,10 +158,13 @@ func gitExecutableURL() throws -> URL {
         return URL(fileURLWithPath: "/usr/bin/git")  // real CLT git available via stub
     }
     // Homebrew git is outside the default sandbox path; requires security-scoped
-    // bookmark or a temporary-exception entitlement:
-    let homebrewGit = URL(fileURLWithPath: "/opt/homebrew/bin/git")
-    if FileManager.default.isExecutableFile(atPath: homebrewGit.path) {
-        return homebrewGit
+    // bookmark or a temporary-exception entitlement.
+    // /opt/homebrew is the Apple Silicon prefix; /usr/local is the Intel prefix.
+    for homebrewPrefix in ["/opt/homebrew/bin/git", "/usr/local/bin/git"] {
+        let url = URL(fileURLWithPath: homebrewPrefix)
+        if FileManager.default.isExecutableFile(atPath: url.path) {
+            return url
+        }
     }
     throw GitError.notFound
 }
@@ -169,9 +184,12 @@ Under the sandbox, `~/.ssh/` is inaccessible by default. A Git app that uses SSH
 **Option A: Inject the SSH key via the git command**
 
 ```swift
-// Pass an explicit identity file so git doesn't need to read ~/.ssh directly
+// Pass an explicit identity file so git doesn't need to read ~/.ssh directly.
+// Quote the path to handle spaces (e.g. "/Users/My Name/.ssh/id_ed25519").
+let quotedKeyPath = keyPath.path.replacingOccurrences(of: "\\", with: "\\\\")
+                               .replacingOccurrences(of: "\"", with: "\\\"")
 process.arguments = [
-    "-c", "core.sshCommand=ssh -i \(keyPath.path) -o StrictHostKeyChecking=accept-new",
+    "-c", "core.sshCommand=ssh -i \"\(quotedKeyPath)\" -o StrictHostKeyChecking=accept-new",
     "fetch", "origin"
 ]
 ```

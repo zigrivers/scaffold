@@ -88,6 +88,21 @@ describe('detectMacosNative', () => {
     expect(m?.confidence).toBe('low')
   })
 
+  it('returns null for iOS project with .entitlements: entitlements must not fire macOS-positive signal', () => {
+    // Regression: entitlements alone was treated as macOS-positive even on iOS projects.
+    // An iphoneos SDKROOT + entitlements file must not match macos-native.
+    const ctx = createFakeSignalContext({
+      rootEntries: ['MyApp.xcodeproj', 'MyApp.entitlements'],
+      dirs: ['MyApp.xcodeproj'],
+      dirListings: { 'MyApp.xcodeproj': ['project.pbxproj'] },
+      files: {
+        'MyApp.entitlements': '<plist/>',
+        'MyApp.xcodeproj/project.pbxproj': 'SDKROOT = iphoneos;\nIPHONEOS_DEPLOYMENT_TARGET = 17.0;',
+      },
+    })
+    expect(detectMacosNative(ctx)).toBeNull()
+  })
+
   it('returns null when there are no Apple/Swift signals', () => {
     const ctx = createFakeSignalContext({ rootEntries: ['package.json'], files: { 'package.json': '{}' } })
     expect(detectMacosNative(ctx)).toBeNull()

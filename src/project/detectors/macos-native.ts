@@ -52,7 +52,11 @@ export function detectMacosNative(ctx: SignalContext): MacosNativeMatch | null {
     return null
   }
 
-  const macosPositive = importsAppKit || entitlements || sdkMacos || (pkgMacos && pkgExecutable && importsSwiftUI)
+  // Entitlements alone is too broad — iOS projects also have .entitlements files.
+  // Only treat entitlements as a macOS-positive signal when no iOS signal is present.
+  const entitlementsIsPositive = entitlements && !sdkIos && !importsUIKit && !ctx.dirExists('ios')
+  const macosPositive =
+    importsAppKit || entitlementsIsPositive || sdkMacos || (pkgMacos && pkgExecutable && importsSwiftUI)
   const iosPositive =
     ctx.dirExists('ios') || importsUIKit || sdkIos || pkgIos
     || ctx.hasDep('expo', 'npm') || ctx.hasDep('react-native', 'npm') || ctx.hasFile('pubspec.yaml')
@@ -73,7 +77,7 @@ export function detectMacosNative(ctx: SignalContext): MacosNativeMatch | null {
 
   const ev: DetectionEvidence[] = []
   if (importsAppKit) ev.push(evidence('appkit-import'))
-  if (entitlements) ev.push(evidence('entitlements-file'))
+  if (entitlementsIsPositive) ev.push(evidence('entitlements-file'))
   if (sdkMacos) ev.push(evidence('pbxproj-macosx-sdk'))
   if (pkgMacos && pkgExecutable && importsSwiftUI) ev.push(evidence('package-swift-macos-executable', 'Package.swift'))
 

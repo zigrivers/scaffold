@@ -36,9 +36,12 @@ VoiceOver reads the accessibility tree, which is a parallel representation of th
 
 ```swift
 // SwiftUI — explicit accessibility metadata
+// Do NOT add .accessibilityValue to a standard Toggle — SwiftUI already
+// announces the on/off state via the control's built-in role. Adding a
+// manual .accessibilityValue("on"/"off") causes VoiceOver to double-announce
+// the state (e.g., "Show hidden files, on, toggle button, on").
 Toggle("Show Hidden Files", isOn: $showHidden)
     .accessibilityLabel("Show hidden files")
-    .accessibilityValue(showHidden ? "on" : "off")
     // No hint needed — the action is obvious from the label
 
 Button(action: deleteSelected) {
