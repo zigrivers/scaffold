@@ -1,7 +1,7 @@
 # macOS-Native Project Type — Design Spec
 
 **Date**: 2026-06-18
-**Status**: Approved Design
+**Status**: Approved Design — revised after multi-model review (see §13)
 **Goal**: Add a first-class `macos-native` project type to Scaffold's project-type
 system so the pipeline can scaffold native macOS applications (Swift / SwiftUI /
 AppKit) — comprehensive, on par with the existing `game` type. Driving use case:
@@ -79,23 +79,33 @@ carries), `src/project/detectors/mobile-app.ts` (detector shape),
 
 ## 2. Config Schema (`MacosNativeConfig`)
 
-Six fields, matching the granularity of `BackendConfig`. Added to
+Seven fields, matching the granularity of `BackendConfig`. Added to
 `src/config/schema.ts` as `MacosNativeConfigSchema` (`.strict()`), inferred type
 exported from `src/types/config.ts`, and surfaced as `ProjectConfig.macosNativeConfig`.
 
 | Field | Values | Default | Purpose |
 |---|---|---|---|
-| `uiFramework` | `swiftui` \| `appkit` \| `hybrid` | `hybrid` | SwiftUI for chrome, AppKit where virtualization/control matter (Glyver's shape) |
+| `uiFramework` | `swiftui` \| `appkit` \| `hybrid` | `swiftui` | SwiftUI-first (modern default for new macOS scaffolds); choose `hybrid` to mix AppKit where virtualization/control matter (Glyver's pick), or `appkit` for AppKit-only |
+| `appStyle` | `standard` \| `menu-bar` \| `agent` | `standard` | Windowed app vs menu-bar (`NSStatusItem`) app vs background agent (`LSUIElement`, no Dock icon) — materially changes app lifecycle, `Info.plist`, and UI prompts |
 | `minMacosVersion` | string (e.g. `"15.0"`) | `"15.0"` | Free string (not enum) so it needn't be re-edited each fall; drives `@available` guidance |
 | `distribution` | `developer-id` \| `mac-app-store` \| `both` | `developer-id` | Direct-download/notarized first (Vision §11), MAS later |
-| `sandboxed` | boolean | `false` | App Sandbox; see coupling rule below |
+| `sandboxed` | boolean | `false` | App Sandbox; see coupling rules below |
 | `persistence` | `none` \| `sqlite` \| `core-data` \| `swiftdata` | `none` | Local-first storage (Glyver = `sqlite`) |
 | `autoUpdate` | `none` \| `sparkle` | `none` | Sparkle appcast for direct-download; MAS self-updates |
 
-**Coupling validator** (`src/config/validators/macos-native.ts`, registered in
-`validators/index.ts`, mirrors `ml.ts`): if `distribution ∈ {mac-app-store, both}`
-then `sandboxed` **must** be `true` (the Mac App Store requires the App Sandbox).
-Emits a config error keyed via `configKeyFor`.
+**Coupling validators** (`src/config/validators/macos-native.ts`, registered in
+`validators/index.ts`, mirrors `ml.ts`; each emits a config error keyed via
+`configKeyFor`):
+1. `distribution ∈ {mac-app-store, both}` ⇒ `sandboxed: true` — the Mac App Store
+   requires the App Sandbox.
+2. `distribution === 'mac-app-store'` ⇒ `autoUpdate: 'none'` — Sparkle (or any
+   third-party updater) is disallowed in App Store builds and is a common rejection
+   cause; the App Store delivers updates. (`distribution: 'both'` is allowed with
+   `sparkle`: it applies to the Developer-ID variant only, and the
+   `macos-packaging-distribution` knowledge entry notes the MAS build must strip it.)
+3. `persistence === 'swiftdata'` ⇒ `minMacosVersion` major ≥ `14` — SwiftData
+   requires macOS 14 (Sonoma)+. The validator parses the leading integer of
+   `minMacosVersion`.
 
 The wizard also sets `ProjectConfig.platforms = ['desktop']` for a macos-native
 project.
@@ -165,7 +175,7 @@ Guidance` sections.
 8. `macos-keyboard-and-menus` — keyboard model, shortcuts, command pattern, responder chain, ⌘K palettes
 
 **Security & privacy (4)**
-9. `macos-app-sandbox-entitlements` — App Sandbox, entitlements, hardened runtime
+9. `macos-app-sandbox-entitlements` — App Sandbox, entitlements, hardened runtime; **sandbox ↔ external tools**: executing system subprocesses (e.g. the user's `git`) under sandbox, tool/binary access limits, SSH-key/credential access constraints, and security-scoped bookmarks / Powerbox for user-granted folder access. This is the central tension for a sandboxed Glyver that shells out to `git` and reads many repos — the entry must spell out what is and isn't possible (and when `developer-id` + non-sandboxed is the pragmatic choice).
 10. `macos-privacy-tcc` — TCC permissions, usage-description strings, security-scoped bookmarks, file access
 11. `macos-keychain-secrets` — Keychain, secure storage, no hardcoded secrets
 12. `macos-untrusted-input` — treating external repos/files as hostile input (argument arrays not shell strings, disabled pagers/prompts, timeouts, output caps, escaping) — directly relevant to Glyver
@@ -208,14 +218,23 @@ Guidance` sections.
 - `review-operations` ← `macos-ci-release-automation`
 - `implementation-plan`, `implementation-playbook` ← `macos-app-architecture`
 
-**`reads-overrides`** (`replace`) — for `story-tests`, `create-evals`,
-`implementation-plan`, `implementation-playbook`, `new-enhancement`,
-`cross-phase-consistency`: `{ ux-spec: macos-ui-spec, design-system: macos-ui-spec }`;
-for `platform-parity-review`: `{ design-system: macos-ui-spec }`.
+**`reads-overrides`** (`replace`) — audited against pipeline frontmatter, the
+steps whose `reads:` reference a disabled doc are: `story-tests`, `create-evals`,
+`implementation-plan`, `new-enhancement` (each reads `ux-spec`),
+`implementation-playbook` (reads both `ux-spec` **and** `design-system`), and
+`platform-parity-review` (reads `design-system`). Map
+`{ ux-spec: macos-ui-spec, design-system: macos-ui-spec }` for each. *(No other
+step reads these docs — `cross-phase-consistency` does not, so it is intentionally
+omitted; a `replace` that matches nothing is a harmless no-op regardless.)*
 
-**`dependency-overrides`** — `platform-parity-review`: `replace: { review-ux:
-review-macos-ui }`; ensure `review-macos-ui` and `review-macos-release` are wired
-as downstream gates on their specs.
+**`dependency-overrides`** — audited against pipeline frontmatter, the **only**
+step whose `dependencies:` reference a disabled step is `platform-parity-review`
+(depends on `review-ux`): `replace: { review-ux: review-macos-ui }`. No other
+downstream dependency edge references `review-ux`/`ux-spec`/`design-system`, so no
+further remaps are required (this avoids the dependency-resolution failure the
+review flagged). `review-macos-ui` and `review-macos-release` are wired as
+downstream gates via the new steps' own `dependencies` frontmatter (§3.2), not via
+overrides.
 
 ---
 
@@ -232,15 +251,16 @@ use `mvp` (fewer steps, lower depth) or `deep` (all steps, max depth).
 
 ## 7. Init Wizard + CLI Flags
 
-- `src/wizard/copy/macos-native.ts` — labels + help text for the 6 config fields
+- `src/wizard/copy/macos-native.ts` — labels + help text for the 7 config fields
   (new file, mirrors `src/wizard/copy/game.ts`).
 - `src/wizard/copy/core.ts` — add `'macos-native'` entry to `projectType.options`.
 - `src/wizard/questions.ts` — `if (projectType === 'macos-native')` branch that
   collects `MacosNativeConfig` with progressive disclosure (ask `sandboxed` only
   when relevant, etc.) and sets `platforms: ['desktop']`.
 - `src/cli/init-flag-families.ts` — `MACOS_NATIVE_FLAGS` family
-  (`--macos-ui-framework`, `--macos-min-version`, `--macos-distribution`,
-  `--macos-sandboxed`, `--macos-persistence`, `--macos-auto-update`).
+  (`--macos-ui-framework`, `--macos-app-style`, `--macos-min-version`,
+  `--macos-distribution`, `--macos-sandboxed`, `--macos-persistence`,
+  `--macos-auto-update`).
 - `src/cli/commands/init.ts` — add to `CONFIG_SETTING_FLAGS`, yargs builder, and
   `applyFlagFamilyValidation()`.
 
@@ -254,25 +274,39 @@ New `src/project/detectors/macos-native.ts`, registered in
 using `SignalContext` helpers (`hasFile`, `dirExists`) plus the existing
 `file-text-match` primitive for Swift-source content.
 
-**Signal tiers:**
-- **High** — `import AppKit` / `import Cocoa` in sources; **or** a `*.entitlements`
-  file + `Info.plist` containing `LSMinimumSystemVersion`; **or** `Package.swift`
-  declaring `.macOS(...)` with an executable/app target.
-- **Medium** — `*.xcodeproj` / `.swiftpm` + a SwiftUI `@main App` with no
-  iOS/UIKit markers.
-- **Yield to `mobile-app` (return `null`)** — any `ios/` dir, `UIKit` import,
-  iOS-only deployment target, or Expo/RN/Flutter signals.
+Detection scores macOS-positive vs iOS-positive signals rather than yielding
+`null` on the first iOS marker — yielding too early would discard `macos-native`
+as a candidate before the disambiguator could weigh it, which is exactly the
+failure mode for a multiplatform target.
+
+- **macOS-positive signals:** `import AppKit` / `import Cocoa`; a `*.entitlements`
+  file + `Info.plist` with `LSMinimumSystemVersion`; `Package.swift` declaring
+  `.macOS(...)` **and** an executable/app product (`.executableTarget` /
+  `.executable` product, or an `.app` Xcode target). A pure library that merely
+  lists `.macOS` as a supported platform is **not** a macOS app and contributes no
+  macOS-positive signal.
+- **iOS-positive signals:** `ios/` dir, `import UIKit`, iOS-only deployment target,
+  Expo / React Native / Flutter.
+- **High** — macOS-positive present and **no** iOS-positive signals.
+- **Medium** — `*.xcodeproj` / `.swiftpm` + a SwiftUI `@main App`, macOS-positive,
+  no iOS-positive.
+- **Low (do NOT return `null`)** — **both** macOS-positive and iOS-positive present
+  (a multiplatform Swift target). A low-confidence match lets the shared
+  `disambiguate.ts` / confidence ranking weigh `macos-native` against `mobile-app`
+  instead of silently dropping it.
+- **Return `null`** — iOS-positive with **no** macOS-positive (a pure iOS app —
+  `mobile-app` owns it), **or** no Swift/Apple signals at all.
 
 **`partialConfig` inference** (best-effort): `uiFramework` from AppKit vs SwiftUI
-imports; `sandboxed`/entitlements from a `*.entitlements` file; `autoUpdate:
-sparkle` from a Sparkle SPM dependency; `persistence` from Core Data/SwiftData/
-GRDB/SQLite usage.
+imports; `appStyle` from `Info.plist` `LSUIElement` / `NSStatusItem` usage
+(`menu-bar`/`agent`); `sandboxed`/entitlements from a `*.entitlements` file;
+`autoUpdate: sparkle` from a Sparkle SPM dependency; `persistence` from Core
+Data/SwiftData/GRDB/SQLite usage.
 
-**Known ambiguity (documented, not a bug):** a true multiplatform Swift app
-(macOS **and** iOS targets) is genuinely ambiguous. Resolution defers to the
-existing `disambiguate.ts` / confidence ranking and, failing that, the wizard's
-explicit project-type pick. Detector tests assert the iOS-only → `null` cases
-explicitly.
+**Detector tests assert** the boundary cases explicitly: pure-iOS → `null`;
+pure-library-with-`.macOS` → `null`; macOS app (AppKit/entitlements) → high;
+macOS + iOS multiplatform → **low** (non-`null`); no Apple signals → `null`. The
+wizard's explicit project-type pick remains the final tie-breaker.
 
 ---
 
@@ -284,7 +318,8 @@ explicitly.
   remapped.
 - `src/project/detectors/macos-native.test.ts` — high/medium/null tiers, incl.
   iOS-yield and library-yield cases.
-- Coupling-validator test for the `mac-app-store ⇒ sandboxed` rule.
+- Coupling-validator tests for all three rules: `mac-app-store ⇒ sandboxed`,
+  `mac-app-store ⇒ autoUpdate none`, and `swiftdata ⇒ minMacosVersion ≥ 14`.
 - The `domain-overlay-alignment` packaging test needs no change (macos-native has
   no sub-domains).
 - `make check-all` green.
@@ -307,7 +342,7 @@ explicitly.
 | Component | Change | Type |
 |---|---|---|
 | `src/config/schema.ts` | Add `'macos-native'` to `ProjectTypeSchema`; add `MacosNativeConfigSchema` | Schema |
-| `src/config/validators/macos-native.ts` (+ `index.ts`) | Coupling validator (MAS ⇒ sandboxed) | Validation |
+| `src/config/validators/macos-native.ts` (+ `index.ts`) | 3 coupling validators (MAS⇒sandboxed; MAS⇒autoUpdate none; swiftdata⇒minMacosVersion≥14) | Validation |
 | `src/types/config.ts` | Export inferred type; add `ProjectConfig.macosNativeConfig` | Types |
 | `src/wizard/copy/macos-native.ts` (+ `core.ts`) | Wizard copy + project-type option | Wizard |
 | `src/wizard/questions.ts` | macos-native config branch; set `platforms: ['desktop']` | Wizard |
@@ -341,7 +376,8 @@ explicitly.
 ## 12. Success Criteria
 
 - `scaffold init --project-type macos-native` (and the interactive wizard) produce
-  a config with a valid `macosNativeConfig`, and the coupling rule is enforced.
+  a config with a valid `macosNativeConfig`, and all three coupling rules are
+  enforced.
 - Assembling the pipeline for a macos-native project enables the 5 macOS steps,
   disables `design-system`/`ux-spec`/`review-ux`, injects the macOS knowledge,
   and remaps reads to `macos-ui-spec`.
@@ -353,3 +389,25 @@ explicitly.
 - Running the pipeline against the Glyver vision doc yields a coherent macOS
   documentation set (PRD → HIG UI spec → architecture → distribution/entitlements
   → implementation plan) with no web-centric artifacts.
+
+---
+
+## 13. Design Review Resolutions (MMR + local AI)
+
+Reviewed via `mmr review` (Codex, Gemini, Claude, Grok, Antigravity) **and** the
+local-ai-delegate `local_review` (Qwen2.5-7B). Local review: no blocking issues.
+Codex/Claude/Grok: no findings. Gemini + Antigravity raised 10 findings;
+resolutions below.
+
+| # | Sev | Finding | Resolution |
+|---|---|---|---|
+| 1 | P1 | Detector returning `null` on iOS signals contradicts the "defer to confidence ranking" claim — multiplatform targets get discarded | **FIXED §8** — dual macOS+iOS targets now emit a **low-confidence** match (not `null`); `null` only when iOS-positive with no macOS-positive |
+| 2 | P1 | Sparkle auto-update in a Mac App Store build causes rejection | **FIXED §2** — new coupling rule: `distribution=='mac-app-store' ⇒ autoUpdate=='none'` |
+| 3 | P1 | Disabling `review-ux` without remapping downstream deps could break dependency resolution | **VERIFIED + FIXED §5** — audited frontmatter: the only dep edge is `platform-parity-review → review-ux` (remapped); reads-edges confirmed complete |
+| 4 | P2 | SwiftData requires macOS 14+; no coupling guard | **FIXED §2** — coupling rule: `persistence=='swiftdata' ⇒ minMacosVersion major ≥ 14` |
+| 5 | P2 | Duplicate of #2 (distribution/autoUpdate) | Merged into rule #2 |
+| 6 | P2 | Missing `appStyle` — windowed vs menu-bar vs agent apps differ materially | **FIXED §2/§7/§8** — added `appStyle` (standard/menu-bar/agent) field + flag + detector inference |
+| 7 | P2 | `Package.swift` `.macOS` detector signal too broad (multiplatform libraries) | **FIXED §8** — require an executable/app product; a pure library yields no macOS-positive signal |
+| 8 | P2 | Also disable a `frontend-assets` step | **REJECTED** — no `frontend-assets` step exists in `content/pipeline` (verified on disk). The three web steps in §3.1 are the complete set. Likely a reviewer hallucination |
+| 9 | P2 | Sandbox + subprocess/`git`/SSH access guidance missing (core Glyver tension) | **FIXED §4** — expanded `macos-app-sandbox-entitlements` to cover subprocess execution, system-tool access, SSH/credential limits, security-scoped bookmarks/Powerbox |
+| 10 | P3 | Default `uiFramework: hybrid` — `swiftui` is the modern default | **APPLIED §2** — default changed `hybrid → swiftui` (`hybrid` still available; Glyver picks it) |
