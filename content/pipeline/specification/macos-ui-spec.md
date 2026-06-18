@@ -3,7 +3,7 @@ name: macos-ui-spec
 description: Specify the macOS UI per Apple HIG — windows, menus, toolbars, keyboard model, and accessibility
 summary: "Replaces design-system and ux-spec for macOS-native projects. Covers window/scene structure, menu bar and menu-bar extras, toolbars, sidebars, keyboard shortcuts and the responder chain, multi-window/multi-monitor behavior, dark mode, density, Reduce Motion, and accessibility (VoiceOver, Dynamic Type)."
 phase: "specification"
-order: 862
+order: 851
 dependencies: [system-architecture]
 outputs: [docs/macos-ui-spec.md]
 conditional: null

@@ -3,7 +3,7 @@ name: review-macos-ui
 description: Review the macOS UI spec for HIG conformance, accessibility, and keyboard completeness
 summary: "Replaces review-ux for macOS-native projects. Audits docs/macos-ui-spec.md against Apple HIG, accessibility requirements, and keyboard/menu completeness."
 phase: "specification"
-order: 864
+order: 852
 dependencies: [macos-ui-spec]
 outputs: [docs/reviews/specification-review-macos-ui.md]
 conditional: null
