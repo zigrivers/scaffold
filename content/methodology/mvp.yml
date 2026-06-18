@@ -113,3 +113,9 @@ steps:
   cross-service-auth: { enabled: false }
   cross-service-observability: { enabled: false }
   integration-test-plan: { enabled: false }
+  # macOS-native steps (enabled via macos-native overlay)
+  macos-ui-spec: { enabled: false }
+  review-macos-ui: { enabled: false }
+  macos-distribution-spec: { enabled: false }
+  macos-entitlements-privacy-spec: { enabled: false }
+  review-macos-release: { enabled: false }
