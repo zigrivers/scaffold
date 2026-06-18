@@ -517,21 +517,21 @@ Counted live from every entry's `sources[*].url` at build time.
 
 | Host | Citations |
 | --- | --- |
+| developer.apple.com | 79 |
 | martinfowler.com | 37 |
 | developer.mozilla.org | 24 |
 | modelcontextprotocol.io | 19 |
-| owasp.org | 17 |
+| owasp.org | 18 |
 | developer.android.com | 15 |
 | the-turing-way.netlify.app | 15 |
-| developer.apple.com | 14 |
 | developer.chrome.com | 14 |
+| github.com | 12 |
 | sre.google | 12 |
 | w3.org | 12 |
 | microservices.io | 11 |
 | rfc-editor.org | 11 |
 | ethereum.org | 10 |
 | consensys.github.io | 9 |
-| docs.openzeppelin.com | 9 |
 :::
 <!-- /gen:host-citations -->
 
@@ -602,7 +602,7 @@ Every host plus its category, and the pinned GitHub repos.
 Totals over `content/knowledge/`, broken down per category.
 
 <!-- gen:kb-inventory -->
-**278 entries** across 20 categories:
+**298 entries** across 21 categories:
 
 | Category | Entries |
 | --- | --- |
@@ -610,6 +610,7 @@ Totals over `content/knowledge/`, broken down per category.
 | game | 25 |
 | research | 25 |
 | backend | 22 |
+| macos-native | 20 |
 | review | 20 |
 | web-app | 17 |
 | web3 | 14 |
