@@ -121,3 +121,16 @@ an agent or developer will implement. The document ensures the app:
   - Depth 3: add toolbar and sidebar spec, responder-chain walkthrough for primary task flow, Dark Mode color token list, and Reduce Motion alternatives.
   - Depth 4: add multi-window/multi-monitor behavior matrix, command palette design (if applicable), menu-bar extra spec (if applicable), Dynamic Type confirmation, and high-contrast notes.
   - Depth 5: full specification — all depth-4 content plus complete scene metadata for every window, per-view accessibility audit table, vibrancy/material inventory, localization text-expansion buffers for all menus, and a signed-off shortcut registry with no reservations violated.
+
+## After This Step
+
+When this step is complete, tell the user:
+
+---
+**macOS UI specification complete** — `docs/macos-ui-spec.md` created.
+
+**Next:** Run `/scaffold:review-macos-ui` — Review the macOS UI spec for HIG conformance, accessibility, and keyboard completeness.
+
+**Pipeline reference:** `/scaffold:prompt-pipeline`
+
+---

@@ -116,3 +116,16 @@ document ensures:
   - Depth 3: add Sparkle appcast setup (Developer ID) or MAS sandbox/submission overview (MAS); CI build→sign→notarize pipeline.
   - Depth 4: add delta updates and Sparkle channel config (Developer ID) or full MAS metadata + IAP (MAS); DMG background/layout automation; CI secrets inventory.
   - Depth 5: full specification — all depth-4 content plus rollback procedure, Xcode version pinning rationale, multi-channel (beta/stable) release configuration, and a signed-off CI pipeline that has been validated against the actual project's build scheme.
+
+## After This Step
+
+When this step is complete, tell the user:
+
+---
+**Distribution spec complete** — `docs/macos-distribution.md` created.
+
+**Next:** Run `/scaffold:macos-entitlements-privacy-spec` — Specify the sandbox, entitlements, and privacy posture for the app.
+
+**Pipeline reference:** `/scaffold:prompt-pipeline`
+
+---

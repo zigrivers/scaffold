@@ -119,3 +119,16 @@ and privacy decision before implementation begins. The document ensures:
   - Depth 3: add TCC string content reviewed for App Store language, security-scoped bookmark strategy, and Keychain access group names.
   - Depth 4: add security-scoped bookmark lifecycle (start/stop call sites, persistence), Powerbox integration points, container directory layout, and entitlement delta between distribution schemes.
   - Depth 5: full specification — all depth-4 content plus temporary entitlement justification texts, `LSApplicationQueriesSchemes`/app-group documentation, and a signed-off entitlements file ready for submission.
+
+## After This Step
+
+When this step is complete, tell the user:
+
+---
+**Entitlements and privacy spec complete** — `docs/macos-entitlements-privacy.md` created.
+
+**Next:** Run `/scaffold:review-macos-release` — Combined ship-readiness review of the macOS distribution and entitlements/privacy specs.
+
+**Pipeline reference:** `/scaffold:prompt-pipeline`
+
+---

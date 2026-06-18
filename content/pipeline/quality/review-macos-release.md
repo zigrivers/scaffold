@@ -94,3 +94,16 @@ prior findings still valid.
 - **Preserve**: Prior findings still valid, resolution decisions, multi-model review artifacts
 - **Triggers**: Either spec updated since last review (compare tracking comment dates); distribution channel changed; new entitlement or TCC key added
 - **Conflict resolution**: Previously resolved findings reappearing = regression; flag and re-evaluate
+
+## After This Step
+
+When this step is complete, tell the user:
+
+---
+**Release review complete** — `docs/reviews/review-macos-release.md` created, fixes applied to both specs.
+
+**Next:** Run `/scaffold:implementation-plan` — Build the implementation plan.
+
+**Pipeline reference:** `/scaffold:prompt-pipeline`
+
+---

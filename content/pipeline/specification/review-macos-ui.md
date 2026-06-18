@@ -98,3 +98,16 @@ modes:
   - Depth 3: six passes — add Reduce Motion coverage, Dark Mode token audit, and responder-chain walkthrough for the primary task flow.
   - Depth 4: all passes (add Dynamic Type compliance, multi-window matrix, menu-bar extra spec) + one external model (if CLI available).
   - Depth 5: all passes + multi-model review with reconciliation and user escalation for Divergent findings.
+
+## After This Step
+
+When this step is complete, tell the user:
+
+---
+**Review complete** — `docs/reviews/specification-review-macos-ui.md` created, fixes applied to `docs/macos-ui-spec.md`.
+
+**Next:** Run `/scaffold:macos-distribution-spec` — Specify signing, notarization, and distribution for the app.
+
+**Pipeline reference:** `/scaffold:prompt-pipeline`
+
+---
