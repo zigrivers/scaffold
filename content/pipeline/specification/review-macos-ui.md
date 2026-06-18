@@ -5,7 +5,7 @@ summary: "Replaces review-ux for macOS-native projects. Audits docs/macos-ui-spe
 phase: "specification"
 order: 864
 dependencies: [macos-ui-spec]
-outputs: [docs/macos-ui-spec.md]
+outputs: [docs/reviews/specification-review-macos-ui.md]
 conditional: null
 reads: [macos-ui-spec, user-stories]
 knowledge-base: [macos-hig-ui-patterns, macos-accessibility]
@@ -16,8 +16,9 @@ accessibility completeness, and keyboard/menu coverage. This step replaces
 `review-ux` for macOS-native projects. Web UX reviews check responsive breakpoints,
 touch targets, and WCAG contrast; macOS UI reviews audit against the Apple Human
 Interface Guidelines, platform accessibility APIs (VoiceOver, Dynamic Type, Reduce
-Motion), and the keyboard contract of a well-behaved Mac app. At depth 4+, the
-review dispatches to external AI models for independent validation.
+Motion), and the keyboard contract of a well-behaved Mac app. At depth 4+, dispatches to one external AI model (Codex or Gemini, if CLI
+available) for independent validation. At depth 5, a full multi-model review
+with reconciliation is dispatched.
 
 ## Mode Detection
 Check for `docs/reviews/specification-review-macos-ui.md`. If it exists, operate
@@ -89,11 +90,11 @@ modes:
   story-to-surface coverage, VoiceOver completeness, Reduce Motion coverage, Dark
   Mode token audit, Dynamic Type compliance, multi-window matrix, menu-bar extra
   spec (if applicable), and responder-chain walkthrough. Multi-model review
-  dispatched at depth 4+.
+  dispatched if available.
 - **mvp**: HIG menu-bar conformance pass and keyboard-shortcut collision check only.
 - **custom:depth(1-5)**:
   - Depth 1: two passes — menu-bar item conformance (App Menu + standard menus) and shortcut collision check.
   - Depth 2: four passes — add story-to-UI-surface coverage and VoiceOver label completeness.
   - Depth 3: six passes — add Reduce Motion coverage, Dark Mode token audit, and responder-chain walkthrough for the primary task flow.
-  - Depth 4: all passes (add Dynamic Type compliance, multi-window matrix, menu-bar extra spec) plus one external model review (Codex or Gemini, if CLI available).
-  - Depth 5: all passes plus full multi-model review with reconciliation and user escalation for Divergent findings.
+  - Depth 4: all passes (add Dynamic Type compliance, multi-window matrix, menu-bar extra spec) + one external model (if CLI available).
+  - Depth 5: all passes + multi-model review with reconciliation and user escalation for Divergent findings.

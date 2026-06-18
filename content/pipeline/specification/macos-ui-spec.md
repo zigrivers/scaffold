@@ -48,7 +48,9 @@ an agent or developer will implement. The document ensures the app:
 
 1. Selects and justifies the correct **app style** (standard windowed app,
    menu-bar extra, background agent) and respects the lifecycle contract of that
-   style.
+   style. A menu-bar/accessory app sets `LSUIElement = YES` in Info.plist to
+   suppress the Dock icon and ⌘-Tab entry; a pure background agent with no UI
+   sets `LSBackgroundOnly = YES` instead.
 2. Defines **window and scene structure** using AppKit `NSWindow`/`NSWindowController`
    or SwiftUI `WindowGroup`/`Window`/`MenuBarExtra` scenes — with scene IDs,
    default sizes, resizability, and tabbing behavior.
@@ -83,9 +85,9 @@ an agent or developer will implement. The document ensures the app:
   and accessibility
 
 ## Quality Criteria
-- (mvp) App style declared — standard windowed, menu-bar extra, or background agent — with lifecycle implications documented (e.g., menu-bar extra has no Dock icon, no Cmd-Tab entry, activation via `NSStatusItem`)
+- (mvp) App style declared — standard windowed, menu-bar extra, or background agent — with lifecycle implications documented (e.g., menu-bar extra sets `LSUIElement = YES` in Info.plist for no Dock icon and no ⌘-Tab entry, activation via `NSStatusItem`; pure background agent uses `LSBackgroundOnly = YES`)
 - (mvp) At least one primary window fully specified: scene ID, default content size, minimum size, resizability, and whether it participates in tab groups
-- (mvp) App Menu fully itemized: About, Settings (⌘,), Services, Hide, Hide Others, Quit (⌘Q) — with any custom items before Quit
+- (mvp) App Menu fully itemized: About, Settings (⌘,), Services, Hide, Hide Others, Quit (⌘Q) — with any custom items before Quit. Note: the item is named "Settings…" on macOS 13 (Ventura) and later but "Preferences…" on macOS 12 (Monterey) and earlier; the correct name depends on the project's deployment target (from system-architecture)
 - (mvp) Standard menus (File/Edit/View/Window/Help) catalogued with items, keyboard shortcuts, and enabling predicates
 - (mvp) Every user story maps to at least one menu item, toolbar button, or documented keyboard shortcut
 - (mvp) Keyboard shortcut table covers all custom shortcuts — no collision with HIG-reserved bindings (⌘Q, ⌘W, ⌘M, ⌘H, ⌘Space, etc.)
