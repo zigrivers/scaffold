@@ -7,7 +7,7 @@ order: 937
 dependencies: [macos-distribution-spec, macos-entitlements-privacy-spec]
 outputs: [docs/reviews/review-macos-release.md, docs/reviews/macos-release/review-summary.md, docs/reviews/macos-release/codex-review.json, docs/reviews/macos-release/gemini-review.json]
 conditional: null
-reads: [macos-distribution-spec, macos-entitlements-privacy-spec]
+reads: [macos-distribution-spec, macos-entitlements-privacy-spec, system-architecture]
 knowledge-base: [macos-code-signing, macos-app-sandbox-entitlements]
 ---
 
