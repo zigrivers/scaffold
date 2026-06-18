@@ -80,6 +80,10 @@ struct LargeDataTable: NSViewRepresentable {
     }
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
+        // Only reload when data actually changed — avoid blanket reloadData() on every
+        // SwiftUI update. A real implementation should diff and apply incremental updates
+        // (e.g. insertRows/removeRows, or NSCollectionViewDiffableDataSource.apply(snapshot)).
+        guard context.coordinator.items.map(\.id) != items.map(\.id) else { return }
         context.coordinator.items = items
         context.coordinator.tableView?.reloadData()
     }

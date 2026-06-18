@@ -24,7 +24,7 @@ Swift's structured concurrency model (introduced in Swift 5.5, macOS 12+) replac
 
 ## Summary
 
-Use `async/await` for all new asynchronous code; avoid `DispatchQueue.async` and completion handlers. Annotate UI-touching code with `@MainActor` — SwiftUI Views and `@Observable`/`ObservableObject` ViewModels are already `@MainActor` isolated by default. Isolate shared mutable state in `actor` types. Perform parallel independent work with `async let` (static) or `TaskGroup` (dynamic). Mark value-type or thread-safe reference types as `Sendable`; avoid crossing actor boundaries with non-`Sendable` types. Cancel tasks on view disappear or ViewModel deinit to prevent work leaking past the view's lifetime.
+Use `async/await` for all new asynchronous code; avoid `DispatchQueue.async` and completion handlers. Annotate UI-touching code with `@MainActor` — SwiftUI Views are implicitly `@MainActor`, but `@Observable` and `ObservableObject` classes are NOT automatically `@MainActor`-isolated; ViewModels that touch UI state must be annotated `@MainActor` explicitly. Isolate shared mutable state in `actor` types. Perform parallel independent work with `async let` (static) or `TaskGroup` (dynamic). Mark value-type or thread-safe reference types as `Sendable`; avoid crossing actor boundaries with non-`Sendable` types. Cancel tasks on view disappear or ViewModel deinit to prevent work leaking past the view's lifetime.
 
 ## Deep Guidance
 

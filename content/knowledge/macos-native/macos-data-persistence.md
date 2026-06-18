@@ -138,7 +138,7 @@ final class ProjectViewModel {
 **SwiftData limitations to know:**
 - Requires macOS 14+. No migration path for macOS 12/13 without Core Data.
 - Schema migrations are handled automatically for simple changes (adding properties with defaults). Complex migrations require `VersionedSchema` and `SchemaMigrationPlan`.
-- iCloud sync via CloudKit requires enabling `NSPersistentCloudKitContainer` — SwiftData's CloudKit integration is still maturing as of 2024.
+- iCloud sync via CloudKit requires enabling `NSPersistentCloudKitContainer` — SwiftData's CloudKit sync has improved across macOS 15+ but still has limitations compared to Core Data + `NSPersistentCloudKitContainer` for complex models with many relationships or custom conflict resolution.
 - `@Query` only works inside SwiftUI view bodies. Use `FetchDescriptor` + `modelContext.fetch` in ViewModels.
 
 ### Core Data (macOS 10.15+)
