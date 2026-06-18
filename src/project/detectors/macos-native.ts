@@ -54,7 +54,7 @@ export function detectMacosNative(ctx: SignalContext): MacosNativeMatch | null {
 
   const macosPositive = importsAppKit || entitlements || sdkMacos || (pkgMacos && pkgExecutable)
   const iosPositive =
-    ctx.dirExists('ios') || importsUIKit || sdkIos || (pkgIos && !pkgMacos)
+    ctx.dirExists('ios') || importsUIKit || sdkIos || pkgIos
     || ctx.hasDep('expo', 'npm') || ctx.hasDep('react-native', 'npm') || ctx.hasFile('pubspec.yaml')
 
   // Pure iOS (or RN/Expo/Flutter) → mobile-app owns it.

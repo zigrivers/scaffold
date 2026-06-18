@@ -61,6 +61,21 @@ describe('detectMacosNative', () => {
     expect(m?.confidence).toBe('low')
   })
 
+  it('low confidence for multiplatform .macOS+.iOS executable without UIKit import (regression)', () => {
+    // This case would incorrectly score "high" before the fix because
+    // (pkgIos && !pkgMacos) suppressed the iOS signal when both platforms are declared.
+    const ctx = createFakeSignalContext({
+      rootEntries: ['Package.swift', 'App.swift'],
+      files: {
+        'Package.swift': 'platforms: [.macOS(.v15), .iOS(.v17)],\n.executable(name: "app", targets: ["App"])',
+        'App.swift': 'import SwiftUI\n@main struct App: App { var body: some Scene { WindowGroup { } } }',
+      },
+    })
+    const m = detectMacosNative(ctx)
+    expect(m?.projectType).toBe('macos-native')
+    expect(m?.confidence).toBe('low')
+  })
+
   it('returns null when there are no Apple/Swift signals', () => {
     const ctx = createFakeSignalContext({ rootEntries: ['package.json'], files: { 'package.json': '{}' } })
     expect(detectMacosNative(ctx)).toBeNull()
