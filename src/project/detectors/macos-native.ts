@@ -52,7 +52,7 @@ export function detectMacosNative(ctx: SignalContext): MacosNativeMatch | null {
     return null
   }
 
-  const macosPositive = importsAppKit || entitlements || sdkMacos || (pkgMacos && pkgExecutable)
+  const macosPositive = importsAppKit || entitlements || sdkMacos || (pkgMacos && pkgExecutable && importsSwiftUI)
   const iosPositive =
     ctx.dirExists('ios') || importsUIKit || sdkIos || pkgIos
     || ctx.hasDep('expo', 'npm') || ctx.hasDep('react-native', 'npm') || ctx.hasFile('pubspec.yaml')
@@ -75,7 +75,7 @@ export function detectMacosNative(ctx: SignalContext): MacosNativeMatch | null {
   if (importsAppKit) ev.push(evidence('appkit-import'))
   if (entitlements) ev.push(evidence('entitlements-file'))
   if (sdkMacos) ev.push(evidence('pbxproj-macosx-sdk'))
-  if (pkgMacos && pkgExecutable) ev.push(evidence('package-swift-macos-executable', 'Package.swift'))
+  if (pkgMacos && pkgExecutable && importsSwiftUI) ev.push(evidence('package-swift-macos-executable', 'Package.swift'))
 
   // Multiplatform macOS+iOS → low confidence; let disambiguation rank it vs mobile-app.
   const confidence: MacosNativeMatch['confidence'] = iosPositive ? 'low' : 'high'

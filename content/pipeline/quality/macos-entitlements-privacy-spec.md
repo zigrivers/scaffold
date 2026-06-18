@@ -3,7 +3,7 @@ name: macos-entitlements-privacy-spec
 description: Specify the App Sandbox, entitlements, hardened runtime, and privacy (TCC) posture for the app
 summary: "Defines App Sandbox on/off, required entitlements, hardened runtime exceptions, TCC privacy usage-description strings, security-scoped bookmarks/Powerbox for user-granted file access, and (for sandboxed apps) subprocess/system-tool access limits."
 phase: "quality"
-order: 936
+order: 966
 dependencies: [system-architecture, tech-stack]
 outputs: [docs/macos-entitlements-privacy.md]
 conditional: null

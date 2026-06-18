@@ -3,7 +3,7 @@ name: review-macos-release
 description: Combined ship-readiness review of the macOS distribution and entitlements/privacy specs
 summary: "Single gate over docs/macos-distribution.md and docs/macos-entitlements-privacy.md — verifies signing/notarization completeness, sandbox/entitlements correctness, privacy strings, and config consistency (e.g. no Sparkle in a Mac App Store build)."
 phase: "quality"
-order: 937
+order: 967
 dependencies: [macos-distribution-spec, macos-entitlements-privacy-spec]
 outputs: [docs/reviews/review-macos-release.md, docs/reviews/macos-release/review-summary.md, docs/reviews/macos-release/codex-review.json, docs/reviews/macos-release/gemini-review.json]
 conditional: null
@@ -59,9 +59,9 @@ review validation.
 - (deep) If the app uses Microphone, Camera, Location, or Contacts, the trigger condition is documented (e.g., "only when user initiates recording") to support App Store review notes
 
 ### Config Consistency
-- (mvp) Sparkle auto-update is absent from the distribution spec if `distribution: mac-app-store` or `distribution: both` (MAS forbids third-party update mechanisms)
+- (mvp) Sparkle auto-update is absent from the distribution spec if `distribution: mac-app-store` (MAS-only builds forbid third-party update mechanisms); for `distribution: both`, Sparkle is permitted but MUST be present only in the Developer ID build scheme/lane and stripped from the MAS variant
 - (mvp) If `distribution: developer-id`, the distribution spec includes Sparkle configuration (appcast URL, EdDSA key) — a Developer ID app without an update mechanism is a ship-readiness gap
-- (deep) If `distribution: both`, the distribution spec uses separate build schemes or Fastlane lanes for Developer ID and MAS — single-scheme builds cannot satisfy both signing requirements simultaneously
+- (mvp) If `distribution: both`, the distribution spec REQUIRES separate Developer ID and MAS build schemes or Fastlane lanes: Sparkle is present in the Developer ID scheme only, stripped from the MAS scheme; single-scheme builds cannot satisfy both signing and update-mechanism requirements simultaneously
 
 ### Findings Triage
 - (mvp) Every finding categorized P0–P3 (P0 = Breaks App Store submission or Gatekeeper. P1 = Prevents ship milestone. P2 = Known tech debt. P3 = Polish.) with specific spec section, key/field, and issue

@@ -3,7 +3,7 @@ name: macos-distribution-spec
 description: Specify code signing, notarization, packaging, auto-update, and Mac App Store distribution for the app
 summary: "Covers Developer ID code signing, notarization (notarytool + stapling + Gatekeeper), DMG/pkg packaging, Sparkle auto-update appcast, the Mac App Store submission path, and CI sign/notarize/release automation."
 phase: "quality"
-order: 935
+order: 965
 dependencies: [system-architecture, tech-stack]
 outputs: [docs/macos-distribution.md]
 conditional: null

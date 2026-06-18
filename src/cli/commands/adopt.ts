@@ -15,7 +15,7 @@ import { ProjectTypeSchema } from '../../config/schema.js'
 import { coerceCSV } from '../utils/coerce.js'
 import {
   LIB_FLAGS, MOBILE_FLAGS, PIPELINE_FLAGS, ML_FLAGS, EXT_FLAGS,
-  RESEARCH_FLAGS, MCP_SERVER_FLAGS, applyFlagFamilyValidation, buildFlagOverrides,
+  RESEARCH_FLAGS, MCP_SERVER_FLAGS, MACOS_NATIVE_FLAGS, applyFlagFamilyValidation, buildFlagOverrides,
 } from '../init-flag-families.js'
 import type { ProjectType } from '../../types/index.js'
 import { asScaffoldError } from '../../utils/errors.js'
@@ -411,6 +411,34 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
         type: 'boolean',
         describe: 'MCP server persists state',
       })
+      // macOS-Native Configuration
+      .option('macos-ui-framework', {
+        type: 'string',
+        describe: 'UI framework',
+        choices: ['swiftui', 'appkit', 'hybrid'] as const,
+      })
+      .option('macos-app-style', {
+        type: 'string',
+        describe: 'App style',
+        choices: ['standard', 'menu-bar', 'agent'] as const,
+      })
+      .option('macos-min-version', { type: 'string', describe: 'Minimum macOS version (e.g. 15.0)' })
+      .option('macos-distribution', {
+        type: 'string',
+        describe: 'Distribution',
+        choices: ['developer-id', 'mac-app-store', 'both'] as const,
+      })
+      .option('macos-sandboxed', { type: 'boolean', describe: 'Enable App Sandbox' })
+      .option('macos-persistence', {
+        type: 'string',
+        describe: 'Local persistence',
+        choices: ['none', 'sqlite', 'core-data', 'swiftdata'] as const,
+      })
+      .option('macos-auto-update', {
+        type: 'string',
+        describe: 'Auto-update mechanism',
+        choices: ['none', 'sparkle'] as const,
+      })
       // Game configuration options
       .option('engine', {
         type: 'string',
@@ -495,6 +523,7 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
       .group([...EXT_FLAGS], 'Browser Extension Configuration:')
       .group([...RESEARCH_FLAGS], 'Research Configuration:')
       .group([...MCP_SERVER_FLAGS], 'MCP Server Configuration:')
+      .group([...MACOS_NATIVE_FLAGS], 'macOS-Native Configuration:')
       .group([
         'game-engine', 'game-multiplayer', 'game-target-platforms', 'game-online-services',
         'game-content-structure', 'game-economy', 'game-narrative', 'game-locales',

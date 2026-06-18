@@ -18,14 +18,26 @@ describe('detectMacosNative', () => {
     expect(m?.partialConfig.sandboxed).toBe(true)
   })
 
-  it('high confidence: Package.swift with .macOS executable', () => {
+  it('high confidence: Package.swift with .macOS executable + SwiftUI import', () => {
     const ctx = createFakeSignalContext({
-      rootEntries: ['Package.swift'],
+      rootEntries: ['Package.swift', 'App.swift'],
       files: {
         'Package.swift': 'platforms: [.macOS(.v15)],\n.executable(name: "app", targets: ["App"])',
+        'App.swift': 'import SwiftUI\n@main struct MyApp: App { var body: some Scene { WindowGroup { } } }',
       },
     })
     expect(detectMacosNative(ctx)?.confidence).toBe('high')
+  })
+
+  it('returns null for a Foundation-only Swift CLI (Package.swift .macOS executable, no SwiftUI/AppKit)', () => {
+    const ctx = createFakeSignalContext({
+      rootEntries: ['Package.swift', 'main.swift'],
+      files: {
+        'Package.swift': 'platforms: [.macOS(.v13)],\n.executable(name: "cli", targets: ["CLI"])',
+        'main.swift': 'import Foundation\n\nprint("hello")',
+      },
+    })
+    expect(detectMacosNative(ctx)).toBeNull()
   })
 
   it('returns null for a pure iOS Xcode app (SDKROOT iphoneos)', () => {
