@@ -6,6 +6,7 @@ import {
   buildDispatcher,
   type Provider,
 } from '../../knowledge-freshness/providers/index.js'
+import { SourceUnusableError } from '../../knowledge-freshness/redirect-classifier.js'
 
 interface AuditRunEntryArgs {
   entryPath: string
@@ -68,8 +69,19 @@ const auditRunEntryCommand: CommandModule<Record<string, unknown>, AuditRunEntry
       timeoutSec: argv.timeout,
       env: process.env,
     })
-    const verdict = await runEntryAudit(argv.entryPath, dispatcher)
-    process.stdout.write(JSON.stringify(verdict, null, 2) + '\n')
+    try {
+      const verdict = await runEntryAudit(argv.entryPath, dispatcher)
+      process.stdout.write(JSON.stringify(verdict, null, 2) + '\n')
+    } catch (err) {
+      if (err instanceof SourceUnusableError) {
+        // Fail closed: emit a skip envelope on stdout (valid JSON, exit 0).
+        // Diagnostics go to stderr so stdout stays jq-parseable.
+        process.stderr.write(`[skip] source unusable for ${argv.entryPath}: ${err.detail}\n`)
+        process.stdout.write(JSON.stringify({ skipped: true, reason: 'source-unusable', url: err.url, detail: err.detail }) + '\n')
+        return
+      }
+      throw err // transient/infra → non-zero exit (workflow surfaces it)
+    }
   },
 }
 
