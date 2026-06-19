@@ -1,16 +1,34 @@
 ---
 name: web-app-auth-patterns
 description: OAuth 2.0 + PKCE flows, cookie security, passkey/WebAuthn, social login, CSRF protection, and auth state management
-topics: [web-app, auth, oauth, pkce, webauthn, passkeys, csrf, security]
+topics:
+  - web-app
+  - auth
+  - oauth
+  - pkce
+  - webauthn
+  - passkeys
+  - csrf
+  - security
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-06-19
 version-pin: null
 sources:
   - url: https://www.rfc-editor.org/rfc/rfc6749
+    hash: sha256:67a9ab50f6393bd2d8c77a8de0128327f4601c0a331179d12b5926ff6298ba74
+    retrieved: 2026-06-19
   - url: https://www.rfc-editor.org/rfc/rfc7636
+    hash: sha256:35911dbcd4c1bf4d26ce2165eca90cc72d521216c36581a07a749a1ee78cd60c
+    retrieved: 2026-06-19
   - url: https://openid.net/specs/openid-connect-core-1_0.html
+    hash: sha256:4d016752a645e8a3c259baa4173b5a90cb6c82898ce868fc8444adde262a5aed
+    retrieved: 2026-06-19
   - url: https://www.w3.org/TR/webauthn-2/
+    hash: sha256:c2465c074ad03054fafc1001ae93997ab0d506ab3597f6a539ce0d14cf3e605a
+    retrieved: 2026-06-19
   - url: https://owasp.org/www-community/attacks/csrf
+    hash: sha256:b7aba438898b0e7593215d0b76c7b45177217808ea732c4062b534e8513b1e05
+    retrieved: 2026-06-19
 ---
 
 Authentication in web applications is a deep domain where implementation mistakes have severe security consequences. The auth surface spans the browser, the server, and third-party identity providers — and each boundary has its own threat model. OAuth 2.0 with PKCE is now the standard for delegated authorization; WebAuthn/passkeys are rapidly becoming the standard for credential-free authentication; and session cookie security attributes are the baseline that every web app must get right. Skipping any of these correctly has historically led to breaches.
