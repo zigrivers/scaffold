@@ -4,9 +4,15 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.35.0] — 2026-06-18
+
 ### Added
 
-- Add `macos-native` project type for scaffolding native macOS apps (Swift/SwiftUI/AppKit) — config, coupling validation, overlay, 5 pipeline steps, 20 knowledge entries, detector, wizard/CLI.
+- **`macos-native` project type** for scaffolding native macOS apps (Swift/SwiftUI/AppKit) — per-type config (UI framework, app style, min macOS version, distribution, sandboxing, persistence, auto-update), coupling validation, methodology overlay, 5 pipeline steps (HIG UI spec + review, distribution/signing/notarization, entitlements/privacy, release review), 20 knowledge entries, adopt detector with iOS/library disambiguation, and wizard + `--macos-*` CLI flags. `scaffold adopt` now also enforces config coupling validators for all project types.
+
+### Changed
+
+- **Knowledge freshness refresh (8 review entries).** Refreshed against current upstream sources with measured review/retrieval dates and source hashes: `review-adr`, `review-api-design`, `review-database-design`, `review-domain-modeling`, `review-game-ui`, `review-implementation-tasks`, `review-operations`, and `review-system-architecture`. KB `VERSION` → 0.1.91.
 
 ## [3.34.4] — 2026-06-16
 
