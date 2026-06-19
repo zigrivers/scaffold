@@ -1,16 +1,16 @@
 ---
 name: multi-model-dispatch
-description: Correct patterns for invoking Codex CLI and Gemini CLI as independent reviewers from Claude Code. Covers headless invocation, context bundling, output parsing, dual-model reconciliation, and fallback handling.
+description: Correct patterns for invoking Codex CLI and Antigravity CLI (`agy`) as independent reviewers from Claude Code. Covers headless invocation, context bundling, output parsing, dual-model reconciliation, and fallback handling.
 ---
 
 # Multi-Model Dispatch
 
-This skill teaches Claude Code how to correctly invoke Codex and Gemini CLIs for independent review of artifacts. Use this whenever a pipeline step needs multi-model validation at depth 4-5.
+This skill teaches Claude Code how to correctly invoke Codex and Antigravity CLIs for independent review of artifacts. Use this whenever a pipeline step needs multi-model validation at depth 4-5.
 
 ## When This Skill Activates
 
 - A review or validation step is running at depth 4+ and wants independent model validation
-- User asks to "run multi-model review" or "get a second opinion from Codex/Gemini"
+- User asks to "run multi-model review" or "get a second opinion from Codex/Antigravity"
 - The `automated-pr-review` step is using local CLI review mode
 - The `implementation-plan-review` step dispatches to external CLIs at depth 4+
 
@@ -22,7 +22,7 @@ Before attempting any dispatch, detect what's available AND verify authenticatio
 
 ```bash
 command -v codex && echo "codex installed" || echo "codex not found"
-command -v gemini && echo "gemini installed" || echo "gemini not found"
+command -v agy && echo "agy installed" || echo "agy not found"
 ```
 
 ### Step 2: Verify Authentication
@@ -36,20 +36,17 @@ command -v gemini && echo "gemini installed" || echo "gemini not found"
 codex login status 2>/dev/null && echo "codex authenticated" || echo "codex NOT authenticated"
 ```
 
-**Gemini auth check** (no built-in status command — use a minimal prompt):
+**Antigravity auth check** (detect auth-failure sentinel text):
 ```bash
-GEMINI_AUTH_CHECK=$(NO_BROWSER=true gemini -p "respond with ok" -o json 2>&1)
-GEMINI_EXIT=$?
-if [ "$GEMINI_EXIT" -eq 0 ]; then
-  echo "gemini authenticated"
-elif [ "$GEMINI_EXIT" -eq 41 ]; then
-  echo "gemini NOT authenticated (exit 41: auth error)"
+AGY_AUTH_CHECK=$(agy -p "respond with ok" --print-timeout 12s 2>&1)
+if echo "$AGY_AUTH_CHECK" | grep -qiE "authentication required|authentication timed out"; then
+  echo "agy NOT authenticated (auth error)"
 else
-  echo "gemini auth unknown (exit $GEMINI_EXIT)"
+  echo "agy authenticated"
 fi
 ```
 
-**Why `NO_BROWSER=true`?** Gemini CLI relaunches itself as a child process for memory management. During the relaunch, it shows a "Do you want to continue? [Y/n]" consent prompt that hangs when stdin is not a TTY (as in Claude Code's Bash tool). `NO_BROWSER=true` suppresses this prompt and uses cached credentials directly.
+Antigravity's `agy -p "hello"` recovery command prints a Google OAuth URL when credentials need refreshing.
 
 ### Step 3: Handle Auth Failures
 
@@ -58,7 +55,7 @@ fi
 1. **Tell the user** which CLI failed auth and why
 2. **Offer interactive recovery**: Ask the user to run the auth command in their terminal:
    - **Codex**: `! codex login` (opens browser for OAuth) or set `CODEX_API_KEY` env var
-   - **Gemini**: `! gemini -p "hello"` (triggers OAuth flow) or set `GEMINI_API_KEY` env var
+   - **Antigravity**: `! agy -p "hello"` (triggers OAuth flow)
 3. **After recovery**: Re-run the auth check. If it passes, proceed with dispatch.
 4. **If user declines**: Fall back to the other CLI or Claude-only review, but **document the auth failure** in the review summary.
 
@@ -101,42 +98,33 @@ codex exec --skip-git-repo-check -s read-only --ephemeral --output-schema schema
 
 **Output**: Progress streams to stderr (suppressed by `2>/dev/null`). Final answer prints to stdout.
 
-### Gemini CLI (`gemini -p`)
+### Antigravity CLI (`agy`)
 
-**Use `-p` / `--prompt` for headless mode.** Without this flag, Gemini launches interactive mode.
-
-**CRITICAL: Always prepend `NO_BROWSER=true`.** Without this, Gemini's child process relaunch shows a consent prompt ("Do you want to continue? [Y/n]") that hangs when stdin is not a TTY. This affects ALL non-interactive contexts including Claude Code's Bash tool.
+**Use `--print` for headless review dispatch.** Antigravity reads the prompt from
+stdin in print mode and writes the model reply to stdout.
 
 ```bash
 # Basic review dispatch
-NO_BROWSER=true gemini -p "REVIEW_PROMPT_HERE" --output-format json --approval-mode yolo 2>/dev/null
+printf '%s' "REVIEW_PROMPT_HERE" | agy --print --sandbox --dangerously-skip-permissions --print-timeout 300s 2>/dev/null
 
-# With specific model
-NO_BROWSER=true gemini -p "REVIEW_PROMPT_HERE" -m pro --output-format json --approval-mode yolo 2>/dev/null
-
-# Reading context from stdin
-cat artifact.md | NO_BROWSER=true gemini -p "Review this artifact for issues" --output-format json --approval-mode yolo 2>/dev/null
-
-# With sandbox (no file writes)
-NO_BROWSER=true gemini -p "REVIEW_PROMPT_HERE" --output-format json -s --approval-mode yolo 2>/dev/null
+# Reading prompt from a file
+agy --print --sandbox --dangerously-skip-permissions --print-timeout 300s < prompt.txt 2>/dev/null
 ```
 
 **Key flags:**
 | Flag | Purpose |
 |------|---------|
-| `NO_BROWSER=true` | **Required** — suppresses consent prompt that hangs in non-TTY shells |
-| `-p "prompt"` | **Required** — headless mode, no interactive UI |
-| `--output-format json` | Structured JSON output for parsing |
-| `--approval-mode yolo` | Auto-approve all tool calls (reviewer doesn't need to write) |
-| `-s` | Sandbox mode (extra safety for read-only review) |
-| `-m pro` | Use Gemini Pro model (default is auto) |
+| `--print` | **Required** — headless mode, no interactive UI |
+| `--sandbox` | OS sandbox for reviewer execution |
+| `--dangerously-skip-permissions` | Auto-approve so review runs do not hang |
+| `--print-timeout 300s` | Bounds a hung reviewer run |
 | `2>/dev/null` | Suppress progress output |
 
-**Output**: JSON on stdout with `{ response, stats, error }` structure.
+**Output**: Plain model response on stdout; the review prompt should require JSON findings and downstream parsers handle the reply.
 
 ## Foreground-Only Execution
 
-Always run Codex and Gemini CLI commands as foreground Bash calls. Never use `run_in_background`, `&`, or `nohup`. Background execution produces empty or truncated output from both CLIs. Multiple foreground calls in a single message are fine — the tool runner supports parallel invocations.
+Always run Codex and Antigravity CLI commands as foreground Bash calls. Never use `run_in_background`, `&`, or `nohup`. Background execution produces empty or truncated output from both CLIs. Multiple foreground calls in a single message are fine — the tool runner supports parallel invocations.
 
 This means: when dispatching reviews, make each CLI call a separate foreground Bash tool invocation. Do NOT use shell `&` or background subshells.
 
@@ -228,8 +216,8 @@ For the full consensus rules, confidence scoring, and disagreement resolution pr
 | Situation | Fallback |
 |-----------|----------|
 | Neither CLI available | Queue two compensating Claude passes (one per missing channel's strength area). Label findings. Max verdict: `degraded-pass`. |
-| Codex only | Single-model review with Codex + compensating Claude pass for Gemini |
-| Gemini only | Single-model review with Gemini + compensating Claude pass for Codex |
+| Codex only | Single-model review with Codex + compensating Claude pass for Antigravity |
+| Antigravity only | Single-model review with Antigravity + compensating Claude pass for Codex |
 | **CLI auth expired** | **Surface to user with `!` recovery command — do NOT silently fall back** |
 | One CLI fails mid-review | Use partial results if available, else queue compensating pass. Note failure in summary. |
 | Both CLIs fail | Two compensating passes, max verdict: `degraded-pass`. Warn user. |
@@ -265,37 +253,33 @@ OUTPUT=$(codex exec --skip-git-repo-check -s read-only --ephemeral "prompt" 2>"$
     # DO NOT silently fall back — surface to user
   else
     echo "Codex CLI failed with exit code $EXIT_CODE"
-    # Fall back to Gemini or Claude-only
+    # Fall back to Antigravity or Claude-only
   fi
   rm -f "$CODEX_STDERR"
 }
 
-GEMINI_STDERR=$(mktemp)
-OUTPUT=$(NO_BROWSER=true gemini -p "prompt" --output-format json --approval-mode yolo 2>"$GEMINI_STDERR") || {
+AGY_STDERR=$(mktemp)
+OUTPUT=$(printf '%s' "prompt" | agy --print --sandbox --dangerously-skip-permissions --print-timeout 300s 2>"$AGY_STDERR") || {
   EXIT_CODE=$?
-  if [ "$EXIT_CODE" -eq 41 ]; then
-    echo "Gemini auth failed (exit 41). Ask user to run: ! gemini -p \"hello\""
+  STDERR_CONTENT=$(cat "$AGY_STDERR")
+  if echo "$STDERR_CONTENT" | grep -qiE "authentication required|authentication timed out"; then
+    echo "Antigravity auth failed. Ask user to run: ! agy -p \"hello\""
     # DO NOT silently fall back — surface to user
   else
-    echo "Gemini CLI failed with exit code $EXIT_CODE"
+    echo "Antigravity CLI failed with exit code $EXIT_CODE"
     # Fall back to Codex or Claude-only
   fi
-  rm -f "$GEMINI_STDERR"
+  rm -f "$AGY_STDERR"
 }
 ```
 
 ### Exit Codes
 
-**Gemini exit codes:**
+**Antigravity auth failures:**
 
-| Code | Meaning | Action |
-|------|---------|--------|
-| 0 | Success | Parse output |
-| 1 | General error | Fall back to other CLI |
-| **41** | **Auth failure** | **Surface to user — offer `! gemini -p "hello"` recovery** |
-| 42 | Input error | Check prompt format |
-| 52 | Config error | Check `~/.gemini/settings.json` |
-| 53 | Turn limit exceeded | Retry with shorter prompt |
+`agy` may print an auth-failure message instead of returning a distinct exit code.
+Treat output containing `authentication required` or `authentication timed out` as
+auth failure and offer `! agy -p "hello"` recovery.
 
 **Codex exit codes:**
 
@@ -311,15 +295,15 @@ Codex uses exit code 1 for all failures. **Check stderr** for auth-specific mess
 When an auth failure is detected during dispatch (not during pre-flight):
 
 1. Stop the review dispatch immediately
-2. Tell the user: "Gemini/Codex auth has expired. To re-authenticate, run:"
-3. Suggest: `! codex login` or `! gemini -p "hello"` (the `!` prefix runs it interactively)
+2. Tell the user: "Antigravity/Codex auth has expired. To re-authenticate, run:"
+3. Suggest: `! codex login` or `! agy -p "hello"` (the `!` prefix runs it interactively)
 4. After the user re-authenticates, re-run the auth check
 5. If auth succeeds, resume the review dispatch from where it stopped
 6. If the user declines, fall back to the other CLI or Claude-only review
 
 ## What This Skill Does NOT Do
 
-- Does not install CLIs (user must install `codex` and `gemini` separately)
+- Does not install CLIs (user must install `codex` and `agy` separately)
 - Does not authenticate CLIs — but it **detects auth failures** and guides the user through interactive recovery via `!` prefix commands
 - Does not replace Claude's own review passes — it adds independent validation on top
 - Does not work as an MCP server — it uses Bash tool invocations directly

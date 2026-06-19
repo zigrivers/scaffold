@@ -18,11 +18,11 @@ This entry documents the common structure shared by all 15+ review pipeline step
 
 **Standard inputs**: Primary artifact being reviewed, upstream artifacts for cross-reference validation, `review-methodology` knowledge + artifact-specific review knowledge entry.
 
-**Standard outputs**: Review document (`docs/reviews/review-{artifact}.md`), updated primary artifact with P0/P1 fixes applied, and at depth 4+: multi-model artifacts (`codex-review.json`, `gemini-review.json`, `review-summary.md`) under `docs/reviews/{artifact}/`.
+**Standard outputs**: Review document (`docs/reviews/review-{artifact}.md`), updated primary artifact with P0/P1 fixes applied, and at depth 4+: multi-model artifacts (`codex-review.json`, `antigravity-review.json`, `review-summary.md`) under `docs/reviews/{artifact}/`.
 
 **Finding severity**: P0 (blocking — must fix), P1 (significant — fix before implementation), P2 (improvement — fix if time permits), P3 (nitpick — log for later).
 
-**Methodology scaling**: Depth 1-2 runs top passes only (P0 focus). Depth 3 runs all passes. Depth 4-5 adds multi-model dispatch to Codex/Gemini with finding synthesis.
+**Methodology scaling**: Depth 1-2 runs top passes only (P0 focus). Depth 3 runs all passes. Depth 4-5 adds multi-model dispatch to Codex/Antigravity with finding synthesis.
 
 **Mode detection**: First review runs all passes from scratch. Re-review preserves prior findings, marks resolved ones, and reports NEW/EXISTING/RESOLVED status.
 
@@ -52,7 +52,7 @@ Every review step produces:
 - **Updated artifact**: The primary artifact with fixes applied for P0/P1 findings
 - **Depth 4+ multi-model artifacts** (when methodology depth >= 4):
   - `docs/reviews/{artifact}/codex-review.json` -- Codex independent review findings
-  - `docs/reviews/{artifact}/gemini-review.json` -- Gemini independent review findings
+  - `docs/reviews/{artifact}/antigravity-review.json` -- Antigravity independent review findings
   - `docs/reviews/{artifact}/review-summary.md` -- Synthesized findings from all models
 
 ### Finding Severity Levels
@@ -150,7 +150,7 @@ Review steps scale their thoroughness based on the methodology depth setting:
 
 ### Depth 4-5 (Comprehensive)
 - Run all review passes
-- Multi-model dispatch: send the artifact to Codex and Gemini for independent analysis
+- Multi-model dispatch: send the artifact to Codex and Antigravity for independent analysis
 - Synthesize findings from all models, flagging convergent findings (multiple models found the same issue) as higher confidence
 - Cross-artifact consistency checks against all upstream documents
 - Full finding descriptions with detailed trace and impact analysis
@@ -171,7 +171,7 @@ At depth 2 (MVP), a domain model review might produce:
 ```
 
 At depth 5 (comprehensive), the same review would run all 10 passes, dispatch to
-Codex and Gemini, and produce a full synthesis with 15-30 findings across all
+Codex and Antigravity, and produce a full synthesis with 15-30 findings across all
 severity levels.
 
 ### Mode Detection Pattern
@@ -213,7 +213,7 @@ description: "Review {artifact} for completeness, consistency, and downstream re
 phase: "{phase-slug}"
 order: {N}20  # Reviews are always 10 after their creation step
 dependencies: [{creation-step}]
-outputs: [docs/reviews/review-{artifact}.md, docs/reviews/{artifact}/review-summary.md, docs/reviews/{artifact}/codex-review.json, docs/reviews/{artifact}/gemini-review.json]
+outputs: [docs/reviews/review-{artifact}.md, docs/reviews/{artifact}/review-summary.md, docs/reviews/{artifact}/codex-review.json, docs/reviews/{artifact}/antigravity-review.json]
 conditional: null
 knowledge-base: [review-methodology, review-{artifact-domain}]
 ---

@@ -1,7 +1,7 @@
 # MMR — Multi-Model Code Review
 
 Use the `mmr` CLI to dispatch a code review across several AI model CLIs (Claude,
-Codex, Gemini, Grok, Antigravity), reconcile the findings, and gate on severity.
+Codex, Grok, Antigravity), reconcile the findings, and gate on severity.
 Reach for it when asked to review code, a PR, a diff, or staged changes, and before
 committing, pushing, or finishing a change.
 
@@ -58,9 +58,9 @@ comma-separated string):
 
 ```bash
 # From Codex:
-mmr review --pr <number> --channels gemini claude grok antigravity --sync --format json
+mmr review --pr <number> --channels claude grok antigravity --sync --format json
 # From Antigravity (agy):
-mmr review --pr <number> --channels codex gemini claude grok --sync --format json
+mmr review --pr <number> --channels codex claude grok --sync --format json
 # or set channels_disabled: ["codex"] / ["antigravity"] in .mmr.yaml
 ```
 
@@ -71,5 +71,5 @@ your coding agent, not to the `antigravity` review channel.
 ## Auth
 
 If a channel reports an auth failure, follow the recovery line in the output
-(`claude login`, `codex login`, `gemini -p 'hello'`, `grok login`,
-`agy -p 'hello'`), then re-run `mmr config test` to verify.
+(`claude login`, `codex login`, `grok login`, `agy -p 'hello'`), then re-run
+`mmr config test` to verify.

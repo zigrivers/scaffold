@@ -52,8 +52,11 @@ export const BUILTIN_CHANNELS: Record<string, SubprocessChannelParsed> = {
   },
   gemini: {
     kind: 'subprocess',
-    enabled: true,
+    enabled: false,
     abstract: false,
+    // Deprecated reviewer channel. Antigravity (`agy`) is the supported Google
+    // CLI reviewer; keep this preset disabled so historical configs can opt in
+    // explicitly without MMR selecting Gemini for new/default reviews.
     // No `-p` here: gemini's `-p/--prompt` flag *requires* a positional
     // value, but MMR delivers prompts via stdin. With `gemini -p
     // --output-format json` and prompt on stdin, gemini parses
@@ -141,9 +144,8 @@ export const BUILTIN_CHANNELS: Record<string, SubprocessChannelParsed> = {
     kind: 'subprocess',
     enabled: true,
     abstract: false,
-    // Google's Antigravity CLI (terminal command `agy`) — the forward replacement
-    // for the deprecating Gemini CLI (Gemini CLI stops serving Pro/Ultra
-    // 2026-06-18). Runs alongside the `gemini` channel until that sunset.
+    // Google's Antigravity CLI (terminal command `agy`) — the supported
+    // replacement for the deprecated Gemini CLI reviewer.
     // Verified on agy 1.0.2: `agy --print` reads the prompt from stdin and writes
     // the model reply to stdout (exit 0). There is NO `--output-format json` flag,
     // so the reply is plain text and the review prompt's findings JSON is handled

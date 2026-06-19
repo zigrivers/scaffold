@@ -2,13 +2,13 @@
 
 Automated multi-model code review with dispatch, reconciliation, and severity gating.
 
-Dispatches reviews to Claude CLI, Codex CLI, Gemini CLI, Grok CLI, and Antigravity CLI. Reconciles findings with consensus scoring. Gates on configurable severity thresholds.
+Dispatches reviews to Claude CLI, Codex CLI, Grok CLI, and Antigravity CLI (`agy`). Reconciles findings with consensus scoring. Gates on configurable severity thresholds.
 
 Built-in channels:
 
-- **Antigravity CLI** (`agy`) — Google's forward replacement for the deprecating
-  Gemini CLI. Enabled by default; runs hardened (neutral cwd, `--sandbox`,
-  auto-approve). The channel key is `antigravity`; `agy` is accepted as an alias
+- **Antigravity CLI** (`agy`) — Google's supported replacement for the deprecated
+  Gemini reviewer. The Antigravity channel is enabled by default and runs
+  hardened (neutral cwd, `--sandbox`, auto-approve). The channel key is `antigravity`; `agy` is accepted as an alias
   in `--channels`, `channels_disabled`, and `channels:` config keys.
 
 ## Install
@@ -71,10 +71,10 @@ channels:
     enabled: true
   codex:
     enabled: true
-  gemini:
-    enabled: true
   antigravity:        # alias: agy
     enabled: true
+  gemini:             # deprecated legacy channel; not used by default
+    enabled: false
 ```
 
 ## Installable skills
@@ -180,9 +180,9 @@ defaults:
       codex: |
         Focus on implementation correctness, memory safety, and async correctness.
         You are compensating for a missing Codex review.
-      gemini: |
+      antigravity: |
         Focus on architectural consistency and dependency boundaries.
-        You are compensating for a missing Gemini review.
+        You are compensating for a missing Antigravity review.
 
 channels:
   qwen-local:
@@ -221,7 +221,7 @@ channels:
     flags: ["run", "qwen2.5-coder:32b", "--format", "json"]
 ```
 
-When enabled review channels such as `codex` or `gemini` are unavailable, missing, or failing, MMR runs `qwen-coder` for each compensating pass instead of `claude -p`. Channels set to `enabled: false` are intentionally skipped and do not receive compensating passes.
+When enabled review channels such as `codex` or `antigravity` are unavailable, missing, or failing, MMR runs `qwen-coder` for each compensating pass instead of `claude -p`. Channels set to `enabled: false` are intentionally skipped and do not receive compensating passes.
 
 ## Features
 

@@ -151,6 +151,20 @@ describe('BUILTIN_CHANNELS — antigravity', () => {
   })
 })
 
+describe('default reviewer selection', () => {
+  it('uses agy/antigravity instead of the deprecated Gemini CLI by default', () => {
+    expect(BUILTIN_CHANNELS.antigravity?.enabled).toBe(true)
+    expect(BUILTIN_CHANNELS.antigravity?.command).toBe('agy')
+    expect(BUILTIN_CHANNELS.gemini?.enabled).toBe(false)
+
+    const defaultEnabled = Object.entries(DEFAULT_CONFIG.channels)
+      .filter(([, channel]) => channel.enabled)
+      .map(([name]) => name)
+    expect(defaultEnabled).toContain('antigravity')
+    expect(defaultEnabled).not.toContain('gemini')
+  })
+})
+
 describe('DEFAULT_CONFIG compensator (T1-G)', () => {
   it('omits the compensator block (so back-compat resolveCompensatorDispatch kicks in)', () => {
     expect(DEFAULT_CONFIG.defaults.compensator).toBeUndefined()

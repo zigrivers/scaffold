@@ -44,7 +44,7 @@ const PHASE_ORDER = [
 // shape here in sync with those files.
 const CODEX_EXECUTOR_RECIPES: Record<string, string> = {
   'review-code': `Run multi-model review on local code before commit or push
-(3 MMR CLI channels: Codex, Gemini, Claude). Pick **one** of the three modes
+(3 MMR CLI channels: Codex, Antigravity, Claude). Pick **one** of the three modes
 below.
 
 **Mode 1 — full local delivery candidate** (committed branch diff + staged
@@ -98,7 +98,7 @@ harness that can dispatch agent skills. Codex cannot do this directly — for
 instead.`,
 
   'review-pr': `Run multi-model review on a pull request
-(3 MMR CLI channels: Codex, Gemini, Claude).
+(3 MMR CLI channels: Codex, Antigravity, Claude).
 
 \`\`\`bash
 # Detect PR number from current branch, or set explicitly:

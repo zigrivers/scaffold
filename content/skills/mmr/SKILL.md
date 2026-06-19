@@ -121,7 +121,7 @@ outside `main`).
 
 If `mmr review` reports auth failures, follow the recovery instructions in the output:
 - **Claude:** `claude login`
-- **Gemini:** `gemini -p 'hello'` (interactive, opens browser)
+- **Antigravity:** `agy -p 'hello'`
 - **Codex:** `codex login`
 
 Re-run `mmr config test` after re-authenticating to verify.

@@ -41,8 +41,8 @@ COMMAND="$BATS_TEST_DIRNAME/../content/tools/post-implementation-review.md"
     [ "$status" -eq 0 ]
 }
 
-@test "command references Gemini CLI" {
-    run grep -q 'Gemini' "$COMMAND"
+@test "command references Antigravity CLI" {
+    run grep -q 'Antigravity' "$COMMAND"
     [ "$status" -eq 0 ]
 }
 

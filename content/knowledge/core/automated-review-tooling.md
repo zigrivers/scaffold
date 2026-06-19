@@ -1,13 +1,13 @@
 ---
 name: automated-review-tooling
 description: >-
-  Patterns for automated code review using AI CLI tools (Codex, Gemini, Claude) — three-CLI MMR orchestration plus
+  Patterns for automated code review using AI CLI tools (Codex, Antigravity, Claude) — three-CLI MMR orchestration plus
   Superpowers 4th channel in wrappers, reconciliation, compensating passes, PR + non-PR targets, and CI integration
 topics:
   - code-review
   - automation
   - codex
-  - gemini
+  - antigravity
   - claude
   - pull-requests
   - non-pr-review
@@ -30,7 +30,7 @@ sources:
 
 # Automated Review Tooling
 
-Automated code review leverages AI models to provide consistent, thorough code review without manual reviewer bottlenecks. This knowledge covers the local CLI approach (no GitHub Actions), the three-channel MMR orchestration (Codex + Gemini + Claude) with the Superpowers code-reviewer added as a complementary 4th channel by the scaffold MMR wrappers, and integration with both PR and non-PR review targets (local code, branch diffs, specific files).
+Automated code review leverages AI models to provide consistent, thorough code review without manual reviewer bottlenecks. This knowledge covers the local CLI approach (no GitHub Actions), the three-channel MMR orchestration (Codex + Antigravity + Claude) with the Superpowers code-reviewer added as a complementary 4th channel by the scaffold MMR wrappers, and integration with both PR and non-PR review targets (local code, branch diffs, specific files).
 
 ## Summary
 
@@ -63,19 +63,19 @@ These are the authoritative verdict definitions. Tool files (`review-code.md`, `
 
 #### Compensating Passes
 
-When a channel (Codex or Gemini) is unavailable, the CLI dispatches a compensating pass via `claude -p`:
+When a channel (Codex or Antigravity) is unavailable, the CLI dispatches a compensating pass via `claude -p`:
 
 - Same prompt structure as the missing channel, executed as a `claude -p` dispatch.
-- Labeled `[compensating: Codex-equivalent]` or `[compensating: Gemini-equivalent]` in the review summary.
+- Labeled `[compensating: Codex-equivalent]` or `[compensating: Antigravity-equivalent]` in the review summary.
 - Missing Codex → focus on implementation correctness, security, API contracts.
-- Missing Gemini → focus on architectural patterns, design reasoning, broad context.
+- Missing Antigravity → focus on architectural patterns, design reasoning, broad context.
 - Missing both → two compensating passes (one per missing channel's strength area).
 - Compensating-pass findings are **single-source confidence** — they do NOT raise to high confidence even if they agree with another channel's findings.
 - Normal mandatory-fix thresholds apply: findings at or above `fix_threshold` from compensating passes still require fixing.
 
 #### Foreground-Only Execution
 
-Always run Codex and Gemini CLI commands as foreground Bash calls. Never use `run_in_background`, `&`, or `nohup`. Background execution produces empty or truncated output from Codex and Gemini CLIs. Multiple foreground calls can still run in parallel if the tool runner supports parallel tool invocations.
+Always run Codex and Antigravity CLI commands as foreground Bash calls. Never use `run_in_background`, `&`, or `nohup`. Background execution produces empty or truncated output from Codex and Antigravity CLIs. Multiple foreground calls can still run in parallel if the tool runner supports parallel tool invocations.
 
 This constraint is intentionally duplicated from `multi-model-review-dispatch`. Knowledge entries are injected independently by the assembly engine — an agent may receive this entry without `multi-model-review-dispatch`, so both need the constraint.
 
@@ -85,11 +85,11 @@ This constraint is intentionally duplicated from `multi-model-review-dispatch`. 
 
 After all channels complete (including compensating passes), reconcile findings using the rules in `multi-model-review-dispatch`. This orchestration entry triggers reconciliation; the dispatch entry defines how to perform it.
 
-Reconciliation normalizes findings from all channels (real and compensating) to a common schema, then matches findings across channels by location and category. The purpose is to detect when multiple independent channels agree on a finding (raising confidence) and to surface contradictions that require human judgment. A finding reported by Codex alone has lower confidence than the same finding reported by both Codex and Gemini.
+Reconciliation normalizes findings from all channels (real and compensating) to a common schema, then matches findings across channels by location and category. The purpose is to detect when multiple independent channels agree on a finding (raising confidence) and to surface contradictions that require human judgment. A finding reported by Codex alone has lower confidence than the same finding reported by both Codex and Antigravity.
 
 The reconciliation output is a deduplicated list of findings with confidence scores. High-confidence findings (agreed by 2+ real channels) are actionable without further discussion. Low-confidence findings (single-source, or from compensating passes) still require action when at or above `fix_threshold` but should be noted as lower-confidence in the review summary.
 
-Findings that appear in all three channels (Codex, Gemini, Claude) are considered maximum-confidence and should be surfaced first in the review summary. Findings that appear in only one channel should include the channel name in the finding description to help the developer assess confidence independently.
+Findings that appear in all three channels (Codex, Antigravity, Claude) are considered maximum-confidence and should be surfaced first in the review summary. Findings that appear in only one channel should include the channel name in the finding description to help the developer assess confidence independently.
 
 ```bash
 # Orchestration reconciliation workflow
@@ -102,11 +102,11 @@ Findings that appear in all three channels (Codex, Gemini, Claude) are considere
 
 ### Channel Dispatch Pattern and Orchestration
 
-Each channel (Codex, Gemini, Claude) follows the same dispatch pattern: check installation, check auth, then dispatch as a foreground call. If any step fails, record the root-cause status, queue a compensating pass (for Codex/Gemini), and continue to the next channel.
+Each channel (Codex, Antigravity, Claude) follows the same dispatch pattern: check installation, check auth, then dispatch as a foreground call. If any step fails, record the root-cause status, queue a compensating pass (for Codex/Antigravity), and continue to the next channel.
 
 ```bash
 # Channel dispatch pattern
-# For each channel (codex, gemini, claude):
+# For each channel (codex, antigravity, claude):
 #   1. command -v <tool> >/dev/null 2>&1 || { status=not_installed; queue_compensating; continue; }
 #   2. <auth_check> || { status=auth_failed; queue_compensating; continue; }
 #   3. <dispatch_foreground> || { status=failed; queue_compensating; continue; }
@@ -121,9 +121,9 @@ When Codex is unavailable (not installed or auth failure), the orchestration pro
 
 1. The installation check (`command -v codex`) fails. Codex channel status is set to `not_installed`.
 2. A compensating Codex-equivalent pass is queued: a `claude -p` dispatch focused on implementation correctness, security, and API contracts.
-3. Gemini and Claude channels run normally.
+3. Antigravity and Claude channels run normally.
 4. The compensating pass runs, producing findings labeled `[compensating: Codex-equivalent]`.
-5. Reconciliation merges findings from all three sources (Gemini, Claude, compensating-Codex).
+5. Reconciliation merges findings from all three sources (Antigravity, Claude, compensating-Codex).
 6. Maximum achievable verdict is `degraded-pass` because a real channel was absent.
 7. The review summary notes: "Codex channel: not_installed (compensating: Codex-equivalent pass ran)."
 
@@ -210,20 +210,20 @@ Log metric snapshots in AGENTS.md after each major project milestone. A declinin
 When external CLIs are unavailable, the degraded-mode behavior defined in the Summary section applies. To summarize the operational steps:
 
 1. For each unavailable external channel, queue a compensating Claude self-review pass focused on that channel's strength area.
-2. Label findings as `[compensating: Codex-equivalent]` or `[compensating: Gemini-equivalent]`.
+2. Label findings as `[compensating: Codex-equivalent]` or `[compensating: Antigravity-equivalent]`.
 3. Treat compensating findings as single-source confidence — they do not raise to high confidence even when they agree with another channel.
 4. Maximum verdict is `degraded-pass` when any channel ran as compensating instead of real.
 5. When both external channels are unavailable, note "All findings are single-model (Claude only). External validation was unavailable." in the review summary.
 6. Never silently drop unavailable channels — always record the channel status and compensating coverage label in the review output.
 
-**Claude CLI channel:** Claude CLI handles its own auth and is generally always available. The compensating-pass mechanism applies to external CLIs (Codex, Gemini) that have an installation/auth gate. When Codex or Gemini are unavailable, compensating passes are dispatched via `claude -p` with focused prompts targeting the missing channel's strength area.
+**Claude CLI channel:** Claude CLI handles its own auth and is generally always available. The compensating-pass mechanism applies to external CLIs (Codex, Antigravity) that have an installation/auth gate. When Codex or Antigravity are unavailable, compensating passes are dispatched via `claude -p` with focused prompts targeting the missing channel's strength area.
 
 ### Auth Recovery Paths
 
 Each external CLI has a distinct auth recovery path. Agents should surface these directly to the user rather than silently downgrading to a compensating pass:
 
 - **Codex:** `codex login` — opens an interactive OAuth flow. After success, `codex login status` should return cleanly.
-- **Gemini:** `gemini -p "hello"` — refreshes the token if expired; `NO_BROWSER=true` is required in headless environments.
+- **Antigravity:** `agy -p "hello"` — starts the OAuth recovery flow when credentials expire.
 - **Claude:** `claude auth login` if `claude -p` returns auth errors; rare in practice because Claude CLI tokens are long-lived.
 
 If the user cannot complete auth recovery within the review session, treat the channel as unavailable and document the compensating pass. Never attempt to work around auth failures by embedding credentials in review prompts or by piping through alternative providers that weren't explicitly requested.

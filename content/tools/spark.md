@@ -29,7 +29,7 @@ upstream context, accelerating the vision step without replacing it.
 - User's idea (provided via `$ARGUMENTS` or interactively)
 - Existing `docs/spark-brief.md` (if rerunning — triggers update/fresh choice)
 - Web search results (depth 2+, if available on the platform)
-- External model responses (depth 4+, if Codex/Gemini CLI available)
+- External model responses (depth 4+, if Codex/Antigravity CLI available)
 
 ## Expected Outputs
 - `docs/spark-brief.md` — directional idea brief with 8 sections
@@ -98,14 +98,14 @@ technology landscape.
 independent competitive research.
 
 ```bash
-# Check Codex or Gemini availability (see multi-model-research-dispatch knowledge)
-# Prefer Gemini for research (Google search built-in)
+# Check Codex or Antigravity (agy) availability (see multi-model-research-dispatch knowledge)
+# Prefer Antigravity (agy) for research
 # If unavailable, primary model does enhanced research with explicit
 # competitor-analysis framing
 ```
 
 **Depth 5:** Comprehensive research + multi-model dispatch with reconciliation.
-Dispatch to both Codex AND Gemini for diverse perspectives. Reconcile:
+Dispatch to both Codex AND Antigravity (`agy`) for diverse perspectives. Reconcile:
 2+ agree = consensus. Disagree = divergent — always present minority views.
 Single model (fallback) = skip reconciliation labels.
 
@@ -189,7 +189,7 @@ Send the draft spark brief to available external models as adversarial
 reviewers.
 
 **Depth 4:** Dispatch to 1 external model.
-**Depth 5:** Dispatch to both Codex AND Gemini with reconciliation.
+**Depth 5:** Dispatch to both Codex AND Antigravity (`agy`) with reconciliation.
 
 **Red-team prompt for external models:**
 
@@ -218,8 +218,8 @@ Be constructive but ruthless. Respond in structured markdown.
 # Codex
 codex exec --skip-git-repo-check -s read-only --ephemeral "RED_TEAM_PROMPT" 2>&1
 
-# Gemini
-NO_BROWSER=true gemini -p "RED_TEAM_PROMPT" --output-format json --approval-mode yolo 2>/dev/null
+# Antigravity
+printf '%s' "RED_TEAM_PROMPT" | agy --print --sandbox --dangerously-skip-permissions --print-timeout 300s 2>/dev/null
 ```
 
 **If no external models available:** Fall back to primary model with distinct
