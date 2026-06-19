@@ -938,6 +938,17 @@ g
     })
   })
 
+  it('is a no-op when source_unverifiable is true, even with proposed edits', () => {
+    const verdict = {
+      entry_name: 'x', audit_date: '2026-06-19', model: 'm',
+      verdict: 'current' as const,
+      sources_checked: baseEntryChecked, // existing helper in this test file
+      findings: [], proposed_changes: [], preserve_warnings: [],
+      source_unverifiable: true,
+    }
+    expect(applyVerdictToEntry(baseEntry, verdict)).toBe(baseEntry)
+  })
+
   describe('edit contract enforcement', () => {
     const entry = `---
 name: x

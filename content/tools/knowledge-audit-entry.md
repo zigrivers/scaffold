@@ -35,6 +35,12 @@ You are auditing a single Scaffold knowledge entry against its declared authorit
 - Where the prefetched source body contradicts the entry, **trust the prefetched body**.
 - Where the prefetched body contradicts your own prior knowledge, **trust the prefetched body**.
 - When you cannot verify a claim against any prefetched body, mark it `preserve_warnings` — do NOT mark it as drift, and do NOT invent corroboration.
+- **Unusable source.** If any entry in `{{prefetched_sources}}` is a redirect
+  stub (its body is a "redirecting…" page or a `<meta http-equiv="refresh">`
+  shell rather than the real content), empty, or otherwise not the actual source
+  content, you cannot verify the entry. In that case return `verdict: "current"`,
+  set `"source_unverifiable": true`, and emit NO `proposed_changes` and NO
+  `proposed_version_pin`. Do not advance any edition label from a redirect notice.
 - Do not propose changes that introduce new normative claims unless those claims are verbatim or near-verbatim derivable from a prefetched body. Cite the source URL (from `{{prefetched_sources}}`) for every new normative claim.
 - Preserve the `## Summary` and `## Deep Guidance` headings exactly — the assembly engine depends on them.
 - You have NO tools available. Do not attempt to call WebFetch, Bash, Read, or any other tool. All evidence must come from `{{prefetched_sources}}` and the entry body.
