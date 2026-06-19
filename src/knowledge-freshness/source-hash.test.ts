@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { fetchAndHash, type FetchImpl } from './source-hash.js'
 import type { Resolver } from './source-url-validator.js'
+import { SourceUnusableError } from './redirect-classifier.js'
 
 // Stub resolver: every public hostname resolves to a single public IP.
 // Tests that want to exercise DNS-rebinding rejection inject a different
@@ -99,5 +100,44 @@ describe('fetchAndHash', () => {
     await expect(
       fetchAndHash('https://attacker.example/', { resolver: rebindingResolver, fetchImpl }),
     ).rejects.toThrow(/DNS-rebinding/)
+  })
+})
+
+describe('fetchAndHash — client-side redirects', () => {
+  const html = (s: string) => new Response(s, { status: 200, headers: { 'content-type': 'text/html' } })
+
+  it('follows a meta-refresh stub to the real page and hashes the real body', async () => {
+    const fetchImpl = mockFetch(
+      html('<html><head><meta http-equiv="refresh" content="0; url=https://example.org/real"></head></html>'),
+      new Response('hello world', { status: 200, headers: { 'content-type': 'text/html' } }),
+    )
+    const { hash, body } = await fetchAndHash('https://example.org/stub', { resolver: publicResolver, fetchImpl })
+    expect(body).toBe('hello world')
+    expect(hash).toBe('sha256:b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9')
+  })
+
+  it('throws SourceUnusableError on a near-zero self-refresh stub', async () => {
+    const fetchImpl = mockFetch(
+      new Response('<html><head><meta http-equiv="refresh" content="0; url=/self"></head><body>x</body></html>',
+        { status: 200, headers: { 'content-type': 'text/html' } }),
+    )
+    await expect(
+      fetchAndHash('https://example.org/self', { resolver: publicResolver, fetchImpl }),
+    ).rejects.toBeInstanceOf(SourceUnusableError)
+  })
+
+  it('re-validates a meta-refresh target against the SSRF guard', async () => {
+    const fetchImpl = mockFetch(
+      html('<html><head><meta http-equiv="refresh" content="0; url=http://169.254.169.254/meta"></head></html>'),
+    )
+    await expect(
+      fetchAndHash('https://example.org/start', { resolver: publicResolver, fetchImpl }),
+    ).rejects.toThrow() // SSRF/DNS guard rejects the private-IP target on the next hop
+  })
+
+  it('still accepts a normal HTML page (regression)', async () => {
+    const fetchImpl = mockFetch(html('hello world'))
+    const { body } = await fetchAndHash('https://example.org/p', { resolver: publicResolver, fetchImpl })
+    expect(body).toBe('hello world')
   })
 })

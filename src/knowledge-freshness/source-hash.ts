@@ -6,6 +6,7 @@ import net from 'node:net'
 // npm-installed package, producing "invalid onError method" at runtime.
 import { fetch as undiciFetch, Agent } from 'undici'
 import { assertSafeSourceUrlWithDns, defaultResolver, type Resolver } from './source-url-validator.js'
+import { classifyRedirect, SourceUnusableError } from './redirect-classifier.js'
 
 /** Production fetch implementation. Tests inject a mock via opts.fetchImpl. */
 export type FetchImpl = (input: string, init?: Record<string, unknown>) => Promise<Response>
@@ -149,6 +150,17 @@ export async function fetchAndHash(
       // exhaust memory (round-7 F-003). The reader is cancelled on size
       // overflow inside readBodyWithLimit so Agent.close() won't stall.
       const body = await readBodyWithLimit(res, maxBodyBytes, current)
+      // Classify for client-side redirects before trusting this as content.
+      const classification = classifyRedirect(body, res.headers.get('content-type'), current)
+      if (classification.kind === 'follow') {
+        // Treat like a 3xx: follow as another guarded hop (the finally below
+        // closes this hop's dispatcher; the next iteration builds a fresh one).
+        current = classification.target
+        continue
+      }
+      if (classification.kind === 'unusable') {
+        throw new SourceUnusableError(current, classification.detail)
+      }
       const hash = `sha256:${createHash('sha256').update(body).digest('hex')}`
       return { hash, body }
     } finally {
