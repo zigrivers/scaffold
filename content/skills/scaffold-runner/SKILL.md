@@ -396,7 +396,7 @@ Applies to: some older depth-5 validation steps and any ad-hoc manual dispatch n
 - **Antigravity:** `printf '%s' "prompt" | agy --print --sandbox --dangerously-skip-permissions --print-timeout 300s 2>/dev/null`
 - **Claude CLI:** `claude -p "prompt" --output-format json 2>/dev/null`
 
-**`NO_BROWSER=true` is required for all Gemini invocations** from Claude Code's Bash tool. Without it, Gemini's child process relaunch shows a consent prompt that hangs in non-TTY shells.
+**Antigravity (`agy`) reads the prompt from stdin via `--print`** — no `NO_BROWSER` env var is needed. The `--sandbox` and `--dangerously-skip-permissions` flags handle non-TTY headless execution.
 
 Auth pre-flight for Path B dispatch:
 1. Codex: `codex login status`
