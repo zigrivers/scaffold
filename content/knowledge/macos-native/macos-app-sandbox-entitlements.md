@@ -98,114 +98,35 @@ If your app loads plug-ins or third-party frameworks not signed by your team, ad
 
 **Using `Process` (Foundation) to exec a subprocess:**
 
+Always set `executableURL` to an explicit path and pass arguments as an array — never build a shell string. Array arguments are safe from shell-expansion injection (see `[[macos-untrusted-input]]`).
+
+Git executable path selection matters under the sandbox:
+- `/usr/bin/git` is the Xcode Command Line Tools (CLT) stub. `isExecutableFile(atPath:)` returns `true` for it even when CLT are not installed; without them, executing it raises a system install-dialog that cannot be suppressed and will hang a subprocess. Probe for the real CLT binary at `/Library/Developer/CommandLineTools/usr/bin/git` before trusting the stub.
+- `/opt/homebrew/bin/git` (Apple Silicon) and `/usr/local/bin/git` (Intel) are outside the default sandbox path and require a security-scoped bookmark or a temporary-exception entitlement to execute.
+
+Set `GIT_TERMINAL_PROMPT=0`, `GIT_PAGER=""`, and `GIT_ASKPASS=""` in the subprocess environment so git never waits for interactive input.
+
+Production code must read stdout and stderr **concurrently** — if the child fills the stderr pipe buffer (~64 KB) while the parent is blocked reading stdout, both sides deadlock. Drive reads on a background queue or use `readabilityHandler`. A minimal synchronous sketch (fine for short output; extend with `readabilityHandler` for production):
+
 ```swift
-import Foundation
+let process = Process()
+process.executableURL = try gitExecutableURL()   // explicit path, not a shell string
+process.arguments = arguments                    // argument array, never a shell string
+process.currentDirectoryURL = workingDirectory
+process.environment = ["GIT_TERMINAL_PROMPT": "0", "GIT_PAGER": "", "PATH": "/usr/bin:/bin"]
 
-func runGit(arguments: [String], workingDirectory: URL) async throws -> String {
-    let process = Process()
-    process.executableURL = try gitExecutableURL()  // resolved at runtime
-    process.arguments = arguments
-    process.currentDirectoryURL = workingDirectory
-
-    // Build a minimal allow-listed environment rather than inheriting the full
-    // parent environment. Copying the entire parent env risks leaking secrets
-    // (API keys, tokens) that the parent process picked up from its own env.
-    // PATH and HOME are needed by git for tool resolution and config lookup.
-    var env: [String: String] = [:]
-    let parentEnv = ProcessInfo.processInfo.environment
-    for key in ["PATH", "HOME", "USER", "TMPDIR", "LANG", "LC_ALL"] {
-        if let val = parentEnv[key] { env[key] = val }
-    }
-    env["GIT_TERMINAL_PROMPT"] = "0"  // disable interactive prompts
-    env["GIT_PAGER"] = ""             // disable pager (subprocess would hang)
-    env["GIT_ASKPASS"] = ""           // disable credential helper UI
-    process.environment = env
-
-    let stdout = Pipe()
-    let stderr = Pipe()
-    process.standardOutput = stdout
-    process.standardError = stderr
-
-    // Bridge Process to async/await with a continuation so we never block
-    // the Swift concurrency cooperative thread pool with waitUntilExit().
-    // Pipe reads also use async handlers to avoid deadlock: if the child
-    // fills the stderr buffer (~64 KB) while the parent is blocked reading
-    // stdout, both sides wait forever. Reading both pipes via
-    // readabilityHandler is fully non-blocking.
-    return try await withCheckedThrowingContinuation { continuation in
-        var stdoutData = Data()
-        var stderrData = Data()
-
-        stdout.fileHandleForReading.readabilityHandler = { handle in
-            let chunk = handle.availableData
-            if chunk.isEmpty {
-                stdout.fileHandleForReading.readabilityHandler = nil
-            } else {
-                stdoutData.append(chunk)
-            }
-        }
-        stderr.fileHandleForReading.readabilityHandler = { handle in
-            let chunk = handle.availableData
-            if chunk.isEmpty {
-                stderr.fileHandleForReading.readabilityHandler = nil
-            } else {
-                stderrData.append(chunk)
-            }
-        }
-
-        process.terminationHandler = { proc in
-            // Drain any remaining bytes after the process exits
-            stdoutData.append(stdout.fileHandleForReading.readDataToEndOfFile())
-            stderrData.append(stderr.fileHandleForReading.readDataToEndOfFile())
-
-            if proc.terminationStatus == 0 {
-                continuation.resume(returning: String(data: stdoutData, encoding: .utf8) ?? "")
-            } else {
-                continuation.resume(throwing: GitError.nonZeroExit(
-                    code: proc.terminationStatus,
-                    stderr: String(data: stderrData, encoding: .utf8) ?? ""
-                ))
-            }
-        }
-
-        do {
-            try process.run()
-        } catch {
-            continuation.resume(throwing: error)
-        }
-    }
-}
-
-func gitExecutableURL() throws -> URL {
-    // /usr/bin/git is the Xcode Command Line Tools (CLT) stub — NOT always available.
-    // CAUTION: isExecutableFile(atPath:) returns true for the stub even when CLT are
-    // NOT installed. Without CLT, executing /usr/bin/git triggers a system dialog
-    // prompting the user to install CLT. That dialog is NOT suppressible via
-    // GIT_TERMINAL_PROMPT and will hang a sandboxed or headless subprocess.
-    // Detect CLT presence before trusting this path:
-    let cltProbe = URL(fileURLWithPath: "/Library/Developer/CommandLineTools/usr/bin/git")
-    if FileManager.default.isExecutableFile(atPath: cltProbe.path) {
-        return URL(fileURLWithPath: "/usr/bin/git")  // real CLT git available via stub
-    }
-    // Homebrew git is outside the default sandbox path; requires security-scoped
-    // bookmark or a temporary-exception entitlement.
-    // /opt/homebrew is the Apple Silicon prefix; /usr/local is the Intel prefix.
-    for homebrewPrefix in ["/opt/homebrew/bin/git", "/usr/local/bin/git"] {
-        let url = URL(fileURLWithPath: homebrewPrefix)
-        if FileManager.default.isExecutableFile(atPath: url.path) {
-            return url
-        }
-    }
-    throw GitError.notFound
-}
+let out = Pipe(), err = Pipe()
+process.standardOutput = out
+process.standardError = err
+try process.run()
+// Read both pipes before waitUntilExit to avoid deadlock on large output.
+let outData = out.fileHandleForReading.readDataToEndOfFile()
+let errData = err.fileHandleForReading.readDataToEndOfFile()
+process.waitUntilExit()
+// Production: replace the two readDataToEndOfFile() calls above with
+// concurrent reads (readabilityHandler or a DispatchGroup with two queues)
+// to handle output larger than the pipe buffer (~64 KB).
 ```
-
-**Key subprocess hardening rules under the sandbox:**
-- Always use `Process.arguments` (an array) — never construct a shell command string. The sandbox can intercept shell expansion, and it is also an injection vector (see `[[macos-untrusted-input]]`).
-- Set `GIT_TERMINAL_PROMPT=0` to prevent git from hanging waiting for a password prompt in a non-interactive context.
-- Set `GIT_PAGER=""` (empty string) or `GIT_PAGER=cat` to prevent git from spawning `less` (which would wait for keyboard input).
-- Cap output via a size limit on the pipe read — runaway output can exhaust memory.
-- Apply a timeout: `Process` has no built-in timeout; wrap with `DispatchQueue` and `process.terminate()`.
 
 ### SSH Keys and Credential Access
 

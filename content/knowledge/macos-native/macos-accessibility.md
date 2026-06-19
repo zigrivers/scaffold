@@ -170,39 +170,32 @@ The `accessibilityChildren` closure creates a parallel hierarchy that VoiceOver 
 
 **AppKit `NSView` custom drawing:**
 
+Custom views must expose accessibility metadata — role, label, a screen-coordinate `accessibilityFrame`, and an activation point — for each logical child element. Critical: child accessibility elements must have **stable identity**. If `accessibilityChildren()` returns newly-allocated objects on every call, VoiceOver cannot track focus across calls and navigation breaks. Cache child elements in a stored property and return the same instances each time.
+
 ```swift
 class CustomView: NSView {
-    override func accessibilityRole() -> NSAccessibility.Role? {
-        return .group
-    }
-
-    override func accessibilityLabel() -> String? {
-        return "Custom diagram"
-    }
-
-    override func accessibilityChildren() -> [Any]? {
-        return items.map { AccessibleItemElement(item: $0, parent: self) }
+    // Stored property — same instances returned every call (stable identity for VoiceOver).
+    private lazy var accessibleItems: [NSAccessibilityElement] = items.map { item in
+        let el = NSAccessibilityElement()
+        el.accessibilityParent = self
+        el.accessibilityRole = .button
+        el.accessibilityLabel = item.name
+        // Convert item frame to screen coordinates (accessibilityFrame requires screen coords).
+        let winRect = self.convert(item.frame, to: nil)
+        let screenRect = self.window?.convertToScreen(winRect) ?? winRect
+        el.accessibilityFrame = screenRect
+        el.accessibilityActivationPoint = CGPoint(x: screenRect.midX, y: screenRect.midY)
+        return el
     }
 
     override func isAccessibilityElement() -> Bool { return true }
-}
-
-// Each logical child as a virtual accessibility element.
-// accessibilityFrame and accessibilityActivationPoint MUST be in screen coordinates.
-class AccessibleItemElement: NSAccessibilityElement {
-    init(item: Item, parent: NSView) {
-        super.init()
-        accessibilityParent = parent
-        accessibilityRole = .button
-        accessibilityLabel = item.name
-        // Convert to screen coordinates (window coords alone are not sufficient).
-        let windowRect = parent.convert(item.frame, to: nil)
-        let screenRect = parent.window?.convertToScreen(windowRect) ?? windowRect
-        accessibilityFrame = screenRect
-        accessibilityActivationPoint = CGPoint(x: screenRect.midX, y: screenRect.midY)
-    }
+    override func accessibilityRole() -> NSAccessibility.Role? { return .group }
+    override func accessibilityLabel() -> String? { return "Custom diagram" }
+    override func accessibilityChildren() -> [Any]? { return accessibleItems }
 }
 ```
+
+When items change (insert/delete/move), invalidate `accessibleItems` so the cache is rebuilt — but do so wholesale rather than mutating individual cached elements mid-navigation.
 
 ### Keyboard Navigation
 
