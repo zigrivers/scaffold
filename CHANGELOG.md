@@ -4,6 +4,13 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.35.2] — 2026-06-19
+
+### Changed
+
+- **MMR review tooling: default reviewer switched from Gemini to Antigravity (`agy`).** The Gemini CLI reviewer is deprecated (Gemini Code Assist for individuals is discontinued and hard-fails auth); Antigravity (`agy`) is now the supported Google CLI reviewer. Updated the review-tool prompts (`review-pr`, `review-code`, `post-implementation-review`, `spark`), skill templates, the review-tooling knowledge entries, README, and the Codex adapter to match. Gemini remains available as an explicit opt-in. (The MMR engine default itself ships in `@zigrivers/mmr` 1.6.2.)
+- **Knowledge freshness refresh (8 entries).** Refreshed against current upstream sources with measured review/retrieval dates and source hashes: `web-app-api-patterns`, `web-app-architecture`, `web-app-auth-patterns`, `decision-completeness`, `release-management`, `review-testing-strategy`, `review-user-stories`, and `review-ux-specification`. KB `VERSION` → 0.1.99.
+
 ## [3.35.1] — 2026-06-19
 
 ### Fixed

@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [1.6.2] — 2026-06-19
+
+### Changed
+
+- **Default reviewer switched from Gemini to Antigravity (`agy`).** The built-in `gemini` channel is now `enabled: false` by default — Gemini Code Assist for individuals is discontinued and the CLI hard-fails auth with `IneligibleTierError`. The `antigravity` channel (`agy`) is Google's supported replacement and remains enabled by default. `gemini` stays available as an explicit opt-in for anyone with a working configuration. Updated config defaults, `config init`, skill templates, and the README to match.
+
 ## [1.6.1] — 2026-06-08
 
 ### Fixed
