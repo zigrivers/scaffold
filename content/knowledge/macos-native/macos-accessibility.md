@@ -191,11 +191,11 @@ class CustomView: NSView {
 class AccessibleItemElement: NSAccessibilityElement {
     init(item: Item, parent: NSView) {
         super.init()
-        setAccessibilityParent(parent)
-        setAccessibilityRole(.button)
-        setAccessibilityLabel(item.name)
-        setAccessibilityFrame(parent.convert(item.frame, to: nil))
-        setAccessibilityActivationPoint(CGPoint(x: item.frame.midX, y: item.frame.midY))
+        accessibilityParent = parent
+        accessibilityRole = .button
+        accessibilityLabel = item.name
+        accessibilityFrame = parent.convert(item.frame, to: nil)
+        accessibilityActivationPoint = CGPoint(x: item.frame.midX, y: item.frame.midY)
     }
 }
 ```

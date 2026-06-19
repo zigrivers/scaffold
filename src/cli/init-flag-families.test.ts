@@ -444,6 +444,21 @@ describe('macos-native flags', () => {
     const out = buildFlagOverrides({ 'macos-ui-framework': 'hybrid', 'macos-distribution': 'developer-id' })
     expect(out).toEqual({ type: 'macos-native', partial: { uiFramework: 'hybrid', distribution: 'developer-id' } })
   })
+  it('forces sandboxed:true when macos-distribution is mac-app-store and sandboxed not provided', () => {
+    const out = buildFlagOverrides({ 'macos-distribution': 'mac-app-store' })
+    expect(out?.type).toBe('macos-native')
+    expect((out as { type: 'macos-native'; partial: { sandboxed?: boolean } }).partial.sandboxed).toBe(true)
+  })
+  it('forces sandboxed:true when macos-distribution is both and sandboxed not provided', () => {
+    const out = buildFlagOverrides({ 'macos-distribution': 'both' })
+    expect(out?.type).toBe('macos-native')
+    expect((out as { type: 'macos-native'; partial: { sandboxed?: boolean } }).partial.sandboxed).toBe(true)
+  })
+  it('keeps explicit sandboxed:false even when macos-distribution is mac-app-store', () => {
+    const out = buildFlagOverrides({ 'macos-distribution': 'mac-app-store', 'macos-sandboxed': false })
+    expect(out?.type).toBe('macos-native')
+    expect((out as { type: 'macos-native'; partial: { sandboxed?: boolean } }).partial.sandboxed).toBe(false)
+  })
 })
 
 describe('mcp-server flag family', () => {

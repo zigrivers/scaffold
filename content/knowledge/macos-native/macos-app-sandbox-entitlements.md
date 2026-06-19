@@ -126,32 +126,54 @@ func runGit(arguments: [String], workingDirectory: URL) async throws -> String {
     process.standardOutput = stdout
     process.standardError = stderr
 
-    try process.run()
-    // IMPORTANT: drain stdout AND stderr concurrently before calling
-    // waitUntilExit(). Sequential reads deadlock: if the child fills the
-    // stderr pipe buffer (~64 KB) while the parent is still draining stdout,
-    // the child blocks on stderr, stdout never reaches EOF, and both sides
-    // wait forever. Reading both pipes on concurrent queues avoids this.
-    var data = Data()
-    var errData = Data()
-    let group = DispatchGroup()
-    DispatchQueue.global().async(group: group) {
-        data = stdout.fileHandleForReading.readDataToEndOfFile()
-    }
-    DispatchQueue.global().async(group: group) {
-        errData = stderr.fileHandleForReading.readDataToEndOfFile()
-    }
-    process.waitUntilExit()
-    group.wait()
+    // Bridge Process to async/await with a continuation so we never block
+    // the Swift concurrency cooperative thread pool with waitUntilExit().
+    // Pipe reads also use async handlers to avoid deadlock: if the child
+    // fills the stderr buffer (~64 KB) while the parent is blocked reading
+    // stdout, both sides wait forever. Reading both pipes via
+    // readabilityHandler is fully non-blocking.
+    return try await withCheckedThrowingContinuation { continuation in
+        var stdoutData = Data()
+        var stderrData = Data()
 
-    guard process.terminationStatus == 0 else {
-        throw GitError.nonZeroExit(
-            code: process.terminationStatus,
-            stderr: String(data: errData, encoding: .utf8) ?? ""
-        )
-    }
+        stdout.fileHandleForReading.readabilityHandler = { handle in
+            let chunk = handle.availableData
+            if chunk.isEmpty {
+                stdout.fileHandleForReading.readabilityHandler = nil
+            } else {
+                stdoutData.append(chunk)
+            }
+        }
+        stderr.fileHandleForReading.readabilityHandler = { handle in
+            let chunk = handle.availableData
+            if chunk.isEmpty {
+                stderr.fileHandleForReading.readabilityHandler = nil
+            } else {
+                stderrData.append(chunk)
+            }
+        }
 
-    return String(data: data, encoding: .utf8) ?? ""
+        process.terminationHandler = { proc in
+            // Drain any remaining bytes after the process exits
+            stdoutData.append(stdout.fileHandleForReading.readDataToEndOfFile())
+            stderrData.append(stderr.fileHandleForReading.readDataToEndOfFile())
+
+            if proc.terminationStatus == 0 {
+                continuation.resume(returning: String(data: stdoutData, encoding: .utf8) ?? "")
+            } else {
+                continuation.resume(throwing: GitError.nonZeroExit(
+                    code: proc.terminationStatus,
+                    stderr: String(data: stderrData, encoding: .utf8) ?? ""
+                ))
+            }
+        }
+
+        do {
+            try process.run()
+        } catch {
+            continuation.resume(throwing: error)
+        }
+    }
 }
 
 func gitExecutableURL() throws -> URL {

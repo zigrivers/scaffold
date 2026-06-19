@@ -637,7 +637,17 @@ export function buildFlagOverrides(argv: Record<string, unknown>): PartialConfig
     if (argv['macos-min-version'] !== undefined) partial.minMacosVersion = argv['macos-min-version'] as string
     if (argv['macos-distribution'] !== undefined)
       partial.distribution = argv['macos-distribution'] as MacosNativeConfig['distribution']
-    if (argv['macos-sandboxed'] !== undefined) partial.sandboxed = argv['macos-sandboxed'] as boolean
+    if (argv['macos-sandboxed'] !== undefined) {
+      partial.sandboxed = argv['macos-sandboxed'] as boolean
+    } else if (
+      argv['macos-distribution'] === 'mac-app-store' ||
+      argv['macos-distribution'] === 'both'
+    ) {
+      // Mac App Store and "both" distributions require sandboxing.
+      // Force sandboxed:true when not explicitly provided to prevent the
+      // adopt coupling check (MAS => sandboxed:true) from erroring.
+      partial.sandboxed = true
+    }
     if (argv['macos-persistence'] !== undefined)
       partial.persistence = argv['macos-persistence'] as MacosNativeConfig['persistence']
     if (argv['macos-auto-update'] !== undefined)
