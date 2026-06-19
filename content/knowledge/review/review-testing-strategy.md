@@ -1,13 +1,22 @@
 ---
 name: review-testing-strategy
 description: Failure modes and review passes specific to testing and quality strategy artifacts
-topics: [testing, quality, coverage, test-pyramid, review]
+topics:
+  - testing
+  - quality
+  - coverage
+  - test-pyramid
+  - review
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-06-19
 version-pin: null
 sources:
   - url: https://martinfowler.com/articles/practical-test-pyramid.html
+    hash: sha256:d5f669995439f1c7bb7109a8f5e52044f1b7f39e92115679518d2b762ca39eff
+    retrieved: 2026-06-19
   - url: https://docs.pact.io/
+    hash: sha256:caab05c6223f587e83203f748c10e36588562ba35f0c10ffe7dbe9f0430552b7
+    retrieved: 2026-06-19
 ---
 
 # Review: Testing Strategy
