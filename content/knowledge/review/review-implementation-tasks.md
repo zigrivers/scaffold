@@ -1,12 +1,19 @@
 ---
 name: review-implementation-tasks
 description: Failure modes and review passes specific to implementation tasks artifacts
-topics: [tasks, planning, decomposition, agents, review]
+topics:
+  - tasks
+  - planning
+  - decomposition
+  - agents
+  - review
 volatility: stable
-last-reviewed: null
+last-reviewed: 2026-06-18
 version-pin: null
 sources:
   - url: https://github.com/steveyegge/beads
+    hash: sha256:9c7c3b4c38c00c264f61edb72588324452602c9c34751696034cf94408841794
+    retrieved: 2026-06-18
 ---
 
 # Review: Implementation Tasks
