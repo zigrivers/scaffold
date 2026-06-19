@@ -4,6 +4,12 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.35.1] — 2026-06-19
+
+### Fixed
+
+- **Knowledge-freshness: client-side redirect stubs no longer ingested as source content.** The nightly audit fetcher followed only HTTP 3xx redirects, so an HTTP-200 page that redirects client-side (e.g. `owasp.org/Top10/`'s `<meta http-equiv="refresh">`) was hashed and fed to the model as authoritative — producing entries labeled with a new edition but containing stale content (the OWASP "Top 10:2025 label on 2021 taxonomy" defect). The fetcher now detects client-side redirects (scoped to `<head>`, content-type-gated, `<base href>`-aware, ReDoS-safe), follows safe `<meta refresh>` targets as a guarded hop (SSRF/DNS/scheme/hop-budget reused), and fails closed on unfollowable stubs. The audit CLI fail-closed-skips on an unusable source (skip-envelope), the workflow branches on it and no longer swallows transient failures, and a `source_unverifiable` verdict field backstops any stub the fetch layer misses.
+
 ## [3.35.0] — 2026-06-18
 
 ### Added
