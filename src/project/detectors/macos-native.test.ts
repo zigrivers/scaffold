@@ -25,6 +25,31 @@ describe('detectMacosNative', () => {
     expect(m?.partialConfig.sandboxed).toBe(true)
   })
 
+  it('app-sandbox key set to <false/> with another entitlement <true/> → sandboxed NOT set', () => {
+    // Regression: the old check matched app-sandbox key presence AND any <true/>
+    // anywhere in the file. An explicit app-sandbox=false with another entitlement
+    // (e.g. allow-jit) set to true must NOT set sandboxed:true.
+    const ctx = createFakeSignalContext({
+      rootEntries: ['Glyver.xcodeproj', 'Glyver.entitlements', 'main.swift'],
+      files: {
+        'Glyver.entitlements': `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.app-sandbox</key>
+  <false/>
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+</dict>
+</plist>`,
+        'main.swift': 'import AppKit\n@main struct App {}',
+      },
+    })
+    const m = detectMacosNative(ctx)
+    expect(m?.projectType).toBe('macos-native')
+    expect(m?.partialConfig.sandboxed).toBeUndefined()
+  })
+
   it('entitlements without app-sandbox key → sandboxed NOT set (hardened-runtime only)', () => {
     // A non-sandboxed Developer ID app may carry .entitlements for
     // hardened-runtime exceptions (e.g. allow-jit, disable-library-validation).

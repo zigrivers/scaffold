@@ -41,7 +41,7 @@ VoiceOver reads the accessibility tree, which is a parallel representation of th
 // manual .accessibilityValue("on"/"off") causes VoiceOver to double-announce
 // the state (e.g., "Show hidden files, on, toggle button, on").
 Toggle("Show Hidden Files", isOn: $showHidden)
-    .accessibilityLabel("Show hidden files")
+    // No .accessibilityLabel needed — VoiceOver derives the label from the Toggle's title text
     // No hint needed — the action is obvious from the label
 
 Button(action: deleteSelected) {

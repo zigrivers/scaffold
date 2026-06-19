@@ -112,7 +112,7 @@ function inferConfig(
     const entFile = ctx.rootEntries().find(f => f.endsWith('.entitlements'))
     if (entFile) {
       const text = ctx.readFileText(entFile)
-      if (text && /com\.apple\.security\.app-sandbox/.test(text) && /<true\s*\/>/.test(text)) {
+      if (text && /com\.apple\.security\.app-sandbox<\/key>\s*<true\s*\/>/.test(text)) {
         pc.sandboxed = true
       }
     }
