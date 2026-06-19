@@ -1,6 +1,6 @@
 # Knowledge-Freshness Client-Side-Redirect Defect — Fix Design
 
-**Status:** Draft, rev. 5 (revised after four multi-model review rounds — see §12)
+**Status:** Draft, rev. 6 (converged after five multi-model review rounds — see §12)
 **Date:** 2026-06-19
 **Author:** Claude (Opus 4.8), at maintainer request
 **Related:** memory `security-best-practices-refresh-defect`; PR #623 (prior
@@ -157,9 +157,11 @@ redirects is still caught.
 2. **HTML with a meta-refresh → follow different targets; judge self-refresh by
    delay.** Parse the HTML (ReDoS-safe — see below) for `<meta http-equiv="refresh">`
    and extract its `content` delay + `url=TARGET`. Resolve `TARGET` against
-   `<base href>` if present, else the **final response URL** (the current hop's URL
-   after any HTTP 3xx — so a missing trailing slash like `/Top10` vs `/Top10/`
-   resolves correctly), and normalize (`#fragment` stripped).
+   `<base href>` if present (the `<base href>` value is itself first resolved to an
+   absolute URL against the final response URL, since it may be relative — R5-B),
+   else against the **final response URL** directly (the current hop's URL after any
+   HTTP 3xx — so a missing trailing slash like `/Top10` vs `/Top10/` resolves
+   correctly); then normalize (`#fragment` stripped).
    - **Different-target refresh → follow it, *regardless of delay*.** Browsers
      navigate there; the target is authoritative (a longer-delay redirect stub must
      not be hashed — R4-D). The followed target re-uses the shared
@@ -226,13 +228,15 @@ verdict schema, `.github/workflows/knowledge-freshness-audit.yml`,
      otherwise proceed with the verdict. Net: **only** a valid skip envelope
      (exit 0 + `.skipped==true`) continues silently; a real failure turns the run
      red. Keeps the existing happy-path jq untouched.
-   - **Subshell caveat (R4-B):** the loop today pipes `jq -c '.[]' … | while read …`
-     (`knowledge-freshness-audit.yml:92`) — a pipeline runs the body in a *subshell*,
-     so a `had_failure` set inside is lost and the job stays green. Rewrite with
-     process substitution: initialize `had_failure=0` **outside**, then
-     `while read -r candidate; do …; done < <(jq -c '.[]' /tmp/candidates.json)`, and
-     `exit 1` after the loop when `had_failure=1`. Without this the R3-A fix is
-     ineffective.
+   - **Subshell caveat (R4-B / R5-A):** the loop today pipes `jq -c '.[]' … | while
+     read …` (`knowledge-freshness-audit.yml:92`) — a pipeline runs the body in a
+     *subshell*, so a `had_failure` set inside is lost and the job stays green.
+     Process substitution (`done < <(jq …)`) fixes the subshell but is non-POSIX and
+     hides `jq`'s own exit code from `set -e`. Instead **materialize first**:
+     `jq -c '.[]' /tmp/candidates.json > /tmp/candidate-lines.json` (so a `jq`
+     failure trips `set -e`), set `had_failure=0` before the loop, then
+     `while read -r candidate; do …; done < /tmp/candidate-lines.json`, and `exit 1`
+     after the loop when `had_failure=1`. Without this the R3-A fix is ineffective.
 2. **Structured `source_unverifiable` verdict field (defense-in-depth).** Add a
    boolean to the verdict schema (`audit-runner.ts:19-44`). Update
    `knowledge-audit-entry.md` to instruct: if any prefetched `body` is a redirect
@@ -532,3 +536,24 @@ Convergence note: rounds 2–4 progressively hardened the Layer-1 fetch heuristi
 (each round narrower and all on the same subsystem). The remaining concerns are
 implementation mechanics that the plan's TDD pins down with the real captured
 fixtures; the design intent and invariants are stable.
+
+### Round 5 (rev. 6) — converged
+
+Re-reviewed via `mmr review` (**codex ✓ 0 findings**, claude ✓ clean,
+compensating-gemini ✓ clean, compensating-grok ✓ clean; gemini/grok still
+tier/credit-blocked) plus the local Qwen2.5 reviewer (0 blocking, "SAFE TO MERGE").
+Codex — the strictest channel across all rounds — reached zero findings. Only
+antigravity raised two mechanics items, now resolved:
+
+- **R5-A (antigravity P1) — workflow loop portability/exit-code.** §5 Layer 2.1 now
+  materializes `jq` output to a temp file and loops `done < /tmp/candidate-lines.json`
+  (POSIX-safe; a `jq` failure trips `set -e`) instead of process substitution.
+- **R5-B (antigravity P2) — relative `<base href>`.** §5 Layer 1.2 now resolves
+  `<base href>` to an absolute URL (against the final response URL) before using it
+  as the base for the target.
+
+**Convergence reached:** codex/claude/local-AI are all clean; antigravity's two
+mechanics findings are incorporated. Per the round-limit discipline (the same
+Layer-1/workflow subsystem has been the focus since round 2), the design intent and
+invariants are stable and remaining nuances are TDD-level. The spec is ready for the
+implementation plan.
