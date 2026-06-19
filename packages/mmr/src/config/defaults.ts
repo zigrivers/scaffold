@@ -205,25 +205,28 @@ export const BUILTIN_CHANNELS: Record<string, SubprocessChannelParsed> = {
     // access to the working tree, so it reviews only the diff in the prompt. HOME is
     // intentionally NOT overridden: opencode stores credentials under
     // ~/.local/share/opencode/auth.json (real $HOME / $XDG_DATA_HOME), so a neutral
-    // HOME would break auth. env must be present ({}) — BUILTIN_CHANNELS is
-    // SubprocessChannelParsed. This is the antigravity posture; the existing
-    // cwd-only host-isolation test covers it (no credential symlink needed).
+    // HOME would break auth. This is the antigravity posture; the existing cwd-only
+    // host-isolation test covers it (no credential symlink needed).
     cwd: '{{neutral_cwd}}',
-    env: {},
-    // --dangerously-skip-permissions: auto-approve so a headless tool call can't
-    // hang waiting for an approval prompt (isolation comes from the empty neutral
-    // cwd, not from approvals — mirrors agy's --dangerously-skip-permissions).
+    // SECURITY: opencode is an agentic CLI with no OS sandbox flag (unlike agy's
+    // --sandbox). Auto-approving tools would let a prompt-injected diff make opencode
+    // read files, dump the environment, or run shell commands — and a neutral cwd is
+    // NOT a sandbox (tools can use absolute paths). So instead of auto-approving, we
+    // DENY every tool via OPENCODE_PERMISSION ('{"*":"deny"}', a catch-all that
+    // opencode merges into its permission config — see config.ts). The review becomes
+    // pure text-in/text-out: there is no execution surface to inject into. "deny"
+    // auto-rejects (it does not prompt), so a headless run cannot hang on approval.
+    // auth.ts merges this env into the auth probe too, so the probe is equally locked.
+    env: { OPENCODE_PERMISSION: '{"*":"deny"}' },
     // --pure: skip external plugins for a deterministic, side-effect-free review.
-    flags: [
-      '--dangerously-skip-permissions',
-      '--pure',
-    ],
+    flags: ['--pure'],
     auth: {
       // A real run is the only reliable opencode auth check (`opencode auth list`
       // reports a stored credential even when the token is expired). opencode exits
       // non-zero on auth failure (verified: exit 1 with "token expired or incorrect"),
-      // so the exit code — not a sentinel grep — drives the verdict.
-      check: 'opencode run "respond with ok" --dangerously-skip-permissions >/dev/null 2>&1',
+      // so the exit code — not a sentinel grep — drives the verdict. The prompt goes
+      // over stdin (matching prompt_delivery) so the probe exercises the real path.
+      check: 'printf "respond with ok" | opencode run --pure >/dev/null 2>&1',
       timeout: 30,
       failure_exit_codes: [1],
       recovery: 'opencode auth login',

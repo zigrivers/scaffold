@@ -172,13 +172,23 @@ describe('BUILTIN_CHANNELS — opencode', () => {
     // found via real $HOME, so neutralizing HOME would break auth. The neutral cwd
     // gives a closed-book review (no repo access — only the diff in the prompt).
     expect(ch()?.cwd).toBe('{{neutral_cwd}}')
-    expect(ch()?.env).toEqual({})
     expect(ch()?.env).not.toHaveProperty('HOME')
     expect(ch()?.env).not.toHaveProperty('XDG_CONFIG_HOME')
+    expect(ch()?.env).not.toHaveProperty('XDG_DATA_HOME')
   })
 
-  it('hardens the run: auto-approve (no headless approval hang) and no external plugins', () => {
-    expect(ch()?.flags).toContain('--dangerously-skip-permissions')
+  it('denies ALL tool permissions so a prompt-injected diff has no execution surface', () => {
+    // opencode has no OS sandbox (unlike agy --sandbox). Instead, deny every tool
+    // via OPENCODE_PERMISSION so the review is text-in/text-out — no bash/read/write,
+    // so a malicious diff cannot read files, dump the environment, or run commands.
+    // "deny" auto-rejects (no approval prompt) so a headless run cannot hang.
+    const perm = JSON.parse(ch()?.env?.OPENCODE_PERMISSION ?? '{}')
+    expect(perm['*']).toBe('deny')
+    // Must NOT auto-approve tools — that would re-open the injection surface.
+    expect(ch()?.flags).not.toContain('--dangerously-skip-permissions')
+  })
+
+  it('runs without external plugins for a deterministic, side-effect-free review', () => {
     expect(ch()?.flags).toContain('--pure')
   })
 
