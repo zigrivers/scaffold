@@ -938,7 +938,8 @@ g
     })
   })
 
-  it('is a no-op when source_unverifiable is true, even with proposed edits and a version-pin (guard fires ahead of real edits)', () => {
+  it('is a no-op when source_unverifiable is true, even with proposed edits and a version-pin' +
+    ' (guard fires ahead of real edits)', () => {
     // Strengthened: the guard must fire BEFORE any edit logic is reached.
     // With major-drift + non-empty proposed_changes + a proposed_version_pin,
     // the edit path would normally mutate the entry. source_unverifiable: true

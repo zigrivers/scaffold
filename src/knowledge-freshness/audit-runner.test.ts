@@ -158,7 +158,8 @@ describe('runEntryAudit', () => {
     }
   })
 
-  it('propagates SourceUnusableError uncaught when a source is a client-side redirect stub (spec §7 regression)', async () => {
+  it('propagates SourceUnusableError uncaught when a source is a client-side redirect stub' +
+    ' (spec §7 regression)', async () => {
     // Regression: the bug was that fetchAndHash detected the stub and threw
     // SourceUnusableError, but runEntryAudit swallowed it (or skipPrefetch
     // was used, bypassing the guard entirely). This test confirms the error

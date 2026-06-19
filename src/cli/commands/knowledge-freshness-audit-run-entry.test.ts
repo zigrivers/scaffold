@@ -19,13 +19,17 @@ describe('audit-run-entry handler', () => {
 
   it('emits a skip envelope and does not throw on SourceUnusableError', async () => {
     vi.mocked(runEntryAudit).mockRejectedValue(new SourceUnusableError('https://owasp.org/Top10/', 'stub'))
-    await (cmd.handler as any)({ entryPath: 'e.md', timeout: 600 })
+    const args = { entryPath: 'e.md', timeout: 600 }
+    await cmd.handler!(args as unknown as Parameters<NonNullable<typeof cmd.handler>>[0])
     const parsed = JSON.parse(out)
     expect(parsed).toMatchObject({ skipped: true, reason: 'source-unusable', url: 'https://owasp.org/Top10/' })
   })
 
   it('rethrows other errors (non-zero exit)', async () => {
     vi.mocked(runEntryAudit).mockRejectedValue(new Error('network timeout'))
-    await expect((cmd.handler as any)({ entryPath: 'e.md', timeout: 600 })).rejects.toThrow(/timeout/)
+    const args = { entryPath: 'e.md', timeout: 600 }
+    await expect(
+      cmd.handler!(args as unknown as Parameters<NonNullable<typeof cmd.handler>>[0]),
+    ).rejects.toThrow(/timeout/)
   })
 })

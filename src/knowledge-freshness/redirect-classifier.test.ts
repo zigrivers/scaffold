@@ -34,7 +34,9 @@ describe('classifyRedirect', () => {
   })
 
   it('accepts a long-delay self-refresh (auto-reload) with content', () => {
-    const html = '<html><head><meta http-equiv="refresh" content="300"></head><body>real dashboard content here</body></html>'
+    const html =
+      '<html><head><meta http-equiv="refresh" content="300"></head>' +
+      '<body>real dashboard content here</body></html>'
     const c = classifyRedirect(html, 'text/html', 'https://x.test/dash')
     expect(c).toEqual({ kind: 'accept' })
   })
@@ -52,12 +54,17 @@ describe('classifyRedirect', () => {
   })
 
   it('accepts a real page that also carries a long auto-reload tag', () => {
-    const html = '<html><head><meta http-equiv="refresh" content="600"></head><body>' + 'lots of real content '.repeat(50) + '</body></html>'
+    const html =
+      '<html><head><meta http-equiv="refresh" content="600"></head><body>' +
+      'lots of real content '.repeat(50) +
+      '</body></html>'
     expect(classifyRedirect(html, 'text/html', 'https://x.test/p')).toEqual({ kind: 'accept' })
   })
 
   it('accepts a small legitimate HTML page with no redirect mechanism', () => {
-    expect(classifyRedirect('<html><body>v3.2.1</body></html>', 'text/html', 'https://x.test/v')).toEqual({ kind: 'accept' })
+    expect(
+      classifyRedirect('<html><body>v3.2.1</body></html>', 'text/html', 'https://x.test/v'),
+    ).toEqual({ kind: 'accept' })
   })
 
   it('accepts non-HTML sources unchanged (explicit content-type)', () => {
@@ -93,7 +100,7 @@ describe('classifyRedirect', () => {
 
   // I1 — single-quoted and unquoted url= in meta-refresh content attribute
   it('extracts single-quoted url= target from meta-refresh content', () => {
-    const html = "<html><head><meta http-equiv=\"refresh\" content=\"0; url='https://x.test/dest'\"></head></html>"
+    const html = '<html><head><meta http-equiv="refresh" content="0; url=\'https://x.test/dest\'"></head></html>'
     const c = classifyRedirect(html, 'text/html', 'https://x.test/src')
     expect(c).toEqual({ kind: 'follow', target: 'https://x.test/dest' })
   })
@@ -106,7 +113,9 @@ describe('classifyRedirect', () => {
 
   // I2 — always sniff body; text/plain that looks like HTML is treated as HTML
   it('treats text/plain body starting with <!doctype html as HTML (mislabeled stub)', () => {
-    const stub = '<!doctype html><html><head><meta http-equiv="refresh" content="0; url=https://x.test/real"></head></html>'
+    const stub =
+      '<!doctype html><html><head>' +
+      '<meta http-equiv="refresh" content="0; url=https://x.test/real"></head></html>'
     const c = classifyRedirect(stub, 'text/plain', 'https://x.test/old')
     expect(c).toEqual({ kind: 'follow', target: 'https://x.test/real' })
   })
@@ -128,7 +137,9 @@ describe('classifyRedirect', () => {
 
   // I3 — commented-out JS redirect should NOT trigger hasJsRedirect
   it('does not flag commented-out window.location as a JS redirect', () => {
-    const html = '<html><head><!-- window.location = "/elsewhere"; --></head><body>real content here with enough text to pass the floor check</body></html>'
+    const html =
+      '<html><head><!-- window.location = "/elsewhere"; --></head>' +
+      '<body>real content here with enough text to pass the floor check</body></html>'
     // The comment contains a JS redirect but real content is present; either way it must not be unusable
     const c = classifyRedirect(html, 'text/html', 'https://x.test/p')
     // Should accept — commented-out code must not trigger the JS redirect path
@@ -137,7 +148,10 @@ describe('classifyRedirect', () => {
 
   it('does not flag noscript-wrapped window.location as unusable when page has no other redirect', () => {
     // A page with a noscript fallback that references window.location should not be flagged if there's real content
-    const html = '<html><head></head><body>' + 'real content '.repeat(20) + '<noscript><!-- window.location.href = "/nojs" --></noscript></body></html>'
+    const html =
+      '<html><head></head><body>' +
+      'real content '.repeat(20) +
+      '<noscript><!-- window.location.href = "/nojs" --></noscript></body></html>'
     const c = classifyRedirect(html, 'text/html', 'https://x.test/p')
     expect(c).toEqual({ kind: 'accept' })
   })
@@ -181,7 +195,9 @@ describe('classifyRedirect', () => {
     // Many "<script" opens with no closing tags, plus a window.location= to trigger hasJsRedirect
     // visibleTextLength must not catastrophically backtrack on this input
     const manyOpenScripts = '<script'.repeat(5000)
-    const body = '<html><head>' + manyOpenScripts + '\nwindow.location="https://x.test/dest"\n</head><body></body></html>'
+    const body =
+      '<html><head>' + manyOpenScripts +
+      '\nwindow.location="https://x.test/dest"\n</head><body></body></html>'
     const start = Date.now()
     classifyRedirect(body, 'text/html', 'https://x.test/p')
     expect(Date.now() - start).toBeLessThan(1000)

@@ -77,7 +77,9 @@ const auditRunEntryCommand: CommandModule<Record<string, unknown>, AuditRunEntry
         // Fail closed: emit a skip envelope on stdout (valid JSON, exit 0).
         // Diagnostics go to stderr so stdout stays jq-parseable.
         process.stderr.write(`[skip] source unusable for ${argv.entryPath}: ${err.detail}\n`)
-        process.stdout.write(JSON.stringify({ skipped: true, reason: 'source-unusable', url: err.url, detail: err.detail }) + '\n')
+        process.stdout.write(
+          JSON.stringify({ skipped: true, reason: 'source-unusable', url: err.url, detail: err.detail }) + '\n',
+        )
         return
       }
       throw err // transient/infra → non-zero exit (workflow surfaces it)
