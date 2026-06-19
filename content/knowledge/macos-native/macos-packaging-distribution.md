@@ -15,7 +15,6 @@ sources:
   - url: https://developer.apple.com/documentation/xcode/distributing-your-app-to-registered-devices
   - url: https://sparkle-project.org/documentation/
   - url: https://sparkle-project.org/documentation/publishing/
-  - url: https://sparkle-project.org/documentation/security/
 ---
 
 Direct-download macOS distribution requires packaging the signed and notarized app into a container (DMG or pkg) that users can download and install. Auto-update via Sparkle 2 eliminates the manual re-download loop for updates. **A Mac App Store build must not bundle Sparkle or any third-party updater** — the App Store manages its own update mechanism.
