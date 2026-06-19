@@ -1,13 +1,26 @@
 ---
 name: web-app-api-patterns
-description: REST API design for web clients, GraphQL client patterns, error handling strategies, request deduplication, auth injection, and CORS
-topics: [web-app, api, rest, graphql, cors, error-handling, auth]
+description: >-
+  REST API design for web clients, GraphQL client patterns, error handling strategies, request deduplication, auth
+  injection, and CORS
+topics:
+  - web-app
+  - api
+  - rest
+  - graphql
+  - cors
+  - error-handling
+  - auth
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-06-19
 version-pin: null
 sources:
   - url: https://developer.mozilla.org/en-US/docs/Web/HTTP
+    hash: sha256:02d5b080a193abdccc4f32239a123bf00de3492090a805b6cebfbd4e7c45e66a
+    retrieved: 2026-06-19
   - url: https://spec.graphql.org/
+    hash: sha256:f7b2292898f6adae5c78f34f3fbdc5ada6d27fca1b8f1c6414190a7b60e72313
+    retrieved: 2026-06-19
 ---
 
 The API layer is the seam between frontend and backend. Poor design here manifests as waterfall requests that serialize page loads, inconsistent error shapes that require fragile client-side guessing, auth token handling bugs that cause random 401 errors, and CORS misconfigurations that block legitimate requests. A well-designed API client is boring: it handles auth transparently, errors consistently, and requests efficiently — so product engineers can focus on features rather than network plumbing.
