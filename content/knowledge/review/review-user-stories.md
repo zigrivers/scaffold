@@ -1,12 +1,20 @@
 ---
 name: review-user-stories
 description: Failure modes and review passes specific to user story artifacts
-topics: [user-stories, coverage, acceptance-criteria, INVEST, testability, review]
+topics:
+  - user-stories
+  - coverage
+  - acceptance-criteria
+  - INVEST
+  - testability
+  - review
 volatility: stable
-last-reviewed: null
+last-reviewed: 2026-06-19
 version-pin: null
 sources:
   - url: https://www.agilealliance.org/glossary/invest/
+    hash: sha256:76d219f0abcdc64e86f954735804fc0032ab89182e7c6d61e5b6e15dc42d63ac
+    retrieved: 2026-06-19
 ---
 
 # Review: User Stories
