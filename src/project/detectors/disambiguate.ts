@@ -25,7 +25,12 @@ export const PROJECT_TYPE_PREFERENCE: readonly ProjectType[] = [
   // a service-like type. A repo with both an MCP SDK dep + registration and a
   // generic CLI entrypoint should resolve to mcp-server rather than cli.
   'mcp-server',
-  'mobile-app', 'macos-native', 'cli', 'library',
+  // macos-native ranks immediately after mobile-app so a macOS+iOS multiplatform
+  // Swift target (which detectMacosNative scores low-confidence) resolves to
+  // mobile-app on an equal-confidence tie. cli/library keep their original
+  // ordering — a macos-native-vs-cli tie does not arise (the cli detector does
+  // not match Swift Package.swift executables).
+  'cli', 'library', 'mobile-app', 'macos-native',
   'data-pipeline', 'ml', 'research', 'data-science',
   'browser-extension', 'game', 'web3',
 ]
