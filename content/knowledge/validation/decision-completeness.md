@@ -1,12 +1,19 @@
 ---
 name: decision-completeness
 description: Verifying all architectural decisions are recorded, justified, and non-contradictory
-topics: [validation, decisions, adr, completeness, contradictions]
+topics:
+  - validation
+  - decisions
+  - adr
+  - completeness
+  - contradictions
 volatility: stable
-last-reviewed: null
+last-reviewed: 2026-06-19
 version-pin: null
 sources:
   - url: https://adr.github.io/
+    hash: sha256:54cfbd863e081fb8f8d4ef6ba49620c1ba66a69baa6b88d75df2081d4567df19
+    retrieved: 2026-06-19
 ---
 
 # Decision Completeness
