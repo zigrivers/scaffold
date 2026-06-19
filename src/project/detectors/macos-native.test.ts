@@ -3,11 +3,18 @@ import { createFakeSignalContext } from './context.js'
 import { detectMacosNative } from './macos-native.js'
 
 describe('detectMacosNative', () => {
-  it('high confidence: AppKit import + entitlements', () => {
+  it('high confidence: AppKit import + entitlements with app-sandbox key → sandboxed:true', () => {
     const ctx = createFakeSignalContext({
       rootEntries: ['Glyver.xcodeproj', 'Glyver.entitlements', 'main.swift'],
       files: {
-        'Glyver.entitlements': '<plist/>',
+        'Glyver.entitlements': `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.app-sandbox</key>
+  <true/>
+</dict>
+</plist>`,
         'main.swift': 'import AppKit\nimport SwiftUI\n@main struct App {}',
       },
     })
@@ -16,6 +23,33 @@ describe('detectMacosNative', () => {
     expect(m?.confidence).toBe('high')
     expect(m?.partialConfig.uiFramework).toBe('hybrid')
     expect(m?.partialConfig.sandboxed).toBe(true)
+  })
+
+  it('entitlements without app-sandbox key → sandboxed NOT set (hardened-runtime only)', () => {
+    // A non-sandboxed Developer ID app may carry .entitlements for
+    // hardened-runtime exceptions (e.g. allow-jit, disable-library-validation).
+    // Presence of the file alone must NOT set sandboxed:true.
+    const ctx = createFakeSignalContext({
+      rootEntries: ['Glyver.xcodeproj', 'Glyver.entitlements', 'main.swift'],
+      files: {
+        'Glyver.entitlements': `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+  <key>com.apple.security.cs.disable-library-validation</key>
+  <true/>
+</dict>
+</plist>`,
+        'main.swift': 'import AppKit\nimport SwiftUI\n@main struct App {}',
+      },
+    })
+    const m = detectMacosNative(ctx)
+    expect(m?.projectType).toBe('macos-native')
+    expect(m?.confidence).toBe('high')
+    // sandboxed must be absent (undefined), not true
+    expect(m?.partialConfig.sandboxed).toBeUndefined()
   })
 
   it('high confidence: Package.swift with .macOS executable + SwiftUI import', () => {

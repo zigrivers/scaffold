@@ -69,7 +69,7 @@ export function detectMacosNative(ctx: SignalContext): MacosNativeMatch | null {
     if (xcodeArtifact && hasMainApp && importsSwiftUI && !iosPositive) {
       return {
         projectType: 'macos-native', confidence: 'medium',
-        partialConfig: inferConfig(swift, pkg, entitlements),
+        partialConfig: inferConfig(swift, pkg, entitlements, ctx),
         evidence: [evidence('xcode-swiftui-main-app', xcodeArtifact)],
       }
     }
@@ -87,19 +87,36 @@ export function detectMacosNative(ctx: SignalContext): MacosNativeMatch | null {
 
   return {
     projectType: 'macos-native', confidence,
-    partialConfig: inferConfig(swift, pkg, entitlements),
+    partialConfig: inferConfig(swift, pkg, entitlements, ctx),
     evidence: ev,
   }
 }
 
-function inferConfig(swift: string, pkg: string, entitlements: boolean): Partial<MacosNativeMatch['partialConfig']> {
+function inferConfig(
+  swift: string,
+  pkg: string,
+  entitlements: boolean,
+  ctx?: SignalContext,
+): Partial<MacosNativeMatch['partialConfig']> {
   const pc: Partial<MacosNativeMatch['partialConfig']> = {}
   const appkit = /\bimport\s+(AppKit|Cocoa)\b/.test(swift)
   const swiftui = /\bimport\s+SwiftUI\b/.test(swift)
   if (appkit && swiftui) pc.uiFramework = 'hybrid'
   else if (appkit) pc.uiFramework = 'appkit'
   else if (swiftui) pc.uiFramework = 'swiftui'
-  if (entitlements) pc.sandboxed = true
+  // Entitlements presence alone does NOT imply App Sandbox — non-sandboxed
+  // Developer ID apps routinely carry .entitlements for hardened-runtime
+  // exceptions, keychain groups, etc.  Only set sandboxed:true when the
+  // entitlements file explicitly enables the sandbox key.
+  if (entitlements && ctx) {
+    const entFile = ctx.rootEntries().find(f => f.endsWith('.entitlements'))
+    if (entFile) {
+      const text = ctx.readFileText(entFile)
+      if (text && /com\.apple\.security\.app-sandbox/.test(text) && /<true\s*\/>/.test(text)) {
+        pc.sandboxed = true
+      }
+    }
+  }
   if (/Sparkle/.test(pkg)) pc.autoUpdate = 'sparkle'
   if (/\bimport\s+SwiftData\b/.test(swift)) pc.persistence = 'swiftdata'
   else if (/\bimport\s+CoreData\b/.test(swift)) pc.persistence = 'core-data'

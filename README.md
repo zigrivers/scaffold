@@ -371,7 +371,7 @@ Every `scaffold init` wizard question can be answered via CLI flags, making scaf
 | `--methodology` | deep/mvp/custom | Methodology preset |
 | `--depth` | 1-5 | Custom methodology depth (requires `--methodology custom`) |
 | `--adapters` | comma-sep | AI adapters: claude-code, codex, gemini |
-| `--traits` | comma-sep | Project traits: web, mobile |
+| `--traits` | comma-sep | Project traits: web, mobile, desktop |
 | `--project-type` | string | web-app, mobile-app, backend, cli, library, game, data-pipeline, ml, browser-extension, research, data-science, web3, mcp-server, macos-native |
 | `--auto` | boolean | Non-interactive mode (uses Zod defaults for unset flags) |
 
