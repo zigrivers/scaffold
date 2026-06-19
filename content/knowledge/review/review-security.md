@@ -1,14 +1,25 @@
 ---
 name: review-security
 description: Failure modes and review passes specific to security review and documentation artifacts
-topics: [security, owasp, auth, threat-modeling, review]
+topics:
+  - security
+  - owasp
+  - auth
+  - threat-modeling
+  - review
 volatility: evolving
 last-reviewed: null
-version-pin: null
+version-pin: OWASP Top 10:2025
 sources:
   - url: https://owasp.org/Top10/
+    hash: sha256:cf318bf6e49239cd034bdfcdf41ca87eab4036c34f8991be2d2a24e52647a12b
+    retrieved: 2026-06-19
   - url: https://owasp.org/www-project-application-security-verification-standard/
+    hash: sha256:b15ef2402c07899c846a4c98ed599d86ae357ea179c6ed63d2c97c941a1a5abe
+    retrieved: 2026-06-19
   - url: https://www.nist.gov/cyberframework
+    hash: sha256:a68671313a25459543839b1f19b6b46d5f6bf1641bce8c8acf959cf65e7a7772
+    retrieved: 2026-06-19
 ---
 
 # Review: Security
@@ -19,7 +30,7 @@ Follows the review process defined in `review-methodology.md`.
 
 ## Summary
 
-- **Pass 1 — OWASP Coverage**: Every OWASP Top 10 category addressed with project-specific analysis, not generic checklist advice.
+- **Pass 1 — OWASP Coverage**: Every OWASP Top 10:2025 category addressed with project-specific analysis, not generic checklist advice.
 - **Pass 2 — Auth/AuthZ Boundary Alignment**: Security boundaries align with API contract auth requirements; no access control gaps between security review and API enforcement.
 - **Pass 3 — Secrets Management**: No secrets in code or version control; rotation strategy exists; vault/secrets manager integration specified for all secret categories.
 - **Pass 4 — Dependency Audit Coverage**: Vulnerability scanning integrated into CI covering direct and transitive dependencies; response policy for discovered vulnerabilities.
@@ -35,7 +46,7 @@ Follows the review process defined in `review-methodology.md`.
 
 ### What to Check
 
-Each OWASP Top 10 category is addressed for this specific project. The assessment is project-specific (not generic), identifying which categories are relevant, what the project's exposure is, and what mitigations are in place or planned.
+Each OWASP Top 10:2025 category is addressed for this specific project. The assessment is project-specific (not generic), identifying which categories are relevant, what the project's exposure is, and what mitigations are in place or planned.
 
 ### Why This Matters
 
@@ -43,7 +54,7 @@ The OWASP Top 10 represents the most common and impactful web application securi
 
 ### How to Check
 
-1. Verify all 10 OWASP categories are addressed (Broken Access Control, Cryptographic Failures, Injection, Insecure Design, Security Misconfiguration, Vulnerable Components, Identity/Auth Failures, Data Integrity Failures, Logging Failures, SSRF)
+1. Verify all OWASP Top 10:2025 categories are addressed (Broken Access Control, Cryptographic Failures, Injection, Insecure Design, Security Misconfiguration, Vulnerable and Outdated Components, Identification and Authentication Failures, Software and Data Integrity Failures, Security Logging and Monitoring Failures, Server-Side Request Forgery)
 2. For each category, check that the assessment is project-specific: which components are affected? What is the attack surface?
 3. Verify that mitigations reference specific architecture components, not generic advice ("use an ORM" vs. "the OrderRepository uses Prisma with parameterized queries by default")
 4. Check for categories marked "not applicable" — is the rationale valid? (SSRF is not applicable only if the system never fetches external URLs)
@@ -56,8 +67,6 @@ The OWASP Top 10 represents the most common and impactful web application securi
 - P0: "Broken Access Control category is marked 'mitigated' but the API contracts show several endpoints with no authorization specification (see API review Pass 3). The mitigation claim is unverified."
 - P1: "Cryptographic Failures category says 'use HTTPS' but does not address data encryption at rest, password hashing algorithm, or token generation security."
 - P2: "Security Misconfiguration category provides generic advice. Should reference the project's specific infrastructure (Docker, Kubernetes, cloud provider) and their configuration risks."
-
----
 
 ## Pass 2: Auth/AuthZ Boundary Alignment
 
