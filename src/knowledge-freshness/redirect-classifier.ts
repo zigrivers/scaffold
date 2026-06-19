@@ -26,6 +26,8 @@ export type RedirectClassification =
 
 // Bounded scan window keeps every regex linear (ReDoS-safe) regardless of body size.
 const SCAN_LIMIT = 65_536
+// Visible-text measurement is bounded to avoid O(n²) ReDoS on the lazy [\s\S]*? patterns.
+const VISIBLE_TEXT_SCAN_LIMIT = 16_384
 const NEAR_ZERO_DELAY_MAX_SEC = 1
 const JS_REDIRECT_TEXT_FLOOR = 200 // visible chars; JS redirect only flagged below this
 
@@ -41,18 +43,24 @@ function looksLikeHtml(body: string): boolean {
   return /<!doctype html|<html[\s>]|<head[\s>]|<meta[\s>]/.test(head)
 }
 
-// Content-types that may mislabel HTML content and should be sniffed.
-const SNIFF_TYPES = new Set(['', 'text/plain'])
-
+/**
+ * Returns true if the body should be treated as HTML.
+ * Always sniffs the body: if it looks like HTML it is treated as HTML
+ * regardless of the declared content-type (catches mislabeled stubs).
+ * Falls back to the declared HTML types when body sniffing is negative.
+ */
 function isHtml(contentType: string | null, body: string): boolean {
   const base = baseMediaType(contentType)
-  if (HTML_BASE_TYPES.has(base)) return true
-  if (SNIFF_TYPES.has(base)) return looksLikeHtml(body) // missing/mislabeled → sniff
-  return false // explicit non-HTML (application/json, …)
+  return HTML_BASE_TYPES.has(base) || looksLikeHtml(body)
+}
+
+/** Regex-escape a string so it is safe to embed in a RegExp. */
+function reEscape(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 function attrValue(tag: string, attr: string): string | null {
-  const m = tag.match(new RegExp(`\\b${attr}\\s*=\\s*("([^"]*)"|'([^']*)'|([^\\s">]+))`, 'i'))
+  const m = tag.match(new RegExp(`\\b${reEscape(attr)}\\s*=\\s*("([^"]*)"|'([^']*)'|([^\\s">]+))`, 'i'))
   if (!m) return null
   return (m[2] ?? m[3] ?? m[4] ?? '').trim() || null
 }
@@ -80,11 +88,15 @@ function extractMetaRefresh(head: string): { delaySec: number; url: string | nul
 }
 
 function hasJsRedirect(head: string): boolean {
-  return /(?:window\.)?location\s*(?:\.href)?\s*=|location\.replace\s*\(|location\.assign\s*\(/i.test(head)
+  // Strip HTML comments first so commented-out JS doesn't trigger a false positive.
+  const stripped = head.replace(/<!--[\s\S]*?-->/g, '')
+  return /(?:window\.)?location\s*(?:\.href)?\s*=|location\.replace\s*\(|location\.assign\s*\(/i.test(stripped)
 }
 
 function visibleTextLength(head: string): number {
-  return head
+  // Bound input to avoid O(n²)/ReDoS from lazy [\s\S]*? patterns on large heads.
+  const bounded = head.slice(0, VISIBLE_TEXT_SCAN_LIMIT)
+  return bounded
     .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
     .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '')
     .replace(/<!--[\s\S]*?-->/g, '')
@@ -93,10 +105,18 @@ function visibleTextLength(head: string): number {
     .trim().length
 }
 
+/**
+ * Strip the URL fragment from an absolute URL.
+ * `finalUrl` must be an absolute URL; a malformed value falls back to the raw string.
+ */
 function stripFragment(u: string): string {
-  const x = new URL(u)
-  x.hash = ''
-  return x.toString()
+  try {
+    const x = new URL(u)
+    x.hash = ''
+    return x.toString()
+  } catch {
+    return u
+  }
 }
 
 export function classifyRedirect(
@@ -115,7 +135,13 @@ export function classifyRedirect(
     try { base = new URL(baseHref, finalUrl).toString() } catch { /* malformed base → ignore */ }
   }
 
-  const currentNorm = stripFragment(finalUrl)
+  let currentNorm: string
+  try {
+    currentNorm = stripFragment(finalUrl)
+  } catch {
+    currentNorm = finalUrl
+  }
+
   const meta = extractMetaRefresh(head)
   if (meta && meta.url) {
     let target: URL
