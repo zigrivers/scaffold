@@ -186,4 +186,29 @@ describe('classifyRedirect', () => {
     classifyRedirect(body, 'text/html', 'https://x.test/p')
     expect(Date.now() - start).toBeLessThan(1000)
   })
+
+  // N1 — HTML-comment blindness: commented-out meta-refresh and base href must be ignored
+  it('N1a: accepts a page whose only meta-refresh is inside an HTML comment (not a real redirect)', () => {
+    // The meta-refresh is commented out; there is real <body> content → should be accepted
+    const html =
+      '<html><head>' +
+      '<!-- <meta http-equiv="refresh" content="0; url=https://other.test/"> -->' +
+      '</head><body><p>Real content here with plenty of text to read.</p></body></html>'
+    const c = classifyRedirect(html, 'text/html', 'https://real.test/page')
+    expect(c).toEqual({ kind: 'accept' })
+  })
+
+  it('N1b: resolves meta-refresh relative url= against real base, not a commented-out <base href>', () => {
+    // The <base href> is commented out; a real near-zero meta-refresh uses a relative url=.
+    // The target must be resolved against finalUrl, not the commented-out base.
+    const html =
+      '<html><head>' +
+      '<!-- <base href="https://bad.test/"> -->' +
+      '<meta http-equiv="refresh" content="0; url=real/">' +
+      '</head><body></body></html>'
+    const finalUrl = 'https://good.test/section/'
+    const c = classifyRedirect(html, 'text/html', finalUrl)
+    // Should follow to https://good.test/section/real/ (relative to finalUrl), NOT bad.test
+    expect(c).toEqual({ kind: 'follow', target: 'https://good.test/section/real/' })
+  })
 })

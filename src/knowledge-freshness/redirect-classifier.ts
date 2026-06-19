@@ -88,9 +88,7 @@ function extractMetaRefresh(head: string): { delaySec: number; url: string | nul
 }
 
 function hasJsRedirect(head: string): boolean {
-  // Strip HTML comments first so commented-out JS doesn't trigger a false positive.
-  const stripped = head.replace(/<!--[\s\S]*?-->/g, '')
-  return /(?:window\.)?location\s*(?:\.href)?\s*=|location\.replace\s*\(|location\.assign\s*\(/i.test(stripped)
+  return /(?:window\.)?location\s*(?:\.href)?\s*=|location\.replace\s*\(|location\.assign\s*\(/i.test(head)
 }
 
 function visibleTextLength(head: string): number {
@@ -126,23 +124,20 @@ export function classifyRedirect(
 ): RedirectClassification {
   if (!isHtml(contentType, body)) return { kind: 'accept' }
   const head = body.slice(0, SCAN_LIMIT)
+  // Strip HTML comments once here so all parsers operate on comment-free input.
+  const headNoComments = head.replace(/<!--[\s\S]*?-->/g, '')
 
   // Base for resolving relative targets: <base href> (itself made absolute
   // against finalUrl) if present, else finalUrl.
   let base = finalUrl
-  const baseHref = extractBaseHref(head)
+  const baseHref = extractBaseHref(headNoComments)
   if (baseHref) {
     try { base = new URL(baseHref, finalUrl).toString() } catch { /* malformed base → ignore */ }
   }
 
-  let currentNorm: string
-  try {
-    currentNorm = stripFragment(finalUrl)
-  } catch {
-    currentNorm = finalUrl
-  }
+  const currentNorm = stripFragment(finalUrl)
 
-  const meta = extractMetaRefresh(head)
+  const meta = extractMetaRefresh(headNoComments)
   if (meta && meta.url) {
     let target: URL
     try { target = new URL(meta.url, base) } catch {
@@ -162,7 +157,7 @@ export function classifyRedirect(
     return { kind: 'accept' } // long-delay auto-reload
   }
 
-  if (hasJsRedirect(head) && visibleTextLength(head) < JS_REDIRECT_TEXT_FLOOR) {
+  if (hasJsRedirect(headNoComments) && visibleTextLength(head) < JS_REDIRECT_TEXT_FLOOR) {
     return { kind: 'unusable', detail: 'javascript-only redirect with no content' }
   }
   return { kind: 'accept' }
