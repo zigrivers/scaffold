@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+## [1.7.0] — 2026-06-19
+
+### Added
+
+- **New built-in `opencode` review channel** running the open-source OpenCode CLI
+  (`opencode run`). **Disabled by default** (opt-in) — enable in `.mmr.yaml`
+  (`channels: { opencode: { enabled: true } }`) or pass `--channels=opencode`
+  (alias: `opc`). The prompt is delivered over stdin and the plain-text model reply
+  is parsed by the `default` findings parser. Runs hardened: a neutral cwd (closed-book
+  — opencode reviews only the diff in the prompt, not the working tree) and, because
+  opencode has no OS sandbox flag, every tool is denied via
+  `OPENCODE_PERMISSION='{"*":"deny"}'` so a prompt-injected diff has no execution
+  surface (no bash/read/write — the review is text-in/text-out); `--pure` skips external
+  plugins. `$HOME` is left real so opencode finds its credentials at
+  `~/.local/share/opencode/auth.json`; the auth probe runs a real `opencode run` over
+  stdin and treats a non-zero exit as failure (recovery: `opencode auth login`).
+  An unavailable `opencode` channel gets a correctness-focused compensating pass.
+
 ## [1.6.2] — 2026-06-19
 
 ### Changed

@@ -221,6 +221,17 @@ way.
    hardened (neutral cwd, `--sandbox`, auto-approve, real HOME). The channel
    key is `antigravity`; `agy` is accepted as an alias in `--channels`,
    `channels_disabled`, and `channels:` config keys.
+6. **OpenCode CLI** (`opencode run`) — an open-source AI coding CLI offering an
+   independent correctness/code-quality pass. **Disabled by default (opt-in)**,
+   like `doc-conformance`: enable in `.mmr.yaml`
+   (`channels: { opencode: { enabled: true } }`) or pass `--channels=opencode`.
+   Reads the prompt from stdin (`prompt_delivery: stdin`) and parses the plain
+   model reply with the `default` parser. Runs hardened (neutral cwd, real HOME,
+   `--pure`); because opencode has no OS sandbox flag, every tool is denied via
+   `OPENCODE_PERMISSION='{"*":"deny"}'` so the review is text-in/text-out with no
+   execution surface. Creds live under real `$HOME`
+   (`~/.local/share/opencode/auth.json`). The channel key is `opencode`; `opc`
+   is accepted as an alias. Auth recovery: `opencode auth login`.
 
 **Critical rules:**
 - **Foreground only** — Always run Codex, Gemini, Claude, Grok, and Antigravity

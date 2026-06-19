@@ -22,6 +22,11 @@ const COMPENSATING_FOCUS: Record<string, string> = {
     'Focus your review on: architectural patterns, design consistency,'
     + ' broad-context reasoning, separation of concerns, and dependency analysis.'
     + ' You are compensating for a missing Antigravity (agy) review.',
+  opencode:
+    'Focus your review on: an independent pass over implementation correctness and'
+    + ' code quality — logic errors, edge cases, error handling, and risky assumptions'
+    + ' other reviewers may have anchored past.'
+    + ' You are compensating for a missing OpenCode review.',
 }
 
 export interface CompensatingChannel {

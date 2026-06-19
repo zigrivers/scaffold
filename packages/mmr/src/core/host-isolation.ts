@@ -5,11 +5,13 @@ import path from 'node:path'
 export const NEUTRAL_HOME_PLACEHOLDER = '{{neutral_home}}'
 export const NEUTRAL_CWD_PLACEHOLDER = '{{neutral_cwd}}'
 // The neutral-posture placeholders are used by the builtin `grok` channel (HOME +
-// cwd) and the `antigravity` channel (cwd only). The credential-preservation step
-// below is gated on HOME neutralization, so only grok's HOME-isolated posture pulls
-// in ~/.grok/auth.json. The `mmr-grok-` temp-dir prefix is retained (shared by both
-// channels; sweepStaleNeutralDirs matches it). Generalize the prefix + credential
-// path together if a third isolated CLI is added.
+// cwd) and the cwd-only channels `antigravity` and `opencode`. The
+// credential-preservation step below is gated on HOME neutralization, so only grok's
+// HOME-isolated posture pulls in ~/.grok/auth.json; the cwd-only channels keep a real
+// HOME and find their own credentials normally (no symlink needed). The `mmr-grok-`
+// temp-dir prefix is retained (shared by all three; sweepStaleNeutralDirs matches it).
+// Generalize the prefix + per-CLI credential path together if a new channel needs
+// HOME isolation.
 const PREFIX = 'mmr-grok-'
 
 export interface NeutralPosture {

@@ -151,6 +151,66 @@ describe('BUILTIN_CHANNELS — antigravity', () => {
   })
 })
 
+describe('BUILTIN_CHANNELS — opencode', () => {
+  const ch = () => BUILTIN_CHANNELS.opencode
+
+  it('exposes an opencode channel DISABLED by default (opt-in, like doc-conformance)', () => {
+    expect(ch()).toBeDefined()
+    expect(ch()?.enabled).toBe(false)
+  })
+
+  it('invokes the opencode `run` subcommand', () => {
+    expect(ch()?.command).toBe('opencode run')
+  })
+
+  it('delivers the prompt via stdin (verified: `opencode run` reads stdin)', () => {
+    expect(ch()?.prompt_delivery).toBe('stdin')
+  })
+
+  it('runs in a neutral cwd but does NOT override HOME/XDG (opencode creds live under real HOME)', () => {
+    // Same posture as antigravity: creds at ~/.local/share/opencode/auth.json are
+    // found via real $HOME, so neutralizing HOME would break auth. The neutral cwd
+    // gives a closed-book review (no repo access — only the diff in the prompt).
+    expect(ch()?.cwd).toBe('{{neutral_cwd}}')
+    expect(ch()?.env).not.toHaveProperty('HOME')
+    expect(ch()?.env).not.toHaveProperty('XDG_CONFIG_HOME')
+    expect(ch()?.env).not.toHaveProperty('XDG_DATA_HOME')
+  })
+
+  it('denies ALL tool permissions so a prompt-injected diff has no execution surface', () => {
+    // opencode has no OS sandbox (unlike agy --sandbox). Instead, deny every tool
+    // via OPENCODE_PERMISSION so the review is text-in/text-out — no bash/read/write,
+    // so a malicious diff cannot read files, dump the environment, or run commands.
+    // "deny" auto-rejects (no approval prompt) so a headless run cannot hang.
+    const perm = JSON.parse(ch()?.env?.OPENCODE_PERMISSION ?? '{}')
+    expect(perm['*']).toBe('deny')
+    // Must NOT auto-approve tools — that would re-open the injection surface.
+    expect(ch()?.flags).not.toContain('--dangerously-skip-permissions')
+  })
+
+  it('runs without external plugins for a deterministic, side-effect-free review', () => {
+    expect(ch()?.flags).toContain('--pure')
+  })
+
+  it('parses plain model output with the default findings parser', () => {
+    expect(ch()?.output_parser).toBe('default')
+  })
+
+  it('auth.check probes a real run; a non-zero exit fails auth, recovery points at opencode auth login', () => {
+    const check = ch()?.auth?.check ?? ''
+    expect(check).toMatch(/opencode run/)
+    expect(ch()?.auth?.failure_exit_codes).toContain(1)
+    expect(ch()?.auth?.recovery).toBe('opencode auth login')
+  })
+
+  it('is NOT in the default-enabled set (opt-in only)', () => {
+    const defaultEnabled = Object.entries(DEFAULT_CONFIG.channels)
+      .filter(([, channel]) => channel.enabled)
+      .map(([name]) => name)
+    expect(defaultEnabled).not.toContain('opencode')
+  })
+})
+
 describe('default reviewer selection', () => {
   it('uses agy/antigravity instead of the deprecated Gemini CLI by default', () => {
     expect(BUILTIN_CHANNELS.antigravity?.enabled).toBe(true)
