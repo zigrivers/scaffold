@@ -4,6 +4,7 @@ import path from 'node:path'
 import os from 'node:os'
 import { runEntryAudit, normalizeVerdict, stampVerdictRunDates, type Dispatcher } from './audit-runner.js'
 import type { AuditVerdict } from './audit-runner.js'
+import { SourceUnusableError } from './redirect-classifier.js'
 
 // Use temp fixtures rather than the real on-disk entry + meta-prompt so the
 // runner tests don't break when those files are edited. We inject the meta-
@@ -152,6 +153,57 @@ describe('runEntryAudit', () => {
 
       const out = await runEntryAudit(entry, dispatcher, { promptPath: prompt, skipPrefetch: true })
       expect(out.verdict).toBe('current')
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true })
+    }
+  })
+
+  it('propagates SourceUnusableError uncaught when a source is a client-side redirect stub (spec §7 regression)', async () => {
+    // Regression: the bug was that fetchAndHash detected the stub and threw
+    // SourceUnusableError, but runEntryAudit swallowed it (or skipPrefetch
+    // was used, bypassing the guard entirely). This test confirms the error
+    // propagates all the way through runEntryAudit when fetchImpl returns a
+    // client-side-redirect stub with little content — no skipPrefetch.
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'runner-unusable-'))
+    try {
+      const prompt = path.join(tmp, 'audit.md')
+      fs.writeFileSync(prompt, '{{prefetched_sources}}')
+      const entry = path.join(tmp, 'entry.md')
+      fs.writeFileSync(
+        entry,
+        '---\nname: stub\ndescription: y\nsources:\n  - url: https://example.org/owasp\n---\nbody\n',
+      )
+
+      // Stub: HTTP 200, text/html, meta http-equiv="refresh" pointing elsewhere,
+      // and very little visible content (a classic redirect-stub page).
+      const redirectStubBody =
+        '<html><head><meta http-equiv="refresh" content="0; url=/elsewhere"></head><body></body></html>'
+      const fetchImpl = vi.fn(async () =>
+        new Response(redirectStubBody, {
+          status: 200,
+          headers: { 'content-type': 'text/html' },
+        }),
+      ) as unknown as Parameters<typeof runEntryAudit>[2] extends infer T
+        ? T extends { fetchImpl?: infer F } ? F : never
+        : never
+
+      // Resolver returns a public IP so DNS-rebinding guard passes.
+      const publicResolver = async () => ['93.184.216.34']
+
+      // The dispatcher should never be reached — the prefetch throws first.
+      const dispatcher: Dispatcher = vi.fn().mockResolvedValue('{}')
+
+      await expect(
+        runEntryAudit(entry, dispatcher, {
+          promptPath: prompt,
+          resolver: publicResolver,
+          fetchImpl,
+          // Do NOT pass skipPrefetch — that would bypass the guard.
+        }),
+      ).rejects.toBeInstanceOf(SourceUnusableError)
+
+      // Dispatcher must not have been called (error happens before dispatch).
+      expect(dispatcher).not.toHaveBeenCalled()
     } finally {
       fs.rmSync(tmp, { recursive: true, force: true })
     }

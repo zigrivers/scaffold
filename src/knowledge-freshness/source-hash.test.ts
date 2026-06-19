@@ -132,7 +132,7 @@ describe('fetchAndHash — client-side redirects', () => {
     )
     await expect(
       fetchAndHash('https://example.org/start', { resolver: publicResolver, fetchImpl }),
-    ).rejects.toThrow() // SSRF/DNS guard rejects the private-IP target on the next hop
+    ).rejects.toThrow(/DNS-rebinding|blocked|private|169\.254/i)
   })
 
   it('still accepts a normal HTML page (regression)', async () => {
