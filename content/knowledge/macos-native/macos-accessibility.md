@@ -187,15 +187,19 @@ class CustomView: NSView {
     override func isAccessibilityElement() -> Bool { return true }
 }
 
-// Each logical child as a virtual accessibility element
+// Each logical child as a virtual accessibility element.
+// accessibilityFrame and accessibilityActivationPoint MUST be in screen coordinates.
 class AccessibleItemElement: NSAccessibilityElement {
     init(item: Item, parent: NSView) {
         super.init()
         accessibilityParent = parent
         accessibilityRole = .button
         accessibilityLabel = item.name
-        accessibilityFrame = parent.convert(item.frame, to: nil)
-        accessibilityActivationPoint = CGPoint(x: item.frame.midX, y: item.frame.midY)
+        // Convert to screen coordinates (window coords alone are not sufficient).
+        let windowRect = parent.convert(item.frame, to: nil)
+        let screenRect = parent.window?.convertToScreen(windowRect) ?? windowRect
+        accessibilityFrame = screenRect
+        accessibilityActivationPoint = CGPoint(x: screenRect.midX, y: screenRect.midY)
     }
 }
 ```

@@ -294,10 +294,10 @@ export function applyFlagFamilyValidation(argv: Record<string, unknown>): true |
         && argv['macos-auto-update'] !== 'none') {
       throw new Error('Mac App Store builds cannot bundle Sparkle (set --macos-auto-update none)')
     }
-    if (argv['macos-persistence'] === 'swiftdata' && argv['macos-min-version'] !== undefined) {
-      const major = parseInt(String(argv['macos-min-version']).split('.')[0] ?? '', 10)
-      if (major < 14) throw new Error('SwiftData requires --macos-min-version 14.0 or later')
-    }
+    // SwiftData + macOS < 14: the init wizard auto-bumps minMacosVersion to '14.0'
+    // (src/wizard/questions.ts), so a preflight throw here makes the documented bump
+    // unreachable for `scaffold init`. The adopt path is caught by the coupling
+    // validator; the config schema is the final backstop. Guard removed.
   }
   if (hasMcpServerFlag) {
     // Cross-field guards fire only when --mcp-transport is EXPLICITLY 'stdio'.

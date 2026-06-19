@@ -103,6 +103,16 @@ describe('detectMacosNative', () => {
     expect(detectMacosNative(ctx)).toBeNull()
   })
 
+  it('returns null for a repo containing ONLY a .entitlements file (no AppKit/SwiftUI/SDKROOT/Package signals)', () => {
+    // A lone .entitlements file must never classify as macos-native — it appears in
+    // helper tools, CI scripts, and iOS repos alike.
+    const ctx = createFakeSignalContext({
+      rootEntries: ['MyHelper.entitlements'],
+      files: { 'MyHelper.entitlements': '<plist/>' },
+    })
+    expect(detectMacosNative(ctx)).toBeNull()
+  })
+
   it('returns null when there are no Apple/Swift signals', () => {
     const ctx = createFakeSignalContext({ rootEntries: ['package.json'], files: { 'package.json': '{}' } })
     expect(detectMacosNative(ctx)).toBeNull()
