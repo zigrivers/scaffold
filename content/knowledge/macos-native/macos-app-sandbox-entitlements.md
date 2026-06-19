@@ -106,27 +106,13 @@ Git executable path selection matters under the sandbox:
 
 Set `GIT_TERMINAL_PROMPT=0`, `GIT_PAGER=""`, and `GIT_ASKPASS=""` in the subprocess environment so git never waits for interactive input.
 
-Production code must read stdout and stderr **concurrently** — if the child fills the stderr pipe buffer (~64 KB) while the parent is blocked reading stdout, both sides deadlock. Drive reads on a background queue or use `readabilityHandler`. A minimal synchronous sketch (fine for short output; extend with `readabilityHandler` for production):
+Key points for launching a subprocess correctly:
 
-```swift
-let process = Process()
-process.executableURL = try gitExecutableURL()   // explicit path, not a shell string
-process.arguments = arguments                    // argument array, never a shell string
-process.currentDirectoryURL = workingDirectory
-process.environment = ["GIT_TERMINAL_PROMPT": "0", "GIT_PAGER": "", "PATH": "/usr/bin:/bin"]
-
-let out = Pipe(), err = Pipe()
-process.standardOutput = out
-process.standardError = err
-try process.run()
-// Read both pipes before waitUntilExit to avoid deadlock on large output.
-let outData = out.fileHandleForReading.readDataToEndOfFile()
-let errData = err.fileHandleForReading.readDataToEndOfFile()
-process.waitUntilExit()
-// Production: replace the two readDataToEndOfFile() calls above with
-// concurrent reads (readabilityHandler or a DispatchGroup with two queues)
-// to handle output larger than the pipe buffer (~64 KB).
-```
+- Use `Process` (Foundation) with an explicit `executableURL` set to an absolute path, and pass arguments as an array — never build a shell string, which is vulnerable to shell-expansion injection.
+- `/usr/bin/git` is the Xcode Command Line Tools (CLT) stub; `/opt/homebrew/bin/git` (Apple Silicon) and `/usr/local/bin/git` (Intel) are Homebrew-managed paths outside the default sandbox path.
+- A sandboxed app needs the appropriate entitlement or a security-scoped bookmark to execute a binary outside the default system paths (`/usr/bin`, `/bin`, etc.).
+- stdout and stderr **must** be drained concurrently — if the child fills the stderr pipe buffer (~64 KB) while the parent is blocked waiting on stdout (or vice versa), both sides deadlock. Drive reads on a background `DispatchQueue` with `readabilityHandler`, or use a continuation-bridged async runner. Do not call `readDataToEndOfFile()` on both pipes sequentially before `waitUntilExit()`.
+- Prefer a vetted process-runner library (e.g., one that wraps `Process` with async/await and concurrent pipe draining) over hand-rolling these mechanics — the deadlock risk is subtle and easy to reintroduce.
 
 ### SSH Keys and Credential Access
 

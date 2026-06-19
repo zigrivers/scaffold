@@ -25,7 +25,7 @@ export const PROJECT_TYPE_PREFERENCE: readonly ProjectType[] = [
   // a service-like type. A repo with both an MCP SDK dep + registration and a
   // generic CLI entrypoint should resolve to mcp-server rather than cli.
   'mcp-server',
-  'macos-native', 'cli', 'library', 'mobile-app',
+  'mobile-app', 'macos-native', 'cli', 'library',
   'data-pipeline', 'ml', 'research', 'data-science',
   'browser-extension', 'game', 'web3',
 ]

@@ -170,32 +170,13 @@ The `accessibilityChildren` closure creates a parallel hierarchy that VoiceOver 
 
 **AppKit `NSView` custom drawing:**
 
-Custom views must expose accessibility metadata — role, label, a screen-coordinate `accessibilityFrame`, and an activation point — for each logical child element. Critical: child accessibility elements must have **stable identity**. If `accessibilityChildren()` returns newly-allocated objects on every call, VoiceOver cannot track focus across calls and navigation breaks. Cache child elements in a stored property and return the same instances each time.
+A custom `NSView` must expose accessibility metadata for each logical child element. Key requirements:
 
-```swift
-class CustomView: NSView {
-    // Stored property — same instances returned every call (stable identity for VoiceOver).
-    private lazy var accessibleItems: [NSAccessibilityElement] = items.map { item in
-        let el = NSAccessibilityElement()
-        el.accessibilityParent = self
-        el.accessibilityRole = .button
-        el.accessibilityLabel = item.name
-        // Convert item frame to screen coordinates (accessibilityFrame requires screen coords).
-        let winRect = self.convert(item.frame, to: nil)
-        let screenRect = self.window?.convertToScreen(winRect) ?? winRect
-        el.accessibilityFrame = screenRect
-        el.accessibilityActivationPoint = CGPoint(x: screenRect.midX, y: screenRect.midY)
-        return el
-    }
-
-    override func isAccessibilityElement() -> Bool { return true }
-    override func accessibilityRole() -> NSAccessibility.Role? { return .group }
-    override func accessibilityLabel() -> String? { return "Custom diagram" }
-    override func accessibilityChildren() -> [Any]? { return accessibleItems }
-}
-```
-
-When items change (insert/delete/move), invalidate `accessibleItems` so the cache is rebuilt — but do so wholesale rather than mutating individual cached elements mid-navigation.
+- Expose role, label, an `accessibilityFrame` in **screen coordinates**, and an activation point in screen coordinates via Swift property assignment (e.g., `accessibilityRole = .button`) — not Obj-C-style setter calls.
+- Child accessibility elements must have **stable identity** — do NOT recreate them on every `accessibilityChildren()` call. VoiceOver tracks focus by object identity; returning newly-allocated elements on each call breaks navigation. Cache child elements in a stored property and return the same instances each time.
+- However, the `accessibilityFrame` of each cached element must reflect the **current screen position** — recompute screen coordinates on access (converting from view-local to window coordinates via `convert(_:to:nil)`, then to screen via `window?.convertToScreen(_:)`), since scroll, resize, or window moves change them without invalidating the cache.
+- When items are inserted, deleted, or reordered, rebuild the cache wholesale (replacing the stored property) rather than mutating individual cached elements mid-navigation.
+- The parent view itself should return an appropriate role (e.g., `.group`) and label via the corresponding overrides.
 
 ### Keyboard Navigation
 

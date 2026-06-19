@@ -499,7 +499,7 @@ The full `macosNativeConfig` object written to `.scaffold/config.yml`:
 **Coupling constraints:**
 - `distribution: mac-app-store` or `both` → `sandboxed` is forced to `true` (Mac App Store requirement).
 - `distribution: mac-app-store` → `autoUpdate` is forced to `none` (App Store builds cannot bundle Sparkle).
-- `persistence: swiftdata` → `minMacosVersion` is bumped to `14.0` if a lower value is provided (SwiftData requires macOS 14+).
+- `persistence: swiftdata` requires `minMacosVersion` ≥ 14.0 (SwiftData requires macOS 14+). The init wizard auto-bumps `minMacosVersion` to `14.0` when you pick swiftdata with a lower version; `adopt` / direct config validation rejects a swiftdata + `<14` combination (fail-closed).
 
 #### Data Science Config (`--project-type data-science`)
 
