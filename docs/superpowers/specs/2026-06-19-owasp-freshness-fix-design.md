@@ -1,6 +1,6 @@
 # Knowledge-Freshness Client-Side-Redirect Defect — Fix Design
 
-**Status:** Draft, rev. 4 (revised after three multi-model review rounds — see §12)
+**Status:** Draft, rev. 5 (revised after four multi-model review rounds — see §12)
 **Date:** 2026-06-19
 **Author:** Claude (Opus 4.8), at maintainer request
 **Related:** memory `security-best-practices-refresh-defect`; PR #623 (prior
@@ -144,30 +144,41 @@ presence of a client-side *redirect mechanism*, not byte count** — so small bu
 legitimate pages are never rejected, and a large templated stub that still
 redirects is still caught.
 
-1. **Non-HTML → accept as-is.** If the `Content-Type` is not `text/html` (or
-   `application/xhtml+xml`) — e.g. `application/json`, `text/plain`, a raw version
-   file — skip all HTML heuristics: hash and return the body unchanged. (HTML
-   stub-detection must never reject a small JSON/text source.)
-2. **HTML with a followable meta-refresh → follow (regardless of text length).**
-   Parse the HTML (ReDoS-safe — see below) for `<meta http-equiv="refresh">` whose
-   `content` has a **near-zero delay** (0 or ≤1s) and a `url=TARGET`. Resolve
-   `TARGET` against `<base href>` if present, else the current URL. If it resolves
-   to a **different** `http(s)` URL, follow it — **even when visible text exceeds
-   any floor** (a stub padded with site chrome must still be followed, not hashed).
-   Each followed target re-uses the shared `MAX_REDIRECT_HOPS` budget, must pass
-   `assertSafeSourceUrlWithDns` (SSRF/DNS), and must use an `http:`/`https:` scheme
-   — `javascript:`, `data:`, `file:`, etc. are rejected outright. `<link
-   rel="canonical">` is **not** a redirect (pages self-canonicalize). URLs are
-   normalized (`#fragment` stripped) before the same-URL comparison, so `A → A#x`
-   counts as cyclic. A **near-zero self/cyclic** refresh (target resolves to the
-   current URL) is a reload stub with no onward content → it is **unusable** and
-   fails closed via Layer 1.3 (it is *not* accepted as terminal). A *long-delay*
-   self-refresh with real content falls through to Layer 1.4 and is accepted.
-3. **HTML with an unfollowable redirect mechanism → fail closed.** If the page has
-   a redirect mechanism that cannot be safely followed — a near-zero meta-refresh
-   with no usable/`http(s)` `url=`, or a detectable JS-only redirect near the top of
-   the document (`location.replace(`, `location.href=`, `window.location=`) with
-   little other content — throw a typed `SourceUnusableError` carrying the URL.
+1. **Decide HTML vs non-HTML by content-type, sniffing when ambiguous.** Parse the
+   `Content-Type` header to its **base media type** (lowercase, strip parameters
+   such as `; charset=utf-8`). Treat the body as **HTML** when the base type is
+   `text/html` or `application/xhtml+xml`, **or** when the content-type is
+   missing/ambiguous **and** the body sniffs as HTML (leading `<!doctype html`,
+   `<html`, `<head`, or `<meta` in the first bytes). Only **explicitly non-HTML**
+   types (`application/json`, `text/plain`, etc.) bypass the HTML heuristics — hash
+   and return unchanged (never reject a small JSON/text source). This stops a stub
+   served with a missing or mislabeled content-type from sneaking past detection
+   (R4-A).
+2. **HTML with a meta-refresh → follow different targets; judge self-refresh by
+   delay.** Parse the HTML (ReDoS-safe — see below) for `<meta http-equiv="refresh">`
+   and extract its `content` delay + `url=TARGET`. Resolve `TARGET` against
+   `<base href>` if present, else the **final response URL** (the current hop's URL
+   after any HTTP 3xx — so a missing trailing slash like `/Top10` vs `/Top10/`
+   resolves correctly), and normalize (`#fragment` stripped).
+   - **Different-target refresh → follow it, *regardless of delay*.** Browsers
+     navigate there; the target is authoritative (a longer-delay redirect stub must
+     not be hashed — R4-D). The followed target re-uses the shared
+     `MAX_REDIRECT_HOPS` budget, must pass `assertSafeSourceUrlWithDns` (SSRF/DNS),
+     and must use an `http:`/`https:` scheme — `javascript:`, `data:`, `file:`, etc.
+     are rejected. A different-target refresh that is **unfollowable**
+     (non-`http(s)`/unsafe scheme, or no usable `url=`) fails closed (Layer 1.3).
+   - **Self/cyclic refresh** (target resolves to the current URL after fragment
+     normalization, so `A → A#x` counts as cyclic): a **near-zero delay** (0 or ≤1s)
+     is a reload stub with no onward content → fails closed (Layer 1.3); a
+     **long delay** is a legitimate auto-reload page → falls through to Layer 1.4
+     and is accepted.
+   `<link rel="canonical">` is **not** a redirect (pages self-canonicalize).
+3. **HTML with an unfollowable redirect mechanism → fail closed.** If the page has a
+   redirect mechanism that cannot be safely followed — an unfollowable different-target
+   meta-refresh (non-`http(s)`/unsafe scheme or no usable `url=`), a near-zero
+   self/cyclic meta-refresh, or a detectable JS-only redirect near the top of the
+   document (`location.replace(`, `location.href=`, `window.location=`) with little
+   other content — throw a typed `SourceUnusableError` carrying the URL.
 4. **Otherwise → accept.** Any other HTML — a long-delay auto-reload page, or a
    small page with **no** redirect mechanism — is real terminal content: hash and
    return it. (Byte count is **not** a rejection criterion; a suspiciously thin body
@@ -215,6 +226,13 @@ verdict schema, `.github/workflows/knowledge-freshness-audit.yml`,
      otherwise proceed with the verdict. Net: **only** a valid skip envelope
      (exit 0 + `.skipped==true`) continues silently; a real failure turns the run
      red. Keeps the existing happy-path jq untouched.
+   - **Subshell caveat (R4-B):** the loop today pipes `jq -c '.[]' … | while read …`
+     (`knowledge-freshness-audit.yml:92`) — a pipeline runs the body in a *subshell*,
+     so a `had_failure` set inside is lost and the job stays green. Rewrite with
+     process substitution: initialize `had_failure=0` **outside**, then
+     `while read -r candidate; do …; done < <(jq -c '.[]' /tmp/candidates.json)`, and
+     `exit 1` after the loop when `had_failure=1`. Without this the R3-A fix is
+     ineffective.
 2. **Structured `source_unverifiable` verdict field (defense-in-depth).** Add a
    boolean to the verdict schema (`audit-runner.ts:19-44`). Update
    `knowledge-audit-entry.md` to instruct: if any prefetched `body` is a redirect
@@ -288,10 +306,13 @@ and a **real-content body** containing 2025 category names.
   (R2-A regression); a real page with a **long-delay** `<meta refresh content="300">`
   auto-reload tag → **accepted** (false-positive guard); a **small-but-legitimate
   HTML page with no redirect mechanism** → **accepted** (byte count is not a
-  rejection criterion).
-- **source-hash — non-HTML:** a small `application/json` / `text/plain` source
-  (e.g. a raw version file) → **accepted unchanged** (HTML heuristics skipped on
-  non-HTML content-type — R2-B).
+  rejection criterion); a **different-target** meta-refresh with a *long* delay (5s)
+  → **followed, not hashed** (R4-D — delay gates only self-refresh).
+- **source-hash — content-type handling:** a small `application/json` / `text/plain`
+  source → **accepted unchanged** (heuristics skipped on explicit non-HTML — R2-B);
+  `text/html; charset=utf-8` → base media type parsed, treated as HTML (R4-A); a stub
+  with a **missing or mislabeled** content-type but an HTML-looking body
+  (`<meta refresh>`) → still classified HTML and followed/failed, **not hashed** (R4-A).
 - **source-hash — reject (fail closed):** a JS-only redirect stub
   (`location.replace(`/`window.location=`) with little content → throws
   `SourceUnusableError`; a near-zero meta-refresh with no usable `http(s)` `url=`
@@ -301,8 +322,9 @@ and a **real-content body** containing 2025 category names.
   URL (R2-D).
 - **source-hash — parser variants:** attribute order/case (`HTTP-EQUIV`,
   `Refresh`), single vs double vs unquoted `url=`, extra whitespace, `;url=` vs
-  `; url =`, delay `0` vs `0.0` vs `1` vs `5` (5 = long delay → not followed);
-  a **near-zero self/cyclic** refresh (target == current) → `SourceUnusableError`
+  `; url =`, delay `0`/`0.0`/`1` (near-zero) vs `5` (long) — long delay gates only a
+  *self*-refresh (accept as auto-reload); a different-target 5s refresh is still
+  followed (R4-D); a **near-zero self/cyclic** refresh (target == current) → `SourceUnusableError`
   (R3-B); a target differing from current only by `#fragment` → recognized as
   cyclic after normalization (R3-C). Include a malicious-input case to assert no
   catastrophic backtracking (bounded time).
@@ -319,7 +341,8 @@ and a **real-content body** containing 2025 category names.
 - **workflow:** a check (bats, matching existing workflow tests) that the
   `.skipped==true` branch skips apply/PR and continues, **and** that a non-zero
   `audit-run-entry` exit is NOT swallowed — it records a hard failure and the job
-  exits non-zero (R3-A).
+  exits non-zero (R3-A), including that `had_failure` **persists across the loop**
+  (process substitution, not a pipeline subshell — R4-B).
 - **audit-apply:** `source_unverifiable: true` + non-empty `proposed_changes`/pin
   → no-op (file unchanged); normal verdict still applies.
 - **Regression (the bug):** feed the OWASP stub fixture end-to-end (mocked fetch) →
@@ -482,3 +505,30 @@ Round-1/2 findings confirmed resolved. New (narrower) findings resolved:
 
 Local AI (non-blocking): re-confirmed the empirical thin-content threshold, parser
 choice, and `<base href>` edge-case coverage — already tracked in §11 and §7.
+
+### Round 4 (rev. 5)
+
+Re-reviewed via `mmr review` (codex ✓, antigravity ✓, claude ✓ clean,
+compensating-gemini ✓ clean, compensating-grok ✓ clean; gemini/grok still
+tier/credit-blocked) plus the local Qwen2.5 reviewer (0 blocking, "SAFE TO MERGE").
+Findings — all refinements of the round-2/3 additions, now resolved:
+
+- **R4-A (codex P1 + antigravity P1) — content-type bypass.** §5 Layer 1.1 now parses
+  the base media type (lowercase, strips `; charset=…`), classifies missing/ambiguous
+  + HTML-looking bodies as HTML, and bypasses heuristics only for *explicit* non-HTML
+  — so a stub with a missing/mislabeled content-type can't sneak past. §7 tests added.
+- **R4-B (codex P1) — workflow `had_failure` lost in a pipeline subshell.** Confirmed
+  `knowledge-freshness-audit.yml:92` pipes `jq … | while read`. §5 Layer 2.1 now
+  requires process substitution (`done < <(jq …)`) with `had_failure` initialized
+  outside and `exit 1` after the loop. §7 test added.
+- **R4-C (antigravity P2) — relative-target base URL.** §5 Layer 1.2 resolves the
+  meta-refresh target against the **final response URL** (current hop, post-3xx) and
+  `<base href>`, fixing trailing-slash cases like `/Top10` vs `/Top10/`.
+- **R4-D (antigravity P2) — longer-delay redirect ingested.** §5 Layer 1.2 now follows
+  a **different-target** refresh *regardless of delay*; the near-zero-vs-long delay
+  test applies only to *self*-refreshes. §7 tests updated.
+
+Convergence note: rounds 2–4 progressively hardened the Layer-1 fetch heuristic
+(each round narrower and all on the same subsystem). The remaining concerns are
+implementation mechanics that the plan's TDD pins down with the real captured
+fixtures; the design intent and invariants are stable.
