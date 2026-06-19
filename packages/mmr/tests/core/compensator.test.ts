@@ -326,6 +326,12 @@ describe('resolveCompensatorFocus', () => {
     expect(focus).toMatch(/broad-context reasoning/i)
     expect(focus).toMatch(/Antigravity/i)
   })
+
+  it('returns an independent-correctness focus for the opencode channel', () => {
+    const focus = resolveCompensatorFocus(baseConfig, 'opencode')
+    expect(focus).toMatch(/correctness/i)
+    expect(focus).toMatch(/OpenCode/i)
+  })
 })
 
 describe('dispatchCompensatingPasses honors defaults.compensator', () => {

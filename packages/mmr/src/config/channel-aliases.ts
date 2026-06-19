@@ -8,6 +8,9 @@
  */
 export const CHANNEL_ALIASES: Record<string, string> = {
   agy: 'antigravity',
+  // `opc` is a short alias for the OpenCode CLI reviewer; `opencode` is the
+  // canonical channel key (it shadows the `opencode run` terminal command).
+  opc: 'opencode',
 }
 
 /** Normalize a channel name to its canonical key (identity if not an alias). */

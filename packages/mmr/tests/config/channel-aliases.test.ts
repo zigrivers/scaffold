@@ -18,4 +18,16 @@ describe('normalizeChannelName', () => {
   it('exposes the agy→antigravity mapping in CHANNEL_ALIASES', () => {
     expect(CHANNEL_ALIASES.agy).toBe('antigravity')
   })
+
+  it('maps the opc alias to the canonical opencode key', () => {
+    expect(normalizeChannelName('opc')).toBe('opencode')
+  })
+
+  it('returns the canonical opencode name unchanged', () => {
+    expect(normalizeChannelName('opencode')).toBe('opencode')
+  })
+
+  it('exposes the opc→opencode mapping in CHANNEL_ALIASES', () => {
+    expect(CHANNEL_ALIASES.opc).toBe('opencode')
+  })
 })

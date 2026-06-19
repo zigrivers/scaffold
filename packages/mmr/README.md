@@ -10,6 +10,12 @@ Built-in channels:
   Gemini reviewer. The Antigravity channel is enabled by default and runs
   hardened (neutral cwd, `--sandbox`, auto-approve). The channel key is `antigravity`; `agy` is accepted as an alias
   in `--channels`, `channels_disabled`, and `channels:` config keys.
+- **OpenCode CLI** (`opencode run`) — an open-source AI coding CLI. **Disabled by
+  default** (opt-in): enable it in `.mmr.yaml` (`channels: { opencode: { enabled: true } }`)
+  or pass `--channels=opencode`. The channel key is `opencode`; `opc` is accepted as an
+  alias. Runs hardened (neutral cwd, auto-approve, `--pure` to skip plugins) and reads
+  the prompt from stdin; credentials stay under your real `$HOME`
+  (`~/.local/share/opencode/auth.json`). Recover auth with `opencode auth login`.
 
 ## Install
 

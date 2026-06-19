@@ -187,6 +187,52 @@ export const BUILTIN_CHANNELS: Record<string, SubprocessChannelParsed> = {
     stderr: 'capture',
     timeout: 360,
   },
+  opencode: {
+    // Disabled by default (opt-in): OpenCode is an open-source AI coding CLI that
+    // not every user has installed/authenticated, and a review is a full agentic
+    // round-trip. Enable in .mmr.yaml (`channels: { opencode: { enabled: true } }`)
+    // or pass --channels=opencode (alias: opc). Mirrors the doc-conformance opt-in.
+    kind: 'subprocess',
+    enabled: false,
+    abstract: false,
+    // `opencode run` runs non-interactively and reads the prompt from stdin
+    // (verified on opencode 1.17.8: a piped prompt starts a headless session and
+    // prints the model reply to stdout). The reply is plain text, so the review
+    // prompt's findings JSON is handled by the `default` parser (same as agy/codex).
+    command: 'opencode run',
+    prompt_delivery: 'stdin',
+    // Neutral cwd ⇒ closed-book review: opencode runs in an empty temp dir with no
+    // access to the working tree, so it reviews only the diff in the prompt. HOME is
+    // intentionally NOT overridden: opencode stores credentials under
+    // ~/.local/share/opencode/auth.json (real $HOME / $XDG_DATA_HOME), so a neutral
+    // HOME would break auth. env must be present ({}) — BUILTIN_CHANNELS is
+    // SubprocessChannelParsed. This is the antigravity posture; the existing
+    // cwd-only host-isolation test covers it (no credential symlink needed).
+    cwd: '{{neutral_cwd}}',
+    env: {},
+    // --dangerously-skip-permissions: auto-approve so a headless tool call can't
+    // hang waiting for an approval prompt (isolation comes from the empty neutral
+    // cwd, not from approvals — mirrors agy's --dangerously-skip-permissions).
+    // --pure: skip external plugins for a deterministic, side-effect-free review.
+    flags: [
+      '--dangerously-skip-permissions',
+      '--pure',
+    ],
+    auth: {
+      // A real run is the only reliable opencode auth check (`opencode auth list`
+      // reports a stored credential even when the token is expired). opencode exits
+      // non-zero on auth failure (verified: exit 1 with "token expired or incorrect"),
+      // so the exit code — not a sentinel grep — drives the verdict.
+      check: 'opencode run "respond with ok" --dangerously-skip-permissions >/dev/null 2>&1',
+      timeout: 30,
+      failure_exit_codes: [1],
+      recovery: 'opencode auth login',
+    },
+    prompt_wrapper: '{{prompt}}',
+    output_parser: 'default',
+    stderr: 'capture',
+    timeout: 360,
+  },
   'doc-conformance': {
     // Disabled by default: runs up to 3 LLM calls (~3 min) via scaffold observe audit.
     // Enable in .mmr.yaml or pass --channels=doc-conformance to use.
