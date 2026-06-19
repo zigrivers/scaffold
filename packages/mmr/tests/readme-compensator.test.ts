@@ -25,7 +25,7 @@ describe('README documents compensator-by-reference (T1-G)', () => {
   it('mentions channel_focus_map', () => {
     const block = yamlBlockContaining('channel_focus_map:')
     expect(block).toContain('codex: |')
-    expect(block).toContain('gemini: |')
+    expect(block).toContain('antigravity: |')
   })
 
   it('documents the implicit claude -p default', () => {

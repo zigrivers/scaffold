@@ -7,7 +7,7 @@ alwaysApply: false
 # MMR — Multi-Model Code Review
 
 Use the `mmr` CLI to dispatch a code review across several AI model CLIs (Claude,
-Codex, Gemini, Grok, Antigravity), reconcile the findings, and gate on severity.
+Codex, Grok, Antigravity), reconcile the findings, and gate on severity.
 
 ## Run a review
 
@@ -49,18 +49,18 @@ Proceed only on `pass` or `degraded-pass`; fix blocking findings on `blocked`.
 
 ## Scoping channels
 
-`mmr review` dispatches to every installed channel (Claude, Codex, Gemini, Grok,
+`mmr review` dispatches to every installed channel (Claude, Codex, Grok,
 Antigravity). Cursor itself is not a separate channel, so there is no Cursor channel
 to exclude. To limit the review to specific channels, pass them space-separated (the
 `--channels` flag is a list, not a comma-separated string):
 
 ```bash
-mmr review --pr <number> --channels claude codex gemini --sync --format json
+mmr review --pr <number> --channels claude codex antigravity --sync --format json
 # or set channels_disabled: ["grok"] in .mmr.yaml
 ```
 
 ## Auth
 
 If a channel reports an auth failure, follow the recovery line in the output
-(`claude login`, `codex login`, `gemini -p 'hello'`, `grok login`,
-`agy -p 'hello'`), then re-run `mmr config test` to verify.
+(`claude login`, `codex login`, `grok login`, `agy -p 'hello'`), then re-run
+`mmr config test` to verify.

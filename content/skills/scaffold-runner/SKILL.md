@@ -202,9 +202,9 @@ When the user asks "what tools are available?", "what can I build?", or "show me
 | `scaffold run update` | Update scaffold to the latest version |
 | `scaffold run dashboard` | Open a visual progress dashboard in your browser |
 | `scaffold run prompt-pipeline` | Print the full pipeline reference table |
-| `scaffold run review-code` | Run all 3 CLI review channels (Codex CLI, Gemini CLI, Claude CLI) on tracked local code (committed branch diff + staged + unstaged — no untracked files) before commit or push, plus Superpowers code-reviewer as a complementary 4th channel |
-| `scaffold run review-pr` | Run all 3 code review channels (Codex CLI, Gemini CLI, Claude CLI) on a PR, plus Superpowers code-reviewer as a complementary 4th channel |
-| `scaffold run post-implementation-review` | Full codebase review (Codex CLI, Gemini CLI, Superpowers code-reviewer) after an AI agent completes all tasks |
+| `scaffold run review-code` | Run all 3 CLI review channels (Codex CLI, Antigravity CLI, Claude CLI) on tracked local code (committed branch diff + staged + unstaged — no untracked files) before commit or push, plus Superpowers code-reviewer as a complementary 4th channel |
+| `scaffold run review-pr` | Run all 3 code review channels (Codex CLI, Antigravity CLI, Claude CLI) on a PR, plus Superpowers code-reviewer as a complementary 4th channel |
+| `scaffold run post-implementation-review` | Full codebase review (Codex CLI, Antigravity CLI, Superpowers code-reviewer) after an AI agent completes all tasks |
 | `scaffold run session-analyzer` | Analyze Claude Code session logs for patterns and insights |
 
 **Display rules:**
@@ -310,7 +310,7 @@ Some steps behave significantly differently at higher depths. When running these
 **`review-user-stories`** — The review step scales with depth:
 - Depth 1-3: Claude-only multi-pass review (6 review passes)
 - Depth 4: Adds requirements index (REQ-xxx IDs) and coverage matrix (coverage.json) for formal PRD traceability
-- Depth 5: Adds multi-model dispatch to Codex/Gemini CLI for independent validation, with graceful fallback to Claude-only enhanced review if CLIs aren't available
+- Depth 5: Adds multi-model dispatch to Codex/Antigravity CLI for independent validation, with graceful fallback to Claude-only enhanced review if CLIs aren't available
 
 When running `review-user-stories` at depth 5, check if `codex` or `gemini` CLI is available (`command -v codex`, `command -v gemini`). If neither is available, inform the user that the step will fall back to a Claude-only adversarial self-review — still valuable but less thorough than multi-model review.
 
@@ -381,11 +381,11 @@ All review and validation steps support independent multi-model validation at de
 
 Applies to: `scaffold run review-pr`, `scaffold run review-code`, and any pipeline review step that invokes `mmr review` directly.
 
-- **Channel model:** three CLIs (Codex + Gemini + Claude) dispatched and reconciled by the MMR CLI; scaffold wrappers add the Superpowers code-reviewer agent as a complementary 4th channel reconciled into the same MMR job via `mmr reconcile`.
-- **Note:** `scaffold run post-implementation-review` follows a different channel layout (raw-CLI dispatch of Codex + Gemini + Superpowers, with optional `mmr reconcile` injection if a prior `mmr review` job exists). Treat it as its own path — consult `content/tools/post-implementation-review.md` for specifics.
-- **Invocation:** go through the wrapper (`scaffold run …`) or call `mmr review …` directly. Do NOT shell out to `codex`/`gemini`/`claude` yourself for these steps — MMR handles dispatch, parsing, compensating passes, and verdict.
+- **Channel model:** three CLIs (Codex + Antigravity + Claude) dispatched and reconciled by the MMR CLI; scaffold wrappers add the Superpowers code-reviewer agent as a complementary 4th channel reconciled into the same MMR job via `mmr reconcile`.
+- **Note:** `scaffold run post-implementation-review` follows a different channel layout (raw-CLI dispatch of Codex + Antigravity + Superpowers, with optional `mmr reconcile` injection if a prior `mmr review` job exists). Treat it as its own path — consult `content/tools/post-implementation-review.md` for specifics.
+- **Invocation:** go through the wrapper (`scaffold run …`) or call `mmr review …` directly. Do NOT shell out to `codex`/`agy`/`claude` yourself for these steps — MMR handles dispatch, parsing, compensating passes, and verdict.
 - **Auth pre-flight:** run `mmr config test` once per session — it probes all three CLIs and reports status in one call.
-- **If auth fails** for any channel, surface recovery commands to the user: `! codex login`, `! gemini -p "hello"`, or `! claude login`. MMR will emit a compensating pass (via `claude -p`) for each missing external channel, labelled `[compensating: Codex-equivalent]` / `[compensating: Gemini-equivalent]`. Maximum achievable verdict in that case is `degraded-pass`.
+- **If auth fails** for any channel, surface recovery commands to the user: `! codex login`, `! agy -p "hello"`, or `! claude login`. MMR will emit a compensating pass (via `claude -p`) for each missing external channel, labelled `[compensating: Codex-equivalent]` / `[compensating: Antigravity-equivalent]`. Maximum achievable verdict in that case is `degraded-pass`.
 - **Never silently skip a CLI due to auth failure** — surface it to the user.
 
 #### Path B: Legacy / non-MMR direct dispatch
@@ -393,16 +393,16 @@ Applies to: `scaffold run review-pr`, `scaffold run review-code`, and any pipeli
 Applies to: some older depth-5 validation steps and any ad-hoc manual dispatch not routed through MMR. The `multi-model-dispatch` skill documents the raw invocation patterns:
 
 - **Codex:** `codex exec --skip-git-repo-check -s read-only --ephemeral "prompt" 2>/dev/null` (NOT bare `codex`)
-- **Gemini:** `NO_BROWSER=true gemini -p "prompt" --output-format json --approval-mode yolo 2>/dev/null`
+- **Antigravity:** `printf '%s' "prompt" | agy --print --sandbox --dangerously-skip-permissions --print-timeout 300s 2>/dev/null`
 - **Claude CLI:** `claude -p "prompt" --output-format json 2>/dev/null`
 
 **`NO_BROWSER=true` is required for all Gemini invocations** from Claude Code's Bash tool. Without it, Gemini's child process relaunch shows a consent prompt that hangs in non-TTY shells.
 
 Auth pre-flight for Path B dispatch:
 1. Codex: `codex login status`
-2. Gemini: `NO_BROWSER=true gemini -p "respond with ok" -o json` (exit 41 = auth failure)
+2. Antigravity: `agy -p "respond with ok" --print-timeout 12s` (auth failure is detected from authentication sentinel text)
 3. Claude CLI: `claude -p "respond with ok"` (typically uses the active Claude Code session)
-4. If any fail: `! codex login`, `! gemini -p "hello"`, or `! claude login` (the `!` prefix runs it interactively with TTY access).
+4. If any fail: `! codex login`, `! agy -p "hello"`, or `! claude login` (the `!` prefix runs it interactively with TTY access).
 5. **Never silently skip a CLI due to auth failure** — surface it to the user.
 
 The runner should surface the depth choice as a decision point for review steps, noting that depth 4-5 enables three-CLI multi-model validation when the CLIs are available.

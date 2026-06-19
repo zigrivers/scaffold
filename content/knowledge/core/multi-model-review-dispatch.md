@@ -1,13 +1,13 @@
 ---
 name: multi-model-review-dispatch
 description: >-
-  Patterns for dispatching reviews to AI CLI tools (Codex, Gemini, Claude), including fallback strategies and finding
+  Patterns for dispatching reviews to AI CLI tools (Codex, Antigravity, Claude), including fallback strategies and finding
   reconciliation
 topics:
   - multi-model
   - code-review
   - codex
-  - gemini
+  - antigravity
   - claude
   - review-synthesis
 volatility: fast-moving
@@ -60,7 +60,7 @@ See `review-methodology` for severity definitions (P0-P3). This entry uses those
 
 #### Foreground-Only Execution
 
-When an AI agent dispatches CLI reviews via a tool runner (Claude Code Bash tool, Codex exec, etc.), always run commands in the foreground. Background execution (`run_in_background`, `&`, `nohup`) produces empty or truncated output from Codex and Gemini CLIs. Multiple foreground calls can still run in parallel if the tool runner supports parallel tool invocations.
+When an AI agent dispatches CLI reviews via a tool runner (Claude Code Bash tool, Codex exec, etc.), always run commands in the foreground. Background execution (`run_in_background`, `&`, `nohup`) produces empty or truncated output from Codex and Antigravity CLIs. Multiple foreground calls can still run in parallel if the tool runner supports parallel tool invocations.
 
 #### CLI Availability Check
 
@@ -72,8 +72,8 @@ Before dispatching, verify the model CLI is installed and authenticated using a 
 # Codex: not found -> status: "not_installed"
 command -v codex >/dev/null 2>&1
 
-# Gemini: not found -> status: "not_installed"
-command -v gemini >/dev/null 2>&1
+# Antigravity: not found -> status: "not_installed"
+command -v agy >/dev/null 2>&1
 
 # Claude CLI: not found -> status: "not_installed"
 command -v claude >/dev/null 2>&1
@@ -87,8 +87,9 @@ If the CLI is not found, report status `not_installed` to the orchestration laye
 # Codex: fail -> status: "auth_failed"
 codex login status 2>/dev/null                                       # local file probe
 
-# Gemini: exit 41 -> status: "auth_failed"
-NO_BROWSER=true gemini -p "respond with ok" -o json 2>&1             # full LLM round-trip
+# Antigravity: auth sentinel -> status: "auth_failed"
+agy -p "respond with ok" --print-timeout 12s 2>&1 \
+  | grep -qiE "authentication required|authentication timed out"       # full LLM round-trip
 
 # Claude CLI: non-zero -> status: "auth_failed"
 claude -p "respond with ok" 2>/dev/null                              # full LLM round-trip
@@ -98,10 +99,10 @@ Prefer `mmr config test` as a single-command pre-flight that runs all three chec
 
 If auth fails, report status `auth_failed` and surface recovery to the user:
 - Codex: "Codex auth expired — run `! codex login` to re-authenticate"
-- Gemini: "Gemini auth expired — run `! gemini -p \"hello\"` to re-authenticate"
+- Antigravity: "Antigravity auth expired — run `! agy -p \"hello\"` to re-authenticate"
 - Claude CLI: "Claude CLI auth expired — run `! claude login` to re-authenticate"
 
-Auth-check timeouts: Codex's check is a local file probe so the default is 5s; Gemini's and Claude's are full LLM round-trips and routinely take 9-14s, so MMR's built-in defaults use 20s for those two. If a check times out, retry once. If still failing, report `timeout`.
+Auth-check timeouts: Codex's check is a local file probe so the default is 5s; Antigravity's and Claude's are full LLM round-trips and can take longer, so MMR's built-in defaults use 20s for those two. If a check times out, retry once. If still failing, report `timeout`.
 If auth succeeds, report `ready` and proceed to dispatch.
 
 **Post-dispatch terminal states:**
@@ -236,18 +237,18 @@ When synthesizing multi-model findings, classify each finding:
 ## Models Used
 - Claude CLI — [available/unavailable/timeout]
 - Codex CLI — [available/unavailable/timeout]
-- Gemini CLI — [available/unavailable/timeout]
+- Antigravity CLI — [available/unavailable/timeout]
 
 ## Consensus Findings
 | # | Severity | Finding | Models | Confidence |
 |---|----------|---------|--------|------------|
 | 1 | P0 | [description] | Claude, Codex | High |
-| 2 | P1 | [description] | Claude, Codex, Gemini | High |
+| 2 | P1 | [description] | Claude, Codex, Antigravity | High |
 
 ## Single-Source Findings
 | # | Severity | Finding | Source | Confidence |
 |---|----------|---------|--------|------------|
-| 3 | P1 | [description] | Gemini | Low |
+| 3 | P1 | [description] | Antigravity | Low |
 
 ## Disagreements
 | # | Topic | Claude | Codex | Resolution |

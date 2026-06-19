@@ -1,7 +1,7 @@
 # MMR — Multi-Model Code Review
 
 Use the `mmr` CLI to dispatch a code review across several AI model CLIs (Claude,
-Codex, Gemini, Grok, Antigravity), reconcile the findings, and gate on severity.
+Codex, Grok, Antigravity), reconcile the findings, and gate on severity.
 Reach for it when asked to review code, a PR, a diff, or staged changes, and before
 committing, pushing, or finishing a change.
 
@@ -45,10 +45,10 @@ Proceed only on `pass` or `degraded-pass`; fix blocking findings on `blocked`.
 
 ## Avoid the nested self-review
 
-`mmr review` includes a channel for **Gemini** and every other installed CLI. When
-you trigger it from inside the Gemini CLI, scope out the Gemini channel to avoid a
-redundant nested review. Pass channels space-separated (the `--channels` flag is a
-list, not a comma-separated string):
+Gemini CLI itself is deprecated as an MMR reviewer. When you trigger MMR from
+inside Gemini, use the supported reviewer CLIs and do not add the legacy `gemini`
+channel. Pass channels space-separated (the `--channels` flag is a list, not a
+comma-separated string):
 
 ```bash
 mmr review --pr <number> --channels codex claude grok antigravity --sync --format json
@@ -58,5 +58,5 @@ mmr review --pr <number> --channels codex claude grok antigravity --sync --forma
 ## Auth
 
 If a channel reports an auth failure, follow the recovery line in the output
-(`claude login`, `codex login`, `gemini -p 'hello'`, `grok login`,
-`agy -p 'hello'`), then re-run `mmr config test` to verify.
+(`claude login`, `codex login`, `grok login`, `agy -p 'hello'`), then re-run
+`mmr config test` to verify.

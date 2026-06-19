@@ -1,7 +1,7 @@
 ---
 name: review-code
 description: Run all configured code review channels on local code before commit or push
-summary: "Review the current local delivery candidate with the four built-in MMR CLI channels (Codex CLI, Gemini CLI, Claude CLI, Grok CLI) plus the Superpowers code-reviewer agent as a complementary agent channel reconciled into the same MMR job, before committing or pushing. Supports staged changes, an explicit ref range, or the full local delivery candidate (committed branch diff + staged + unstaged); untracked files are not included."
+summary: "Review the current local delivery candidate with the four built-in MMR CLI channels (Codex CLI, Antigravity CLI, Claude CLI, Grok CLI) plus the Superpowers code-reviewer agent as a complementary agent channel reconciled into the same MMR job, before committing or pushing. Supports staged changes, an explicit ref range, or the full local delivery candidate (committed branch diff + staged + unstaged); untracked files are not included."
 phase: null
 order: null
 dependencies: []
@@ -23,7 +23,7 @@ multi-model review before anything leaves the machine.
 
 The built-in CLI channels are:
 1. **Codex CLI** — implementation correctness, security, API contracts
-2. **Gemini CLI** — architectural patterns, broad-context reasoning
+2. **Antigravity CLI** (`agy`) — architectural patterns, broad-context reasoning
 3. **Claude CLI** — code quality, tests, and plan alignment
 4. **Grok CLI** — xAI's independent second opinion (correctness, code quality; proprietary)
 
@@ -262,7 +262,7 @@ Format the changed-file context like:
 
 Each channel reviews independently. Do NOT share one channel's output with another.
 
-**Foreground only:** Always run Codex, Gemini, and Grok CLI commands as foreground Bash calls. Never use `run_in_background`, `&`, or `nohup`. Background execution produces empty output. Multiple foreground calls in a single message are fine.
+**Foreground only:** Always run Codex, Antigravity, and Grok CLI commands as foreground Bash calls. Never use `run_in_background`, `&`, or `nohup`. Background execution produces empty output. Multiple foreground calls in a single message are fine.
 
 #### Channel 1: Codex CLI
 
@@ -288,26 +288,28 @@ codex exec --skip-git-repo-check -s read-only --ephemeral - < "$PROMPT_FILE" 2>/
 
 If the CLI exits with a non-zero code, produces malformed/unparseable output, or is killed by the tool runner timeout, record root-cause `failed` and queue a compensating pass for that channel.
 
-#### Channel 2: Gemini CLI
+#### Channel 2: Antigravity CLI
 
 Check installation and auth:
 
 ```bash
-command -v gemini >/dev/null 2>&1
-NO_BROWSER=true gemini -p "respond with ok" -o json 2>&1
+command -v agy >/dev/null 2>&1
+agy -p "respond with ok" --print-timeout 12s 2>&1 \
+  | grep -qiE "authentication required|authentication timed out" \
+  && exit 41 || exit 0
 ```
 
-- If `gemini` is not installed: skip this channel and record root-cause `not_installed`
-- If auth fails (including exit 41): tell the user to run `! gemini -p "hello"`, retry after recovery, and if recovery is not possible, record root-cause `auth_failed` and continue with the remaining channels
+- If `agy` is not installed: skip this channel and record root-cause `not_installed`
+- If auth fails (including exit 41): tell the user to run `! agy -p "hello"`, retry after recovery, and if recovery is not possible, record root-cause `auth_failed` and continue with the remaining channels
 
-If auth cannot be recovered, or if Gemini is not installed, queue a compensating Claude self-review pass focused on architectural patterns, design reasoning, and broad context. Label findings as `[compensating: Gemini-equivalent]`. If the auth check times out (the configured `channels.gemini.auth.timeout`; 20s by default since Gemini's check is a full LLM round-trip), retry once; if still failing, record `auth timeout` and queue compensating pass. This pass runs after all channel dispatch attempts complete.
+If auth cannot be recovered, or if Antigravity is not installed, queue a compensating Claude self-review pass focused on architectural patterns, design reasoning, and broad context. Label findings as `[compensating: Antigravity-equivalent]`. If the auth check times out (the configured `channels.antigravity.auth.timeout`; 20s by default), retry once; if still failing, record `auth timeout` and queue compensating pass. This pass runs after all channel dispatch attempts complete.
 
-Build the prompt in a temporary file and pass it as a single prompt string:
+Build the prompt in a temporary file and pass it over stdin:
 
 ```bash
 PROMPT_FILE=$(mktemp)
 # ...write the full review prompt to "$PROMPT_FILE"...
-NO_BROWSER=true gemini -p "$(cat "$PROMPT_FILE")" --output-format json --approval-mode yolo 2>/dev/null
+agy --print --sandbox --dangerously-skip-permissions --print-timeout 300s < "$PROMPT_FILE" 2>/dev/null
 ```
 
 If the CLI exits with a non-zero code, produces malformed/unparseable output, or is killed by the tool runner timeout, record root-cause `failed` and queue a compensating pass for that channel.
@@ -793,8 +795,8 @@ Output a concise summary in this format:
 
 ### Channels Executed
 - Codex CLI — root cause: [completed / not_installed / auth_failed / timeout / failed], coverage: [full / compensating (Codex-equivalent)]
-- Gemini CLI — root cause: [completed / not_installed / auth_failed / timeout / failed], coverage: [full / compensating (Gemini-equivalent)]
-- Claude CLI — root cause: [completed / not_installed / auth_failed / timeout / failed], coverage: [full / none (Claude is never compensated — it IS the compensator for Codex/Gemini/Grok)]
+- Antigravity CLI — root cause: [completed / not_installed / auth_failed / timeout / failed], coverage: [full / compensating (Antigravity-equivalent)]
+- Claude CLI — root cause: [completed / not_installed / auth_failed / timeout / failed], coverage: [full / none (Claude is never compensated — it IS the compensator for Codex/Antigravity/Grok)]
 - Grok CLI — root cause: [completed / not_installed / auth_failed / timeout / failed], coverage: [full / compensating (Grok-equivalent)]
 - Agent review (Superpowers code-reviewer, agent channel) — [completed / skipped], injected via `mmr reconcile`
 
@@ -810,7 +812,7 @@ for the next delivery step (commit, push, or PR creation).
 
 ## Process Rules
 
-1. **Foreground only** — Always run Codex, Gemini, and Grok CLI commands as foreground Bash calls. Never use `run_in_background`, `&`, or `nohup`.
+1. **Foreground only** — Always run Codex, Antigravity, and Grok CLI commands as foreground Bash calls. Never use `run_in_background`, `&`, or `nohup`.
 2. **All built-in CLI channels are mandatory** — skip only when a tool is genuinely not installed, never by choice.
 3. **Auth failures are not silent** — always surface to the user with recovery instructions.
 4. **Independence** — never share one channel's output with another.

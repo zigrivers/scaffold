@@ -38,4 +38,36 @@ describe('mmr config init template', () => {
     const parsed = yaml.load(written) as { defaults: { fix_threshold: string } }
     expect(parsed.defaults.fix_threshold).toBe('P2')
   })
+
+  it('keeps Gemini disabled and Antigravity enabled when every reviewer CLI is installed', async () => {
+    vi.resetModules()
+    vi.doMock('../../src/core/auth.js', () => ({
+      checkInstalled: vi.fn().mockResolvedValue(true),
+      checkAuth: vi.fn(),
+    }))
+    vi.doMock('../../src/core/runtime-probe.js', () => ({
+      probeRuntime: async () => ({ detected: false }),
+    }))
+
+    const { configCommand } = await import('../../src/commands/config.js')
+    const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(tmpDir)
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never)
+
+    await configCommand.handler({ action: 'init', _: ['config'], $0: 'mmr' } as never)
+
+    cwdSpy.mockRestore()
+    exitSpy.mockRestore()
+    vi.doUnmock('../../src/core/auth.js')
+    vi.doUnmock('../../src/core/runtime-probe.js')
+
+    const written = fs.readFileSync(path.join(tmpDir, '.mmr.yaml'), 'utf-8')
+    const parsed = yaml.load(written) as {
+      channels: {
+        gemini: { enabled: boolean }
+        antigravity: { enabled: boolean }
+      }
+    }
+    expect(parsed.channels.gemini.enabled).toBe(false)
+    expect(parsed.channels.antigravity.enabled).toBe(true)
+  })
 })

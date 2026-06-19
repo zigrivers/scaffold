@@ -1,7 +1,7 @@
 ---
 name: multi-model-research-dispatch
 description: >-
-  Patterns for dispatching research and adversarial challenge to external AI models (Codex, Gemini) with reconciliation
+  Patterns for dispatching research and adversarial challenge to external AI models (Codex, Antigravity) with reconciliation
   rules and single-model fallback
 topics:
   - multi-model
@@ -9,7 +9,7 @@ topics:
   - competitive-analysis
   - red-team
   - codex
-  - gemini
+  - antigravity
   - dispatch
   - reconciliation
 volatility: fast-moving
@@ -38,9 +38,9 @@ At higher methodology depths (4+), idea exploration and adversarial challenge be
 | 5 | Multi-model with reconciliation | Multi-model with reconciliation |
 
 ### Graceful Fallback Chain
-1. Check if external CLI is available (`command -v codex`, `command -v gemini`)
+1. Check if external CLI is available (`command -v codex`, `command -v agy`)
 2. If not installed, skip that model silently — note in Session Metadata
-3. If installed, check auth (`codex login status`, `NO_BROWSER=true gemini -p "respond with ok" -o json`)
+3. If installed, check auth (`codex login status`, `agy -p "respond with ok" --print-timeout 12s`)
 4. If auth fails, surface loudly to the user with `!` recovery command — do NOT silently skip
 5. If auth succeeds, dispatch with timeout
 6. If no external models available, fall back to primary model with distinct framing prompts
@@ -59,7 +59,7 @@ Before dispatching, verify CLI tools are installed and authenticated:
 
 ### Foreground-Only Execution
 
-When an AI agent dispatches research or challenge prompts via a tool runner, always run commands in the foreground. Background execution (`run_in_background`, `&`, `nohup`) produces empty or truncated output from Codex and Gemini CLIs. Multiple foreground calls can still run in parallel if the tool runner supports parallel tool invocations.
+When an AI agent dispatches research or challenge prompts via a tool runner, always run commands in the foreground. Background execution (`run_in_background`, `&`, `nohup`) produces empty or truncated output from Codex and Antigravity CLIs. Multiple foreground calls can still run in parallel if the tool runner supports parallel tool invocations.
 
 ```bash
 # Codex CLI — step 1: check installed
@@ -68,18 +68,18 @@ command -v codex >/dev/null 2>&1 || { echo "Codex not installed — skipping"; e
 codex login status 2>/dev/null
 # Exit 0 = ready. Non-zero = auth failure (surface to user).
 
-# Gemini CLI — step 1: check installed
-command -v gemini >/dev/null 2>&1 || { echo "Gemini not installed — skipping"; exit 0; }
+# Antigravity CLI — step 1: check installed
+command -v agy >/dev/null 2>&1 || { echo "Antigravity not installed — skipping"; exit 0; }
 # step 2: check auth
-NO_BROWSER=true gemini -p "respond with ok" -o json 2>&1
-# Check for "ok" in response. Exit 41 = auth failure (surface to user).
+agy -p "respond with ok" --print-timeout 12s 2>&1
+# Check for authentication sentinel text. Auth failure must be surfaced to user.
 ```
 
 Two distinct failure modes:
 - **Not installed** (`command -v` fails): skip silently, note in Session Metadata
 - **Auth failed** (non-zero after install check): surface loudly — tell the user which tool failed and how to fix it:
   - Codex: "Codex auth expired — run `! codex login` to re-authenticate"
-  - Gemini: "Gemini auth expired — run `! gemini -p \"hello\"` to re-authenticate"
+  - Antigravity: "Antigravity auth expired — run `! agy -p \"hello\"` to re-authenticate"
 
 Auth failures are NOT silent fallbacks — surface them explicitly.
 
@@ -123,8 +123,8 @@ Respond in structured markdown with one section per question.
 # Codex
 codex exec --skip-git-repo-check -s read-only --ephemeral "RESEARCH_PROMPT" 2>&1
 
-# Gemini
-NO_BROWSER=true gemini -p "RESEARCH_PROMPT" --output-format json --approval-mode yolo 2>/dev/null
+# Antigravity
+printf '%s' "RESEARCH_PROMPT" | agy --print --sandbox --dangerously-skip-permissions --print-timeout 300s 2>/dev/null
 ```
 
 **Processing results:**

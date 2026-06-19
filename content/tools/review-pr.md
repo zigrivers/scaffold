@@ -1,6 +1,6 @@
 ---
 name: review-pr
-description: Run all configured code review channels on a PR (Codex CLI, Gemini CLI, Claude CLI)
+description: Run all configured code review channels on a PR (Codex CLI, Antigravity CLI, Claude CLI)
 phase: null
 order: null
 dependencies: []
@@ -22,7 +22,7 @@ current branch) and/or `--fix-threshold P0|P1|P2|P3`.
 
 ## Purpose
 
-Run the four built-in CLI review channels (Codex, Gemini, Claude, Grok) on a
+Run the four built-in CLI review channels (Codex, Antigravity, Claude, Grok) on a
 pull request **plus** the Superpowers code-reviewer agent as a complementary
 agent channel, and reconcile all findings through MMR. This is the single entry
 point for **PR-scoped** code review — agents call this once instead of
@@ -47,7 +47,7 @@ just the PR wrapper around the more general `mmr review` CLI.
 
 The built-in CLI channels are:
 1. **Codex CLI** — OpenAI's code analysis (implementation correctness, security, API contracts)
-2. **Gemini CLI** — Google's design reasoning (architectural patterns, broad context)
+2. **Antigravity CLI** (`agy`) — Google's design reasoning (architectural patterns, broad context)
 3. **Claude CLI** — Anthropic's code review (plan alignment, code quality, testing)
 4. **Grok CLI** — xAI's independent second opinion (correctness, code quality; proprietary)
 
@@ -103,7 +103,7 @@ JOB_ID=$(echo "$MMR_RESULT" | grep -o '"job_id": "[^"]*"' | head -1 | cut -d'"' 
 ```
 
 The CLI handles:
-- Installation and auth checks for each channel (codex, gemini, claude)
+- Installation and auth checks for each channel (codex, antigravity, claude)
 - Compensating passes when channels are unavailable (dispatched via `claude -p`)
 - Output parsing and finding reconciliation
 - Verdict derivation (pass/degraded-pass/blocked/needs-user-decision)
@@ -117,7 +117,7 @@ The CLI supports multiple input modes:
 
 **Manual fallback** (when MMR CLI is not installed):
 
-Run Codex, Gemini, Claude, and Grok CLI commands individually as foreground Bash calls.
+Run Codex, Antigravity, Claude, and Grok CLI commands individually as foreground Bash calls.
 Never use `run_in_background`, `&`, or `nohup`.
 
 #### Channel 1: Codex CLI
@@ -131,16 +131,18 @@ codex exec --skip-git-repo-check -s read-only --ephemeral "REVIEW_PROMPT" 2>/dev
 If not installed or auth fails, queue a compensating pass focused on implementation
 correctness, security, and API contracts. Auth failure recovery: `! codex login`.
 
-#### Channel 2: Gemini CLI
+#### Channel 2: Antigravity CLI
 
 ```bash
-command -v gemini >/dev/null 2>&1 || echo "Gemini not installed"
-NO_BROWSER=true gemini -p "respond with ok" -o json 2>&1
-NO_BROWSER=true gemini -p "REVIEW_PROMPT" --output-format json --approval-mode yolo 2>/dev/null
+command -v agy >/dev/null 2>&1 || echo "Antigravity not installed"
+agy -p "respond with ok" --print-timeout 12s 2>&1 \
+  | grep -qiE "authentication required|authentication timed out" \
+  && exit 41 || exit 0
+printf '%s' "REVIEW_PROMPT" | agy --print --sandbox --dangerously-skip-permissions --print-timeout 300s 2>/dev/null
 ```
 
 If not installed or auth fails, queue a compensating pass focused on architectural
-patterns, design reasoning, and broad context. Auth failure recovery: `! gemini -p "hello"`.
+patterns, design reasoning, and broad context. Auth failure recovery: `! agy -p "hello"`.
 
 #### Channel 3: Claude CLI
 
@@ -169,7 +171,7 @@ quality. Auth failure recovery: `! grok login`.
 
 **After all channels:** Run any queued compensating passes as additional `claude -p`
 dispatches with focused prompts. Label findings as `[compensating: Codex-equivalent]`,
-`[compensating: Gemini-equivalent]`, or `[compensating: Grok-equivalent]`.
+`[compensating: Antigravity-equivalent]`, or `[compensating: Grok-equivalent]`.
 
 ### Step 3: Run Agent Code Review (complementary agent channel)
 
@@ -220,8 +222,8 @@ Output a review summary in this format:
 
 ### Channels Executed
 - [ ] Codex CLI — root cause: [completed / not installed / auth failed / timeout / failed], coverage: [full / compensating (Codex-equivalent)]
-- [ ] Gemini CLI — root cause: [completed / not installed / auth failed / timeout / failed], coverage: [full / compensating (Gemini-equivalent)]
-- [ ] Claude CLI — root cause: [completed / not_installed / auth_failed / timeout / failed], coverage: [full / none (Claude is never compensated — it IS the compensator for Codex/Gemini)]
+- [ ] Antigravity CLI — root cause: [completed / not installed / auth failed / timeout / failed], coverage: [full / compensating (Antigravity-equivalent)]
+- [ ] Claude CLI — root cause: [completed / not_installed / auth_failed / timeout / failed], coverage: [full / none (Claude is never compensated — it IS the compensator for Codex/Antigravity)]
 - [ ] Agent review — [completed / skipped], injected via mmr reconcile
 
 ### Consensus Findings (High Confidence)
@@ -640,8 +642,8 @@ In either path, output the message and stop. Do NOT proceed to the next task wit
 
 ## Process Rules
 
-1. **Foreground only** — Always run Codex, Gemini, Claude, and Grok CLI commands as foreground Bash calls. Never use `run_in_background`, `&`, or `nohup`.
-2. **All built-in CLI channels are mandatory** — Codex CLI, Gemini CLI, Claude CLI, and Grok CLI. Plus the Superpowers code-reviewer agent as a complementary agent channel reconciled via `mmr reconcile` (Step 3). Skip a CLI channel only when a tool is genuinely not installed or auth cannot be recovered (in which case MMR emits a compensating pass for missing Codex/Gemini/Grok channels; a missing Claude CLI has no compensator). Never skip by choice.
+1. **Foreground only** — Always run Codex, Antigravity, Claude, and Grok CLI commands as foreground Bash calls. Never use `run_in_background`, `&`, or `nohup`.
+2. **All built-in CLI channels are mandatory** — Codex CLI, Antigravity CLI, Claude CLI, and Grok CLI. Plus the Superpowers code-reviewer agent as a complementary agent channel reconciled via `mmr reconcile` (Step 3). Skip a CLI channel only when a tool is genuinely not installed or auth cannot be recovered (in which case MMR emits a compensating pass for missing Codex/Antigravity/Grok channels; a missing Claude CLI has no compensator). Never skip by choice.
 3. **Auth failures are not silent** — always surface to the user with the exact recovery command.
 4. **Independence** — never share one channel's output with another. Each reviews the diff independently.
 5. **Fix before proceeding** — findings at or above `fix_threshold` must be resolved before moving to the next task.

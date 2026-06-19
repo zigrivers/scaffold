@@ -29,7 +29,7 @@ upstream context, accelerating the vision step without replacing it.
 - User's idea (provided via `$ARGUMENTS` or interactively)
 - Existing `docs/spark-brief.md` (if rerunning — triggers update/fresh choice)
 - Web search results (depth 2+, if available on the platform)
-- External model responses (depth 4+, if Codex/Gemini CLI available)
+- External model responses (depth 4+, if Codex/Antigravity CLI available)
 
 ## Expected Outputs
 - `docs/spark-brief.md` — directional idea brief with 8 sections
@@ -218,8 +218,8 @@ Be constructive but ruthless. Respond in structured markdown.
 # Codex
 codex exec --skip-git-repo-check -s read-only --ephemeral "RED_TEAM_PROMPT" 2>&1
 
-# Gemini
-NO_BROWSER=true gemini -p "RED_TEAM_PROMPT" --output-format json --approval-mode yolo 2>/dev/null
+# Antigravity
+printf '%s' "RED_TEAM_PROMPT" | agy --print --sandbox --dangerously-skip-permissions --print-timeout 300s 2>/dev/null
 ```
 
 **If no external models available:** Fall back to primary model with distinct

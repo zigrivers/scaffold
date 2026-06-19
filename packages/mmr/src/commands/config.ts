@@ -61,8 +61,9 @@ async function configInit(opts: { withExamples: boolean } = { withExamples: fals
     if (!chConfig.command) continue
     const cmd = chConfig.command.split(' ')[0]
     const installed = await checkInstalled(cmd)
+    const enabled = chConfig.enabled === false ? false : installed
     channelLines.push(`  ${name}:`)
-    channelLines.push(`    enabled: ${installed}`)
+    channelLines.push(`    enabled: ${enabled}`)
     console.log(`  ${name}: ${installed ? 'detected' : 'not found'}`)
   }
 
