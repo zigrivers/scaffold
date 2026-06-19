@@ -1113,6 +1113,114 @@ describe('mcp-server wizard (interactive mode — empty primitives)', () => {
   })
 })
 
+describe('macos-native wizard branch', () => {
+  it('produces a valid macosNativeConfig in auto mode from flags', async () => {
+    const answers = await askWizardQuestions({
+      output: makeOutputContext(),       // existing helper in this test file
+      suggestion: 'deep',
+      projectType: 'macos-native',
+      auto: true,
+      macosNativeFlags: {
+        macosUiFramework: 'hybrid', macosDistribution: 'developer-id',
+        macosPersistence: 'sqlite', macosAutoUpdate: 'sparkle',
+      },
+    })
+    expect(answers.macosNativeConfig).toEqual({
+      uiFramework: 'hybrid',
+      appStyle: 'standard',
+      minMacosVersion: '15.0',
+      distribution: 'developer-id',
+      sandboxed: false,
+      persistence: 'sqlite',
+      autoUpdate: 'sparkle',
+    })
+    // macos-native must record the desktop platform (→ project.platforms: ['desktop'])
+    expect(answers.traits).toContain('desktop')
+  })
+})
+
+describe('macos-native minMacosVersion format validation', () => {
+  it('falls back to 15.0 and warns when macosMinVersion is a non-numeric string (e.g. "Sonoma")', async () => {
+    const output = makeOutputContext()
+
+    const answers = await askWizardQuestions({
+      output,
+      suggestion: 'deep',
+      projectType: 'macos-native',
+      auto: true,
+      macosNativeFlags: {
+        macosMinVersion: 'Sonoma',
+      },
+    })
+
+    expect(answers.macosNativeConfig).toBeDefined()
+    expect(answers.macosNativeConfig!.minMacosVersion).toBe('15.0')
+    expect(output.warn).toHaveBeenCalledWith(
+      expect.stringContaining('Invalid minMacosVersion'),
+    )
+  })
+})
+
+describe('macos-native SwiftData ⇒ macOS 14 guard', () => {
+  it('bumps minMacosVersion to 14.0 and emits a warning when persistence=swiftdata and version<14', async () => {
+    const output = makeOutputContext()
+
+    const answers = await askWizardQuestions({
+      output,
+      suggestion: 'deep',
+      projectType: 'macos-native',
+      auto: true,
+      macosNativeFlags: {
+        macosPersistence: 'swiftdata',
+        macosMinVersion: '13.0',
+      },
+    })
+
+    expect(answers.macosNativeConfig).toBeDefined()
+    expect(answers.macosNativeConfig!.minMacosVersion).toBe('14.0')
+    // A warning should have been emitted about the bump
+    expect(output.warn).toHaveBeenCalledWith(
+      expect.stringContaining('SwiftData requires macOS 14.0+'),
+    )
+  })
+
+  it('does not bump minMacosVersion when persistence=swiftdata and version is already 14.0', async () => {
+    const output = makeOutputContext()
+
+    const answers = await askWizardQuestions({
+      output,
+      suggestion: 'deep',
+      projectType: 'macos-native',
+      auto: true,
+      macosNativeFlags: {
+        macosPersistence: 'swiftdata',
+        macosMinVersion: '14.0',
+      },
+    })
+
+    expect(answers.macosNativeConfig!.minMacosVersion).toBe('14.0')
+    expect(output.warn).not.toHaveBeenCalled()
+  })
+
+  it('does not bump when persistence is not swiftdata with an older version', async () => {
+    const output = makeOutputContext()
+
+    const answers = await askWizardQuestions({
+      output,
+      suggestion: 'deep',
+      projectType: 'macos-native',
+      auto: true,
+      macosNativeFlags: {
+        macosPersistence: 'core-data',
+        macosMinVersion: '13.0',
+      },
+    })
+
+    expect(answers.macosNativeConfig!.minMacosVersion).toBe('13.0')
+    expect(output.warn).not.toHaveBeenCalled()
+  })
+})
+
 describe('mcp-server wizard (auto mode)', () => {
   it('throws when --mcp-language missing in auto mode', async () => {
     const output = makeOutputContext()

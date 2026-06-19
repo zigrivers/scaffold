@@ -50,7 +50,7 @@ import { loadOverlay } from '../core/assembly/overlay-loader.js'
 import { getPackagePipelineDir, getPackageMethodologyDir } from '../utils/fs.js'
 import type { MetaPromptFile } from '../types/index.js'
 import type { OverlayState } from '../core/assembly/overlay-state-resolver.js'
-import type { BackendConfig, ResearchConfig, McpServerConfig } from '../types/config.js'
+import type { BackendConfig, ResearchConfig, McpServerConfig, MacosNativeConfig } from '../types/config.js'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -98,7 +98,7 @@ async function discoverRealMetaPrompts(): Promise<Map<string, MetaPromptFile>> {
  */
 async function resolveProjectOverlay(
   projectType: 'web-app' | 'backend' | 'cli' | 'library' | 'mobile-app'
-    | 'data-pipeline' | 'ml' | 'browser-extension' | 'research' | 'data-science' | 'web3',
+    | 'data-pipeline' | 'ml' | 'browser-extension' | 'research' | 'data-science' | 'web3' | 'macos-native',
   methodology: 'deep' | 'mvp' = 'deep',
 ): Promise<{ overlayState: OverlayState; realMetaPrompts: Map<string, MetaPromptFile> }> {
   const methodologyDir = getPackageMethodologyDir()
@@ -2040,5 +2040,184 @@ describe('mcp-server overlay integration', () => {
     expect(state.knowledge['operations']).toBeDefined()
     expect(state.knowledge['operations']).toContain('mcp-deployment-patterns')
     expect(state.knowledge['operations']).toContain('mcp-versioning')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Tests — macOS Native
+// ---------------------------------------------------------------------------
+
+describe('macos-native overlay integration', () => {
+  /**
+   * Resolve the macos-native overlay with a minimal valid MacosNativeConfig.
+   * Cannot use the generic resolveProjectOverlay helper because 'macos-native'
+   * requires macosNativeConfig (all fields have defaults, so {} is valid).
+   */
+  async function resolvesMacosNativeOverlay(): Promise<OverlayState> {
+    const macosNativeConfig: MacosNativeConfig = {
+      uiFramework: 'swiftui',
+      appStyle: 'standard',
+      minMacosVersion: '15.0',
+      distribution: 'developer-id',
+      sandboxed: false,
+      persistence: 'none',
+      autoUpdate: 'none',
+    }
+    const methodologyDir = getPackageMethodologyDir()
+    const realMetaPrompts = await discoverRealMetaPrompts()
+    const knownSteps = [...realMetaPrompts.keys()]
+    const presets = loadAllPresets(methodologyDir, knownSteps)
+    const output = createMockOutput()
+
+    const preset = presets.deep
+    return resolveOverlayState({
+      config: {
+        version: 2,
+        methodology: 'deep',
+        platforms: ['claude-code'],
+        project: {
+          projectType: 'macos-native',
+          macosNativeConfig,
+        },
+      },
+      methodologyDir,
+      metaPrompts: realMetaPrompts,
+      presetSteps: preset?.steps ?? {},
+      output,
+    })
+  }
+
+  it('overlay enables the 5 macOS-specific steps', async () => {
+    const state = await resolvesMacosNativeOverlay()
+
+    expect(state.steps['macos-ui-spec']?.enabled).toBe(true)
+    expect(state.steps['review-macos-ui']?.enabled).toBe(true)
+    expect(state.steps['macos-distribution-spec']?.enabled).toBe(true)
+    expect(state.steps['macos-entitlements-privacy-spec']?.enabled).toBe(true)
+    expect(state.steps['review-macos-release']?.enabled).toBe(true)
+  })
+
+  it('overlay disables web-centric UI steps (design-system, ux-spec, review-ux)', async () => {
+    const state = await resolvesMacosNativeOverlay()
+
+    expect(state.steps['design-system']?.enabled).toBe(false)
+    expect(state.steps['ux-spec']?.enabled).toBe(false)
+    expect(state.steps['review-ux']?.enabled).toBe(false)
+  })
+
+  it('overlay injects macos-app-architecture into system-architecture step', async () => {
+    const state = await resolvesMacosNativeOverlay()
+
+    expect(state.knowledge['system-architecture']).toBeDefined()
+    expect(state.knowledge['system-architecture']).toContain('macos-app-architecture')
+    expect(state.knowledge['system-architecture']).toContain('macos-swiftui-appkit-interop')
+    expect(state.knowledge['system-architecture']).toContain('macos-performance')
+    expect(state.knowledge['system-architecture']).toContain('macos-system-integration')
+  })
+
+  it('overlay injects macos knowledge into security step', async () => {
+    const state = await resolvesMacosNativeOverlay()
+
+    expect(state.knowledge['security']).toBeDefined()
+    expect(state.knowledge['security']).toContain('macos-app-sandbox-entitlements')
+    expect(state.knowledge['security']).toContain('macos-privacy-tcc')
+    expect(state.knowledge['security']).toContain('macos-keychain-secrets')
+    expect(state.knowledge['security']).toContain('macos-untrusted-input')
+  })
+
+  it('overlay injects macos-testing into tdd, add-e2e-testing, and story-tests steps', async () => {
+    const state = await resolvesMacosNativeOverlay()
+
+    expect(state.knowledge['tdd']).toBeDefined()
+    expect(state.knowledge['tdd']).toContain('macos-testing')
+
+    expect(state.knowledge['add-e2e-testing']).toBeDefined()
+    expect(state.knowledge['add-e2e-testing']).toContain('macos-testing')
+
+    expect(state.knowledge['story-tests']).toBeDefined()
+    expect(state.knowledge['story-tests']).toContain('macos-testing')
+  })
+
+  it('overlay injects macos knowledge into tech-stack and coding-standards steps', async () => {
+    const state = await resolvesMacosNativeOverlay()
+
+    expect(state.knowledge['tech-stack']).toBeDefined()
+    expect(state.knowledge['tech-stack']).toContain('macos-app-architecture')
+    expect(state.knowledge['tech-stack']).toContain('macos-swiftui-appkit-interop')
+    expect(state.knowledge['tech-stack']).toContain('macos-project-tooling')
+
+    expect(state.knowledge['coding-standards']).toBeDefined()
+    expect(state.knowledge['coding-standards']).toContain('macos-swift-concurrency')
+    expect(state.knowledge['coding-standards']).toContain('macos-app-architecture')
+  })
+
+  it('overlay injects macos knowledge into operations step', async () => {
+    const state = await resolvesMacosNativeOverlay()
+
+    expect(state.knowledge['operations']).toBeDefined()
+    expect(state.knowledge['operations']).toContain('macos-ci-release-automation')
+    expect(state.knowledge['operations']).toContain('macos-packaging-distribution')
+  })
+
+  it('overlay remaps implementation-plan reads: macos-ui-spec replaces ux-spec', async () => {
+    const state = await resolvesMacosNativeOverlay()
+
+    expect(state.reads['implementation-plan']).toBeDefined()
+    expect(state.reads['implementation-plan']).toContain('macos-ui-spec')
+    expect(state.reads['implementation-plan']).not.toContain('ux-spec')
+  })
+
+  it('overlay remaps story-tests reads: macos-ui-spec replaces ux-spec', async () => {
+    const state = await resolvesMacosNativeOverlay()
+
+    expect(state.reads['story-tests']).toBeDefined()
+    expect(state.reads['story-tests']).toContain('macos-ui-spec')
+    expect(state.reads['story-tests']).not.toContain('ux-spec')
+  })
+
+  it('overlay loads without errors from content/methodology', () => {
+    const methodologyDir = getPackageMethodologyDir()
+    const overlayPath = path.join(methodologyDir, 'macos-native-overlay.yml')
+    const { overlay, errors } = loadOverlay(overlayPath)
+    expect(errors).toHaveLength(0)
+    expect(overlay).not.toBeNull()
+    expect(overlay!.projectType).toBe('macos-native')
+    expect(Object.keys(overlay!.knowledgeOverrides).length).toBeGreaterThan(0)
+    expect(Object.keys(overlay!.stepOverrides).length).toBeGreaterThan(0)
+  })
+
+  it('MVP methodology with macos-native overlay also injects knowledge', async () => {
+    const methodologyDir = getPackageMethodologyDir()
+    const realMetaPrompts = await discoverRealMetaPrompts()
+    const knownSteps = [...realMetaPrompts.keys()]
+    const presets = loadAllPresets(methodologyDir, knownSteps)
+    const output = createMockOutput()
+
+    const state = resolveOverlayState({
+      config: {
+        version: 2,
+        methodology: 'mvp',
+        platforms: ['claude-code'],
+        project: {
+          projectType: 'macos-native',
+          macosNativeConfig: {
+            uiFramework: 'swiftui',
+            appStyle: 'standard',
+            minMacosVersion: '15.0',
+            distribution: 'developer-id',
+            sandboxed: false,
+            persistence: 'none',
+            autoUpdate: 'none',
+          },
+        },
+      },
+      methodologyDir,
+      metaPrompts: realMetaPrompts,
+      presetSteps: presets.mvp?.steps ?? {},
+      output,
+    })
+
+    expect(state.knowledge['system-architecture']).toContain('macos-app-architecture')
+    expect(state.knowledge['tdd']).toContain('macos-testing')
   })
 })

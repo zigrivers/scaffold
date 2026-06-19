@@ -5,7 +5,7 @@ import {
   CliConfigSchema, LibraryConfigSchema, MobileAppConfigSchema,
   DataPipelineConfigSchema, MlConfigSchema, BrowserExtensionConfigSchema,
   GameConfigSchema, ResearchConfigSchema, DataScienceConfigSchema,
-  Web3ConfigSchema, McpServerConfigSchema,
+  Web3ConfigSchema, McpServerConfigSchema, MacosNativeConfigSchema,
 } from '../config/schema.js'
 
 /** Step enablement entry used in presets and overlays. */
@@ -74,6 +74,9 @@ export type GameConfig = z.infer<typeof GameConfigSchema>
 /** Game engine options — derived from GameConfig (single source of truth). */
 export type GameEngine = GameConfig['engine']
 
+/** macOS-native (Swift/SwiftUI/AppKit) configuration — derived from Zod schema (single source of truth). */
+export type MacosNativeConfig = z.infer<typeof MacosNativeConfigSchema>
+
 /**
  * Discriminated union for detected project configuration (v3.10+).
  * Replaces the single `gameConfig` field with a polymorphic shape
@@ -89,6 +92,7 @@ export type DetectedConfig =
   | { type: 'ml'; config: MlConfig }
   | { type: 'browser-extension'; config: BrowserExtensionConfig }
   | { type: 'game'; config: GameConfig }
+  | { type: 'macos-native'; config: MacosNativeConfig }
   | { type: 'research'; config: ResearchConfig }
   | { type: 'data-science'; config: DataScienceConfig }
   | { type: 'web3'; config: Web3Config }
@@ -142,6 +146,7 @@ export interface ServiceConfig {
   dataPipelineConfig?: DataPipelineConfig
   mlConfig?: MlConfig
   gameConfig?: GameConfig
+  macosNativeConfig?: MacosNativeConfig
   browserExtensionConfig?: BrowserExtensionConfig
   dataScienceConfig?: DataScienceConfig
   web3Config?: Web3Config
@@ -157,6 +162,7 @@ export interface ProjectConfig {
   platforms?: Array<'web' | 'mobile' | 'desktop'>
   projectType?: ProjectType
   gameConfig?: GameConfig
+  macosNativeConfig?: MacosNativeConfig
   webAppConfig?: WebAppConfig
   backendConfig?: BackendConfig
   cliConfig?: CliConfig

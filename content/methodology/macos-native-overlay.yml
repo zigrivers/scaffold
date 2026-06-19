@@ -1,0 +1,81 @@
+# methodology/macos-native-overlay.yml
+name: macos-native
+description: >
+  macOS-native overlay — enables Apple-HIG UI, distribution/signing, and
+  entitlements/privacy steps; injects macOS knowledge; disables web-centric
+  UI steps and remaps their artifact references.
+project-type: macos-native
+
+step-overrides:
+  # Enable the 5 macOS steps
+  macos-ui-spec: { enabled: true }
+  review-macos-ui: { enabled: true }
+  macos-distribution-spec: { enabled: true }
+  macos-entitlements-privacy-spec: { enabled: true }
+  review-macos-release: { enabled: true }
+  # Disable web-centric UI steps (replaced by macos-ui-spec / review-macos-ui)
+  design-system: { enabled: false }
+  ux-spec: { enabled: false }
+  review-ux: { enabled: false }
+
+knowledge-overrides:
+  tech-stack:
+    append: [macos-app-architecture, macos-swiftui-appkit-interop, macos-project-tooling]
+  coding-standards:
+    append: [macos-swift-concurrency, macos-app-architecture]
+  tdd:
+    append: [macos-testing]
+  story-tests:
+    append: [macos-testing]
+  review-testing:
+    append: [macos-testing]
+  create-evals:
+    append: [macos-testing]
+  add-e2e-testing:
+    append: [macos-testing]
+  project-structure:
+    append: [macos-project-tooling]
+  dev-env-setup:
+    append: [macos-project-tooling]
+  git-workflow:
+    append: [macos-project-tooling]
+  domain-modeling:
+    append: [macos-data-persistence]
+  database-schema:
+    append: [macos-data-persistence]
+  adrs:
+    append: [macos-app-architecture, macos-swiftui-appkit-interop]
+  system-architecture:
+    append: [macos-app-architecture, macos-swiftui-appkit-interop, macos-performance, macos-system-integration]
+  review-architecture:
+    append: [macos-performance]
+  security:
+    append: [macos-app-sandbox-entitlements, macos-privacy-tcc, macos-keychain-secrets, macos-untrusted-input]
+  review-security:
+    append: [macos-app-sandbox-entitlements, macos-privacy-tcc]
+  operations:
+    append: [macos-ci-release-automation, macos-packaging-distribution]
+  review-operations:
+    append: [macos-ci-release-automation]
+  implementation-plan:
+    append: [macos-app-architecture]
+  implementation-playbook:
+    append: [macos-app-architecture]
+
+reads-overrides:
+  story-tests:
+    replace: { ux-spec: macos-ui-spec }
+  create-evals:
+    replace: { ux-spec: macos-ui-spec }
+  implementation-plan:
+    replace: { ux-spec: macos-ui-spec }
+  new-enhancement:
+    replace: { ux-spec: macos-ui-spec }
+  implementation-playbook:
+    replace: { ux-spec: macos-ui-spec, design-system: macos-ui-spec }
+  platform-parity-review:
+    replace: { design-system: macos-ui-spec }
+
+dependency-overrides:
+  platform-parity-review:
+    replace: { review-ux: review-macos-ui }

@@ -427,6 +427,42 @@ describe('mcp-server auto-detect via flag', () => {
   })
 })
 
+describe('macos-native flags', () => {
+  it('rejects macos flags with a non-macos project type', () => {
+    expect(() => applyFlagFamilyValidation({ 'macos-ui-framework': 'swiftui', 'project-type': 'web-app' }))
+      .toThrow(/macos/i)
+  })
+  it('rejects mac-app-store + sparkle', () => {
+    expect(() => applyFlagFamilyValidation({ 'macos-distribution': 'mac-app-store', 'macos-auto-update': 'sparkle' }))
+      .toThrow(/App Store/i)
+  })
+  it('does NOT throw at preflight for swiftdata + macOS 13 (wizard auto-bumps to 14.0)', () => {
+    // The init wizard handles the version bump gracefully; the preflight throw was
+    // removed so the documented auto-bump path remains reachable.
+    expect(() => applyFlagFamilyValidation({ 'macos-persistence': 'swiftdata', 'macos-min-version': '13.0' }))
+      .not.toThrow()
+  })
+  it('maps flags into a macos-native partial', () => {
+    const out = buildFlagOverrides({ 'macos-ui-framework': 'hybrid', 'macos-distribution': 'developer-id' })
+    expect(out).toEqual({ type: 'macos-native', partial: { uiFramework: 'hybrid', distribution: 'developer-id' } })
+  })
+  it('forces sandboxed:true when macos-distribution is mac-app-store and sandboxed not provided', () => {
+    const out = buildFlagOverrides({ 'macos-distribution': 'mac-app-store' })
+    expect(out?.type).toBe('macos-native')
+    expect((out as { type: 'macos-native'; partial: { sandboxed?: boolean } }).partial.sandboxed).toBe(true)
+  })
+  it('forces sandboxed:true when macos-distribution is both and sandboxed not provided', () => {
+    const out = buildFlagOverrides({ 'macos-distribution': 'both' })
+    expect(out?.type).toBe('macos-native')
+    expect((out as { type: 'macos-native'; partial: { sandboxed?: boolean } }).partial.sandboxed).toBe(true)
+  })
+  it('keeps explicit sandboxed:false even when macos-distribution is mac-app-store', () => {
+    const out = buildFlagOverrides({ 'macos-distribution': 'mac-app-store', 'macos-sandboxed': false })
+    expect(out?.type).toBe('macos-native')
+    expect((out as { type: 'macos-native'; partial: { sandboxed?: boolean } }).partial.sandboxed).toBe(false)
+  })
+})
+
 describe('mcp-server flag family', () => {
   it('buildFlagOverrides maps --mcp-* to McpServerConfig partial', () => {
     const out = buildFlagOverrides({

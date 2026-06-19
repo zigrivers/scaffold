@@ -371,8 +371,8 @@ Every `scaffold init` wizard question can be answered via CLI flags, making scaf
 | `--methodology` | deep/mvp/custom | Methodology preset |
 | `--depth` | 1-5 | Custom methodology depth (requires `--methodology custom`) |
 | `--adapters` | comma-sep | AI adapters: claude-code, codex, gemini |
-| `--traits` | comma-sep | Project traits: web, mobile |
-| `--project-type` | string | web-app, mobile-app, backend, cli, library, game, data-pipeline, ml, browser-extension, research, data-science, web3, mcp-server |
+| `--traits` | comma-sep | Project traits: web, mobile, desktop |
+| `--project-type` | string | web-app, mobile-app, backend, cli, library, game, data-pipeline, ml, browser-extension, research, data-science, web3, mcp-server, macos-native |
 | `--auto` | boolean | Non-interactive mode (uses Zod defaults for unset flags) |
 
 #### Web-App Config Flags (require `--project-type web-app` or auto-set it)
@@ -471,6 +471,35 @@ Every `scaffold init` wizard question can be answered via CLI flags, making scaf
 | `--mcp-auth` | string | none, oauth, apikey |
 | `--mcp-deployment` | string | local, hosted |
 | `--mcp-stateful` | boolean | `--mcp-stateful` / `--no-mcp-stateful` |
+
+#### macOS-Native Config Flags (require `--project-type macos-native` or auto-set it)
+
+| Flag | Type | Values |
+|------|------|--------|
+| `--macos-ui-framework` | string | swiftui, appkit, hybrid |
+| `--macos-app-style` | string | standard, menu-bar, agent |
+| `--macos-min-version` | string | e.g. 14.0, 15.0 |
+| `--macos-distribution` | string | developer-id, mac-app-store, both |
+| `--macos-sandboxed` | boolean | `--macos-sandboxed` / `--no-macos-sandboxed` |
+| `--macos-persistence` | string | none, sqlite, core-data, swiftdata |
+| `--macos-auto-update` | string | none, sparkle |
+
+The full `macosNativeConfig` object written to `.scaffold/config.yml`:
+
+| Config field | Default | Notes |
+|------|------|--------|
+| `macosNativeConfig.uiFramework` | `swiftui` | UI toolkit: `swiftui`, `appkit`, or `hybrid` |
+| `macosNativeConfig.appStyle` | `standard` | App style: `standard`, `menu-bar`, or `agent` |
+| `macosNativeConfig.minMacosVersion` | `15.0` | Minimum macOS deployment target (string, e.g. `"15.0"`) |
+| `macosNativeConfig.distribution` | `developer-id` | Distribution channel: `developer-id`, `mac-app-store`, or `both` |
+| `macosNativeConfig.sandboxed` | `false` | Whether the App Sandbox is enabled |
+| `macosNativeConfig.persistence` | `none` | Local persistence: `none`, `sqlite`, `core-data`, or `swiftdata` |
+| `macosNativeConfig.autoUpdate` | `none` | Auto-update mechanism: `none` or `sparkle` |
+
+**Coupling constraints:**
+- `distribution: mac-app-store` or `both` → `sandboxed` is forced to `true` (Mac App Store requirement).
+- `distribution: mac-app-store` → `autoUpdate` is forced to `none` (App Store builds cannot bundle Sparkle).
+- `persistence: swiftdata` requires `minMacosVersion` ≥ 14.0 (SwiftData requires macOS 14+). The init wizard auto-bumps `minMacosVersion` to `14.0` when you pick swiftdata with a lower version; `adopt` / direct config validation rejects a swiftdata + `<14` combination (fail-closed).
 
 #### Data Science Config (`--project-type data-science`)
 
@@ -690,6 +719,7 @@ Overlays are composable with methodology presets. An MVP web-app gets fewer step
 | `web3` | `web3-overlay.yml` | 14 entries (Foundry tooling, smart-contract security, upgradeability, gas optimization, oracles, audit workflow, deployment, testing patterns, EVM fundamentals, ABI/interface design, event/log indexing, supply-chain) | Scope (`contracts` default; `dapp` reserved for W3-2) |
 | `game` | `game-overlay.yml` | 25 entries (engines, networking, audio, VR/AR, economy, save systems, certification) | Engine, multiplayer, platforms, economy, narrative, and 6 more |
 | `mcp-server` | `mcp-server-overlay.yml` | 12 entries (protocol fundamentals, tool design, resource design, transport patterns, SDK selection, auth, error handling, testing, observability, deployment, versioning, prompt primitives) | Language, transport, primitives, auth, deployment, stateful |
+| `macos-native` | `macos-native-overlay.yml` | 20 entries (architecture, SwiftUI/AppKit patterns, accessibility, distribution, entitlements, sandboxing, testing, observability, security, conventions) | UI framework |
 
 ### Game Development
 
@@ -774,7 +804,7 @@ These answers control which conditional steps activate. A single-player puzzle g
 
 #### Multi-type Detection
 
-`scaffold adopt` detects 13 project types from manifest files and directory layouts:
+`scaffold adopt` detects 14 project types from manifest files and directory layouts:
 
 | Type | Key Signals |
 |------|-------------|
@@ -791,6 +821,7 @@ These answers control which conditional steps activate. A single-player puzzle g
 | `data-science` | Marimo signals required (`marimo` dep or `.marimo.toml`); DVC (`dvc.yaml`, `.dvc/config`, `dvc` py dep) is supplementary evidence only. Low-tier; defers to `ml` / `research` / `data-pipeline` when those match at medium/high tier |
 | `web3` | `foundry.toml` or `hardhat.config.{ts,js,cjs,mjs}` (medium-tier); `remappings.txt`, `lib/forge-std` are supplementary low-tier signals. EVM-only scope. Library-collision boundary pinned by tiebreak (high-tier `library` wins over medium-tier `web3` for published-library Hardhat projects) |
 | `mcp-server` | `@modelcontextprotocol/sdk` / `mcp` / `fastmcp` dep = low (MCP clients share these deps — avoids mis-adopting a client as a server); dep + entrypoint registering tools/resources = high |
+| `macos-native` | `*.xcodeproj` / `*.xcworkspace` + `.swift` sources = medium; `Package.swift` + `import AppKit`/`import SwiftUI` without mobile targets = high |
 
 Each detector returns a confidence tier (high/medium/low) with evidence trails. Override detection with `--project-type <type>`.
 

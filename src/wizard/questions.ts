@@ -3,12 +3,12 @@ import type {
   ProjectType, GameConfig, WebAppConfig, BackendConfig,
   CliConfig, LibraryConfig, MobileAppConfig,
   DataPipelineConfig, MlConfig, BrowserExtensionConfig,
-  ResearchConfig, DataScienceConfig, Web3Config, McpServerConfig,
+  ResearchConfig, DataScienceConfig, Web3Config, McpServerConfig, MacosNativeConfig,
 } from '../types/index.js'
 import type {
   GameFlags, WebAppFlags, BackendFlags, CliFlags, LibraryFlags,
   MobileAppFlags, DataPipelineFlags, MlFlags, BrowserExtensionFlags,
-  ResearchFlags, McpServerFlags,
+  ResearchFlags, McpServerFlags, MacosNativeFlags,
 } from './flags.js'
 import { GameConfigSchema, ProjectTypeSchema } from '../config/schema.js'
 import { coreCopy, getCopyForType, optionsFromCopy } from './copy/index.js'
@@ -32,6 +32,7 @@ export interface WizardAnswers {
   dataScienceConfig?: DataScienceConfig
   web3Config?: Web3Config
   mcpServerConfig?: McpServerConfig
+  macosNativeConfig?: MacosNativeConfig
 }
 
 /**
@@ -59,6 +60,7 @@ export async function askWizardQuestions(options: {
   browserExtensionFlags?: BrowserExtensionFlags
   researchFlags?: ResearchFlags
   mcpServerFlags?: McpServerFlags
+  macosNativeFlags?: MacosNativeFlags
 }): Promise<WizardAnswers> {
   const { output, suggestion, auto } = options
 
@@ -384,6 +386,91 @@ export async function askWizardQuestions(options: {
       ?? (!auto ? await output.confirm('Push notification support?', false, copy.hasPushNotifications) : false)
 
     mobileAppConfig = { platform, distributionModel, offlineSupport, hasPushNotifications }
+  }
+
+  // macOS-native configuration
+  let macosNativeConfig: MacosNativeConfig | undefined
+  if (projectType === 'macos-native') {
+    // macOS-native is a desktop platform — ensure project.platforms records it (spec §2/§7).
+    if (!traits.includes('desktop')) traits.push('desktop')
+    const copy = getCopyForType('macos-native')
+    showBannerOnce()
+    const mf = options.macosNativeFlags
+
+    const uiFramework: MacosNativeConfig['uiFramework'] = mf?.macosUiFramework
+      ?? (!auto
+        ? await output.select('UI framework?',
+          optionsFromCopy(copy.uiFramework.options, ['swiftui', 'appkit', 'hybrid']),
+          'swiftui', copy.uiFramework) as MacosNativeConfig['uiFramework']
+        : 'swiftui')
+
+    const appStyle: MacosNativeConfig['appStyle'] = mf?.macosAppStyle
+      ?? (!auto
+        ? await output.select('App style?',
+          optionsFromCopy(copy.appStyle.options, ['standard', 'menu-bar', 'agent']),
+          'standard', copy.appStyle) as MacosNativeConfig['appStyle']
+        : 'standard')
+
+    const minMacosVersion: string = mf?.macosMinVersion
+      ?? (!auto
+        ? (await output.prompt<string>('Minimum macOS version [15.0]:', '15.0', copy.minMacosVersion)) || '15.0'
+        : '15.0')
+
+    const distribution: MacosNativeConfig['distribution'] = mf?.macosDistribution
+      ?? (!auto
+        ? await output.select('Distribution?',
+          optionsFromCopy(copy.distribution.options, ['developer-id', 'mac-app-store', 'both']),
+          'developer-id', copy.distribution) as MacosNativeConfig['distribution']
+        : 'developer-id')
+
+    // Mac App Store requires the sandbox — force it; otherwise ask/ default false.
+    const requiresSandbox = distribution === 'mac-app-store' || distribution === 'both'
+    const sandboxed: boolean = requiresSandbox ? true
+      : (mf?.macosSandboxed ?? (!auto ? await output.confirm('Enable App Sandbox?', false, copy.sandboxed) : false))
+
+    const persistence: MacosNativeConfig['persistence'] = mf?.macosPersistence
+      ?? (!auto
+        ? await output.select('Local persistence?',
+          optionsFromCopy(copy.persistence.options, ['none', 'sqlite', 'core-data', 'swiftdata']),
+          'none', copy.persistence) as MacosNativeConfig['persistence']
+        : 'none')
+
+    // App Store builds can't bundle Sparkle — force none.
+    const autoUpdate: MacosNativeConfig['autoUpdate'] = distribution === 'mac-app-store' ? 'none'
+      : (mf?.macosAutoUpdate
+        ?? (!auto
+          ? await output.select('Auto-update?',
+            optionsFromCopy(copy.autoUpdate.options, ['none', 'sparkle']),
+            'none', copy.autoUpdate) as MacosNativeConfig['autoUpdate']
+          : 'none'))
+
+    // Validate minMacosVersion format — must match /^\d+(\.\d+){0,2}$/ (same as schema).
+    // A free-string flag like --macos-min-version Sonoma bypasses yargs enum validation,
+    // so we guard here and fall back to '15.0' with a warning.
+    const VERSION_RE = /^\d+(\.\d+){0,2}$/
+    let effectiveMinMacosVersion = minMacosVersion
+    if (!VERSION_RE.test(effectiveMinMacosVersion)) {
+      output.warn(
+        `Invalid minMacosVersion "${effectiveMinMacosVersion}" (expected "15" or "15.0"). Defaulting to 15.0.`,
+      )
+      effectiveMinMacosVersion = '15.0'
+    }
+
+    // SwiftData requires macOS 14+. If the user picked swiftdata with an older floor, bump it.
+    if (persistence === 'swiftdata') {
+      const majorVersion = parseInt(effectiveMinMacosVersion.split('.')[0] ?? '0', 10)
+      if (majorVersion < 14) {
+        effectiveMinMacosVersion = '14.0'
+        output.warn(
+          `SwiftData requires macOS 14.0+. Minimum macOS version bumped from ${minMacosVersion} to 14.0.`,
+        )
+      }
+    }
+
+    macosNativeConfig = {
+      uiFramework, appStyle, minMacosVersion: effectiveMinMacosVersion,
+      distribution, sandboxed, persistence, autoUpdate,
+    }
   }
 
   // Data pipeline configuration
@@ -795,7 +882,7 @@ export async function askWizardQuestions(options: {
   return {
     methodology, depth, platforms, traits, projectType,
     webAppConfig, backendConfig, cliConfig,
-    libraryConfig, mobileAppConfig, dataPipelineConfig,
+    libraryConfig, mobileAppConfig, macosNativeConfig, dataPipelineConfig,
     mlConfig, browserExtensionConfig, researchConfig, dataScienceConfig, web3Config, gameConfig,
     mcpServerConfig,
   }

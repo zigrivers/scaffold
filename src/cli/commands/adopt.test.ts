@@ -386,4 +386,18 @@ describe('adopt command', () => {
 
     void releaseLock
   })
+
+  // Test 8: --project-type macos-native + --macos-ui-framework hybrid is accepted (not rejected by strict mode)
+  it('accepts --project-type macos-native with --macos-ui-framework hybrid flag', async () => {
+    await adoptCommand.handler(
+      defaultArgv({
+        'project-type': 'macos-native',
+        'macos-ui-framework': 'hybrid',
+      }),
+    )
+
+    // runAdoption should be called — no strict-mode rejection
+    expect(mockRunAdoption).toHaveBeenCalled()
+    expect(process.exitCode).toBe(0)
+  })
 })

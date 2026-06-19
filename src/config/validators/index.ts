@@ -8,6 +8,7 @@ import { cliCouplingValidator } from './cli.js'
 import { libraryCouplingValidator } from './library.js'
 import { mobileAppCouplingValidator } from './mobile-app.js'
 import { dataPipelineCouplingValidator } from './data-pipeline.js'
+import { macosNativeCouplingValidator } from './macos-native.js'
 import { mlCouplingValidator } from './ml.js'
 import { gameCouplingValidator } from './game.js'
 import { browserExtensionCouplingValidator } from './browser-extension.js'
@@ -23,6 +24,7 @@ export const ALL_COUPLING_VALIDATORS: readonly CouplingValidator<unknown>[] = [
   libraryCouplingValidator as CouplingValidator<unknown>,
   mobileAppCouplingValidator as CouplingValidator<unknown>,
   dataPipelineCouplingValidator as CouplingValidator<unknown>,
+  macosNativeCouplingValidator as CouplingValidator<unknown>,
   mlCouplingValidator as CouplingValidator<unknown>,
   gameCouplingValidator as CouplingValidator<unknown>,
   browserExtensionCouplingValidator as CouplingValidator<unknown>,

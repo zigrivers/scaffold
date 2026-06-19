@@ -18,13 +18,13 @@ import {
 import {
   GAME_FLAGS, WEB_FLAGS, BACKEND_FLAGS, CLI_TYPE_FLAGS,
   LIB_FLAGS, MOBILE_FLAGS, PIPELINE_FLAGS, ML_FLAGS, EXT_FLAGS,
-  RESEARCH_FLAGS, MCP_SERVER_FLAGS, applyFlagFamilyValidation,
+  RESEARCH_FLAGS, MCP_SERVER_FLAGS, MACOS_NATIVE_FLAGS, applyFlagFamilyValidation,
 } from '../init-flag-families.js'
 import type { ScaffoldConfig } from '../../types/index.js'
 import type {
   GameFlags, WebAppFlags, BackendFlags, CliFlags, LibraryFlags,
   MobileAppFlags, DataPipelineFlags, MlFlags, BrowserExtensionFlags,
-  ResearchFlags, McpServerFlags,
+  ResearchFlags, McpServerFlags, MacosNativeFlags,
 } from '../../wizard/flags.js'
 
 interface InitArgs {
@@ -106,6 +106,14 @@ interface InitArgs {
   'mcp-auth'?: string
   'mcp-deployment'?: string
   'mcp-stateful'?: boolean
+  // macOS-native flags
+  'macos-ui-framework'?: string
+  'macos-app-style'?: string
+  'macos-min-version'?: string
+  'macos-distribution'?: string
+  'macos-sandboxed'?: boolean
+  'macos-persistence'?: string
+  'macos-auto-update'?: string
 }
 
 // ---------------------------------------------------------------------------
@@ -116,7 +124,7 @@ export const CONFIG_SETTING_FLAGS: readonly string[] = [
   'methodology', 'depth', 'adapters', 'traits', 'project-type', 'idea',
   ...GAME_FLAGS, ...WEB_FLAGS, ...BACKEND_FLAGS, ...CLI_TYPE_FLAGS,
   ...LIB_FLAGS, ...MOBILE_FLAGS, ...PIPELINE_FLAGS, ...ML_FLAGS,
-  ...EXT_FLAGS, ...RESEARCH_FLAGS, ...MCP_SERVER_FLAGS,
+  ...EXT_FLAGS, ...RESEARCH_FLAGS, ...MCP_SERVER_FLAGS, ...MACOS_NATIVE_FLAGS,
 ]
 
 // ---------------------------------------------------------------------------
@@ -428,6 +436,34 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
         type: 'boolean',
         describe: 'MCP server persists state',
       })
+      // macOS-Native Configuration
+      .option('macos-ui-framework', {
+        type: 'string',
+        describe: 'UI framework',
+        choices: ['swiftui', 'appkit', 'hybrid'] as const,
+      })
+      .option('macos-app-style', {
+        type: 'string',
+        describe: 'App style',
+        choices: ['standard', 'menu-bar', 'agent'] as const,
+      })
+      .option('macos-min-version', { type: 'string', describe: 'Minimum macOS version (e.g. 15.0)' })
+      .option('macos-distribution', {
+        type: 'string',
+        describe: 'Distribution',
+        choices: ['developer-id', 'mac-app-store', 'both'] as const,
+      })
+      .option('macos-sandboxed', { type: 'boolean', describe: 'Enable App Sandbox' })
+      .option('macos-persistence', {
+        type: 'string',
+        describe: 'Local persistence',
+        choices: ['none', 'sqlite', 'core-data', 'swiftdata'] as const,
+      })
+      .option('macos-auto-update', {
+        type: 'string',
+        describe: 'Auto-update mechanism',
+        choices: ['none', 'sparkle'] as const,
+      })
       // Game configuration options
       .option('engine', {
         type: 'string',
@@ -550,6 +586,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       .group([...EXT_FLAGS], 'Browser Extension Configuration:')
       .group([...RESEARCH_FLAGS], 'Research Configuration:')
       .group([...MCP_SERVER_FLAGS], 'MCP Server Configuration:')
+      .group([...MACOS_NATIVE_FLAGS], 'macOS-Native Configuration:')
       .group([
         'game-engine', 'game-multiplayer', 'game-target-platforms', 'game-online-services',
         'game-content-structure', 'game-economy', 'game-narrative', 'game-locales',
@@ -609,6 +646,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
           const hasExtFlag = EXT_FLAGS.some((f) => argv[f] !== undefined)
           const hasResearchFlag = RESEARCH_FLAGS.some((f) => argv[f] !== undefined)
           const hasMcpServerFlag = MCP_SERVER_FLAGS.some((f) => argv[f] !== undefined)
+          const hasMacosNativeFlag = MACOS_NATIVE_FLAGS.some((f) => argv[f] !== undefined)
 
           const detectedType = hasGameFlag
             ? 'game'
@@ -632,7 +670,9 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
                               ? 'research'
                               : hasMcpServerFlag
                                 ? 'mcp-server'
-                                : undefined
+                                : hasMacosNativeFlag
+                                  ? 'macos-native'
+                                  : undefined
           const projectType = argv['project-type'] ?? detectedType
 
           result = await shutdown.withPrompt(async () => runWizard({
@@ -725,6 +765,15 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
               mcpAuth: argv['mcp-auth'] as McpServerFlags['mcpAuth'],
               mcpDeployment: argv['mcp-deployment'] as McpServerFlags['mcpDeployment'],
               mcpStateful: argv['mcp-stateful'] as McpServerFlags['mcpStateful'],
+            } : undefined,
+            macosNativeFlags: hasMacosNativeFlag ? {
+              macosUiFramework: argv['macos-ui-framework'] as MacosNativeFlags['macosUiFramework'],
+              macosAppStyle: argv['macos-app-style'] as MacosNativeFlags['macosAppStyle'],
+              macosMinVersion: argv['macos-min-version'] as MacosNativeFlags['macosMinVersion'],
+              macosDistribution: argv['macos-distribution'] as MacosNativeFlags['macosDistribution'],
+              macosSandboxed: argv['macos-sandboxed'],
+              macosPersistence: argv['macos-persistence'] as MacosNativeFlags['macosPersistence'],
+              macosAutoUpdate: argv['macos-auto-update'] as MacosNativeFlags['macosAutoUpdate'],
             } : undefined,
           }))
 

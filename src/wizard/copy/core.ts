@@ -42,6 +42,10 @@ export const coreCopy: CoreCopy = {
         label: 'MCP server',
         short: 'Model Context Protocol server exposing tools/resources/prompts to AI clients.',
       },
+      'macos-native': {
+        label: 'macOS native app',
+        short: 'Native macOS desktop app in Swift/SwiftUI/AppKit (notarized or App Store).',
+      },
     },
   },
   methodology: {

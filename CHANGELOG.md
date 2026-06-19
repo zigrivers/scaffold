@@ -4,6 +4,10 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Add `macos-native` project type for scaffolding native macOS apps (Swift/SwiftUI/AppKit) — config, coupling validation, overlay, 5 pipeline steps, 20 knowledge entries, detector, wizard/CLI.
+
 ## [3.34.4] — 2026-06-16
 
 ### Changed

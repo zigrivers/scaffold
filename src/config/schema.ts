@@ -18,7 +18,7 @@ const CustomSchema = z.object({
 export const ProjectTypeSchema = z.enum([
   'web-app', 'mobile-app', 'backend', 'cli', 'library', 'game',
   'data-pipeline', 'ml', 'browser-extension', 'research',
-  'data-science', 'web3', 'mcp-server',
+  'data-science', 'web3', 'mcp-server', 'macos-native',
 ])
 
 export const WebAppConfigSchema = z.object({
@@ -182,6 +182,18 @@ export const GameConfigSchema = z.object({
   npcAiComplexity: z.enum(['none', 'simple', 'complex']).default('none'),
 }).strict()
 
+export const MacosNativeConfigSchema = z.object({
+  uiFramework: z.enum(['swiftui', 'appkit', 'hybrid']).default('swiftui'),
+  appStyle: z.enum(['standard', 'menu-bar', 'agent']).default('standard'),
+  minMacosVersion: z.string()
+    .regex(/^\d+(\.\d+){0,2}$/, 'must be a macOS version like "15" or "15.0"')
+    .default('15.0'),
+  distribution: z.enum(['developer-id', 'mac-app-store', 'both']).default('developer-id'),
+  sandboxed: z.boolean().default(false),
+  persistence: z.enum(['none', 'sqlite', 'core-data', 'swiftdata']).default('none'),
+  autoUpdate: z.enum(['none', 'sparkle']).default('none'),
+}).strict()
+
 export const ServiceSchema = z.object({
   name: z.string().min(1).regex(/^[a-z][a-z0-9-]*$/, {
     message: 'name must be kebab-case starting with a letter',
@@ -197,6 +209,7 @@ export const ServiceSchema = z.object({
   dataPipelineConfig: DataPipelineConfigSchema.optional(),
   mlConfig: MlConfigSchema.optional(),
   gameConfig: GameConfigSchema.optional(),
+  macosNativeConfig: MacosNativeConfigSchema.optional(),
   browserExtensionConfig: BrowserExtensionConfigSchema.optional(),
   dataScienceConfig: DataScienceConfigSchema.optional(),
   web3Config: Web3ConfigSchema.optional(),
@@ -226,6 +239,7 @@ export const ProjectSchema = z.object({
   platforms: z.array(z.enum(['web', 'mobile', 'desktop'])).optional(),
   projectType: ProjectTypeSchema.optional(),
   gameConfig: GameConfigSchema.optional(),
+  macosNativeConfig: MacosNativeConfigSchema.optional(),
   webAppConfig: WebAppConfigSchema.optional(),
   backendConfig: BackendConfigSchema.optional(),
   cliConfig: CliConfigSchema.optional(),

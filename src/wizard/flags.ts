@@ -19,7 +19,7 @@
 import type {
   GameConfig, WebAppConfig, BackendConfig, CliConfig, LibraryConfig,
   MobileAppConfig, DataPipelineConfig, MlConfig, BrowserExtensionConfig,
-  ResearchConfig, McpServerConfig,
+  ResearchConfig, McpServerConfig, MacosNativeConfig,
 } from '../types/index.js'
 
 export interface GameFlags {
@@ -71,6 +71,16 @@ export interface MobileAppFlags {
   mobileDistribution?: MobileAppConfig['distributionModel']
   mobileOffline?: MobileAppConfig['offlineSupport']
   mobilePushNotifications?: MobileAppConfig['hasPushNotifications']
+}
+
+export interface MacosNativeFlags {
+  macosUiFramework?: MacosNativeConfig['uiFramework']
+  macosAppStyle?: MacosNativeConfig['appStyle']
+  macosMinVersion?: MacosNativeConfig['minMacosVersion']
+  macosDistribution?: MacosNativeConfig['distribution']
+  macosSandboxed?: MacosNativeConfig['sandboxed']
+  macosPersistence?: MacosNativeConfig['persistence']
+  macosAutoUpdate?: MacosNativeConfig['autoUpdate']
 }
 
 export interface DataPipelineFlags {

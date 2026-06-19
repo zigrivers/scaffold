@@ -15,6 +15,7 @@ import { researchCopy } from './research.js'
 import { dataScienceCopy } from './data-science.js'
 import { web3Copy } from './web3.js'
 import { mcpServerCopy } from './mcp-server.js'
+import { macosNativeCopy } from './macos-native.js'
 
 const PROJECT_COPY: ProjectCopyMap = {
   'web-app': webAppCopy,
@@ -30,6 +31,7 @@ const PROJECT_COPY: ProjectCopyMap = {
   'data-science': dataScienceCopy,
   'web3': web3Copy,
   'mcp-server': mcpServerCopy,
+  'macos-native': macosNativeCopy,
 }
 
 export function getCopyForType<T extends ProjectType>(type: T): ProjectCopyMap[T] {

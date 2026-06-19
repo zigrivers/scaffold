@@ -9,6 +9,7 @@ import {
   DataPipelineConfigSchema, MlConfigSchema, BrowserExtensionConfigSchema,
   ResearchConfigSchema, ServiceSchema, ProjectSchema,
   backendRealDomains, researchRealDomains, McpServerConfigSchema,
+  MacosNativeConfigSchema,
 } from './schema.js'
 
 describe('ProjectTypeSchema', () => {
@@ -20,7 +21,7 @@ describe('ProjectTypeSchema', () => {
         'mcp-server',
       ]),
     )
-    expect(ProjectTypeSchema.options).toHaveLength(13)
+    expect(ProjectTypeSchema.options).toHaveLength(14)
   })
 })
 
@@ -1339,6 +1340,33 @@ describe('domain field — multi-domain union', () => {
     if (result.success) {
       expect(result.data.project?.backendConfig?.domain).toEqual(['fintech'])
     }
+  })
+})
+
+describe('macos-native config schema', () => {
+  it('includes macos-native in the project-type enum', () => {
+    expect(ProjectTypeSchema.options).toContain('macos-native')
+  })
+
+  it('applies defaults', () => {
+    const cfg = MacosNativeConfigSchema.parse({})
+    expect(cfg).toEqual({
+      uiFramework: 'swiftui',
+      appStyle: 'standard',
+      minMacosVersion: '15.0',
+      distribution: 'developer-id',
+      sandboxed: false,
+      persistence: 'none',
+      autoUpdate: 'none',
+    })
+  })
+
+  it('rejects unknown keys (strict)', () => {
+    expect(MacosNativeConfigSchema.safeParse({ bogus: true }).success).toBe(false)
+  })
+
+  it('rejects a malformed minMacosVersion', () => {
+    expect(MacosNativeConfigSchema.safeParse({ minMacosVersion: 'Sonoma' }).success).toBe(false)
   })
 })
 
