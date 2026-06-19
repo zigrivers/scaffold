@@ -121,6 +121,9 @@ and overwrites both fields after you respond.
   ],
   "preserve_warnings": [
     "<any claim you could not verify but should not change>"
-  ]
+  ],
+  "source_unverifiable": false
 }
 ```
+
+> **`source_unverifiable`** — set to `true` only when every prefetched source body is an unusable redirect stub, empty, or otherwise not the real content (e.g. a `<meta http-equiv="refresh">` shell rather than the actual documentation). When `true`, the verdict must be `"current"` and `proposed_changes` must be empty — the entry cannot be audited. Default is `false`.

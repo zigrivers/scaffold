@@ -249,6 +249,40 @@ describe('classifyRedirect', () => {
     expect(c).toEqual({ kind: 'accept' })
   })
 
+  // HEAD-SCOPE — redirect detection must be restricted to the <head> region
+  it('HEAD-SCOPE-1: benign <head> + meta-refresh in <body> code sample → accept (not follow)', () => {
+    // A legitimate doc page whose <head> has no redirect but whose <body> contains a
+    // <meta http-equiv="refresh"> inside an example/code block.  Must NOT follow.
+    const html =
+      '<html><head><title>Docs</title></head><body>' +
+      '<p>Example of a redirect stub:</p>' +
+      '<pre><meta http-equiv="refresh" content="0; url=https://evil.test/"></pre>' +
+      '<p>Real content here with plenty of text explaining things.</p>' +
+      '</body></html>'
+    const c = classifyRedirect(html, 'text/html', 'https://docs.test/page')
+    expect(c).toEqual({ kind: 'accept' })
+  })
+
+  it('HEAD-SCOPE-2: <base href> in <body> (not head) does not affect resolution', () => {
+    // A page with no <head> redirect but a <base href> in the <body>.
+    // The base tag in the body must be ignored; any relative URL resolution
+    // should fall back to finalUrl.
+    const html =
+      '<html><head></head><body>' +
+      '<base href="https://evil.test/">' +
+      '<p>Real content: base tag in body should be ignored by redirect classifier.</p>' +
+      '</body></html>'
+    const c = classifyRedirect(html, 'text/html', 'https://docs.test/page')
+    // No redirect signals in <head> → accept
+    expect(c).toEqual({ kind: 'accept' })
+  })
+
+  it('HEAD-SCOPE-3: meta-refresh in real <head> (OWASP stub) still returns follow', () => {
+    // Regression: the head-scoping change must not break genuine head-based stubs.
+    const c = classifyRedirect(OWASP_STUB, 'text/html; charset=utf-8', 'https://owasp.org/Top10/')
+    expect(c).toEqual({ kind: 'follow', target: 'https://owasp.org/Top10/2025/en/' })
+  })
+
   // F2 — HTML entities in meta-refresh url= are decoded before URL construction
   it('F2: meta-refresh url= with &amp; entity resolves correctly (entity decoded before new URL)', () => {
     const html =

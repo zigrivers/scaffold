@@ -127,13 +127,40 @@ function decodeHtmlEntities(s: string): string {
     .replace(/&#47;/g, '/')
 }
 
+/**
+ * Returns the `<head>` region of an HTML document for redirect-signal detection.
+ *
+ * Browsers only honour `<meta http-equiv="refresh">` and `<base>` when they
+ * appear inside `<head>`, so scanning the whole body risks false-positives on
+ * pages that include those tags inside code samples or other body content.
+ *
+ * Strategy:
+ * 1. Work within the SCAN_LIMIT window.
+ * 2. Find the first `</head>` (case-insensitive) — use everything before it.
+ * 3. If absent, find the first `<body` — use everything before it.
+ * 4. If neither is present, fall back to the full SCAN_LIMIT slice.
+ */
+function headRegion(body: string): string {
+  const bounded = body.slice(0, SCAN_LIMIT)
+  const lower = bounded.toLowerCase()
+  const headClose = lower.indexOf('</head')
+  if (headClose !== -1) return bounded.slice(0, headClose)
+  const bodyOpen = lower.indexOf('<body')
+  if (bodyOpen !== -1) return bounded.slice(0, bodyOpen)
+  return bounded
+}
+
 export function classifyRedirect(
   body: string,
   contentType: string | null,
   finalUrl: string,
 ): RedirectClassification {
   if (!isHtml(contentType, body)) return { kind: 'accept' }
-  const head = body.slice(0, SCAN_LIMIT)
+  // Restrict redirect-signal detection to the <head> region only.
+  // Browsers do not honour meta-refresh or <base> outside of <head>, so
+  // scanning the full body would create false-positives on pages that embed
+  // those tags inside code samples or documentation examples.
+  const head = headRegion(body)
   // Strip HTML comments once here so all parsers operate on comment-free input.
   const headNoComments = head.replace(/<!--[\s\S]*?-->/g, '')
 
@@ -176,7 +203,9 @@ export function classifyRedirect(
     return { kind: 'accept' } // long-delay auto-reload
   }
 
-  if (hasJsRedirect(headNoComments) && visibleTextLength(head) < JS_REDIRECT_TEXT_FLOOR) {
+  // For JS-redirect detection: check redirect signals in <head> but measure
+  // visible text over the broader bounded body (real content can live in <body>).
+  if (hasJsRedirect(headNoComments) && visibleTextLength(body.slice(0, SCAN_LIMIT)) < JS_REDIRECT_TEXT_FLOOR) {
     return { kind: 'unusable', detail: 'javascript-only redirect with no content' }
   }
   return { kind: 'accept' }
