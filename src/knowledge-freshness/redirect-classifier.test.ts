@@ -227,4 +227,37 @@ describe('classifyRedirect', () => {
     // Should follow to https://good.test/section/real/ (relative to finalUrl), NOT bad.test
     expect(c).toEqual({ kind: 'follow', target: 'https://good.test/section/real/' })
   })
+
+  // F1 — meta-refresh with no/empty url= treated as self-reload
+  it('F1a: content="0" (no url) near-zero → unusable (self-reload stub)', () => {
+    const html = '<html><head><meta http-equiv="refresh" content="0"></head><body></body></html>'
+    const c = classifyRedirect(html, 'text/html', 'https://x.test/p')
+    expect(c.kind).toBe('unusable')
+    expect((c as { kind: string; detail: string }).detail).toMatch(/no url/)
+  })
+
+  it('F1b: content="0; url=" (empty url) near-zero → unusable (self-reload stub)', () => {
+    const html = '<html><head><meta http-equiv="refresh" content="0; url="></head><body></body></html>'
+    const c = classifyRedirect(html, 'text/html', 'https://x.test/p')
+    expect(c.kind).toBe('unusable')
+    expect((c as { kind: string; detail: string }).detail).toMatch(/no url/)
+  })
+
+  it('F1c: content="30" (no url, long delay) → accept (legitimate auto-reload)', () => {
+    const html = '<html><head><meta http-equiv="refresh" content="30"></head><body>content</body></html>'
+    const c = classifyRedirect(html, 'text/html', 'https://x.test/p')
+    expect(c).toEqual({ kind: 'accept' })
+  })
+
+  // F2 — HTML entities in meta-refresh url= are decoded before URL construction
+  it('F2: meta-refresh url= with &amp; entity resolves correctly (entity decoded before new URL)', () => {
+    const html =
+      '<html><head><meta http-equiv="refresh" content="0; url=https://x.test/p?a=1&amp;b=2"></head></html>'
+    const c = classifyRedirect(html, 'text/html', 'https://x.test/old')
+    // The target should contain a single & (decoded from &amp;), not &amp;
+    expect(c.kind).toBe('follow')
+    const target = (c as { kind: string; target: string }).target
+    expect(target).toContain('a=1&b=2')
+    expect(target).not.toContain('&amp;')
+  })
 })

@@ -117,6 +117,16 @@ function stripFragment(u: string): string {
   }
 }
 
+/** Decode common HTML entities in a URL string extracted from a meta-refresh content= attribute. */
+function decodeHtmlEntities(s: string): string {
+  return s
+    .replace(/&#x26;/gi, '&')
+    .replace(/&#38;/g, '&')
+    .replace(/&amp;/gi, '&')
+    .replace(/&#x2F;/gi, '/')
+    .replace(/&#47;/g, '/')
+}
+
 export function classifyRedirect(
   body: string,
   contentType: string | null,
@@ -138,9 +148,18 @@ export function classifyRedirect(
   const currentNorm = stripFragment(finalUrl)
 
   const meta = extractMetaRefresh(headNoComments)
-  if (meta && meta.url) {
+  if (meta) {
+    if (!meta.url) {
+      // No url= (or empty url=) → this is a self-reload of the current page.
+      if (meta.delaySec <= NEAR_ZERO_DELAY_MAX_SEC) {
+        return { kind: 'unusable', detail: 'near-zero self-reload meta-refresh (no url)' }
+      }
+      return { kind: 'accept' } // long-delay auto-reload with no explicit target
+    }
+    // F2: decode common HTML entities in the url= value before URL construction.
+    const decodedUrl = decodeHtmlEntities(meta.url)
     let target: URL
-    try { target = new URL(meta.url, base) } catch {
+    try { target = new URL(decodedUrl, base) } catch {
       return { kind: 'unusable', detail: `meta-refresh target unparseable: ${meta.url}` }
     }
     if (target.protocol !== 'http:' && target.protocol !== 'https:') {

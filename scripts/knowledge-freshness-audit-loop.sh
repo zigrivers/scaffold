@@ -43,6 +43,7 @@ while read -r candidate; do
       # would run, then either open the PR or skip the entry.
       if ! node dist/index.js knowledge-freshness audit-apply "$path" "$verdict_path"; then
         echo "audit-apply (pre-gates dry-run) failed for $name"
+        git checkout -- "$path"
         echo "::endgroup::"
         continue
       fi
