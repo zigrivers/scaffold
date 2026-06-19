@@ -1,6 +1,6 @@
 # Knowledge-Freshness Client-Side-Redirect Defect — Fix Design
 
-**Status:** Draft, rev. 3 (revised after two multi-model review rounds — see §12)
+**Status:** Draft, rev. 4 (revised after three multi-model review rounds — see §12)
 **Date:** 2026-06-19
 **Author:** Claude (Opus 4.8), at maintainer request
 **Related:** memory `security-best-practices-refresh-defect`; PR #623 (prior
@@ -157,9 +157,12 @@ redirects is still caught.
    Each followed target re-uses the shared `MAX_REDIRECT_HOPS` budget, must pass
    `assertSafeSourceUrlWithDns` (SSRF/DNS), and must use an `http:`/`https:` scheme
    — `javascript:`, `data:`, `file:`, etc. are rejected outright. `<link
-   rel="canonical">` is **not** a redirect (pages self-canonicalize). A self/cyclic
-   refresh (target resolves to the current URL) is treated as terminal, not
-   followed.
+   rel="canonical">` is **not** a redirect (pages self-canonicalize). URLs are
+   normalized (`#fragment` stripped) before the same-URL comparison, so `A → A#x`
+   counts as cyclic. A **near-zero self/cyclic** refresh (target resolves to the
+   current URL) is a reload stub with no onward content → it is **unusable** and
+   fails closed via Layer 1.3 (it is *not* accepted as terminal). A *long-delay*
+   self-refresh with real content falls through to Layer 1.4 and is accepted.
 3. **HTML with an unfollowable redirect mechanism → fail closed.** If the page has
    a redirect mechanism that cannot be safely followed — a near-zero meta-refresh
    with no usable/`http(s)` `url=`, or a detectable JS-only redirect near the top of
@@ -200,12 +203,18 @@ verdict schema, `.github/workflows/knowledge-freshness-audit.yml`,
      JSON on stdout**: `{"skipped": true, "reason": "source-unusable", "url": "…",
      "detail": "…"}`, and exits **0**. It must never write partial/zero verdict JSON
      or free-text to stdout; all diagnostics go to **stderr**.
-   - On any other error, the CLI exits non-zero (as today) so the workflow step
-     fails and the outage is visible.
-   - The workflow branches **before** the `jq .verdict`/apply steps: if
-     `.skipped == true`, log the reason to the run output and `continue` to the next
-     entry (no apply, no PR). This requires a small workflow edit and keeps the
-     existing happy-path jq untouched.
+   - On any other (transient/infra) error, the CLI exits **non-zero**.
+   - **Workflow change (required) — stop swallowing non-zero exits.** The loop today
+     wraps the call as `if ! node … audit-run-entry … > "$verdict_path"; then …
+     continue` (`knowledge-freshness-audit.yml:101-104`), which **silently swallows
+     a non-zero exit and continues**, masking outages. Change it so a non-zero exit
+     records a hard failure (`had_failure=1`) and the job `exit 1`s after the loop
+     (remaining entries still process, but the run goes **red**). On a zero exit,
+     branch **before** `jq -r '.verdict'`/apply: if `jq -e '.skipped == true'
+     "$verdict_path"` succeeds, log the reason and `continue` (no apply, no PR);
+     otherwise proceed with the verdict. Net: **only** a valid skip envelope
+     (exit 0 + `.skipped==true`) continues silently; a real failure turns the run
+     red. Keeps the existing happy-path jq untouched.
 2. **Structured `source_unverifiable` verdict field (defense-in-depth).** Add a
    boolean to the verdict schema (`audit-runner.ts:19-44`). Update
    `knowledge-audit-entry.md` to instruct: if any prefetched `body` is a redirect
@@ -256,7 +265,8 @@ source-hash.fetchAndHash(url)
 audit-runner: prefetch loop
   → SourceUnusableError → emit {"skipped":true,...} JSON on stdout, exit 0
         workflow sees .skipped==true → log reason, continue (no apply, no PR)
-  → transient/infra error (timeout / 5xx / DNS / socket) → propagate, exit non-zero
+  → transient/infra error (timeout / 5xx / DNS / socket) → exit non-zero
+        workflow records hard failure → run goes RED (NOT a silent continue)
   → success → inject real body into prompt → model
 model verdict
   → source_unverifiable:true → audit-apply no-op (no edits, no pin change)
@@ -292,9 +302,10 @@ and a **real-content body** containing 2025 category names.
 - **source-hash — parser variants:** attribute order/case (`HTTP-EQUIV`,
   `Refresh`), single vs double vs unquoted `url=`, extra whitespace, `;url=` vs
   `; url =`, delay `0` vs `0.0` vs `1` vs `5` (5 = long delay → not followed);
-  self/cyclic refresh (target == current) → not followed (treated as terminal).
-  Include a malicious-input case to assert no catastrophic backtracking (bounded
-  time).
+  a **near-zero self/cyclic** refresh (target == current) → `SourceUnusableError`
+  (R3-B); a target differing from current only by `#fragment` → recognized as
+  cyclic after normalization (R3-C). Include a malicious-input case to assert no
+  catastrophic backtracking (bounded time).
 - **source-hash — security:** a meta-refresh `url=` pointing at a private IP →
   rejected by the SSRF/DNS guard (not followed); `url=javascript:…`/`data:…`/`file:…`
   → rejected by the scheme check (not resolved/fetched).
@@ -305,8 +316,10 @@ and a **real-content body** containing 2025 category names.
   error** (timeout / HTTP 5xx / DNS failure) → CLI exits **non-zero** and does NOT
   emit a skip envelope (R2-E: outages stay visible). `source_unverifiable`
   round-trips through the schema.
-- **workflow:** a unit/integration check (or bats, matching existing workflow
-  tests) that the `.skipped==true` branch skips apply/PR and continues.
+- **workflow:** a check (bats, matching existing workflow tests) that the
+  `.skipped==true` branch skips apply/PR and continues, **and** that a non-zero
+  `audit-run-entry` exit is NOT swallowed — it records a hard failure and the job
+  exits non-zero (R3-A).
 - **audit-apply:** `source_unverifiable: true` + non-empty `proposed_changes`/pin
   → no-op (file unchanged); normal verdict still applies.
 - **Regression (the bug):** feed the OWASP stub fixture end-to-end (mocked fetch) →
@@ -446,3 +459,26 @@ discontinued; the Antigravity `agy` channel is its replacement and is healthy), 
 `grok` fails with a 403 spending-limit/credits error. Both were covered by
 compensating claude-based passes; consider replacing the gemini channel with `agy`
 and topping up grok credits, or disabling grok in `.mmr.yaml`.
+
+### Round 3 (rev. 4)
+
+Re-reviewed via `mmr review` (codex ✓, antigravity ✓, claude ✓ clean,
+compensating-gemini ✓ clean, compensating-grok ✓ clean; gemini/grok still
+tier/credit-blocked) plus the local Qwen2.5 reviewer (0 blocking, "SAFE TO MERGE").
+Round-1/2 findings confirmed resolved. New (narrower) findings resolved:
+
+- **R3-A (codex P1) — the workflow swallows non-zero exits.** Confirmed: the loop
+  wraps the call as `if ! node … audit-run-entry …; then … continue`
+  (`knowledge-freshness-audit.yml:101-104`), so a transient-error non-zero exit
+  would be masked. §5 Layer 2.1 now requires changing the workflow so only a valid
+  skip envelope (exit 0 + `.skipped==true`) continues; any non-zero exit records a
+  hard failure and the job exits non-zero. §6/§7 updated.
+- **R3-B (antigravity P1) — a near-zero self/cyclic refresh accepted as terminal
+  ingests a reload stub.** §5 Layer 1.2 now fails closed on a near-zero self/cyclic
+  refresh (only a long-delay self-refresh with real content is accepted). §7 test
+  updated.
+- **R3-C (antigravity P2) — fragment bypass of the cyclic check.** §5 Layer 1.2 now
+  normalizes URLs (strips `#fragment`) before the same-URL comparison. §7 test added.
+
+Local AI (non-blocking): re-confirmed the empirical thin-content threshold, parser
+choice, and `<base href>` edge-case coverage — already tracked in §11 and §7.
