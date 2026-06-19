@@ -312,7 +312,7 @@ Some steps behave significantly differently at higher depths. When running these
 - Depth 4: Adds requirements index (REQ-xxx IDs) and coverage matrix (coverage.json) for formal PRD traceability
 - Depth 5: Adds multi-model dispatch to Codex/Antigravity CLI for independent validation, with graceful fallback to Claude-only enhanced review if CLIs aren't available
 
-When running `review-user-stories` at depth 5, check if `codex` or `gemini` CLI is available (`command -v codex`, `command -v gemini`). If neither is available, inform the user that the step will fall back to a Claude-only adversarial self-review — still valuable but less thorough than multi-model review.
+When running `review-user-stories` at depth 5, check if `codex` or `agy` (Antigravity) CLI is available (`command -v codex`, `command -v agy`). If neither is available, inform the user that the step will fall back to a Claude-only adversarial self-review — still valuable but less thorough than multi-model review.
 
 **`ai-memory-setup`** — Three-tier AI memory configuration:
 - Tier 1 (Modular Rules): Extracts conventions from coding-standards.md, tech-stack.md, git-workflow.md into path-scoped `.claude/rules/` files. Always recommended.

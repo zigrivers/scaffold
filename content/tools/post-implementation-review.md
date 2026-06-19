@@ -456,11 +456,11 @@ before returning. Then return all three channels' findings plus channel status:
   "story": "[STORY_TITLE]",
   "channel_status": {
     "codex": { "root_cause": "null|not_installed|auth_failed|timeout|failed", "coverage_status": "full|compensating" },
-    "gemini": { "root_cause": "null|not_installed|auth_failed|timeout|failed", "coverage_status": "full|compensating" },
+    "antigravity": { "root_cause": "null|not_installed|auth_failed|timeout|failed", "coverage_status": "full|compensating" },
     "superpowers": { "root_cause": null, "coverage_status": "full" }
   },
   "codex": { "findings": [...] },
-  "gemini": { "findings": [...] },
+  "antigravity": { "findings": [...] },
   "superpowers": { "findings": [...] }
 }
 ```
@@ -498,7 +498,7 @@ the job's threshold is set at `mmr review` time.
 
 ### Step 6: Consolidate Findings
 
-Merge all findings from Phase 1 (`CODEX_PHASE1_FINDINGS`, `GEMINI_PHASE1_FINDINGS`,
+Merge all findings from Phase 1 (`CODEX_PHASE1_FINDINGS`, `ANTIGRAVITY_PHASE1_FINDINGS`,
 `SUPERPOWERS_PHASE1_FINDINGS`) and Phase 2 (`PHASE2_FINDINGS`) into one flat list.
 
 **Deduplication:** If two findings reference the same `file` and have similar
