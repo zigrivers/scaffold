@@ -36,9 +36,20 @@ const auditApplyCommand: CommandModule<Record<string, unknown>, AuditApplyArgs> 
       describe: 'MMR corroboration job ID to reference in the PR body (optional)',
     }) as unknown as Argv<AuditApplyArgs>,
   handler: async (argv) => {
-    const content = fs.readFileSync(argv.entryPath, 'utf8')
     const verdictRaw = fs.readFileSync(argv.verdictPath, 'utf8')
     const verdict = JSON.parse(verdictRaw) as AuditVerdict
+
+    // Short-circuit: source_unverifiable verdicts carry no actionable diff —
+    // the entry file is unchanged and no PR should be opened.
+    if ((verdict as unknown as Record<string, unknown>).source_unverifiable === true) {
+      process.stderr.write(
+        `audit-apply: no-op — source_unverifiable for entry "${verdict.entry_name}" ` +
+        `(${argv.entryPath}); skipping fetch, apply, and PR\n`,
+      )
+      return
+    }
+
+    const content = fs.readFileSync(argv.entryPath, 'utf8')
 
     // Sanity-check: the verdict and the on-disk entry must agree on `name`.
     // The verdict schema intentionally doesn't carry a filesystem path (so the

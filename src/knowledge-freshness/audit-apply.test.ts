@@ -938,6 +938,28 @@ g
     })
   })
 
+  it('is a no-op when source_unverifiable is true, even with proposed edits and a version-pin' +
+    ' (guard fires ahead of real edits)', () => {
+    // Strengthened: the guard must fire BEFORE any edit logic is reached.
+    // With major-drift + non-empty proposed_changes + a proposed_version_pin,
+    // the edit path would normally mutate the entry. source_unverifiable: true
+    // must short-circuit all of that and return the entry byte-identical.
+    const verdict = {
+      entry_name: 'x', audit_date: '2026-06-19', model: 'm',
+      verdict: 'major-drift' as const,
+      sources_checked: baseEntryChecked,
+      findings: [],
+      proposed_changes: [
+        { location: '## Deep Guidance', kind: 'replace' as const,
+          rationale: 'r', new_text: '## Deep Guidance\n\nNEW' },
+      ],
+      preserve_warnings: [],
+      proposed_version_pin: 'OWASP Top 10:2025',
+      source_unverifiable: true,
+    }
+    expect(applyVerdictToEntry(baseEntry, verdict)).toBe(baseEntry)
+  })
+
   describe('edit contract enforcement', () => {
     const entry = `---
 name: x

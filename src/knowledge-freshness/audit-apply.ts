@@ -50,6 +50,10 @@ export function applyVerdictToEntry(
   verdict: AuditVerdict,
   opts: ApplyOptions = {},
 ): string {
+  // Source-unusable backstop: if the model flagged that it could not verify
+  // against the prefetched source, make no changes at all.
+  if (verdict.source_unverifiable === true) return original
+
   // Enforce the spec contract: minor-drift carries findings only, no changes.
   if ((verdict.verdict === 'current' || verdict.verdict === 'minor-drift') && verdict.proposed_changes.length > 0) {
     throw new Error(

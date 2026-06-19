@@ -39,6 +39,10 @@ const verdictSchema = z.object({
   // the pinned taxonomy (e.g. "OWASP Top 10:2025"); null/absent leaves it as-is.
   proposed_version_pin: z.string().nullable().optional(),
   preserve_warnings: z.array(z.string()),
+  // True when the model could not verify the entry against the prefetched
+  // source bodies (e.g. a body was a redirect stub). Apply treats this as a
+  // hard no-op. Backstop for any stub that slips the fetch-layer detection.
+  source_unverifiable: z.boolean().optional(),
 })
 
 export type AuditVerdict = z.infer<typeof verdictSchema>
