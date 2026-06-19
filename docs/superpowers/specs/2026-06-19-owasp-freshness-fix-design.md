@@ -1,6 +1,6 @@
 # Knowledge-Freshness Client-Side-Redirect Defect — Fix Design
 
-**Status:** Draft, rev. 2 (revised after multi-model review — see §12)
+**Status:** Draft, rev. 3 (revised after two multi-model review rounds — see §12)
 **Date:** 2026-06-19
 **Author:** Claude (Opus 4.8), at maintainer request
 **Related:** memory `security-best-practices-refresh-defect`; PR #623 (prior
@@ -139,34 +139,43 @@ backstop.
 ### Layer 1 — Fetch: resolve client-side redirects, reject stubs (the linchpin)
 **File:** `src/knowledge-freshness/source-hash.ts` (`fetchAndHash`)
 
-After a `200` response, before hashing, classify the body using **visible text
-length as the primary signal** (substantial content always wins — a real page is
-never rejected just because it carries a refresh tag):
+After a `200` response, before hashing, classify the body. **The signal is the
+presence of a client-side *redirect mechanism*, not byte count** — so small but
+legitimate pages are never rejected, and a large templated stub that still
+redirects is still caught.
 
-1. **Substantial content → accept.** Extract visible text (strip `<script>`,
-   `<style>`, tags, comments, hidden content). If it exceeds a floor (empirically
-   pinned in TDD; the stub is ~60 chars vs ~KBs for a real page — see §7/§11), the
-   body is real content: hash and return it **even if** it also contains a
-   `<meta refresh>` (legitimate auto-reload pages do this).
-2. **Thin content + followable meta-refresh → follow.** If visible text is below
-   the floor *and* the body has a `<meta http-equiv="refresh">` whose `content`
-   specifies a **near-zero delay** (0 or ≤1s) and a `url=TARGET` that resolves to a
-   URL **different** from the current one, treat it as a redirect: resolve `TARGET`
-   relative to the current URL and continue the existing hop loop. Each followed
-   target is re-validated exactly like a 3xx target: it shares the same
-   `MAX_REDIRECT_HOPS` budget, must pass `assertSafeSourceUrlWithDns` (SSRF/DNS),
-   **and must use an `http:`/`https:` scheme** — `javascript:`, `data:`, `file:`,
-   etc. are rejected outright (do not resolve or fetch them). `<link rel="canonical">`
-   is **not** treated as a redirect (legitimate pages self-canonicalize).
-3. **Thin content, no followable target → fail closed.** Otherwise (JS-only
-   redirect, contentless page, meta-refresh with a non-near-zero delay or no `url=`)
-   throw a typed `SourceUnusableError` carrying the URL.
+1. **Non-HTML → accept as-is.** If the `Content-Type` is not `text/html` (or
+   `application/xhtml+xml`) — e.g. `application/json`, `text/plain`, a raw version
+   file — skip all HTML heuristics: hash and return the body unchanged. (HTML
+   stub-detection must never reject a small JSON/text source.)
+2. **HTML with a followable meta-refresh → follow (regardless of text length).**
+   Parse the HTML (ReDoS-safe — see below) for `<meta http-equiv="refresh">` whose
+   `content` has a **near-zero delay** (0 or ≤1s) and a `url=TARGET`. Resolve
+   `TARGET` against `<base href>` if present, else the current URL. If it resolves
+   to a **different** `http(s)` URL, follow it — **even when visible text exceeds
+   any floor** (a stub padded with site chrome must still be followed, not hashed).
+   Each followed target re-uses the shared `MAX_REDIRECT_HOPS` budget, must pass
+   `assertSafeSourceUrlWithDns` (SSRF/DNS), and must use an `http:`/`https:` scheme
+   — `javascript:`, `data:`, `file:`, etc. are rejected outright. `<link
+   rel="canonical">` is **not** a redirect (pages self-canonicalize). A self/cyclic
+   refresh (target resolves to the current URL) is treated as terminal, not
+   followed.
+3. **HTML with an unfollowable redirect mechanism → fail closed.** If the page has
+   a redirect mechanism that cannot be safely followed — a near-zero meta-refresh
+   with no usable/`http(s)` `url=`, or a detectable JS-only redirect near the top of
+   the document (`location.replace(`, `location.href=`, `window.location=`) with
+   little other content — throw a typed `SourceUnusableError` carrying the URL.
+4. **Otherwise → accept.** Any other HTML — a long-delay auto-reload page, or a
+   small page with **no** redirect mechanism — is real terminal content: hash and
+   return it. (Byte count is **not** a rejection criterion; a suspiciously thin body
+   with no redirect mechanism may emit a non-fatal warning but is still accepted,
+   since small legitimate sources exist.)
 
-Parsing of the `<meta refresh>` tag must be **ReDoS-safe**: use a robust HTML parse
-(prefer a parser already vendored in the repo; otherwise a bounded, linear,
-non-backtracking scan) — never a catastrophic-backtracking regex on the raw body.
-Handle attribute-order/case variation, single/double/unquoted values, and
-whitespace in the `content` attribute.
+Parsing must be **ReDoS-safe**: use a robust HTML parse (prefer a parser already
+vendored in the repo; otherwise a bounded, linear, non-backtracking scan) — never a
+catastrophic-backtracking regex on the raw body. Handle attribute order/case
+(`HTTP-EQUIV`, `Refresh`), single/double/unquoted values, and whitespace in the
+`content` attribute.
 
 Classification operates on the body already in hand (no extra network on the happy
 path).
@@ -176,16 +185,23 @@ path).
 verdict schema, `.github/workflows/knowledge-freshness-audit.yml`,
 `content/tools/knowledge-audit-entry.md`
 
-1. **Graceful, workflow-compatible skip.** Wrap the prefetch loop
-   (`audit-runner.ts:91-105`) so a `SourceUnusableError` (or any fetch failure)
-   **skips the entry for this cycle** instead of throwing all the way out. The skip
-   must fit the existing CLI/workflow contract — `audit-run-entry` writes the
-   **verdict JSON to stdout**, and the workflow runs `jq` on `.verdict` under
-   `set -e`. So:
-   - The CLI emits a **structured skip envelope as valid JSON on stdout**:
-     `{"skipped": true, "reason": "source-unusable", "url": "…", "detail": "…"}`,
-     and exits **0**. It must never write partial/zero verdict JSON or free-text to
-     stdout; all diagnostics go to **stderr**.
+1. **Graceful, workflow-compatible skip — for `SourceUnusableError` ONLY.** Wrap
+   the prefetch loop (`audit-runner.ts:91-105`) so a `SourceUnusableError` (the
+   structural client-side-redirect/stub signal from Layer 1) **skips the entry for
+   this cycle** instead of throwing all the way out. **Transient and infrastructure
+   failures — network timeout, HTTP 5xx, DNS resolution failure, socket hangup —
+   must NOT be swallowed as skips; they propagate as real failures (non-zero exit)**
+   so a genuine outage surfaces as a red run rather than silently masking every
+   entry as "skipped." Only the typed `SourceUnusableError` (and not generic
+   `Error`) triggers the skip path. The skip must fit the existing CLI/workflow
+   contract — `audit-run-entry` writes the **verdict JSON to stdout**, and the
+   workflow runs `jq` on `.verdict` under `set -e`. So:
+   - On `SourceUnusableError`, the CLI emits a **structured skip envelope as valid
+     JSON on stdout**: `{"skipped": true, "reason": "source-unusable", "url": "…",
+     "detail": "…"}`, and exits **0**. It must never write partial/zero verdict JSON
+     or free-text to stdout; all diagnostics go to **stderr**.
+   - On any other error, the CLI exits non-zero (as today) so the workflow step
+     fails and the outage is visible.
    - The workflow branches **before** the `jq .verdict`/apply steps: if
      `.skipped == true`, log the reason to the run output and `continue` to the next
      entry (no apply, no PR). This requires a small workflow edit and keeps the
@@ -230,15 +246,17 @@ of scope; if pursued later it would slot in as an apply gate for
 ```
 source-hash.fetchAndHash(url)
   → GET url (manual redirect)
-  → 3xx? follow Location (existing)                      ─┐ shared hop budget,
-  → 200 + thin body + near-zero <meta refresh url=X>?     ─┤ SSRF/DNS guard +
-        X is http(s) & differs → follow X                 ─┤ http(s)-scheme check
-  → 200 terminal:
-        substantial visible text → {hash, body}  (accept, even w/ refresh tag)
-        thin & no followable target → throw SourceUnusableError
+  → 3xx? follow Location (existing)                           ─┐ shared hop budget,
+  → 200 non-HTML (json/text/…)          → {hash, body}        ─┤ SSRF/DNS guard +
+  → 200 HTML, near-zero <meta refresh url=X> (vs <base href>)? ┤ http(s)-scheme
+        X http(s) & differs from current → follow X            ┤ check, per hop
+        (regardless of visible-text length)                   ─┘
+  → 200 HTML, unfollowable redirect (js-only / no http(s) url=) → SourceUnusableError
+  → 200 HTML, no redirect mechanism (any size)                 → {hash, body} (accept)
 audit-runner: prefetch loop
-  → fetchAndHash throws → catch → emit {"skipped":true,...} JSON on stdout, exit 0
+  → SourceUnusableError → emit {"skipped":true,...} JSON on stdout, exit 0
         workflow sees .skipped==true → log reason, continue (no apply, no PR)
+  → transient/infra error (timeout / 5xx / DNS / socket) → propagate, exit non-zero
   → success → inject real body into prompt → model
 model verdict
   → source_unverifiable:true → audit-apply no-op (no edits, no pin change)
@@ -253,26 +271,40 @@ Existing tests already inject a fake `fetchImpl` (queued `Response`s) and
 Add fixtures from the real captured bytes: the **326-byte OWASP meta-refresh stub**
 and a **real-content body** containing 2025 category names.
 
-- **source-hash — follow & accept:** meta-refresh stub → follows to the
-  real-content fixture and returns its hash/body; *chained* stubs → followed within
-  the hop budget; a real page that *also* contains a `<meta refresh>` auto-reload
-  tag → **accepted, not rejected** (false-positive guard); a small-but-legitimate
-  real source → **accepted** (visible-text floor must not reject it).
-- **source-hash — reject (fail closed):** JS-only / no-`url=` / non-near-zero-delay
-  stub → throws `SourceUnusableError`; contentless thin body → throws.
+- **source-hash — follow & accept:** the 326-byte meta-refresh stub → follows to
+  the real-content fixture and returns its hash/body; *chained* stubs → followed
+  within the hop budget; a **long templated stub** (site chrome/footer text well
+  above any floor) with a near-zero meta-refresh → **followed, not hashed**
+  (R2-A regression); a real page with a **long-delay** `<meta refresh content="300">`
+  auto-reload tag → **accepted** (false-positive guard); a **small-but-legitimate
+  HTML page with no redirect mechanism** → **accepted** (byte count is not a
+  rejection criterion).
+- **source-hash — non-HTML:** a small `application/json` / `text/plain` source
+  (e.g. a raw version file) → **accepted unchanged** (HTML heuristics skipped on
+  non-HTML content-type — R2-B).
+- **source-hash — reject (fail closed):** a JS-only redirect stub
+  (`location.replace(`/`window.location=`) with little content → throws
+  `SourceUnusableError`; a near-zero meta-refresh with no usable `http(s)` `url=`
+  → throws.
+- **source-hash — `<base href>` resolution:** a stub with `<base href>` + a
+  relative meta-refresh `url=` → target resolved against the base, not the document
+  URL (R2-D).
 - **source-hash — parser variants:** attribute order/case (`HTTP-EQUIV`,
   `Refresh`), single vs double vs unquoted `url=`, extra whitespace, `;url=` vs
-  `; url =`, delay `0` vs `0.0` vs `1` vs `5`; self/cyclic refresh (target == current)
-  → not followed (treated as terminal); visible-text extraction ignores
-  `<script>`/`<style>`/comments/hidden content. Include a malicious-input case to
-  assert no catastrophic backtracking (bounded time).
+  `; url =`, delay `0` vs `0.0` vs `1` vs `5` (5 = long delay → not followed);
+  self/cyclic refresh (target == current) → not followed (treated as terminal).
+  Include a malicious-input case to assert no catastrophic backtracking (bounded
+  time).
 - **source-hash — security:** a meta-refresh `url=` pointing at a private IP →
   rejected by the SSRF/DNS guard (not followed); `url=javascript:…`/`data:…`/`file:…`
   → rejected by the scheme check (not resolved/fetched).
-- **audit-runner — fail-closed skip:** a throwing `fetchImpl` → CLI emits a valid
-  `{"skipped":true,...}` JSON envelope on stdout and exits 0 (assert stdout parses
-  as JSON and `.skipped===true`; assert diagnostics are on stderr, not stdout);
-  `source_unverifiable` round-trips through the schema.
+- **audit-runner — fail-closed skip vs hard failure:** a `fetchImpl` raising
+  `SourceUnusableError` → CLI emits a valid `{"skipped":true,...}` JSON envelope on
+  stdout and exits 0 (assert stdout parses as JSON, `.skipped===true`, and
+  diagnostics are on stderr not stdout). A `fetchImpl` raising a **transient/infra
+  error** (timeout / HTTP 5xx / DNS failure) → CLI exits **non-zero** and does NOT
+  emit a skip envelope (R2-E: outages stay visible). `source_unverifiable`
+  round-trips through the schema.
 - **workflow:** a unit/integration check (or bats, matching existing workflow
   tests) that the `.skipped==true` branch skips apply/PR and continues.
 - **audit-apply:** `source_unverifiable: true` + non-empty `proposed_changes`/pin
@@ -308,13 +340,22 @@ and a **real-content body** containing 2025 category names.
 
 ## 10. Risks & Tradeoffs
 
-- **Heuristic stub detection** could false-reject a real page. Mitigated:
-  substantial visible text is accepted unconditionally (primary signal); the floor
-  sits far below any real source; the regression suite includes a small-but-legit
-  page that must pass.
+- **Heuristic stub detection** could false-reject a real page. Mitigated: rejection
+  keys on a *redirect mechanism*, not byte count (so small legit pages pass); HTML
+  heuristics are gated on a `text/html` content-type (so JSON/text sources pass);
+  the regression suite includes a small-but-legit HTML page and a small non-HTML
+  source that must both pass.
+- **JS-only redirect detection is heuristic** and may miss an obscure redirect
+  pattern. Mitigated: the model-side `source_unverifiable` backstop (Layer 2.2)
+  catches a stub that reaches the model, and an undetected JS redirect is no worse
+  than today's behavior (accept) — never a *new* failure.
 - **Following meta-refresh expands the fetch's trust surface.** Mitigated: the
   SSRF/DNS guard runs on every hop (including meta-refresh targets), the scheme is
-  restricted to http(s), and the hop budget is shared — no new unbounded following.
+  restricted to http(s), `<base href>` is honored for resolution, and the hop budget
+  is shared — no new unbounded following.
+- **Masking outages as skips.** Mitigated: only the typed `SourceUnusableError`
+  triggers a skip; transient/infra errors (timeout/5xx/DNS/socket) propagate as a
+  non-zero exit so a real outage shows up as a red run, not silent skips.
 - **`source_unverifiable` depends on the model.** That's why it is the *backstop*,
   not the primary fix; Layer 1 prevents the stub from reaching the model at all.
 - **Skip envelope is a CLI contract change.** The workflow must branch on it;
@@ -324,8 +365,11 @@ and a **real-content body** containing 2025 category names.
 
 ## 11. Open Questions (for the implementation plan to resolve)
 
-1. **Exact visible-text floor** for stub detection — pin empirically against the
-   real fixtures so it rejects the 326-byte stub with margin and never a real page.
+1. **Optional thin-content warning threshold** — rejection now keys on a redirect
+   *mechanism*, not byte count, so no hard floor is required. If a non-fatal
+   "suspiciously thin, no redirect mechanism" warning is wanted (§5 Layer 1.4),
+   pick a conservative threshold empirically (the stub is ~60 chars vs ~KBs for a
+   real page); it must never gate acceptance.
 2. **HTML parser choice** — does the repo already vendor an HTML/DOM parser usable
    for ReDoS-safe meta-tag extraction, or should the fetch use a small bounded
    linear scan? (Prefer reuse; avoid adding a heavy dependency for one tag.)
@@ -367,3 +411,38 @@ Qwen2.5 reviewer (0 blocking). Resolutions:
 - **Local AI (non-blocking) — source_unverifiable wiring, empirical floor, skip
   visibility.** Folded into §5 Layer 2, §11 Q1, and §11 Q3 (skip visibility resolved
   to "yes").
+
+### Round 2 (rev. 3)
+
+Re-reviewed via `mmr review` (codex ✓, antigravity ✓, claude ✓ clean,
+compensating-gemini ✓ clean; gemini/grok still failing on tier/credits) plus the
+local Qwen2.5 reviewer (0 blocking, "SAFE TO MERGE"). Round-1 findings confirmed
+resolved. New findings — all reframing Layer 1 around redirect-*mechanism* detection
+rather than byte count — resolved:
+
+- **R2-A (codex P1) — a templated stub with chrome text above the floor still
+  redirects.** §5 Layer 1 reordered: a near-zero, differing-target meta-refresh is
+  followed **regardless of visible-text length**; text length is no longer the
+  primary signal. Added a long-templated-stub test (§7).
+- **R2-B (antigravity P1) — content-type-blind heuristics reject small non-HTML
+  sources.** §5 Layer 1.1 gates all HTML heuristics on a `text/html` /
+  `application/xhtml+xml` content-type; JSON/text sources are accepted unchanged.
+  Added a non-HTML test (§7).
+- **R2-C (antigravity P1) — thin HTML with no redirect mechanism falsely rejected.**
+  §5 Layer 1.4: byte count is not a rejection criterion; only an *unfollowable
+  redirect mechanism* fails closed. A small page with no redirect mechanism is
+  accepted. §11 Q1 demoted the floor to an optional warning.
+- **R2-D (antigravity P2) — `<base href>` ignored when resolving relative target.**
+  §5 Layer 1.2 resolves the meta-refresh `url=` against `<base href>` when present.
+  Added a `<base href>` test (§7).
+- **R2-E (antigravity P2) — catching all fetch errors as skips masks outages.**
+  §5 Layer 2.1: only the typed `SourceUnusableError` skips (exit 0 + envelope);
+  transient/infra errors (timeout/5xx/DNS/socket) propagate as a non-zero exit.
+  Added a transient-error test (§7) and a risk note (§10).
+
+Channel-health note for the maintainer (not a design finding): the `gemini` MMR
+channel now fails with `IneligibleTierError` (Gemini Code Assist for individuals is
+discontinued; the Antigravity `agy` channel is its replacement and is healthy), and
+`grok` fails with a 403 spending-limit/credits error. Both were covered by
+compensating claude-based passes; consider replacing the gemini channel with `agy`
+and topping up grok credits, or disabling grok in `.mmr.yaml`.
