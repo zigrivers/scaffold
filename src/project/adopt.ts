@@ -16,11 +16,25 @@ import {
   MobileAppConfigSchema, DataPipelineConfigSchema, MlConfigSchema,
   BrowserExtensionConfigSchema, GameConfigSchema, ResearchConfigSchema,
   DataScienceConfigSchema, Web3ConfigSchema, McpServerConfigSchema,
-  MacosNativeConfigSchema,
+  MacosNativeConfigSchema, ProjectSchema,
 } from '../config/schema.js'
+import { configKeyFor } from '../config/validators/index.js'
 import { ExitCode } from '../types/enums.js'
 import { configParseError, configNotObject } from '../utils/errors.js'
 import type { PartialConfigOverrides } from '../cli/init-flag-families.js'
+
+// ---------------------------------------------------------------------------
+// CouplingViolationError — thrown when cross-field coupling rules fail
+// ---------------------------------------------------------------------------
+
+class CouplingViolationError extends Error {
+  readonly zodError: z.ZodError
+  constructor(message: string, zodError: z.ZodError) {
+    super(message)
+    this.name = 'CouplingViolationError'
+    this.zodError = zodError
+  }
+}
 
 // CRITICAL: project-type → typed-config-key mapping. Do NOT derive via string transforms
 // — `'web-app'.replace('-','')` produces 'webapp', not 'webApp'.
@@ -275,6 +289,17 @@ export async function runAdoption(options: {
         })
       }
     } catch (err) {
+      if (err instanceof CouplingViolationError) {
+        const violations = err.zodError.errors.map(e => e.message).join('; ')
+        result.errors.push({
+          code: 'ADOPT_CONFIG_COUPLING_VIOLATION',
+          message: `Config coupling violation for ${decision.chosen.projectType}: ${violations}. `
+            + 'Run \'scaffold init --help\' to see the available flags.',
+          exitCode: ExitCode.ValidationError,
+          context: { type: decision.chosen.projectType, violations },
+        })
+        return result
+      }
       if (err instanceof z.ZodError) {
         const missing = err.errors.map(e => e.path.join('.')).join(', ')
         result.errors.push({
@@ -323,6 +348,21 @@ function finalizeConfigFromMatch(
   // Step 3: Zod.parse — applies defaults to fields still unset
   const schema = schemaForType(match.projectType)
   const config = schema.parse(flagged)
+
+  // Step 4: coupling check — run ALL_COUPLING_VALIDATORS via ProjectSchema.superRefine
+  // to catch cross-field rules (e.g. mac-app-store requires sandboxed: true).
+  // Fail-closed: do NOT auto-correct. Surface a clear error so the user fixes the flag.
+  const couplingCheck = ProjectSchema.safeParse({
+    projectType: match.projectType,
+    [configKeyFor(match.projectType)]: config,
+  })
+  if (!couplingCheck.success) {
+    const messages = couplingCheck.error.errors.map(e => e.message).join('; ')
+    throw new CouplingViolationError(
+      `Config coupling violation for ${match.projectType}: ${messages}`,
+      couplingCheck.error,
+    )
+  }
 
   return { config, conflicts }
 }
