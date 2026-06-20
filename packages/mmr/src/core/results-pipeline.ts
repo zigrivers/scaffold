@@ -104,6 +104,7 @@ export function runResultsPipeline(
         elapsed: entry.elapsed ?? '0s',
         findings: [],
         error: errorMsg,
+        recovery: entry.recovery,
       }
       continue
     }

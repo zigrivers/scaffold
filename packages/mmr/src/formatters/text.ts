@@ -54,8 +54,22 @@ export function formatText(results: ReconciledResults): string {
   }
 
   lines.push('Channels:')
+  const DEGRADED = new Set(['not_installed', 'auth_failed', 'failed', 'timeout', 'skipped'])
+  let anyDegraded = false
   for (const [name, ch] of Object.entries(results.per_channel)) {
     lines.push(`  ${name}: ${ch.status} (${ch.elapsed})`)
+    if (DEGRADED.has(ch.status)) {
+      anyDegraded = true
+      if (ch.status === 'not_installed') {
+        lines.push(`    → not installed — install it, or silence: mmr config disable ${name}`)
+      } else if (ch.recovery) {
+        lines.push(`    → ${ch.recovery}`)
+      }
+    }
+  }
+  if (anyDegraded) {
+    lines.push('')
+    lines.push('Some channels were unavailable — run `mmr doctor` to diagnose and fix.')
   }
 
   return lines.join('\n')
