@@ -42,7 +42,19 @@ function loadDoc(file: string, opts: { create?: boolean } = {}): Document {
  */
 function atomicWrite(file: string, content: string): void {
   const tmp = `${file}.tmp-${process.pid}`
-  fs.writeFileSync(tmp, content)
+  // Preserve the target's permission bits across the temp+rename, so a private
+  // 0600 config is not silently widened to 0644 under the umask — config can
+  // hold secrets in env/headers/command tokens. New files default to 0600.
+  let mode = 0o600
+  try {
+    mode = fs.statSync(file).mode & 0o777
+  } catch {
+    // target does not exist yet → keep the restrictive default
+  }
+  fs.writeFileSync(tmp, content, { mode })
+  // chmod explicitly: writeFileSync's mode is masked by the umask, but the
+  // intent here is the exact mode (especially when preserving an existing one).
+  fs.chmodSync(tmp, mode)
   fs.renameSync(tmp, file)
 }
 

@@ -82,6 +82,18 @@ describe('config writer', () => {
     expect(leftovers).toEqual([])
   })
 
+  it('preserves the existing file mode across an atomic write', () => {
+    fs.writeFileSync(file, 'version: 1\n')
+    fs.chmodSync(file, 0o600)
+    setChannelEnabled(file, 'codex', false)
+    expect(fs.statSync(file).mode & 0o777).toBe(0o600)
+  })
+
+  it('creates a new config file with restrictive 0600 permissions', () => {
+    setChannelEnabled(file, 'codex', false)
+    expect(fs.statSync(file).mode & 0o777).toBe(0o600)
+  })
+
   it('treats a channel name containing a dot as a single key', () => {
     fs.writeFileSync(file, 'version: 1\n')
     setChannelEnabled(file, 'my-bot.v2', false)
