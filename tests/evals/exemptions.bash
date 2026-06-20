@@ -13,6 +13,10 @@ TERMINAL_OUTPUT_EXEMPT=(
   "automated-pr-review"
   "beads"
   "create-evals"
+  # github-setup's output (docs/github-setup.md) is a setup record consumed by the
+  # user, not a document downstream steps build on — the remote it creates is an
+  # environmental fact, not a pipeline input.
+  "github-setup"
   # Game development steps — terminal artifacts consumed by developers, not pipeline.
   # These correspond to game-overlay.yml step-overrides. Keep in sync.
   "playtest-plan"
