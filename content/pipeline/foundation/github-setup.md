@@ -18,9 +18,11 @@ off-machine from the start. Initialize git if needed, ensure a `.gitignore` is i
 place, make an initial commit, and create a remote repository (private by default,
 public if the user chooses) named `origin`, then verify the push. A private GitHub
 repo is the project's real safety net; local git on one machine is not a backup.
-This step establishes the remote that later steps assume — `git-workflow`
-(branching, CI, worktrees) configures *how* the repository is used and depends on it
-already existing.
+Running this early means the remote is in place before the later `git-workflow`
+step (order 330), which configures *how* the repository is used (branching, CI,
+worktrees). This is a sequencing relationship, not a hard dependency — a user who
+created the remote another way can still proceed; this step simply detects that and
+skips creation.
 
 ## Inputs
 - Project name and description — from docs/plan.md if it exists; otherwise ask the user
@@ -46,16 +48,20 @@ already existing.
 - (deep) Branching strategy, CI, PR workflow, and branch protection are explicitly deferred to git-workflow (order 330), not duplicated here
 
 ## Methodology Scaling
+docs/github-setup.md is always produced (it is the Mode Detection marker) — depth
+governs how much it records, not whether it exists.
 - **deep**: Full setup — detect state, confirm visibility, ensure a comprehensive
-  `.gitignore`, secret-scan the initial commit, create the remote, verify the push,
-  and write docs/github-setup.md with re-run and visibility-change guidance.
-- **mvp**: Initialize git, ensure a minimal `.gitignore`, make an initial commit,
-  create a private remote, and confirm the push. Skip the detailed record doc.
+  `.gitignore`, secret-scan everything about to be pushed, create the remote, verify
+  the push, and write docs/github-setup.md with default branch, re-run, and
+  visibility-change guidance.
+- **mvp**: Initialize git, ensure a minimal `.gitignore`, secret-scan, make an
+  initial commit, create a private remote, confirm the push, and write a minimal
+  docs/github-setup.md (remote URL + visibility).
 - **custom:depth(1-5)**:
-  - Depth 1: `git init`, minimal `.gitignore`, initial commit, create private remote, push.
+  - Depth 1: `git init`, minimal `.gitignore`, secret-scan, initial commit, create private remote, push, and write a minimal docs/github-setup.md (URL + visibility).
   - Depth 2: add the public/private choice and push verification against the remote.
-  - Depth 3: add a secret scan of the initial commit and a `gh`-absent manual fallback.
-  - Depth 4: add docs/github-setup.md recording URL, visibility, and default branch.
+  - Depth 3: add the `gh`-absent manual fallback and an explicit secret scan of already-tracked files (not just newly staged ones).
+  - Depth 4: expand docs/github-setup.md with the default branch and re-run instructions.
   - Depth 5: add visibility-change guidance and an explicit hand-off note to git-workflow.
 
 ## Mode Detection
@@ -69,7 +75,7 @@ visibility, default branch, and commit history.
 ## Update Mode Specifics
 - **Detect prior artifact**: docs/github-setup.md exists, or a git repository with an `origin` remote already exists (`git remote get-url origin` succeeds)
 - **Preserve**: existing remote URL, repository visibility, default branch, commit history, existing `.gitignore` entries
-- **Triggers for update**: repository exists but has no `origin` remote (add it and push); repository exists but was never pushed (push); docs/github-setup.md is missing (write it); `.gitignore` is missing a secret/env rule (add it)
+- **Triggers for update**: repository exists but has no `origin` remote (secret-scan the tracked files and commits, then add the remote and push); repository exists but was never pushed (secret-scan tracked files and history first, then push); docs/github-setup.md is missing (write it); `.gitignore` is missing a secret/env rule (add it)
 - **Conflict resolution**: never delete or recreate an existing remote; to change visibility, use `gh repo edit --visibility` with explicit user confirmation rather than recreating the repository; never force-push and never rewrite history
 
 ### Detect the current state
@@ -95,8 +101,9 @@ Never assume visibility — wait for the choice before creating the remote.
 2. Ensure a `.gitignore` exists and excludes secrets and local env files (`.env`,
    `.env.local`), dependency/build directories, and OS cruft. Create a minimal one
    if absent; otherwise add only the missing secret/env rules.
-3. Stage the project and make an initial commit using the project's commit
-   convention (e.g., `chore: initial commit`).
+3. Stage the project, then scan the staged files for secrets, credentials, tokens,
+   or keys (see Safety rules). Only once the scan is clean, make an initial commit
+   using the project's commit convention (e.g., `chore: initial commit`).
 4. Create the remote and push with the GitHub CLI. Derive the repository name from
    the project (docs/plan.md) or ask:
    `gh repo create <name> --private --source=. --remote=origin --push`
@@ -115,9 +122,14 @@ Never assume visibility — wait for the choice before creating the remote.
   (`gh repo edit --visibility …`).
 
 ### Safety rules
-- **Never commit secrets.** Before the initial commit, scan staged files for obvious
-  credentials, tokens, or keys; if any are found, stop and tell the user rather than
-  committing.
+- **Never commit or push secrets.** Scan for credentials, tokens, and keys before
+  the initial commit **and before any push** — including the update-mode case of
+  pushing an existing repository for the first time, where the secret may already sit
+  in tracked files or earlier commits rather than in newly staged changes. If any are
+  found, STOP and tell the user; do not commit or push. Note that adding a
+  `.gitignore` does NOT untrack a secret that is already committed — an
+  already-tracked secret must be removed from tracking (and from history if it was
+  already committed) before the push.
 - Never force-push, never overwrite an existing remote, and never rewrite history.
 - Defer branching strategy, commit standards, CI, PR workflow, branch protection, and
   worktrees to the `git-workflow` step (order 330) — do not duplicate that work here.
