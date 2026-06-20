@@ -2,7 +2,7 @@ import type { CommandModule, ArgumentsCamelCase } from 'yargs'
 import fs from 'node:fs'
 import path from 'node:path'
 import { loadConfig } from '../config/loader.js'
-import { resolveConfigPaths } from '../config/paths.js'
+import { resolveDisableScope } from '../config/scope.js'
 import { setChannelEnabled } from '../config/writer.js'
 import { probeChannels, type ChannelHealth } from '../core/channel-health.js'
 
@@ -14,6 +14,7 @@ interface DoctorArgs {
 const ICON: Record<ChannelHealth['status'], string> = {
   ok: '✓',
   auth_failed: '⚠',
+  timeout: '⚠',
   not_installed: '✗',
   missing_command: '✗',
   disabled: '·',
@@ -21,7 +22,7 @@ const ICON: Record<ChannelHealth['status'], string> = {
 }
 
 function needsAttention(h: ChannelHealth, fixed: boolean): boolean {
-  if (h.status === 'auth_failed' || h.status === 'missing_command') return true
+  if (h.status === 'auth_failed' || h.status === 'timeout' || h.status === 'missing_command') return true
   if (h.status === 'not_installed') return !fixed
   return false
 }
@@ -46,16 +47,22 @@ async function runDoctor(args: DoctorArgs): Promise<void> {
     }
   }
 
+  const fixedNames = new Set<string>()
+  let fixFailures = 0
   if (willFix) {
-    const paths = resolveConfigPaths({ projectRoot: process.cwd() })
-    fs.mkdirSync(path.dirname(paths.user), { recursive: true })
+    // Route each disable to the SAME scope `mmr config disable` would choose,
+    // so a project-only / project-overridden channel isn't stubbed globally.
+    const scope = resolveDisableScope({ projectRoot: process.cwd() })
     if (args.format !== 'json') console.log('')
     for (const h of structural) {
+      const target = scope.forChannel(h.name)
       try {
-        // not-installed is machine-level → record the disable in the global file.
-        setChannelEnabled(paths.user, h.name, false, { allowSymlink: true })
-        if (args.format !== 'json') console.log(`  ✓ disabled ${h.name} in ${paths.user}`)
+        fs.mkdirSync(path.dirname(target.file), { recursive: true })
+        setChannelEnabled(target.file, h.name, false, { allowSymlink: target.allowSymlink })
+        fixedNames.add(h.name)
+        if (args.format !== 'json') console.log(`  ✓ disabled ${h.name} in ${target.file}`)
       } catch (err) {
+        fixFailures += 1
         console.error(`  ✗ could not disable ${h.name}: ${err instanceof Error ? err.message : String(err)}`)
       }
     }
@@ -64,8 +71,12 @@ async function runDoctor(args: DoctorArgs): Promise<void> {
     console.log('Run `mmr doctor --fix` to disable the not-installed channel(s) above.')
   }
 
-  const remaining = health.filter((h) => needsAttention(h, willFix)).length
-  process.exit(remaining > 0 ? 1 : 0)
+  // Only count a not_installed channel as resolved if its disable actually wrote.
+  const remaining = health.filter((h) => {
+    if (h.status === 'not_installed') return !fixedNames.has(h.name)
+    return needsAttention(h, false)
+  }).length
+  process.exit(remaining > 0 || fixFailures > 0 ? 1 : 0)
 }
 
 export const doctorCommand: CommandModule<object, DoctorArgs> = {

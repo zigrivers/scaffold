@@ -560,7 +560,11 @@ async function configToggle(channelArg: string | undefined, enabled: boolean, ar
  * loads. If validation fails, roll the file back to its prior state (or delete a
  * newly-created file) so an invalid config is never left on disk.
  */
-function withValidatedWrite(file: string, mutate: () => void): { ok: true } | { ok: false; error: string } {
+function withValidatedWrite(
+  file: string,
+  mutate: () => void,
+  opts: { global?: boolean } = {},
+): { ok: true } | { ok: false; error: string } {
   const existed = fs.existsSync(file)
   const backup = existed ? fs.readFileSync(file, 'utf-8') : null
   try {
@@ -569,7 +573,10 @@ function withValidatedWrite(file: string, mutate: () => void): { ok: true } | { 
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
   }
   try {
-    loadConfig({ projectRoot: process.cwd() })
+    // For a --global write, validate WITHOUT the project layer: a valid project
+    // override must not be able to mask an invalid ~/.mmr/config.yaml that would
+    // then break config loading in other repos.
+    loadConfig({ projectRoot: process.cwd(), skipProjectConfig: opts.global === true })
     return { ok: true }
   } catch (err) {
     if (existed && backup !== null) fs.writeFileSync(file, backup)
@@ -595,7 +602,11 @@ function configSet(pathArg: string | undefined, valueArg: string | undefined, ar
   }
   const { file, allowSymlink, flag } = scopeFile(args)
   fs.mkdirSync(path.dirname(file), { recursive: true })
-  const res = withValidatedWrite(file, () => setConfigValueSegs(file, pathArg.split('.'), valueArg, { allowSymlink }))
+  const res = withValidatedWrite(
+    file,
+    () => setConfigValueSegs(file, pathArg.split('.'), valueArg, { allowSymlink }),
+    { global: args.global === true },
+  )
   if (!res.ok) {
     console.error(`Cannot set ${pathArg}: ${res.error}`)
     return false
@@ -620,7 +631,11 @@ function configUnset(pathArg: string | undefined, args: ConfigArgs): boolean {
     console.error(`Nothing to unset: ${file} does not exist.`)
     return false
   }
-  const res = withValidatedWrite(file, () => unsetConfigValueSegs(file, pathArg.split('.'), { allowSymlink }))
+  const res = withValidatedWrite(
+    file,
+    () => unsetConfigValueSegs(file, pathArg.split('.'), { allowSymlink }),
+    { global: args.global === true },
+  )
   if (!res.ok) {
     console.error(`Cannot unset ${pathArg}: ${res.error}`)
     return false

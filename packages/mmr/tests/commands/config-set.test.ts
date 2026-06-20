@@ -63,6 +63,22 @@ describe('mmr config set / unset', () => {
     exitSpy.mockRestore()
   })
 
+  it('validates a --global set in global-only scope (a project override cannot mask it)', async () => {
+    // The project masks fix_threshold with a VALID value, so the merged config
+    // would look fine — but the global write itself is invalid and must be
+    // rejected so it can't break other repos.
+    fs.writeFileSync(path.join(tmp, '.mmr.yaml'), 'version: 1\ndefaults:\n  fix_threshold: P2\n')
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
+    await run({ action: 'set', name: 'defaults.fix_threshold', target: 'NOPE', global: true })
+    expect(exitSpy).toHaveBeenCalledWith(1)
+    const global = path.join(home, '.mmr', 'config.yaml')
+    const globalText = fs.existsSync(global) ? fs.readFileSync(global, 'utf-8') : ''
+    expect(globalText).not.toContain('NOPE')
+    errSpy.mockRestore()
+    exitSpy.mockRestore()
+  })
+
   it('unsets a project override and reports the inherited default', async () => {
     fs.writeFileSync(path.join(tmp, '.mmr.yaml'), 'version: 1\ndefaults:\n  timeout: 999\n')
     await run({ action: 'unset', name: 'defaults.timeout', project: true })

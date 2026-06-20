@@ -3,9 +3,10 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-// codex is "not installed"; everything else installs + auths fine.
+// codex (a built-in) and absent-cli-xyz (a custom project channel) are "not
+// installed"; everything else installs + auths fine.
 vi.mock('../../src/core/auth.js', () => ({
-  checkInstalled: async (cmd: string) => cmd !== 'codex',
+  checkInstalled: async (cmd: string) => cmd !== 'codex' && cmd !== 'absent-cli-xyz',
   checkAuth: async () => ({ status: 'ok' }),
   checkHttpAuth: async () => ({ status: 'ok' }),
   deriveProbeUrl: () => undefined,
@@ -51,6 +52,22 @@ describe('mmr doctor', () => {
     expect(fs.existsSync(global)).toBe(true)
     expect(fs.readFileSync(global, 'utf-8')).toMatch(/codex:[\s\S]*enabled: false/)
     expect(exitSpy).toHaveBeenCalledWith(0)
+  })
+
+  it('--fix routes a project-only not-installed channel to the project (not global)', async () => {
+    fs.writeFileSync(
+      path.join(tmp, '.mmr.yaml'),
+      'version: 1\nchannels:\n  projbot:\n    command: "absent-cli-xyz review"\n',
+    )
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
+    await run({ format: 'text', fix: true })
+    // projbot is project-only → its disable stays in the project file
+    expect(fs.readFileSync(path.join(tmp, '.mmr.yaml'), 'utf-8')).toMatch(/projbot:[\s\S]*enabled: false/)
+    // codex is a built-in → routed to global; projbot must NOT be in global
+    const global = path.join(home, '.mmr', 'config.yaml')
+    const globalText = fs.existsSync(global) ? fs.readFileSync(global, 'utf-8') : ''
+    expect(globalText).not.toMatch(/projbot/)
+    exitSpy.mockRestore()
   })
 
   it('emits JSON with --format json', async () => {

@@ -5,10 +5,18 @@ import type { MmrConfigParsed } from '../config/schema.js'
 export type ChannelHealthStatus =
   | 'ok'
   | 'auth_failed'
+  | 'timeout'
   | 'not_installed'
   | 'disabled'
   | 'abstract'
   | 'missing_command'
+
+/** Map an auth-probe result ('ok'|'failed'|'timeout') to a health status. */
+function authToHealth(status: 'ok' | 'failed' | 'timeout'): ChannelHealthStatus {
+  if (status === 'ok') return 'ok'
+  if (status === 'timeout') return 'timeout'
+  return 'auth_failed'
+}
 
 export interface ChannelHealth {
   name: string
@@ -38,7 +46,7 @@ export async function probeChannels(config: MmrConfigParsed): Promise<ChannelHea
       const a = await checkHttpAuth(ch)
       out.push({
         name,
-        status: a.status === 'ok' ? 'ok' : 'auth_failed',
+        status: authToHealth(a.status),
         installed: true,
         recovery: a.status === 'ok' ? undefined : redact(a.recovery),
       })
@@ -60,7 +68,7 @@ export async function probeChannels(config: MmrConfigParsed): Promise<ChannelHea
     const a = await checkAuth(ch)
     out.push({
       name,
-      status: a.status === 'ok' ? 'ok' : 'auth_failed',
+      status: authToHealth(a.status),
       installed: true,
       recovery: a.status === 'ok' ? undefined : redact(a.recovery),
     })
