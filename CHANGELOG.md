@@ -4,6 +4,26 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.37.0] — 2026-06-20
+
+### Changed
+
+- **MMR 2.0.0 — agent-legible config & self-healing channels** (ships in
+  `@zigrivers/mmr` 2.0.0). The MMR review CLI gains config mutation
+  (`config enable/disable/set/unset`), introspection (`config path`, channel
+  provenance, `config show`), `mmr doctor` (channel health + `--fix`), a
+  machine-readable `mmr commands --json` manifest, and `mmr explain <topic>`
+  inline docs — so agents manage channels without hand-editing YAML.
+  **Behavior change:** a *not-installed* (structural) channel is no longer
+  compensated by default — transient failures still are; opt back in with
+  `--compensate-missing` or per-channel `required: true`. Config writes are
+  comment-preserving, symlink-safe, validated-before-commit, and redact secrets
+  across every output. (#690, #691, #692)
+- **Compensation guidance aligned.** `CLAUDE.md` and the `review-pr` /
+  `review-code` wrappers now distinguish *transient* degradation (compensate)
+  from *structural* absence (skip + remediate via `mmr config disable` /
+  `mmr doctor`); the `mmr` skill and reference guide document the new commands.
+
 ## [3.36.0] — 2026-06-20
 
 ### Added

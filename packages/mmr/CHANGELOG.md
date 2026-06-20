@@ -2,6 +2,58 @@
 
 ## [Unreleased]
 
+## [2.0.0] — 2026-06-20
+
+**Agent-legible config & self-healing channels.** Makes MMR's configuration
+discoverable, mutable, and self-healing for the AI agents that drive it — you no
+longer hand-edit `.mmr.yaml` to manage channels, and the review stops wasting
+work on channels that aren't installed.
+
+### ⚠️ Behavior changes (why this is a major release)
+
+- **Structurally-absent channels are no longer compensated by default.** A
+  channel whose CLI is **not installed** (`not_installed`) used to get a
+  substitute "compensating pass" on **every** review — added latency, no real
+  coverage. It is now **skipped by default** with a one-line remediation notice.
+  *Transient* failures (auth expired, timeout, runtime error) are still
+  compensated automatically. Restore the old behavior with `--compensate-missing`
+  on the review, or mark a channel `required: true` in config. A CI gate that
+  implicitly relied on the compensating pass for a missing CLI may see different
+  results — install the CLI, set `required: true`, or pass `--compensate-missing`.
+
+### Added
+
+- **Config mutation commands** (no more hand-editing YAML):
+  - `mmr config enable|disable <channel>` — toggle a channel; writes the canonical
+    `channels.<name>.enabled`. Disabling a *not-installed* channel records to the
+    global `~/.mmr/config.yaml` (machine-level); `--global`/`--project` override.
+  - `mmr config set <dotted.path> <value>` / `unset <dotted.path>` — edit any
+    value, validated before write (an edit that would break config loading is
+    rolled back), scope-aware, type/string-aware (env/headers stay strings).
+- **Config introspection:** `mmr config path` (read/write search order),
+  a provenance `source` column + `--format text` table on `config channels`, and
+  a top-level `mmr config show <channel>` alias.
+- **`mmr doctor`** — one-shot channel health (install + auth, HTTP probed over
+  the wire) with per-channel remediation; `--fix` disables not-installed channels;
+  `--format json` for agents.
+- **`mmr commands [--json]`** — machine-readable capability manifest; an agent
+  loads the whole command surface in one call instead of probing `--help`.
+- **`mmr explain <topic>`** — inline docs for channels, config, scopes,
+  compensation, redaction, provenance.
+- **Per-channel `required: true`** schema field (compensation opt-in).
+- **Point-of-pain remediation** in review output for degraded channels.
+
+### Changed / Security
+
+- **Comment-preserving, symlink-safe config writes.** Mutations preserve comments
+  and key order (eemeli `yaml`), create new files `0600`, refuse to write through
+  a symlinked project config (clobber guard), and validate before committing.
+- **Secret redaction is centralized and complete.** A user-configurable
+  `auth.recovery` (or inline command token) is redacted everywhere it is printed —
+  `config test`/`channels`/`show`, `mmr doctor`, and review dry-run/results output.
+- **A disabled channel no longer needs a `command`** — a bare `enabled: false`
+  override is valid in any layer, so scoped disables are portable across repos.
+
 ## [1.7.0] — 2026-06-19
 
 ### Added
