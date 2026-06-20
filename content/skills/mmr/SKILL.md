@@ -126,6 +126,28 @@ If `mmr review` reports auth failures, follow the recovery instructions in the o
 
 Re-run `mmr config test` after re-authenticating to verify.
 
+## Configuring Channels
+
+Turn a channel on or off without hand-editing YAML:
+
+```bash
+mmr config disable grok      # writes channels.grok.enabled: false
+mmr config enable grok       # turns it back on (and clears legacy channels_disabled)
+mmr config path              # where config is read from / written to
+mmr config channels --format text   # table with a SOURCE (provenance) column
+```
+
+`disable`/`enable` default to the project `./.mmr.yaml`. Disabling a channel
+whose CLI is **not installed** is a machine-level fact, so it records to the
+global `~/.mmr/config.yaml` instead — pass `--project` to scope it to the repo.
+Every mutation prints the file it wrote, the new effective value with its
+provenance source, and the revert command.
+
+If a review reports a channel as `not_installed`, the output prints the exact
+remediation: install the CLI, or `mmr config disable <name>` to stop dispatching
+it. `mmr config channels show <name>` inspects one channel with per-field
+provenance.
+
 ## Severity Gate
 
 Default threshold is `P2` (the verdict gate blocks on P0, P1, and P2;
