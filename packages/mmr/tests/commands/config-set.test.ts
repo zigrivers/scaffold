@@ -42,6 +42,32 @@ describe('mmr config set / unset', () => {
     expect(yaml).not.toContain('"600"')
   })
 
+  it('rejects a typo / unknown dotted path instead of silently no-op-ing', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
+    await run({ action: 'set', name: 'defaults.fix_treshold', target: 'P1', project: true })
+    expect(exitSpy).toHaveBeenCalledWith(1)
+    expect(errSpy.mock.calls.map((c) => String(c[0])).join('\n')).toMatch(/not a recognized config path/)
+    errSpy.mockRestore()
+    exitSpy.mockRestore()
+  })
+
+  it('redacts an inherited command-like value with an inline token on unset', async () => {
+    fs.mkdirSync(path.join(home, '.mmr'), { recursive: true })
+    fs.writeFileSync(
+      path.join(home, '.mmr', 'config.yaml'),
+      'version: 1\nchannels:\n  codex:\n    command: "codex exec --api-key sk-inherited-secret"\n',
+    )
+    fs.writeFileSync(
+      path.join(tmp, '.mmr.yaml'),
+      'version: 1\nchannels:\n  codex:\n    command: "codex exec"\n',
+    )
+    await run({ action: 'unset', name: 'channels.codex.command', project: true })
+    const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n')
+    expect(out).not.toContain('sk-inherited-secret')
+    expect(out).toContain('<redacted>')
+  })
+
   it('refuses a set that would make config invalid, and does not write', async () => {
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)

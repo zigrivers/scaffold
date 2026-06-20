@@ -20,7 +20,7 @@ import {
   isCommandSecretKey,
 } from '../core/redact.js'
 import { resolveConfigPaths } from '../config/paths.js'
-import { setChannelEnabled, setConfigValueSegs, unsetConfigValueSegs } from '../config/writer.js'
+import { setChannelEnabled, setConfigValueSegs, unsetConfigValueSegs, coerceScalar } from '../config/writer.js'
 import { normalizeChannelName } from '../config/channel-aliases.js'
 import { parse as parseYaml } from 'yaml'
 import type { OutputParserConfig, MmrConfigParsed } from '../config/schema.js'
@@ -560,10 +560,17 @@ async function configToggle(channelArg: string | undefined, enabled: boolean, ar
  * loads. If validation fails, roll the file back to its prior state (or delete a
  * newly-created file) so an invalid config is never left on disk.
  */
+function valueAtPath(root: unknown, segs: string[]): unknown {
+  return segs.reduce<unknown>(
+    (acc, k) => (acc && typeof acc === 'object' ? (acc as Record<string, unknown>)[k] : undefined),
+    root,
+  )
+}
+
 function withValidatedWrite(
   file: string,
   mutate: () => void,
-  opts: { global?: boolean } = {},
+  opts: { global?: boolean; expectPath?: { segs: string[]; value: unknown } } = {},
 ): { ok: true } | { ok: false; error: string } {
   const existed = fs.existsSync(file)
   const backup = existed ? fs.readFileSync(file, 'utf-8') : null
@@ -580,7 +587,12 @@ function withValidatedWrite(
     // For a --global write, validate WITHOUT the project layer: a valid project
     // override must not be able to mask an invalid ~/.mmr/config.yaml that would
     // then break config loading in other repos.
-    loadConfig({ projectRoot: process.cwd(), skipProjectConfig: opts.global === true })
+    const cfg = loadConfig({ projectRoot: process.cwd(), skipProjectConfig: opts.global === true })
+    // The Zod schema strips unknown keys, so a typo'd path validates but does
+    // nothing. Confirm the value actually landed at the requested path.
+    if (opts.expectPath && valueAtPath(cfg, opts.expectPath.segs) !== opts.expectPath.value) {
+      throw new Error(`'${opts.expectPath.segs.join('.')}' is not a recognized config path`)
+    }
     return { ok: true }
   } catch (err) {
     // The write succeeded (and so passed the symlink guard) but produced an
@@ -608,10 +620,11 @@ function configSet(pathArg: string | undefined, valueArg: string | undefined, ar
   }
   const { file, allowSymlink, flag } = scopeFile(args)
   fs.mkdirSync(path.dirname(file), { recursive: true })
+  const segs = pathArg.split('.')
   const res = withValidatedWrite(
     file,
-    () => setConfigValueSegs(file, pathArg.split('.'), valueArg, { allowSymlink }),
-    { global: args.global === true },
+    () => setConfigValueSegs(file, segs, valueArg, { allowSymlink }),
+    { global: args.global === true, expectPath: { segs, value: coerceScalar(valueArg) } },
   )
   if (!res.ok) {
     console.error(`Cannot set ${pathArg}: ${res.error}`)
@@ -660,10 +673,16 @@ function configUnset(pathArg: string | undefined, args: ConfigArgs): boolean {
     config,
   )
   if (inherited !== undefined) {
-    // Redact by the leaf KEY (a primitive value carries no key context), so a
-    // secret-bearing path like channels.foo.env.OPENAI_API_KEY isn't printed.
+    // Redact by the leaf KEY (a primitive value carries no key context): a
+    // secret-keyed path (…env.OPENAI_API_KEY) is fully redacted; a command-like
+    // path (command/check/recovery) is scanned for inline tokens; otherwise the
+    // value passes through the standard config-view redaction.
     const leaf = segs[segs.length - 1] ?? ''
-    const display = isSecretKey(leaf) ? '<redacted>' : redactConfigView(inherited)
+    const display = isSecretKey(leaf)
+      ? '<redacted>'
+      : isCommandLikeKey(leaf)
+        ? redactCommandString(inherited)
+        : redactConfigView(inherited)
     console.log(`  now inherits: ${JSON.stringify(display)}`)
   }
   return true
