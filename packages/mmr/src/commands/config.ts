@@ -300,26 +300,27 @@ function renderScalar(value: unknown): string {
 function redactShowChannel(channel: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(channel)) {
-    out[key] = redactShowValue(key, value)
+    out[key] = redactShowValue(key, value, true)
   }
   return out
 }
 
-function redactShowValue(key: string, value: unknown): unknown {
+function redactShowValue(key: string, value: unknown, topLevel = false): unknown {
   if (Array.isArray(value)) return redactShowArray(value)
   if (value !== null && typeof value === 'object') {
     const out: Record<string, unknown> = {}
     for (const [nestedKey, nestedValue] of Object.entries(value as Record<string, unknown>)) {
-      out[nestedKey] = redactShowValue(nestedKey, nestedValue)
+      // Nested env/headers entries carry VALUES, so api_key_env is not exempt there.
+      out[nestedKey] = redactShowValue(nestedKey, nestedValue, false)
     }
     return out
   }
   if (typeof value === 'string' && isCommandLikeKey(key) && commandContainsInlineSecret(value)) {
     return '<redacted>'
   }
-  // Keep `api_key_env` (the env-var NAME, not its value) visible, matching the
-  // `config channels` output and the documented redaction contract.
-  return isSecretKey(key) ? '<redacted>' : value
+  // Keep the TOP-LEVEL channel `api_key_env` (the env-var NAME) visible, matching
+  // `config channels`; a nested env/headers `api_key_env` holds a value → redact.
+  return isSecretKey(key, { exemptEnvNameKeys: topLevel }) ? '<redacted>' : value
 }
 
 function redactShowArray(values: unknown[]): unknown[] {

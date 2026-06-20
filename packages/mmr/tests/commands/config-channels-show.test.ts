@@ -35,6 +35,32 @@ describe('mmr config channels show <name> (T1-E)', () => {
     logSpy.mockRestore()
   })
 
+  it('still redacts a value stored under a NESTED api_key_env (not the top-level name)', async () => {
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), [
+      'version: 1',
+      'channels:',
+      '  myhttp:',
+      '    kind: http',
+      '    endpoint: https://api.example.com/v1/chat/completions',
+      '    model: gpt-4',
+      '    endpoint_convention: openai-chat',
+      '    api_key_env: MY_API_KEY',
+      '    headers:',
+      '      api_key_env: leaked-secret-value',
+    ].join('\n'))
+    const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(tmpDir)
+    const homeSpy = vi.spyOn(os, 'homedir').mockReturnValue(tmpDir)
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const { configCommand } = await import('../../src/commands/config.js')
+    await configCommand.handler({ action: 'show', name: 'myhttp', _: ['config'], $0: 'mmr' } as never)
+    const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n')
+    expect(out).toContain('MY_API_KEY')            // top-level name visible
+    expect(out).not.toContain('leaked-secret-value') // nested value redacted
+    cwdSpy.mockRestore()
+    homeSpy.mockRestore()
+    logSpy.mockRestore()
+  })
+
   it('prints merged channel config with provenance comments', async () => {
     fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), [
       'version: 1',
