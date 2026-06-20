@@ -56,6 +56,7 @@ interface ReviewArgs {
   configBaseRef?: string
   sync?: boolean
   'dry-run'?: boolean
+  'compensate-missing'?: boolean
 }
 
 /** 10MB buffer for large diffs (default is ~1MB which can throw) */
@@ -341,6 +342,11 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
         type: 'boolean',
         default: false,
         describe: 'Resolve diff and assemble prompt without dispatching channels',
+      })
+      .option('compensate-missing', {
+        type: 'boolean',
+        default: false,
+        describe: 'Also run a compensating pass for not-installed channels (off by default)',
       })
       .check((argv) => {
         if (typeof argv.session === 'string' && !isValidSessionId(argv.session)) {
@@ -739,7 +745,21 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     const compensating = getCompensatingChannels(
       channelStatuses,
       resolveCompensatorChannelName(config),
+      { compensateMissing: args['compensate-missing'] === true, channels: config.channels },
     )
+
+    // C1: surface structurally-absent channels we intentionally did NOT
+    // compensate, so the drop in coverage is visible and actionable.
+    const notCompensated = Object.entries(channelStatuses)
+      .filter(([n, s]) => s === 'not_installed' && !compensating.some((c) => c.originalChannel === n))
+      .map(([n]) => n)
+    if (notCompensated.length > 0) {
+      console.error(
+        `[mmr] not compensating structurally-absent channel(s): ${notCompensated.join(', ')}. `
+        + 'Install them, mark `required: true`, or pass --compensate-missing to substitute; '
+        + 'silence with `mmr config disable <name>`.',
+      )
+    }
 
     if (compensating.length > 0) {
       const compensatorAvailability = await checkConfiguredCompensatorAvailability(config)

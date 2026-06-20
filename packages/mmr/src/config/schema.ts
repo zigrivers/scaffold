@@ -131,6 +131,9 @@ const CommonChannelFields = {
   // and `extends` children (resolved before parse) validate.
   extends: z.string().optional(),
   abstract: z.boolean().default(false),
+  // When true, a structurally-absent (not-installed) channel still gets a
+  // compensating pass instead of being silently skipped (C1 opt-in).
+  required: z.boolean().optional(),
 }
 
 const SubprocessChannelSchema = z.object({

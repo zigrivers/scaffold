@@ -20,7 +20,7 @@ import {
   isCommandSecretKey,
 } from '../core/redact.js'
 import { resolveConfigPaths } from '../config/paths.js'
-import { setChannelEnabled } from '../config/writer.js'
+import { setChannelEnabled, setConfigValueSegs, unsetConfigValueSegs, coerceScalar } from '../config/writer.js'
 import { normalizeChannelName } from '../config/channel-aliases.js'
 import { parse as parseYaml } from 'yaml'
 import type { OutputParserConfig, MmrConfigParsed } from '../config/schema.js'
@@ -556,6 +556,166 @@ async function configToggle(channelArg: string | undefined, enabled: boolean, ar
 }
 
 /**
+ * Apply a config-file mutation, then validate that the whole merged config still
+ * loads. If validation fails, roll the file back to its prior state (or delete a
+ * newly-created file) so an invalid config is never left on disk.
+ */
+function valueAtPath(root: unknown, segs: string[]): unknown {
+  return segs.reduce<unknown>(
+    (acc, k) => (acc && typeof acc === 'object' ? (acc as Record<string, unknown>)[k] : undefined),
+    root,
+  )
+}
+
+function withValidatedWrite(
+  file: string,
+  mutate: () => void,
+  opts: { global?: boolean; expectPath?: { segs: string[]; value: unknown } } = {},
+): { ok: true } | { ok: false; error: string } {
+  const existed = fs.existsSync(file)
+  const backup = existed ? fs.readFileSync(file, 'utf-8') : null
+  // A mutate() failure means the writer refused BEFORE writing (symlink guard,
+  // YAML syntax, multi-doc) — nothing was written, so there's nothing to roll
+  // back. Rolling back here would be wrong: a raw write-back would bypass the
+  // very symlink protection that just refused the write.
+  try {
+    mutate()
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+  try {
+    // For a --global write, validate WITHOUT the project layer: a valid project
+    // override must not be able to mask an invalid ~/.mmr/config.yaml that would
+    // then break config loading in other repos.
+    const cfg = loadConfig({ projectRoot: process.cwd(), skipProjectConfig: opts.global === true })
+    // The Zod schema strips unknown keys, so a typo'd path validates but does
+    // nothing. Confirm the value actually landed at the requested path.
+    if (opts.expectPath && valueAtPath(cfg, opts.expectPath.segs) !== opts.expectPath.value) {
+      throw new Error(`'${opts.expectPath.segs.join('.')}' is not a recognized config path`)
+    }
+    return { ok: true }
+  } catch (err) {
+    // The write succeeded (and so passed the symlink guard) but produced an
+    // invalid config — restore the prior state of this same, already-vetted file.
+    if (existed && backup !== null) fs.writeFileSync(file, backup)
+    else if (!existed) fs.rmSync(file, { force: true })
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+/** Canonicalize a channel-name segment in a config path (agy → antigravity). */
+function canonicalizeConfigPath(segs: string[]): string[] {
+  if (segs[0] === 'channels' && segs.length >= 2) {
+    return ['channels', normalizeChannelName(segs[1]), ...segs.slice(2)]
+  }
+  return segs
+}
+
+/** env/headers are `z.record(z.string())` — their values must stay strings (no bool/number coercion). */
+function isStringValuedPath(segs: string[]): boolean {
+  const i = segs.findIndex((s) => s === 'env' || s === 'headers')
+  return i >= 0 && i < segs.length - 1
+}
+
+function scopeFile(args: ConfigArgs): { file: string; allowSymlink: boolean; flag: string } {
+  const paths = resolveConfigPaths({ projectRoot: process.cwd() })
+  const global = args.global === true
+  return { file: global ? paths.user : paths.project, allowSymlink: global, flag: global ? ' --global' : ' --project' }
+}
+
+function configSet(pathArg: string | undefined, valueArg: string | undefined, args: ConfigArgs): boolean {
+  if (!pathArg || valueArg === undefined) {
+    console.error('Usage: mmr config set <dotted.path> <value>')
+    return false
+  }
+  if (args.global && args.project) {
+    console.error('Pass only one of --global or --project, not both.')
+    return false
+  }
+  const { file, allowSymlink, flag } = scopeFile(args)
+  const segs = canonicalizeConfigPath(pathArg.split('.'))
+  // A channels.<name>.* path must target a channel that already exists, so a
+  // typo doesn't silently create a stub (valid command-less disabled stubs are
+  // allowed by the schema, which would otherwise mask the mistake).
+  if (segs[0] === 'channels' && segs.length >= 2) {
+    const known = loadConfig({ projectRoot: process.cwd() })
+    if (!known.channels[segs[1]]) {
+      console.error(`Unknown channel '${segs[1]}'. Define it first, or check the spelling.`)
+      return false
+    }
+  }
+  fs.mkdirSync(path.dirname(file), { recursive: true })
+  const stringField = isStringValuedPath(segs)
+  const expected = stringField ? valueArg : coerceScalar(valueArg)
+  const res = withValidatedWrite(
+    file,
+    () => setConfigValueSegs(file, segs, valueArg, { allowSymlink, coerce: !stringField }),
+    { global: args.global === true, expectPath: { segs, value: expected } },
+  )
+  if (!res.ok) {
+    console.error(`Cannot set ${pathArg}: ${res.error}`)
+    return false
+  }
+  console.log(`✓ set ${pathArg}`)
+  console.log(`  wrote ${file}`)
+  console.log(`  revert mmr config unset ${pathArg}${flag}`)
+  return true
+}
+
+function configUnset(pathArg: string | undefined, args: ConfigArgs): boolean {
+  if (!pathArg) {
+    console.error('Usage: mmr config unset <dotted.path>')
+    return false
+  }
+  if (args.global && args.project) {
+    console.error('Pass only one of --global or --project, not both.')
+    return false
+  }
+  const { file, allowSymlink } = scopeFile(args)
+  if (!fs.existsSync(file)) {
+    console.error(`Nothing to unset: ${file} does not exist.`)
+    return false
+  }
+  const segs = canonicalizeConfigPath(pathArg.split('.'))
+  let changed = false
+  const res = withValidatedWrite(
+    file,
+    () => { changed = unsetConfigValueSegs(file, segs, { allowSymlink }) },
+    { global: args.global === true },
+  )
+  if (!res.ok) {
+    console.error(`Cannot unset ${pathArg}: ${res.error}`)
+    return false
+  }
+  if (!changed) {
+    console.log(`  ${pathArg} is not set in ${file} — nothing to unset.`)
+    return true
+  }
+  console.log(`✓ unset ${pathArg}  (${file})`)
+  // Report the value now in effect after removing the override. Use the
+  // canonical `segs` — the loaded config is keyed by canonical channel names.
+  const { config } = loadConfigWithProvenance({ projectRoot: process.cwd() })
+  const inherited = segs.reduce<unknown>(
+    (acc, k) => (acc && typeof acc === 'object' ? (acc as Record<string, unknown>)[k] : undefined),
+    config,
+  )
+  if (inherited !== undefined) {
+    // Redact by the leaf KEY (a primitive value carries no key context): a
+    // secret-keyed path (…env.OPENAI_API_KEY) is fully redacted; a command-like
+    // path (command/check/recovery) is scanned for inline tokens; otherwise the
+    // value passes through the standard config-view redaction.
+    const leaf = segs[segs.length - 1] ?? ''
+    const display = isSecretKey(leaf)
+      ? '<redacted>'
+      : isCommandLikeKey(leaf)
+        ? redactCommandString(inherited)
+        : redactConfigView(inherited)
+    console.log(`  now inherits: ${JSON.stringify(display)}`)
+  }
+  return true
+}
+
+/**
  * Canonical, runnable examples surfaced in `mmr config --help`. Lead with the
  * conventional positional forms (P7/P8) so an agent reading help picks the
  * canonical command, not the bespoke `show:<channel>` colon alias.
@@ -566,6 +726,8 @@ export const CONFIG_EXAMPLES: ReadonlyArray<readonly [string, string]> = [
   ['mmr config channels show codex', 'Inspect one channel with provenance'],
   ['mmr config disable grok', 'Turn a channel off (writes channels.grok.enabled: false)'],
   ['mmr config enable grok', 'Turn a channel back on'],
+  ['mmr config set defaults.fix_threshold P1', 'Set any dotted config value (validated before write)'],
+  ['mmr config unset defaults.fix_threshold', 'Remove an override and fall back to the inherited value'],
 ]
 
 export const configCommand: CommandModule<object, ConfigArgs> = {
@@ -578,7 +740,7 @@ export const configCommand: CommandModule<object, ConfigArgs> = {
         type: 'string',
         demandOption: true,
         describe: 'Config action',
-        choices: ['init', 'test', 'channels', 'path', 'enable', 'disable', 'show'],
+        choices: ['init', 'test', 'channels', 'path', 'enable', 'disable', 'show', 'set', 'unset'],
       })
       .positional('name', {
         type: 'string',
@@ -615,9 +777,9 @@ export const configCommand: CommandModule<object, ConfigArgs> = {
         if (args.redact === false) args['no-redact'] = true
       }),
   handler: async (args: ArgumentsCamelCase<ConfigArgs>) => {
-    // `channels` takes [name] and [target]; `enable`/`disable`/`show` take [name].
-    const nameOk = ['channels', 'enable', 'disable', 'show'].includes(args.action)
-    const targetOk = args.action === 'channels'
+    // `channels`/`set` take [name] and [target]; enable/disable/show/unset take [name].
+    const nameOk = ['channels', 'enable', 'disable', 'show', 'set', 'unset'].includes(args.action)
+    const targetOk = args.action === 'channels' || args.action === 'set'
     if ((!nameOk && args.name) || (!targetOk && args.target)) {
       console.error(`Unexpected argument for config ${args.action}: ${args.target ?? args.name}`)
       process.exit(1)
@@ -649,6 +811,12 @@ export const configCommand: CommandModule<object, ConfigArgs> = {
       if (!ok) process.exit(1)
       break
     }
+    case 'set':
+      if (!configSet(args.name, args.target, args)) process.exit(1)
+      break
+    case 'unset':
+      if (!configUnset(args.name, args)) process.exit(1)
+      break
     case 'channels': {
       const ok = configChannels({
         name: args.name,

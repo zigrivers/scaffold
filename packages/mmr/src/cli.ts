@@ -3,6 +3,7 @@ import { reviewCommand } from './commands/review.js'
 import { statusCommand } from './commands/status.js'
 import { resultsCommand } from './commands/results.js'
 import { configCommand } from './commands/config.js'
+import { doctorCommand } from './commands/doctor.js'
 import { jobsCommand } from './commands/jobs.js'
 import { reconcileCommand } from './commands/reconcile.js'
 import { sessionsCommand } from './commands/sessions.js'
@@ -17,6 +18,7 @@ export async function runCli(argv: string[]): Promise<void> {
     .command(statusCommand)
     .command(resultsCommand)
     .command(configCommand)
+    .command(doctorCommand)
     .command(jobsCommand)
     .command(reconcileCommand)
     .command(sessionsCommand)
