@@ -25,6 +25,7 @@ interface ConfigArgs {
   redact?: boolean
   global?: boolean
   project?: boolean
+  format?: string
 }
 
 async function ossProbeResults(): Promise<Map<OssRuntimeId, boolean>> {
@@ -159,13 +160,15 @@ async function configTest(): Promise<void> {
   process.exit(allOk ? 0 : 1)
 }
 
-function configChannels(opts: { name?: string, target?: string, noRedact?: boolean } = {}): boolean {
+function configChannels(
+  opts: { name?: string, target?: string, noRedact?: boolean, format?: string } = {},
+): boolean {
   const rawName = opts.name
   if (rawName === 'show' && opts.target) {
     return showChannel(opts.target, { noRedact: opts.noRedact === true })
   }
   if (rawName === 'show') {
-    console.error('Usage: mmr config channels show:<channel> or mmr config channels show <channel>')
+    console.error('Usage: mmr config channels show <channel> (or show:<channel>)')
     return false
   }
   if (rawName && rawName.startsWith('show:')) {
@@ -173,22 +176,35 @@ function configChannels(opts: { name?: string, target?: string, noRedact?: boole
     return showChannel(channelName, { noRedact: opts.noRedact === true })
   }
   if (rawName || opts.target) {
-    console.error('Usage: mmr config channels show:<channel> or mmr config channels show <channel>')
+    console.error('Usage: mmr config channels show <channel> (or show:<channel>)')
     return false
   }
 
-  const config = loadConfig({ projectRoot: process.cwd() })
-  const channels = Object.entries(config.channels).map(([name, ch]) => {
+  const { config, provenance } = loadConfigWithProvenance({ projectRoot: process.cwd() })
+  const rows = Object.entries(config.channels).map(([name, ch]) => {
     const display = redactChannel(ch as unknown as Record<string, unknown>)
     const command = redactDisplayCommand(display.command)
+    const source = (provenance.channels[name]?.enabled as string | undefined) ?? 'default'
     return {
       name,
       enabled: display.enabled,
       command,
       parser: formatOutputParser(display.output_parser as OutputParserConfig | undefined),
+      source,
     }
   })
-  console.log(JSON.stringify(channels, null, 2))
+
+  if (opts.format === 'text') {
+    const pad = (s: string, n: number) => s.padEnd(n)
+    console.log(`${pad('CHANNEL', 18)}${pad('STATUS', 11)}SOURCE`)
+    for (const r of rows) {
+      const status = r.enabled === false ? 'disabled' : 'enabled'
+      console.log(`${pad(r.name, 18)}${pad(status, 11)}${r.source}`)
+    }
+    return true
+  }
+
+  console.log(JSON.stringify(rows, null, 2))
   return true
 }
 
@@ -425,6 +441,11 @@ export const configCommand: CommandModule<object, ConfigArgs> = {
         type: 'boolean',
         describe: 'Write to the project ./.mmr.yaml (enable/disable)',
       })
+      .option('format', {
+        choices: ['json', 'text'],
+        default: 'json',
+        describe: 'Output format for config channels (json | text table)',
+      })
       .middleware((args) => {
         if (args.redact === false) args['no-redact'] = true
       }),
@@ -458,6 +479,7 @@ export const configCommand: CommandModule<object, ConfigArgs> = {
         name: args.name,
         target: args.target,
         noRedact: isNoRedact(args),
+        format: args.format,
       })
       if (!ok) process.exit(1)
       break

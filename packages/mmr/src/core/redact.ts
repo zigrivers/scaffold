@@ -141,3 +141,37 @@ function redactList(
 export function redactChannel(channel: Record<string, unknown>): Record<string, unknown> {
   return redactRecord(channel)
 }
+
+/**
+ * Single redaction boundary for ALL machine-readable config views (D4).
+ * Deep-redacts secret-keyed values anywhere in the structure (nested maps,
+ * arrays) so any present or future `--json` / effective-config / manifest view
+ * inherits redaction by construction rather than re-implementing it. Default
+ * redacts; `noRedact: true` returns the value untouched (callers must print a
+ * loud stderr warning when they bypass).
+ */
+export function redactConfigView(value: unknown, opts: { noRedact?: boolean } = {}): unknown {
+  if (opts.noRedact) return value
+  if (Array.isArray(value)) return redactList(value)
+  if (!value || typeof value !== 'object') return value
+  const obj = value as Record<string, unknown>
+  const out: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(obj)) {
+    if (k === 'channels' && v && typeof v === 'object' && !Array.isArray(v)) {
+      // Redact each channel at its own top level so api_key_env (a NAME) is
+      // kept while env/headers secret VALUES are redacted (D4).
+      const channels: Record<string, unknown> = {}
+      for (const [name, ch] of Object.entries(v as Record<string, unknown>)) {
+        channels[name] = ch && typeof ch === 'object' && !Array.isArray(ch)
+          ? redactChannel(ch as Record<string, unknown>)
+          : ch
+      }
+      out[k] = channels
+    } else if (isSecretKey(k)) {
+      out[k] = '<redacted>'
+    } else {
+      out[k] = redactConfigView(v)
+    }
+  }
+  return out
+}
