@@ -508,7 +508,12 @@ async function configToggle(channelArg: string | undefined, enabled: boolean, ar
   // higher-precedence layer (e.g. a project override after a global write)
   // could still win, and the user must know if the intent didn't take effect.
   const { config, provenance } = loadConfigWithProvenance({ projectRoot: process.cwd() })
-  const src = (provenance.channels?.[channel]?.enabled as string | undefined) ?? 'default'
+  // Attribute the source to channels_disabled's layer when that list (not the
+  // enabled flag) is what determines dispatch — same logic as the list view.
+  const listSource = channelsDisabledSource()
+  const src = (disabledByList(config, channel) && listSource)
+    ? listSource
+    : ((provenance.channels?.[channel]?.enabled as string | undefined) ?? 'default')
   const effective = effectiveEnabled(config, channel)
   console.log(`  now    ${channel}  ${effective ? 'enabled' : 'disabled'}  (${src})`)
   if (effective !== enabled) {
@@ -520,9 +525,10 @@ async function configToggle(channelArg: string | undefined, enabled: boolean, ar
     console.log('    run `mmr config channels --format text` to see which source wins,')
     console.log(`    or re-run with ${otherScope} to change the other layer`)
   }
-  // The revert must target the same scope we wrote, or it would land in the
-  // default (project) scope and leave the original change in place.
-  const scopeFlag = isGlobalTarget ? ' --global' : ''
+  // The revert must target the SAME file we wrote — always explicit, because the
+  // inverse op could otherwise auto-route elsewhere (e.g. a disable of a
+  // not-installed channel routes to global). --project keeps it in this repo.
+  const scopeFlag = isGlobalTarget ? ' --global' : ' --project'
   console.log(`  revert mmr config ${enabled ? 'disable' : 'enable'} ${channel}${scopeFlag}`)
   return true
 }

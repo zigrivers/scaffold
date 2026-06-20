@@ -115,7 +115,7 @@ export function setConfigValueSegs(
   value: unknown,
   opts: WriteOpts = { create: true },
 ): void {
-  const doc = loadDoc(file, { create: opts.create !== false })
+  const doc = loadDoc(file, { create: opts.create ?? true })
   const coerced = typeof value === 'string' ? coerceScalar(value) : value
   doc.setIn(segs, coerced)
   safeWrite(file, doc.toString(), opts)
