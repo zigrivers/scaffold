@@ -143,6 +143,19 @@ describe('mmr config disable/enable', () => {
     expect(yaml).toMatch(/codex:[\s\S]*enabled: true/)
   })
 
+  it('refuses to enable a bare command-less disabled stub', async () => {
+    fs.writeFileSync(path.join(tmp, '.mmr.yaml'), 'version: 1\nchannels:\n  ghost:\n    enabled: false\n')
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
+    await run({ action: 'enable', name: 'ghost', project: true })
+    expect(errSpy.mock.calls.map((c) => String(c[0])).join('\n')).toMatch(/no command defined/)
+    expect(exitSpy).toHaveBeenCalledWith(1)
+    // file not changed to enabled: true
+    expect(fs.readFileSync(path.join(tmp, '.mmr.yaml'), 'utf-8')).toMatch(/enabled: false/)
+    errSpy.mockRestore()
+    exitSpy.mockRestore()
+  })
+
   it('rejects an unknown channel and writes nothing', async () => {
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)

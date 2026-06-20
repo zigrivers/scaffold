@@ -2,6 +2,12 @@ import fs from 'node:fs'
 import { parseDocument, parseAllDocuments, isSeq, type Document } from 'yaml'
 import { normalizeChannelName } from './channel-aliases.js'
 
+/** Shared write options. `allowSymlink` opts a trusted (user-owned) path into symlink-following. */
+export interface WriteOpts {
+  create?: boolean
+  allowSymlink?: boolean
+}
+
 /**
  * Comment-preserving config mutation (vision decision D2).
  *
@@ -43,10 +49,8 @@ function loadDoc(file: string, opts: { create?: boolean } = {}): Document {
 }
 
 /** Write config to disk in place — see the body for the symlink/mode/security rationale. */
-function safeWrite(file: string, content: string): void {
+function safeWrite(file: string, content: string, opts: WriteOpts = {}): void {
   // Deliberately a plain in-place write, not a temp-file+rename:
-  //  - it writes THROUGH a symlink to the real file, so dotfiles managers
-  //    (chezmoi/stow) keep working (the link is preserved);
   //  - it preserves an existing file's mode (the inode is reused), so a private
   //    0600 config is never widened;
   //  - it introduces no predictable temp path, avoiding the symlink/TOCTOU
@@ -54,6 +58,19 @@ function safeWrite(file: string, content: string): void {
   // The only thing it gives up versus temp+rename is atomicity — acceptable for
   // a local, single-user config edited by an interactive command. New files get
   // a restrictive 0600 default since config can hold secrets in env/headers.
+  //
+  // Symlink policy: writing THROUGH a symlink would let a repo-controlled
+  // project .mmr.yaml (a malicious symlink in a cloned repo) clobber an
+  // arbitrary user-writable file. So refuse symlinks by default; only the
+  // user-owned global ~/.mmr/config.yaml opts in (allowSymlink) to keep
+  // dotfiles managers working there.
+  if (!opts.allowSymlink) {
+    let isLink = false
+    try { isLink = fs.lstatSync(file).isSymbolicLink() } catch { isLink = false }
+    if (isLink) {
+      throw new Error(`refusing to write through a symlink: ${file}`)
+    }
+  }
   const existed = fs.existsSync(file)
   fs.writeFileSync(file, content)
   if (!existed) fs.chmodSync(file, 0o600)
@@ -81,7 +98,7 @@ export function setConfigValue(
   file: string,
   dottedPath: string,
   value: unknown,
-  opts: { create?: boolean } = { create: true },
+  opts: WriteOpts = { create: true },
 ): void {
   setConfigValueSegs(file, dottedPath.split('.'), value, opts)
 }
@@ -96,12 +113,12 @@ export function setConfigValueSegs(
   file: string,
   segs: string[],
   value: unknown,
-  opts: { create?: boolean } = { create: true },
+  opts: WriteOpts = { create: true },
 ): void {
   const doc = loadDoc(file, { create: opts.create !== false })
   const coerced = typeof value === 'string' ? coerceScalar(value) : value
   doc.setIn(segs, coerced)
-  safeWrite(file, doc.toString())
+  safeWrite(file, doc.toString(), opts)
 }
 
 /**
@@ -109,7 +126,7 @@ export function setConfigValueSegs(
  * Returns whether the file was changed. No-op (returns false) when the file is
  * missing, has no `channels_disabled`, or the channel is not listed.
  */
-export function pruneChannelsDisabled(file: string, channel: string): boolean {
+export function pruneChannelsDisabled(file: string, channel: string, opts: WriteOpts = {}): boolean {
   if (!fs.existsSync(file)) return false
   const doc = loadDoc(file)
   const seq = doc.get('channels_disabled')
@@ -126,7 +143,7 @@ export function pruneChannelsDisabled(file: string, channel: string): boolean {
       changed = true
     }
   }
-  if (changed) safeWrite(file, doc.toString())
+  if (changed) safeWrite(file, doc.toString(), opts)
   return changed
 }
 
@@ -135,9 +152,9 @@ export function pruneChannelsDisabled(file: string, channel: string): boolean {
  * mechanism (D5). When enabling, also prune any stale `channels_disabled`
  * membership so the enable cannot be silently overridden by the legacy list.
  */
-export function setChannelEnabled(file: string, channel: string, enabled: boolean): void {
+export function setChannelEnabled(file: string, channel: string, enabled: boolean, opts: WriteOpts = {}): void {
   // Use the segment form so a channel name containing a dot is treated as one
   // key, not split into nested maps.
-  setConfigValueSegs(file, ['channels', channel, 'enabled'], enabled)
-  if (enabled) pruneChannelsDisabled(file, channel)
+  setConfigValueSegs(file, ['channels', channel, 'enabled'], enabled, opts)
+  if (enabled) pruneChannelsDisabled(file, channel, opts)
 }

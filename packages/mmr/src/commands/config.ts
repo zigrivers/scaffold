@@ -450,20 +450,34 @@ async function configToggle(channelArg: string | undefined, enabled: boolean, ar
   // Validate the channel exists before writing, so a typo cannot create a
   // command-less channel that then fails config validation on the next load.
   const before = loadConfig({ projectRoot: process.cwd() })
-  if (!before.channels?.[channel]) {
+  const def = before.channels?.[channel]
+  if (!def) {
     const known = Object.keys(before.channels ?? {}).join(', ')
     console.error(`Unknown channel '${channelArg}'. Known channels: ${known}`)
     return false
   }
+  // Enabling a bare disabled stub (command-less, which loadConfig now allows)
+  // would write enabled: true and then fail validation on the next load. Refuse
+  // unless the channel actually has something to run.
+  if (enabled && def.kind !== 'http' && !def.command) {
+    console.error(
+      `Cannot enable '${channel}': it has no command defined (it's a disabled stub). `
+      + 'Add a command to its channel config first.',
+    )
+    return false
+  }
 
   const target = await resolveWriteTarget(channel, enabled, args, before)
+  // Only the user-owned global config may be a (dotfiles-managed) symlink; the
+  // repo-controlled project file must not be written through a symlink.
+  const allowSymlink = target.file === resolveConfigPaths({ projectRoot: process.cwd() }).user
   try {
     fs.mkdirSync(path.dirname(target.file), { recursive: true })
     // setChannelEnabled writes enabled and (on enable) prunes channels_disabled
     // in THIS file only. We never silently mutate another scope's file — if a
     // different layer still disables the channel, we surface it below so the
     // user can decide, rather than reaching into their global config.
-    setChannelEnabled(target.file, channel, enabled)
+    setChannelEnabled(target.file, channel, enabled, { allowSymlink })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     console.error(`Failed to write ${target.file}: ${msg}`)
