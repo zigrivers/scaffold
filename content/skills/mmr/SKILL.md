@@ -141,6 +141,12 @@ mmr doctor                   # diagnose every channel (install + auth) with reme
 mmr doctor --fix             # disable channels whose CLI isn't installed
 ```
 
+To learn the whole command surface in one call (instead of probing `--help`),
+run `mmr commands --format json` — a machine-readable manifest of every command
+with a runnable example and a `writes` flag. For a concept, `mmr explain <topic>`
+prints inline docs (`channels`, `config`, `scopes`, `compensation`, `redaction`,
+`provenance`); `mmr explain` with no topic lists them.
+
 `mmr doctor` is the one-shot health check: it classifies each channel and
 prints the exact fix. A channel whose CLI is **not installed** is treated as a
 *structural* absence — as of mmr 2.0.0 the review no longer runs a wasteful
