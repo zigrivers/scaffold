@@ -1,13 +1,26 @@
 ---
 name: web-app-observability
-description: Real User Monitoring, Core Web Vitals tracking, error tracking with Sentry, CDN analytics, custom performance marks, and performance regression alerting
-topics: [web-app, observability, rum, core-web-vitals, sentry, performance, monitoring]
+description: >-
+  Real User Monitoring, Core Web Vitals tracking, error tracking with Sentry, CDN analytics, custom performance marks,
+  and performance regression alerting
+topics:
+  - web-app
+  - observability
+  - rum
+  - core-web-vitals
+  - sentry
+  - performance
+  - monitoring
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-06-20
 version-pin: null
 sources:
   - url: https://opentelemetry.io/docs/
+    hash: sha256:3e2cdfaf0b95ba481d90b14e34808b9c73af6d30257e62e9962eb2db3d661e7f
+    retrieved: 2026-06-20
   - url: https://www.w3.org/TR/performance-timeline/
+    hash: sha256:6c2746178b8ea369d673b84058c2cccae36eef480371c931ba75782be8e2252a
+    retrieved: 2026-06-20
 ---
 
 You cannot improve what you cannot measure. Frontend observability is often treated as an afterthought — added after users start complaining — but by then you have no baseline to regress against and no historical data to understand when performance degraded or errors started. Real User Monitoring (RUM) captures the experience of your actual users on their actual devices and networks, which lab-based tests like Lighthouse cannot replicate. Core Web Vitals are Google's standardized metrics for page experience and directly influence search ranking.
