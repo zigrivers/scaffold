@@ -4,6 +4,17 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.36.0] — 2026-06-20
+
+### Added
+
+- **`github-setup` pipeline step (Phase 2 — Foundation, order 205).** A new meta-prompt that connects a project to GitHub early so work is backed up off-machine from the start: it `git init`s if needed, ensures `.gitignore` excludes secrets and local env files, makes a secret-scanned initial commit, and creates a **private (default) or public** remote via `gh repo create` — then verifies the push. Operates in update mode (no re-init, no remote overwrite, no force-push) when a repo + `origin` already exist, and falls back to documented manual commands when `gh` is absent. Registered in all three base presets and marked global in the multi-service overlay. (#679)
+
+### Changed
+
+- **MMR: new opt-in `opencode` review channel** (ships in `@zigrivers/mmr` 1.7.0). Adds the open-source OpenCode CLI as a reviewer, **disabled by default** (enable via `--channels=opencode` or `.mmr.yaml`; alias `opc`). Runs hardened — every tool denied via `OPENCODE_PERMISSION` so a prompt-injected diff has no execution surface — in a neutral cwd with stdin prompt delivery. Root `CLAUDE.md` channel docs updated to match. (#678)
+- **Knowledge freshness refresh (9 entries).** Refreshed against current upstream sources with measured review/retrieval dates and source hashes: `review-security` (now correctly on the real OWASP Top 10:2025 taxonomy), `web-app-conventions`, `web-app-data-patterns`, `web-app-deployment`, `web-app-deployment-workflow`, `web-app-design-system`, `web-app-dev-environment`, `web-app-observability`, and `web-app-project-structure`. KB `VERSION` → 0.1.109.
+
 ## [3.35.2] — 2026-06-19
 
 ### Changed
