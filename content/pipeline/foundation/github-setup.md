@@ -115,7 +115,10 @@ Never assume visibility — wait for the choice before creating the remote.
 5. **If `gh` is not installed or not authenticated**, do not block — fall back to a
    documented manual path: tell the user to authenticate (`gh auth login`) or create
    the repository in the GitHub web UI, then connect and push with the exact
-   commands: `git remote add origin <url>` followed by `git push -u origin main`.
+   commands: `git remote add origin <url>` followed by `git push -u origin HEAD`
+   (`HEAD` pushes the current branch — `main` for a fresh repo, or the existing
+   default branch when connecting a repository that already has history — so it never
+   assumes the branch is named `main`).
 
 ### Verify the push and record the result
 - Confirm the push actually succeeded (e.g., `git ls-remote origin` returns the
@@ -134,10 +137,11 @@ Never assume visibility — wait for the choice before creating the remote.
   the initial commit **and before any push** — including the update-mode case of
   pushing an existing repository for the first time, where the secret may already sit
   in tracked files or earlier commits rather than in newly staged changes. If any are
-  found, STOP and tell the user; do not commit or push. Note that adding a
-  `.gitignore` does NOT untrack a secret that is already committed — an
-  already-tracked secret must be removed from tracking (and from history if it was
-  already committed) before the push.
+  found, STOP and tell the user; do not commit or push. Adding a `.gitignore` does NOT
+  untrack a secret that is already committed, and cleaning a secret out of existing
+  history is destructive — so do not attempt it here. Escalate to the user, who can
+  rotate the secret and clean history deliberately (e.g., with `git filter-repo`),
+  rather than this step rewriting history.
 - Never force-push, never overwrite an existing remote, and never rewrite history.
 - Defer branching strategy, commit standards, CI, PR workflow, branch protection, and
   worktrees to the `git-workflow` step (order 330) — do not duplicate that work here.
