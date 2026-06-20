@@ -12,6 +12,7 @@ import { checkInstalled, checkAuth } from '../core/auth.js'
 import { probeRuntime } from '../core/runtime-probe.js'
 import { OSS_RUNTIMES, exampleBlockFor, type OssRuntimeId } from '../core/oss-examples.js'
 import { isSecretKey, redactChannel } from '../core/redact.js'
+import { resolveConfigPaths } from '../config/paths.js'
 import type { OutputParserConfig } from '../config/schema.js'
 
 interface ConfigArgs {
@@ -99,6 +100,17 @@ async function configInit(opts: { withExamples: boolean } = { withExamples: fals
 
   fs.writeFileSync(configPath, template)
   console.log(`\nCreated ${configPath}`)
+}
+
+function configPath(): void {
+  const paths = resolveConfigPaths({ projectRoot: process.cwd() })
+  console.log('Search order (later wins):')
+  console.log('  1 built-in defaults      (always)')
+  console.log(`  2 ${paths.user}      ${paths.userExists ? '✓ exists' : '✗ not found'}`)
+  console.log(`  3 ${paths.project}            ${paths.projectExists ? '✓ exists' : '✗ not found'}`)
+  console.log('  4 CLI flags              (per-invocation)')
+  console.log(`write target (default): ${paths.project}`)
+  console.log(`                  --global → ${paths.user}`)
 }
 
 async function configTest(): Promise<void> {
@@ -334,7 +346,7 @@ export const configCommand: CommandModule<object, ConfigArgs> = {
         type: 'string',
         demandOption: true,
         describe: 'Config action',
-        choices: ['init', 'test', 'channels'],
+        choices: ['init', 'test', 'channels', 'path', 'enable', 'disable'],
       })
       .positional('name', {
         type: 'string',
@@ -369,6 +381,9 @@ export const configCommand: CommandModule<object, ConfigArgs> = {
       break
     case 'test':
       await configTest()
+      break
+    case 'path':
+      configPath()
       break
     case 'channels': {
       const ok = configChannels({
