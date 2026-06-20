@@ -48,6 +48,15 @@ describe('runResultsPipeline', () => {
     expect(exitCode).toBe(2)
   })
 
+  it('threads a channel recovery command through to the per_channel result (C3)', () => {
+    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['grok'] })
+    store.updateChannel(job.job_id, 'grok', { status: 'auth_failed', recovery: 'grok login' })
+
+    const { results } = runResultsPipeline(store, store.loadJob(job.job_id), 'json')
+    expect(results.per_channel.grok.status).toBe('auth_failed')
+    expect(results.per_channel.grok.recovery).toBe('grok login')
+  })
+
   it('uses an object-form output_parser stored on the channel entry', () => {
     const inner = '{"approved": false, "findings": [{"severity": "P0", "location": "f.ts:1", "description": "vuln", "suggestion": "fix"}], "summary": "issue"}'
     const envelope = JSON.stringify({ choices: [{ message: { content: inner } }] })

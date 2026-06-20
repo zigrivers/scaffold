@@ -180,14 +180,23 @@ function configChannels(
     return false
   }
 
+  const noRedact = opts.noRedact === true
+  if (noRedact) {
+    console.error('WARNING: --no-redact is enabled; secrets in commands/env/headers may be printed verbatim.')
+  }
   const { config, provenance } = loadConfigWithProvenance({ projectRoot: process.cwd() })
   const rows = Object.entries(config.channels).map(([name, ch]) => {
-    const display = redactChannel(ch as unknown as Record<string, unknown>)
-    const command = redactDisplayCommand(display.command)
+    const chRec = ch as unknown as Record<string, unknown>
+    const display = noRedact ? chRec : redactChannel(chRec)
+    const command = noRedact ? display.command : redactDisplayCommand(display.command)
     const source = (provenance.channels[name]?.enabled as string | undefined) ?? 'default'
     return {
       name,
+      // `enabled` is the raw per-channel flag; `effective` folds in the legacy
+      // channels_disabled list so the displayed status matches what review
+      // actually dispatches.
       enabled: display.enabled,
+      effective: effectiveEnabled(config, name),
       command,
       parser: formatOutputParser(display.output_parser as OutputParserConfig | undefined),
       source,
@@ -196,16 +205,15 @@ function configChannels(
 
   // Route every output mode through the single redaction boundary (D4). The
   // command string is also scanned for inline secrets at row-build time above
-  // (redactDisplayCommand), which key-based redaction cannot see; this pass
-  // guarantees any secret-keyed field (now or future) is redacted by
-  // construction before serialization.
-  const safeRows = redactConfigView(rows) as typeof rows
+  // (redactDisplayCommand), which key-based redaction cannot see. `noRedact`
+  // is threaded through so --no-redact bypasses (after the stderr warning above).
+  const safeRows = redactConfigView(rows, { noRedact }) as typeof rows
 
   if (opts.format === 'text') {
     const pad = (s: string, n: number) => s.padEnd(n)
     console.log(`${pad('CHANNEL', 18)}${pad('STATUS', 11)}SOURCE`)
     for (const r of safeRows) {
-      const status = r.enabled === false ? 'disabled' : 'enabled'
+      const status = r.effective ? 'enabled' : 'disabled'
       console.log(`${pad(r.name, 18)}${pad(status, 11)}${r.source}`)
     }
     return true
@@ -381,7 +389,15 @@ async function resolveWriteTarget(
   if (!enabling) {
     const cmd = config.channels[channel]?.command?.split(' ')[0]
     if (cmd && !(await checkInstalled(cmd))) {
-      return { file: paths.user, notInstalled: true }
+      // Only route to global if the channel is known WITHOUT the project config
+      // (a built-in, or one defined in the global file). A project-only custom
+      // channel must NOT be stubbed globally: its command lives only in the
+      // project, so a global `enabled: false` stub (command-less) would fail
+      // config validation in every other repo.
+      const globalOnly = loadConfig({ projectRoot: process.cwd(), skipProjectConfig: true })
+      if (globalOnly.channels[channel]) {
+        return { file: paths.user, notInstalled: true }
+      }
     }
   }
   return { file: paths.project, notInstalled: false }
@@ -401,6 +417,10 @@ function effectiveEnabled(config: MmrConfigParsed, channel: string): boolean {
 async function configToggle(channel: string | undefined, enabled: boolean, args: ConfigArgs): Promise<boolean> {
   if (!channel) {
     console.error(`Usage: mmr config ${enabled ? 'enable' : 'disable'} <channel>`)
+    return false
+  }
+  if (args.global && args.project) {
+    console.error('Pass only one of --global or --project, not both.')
     return false
   }
   // Validate the channel exists before writing, so a typo cannot create a
@@ -435,7 +455,7 @@ async function configToggle(channel: string | undefined, enabled: boolean, args:
   // higher-precedence layer (e.g. a project override after a global write)
   // could still win, and the user must know if the intent didn't take effect.
   const { config, provenance } = loadConfigWithProvenance({ projectRoot: process.cwd() })
-  const src = (provenance.channels[channel]?.enabled as string | undefined) ?? 'project'
+  const src = (provenance.channels[channel]?.enabled as string | undefined) ?? 'default'
   const effective = effectiveEnabled(config, channel)
   console.log(`  now    ${channel}  ${effective ? 'enabled' : 'disabled'}  (${src})`)
   if (effective !== enabled) {
