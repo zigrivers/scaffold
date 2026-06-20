@@ -8,7 +8,7 @@ import {
   type ProvenanceSource,
 } from '../config/loader.js'
 import { BUILTIN_CHANNELS } from '../config/defaults.js'
-import { checkInstalled, checkAuth } from '../core/auth.js'
+import { checkInstalled, checkAuth, checkHttpAuth } from '../core/auth.js'
 import { probeRuntime } from '../core/runtime-probe.js'
 import { OSS_RUNTIMES, exampleBlockFor, type OssRuntimeId } from '../core/oss-examples.js'
 import {
@@ -138,6 +138,18 @@ async function configTest(): Promise<void> {
     }
     if (!chConfig.enabled) {
       results[name] = { installed: false, auth: 'disabled' }
+      continue
+    }
+    // HTTP channels are runnable via endpoint/model, not a command — probe auth
+    // over the wire rather than checking for an installed CLI.
+    if (chConfig.kind === 'http') {
+      const httpAuth = await checkHttpAuth(chConfig)
+      results[name] = {
+        installed: true,
+        auth: httpAuth.status,
+        recovery: redactCommandString(httpAuth.recovery) as string | undefined,
+      }
+      if (httpAuth.status !== 'ok') allOk = false
       continue
     }
     if (!chConfig.command) {

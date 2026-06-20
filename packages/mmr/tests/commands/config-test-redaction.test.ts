@@ -36,4 +36,24 @@ describe('mmr config test — recovery redaction', () => {
     expect(out).toContain('<redacted>')
     expect(exitSpy).toHaveBeenCalled()
   })
+
+  it('probes an HTTP channel over the wire instead of reporting missing_command', async () => {
+    fs.writeFileSync(path.join(tmp, '.mmr.yaml'), [
+      'version: 1',
+      'channels:',
+      '  myhttp:',
+      '    kind: http',
+      '    endpoint: https://api.example.com/v1/chat/completions',
+      '    model: gpt-4',
+      '    endpoint_convention: openai-chat',
+      '    api_key_env: MY_API_KEY',
+    ].join('\n'))
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
+    const { configCommand } = await import('../../src/commands/config.js')
+    await configCommand.handler({ action: 'test', _: ['config'], $0: 'mmr' } as never)
+    const result = JSON.parse(logSpy.mock.calls.map((c) => String(c[0])).join('')) as Record<string, { auth: string }>
+    expect(result.myhttp.auth).not.toBe('missing_command')
+    expect(result.myhttp.auth).toBe('failed') // the mocked checkHttpAuth returns failed
+    expect(exitSpy).toHaveBeenCalled()
+  })
 })

@@ -535,7 +535,10 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       // HTTP channels have no command/install step — probe over the wire.
       if (chConfig.kind === 'http') {
         const authResult = await checkHttpAuth(chConfig)
-        authResults[name] = authResult
+        authResults[name] = {
+          ...authResult,
+          recovery: redactCommandString(authResult.recovery) as string | undefined,
+        }
         if (authResult.status === 'ok') {
           validChannels.push(name)
         }
