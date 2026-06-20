@@ -8,6 +8,7 @@ import { assemblePrompt } from '../core/prompt.js'
 import { dispatchChannel } from '../core/dispatcher.js'
 import { dispatchHttpChannel } from '../core/http-dispatcher.js'
 import { runResultsPipeline } from '../core/results-pipeline.js'
+import { redactCommandString } from '../core/redact.js'
 import { buildReviewAckStore } from '../core/ack-store.js'
 import { classifyTrustMode } from '../core/trust-mode.js'
 import { detectConfigChanges, type ConfigChangeReport } from '../core/diff-introspect.js'
@@ -221,7 +222,7 @@ export async function checkConfiguredCompensatorAvailability(
     return {
       status: httpStatus,
       auth: httpStatus === 'skipped' ? 'skipped' : 'failed',
-      recovery: httpAuth.recovery,
+      recovery: redactCommandString(httpAuth.recovery) as string | undefined,
     }
   }
 
@@ -243,7 +244,7 @@ export async function checkConfiguredCompensatorAvailability(
   return {
     status,
     auth: status === 'skipped' ? 'skipped' : 'failed',
-    recovery: authResult.recovery,
+    recovery: redactCommandString(authResult.recovery) as string | undefined,
   }
 }
 
@@ -534,7 +535,10 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       // HTTP channels have no command/install step — probe over the wire.
       if (chConfig.kind === 'http') {
         const authResult = await checkHttpAuth(chConfig)
-        authResults[name] = authResult
+        authResults[name] = {
+          ...authResult,
+          recovery: redactCommandString(authResult.recovery) as string | undefined,
+        }
         if (authResult.status === 'ok') {
           validChannels.push(name)
         }
@@ -554,7 +558,12 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       }
 
       const authResult = await checkAuth(chConfig)
-      authResults[name] = authResult
+      // auth.recovery is user-configurable and can embed a token; redact before
+      // it's stored, printed in --dry-run, or surfaced in the no-channels error.
+      authResults[name] = {
+        ...authResult,
+        recovery: redactCommandString(authResult.recovery) as string | undefined,
+      }
       if (authResult.status === 'ok') {
         validChannels.push(name)
       }

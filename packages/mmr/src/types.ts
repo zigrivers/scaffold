@@ -78,6 +78,8 @@ export interface ChannelResult {
   findings: Finding[]
   raw_output?: string
   error?: string
+  /** Recovery command for a degraded channel (e.g. re-auth), surfaced at the point of pain (C3). */
+  recovery?: string
 }
 
 export interface JobMetadata {

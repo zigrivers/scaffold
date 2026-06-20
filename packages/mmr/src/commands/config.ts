@@ -8,11 +8,22 @@ import {
   type ProvenanceSource,
 } from '../config/loader.js'
 import { BUILTIN_CHANNELS } from '../config/defaults.js'
-import { checkInstalled, checkAuth } from '../core/auth.js'
+import { checkInstalled, checkAuth, checkHttpAuth } from '../core/auth.js'
 import { probeRuntime } from '../core/runtime-probe.js'
 import { OSS_RUNTIMES, exampleBlockFor, type OssRuntimeId } from '../core/oss-examples.js'
-import { isSecretKey, redactChannel } from '../core/redact.js'
-import type { OutputParserConfig } from '../config/schema.js'
+import {
+  isSecretKey,
+  redactChannel,
+  redactConfigView,
+  redactCommandString,
+  commandContainsInlineSecret,
+  isCommandSecretKey,
+} from '../core/redact.js'
+import { resolveConfigPaths } from '../config/paths.js'
+import { setChannelEnabled } from '../config/writer.js'
+import { normalizeChannelName } from '../config/channel-aliases.js'
+import { parse as parseYaml } from 'yaml'
+import type { OutputParserConfig, MmrConfigParsed } from '../config/schema.js'
 
 interface ConfigArgs {
   action: string
@@ -21,6 +32,9 @@ interface ConfigArgs {
   'with-examples'?: boolean
   'no-redact'?: boolean
   redact?: boolean
+  global?: boolean
+  project?: boolean
+  format?: string
 }
 
 async function ossProbeResults(): Promise<Map<OssRuntimeId, boolean>> {
@@ -101,6 +115,17 @@ async function configInit(opts: { withExamples: boolean } = { withExamples: fals
   console.log(`\nCreated ${configPath}`)
 }
 
+function configPath(): void {
+  const paths = resolveConfigPaths({ projectRoot: process.cwd() })
+  console.log('Search order (later wins):')
+  console.log('  1 built-in defaults      (always)')
+  console.log(`  2 ${paths.user}      ${paths.userExists ? '✓ exists' : '✗ not found'}`)
+  console.log(`  3 ${paths.project}            ${paths.projectExists ? '✓ exists' : '✗ not found'}`)
+  console.log('  4 CLI flags              (per-invocation)')
+  console.log(`write target (default): ${paths.project}`)
+  console.log(`                  --global → ${paths.user}`)
+}
+
 async function configTest(): Promise<void> {
   const config = loadConfig({ projectRoot: process.cwd() })
   const results: Record<string, { installed: boolean; auth: string; recovery?: string }> = {}
@@ -113,6 +138,18 @@ async function configTest(): Promise<void> {
     }
     if (!chConfig.enabled) {
       results[name] = { installed: false, auth: 'disabled' }
+      continue
+    }
+    // HTTP channels are runnable via endpoint/model, not a command — probe auth
+    // over the wire rather than checking for an installed CLI.
+    if (chConfig.kind === 'http') {
+      const httpAuth = await checkHttpAuth(chConfig)
+      results[name] = {
+        installed: true,
+        auth: httpAuth.status,
+        recovery: redactCommandString(httpAuth.recovery) as string | undefined,
+      }
+      if (httpAuth.status !== 'ok') allOk = false
       continue
     }
     if (!chConfig.command) {
@@ -133,7 +170,9 @@ async function configTest(): Promise<void> {
     results[name] = {
       installed: true,
       auth: authResult.status,
-      recovery: authResult.recovery,
+      // A user-defined auth.recovery can be an arbitrary command that embeds a
+      // token; scan it for inline secrets before printing to stdout.
+      recovery: redactCommandString(authResult.recovery) as string | undefined,
     }
     if (authResult.status !== 'ok') {
       allOk = false
@@ -144,13 +183,15 @@ async function configTest(): Promise<void> {
   process.exit(allOk ? 0 : 1)
 }
 
-function configChannels(opts: { name?: string, target?: string, noRedact?: boolean } = {}): boolean {
+function configChannels(
+  opts: { name?: string, target?: string, noRedact?: boolean, format?: string } = {},
+): boolean {
   const rawName = opts.name
   if (rawName === 'show' && opts.target) {
     return showChannel(opts.target, { noRedact: opts.noRedact === true })
   }
   if (rawName === 'show') {
-    console.error('Usage: mmr config channels show:<channel> or mmr config channels show <channel>')
+    console.error('Usage: mmr config channels show <channel> (or show:<channel>)')
     return false
   }
   if (rawName && rawName.startsWith('show:')) {
@@ -158,22 +199,55 @@ function configChannels(opts: { name?: string, target?: string, noRedact?: boole
     return showChannel(channelName, { noRedact: opts.noRedact === true })
   }
   if (rawName || opts.target) {
-    console.error('Usage: mmr config channels show:<channel> or mmr config channels show <channel>')
+    console.error('Usage: mmr config channels show <channel> (or show:<channel>)')
     return false
   }
 
-  const config = loadConfig({ projectRoot: process.cwd() })
-  const channels = Object.entries(config.channels).map(([name, ch]) => {
-    const display = redactChannel(ch as unknown as Record<string, unknown>)
-    const command = redactDisplayCommand(display.command)
+  const noRedact = opts.noRedact === true
+  if (noRedact) {
+    console.error('WARNING: --no-redact is enabled; secrets in commands/env/headers may be printed verbatim.')
+  }
+  const { config, provenance } = loadConfigWithProvenance({ projectRoot: process.cwd() })
+  const listSource = channelsDisabledSource()
+  const rows = Object.entries(config.channels).map(([name, ch]) => {
+    const chRec = ch as unknown as Record<string, unknown>
+    const display = noRedact ? chRec : redactChannel(chRec)
+    const command = noRedact ? display.command : redactCommandString(display.command)
+    // Attribute the source to channels_disabled's layer when the channel is
+    // disabled by that list rather than by its own enabled flag.
+    const source = (disabledByList(config, name) && listSource)
+      ? listSource
+      : ((provenance.channels[name]?.enabled as string | undefined) ?? 'default')
     return {
       name,
+      // `enabled` is the raw per-channel flag; `effective` folds in the legacy
+      // channels_disabled list so the displayed status matches what review
+      // actually dispatches.
       enabled: display.enabled,
+      effective: effectiveEnabled(config, name),
       command,
       parser: formatOutputParser(display.output_parser as OutputParserConfig | undefined),
+      source,
     }
   })
-  console.log(JSON.stringify(channels, null, 2))
+
+  // Route every output mode through the single redaction boundary (D4). The
+  // command string is also scanned for inline secrets at row-build time above
+  // (redactDisplayCommand), which key-based redaction cannot see. `noRedact`
+  // is threaded through so --no-redact bypasses (after the stderr warning above).
+  const safeRows = redactConfigView(rows, { noRedact }) as typeof rows
+
+  if (opts.format === 'text') {
+    const pad = (s: string, n: number) => s.padEnd(n)
+    console.log(`${pad('CHANNEL', 18)}${pad('STATUS', 11)}SOURCE`)
+    for (const r of safeRows) {
+      const status = r.effective ? 'enabled' : 'disabled'
+      console.log(`${pad(r.name, 18)}${pad(status, 11)}${r.source}`)
+    }
+    return true
+  }
+
+  console.log(JSON.stringify(safeRows, null, 2))
   return true
 }
 
@@ -199,7 +273,7 @@ function showChannel(name: string, opts: { noRedact: boolean }): boolean {
     ? { ...ch } as Record<string, unknown>
     : redactShowChannel(ch as unknown as Record<string, unknown>)
   if (!opts.noRedact && Object.prototype.hasOwnProperty.call(display, 'command')) {
-    display.command = redactDisplayCommand(display.command)
+    display.command = redactCommandString(display.command)
   }
   if (opts.noRedact) {
     console.error('WARNING: --no-redact is enabled; secrets in env/headers are printed verbatim.')
@@ -235,31 +309,30 @@ function renderScalar(value: unknown): string {
   return JSON.stringify(value)
 }
 
-function redactDisplayCommand(command: unknown): unknown {
-  return typeof command === 'string' && commandContainsInlineSecret(command) ? '<redacted>' : command
-}
-
 function redactShowChannel(channel: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(channel)) {
-    out[key] = redactShowValue(key, value)
+    out[key] = redactShowValue(key, value, true)
   }
   return out
 }
 
-function redactShowValue(key: string, value: unknown): unknown {
+function redactShowValue(key: string, value: unknown, topLevel = false): unknown {
   if (Array.isArray(value)) return redactShowArray(value)
   if (value !== null && typeof value === 'object') {
     const out: Record<string, unknown> = {}
     for (const [nestedKey, nestedValue] of Object.entries(value as Record<string, unknown>)) {
-      out[nestedKey] = redactShowValue(nestedKey, nestedValue)
+      // Nested env/headers entries carry VALUES, so api_key_env is not exempt there.
+      out[nestedKey] = redactShowValue(nestedKey, nestedValue, false)
     }
     return out
   }
   if (typeof value === 'string' && isCommandLikeKey(key) && commandContainsInlineSecret(value)) {
     return '<redacted>'
   }
-  return isSecretKey(key, { exemptEnvNameKeys: false }) ? '<redacted>' : value
+  // Keep the TOP-LEVEL channel `api_key_env` (the env-var NAME) visible, matching
+  // `config channels`; a nested env/headers `api_key_env` holds a value → redact.
+  return isSecretKey(key, { exemptEnvNameKeys: topLevel }) ? '<redacted>' : value
 }
 
 function redactShowArray(values: unknown[]): unknown[] {
@@ -292,49 +365,220 @@ function isCommandLikeKey(key: string): boolean {
   return ['command', 'check', 'recovery'].includes(key)
 }
 
-function commandContainsInlineSecret(command: string): boolean {
-  const keyValueRe = /(?:^|[\s'"?&{,=])"?(-{0,2}[A-Za-z0-9_.-]+)"?\s*[:=]/g
-  for (const match of command.matchAll(keyValueRe)) {
-    if (isCommandSecretKey(match[1])) return true
+/**
+ * Resolve which config file a mutator should write to (D1).
+ * `--global`/`--project` force the target. Otherwise the default is the
+ * project `.mmr.yaml` — except a `disable` of a channel whose CLI is not
+ * installed, which is a machine-level fact and routes to the global file.
+ */
+async function resolveWriteTarget(
+  channel: string,
+  enabling: boolean,
+  args: ConfigArgs,
+  config: MmrConfigParsed,
+): Promise<{ file: string; notInstalled: boolean }> {
+  const paths = resolveConfigPaths({ projectRoot: process.cwd() })
+  if (args.global) return { file: paths.user, notInstalled: false }
+  if (args.project) return { file: paths.project, notInstalled: false }
+  if (!enabling) {
+    const cmd = config.channels[channel]?.command?.split(' ')[0]
+    if (cmd && !(await checkInstalled(cmd))) {
+      // Route a not-installed disable to global only when BOTH hold:
+      //  (a) the channel itself resolves from global-only config (a built-in or
+      //      a user-defined channel) — so a global `enabled: false` won't be an
+      //      orphan stub for a channel that doesn't exist in other repos; and
+      //  (b) the missing command's VALUE is not a project override — otherwise
+      //      the not-installed-ness is project-specific and belongs in-project.
+      // (a) alone misses a built-in whose command the project overrides to a
+      // missing CLI; (b) alone misses a project-only channel that `extends` a
+      // built-in (whose inherited command provenance is default/user). Both
+      // together cover every case.
+      const globalOnly = loadConfig({ projectRoot: process.cwd(), skipProjectConfig: true })
+      const { provenance } = loadConfigWithProvenance({ projectRoot: process.cwd() })
+      const cmdSource = provenance.channels[channel]?.command as ProvenanceSource | undefined
+      const channelResolvesGlobally = globalOnly.channels[channel] !== undefined
+      const commandIsMachineLevel = cmdSource === 'default' || cmdSource === 'user'
+      if (channelResolvesGlobally && commandIsMachineLevel) {
+        return { file: paths.user, notInstalled: true }
+      }
+    }
   }
-  const nestedKeyValueRe = /[=:]"?([A-Za-z0-9_.-]+)"?\s*[:=]/g
-  for (const match of command.matchAll(nestedKeyValueRe)) {
-    if (isCommandSecretKey(match[1])) return true
-  }
-
-  const tokens = command.match(/"[^"]*"|'[^']*'|\S+/g) ?? []
-  for (let i = 0; i < tokens.length - 1; i += 1) {
-    const token = stripQuotes(tokens[i])
-    const next = stripQuotes(tokens[i + 1])
-    if (['--header', '-H', '--env', '-e'].includes(token) && commandContainsInlineSecret(next)) return true
-    if (!token.startsWith('-') || token.includes('=') || token.includes(':') || next.startsWith('-')) continue
-    if (isCommandSecretKey(token)) return true
-  }
-
-  return false
+  return { file: paths.project, notInstalled: false }
 }
 
-function stripQuotes(value: string): string {
-  return value.replace(/^['"]|['"]$/g, '')
+/**
+ * Compute whether a channel will actually be dispatched given the fully merged
+ * config: its effective `enabled` flag AND any legacy `channels_disabled` list
+ * membership. Used to report the real post-write state rather than the value we
+ * just requested, which a higher-precedence layer could still override.
+ */
+function effectiveEnabled(config: MmrConfigParsed, channel: string): boolean {
+  // Normalize both sides so an alias in the list (e.g. `agy`) disables its
+  // canonical channel (`antigravity`), matching how review dispatch resolves it.
+  const target = normalizeChannelName(channel)
+  const disabledList = new Set((config.channels_disabled ?? []).map(normalizeChannelName))
+  return config.channels[channel]?.enabled !== false && !disabledList.has(target)
 }
 
-function isCommandSecretKey(name: string): boolean {
-  const normalized = name.replace(/^-+/, '').toLowerCase()
-  if (normalized.endsWith('-env') || normalized.endsWith('_env')) return false
-  if (['auth-type', 'max-tokens', 'session-dir', 'token-limit', 'token-usage'].includes(normalized)) return false
-  return isSecretKey(normalized, { exemptEnvNameKeys: false })
+/**
+ * True when `channel` (by canonical name) is a member of the merged
+ * `channels_disabled` list — i.e. disabled by the list mechanism rather than by
+ * its own `enabled` flag.
+ */
+function disabledByList(config: MmrConfigParsed, channel: string): boolean {
+  const target = normalizeChannelName(channel)
+  return (config.channels_disabled ?? []).map(normalizeChannelName).includes(target)
 }
+
+/**
+ * Which config layer's `channels_disabled` list is in effect. Arrays replace
+ * (not merge) across layers, so the highest layer that defines the list wins;
+ * we report that layer as the provenance source for list-disabled channels.
+ */
+function channelsDisabledSource(): ProvenanceSource | undefined {
+  const paths = resolveConfigPaths({ projectRoot: process.cwd() })
+  for (const [file, src] of [[paths.project, 'project'], [paths.user, 'user']] as const) {
+    if (!fs.existsSync(file)) continue
+    try {
+      const parsed = parseYaml(fs.readFileSync(file, 'utf-8')) as { channels_disabled?: unknown }
+      if (parsed && Array.isArray(parsed.channels_disabled)) return src
+    } catch {
+      // ignore unreadable/invalid file; fall through to the next layer
+    }
+  }
+  return undefined
+}
+
+async function configToggle(channelArg: string | undefined, enabled: boolean, args: ConfigArgs): Promise<boolean> {
+  if (!channelArg) {
+    console.error(`Usage: mmr config ${enabled ? 'enable' : 'disable'} <channel>`)
+    return false
+  }
+  if (args.global && args.project) {
+    console.error('Pass only one of --global or --project, not both.')
+    return false
+  }
+  // Accept channel aliases (e.g. `agy` → `antigravity`) at the front door, the
+  // same way effectiveEnabled, pruning, and review dispatch resolve them. Use
+  // the canonical name for every step below.
+  const channel = normalizeChannelName(channelArg)
+  // Validate the channel exists before writing, so a typo cannot create a
+  // command-less channel that then fails config validation on the next load.
+  const before = loadConfig({ projectRoot: process.cwd() })
+  const def = before.channels?.[channel]
+  if (!def) {
+    const known = Object.keys(before.channels ?? {}).join(', ')
+    console.error(`Unknown channel '${channelArg}'. Known channels: ${known}`)
+    return false
+  }
+  const target = await resolveWriteTarget(channel, enabled, args, before)
+  const userPath = resolveConfigPaths({ projectRoot: process.cwd() }).user
+  const isGlobalTarget = target.file === userPath
+  // Only the user-owned global config may be a (dotfiles-managed) symlink; the
+  // repo-controlled project file must not be written through a symlink.
+  const allowSymlink = isGlobalTarget
+
+  // Scope guard, kept symmetric between enable and disable:
+  //  - ANY global write requires the channel to be runnable in global-only
+  //    config. Disabling a project-only channel globally would write a stub that
+  //    its own revert (`enable … --global`) then can't undo; and enabling a
+  //    command-less channel globally is invalid. Reject both, point at --project.
+  //  - A project ENABLE additionally must not turn a bare merged stub (command-
+  //    less) into an invalid `enabled: true`.
+  if (isGlobalTarget) {
+    const g = loadConfig({ projectRoot: process.cwd(), skipProjectConfig: true }).channels[channel]
+    if (!g || (g.kind !== 'http' && !g.command)) {
+      console.error(
+        `Cannot ${enabled ? 'enable' : 'disable'} '${channel}' with --global: it has no command in `
+        + 'the global config (the change would be an unrunnable/un-revertable stub). Use --project.',
+      )
+      return false
+    }
+  } else if (enabled) {
+    const m = before.channels[channel]
+    if (m.kind !== 'http' && !m.command) {
+      console.error(
+        `Cannot enable '${channel}': it has no command in the merged config `
+        + '(it is a disabled stub). Add a command to its channel config first.',
+      )
+      return false
+    }
+  }
+  try {
+    fs.mkdirSync(path.dirname(target.file), { recursive: true })
+    // setChannelEnabled writes enabled and (on enable) prunes channels_disabled
+    // in THIS file only. We never silently mutate another scope's file — if a
+    // different layer still disables the channel, we surface it below so the
+    // user can decide, rather than reaching into their global config.
+    setChannelEnabled(target.file, channel, enabled, { allowSymlink })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error(`Failed to write ${target.file}: ${msg}`)
+    return false
+  }
+
+  const verb = enabled ? 'Enabled' : 'Disabled'
+  console.log(`✓ ${verb} channel '${channel}'`)
+  if (target.notInstalled) {
+    console.log(`  ${channel} CLI not installed — recorded as a machine-level preference in ${target.file}`)
+    console.log('  pass --project to scope it to this repo instead')
+  } else {
+    console.log(`  wrote ${target.file}`)
+  }
+
+  // Report the EFFECTIVE merged state, not just the value we wrote — a
+  // higher-precedence layer (e.g. a project override after a global write)
+  // could still win, and the user must know if the intent didn't take effect.
+  const { config, provenance } = loadConfigWithProvenance({ projectRoot: process.cwd() })
+  // Attribute the source to channels_disabled's layer when that list (not the
+  // enabled flag) is what determines dispatch — same logic as the list view.
+  const listSource = channelsDisabledSource()
+  const src = (disabledByList(config, channel) && listSource)
+    ? listSource
+    : ((provenance.channels?.[channel]?.enabled as string | undefined) ?? 'default')
+  const effective = effectiveEnabled(config, channel)
+  console.log(`  now    ${channel}  ${effective ? 'enabled' : 'disabled'}  (${src})`)
+  if (effective !== enabled) {
+    // The requested change didn't take effect because another scope wins. Tell
+    // the user exactly how to clear it rather than silently editing that file.
+    const otherScope = isGlobalTarget ? '--project' : '--global'
+    const verb2 = effective ? 'enables' : 'disables'
+    console.log(`  ⚠ another config layer still ${verb2} this channel`)
+    console.log('    run `mmr config channels --format text` to see which source wins,')
+    console.log(`    or re-run with ${otherScope} to change the other layer`)
+  }
+  // The revert must target the SAME file we wrote — always explicit, because the
+  // inverse op could otherwise auto-route elsewhere (e.g. a disable of a
+  // not-installed channel routes to global). --project keeps it in this repo.
+  const scopeFlag = isGlobalTarget ? ' --global' : ' --project'
+  console.log(`  revert mmr config ${enabled ? 'disable' : 'enable'} ${channel}${scopeFlag}`)
+  return true
+}
+
+/**
+ * Canonical, runnable examples surfaced in `mmr config --help`. Lead with the
+ * conventional positional forms (P7/P8) so an agent reading help picks the
+ * canonical command, not the bespoke `show:<channel>` colon alias.
+ */
+export const CONFIG_EXAMPLES: ReadonlyArray<readonly [string, string]> = [
+  ['mmr config path', 'Show where config is read from and written to'],
+  ['mmr config channels', 'List channels as JSON (add --format text for a table)'],
+  ['mmr config channels show codex', 'Inspect one channel with provenance'],
+  ['mmr config disable grok', 'Turn a channel off (writes channels.grok.enabled: false)'],
+  ['mmr config enable grok', 'Turn a channel back on'],
+]
 
 export const configCommand: CommandModule<object, ConfigArgs> = {
   command: 'config <action> [name] [target]',
   describe: 'Manage mmr configuration',
   builder: (yargs) =>
     yargs
+      .example(CONFIG_EXAMPLES as Array<[string, string]>)
       .positional('action', {
         type: 'string',
         demandOption: true,
         describe: 'Config action',
-        choices: ['init', 'test', 'channels'],
+        choices: ['init', 'test', 'channels', 'path', 'enable', 'disable', 'show'],
       })
       .positional('name', {
         type: 'string',
@@ -354,11 +598,27 @@ export const configCommand: CommandModule<object, ConfigArgs> = {
         default: true,
         describe: 'Redact secrets for config channels show',
       })
+      .option('global', {
+        type: 'boolean',
+        describe: 'Write to the global ~/.mmr/config.yaml (enable/disable)',
+      })
+      .option('project', {
+        type: 'boolean',
+        describe: 'Write to the project ./.mmr.yaml (enable/disable)',
+      })
+      .option('format', {
+        choices: ['json', 'text'],
+        default: 'json',
+        describe: 'Output format for config channels (json | text table)',
+      })
       .middleware((args) => {
         if (args.redact === false) args['no-redact'] = true
       }),
   handler: async (args: ArgumentsCamelCase<ConfigArgs>) => {
-    if (args.action !== 'channels' && (args.name || args.target)) {
+    // `channels` takes [name] and [target]; `enable`/`disable`/`show` take [name].
+    const nameOk = ['channels', 'enable', 'disable', 'show'].includes(args.action)
+    const targetOk = args.action === 'channels'
+    if ((!nameOk && args.name) || (!targetOk && args.target)) {
       console.error(`Unexpected argument for config ${args.action}: ${args.target ?? args.name}`)
       process.exit(1)
       return
@@ -370,11 +630,31 @@ export const configCommand: CommandModule<object, ConfigArgs> = {
     case 'test':
       await configTest()
       break
+    case 'path':
+      configPath()
+      break
+    case 'show': {
+      // Top-level alias for `config channels show <channel>`.
+      if (!args.name) {
+        console.error('Usage: mmr config show <channel>')
+        process.exit(1)
+        return
+      }
+      if (!showChannel(args.name, { noRedact: isNoRedact(args) })) process.exit(1)
+      break
+    }
+    case 'enable':
+    case 'disable': {
+      const ok = await configToggle(args.name, args.action === 'enable', args)
+      if (!ok) process.exit(1)
+      break
+    }
     case 'channels': {
       const ok = configChannels({
         name: args.name,
         target: args.target,
         noRedact: isNoRedact(args),
+        format: args.format,
       })
       if (!ok) process.exit(1)
       break

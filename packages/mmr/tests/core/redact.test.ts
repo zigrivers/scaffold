@@ -1,5 +1,25 @@
 import { describe, it, expect } from 'vitest'
-import { isSecretKey, redactRecord, redactChannel } from '../../src/core/redact.js'
+import { isSecretKey, redactRecord, redactChannel, redactConfigView } from '../../src/core/redact.js'
+
+describe('redactConfigView (D4 — single boundary)', () => {
+  it('deep-redacts secret-keyed values in nested config structures', () => {
+    const out = redactConfigView({
+      channels: { http: { headers: { Authorization: 'Bearer sk-live' }, api_key_env: 'OPENAI_API_KEY' } },
+    }) as { channels: { http: { headers: { Authorization: string }; api_key_env: string } } }
+    expect(out.channels.http.headers.Authorization).toBe('<redacted>')
+    // api_key_env is a NAME, not a value — kept.
+    expect(out.channels.http.api_key_env).toBe('OPENAI_API_KEY')
+  })
+
+  it('returns the value untouched when noRedact is set', () => {
+    const input = { headers: { Authorization: 'Bearer sk-live' } }
+    expect(redactConfigView(input, { noRedact: true })).toBe(input)
+  })
+
+  it('redacts arrays of KEY value token pairs', () => {
+    expect(redactConfigView(['Authorization', 'Bearer sk-live'])).toEqual(['Authorization', '<redacted>'])
+  })
+})
 
 describe('isSecretKey (T1-E)', () => {
   it('matches token / key / secret / password / auth / authorization (case-insensitive)', () => {

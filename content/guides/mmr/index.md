@@ -127,7 +127,7 @@ mmr review --pr 123 --channels grok claude --sync --format json
 | `mmr results <job-id> [--raw]` | Re-run parse → reconcile → format on a completed job. Exit code reflects the verdict. |
 | `mmr jobs <list\|prune>` | List jobs, or prune old ones per `job_retention_days`. |
 | `mmr sessions <start\|list\|show\|end> <id>` | Manage multi-round review sessions (stored under `~/.mmr/sessions/`). |
-| `mmr config <init\|show\|validate…>` | Scaffold and inspect `.mmr.yaml` (including OSS-runtime example blocks). |
+| `mmr config <init\|test\|channels\|path\|enable\|disable>` | Scaffold, inspect, and **mutate** `.mmr.yaml`. `init` scaffolds; `test` pre-flights install + auth; `channels` lists (add `--format text` for a table with a provenance SOURCE column, or `channels show <name>` for one channel); `path` discloses the read/write search order; `enable`/`disable <channel>` toggle a channel without hand-editing YAML. |
 | `mmr ack <add\|list\|rm\|prune>` | Sticky acknowledgments — silence a finding by its stable key so it stops blocking across rounds. |
 | `mmr skill install --platform <name> \| --all` | Install a "use MMR for code review" skill into a project per agent CLI: Cursor (`.cursor/rules/mmr-review.mdc`), Gemini (`GEMINI.md`), Codex + Antigravity (shared `AGENTS.md` managed block). Supports `--dry-run`, `--force`, and `--dir`. :cite[packages/mmr/src/commands/skill.ts:85] |
 
@@ -138,6 +138,11 @@ mmr reconcile "$JOB_ID" --channel superpowers --input findings.json
 # Install the MMR review skill into the current project for one or all agent CLIs:
 mmr skill install --platform cursor
 mmr skill install --all --dry-run
+
+# Turn a channel off / on without hand-editing YAML (writes channels.<name>.enabled):
+mmr config disable grok      # not-installed channels record to ~/.mmr/config.yaml; --project to scope to repo
+mmr config enable grok       # also clears any legacy channels_disabled entry
+mmr config path              # show where config is read from and written to
 ```
 
 :::callout{type=info}

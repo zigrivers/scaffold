@@ -97,6 +97,8 @@ claude -p "respond with ok" 2>/dev/null                              # full LLM 
 
 Prefer `mmr config test` as a single-command pre-flight that runs all three checks and emits structured JSON.
 
+If a channel's CLI is permanently unavailable on this machine, `mmr config disable <name>` stops it being dispatched (and stops the wasteful compensating pass for it); `mmr config enable <name>` re-enables it. Disabling a channel whose CLI is not installed is a machine-level fact, so it records to the global `~/.mmr/config.yaml` by default (pass `--project` to scope it to the repo); both write `channels.<name>.enabled` rather than requiring a hand-edit.
+
 If auth fails, report status `auth_failed` and surface recovery to the user:
 - Codex: "Codex auth expired — run `! codex login` to re-authenticate"
 - Antigravity: "Antigravity auth expired — run `! agy -p \"hello\"` to re-authenticate"

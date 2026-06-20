@@ -202,6 +202,12 @@ function resolveExtendsAcrossChannels(
 function validateRunnableChannels(config: MmrConfigParsed): void {
   for (const [name, channel] of Object.entries(config.channels)) {
     if (channel.abstract) continue
+    // A disabled channel is filtered out before dispatch (review.ts), so it
+    // never runs and needs no command. Allowing a bare `enabled: false` entry
+    // is what makes a scoped disable override portable: writing only
+    // `channels.<name>.enabled: false` to any layer is always valid, even in a
+    // repo that doesn't define that channel's command.
+    if (channel.enabled === false) continue
     // http channels are runnable via endpoint/model (schema-required), not a
     // command — only subprocess channels must define one after inheritance.
     if (channel.kind === 'http') continue
