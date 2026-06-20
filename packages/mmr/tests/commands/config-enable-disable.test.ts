@@ -143,12 +143,32 @@ describe('mmr config disable/enable', () => {
     expect(yaml).toMatch(/codex:[\s\S]*enabled: true/)
   })
 
+  it('prints a scope-qualified revert command for a global write', async () => {
+    await run({ action: 'disable', name: 'codex', global: true })
+    const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n')
+    expect(out).toContain('revert mmr config enable codex --global')
+  })
+
+  it('refuses --global enable of a channel that is a command-less stub in global config', async () => {
+    // global has a bare stub; the runnable command lives only in the project.
+    fs.mkdirSync(path.join(home, '.mmr'), { recursive: true })
+    fs.writeFileSync(path.join(home, '.mmr', 'config.yaml'), 'version: 1\nchannels:\n  foo:\n    enabled: false\n')
+    fs.writeFileSync(path.join(tmp, '.mmr.yaml'), 'version: 1\nchannels:\n  foo:\n    command: "some-cli review"\n')
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
+    await run({ action: 'enable', name: 'foo', global: true })
+    expect(errSpy.mock.calls.map((c) => String(c[0])).join('\n')).toMatch(/no command in the global config/)
+    expect(exitSpy).toHaveBeenCalledWith(1)
+    errSpy.mockRestore()
+    exitSpy.mockRestore()
+  })
+
   it('refuses to enable a bare command-less disabled stub', async () => {
     fs.writeFileSync(path.join(tmp, '.mmr.yaml'), 'version: 1\nchannels:\n  ghost:\n    enabled: false\n')
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
     await run({ action: 'enable', name: 'ghost', project: true })
-    expect(errSpy.mock.calls.map((c) => String(c[0])).join('\n')).toMatch(/no command defined/)
+    expect(errSpy.mock.calls.map((c) => String(c[0])).join('\n')).toMatch(/no command in the/)
     expect(exitSpy).toHaveBeenCalledWith(1)
     // file not changed to enabled: true
     expect(fs.readFileSync(path.join(tmp, '.mmr.yaml'), 'utf-8')).toMatch(/enabled: false/)

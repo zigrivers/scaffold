@@ -456,21 +456,32 @@ async function configToggle(channelArg: string | undefined, enabled: boolean, ar
     console.error(`Unknown channel '${channelArg}'. Known channels: ${known}`)
     return false
   }
-  // Enabling a bare disabled stub (command-less, which loadConfig now allows)
-  // would write enabled: true and then fail validation on the next load. Refuse
-  // unless the channel actually has something to run.
-  if (enabled && def.kind !== 'http' && !def.command) {
-    console.error(
-      `Cannot enable '${channel}': it has no command defined (it's a disabled stub). `
-      + 'Add a command to its channel config first.',
-    )
-    return false
-  }
-
   const target = await resolveWriteTarget(channel, enabled, args, before)
+  const userPath = resolveConfigPaths({ projectRoot: process.cwd() }).user
+  const isGlobalTarget = target.file === userPath
   // Only the user-owned global config may be a (dotfiles-managed) symlink; the
   // repo-controlled project file must not be written through a symlink.
-  const allowSymlink = target.file === resolveConfigPaths({ projectRoot: process.cwd() }).user
+  const allowSymlink = isGlobalTarget
+
+  // Enabling a channel that has no runnable definition AT THE TARGET SCOPE would
+  // write enabled: true and then fail validation on the next load (a command-
+  // less stub). Check the scope we're writing to: global writes are visible to
+  // every repo, so they must be runnable in global-only config; project writes
+  // can rely on this repo's merged config.
+  if (enabled) {
+    const scopeConfig = isGlobalTarget
+      ? loadConfig({ projectRoot: process.cwd(), skipProjectConfig: true })
+      : before
+    const sdef = scopeConfig.channels[channel]
+    if (!sdef || (sdef.kind !== 'http' && !sdef.command)) {
+      const where = isGlobalTarget ? 'global' : 'merged'
+      console.error(
+        `Cannot enable '${channel}': it has no command in the ${where} config `
+        + '(it would be an unrunnable stub). Define its command there first.',
+      )
+      return false
+    }
+  }
   try {
     fs.mkdirSync(path.dirname(target.file), { recursive: true })
     // setChannelEnabled writes enabled and (on enable) prunes channels_disabled
@@ -503,14 +514,16 @@ async function configToggle(channelArg: string | undefined, enabled: boolean, ar
   if (effective !== enabled) {
     // The requested change didn't take effect because another scope wins. Tell
     // the user exactly how to clear it rather than silently editing that file.
-    const userPath = resolveConfigPaths({ projectRoot: process.cwd() }).user
-    const otherScope = target.file === userPath ? '--project' : '--global'
+    const otherScope = isGlobalTarget ? '--project' : '--global'
     const verb2 = effective ? 'enables' : 'disables'
     console.log(`  ⚠ another config layer still ${verb2} this channel`)
     console.log('    run `mmr config channels --format text` to see which source wins,')
     console.log(`    or re-run with ${otherScope} to change the other layer`)
   }
-  console.log(`  revert mmr config ${enabled ? 'disable' : 'enable'} ${channel}`)
+  // The revert must target the same scope we wrote, or it would land in the
+  // default (project) scope and leave the original change in place.
+  const scopeFlag = isGlobalTarget ? ' --global' : ''
+  console.log(`  revert mmr config ${enabled ? 'disable' : 'enable'} ${channel}${scopeFlag}`)
   return true
 }
 
