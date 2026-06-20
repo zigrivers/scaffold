@@ -404,11 +404,25 @@ async function configToggle(channel: string | undefined, enabled: boolean, args:
   return true
 }
 
+/**
+ * Canonical, runnable examples surfaced in `mmr config --help`. Lead with the
+ * conventional positional forms (P7/P8) so an agent reading help picks the
+ * canonical command, not the bespoke `show:<channel>` colon alias.
+ */
+export const CONFIG_EXAMPLES: ReadonlyArray<readonly [string, string]> = [
+  ['mmr config path', 'Show where config is read from and written to'],
+  ['mmr config channels', 'List channels as JSON (add --format text for a table)'],
+  ['mmr config channels show codex', 'Inspect one channel with provenance'],
+  ['mmr config disable grok', 'Turn a channel off (writes channels.grok.enabled: false)'],
+  ['mmr config enable grok', 'Turn a channel back on'],
+]
+
 export const configCommand: CommandModule<object, ConfigArgs> = {
   command: 'config <action> [name] [target]',
   describe: 'Manage mmr configuration',
   builder: (yargs) =>
     yargs
+      .example(CONFIG_EXAMPLES as Array<[string, string]>)
       .positional('action', {
         type: 'string',
         demandOption: true,
