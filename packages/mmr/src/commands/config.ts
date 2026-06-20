@@ -466,21 +466,28 @@ async function configToggle(channelArg: string | undefined, enabled: boolean, ar
   // repo-controlled project file must not be written through a symlink.
   const allowSymlink = isGlobalTarget
 
-  // Enabling a channel that has no runnable definition AT THE TARGET SCOPE would
-  // write enabled: true and then fail validation on the next load (a command-
-  // less stub). Check the scope we're writing to: global writes are visible to
-  // every repo, so they must be runnable in global-only config; project writes
-  // can rely on this repo's merged config.
-  if (enabled) {
-    const scopeConfig = isGlobalTarget
-      ? loadConfig({ projectRoot: process.cwd(), skipProjectConfig: true })
-      : before
-    const sdef = scopeConfig.channels[channel]
-    if (!sdef || (sdef.kind !== 'http' && !sdef.command)) {
-      const where = isGlobalTarget ? 'global' : 'merged'
+  // Scope guard, kept symmetric between enable and disable:
+  //  - ANY global write requires the channel to be runnable in global-only
+  //    config. Disabling a project-only channel globally would write a stub that
+  //    its own revert (`enable … --global`) then can't undo; and enabling a
+  //    command-less channel globally is invalid. Reject both, point at --project.
+  //  - A project ENABLE additionally must not turn a bare merged stub (command-
+  //    less) into an invalid `enabled: true`.
+  if (isGlobalTarget) {
+    const g = loadConfig({ projectRoot: process.cwd(), skipProjectConfig: true }).channels[channel]
+    if (!g || (g.kind !== 'http' && !g.command)) {
       console.error(
-        `Cannot enable '${channel}': it has no command in the ${where} config `
-        + '(it would be an unrunnable stub). Define its command there first.',
+        `Cannot ${enabled ? 'enable' : 'disable'} '${channel}' with --global: it has no command in `
+        + 'the global config (the change would be an unrunnable/un-revertable stub). Use --project.',
+      )
+      return false
+    }
+  } else if (enabled) {
+    const m = before.channels[channel]
+    if (m.kind !== 'http' && !m.command) {
+      console.error(
+        `Cannot enable '${channel}': it has no command in the merged config `
+        + '(it is a disabled stub). Add a command to its channel config first.',
       )
       return false
     }

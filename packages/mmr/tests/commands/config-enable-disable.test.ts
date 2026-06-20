@@ -149,6 +149,21 @@ describe('mmr config disable/enable', () => {
     expect(out).toContain('revert mmr config enable codex --global')
   })
 
+  it('rejects --global disable of a project-only channel (revert would be unusable)', async () => {
+    fs.writeFileSync(
+      path.join(tmp, '.mmr.yaml'),
+      'version: 1\nchannels:\n  projonly:\n    command: "some-cli review"\n',
+    )
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
+    await run({ action: 'disable', name: 'projonly', global: true })
+    expect(fs.existsSync(path.join(home, '.mmr', 'config.yaml'))).toBe(false)
+    expect(errSpy.mock.calls.map((c) => String(c[0])).join('\n')).toMatch(/with --global|Use --project/)
+    expect(exitSpy).toHaveBeenCalledWith(1)
+    errSpy.mockRestore()
+    exitSpy.mockRestore()
+  })
+
   it('refuses --global enable of a channel that is a command-less stub in global config', async () => {
     // global has a bare stub; the runnable command lives only in the project.
     fs.mkdirSync(path.join(home, '.mmr'), { recursive: true })
