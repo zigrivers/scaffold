@@ -49,19 +49,23 @@ skips creation.
 
 ## Methodology Scaling
 docs/github-setup.md is always produced (it is the Mode Detection marker) — depth
-governs how much it records, not whether it exists.
+governs how much it records, not whether it exists. The safety behaviors apply at
+**every** depth, not just higher ones: always secret-scan what is about to be pushed
+(including already-tracked files and history, not only newly staged changes), and
+always use the `gh`-absent manual fallback when the GitHub CLI is unavailable.
 - **deep**: Full setup — detect state, confirm visibility, ensure a comprehensive
   `.gitignore`, secret-scan everything about to be pushed, create the remote, verify
   the push, and write docs/github-setup.md with default branch, re-run, and
   visibility-change guidance.
 - **mvp**: Initialize git, ensure a minimal `.gitignore`, secret-scan, make an
-  initial commit, create a private remote, confirm the push, and write a minimal
-  docs/github-setup.md (remote URL + visibility).
+  initial commit, confirm visibility (private by default — still ask), create the
+  remote, confirm the push, and write a minimal docs/github-setup.md (remote URL +
+  visibility).
 - **custom:depth(1-5)**:
-  - Depth 1: `git init`, minimal `.gitignore`, secret-scan, initial commit, create private remote, push, and write a minimal docs/github-setup.md (URL + visibility).
-  - Depth 2: add the public/private choice and push verification against the remote.
-  - Depth 3: add the `gh`-absent manual fallback and an explicit secret scan of already-tracked files (not just newly staged ones).
-  - Depth 4: expand docs/github-setup.md with the default branch and re-run instructions.
+  - Depth 1: `git init`, minimal `.gitignore`, secret-scan, initial commit, confirm visibility (private by default — still ask), create the remote, push, and write a minimal docs/github-setup.md (URL + visibility).
+  - Depth 2: add push verification against the remote (confirm the branch exists on origin).
+  - Depth 3: tune the `.gitignore` to the project's tech stack and record the remote name and default branch in docs/github-setup.md.
+  - Depth 4: expand docs/github-setup.md with re-run instructions.
   - Depth 5: add visibility-change guidance and an explicit hand-off note to git-workflow.
 
 ## Mode Detection
