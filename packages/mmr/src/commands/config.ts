@@ -455,6 +455,22 @@ async function configToggle(channelArg: string | undefined, enabled: boolean, ar
     console.error(`Unknown channel '${channelArg}'. Known channels: ${known}`)
     return false
   }
+  // A write to the global scope must only touch channels that resolve from
+  // global-only config (built-in or user-defined). Writing a bare `enabled`
+  // override for a project-only channel into ~/.mmr/config.yaml would leave an
+  // orphan, command-less stub that fails config validation in every other repo.
+  // (Project writes are always safe: the channel is in this repo's merged config.)
+  if (args.global) {
+    const globalOnly = loadConfig({ projectRoot: process.cwd(), skipProjectConfig: true })
+    if (!globalOnly.channels[channel]) {
+      console.error(
+        `Channel '${channel}' is defined only in the project config, so it can't be `
+        + 'written to the global config (it would be an orphan stub in other repos). '
+        + 'Use --project instead.',
+      )
+      return false
+    }
+  }
 
   const target = await resolveWriteTarget(channel, enabled, args, before)
   try {
