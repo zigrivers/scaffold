@@ -135,7 +135,19 @@ mmr config disable grok      # writes channels.grok.enabled: false
 mmr config enable grok       # turns it back on (and clears legacy channels_disabled)
 mmr config path              # where config is read from / written to
 mmr config channels --format text   # table with a SOURCE (provenance) column
+mmr config set defaults.fix_threshold P1   # set any dotted value (validated before write)
+mmr config unset defaults.fix_threshold    # remove an override, fall back to inherited
+mmr doctor                   # diagnose every channel (install + auth) with remediation
+mmr doctor --fix             # disable channels whose CLI isn't installed
 ```
+
+`mmr doctor` is the one-shot health check: it classifies each channel and
+prints the exact fix. A channel whose CLI is **not installed** is treated as a
+*structural* absence — as of mmr 2.0.0 the review no longer runs a wasteful
+compensating pass for it by default (you'll see a one-line notice). Re-enable
+that substitution with `--compensate-missing` on the review, or mark the
+channel `required: true` in config. Transient failures (auth expired) are still
+compensated automatically.
 
 `disable`/`enable` default to the project `./.mmr.yaml`. Disabling a channel
 whose CLI is **not installed** is a machine-level fact, so it records to the

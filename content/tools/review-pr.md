@@ -172,6 +172,10 @@ quality. Auth failure recovery: `! grok login`.
 **After all channels:** Run any queued compensating passes as additional `claude -p`
 dispatches with focused prompts. Label findings as `[compensating: Codex-equivalent]`,
 `[compensating: Antigravity-equivalent]`, or `[compensating: Grok-equivalent]`.
+Compensate **transient** degradation (auth expired, timeout, runtime failure). For a
+**structural** absence (the CLI is not installed on this machine and won't return),
+do not compensate — note it and recommend `mmr config disable <name>` (or `mmr doctor
+--fix`); matches MMR's own default since 2.0.0.
 
 ### Step 3: Run Agent Code Review (complementary agent channel)
 

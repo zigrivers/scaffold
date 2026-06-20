@@ -241,11 +241,17 @@ way.
 - **All built-in channels are required** — A channel enters degraded mode when
   it is not installed (`command -v` fails), auth fails and the user cannot
   recover, or it fails during execution (non-zero exit, malformed output,
-  timeout). Run a compensating pass via `claude -p` for each missing
-  **external** channel (Codex, Gemini, or Grok), focused on that channel's
-  strength area and labeled `[compensating: Codex-equivalent]`,
-  `[compensating: Gemini-equivalent]`, or `[compensating: Grok-equivalent]`.
-  Compensating findings are single-source confidence.
+  timeout). **Distinguish transient from structural degradation (mmr 2.0.0):**
+  for a *transient* failure (auth expired, timeout, runtime error) of an
+  **external** channel (Codex, Gemini, or Grok), run a compensating pass via
+  `claude -p`, focused on that channel's strength area and labeled
+  `[compensating: Codex-equivalent]`, `[compensating: Gemini-equivalent]`, or
+  `[compensating: Grok-equivalent]`; compensating findings are single-source
+  confidence. For a *structural* absence (the CLI is not installed and won't
+  return), do **not** auto-compensate — MMR skips it by default and prints a
+  remediation; either install the CLI, mark the channel `required: true`, pass
+  `--compensate-missing`, or `mmr config disable <name>` to stop dispatching it.
+  Run `mmr doctor` to classify channels and apply the safe fixes.
 - **Auth failures are NOT silent** — surface to the user with recovery commands:
   - Codex: `! codex login`
   - Gemini: `! gemini -p "hello"`

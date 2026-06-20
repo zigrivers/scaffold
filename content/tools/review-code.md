@@ -353,7 +353,7 @@ rm -f "$PROMPT_FILE"   # clean up the temp prompt file
 
 If the CLI exits with a non-zero code, produces malformed/unparseable output, or is killed by the tool runner timeout, record root-cause `failed` and queue a compensating pass for that channel.
 
-**After all channels:** Run any queued compensating passes as foreground Claude self-review passes. Each compensating pass uses the same review prompt as the missing channel, focusing on that channel's strength area.
+**After all channels:** Run any queued compensating passes as foreground Claude self-review passes. Each compensating pass uses the same review prompt as the missing channel, focusing on that channel's strength area. Compensate **transient** degradation (auth expired, timeout, runtime failure) only; for a **structural** absence (CLI not installed and won't return), do not compensate — note it and recommend `mmr config disable <name>` / `mmr doctor --fix` (matches MMR's default since 2.0.0).
 
 ### Step 5: Use This Review Prompt
 

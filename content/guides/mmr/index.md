@@ -127,7 +127,8 @@ mmr review --pr 123 --channels grok claude --sync --format json
 | `mmr results <job-id> [--raw]` | Re-run parse → reconcile → format on a completed job. Exit code reflects the verdict. |
 | `mmr jobs <list\|prune>` | List jobs, or prune old ones per `job_retention_days`. |
 | `mmr sessions <start\|list\|show\|end> <id>` | Manage multi-round review sessions (stored under `~/.mmr/sessions/`). |
-| `mmr config <init\|test\|channels\|path\|enable\|disable>` | Scaffold, inspect, and **mutate** `.mmr.yaml`. `init` scaffolds; `test` pre-flights install + auth; `channels` lists (add `--format text` for a table with a provenance SOURCE column, or `channels show <name>` for one channel); `path` discloses the read/write search order; `enable`/`disable <channel>` toggle a channel without hand-editing YAML. |
+| `mmr config <init\|test\|channels\|path\|show\|enable\|disable\|set\|unset>` | Scaffold, inspect, and **mutate** `.mmr.yaml`. `init` scaffolds; `test` pre-flights install + auth; `channels` lists (add `--format text` for a table with a provenance SOURCE column); `show <name>` inspects one channel with provenance; `path` discloses the read/write search order; `enable`/`disable <channel>` toggle a channel; `set <dotted.path> <value>` / `unset <dotted.path>` edit any value (validated before write). All mutators are scope-aware (`--global`/`--project`) and never leave an invalid config on disk. |
+| `mmr doctor [--fix] [--format json]` | Diagnose every channel's health (install + auth) with per-channel remediation. `--fix` disables channels whose CLI is not installed (records to `~/.mmr/config.yaml`). |
 | `mmr ack <add\|list\|rm\|prune>` | Sticky acknowledgments — silence a finding by its stable key so it stops blocking across rounds. |
 | `mmr skill install --platform <name> \| --all` | Install a "use MMR for code review" skill into a project per agent CLI: Cursor (`.cursor/rules/mmr-review.mdc`), Gemini (`GEMINI.md`), Codex + Antigravity (shared `AGENTS.md` managed block). Supports `--dry-run`, `--force`, and `--dir`. :cite[packages/mmr/src/commands/skill.ts:85] |
 
@@ -391,15 +392,21 @@ automatically.
 ## Degraded mode, compensation & auth
 
 A channel is "degraded" when it's `not_installed` (no binary), `auth_failed`,
-`timeout`, `skipped`, or `failed`. The review doesn't stop — it compensates and
-tells you how to recover.
+`timeout`, `skipped`, or `failed`. The review doesn't stop — it tells you how to
+recover and, for *transient* degradation, compensates.
 
-- **Compensating pass.** For each degraded external channel, a `claude -p` pass
-  runs with that channel's focus area, labeled e.g.
-  `[compensating: Grok-equivalent]`. These findings are single-source, low
-  confidence. The compensator channel is configurable via
+- **Transient vs structural (mmr 2.0.0).** `auth_failed`/`timeout`/`failed` are
+  *transient* — the channel will come back, so a compensating pass runs.
+  `not_installed` is *structural* — the CLI isn't on this machine and won't
+  return without action, so MMR **no longer compensates it by default** (a
+  one-line notice names it). Opt back in with `--compensate-missing` on the
+  review, or mark the channel `required: true`. Run `mmr doctor` to see the
+  classification and the fix, or `mmr config disable <name>` to silence it.
+- **Compensating pass.** When it runs, a `claude -p` pass uses that channel's
+  focus area, labeled e.g. `[compensating: Grok-equivalent]`. These findings are
+  single-source, low confidence. The compensator channel is configurable via
   `defaults.compensator.channel`.
-- **Auth recovery** is surfaced, never silent.
+- **Auth recovery** is surfaced (redacted), never silent.
 
 | Channel | Auth check | Recovery |
 | --- | --- | --- |
