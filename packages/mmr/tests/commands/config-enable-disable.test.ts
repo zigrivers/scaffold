@@ -90,6 +90,19 @@ describe('mmr config disable/enable', () => {
     expect(out).toMatch(/now\s+codex\s+enabled/)
   })
 
+  it('keeps a built-in disable in the project when its missing command is a project override', async () => {
+    // codex is a built-in, but the project overrides its command to an absent
+    // CLI. The not-installed-ness is project-specific, so the disable must NOT
+    // leak to the global config.
+    fs.writeFileSync(
+      path.join(tmp, '.mmr.yaml'),
+      'version: 1\nchannels:\n  codex:\n    command: "nonexistent-cli-xyz-123 exec"\n',
+    )
+    await run({ action: 'disable', name: 'codex' })
+    expect(fs.existsSync(path.join(home, '.mmr', 'config.yaml'))).toBe(false)
+    expect(fs.readFileSync(path.join(tmp, '.mmr.yaml'), 'utf-8')).toMatch(/codex:[\s\S]*enabled: false/)
+  })
+
   it('rejects passing both --global and --project', async () => {
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)

@@ -94,6 +94,16 @@ describe('config writer', () => {
     expect(fs.statSync(file).mode & 0o777).toBe(0o600)
   })
 
+  it('writes through a symlink without replacing the link', () => {
+    const real = path.join(dir, 'real-config.yaml')
+    fs.writeFileSync(real, 'version: 1\nchannels:\n  codex:\n    enabled: true\n')
+    fs.symlinkSync(real, file)
+    setChannelEnabled(file, 'codex', false)
+    // The path we wrote to is still a symlink, and the real file got the change.
+    expect(fs.lstatSync(file).isSymbolicLink()).toBe(true)
+    expect(fs.readFileSync(real, 'utf-8')).toMatch(/enabled: false/)
+  })
+
   it('treats a channel name containing a dot as a single key', () => {
     fs.writeFileSync(file, 'version: 1\n')
     setChannelEnabled(file, 'my-bot.v2', false)

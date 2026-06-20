@@ -41,13 +41,18 @@ function loadDoc(file: string, opts: { create?: boolean } = {}): Document {
  * a half-truncated config that fails to load.
  */
 function atomicWrite(file: string, content: string): void {
-  const tmp = `${file}.tmp-${process.pid}`
+  // Resolve symlinks first: renaming over a symlink would replace the link with
+  // a regular file, breaking dotfiles managers (chezmoi/stow). Write through to
+  // the real file, keeping the temp file in the same directory for an atomic
+  // same-filesystem rename.
+  const targetPath = fs.existsSync(file) ? fs.realpathSync(file) : file
+  const tmp = `${targetPath}.tmp-${process.pid}`
   // Preserve the target's permission bits across the temp+rename, so a private
   // 0600 config is not silently widened to 0644 under the umask — config can
   // hold secrets in env/headers/command tokens. New files default to 0600.
   let mode = 0o600
   try {
-    mode = fs.statSync(file).mode & 0o777
+    mode = fs.statSync(targetPath).mode & 0o777
   } catch {
     // target does not exist yet → keep the restrictive default
   }
@@ -55,7 +60,7 @@ function atomicWrite(file: string, content: string): void {
   // chmod explicitly: writeFileSync's mode is masked by the umask, but the
   // intent here is the exact mode (especially when preserving an existing one).
   fs.chmodSync(tmp, mode)
-  fs.renameSync(tmp, file)
+  fs.renameSync(tmp, targetPath)
 }
 
 /**

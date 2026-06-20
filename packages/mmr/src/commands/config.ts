@@ -396,13 +396,16 @@ async function resolveWriteTarget(
   if (!enabling) {
     const cmd = config.channels[channel]?.command?.split(' ')[0]
     if (cmd && !(await checkInstalled(cmd))) {
-      // Only route to global if the channel is known WITHOUT the project config
-      // (a built-in, or one defined in the global file). A project-only custom
-      // channel must NOT be stubbed globally: its command lives only in the
-      // project, so a global `enabled: false` stub (command-less) would fail
-      // config validation in every other repo.
-      const globalOnly = loadConfig({ projectRoot: process.cwd(), skipProjectConfig: true })
-      if (globalOnly.channels[channel]) {
+      // Route to global only when the missing command is machine-level — i.e.
+      // its VALUE comes from built-in defaults or the user config, not a project
+      // override. A project-sourced command (a project-only custom channel, or a
+      // built-in whose command the project overrides to a repo-local CLI) makes
+      // the not-installed-ness project-specific, so it belongs in the project
+      // file. This also avoids writing a command-less global stub that would
+      // fail config validation in other repos.
+      const { provenance } = loadConfigWithProvenance({ projectRoot: process.cwd() })
+      const cmdSource = provenance.channels[channel]?.command as ProvenanceSource | undefined
+      if (cmdSource === 'default' || cmdSource === 'user') {
         return { file: paths.user, notInstalled: true }
       }
     }
