@@ -1,13 +1,28 @@
 ---
 name: web-app-deployment
-description: Static CDN hosting, serverless platforms, container deployments, edge runtimes, long-running servers, and blue-green deploy patterns for web apps
-topics: [web-app, deployment, vercel, netlify, aws, docker, cloudflare, serverless, containers]
+description: >-
+  Static CDN hosting, serverless platforms, container deployments, edge runtimes, long-running servers, and blue-green
+  deploy patterns for web apps
+topics:
+  - web-app
+  - deployment
+  - vercel
+  - netlify
+  - aws
+  - docker
+  - cloudflare
+  - serverless
+  - containers
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-06-20
 version-pin: null
 sources:
   - url: https://docs.aws.amazon.com/whitepapers/latest/blue-green-deployments/welcome.html
+    hash: sha256:0ba5eeca4f31967ab9bb16c3b7ed5bfc83334c60adc6376f8adda1c8597c571c
+    retrieved: 2026-06-20
   - url: https://martinfowler.com/bliki/BlueGreenDeployment.html
+    hash: sha256:eeb9a79a1caab2e9ffcafdfcfb12d9d6669918a7f2af3e9f44087458d0951717
+    retrieved: 2026-06-20
 ---
 
 Deployment platform selection determines your app's operational cost, performance ceiling, and scaling characteristics. Each platform has a different cost model, latency profile, and runtime constraint. Choose based on your app's rendering strategy, traffic patterns, and team's operational expertise — not on what is fashionable.
