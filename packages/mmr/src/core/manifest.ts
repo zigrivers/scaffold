@@ -13,7 +13,12 @@ export interface CommandSpec {
   summary: string
   /** A runnable example. */
   example: string
-  /** Whether the command mutates state (config files, job store). */
+  /**
+   * True if the command (or any of its subcommands/flags) can mutate state —
+   * config files or the job store. A compound entry like `jobs <list|prune>` is
+   * marked true because `prune` writes even though `list` is read-only; treat it
+   * as "this command can write," and read the specific invocation form.
+   */
   writes: boolean
 }
 
@@ -26,7 +31,7 @@ export const COMMAND_MANIFEST: ReadonlyArray<CommandSpec> = [
   { command: 'sessions <start|list|show|end>', summary: 'Manage multi-round review sessions', example: 'mmr sessions list', writes: true },
   { command: 'ack <add|list|rm|prune>', summary: 'Silence a finding by its stable key across rounds', example: 'mmr ack list', writes: true },
   { command: 'skill install', summary: 'Install the MMR review skill into a project per agent CLI', example: 'mmr skill install --all', writes: true },
-  { command: 'doctor', summary: 'Diagnose channel health (install + auth) with remediation', example: 'mmr doctor --fix', writes: false },
+  { command: 'doctor', summary: 'Diagnose channel health (install + auth); --fix disables not-installed channels', example: 'mmr doctor', writes: true },
   { command: 'config init', summary: 'Scaffold a .mmr.yaml (auto-detects installed CLIs)', example: 'mmr config init', writes: true },
   { command: 'config test', summary: 'Pre-flight every channel (install + auth)', example: 'mmr config test', writes: false },
   { command: 'config path', summary: 'Show where config is read from and written to', example: 'mmr config path', writes: false },
@@ -36,6 +41,6 @@ export const COMMAND_MANIFEST: ReadonlyArray<CommandSpec> = [
   { command: 'config disable <channel>', summary: 'Turn a channel off (writes enabled: false)', example: 'mmr config disable grok', writes: true },
   { command: 'config set <dotted.path> <value>', summary: 'Set any config value (validated before write)', example: 'mmr config set defaults.fix_threshold P1', writes: true },
   { command: 'config unset <dotted.path>', summary: 'Remove an override, fall back to the inherited value', example: 'mmr config unset defaults.fix_threshold', writes: true },
-  { command: 'commands', summary: 'This manifest — every command as machine-readable data', example: 'mmr commands --format json', writes: false },
+  { command: 'commands', summary: 'This manifest — every command as machine-readable data', example: 'mmr commands --json', writes: false },
   { command: 'explain <topic>', summary: 'Print inline docs for a concept (channels, compensation, …)', example: 'mmr explain compensation', writes: false },
 ]

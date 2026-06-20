@@ -3,6 +3,7 @@ import { COMMAND_MANIFEST } from '../core/manifest.js'
 
 interface CommandsArgs {
   format?: string
+  json?: boolean
 }
 
 export const commandsCommand: CommandModule<object, CommandsArgs> = {
@@ -15,10 +16,15 @@ export const commandsCommand: CommandModule<object, CommandsArgs> = {
         default: 'text',
         describe: 'Output format (json = the full capability manifest for agents)',
       })
+      .option('json', {
+        type: 'boolean',
+        default: false,
+        describe: 'Shorthand for --format json',
+      })
       .example('mmr commands', 'Human-readable command list')
-      .example('mmr commands --format json', 'Machine-readable manifest for agents'),
+      .example('mmr commands --json', 'Machine-readable manifest for agents'),
   handler: (args: ArgumentsCamelCase<CommandsArgs>) => {
-    if (args.format === 'json') {
+    if (args.json === true || args.format === 'json') {
       console.log(JSON.stringify(COMMAND_MANIFEST, null, 2))
       return
     }
