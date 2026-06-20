@@ -66,6 +66,44 @@ describe('mmr review --dry-run (T1-F)', () => {
     expect(output).toMatch(/Assembled prompt for claude/)
   })
 
+  it('redacts a secret-bearing auth recovery in --dry-run output', async () => {
+    vi.resetModules()
+    vi.doMock('../../src/core/dispatcher.js', () => ({ dispatchChannel: vi.fn() }))
+    vi.doMock('../../src/core/auth.js', () => ({
+      checkInstalled: vi.fn().mockResolvedValue(true),
+      checkAuth: vi.fn().mockResolvedValue({
+        status: 'failed',
+        recovery: "curl -H 'Authorization: Bearer sk-secret-xyz'",
+      }),
+      checkHttpAuth: vi.fn().mockResolvedValue({ status: 'failed' }),
+    }))
+
+    const { reviewCommand } = await import('../../src/commands/review.js')
+    const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(tmpDir)
+    const homeSpy = vi.spyOn(os, 'homedir').mockReturnValue(tmpDir)
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never)
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await reviewCommand.handler({
+      diff: diffPath,
+      'dry-run': true,
+      trustProjectConfig: true,
+      _: ['review'],
+      $0: 'mmr',
+    } as never)
+
+    const output = logSpy.mock.calls.map((c) => c.join(' ')).join('\n')
+      + errSpy.mock.calls.map((c) => c.join(' ')).join('\n')
+    cwdSpy.mockRestore(); homeSpy.mockRestore(); exitSpy.mockRestore()
+    logSpy.mockRestore(); errSpy.mockRestore()
+    vi.doUnmock('../../src/core/dispatcher.js')
+    vi.doUnmock('../../src/core/auth.js')
+
+    expect(output).not.toContain('sk-secret-xyz')
+    expect(output).toContain('<redacted>')
+  })
+
   it('prints prompt wrappers with every placeholder replaced', async () => {
     fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), [
       'version: 1',
