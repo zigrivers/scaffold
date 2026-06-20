@@ -19,6 +19,10 @@ step-overrides:
   review-vision: { enabled: true }
   create-prd: { enabled: true }
   review-prd: { enabled: true }
+  # Repository setup is root-level: a monorepo has one git repo and one GitHub
+  # remote for all services, so github-setup runs once at the root (global), not
+  # per-service.
+  github-setup: { enabled: true }
 
 # ---------------------------------------------------------------------------
 # knowledge-overrides

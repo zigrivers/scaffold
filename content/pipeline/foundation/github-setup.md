@@ -25,7 +25,7 @@ created the remote another way can still proceed; this step simply detects that 
 skips creation.
 
 ## Inputs
-- Project name and description — from docs/plan.md if it exists; otherwise ask the user
+- Project name and description — from docs/plan.md (the `create-prd` output named in `reads`) if it exists; otherwise ask the user
 - GitHub CLI (`gh`) install + authentication status (`gh auth status`)
 - Current repository state — whether a `.git/` directory and an `origin` remote already exist
 
@@ -120,6 +120,10 @@ Never assume visibility — wait for the choice before creating the remote.
 - Write docs/github-setup.md recording the remote URL, visibility, default branch,
   remote name, and how to re-run this step or change visibility later
   (`gh repo edit --visibility …`).
+- Commit and push docs/github-setup.md (e.g., `docs: record GitHub setup`) so the
+  step's declared output is captured in the repository rather than left uncommitted
+  in the working tree. (The record is written after the remote is created — its URL
+  and visibility are not known until then — so it lands in this follow-up commit.)
 
 ### Safety rules
 - **Never commit or push secrets.** Scan for credentials, tokens, and keys before
