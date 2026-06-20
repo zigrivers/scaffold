@@ -1,12 +1,21 @@
 ---
 name: web-app-project-structure
-description: Directory layout conventions, route organization, shared vs feature modules, barrel exports, and config file placement for web apps
-topics: [web-app, project-structure, architecture, routing, modules]
+description: >-
+  Directory layout conventions, route organization, shared vs feature modules, barrel exports, and config file placement
+  for web apps
+topics:
+  - web-app
+  - project-structure
+  - architecture
+  - routing
+  - modules
 volatility: stable
-last-reviewed: null
+last-reviewed: 2026-06-20
 version-pin: null
 sources:
   - url: https://martinfowler.com/bliki/PresentationDomainDataLayering.html
+    hash: sha256:bb249131feb914aa939976528d7d28ce4063e6413fc1038826d9e80bf12e0444
+    retrieved: 2026-06-20
 ---
 
 A well-structured web app project is navigable by any developer without a tour. The directory layout should communicate the architecture at a glance: where pages live, where shared code lives, where API logic lives, and where configuration lives. A poor structure forces every developer to ask "where does this go?" on every new file they create.
