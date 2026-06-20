@@ -1,0 +1,820 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Making MMR Legible to Agents — A Vision</title>
+<style>
+  :root {
+    --bg: #fbfbfd;
+    --surface: #ffffff;
+    --surface-2: #f4f4f8;
+    --text: #1b1b26;
+    --muted: #5d5d70;
+    --faint: #8a8a9c;
+    --border: #e6e6ef;
+    --primary: #5a4bd6;
+    --primary-soft: #ece9fc;
+    --accent: #c2761a;
+    --good: #1c8f63;
+    --good-soft: #e3f5ec;
+    --bad: #cf3f57;
+    --bad-soft: #fce7eb;
+    --code-bg: #f6f6fb;
+    --code-ink: #2a2a3a;
+    --shadow: 0 1px 2px rgba(20,20,40,.04), 0 8px 24px rgba(20,20,40,.06);
+    --radius: 14px;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e0e14;
+      --surface: #16161f;
+      --surface-2: #1c1c28;
+      --text: #e9e9f2;
+      --muted: #a6a6b8;
+      --faint: #76768a;
+      --border: #272734;
+      --primary: #9b8cff;
+      --primary-soft: #211d3a;
+      --accent: #e0a24e;
+      --good: #4cc591;
+      --good-soft: #15291f;
+      --bad: #f06a82;
+      --bad-soft: #2c1820;
+      --code-bg: #12121a;
+      --code-ink: #d4d4e2;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  html[data-theme="light"] {
+    --bg:#fbfbfd;--surface:#fff;--surface-2:#f4f4f8;--text:#1b1b26;--muted:#5d5d70;--faint:#8a8a9c;
+    --border:#e6e6ef;--primary:#5a4bd6;--primary-soft:#ece9fc;--accent:#c2761a;--good:#1c8f63;--good-soft:#e3f5ec;
+    --bad:#cf3f57;--bad-soft:#fce7eb;--code-bg:#f6f6fb;--code-ink:#2a2a3a;--shadow:0 1px 2px rgba(20,20,40,.04),0 8px 24px rgba(20,20,40,.06);
+  }
+  html[data-theme="dark"] {
+    --bg:#0e0e14;--surface:#16161f;--surface-2:#1c1c28;--text:#e9e9f2;--muted:#a6a6b8;--faint:#76768a;
+    --border:#272734;--primary:#9b8cff;--primary-soft:#211d3a;--accent:#e0a24e;--good:#4cc591;--good-soft:#15291f;
+    --bad:#f06a82;--bad-soft:#2c1820;--code-bg:#12121a;--code-ink:#d4d4e2;--shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: var(--sans); font-size: 17px; line-height: 1.65;
+    -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+  }
+  a { color: var(--primary); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code, kbd, pre { font-family: var(--mono); }
+
+  /* ---------- Layout ---------- */
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
+  .layout { display: grid; grid-template-columns: 240px minmax(0,1fr); gap: 48px; align-items: start; }
+  @media (max-width: 920px) { .layout { grid-template-columns: 1fr; gap: 0; } .toc { display: none; } }
+
+  /* ---------- Hero ---------- */
+  .hero {
+    background:
+      radial-gradient(1200px 400px at 12% -10%, var(--primary-soft), transparent 60%),
+      linear-gradient(180deg, var(--surface), var(--bg));
+    border-bottom: 1px solid var(--border);
+    padding: 64px 0 40px;
+  }
+  .eyebrow {
+    font-family: var(--mono); font-size: 12.5px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--primary); font-weight: 600; margin: 0 0 14px;
+  }
+  .hero h1 {
+    font-family: var(--serif); font-weight: 600; letter-spacing: -.01em;
+    font-size: clamp(32px, 5vw, 52px); line-height: 1.08; margin: 0 0 18px; max-width: 18ch;
+  }
+  .hero .lede { font-size: clamp(18px, 2.4vw, 22px); color: var(--muted); max-width: 60ch; margin: 0 0 26px; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 10px; font-size: 13.5px; color: var(--faint); align-items: center; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border-radius: 999px;
+    background: var(--surface); border: 1px solid var(--border); color: var(--muted); font-weight: 500;
+  }
+  .pill.status { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
+
+  /* ---------- TOC ---------- */
+  .toc { position: sticky; top: 24px; font-size: 14px; padding: 8px 0; max-height: calc(100vh - 48px); overflow:auto; }
+  .toc .toc-title { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); margin: 0 0 10px; }
+  .toc ol { list-style: none; margin: 0; padding: 0; }
+  .toc li { margin: 2px 0; }
+  .toc a { color: var(--muted); display: block; padding: 4px 10px; border-left: 2px solid transparent; border-radius: 0 6px 6px 0; }
+  .toc a:hover { color: var(--text); background: var(--surface-2); text-decoration: none; }
+  .toc a.active { color: var(--primary); border-left-color: var(--primary); background: var(--primary-soft); font-weight: 600; }
+  .toc .num { font-family: var(--mono); color: var(--faint); font-size: 12px; margin-right: 7px; }
+
+  /* ---------- Main content ---------- */
+  main { padding: 48px 0 96px; }
+  section { scroll-margin-top: 24px; margin-bottom: 64px; }
+  section > h2 {
+    font-family: var(--serif); font-weight: 600; font-size: clamp(24px, 3.4vw, 32px); letter-spacing: -.01em;
+    line-height: 1.18; margin: 0 0 6px; display: flex; align-items: baseline; gap: 14px;
+  }
+  section > h2 .secnum { font-family: var(--mono); font-size: 15px; color: var(--primary); font-weight: 600; flex: none; }
+  .section-sub { color: var(--muted); font-size: 16.5px; margin: 0 0 28px; max-width: 66ch; }
+  h3 { font-size: 20px; letter-spacing: -.01em; margin: 36px 0 10px; }
+  h4 { font-size: 15px; margin: 22px 0 8px; color: var(--text); }
+  p { max-width: 70ch; }
+  .muted { color: var(--muted); }
+  strong { font-weight: 650; }
+
+  /* ---------- Callouts ---------- */
+  .callout {
+    border: 1px solid var(--border); border-left: 4px solid var(--primary);
+    background: var(--surface); border-radius: 10px; padding: 16px 18px; margin: 22px 0; box-shadow: var(--shadow);
+  }
+  .callout.warn { border-left-color: var(--accent); }
+  .callout.bad { border-left-color: var(--bad); }
+  .callout.good { border-left-color: var(--good); }
+  .callout .ct { font-weight: 650; font-size: 13px; letter-spacing: .02em; text-transform: uppercase; margin: 0 0 6px; color: var(--primary); }
+  .callout.warn .ct { color: var(--accent); }
+  .callout.bad .ct { color: var(--bad); }
+  .callout.good .ct { color: var(--good); }
+  .callout p { margin: 6px 0; }
+  .callout p:last-child { margin-bottom: 0; }
+
+  /* ---------- Code ---------- */
+  pre {
+    background: var(--code-bg); color: var(--code-ink); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px 18px; overflow-x: auto; font-size: 13.5px; line-height: 1.6; margin: 14px 0;
+  }
+  pre code { color: inherit; }
+  p code, li code, td code { background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; font-size: .88em; }
+  .c-good { color: var(--good); }
+  .c-bad { color: var(--bad); }
+  .c-dim { color: var(--faint); }
+  .c-key { color: var(--primary); }
+  .c-warn { color: var(--accent); }
+
+  /* ---------- Principle cards ---------- */
+  .grid { display: grid; gap: 16px; }
+  .grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+  @media (max-width: 720px) { .grid.cols-2 { grid-template-columns: 1fr; } }
+  .pcard {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px 18px 16px;
+    box-shadow: var(--shadow); position: relative;
+  }
+  .pcard .pnum { font-family: var(--mono); font-size: 12px; color: var(--primary); font-weight: 700; }
+  .pcard h4 { margin: 6px 0 8px; font-size: 16.5px; }
+  .pcard p { margin: 0; font-size: 14.5px; color: var(--muted); }
+
+  /* ---------- Feature blocks ---------- */
+  .feature {
+    border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface);
+    box-shadow: var(--shadow); margin: 22px 0; overflow: hidden;
+  }
+  .feature > .fhead { padding: 18px 20px 4px; }
+  .feature > .fbody { padding: 0 20px 18px; }
+  .feature h3 { margin: 0 0 4px; font-size: 19px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .feature h3 .fid { font-family: var(--mono); font-size: 13px; color: var(--primary); border: 1px solid var(--border); border-radius: 6px; padding: 1px 7px; background: var(--surface-2); }
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 2px; }
+  .tag { font-family: var(--mono); font-size: 11.5px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); background: var(--surface-2); }
+  .tag.phase1 { color: var(--good); border-color: color-mix(in srgb, var(--good) 40%, var(--border)); background: var(--good-soft); }
+  .tag.phase2 { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+  .tag.phase3 { color: var(--primary); border-color: color-mix(in srgb, var(--primary) 40%, var(--border)); background: var(--primary-soft); }
+  .tag.prin { color: var(--faint); }
+
+  .ba { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 14px 0 4px; }
+  @media (max-width: 760px) { .ba { grid-template-columns: 1fr; } }
+  .ba .col { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--bg); }
+  .ba .col .lab { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; padding: 8px 14px; font-weight: 700; border-bottom: 1px solid var(--border); }
+  .ba .before .lab { color: var(--bad); background: var(--bad-soft); }
+  .ba .after .lab { color: var(--good); background: var(--good-soft); }
+  .ba pre { margin: 0; border: none; border-radius: 0; background: transparent; font-size: 12.5px; }
+
+  .fproblem { font-size: 14.5px; color: var(--muted); }
+  .fproblem code { font-size: .9em; }
+  .ref { font-family: var(--mono); font-size: 12px; color: var(--faint); }
+
+  /* ---------- Roadmap ---------- */
+  .timeline { display: grid; gap: 16px; }
+  .phase {
+    border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow);
+    padding: 18px 20px; position: relative; padding-left: 22px;
+  }
+  .phase::before { content:""; position:absolute; left:0; top:14px; bottom:14px; width:4px; border-radius:4px; }
+  .phase.p1::before { background: var(--good); }
+  .phase.p2::before { background: var(--accent); }
+  .phase.p3::before { background: var(--primary); }
+  .phase h3 { margin: 0 0 2px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .phase .badge { font-family: var(--mono); font-size: 11.5px; padding: 2px 9px; border-radius: 999px; border:1px solid var(--border); }
+  .phase.p1 .badge { color: var(--good); background: var(--good-soft); }
+  .phase.p2 .badge { color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+  .phase.p3 .badge { color: var(--primary); background: var(--primary-soft); }
+  .phase .when { font-size: 13px; color: var(--faint); font-family: var(--mono); }
+  .phase ul { margin: 10px 0 0; padding-left: 20px; }
+  .phase li { margin: 4px 0; }
+
+  /* ---------- Table ---------- */
+  .tablewrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; background: var(--surface); }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--faint); font-weight: 700; background: var(--surface-2); }
+  tr:last-child td { border-bottom: none; }
+  td .tag { font-size: 11px; }
+
+  ul.clean { list-style: none; padding-left: 0; }
+  ul.clean li { position: relative; padding-left: 26px; margin: 8px 0; max-width: 70ch; }
+  ul.clean li::before { content: "→"; position: absolute; left: 4px; color: var(--primary); font-weight: 700; }
+
+  .kv { display:grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-size: 14.5px; margin: 10px 0; }
+  .kv dt { font-weight: 650; color: var(--text); }
+  .kv dd { margin: 0; color: var(--muted); }
+
+  hr.soft { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+
+  footer { border-top: 1px solid var(--border); padding: 28px 0 60px; color: var(--faint); font-size: 13.5px; }
+  footer code { font-size: .92em; }
+
+  /* theme toggle */
+  .theme-toggle {
+    position: fixed; top: 16px; right: 16px; z-index: 50;
+    background: var(--surface); border: 1px solid var(--border); color: var(--muted);
+    border-radius: 999px; padding: 7px 13px; font-size: 13px; cursor: pointer; box-shadow: var(--shadow);
+    font-family: var(--mono);
+  }
+  .theme-toggle:hover { color: var(--text); }
+
+  .lead-quote {
+    border-left: 3px solid var(--border); padding: 4px 0 4px 18px; color: var(--muted);
+    font-size: 15px; font-style: italic; margin: 18px 0;
+  }
+</style>
+</head>
+<body>
+<button class="theme-toggle" id="themeToggle" aria-label="Toggle color theme">◐ theme</button>
+
+<header class="hero">
+  <div class="wrap">
+    <p class="eyebrow">MMR CLI · Design Vision</p>
+    <h1>Making MMR legible to the agents that drive it</h1>
+    <p class="lede">An AI agent spent 20 minutes and 8 commands trying to turn off one review channel. The capability already existed — the agent just couldn't <em>see</em> it. This is a vision for a CLI an agent can read, mutate, and self-heal in seconds.</p>
+    <div class="meta">
+      <span class="pill status">● Vision — decisions resolved (§11)</span>
+      <span class="pill">2026-06-20</span>
+      <span class="pill">MMR v1.7.0 · Scaffold v3.36.0</span>
+      <span class="pill">Author: Claude (with Ken)</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+<div class="layout">
+
+  <!-- TOC -->
+  <nav class="toc" aria-label="Contents">
+    <p class="toc-title">Contents</p>
+    <ol id="tocList">
+      <li><a href="#tldr"><span class="num">00</span>The one command</a></li>
+      <li><a href="#what-happened"><span class="num">01</span>What happened</a></li>
+      <li><a href="#principles"><span class="num">02</span>First principles</a></li>
+      <li><a href="#vision-a"><span class="num">03</span>Mutate config</a></li>
+      <li><a href="#vision-b"><span class="num">04</span>See config</a></li>
+      <li><a href="#vision-c"><span class="num">05</span>Self-healing channels</a></li>
+      <li><a href="#vision-d"><span class="num">06</span>Discover &amp; use</a></li>
+      <li><a href="#vision-e"><span class="num">07</span>Scaffold side</a></li>
+      <li><a href="#roadmap"><span class="num">08</span>Roadmap</a></li>
+      <li><a href="#matrix"><span class="num">09</span>Traceability</a></li>
+      <li><a href="#nongoals"><span class="num">10</span>Non-goals</a></li>
+      <li><a href="#open"><span class="num">11</span>Decisions</a></li>
+      <li><a href="#next"><span class="num">12</span>What's next</a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+  <!-- 00 TL;DR -->
+  <section id="tldr">
+    <h2><span class="secnum">00</span> The one command that should have existed</h2>
+    <p class="section-sub">A trivial goal — disable a channel that fails on every review — took an exploratory expedition. The fix the agent ultimately hand-wrote into a YAML file in a path the CLI never names should have been a single, guessable command.</p>
+
+    <div class="ba">
+      <div class="col before">
+        <div class="lab">Today — ~20 min, 8 commands</div>
+<pre><code>$ mmr config
+<span class="c-dim">action  [choices: "init","test","channels"]   # read-only</span>
+$ mmr config channels show:grok
+<span class="c-dim"># ...read docs site for precedence...</span>
+<span class="c-dim"># ...discover ~/.mmr/config.yaml is never mentioned...</span>
+$ nano ~/.mmr/config.yaml
+<span class="c-key">channels:</span>
+  <span class="c-key">grok:</span>
+    <span class="c-key">enabled:</span> false   <span class="c-dim"># hand-edited, unguided</span></code></pre>
+      </div>
+      <div class="col after">
+        <div class="lab">The vision — 5 seconds, 1 command</div>
+<pre><code>$ mmr config disable grok
+<span class="c-good">✓ Disabled channel 'grok'</span>
+  wrote   <span class="c-dim">./.mmr.yaml</span>  (channels.grok.enabled: false)
+  now     grok  <span class="c-bad">disabled</span>  (project .mmr.yaml)
+  revert  <span class="c-key">mmr config enable grok</span></code></pre>
+      </div>
+    </div>
+
+    <div class="callout">
+      <p class="ct">The thesis</p>
+      <p>MMR is <strong>read-rich and write-poor</strong>, and its richest signals are invisible at the moment an agent needs them. Almost every capability the agent wanted <em>already exists in the code</em> — disabling channels, provenance tracking, install/auth diagnostics, auto-skip. The gap is not capability. It is <strong>legibility</strong>: can an agent discover, mutate, and verify state without spelunking? This vision closes that gap, starting from what a perfectly agent-legible CLI would feel like and back-casting to concrete MMR changes.</p>
+    </div>
+  </section>
+
+  <!-- 01 What happened -->
+  <section id="what-happened">
+    <h2><span class="secnum">01</span> What happened — grounded in the code</h2>
+    <p class="section-sub">The agent's feedback was sharp and mostly correct. Reading the actual source (MMR v1.7.0) sharpens it further — and reveals that the real story is more "hidden" than "missing."</p>
+
+    <div class="kv">
+      <dt>The trigger</dt>
+      <dd><code>grok</code> failed/timed out on all 11 reviews in a session. Each failure spawned a compensating retry — added latency, zero findings. Root cause: grok wasn't installed.</dd>
+      <dt>The goal</dt>
+      <dd>Turn the channel off. The agent expected <code>mmr channels disable grok</code>. There is no such command.</dd>
+      <dt>The cost</dt>
+      <dd>~8 exploratory commands, a separate docs site, and a hand-edited YAML file in <code>~/.mmr/config.yaml</code> — a path the CLI never prints.</dd>
+    </div>
+
+    <h3>What the code actually shows</h3>
+    <ul class="clean">
+      <li><strong>Write-poor is real.</strong> <code>mmr config</code> accepts exactly <code>init | test | channels</code> <span class="ref">(config.ts:337)</span>, and <code>channels</code> is read-only. There is no <code>enable</code>, <code>disable</code>, or <code>set</code>.</li>
+      <li><strong>But the capability already exists — twice.</strong> The config schema supports <em>two</em> ways to turn a channel off: <code>channels_disabled: ["grok"]</code> and per-channel <code>enabled: false</code>. Both require hand-editing YAML. The missing piece is a <em>mutator</em>, not a model.</li>
+      <li><strong>Provenance already exists — but hides.</strong> <code>loadConfigWithProvenance</code> tracks every value's source and <code>mmr config channels show &lt;name&gt;</code> prints per-field <code># from &lt;source&gt;</code> <span class="ref">(config.ts:208–230)</span>. Yet the <em>list</em> view shows no source, there's no whole-config view, and no command prints where config files live — even though the loader computes both paths <span class="ref">(loader.ts:302, :143)</span>.</li>
+      <li><strong>The compensating-pass waste is the real bug.</strong> Review <em>does</em> auto-skip uninstalled channels <span class="ref">(review.ts:550–556)</span> — then fires a compensating pass for them <em>every run</em> <span class="ref">(review.ts:725+)</span>. That's the "added latency, zero findings" the agent felt. Nothing tells the agent "you don't have grok → disable it."</li>
+      <li><strong>The diagnostic is already there, just unsurfaced.</strong> <code>mmr config test</code> reports <code>"grok": { installed: false }</code> with a recovery hint. The tool knew the whole time — it just never said so at the point of pain, nor suggested running it.</li>
+      <li><strong>The "docs say init|show|validate" claim is a red herring.</strong> The README, reference guide, and skill all correctly document <code>init|test|channels</code>. The real documentation gap is that the agent-facing skill teaches <em>nothing</em> about disabling a channel, and <code>--help</code> ships no examples.</li>
+    </ul>
+
+    <div class="callout warn">
+      <p class="ct">The pattern under all six points</p>
+      <p>MMR gives an agent excellent <em>read</em> access and almost no <em>write</em> path, then hides its best diagnostics one command away from where they're needed. An agent reasons from what a tool <em>says</em> — <code>--help</code>, output, errors. If the help doesn't list it and the error doesn't teach it, the agent concludes it doesn't exist and starts spelunking.</p>
+    </div>
+  </section>
+
+  <!-- 02 First principles -->
+  <section id="principles">
+    <h2><span class="secnum">02</span> First principles — what a perfectly agent-legible CLI feels like</h2>
+    <p class="section-sub">Before fixing MMR, design the ideal. Agents use a CLI differently from humans: every exploratory command costs context; they infer capability from text; they carry strong priors from the thousands of CLIs in their training; and they act decisively on explicit, machine-readable instructions. Ten principles fall out of that.</p>
+
+    <div class="grid cols-2">
+      <div class="pcard"><div class="pnum">P1</div><h4>Every capability self-discloses</h4><p>If the tool can do it, <code>--help</code> and a machine-readable manifest list it with a runnable example. An agent should never have to <em>guess</em> a command exists. Undiscoverable = nonexistent.</p></div>
+      <div class="pcard"><div class="pnum">P2</div><h4>Read and write are symmetric</h4><p>If you can <code>show</code> a value, you can <code>set</code> it — in the same namespace. The universal agent loop is <em>inspect → mutate → re-inspect</em>. No read-only islands.</p></div>
+      <div class="pcard"><div class="pnum">P3</div><h4>State is locatable &amp; attributed</h4><p>Every effective value traces to its source file and layer. A <code>path</code> command discloses the search order and which files exist. No invisible config surfaces.</p></div>
+      <div class="pcard"><div class="pnum">P4</div><h4>Errors are remediations</h4><p>Every failure prints the one command that fixes it. The diagnostic the tool already computes is surfaced <em>at the point of pain</em>, not hidden behind a command the agent must know to run.</p></div>
+      <div class="pcard"><div class="pnum">P5</div><h4>Self-heal what's safe; propose the rest</h4><p>A structurally-dead channel auto-skips with one remediation line — it does not silently retry-then-compensate-then-fail every run. Distinguish "transiently down" from "permanently absent."</p></div>
+      <div class="pcard"><div class="pnum">P6</div><h4>Machine-readable is a first-class mode</h4><p>Every human view has a <code>--json</code> twin emitting the same data — value, source, remediation — so agents parse deterministically instead of scraping prose.</p></div>
+      <div class="pcard"><div class="pnum">P7</div><h4>Convention over novelty</h4><p>Match the noun-verb-object grammar agents already know (<code>config set key value</code>). Avoid bespoke syntax like <code>show:codex</code> that no agent has priors for.</p></div>
+      <div class="pcard"><div class="pnum">P8</div><h4>One obvious path; aliases for the rest</h4><p>The 90% task has a single guessable command. Synonyms are fine as fallbacks, but <code>--help</code> leads with the canonical one.</p></div>
+      <div class="pcard"><div class="pnum">P9</div><h4>Teach just-in-time</h4><p>The lesson lives in the output at the moment of need, not only in a manual the agent must know to open. Context-local teaching beats a separate guide.</p></div>
+      <div class="pcard"><div class="pnum">P10</div><h4>Mutations are safe &amp; self-confirming</h4><p>Every mutator is idempotent, prints what changed and where it wrote, and shows how to revert. An agent never fears running it.</p></div>
+    </div>
+
+    <p class="muted" style="margin-top:22px">The rest of this document back-casts these principles onto concrete MMR features. Each feature is tagged with the principles it serves and the phase it lands in.</p>
+  </section>
+
+  <!-- 03 Vision A: mutate -->
+  <section id="vision-a">
+    <h2><span class="secnum">03</span> Mutate config — give the agent a write path</h2>
+    <p class="section-sub">The headline gap. MMR can read everything and change nothing through the CLI. Three commands close it, all built on config machinery that already exists.</p>
+
+    <div class="feature">
+      <div class="fhead">
+        <h3><span class="fid">A1</span> mmr config disable / enable &lt;channel&gt;</h3>
+        <div class="tags"><span class="tag phase1">Phase 1</span><span class="tag prin">P2</span><span class="tag prin">P7</span><span class="tag prin">P8</span><span class="tag prin">P10</span></div>
+      </div>
+      <div class="fbody">
+        <p class="fproblem"><strong>Problem.</strong> The 90% task — "turn this channel off" — has no command. The agent must learn the YAML schema and pick one of two undocumented mechanisms. <span class="ref">config.ts:337 · schema supports channels_disabled + enabled:false</span></p>
+        <p class="fproblem"><strong>Proposed.</strong> A dedicated, idempotent verb. Writes the canonical per-channel <code>enabled: false</code> (D5) using a comment-preserving YAML writer (D2) to the project <code>.mmr.yaml</code> by default — but a <code>disable</code> targeting a <em>not-installed</em> channel routes to global with a notice (D1). <code>--global</code>/<code>--project</code> override. Prints the write location, the new effective value <em>with provenance</em>, and the revert command; <code>enable</code> also prunes a stale <code>channels_disabled</code> entry (D5).</p>
+        <div class="ba">
+          <div class="col before"><div class="lab">Before</div><pre><code>$ mmr config disable grok
+<span class="c-bad">Unknown argument: disable</span>
+<span class="c-dim"># agent falls back to editing YAML by hand</span></code></pre></div>
+          <div class="col after"><div class="lab">After</div><pre><code>$ mmr config disable grok
+<span class="c-good">✓ Disabled channel 'grok'</span>
+  wrote   ./.mmr.yaml
+  now     grok  <span class="c-bad">disabled</span>  (project .mmr.yaml)
+  revert  mmr config enable grok</code></pre></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="feature">
+      <div class="fhead">
+        <h3><span class="fid">A2</span> mmr config set / unset &lt;dotted.path&gt; &lt;value&gt;</h3>
+        <div class="tags"><span class="tag phase2">Phase 2</span><span class="tag prin">P2</span><span class="tag prin">P7</span><span class="tag prin">P10</span></div>
+      </div>
+      <div class="fbody">
+        <p class="fproblem"><strong>Problem.</strong> Disabling is one of many edits — thresholds, timeouts, model overrides — that all currently mean hand-editing YAML. There's no general mutator, and MMR's own ecosystem already standardizes one: Scaffold's <code>cli-conventions.md</code> documents <code>tool config set key value</code> and explicitly recommends noun-verb-object. MMR violates its own house convention.</p>
+        <p class="fproblem"><strong>Proposed.</strong> A general dotted-path setter with a comment-preserving YAML writer, mirroring <code>bd config set</code> (already used across Scaffold). <code>unset</code> removes an override and prints the inherited value it falls back to.</p>
+        <div class="ba">
+          <div class="col before"><div class="lab">Before</div><pre><code><span class="c-dim"># edit .mmr.yaml by hand:</span>
+<span class="c-key">defaults:</span>
+  <span class="c-key">fix_threshold:</span> P1
+<span class="c-key">channels:</span>
+  <span class="c-key">codex:</span>
+    <span class="c-key">timeout:</span> 600</code></pre></div>
+          <div class="col after"><div class="lab">After</div><pre><code>$ mmr config set defaults.fix_threshold P1
+<span class="c-good">✓ defaults.fix_threshold: P2 → P1</span>  (./.mmr.yaml)
+$ mmr config set channels.codex.timeout 600
+<span class="c-good">✓ channels.codex.timeout: 300 → 600</span>  (./.mmr.yaml)
+$ mmr config unset channels.codex.timeout
+<span class="c-good">✓ unset</span> — reverts to default <span class="c-dim">(300)</span></code></pre></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout">
+      <p class="ct">Design decision — where do writes land?</p>
+      <p><strong>Default: project <code>.mmr.yaml</code></strong> (the change travels with the repo and the team sees it). <code>--global</code> writes <code>~/.mmr/config.yaml</code> for machine-wide preferences like "I never have grok installed." Every mutator prints which file it touched (P3/P10) so the choice is never silent.</p>
+    </div>
+  </section>
+
+  <!-- 04 Vision B: see -->
+  <section id="vision-b">
+    <h2><span class="secnum">04</span> See config — make state locatable and attributed</h2>
+    <p class="section-sub">The provenance engine already exists; it's just under-exposed. Surface it everywhere, add a path command, and give every view a <code>--json</code> twin.</p>
+
+    <div class="feature">
+      <div class="fhead">
+        <h3><span class="fid">B1</span> mmr config path</h3>
+        <div class="tags"><span class="tag phase1">Phase 1</span><span class="tag prin">P3</span><span class="tag prin">P1</span></div>
+      </div>
+      <div class="fbody">
+        <p class="fproblem"><strong>Problem.</strong> The CLI never discloses where config is read from or written to. The agent had to find the precedence rule in a separate docs site. <span class="ref">loader.ts computes both paths at :302 and :143</span></p>
+        <div class="ba">
+          <div class="col before"><div class="lab">Before</div><pre><code>$ mmr config path
+<span class="c-bad">Unknown argument: path</span></code></pre></div>
+          <div class="col after"><div class="lab">After</div><pre><code>$ mmr config path
+Search order (later wins):
+  1 built-in defaults      <span class="c-dim">(always)</span>
+  2 ~/.mmr/config.yaml     <span class="c-good">✓ exists</span>
+  3 ./.mmr.yaml            <span class="c-bad">✗ not found</span>
+  4 CLI flags              <span class="c-dim">(per-invocation)</span>
+write target (default): ./.mmr.yaml
+                  --global → ~/.mmr/config.yaml</code></pre></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="feature">
+      <div class="fhead">
+        <h3><span class="fid">B2</span> Provenance in the list view + <code>mmr config show</code> (whole config)</h3>
+        <div class="tags"><span class="tag phase1">Phase 1</span><span class="tag prin">P3</span><span class="tag prin">P6</span></div>
+      </div>
+      <div class="fbody">
+        <p class="fproblem"><strong>Problem.</strong> Per-field provenance only appears in single-channel <code>show &lt;name&gt;</code>. The list view shows name/enabled/command/parser with no source, and there's no effective-whole-config view. So "is grok off because of a default or my file?" needs a guess.</p>
+        <div class="ba">
+          <div class="col before"><div class="lab">Before — mmr config channels</div><pre><code>[
+  { "name": "grok", "enabled": false, ... },
+  { "name": "claude", "enabled": true, ... }
+]
+<span class="c-dim"># no source — can't tell default from override</span></code></pre></div>
+          <div class="col after"><div class="lab">After — mmr config channels</div><pre><code>CHANNEL    STATUS    SOURCE
+claude     <span class="c-good">enabled</span>   default
+codex      <span class="c-good">enabled</span>   default
+grok       <span class="c-bad">disabled</span>  ~/.mmr/config.yaml
+gemini     <span class="c-bad">disabled</span>  default
+<span class="c-dim"># --json emits {name,enabled,source,file} per row</span></code></pre></div>
+        </div>
+        <p class="fproblem" style="margin-top:8px"><strong>Proposed.</strong> Annotate every value with its source (extending the existing provenance plumbing to the list + a new whole-config <code>mmr config show</code>). Add <code>--json</code> to all of them so an agent reads <code>{value, source, file}</code> structurally rather than scraping (P6).</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 05 Vision C: self-healing -->
+  <section id="vision-c">
+    <h2><span class="secnum">05</span> Self-healing channels — stop dispatching the dead ones</h2>
+    <p class="section-sub">The most impactful behavior change. MMR should classify <em>why</em> a channel is unavailable and act accordingly — heal the transient, skip-and-remediate the structural, and never silently burn latency on a channel you'll never have.</p>
+
+    <div class="feature">
+      <div class="fhead">
+        <h3><span class="fid">C1</span> Classify unavailability: transient vs. structural</h3>
+        <div class="tags"><span class="tag phase2">Phase 2</span><span class="tag prin">P5</span><span class="tag prin">P4</span></div>
+      </div>
+      <div class="fbody">
+        <p class="fproblem"><strong>Problem.</strong> Review treats every unavailable channel the same: skip, then fire a compensating pass — <em>every run</em>. For a channel that's merely re-auth-able that's correct; for one that isn't installed and never will be, it's pure waste. <span class="ref">review.ts:550 (skip) · :725+ (compensate)</span></p>
+        <p class="fproblem"><strong>Proposed.</strong> The status is <em>already computed</em> (<code>not_installed</code> vs <code>auth_failed</code> vs <code>disabled</code>). Branch on it:</p>
+        <div class="kv">
+          <dt><code>auth_failed</code> <span class="tag">transient</span></dt><dd>Compensate (it'll come back after re-auth) and print the recovery command.</dd>
+          <dt><code>not_installed</code> <span class="tag">structural</span></dt><dd>Skip with a one-line remediation. <strong>Do not</strong> compensate by default — opt in with <code>--compensate-missing</code> or mark the channel <code>required: true</code>.</dd>
+          <dt><code>disabled</code> <span class="tag">intentional</span></dt><dd>Silent. The agent already chose this.</dd>
+        </div>
+        <div class="ba">
+          <div class="col before"><div class="lab">Before — every review</div><pre><code>$ mmr review --pr 47
+...
+grok: <span class="c-bad">failed (0s)</span>
+<span class="c-dim">[compensating: Grok-equivalent] dispatched…</span>
+<span class="c-dim"># +latency, 0 findings, repeats forever</span></code></pre></div>
+          <div class="col after"><div class="lab">After</div><pre><code>$ mmr review --pr 47
+...
+grok: <span class="c-warn">skipped — not installed (structural)</span>
+      not compensating a channel you don't have
+      <span class="c-key">→ mmr config disable grok</span>  (silence this)</code></pre></div>
+        </div>
+        <div class="callout warn"><p class="ct">Back-compat note → resolved as D3</p><p>This flips a default for a published tool, so the consolidated release ships as <strong>major (mmr 2.0.0)</strong> with a "Behavior changes" CHANGELOG entry, a one-time runtime notice, and the <code>--compensate-missing</code> / <code>required: true</code> opt-outs. The CLAUDE.md guidance ("run a compensating pass for each missing external channel") is updated to distinguish transient from structural — see §07 (E3) and the decision in §11.</p></div>
+      </div>
+    </div>
+
+    <div class="feature">
+      <div class="fhead">
+        <h3><span class="fid">C2</span> <code>mmr doctor</code> — diagnose and remediate in one shot</h3>
+        <div class="tags"><span class="tag phase2">Phase 2</span><span class="tag prin">P4</span><span class="tag prin">P5</span><span class="tag prin">P9</span></div>
+      </div>
+      <div class="fbody">
+        <p class="fproblem"><strong>Problem.</strong> <code>mmr config test</code> already knows install + auth status, but emits raw JSON with no remediation plan, and nothing points the agent to it. The diagnostic and the fix live in different places.</p>
+        <p class="fproblem"><strong>Proposed.</strong> One command that fuses them: classify every channel, print a human plan with the exact remediation per channel, and offer <code>--fix</code> to apply the safe ones (disable structurally-absent channels). <code>--json</code> for agents.</p>
+        <div class="ba">
+          <div class="col before"><div class="lab">Before — mmr config test</div><pre><code>{
+  "grok":   { "installed": false, "auth": "skipped" },
+  "gemini": { "installed": true,  "auth": "failed" }
+}
+<span class="c-dim"># now what? no plan, no next step</span></code></pre></div>
+          <div class="col after"><div class="lab">After — mmr doctor</div><pre><code>Channels: 3 ready · 1 needs auth · 1 absent
+
+ <span class="c-good">✓</span> claude   installed, authed
+ <span class="c-good">✓</span> codex    installed, authed
+ <span class="c-warn">⚠</span> gemini   auth expired  → gemini -p "hello"
+ <span class="c-bad">✗</span> grok     not installed → install, or:
+                              mmr config disable grok
+
+Run `mmr doctor --fix` to disable absent channels.</code></pre></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="feature">
+      <div class="fhead">
+        <h3><span class="fid">C3</span> Point-of-pain surfacing</h3>
+        <div class="tags"><span class="tag phase1">Phase 1</span><span class="tag prin">P4</span><span class="tag prin">P9</span></div>
+      </div>
+      <div class="fbody">
+        <p class="fproblem"><strong>Problem.</strong> When a review degrades, the summary says <code>grok: failed (0s)</code> — a dead end. The tool never suggests <code>mmr config test</code> or a fix.</p>
+        <p class="fproblem"><strong>Proposed.</strong> Every degraded channel in a review summary carries its remediation inline and a pointer to <code>mmr doctor</code>. The lesson arrives where the pain is (P9), one parse away from action (P4). This is a Phase-1 win because the statuses already exist — it's a formatting change.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 06 Vision D: discover & use -->
+  <section id="vision-d">
+    <h2><span class="secnum">06</span> Discover &amp; use — let an agent load the whole surface at once</h2>
+    <p class="section-sub">Beyond config: an agent should be able to learn what MMR can do in <em>one</em> call, not by probing N commands and accumulating context. This is where "agent-native" goes furthest.</p>
+
+    <div class="feature">
+      <div class="fhead">
+        <h3><span class="fid">D1</span> Rich <code>--help</code> with runnable examples</h3>
+        <div class="tags"><span class="tag phase1">Phase 1</span><span class="tag prin">P1</span><span class="tag prin">P8</span></div>
+      </div>
+      <div class="fbody">
+        <p class="fproblem"><strong>Problem.</strong> <code>--help</code> lists choices but no examples, and leads with the bespoke <code>show:&lt;channel&gt;</code> colon form. An agent guessing from help can't tell the canonical path from a fallback.</p>
+        <p class="fproblem"><strong>Proposed.</strong> Add yargs <code>.example()</code> lines that lead with canonical commands (<code>mmr config disable grok</code>, <code>mmr config channels show codex</code>). Keep <code>show:codex</code> as a back-compat alias — but the help leads with the conventional positional form (P7/P8).</p>
+      </div>
+    </div>
+
+    <div class="feature">
+      <div class="fhead">
+        <h3><span class="fid">D2</span> Machine-readable capability manifest — <code>mmr commands --json</code></h3>
+        <div class="tags"><span class="tag phase3">Phase 3</span><span class="tag prin">P1</span><span class="tag prin">P6</span></div>
+      </div>
+      <div class="fbody">
+        <p class="fproblem"><strong>Problem.</strong> To learn MMR's surface, an agent runs many <code>--help</code> calls and scrapes prose — expensive in context and lossy.</p>
+        <p class="fproblem"><strong>Proposed.</strong> One command emits the entire command tree as structured data — each command, its args, flags, and a runnable example. An agent (or an MCP wrapper) loads the whole capability surface in a single deterministic call. The CLI becomes a self-describing API (P1/P6).</p>
+        <pre><code>$ mmr commands --json
+[
+  { "command": "config disable &lt;channel&gt;",
+    "summary": "Turn a review channel off",
+    "example": "mmr config disable grok",
+    "writes": true, "idempotent": true },
+  { "command": "doctor",
+    "summary": "Diagnose channels and print fixes",
+    "example": "mmr doctor --fix", "writes": false },
+  ...
+]</code></pre>
+      </div>
+    </div>
+
+    <div class="feature">
+      <div class="fhead">
+        <h3><span class="fid">D3</span> <code>mmr explain &lt;topic&gt;</code> — just-in-time docs from the CLI</h3>
+        <div class="tags"><span class="tag phase3">Phase 3</span><span class="tag prin">P9</span></div>
+      </div>
+      <div class="fbody">
+        <p class="fproblem"><strong>Problem.</strong> The good guidance lives in a guide the agent must already know exists. Discovery requires prior knowledge — the opposite of legible.</p>
+        <p class="fproblem"><strong>Proposed.</strong> <code>mmr explain channels</code>, <code>mmr explain config</code>, <code>mmr explain compensation</code> print the relevant concept inline. The CLI carries its own teaching surface, so an agent that hits a wall can ask the tool itself instead of guessing a docs URL (P9).</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 07 Vision E: scaffold -->
+  <section id="vision-e">
+    <h2><span class="secnum">07</span> The Scaffold side — teach agents the new surface</h2>
+    <p class="section-sub">A better MMR CLI only helps if the agent-facing material Scaffold ships actually teaches it. The 20-minute spelunk happened partly because the <code>mmr</code> skill — the thing agents actually read — never mentions disabling a channel.</p>
+
+    <div class="grid cols-2">
+      <div class="pcard">
+        <div class="pnum">E1 · Phase 1</div>
+        <h4>mmr SKILL.md — add "Configuring channels"</h4>
+        <p>The highest-leverage doc fix. <code>content/skills/mmr/SKILL.md</code> teaches <code>init/test/channels</code> but nothing about turning a channel off. Add a section covering <code>disable/enable/set</code>, <code>mmr doctor</code>, and where config lives. This is what agents load at the point of need.</p>
+      </div>
+      <div class="pcard">
+        <div class="pnum">E2 · Phase 1</div>
+        <h4>Reference guide + knowledge</h4>
+        <p>Surface config-mutation prominently in <code>content/guides/mmr/index.md</code> (not buried in a config appendix) and regenerate <code>index.html</code> (drift gate). Mention <code>doctor</code>/<code>disable</code> in <code>content/knowledge/core/multi-model-review-dispatch.md</code> pre-flight guidance.</p>
+      </div>
+      <div class="pcard">
+        <div class="pnum">E3 · Phase 2</div>
+        <h4>Wrapper behavior + CLAUDE.md</h4>
+        <p><code>review-pr.md</code> / <code>review-code.md</code> and the CLAUDE.md "compensating pass for each missing external channel" rule should adopt the transient-vs-structural distinction (§05 C1): re-auth transient channels, skip-and-remediate structural ones — don't over-compensate.</p>
+      </div>
+      <div class="pcard">
+        <div class="pnum">E4 · Phase 1</div>
+        <h4>Internal-consistency win</h4>
+        <p>Scaffold's own <code>content/knowledge/cli/cli-conventions.md</code> already prescribes noun-verb-object (<code>config set key value</code>). Citing it makes A1/A2 a consistency fix, not a new opinion — MMR conforming to the house standard it ships.</p>
+      </div>
+    </div>
+
+    <div class="callout good">
+      <p class="ct">Net Scaffold verdict</p>
+      <p>No Scaffold <em>CLI</em> changes are required for Phase 1 — the wrappers call MMR and inherit its improvements. The required Scaffold work is <strong>content</strong>: teach the new commands in the skill/guide/knowledge so agents discover them, and (Phase 2) align the compensating-pass guidance with the new classify behavior.</p>
+    </div>
+  </section>
+
+  <!-- 08 Roadmap -->
+  <section id="roadmap">
+    <h2><span class="secnum">08</span> Roadmap — surface first, heal second, self-describe third</h2>
+    <p class="section-sub">Ordered by leverage-per-effort. Phase 1 is mostly <em>surfacing machinery that already exists</em> — high impact, low risk. Phase 2 adds genuine behavior change. Phase 3 is the agent-native frontier.</p>
+
+    <div class="timeline">
+      <div class="phase p1">
+        <h3><span class="badge">Phase 1 · Quick wins</span> <span class="when">days · surfacing existing machinery</span></h3>
+        <p class="muted">Turn the 20-minute spelunk into a 5-second command, mostly by exposing what's already computed.</p>
+        <ul>
+          <li><strong>A1</strong> <code>config enable/disable &lt;channel&gt;</code> — the headline command (introduces the comment-preserving <code>yaml</code> writer, D2; not-installed→global routing, D1)</li>
+          <li><strong>B1</strong> <code>config path</code> — disclose the search order &amp; write target</li>
+          <li><strong>B2</strong> provenance + source in the list view; <code>--json</code> twins</li>
+          <li><strong>C3</strong> point-of-pain remediation lines in review output</li>
+          <li><strong>D1</strong> <code>--help</code> examples; lead with the canonical <code>show &lt;channel&gt;</code></li>
+          <li><strong>E1, E2, E4</strong> teach the new surface in the mmr skill, guide, knowledge</li>
+        </ul>
+      </div>
+
+      <div class="phase p2">
+        <h3><span class="badge">Phase 2 · Self-healing</span> <span class="when">~1–2 weeks · behavior change</span></h3>
+        <p class="muted">Stop wasting latency on dead channels; give the agent a one-shot diagnose-and-fix.</p>
+        <ul>
+          <li><strong>A2</strong> <code>config set/unset</code> general setter (comment-preserving writer)</li>
+          <li><strong>C1</strong> classify transient vs. structural; flip the compensating-pass default → consolidated release is <strong>major, mmr 2.0.0</strong> (D3)</li>
+          <li><strong>C2</strong> <code>mmr doctor</code> (+ <code>--fix</code>)</li>
+          <li><strong>E3</strong> align wrapper + CLAUDE.md compensation guidance</li>
+        </ul>
+      </div>
+
+      <div class="phase p3">
+        <h3><span class="badge">Phase 3 · Agent-native</span> <span class="when">exploratory · self-describing CLI</span></h3>
+        <p class="muted">Let an agent (or an MCP layer) consume MMR as a structured, self-teaching API.</p>
+        <ul>
+          <li><strong>D2</strong> <code>mmr commands --json</code> capability manifest</li>
+          <li><strong>D3</strong> <code>mmr explain &lt;topic&gt;</code> inline docs</li>
+          <li><strong>required vs. optional</strong> channel semantics so compensation is always intentional</li>
+          <li>optional: an MCP/JSON contract over the whole config + review surface</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 09 Matrix -->
+  <section id="matrix">
+    <h2><span class="secnum">09</span> Principles → features traceability</h2>
+    <p class="section-sub">Every principle earns its place by mapping to shipped features; every feature traces back to a principle. Nothing floats.</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Principle</th><th>Features</th><th>Phase</th></tr></thead>
+        <tbody>
+          <tr><td><strong>P1</strong> Self-disclosing</td><td>B1 path · D1 help · D2 manifest</td><td><span class="tag phase1">1</span> <span class="tag phase3">3</span></td></tr>
+          <tr><td><strong>P2</strong> Read/write symmetry</td><td>A1 disable · A2 set/unset</td><td><span class="tag phase1">1</span> <span class="tag phase2">2</span></td></tr>
+          <tr><td><strong>P3</strong> Locatable &amp; attributed</td><td>B1 path · B2 provenance</td><td><span class="tag phase1">1</span></td></tr>
+          <tr><td><strong>P4</strong> Errors = remediations</td><td>C2 doctor · C3 point-of-pain</td><td><span class="tag phase1">1</span> <span class="tag phase2">2</span></td></tr>
+          <tr><td><strong>P5</strong> Self-heal / propose</td><td>C1 classify · C2 doctor</td><td><span class="tag phase2">2</span></td></tr>
+          <tr><td><strong>P6</strong> Machine-readable</td><td>B2 --json · D2 manifest</td><td><span class="tag phase1">1</span> <span class="tag phase3">3</span></td></tr>
+          <tr><td><strong>P7</strong> Convention over novelty</td><td>A1/A2 noun-verb · D1 canonical help</td><td><span class="tag phase1">1</span> <span class="tag phase2">2</span></td></tr>
+          <tr><td><strong>P8</strong> One obvious path</td><td>A1 disable · D1 help leads canonical</td><td><span class="tag phase1">1</span></td></tr>
+          <tr><td><strong>P9</strong> Teach just-in-time</td><td>C3 point-of-pain · D3 explain</td><td><span class="tag phase1">1</span> <span class="tag phase3">3</span></td></tr>
+          <tr><td><strong>P10</strong> Safe, self-confirming</td><td>A1/A2 print diff + revert + path</td><td><span class="tag phase1">1</span> <span class="tag phase2">2</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 10 Non-goals -->
+  <section id="nongoals">
+    <h2><span class="secnum">10</span> Non-goals (YAGNI)</h2>
+    <p class="section-sub">What this vision deliberately does <em>not</em> build, to keep the surface small and the changes safe.</p>
+    <ul class="clean">
+      <li><strong>No interactive TUI / GUI config editor.</strong> Agents drive a CLI; a visual editor adds surface no agent uses.</li>
+      <li><strong>No config daemon or watch mode.</strong> Config is read on invocation; that's the right model. Don't add a long-running process.</li>
+      <li><strong>No new config schema.</strong> Every mutation targets fields that already exist. We're adding write paths and visibility, not new concepts.</li>
+      <li><strong>No auto-install of missing CLIs.</strong> <code>doctor --fix</code> disables absent channels; it does not silently install third-party tools (security + consent).</li>
+      <li><strong>No change to the merge/precedence model.</strong> The four-layer deep-merge stays exactly as-is; we expose it, we don't redesign it.</li>
+    </ul>
+  </section>
+
+  <!-- 11 Resolved decisions -->
+  <section id="open">
+    <h2><span class="secnum">11</span> Decisions — resolved by multi-model consult</h2>
+    <p class="section-sub">Each open question was put independently to three models — <strong>Codex</strong>, <strong>Claude</strong>, and <strong>Antigravity</strong> — and consolidated. Consensus was strong; the only split was on Q3's semver, resolved below. These decisions are now binding inputs to the implementation plans.</p>
+
+    <div class="callout good">
+      <p class="ct">D1 · Write target — RESOLVED (all 3 → option c)</p>
+      <p>Mutators default to the <strong>project <code>./.mmr.yaml</code></strong>; <code>--global</code>/<code>--project</code> always override and the chosen path is always printed. <strong>Special case:</strong> <code>config disable &lt;channel&gt;</code> for a channel whose CLI is <em>not installed</em> defaults to <strong>global <code>~/.mmr/config.yaml</code></strong> with a one-line notice ("grok CLI not found — recording as a machine-level preference; pass <code>--project</code> to scope to this repo"), since absence is a property of the laptop, not the repo. <code>mmr doctor</code> flags the stale-disable case (a globally-disabled channel whose CLI later appears).</p>
+    </div>
+
+    <div class="callout good">
+      <p class="ct">D2 · Comment preservation — RESOLVED (all 3 → eemeli <code>yaml</code>)</p>
+      <p>Use the <strong><code>yaml</code> (eemeli) Document API</strong> — <code>parseDocument()</code> → <code>setIn()</code>/<code>deleteIn()</code> → <code>toString()</code> — to edit values in place, preserving comments, key order, and scalar style. Adds <code>yaml</code> as a write-side dependency alongside the existing <code>js-yaml</code> reader. Guard four pitfalls: <strong>schema-aware type coercion</strong> (CLI strings → typed bool/number scalars, never <code>"false"</code>), anchors/aliases/merge keys, multi-document files (refuse with a clear error), and missing intermediate keys. Fixture tests cover comments, anchors, arrays, and missing paths.</p>
+    </div>
+
+    <div class="callout warn">
+      <p class="ct">D3 · Compensation back-compat — RESOLVED (flip default; ship as MAJOR)</p>
+      <p>Flip the default: <strong>do not compensate structurally-absent (<code>not_installed</code>) channels</strong>; continue compensating transient (<code>auth_failed</code>) ones. Two of three models (Codex, Antigravity) classed the default-flip as a <strong>major</strong> change; Claude argued minor-but-loud. Consolidated: since the product value <em>is</em> the better default, flip it and ship the consolidated release as <strong>MAJOR (mmr 2.0.0)</strong>. Escape hatches preserve old behavior: <code>--compensate-missing</code> and per-channel <code>required: true</code>. Mitigations: a "Behavior changes" CHANGELOG heading, a one-time runtime notice the first time a structurally-absent channel is skipped-without-compensation (naming the channel + the opt-outs), and the Scaffold rule update (E3). <code>--json</code> changes stay additive (new <code>status</code>/<code>reason</code>/<code>remediation</code> fields).</p>
+    </div>
+
+    <div class="callout good">
+      <p class="ct">D4 · Redaction — RESOLVED (all 3 → single boundary, default-on)</p>
+      <p>Redact <strong>once</strong>, over the in-memory config model, <em>before</em> any serialization boundary — so text, <code>--json</code>, effective-config, and the capability manifest all inherit it by construction. Default-on; the only bypass is <code>--no-redact</code>, which prints a loud warning <strong>to stderr</strong> so it can never contaminate stdout JSON. Guard four failure modes: recurse into nested maps/arrays; positional <code>KEY value</code> token pairs (<code>["--header","Authorization: Bearer …"]</code>); <strong>name vs. value</strong> (keep <code>api_key_env: OPENAI_API_KEY</code> names, redact <code>api_key</code> values); and unknown/future fields via a value-pattern/entropy scan (<code>sk-</code>, <code>ghp_</code>) so new secret fields fail closed. Extends the existing <code>redact.ts</code> guards rather than reinventing them.</p>
+    </div>
+
+    <div class="callout good">
+      <p class="ct">D5 · Canonical disable — RESOLVED (all 3 → per-channel <code>enabled: false</code>)</p>
+      <p>The mutator writes <strong>per-channel <code>channels.&lt;id&gt;.enabled: false</code></strong> (round-trips cleanly with <code>config set</code>, gives precise provenance, deep-merges as a predictable scalar). <code>channels_disabled: [...]</code> stays honored on read as <strong>legacy</strong> (it is implemented today — <span class="ref">review.ts:500–503</span>). Precedence: an explicit per-channel <code>enabled</code> wins over <code>channels_disabled</code> membership. <code>config enable &lt;ch&gt;</code> also prunes a stale <code>channels_disabled</code> entry at the target layer (and warns if it lives in a layer it can't edit) so enable can't silently fail. <code>doctor --fix</code> offers to migrate legacy lists to per-channel form.</p>
+    </div>
+  </section>
+
+  <!-- 12 Next -->
+  <section id="next">
+    <h2><span class="secnum">12</span> What I recommend next</h2>
+    <p>If this direction is right, the natural next step is to turn <strong>Phase 1</strong> into an implementation plan — it's high-impact, low-risk, and mostly surfaces machinery that already exists. The headline command (<code>config disable/enable</code>) plus point-of-pain remediation and the skill update would have prevented the entire 20-minute spelunk that prompted this.</p>
+    <div class="callout good">
+      <p class="ct">Recommendation</p>
+      <p>Approve the vision (or redirect it), then I'll invoke the planning skill to write a Phase-1 implementation plan: TDD'd <code>config enable/disable</code> + <code>config path</code> + provenance list view + review remediation lines, paired with the <code>mmr</code> skill/guide updates. Phases 2–3 each get their own plan when we're ready.</p>
+    </div>
+    <p class="muted">This document is a vision, not a spec — it commits to a direction and a command surface, but exact flags, output formats, and edge cases get pinned down per-phase in the implementation plans.</p>
+  </section>
+
+  <footer>
+    <p><strong>Sources grounded in code:</strong> <code>packages/mmr/src/commands/config.ts</code> · <code>packages/mmr/src/config/loader.ts</code> · <code>packages/mmr/src/commands/review.ts</code> · <code>packages/mmr/src/config/defaults.ts</code> · <code>content/skills/mmr/SKILL.md</code> · <code>content/guides/mmr/index.md</code> · <code>content/knowledge/cli/cli-conventions.md</code></p>
+    <p>MMR v1.7.0 · Scaffold v3.36.0 · Vision draft 2026-06-20 · for review before planning.</p>
+  </footer>
+
+  </main>
+</div>
+</div>
+
+<script>
+  // Theme toggle with persistence
+  (function () {
+    var key = "mmr-vision-theme";
+    var btn = document.getElementById("themeToggle");
+    var saved = null;
+    try { saved = localStorage.getItem(key); } catch (e) {}
+    if (saved) document.documentElement.setAttribute("data-theme", saved);
+    function label() {
+      var t = document.documentElement.getAttribute("data-theme");
+      btn.textContent = (t === "dark") ? "☀ light" : (t === "light" ? "☾ dark" : "◐ theme");
+    }
+    label();
+    btn.addEventListener("click", function () {
+      var cur = document.documentElement.getAttribute("data-theme");
+      var next = cur === "dark" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", next);
+      try { localStorage.setItem(key, next); } catch (e) {}
+      label();
+    });
+  })();
+
+  // Active-section highlighting in the TOC
+  (function () {
+    var links = Array.prototype.slice.call(document.querySelectorAll("#tocList a"));
+    var map = {};
+    links.forEach(function (a) {
+      var id = a.getAttribute("href").slice(1);
+      var el = document.getElementById(id);
+      if (el) map[id] = a;
+    });
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) {
+          links.forEach(function (l) { l.classList.remove("active"); });
+          var a = map[e.target.id];
+          if (a) a.classList.add("active");
+        }
+      });
+    }, { rootMargin: "-20% 0px -70% 0px", threshold: 0 });
+    Object.keys(map).forEach(function (id) {
+      observer.observe(document.getElementById(id));
+    });
+  })();
+</script>
+</body>
+</html>
