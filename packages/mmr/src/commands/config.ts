@@ -20,7 +20,7 @@ import {
   isCommandSecretKey,
 } from '../core/redact.js'
 import { resolveConfigPaths } from '../config/paths.js'
-import { setChannelEnabled } from '../config/writer.js'
+import { setChannelEnabled, setConfigValueSegs, unsetConfigValueSegs } from '../config/writer.js'
 import { normalizeChannelName } from '../config/channel-aliases.js'
 import { parse as parseYaml } from 'yaml'
 import type { OutputParserConfig, MmrConfigParsed } from '../config/schema.js'
@@ -556,6 +556,89 @@ async function configToggle(channelArg: string | undefined, enabled: boolean, ar
 }
 
 /**
+ * Apply a config-file mutation, then validate that the whole merged config still
+ * loads. If validation fails, roll the file back to its prior state (or delete a
+ * newly-created file) so an invalid config is never left on disk.
+ */
+function withValidatedWrite(file: string, mutate: () => void): { ok: true } | { ok: false; error: string } {
+  const existed = fs.existsSync(file)
+  const backup = existed ? fs.readFileSync(file, 'utf-8') : null
+  try {
+    mutate()
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+  try {
+    loadConfig({ projectRoot: process.cwd() })
+    return { ok: true }
+  } catch (err) {
+    if (existed && backup !== null) fs.writeFileSync(file, backup)
+    else if (!existed) fs.rmSync(file, { force: true })
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+function scopeFile(args: ConfigArgs): { file: string; allowSymlink: boolean; flag: string } {
+  const paths = resolveConfigPaths({ projectRoot: process.cwd() })
+  const global = args.global === true
+  return { file: global ? paths.user : paths.project, allowSymlink: global, flag: global ? ' --global' : ' --project' }
+}
+
+function configSet(pathArg: string | undefined, valueArg: string | undefined, args: ConfigArgs): boolean {
+  if (!pathArg || valueArg === undefined) {
+    console.error('Usage: mmr config set <dotted.path> <value>')
+    return false
+  }
+  if (args.global && args.project) {
+    console.error('Pass only one of --global or --project, not both.')
+    return false
+  }
+  const { file, allowSymlink, flag } = scopeFile(args)
+  fs.mkdirSync(path.dirname(file), { recursive: true })
+  const res = withValidatedWrite(file, () => setConfigValueSegs(file, pathArg.split('.'), valueArg, { allowSymlink }))
+  if (!res.ok) {
+    console.error(`Cannot set ${pathArg}: ${res.error}`)
+    return false
+  }
+  console.log(`✓ set ${pathArg}`)
+  console.log(`  wrote ${file}`)
+  console.log(`  revert mmr config unset ${pathArg}${flag}`)
+  return true
+}
+
+function configUnset(pathArg: string | undefined, args: ConfigArgs): boolean {
+  if (!pathArg) {
+    console.error('Usage: mmr config unset <dotted.path>')
+    return false
+  }
+  if (args.global && args.project) {
+    console.error('Pass only one of --global or --project, not both.')
+    return false
+  }
+  const { file, allowSymlink } = scopeFile(args)
+  if (!fs.existsSync(file)) {
+    console.error(`Nothing to unset: ${file} does not exist.`)
+    return false
+  }
+  const res = withValidatedWrite(file, () => unsetConfigValueSegs(file, pathArg.split('.'), { allowSymlink }))
+  if (!res.ok) {
+    console.error(`Cannot unset ${pathArg}: ${res.error}`)
+    return false
+  }
+  console.log(`✓ unset ${pathArg}  (${file})`)
+  // Report the value now in effect after removing the override.
+  const { config } = loadConfigWithProvenance({ projectRoot: process.cwd() })
+  const inherited = pathArg.split('.').reduce<unknown>(
+    (acc, k) => (acc && typeof acc === 'object' ? (acc as Record<string, unknown>)[k] : undefined),
+    config,
+  )
+  if (inherited !== undefined) {
+    console.log(`  now inherits: ${JSON.stringify(redactConfigView(inherited))}`)
+  }
+  return true
+}
+
+/**
  * Canonical, runnable examples surfaced in `mmr config --help`. Lead with the
  * conventional positional forms (P7/P8) so an agent reading help picks the
  * canonical command, not the bespoke `show:<channel>` colon alias.
@@ -566,6 +649,8 @@ export const CONFIG_EXAMPLES: ReadonlyArray<readonly [string, string]> = [
   ['mmr config channels show codex', 'Inspect one channel with provenance'],
   ['mmr config disable grok', 'Turn a channel off (writes channels.grok.enabled: false)'],
   ['mmr config enable grok', 'Turn a channel back on'],
+  ['mmr config set defaults.fix_threshold P1', 'Set any dotted config value (validated before write)'],
+  ['mmr config unset defaults.fix_threshold', 'Remove an override and fall back to the inherited value'],
 ]
 
 export const configCommand: CommandModule<object, ConfigArgs> = {
@@ -578,7 +663,7 @@ export const configCommand: CommandModule<object, ConfigArgs> = {
         type: 'string',
         demandOption: true,
         describe: 'Config action',
-        choices: ['init', 'test', 'channels', 'path', 'enable', 'disable', 'show'],
+        choices: ['init', 'test', 'channels', 'path', 'enable', 'disable', 'show', 'set', 'unset'],
       })
       .positional('name', {
         type: 'string',
@@ -615,9 +700,9 @@ export const configCommand: CommandModule<object, ConfigArgs> = {
         if (args.redact === false) args['no-redact'] = true
       }),
   handler: async (args: ArgumentsCamelCase<ConfigArgs>) => {
-    // `channels` takes [name] and [target]; `enable`/`disable`/`show` take [name].
-    const nameOk = ['channels', 'enable', 'disable', 'show'].includes(args.action)
-    const targetOk = args.action === 'channels'
+    // `channels`/`set` take [name] and [target]; enable/disable/show/unset take [name].
+    const nameOk = ['channels', 'enable', 'disable', 'show', 'set', 'unset'].includes(args.action)
+    const targetOk = args.action === 'channels' || args.action === 'set'
     if ((!nameOk && args.name) || (!targetOk && args.target)) {
       console.error(`Unexpected argument for config ${args.action}: ${args.target ?? args.name}`)
       process.exit(1)
@@ -649,6 +734,12 @@ export const configCommand: CommandModule<object, ConfigArgs> = {
       if (!ok) process.exit(1)
       break
     }
+    case 'set':
+      if (!configSet(args.name, args.target, args)) process.exit(1)
+      break
+    case 'unset':
+      if (!configUnset(args.name, args)) process.exit(1)
+      break
     case 'channels': {
       const ok = configChannels({
         name: args.name,

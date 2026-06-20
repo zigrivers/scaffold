@@ -149,6 +149,18 @@ export function pruneChannelsDisabled(file: string, channel: string, opts: Write
 }
 
 /**
+ * Remove the value at an explicit path-segment array, preserving comments.
+ * No-op when the file or the path is absent. Used by `config unset`.
+ */
+export function unsetConfigValueSegs(file: string, segs: string[], opts: WriteOpts = {}): void {
+  if (!fs.existsSync(file)) return
+  const doc = loadDoc(file)
+  if (!doc.hasIn(segs)) return
+  doc.deleteIn(segs)
+  safeWrite(file, doc.toString(), opts)
+}
+
+/**
  * Set `channels.<channel>.enabled` to the given boolean — the canonical disable
  * mechanism (D5). When enabling, also prune any stale `channels_disabled`
  * membership so the enable cannot be silently overridden by the legacy list.
