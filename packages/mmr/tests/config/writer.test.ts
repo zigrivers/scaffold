@@ -89,11 +89,11 @@ describe('config writer', () => {
     expect(leftovers).toEqual([])
   })
 
-  it('preserves the existing file mode across an atomic write', () => {
+  it('preserves the existing file mode on write (does not force 0600)', () => {
     fs.writeFileSync(file, 'version: 1\n')
-    fs.chmodSync(file, 0o600)
+    fs.chmodSync(file, 0o644)
     setChannelEnabled(file, 'codex', false)
-    expect(fs.statSync(file).mode & 0o777).toBe(0o600)
+    expect(fs.statSync(file).mode & 0o777).toBe(0o644)
   })
 
   it('creates a new config file with restrictive 0600 permissions', () => {

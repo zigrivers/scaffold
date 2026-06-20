@@ -317,7 +317,9 @@ function redactShowValue(key: string, value: unknown): unknown {
   if (typeof value === 'string' && isCommandLikeKey(key) && commandContainsInlineSecret(value)) {
     return '<redacted>'
   }
-  return isSecretKey(key, { exemptEnvNameKeys: false }) ? '<redacted>' : value
+  // Keep `api_key_env` (the env-var NAME, not its value) visible, matching the
+  // `config channels` output and the documented redaction contract.
+  return isSecretKey(key) ? '<redacted>' : value
 }
 
 function redactShowArray(values: unknown[]): unknown[] {

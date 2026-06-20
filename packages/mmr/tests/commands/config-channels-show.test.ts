@@ -12,6 +12,29 @@ describe('mmr config channels show <name> (T1-E)', () => {
     fs.rmSync(tmpDir, { recursive: true })
   })
 
+  it('keeps the api_key_env NAME visible (matches config channels output)', async () => {
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), [
+      'version: 1',
+      'channels:',
+      '  myhttp:',
+      '    kind: http',
+      '    endpoint: https://api.example.com/v1/chat/completions',
+      '    model: gpt-4',
+      '    endpoint_convention: openai-chat',
+      '    api_key_env: MY_API_KEY',
+    ].join('\n'))
+    const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(tmpDir)
+    const homeSpy = vi.spyOn(os, 'homedir').mockReturnValue(tmpDir)
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const { configCommand } = await import('../../src/commands/config.js')
+    await configCommand.handler({ action: 'show', name: 'myhttp', _: ['config'], $0: 'mmr' } as never)
+    const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n')
+    expect(out).toContain('MY_API_KEY')
+    cwdSpy.mockRestore()
+    homeSpy.mockRestore()
+    logSpy.mockRestore()
+  })
+
   it('prints merged channel config with provenance comments', async () => {
     fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), [
       'version: 1',

@@ -71,9 +71,10 @@ function safeWrite(file: string, content: string, opts: WriteOpts = {}): void {
       throw new Error(`refusing to write through a symlink: ${file}`)
     }
   }
-  const existed = fs.existsSync(file)
-  fs.writeFileSync(file, content)
-  if (!existed) fs.chmodSync(file, 0o600)
+  // The `mode` option is applied only when the file is CREATED, so a NEW config
+  // file is born 0600 (no write-then-chmod race window), while an EXISTING
+  // file keeps its current mode (the option is ignored for it).
+  fs.writeFileSync(file, content, { mode: 0o600 })
 }
 
 /**
