@@ -72,6 +72,24 @@ describe('mmr config disable/enable', () => {
     fs.rmSync(other, { recursive: true })
   })
 
+  it('accepts a channel alias at the front door (disable agy → antigravity)', async () => {
+    await run({ action: 'disable', name: 'agy', project: true })
+    const yaml = fs.readFileSync(path.join(tmp, '.mmr.yaml'), 'utf-8')
+    expect(yaml).toMatch(/antigravity:[\s\S]*enabled: false/)
+    expect(yaml).not.toMatch(/\bagy:/)
+  })
+
+  it('enable prunes a legacy channels_disabled entry from the global layer too', async () => {
+    fs.mkdirSync(path.join(home, '.mmr'), { recursive: true })
+    fs.writeFileSync(path.join(home, '.mmr', 'config.yaml'), 'version: 1\nchannels_disabled:\n  - codex\n')
+    await run({ action: 'enable', name: 'codex', project: true })
+    // global channels_disabled entry removed, so the enable actually takes effect
+    expect(fs.readFileSync(path.join(home, '.mmr', 'config.yaml'), 'utf-8')).not.toMatch(/-\s*codex/)
+    const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n')
+    expect(out).toContain('also removed')
+    expect(out).toMatch(/now\s+codex\s+enabled/)
+  })
+
   it('rejects passing both --global and --project', async () => {
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)

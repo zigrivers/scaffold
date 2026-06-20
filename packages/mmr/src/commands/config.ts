@@ -13,7 +13,7 @@ import { probeRuntime } from '../core/runtime-probe.js'
 import { OSS_RUNTIMES, exampleBlockFor, type OssRuntimeId } from '../core/oss-examples.js'
 import { isSecretKey, redactChannel, redactConfigView } from '../core/redact.js'
 import { resolveConfigPaths } from '../config/paths.js'
-import { setChannelEnabled } from '../config/writer.js'
+import { setChannelEnabled, pruneChannelsDisabled } from '../config/writer.js'
 import { normalizeChannelName } from '../config/channel-aliases.js'
 import { parse as parseYaml } from 'yaml'
 import type { OutputParserConfig, MmrConfigParsed } from '../config/schema.js'
@@ -453,8 +453,8 @@ function channelsDisabledSource(): ProvenanceSource | undefined {
   return undefined
 }
 
-async function configToggle(channel: string | undefined, enabled: boolean, args: ConfigArgs): Promise<boolean> {
-  if (!channel) {
+async function configToggle(channelArg: string | undefined, enabled: boolean, args: ConfigArgs): Promise<boolean> {
+  if (!channelArg) {
     console.error(`Usage: mmr config ${enabled ? 'enable' : 'disable'} <channel>`)
     return false
   }
@@ -462,19 +462,34 @@ async function configToggle(channel: string | undefined, enabled: boolean, args:
     console.error('Pass only one of --global or --project, not both.')
     return false
   }
+  // Accept channel aliases (e.g. `agy` → `antigravity`) at the front door, the
+  // same way effectiveEnabled, pruning, and review dispatch resolve them. Use
+  // the canonical name for every step below.
+  const channel = normalizeChannelName(channelArg)
   // Validate the channel exists before writing, so a typo cannot create a
   // command-less channel that then fails config validation on the next load.
   const before = loadConfig({ projectRoot: process.cwd() })
   if (!before.channels[channel]) {
     const known = Object.keys(before.channels).join(', ')
-    console.error(`Unknown channel '${channel}'. Known channels: ${known}`)
+    console.error(`Unknown channel '${channelArg}'. Known channels: ${known}`)
     return false
   }
 
   const target = await resolveWriteTarget(channel, enabled, args, before)
+  const alsoPruned: string[] = []
   try {
     fs.mkdirSync(path.dirname(target.file), { recursive: true })
     setChannelEnabled(target.file, channel, enabled)
+    // Enabling must actually take effect: prune the channel from a legacy
+    // channels_disabled list wherever it lives (not just the file we wrote),
+    // else review dispatch would still filter it out from another layer.
+    if (enabled) {
+      const paths = resolveConfigPaths({ projectRoot: process.cwd() })
+      for (const f of [paths.project, paths.user]) {
+        if (f === target.file) continue
+        if (pruneChannelsDisabled(f, channel)) alsoPruned.push(f)
+      }
+    }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     console.error(`Failed to write ${target.file}: ${msg}`)
@@ -488,6 +503,9 @@ async function configToggle(channel: string | undefined, enabled: boolean, args:
     console.log('  pass --project to scope it to this repo instead')
   } else {
     console.log(`  wrote ${target.file}`)
+  }
+  for (const f of alsoPruned) {
+    console.log(`  also removed '${channel}' from channels_disabled in ${f}`)
   }
 
   // Report the EFFECTIVE merged state, not just the value we wrote — a

@@ -75,6 +75,13 @@ describe('config writer', () => {
     expect(out).toMatch(/-\s*gemini/)
   })
 
+  it('leaves no temp file behind after an atomic write', () => {
+    fs.writeFileSync(file, 'version: 1\n')
+    setChannelEnabled(file, 'codex', false)
+    const leftovers = fs.readdirSync(dir).filter((f) => f.includes('.tmp-'))
+    expect(leftovers).toEqual([])
+  })
+
   it('treats a channel name containing a dot as a single key', () => {
     fs.writeFileSync(file, 'version: 1\n')
     setChannelEnabled(file, 'my-bot.v2', false)

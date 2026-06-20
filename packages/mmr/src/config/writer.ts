@@ -36,6 +36,17 @@ function loadDoc(file: string, opts: { create?: boolean } = {}): Document {
 }
 
 /**
+ * Write atomically: serialize to a sibling temp file, then rename over the
+ * target. A crash/signal/ENOSPC mid-write leaves the original intact rather than
+ * a half-truncated config that fails to load.
+ */
+function atomicWrite(file: string, content: string): void {
+  const tmp = `${file}.tmp-${process.pid}`
+  fs.writeFileSync(tmp, content)
+  fs.renameSync(tmp, file)
+}
+
+/**
  * Coerce a CLI-supplied string into the YAML scalar it represents, so
  * `set … false` writes a boolean and `set … 300` writes a number — never the
  * string `"false"` (D2, type-coercion pitfall).
@@ -77,7 +88,7 @@ export function setConfigValueSegs(
   const doc = loadDoc(file, { create: opts.create !== false })
   const coerced = typeof value === 'string' ? coerceScalar(value) : value
   doc.setIn(segs, coerced)
-  fs.writeFileSync(file, doc.toString())
+  atomicWrite(file, doc.toString())
 }
 
 /**
@@ -102,7 +113,7 @@ export function pruneChannelsDisabled(file: string, channel: string): boolean {
       changed = true
     }
   }
-  if (changed) fs.writeFileSync(file, doc.toString())
+  if (changed) atomicWrite(file, doc.toString())
   return changed
 }
 
