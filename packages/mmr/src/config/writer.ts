@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import { parseDocument, parseAllDocuments, isSeq, type Document } from 'yaml'
+import { normalizeChannelName } from './channel-aliases.js'
 
 /**
  * Comment-preserving config mutation (vision decision D2).
@@ -58,8 +59,22 @@ export function setConfigValue(
   value: unknown,
   opts: { create?: boolean } = { create: true },
 ): void {
+  setConfigValueSegs(file, dottedPath.split('.'), value, opts)
+}
+
+/**
+ * Set a value at an explicit path-segment array, preserving comments. Use this
+ * (rather than `setConfigValue`) when a segment can itself contain a dot — e.g.
+ * a custom channel named `my-bot.v2`, where a dotted string would wrongly nest
+ * `channels.my-bot.v2.enabled` into four keys.
+ */
+export function setConfigValueSegs(
+  file: string,
+  segs: string[],
+  value: unknown,
+  opts: { create?: boolean } = { create: true },
+): void {
   const doc = loadDoc(file, { create: opts.create !== false })
-  const segs = dottedPath.split('.')
   const coerced = typeof value === 'string' ? coerceScalar(value) : value
   doc.setIn(segs, coerced)
   fs.writeFileSync(file, doc.toString())
@@ -75,14 +90,20 @@ export function pruneChannelsDisabled(file: string, channel: string): boolean {
   const doc = loadDoc(file)
   const seq = doc.get('channels_disabled')
   if (!isSeq(seq)) return false
-  const idx = seq.items.findIndex((item) => {
-    const v = (item as { value?: unknown }).value ?? item
-    return v === channel
-  })
-  if (idx === -1) return false
-  seq.delete(idx)
-  fs.writeFileSync(file, doc.toString())
-  return true
+  // Match by canonical name so an alias entry (e.g. `agy`) is pruned when
+  // enabling its canonical channel (`antigravity`). Remove every match, not
+  // just the first, in case both forms are listed.
+  const target = normalizeChannelName(channel)
+  let changed = false
+  for (let i = seq.items.length - 1; i >= 0; i -= 1) {
+    const v = (seq.items[i] as { value?: unknown }).value ?? seq.items[i]
+    if (typeof v === 'string' && normalizeChannelName(v) === target) {
+      seq.delete(i)
+      changed = true
+    }
+  }
+  if (changed) fs.writeFileSync(file, doc.toString())
+  return changed
 }
 
 /**
@@ -91,6 +112,8 @@ export function pruneChannelsDisabled(file: string, channel: string): boolean {
  * membership so the enable cannot be silently overridden by the legacy list.
  */
 export function setChannelEnabled(file: string, channel: string, enabled: boolean): void {
-  setConfigValue(file, `channels.${channel}.enabled`, enabled)
+  // Use the segment form so a channel name containing a dot is treated as one
+  // key, not split into nested maps.
+  setConfigValueSegs(file, ['channels', channel, 'enabled'], enabled)
   if (enabled) pruneChannelsDisabled(file, channel)
 }

@@ -66,4 +66,21 @@ describe('config writer', () => {
     expect(out).not.toMatch(/-\s*grok/)
     expect(out).toMatch(/-\s*gemini/)
   })
+
+  it('prunes an alias entry when enabling the canonical channel', () => {
+    fs.writeFileSync(file, 'version: 1\nchannels_disabled:\n  - agy\n  - gemini\n')
+    setChannelEnabled(file, 'antigravity', true)
+    const out = fs.readFileSync(file, 'utf-8')
+    expect(out).not.toMatch(/-\s*agy/)
+    expect(out).toMatch(/-\s*gemini/)
+  })
+
+  it('treats a channel name containing a dot as a single key', () => {
+    fs.writeFileSync(file, 'version: 1\n')
+    setChannelEnabled(file, 'my-bot.v2', false)
+    const out = fs.readFileSync(file, 'utf-8')
+    // The dotted name is one key under channels, not nested maps.
+    expect(out).toMatch(/['"]?my-bot\.v2['"]?:/)
+    expect(out).not.toMatch(/my-bot:\s*\n\s+v2:/)
+  })
 })

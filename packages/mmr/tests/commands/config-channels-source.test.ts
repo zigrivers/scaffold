@@ -43,6 +43,25 @@ describe('mmr config channels — source provenance', () => {
     expect(codexLine).toMatch(/disabled/)
   })
 
+  it('treats an alias in channels_disabled as disabling the canonical channel', async () => {
+    fs.writeFileSync(path.join(tmp, '.mmr.yaml'), 'version: 1\nchannels_disabled:\n  - agy\n')
+    const { configCommand } = await import('../../src/commands/config.js')
+    await configCommand.handler({ action: 'channels', format: 'text', _: ['config'], $0: 'mmr' } as never)
+    const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n')
+    const antigravityLine = out.split('\n').find((l) => l.startsWith('antigravity'))
+    expect(antigravityLine).toMatch(/disabled/)
+  })
+
+  it('attributes the source of a channels_disabled channel to its config layer', async () => {
+    fs.writeFileSync(path.join(tmp, '.mmr.yaml'), 'version: 1\nchannels_disabled:\n  - codex\n')
+    const { configCommand } = await import('../../src/commands/config.js')
+    await configCommand.handler({ action: 'channels', _: ['config'], $0: 'mmr' } as never)
+    const rows = JSON.parse(String(logSpy.mock.calls.at(-1)?.[0])) as Array<{ name: string; source: string; effective: boolean }>
+    const codex = rows.find((r) => r.name === 'codex')
+    expect(codex?.effective).toBe(false)
+    expect(codex?.source).toBe('project')
+  })
+
   it('honors --no-redact: prints the raw command and a stderr warning', async () => {
     fs.writeFileSync(
       path.join(tmp, '.mmr.yaml'),

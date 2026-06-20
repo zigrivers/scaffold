@@ -14,6 +14,8 @@ import { OSS_RUNTIMES, exampleBlockFor, type OssRuntimeId } from '../core/oss-ex
 import { isSecretKey, redactChannel, redactConfigView } from '../core/redact.js'
 import { resolveConfigPaths } from '../config/paths.js'
 import { setChannelEnabled } from '../config/writer.js'
+import { normalizeChannelName } from '../config/channel-aliases.js'
+import { parse as parseYaml } from 'yaml'
 import type { OutputParserConfig, MmrConfigParsed } from '../config/schema.js'
 
 interface ConfigArgs {
@@ -185,11 +187,16 @@ function configChannels(
     console.error('WARNING: --no-redact is enabled; secrets in commands/env/headers may be printed verbatim.')
   }
   const { config, provenance } = loadConfigWithProvenance({ projectRoot: process.cwd() })
+  const listSource = channelsDisabledSource()
   const rows = Object.entries(config.channels).map(([name, ch]) => {
     const chRec = ch as unknown as Record<string, unknown>
     const display = noRedact ? chRec : redactChannel(chRec)
     const command = noRedact ? display.command : redactDisplayCommand(display.command)
-    const source = (provenance.channels[name]?.enabled as string | undefined) ?? 'default'
+    // Attribute the source to channels_disabled's layer when the channel is
+    // disabled by that list rather than by its own enabled flag.
+    const source = (disabledByList(config, name) && listSource)
+      ? listSource
+      : ((provenance.channels[name]?.enabled as string | undefined) ?? 'default')
     return {
       name,
       // `enabled` is the raw per-channel flag; `effective` folds in the legacy
@@ -410,8 +417,40 @@ async function resolveWriteTarget(
  * just requested, which a higher-precedence layer could still override.
  */
 function effectiveEnabled(config: MmrConfigParsed, channel: string): boolean {
-  const disabledList = new Set(config.channels_disabled ?? [])
-  return config.channels[channel]?.enabled !== false && !disabledList.has(channel)
+  // Normalize both sides so an alias in the list (e.g. `agy`) disables its
+  // canonical channel (`antigravity`), matching how review dispatch resolves it.
+  const target = normalizeChannelName(channel)
+  const disabledList = new Set((config.channels_disabled ?? []).map(normalizeChannelName))
+  return config.channels[channel]?.enabled !== false && !disabledList.has(target)
+}
+
+/**
+ * True when `channel` (by canonical name) is a member of the merged
+ * `channels_disabled` list — i.e. disabled by the list mechanism rather than by
+ * its own `enabled` flag.
+ */
+function disabledByList(config: MmrConfigParsed, channel: string): boolean {
+  const target = normalizeChannelName(channel)
+  return (config.channels_disabled ?? []).map(normalizeChannelName).includes(target)
+}
+
+/**
+ * Which config layer's `channels_disabled` list is in effect. Arrays replace
+ * (not merge) across layers, so the highest layer that defines the list wins;
+ * we report that layer as the provenance source for list-disabled channels.
+ */
+function channelsDisabledSource(): ProvenanceSource | undefined {
+  const paths = resolveConfigPaths({ projectRoot: process.cwd() })
+  for (const [file, src] of [[paths.project, 'project'], [paths.user, 'user']] as const) {
+    if (!fs.existsSync(file)) continue
+    try {
+      const parsed = parseYaml(fs.readFileSync(file, 'utf-8')) as { channels_disabled?: unknown }
+      if (parsed && Array.isArray(parsed.channels_disabled)) return src
+    } catch {
+      // ignore unreadable/invalid file; fall through to the next layer
+    }
+  }
+  return undefined
 }
 
 async function configToggle(channel: string | undefined, enabled: boolean, args: ConfigArgs): Promise<boolean> {
