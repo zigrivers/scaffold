@@ -156,23 +156,35 @@ export function resolveCompensatorFocus(
 export function getCompensatingChannels(
   channelStatuses: Record<string, ChannelStatus>,
   compensatorChannel: string,
+  opts: {
+    compensateMissing?: boolean
+    channels?: Record<string, { required?: boolean }>
+  } = {},
 ): CompensatingChannel[] {
   const compensating: CompensatingChannel[] = []
+  const compensateMissing = opts.compensateMissing === true
+  const channels = opts.channels ?? {}
 
   for (const [name, status] of Object.entries(channelStatuses)) {
     if (name === compensatorChannel) continue
-    if (
-      status === 'not_installed'
-      || status === 'auth_failed'
-      || status === 'timeout'
-      || status === 'skipped'
-      || status === 'failed'
+    // `not_installed` is a STRUCTURAL absence — the CLI isn't on this machine and
+    // won't be without action, so compensating for it every run is wasted work
+    // (C1). Skip it by default; compensate only when explicitly asked
+    // (--compensate-missing) or the channel is marked required.
+    if (status === 'not_installed') {
+      if (!compensateMissing && channels[name]?.required !== true) continue
+    } else if (
+      status !== 'auth_failed'
+      && status !== 'timeout'
+      && status !== 'skipped'
+      && status !== 'failed'
     ) {
-      compensating.push({
-        originalChannel: name,
-        compensatingName: `compensating-${name}`,
-      })
+      continue
     }
+    compensating.push({
+      originalChannel: name,
+      compensatingName: `compensating-${name}`,
+    })
   }
 
   return compensating

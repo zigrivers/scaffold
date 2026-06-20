@@ -25,7 +25,8 @@ describe('getCompensatingChannels', () => {
       codex: 'not_installed',
       gemini: 'auth_failed',
     }
-    const result = getCompensatingChannels(statuses, 'claude')
+    // not_installed is structural — compensated only with --compensate-missing (C1).
+    const result = getCompensatingChannels(statuses, 'claude', { compensateMissing: true })
     expect(result).toHaveLength(2)
     expect(result.map(c => c.compensatingName)).toContain('compensating-codex')
     expect(result.map(c => c.compensatingName)).toContain('compensating-gemini')
@@ -63,7 +64,7 @@ describe('getCompensatingChannels', () => {
 
   it('returns descriptors for known channels without resolving focus prematurely', () => {
     const statuses: Record<string, ChannelStatus> = { codex: 'not_installed' }
-    const result = getCompensatingChannels(statuses, 'claude')
+    const result = getCompensatingChannels(statuses, 'claude', { compensateMissing: true })
     expect(result[0]).toEqual({
       originalChannel: 'codex',
       compensatingName: 'compensating-codex',

@@ -65,6 +65,9 @@ describe('review compensator integration', () => {
       $0: 'mmr',
       diff: diffPath,
       sync: false,
+      // codex is not_installed in these tests; opt in so the compensator path
+      // (the subject under test) still runs under the C1 default.
+      'compensate-missing': true,
     } as unknown as Parameters<typeof reviewCommand.handler>[0])
 
     logSpy.mockRestore()
