@@ -603,6 +603,20 @@ function withValidatedWrite(
   }
 }
 
+/** Canonicalize a channel-name segment in a config path (agy → antigravity). */
+function canonicalizeConfigPath(segs: string[]): string[] {
+  if (segs[0] === 'channels' && segs.length >= 2) {
+    return ['channels', normalizeChannelName(segs[1]), ...segs.slice(2)]
+  }
+  return segs
+}
+
+/** env/headers are `z.record(z.string())` — their values must stay strings (no bool/number coercion). */
+function isStringValuedPath(segs: string[]): boolean {
+  const i = segs.findIndex((s) => s === 'env' || s === 'headers')
+  return i >= 0 && i < segs.length - 1
+}
+
 function scopeFile(args: ConfigArgs): { file: string; allowSymlink: boolean; flag: string } {
   const paths = resolveConfigPaths({ projectRoot: process.cwd() })
   const global = args.global === true
@@ -619,12 +633,24 @@ function configSet(pathArg: string | undefined, valueArg: string | undefined, ar
     return false
   }
   const { file, allowSymlink, flag } = scopeFile(args)
+  const segs = canonicalizeConfigPath(pathArg.split('.'))
+  // A channels.<name>.* path must target a channel that already exists, so a
+  // typo doesn't silently create a stub (valid command-less disabled stubs are
+  // allowed by the schema, which would otherwise mask the mistake).
+  if (segs[0] === 'channels' && segs.length >= 2) {
+    const known = loadConfig({ projectRoot: process.cwd() })
+    if (!known.channels[segs[1]]) {
+      console.error(`Unknown channel '${segs[1]}'. Define it first, or check the spelling.`)
+      return false
+    }
+  }
   fs.mkdirSync(path.dirname(file), { recursive: true })
-  const segs = pathArg.split('.')
+  const stringField = isStringValuedPath(segs)
+  const expected = stringField ? valueArg : coerceScalar(valueArg)
   const res = withValidatedWrite(
     file,
-    () => setConfigValueSegs(file, segs, valueArg, { allowSymlink }),
-    { global: args.global === true, expectPath: { segs, value: coerceScalar(valueArg) } },
+    () => setConfigValueSegs(file, segs, valueArg, { allowSymlink, coerce: !stringField }),
+    { global: args.global === true, expectPath: { segs, value: expected } },
   )
   if (!res.ok) {
     console.error(`Cannot set ${pathArg}: ${res.error}`)
@@ -650,10 +676,11 @@ function configUnset(pathArg: string | undefined, args: ConfigArgs): boolean {
     console.error(`Nothing to unset: ${file} does not exist.`)
     return false
   }
+  const segs = canonicalizeConfigPath(pathArg.split('.'))
   let changed = false
   const res = withValidatedWrite(
     file,
-    () => { changed = unsetConfigValueSegs(file, pathArg.split('.'), { allowSymlink }) },
+    () => { changed = unsetConfigValueSegs(file, segs, { allowSymlink }) },
     { global: args.global === true },
   )
   if (!res.ok) {
@@ -665,8 +692,8 @@ function configUnset(pathArg: string | undefined, args: ConfigArgs): boolean {
     return true
   }
   console.log(`✓ unset ${pathArg}  (${file})`)
-  // Report the value now in effect after removing the override.
-  const segs = pathArg.split('.')
+  // Report the value now in effect after removing the override. Use the
+  // canonical `segs` — the loaded config is keyed by canonical channel names.
   const { config } = loadConfigWithProvenance({ projectRoot: process.cwd() })
   const inherited = segs.reduce<unknown>(
     (acc, k) => (acc && typeof acc === 'object' ? (acc as Record<string, unknown>)[k] : undefined),

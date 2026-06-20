@@ -35,6 +35,33 @@ describe('mmr config set / unset', () => {
     expect(out).toContain('mmr config unset defaults.fix_threshold --project')
   })
 
+  it('keeps an env value as a string (no bool/number coercion)', async () => {
+    await run({ action: 'set', name: 'channels.codex.env.NO_BROWSER', target: 'true', project: true })
+    const yaml = fs.readFileSync(path.join(tmp, '.mmr.yaml'), 'utf-8')
+    expect(yaml).toMatch(/NO_BROWSER: ['"]?true['"]?/)
+    // it must be the string "true", not a YAML boolean — assert config loads it as a string
+    const { loadConfig } = await import('../../src/config/loader.js')
+    const cfg = loadConfig({ projectRoot: tmp, userHome: home })
+    expect(cfg.channels.codex.env?.NO_BROWSER).toBe('true')
+  })
+
+  it('accepts a channel alias in the path (channels.agy.* → antigravity)', async () => {
+    await run({ action: 'set', name: 'channels.agy.timeout', target: '600', project: true })
+    const yaml = fs.readFileSync(path.join(tmp, '.mmr.yaml'), 'utf-8')
+    expect(yaml).toMatch(/antigravity:[\s\S]*timeout: 600/)
+  })
+
+  it('rejects a typo channel name in a set path', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
+    await run({ action: 'set', name: 'channels.codx.enabled', target: 'false', project: true })
+    expect(exitSpy).toHaveBeenCalledWith(1)
+    expect(errSpy.mock.calls.map((c) => String(c[0])).join('\n')).toMatch(/Unknown channel 'codx'/)
+    expect(fs.existsSync(path.join(tmp, '.mmr.yaml'))).toBe(false)
+    errSpy.mockRestore()
+    exitSpy.mockRestore()
+  })
+
   it('coerces a numeric value to a number scalar', async () => {
     await run({ action: 'set', name: 'channels.codex.timeout', target: '600', project: true })
     const yaml = fs.readFileSync(path.join(tmp, '.mmr.yaml'), 'utf-8')
