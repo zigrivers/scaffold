@@ -9,6 +9,17 @@ import { reconcileCommand } from './commands/reconcile.js'
 import { sessionsCommand } from './commands/sessions.js'
 import { ackCommand } from './commands/ack.js'
 import { skillCommand } from './commands/skill.js'
+import { commandsCommand } from './commands/commands.js'
+import { explainCommand } from './commands/explain.js'
+
+/**
+ * Top-level command names registered below. Exported so the manifest-drift test
+ * can assert every command appears in COMMAND_MANIFEST (no silent gaps).
+ */
+export const REGISTERED_TOP_LEVEL = [
+  'review', 'status', 'results', 'config', 'doctor', 'jobs',
+  'reconcile', 'sessions', 'ack', 'skill', 'commands', 'explain',
+] as const
 
 export async function runCli(argv: string[]): Promise<void> {
   await yargs(argv)
@@ -24,6 +35,8 @@ export async function runCli(argv: string[]): Promise<void> {
     .command(sessionsCommand)
     .command(ackCommand)
     .command(skillCommand)
+    .command(commandsCommand)
+    .command(explainCommand)
     .demandCommand(1, 'Run mmr --help for usage')
     .strict()
     .help()
