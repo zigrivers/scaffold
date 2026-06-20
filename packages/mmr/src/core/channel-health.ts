@@ -68,7 +68,8 @@ export async function probeChannels(config: MmrConfigParsed): Promise<ChannelHea
         name,
         status: 'not_installed',
         installed: false,
-        recovery: `install ${cmd}, or stop dispatching it: mmr config disable ${name}`,
+        // redact cmd: a command can start with an env assignment (FOO=secret …).
+        recovery: `install ${redact(cmd)}, or stop dispatching it: mmr config disable ${name}`,
       })
       continue
     }

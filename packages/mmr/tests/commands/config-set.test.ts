@@ -87,6 +87,23 @@ describe('mmr config set / unset', () => {
     expect(out).toMatch(/inherits.*300/)
   })
 
+  it('redacts a secret-bearing inherited value when reporting an unset', async () => {
+    // global holds the inherited secret; project overrides it
+    fs.mkdirSync(path.join(home, '.mmr'), { recursive: true })
+    fs.writeFileSync(
+      path.join(home, '.mmr', 'config.yaml'),
+      'version: 1\nchannels:\n  codex:\n    env:\n      API_KEY: inherited-secret\n',
+    )
+    fs.writeFileSync(
+      path.join(tmp, '.mmr.yaml'),
+      'version: 1\nchannels:\n  codex:\n    env:\n      API_KEY: project-secret\n',
+    )
+    await run({ action: 'unset', name: 'channels.codex.env.API_KEY', project: true })
+    const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n')
+    expect(out).toContain('<redacted>')
+    expect(out).not.toContain('inherited-secret')
+  })
+
   it('reports a no-op unset when the key is not set', async () => {
     fs.writeFileSync(path.join(tmp, '.mmr.yaml'), 'version: 1\n')
     await run({ action: 'unset', name: 'defaults.timeout', project: true })

@@ -567,21 +567,26 @@ function withValidatedWrite(
 ): { ok: true } | { ok: false; error: string } {
   const existed = fs.existsSync(file)
   const backup = existed ? fs.readFileSync(file, 'utf-8') : null
-  const rollback = () => {
-    if (existed && backup !== null) fs.writeFileSync(file, backup)
-    else if (!existed) fs.rmSync(file, { force: true })
-  }
+  // A mutate() failure means the writer refused BEFORE writing (symlink guard,
+  // YAML syntax, multi-doc) — nothing was written, so there's nothing to roll
+  // back. Rolling back here would be wrong: a raw write-back would bypass the
+  // very symlink protection that just refused the write.
   try {
     mutate()
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+  try {
     // For a --global write, validate WITHOUT the project layer: a valid project
     // override must not be able to mask an invalid ~/.mmr/config.yaml that would
     // then break config loading in other repos.
     loadConfig({ projectRoot: process.cwd(), skipProjectConfig: opts.global === true })
     return { ok: true }
   } catch (err) {
-    // Roll back whether the failure was in the write or the validation, so a
-    // partial/invalid file is never left behind.
-    rollback()
+    // The write succeeded (and so passed the symlink guard) but produced an
+    // invalid config — restore the prior state of this same, already-vetted file.
+    if (existed && backup !== null) fs.writeFileSync(file, backup)
+    else if (!existed) fs.rmSync(file, { force: true })
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
   }
 }
@@ -648,13 +653,18 @@ function configUnset(pathArg: string | undefined, args: ConfigArgs): boolean {
   }
   console.log(`✓ unset ${pathArg}  (${file})`)
   // Report the value now in effect after removing the override.
+  const segs = pathArg.split('.')
   const { config } = loadConfigWithProvenance({ projectRoot: process.cwd() })
-  const inherited = pathArg.split('.').reduce<unknown>(
+  const inherited = segs.reduce<unknown>(
     (acc, k) => (acc && typeof acc === 'object' ? (acc as Record<string, unknown>)[k] : undefined),
     config,
   )
   if (inherited !== undefined) {
-    console.log(`  now inherits: ${JSON.stringify(redactConfigView(inherited))}`)
+    // Redact by the leaf KEY (a primitive value carries no key context), so a
+    // secret-bearing path like channels.foo.env.OPENAI_API_KEY isn't printed.
+    const leaf = segs[segs.length - 1] ?? ''
+    const display = isSecretKey(leaf) ? '<redacted>' : redactConfigView(inherited)
+    console.log(`  now inherits: ${JSON.stringify(display)}`)
   }
   return true
 }

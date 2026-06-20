@@ -11,7 +11,8 @@ import type { MmrConfigParsed } from '../config/schema.js'
 function effectivelyDisabled(config: MmrConfigParsed, channel: string): boolean {
   const target = normalizeChannelName(channel)
   const disabled = new Set((config.channels_disabled ?? []).map(normalizeChannelName))
-  return config.channels[channel]?.enabled === false || disabled.has(target)
+  const ch = config.channels[channel] ?? config.channels[target]
+  return ch?.enabled === false || disabled.has(target)
 }
 
 interface DoctorArgs {
