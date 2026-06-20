@@ -13,6 +13,7 @@ import { probeRuntime } from '../core/runtime-probe.js'
 import { OSS_RUNTIMES, exampleBlockFor, type OssRuntimeId } from '../core/oss-examples.js'
 import { isSecretKey, redactChannel } from '../core/redact.js'
 import { resolveConfigPaths } from '../config/paths.js'
+import { setChannelEnabled } from '../config/writer.js'
 import type { OutputParserConfig } from '../config/schema.js'
 
 interface ConfigArgs {
@@ -22,6 +23,8 @@ interface ConfigArgs {
   'with-examples'?: boolean
   'no-redact'?: boolean
   redact?: boolean
+  global?: boolean
+  project?: boolean
 }
 
 async function ossProbeResults(): Promise<Map<OssRuntimeId, boolean>> {
@@ -337,6 +340,54 @@ function isCommandSecretKey(name: string): boolean {
   return isSecretKey(normalized, { exemptEnvNameKeys: false })
 }
 
+/**
+ * Resolve which config file a mutator should write to (D1).
+ * `--global`/`--project` force the target. Otherwise the default is the
+ * project `.mmr.yaml` — except a `disable` of a channel whose CLI is not
+ * installed, which is a machine-level fact and routes to the global file.
+ */
+async function resolveWriteTarget(
+  channel: string,
+  enabling: boolean,
+  args: ConfigArgs,
+): Promise<{ file: string; notInstalled: boolean }> {
+  const paths = resolveConfigPaths({ projectRoot: process.cwd() })
+  if (args.global) return { file: paths.user, notInstalled: false }
+  if (args.project) return { file: paths.project, notInstalled: false }
+  if (!enabling) {
+    const config = loadConfig({ projectRoot: process.cwd() })
+    const cmd = config.channels[channel]?.command?.split(' ')[0]
+    if (cmd && !(await checkInstalled(cmd))) {
+      return { file: paths.user, notInstalled: true }
+    }
+  }
+  return { file: paths.project, notInstalled: false }
+}
+
+async function configToggle(channel: string | undefined, enabled: boolean, args: ConfigArgs): Promise<boolean> {
+  if (!channel) {
+    console.error(`Usage: mmr config ${enabled ? 'enable' : 'disable'} <channel>`)
+    return false
+  }
+  const target = await resolveWriteTarget(channel, enabled, args)
+  fs.mkdirSync(path.dirname(target.file), { recursive: true })
+  setChannelEnabled(target.file, channel, enabled)
+
+  const verb = enabled ? 'Enabled' : 'Disabled'
+  console.log(`✓ ${verb} channel '${channel}'`)
+  if (target.notInstalled) {
+    console.log(`  ${channel} CLI not installed — recorded as a machine-level preference in ${target.file}`)
+    console.log('  pass --project to scope it to this repo instead')
+  } else {
+    console.log(`  wrote ${target.file}`)
+  }
+  const { provenance } = loadConfigWithProvenance({ projectRoot: process.cwd() })
+  const src = (provenance.channels[channel]?.enabled as string | undefined) ?? 'project'
+  console.log(`  now    ${channel}  ${enabled ? 'enabled' : 'disabled'}  (${src})`)
+  console.log(`  revert mmr config ${enabled ? 'disable' : 'enable'} ${channel}`)
+  return true
+}
+
 export const configCommand: CommandModule<object, ConfigArgs> = {
   command: 'config <action> [name] [target]',
   describe: 'Manage mmr configuration',
@@ -366,11 +417,22 @@ export const configCommand: CommandModule<object, ConfigArgs> = {
         default: true,
         describe: 'Redact secrets for config channels show',
       })
+      .option('global', {
+        type: 'boolean',
+        describe: 'Write to the global ~/.mmr/config.yaml (enable/disable)',
+      })
+      .option('project', {
+        type: 'boolean',
+        describe: 'Write to the project ./.mmr.yaml (enable/disable)',
+      })
       .middleware((args) => {
         if (args.redact === false) args['no-redact'] = true
       }),
   handler: async (args: ArgumentsCamelCase<ConfigArgs>) => {
-    if (args.action !== 'channels' && (args.name || args.target)) {
+    // `channels` takes [name] and [target]; `enable`/`disable` take [name] only.
+    const nameOk = args.action === 'channels' || args.action === 'enable' || args.action === 'disable'
+    const targetOk = args.action === 'channels'
+    if ((!nameOk && args.name) || (!targetOk && args.target)) {
       console.error(`Unexpected argument for config ${args.action}: ${args.target ?? args.name}`)
       process.exit(1)
       return
@@ -385,6 +447,12 @@ export const configCommand: CommandModule<object, ConfigArgs> = {
     case 'path':
       configPath()
       break
+    case 'enable':
+    case 'disable': {
+      const ok = await configToggle(args.name, args.action === 'enable', args)
+      if (!ok) process.exit(1)
+      break
+    }
     case 'channels': {
       const ok = configChannels({
         name: args.name,
