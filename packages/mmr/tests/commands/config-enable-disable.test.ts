@@ -125,20 +125,6 @@ describe('mmr config disable/enable', () => {
     expect(fs.readFileSync(path.join(tmp, '.mmr.yaml'), 'utf-8')).toMatch(/codex:[\s\S]*enabled: false/)
   })
 
-  it('rejects --global for a project-only channel (would orphan-stub other repos)', async () => {
-    fs.writeFileSync(
-      path.join(tmp, '.mmr.yaml'),
-      'version: 1\nchannels:\n  projonly:\n    command: "some-cli review"\n',
-    )
-    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
-    await run({ action: 'disable', name: 'projonly', global: true })
-    expect(fs.existsSync(path.join(home, '.mmr', 'config.yaml'))).toBe(false)
-    expect(errSpy.mock.calls.map((c) => String(c[0])).join('\n')).toMatch(/only in the project|Use --project/)
-    errSpy.mockRestore()
-    exitSpy.mockRestore()
-  })
-
   it('rejects passing both --global and --project', async () => {
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)

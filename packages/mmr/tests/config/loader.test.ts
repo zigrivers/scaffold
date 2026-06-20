@@ -22,6 +22,16 @@ describe('loadConfig', () => {
     expect(config.defaults.timeout).toBe(300)
   })
 
+  it('accepts a command-less channel when it is disabled (portable disable stub)', () => {
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), 'version: 1\nchannels:\n  ghost:\n    enabled: false\n')
+    expect(() => loadConfig({ projectRoot: tmpDir, userHome: tmpDir })).not.toThrow()
+  })
+
+  it('still rejects a command-less channel when it is enabled', () => {
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), 'version: 1\nchannels:\n  ghost:\n    enabled: true\n')
+    expect(() => loadConfig({ projectRoot: tmpDir, userHome: tmpDir })).toThrow(/must define command/)
+  })
+
   it('default gemini command does not pass `-p` (prompt is piped via stdin)', () => {
     // Repro: `gemini -p` requires a positional value; with prompt
     // delivered via stdin and `--output-format json` as the next argv
