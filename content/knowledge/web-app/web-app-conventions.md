@@ -1,12 +1,22 @@
 ---
 name: web-app-conventions
-description: Component naming, file colocation, state management patterns, custom hook conventions, and CSS methodology selection for web apps
-topics: [web-app, conventions, components, state-management, css, hooks]
+description: >-
+  Component naming, file colocation, state management patterns, custom hook conventions, and CSS methodology selection
+  for web apps
+topics:
+  - web-app
+  - conventions
+  - components
+  - state-management
+  - css
+  - hooks
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-06-20
 version-pin: null
 sources:
   - url: https://developer.mozilla.org/en-US/docs/Web/CSS
+    hash: sha256:ef8f7a3210edcac67141eabbed34235a1e9223f45f50b9113d8041b2d7eb2d1b
+    retrieved: 2026-06-20
 ---
 
 Conventions are the difference between a codebase where any engineer can find and modify any file in minutes versus one where only the original author can navigate it confidently. Establish these once, enforce them via linting and code review, and never let individual preferences override them during the project lifecycle.
