@@ -1,13 +1,25 @@
 ---
 name: web-app-design-system
-description: Responsive token systems, dark/light mode, component library patterns, and CSS methodology selection for web applications
-topics: [web-app, design-system, css, tokens, dark-mode, responsive]
+description: >-
+  Responsive token systems, dark/light mode, component library patterns, and CSS methodology selection for web
+  applications
+topics:
+  - web-app
+  - design-system
+  - css
+  - tokens
+  - dark-mode
+  - responsive
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-06-20
 version-pin: null
 sources:
   - url: https://tr.designtokens.org/format/
+    hash: sha256:84a371b4787b62afbd05ea2fb6d1f1a30e1b08d80c1799ba4918dd1636e4537d
+    retrieved: 2026-06-20
   - url: https://developer.mozilla.org/en-US/docs/Web/CSS/Using_CSS_custom_properties
+    hash: sha256:3f2efe6da245657ce23ebdd83b6ec2a43cb7c5976f4dacd8b4bba8018801e201
+    retrieved: 2026-06-20
 ---
 
 A design system is the contract between design and engineering. Without one, components drift, spacing is inconsistent, and every engineer makes independent decisions about color, typography, and layout. A well-structured token system makes that contract explicit, machine-enforceable, and refactorable — changing a spacing scale or switching a brand color becomes a one-line edit rather than a codebase-wide search-and-replace.
