@@ -11,10 +11,10 @@ import { BUILTIN_CHANNELS } from '../config/defaults.js'
 import { checkInstalled, checkAuth } from '../core/auth.js'
 import { probeRuntime } from '../core/runtime-probe.js'
 import { OSS_RUNTIMES, exampleBlockFor, type OssRuntimeId } from '../core/oss-examples.js'
-import { isSecretKey, redactChannel } from '../core/redact.js'
+import { isSecretKey, redactChannel, redactConfigView } from '../core/redact.js'
 import { resolveConfigPaths } from '../config/paths.js'
 import { setChannelEnabled } from '../config/writer.js'
-import type { OutputParserConfig } from '../config/schema.js'
+import type { OutputParserConfig, MmrConfigParsed } from '../config/schema.js'
 
 interface ConfigArgs {
   action: string
@@ -194,17 +194,24 @@ function configChannels(
     }
   })
 
+  // Route every output mode through the single redaction boundary (D4). The
+  // command string is also scanned for inline secrets at row-build time above
+  // (redactDisplayCommand), which key-based redaction cannot see; this pass
+  // guarantees any secret-keyed field (now or future) is redacted by
+  // construction before serialization.
+  const safeRows = redactConfigView(rows) as typeof rows
+
   if (opts.format === 'text') {
     const pad = (s: string, n: number) => s.padEnd(n)
     console.log(`${pad('CHANNEL', 18)}${pad('STATUS', 11)}SOURCE`)
-    for (const r of rows) {
+    for (const r of safeRows) {
       const status = r.enabled === false ? 'disabled' : 'enabled'
       console.log(`${pad(r.name, 18)}${pad(status, 11)}${r.source}`)
     }
     return true
   }
 
-  console.log(JSON.stringify(rows, null, 2))
+  console.log(JSON.stringify(safeRows, null, 2))
   return true
 }
 
@@ -366,12 +373,12 @@ async function resolveWriteTarget(
   channel: string,
   enabling: boolean,
   args: ConfigArgs,
+  config: MmrConfigParsed,
 ): Promise<{ file: string; notInstalled: boolean }> {
   const paths = resolveConfigPaths({ projectRoot: process.cwd() })
   if (args.global) return { file: paths.user, notInstalled: false }
   if (args.project) return { file: paths.project, notInstalled: false }
   if (!enabling) {
-    const config = loadConfig({ projectRoot: process.cwd() })
     const cmd = config.channels[channel]?.command?.split(' ')[0]
     if (cmd && !(await checkInstalled(cmd))) {
       return { file: paths.user, notInstalled: true }
@@ -380,14 +387,40 @@ async function resolveWriteTarget(
   return { file: paths.project, notInstalled: false }
 }
 
+/**
+ * Compute whether a channel will actually be dispatched given the fully merged
+ * config: its effective `enabled` flag AND any legacy `channels_disabled` list
+ * membership. Used to report the real post-write state rather than the value we
+ * just requested, which a higher-precedence layer could still override.
+ */
+function effectiveEnabled(config: MmrConfigParsed, channel: string): boolean {
+  const disabledList = new Set(config.channels_disabled ?? [])
+  return config.channels[channel]?.enabled !== false && !disabledList.has(channel)
+}
+
 async function configToggle(channel: string | undefined, enabled: boolean, args: ConfigArgs): Promise<boolean> {
   if (!channel) {
     console.error(`Usage: mmr config ${enabled ? 'enable' : 'disable'} <channel>`)
     return false
   }
-  const target = await resolveWriteTarget(channel, enabled, args)
-  fs.mkdirSync(path.dirname(target.file), { recursive: true })
-  setChannelEnabled(target.file, channel, enabled)
+  // Validate the channel exists before writing, so a typo cannot create a
+  // command-less channel that then fails config validation on the next load.
+  const before = loadConfig({ projectRoot: process.cwd() })
+  if (!before.channels[channel]) {
+    const known = Object.keys(before.channels).join(', ')
+    console.error(`Unknown channel '${channel}'. Known channels: ${known}`)
+    return false
+  }
+
+  const target = await resolveWriteTarget(channel, enabled, args, before)
+  try {
+    fs.mkdirSync(path.dirname(target.file), { recursive: true })
+    setChannelEnabled(target.file, channel, enabled)
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error(`Failed to write ${target.file}: ${msg}`)
+    return false
+  }
 
   const verb = enabled ? 'Enabled' : 'Disabled'
   console.log(`✓ ${verb} channel '${channel}'`)
@@ -397,9 +430,18 @@ async function configToggle(channel: string | undefined, enabled: boolean, args:
   } else {
     console.log(`  wrote ${target.file}`)
   }
-  const { provenance } = loadConfigWithProvenance({ projectRoot: process.cwd() })
+
+  // Report the EFFECTIVE merged state, not just the value we wrote — a
+  // higher-precedence layer (e.g. a project override after a global write)
+  // could still win, and the user must know if the intent didn't take effect.
+  const { config, provenance } = loadConfigWithProvenance({ projectRoot: process.cwd() })
   const src = (provenance.channels[channel]?.enabled as string | undefined) ?? 'project'
-  console.log(`  now    ${channel}  ${enabled ? 'enabled' : 'disabled'}  (${src})`)
+  const effective = effectiveEnabled(config, channel)
+  console.log(`  now    ${channel}  ${effective ? 'enabled' : 'disabled'}  (${src})`)
+  if (effective !== enabled) {
+    console.log(`  ⚠ a higher-precedence config layer still ${effective ? 'enables' : 'disables'} this channel`)
+    console.log('    run `mmr config channels --format text` to see which source wins')
+  }
   console.log(`  revert mmr config ${enabled ? 'disable' : 'enable'} ${channel}`)
   return true
 }

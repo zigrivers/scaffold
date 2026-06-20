@@ -62,6 +62,17 @@ describe('mmr config disable/enable', () => {
     expect(yaml).toMatch(/codex:[\s\S]*enabled: true/)
   })
 
+  it('rejects an unknown channel and writes nothing', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
+    await run({ action: 'disable', name: 'cdoex', project: true })
+    expect(errSpy.mock.calls.map((c) => String(c[0])).join('\n')).toContain('Unknown channel')
+    expect(exitSpy).toHaveBeenCalledWith(1)
+    expect(fs.existsSync(path.join(tmp, '.mmr.yaml'))).toBe(false)
+    errSpy.mockRestore()
+    exitSpy.mockRestore()
+  })
+
   it('errors when no channel name is given', async () => {
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)

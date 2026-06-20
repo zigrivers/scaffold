@@ -53,6 +53,12 @@ describe('config writer', () => {
     expect(() => setConfigValue(file, 'a.b', '1')).toThrow(/multi-document/)
   })
 
+  it('accepts a single document that begins with a --- marker', () => {
+    fs.writeFileSync(file, '---\nversion: 1\nchannels:\n  grok:\n    enabled: true\n')
+    expect(() => setChannelEnabled(file, 'grok', false)).not.toThrow()
+    expect(fs.readFileSync(file, 'utf-8')).toMatch(/enabled: false/)
+  })
+
   it('prunes a channel from channels_disabled when enabling', () => {
     fs.writeFileSync(file, 'version: 1\nchannels_disabled:\n  - grok\n  - gemini\n')
     setChannelEnabled(file, 'grok', true)

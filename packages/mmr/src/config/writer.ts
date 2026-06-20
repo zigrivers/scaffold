@@ -1,5 +1,5 @@
 import fs from 'node:fs'
-import { parseDocument, isSeq, type Document } from 'yaml'
+import { parseDocument, parseAllDocuments, isSeq, type Document } from 'yaml'
 
 /**
  * Comment-preserving config mutation (vision decision D2).
@@ -24,8 +24,11 @@ function loadDoc(file: string, opts: { create?: boolean } = {}): Document {
     throw new Error(`config file not found: ${file}`)
   }
   // Refuse multi-document files: setIn against the first document would
-  // silently ignore later documents, so fail loudly instead (D2).
-  if (/^---\s*$/m.test(raw)) {
+  // silently ignore later documents, so fail loudly instead (D2). Count actual
+  // documents with the parser rather than regex-matching `---`, which would
+  // false-reject a valid single document that merely starts with a `---`
+  // marker or contains `---` inside a block scalar.
+  if (parseAllDocuments(raw).length > 1) {
     throw new Error(`multi-document YAML not supported: ${file}`)
   }
   return parseDocument(raw)

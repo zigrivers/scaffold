@@ -69,7 +69,7 @@ export function formatText(results: ReconciledResults): string {
   }
   if (anyDegraded) {
     lines.push('')
-    lines.push('Some channels were unavailable — run `mmr doctor` to diagnose and fix.')
+    lines.push('Some channels were unavailable — run `mmr config test` to diagnose install + auth.')
   }
 
   return lines.join('\n')
