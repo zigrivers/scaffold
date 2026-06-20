@@ -396,16 +396,22 @@ async function resolveWriteTarget(
   if (!enabling) {
     const cmd = config.channels[channel]?.command?.split(' ')[0]
     if (cmd && !(await checkInstalled(cmd))) {
-      // Route to global only when the missing command is machine-level — i.e.
-      // its VALUE comes from built-in defaults or the user config, not a project
-      // override. A project-sourced command (a project-only custom channel, or a
-      // built-in whose command the project overrides to a repo-local CLI) makes
-      // the not-installed-ness project-specific, so it belongs in the project
-      // file. This also avoids writing a command-less global stub that would
-      // fail config validation in other repos.
+      // Route a not-installed disable to global only when BOTH hold:
+      //  (a) the channel itself resolves from global-only config (a built-in or
+      //      a user-defined channel) — so a global `enabled: false` won't be an
+      //      orphan stub for a channel that doesn't exist in other repos; and
+      //  (b) the missing command's VALUE is not a project override — otherwise
+      //      the not-installed-ness is project-specific and belongs in-project.
+      // (a) alone misses a built-in whose command the project overrides to a
+      // missing CLI; (b) alone misses a project-only channel that `extends` a
+      // built-in (whose inherited command provenance is default/user). Both
+      // together cover every case.
+      const globalOnly = loadConfig({ projectRoot: process.cwd(), skipProjectConfig: true })
       const { provenance } = loadConfigWithProvenance({ projectRoot: process.cwd() })
       const cmdSource = provenance.channels[channel]?.command as ProvenanceSource | undefined
-      if (cmdSource === 'default' || cmdSource === 'user') {
+      const channelResolvesGlobally = globalOnly.channels[channel] !== undefined
+      const commandIsMachineLevel = cmdSource === 'default' || cmdSource === 'user'
+      if (channelResolvesGlobally && commandIsMachineLevel) {
         return { file: paths.user, notInstalled: true }
       }
     }

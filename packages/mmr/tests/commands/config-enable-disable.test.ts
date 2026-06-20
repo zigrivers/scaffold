@@ -90,6 +90,27 @@ describe('mmr config disable/enable', () => {
     expect(out).toMatch(/now\s+codex\s+enabled/)
   })
 
+  it('keeps a project-only channel that extends a template in the project (not global)', async () => {
+    // A global template carries the (missing) command; the project channel
+    // inherits it via extends, so its command provenance is user-level — but the
+    // channel KEY is project-only. Disabling it must stay in the project, or a
+    // global stub would be an orphan in every other repo. (Equivalent to the
+    // "project channel extends grok with grok missing" case.)
+    fs.mkdirSync(path.join(home, '.mmr'), { recursive: true })
+    fs.writeFileSync(
+      path.join(home, '.mmr', 'config.yaml'),
+      'version: 1\nchannels:\n  tmpl:\n    abstract: true\n    command: "nonexistent-cli-xyz-123 review"\n',
+    )
+    fs.writeFileSync(
+      path.join(tmp, '.mmr.yaml'),
+      'version: 1\nchannels:\n  my-x:\n    extends: tmpl\n',
+    )
+    await run({ action: 'disable', name: 'my-x' })
+    // global config still only has the template (no my-x stub added)
+    expect(fs.readFileSync(path.join(home, '.mmr', 'config.yaml'), 'utf-8')).not.toMatch(/my-x/)
+    expect(fs.readFileSync(path.join(tmp, '.mmr.yaml'), 'utf-8')).toMatch(/my-x:[\s\S]*enabled: false/)
+  })
+
   it('keeps a built-in disable in the project when its missing command is a project override', async () => {
     // codex is a built-in, but the project overrides its command to an absent
     // CLI. The not-installed-ness is project-specific, so the disable must NOT
