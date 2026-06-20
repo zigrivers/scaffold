@@ -87,6 +87,14 @@ describe('mmr config set / unset', () => {
     expect(out).toMatch(/inherits.*300/)
   })
 
+  it('reports a no-op unset when the key is not set', async () => {
+    fs.writeFileSync(path.join(tmp, '.mmr.yaml'), 'version: 1\n')
+    await run({ action: 'unset', name: 'defaults.timeout', project: true })
+    const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n')
+    expect(out).toMatch(/nothing to unset/)
+    expect(out).not.toMatch(/✓ unset/)
+  })
+
   it('errors when set is missing a value', async () => {
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)

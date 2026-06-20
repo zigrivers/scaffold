@@ -1,5 +1,6 @@
 import { checkInstalled, checkAuth, checkHttpAuth } from './auth.js'
 import { redactCommandString } from './redact.js'
+import { normalizeChannelName } from '../config/channel-aliases.js'
 import type { MmrConfigParsed } from '../config/schema.js'
 
 export type ChannelHealthStatus =
@@ -38,9 +39,15 @@ const redact = (s: string | undefined): string | undefined => redactCommandStrin
  */
 export async function probeChannels(config: MmrConfigParsed): Promise<ChannelHealth[]> {
   const out: ChannelHealth[] = []
+  // A channel turned off via the legacy channels_disabled list is intentionally
+  // off — don't probe it (and don't let `doctor --fix` mutate it).
+  const disabledList = new Set((config.channels_disabled ?? []).map(normalizeChannelName))
   for (const [name, ch] of Object.entries(config.channels)) {
     if (ch.abstract) { out.push({ name, status: 'abstract', installed: false }); continue }
-    if (!ch.enabled) { out.push({ name, status: 'disabled', installed: false }); continue }
+    if (!ch.enabled || disabledList.has(normalizeChannelName(name))) {
+      out.push({ name, status: 'disabled', installed: false })
+      continue
+    }
 
     if (ch.kind === 'http') {
       const a = await checkHttpAuth(ch)

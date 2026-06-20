@@ -567,20 +567,21 @@ function withValidatedWrite(
 ): { ok: true } | { ok: false; error: string } {
   const existed = fs.existsSync(file)
   const backup = existed ? fs.readFileSync(file, 'utf-8') : null
-  try {
-    mutate()
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  const rollback = () => {
+    if (existed && backup !== null) fs.writeFileSync(file, backup)
+    else if (!existed) fs.rmSync(file, { force: true })
   }
   try {
+    mutate()
     // For a --global write, validate WITHOUT the project layer: a valid project
     // override must not be able to mask an invalid ~/.mmr/config.yaml that would
     // then break config loading in other repos.
     loadConfig({ projectRoot: process.cwd(), skipProjectConfig: opts.global === true })
     return { ok: true }
   } catch (err) {
-    if (existed && backup !== null) fs.writeFileSync(file, backup)
-    else if (!existed) fs.rmSync(file, { force: true })
+    // Roll back whether the failure was in the write or the validation, so a
+    // partial/invalid file is never left behind.
+    rollback()
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
   }
 }
@@ -631,14 +632,19 @@ function configUnset(pathArg: string | undefined, args: ConfigArgs): boolean {
     console.error(`Nothing to unset: ${file} does not exist.`)
     return false
   }
+  let changed = false
   const res = withValidatedWrite(
     file,
-    () => unsetConfigValueSegs(file, pathArg.split('.'), { allowSymlink }),
+    () => { changed = unsetConfigValueSegs(file, pathArg.split('.'), { allowSymlink }) },
     { global: args.global === true },
   )
   if (!res.ok) {
     console.error(`Cannot unset ${pathArg}: ${res.error}`)
     return false
+  }
+  if (!changed) {
+    console.log(`  ${pathArg} is not set in ${file} — nothing to unset.`)
+    return true
   }
   console.log(`✓ unset ${pathArg}  (${file})`)
   // Report the value now in effect after removing the override.

@@ -70,6 +70,16 @@ describe('mmr doctor', () => {
     exitSpy.mockRestore()
   })
 
+  it('treats a channels_disabled channel as disabled (does not probe or fix it)', async () => {
+    // codex would otherwise be not_installed; the legacy list turns it off.
+    fs.writeFileSync(path.join(tmp, '.mmr.yaml'), 'version: 1\nchannels_disabled:\n  - codex\n')
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
+    await run({ format: 'json' })
+    const rows = JSON.parse(String(logSpy.mock.calls.at(-1)?.[0])) as Array<{ name: string; status: string }>
+    expect(rows.find((r) => r.name === 'codex')?.status).toBe('disabled')
+    exitSpy.mockRestore()
+  })
+
   it('emits JSON with --format json', async () => {
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
     await run({ format: 'json' })

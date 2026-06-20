@@ -152,12 +152,13 @@ export function pruneChannelsDisabled(file: string, channel: string, opts: Write
  * Remove the value at an explicit path-segment array, preserving comments.
  * No-op when the file or the path is absent. Used by `config unset`.
  */
-export function unsetConfigValueSegs(file: string, segs: string[], opts: WriteOpts = {}): void {
-  if (!fs.existsSync(file)) return
+export function unsetConfigValueSegs(file: string, segs: string[], opts: WriteOpts = {}): boolean {
+  if (!fs.existsSync(file)) return false
   const doc = loadDoc(file)
-  if (!doc.hasIn(segs)) return
+  if (!doc.hasIn(segs)) return false
   doc.deleteIn(segs)
   safeWrite(file, doc.toString(), opts)
+  return true
 }
 
 /**

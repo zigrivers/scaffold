@@ -4,7 +4,15 @@ import path from 'node:path'
 import { loadConfig } from '../config/loader.js'
 import { resolveDisableScope } from '../config/scope.js'
 import { setChannelEnabled } from '../config/writer.js'
+import { normalizeChannelName } from '../config/channel-aliases.js'
 import { probeChannels, type ChannelHealth } from '../core/channel-health.js'
+import type { MmrConfigParsed } from '../config/schema.js'
+
+function effectivelyDisabled(config: MmrConfigParsed, channel: string): boolean {
+  const target = normalizeChannelName(channel)
+  const disabled = new Set((config.channels_disabled ?? []).map(normalizeChannelName))
+  return config.channels[channel]?.enabled === false || disabled.has(target)
+}
 
 interface DoctorArgs {
   fix?: boolean
@@ -59,8 +67,18 @@ async function runDoctor(args: DoctorArgs): Promise<void> {
       try {
         fs.mkdirSync(path.dirname(target.file), { recursive: true })
         setChannelEnabled(target.file, h.name, false, { allowSymlink: target.allowSymlink })
-        fixedNames.add(h.name)
-        if (args.format !== 'json') console.log(`  ✓ disabled ${h.name} in ${target.file}`)
+        // Confirm the disable actually took effect — a higher-precedence layer
+        // could still enable the channel, in which case it isn't really fixed.
+        if (effectivelyDisabled(loadConfig({ projectRoot: process.cwd() }), h.name)) {
+          fixedNames.add(h.name)
+          if (args.format !== 'json') console.log(`  ✓ disabled ${h.name} in ${target.file}`)
+        } else {
+          fixFailures += 1
+          console.error(
+            `  ✗ wrote ${h.name} disabled to ${target.file}, but a higher-precedence layer `
+            + 'still enables it — disable it there (e.g. --project / --global).',
+          )
+        }
       } catch (err) {
         fixFailures += 1
         console.error(`  ✗ could not disable ${h.name}: ${err instanceof Error ? err.message : String(err)}`)
