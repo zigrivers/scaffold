@@ -24,7 +24,7 @@ describe('formatText remediation', () => {
     const out = formatText(base())
     expect(out).toMatch(/grok: not_installed/)
     expect(out).toContain('mmr config disable grok')
-    expect(out).toContain('mmr config test')
+    expect(out).toContain('mmr doctor')
   })
 
   it('prints the recovery command for an auth_failed channel', () => {
@@ -32,13 +32,13 @@ describe('formatText remediation', () => {
     r.per_channel.grok = { status: 'auth_failed', elapsed: '1s', findings: [], recovery: 'grok login' }
     const out = formatText(r)
     expect(out).toContain('grok login')
-    expect(out).toContain('mmr config test')
+    expect(out).toContain('mmr doctor')
   })
 
   it('prints no remediation block when all channels completed', () => {
     const r = base()
     r.per_channel.grok = { status: 'completed', elapsed: '2s', findings: [] }
     const out = formatText(r)
-    expect(out).not.toContain('mmr config test')
+    expect(out).not.toContain('mmr doctor')
   })
 })
