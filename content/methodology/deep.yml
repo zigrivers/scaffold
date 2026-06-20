@@ -16,6 +16,7 @@ steps:
   review-user-stories: { enabled: true }
   innovate-user-stories: { enabled: true, conditional: "if-needed" }
   # Phase 2 — Project Foundation (foundation)
+  github-setup: { enabled: true }
   beads: { enabled: true, conditional: "if-needed" }
   tech-stack: { enabled: true }
   coding-standards: { enabled: true }
