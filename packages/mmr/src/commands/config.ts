@@ -11,7 +11,14 @@ import { BUILTIN_CHANNELS } from '../config/defaults.js'
 import { checkInstalled, checkAuth } from '../core/auth.js'
 import { probeRuntime } from '../core/runtime-probe.js'
 import { OSS_RUNTIMES, exampleBlockFor, type OssRuntimeId } from '../core/oss-examples.js'
-import { isSecretKey, redactChannel, redactConfigView } from '../core/redact.js'
+import {
+  isSecretKey,
+  redactChannel,
+  redactConfigView,
+  redactCommandString,
+  commandContainsInlineSecret,
+  isCommandSecretKey,
+} from '../core/redact.js'
 import { resolveConfigPaths } from '../config/paths.js'
 import { setChannelEnabled } from '../config/writer.js'
 import { normalizeChannelName } from '../config/channel-aliases.js'
@@ -153,7 +160,7 @@ async function configTest(): Promise<void> {
       auth: authResult.status,
       // A user-defined auth.recovery can be an arbitrary command that embeds a
       // token; scan it for inline secrets before printing to stdout.
-      recovery: redactDisplayCommand(authResult.recovery) as string | undefined,
+      recovery: redactCommandString(authResult.recovery) as string | undefined,
     }
     if (authResult.status !== 'ok') {
       allOk = false
@@ -193,7 +200,7 @@ function configChannels(
   const rows = Object.entries(config.channels).map(([name, ch]) => {
     const chRec = ch as unknown as Record<string, unknown>
     const display = noRedact ? chRec : redactChannel(chRec)
-    const command = noRedact ? display.command : redactDisplayCommand(display.command)
+    const command = noRedact ? display.command : redactCommandString(display.command)
     // Attribute the source to channels_disabled's layer when the channel is
     // disabled by that list rather than by its own enabled flag.
     const source = (disabledByList(config, name) && listSource)
@@ -254,7 +261,7 @@ function showChannel(name: string, opts: { noRedact: boolean }): boolean {
     ? { ...ch } as Record<string, unknown>
     : redactShowChannel(ch as unknown as Record<string, unknown>)
   if (!opts.noRedact && Object.prototype.hasOwnProperty.call(display, 'command')) {
-    display.command = redactDisplayCommand(display.command)
+    display.command = redactCommandString(display.command)
   }
   if (opts.noRedact) {
     console.error('WARNING: --no-redact is enabled; secrets in env/headers are printed verbatim.')
@@ -288,10 +295,6 @@ function printWithProvenance(
 function renderScalar(value: unknown): string {
   if (value === '<redacted>') return '<redacted>'
   return JSON.stringify(value)
-}
-
-function redactDisplayCommand(command: unknown): unknown {
-  return typeof command === 'string' && commandContainsInlineSecret(command) ? '<redacted>' : command
 }
 
 function redactShowChannel(channel: Record<string, unknown>): Record<string, unknown> {
@@ -345,39 +348,6 @@ function isStandaloneSecretKeyToken(value: string): boolean {
 
 function isCommandLikeKey(key: string): boolean {
   return ['command', 'check', 'recovery'].includes(key)
-}
-
-function commandContainsInlineSecret(command: string): boolean {
-  const keyValueRe = /(?:^|[\s'"?&{,=])"?(-{0,2}[A-Za-z0-9_.-]+)"?\s*[:=]/g
-  for (const match of command.matchAll(keyValueRe)) {
-    if (isCommandSecretKey(match[1])) return true
-  }
-  const nestedKeyValueRe = /[=:]"?([A-Za-z0-9_.-]+)"?\s*[:=]/g
-  for (const match of command.matchAll(nestedKeyValueRe)) {
-    if (isCommandSecretKey(match[1])) return true
-  }
-
-  const tokens = command.match(/"[^"]*"|'[^']*'|\S+/g) ?? []
-  for (let i = 0; i < tokens.length - 1; i += 1) {
-    const token = stripQuotes(tokens[i])
-    const next = stripQuotes(tokens[i + 1])
-    if (['--header', '-H', '--env', '-e'].includes(token) && commandContainsInlineSecret(next)) return true
-    if (!token.startsWith('-') || token.includes('=') || token.includes(':') || next.startsWith('-')) continue
-    if (isCommandSecretKey(token)) return true
-  }
-
-  return false
-}
-
-function stripQuotes(value: string): string {
-  return value.replace(/^['"]|['"]$/g, '')
-}
-
-function isCommandSecretKey(name: string): boolean {
-  const normalized = name.replace(/^-+/, '').toLowerCase()
-  if (normalized.endsWith('-env') || normalized.endsWith('_env')) return false
-  if (['auth-type', 'max-tokens', 'session-dir', 'token-limit', 'token-usage'].includes(normalized)) return false
-  return isSecretKey(normalized, { exemptEnvNameKeys: false })
 }
 
 /**
@@ -480,8 +450,8 @@ async function configToggle(channelArg: string | undefined, enabled: boolean, ar
   // Validate the channel exists before writing, so a typo cannot create a
   // command-less channel that then fails config validation on the next load.
   const before = loadConfig({ projectRoot: process.cwd() })
-  if (!before.channels[channel]) {
-    const known = Object.keys(before.channels).join(', ')
+  if (!before.channels?.[channel]) {
+    const known = Object.keys(before.channels ?? {}).join(', ')
     console.error(`Unknown channel '${channelArg}'. Known channels: ${known}`)
     return false
   }
@@ -513,7 +483,7 @@ async function configToggle(channelArg: string | undefined, enabled: boolean, ar
   // higher-precedence layer (e.g. a project override after a global write)
   // could still win, and the user must know if the intent didn't take effect.
   const { config, provenance } = loadConfigWithProvenance({ projectRoot: process.cwd() })
-  const src = (provenance.channels[channel]?.enabled as string | undefined) ?? 'default'
+  const src = (provenance.channels?.[channel]?.enabled as string | undefined) ?? 'default'
   const effective = effectiveEnabled(config, channel)
   console.log(`  now    ${channel}  ${effective ? 'enabled' : 'disabled'}  (${src})`)
   if (effective !== enabled) {
@@ -553,7 +523,7 @@ export const configCommand: CommandModule<object, ConfigArgs> = {
         type: 'string',
         demandOption: true,
         describe: 'Config action',
-        choices: ['init', 'test', 'channels', 'path', 'enable', 'disable'],
+        choices: ['init', 'test', 'channels', 'path', 'enable', 'disable', 'show'],
       })
       .positional('name', {
         type: 'string',
@@ -590,8 +560,8 @@ export const configCommand: CommandModule<object, ConfigArgs> = {
         if (args.redact === false) args['no-redact'] = true
       }),
   handler: async (args: ArgumentsCamelCase<ConfigArgs>) => {
-    // `channels` takes [name] and [target]; `enable`/`disable` take [name] only.
-    const nameOk = args.action === 'channels' || args.action === 'enable' || args.action === 'disable'
+    // `channels` takes [name] and [target]; `enable`/`disable`/`show` take [name].
+    const nameOk = ['channels', 'enable', 'disable', 'show'].includes(args.action)
     const targetOk = args.action === 'channels'
     if ((!nameOk && args.name) || (!targetOk && args.target)) {
       console.error(`Unexpected argument for config ${args.action}: ${args.target ?? args.name}`)
@@ -608,6 +578,16 @@ export const configCommand: CommandModule<object, ConfigArgs> = {
     case 'path':
       configPath()
       break
+    case 'show': {
+      // Top-level alias for `config channels show <channel>`.
+      if (!args.name) {
+        console.error('Usage: mmr config show <channel>')
+        process.exit(1)
+        return
+      }
+      if (!showChannel(args.name, { noRedact: isNoRedact(args) })) process.exit(1)
+      break
+    }
     case 'enable':
     case 'disable': {
       const ok = await configToggle(args.name, args.action === 'enable', args)

@@ -1,5 +1,6 @@
 import { parseChannelOutput } from './parser.js'
 import { reconcile, evaluateGate, deriveVerdict } from './reconciler.js'
+import { redactCommandString } from './redact.js'
 import { formatJson } from '../formatters/json.js'
 import { formatText } from '../formatters/text.js'
 import { formatMarkdown } from '../formatters/markdown.js'
@@ -104,7 +105,9 @@ export function runResultsPipeline(
         elapsed: entry.elapsed ?? '0s',
         findings: [],
         error: errorMsg,
-        recovery: entry.recovery,
+        // recovery is a user-configurable command that can embed a token; redact
+        // before it reaches stdout/JSON via the formatter (C3).
+        recovery: redactCommandString(entry.recovery) as string | undefined,
       }
       continue
     }

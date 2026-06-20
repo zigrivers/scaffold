@@ -26,4 +26,11 @@ describe('mmr config path', () => {
     expect(out).toMatch(/config\.yaml/)
     expect(out.toLowerCase()).toContain('write target')
   })
+
+  it('supports the top-level `config show <channel>` alias', async () => {
+    const { configCommand } = await import('../../src/commands/config.js')
+    await configCommand.handler({ action: 'show', name: 'codex', _: ['config'], $0: 'mmr' } as never)
+    const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n')
+    expect(out).toMatch(/# Channel: codex/)
+  })
 })

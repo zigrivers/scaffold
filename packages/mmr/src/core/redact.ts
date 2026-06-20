@@ -150,6 +150,56 @@ export function redactChannel(channel: Record<string, unknown>): Record<string, 
  * redacts; `noRedact: true` returns the value untouched (callers must print a
  * loud stderr warning when they bypass).
  */
+function stripQuotes(value: string): string {
+  return value.replace(/^['"]|['"]$/g, '')
+}
+
+function isCommandSecretKey(name: string): boolean {
+  const normalized = name.replace(/^-+/, '').toLowerCase()
+  if (normalized.endsWith('-env') || normalized.endsWith('_env')) return false
+  if (['auth-type', 'max-tokens', 'session-dir', 'token-limit', 'token-usage'].includes(normalized)) return false
+  return isSecretKey(normalized, { exemptEnvNameKeys: false })
+}
+
+/**
+ * Heuristically detect a secret embedded in a command/recovery string — a
+ * `--api-key sk-…`, `Authorization: Bearer …`, `--header`/`-H` pairs, or
+ * `KEY=secret` forms. Shared so every surface that prints a user-supplied
+ * command-like string (channels show/list, config test recovery, review result
+ * recovery) redacts consistently.
+ */
+export function commandContainsInlineSecret(command: string): boolean {
+  const keyValueRe = /(?:^|[\s'"?&{,=])"?(-{0,2}[A-Za-z0-9_.-]+)"?\s*[:=]/g
+  for (const match of command.matchAll(keyValueRe)) {
+    if (isCommandSecretKey(match[1])) return true
+  }
+  const nestedKeyValueRe = /[=:]"?([A-Za-z0-9_.-]+)"?\s*[:=]/g
+  for (const match of command.matchAll(nestedKeyValueRe)) {
+    if (isCommandSecretKey(match[1])) return true
+  }
+
+  const tokens = command.match(/"[^"]*"|'[^']*'|\S+/g) ?? []
+  for (let i = 0; i < tokens.length - 1; i += 1) {
+    const token = stripQuotes(tokens[i])
+    const next = stripQuotes(tokens[i + 1])
+    if (['--header', '-H', '--env', '-e'].includes(token) && commandContainsInlineSecret(next)) return true
+    if (!token.startsWith('-') || token.includes('=') || token.includes(':') || next.startsWith('-')) continue
+    if (isCommandSecretKey(token)) return true
+  }
+
+  return false
+}
+
+/**
+ * Redact a command/recovery string to `<redacted>` when it embeds an inline
+ * secret; pass non-strings and secret-free strings through unchanged.
+ */
+export function redactCommandString(value: unknown): unknown {
+  return typeof value === 'string' && commandContainsInlineSecret(value) ? '<redacted>' : value
+}
+
+export { isCommandSecretKey }
+
 export function redactConfigView(value: unknown, opts: { noRedact?: boolean } = {}): unknown {
   if (opts.noRedact) return value
   if (Array.isArray(value)) return redactList(value)

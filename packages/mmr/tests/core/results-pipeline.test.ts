@@ -57,6 +57,18 @@ describe('runResultsPipeline', () => {
     expect(results.per_channel.grok.recovery).toBe('grok login')
   })
 
+  it('redacts a secret-bearing recovery command before it reaches the result', () => {
+    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['grok'] })
+    store.updateChannel(job.job_id, 'grok', {
+      status: 'auth_failed',
+      recovery: "curl -H 'Authorization: Bearer sk-secret-123'",
+    })
+
+    const { results } = runResultsPipeline(store, store.loadJob(job.job_id), 'json')
+    expect(results.per_channel.grok.recovery).toBe('<redacted>')
+    expect(JSON.stringify(results)).not.toContain('sk-secret-123')
+  })
+
   it('uses an object-form output_parser stored on the channel entry', () => {
     const inner = '{"approved": false, "findings": [{"severity": "P0", "location": "f.ts:1", "description": "vuln", "suggestion": "fix"}], "summary": "issue"}'
     const envelope = JSON.stringify({ choices: [{ message: { content: inner } }] })

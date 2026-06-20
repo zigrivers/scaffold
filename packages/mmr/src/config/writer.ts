@@ -32,7 +32,14 @@ function loadDoc(file: string, opts: { create?: boolean } = {}): Document {
   if (parseAllDocuments(raw).length > 1) {
     throw new Error(`multi-document YAML not supported: ${file}`)
   }
-  return parseDocument(raw)
+  const doc = parseDocument(raw)
+  // parseDocument does not throw on syntax errors — it records them on
+  // doc.errors. Mutating and re-writing a partially-parsed document would
+  // silently corrupt/lose config, so refuse up front.
+  if (doc.errors.length > 0) {
+    throw new Error(`cannot edit ${file}: it has YAML syntax errors (${doc.errors[0].message})`)
+  }
+  return doc
 }
 
 /** Write config to disk in place — see the body for the symlink/mode/security rationale. */

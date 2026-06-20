@@ -53,6 +53,13 @@ describe('config writer', () => {
     expect(() => setConfigValue(file, 'a.b', '1')).toThrow(/multi-document/)
   })
 
+  it('refuses to edit a file with YAML syntax errors instead of corrupting it', () => {
+    fs.writeFileSync(file, 'channels:\n  grok: [unclosed\n')
+    expect(() => setChannelEnabled(file, 'grok', false)).toThrow(/syntax error/i)
+    // original content is left intact
+    expect(fs.readFileSync(file, 'utf-8')).toContain('[unclosed')
+  })
+
   it('accepts a single document that begins with a --- marker', () => {
     fs.writeFileSync(file, '---\nversion: 1\nchannels:\n  grok:\n    enabled: true\n')
     expect(() => setChannelEnabled(file, 'grok', false)).not.toThrow()
