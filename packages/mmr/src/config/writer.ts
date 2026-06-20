@@ -35,32 +35,21 @@ function loadDoc(file: string, opts: { create?: boolean } = {}): Document {
   return parseDocument(raw)
 }
 
-/**
- * Write atomically: serialize to a sibling temp file, then rename over the
- * target. A crash/signal/ENOSPC mid-write leaves the original intact rather than
- * a half-truncated config that fails to load.
- */
-function atomicWrite(file: string, content: string): void {
-  // Resolve symlinks first: renaming over a symlink would replace the link with
-  // a regular file, breaking dotfiles managers (chezmoi/stow). Write through to
-  // the real file, keeping the temp file in the same directory for an atomic
-  // same-filesystem rename.
-  const targetPath = fs.existsSync(file) ? fs.realpathSync(file) : file
-  const tmp = `${targetPath}.tmp-${process.pid}`
-  // Preserve the target's permission bits across the temp+rename, so a private
-  // 0600 config is not silently widened to 0644 under the umask — config can
-  // hold secrets in env/headers/command tokens. New files default to 0600.
-  let mode = 0o600
-  try {
-    mode = fs.statSync(targetPath).mode & 0o777
-  } catch {
-    // target does not exist yet → keep the restrictive default
-  }
-  fs.writeFileSync(tmp, content, { mode })
-  // chmod explicitly: writeFileSync's mode is masked by the umask, but the
-  // intent here is the exact mode (especially when preserving an existing one).
-  fs.chmodSync(tmp, mode)
-  fs.renameSync(tmp, targetPath)
+/** Write config to disk in place — see the body for the symlink/mode/security rationale. */
+function safeWrite(file: string, content: string): void {
+  // Deliberately a plain in-place write, not a temp-file+rename:
+  //  - it writes THROUGH a symlink to the real file, so dotfiles managers
+  //    (chezmoi/stow) keep working (the link is preserved);
+  //  - it preserves an existing file's mode (the inode is reused), so a private
+  //    0600 config is never widened;
+  //  - it introduces no predictable temp path, avoiding the symlink/TOCTOU
+  //    attack surface a `<file>.tmp-<pid>` sibling would create.
+  // The only thing it gives up versus temp+rename is atomicity — acceptable for
+  // a local, single-user config edited by an interactive command. New files get
+  // a restrictive 0600 default since config can hold secrets in env/headers.
+  const existed = fs.existsSync(file)
+  fs.writeFileSync(file, content)
+  if (!existed) fs.chmodSync(file, 0o600)
 }
 
 /**
@@ -105,7 +94,7 @@ export function setConfigValueSegs(
   const doc = loadDoc(file, { create: opts.create !== false })
   const coerced = typeof value === 'string' ? coerceScalar(value) : value
   doc.setIn(segs, coerced)
-  atomicWrite(file, doc.toString())
+  safeWrite(file, doc.toString())
 }
 
 /**
@@ -130,7 +119,7 @@ export function pruneChannelsDisabled(file: string, channel: string): boolean {
       changed = true
     }
   }
-  if (changed) atomicWrite(file, doc.toString())
+  if (changed) safeWrite(file, doc.toString())
   return changed
 }
 

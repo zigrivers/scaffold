@@ -79,15 +79,16 @@ describe('mmr config disable/enable', () => {
     expect(yaml).not.toMatch(/\bagy:/)
   })
 
-  it('enable prunes a legacy channels_disabled entry from the global layer too', async () => {
+  it('enable respects scope: does not mutate the global layer, warns instead', async () => {
     fs.mkdirSync(path.join(home, '.mmr'), { recursive: true })
     fs.writeFileSync(path.join(home, '.mmr', 'config.yaml'), 'version: 1\nchannels_disabled:\n  - codex\n')
     await run({ action: 'enable', name: 'codex', project: true })
-    // global channels_disabled entry removed, so the enable actually takes effect
-    expect(fs.readFileSync(path.join(home, '.mmr', 'config.yaml'), 'utf-8')).not.toMatch(/-\s*codex/)
+    // The global channels_disabled entry is NOT silently removed by a --project
+    // enable; the command warns that another layer still disables the channel.
+    expect(fs.readFileSync(path.join(home, '.mmr', 'config.yaml'), 'utf-8')).toMatch(/-\s*codex/)
     const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n')
-    expect(out).toContain('also removed')
-    expect(out).toMatch(/now\s+codex\s+enabled/)
+    expect(out).toMatch(/⚠|still disables/)
+    expect(out).toMatch(/now\s+codex\s+disabled/)
   })
 
   it('keeps a project-only channel that extends a template in the project (not global)', async () => {

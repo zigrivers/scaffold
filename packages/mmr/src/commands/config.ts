@@ -13,7 +13,7 @@ import { probeRuntime } from '../core/runtime-probe.js'
 import { OSS_RUNTIMES, exampleBlockFor, type OssRuntimeId } from '../core/oss-examples.js'
 import { isSecretKey, redactChannel, redactConfigView } from '../core/redact.js'
 import { resolveConfigPaths } from '../config/paths.js'
-import { setChannelEnabled, pruneChannelsDisabled } from '../config/writer.js'
+import { setChannelEnabled } from '../config/writer.js'
 import { normalizeChannelName } from '../config/channel-aliases.js'
 import { parse as parseYaml } from 'yaml'
 import type { OutputParserConfig, MmrConfigParsed } from '../config/schema.js'
@@ -151,7 +151,9 @@ async function configTest(): Promise<void> {
     results[name] = {
       installed: true,
       auth: authResult.status,
-      recovery: authResult.recovery,
+      // A user-defined auth.recovery can be an arbitrary command that embeds a
+      // token; scan it for inline secrets before printing to stdout.
+      recovery: redactDisplayCommand(authResult.recovery) as string | undefined,
     }
     if (authResult.status !== 'ok') {
       allOk = false
@@ -485,20 +487,13 @@ async function configToggle(channelArg: string | undefined, enabled: boolean, ar
   }
 
   const target = await resolveWriteTarget(channel, enabled, args, before)
-  const alsoPruned: string[] = []
   try {
     fs.mkdirSync(path.dirname(target.file), { recursive: true })
+    // setChannelEnabled writes enabled and (on enable) prunes channels_disabled
+    // in THIS file only. We never silently mutate another scope's file — if a
+    // different layer still disables the channel, we surface it below so the
+    // user can decide, rather than reaching into their global config.
     setChannelEnabled(target.file, channel, enabled)
-    // Enabling must actually take effect: prune the channel from a legacy
-    // channels_disabled list wherever it lives (not just the file we wrote),
-    // else review dispatch would still filter it out from another layer.
-    if (enabled) {
-      const paths = resolveConfigPaths({ projectRoot: process.cwd() })
-      for (const f of [paths.project, paths.user]) {
-        if (f === target.file) continue
-        if (pruneChannelsDisabled(f, channel)) alsoPruned.push(f)
-      }
-    }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     console.error(`Failed to write ${target.file}: ${msg}`)
@@ -513,9 +508,6 @@ async function configToggle(channelArg: string | undefined, enabled: boolean, ar
   } else {
     console.log(`  wrote ${target.file}`)
   }
-  for (const f of alsoPruned) {
-    console.log(`  also removed '${channel}' from channels_disabled in ${f}`)
-  }
 
   // Report the EFFECTIVE merged state, not just the value we wrote — a
   // higher-precedence layer (e.g. a project override after a global write)
@@ -525,8 +517,14 @@ async function configToggle(channelArg: string | undefined, enabled: boolean, ar
   const effective = effectiveEnabled(config, channel)
   console.log(`  now    ${channel}  ${effective ? 'enabled' : 'disabled'}  (${src})`)
   if (effective !== enabled) {
-    console.log(`  ⚠ a higher-precedence config layer still ${effective ? 'enables' : 'disables'} this channel`)
-    console.log('    run `mmr config channels --format text` to see which source wins')
+    // The requested change didn't take effect because another scope wins. Tell
+    // the user exactly how to clear it rather than silently editing that file.
+    const userPath = resolveConfigPaths({ projectRoot: process.cwd() }).user
+    const otherScope = target.file === userPath ? '--project' : '--global'
+    const verb2 = effective ? 'enables' : 'disables'
+    console.log(`  ⚠ another config layer still ${verb2} this channel`)
+    console.log('    run `mmr config channels --format text` to see which source wins,')
+    console.log(`    or re-run with ${otherScope} to change the other layer`)
   }
   console.log(`  revert mmr config ${enabled ? 'disable' : 'enable'} ${channel}`)
   return true
