@@ -92,10 +92,10 @@ function buildReport(
   const consensus = items.filter((i) => i.agreement === 'consensus').length
   const agreed = items.filter((i) => i.agreement !== 'unique').length
   const unique = items.filter((i) => i.agreement === 'unique').length
-  // Under lenses, cross-channel overlap isn't independent consensus (D5), so
-  // report the broader "multi-lens" count; otherwise report consensus precisely
-  // (majority items are NOT folded into the consensus count).
-  const agreedPart = lensed ? `${agreed} multi-lens` : `${consensus} consensus`
+  // Under lenses, cross-channel overlap isn't independent consensus (D5) — and
+  // channels may even share a lens — so use the neutral "agreed" (raised by ≥2
+  // channels). Non-lensed reports consensus precisely (majority is NOT folded in).
+  const agreedPart = lensed ? `${agreed} agreed` : `${consensus} consensus`
   const summary = dispatched === 0 || completed === 0
     ? 'No channels were available to run the critique — check `mmr doctor`.'
     : `${items.length} item(s) across ${completed} of ${dispatched} channel(s) — ` +
