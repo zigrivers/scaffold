@@ -1,13 +1,27 @@
 ---
 name: web-app-testing
-description: Component testing with Testing Library, SSR testing, E2E testing with Playwright, visual regression, accessibility testing with axe-core, and Lighthouse CI
-topics: [web-app, testing, playwright, testing-library, accessibility, visual-regression, lighthouse, e2e]
+description: >-
+  Component testing with Testing Library, SSR testing, E2E testing with Playwright, visual regression, accessibility
+  testing with axe-core, and Lighthouse CI
+topics:
+  - web-app
+  - testing
+  - playwright
+  - testing-library
+  - accessibility
+  - visual-regression
+  - lighthouse
+  - e2e
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-06-21
 version-pin: null
 sources:
   - url: https://www.w3.org/WAI/standards-guidelines/aria/
+    hash: sha256:155c511841b10771dac3db7001ff0d0d1ae46a9dee0ac6e387fef0cbae1a038f
+    retrieved: 2026-06-21
   - url: https://developer.chrome.com/docs/lighthouse/overview
+    hash: sha256:69973b80b4f5dcc936ee6df21bdeb02f9e7f88a745becb4440381b7ded37e1b5
+    retrieved: 2026-06-21
 ---
 
 Web application testing requires covering multiple distinct layers: component behavior, server rendering correctness, end-to-end user flows, visual appearance, accessibility compliance, and performance budgets. Each layer catches different classes of bugs and has different cost/value characteristics. The correct strategy invests heavily in component and integration tests (fast feedback, high coverage), uses E2E tests for critical user journeys (slow but comprehensive), and enforces visual and performance budgets in CI (catches regressions before users do).
