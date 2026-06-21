@@ -72,8 +72,9 @@ your coding agent, not to the `antigravity` review channel.
 
 `mmr review` reviews a *diff* for defects and gates by severity. Its peer
 `mmr critique` reviews a *design* — a design doc, a pasted "problem + proposed
-solution", or a plan — and is **advisory**: no severity, no pass/fail gate,
-always exits 0. Reach for it to get independent models to weigh an approach
+solution", or a plan — and is **advisory**: no severity and no pass/fail gate,
+so a critique never blocks (only a usage error like a missing input file exits
+non-zero). Reach for it to get independent models to weigh an approach
 *before* building it.
 
 ```bash

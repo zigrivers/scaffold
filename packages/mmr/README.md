@@ -9,7 +9,8 @@ A multi-model **second-opinion engine** with two peer commands sharing one core
   scoring; gates on configurable severity thresholds.
 - **`mmr critique`** — multi-model **design/brainstorm critique** of an artifact
   (a design doc, a pasted "problem + proposed solution", or a plan). **Advisory**
-  — no severity, no pass/fail gate, always exits 0. Reports **convergence**
+  — no severity and no pass/fail gate, so a critique never blocks (only a usage
+  error like a missing input file exits non-zero). Reports **convergence**
   (where independent models agreed), **divergence** (genuine splits + the
   deciding crux), and an editorial **synthesis** that never picks a winner.
   Supports repo grounding (`--context repo`), iterative rounds (`--session`),
