@@ -24,6 +24,7 @@ export interface CommandSpec {
 
 export const COMMAND_MANIFEST: ReadonlyArray<CommandSpec> = [
   { command: 'review', summary: 'Dispatch a multi-model review of a diff/PR and gate on severity', example: 'mmr review --pr 47 --sync', writes: true },
+  { command: 'critique [input]', summary: 'Multi-model design/brainstorm critique of an artifact — advisory, no gate', example: 'mmr critique design.md', writes: true },
   { command: 'status <job-id>', summary: 'Per-channel status + elapsed for a review job', example: 'mmr status job_abc', writes: false },
   { command: 'results <job-id>', summary: 'Re-run parse → reconcile → format on a completed job', example: 'mmr results job_abc --format text', writes: false },
   { command: 'reconcile <job-id>', summary: 'Inject an external channel\'s findings into a job', example: 'mmr reconcile job_abc --channel superpowers --input findings.json', writes: true },
