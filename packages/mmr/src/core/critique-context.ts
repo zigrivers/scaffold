@@ -31,20 +31,24 @@ const TREE_WALK_CAP = TREE_CAP * 4
 
 // Never read secret/credential files into the prompt — they'd be sent to every
 // channel. A filename denylist (gitignore isn't necessarily present/parsed).
-const SECRET_BASENAMES = new Set([
-  '.npmrc', '.netrc', '.git-credentials', '.pgpass', '.htpasswd',
-  'id_rsa', 'id_dsa', 'id_ecdsa', 'id_ed25519', 'credentials',
-])
+// All matching is case-insensitive and token-aware (so `credentials.json` and
+// `aws-credentials` match, not just an exact `credentials`).
 const SECRET_EXT = /\.(pem|key|pfx|p12|keystore|jks|asc|ppk)$/i
+const SECRET_NAME_RE = new RegExp([
+  '(^\\.env)',                                            // .env, .env.local, .env.production
+  '(^\\.(npmrc|netrc|pgpass|htpasswd|git-credentials)$)', // dotfile credential stores
+  '(^id_(rsa|dsa|ecdsa|ed25519))',                        // ssh private keys
+  '((^|[._-])(secrets?|credentials?|passwd|password|token|apikey|api[._-]?key)([._-]|$))',
+].join('|'), 'i')
 
 function baseName(rel: string): string {
   return rel.split(/[/\\]/).pop() ?? ''
 }
 
-/** True for env files, private keys, and credential stores. */
+/** True for env files, private keys, and credential/secret-named files. */
 function isSensitiveFile(rel: string): boolean {
-  const base = baseName(rel)
-  return base.startsWith('.env') || SECRET_BASENAMES.has(base) || SECRET_EXT.test(base)
+  const base = baseName(rel).toLowerCase()
+  return SECRET_EXT.test(base) || SECRET_NAME_RE.test(base)
 }
 
 /** True if any path segment names an ignored directory. */
@@ -148,7 +152,10 @@ export function buildRepoContext(opts: BuildContextOpts): RepoContext {
 
   const tree = walkTree(cwd).slice(0, TREE_CAP)
   let treeBlock = `## Repository tree\n\`\`\`\n${tree.join('\n')}\n\`\`\``
-  if (treeBlock.length > budget) treeBlock = `${treeBlock.slice(0, Math.max(0, budget))}\n_(tree truncated)_`
+  const TREE_TRUNC = '\n_(tree truncated)_'
+  if (treeBlock.length > budget) {
+    treeBlock = treeBlock.slice(0, Math.max(0, budget - TREE_TRUNC.length)) + TREE_TRUNC
+  }
   const parts: string[] = [treeBlock]
   let size = treeBlock.length
   const used: string[] = []

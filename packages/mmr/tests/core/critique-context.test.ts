@@ -90,6 +90,25 @@ describe('buildRepoContext', () => {
     expect(out.context).not.toContain('.env.local')
   })
 
+  it('excludes credential files with extensions, case-insensitively', () => {
+    const cwd = repo({
+      'credentials.json': 'TOP-SECRET-CREDS',
+      '.ENV': 'UPPER-ENV-SECRET',
+      'google-credentials.json': 'GOOG-SECRET',
+      'src/PasswordValidator.ts': 'legit source code',
+    })
+    const out = buildRepoContext({
+      cwd,
+      explicitPaths: ['credentials.json', '.ENV', 'google-credentials.json', 'src/PasswordValidator.ts'],
+      artifact: 'd',
+    })
+    expect(out.context).not.toContain('TOP-SECRET-CREDS')
+    expect(out.context).not.toContain('UPPER-ENV-SECRET')
+    expect(out.context).not.toContain('GOOG-SECRET')
+    // a legit source file whose name merely contains "Password" is NOT excluded
+    expect(out.used).toContain('src/PasswordValidator.ts')
+  })
+
   it('caps total output to the budget', () => {
     const big = 'x'.repeat(5000)
     const cwd = repo({ 'README.md': big, 'package.json': '{"name":"d"}', 'src/a.ts': big })
