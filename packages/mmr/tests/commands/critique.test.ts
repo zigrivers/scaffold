@@ -82,7 +82,7 @@ describe('mmr critique (dry-run)', () => {
     fs.writeFileSync(artifact, '# D\nPoll every 30s.')
     const { critiqueCommand } = await import('../../src/commands/critique.js')
     await critiqueCommand.handler({
-      input: artifact, 'dry-run': true, trustProjectConfig: true, lenses: ['skeptic'],
+      input: artifact, 'dry-run': true, trustProjectConfig: true, lenses: 'skeptic',
       _: ['critique'], $0: 'mmr',
     } as never)
     const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n')
@@ -134,9 +134,17 @@ describe('mmr critique (yargs parsing)', () => {
     expect(args.synthesis).toBe(true)
   })
 
-  it('parses --lenses and --session', async () => {
-    const args = await parse(['critique', 'design.md', '--lenses', 'skeptic', 'simplifier', '--session', 's1'])
-    expect(args.lenses).toEqual(['skeptic', 'simplifier'])
+  it('parses --lenses (comma string) and --session', async () => {
+    const args = await parse(['critique', 'design.md', '--lenses', 'skeptic,simplifier', '--session', 's1'])
+    expect(args.lenses).toBe('skeptic,simplifier')
     expect(args.session).toBe('s1')
+  })
+
+  it('does not let --lenses swallow the positional input (greedy-array footgun)', async () => {
+    // The whole point of the comma-string form: `--lenses skeptic design.md`
+    // keeps design.md as the positional input instead of a second lens.
+    const args = await parse(['critique', '--lenses', 'skeptic', 'design.md'])
+    expect(args.lenses).toBe('skeptic')
+    expect(args.input).toBe('design.md')
   })
 })

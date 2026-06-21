@@ -33,9 +33,9 @@ interface CritiqueArgs {
   'dry-run'?: boolean
   synthesis?: boolean
   context?: string
-  'context-paths'?: string[]
+  'context-paths'?: string
   session?: string
-  lenses?: string[]
+  lenses?: string
   configBaseRef?: string
   trustProjectConfig?: boolean
 }
@@ -131,16 +131,16 @@ export const critiqueCommand: CommandModule<object, CritiqueArgs> = {
         describe: 'Ground the critique in the codebase (repo) so models judge fit; default none',
       })
       .option('context-paths', {
-        type: 'array', string: true,
-        describe: 'Specific repo files to ground against (implies --context repo; highest priority)',
+        type: 'string',
+        describe: 'Comma-separated repo files to ground against (implies --context repo; highest priority)',
       })
       .option('session', {
         type: 'string',
         describe: 'Iterative session id — round N sees the prior round and your revisions (D7)',
       })
       .option('lenses', {
-        type: 'array', string: true,
-        describe: 'Persona lenses, one per channel (skeptic, simplifier, …); relabels output (D5)',
+        type: 'string',
+        describe: 'Comma-separated persona lenses, one per channel (skeptic,simplifier,…); relabels output (D5)',
       })
       .option('config-base-ref', {
         type: 'string',
@@ -197,6 +197,8 @@ export const critiqueCommand: CommandModule<object, CritiqueArgs> = {
     // Repo grounding (D3): explicit paths or --context repo. The SAME context
     // goes to every channel (independence). Built once, before assembly.
     const contextPaths = args['context-paths']
+      ? args['context-paths'].split(',').map((s) => s.trim()).filter(Boolean)
+      : undefined
     const wantContext = args.context === 'repo' || (contextPaths?.length ?? 0) > 0
     let repoContext: string | undefined
     let contextUsed: string[] | undefined
@@ -215,7 +217,7 @@ export const critiqueCommand: CommandModule<object, CritiqueArgs> = {
 
     // Persona lenses (D5): one per channel, cycled. An empty list keeps the
     // single shared prompt (independence) used by Phases 1–3.
-    const lenses = (args.lenses ?? []).flatMap((l) => l.split(',')).map((s) => s.trim()).filter(Boolean)
+    const lenses = (args.lenses ? args.lenses.split(',') : []).map((s) => s.trim()).filter(Boolean)
     const lensByChannel = new Map<string, string>()
     if (lenses.length > 0) {
       const assigned = assignLenses(lenses, channelNames.length)
