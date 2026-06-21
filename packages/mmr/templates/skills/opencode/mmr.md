@@ -1,0 +1,171 @@
+---
+name: mmr
+description: "Run multi-model code review with the MMR CLI (`mmr review`) before merging or finishing a change, or a multi-model design critique (`mmr critique`) of a design doc, plan, or proposed approach before building it. Use when the user asks to review code, a PR, a diff, or staged changes, or to critique/second-opinion a design or approach."
+topics:
+  - code review
+  - multi-model review
+  - review gate
+  - design critique
+  - mmr
+---
+
+# mmr — Multi-Model Review
+
+Dispatch code reviews across several AI model CLIs (Claude, Codex, Grok,
+Antigravity), reconcile the findings, and gate on severity. Its peer
+`mmr critique` does the same fan-out for a *design* and is advisory (no gate).
+
+## Run a review
+
+Pick the input mode that matches the target. Pass `--sync --format json` to get
+reconciled findings back in a single call:
+
+```bash
+# GitHub PR (fetches the diff via `gh pr diff`)
+mmr review --pr <number> --focus "what to focus on" --sync --format json
+
+# Staged changes (pre-commit)
+mmr review --staged --sync --format json
+
+# All tracked uncommitted changes (excludes untracked files)
+git diff HEAD | mmr review --diff - --sync --format json
+
+# Branch / ref range
+mmr review --base main --head <branch> --sync --format json
+
+# A specific file's current contents (tracked-no-changes, untracked, or new)
+(diff -u /dev/null path/to/file.ts || true) | mmr review --diff - --sync --format json
+```
+
+The `--diff` flag expects diff-format content (a `.patch`/`.diff` path, or `-`
+for stdin). It does not read raw file content — wrap the target in a diff first.
+The `|| true` guard is required because `diff` exits 1 when files differ, which
+breaks pipelines under `set -o pipefail`.
+
+## Severity gate
+
+The verdict blocks on findings at or above `fix_threshold` (default `P2`; lower
+severities are advisory). Override per run with `--fix-threshold P0|P1|P2|P3`.
+Proceed only on `pass` or `degraded-pass`; fix blocking findings on `blocked`.
+
+## Async flow (without `--sync`)
+
+`mmr review …` prints a job id → `mmr status <job-id>` until complete →
+`mmr results <job-id> --format markdown`.
+
+## Avoid the nested self-review
+
+`mmr review` includes a channel for the very CLI you are running — `codex` when
+you are in Codex, `antigravity` (`agy`) when you are in Antigravity — plus every
+other installed CLI. Scope out the channel you are already running to avoid a
+redundant nested review (the `--channels` flag is a space-separated list, not a
+comma-separated string):
+
+```bash
+# From Codex:
+mmr review --pr <number> --channels claude grok antigravity --sync --format json
+# From Antigravity (agy):
+mmr review --pr <number> --channels codex claude grok --sync --format json
+# or set channels_disabled: ["codex"] / ["antigravity"] in .mmr.yaml
+```
+
+## Design critique (`mmr critique`)
+
+`mmr review` reviews a *diff* for defects and gates by severity. Its peer
+`mmr critique` reviews a *design* — a design doc, a pasted "problem + proposed
+solution", or a plan — and is **advisory**: no severity and no pass/fail gate,
+so a critique never blocks (only a usage error like a missing input file exits
+non-zero). Reach for it to get independent models to weigh an approach
+*before* building it.
+
+```bash
+mmr critique design.md --format json                 # critique a design doc
+mmr critique - --focus scaling                       # critique stdin, focused
+mmr critique design.md --context repo                # ground it in the codebase
+mmr critique design.md --session redesign            # iterate across rounds
+mmr critique design.md --lenses skeptic,simplifier   # one persona per channel
+```
+
+It reports **convergence** (where independent models agreed), **divergence**
+(genuine splits + the deciding crux — it never picks a winner), and an editorial
+**synthesis**. It is **advisory only** — never a merge gate.
+
+## Auth
+
+If a channel reports an auth failure, follow the recovery line in the output
+(`claude login`, `codex login`, `grok login`, `agy -p 'hello'`), then re-run
+`mmr config test` to verify.
+
+## Common workflows
+
+**After creating a PR** — run `mmr review --pr <number>`, note the job id, keep
+working, poll `mmr status <job-id>` until channels complete, collect with
+`mmr results <job-id>`, then fix findings at or above the threshold (or merge if
+the gate passed).
+
+**Reviewing a document or arbitrary file** — for *pending edits* to a tracked
+file: `git diff HEAD -- path/to/doc.md | mmr review --diff - --focus "..."`
+(fails with "no diff content" if the file is unchanged). For the *current
+contents* of any file (tracked-no-changes, untracked, or brand-new), wrap it as
+a synthetic "all added" diff:
+`(diff -u /dev/null path/to/doc.md || true) | mmr review --diff - --focus "..."`.
+
+Prefer the wrapper tools (`scaffold run review-pr`, `scaffold run review-code`)
+when they cover your target — they add auth checks, compensating passes, and the
+agent-review channel on top of `mmr review`. Call `mmr review` directly for
+targets the wrappers don't cover (docs, arbitrary diffs, ref ranges).
+
+## Jobs, sessions, and findings
+
+```bash
+mmr jobs list                          # recent review/critique jobs (also: prune)
+mmr status <job-id>                    # one job's per-channel progress
+mmr results <job-id> --format json     # reconciled findings (also text | markdown)
+mmr ack add <finding-key> --job <id>   # acknowledge a finding (also: list, rm, prune)
+mmr reconcile <job-id> --channel superpowers --input findings.json
+mmr sessions list                      # iterative sessions (also: start | show | end)
+```
+
+`mmr review --session <id> --max-rounds N` bounds an iterative review across fix
+rounds (manage them with `mmr sessions`); `mmr reconcile` injects an external
+channel's findings (e.g. an agent reviewer) into an existing job so they
+reconcile with the CLI channels.
+
+## Configuring channels
+
+Turn channels on/off and inspect config without hand-editing YAML:
+
+```bash
+mmr config channels --format text          # table with a SOURCE (provenance) column
+mmr config disable grok                     # channels.grok.enabled: false (prints revert)
+mmr config enable grok                      # turn it back on
+mmr config set defaults.fix_threshold P1    # set any dotted value (validated)
+mmr config unset defaults.fix_threshold     # remove an override
+mmr config path                             # where config is read from / written to
+mmr doctor                                  # diagnose every channel (install + auth)
+mmr doctor --fix                            # disable channels whose CLI isn't installed
+```
+
+`disable`/`enable` default to the project `./.mmr.yaml`; disabling a channel
+whose CLI isn't installed records to the global `~/.mmr/config.yaml` instead
+(pass `--project` to scope it to the repo). A channel whose CLI is **not
+installed** is a *structural* absence — the review no longer runs a wasteful
+compensating pass for it by default; re-enable with `--compensate-missing` or
+mark the channel `required: true`. Transient failures (auth expired) are still
+compensated automatically.
+
+## Discovering the surface
+
+To learn the whole command surface in one call (instead of probing `--help`),
+run `mmr commands --json` — a machine-readable manifest of every command with a
+runnable example and a `writes` flag. For a concept, `mmr explain <topic>`
+prints inline docs (`channels`, `config`, `scopes`, `compensation`,
+`provenance`, …); `mmr explain` with no topic lists the topics.
+
+## Output formats
+
+```bash
+mmr results <job-id>                    # JSON (default)
+mmr results <job-id> --format text      # human-readable terminal output
+mmr results <job-id> --format markdown  # for PR comments
+```

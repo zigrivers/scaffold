@@ -6,7 +6,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const TEMPLATES_ROOT = resolve(__dirname, '../../templates/skills')
 
 /** Platforms that can host an installable MMR review skill. */
-export const SKILL_PLATFORMS = ['cursor', 'codex', 'antigravity'] as const
+export const SKILL_PLATFORMS = ['cursor', 'codex', 'antigravity', 'opencode'] as const
 export type SkillPlatform = (typeof SKILL_PLATFORMS)[number]
 
 /** Delimiters for the idempotent managed block in shared instruction files. */
@@ -28,6 +28,8 @@ interface PlatformSpec {
 /**
  * Codex and Antigravity both follow the `AGENTS.md` standard, so they resolve to the
  * same target and body. Cursor has its own convention (.cursor/rules/*.mdc).
+ * OpenCode auto-discovers full Agent Skills under `.opencode/skills/<name>/SKILL.md`
+ * (the dir name must match the skill's `name:` — here `mmr`).
  */
 export const PLATFORM_SPECS: Record<SkillPlatform, PlatformSpec> = {
   cursor: {
@@ -44,6 +46,11 @@ export const PLATFORM_SPECS: Record<SkillPlatform, PlatformSpec> = {
     targetRelPath: 'AGENTS.md',
     mode: 'block',
     templateFile: join('agents', 'mmr-review.md'),
+  },
+  opencode: {
+    targetRelPath: join('.opencode', 'skills', 'mmr', 'SKILL.md'),
+    mode: 'file',
+    templateFile: join('opencode', 'mmr.md'),
   },
 }
 

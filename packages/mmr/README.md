@@ -109,6 +109,7 @@ in the native convention of whichever agent CLI you run:
 | `cursor` | `.cursor/rules/mmr-review.mdc` | dedicated Cursor rule file |
 | `codex` | `AGENTS.md` | idempotent managed block |
 | `antigravity` | `AGENTS.md` | idempotent managed block |
+| `opencode` | `.opencode/skills/mmr/SKILL.md` | full Agent Skill (auto-discovered) |
 
 ```bash
 mmr skill install --platform cursor        # one platform
