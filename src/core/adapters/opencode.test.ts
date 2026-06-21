@@ -39,12 +39,12 @@ describe('OpenCodeAdapter', () => {
     expect(adapter.initialize(makeContext())).toEqual({ success: true, errors: [] })
   })
 
-  it('writes a command file under .opencode/commands/scaffold/', () => {
+  it('writes a flat scaffold-prefixed command file under .opencode/commands/', () => {
     adapter.initialize(makeContext())
     const out = adapter.generateStepWrapper(makeStepInput())
     expect(out.success).toBe(true)
     expect(out.files).toHaveLength(1)
-    expect(out.files[0].relativePath).toBe('.opencode/commands/scaffold/define-goals.md')
+    expect(out.files[0].relativePath).toBe('.opencode/commands/scaffold-define-goals.md')
     expect(out.files[0].writeMode).toBe('create')
   })
 
@@ -71,7 +71,7 @@ describe('OpenCodeAdapter', () => {
     adapter.initialize(makeContext())
     const { content } = adapter.generateStepWrapper(makeStepInput({ dependsOn: ['design-arch'] })).files[0]
     expect(content).toContain('## After This Step')
-    expect(content).toContain('`design-arch`')
+    expect(content).toContain('`/scaffold-design-arch`')
   })
 
   it('finalize() returns no extra files', () => {

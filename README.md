@@ -1797,7 +1797,7 @@ src/
 - **Assembly engine** (`src/core/assembly/engine.ts`) — Pure orchestrator with no I/O. Constructs 7-section prompts from meta-prompt + knowledge + context + methodology + instructions + depth guidance.
 - **State manager** (`src/state/state-manager.ts`) — Atomic writes via tmp + `fs.renameSync()`. Tracks step status, in-progress records, and next-eligible cache. Includes migration system for step renames and retired steps.
 - **Dependency graph** (`src/core/dependency/`) — Kahn's algorithm topological sort with phase-aware ordering and cycle detection.
-- **Platform adapters** (`src/core/adapters/`) — 3-step lifecycle (initialize → generateStepWrapper → finalize) producing `.scaffold/generated/claude-code/commands/`, `.scaffold/generated/codex/AGENTS.md`, OpenCode custom commands under `.opencode/commands/scaffold/`, and `.scaffold/generated/universal/prompts/README.md`. Skills install separately to `.claude/skills/` and `.agents/skills/`.
+- **Platform adapters** (`src/core/adapters/`) — 3-step lifecycle (initialize → generateStepWrapper → finalize) producing `.scaffold/generated/claude-code/commands/`, `.scaffold/generated/codex/AGENTS.md`, OpenCode custom commands (`.opencode/commands/scaffold-<slug>.md`), and `.scaffold/generated/universal/prompts/README.md`. Skills install separately to `.claude/skills/` and `.agents/skills/`.
 - **Project detector** (`src/project/detector.ts`) — Scans for file system signals to classify projects as greenfield, brownfield, or v1-migration.
 - **Check command** (`src/cli/commands/check.ts`) — Applicability detection for conditional steps (platform detection, GitHub remote detection, CLI availability).
 

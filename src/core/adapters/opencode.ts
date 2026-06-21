@@ -11,8 +11,11 @@ import { renderGapSignalTail } from '../assembly/gap-signal-tail.js'
 
 /**
  * Generates OpenCode custom commands. OpenCode auto-discovers markdown files
- * under `.opencode/commands/` and runs each as a prompt when invoked. The
- * `$ARGUMENTS` placeholder injects whatever the user passes after the command.
+ * under `.opencode/commands/` and runs each as a prompt when invoked. Files are
+ * written FLAT with a `scaffold-` prefix (`scaffold-<slug>.md`) so each is
+ * invoked as the documented `/scaffold-<slug>` — OpenCode documents flat-file
+ * commands (`test.md` → `/test`) but not an invocation for nested subdirectories.
+ * The `$ARGUMENTS` placeholder injects whatever the user passes after the command.
  */
 export class OpenCodeAdapter implements PlatformAdapter {
   readonly platformId = 'opencode'
@@ -42,7 +45,7 @@ User request: $ARGUMENTS
     return {
       slug,
       platformId: this.platformId,
-      files: [{ relativePath: `.opencode/commands/scaffold/${slug}.md`, content, writeMode: 'create' }],
+      files: [{ relativePath: `.opencode/commands/scaffold-${slug}.md`, content, writeMode: 'create' }],
       success: true,
     }
   }
@@ -68,13 +71,13 @@ function buildKnowledgeSection(
 /**
  * Build the After This Step section from forward dependencies. `dependsOn` here
  * is the set of DOWNSTREAM steps (build.ts populates it from forwardDeps), so
- * these are what comes next. Referenced by plain step slug rather than a
- * slash-command form, since OpenCode does not document an invocation syntax for
- * commands nested in a subdirectory.
+ * these are what comes next. Each is referenced by its actual OpenCode command
+ * invocation (`/scaffold-<slug>`), matching the flat command files this adapter
+ * writes.
  */
 function buildAfterThisStep(dependsOn: string[]): string {
   if (dependsOn.length === 0) return ''
 
-  const nextSteps = dependsOn.map((d) => `\`${d}\``).join(', ')
-  return `\n\n---\n\n## After This Step\n\nContinue with the ${nextSteps} step(s).`
+  const nextSteps = dependsOn.map((d) => `\`/scaffold-${d}\``).join(', ')
+  return `\n\n---\n\n## After This Step\n\nContinue with: ${nextSteps}`
 }
