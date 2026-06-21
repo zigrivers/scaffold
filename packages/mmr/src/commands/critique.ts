@@ -87,13 +87,16 @@ function buildReport(
   dispatched: number,
   completed: number,
   elapsedS: number,
+  lensed = false,
 ): CritiqueReport {
-  const consensus = items.filter((i) => i.agreement === 'consensus').length
+  const agreed = items.filter((i) => i.agreement !== 'unique').length
   const unique = items.filter((i) => i.agreement === 'unique').length
+  // Under lenses, multi-model overlap is not independent "consensus" (D5).
+  const agreedLabel = lensed ? 'multi-lens' : 'consensus'
   const summary = dispatched === 0 || completed === 0
     ? 'No channels were available to run the critique — check `mmr doctor`.'
     : `${items.length} item(s) across ${completed} of ${dispatched} channel(s) — ` +
-      `${consensus} consensus, ${unique} single-model`
+      `${agreed} ${agreedLabel}, ${unique} single-model`
   return {
     kind: 'design-critique',
     job_id: jobId,
@@ -370,7 +373,7 @@ export const critiqueCommand: CommandModule<object, CritiqueArgs> = {
     const synth = await synthesizeCritique(items, runner)
 
     const report = buildReport(job.job_id, source, items, perChannel, valid.length, completed,
-      Math.round((Date.now() - started) / 1000))
+      Math.round((Date.now() - started) / 1000), lenses.length > 0)
     if (contextUsed && contextUsed.length > 0) report.context_used = contextUsed
     if (lenses.length > 0) report.lenses = lenses
     if (synth.splits.length > 0) report.splits = synth.splits

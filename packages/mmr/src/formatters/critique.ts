@@ -52,7 +52,8 @@ export function formatCritiqueText(report: CritiqueReport): string {
   const channelCount = Object.keys(report.per_channel).length
   const roundTag = report.round ? ` · round ${report.round}` : ''
   const lensTag = lensed ? ` · lenses: ${report.lenses!.join(', ')}` : ''
-  out.push(`CRITIQUE · ${report.artifact_source} · ${channelCount} channels${roundTag}${lensTag} · advisory (no gate)`)
+  const header = `CRITIQUE · ${report.artifact_source} · ${channelCount} channels${roundTag}${lensTag}`
+  out.push(`${header} · advisory (no gate)`)
   out.push('')
 
   const converged = report.items.filter((i) => i.agreement !== 'unique')
