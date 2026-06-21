@@ -5,10 +5,12 @@
  */
 export const EXPLAIN_TOPICS: Record<string, string> = {
   channels: `Channels are the AI model CLIs (or HTTP endpoints) a review dispatches to.
-Built-ins: claude, codex, antigravity, grok, gemini (deprecated). Each is enabled
-or disabled, has a command (subprocess) or endpoint (http), an auth check, and an
-output parser. List them with \`mmr config channels --format text\`; inspect one
-with \`mmr config show <name>\`; toggle with \`mmr config enable|disable <name>\`.`,
+Built-ins: claude, codex, antigravity, grok. Each is enabled or disabled, has a
+command (subprocess) or endpoint (http), an auth check, and an output parser. List
+them with \`mmr config channels --format text\`; inspect one with \`mmr config show
+<name>\`; toggle with \`mmr config enable|disable <name>\`. (The gemini channel is
+retired — its CLI is sunset; use antigravity. It is kept only as a disabled
+tombstone so old configs load, is never dispatched, and cannot be re-enabled.)`,
 
   config: `Config is layered, later wins: built-in defaults → ~/.mmr/config.yaml (global)
 → ./.mmr.yaml (project) → CLI flags. Objects deep-merge; arrays replace.
