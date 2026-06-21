@@ -70,7 +70,8 @@ export function assembleCritiquePrompt(options: AssembleCritiquePromptOptions): 
   // Prior-round ledger: the artifact below is a REVISION; assess each prior point.
   if (priorRound && priorRound.items.length > 0) {
     const ledger = priorRound.items
-      .map((i) => `- [${i.id}] (${i.kind} · ${i.theme}): ${i.observation}`)
+      // Collapse newlines so a multi-line observation can't break the list item.
+      .map((i) => `- [${i.id}] (${i.kind} · ${i.theme}): ${i.observation.replace(/\s*\n\s*/g, ' ')}`)
       .join('\n')
     layers.push(
       `## Previously raised (round ${priorRound.round})\n` +

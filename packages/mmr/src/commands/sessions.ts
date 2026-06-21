@@ -2,17 +2,11 @@ import type { CommandModule, ArgumentsCamelCase } from 'yargs'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { SESSION_ID_RULE, isValidSessionId } from '../core/session-id.js'
 
-const SESSION_ID_RE = /^[a-zA-Z0-9_-]+$/
-const WINDOWS_RESERVED_ID_RE = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i
-const SYSTEM_SESSION_ID_RE = /^(index|__proto__)$/i
-/**
- * Human-readable description of the session-id rules, shared by every
- * validation error message so the CLI surfaces one consistent explanation
- * (the bare regex plus the reserved-name rejections).
- */
-export const SESSION_ID_RULE =
-  '^[a-zA-Z0-9_-]+$ and not a reserved name (con, prn, aux, nul, com1-9, lpt1-9, index, __proto__)'
+// Re-exported for back-compat: existing imports of these from this module still work.
+export { SESSION_ID_RULE, isValidSessionId } from '../core/session-id.js'
+
 const LOCK_TIMEOUT_MS = 5000
 const LOCK_POLL_MS = 25
 
@@ -207,16 +201,6 @@ export class SessionStore {
       })
     })
   }
-}
-
-/**
- * Validates a session id against the same rules SessionStore enforces:
- * the allowed-character regex plus Windows-reserved and system-reserved names
- * that would otherwise pass the bare regex. Exported so callers (e.g. the
- * review command) can reject invalid ids up front, before any side effects.
- */
-export function isValidSessionId(id: string): boolean {
-  return SESSION_ID_RE.test(id) && !WINDOWS_RESERVED_ID_RE.test(id) && !SYSTEM_SESSION_ID_RE.test(id)
 }
 
 /**

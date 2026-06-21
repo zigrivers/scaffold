@@ -384,6 +384,10 @@ export const critiqueCommand: CommandModule<object, CritiqueArgs> = {
     if (args.session && sessionStore) {
       report.session_id = args.session
       report.round = roundNumber
+    }
+    // Only persist a round that actually produced a critique — a transient
+    // all-channels-failed run must not pollute the session ledger or advance it.
+    if (args.session && sessionStore && completed > 0) {
       // Append this round's items as the bounded ledger for the next round.
       sessionStore.append(args.session, {
         round: roundNumber,

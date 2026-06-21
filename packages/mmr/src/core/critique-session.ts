@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { isValidSessionId, SESSION_ID_RULE } from '../commands/sessions.js'
+import { isValidSessionId, SESSION_ID_RULE } from './session-id.js'
 import type { CritiqueKind } from '../types/critique.js'
 
 /** A single item carried in the iteration ledger (bounded — no shingles/sources). */

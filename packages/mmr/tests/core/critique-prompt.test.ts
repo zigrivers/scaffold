@@ -57,6 +57,15 @@ describe('assembleCritiquePrompt', () => {
     expect(prompt.indexOf('C-001')).toBeLessThan(prompt.indexOf('REVISED-DESIGN'))
   })
 
+  it('collapses newlines in a prior-round observation so the list stays intact', () => {
+    const prompt = assembleCritiquePrompt({
+      artifact: 'a',
+      priorRound: { round: 1, items: [{ id: 'C-001', kind: 'concern', theme: 't', observation: 'line one\nline two' }] },
+    })
+    expect(prompt).toContain('line one line two')
+    expect(prompt).not.toContain('line one\nline two')
+  })
+
   it('applies a prompt wrapper', () => {
     const prompt = assembleCritiquePrompt({ artifact: 'a', promptWrapper: 'BEGIN {{prompt}} END' })
     expect(prompt.startsWith('BEGIN ')).toBe(true)
