@@ -27,7 +27,7 @@ interface PlatformSpec {
 
 /**
  * Codex and Antigravity both follow the `AGENTS.md` standard, so they resolve to the
- * same target and body. Cursor and Gemini each have their own convention.
+ * same target and body. Cursor has its own convention (.cursor/rules/*.mdc).
  */
 export const PLATFORM_SPECS: Record<SkillPlatform, PlatformSpec> = {
   cursor: {

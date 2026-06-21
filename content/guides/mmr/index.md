@@ -308,9 +308,9 @@ add orchestration on top.
 | `scaffold run post-implementation-review` | Full codebase | Two phases — systemic review + per-story functional review via parallel agents — with its own report under `docs/reviews/`. (See its own doc for the exact channel layout.) |
 
 :::callout{type=warning}
-**Foreground only.** The wrappers' manual fallback runs Codex, Gemini, Claude,
-and Grok as foreground Bash calls when the `mmr` CLI isn't available — never in
-the background. Background execution produces empty output.
+**Foreground only.** The wrappers' manual fallback runs Codex, Claude, Grok,
+and Antigravity as foreground Bash calls when the `mmr` CLI isn't available — never
+in the background. Background execution produces empty output.
 :::
 
 ## Findings, reconciliation & verdicts
@@ -412,9 +412,9 @@ recover and, for *transient* degradation, compensates.
 | Channel | Auth check | Recovery |
 | --- | --- | --- |
 | `codex` | `codex login status` | `codex login` |
-| `gemini` | `gemini -p "respond with ok"` | `gemini -p "hello"` |
 | `claude` | `claude -p "respond with ok"` | `claude login` |
 | `grok` | `grok models` | `grok login` |
+| `antigravity` (`agy`) | `agy -p "respond with ok"` | `agy -p "hello"` |
 
 ## Configuration (`.mmr.yaml`)
 

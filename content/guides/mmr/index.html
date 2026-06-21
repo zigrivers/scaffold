@@ -1769,9 +1769,9 @@ add orchestration on top.</p>
 
 
 <table><thead><tr><th>Wrapper</th><th>Target</th><th>Adds on top of <code>mmr review</code></th></tr></thead><tbody><tr><td><code>scaffold run review-pr</code></td><td>A PR (<code>--pr</code>)</td><td>Auth checks, the Superpowers code-reviewer <em>agent</em> channel via <code>mmr reconcile</code>, consensus/verdict handling, the 3-strike-per-finding round bookkeeping, optional Beads issue bridge.</td></tr><tr><td><code>scaffold run review-code</code></td><td>Local pre-push</td><td>Synthesizes a "delivery candidate" diff (committed + staged + unstaged), gathers file &#x26; standards context for the file-blind CLIs, then the same agent channel + round bounding. <em>Untracked files aren't covered.</em></td></tr><tr><td><code>scaffold run post-implementation-review</code></td><td>Full codebase</td><td>Two phases — systemic review + per-story functional review via parallel agents — with its own report under <code>docs/reviews/</code>. (See its own doc for the exact channel layout.)</td></tr></tbody></table>
-<div class="callout callout-warning"><p><strong>Foreground only.</strong> The wrappers' manual fallback runs Codex, Gemini, Claude,
-and Grok as foreground Bash calls when the <code>mmr</code> CLI isn't available — never in
-the background. Background execution produces empty output.</p></div>
+<div class="callout callout-warning"><p><strong>Foreground only.</strong> The wrappers' manual fallback runs Codex, Claude, Grok,
+and Antigravity as foreground Bash calls when the <code>mmr</code> CLI isn't available — never
+in the background. Background execution produces empty output.</p></div>
 <h2 id="findings-reconciliation-verdicts">Findings, reconciliation &#x26; verdicts</h2>
 <h3 id="the-finding-shape">The Finding shape</h3>
 <p>Every channel's output parses into this common shape
@@ -1937,7 +1937,7 @@ single-source, low confidence. The compensator channel is configurable via
 
 
 
-<table><thead><tr><th>Channel</th><th>Auth check</th><th>Recovery</th></tr></thead><tbody><tr><td><code>codex</code></td><td><code>codex login status</code></td><td><code>codex login</code></td></tr><tr><td><code>gemini</code></td><td><code>gemini -p "respond with ok"</code></td><td><code>gemini -p "hello"</code></td></tr><tr><td><code>claude</code></td><td><code>claude -p "respond with ok"</code></td><td><code>claude login</code></td></tr><tr><td><code>grok</code></td><td><code>grok models</code></td><td><code>grok login</code></td></tr></tbody></table>
+<table><thead><tr><th>Channel</th><th>Auth check</th><th>Recovery</th></tr></thead><tbody><tr><td><code>codex</code></td><td><code>codex login status</code></td><td><code>codex login</code></td></tr><tr><td><code>claude</code></td><td><code>claude -p "respond with ok"</code></td><td><code>claude login</code></td></tr><tr><td><code>grok</code></td><td><code>grok models</code></td><td><code>grok login</code></td></tr><tr><td><code>antigravity</code> (<code>agy</code>)</td><td><code>agy -p "respond with ok"</code></td><td><code>agy -p "hello"</code></td></tr></tbody></table>
 <h2 id="configuration-mmryaml">Configuration (<code>.mmr.yaml</code>)</h2>
 <p>Config is layered: built-in defaults → <code>~/.mmr/config.yaml</code> → project
 <code>.mmr.yaml</code> → CLI flags. Arrays replace; objects deep-merge.</p>

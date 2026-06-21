@@ -132,6 +132,11 @@ async function configTest(): Promise<void> {
   let allOk = true
 
   for (const [name, chConfig] of Object.entries(config.channels)) {
+    if (chConfig.retired) {
+      // Never probe a retired channel even if a legacy config re-enabled it.
+      results[name] = { installed: false, auth: 'retired' }
+      continue
+    }
     if (chConfig.abstract) {
       results[name] = { installed: false, auth: 'abstract' }
       continue
@@ -466,6 +471,10 @@ async function configToggle(channelArg: string | undefined, enabled: boolean, ar
   // command-less channel that then fails config validation on the next load.
   const before = loadConfig({ projectRoot: process.cwd() })
   const def = before.channels?.[channel]
+  if (def?.retired && enabled) {
+    console.error(`Channel '${channel}' is retired and cannot be enabled — use "antigravity" (agy).`)
+    return false
+  }
   if (!def) {
     const known = Object.keys(before.channels ?? {}).join(', ')
     console.error(`Unknown channel '${channelArg}'. Known channels: ${known}`)

@@ -28,6 +28,7 @@ const ICON: Record<ChannelHealth['status'], string> = {
   missing_command: '✗',
   disabled: '·',
   abstract: '·',
+  retired: '·',
 }
 
 function needsAttention(h: ChannelHealth, fixed: boolean): boolean {
@@ -47,7 +48,8 @@ async function runDoctor(args: DoctorArgs): Promise<void> {
   } else {
     const ready = health.filter((h) => h.status === 'ok').length
     const attention = health.filter((h) => needsAttention(h, false)).length
-    const off = health.filter((h) => h.status === 'disabled' || h.status === 'abstract').length
+    const off = health.filter((h) =>
+      h.status === 'disabled' || h.status === 'abstract' || h.status === 'retired').length
     console.log(`Channels: ${ready} ready · ${attention} need attention · ${off} off`)
     console.log('')
     for (const h of health) {

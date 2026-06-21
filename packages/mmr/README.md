@@ -119,7 +119,7 @@ mmr skill install --platform cursor --force # overwrite an existing dedicated fi
 
 Codex and Antigravity both follow the [`AGENTS.md`](https://agents.md) standard, so
 they share one managed block in `AGENTS.md`; installing either manages the same block.
-Block-mode targets (`GEMINI.md`, `AGENTS.md`) are updated in place between
+Block-mode targets (`AGENTS.md`) are updated in place between
 `<!-- BEGIN mmr-skill -->` / `<!-- END mmr-skill -->` delimiters, so re-running never
 disturbs your own content. Dedicated files (Cursor) are created fresh and require
 `--force` to overwrite. By default `mmr skill install` writes into the detected project
