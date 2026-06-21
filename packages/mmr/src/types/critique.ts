@@ -84,6 +84,8 @@ export interface CritiqueReport {
   artifact_source: string
   items: ReconciledCritiqueItem[]
   per_channel: Record<string, CritiqueChannelResult>
+  /** Repo files folded into the critique via --context repo (D3); absent when artifact-only. */
+  context_used?: string[]
   /** Genuine cross-model disagreements, surfaced first-class (D2). */
   splits?: CritiqueSplit[]
   /** Editorial synthesis prose (D6); absent when the synthesis pass is skipped. */

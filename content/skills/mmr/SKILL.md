@@ -162,11 +162,18 @@ points grouped by kind, and finally an **editorial SYNTHESIS** — a cited read
 of the critique that never picks a winner on a split. `--no-synthesis` skips the
 synthesis pass (faster; deterministic clustering only).
 
+By default the critique sees only the artifact. `--context repo` grounds it in
+the codebase (a structural skeleton: tree + manifests + README + the files the
+artifact references) so the models judge fit against your real system; the
+report discloses which files were used. `--context-paths a.ts b.ts` grounds
+against specific files instead (highest priority).
+
 ```bash
 mmr critique docs/design/notifications.md   # critique a design doc
 mmr critique - --focus scaling              # critique stdin, focused
 mmr critique plan.md --format json          # machine-readable report
 mmr critique design.md --no-synthesis       # skip the editorial synthesis pass
+mmr critique design.md --context repo       # ground the critique in the codebase
 ```
 
 `mmr doctor` is the one-shot health check: it classifies each channel and

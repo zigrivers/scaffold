@@ -31,6 +31,15 @@ describe('assembleCritiquePrompt', () => {
     expect(prompt).toContain('````') // a 4-backtick wrapping fence
   })
 
+  it('places repo context before the artifact when provided', () => {
+    const prompt = assembleCritiquePrompt({
+      artifact: 'THE-DESIGN-BODY', repoContext: 'REPO-CONTEXT-BLOB',
+    })
+    expect(prompt).toContain('Repository context')
+    expect(prompt).toContain('REPO-CONTEXT-BLOB')
+    expect(prompt.indexOf('REPO-CONTEXT-BLOB')).toBeLessThan(prompt.indexOf('THE-DESIGN-BODY'))
+  })
+
   it('applies a prompt wrapper', () => {
     const prompt = assembleCritiquePrompt({ artifact: 'a', promptWrapper: 'BEGIN {{prompt}} END' })
     expect(prompt.startsWith('BEGIN ')).toBe(true)

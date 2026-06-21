@@ -56,4 +56,18 @@ describe('mmr critique (dry-run)', () => {
     expect(out.toLowerCase()).toContain('design critique')
     expect(out).toContain('Poll a status table every 30 seconds')
   })
+
+  it('grounds the prompt in the repo with --context repo', async () => {
+    fs.writeFileSync(path.join(project, 'package.json'), '{"name":"ground-demo"}')
+    const artifact = path.join(project, 'design.md')
+    fs.writeFileSync(artifact, '# Notifications\nPoll every 30s.')
+    const { critiqueCommand } = await import('../../src/commands/critique.js')
+    await critiqueCommand.handler({
+      input: artifact, 'dry-run': true, trustProjectConfig: true, context: 'repo',
+      _: ['critique'], $0: 'mmr',
+    } as never)
+    const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n')
+    expect(out).toContain('Repository context')
+    expect(out).toContain('ground-demo') // package.json was folded in
+  })
 })
