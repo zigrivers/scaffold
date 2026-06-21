@@ -62,11 +62,22 @@ describe('formatCritiqueText (Phase 2 layout)', () => {
   })
 })
 
+describe('context disclosure', () => {
+  it('renders CONTEXT USED when context_used is set, omits it otherwise', () => {
+    expect(formatCritiqueText(report)).not.toContain('CONTEXT USED')
+    const grounded = { ...report, context_used: ['package.json', 'src/notify.ts'] }
+    const out = formatCritiqueText(grounded)
+    expect(out).toContain('CONTEXT USED')
+    expect(out).toContain('src/notify.ts')
+  })
+})
+
 describe('formatCritiqueJson', () => {
-  it('round-trips the report including splits + synthesis', () => {
-    const parsed = JSON.parse(formatCritiqueJson(report))
+  it('round-trips the report including splits + synthesis + context_used', () => {
+    const parsed = JSON.parse(formatCritiqueJson({ ...report, context_used: ['a.ts'] }))
     expect(parsed.splits).toHaveLength(1)
     expect(parsed.splits[0].crux).toMatch(/throughput/)
     expect(parsed.synthesis).toMatch(/C-001/)
+    expect(parsed.context_used).toEqual(['a.ts'])
   })
 })

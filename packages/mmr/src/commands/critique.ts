@@ -10,6 +10,7 @@ import { assembleCritiquePrompt } from '../core/critique-prompt.js'
 import { parseCritiqueOutput } from '../core/critique-parser.js'
 import { reconcileCritique } from '../core/critique-reconciler.js'
 import { synthesizeCritique, type SynthesisRunner } from '../core/critique-synthesis.js'
+import { buildRepoContext } from '../core/critique-context.js'
 import { formatCritiqueText, formatCritiqueJson } from '../formatters/critique.js'
 import { resolveCritiqueInput } from '../core/critique-input.js'
 import { resolveDispatchChannels } from './review.js'
@@ -29,6 +30,8 @@ interface CritiqueArgs {
   format?: string
   'dry-run'?: boolean
   'no-synthesis'?: boolean
+  context?: string
+  'context-paths'?: string[]
   configBaseRef?: string
   trustProjectConfig?: boolean
 }
@@ -113,6 +116,14 @@ export const critiqueCommand: CommandModule<object, CritiqueArgs> = {
         type: 'boolean', default: false,
         describe: 'Skip the editorial synthesis pass (faster; deterministic clustering only)',
       })
+      .option('context', {
+        type: 'string', choices: ['none', 'repo'], default: 'none',
+        describe: 'Ground the critique in the codebase (repo) so models judge fit; default none',
+      })
+      .option('context-paths', {
+        type: 'array', string: true,
+        describe: 'Specific repo files to ground against (implies --context repo; highest priority)',
+      })
       .option('config-base-ref', {
         type: 'string',
         describe: 'Load project .mmr.yaml from this trusted Git ref instead of the working tree',
@@ -164,7 +175,19 @@ export const critiqueCommand: CommandModule<object, CritiqueArgs> = {
     const disabled = new Set(config.channels_disabled ?? [])
     const explicit = args.channels?.map(normalizeChannelName)
     const channelNames = resolveDispatchChannels(config.channels, explicit, disabled)
-    const basePrompt = assembleCritiquePrompt({ artifact, focus: args.focus })
+
+    // Repo grounding (D3): explicit paths or --context repo. The SAME context
+    // goes to every channel (independence). Built once, before assembly.
+    const contextPaths = args['context-paths']
+    const wantContext = args.context === 'repo' || (contextPaths?.length ?? 0) > 0
+    let repoContext: string | undefined
+    let contextUsed: string[] | undefined
+    if (wantContext) {
+      const ctx = buildRepoContext({ cwd, explicitPaths: contextPaths, artifact })
+      repoContext = ctx.context
+      contextUsed = ctx.used
+    }
+    const basePrompt = assembleCritiquePrompt({ artifact, focus: args.focus, repoContext })
     const format = args.format === 'json' ? 'json' : 'text'
 
     // Dry-run is side-effect-free: assemble + print, no install/auth subprocesses.
@@ -214,6 +237,7 @@ export const critiqueCommand: CommandModule<object, CritiqueArgs> = {
       console.error('No channels passed auth — emitting an empty critique. Run `mmr doctor`.')
       const report = buildReport('none', source, [], perChannel, 0, 0,
         Math.round((Date.now() - started) / 1000))
+      if (contextUsed && contextUsed.length > 0) report.context_used = contextUsed
       console.log(format === 'json' ? formatCritiqueJson(report) : formatCritiqueText(report))
       return
     }
@@ -311,6 +335,7 @@ export const critiqueCommand: CommandModule<object, CritiqueArgs> = {
 
     const report = buildReport(job.job_id, source, items, perChannel, valid.length, completed,
       Math.round((Date.now() - started) / 1000))
+    if (contextUsed && contextUsed.length > 0) report.context_used = contextUsed
     if (synth.splits.length > 0) report.splits = synth.splits
     if (synth.synthesis) report.synthesis = synth.synthesis
     store.saveResults(job.job_id, report as unknown as never)

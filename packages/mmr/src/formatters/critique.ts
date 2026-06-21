@@ -77,6 +77,12 @@ export function formatCritiqueText(report: CritiqueReport): string {
     out.push('')
   }
 
+  if (report.context_used && report.context_used.length > 0) {
+    out.push('CONTEXT USED — repo files the models judged the design against')
+    out.push(`  ${report.context_used.join(', ')}`)
+    out.push('')
+  }
+
   out.push('CHANNELS')
   for (const [name, ch] of Object.entries(report.per_channel)) {
     const detail = ch.status === 'completed'

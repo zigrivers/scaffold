@@ -1,0 +1,162 @@
+import { afterEach, describe, expect, it } from 'vitest'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import { buildRepoContext } from '../../src/core/critique-context.js'
+
+const tmps: string[] = []
+function repo(files: Record<string, string>): string {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'crit-ctx-'))
+  tmps.push(dir)
+  for (const [rel, content] of Object.entries(files)) {
+    const full = path.join(dir, rel)
+    fs.mkdirSync(path.dirname(full), { recursive: true })
+    fs.writeFileSync(full, content)
+  }
+  return dir
+}
+afterEach(() => { for (const d of tmps.splice(0)) fs.rmSync(d, { recursive: true, force: true }) })
+
+describe('buildRepoContext', () => {
+  it('reads explicit paths and lists them in used', () => {
+    const cwd = repo({ 'src/app.ts': 'export const x = 1', 'README.md': '# hi' })
+    const out = buildRepoContext({ cwd, explicitPaths: ['src/app.ts'], artifact: 'design' })
+    expect(out.context).toContain('export const x = 1')
+    expect(out.used).toContain('src/app.ts')
+  })
+
+  it('refuses to read a path that escapes the repo root', () => {
+    const cwd = repo({ 'a.ts': 'inside' })
+    const out = buildRepoContext({ cwd, explicitPaths: ['../../../etc/passwd'], artifact: 'd' })
+    expect(out.used).not.toContain('../../../etc/passwd')
+    expect(out.context).not.toContain('root:')
+  })
+
+  it('skeleton pulls in manifests + README', () => {
+    const cwd = repo({ 'package.json': '{"name":"demo"}', 'README.md': '# Demo project', 'src/i.ts': 'x' })
+    const out = buildRepoContext({ cwd, artifact: 'a generic design with no path references' })
+    expect(out.used).toContain('package.json')
+    expect(out.used).toContain('README.md')
+    expect(out.context).toContain('demo')
+  })
+
+  it('pulls in files referenced by the artifact', () => {
+    const cwd = repo({ 'src/notify.ts': 'export function notify(){}', 'README.md': '#' })
+    const out = buildRepoContext({ cwd, artifact: 'The change touches src/notify.ts and adds a webhook.' })
+    expect(out.used).toContain('src/notify.ts')
+  })
+
+  it('includes a repo tree that excludes node_modules', () => {
+    const cwd = repo({ 'src/a.ts': 'x', 'node_modules/dep/index.js': 'junk', 'README.md': '#' })
+    const out = buildRepoContext({ cwd, artifact: 'd' })
+    expect(out.context).toMatch(/tree|structure/i)
+    expect(out.context).not.toContain('node_modules/dep')
+  })
+
+  it('refuses a repo-local symlink that points outside the repo', () => {
+    const secret = fs.mkdtempSync(path.join(os.tmpdir(), 'crit-secret-'))
+    tmps.push(secret)
+    fs.writeFileSync(path.join(secret, 'passwd'), 'SECRET-OUTSIDE-CONTENT')
+    const cwd = repo({ 'README.md': '#' })
+    fs.symlinkSync(path.join(secret, 'passwd'), path.join(cwd, 'link.txt'))
+    const out = buildRepoContext({ cwd, explicitPaths: ['link.txt'], artifact: 'd' })
+    expect(out.context).not.toContain('SECRET-OUTSIDE-CONTENT')
+    expect(out.used).not.toContain('link.txt')
+  })
+
+  it('does not fold in ignored dirs or duplicate paths via explicit paths', () => {
+    const cwd = repo({ 'node_modules/dep/i.js': 'junk', 'src/a.ts': 'real' })
+    const out = buildRepoContext({ cwd, explicitPaths: ['node_modules/dep/i.js', 'src/a.ts', 'src/a.ts'], artifact: 'd' })
+    expect(out.used).not.toContain('node_modules/dep/i.js')
+    expect(out.used.filter((u) => u === 'src/a.ts')).toHaveLength(1)
+  })
+
+  it('never folds in secret files (.env, keys) — even when explicitly requested', () => {
+    const cwd = repo({
+      '.env.local': 'API_KEY=sk-super-secret-value',
+      'private.pem': '-----BEGIN PRIVATE KEY-----',
+      'src/a.ts': 'real',
+    })
+    const out = buildRepoContext({
+      cwd, explicitPaths: ['.env.local', 'private.pem', 'src/a.ts'],
+      artifact: 'references .env.local for config',
+    })
+    expect(out.context).not.toContain('sk-super-secret-value')
+    expect(out.context).not.toContain('BEGIN PRIVATE KEY')
+    expect(out.used).not.toContain('.env.local')
+    expect(out.used).not.toContain('private.pem')
+    expect(out.used).toContain('src/a.ts')
+    // and the secret names don't even appear in the tree listing
+    expect(out.context).not.toContain('.env.local')
+  })
+
+  it('excludes credential files with extensions, case-insensitively', () => {
+    const cwd = repo({
+      'credentials.json': 'TOP-SECRET-CREDS',
+      '.ENV': 'UPPER-ENV-SECRET',
+      'google-credentials.json': 'GOOG-SECRET',
+      'src/PasswordValidator.ts': 'legit source code',
+    })
+    const out = buildRepoContext({
+      cwd,
+      explicitPaths: ['credentials.json', '.ENV', 'google-credentials.json', 'src/PasswordValidator.ts'],
+      artifact: 'd',
+    })
+    expect(out.context).not.toContain('TOP-SECRET-CREDS')
+    expect(out.context).not.toContain('UPPER-ENV-SECRET')
+    expect(out.context).not.toContain('GOOG-SECRET')
+    // a legit source file whose name merely contains "Password" is NOT excluded
+    expect(out.used).toContain('src/PasswordValidator.ts')
+  })
+
+  it('excludes env files named with a .env suffix (prod.env, local.env)', () => {
+    const cwd = repo({ 'prod.env': 'SUFFIX-ENV-SECRET', 'config/local.env': 'NESTED-ENV-SECRET', 'README.md': '#' })
+    const out = buildRepoContext({
+      cwd, explicitPaths: ['prod.env', 'config/local.env'], artifact: 'd',
+    })
+    expect(out.context).not.toContain('SUFFIX-ENV-SECRET')
+    expect(out.context).not.toContain('NESTED-ENV-SECRET')
+  })
+
+  it('excludes secret directories and bare key files', () => {
+    const cwd = repo({
+      'secrets/db.txt': 'DIR-SECRET-VALUE',
+      'config/keys.json': 'BARE-KEYS-SECRET',
+      'tokens.json': 'PLURAL-TOKEN-SECRET',
+      'src/keyboard.ts': 'legit keyboard code',
+    })
+    const out = buildRepoContext({
+      cwd,
+      explicitPaths: ['secrets/db.txt', 'config/keys.json', 'tokens.json', 'src/keyboard.ts'],
+      artifact: 'd',
+    })
+    expect(out.context).not.toContain('DIR-SECRET-VALUE')
+    expect(out.context).not.toContain('BARE-KEYS-SECRET')
+    expect(out.context).not.toContain('PLURAL-TOKEN-SECRET')
+    // 'keyboard' is not a key token — legit source stays
+    expect(out.used).toContain('src/keyboard.ts')
+  })
+
+  it('does not let an innocent-named symlink expose an in-repo secret', () => {
+    const cwd = repo({ '.env': 'API_KEY=sk-leak-via-symlink', 'README.md': '#' })
+    fs.symlinkSync(path.join(cwd, '.env'), path.join(cwd, 'innocent.json'))
+    const out = buildRepoContext({ cwd, explicitPaths: ['innocent.json'], artifact: 'd' })
+    expect(out.context).not.toContain('sk-leak-via-symlink')
+    expect(out.used).not.toContain('.env')
+  })
+
+  it('wraps a context file in a fence longer than any backticks inside it', () => {
+    const cwd = repo({ 'doc.md': 'intro\n```ts\nconst x = 1\n```\nend', 'README.md': '#' })
+    const out = buildRepoContext({ cwd, explicitPaths: ['doc.md'], artifact: 'd' })
+    expect(out.context).toContain('```ts')   // inner fence survives
+    expect(out.context).toContain('````')     // 4-backtick wrapping fence
+  })
+
+  it('caps total output to the budget', () => {
+    const big = 'x'.repeat(5000)
+    const cwd = repo({ 'README.md': big, 'package.json': '{"name":"d"}', 'src/a.ts': big })
+    const out = buildRepoContext({ cwd, artifact: 'd', budgetChars: 1500 })
+    expect(out.context.length).toBeLessThan(3000)
+    expect(out.context.toLowerCase()).toContain('truncat')
+  })
+})

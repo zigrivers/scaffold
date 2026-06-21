@@ -19,6 +19,8 @@ export interface AssembleCritiquePromptOptions {
   artifact: string
   /** Free-text focus areas for this critique. */
   focus?: string
+  /** Repository context blob (from --context repo) to ground the critique (D3). */
+  repoContext?: string
   /** Channel prompt wrapper with {{prompt}} placeholder. */
   promptWrapper?: string
 }
@@ -40,12 +42,18 @@ function fenceFor(artifact: string): string {
  * layering of `assemblePrompt` but with the design framing and no diff/severity.
  */
 export function assembleCritiquePrompt(options: AssembleCritiquePromptOptions): string {
-  const { artifact, focus, promptWrapper } = options
+  const { artifact, focus, repoContext, promptWrapper } = options
 
   const layers: string[] = [loadTemplate()]
 
   if (focus) {
     layers.push(`## Focus Areas\n${focus}`)
+  }
+
+  // Repo grounding goes before the artifact so the model reads the system first,
+  // then judges the proposed design against it (D3).
+  if (repoContext) {
+    layers.push(`## Repository context\nJudge the design's fit against this codebase.\n\n${repoContext}`)
   }
 
   const fence = fenceFor(artifact)
