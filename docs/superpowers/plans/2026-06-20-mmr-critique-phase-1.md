@@ -26,7 +26,7 @@
 - `CritiqueKind = 'concern' | 'alternative' | 'consideration' | 'open-question'`
 - `CritiqueItem { kind; theme; observation; recommendation? }`
 - `CritiqueAgreement = 'consensus' | 'majority' | 'unique'`
-- `ReconciledCritiqueItem extends CritiqueItem { id; sources: string[]; agreement; finding_key?; description_shingle? }`
+- `ReconciledCritiqueItem extends CritiqueItem { id; sources: string[]; agreement; observation_shingle? }` (shingle of the `observation`, named to match its source field)
 - `CritiqueChannelResult { status: ChannelStatus; item_count: number; summary?: string; recovery? }`
 - `CritiqueReport { kind: 'design-critique'; artifact_source; items: ReconciledCritiqueItem[]; per_channel; summary; metadata }`
 
@@ -71,7 +71,7 @@
 **Produces:** `resolveCritiqueInput(input: string | undefined): { artifact: string; source: string }`
 
 - [ ] **Step 1 (test first):** a temp file path → its contents + source=path; `-` → reads fd 0 (mock); missing/empty input → throws a clear usage error.
-- [ ] **Step 2:** Implement (file read; `-` → `fs.readFileSync(0)`; empty → Error). Green.
+- [ ] **Step 2:** Implement (file read; `-` → `fs.readFileSync(0, 'utf-8')` — encoding required so stdin returns a string, not a Buffer; empty → Error). Green.
 
 ### Task 6: Critique formatters (text + json)
 
@@ -88,9 +88,9 @@
 
 **Produces:** `critiqueCommand` (yargs module)
 
-- [ ] **Step 1 (test first — dry-run):** `--dry-run` with a temp artifact prints the assembled prompt + the channels that would dispatch, never spawns, exits 0.
-- [ ] **Step 2:** Implement the handler: resolve input → load config → `resolveDispatchChannels` → per-channel install/auth (reuse `checkInstalled`/`checkAuth`/`checkHttpAuth`, redact recovery) → if `--dry-run` print + return → create `JobStore` job → dispatch valid channels (mirror review's parallel/serial loop with `dispatchChannel`/`dispatchHttpChannel`, `buildChannelPrompt`) → read raw outputs (`JSON.parse(store.loadChannelOutput(...))`), `parseCritiqueOutput`, `reconcileCritique`, build `CritiqueReport` (per-channel statuses + counts; summary = counts for Phase 1) → format + print → **exit 0**.
-- [ ] **Step 3:** Builder options: positional `[input]`, `--focus`, `--channels`, `--timeout`, `--format text|json` (default text), `--dry-run`. Green.
+- [ ] **Step 1 (test first — dry-run):** `--dry-run` with a temp artifact prints the assembled prompt + the configured channels, **never spawns a subprocess** (not even install/auth probes), exits 0.
+- [ ] **Step 2:** Implement the handler: resolve input → classify trust + load config under the same trust policy as review (honor working-tree `.mmr.yaml` only from a trusted ref / `--trust-project-config`) → `resolveDispatchChannels` → assemble the critique prompt → **if `--dry-run`, print the critique prompt per channel (via a local `applyWrapper`, NOT review's `buildChannelPrompt`) and return — before any auth subprocess** → per-channel install/auth (reuse `checkInstalled`/`checkAuth`, redact recovery) → if no channel passes auth, emit an empty advisory report and **exit 0** (no gate) → else create `JobStore` job → dispatch valid channels (mirror review's parallel/serial loop with `dispatchChannel`/`dispatchHttpChannel`) → read raw outputs (`JSON.parse(store.loadChannelOutput(...))` to undo the store's `JSON.stringify`, guarded by try/catch), `parseCritiqueOutput` (which also unwraps the per-CLI envelopes), `reconcileCritique`, build `CritiqueReport` → format + print → **exit 0**.
+- [ ] **Step 3:** Builder options: positional `[input]`, `--focus`, `--channels`, `--timeout`, `--format text|json` (default **text**, independent of `config.defaults.format`), `--dry-run`, `--config-base-ref`, `--trust-project-config`. Green.
 
 ### Task 8: Register the command + manifest + drift
 

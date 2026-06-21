@@ -35,7 +35,7 @@ export interface ReconciledCritiqueItem extends CritiqueItem {
   sources: string[]
   agreement: CritiqueAgreement
   /** Char-5-gram set of the observation, for cross-round fuzzy match (Phase 4). */
-  description_shingle?: string[]
+  observation_shingle?: string[]
 }
 
 /** Per-channel outcome in a critique run. */

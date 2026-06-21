@@ -90,7 +90,7 @@ export function reconcileCritique(channelItems: Record<string, CritiqueItem[]>):
       id: '',
       sources: sources.sort(),
       agreement,
-      description_shingle: representative.shingle,
+      observation_shingle: representative.shingle,
     }
   })
 
