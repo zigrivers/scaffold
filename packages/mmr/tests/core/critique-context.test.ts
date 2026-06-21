@@ -71,6 +71,25 @@ describe('buildRepoContext', () => {
     expect(out.used.filter((u) => u === 'src/a.ts')).toHaveLength(1)
   })
 
+  it('never folds in secret files (.env, keys) — even when explicitly requested', () => {
+    const cwd = repo({
+      '.env.local': 'API_KEY=sk-super-secret-value',
+      'private.pem': '-----BEGIN PRIVATE KEY-----',
+      'src/a.ts': 'real',
+    })
+    const out = buildRepoContext({
+      cwd, explicitPaths: ['.env.local', 'private.pem', 'src/a.ts'],
+      artifact: 'references .env.local for config',
+    })
+    expect(out.context).not.toContain('sk-super-secret-value')
+    expect(out.context).not.toContain('BEGIN PRIVATE KEY')
+    expect(out.used).not.toContain('.env.local')
+    expect(out.used).not.toContain('private.pem')
+    expect(out.used).toContain('src/a.ts')
+    // and the secret names don't even appear in the tree listing
+    expect(out.context).not.toContain('.env.local')
+  })
+
   it('caps total output to the budget', () => {
     const big = 'x'.repeat(5000)
     const cwd = repo({ 'README.md': big, 'package.json': '{"name":"d"}', 'src/a.ts': big })

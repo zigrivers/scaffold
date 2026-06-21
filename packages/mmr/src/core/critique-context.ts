@@ -29,6 +29,24 @@ const MAX_FILE_BYTES = 64 * 1024
 const TREE_CAP = 200
 const TREE_WALK_CAP = TREE_CAP * 4
 
+// Never read secret/credential files into the prompt — they'd be sent to every
+// channel. A filename denylist (gitignore isn't necessarily present/parsed).
+const SECRET_BASENAMES = new Set([
+  '.npmrc', '.netrc', '.git-credentials', '.pgpass', '.htpasswd',
+  'id_rsa', 'id_dsa', 'id_ecdsa', 'id_ed25519', 'credentials',
+])
+const SECRET_EXT = /\.(pem|key|pfx|p12|keystore|jks|asc|ppk)$/i
+
+function baseName(rel: string): string {
+  return rel.split(/[/\\]/).pop() ?? ''
+}
+
+/** True for env files, private keys, and credential stores. */
+function isSensitiveFile(rel: string): boolean {
+  const base = baseName(rel)
+  return base.startsWith('.env') || SECRET_BASENAMES.has(base) || SECRET_EXT.test(base)
+}
+
 /** True if any path segment names an ignored directory. */
 function hasIgnoredSegment(rel: string): boolean {
   return rel.split(/[/\\]/).some((seg) => IGNORE_DIRS.has(seg))
@@ -71,7 +89,7 @@ function walkTree(cwd: string, maxDepth = 3): string[] {
       const full = path.join(dir, entry.name)
       // isDirectory()/isFile() are false for symlinks, so they're skipped here.
       if (entry.isDirectory()) walk(full, depth + 1)
-      else if (entry.isFile()) out.push(path.relative(cwd, full))
+      else if (entry.isFile() && !isSensitiveFile(entry.name)) out.push(path.relative(cwd, full))
     }
   }
   walk(cwd, 1)
@@ -145,7 +163,7 @@ export function buildRepoContext(opts: BuildContextOpts): RepoContext {
     const abs = resolveInside(cwd, rel)
     if (!abs) continue
     const display = path.relative(cwd, abs)             // always repo-relative (no absolute leak)
-    if (seen.has(display) || hasIgnoredSegment(display)) continue
+    if (seen.has(display) || hasIgnoredSegment(display) || isSensitiveFile(display)) continue
     const content = readTextFile(abs)
     if (content === null) continue
     const block = `### ${display}\n\`\`\`\n${content}\n\`\`\``
