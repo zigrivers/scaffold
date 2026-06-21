@@ -109,6 +109,25 @@ describe('buildRepoContext', () => {
     expect(out.used).toContain('src/PasswordValidator.ts')
   })
 
+  it('excludes secret directories and bare key files', () => {
+    const cwd = repo({
+      'secrets/db.txt': 'DIR-SECRET-VALUE',
+      'config/keys.json': 'BARE-KEYS-SECRET',
+      'tokens.json': 'PLURAL-TOKEN-SECRET',
+      'src/keyboard.ts': 'legit keyboard code',
+    })
+    const out = buildRepoContext({
+      cwd,
+      explicitPaths: ['secrets/db.txt', 'config/keys.json', 'tokens.json', 'src/keyboard.ts'],
+      artifact: 'd',
+    })
+    expect(out.context).not.toContain('DIR-SECRET-VALUE')
+    expect(out.context).not.toContain('BARE-KEYS-SECRET')
+    expect(out.context).not.toContain('PLURAL-TOKEN-SECRET')
+    // 'keyboard' is not a key token — legit source stays
+    expect(out.used).toContain('src/keyboard.ts')
+  })
+
   it('caps total output to the budget', () => {
     const big = 'x'.repeat(5000)
     const cwd = repo({ 'README.md': big, 'package.json': '{"name":"d"}', 'src/a.ts': big })

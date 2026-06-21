@@ -34,21 +34,24 @@ const TREE_WALK_CAP = TREE_CAP * 4
 // All matching is case-insensitive and token-aware (so `credentials.json` and
 // `aws-credentials` match, not just an exact `credentials`).
 const SECRET_EXT = /\.(pem|key|pfx|p12|keystore|jks|asc|ppk)$/i
+const SECRET_TOKENS = 'secrets?|credentials?|passwd|passwords?|tokens?|apikeys?|api[._-]?keys?|keys?'
 const SECRET_NAME_RE = new RegExp([
   '(^\\.env)',                                            // .env, .env.local, .env.production
   '(^\\.(npmrc|netrc|pgpass|htpasswd|git-credentials)$)', // dotfile credential stores
   '(^id_(rsa|dsa|ecdsa|ed25519))',                        // ssh private keys
-  '((^|[._-])(secrets?|credentials?|passwd|password|token|apikey|api[._-]?key)([._-]|$))',
+  `((^|[._-])(${SECRET_TOKENS})([._-]|$))`,               // secret/credential/key/token-named
 ].join('|'), 'i')
 
-function baseName(rel: string): string {
-  return rel.split(/[/\\]/).pop() ?? ''
-}
-
-/** True for env files, private keys, and credential/secret-named files. */
+/**
+ * True for env files, private keys, and credential/secret-named files OR
+ * directories — checks every path segment (a `secrets/` dir is sensitive even
+ * if the leaf file name isn't).
+ */
 function isSensitiveFile(rel: string): boolean {
-  const base = baseName(rel).toLowerCase()
-  return SECRET_EXT.test(base) || SECRET_NAME_RE.test(base)
+  const segs = rel.split(/[/\\]/).map((s) => s.toLowerCase())
+  const base = segs[segs.length - 1] ?? ''
+  if (SECRET_EXT.test(base)) return true
+  return segs.some((seg) => SECRET_NAME_RE.test(seg))
 }
 
 /** True if any path segment names an ignored directory. */
@@ -65,6 +68,9 @@ function resolveInside(cwd: string, rel: string): string | null {
   const abs = path.resolve(cwd, rel)
   const lexRel = path.relative(cwd, abs)
   if (lexRel === '' || lexRel.startsWith('..') || path.isAbsolute(lexRel)) return null
+  // Existence check first so the common non-existent-token case (referencedPaths
+  // extracts many file-like tokens) doesn't go through realpathSync's throw path.
+  if (!fs.existsSync(abs)) return null
   try {
     const realCwd = fs.realpathSync(cwd)
     const realAbs = fs.realpathSync(abs)
@@ -92,8 +98,11 @@ function walkTree(cwd: string, maxDepth = 3): string[] {
       if (IGNORE_DIRS.has(entry.name)) continue
       const full = path.join(dir, entry.name)
       // isDirectory()/isFile() are false for symlinks, so they're skipped here.
-      if (entry.isDirectory()) walk(full, depth + 1)
-      else if (entry.isFile() && !isSensitiveFile(entry.name)) out.push(path.relative(cwd, full))
+      if (entry.isDirectory()) {
+        if (!SECRET_NAME_RE.test(entry.name.toLowerCase())) walk(full, depth + 1)
+      } else if (entry.isFile() && !isSensitiveFile(entry.name)) {
+        out.push(path.relative(cwd, full))
+      }
     }
   }
   walk(cwd, 1)
