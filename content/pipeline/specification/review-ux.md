@@ -5,7 +5,7 @@ summary: "Verifies every user story has a flow, accessibility requirements are m
 phase: "specification"
 order: 860
 dependencies: [ux-spec]
-outputs: [docs/reviews/review-ux.md, docs/reviews/ux/review-summary.md, docs/reviews/ux/codex-review.json, docs/reviews/ux/gemini-review.json]
+outputs: [docs/reviews/review-ux.md, docs/reviews/ux/review-summary.md, docs/reviews/ux/codex-review.json, docs/reviews/ux/antigravity-review.json]
 conditional: "if-needed"
 reads: [api-contracts]
 knowledge-base: [review-methodology, review-ux-specification, multi-model-review-dispatch, review-step-template]
@@ -16,7 +16,7 @@ Review UX specification targeting UX-specific failure modes: user journey gaps,
 accessibility issues, incomplete interaction states, design system inconsistencies,
 and missing error states.
 
-At depth 4+, dispatches to external AI models (Codex, Gemini) for
+At depth 4+, dispatches to external AI models (Codex, Antigravity) for
 independent review validation.
 
 ## Inputs
@@ -29,7 +29,7 @@ independent review validation.
 - docs/ux-spec.md — updated with fixes
 - docs/reviews/ux/review-summary.md (depth 4+) — multi-model review synthesis
 - docs/reviews/ux/codex-review.json (depth 4+, if available) — raw Codex findings
-- docs/reviews/ux/gemini-review.json (depth 4+, if available) — raw Gemini findings
+- docs/reviews/ux/antigravity-review.json (depth 4+, if available) — raw Antigravity findings
 
 ## Quality Criteria
 - (mvp) User journey coverage verified against PRD
@@ -45,7 +45,7 @@ independent review validation.
 
 ## Methodology Scaling
 - **deep**: Full multi-pass review. Multi-model review dispatched to Codex and
-  Gemini if available, with graceful fallback to Claude-only enhanced review.
+  Antigravity if available, with graceful fallback to Claude-only enhanced review.
 - **mvp**: Journey coverage only.
 - **custom:depth(1-5)**:
   - Depth 1: Flow completeness and accessibility pass only (1 review pass)

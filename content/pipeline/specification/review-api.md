@@ -5,7 +5,7 @@ summary: "Checks that every domain operation has an endpoint, error responses in
 phase: "specification"
 order: 840
 dependencies: [api-contracts]
-outputs: [docs/reviews/review-api.md, docs/reviews/api/review-summary.md, docs/reviews/api/codex-review.json, docs/reviews/api/gemini-review.json]
+outputs: [docs/reviews/review-api.md, docs/reviews/api/review-summary.md, docs/reviews/api/codex-review.json, docs/reviews/api/antigravity-review.json]
 conditional: "if-needed"
 knowledge-base: [review-methodology, review-api-design, multi-model-review-dispatch, review-step-template]
 ---
@@ -15,7 +15,7 @@ Review API contracts targeting API-specific failure modes: operation coverage
 gaps, error contract incompleteness, auth/authz gaps, versioning inconsistencies,
 payload shape mismatches with domain entities, and idempotency gaps.
 
-At depth 4+, dispatches to external AI models (Codex, Gemini) for
+At depth 4+, dispatches to external AI models (Codex, Antigravity) for
 independent review validation.
 
 ## Inputs
@@ -29,7 +29,7 @@ independent review validation.
 - docs/api-contracts.md — updated with fixes
 - docs/reviews/api/review-summary.md (depth 4+) — multi-model review synthesis
 - docs/reviews/api/codex-review.json (depth 4+, if available) — raw Codex findings
-- docs/reviews/api/gemini-review.json (depth 4+, if available) — raw Gemini findings
+- docs/reviews/api/antigravity-review.json (depth 4+, if available) — raw Antigravity findings
 
 ## Quality Criteria
 - (mvp) Operation coverage against domain model verified
@@ -45,7 +45,7 @@ independent review validation.
 
 ## Methodology Scaling
 - **deep**: Full multi-pass review targeting all API failure modes. Multi-model
-  review dispatched to Codex and Gemini if available, with graceful fallback
+  review dispatched to Codex and Antigravity if available, with graceful fallback
   to Claude-only enhanced review.
 - **mvp**: Operation coverage check only.
 - **custom:depth(1-5)**:

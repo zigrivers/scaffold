@@ -5,7 +5,7 @@ summary: "Stress-tests the GDD through multiple review passes checking pillar co
 phase: "pre"
 order: 116
 dependencies: [game-design-document]
-outputs: [docs/reviews/pre-review-gdd.md, docs/reviews/gdd/review-summary.md, docs/reviews/gdd/codex-review.json, docs/reviews/gdd/gemini-review.json]
+outputs: [docs/reviews/pre-review-gdd.md, docs/reviews/gdd/review-summary.md, docs/reviews/gdd/codex-review.json, docs/reviews/gdd/antigravity-review.json]
 conditional: null
 reads: []
 knowledge-base: [review-methodology, review-game-design, review-step-template, multi-model-review-dispatch]
@@ -20,7 +20,7 @@ execute fixes, and re-validate. Ensures the GDD is implementable, internally
 consistent, and ready for downstream consumption by user stories, architecture,
 and art/audio specifications.
 
-At depth 4+, dispatches to external AI models (Codex, Gemini) for
+At depth 4+, dispatches to external AI models (Codex, Antigravity) for
 independent review validation.
 
 ## Inputs
@@ -33,7 +33,7 @@ independent review validation.
 - docs/game-design.md — updated with fixes
 - docs/reviews/gdd/review-summary.md (depth 4+) — multi-model review synthesis
 - docs/reviews/gdd/codex-review.json (depth 4+, if available) — raw Codex findings
-- docs/reviews/gdd/gemini-review.json (depth 4+, if available) — raw Gemini findings
+- docs/reviews/gdd/antigravity-review.json (depth 4+, if available) — raw Antigravity findings
 
 ## Quality Criteria
 - (mvp) Passes 1-2 executed with findings documented (Pillar Coherence, Core Loop Closure)
@@ -49,7 +49,7 @@ independent review validation.
   Loop Closure, Mechanic Ambiguity Detection, Progression Curve Feasibility,
   Scope vs Reality Check, Competitive Differentiation, Systems Interaction
   Audit). Full findings report with severity categorization. Fixes applied and
-  re-validated. Multi-model review dispatched to Codex and Gemini if available,
+  re-validated. Multi-model review dispatched to Codex and Antigravity if available,
   with graceful fallback to Claude-only enhanced review.
 - **mvp**: Passes 1-2 only (Pillar Coherence, Core Loop Closure). Focus on
   blocking gaps — pillars that do not constrain and loops that do not close.

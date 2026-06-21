@@ -19,7 +19,7 @@ hierarchies, missing controller navigation paths, inadequate settings coverage,
 ineffective FTUE design, incomplete UI state machines, and platform shell
 non-compliance.
 
-At depth 4+, dispatches to external AI models (Codex, Gemini) for
+At depth 4+, dispatches to external AI models (Codex, Antigravity) for
 independent review validation.
 
 ## Inputs
@@ -33,7 +33,7 @@ independent review validation.
 - docs/game-ui-spec.md — updated with fixes
 - docs/reviews/game-ui/review-summary.md (depth 4+) — multi-model review synthesis
 - docs/reviews/game-ui/codex-review.json (depth 4+, if available) — raw Codex findings
-- docs/reviews/game-ui/gemini-review.json (depth 4+, if available) — raw Gemini findings
+- docs/reviews/game-ui/antigravity-review.json (depth 4+, if available) — raw Antigravity findings
 
 ## Quality Criteria
 - (mvp) Every GDD mechanic with player-visible feedback has a corresponding HUD element or UI flow

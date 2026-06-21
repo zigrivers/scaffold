@@ -6,7 +6,7 @@ By the end, you'll have a fully planned, standards-documented, implementation-re
 
 ## What is Scaffold?
 
-Scaffold is a composable meta-prompt pipeline built for [Claude Code](https://docs.anthropic.com/en/docs/claude-code), Gemini, and other supported AI coding tools. If you have an idea for a software project but don't know where to start — or you want to make sure your project is set up with solid architecture, standards, and tests from day one — Scaffold guides you through every step.
+Scaffold is a composable meta-prompt pipeline built for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and other supported AI coding tools. If you have an idea for a software project but don't know where to start — or you want to make sure your project is set up with solid architecture, standards, and tests from day one — Scaffold guides you through every step.
 
 Here's how it works:
 
@@ -19,7 +19,7 @@ Here's how it works:
 You can run steps two ways:
 
 - **CLI**: `scaffold run create-prd` — the assembly engine builds a full prompt from the meta-prompt, knowledge base entries, and project context. Best for the structured pipeline with dependency tracking.
-- **Runner skill**: In Claude Code or Gemini, the scaffold-runner skill provides an interactive wrapper that surfaces decision points (depth level, strictness, optional sections) before execution instead of letting the AI pick defaults silently.
+- **Runner skill**: In Claude Code (or another agent host), the scaffold-runner skill provides an interactive wrapper that surfaces decision points (depth level, strictness, optional sections) before execution instead of letting the AI pick defaults silently.
 
 Either way, Scaffold constructs the prompt and the target AI tool does the work. The CLI tracks pipeline state and dependencies; the runner skill adds interactive decision surfacing on top.
 
@@ -145,8 +145,6 @@ This gives you:
 The plugin is optional — everything it does can also be done with `scaffold run <step>` from the CLI. But you lose the interactive decision surfacing without the Scaffold Runner skill.
 
 > **CLI-only users**: If you prefer not to install the plugin, skills are installed automatically — `scaffold init` sets them up, and any subsequent CLI command keeps them current after upgrades. No manual `scaffold skill install` needed.
-
-> **Gemini users**: `scaffold build` keeps a root `GEMINI.md` in sync with the shared runner instructions and generates `.gemini/commands/scaffold/*.toml` wrappers. Plain prompts like `scaffold status` work because Gemini loads `GEMINI.md`.
 
 ## Updating
 
@@ -370,7 +368,7 @@ Every `scaffold init` wizard question can be answered via CLI flags, making scaf
 |------|------|-------------|
 | `--methodology` | deep/mvp/custom | Methodology preset |
 | `--depth` | 1-5 | Custom methodology depth (requires `--methodology custom`) |
-| `--adapters` | comma-sep | AI adapters: claude-code, codex, gemini |
+| `--adapters` | comma-sep | AI adapters: claude-code, codex |
 | `--traits` | comma-sep | Project traits: web, mobile, desktop |
 | `--project-type` | string | web-app, mobile-app, backend, cli, library, game, data-pipeline, ml, browser-extension, research, data-science, web3, mcp-server, macos-native |
 | `--auto` | boolean | Non-interactive mode (uses Zod defaults for unset flags) |

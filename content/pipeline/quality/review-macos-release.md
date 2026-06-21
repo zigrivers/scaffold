@@ -5,7 +5,7 @@ summary: "Single gate over docs/macos-distribution.md and docs/macos-entitlement
 phase: "quality"
 order: 967
 dependencies: [macos-distribution-spec, macos-entitlements-privacy-spec]
-outputs: [docs/reviews/review-macos-release.md, docs/reviews/macos-release/review-summary.md, docs/reviews/macos-release/codex-review.json, docs/reviews/macos-release/gemini-review.json]
+outputs: [docs/reviews/review-macos-release.md, docs/reviews/macos-release/review-summary.md, docs/reviews/macos-release/codex-review.json, docs/reviews/macos-release/antigravity-review.json]
 conditional: null
 reads: [macos-distribution-spec, macos-entitlements-privacy-spec, system-architecture]
 knowledge-base: [macos-code-signing, macos-app-sandbox-entitlements]
@@ -21,7 +21,7 @@ in a Mac App Store build; an entitlements spec that declares network access but 
 distribution spec that omits the corresponding hardened runtime exception; a
 sandbox decision that conflicts with subprocess calls the architecture requires.
 
-At depth 4+, dispatches to external AI models (Codex, Gemini) for independent
+At depth 4+, dispatches to external AI models (Codex, Antigravity) for independent
 review validation.
 
 ## Inputs
@@ -37,7 +37,7 @@ review validation.
 - `docs/macos-entitlements-privacy.md` — updated with fixes
 - `docs/reviews/macos-release/review-summary.md` (depth 4+) — multi-model review synthesis
 - `docs/reviews/macos-release/codex-review.json` (depth 4+, if available) — raw Codex findings
-- `docs/reviews/macos-release/gemini-review.json` (depth 4+, if available) — raw Gemini findings
+- `docs/reviews/macos-release/antigravity-review.json` (depth 4+, if available) — raw Antigravity findings
 
 ## Quality Criteria
 
@@ -72,7 +72,7 @@ review validation.
 ## Methodology Scaling
 - **deep**: Full multi-pass review covering all four check areas (signing/notarization,
   sandbox/entitlements, privacy/TCC, config consistency). Multi-model review
-  dispatched to Codex and Gemini if available, with graceful fallback to
+  dispatched to Codex and Antigravity if available, with graceful fallback to
   Claude-only enhanced review. Cross-spec correlation matrix produced.
 - **mvp**: Config consistency check (Sparkle/MAS conflict, sandbox/channel match)
   and TCC string completeness only — the two highest-value catches for fast

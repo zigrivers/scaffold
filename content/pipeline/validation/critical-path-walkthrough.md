@@ -5,7 +5,7 @@ summary: "Walks the most important user journeys end-to-end across every spec la
 phase: "validation"
 order: 1340
 dependencies: [implementation-plan-review, review-security]
-outputs: [docs/validation/critical-path-walkthrough.md, docs/validation/critical-path-walkthrough/review-summary.md, docs/validation/critical-path-walkthrough/codex-review.json, docs/validation/critical-path-walkthrough/gemini-review.json]
+outputs: [docs/validation/critical-path-walkthrough.md, docs/validation/critical-path-walkthrough/review-summary.md, docs/validation/critical-path-walkthrough/codex-review.json, docs/validation/critical-path-walkthrough/antigravity-review.json]
 conditional: null
 knowledge-base: [critical-path-analysis, multi-model-review-dispatch]
 ---
@@ -17,7 +17,7 @@ architecture components, database operations, and implementation tasks.
 Use story acceptance criteria as the definition of "correct behavior" when
 verifying completeness and consistency at every layer.
 
-At depth 4+, dispatches to external AI models (Codex, Gemini) for
+At depth 4+, dispatches to external AI models (Codex, Antigravity) for
 independent journey walkthroughs — different models catch different
 spec gaps along the critical path.
 
@@ -29,7 +29,7 @@ spec gaps along the critical path.
 - docs/validation/critical-path-walkthrough.md — findings report
 - docs/validation/critical-path-walkthrough/review-summary.md (depth 4+) — multi-model validation synthesis
 - docs/validation/critical-path-walkthrough/codex-review.json (depth 4+, if available) — raw Codex findings
-- docs/validation/critical-path-walkthrough/gemini-review.json (depth 4+, if available) — raw Gemini findings
+- docs/validation/critical-path-walkthrough/antigravity-review.json (depth 4+, if available) — raw Antigravity findings
 
 ## Quality Criteria
 - (mvp) User specifies >= 3 Must-have epics as critical user journeys; each traced end-to-end
@@ -54,7 +54,7 @@ proceeding without acknowledgment.
 
 ## Methodology Scaling
 - **deep**: Exhaustive analysis with all sub-checks. Multi-model validation
-  dispatched to Codex and Gemini if available, with graceful fallback to
+  dispatched to Codex and Antigravity if available, with graceful fallback to
   Claude-only enhanced validation.
 - **mvp**: High-level scan for blocking issues only.
 - **custom:depth(1-5)**:

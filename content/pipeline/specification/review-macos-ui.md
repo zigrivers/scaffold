@@ -16,7 +16,7 @@ accessibility completeness, and keyboard/menu coverage. This step replaces
 `review-ux` for macOS-native projects. Web UX reviews check responsive breakpoints,
 touch targets, and WCAG contrast; macOS UI reviews audit against the Apple Human
 Interface Guidelines, platform accessibility APIs (VoiceOver, Dynamic Type, Reduce
-Motion), and the keyboard contract of a well-behaved Mac app. At depth 4+, dispatches to one external AI model (Codex or Gemini, if CLI
+Motion), and the keyboard contract of a well-behaved Mac app. At depth 4+, dispatches to one external AI model (Codex or Antigravity, if CLI
 available) for independent validation. At depth 5, a full multi-model review
 with reconciliation is dispatched.
 
@@ -63,7 +63,7 @@ modes:
 - `docs/macos-ui-spec.md` — updated with fixes for all P0/P1 findings
 - `docs/reviews/macos-ui/review-summary.md` (depth 4+) — multi-model review synthesis
 - `docs/reviews/macos-ui/codex-review.json` (depth 4+, if available) — raw Codex findings
-- `docs/reviews/macos-ui/gemini-review.json` (depth 4+, if available) — raw Gemini findings
+- `docs/reviews/macos-ui/antigravity-review.json` (depth 4+, if available) — raw Antigravity findings
 
 ## Quality Criteria
 - (mvp) App-style declaration reviewed: correct lifecycle implications stated for the chosen style (standard, menu-bar extra, or background agent)

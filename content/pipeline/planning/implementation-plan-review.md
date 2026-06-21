@@ -5,7 +5,7 @@ summary: "Verifies every feature has implementation tasks, no task is too large 
 phase: "planning"
 order: 1220
 dependencies: [implementation-plan]
-outputs: [docs/reviews/review-tasks.md, docs/reviews/implementation-plan/task-coverage.json, docs/reviews/implementation-plan/review-summary.md, docs/reviews/implementation-plan/codex-review.json, docs/reviews/implementation-plan/gemini-review.json]
+outputs: [docs/reviews/review-tasks.md, docs/reviews/implementation-plan/task-coverage.json, docs/reviews/implementation-plan/review-summary.md, docs/reviews/implementation-plan/codex-review.json, docs/reviews/implementation-plan/antigravity-review.json]
 conditional: null
 knowledge-base: [review-methodology, review-implementation-tasks, task-decomposition, multi-model-review-dispatch, review-step-template]
 ---
@@ -15,7 +15,7 @@ Review implementation tasks targeting task-specific failure modes: architecture
 coverage gaps, missing dependencies, tasks too large or too vague for agents,
 agent executability violations, critical path inaccuracy, and invalid
 parallelization assumptions. At depth 4+,
-dispatch to independent AI models (Codex/Gemini CLIs) for multi-model validation
+dispatch to independent AI models (Codex/Antigravity CLIs) for multi-model validation
 and produce a structured coverage matrix and review summary.
 
 ## Inputs
@@ -33,7 +33,7 @@ and produce a structured coverage matrix and review summary.
 - docs/reviews/implementation-plan/task-coverage.json — AC-to-task coverage matrix (depth 3+)
 - docs/reviews/implementation-plan/review-summary.md — multi-model review summary (depth 4+)
 - docs/reviews/implementation-plan/codex-review.json — raw Codex findings (depth 4+, if available)
-- docs/reviews/implementation-plan/gemini-review.json — raw Gemini findings (depth 4+, if available)
+- docs/reviews/implementation-plan/antigravity-review.json — raw Antigravity findings (depth 4+, if available)
 
 ## Quality Criteria
 - (deep) Architecture coverage verified (every component has tasks)
@@ -75,13 +75,13 @@ any plan that violates it:
 
 ## Methodology Scaling
 - **deep**: Full multi-pass review with multi-model validation. AC coverage
-  matrix. Independent Codex/Gemini dispatches. Detailed reconciliation report.
+  matrix. Independent Codex/Antigravity dispatches. Detailed reconciliation report.
 - **mvp**: Coverage check only. No external model dispatch.
 - **custom:depth(1-5)**:
   - Depth 1: architecture coverage check (every component has tasks).
   - Depth 2: coverage check plus DAG validation and agent executability rules.
   - Depth 3: add dependency analysis, AC coverage matrix, and task sizing audit.
-  - Depth 4: add one external model review (Codex or Gemini).
+  - Depth 4: add one external model review (Codex or Antigravity).
   - Depth 5: full multi-model review with reconciliation and detailed findings report.
 
 ## Mode Detection

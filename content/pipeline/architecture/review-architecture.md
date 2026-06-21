@@ -5,7 +5,7 @@ summary: "Verifies every domain concept lands in a component, every decision con
 phase: "architecture"
 order: 720
 dependencies: [system-architecture]
-outputs: [docs/reviews/review-architecture.md, docs/reviews/architecture/review-summary.md, docs/reviews/architecture/codex-review.json, docs/reviews/architecture/gemini-review.json]
+outputs: [docs/reviews/review-architecture.md, docs/reviews/architecture/review-summary.md, docs/reviews/architecture/codex-review.json, docs/reviews/architecture/antigravity-review.json]
 reads: [domain-modeling]
 conditional: null
 knowledge-base: [review-methodology, review-system-architecture, multi-model-review-dispatch, review-step-template]
@@ -17,7 +17,7 @@ failure modes: domain coverage gaps, ADR constraint violations, data flow
 orphans, module structure issues, state inconsistencies, diagram/prose drift,
 and downstream readiness.
 
-At depth 4+, dispatches to external AI models (Codex, Gemini) for
+At depth 4+, dispatches to external AI models (Codex, Antigravity) for
 independent review validation.
 
 ## Inputs
@@ -31,7 +31,7 @@ independent review validation.
 - docs/system-architecture.md — updated with fixes
 - docs/reviews/architecture/review-summary.md (depth 4+) — multi-model review synthesis
 - docs/reviews/architecture/codex-review.json (depth 4+, if available) — raw Codex findings
-- docs/reviews/architecture/gemini-review.json (depth 4+, if available) — raw Gemini findings
+- docs/reviews/architecture/antigravity-review.json (depth 4+, if available) — raw Antigravity findings
 
 ## Quality Criteria
 - (mvp) Domain model coverage verified (every model maps to a component)
@@ -48,7 +48,7 @@ independent review validation.
 - **deep**: All 10 review passes (coverage, constraints, data flows, module
   structure, state consistency, diagram integrity, extension points,
   invariants, downstream readiness, internal consistency). Multi-model
-  review dispatched to Codex and Gemini if available, with graceful fallback
+  review dispatched to Codex and Antigravity if available, with graceful fallback
   to Claude-only enhanced review.
 - **mvp**: Domain coverage and ADR compliance checks only.
 - **custom:depth(1-5)**:

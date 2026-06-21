@@ -5,7 +5,7 @@ summary: "Verifies the task dependency graph has no cycles (which would deadlock
 phase: "validation"
 order: 1360
 dependencies: [implementation-plan-review, review-security]
-outputs: [docs/validation/dependency-graph-validation.md, docs/validation/dependency-graph-validation/review-summary.md, docs/validation/dependency-graph-validation/codex-review.json, docs/validation/dependency-graph-validation/gemini-review.json]
+outputs: [docs/validation/dependency-graph-validation.md, docs/validation/dependency-graph-validation/review-summary.md, docs/validation/dependency-graph-validation/codex-review.json, docs/validation/dependency-graph-validation/antigravity-review.json]
 conditional: null
 knowledge-base: [dependency-validation, multi-model-review-dispatch]
 ---
@@ -16,7 +16,7 @@ Validate that the implementation task dependency graph forms a valid DAG,
 that all dependencies are satisfied before dependent tasks, and that no
 critical tasks are missing from the graph.
 
-At depth 4+, dispatches to external AI models (Codex, Gemini) for
+At depth 4+, dispatches to external AI models (Codex, Antigravity) for
 independent graph validation — different models catch different ordering
 and completeness issues.
 
@@ -28,7 +28,7 @@ and completeness issues.
 - docs/validation/dependency-graph-validation.md — findings report
 - docs/validation/dependency-graph-validation/review-summary.md (depth 4+) — multi-model validation synthesis
 - docs/validation/dependency-graph-validation/codex-review.json (depth 4+, if available) — raw Codex findings
-- docs/validation/dependency-graph-validation/gemini-review.json (depth 4+, if available) — raw Gemini findings
+- docs/validation/dependency-graph-validation/antigravity-review.json (depth 4+, if available) — raw Antigravity findings
 
 ## Quality Criteria
 - (mvp) Task dependency graph verified as acyclic (no circular dependencies)
@@ -54,7 +54,7 @@ proceeding without acknowledgment.
 
 ## Methodology Scaling
 - **deep**: Exhaustive analysis with all sub-checks. Multi-model validation
-  dispatched to Codex and Gemini if available, with graceful fallback to
+  dispatched to Codex and Antigravity if available, with graceful fallback to
   Claude-only enhanced validation.
 - **mvp**: High-level scan for blocking issues only.
 - **custom:depth(1-5)**:

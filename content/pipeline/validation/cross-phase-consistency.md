@@ -5,7 +5,7 @@ summary: "Traces every named concept (entities, fields, API endpoints) across al
 phase: "validation"
 order: 1310
 dependencies: [implementation-plan-review, review-security]
-outputs: [docs/validation/cross-phase-consistency.md, docs/validation/cross-phase-consistency/review-summary.md, docs/validation/cross-phase-consistency/codex-review.json, docs/validation/cross-phase-consistency/gemini-review.json]
+outputs: [docs/validation/cross-phase-consistency.md, docs/validation/cross-phase-consistency/review-summary.md, docs/validation/cross-phase-consistency/codex-review.json, docs/validation/cross-phase-consistency/antigravity-review.json]
 conditional: null
 knowledge-base: [cross-phase-consistency, multi-model-review-dispatch]
 ---
@@ -15,7 +15,7 @@ Audit naming, assumptions, data flows, interface contracts across all phases.
 Ensure consistent terminology, compatible assumptions, and aligned interfaces
 between every pair of phase artifacts.
 
-At depth 4+, dispatches to external AI models (Codex, Gemini) for
+At depth 4+, dispatches to external AI models (Codex, Antigravity) for
 independent consistency validation — different models catch different
 drift patterns.
 
@@ -27,7 +27,7 @@ drift patterns.
 - docs/validation/cross-phase-consistency.md — findings report
 - docs/validation/cross-phase-consistency/review-summary.md (depth 4+) — multi-model validation synthesis
 - docs/validation/cross-phase-consistency/codex-review.json (depth 4+, if available) — raw Codex findings
-- docs/validation/cross-phase-consistency/gemini-review.json (depth 4+, if available) — raw Gemini findings
+- docs/validation/cross-phase-consistency/antigravity-review.json (depth 4+, if available) — raw Antigravity findings
 
 ## Quality Criteria
 - (mvp) Entity names are consistent across domain models, database schema, and API contracts (zero mismatches)
@@ -52,7 +52,7 @@ proceeding without acknowledgment.
 
 ## Methodology Scaling
 - **deep**: Exhaustive analysis with all sub-checks. Multi-model validation
-  dispatched to Codex and Gemini if available, with graceful fallback to
+  dispatched to Codex and Antigravity if available, with graceful fallback to
   Claude-only enhanced validation.
 - **mvp**: High-level scan for blocking issues only.
 - **custom:depth(1-5)**:

@@ -1,7 +1,7 @@
 ---
 name: automated-pr-review
-description: "Agent-driven automated code review via MMR (Codex, Gemini, Claude CLIs + Superpowers as 4th channel in wrappers), for PRs and non-PR targets"
-summary: "Configures agent-driven automated code review: mandatory after `gh pr create` and also usable on any non-PR target. Direct `mmr review` runs three CLI channels (Codex, Gemini, Claude); `scaffold run review-pr` / `scaffold run review-code` add the Superpowers code-reviewer agent as a complementary 4th channel. An external GitHub App reviewer is supported as a fallback when CLIs are unavailable."
+description: "Agent-driven automated code review via MMR (Codex, Antigravity, Claude CLIs + Superpowers as 4th channel in wrappers), for PRs and non-PR targets"
+summary: "Configures agent-driven automated code review: mandatory after `gh pr create` and also usable on any non-PR target. Direct `mmr review` runs three CLI channels (Codex, Antigravity, Claude); `scaffold run review-pr` / `scaffold run review-code` add the Superpowers code-reviewer agent as a complementary 4th channel. An external GitHub App reviewer is supported as a fallback when CLIs are unavailable."
 phase: "environment"
 order: 340
 dependencies: [git-workflow]
@@ -13,14 +13,14 @@ knowledge-base: [review-methodology, automated-review-tooling]
 
 ## Purpose
 Configure an agent-driven automated code review system using local CLI
-reviewers dispatched through MMR (Codex, Gemini, Claude — runs all three when
+reviewers dispatched through MMR (Codex, Antigravity, Claude — runs all three when
 available) plus the Superpowers code-reviewer agent as a complementary 4th
 channel when using the MMR wrappers `scaffold run review-pr` and
 `scaffold run review-code`. The review is mandatory after `gh pr create` and
 also runs on non-PR targets (local staged/unstaged code, branch diffs,
 specific files) via the same `mmr review` CLI.
 `scaffold run post-implementation-review` is a separate full-codebase review
-(Codex CLI + Gemini CLI + Superpowers code-reviewer) that runs after an AI
+(Codex CLI + Antigravity CLI + Superpowers code-reviewer) that runs after an AI
 agent completes all implementation tasks; it does not currently use Claude
 CLI as a standard channel and is not an MMR wrapper, though it can inject
 findings into an existing MMR job via `mmr reconcile`.
@@ -37,7 +37,7 @@ review-fix loop locally.
 ## Expected Outputs
 - AGENTS.md — Reviewer instructions with project-specific rules
 - docs/review-standards.md — severity definitions (P0-P3) and review criteria
-- scripts/cli-pr-review.sh (legacy dual-model fallback) — Codex+Gemini review with manual reconciliation, used when MMR / `scaffold run review-pr` is unavailable
+- scripts/cli-pr-review.sh (legacy dual-model fallback) — Codex+Antigravity review with manual reconciliation, used when MMR / `scaffold run review-pr` is unavailable
 - scripts/await-pr-review.sh (external bot mode) — polling script with JSON output
 - docs/git-workflow.md updated with review loop integration
 - CLAUDE.md updated with agent-driven review workflow and review-pr hook
@@ -52,12 +52,12 @@ review-fix loop locally.
 - (mvp) No ANTHROPIC_API_KEY secret required
 - (mvp) Post-PR-creation hook configured in settings to remind agents to run review-pr
 - (deep) Legacy GitHub Actions workflows detected and cleanup offered
-- (deep) Three-CLI review (Codex, Gemini, Claude) enabled when all three CLIs available, with per-channel auth checks and compensating passes
-- (deep) The MMR scaffold wrappers (review-pr, review-code) add the Superpowers code-reviewer agent as a complementary 4th channel and reconcile its findings through MMR. `post-implementation-review` follows a separate channel layout (Codex + Gemini + Superpowers, with optional `mmr reconcile` injection) and is not one of the MMR wrappers.
+- (deep) Three-CLI review (Codex, Antigravity, Claude) enabled when all three CLIs available, with per-channel auth checks and compensating passes
+- (deep) The MMR scaffold wrappers (review-pr, review-code) add the Superpowers code-reviewer agent as a complementary 4th channel and reconcile its findings through MMR. `post-implementation-review` follows a separate channel layout (Codex + Antigravity + Superpowers, with optional `mmr reconcile` injection) and is not one of the MMR wrappers.
 
 ## Methodology Scaling
 - **deep**: Full setup with local three-CLI review dispatched through MMR
-  (Codex, Gemini, Claude), scaffold wrappers adding the Superpowers
+  (Codex, Antigravity, Claude), scaffold wrappers adding the Superpowers
   code-reviewer as a complementary 4th channel, review-standards.md,
   AGENTS.md, and comprehensive CLAUDE.md workflow covering PR and non-PR
   targets. Falls back to external bot review if no CLIs available.
@@ -65,7 +65,7 @@ review-fix loop locally.
 - **custom:depth(1-5)**:
   - Depth 1: disabled — local self-review from git-workflow suffices.
   - Depth 2: disabled — same as depth 1.
-  - Depth 3: basic review-standards.md + MMR dispatch using whichever CLIs are available (graceful compensating Claude passes for missing Codex or Gemini channels; if Claude CLI itself is unavailable, the review proceeds with the remaining channels — no compensating pass for missing Claude).
+  - Depth 3: basic review-standards.md + MMR dispatch using whichever CLIs are available (graceful compensating Claude passes for missing Codex or Antigravity channels; if Claude CLI itself is unavailable, the review proceeds with the remaining channels — no compensating pass for missing Claude).
   - Depth 4: three-CLI review via MMR when all CLIs available, plus AGENTS.md with project-specific rules and the Superpowers 4th channel on wrapper invocations.
   - Depth 5: full suite — three-CLI + Superpowers review, legacy GitHub Actions cleanup, comprehensive CLAUDE.md workflow integration covering PR and non-PR targets.
 
@@ -95,7 +95,7 @@ Check if AGENTS.md exists first. If it exists, check for scaffold tracking comme
 - **Conflict resolution**: if review criteria changed in coding-standards.md,
   update AGENTS.md review rules to match; if additional CLI reviewers have
   become available, offer to enable the full three-CLI MMR flow (Codex,
-  Gemini, Claude) and, on wrapper invocations, surface Superpowers
+  Antigravity, Claude) and, on wrapper invocations, surface Superpowers
   code-reviewer as the complementary 4th channel
 
 ## Instructions
@@ -130,7 +130,7 @@ Add this to `.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "if echo \"$CC_BASH_COMMAND\" | grep -q 'gh pr create'; then echo '\\n⚠️  MANDATORY: Run all 3 CLI review channels plus the Superpowers 4th channel before proceeding to the next task:\\n\\n  1. Codex CLI:\\n     Auth: codex login status 2>/dev/null\\n     Run:  codex exec --skip-git-repo-check -s read-only --ephemeral \"REVIEW_PROMPT\" 2>/dev/null\\n\\n  2. Gemini CLI:\\n     Auth: NO_BROWSER=true gemini -p \"respond with ok\" -o json 2>&1\\n     Run:  NO_BROWSER=true gemini -p \"REVIEW_PROMPT\" --output-format json --approval-mode yolo 2>/dev/null\\n\\n  3. Claude CLI:\\n     Auth: claude -p \"respond with ok\" 2>/dev/null\\n     Run:  claude -p \"REVIEW_PROMPT\" --output-format json 2>/dev/null\\n\\n  4. Superpowers code-reviewer (complementary 4th channel):\\n     Dispatch superpowers:code-reviewer subagent with BASE_SHA and HEAD_SHA\\n\\nIf auth fails: tell user to run ! codex login, ! gemini -p \"hello\", or ! claude login (as applicable).\\nDo not silently skip channels — surface auth failures and let MMR decide: missing Codex/Gemini get compensating Claude passes (degraded-pass verdict); missing Claude proceeds without compensation.\\nFix all findings at or above the configured fix_threshold (see results.fix_threshold in the verdict JSON; default P2).\\nFull instructions: scaffold run review-pr'; fi"
+            "command": "if echo \"$CC_BASH_COMMAND\" | grep -q 'gh pr create'; then echo '\\n⚠️  MANDATORY: Run all 3 CLI review channels plus the Superpowers 4th channel before proceeding to the next task:\\n\\n  1. Codex CLI:\\n     Auth: codex login status 2>/dev/null\\n     Run:  codex exec --skip-git-repo-check -s read-only --ephemeral \"REVIEW_PROMPT\" 2>/dev/null\\n\\n  2. Antigravity CLI:\\n     Auth: agy -p \"respond with ok\" 2>&1\\n     Run:  agy --print --sandbox --dangerously-skip-permissions \"REVIEW_PROMPT\" 2>/dev/null\\n\\n  3. Claude CLI:\\n     Auth: claude -p \"respond with ok\" 2>/dev/null\\n     Run:  claude -p \"REVIEW_PROMPT\" --output-format json 2>/dev/null\\n\\n  4. Superpowers code-reviewer (complementary 4th channel):\\n     Dispatch superpowers:code-reviewer subagent with BASE_SHA and HEAD_SHA\\n\\nIf auth fails: tell user to run ! codex login, ! agy -p \"hello\", or ! claude login (as applicable).\\nDo not silently skip channels — surface auth failures and let MMR decide: missing Codex/Antigravity get compensating Claude passes (degraded-pass verdict); missing Claude proceeds without compensation.\\nFix all findings at or above the configured fix_threshold (see results.fix_threshold in the verdict JSON; default P2).\\nFull instructions: scaffold run review-pr'; fi"
           }
         ]
       }
@@ -162,13 +162,13 @@ markers, replace it in place and add the markers.
 
 <!-- scaffold:automated-pr-review:claude-md start -->
 **Mandatory after `gh pr create`** — run `/scaffold:review-pr <PR#>` to execute
-all three review channels (Codex CLI, Gemini CLI, Claude CLI), plus the
+all three review channels (Codex CLI, Antigravity CLI, Claude CLI), plus the
 Superpowers code-reviewer agent as a complementary 4th channel. Fix findings
 at or above `fix_threshold` before moving to the next task. A post-hook on `gh pr create` will
 remind you.
 
 **Optional but supported** for non-PR targets — the review is not PR-gated.
-Direct `mmr review` runs the three CLI channels (Codex, Gemini, Claude) on
+Direct `mmr review` runs the three CLI channels (Codex, Antigravity, Claude) on
 any diff or file. `scaffold run review-code` adds the Superpowers
 code-reviewer agent as a complementary 4th channel on top of those three
 CLIs for the local pre-commit review path.

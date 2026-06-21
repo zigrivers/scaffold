@@ -7,7 +7,7 @@ The scaffold pipeline supports 5 depth levels that control the thoroughness of e
 | 1 | Minimal | Bare minimum viable output. Just enough to start building. |
 | 2 | Light | Slightly more detail than minimal. Still focused on speed over completeness. |
 | 3 | Balanced | Recommended for most projects. Good coverage without excessive documentation. |
-| 4 | Thorough | Comprehensive output with external model validation (Codex/Gemini) when available. |
+| 4 | Thorough | Comprehensive output with external model validation (Codex/Antigravity) when available. |
 | 5 | Exhaustive | Maximum detail with multi-model reconciliation. Best for critical or regulated projects. |
 
 ## Presets

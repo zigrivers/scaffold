@@ -24,7 +24,7 @@ can destroy an economy in hours, and rebalancing a live economy with real-money
 purchases has legal implications. This review catches these failures before
 implementation begins.
 
-At depth 4+, dispatches to external AI models (Codex, Gemini) for
+At depth 4+, dispatches to external AI models (Codex, Antigravity) for
 independent review validation.
 
 ## Conditional Evaluation
@@ -45,7 +45,7 @@ No economy design means no economy review.
 - docs/economy-design.md — updated with fixes
 - docs/reviews/economy/review-summary.md (depth 4+) — multi-model review synthesis
 - docs/reviews/economy/codex-review.json (depth 4+, if available) — raw Codex findings
-- docs/reviews/economy/gemini-review.json (depth 4+, if available) — raw Gemini findings
+- docs/reviews/economy/antigravity-review.json (depth 4+, if available) — raw Antigravity findings
 
 ## Quality Criteria
 - (mvp) Inflation/deflation trajectory verified: currency generation and removal rates produce a stable or managed economy over the player lifecycle
@@ -65,7 +65,7 @@ No economy design means no economy review.
 - **deep**: All 7 review passes (Inflation Trajectory, Exploit Vectors,
   Ethical Monetization, Pay-to-Win Detection, Legal Compliance,
   Earn Rate vs Engagement Projection, Sink Effectiveness Analysis).
-  Multi-model review dispatched to Codex and Gemini if available, with
+  Multi-model review dispatched to Codex and Antigravity if available, with
   graceful fallback to Claude-only enhanced review.
 - **mvp**: Three passes — Inflation Trajectory, Exploit Vectors, and Ethical
   Monetization only.

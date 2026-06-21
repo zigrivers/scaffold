@@ -17,7 +17,7 @@ failure modes: latency tolerance violations, bandwidth budget overruns, cheat
 surface exposure, determinism gaps in simulation, connection edge case omissions,
 and inconsistencies with the system architecture and performance budgets.
 
-At depth 4+, dispatches to external AI models (Codex, Gemini) for
+At depth 4+, dispatches to external AI models (Codex, Antigravity) for
 independent review validation.
 
 ## Conditional Evaluation
@@ -38,7 +38,7 @@ Skip when: netcode-spec is skipped (i.e., `multiplayerMode` is `none` or
 - docs/netcode-spec.md — updated with fixes
 - docs/reviews/netcode/review-summary.md (depth 4+) — multi-model review synthesis
 - docs/reviews/netcode/codex-review.json (depth 4+, if available) — raw Codex findings
-- docs/reviews/netcode/gemini-review.json (depth 4+, if available) — raw Gemini findings
+- docs/reviews/netcode/antigravity-review.json (depth 4+, if available) — raw Antigravity findings
 
 ## Quality Criteria
 - (mvp) Latency tolerance verified (prediction window covers target round-trip time)
@@ -56,7 +56,7 @@ Skip when: netcode-spec is skipped (i.e., `multiplayerMode` is `none` or
 - **deep**: All 7 review passes (Latency Tolerance, Bandwidth Compliance,
   Cheat Surface Audit, Determinism Verification, Disconnect/Reconnect Handling,
   Matchmaking Fairness Assessment, Bandwidth Spike Resilience). Multi-model
-  review dispatched to Codex and Gemini if available, with graceful fallback
+  review dispatched to Codex and Antigravity if available, with graceful fallback
   to Claude-only enhanced review.
 - **mvp**: Three passes — Latency Tolerance, Bandwidth Compliance, and Cheat
   Surface Audit only.
