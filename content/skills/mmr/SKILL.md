@@ -147,6 +147,21 @@ with a runnable example and a `writes` flag. For a concept, `mmr explain <topic>
 prints inline docs (`channels`, `config`, `scopes`, `compensation`, `redaction`,
 `provenance`); `mmr explain` with no topic lists them.
 
+## Design critique (`mmr critique`)
+
+`mmr review` reviews a diff for defects. `mmr critique` is its **peer** for
+*design* work: give it a design doc, a pasted "problem + proposed solution", or
+a plan, and it fans the artifact out to the same independent channels with a
+design-critique prompt (alternatives, missed considerations, tradeoffs, risks)
+and reports where the models **converge vs. diverge**. It is **advisory** — no
+severity, no pass/fail gate, always exits 0 — so it never blocks a merge.
+
+```bash
+mmr critique docs/design/notifications.md   # critique a design doc
+mmr critique - --focus scaling              # critique stdin, focused
+mmr critique plan.md --format json          # machine-readable report
+```
+
 `mmr doctor` is the one-shot health check: it classifies each channel and
 prints the exact fix. A channel whose CLI is **not installed** is treated as a
 *structural* absence — as of mmr 2.0.0 the review no longer runs a wasteful

@@ -11,13 +11,14 @@ import { ackCommand } from './commands/ack.js'
 import { skillCommand } from './commands/skill.js'
 import { commandsCommand } from './commands/commands.js'
 import { explainCommand } from './commands/explain.js'
+import { critiqueCommand } from './commands/critique.js'
 
 /**
  * Top-level command names registered below. Exported so the manifest-drift test
  * can assert every command appears in COMMAND_MANIFEST (no silent gaps).
  */
 export const REGISTERED_TOP_LEVEL = [
-  'review', 'status', 'results', 'config', 'doctor', 'jobs',
+  'review', 'critique', 'status', 'results', 'config', 'doctor', 'jobs',
   'reconcile', 'sessions', 'ack', 'skill', 'commands', 'explain',
 ] as const
 
@@ -26,6 +27,7 @@ export async function runCli(argv: string[]): Promise<void> {
     .scriptName('mmr')
     .usage('$0 <command> [options]')
     .command(reviewCommand)
+    .command(critiqueCommand)
     .command(statusCommand)
     .command(resultsCommand)
     .command(configCommand)
