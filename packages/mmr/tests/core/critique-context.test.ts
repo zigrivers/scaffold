@@ -53,6 +53,24 @@ describe('buildRepoContext', () => {
     expect(out.context).not.toContain('node_modules/dep')
   })
 
+  it('refuses a repo-local symlink that points outside the repo', () => {
+    const secret = fs.mkdtempSync(path.join(os.tmpdir(), 'crit-secret-'))
+    tmps.push(secret)
+    fs.writeFileSync(path.join(secret, 'passwd'), 'SECRET-OUTSIDE-CONTENT')
+    const cwd = repo({ 'README.md': '#' })
+    fs.symlinkSync(path.join(secret, 'passwd'), path.join(cwd, 'link.txt'))
+    const out = buildRepoContext({ cwd, explicitPaths: ['link.txt'], artifact: 'd' })
+    expect(out.context).not.toContain('SECRET-OUTSIDE-CONTENT')
+    expect(out.used).not.toContain('link.txt')
+  })
+
+  it('does not fold in ignored dirs or duplicate paths via explicit paths', () => {
+    const cwd = repo({ 'node_modules/dep/i.js': 'junk', 'src/a.ts': 'real' })
+    const out = buildRepoContext({ cwd, explicitPaths: ['node_modules/dep/i.js', 'src/a.ts', 'src/a.ts'], artifact: 'd' })
+    expect(out.used).not.toContain('node_modules/dep/i.js')
+    expect(out.used.filter((u) => u === 'src/a.ts')).toHaveLength(1)
+  })
+
   it('caps total output to the budget', () => {
     const big = 'x'.repeat(5000)
     const cwd = repo({ 'README.md': big, 'package.json': '{"name":"d"}', 'src/a.ts': big })

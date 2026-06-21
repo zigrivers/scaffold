@@ -18,26 +18,47 @@ export interface BuildContextOpts {
   budgetChars?: number
 }
 
-const IGNORE_DIRS = new Set(['.git', 'node_modules', 'dist', 'build', 'coverage', '.next', '.cache', '.turbo'])
+const IGNORE_DIRS = new Set([
+  '.git', 'node_modules', 'dist', 'build', 'coverage', '.next', '.cache', '.turbo',
+  'target', 'vendor', '.venv', 'venv', '__pycache__', '.tox', 'out', '.gradle',
+])
 const MANIFESTS = [
   'package.json', 'tsconfig.json', 'pyproject.toml', 'go.mod', 'Cargo.toml', 'requirements.txt', 'Gemfile', 'pom.xml',
 ]
 const MAX_FILE_BYTES = 64 * 1024
 const TREE_CAP = 200
+const TREE_WALK_CAP = TREE_CAP * 4
 
-/** Resolve a repo-relative path, returning null if it escapes the repo root. */
+/** True if any path segment names an ignored directory. */
+function hasIgnoredSegment(rel: string): boolean {
+  return rel.split(/[/\\]/).some((seg) => IGNORE_DIRS.has(seg))
+}
+
+/**
+ * Resolve a repo-relative path, returning null if it escapes the repo root —
+ * lexically AND after symlink resolution (a repo-local symlink can point
+ * outside). Non-existent paths resolve to null (nothing to read).
+ */
 function resolveInside(cwd: string, rel: string): string | null {
   const abs = path.resolve(cwd, rel)
-  const relCheck = path.relative(cwd, abs)
-  if (relCheck === '' || relCheck.startsWith('..') || path.isAbsolute(relCheck)) return null
+  const lexRel = path.relative(cwd, abs)
+  if (lexRel === '' || lexRel.startsWith('..') || path.isAbsolute(lexRel)) return null
+  try {
+    const realCwd = fs.realpathSync(cwd)
+    const realAbs = fs.realpathSync(abs)
+    const realRel = path.relative(realCwd, realAbs)
+    if (realRel.startsWith('..') || path.isAbsolute(realRel)) return null
+  } catch {
+    return null
+  }
   return abs
 }
 
-/** Shallow file list (depth ≤ maxDepth), skipping ignored dirs. */
+/** Shallow file list (depth ≤ maxDepth), skipping ignored + symlinked entries. */
 function walkTree(cwd: string, maxDepth = 3): string[] {
   const out: string[] = []
   const walk = (dir: string, depth: number): void => {
-    if (depth > maxDepth || out.length >= TREE_CAP * 4) return
+    if (depth > maxDepth) return
     let entries: fs.Dirent[]
     try {
       entries = fs.readdirSync(dir, { withFileTypes: true })
@@ -45,8 +66,10 @@ function walkTree(cwd: string, maxDepth = 3): string[] {
       return
     }
     for (const entry of entries) {
-      if (entry.name.startsWith('.git') || IGNORE_DIRS.has(entry.name)) continue
+      if (out.length >= TREE_WALK_CAP) return
+      if (IGNORE_DIRS.has(entry.name)) continue
       const full = path.join(dir, entry.name)
+      // isDirectory()/isFile() are false for symlinks, so they're skipped here.
       if (entry.isDirectory()) walk(full, depth + 1)
       else if (entry.isFile()) out.push(path.relative(cwd, full))
     }
@@ -71,14 +94,10 @@ function readTextFile(abs: string): string | null {
 /** Paths referenced in the artifact text that exist in the repo. */
 function referencedPaths(cwd: string, artifact: string): string[] {
   const matches = artifact.match(/[\w./-]+\.\w+/g) ?? []
-  const seen = new Set<string>()
   const out: string[] = []
   for (const m of matches) {
     const rel = m.replace(/^\.\//, '')
-    if (seen.has(rel)) continue
-    seen.add(rel)
-    const abs = resolveInside(cwd, rel)
-    if (abs && fs.existsSync(abs) && fs.statSync(abs).isFile()) out.push(rel)
+    if (resolveInside(cwd, rel)) out.push(rel)
   }
   return out
 }
@@ -86,14 +105,11 @@ function referencedPaths(cwd: string, artifact: string): string[] {
 /** Skeleton fallback: manifests + README + architecture docs + referenced files. */
 function skeletonCandidates(cwd: string, artifact: string): string[] {
   const out: string[] = []
-  const push = (rel: string): void => {
-    const abs = resolveInside(cwd, rel)
-    if (abs && fs.existsSync(abs) && fs.statSync(abs).isFile() && !out.includes(rel)) out.push(rel)
-  }
+  const push = (rel: string): void => { if (resolveInside(cwd, rel)) out.push(rel) }
   for (const m of MANIFESTS) push(m)
   push('README.md')
   const archDir = resolveInside(cwd, 'docs/architecture')
-  if (archDir && fs.existsSync(archDir)) {
+  if (archDir) {
     try {
       fs.readdirSync(archDir).filter((f) => f.endsWith('.md')).sort().slice(0, 3)
         .forEach((f) => push(`docs/architecture/${f}`))
@@ -113,28 +129,33 @@ export function buildRepoContext(opts: BuildContextOpts): RepoContext {
   const budget = opts.budgetChars ?? 40000
 
   const tree = walkTree(cwd).slice(0, TREE_CAP)
-  const treeBlock = `## Repository tree\n\`\`\`\n${tree.join('\n')}\n\`\`\``
+  let treeBlock = `## Repository tree\n\`\`\`\n${tree.join('\n')}\n\`\`\``
+  if (treeBlock.length > budget) treeBlock = `${treeBlock.slice(0, Math.max(0, budget))}\n_(tree truncated)_`
   const parts: string[] = [treeBlock]
   let size = treeBlock.length
   const used: string[] = []
+  const seen = new Set<string>()
   let truncated = false
 
   const candidates = explicitPaths && explicitPaths.length > 0
-    ? explicitPaths.map((p) => p.replace(/^\.\//, ''))
+    ? explicitPaths
     : skeletonCandidates(cwd, artifact)
 
   for (const rel of candidates) {
     const abs = resolveInside(cwd, rel)
     if (!abs) continue
+    const display = path.relative(cwd, abs)             // always repo-relative (no absolute leak)
+    if (seen.has(display) || hasIgnoredSegment(display)) continue
     const content = readTextFile(abs)
     if (content === null) continue
-    const block = `### ${rel}\n\`\`\`\n${content}\n\`\`\``
+    const block = `### ${display}\n\`\`\`\n${content}\n\`\`\``
     if (size + block.length + 2 > budget) {
       truncated = true
       continue
     }
+    seen.add(display)
     parts.push(block)
-    used.push(rel)
+    used.push(display)
     size += block.length + 2
   }
 
