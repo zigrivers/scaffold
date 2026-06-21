@@ -55,6 +55,30 @@ mmr review --pr <number> --channels codex claude grok antigravity --sync --forma
 # or set channels_disabled: ["gemini"] in .mmr.yaml
 ```
 
+## Design critique (`mmr critique`)
+
+`mmr review` reviews a *diff* for defects and gates by severity. Its peer
+`mmr critique` reviews a *design* — a design doc, a pasted "problem + proposed
+solution", or a plan — and is **advisory**: no severity, no pass/fail gate,
+always exits 0. Reach for it to get independent models to weigh an approach
+*before* building it.
+
+```bash
+mmr critique design.md --format json                 # critique a design doc
+mmr critique - --focus scaling                       # critique stdin, focused
+mmr critique design.md --context repo                # ground it in the codebase
+mmr critique design.md --session redesign            # iterate across rounds
+mmr critique design.md --lenses skeptic,simplifier   # one persona per channel
+```
+
+It reports **convergence** (where independent models agreed), **divergence**
+(genuine splits + the deciding crux — it never picks a winner), and an editorial
+**synthesis**. `--context repo` (or `--context-paths a.ts,b.ts`) grounds it in
+the codebase; `--session <id>` carries the prior round across edits; `--lenses`
+gives each channel a persona (and relabels output to "perspectives");
+`--no-synthesis` skips the synthesis pass. It is **advisory only** — never a
+merge gate.
+
 ## Auth
 
 If a channel reports an auth failure, follow the recovery line in the output
