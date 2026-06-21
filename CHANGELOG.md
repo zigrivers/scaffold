@@ -4,6 +4,24 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.38.0] — 2026-06-20
+
+### Changed
+
+- **MMR 3.0.0 — repositioned as a multi-model second-opinion engine** (ships in
+  `@zigrivers/mmr` 3.0.0). Adds **`mmr critique`**, a peer to `mmr review` for
+  **design/brainstorm review**: give it a design doc, a pasted "problem +
+  proposed solution", or a plan, and independent models report **convergence**
+  (where they agreed), **divergence** (genuine splits + the deciding crux), and
+  an editorial **synthesis** that never picks a winner. **Advisory** — no
+  severity, no gate, always exits 0. Supports repo grounding (`--context repo`),
+  iterative rounds (`--session`), and persona lenses (`--lenses`). Purely
+  additive — `mmr review` is unchanged. (#694, #695, #696, #697)
+- **`CLAUDE.md` + the `mmr` skill and reference guide** document `mmr critique`
+  as a peer to `review` (advisory; convergence/divergence/synthesis;
+  `--context`/`--session`/`--lenses`); it is not part of the mandatory PR-review
+  flow.
+
 ## [3.37.0] — 2026-06-20
 
 ### Changed
