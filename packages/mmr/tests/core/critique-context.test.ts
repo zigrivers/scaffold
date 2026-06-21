@@ -128,6 +128,21 @@ describe('buildRepoContext', () => {
     expect(out.used).toContain('src/keyboard.ts')
   })
 
+  it('does not let an innocent-named symlink expose an in-repo secret', () => {
+    const cwd = repo({ '.env': 'API_KEY=sk-leak-via-symlink', 'README.md': '#' })
+    fs.symlinkSync(path.join(cwd, '.env'), path.join(cwd, 'innocent.json'))
+    const out = buildRepoContext({ cwd, explicitPaths: ['innocent.json'], artifact: 'd' })
+    expect(out.context).not.toContain('sk-leak-via-symlink')
+    expect(out.used).not.toContain('.env')
+  })
+
+  it('wraps a context file in a fence longer than any backticks inside it', () => {
+    const cwd = repo({ 'doc.md': 'intro\n```ts\nconst x = 1\n```\nend', 'README.md': '#' })
+    const out = buildRepoContext({ cwd, explicitPaths: ['doc.md'], artifact: 'd' })
+    expect(out.context).toContain('```ts')   // inner fence survives
+    expect(out.context).toContain('````')     // 4-backtick wrapping fence
+  })
+
   it('caps total output to the budget', () => {
     const big = 'x'.repeat(5000)
     const cwd = repo({ 'README.md': big, 'package.json': '{"name":"d"}', 'src/a.ts': big })

@@ -60,9 +60,11 @@ function hasIgnoredSegment(rel: string): boolean {
 }
 
 /**
- * Resolve a repo-relative path, returning null if it escapes the repo root —
- * lexically AND after symlink resolution (a repo-local symlink can point
- * outside). Non-existent paths resolve to null (nothing to read).
+ * Resolve a repo-relative path to its REAL (symlink-resolved) absolute path,
+ * returning null if it escapes the repo root — lexically AND after symlink
+ * resolution. Returning the real path lets callers run the sensitivity check
+ * and the read against the symlink TARGET (so an innocent-named symlink pointing
+ * at an in-repo secret can't bypass the denylist). Non-existent → null.
  */
 function resolveInside(cwd: string, rel: string): string | null {
   const abs = path.resolve(cwd, rel)
@@ -76,10 +78,10 @@ function resolveInside(cwd: string, rel: string): string | null {
     const realAbs = fs.realpathSync(abs)
     const realRel = path.relative(realCwd, realAbs)
     if (realRel.startsWith('..') || path.isAbsolute(realRel)) return null
+    return realAbs
   } catch {
     return null
   }
-  return abs
 }
 
 /** Shallow file list (depth ≤ maxDepth), skipping ignored + symlinked entries. */
@@ -107,6 +109,14 @@ function walkTree(cwd: string, maxDepth = 3): string[] {
   }
   walk(cwd, 1)
   return out.sort()
+}
+
+/** Wrap content in a code fence longer than any backtick run inside it. */
+function fence(content: string): string {
+  let longest = 0
+  for (const m of content.matchAll(/`+/g)) longest = Math.max(longest, m[0].length)
+  const ticks = '`'.repeat(Math.max(3, longest + 1))
+  return `${ticks}\n${content}\n${ticks}`
 }
 
 /** Read a text file, returning null if missing, oversized, or binary. */
@@ -158,13 +168,16 @@ function skeletonCandidates(cwd: string, artifact: string): string[] {
 export function buildRepoContext(opts: BuildContextOpts): RepoContext {
   const { cwd, explicitPaths, artifact } = opts
   const budget = opts.budgetChars ?? 40000
+  let realCwd = cwd
+  try { realCwd = fs.realpathSync(cwd) } catch { /* keep cwd */ }
 
-  const tree = walkTree(cwd).slice(0, TREE_CAP)
-  let treeBlock = `## Repository tree\n\`\`\`\n${tree.join('\n')}\n\`\`\``
+  // Truncate the tree BODY (not the whole block) so the fence stays closed.
+  const fullTreeBody = walkTree(cwd).slice(0, TREE_CAP).join('\n')
   const TREE_TRUNC = '\n_(tree truncated)_'
-  if (treeBlock.length > budget) {
-    treeBlock = treeBlock.slice(0, Math.max(0, budget - TREE_TRUNC.length)) + TREE_TRUNC
-  }
+  const treeOverhead = `## Repository tree\n${fence('')}${TREE_TRUNC}`.length
+  const treeFits = treeOverhead + fullTreeBody.length <= budget
+  const treeBody = treeFits ? fullTreeBody : fullTreeBody.slice(0, Math.max(0, budget - treeOverhead))
+  const treeBlock = `## Repository tree\n${fence(treeBody)}${treeFits ? '' : TREE_TRUNC}`
   const parts: string[] = [treeBlock]
   let size = treeBlock.length
   const used: string[] = []
@@ -176,13 +189,13 @@ export function buildRepoContext(opts: BuildContextOpts): RepoContext {
     : skeletonCandidates(cwd, artifact)
 
   for (const rel of candidates) {
-    const abs = resolveInside(cwd, rel)
+    const abs = resolveInside(cwd, rel)   // real (symlink-resolved) path
     if (!abs) continue
-    const display = path.relative(cwd, abs)             // always repo-relative (no absolute leak)
+    const display = path.relative(realCwd, abs)   // repo-relative to the REAL target (no absolute leak)
     if (seen.has(display) || hasIgnoredSegment(display) || isSensitiveFile(display)) continue
     const content = readTextFile(abs)
     if (content === null) continue
-    const block = `### ${display}\n\`\`\`\n${content}\n\`\`\``
+    const block = `### ${display}\n${fence(content)}`
     if (size + block.length + 2 > budget) {
       truncated = true
       continue
