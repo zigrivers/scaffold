@@ -7,6 +7,9 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "license": "MIT",
+  "dependencies": {
+    "js-yaml": "^4.1.0"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
@@ -16,6 +19,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.21.0",
+    "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.13.0",
     "eslint": "^9.21.0",
     "typescript": "^5.8.2",

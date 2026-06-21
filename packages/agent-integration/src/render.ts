@@ -47,7 +47,18 @@ export function renderCursorMdc(skill: CanonicalSkill): string {
     + `${skill.lean.trim()}\n`
 }
 
-/** Emit a YAML double-quoted scalar, escaping backslashes and quotes. */
+/**
+ * Emit a YAML double-quoted scalar. Backslashes and quotes are escaped first,
+ * then control characters (newline/tab/CR) are emitted as YAML escape sequences
+ * so a multi-line or whitespace-laden description can never break the
+ * single-line frontmatter or alter spacing in a host's parser.
+ */
 function yamlDoubleQuote(value: string): string {
-  return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
+  const escaped = value
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '\\r')
+    .replace(/\t/g, '\\t')
+  return `"${escaped}"`
 }

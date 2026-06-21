@@ -67,4 +67,17 @@ describe('YAML safety', () => {
     const out = renderCursorMdc(s)
     expect(out).toContain('description: "Has a \\"quote\\" and a colon: here"')
   })
+
+  it('escapes control characters (newline/tab/CR) so they cannot break the frontmatter', () => {
+    const s: CanonicalSkill = {
+      name: 'x',
+      description: 'line one\nline two\twith tab',
+      body: 'b',
+      lean: 'b',
+    }
+    const out = renderSkillMd(s)
+    expect(out).toContain('description: "line one\\nline two\\twith tab"')
+    // the rendered frontmatter stays a single description line
+    expect(out.split('\n').filter((l) => l.startsWith('description:'))).toHaveLength(1)
+  })
 })

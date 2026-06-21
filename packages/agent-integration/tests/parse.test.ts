@@ -79,6 +79,26 @@ Just a body, no headings.
     expect(() => parseCanonicalSkill('---\nname: x\n---\n\nbody\n')).toThrow(/description/)
   })
 
+  it('parses a YAML block-scalar description (real YAML, not line-splitting)', () => {
+    const md = '---\nname: x\ndescription: >-\n  first line\n  second line\n---\n\nbody\n'
+    expect(parseCanonicalSkill(md).description).toBe('first line second line')
+  })
+
+  it('parses a double-quoted description with an escaped backslash', () => {
+    const md = '---\nname: x\ndescription: "a \\\\ b"\n---\n\nbody\n'
+    expect(parseCanonicalSkill(md).description).toBe('a \\ b')
+  })
+
+  it('tolerates trailing whitespace after the --- delimiters', () => {
+    const md = '---  \nname: x\ndescription: d\n---  \n\nbody\n'
+    expect(parseCanonicalSkill(md).name).toBe('x')
+  })
+
+  it('throws on a lean fence opened but never closed', () => {
+    const md = '---\nname: x\ndescription: d\n---\n\nbody <!-- lean:start --> oops\n'
+    expect(() => parseCanonicalSkill(md)).toThrow(/lean:end/)
+  })
+
   it('tolerates CRLF line endings', () => {
     const s = parseCanonicalSkill('---\r\nname: x\r\ndescription: d\r\n---\r\n\r\nbody\r\n')
     expect(s.name).toBe('x')
