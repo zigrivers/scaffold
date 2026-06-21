@@ -69,4 +69,11 @@ describe('installSkillsForPlatform', () => {
     expect(fs.existsSync(skillPath)).toBe(true)
     expect(fs.readFileSync(skillPath, 'utf8')).toMatch(/^---\nname: scaffold-runner\n/)
   })
+
+  it('resolves {{INSTRUCTIONS_FILE}} markers (no raw placeholder leaks into installed files)', () => {
+    installSkillsForPlatform(tmp, 'opencode')
+    const body = fs.readFileSync(path.join(tmp, '.opencode', 'skills', 'scaffold-pipeline', 'SKILL.md'), 'utf8')
+    expect(body).not.toContain('{{INSTRUCTIONS_FILE}}')
+    expect(body).toContain('AGENTS.md')
+  })
 })

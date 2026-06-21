@@ -1,6 +1,15 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { getSkillTemplateDir, INSTALLABLE_SKILLS } from './sync.js'
+import { getSkillTemplateDir, INSTALLABLE_SKILLS, resolveSkillTemplate } from './sync.js'
+
+// All non-Claude hosts use AGENTS.md as their standing-instructions file, so the
+// skill templates' {{INSTRUCTIONS_FILE}} marker resolves to AGENTS.md for every
+// platform here (Claude Code → CLAUDE.md is handled by the auto-sync).
+const TEMPLATE_VARS: Record<string, string> = { INSTRUCTIONS_FILE: 'AGENTS.md' }
+
+function loadResolved(templateDir: string, name: string, file: string): string {
+  return resolveSkillTemplate(fs.readFileSync(path.join(templateDir, name, file), 'utf8'), TEMPLATE_VARS)
+}
 
 /**
  * Platforms that consume the scaffold skills in a non-`SKILL.md` form. Claude
@@ -61,20 +70,20 @@ export function installSkillsForPlatform(projectRoot: string, platform: SkillPla
   for (const skill of INSTALLABLE_SKILLS) {
     try {
       if (platform === 'codex' || platform === 'antigravity') {
-        const body = fs.readFileSync(path.join(templateDir, skill.name, 'agents-block.md'), 'utf8')
+        const body = loadResolved(templateDir, skill.name, 'agents-block.md')
         const target = path.join(projectRoot, 'AGENTS.md')
         const existing = fs.existsSync(target) ? fs.readFileSync(target, 'utf8') : ''
         fs.writeFileSync(target, upsertManagedBlock(existing, skill.name, body))
         installed.push(`AGENTS.md (${skill.name})`)
       } else if (platform === 'cursor') {
-        const body = fs.readFileSync(path.join(templateDir, skill.name, 'cursor.mdc'), 'utf8')
+        const body = loadResolved(templateDir, skill.name, 'cursor.mdc')
         const target = path.join(projectRoot, '.cursor', 'rules', `${skill.name}.mdc`)
         fs.mkdirSync(path.dirname(target), { recursive: true })
         fs.writeFileSync(target, body)
         installed.push(path.join('.cursor', 'rules', `${skill.name}.mdc`))
       } else {
         // opencode — the full Agent Skill (dir name must match the skill name).
-        const body = fs.readFileSync(path.join(templateDir, skill.name, 'SKILL.md'), 'utf8')
+        const body = loadResolved(templateDir, skill.name, 'SKILL.md')
         const target = path.join(projectRoot, '.opencode', 'skills', skill.name, 'SKILL.md')
         fs.mkdirSync(path.dirname(target), { recursive: true })
         fs.writeFileSync(target, body)
