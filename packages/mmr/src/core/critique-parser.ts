@@ -1,4 +1,4 @@
-import { stripMarkdownFences, extractJson, fixTrailingCommas } from './parser.js'
+import { extractModelJson } from './cli-envelope.js'
 import { CRITIQUE_KINDS, type CritiqueItem, type CritiqueKind } from '../types/critique.js'
 
 export interface ParsedCritique {
@@ -31,47 +31,22 @@ function validateItem(raw: unknown): CritiqueItem | null {
 }
 
 /**
- * CLI envelope keys whose string value carries the model's actual reply. The
- * subprocess channels wrap their output differently — claude → `result`,
- * grok → `text`, gemini → `response` — so when the top-level JSON has no
- * `items`, we recurse into a wrapper string. Codex returns the reply directly.
- */
-const WRAPPER_KEYS = ['result', 'text', 'response', 'output', 'content', 'message']
-
-function fromObject(obj: Record<string, unknown>, depth: number): ParsedCritique | null {
-  if (Array.isArray(obj.items)) {
-    const items = obj.items.map(validateItem).filter((i): i is CritiqueItem => i !== null)
-    return { items, summary: typeof obj.summary === 'string' ? obj.summary : '' }
-  }
-  if (depth <= 0) return null
-  for (const key of WRAPPER_KEYS) {
-    if (typeof obj[key] === 'string') {
-      const inner = parseAtDepth(obj[key] as string, depth - 1)
-      if (inner && (inner.items.length > 0 || inner.summary)) return inner
-    }
-  }
-  return null
-}
-
-function parseAtDepth(raw: string, depth: number): ParsedCritique | null {
-  try {
-    const json = fixTrailingCommas(extractJson(stripMarkdownFences(raw)))
-    const obj = JSON.parse(json) as Record<string, unknown>
-    return fromObject(obj, depth)
-  } catch {
-    return null
-  }
-}
-
-/**
- * Parse a model's critique reply into items + summary. Reuses the review
- * parser's fence-stripping and JSON extraction, and transparently unwraps the
- * per-CLI JSON envelopes (claude `result`, grok `text`, gemini `response`).
- * Never throws — a non-JSON or malformed reply yields empty items and a
+ * Parse a model's critique reply into items + summary. Reuses the shared
+ * envelope extractor (so the per-CLI wrappers are transparently unwrapped) and
+ * never throws — a non-JSON or malformed reply yields empty items and a
  * diagnostic summary, so one bad channel can't abort the whole critique.
  */
 export function parseCritiqueOutput(raw: string): ParsedCritique {
-  const parsed = parseAtDepth(raw, 2)
-  if (parsed) return parsed
-  return { items: [], summary: 'Failed to parse critique output: no items found' }
+  const obj = extractModelJson(raw)
+  if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) {
+    return { items: [], summary: 'Failed to parse critique output: no items found' }
+  }
+  const record = obj as Record<string, unknown>
+  const rawItems = Array.isArray(record.items) ? record.items : []
+  const items = rawItems.map(validateItem).filter((i): i is CritiqueItem => i !== null)
+  const summary = typeof record.summary === 'string' ? record.summary : ''
+  if (items.length === 0 && !summary) {
+    return { items: [], summary: 'Failed to parse critique output: no items found' }
+  }
+  return { items, summary }
 }

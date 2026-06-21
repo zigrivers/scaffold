@@ -156,10 +156,17 @@ design-critique prompt (alternatives, missed considerations, tradeoffs, risks)
 and reports where the models **converge vs. diverge**. It is **advisory** — no
 severity, no pass/fail gate, always exits 0 — so it never blocks a merge.
 
+The output leads with **CONVERGENCE** (where independent models agreed), then
+**DIVERGENCE** (genuine splits with the deciding *crux*), then single-model
+points grouped by kind, and finally an **editorial SYNTHESIS** — a cited read
+of the critique that never picks a winner on a split. `--no-synthesis` skips the
+synthesis pass (faster; deterministic clustering only).
+
 ```bash
 mmr critique docs/design/notifications.md   # critique a design doc
 mmr critique - --focus scaling              # critique stdin, focused
 mmr critique plan.md --format json          # machine-readable report
+mmr critique design.md --no-synthesis       # skip the editorial synthesis pass
 ```
 
 `mmr doctor` is the one-shot health check: it classifies each channel and

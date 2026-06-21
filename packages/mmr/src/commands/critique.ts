@@ -9,6 +9,7 @@ import { classifyTrustMode } from '../core/trust-mode.js'
 import { assembleCritiquePrompt } from '../core/critique-prompt.js'
 import { parseCritiqueOutput } from '../core/critique-parser.js'
 import { reconcileCritique } from '../core/critique-reconciler.js'
+import { synthesizeCritique, type SynthesisRunner } from '../core/critique-synthesis.js'
 import { formatCritiqueText, formatCritiqueJson } from '../formatters/critique.js'
 import { resolveCritiqueInput } from '../core/critique-input.js'
 import { resolveDispatchChannels } from './review.js'
@@ -27,6 +28,7 @@ interface CritiqueArgs {
   timeout?: number
   format?: string
   'dry-run'?: boolean
+  'no-synthesis'?: boolean
   configBaseRef?: string
   trustProjectConfig?: boolean
 }
@@ -102,6 +104,10 @@ export const critiqueCommand: CommandModule<object, CritiqueArgs> = {
       .option('timeout', { type: 'number', describe: 'Per-channel timeout in seconds' })
       .option('format', { type: 'string', choices: ['text', 'json'], describe: 'Output format (default text)' })
       .option('dry-run', { type: 'boolean', default: false, describe: 'Assemble the prompt without dispatching' })
+      .option('no-synthesis', {
+        type: 'boolean', default: false,
+        describe: 'Skip the editorial synthesis pass (faster; deterministic clustering only)',
+      })
       .option('config-base-ref', {
         type: 'string',
         describe: 'Load project .mmr.yaml from this trusted Git ref instead of the working tree',
@@ -265,8 +271,35 @@ export const critiqueCommand: CommandModule<object, CritiqueArgs> = {
     }
 
     const items = reconcileCritique(channelItems)
+
+    // Editorial synthesis pass (D6): runs only with genuine multi-model input.
+    // Reuses the configured `claude` channel (respects the user's auth/flags);
+    // skipped gracefully if claude is unavailable or --no-synthesis is set.
+    let runner: SynthesisRunner | undefined
+    if (!args['no-synthesis'] && items.length >= 2 && completed >= 2) {
+      const claudeCfg = config.channels['claude']
+      if (claudeCfg && claudeCfg.kind === 'subprocess' && claudeCfg.command) {
+        const installed = await checkInstalled(claudeCfg.command.split(' ')[0])
+        const auth = installed ? await checkAuth(claudeCfg) : { status: 'not_installed' }
+        if (installed && auth.status === 'ok') {
+          runner = async (prompt: string): Promise<string> => {
+            await dispatchChannel(store, job.job_id, 'critique-synthesis', {
+              command: claudeCfg.command!, prompt: applyWrapper(claudeCfg.prompt_wrapper, prompt),
+              flags: claudeCfg.flags, env: claudeCfg.env,
+              timeout: claudeCfg.timeout ?? config.defaults.timeout,
+              stderr: 'capture', promptDelivery: claudeCfg.prompt_delivery, cwd: claudeCfg.cwd,
+            })
+            return readRawOutput(store, job.job_id, 'critique-synthesis')
+          }
+        }
+      }
+    }
+    const synth = await synthesizeCritique(items, runner)
+
     const report = buildReport(job.job_id, source, items, perChannel, valid.length, completed,
       Math.round((Date.now() - started) / 1000))
+    if (synth.splits.length > 0) report.splits = synth.splits
+    if (synth.synthesis) report.synthesis = synth.synthesis
     store.saveResults(job.job_id, report as unknown as never)
 
     console.log(format === 'json' ? formatCritiqueJson(report) : formatCritiqueText(report))

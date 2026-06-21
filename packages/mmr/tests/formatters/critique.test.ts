@@ -8,36 +8,65 @@ const report: CritiqueReport = {
   artifact_source: 'design.md',
   items: [
     { id: 'C-001', kind: 'concern', theme: 'scaling', observation: 'polling will not scale', recommendation: 'use SSE', sources: ['claude', 'codex'], agreement: 'consensus' },
-    { id: 'C-002', kind: 'alternative', theme: 'queue', observation: 'consider a durable queue', sources: ['codex'], agreement: 'unique' },
+    { id: 'C-002', kind: 'alternative', theme: 'queue', observation: 'use a durable queue', sources: ['codex'], agreement: 'unique' },
+    { id: 'C-003', kind: 'open-question', theme: 'scale', observation: 'what is the concurrency target?', sources: ['claude'], agreement: 'unique' },
   ],
   per_channel: {
     codex: { status: 'completed', item_count: 2 },
-    claude: { status: 'completed', item_count: 1 },
+    claude: { status: 'completed', item_count: 2 },
   },
-  summary: '2 items across 2 channels',
+  splits: [{
+    theme: 'queue',
+    positions: [
+      { stance: 'add a durable queue', item_ids: ['C-002'], sources: ['codex'] },
+      { stance: 'a queue is premature; use cron', item_ids: ['C-004'], sources: ['claude'] },
+    ],
+    crux: 'what is the real throughput target?',
+  }],
+  synthesis: 'Polling is the main scaling risk (C-001); resolve the concurrency target first (C-003).',
+  summary: '3 items across 2 channels',
   metadata: { channels_dispatched: 2, channels_completed: 2, total_elapsed: '4s' },
 }
 
-describe('formatCritiqueText', () => {
-  it('renders an advisory report grouped by agreement, with no gate/verdict', () => {
-    const out = formatCritiqueText(report)
+describe('formatCritiqueText (Phase 2 layout)', () => {
+  const out = formatCritiqueText(report)
+
+  it('keeps the advisory header, no verdict', () => {
     expect(out).toMatch(/CRITIQUE/)
     expect(out.toLowerCase()).toContain('advisory')
     expect(out).not.toMatch(/PASS|BLOCK|verdict/i)
-    // consensus item surfaces with its sources and kind
+  })
+
+  it('renders CONVERGENCE for agreed items', () => {
+    expect(out).toContain('CONVERGENCE')
     expect(out).toContain('polling will not scale')
-    expect(out).toContain('consensus')
-    expect(out).toContain('claude')
-    // summary present
-    expect(out).toContain('2 items across 2 channels')
+  })
+
+  it('renders DIVERGENCE with positions, sources, and the crux', () => {
+    expect(out).toContain('DIVERGENCE')
+    expect(out).toContain('add a durable queue')
+    expect(out).toContain('a queue is premature')
+    expect(out.toLowerCase()).toContain('crux:')
+    expect(out).toContain('throughput target')
+  })
+
+  it('groups single-model items under kind headers', () => {
+    expect(out).toContain('ALTERNATIVES')
+    expect(out).toContain('OPEN QUESTIONS')
+    expect(out).toContain('what is the concurrency target?')
+  })
+
+  it('renders the editorial SYNTHESIS prose', () => {
+    expect(out).toContain('SYNTHESIS')
+    expect(out).toContain('Polling is the main scaling risk (C-001)')
   })
 })
 
 describe('formatCritiqueJson', () => {
-  it('round-trips the report', () => {
+  it('round-trips the report including splits + synthesis', () => {
     const parsed = JSON.parse(formatCritiqueJson(report))
-    expect(parsed.kind).toBe('design-critique')
-    expect(parsed.items).toHaveLength(2)
-    expect(parsed.items[0].agreement).toBe('consensus')
+    expect(parsed.splits).toHaveLength(1)
+    expect(parsed.splits[0].crux).toMatch(/throughput/)
+    expect(parsed.synthesis).toMatch(/C-001/)
   })
 })
