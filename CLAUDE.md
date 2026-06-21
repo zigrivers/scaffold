@@ -177,7 +177,7 @@ working tree, a branch diff, a specific diff file, or an arbitrary document.
 The MMR CLI accepts any of these — the review is not gated to PRs.
 
 **Channel model:** direct `mmr review` runs the built-in CLI channels (Codex,
-Gemini, Claude, and Grok). The scaffold wrappers (`scaffold run review-pr` and
+Claude, Grok, and Antigravity). The scaffold wrappers (`scaffold run review-pr` and
 `scaffold run review-code`) add the Superpowers code-reviewer agent as a
 complementary agent channel and reconcile its findings into the same MMR job.
 (`scaffold run post-implementation-review` has its own channel layout
@@ -218,20 +218,20 @@ way.
 
 **The built-in channels:**
 1. **Codex CLI** — implementation correctness, security, API contracts
-2. **Gemini CLI** — architectural patterns, broad-context reasoning
-3. **Claude CLI** — plan alignment, code quality, testing
-4. **Grok CLI** — independent second-opinion pass on correctness and code
+2. **Claude CLI** — plan alignment, code quality, testing
+3. **Grok CLI** — independent second-opinion pass on correctness and code
    quality (xAI; proprietary, not open-source). Enabled by default like the
    other three; disable with `channels_disabled: ["grok"]` in `.mmr.yaml`.
    Unlike the others, grok requires the prompt as an arg (it ignores stdin),
    so its built-in channel uses `prompt_delivery: prompt-file`.
-5. **Antigravity CLI** (`agy`) — Google's forward replacement for the
-   sunsetting Gemini CLI (Gemini stops serving Pro/Ultra on 2026-06-18; agy
-   runs in parallel with `gemini` until then). Enabled by default; runs
+4. **Antigravity CLI** (`agy`) — Google's CLI reviewer, the replacement for the
+   **retired** Gemini channel (Gemini's CLI is sunset). Enabled by default; runs
    hardened (neutral cwd, `--sandbox`, auto-approve, real HOME). The channel
    key is `antigravity`; `agy` is accepted as an alias in `--channels`,
    `channels_disabled`, and `channels:` config keys.
-6. **OpenCode CLI** (`opencode run`) — an open-source AI coding CLI offering an
+   (The `gemini` channel is retired — kept only as a disabled tombstone so old
+   configs load; it is never dispatched.)
+5. **OpenCode CLI** (`opencode run`) — an open-source AI coding CLI offering an
    independent correctness/code-quality pass. **Disabled by default (opt-in)**,
    like `doc-conformance`: enable in `.mmr.yaml`
    (`channels: { opencode: { enabled: true } }`) or pass `--channels=opencode`.
@@ -244,7 +244,7 @@ way.
    is accepted as an alias. Auth recovery: `opencode auth login`.
 
 **Critical rules:**
-- **Foreground only** — Always run Codex, Gemini, Claude, Grok, and Antigravity
+- **Foreground only** — Always run Codex, Claude, Grok, and Antigravity
   (`agy`) CLI commands as foreground Bash calls. Never use `run_in_background`, `&`, or `nohup`.
   Background execution produces empty output. Multiple foreground calls in a
   single message are fine (the tool runner supports parallel invocations).
@@ -253,10 +253,10 @@ way.
   recover, or it fails during execution (non-zero exit, malformed output,
   timeout). **Distinguish transient from structural degradation (mmr 2.0.0):**
   for a *transient* failure (auth expired, timeout, runtime error) of an
-  **external** channel (Codex, Gemini, or Grok), run a compensating pass via
+  **external** channel (Codex, Grok, or Antigravity), run a compensating pass via
   `claude -p`, focused on that channel's strength area and labeled
-  `[compensating: Codex-equivalent]`, `[compensating: Gemini-equivalent]`, or
-  `[compensating: Grok-equivalent]`; compensating findings are single-source
+  `[compensating: Codex-equivalent]`, `[compensating: Grok-equivalent]`, or
+  `[compensating: Antigravity-equivalent]`; compensating findings are single-source
   confidence. For a *structural* absence (the CLI is not installed and won't
   return), do **not** auto-compensate — MMR skips it by default and prints a
   remediation; either install the CLI, mark the channel `required: true`, pass
@@ -264,7 +264,6 @@ way.
   Run `mmr doctor` to classify channels and apply the safe fixes.
 - **Auth failures are NOT silent** — surface to the user with recovery commands:
   - Codex: `! codex login`
-  - Gemini: `! gemini -p "hello"`
   - Grok: `! grok login`
   - Antigravity: `! agy -p "hello"`   (then open the printed Google OAuth URL)
 - **Independence** — never share one channel's output with another.
@@ -310,19 +309,16 @@ mmr review --pr "$PR_NUMBER" --sync --format text
 
 # Manual fallback — installation checks
 command -v codex >/dev/null 2>&1 || echo "Codex not installed"
-command -v gemini >/dev/null 2>&1 || echo "Gemini not installed"
 command -v grok >/dev/null 2>&1 || echo "Grok not installed"
 command -v agy >/dev/null 2>&1 || echo "Antigravity (agy) not installed"
 
 # Manual fallback — auth checks
 codex login status 2>/dev/null
-NO_BROWSER=true gemini -p "respond with ok" -o json 2>&1
 grok models >/dev/null 2>&1 && echo "Grok authed" || echo "Run: grok login"
 agy -p "respond with ok" 2>&1   # auth fails → printed Google OAuth URL; run: agy -p "hello"
 
 # Manual fallback — review dispatch (foreground only — never run_in_background)
 codex exec --skip-git-repo-check -s read-only --ephemeral "PROMPT" 2>/dev/null
-NO_BROWSER=true gemini -p "PROMPT" --output-format json --approval-mode yolo 2>/dev/null
 claude -p "PROMPT" --output-format json 2>/dev/null
 # grok ignores stdin — pass an ABSOLUTE prompt-file path. Hardened review posture:
 # isolated HOME/cwd (strips host config: skills/MCP/hooks/instructions), no

@@ -72,7 +72,7 @@ async function configInit(opts: { withExamples: boolean } = { withExamples: fals
   // Auto-detect which CLIs are installed
   const channelLines: string[] = ['channels:']
   for (const [name, chConfig] of Object.entries(BUILTIN_CHANNELS)) {
-    if (!chConfig.command) continue
+    if (!chConfig.command || chConfig.retired) continue  // never seed a retired channel
     const cmd = chConfig.command.split(' ')[0]
     const installed = await checkInstalled(cmd)
     const enabled = chConfig.enabled === false ? false : installed

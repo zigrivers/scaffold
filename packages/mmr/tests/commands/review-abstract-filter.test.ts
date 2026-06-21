@@ -9,6 +9,7 @@ describe('resolveDispatchChannels (T1-A)', () => {
     deepseek: { kind: 'subprocess' as const, enabled: true, abstract: false, command: 'ollama run', flags: ['deepseek'], env: {}, prompt_wrapper: '{{prompt}}', output_parser: 'default', stderr: 'capture' as const },
     disabled: { kind: 'subprocess' as const, enabled: false, abstract: false, command: 'x', flags: [], env: {}, prompt_wrapper: '{{prompt}}', output_parser: 'default', stderr: 'capture' as const },
     antigravity: { kind: 'subprocess' as const, enabled: true, abstract: false, command: 'agy', flags: [], env: {}, prompt_wrapper: '{{prompt}}', output_parser: 'default', stderr: 'capture' as const },
+    gemini: { kind: 'subprocess' as const, enabled: false, abstract: false, retired: true, command: 'gemini', flags: [], env: {}, prompt_wrapper: '{{prompt}}', output_parser: 'default', stderr: 'capture' as const },
   } satisfies Record<string, ChannelConfigParsed>
 
   it('filters out channels with abstract: true from default resolution', () => {
@@ -69,5 +70,21 @@ describe('resolveDispatchChannels (T1-A)', () => {
   it('dedupes a plainly repeated explicit channel', () => {
     const names = resolveDispatchChannels(sampleChannels, ['qwen', 'qwen'], new Set())
     expect(names).toEqual(['qwen'])
+  })
+
+  it('excludes a retired channel (gemini) from default resolution', () => {
+    const names = resolveDispatchChannels(sampleChannels, undefined, new Set())
+    expect(names).not.toContain('gemini')
+  })
+
+  it('throws a migration hint when a retired channel is explicitly requested', () => {
+    expect(() => resolveDispatchChannels(sampleChannels, ['gemini'], new Set()))
+      .toThrow('Channel "gemini" is retired and cannot be dispatched — use "antigravity" instead.')
+  })
+
+  it('tolerates a retired channel named in channels_disabled (loads, no dispatch)', () => {
+    const names = resolveDispatchChannels(sampleChannels, undefined, new Set(['gemini']))
+    expect(names).not.toContain('gemini')
+    expect(names).toContain('qwen')
   })
 })

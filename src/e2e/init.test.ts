@@ -286,8 +286,8 @@ describe('scaffold init E2E', () => {
     expect(fs.existsSync(path.join(tmpDir, '.scaffold', 'generated', 'universal', 'prompts', 'README.md'))).toBe(true)
   })
 
-  // Test 13: real wizard + build path produces Gemini output with a tiny step fixture
-  it('runWizard and runBuild produce Gemini output for a configured project', async () => {
+  // Test 13: real wizard + build path produces Codex output with a tiny step fixture
+  it('runWizard and runBuild produce Codex output for a configured project', async () => {
     vi.mocked(discoverAllMetaPrompts).mockReturnValue(
       makeMetaPromptFixture() as ReturnType<typeof discoverAllMetaPrompts>,
     )
@@ -295,10 +295,9 @@ describe('scaffold init E2E', () => {
     const output = createMockOutput()
     output.prompt.mockResolvedValueOnce('mvp')
     output.confirm
-      .mockResolvedValueOnce(false)
-      .mockResolvedValueOnce(true)
-      .mockResolvedValueOnce(false)
-      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true)   // Codex adapter
+      .mockResolvedValueOnce(false)  // web
+      .mockResolvedValueOnce(false)  // mobile
 
     const wizardResult = await runWizard({
       projectRoot: tmpDir,
@@ -318,11 +317,8 @@ describe('scaffold init E2E', () => {
     }, { output })
 
     expect(buildResult.exitCode).toBe(0)
-    expect(fs.existsSync(path.join(tmpDir, '.agents', 'skills', 'scaffold-runner', 'SKILL.md'))).toBe(true)
-    expect(fs.existsSync(path.join(tmpDir, '.agents', 'skills', 'scaffold-pipeline', 'SKILL.md'))).toBe(true)
-    expect(fs.existsSync(path.join(tmpDir, 'GEMINI.md'))).toBe(true)
-    expect(fs.existsSync(path.join(tmpDir, '.gemini', 'commands', 'scaffold', 'create-prd.toml'))).toBe(true)
-    expect(fs.readFileSync(path.join(tmpDir, '.gemini', 'commands', 'scaffold', 'create-prd.toml'), 'utf8'))
-      .toContain('User request: scaffold create-prd')
+    const codexAgents = path.join(tmpDir, '.scaffold', 'generated', 'codex', 'AGENTS.md')
+    expect(fs.existsSync(codexAgents)).toBe(true)
+    expect(fs.readFileSync(codexAgents, 'utf8')).toContain('create-prd')
   })
 })

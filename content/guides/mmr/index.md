@@ -44,7 +44,7 @@ flowchart LR
 --diff / --base)"] --> B["Build prompt
 (+ focus, criteria)"]
   B --> C1["codex"]
-  B --> C2["gemini"]
+  B --> C2["antigravity"]
   B --> C3["claude"]
   B --> C4["grok"]
   B --> C5["doc-conformance
@@ -133,7 +133,7 @@ mmr review --pr 123 --channels grok claude --sync --format json
 | `mmr commands [--format json]` | Machine-readable capability manifest — every command with a runnable example and a `writes` flag. Agents load this once instead of probing `--help`. |
 | `mmr explain [<topic>]` | Inline just-in-time docs for a concept (`channels`, `config`, `scopes`, `compensation`, `redaction`, `provenance`). No arg lists the topics. |
 | `mmr ack <add\|list\|rm\|prune>` | Sticky acknowledgments — silence a finding by its stable key so it stops blocking across rounds. |
-| `mmr skill install --platform <name> \| --all` | Install a "use MMR for code review" skill into a project per agent CLI: Cursor (`.cursor/rules/mmr-review.mdc`), Gemini (`GEMINI.md`), Codex + Antigravity (shared `AGENTS.md` managed block). Supports `--dry-run`, `--force`, and `--dir`. :cite[packages/mmr/src/commands/skill.ts:85] |
+| `mmr skill install --platform <name> \| --all` | Install a "use MMR for code review" skill into a project per agent CLI: Cursor (`.cursor/rules/mmr-review.mdc`), Codex + Antigravity (shared `AGENTS.md` managed block). Supports `--dry-run`, `--force`, and `--dir`. :cite[packages/mmr/src/commands/skill.ts:85] |
 
 ```bash
 # Capture a job_id from a review, then fold in an agent channel:
@@ -152,8 +152,8 @@ mmr config path              # show where config is read from and written to
 :::callout{type=info}
 **Each agent CLI reads its own instruction file**, so `mmr skill install` writes the
 skill in the matching convention: a dedicated `.cursor/rules/mmr-review.mdc` for
-Cursor, and an idempotent managed block (delimited by `<!-- BEGIN mmr-skill -->` and `<!-- END mmr-skill -->`) in `GEMINI.md`
-(Gemini) or `AGENTS.md` (Codex and Antigravity share the `AGENTS.md` standard, so
+Cursor, and an idempotent managed block (delimited by `<!-- BEGIN mmr-skill -->` and `<!-- END mmr-skill -->`)
+in `AGENTS.md` (Codex and Antigravity share the `AGENTS.md` standard, so
 both resolve to the same block). For the block-mode files, re-running rewrites only
 the managed block and leaves the rest of the file intact; the dedicated Cursor file
 is created fresh and needs `--force` to overwrite. The skill bodies are bundled with
@@ -189,7 +189,7 @@ channels:
 ### Built-in channels
 
 :::callout{type=info}
-**Why grok is different.** codex/gemini/claude all read the prompt from `stdin`.
+**Why grok is different.** codex/claude/antigravity all read the prompt from `stdin`.
 Grok's CLI requires the prompt as an argument and ignores stdin, so its channel
 uses `prompt_delivery: prompt-file` — the dispatcher writes the prompt to a temp
 file and passes its path via the `{{prompt_file}}` placeholder. Grok wraps its
@@ -205,9 +205,9 @@ The defaults, commands, and parsers below are the built-in presets :cite[package
 | Channel | Default | Strength | Prompt delivery | Parser |
 | --- | --- | --- | --- | --- |
 | `codex` | enabled | Correctness, security, API contracts | stdin | `default` |
-| `gemini` | enabled | Architecture, broad-context reasoning | stdin | `gemini` |
 | `claude` | enabled | Plan alignment, code quality, testing | stdin | `default` |
 | `grok` | enabled | Independent second opinion (xAI; proprietary) | **prompt-file** | `unwrap $.text → default` |
+| `antigravity` (`agy`) | enabled | Google's CLI reviewer (replaces the retired Gemini) | stdin | `default` |
 | `doc-conformance` | opt-in | PRD/stories/standards conformance (LLM-graded) | stdin | `doc-conformance` |
 :::
 
@@ -222,15 +222,13 @@ stderr: suppress
 ```
 :::
 
-:::tab{title="gemini"}
+:::tab{title="antigravity"}
 ```yaml
-command: gemini                       # NO -p: gemini reads stdin natively
-flags: [--output-format, json]
-env: { NO_BROWSER: "true" }
-auth.check: NO_BROWSER=true gemini -p "respond with ok" -o json   # LLM round-trip, 20s
-recovery: gemini -p "hello"
-output_parser: gemini                 # unwraps { "response": "…" }
-timeout: 360
+command: agy                          # Google's CLI reviewer (alias of antigravity)
+# runs hardened: neutral cwd, --sandbox, auto-approve, real HOME
+auth.check: agy -p "respond with ok"  # LLM round-trip, 20s
+recovery: agy -p "hello"              # then open the printed Google OAuth URL
+output_parser: default
 ```
 :::
 

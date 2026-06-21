@@ -16,7 +16,7 @@ import { coreCopy, getCopyForType, optionsFromCopy } from './copy/index.js'
 export interface WizardAnswers {
   methodology: 'deep' | 'mvp' | 'custom'
   depth: 1 | 2 | 3 | 4 | 5
-  platforms: Array<'claude-code' | 'codex' | 'gemini'>
+  platforms: Array<'claude-code' | 'codex'>
   traits: string[]
   projectType?: ProjectType
   gameConfig?: GameConfig
@@ -99,16 +99,17 @@ export async function askWizardQuestions(options: {
     if (parsed >= 1 && parsed <= 5) depth = parsed as 1 | 2 | 3 | 4 | 5
   }
 
-  // Platform selection (simplified — claude-code always included)
-  let platforms: Array<'claude-code' | 'codex' | 'gemini'>
+  // Platform selection (simplified — claude-code always included). Gemini was
+  // dropped (its CLI is sunset); strip any legacy value from --adapters input.
+  let platforms: Array<'claude-code' | 'codex'>
   if (options.adapters) {
-    platforms = options.adapters as Array<'claude-code' | 'codex' | 'gemini'>
+    platforms = (options.adapters as string[])
+      .filter((p): p is 'claude-code' | 'codex' => p === 'claude-code' || p === 'codex')
+    if (platforms.length === 0) platforms = ['claude-code']
   } else if (!auto) {
     platforms = ['claude-code']
     const addCodex = await output.confirm('Include Codex adapter?', false, coreCopy.codexAdapter)
     if (addCodex) platforms.push('codex')
-    const addGemini = await output.confirm('Include Gemini adapter?', false, coreCopy.geminiAdapter)
-    if (addGemini) platforms.push('gemini')
   } else {
     platforms = ['claude-code']
   }

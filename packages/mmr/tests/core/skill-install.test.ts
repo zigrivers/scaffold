@@ -35,7 +35,7 @@ describe('resolvePlatforms', () => {
   })
 
   it('dedups and normalizes case', () => {
-    expect(resolvePlatforms(['Cursor', 'cursor', 'GEMINI'], false)).toEqual(['cursor', 'gemini'])
+    expect(resolvePlatforms(['Cursor', 'cursor', 'CODEX'], false)).toEqual(['cursor', 'codex'])
   })
 
   it('throws UnknownPlatformError for an unsupported platform', () => {
@@ -135,12 +135,11 @@ describe('planSkillInstall', () => {
 })
 
 describe('executePlan + idempotency', () => {
-  it('writes all four platforms and is idempotent on re-run', () => {
+  it('writes all platforms and is idempotent on re-run', () => {
     const platforms = [...SKILL_PLATFORMS]
     executePlan(planSkillInstall({ projectRoot: root, platforms }))
 
     expect(read(PLATFORM_SPECS.cursor.targetRelPath)).toContain('MMR — Multi-Model Code Review')
-    expect(read('GEMINI.md')).toContain(MANAGED_BEGIN)
     expect(read('AGENTS.md')).toContain(MANAGED_BEGIN)
 
     // Second plan over the same tree should report no changes.

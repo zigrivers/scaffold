@@ -134,6 +134,10 @@ const CommonChannelFields = {
   // When true, a structurally-absent (not-installed) channel still gets a
   // compensating pass instead of being silently skipped (C1 opt-in).
   required: z.boolean().optional(),
+  // A retired channel is kept only as a disabled tombstone so existing configs
+  // that still name it keep loading; it is never dispatched, and an explicit
+  // request for it errors with a migration hint (e.g. gemini → antigravity).
+  retired: z.boolean().optional(),
 }
 
 const SubprocessChannelSchema = z.object({

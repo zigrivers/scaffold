@@ -1,7 +1,6 @@
 import type { ScaffoldError } from '../../types/index.js'
 import { ClaudeCodeAdapter } from './claude-code.js'
 import { CodexAdapter } from './codex.js'
-import { GeminiAdapter } from './gemini.js'
 import { UniversalAdapter } from './universal.js'
 
 /** An output file to write during the build phase. */
@@ -86,8 +85,6 @@ export function createAdapter(platformId: string): PlatformAdapter {
     return new ClaudeCodeAdapter()
   case 'codex':
     return new CodexAdapter()
-  case 'gemini':
-    return new GeminiAdapter()
   case 'universal':
     return new UniversalAdapter()
   default:
@@ -99,5 +96,5 @@ export function createAdapter(platformId: string): PlatformAdapter {
 }
 
 /** Register of known platform IDs */
-export const KNOWN_PLATFORMS = ['claude-code', 'codex', 'gemini', 'universal'] as const
+export const KNOWN_PLATFORMS = ['claude-code', 'codex', 'universal'] as const
 export type KnownPlatformId = typeof KNOWN_PLATFORMS[number]

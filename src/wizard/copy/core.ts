@@ -58,9 +58,6 @@ export const coreCopy: CoreCopy = {
   codexAdapter: {
     short: 'Generates an OpenAI Codex adapter alongside the Claude Code output.',
   },
-  geminiAdapter: {
-    short: 'Generates a Google Gemini adapter alongside the Claude Code output.',
-  },
   webTrait: {
     short: 'Adds web-platform questions (rendering strategy, deploy target, etc.).',
   },

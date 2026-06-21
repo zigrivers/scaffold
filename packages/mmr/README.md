@@ -94,9 +94,10 @@ channels:
     enabled: true
   antigravity:        # alias: agy
     enabled: true
-  gemini:             # deprecated legacy channel; not used by default
-    enabled: false
 ```
+
+> Note: the `gemini` channel was **retired** (its CLI is sunset; use `antigravity`).
+> Existing configs that still name `gemini` keep loading — it is never dispatched.
 
 ## Installable skills
 
@@ -106,7 +107,6 @@ in the native convention of whichever agent CLI you run:
 | Platform | Target | Format |
 |----------|--------|--------|
 | `cursor` | `.cursor/rules/mmr-review.mdc` | dedicated Cursor rule file |
-| `gemini` | `GEMINI.md` | idempotent managed block |
 | `codex` | `AGENTS.md` | idempotent managed block |
 | `antigravity` | `AGENTS.md` | idempotent managed block |
 
