@@ -62,6 +62,19 @@ describe('formatCritiqueText (Phase 2 layout)', () => {
   })
 })
 
+describe('lensed output (D5)', () => {
+  it('relabels CONVERGENCE as PERSPECTIVES and drops the consensus tier wording', () => {
+    const plain = formatCritiqueText(report)
+    expect(plain).toContain('CONVERGENCE')
+    expect(plain).toContain('consensus')
+    const lensedOut = formatCritiqueText({ ...report, lenses: ['skeptic', 'simplifier'] })
+    expect(lensedOut).toContain('PERSPECTIVES')
+    expect(lensedOut).not.toContain('CONVERGENCE')
+    expect(lensedOut).toContain('perspective')
+    expect(lensedOut).toContain('lenses: skeptic, simplifier')
+  })
+})
+
 describe('context disclosure', () => {
   it('renders CONTEXT USED when context_used is set, omits it otherwise', () => {
     expect(formatCritiqueText(report)).not.toContain('CONTEXT USED')

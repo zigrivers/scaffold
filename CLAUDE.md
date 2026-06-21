@@ -158,6 +158,16 @@ Minimum checklist:
 
 Before pushing, review `git diff origin/main...HEAD` against CLAUDE.md and docs/coding-standards.md. Fix any issues and re-run `make check-all`. Log recurring patterns to tasks/lessons.md.
 
+> **Design critique vs. code review.** `mmr review` reviews a *diff* for defects
+> and gates by severity. Its **peer** `mmr critique` reviews a *design* — a design
+> doc, a pasted "problem + proposed solution", or a plan — and is **advisory**
+> (no severity, no pass/fail gate, always exits 0). Use it when you want
+> independent models to weigh an approach *before* building: it reports
+> **convergence** (where models agreed), **divergence** (genuine splits + the
+> deciding crux), and an editorial **synthesis** that never picks a winner.
+> `mmr critique <doc> [--context repo] [--session <id>] [--lenses skeptic,…]`.
+> See the `mmr` skill/guide. It is not part of the mandatory PR-review flow below.
+
 ### Mandatory Code Review
 
 **Mandatory after `gh pr create`** — run all review channels before moving to

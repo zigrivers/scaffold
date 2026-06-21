@@ -14,6 +14,14 @@ function loadTemplate(): string {
   return cachedTemplate
 }
 
+/** Bounded prior-round ledger item carried into an iterative round (D7). */
+export interface PromptLedgerItem {
+  id: string
+  kind: string
+  theme: string
+  observation: string
+}
+
 export interface AssembleCritiquePromptOptions {
   /** The artifact to critique (design doc, plan, or problem + proposed solution). */
   artifact: string
@@ -21,6 +29,10 @@ export interface AssembleCritiquePromptOptions {
   focus?: string
   /** Repository context blob (from --context repo) to ground the critique (D3). */
   repoContext?: string
+  /** Persona lens preamble (from --lenses) prepended to frame the critique (D5). */
+  lens?: string
+  /** The immediately-prior round's items, for an iterative critique (D7). */
+  priorRound?: { round: number; items: PromptLedgerItem[] }
   /** Channel prompt wrapper with {{prompt}} placeholder. */
   promptWrapper?: string
 }
@@ -42,12 +54,36 @@ function fenceFor(artifact: string): string {
  * layering of `assemblePrompt` but with the design framing and no diff/severity.
  */
 export function assembleCritiquePrompt(options: AssembleCritiquePromptOptions): string {
-  const { artifact, focus, repoContext, promptWrapper } = options
+  const { artifact, focus, repoContext, lens, priorRound, promptWrapper } = options
 
-  const layers: string[] = [loadTemplate()]
+  const layers: string[] = []
+
+  // The lens (if any) frames everything that follows.
+  if (lens) layers.push(`## Your lens\n${lens}`)
+
+  layers.push(loadTemplate())
 
   if (focus) {
     layers.push(`## Focus Areas\n${focus}`)
+  }
+
+  // Prior-round ledger: the artifact below is a REVISION; assess each prior point.
+  if (priorRound && priorRound.items.length > 0) {
+    const ledger = priorRound.items
+      // Collapse newlines so a multi-line observation can't break the list item.
+      // Tolerate a malformed stored item (missing field) — the ledger is loaded
+      // from a session file that could in principle be hand-edited/corrupted.
+      .map((i) => {
+        const obs = (i.observation ?? '').replace(/\s*\n\s*/g, ' ')
+        return `- [${i.id ?? '?'}] (${i.kind ?? '?'} · ${i.theme ?? '?'}): ${obs}`
+      })
+      .join('\n')
+    layers.push(
+      `## Previously raised (round ${priorRound.round})\n` +
+      'The artifact below is a REVISION. For EACH prior point, judge whether the revision ' +
+      'addresses it (state which are resolved vs. still open), then raise any NEW points.\n\n' +
+      ledger,
+    )
   }
 
   // Repo grounding goes before the artifact so the model reads the system first,

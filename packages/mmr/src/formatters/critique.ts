@@ -14,8 +14,11 @@ const KIND_HEADER: Record<CritiqueKind, string> = {
 }
 const KIND_ORDER: CritiqueKind[] = ['concern', 'alternative', 'consideration', 'open-question']
 
-function renderConverged(item: ReconciledCritiqueItem): string {
-  const lines = [`  • [${item.kind} · ${item.agreement}] ${item.theme} — ${item.observation}`]
+function renderConverged(item: ReconciledCritiqueItem, lensed: boolean): string {
+  // Under lenses, agreement no longer means independent consensus (it could be
+  // assigned-role overlap), so we label it "perspective" instead of the tier.
+  const tag = lensed ? 'perspective' : item.agreement
+  const lines = [`  • [${item.kind} · ${tag}] ${item.theme} — ${item.observation}`]
   if (item.recommendation) lines.push(`      ↳ ${item.recommendation}`)
   lines.push(`      sources: ${item.sources.join(', ')}`)
   return lines.join('\n')
@@ -45,16 +48,22 @@ function renderSplit(split: CritiqueSplit): string {
  */
 export function formatCritiqueText(report: CritiqueReport): string {
   const out: string[] = []
+  const lensed = !!(report.lenses && report.lenses.length > 0)
   const channelCount = Object.keys(report.per_channel).length
-  out.push(`CRITIQUE · ${report.artifact_source} · ${channelCount} channels · advisory (no gate)`)
+  const roundTag = report.round ? ` · round ${report.round}` : ''
+  const lensTag = lensed ? ` · lenses: ${report.lenses!.join(', ')}` : ''
+  const header = `CRITIQUE · ${report.artifact_source} · ${channelCount} channels${roundTag}${lensTag}`
+  out.push(`${header} · advisory (no gate)`)
   out.push('')
 
   const converged = report.items.filter((i) => i.agreement !== 'unique')
   const unique = report.items.filter((i) => i.agreement === 'unique')
 
   if (converged.length > 0) {
-    out.push('CONVERGENCE — independent models agreed (high signal)')
-    for (const item of converged) out.push(renderConverged(item))
+    out.push(lensed
+      ? 'PERSPECTIVES — raised by more than one channel'
+      : 'CONVERGENCE — independent models agreed (high signal)')
+    for (const item of converged) out.push(renderConverged(item, lensed))
     out.push('')
   }
 
