@@ -165,7 +165,7 @@ synthesis pass (faster; deterministic clustering only).
 By default the critique sees only the artifact. `--context repo` grounds it in
 the codebase (a structural skeleton: tree + manifests + README + the files the
 artifact references) so the models judge fit against your real system; the
-report discloses which files were used. `--context-paths a.ts b.ts` grounds
+report discloses which files were used. `--context-paths a.ts,b.ts` grounds
 against specific files instead (highest priority).
 
 **Iterate** across rounds with `--session <id>`: round 1 critiques; you revise
