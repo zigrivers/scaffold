@@ -6,7 +6,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const TEMPLATES_ROOT = resolve(__dirname, '../../templates/skills')
 
 /** Platforms that can host an installable MMR review skill. */
-export const SKILL_PLATFORMS = ['cursor', 'codex', 'gemini', 'antigravity'] as const
+export const SKILL_PLATFORMS = ['cursor', 'codex', 'antigravity'] as const
 export type SkillPlatform = (typeof SKILL_PLATFORMS)[number]
 
 /** Delimiters for the idempotent managed block in shared instruction files. */
@@ -27,18 +27,13 @@ interface PlatformSpec {
 
 /**
  * Codex and Antigravity both follow the `AGENTS.md` standard, so they resolve to the
- * same target and body. Cursor and Gemini each have their own convention.
+ * same target and body. Cursor has its own convention (.cursor/rules/*.mdc).
  */
 export const PLATFORM_SPECS: Record<SkillPlatform, PlatformSpec> = {
   cursor: {
     targetRelPath: join('.cursor', 'rules', 'mmr-review.mdc'),
     mode: 'file',
     templateFile: join('cursor', 'mmr-review.mdc'),
-  },
-  gemini: {
-    targetRelPath: 'GEMINI.md',
-    mode: 'block',
-    templateFile: join('gemini', 'mmr-review.md'),
   },
   codex: {
     targetRelPath: 'AGENTS.md',

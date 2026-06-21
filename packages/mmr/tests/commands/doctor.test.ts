@@ -80,6 +80,15 @@ describe('mmr doctor', () => {
     exitSpy.mockRestore()
   })
 
+  it('reports the retired gemini channel as retired and never probes it (even if a config re-enables it)', async () => {
+    fs.writeFileSync(path.join(tmp, '.mmr.yaml'), 'version: 1\nchannels:\n  gemini:\n    enabled: true\n')
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
+    await run({ format: 'json' })
+    const rows = JSON.parse(String(logSpy.mock.calls.at(-1)?.[0])) as Array<{ name: string; status: string }>
+    expect(rows.find((r) => r.name === 'gemini')?.status).toBe('retired')
+    exitSpy.mockRestore()
+  })
+
   it('emits JSON with --format json', async () => {
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
     await run({ format: 'json' })

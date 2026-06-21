@@ -26,13 +26,22 @@ export function migrateV1(raw: Record<string, unknown>): ScaffoldConfig {
   const platforms = raw['platforms']
 
   const migratedMethodology = mapMethodology(String(methodology ?? ''))
-  const migratedPlatforms = (platforms as Array<'claude-code' | 'codex' | 'gemini'> | undefined) ?? ['claude-code']
+  // Gemini was dropped — strip ONLY that entry and preserve every other value so
+  // the schema (not the migration) validates the platform enum. Backfill if empty.
+  // A malformed non-array value is passed through untouched for the schema to reject.
+  const rawPlatforms = platforms ?? ['claude-code']
+  const migratedPlatforms = (Array.isArray(rawPlatforms)
+    ? ((rawPlatforms.filter((p) => p !== 'gemini')) as string[])
+    : rawPlatforms) as ScaffoldConfig['platforms']
+  const finalPlatforms = (Array.isArray(migratedPlatforms) && migratedPlatforms.length === 0
+    ? ['claude-code']
+    : migratedPlatforms) as ScaffoldConfig['platforms']
 
   return {
     ...rest,
     version: 2,
     methodology: migratedMethodology,
-    platforms: migratedPlatforms,
+    platforms: finalPlatforms,
   } as ScaffoldConfig
 }
 

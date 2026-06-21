@@ -118,8 +118,9 @@ describe('mmr skill install CLI', () => {
     try {
       runSkill({ action: 'install', dir, all: true })
       expect(fs.existsSync(path.join(dir, '.cursor', 'rules', 'mmr-review.mdc'))).toBe(true)
-      expect(fs.existsSync(path.join(dir, 'GEMINI.md'))).toBe(true)
       expect(fs.existsSync(path.join(dir, 'AGENTS.md'))).toBe(true)
+      // Gemini was dropped — no GEMINI.md is written
+      expect(fs.existsSync(path.join(dir, 'GEMINI.md'))).toBe(false)
 
       const { out, exited } = runSkill({ action: 'install', dir, all: true })
       expect(exited).toBeUndefined()

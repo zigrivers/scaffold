@@ -5,7 +5,7 @@ summary: "Verifies every PRD feature maps to a domain entity, checks that busine
 phase: "modeling"
 order: 520
 dependencies: [domain-modeling]
-outputs: [docs/reviews/review-domain-modeling.md, docs/reviews/domain-modeling/review-summary.md, docs/reviews/domain-modeling/codex-review.json, docs/reviews/domain-modeling/gemini-review.json]
+outputs: [docs/reviews/review-domain-modeling.md, docs/reviews/domain-modeling/review-summary.md, docs/reviews/domain-modeling/codex-review.json, docs/reviews/domain-modeling/antigravity-review.json]
 conditional: null
 knowledge-base: [review-methodology, review-domain-modeling, multi-model-review-dispatch, review-step-template]
 ---
@@ -15,7 +15,7 @@ Deep multi-pass review of the domain models, targeting the specific failure mode
 of domain modeling artifacts. Identify issues, create a fix plan, execute fixes,
 and re-validate.
 
-At depth 4+, dispatches to external AI models (Codex, Gemini) for
+At depth 4+, dispatches to external AI models (Codex, Antigravity) for
 independent review validation.
 
 ## Inputs
@@ -27,7 +27,7 @@ independent review validation.
 - docs/domain-models/ — updated with fixes
 - docs/reviews/domain-modeling/review-summary.md (depth 4+) — multi-model review synthesis
 - docs/reviews/domain-modeling/codex-review.json (depth 4+, if available) — raw Codex findings
-- docs/reviews/domain-modeling/gemini-review.json (depth 4+, if available) — raw Gemini findings
+- docs/reviews/domain-modeling/antigravity-review.json (depth 4+, if available) — raw Antigravity findings
 
 ## Quality Criteria
 - (mvp) Consistency check executed with blocking issues documented
@@ -43,7 +43,7 @@ independent review validation.
 ## Methodology Scaling
 - **deep**: All review passes from the knowledge base. Full findings report
   with severity categorization. Fixes applied and re-validated. Multi-model
-  review dispatched to Codex and Gemini if available, with graceful fallback
+  review dispatched to Codex and Antigravity if available, with graceful fallback
   to Claude-only enhanced review.
 - **mvp**: Quick consistency check. Focus on blocking issues only.
 - **custom:depth(1-5)**:

@@ -189,13 +189,12 @@ describe('runWizard', () => {
     expect(output.prompt).not.toHaveBeenCalled()
   })
 
-  // Test 10: Interactive mode preserves Gemini in config.yml when selected
-  it('writes Gemini to config.yml when Codex is declined and Gemini is accepted in interactive mode', async () => {
+  // Test 10: Interactive mode writes Codex to config.yml when accepted
+  it('writes codex to config.yml when the codex adapter is accepted in interactive mode', async () => {
     const output = makeOutputContext()
     vi.mocked(output.prompt).mockResolvedValueOnce('deep')
     vi.mocked(output.confirm)
-      .mockResolvedValueOnce(false)   // Codex
-      .mockResolvedValueOnce(true)    // Gemini
+      .mockResolvedValueOnce(true)    // Codex
       .mockResolvedValueOnce(false)   // web
       .mockResolvedValueOnce(false)   // mobile
     vi.mocked(output.select).mockResolvedValueOnce('web-app')  // projectType
@@ -210,7 +209,7 @@ describe('runWizard', () => {
     expect(result.success).toBe(true)
     const configPath = path.join(tmpDir, '.scaffold', 'config.yml')
     const parsed = yaml.load(fs.readFileSync(configPath, 'utf8')) as Record<string, unknown>
-    expect(parsed['platforms']).toEqual(['claude-code', 'gemini'])
+    expect(parsed['platforms']).toEqual(['claude-code', 'codex'])
   })
 
   // Test 11: Result has success: true on successful init
@@ -229,7 +228,6 @@ describe('runWizard', () => {
     vi.mocked(output.prompt).mockResolvedValueOnce('deep')
     vi.mocked(output.confirm)
       .mockResolvedValueOnce(false)   // Codex
-      .mockResolvedValueOnce(false)   // Gemini
       .mockResolvedValueOnce(false)   // web
       .mockResolvedValueOnce(false)   // mobile
       .mockResolvedValueOnce(false)   // advanced options
@@ -267,7 +265,6 @@ describe('runWizard', () => {
     vi.mocked(output.prompt).mockResolvedValueOnce('deep')
     vi.mocked(output.confirm)
       .mockResolvedValueOnce(false)   // Codex
-      .mockResolvedValueOnce(false)   // Gemini
       .mockResolvedValueOnce(false)   // web
       .mockResolvedValueOnce(false)   // mobile
     vi.mocked(output.select)
@@ -334,7 +331,6 @@ describe('runWizard', () => {
     vi.mocked(output.prompt).mockResolvedValueOnce('deep')  // methodology
     vi.mocked(output.confirm)
       .mockResolvedValueOnce(false)   // Codex adapter
-      .mockResolvedValueOnce(false)   // Gemini adapter
       .mockResolvedValueOnce(false)   // web trait
       .mockResolvedValueOnce(false)   // mobile trait
     vi.mocked(output.select)
@@ -390,7 +386,6 @@ describe('runWizard', () => {
     vi.mocked(output.prompt).mockResolvedValueOnce('deep')  // methodology
     vi.mocked(output.confirm)
       .mockResolvedValueOnce(false)   // Codex adapter
-      .mockResolvedValueOnce(false)   // Gemini adapter
       .mockResolvedValueOnce(false)   // web trait
       .mockResolvedValueOnce(false)   // mobile trait
     vi.mocked(output.select)

@@ -40,7 +40,7 @@ and autonomous behavior guidelines.
 - (mvp) tasks/lessons.md exists with Patterns, Anti-Patterns, and Common Gotchas sections
 - (mvp) `bd setup claude` was run after `bd init` to install the upstream-managed
   Beads integration block in CLAUDE.md (marker-wrapped, hook-driven). For projects
-  also targeting Codex CLI or Gemini CLI: `bd setup codex` and/or `bd setup gemini`
+  also targeting Codex CLI or Antigravity CLI: `bd setup codex`
   were run. Verify with `bd setup claude --check`.
 - (mvp) CLAUDE.md contains Core Principles with all four tenets (Simplicity, No Laziness, TDD, Prove It) — scaffold-owned content, ADJACENT to the Beads-managed block
 - (mvp) CLAUDE.md contains commit-message convention requiring Beads task IDs — scaffold-owned content
@@ -63,7 +63,7 @@ and autonomous behavior guidelines.
 
 ## Methodology Scaling
 - **deep**: Full Beads setup — `bd init`, then `bd doctor --fix`, then `bd setup
-  claude` (and/or `bd setup codex`, `bd setup gemini` for multi-platform projects).
+  claude` (and/or `bd setup codex`).
   Enable custom issue types via `bd config set types.custom '["story","milestone","spike"]'`
   so downstream prompts can use `-t story` for user stories and `-t milestone` for
   releases. Scaffold-owned CLAUDE.md content (Core Principles + commit convention +
@@ -79,7 +79,7 @@ and autonomous behavior guidelines.
   - Depth 2: Depth 1 + add commit convention + upgrade-remediation callout.
   - Depth 3: Add priority level documentation and autonomous behavior rules.
   - Depth 4: Full setup with cross-doc consistency checks against git-workflow.md and coding-standards.md. Enable `bd config set types.custom '["story","milestone","spike"]'`.
-  - Depth 5: Full setup + detailed autonomous behavior rules + commit-message convention enforcement. Run `bd setup codex` and `bd setup gemini` if the project targets those CLIs.
+  - Depth 5: Full setup + detailed autonomous behavior rules + commit-message convention enforcement. Run `bd setup codex`.
 
 ## Instructions
 
@@ -99,12 +99,11 @@ existing setup updates rather than re-initializes.
 
 3. **Install the upstream-managed editor integration** for whichever AI agent CLI
    the project targets. The recipe writes a marker-managed block in CLAUDE.md /
-   AGENTS.md / GEMINI.md and installs the SessionStart hooks that load
+   AGENTS.md and installs the SessionStart hooks that load
    `bd prime --hook-json`:
    ```bash
    bd setup claude     # Claude Code (always)
    bd setup codex      # Codex CLI (multi-platform projects only)
-   bd setup gemini     # Gemini CLI (multi-platform projects only)
    ```
    Verify with `bd setup claude --check`.
 

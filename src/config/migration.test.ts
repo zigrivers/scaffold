@@ -34,9 +34,19 @@ describe('migrateV1', () => {
     expect(result.platforms).toEqual(['codex'])
   })
 
-  it('preserves claude-code and gemini platforms if already present', () => {
+  it('strips a dropped gemini platform during migration', () => {
     const result = migrateV1({ version: 1, methodology: 'classic', platforms: ['claude-code', 'gemini'] })
-    expect(result.platforms).toEqual(['claude-code', 'gemini'])
+    expect(result.platforms).toEqual(['claude-code'])
+  })
+
+  it('falls back to claude-code when migration strips gemini to empty', () => {
+    const result = migrateV1({ version: 1, methodology: 'classic', platforms: ['gemini'] })
+    expect(result.platforms).toEqual(['claude-code'])
+  })
+
+  it('preserves non-gemini values (strips only gemini; the schema validates the rest)', () => {
+    const result = migrateV1({ version: 1, methodology: 'classic', platforms: ['claude-code', 'future-cli', 'gemini'] })
+    expect(result.platforms).toEqual(['claude-code', 'future-cli'])
   })
 
   it('adds platforms claude-code if missing', () => {

@@ -5,7 +5,7 @@ summary: "Analyzes the PRD for feature-level gaps — competitive blind spots, U
 phase: "pre"
 order: 130
 dependencies: [review-prd]
-outputs: [docs/prd-innovation.md, docs/plan.md, docs/reviews/prd-innovation/review-summary.md, docs/reviews/prd-innovation/codex-review.json, docs/reviews/prd-innovation/gemini-review.json]
+outputs: [docs/prd-innovation.md, docs/plan.md, docs/reviews/prd-innovation/review-summary.md, docs/reviews/prd-innovation/codex-review.json, docs/reviews/prd-innovation/antigravity-review.json]
 conditional: "if-needed"
 knowledge-base: [prd-innovation, prd-craft, multi-model-review-dispatch]
 reads: [review-prd]
@@ -17,7 +17,7 @@ new capabilities, competitive positioning, and defensive product gaps. It is
 NOT UX-level enhancement (that belongs in user story innovation) — it focuses
 on whether the right features are in the PRD at all.
 
-At depth 4+, dispatches to external AI models (Codex, Gemini) for
+At depth 4+, dispatches to external AI models (Codex, Antigravity) for
 independent innovation brainstorming — different models surface different
 creative opportunities and competitive insights.
 
@@ -31,7 +31,7 @@ creative opportunities and competitive insights.
 - docs/plan.md — updated with approved innovations
 - docs/reviews/prd-innovation/review-summary.md (depth 4+) — multi-model innovation synthesis
 - docs/reviews/prd-innovation/codex-review.json (depth 4+, if available) — raw Codex suggestions
-- docs/reviews/prd-innovation/gemini-review.json (depth 4+, if available) — raw Gemini suggestions
+- docs/reviews/prd-innovation/antigravity-review.json (depth 4+, if available) — raw Antigravity suggestions
 
 ## Quality Criteria
 - (mvp) Enhancements are feature-level, not UX-level polish
@@ -48,7 +48,7 @@ creative opportunities and competitive insights.
 - **deep**: Full innovation pass across all categories (competitive research,
   UX gaps, AI-native opportunities, defensive product thinking). Cost/impact
   matrix. Detailed integration of approved innovations into PRD. Multi-model
-  innovation dispatched to Codex and Gemini if available, with graceful
+  innovation dispatched to Codex and Antigravity if available, with graceful
   fallback to Claude-only enhanced brainstorming.
 - **mvp**: Not applicable — this step is conditional and skipped in MVP.
 - **custom:depth(1-5)**:

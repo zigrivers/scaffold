@@ -187,7 +187,7 @@ export interface ScaffoldConfig {
   version: 2
   methodology: MethodologyName
   custom?: CustomConfig
-  platforms: Array<'claude-code' | 'codex' | 'gemini'>
+  platforms: Array<'claude-code' | 'codex'>
   project?: ProjectConfig
   [key: string]: unknown  // forward compatibility — unknown fields preserved per ADR-033
 }

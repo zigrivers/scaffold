@@ -5,7 +5,7 @@ summary: "Compares everything that has been specified against the original PRD a
 phase: "validation"
 order: 1370
 dependencies: [implementation-plan-review, review-security]
-outputs: [docs/validation/scope-creep-check.md, docs/validation/scope-creep-check/review-summary.md, docs/validation/scope-creep-check/codex-review.json, docs/validation/scope-creep-check/gemini-review.json]
+outputs: [docs/validation/scope-creep-check.md, docs/validation/scope-creep-check/review-summary.md, docs/validation/scope-creep-check/codex-review.json, docs/validation/scope-creep-check/antigravity-review.json]
 conditional: null
 knowledge-base: [scope-management, multi-model-review-dispatch]
 ---
@@ -18,7 +18,7 @@ should not introduce features not in the PRD — UX-level enhancements are
 allowed only via the innovation step with explicit user approval. Flag any
 scope expansion for explicit approval.
 
-At depth 4+, dispatches to external AI models (Codex, Gemini) for
+At depth 4+, dispatches to external AI models (Codex, Antigravity) for
 independent scope analysis — different models interpret PRD boundaries
 differently, surfacing subtle creep.
 
@@ -30,7 +30,7 @@ differently, surfacing subtle creep.
 - docs/validation/scope-creep-check.md — findings report
 - docs/validation/scope-creep-check/review-summary.md (depth 4+) — multi-model validation synthesis
 - docs/validation/scope-creep-check/codex-review.json (depth 4+, if available) — raw Codex findings
-- docs/validation/scope-creep-check/gemini-review.json (depth 4+, if available) — raw Gemini findings
+- docs/validation/scope-creep-check/antigravity-review.json (depth 4+, if available) — raw Antigravity findings
 
 ## Quality Criteria
 - (mvp) Every user story maps to a PRD feature or requirement
@@ -56,7 +56,7 @@ proceeding without acknowledgment.
 
 ## Methodology Scaling
 - **deep**: Exhaustive analysis with all sub-checks. Multi-model validation
-  dispatched to Codex and Gemini if available, with graceful fallback to
+  dispatched to Codex and Antigravity if available, with graceful fallback to
   Claude-only enhanced validation.
 - **mvp**: High-level scan for blocking issues only.
 - **custom:depth(1-5)**:

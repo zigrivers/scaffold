@@ -311,7 +311,20 @@ export const ConfigSchema = z.object({
   version: z.literal(2),
   methodology: z.enum(['deep', 'mvp', 'custom']).default('deep'),
   custom: CustomSchema.optional(),
-  platforms: z.array(z.enum(['claude-code', 'codex', 'gemini'])).min(1).default(['claude-code']),
+  // Gemini was dropped (its CLI is sunset). Strip a legacy `gemini` entry from
+  // existing configs BEFORE the enum validates, so old project configs still
+  // load; if that empties the list, fall back to the default.
+  platforms: z.preprocess(
+    (v) => {
+      if (!Array.isArray(v)) return v
+      const hadGemini = v.includes('gemini')
+      const filtered = v.filter((p) => p !== 'gemini')
+      // Only backfill when stripping gemini EMPTIED the list; a genuinely empty
+      // input still fails .min(1) (it's a user error, not a legacy config).
+      return hadGemini && filtered.length === 0 ? ['claude-code'] : filtered
+    },
+    z.array(z.enum(['claude-code', 'codex'])).min(1).default(['claude-code']),
+  ),
   project: ProjectSchema.optional(),
 }).passthrough()  // allow unknown fields at top level per ADR-033
 

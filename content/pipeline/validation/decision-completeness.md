@@ -5,7 +5,7 @@ summary: "Checks that every technology choice and architectural pattern has a re
 phase: "validation"
 order: 1330
 dependencies: [implementation-plan-review, review-security]
-outputs: [docs/validation/decision-completeness.md, docs/validation/decision-completeness/review-summary.md, docs/validation/decision-completeness/codex-review.json, docs/validation/decision-completeness/gemini-review.json]
+outputs: [docs/validation/decision-completeness.md, docs/validation/decision-completeness/review-summary.md, docs/validation/decision-completeness/codex-review.json, docs/validation/decision-completeness/antigravity-review.json]
 conditional: null
 knowledge-base: [decision-completeness, multi-model-review-dispatch]
 ---
@@ -16,7 +16,7 @@ significant architectural and technology decision has a corresponding ADR,
 that no two ADRs contradict each other, and that all decisions have clear
 rationale.
 
-At depth 4+, dispatches to external AI models (Codex, Gemini) for
+At depth 4+, dispatches to external AI models (Codex, Antigravity) for
 independent decision audit — different models surface different implicit
 decisions.
 
@@ -28,7 +28,7 @@ decisions.
 - docs/validation/decision-completeness.md — findings report
 - docs/validation/decision-completeness/review-summary.md (depth 4+) — multi-model validation synthesis
 - docs/validation/decision-completeness/codex-review.json (depth 4+, if available) — raw Codex findings
-- docs/validation/decision-completeness/gemini-review.json (depth 4+, if available) — raw Gemini findings
+- docs/validation/decision-completeness/antigravity-review.json (depth 4+, if available) — raw Antigravity findings
 
 ## Quality Criteria
 - (mvp) Every technology choice in `docs/tech-stack.md` has a corresponding ADR
@@ -53,7 +53,7 @@ proceeding without acknowledgment.
 
 ## Methodology Scaling
 - **deep**: Exhaustive analysis with all sub-checks. Multi-model validation
-  dispatched to Codex and Gemini if available, with graceful fallback to
+  dispatched to Codex and Antigravity if available, with graceful fallback to
   Claude-only enhanced validation.
 - **mvp**: High-level scan for blocking issues only.
 - **custom:depth(1-5)**:

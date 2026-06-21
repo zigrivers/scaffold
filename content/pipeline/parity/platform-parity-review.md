@@ -5,7 +5,7 @@ summary: "Audits all documentation for platform-specific gaps — features missi
 phase: "parity"
 order: 1010
 dependencies: [review-architecture, review-database, review-api, review-ux]
-outputs: [docs/reviews/platform-parity-review.md, docs/reviews/platform-parity/review-summary.md, docs/reviews/platform-parity/codex-review.json, docs/reviews/platform-parity/gemini-review.json]
+outputs: [docs/reviews/platform-parity-review.md, docs/reviews/platform-parity/review-summary.md, docs/reviews/platform-parity/codex-review.json, docs/reviews/platform-parity/antigravity-review.json]
 reads: [user-stories, coding-standards, tech-stack, project-structure, tdd, design-system]
 conditional: "if-needed"
 knowledge-base: [cross-phase-consistency, multi-model-review-dispatch, review-step-template, review-methodology]
@@ -18,7 +18,7 @@ Identify gaps where one platform was assumed but another was not considered,
 verify feature parity across targets, and ensure platform-specific testing,
 input patterns, and UX considerations are documented.
 
-At depth 4+, dispatches to external AI models (Codex, Gemini) for
+At depth 4+, dispatches to external AI models (Codex, Antigravity) for
 independent platform gap analysis.
 
 ## Conditional Evaluation
@@ -45,7 +45,7 @@ Skip when the project targets a single platform only.
   findings per document, feature parity matrix, and recommended fixes
 - docs/reviews/platform-parity/review-summary.md (depth 4+) — multi-model review synthesis
 - docs/reviews/platform-parity/codex-review.json (depth 4+, if available) — raw Codex findings
-- docs/reviews/platform-parity/gemini-review.json (depth 4+, if available) — raw Gemini findings
+- docs/reviews/platform-parity/antigravity-review.json (depth 4+, if available) — raw Antigravity findings
 
 ## Quality Criteria
 - (mvp) All target platforms identified from PRD and tech-stack.md
@@ -64,7 +64,7 @@ Skip when the project targets a single platform only.
 - **deep**: Comprehensive platform audit across all documents, feature parity
   matrix, input pattern analysis, navigation pattern review, offline handling,
   accessibility per platform, and detailed fix recommendations. Multi-model
-  review dispatched to Codex and Gemini if available, with graceful fallback
+  review dispatched to Codex and Antigravity if available, with graceful fallback
   to Claude-only enhanced review.
 - **mvp**: Quick check of user stories and tech-stack for platform coverage.
   Identify top 3 platform gaps. Skip detailed feature parity matrix.

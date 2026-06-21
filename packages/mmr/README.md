@@ -94,9 +94,10 @@ channels:
     enabled: true
   antigravity:        # alias: agy
     enabled: true
-  gemini:             # deprecated legacy channel; not used by default
-    enabled: false
 ```
+
+> Note: the `gemini` channel was **retired** (its CLI is sunset; use `antigravity`).
+> Existing configs that still name `gemini` keep loading — it is never dispatched.
 
 ## Installable skills
 
@@ -106,7 +107,6 @@ in the native convention of whichever agent CLI you run:
 | Platform | Target | Format |
 |----------|--------|--------|
 | `cursor` | `.cursor/rules/mmr-review.mdc` | dedicated Cursor rule file |
-| `gemini` | `GEMINI.md` | idempotent managed block |
 | `codex` | `AGENTS.md` | idempotent managed block |
 | `antigravity` | `AGENTS.md` | idempotent managed block |
 
@@ -119,7 +119,7 @@ mmr skill install --platform cursor --force # overwrite an existing dedicated fi
 
 Codex and Antigravity both follow the [`AGENTS.md`](https://agents.md) standard, so
 they share one managed block in `AGENTS.md`; installing either manages the same block.
-Block-mode targets (`GEMINI.md`, `AGENTS.md`) are updated in place between
+Block-mode targets (`AGENTS.md`) are updated in place between
 `<!-- BEGIN mmr-skill -->` / `<!-- END mmr-skill -->` delimiters, so re-running never
 disturbs your own content. Dedicated files (Cursor) are created fresh and require
 `--force` to overwrite. By default `mmr skill install` writes into the detected project

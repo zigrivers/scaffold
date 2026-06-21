@@ -5,7 +5,7 @@ summary: "Checks for contradictions between decisions, missing decisions implied
 phase: "decisions"
 order: 620
 dependencies: [adrs]
-outputs: [docs/reviews/review-adrs.md, docs/reviews/adrs/review-summary.md, docs/reviews/adrs/codex-review.json, docs/reviews/adrs/gemini-review.json]
+outputs: [docs/reviews/review-adrs.md, docs/reviews/adrs/review-summary.md, docs/reviews/adrs/codex-review.json, docs/reviews/adrs/antigravity-review.json]
 conditional: null
 knowledge-base: [review-methodology, review-adr, multi-model-review-dispatch, review-step-template]
 ---
@@ -15,7 +15,7 @@ Multi-pass review of ADRs targeting ADR-specific failure modes: contradictory
 decisions, missing rationale, implied-but-unrecorded decisions, and unresolved
 trade-offs.
 
-At depth 4+, dispatches to external AI models (Codex, Gemini) for
+At depth 4+, dispatches to external AI models (Codex, Antigravity) for
 independent review validation.
 
 ## Inputs
@@ -28,7 +28,7 @@ independent review validation.
 - docs/adrs/ — updated with fixes
 - docs/reviews/adrs/review-summary.md (depth 4+) — multi-model review synthesis
 - docs/reviews/adrs/codex-review.json (depth 4+, if available) — raw Codex findings
-- docs/reviews/adrs/gemini-review.json (depth 4+, if available) — raw Gemini findings
+- docs/reviews/adrs/antigravity-review.json (depth 4+, if available) — raw Antigravity findings
 
 ## Quality Criteria
 - (mvp) Contradiction check executed with findings documented
@@ -40,7 +40,7 @@ independent review validation.
 
 ## Methodology Scaling
 - **deep**: All review passes. Full findings report. Fixes applied and
-  re-validated. Multi-model review dispatched to Codex and Gemini if available,
+  re-validated. Multi-model review dispatched to Codex and Antigravity if available,
   with graceful fallback to Claude-only enhanced review.
 - **mvp**: Quick consistency check for contradictions only.
 - **custom:depth(1-5)**:

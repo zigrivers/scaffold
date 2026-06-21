@@ -54,34 +54,18 @@ export const BUILTIN_CHANNELS: Record<string, SubprocessChannelParsed> = {
     kind: 'subprocess',
     enabled: false,
     abstract: false,
-    // Deprecated reviewer channel. Antigravity (`agy`) is the supported Google
-    // CLI reviewer; keep this preset disabled so historical configs can opt in
-    // explicitly without MMR selecting Gemini for new/default reviews.
-    // No `-p` here: gemini's `-p/--prompt` flag *requires* a positional
-    // value, but MMR delivers prompts via stdin. With `gemini -p
-    // --output-format json` and prompt on stdin, gemini parses
-    // `--output-format` as `-p`'s value and bails out with
-    // "Not enough arguments following: p", failing the channel in 0s.
-    // Without `-p`, gemini reads stdin natively. The auth probe at
-    // `auth.check` below keeps `-p "respond with ok"` because that
-    // invocation supplies an explicit prompt value.
+    // RETIRED (v3.1.0). Google sunset the Gemini CLI reviewer; Antigravity
+    // (`agy`) is the supported replacement. Kept as a disabled TOMBSTONE so
+    // existing `.mmr.yaml` files that still name `gemini` (e.g. in
+    // channels_disabled) keep loading. It is never dispatched, and an explicit
+    // `--channels gemini` errors with a migration hint (→ antigravity).
+    retired: true,
     command: 'gemini',
-    flags: ['--output-format', 'json'],
-    env: { NO_BROWSER: 'true' },
-    auth: {
-      check: 'NO_BROWSER=true gemini -p "respond with ok" -o json 2>&1',
-      // Gemini CLI's auth probe is a full LLM round-trip (not a local
-      // status check) and routinely takes ~9s. 5s false-fails normal
-      // environments. Codex stays at 5s below because its auth probe
-      // is a local file check (`codex login status`), not a round-trip.
-      timeout: 20,
-      failure_exit_codes: [41],
-      recovery: 'gemini -p "hello"',
-    },
+    flags: [],
+    env: {},
     prompt_wrapper: '{{prompt}}',
-    output_parser: 'gemini',
+    output_parser: 'default',
     stderr: 'capture',
-    timeout: 360,
   },
   codex: {
     kind: 'subprocess',

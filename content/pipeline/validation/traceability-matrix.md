@@ -5,7 +5,7 @@ summary: "Builds a map showing that every PRD requirement traces through to user
 phase: "validation"
 order: 1320
 dependencies: [implementation-plan-review, review-security]
-outputs: [docs/validation/traceability-matrix.md, docs/validation/traceability-matrix/review-summary.md, docs/validation/traceability-matrix/codex-review.json, docs/validation/traceability-matrix/gemini-review.json]
+outputs: [docs/validation/traceability-matrix.md, docs/validation/traceability-matrix/review-summary.md, docs/validation/traceability-matrix/codex-review.json, docs/validation/traceability-matrix/antigravity-review.json]
 reads: [story-tests, create-evals]
 conditional: null
 knowledge-base: [traceability, multi-model-review-dispatch]
@@ -17,7 +17,7 @@ to implementation tasks. Verify the full chain: PRD → User Stories → Domain
 Model → Architecture → Tasks, with no orphans in either direction. Every PRD
 requirement must trace to at least one story, every story to at least one task.
 
-At depth 4+, dispatches to external AI models (Codex, Gemini) for
+At depth 4+, dispatches to external AI models (Codex, Antigravity) for
 independent traceability validation — different models catch different
 coverage gaps.
 
@@ -32,7 +32,7 @@ coverage gaps.
 - docs/validation/traceability-matrix.md — findings report
 - docs/validation/traceability-matrix/review-summary.md (depth 4+) — multi-model validation synthesis
 - docs/validation/traceability-matrix/codex-review.json (depth 4+, if available) — raw Codex findings
-- docs/validation/traceability-matrix/gemini-review.json (depth 4+, if available) — raw Gemini findings
+- docs/validation/traceability-matrix/antigravity-review.json (depth 4+, if available) — raw Antigravity findings
 
 ## Quality Criteria
 - (mvp) Every feature and user-facing behavior in the PRD's feature list maps to >= 1 user story
@@ -59,7 +59,7 @@ proceeding without acknowledgment.
 
 ## Methodology Scaling
 - **deep**: Exhaustive analysis with all sub-checks. Multi-model validation
-  dispatched to Codex and Gemini if available, with graceful fallback to
+  dispatched to Codex and Antigravity if available, with graceful fallback to
   Claude-only enhanced validation.
 - **mvp**: High-level scan for blocking issues only.
 - **custom:depth(1-5)**:

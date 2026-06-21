@@ -10,6 +10,7 @@ export type ChannelHealthStatus =
   | 'not_installed'
   | 'disabled'
   | 'abstract'
+  | 'retired'
   | 'missing_command'
 
 /** Map an auth-probe result ('ok'|'failed'|'timeout') to a health status. */
@@ -43,6 +44,9 @@ export async function probeChannels(config: MmrConfigParsed): Promise<ChannelHea
   // off — don't probe it (and don't let `doctor --fix` mutate it).
   const disabledList = new Set((config.channels_disabled ?? []).map(normalizeChannelName))
   for (const [name, ch] of Object.entries(config.channels)) {
+    // A retired channel (gemini tombstone) is never probed or mutated by --fix,
+    // even if a legacy config re-enabled it.
+    if (ch.retired) { out.push({ name, status: 'retired', installed: false }); continue }
     if (ch.abstract) { out.push({ name, status: 'abstract', installed: false }); continue }
     if (!ch.enabled || disabledList.has(normalizeChannelName(name))) {
       out.push({ name, status: 'disabled', installed: false })

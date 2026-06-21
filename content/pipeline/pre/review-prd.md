@@ -5,7 +5,7 @@ summary: "Reviews the PRD across eight passes — problem rigor, persona coverag
 phase: "pre"
 order: 120
 dependencies: [create-prd]
-outputs: [docs/reviews/pre-review-prd.md, docs/reviews/prd/review-summary.md, docs/reviews/prd/codex-review.json, docs/reviews/prd/gemini-review.json]
+outputs: [docs/reviews/pre-review-prd.md, docs/reviews/prd/review-summary.md, docs/reviews/prd/codex-review.json, docs/reviews/prd/antigravity-review.json]
 conditional: null
 knowledge-base: [review-methodology, review-prd, prd-craft, gap-analysis, multi-model-review-dispatch, review-step-template]
 ---
@@ -16,7 +16,7 @@ product requirements artifacts. Identify issues, create a fix plan, execute
 fixes, and re-validate. Ensures the PRD is complete, clear, consistent, and
 ready for User Stories to consume.
 
-At depth 4+, dispatches to external AI models (Codex, Gemini) for
+At depth 4+, dispatches to external AI models (Codex, Antigravity) for
 independent review validation.
 
 ## Inputs
@@ -28,7 +28,7 @@ independent review validation.
 - docs/plan.md — updated with fixes
 - docs/reviews/prd/review-summary.md (depth 4+) — multi-model review synthesis
 - docs/reviews/prd/codex-review.json (depth 4+, if available) — raw Codex findings
-- docs/reviews/prd/gemini-review.json (depth 4+, if available) — raw Gemini findings
+- docs/reviews/prd/antigravity-review.json (depth 4+, if available) — raw Antigravity findings
 
 ## Quality Criteria
 - (mvp) Passes 1-2 executed with findings documented
@@ -42,7 +42,7 @@ independent review validation.
 ## Methodology Scaling
 - **deep**: All 8 review passes from the knowledge base. Full findings report
   with severity categorization. Fixes applied and re-validated. Multi-model
-  review dispatched to Codex and Gemini if available, with graceful fallback
+  review dispatched to Codex and Antigravity if available, with graceful fallback
   to Claude-only enhanced review.
 - **mvp**: Passes 1-2 only (Problem Statement Rigor, Persona Coverage). Focus
   on blocking gaps — requirements too vague to write stories from.

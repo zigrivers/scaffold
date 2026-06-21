@@ -5,7 +5,7 @@ summary: "Identifies UX enhancement opportunities — progressive disclosure, sm
 phase: "pre"
 order: 160
 dependencies: [review-user-stories]
-outputs: [docs/user-stories-innovation.md, docs/user-stories.md, docs/reviews/user-stories-innovation/review-summary.md, docs/reviews/user-stories-innovation/codex-review.json, docs/reviews/user-stories-innovation/gemini-review.json]
+outputs: [docs/user-stories-innovation.md, docs/user-stories.md, docs/reviews/user-stories-innovation/review-summary.md, docs/reviews/user-stories-innovation/codex-review.json, docs/reviews/user-stories-innovation/antigravity-review.json]
 conditional: "if-needed"
 knowledge-base: [user-stories, user-story-innovation, multi-model-review-dispatch]
 ---
@@ -17,7 +17,7 @@ innovation — `innovate-prd`) — it focuses on making existing features better
 through smart defaults,
 progressive disclosure, accessibility improvements, and AI-native capabilities.
 
-At depth 4+, dispatches to external AI models (Codex, Gemini) for
+At depth 4+, dispatches to external AI models (Codex, Antigravity) for
 independent UX innovation brainstorming — different models surface different
 enhancement opportunities.
 
@@ -31,7 +31,7 @@ enhancement opportunities.
 - docs/user-stories.md — updated with approved enhancements
 - docs/reviews/user-stories-innovation/review-summary.md (depth 4+) — multi-model innovation synthesis
 - docs/reviews/user-stories-innovation/codex-review.json (depth 4+, if available) — raw Codex suggestions
-- docs/reviews/user-stories-innovation/gemini-review.json (depth 4+, if available) — raw Gemini suggestions
+- docs/reviews/user-stories-innovation/antigravity-review.json (depth 4+, if available) — raw Antigravity suggestions
 
 ## Quality Criteria
 - (mvp) Enhancements are UX-level, not new features
@@ -47,7 +47,7 @@ enhancement opportunities.
 - **deep**: Full innovation pass across all three categories (high-value
   low-effort, differentiators, defensive gaps). Cost/impact matrix.
   Detailed integration of approved enhancements into stories. Multi-model
-  innovation dispatched to Codex and Gemini if available, with graceful
+  innovation dispatched to Codex and Antigravity if available, with graceful
   fallback to Claude-only enhanced brainstorming.
 - **mvp**: Not applicable — this step is conditional and skipped in MVP.
 - **custom:depth(1-5)**:

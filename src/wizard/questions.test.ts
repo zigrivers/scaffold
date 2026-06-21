@@ -23,11 +23,10 @@ function makeOutputContext() {
 }
 
 describe('askWizardQuestions', () => {
-  it('allows adding Gemini after declining Codex', async () => {
+  it('adds codex after accepting the codex prompt (gemini prompt removed)', async () => {
     const output = makeOutputContext()
     vi.mocked(output.confirm)
-      .mockResolvedValueOnce(false)   // Codex
-      .mockResolvedValueOnce(true)    // Gemini
+      .mockResolvedValueOnce(true)    // Codex
       .mockResolvedValueOnce(false)   // web
       .mockResolvedValueOnce(false)   // mobile
     vi.mocked(output.select)
@@ -40,14 +39,13 @@ describe('askWizardQuestions', () => {
       auto: false,
     })
 
-    expect(result.platforms).toEqual(['claude-code', 'gemini'])
+    expect(result.platforms).toEqual(['claude-code', 'codex'])
   })
 
   it('non-game projectType does not trigger game questions', async () => {
     const output = makeOutputContext()
     vi.mocked(output.confirm)
       .mockResolvedValueOnce(false)   // Codex
-      .mockResolvedValueOnce(false)   // Gemini
       .mockResolvedValueOnce(false)   // web
       .mockResolvedValueOnce(false)   // mobile
     vi.mocked(output.select)
@@ -71,7 +69,6 @@ describe('askWizardQuestions', () => {
     const output = makeOutputContext()
     vi.mocked(output.confirm)
       .mockResolvedValueOnce(false)   // Codex
-      .mockResolvedValueOnce(false)   // Gemini
       .mockResolvedValueOnce(false)   // web
       .mockResolvedValueOnce(false)   // mobile
       .mockResolvedValueOnce(false)   // advanced options
@@ -110,7 +107,6 @@ describe('askWizardQuestions', () => {
     const output = makeOutputContext()
     vi.mocked(output.confirm)
       .mockResolvedValueOnce(false)   // Codex
-      .mockResolvedValueOnce(false)   // Gemini
       .mockResolvedValueOnce(false)   // web
       .mockResolvedValueOnce(false)   // mobile
       .mockResolvedValueOnce(false)   // advanced options
@@ -180,7 +176,6 @@ describe('askWizardQuestions', () => {
     const output = makeOutputContext()
     vi.mocked(output.confirm)
       .mockResolvedValueOnce(false)   // Codex
-      .mockResolvedValueOnce(false)   // Gemini
       .mockResolvedValueOnce(false)   // web
       .mockResolvedValueOnce(false)   // mobile
     vi.mocked(output.select)
@@ -208,7 +203,6 @@ describe('askWizardQuestions', () => {
     const output = makeOutputContext()
     vi.mocked(output.confirm)
       .mockResolvedValueOnce(false)   // Codex
-      .mockResolvedValueOnce(false)   // Gemini
       .mockResolvedValueOnce(false)   // web
       .mockResolvedValueOnce(false)   // mobile
       .mockResolvedValueOnce(false)   // advanced options
@@ -250,7 +244,6 @@ describe('askWizardQuestions', () => {
     const output = makeOutputContext()
     vi.mocked(output.confirm)
       .mockResolvedValueOnce(false)   // Codex
-      .mockResolvedValueOnce(false)   // Gemini
       .mockResolvedValueOnce(false)   // web
       .mockResolvedValueOnce(false)   // mobile
     vi.mocked(output.select)
@@ -288,7 +281,8 @@ describe('askWizardQuestions', () => {
       adapters: ['claude-code', 'codex', 'gemini'],
     })
 
-    expect(result.platforms).toEqual(['claude-code', 'codex', 'gemini'])
+    // a legacy `gemini` in --adapters is stripped (the CLI was dropped)
+    expect(result.platforms).toEqual(['claude-code', 'codex'])
     // confirm called only twice (web + mobile), not four times (Codex + Gemini + web + mobile)
     expect(output.confirm).toHaveBeenCalledTimes(2)
   })
@@ -299,7 +293,6 @@ describe('askWizardQuestions', () => {
     // Plus library wizard asks "Ship type definitions?"
     vi.mocked(output.confirm)
       .mockResolvedValueOnce(false)   // Codex
-      .mockResolvedValueOnce(false)   // Gemini
       .mockResolvedValueOnce(true)    // Ship type definitions? (library)
     vi.mocked(output.select)
       .mockResolvedValueOnce('library')  // projectType
@@ -317,8 +310,8 @@ describe('askWizardQuestions', () => {
     })
 
     expect(result.traits).toEqual(['web', 'mobile'])
-    // confirm called 3 times: Codex + Gemini + Ship type definitions (library)
-    expect(output.confirm).toHaveBeenCalledTimes(3)
+    // confirm called 2 times: Codex + Ship type definitions (library); Gemini prompt removed
+    expect(output.confirm).toHaveBeenCalledTimes(2)
   })
 
   it('--depth with --auto overrides auto default for custom methodology', async () => {
@@ -346,7 +339,6 @@ describe('askWizardQuestions', () => {
     const output = makeOutputContext()
     vi.mocked(output.confirm)
       .mockResolvedValueOnce(false)   // Codex
-      .mockResolvedValueOnce(false)   // Gemini
       .mockResolvedValueOnce(false)   // web
       .mockResolvedValueOnce(false)   // mobile
       .mockResolvedValueOnce(false)   // advanced options
@@ -415,7 +407,6 @@ describe('askWizardQuestions', () => {
     const output = makeOutputContext()
     vi.mocked(output.confirm)
       .mockResolvedValueOnce(false)   // Codex
-      .mockResolvedValueOnce(false)   // Gemini
       .mockResolvedValueOnce(false)   // web
       .mockResolvedValueOnce(false)   // mobile
       // No advanced gate confirm — it should be auto-opened by --narrative flag
@@ -450,8 +441,8 @@ describe('askWizardQuestions', () => {
     expect(result.gameConfig!.hasModding).toBe(true)
     expect(result.gameConfig!.persistence).toBe('cloud')
     // confirm should NOT have been called for the advanced gate
-    // Total confirms: Codex, Gemini, web, mobile, modding = 5
-    expect(output.confirm).toHaveBeenCalledTimes(5)
+    // Total confirms: Codex, web, mobile, modding = 4 (Gemini prompt removed)
+    expect(output.confirm).toHaveBeenCalledTimes(4)
     // Advanced gate confirm should never fire — verify no call with that text
     for (const call of output.confirm.mock.calls) {
       expect(call[0]).not.toBe('Configure advanced game options?')
@@ -1059,7 +1050,6 @@ describe('mcp-server wizard (interactive mode)', () => {
     const output = makeOutputContext()
     vi.mocked(output.confirm)
       .mockResolvedValueOnce(false)   // Codex
-      .mockResolvedValueOnce(false)   // Gemini
       .mockResolvedValueOnce(false)   // web
       .mockResolvedValueOnce(false)   // mobile
       .mockResolvedValueOnce(false)   // stateful
@@ -1094,7 +1084,6 @@ describe('mcp-server wizard (interactive mode — empty primitives)', () => {
     const output = makeOutputContext()
     vi.mocked(output.confirm)
       .mockResolvedValueOnce(false)   // Codex
-      .mockResolvedValueOnce(false)   // Gemini
       .mockResolvedValueOnce(false)   // web
       .mockResolvedValueOnce(false)   // mobile
     vi.mocked(output.select)

@@ -165,16 +165,16 @@ describe('KNOWN_PLATFORMS', () => {
     expect(KNOWN_PLATFORMS).toContain('codex')
   })
 
-  it('includes "gemini"', () => {
-    expect(KNOWN_PLATFORMS).toContain('gemini')
+  it('no longer includes the dropped "gemini" platform', () => {
+    expect(KNOWN_PLATFORMS).not.toContain('gemini')
   })
 
   it('includes "universal"', () => {
     expect(KNOWN_PLATFORMS).toContain('universal')
   })
 
-  it('has exactly 4 entries', () => {
-    expect(KNOWN_PLATFORMS).toHaveLength(4)
+  it('has exactly 3 entries', () => {
+    expect(KNOWN_PLATFORMS).toHaveLength(3)
   })
 })
 

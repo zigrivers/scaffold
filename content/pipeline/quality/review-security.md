@@ -5,7 +5,7 @@ summary: "Verifies OWASP coverage is complete, auth boundaries match API contrac
 phase: "quality"
 order: 960
 dependencies: [security]
-outputs: [docs/reviews/review-security.md, docs/reviews/security/review-summary.md, docs/reviews/security/codex-review.json, docs/reviews/security/gemini-review.json]
+outputs: [docs/reviews/review-security.md, docs/reviews/security/review-summary.md, docs/reviews/security/codex-review.json, docs/reviews/security/antigravity-review.json]
 conditional: null
 reads: [api-contracts]
 knowledge-base: [review-methodology, review-security, multi-model-review-dispatch, review-step-template]
@@ -17,7 +17,7 @@ gaps, auth/authz boundary mismatches with API contracts, secrets management gaps
 insufficient dependency audit coverage, missing threat model scenarios, and data
 classification gaps.
 
-At depth 4+, dispatches to external AI models (Codex, Gemini) for
+At depth 4+, dispatches to external AI models (Codex, Antigravity) for
 independent review validation.
 
 ## Inputs
@@ -30,7 +30,7 @@ independent review validation.
 - docs/security-review.md — updated with fixes
 - docs/reviews/security/review-summary.md (depth 4+) — multi-model review synthesis
 - docs/reviews/security/codex-review.json (depth 4+, if available) — raw Codex findings
-- docs/reviews/security/gemini-review.json (depth 4+, if available) — raw Gemini findings
+- docs/reviews/security/antigravity-review.json (depth 4+, if available) — raw Antigravity findings
 
 ## Quality Criteria
 - (mvp) OWASP coverage verified for this project
@@ -46,7 +46,7 @@ independent review validation.
 
 ## Methodology Scaling
 - **deep**: Full multi-pass review. Multi-model review dispatched to Codex and
-  Gemini if available, with graceful fallback to Claude-only enhanced review.
+  Antigravity if available, with graceful fallback to Claude-only enhanced review.
 - **mvp**: OWASP coverage check only.
 - **custom:depth(1-5)**:
   - Depth 1: OWASP top 10 and secrets management pass only (1 review pass)

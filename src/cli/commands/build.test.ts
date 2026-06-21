@@ -96,17 +96,17 @@ vi.mock('../../core/adapters/adapter.js', () => ({
           content: `command:${input.slug}`,
           writeMode: 'create',
         }]
-        : platformId === 'gemini'
+        : platformId === 'codex'
           ? [{
-            relativePath: `.gemini/commands/scaffold/${input.slug}.toml`,
-            content: `gemini:${input.slug}`,
+            relativePath: `.scaffold/generated/codex/commands/${input.slug}.md`,
+            content: `codex:${input.slug}`,
             writeMode: 'create',
           }]
           : [],
       success: true,
     })),
     finalize: vi.fn(() => ({
-      files: platformId === 'gemini'
+      files: platformId === 'codex'
         ? [
           {
             relativePath: '.agents/skills/scaffold-runner/SKILL.md',
@@ -119,8 +119,8 @@ vi.mock('../../core/adapters/adapter.js', () => ({
             writeMode: 'create',
           },
           {
-            relativePath: 'GEMINI.md',
-            content: 'gemini',
+            relativePath: 'AGENTS.md',
+            content: 'codex',
             writeMode: 'create',
           },
         ]
@@ -464,18 +464,18 @@ describe('build command', () => {
     )
   })
 
-  it('writes Gemini output when gemini is configured', async () => {
+  it('writes Codex output when codex is configured', async () => {
     mockLoadConfig.mockReturnValue({
-      config: makeConfig({ platforms: ['claude-code', 'gemini'] }) as ReturnType<typeof loadConfig>['config'],
+      config: makeConfig({ platforms: ['claude-code', 'codex'] }) as ReturnType<typeof loadConfig>['config'],
       errors: [],
       warnings: [],
     })
 
     await buildCommand.handler(defaultBuildArgv())
 
-    expect(mockCreateAdapter).toHaveBeenCalledWith('gemini')
+    expect(mockCreateAdapter).toHaveBeenCalledWith('codex')
     expect(mockAtomicWriteFile).toHaveBeenCalledWith(
-      '/fake/project/.gemini/commands/scaffold/step-a.toml',
+      '/fake/project/.scaffold/generated/codex/commands/step-a.md',
       expect.any(String),
     )
   })

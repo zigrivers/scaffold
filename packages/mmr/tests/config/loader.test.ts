@@ -303,6 +303,33 @@ channels:
     ).toThrow(/abstract|T1-A|non-dispatchable|template/i)
   })
 
+  it('keeps a builtin-retired channel retired+disabled even if a config tries to un-retire it', () => {
+    const projectYaml = `
+version: 1
+channels:
+  gemini:
+    retired: false
+    enabled: true
+`
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), projectYaml)
+    const config = loadConfig({ projectRoot: tmpDir, userHome: path.join(tmpDir, 'home') })
+    expect(config.channels.gemini.retired).toBe(true)
+    expect(config.channels.gemini.enabled).toBe(false)
+  })
+
+  it('rejects compensator.channel that targets the retired gemini channel', () => {
+    const projectYaml = `
+version: 1
+defaults:
+  compensator:
+    channel: gemini
+`
+    fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), projectYaml)
+    expect(() =>
+      loadConfig({ projectRoot: tmpDir, userHome: path.join(tmpDir, 'home') }),
+    ).toThrow(/retired|antigravity/i)
+  })
+
   it('rejects compensator.channel that targets a channel without command', () => {
     const projectYaml = `
 version: 1

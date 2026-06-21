@@ -3,7 +3,7 @@ import path from 'node:path'
 import os from 'node:os'
 import yaml from 'js-yaml'
 import { MmrConfigSchema, type MmrConfigParsed } from './schema.js'
-import { DEFAULT_CONFIG } from './defaults.js'
+import { DEFAULT_CONFIG, BUILTIN_CHANNELS } from './defaults.js'
 import { isSecretKey } from '../core/redact.js'
 import { readFileAtRef } from '../core/git-show.js'
 import { normalizeChannelName } from './channel-aliases.js'
@@ -244,6 +244,14 @@ function validateCompensatorReference(config: MmrConfigParsed): void {
       + 'Abstract channels are non-dispatchable templates; reference a concrete channel that extends it instead.',
     )
   }
+  // Retired channels (e.g. gemini) are tombstones and never dispatched, so they
+  // cannot serve as a compensator target.
+  if (target.retired === true) {
+    throw new Error(
+      `defaults.compensator.channel "${ref}" is retired and cannot be a compensator. `
+      + 'Reference a supported channel (e.g. antigravity) instead.',
+    )
+  }
   // http channels are concrete via endpoint/model rather than command.
   if (target.kind !== 'http' && !target.command) {
     throw new Error(
@@ -345,10 +353,26 @@ function parseMergedConfig(mergedRaw: Record<string, unknown>, warn: WarningSink
   }
 
   const config = MmrConfigSchema.parse(merged)
+  enforceRetiredChannels(config)
   warnOnInlineSecretHeaders(config, warn)
   validateCompensatorReference(config)
   validateRunnableChannels(config)
   return config
+}
+
+/**
+ * Retirement is a maintainer decision, not a user-overridable flag. Re-assert
+ * `retired: true` (and force `enabled: false`) on any channel the built-in
+ * defaults mark retired, so a config that sets `channels.<name>.retired: false`
+ * cannot resurrect a tombstone (e.g. the dropped gemini channel).
+ */
+function enforceRetiredChannels(config: MmrConfigParsed): void {
+  for (const [name, builtin] of Object.entries(BUILTIN_CHANNELS)) {
+    if (builtin.retired && config.channels[name]) {
+      config.channels[name].retired = true
+      config.channels[name].enabled = false
+    }
+  }
 }
 
 /**

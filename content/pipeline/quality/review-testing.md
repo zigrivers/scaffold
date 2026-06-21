@@ -5,7 +5,7 @@ summary: "Audits the testing strategy for coverage gaps by layer, verifies edge 
 phase: "quality"
 order: 910
 dependencies: [tdd, system-architecture]
-outputs: [docs/reviews/review-testing.md, docs/reviews/testing/review-summary.md, docs/reviews/testing/codex-review.json, docs/reviews/testing/gemini-review.json]
+outputs: [docs/reviews/review-testing.md, docs/reviews/testing/review-summary.md, docs/reviews/testing/codex-review.json, docs/reviews/testing/antigravity-review.json]
 reads: [domain-modeling]
 conditional: null
 knowledge-base: [review-methodology, review-testing-strategy, multi-model-review-dispatch, review-step-template]
@@ -16,7 +16,7 @@ Review testing strategy targeting testing-specific failure modes: coverage gaps
 by layer, missing edge cases from domain invariants, unrealistic test environment
 assumptions, inadequate performance test coverage, and missing integration boundaries.
 
-At depth 4+, dispatches to external AI models (Codex, Gemini) for
+At depth 4+, dispatches to external AI models (Codex, Antigravity) for
 independent review validation.
 
 ## Inputs
@@ -29,7 +29,7 @@ independent review validation.
 - docs/tdd-standards.md — updated with fixes
 - docs/reviews/testing/review-summary.md (depth 4+) — multi-model review synthesis
 - docs/reviews/testing/codex-review.json (depth 4+, if available) — raw Codex findings
-- docs/reviews/testing/gemini-review.json (depth 4+, if available) — raw Gemini findings
+- docs/reviews/testing/antigravity-review.json (depth 4+, if available) — raw Antigravity findings
 
 ## Quality Criteria
 - (mvp) Coverage gaps by layer documented with severity
@@ -44,7 +44,7 @@ independent review validation.
 
 ## Methodology Scaling
 - **deep**: Full multi-pass review targeting all testing failure modes. Multi-model
-  review dispatched to Codex and Gemini if available, with graceful fallback
+  review dispatched to Codex and Antigravity if available, with graceful fallback
   to Claude-only enhanced review.
 - **mvp**: Coverage gap check only.
 - **custom:depth(1-5)**:

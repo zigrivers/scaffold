@@ -5,7 +5,7 @@ summary: "Verifies every PRD feature maps to at least one story, checks that acc
 phase: "pre"
 order: 150
 dependencies: [user-stories]
-outputs: [docs/reviews/pre-review-user-stories.md, docs/reviews/user-stories/requirements-index.md, docs/reviews/user-stories/coverage.json, docs/reviews/user-stories/review-summary.md, docs/reviews/user-stories/codex-review.json, docs/reviews/user-stories/gemini-review.json]
+outputs: [docs/reviews/pre-review-user-stories.md, docs/reviews/user-stories/requirements-index.md, docs/reviews/user-stories/coverage.json, docs/reviews/user-stories/review-summary.md, docs/reviews/user-stories/codex-review.json, docs/reviews/user-stories/antigravity-review.json]
 conditional: null
 knowledge-base: [review-methodology, review-user-stories, multi-model-review-dispatch, review-step-template]
 ---
@@ -16,7 +16,7 @@ story artifacts. Identify coverage gaps, quality issues, and downstream
 readiness problems. Create a fix plan, execute fixes, and re-validate.
 
 At higher depths, builds a formal requirements index with traceability matrix
-and optionally dispatches to external AI models (Codex, Gemini) for
+and optionally dispatches to external AI models (Codex, Antigravity) for
 independent coverage validation.
 
 ## Inputs
@@ -48,7 +48,7 @@ independent coverage validation.
 - **deep**: All 6 review passes from the knowledge base. Full findings report
   with severity categorization. Fixes applied and re-validated. Requirements
   index and coverage matrix built. Multi-model review dispatched to Codex and
-  Gemini if available, with graceful fallback to Claude-only enhanced review.
+  Antigravity if available, with graceful fallback to Claude-only enhanced review.
 - **mvp**: Pass 1 only (PRD coverage). Focus on blocking gaps — PRD features
   with no corresponding story.
 - **custom:depth(1-5)**:

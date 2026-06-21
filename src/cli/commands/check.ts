@@ -192,11 +192,11 @@ const checkCommand: CommandModule<Record<string, unknown>, CheckArgs> = {
         }
       }
       const hasCodexCli = detectCli('codex')
-      const hasGeminiCli = detectCli('gemini')
+      const hasAntigravityCli = detectCli('agy')
       const hasClaudeCli = detectCli('claude')
       const availableClis = [
         hasCodexCli && 'codex',
-        hasGeminiCli && 'gemini',
+        hasAntigravityCli && 'antigravity',
         hasClaudeCli && 'claude',
       ].filter(Boolean) as string[]
       const recommendedMode = availableClis.length > 0 ? 'local-cli' : 'external-bot'

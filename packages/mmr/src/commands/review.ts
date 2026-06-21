@@ -155,6 +155,16 @@ export function resolveDispatchChannels(
   const isDispatchable = (name: string, explicitRequest = false): boolean => {
     const ch = channels[name]
     if (!ch) throw new Error(`Channel "${name}" not found in config`)
+    if (ch.retired === true) {
+      if (explicitRequest) {
+        const hint = RETIRED_CHANNEL_REPLACEMENT[name]
+        throw new Error(
+          `Channel "${name}" is retired and cannot be dispatched` +
+          (hint ? ` — use "${hint}" instead.` : '.'),
+        )
+      }
+      return false
+    }
     if (ch.abstract === true) {
       if (explicitRequest) {
         throw new Error(`Channel "${name}" is abstract and cannot be dispatched`)
@@ -175,8 +185,13 @@ export function resolveDispatchChannels(
     )]
   }
   return Object.entries(channels)
-    .filter(([name, ch]) => ch.enabled && !normalizedDisabled.has(name) && !ch.abstract)
+    .filter(([name, ch]) => ch.enabled && !normalizedDisabled.has(name) && !ch.abstract && !ch.retired)
     .map(([name]) => name)
+}
+
+/** Retired channels → their supported replacement, for migration hints. */
+export const RETIRED_CHANNEL_REPLACEMENT: Record<string, string> = {
+  gemini: 'antigravity',
 }
 
 function resolveTemplateCriteria(

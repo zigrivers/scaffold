@@ -5,7 +5,7 @@ summary: "Verifies the full deployment lifecycle is documented, monitoring cover
 phase: "quality"
 order: 940
 dependencies: [operations]
-outputs: [docs/reviews/review-operations.md, docs/reviews/operations/review-summary.md, docs/reviews/operations/codex-review.json, docs/reviews/operations/gemini-review.json]
+outputs: [docs/reviews/review-operations.md, docs/reviews/operations/review-summary.md, docs/reviews/operations/codex-review.json, docs/reviews/operations/antigravity-review.json]
 conditional: null
 knowledge-base: [review-methodology, review-operations, multi-model-review-dispatch, review-step-template]
 ---
@@ -15,7 +15,7 @@ Review operations runbook targeting operations-specific failure modes: deploymen
 strategy gaps, missing rollback procedures, monitoring blind spots, unjustified
 alerting thresholds, missing runbook scenarios, and DR coverage gaps.
 
-At depth 4+, dispatches to external AI models (Codex, Gemini) for
+At depth 4+, dispatches to external AI models (Codex, Antigravity) for
 independent review validation.
 
 ## Inputs
@@ -27,7 +27,7 @@ independent review validation.
 - docs/operations-runbook.md — updated with fixes
 - docs/reviews/operations/review-summary.md (depth 4+) — multi-model review synthesis
 - docs/reviews/operations/codex-review.json (depth 4+, if available) — raw Codex findings
-- docs/reviews/operations/gemini-review.json (depth 4+, if available) — raw Gemini findings
+- docs/reviews/operations/antigravity-review.json (depth 4+, if available) — raw Antigravity findings
 
 ## Quality Criteria
 - (mvp) Deployment lifecycle fully documented (deploy, verify, rollback)
@@ -44,7 +44,7 @@ independent review validation.
 
 ## Methodology Scaling
 - **deep**: Full multi-pass review. Multi-model review dispatched to Codex and
-  Gemini if available, with graceful fallback to Claude-only enhanced review.
+  Antigravity if available, with graceful fallback to Claude-only enhanced review.
 - **mvp**: Deployment coverage only.
 - **custom:depth(1-5)**:
   - Depth 1: Monitoring and logging pass only (1 review pass)

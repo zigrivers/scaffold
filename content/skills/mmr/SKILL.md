@@ -14,7 +14,7 @@ Dispatch code reviews to multiple AI model CLIs, poll for results, and collect r
 
 > **Scope & related skills.** This skill ships with Scaffold for Claude Code and
 > shared-agent hosts (`.claude/skills/`, `.agents/skills/`). The MMR CLI itself can
-> install an equivalent review skill into other agent CLIs — Cursor, Codex, Gemini,
+> install an equivalent review skill into other agent CLIs — Cursor, Codex,
 > and Antigravity — via `mmr skill install` (see the
 > [`mmr` reference guide](../../guides/mmr/index.md)). Those per-platform skill bodies
 > live in `packages/mmr/templates/skills/` and are the source of truth for those

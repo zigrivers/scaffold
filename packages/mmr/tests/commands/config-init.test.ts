@@ -39,7 +39,7 @@ describe('mmr config init template', () => {
     expect(parsed.defaults.fix_threshold).toBe('P2')
   })
 
-  it('keeps Gemini disabled and Antigravity enabled when every reviewer CLI is installed', async () => {
+  it('omits the retired Gemini channel and enables Antigravity when every reviewer CLI is installed', async () => {
     vi.resetModules()
     vi.doMock('../../src/core/auth.js', () => ({
       checkInstalled: vi.fn().mockResolvedValue(true),
@@ -63,11 +63,12 @@ describe('mmr config init template', () => {
     const written = fs.readFileSync(path.join(tmpDir, '.mmr.yaml'), 'utf-8')
     const parsed = yaml.load(written) as {
       channels: {
-        gemini: { enabled: boolean }
+        gemini?: { enabled: boolean }
         antigravity: { enabled: boolean }
       }
     }
-    expect(parsed.channels.gemini.enabled).toBe(false)
+    // gemini is retired — a fresh config must not seed it at all
+    expect(parsed.channels.gemini).toBeUndefined()
     expect(parsed.channels.antigravity.enabled).toBe(true)
   })
 })
