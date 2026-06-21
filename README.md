@@ -368,7 +368,7 @@ Every `scaffold init` wizard question can be answered via CLI flags, making scaf
 |------|------|-------------|
 | `--methodology` | deep/mvp/custom | Methodology preset |
 | `--depth` | 1-5 | Custom methodology depth (requires `--methodology custom`) |
-| `--adapters` | comma-sep | AI adapters: claude-code, codex |
+| `--adapters` | comma-sep | AI adapters: claude-code, codex, opencode |
 | `--traits` | comma-sep | Project traits: web, mobile, desktop |
 | `--project-type` | string | web-app, mobile-app, backend, cli, library, game, data-pipeline, ml, browser-extension, research, data-science, web3, mcp-server, macos-native |
 | `--auto` | boolean | Non-interactive mode (uses Zod defaults for unset flags) |
@@ -1779,7 +1779,7 @@ src/
 ├── cli/middleware/    # Project root detection, output mode resolution
 ├── cli/output/       # Output strategies (interactive, json, auto)
 ├── core/assembly/    # Assembly engine — meta-prompt → full prompt
-├── core/adapters/    # Platform adapters (Claude Code, Codex, Universal)
+├── core/adapters/    # Platform adapters (Claude Code, Codex, OpenCode, Universal)
 ├── core/dependency/  # DAG builder, topological sort, eligibility
 ├── core/knowledge/   # Knowledge update assembler
 ├── state/            # State manager, lock manager, decision logger
@@ -1797,7 +1797,7 @@ src/
 - **Assembly engine** (`src/core/assembly/engine.ts`) — Pure orchestrator with no I/O. Constructs 7-section prompts from meta-prompt + knowledge + context + methodology + instructions + depth guidance.
 - **State manager** (`src/state/state-manager.ts`) — Atomic writes via tmp + `fs.renameSync()`. Tracks step status, in-progress records, and next-eligible cache. Includes migration system for step renames and retired steps.
 - **Dependency graph** (`src/core/dependency/`) — Kahn's algorithm topological sort with phase-aware ordering and cycle detection.
-- **Platform adapters** (`src/core/adapters/`) — 3-step lifecycle (initialize → generateStepWrapper → finalize) producing `.scaffold/generated/claude-code/commands/`, `.scaffold/generated/codex/AGENTS.md`, and `.scaffold/generated/universal/prompts/README.md`. Skills install separately to `.claude/skills/` and `.agents/skills/`.
+- **Platform adapters** (`src/core/adapters/`) — 3-step lifecycle (initialize → generateStepWrapper → finalize) producing `.scaffold/generated/claude-code/commands/`, `.scaffold/generated/codex/AGENTS.md`, OpenCode custom commands under `.opencode/command/scaffold/`, and `.scaffold/generated/universal/prompts/README.md`. Skills install separately to `.claude/skills/` and `.agents/skills/`.
 - **Project detector** (`src/project/detector.ts`) — Scans for file system signals to classify projects as greenfield, brownfield, or v1-migration.
 - **Check command** (`src/cli/commands/check.ts`) — Applicability detection for conditional steps (platform detection, GitHub remote detection, CLI availability).
 

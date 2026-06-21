@@ -323,7 +323,7 @@ export const ConfigSchema = z.object({
       // input still fails .min(1) (it's a user error, not a legacy config).
       return hadGemini && filtered.length === 0 ? ['claude-code'] : filtered
     },
-    z.array(z.enum(['claude-code', 'codex'])).min(1).default(['claude-code']),
+    z.array(z.enum(['claude-code', 'codex', 'opencode'])).min(1).default(['claude-code']),
   ),
   project: ProjectSchema.optional(),
 }).passthrough()  // allow unknown fields at top level per ADR-033

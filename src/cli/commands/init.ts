@@ -192,7 +192,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       .option('adapters', {
         type: 'string',
         array: true,
-        describe: 'AI adapters (claude-code,codex)',
+        describe: 'AI adapters (claude-code,codex,opencode)',
         coerce: coerceCSV,
       })
       .option('traits', {
@@ -555,7 +555,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
         // Validate array enum values (init-only). Gemini was dropped (its CLI
         // is sunset) — accept it as a legacy no-op so old scripts don't break,
         // but warn; it is stripped from the platform list downstream.
-        const validAdapters = ['claude-code', 'codex']
+        const validAdapters = ['claude-code', 'codex', 'opencode']
         if (argv.adapters) {
           for (const a of argv.adapters as string[]) {
             if (a === 'gemini') {

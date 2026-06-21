@@ -169,12 +169,16 @@ describe('KNOWN_PLATFORMS', () => {
     expect(KNOWN_PLATFORMS).not.toContain('gemini')
   })
 
+  it('includes "opencode"', () => {
+    expect(KNOWN_PLATFORMS).toContain('opencode')
+  })
+
   it('includes "universal"', () => {
     expect(KNOWN_PLATFORMS).toContain('universal')
   })
 
-  it('has exactly 3 entries', () => {
-    expect(KNOWN_PLATFORMS).toHaveLength(3)
+  it('has exactly 4 entries', () => {
+    expect(KNOWN_PLATFORMS).toHaveLength(4)
   })
 })
 

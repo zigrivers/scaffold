@@ -16,7 +16,7 @@ import { coreCopy, getCopyForType, optionsFromCopy } from './copy/index.js'
 export interface WizardAnswers {
   methodology: 'deep' | 'mvp' | 'custom'
   depth: 1 | 2 | 3 | 4 | 5
-  platforms: Array<'claude-code' | 'codex'>
+  platforms: Array<'claude-code' | 'codex' | 'opencode'>
   traits: string[]
   projectType?: ProjectType
   gameConfig?: GameConfig
@@ -101,15 +101,18 @@ export async function askWizardQuestions(options: {
 
   // Platform selection (simplified — claude-code always included). Gemini was
   // dropped (its CLI is sunset); strip any legacy value from --adapters input.
-  let platforms: Array<'claude-code' | 'codex'>
+  const isAdapter = (p: string): p is 'claude-code' | 'codex' | 'opencode' =>
+    p === 'claude-code' || p === 'codex' || p === 'opencode'
+  let platforms: Array<'claude-code' | 'codex' | 'opencode'>
   if (options.adapters) {
-    platforms = (options.adapters as string[])
-      .filter((p): p is 'claude-code' | 'codex' => p === 'claude-code' || p === 'codex')
+    platforms = (options.adapters as string[]).filter(isAdapter)
     if (platforms.length === 0) platforms = ['claude-code']
   } else if (!auto) {
     platforms = ['claude-code']
     const addCodex = await output.confirm('Include Codex adapter?', false, coreCopy.codexAdapter)
     if (addCodex) platforms.push('codex')
+    const addOpenCode = await output.confirm('Include OpenCode adapter?', false, coreCopy.openCodeAdapter)
+    if (addOpenCode) platforms.push('opencode')
   } else {
     platforms = ['claude-code']
   }

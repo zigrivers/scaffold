@@ -293,6 +293,7 @@ describe('askWizardQuestions', () => {
     // Plus library wizard asks "Ship type definitions?"
     vi.mocked(output.confirm)
       .mockResolvedValueOnce(false)   // Codex
+      .mockResolvedValueOnce(false)   // OpenCode
       .mockResolvedValueOnce(true)    // Ship type definitions? (library)
     vi.mocked(output.select)
       .mockResolvedValueOnce('library')  // projectType
@@ -310,8 +311,8 @@ describe('askWizardQuestions', () => {
     })
 
     expect(result.traits).toEqual(['web', 'mobile'])
-    // confirm called 2 times: Codex + Ship type definitions (library); Gemini prompt removed
-    expect(output.confirm).toHaveBeenCalledTimes(2)
+    // confirm called 3 times: Codex + OpenCode + Ship type definitions (library)
+    expect(output.confirm).toHaveBeenCalledTimes(3)
   })
 
   it('--depth with --auto overrides auto default for custom methodology', async () => {
@@ -407,6 +408,7 @@ describe('askWizardQuestions', () => {
     const output = makeOutputContext()
     vi.mocked(output.confirm)
       .mockResolvedValueOnce(false)   // Codex
+      .mockResolvedValueOnce(false)   // OpenCode
       .mockResolvedValueOnce(false)   // web
       .mockResolvedValueOnce(false)   // mobile
       // No advanced gate confirm — it should be auto-opened by --narrative flag
@@ -441,8 +443,8 @@ describe('askWizardQuestions', () => {
     expect(result.gameConfig!.hasModding).toBe(true)
     expect(result.gameConfig!.persistence).toBe('cloud')
     // confirm should NOT have been called for the advanced gate
-    // Total confirms: Codex, web, mobile, modding = 4 (Gemini prompt removed)
-    expect(output.confirm).toHaveBeenCalledTimes(4)
+    // Total confirms: Codex, OpenCode, web, mobile, modding = 5
+    expect(output.confirm).toHaveBeenCalledTimes(5)
     // Advanced gate confirm should never fire — verify no call with that text
     for (const call of output.confirm.mock.calls) {
       expect(call[0]).not.toBe('Configure advanced game options?')

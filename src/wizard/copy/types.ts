@@ -45,6 +45,7 @@ export type CoreCopy = {
   methodology: QuestionCopy<MethodologyName>
   depth: QuestionCopy<string> // depth is numeric (1-5); options are never regardless of type param
   codexAdapter: QuestionCopy<string>   // yes/no confirm — no enum options
+  openCodeAdapter: QuestionCopy<string> // yes/no confirm — no enum options
   webTrait: QuestionCopy<string>       // yes/no confirm — no enum options
   mobileTrait: QuestionCopy<string>    // yes/no confirm — no enum options
   projectType: QuestionCopy<ProjectType>
