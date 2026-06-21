@@ -26,10 +26,11 @@ export function migrateV1(raw: Record<string, unknown>): ScaffoldConfig {
   const platforms = raw['platforms']
 
   const migratedMethodology = mapMethodology(String(methodology ?? ''))
-  // Gemini was dropped — strip any legacy entry; fall back to default if empty.
+  // Gemini was dropped — strip ONLY that entry and preserve every other value so
+  // the schema (not the migration) validates the platform enum. Backfill if empty.
   const rawPlatforms = (platforms as string[] | undefined) ?? ['claude-code']
-  const stripped = rawPlatforms.filter((p): p is 'claude-code' | 'codex' => p === 'claude-code' || p === 'codex')
-  const migratedPlatforms = stripped.length > 0 ? stripped : ['claude-code']
+  const stripped = rawPlatforms.filter((p) => p !== 'gemini')
+  const migratedPlatforms = (stripped.length > 0 ? stripped : ['claude-code']) as ScaffoldConfig['platforms']
 
   return {
     ...rest,

@@ -44,6 +44,11 @@ describe('migrateV1', () => {
     expect(result.platforms).toEqual(['claude-code'])
   })
 
+  it('preserves non-gemini values (strips only gemini; the schema validates the rest)', () => {
+    const result = migrateV1({ version: 1, methodology: 'classic', platforms: ['claude-code', 'future-cli', 'gemini'] })
+    expect(result.platforms).toEqual(['claude-code', 'future-cli'])
+  })
+
   it('adds platforms claude-code if missing', () => {
     const result = migrateV1({ version: 1, methodology: 'classic' })
     expect(result.platforms).toEqual(['claude-code'])

@@ -421,8 +421,11 @@ function effectiveEnabled(config: MmrConfigParsed, channel: string): boolean {
   // Normalize both sides so an alias in the list (e.g. `agy`) disables its
   // canonical channel (`antigravity`), matching how review dispatch resolves it.
   const target = normalizeChannelName(channel)
+  const ch = config.channels[channel]
+  // A retired channel is never dispatched, even if a legacy config re-enabled it.
+  if (ch?.retired) return false
   const disabledList = new Set((config.channels_disabled ?? []).map(normalizeChannelName))
-  return config.channels[channel]?.enabled !== false && !disabledList.has(target)
+  return ch?.enabled !== false && !disabledList.has(target)
 }
 
 /**

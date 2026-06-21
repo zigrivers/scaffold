@@ -1205,7 +1205,7 @@ mmr review --pr 47 --focus "auth flow, session handling"
 
 ```bash
 mmr status mmr-a1b2c3
-# → claude: completed (47s) | gemini: running (2m12s)
+# → claude: completed (47s) | antigravity: running (2m12s)
 
 # Later:
 mmr status mmr-a1b2c3
@@ -1563,8 +1563,8 @@ scaffold check add-e2e-testing
 # → Applicable: yes | Platform: web | Brownfield: no | Mode: fresh
 
 scaffold check automated-pr-review
-# → Applicable: yes | GitHub remote: yes | Available CLIs: codex, gemini, claude | Recommended: local-cli (three-CLI MMR review)
-# (suffix is `(three-CLI MMR review)` / `(two-CLI MMR review)` / `(single-CLI review)` based on how many of codex/gemini/claude are detected)
+# → Applicable: yes | GitHub remote: yes | Available CLIs: codex, antigravity, claude | Recommended: local-cli (three-CLI MMR review)
+# (suffix is `(three-CLI MMR review)` / `(two-CLI MMR review)` / `(single-CLI review)` based on how many of codex/antigravity/claude are detected)
 
 scaffold check ai-memory-setup
 # → Rules: no | MCP server: none | Hooks: none | Mode: fresh
@@ -1656,7 +1656,7 @@ Use `scaffold run spark` before `create-vision` when you have a vague idea that 
 
 > **Codex users:** the generated `AGENTS.md` ships direct `mmr review` shell recipes for `review-code` and `review-pr` (3-channel coverage: Codex CLI, Antigravity CLI, Claude CLI). The Superpowers `code-reviewer` 4th-channel reconcile requires a harness that can dispatch agent skills — Codex cannot do this directly, so run `scaffold run review-{code,pr}` from a Claude Code session when you need full 4-channel coverage.
 
-Run any of these via the CLI or ask the scaffold runner skill in Claude Code or Gemini.
+Run any of these via the CLI or ask the scaffold runner skill in Claude Code or another agent host.
 
 ## Releasing Your Project
 
@@ -1703,7 +1703,7 @@ Options: `--dry-run` to preview, `minor`/`major`/`patch` to specify the bump, `c
 | **Methodology** | A preset (deep, mvp, custom) controlling which steps run and at what depth. |
 | **Multi-model review** | Independent validation from Codex/Antigravity CLIs at depth 4-5, catching blind spots a single model misses. |
 | **PRD** | Product Requirements Document. The foundation for everything Scaffold builds. |
-| **Runner skill** | Auto-activated Claude Code/Gemini skill that surfaces decision points before executing pipeline steps. |
+| **Runner skill** | Auto-activated agent-host skill (Claude Code, OpenCode, …) that surfaces decision points before executing pipeline steps. |
 | **Worktrees** | A git feature for multiple working copies. Scaffold uses these for parallel agent execution. |
 
 ## Troubleshooting / FAQ
@@ -1779,12 +1779,12 @@ src/
 ├── cli/middleware/    # Project root detection, output mode resolution
 ├── cli/output/       # Output strategies (interactive, json, auto)
 ├── core/assembly/    # Assembly engine — meta-prompt → full prompt
-├── core/adapters/    # Platform adapters (Claude Code, Gemini, Codex, Universal)
+├── core/adapters/    # Platform adapters (Claude Code, Codex, Universal)
 ├── core/dependency/  # DAG builder, topological sort, eligibility
 ├── core/knowledge/   # Knowledge update assembler
 ├── state/            # State manager, lock manager, decision logger
 ├── config/           # Config loading, migration, schema validation
-├── project/          # Project detector, CLAUDE.md/GEMINI.md managers, adoption
+├── project/          # Project detector, CLAUDE.md / AGENTS.md managers, adoption
 ├── wizard/           # Init wizard (interactive + --auto)
 ├── validation/       # Config, state, frontmatter validators
 ├── types/            # TypeScript types and enums
@@ -1797,7 +1797,7 @@ src/
 - **Assembly engine** (`src/core/assembly/engine.ts`) — Pure orchestrator with no I/O. Constructs 7-section prompts from meta-prompt + knowledge + context + methodology + instructions + depth guidance.
 - **State manager** (`src/state/state-manager.ts`) — Atomic writes via tmp + `fs.renameSync()`. Tracks step status, in-progress records, and next-eligible cache. Includes migration system for step renames and retired steps.
 - **Dependency graph** (`src/core/dependency/`) — Kahn's algorithm topological sort with phase-aware ordering and cycle detection.
-- **Platform adapters** (`src/core/adapters/`) — 3-step lifecycle (initialize → generateStepWrapper → finalize) producing `.scaffold/generated/claude-code/commands/`, `.scaffold/generated/codex/AGENTS.md`, `.scaffold/generated/universal/prompts/README.md`, and Gemini project-local files under `.agents/skills/`, `GEMINI.md`, and `.gemini/commands/scaffold/`.
+- **Platform adapters** (`src/core/adapters/`) — 3-step lifecycle (initialize → generateStepWrapper → finalize) producing `.scaffold/generated/claude-code/commands/`, `.scaffold/generated/codex/AGENTS.md`, and `.scaffold/generated/universal/prompts/README.md`. Skills install separately to `.claude/skills/` and `.agents/skills/`.
 - **Project detector** (`src/project/detector.ts`) — Scans for file system signals to classify projects as greenfield, brownfield, or v1-migration.
 - **Check command** (`src/cli/commands/check.ts`) — Applicability detection for conditional steps (platform detection, GitHub remote detection, CLI availability).
 
@@ -1847,7 +1847,7 @@ dist/                 # Compiled TypeScript output
 ### Contributing
 
 1. Meta-prompt content lives in `content/pipeline/` — edit the relevant `.md` file
-2. If you changed adapter behavior, run `scaffold build` in a test project and inspect the generated artifacts under `.scaffold/generated/` plus the Gemini project-local outputs (`.agents/skills/`, `GEMINI.md`, `.gemini/commands/scaffold/`).
+2. If you changed adapter behavior, run `scaffold build` in a test project and inspect the generated artifacts under `.scaffold/generated/` plus the installed skills under `.claude/skills/` and `.agents/skills/`.
 3. Run `make check-all` (lint + type-check + test + evals) before submitting
 4. Knowledge entries live in `content/knowledge/` — follow the existing frontmatter schema
 5. ADRs documenting architectural decisions are in `docs/architecture/adrs/`
