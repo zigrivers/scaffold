@@ -96,7 +96,7 @@ describe('planSkillInstall', () => {
     expect(plan).toHaveLength(1)
     expect(plan[0].action).toBe('create')
     expect(plan[0].relPath).toBe(PLATFORM_SPECS.cursor.targetRelPath)
-    expect(plan[0].content).toContain('MMR — Multi-Model Code Review')
+    expect(plan[0].content).toContain('Multi-Model Review')
   })
 
   it('collapses codex + antigravity into one AGENTS.md entry', () => {
@@ -121,7 +121,7 @@ describe('planSkillInstall', () => {
     fs.writeFileSync(target, 'user content')
     const plan = planSkillInstall({ projectRoot: root, platforms: ['cursor'], force: true })
     expect(plan[0].action).toBe('update')
-    expect(plan[0].content).toContain('MMR — Multi-Model Code Review')
+    expect(plan[0].content).toContain('Multi-Model Review')
   })
 
   it('preserves surrounding content when managing a block in an existing file', () => {
@@ -139,7 +139,7 @@ describe('executePlan + idempotency', () => {
     const platforms = [...SKILL_PLATFORMS]
     executePlan(planSkillInstall({ projectRoot: root, platforms }))
 
-    expect(read(PLATFORM_SPECS.cursor.targetRelPath)).toContain('MMR — Multi-Model Code Review')
+    expect(read(PLATFORM_SPECS.cursor.targetRelPath)).toContain('Multi-Model Review')
     expect(read('AGENTS.md')).toContain(MANAGED_BEGIN)
 
     // Second plan over the same tree should report no changes.

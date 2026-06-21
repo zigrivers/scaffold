@@ -1,6 +1,6 @@
 ---
 name: mmr
-description: "Run multi-model code review with the MMR CLI (`mmr review`) before merging or finishing a change, or a multi-model design critique (`mmr critique`) of a design doc, plan, or proposed approach before building it. Use when the user asks to review code, a PR, a diff, or staged changes, or to critique/second-opinion a design or approach."
+description: Run multi-model code review with the MMR CLI (`mmr review`) before merging or finishing a change, or a multi-model design critique (`mmr critique`) of a design doc, plan, or proposed approach before building it. Use when the user asks to review code, a PR, a diff, or staged changes, or to critique/second-opinion a design or approach.
 topics:
   - code review
   - multi-model review
@@ -9,6 +9,7 @@ topics:
   - mmr
 ---
 
+<!-- lean:start -->
 # mmr — Multi-Model Review
 
 Dispatch code reviews across several AI model CLIs (Claude, Codex, Grok,
@@ -95,6 +96,7 @@ It reports **convergence** (where independent models agreed), **divergence**
 If a channel reports an auth failure, follow the recovery line in the output
 (`claude login`, `codex login`, `grok login`, `agy -p 'hello'`), then re-run
 `mmr config test` to verify.
+<!-- lean:end -->
 
 ## Common workflows
 

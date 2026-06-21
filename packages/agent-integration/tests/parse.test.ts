@@ -31,6 +31,11 @@ describe('parseCanonicalSkill', () => {
     expect(s.lean).toBe('Use `mmr review --pr <n> --sync --format json` to review a PR.')
   })
 
+  it('captures extra frontmatter fields beyond name/description', () => {
+    const md = '---\nname: x\ndescription: d\ntopics:\n  - a\n  - b\n---\n\nbody\n'
+    expect(parseCanonicalSkill(md).frontmatter.topics).toEqual(['a', 'b'])
+  })
+
   it('falls back to the intro (before the first ## heading) when no lean fence', () => {
     const md = `---
 name: x
