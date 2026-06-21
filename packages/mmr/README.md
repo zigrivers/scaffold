@@ -1,8 +1,19 @@
-# @zigrivers/mmr — Multi-Model Review CLI
+# @zigrivers/mmr — Multi-Model Second-Opinion Engine
 
-Automated multi-model code review with dispatch, reconciliation, and severity gating.
+A multi-model **second-opinion engine** with two peer commands sharing one core
+(independent fan-out + reconciliation):
 
-Dispatches reviews to Claude CLI, Codex CLI, Grok CLI, and Antigravity CLI (`agy`). Reconciles findings with consensus scoring. Gates on configurable severity thresholds.
+- **`mmr review`** — automated multi-model **code review** of a diff/PR, with
+  reconciliation and **severity gating**. Dispatches to Claude CLI, Codex CLI,
+  Grok CLI, and Antigravity CLI (`agy`); reconciles findings with consensus
+  scoring; gates on configurable severity thresholds.
+- **`mmr critique`** — multi-model **design/brainstorm critique** of an artifact
+  (a design doc, a pasted "problem + proposed solution", or a plan). **Advisory**
+  — no severity, no pass/fail gate, always exits 0. Reports **convergence**
+  (where independent models agreed), **divergence** (genuine splits + the
+  deciding crux), and an editorial **synthesis** that never picks a winner.
+  Supports repo grounding (`--context repo`), iterative rounds (`--session`),
+  and persona lenses (`--lenses`).
 
 Built-in channels:
 

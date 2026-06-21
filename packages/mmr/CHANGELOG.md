@@ -2,6 +2,42 @@
 
 ## [Unreleased]
 
+## [3.0.0] — 2026-06-20
+
+**Repositioned: from code reviewer to multi-model second-opinion engine.** MMR
+now has two peer commands sharing one core (independent fan-out + reconciliation):
+the existing `mmr review` (code review, gated) and a new `mmr critique` (design
+review, advisory). This release is **purely additive** — `mmr review` and all
+existing behaviour are unchanged; the major bump signals the repositioning.
+
+### Added — `mmr critique`
+
+A multi-model **design/brainstorm critique** of an artifact (a design doc, a
+pasted "problem + proposed solution", or a plan). It fans the artifact out to the
+same independent channels with a design-critique prompt (alternatives, missed
+considerations, tradeoffs, risks — *not* bug-finding) and is **advisory**: no
+severity, no pass/fail gate, **always exits 0**.
+
+- **Convergence vs. divergence (D1/D2).** Clusters items by cross-model agreement
+  (consensus / majority / unique) and surfaces genuine disagreements as
+  first-class **`split`** items carrying the deciding **crux** — it never picks a
+  winner.
+- **Editorial synthesis (D6).** An optional pass (one `claude -p` call) that
+  groups, cites item ids, and recommends — editorial, not judicial; never
+  resolves a split. `--no-synthesis` skips it.
+- **Repo grounding (D3).** `--context repo` (or `--context-paths a.ts,b.ts`)
+  folds a structural skeleton of the codebase into the critique so models judge
+  fit against the real system. No embeddings; path-contained; secret files
+  (`.env`, keys, credentials) are never read; budget-capped; the report discloses
+  `context_used`.
+- **Iterative refinement (D7).** `--session <id>` carries a bounded prior-round
+  ledger so a re-run after edits asks "which prior points did the revision
+  address?" without the prompt growing unbounded.
+- **Persona lenses (D5).** `--lenses skeptic,simplifier,…` gives each channel a
+  distinct lens for breadth; because that trades away independence, the output
+  relabels "consensus" as "perspectives".
+- Flexible input (file path or `-` for stdin); `--focus`; `--format text|json`.
+
 ## [2.0.0] — 2026-06-20
 
 **Agent-legible config & self-healing channels.** Makes MMR's configuration
