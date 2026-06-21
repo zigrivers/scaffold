@@ -109,6 +109,7 @@ in the native convention of whichever agent CLI you run:
 | `cursor` | `.cursor/rules/mmr-review.mdc` | dedicated Cursor rule file |
 | `codex` | `AGENTS.md` | idempotent managed block |
 | `antigravity` | `AGENTS.md` | idempotent managed block |
+| `opencode` | `.opencode/skills/mmr/SKILL.md` | full Agent Skill (auto-discovered) |
 
 ```bash
 mmr skill install --platform cursor        # one platform
@@ -121,9 +122,10 @@ Codex and Antigravity both follow the [`AGENTS.md`](https://agents.md) standard,
 they share one managed block in `AGENTS.md`; installing either manages the same block.
 Block-mode targets (`AGENTS.md`) are updated in place between
 `<!-- BEGIN mmr-skill -->` / `<!-- END mmr-skill -->` delimiters, so re-running never
-disturbs your own content. Dedicated files (Cursor) are created fresh and require
-`--force` to overwrite. By default `mmr skill install` writes into the detected project
-root (nearest `.git`); override with `--dir <path>`.
+disturbs your own content. Dedicated-file targets (Cursor's `.mdc` and OpenCode's
+`.opencode/skills/mmr/SKILL.md`) are created fresh and require `--force` to
+overwrite an existing one. By default `mmr skill install` writes into the detected
+project root (nearest `.git`); override with `--dir <path>`.
 
 ## Custom output parsers
 

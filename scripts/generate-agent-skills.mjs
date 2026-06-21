@@ -6,7 +6,7 @@
 // to (re)generate, or `--check` to fail when a committed file is stale (the drift
 // gate). One canonical source = one source of truth, so the per-platform files
 // can no longer drift apart.
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
@@ -31,6 +31,9 @@ const SKILLS = [
       { path: 'content/skills/mmr/SKILL.md', render: (s) => renderSkillMd(s) },
       { path: 'packages/mmr/templates/skills/agents/mmr-review.md', render: (s) => `${s.lean}\n` },
       { path: 'packages/mmr/templates/skills/cursor/mmr-review.mdc', render: (s) => renderCursorMdc(s) },
+      // OpenCode auto-discovers full Agent Skills under .opencode/skills/<name>/;
+      // this template is the full SKILL.md that mmr skill-install drops there.
+      { path: 'packages/mmr/templates/skills/opencode/mmr.md', render: (s) => renderSkillMd(s) },
     ],
   },
 ]
@@ -52,6 +55,7 @@ for (const skill of SKILLS) {
     if (current !== null && normalize(current) === normalize(out)) continue
     if (check) stale.push(target.path)
     else {
+      mkdirSync(dirname(abs), { recursive: true })
       writeFileSync(abs, out)
       generated.push(target.path)
     }

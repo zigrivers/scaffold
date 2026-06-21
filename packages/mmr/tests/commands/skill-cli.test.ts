@@ -119,12 +119,28 @@ describe('mmr skill install CLI', () => {
       runSkill({ action: 'install', dir, all: true })
       expect(fs.existsSync(path.join(dir, '.cursor', 'rules', 'mmr-review.mdc'))).toBe(true)
       expect(fs.existsSync(path.join(dir, 'AGENTS.md'))).toBe(true)
+      // OpenCode auto-discovers .opencode/skills/<name>/SKILL.md
+      expect(fs.existsSync(path.join(dir, '.opencode', 'skills', 'mmr', 'SKILL.md'))).toBe(true)
       // Gemini was dropped — no GEMINI.md is written
       expect(fs.existsSync(path.join(dir, 'GEMINI.md'))).toBe(false)
 
       const { out, exited } = runSkill({ action: 'install', dir, all: true })
       expect(exited).toBeUndefined()
       expect(out.join('\n')).toMatch(/already up to date/i)
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('--platform opencode installs a full SKILL.md whose name matches the dir', () => {
+    const dir = tmpDir()
+    try {
+      runSkill({ action: 'install', dir, platform: ['opencode'] })
+      const skillPath = path.join(dir, '.opencode', 'skills', 'mmr', 'SKILL.md')
+      expect(fs.existsSync(skillPath)).toBe(true)
+      const body = fs.readFileSync(skillPath, 'utf-8')
+      expect(body).toMatch(/^---\nname: mmr\n/)          // name matches the `mmr` dir (OpenCode requires this)
+      expect(body).toContain('mmr review')
     } finally {
       fs.rmSync(dir, { recursive: true, force: true })
     }
