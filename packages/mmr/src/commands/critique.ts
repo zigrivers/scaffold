@@ -89,14 +89,17 @@ function buildReport(
   elapsedS: number,
   lensed = false,
 ): CritiqueReport {
+  const consensus = items.filter((i) => i.agreement === 'consensus').length
   const agreed = items.filter((i) => i.agreement !== 'unique').length
   const unique = items.filter((i) => i.agreement === 'unique').length
-  // Under lenses, multi-model overlap is not independent "consensus" (D5).
-  const agreedLabel = lensed ? 'multi-lens' : 'consensus'
+  // Under lenses, cross-channel overlap isn't independent consensus (D5), so
+  // report the broader "multi-lens" count; otherwise report consensus precisely
+  // (majority items are NOT folded into the consensus count).
+  const agreedPart = lensed ? `${agreed} multi-lens` : `${consensus} consensus`
   const summary = dispatched === 0 || completed === 0
     ? 'No channels were available to run the critique — check `mmr doctor`.'
     : `${items.length} item(s) across ${completed} of ${dispatched} channel(s) — ` +
-      `${agreed} ${agreedLabel}, ${unique} single-model`
+      `${agreedPart}, ${unique} single-model`
   return {
     kind: 'design-critique',
     job_id: jobId,
