@@ -91,17 +91,19 @@ function firstHeadingOutsideCode(body: string): number {
   let offset = 0
   let fence: { char: string; len: number } | null = null
   for (const line of body.split('\n')) {
-    const trimmed = line.trimStart()
-    const marker = /^(`{3,}|~{3,})/.exec(trimmed)
+    // CommonMark allows up to 3 leading spaces before both fences and ATX
+    // headings; match both with the same leniency for consistent detection.
+    const marker = /^ {0,3}(`{3,}|~{3,})/.exec(line)
     if (marker) {
       const char = marker[1][0]
       const len = marker[1].length
+      const rest = line.slice(marker[0].length).trim()
       if (!fence) {
-        fence = { char, len }
-      } else if (char === fence.char && len >= fence.len && trimmed.slice(len).trim() === '') {
-        fence = null
+        fence = { char, len } // opening fence — an info string in `rest` is allowed
+      } else if (char === fence.char && len >= fence.len && rest === '') {
+        fence = null // closing fence — same char, >= length, nothing after
       }
-    } else if (!fence && /^##\s/.test(line)) {
+    } else if (!fence && /^ {0,3}##\s/.test(line)) {
       return offset
     }
     offset += line.length + 1
