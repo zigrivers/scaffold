@@ -71,7 +71,12 @@ export function assembleCritiquePrompt(options: AssembleCritiquePromptOptions): 
   if (priorRound && priorRound.items.length > 0) {
     const ledger = priorRound.items
       // Collapse newlines so a multi-line observation can't break the list item.
-      .map((i) => `- [${i.id}] (${i.kind} · ${i.theme}): ${i.observation.replace(/\s*\n\s*/g, ' ')}`)
+      // Tolerate a malformed stored item (missing field) — the ledger is loaded
+      // from a session file that could in principle be hand-edited/corrupted.
+      .map((i) => {
+        const obs = (i.observation ?? '').replace(/\s*\n\s*/g, ' ')
+        return `- [${i.id ?? '?'}] (${i.kind ?? '?'} · ${i.theme ?? '?'}): ${obs}`
+      })
       .join('\n')
     layers.push(
       `## Previously raised (round ${priorRound.round})\n` +
