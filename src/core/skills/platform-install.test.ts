@@ -70,6 +70,17 @@ describe('installSkillsForPlatform', () => {
     expect(fs.readFileSync(skillPath, 'utf8')).toMatch(/^---\nname: scaffold-runner\n/)
   })
 
+  it('skips an existing dedicated file without --force, overwrites with it', () => {
+    const mdc = path.join(tmp, '.cursor', 'rules', 'scaffold-runner.mdc')
+    fs.mkdirSync(path.dirname(mdc), { recursive: true })
+    fs.writeFileSync(mdc, 'USER EDITED')
+    const r1 = installSkillsForPlatform(tmp, 'cursor')
+    expect(fs.readFileSync(mdc, 'utf8')).toBe('USER EDITED')        // untouched without force
+    expect(r1.skipped.some((s) => s.includes('scaffold-runner.mdc'))).toBe(true)
+    installSkillsForPlatform(tmp, 'cursor', { force: true })
+    expect(fs.readFileSync(mdc, 'utf8')).not.toBe('USER EDITED')    // overwritten with force
+  })
+
   it('resolves {{INSTRUCTIONS_FILE}} markers (no raw placeholder leaks into installed files)', () => {
     installSkillsForPlatform(tmp, 'opencode')
     const body = fs.readFileSync(path.join(tmp, '.opencode', 'skills', 'scaffold-pipeline', 'SKILL.md'), 'utf8')

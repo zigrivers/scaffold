@@ -51,7 +51,13 @@ export function upsertManagedBlock(existing: string, name: string, body: string)
 
 export interface PlatformInstallResult {
   installed: string[]
+  skipped: string[]
   errors: string[]
+}
+
+export interface PlatformInstallOptions {
+  /** Overwrite an existing dedicated file (Cursor .mdc / OpenCode SKILL.md). */
+  force?: boolean
 }
 
 /**
@@ -62,37 +68,54 @@ export interface PlatformInstallResult {
  *
  * The generated forms are read from the bundled templates (`content/skills/<name>/`).
  */
-export function installSkillsForPlatform(projectRoot: string, platform: SkillPlatform): PlatformInstallResult {
+export function installSkillsForPlatform(
+  projectRoot: string,
+  platform: SkillPlatform,
+  options: PlatformInstallOptions = {},
+): PlatformInstallResult {
   const templateDir = getSkillTemplateDir()
   const installed: string[] = []
+  const skipped: string[] = []
   const errors: string[] = []
+
+  // Write a dedicated file, honoring --force (block when it already exists).
+  const writeDedicated = (target: string, rel: string, body: string): void => {
+    if (fs.existsSync(target) && !options.force) {
+      skipped.push(`${rel} (exists; use --force to overwrite)`)
+      return
+    }
+    fs.mkdirSync(path.dirname(target), { recursive: true })
+    fs.writeFileSync(target, body)
+    installed.push(rel)
+  }
 
   for (const skill of INSTALLABLE_SKILLS) {
     try {
       if (platform === 'codex' || platform === 'antigravity') {
+        // Managed block: always safe to upsert (only the delimited region changes).
         const body = loadResolved(templateDir, skill.name, 'agents-block.md')
         const target = path.join(projectRoot, 'AGENTS.md')
         const existing = fs.existsSync(target) ? fs.readFileSync(target, 'utf8') : ''
         fs.writeFileSync(target, upsertManagedBlock(existing, skill.name, body))
         installed.push(`AGENTS.md (${skill.name})`)
       } else if (platform === 'cursor') {
-        const body = loadResolved(templateDir, skill.name, 'cursor.mdc')
-        const target = path.join(projectRoot, '.cursor', 'rules', `${skill.name}.mdc`)
-        fs.mkdirSync(path.dirname(target), { recursive: true })
-        fs.writeFileSync(target, body)
-        installed.push(path.join('.cursor', 'rules', `${skill.name}.mdc`))
+        writeDedicated(
+          path.join(projectRoot, '.cursor', 'rules', `${skill.name}.mdc`),
+          path.join('.cursor', 'rules', `${skill.name}.mdc`),
+          loadResolved(templateDir, skill.name, 'cursor.mdc'),
+        )
       } else {
         // opencode — the full Agent Skill (dir name must match the skill name).
-        const body = loadResolved(templateDir, skill.name, 'SKILL.md')
-        const target = path.join(projectRoot, '.opencode', 'skills', skill.name, 'SKILL.md')
-        fs.mkdirSync(path.dirname(target), { recursive: true })
-        fs.writeFileSync(target, body)
-        installed.push(path.join('.opencode', 'skills', skill.name, 'SKILL.md'))
+        writeDedicated(
+          path.join(projectRoot, '.opencode', 'skills', skill.name, 'SKILL.md'),
+          path.join('.opencode', 'skills', skill.name, 'SKILL.md'),
+          loadResolved(templateDir, skill.name, 'SKILL.md'),
+        )
       }
     } catch (err) {
       errors.push(`Failed to install ${skill.name} for ${platform}: ${err}`)
     }
   }
 
-  return { installed, errors }
+  return { installed, skipped, errors }
 }

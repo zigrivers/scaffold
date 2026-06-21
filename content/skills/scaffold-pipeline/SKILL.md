@@ -196,7 +196,7 @@ Steps within the same track that don't depend on each other can run in parallel 
 7. **TDD → Review Testing → Operations → Security** — quality gate chain
 8. **Both tracks converge at Implementation Plan** — depends on tdd, operations, security, AND review-architecture
 9. **Quality Gates before Consolidation** — consolidation verifies all docs including operations/security
-10. **Claude.md Optimization before Workflow Audit** — optimize first, verify second
+10. **{{INSTRUCTIONS_FILE}} Optimization before Workflow Audit** — optimize first, verify second
 11. **Implementation Plan Review before Validation** — 7 checks run after plan review
 12. **All 7 Validation checks before Apply Fixes & Freeze** — freeze requires all findings
 13. **Finalization before Execution** — agents need frozen docs and playbook

@@ -67,11 +67,17 @@ const skillCommand: CommandModule<Record<string, unknown>, SkillArgs> = {
       // Native-form install for a specific CLI (AGENTS.md / .cursor/rules /
       // .opencode/skills); the default path below covers Claude Code + shared.
       if (argv.platform) {
-        const { installed, errors } = installSkillsForPlatform(projectRoot, argv.platform as SkillPlatform)
+        const { installed, skipped, errors } = installSkillsForPlatform(
+          projectRoot, argv.platform as SkillPlatform, { force: argv.force },
+        )
         for (const err of errors) output.error(err)
         if (installed.length > 0) {
           output.info(`\nInstalled scaffold skills for ${argv.platform}:\n  ${installed.join('\n  ')}`)
-        } else {
+        }
+        if (skipped.length > 0) {
+          output.warn(`\nSkipped:\n  ${skipped.join('\n  ')}`)
+        }
+        if (installed.length === 0 && skipped.length === 0) {
           output.warn('\nNo skills installed.')
         }
         break

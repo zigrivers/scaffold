@@ -203,8 +203,8 @@ When the user asks "what tools are available?", "what can I build?", or "show me
 
 | Command | When to Use |
 |---------|-------------|
-| `scaffold run single-agent-start` | Start the autonomous TDD implementation loop — Claude picks up tasks and builds |
-| `scaffold run single-agent-resume` | Resume where you left off after closing Claude Code |
+| `scaffold run single-agent-start` | Start the autonomous TDD implementation loop — the agent picks up tasks and builds |
+| `scaffold run single-agent-resume` | Resume where you left off after closing your agent session |
 | `scaffold run multi-agent-start` | Start parallel implementation with multiple agents in worktrees |
 | `scaffold run multi-agent-resume` | Resume parallel agent work after a break |
 | `scaffold run quick-task` | Create a focused task for a bug fix, refactor, or small improvement |
@@ -727,5 +727,5 @@ When `scaffold rework --advance` reports all steps done (returns `all_done: true
 - **Does not modify .scaffold/config.json** — reads only (unless user explicitly asks to change methodology)
 - **Does not invent pipeline steps** — the pipeline defines what runs; this skill executes it
 - **Does not suppress questions** — every decision point gets surfaced. Silent defaults defeat the purpose.
-- **Does not cache preferences across sessions** — each Claude Code session starts fresh
+- **Does not cache preferences across sessions** — each agent session starts fresh
 - **Does not run steps in parallel** — batch execution is always sequential (one step at a time per ADR-021). Parallel execution is for the implementation phase via separate worktrees.
