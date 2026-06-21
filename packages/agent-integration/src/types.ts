@@ -22,6 +22,12 @@ export interface CanonicalSkill {
    * full body.
    */
   lean: string
+  /**
+   * The full parsed frontmatter (includes `name` and `description` plus any
+   * extra fields like `topics:`). `renderSkillMd` emits these extras so a single
+   * canonical source can feed a host that expects richer frontmatter.
+   */
+  frontmatter: Record<string, unknown>
 }
 
 /** A host CLI the integration core renders skills for. */

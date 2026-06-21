@@ -46,7 +46,8 @@
     "lint": "eslint src/ tests/",
     "type-check": "tsc --noEmit",
     "check": "npm run lint && npm run type-check && npm test",
-    "prepublishOnly": "bash scripts/prepublish.sh"
+    "prepublishOnly": "bash scripts/prepublish.sh",
+    "gen:skills": "npm run build --workspace=@zigrivers/agent-integration && node scripts/generate-agent-skills.mjs"
   },
   "dependencies": {
     "@babel/parser": "^7.29.0",

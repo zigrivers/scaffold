@@ -31,7 +31,7 @@ export function parseCanonicalSkill(markdown: string): CanonicalSkill {
   }
 
   const body = rawBody.trim()
-  return { name, description, body, lean: deriveLean(body) }
+  return { name, description, body, lean: deriveLean(body), frontmatter: fields }
 }
 
 interface Frontmatter {

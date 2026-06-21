@@ -23,8 +23,23 @@ function stripLeanMarkers(body: string): string {
  * hosts that auto-discover Agent Skills (Claude Code, OpenCode).
  */
 export function renderSkillMd(skill: CanonicalSkill): string {
-  return `---\nname: ${yamlScalarName(skill.name)}\ndescription: ${yamlDoubleQuote(skill.description)}\n---\n\n`
+  return `---\nname: ${yamlScalarName(skill.name)}\ndescription: ${yamlDoubleQuote(skill.description)}\n`
+    + `${renderExtraFrontmatter(skill.frontmatter)}---\n\n`
     + `${stripLeanMarkers(skill.body)}\n`
+}
+
+/**
+ * Serialize any frontmatter fields beyond `name`/`description` (e.g. `topics:`)
+ * so a richer canonical source round-trips into the full `SKILL.md`. Returns ''
+ * when there are no extras. js-yaml handles types/quoting; `name`/`description`
+ * are emitted explicitly above and excluded here.
+ */
+function renderExtraFrontmatter(frontmatter: CanonicalSkill['frontmatter']): string {
+  const extras: Record<string, unknown> = { ...frontmatter }
+  delete extras.name
+  delete extras.description
+  if (Object.keys(extras).length === 0) return ''
+  return yaml.dump(extras, { lineWidth: -1 })
 }
 
 /**
