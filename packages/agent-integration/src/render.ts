@@ -1,3 +1,4 @@
+import yaml from 'js-yaml'
 import type { CanonicalSkill } from './types.js'
 
 /** Per-skill managed-block delimiters for shared instruction files (AGENTS.md). */
@@ -47,16 +48,14 @@ export function renderCursorMdc(skill: CanonicalSkill): string {
     + `${skill.lean.trim()}\n`
 }
 
-/** YAML 1.1 plain scalars that a loader would read as a non-string. */
-const YAML_AMBIGUOUS_PLAIN = /^(y|yes|n|no|true|false|on|off|null|~)$/i
-
 /**
- * Emit a skill name as a YAML scalar — plain (unquoted) for normal kebab names,
- * but double-quoted when the name would otherwise be read as a boolean, null, or
- * number (e.g. `true`, `null`, `123`) rather than the string it is.
+ * Emit a skill name as a YAML scalar. The serializer decides quoting: normal
+ * kebab names stay plain (`mmr-review`), but any name a loader would read as a
+ * non-string — boolean (`true`), null, number (`123`), hex (`0x1f`), date
+ * (`2024-01-01`), etc. — is quoted so it round-trips as the string it is.
  */
 function yamlScalarName(name: string): string {
-  return YAML_AMBIGUOUS_PLAIN.test(name) || /^[0-9]+$/.test(name) ? yamlDoubleQuote(name) : name
+  return yaml.dump(name, { lineWidth: -1 }).trim()
 }
 
 /**

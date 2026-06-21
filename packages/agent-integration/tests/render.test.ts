@@ -6,6 +6,7 @@ import {
   agentsBlockBegin,
   agentsBlockEnd,
 } from '../src/render.js'
+import { parseCanonicalSkill } from '../src/parse.js'
 import type { CanonicalSkill } from '../src/types.js'
 
 const SKILL: CanonicalSkill = {
@@ -68,10 +69,13 @@ describe('YAML safety', () => {
     expect(out).toContain('description: "Has a \\"quote\\" and a colon: here"')
   })
 
-  it('quotes a YAML-ambiguous name so it is not read as a boolean/null/number', () => {
-    for (const name of ['true', 'false', 'null', 'no', '123']) {
+  it('quotes a YAML-ambiguous name so it round-trips as a string (not bool/null/number/date/hex)', () => {
+    for (const name of ['true', 'false', 'null', 'no', '123', '2024-01-01', '0x1f']) {
       const out = renderSkillMd({ name, description: 'd', body: 'b', lean: 'b' })
-      expect(out).toContain(`name: "${name}"`)
+      // the rendered frontmatter must parse back to the original string name
+      expect(parseCanonicalSkill(out).name).toBe(name)
+      // …and it must NOT be emitted as a bare unquoted scalar
+      expect(out).not.toContain(`name: ${name}\n`)
     }
   })
 
