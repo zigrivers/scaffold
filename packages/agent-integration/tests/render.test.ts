@@ -68,6 +68,23 @@ describe('YAML safety', () => {
     expect(out).toContain('description: "Has a \\"quote\\" and a colon: here"')
   })
 
+  it('quotes a YAML-ambiguous name so it is not read as a boolean/null/number', () => {
+    for (const name of ['true', 'false', 'null', 'no', '123']) {
+      const out = renderSkillMd({ name, description: 'd', body: 'b', lean: 'b' })
+      expect(out).toContain(`name: "${name}"`)
+    }
+  })
+
+  it('leaves a normal kebab name unquoted', () => {
+    const out = renderSkillMd({ name: 'mmr-review', description: 'd', body: 'b', lean: 'b' })
+    expect(out).toContain('name: mmr-review\n')
+  })
+
+  it('escapes other C0 control characters as \\xNN', () => {
+    const s: CanonicalSkill = { name: 'x', description: `a${String.fromCharCode(0)}b`, body: 'b', lean: 'b' }
+    expect(renderSkillMd(s)).toContain('description: "a\\x00b"')
+  })
+
   it('escapes control characters (newline/tab/CR) so they cannot break the frontmatter', () => {
     const s: CanonicalSkill = {
       name: 'x',

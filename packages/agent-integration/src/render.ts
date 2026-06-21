@@ -22,7 +22,7 @@ function stripLeanMarkers(body: string): string {
  * hosts that auto-discover Agent Skills (Claude Code, OpenCode).
  */
 export function renderSkillMd(skill: CanonicalSkill): string {
-  return `---\nname: ${skill.name}\ndescription: ${yamlDoubleQuote(skill.description)}\n---\n\n`
+  return `---\nname: ${yamlScalarName(skill.name)}\ndescription: ${yamlDoubleQuote(skill.description)}\n---\n\n`
     + `${stripLeanMarkers(skill.body)}\n`
 }
 
@@ -47,18 +47,35 @@ export function renderCursorMdc(skill: CanonicalSkill): string {
     + `${skill.lean.trim()}\n`
 }
 
+/** YAML 1.1 plain scalars that a loader would read as a non-string. */
+const YAML_AMBIGUOUS_PLAIN = /^(y|yes|n|no|true|false|on|off|null|~)$/i
+
 /**
- * Emit a YAML double-quoted scalar. Backslashes and quotes are escaped first,
- * then control characters (newline/tab/CR) are emitted as YAML escape sequences
- * so a multi-line or whitespace-laden description can never break the
- * single-line frontmatter or alter spacing in a host's parser.
+ * Emit a skill name as a YAML scalar — plain (unquoted) for normal kebab names,
+ * but double-quoted when the name would otherwise be read as a boolean, null, or
+ * number (e.g. `true`, `null`, `123`) rather than the string it is.
+ */
+function yamlScalarName(name: string): string {
+  return YAML_AMBIGUOUS_PLAIN.test(name) || /^[0-9]+$/.test(name) ? yamlDoubleQuote(name) : name
+}
+
+/**
+ * Emit a YAML double-quoted scalar. Backslashes and quotes are escaped, common
+ * whitespace controls (newline/tab/CR) use their named escapes, and every other
+ * C0 control character (and DEL) is emitted as a `\xNN` escape — so no control
+ * character can break the single-line frontmatter or yield invalid YAML.
  */
 function yamlDoubleQuote(value: string): string {
-  const escaped = value
-    .replace(/\\/g, '\\\\')
-    .replace(/"/g, '\\"')
-    .replace(/\n/g, '\\n')
-    .replace(/\r/g, '\\r')
-    .replace(/\t/g, '\\t')
-  return `"${escaped}"`
+  let out = ''
+  for (const ch of value) {
+    const code = ch.codePointAt(0) ?? 0
+    if (ch === '\\') out += '\\\\'
+    else if (ch === '"') out += '\\"'
+    else if (ch === '\n') out += '\\n'
+    else if (ch === '\r') out += '\\r'
+    else if (ch === '\t') out += '\\t'
+    else if (code < 0x20 || code === 0x7F) out += `\\x${code.toString(16).padStart(2, '0').toUpperCase()}`
+    else out += ch
+  }
+  return `"${out}"`
 }
