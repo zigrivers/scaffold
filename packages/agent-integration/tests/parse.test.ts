@@ -99,6 +99,29 @@ Just a body, no headings.
     expect(() => parseCanonicalSkill(md)).toThrow(/lean:end/)
   })
 
+  it('rejects a name that is not kebab-case (could break the AGENTS.md markers)', () => {
+    expect(() => parseCanonicalSkill('---\nname: Bad_Name\ndescription: d\n---\n\nb\n')).toThrow(/kebab/)
+    expect(() => parseCanonicalSkill('---\nname: x-->y\ndescription: d\n---\n\nb\n')).toThrow(/kebab/)
+  })
+
+  it('strips a leading UTF-8 BOM before matching the frontmatter', () => {
+    const md = '﻿---\nname: x\ndescription: d\n---\n\nbody\n'
+    expect(parseCanonicalSkill(md).name).toBe('x')
+  })
+
+  it('does not treat a "## " line inside a code block as the intro boundary', () => {
+    const md = [
+      '---', 'name: x', 'description: d', '---', '',
+      '# Title', '', 'Intro before code.', '',
+      '```bash', '## this is a shell comment, not a heading', 'echo hi', '```', '',
+      '## Real Section', '', 'Deep content.', '',
+    ].join('\n')
+    const lean = parseCanonicalSkill(md).lean
+    expect(lean).toContain('Intro before code.')
+    expect(lean).toContain('## this is a shell comment')
+    expect(lean).not.toContain('Deep content')
+  })
+
   it('tolerates CRLF line endings', () => {
     const s = parseCanonicalSkill('---\r\nname: x\r\ndescription: d\r\n---\r\n\r\nbody\r\n')
     expect(s.name).toBe('x')

@@ -20,6 +20,15 @@ export function parseCanonicalSkill(markdown: string): CanonicalSkill {
   const description = typeof fields.description === 'string' ? fields.description : undefined
   if (!name) throw new Error('Canonical skill is missing required frontmatter field: name')
   if (!description) throw new Error(`Canonical skill "${name}" is missing required frontmatter field: description`)
+  // 1–64 chars, lowercase alphanumeric with single-hyphen separators (the Agent
+  // Skills spec). Also keeps the name safe to embed in the `<!-- BEGIN
+  // agent-skill:<name> -->` markers — a name with `-->` would break the block.
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name) || name.length > 64) {
+    throw new Error(
+      `Canonical skill name "${name}" must be kebab-case `
+      + '(1–64 chars, lowercase alphanumeric with single-hyphen separators)',
+    )
+  }
 
   const body = rawBody.trim()
   return { name, description, body, lean: deriveLean(body) }
@@ -35,7 +44,8 @@ interface Frontmatter {
  * body. Trailing whitespace after either `---` delimiter is tolerated.
  */
 function extractFrontmatter(markdown: string): Frontmatter {
-  const normalized = markdown.replace(/\r\n/g, '\n')
+  // Strip a leading UTF-8 BOM (editors add it) before matching the delimiter.
+  const normalized = markdown.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n')
   const match = /^---[ \t]*\n([\s\S]*?)\n---[ \t]*\n?/.exec(normalized)
   if (!match) throw new Error('Canonical skill is missing its --- frontmatter block')
   const parsed = yaml.load(match[1])
@@ -62,7 +72,27 @@ function deriveLean(body: string): string {
     if (end < start) throw new Error('Canonical skill lean fence is inverted (<!-- lean:end --> before start)')
     return body.slice(start + LEAN_START.length, end).trim()
   }
-  const heading = /^##\s/m.exec(body)
-  if (heading && heading.index > 0) return body.slice(0, heading.index).trim()
+  const introEnd = firstHeadingOutsideCode(body)
+  if (introEnd > 0) return body.slice(0, introEnd).trim()
   return body
+}
+
+/**
+ * Offset of the first `##`+ heading that is NOT inside a fenced code block, or
+ * -1 if none. Tracks ``` / ~~~ fences so a `## ` line inside an example (e.g. a
+ * shell comment) does not truncate the intro.
+ */
+function firstHeadingOutsideCode(body: string): number {
+  let offset = 0
+  let inFence = false
+  for (const line of body.split('\n')) {
+    const trimmed = line.trimStart()
+    if (trimmed.startsWith('```') || trimmed.startsWith('~~~')) {
+      inFence = !inFence
+    } else if (!inFence && /^##\s/.test(line)) {
+      return offset
+    }
+    offset += line.length + 1
+  }
+  return -1
 }
