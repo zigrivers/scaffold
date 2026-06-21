@@ -17,10 +17,7 @@ import { renderGapSignalTail } from '../assembly/gap-signal-tail.js'
 export class OpenCodeAdapter implements PlatformAdapter {
   readonly platformId = 'opencode'
 
-  private context: AdapterContext | null = null
-
-  initialize(context: AdapterContext): AdapterInitResult {
-    this.context = context
+  initialize(_context: AdapterContext): AdapterInitResult {
     return { success: true, errors: [] }
   }
 
