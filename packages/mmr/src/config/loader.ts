@@ -244,6 +244,14 @@ function validateCompensatorReference(config: MmrConfigParsed): void {
       + 'Abstract channels are non-dispatchable templates; reference a concrete channel that extends it instead.',
     )
   }
+  // Retired channels (e.g. gemini) are tombstones and never dispatched, so they
+  // cannot serve as a compensator target.
+  if (target.retired === true) {
+    throw new Error(
+      `defaults.compensator.channel "${ref}" is retired and cannot be a compensator. `
+      + 'Reference a supported channel (e.g. antigravity) instead.',
+    )
+  }
   // http channels are concrete via endpoint/model rather than command.
   if (target.kind !== 'http' && !target.command) {
     throw new Error(
