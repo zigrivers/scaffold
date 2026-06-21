@@ -1,4 +1,4 @@
-.PHONY: help test lint validate validate-knowledge check check-all eval ts-check setup hooks dashboard-test mmr-build mmr-test mmr-check check-reference-citations check-freshness-citations guides-check
+.PHONY: help test lint validate validate-knowledge check check-all eval ts-check setup hooks dashboard-test mmr-build mmr-test mmr-check agent-integration-check check-reference-citations check-freshness-citations guides-check
 
 help: ## Show available targets
 	@grep -E '^[a-z][a-z-]*:.*## ' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -23,7 +23,7 @@ check-freshness-citations: check-reference-citations ## Back-compat alias for ch
 
 check: lint validate test eval ## Run bash quality gates (lint + validate + test + eval)
 
-check-all: check ts-check mmr-check validate-knowledge check-reference-citations guides-check ## Run all quality gates (bash + TypeScript + knowledge frontmatter + reference-page citations)
+check-all: check ts-check mmr-check agent-integration-check validate-knowledge check-reference-citations guides-check ## Run all quality gates (bash + TypeScript + knowledge frontmatter + reference-page citations)
 
 ts-check: ## Run TypeScript quality gates (lint + type-check + build + unit tests)
 	npm run lint
@@ -62,3 +62,7 @@ mmr-test: ## Run mmr package tests
 
 mmr-check: ## Run mmr package quality gates
 	cd packages/mmr && npm run check
+
+## agent-integration package (shared cross-CLI renderer/installer core)
+agent-integration-check: ## Run agent-integration package quality gates
+	cd packages/agent-integration && npm run check
