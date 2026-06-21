@@ -11,9 +11,8 @@ import { renderGapSignalTail } from '../assembly/gap-signal-tail.js'
 
 /**
  * Generates OpenCode custom commands. OpenCode auto-discovers markdown files
- * under `.opencode/command/` and runs each as a prompt when invoked (a nested
- * `command/scaffold/<slug>.md` is invoked as `/scaffold/<slug>`). The `$ARGUMENTS`
- * placeholder injects whatever the user passes after the command.
+ * under `.opencode/commands/` and runs each as a prompt when invoked. The
+ * `$ARGUMENTS` placeholder injects whatever the user passes after the command.
  */
 export class OpenCodeAdapter implements PlatformAdapter {
   readonly platformId = 'opencode'
@@ -46,7 +45,7 @@ User request: $ARGUMENTS
     return {
       slug,
       platformId: this.platformId,
-      files: [{ relativePath: `.opencode/command/scaffold/${slug}.md`, content, writeMode: 'create' }],
+      files: [{ relativePath: `.opencode/commands/scaffold/${slug}.md`, content, writeMode: 'create' }],
       success: true,
     }
   }
@@ -69,10 +68,16 @@ function buildKnowledgeSection(
   return tail ? `${body}\n\n${tail}` : body
 }
 
-/** Build the After This Step section from forward dependencies (downstream steps). */
+/**
+ * Build the After This Step section from forward dependencies. `dependsOn` here
+ * is the set of DOWNSTREAM steps (build.ts populates it from forwardDeps), so
+ * these are what comes next. Referenced by plain step slug rather than a
+ * slash-command form, since OpenCode does not document an invocation syntax for
+ * commands nested in a subdirectory.
+ */
 function buildAfterThisStep(dependsOn: string[]): string {
   if (dependsOn.length === 0) return ''
 
-  const nextSteps = dependsOn.map((d) => `\`/scaffold/${d}\``).join(', ')
-  return `\n\n---\n\n## After This Step\n\nContinue with: ${nextSteps}`
+  const nextSteps = dependsOn.map((d) => `\`${d}\``).join(', ')
+  return `\n\n---\n\n## After This Step\n\nContinue with the ${nextSteps} step(s).`
 }

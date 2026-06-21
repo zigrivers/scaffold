@@ -59,7 +59,7 @@ export const coreCopy: CoreCopy = {
     short: 'Generates an OpenAI Codex adapter alongside the Claude Code output.',
   },
   openCodeAdapter: {
-    short: 'Generates OpenCode custom commands (.opencode/command/) alongside the Claude Code output.',
+    short: 'Generates OpenCode custom commands (.opencode/commands/) alongside the Claude Code output.',
   },
   webTrait: {
     short: 'Adds web-platform questions (rendering strategy, deploy target, etc.).',
