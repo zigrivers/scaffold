@@ -256,7 +256,7 @@
     <h1>From code reviewer to second-opinion engine</h1>
     <p class="lede">MMR already does the hard part — fan one question out to many independent models and reconcile where they agree. Today it only ever points that engine at a <em>diff</em>. Point it at a <em>design</em>, and the same machine answers the question every builder actually asks: <strong>is this the best way to solve this — and what did we miss?</strong></p>
     <div class="meta">
-      <span class="pill status">● Vision — open questions pending multi-model consult (§10)</span>
+      <span class="pill status">● Vision — decisions resolved by multi-model consult (§10)</span>
       <span class="pill">2026-06-20</span>
       <span class="pill">MMR v2.0.0 · Scaffold v3.37.0</span>
       <span class="pill">Author: Claude (with Ken)</span>
@@ -281,7 +281,7 @@
       <li><a href="#context"><span class="num">07</span>Repo-grounded critique</a></li>
       <li><a href="#arch"><span class="num">08</span>Architecture</a></li>
       <li><a href="#roadmap"><span class="num">09</span>Roadmap</a></li>
-      <li><a href="#open"><span class="num">10</span>Open questions</a></li>
+      <li><a href="#open"><span class="num">10</span>Decisions</a></li>
       <li><a href="#nongoals"><span class="num">11</span>Non-goals</a></li>
       <li><a href="#next"><span class="num">12</span>What's next</a></li>
     </ol>
@@ -428,7 +428,9 @@ $ mmr critique docs/plans/2026-07-01-billing.md --context repo</code></pre>
 
 <span class="c-warn">DIVERGENCE</span>  <span class="c-dim">— models split (your judgment call)</span>
   <span class="c-warn">▲</span> Codex + Claude: add a durable queue.
-    Antigravity: a queue is premature for v1 — cron sweep.  <span class="c-dim">[alternative · split]</span>
+    Antigravity: a queue is premature for v1 — cron sweep.  <span class="c-dim">[split]</span>
+    <span class="c-warn">↳</span> crux: at the real concurrency target, does cron miss SLAs?
+      answer this and the split decides itself.        <span class="c-dim">[decides it]</span>
 
 <span class="c-key">ALTERNATIVES</span> <span class="c-dim">the proposal didn't consider</span>
   • Server-Sent Events over a dedicated channel        <span class="c-dim">(Claude, Codex)</span>
@@ -528,8 +530,8 @@ $ mmr critique design.md --session s-7f3a
         <p class="muted">Make the multi-model nature pay off explicitly.</p>
         <ul>
           <li>Render the convergence / divergence map as the headline</li>
-          <li>A synthesis pass — one model reads the reconciled set and recommends</li>
-          <li>Surface model <em>disagreement</em> as a first-class section, not noise</li>
+          <li>First-class <code>split</code> items with the deciding <strong>crux</strong> (D2) — disagreement near the top, never smoothed away</li>
+          <li>An <strong>editorial</strong> synthesis pass — cites sources, introduces no new opinion, never breaks a split (D6)</li>
         </ul>
       </div>
       <div class="phase p3">
@@ -544,33 +546,57 @@ $ mmr critique design.md --session s-7f3a
         <h3><span class="badge">Phase 4 · Iterate + teach</span> <span class="when">close the loop</span></h3>
         <p class="muted">Multi-round refinement and the docs that make it discoverable.</p>
         <ul>
-          <li>Session-based iterative refinement (<code>--session</code>); bounded round memory</li>
-          <li>Config defaults for critique; <code>mmr commands</code> + <code>explain</code> entries</li>
+          <li>Session-based iterative refinement (<code>--session</code>); a concern ledger keyed by <code>finding_key</code> bounds the prompt to open items (D7)</li>
+          <li>Optional <code>--lenses</code> persona mode (relabels "consensus" → "perspectives", D5); config defaults; <code>mmr commands</code> + <code>explain</code> entries</li>
           <li>Teach it: <code>CLAUDE.md</code>, the <code>mmr</code> skill, the reference guide</li>
         </ul>
       </div>
     </div>
   </section>
 
-  <!-- 10 Open questions -->
+  <!-- 10 Decisions -->
   <section id="open">
-    <h2><span class="secnum">10</span> Open questions — to resolve by multi-model consult</h2>
-    <p class="section-sub">Before planning, each of these goes independently to <strong>Codex, Claude, Antigravity, and local-ai-delegate</strong>; answers get consolidated and folded back into this roadmap. (This section becomes "Decisions — resolved" after the consult.)</p>
-    <div class="kv">
-      <dt>OQ1 · Item taxonomy</dt>
-      <dd>Are <code>concern / alternative / consideration / open-question</code> the right kinds? Should items carry an optional importance, or stay unranked to avoid smuggling a severity gate back in?</dd>
-      <dt>OQ2 · Representing disagreement</dt>
-      <dd>What's the most decision-useful way to show models in genuine conflict (A says X, B says ¬X)? A diff-style split? A spectrum? This is the differentiator — get it right.</dd>
-      <dt>OQ3 · Repo-context selection</dt>
-      <dd>For <code>--context repo</code>: whole-tree digest, a relevant-file heuristic, agent-supplied paths, or a hybrid? How to stay within token budgets without starving the critique.</dd>
-      <dt>OQ4 · Naming</dt>
-      <dd><code>critique</code> vs. <code>advise</code> vs. <code>second-opinion</code> vs. <code>design-review</code> — and the conceptual noun for the unified engine (does <code>review</code> stay the umbrella, or does a new noun sit above both?).</dd>
-      <dt>OQ5 · Same prompt vs. personas</dt>
-      <dd>Send every channel the same critique prompt (rely on model diversity), or assign distinct lenses (skeptic / simplifier / user-advocate / domain-expert) to maximize perspective spread? Does persona assignment compromise independence?</dd>
-      <dt>OQ6 · Synthesis pass</dt>
-      <dd>Should a final model synthesize a recommendation, or is that over-reach for an advisory tool? If yes — which model, and how to keep it from laundering one model's opinion as "the answer"?</dd>
-      <dt>OQ7 · Bounded iteration memory</dt>
-      <dd>Across rounds, how is prior-round context compacted so the prompt doesn't grow without bound while still letting models judge "did my revision address your concern"?</dd>
+    <h2><span class="secnum">10</span> Decisions — resolved by multi-model consult</h2>
+    <p class="section-sub">Each open question was put <em>independently</em> to four models — <strong>Codex, Claude, Antigravity, and a local model (Qwen 2.5)</strong> — and consolidated. Convergence was unusually high; the only structural split was D4, resolved below for backward-compatibility. These are now binding inputs to the implementation plans.</p>
+
+    <div class="callout good">
+      <p class="ct">D1 · Item taxonomy &amp; ranking — RESOLVED (4/4: no severity; sort by consensus)</p>
+      <p>Keep four kinds — <strong>concern</strong> (a risk), <strong>alternative</strong> (a different approach), <strong>consideration</strong> (a tradeoff with <em>no</em> recommended direction), <strong>open-question</strong> (a fact to go get). Add <strong>no</strong> P0–P3 severity or aggregated score — that re-imports the gate the tool is leaving behind. The <strong>primary sort/grouping is the cross-model agreement tier</strong> (consensus → majority → unique), the native signal of a multi-model tool. An optional free-text <em>materiality</em> hint in the model's own words ("would block me" vs "nice to have") is allowed but <strong>never aggregated</strong> into a number or threshold.</p>
+    </div>
+
+    <div class="callout good">
+      <p class="ct">D2 · Representing disagreement — RESOLVED (4/4: first-class <code>split</code> + the crux)</p>
+      <p>Model conflict is a <strong>first-class <code>split</code> item</strong>, never smoothed into a watered-down "consensus" (that would destroy the differentiator). Each split carries the <strong>decision axis</strong>, each <strong>position</strong> with the models holding it and a one-line rationale, and — the standout idea from Codex &amp; Claude — the <strong>crux</strong>: the fact or assumption that, if known, resolves it. The tool <strong>never picks a winner</strong>; it converts "the models disagree" into "go measure X." Splits surface near the top.</p>
+    </div>
+
+    <div class="callout good">
+      <p class="ct">D3 · Repo-context selection — RESOLVED (4/4: hybrid, agent paths first, no embeddings in v1)</p>
+      <p>For <code>--context repo</code>: <strong>agent/user-supplied paths first</strong> (the agent that just designed the feature already knows the relevant files), with a structural <strong>skeleton fallback</strong> when none are given — directory tree + key manifests + README/architecture docs + the files the artifact references + an exported-symbol map. <strong>No embeddings in v1</strong> (a vector index is a dependency and failure mode to avoid); v2 can add ripgrep over identifiers pulled from the artifact. Every channel gets the <strong>identical context budget</strong> (independence), and the report discloses a <strong>"context used"</strong> list.</p>
+    </div>
+
+    <div class="callout good">
+      <p class="ct">D4 · Naming &amp; structure — RESOLVED (4/4 on the name; peer-verb structure)</p>
+      <p>The command is <strong><code>mmr critique</code></strong> — short, signals judgment-without-gating, and not locked to "design" (input may be a problem+solution or a plan, so <code>design-review</code> is too narrow; <code>advise</code> is vague; <code>second-opinion</code> is clunky as a verb). <strong><code>critique</code> and <code>review</code> are peer top-level verbs sharing one engine</strong>, not <code>review --kind</code>: they have different output contracts (review gates and can fail; critique is advisory and always exits 0), and <code>mmr review</code> stays exactly as-is. "Multi-model second-opinion engine" is the positioning, not a third command. <span class="muted">(Antigravity preferred a <code>review</code> umbrella with <code>code</code>/<code>critique</code> sub-kinds; rejected — it would break the existing <code>mmr review</code> surface.)</span></p>
+    </div>
+
+    <div class="callout good">
+      <p class="ct">D5 · Same prompt vs. personas — RESOLVED (4/4: same prompt by default)</p>
+      <p><strong>Every channel gets the same critique prompt by default</strong> — that is what makes consensus meaningful (independent models converged on the <em>same</em> artifact and question). Personas don't break independence, but they <strong>poison the consensus signal</strong> (you can't tell role-driven divergence from real model divergence). Personas ship as an <strong>opt-in <code>--lenses skeptic,simplifier,…</code> mode</strong>, and in that mode the tool <strong>stops reporting "consensus" and relabels the output "perspectives"</strong> — trading the agreement signal for breadth, explicitly.</p>
+    </div>
+
+    <div class="callout good">
+      <p class="ct">D6 · Synthesis pass — RESOLVED (4/4: yes, but editorial not judicial)</p>
+      <p>A final synthesis pass ships, but it is <strong>editorial, not judicial</strong>: it groups, dedupes, and orders by agreement to produce a <strong>map, not a verdict</strong>. Guardrails: clustering is done <strong>deterministically in the engine</strong> (the LLM only writes prose), every synthesized line <strong>cites the channels/item-IDs</strong> behind it, it introduces <strong>no new opinion</strong>, and it <strong>never resolves a <code>split</code></strong> (it presents the crux). Labeled unmistakably ("Editorial digest — not an additional opinion"), with the raw per-channel critiques one step away.</p>
+    </div>
+
+    <div class="callout good">
+      <p class="ct">D7 · Bounded iteration memory — RESOLVED (4/4: a concern ledger keyed by <code>finding_key</code>)</p>
+      <p>Iterative rounds carry a compact <strong>concern ledger</strong>, not raw transcripts: each prior item reduces to <code>{stable-id, summary, kind, status: addressed | partial | not-addressed | superseded}</code>, keyed by MMR's existing stable <strong><code>finding_key</code></strong> (1.4.0). Each round feeds the models the <strong>revised artifact + a diff of what changed + the still-open ledger</strong>, with the explicit ask "for each, is it now addressed?" Resolved-and-confirmed items <strong>drop out of the active prompt</strong> (they stay in the session store), so prompt size tracks <strong>open</strong> items, not total history.</p>
+    </div>
+
+    <div class="callout">
+      <p class="ct">The thread under D1, D2, D5, D6</p>
+      <p>Claude's cross-cutting flag, worth preserving: the consensus-tier ranking (D1), the first-class <code>split</code> (D2), the same-prompt default (D5), and the no-tiebreak synthesis (D6) are <strong>one commitment to a trustworthy agreement signal, seen from four angles</strong>. Cave on any one — add a severity gate, default to personas, let synthesis pick winners — and the others lose their meaning. The implementation must hold all four together.</p>
     </div>
   </section>
 
@@ -590,10 +616,10 @@ $ mmr critique design.md --session s-7f3a
   <!-- 12 Next -->
   <section id="next">
     <h2><span class="secnum">12</span> What I recommend next</h2>
-    <p>Put the seven open questions to the model fleet, consolidate the answers into this roadmap, then turn <strong>Phase 1</strong> into a TDD implementation plan — a one-shot <code>mmr critique</code> that already replaces the manual three-tab ritual. Phases 2–4 each get their own plan as we go.</p>
+    <p>The seven open questions are <strong>resolved</strong> (§10) — consulted across four models and consolidated. The next step is to turn <strong>Phase 1</strong> into a TDD implementation plan — a one-shot <code>mmr critique</code> that already replaces the manual three-tab ritual. Phases 2–4 each get their own plan as we go.</p>
     <div class="callout good">
       <p class="ct">Recommendation</p>
-      <p>Approve this direction (or redirect it). Then I'll consult Codex + Claude + Antigravity + local-ai-delegate on §10, fold the consolidated answers in, and pause once for your go-ahead before building Phase 1.</p>
+      <p>The consult is done and folded into §10. <strong>Approve this direction (or redirect it)</strong> and I'll write the Phase 1 implementation plan, then build it TDD — commit, PR, multi-model review, merge — and proceed through Phases 2–4 the same way before one consolidated release.</p>
     </div>
     <p class="muted">This is a vision, not a spec — it commits to a direction and a command surface; exact flags, output formats, and edge cases get pinned per-phase in the plans.</p>
   </section>
