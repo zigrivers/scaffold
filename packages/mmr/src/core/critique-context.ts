@@ -37,6 +37,7 @@ const SECRET_EXT = /\.(pem|key|pfx|p12|keystore|jks|asc|ppk)$/i
 const SECRET_TOKENS = 'secrets?|credentials?|passwd|passwords?|tokens?|apikeys?|api[._-]?keys?|keys?'
 const SECRET_NAME_RE = new RegExp([
   '(^\\.env)',                                            // .env, .env.local, .env.production
+  '(\\.env$)',                                            // prod.env, local.env, app.env
   '(^\\.(npmrc|netrc|pgpass|htpasswd|git-credentials)$)', // dotfile credential stores
   '(^id_(rsa|dsa|ecdsa|ed25519))',                        // ssh private keys
   `((^|[._-])(${SECRET_TOKENS})([._-]|$))`,               // secret/credential/key/token-named

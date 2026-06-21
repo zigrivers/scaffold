@@ -109,6 +109,15 @@ describe('buildRepoContext', () => {
     expect(out.used).toContain('src/PasswordValidator.ts')
   })
 
+  it('excludes env files named with a .env suffix (prod.env, local.env)', () => {
+    const cwd = repo({ 'prod.env': 'SUFFIX-ENV-SECRET', 'config/local.env': 'NESTED-ENV-SECRET', 'README.md': '#' })
+    const out = buildRepoContext({
+      cwd, explicitPaths: ['prod.env', 'config/local.env'], artifact: 'd',
+    })
+    expect(out.context).not.toContain('SUFFIX-ENV-SECRET')
+    expect(out.context).not.toContain('NESTED-ENV-SECRET')
+  })
+
   it('excludes secret directories and bare key files', () => {
     const cwd = repo({
       'secrets/db.txt': 'DIR-SECRET-VALUE',
