@@ -44,7 +44,11 @@ describe('mmr critique (dry-run)', () => {
     const artifact = path.join(project, 'design.md')
     fs.writeFileSync(artifact, '# Notifications\nPoll a status table every 30 seconds from the client.')
     const { critiqueCommand } = await import('../../src/commands/critique.js')
-    await critiqueCommand.handler({ input: artifact, 'dry-run': true, _: ['critique'], $0: 'mmr' } as never)
+    // --trust-project-config so the working-tree .mmr.yaml (with the fake channel)
+    // is honored in this non-git temp dir; dry-run must not spawn any subprocess.
+    await critiqueCommand.handler({
+      input: artifact, 'dry-run': true, trustProjectConfig: true, _: ['critique'], $0: 'mmr',
+    } as never)
     const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n')
     expect(out).toContain('DRY RUN')
     expect(out).toContain('fake')

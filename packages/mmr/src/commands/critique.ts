@@ -5,6 +5,7 @@ import { checkInstalled, checkAuth } from '../core/auth.js'
 import { dispatchChannel } from '../core/dispatcher.js'
 import { dispatchHttpChannel } from '../core/http-dispatcher.js'
 import { redactCommandString } from '../core/redact.js'
+import { classifyTrustMode } from '../core/trust-mode.js'
 import { assembleCritiquePrompt } from '../core/critique-prompt.js'
 import { parseCritiqueOutput } from '../core/critique-parser.js'
 import { reconcileCritique } from '../core/critique-reconciler.js'
@@ -14,7 +15,7 @@ import { resolveDispatchChannels } from './review.js'
 import { resolveJobsDir } from './sessions.js'
 import { normalizeChannelName } from '../config/channel-aliases.js'
 import type {
-  CritiqueItem, CritiqueReport, CritiqueChannelResult,
+  CritiqueItem, CritiqueReport, CritiqueChannelResult, ReconciledCritiqueItem,
 } from '../types/critique.js'
 import type { ChannelStatus, OutputFormat } from '../types.js'
 import type { ChannelConfigParsed } from '../config/schema.js'
@@ -26,15 +27,17 @@ interface CritiqueArgs {
   timeout?: number
   format?: string
   'dry-run'?: boolean
+  configBaseRef?: string
+  trustProjectConfig?: boolean
 }
+
+interface AuthInfo { status: string, recovery?: string }
 
 /** Apply a channel's prompt wrapper to the assembled prompt (mirrors review). */
 function applyWrapper(wrapper: string | undefined, prompt: string): string {
   const w = wrapper ?? '{{prompt}}'
   return w === '{{prompt}}' ? prompt : w.replaceAll('{{prompt}}', () => prompt)
 }
-
-interface AuthInfo { status: string, recovery?: string }
 
 function channelStatusFromAuth(status: string): ChannelStatus {
   return status === 'not_installed' ? 'not_installed'
@@ -55,6 +58,32 @@ function readRawOutput(store: JobStore, jobId: string, name: string): string {
   }
 }
 
+function buildReport(
+  jobId: string,
+  source: string,
+  items: ReconciledCritiqueItem[],
+  perChannel: Record<string, CritiqueChannelResult>,
+  dispatched: number,
+  completed: number,
+  elapsedS: number,
+): CritiqueReport {
+  const consensus = items.filter((i) => i.agreement === 'consensus').length
+  const unique = items.filter((i) => i.agreement === 'unique').length
+  const summary = dispatched === 0 || completed === 0
+    ? 'No channels were available to run the critique — check `mmr doctor`.'
+    : `${items.length} item(s) across ${completed} of ${dispatched} channel(s) — ` +
+      `${consensus} consensus, ${unique} single-model`
+  return {
+    kind: 'design-critique',
+    job_id: jobId,
+    artifact_source: source,
+    items,
+    per_channel: perChannel,
+    summary,
+    metadata: { channels_dispatched: dispatched, channels_completed: completed, total_elapsed: `${elapsedS}s` },
+  }
+}
+
 export const critiqueCommand: CommandModule<object, CritiqueArgs> = {
   command: 'critique [input]',
   describe: 'Multi-model design/brainstorm critique of an artifact (advisory, no gate)',
@@ -66,12 +95,22 @@ export const critiqueCommand: CommandModule<object, CritiqueArgs> = {
       .option('timeout', { type: 'number', describe: 'Per-channel timeout in seconds' })
       .option('format', { type: 'string', choices: ['text', 'json'], describe: 'Output format (default text)' })
       .option('dry-run', { type: 'boolean', default: false, describe: 'Assemble the prompt without dispatching' })
+      .option('config-base-ref', {
+        type: 'string',
+        describe: 'Load project .mmr.yaml from this trusted Git ref instead of the working tree',
+      })
+      .option('trust-project-config', {
+        type: 'boolean',
+        default: false,
+        describe: 'Honor the working-tree .mmr.yaml channel config (use only in a trusted repo)',
+      })
       .example('mmr critique design.md', 'Critique a design doc')
       .example('mmr critique - --focus scaling', 'Critique stdin, focused on scaling'),
   handler: async (args: ArgumentsCamelCase<CritiqueArgs>) => {
     const started = Date.now()
     const cwd = process.cwd()
 
+    // Usage errors (bad input) exit non-zero; everything else is advisory (exit 0).
     let artifact: string
     let source: string
     try {
@@ -82,11 +121,43 @@ export const critiqueCommand: CommandModule<object, CritiqueArgs> = {
       return
     }
 
-    const config = loadConfig({ projectRoot: cwd, cliOverrides: { timeout: args.timeout, format: args.format } })
+    // Trust policy (mirrors review): a malicious working-tree .mmr.yaml can run
+    // arbitrary commands via channel `command`/`auth.check`, so honor it only
+    // from a trusted ref (committed HEAD locally) unless --trust-project-config.
+    const trust = classifyTrustMode({ cwd, args: { 'config-base-ref': args.configBaseRef } })
+    const baseRef = trust.trust_mode === 'base-ref' ? trust.base_ref : undefined
+    const trustWorkingTreeConfig = args.trustProjectConfig === true
+    if (trustWorkingTreeConfig) {
+      console.error('[mmr] warning: --trust-project-config is honoring the working-tree .mmr.yaml')
+    }
+    const projectTrust = trustWorkingTreeConfig
+      ? { trustProjectConfig: true }
+      : baseRef !== undefined
+        ? { configBaseRef: baseRef }
+        : { skipProjectConfig: true }
+    const config = loadConfig({
+      projectRoot: cwd,
+      cliOverrides: { timeout: args.timeout, format: args.format },
+      ...projectTrust,
+    })
+
     const disabled = new Set(config.channels_disabled ?? [])
     const explicit = args.channels?.map(normalizeChannelName)
     const channelNames = resolveDispatchChannels(config.channels, explicit, disabled)
     const basePrompt = assembleCritiquePrompt({ artifact, focus: args.focus })
+    const format = args.format === 'json' ? 'json' : 'text'
+
+    // Dry-run is side-effect-free: assemble + print, no install/auth subprocesses.
+    if (args['dry-run']) {
+      console.log('=== DRY RUN - no channels will be dispatched ===')
+      console.log(`Artifact: ${source}`)
+      console.log(`Channels configured: ${channelNames.join(', ') || '(none)'}`)
+      for (const name of channelNames) {
+        console.log(`\n--- Assembled prompt for ${name} ---`)
+        console.log(applyWrapper(config.channels[name].prompt_wrapper, basePrompt))
+      }
+      return
+    }
 
     // Install + auth gate per channel.
     const authResults: Record<string, AuthInfo> = {}
@@ -109,26 +180,20 @@ export const critiqueCommand: CommandModule<object, CritiqueArgs> = {
       if (auth.status === 'ok') valid.push(name)
     }
 
-    if (args['dry-run']) {
-      console.log('=== DRY RUN - no channels will be dispatched ===')
-      console.log(`Artifact: ${source}`)
-      console.log(`Channels that would dispatch: ${valid.join(', ') || '(none)'}`)
-      for (const [name, info] of Object.entries(authResults)) {
-        if (!valid.includes(name)) console.log(`  ${name}: ${info.status}${info.recovery ? ` — ${info.recovery}` : ''}`)
-      }
-      for (const name of valid) {
-        console.log(`\n--- Assembled prompt for ${name} ---`)
-        console.log(applyWrapper(config.channels[name].prompt_wrapper, basePrompt))
-      }
-      return
-    }
-
+    // No channels available: critique is advisory, so emit an empty report and
+    // exit 0 (never gate). The degraded statuses make the failure visible.
     if (valid.length === 0) {
-      console.error('No channels passed auth check:')
+      const perChannel: Record<string, CritiqueChannelResult> = {}
       for (const [name, info] of Object.entries(authResults)) {
-        console.error(`  ${name}: ${info.status}${info.recovery ? ` — ${info.recovery}` : ''}`)
+        perChannel[name] = {
+          status: channelStatusFromAuth(info.status), item_count: 0,
+          ...(info.recovery ? { recovery: info.recovery } : {}),
+        }
       }
-      process.exit(1)
+      console.error('No channels passed auth — emitting an empty critique. Run `mmr doctor`.')
+      const report = buildReport('none', source, [], perChannel, 0, 0,
+        Math.round((Date.now() - started) / 1000))
+      console.log(format === 'json' ? formatCritiqueJson(report) : formatCritiqueText(report))
       return
     }
 
@@ -136,7 +201,7 @@ export const critiqueCommand: CommandModule<object, CritiqueArgs> = {
     const store = new JobStore(resolveJobsDir())
     const job = store.createJob({
       fix_threshold: 'P2',
-      format: (args.format ?? 'text') as OutputFormat,
+      format: format as OutputFormat,
       channels: channelNames,
     })
     store.savePrompt(job.job_id, basePrompt)
@@ -191,25 +256,10 @@ export const critiqueCommand: CommandModule<object, CritiqueArgs> = {
     }
 
     const items = reconcileCritique(channelItems)
-    const consensus = items.filter((i) => i.agreement === 'consensus').length
-    const unique = items.filter((i) => i.agreement === 'unique').length
-    const report: CritiqueReport = {
-      kind: 'design-critique',
-      job_id: job.job_id,
-      artifact_source: source,
-      items,
-      per_channel: perChannel,
-      summary: `${items.length} item(s) across ${completed} of ${valid.length} channel(s) — ` +
-        `${consensus} consensus, ${unique} single-model`,
-      metadata: {
-        channels_dispatched: valid.length,
-        channels_completed: completed,
-        total_elapsed: `${Math.round((Date.now() - started) / 1000)}s`,
-      },
-    }
+    const report = buildReport(job.job_id, source, items, perChannel, valid.length, completed,
+      Math.round((Date.now() - started) / 1000))
     store.saveResults(job.job_id, report as unknown as never)
 
-    const format = (args.format ?? config.defaults.format) === 'json' ? 'json' : 'text'
     console.log(format === 'json' ? formatCritiqueJson(report) : formatCritiqueText(report))
     // Advisory: critique never gates. Always exit 0.
   },
