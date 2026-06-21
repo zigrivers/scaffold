@@ -1,13 +1,25 @@
 ---
 name: web-app-requirements
-description: SSR/SPA decision criteria, Core Web Vitals budgets, responsive breakpoints, browser support matrix, PWA considerations, and SEO requirements
-topics: [web-app, requirements, performance, pwa, seo, accessibility]
+description: >-
+  SSR/SPA decision criteria, Core Web Vitals budgets, responsive breakpoints, browser support matrix, PWA
+  considerations, and SEO requirements
+topics:
+  - web-app
+  - requirements
+  - performance
+  - pwa
+  - seo
+  - accessibility
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-06-21
 version-pin: null
 sources:
   - url: https://www.w3.org/TR/WCAG22/
+    hash: sha256:6e3c5fe397257cae509a2fb4752b73062cf8cbeb92c2cec618989b17e4cf7057
+    retrieved: 2026-06-21
   - url: https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps
+    hash: sha256:e7ee0f9da4fa5fb14e5ca5450d5d980bd9415ab4d34acc42ae0e3eba67d90dfb
+    retrieved: 2026-06-21
 ---
 
 Defining web app requirements before writing a line of code prevents the most expensive rework in the project lifecycle. Rendering strategy, performance budgets, and browser support targets affect every architectural decision downstream. Locking these down early — with explicit tradeoff acknowledgment — removes ambiguity and gives the team a shared definition of "done."
