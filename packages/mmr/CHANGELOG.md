@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [3.0.1] — 2026-06-21
+
+### Fixed
+
+- **`mmr skill install` now teaches `mmr critique`.** The per-platform skill
+  templates that ship in the package (`templates/skills/{agents,gemini,cursor}`
+  — installed into Codex/Antigravity `AGENTS.md`, `GEMINI.md`, and Cursor rules)
+  covered only `mmr review`. They now include a "Design critique" section
+  (advisory; convergence/divergence/synthesis; `--context`/`--session`/
+  `--lenses`), and the Cursor rule's `description` mentions design critique so it
+  activates on critique requests. (3.0.0 added `mmr critique` but missed these
+  installable skills.)
+
 ## [3.0.0] — 2026-06-20
 
 **Repositioned: from code reviewer to multi-model second-opinion engine.** MMR
