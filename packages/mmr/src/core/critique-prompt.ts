@@ -24,6 +24,17 @@ export interface AssembleCritiquePromptOptions {
 }
 
 /**
+ * A code fence guaranteed longer than the longest backtick run in the artifact,
+ * so a design doc that itself contains ``` blocks can't terminate the fence
+ * early (CommonMark's own rule). Minimum 3 backticks.
+ */
+function fenceFor(artifact: string): string {
+  let longest = 0
+  for (const match of artifact.matchAll(/`+/g)) longest = Math.max(longest, match[0].length)
+  return '`'.repeat(Math.max(3, longest + 1))
+}
+
+/**
  * Assemble the critique prompt: design-critique template → optional focus →
  * the artifact (always last), then the optional channel wrapper. Mirrors the
  * layering of `assemblePrompt` but with the design framing and no diff/severity.
@@ -37,7 +48,8 @@ export function assembleCritiquePrompt(options: AssembleCritiquePromptOptions): 
     layers.push(`## Focus Areas\n${focus}`)
   }
 
-  layers.push(`## Artifact to critique\n\`\`\`\n${artifact}\n\`\`\``)
+  const fence = fenceFor(artifact)
+  layers.push(`## Artifact to critique\n${fence}\n${artifact}\n${fence}`)
 
   let assembled = layers.join('\n\n')
 

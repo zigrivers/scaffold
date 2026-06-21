@@ -23,6 +23,14 @@ describe('assembleCritiquePrompt', () => {
     expect(prompt).toContain('scaling to 1M users')
   })
 
+  it('uses a longer fence when the artifact contains triple backticks', () => {
+    const artifact = 'Design:\n```ts\nconst x = 1\n```\nmore text'
+    const prompt = assembleCritiquePrompt({ artifact })
+    // the inner ``` must survive intact (the wrapping fence is longer)
+    expect(prompt).toContain('```ts')
+    expect(prompt).toContain('````') // a 4-backtick wrapping fence
+  })
+
   it('applies a prompt wrapper', () => {
     const prompt = assembleCritiquePrompt({ artifact: 'a', promptWrapper: 'BEGIN {{prompt}} END' })
     expect(prompt.startsWith('BEGIN ')).toBe(true)

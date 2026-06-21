@@ -48,7 +48,14 @@ function channelStatusFromAuth(status: string): ChannelStatus {
 
 /** Read a completed channel's raw stdout back from the job store. */
 function readRawOutput(store: JobStore, jobId: string, name: string): string {
-  const stored = store.loadChannelOutput(jobId, name)
+  // The output file is missing if a "completed" channel produced none; don't
+  // let a read error crash the whole critique.
+  let stored: string
+  try {
+    stored = store.loadChannelOutput(jobId, name)
+  } catch {
+    return ''
+  }
   // dispatchChannel saves via JSON.stringify(stdout); unwrap to the raw string.
   try {
     const unwrapped = JSON.parse(stored)
@@ -117,7 +124,9 @@ export const critiqueCommand: CommandModule<object, CritiqueArgs> = {
       ({ artifact, source } = resolveCritiqueInput(args.input))
     } catch (err) {
       console.error(err instanceof Error ? err.message : String(err))
-      process.exit(1)
+      // exitCode (not process.exit) so stderr flushes and the handler stays
+      // unit-testable; this is a usage error, the one non-advisory exit.
+      process.exitCode = 1
       return
     }
 
