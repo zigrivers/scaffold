@@ -41,6 +41,11 @@ function applyWrapper(wrapper: string | undefined, prompt: string): string {
   return w === '{{prompt}}' ? prompt : w.replaceAll('{{prompt}}', () => prompt)
 }
 
+/** Executable name from a command string, robust to leading/multiple spaces. */
+function firstWord(command: string): string {
+  return command.trim().split(/\s+/)[0]
+}
+
 function channelStatusFromAuth(status: string): ChannelStatus {
   return status === 'not_installed' ? 'not_installed'
     : status === 'failed' ? 'auth_failed'
@@ -184,9 +189,10 @@ export const critiqueCommand: CommandModule<object, CritiqueArgs> = {
         continue
       }
       if (ch.kind !== 'http') {
-        const installed = await checkInstalled(ch.command!.split(' ')[0])
+        const exe = firstWord(ch.command!)
+        const installed = await checkInstalled(exe)
         if (!installed) {
-          authResults[name] = { status: 'not_installed', recovery: `${ch.command!.split(' ')[0]} not found on PATH` }
+          authResults[name] = { status: 'not_installed', recovery: `${exe} not found on PATH` }
           continue
         }
       }
@@ -276,22 +282,29 @@ export const critiqueCommand: CommandModule<object, CritiqueArgs> = {
     // Reuses the configured `claude` channel (respects the user's auth/flags);
     // skipped gracefully if claude is unavailable or --no-synthesis is set.
     let runner: SynthesisRunner | undefined
+    // Synthesis is best-effort — guard its setup so an unexpected auth/install
+    // error can't crash the critique after the main result is already computed.
     if (!args['no-synthesis'] && items.length >= 2 && completed >= 2) {
-      const claudeCfg = config.channels['claude']
-      if (claudeCfg && claudeCfg.kind === 'subprocess' && claudeCfg.command) {
-        const installed = await checkInstalled(claudeCfg.command.split(' ')[0])
-        const auth = installed ? await checkAuth(claudeCfg) : { status: 'not_installed' }
-        if (installed && auth.status === 'ok') {
-          runner = async (prompt: string): Promise<string> => {
-            await dispatchChannel(store, job.job_id, 'critique-synthesis', {
-              command: claudeCfg.command!, prompt: applyWrapper(claudeCfg.prompt_wrapper, prompt),
-              flags: claudeCfg.flags, env: claudeCfg.env,
-              timeout: claudeCfg.timeout ?? config.defaults.timeout,
-              stderr: 'capture', promptDelivery: claudeCfg.prompt_delivery, cwd: claudeCfg.cwd,
-            })
-            return readRawOutput(store, job.job_id, 'critique-synthesis')
+      try {
+        const claudeCfg = config.channels['claude']
+        if (claudeCfg && claudeCfg.kind === 'subprocess' && claudeCfg.command) {
+          const installed = await checkInstalled(firstWord(claudeCfg.command))
+          const auth = installed ? await checkAuth(claudeCfg) : { status: 'not_installed' }
+          if (installed && auth.status === 'ok') {
+            runner = async (prompt: string): Promise<string> => {
+              await dispatchChannel(store, job.job_id, 'critique-synthesis', {
+                command: claudeCfg.command!, prompt: applyWrapper(claudeCfg.prompt_wrapper, prompt),
+                flags: claudeCfg.flags, env: claudeCfg.env,
+                timeout: claudeCfg.timeout ?? config.defaults.timeout,
+                stderr: 'capture', promptDelivery: claudeCfg.prompt_delivery, cwd: claudeCfg.cwd,
+              })
+              return readRawOutput(store, job.job_id, 'critique-synthesis')
+            }
           }
         }
+      } catch {
+        // Couldn't set up synthesis — skip it; the critique itself stands.
+        runner = undefined
       }
     }
     const synth = await synthesizeCritique(items, runner)
