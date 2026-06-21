@@ -39,13 +39,17 @@ const check = process.argv.includes('--check')
 const generated = []
 const stale = []
 
+// Compare on normalized newlines so a CRLF checkout (git autocrlf on Windows)
+// is not reported as drift; generated files are always written with LF.
+const normalize = (text) => text.replace(/\r\n/g, '\n')
+
 for (const skill of SKILLS) {
   const parsed = parseCanonicalSkill(readFileSync(resolve(ROOT, skill.source), 'utf8'))
   for (const target of skill.targets) {
     const out = target.render(parsed)
     const abs = resolve(ROOT, target.path)
     const current = existsSync(abs) ? readFileSync(abs, 'utf8') : null
-    if (current === out) continue
+    if (current !== null && normalize(current) === normalize(out)) continue
     if (check) stale.push(target.path)
     else {
       writeFileSync(abs, out)

@@ -120,16 +120,18 @@ targets the wrappers don't cover (docs, arbitrary diffs, ref ranges).
 ## Jobs, sessions, and findings
 
 ```bash
-mmr jobs list                       # recent review/critique jobs (ids + status)
-mmr status <job-id>                 # one job's per-channel progress
-mmr results <job-id> --format json  # reconciled findings (also text | markdown)
-mmr ack <finding-prefix>            # acknowledge a finding by id prefix
+mmr jobs list                          # recent review/critique jobs (also: prune)
+mmr status <job-id>                    # one job's per-channel progress
+mmr results <job-id> --format json     # reconciled findings (also text | markdown)
+mmr ack add <finding-key> --job <id>   # acknowledge a finding (also: list, rm, prune)
 mmr reconcile <job-id> --channel superpowers --input findings.json
+mmr sessions list                      # iterative sessions (also: start | show | end)
 ```
 
-`mmr review --session <id> --max-rounds N` bounds an iterative review across
-fix rounds; `mmr reconcile` injects an external channel's findings (e.g. an
-agent reviewer) into an existing job so they reconcile with the CLI channels.
+`mmr review --session <id> --max-rounds N` bounds an iterative review across fix
+rounds (manage them with `mmr sessions`); `mmr reconcile` injects an external
+channel's findings (e.g. an agent reviewer) into an existing job so they
+reconcile with the CLI channels.
 
 ## Configuring channels
 
