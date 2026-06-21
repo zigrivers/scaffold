@@ -38,6 +38,31 @@ export interface ReconciledCritiqueItem extends CritiqueItem {
   observation_shingle?: string[]
 }
 
+/** One side of a genuine cross-model disagreement (D2). */
+export interface CritiqueSplitPosition {
+  /** One-line statement of this side's recommendation. */
+  stance: string
+  /** The critique item ids supporting this side. */
+  item_ids: string[]
+  /** The channels holding this side. */
+  sources: string[]
+}
+
+/** A first-class disagreement: the tool presents it, never resolves it (D2). */
+export interface CritiqueSplit {
+  theme: string
+  positions: CritiqueSplitPosition[]
+  /** The fact or assumption that, if known, would resolve the split. */
+  crux: string
+}
+
+/** Output of the editorial synthesis pass (D6) — structures, never adjudicates. */
+export interface CritiqueSynthesis {
+  splits: CritiqueSplit[]
+  /** Editorial prose that cites item ids and introduces no new opinion. */
+  synthesis: string
+}
+
 /** Per-channel outcome in a critique run. */
 export interface CritiqueChannelResult {
   status: ChannelStatus
@@ -59,7 +84,11 @@ export interface CritiqueReport {
   artifact_source: string
   items: ReconciledCritiqueItem[]
   per_channel: Record<string, CritiqueChannelResult>
-  /** Neutral roll-up (Phase 1: counts; Phase 2 replaces with editorial synthesis). */
+  /** Genuine cross-model disagreements, surfaced first-class (D2). */
+  splits?: CritiqueSplit[]
+  /** Editorial synthesis prose (D6); absent when the synthesis pass is skipped. */
+  synthesis?: string
+  /** Neutral count roll-up of the run. */
   summary: string
   metadata: {
     channels_dispatched: number
