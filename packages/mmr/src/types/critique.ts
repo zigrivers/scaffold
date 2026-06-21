@@ -82,6 +82,12 @@ export interface CritiqueReport {
   job_id: string
   /** Where the critiqued artifact came from (a path or "stdin"). */
   artifact_source: string
+  /** Iterative-session id, when --session was used (D7). */
+  session_id?: string
+  /** One-based round number within the session (D7). */
+  round?: number
+  /** Persona lenses applied (D5); when set, "consensus" is relabeled "perspectives". */
+  lenses?: string[]
   items: ReconciledCritiqueItem[]
   per_channel: Record<string, CritiqueChannelResult>
   /** Repo files folded into the critique via --context repo (D3); absent when artifact-only. */

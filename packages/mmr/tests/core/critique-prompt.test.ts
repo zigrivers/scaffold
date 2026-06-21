@@ -40,6 +40,23 @@ describe('assembleCritiquePrompt', () => {
     expect(prompt.indexOf('REPO-CONTEXT-BLOB')).toBeLessThan(prompt.indexOf('THE-DESIGN-BODY'))
   })
 
+  it('prepends a lens preamble before the template', () => {
+    const prompt = assembleCritiquePrompt({ artifact: 'a', lens: 'BE-A-SKEPTIC' })
+    expect(prompt).toContain('BE-A-SKEPTIC')
+    expect(prompt.indexOf('BE-A-SKEPTIC')).toBeLessThan(prompt.indexOf('items'))
+  })
+
+  it('injects a prior-round ledger and frames the artifact as a revision', () => {
+    const prompt = assembleCritiquePrompt({
+      artifact: 'REVISED-DESIGN',
+      priorRound: { round: 1, items: [{ id: 'C-001', kind: 'concern', theme: 'scaling', observation: 'wont scale' }] },
+    })
+    expect(prompt).toContain('Previously raised (round 1)')
+    expect(prompt).toContain('C-001')
+    expect(prompt.toLowerCase()).toContain('revision')
+    expect(prompt.indexOf('C-001')).toBeLessThan(prompt.indexOf('REVISED-DESIGN'))
+  })
+
   it('applies a prompt wrapper', () => {
     const prompt = assembleCritiquePrompt({ artifact: 'a', promptWrapper: 'BEGIN {{prompt}} END' })
     expect(prompt.startsWith('BEGIN ')).toBe(true)

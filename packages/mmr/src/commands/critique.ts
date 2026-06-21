@@ -11,6 +11,8 @@ import { parseCritiqueOutput } from '../core/critique-parser.js'
 import { reconcileCritique } from '../core/critique-reconciler.js'
 import { synthesizeCritique, type SynthesisRunner } from '../core/critique-synthesis.js'
 import { buildRepoContext } from '../core/critique-context.js'
+import { lensPreamble, assignLenses } from '../core/critique-lenses.js'
+import { CritiqueSessionStore, resolveCritiqueSessionRoot } from '../core/critique-session.js'
 import { formatCritiqueText, formatCritiqueJson } from '../formatters/critique.js'
 import { resolveCritiqueInput } from '../core/critique-input.js'
 import { resolveDispatchChannels } from './review.js'
@@ -29,9 +31,11 @@ interface CritiqueArgs {
   timeout?: number
   format?: string
   'dry-run'?: boolean
-  'no-synthesis'?: boolean
+  synthesis?: boolean
   context?: string
   'context-paths'?: string[]
+  session?: string
+  lenses?: string[]
   configBaseRef?: string
   trustProjectConfig?: boolean
 }
@@ -112,9 +116,9 @@ export const critiqueCommand: CommandModule<object, CritiqueArgs> = {
       .option('timeout', { type: 'number', describe: 'Per-channel timeout in seconds' })
       .option('format', { type: 'string', choices: ['text', 'json'], describe: 'Output format (default text)' })
       .option('dry-run', { type: 'boolean', default: false, describe: 'Assemble the prompt without dispatching' })
-      .option('no-synthesis', {
-        type: 'boolean', default: false,
-        describe: 'Skip the editorial synthesis pass (faster; deterministic clustering only)',
+      .option('synthesis', {
+        type: 'boolean', default: true,
+        describe: 'Run the editorial synthesis pass; use --no-synthesis to skip (deterministic only)',
       })
       .option('context', {
         type: 'string', choices: ['none', 'repo'], default: 'none',
@@ -123,6 +127,14 @@ export const critiqueCommand: CommandModule<object, CritiqueArgs> = {
       .option('context-paths', {
         type: 'array', string: true,
         describe: 'Specific repo files to ground against (implies --context repo; highest priority)',
+      })
+      .option('session', {
+        type: 'string',
+        describe: 'Iterative session id — round N sees the prior round and your revisions (D7)',
+      })
+      .option('lenses', {
+        type: 'array', string: true,
+        describe: 'Persona lenses, one per channel (skeptic, simplifier, …); relabels output (D5)',
       })
       .option('config-base-ref', {
         type: 'string',
@@ -187,7 +199,31 @@ export const critiqueCommand: CommandModule<object, CritiqueArgs> = {
       repoContext = ctx.context
       contextUsed = ctx.used
     }
-    const basePrompt = assembleCritiquePrompt({ artifact, focus: args.focus, repoContext })
+    // Iterative session (D7): inject only the immediately-prior round's items.
+    const sessionStore = args.session ? new CritiqueSessionStore(resolveCritiqueSessionRoot()) : undefined
+    const priorRounds = sessionStore && args.session ? sessionStore.load(args.session) : []
+    const priorRound = priorRounds.length > 0
+      ? { round: priorRounds.length, items: priorRounds[priorRounds.length - 1].items }
+      : undefined
+    const roundNumber = priorRounds.length + 1
+
+    // Persona lenses (D5): one per channel, cycled. An empty list keeps the
+    // single shared prompt (independence) used by Phases 1–3.
+    const lenses = (args.lenses ?? []).flatMap((l) => l.split(',')).map((s) => s.trim()).filter(Boolean)
+    const lensByChannel = new Map<string, string>()
+    if (lenses.length > 0) {
+      const assigned = assignLenses(lenses, channelNames.length)
+      channelNames.forEach((name, i) => lensByChannel.set(name, lensPreamble(assigned[i])))
+    }
+    const promptFor = (name: string): string => assembleCritiquePrompt({
+      artifact, focus: args.focus, repoContext,
+      ...(lensByChannel.has(name) ? { lens: lensByChannel.get(name) } : {}),
+      ...(priorRound ? { priorRound } : {}),
+    })
+    // Canonical (lens-free) prompt for persistence + the no-channels path.
+    const basePrompt = assembleCritiquePrompt({
+      artifact, focus: args.focus, repoContext, ...(priorRound ? { priorRound } : {}),
+    })
     const format = args.format === 'json' ? 'json' : 'text'
 
     // Dry-run is side-effect-free: assemble + print, no install/auth subprocesses.
@@ -197,7 +233,7 @@ export const critiqueCommand: CommandModule<object, CritiqueArgs> = {
       console.log(`Channels configured: ${channelNames.join(', ') || '(none)'}`)
       for (const name of channelNames) {
         console.log(`\n--- Assembled prompt for ${name} ---`)
-        console.log(applyWrapper(config.channels[name].prompt_wrapper, basePrompt))
+        console.log(applyWrapper(config.channels[name].prompt_wrapper, promptFor(name)))
       }
       return
     }
@@ -262,7 +298,7 @@ export const critiqueCommand: CommandModule<object, CritiqueArgs> = {
 
     const dispatchOne = (name: string): Promise<void> => {
       const ch: ChannelConfigParsed = config.channels[name]
-      const prompt = applyWrapper(ch.prompt_wrapper, basePrompt)
+      const prompt = applyWrapper(ch.prompt_wrapper, promptFor(name))
       const timeout = ch.timeout ?? config.defaults.timeout
       if (ch.kind === 'http') {
         return dispatchHttpChannel(store, job.job_id, name, { channel: ch, prompt, timeout })
@@ -308,7 +344,7 @@ export const critiqueCommand: CommandModule<object, CritiqueArgs> = {
     let runner: SynthesisRunner | undefined
     // Synthesis is best-effort — guard its setup so an unexpected auth/install
     // error can't crash the critique after the main result is already computed.
-    if (!args['no-synthesis'] && items.length >= 2 && completed >= 2) {
+    if (args.synthesis !== false && items.length >= 2 && completed >= 2) {
       try {
         const claudeCfg = config.channels['claude']
         if (claudeCfg && claudeCfg.kind === 'subprocess' && claudeCfg.command) {
@@ -336,8 +372,19 @@ export const critiqueCommand: CommandModule<object, CritiqueArgs> = {
     const report = buildReport(job.job_id, source, items, perChannel, valid.length, completed,
       Math.round((Date.now() - started) / 1000))
     if (contextUsed && contextUsed.length > 0) report.context_used = contextUsed
+    if (lenses.length > 0) report.lenses = lenses
     if (synth.splits.length > 0) report.splits = synth.splits
     if (synth.synthesis) report.synthesis = synth.synthesis
+    if (args.session && sessionStore) {
+      report.session_id = args.session
+      report.round = roundNumber
+      // Append this round's items as the bounded ledger for the next round.
+      sessionStore.append(args.session, {
+        round: roundNumber,
+        artifact_source: source,
+        items: items.map((i) => ({ id: i.id, kind: i.kind, theme: i.theme, observation: i.observation })),
+      })
+    }
     store.saveResults(job.job_id, report as unknown as never)
 
     console.log(format === 'json' ? formatCritiqueJson(report) : formatCritiqueText(report))

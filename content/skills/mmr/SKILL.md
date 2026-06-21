@@ -168,12 +168,21 @@ artifact references) so the models judge fit against your real system; the
 report discloses which files were used. `--context-paths a.ts b.ts` grounds
 against specific files instead (highest priority).
 
+**Iterate** across rounds with `--session <id>`: round 1 critiques; you revise
+the artifact and re-run with the same id, and the models see the prior round's
+points and judge which your revision addressed (the prompt stays bounded to the
+last round). **Lenses** (`--lenses skeptic,simplifier,…`) give each channel a
+distinct persona for breadth; because that trades away independence, the output
+relabels "consensus" as "perspectives".
+
 ```bash
 mmr critique docs/design/notifications.md   # critique a design doc
 mmr critique - --focus scaling              # critique stdin, focused
 mmr critique plan.md --format json          # machine-readable report
 mmr critique design.md --no-synthesis       # skip the editorial synthesis pass
 mmr critique design.md --context repo       # ground the critique in the codebase
+mmr critique design.md --session redesign   # iterative round (re-run after edits)
+mmr critique design.md --lenses skeptic,simplifier   # persona lenses per channel
 ```
 
 `mmr doctor` is the one-shot health check: it classifies each channel and
