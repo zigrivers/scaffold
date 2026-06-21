@@ -46,7 +46,9 @@ interface Frontmatter {
 function extractFrontmatter(markdown: string): Frontmatter {
   // Strip a leading UTF-8 BOM (editors add it) before matching the delimiter.
   const normalized = markdown.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n')
-  const match = /^---[ \t]*\n([\s\S]*?)\n---[ \t]*\n?/.exec(normalized)
+  // The closing `---` must be alone on its line (only trailing whitespace, then a
+  // newline or EOF) — `---some-text` is NOT a delimiter.
+  const match = /^---[ \t]*\n([\s\S]*?)\n---[ \t]*(?:\n|$)/.exec(normalized)
   if (!match) throw new Error('Canonical skill is missing its --- frontmatter block')
   const parsed = yaml.load(match[1])
   if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
@@ -103,8 +105,8 @@ function firstHeadingOutsideCode(body: string): number {
       } else if (char === fence.char && len >= fence.len && rest === '') {
         fence = null // closing fence — same char, >= length, nothing after
       }
-    } else if (!fence && /^ {0,3}#{2,}\s/.test(line)) {
-      return offset // first level-2-or-deeper section heading outside a code fence
+    } else if (!fence && /^ {0,3}#{2,}(?:\s|$)/.test(line)) {
+      return offset // first level-2-or-deeper section heading outside a code fence (empty heading allowed)
     }
     offset += line.length + 1
   }

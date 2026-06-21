@@ -74,8 +74,13 @@ function yamlDoubleQuote(value: string): string {
     else if (ch === '\n') out += '\\n'
     else if (ch === '\r') out += '\\r'
     else if (ch === '\t') out += '\\t'
-    else if (code < 0x20 || code === 0x7F) out += `\\x${code.toString(16).padStart(2, '0').toUpperCase()}`
-    else out += ch
+    // C0 (+DEL) and C1 control characters are not printable in a YAML scalar.
+    else if (code < 0x20 || code === 0x7F || (code >= 0x80 && code <= 0x9F)) {
+      out += `\\x${code.toString(16).padStart(2, '0').toUpperCase()}`
+    } else if (code === 0x2028 || code === 0x2029) {
+      // Unicode line/paragraph separators are line breaks in YAML — escape them.
+      out += `\\u${code.toString(16).padStart(4, '0').toUpperCase()}`
+    } else out += ch
   }
   return `"${out}"`
 }

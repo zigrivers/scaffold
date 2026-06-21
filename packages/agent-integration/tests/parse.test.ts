@@ -148,6 +148,20 @@ Just a body, no headings.
     expect(lean).not.toContain('Deep content')
   })
 
+  it('does not treat a "---trailing" line as the closing frontmatter delimiter', () => {
+    const md = '---\nname: x\ndescription: d\n---\n\n---notadelimiter here\nbody\n'
+    const s = parseCanonicalSkill(md)
+    expect(s.name).toBe('x')
+    expect(s.body).toContain('---notadelimiter here')
+  })
+
+  it('recognizes an empty ATX heading ("##" with no text) as a section boundary', () => {
+    const md = '---\nname: x\ndescription: d\n---\n\n# T\n\nIntro.\n\n##\n\nDeep.\n'
+    const lean = parseCanonicalSkill(md).lean
+    expect(lean).toContain('Intro.')
+    expect(lean).not.toContain('Deep.')
+  })
+
   it('tolerates CRLF line endings', () => {
     const s = parseCanonicalSkill('---\r\nname: x\r\ndescription: d\r\n---\r\n\r\nbody\r\n')
     expect(s.name).toBe('x')

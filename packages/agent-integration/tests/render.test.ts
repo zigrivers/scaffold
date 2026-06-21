@@ -85,6 +85,16 @@ describe('YAML safety', () => {
     expect(renderSkillMd(s)).toContain('description: "a\\x00b"')
   })
 
+  it('escapes C1 control characters (U+0080–U+009F) as \\xNN', () => {
+    const s: CanonicalSkill = { name: 'x', description: `a${String.fromCharCode(0x85)}b`, body: 'b', lean: 'b' }
+    expect(renderSkillMd(s)).toContain('description: "a\\x85b"')
+  })
+
+  it('escapes Unicode line/paragraph separators (U+2028/U+2029) as \\uNNNN', () => {
+    const s: CanonicalSkill = { name: 'x', description: `a${String.fromCharCode(0x2028)}b`, body: 'b', lean: 'b' }
+    expect(renderSkillMd(s)).toContain('description: "a\\u2028b"')
+  })
+
   it('escapes control characters (newline/tab/CR) so they cannot break the frontmatter', () => {
     const s: CanonicalSkill = {
       name: 'x',
