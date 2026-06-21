@@ -109,6 +109,24 @@ Just a body, no headings.
     expect(parseCanonicalSkill(md).name).toBe('x')
   })
 
+  it('does not let a 3-backtick line close a 4-backtick block (nested fence)', () => {
+    const md = [
+      '---', 'name: x', 'description: d', '---', '',
+      '# Title', '', 'Intro.', '',
+      '````markdown', 'example with an inner fence:', '```', '## not a heading', '```', '````', '',
+      '## Real Section', '', 'Deep.', '',
+    ].join('\n')
+    const lean = parseCanonicalSkill(md).lean
+    expect(lean).toContain('Intro.')
+    expect(lean).toContain('## not a heading')
+    expect(lean).not.toContain('Deep.')
+  })
+
+  it('returns the full body when it opens with a heading (no intro to extract)', () => {
+    const md = '---\nname: x\ndescription: d\n---\n\n## Section\n\nBody.\n'
+    expect(parseCanonicalSkill(md).lean).toBe('## Section\n\nBody.')
+  })
+
   it('does not treat a "## " line inside a code block as the intro boundary', () => {
     const md = [
       '---', 'name: x', 'description: d', '---', '',

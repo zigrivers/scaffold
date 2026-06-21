@@ -73,23 +73,35 @@ function deriveLean(body: string): string {
     return body.slice(start + LEAN_START.length, end).trim()
   }
   const introEnd = firstHeadingOutsideCode(body)
+  // introEnd === 0 means the body opens with a heading (no intro to extract), so
+  // fall back to the full body rather than an empty lean.
   if (introEnd > 0) return body.slice(0, introEnd).trim()
   return body
 }
 
 /**
  * Offset of the first `##`+ heading that is NOT inside a fenced code block, or
- * -1 if none. Tracks ``` / ~~~ fences so a `## ` line inside an example (e.g. a
- * shell comment) does not truncate the intro.
+ * -1 if none. Tracks fences per CommonMark so a `## ` line inside an example
+ * (e.g. a shell comment) does not truncate the intro: a fence opens on `` ``` ``
+ * / `~~~` (3+), and only a CLOSING fence of the SAME character, AT LEAST as
+ * long, and with nothing after it ends the block — so a 3-backtick line inside
+ * a 4-backtick block does not falsely close it.
  */
 function firstHeadingOutsideCode(body: string): number {
   let offset = 0
-  let inFence = false
+  let fence: { char: string; len: number } | null = null
   for (const line of body.split('\n')) {
     const trimmed = line.trimStart()
-    if (trimmed.startsWith('```') || trimmed.startsWith('~~~')) {
-      inFence = !inFence
-    } else if (!inFence && /^##\s/.test(line)) {
+    const marker = /^(`{3,}|~{3,})/.exec(trimmed)
+    if (marker) {
+      const char = marker[1][0]
+      const len = marker[1].length
+      if (!fence) {
+        fence = { char, len }
+      } else if (char === fence.char && len >= fence.len && trimmed.slice(len).trim() === '') {
+        fence = null
+      }
+    } else if (!fence && /^##\s/.test(line)) {
       return offset
     }
     offset += line.length + 1
