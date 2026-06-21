@@ -61,7 +61,7 @@ export function formatCritiqueText(report: CritiqueReport): string {
 
   if (converged.length > 0) {
     out.push(lensed
-      ? 'PERSPECTIVES — raised under more than one lens'
+      ? 'PERSPECTIVES — raised by more than one channel'
       : 'CONVERGENCE — independent models agreed (high signal)')
     for (const item of converged) out.push(renderConverged(item, lensed))
     out.push('')
