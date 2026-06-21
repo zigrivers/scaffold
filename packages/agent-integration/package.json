@@ -13,7 +13,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
-    "lint": "eslint src/",
+    "lint": "eslint src/ tests/",
     "type-check": "tsc -p tsconfig.check.json",
     "check": "npm run lint && npm run type-check && npm test"
   },

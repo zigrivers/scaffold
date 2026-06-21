@@ -105,8 +105,16 @@ Just a body, no headings.
   })
 
   it('strips a leading UTF-8 BOM before matching the frontmatter', () => {
-    const md = '﻿---\nname: x\ndescription: d\n---\n\nbody\n'
+    const md = String.fromCharCode(0xFEFF) + '---\nname: x\ndescription: d\n---\n\nbody\n'
+    expect(md.charCodeAt(0)).toBe(0xFEFF) // the input really does start with a BOM
     expect(parseCanonicalSkill(md).name).toBe('x')
+  })
+
+  it('stops the intro at the first level-3 heading when there is no level-2', () => {
+    const md = '---\nname: x\ndescription: d\n---\n\n# Title\n\nIntro.\n\n### Subsection\n\nDeep.\n'
+    const lean = parseCanonicalSkill(md).lean
+    expect(lean).toContain('Intro.')
+    expect(lean).not.toContain('Deep.')
   })
 
   it('does not let a 3-backtick line close a 4-backtick block (nested fence)', () => {

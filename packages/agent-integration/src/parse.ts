@@ -103,8 +103,8 @@ function firstHeadingOutsideCode(body: string): number {
       } else if (char === fence.char && len >= fence.len && rest === '') {
         fence = null // closing fence — same char, >= length, nothing after
       }
-    } else if (!fence && /^ {0,3}##\s/.test(line)) {
-      return offset
+    } else if (!fence && /^ {0,3}#{2,}\s/.test(line)) {
+      return offset // first level-2-or-deeper section heading outside a code fence
     }
     offset += line.length + 1
   }
