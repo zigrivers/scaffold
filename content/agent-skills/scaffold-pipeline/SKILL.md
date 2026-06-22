@@ -1,8 +1,9 @@
 ---
 name: scaffold-pipeline
-description: "Static reference for scaffold pipeline ordering, dependencies, and phase structure. Use ONLY for questions about pipeline design, step ordering, or dependency constraints — NOT for status, progress, or \"what's next\" queries (those go through scaffold-runner)."
+description: Static reference for scaffold pipeline ordering, dependencies, and phase structure. Use ONLY for questions about pipeline design, step ordering, or dependency constraints — NOT for status, progress, or "what's next" queries (those go through scaffold-runner).
 ---
 
+<!-- lean:start -->
 # Scaffold Pipeline Reference
 
 This skill is a **static reference** for pipeline ordering and dependency constraints. It does NOT handle status checks, progress queries, or navigation.
@@ -17,6 +18,7 @@ Use this skill ONLY when the user asks about:
 Run `scaffold guides pipeline` for the full phase/dependency reference (add
 `--markdown` for the plain-text body), and `scaffold next` to see which steps are
 eligible right now.
+<!-- lean:end -->
 
 ## Phases
 

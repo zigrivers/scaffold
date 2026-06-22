@@ -146,6 +146,8 @@ The plugin is optional — everything it does can also be done with `scaffold ru
 
 > **CLI-only users**: If you prefer not to install the plugin, skills are installed automatically — `scaffold init` sets them up, and any subsequent CLI command keeps them current after upgrades. No manual `scaffold skill install` needed.
 
+> **Other agent CLIs**: the auto-install covers Claude Code (`.claude/skills/`) and shared/OpenCode hosts (`.agents/skills/`). To install the scaffold skills in another CLI's native form, run `scaffold skill install --platform <codex|antigravity|cursor|opencode>` — it writes a managed `AGENTS.md` block (Codex/Antigravity), `.cursor/rules/*.mdc` (Cursor), or `.opencode/skills/` (OpenCode).
+
 ## Updating
 
 ### npm

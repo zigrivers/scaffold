@@ -36,6 +36,18 @@ const SKILLS = [
       { path: 'packages/mmr/templates/skills/opencode/mmr.md', render: (s) => renderSkillMd(s) },
     ],
   },
+  // Scaffold's own skills. The full SKILL.md is what skill-sync installs to
+  // .claude/skills + .agents/skills; the agents-block (raw lean body) and
+  // cursor.mdc are what `scaffold skill install --platform` writes for
+  // Codex/Antigravity (AGENTS.md) and Cursor (.cursor/rules).
+  ...['scaffold-runner', 'scaffold-pipeline'].map((name) => ({
+    source: `content/agent-skills/${name}/SKILL.md`,
+    targets: [
+      { path: `content/skills/${name}/SKILL.md`, render: (s) => renderSkillMd(s) },
+      { path: `content/skills/${name}/agents-block.md`, render: (s) => `${s.lean}\n` },
+      { path: `content/skills/${name}/cursor.mdc`, render: (s) => renderCursorMdc(s) },
+    ],
+  })),
 ]
 
 const check = process.argv.includes('--check')

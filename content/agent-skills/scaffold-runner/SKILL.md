@@ -1,8 +1,9 @@
 ---
 name: scaffold-runner
-description: "Interactive wrapper for the scaffold CLI that surfaces a pipeline step's decision points before executing it and manages the step lifecycle. Use when the user asks to run a scaffold step (\"run scaffold <step>\", \"scaffold <step>\", \"what's next?\"), to start building, or works in a project with a .scaffold/ directory."
+description: Interactive wrapper for the scaffold CLI that surfaces a pipeline step's decision points before executing it and manages the step lifecycle. Use when the user asks to run a scaffold step ("run scaffold <step>", "scaffold <step>", "what's next?"), to start building, or works in a project with a .scaffold/ directory.
 ---
 
+<!-- lean:start -->
 # Scaffold Runner
 
 An interactive layer over the `scaffold` CLI: when the user asks to run a
@@ -23,6 +24,7 @@ stateless and have no completion to record. Key commands: `scaffold list`,
 For the full command surface, run `scaffold guides cli` (every command grouped
 by purpose) and `scaffold guides pipeline`; `scaffold next` shows what's eligible
 now.
+<!-- lean:end -->
 
 This skill provides an intelligent interactive layer between the user and the `scaffold` CLI. It ensures that decision points embedded in scaffold prompts are surfaced to the user before execution, and manages the full step lifecycle.
 

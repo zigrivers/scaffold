@@ -9,6 +9,11 @@ import {
   INSTALLABLE_SKILLS,
   installAllSkills,
 } from '../../core/skills/sync.js'
+import {
+  type SkillPlatform,
+  SKILL_PLATFORMS,
+  installSkillsForPlatform,
+} from '../../core/skills/platform-install.js'
 
 interface SkillArgs {
   action: string
@@ -17,6 +22,7 @@ interface SkillArgs {
   verbose?: boolean
   root?: string
   force?: boolean
+  platform?: string
 }
 
 function getSkillDestDir(projectRoot: string, target: SkillTarget, skillName: string): string {
@@ -29,7 +35,8 @@ function getSkillDestPath(projectRoot: string, target: SkillTarget, skillName: s
 
 const skillCommand: CommandModule<Record<string, unknown>, SkillArgs> = {
   command: 'skill <action>',
-  describe: 'Manage scaffold skills for Claude Code and shared agents',
+  describe: 'Manage scaffold skills (Claude Code + shared agents by default; '
+    + '--platform for Codex/Antigravity/Cursor/OpenCode native forms)',
   builder: (yargs: Argv) => {
     return yargs
       .positional('action', {
@@ -43,6 +50,12 @@ const skillCommand: CommandModule<Record<string, unknown>, SkillArgs> = {
         description: 'Overwrite existing skill files',
         default: false,
       })
+      .option('platform', {
+        type: 'string',
+        choices: SKILL_PLATFORMS,
+        description: 'Install in a CLI\'s native form (codex/antigravity → AGENTS.md, '
+          + 'cursor → .cursor/rules, opencode → .opencode/skills). Default: Claude Code + shared agents.',
+      })
   },
   handler: async (argv) => {
     const outputMode = resolveOutputMode(argv)
@@ -51,6 +64,29 @@ const skillCommand: CommandModule<Record<string, unknown>, SkillArgs> = {
 
     switch (argv.action) {
     case 'install': {
+      // Native-form install for a specific CLI (AGENTS.md / .cursor/rules /
+      // .opencode/skills); the default path below covers Claude Code + shared.
+      if (argv.platform) {
+        const { installed, skipped, errors } = installSkillsForPlatform(
+          projectRoot, argv.platform as SkillPlatform, { force: argv.force },
+        )
+        for (const err of errors) output.error(err)
+        if (installed.length > 0) {
+          output.info(`\nInstalled scaffold skills for ${argv.platform}:\n  ${installed.join('\n  ')}`)
+        }
+        if (skipped.length > 0) {
+          output.warn(`\nSkipped:\n  ${skipped.join('\n  ')}`)
+        }
+        // A failed native install must not report success.
+        if (errors.length > 0) {
+          process.exit(1)
+        }
+        if (installed.length === 0 && skipped.length === 0) {
+          output.warn('\nNo skills installed.')
+        }
+        break
+      }
+
       // Clean up legacy flat-file skill format (.claude/skills/<name>.md)
       for (const skill of INSTALLABLE_SKILLS) {
         const oldFlatPath = path.join(projectRoot, '.claude', 'skills', `${skill.name}.md`)
@@ -78,6 +114,7 @@ const skillCommand: CommandModule<Record<string, unknown>, SkillArgs> = {
         }
       } else if (result.errors.length > 0) {
         output.warn('\nNo skills installed due to source errors.')
+        process.exit(1) // a failed install must not report success (matches --platform)
       } else {
         output.info('\nAll skills already installed.')
       }

@@ -1,0 +1,14 @@
+# Scaffold Pipeline Reference
+
+This skill is a **static reference** for pipeline ordering and dependency constraints. It does NOT handle status checks, progress queries, or navigation.
+
+**Activation boundary:** If the user asks "where am I?", "what's next?", "pipeline status", or anything about their current progress → **do not use this skill**. The `scaffold-runner` skill handles all status/navigation via the `scaffold` CLI.
+
+Use this skill ONLY when the user asks about:
+- Pipeline design: "what phases are there?", "what's the ordering?"
+- Dependency rules: "what depends on what?", "can I run X before Y?"
+- Step reference: "what commands are in phase 3?", "is design-system optional?"
+
+Run `scaffold guides pipeline` for the full phase/dependency reference (add
+`--markdown` for the plain-text body), and `scaffold next` to see which steps are
+eligible right now.
