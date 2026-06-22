@@ -88,7 +88,8 @@ describe('classifyRedirect', () => {
     const evil = '<html><head>' + '<meta '.repeat(20000) + '</head>'
     const start = Date.now()
     classifyRedirect(evil, 'text/html', 'https://x.test/p')
-    expect(Date.now() - start).toBeLessThan(1000)
+    // catastrophic backtracking would take many seconds; 1000ms was too tight for CI jitter (~1s linear)
+    expect(Date.now() - start).toBeLessThan(5000)
   })
 
   it('SourceUnusableError carries url and detail', () => {
@@ -200,7 +201,8 @@ describe('classifyRedirect', () => {
       '\nwindow.location="https://x.test/dest"\n</head><body></body></html>'
     const start = Date.now()
     classifyRedirect(body, 'text/html', 'https://x.test/p')
-    expect(Date.now() - start).toBeLessThan(1000)
+    // catastrophic backtracking would take many seconds; 1000ms was too tight for CI jitter (~1s linear)
+    expect(Date.now() - start).toBeLessThan(5000)
   })
 
   // N1 — HTML-comment blindness: commented-out meta-refresh and base href must be ignored
