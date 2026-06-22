@@ -14,11 +14,12 @@ executing, then run it.
 &lt;step&gt;", "what's next?", "scaffold status", "start building", or is working
 in a project with a `.scaffold/` directory.
 
-**Core loop:** `scaffold next` (what's eligible) → `scaffold run <step> --auto`
-to PREVIEW the assembled prompt → surface any decision points / optional sections
-to the user → on approval, execute the step's prompt → record it with
-`scaffold complete <step>`. Key commands: `scaffold list`, `scaffold status`,
-`scaffold next`, `scaffold run <step>`, `scaffold complete <step>`.
+**Core loop:** check `scaffold next` for what's eligible; before running a step,
+surface its decision points (depth, strictness, optional sections) to the user;
+then run it. For **stateful** pipeline steps, record completion with
+`scaffold complete <step>` — **build** steps (e.g. `single-agent-start`) are
+stateless and have no completion to record. Key commands: `scaffold list`,
+`scaffold status`, `scaffold next`, `scaffold run <step>`, `scaffold complete <step>`.
 
 For the full command surface, run `scaffold guides cli` (every command grouped
 by purpose) and `scaffold guides pipeline`; `scaffold next` shows what's eligible

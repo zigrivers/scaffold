@@ -43,6 +43,11 @@ eligible right now.
 
 ## Pipeline Order
 
+The `#` column below is a recommended **walkthrough order** for reading, not a
+strict sequence — actual dispatch order is determined by each step's
+dependencies (the per-step `order` field is only a tiebreaker between steps that
+are otherwise eligible at the same time; see "Execution Model" below).
+
 | # | Phase | Command | Notes |
 |---|-------|---------|-------|
 | 0.1 | Product Vision | `/scaffold:create-vision` | Interactive — requires user input |
@@ -183,7 +188,7 @@ Order numbers are **phase-aligned**: Phase N uses orders in the N00 range (Phase
 
 Steps within the same track that don't depend on each other can run in parallel (in separate sessions/worktrees):
 
-- **Track A** and **Track B** are fully independent until Phase 12
+- **Track A** and **Track B** are independent **of each other** (both branch from the shared Product Definition pre-phase) until they converge at Phase 12
 - Within Track B, specification steps (Phase 8) can parallelize: DB schema, API contracts, and UX spec all depend on review-architecture but not each other
 - Validation steps (Phase 13) all depend on implementation-plan-review but not each other — all 7 can run in parallel
 
