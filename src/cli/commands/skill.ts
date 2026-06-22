@@ -77,6 +77,10 @@ const skillCommand: CommandModule<Record<string, unknown>, SkillArgs> = {
         if (skipped.length > 0) {
           output.warn(`\nSkipped:\n  ${skipped.join('\n  ')}`)
         }
+        // A failed native install must not report success.
+        if (errors.length > 0) {
+          process.exit(1)
+        }
         if (installed.length === 0 && skipped.length === 0) {
           output.warn('\nNo skills installed.')
         }
