@@ -99,8 +99,9 @@ eligible right now.
 | 45 | Finalization | `/scaffold:apply-fixes-and-freeze` | Apply findings, freeze docs |
 | 46 | Finalization | `/scaffold:developer-onboarding-guide` | "Start here" for new devs/agents |
 | 47 | Finalization | `/scaffold:implementation-playbook` | Operational guide for agent execution |
-| 48 | Execution | `/scaffold:single-agent-start` | Single-agent TDD execution loop |
-| 48 | Execution | `/scaffold:multi-agent-start` | Multi-agent — one per worktree |
+| 47.5 | Finalization | `/scaffold:materialize-plan-to-beads` | **(optional)** Materialize plan tasks into Beads issues |
+| 48 | Build | `/scaffold:single-agent-start` | Single-agent TDD execution loop |
+| 48 | Build | `/scaffold:multi-agent-start` | Multi-agent — one per worktree |
 
 ### Phase 15 — Build (stateless, on-demand)
 
@@ -166,7 +167,7 @@ review-user-stories ──┐    │    git-workflow → claude-md-optimization 
                                               ↓
                               Phase 13: Validation (7 parallel checks)
                                               ↓
-                              Phase 14: Finalization → Execution
+                              Phase 14: Finalization → Build
 ```
 
 ### How Order Numbers Work
@@ -200,7 +201,7 @@ Steps within the same track that don't depend on each other can run in parallel 
 10. **{{INSTRUCTIONS_FILE}} Optimization before Workflow Audit** — optimize first, verify second
 11. **Implementation Plan Review before Validation** — 7 checks run after plan review
 12. **All 7 Validation checks before Apply Fixes & Freeze** — freeze requires all findings
-13. **Finalization before Execution** — agents need frozen docs and playbook
+13. **Finalization before Build** — agents need frozen docs and playbook
 
 ## Status & Navigation
 
