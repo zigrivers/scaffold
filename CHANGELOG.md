@@ -4,6 +4,44 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.39.0] — 2026-06-21
+
+### Added
+
+- **Cross-CLI first-class support — Scaffold and MMR now install natively on all
+  five supported agent CLIs.** Previously only Claude Code was truly first-class.
+  - **Scaffold skills on every CLI.** `scaffold skill install --platform
+    <codex|antigravity|cursor|opencode>` installs the `scaffold-runner` and
+    `scaffold-pipeline` skills in each host's native form: a managed `AGENTS.md`
+    block (Codex/Antigravity), a `.cursor/rules/*.mdc` rule (Cursor), or a full
+    `.opencode/skills/<name>/SKILL.md` Agent Skill (OpenCode). The default
+    `scaffold skill install` continues to cover Claude Code (`.claude/skills/`)
+    and shared agents (`.agents/skills/`, which OpenCode also reads).
+  - **OpenCode is first-class** — it picks up the scaffold skills via
+    `.agents/skills/`, the MMR review skill via `.opencode/skills/`, project
+    rules via `AGENTS.md`, and runs the pipeline through the `scaffold` CLI.
+- **OpenCode platform for `mmr skill install`** (in `@zigrivers/mmr` 3.1.0) —
+  installs the full review Agent Skill to `.opencode/skills/mmr/SKILL.md`.
+
+### Changed
+
+- **Unified, drift-proof skill content.** Each agent skill now has ONE canonical
+  source under `content/agent-skills/<name>/SKILL.md`; a codegen step
+  (`npm run gen:skills`) renders every per-platform form (full `SKILL.md`, lean
+  `AGENTS.md` block, Cursor `.mdc`) from it, with a `make agent-skills-check`
+  drift gate. The shared renderer core lives in a new internal
+  `packages/agent-integration` workspace package.
+
+### Removed
+
+- **Gemini support dropped entirely** — Google's Gemini CLI is sunset and
+  **Antigravity** (`agy`) is its replacement. The `GeminiAdapter` and the
+  `gemini` platform are gone; the MMR `gemini` review channel is now a disabled,
+  never-dispatched **tombstone** so existing `.mmr.yaml`/scaffold configs that
+  still name `gemini` keep loading (it is stripped/ignored with a clear message,
+  and cannot be re-enabled). All docs and pipeline prompts now reference
+  Antigravity.
+
 ## [3.38.0] — 2026-06-20
 
 ### Changed
