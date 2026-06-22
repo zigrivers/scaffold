@@ -8,18 +8,18 @@ topics:
   - threat-modeling
   - review
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-06-22
 version-pin: OWASP Top 10:2025
 sources:
   - url: https://owasp.org/Top10/
     hash: sha256:9c81589b5ccefa00952524cf50d4bbcd9b077a3c842dc209b1db04714b545e20
-    retrieved: 2026-06-20
+    retrieved: 2026-06-22
   - url: https://owasp.org/www-project-application-security-verification-standard/
-    hash: sha256:070726c9e7979260b0bd323507593f999480964f5665b4a46cc45d42af472f7c
-    retrieved: 2026-06-20
+    hash: sha256:da3c1433cf4eddcadc676dfc79f259247c0604f4fad1fb08ca44b362a3876931
+    retrieved: 2026-06-22
   - url: https://www.nist.gov/cyberframework
-    hash: sha256:d6df801c848507cea3639af1bc6a114a22eba3042ac39d212906bc1e672d673d
-    retrieved: 2026-06-20
+    hash: sha256:cb5757958f0ba48cc294ed66d32ad293430625f77aaa35f648f67a9b2c5a3f75
+    retrieved: 2026-06-22
 ---
 
 # Review: Security
