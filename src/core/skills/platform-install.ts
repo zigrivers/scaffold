@@ -21,10 +21,6 @@ function loadResolved(templateDir: string, name: string, file: string): string {
 export const SKILL_PLATFORMS = ['codex', 'antigravity', 'cursor', 'opencode'] as const
 export type SkillPlatform = (typeof SKILL_PLATFORMS)[number]
 
-export function isSkillPlatform(value: string): value is SkillPlatform {
-  return (SKILL_PLATFORMS as readonly string[]).includes(value)
-}
-
 /** Per-skill managed-block delimiters for the shared `AGENTS.md` file. */
 const blockBegin = (name: string): string => `<!-- BEGIN scaffold-skill:${name} -->`
 const blockEnd = (name: string): string => `<!-- END scaffold-skill:${name} -->`
@@ -78,11 +74,17 @@ export function installSkillsForPlatform(
   const skipped: string[] = []
   const errors: string[] = []
 
-  // Write a dedicated file, honoring --force (block when it already exists).
+  // Write a dedicated file. A file that already matches is a silent no-op (so a
+  // re-run after a no-op upgrade is quiet); one that DIFFERS is left alone
+  // without --force but reported as stale, so the user gets a clear "out of
+  // date — use --force to update" signal rather than silently keeping old content.
   const writeDedicated = (target: string, rel: string, body: string): void => {
-    if (fs.existsSync(target) && !options.force) {
-      skipped.push(`${rel} (exists; use --force to overwrite)`)
-      return
+    if (fs.existsSync(target)) {
+      if (fs.readFileSync(target, 'utf8') === body) return // already up to date
+      if (!options.force) {
+        skipped.push(`${rel} (differs from the current template — use --force to update)`)
+        return
+      }
     }
     fs.mkdirSync(path.dirname(target), { recursive: true })
     fs.writeFileSync(target, body)

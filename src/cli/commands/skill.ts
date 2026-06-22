@@ -114,6 +114,7 @@ const skillCommand: CommandModule<Record<string, unknown>, SkillArgs> = {
         }
       } else if (result.errors.length > 0) {
         output.warn('\nNo skills installed due to source errors.')
+        process.exit(1) // a failed install must not report success (matches --platform)
       } else {
         output.info('\nAll skills already installed.')
       }

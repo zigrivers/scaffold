@@ -81,6 +81,14 @@ describe('installSkillsForPlatform', () => {
     expect(fs.readFileSync(mdc, 'utf8')).not.toBe('USER EDITED')    // overwritten with force
   })
 
+  it('is a no-op when a dedicated file already matches the current template', () => {
+    installSkillsForPlatform(tmp, 'cursor')
+    const second = installSkillsForPlatform(tmp, 'cursor')
+    // unchanged files are neither re-installed nor reported stale
+    expect(second.installed).toEqual([])
+    expect(second.skipped).toEqual([])
+  })
+
   it('resolves {{INSTRUCTIONS_FILE}} markers (no raw placeholder leaks into installed files)', () => {
     installSkillsForPlatform(tmp, 'opencode')
     const body = fs.readFileSync(path.join(tmp, '.opencode', 'skills', 'scaffold-pipeline', 'SKILL.md'), 'utf8')
