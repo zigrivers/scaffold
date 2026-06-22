@@ -145,7 +145,7 @@ After Phase 1 (Product Definition), the pipeline splits into **two independent t
 ```
                            ┌─ Track A: Infrastructure ──────────────────────┐
                            │                                                │
-Phase 1                    │  Phases 2-3 (foundation + dev env)             │
+Phase 1                    │  foundation → dev env → consolidation          │
 create-prd ─→ review-prd  │    tech-stack → coding-standards → tdd         │
     ↓                      │                     ↓                          │
 user-stories               │    project-structure → dev-env-setup           │
