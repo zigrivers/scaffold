@@ -2,6 +2,29 @@
 
 ## [Unreleased]
 
+## [3.1.0] — 2026-06-21
+
+### Added
+
+- **OpenCode skill platform.** `mmr skill install --platform opencode` (and
+  `--all`) now installs the full review Agent Skill to
+  `.opencode/skills/mmr/SKILL.md`, which OpenCode auto-discovers (the directory
+  name matches the skill's `name:`, as OpenCode requires). This is richer than
+  the `AGENTS.md` managed block OpenCode also reads.
+
+### Removed
+
+- **Gemini channel retired.** Google's Gemini CLI is sunset; **Antigravity**
+  (`agy`) is the supported replacement. The `gemini` review channel is now a
+  disabled, never-dispatched **tombstone**: existing `.mmr.yaml` files that name
+  `gemini` (e.g. in `channels_disabled` or a `channels.gemini` override) keep
+  loading, but it is never dispatched, an explicit `--channels gemini` errors
+  with a migration hint, retirement is enforced at load (a config cannot
+  un-retire it), and `mmr config init`/`doctor`/`config test`/`config enable`
+  all treat it as retired. The `gemini` skill-install platform and its template
+  were removed. This is non-breaking — the channel was already disabled by
+  default and its backend is sunset.
+
 ## [3.0.1] — 2026-06-21
 
 ### Fixed
