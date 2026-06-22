@@ -1,13 +1,27 @@
 ---
 name: web-app-rendering-strategies
-description: SSR TTFB and SEO benefits, SSG for content sites, ISR, streaming SSR, React Server Components, and progressive hydration patterns
-topics: [web-app, rendering, ssr, ssg, isr, streaming, react-server-components, hydration]
+description: >-
+  SSR TTFB and SEO benefits, SSG for content sites, ISR, streaming SSR, React Server Components, and progressive
+  hydration patterns
+topics:
+  - web-app
+  - rendering
+  - ssr
+  - ssg
+  - isr
+  - streaming
+  - react-server-components
+  - hydration
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-06-22
 version-pin: null
 sources:
   - url: https://developer.mozilla.org/en-US/docs/Glossary/SSR
+    hash: sha256:8a4eb907db76a6a6bd4770438e8de66e7759525e0c018789b3467b3e81e12896
+    retrieved: 2026-06-22
   - url: https://developer.mozilla.org/en-US/docs/Glossary/SPA
+    hash: sha256:f4ca6d86187e933a43fe2a9b262584b4ac2c27f92591b0859da62ba5741def7f
+    retrieved: 2026-06-22
 ---
 
 Rendering strategy is the foundational technical decision in a web app — it determines server infrastructure requirements, SEO characteristics, performance profile, and the developer model for data fetching. Understanding the precise mechanics of each strategy (not just their marketing descriptions) is essential for making and defending the right choice for a given project.
