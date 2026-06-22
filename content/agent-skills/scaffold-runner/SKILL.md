@@ -20,8 +20,8 @@ to the user → on approval, execute the step's prompt → record it with
 `scaffold complete <step>`. Key commands: `scaffold list`, `scaffold status`,
 `scaffold next`, `scaffold run <step>`, `scaffold complete <step>`.
 
-For full batch execution, rework mode, tool execution, and pipeline-navigation
-detail, see the complete skill (installed for Claude Code / OpenCode).
+For the full command and step surface (batch execution, rework, tools), run
+`scaffold --help` and `scaffold list`; `scaffold next` shows what's eligible now.
 <!-- lean:end -->
 
 This skill provides an intelligent interactive layer between the user and the `scaffold` CLI. It ensures that decision points embedded in scaffold prompts are surfaced to the user before execution, and manages the full step lifecycle.
