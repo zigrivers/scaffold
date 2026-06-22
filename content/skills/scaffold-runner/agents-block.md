@@ -14,5 +14,6 @@ to the user → on approval, execute the step's prompt → record it with
 `scaffold complete <step>`. Key commands: `scaffold list`, `scaffold status`,
 `scaffold next`, `scaffold run <step>`, `scaffold complete <step>`.
 
-For the full command and step surface (batch execution, rework, tools), run
-`scaffold --help` and `scaffold list`; `scaffold next` shows what's eligible now.
+For the full command surface, run `scaffold guides cli` (every command grouped
+by purpose) and `scaffold guides pipeline`; `scaffold next` shows what's eligible
+now.

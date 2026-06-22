@@ -15,9 +15,9 @@ Use this skill ONLY when the user asks about:
 - Dependency rules: "what depends on what?", "can I run X before Y?"
 - Step reference: "what commands are in phase 3?", "is design-system optional?"
 
-Run `scaffold list` for the full phase/step reference (add `--json` for
-machine-readable detail); the dependency and ordering rules come from each
-step's frontmatter.
+Run `scaffold guides pipeline` for the full phase/dependency reference (add
+`--markdown` for the plain-text body), and `scaffold next` to see which steps are
+eligible right now.
 <!-- lean:end -->
 
 ## Phases
@@ -155,7 +155,7 @@ review-user-stories ──┐    │    git-workflow → claude-md-optimization 
                       └──→ │  Phase 5-8: domain-modeling → adrs →           │
                            │    system-architecture → specs (DB/API/UX)     │
                            │                                                │
-                           │  Phase 9: tdd → review-testing → operations    │
+                           │  Phase 9: review-testing → operations          │
                            │    → security (+ reviews for each)             │
                            │                                                │
                            └────────────────────────────────────────────────┘

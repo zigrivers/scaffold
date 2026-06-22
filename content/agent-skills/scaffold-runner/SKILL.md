@@ -20,8 +20,9 @@ to the user → on approval, execute the step's prompt → record it with
 `scaffold complete <step>`. Key commands: `scaffold list`, `scaffold status`,
 `scaffold next`, `scaffold run <step>`, `scaffold complete <step>`.
 
-For the full command and step surface (batch execution, rework, tools), run
-`scaffold --help` and `scaffold list`; `scaffold next` shows what's eligible now.
+For the full command surface, run `scaffold guides cli` (every command grouped
+by purpose) and `scaffold guides pipeline`; `scaffold next` shows what's eligible
+now.
 <!-- lean:end -->
 
 This skill provides an intelligent interactive layer between the user and the `scaffold` CLI. It ensures that decision points embedded in scaffold prompts are surfaced to the user before execution, and manages the full step lifecycle.
@@ -219,7 +220,7 @@ When the user asks "what tools are available?", "what can I build?", or "show me
 | `scaffold run release` | Run the target project's release ceremony — changelog plus whatever release artifacts that project defines. Supports `--dry-run`, `current`, and `rollback` |
 | `scaffold run version` | Show the current scaffold version |
 | `scaffold run update` | Update scaffold to the latest version |
-| `scaffold run dashboard` | Open a visual progress dashboard in your browser |
+| `scaffold dashboard` | Open a visual progress dashboard in your browser |
 | `scaffold run prompt-pipeline` | Print the full pipeline reference table |
 | `scaffold run review-code` | Run all 3 CLI review channels (Codex CLI, Antigravity CLI, Claude CLI) on tracked local code (committed branch diff + staged + unstaged — no untracked files) before commit or push, plus Superpowers code-reviewer as a complementary 4th channel |
 | `scaffold run review-pr` | Run all 3 code review channels (Codex CLI, Antigravity CLI, Claude CLI) on a PR, plus Superpowers code-reviewer as a complementary 4th channel |
