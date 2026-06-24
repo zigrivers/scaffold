@@ -1,4 +1,5 @@
 import type { Dispatcher } from '../audit-runner.js'
+import { DispatcherError } from './errors.js'
 
 export interface BuildFallbackDispatcherOptions {
   /** Tried first for every prompt. */
@@ -20,12 +21,19 @@ export interface BuildFallbackDispatcherOptions {
  * again. This matches the audit's per-entry process model (each candidate
  * is a fresh `audit-run-entry` invocation).
  *
- * Fallback triggers on ANY dispatcher-level failure: the deepseek/zai
- * dispatchers already normalize transport errors, timeouts, non-2xx
- * responses, malformed JSON, and empty content into thrown Errors, so
- * catching here covers exactly the "primary failed to return usable text"
- * cases the operator wants to fall back on. Content-quality / verdict
- * parsing happens downstream in the runner and is out of scope by design.
+ * Fallback triggers on TRANSIENT dispatcher-level failures: transport
+ * errors, timeouts, malformed/empty responses, and transient HTTP statuses
+ * (429, 5xx, 408). It deliberately does NOT fall back on a PERMANENT primary
+ * failure — a `DispatcherError` with `retryable: false` (bad/missing key →
+ * 401/403, malformed request → 400). Those indicate the primary is
+ * misconfigured; silently failing over would hide that and let the cron run
+ * entirely on the fallback, never using the intended primary. Such errors are
+ * re-thrown so the run fails loudly and the operator fixes the primary.
+ *
+ * Any non-`DispatcherError` (an unanticipated throw) is treated as retryable
+ * so we never lose the safety net on an error shape we didn't classify.
+ * Content-quality / verdict parsing happens downstream in the runner and is
+ * out of scope by design.
  */
 export function buildFallbackDispatcher(opts: BuildFallbackDispatcherOptions): Dispatcher {
   const { primary, secondary, primaryName, secondaryName } = opts
@@ -33,6 +41,12 @@ export function buildFallbackDispatcher(opts: BuildFallbackDispatcherOptions): D
     try {
       return await primary(prompt)
     } catch (primaryErr) {
+      // Permanent primary failures (bad key, malformed request) must NOT be
+      // swallowed by the fallback — surface them so the misconfiguration is
+      // visible instead of the cron silently running on the secondary.
+      if (primaryErr instanceof DispatcherError && !primaryErr.retryable) {
+        throw primaryErr
+      }
       const primaryReason = primaryErr instanceof Error ? primaryErr.message : String(primaryErr)
       // Surface the fallback on stderr so cron logs record that the primary
       // failed and the secondary took over (stdout stays verdict-JSON only).

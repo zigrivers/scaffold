@@ -1,6 +1,7 @@
 import { fetch as undiciFetch } from 'undici'
 import { z } from 'zod'
 import type { Dispatcher } from '../audit-runner.js'
+import { DispatcherError, isRetryableHttpStatus } from './errors.js'
 
 /**
  * SECURITY: like the deepseek dispatcher (and decision #7's
@@ -100,44 +101,51 @@ export function buildZaiDispatcher(opts: BuildZaiDispatcherOptions): Dispatcher 
       // both non-2xx AND malformed-JSON responses.
       const rawText = await res.text()
       if (res.status < 200 || res.status >= 300) {
-        throw new Error(
+        // Classify so the fallback only fails over on transient failures
+        // (429, 5xx, 408) and surfaces permanent ones (400/401/403/404)
+        // instead of silently running the cron on the fallback provider.
+        throw new DispatcherError(
           `zai dispatcher: HTTP ${res.status} from ${ZAI_URL}. ` +
           `Body (first 200 chars): ${rawText.slice(0, 200)}`,
+          { retryable: isRetryableHttpStatus(res.status) },
         )
       }
       let parsed: unknown
       try {
         parsed = JSON.parse(rawText)
       } catch {
-        throw new Error(
+        throw new DispatcherError(
           'zai dispatcher: response was not valid JSON. ' +
           `Body (first 200 chars): ${rawText.slice(0, 200)}`,
+          { retryable: true },
         )
       }
       const result = responseSchema.safeParse(parsed)
       if (!result.success) {
-        throw new Error(
+        throw new DispatcherError(
           'zai dispatcher: response missing choices[0].message.content. ' +
           `Truncated response: ${rawText.slice(0, 200)}`,
+          { retryable: true },
         )
       }
       const content = result.data.choices[0].message.content
       // An empty-string content satisfies the zod schema but is useless to
       // the runner's JSON extractor — surface it with a clear message.
       if (content.trim() === '') {
-        throw new Error(
+        throw new DispatcherError(
           'zai dispatcher: model returned empty content. ' +
           `Truncated response: ${rawText.slice(0, 200)}`,
+          { retryable: true },
         )
       }
       return content
     } catch (err) {
-      // Re-throw our own already-prefixed errors verbatim; wrap everything
-      // else (transport failures, abort errors, etc.) so cron logs see a
-      // consistent "zai dispatcher: …" prefix.
-      if (err instanceof Error && err.message.startsWith('zai dispatcher: ')) throw err
+      // Re-throw our own classified errors verbatim (preserving the retryable
+      // flag); wrap everything else (transport failures, abort errors, etc.)
+      // as a retryable error with a consistent "zai dispatcher: …" prefix.
+      if (err instanceof DispatcherError) throw err
       const reason = describeFetchError(err)
-      throw new Error(`zai dispatcher: fetch failed: ${reason}`)
+      throw new DispatcherError(`zai dispatcher: fetch failed: ${reason}`, { retryable: true })
     }
   }
 }

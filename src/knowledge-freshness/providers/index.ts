@@ -1,6 +1,6 @@
 import type { Dispatcher } from '../audit-runner.js'
 import { buildAnthropicDispatcher } from './anthropic.js'
-import { buildDeepseekDispatcher } from './deepseek.js'
+import { buildDeepseekDispatcher, type DeepseekFetch } from './deepseek.js'
 import { buildZaiDispatcher } from './zai.js'
 import { buildFallbackDispatcher } from './fallback.js'
 
@@ -129,6 +129,9 @@ export interface BuildDispatcherOptions {
   /** Process env (production: `process.env`). Used by provider implementations
    *  for API keys and any optional overrides (e.g. model name). */
   env: Record<string, string | undefined>
+  /** Test-injectable fetch for the HTTP providers (zai/deepseek). Production
+   *  omits this so the providers use undici's fetch. */
+  fetchImpl?: DeepseekFetch
 }
 
 export function buildDispatcher(provider: Provider, opts: BuildDispatcherOptions): Dispatcher {
@@ -185,6 +188,7 @@ function buildSingleDispatcher(provider: Provider, opts: BuildDispatcherOptions)
       apiKey,
       timeoutSec: opts.timeoutSec,
       model: modelOverride,
+      fetchImpl: opts.fetchImpl,
     })
   }
   if (provider === 'zai') {
@@ -201,6 +205,7 @@ function buildSingleDispatcher(provider: Provider, opts: BuildDispatcherOptions)
       apiKey,
       timeoutSec: opts.timeoutSec,
       model: modelOverride,
+      fetchImpl: opts.fetchImpl,
     })
   }
   // Unreachable: the type narrowing above is exhaustive.

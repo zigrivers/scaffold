@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { buildZaiDispatcher, type ZaiFetch } from './zai.js'
+import { DispatcherError } from './errors.js'
 
 const ok = (body: unknown): Response =>
   new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } })
@@ -64,6 +65,47 @@ describe('zai provider — error paths', () => {
     ) as unknown as ZaiFetch
     const dispatcher = buildZaiDispatcher({ apiKey: 'k', timeoutSec: 60, fetchImpl: fetchSpy })
     await expect(dispatcher('x')).rejects.toThrow(/HTTP 429.*rate limited/i)
+  })
+
+  it('classifies a 429 rate-limit as a retryable DispatcherError (fallback-eligible)', async () => {
+    const fetchSpy: ZaiFetch = vi.fn(async () =>
+      new Response('rate limited', { status: 429 }),
+    ) as unknown as ZaiFetch
+    const dispatcher = buildZaiDispatcher({ apiKey: 'k', timeoutSec: 60, fetchImpl: fetchSpy })
+    const err = await dispatcher('x').then(
+      () => { throw new Error('expected rejection') },
+      (e: unknown) => e as DispatcherError,
+    )
+    expect(err).toBeInstanceOf(DispatcherError)
+    expect(err.retryable).toBe(true)
+  })
+
+  it('classifies a 401 auth failure as a NON-retryable DispatcherError (no silent fallback)', async () => {
+    // A bad/missing key is a permanent misconfiguration — the fallback must
+    // NOT swallow it, so the dispatcher marks it non-retryable.
+    const fetchSpy: ZaiFetch = vi.fn(async () =>
+      new Response('unauthorized', { status: 401 }),
+    ) as unknown as ZaiFetch
+    const dispatcher = buildZaiDispatcher({ apiKey: 'k', timeoutSec: 60, fetchImpl: fetchSpy })
+    const err = await dispatcher('x').then(
+      () => { throw new Error('expected rejection') },
+      (e: unknown) => e as DispatcherError,
+    )
+    expect(err).toBeInstanceOf(DispatcherError)
+    expect(err.retryable).toBe(false)
+  })
+
+  it('classifies a transport failure as a retryable DispatcherError', async () => {
+    const fetchSpy: ZaiFetch = vi.fn(async () => {
+      throw new Error('getaddrinfo ENOTFOUND api.z.ai')
+    }) as unknown as ZaiFetch
+    const dispatcher = buildZaiDispatcher({ apiKey: 'k', timeoutSec: 60, fetchImpl: fetchSpy })
+    const err = await dispatcher('x').then(
+      () => { throw new Error('expected rejection') },
+      (e: unknown) => e as DispatcherError,
+    )
+    expect(err).toBeInstanceOf(DispatcherError)
+    expect(err.retryable).toBe(true)
   })
 
   it('throws on a 200 response that lacks choices[0].message.content', async () => {

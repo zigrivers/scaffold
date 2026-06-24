@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { resolveProvider, buildDispatcher } from './index.js'
+import type { ZaiFetch } from './zai.js'
 
 // `claudeOnPath` is injected so tests don't depend on the host's $PATH.
 // We type `env` as `Record<string, string | undefined>` directly rather
@@ -105,7 +106,8 @@ describe('resolveProvider', () => {
   })
 
   it('rule 2: KNOWLEDGE_FRESHNESS_PROVIDER=zai', () => {
-    expect(resolveProvider(opts({ ZAI_API_KEY: 'z' }, {}))).toBe('zai')
+    // Env var alone (no API key in env) must still resolve to zai — this
+    // exercises rule 2 specifically, not key inference (rule 3, tested below).
     expect(resolveProvider(opts({ KNOWLEDGE_FRESHNESS_PROVIDER: 'zai' }, {}))).toBe('zai')
   })
 
@@ -128,7 +130,7 @@ describe('resolveProvider', () => {
     expect(call).toThrow(/ambiguous/i)
   })
 
-  it('rejects --provider zai is accepted as a known provider', () => {
+  it('does not throw when --provider zai is specified (zai is a known provider)', () => {
     // Guard against a regression where zai is missing from KNOWN_PROVIDERS.
     expect(() => resolveProvider(opts({}, { provider: 'zai' }))).not.toThrow(/unknown provider/i)
   })
@@ -152,12 +154,44 @@ describe('buildDispatcher — fallback wiring', () => {
     expect(typeof d).toBe('function')
   })
 
-  it('builds a composite when KNOWLEDGE_FRESHNESS_FALLBACK_PROVIDER is set (primary + fallback keys present)', () => {
+  it('builds a WORKING composite that falls back to the secondary when the primary fails', async () => {
+    // Strong wiring check (not just typeof===function): inject a fetch that
+    // makes the zai primary fail with a retryable 429 and the deepseek
+    // fallback succeed, then assert the composite returns the SECONDARY's
+    // content. This fails if the fallback wrapping is ever dropped and a bare
+    // primary dispatcher is returned.
+    const fetchImpl = vi.fn(async (url: unknown) => {
+      if (String(url).includes('z.ai')) return new Response('rate limited', { status: 429 })
+      return new Response(
+        JSON.stringify({ choices: [{ message: { content: 'from-deepseek' } }] }),
+        { status: 200 },
+      )
+    }) as unknown as ZaiFetch
+    vi.spyOn(console, 'error').mockImplementation(() => {})
     const d = buildDispatcher('zai', {
       timeoutSec: 60,
       env: { ZAI_API_KEY: 'z', DEEPSEEK_API_KEY: 'd', KNOWLEDGE_FRESHNESS_FALLBACK_PROVIDER: 'deepseek' },
+      fetchImpl,
     })
-    expect(typeof d).toBe('function')
+    expect(await d('prompt')).toBe('from-deepseek')
+  })
+
+  it('does NOT fall back when the primary fails with a non-retryable error', async () => {
+    // A 401 from the primary is a permanent misconfiguration; the composite
+    // must surface it rather than silently running on the fallback.
+    const fetchImpl = vi.fn(async (url: unknown) => {
+      if (String(url).includes('z.ai')) return new Response('unauthorized', { status: 401 })
+      return new Response(
+        JSON.stringify({ choices: [{ message: { content: 'from-deepseek' } }] }),
+        { status: 200 },
+      )
+    }) as unknown as ZaiFetch
+    const d = buildDispatcher('zai', {
+      timeoutSec: 60,
+      env: { ZAI_API_KEY: 'z', DEEPSEEK_API_KEY: 'd', KNOWLEDGE_FRESHNESS_FALLBACK_PROVIDER: 'deepseek' },
+      fetchImpl,
+    })
+    await expect(d('prompt')).rejects.toThrow(/HTTP 401/)
   })
 
   it('throws when the fallback provider is unknown', () => {

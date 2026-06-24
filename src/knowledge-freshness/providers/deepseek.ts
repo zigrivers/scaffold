@@ -1,6 +1,7 @@
 import { fetch as undiciFetch } from 'undici'
 import { z } from 'zod'
 import type { Dispatcher } from '../audit-runner.js'
+import { DispatcherError, isRetryableHttpStatus } from './errors.js'
 
 /**
  * SECURITY: like decision #7's anthropic-subprocess invariant, the
@@ -106,25 +107,30 @@ export function buildDeepseekDispatcher(opts: BuildDeepseekDispatcherOptions): D
       // SyntaxError that masked the actual response body).
       const rawText = await res.text()
       if (res.status < 200 || res.status >= 300) {
-        throw new Error(
+        // Classify so a fallback chain only fails over on transient failures
+        // (429, 5xx, 408) and surfaces permanent ones (400/401/403/404).
+        throw new DispatcherError(
           `deepseek dispatcher: HTTP ${res.status} from ${DEEPSEEK_URL}. ` +
           `Body (first 200 chars): ${rawText.slice(0, 200)}`,
+          { retryable: isRetryableHttpStatus(res.status) },
         )
       }
       let parsed: unknown
       try {
         parsed = JSON.parse(rawText)
       } catch {
-        throw new Error(
+        throw new DispatcherError(
           'deepseek dispatcher: response was not valid JSON. ' +
           `Body (first 200 chars): ${rawText.slice(0, 200)}`,
+          { retryable: true },
         )
       }
       const result = responseSchema.safeParse(parsed)
       if (!result.success) {
-        throw new Error(
+        throw new DispatcherError(
           'deepseek dispatcher: response missing choices[0].message.content. ' +
           `Truncated response: ${rawText.slice(0, 200)}`,
+          { retryable: true },
         )
       }
       const content = result.data.choices[0].message.content
@@ -133,19 +139,20 @@ export function buildDeepseekDispatcher(opts: BuildDeepseekDispatcherOptions): D
       // a confusing downstream parse error. Surface the empty-response
       // case with a clear message and the truncated body.
       if (content.trim() === '') {
-        throw new Error(
+        throw new DispatcherError(
           'deepseek dispatcher: model returned empty content. ' +
           `Truncated response: ${rawText.slice(0, 200)}`,
+          { retryable: true },
         )
       }
       return content
     } catch (err) {
-      // Re-throw our own already-prefixed errors verbatim; wrap everything
-      // else (transport failures, abort errors, etc.) so cron logs see a
-      // consistent "deepseek dispatcher: …" prefix (round-7 grok finding:
-      // the round-6 fix only covered the initial doFetch call, leaving
-      // body-read aborts and stream errors unwrapped).
-      if (err instanceof Error && err.message.startsWith('deepseek dispatcher: ')) throw err
+      // Re-throw our own classified errors verbatim (preserving the retryable
+      // flag); wrap everything else (transport failures, abort errors, etc.)
+      // as a retryable error with a consistent "deepseek dispatcher: …"
+      // prefix (round-7 grok finding: the round-6 fix only covered the initial
+      // doFetch call, leaving body-read aborts and stream errors unwrapped).
+      if (err instanceof DispatcherError) throw err
       // Surface the underlying transport detail. undici's fetch rejects
       // with `TypeError: fetch failed` and stashes the actionable
       // ENOTFOUND/ECONNRESET/TLS detail in `err.cause` — without
@@ -153,7 +160,7 @@ export function buildDeepseekDispatcher(opts: BuildDeepseekDispatcherOptions): D
       // "deepseek dispatcher: fetch failed: fetch failed" (PR #393 MMR
       // F-002).
       const reason = describeFetchError(err)
-      throw new Error(`deepseek dispatcher: fetch failed: ${reason}`)
+      throw new DispatcherError(`deepseek dispatcher: fetch failed: ${reason}`, { retryable: true })
     }
   }
 }

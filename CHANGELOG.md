@@ -11,11 +11,14 @@ All notable changes to Scaffold are documented here.
   (OpenAI-compatible HTTPS to `api.z.ai`, default model `glm-4.6`, override via
   `KNOWLEDGE_FRESHNESS_ZAI_MODEL`) joins `deepseek` and `anthropic`. Set
   `KNOWLEDGE_FRESHNESS_FALLBACK_PROVIDER` to chain a secondary provider: each
-  audited entry tries the primary first and only drops to the fallback when that
-  call **fails** (transport error, timeout, rate-limit, malformed/empty
-  response) — content-quality differences never trigger fallback, and there is
-  no cross-entry latch. The daily cron now sets `KNOWLEDGE_FRESHNESS_PROVIDER=zai`
-  + `KNOWLEDGE_FRESHNESS_FALLBACK_PROVIDER=deepseek`.
+  audited entry tries the primary first and drops to the fallback on a
+  **transient** failure (transport error, timeout, HTTP 429/5xx/408,
+  malformed/empty response). A **permanent** primary failure — a bad/missing
+  key (401/403) or malformed request (400) — is surfaced and fails the entry
+  loudly instead, so a misconfigured primary can't silently run the whole cron
+  on the fallback. Content-quality differences never trigger fallback, and
+  there is no cross-entry latch. The daily cron now sets
+  `KNOWLEDGE_FRESHNESS_PROVIDER=zai` + `KNOWLEDGE_FRESHNESS_FALLBACK_PROVIDER=deepseek`.
 
 ### Changed
 

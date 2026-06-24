@@ -198,10 +198,17 @@ Provider selection (highest precedence first):
 The cron runs **Z.ai as the primary** researcher with **DeepSeek as a
 per-entry fallback**. Set `KNOWLEDGE_FRESHNESS_FALLBACK_PROVIDER` to the
 secondary provider's name; the dispatcher then tries the primary first for
-every entry and only drops to the fallback when that specific call **fails**
-(transport error, timeout, HTTP 4xx/5xx such as a rate limit, malformed
-JSON, or an empty response). Content-quality differences do **not** trigger
-fallback — only a failure to return usable text does.
+every entry and drops to the fallback when that call fails **transiently**:
+transport error, timeout, malformed JSON, empty response, or a transient HTTP
+status (**429** rate-limit, **5xx** server error, **408** request timeout).
+
+It deliberately does **not** fall back on a **permanent** primary failure —
+a bad/missing API key (**401/403**) or a malformed request (**400**). Those
+mean the primary is misconfigured; failing over would hide that and let the
+cron run entirely on the fallback, never using the intended primary. Such
+errors are surfaced and **fail the entry loudly** so the operator fixes the
+primary. Content-quality differences also do **not** trigger fallback — only a
+transient failure to return usable text does.
 
 - The fallback is **per entry**: if Z.ai fails on one candidate but
   recovers, later candidates use Z.ai again. There is no cross-entry latch.
