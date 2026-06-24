@@ -35,6 +35,11 @@ export class DispatcherError extends Error {
  * - 5xx are server-side and transient → retry.
  * - Any other 4xx (400/401/403/404/…) is a permanent client error
  *   (bad key, malformed request, wrong endpoint) → do NOT retry; surface it.
+ *
+ * In practice this is only ever called for a non-2xx status (the dispatchers
+ * invoke it inside their `status < 200 || status >= 300` branch, and undici
+ * follows 3xx redirects itself), so the final `< 400` fall-through is just a
+ * safe "treat anything unexpected as retryable" default.
  */
 export function isRetryableHttpStatus(status: number): boolean {
   if (status === 408 || status === 429) return true

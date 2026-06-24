@@ -298,14 +298,18 @@ Each provider has its own auth path:
   for running against a different account). The env var alone is NOT
   sufficient — the CLI must exist regardless; resolveProvider rejects
   this combination at startup so you find out before the first audit.
-- **deepseek** (default for cron): the audit makes a direct HTTPS
+- **zai** (primary for cron): the audit makes a direct HTTPS POST to
+  `api.z.ai`. Requires `ZAI_API_KEY` in env; no CLI install needed.
+- **deepseek** (cron fallback): the audit makes a direct HTTPS
   POST to `api.deepseek.com`. Requires `DEEPSEEK_API_KEY` in env;
   no CLI install needed.
 
-The cron workflow sets `DEEPSEEK_API_KEY` from the repo secret and
-`KNOWLEDGE_FRESHNESS_PROVIDER=deepseek` to pin the choice. Set the
-secret once with `gh secret set DEEPSEEK_API_KEY` before the first
-scheduled run.
+The cron workflow pins `KNOWLEDGE_FRESHNESS_PROVIDER=zai` +
+`KNOWLEDGE_FRESHNESS_FALLBACK_PROVIDER=deepseek` and reads both keys from
+repo secrets. `ZAI_API_KEY` is **required** (set it with
+`gh secret set ZAI_API_KEY` before the first scheduled run); `DEEPSEEK_API_KEY`
+is the fallback and is recommended but optional (without it the run loses its
+safety net — see §4 "Provider fallback").
 
 `--open-pr` requires `gh auth login` to have run (and `gh` to be on PATH).
 
