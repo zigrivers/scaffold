@@ -1,14 +1,29 @@
 ---
 name: web-app-session-patterns
-description: Session management architecture, JWT vs cookie sessions, refresh token rotation, session storage, and hijacking prevention
-topics: [web-app, auth, sessions, jwt, cookies, security, redis]
+description: >-
+  Session management architecture, JWT vs cookie sessions, refresh token rotation, session storage, and hijacking
+  prevention
+topics:
+  - web-app
+  - auth
+  - sessions
+  - jwt
+  - cookies
+  - security
+  - redis
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-06-24
 version-pin: null
 sources:
   - url: https://owasp.org/www-project-cheat-sheets/cheatsheets/Session_Management_Cheat_Sheet.html
+    hash: sha256:889397e04562cf0a3ab8e53b6066c739186da425d6a5e10f5bc4446d836bb9a6
+    retrieved: 2026-06-24
   - url: https://www.rfc-editor.org/rfc/rfc7519
+    hash: sha256:47ff467f7d505acedf443e68f5cc7b8d9b36983f70c463a06c5d9281df9ee1d1
+    retrieved: 2026-06-24
   - url: https://www.rfc-editor.org/rfc/rfc6265
+    hash: sha256:036d4cf713128ca12f837dc97da78265c70fecb52f45968e6f97fe7e6e533583
+    retrieved: 2026-06-24
 ---
 
 Session management is the mechanism by which a web application recognizes a returning user between HTTP requests. Because HTTP is stateless, sessions are an application-level construct — and the design decisions here directly affect security, scalability, and user experience. The wrong session architecture causes token theft, session fixation attacks, memory exhaustion on the server, and logout failures that leave users permanently authenticated even after they believe they've signed out.
