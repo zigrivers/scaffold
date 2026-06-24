@@ -32,3 +32,26 @@ export function isRetryableHttpStatus(status: number): boolean {
   if (status >= 400) return false
   return true
 }
+
+/**
+ * Pull a useful message out of a thrown fetch error. undici wraps
+ * transport-layer failures (DNS, connection reset, TLS) in a
+ * `TypeError: fetch failed` whose `cause` carries the actionable detail
+ * (ENOTFOUND, ECONNRESET, etc.). Without unwrapping `cause`, cron logs would
+ * lose that detail and show only "fetch failed" — useless for triage. Shared
+ * by the zai and deepseek dispatchers so the unwrapping logic lives in one
+ * place.
+ */
+export function describeFetchError(err: unknown): string {
+  if (!(err instanceof Error)) return String(err)
+  const cause = (err as Error & { cause?: unknown }).cause
+  if (cause instanceof Error) {
+    const code = (cause as Error & { code?: string }).code
+    const tail = code ? `${code}: ${cause.message}` : cause.message
+    return `${err.message} (${tail})`
+  }
+  if (typeof cause === 'string' && cause) {
+    return `${err.message} (${cause})`
+  }
+  return err.message
+}

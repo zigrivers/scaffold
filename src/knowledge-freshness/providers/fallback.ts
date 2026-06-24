@@ -58,9 +58,13 @@ export function buildFallbackDispatcher(opts: BuildFallbackDispatcherOptions): D
         return await secondary(prompt)
       } catch (secondaryErr) {
         const secondaryReason = secondaryErr instanceof Error ? secondaryErr.message : String(secondaryErr)
-        throw new Error(
+        // Both providers are exhausted — there is nothing left to fail over
+        // to, so mark the combined error non-retryable for type consistency
+        // with the rest of the dispatcher error surface.
+        throw new DispatcherError(
           `both providers failed. ${primaryName}: ${primaryReason} | ` +
           `${secondaryName}: ${secondaryReason}`,
+          { retryable: false },
         )
       }
     }

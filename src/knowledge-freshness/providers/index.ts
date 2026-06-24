@@ -28,7 +28,7 @@ export interface ResolveProviderInput {
  *   1. --provider <name>           (explicit flag — operator override)
  *   2. KNOWLEDGE_FRESHNESS_PROVIDER env var
  *   3. Single API key in env       (inferred)
- *   4. Both API keys present       → error (ambiguous)
+ *   4. >1 API key present          → error (ambiguous)
  *   5. No env, claude on PATH      → anthropic (subprocess uses keychain)
  *   6. Nothing                     → error (no provider configured)
  *
@@ -50,8 +50,9 @@ export function resolveProvider(input: ResolveProviderInput): Provider {
       'required regardless of how the provider was chosen (--provider flag, ' +
       'KNOWLEDGE_FRESHNESS_PROVIDER env, or ANTHROPIC_API_KEY inference). ' +
       'Install Claude Code (`brew install anthropic/claude-code/claude-code` ' +
-      'or `npm install -g @anthropic-ai/claude-code`), OR switch to the ' +
-      'deepseek provider (export DEEPSEEK_API_KEY and set ' +
+      'or `npm install -g @anthropic-ai/claude-code`), OR switch to an ' +
+      'HTTP provider that needs no CLI — export ZAI_API_KEY and set ' +
+      'KNOWLEDGE_FRESHNESS_PROVIDER=zai (or DEEPSEEK_API_KEY + ' +
       'KNOWLEDGE_FRESHNESS_PROVIDER=deepseek).',
     )
   }
@@ -132,6 +133,10 @@ export interface BuildDispatcherOptions {
   /** Test-injectable fetch for the HTTP providers (zai/deepseek). Production
    *  omits this so the providers use undici's fetch. */
   fetchImpl?: DeepseekFetch
+  /** Whether the `claude` CLI is on PATH. Pass `false` to fail construction
+   *  of an anthropic dispatcher (primary OR fallback) early, instead of at
+   *  first dispatch. Leave undefined to skip the check (back-compat). */
+  claudeOnPath?: boolean
 }
 
 export function buildDispatcher(provider: Provider, opts: BuildDispatcherOptions): Dispatcher {
@@ -172,6 +177,18 @@ export function buildDispatcher(provider: Provider, opts: BuildDispatcherOptions
  */
 function buildSingleDispatcher(provider: Provider, opts: BuildDispatcherOptions): Dispatcher {
   if (provider === 'anthropic') {
+    // The anthropic dispatcher shells out to `claude -p`, so the CLI must be
+    // on PATH. When the caller has probed PATH and passed `false`, fail here
+    // (covers an anthropic FALLBACK too, not just a primary resolved via the
+    // CLI's resolveProvider path). Undefined skips the check for back-compat.
+    if (opts.claudeOnPath === false) {
+      throw new Error(
+        'anthropic provider selected but the `claude` CLI is not on PATH. ' +
+        'The dispatcher invokes `claude -p` as a subprocess, so the CLI is ' +
+        'required. Install Claude Code, or pick a different provider (e.g. ' +
+        'export ZAI_API_KEY / DEEPSEEK_API_KEY).',
+      )
+    }
     return buildAnthropicDispatcher({ timeoutSec: opts.timeoutSec })
   }
   if (provider === 'deepseek') {

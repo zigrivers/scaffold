@@ -217,6 +217,33 @@ describe('buildDispatcher — fallback wiring', () => {
       env: { ZAI_API_KEY: 'z', KNOWLEDGE_FRESHNESS_FALLBACK_PROVIDER: 'deepseek' },
     })).toThrow(/DEEPSEEK_API_KEY env var is not set/)
   })
+
+  it('throws when an anthropic FALLBACK is configured but claude is not on PATH', () => {
+    // The anthropic dispatcher shells out to `claude -p`, so an anthropic
+    // fallback needs the CLI just like a primary anthropic does. Validate at
+    // construction (claudeOnPath: false) instead of letting it fail only at
+    // the first fallback attempt.
+    expect(() => buildDispatcher('zai', {
+      timeoutSec: 60,
+      env: { ZAI_API_KEY: 'z', KNOWLEDGE_FRESHNESS_FALLBACK_PROVIDER: 'anthropic' },
+      claudeOnPath: false,
+    })).toThrow(/`claude` CLI is not on PATH/)
+  })
+
+  it('throws when a primary anthropic is built with claudeOnPath: false', () => {
+    expect(() => buildDispatcher('anthropic', {
+      timeoutSec: 60,
+      env: {},
+      claudeOnPath: false,
+    })).toThrow(/`claude` CLI is not on PATH/)
+  })
+
+  it('does NOT enforce the PATH check when claudeOnPath is unspecified (back-compat)', () => {
+    // Default (undefined) preserves existing behavior: construction succeeds
+    // and any missing-CLI failure surfaces at dispatch time.
+    const d = buildDispatcher('anthropic', { timeoutSec: 60, env: {} })
+    expect(typeof d).toBe('function')
+  })
 })
 
 describe('buildDispatcher — deepseek wiring', () => {

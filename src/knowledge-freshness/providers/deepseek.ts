@@ -1,7 +1,7 @@
 import { fetch as undiciFetch } from 'undici'
 import { z } from 'zod'
 import type { Dispatcher } from '../audit-runner.js'
-import { DispatcherError, isRetryableHttpStatus } from './errors.js'
+import { DispatcherError, isRetryableHttpStatus, describeFetchError } from './errors.js'
 
 /**
  * SECURITY: like decision #7's anthropic-subprocess invariant, the
@@ -163,27 +163,4 @@ export function buildDeepseekDispatcher(opts: BuildDeepseekDispatcherOptions): D
       throw new DispatcherError(`deepseek dispatcher: fetch failed: ${reason}`, { retryable: true })
     }
   }
-}
-
-/**
- * Pull out a useful message from a thrown fetch error. undici wraps
- * transport-layer failures (DNS, connection reset, TLS) in a
- * `TypeError: fetch failed` whose `cause` carries the actionable detail
- * (ENOTFOUND, ECONNRESET, etc.). Without unwrapping `cause`, cron logs
- * would lose that detail and show only "fetch failed" — useless for
- * triage. We compose the outer message with the cause's `code` and
- * `message` when present.
- */
-function describeFetchError(err: unknown): string {
-  if (!(err instanceof Error)) return String(err)
-  const cause = (err as Error & { cause?: unknown }).cause
-  if (cause instanceof Error) {
-    const code = (cause as Error & { code?: string }).code
-    const tail = code ? `${code}: ${cause.message}` : cause.message
-    return `${err.message} (${tail})`
-  }
-  if (typeof cause === 'string' && cause) {
-    return `${err.message} (${cause})`
-  }
-  return err.message
 }

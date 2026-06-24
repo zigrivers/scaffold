@@ -73,9 +73,11 @@ jobs:
           # tries Z.ai first and only drops to DeepSeek if that call fails
           # (transport error, timeout, rate-limit, empty response). See
           # docs/knowledge-freshness/operations.md §4 "Choosing a provider"
-          # for the precedence + fallback rules. The operator must set BOTH
-          # ZAI_API_KEY (primary) and DEEPSEEK_API_KEY (fallback) as
-          # repository secrets before the first run.
+          # for the precedence + fallback rules. ZAI_API_KEY (primary) is
+          # REQUIRED — the preflight below fails the run without it.
+          # DEEPSEEK_API_KEY (fallback) is recommended but optional: without
+          # it the run still works and just loses the fallback safety net
+          # (the preflight warns and disables the fallback).
           ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           KNOWLEDGE_FRESHNESS_PROVIDER: zai

@@ -60,14 +60,18 @@ const auditRunEntryCommand: CommandModule<Record<string, unknown>, AuditRunEntry
   handler: async (argv) => {
     // Resolve the provider FIRST so a misconfiguration fails before we
     // do any other work (entry-file reading, frontmatter parsing, etc.).
+    const claudeOnPath = probeClaudeOnPath()
     const provider: Provider = resolveProvider({
       env: process.env,
       args: { provider: argv.provider },
-      claudeOnPath: probeClaudeOnPath(),
+      claudeOnPath,
     })
     const dispatcher = buildDispatcher(provider, {
       timeoutSec: argv.timeout,
       env: process.env,
+      // Pass the PATH probe so an anthropic primary OR fallback fails fast at
+      // construction if the `claude` CLI is missing, rather than at dispatch.
+      claudeOnPath,
     })
     try {
       const verdict = await runEntryAudit(argv.entryPath, dispatcher)
