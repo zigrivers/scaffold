@@ -1,8 +1,9 @@
 import type { Dispatcher } from '../audit-runner.js'
 import { buildAnthropicDispatcher } from './anthropic.js'
-import { buildDeepseekDispatcher, type DeepseekFetch } from './deepseek.js'
+import { buildDeepseekDispatcher } from './deepseek.js'
 import { buildZaiDispatcher } from './zai.js'
 import { buildFallbackDispatcher } from './fallback.js'
+import type { ProviderFetch } from './errors.js'
 
 export type Provider = 'anthropic' | 'deepseek' | 'zai'
 
@@ -132,7 +133,7 @@ export interface BuildDispatcherOptions {
   env: Record<string, string | undefined>
   /** Test-injectable fetch for the HTTP providers (zai/deepseek). Production
    *  omits this so the providers use undici's fetch. */
-  fetchImpl?: DeepseekFetch
+  fetchImpl?: ProviderFetch
   /** Whether the `claude` CLI is on PATH. Pass `false` to fail construction
    *  of an anthropic dispatcher (primary OR fallback) early, instead of at
    *  first dispatch. Leave undefined to skip the check (back-compat). */

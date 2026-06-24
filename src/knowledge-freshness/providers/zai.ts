@@ -73,8 +73,11 @@ export function buildZaiDispatcher(opts: BuildZaiDispatcherOptions): Dispatcher 
     const body = JSON.stringify({
       model,
       messages: [{ role: 'user', content: prompt }],
-      // GLM models default thinking ON; disable it so temperature: 0 takes
-      // effect and the response goes straight to the structured verdict
+      // `thinking: { type: 'enabled' | 'disabled' }` is a documented Z.ai
+      // parameter, supported on GLM-4.5-series-and-higher (incl. glm-4.6 and
+      // glm-4.5-air) — see https://docs.z.ai/api-reference/llm/chat-completion.
+      // GLM-4.6 auto-decides whether to think; we disable it so temperature: 0
+      // takes effect and the response goes straight to the structured verdict
       // (same rationale as the deepseek dispatcher).
       thinking: { type: 'disabled' },
       temperature: 0,

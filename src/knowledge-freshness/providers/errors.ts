@@ -1,4 +1,14 @@
 /**
+ * The fetch implementation used by the HTTP providers (zai/deepseek). A
+ * neutral, provider-agnostic alias so shared call sites (e.g. the dispatcher
+ * factory's test-injectable `fetchImpl`) don't have to borrow one provider's
+ * name. Equal to undici's `fetch` type; `ZaiFetch`/`DeepseekFetch` are the
+ * same type under provider-specific names. Uses a type-only `import()` so no
+ * runtime dependency is added to this leaf module.
+ */
+export type ProviderFetch = typeof import('undici').fetch
+
+/**
  * Error thrown by a provider dispatcher, carrying whether the failure is
  * worth failing over to a secondary provider.
  *
