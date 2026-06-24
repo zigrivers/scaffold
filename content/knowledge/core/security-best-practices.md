@@ -21,6 +21,16 @@ sources:
 
 ## Summary
 
+This entry outlines core security principles and mitigations for web applications, structured around the **OWASP Top 10:2025** standards.
+
+### Key Principles
+- **Deny by Default:** Lock down all resources and explicitly authorize access at the server level on every request.
+- **Defense in Depth:** Apply multiple layers of security controls (input validation, authentication, granular authorization, encryption).
+- **Secure by Design:** Threat model (using STRIDE) and design security controls early in the development lifecycle rather than patching later.
+- **Fail Securely:** Centralize error handling to ensure unhandled conditions fail closed and never leak stack traces or internal diagnostics.
+
+## Deep Guidance
+
 ## OWASP Top 10
 
 The OWASP Top 10 represents the most critical security risks to web applications. Every project should evaluate each risk and implement appropriate mitigations. The current edition is the [OWASP Top 10:2025](https://owasp.org/Top10/).
@@ -87,18 +97,20 @@ Permissions-Policy: camera=(), microphone=(), geolocation=()
 
 ### A03:2025 – Software Supply Chain Failures
 
-Code and infrastructure that doesn't verify integrity: unverified CI/CD pipelines, auto-updated dependencies, unsigned software.
+Code and infrastructure that doesn't verify integrity: using third-party packages with known vulnerabilities, auto-updating dependencies without testing, unsigned commits, or unverified CI/CD pipelines.
 
 **Mitigations:**
-- Verify dependency integrity (lockfile checksums)
-- Use signed commits for critical code paths
+- Run automated vulnerability scanning on every build (`npm audit`, `pip audit`, `cargo audit`)
+- Pin dependency versions and commit lockfiles (`package-lock.json`, `poetry.lock`, etc.)
+- Update dependencies regularly (weekly for patches, monthly for minor versions) and review changes
+- Verify dependency integrity via lockfile checksums (`npm ci` instead of `npm install` in CI)
 - Review CI/CD pipeline configuration changes with the same rigor as application code
-- Don't auto-merge dependency updates without CI verification
+- Use signed commits for critical code paths
 - Use Subresource Integrity (SRI) for CDN-loaded scripts
 
 ### A04:2025 – Cryptographic Failures
 
-Sensitive data exposed due to weak or missing encryption.
+Sensitive data exposed due to weak or missing encryption at rest or in transit.
 
 **At-risk data:** Passwords, credit card numbers, health records, personal data, API keys, session tokens.
 
@@ -195,14 +207,12 @@ Broken authentication mechanisms that allow attackers to assume identities.
 
 ### A08:2025 – Software or Data Integrity Failures
 
-Code and infrastructure that doesn't verify integrity: unverified CI/CD pipelines, auto-updated dependencies, unsigned software.
+Code, dependencies, and infrastructure that do not verify integrity (e.g. deserializing untrusted data without verification).
 
 **Mitigations:**
-- Verify dependency integrity (lockfile checksums)
-- Use signed commits for critical code paths
-- Review CI/CD pipeline configuration changes with the same rigor as application code
-- Don't auto-merge dependency updates without CI verification
-- Use Subresource Integrity (SRI) for CDN-loaded scripts
+- Avoid deserializing untrusted data from untrusted sources
+- Use signature verification for data payloads and message queues
+- Validate and sign configuration files and serialized objects
 
 ### A09:2025 – Security Logging and Alerting Failures
 
@@ -240,162 +250,7 @@ Applications that fail to handle errors and exceptional conditions securely, lea
 - Ensure that error states do not bypass authentication or authorization checks
 - Test error paths as part of security testing — attackers often exploit unhandled edge cases
 
-## Deep Guidance
-
-### A03: Injection
-
-Untrusted data sent to an interpreter as part of a command or query, causing unintended execution.
-
-**SQL injection:**
-
-```typescript
-// BAD: String concatenation — vulnerable
-const query = `SELECT * FROM users WHERE email = '${email}'`;
-
-// GOOD: Parameterized query — safe
-const query = `SELECT * FROM users WHERE email = $1`;
-const result = await db.query(query, [email]);
-
-// GOOD: ORM with parameterized API — safe
-const user = await db.users.findFirst({ where: { email } });
-```
-
-**NoSQL injection:**
-
-```typescript
-// BAD: User input directly in query object
-db.users.find({ email: req.body.email, password: req.body.password });
-// Attacker sends: { "password": { "$ne": "" } } — bypasses password check
-
-// GOOD: Validate and sanitize input types before use
-const email = String(req.body.email);
-const passwordHash = await hash(String(req.body.password));
-db.users.find({ email, passwordHash });
-```
-
-**Command injection:**
-
-```typescript
-// BAD: User input in shell command
-exec(`convert ${userFilename} output.png`);
-
-// GOOD: Use library APIs instead of shell commands
-sharp(userFilePath).toFile('output.png');
-```
-
-**Prevention rules:**
-- Use parameterized queries for all database access
-- Use ORM/query builders that parameterize automatically
-- Validate and sanitize all user input at the boundary
-- Never construct shell commands from user input
-
-### A04: Insecure Design
-
-Security flaws from missing or ineffective control design, as opposed to implementation bugs. These are architectural problems.
-
-**Examples:**
-- Password reset via security questions (attackable)
-- No rate limiting on login endpoint (brute force possible)
-- No account lockout policy (unlimited password attempts)
-- Returning different error messages for "user not found" vs. "wrong password" (user enumeration)
-
-**Mitigations:**
-- Threat model during design phase, not after implementation
-- Use established security patterns (don't invent custom auth)
-- Rate limit all authentication endpoints
-- Return generic error messages for auth failures ("Invalid credentials" for both wrong email and wrong password)
-- Require MFA for sensitive operations
-
-### A05: Security Misconfiguration
-
-Default credentials, unnecessary features enabled, verbose error messages, missing security headers.
-
-**Common misconfigurations:**
-- Debug mode enabled in production (stack traces exposed)
-- Default database passwords unchanged
-- Directory listing enabled on web server
-- Unnecessary HTTP methods enabled (TRACE, OPTIONS returning too much)
-- Missing security headers (CSP, X-Frame-Options, X-Content-Type-Options)
-
-**Mitigations:**
-- Hardened configuration for each environment (dev uses relaxed settings; production uses strict settings)
-- Remove default accounts and sample data before deployment
-- Disable stack traces and verbose error messages in production
-- Set security headers on all responses:
-
-```
-Content-Security-Policy: default-src 'self'; script-src 'self'
-X-Content-Type-Options: nosniff
-X-Frame-Options: DENY
-Strict-Transport-Security: max-age=31536000; includeSubDomains
-Referrer-Policy: strict-origin-when-cross-origin
-Permissions-Policy: camera=(), microphone=(), geolocation=()
-```
-
-### A06: Vulnerable and Outdated Components
-
-Using libraries with known vulnerabilities.
-
-**Mitigations:**
-- Run dependency audit on every CI build (`npm audit`, `pip audit`, `cargo audit`)
-- Subscribe to security advisories for critical dependencies
-- Update dependencies regularly (weekly for patch versions, monthly for minor)
-- Pin dependency versions (use lockfiles: `package-lock.json`, `poetry.lock`)
-- Remove unused dependencies
-- Prefer dependencies with active maintenance and security response processes
-
-### A07: Identification and Authentication Failures
-
-Broken authentication mechanisms that allow attackers to assume identities.
-
-**Common failures:**
-- Permitting weak passwords ("123456", "password")
-- Storing passwords in plaintext or with reversible encryption
-- Missing brute-force protection
-- Session tokens in URLs (exposed in logs and browser history)
-- Session not invalidated after logout or password change
-
-**Mitigations:**
-- Enforce password complexity requirements (minimum 8 characters, no common passwords list)
-- Hash passwords with Argon2id, bcrypt (cost factor 12+), or scrypt
-- Rate limit login attempts (5 failures per minute per IP and per account)
-- Implement account lockout (lock after 10 consecutive failures, unlock after 30 minutes)
-- Invalidate all sessions when password changes
-- Use secure, HttpOnly, SameSite cookies for session tokens
-- Implement MFA for sensitive applications
-
-### A08: Software and Data Integrity Failures
-
-Code and infrastructure that doesn't verify integrity: unverified CI/CD pipelines, auto-updated dependencies, unsigned software.
-
-**Mitigations:**
-- Verify dependency integrity (lockfile checksums)
-- Use signed commits for critical code paths
-- Review CI/CD pipeline configuration changes with the same rigor as application code
-- Don't auto-merge dependency updates without CI verification
-- Use Subresource Integrity (SRI) for CDN-loaded scripts
-
-### A09: Security Logging and Monitoring Failures
-
-Insufficient logging to detect, investigate, or alert on attacks.
-
-**What to log:**
-- All authentication attempts (success and failure, with IP and user agent)
-- Authorization failures (user tried to access something they shouldn't)
-- Input validation failures (potential injection attempts)
-- Changes to user permissions or roles
-- Administrative actions (user creation, role changes, config changes)
-- Application errors (5xx responses with context)
-
-**What NEVER to log:**
-- Passwords (even failed ones — they might be the correct password for a different account)
-- Session tokens, API keys, or JWT tokens
-- Credit card numbers, SSNs, or other PII
-- Full request bodies of sensitive endpoints (login, payment)
-
-**Log format:** Use structured logging (JSON) with correlation IDs for request tracing. Include timestamp, severity, source, action, actor, target, and result.
-
-### A10: Server-Side Request Forgery (SSRF)
+### Server-Side Request Forgery (SSRF)
 
 The application fetches a URL provided by the user, allowing the attacker to make requests from the server's network position (accessing internal services, cloud metadata endpoints).
 
