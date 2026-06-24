@@ -4,6 +4,12 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.39.4] — 2026-06-24
+
+### Changed
+
+- **Knowledge freshness refresh (1 entry).** Refreshed against current upstream sources with measured review/retrieval dates and source hashes: `security-best-practices`. KB `VERSION` → 0.1.120.
+
 ## [3.39.3] — 2026-06-24
 
 ### Changed
