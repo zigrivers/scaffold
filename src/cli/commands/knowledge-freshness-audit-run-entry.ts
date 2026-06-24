@@ -51,7 +51,7 @@ const auditRunEntryCommand: CommandModule<Record<string, unknown>, AuditRunEntry
     })
     .option('provider', {
       type: 'string',
-      choices: ['anthropic', 'deepseek'],
+      choices: ['anthropic', 'deepseek', 'zai'],
       describe:
         'Force a specific LLM provider. Overrides KNOWLEDGE_FRESHNESS_PROVIDER and ' +
         'auto-detection from env vars. Default: resolved from env (see ' +

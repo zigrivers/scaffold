@@ -99,6 +99,90 @@ describe('resolveProvider', () => {
     expect(() => resolveProvider(opts({ KNOWLEDGE_FRESHNESS_PROVIDER: 'gemini' }, {}, true)))
       .toThrow(/unknown provider "gemini"/i)
   })
+
+  it('rule 1: --provider zai wins', () => {
+    expect(resolveProvider(opts({ ZAI_API_KEY: 'z' }, { provider: 'zai' }))).toBe('zai')
+  })
+
+  it('rule 2: KNOWLEDGE_FRESHNESS_PROVIDER=zai', () => {
+    expect(resolveProvider(opts({ ZAI_API_KEY: 'z' }, {}))).toBe('zai')
+    expect(resolveProvider(opts({ KNOWLEDGE_FRESHNESS_PROVIDER: 'zai' }, {}))).toBe('zai')
+  })
+
+  it('rule 3: only ZAI_API_KEY set → zai', () => {
+    expect(resolveProvider(opts({ ZAI_API_KEY: 'z' }))).toBe('zai')
+  })
+
+  it('rule 4: ZAI_API_KEY + DEEPSEEK_API_KEY without explicit choice → ambiguous error', () => {
+    // The fallback config DOES set both keys — but it also sets
+    // KNOWLEDGE_FRESHNESS_PROVIDER explicitly, so rule 2 short-circuits
+    // before this inference path. Inference with two keys and no explicit
+    // choice stays ambiguous on purpose.
+    const call = () => resolveProvider(opts({ ZAI_API_KEY: 'z', DEEPSEEK_API_KEY: 'd' }))
+    expect(call).toThrow(/ambiguous/i)
+    expect(call).toThrow(/KNOWLEDGE_FRESHNESS_PROVIDER/)
+  })
+
+  it('rule 4: all three keys without explicit choice → ambiguous error', () => {
+    const call = () => resolveProvider(opts({ ZAI_API_KEY: 'z', DEEPSEEK_API_KEY: 'd', ANTHROPIC_API_KEY: 'a' }))
+    expect(call).toThrow(/ambiguous/i)
+  })
+
+  it('rejects --provider zai is accepted as a known provider', () => {
+    // Guard against a regression where zai is missing from KNOWN_PROVIDERS.
+    expect(() => resolveProvider(opts({}, { provider: 'zai' }))).not.toThrow(/unknown provider/i)
+  })
+})
+
+describe('buildDispatcher — zai wiring', () => {
+  it('throws when zai is selected but ZAI_API_KEY is not in env', () => {
+    expect(() => buildDispatcher('zai', { timeoutSec: 60, env: {} }))
+      .toThrow(/ZAI_API_KEY env var is not set/)
+  })
+
+  it('constructs a Dispatcher when ZAI_API_KEY is set', () => {
+    const d = buildDispatcher('zai', { timeoutSec: 60, env: { ZAI_API_KEY: 'z' } })
+    expect(typeof d).toBe('function')
+  })
+})
+
+describe('buildDispatcher — fallback wiring', () => {
+  it('returns a bare dispatcher when no fallback env var is set', () => {
+    const d = buildDispatcher('zai', { timeoutSec: 60, env: { ZAI_API_KEY: 'z' } })
+    expect(typeof d).toBe('function')
+  })
+
+  it('builds a composite when KNOWLEDGE_FRESHNESS_FALLBACK_PROVIDER is set (primary + fallback keys present)', () => {
+    const d = buildDispatcher('zai', {
+      timeoutSec: 60,
+      env: { ZAI_API_KEY: 'z', DEEPSEEK_API_KEY: 'd', KNOWLEDGE_FRESHNESS_FALLBACK_PROVIDER: 'deepseek' },
+    })
+    expect(typeof d).toBe('function')
+  })
+
+  it('throws when the fallback provider is unknown', () => {
+    expect(() => buildDispatcher('zai', {
+      timeoutSec: 60,
+      env: { ZAI_API_KEY: 'z', KNOWLEDGE_FRESHNESS_FALLBACK_PROVIDER: 'openai' },
+    })).toThrow(/unknown.*fallback.*openai/i)
+  })
+
+  it('throws when the fallback provider equals the primary', () => {
+    expect(() => buildDispatcher('zai', {
+      timeoutSec: 60,
+      env: { ZAI_API_KEY: 'z', KNOWLEDGE_FRESHNESS_FALLBACK_PROVIDER: 'zai' },
+    })).toThrow(/fallback.*same.*primary/i)
+  })
+
+  it('throws when the fallback provider key is missing', () => {
+    // primary zai is configured, but the deepseek fallback has no key — the
+    // composite cannot be built, so fail at construction rather than at the
+    // first fallback attempt.
+    expect(() => buildDispatcher('zai', {
+      timeoutSec: 60,
+      env: { ZAI_API_KEY: 'z', KNOWLEDGE_FRESHNESS_FALLBACK_PROVIDER: 'deepseek' },
+    })).toThrow(/DEEPSEEK_API_KEY env var is not set/)
+  })
 })
 
 describe('buildDispatcher — deepseek wiring', () => {

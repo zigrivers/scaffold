@@ -1,10 +1,12 @@
 import type { Dispatcher } from '../audit-runner.js'
 import { buildAnthropicDispatcher } from './anthropic.js'
 import { buildDeepseekDispatcher } from './deepseek.js'
+import { buildZaiDispatcher } from './zai.js'
+import { buildFallbackDispatcher } from './fallback.js'
 
-export type Provider = 'anthropic' | 'deepseek'
+export type Provider = 'anthropic' | 'deepseek' | 'zai'
 
-const KNOWN_PROVIDERS: readonly Provider[] = ['anthropic', 'deepseek']
+const KNOWN_PROVIDERS: readonly Provider[] = ['anthropic', 'deepseek', 'zai']
 
 function isKnownProvider(s: string): s is Provider {
   return (KNOWN_PROVIDERS as readonly string[]).includes(s)
@@ -84,17 +86,24 @@ function pickProviderFromRules(input: ResolveProviderInput): Provider {
     }
     return envChoice
   }
-  // Rules 3/4: infer from API keys.
-  const hasAnthropic = !!input.env['ANTHROPIC_API_KEY']
-  const hasDeepseek = !!input.env['DEEPSEEK_API_KEY']
-  if (hasAnthropic && hasDeepseek) {
+  // Rules 3/4: infer from API keys. More than one key present is ambiguous
+  // (the operator must say which is primary — this is exactly the case the
+  // fallback config hits, which is why the fallback config ALSO sets
+  // KNOWLEDGE_FRESHNESS_PROVIDER explicitly so rule 2 short-circuits above).
+  const present: Provider[] = []
+  if (input.env['ZAI_API_KEY']) present.push('zai')
+  if (input.env['DEEPSEEK_API_KEY']) present.push('deepseek')
+  if (input.env['ANTHROPIC_API_KEY']) present.push('anthropic')
+  if (present.length > 1) {
+    const setVars = present
+      .map((p) => (p === 'zai' ? 'ZAI_API_KEY' : p === 'deepseek' ? 'DEEPSEEK_API_KEY' : 'ANTHROPIC_API_KEY'))
+      .join(', ')
     throw new Error(
-      'provider selection ambiguous: both ANTHROPIC_API_KEY and DEEPSEEK_API_KEY are set. ' +
-      'Set KNOWLEDGE_FRESHNESS_PROVIDER=anthropic|deepseek (or pass --provider) to disambiguate.',
+      `provider selection ambiguous: multiple API keys are set (${setVars}). ` +
+      `Set KNOWLEDGE_FRESHNESS_PROVIDER=${KNOWN_PROVIDERS.join('|')} (or pass --provider) to disambiguate.`,
     )
   }
-  if (hasDeepseek) return 'deepseek'
-  if (hasAnthropic) return 'anthropic'
+  if (present.length === 1) return present[0]
   // Rule 5: PATH probe (no env vars set, but Claude Code is installed and
   // already authenticated via `claude /login`).
   if (input.claudeOnPath) return 'anthropic'
@@ -103,6 +112,7 @@ function pickProviderFromRules(input: ResolveProviderInput): Provider {
     'no provider configured for the knowledge-freshness audit. Either:\n' +
     '  - install Claude Code and run `claude /login` (anthropic provider), OR\n' +
     '  - export ANTHROPIC_API_KEY AND have `claude` on PATH (anthropic, env-var auth), OR\n' +
+    '  - export ZAI_API_KEY (zai provider, no CLI install needed), OR\n' +
     '  - export DEEPSEEK_API_KEY (deepseek provider, no CLI install needed).\n' +
     'See docs/knowledge-freshness/operations.md §4 for details.',
   )
@@ -122,6 +132,42 @@ export interface BuildDispatcherOptions {
 }
 
 export function buildDispatcher(provider: Provider, opts: BuildDispatcherOptions): Dispatcher {
+  const primary = buildSingleDispatcher(provider, opts)
+  // Optional primary→secondary fallback. When set, the primary is tried
+  // first for every prompt and the secondary only runs if that call throws
+  // (per-entry, no cross-call latch — see fallback.ts). The cron sets this
+  // to chain zai → deepseek.
+  const fallbackName = opts.env['KNOWLEDGE_FRESHNESS_FALLBACK_PROVIDER']
+  if (!fallbackName) return primary
+  if (!isKnownProvider(fallbackName)) {
+    throw new Error(
+      `unknown fallback provider "${fallbackName}" set in ` +
+      `KNOWLEDGE_FRESHNESS_FALLBACK_PROVIDER. Supported values: ${KNOWN_PROVIDERS.join(', ')}.`,
+    )
+  }
+  if (fallbackName === provider) {
+    throw new Error(
+      `KNOWLEDGE_FRESHNESS_FALLBACK_PROVIDER ("${fallbackName}") is the same as the ` +
+      'primary provider. The fallback must be a different provider, or unset it.',
+    )
+  }
+  // Build the secondary eagerly so a misconfigured fallback (e.g. missing
+  // key) fails at construction time, not silently at the first fallback.
+  const secondary = buildSingleDispatcher(fallbackName, opts)
+  return buildFallbackDispatcher({
+    primary,
+    secondary,
+    primaryName: provider,
+    secondaryName: fallbackName,
+  })
+}
+
+/**
+ * Build a single provider's dispatcher with no fallback wrapping. This is
+ * the per-provider switch; `buildDispatcher` composes it with an optional
+ * fallback chain.
+ */
+function buildSingleDispatcher(provider: Provider, opts: BuildDispatcherOptions): Dispatcher {
   if (provider === 'anthropic') {
     return buildAnthropicDispatcher({ timeoutSec: opts.timeoutSec })
   }
@@ -136,6 +182,22 @@ export function buildDispatcher(provider: Provider, opts: BuildDispatcherOptions
     }
     const modelOverride = opts.env['KNOWLEDGE_FRESHNESS_DEEPSEEK_MODEL']
     return buildDeepseekDispatcher({
+      apiKey,
+      timeoutSec: opts.timeoutSec,
+      model: modelOverride,
+    })
+  }
+  if (provider === 'zai') {
+    const apiKey = opts.env['ZAI_API_KEY']
+    if (!apiKey) {
+      throw new Error(
+        'zai provider selected but ZAI_API_KEY env var is not set. ' +
+        'Either export the key or pick a different provider via --provider / ' +
+        'KNOWLEDGE_FRESHNESS_PROVIDER.',
+      )
+    }
+    const modelOverride = opts.env['KNOWLEDGE_FRESHNESS_ZAI_MODEL']
+    return buildZaiDispatcher({
       apiKey,
       timeoutSec: opts.timeoutSec,
       model: modelOverride,

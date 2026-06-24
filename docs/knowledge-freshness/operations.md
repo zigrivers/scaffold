@@ -168,25 +168,53 @@ For each cron-opened PR, verify before merging:
 
 ### Choosing a provider
 
-Two LLM providers are supported for the per-entry audit dispatch:
+Three LLM providers are supported for the per-entry audit dispatch:
 
 - **anthropic** (default for local) — invokes `claude -p` as a subprocess.
   Requires the Claude Code CLI on `$PATH`. Auth via Claude Code's
   keychain integration (run `claude /login` once) OR via
   `ANTHROPIC_API_KEY` env var — but in both cases the CLI must be
   installed; the env var alone is not sufficient.
-- **deepseek** (default for the cron) — HTTPS POST to
+- **zai** (default primary for the cron) — HTTPS POST to
+  `api.z.ai/api/paas/v4/chat/completions`. Auth via `ZAI_API_KEY` env var.
+  Requires no CLI install. Default model `glm-4.6` (flagship reasoning,
+  200K context — a good fit for the grounded audit, which embeds source
+  documents in the prompt).
+- **deepseek** (cron fallback) — HTTPS POST to
   `api.deepseek.com/chat/completions`. Auth via `DEEPSEEK_API_KEY`
   env var. Requires no CLI install.
 
 Provider selection (highest precedence first):
 
-1. `--provider <anthropic|deepseek>` flag on `audit-run-entry`
+1. `--provider <anthropic|deepseek|zai>` flag on `audit-run-entry`
 2. `KNOWLEDGE_FRESHNESS_PROVIDER` env var
 3. Inferred from which API key is set
-4. **Error** if both keys are set without an explicit choice
+4. **Error** if more than one key is set without an explicit choice
 5. Falls back to `anthropic` when `claude` is on `$PATH` (local dev case)
 6. **Error** if nothing is configured
+
+### Provider fallback (zai → deepseek)
+
+The cron runs **Z.ai as the primary** researcher with **DeepSeek as a
+per-entry fallback**. Set `KNOWLEDGE_FRESHNESS_FALLBACK_PROVIDER` to the
+secondary provider's name; the dispatcher then tries the primary first for
+every entry and only drops to the fallback when that specific call **fails**
+(transport error, timeout, HTTP 4xx/5xx such as a rate limit, malformed
+JSON, or an empty response). Content-quality differences do **not** trigger
+fallback — only a failure to return usable text does.
+
+- The fallback is **per entry**: if Z.ai fails on one candidate but
+  recovers, later candidates use Z.ai again. There is no cross-entry latch.
+- When the fallback fires it logs a `[fallback] zai dispatch failed; retrying
+  with deepseek …` line to stderr, so cron logs record the switch.
+- If **both** providers fail for an entry, the dispatcher throws a combined
+  error naming both failures.
+- The fallback provider must differ from the primary, and its key must be
+  present, or `buildDispatcher` errors at construction time.
+
+The cron sets `KNOWLEDGE_FRESHNESS_PROVIDER=zai` explicitly, so the "multiple
+keys set" ambiguity error (rule 4) is never reached even though both
+`ZAI_API_KEY` and `DEEPSEEK_API_KEY` are configured.
 
 For a local one-off DeepSeek run:
 
@@ -203,9 +231,24 @@ node dist/index.js knowledge-freshness audit-run-entry \
   --provider anthropic
 ```
 
+For a local one-off Z.ai run:
+
+```bash
+ZAI_API_KEY=... node dist/index.js knowledge-freshness audit-run-entry \
+  content/knowledge/core/<entry>.md --provider zai
+```
+
 For the cron: the secret + env block are configured in
-`.github/workflows/knowledge-freshness-audit.yml`. Set the secret
-once with `gh secret set DEEPSEEK_API_KEY`.
+`.github/workflows/knowledge-freshness-audit.yml`. Set both secrets
+once with `gh secret set ZAI_API_KEY` (primary) and
+`gh secret set DEEPSEEK_API_KEY` (fallback).
+
+#### Z.ai model override
+
+The default Z.ai model is `glm-4.6`. To use the lighter, cheaper
+`glm-4.5-air` instead, set `KNOWLEDGE_FRESHNESS_ZAI_MODEL=glm-4.5-air` in
+the workflow env block (or your shell). Only the two allowlisted values are
+accepted — the dispatcher rejects any other model name at startup.
 
 #### DeepSeek model override
 

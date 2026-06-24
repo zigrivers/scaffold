@@ -4,6 +4,27 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **Z.ai (GLM) is now the primary researcher for the daily knowledge-freshness
+  audit, with DeepSeek as a per-entry fallback.** A new `zai` provider
+  (OpenAI-compatible HTTPS to `api.z.ai`, default model `glm-4.6`, override via
+  `KNOWLEDGE_FRESHNESS_ZAI_MODEL`) joins `deepseek` and `anthropic`. Set
+  `KNOWLEDGE_FRESHNESS_FALLBACK_PROVIDER` to chain a secondary provider: each
+  audited entry tries the primary first and only drops to the fallback when that
+  call **fails** (transport error, timeout, rate-limit, malformed/empty
+  response) — content-quality differences never trigger fallback, and there is
+  no cross-entry latch. The daily cron now sets `KNOWLEDGE_FRESHNESS_PROVIDER=zai`
+  + `KNOWLEDGE_FRESHNESS_FALLBACK_PROVIDER=deepseek`.
+
+### Changed
+
+- **The knowledge-freshness cron requires a `ZAI_API_KEY` repository secret**
+  (primary). `DEEPSEEK_API_KEY` is now the fallback key — if it is unset the run
+  still works but logs a warning and runs without a safety net. The
+  "multiple API keys set without an explicit choice" inference error now covers
+  all three providers. See `docs/knowledge-freshness/operations.md §4`.
+
 ## [3.39.0] — 2026-06-21
 
 ### Added
