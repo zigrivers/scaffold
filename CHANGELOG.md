@@ -4,6 +4,12 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.39.3] — 2026-06-24
+
+### Changed
+
+- **Knowledge freshness refresh (8 entries).** Refreshed against current upstream sources with measured review/retrieval dates and source hashes: `web-app-rendering-strategies`, `web-app-requirements`, `web-app-security`, `web-app-session-patterns`, `web-app-testing`, `web-app-ux-patterns`, `web3-access-control`, and `web3-architecture`. KB `VERSION` → 0.1.120.
+
 ## [3.39.2] — 2026-06-24
 
 ### Changed
