@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { resolveProvider, buildDispatcher } from './index.js'
+import type { ZaiFetch } from './zai.js'
 
 // `claudeOnPath` is injected so tests don't depend on the host's $PATH.
 // We type `env` as `Record<string, string | undefined>` directly rather
@@ -98,6 +99,150 @@ describe('resolveProvider', () => {
   it('rejects an invalid KNOWLEDGE_FRESHNESS_PROVIDER env value', () => {
     expect(() => resolveProvider(opts({ KNOWLEDGE_FRESHNESS_PROVIDER: 'gemini' }, {}, true)))
       .toThrow(/unknown provider "gemini"/i)
+  })
+
+  it('rule 1: --provider zai wins', () => {
+    expect(resolveProvider(opts({ ZAI_API_KEY: 'z' }, { provider: 'zai' }))).toBe('zai')
+  })
+
+  it('rule 2: KNOWLEDGE_FRESHNESS_PROVIDER=zai', () => {
+    // Env var alone (no API key in env) must still resolve to zai — this
+    // exercises rule 2 specifically, not key inference (rule 3, tested below).
+    expect(resolveProvider(opts({ KNOWLEDGE_FRESHNESS_PROVIDER: 'zai' }, {}))).toBe('zai')
+  })
+
+  it('rule 3: only ZAI_API_KEY set → zai', () => {
+    expect(resolveProvider(opts({ ZAI_API_KEY: 'z' }))).toBe('zai')
+  })
+
+  it('rule 4: ZAI_API_KEY + DEEPSEEK_API_KEY without explicit choice → ambiguous error', () => {
+    // The fallback config DOES set both keys — but it also sets
+    // KNOWLEDGE_FRESHNESS_PROVIDER explicitly, so rule 2 short-circuits
+    // before this inference path. Inference with two keys and no explicit
+    // choice stays ambiguous on purpose.
+    const call = () => resolveProvider(opts({ ZAI_API_KEY: 'z', DEEPSEEK_API_KEY: 'd' }))
+    expect(call).toThrow(/ambiguous/i)
+    expect(call).toThrow(/KNOWLEDGE_FRESHNESS_PROVIDER/)
+  })
+
+  it('rule 4: all three keys without explicit choice → ambiguous error', () => {
+    const call = () => resolveProvider(opts({ ZAI_API_KEY: 'z', DEEPSEEK_API_KEY: 'd', ANTHROPIC_API_KEY: 'a' }))
+    expect(call).toThrow(/ambiguous/i)
+  })
+
+  it('does not throw when --provider zai is specified (zai is a known provider)', () => {
+    // Guard against a regression where zai is missing from KNOWN_PROVIDERS.
+    expect(() => resolveProvider(opts({}, { provider: 'zai' }))).not.toThrow(/unknown provider/i)
+  })
+})
+
+describe('buildDispatcher — zai wiring', () => {
+  it('throws when zai is selected but ZAI_API_KEY is not in env', () => {
+    expect(() => buildDispatcher('zai', { timeoutSec: 60, env: {} }))
+      .toThrow(/ZAI_API_KEY env var is not set/)
+  })
+
+  it('constructs a Dispatcher when ZAI_API_KEY is set', () => {
+    const d = buildDispatcher('zai', { timeoutSec: 60, env: { ZAI_API_KEY: 'z' } })
+    expect(typeof d).toBe('function')
+  })
+})
+
+describe('buildDispatcher — fallback wiring', () => {
+  it('returns a bare dispatcher when no fallback env var is set', () => {
+    const d = buildDispatcher('zai', { timeoutSec: 60, env: { ZAI_API_KEY: 'z' } })
+    expect(typeof d).toBe('function')
+  })
+
+  it('builds a WORKING composite that falls back to the secondary when the primary fails', async () => {
+    // Strong wiring check (not just typeof===function): inject a fetch that
+    // makes the zai primary fail with a retryable 429 and the deepseek
+    // fallback succeed, then assert the composite returns the SECONDARY's
+    // content. This fails if the fallback wrapping is ever dropped and a bare
+    // primary dispatcher is returned.
+    const fetchImpl = vi.fn(async (url: unknown) => {
+      if (String(url).includes('z.ai')) return new Response('rate limited', { status: 429 })
+      return new Response(
+        JSON.stringify({ choices: [{ message: { content: 'from-deepseek' } }] }),
+        { status: 200 },
+      )
+    }) as unknown as ZaiFetch
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const d = buildDispatcher('zai', {
+      timeoutSec: 60,
+      env: { ZAI_API_KEY: 'z', DEEPSEEK_API_KEY: 'd', KNOWLEDGE_FRESHNESS_FALLBACK_PROVIDER: 'deepseek' },
+      fetchImpl,
+    })
+    expect(await d('prompt')).toBe('from-deepseek')
+  })
+
+  it('does NOT fall back when the primary fails with a non-retryable error', async () => {
+    // A 401 from the primary is a permanent misconfiguration; the composite
+    // must surface it rather than silently running on the fallback.
+    const fetchImpl = vi.fn(async (url: unknown) => {
+      if (String(url).includes('z.ai')) return new Response('unauthorized', { status: 401 })
+      return new Response(
+        JSON.stringify({ choices: [{ message: { content: 'from-deepseek' } }] }),
+        { status: 200 },
+      )
+    }) as unknown as ZaiFetch
+    const d = buildDispatcher('zai', {
+      timeoutSec: 60,
+      env: { ZAI_API_KEY: 'z', DEEPSEEK_API_KEY: 'd', KNOWLEDGE_FRESHNESS_FALLBACK_PROVIDER: 'deepseek' },
+      fetchImpl,
+    })
+    await expect(d('prompt')).rejects.toThrow(/HTTP 401/)
+  })
+
+  it('throws when the fallback provider is unknown', () => {
+    expect(() => buildDispatcher('zai', {
+      timeoutSec: 60,
+      env: { ZAI_API_KEY: 'z', KNOWLEDGE_FRESHNESS_FALLBACK_PROVIDER: 'openai' },
+    })).toThrow(/unknown.*fallback.*openai/i)
+  })
+
+  it('throws when the fallback provider equals the primary', () => {
+    expect(() => buildDispatcher('zai', {
+      timeoutSec: 60,
+      env: { ZAI_API_KEY: 'z', KNOWLEDGE_FRESHNESS_FALLBACK_PROVIDER: 'zai' },
+    })).toThrow(/fallback.*same.*primary/i)
+  })
+
+  it('throws when the fallback provider key is missing', () => {
+    // primary zai is configured, but the deepseek fallback has no key — the
+    // composite cannot be built, so fail at construction rather than at the
+    // first fallback attempt.
+    expect(() => buildDispatcher('zai', {
+      timeoutSec: 60,
+      env: { ZAI_API_KEY: 'z', KNOWLEDGE_FRESHNESS_FALLBACK_PROVIDER: 'deepseek' },
+    })).toThrow(/DEEPSEEK_API_KEY env var is not set/)
+  })
+
+  it('throws when an anthropic FALLBACK is configured but claude is not on PATH', () => {
+    // The anthropic dispatcher shells out to `claude -p`, so an anthropic
+    // fallback needs the CLI just like a primary anthropic does. Validate at
+    // construction (claudeOnPath: false) instead of letting it fail only at
+    // the first fallback attempt.
+    expect(() => buildDispatcher('zai', {
+      timeoutSec: 60,
+      env: { ZAI_API_KEY: 'z', KNOWLEDGE_FRESHNESS_FALLBACK_PROVIDER: 'anthropic' },
+      claudeOnPath: false,
+    })).toThrow(/`claude` CLI is not on PATH/)
+  })
+
+  it('throws when a primary anthropic is built with claudeOnPath: false', () => {
+    expect(() => buildDispatcher('anthropic', {
+      timeoutSec: 60,
+      env: {},
+      claudeOnPath: false,
+    })).toThrow(/`claude` CLI is not on PATH/)
+  })
+
+  it('does NOT enforce the PATH check when claudeOnPath is unspecified (back-compat)', () => {
+    // Default (undefined) preserves existing behavior: construction succeeds
+    // and any missing-CLI failure surfaces at dispatch time.
+    const d = buildDispatcher('anthropic', { timeoutSec: 60, env: {} })
+    expect(typeof d).toBe('function')
   })
 })
 

@@ -1,10 +1,13 @@
 import type { Dispatcher } from '../audit-runner.js'
 import { buildAnthropicDispatcher } from './anthropic.js'
 import { buildDeepseekDispatcher } from './deepseek.js'
+import { buildZaiDispatcher } from './zai.js'
+import { buildFallbackDispatcher } from './fallback.js'
+import type { ProviderFetch } from './errors.js'
 
-export type Provider = 'anthropic' | 'deepseek'
+export type Provider = 'anthropic' | 'deepseek' | 'zai'
 
-const KNOWN_PROVIDERS: readonly Provider[] = ['anthropic', 'deepseek']
+const KNOWN_PROVIDERS: readonly Provider[] = ['anthropic', 'deepseek', 'zai']
 
 function isKnownProvider(s: string): s is Provider {
   return (KNOWN_PROVIDERS as readonly string[]).includes(s)
@@ -26,7 +29,7 @@ export interface ResolveProviderInput {
  *   1. --provider <name>           (explicit flag — operator override)
  *   2. KNOWLEDGE_FRESHNESS_PROVIDER env var
  *   3. Single API key in env       (inferred)
- *   4. Both API keys present       → error (ambiguous)
+ *   4. >1 API key present          → error (ambiguous)
  *   5. No env, claude on PATH      → anthropic (subprocess uses keychain)
  *   6. Nothing                     → error (no provider configured)
  *
@@ -48,8 +51,9 @@ export function resolveProvider(input: ResolveProviderInput): Provider {
       'required regardless of how the provider was chosen (--provider flag, ' +
       'KNOWLEDGE_FRESHNESS_PROVIDER env, or ANTHROPIC_API_KEY inference). ' +
       'Install Claude Code (`brew install anthropic/claude-code/claude-code` ' +
-      'or `npm install -g @anthropic-ai/claude-code`), OR switch to the ' +
-      'deepseek provider (export DEEPSEEK_API_KEY and set ' +
+      'or `npm install -g @anthropic-ai/claude-code`), OR switch to an ' +
+      'HTTP provider that needs no CLI — export ZAI_API_KEY and set ' +
+      'KNOWLEDGE_FRESHNESS_PROVIDER=zai (or DEEPSEEK_API_KEY + ' +
       'KNOWLEDGE_FRESHNESS_PROVIDER=deepseek).',
     )
   }
@@ -84,17 +88,24 @@ function pickProviderFromRules(input: ResolveProviderInput): Provider {
     }
     return envChoice
   }
-  // Rules 3/4: infer from API keys.
-  const hasAnthropic = !!input.env['ANTHROPIC_API_KEY']
-  const hasDeepseek = !!input.env['DEEPSEEK_API_KEY']
-  if (hasAnthropic && hasDeepseek) {
+  // Rules 3/4: infer from API keys. More than one key present is ambiguous
+  // (the operator must say which is primary — this is exactly the case the
+  // fallback config hits, which is why the fallback config ALSO sets
+  // KNOWLEDGE_FRESHNESS_PROVIDER explicitly so rule 2 short-circuits above).
+  const present: Provider[] = []
+  if (input.env['ZAI_API_KEY']) present.push('zai')
+  if (input.env['DEEPSEEK_API_KEY']) present.push('deepseek')
+  if (input.env['ANTHROPIC_API_KEY']) present.push('anthropic')
+  if (present.length > 1) {
+    const setVars = present
+      .map((p) => (p === 'zai' ? 'ZAI_API_KEY' : p === 'deepseek' ? 'DEEPSEEK_API_KEY' : 'ANTHROPIC_API_KEY'))
+      .join(', ')
     throw new Error(
-      'provider selection ambiguous: both ANTHROPIC_API_KEY and DEEPSEEK_API_KEY are set. ' +
-      'Set KNOWLEDGE_FRESHNESS_PROVIDER=anthropic|deepseek (or pass --provider) to disambiguate.',
+      `provider selection ambiguous: multiple API keys are set (${setVars}). ` +
+      `Set KNOWLEDGE_FRESHNESS_PROVIDER=${KNOWN_PROVIDERS.join('|')} (or pass --provider) to disambiguate.`,
     )
   }
-  if (hasDeepseek) return 'deepseek'
-  if (hasAnthropic) return 'anthropic'
+  if (present.length === 1) return present[0]
   // Rule 5: PATH probe (no env vars set, but Claude Code is installed and
   // already authenticated via `claude /login`).
   if (input.claudeOnPath) return 'anthropic'
@@ -103,6 +114,7 @@ function pickProviderFromRules(input: ResolveProviderInput): Provider {
     'no provider configured for the knowledge-freshness audit. Either:\n' +
     '  - install Claude Code and run `claude /login` (anthropic provider), OR\n' +
     '  - export ANTHROPIC_API_KEY AND have `claude` on PATH (anthropic, env-var auth), OR\n' +
+    '  - export ZAI_API_KEY (zai provider, no CLI install needed), OR\n' +
     '  - export DEEPSEEK_API_KEY (deepseek provider, no CLI install needed).\n' +
     'See docs/knowledge-freshness/operations.md §4 for details.',
   )
@@ -119,10 +131,65 @@ export interface BuildDispatcherOptions {
   /** Process env (production: `process.env`). Used by provider implementations
    *  for API keys and any optional overrides (e.g. model name). */
   env: Record<string, string | undefined>
+  /** Test-injectable fetch for the HTTP providers (zai/deepseek). Production
+   *  omits this so the providers use undici's fetch. */
+  fetchImpl?: ProviderFetch
+  /** Whether the `claude` CLI is on PATH. Pass `false` to fail construction
+   *  of an anthropic dispatcher (primary OR fallback) early, instead of at
+   *  first dispatch. Leave undefined to skip the check (back-compat). */
+  claudeOnPath?: boolean
 }
 
 export function buildDispatcher(provider: Provider, opts: BuildDispatcherOptions): Dispatcher {
+  const primary = buildSingleDispatcher(provider, opts)
+  // Optional primary→secondary fallback. When set, the primary is tried
+  // first for every prompt and the secondary only runs if that call throws
+  // (per-entry, no cross-call latch — see fallback.ts). The cron sets this
+  // to chain zai → deepseek.
+  const fallbackName = opts.env['KNOWLEDGE_FRESHNESS_FALLBACK_PROVIDER']
+  if (!fallbackName) return primary
+  if (!isKnownProvider(fallbackName)) {
+    throw new Error(
+      `unknown fallback provider "${fallbackName}" set in ` +
+      `KNOWLEDGE_FRESHNESS_FALLBACK_PROVIDER. Supported values: ${KNOWN_PROVIDERS.join(', ')}.`,
+    )
+  }
+  if (fallbackName === provider) {
+    throw new Error(
+      `KNOWLEDGE_FRESHNESS_FALLBACK_PROVIDER ("${fallbackName}") is the same as the ` +
+      'primary provider. The fallback must be a different provider, or unset it.',
+    )
+  }
+  // Build the secondary eagerly so a misconfigured fallback (e.g. missing
+  // key) fails at construction time, not silently at the first fallback.
+  const secondary = buildSingleDispatcher(fallbackName, opts)
+  return buildFallbackDispatcher({
+    primary,
+    secondary,
+    primaryName: provider,
+    secondaryName: fallbackName,
+  })
+}
+
+/**
+ * Build a single provider's dispatcher with no fallback wrapping. This is
+ * the per-provider switch; `buildDispatcher` composes it with an optional
+ * fallback chain.
+ */
+function buildSingleDispatcher(provider: Provider, opts: BuildDispatcherOptions): Dispatcher {
   if (provider === 'anthropic') {
+    // The anthropic dispatcher shells out to `claude -p`, so the CLI must be
+    // on PATH. When the caller has probed PATH and passed `false`, fail here
+    // (covers an anthropic FALLBACK too, not just a primary resolved via the
+    // CLI's resolveProvider path). Undefined skips the check for back-compat.
+    if (opts.claudeOnPath === false) {
+      throw new Error(
+        'anthropic provider selected but the `claude` CLI is not on PATH. ' +
+        'The dispatcher invokes `claude -p` as a subprocess, so the CLI is ' +
+        'required. Install Claude Code, or pick a different provider (e.g. ' +
+        'export ZAI_API_KEY / DEEPSEEK_API_KEY).',
+      )
+    }
     return buildAnthropicDispatcher({ timeoutSec: opts.timeoutSec })
   }
   if (provider === 'deepseek') {
@@ -139,6 +206,24 @@ export function buildDispatcher(provider: Provider, opts: BuildDispatcherOptions
       apiKey,
       timeoutSec: opts.timeoutSec,
       model: modelOverride,
+      fetchImpl: opts.fetchImpl,
+    })
+  }
+  if (provider === 'zai') {
+    const apiKey = opts.env['ZAI_API_KEY']
+    if (!apiKey) {
+      throw new Error(
+        'zai provider selected but ZAI_API_KEY env var is not set. ' +
+        'Either export the key or pick a different provider via --provider / ' +
+        'KNOWLEDGE_FRESHNESS_PROVIDER.',
+      )
+    }
+    const modelOverride = opts.env['KNOWLEDGE_FRESHNESS_ZAI_MODEL']
+    return buildZaiDispatcher({
+      apiKey,
+      timeoutSec: opts.timeoutSec,
+      model: modelOverride,
+      fetchImpl: opts.fetchImpl,
     })
   }
   // Unreachable: the type narrowing above is exhaustive.

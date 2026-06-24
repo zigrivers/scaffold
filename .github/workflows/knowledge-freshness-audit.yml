@@ -68,23 +68,39 @@ jobs:
 
       - name: Run audits and open PRs
         env:
-          # The cron uses the DeepSeek HTTP provider instead of `claude -p`.
-          # See docs/knowledge-freshness/operations.md §4 "Choosing a
-          # provider" for the precedence rules. The operator must set
-          # DEEPSEEK_API_KEY as a repository secret before the first run.
+          # The cron uses the Z.ai (GLM) HTTP provider as PRIMARY for content
+          # research, with DeepSeek as a PER-ENTRY fallback: each candidate
+          # tries Z.ai first and only drops to DeepSeek if that call fails
+          # (transport error, timeout, rate-limit, empty response). See
+          # docs/knowledge-freshness/operations.md §4 "Choosing a provider"
+          # for the precedence + fallback rules. ZAI_API_KEY (primary) is
+          # REQUIRED — the preflight below fails the run without it.
+          # DEEPSEEK_API_KEY (fallback) is recommended but optional: without
+          # it the run still works and just loses the fallback safety net
+          # (the preflight warns and disables the fallback).
+          ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-          KNOWLEDGE_FRESHNESS_PROVIDER: deepseek
+          KNOWLEDGE_FRESHNESS_PROVIDER: zai
+          KNOWLEDGE_FRESHNESS_FALLBACK_PROVIDER: deepseek
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          # Preflight: surface a missing DEEPSEEK_API_KEY immediately instead
-          # of letting every per-candidate dispatch fail in the per-entry
+          # Preflight: surface a missing ZAI_API_KEY immediately instead of
+          # letting every per-candidate dispatch fail in the per-entry
           # try/catch — that path exits 0 with zero PRs opened, the same
           # silent failure mode this provider switch is meant to eliminate
           # (PR #393 MMR F-001).
-          if [ -z "${DEEPSEEK_API_KEY:-}" ]; then
-            echo "::error::DEEPSEEK_API_KEY repository secret is required for the deepseek provider."
-            echo "Run \`gh secret set DEEPSEEK_API_KEY\` and re-trigger the workflow."
+          if [ -z "${ZAI_API_KEY:-}" ]; then
+            echo "::error::ZAI_API_KEY repository secret is required for the zai provider."
+            echo "Run \`gh secret set ZAI_API_KEY\` and re-trigger the workflow."
             exit 1
+          fi
+          # The fallback is what makes a Z.ai outage non-fatal. Warn (don't
+          # fail) if it's unconfigured — the run still works, just without a
+          # safety net.
+          if [ -z "${DEEPSEEK_API_KEY:-}" ]; then
+            echo "::warning::DEEPSEEK_API_KEY is not set — the zai→deepseek fallback is disabled."
+            echo "Run \`gh secret set DEEPSEEK_API_KEY\` to enable the fallback."
+            unset KNOWLEDGE_FRESHNESS_FALLBACK_PROVIDER
           fi
           bash scripts/knowledge-freshness-audit-loop.sh /tmp/candidates.json
