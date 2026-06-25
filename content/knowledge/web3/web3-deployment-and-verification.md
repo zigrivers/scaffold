@@ -1,14 +1,27 @@
 ---
 name: web3-deployment-and-verification
-description: Deploying smart contracts with forge script — broadcast artifacts as provenance, Etherscan verification, multi-chain flows, testnet rehearsals, mainnet pre-flight, post-deploy role hardening, and CREATE2 deterministic deploys
-topics: [web3, deployment, verification, forge-script, etherscan]
+description: >-
+  Deploying smart contracts with forge script — broadcast artifacts as provenance, Etherscan verification, multi-chain
+  flows, testnet rehearsals, mainnet pre-flight, post-deploy role hardening, and CREATE2 deterministic deploys
+topics:
+  - web3
+  - deployment
+  - verification
+  - forge-script
+  - etherscan
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-06-25
 version-pin: null
 sources:
   - url: https://ethereum.org/en/developers/docs/smart-contracts/deploying/
+    hash: sha256:5914ad2a7bdcbef2493e66b77a887694013cf081e0c5e09447f64c234dedf444
+    retrieved: 2026-06-25
   - url: https://docs.openzeppelin.com/contracts/5.x/
+    hash: sha256:ec0a9a1b0f267036c8e32dd2587d30843359b7351b8c7dd0e19afb548159993f
+    retrieved: 2026-06-25
   - url: https://docs.safe.global/
+    hash: sha256:b4011a55ef1fe4851fa4da7c3e77a56c7d930bc16066824075a56690e9950fb7
+    retrieved: 2026-06-25
 ---
 
 Shipping a contract to mainnet is the most irreversible thing a smart-contract team ever does. There is no rollback, no patch deploy, no `kubectl rollout undo` — once the bytecode is live and users start interacting with it, you live with what you wrote. The instinct from web2 — "deploy fast, fix forward" — produces drained protocols on-chain. Treat deployment as a release event: every privileged operation scripted (not hand-called), every artifact archived (not transient), every step rehearsed on a testnet that mirrors mainnet, and every contract verified on Etherscan before you tell anyone the address. The cost of the discipline is half a day of process; the cost of skipping it is the entire protocol.
