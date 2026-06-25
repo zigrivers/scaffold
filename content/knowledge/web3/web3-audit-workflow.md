@@ -1,14 +1,28 @@
 ---
 name: web3-audit-workflow
-description: Pre-audit readiness, tooling (Slither, Echidna, Halmos, Certora), CI integration, firm selection, timing, remediation, and post-launch bug bounties for protocol teams preparing for a smart-contract audit
-topics: [web3, audit, slither, echidna, halmos, security]
+description: >-
+  Pre-audit readiness, tooling (Slither, Echidna, Halmos, Certora), CI integration, firm selection, timing, remediation,
+  and post-launch bug bounties for protocol teams preparing for a smart-contract audit
+topics:
+  - web3
+  - audit
+  - slither
+  - echidna
+  - halmos
+  - security
 volatility: fast-moving
-last-reviewed: null
+last-reviewed: 2026-06-25
 version-pin: null
 sources:
   - url: https://consensys.github.io/smart-contract-best-practices/
+    hash: sha256:c36192265bf3322e75552f73527415de8a6b34b481ec6b2cfa2e12b52b329dbe
+    retrieved: 2026-06-25
   - url: https://swcregistry.io/
+    hash: sha256:ed54ed99fdbb30267dfb0a4c3d52013f8a873b3dc1e3b29d14e01485b0b64218
+    retrieved: 2026-06-25
   - url: https://docs.openzeppelin.com/contracts/5.x/
+    hash: sha256:f168332e431c2100829530c37eed1302e93a3367915d1053fcaf72805c6f3d9f
+    retrieved: 2026-06-25
 ---
 
 Audits are expensive ($30k–$500k+) and time-consuming, and the meter starts the day the auditors open your repo — not the day they find their first bug. A team that hands over a half-finished spec, 40% test coverage, and a Slither report full of unaddressed mediums is paying senior security engineers to do the work the team should have done before kickoff. The protocols that get the most out of an audit treat the engagement as a final review against work already proven correct, not as a substitute for it. Maximize value by being ready before the audit starts.
