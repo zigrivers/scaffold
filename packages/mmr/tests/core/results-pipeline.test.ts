@@ -322,4 +322,40 @@ describe('runResultsPipeline', () => {
     expect(isBlockingFinding(finding, 'P2')).toBe(true)
     expect(isAdvisoryFinding(finding, 'P2')).toBe(false)
   })
+
+
+  it('filters out findings targeting files not modified in the diff', () => {
+    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['claude'] })
+    const diff = `diff --git a/src/foo.ts b/src/foo.ts
+--- a/src/foo.ts
++++ b/src/foo.ts
+@@ -1 +1 @@
+-old
++new
+`
+    store.saveDiff(job.job_id, diff)
+
+    store.updateChannel(job.job_id, 'claude', {
+      status: 'completed',
+      started_at: '2026-04-13T00:00:00Z',
+      completed_at: '2026-04-13T00:00:10Z',
+    })
+
+    store.saveChannelOutput(
+      job.job_id,
+      'claude',
+      JSON.stringify({
+        approved: false,
+        findings: [
+          { severity: 'P0', location: 'src/foo.ts:10', description: 'crit', suggestion: 'fix' },
+          { severity: 'P1', location: 'docs/readme.md:5', description: 'doc err', suggestion: 'fix' },
+        ],
+        summary: 'two findings',
+      }),
+    )
+
+    const { results } = runResultsPipeline(store, store.loadJob(job.job_id), 'json')
+    expect(results.reconciled_findings).toHaveLength(1)
+    expect(results.reconciled_findings[0].location).toBe('src/foo.ts:10')
+  })
 })

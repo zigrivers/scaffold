@@ -171,15 +171,22 @@ export function resolveDispatchChannels(
       }
       return false
     }
+    if (explicitRequest && ch.kind !== 'http' && !ch.command) {
+      throw new Error(`Channel "${name}" is not fully configured (missing command or kind: http)`)
+    }
     return true
   }
 
   if (explicit !== undefined) {
+    // Flatten any comma-separated entries passed on the CLI and trim whitespace
+    const explicitFlat = explicit
+      .flatMap((item) => item.split(',').map((x) => x.trim()))
+      .filter(Boolean)
     // Dedupe after normalization: an alias and its canonical (e.g. `agy` +
     // `antigravity`) collapse to one name, so `--channels=agy,antigravity` must
     // dispatch the channel once, not twice. `new Set` preserves first-seen order.
     return [...new Set(
-      explicit
+      explicitFlat
         .map(normalizeChannelName)
         .filter((name) => isDispatchable(name, true)),
     )]

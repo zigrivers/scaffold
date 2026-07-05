@@ -1,4 +1,5 @@
 import { parseChannelOutput } from './parser.js'
+import { getModifiedFilesFromDiff } from './diff-introspect.js'
 import { reconcile, evaluateGate, deriveVerdict } from './reconciler.js'
 import { redactCommandString } from './redact.js'
 import { formatJson } from '../formatters/json.js'
@@ -82,6 +83,16 @@ export function runResultsPipeline(
   includeRaw = false,
   opts: PipelineOptions = {},
 ): PipelineResult {
+  let diff = ''
+  let hasDiff = false
+  try {
+    diff = store.loadDiff(job.job_id)
+    hasDiff = !!diff.trim()
+  } catch {
+    // ignore
+  }
+  const modifiedFiles = hasDiff ? getModifiedFilesFromDiff(diff) : new Set<string>()
+
   const channelFindings: Record<string, Finding[]> = {}
   const perChannel: Record<string, ChannelResult> = {}
   const startTimes: number[] = []
@@ -126,7 +137,17 @@ export function runResultsPipeline(
       }
       const parserName = entry.output_parser ?? 'default'
       const parsed = parseChannelOutput(raw, parserName)
-      findings = parsed.findings
+      if (hasDiff) {
+        findings = parsed.findings.filter((f) => {
+          if (!f.location) return false
+          const idx = f.location.indexOf(':')
+          const rawPath = idx !== -1 ? f.location.substring(0, idx) : f.location
+          const cleanPath = rawPath.trim().replace(/^\.\//, '').replace(/\/+/g, '/')
+          return modifiedFiles.has(cleanPath)
+        })
+      } else {
+        findings = parsed.findings
+      }
     } catch {
       // Fall back: no parseable output
     }

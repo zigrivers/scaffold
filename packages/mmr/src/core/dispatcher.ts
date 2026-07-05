@@ -204,6 +204,10 @@ export async function dispatchChannel(
       } catch {
         // Process may have already exited
       }
+      // Explicitly destroy streams so open pipes do not hang the event loop
+      proc.stdout?.destroy()
+      proc.stderr?.destroy()
+      proc.stdin?.destroy()
       const completedAt = new Date().toISOString()
       store.updateChannel(jobId, channelName, {
         status: 'timeout',
