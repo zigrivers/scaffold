@@ -47,11 +47,18 @@ async function runAuthCheck(config: AuthenticatedChannelConfig): Promise<AuthRes
         env: { ...process.env, ...posture.env },
         cwd: posture.cwd,
         stdio: 'ignore',
+        detached: true,
       })
 
       const timer = setTimeout(() => {
         timedOut = true
-        child.kill('SIGKILL')
+        try {
+          if (child.pid) {
+            process.kill(-child.pid, 'SIGKILL')
+          }
+        } catch {
+          // ignore
+        }
       }, auth.timeout * 1000)
 
       child.on('close', (code) => {

@@ -87,4 +87,19 @@ describe('resolveDispatchChannels (T1-A)', () => {
     expect(names).not.toContain('gemini')
     expect(names).toContain('qwen')
   })
+
+
+  it('flattens and dedupes comma-separated channel lists', () => {
+    const names = resolveDispatchChannels(sampleChannels, ['qwen,deepseek', 'agy', 'antigravity,qwen'], new Set())
+    expect(names).toEqual(['qwen', 'deepseek', 'antigravity'])
+  })
+
+  it('throws a validation error when an unconfigured channel is explicitly requested', () => {
+    const unconfiguredChannels = {
+      ...sampleChannels,
+      unconfigured: { kind: 'subprocess' as const, enabled: false, abstract: false, flags: [], env: {}, prompt_wrapper: '{{prompt}}', output_parser: 'default', stderr: 'capture' as const },
+    }
+    expect(() => resolveDispatchChannels(unconfiguredChannels, ['unconfigured'], new Set()))
+      .toThrow('Channel "unconfigured" is not fully configured (missing command or kind: http)')
+  })
 })

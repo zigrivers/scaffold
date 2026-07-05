@@ -44,3 +44,44 @@ export function detectConfigChanges(diff: string): ConfigChangeReport {
   report.ack_files_changed = [...acks]
   return report
 }
+
+
+/**
+ * Extract the set of all modified/added/renamed file paths from a unified diff.
+ * Returns normalized paths (leading "./" and duplicate slashes removed).
+ */
+export function getModifiedFilesFromDiff(diff: string): Set<string> {
+  const files = new Set<string>()
+  if (!diff) return files
+  const lines = diff.split('\n')
+  for (const line of lines) {
+    if (line.startsWith('--- ')) {
+      const pathPart = line.slice(4).trim()
+      if (pathPart && pathPart !== '/dev/null') {
+        const clean = pathPart.replace(/^(?:a|b)\//, '').replace(/^\.\//, '').replace(/\/+/g, '/')
+        files.add(clean)
+      }
+    } else if (line.startsWith('+++ ')) {
+      const pathPart = line.slice(4).trim()
+      if (pathPart && pathPart !== '/dev/null') {
+        const clean = pathPart.replace(/^(?:a|b)\//, '').replace(/^\.\//, '').replace(/\/+/g, '/')
+        files.add(clean)
+      }
+    } else if (line.startsWith('diff --git ')) {
+      const match = line.match(/^diff --git\s+(?:"?a\/(.+?)"?)\s+(?:"?b\/(.+?)"?)$/)
+      if (match) {
+        if (match[1]) files.add(match[1].replace(/^\.\//, '').replace(/\/+/g, '/'))
+        if (match[2]) files.add(match[2].replace(/^\.\//, '').replace(/\/+/g, '/'))
+      } else {
+        const parts = line.slice(11).split(' ')
+        if (parts.length >= 2) {
+          const p1 = parts[0].replace(/^(?:a|b)\//, '').replace(/^"|"$/g, '').replace(/^\.\//, '').replace(/\/+/g, '/')
+          const p2 = parts[1].replace(/^(?:a|b)\//, '').replace(/^"|"$/g, '').replace(/^\.\//, '').replace(/\/+/g, '/')
+          files.add(p1)
+          files.add(p2)
+        }
+      }
+    }
+  }
+  return files
+}

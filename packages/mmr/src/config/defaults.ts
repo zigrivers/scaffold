@@ -169,7 +169,7 @@ export const BUILTIN_CHANNELS: Record<string, SubprocessChannelParsed> = {
     prompt_wrapper: '{{prompt}}',
     output_parser: 'default',
     stderr: 'capture',
-    timeout: 360,
+    timeout: 300,
   },
   opencode: {
     // Disabled by default (opt-in): OpenCode is an open-source AI coding CLI that
@@ -218,7 +218,7 @@ export const BUILTIN_CHANNELS: Record<string, SubprocessChannelParsed> = {
     prompt_wrapper: '{{prompt}}',
     output_parser: 'default',
     stderr: 'capture',
-    timeout: 360,
+    timeout: 300,
   },
   'doc-conformance': {
     // Disabled by default: runs up to 3 LLM calls (~3 min) via scaffold observe audit.
@@ -243,7 +243,7 @@ export const BUILTIN_CHANNELS: Record<string, SubprocessChannelParsed> = {
     prompt_wrapper: '{{prompt}}',
     output_parser: 'doc-conformance',
     stderr: 'capture',
-    timeout: 240, // 3 sequential LLM calls × 60s each + margin
+    timeout: 180, // 3 sequential LLM calls × 60s each + margin
   },
 }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { detectConfigChanges } from '../../src/core/diff-introspect.js'
+import { detectConfigChanges, getModifiedFilesFromDiff } from '../../src/core/diff-introspect.js'
 
 const DIFF_WITH_ACK = `diff --git a/.mmr/acks/${'a'.repeat(40)}.json b/.mmr/acks/${'a'.repeat(40)}.json
 new file mode 100644
@@ -83,5 +83,42 @@ describe('detectConfigChanges', () => {
       'diff --git a/docs/readme.md b/docs/readme.md\n--- a/docs/readme.md\n+++ b/docs/readme.md\n@@ -1 +1 @@\n+see .mmr.yaml for config\n',
     )
     expect(r.config_file_changed).toBe(false)
+  })
+})
+
+
+describe('getModifiedFilesFromDiff', () => {
+  it('extracts modified files from git diff header and file lines', () => {
+    const diff = `diff --git a/src/foo.ts b/src/foo.ts
+index 1..2 100644
+--- a/src/foo.ts
++++ b/src/foo.ts
+@@ -1 +1 @@
+-old
++new
+`
+    const files = getModifiedFilesFromDiff(diff)
+    expect(files).toEqual(new Set(['src/foo.ts']))
+  })
+
+  it('handles renames and ignores /dev/null', () => {
+    const diff = `diff --git a/old.ts b/new.ts
+similarity index 100%
+rename from old.ts
+rename to new.ts
+--- a/old.ts
++++ b/new.ts
+`
+    const files = getModifiedFilesFromDiff(diff)
+    expect(files).toEqual(new Set(['old.ts', 'new.ts']))
+  })
+
+  it('normalizes paths by stripping leading ./ and duplicate slashes', () => {
+    const diff = `diff --git a/./src//foo.ts b/./src//foo.ts
+--- a/./src//foo.ts
++++ b/./src//foo.ts
+`
+    const files = getModifiedFilesFromDiff(diff)
+    expect(files).toEqual(new Set(['src/foo.ts']))
   })
 })
