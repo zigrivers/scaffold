@@ -358,4 +358,20 @@ describe('runResultsPipeline', () => {
     expect(results.reconciled_findings).toHaveLength(1)
     expect(results.reconciled_findings[0].location).toBe('src/foo.ts:10')
   })
+
+
+  it('handles channel output parsing failures by marking the channel status as failed', () => {
+    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['claude'] })
+    store.updateChannel(job.job_id, 'claude', {
+      status: 'completed',
+      started_at: '2026-04-13T00:00:00Z',
+      completed_at: '2026-04-13T00:00:10Z',
+    })
+    store.saveChannelOutput(job.job_id, 'claude', 'Invalid output that is not JSON')
+
+    const { results } = runResultsPipeline(store, store.loadJob(job.job_id), 'json')
+    expect(results.per_channel['claude'].status).toBe('failed')
+    expect(results.per_channel['claude'].findings).toEqual([])
+    expect(results.per_channel['claude'].error).toContain('Failed to parse channel output')
+  })
 })
