@@ -125,6 +125,8 @@ export function runResultsPipeline(
 
     let raw = ''
     let findings: Finding[] = []
+    let parseFailed = false
+    let parseErrorMessage = ''
     try {
       const stored = store.loadChannelOutput(job.job_id, name)
       // saveChannelOutput writes JSON.stringify(output), so JSON.parse
@@ -137,19 +139,25 @@ export function runResultsPipeline(
       }
       const parserName = entry.output_parser ?? 'default'
       const parsed = parseChannelOutput(raw, parserName)
-      if (hasDiff) {
-        findings = parsed.findings.filter((f) => {
-          if (!f.location) return false
-          const idx = f.location.indexOf(':')
-          const rawPath = idx !== -1 ? f.location.substring(0, idx) : f.location
-          const cleanPath = rawPath.trim().replace(/^\.\//, '').replace(/\/+/g, '/')
-          return modifiedFiles.has(cleanPath)
-        })
+      if (parsed.summary === 'Output parsing failed.') {
+        parseFailed = true
+        parseErrorMessage = parsed.findings[0]?.description ?? 'Failed to parse channel output'
       } else {
-        findings = parsed.findings
+        if (hasDiff) {
+          findings = parsed.findings.filter((f) => {
+            if (!f.location) return false
+            const idx = f.location.indexOf(':')
+            const rawPath = idx !== -1 ? f.location.substring(0, idx) : f.location
+            const cleanPath = rawPath.trim().replace(/^\.\//, '').replace(/\/+/g, '/')
+            return modifiedFiles.has(cleanPath)
+          })
+        } else {
+          findings = parsed.findings
+        }
       }
     } catch {
-      // Fall back: no parseable output
+      parseFailed = true
+      parseErrorMessage = 'Failed to load or parse channel output'
     }
 
     channelFindings[name] = findings
@@ -161,12 +169,23 @@ export function runResultsPipeline(
     if (entry.started_at) startTimes.push(new Date(entry.started_at).getTime())
     if (entry.completed_at) endTimes.push(new Date(entry.completed_at).getTime())
 
-    perChannel[name] = {
-      status: entry.status,
-      elapsed,
-      findings,
-      raw_output: includeRaw ? raw : undefined,
-      error: raw === '' ? 'Failed to load or parse channel output' : undefined,
+    if (parseFailed) {
+      perChannel[name] = {
+        status: 'failed',
+        elapsed,
+        findings: [],
+        raw_output: includeRaw ? raw : undefined,
+        error: parseErrorMessage,
+      }
+      job.channels[name].status = 'failed'
+    } else {
+      perChannel[name] = {
+        status: entry.status,
+        elapsed,
+        findings,
+        raw_output: includeRaw ? raw : undefined,
+        error: raw === '' ? 'Failed to load or parse channel output' : undefined,
+      }
     }
   }
 
