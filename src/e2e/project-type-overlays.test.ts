@@ -1844,7 +1844,7 @@ describe('data-science overlay integration', () => {
     )
   })
 
-  it('overlay is knowledge-plus-staging (no cross-reads-overrides; staging-environments is the only step-override)', () => {
+  it('overlay is knowledge-plus-staging: no cross-reads-overrides, only staging-environments overridden', () => {
     const methodologyDir = getPackageMethodologyDir()
     const overlayPath = path.join(methodologyDir, 'data-science-overlay.yml')
     const { overlay } = loadOverlay(overlayPath)
@@ -1934,7 +1934,7 @@ describe('web3 overlay integration', () => {
     )
   })
 
-  it('overlay is knowledge-plus-staging (no cross-reads-overrides; staging-environments is the only step-override)', () => {
+  it('overlay is knowledge-plus-staging: no cross-reads-overrides, only staging-environments overridden', () => {
     const methodologyDir = getPackageMethodologyDir()
     const overlayPath = path.join(methodologyDir, 'web3-overlay.yml')
     const { overlay } = loadOverlay(overlayPath)

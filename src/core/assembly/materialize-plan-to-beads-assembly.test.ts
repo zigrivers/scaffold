@@ -72,8 +72,10 @@ describe('materialize-plan-to-beads assembly', () => {
     expect(orderOf(step!)).toBeLessThan(minBuildOrder)
   })
 
-  it('is enabled (conditional) in the Beads-capable deep + custom presets, immediately after the playbook', () => {
-    for (const file of ['deep.yml', 'custom-defaults.yml']) {
+  it('is enabled (conditional) in Beads-capable deep + custom + mvp presets, immediately after the playbook', () => {
+    // mvp raises its Beads floor (D5): beads, git-workflow, and materialize-plan-to-beads
+    // are all enabled (conditional if-needed) alongside deep and custom-defaults.
+    for (const file of ['deep.yml', 'custom-defaults.yml', 'mvp.yml']) {
       const preset = loadRealPreset(file)
       expect(preset.steps[STEP]?.enabled, `${file} should enable ${STEP}`).toBe(true)
       expect(preset.steps[STEP]?.conditional).toBe('if-needed')
@@ -83,11 +85,5 @@ describe('materialize-plan-to-beads assembly', () => {
       // The materializer assembles immediately after the playbook.
       expect(ordered.indexOf(STEP)).toBe(ordered.indexOf(PLAYBOOK) + 1)
     }
-  })
-
-  it('is absent from the assembled mvp pipeline (Beads disabled)', () => {
-    const preset = loadRealPreset('mvp.yml')
-    expect(preset.steps[STEP]?.enabled).toBe(false)
-    expect(enabledPhaseStepsInOrder(preset, 'finalization')).not.toContain(STEP)
   })
 })

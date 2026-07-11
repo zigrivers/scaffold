@@ -1,7 +1,7 @@
 ---
 name: automated-pr-review
-description: "Agent-driven automated code review via MMR — the generated project's mandatory entry point is direct `mmr review --pr <N> --sync --format json` (Codex, Antigravity, Claude CLIs), not a scaffold wrapper, for PRs and non-PR targets"
-summary: "Configures agent-driven automated code review: mandatory after `gh pr create` and also usable on any non-PR target. The documented entry point is direct `mmr review --pr <N> --sync --format json` (three CLI channels — Codex, Antigravity, Claude) with a 3-round budget and a verified-P0 stop condition; `scaffold run review-pr` / `scaffold run review-code` remain available as an optional complementary Superpowers channel when scaffold itself is present. An external GitHub App reviewer is supported as a fallback when CLIs are unavailable."
+description: "Agent-driven automated code review via MMR — the generated project's mandatory entry point is direct `mmr review --pr <N> --sync --format json`, not a scaffold wrapper, for PR and non-PR targets"
+summary: "Configures agent-driven automated code review: mandatory after `gh pr create` and also usable on any non-PR target. The entry point is direct `mmr review --pr <N> --sync --format json` (Codex, Antigravity, Claude) with a 3-round budget and a verified-P0 stop condition; `scaffold run review-pr` / `scaffold run review-code` add the Superpowers channel when scaffold is present. A GitHub App reviewer is a fallback when CLIs are unavailable."
 phase: "environment"
 order: 340
 dependencies: [git-workflow]
