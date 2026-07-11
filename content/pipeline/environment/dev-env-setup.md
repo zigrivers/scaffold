@@ -29,24 +29,31 @@ by the entire workflow.
   troubleshooting, and AI agent instructions
 - Makefile or package.json scripts (dev, test, test:watch, lint, db-setup, db-reset)
 - .env.example with all required variables and sensible local defaults
-- CLAUDE.md updated with Key Commands table and Dev Environment section
+- CLAUDE.md updated with Key Commands table (every row marked **Agent-safe** or
+  **Ask-first**) and Dev Environment section
 
 ## Quality Criteria
 - (mvp) Dev server starts with a single command and supports live/hot reloading
 - (deep) Local database setup is scripted (if applicable)
 - (deep) .env.example documents all variables with comments
 - (mvp) Key Commands table in CLAUDE.md matches actual Makefile/package.json commands
+- (mvp) Every Key Commands table row carries an Agent-safe or Ask-first marker
 - (mvp) Lint and test commands exist and are runnable
 - (deep) Verification checklist passes (install, dev server, browser, live reload, tests, db)
 - (mvp) Setup process works for first-time clone (max 5 steps)
 - (mvp) Makefile/package.json includes at minimum: dev, test, lint targets
+- (deep) Every agent-ops target present in the Makefile (via `agent-ops.mk`)
+  has a matching Key Commands row using that target's own `## [agent-safe]`
+  doc-comment as its marker
 
 ## Methodology Scaling
 - **deep**: Full environment with database setup, seed data, Docker Compose (if
   needed), watch mode tests, multi-platform instructions (Mac, Linux, WSL),
-  troubleshooting section. Complete Key Commands table.
+  troubleshooting section. Complete Key Commands table, every row marked
+  Agent-safe/Ask-first, including installed agent-ops targets once present.
 - **mvp**: Dev server with live reload, basic lint and test commands, .env.example.
-  Minimal docs. Key Commands table with essentials only.
+  Minimal docs. Key Commands table with essentials only, still marked
+  Agent-safe/Ask-first.
 - **custom:depth(1-5)**:
   - Depth 1: dev server with live reload and a single test command.
   - Depth 2: dev server, test command, and basic lint command.
@@ -62,10 +69,90 @@ customizations. Update CLAUDE.md Key Commands section in-place.
 ## Update Mode Specifics
 - **Detect prior artifact**: docs/dev-setup.md exists
 - **Preserve**: port assignments, .env variable names and defaults, database
-  connection strings, custom Makefile targets, troubleshooting entries
+  connection strings, custom Makefile targets, troubleshooting entries,
+  existing Agent-safe/Ask-first markers on rows this step didn't just add
 - **Triggers for update**: tech stack changed (new dev server or database),
   project structure changed (new config file locations), new dependencies
-  require setup steps, tdd-standards.md changed test commands
+  require setup steps, tdd-standards.md changed test commands, the
+  agent-ops Makefile fragment (`agent-ops.mk`) was newly installed or
+  updated since this step last ran (git-workflow's or staging-environments'
+  `scaffold agent-ops install` added Makefile targets that don't yet have a
+  Key Commands row)
 - **Conflict resolution**: if a new dependency conflicts with an existing port
   or env var, propose a non-breaking alternative; always update CLAUDE.md Key
-  Commands table to match actual Makefile/package.json after changes
+  Commands table to match actual Makefile/package.json after changes,
+  re-deriving the marker for any row whose underlying command changed
+
+## Instructions
+
+### Populate the Key Commands table
+Every row in CLAUDE.md's Key Commands table carries a third column,
+**Marker**, set to `Agent-safe` or `Ask-first`:
+- **Agent-safe** — runs unattended with no destructive effect (dev server,
+  test, lint --check, install, doctor/diagnostic commands, snapshot/export
+  commands).
+- **Ask-first** — formatting sweeps that rewrite files in place, database
+  resets, or any other destructive command; an agent running the standing
+  autonomous loop must still confirm with the user before running one of
+  these.
+
+Table format:
+```markdown
+| Command | Purpose | Marker |
+|---------|---------|--------|
+| `make dev` | Start dev server with live reload | Agent-safe |
+| `make test` | Run test suite | Agent-safe |
+| `make db-reset` | Drop and recreate the local database | Ask-first |
+```
+
+Classify every command this step adds (dev, test, test:watch, lint,
+db-setup, db-reset, and any other Makefile/package.json script) using the
+definitions above. `db-reset` and any formatting sweep that rewrites files
+in place are always Ask-first; everything else this step generates is
+Agent-safe.
+
+### Add the agent-ops targets
+The `agent-ops.mk` Makefile fragment (installed by `scaffold agent-ops
+install`, wired into the project Makefile via a managed `-include
+agent-ops.mk` line) defines ten targets, each carrying its own `##
+[agent-safe]` doc-comment. When that fragment is present in the Makefile,
+add one Key Commands row per target it defines, copying the marker straight
+from its `##` comment rather than re-deriving it:
+
+| Command | Purpose | Marker |
+|---------|---------|--------|
+| `make main-sync` | Fetch + fast-forward main from anywhere | Agent-safe |
+| `make prune-merged` | Sweep merged branches/worktrees, reclaim staging | Agent-safe |
+| `make doctor` | Diagnose the primary-checkout invariant (read-only) | Agent-safe |
+| `make doctor-fix` | Repair unattended-safe primary-checkout problems | Agent-safe |
+| `make beads-snapshot` | Export the Beads DB to a local restore copy | Agent-safe |
+| `make staging-up` | Start this worktree's staging stack | Agent-safe |
+| `make staging-down` | Stop this worktree's staging stack | Agent-safe |
+| `make staging-prune` | Reap orphaned per-worktree staging stacks | Agent-safe |
+| `make docker-doctor` | Show engine placement, warn on split-brain | Agent-safe |
+| `make tc-reap` | Remove leaked testcontainers from dead sessions | Agent-safe |
+
+`main-sync`, `prune-merged`, `doctor`, `doctor-fix`, and `beads-snapshot`
+come from the agent-ops **git** component, which every preset installs
+unconditionally (git-workflow's step) — expect these five rows once
+git-workflow has run. `staging-up`, `staging-down`, `staging-prune`,
+`docker-doctor`, and `tc-reap` come from the agent-ops **staging**
+component, installed only when the staging-environments step ran
+(conditional on containerized services). The staging targets guard
+themselves (`staging component not installed`) when `scripts/ops/` is
+absent, so only add those five rows once `ops/compose/staging.yml` or
+`scripts/ops/staging-env.sh` actually exists — never add a row for a target
+that isn't installed yet.
+
+**Sequencing note.** This step runs at phase order 310 — before both
+staging-environments (order 315) and git-workflow (order 330), the two
+steps that actually install `agent-ops.mk` and the scripts it wires up. On
+a fresh build this step's first pass therefore finds neither: populate the
+table with this project's own commands only, using the Marker column above.
+The agent-ops rows are added the next time this step's Key Commands
+reconciliation runs — a later Update Mode pass (see "Triggers for update"
+above) or the cross-doc consistency check that verifies agent-ops targets
+stay in sync across CLAUDE.md, git-workflow, and dev-setup. Do not
+hand-write the agent-ops rows speculatively before `agent-ops.mk` is
+actually included in the Makefile — a row documenting a target that doesn't
+exist yet is worse than a temporarily missing row.
