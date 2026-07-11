@@ -59,8 +59,8 @@ all issues found.
   docs/coding-standards.md, docs/beads-workflow.md) — a Beads task ID, when
   configured, appears only in the commit/PR body as `Closes <id>`
 - (mvp) Branch naming is `<type>/<short-desc>` everywhere (worktree
-  workspace branches `agent/<name>`); no document still documents
-  `bd-<task-id>/<short-desc>`
+  workspace branches `agent/<name>`); no document still documents the
+  retired convention of a bead ID as the branch's leading path segment
 - (mvp) No `.github/workflows/` reference is presented as present-tense
   setup — every mention uses deferral language ("when a launch target is
   chosen…"), never "the CI pipeline runs…" or similar

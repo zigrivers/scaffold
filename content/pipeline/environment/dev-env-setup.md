@@ -161,7 +161,6 @@ reconciliation runs — a later Update Mode pass (see "Triggers for update"
 above) or the workflow-audit step's cross-doc consistency check
 (`content/pipeline/consolidation/workflow-audit.md`), which verifies
 agent-ops targets stay in sync across CLAUDE.md, git-workflow, and
-dev-setup. Do not
-hand-write the agent-ops rows speculatively before `agent-ops.mk` is
-actually included in the Makefile — a row documenting a target that doesn't
-exist yet is worse than a temporarily missing row.
+dev-setup. Do not hand-write the agent-ops rows speculatively before
+`agent-ops.mk` is actually included in the Makefile — a row documenting a
+target that doesn't exist yet is worse than a temporarily missing row.

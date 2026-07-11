@@ -14,7 +14,9 @@ CUSTOM="content/methodology/custom-defaults.yml"
   [ "$status" -eq 0 ]
 }
 
-@test "mvp.yml lists materialize-plan-to-beads disabled" {
-  run grep -qE "^\s*materialize-plan-to-beads: \{ enabled: false \}" "$MVP"
+@test "mvp.yml enables materialize-plan-to-beads as conditional if-needed" {
+  # D5 (spec 2026-07-10): mvp floor raised — materialize-plan-to-beads is
+  # enabled (conditional if-needed) in every preset, not just deep/custom.
+  run grep -qE "^\s*materialize-plan-to-beads: \{ enabled: true, conditional: \"if-needed\" \}" "$MVP"
   [ "$status" -eq 0 ]
 }

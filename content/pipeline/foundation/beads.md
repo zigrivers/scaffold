@@ -280,7 +280,7 @@ in-place preserving project-specific customizations.
 - **Triggers for update**: new CLAUDE.md sections need Beads references,
   Beads CLI version changed requiring command updates, git hooks need
   reconfiguration after workflow changes, or docs/beads-workflow.md is
-  missing or still documents the retired `[bd-<id>]` prefix convention
+  missing or still documents the retired bead-ID commit-prefix convention
   instead of the D7 body-reference form
 - **Conflict resolution**: if CLAUDE.md Beads section was manually customized,
   merge new content around existing customizations rather than replacing;

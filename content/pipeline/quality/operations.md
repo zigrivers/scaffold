@@ -12,25 +12,28 @@ knowledge-base: [operations-runbook]
 ---
 
 ## Purpose
-Define the production operational strategy: deployment pipeline (extending the
-base CI from git-workflow), deployment approach, monitoring and alerting, incident
-response, and rollback procedures. References docs/dev-setup.md for local
-development setup rather than redefining it.
+Define the production operational strategy: deployment pipeline (building on
+the local quality gates from git-workflow — pre-commit hooks, `make check`,
+`mmr review`; CI is deliberately deferred until a launch target is chosen),
+deployment approach, monitoring and alerting, incident response, and
+rollback procedures. References docs/dev-setup.md for local development
+setup rather than redefining it.
 
 ## Inputs
 - docs/system-architecture.md (required) — what to deploy
-- docs/tdd-standards.md (required) — CI pipeline test stages
+- docs/tdd-standards.md (required) — test stages the deployment pipeline runs
 - docs/adrs/ (required) — infrastructure decisions
 - docs/dev-setup.md (optional) — local dev setup to reference, not redefine
-- docs/git-workflow.md (optional) — base CI pipeline to extend, not redefine
+- docs/git-workflow.md (optional) — local quality gates (CI deferred) to
+  build on, not redefine
 
 ## Expected Outputs
 - docs/operations-runbook.md — production operations and deployment runbook
 
 ## Quality Criteria
-- (mvp) Deployment pipeline extends existing CI (build, deploy, post-deploy stages)
+- (mvp) Deployment pipeline builds on the local quality gates (build, deploy, post-deploy stages)
 - (mvp) Deployment pipeline has explicit stages (build → test → deploy → verify → rollback-ready)
-- (mvp) Does not redefine base CI stages (lint, test) from git-workflow
+- (mvp) Does not redefine the local quality gates (pre-commit, `make check`, `mmr review`) from git-workflow; notes that CI, once adopted at launch, would run those same gates
 - (mvp) Deployment strategy chosen with rollback procedure
 - (deep) Rollback procedure tested with specific trigger conditions (e.g., error rate > X%, health check failure)
 - (deep) Runbook structured by operational scenario (deployment, rollback, incident, scaling)
@@ -69,7 +72,10 @@ if architecture changed. Never modify rollback procedures without user approval.
   configurations
 - **Triggers for update**: architecture changed deployment topology, new ADRs
   changed infrastructure, security review identified operational requirements,
-  CI pipeline changed (new stages to extend)
+  local quality gates changed (new stages to build on), or a launch target
+  was chosen and CI was adopted (see git-workflow.md's "CI is deferred"
+  section)
 - **Conflict resolution**: if architecture changed the deployment target,
   update deployment stages but preserve monitoring and alerting sections;
-  verify runbook does not redefine base CI stages from git-workflow.md
+  verify runbook does not redefine the local quality gates from
+  git-workflow.md

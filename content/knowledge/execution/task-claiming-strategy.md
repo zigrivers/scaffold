@@ -107,7 +107,9 @@ Beads is an optional task-tracking tool. Detect its presence and adapt.
 - Use `bd update <id> --claim` to atomically claim a task (or `bd ready --claim --json` to find and claim the first available in one call)
 - Use `bd close <id>` after PR is merged to mark task complete
 - Task IDs come from Beads (`bd-a3f8`, `bd-a3f9`, etc. — hash-based, lowercase)
-- Branch naming follows Beads convention: `bd-<id>/<short-desc>`
+- Branch naming follows the `<type>/<short-desc>` convention (worktree
+  branches use `agent/<name>`) — bead IDs never appear in the branch name;
+  reference the task ID in the commit/PR body instead (e.g. `Closes bd-a3f8`)
 
 **Without Beads:**
 - Parse `implementation-plan.md` task list for task IDs and dependencies

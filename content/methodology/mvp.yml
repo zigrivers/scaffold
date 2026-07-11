@@ -17,7 +17,7 @@ steps:
   innovate-user-stories: { enabled: false }
   # Phase 2 — Project Foundation (foundation)
   github-setup: { enabled: true }
-  beads: { enabled: false }
+  beads: { enabled: true, conditional: "if-needed" }
   tech-stack: { enabled: true }
   coding-standards: { enabled: true }
   tdd: { enabled: true }
@@ -26,7 +26,7 @@ steps:
   dev-env-setup: { enabled: true }
   staging-environments: { enabled: false }
   design-system: { enabled: false }
-  git-workflow: { enabled: false }
+  git-workflow: { enabled: true }
   automated-pr-review: { enabled: false }
   ai-memory-setup: { enabled: false }
   # Phase 4 — Testing Integration (integration)
@@ -76,7 +76,7 @@ steps:
   apply-fixes-and-freeze: { enabled: false }
   developer-onboarding-guide: { enabled: false }
   implementation-playbook: { enabled: true }
-  materialize-plan-to-beads: { enabled: false }
+  materialize-plan-to-beads: { enabled: true, conditional: "if-needed" }
   # Phase 15 — Build (build) — stateless, on-demand execution steps
   single-agent-start: { enabled: true }
   single-agent-resume: { enabled: true }

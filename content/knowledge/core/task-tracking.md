@@ -35,7 +35,7 @@ Core properties:
 - **Repository-local** — Task data lives in `.beads/`, committed alongside code
 - **Git-hook synced** — Task state updates automatically on commit via data-sync hooks
 - **CLI-driven** — All operations via `bd` commands (create, list, status, ready)
-- **ID-prefixed commits** — Every commit message includes `[bd-<id>]` for traceability
+- **Body-referenced commits** — Every commit message references its task ID in the body (`Closes bd-<id>`), never as a subject-line prefix (D7)
 
 > IDs are hash-based and lowercase (e.g., `bd-a3f8`). The `bd-` prefix is configurable at `bd init` time. Hierarchical IDs for epic children: `bd-a3f8.1`, `bd-a3f8.1.1`. Older example IDs in this doc using `BD-42`-style uppercase digits reflect a pre-v1.0.0 convention; current upstream emits hash-based lowercase IDs.
 
@@ -95,7 +95,7 @@ bd init              # Creates .beads/ directory with data store and git hooks
 Initialization creates:
 - `.beads/` — Data directory (committed to git)
 - Git hooks for automatic data sync (these are Beads data hooks, not code-quality hooks like pre-commit linters)
-- Initial `[bd-<id>]` bootstrap convention (lowercase hash-style)
+- Hash-based lowercase task ID convention (e.g., `bd-a3f8`)
 
 #### Core Commands
 
@@ -112,17 +112,20 @@ Initialization creates:
 
 #### Commit Message Convention
 
-Every commit references its Beads task:
+Every commit references its Beads task in the body, never the subject line
+(D7 — bead IDs stay out of branch names and commit subjects):
 
 ```
-[bd-a3f8] feat(api): implement user registration endpoint
+feat(api): implement user registration endpoint
 
 - Add POST /api/v1/auth/register
 - Add input validation with zod schema
 - Add integration tests for happy path and validation errors
+
+Closes bd-a3f8
 ```
 
-The `[bd-<id>]` prefix enables:
+Referencing the task ID in the body enables:
 - Automatic task-to-commit traceability
 - Progress tracking based on commit activity
 - Session reconstruction (which commits belong to which task)
@@ -139,7 +142,7 @@ The `[bd-<id>]` prefix enables:
 
 #### Session End Protocol
 
-1. Commit all work with `[bd-<id>]` prefix (lowercase hash-style)
+1. Commit all work referencing the task ID in the commit body (`Closes bd-<id>`), never the subject line
 2. If task is complete: create PR, run `bd close <id>` (alias: `bd done`)
 3. If task is incomplete: leave clear notes about current state and next steps
 4. If lessons were learned: update `tasks/lessons.md`
@@ -150,7 +153,7 @@ A task is done when:
 - All acceptance criteria from the task description are met
 - Tests pass (`make check` or equivalent)
 - Code follows project coding standards
-- Changes are committed with proper `[bd-<id>]` message
+- Changes are committed with the task ID referenced in the body (`Closes bd-<id>`)
 - PR is created (or merged, depending on workflow)
 
 Do not mark a task done based on "it seems to work." Prove it works — tests pass, logs clean, behavior verified.
@@ -244,7 +247,7 @@ Each task should define explicit completion criteria, not vague goals:
 
 **Missing lessons.** The user corrects the same mistake three sessions in a row because nobody captured it in `tasks/lessons.md`. Fix: treat lesson capture as mandatory, not optional. After every correction, update the file before continuing with other work.
 
-**Task ID drift.** Commits stop including `[bd-<id>]` prefixes partway through the project. Traceability breaks down. Fix: make task ID inclusion a habit enforced by review. If using a pre-commit hook, validate the prefix.
+**Task ID drift.** Commits stop referencing the Beads task ID in the body partway through the project. Traceability breaks down. Fix: make task ID inclusion a habit enforced by review. If using a pre-commit hook, validate that the body contains a `Closes bd-<id>` reference.
 
 **Overloaded tasks.** A single task covers "implement the API, write the UI, add tests, update docs." This overflows a single session and makes progress tracking meaningless. Fix: split into tasks that each fit in one agent session (30-90 minutes).
 

@@ -18,7 +18,14 @@ This is the most critical finalization document. If the onboarding guide tells a
 
 ## Task Execution Protocol
 
-### How Agents Pick Work
+### Route to the work-beads Skill First
+
+When Beads and the `work-beads` skill are installed
+(`.claude/skills/work-beads/SKILL.md` or `.agents/skills/work-beads/SKILL.md`),
+follow that skill **exactly** for the per-task loop (claim → build →
+verify → review → merge → close) — it supersedes the fallback steps below.
+
+### How Agents Pick Work (generic fallback)
 
 1. **Check for available tasks.** Query the task management system for unblocked, unclaimed tasks.
 2. **Claim the task.** Mark the task as claimed with the agent's identity. This prevents two agents from working on the same task.

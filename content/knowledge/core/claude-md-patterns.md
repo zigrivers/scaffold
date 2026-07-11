@@ -60,7 +60,7 @@ Rules must be specific, actionable, and testable:
 **Good rules:**
 - "Run `make check` before every commit"
 - "Never push directly to main — always use branch + PR"
-- "Every commit message starts with `[bd-<id>]` task ID"
+- "Reference the Beads task ID in the commit body (`Closes bd-<id>`), never the subject line"
 
 **Bad rules:**
 - "Write clean code" — what does clean mean?
@@ -325,7 +325,7 @@ Beads-workflow doc.
 
 **Stale commands.** Key Commands table references `npm test` but the project switched to `bun test` two months ago. The agent runs the wrong command and wastes a cycle. Fix: keep Key Commands in sync with actual build tool configuration. The `claude-md-optimization` step verifies this.
 
-**Conflicting rules.** CLAUDE.md says "always use conventional commits" in one section and "use `[bd-<id>]` prefix" in another, with no guidance on which takes precedence. Fix: consolidate commit message rules in one place. If both apply, show the combined format: `[bd-a3f8] feat(api): implement endpoint`.
+**Conflicting rules.** CLAUDE.md says "reference the Beads task ID in the commit body, never the subject" in one section and shows an example with the task ID as a subject-line prefix in another, with no guidance on which takes precedence. Fix: consolidate commit message rules in one place. Show the single canonical format: `feat(api): implement endpoint`, with `Closes bd-a3f8` in the commit body.
 
 **Redundant instructions.** The same rule appears in Core Principles, Workflow, and Rules sections with slightly different wording. The agent may follow one version and violate another. Fix: state each rule once in its canonical section. Other sections reference it.
 

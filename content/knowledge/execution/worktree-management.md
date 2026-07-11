@@ -86,12 +86,14 @@ Each agent gets a persistent workspace branch that serves as its "home base":
 ```bash
 # Inside the agent's worktree
 git fetch origin
-git checkout -b bd-42/add-user-endpoint origin/main
+git checkout -b feat/add-user-endpoint origin/main
 ```
 
 **Critical rules:**
 - Always branch from `origin/main` — never from local `main` (it may be stale) and never from the workspace branch
-- Branch naming: `bd-<id>/<short-desc>` when using Beads, or `feat/<task-id>-<slug>` otherwise
+- Branch naming: `<type>/<short-desc>` (e.g. `feat/add-user-endpoint`) —
+  bead IDs never appear in the branch name; reference the task ID in the
+  commit/PR body instead (e.g. `Closes bd-42`)
 - One branch per task — never combine multiple tasks on a single branch
 
 **Never run `git checkout main` in a worktree:**
@@ -173,12 +175,20 @@ Run this after removing worktrees or if a worktree directory was deleted manuall
 
 **Batch cleanup of merged feature branches:**
 
+Prefer `scripts/cleanup-merged-branches.sh` (`make prune-merged`) — see
+"Squash-aware pruning with triage" below, which correctly detects
+squash-merged branches (ancestry-only detection misses those). For a manual
+ancestry-only sweep across all local task branches:
+
 ```bash
 git fetch origin --prune
-git branch --merged origin/main | grep "bd-" | xargs -r git branch -d
+git branch --merged origin/main | grep -vE '^\*|main|agent/' | xargs -r git branch -d
 ```
 
-This deletes all local branches that have been merged to `origin/main` and match the `bd-` prefix. Safe because `--merged` ensures only fully-merged branches are deleted, and `-d` (not `-D`) refuses to delete unmerged branches.
+This deletes all local branches merged to `origin/main`, excluding the
+current branch, `main`, and worktree workspace branches (`agent/<name>`).
+Safe because `--merged` ensures only fully-merged branches are deleted, and
+`-d` (not `-D`) refuses to delete unmerged branches.
 
 **Cleanup of workspace branches:**
 

@@ -97,10 +97,11 @@ for CI until a launch target is chosen and automated CI is deliberately wired up
   and comprehensive CLAUDE.md updates.
 - **mvp**: The single rule, branching, commit format, quality gates (CI
   deferred), and the 8-step PR workflow (mmr review still mandatory as
-  step 5.5). The agent-ops git component is installed regardless of depth —
-  it is a cheap, idempotent script install that `/work-beads` depends on in
-  every preset. Skip the crash-recovery and conflict-prevention detail
-  sections; keep CLAUDE.md updates minimal.
+  step 5.5). The agent-ops git component is installed for the mvp preset
+  (as it is for deep) — it is a cheap, idempotent script install that
+  `/work-beads` depends on. Custom depth follows its own ladder below (the
+  component installs starting at depth 3). Skip the crash-recovery and
+  conflict-prevention detail sections; keep CLAUDE.md updates minimal.
 - **custom:depth(1-5)**:
   - Depth 1: the single rule, branching strategy, commit format, and the
     "Quality gates (CI deferred)" section.
