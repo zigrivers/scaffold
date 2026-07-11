@@ -16,7 +16,7 @@ Define the branching strategy (one task -> one branch -> one PR -> squash-merge 
 delete branch), Conventional Commits format (bead IDs, when Beads is configured,
 referenced in commit/PR bodies via `Closes <id>` — never in branch names or commit
 subjects), a rebase-never-merge strategy, the 8-step PR workflow with `mmr review`
-as the mandatory AI-review step, the agent-ops worktree scripts for parallel agents
+as mandatory AI-review step 5.5, the agent-ops worktree scripts for parallel agents
 (setup, doctor, prune), conflict-prevention rules, and the local quality gate
 (pre-commit hooks + `make check` + agent self-review + `mmr review`) that stands in
 for CI until a launch target is chosen and automated CI is deliberately wired up.
@@ -61,10 +61,12 @@ for CI until a launch target is chosen and automated CI is deliberately wired up
   explicitly (pre-commit hooks + `make check` + agent self-review + `mmr
   review`), states that `.github/workflows/` is deliberately absent until a
   launch target is chosen, and includes a short "adding CI later" pointer
-- (deep) PR workflow documents all 8 steps plus step 5.5 (commit, local
-  review, rebase, push, create PR, `mmr review --pr <N> --sync --format
-  json`, merge, sync main), including the 3-round cap and the
-  degraded-pass self-merge path
+- (deep) PR workflow documents all 8 steps plus step 5.5 — (1) commit,
+  (2) local review, (3) rebase, (4) push, (5) create PR, (6) watch local
+  gates (CI deferred), (7) merge, (8) sync main via `make main-sync &&
+  make prune-merged` — with step 5.5 = `mmr review --pr <N> --sync
+  --format json` between creating the PR and the gates/merge, including
+  the 3-round cap and the degraded-pass self-merge path
 - (deep) `scripts/setup-agent-worktree.sh` is confirmed present via
   `scaffold agent-ops install --component git` + `scaffold agent-ops
   check` — not hand-authored; creates worktrees at the project-local
@@ -141,9 +143,12 @@ modified files without `--force`; never pass `--force` in generation mode.
 ### Install the agent-ops git component
 1. Check whether `.scaffold/agent-ops.yaml` already exists. If it does not,
    write the minimal form before installing — `project_name` (derive from
-   the repo directory name, falling back to the git remote slug) and
-   `worktree_setup_commands` (the dependency-install commands already
-   documented in docs/dev-setup.md, e.g. `["npm ci"]` or `["uv sync"]`):
+   the repo directory name, falling back to the git remote slug, then
+   sanitize to the installer's required shape `^[a-z][a-z0-9_-]*$` —
+   lowercase, no leading digit — or `scaffold agent-ops install` will
+   reject it) and `worktree_setup_commands` (the dependency-install
+   commands already documented in docs/dev-setup.md, e.g. `["npm ci"]` or
+   `["uv sync"]`):
    ```yaml
    project_name: <slug>
    worktree_setup_commands: []   # e.g. ["npm ci"], pulled from docs/dev-setup.md
@@ -194,19 +199,24 @@ Depth-gate per Methodology Scaling above.
    launch target is picked, wire the same `make check` and `mmr review`
    commands into a CI workflow and enable branch protection referencing
    that workflow's job name — until then, this document is the gate.
-6. **The 8-step PR workflow** — commit -> local review (`make check`,
-   re-read the diff) -> rebase -> push -> `gh pr create` (auto-applies
-   `.github/pull_request_template.md`) -> **step 5.5:
-   `mmr review --pr <N> --sync --format json`** (mandatory; 3-round cap —
-   round 1 fixes every real finding, round 2+ fixes P0/P1 only and files
-   P2/P3 as follow-up tasks, hard cap 3 rounds then complete a
-   degraded-pass self-merge; the one thing that still blocks the merge is
-   a verified, still-reproducing P0) -> `gh pr merge --squash
-   --delete-branch` -> `make main-sync && make prune-merged` from the
-   primary checkout. Cross-reference the work-beads skill's Step 2.7 for
-   the exact review contract this mirrors (`content/agent-skills/work-beads/SKILL.md`
-   in the Scaffold repo; installed at `.claude/skills/work-beads/SKILL.md`
-   or `.agents/skills/work-beads/SKILL.md` in the target project).
+6. **The 8-step PR workflow** — (1) commit -> (2) local review
+   (`make check`, re-read the diff) -> (3) rebase -> (4) push ->
+   (5) `gh pr create` (auto-applies `.github/pull_request_template.md`) ->
+   **step 5.5: `mmr review --pr <N> --sync --format json`** (mandatory;
+   3-round cap — round 1 fixes every real finding, round 2+ fixes P0/P1
+   only and files P2/P3 as follow-up tasks, hard cap 3 rounds then
+   complete a degraded-pass self-merge; the one thing that still blocks
+   the merge is a verified, still-reproducing P0) -> (6) watch local
+   gates — CI is deferred, so this means confirming pre-commit hooks ran
+   and `make check` is green on the branch HEAD -> (7) `gh pr merge
+   --squash --delete-branch` — with 3+ concurrent agents, serialize the
+   merge via `bd merge-slot acquire --wait` when the project's Beads has
+   merge-slots, releasing after the merge -> (8) `make main-sync && make
+   prune-merged` from the primary checkout. Cross-reference the
+   work-beads skill's Step 2.7 for the exact review contract this mirrors
+   (`content/agent-skills/work-beads/SKILL.md` in the Scaffold repo;
+   installed at `.claude/skills/work-beads/SKILL.md` or
+   `.agents/skills/work-beads/SKILL.md` in the target project).
 7. **Conflict-prevention rules** — single-writer surfaces (one agent at a
    time on a given module or domain directory), migration-sequence
    ownership (never two agents in the same migration directory), high-
