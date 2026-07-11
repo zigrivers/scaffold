@@ -61,6 +61,28 @@ docker:
     expect(() => loadAgentOpsConfig(bad)).toThrow(/service/i)
   })
 
+  it('rejects non-integer shared_stack values', () => {
+    const bad = tmpProject(`
+project_name: myapp
+docker:
+  context: orbstack
+  services:
+    - name: postgres
+      band: 20000
+  shared_stack:
+    postgres: "abc"
+`)
+    expect(() => loadAgentOpsConfig(bad)).toThrow(/shared_stack/i)
+  })
+
+  it('rejects an empty docker section', () => {
+    const bad = tmpProject(`
+project_name: myapp
+docker:
+`)
+    expect(() => loadAgentOpsConfig(bad)).toThrow(/docker/i)
+  })
+
   it('rejects duplicate bands', () => {
     const bad = tmpProject(`
 project_name: myapp

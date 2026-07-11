@@ -59,6 +59,7 @@ export function loadAgentOpsConfig(projectRoot: string): AgentOpsConfig {
   }
 
   if (raw.docker !== undefined) {
+    if (raw.docker === null) fail('docker section is empty — remove the key or add services')
     const d = raw.docker as Record<string, unknown>
     const services = (Array.isArray(d.services) ? d.services : []).map(s => {
       const svc = s as Record<string, unknown>
@@ -76,6 +77,11 @@ export function loadAgentOpsConfig(projectRoot: string): AgentOpsConfig {
       bands.add(s.band)
     }
     const sharedStack = d.shared_stack && typeof d.shared_stack === 'object' ? d.shared_stack : {}
+    for (const [key, value] of Object.entries(sharedStack)) {
+      if (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > 65535) {
+        fail(`shared_stack.${key} must be an integer port in 1..65535, got ${JSON.stringify(value)}`)
+      }
+    }
     const shared = sharedStack as Record<string, number>
     cfg.docker = {
       context: typeof d.context === 'string' && d.context ? d.context : 'orbstack',
