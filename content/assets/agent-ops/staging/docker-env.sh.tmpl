@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# {{PROJECT_NAME}} — pin the ONE Docker engine every {{PROJECT_NAME}} tool targets
+# (single-engine policy). With more than one engine installed (e.g. OrbStack + Docker
+# Desktop), "which daemon am I talking to" otherwise depends on the caller: the docker CLI
+# follows the selected context while docker-py/testcontainers follow DOCKER_HOST or fall back
+# to /var/run/docker.sock. That split can put staging stacks on one VM and the integration
+# testcontainers on another. Pinning a single context keeps every tool on the same engine.
+#
+# Resolution order:
+#   1. DOCKER_HOST or DOCKER_CONTEXT already set -> respected unchanged (explicit override wins).
+#   2. The pinned context ({{DOCKER_CONTEXT}}) if it exists -> exported via DOCKER_CONTEXT.
+#   3. Otherwise -> print nothing; Docker's own defaults apply.
+#
+# Usage:
+#   eval "$(bash scripts/ops/docker-env.sh)"   # exports DOCKER_CONTEXT (or nothing)
+#   bash scripts/ops/docker-env.sh --print     # bare context name, for Makefile $(shell ...)
+set -euo pipefail
+
+MODE="eval"
+case "${1:-}" in
+  --print) MODE="print" ;;
+  "") ;;
+  *) printf "usage: docker-env.sh [--print]\n" >&2; exit 2 ;;
+esac
+
+PINNED_CONTEXT="{{DOCKER_CONTEXT}}"
+
+resolve() {
+  # An explicit engine selection by the caller always wins — never override it.
+  if [[ -n "${DOCKER_HOST:-}" || -n "${DOCKER_CONTEXT:-}" ]]; then
+    return 0
+  fi
+  command -v docker >/dev/null 2>&1 || return 0
+  [[ -n "$PINNED_CONTEXT" ]] || return 0
+  # Only pin a context that actually exists, so this never redirects tooling at a
+  # non-existent engine (a fresh machine that hasn't created the context yet).
+  docker context inspect "$PINNED_CONTEXT" >/dev/null 2>&1 || return 0
+  printf '%s' "$PINNED_CONTEXT"
+}
+
+ctx="$(resolve)"
+[[ -n "$ctx" ]] || exit 0
+if [[ "$MODE" == "print" ]]; then
+  printf '%s\n' "$ctx"
+else
+  # %q so a mangled context value can never break out of the eval'd assignment.
+  printf 'export DOCKER_CONTEXT=%q\n' "$ctx"
+fi

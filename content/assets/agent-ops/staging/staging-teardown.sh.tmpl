@@ -1,0 +1,198 @@
+#!/usr/bin/env bash
+# {{PROJECT_NAME}} — reclaim per-worktree staging Docker stacks (containers + network +
+# volumes + the images compose built for them). Modes:
+#
+#   staging-teardown.sh --for-worktree <path> [--for-worktree <path>...]
+#                                Tear down the stack(s) belonging to those worktrees.
+#                                cleanup-merged-branches.sh calls this AFTER a successful
+#                                `git worktree remove` — the stack name derives from the path
+#                                STRING, still known even once the directory is gone.
+#   staging-teardown.sh --reap   Tear down every `{{PROJECT_NAME}}-wt-*` stack whose backing
+#                                worktree no longer exists (orphans from removed worktrees /
+#                                crashed agents).
+#   staging-teardown.sh --dry-run ...   Print what would run; change nothing.
+#
+# Safe by construction:
+#   * No-op (with a note) when docker is missing or the daemon is down.
+#   * NEVER touches the shared `{{PROJECT_NAME}}` stack — only `{{PROJECT_NAME}}-wt-*`
+#     (the shared name matches neither the path-mode nor the reap filter).
+#   * --reap only removes a stack whose worktree-hash matches NO current worktree, so a live
+#     sibling agent's running stack is never reaped. If the worktree list can't be read it
+#     ABORTS rather than treat every stack as an orphan.
+set -euo pipefail
+
+DRY_RUN=0
+REAP=0
+# One or more worktree paths (--for-worktree, repeatable) so a batch caller pays a single
+# docker-availability probe for the whole run instead of one per worktree.
+TARGETS=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dry-run) DRY_RUN=1 ;;
+    --reap) REAP=1 ;;
+    --for-worktree) shift; TARGETS+=("${1:?--for-worktree needs a path}") ;;
+    --help|-h) sed -n '2,/^set -/p' "$0" | sed 's/^# \{0,1\}//; /^set -/d'; exit 0 ;;
+    *) printf "! unknown arg: %s (try --for-worktree <path>, --reap, --dry-run)\n" "$1" >&2; exit 2 ;;
+  esac
+  shift
+done
+
+# --reap and --for-worktree are mutually exclusive, in any order.
+if [[ $REAP -eq 1 && ${#TARGETS[@]} -gt 0 ]]; then
+  printf "! choose one: --reap OR --for-worktree <path>, not both\n" >&2
+  exit 2
+fi
+if [[ $REAP -eq 1 ]]; then
+  MODE="reap"
+elif [[ ${#TARGETS[@]} -gt 0 ]]; then
+  MODE="path"
+else
+  printf "usage: staging-teardown.sh --for-worktree <path>... | --reap [--dry-run]\n" >&2
+  exit 2
+fi
+
+log()  { printf "→ %s\n" "$*"; }
+warn() { printf "! %s\n" "$*" >&2; }
+# In dry-run, print what would run and change nothing; otherwise run it directly (no eval,
+# so paths/names with metacharacters stay safe).
+run()  { if [[ $DRY_RUN -eq 1 ]]; then printf "  [dry-run] %s\n" "$*"; else "$@"; fi; }
+
+PROJECT_NAME="{{PROJECT_NAME}}"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+# Pin to the project's engine so a direct invocation reaps the same daemon the Makefile
+# targets use (scripts/ops/docker-env.sh; an explicit DOCKER_HOST/DOCKER_CONTEXT still wins).
+eval "$(bash "$SCRIPT_DIR/docker-env.sh" 2>/dev/null || true)"
+
+docker_ok() { command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; }
+
+# cksum (first field) of a string — the SAME hash staging-env.sh derives the per-worktree
+# compose project name from, so a path here names exactly the stack `make staging-up` created.
+_cksum() { printf '%s' "$1" | cksum | awk '{print $1}'; }
+
+# Compose project name for a worktree path.
+project_for_path() { printf '%s' "${PROJECT_NAME}-wt-$(_cksum "$1")"; }
+
+# Named volumes carrying a project's compose label — persist after a plain teardown (which
+# removes containers but can keep volumes).
+project_volumes() {
+  docker volume ls -q -f "label=com.docker.compose.project=$1" 2>/dev/null
+}
+
+# `docker compose down` quiet on the expected no-op (already-downed stack exits 0 with benign
+# chatter); surface output only on a real non-zero exit.
+compose_down() {
+  local project="$1" out rc=0
+  if [[ $DRY_RUN -eq 1 ]]; then
+    printf "  [dry-run] docker compose -p %s down -v --remove-orphans\n" "$project"
+    return 0
+  fi
+  out="$(docker compose -p "$project" down -v --remove-orphans 2>&1)" || rc=$?
+  if [[ $rc -ne 0 ]]; then
+    warn "compose down failed for $project${out:+: $out}"
+    return 1
+  fi
+  return 0
+}
+
+# Full teardown of one compose project: containers + default network + named volumes (via
+# `down -v`, label-based so the compose files aren't needed), leftover named volumes, then the
+# images compose built for it (tagged `<project>-<service>`; match by glob prefix, never a
+# regex). Best-effort per docker call so a transient failure never aborts a multi-stack reap.
+# Returns 0 on a fully-clean teardown, 1 if any op warned.
+teardown_project() {
+  local project="$1" img vol failed=0
+  [[ -n "$project" ]] || return 0
+  log "reclaiming staging stack: $project"
+  compose_down "$project" || failed=1
+  while IFS= read -r vol; do
+    [[ -n "$vol" ]] && { run docker volume rm -f "$vol" || { warn "could not remove volume $vol"; failed=1; }; }
+  done < <(project_volumes "$project")
+  while IFS= read -r img; do
+    [[ "$img" == "${project}-"* ]] || continue
+    run docker image rm -f "$img" || { warn "could not remove image $img"; failed=1; }
+  done < <(docker image ls --filter=reference="${project}-*" --format '{{.Repository}}:{{.Tag}}' 2>/dev/null)
+  return "$failed"
+}
+
+if ! docker_ok; then
+  log "docker unavailable (not installed or daemon down) — skipping staging teardown"
+  exit 0
+fi
+
+# ----- path mode -----
+if [[ "$MODE" == "path" ]]; then
+  rc=0
+  for target in "${TARGETS[@]}"; do
+    project="$(project_for_path "$target")"
+    if [[ -z "$project" || "$project" == "$PROJECT_NAME" ]]; then
+      log "no per-worktree staging stack for $target — nothing to tear down"
+      continue
+    fi
+    teardown_project "$project" || rc=1
+  done
+  exit "$rc"
+fi
+
+# ----- reap mode -----
+# Live worktree hashes: cksum of each current worktree path. LIVE_WT_HASHES (space- or
+# newline-separated) overrides for tests. A `{{PROJECT_NAME}}-wt-<hash>` stack whose hash is
+# NOT live has no worktree left to address it, so it is an orphan.
+live_hashes() {
+  if [[ -n "${LIVE_WT_HASHES:-}" ]]; then
+    printf '%s\n' "$LIVE_WT_HASHES" | tr ' ' '\n' | grep -v '^$' || true
+    return 0
+  fi
+  local wtpath
+  git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null \
+    | awk '/^worktree /{ print substr($0, 10) }' \
+    | while IFS= read -r wtpath; do
+        [[ -n "$wtpath" ]] && _cksum "$wtpath"
+      done
+}
+
+# Fail closed: without a hash override, an unreadable worktree list means we cannot prove any
+# stack is an orphan — abort rather than risk reaping a live sibling.
+if [[ -z "${LIVE_WT_HASHES:-}" ]] && ! git -C "$REPO_ROOT" worktree list --porcelain >/dev/null 2>&1; then
+  warn "cannot list worktrees under $REPO_ROOT — aborting reap (won't risk live stacks)"
+  exit 1
+fi
+
+live="$(live_hashes)"
+prefix="${PROJECT_NAME}-wt-"
+reaped=0
+partial=0
+# Candidate projects, unioned from three sources then filtered to `{{PROJECT_NAME}}-wt-<hash>`
+# (the shared `{{PROJECT_NAME}}` stack matches neither prefix) and deduped:
+#   1. stacks `docker compose ls` still lists (they have containers);
+#   2. named volumes that outlived their containers, keyed by compose-project label;
+#   3. pure-image residue (project fully downed, only its built images remain).
+while IFS= read -r project; do
+  [[ -n "$project" ]] || continue
+  hash="${project#"$prefix"}"
+  if grep -qxF -- "$hash" <<<"$live"; then
+    continue    # backs a current worktree — leave alone
+  fi
+  if teardown_project "$project"; then
+    reaped=$((reaped + 1))
+  else
+    partial=$((partial + 1))
+  fi
+done < <(
+  {
+    docker compose ls -a 2>/dev/null | awk 'NR>1{print $1}'
+    docker volume ls --format '{{.Label "com.docker.compose.project"}}' 2>/dev/null
+    docker image ls --filter=reference="${PROJECT_NAME}-*" --format '{{.Repository}}' 2>/dev/null \
+      | grep -oE "^${PROJECT_NAME}-wt-[0-9]+" || true
+  } | grep -E "^${PROJECT_NAME}-wt-[0-9]+$" | sort -u
+)
+
+if [[ $reaped -eq 0 && $partial -eq 0 ]]; then
+  log "no orphaned staging stacks to reap"
+elif [[ $partial -eq 0 ]]; then
+  log "reaped $reaped orphaned staging stack(s)"
+else
+  log "reaped $reaped orphaned staging stack(s) fully; $partial with partial failures (see warnings)"
+fi

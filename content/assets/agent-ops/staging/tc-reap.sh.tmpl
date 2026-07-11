@@ -1,0 +1,173 @@
+#!/usr/bin/env bash
+# {{PROJECT_NAME}} — reap LEAKED testcontainers (integration-test Postgres etc. whose test
+# session died without cleanup). A live testcontainers session always has its ryuk reaper
+# container Running: ryuk starts before any other container in the session and removes the
+# session's containers when the test process disconnects. So a testcontainers-labeled
+# container whose session has no Running ryuk — and old enough to rule out a session that
+# is still starting up — is a leak. Leaks matter: a starved engine fails container starts,
+# failed starts leak ryuk itself, and every leaked Postgres makes the starvation worse.
+#
+#   tc-reap.sh [--dry-run] [--include-running] [--context <name>] [--min-age-minutes N]
+#
+#   --dry-run            Print what would be removed; change nothing.
+#   --include-running    Also reap RUNNING containers in dead sessions (age-guarded).
+#                        Default reaps only non-running leftovers (created/exited) —
+#                        zero risk to any live workload, so safe unattended.
+#   --context <name>     Run against that docker context (default: the engine
+#                        docker-env.sh pins — sourced below; DOCKER_HOST/DOCKER_CONTEXT wins).
+#   --min-age-minutes N  Grace period for RUNNING containers in a dead session
+#                        (default 30, with --include-running) — never races a
+#                        session mid-startup.
+#
+# Label semantics: every testcontainers container gets `org.testcontainers=true`. The
+# session id lives in `org.testcontainers.session-id` (testcontainers-python) or
+# `org.testcontainers.sessionId` (testcontainers-java/go) — we read both. The ryuk
+# container carries NEITHER (python's core/labels.py skips it) — its session is only
+# recoverable from its NAME, `testcontainers-ryuk-<session-id>`. So we list by the
+# org.testcontainers label (which includes ryuk) and derive ryuk sessions from names.
+#
+# Safe by construction:
+#   * Only containers labeled org.testcontainers are ever considered — compose stacks,
+#     dev DBs, and anything unlabeled are structurally out of scope.
+#   * A session with a Running ryuk is always left alone (ryuk owns its cleanup) —
+#     this protects OTHER projects' live testcontainers sessions on the same engine too.
+#   * By default only NON-running leftovers (Created/Exited) are reaped — inert state,
+#     never live work — so even a TESTCONTAINERS_RYUK_DISABLED workload is safe.
+#   * With --include-running: a running container is reaped only when its session is
+#     known (non-empty), has no Running ryuk, and is past the age grace. A running
+#     container with NO recoverable session (unknown client) is always left alone.
+#   * No-op (with a note) when docker is missing or the daemon is down.
+set -euo pipefail
+
+DRY_RUN=0
+INCLUDE_RUNNING=0
+CONTEXT=""
+MIN_AGE_MINUTES=30
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dry-run) DRY_RUN=1 ;;
+    --include-running) INCLUDE_RUNNING=1 ;;
+    --context) shift; CONTEXT="${1:?--context needs a name}" ;;
+    --min-age-minutes) shift; MIN_AGE_MINUTES="${1:?--min-age-minutes needs a number}" ;;
+    --help|-h) sed -n '2,/^set -/p' "$0" | sed 's/^# \{0,1\}//; /^set -/d'; exit 0 ;;
+    *) printf "! unknown arg: %s (try --dry-run, --include-running, --context <name>, --min-age-minutes N)\n" "$1" >&2; exit 2 ;;
+  esac
+  shift
+done
+
+log()  { printf "→ %s\n" "$*"; }
+warn() { printf "! %s\n" "$*" >&2; }
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Pin to the project's engine so a direct invocation reaps the same daemon the Makefile
+# targets use (scripts/ops/docker-env.sh; explicit DOCKER_HOST/DOCKER_CONTEXT or --context wins).
+eval "$(bash "$SCRIPT_DIR/docker-env.sh" 2>/dev/null || true)"
+
+dkr() {
+  if [[ -n "$CONTEXT" ]]; then docker --context "$CONTEXT" "$@"; else docker "$@"; fi
+}
+
+if ! command -v docker >/dev/null 2>&1 || ! dkr info >/dev/null 2>&1; then
+  log "docker unavailable (not installed or daemon down) — skipping testcontainers reap"
+  exit 0
+fi
+
+# Age gate for RUNNING containers in a dead session. `docker ps --format {{.RunningFor}}`
+# emits humanized English durations ("23 seconds ago", "About a minute ago", "3 hours
+# ago"); day-and-above granularity is treated as unconditionally old. Unparseable output
+# fails closed (young) so we never reap on a format surprise.
+old_enough() {
+  local running_for="$1" n=""
+  case "$running_for" in
+    *second*) n=0 ;;
+    *"About a minute"*) n=1 ;;
+    *minute*) n="$(sed -n 's/^\([0-9][0-9]*\) minutes*.*/\1/p' <<<"$running_for")" ;;
+    *"About an hour"*) n=60 ;;
+    *hour*)
+      n="$(sed -n 's/^\([0-9][0-9]*\) hours*.*/\1/p' <<<"$running_for")"
+      [[ -n "$n" ]] && n=$((n * 60)) ;;
+    *day*|*week*|*month*|*year*) n=1000000 ;;
+    *) return 1 ;;
+  esac
+  [[ -n "$n" ]] || return 1
+  [[ "$n" -ge "$MIN_AGE_MINUTES" ]]
+}
+
+# One pass over every testcontainers-managed container, ryuk included. Fields are
+# tab-separated; names/ids never contain tabs. State is the low-level state string
+# (running/created/exited/...). Both session-label spellings are read (python vs
+# java/go); both are EMPTY for ryuk rows (see header).
+listing="$(dkr ps -a --filter label=org.testcontainers=true \
+  --format '{{.ID}}\t{{.Names}}\t{{.State}}\t{{.Label "org.testcontainers.session-id"}}\t{{.Label "org.testcontainers.sessionId"}}\t{{.RunningFor}}')"
+
+if [[ -z "$listing" ]]; then
+  log "no testcontainers found — nothing to reap"
+  exit 0
+fi
+
+# A row's session: ryuk rows carry it in the name suffix, everything else in whichever
+# session label its testcontainers client set (python kebab-case, java/go camelCase).
+session_of() {
+  local name="$1" label="$2" label_camel="$3"
+  if [[ "$name" == testcontainers-ryuk-* ]]; then
+    printf '%s' "${name#testcontainers-ryuk-}"
+  elif [[ -n "$label" ]]; then
+    printf '%s' "$label"
+  else
+    printf '%s' "$label_camel"
+  fi
+}
+
+# Sessions with a Running ryuk are live; every container in them is ryuk's to manage.
+live_sessions="$(awk -F'\t' '$2 ~ /^testcontainers-ryuk-/ && $3 == "running" {sub(/^testcontainers-ryuk-/, "", $2); print $2}' <<<"$listing")"
+
+reaped=0
+skipped=0
+# Tab is IFS whitespace, and bash collapses runs of IFS whitespace — a ryuk row's EMPTY
+# session-id field (two adjacent tabs) would shift the later fields left. Translate the
+# delimiter to `|` (non-whitespace; impossible in docker names/IDs/states/durations, and
+# macOS bash 3.2 mis-handles $'\x01' in IFS) so empty fields survive positionally.
+while IFS='|' read -r id name state label label_camel running_for; do
+  [[ -n "$id" ]] || continue
+  session="$(session_of "$name" "$label" "$label_camel")"
+  if [[ -n "$session" ]] && grep -qxF -- "$session" <<<"$live_sessions"; then
+    skipped=$((skipped + 1))
+    continue
+  fi
+  if [[ "$state" == "running" ]]; then
+    if [[ $INCLUDE_RUNNING -ne 1 ]]; then
+      # Default posture: never touch running work. Rerun with --include-running to
+      # reclaim running leaks once you've confirmed them (docker-doctor shows both).
+      skipped=$((skipped + 1))
+      continue
+    fi
+    if [[ -z "$session" ]]; then
+      # Running, testcontainers-labeled, but no recoverable session (unknown client
+      # dialect): fail closed — we cannot prove its session is dead.
+      skipped=$((skipped + 1))
+      continue
+    fi
+    if ! old_enough "$running_for"; then
+      # Dead-looking but young: ryuk may still be coming up for this session. Next
+      # sweep gets it if it is a real leak.
+      skipped=$((skipped + 1))
+      continue
+    fi
+  fi
+  if [[ $DRY_RUN -eq 1 ]]; then
+    printf "  [dry-run] docker rm -f -v %s  # %s (%s, session %s, up %s)\n" \
+      "$id" "$name" "$state" "${session:0:8}" "$running_for"
+  else
+    dkr rm -f -v "$id" >/dev/null || { warn "could not remove $name ($id)"; continue; }
+    log "reaped leaked testcontainer: $name ($state, session ${session:0:8})"
+  fi
+  reaped=$((reaped + 1))
+done < <(tr '\t' '|' <<<"$listing")
+
+if [[ $reaped -eq 0 ]]; then
+  log "no leaked testcontainers to reap ($skipped live/young left alone)"
+elif [[ $DRY_RUN -eq 1 ]]; then
+  log "would reap $reaped leaked testcontainer(s); $skipped live/young left alone"
+else
+  log "reaped $reaped leaked testcontainer(s); $skipped live/young left alone"
+fi

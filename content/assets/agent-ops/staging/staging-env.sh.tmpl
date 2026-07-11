@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+# staging-env.sh — deterministic per-worktree staging environment.
+# SOURCE this file (do not execute). Installed by `scaffold agent-ops install`.
+#
+# Every worktree gets a collision-free slot derived from its path:
+#   O = (cksum(worktree_path) % 254) + 1          # 1..254
+#   compose project = {{PROJECT_NAME}}-wt-<cksum>
+#   host port for service S = BAND_S + O
+#   subnet = 10.<O>.0.0/16
+# The primary checkout gets the shared stack ({{PROJECT_NAME}}, SHARED_* ports).
+# Never select the shared stack from a worktree.
+
+set -euo pipefail
+
+PROJECT_NAME="{{PROJECT_NAME}}"
+
+# --- GENERATED: service port bands (from .scaffold/agent-ops.yaml) ---
+{{SERVICE_PORT_BANDS}}
+# --- END GENERATED ---
+
+_repo_root() { git rev-parse --show-toplevel; }
+_primary_root() { git worktree list --porcelain | head -1 | sed 's/^worktree //'; }
+
+is_primary_checkout() { [ "$(_repo_root)" = "$(_primary_root)" ]; }
+
+worktree_offset() {
+    if [ -n "${STAGING_WT_OFFSET:-}" ]; then
+        echo "${STAGING_WT_OFFSET}"
+        return
+    fi
+    local cksum_val
+    cksum_val=$(printf '%s' "$(_repo_root)" | cksum | awk '{print $1}')
+    echo $(( (cksum_val % 254) + 1 ))
+}
+
+_cksum_val=$(printf '%s' "$(_repo_root)" | cksum | awk '{print $1}')
+STAGING_OFFSET="$(worktree_offset)"
+export STAGING_OFFSET
+
+if is_primary_checkout || [ "${STAGING_COMPOSE_PROJECT:-}" = "$PROJECT_NAME" ]; then
+    if ! is_primary_checkout; then
+        echo "ERROR: the shared '$PROJECT_NAME' stack may only be selected from the primary checkout." >&2
+        echo "       From a worktree, use the default per-worktree stack instead." >&2
+        return 1 2>/dev/null || exit 1
+    fi
+    export COMPOSE_PROJECT_NAME="$PROJECT_NAME"
+    for svc in $SERVICES; do
+        shared_var="SHARED_${svc}"
+        port_var="PORT_$(echo "$svc" | tr '[:lower:]-' '[:upper:]_')"
+        export "$port_var"="${!shared_var}"
+    done
+    # Shared stack keeps the conventional docker-compose default network.
+    export STAGING_SUBNET=""
+else
+    export COMPOSE_PROJECT_NAME="${PROJECT_NAME}-wt-${_cksum_val}"
+    for svc in $SERVICES; do
+        band_var="BAND_${svc}"
+        port_var="PORT_$(echo "$svc" | tr '[:lower:]-' '[:upper:]_')"
+        export "$port_var"="$(( ${!band_var} + STAGING_OFFSET ))"
+    done
+    export STAGING_SUBNET="10.${STAGING_OFFSET}.0.0/16"
+fi
+
+# --- Env-file preflight (spec §4.3): warn-only, NEVER fail the source. ---
+# Non-derived values (CORS origins, email-link base URLs) live in
+# ops/compose/staging.env and must be kept in step with the resolved ports.
+# Scan that file's URL-ish `:<port>` tokens: a token that falls in a known
+# service's band (BAND_S+1..BAND_S+254) or equals its SHARED_S value, yet does
+# not match the port we just resolved for that service, means the file is stale
+# for this stack — surface a one-line warning naming the variable, nothing more.
+_staging_env_check_envfile() {
+    local envfile="ops/compose/staging.env"
+    [ -f "$envfile" ] || return 0
+    local token svc band_var shared_var port_var band shared resolved
+    while IFS= read -r token; do
+        [ -n "$token" ] || continue
+        for svc in $SERVICES; do
+            band_var="BAND_${svc}"
+            shared_var="SHARED_${svc}"
+            port_var="PORT_$(echo "$svc" | tr '[:lower:]-' '[:upper:]_')"
+            band="${!band_var:-}"
+            shared="${!shared_var:-}"
+            resolved="${!port_var:-}"
+            [ -n "$resolved" ] || continue
+            if { [ -n "$band" ] && [ "$token" -gt "$band" ] && [ "$token" -le "$((band + 254))" ]; } \
+               || { [ -n "$shared" ] && [ "$token" = "$shared" ]; }; then
+                if [ "$token" != "$resolved" ]; then
+                    printf '! staging.env: service %s uses :%s but resolved %s=%s — update ops/compose/staging.env\n' \
+                        "$svc" "$token" "$port_var" "$resolved" >&2
+                fi
+            fi
+        done
+    done < <(grep -oE ':[0-9]+' "$envfile" 2>/dev/null | tr -d ':' | sort -u)
+    return 0
+}
+_staging_env_check_envfile || true
