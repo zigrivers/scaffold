@@ -77,19 +77,24 @@ AI agent commits should include the Co-Authored-By trailer for attribution and a
 
 ### Pull Request Workflow
 
-Standard PR lifecycle:
-1. Create branch from `main`
-2. Implement changes with passing tests
-3. Rebase onto latest `main`, push branch, create PR with structured
-   description
-4. **Step 5.5 — mandatory AI review**: `mmr review --pr <N> --sync --format
-   json` (3-round cap; a degraded-pass self-merge past the cap is the
-   documented path, not a stall)
-5. Confirm the local quality gates are green — pre-commit hooks ran,
-   `make check` passes on the branch HEAD; CI is deliberately deferred until
-   a launch target is chosen, so these local gates *are* the merge bar
-6. Squash-merge to maintain clean history
-7. Delete branch after merge
+Standard PR lifecycle (the harmonized 8-step workflow, with the mandatory
+AI review inserted as step 5.5):
+1. Commit — on a branch created from `main`, with passing tests
+2. Local review — `make check` green, re-read the diff
+3. Rebase onto latest `origin/main`
+4. Push the branch
+5. Create the PR with a structured description
+   - **Step 5.5 — mandatory AI review**: `mmr review --pr <N> --sync
+     --format json` (3-round cap; a degraded-pass self-merge past the cap
+     is the documented path, not a stall)
+6. Watch the local quality gates — pre-commit hooks ran, `make check`
+   passes on the branch HEAD; CI is deliberately deferred until a launch
+   target is chosen, so these local gates *are* the merge bar
+7. Squash-merge and delete the branch (`gh pr merge --squash
+   --delete-branch`)
+8. Sync `main` from the primary checkout: `make main-sync &&
+   make prune-merged` (squash-aware pruning with a triage report — see
+   [worktree-management](../execution/worktree-management.md))
 
 ## Deep Guidance
 
