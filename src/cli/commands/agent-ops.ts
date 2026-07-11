@@ -1,3 +1,5 @@
+import fs from 'node:fs'
+import path from 'node:path'
 import type { CommandModule, Argv } from 'yargs'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
@@ -61,6 +63,15 @@ const agentOpsCommand: CommandModule<Record<string, unknown>, AgentOpsArgs> = {
         }
         for (const f of res.modified) output.warn(`agent-ops: locally modified: ${f}`)
         for (const f of res.missing) output.warn(`agent-ops: missing: ${f}`)
+      }
+      // Unmanaged files are informational (they never affect the exit code): a
+      // known agent-ops path exists on disk but scaffold isn't managing it.
+      for (const dest of res.unmanaged) {
+        if (fs.existsSync(path.join(projectRoot, dest))) {
+          output.warn(
+            `agent-ops: exists but not managed by scaffold (pre-existing — review manually): ${dest}`,
+          )
+        }
       }
       process.exit(res.upToDate ? 0 : 1)
     }

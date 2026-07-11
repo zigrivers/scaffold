@@ -62,13 +62,24 @@ export function loadAgentOpsConfig(projectRoot: string): AgentOpsConfig {
   if (raw.docker !== undefined) {
     if (raw.docker === null) fail('docker section is empty — remove the key or add services')
     const d = raw.docker as Record<string, unknown>
+    // A per-worktree host port is BAND_S + offset, offset in 1..254; so a band
+    // must leave 254 headroom below the 65535 ceiling.
+    const BAND_CEILING = 65535 - 254
+    const seenNames = new Set<string>()
     const services = (Array.isArray(d.services) ? d.services : []).map(s => {
       const svc = s as Record<string, unknown>
       if (typeof svc.name !== 'string' || !NAME_RE.test(svc.name)) {
         fail(`invalid service name "${String(svc.name)}"`)
       }
+      if (seenNames.has(svc.name)) fail(`duplicate service name "${svc.name}"`)
+      seenNames.add(svc.name)
       if (typeof svc.band !== 'number' || !Number.isInteger(svc.band) || svc.band < 1024) {
         fail(`service "${svc.name}" needs an integer band >= 1024`)
+      }
+      if (svc.band > BAND_CEILING) {
+        fail(
+          `service "${svc.name}" band ${svc.band} exceeds the ceiling — band + 254 must be <= 65535`,
+        )
       }
       return { name: svc.name, band: svc.band }
     })
@@ -77,8 +88,18 @@ export function loadAgentOpsConfig(projectRoot: string): AgentOpsConfig {
       if (bands.has(s.band)) fail(`duplicate band ${s.band}`)
       bands.add(s.band)
     }
-    const sharedStack = d.shared_stack && typeof d.shared_stack === 'object' ? d.shared_stack : {}
+    // shared_stack must be a mapping of service name -> port. An array is a
+    // `typeof === 'object'`, so it would slip through a bare object check; reject
+    // it (and any non-object) explicitly.
+    let sharedStack: Record<string, unknown> = {}
+    if (d.shared_stack !== undefined && d.shared_stack !== null) {
+      if (typeof d.shared_stack !== 'object' || Array.isArray(d.shared_stack)) {
+        fail('shared_stack must be a mapping of service name to port')
+      }
+      sharedStack = d.shared_stack as Record<string, unknown>
+    }
     for (const [key, value] of Object.entries(sharedStack)) {
+      if (!NAME_RE.test(key)) fail(`invalid shared_stack service name "${key}"`)
       if (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > 65535) {
         fail(`shared_stack.${key} must be an integer port in 1..65535, got ${JSON.stringify(value)}`)
       }

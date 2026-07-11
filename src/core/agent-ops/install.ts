@@ -78,7 +78,18 @@ export interface AgentOpsCheckResult {
   staleVersion: boolean
   modified: string[]
   missing: string[]
+  /**
+   * Dests scaffold knows about (in AGENT_OPS_FILE_MAP) for a previously-installed
+   * component that are NOT in the manifest — i.e. pre-existing user files the
+   * installer refused to clobber. Informational only; never affects upToDate.
+   */
+  unmanaged: string[]
 }
+
+// The make fragment defines BOTH git and staging targets and each target
+// self-guards, so it is component-agnostic — install it whenever any component
+// is requested, not only for 'git'.
+const MAKE_FRAGMENT_TMPL = 'make/agent-ops.mk.tmpl'
 
 interface Manifest {
   version: string
@@ -95,14 +106,22 @@ function readManifest(projectRoot: string): Manifest {
   return JSON.parse(fs.readFileSync(p, 'utf8')) as Manifest
 }
 
+// Shell variable names cannot contain a dash, so a service like `redis-cache`
+// becomes `BAND_redis_cache`. staging-env.sh.tmpl applies the SAME `-`→`_`
+// transform when it reads these back by indirection. SERVICES keeps the raw
+// names (the template re-derives the safe suffix per service).
+function shellVarSuffix(name: string): string {
+  return name.replace(/-/g, '_')
+}
+
 export function buildTemplateVars(config: AgentOpsConfig): Record<string, string> {
   const defaultContext = process.platform === 'darwin' ? 'orbstack' : 'default'
   const bandLines: string[] = []
   if (config.docker) {
     bandLines.push(`SERVICES="${config.docker.services.map(s => s.name).join(' ')}"`)
-    for (const s of config.docker.services) bandLines.push(`BAND_${s.name}=${s.band}`)
+    for (const s of config.docker.services) bandLines.push(`BAND_${shellVarSuffix(s.name)}=${s.band}`)
     for (const [name, port] of Object.entries(config.docker.shared_stack)) {
-      bandLines.push(`SHARED_${name}=${port}`)
+      bandLines.push(`SHARED_${shellVarSuffix(name)}=${port}`)
     }
   }
   return {
@@ -133,9 +152,16 @@ export function installAgentOps(projectRoot: string, opts: AgentOpsInstallOption
   const result: AgentOpsInstallResult = { installed: [], skippedModified: [], errors: [] }
 
   for (const [tmpl, spec] of Object.entries(AGENT_OPS_FILE_MAP)) {
-    if (!opts.components.includes(spec.component)) continue
+    const requested =
+      tmpl === MAKE_FRAGMENT_TMPL ? opts.components.length > 0 : opts.components.includes(spec.component)
+    if (!requested) continue
     const srcPath = path.join(templateRoot, tmpl)
-    if (!fs.existsSync(srcPath)) continue // template not bundled (pre-Task-4 state)
+    if (!fs.existsSync(srcPath)) {
+      // A requested component whose template source isn't bundled is a real
+      // install failure — surface it instead of silently shipping a partial kit.
+      result.errors.push(`${spec.dest}: template source missing at ${tmpl}`)
+      continue
+    }
 
     const destPath = path.join(projectRoot, spec.dest)
     if (fs.existsSync(destPath) && !opts.force) {
@@ -166,14 +192,18 @@ export function installAgentOps(projectRoot: string, opts: AgentOpsInstallOption
   fs.mkdirSync(path.join(projectRoot, '.scaffold'), { recursive: true })
   fs.writeFileSync(path.join(projectRoot, MANIFEST_PATH), `${JSON.stringify(manifest, null, 2)}\n`)
   fs.writeFileSync(path.join(projectRoot, VERSION_MARKER_PATH), manifest.version)
-  if (opts.components.includes('git')) ensureMakefileInclude(projectRoot)
+  // The make fragment (and thus the include) is component-agnostic — ensure the
+  // Makefile wires it in for any requested component, not just 'git'. Staging
+  // targets self-guard; git targets fail loudly if their scripts are absent.
+  if (opts.components.length > 0) ensureMakefileInclude(projectRoot)
   return result
 }
 
 export function checkAgentOps(projectRoot: string): AgentOpsCheckResult {
   const manifest = readManifest(projectRoot)
   const markerPath = path.join(projectRoot, VERSION_MARKER_PATH)
-  const marker = fs.existsSync(markerPath) ? fs.readFileSync(markerPath, 'utf8').trim() : ''
+  const markerPresent = fs.existsSync(markerPath)
+  const marker = markerPresent ? fs.readFileSync(markerPath, 'utf8').trim() : ''
   const staleVersion = marker !== getPackageVersion()
   const modified: string[] = []
   const missing: string[] = []
@@ -182,5 +212,24 @@ export function checkAgentOps(projectRoot: string): AgentOpsCheckResult {
     if (!fs.existsSync(p)) missing.push(dest)
     else if (sha256(fs.readFileSync(p)) !== hash) modified.push(dest)
   }
-  return { upToDate: !staleVersion && modified.length === 0 && missing.length === 0, staleVersion, modified, missing }
+  // A component counts as previously installed if the version marker exists
+  // (some install ran) or the manifest already holds one of its dests. For such
+  // components, any known dest missing from the manifest is "unmanaged" — a
+  // pre-existing file the installer refused to clobber. Reported, never gating.
+  const installedComponents = new Set<AgentOpsComponent>()
+  for (const spec of Object.values(AGENT_OPS_FILE_MAP)) {
+    if (manifest.files[spec.dest]) installedComponents.add(spec.component)
+  }
+  const unmanaged: string[] = []
+  for (const spec of Object.values(AGENT_OPS_FILE_MAP)) {
+    const componentInstalled = markerPresent || installedComponents.has(spec.component)
+    if (componentInstalled && !manifest.files[spec.dest]) unmanaged.push(spec.dest)
+  }
+  return {
+    upToDate: !staleVersion && modified.length === 0 && missing.length === 0,
+    staleVersion,
+    modified,
+    missing,
+    unmanaged,
+  }
 }

@@ -8,7 +8,7 @@ main-sync: ## [agent-safe] Fetch + fast-forward main from anywhere
 	@scripts/main-sync.sh
 
 prune-merged: ## [agent-safe] Sweep merged branches/worktrees + reclaim staging
-	@scripts/cleanup-merged-branches.sh
+	@scripts/cleanup-merged-branches.sh $(ARGS)
 
 doctor: ## [agent-safe] Diagnose primary-checkout invariant (read-only)
 	@scripts/doctor.sh
@@ -41,4 +41,4 @@ docker-doctor: ## [agent-safe] Show engine placement; warn on split-brain
 
 tc-reap: ## [agent-safe] Remove leaked testcontainers from dead sessions
 	$(staging_guard)
-	@scripts/ops/tc-reap.sh
+	@scripts/ops/tc-reap.sh $(ARGS)

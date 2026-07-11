@@ -18,6 +18,19 @@ PROJECT_NAME="{{PROJECT_NAME}}"
 {{SERVICE_PORT_BANDS}}
 # --- END GENERATED ---
 
+# No services configured (staging installed without a docker section in
+# .scaffold/agent-ops.yaml) — there is nothing to set up. No-op with a clear
+# message rather than crashing on the unbound $SERVICES below.
+if [ -z "${SERVICES:-}" ]; then
+    echo "staging-env: no services configured in .scaffold/agent-ops.yaml — staging disabled" >&2
+    return 0 2>/dev/null || exit 0
+fi
+
+# Service names may contain dashes (e.g. redis-cache), which are illegal in shell
+# variable names. buildTemplateVars emits BAND_redis_cache / SHARED_redis_cache;
+# recompute the same `-`→`_` suffix here to read them back by indirection.
+_svc_var_suffix() { printf '%s' "$1" | tr -- '-' '_'; }
+
 _repo_root() { git rev-parse --show-toplevel; }
 _primary_root() { git worktree list --porcelain | head -1 | sed 's/^worktree //'; }
 
@@ -45,8 +58,14 @@ if is_primary_checkout || [ "${STAGING_COMPOSE_PROJECT:-}" = "$PROJECT_NAME" ]; 
     fi
     export COMPOSE_PROJECT_NAME="$PROJECT_NAME"
     for svc in $SERVICES; do
-        shared_var="SHARED_${svc}"
+        shared_var="SHARED_$(_svc_var_suffix "$svc")"
         port_var="PORT_$(echo "$svc" | tr '[:lower:]-' '[:upper:]_')"
+        # A service that isn't in shared_stack has no SHARED_ port. Warn and skip
+        # its export rather than failing the whole source (spec §4.3: never fail).
+        if [ -z "${!shared_var:-}" ]; then
+            echo "! staging-env: service '$svc' has no shared_stack port — skipping its shared export" >&2
+            continue
+        fi
         export "$port_var"="${!shared_var}"
     done
     # Shared stack keeps the conventional docker-compose default network.
@@ -54,7 +73,7 @@ if is_primary_checkout || [ "${STAGING_COMPOSE_PROJECT:-}" = "$PROJECT_NAME" ]; 
 else
     export COMPOSE_PROJECT_NAME="${PROJECT_NAME}-wt-${_cksum_val}"
     for svc in $SERVICES; do
-        band_var="BAND_${svc}"
+        band_var="BAND_$(_svc_var_suffix "$svc")"
         port_var="PORT_$(echo "$svc" | tr '[:lower:]-' '[:upper:]_')"
         export "$port_var"="$(( ${!band_var} + STAGING_OFFSET ))"
     done
@@ -75,8 +94,8 @@ _staging_env_check_envfile() {
     while IFS= read -r token; do
         [ -n "$token" ] || continue
         for svc in $SERVICES; do
-            band_var="BAND_${svc}"
-            shared_var="SHARED_${svc}"
+            band_var="BAND_$(_svc_var_suffix "$svc")"
+            shared_var="SHARED_$(_svc_var_suffix "$svc")"
             port_var="PORT_$(echo "$svc" | tr '[:lower:]-' '[:upper:]_')"
             band="${!band_var:-}"
             shared="${!shared_var:-}"
