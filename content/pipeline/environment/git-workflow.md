@@ -204,7 +204,7 @@ Depth-gate per Methodology Scaling above.
    (5) `gh pr create` (auto-applies `.github/pull_request_template.md`) ->
    **step 5.5: `mmr review --pr <N> --sync --format json`** (mandatory;
    3-round cap — round 1 fixes every real finding, round 2+ fixes P0/P1
-   only and files P2/P3 as follow-up tasks, hard cap 3 rounds then
+   only and files beads for P2/P3, hard cap 3 rounds then
    complete a degraded-pass self-merge; the one thing that still blocks
    the merge is a verified, still-reproducing P0) -> (6) watch local
    gates — CI is deferred, so this means confirming pre-commit hooks ran

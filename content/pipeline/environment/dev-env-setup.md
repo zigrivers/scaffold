@@ -96,6 +96,12 @@ Every row in CLAUDE.md's Key Commands table carries a third column,
   autonomous loop must still confirm with the user before running one of
   these.
 
+When a source marker carries a qualifier beyond the two-value taxonomy
+(e.g. `agent-ops.mk` tags `staging-up` as `## [agent-safe, worktree-only]`),
+preserve the qualifier as a parenthetical after the marker —
+`Agent-safe (worktree-only)` — never drop it: the qualifier is a safety
+caveat that must survive into the generated table.
+
 Table format:
 ```markdown
 | Command | Purpose | Marker |
@@ -126,23 +132,24 @@ from its `##` comment rather than re-deriving it:
 | `make doctor` | Diagnose the primary-checkout invariant (read-only) | Agent-safe |
 | `make doctor-fix` | Repair unattended-safe primary-checkout problems | Agent-safe |
 | `make beads-snapshot` | Export the Beads DB to a local restore copy | Agent-safe |
-| `make staging-up` | Start this worktree's staging stack | Agent-safe |
+| `make staging-up` | Start this worktree's staging stack | Agent-safe (worktree-only) |
 | `make staging-down` | Stop this worktree's staging stack | Agent-safe |
 | `make staging-prune` | Reap orphaned per-worktree staging stacks | Agent-safe |
 | `make docker-doctor` | Show engine placement, warn on split-brain | Agent-safe |
 | `make tc-reap` | Remove leaked testcontainers from dead sessions | Agent-safe |
 
 `main-sync`, `prune-merged`, `doctor`, `doctor-fix`, and `beads-snapshot`
-come from the agent-ops **git** component, which every preset installs
-unconditionally (git-workflow's step) — expect these five rows once
-git-workflow has run. `staging-up`, `staging-down`, `staging-prune`,
-`docker-doctor`, and `tc-reap` come from the agent-ops **staging**
-component, installed only when the staging-environments step ran
-(conditional on containerized services). The staging targets guard
+come from the agent-ops **git** component, installed by the git-workflow
+step at most depths (its custom depth 1-2 does not install it) — add these
+five rows only once `agent-ops.mk` is included in the Makefile and
+`scripts/setup-agent-worktree.sh` exists. `staging-up`, `staging-down`,
+`staging-prune`, `docker-doctor`, and `tc-reap` come from the agent-ops
+**staging** component, installed only when the staging-environments step
+ran (conditional on containerized services). The staging targets guard
 themselves (`staging component not installed`) when `scripts/ops/` is
 absent, so only add those five rows once `ops/compose/staging.yml` or
-`scripts/ops/staging-env.sh` actually exists — never add a row for a target
-that isn't installed yet.
+`scripts/ops/staging-env.sh` actually exists. In both cases the rule is
+the same: never add a row for a target that isn't installed yet.
 
 **Sequencing note.** This step runs at phase order 310 — before both
 staging-environments (order 315) and git-workflow (order 330), the two
@@ -151,8 +158,10 @@ a fresh build this step's first pass therefore finds neither: populate the
 table with this project's own commands only, using the Marker column above.
 The agent-ops rows are added the next time this step's Key Commands
 reconciliation runs — a later Update Mode pass (see "Triggers for update"
-above) or the cross-doc consistency check that verifies agent-ops targets
-stay in sync across CLAUDE.md, git-workflow, and dev-setup. Do not
+above) or the workflow-audit step's cross-doc consistency check
+(`content/pipeline/consolidation/workflow-audit.md`), which verifies
+agent-ops targets stay in sync across CLAUDE.md, git-workflow, and
+dev-setup. Do not
 hand-write the agent-ops rows speculatively before `agent-ops.mk` is
 actually included in the Makefile — a row documenting a target that doesn't
 exist yet is worse than a temporarily missing row.
