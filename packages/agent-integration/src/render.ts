@@ -52,14 +52,29 @@ export function renderAgentsBlock(skill: CanonicalSkill): string {
   return `${agentsBlockBegin(skill.name)}\n${skill.lean.trim()}\n${agentsBlockEnd(skill.name)}\n`
 }
 
+/** Per-skill overrides for {@link renderCursorMdc}. */
+export interface CursorMdcOptions {
+  /**
+   * Force the rule to always load rather than only when Cursor's relevance
+   * matching pulls it in. Defaults to `false` (kept lean per Cursor best
+   * practice). Some skills need this: a skill whose activation depends on the
+   * agent *continuing* past an early checkpoint (e.g. not stopping after a
+   * draft PR) can't rely on description-matching alone, since matching only
+   * runs again on a fresh, on-topic user message.
+   */
+  alwaysApply?: boolean
+}
+
 /**
  * Render a Cursor rule (`.cursor/rules/<name>.mdc`): `description` drives
- * relevance, `globs` is empty and `alwaysApply` is false so the rule loads only
- * when the agent pulls it in (kept lean per Cursor best practice). One file per
- * skill — Cursor's native idiom.
+ * relevance, `globs` is empty, and `alwaysApply` is false by default so the
+ * rule loads only when the agent pulls it in (kept lean per Cursor best
+ * practice) — pass `{ alwaysApply: true }` to force it to always load. One
+ * file per skill — Cursor's native idiom.
  */
-export function renderCursorMdc(skill: CanonicalSkill): string {
-  return `---\ndescription: ${yamlDoubleQuote(skill.description)}\nglobs:\nalwaysApply: false\n---\n\n`
+export function renderCursorMdc(skill: CanonicalSkill, options: CursorMdcOptions = {}): string {
+  const alwaysApply = options.alwaysApply ?? false
+  return `---\ndescription: ${yamlDoubleQuote(skill.description)}\nglobs:\nalwaysApply: ${alwaysApply}\n---\n\n`
     + `${skill.lean.trim()}\n`
 }
 

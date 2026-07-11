@@ -40,12 +40,21 @@ const SKILLS = [
   // .claude/skills + .agents/skills; the agents-block (raw lean body) and
   // cursor.mdc are what `scaffold skill install --platform` writes for
   // Codex/Antigravity (AGENTS.md) and Cursor (.cursor/rules).
-  ...['scaffold-runner', 'scaffold-pipeline'].map((name) => ({
+  //
+  // work-beads forces alwaysApply: true in its cursor.mdc — Cursor's
+  // description-matching only re-runs on a fresh, on-topic user message, and
+  // the observed failure mode is agents stopping after the draft PR instead
+  // of continuing the ship loop. Always-applying keeps the loop contract
+  // loaded across that gap. Other skills default to alwaysApply: false.
+  ...['scaffold-runner', 'scaffold-pipeline', 'work-beads'].map((name) => ({
     source: `content/agent-skills/${name}/SKILL.md`,
     targets: [
       { path: `content/skills/${name}/SKILL.md`, render: (s) => renderSkillMd(s) },
       { path: `content/skills/${name}/agents-block.md`, render: (s) => `${s.lean}\n` },
-      { path: `content/skills/${name}/cursor.mdc`, render: (s) => renderCursorMdc(s) },
+      {
+        path: `content/skills/${name}/cursor.mdc`,
+        render: (s) => renderCursorMdc(s, { alwaysApply: name === 'work-beads' }),
+      },
     ],
   })),
 ]

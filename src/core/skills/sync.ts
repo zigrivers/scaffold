@@ -53,6 +53,10 @@ export const INSTALLABLE_SKILLS: SkillDefinition[] = [
     name: 'scaffold-pipeline',
     description: 'Static reference for pipeline ordering, dependencies, and phase structure',
   },
+  {
+    name: 'work-beads',
+    description: 'End-to-end Beads ship loop: claim, worktree, build, verify, review, merge, close, report',
+  },
 ]
 
 const VERSION_MARKER_FILE = '.scaffold-skill-version'
