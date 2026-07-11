@@ -11,7 +11,7 @@ sources: []
 # Per-Worktree Environments
 
 When N agents work in parallel git worktrees (see
-[worktree-management](../execution/worktree-management.md)), each one
+[worktree-management](./worktree-management.md)), each one
 eventually needs to run the project's containerized services — a database,
 a cache, a queue, the app itself — to exercise real behavior instead of
 mocks. If every worktree reaches for the same `docker-compose up`, they
@@ -37,9 +37,11 @@ Every service gets a 1000-wide port band (assigned in config, starting at
 20000); the worktree's host port for that service is `band + O`. Two
 worktrees only collide if their paths checksum to the same offset, which is
 rare enough in practice and has an escape hatch (`STAGING_WT_OFFSET`) for
-the case where it happens. The compose project name and the private subnet
-(`10.<O>.0.0/16`) are derived the same way, so containers, networks, and
-volumes never share a name across worktrees either.
+the case where it happens. The private subnet (`10.<O>.0.0/16`) uses the
+same reduced offset, but the compose project name does not — it embeds the
+raw, unreduced checksum (`<project>-wt-<cksum>`), so container, network,
+and volume names stay distinct across worktrees even in the rare case where
+two paths reduce to the same offset.
 
 ### The Shared QA Stack
 The primary checkout (not a worktree) gets a separate, fixed-port stack
@@ -137,7 +139,7 @@ expansion pass that broadens coverage beyond the Docker-specific mechanics
 documented here.*
 
 ## See Also
-- [worktree-management](../execution/worktree-management.md) — the git
+- [worktree-management](./worktree-management.md) — the git
   worktree isolation this pattern is layered on top of
 - [dev-environment](../core/dev-environment.md) — general local dev
   environment patterns (Makefile, .env, live reload) this specializes for
