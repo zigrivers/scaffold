@@ -7,6 +7,15 @@ description: >
 project-type: mobile-app
 
 # ---------------------------------------------------------------------------
+# step-overrides
+# ---------------------------------------------------------------------------
+# A mobile app's own repo has no containerized backend services (any API it
+# talks to belongs to a separate backend/multi-service project) —
+# staging-environments never applies here.
+step-overrides:
+  staging-environments: { enabled: false }
+
+# ---------------------------------------------------------------------------
 # knowledge-overrides
 # ---------------------------------------------------------------------------
 # Map mobile-app knowledge entries into existing pipeline steps so that mobile

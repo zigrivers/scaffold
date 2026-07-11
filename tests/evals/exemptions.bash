@@ -13,6 +13,10 @@ TERMINAL_OUTPUT_EXEMPT=(
   "automated-pr-review"
   "beads"
   "create-evals"
+  # staging-environments' outputs (.scaffold/agent-ops.yaml, ops/compose/staging.yml,
+  # ops/compose/staging.env.example) are operational config consumed by the
+  # agent-ops CLI and Docker at runtime, not documents another pipeline step reads.
+  "staging-environments"
   # github-setup's output (docs/github-setup.md) is a setup record consumed by the
   # user, not a document downstream steps build on — the remote it creates is an
   # environmental fact, not a pipeline input.

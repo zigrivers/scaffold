@@ -43,6 +43,10 @@ step-overrides:
   design-system: { enabled: false }
   ux-spec: { enabled: false }
   review-ux: { enabled: false }
+  # Game clients have no containerized backend services of their own (an
+  # online-services backend, when needed, is its own project) —
+  # staging-environments never applies.
+  staging-environments: { enabled: false }
 
 # ---------------------------------------------------------------------------
 # knowledge-overrides

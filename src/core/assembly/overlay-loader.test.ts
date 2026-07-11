@@ -137,7 +137,8 @@ describe('web-app overlay', () => {
     expect(overlay).not.toBeNull()
     expect(overlay!.projectType).toBe('web-app')
     expect(Object.keys(overlay!.knowledgeOverrides).length).toBeGreaterThan(20)
-    expect(Object.keys(overlay!.stepOverrides)).toHaveLength(0)
+    expect(Object.keys(overlay!.stepOverrides)).toEqual(['staging-environments'])
+    expect(overlay!.stepOverrides['staging-environments']).toEqual({ enabled: true, conditional: 'if-needed' })
   })
 })
 
@@ -149,7 +150,8 @@ describe('backend overlay', () => {
     expect(overlay).not.toBeNull()
     expect(overlay!.projectType).toBe('backend')
     expect(Object.keys(overlay!.knowledgeOverrides).length).toBeGreaterThan(15)
-    expect(Object.keys(overlay!.stepOverrides)).toHaveLength(0)
+    expect(Object.keys(overlay!.stepOverrides)).toEqual(['staging-environments'])
+    expect(overlay!.stepOverrides['staging-environments']).toEqual({ enabled: true, conditional: 'if-needed' })
   })
 })
 
@@ -161,7 +163,8 @@ describe('cli overlay', () => {
     expect(overlay).not.toBeNull()
     expect(overlay!.projectType).toBe('cli')
     expect(Object.keys(overlay!.knowledgeOverrides).length).toBeGreaterThan(15)
-    expect(Object.keys(overlay!.stepOverrides)).toHaveLength(0)
+    expect(Object.keys(overlay!.stepOverrides)).toEqual(['staging-environments'])
+    expect(overlay!.stepOverrides['staging-environments']).toEqual({ enabled: false })
   })
 })
 
@@ -173,7 +176,8 @@ describe('library overlay', () => {
     expect(overlay).not.toBeNull()
     expect(overlay!.projectType).toBe('library')
     expect(Object.keys(overlay!.knowledgeOverrides).length).toBeGreaterThan(15)
-    expect(Object.keys(overlay!.stepOverrides)).toHaveLength(0)
+    expect(Object.keys(overlay!.stepOverrides)).toEqual(['staging-environments'])
+    expect(overlay!.stepOverrides['staging-environments']).toEqual({ enabled: false })
   })
 })
 
@@ -185,7 +189,8 @@ describe('mobile-app overlay', () => {
     expect(overlay).not.toBeNull()
     expect(overlay!.projectType).toBe('mobile-app')
     expect(Object.keys(overlay!.knowledgeOverrides).length).toBeGreaterThan(15)
-    expect(Object.keys(overlay!.stepOverrides)).toHaveLength(0)
+    expect(Object.keys(overlay!.stepOverrides)).toEqual(['staging-environments'])
+    expect(overlay!.stepOverrides['staging-environments']).toEqual({ enabled: false })
   })
 })
 
@@ -197,7 +202,8 @@ describe('data-pipeline overlay', () => {
     expect(overlay).not.toBeNull()
     expect(overlay!.projectType).toBe('data-pipeline')
     expect(Object.keys(overlay!.knowledgeOverrides).length).toBeGreaterThan(15)
-    expect(Object.keys(overlay!.stepOverrides)).toHaveLength(0)
+    expect(Object.keys(overlay!.stepOverrides)).toEqual(['staging-environments'])
+    expect(overlay!.stepOverrides['staging-environments']).toEqual({ enabled: true, conditional: 'if-needed' })
   })
 })
 
@@ -209,7 +215,8 @@ describe('ml overlay', () => {
     expect(overlay).not.toBeNull()
     expect(overlay!.projectType).toBe('ml')
     expect(Object.keys(overlay!.knowledgeOverrides).length).toBeGreaterThan(15)
-    expect(Object.keys(overlay!.stepOverrides)).toHaveLength(0)
+    expect(Object.keys(overlay!.stepOverrides)).toEqual(['staging-environments'])
+    expect(overlay!.stepOverrides['staging-environments']).toEqual({ enabled: true, conditional: 'if-needed' })
   })
 })
 
@@ -221,7 +228,8 @@ describe('browser-extension overlay', () => {
     expect(overlay).not.toBeNull()
     expect(overlay!.projectType).toBe('browser-extension')
     expect(Object.keys(overlay!.knowledgeOverrides).length).toBeGreaterThan(15)
-    expect(Object.keys(overlay!.stepOverrides)).toHaveLength(0)
+    expect(Object.keys(overlay!.stepOverrides)).toEqual(['staging-environments'])
+    expect(overlay!.stepOverrides['staging-environments']).toEqual({ enabled: false })
   })
 })
 

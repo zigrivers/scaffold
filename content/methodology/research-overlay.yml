@@ -7,6 +7,15 @@ description: >
 project-type: research
 
 # ---------------------------------------------------------------------------
+# step-overrides
+# ---------------------------------------------------------------------------
+# Research projects are local-first (see research-dev-environment) — data
+# sources are files or remote/managed databases, not local containerized
+# services — staging-environments never applies.
+step-overrides:
+  staging-environments: { enabled: false }
+
+# ---------------------------------------------------------------------------
 # knowledge-overrides
 # ---------------------------------------------------------------------------
 # Map research knowledge entries into existing pipeline steps so that

@@ -24,6 +24,7 @@ steps:
   project-structure: { enabled: true }
   # Phase 3 — Development Environment (environment)
   dev-env-setup: { enabled: true }
+  staging-environments: { enabled: false }
   design-system: { enabled: false }
   git-workflow: { enabled: false }
   automated-pr-review: { enabled: false }

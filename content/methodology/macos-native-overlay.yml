@@ -17,6 +17,9 @@ step-overrides:
   design-system: { enabled: false }
   ux-spec: { enabled: false }
   review-ux: { enabled: false }
+  # A native macOS app has no containerized backend services of its own —
+  # staging-environments never applies.
+  staging-environments: { enabled: false }
 
 knowledge-overrides:
   tech-stack:
