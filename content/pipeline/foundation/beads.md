@@ -5,16 +5,18 @@ summary: "Sets up Beads task tracking with a lessons-learned file for cross-sess
 phase: "foundation"
 order: 210
 dependencies: []
-outputs: [.beads/, tasks/lessons.md, CLAUDE.md]
+outputs: [.beads/, tasks/lessons.md, CLAUDE.md, docs/beads-workflow.md]
 conditional: "if-needed"
 knowledge-base: [task-tracking]
 ---
 
 ## Purpose
 Initialize the Beads issue tracker for AI-friendly task tracking, create the
-lessons-learned file for cross-session memory, and establish the initial CLAUDE.md
+lessons-learned file for cross-session memory, establish the initial CLAUDE.md
 skeleton with core principles, task management commands, self-improvement rules,
-and autonomous behavior guidelines.
+and autonomous behavior guidelines, and generate docs/beads-workflow.md as the
+day-to-day Beads reference (defer-immediately rule, `bd create` template,
+bootstrap-trap warning, and the D7 relationship between Beads IDs and git).
 
 ## Inputs
 - Project root directory (required) — must be a git repository
@@ -30,6 +32,13 @@ and autonomous behavior guidelines.
   automatically. Scaffold adds its own Core Principles + commit convention sections
   AROUND that block but does NOT hand-roll the Beads command reference — `bd prime`
   is the single source of truth for agent context.
+- docs/beads-workflow.md — scaffold-owned reference for day-to-day Beads usage:
+  the defer-immediately rule, the `bd create` template (with the required
+  `docs:` tail), day-to-day commands, the bootstrap-trap warning, epics & phase
+  conventions, and Beads' relationship to git (D7: IDs referenced only in
+  commit/PR bodies, never branch names or commit subjects). Not part of the
+  `bd setup claude` marker block — safe to edit freely and unaffected by future
+  `bd setup claude` re-runs.
 
 ## Quality Criteria
 - (mvp) `bd ready` executes without error (Beads is initialized)
@@ -43,12 +52,29 @@ and autonomous behavior guidelines.
   also targeting Codex CLI or Antigravity CLI: `bd setup codex`
   were run. Verify with `bd setup claude --check`.
 - (mvp) CLAUDE.md contains Core Principles with all four tenets (Simplicity, No Laziness, TDD, Prove It) — scaffold-owned content, ADJACENT to the Beads-managed block
-- (mvp) CLAUDE.md contains commit-message convention requiring Beads task IDs — scaffold-owned content
+- (mvp) CLAUDE.md contains commit-message convention documenting that a Beads
+  task ID, when Beads is configured, is referenced only in the commit/PR body
+  as `Closes <id>` — never as a subject-line prefix and never in the branch
+  name (D7) — scaffold-owned content
 - (mvp) CLAUDE.md contains an upgrade-remediation callout: "If `bd` was upgraded since
   last `bd init`, run `bd doctor --fix` to re-sync git hooks and project config. This
   fixes errors like `unknown command \"hook\" for \"bd\"` from stale post-checkout /
   post-merge hook shims."
-- (mvp) Bootstrap commit uses `[bd-<id>]` convention (lowercase hash-style IDs per Beads v1.0.0+)
+- (mvp) Bootstrap commit uses Conventional Commits subject `chore: initialize
+  Beads task tracking`; the bootstrap bead ID is referenced only in the commit
+  body as `Closes <id>` — never as a subject-line prefix (D7)
+- (mvp) docs/beads-workflow.md exists and documents: the defer-immediately
+  rule verbatim ("If you decide not to do something now, it becomes a bead —
+  immediately.") plus the tracking-exemptions note (a commit-body note, a PR
+  comment, an in-code TODO or FIXME comment, or an agent's own memory is not
+  tracking; a bare in-code TODO or FIXME with no issue reference attached is
+  forbidden); the `bd create` template with a required `docs:` tail;
+  day-to-day commands (`bd ready` / `bd list` /
+  `bd show` / `bd update --status in_progress` / `bd close` / `bd stats`);
+  the bootstrap-trap warning verbatim; epics & phases conventions (`-t epic`
+  + `--parent`, phase epics `blocks:` each other); and Beads' relationship to
+  git (D7: IDs out of branch names/commit subjects, `Closes <id>` in bodies,
+  close only after the squash-merge is verified)
 - (mvp) Auto-export to `.beads/issues.jsonl` is explicitly enabled after `bd init`:
   `bd config set export.auto true && bd config set export.git-add true`. As of
   Beads v1.0.4-Unreleased this is opt-in (previously default); explicit enable means
@@ -68,17 +94,23 @@ and autonomous behavior guidelines.
   so downstream prompts can use `-t story` for user stories and `-t milestone` for
   releases. Scaffold-owned CLAUDE.md content (Core Principles + commit convention +
   upgrade-remediation callout) is composed ADJACENT to the recipe-managed integration
-  block. Detailed priority level documentation. Cross-doc consistency checks against
-  existing git-workflow.md and coding-standards.md.
+  block. Detailed priority level documentation. Generates the full
+  docs/beads-workflow.md reference (all six sections) and cross-doc consistency
+  checks against existing git-workflow.md and coding-standards.md (D7 branch/commit
+  conventions must agree).
 - **mvp**: `bd init`, `bd doctor --fix`, `bd setup claude`, create tasks/lessons.md,
   add minimal scaffold-owned CLAUDE.md sections (Core Principles + commit convention +
-  upgrade-remediation callout). Skip cross-doc checks. Custom types stay off — only
-  built-in `bug|feature|task|epic|chore|decision` available.
+  upgrade-remediation callout), and generate docs/beads-workflow.md with its core six
+  sections. Skip cross-doc checks. Custom types stay off — only built-in
+  `bug|feature|task|epic|chore|decision` available.
 - **custom:depth(1-5)**:
   - Depth 1: `bd init` + `bd doctor --fix` + `bd setup claude` + create tasks/lessons.md. Minimal scaffold CLAUDE.md content (Core Principles only).
-  - Depth 2: Depth 1 + add commit convention + upgrade-remediation callout.
+  - Depth 2: Depth 1 + add commit convention + upgrade-remediation callout + generate
+    docs/beads-workflow.md (defer rule, `bd create` template, day-to-day commands,
+    bootstrap trap, epics & phases, relationship to git).
   - Depth 3: Add priority level documentation and autonomous behavior rules.
-  - Depth 4: Full setup with cross-doc consistency checks against git-workflow.md and coding-standards.md. Enable `bd config set types.custom '["story","milestone","spike"]'`.
+  - Depth 4: Full setup with cross-doc consistency checks (docs/beads-workflow.md
+    against git-workflow.md and coding-standards.md). Enable `bd config set types.custom '["story","milestone","spike"]'`.
   - Depth 5: Full setup + detailed autonomous behavior rules + commit-message convention enforcement. Run `bd setup codex`.
 
 ## Instructions
@@ -160,17 +192,63 @@ existing setup updates rather than re-initializes.
 8. **Compose scaffold-owned CLAUDE.md sections** ADJACENT to (not replacing) the
    recipe-managed block from step 3. The scaffold-owned content includes Core
    Principles (Simplicity, No Laziness, TDD, Prove It), the commit-message
-   convention (`[bd-<id>]` prefix, lowercase hash IDs), the upgrade-remediation
-   callout ("If `bd` was upgraded since last `bd init`, run `bd doctor --fix`..."),
-   and (deep) autonomous behavior rules.
+   convention (Conventional Commits `type(scope): subject`; a Beads task ID,
+   when configured, is referenced only in the commit/PR body as `Closes <id>`
+   — never as a subject-line prefix and never in the branch name, per D7),
+   the upgrade-remediation callout ("If `bd` was upgraded since last
+   `bd init`, run `bd doctor --fix`..."), and (deep) autonomous behavior
+   rules.
 
-9. **Bootstrap commit** with the lowercase hash-style ID convention:
+9. **Bootstrap commit** — Conventional Commits subject; the bootstrap bead ID
+   is referenced only in the body (D7):
    ```bash
    git add .beads tasks/lessons.md CLAUDE.md
-   git commit -m "[bd-<id>] chore: initialize Beads task tracking"
+   git commit -m "$(cat <<'EOF'
+   chore: initialize Beads task tracking
+
+   Closes <id>
+   EOF
+   )"
    ```
-   The bd-<id> here references whatever bootstrap task you created via
+   The `<id>` here references whatever bootstrap task you created via
    `bd create "Initialize Beads"` (or the auto-generated bootstrap bead).
+
+### Generate docs/beads-workflow.md
+Write docs/beads-workflow.md with the sections below. This is scaffold-owned
+reference content — it does not touch (and is never overwritten by) the
+`bd setup claude` marker block from step 3.
+
+1. **The deferred-work rule** — verbatim: "If you decide not to do something
+   now, it becomes a bead — immediately." Not tracking: a commit-body note, a
+   PR comment, an in-code TODO or FIXME comment, or an agent's own memory. A
+   bare in-code TODO or FIXME with no issue reference attached is forbidden.
+2. **The `bd create` template** — the day-to-day pattern for filing a bead,
+   with the `docs:` tail required so the resolving PR knows which docs to
+   touch:
+   ```bash
+   bd create "<imperative title>" -t task -p 2 [-l <area>] [--parent <epic>] \
+     --deps discovered-from:<id> \
+     -d "<what, why, where (file/function)>; docs: <paths or none>"
+   ```
+   `-l <area>` and `--parent <epic>` are optional — add them when the bead
+   belongs to a labeled area or an epic (see "Epics & phases" below); the
+   `work-beads` skill's defer step (2.5) uses this same template without
+   those two optional flags.
+3. **Day-to-day commands** — `bd ready` (start here — surfaces unblocked
+   work) / `bd list` / `bd show <id>` / `bd update <id> --status in_progress`
+   / `bd close <id>` (only after the PR is merged and verified) / `bd stats`.
+4. **The bootstrap trap** — verbatim warning: never run `bd bootstrap`,
+   `bd init --force`, or any reset on a checkout with a populated local
+   Beads DB — it silently replaces local (usually ahead) state with the
+   stale remote. Bootstrap is for fresh clones only. Before any reset, run
+   `make beads-snapshot` (installed by the agent-ops git component). Drive
+   embedded storage only through `bd` subcommands, never a standalone CLI.
+5. **Epics & phases** — `bd create "<title>" -t epic --parent <parent-epic>`
+   for containers; phase epics `blocks:` each other so `bd ready` surfaces
+   only the current phase's work.
+6. **Relationship to git** — bead IDs stay out of branch names and commit
+   subjects (D7); reference them only in commit/PR bodies as `Closes <id>`;
+   close the bead only after the squash-merge is verified on `main`.
 
 ## Conditional Evaluation
 Enable when: project uses Beads task tracking methodology (user selects Beads during
@@ -197,9 +275,13 @@ in-place preserving project-specific customizations.
 - **Detect prior artifact**: .beads/ directory exists with data files
 - **Preserve**: all existing task data in .beads/, tasks/lessons.md content
   (patterns, anti-patterns, gotchas), CLAUDE.md Beads command table
-  customizations, git hook configurations
+  customizations, git hook configurations, and any project-specific
+  customizations layered onto docs/beads-workflow.md
 - **Triggers for update**: new CLAUDE.md sections need Beads references,
   Beads CLI version changed requiring command updates, git hooks need
-  reconfiguration after workflow changes
+  reconfiguration after workflow changes, or docs/beads-workflow.md is
+  missing or still documents the retired `[bd-<id>]` prefix convention
+  instead of the D7 body-reference form
 - **Conflict resolution**: if CLAUDE.md Beads section was manually customized,
-  merge new content around existing customizations rather than replacing
+  merge new content around existing customizations rather than replacing;
+  the same rule applies to docs/beads-workflow.md
