@@ -48,6 +48,33 @@ docker:
     expect(cfg.docker?.shared_stack).toEqual({ postgres: 55432, api: 8001 })
   })
 
+  it('leaves docker context unset when omitted', () => {
+    const dir = tmpProject(`
+project_name: myapp
+docker:
+  services:
+    - name: postgres
+      band: 20000
+  shared_stack: {}
+`)
+    const cfg = loadAgentOpsConfig(dir)
+    expect(cfg.docker).toBeDefined()
+    expect(cfg.docker?.context).toBeUndefined()
+  })
+
+  it('keeps an explicitly provided docker context', () => {
+    const dir = tmpProject(`
+project_name: myapp
+docker:
+  context: colima
+  services:
+    - name: postgres
+      band: 20000
+  shared_stack: {}
+`)
+    expect(loadAgentOpsConfig(dir).docker?.context).toBe('colima')
+  })
+
   it('rejects invalid service names and bands', () => {
     const bad = tmpProject(`
 project_name: myapp

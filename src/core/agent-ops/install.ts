@@ -139,9 +139,12 @@ export function installAgentOps(projectRoot: string, opts: AgentOpsInstallOption
 
     const destPath = path.join(projectRoot, spec.dest)
     if (fs.existsSync(destPath) && !opts.force) {
+      // Overwrite only files we own (manifest entry exists) and that are
+      // unmodified (manifest hash matches disk). A file with no manifest
+      // entry is a pre-existing user file — never clobber it without force.
       const onDisk = sha256(fs.readFileSync(destPath))
       const recorded = manifest.files[spec.dest]
-      if (recorded && recorded !== onDisk) {
+      if (!recorded || recorded !== onDisk) {
         result.skippedModified.push(spec.dest)
         continue
       }

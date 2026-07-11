@@ -10,7 +10,8 @@ export interface AgentOpsService {
 }
 
 export interface AgentOpsDocker {
-  context: string
+  /** Docker context name; when omitted, the installer picks a platform default. */
+  context?: string
   services: AgentOpsService[]
   shared_stack: Record<string, number>
 }
@@ -83,11 +84,8 @@ export function loadAgentOpsConfig(projectRoot: string): AgentOpsConfig {
       }
     }
     const shared = sharedStack as Record<string, number>
-    cfg.docker = {
-      context: typeof d.context === 'string' && d.context ? d.context : 'orbstack',
-      services,
-      shared_stack: shared,
-    }
+    cfg.docker = { services, shared_stack: shared }
+    if (typeof d.context === 'string' && d.context) cfg.docker.context = d.context
   }
   return cfg
 }

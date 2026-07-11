@@ -36,6 +36,19 @@ describe('buildTemplateVars', () => {
       'SERVICES="postgres api"\nBAND_postgres=20000\nBAND_api=21000\nSHARED_postgres=55432\nSHARED_api=8001',
     )
   })
+
+  it('defaults DOCKER_CONTEXT by platform when config omits context', () => {
+    const vars = buildTemplateVars({
+      project_name: 'myapp',
+      critical_labels: [],
+      worktree_setup_commands: [],
+      docker: {
+        services: [{ name: 'postgres', band: 20000 }],
+        shared_stack: {},
+      },
+    })
+    expect(vars.DOCKER_CONTEXT).toBe(process.platform === 'darwin' ? 'orbstack' : 'default')
+  })
 })
 
 describe('installAgentOps / checkAgentOps', () => {
@@ -64,6 +77,20 @@ describe('installAgentOps / checkAgentOps', () => {
     const forced = installAgentOps(projectRoot, { components: ['git'], templateRoot, force: true })
     expect(forced.skippedModified).toEqual([])
     expect(fs.readFileSync(dest, 'utf8')).not.toContain('# local edit')
+  })
+
+  it('skips pre-existing files it does not own (no manifest entry) unless force', () => {
+    const dest = path.join(projectRoot, 'scripts', 'setup-agent-worktree.sh')
+    fs.mkdirSync(path.dirname(dest), { recursive: true })
+    fs.writeFileSync(dest, '# user-owned file\n')
+    const res = installAgentOps(projectRoot, { components: ['git'], templateRoot })
+    expect(res.skippedModified).toEqual(['scripts/setup-agent-worktree.sh'])
+    expect(res.installed).toEqual([])
+    expect(fs.readFileSync(dest, 'utf8')).toBe('# user-owned file\n')
+    const forced = installAgentOps(projectRoot, { components: ['git'], templateRoot, force: true })
+    expect(forced.skippedModified).toEqual([])
+    expect(forced.installed).toEqual(['scripts/setup-agent-worktree.sh'])
+    expect(fs.readFileSync(dest, 'utf8')).not.toContain('# user-owned file')
   })
 
   it('ensures the Makefile includes agent-ops.mk exactly once', () => {
