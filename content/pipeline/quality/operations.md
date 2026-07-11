@@ -73,8 +73,8 @@ if architecture changed. Never modify rollback procedures without user approval.
 - **Triggers for update**: architecture changed deployment topology, new ADRs
   changed infrastructure, security review identified operational requirements,
   local quality gates changed (new stages to build on), or a launch target
-  was chosen and CI was adopted (see git-workflow.md's "CI is deferred"
-  section)
+  was chosen and CI was adopted (see git-workflow.md's "Quality gates (CI
+  deferred)" item)
 - **Conflict resolution**: if architecture changed the deployment target,
   update deployment stages but preserve monitoring and alerting sections;
   verify runbook does not redefine the local quality gates from

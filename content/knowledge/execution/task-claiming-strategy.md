@@ -70,7 +70,7 @@ Before starting a task, verify all its blockers are resolved. After completing e
 ### Multi-Agent Conflict Avoidance — Extended
 
 **Claiming a task:**
-- Creating a feature branch (e.g., `bd-a3f8/add-user-endpoint`) is the claim signal
+- Creating a feature branch (e.g., `feat/add-user-endpoint`) is the claim signal — the bead ID stays out of the branch name; the PR body's `Closes bd-a3f8` reference ties the claim to the task
 - Other agents should check for existing branches before claiming the same task
 - If two agents accidentally claim the same task, the one with fewer commits yields
 
