@@ -70,14 +70,15 @@ scannability.
   with every row's Agent-safe/Ask-first marker preserved
 - (mvp) AGENTS.md contains a section titled "Operations core (binding for
   every agent)" with the 8-step ship-loop summary ending in the batch
-  report, the standing authorization ("run this whole loop without asking
-  permission; do not end your turn after opening a draft PR"), and the
+  report, the standing authorization ("Run this whole loop without asking
+  permission; do not end your turn after opening a draft PR."), and the
   parallel-safety hard rules (primary checkout shared/read-only; one agent
   per module/migration-sequence/shared surface; one open PR per agent;
   staging-up from worktrees only)
 - (mvp) AGENTS.md's Operations core section contains the Beads rules (start
   from the ready queue, defer = bead immediately, never bootstrap on a
-  populated DB) and, when `.agents/skills/work-beads/SKILL.md` exists in the
+  populated DB — ending with the docs/beads-workflow.md reference when that
+  file exists) and, when `.agents/skills/work-beads/SKILL.md` exists in the
   project, the `/work-beads` routing line
 - (mvp) CLAUDE.md contains the one-line pointer "The binding operations core
   lives in AGENTS.md and applies to Claude Code sessions too."
@@ -209,7 +210,10 @@ order:
 4. **Beads rules** — start from `bd ready` (the ready queue); anything you
    decide not to do now becomes a bead immediately (a TODO comment, PR note,
    or mental note is not tracking); never run `bd bootstrap` or
-   `bd init --force` on a checkout with a populated local Beads DB.
+   `bd init --force` on a checkout with a populated local Beads DB. End the
+   Beads rules with: see docs/beads-workflow.md for the `bd create`
+   template, day-to-day commands, and the bootstrap trap (when that file
+   exists).
 
 5. **Project invariants (optional)** — scan docs/plan.md and
    docs/tech-stack.md for cross-cutting invariants the project declares
@@ -254,7 +258,9 @@ Keep Core Principles, the project navigation table, and the Key Commands
 table (with Agent-safe/Ask-first markers, per dev-env-setup's taxonomy)
 above this table. Keep CLAUDE.md at or under 200 lines — if the combined
 content overflows, point to docs/git-workflow.md and docs/beads-workflow.md
-rather than inlining more detail.
+rather than inlining more detail, and when the Key Commands table grows past
+~20 rows, keep the agent-ops and daily-driver rows and point to
+docs/dev-setup.md for the rest.
 
 ### Point other harness files at AGENTS.md
 For any other agent-harness file already present in the project root (e.g.
