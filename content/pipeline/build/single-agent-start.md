@@ -139,9 +139,10 @@ tracker looks done" bug):
    - This sets `assignee=$BEADS_ACTOR` (or your git user.name) and
      `status=in_progress` in a single round-trip — no race window.
    - If you need a specific task by ID instead, use `bd update <id> --claim`.
-3. Implement following the TDD workflow below.
-4. After the PR is merged, run `bd close <id>`.
-5. Repeat the scoped claim (`bd ready --claim --has-metadata-key plan_task_id --json`)
+3. Build, verify, review, and merge following the work-beads skill's per-bead
+   loop — see "Execute the Ship Loop" below. Close only after the merge is
+   verified.
+4. Repeat the scoped claim (`bd ready --claim --has-metadata-key plan_task_id --json`)
    until it returns no ready task, then run the **completion check**.
 
 **Completion check (empty `bd ready` ≠ done).** An empty scoped-ready result does
@@ -170,75 +171,30 @@ legacy plan per the table — never past existing Beads state):
 1. Read `docs/implementation-playbook.md` as the primary task execution reference.
    Fall back to `docs/implementation-plan.md` when no playbook is present.
 2. Pick the first uncompleted task that has no unfinished dependencies.
-3. Implement following the TDD workflow below.
+3. Implement using red-green-refactor: write a failing test, make it pass, then
+   refactor. Run `make check` (and `make eval` if `tests/evals/` exists) before
+   opening a PR (`gh pr create`) and running code review per
+   `docs/git-workflow.md` or CLAUDE.md; merge only after review passes.
 4. Mark the task complete in the plan/playbook.
 5. Repeat in dependency order until all tasks are done.
 
-### TDD Execution Loop
+### Execute the Ship Loop
 
-For each task:
+**Sequential variant:** you work in the primary checkout on `<type>/<desc>`
+branches (no worktree, skip `setup-agent-worktree.sh`, skip merge-slot); every
+other step of the skill applies unchanged.
 
-1. **Claim the task**
-   - Create a feature branch: `git checkout -b <type>/<description>` (e.g., `feat/add-auth`)
-   - If Beads: branch as `bd-<id>/<desc>`
+From here, follow the **work-beads skill** exactly — it owns the per-bead loop
+(claim → worktree → build with draft-PR-on-first-push → verify → review with
+the 3-round cap → squash-merge → close → batch report):
 
-2. **Red phase — write failing tests**
-   - Check `docs/story-tests-map.md` (if it exists) to find test skeletons that correspond to this task's user stories
-   - Check `tests/acceptance/` for existing test skeletons that correspond to the task
-   - If skeletons exist, use them as your starting point
-   - Otherwise, write test cases from the task's acceptance criteria
-   - Run the test suite — confirm the new tests FAIL (red)
+- Claude Code: `.claude/skills/work-beads/SKILL.md`
+- Other agents: `.agents/skills/work-beads/SKILL.md`
 
-3. **Green phase — implement**
-   - Write the minimum code to make the failing tests pass
-   - Follow conventions from `docs/coding-standards.md`
-   - Follow file placement from `docs/project-structure.md`
-   - Run tests after each meaningful change — stop when green
-
-4. **Refactor phase — clean up**
-   - Refactor for clarity, DRY, and convention compliance
-   - Run the full test suite — confirm everything still passes
-
-5. **Quality gates**
-   - Run `make check` (or equivalent from CLAUDE.md Key Commands)
-   - If `tests/evals/` exists, run `make eval` (or equivalent eval command)
-   - Fix any failures before proceeding
-
-6. **Pre-push local code review (when requested or required)**
-   - If the user says to review before committing or pushing, or the project's workflow requires a local multi-model gate before `git push`, run `scaffold run review-code`
-   - This reviews the local delivery candidate without requiring a PR
-   - Surface auth failures immediately and retry after recovery
-   - If recovery is not possible, document reduced review coverage and continue with the available channels
-   - Fix any findings at or above `fix_threshold` before proceeding
-
-7. **Create PR**
-   - If Beads is configured, run the PR-readiness checklist first:
-     ```bash
-     if [ -d .beads ]; then
-       bd preflight
-     fi
-     ```
-     Fix any issues `bd preflight` flags before proceeding. (Note: do NOT use `[ -d .beads ] && bd preflight` — that returns exit-1 when `.beads/` is absent and breaks any caller running under `set -e`.)
-   - Push the branch: `git push -u origin HEAD`
-   - Create a pull request: `gh pr create`
-   - Include in the PR description: what was implemented, key decisions, files changed
-   - Follow the PR workflow from `docs/git-workflow.md` or CLAUDE.md
-
-8. **Run code reviews (MANDATORY)**
-   - Run the review-pr tool: `scaffold run review-pr` (CLI) or `/scaffold:review-pr` (plugin)
-   - This runs the three MMR CLI channels on the PR diff plus the Superpowers code-reviewer agent as a complementary 4th channel reconciled through `mmr reconcile`:
-     1. **Codex CLI**: `codex exec --skip-git-repo-check -s read-only --ephemeral "REVIEW_PROMPT" 2>/dev/null`
-     2. **Antigravity CLI**: `printf '%s' "REVIEW_PROMPT" | agy --print --sandbox --dangerously-skip-permissions --print-timeout 300s 2>/dev/null`
-     3. **Claude CLI**: `claude -p "REVIEW_PROMPT" --output-format json 2>/dev/null`
-     4. **Superpowers code-reviewer** (4th channel): dispatch `superpowers:code-reviewer` subagent with BASE_SHA and HEAD_SHA
-   - Verify auth before each CLI (`mmr config test` pre-flights all three at once)
-   - All four channels should execute. Missing Codex or Antigravity → MMR runs a compensating Claude pass in its place (degraded-pass verdict). Missing Claude CLI → review proceeds without compensation.
-   - Fix any findings at or above `fix_threshold` before proceeding
-   - Do NOT move to the next task until the review completes
-
-9. **Update status**
-   - If Beads: task status is managed via `bd` commands
-   - Without Beads: mark the task as complete in the plan/playbook
+Loop until the completion check confirms all plan tasks are closed. Do not
+re-derive the loop from memory; open the skill file and follow it. Your claims
+stay scoped to materialized plan tasks (`bd ready --claim
+--has-metadata-key plan_task_id`) as detected above.
 
 ### Recovery Procedures
 
@@ -264,14 +220,12 @@ For each task:
 
 ### Process Rules
 
-1. **TDD is not optional** — Write failing tests before implementation. No exceptions.
-2. **One task at a time** — Complete the current task fully before starting the next.
-3. **Quality gates before PR** — Never create a PR with failing checks.
-4. **Honor pre-push review when requested** — If the user or project workflow asks for pre-push multi-model review, run `scaffold run review-code` after quality gates and before `git push`.
-5. **Code review before next task** — After creating a PR, run `scaffold run review-pr`: three CLI channels (Codex CLI, Antigravity CLI, Claude CLI) via MMR plus the Superpowers code-reviewer agent as a complementary 4th channel. Fix all findings at or above `fix_threshold` before moving on.
-6. **Update status immediately** — Mark tasks complete as soon as review passes.
-7. **Consult lessons.md** — Check for relevant anti-patterns before each task.
-8. **Follow CLAUDE.md** — It is the authority on project conventions and commands.
+1. **One task at a time** — Complete the current task fully before starting the next.
+2. **Update status immediately** — Mark tasks complete as soon as review passes.
+3. **Consult lessons.md** — Check for relevant anti-patterns before each task.
+4. **Follow CLAUDE.md** — It is the authority on project conventions and commands.
+5. **Follow the work-beads skill exactly for the ship loop** — Do not re-derive
+   claim → build → verify → review → merge → close from memory.
 
 ---
 

@@ -194,53 +194,28 @@ If you are on a feature branch with changes:
    - If tests pass: you may be in the refactor phase or ready for PR
    - If tests fail: determine if these are your in-progress test cases (red phase) or regressions
 
-4. **Continue the TDD loop**
-   - Pick up where the previous session left off
-   - Follow the same Red-Green-Refactor cycle as in `/scaffold:single-agent-start`
+4. **Continue the build**
+   - Pick up where the previous session left off, following the work-beads
+     skill's Step 2.3 (Build) TDD discipline
+   - Then proceed to "Execute the Ship Loop" below for verify → review → merge
 
-### Continue to Next Task
+### Execute the Ship Loop
 
-Once in-progress work is complete (or if there was none):
+**Sequential variant:** you work in the primary checkout on `<type>/<desc>`
+branches (no worktree, skip `setup-agent-worktree.sh`, skip merge-slot); every
+other step of the skill applies unchanged.
 
-1. **Quality gates**
-   - Run `make check` (or equivalent from CLAUDE.md Key Commands)
-   - If `tests/evals/` exists, run `make eval` (or equivalent eval command)
+From here, follow the **work-beads skill** exactly — it owns the per-bead loop
+(claim → worktree → build with draft-PR-on-first-push → verify → review with
+the 3-round cap → squash-merge → close → batch report):
 
-2. **Pre-push local code review (when requested or required)**
-   - If the user says to review before committing or pushing, or the project's workflow requires a local multi-model gate before `git push`, run `scaffold run review-code`
-   - This reviews the local delivery candidate without requiring a PR
-   - Surface auth failures immediately and retry after recovery
-   - If recovery is not possible, document reduced review coverage and continue with the available channels
-   - Fix any findings at or above `fix_threshold` before proceeding
+- Claude Code: `.claude/skills/work-beads/SKILL.md`
+- Other agents: `.agents/skills/work-beads/SKILL.md`
 
-3. **Create PR** (if not already created for in-progress work)
-   - If Beads is configured, run the PR-readiness checklist first:
-     ```bash
-     if [ -d .beads ]; then
-       bd preflight
-     fi
-     ```
-     Fix any issues `bd preflight` flags before proceeding.
-   - Push the branch: `git push -u origin HEAD`
-   - Create a pull request: `gh pr create`
-   - Follow the PR workflow from `docs/git-workflow.md` or CLAUDE.md
-
-4. **Run code reviews (MANDATORY)**
-   - Run the review-pr tool: `scaffold run review-pr` (CLI) or `/scaffold:review-pr` (plugin)
-   - This runs the three MMR CLI channels on the PR diff plus the Superpowers code-reviewer agent as a complementary 4th channel reconciled through `mmr reconcile`:
-     1. **Codex CLI**: `codex exec --skip-git-repo-check -s read-only --ephemeral "REVIEW_PROMPT" 2>/dev/null`
-     2. **Antigravity CLI**: `printf '%s' "REVIEW_PROMPT" | agy --print --sandbox --dangerously-skip-permissions --print-timeout 300s 2>/dev/null`
-     3. **Claude CLI**: `claude -p "REVIEW_PROMPT" --output-format json 2>/dev/null`
-     4. **Superpowers code-reviewer** (4th channel): dispatch `superpowers:code-reviewer` subagent with BASE_SHA and HEAD_SHA
-   - Verify auth before each CLI (`mmr config test` pre-flights all three at once)
-   - All four channels should execute. Missing Codex or Antigravity → MMR runs a compensating Claude pass in its place (degraded-pass verdict). Missing Claude CLI → review proceeds without compensation.
-   - Fix any findings at or above `fix_threshold` before proceeding
-   - Do NOT move to the next task until the review completes
-
-5. **Claim next task**
-   - Return to main: `git checkout main && git pull origin main`
-   - Pick the next task following the same process as `/scaffold:single-agent-start`
-   - Continue the TDD execution loop
+Loop until the completion check confirms all plan tasks are closed. Do not
+re-derive the loop from memory; open the skill file and follow it. Your claims
+stay scoped to materialized plan tasks (`bd ready --claim
+--has-metadata-key plan_task_id`) as detected above.
 
 ### Recovery Procedures
 
@@ -274,11 +249,9 @@ Once in-progress work is complete (or if there was none):
 1. **Always recover state first** — Never start new work without checking for in-progress tasks and merged PRs.
 2. **Rebase before continuing** — Ensure your branch is up to date with main.
 3. **Reconcile task status** — Merged PRs must be reflected in the task tracker.
-4. **TDD is not optional** — Continue the red-green-refactor cycle for any in-progress work.
-5. **Quality gates before PR** — Never create a PR with failing checks.
-6. **Honor pre-push review when requested** — If the user or project workflow asks for pre-push multi-model review, run `scaffold run review-code` after quality gates and before `git push`.
-7. **Code review before next task** — After creating a PR, run `scaffold run review-pr`: three CLI channels (Codex CLI, Antigravity CLI, Claude CLI) via MMR plus the Superpowers code-reviewer agent as a complementary 4th channel. Fix all findings at or above `fix_threshold` before moving on.
-8. **Follow CLAUDE.md** — It is the authority on project conventions and commands.
+4. **Follow CLAUDE.md** — It is the authority on project conventions and commands.
+5. **Follow the work-beads skill exactly for the ship loop** — Do not re-derive
+   claim → build → verify → review → merge → close from memory.
 
 ---
 
