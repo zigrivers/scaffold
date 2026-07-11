@@ -104,7 +104,7 @@ Recover your context by checking the current state of work:
    - Read `tasks/lessons.md` for relevant anti-patterns
 
 2. **Git state assessment**
-   - `git branch --show-current` — determine if you are on a feature branch (in-progress work) or a workspace branch
+   - `git branch --show-current` — confirm you are on your `agent/<name>` workspace branch (all task work commits directly on it)
    - `git status` — check for uncommitted changes or staged files
    - `git stash list` — check for stashed work
    - `git log --oneline -5` — review recent commits for context

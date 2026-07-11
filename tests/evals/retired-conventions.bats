@@ -18,7 +18,7 @@
 }
 
 @test "no work-item-ID branch examples remain in content/" {
-    # D4 (spec 2026-07-10): agents commit directly on agent/<name>; a branch name
+    # D7 (spec 2026-07-10): agents commit directly on agent/<name>; a branch name
     # never embeds a work-item or bead ID (IDs ride in the commit/PR body as
     # `Closes <id>`). Reject concrete ID-in-branch examples like feat/US-001 or
     # bd-a3f8/some-branch.
