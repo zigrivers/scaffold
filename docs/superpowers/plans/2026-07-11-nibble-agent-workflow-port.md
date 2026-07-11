@@ -266,7 +266,7 @@ git commit -m "feat(agent-ops): add agent-ops.yaml config loader"
 | `staging/tc-reap.sh.tmpl` | `scripts/ops/tc-reap.sh` | staging |
 | `staging/staging.env.example.tmpl` | `ops/compose/staging.env.example` (not executable) | staging |
 
-- Template vars built from config: `PROJECT_NAME`; `DOCKER_CONTEXT` (default `orbstack` on `process.platform === 'darwin'`, else `default`, overridden by `config.docker.context`); `WORKTREE_SETUP_COMMANDS` = the commands joined with `\n` (empty string when none); `SERVICE_PORT_BANDS` = generated shell lines, e.g. for services postgres/20000, api/21000 with shared 55432/8001:
+- Template vars built from config: `PROJECT_NAME`; `DOCKER_CONTEXT` (default `orbstack` on `process.platform === 'darwin'`, else `default`, overridden by `config.docker.context` — for this to work, `AgentOpsDocker.context` is OPTIONAL and the config loader must NOT apply its own fallback; *amended during execution per Task 2 review*); `WORKTREE_SETUP_COMMANDS` = the commands joined with `\n` (empty string when none); `SERVICE_PORT_BANDS` = generated shell lines, e.g. for services postgres/20000, api/21000 with shared 55432/8001:
 
 ```
 SERVICES="postgres api"
@@ -277,7 +277,7 @@ SHARED_api=8001
 ```
 
 - Manifest `.scaffold/agent-ops-manifest.json`: `{ "version": "<pkg version>", "files": { "<dest>": "<sha256 of installed content>" } }`. Version marker file `.scaffold/agent-ops-version` contains the package version (mirrors `.scaffold-skill-version`).
-- Install semantics: for each file in the requested components — if dest exists AND its on-disk sha256 differs from the manifest entry (locally modified) AND `!force` → add to `skippedModified`, don't write. Otherwise resolve, write, chmod, record new hash. Missing template sources are skipped silently (pre-Task-4 state). Manifest entries merge across components.
+- Install semantics: for each file in the requested components — when dest exists and `!force`, overwrite ONLY if the manifest has an entry for it AND that hash matches the on-disk sha256 (we own it, unmodified). Every other exists case (no manifest entry = pre-existing user file; hash mismatch = locally modified) → `skippedModified`, don't write. Otherwise resolve, write, chmod, record new hash. Missing template sources are skipped silently (pre-Task-4 state). Manifest entries merge across components. *(Amended during execution per Task 2 review — original wording allowed clobbering never-installed pre-existing files.)*
 - `checkAgentOps`: `{ upToDate: boolean, staleVersion: boolean, modified: string[], missing: string[] }` — `modified` = manifest hash ≠ disk hash; `missing` = in manifest but absent on disk; `staleVersion` = marker ≠ package version.
 
 - [ ] **Step 1: Write the failing test**
