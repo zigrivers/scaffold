@@ -212,6 +212,11 @@ the 3-round cap → squash-merge → close → batch report):
 - Claude Code: `.claude/skills/work-beads/SKILL.md`
 - Other agents: `.agents/skills/work-beads/SKILL.md`
 
+**Claim reentry:** the claim you already performed above satisfies the
+skill's Step 2.1 for the FIRST bead — do not claim a second bead; enter the
+skill's loop at Step 2.2 for that bead, and use the skill's Step 2.1 only
+for subsequent beads after the current one is merged and closed.
+
 Loop until the completion check confirms all plan tasks are closed. Do not
 re-derive the loop from memory; open the skill file and follow it. Your claims
 stay scoped to materialized plan tasks (`bd ready --claim
