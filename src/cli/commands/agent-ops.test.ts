@@ -123,4 +123,20 @@ describe('agentOpsCommand.handler exit-code contract', () => {
     expect(combinedOutput()).toContain('AGENT_OPS_INVALID_COMPONENT')
     expect(combinedOutput()).toContain('unknown component "nope"')
   })
+
+  it('check reports a pre-existing unmanaged file, without failing the check on it alone', async () => {
+    // Pre-create a git-owned dest as a user file so install refuses to claim it
+    // (it never enters the manifest).
+    const doctor = path.join(tmpDir, 'scripts', 'doctor.sh')
+    fs.mkdirSync(path.dirname(doctor), { recursive: true })
+    fs.writeFileSync(doctor, '# user-owned doctor\n')
+    expect(await run({ action: 'install', component: 'git' })).toBe(0)
+
+    const code = await run({ action: 'check' })
+    expect(combinedOutput()).toContain('exists but not managed by scaffold')
+    expect(combinedOutput()).toContain('scripts/doctor.sh')
+    // Unmanaged files are informational: everything scaffold DOES manage is
+    // present and fresh, so the check still exits 0.
+    expect(code).toBe(0)
+  })
 })

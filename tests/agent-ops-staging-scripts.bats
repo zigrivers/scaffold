@@ -47,6 +47,30 @@ env_var_at() { bash -c "cd '$1' && source scripts/ops/staging-env.sh && echo \${
     [ "$(env_var_at "$REPO" PORT_API)" = "8001" ]
 }
 
+@test "dash-named service resolves a valid PORT_ var (var-name safety)" {
+    git -C "$REPO" worktree add --quiet "$REPO/.worktrees/c" -b agent/c
+    mkdir -p "$REPO/.worktrees/c/scripts/ops"
+    cp "$REPO/scripts/ops/staging-env.sh" "$REPO/.worktrees/c/scripts/ops/"
+    o=$(env_var_at "$REPO/.worktrees/c" STAGING_OFFSET)
+    # redis-cache -> PORT_REDIS_CACHE, banded from BAND_redis_cache=22000
+    [ "$(env_var_at "$REPO/.worktrees/c" PORT_REDIS_CACHE)" = "$(( 22000 + o ))" ]
+    # primary checkout gets the shared port SHARED_redis_cache=6379
+    [ "$(env_var_at "$REPO" PORT_REDIS_CACHE)" = "6379" ]
+}
+
+@test "no services configured: sourcing no-ops with a clear message (does not crash)" {
+    # Staging installed without a docker section — the generated block is empty,
+    # so SERVICES is never defined. Must no-op, not crash on unbound $SERVICES.
+    sed -e 's/{{PROJECT_NAME}}/testproj/g' \
+        -e '/{{SERVICE_PORT_BANDS}}/d' \
+        "$TEMPLATES/staging-env.sh.tmpl" > "$REPO/scripts/ops/staging-env.sh"
+    chmod +x "$REPO/scripts/ops/staging-env.sh"
+    run bash -c "cd '$REPO' && source scripts/ops/staging-env.sh"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"no services configured"* ]]
+    [[ "$output" == *"staging disabled"* ]]
+}
+
 @test "STAGING_WT_OFFSET overrides the derived offset" {
     run bash -c "cd '$REPO' && STAGING_WT_OFFSET=7 source scripts/ops/staging-env.sh && echo \$STAGING_OFFSET"
     [ "$output" = "7" ]

@@ -124,6 +124,74 @@ docker:
 `)
     expect(() => loadAgentOpsConfig(bad)).toThrow(/band/i)
   })
+
+  it('(b) rejects a shared_stack key that is not a valid service name', () => {
+    const bad = tmpProject(`
+project_name: myapp
+docker:
+  services:
+    - name: postgres
+      band: 20000
+  shared_stack:
+    "Has Space": 55432
+`)
+    expect(() => loadAgentOpsConfig(bad)).toThrow(/shared_stack service name/i)
+  })
+
+  it('(c) rejects a shared_stack that is an array, not a mapping', () => {
+    const bad = tmpProject(`
+project_name: myapp
+docker:
+  services:
+    - name: postgres
+      band: 20000
+  shared_stack:
+    - 55432
+    - 8001
+`)
+    expect(() => loadAgentOpsConfig(bad)).toThrow(/shared_stack must be a mapping/i)
+  })
+
+  it('(d) rejects duplicate service names', () => {
+    const bad = tmpProject(`
+project_name: myapp
+docker:
+  services:
+    - name: postgres
+      band: 20000
+    - name: postgres
+      band: 21000
+  shared_stack: {}
+`)
+    expect(() => loadAgentOpsConfig(bad)).toThrow(/duplicate service name/i)
+  })
+
+  it('rejects a band that leaves no per-worktree headroom (band + 254 > 65535)', () => {
+    const bad = tmpProject(`
+project_name: myapp
+docker:
+  services:
+    - name: postgres
+      band: 65400
+  shared_stack: {}
+`)
+    expect(() => loadAgentOpsConfig(bad)).toThrow(/ceiling|65535/i)
+  })
+
+  it('accepts and preserves a dash-named service', () => {
+    const dir = tmpProject(`
+project_name: myapp
+docker:
+  services:
+    - name: redis-cache
+      band: 20000
+  shared_stack:
+    redis-cache: 6379
+`)
+    const cfg = loadAgentOpsConfig(dir)
+    expect(cfg.docker?.services).toEqual([{ name: 'redis-cache', band: 20000 }])
+    expect(cfg.docker?.shared_stack).toEqual({ 'redis-cache': 6379 })
+  })
 })
 
 describe('defaultAgentOpsConfig', () => {

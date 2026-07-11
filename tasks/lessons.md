@@ -145,3 +145,14 @@ Patterns and anti-patterns discovered during development. Review before starting
   — see memory `security-best-practices-refresh-defect`. The +180 size is the
   tell; the automation adds a parallel OWASP-2025 section instead of updating in
   place and never reconciles version-pin.
+
+## 2026-07-11 — Content edits near TODO/FIXME placeholder evals are fragile
+
+- **Check eval regexes before rewording content** (from Task 12). Prompt/knowledge
+  edits often sit next to eval checks that grep for literal placeholder tokens
+  (`TODO`, `FIXME`, `<type>/<short-desc>`, ID-in-branch patterns). Rewording the
+  surrounding prose can accidentally satisfy or trip a regex — e.g. an anti-pattern
+  eval that greps `content/` for `feat/US-[0-9]` goes red the instant a doc adds
+  such an example, and green only after the sweep. Before editing, grep
+  `tests/evals/*.bats` for patterns that touch the file/line you're changing, and
+  run the affected eval right after the edit rather than at the end of the batch.
