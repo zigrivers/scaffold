@@ -3,7 +3,7 @@ name: per-worktree-environments
 description: Deterministic per-worktree Docker staging environments for parallel-agent development — port-band allocation, a protected shared QA stack, and orphan reaping
 topics: [dev-environment, docker, worktrees, staging, ports, multi-agent]
 volatility: evolving
-last-reviewed: null
+last-reviewed: 2026-07-11
 version-pin: null
 sources: []
 ---
@@ -131,6 +131,29 @@ caused by Docker contention (not a real test failure) is diagnosed with the
 doctor script, cleaned up with the reap targets, and re-run in isolation —
 never treated as a merge-blocking test failure and never "fixed" with
 `docker system prune`.
+
+### When Not to Use This
+Deterministic port derivation is a fix for a specific collision — it isn't
+free, and it isn't the right default for every project. Skip it when:
+- **The project has no containerized services.** No `docker-compose.yml`
+  worth staging means there's no port collision to solve; the config shape
+  above (and the `make staging-*` targets it drives) has nothing to attach
+  to.
+- **Only one agent (or one developer) ever runs the stack.** The collision
+  problem this pattern solves is specifically *concurrent* agents fighting
+  over the same ports and database. A single worktree, or a single human
+  developer working sequentially, can use a plain `docker-compose.yml` with
+  hardcoded ports — the added indirection (offset math, `STAGING_WT_OFFSET`
+  escape hatch, reap passes) buys nothing.
+- **The services are stateless and disposable per-test** (e.g. every test
+  spins up its own ephemeral container via testcontainers rather than a
+  long-lived compose stack). That's a different hygiene problem — see
+  "Teardown, reap, and engine contention" above for the separate
+  testcontainer reap pass — not the one this pattern's port bands solve.
+
+In these cases, a single shared compose file with fixed ports is simpler and
+correct; introducing per-worktree offsets adds a layer of indirection with no
+corresponding problem to solve.
 
 ---
 *Initial pass authored alongside the `staging-environments` pipeline step

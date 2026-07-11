@@ -11,7 +11,7 @@ topics:
   - coordination
   - parallel-execution
 volatility: evolving
-last-reviewed: 2026-06-13
+last-reviewed: 2026-07-11
 version-pin: null
 sources:
   - url: https://github.com/steveyegge/beads
@@ -126,6 +126,35 @@ done
 `bd gate check` (or the automatic watcher) resolves all five at once when the PR merges.
 
 > The `bd gate add-waiter` subcommand is a different mechanism — it registers an agent's *wake address* (e.g., "my-project/workers/agent-1") to receive notifications. It's not for chaining issues to gates; use `--blocks` on `bd gate create` for that.
+
+## Draft PRs and One-PR-Per-Agent — the Visible-Claim Layer
+
+`bd ready --claim` (or `bd update <id> --status in_progress`) is the
+authoritative, atomic claim, but it's only visible to agents that query
+Beads. `gh pr list --state open` is the *other* live registry other agents
+(and humans) check first — see the work-beads skill's orient step
+(`bd ready && bd stats; gh pr list --state open; git worktree list`). A bead
+can sit `in_progress` in Beads for a while before any code exists, so the
+loop opens a **draft PR on the first push**, not once the change is
+polished: the draft is what a second agent scanning `gh pr list` sees before
+independently starting the same work, and it's the same signal the
+project's duplicate-work preflight scan (see
+[worktree-management](./worktree-management.md)) matches keywords against.
+Treat "claimed in Beads" and "visible via an open/draft PR" as two halves of
+one claim, not two separate mechanisms — the first stops a second Beads
+claim on the same bead, the second stops a second agent from building the
+same thing without ever having checked Beads at all.
+
+This composes with the strict **one open PR per agent** rule: an agent works
+its queue sequentially — claim -> worktree -> build (draft PR on first
+push) -> verify -> review -> merge -> close — and does not start the next
+bead until the current one's PR has merged. Ending a turn after opening a
+draft PR with a "next steps" list instead of finishing through merge and
+bead-close is the single most common failure mode observed in this loop.
+Keeping it to one open PR per agent is also what keeps `bd merge-slot`
+(above) tractable once a project reaches 3+ concurrent agents — the slot
+only ever has to serialize one pending merge per agent at a time, not an
+unbounded backlog each agent accumulated by moving on before finishing.
 
 ## Composition
 

@@ -8,7 +8,7 @@ topics:
   - lessons-learned
   - autonomous-work
 volatility: evolving
-last-reviewed: 2026-06-09
+last-reviewed: 2026-07-11
 version-pin: null
 sources:
   - url: https://github.com/steveyegge/beads
@@ -249,6 +249,46 @@ Each task should define explicit completion criteria, not vague goals:
 **Overloaded tasks.** A single task covers "implement the API, write the UI, add tests, update docs." This overflows a single session and makes progress tracking meaningless. Fix: split into tasks that each fit in one agent session (30-90 minutes).
 
 **Lessons without rules.** A lesson says "we had trouble with X" but doesn't state a preventive rule. Future sessions read the lesson but don't know what to do differently. Fix: every lesson must include a concrete rule — "Always do Y" or "Never do Z" — not just a description of what went wrong.
+
+### The Beads Discipline: Defer, Docs, Bootstrap, Closure
+
+Four rules close the gaps that erode task tracking over a long agent
+session:
+
+**Defer = bead, immediately.** If you decide not to do something now, it
+becomes a bead — immediately, not "later" or "if I remember." A commit-body
+note, a PR comment, an in-code `TODO`/`FIXME`, or an agent's own memory is
+NOT tracking; a bare `TODO`/`FIXME` with no issue reference attached is
+forbidden. File it with the same template used for day-to-day work:
+
+```bash
+bd create "<imperative title>" -t task -p 2 [-l <area>] [--parent <epic>] \
+  --deps discovered-from:<id> \
+  -d "<what, why, where (file/function)>; docs: <paths or none>"
+```
+
+**The `docs:` tail.** Every bead's description ends with a `docs:` tail
+naming which docs the resolving PR must touch (or `docs: none` when nothing
+applies) — filed at creation time, resolved at merge time. Docs travel with
+the code: when a bead's `docs:` tail names stale files, update them in the
+same PR that closes the bead, not in a follow-up.
+
+**The bootstrap trap.** Never run `bd bootstrap`, `bd init --force`, or any
+reset on a checkout with a populated local Beads DB — it silently replaces
+local (usually-ahead) state with the stale remote. Bootstrap is for fresh
+clones only. Before any reset, snapshot first (`make beads-snapshot`, when
+the agent-ops git component is installed). Drive embedded storage only
+through `bd` subcommands, never a standalone CLI against the data files
+directly.
+
+**Close after merge, not after PR-open.** Bead IDs stay out of branch names
+and commit subjects (per D7 — see the branch-naming rules in
+[git-workflow-patterns](./git-workflow-patterns.md)); reference them only in
+commit/PR bodies as `Closes <id>`. `bd close
+<id>` runs only after the squash-merge is verified on `main` — closing on PR
+creation, before review or merge, is a common but incorrect shortcut that
+leaves `bd ready` reporting work as available when it's actually already
+spoken for.
 
 ### Agent context: `bd prime` is the SSOT
 

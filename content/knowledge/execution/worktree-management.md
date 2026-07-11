@@ -7,7 +7,7 @@ topics:
   - multi-agent
   - branching
 volatility: evolving
-last-reviewed: 2026-06-13
+last-reviewed: 2026-07-11
 version-pin: null
 sources:
   - url: https://git-scm.com/docs/git-worktree
@@ -189,6 +189,60 @@ git branch | grep "workspace" | xargs -r git branch -D
 ```
 
 Use `-D` here because workspace branches are not merged — they're disposable.
+
+### Doctor, Pruning, and Preflight — Keeping the Fleet Honest
+
+Three agent-ops scripts (installed by `scaffold agent-ops install
+--component git`) keep a multi-worktree fleet from silently drifting into a
+bad state.
+
+**The primary-checkout invariant.** The primary checkout — the first entry
+in `git worktree list` — must always stay on `main`, never a feature branch,
+never detached; agents work in `.worktrees/`, never commit in the primary.
+`scripts/doctor.sh` (`make doctor`) is a read-only diagnostic covering five
+checks: `on-main` (primary is on `main`, not detached or on a feature
+branch), `main-location` (`main` isn't "hostage" — checked out in some
+non-primary worktree instead), `no-conflict` (no in-progress merge/rebase or
+unmerged paths in the primary), `identity` (no per-agent git identity leaked
+into the shared `.git/config` — it belongs in per-worktree config only), and
+`main-sync` (local `main` matches `origin/main`). `scripts/doctor.sh --fix`
+(`make doctor-fix`) performs only non-destructive repairs — clearing a
+leaked shared identity, and, if `main` is hostage, freeing it by rebranding
+the hostage worktree onto `agent/<name>` (or detaching it if the rebrand
+fails), then restoring/fast-forwarding the primary via `main-sync.sh`. It
+refuses every ambiguous case outright: primary on a feature branch, an
+unresolved conflict/rebase, a diverged or ahead-of-origin `main`,
+uncommitted tracked changes in the primary, or a detached primary whose HEAD
+carries commits not on `origin/main` — all of those need a human decision,
+not an automated repair.
+
+**Squash-aware pruning with triage.** `scripts/cleanup-merged-branches.sh`
+(`make prune-merged`) detects a merged branch two ways: commit ancestry
+(`git merge-base --is-ancestor`) *and* a merged PR whose head branch name
+**and** head SHA match the local branch tip. The second path is what catches
+squash-merges — a squash-merged branch's commits are never ancestors of
+`main`, so ancestry-only detection misses every one of them. The script
+removes merged, clean worktrees (skipping dirty ones, worktrees younger than
+5 minutes, and zero-commit branch worktrees unless `--include-zero-commit`),
+deletes merged local branches, prunes stale worktree admin refs, and never
+touches protected branches
+(`main`/`master`/`trunk`/`develop`/`dev`/`release`/`staging`/`production`),
+the current branch, or the primary checkout. It always ends with a
+**Triage** section — unmerged branches with commits ahead of the base
+(noting any open PR number), worktrees skipped for uncommitted changes, and
+worktrees skipped as zero-commit — naming exactly what still needs a human
+look instead of silently omitting it.
+
+**Duplicate-work preflight scanning.** `scripts/setup-agent-worktree.sh
+<name> --task "<description>"` runs an advisory duplicate-work scan before
+creating the worktree (or standalone via `--preflight-only --task
+"<description>"`, useful before even claiming a task). It extracts
+lowercase keywords (>=3 chars, minus a Conventional-Commits stoplist) from
+the task description and greps them against open + recently-merged PR
+titles (`gh pr list`) and in-progress bead titles (`bd list --status
+in_progress`, when `bd` is present). The scan is advisory only — it never
+blocks worktree creation — but a match prints which keyword collided and the
+commands to coordinate before building duplicate work.
 
 ### BEADS_ACTOR Environment Variable
 
