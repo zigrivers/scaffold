@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# {{PROJECT_NAME}} — fast-forward local main to origin/main from anywhere.
+#
+# Usage: scripts/main-sync.sh   (or: make main-sync)
+#
+# - Fetches origin, then fast-forwards `main` wherever it is checked out.
+# - If `main` is checked out nowhere (invariant temporarily violated — e.g. the primary
+#   checkout is detached), restores it into the current checkout when clean.
+# - Refuses (non-zero) if `main` has diverged (any commit ahead of origin/main).
+set -euo pipefail
+
+log()  { printf "→ %s\n" "$*"; }
+warn() { printf "! %s\n" "$*" >&2; }
+
+git rev-parse --is-inside-work-tree >/dev/null 2>&1 || { warn "not in a git repository"; exit 1; }
+
+log "Fetching origin..."
+git fetch --quiet origin || { warn "fetch failed"; exit 1; }
+git rev-parse --verify --quiet origin/main >/dev/null || { warn "origin/main not found"; exit 1; }
+
+# Where is `main` checked out (if anywhere)?
+main_wt="$(git worktree list --porcelain | awk '
+  /^worktree /{ wt = substr($0, 10) }
+  /^branch refs\/heads\/main$/{ print wt }')"
+
+if [[ -z "$main_wt" ]]; then
+  # main is checked out nowhere: restore it into the PRIMARY checkout (the first worktree —
+  # main belongs there), NOT wherever main-sync happens to be run from.
+  primary="$(git worktree list --porcelain | awk 'NR==1 && /^worktree /{ print substr($0, 10) }')"
+  if [[ -z "$primary" ]]; then
+    warn "main is checked out nowhere and the primary checkout could not be located."
+    exit 1
+  fi
+  # Only restore when the primary is detached — never silently switch it off a feature branch.
+  primary_branch="$(git -C "$primary" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+  if [[ -n "$primary_branch" && "$primary_branch" != "main" ]]; then
+    warn "main is checked out nowhere and the primary checkout ($primary) is on branch '$primary_branch'."
+    warn "Refusing to switch it away. Restore main yourself: git -C \"$primary\" switch main"
+    exit 1
+  fi
+  if [[ -n "$(git -C "$primary" status --porcelain --untracked-files=no)" ]]; then
+    warn "main is checked out nowhere and the primary checkout ($primary) has uncommitted changes to tracked files — cannot restore."
+    warn "Expected main in the primary checkout."
+    exit 1
+  fi
+  log "main checked out nowhere — restoring it into the primary checkout: $primary"
+  if git -C "$primary" rev-parse --verify --quiet refs/heads/main >/dev/null; then
+    git -C "$primary" checkout main >/dev/null 2>&1
+  else
+    git -C "$primary" checkout -b main --track origin/main >/dev/null 2>&1
+  fi
+  main_wt="$primary"
+fi
+
+ahead="$(git -C "$main_wt" rev-list --count origin/main..main)"
+if [[ "$ahead" != "0" ]]; then
+  warn "main has diverged from origin/main ($ahead commit(s) ahead) — refusing to fast-forward."
+  warn "Investigate: 'git -C \"$main_wt\" log --oneline origin/main..main'."
+  exit 1
+fi
+
+git -C "$main_wt" merge --ff-only origin/main >/dev/null
+log "main is in sync at $(git -C "$main_wt" rev-parse --short main) (worktree: $main_wt)."

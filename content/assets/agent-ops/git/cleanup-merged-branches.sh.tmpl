@@ -1,0 +1,306 @@
+#!/usr/bin/env bash
+# {{PROJECT_NAME}} — prune merged branches + stale worktrees.
+#
+# Usage:
+#   scripts/cleanup-merged-branches.sh [--dry-run] [--include-external] [--include-zero-commit]
+#   make prune-merged                       # convenience wrapper
+#
+# --include-external also removes merged, clean worktrees OUTSIDE .worktrees/ (the
+# checkouts other tools create under ~/.codex, ~/.cursor, /tmp, …). Off by default.
+# --include-zero-commit also removes clean branch worktrees whose branch never moved
+# after creation, once they are older than the freshness window. Off by default.
+# Always ends with a Triage section listing unmerged/no-PR branches and dirty worktrees.
+#
+# Deletes local branches already merged into the default branch (origin/HEAD,
+# normally main), detected two ways so squash-merges are caught too:
+#   1. commit ancestry  (git merge-base --is-ancestor <branch> <base>)
+#   2. a MERGED pull request into <base> whose head name AND head SHA match the
+#      local branch tip — the SHA check means a name-reused branch, or a branch
+#      with commits added after its PR merged, is NOT mistaken for merged.
+# Then removes worktrees whose branch is merged (clean ones only) and prunes
+# stale worktree admin refs. Checked-out branch worktrees whose tip has not
+# moved since branch creation are skipped so a concurrent agent's
+# pre-first-commit worktree is not mistaken for disposable merged residue.
+#
+# NEVER touches: protected branches (main/master/trunk/develop/dev/release/
+# staging/production), the current branch, branches checked out in a worktree,
+# the primary checkout, or worktrees with uncommitted changes (warns + skips).
+
+set -euo pipefail
+
+DRY_RUN=0
+INCLUDE_EXTERNAL=0
+INCLUDE_ZERO_COMMIT=0
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dry-run) DRY_RUN=1 ;;
+    --include-external) INCLUDE_EXTERNAL=1 ;;
+    --include-zero-commit) INCLUDE_ZERO_COMMIT=1 ;;
+    --help|-h) sed -n '2,/^set -/p' "$0" | sed 's/^# \{0,1\}//; /^set -/d'; exit 0 ;;
+    *) printf "! unknown arg: %s (try --dry-run, --include-external, --include-zero-commit)\n" "$1" >&2; exit 2 ;;
+  esac
+  shift
+done
+
+log()  { printf "→ %s\n" "$*"; }
+warn() { printf "! %s\n" "$*" >&2; }
+# Run a git command directly (no eval, so refnames/paths with metacharacters are
+# safe). In dry-run, print what would run. Returns the command's exit status.
+act()  { if [[ $DRY_RUN -eq 1 ]]; then printf "  [dry-run] %s\n" "$*"; return 0; fi; "$@"; }
+
+# This script's own directory — so an optional staging-teardown helper resolves regardless of which
+# checkout invoked us.
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+PROTECTED='^(main|master|trunk|develop|dev|release|staging|production)$'
+
+git rev-parse --is-inside-work-tree >/dev/null 2>&1 || { warn "not in a git repository"; exit 1; }
+# The PRIMARY checkout (first `git worktree list` entry) — so the "never the primary" guard and
+# the `.worktrees/` internal/external split resolve correctly even when this script is run from
+# a linked worktree, not just the primary. Falls back to the current toplevel if unavailable.
+ROOT="$(git worktree list --porcelain | awk 'NR==1 && /^worktree /{ print substr($0, 10) }')"
+[[ -n "$ROOT" ]] || ROOT="$(git rev-parse --show-toplevel)"
+
+# Dry-run only syncs refs (no --prune) so a preview never deletes anything,
+# even remote-tracking refs.
+if [[ $DRY_RUN -eq 1 ]]; then
+  log "Fetching remote-tracking refs (dry-run: no prune)..."
+  git fetch --quiet origin || warn "fetch failed — continuing with local state"
+else
+  log "Fetching + pruning remote-tracking refs..."
+  git fetch --prune --quiet origin || warn "fetch failed — continuing with local state"
+fi
+
+# Resolve the default branch from origin/HEAD; populate it if unset; fall back to main.
+DEFAULT="$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's@^origin/@@')"
+if [[ -z "$DEFAULT" ]]; then
+  git remote set-head origin --auto >/dev/null 2>&1 || true
+  DEFAULT="$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's@^origin/@@')"
+fi
+[[ -z "$DEFAULT" ]] && DEFAULT="main"
+BASE="origin/$DEFAULT"
+git rev-parse --verify --quiet "$BASE" >/dev/null || { warn "$BASE not found — cannot determine the merge base; aborting"; exit 1; }
+log "Base branch: $BASE"
+
+# Merged-PR map: "<headRefName> <headRefOid>" per line, scoped to PRs merged into
+# the default branch. Empty (with a visible warning) when gh is unavailable or
+# fails — ancestry detection still applies.
+MERGED_MAP=""
+if command -v gh >/dev/null 2>&1; then
+  # --limit 1000: cleanup runs often, so recently-merged branches are well within
+  # the window; only branches from >1000 PRs ago could miss the PR-SHA path.
+  # </dev/null so gh can never block prompting for auth in an unattended run.
+  if ! MERGED_MAP="$(gh pr list --state merged --base "$DEFAULT" --limit 1000 \
+      --json headRefName,headRefOid --jq '.[] | .headRefName + " " + .headRefOid' </dev/null 2>/dev/null)"; then
+    warn "gh query failed (auth? network?) — squash-merged branches will NOT be detected this run"
+    MERGED_MAP=""
+  fi
+else
+  warn "gh not found — squash-merged branches without ancestry will NOT be detected"
+fi
+
+# SHA-only view of merged-PR heads — lets us catch detached worktrees (which carry no
+# branch name to match) whose HEAD is a squash-merged pre-squash tip (never an ancestor).
+MERGED_SHAS="$(awk '{print $2}' <<<"$MERGED_MAP")"
+
+is_merged() {
+  # Qualify as refs/heads/<name> so a same-named tag/remote ref can't shadow the
+  # branch and make an unmerged branch look merged.
+  local b="$1" tip
+  git merge-base --is-ancestor "refs/heads/$b" "$BASE" 2>/dev/null && return 0
+  [[ -n "$MERGED_MAP" ]] || return 1
+  tip="$(git rev-parse --verify --quiet "refs/heads/$b" 2>/dev/null)" || return 1
+  grep -qxF -- "$b $tip" <<<"$MERGED_MAP" && return 0   # merged PR head name AND SHA match
+  return 1
+}
+
+is_merged_sha() {
+  # A detached worktree's HEAD SHA matching a merged PR's head commit means its content
+  # is in $BASE even though (under squash) that SHA is not an ancestor.
+  local sha="$1"
+  [[ -n "$MERGED_SHAS" ]] || return 1
+  grep -qxF -- "$sha" <<<"$MERGED_SHAS" && return 0
+  return 1
+}
+
+has_no_commits_after_creation() {
+  local b="$1" tip reflog_count oldest_entry created_tip subject
+  ZERO_GUARD_REASON=""
+  tip="$(git rev-parse --verify --quiet "refs/heads/$b" 2>/dev/null)" || return 1
+  # Git has no direct "oldest reflog entry" selector across both files and the
+  # reftable backend, so count entries first and then select @{count-1}.
+  reflog_count="$(git reflog show --format=%H "refs/heads/$b" 2>/dev/null | wc -l | tr -d '[:space:]' || true)"
+  if [[ ! "$reflog_count" =~ ^[0-9]+$ || "$reflog_count" -eq 0 ]]; then
+    # If the creation point is unavailable, fail closed for checked-out branch
+    # worktrees. Deleting a live agent worktree is worse than leaving stale residue
+    # for an explicit --include-zero-commit sweep.
+    ZERO_GUARD_REASON="branch reflog unavailable or ambiguous; fail-closed skip"
+    return 0
+  fi
+  oldest_entry="$(git reflog show -n 1 --format='%H%x09%gs' "refs/heads/$b@{$((reflog_count - 1))}" 2>/dev/null || true)"
+  created_tip="${oldest_entry%%$'\t'*}"
+  subject="${oldest_entry#*$'\t'}"
+  if [[ "$oldest_entry" != *$'\t'* || "$subject" != branch:\ Created\ from* ]]; then
+    # A truncated or rewritten reflog may no longer prove the branch creation
+    # tip. Treat that ambiguity like a missing reflog.
+    ZERO_GUARD_REASON="branch reflog unavailable or ambiguous; fail-closed skip"
+    return 0
+  fi
+  if [[ "$tip" == "$created_tip" ]]; then
+    ZERO_GUARD_REASON="branch has zero unique commits after creation"
+    return 0
+  fi
+  return 1
+}
+
+# ----- 1. Remove worktrees whose branch/HEAD is merged (clean ones only) -----
+log "Checking worktrees..."
+wt_removed=0
+FREED=""            # branches whose worktree was (or would be) removed — now deletable in §2
+SKIPPED_DIRTY=""    # merged worktrees left in place because they had uncommitted changes
+SKIPPED_ZERO=""     # merged branch worktrees left in place because the branch never moved after creation
+# Deepest paths first so a nested worktree is removed before its parent.
+while IFS=$'\t' read -r wt br; do
+  [[ "$wt" == "$ROOT" ]] && continue          # never the primary checkout
+  [[ -z "$br" ]] && continue
+  # Worktrees outside .worktrees/ (external tools' checkouts) need explicit opt-in.
+  if [[ "$wt" != "$ROOT/.worktrees/"* && $INCLUDE_EXTERNAL -eq 0 ]]; then continue; fi
+  if [[ "$br" == "(detached)" ]]; then
+    head_sha="$(git -C "$wt" rev-parse HEAD 2>/dev/null)" || continue
+    { git merge-base --is-ancestor "$head_sha" "$BASE" 2>/dev/null || is_merged_sha "$head_sha"; } || continue
+  else
+    [[ "$br" =~ $PROTECTED || "$br" == "$DEFAULT" ]] && continue
+    is_merged "$br" || continue
+  fi
+  if [[ -n "$(git -C "$wt" status --porcelain 2>/dev/null)" ]]; then
+    # Dirty-before-fresh is intentional: a fresh dirty worktree is still
+    # protected, but the operator sees the actionable reason it was skipped.
+    warn "skip worktree $wt (merged) — has uncommitted changes; resolve manually"
+    SKIPPED_DIRTY="$SKIPPED_DIRTY$wt"$'\n'
+    continue
+  fi
+  # Skip freshly created worktrees to avoid sweeping a concurrent agent's
+  # new clean worktree before their first commit or setup step finishes.
+  # 5 minutes = 300 seconds threshold. Older zero-commit branch worktrees get a
+  # separate checked-out-branch guard below unless --include-zero-commit is set.
+  if command -v stat >/dev/null 2>&1; then
+    mtime=0
+    now=0
+    age=0
+    if stat --help 2>&1 | grep -q 'GNU'; then
+      mtime="$(stat -c %Y "$wt" 2>/dev/null || echo 0)"
+    else
+      mtime="$(stat -f %m "$wt" 2>/dev/null || echo 0)"
+    fi
+    now="$(date +%s)"
+    age=$((now - mtime))
+    if [[ $mtime -ne 0 && $age -lt 300 ]]; then
+      log "skip worktree $wt ($br merged) — freshly created (age: ${age}s < 300s); skipping to protect concurrent work"
+      continue
+    fi
+  fi
+  if [[ "$br" != "(detached)" && $INCLUDE_ZERO_COMMIT -eq 0 ]]; then
+    if has_no_commits_after_creation "$br"; then
+      log "skip worktree $wt ($br merged) — $ZERO_GUARD_REASON; protect concurrent work"
+      SKIPPED_ZERO="$SKIPPED_ZERO$wt"$'\t'"$ZERO_GUARD_REASON"$'\n'
+      continue
+    fi
+  fi
+  if act git worktree remove "$wt"; then
+    log "  removed worktree $wt ($br merged)"
+    wt_removed=$((wt_removed + 1))
+    [[ "$br" != "(detached)" ]] && FREED="$FREED$br"$'\n'
+    # Reclaim this worktree's staging resources if the project ships a teardown helper.
+    # Optional and never fatal to the prune — projects without it skip cleanly.
+    if [[ $DRY_RUN -eq 0 && -f "$HERE/ops/staging-teardown.sh" ]]; then
+      "$HERE/ops/staging-teardown.sh" --for-worktree "$wt" \
+        || warn "staging teardown for $wt reported an issue — continuing"
+    fi
+  else
+    warn "could not remove worktree $wt (locked?) — skipping"
+  fi
+done < <(
+  git worktree list --porcelain | awk '
+    /^worktree /{ wt=substr($0,10); br="" }
+    /^branch /{ br=$2; sub(/refs\/heads\//,"",br) }
+    /^detached/{ br="(detached)" }
+    /^$/{ if (wt!="") print wt "\t" br; wt="" }
+    END{ if (wt!="") print wt "\t" br }
+  ' | awk -F'\t' '{ print length($1), $0 }' | sort -rn | cut -d" " -f2-
+)
+log "Removed $wt_removed merged worktree(s)."
+
+# ----- 2. Delete merged local branches -----
+# Re-read checked-out branches AFTER worktree removal so branches just freed are deletable.
+CURRENT="$(git symbolic-ref --quiet --short HEAD || echo '')"
+CHECKED_OUT="$(git worktree list --porcelain | awk '/^branch /{sub(/refs\/heads\//,"",$2); print $2}')"
+
+log "Checking local branches..."
+br_deleted=0
+while IFS= read -r b; do
+  [[ -z "$b" ]] && continue
+  [[ "$b" =~ $PROTECTED || "$b" == "$DEFAULT" ]] && continue
+  [[ "$b" == "$CURRENT" ]] && continue
+  # Skip if still checked out in a worktree we didn't (and won't) remove. A
+  # branch freed in §1 is deletable — in dry-run the worktree list is unchanged,
+  # so consult FREED to preview accurately.
+  if grep -qxF -- "$b" <<<"$CHECKED_OUT" && ! grep -qxF -- "$b" <<<"$FREED"; then continue; fi
+  is_merged "$b" || continue
+  if act git branch -D "$b"; then
+    log "  deleted branch $b"
+    br_deleted=$((br_deleted + 1))
+  else
+    warn "could not delete branch $b — skipping"
+  fi
+done < <(git for-each-ref --format='%(refname:short)' refs/heads/)
+log "Deleted $br_deleted merged branch(es)."
+
+# ----- 3. Prune stale worktree admin refs -----
+act git worktree prune
+
+# ----- 4. Triage report: what was NOT cleaned (needs a human decision) -----
+log "Triage — not cleaned (review):"
+# One gh call for all open PR heads (avoids a network round-trip per branch); "<headRefName>
+# <number>" per line. `// empty`-free by construction — a branch with no open PR simply
+# won't appear in the map, so the awk lookup yields "".
+OPEN_PR_MAP=""
+if command -v gh >/dev/null 2>&1; then
+  OPEN_PR_MAP="$(gh pr list --state open --limit 500 --json number,headRefName \
+    --jq '.[] | .headRefName + " " + (.number|tostring)' 2>/dev/null || true)"
+fi
+triage_any=0
+while IFS= read -r b; do
+  [[ -z "$b" ]] && continue
+  [[ "$b" =~ $PROTECTED || "$b" == "$DEFAULT" ]] && continue
+  is_merged "$b" && continue
+  ahead="$(git rev-list --count "$BASE..refs/heads/$b" 2>/dev/null || echo 0)"
+  [[ "$ahead" == "0" ]] && continue
+  pr="$(awk -v b="$b" '$1==b{print $2; exit}' <<<"$OPEN_PR_MAP")"
+  if [[ -n "$pr" ]]; then
+    log "  branch $b — $ahead commit(s) ahead of $DEFAULT, open PR #$pr"
+  else
+    log "  branch $b — $ahead commit(s) ahead of $DEFAULT, no PR"
+  fi
+  triage_any=1
+done < <(git for-each-ref --format='%(refname:short)' refs/heads/)
+if [[ -n "$SKIPPED_DIRTY" ]]; then
+  while IFS= read -r w; do
+    [[ -z "$w" ]] && continue
+    log "  worktree $w — merged but has uncommitted changes (skipped)"
+    triage_any=1
+  done <<<"$SKIPPED_DIRTY"
+fi
+if [[ -n "$SKIPPED_ZERO" ]]; then
+  while IFS=$'\t' read -r w reason; do
+    [[ -z "$w" ]] && continue
+    log "  worktree $w — $reason (skipped; use ARGS=--include-zero-commit to prune abandoned ones)"
+    triage_any=1
+  done <<<"$SKIPPED_ZERO"
+fi
+[[ $triage_any -eq 0 ]] && log "  (nothing — every branch/worktree is merged or a clean base)"
+
+if [[ $DRY_RUN -eq 1 ]]; then
+  log "Dry run only — nothing was changed. Re-run without --dry-run to apply."
+else
+  log "Done. Removed $wt_removed worktree(s), deleted $br_deleted branch(es)."
+fi

@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# Export the local beads DB to .beads/issues.jsonl — a durable local recovery
+# point before any DB reset. Invoked by `make beads-snapshot`.
+#
+# Beads is OPTIONAL: if the `bd` CLI is not installed, or this project has no
+# .beads/ database, the script prints a note and exits 0 (nothing to snapshot).
+#
+# Atomicity: export writes to an mktemp sibling in .beads/, then `mv -f` renames
+# it into place, so a failed export never clobbers a prior good snapshot. An EXIT
+# trap removes the temp on any failure or interrupt (bash runs EXIT traps on
+# SIGINT too), so it never lingers.
+set -euo pipefail
+
+# bd optional: a project without the beads CLI is a graceful no-op, not an error.
+if ! command -v bd >/dev/null 2>&1; then
+	printf '%s\n' "→ bd not found on PATH — skipping beads snapshot (nothing to do)."
+	exit 0
+fi
+
+# No beads DB in this project: nothing for bd to snapshot. Graceful no-op.
+if [ ! -d .beads ]; then
+	printf '%s\n' "→ no .beads/ database here — nothing for bd to snapshot; skipping."
+	exit 0
+fi
+
+# Install the cleanup trap before mktemp so an interrupt around creation still
+# removes the temp; `rm -f ""` is a silent no-op if we're hit before the name is
+# captured.
+tmp=""
+trap '[ -n "$tmp" ] && rm -f "$tmp"' EXIT
+tmp="$(mktemp .beads/issues.jsonl.XXXXXX)"
+
+# 2>&1 captures both streams so any diagnostic bd emits (on either stream) is
+# withheld from the success output and surfaced on failure. The `if` consumes
+# bd's exit status, so `set -e` does not abort on a failed export.
+if err="$(bd export --all -o "$tmp" 2>&1)"; then
+	if mv -f "$tmp" .beads/issues.jsonl; then
+		printf '%s\n' "✓ wrote .beads/issues.jsonl — a local restore copy for 'bd import' after a wipe; still push to the remote (bootstrap won't auto-use it)"
+	else
+		printf '%s\n' "✗ beads-snapshot failed — could not move the snapshot into place; prior snapshot unchanged" >&2
+		exit 1
+	fi
+else
+	if [ -n "$err" ]; then
+		printf '%s\n' "$err" >&2
+	fi
+	printf '%s\n' "✗ beads-snapshot failed — snapshot left unchanged" >&2
+	exit 1
+fi
