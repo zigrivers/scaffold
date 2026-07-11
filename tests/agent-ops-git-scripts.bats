@@ -116,3 +116,15 @@ EOF
     [ "$status" -eq 0 ]
     [[ "$output" == *bd* ]]
 }
+
+@test "agent-ops.mk: git targets run; staging targets fail cleanly without staging component" {
+    sed 's/{{PROJECT_NAME}}/testproj/g' \
+        "$BATS_TEST_DIRNAME/../content/assets/agent-ops/make/agent-ops.mk.tmpl" \
+        > "$CLONE_DIR/agent-ops.mk"
+    printf -- '-include agent-ops.mk\n' > "$CLONE_DIR/Makefile"
+    run make -C "$CLONE_DIR" doctor
+    [ "$status" -eq 0 ]
+    run make -C "$CLONE_DIR" staging-up
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"staging component not installed"* ]]
+}

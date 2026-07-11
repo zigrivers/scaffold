@@ -1,0 +1,44 @@
+# agent-ops.mk — installed by `scaffold agent-ops install`. Do not edit; re-run
+# the installer to update. Targets marked [agent-safe] may run unattended.
+
+.PHONY: main-sync prune-merged doctor doctor-fix beads-snapshot \
+        staging-up staging-down staging-prune docker-doctor tc-reap
+
+main-sync: ## [agent-safe] Fetch + fast-forward main from anywhere
+	@scripts/main-sync.sh
+
+prune-merged: ## [agent-safe] Sweep merged branches/worktrees + reclaim staging
+	@scripts/cleanup-merged-branches.sh
+
+doctor: ## [agent-safe] Diagnose primary-checkout invariant (read-only)
+	@scripts/doctor.sh
+
+doctor-fix: ## [agent-safe] Repair unattended-safe primary-checkout problems
+	@scripts/doctor.sh --fix
+
+beads-snapshot: ## [agent-safe] Export beads DB to a local git-ignored restore copy
+	@scripts/beads-snapshot.sh
+
+define staging_guard
+	@test -f scripts/ops/staging-env.sh || { echo "staging component not installed (run: scaffold agent-ops install --component staging)"; exit 1; }
+endef
+
+staging-up: ## [agent-safe, worktree-only] Start this worktree's staging stack
+	$(staging_guard)
+	@bash -c 'source scripts/ops/docker-env.sh && source scripts/ops/staging-env.sh && docker compose -f ops/compose/staging.yml --env-file ops/compose/staging.env up -d'
+
+staging-down: ## [agent-safe] Stop this worktree's staging stack
+	$(staging_guard)
+	@bash -c 'source scripts/ops/docker-env.sh && source scripts/ops/staging-env.sh && docker compose -f ops/compose/staging.yml --env-file ops/compose/staging.env down -v'
+
+staging-prune: ## [agent-safe] Reap orphaned per-worktree staging stacks
+	$(staging_guard)
+	@scripts/ops/staging-teardown.sh --reap
+
+docker-doctor: ## [agent-safe] Show engine placement; warn on split-brain
+	$(staging_guard)
+	@scripts/ops/docker-doctor.sh
+
+tc-reap: ## [agent-safe] Remove leaked testcontainers from dead sessions
+	$(staging_guard)
+	@scripts/ops/tc-reap.sh
