@@ -117,9 +117,8 @@ Before writing any code, verify the worktree environment:
 These rules are critical for multi-agent operation:
 
 - **Never run `git checkout main`** — it will fail because main is checked out in the main repo
-- **Always branch from remote**: `git fetch origin && git checkout -b <branch-name> origin/main`
-- **Between tasks, clean up**: `git fetch origin --prune && git clean -fd` then run the install command from CLAUDE.md Key Commands
-- **Use unique branch names** — include the agent name or task ID to avoid conflicts with other agents
+- **Work on your `agent/<name>` branch** — the worktree already tracks `origin/main`; commit each bead's task work **directly** on `agent/<name>`. Do NOT create per-task branches, and never put an agent name or task ID in a branch name (reference the task ID in the commit/PR body as `Closes <id>`)
+- **Between beads, rebase your own branch**: `git fetch origin --prune && git rebase origin/main && git clean -fd`, then run the install command from CLAUDE.md Key Commands
 
 ### Beads Detection
 
@@ -275,7 +274,9 @@ stay scoped to materialized plan tasks (`bd ready --claim
 - Or reference `docs/git-workflow.md` section 7 for manual worktree setup
 
 **`git checkout main` fails:**
-- This is expected in a worktree. Use `git fetch origin && git checkout -b <branch> origin/main` instead.
+- This is expected in a worktree. Recover by rebasing your own branch onto the
+  remote: `git fetch origin && git rebase origin/main` — never create a per-task
+  branch; you commit directly on `agent/<name>`.
 
 **Merge conflicts on PR:**
 - `git fetch origin && git rebase origin/main`

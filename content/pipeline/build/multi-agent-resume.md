@@ -317,7 +317,9 @@ stay scoped to materialized plan tasks (`bd ready --claim
 - Skip to the next available task
 
 **`git checkout main` fails:**
-- This is expected in a worktree. Use `git fetch origin && git checkout -b <branch> origin/main` instead.
+- This is expected in a worktree. Recover by rebasing your own branch onto the
+  remote: `git fetch origin && git rebase origin/main` — never create a per-task
+  branch; you commit directly on `agent/<name>`.
 
 **Dependency install fails after cleanup:**
 - `git clean -fd` may have removed generated files — re-run the full install sequence

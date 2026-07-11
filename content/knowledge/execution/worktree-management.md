@@ -23,12 +23,12 @@ Expert knowledge for managing git worktrees to enable parallel multi-agent execu
 
 ### Setup
 
-Use `scripts/setup-agent-worktree.sh <agent-name>` to create a worktree at `.worktrees/<agent-name>/` (project-local). Each agent gets its own isolated working directory and workspace branch.
+Use `scripts/setup-agent-worktree.sh <agent-name> --install` to create a worktree at `.worktrees/<agent-name>/` (project-local). Each agent gets its own isolated working directory on its own `agent/<name>` branch. The `--install` flag runs the project's configured worktree setup commands (dependency installs); a plain invocation creates the worktree but installs nothing.
 
 ### Branching Conventions
 
-- Each agent operates on a workspace branch (e.g., `agent-1-workspace`)
-- Feature branches are created from `origin/main` — never from local `main`
+- Each agent commits its task work **directly** on its own `agent/<name>` branch — there are no per-task feature branches, and no work-item or bead IDs ever appear in a branch name (reference them in the commit/PR body as `Closes <id>`)
+- Keep `agent/<name>` current by rebasing it onto `origin/main` between beads — never branch from local `main` (it may be stale)
 - Never run `git checkout main` inside a worktree — it will fail because `main` is checked out in the primary repo
 
 ### Cleanup
@@ -43,58 +43,63 @@ After all agents finish, remove worktrees and prune stale references. Delete mer
 
 ```bash
 # From the main repository
-scripts/setup-agent-worktree.sh agent-1
+scripts/setup-agent-worktree.sh agent-1 --install
 
 # This creates:
-#   .worktrees/agent-1/        (working directory, project-local)
-#   Branch: agent-1-workspace  (workspace branch)
+#   .worktrees/agent-1/    (working directory, project-local)
+#   Branch: agent/agent-1  (the agent's own branch — task work commits here)
 ```
 
 **What the setup script does:**
 1. Creates a new worktree directory project-local under `.worktrees/`
-2. Creates a workspace branch for the agent
+2. Creates the agent's `agent/<name>` branch tracking `origin/main`
 3. Sets up the working directory with a clean state
-4. Installs dependencies if a package manager is detected
+4. Runs the project's configured worktree setup commands (dependency installs) **only when passed `--install`** — a plain invocation installs nothing
 
 **Multiple agents:**
 
 ```bash
-scripts/setup-agent-worktree.sh agent-1
-scripts/setup-agent-worktree.sh agent-2
-scripts/setup-agent-worktree.sh agent-3
+scripts/setup-agent-worktree.sh agent-1 --install
+scripts/setup-agent-worktree.sh agent-2 --install
+scripts/setup-agent-worktree.sh agent-3 --install
 ```
 
 Each agent has a completely isolated working directory. They share the same `.git` object store but have separate working trees, index files, and HEAD pointers.
 
-### Workspace Branch Conventions
+### The `agent/<name>` Branch
 
-Each agent gets a persistent workspace branch that serves as its "home base":
+Each agent has one persistent branch — `agent/<name>` — that it commits **all**
+of its task work to directly. There are no per-task feature branches layered on
+top of it:
 
-- `agent-1-workspace`, `agent-2-workspace`, etc.
-- The workspace branch is where the agent returns between tasks
-- Feature branches for individual tasks are created from `origin/main`, not from the workspace branch
+- The worktree is created on `agent/<name>`, which tracks `origin/main`
+- Each bead's work is committed straight onto `agent/<name>`; one PR per agent at
+  a time carries that work to `main`
+- The bead/task ID never appears in the branch name — it goes in the commit/PR
+  body as `Closes <id>`
 
-**Why workspace branches exist:**
-- A worktree requires a branch that isn't checked out elsewhere
-- The workspace branch prevents conflicts with `main` (which is checked out in the primary repo)
-- It provides a stable base for the agent to return to between tasks
+**Why one branch per worktree (not one per task):**
+- A worktree requires a branch that isn't checked out elsewhere; `agent/<name>`
+  is that branch and it never collides with `main` (checked out in the primary)
+- Committing directly on it keeps the model simple — no branch bookkeeping, no
+  IDs in branch names, nothing to "switch back" to between beads
 
 ### Branching — Extended
 
-**Creating a feature branch for a task:**
+**Starting the next bead on `agent/<name>`:**
 
 ```bash
-# Inside the agent's worktree
+# Inside the agent's worktree, before starting the next bead
 git fetch origin
-git checkout -b feat/add-user-endpoint origin/main
+git rebase origin/main   # bring agent/<name> up to date; do NOT create a new branch
 ```
 
 **Critical rules:**
-- Always branch from `origin/main` — never from local `main` (it may be stale) and never from the workspace branch
-- Branch naming: `<type>/<short-desc>` (e.g. `feat/add-user-endpoint`) —
-  bead IDs never appear in the branch name; reference the task ID in the
-  commit/PR body instead (e.g. `Closes bd-42`)
-- One branch per task — never combine multiple tasks on a single branch
+- Rebase `agent/<name>` onto `origin/main` between beads — never branch from
+  local `main` (it may be stale)
+- Commit task work directly on `agent/<name>`; do **not** create per-task
+  branches, and never put a work-item or bead ID in the branch name — reference
+  the task ID in the commit/PR body instead (e.g. `Closes bd-42`)
 
 **Never run `git checkout main` in a worktree:**
 - The `main` branch is checked out in the primary repo
@@ -103,14 +108,16 @@ git checkout -b feat/add-user-endpoint origin/main
 
 ### Between Tasks
 
-After completing a task (PR created and CI passing), prepare for the next one:
+After a bead's PR has merged (local quality gates green + `mmr review` passed —
+CI is deferred until launch), prepare for the next one on the same
+`agent/<name>` branch:
 
 ```bash
 # Fetch latest state from remote
 git fetch origin --prune
 
-# Switch back to workspace branch
-git checkout agent-1-workspace
+# Rebase agent/<name> onto the freshly-merged main (stay on your own branch)
+git rebase origin/main
 
 # Clean up untracked files and directories
 git clean -fd
@@ -121,6 +128,7 @@ git clean -fd
 
 **Why this matters:**
 - `git fetch --prune` ensures you see newly merged branches and removed remote branches
+- Rebasing `agent/<name>` onto `origin/main` picks up other agents' merged work
 - `git clean -fd` removes artifacts from the previous task
 - Dependency reinstallation catches changes merged by other agents
 
@@ -186,19 +194,23 @@ git branch --merged origin/main | grep -vE '^\*|main|agent/' | xargs -r git bran
 ```
 
 This deletes all local branches merged to `origin/main`, excluding the
-current branch, `main`, and worktree workspace branches (`agent/<name>`).
+current branch, `main`, and the worktree `agent/<name>` branches.
 Safe because `--merged` ensures only fully-merged branches are deleted, and
 `-d` (not `-D`) refuses to delete unmerged branches.
 
-**Cleanup of workspace branches:**
+**Cleanup of `agent/<name>` branches:**
 
-After all agents are done and their worktrees are removed:
+Prefer `scripts/teardown-agent-worktree.sh <path>`, which harvests the ledger,
+removes the worktree, and deletes its `agent/<name>` branch under guards (it
+never deletes the primary's checked-out branch or the default branch). For a
+manual sweep after all agents are done and their worktrees removed:
 
 ```bash
-git branch | grep "workspace" | xargs -r git branch -D
+git branch --list 'agent/*' | xargs -r git branch -D
 ```
 
-Use `-D` here because workspace branches are not merged — they're disposable.
+Use `-D` here because a squash-merged `agent/<name>` tip is never an ancestor of
+`main`, so `-d` would refuse it even though the work is safely on `main`.
 
 ### Doctor, Pruning, and Preflight — Keeping the Fleet Honest
 

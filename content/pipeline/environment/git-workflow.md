@@ -154,9 +154,10 @@ modified files without `--force`; never pass `--force` in generation mode.
    project_name: <slug>
    worktree_setup_commands: []   # e.g. ["npm ci"], pulled from docs/dev-setup.md
    ```
-   If `.scaffold/agent-ops.yaml` already exists, leave it untouched — a
-   later step (`staging-environments`, if enabled) extends it, and this
-   step must not clobber prior customizations.
+   If `.scaffold/agent-ops.yaml` already exists, leave it untouched — an
+   earlier step (`staging-environments`, if enabled, runs first at order 315)
+   may already have written the full docker config, and this step must not
+   clobber prior customizations.
 2. Install the git component and confirm it landed clean:
    ```bash
    scaffold agent-ops install --component git
@@ -225,9 +226,10 @@ Depth-gate per Methodology Scaling above.
    them, and one open PR per agent at a time.
 8. **Parallel agents and worktrees** — `.worktrees/<name>` on branch
    `agent/<name>`, created via `scripts/setup-agent-worktree.sh <name>
-   --task "..."`; per-worktree agent identity via git config; cleanup via
-   `make prune-merged` (squash-aware — detects merged branches even when
-   ancestry alone would miss a squash merge).
+   --install --task "..."` (`--install` runs the dependency-install setup
+   commands — a plain invocation installs nothing); per-worktree agent
+   identity via git config; cleanup via `make prune-merged` (squash-aware —
+   detects merged branches even when ancestry alone would miss a squash merge).
 9. **The primary-checkout invariant** — the top-level clone stays on
    `main`, never a feature branch, never detached; agents work in
    worktrees, not the primary checkout. `make doctor` diagnoses the
@@ -248,7 +250,7 @@ Depth-gate per Methodology Scaling above.
     commit, push, `gh pr create`, `mmr review --pr`, `gh pr merge
     --squash --delete-branch`, `make main-sync && make prune-merged`) and
     the parallel-agent worktree variant (`scripts/setup-agent-worktree.sh
-    <name>`, `cd .worktrees/<name>`, work normally).
+    <name> --install`, `cd .worktrees/<name>`, work normally).
 
 ### Configure the PostToolUse review-reminder hook
 Merge (never overwrite) the following into the target project's
@@ -281,7 +283,7 @@ Update these sections (create if missing) with the D7 branch/commit
 conventions and the local-quality-gate framing above. Cross-reference
 docs/git-workflow.md rather than restating its full content:
 - **Committing/PR Workflow** — branch naming, commit format, and the
-  8-step flow with `mmr review --pr` as the mandatory step
+  8-step flow with `mmr review --pr` as mandatory step 5.5
 - **Task Closure** — sync main, mark scaffold steps complete, close beads
   only after the merge is verified
 - **Parallel Sessions** — one open PR per agent, the agent-ops worktree

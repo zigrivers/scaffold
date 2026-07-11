@@ -181,9 +181,10 @@ order:
       an open/draft PR.
    3. Claim from the primary checkout: `bd ready --claim` (or
       `bd update <id> --status in_progress`).
-   4. Worktree + build: `scripts/setup-agent-worktree.sh <name> --task
-      "<title>"`; draft PR on the first push — the draft is the visible
-      claim.
+   4. Worktree + build: `scripts/setup-agent-worktree.sh <name> --install
+      --task "<title>"` (`--install` runs the dependency-install setup
+      commands — a plain invocation installs nothing); draft PR on the first
+      push — the draft is the visible claim.
    5. Verify: `make check` green on branch HEAD, personally watched.
    6. Review + merge: `mmr review --pr <N> --sync --format json` (3-round
       cap, degraded-pass self-merge past the cap); `gh pr merge --squash

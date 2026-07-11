@@ -40,8 +40,8 @@ branch.
 
 ## Setup — `setup-agent-worktree.sh`
 
-`scripts/setup-agent-worktree.sh <agent-name>` creates a permanent worktree for
-one parallel agent. Given a name like `alpha`, it:
+`scripts/setup-agent-worktree.sh <agent-name> --install` creates a permanent
+worktree for one parallel agent. Given a name like `alpha`, it:
 
 1. **Normalizes the name** to a lowercase, hyphenated, alphanumeric slug (so
    `Agent_1` becomes `agent-1`), then derives the worktree directory project-local
@@ -63,6 +63,11 @@ one parallel agent. Given a name like `alpha`, it:
    version. (Beads DB sharing is automatic — worktrees discover the main repo's
    task DB via git's common directory, so there is nothing for `bd doctor` to
    register.)
+
+With `--install`, it additionally runs the project's configured worktree setup
+commands (dependency installs) inside the fresh checkout — pass it whenever the
+worktree needs to build and test, since a plain invocation creates the worktree
+but installs nothing.
 
 The `worktree_id` is what later lets the harvester tell one worktree's ledger
 from another's — see the [observability guide](../observability/index.md) for
@@ -148,9 +153,11 @@ footprint small and its branches short. The conflict-prevention rules from
   into needless conflicts.
 
 Each agent otherwise follows the standard PR workflow from its own worktree:
-branch, commit, push, `gh pr create`, wait for CI, squash-merge. The shared
-object store means a merge from agent `alpha`'s worktree is on `main` for
-everyone the moment it lands.
+commit on `agent/<name>`, push, `gh pr create`, run `mmr review` (mandatory
+step 5.5), watch the local quality gates go green (pre-commit + `make check` —
+CI is deferred until launch), then squash-merge. The shared object store means a
+merge from agent `alpha`'s worktree is on `main` for everyone the moment it
+lands.
 
 ## Teardown & harvest
 

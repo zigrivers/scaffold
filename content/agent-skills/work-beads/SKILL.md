@@ -68,10 +68,11 @@ For explicit-ID invocations: topologically sort the listed IDs by dependency
 (a `.scaffold/` directory and the `scaffold` CLI), also
 `scaffold observe event claim --task <id>` — feature-detect and skip silently.
 
-**2.2 Worktree:** `scripts/setup-agent-worktree.sh <name> --task "<bead title>"`,
-then `cd .worktrees/<name>`. The script runs the configured worktree setup
-commands — skipping dependency install is a known `make check` breaker. Need a
-live stack? `make staging-up` **from the worktree** (never the primary).
+**2.2 Worktree:** `scripts/setup-agent-worktree.sh <name> --install --task "<bead title>"`,
+then `cd .worktrees/<name>`. The `--install` flag runs the configured worktree
+setup commands (dependency installs) — omitting it is a known `make check`
+breaker, because a plain invocation creates the worktree but installs nothing.
+Need a live stack? `make staging-up` **from the worktree** (never the primary).
 
 **2.3 Build:** use the Superpowers discipline if available (brainstorm → plan →
 TDD); otherwise write the failing test first. Commit and push frequently on

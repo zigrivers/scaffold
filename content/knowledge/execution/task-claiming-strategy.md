@@ -24,8 +24,8 @@ Before starting a task, verify all its blockers are resolved. After completing e
 
 ### Multi-Agent Conflict Avoidance
 
-- Claim the task before starting work (branch creation = claim)
-- Communicate via git branches — branch existence signals ownership
+- Claim the task before starting work — an atomic `bd` claim plus a draft PR is the claim signal (not branch creation)
+- Communicate via the draft PR and `bd` status — an open/draft PR and an `in_progress` bead signal ownership
 - Detect file overlap in implementation plans before starting — if two tasks modify the same files, they should not run in parallel
 
 ## Deep Guidance
@@ -37,7 +37,7 @@ Before starting a task, verify all its blockers are resolved. After completing e
 2. Filter to tasks with status "ready" or "unblocked"
 3. Sort by task ID (ascending)
 4. Select the first task in the sorted list
-5. Claim it by creating a feature branch
+5. Claim it atomically (`bd ready --claim`) and open a draft PR on the first push
 
 **Why lowest-ID first:**
 - Deterministic — two agents independently applying this rule will never pick the same task (the first agent claims it, the second sees it as taken)
@@ -70,8 +70,8 @@ Before starting a task, verify all its blockers are resolved. After completing e
 ### Multi-Agent Conflict Avoidance — Extended
 
 **Claiming a task:**
-- Creating a feature branch (e.g., `feat/add-user-endpoint`) is the claim signal — the bead ID stays out of the branch name; the PR body's `Closes bd-a3f8` reference ties the claim to the task
-- Other agents should check for existing branches before claiming the same task
+- The claim is an atomic `bd ready --claim` (sets `in_progress` + assignee) plus a draft PR opened on the first push — not branch creation. The draft PR is the visible claim other agents see; the bead ID stays out of the branch name and rides in the PR body as `Closes bd-a3f8`
+- Other agents should check open/draft PRs and `bd` status before claiming the same task
 - If two agents accidentally claim the same task, the one with fewer commits yields
 
 **Detecting file overlap:**
@@ -79,10 +79,10 @@ Before starting a task, verify all its blockers are resolved. After completing e
 - If two tasks both modify `src/auth/middleware.ts`, they should not run in parallel
 - When overlap is detected: serialize the tasks (one blocks the other), or split the overlapping file into two files first
 
-**Communication via branches:**
-- Branch exists = task claimed
-- Branch merged = task complete
-- Branch deleted without merge = task abandoned, available for re-claim
+**Communication via draft PRs and `bd`:**
+- Bead `in_progress` + open draft PR = task claimed
+- PR merged + bead `closed` = task complete
+- Bead released back to `ready` (PR closed unmerged) = task abandoned, available for re-claim
 
 ### What to Do When Blocked
 
@@ -114,7 +114,7 @@ Beads is an optional task-tracking tool. Detect its presence and adapt.
 **Without Beads:**
 - Parse `implementation-plan.md` task list for task IDs and dependencies
 - Or use the project's task tracking system (GitHub Issues, Linear, Jira)
-- Branch naming uses the project's convention (e.g., `feat/US-001-slug`)
+- Branch naming uses the project's convention (e.g., `feat/user-registration`) — no work-item IDs in the branch name; put the ID in the PR body as `Closes <id>`
 - Task status is tracked via PR state: open PR = in progress, merged PR = done
 
 ### Task Completion Criteria
@@ -124,7 +124,7 @@ A task is complete when all of the following are true:
 1. **All acceptance criteria met** — every criterion listed in the task description is satisfied
 2. **Tests passing** — new tests written for the task, plus the full existing suite, all pass
 3. **PR created** — code is pushed and a pull request is open with a structured description
-4. **CI passing** — all automated quality gates pass on the PR
+4. **Local quality gates pass** — pre-commit hooks + `make check` are green on the branch HEAD and `mmr review` passed (CI is deferred until a launch target is chosen; it applies only post-launch)
 5. **No regressions** — existing functionality is unchanged unless the task explicitly modifies it
 
 Only after all five criteria are met should the task be marked as done.

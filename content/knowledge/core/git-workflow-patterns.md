@@ -91,7 +91,9 @@ AI review inserted as step 5.5):
    passes on the branch HEAD; CI is deliberately deferred until a launch
    target is chosen, so these local gates *are* the merge bar
 7. Squash-merge and delete the branch (`gh pr merge --squash
-   --delete-branch`)
+   --delete-branch`) — with 3+ concurrent agents, serialize the merge via
+   `bd merge-slot acquire --wait` when the project's Beads has merge-slots,
+   releasing after the merge
 8. Sync `main` from the primary checkout: `make main-sync &&
    make prune-merged` (squash-aware pruning with a triage report — see
    [worktree-management](../execution/worktree-management.md))
@@ -133,8 +135,9 @@ enforced rather than merely documented.
 Git worktrees enable parallel agent execution on the same repository:
 
 ```bash
-# Create a worktree for an agent
-scripts/setup-agent-worktree.sh agent-name
+# Create a worktree for an agent (--install runs the dependency-install
+# setup commands; a plain invocation creates the worktree but installs nothing)
+scripts/setup-agent-worktree.sh agent-name --install
 
 # Each worktree gets its own branch and working directory
 # Agents can work simultaneously without conflicts
