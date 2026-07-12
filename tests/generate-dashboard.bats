@@ -226,6 +226,21 @@ teardown() {
     [ "$total" -ge "$closed" ]
 }
 
+@test "beads section: not rendered when bd is on PATH but the project has no .beads/" {
+    # stub bd that would return an issue if consulted — the gate must prevent the call
+    mkdir -p "$TEST_OUT/project/stubs"
+    cat > "$TEST_OUT/project/stubs/bd" <<'EOF'
+#!/usr/bin/env bash
+[ "$1" = "list" ] && { echo '[{"id":"leak-1","title":"leaked","status":"open"}]'; exit 0; }
+exit 0
+EOF
+    chmod +x "$TEST_OUT/project/stubs/bd"
+    rm -rf "$TEST_OUT/project/.beads"
+    run bash -c "cd '$TEST_OUT/project' && PATH='$TEST_OUT/project/stubs:$PATH' bash '$SCRIPT' --no-open --output '$TEST_OUT/dashboard.html'"
+    [ "$status" -eq 0 ]
+    [[ "$(cat "$TEST_OUT/dashboard.html" 2>/dev/null)" != *leak-1* ]]
+}
+
 # ─── Bug fix verification ───────────────────────────────────────
 
 @test "pipeline skill defers status to scaffold-runner" {
