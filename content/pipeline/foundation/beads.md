@@ -171,9 +171,20 @@ existing setup updates rather than re-initializes.
 6. **Configure a full-fidelity backup** (Dolt history included — `bd export`
    JSONL is issue-level only and NOT a substitute). The target lives outside
    the repository so a checkout deletion or reset cannot take the backup with
-   it. Skip if `bd backup status` already reports a configured target:
+   it, and it is made **unique per repository** so two projects that share a
+   directory name never collide on one backup path. Detect the "already
+   configured" case via the stable machine contract `bd backup status --json`
+   (`.dolt.configured`), NOT the exit code or prose: `bd backup status` exits 0
+   even when unconfigured, so a bare `bd backup status >/dev/null 2>&1 ||` would
+   wrongly skip init on every fresh project, and the human text is
+   TTY/format-fragile.
    ```bash
-   bd backup status >/dev/null 2>&1 || bd backup init "$HOME/.beads-backups/$(basename "$(pwd)")"
+   slug="$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")"
+   uniq="$(printf '%s' "$(git config --get remote.origin.url 2>/dev/null || pwd -P)" | cksum | cut -d' ' -f1)"
+   bstatus="$(bd backup status --json 2>/dev/null || true)"
+   if ! printf '%s' "$bstatus" | grep -qE '"configured":[[:space:]]*true'; then
+     bd backup init "$HOME/.beads-backups/${slug}-${uniq}"
+   fi
    bd backup sync
    ```
    From now on `make beads-snapshot` (agent-ops git component) refreshes both

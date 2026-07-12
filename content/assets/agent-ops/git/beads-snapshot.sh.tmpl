@@ -38,13 +38,15 @@ if err="$(bd export --all -o "$tmp" 2>&1)"; then
 	if mv -f "$tmp" .beads/issues.jsonl; then
 		printf '%s\n' "✓ wrote .beads/issues.jsonl — a committed restore copy for 'bd import' after a wipe; still push the Dolt remote (bootstrap won't auto-use it)"
 		# Full-fidelity Dolt backup (history included) when the project has one
-		# configured via `bd backup init`. Feature-detected by CONTENT, not exit
-		# code: real `bd backup status` exits 0 even when unconfigured, printing
-		# "No backup has been performed yet." — so we sync only when the status
-		# names a destination. Silently skipped when `bd backup` is unavailable
-		# (old bd → non-zero, empty stdout) or no target is configured.
-		if backup_status="$(bd backup status 2>/dev/null)" \
-			&& ! printf '%s' "$backup_status" | grep -qi 'no backup'; then
+		# configured via `bd backup init`. Detected via the stable machine
+		# contract `bd backup status --json` → `.dolt.configured` (a boolean):
+		# the human text is TTY/format-fragile and `bd backup status` exits 0
+		# even when unconfigured, so neither exit code nor prose is reliable.
+		# Capture via command substitution first, then match the captured string
+		# — piping bd straight into `grep -q` can race the pipe. Silently skipped
+		# when `bd backup` is unavailable (old bd → non-zero) or unconfigured.
+		if backup_status="$(bd backup status --json 2>/dev/null)" \
+			&& printf '%s' "$backup_status" | grep -qE '"configured":[[:space:]]*true'; then
 			if bd backup sync >/dev/null 2>&1; then
 				printf '%s\n' "✓ bd backup sync — full-history Dolt backup updated"
 			else

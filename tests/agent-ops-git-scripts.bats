@@ -272,11 +272,47 @@ EOF
     [ "$status" -eq 0 ]
 }
 
+@test "bd-guard: blocks a path-qualified bd (absolute or ./ prefix)" {
+    mkdir -p "$CLONE_DIR/.beads/embeddeddolt"
+    for c in '/opt/homebrew/bin/bd bootstrap' './node_modules/.bin/bd init --reinit-local' '/usr/local/bin/bd bootstrap'; do
+        run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check '$c'"
+        [ "$status" -eq 2 ] || { echo "not blocked: $c"; false; }
+    done
+}
+
+@test "bd-guard: blocks a backslash-newline split bd bootstrap" {
+    mkdir -p "$CLONE_DIR/.beads/embeddeddolt"
+    split=$(printf 'bd \\\nbootstrap')
+    run bash -c 'cd "$1" && scripts/bd-guard.sh --check "$2"' _ "$CLONE_DIR" "$split"
+    [ "$status" -eq 2 ]
+}
+
+@test "bd-guard: does NOT block rm of a .beads-backups sibling (word boundary), still guards .beads" {
+    mkdir -p "$CLONE_DIR/.beads/embeddeddolt"
+    run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check 'rm -rf .beads-backups'"
+    [ "$status" -eq 0 ]
+    run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check 'rm -rf .beads'"
+    [ "$status" -eq 2 ]
+}
+
+@test "bd-guard: honors inline BEADS_DESTRUCTIVE_OK=1 only as a real leading assignment" {
+    mkdir -p "$CLONE_DIR/.beads/embeddeddolt"
+    # genuine leading env-assignment → allowed
+    run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check 'BEADS_DESTRUCTIVE_OK=1 bd bootstrap'"
+    [ "$status" -eq 0 ]
+    # assignment right after a separator → allowed
+    run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check 'cd /x && BEADS_DESTRUCTIVE_OK=1 bd bootstrap'"
+    [ "$status" -eq 0 ]
+    # bare mention inside an echo (not a leading assignment) → still BLOCKED
+    run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check 'echo BEADS_DESTRUCTIVE_OK=1 && bd bootstrap'"
+    [ "$status" -eq 2 ]
+}
+
 @test "beads-snapshot: writes issues.jsonl and syncs bd backup when configured" {
     mkdir -p "$CLONE_DIR/.beads"
-    # richer bd stub: export writes the -o target; `bd backup status` always
-    # exits 0 (real bd behavior) but its OUTPUT differs — "No backup" when
-    # unconfigured — so detection is content-based, not exit-code-based.
+    # richer bd stub: export writes the -o target; `bd backup status --json`
+    # always exits 0 (real bd behavior) but its .dolt.configured boolean differs
+    # — detection is via the stable JSON contract, not exit code or prose.
     cat > "$CLONE_DIR/stubs/bd" <<'EOF'
 #!/usr/bin/env bash
 if [ "$1" = "export" ]; then
@@ -290,9 +326,9 @@ if [ "$1" = "backup" ]; then
     case "$2" in
         status)
             if [ "${BD_BACKUP_EXIT:-1}" = "0" ]; then
-                printf 'Dolt Backup:\n  Destination: file:///tmp/bk\n'
+                printf '{"dolt":{"configured": true}}\n'
             else
-                printf 'No backup has been performed yet.\n'
+                printf '{"dolt":{"configured": false}}\n'
             fi
             exit 0 ;;
         sync) exit "${BD_BACKUP_EXIT:-1}" ;;

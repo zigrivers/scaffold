@@ -33,10 +33,21 @@ else
 fi
 [ -n "$cmd" ] || exit 0
 
+# Match-only normalized copy: collapse newlines and backslash line-continuations
+# to spaces so a split like `bd \<newline>bootstrap` (or a multiline script)
+# cannot slip past the single-line patterns below. NEVER executed — used only
+# for matching.
+scan=$(printf '%s' "$cmd" | tr '\n\\' '  ')
+
 # Deliberate, human-approved override (procedure documented in
-# docs/beads-workflow.md — not here).
+# docs/beads-workflow.md — not here). Primary path: the real environment
+# variable. Inline path (a PreToolUse hook cannot see the not-yet-applied env
+# assignment): honor it ONLY as a genuine leading assignment at a command
+# boundary — the start of the command or right after a ; & | separator — never a
+# bare mention elsewhere (e.g. inside an echo/heredoc), which would otherwise
+# disarm the guard wholesale.
 if [ "${BEADS_DESTRUCTIVE_OK:-0}" = "1" ]; then exit 0; fi
-case "$cmd" in *BEADS_DESTRUCTIVE_OK=1*) exit 0 ;; esac
+if printf '%s' "$scan" | grep -qE '(^|[;&|])[[:space:]]*BEADS_DESTRUCTIVE_OK=1[[:space:]]'; then exit 0; fi
 
 # Guard only when there is a populated database to lose.
 db_populated() {
@@ -46,15 +57,20 @@ db_populated() {
 }
 db_populated || exit 0
 
-# Each pattern is bounded to one command segment ([^|;&]*) so a safe command
-# chained after && is not misread as flags of a dangerous one.
-dangerous='(^|[^[:alnum:]_./-])bd[[:space:]]+bootstrap([[:space:]|;&]|$)'
-dangerous="${dangerous}|(^|[^[:alnum:]_./-])bd[[:space:]]+init[^|;&]*--(force|reinit-local|discard-remote|destroy-token)"
-dangerous="${dangerous}|(^|[^[:alnum:]_./-])bd[[:space:]]+admin[[:space:]]+reset"
-dangerous="${dangerous}|(^|[^[:alnum:]_./-])rm[[:space:]][^|;&]*\.beads"
-dangerous="${dangerous}|(^|[^[:alnum:]_./-])dolt[[:space:]][^|;&]*\.beads"
+# `bd`/`rm`/`dolt` must appear as their own token, not as the tail of another
+# word. The boundary class excludes `/` so a path-qualified binary
+# (/opt/homebrew/bin/bd) is still caught, and `.beads` is anchored to a real
+# boundary so a sibling like `.beads-backups` is not a false positive. Each
+# pattern is bounded to one command segment ([^|;&]*) so a safe command chained
+# after && is not misread as flags of a dangerous one.
+b='(^|[^[:alnum:]_.-])'
+dangerous="${b}bd[[:space:]]+bootstrap([[:space:]|;&]|\$)"
+dangerous="${dangerous}|${b}bd[[:space:]]+init[^|;&]*--(force|reinit-local|discard-remote|destroy-token)"
+dangerous="${dangerous}|${b}bd[[:space:]]+admin[[:space:]]+reset"
+dangerous="${dangerous}|${b}rm[[:space:]][^|;&]*\.beads([[:space:]/|;&]|\$)"
+dangerous="${dangerous}|${b}dolt[[:space:]][^|;&]*\.beads([[:space:]/|;&]|\$)"
 
-if printf '%s' "$cmd" | grep -qE "$dangerous"; then
+if printf '%s' "$scan" | grep -qE "$dangerous"; then
 	{
 		printf '%s\n' "bd-guard: BLOCKED — this command can destroy the populated Beads database (.beads/)."
 		printf '%s\n' "Bootstrap/reset is for FRESH CLONES ONLY; on this checkout it would replace local"
