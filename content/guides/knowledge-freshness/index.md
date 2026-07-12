@@ -594,7 +594,7 @@ Every host plus its category, and the pinned GitHub repos.
 | `www.w3.org` | web-standards |
 :::
 
-**GitHub repos:** `modelcontextprotocol/specification`, `steveyegge/beads`, `joelparkerhenderson/architecture-decision-record`
+**GitHub repos:** `modelcontextprotocol/specification`, `gastownhall/beads`, `joelparkerhenderson/architecture-decision-record`
 <!-- /gen:allowlist -->
 
 ### KB inventory
