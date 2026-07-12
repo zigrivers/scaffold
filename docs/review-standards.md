@@ -34,7 +34,10 @@ advisory.
 ## Round budget
 
 Round-bounding is enforced **natively** by MMR — the meta-prompts pass
-`--session <id> --max-rounds 3`. MMR tracks recurrence with its stable
+`--session <id> --round <N> --max-rounds 3`, incrementing `--round` each fix
+round. `--round` is required: MMR compares it against `--max-rounds`, so without
+it every call is round 1 and the cap never fires. MMR tracks recurrence with its
+stable
 `finding_key` (normalized location + category + description + suggestion, with
 severity excluded) and stops re-attempting a finding that survives the budget.
 Because description and suggestion are part of the key, a *materially reworded*

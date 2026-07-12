@@ -27,9 +27,10 @@ ROOT="$BATS_TEST_DIRNAME/.."
 }
 
 @test "review-pr.md uses native session round-bounding on the mmr invocation" {
-  # --session and --max-rounds must sit together on the real flags line (the
-  # MMR_FLAGS array), not merely appear somewhere in prose.
-  grep -Eq -- '--session.*--max-rounds|--max-rounds.*--session' "$ROOT/content/tools/review-pr.md"
+  # --session, --round, and --max-rounds must sit together on the real flags
+  # line (the MMR_FLAGS array), not merely appear somewhere in prose. --round is
+  # required for the cap to fire (MMR compares --round to --max-rounds).
+  grep -Eq -- '--session.*--round.*--max-rounds' "$ROOT/content/tools/review-pr.md"
   grep -q -- "--max-rounds 3" "$ROOT/content/tools/review-pr.md"
 }
 
@@ -49,9 +50,10 @@ ROOT="$BATS_TEST_DIRNAME/.."
 }
 
 @test "review-code.md uses native session round-bounding on the mmr invocation" {
-  # --session and --max-rounds must sit together on the real flags line (the
-  # MMR_FLAGS array), not merely appear somewhere in prose.
-  grep -Eq -- '--session.*--max-rounds|--max-rounds.*--session' "$ROOT/content/tools/review-code.md"
+  # --session, --round, and --max-rounds must sit together on the real flags
+  # line (the MMR_FLAGS array), not merely appear somewhere in prose. --round is
+  # required for the cap to fire (MMR compares --round to --max-rounds).
+  grep -Eq -- '--session.*--round.*--max-rounds' "$ROOT/content/tools/review-code.md"
   grep -q -- "--max-rounds 3" "$ROOT/content/tools/review-code.md"
 }
 

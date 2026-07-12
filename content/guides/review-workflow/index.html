@@ -1418,7 +1418,7 @@ reconciliation only as an optional add-on. Consult its own doc for specifics.</p
 
 
 
-<table><thead><tr><th>Entry point</th><th>Target</th><th>Notes</th></tr></thead><tbody><tr><td><code>scaffold run review-pr</code></td><td>One PR (<code>--pr N</code>, auto-detected from the branch)</td><td><strong>MMR wrapper.</strong> Adds the Superpowers agent channel and native round-bounding (<code>--session</code>/<code>--max-rounds</code>) over a bare <code>mmr review</code>.</td></tr><tr><td><code>scaffold run review-code</code></td><td>Local pre-push: committed branch diff + staged + unstaged, as one synthesized "delivery candidate"</td><td><strong>MMR wrapper.</strong> Adds the same agent channel and native round-bounding, scoped to the local delivery candidate. <strong>Untracked files are not covered.</strong></td></tr><tr><td><code>scaffold run post-implementation-review</code></td><td>The full implemented codebase against stories + standards</td><td><strong>Independent, not an MMR wrapper.</strong> A release-time review (systemic sweep + per-story functional review via parallel agents) with its own report under <code>docs/reviews/</code>; MMR injection is optional. Consult its own doc.</td></tr></tbody></table>
+<table><thead><tr><th>Entry point</th><th>Target</th><th>Notes</th></tr></thead><tbody><tr><td><code>scaffold run review-pr</code></td><td>One PR (<code>--pr N</code>, auto-detected from the branch)</td><td><strong>MMR wrapper.</strong> Adds the Superpowers agent channel and native round-bounding (<code>--session</code>/<code>--round</code>/<code>--max-rounds</code>) over a bare <code>mmr review</code>.</td></tr><tr><td><code>scaffold run review-code</code></td><td>Local pre-push: committed branch diff + staged + unstaged, as one synthesized "delivery candidate"</td><td><strong>MMR wrapper.</strong> Adds the same agent channel and native round-bounding, scoped to the local delivery candidate. <strong>Untracked files are not covered.</strong></td></tr><tr><td><code>scaffold run post-implementation-review</code></td><td>The full implemented codebase against stories + standards</td><td><strong>Independent, not an MMR wrapper.</strong> A release-time review (systemic sweep + per-story functional review via parallel agents) with its own report under <code>docs/reviews/</code>; MMR injection is optional. Consult its own doc.</td></tr></tbody></table>
 <div class="callout callout-note"><p><strong>The mandatory one.</strong> After <code>gh pr create</code>, running <code>review-pr</code> is mandatory
 before moving to the next task (a PostToolUse hook reminds you).
 <code>review-code</code> is the recommended preflight before a push but isn't gated.
@@ -1537,7 +1537,7 @@ is derived from gate result + channel health.</p>
 <code>needs-user-decision</code>, never merge automatically — surface the verdict and the
 remaining findings to the user. The wrappers enforce this: report only says the
 PR is merge-ready on <code>pass</code> / <code>degraded-pass</code>
-<span class="fp" data-path="content/tools/review-pr.md:127">content/tools/review-pr.md:127</span>.</p></div>
+<span class="fp" data-path="content/tools/review-pr.md:134">content/tools/review-pr.md:134</span>.</p></div>
 <h2 id="step-4-fix-the-blocking-findings-bounded">Step 4 — Fix the blocking findings (bounded)</h2>
 <p>When the verdict is <code>blocked</code>, the loop is: fix the findings at or above the
 threshold → re-review → repeat. The guard rail is that this loop is <strong>bounded
@@ -1561,10 +1561,12 @@ wording produces a new identity each time.</li>
 </ul>
 <p>When you stop, <strong>do not merge</strong>. Document each unresolved finding (severity,
 location, attempt count) and hand the decision to the user
-<span class="fp" data-path="content/tools/review-pr.md:127">content/tools/review-pr.md:127</span>.</p>
+<span class="fp" data-path="content/tools/review-pr.md:134">content/tools/review-pr.md:134</span>.</p>
 <h3 id="how-the-round-budget-is-enforced">How the round budget is enforced</h3>
-<p>Round-bounding is <strong>native</strong> to the engine. The wrappers pass <code>mmr review --session &#x3C;id> --max-rounds 3</code>
-<span class="fp" data-path="content/tools/review-pr.md:76">content/tools/review-pr.md:76</span>, and MMR enforces the budget itself using a
+<p>Round-bounding is <strong>native</strong> to the engine. The wrappers pass <code>mmr review --session &#x3C;id> --round &#x3C;N> --max-rounds 3</code>
+<span class="fp" data-path="content/tools/review-pr.md:79">content/tools/review-pr.md:79</span>, incrementing <code>--round</code> each fix round
+(<code>--round</code> is required — MMR compares it against <code>--max-rounds</code>, so without it
+every call is round 1 and the cap never fires). MMR enforces the budget using a
 stable, line-number-independent <code>finding_key</code>
 <span class="fp" data-path="packages/mmr/src/core/stable-id.ts:115">packages/mmr/src/core/stable-id.ts:115</span> — the same identity across
 severity changes and line-number shifts (a materially reworded description does
@@ -1575,10 +1577,11 @@ re-attempted; you don't track strikes by hand.</p>
 <p>This replaced the former wrapper-side attempts file
 (<code>.scaffold/review-attempts/&#x3C;session-id>.json</code>), retired when the review tools
 were slimmed to the MMR-dispatch core.</p>
-<div class="callout callout-note"><p><strong>Practical takeaway.</strong> Pass <code>--session</code> so the round budget actually applies —
-without it, <code>--max-rounds</code> is inert. For a very noisy loop you may narrow the
-gate for one run with <code>--fix-threshold P1</code> — but don't permanently lower the
-project default (P2).</p></div>
+<div class="callout callout-note"><p><strong>Practical takeaway.</strong> Pass <code>--session</code> <strong>and</strong> an incrementing <code>--round</code> so
+the round budget actually applies — <code>--max-rounds</code> is inert without <code>--round</code>
+(MMR compares <code>--round</code> to the cap; <code>--session</code> alone doesn't). For a very noisy
+loop you may narrow the gate for one run with <code>--fix-threshold P1</code> — but don't
+permanently lower the project default (P2).</p></div>
 <h2 id="step-5-handle-degraded-mode">Step 5 — Handle degraded mode</h2>
 <p>A review never silently runs with fewer reviewers. A channel is <em>degraded</em> when
 its binary isn't installed, auth fails, it times out, or it errors out. The
@@ -1606,7 +1609,7 @@ table.</li>
 to invoking Codex / Gemini / Claude / Grok directly, run them as <strong>foreground</strong>
 Bash calls — never with <code>run_in_background</code>, <code>&#x26;</code>, or <code>nohup</code>. Background
 execution produces empty output, which the parser then reads as a degraded
-channel <span class="fp" data-path="content/tools/review-code.md:177">content/tools/review-code.md:177</span>.</p></div>
+channel <span class="fp" data-path="content/tools/review-code.md:188">content/tools/review-code.md:188</span>.</p></div>
 <p>Once any channel was compensated, the best possible verdict is
 <code>degraded-pass</code> — full <code>pass</code> requires all channels to have completed for real.</p>
 <h2 id="see-also">See also</h2>

@@ -52,7 +52,7 @@ after all tasks land]
 
 | Entry point | Target | Notes |
 | --- | --- | --- |
-| `scaffold run review-pr` | One PR (`--pr N`, auto-detected from the branch) | **MMR wrapper.** Adds the Superpowers agent channel and native round-bounding (`--session`/`--max-rounds`) over a bare `mmr review`. |
+| `scaffold run review-pr` | One PR (`--pr N`, auto-detected from the branch) | **MMR wrapper.** Adds the Superpowers agent channel and native round-bounding (`--session`/`--round`/`--max-rounds`) over a bare `mmr review`. |
 | `scaffold run review-code` | Local pre-push: committed branch diff + staged + unstaged, as one synthesized "delivery candidate" | **MMR wrapper.** Adds the same agent channel and native round-bounding, scoped to the local delivery candidate. **Untracked files are not covered.** |
 | `scaffold run post-implementation-review` | The full implemented codebase against stories + standards | **Independent, not an MMR wrapper.** A release-time review (systemic sweep + per-story functional review via parallel agents) with its own report under `docs/reviews/`; MMR injection is optional. Consult its own doc. |
 
@@ -145,7 +145,7 @@ is derived from gate result + channel health.
 `needs-user-decision`, never merge automatically — surface the verdict and the
 remaining findings to the user. The wrappers enforce this: report only says the
 PR is merge-ready on `pass` / `degraded-pass`
-:cite[content/tools/review-pr.md:127].
+:cite[content/tools/review-pr.md:134].
 :::
 
 ## Step 4 — Fix the blocking findings (bounded)
@@ -175,13 +175,15 @@ stop conditions:
 
 When you stop, **do not merge**. Document each unresolved finding (severity,
 location, attempt count) and hand the decision to the user
-:cite[content/tools/review-pr.md:127].
+:cite[content/tools/review-pr.md:134].
 
 ### How the round budget is enforced
 
 Round-bounding is **native** to the engine. The wrappers pass `mmr review
---session <id> --max-rounds 3`
-:cite[content/tools/review-pr.md:76], and MMR enforces the budget itself using a
+--session <id> --round <N> --max-rounds 3`
+:cite[content/tools/review-pr.md:79], incrementing `--round` each fix round
+(`--round` is required — MMR compares it against `--max-rounds`, so without it
+every call is round 1 and the cap never fires). MMR enforces the budget using a
 stable, line-number-independent `finding_key`
 :cite[packages/mmr/src/core/stable-id.ts:115] — the same identity across
 severity changes and line-number shifts (a materially reworded description does
@@ -195,10 +197,11 @@ This replaced the former wrapper-side attempts file
 were slimmed to the MMR-dispatch core.
 
 :::callout{type=note}
-**Practical takeaway.** Pass `--session` so the round budget actually applies —
-without it, `--max-rounds` is inert. For a very noisy loop you may narrow the
-gate for one run with `--fix-threshold P1` — but don't permanently lower the
-project default (P2).
+**Practical takeaway.** Pass `--session` **and** an incrementing `--round` so
+the round budget actually applies — `--max-rounds` is inert without `--round`
+(MMR compares `--round` to the cap; `--session` alone doesn't). For a very noisy
+loop you may narrow the gate for one run with `--fix-threshold P1` — but don't
+permanently lower the project default (P2).
 :::
 
 ## Step 5 — Handle degraded mode
@@ -230,7 +233,7 @@ what it means for *your* workflow.
 to invoking Codex / Gemini / Claude / Grok directly, run them as **foreground**
 Bash calls — never with `run_in_background`, `&`, or `nohup`. Background
 execution produces empty output, which the parser then reads as a degraded
-channel :cite[content/tools/review-code.md:177].
+channel :cite[content/tools/review-code.md:188].
 :::
 
 Once any channel was compensated, the best possible verdict is

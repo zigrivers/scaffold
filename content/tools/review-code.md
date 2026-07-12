@@ -73,28 +73,35 @@ fi
 
 ### Step 2: Run MMR review (binding), matched to scope
 
-`--sync` is required for reconciliation, verdict, and exit codes. A stable
-`--session` plus `--max-rounds 3` enforces the 3-round budget **natively** (the
-native replacement for the old wrapper-side attempt bookkeeping).
+`--sync` is required for reconciliation, verdict, and exit codes.
+`--session <id> --round <N> --max-rounds 3` enforces the 3-round budget
+**natively**. **`--round` is required for the cap to work** — MMR compares it
+against `--max-rounds`, so without it every call looks like round 1 and the cap
+never fires; `ROUND` starts at 1 and increments each fix round (Step 4). The
+session id must match `^[a-zA-Z0-9_-]+$`, so sanitize the branch name (strip
+`/`, `.`, and anything else — not just `/`).
 
 ```bash
-SESSION_ID="local-$(git rev-parse --abbrev-ref HEAD 2>/dev/null | tr '/' '-')"
-MMR_FLAGS=(--session "$SESSION_ID" --max-rounds 3 --sync --format json)
+BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+SESSION_ID="local-$(printf '%s' "$BRANCH" | tr -c 'a-zA-Z0-9_-' '-')"
+ROUND="${ROUND:-1}"
+MMR_FLAGS=(--session "$SESSION_ID" --round "$ROUND" --max-rounds 3 --sync --format json)
 [ -n "$FIX_THRESHOLD" ] && MMR_FLAGS+=(--fix-threshold "$FIX_THRESHOLD")
 ```
 
 Exactly ONE invocation runs, routed by scope (this is a single script — the
-`if`/`elif`/`else` guarantees the other modes do not also execute):
+`if`/`elif`/`else` guarantees the other modes do not also execute). Capture the
+review output so Step 3 has a real `JOB_ID`:
 
 ```bash
 STAGED_ONLY=false; [[ "$ARGUMENTS" == *--staged* ]] && STAGED_ONLY=true
 
 if [ "$STAGED_ONLY" = true ]; then
   # --staged → staged changes only:
-  mmr review --staged "${MMR_FLAGS[@]}"
+  MMR_RESULT=$(mmr review --staged "${MMR_FLAGS[@]}")
 elif [ -n "$BASE_REF" ]; then
   # --base/--head → explicit ref range (base-only defaults head to HEAD):
-  mmr review --base "$BASE_REF" ${HEAD_REF:+--head "$HEAD_REF"} "${MMR_FLAGS[@]}"
+  MMR_RESULT=$(mmr review --base "$BASE_REF" ${HEAD_REF:+--head "$HEAD_REF"} "${MMR_FLAGS[@]}")
 else
   # No flags → full local delivery candidate: committed branch diff + staged +
   # unstaged, synthesized into one bundle and piped in. `mmr review` with no
@@ -115,11 +122,14 @@ else
   # upstream drift. `git diff <merge-base>` covers committed branch work + staged
   # + unstaged in one coherent patch.
   MERGE_BASE=$(git merge-base "$TRUNK" HEAD 2>/dev/null || echo "$TRUNK")
-  git diff "$MERGE_BASE" | mmr review --diff - "${MMR_FLAGS[@]}"
+  MMR_RESULT=$(git diff "$MERGE_BASE" | mmr review --diff - "${MMR_FLAGS[@]}")
 fi
+
+echo "$MMR_RESULT"   # surface the review JSON
+JOB_ID=$(echo "$MMR_RESULT" | grep -o '"job_id": "[^"]*"' | head -1 | cut -d'"' -f4)
 ```
 
-Capture `JOB_ID` from the JSON (`grep -o '"job_id": "[^"]*"' | head -1 | cut -d'"' -f4`).
+When `--round` would exceed `--max-rounds`, MMR returns `needs-user-decision`.
 If the chosen scope's diff is empty, stop and tell the user there is nothing to
 review. Do NOT fall back to bare `mmr review` for the no-flags case — it would
 miss committed and staged work. If `mmr` is not installed, see **Manual
@@ -150,10 +160,11 @@ code-reviewer run the four CLI channels only — note it, don't skip silently.
 If `--report-only`: output the summary and verdict, apply no fixes, stop.
 
 Otherwise follow `docs/review-standards.md`: fix every real finding at or above
-the fix threshold, then re-run **Steps 2–3** (the full review, including the
-mandatory Superpowers reconcile — re-running Step 2 alone would drop the fifth
-channel; keep the same `--session` so MMR bounds the rounds). Stop on
-`pass`/`degraded-pass`, or on a stop condition — round budget
+the fix threshold, **increment `ROUND`**, then re-run **Steps 2–3** (the full
+review, including the mandatory Superpowers reconcile — re-running Step 2 alone
+would drop the fifth channel; keep the same `--session` and the incremented
+`--round` so MMR bounds the rounds). Stop on `pass`/`degraded-pass`, or on a stop
+condition — round budget
 exhausted, channels contradict each other, or the user asks to stop.
 
 ### Step 5: Report

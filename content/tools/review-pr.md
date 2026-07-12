@@ -68,16 +68,22 @@ If no PR is found, stop and tell the user to create a PR first.
 ### Step 2: Run MMR review (binding)
 
 One invocation. `--sync` is required for reconciliation, verdict, and exit
-codes. `--session pr-<N> --max-rounds 3` enforces the 3-round budget **natively**
-(MMR tracks recurrence with its stable `finding_key` — this is the native
-replacement for the old wrapper-side attempt bookkeeping).
+codes. `--session pr-<N> --round <N> --max-rounds 3` enforces the 3-round budget
+**natively** (the native replacement for the old wrapper-side attempt
+bookkeeping). **`--round` is required for the cap to work:** MMR compares
+`--round` against `--max-rounds`, so without it every call looks like round 1 and
+the cap never fires. `ROUND` starts at 1 and increments each fix round (Step 4).
 
 ```bash
-MMR_FLAGS=(--pr "$PR_NUMBER" --session "pr-$PR_NUMBER" --max-rounds 3 --sync --format json)
+ROUND="${ROUND:-1}"
+MMR_FLAGS=(--pr "$PR_NUMBER" --session "pr-$PR_NUMBER" --round "$ROUND" --max-rounds 3 --sync --format json)
 [ -n "$FIX_THRESHOLD" ] && MMR_FLAGS+=(--fix-threshold "$FIX_THRESHOLD")
 MMR_RESULT=$(mmr review "${MMR_FLAGS[@]}")
 JOB_ID=$(echo "$MMR_RESULT" | grep -o '"job_id": "[^"]*"' | head -1 | cut -d'"' -f4)
 ```
+
+When `--round` would exceed `--max-rounds` (round 4 with `--max-rounds 3`), MMR
+returns `needs-user-decision` — stop and surface the remaining findings.
 
 Read `fix_threshold` and `reconciled_findings` from the JSON. Exit codes:
 `0` pass/degraded-pass · `2` blocked · `3` needs-user-decision. Cross-check each
@@ -113,10 +119,11 @@ only — note this in the summary rather than skipping silently.
 ### Step 4: Fix loop (project policy)
 
 Follow `docs/review-standards.md`. Default: fix every real finding at or above
-the fix threshold, push, and re-run **Steps 2–3** (the full review, including the
-mandatory Superpowers reconcile — re-running Step 2 alone would drop the fifth
-channel; keep the same `--session` so MMR bounds the rounds). Stop on
-`pass`/`degraded-pass`, or on a stop condition — the round
+the fix threshold, push, **increment `ROUND`**, and re-run **Steps 2–3** (the
+full review, including the mandatory Superpowers reconcile — re-running Step 2
+alone would drop the fifth channel; keep the same `--session` and the
+incremented `--round` so MMR bounds the rounds). Stop on `pass`/`degraded-pass`,
+or on a stop condition — the round
 budget is exhausted (a finding survives 3 rounds), channels contradict each
 other, or the user asks to stop. Surface any channel auth failure with the
 recovery command MMR prints; never silent-skip.

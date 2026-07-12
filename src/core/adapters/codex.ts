@@ -41,7 +41,10 @@ const PHASE_ORDER = [
 //
 // Source-of-truth meta-prompts: `content/tools/review-code.md` and
 // `content/tools/review-pr.md`. Keep the resolution chain and command
-// shape here in sync with those files.
+// shape here in sync with those files. Note: those prompts add
+// `--session/--round/--max-rounds` for the Claude Code fix LOOP; Codex runs a
+// recipe once (single shot, no loop), so round-bounding adds nothing here and
+// is deliberately omitted.
 const CODEX_EXECUTOR_RECIPES: Record<string, string> = {
   'review-code': `Run multi-model review on local code before commit or push
 (3 MMR CLI channels: Codex, Antigravity, Claude). Pick **one** of the three modes
@@ -69,24 +72,20 @@ MERGE_BASE=$(git merge-base "$BASE_REF" HEAD 2>/dev/null || echo "$BASE_REF")
 if git diff --quiet "$MERGE_BASE"; then
   echo "No changes to review"; exit 0
 fi
-# --session + --max-rounds enforce the 3-round budget natively (matches
-# content/tools/review-code.md); --session is required for the cap to apply.
-SESSION_ID="local-$(git rev-parse --abbrev-ref HEAD 2>/dev/null | tr '/' '-')"
-git diff "$MERGE_BASE" | mmr review --diff - --session "$SESSION_ID" --max-rounds 3 --sync --format json
+git diff "$MERGE_BASE" | mmr review --diff - --sync --format json
 \`\`\`
 
 **Mode 2 — staged changes only** (e.g. pre-commit gate):
 
 \`\`\`bash
-SESSION_ID="local-$(git rev-parse --abbrev-ref HEAD 2>/dev/null | tr '/' '-')"
-mmr review --staged --session "$SESSION_ID" --max-rounds 3 --sync --format json
+mmr review --staged --sync --format json
 \`\`\`
 
 **Mode 3 — explicit branch diff** (substitute the actual branch name for
 \`BRANCH_NAME\`):
 
 \`\`\`bash
-mmr review --base main --head BRANCH_NAME --session "BRANCH_NAME@main" --max-rounds 3 --sync --format json
+mmr review --base main --head BRANCH_NAME --sync --format json
 \`\`\`
 
 Append \`--fix-threshold P0|P1|P2|P3\` to any of the above to override the
@@ -110,9 +109,7 @@ PR_NUMBER="\${PR_NUMBER:-$(gh pr view --json number -q .number 2>/dev/null)}"
 if [ -z "$PR_NUMBER" ]; then
   echo "PR_NUMBER not set and no PR for current branch"; exit 1
 fi
-# --session pr-<N> + --max-rounds 3 enforce the 3-round budget natively
-# (matches content/tools/review-pr.md).
-mmr review --pr "$PR_NUMBER" --session "pr-$PR_NUMBER" --max-rounds 3 --sync --format json
+mmr review --pr "$PR_NUMBER" --sync --format json
 \`\`\`
 
 Append \`--fix-threshold P0|P1|P2|P3\` to override the project's configured
