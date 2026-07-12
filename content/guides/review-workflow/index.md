@@ -145,7 +145,7 @@ is derived from gate result + channel health.
 `needs-user-decision`, never merge automatically — surface the verdict and the
 remaining findings to the user. The wrappers enforce this: report only says the
 PR is merge-ready on `pass` / `degraded-pass`
-:cite[content/tools/review-pr.md:124].
+:cite[content/tools/review-pr.md:127].
 :::
 
 ## Step 4 — Fix the blocking findings (bounded)
@@ -175,7 +175,7 @@ stop conditions:
 
 When you stop, **do not merge**. Document each unresolved finding (severity,
 location, attempt count) and hand the decision to the user
-:cite[content/tools/review-pr.md:124].
+:cite[content/tools/review-pr.md:127].
 
 ### How the round budget is enforced
 
@@ -183,8 +183,9 @@ Round-bounding is **native** to the engine. The wrappers pass `mmr review
 --session <id> --max-rounds 3`
 :cite[content/tools/review-pr.md:76], and MMR enforces the budget itself using a
 stable, line-number-independent `finding_key`
-:cite[packages/mmr/src/core/stable-id.ts:115] — the same identity across a
-finding's re-wordings and severity changes. (See the
+:cite[packages/mmr/src/core/stable-id.ts:115] — the same identity across
+severity changes and line-number shifts (a materially reworded description does
+change the key, since description and suggestion are part of it). (See the
 [MMR reference](../mmr/index.md) for how that key collapses the same issue at
 different severities.) A finding that survives the budget stops being
 re-attempted; you don't track strikes by hand.
@@ -229,7 +230,7 @@ what it means for *your* workflow.
 to invoking Codex / Gemini / Claude / Grok directly, run them as **foreground**
 Bash calls — never with `run_in_background`, `&`, or `nohup`. Background
 execution produces empty output, which the parser then reads as a degraded
-channel :cite[content/tools/review-code.md:167].
+channel :cite[content/tools/review-code.md:177].
 :::
 
 Once any channel was compensated, the best possible verdict is

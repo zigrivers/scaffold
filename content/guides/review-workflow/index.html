@@ -1537,7 +1537,7 @@ is derived from gate result + channel health.</p>
 <code>needs-user-decision</code>, never merge automatically — surface the verdict and the
 remaining findings to the user. The wrappers enforce this: report only says the
 PR is merge-ready on <code>pass</code> / <code>degraded-pass</code>
-<span class="fp" data-path="content/tools/review-pr.md:124">content/tools/review-pr.md:124</span>.</p></div>
+<span class="fp" data-path="content/tools/review-pr.md:127">content/tools/review-pr.md:127</span>.</p></div>
 <h2 id="step-4-fix-the-blocking-findings-bounded">Step 4 — Fix the blocking findings (bounded)</h2>
 <p>When the verdict is <code>blocked</code>, the loop is: fix the findings at or above the
 threshold → re-review → repeat. The guard rail is that this loop is <strong>bounded
@@ -1561,13 +1561,14 @@ wording produces a new identity each time.</li>
 </ul>
 <p>When you stop, <strong>do not merge</strong>. Document each unresolved finding (severity,
 location, attempt count) and hand the decision to the user
-<span class="fp" data-path="content/tools/review-pr.md:124">content/tools/review-pr.md:124</span>.</p>
+<span class="fp" data-path="content/tools/review-pr.md:127">content/tools/review-pr.md:127</span>.</p>
 <h3 id="how-the-round-budget-is-enforced">How the round budget is enforced</h3>
 <p>Round-bounding is <strong>native</strong> to the engine. The wrappers pass <code>mmr review --session &#x3C;id> --max-rounds 3</code>
 <span class="fp" data-path="content/tools/review-pr.md:76">content/tools/review-pr.md:76</span>, and MMR enforces the budget itself using a
 stable, line-number-independent <code>finding_key</code>
-<span class="fp" data-path="packages/mmr/src/core/stable-id.ts:115">packages/mmr/src/core/stable-id.ts:115</span> — the same identity across a
-finding's re-wordings and severity changes. (See the
+<span class="fp" data-path="packages/mmr/src/core/stable-id.ts:115">packages/mmr/src/core/stable-id.ts:115</span> — the same identity across
+severity changes and line-number shifts (a materially reworded description does
+change the key, since description and suggestion are part of it). (See the
 <a href="../mmr/index.md">MMR reference</a> for how that key collapses the same issue at
 different severities.) A finding that survives the budget stops being
 re-attempted; you don't track strikes by hand.</p>
@@ -1605,7 +1606,7 @@ table.</li>
 to invoking Codex / Gemini / Claude / Grok directly, run them as <strong>foreground</strong>
 Bash calls — never with <code>run_in_background</code>, <code>&#x26;</code>, or <code>nohup</code>. Background
 execution produces empty output, which the parser then reads as a degraded
-channel <span class="fp" data-path="content/tools/review-code.md:167">content/tools/review-code.md:167</span>.</p></div>
+channel <span class="fp" data-path="content/tools/review-code.md:177">content/tools/review-code.md:177</span>.</p></div>
 <p>Once any channel was compensated, the best possible verdict is
 <code>degraded-pass</code> — full <code>pass</code> requires all channels to have completed for real.</p>
 <h2 id="see-also">See also</h2>

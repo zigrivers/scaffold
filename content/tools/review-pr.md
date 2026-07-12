@@ -95,7 +95,8 @@ sees the plan, acceptance criteria, and conversation history the external CLIs
 cannot.
 
 ```bash
-# Write the agent's findings (MMR schema) to a temp file, then reconcile.
+# $AGENT_FINDINGS is the agent code-reviewer's output, captured as an MMR-schema
+# JSON array (see the schema note below). Write it to a temp file, then reconcile.
 FINDINGS_FILE=$(mktemp)
 printf '%s\n' "$AGENT_FINDINGS" > "$FINDINGS_FILE"
 mmr reconcile "$JOB_ID" --channel superpowers --input "$FINDINGS_FILE"
@@ -112,8 +113,10 @@ only — note this in the summary rather than skipping silently.
 ### Step 4: Fix loop (project policy)
 
 Follow `docs/review-standards.md`. Default: fix every real finding at or above
-the fix threshold, push, and re-run Step 2 (same `--session`, so MMR bounds the
-rounds). Stop on `pass`/`degraded-pass`, or on a stop condition — the round
+the fix threshold, push, and re-run **Steps 2–3** (the full review, including the
+mandatory Superpowers reconcile — re-running Step 2 alone would drop the fifth
+channel; keep the same `--session` so MMR bounds the rounds). Stop on
+`pass`/`degraded-pass`, or on a stop condition — the round
 budget is exhausted (a finding survives 3 rounds), channels contradict each
 other, or the user asks to stop. Surface any channel auth failure with the
 recovery command MMR prints; never silent-skip.

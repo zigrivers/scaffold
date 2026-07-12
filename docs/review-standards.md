@@ -37,6 +37,9 @@ Round-bounding is enforced **natively** by MMR — the meta-prompts pass
 `--session <id> --max-rounds 3`. MMR tracks recurrence with its stable
 `finding_key` (normalized location + category + description + suggestion, with
 severity excluded) and stops re-attempting a finding that survives the budget.
+Because description and suggestion are part of the key, a *materially reworded*
+report of the same defect can hash to a new key — so also stop when the same
+underlying defect recurs across rounds even under new wording.
 
 - **Rounds 1–3:** fix every real finding at or above the threshold, re-run the
   review, repeat.

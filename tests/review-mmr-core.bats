@@ -26,9 +26,11 @@ ROOT="$BATS_TEST_DIRNAME/.."
   grep -q -- "--sync" "$ROOT/content/tools/review-pr.md"
 }
 
-@test "review-pr.md uses native session round-bounding" {
-  grep -q -- "--session" "$ROOT/content/tools/review-pr.md"
-  grep -q -- "--max-rounds" "$ROOT/content/tools/review-pr.md"
+@test "review-pr.md uses native session round-bounding on the mmr invocation" {
+  # --session and --max-rounds must sit together on the real flags line (the
+  # MMR_FLAGS array), not merely appear somewhere in prose.
+  grep -Eq -- '--session.*--max-rounds|--max-rounds.*--session' "$ROOT/content/tools/review-pr.md"
+  grep -q -- "--max-rounds 3" "$ROOT/content/tools/review-pr.md"
 }
 
 @test "review-pr.md keeps the Superpowers reconcile channel" {
@@ -46,9 +48,11 @@ ROOT="$BATS_TEST_DIRNAME/.."
   grep -q -- "--sync" "$ROOT/content/tools/review-code.md"
 }
 
-@test "review-code.md uses native session round-bounding" {
-  grep -q -- "--session" "$ROOT/content/tools/review-code.md"
-  grep -q -- "--max-rounds" "$ROOT/content/tools/review-code.md"
+@test "review-code.md uses native session round-bounding on the mmr invocation" {
+  # --session and --max-rounds must sit together on the real flags line (the
+  # MMR_FLAGS array), not merely appear somewhere in prose.
+  grep -Eq -- '--session.*--max-rounds|--max-rounds.*--session' "$ROOT/content/tools/review-code.md"
+  grep -q -- "--max-rounds 3" "$ROOT/content/tools/review-code.md"
 }
 
 @test "review-code.md keeps the Superpowers reconcile channel" {

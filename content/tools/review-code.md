@@ -83,34 +83,40 @@ MMR_FLAGS=(--session "$SESSION_ID" --max-rounds 3 --sync --format json)
 [ -n "$FIX_THRESHOLD" ] && MMR_FLAGS+=(--fix-threshold "$FIX_THRESHOLD")
 ```
 
-Pick ONE invocation by scope:
+Exactly ONE invocation runs, routed by scope (this is a single script — the
+`if`/`elif`/`else` guarantees the other modes do not also execute):
 
 ```bash
-# --staged → staged changes only:
-mmr review --staged "${MMR_FLAGS[@]}"
+STAGED_ONLY=false; [[ "$ARGUMENTS" == *--staged* ]] && STAGED_ONLY=true
 
-# --base/--head → explicit ref range (base-only defaults head to HEAD):
-mmr review --base "$BASE_REF" ${HEAD_REF:+--head "$HEAD_REF"} "${MMR_FLAGS[@]}"
-
-# No flags → full local delivery candidate: committed branch diff + staged +
-# unstaged, synthesized into one bundle and piped in. `mmr review` with no
-# input flag defaults to `git diff` (unstaged only), so we MUST build the
-# combined bundle ourselves. Resolve the TRUNK ref (NOT the branch upstream —
-# @{u} would exclude already-pushed branch commits):
-BASE_REF=""
-if   ORIGIN_HEAD=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null); then BASE_REF="${ORIGIN_HEAD#refs/remotes/}"
-elif git rev-parse --verify origin/main   >/dev/null 2>&1; then BASE_REF=origin/main
-elif git rev-parse --verify main          >/dev/null 2>&1; then BASE_REF=main
-elif git rev-parse --verify origin/master >/dev/null 2>&1; then BASE_REF=origin/master
-elif git rev-parse --verify master        >/dev/null 2>&1; then BASE_REF=master
-elif git rev-parse --verify HEAD~1        >/dev/null 2>&1; then BASE_REF=HEAD~1
-else                                                           BASE_REF=HEAD
+if [ "$STAGED_ONLY" = true ]; then
+  # --staged → staged changes only:
+  mmr review --staged "${MMR_FLAGS[@]}"
+elif [ -n "$BASE_REF" ]; then
+  # --base/--head → explicit ref range (base-only defaults head to HEAD):
+  mmr review --base "$BASE_REF" ${HEAD_REF:+--head "$HEAD_REF"} "${MMR_FLAGS[@]}"
+else
+  # No flags → full local delivery candidate: committed branch diff + staged +
+  # unstaged, synthesized into one bundle and piped in. `mmr review` with no
+  # input flag defaults to `git diff` (unstaged only), so we MUST build the
+  # combined bundle ourselves. Resolve the TRUNK ref into its own variable (do
+  # NOT clobber a user-supplied $BASE_REF) — and NOT the branch upstream, since
+  # @{u} would exclude already-pushed branch commits:
+  TRUNK=""
+  if   ORIGIN_HEAD=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null); then TRUNK="${ORIGIN_HEAD#refs/remotes/}"
+  elif git rev-parse --verify origin/main   >/dev/null 2>&1; then TRUNK=origin/main
+  elif git rev-parse --verify main          >/dev/null 2>&1; then TRUNK=main
+  elif git rev-parse --verify origin/master >/dev/null 2>&1; then TRUNK=origin/master
+  elif git rev-parse --verify master        >/dev/null 2>&1; then TRUNK=master
+  elif git rev-parse --verify HEAD~1        >/dev/null 2>&1; then TRUNK=HEAD~1
+  else                                                           TRUNK=HEAD
+  fi
+  # merge-base so we review only the local delivery candidate, not unrelated
+  # upstream drift. `git diff <merge-base>` covers committed branch work + staged
+  # + unstaged in one coherent patch.
+  MERGE_BASE=$(git merge-base "$TRUNK" HEAD 2>/dev/null || echo "$TRUNK")
+  git diff "$MERGE_BASE" | mmr review --diff - "${MMR_FLAGS[@]}"
 fi
-# merge-base so we review only the local delivery candidate, not unrelated
-# upstream drift. `git diff <merge-base>` covers committed branch work + staged
-# + unstaged in one coherent patch.
-MERGE_BASE=$(git merge-base "$BASE_REF" HEAD 2>/dev/null || echo "$BASE_REF")
-git diff "$MERGE_BASE" | mmr review --diff - "${MMR_FLAGS[@]}"
 ```
 
 Capture `JOB_ID` from the JSON (`grep -o '"job_id": "[^"]*"' | head -1 | cut -d'"' -f4`).
@@ -127,6 +133,8 @@ and reconcile its findings into the job. On Claude Code, dispatch the
 the external CLIs cannot.
 
 ```bash
+# $AGENT_FINDINGS is the agent code-reviewer's output, captured as an MMR-schema
+# JSON array (see the schema note below). Write it to a temp file, then reconcile.
 FINDINGS_FILE=$(mktemp)
 printf '%s\n' "$AGENT_FINDINGS" > "$FINDINGS_FILE"
 mmr reconcile "$JOB_ID" --channel superpowers --input "$FINDINGS_FILE"
@@ -142,8 +150,10 @@ code-reviewer run the four CLI channels only — note it, don't skip silently.
 If `--report-only`: output the summary and verdict, apply no fixes, stop.
 
 Otherwise follow `docs/review-standards.md`: fix every real finding at or above
-the fix threshold, then re-run Step 2 (same `--session`, so MMR bounds the
-rounds). Stop on `pass`/`degraded-pass`, or on a stop condition — round budget
+the fix threshold, then re-run **Steps 2–3** (the full review, including the
+mandatory Superpowers reconcile — re-running Step 2 alone would drop the fifth
+channel; keep the same `--session` so MMR bounds the rounds). Stop on
+`pass`/`degraded-pass`, or on a stop condition — round budget
 exhausted, channels contradict each other, or the user asks to stop.
 
 ### Step 5: Report
