@@ -317,8 +317,8 @@ Run on every push and PR (should complete in <5 minutes):
 
 Before a PR can be merged:
 
-- All CI checks pass
-- Code review approved (by human or AI reviewer)
+- Local quality gates pass (pre-commit hooks + `make check`) — CI is deferred until a launch target is chosen and applies only post-launch
+- Code review approved (by human or AI reviewer, e.g. `mmr review`)
 - No merge conflicts
 - Branch is up-to-date with main (or rebased)
 

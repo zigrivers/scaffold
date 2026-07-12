@@ -7,6 +7,14 @@ description: >
 project-type: cli
 
 # ---------------------------------------------------------------------------
+# step-overrides
+# ---------------------------------------------------------------------------
+# CLI tools ship as a single binary/script with no containerized runtime
+# services of their own — staging-environments never applies.
+step-overrides:
+  staging-environments: { enabled: false }
+
+# ---------------------------------------------------------------------------
 # knowledge-overrides
 # ---------------------------------------------------------------------------
 # Map CLI knowledge entries into existing pipeline steps so that CLI tool

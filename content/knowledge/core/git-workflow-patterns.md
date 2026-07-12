@@ -12,7 +12,7 @@ topics:
   - merge-strategy
   - worktrees
 volatility: stable
-last-reviewed: 2026-06-08
+last-reviewed: 2026-07-11
 version-pin: null
 sources:
   - url: https://git-scm.com/docs/git-worktree
@@ -35,13 +35,25 @@ Structured git workflows for AI-agent-driven projects ensure consistent branchin
 
 The trunk-based development model works best for AI-agent workflows:
 
-- **Main branch** (`main`) — always deployable, protected by CI
-- **Feature branches** — short-lived, created per task or story (`feat/US-xxx-slug`, `fix/bug-description`)
-- **Worktree branches** — parallel agent execution using git worktrees (`agent/<name>/<task>`)
+- **Main branch** (`main`) — always deployable, protected by the local quality
+  gate (pre-commit hooks + `make check` + agent self-review + `mmr review`)
+  and PR review; CI is deliberately deferred until a launch target is chosen
+  — see "Quality gates (CI deferred)" below
+- **Feature branches** — short-lived, one per task (`feat/short-desc`,
+  `fix/bug-description`); no work-item or bead IDs in the branch name — those
+  are referenced only in the commit/PR body as `Closes <id>`
+- **Worktree branches** — parallel agent execution using git worktrees; the
+  workspace branch is `agent/<name>` (one branch per worktree, not one per
+  task — an agent commits its task work directly on this branch, with the
+  task ID referenced in commit/PR bodies, never appended to the branch name)
 
-Branch naming conventions:
+Branch naming conventions — `<type>` matches the Conventional Commits type;
+`<short-desc>` is kebab-case, <= 40 chars, and never embeds a work-item or
+bead ID (IDs live in the commit/PR body as `Closes <id>` so squash-merge, PR
+search, and `git log --grep` don't have to parse branch names for
+traceability):
 ```
-feat/US-001-user-registration    # Feature work tied to a story
+feat/user-registration           # Feature work
 fix/login-timeout-handling       # Bug fix
 chore/update-dependencies        # Maintenance
 docs/api-contract-updates        # Documentation only
@@ -65,14 +77,26 @@ AI agent commits should include the Co-Authored-By trailer for attribution and a
 
 ### Pull Request Workflow
 
-Standard PR lifecycle:
-1. Create branch from `main`
-2. Implement changes with passing tests
-3. Push branch, create PR with structured description
-4. CI runs all quality gates (`make check` or equivalent)
-5. Review (automated or manual)
-6. Squash-merge to maintain clean history
-7. Delete branch after merge
+Standard PR lifecycle (the harmonized 8-step workflow, with the mandatory
+AI review inserted as step 5.5):
+1. Commit — on a branch created from `main`, with passing tests
+2. Local review — `make check` green, re-read the diff
+3. Rebase onto latest `origin/main`
+4. Push the branch
+5. Create the PR with a structured description
+   - **Step 5.5 — mandatory AI review**: `mmr review --pr <N> --sync
+     --format json` (3-round cap; a degraded-pass self-merge past the cap
+     is the documented path, not a stall)
+6. Watch the local quality gates — pre-commit hooks ran, `make check`
+   passes on the branch HEAD; CI is deliberately deferred until a launch
+   target is chosen, so these local gates *are* the merge bar
+7. Squash-merge and delete the branch (`gh pr merge --squash
+   --delete-branch`) — with 3+ concurrent agents, serialize the merge via
+   `bd merge-slot acquire --wait` when the project's Beads has merge-slots,
+   releasing after the merge
+8. Sync `main` from the primary checkout: `make main-sync &&
+   make prune-merged` (squash-aware pruning with a triage report — see
+   [worktree-management](../execution/worktree-management.md))
 
 ## Deep Guidance
 
@@ -83,21 +107,37 @@ Standard PR lifecycle:
 - **Never force-push** to main or shared branches
 - **Delete branches** after merge to prevent clutter
 
-### CI Integration
+### Quality gates (CI deferred)
 
-Minimum CI pipeline for scaffold projects:
-1. **Lint** — ShellCheck, ESLint, or language-appropriate linter
-2. **Test** — Full test suite including evals
-3. **Build** — Verify compilation/bundling succeeds
-4. **Type check** — For typed languages (TypeScript, etc.)
+Scaffold projects run their quality gate locally, not in CI, until a launch
+or deploy target is chosen:
+1. **Pre-commit hooks** — lint (ShellCheck, ESLint, or language-appropriate),
+   secret scanning, frontmatter validation on changed files
+2. **`make check` (or equivalent)** — full test suite including evals, type
+   check, and build verification
+3. **Agent self-review** — re-read the diff against the project's coding
+   standards before pushing
+4. **`mmr review --pr <N> --sync --format json`** — mandatory multi-model AI
+   review (3-round cap, degraded-pass self-merge past the cap)
+
+`.github/workflows/` is deliberately absent until a launch/deploy target is
+picked — nothing runs these checks server-side yet, so this local stack **is**
+the gate, not a supplement to one.
+
+#### Adding CI at launch
+When a launch target is chosen, wire the same `make check` and `mmr review`
+commands into a CI workflow, then turn on branch protection referencing that
+workflow's job name (see "Branch Protection Rules" below) so the gate becomes
+enforced rather than merely documented.
 
 ### Worktree Patterns for Multi-Agent Work
 
 Git worktrees enable parallel agent execution on the same repository:
 
 ```bash
-# Create a worktree for an agent
-scripts/setup-agent-worktree.sh agent-name
+# Create a worktree for an agent (--install runs the dependency-install
+# setup commands; a plain invocation creates the worktree but installs nothing)
+scripts/setup-agent-worktree.sh agent-name --install
 
 # Each worktree gets its own branch and working directory
 # Agents can work simultaneously without conflicts
@@ -111,11 +151,17 @@ Key rules:
 
 ### Branch Protection Rules
 
-Configure branch protection for `main`:
-- Require status checks to pass before merge
-- Require branches to be up to date before merge
-- Do not allow direct pushes
-- Require squash merging for feature branches
+Before a CI workflow exists, enforce the settings that don't depend on status
+checks directly as repo-host settings (e.g. GitHub repository settings):
+- Squash merging only for feature branches (disable merge commits and
+  rebase-merge in the UI)
+- Delete the head branch automatically on merge
+
+Full branch protection — required status checks, "require branches up to
+date before merge," blocking direct pushes — is a launch-time addition: once
+"Adding CI at launch" above wires `make check` and `mmr review` into a CI
+workflow, turn on branch protection referencing that workflow's job name so
+it becomes an enforced gate rather than a documented convention.
 
 ### Commit Message Quality
 
@@ -217,5 +263,5 @@ Patterns to avoid in AI-agent git workflows:
 3. **Skipping hooks** — `--no-verify` hides real issues. Fix the root cause instead.
 4. **Rebasing shared branches** — only rebase branches that only you use. Shared branches use merge commits.
 5. **Committing generated files** — lock files yes, build output no. Use `.gitignore` aggressively.
-6. **Force-pushing to main** — this is never acceptable. Even if CI is broken, create a fix branch.
+6. **Force-pushing to main** — this is never acceptable. Even if `make check` or `mmr review` is broken, create a fix branch.
 7. **Mixing concerns in one commit** — each commit should be atomic and focused on one change.

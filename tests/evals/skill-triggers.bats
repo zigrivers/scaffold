@@ -68,6 +68,33 @@ setup() {
   fi
 }
 
+# --- work-beads activation ---
+
+@test "work-beads skill description covers its trigger phrases" {
+  local skill_file="${SKILLS_DIR}/work-beads/SKILL.md"
+  [[ -f "$skill_file" ]] || skip "work-beads not found"
+
+  local desc
+  desc="$(extract_field "$skill_file" "description")"
+
+  local failures=()
+  if [[ "$desc" != *"/work-beads"* ]]; then
+    failures+=("work-beads description missing '/work-beads' trigger phrase")
+  fi
+  if [[ "$desc" != *"work the next"* ]]; then
+    failures+=("work-beads description missing 'work the next' trigger phrase")
+  fi
+  if [[ "$desc" != *"pick up some open tasks"* ]]; then
+    failures+=("work-beads description missing 'pick up some open tasks' trigger phrase")
+  fi
+
+  if [[ ${#failures[@]} -gt 0 ]]; then
+    printf "Missing trigger patterns:\n"
+    printf "  %s\n" "${failures[@]}"
+    return 1
+  fi
+}
+
 # --- scaffold-pipeline activation boundary ---
 
 @test "scaffold-pipeline has activation boundary directing status queries away" {

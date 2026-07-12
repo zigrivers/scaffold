@@ -1,0 +1,56 @@
+# agent-ops.mk — installed by `scaffold agent-ops install`. Do not edit; re-run
+# the installer to update. Targets marked [agent-safe] may run unattended.
+
+.PHONY: main-sync prune-merged doctor doctor-fix beads-snapshot \
+        staging-up staging-down staging-shared-down staging-prune docker-doctor tc-reap
+
+main-sync: ## [agent-safe] Fetch + fast-forward main from anywhere
+	@scripts/main-sync.sh
+
+prune-merged: ## [agent-safe] Sweep merged branches/worktrees + reclaim staging
+	@scripts/cleanup-merged-branches.sh $(ARGS)
+
+doctor: ## [agent-safe] Diagnose primary-checkout invariant (read-only)
+	@scripts/doctor.sh
+
+doctor-fix: ## [agent-safe] Repair unattended-safe primary-checkout problems
+	@scripts/doctor.sh --fix
+
+beads-snapshot: ## [agent-safe] Export beads DB to a local git-ignored restore copy
+	@scripts/beads-snapshot.sh
+
+define staging_guard
+	@test -f scripts/ops/staging-env.sh || { echo "staging component not installed (run: scaffold agent-ops install --component staging)"; exit 1; }
+endef
+
+# docker-env.sh PRINTS an `export DOCKER_CONTEXT=…` line for `eval` (its canonical mode —
+# see the script header); it is NOT a sourceable exporter, so `eval "$(…)"` is required to
+# actually pin the engine. --env-file is added only when ops/compose/staging.env exists
+# (fresh projects ship only staging.env.example), so the first staging-up never fails on a
+# missing file.
+staging-up: ## [agent-safe, worktree-only] Start this worktree's staging stack
+	$(staging_guard)
+	@bash -c 'eval "$$(bash scripts/ops/docker-env.sh)" && source scripts/ops/staging-env.sh && { env_file=""; if [ -f ops/compose/staging.env ]; then env_file="--env-file ops/compose/staging.env"; fi; docker compose -f ops/compose/staging.yml $$env_file up -d; }'
+
+# worktree-only: from the primary checkout, `source staging-env.sh` selects the SHARED QA
+# stack, so `down -v` would wipe that shared stack and its volumes. Refuse there (naming the
+# ask-first alternative) before touching docker. is_primary_checkout replicated inline.
+staging-down: ## [agent-safe, worktree-only] Stop this worktree's staging stack
+	$(staging_guard)
+	@bash -c 'if [ "$$(git rev-parse --show-toplevel)" = "$$(git worktree list --porcelain | head -1 | sed "s/^worktree //")" ]; then echo "staging-down is worktree-only: from the primary it targets the SHARED QA stack and \"down -v\" would wipe its volumes. Run it from a worktree, or use \"make staging-shared-down\" (ask-first) to destroy the shared stack on purpose." >&2; exit 1; fi; eval "$$(bash scripts/ops/docker-env.sh)" && source scripts/ops/staging-env.sh && { env_file=""; if [ -f ops/compose/staging.env ]; then env_file="--env-file ops/compose/staging.env"; fi; docker compose -f ops/compose/staging.yml $$env_file down -v; }'
+
+staging-shared-down: ## [ask-first] Destroy the shared QA stack (volumes included)
+	$(staging_guard)
+	@bash -c 'if [ "$$(git rev-parse --show-toplevel)" != "$$(git worktree list --porcelain | head -1 | sed "s/^worktree //")" ]; then echo "staging-shared-down runs only from the primary checkout (it destroys the shared QA stack). From a worktree, use \"make staging-down\"." >&2; exit 1; fi; eval "$$(bash scripts/ops/docker-env.sh)" && source scripts/ops/staging-env.sh && { env_file=""; if [ -f ops/compose/staging.env ]; then env_file="--env-file ops/compose/staging.env"; fi; docker compose -f ops/compose/staging.yml $$env_file down -v; }'
+
+staging-prune: ## [agent-safe] Reap orphaned per-worktree staging stacks
+	$(staging_guard)
+	@scripts/ops/staging-teardown.sh --reap
+
+docker-doctor: ## [agent-safe] Show engine placement; warn on split-brain
+	$(staging_guard)
+	@scripts/ops/docker-doctor.sh
+
+tc-reap: ## [agent-safe] Remove leaked testcontainers from dead sessions
+	$(staging_guard)
+	@scripts/ops/tc-reap.sh $(ARGS)

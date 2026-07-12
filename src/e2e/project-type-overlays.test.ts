@@ -256,12 +256,14 @@ describe('web-app overlay integration', () => {
     expect(overlayState.knowledge['project-structure']).toContain('web-app-project-structure')
   })
 
-  // Test 9: No step overrides (web-app overlay is knowledge-only)
+  // Test 9: Step overrides match the deep preset's enablement values
   it('web-app overlay does not override step enablement', async () => {
     const { overlayState } = await resolveProjectOverlay('web-app')
 
-    // web-app overlay has no step-overrides section
-    // All steps should match the deep preset exactly
+    // web-app overlay's only step-override (staging-environments) sets the
+    // same enabled value the deep preset already uses — so resolved
+    // enablement for every step should still match the deep preset exactly
+    // (the override changes precedence, not the outcome, for this preset)
     const methodologyDir = getPackageMethodologyDir()
     const realMetaPrompts = await discoverRealMetaPrompts()
     const knownSteps = [...realMetaPrompts.keys()]
@@ -1842,12 +1844,13 @@ describe('data-science overlay integration', () => {
     )
   })
 
-  it('overlay is knowledge-only (no step-overrides, no cross-reads-overrides)', () => {
+  it('overlay is knowledge-plus-staging: no cross-reads-overrides, only staging-environments overridden', () => {
     const methodologyDir = getPackageMethodologyDir()
     const overlayPath = path.join(methodologyDir, 'data-science-overlay.yml')
     const { overlay } = loadOverlay(overlayPath)
     expect(overlay).not.toBeNull()
-    expect(Object.keys(overlay!.stepOverrides)).toHaveLength(0)
+    expect(Object.keys(overlay!.stepOverrides)).toEqual(['staging-environments'])
+    expect(overlay!.stepOverrides['staging-environments']).toEqual({ enabled: true, conditional: 'if-needed' })
     expect(Object.keys(overlay!.crossReadsOverrides)).toHaveLength(0)
   })
 })
@@ -1931,12 +1934,13 @@ describe('web3 overlay integration', () => {
     )
   })
 
-  it('overlay is knowledge-only (no step-overrides, no cross-reads-overrides)', () => {
+  it('overlay is knowledge-plus-staging: no cross-reads-overrides, only staging-environments overridden', () => {
     const methodologyDir = getPackageMethodologyDir()
     const overlayPath = path.join(methodologyDir, 'web3-overlay.yml')
     const { overlay } = loadOverlay(overlayPath)
     expect(overlay).not.toBeNull()
-    expect(Object.keys(overlay!.stepOverrides)).toHaveLength(0)
+    expect(Object.keys(overlay!.stepOverrides)).toEqual(['staging-environments'])
+    expect(overlay!.stepOverrides['staging-environments']).toEqual({ enabled: false })
     expect(Object.keys(overlay!.crossReadsOverrides)).toHaveLength(0)
   })
 })

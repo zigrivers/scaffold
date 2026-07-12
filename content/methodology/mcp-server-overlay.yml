@@ -15,6 +15,9 @@ step-overrides:
   design-system: { enabled: false }
   ux-spec: { enabled: false }
   review-ux: { enabled: false }
+  # An MCP server is typically a single stdio/HTTP process, not a multi-service
+  # container stack — per-worktree Docker staging is off.
+  staging-environments: { enabled: false }
   # Stateful servers may persist resources; keep available but skippable.
   database-schema: { enabled: true, conditional: "if-needed" }
   review-database: { enabled: true, conditional: "if-needed" }

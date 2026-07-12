@@ -1,0 +1,585 @@
+#!/usr/bin/env bash
+# {{PROJECT_NAME}} — agent worktree helper.
+#
+# Usage:
+#   scripts/setup-agent-worktree.sh <name> [--task "<description>"] [--install]
+#       Create or update .worktrees/<name>/ on branch agent/<name>.
+#       Idempotent: re-running on an existing worktree is safe.
+#       First runs an advisory duplicate-work scan (open/merged PRs + in-progress beads);
+#       --task "<desc>" gives it better keywords than the bare <name>.
+#       --install also runs the project's worktree setup commands (dependency installs, etc.)
+#       inside the fresh worktree. Flags may appear in any order.
+#
+#   scripts/setup-agent-worktree.sh --preflight-only --task "<description>"
+#       Run only the duplicate-work scan (no worktree created).
+#
+#   scripts/setup-agent-worktree.sh --list
+#       List all current worktrees with their branch and status.
+#
+# Conventions:
+#   - Worktrees live under `.worktrees/<name>/` (gitignored).
+#   - Each worktree's branch is named `agent/<name>` and tracks origin/main initially.
+#   - Each worktree gets a per-name git author identity for traceable blame.
+
+set -euo pipefail
+
+# Global variables for cleanup
+CLEANUP_LOCK_DIR=""
+PARENT_PID="${BASHPID:-$$}"
+
+cleanup() {
+  local current_pid="${BASHPID:-$$}"
+  # Protect against subshell execution: BASH_SUBSHELL is supported in Bash 3.0+ and increments in every subshell.
+  # This provides robust protection even on systems with Bash 3.2 where BASHPID is empty.
+  if [[ "$current_pid" -eq "$PARENT_PID" ]] && [[ "${BASH_SUBSHELL:-0}" -eq 0 ]]; then
+    if [[ -n "$CLEANUP_LOCK_DIR" && -d "$CLEANUP_LOCK_DIR" ]]; then
+      # Only delete the lock directory if we still own it (verified by reading the pid file inside it)
+      local holder_pid
+      holder_pid="$(cat "$CLEANUP_LOCK_DIR/pid" 2>/dev/null || true)"
+      if [[ "$holder_pid" -eq "$PARENT_PID" ]]; then
+        rm -rf "$CLEANUP_LOCK_DIR" 2>/dev/null || true
+      fi
+    fi
+  fi
+}
+trap cleanup EXIT
+
+# ----- helpers -----
+
+log()   { printf "→ %s\n" "$*"; }
+# log() goes to stdout so test capture works; warn()/fatal() go to stderr.
+warn()  { printf "! %s\n" "$*" >&2; }
+fatal() { printf "✗ %s\n" "$*" >&2; exit 1; }
+
+if [[ "$(git rev-parse --is-bare-repository 2>/dev/null || echo "false")" == "true" ]]; then
+  fatal "bare repositories are not supported"
+fi
+
+GIT_DIR="$(git rev-parse --git-dir 2>/dev/null || true)"
+COMMON_DIR="$(git rev-parse --git-common-dir 2>/dev/null || true)"
+if [[ -z "$GIT_DIR" || -z "$COMMON_DIR" ]]; then
+  fatal "not inside a git repository"
+fi
+
+# Convert relative paths to absolute paths
+if [[ "$GIT_DIR" != /* ]]; then
+  GIT_DIR="$(pwd -P)/$GIT_DIR"
+fi
+GIT_DIR="$(cd "$GIT_DIR" >/dev/null 2>&1 && pwd -P || true)"
+
+if [[ "$COMMON_DIR" != /* ]]; then
+  COMMON_DIR="$(pwd -P)/$COMMON_DIR"
+fi
+COMMON_DIR="$(cd "$COMMON_DIR" >/dev/null 2>&1 && pwd -P || true)"
+
+if [[ -z "$GIT_DIR" || -z "$COMMON_DIR" || ! -d "$COMMON_DIR" ]]; then
+  fatal "failed to resolve absolute git directories"
+fi
+
+# If GIT_DIR is different from COMMON_DIR, we are executing inside a linked worktree.
+# In that case, REPO_ROOT should point to the main repository checkout.
+# We resolve the main worktree's path directly from the git worktree list.
+if [[ "$GIT_DIR" != "$COMMON_DIR" ]]; then
+  first_wt_line="$(git worktree list --porcelain 2>/dev/null | head -n 1 || true)"
+  if [[ "$first_wt_line" =~ ^worktree[[:space:]](.+) ]]; then
+    REPO_ROOT="${BASH_REMATCH[1]}"
+  else
+    REPO_ROOT=""
+  fi
+  if [[ -z "$REPO_ROOT" ]]; then
+    REPO_ROOT="$(dirname "$COMMON_DIR")"
+  fi
+else
+  REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+  if [[ -z "$REPO_ROOT" ]]; then
+    fatal "Failed to resolve repository top-level directory"
+  fi
+fi
+REPO_ROOT="$(cd "$REPO_ROOT" >/dev/null 2>&1 && pwd -P || true)"
+
+if [[ -z "$REPO_ROOT" || ! -d "$REPO_ROOT" ]]; then
+  fatal "resolved repository root '$REPO_ROOT' does not exist or is not a directory"
+fi
+
+WORKTREE_DIR="$REPO_ROOT/.worktrees"
+mkdir -p "$WORKTREE_DIR"
+
+usage() {
+  sed -n '2,/^set -/p' "$0" | sed 's/^# \{0,1\}//; /^set -/d'
+  exit 1
+}
+
+# Advisory duplicate-work scan: warn if an open or recently-merged PR (or in-progress bead)
+# looks like the task about to be started. Never blocks; always returns 0.
+# Matches task keywords against the raw text of PR titles (and in-progress beads), so it works
+# whether `gh --jq` shaped the output or not — the scan is advisory, not a parser.
+preflight_scan() {
+  local desc="$1"
+  [[ -n "$desc" ]] || return 0
+  command -v gh >/dev/null 2>&1 || { log "preflight: gh not found — skipping duplicate scan."; return 0; }
+
+  # keywords: lowercase tokens ≥ 3 chars, minus a tiny stoplist of conventional-commit noise.
+  local stop=" add the for and fix feat test docs chore refactor with from into support update "
+  local -a kws=()
+  local tok
+  for tok in $(printf '%s' "$desc" | tr 'A-Z' 'a-z' | tr -cs 'a-z0-9' ' '); do
+    [[ ${#tok} -ge 3 ]] || continue
+    [[ "$stop" == *" $tok "* ]] && continue
+    kws+=("$tok")
+  done
+  [[ ${#kws[@]} -gt 0 ]] || { log "preflight: no distinctive keywords in task — skipping scan."; return 0; }
+
+  local open_prs merged_prs blob gh_ok=1 found=0 kw
+  # Capture query failures so an auth/network error is not mistaken for "no duplicates".
+  open_prs="$(gh pr list --state open --limit 200 --json title --jq '.[].title' 2>/dev/null)" || gh_ok=0
+  merged_prs="$(gh pr list --state merged --limit 60 --json title --jq '.[].title' 2>/dev/null)" || gh_ok=0
+  if [[ $gh_ok -eq 0 ]]; then
+    log "⚠️  preflight: could not query PRs (gh auth/network?) — check for duplicates manually before starting."
+  fi
+  blob="$(printf '%s\n%s\n' "$open_prs" "$merged_prs" | tr 'A-Z' 'a-z')"
+
+  for kw in "${kws[@]}"; do
+    # whole-word match so a short keyword like "art" doesn't spuriously match "chart".
+    # kws are [a-z0-9] tokens — no regex metachars.
+    if printf '%s\n' "$blob" | grep -qw -- "$kw"; then
+      printf "⚠️  possible duplicate: task keyword \"%s\" appears in an open/merged PR title\n" "$kw"
+      found=1
+    fi
+  done
+
+  if command -v bd >/dev/null 2>&1; then
+    local beads
+    beads="$(bd list --status in_progress 2>/dev/null || true)"
+    for kw in "${kws[@]}"; do
+      if grep -qiw -- "$kw" <<<"$beads" 2>/dev/null; then
+        printf "⚠️  in-progress bead matches \"%s\" — check: bd list --status in_progress\n" "$kw"
+        found=1
+        break
+      fi
+    done
+  fi
+
+  if [[ $found -eq 1 ]]; then
+    log "If this overlaps existing work, coordinate before building. Claim your task first:"
+    log "  bd update <id> --status in_progress   # or: bd create \"$desc\" -t task -p 2"
+    log "  # then open a DRAFT PR on your first commit:  gh pr create --draft --fill"
+  else
+    log "preflight: no obvious duplicate open/merged PR for \"$desc\"."
+  fi
+  return 0
+}
+
+# ----- subcommands -----
+
+cmd_list() {
+  log "Configured worktrees:"
+  local wt="" branch="" detached="false" bare="false"
+  while read -r line; do
+    if [[ "$line" =~ ^worktree[[:space:]](.+) ]]; then
+      if [[ -n "$wt" ]]; then
+        local status="$branch"
+        if [[ "$bare" == "true" ]]; then status="(bare)"; fi
+        if [[ "$detached" == "true" ]]; then status="(detached HEAD)"; fi
+        printf "  %-40s  %s\n" "$wt" "$status"
+      fi
+      wt="${BASH_REMATCH[1]}"
+      branch=""
+      detached="false"
+      bare="false"
+    elif [[ "$line" =~ ^branch[[:space:]](.+) ]]; then
+      branch="${BASH_REMATCH[1]}"
+      branch="${branch#refs/heads/}"
+    elif [[ "$line" == "detached" ]]; then
+      detached="true"
+    elif [[ "$line" == "bare" ]]; then
+      bare="true"
+    fi
+  done < <(git worktree list --porcelain)
+  if [[ -n "$wt" ]]; then
+    local status="$branch"
+    if [[ "$bare" == "true" ]]; then status="(bare)"; fi
+    if [[ "$detached" == "true" ]]; then status="(detached HEAD)"; fi
+    printf "  %-40s  %s\n" "$wt" "$status"
+  fi
+}
+
+# ----- concurrency lock (parallel agents may create worktrees at once) -----
+
+SETUP_WORKTREE_LOCK_DEPTH=0
+GIT_VERSION_CHECKED="false"
+WORKTREE_CONFIG_ENABLED="false"
+
+acquire_lock() {
+  if [[ "$SETUP_WORKTREE_LOCK_DEPTH" -eq 0 ]]; then
+    local lock_dir="$COMMON_DIR/setup-agent-worktree.lock"
+    local max_retries="${SETUP_WORKTREE_MAX_RETRIES:-100}"
+    local retry_interval="${SETUP_WORKTREE_RETRY_INTERVAL:-0.1}"
+    local stale_timeout="${SETUP_WORKTREE_STALE_TIMEOUT:-10}"
+
+    # Validate lock configuration: prevent command injection and ensure positive integers/numbers
+    if ! [[ "$max_retries" =~ ^[1-9][0-9]*$ ]] || ! [[ "$retry_interval" =~ ^[0-9]+(\.[0-9]+)?$ ]] || ! [[ "$stale_timeout" =~ ^[1-9][0-9]*$ ]]; then
+      fatal "Invalid lock configuration: max_retries='$max_retries' (must be >= 1), retry_interval='$retry_interval' (must be a positive number), stale_timeout='$stale_timeout' (must be >= 1)"
+    fi
+    if [[ "$retry_interval" =~ ^0+(\.0+)?$ ]]; then
+      fatal "Invalid lock configuration: retry_interval='$retry_interval' (must be > 0)"
+    fi
+
+    local i=0
+    local acquired="false"
+    local missing_created_start=""
+    while [[ "$i" -lt "$max_retries" ]]; do
+      if mkdir "$lock_dir" 2>/dev/null; then
+        acquired="true"
+        break
+      fi
+
+      # Stale lock detection: check lock age using created_at
+      if [[ -f "$lock_dir/created_at" ]]; then
+        missing_created_start=""
+        local created_at
+        created_at="$(cat "$lock_dir/created_at" 2>/dev/null || true)"
+        if [[ -n "$created_at" ]] && [[ "$created_at" =~ ^[0-9]+$ ]]; then
+          local current_time
+          current_time="$(date +%s 2>/dev/null || echo 0)"
+          local lock_age=$((current_time - created_at))
+          if [[ "$lock_age" -ge "$stale_timeout" ]]; then
+            local holder_pid
+            holder_pid="$(cat "$lock_dir/pid" 2>/dev/null || true)"
+            local is_alive="false"
+            if [[ -n "$holder_pid" ]] && [[ "$holder_pid" =~ ^[0-9]+$ ]]; then
+              if ps -p "$holder_pid" >/dev/null 2>&1; then
+                if ps -p "$holder_pid" -o args= 2>/dev/null | grep -q "setup-agent-worktree"; then
+                  is_alive="true"
+                fi
+              fi
+            fi
+            if [[ "$is_alive" == "false" ]]; then
+              local stale_dir="${lock_dir}.stale.$$"
+              if mv "$lock_dir" "$stale_dir" 2>/dev/null; then
+                log "Stale lock detected (holder PID ${holder_pid:-unknown} is dead, reused, or lock is abandoned). Breaking lock..."
+                rm -rf "$stale_dir" 2>/dev/null || true
+              fi
+            fi
+          fi
+        fi
+      else
+        # If created_at is missing, track how long we have been seeing the missing created_at file
+        if [[ -z "$missing_created_start" ]]; then
+          missing_created_start=$SECONDS
+        fi
+        if [[ $((SECONDS - missing_created_start)) -ge "$stale_timeout" ]]; then
+          local stale_dir="${lock_dir}.stale.$$"
+          if mv "$lock_dir" "$stale_dir" 2>/dev/null; then
+            log "Stale lock detected (legacy or incomplete lock). Breaking lock..."
+            rm -rf "$stale_dir" 2>/dev/null || true
+          fi
+          missing_created_start=""
+        fi
+      fi
+
+      sleep "$retry_interval"
+      i=$((i + 1))
+    done
+
+    if [[ "$acquired" == "true" ]]; then
+      CLEANUP_LOCK_DIR="$lock_dir"
+      echo "$$" > "$lock_dir/pid" 2>/dev/null || fatal "Failed to write PID file inside lock directory '$lock_dir'."
+      echo "$0" > "$lock_dir/script_path" 2>/dev/null || true
+      date +%s > "$lock_dir/created_at" 2>/dev/null || true
+    else
+      local wait_sec
+      wait_sec="$(LC_ALL=C awk -v m="$max_retries" -v r="$retry_interval" 'BEGIN {print m * r}' 2>/dev/null || echo "10")"
+      fatal "Failed to acquire lock '$lock_dir' after a configured timeout of $wait_sec seconds. Another process might be running, or the lock is stale. If no other setup-agent-worktree.sh process is running, manually remove the lock directory at '$lock_dir' and try again."
+    fi
+  fi
+  SETUP_WORKTREE_LOCK_DEPTH=$((SETUP_WORKTREE_LOCK_DEPTH + 1))
+}
+
+release_lock() {
+  if [[ "$SETUP_WORKTREE_LOCK_DEPTH" -le 0 ]]; then
+    return 0
+  fi
+  SETUP_WORKTREE_LOCK_DEPTH=$((SETUP_WORKTREE_LOCK_DEPTH - 1))
+  if [[ "$SETUP_WORKTREE_LOCK_DEPTH" -eq 0 && -n "$CLEANUP_LOCK_DIR" ]]; then
+    rm -f "$CLEANUP_LOCK_DIR/pid" "$CLEANUP_LOCK_DIR/script_path" "$CLEANUP_LOCK_DIR/created_at" 2>/dev/null || true
+    if rmdir "$CLEANUP_LOCK_DIR" 2>/dev/null; then
+      CLEANUP_LOCK_DIR=""
+    fi
+  fi
+}
+
+ensure_worktree_config_enabled() {
+  if [[ "$WORKTREE_CONFIG_ENABLED" == "true" ]]; then
+    return 0
+  fi
+
+  if [[ "$GIT_VERSION_CHECKED" != "true" ]]; then
+    # Enforce minimum Git version (2.20.0+) for worktree-local configuration support.
+    local git_ver major minor
+    if ! command -v git >/dev/null 2>&1; then
+      fatal "git command not found in PATH"
+    fi
+    git_ver="$(git --version 2>/dev/null || echo "0.0.0")"
+
+    # Parse major and minor version numbers safely using an anchored regex check
+    major=""
+    minor=""
+    if [[ "$git_ver" =~ git[[:space:]]version[[:space:]]([0-9]+)\.([0-9]+)(\.[0-9]+)?.* ]]; then
+      major="${BASH_REMATCH[1]}"
+      minor="${BASH_REMATCH[2]}"
+    fi
+
+    if ! [[ "$major" =~ ^[0-9]+$ ]] || ! [[ "$minor" =~ ^[0-9]+$ ]]; then
+      fatal "Failed to parse Git version (detected version string: '$git_ver'). Please ensure git is installed and working."
+    fi
+
+    if [[ "$major" -lt 2 ]] || [[ "$major" -eq 2 && "$minor" -lt 20 ]]; then
+      fatal "Git version 2.20.0 or newer is required for worktree-local configuration (detected: $git_ver)"
+    fi
+    GIT_VERSION_CHECKED="true"
+  fi
+
+  # Lock-free fast-path: if already enabled in the config file, bypass lock acquisition
+  if [[ "$(git config --file "$COMMON_DIR/config" --type=bool --get extensions.worktreeConfig 2>/dev/null || echo "false")" == "true" ]]; then
+    WORKTREE_CONFIG_ENABLED="true"
+    return 0
+  fi
+
+  acquire_lock
+
+  # Perform idempotent configurations with contextual error checks.
+  local cur_version
+  cur_version="$(git config --file "$COMMON_DIR/config" core.repositoryFormatVersion 2>/dev/null || true)"
+  if ! [[ "$cur_version" =~ ^[0-9]+$ ]]; then
+    cur_version=0
+  fi
+  if [[ "$cur_version" -lt 1 ]]; then
+    log "WARNING: Enabling extensions.worktreeConfig repository-wide. Upgrading shared repository format version to 1."
+    git config --file "$COMMON_DIR/config" core.repositoryFormatVersion 1 || fatal "Failed to set core.repositoryFormatVersion 1 in shared config"
+  fi
+
+  if [[ "$(git config --file "$COMMON_DIR/config" --type=bool --get extensions.worktreeConfig 2>/dev/null || echo "false")" != "true" ]]; then
+    log "Enabled extensions.worktreeConfig repository-wide"
+    git config --file "$COMMON_DIR/config" extensions.worktreeConfig true || fatal "Failed to enable extensions.worktreeConfig in shared config"
+  fi
+
+  WORKTREE_CONFIG_ENABLED="true"
+  release_lock
+}
+
+configure_identity() {
+  local wt_path="$1"
+  local name_val="$2"
+
+  # Auto-heal: ensure extensions.worktreeConfig is enabled when configuring identity
+  ensure_worktree_config_enabled
+
+  git -C "$wt_path" config --worktree user.email "agent-$name_val@{{PROJECT_NAME}}.local" || fatal "Failed to set worktree-local email config at: $wt_path"
+  git -C "$wt_path" config --worktree user.name  "agent-$name_val" || fatal "Failed to set worktree-local name config at: $wt_path"
+  log "Set worktree-local git identity: agent-$name_val <agent-$name_val@{{PROJECT_NAME}}.local>"
+}
+
+# Ensure `.worktrees/` is ignored so a project-local worktree checkout is never accidentally
+# committed. Idempotent — the rule is added at most once.
+#
+# The exclusion goes in the repo-local `.git/info/exclude` (never tracked, never shows as a
+# working-tree change) rather than the tracked `.gitignore`: the primary checkout is shared and
+# treated read-only, so appending to its `.gitignore` would dirty it outside any agent's PR and
+# trip doctor/clean-state checks. `git check-ignore` reads `.gitignore` FIRST, so a project that
+# already committed `.worktrees/` to `.gitignore` (git-workflow step 8 recommends this) is
+# detected and skipped silently — no duplicate exclude entry.
+ensure_worktrees_gitignored() {
+  # Use the trailing-slash directory pattern in the check so `git check-ignore` matches
+  # the directory even before its contents exist (this consults .gitignore AND info/exclude).
+  if ! git -C "$REPO_ROOT" check-ignore -q .worktrees/ 2>/dev/null; then
+    local exclude_file="$COMMON_DIR/info/exclude"
+    mkdir -p "$(dirname "$exclude_file")"
+    if [ -f "$exclude_file" ] && [ -s "$exclude_file" ] && [ "$(tail -c1 "$exclude_file")" != "" ]; then
+      printf '\n' >> "$exclude_file"
+    fi
+    printf '# Git worktrees ({{PROJECT_NAME}} parallel agents)\n.worktrees/\n' >> "$exclude_file"
+    log "Ignored .worktrees/ via $exclude_file (repo-local, uncommitted). To share it, commit '.worktrees/' to .gitignore."
+  fi
+}
+
+# Seed .scaffold/identity.json inside the worktree so `scaffold observe` can attribute
+# ledger events to this worktree. Best-effort: absence of .scaffold/ is created, not an error.
+seed_scaffold_identity() {
+  local wt="$1" name="$2"
+  mkdir -p "$wt/.scaffold"
+  if [ ! -f "$wt/.scaffold/identity.json" ]; then
+    local identity_uuid created_at
+    if command -v uuidgen >/dev/null 2>&1; then
+      identity_uuid="$(uuidgen | tr 'A-Z' 'a-z')"
+    elif command -v python3 >/dev/null 2>&1; then
+      identity_uuid="$(python3 -c 'import uuid; print(uuid.uuid4())')"
+    elif [ -r /proc/sys/kernel/random/uuid ]; then
+      identity_uuid="$(cat /proc/sys/kernel/random/uuid)"
+    else
+      # od: strip all non-hex chars for portability across platforms
+      local raw p1 p2 p3 hi
+      raw="$(od -vAn -N16 -tx1 /dev/urandom | tr -dc '0-9a-f')"
+      p1="${raw:0:8}" p2="${raw:8:4}" p3="4${raw:13:3}"
+      hi="$(printf '%x' "$(( (16#${raw:16:1} & 3) | 8 ))")"
+      identity_uuid="${p1}-${p2}-${p3}-${hi}${raw:17:3}-${raw:20:12}"
+    fi
+    created_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    printf '{\n  "worktree_id": "%s",\n  "worktree_label": "%s",\n  "created_at": "%s"\n}\n' \
+      "$identity_uuid" "$name" "$created_at" \
+      > "$wt/.scaffold/identity.json"
+    log "Wrote $wt/.scaffold/identity.json (worktree_id=$identity_uuid)"
+  fi
+}
+
+# Run the project's worktree setup commands (dependency installs, etc.) inside the fresh
+# worktree. --install opts into this. The command block is generated at install time from
+# the project's methodology config; if it is empty, this is a no-op.
+run_dependency_installs() {
+  local wt="$1" cd_diag=""
+  # Probe cd first so a missing/unenterable worktree is reported distinctly from a
+  # setup-command failure below.
+  if ! cd_diag="$( (cd "$wt") 2>&1 )"; then
+    fatal "cannot enter worktree $wt — cannot run setup there${cd_diag:+ ($cd_diag)}."
+  fi
+  log "Running worktree setup commands in $wt"
+  (
+    cd "$wt" || exit 1
+    # --- GENERATED: worktree setup commands ---
+{{WORKTREE_SETUP_COMMANDS}}
+    # --- END GENERATED ---
+  ) || fatal "worktree setup commands failed in $wt — re-run manually, then proceed."
+}
+
+# Resolve the remote's default branch NAME (bare, e.g. "main"), falling back to "main" when
+# origin/HEAD is unset. New worktrees branch off `origin/<default>`, so hardcoding `origin/main`
+# would fail `git worktree add` on a repo whose default is `master`/`trunk`/etc.
+resolve_default_branch() {
+  local d
+  d="$(git symbolic-ref refs/remotes/origin/HEAD --short 2>/dev/null | sed 's@^origin/@@')"
+  printf '%s' "${d:-main}"
+}
+
+cmd_create() {
+  local name="$1" task="$2" install="${3:-0}"
+  [[ -n "$name" ]] || fatal "name is required"
+
+  # Validate name: lowercase + digits + dashes, ≤ 40 chars.
+  # Validate name early before performing any repository configuration changes.
+  if ! [[ "$name" =~ ^[a-z0-9][a-z0-9-]{0,39}$ ]]; then
+    fatal "name must be lowercase alphanumeric/dashes, 1–40 chars (got: '$name')"
+  fi
+
+  # Advisory: warn on likely-duplicate in-flight work before creating the worktree.
+  # This scan runs lock-free by design to maximize throughput for concurrent read-only queries.
+  preflight_scan "${task:-$name}"
+
+  # Ensure .worktrees/ is gitignored before the checkout lands there.
+  ensure_worktrees_gitignored
+
+  # Acquire lock for the duration of the worktree creation process
+  acquire_lock
+
+  # Verify Git version and enable extensions before any git mutations occur
+  ensure_worktree_config_enabled
+
+  local branch="agent/$name"
+  local wt="$WORKTREE_DIR/$name"
+
+  # If the worktree already exists, just refresh tracking and exit.
+  if [[ -d "$wt" ]]; then
+    log "Worktree $wt already exists — refreshing branch tracking."
+    local default_branch existing_upstream
+    default_branch="origin/$(resolve_default_branch)"
+    existing_upstream="$(git -C "$wt" config "branch.$branch.merge" 2>/dev/null || true)"
+    if ! git -C "$wt" fetch origin 2>/dev/null; then
+      warn "Could not fetch from remote repository. Tracking branch refresh might be outdated."
+    else
+      if [[ -z "$existing_upstream" ]]; then
+        git -C "$wt" branch -u "$default_branch" "$branch" 2>/dev/null || true
+      fi
+    fi
+    configure_identity "$wt" "$name"
+    seed_scaffold_identity "$wt" "$name" || warn "could not seed .scaffold/identity.json in $wt (non-fatal)"
+    log "Done. cd $wt"
+    release_lock
+    if [[ "$install" == "1" ]]; then
+      run_dependency_installs "$wt"
+    fi
+    return 0
+  fi
+
+  # If the branch exists locally but no worktree, create the worktree pointing at it.
+  if git show-ref --verify --quiet "refs/heads/$branch"; then
+    log "Branch $branch exists; creating worktree at $wt."
+    git worktree add "$wt" "$branch"
+  else
+    local default_branch
+    default_branch="$(resolve_default_branch)"
+    log "Creating branch $branch and worktree at $wt (off origin/$default_branch)."
+    # Non-fatal fetch: offline should not abort creation when a local origin/<default>
+    # tracking ref already exists — `git worktree add` below falls back to it.
+    git fetch origin || warn "fetch failed — proceeding with local refs"
+    git worktree add -b "$branch" "$wt" "origin/$default_branch"
+  fi
+
+  # Set per-worktree git identity so blame is meaningful.
+  configure_identity "$wt" "$name"
+  seed_scaffold_identity "$wt" "$name" || warn "could not seed .scaffold/identity.json in $wt (non-fatal)"
+
+  log "Done."
+  log "  cd $wt"
+  log "  # work normally; commit, push, open PR per your project's git workflow"
+  release_lock
+  # Installs run AFTER the lock is released: they write only to this worktree's own
+  # dependency dirs (never shared git state) and can take minutes, so holding the
+  # creation lock through them would serialize every concurrent agent's worktree setup.
+  if [[ "$install" == "1" ]]; then
+    run_dependency_installs "$wt"
+  fi
+}
+
+# ----- entrypoint -----
+
+case "${1:-}" in
+  --help|-h|"")
+    usage
+    ;;
+  --list)
+    cmd_list
+    ;;
+  --preflight-only)
+    task=""
+    if [[ "${2:-}" == "--task" ]] && [[ $# -ge 3 ]]; then
+      task="$3"
+    fi
+    preflight_scan "$task"
+    ;;
+  *)
+    name="$1"
+    if [[ "$name" == --* ]]; then
+      fatal "unknown option: $name — a worktree <name> must come before flags (see --help)"
+    fi
+    shift
+    task=""
+    install=0
+    # Parse trailing flags in any order: --task "<desc>" and/or --install.
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --task)
+          [[ $# -ge 2 ]] || fatal "--task requires a description argument"
+          [[ "$2" == --* ]] && fatal "--task requires a description argument, not another flag (got: '$2')"
+          task="$2"
+          shift 2
+          ;;
+        --install)
+          install=1
+          shift
+          ;;
+        *)
+          fatal "unknown argument: $1 (after name '$name'); supported flags: --task \"<desc>\", --install"
+          ;;
+      esac
+    done
+    cmd_create "$name" "$task" "$install"
+    ;;
+esac

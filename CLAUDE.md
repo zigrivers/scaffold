@@ -60,6 +60,8 @@ When modifying prompts:
 | `make hooks` | Install pre-commit and pre-push hooks |
 | `scripts/setup-agent-worktree.sh <name>` | Create worktree for parallel agent |
 | `git worktree list` | List all active worktrees |
+| `scaffold agent-ops install [--component git\|staging\|all] [--force]` | Install the parallel-agent tooling bundle (worktree + staging scripts, `agent-ops.mk`) into a **generated** project |
+| `scaffold agent-ops check` | Drift-check an installed agent-ops bundle against its ownership manifest; exits non-zero on staleness |
 | `gh pr create` | Create pull request from current branch |
 | `gh pr merge --squash --delete-branch` | Squash-merge PR and clean up branch |
 | `gh pr diff` | Review PR diff before merging |

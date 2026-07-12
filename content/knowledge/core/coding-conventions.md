@@ -57,7 +57,7 @@ If a convention cannot be checked by a tool, it will not be followed consistentl
 
 ### Comment Philosophy at a Glance
 
-Comments explain **why**, not **what**. If you need a comment to explain what code does, the code is too complex — refactor first. Extract well-named functions, use descriptive variables, replace magic numbers with constants. TODOs must include a task ID: `// TODO [bd-<id>]: Reason`. Bare TODOs are not allowed.
+Comments explain **why**, not **what**. If you need a comment to explain what code does, the code is too complex — refactor first. Extract well-named functions, use descriptive variables, replace magic numbers with constants. TODOs must include a task ID: `// TODO(bd-<id>): Reason`. Bare TODOs are not allowed.
 
 ## Deep Guidance
 
@@ -124,7 +124,7 @@ Comments explain **why**, not **what**. If you need a comment to explain what co
 
 **Documentation comments**: Public APIs always need documentation comments. TypeScript uses JSDoc `/** */`. Python uses docstrings. Go uses comments above exported identifiers starting with the identifier name.
 
-**TODO format**: `// TODO [bd-<id>]: Reason for the TODO`. Also `FIXME [bd-<id2>]` and `HACK [bd-<id3>]`. Bare TODOs without task IDs accumulate without accountability and are not allowed.
+**TODO format**: `// TODO(bd-<id>): Reason for the TODO`. Also `FIXME(bd-<id2>)` and `HACK(bd-<id3>)`. Bare TODOs without task IDs accumulate without accountability and are not allowed.
 
 ### Error Handling Patterns by Language
 

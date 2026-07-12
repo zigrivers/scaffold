@@ -54,6 +54,11 @@ format between agents, and success criteria.
 - (deep) Quality gates include `make eval` (or equivalent) as a required check when eval tests exist
 - (deep) Agent workflow references test skeleton implementation from tests/acceptance/
 - (deep) Handoff format includes at minimum: implementation summary, assumptions made, known limitations, gotchas, and files modified
+- (mvp) When Beads and the `work-beads` skill are present, the task-execution
+  section routes to the `work-beads` skill for the per-task loop (claim →
+  worktree → build → verify → review → merge → close) instead of restating
+  it — the skill is the single source of truth; the playbook keeps only the
+  generic fallback loop for projects without Beads or the skill installed
 
 ## Methodology Scaling
 - **deep**: Full playbook. Detailed coding standards, git workflow with

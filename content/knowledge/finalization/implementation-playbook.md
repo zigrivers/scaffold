@@ -18,7 +18,14 @@ This is the most critical finalization document. If the onboarding guide tells a
 
 ## Task Execution Protocol
 
-### How Agents Pick Work
+### Route to the work-beads Skill First
+
+When Beads and the `work-beads` skill are installed
+(`.claude/skills/work-beads/SKILL.md` or `.agents/skills/work-beads/SKILL.md`),
+follow that skill **exactly** for the per-task loop (claim → build →
+verify → review → merge → close) — it supersedes the fallback steps below.
+
+### How Agents Pick Work (generic fallback)
 
 1. **Check for available tasks.** Query the task management system for unblocked, unclaimed tasks.
 2. **Claim the task.** Mark the task as claimed with the agent's identity. This prevents two agents from working on the same task.
@@ -273,13 +280,13 @@ Format: Include `Closes T-XXX` or `[T-XXX]` in the commit message footer or body
 2. **Implement the task.** Make focused commits — each commit should be atomic and meaningful.
 3. **Run all quality gates** locally before pushing.
 4. **Push the branch** and create a pull request.
-5. **PR title** follows commit message format: `type(scope): description [T-XXX]`
+5. **PR title** follows commit message format: `type(scope): description` — work-item IDs stay out of the title (under squash-merge it becomes the commit subject on main); reference the task in the PR body instead (`Closes <id>` / `Refs T-XXX`)
 6. **PR body** includes:
    - What changed and why
    - How to test it
    - Any follow-up work needed
    - Screenshots if UI changes (or description of visual changes)
-7. **Wait for CI** to pass.
+7. **Watch the local quality gates** — pre-commit hooks and `make check` green on the branch HEAD, plus the mandatory AI review (step 5.5 of the PR flow); CI applies only after a launch target is chosen.
 8. **Review and address feedback** — make new commits, do not force-push during review.
 9. **Merge** using squash merge (single commit on main with clean history).
 10. **Delete the branch** after merge.

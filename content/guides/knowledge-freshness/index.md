@@ -602,7 +602,7 @@ Every host plus its category, and the pinned GitHub repos.
 Totals over `content/knowledge/`, broken down per category.
 
 <!-- gen:kb-inventory -->
-**298 entries** across 21 categories:
+**299 entries** across 21 categories:
 
 | Category | Entries |
 | --- | --- |
@@ -623,8 +623,8 @@ Totals over `content/knowledge/`, broken down per category.
 | mobile-app | 12 |
 | cli | 10 |
 | validation | 7 |
+| execution | 6 |
 | product | 6 |
-| execution | 5 |
 | tools | 4 |
 | finalization | 3 |
 <!-- /gen:kb-inventory -->

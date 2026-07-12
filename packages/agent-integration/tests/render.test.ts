@@ -74,6 +74,17 @@ describe('renderCursorMdc', () => {
     expect(out).toContain('Lean: run `mmr review`.')
     expect(out).not.toContain('Full body.')
   })
+
+  it('defaults alwaysApply to false when no options are passed', () => {
+    const out = renderCursorMdc(SKILL, {})
+    expect(out).toContain('alwaysApply: false')
+  })
+
+  it('emits alwaysApply: true when the skill opts in via options', () => {
+    const out = renderCursorMdc(SKILL, { alwaysApply: true })
+    expect(out).toContain('alwaysApply: true')
+    expect(out).not.toContain('alwaysApply: false')
+  })
 })
 
 describe('YAML safety', () => {

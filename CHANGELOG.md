@@ -4,6 +4,78 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **`scaffold agent-ops install|check` — a versioned parallel-agent tooling
+  bundle.** Installs the worktree and staging machinery generated projects
+  need for multiple AI agents to work in parallel without colliding: five git
+  scripts (`setup-agent-worktree.sh`, `doctor.sh`, `main-sync.sh`,
+  `cleanup-merged-branches.sh`, `beads-snapshot.sh`), five per-worktree
+  staging scripts (`docker-env.sh`, `docker-doctor.sh`, `staging-env.sh`,
+  `staging-teardown.sh`, `tc-reap.sh`), and an `agent-ops.mk` Makefile
+  fragment, sourced from a new template bundle at `content/assets/agent-ops/`.
+  `scaffold agent-ops install --component git|staging|all` installs by
+  component (default `all`); `scaffold agent-ops check` reports drift against
+  an ownership manifest and exits non-zero on staleness. Installed files are
+  protected from accidental overwrite — a locally modified or pre-existing
+  file is skipped unless `--force` is passed.
+- **`work-beads` skill** (`content/agent-skills/work-beads/`) — the canonical
+  source for the per-bead ship loop (claim → build → verify → review → merge
+  → close), fanned out to every supported platform (`.claude/skills/`,
+  `.agents/skills/`, Cursor `.mdc` with `alwaysApply: true` so the loop
+  survives Cursor's mid-session description-matching gaps). Registered in
+  `INSTALLABLE_SKILLS`, so it auto-installs into existing Scaffold projects on
+  their next skill sync — no re-run of `git-workflow` or `beads` required.
+- **`staging-environments` pipeline step** (Phase 3 — Development Environment,
+  order 315, conditional, disabled by default in `mvp`). Installs the
+  agent-ops staging component and generates a per-worktree Docker Compose
+  setup — deterministic port bands derived from the worktree path, no port
+  collisions between concurrently running agents, orphan container reaping,
+  and a protected shared QA stack.
+
+### Changed
+
+- **Build prompts slimmed to bootstrap + `work-beads` handoff.**
+  `multi-agent-start`, `multi-agent-resume`, `single-agent-start`, and
+  `single-agent-resume` now cover only pre-flight, worktree setup, and Beads
+  orchestrator materialization, then hand off the per-bead ship loop to the
+  `work-beads` skill — removing ~275 lines of TDD/PR/review/merge instructions
+  that were duplicated between the prompts and the skill.
+- **`git-workflow` pipeline step** now defers CI to launch (generated projects
+  get **no** `.github/workflows/`; the quality gate is local `make check` +
+  `pre-commit`/`pre-push` hooks + `mmr review`, matching this repo's own D4
+  policy), installs the agent-ops git component, documents the harmonized
+  8-step PR flow with mandatory AI review as step 5.5, and wires a
+  `PostToolUse` hook that reminds agents to run review after `gh pr create`.
+- **`beads` pipeline step** now generates `docs/beads-workflow.md`, documenting
+  the defer-to-bead convention and the bootstrap-trap failure mode.
+- **`claude-md-optimization`** now documents the `AGENTS.md` operations-core
+  split architecture, and **`workflow-audit`** gained six new cross-document
+  consistency checks that enforce it.
+- **Knowledge base**: `git-workflow-patterns` rewritten to match the D4
+  (CI-deferred) and D7 (branch/commit convention) decisions below — including
+  the canonical 8-step PR flow and the `make main-sync && make prune-merged`
+  closing step; new `per-worktree-environments` entry documenting the staging
+  isolation model; `worktree-management`, `multi-agent-coordination`,
+  `task-tracking`, and `claude-md-patterns` extended with doctor/prune/
+  claim-reentry guidance.
+- **BEHAVIOR CHANGE — the `mvp` preset floor is raised.** `beads`,
+  `git-workflow`, and `materialize-plan-to-beads` are now `enabled: true` by
+  default under `mvp` (`beads` and `materialize-plan-to-beads` conditional
+  `if-needed`; `staging-environments` and `ai-memory-setup` stay disabled).
+  Previously all three were disabled under `mvp`. Existing `mvp` projects keep
+  their current `.scaffold/config.yml` unless re-initialized or manually
+  updated.
+- **BEHAVIOR CHANGE — `bd-<id>` branch and commit conventions are retired.**
+  Generated projects now use `<type>/<short-desc>` branch names (agent
+  worktree branches: `agent/<name>`) with task IDs referenced in commit/PR
+  bodies (`Closes bd-<id>`) instead of embedded in branch names or as a
+  `[bd-<id>]` commit prefix. All `content/` references to the old convention
+  were swept and replaced; a new regression eval,
+  `tests/evals/retired-conventions.bats`, locks the decision in. **Existing
+  projects generated before this change do not update automatically** — re-run
+  `workflow-audit` to reconcile local convention docs with the new default.
+
 ## [3.39.4] — 2026-06-24
 
 ### Changed

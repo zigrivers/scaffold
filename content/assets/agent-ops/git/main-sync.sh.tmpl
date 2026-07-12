@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# {{PROJECT_NAME}} — fast-forward the local default branch to its origin from anywhere.
+# The default branch (main/master/trunk) is resolved from origin/HEAD, never hardcoded.
+#
+# Usage: scripts/main-sync.sh   (or: make main-sync)
+#
+# - Fetches origin, then fast-forwards the default branch wherever it is checked out.
+# - If the default branch is checked out nowhere (invariant temporarily violated — e.g. the
+#   primary checkout is detached), restores it into the primary checkout when clean.
+# - Refuses (non-zero) if the default branch has diverged (any commit ahead of its origin).
+set -euo pipefail
+
+log()  { printf "→ %s\n" "$*"; }
+warn() { printf "! %s\n" "$*" >&2; }
+
+git rev-parse --is-inside-work-tree >/dev/null 2>&1 || { warn "not in a git repository"; exit 1; }
+
+# Resolve the remote's default branch NAME (bare, e.g. "main"), falling back to
+# "main" when origin/HEAD is unset. Same helper as setup-agent-worktree.sh — a
+# repo whose default is `master`/`trunk` must not have `main` hardcoded here.
+resolve_default_branch() {
+  local d
+  d="$(git symbolic-ref refs/remotes/origin/HEAD --short 2>/dev/null | sed 's@^origin/@@')"
+  printf '%s' "${d:-main}"
+}
+DEFAULT="$(resolve_default_branch)"
+
+log "Fetching origin..."
+git fetch --quiet origin || { warn "fetch failed"; exit 1; }
+git rev-parse --verify --quiet "origin/$DEFAULT" >/dev/null || { warn "origin/$DEFAULT not found"; exit 1; }
+
+# Where is the default branch checked out (if anywhere)?
+main_wt="$(git worktree list --porcelain | awk -v def="refs/heads/$DEFAULT" '
+  /^worktree /{ wt = substr($0, 10) }
+  $0 == "branch " def { print wt }')"
+
+if [[ -z "$main_wt" ]]; then
+  # The default branch is checked out nowhere: restore it into the PRIMARY checkout (the first
+  # worktree — it belongs there), NOT wherever main-sync happens to be run from.
+  primary="$(git worktree list --porcelain | awk 'NR==1 && /^worktree /{ print substr($0, 10) }')"
+  if [[ -z "$primary" ]]; then
+    warn "$DEFAULT is checked out nowhere and the primary checkout could not be located."
+    exit 1
+  fi
+  # Only restore when the primary is detached — never silently switch it off a feature branch.
+  primary_branch="$(git -C "$primary" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+  if [[ -n "$primary_branch" && "$primary_branch" != "$DEFAULT" ]]; then
+    warn "$DEFAULT is checked out nowhere and the primary checkout ($primary) is on branch '$primary_branch'."
+    warn "Refusing to switch it away. Restore $DEFAULT yourself: git -C \"$primary\" switch $DEFAULT"
+    exit 1
+  fi
+  if [[ -n "$(git -C "$primary" status --porcelain --untracked-files=no)" ]]; then
+    warn "$DEFAULT is checked out nowhere and the primary checkout ($primary) has uncommitted changes to tracked files — cannot restore."
+    warn "Expected $DEFAULT in the primary checkout."
+    exit 1
+  fi
+  log "$DEFAULT checked out nowhere — restoring it into the primary checkout: $primary"
+  if git -C "$primary" rev-parse --verify --quiet "refs/heads/$DEFAULT" >/dev/null; then
+    git -C "$primary" checkout "$DEFAULT" >/dev/null 2>&1
+  else
+    git -C "$primary" checkout -b "$DEFAULT" --track "origin/$DEFAULT" >/dev/null 2>&1
+  fi
+  main_wt="$primary"
+fi
+
+ahead="$(git -C "$main_wt" rev-list --count "origin/$DEFAULT..$DEFAULT")"
+if [[ "$ahead" != "0" ]]; then
+  warn "$DEFAULT has diverged from origin/$DEFAULT ($ahead commit(s) ahead) — refusing to fast-forward."
+  warn "Investigate: 'git -C \"$main_wt\" log --oneline origin/$DEFAULT..$DEFAULT'."
+  exit 1
+fi
+
+git -C "$main_wt" merge --ff-only "origin/$DEFAULT" >/dev/null
+log "$DEFAULT is in sync at $(git -C "$main_wt" rev-parse --short "$DEFAULT") (worktree: $main_wt)."

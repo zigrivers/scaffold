@@ -1,0 +1,179 @@
+#!/usr/bin/env bash
+# {{PROJECT_NAME}} — Docker engine diagnostic (read-only). Answers the question agents keep
+# getting wrong: WHICH engine is my Docker work actually on? With more than one local engine
+# (e.g. OrbStack + Docker Desktop), the CLI follows the selected context while
+# testcontainers/docker-py follow DOCKER_HOST or /var/run/docker.sock — so `docker ps` can
+# show a calm engine while the other one drowns. This script shows every local engine, where
+# {{PROJECT_NAME}}'s footprint (staging stacks + testcontainers) actually lives, and warns on
+# split-brain.
+#
+#   docker-doctor.sh            # human/agent-readable report; exit 0 = consistent,
+#                               # exit 1 = split-brain or pinned engine unreachable
+#   docker-doctor.sh --check    # cheap probe for `make doctor`: stderr-only problems,
+#                               # silent on success (same exit codes)
+#
+# Read-only: never creates, removes, or restarts anything.
+set -uo pipefail
+
+CHECK_MODE=0
+for arg in "$@"; do
+  case "$arg" in
+    --check) CHECK_MODE=1 ;;
+    -h|--help)
+      awk 'NR>1{ if (/^#/) { sub(/^# ?/, ""); print } else exit }' "$0"
+      exit 0
+      ;;
+    *) printf "usage: docker-doctor.sh [--check]\n" >&2; exit 2 ;;
+  esac
+done
+
+log()  { [[ "$CHECK_MODE" == "1" ]] || printf "%s\n" "$*"; }
+warn() {
+  if [[ "$CHECK_MODE" == "1" ]]; then
+    printf "%s\n" "$*" >&2
+  else
+    printf "! %s\n" "$*"
+  fi
+}
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# The pinned context: an explicit DOCKER_CONTEXT override wins, else the baked-in default.
+PINNED_CTX="${DOCKER_CONTEXT:-{{DOCKER_CONTEXT}}}"
+PROBLEMS=0
+
+# The daemon ID behind the pinned context (empty if unreachable). Selecting by context keeps
+# this consistent with docker-env.sh, which pins the same context for every {{PROJECT_NAME}} tool.
+pinned_daemon_id() {
+  docker --context "$PINNED_CTX" info --format '{{.ID}}' 2>/dev/null || true
+}
+
+# Cheap probe for `make doctor`: pinned reachability + split-brain only (no resource
+# stats or tc-reap). Full report path below handles human diagnostics.
+run_check_probe() {
+  local pinned_daemon seen="" ctx endpoint id projects tc_total
+  pinned_daemon="$(pinned_daemon_id)"
+  if [[ -z "$pinned_daemon" ]]; then
+    warn "pinned context '$PINNED_CTX' is not reachable — is that engine running?"
+    PROBLEMS=1
+    return 0
+  fi
+  while IFS=$'\t' read -r ctx endpoint; do
+    [[ "$endpoint" == unix://* ]] || continue
+    id="$(docker --context "$ctx" info --format '{{.ID}}' 2>/dev/null)" || continue
+    [[ -n "$id" && "$id" != "$pinned_daemon" ]] || continue
+    case " $seen " in *" $id "*) continue ;; esac
+    seen="$seen $id"
+    projects="$( {
+        docker --context "$ctx" compose ls -a 2>/dev/null | awk 'NR>1{print $1}'
+        docker --context "$ctx" volume ls --format '{{.Label "com.docker.compose.project"}}' 2>/dev/null
+      } | grep -E '^{{PROJECT_NAME}}($|-wt-)' | sort -u || true)"
+    tc_total="$(docker --context "$ctx" ps -a -q --filter label=org.testcontainers=true 2>/dev/null \
+      | wc -l | tr -d ' ' || true)"
+    tc_total="${tc_total:-0}"
+    if [[ -n "$projects" || "$tc_total" -gt 0 ]]; then
+      warn "SPLIT-BRAIN: {{PROJECT_NAME}} containers live on the NON-pinned context '$ctx'. New work"
+      warn "targets the pinned engine, so reapers/doctors here won't see these by default."
+      warn "Migrate or clean up (single-engine policy)."
+      PROBLEMS=1
+    fi
+  done < <(docker context ls --format '{{.Name}}\t{{.DockerEndpoint}}' 2>/dev/null)
+  return 0
+}
+
+if ! command -v docker >/dev/null 2>&1; then
+  warn "docker CLI not installed — nothing to diagnose"
+  exit 1
+fi
+
+if [[ "$CHECK_MODE" == "1" ]]; then
+  run_check_probe
+  if [[ $PROBLEMS -eq 0 ]]; then
+    exit 0
+  fi
+  printf '%s\n' "engine wiring problems (run: make docker-doctor)" >&2
+  exit 1
+fi
+
+log "=== Docker engine wiring ==="
+log "CLI context (docker context show): $(docker context show 2>/dev/null || echo '?')"
+log "Ambient DOCKER_HOST:               ${DOCKER_HOST:-<unset>}"
+log "Ambient DOCKER_CONTEXT:            ${DOCKER_CONTEXT:-<unset>}"
+log "Pinned context ({{PROJECT_NAME}}):        $PINNED_CTX"
+sock_target="$(readlink /var/run/docker.sock 2>/dev/null || true)"
+log "/var/run/docker.sock:              ${sock_target:-<not a symlink / absent>}"
+log ""
+
+# Group every local unix-socket context by the daemon actually behind it (two contexts can
+# point at the same engine — e.g. `default` symlinked to another engine's socket). Plain
+# newline-delimited "id<TAB>ctx<TAB>os" records: macOS ships bash 3.2, no associative arrays.
+pairs=""
+while IFS=$'\t' read -r ctx endpoint; do
+  [[ "$endpoint" == unix://* ]] || continue
+  id="$(docker --context "$ctx" info --format '{{.ID}}' 2>/dev/null)" || continue
+  [[ -n "$id" ]] || continue
+  os="$(docker --context "$ctx" info --format '{{.OperatingSystem}}' 2>/dev/null || echo '?')"
+  pairs="${pairs}${id}"$'\t'"${ctx}"$'\t'"${os}"$'\n'
+done < <(docker context ls --format '{{.Name}}\t{{.DockerEndpoint}}' 2>/dev/null)
+
+if [[ -z "$pairs" ]]; then
+  warn "no reachable local Docker engine (is your engine running?)"
+  exit 1
+fi
+
+pinned_daemon="$(pinned_daemon_id)"
+if [[ -z "$pinned_daemon" ]]; then
+  warn "pinned context '$PINNED_CTX' is not reachable — is that engine running?"
+  PROBLEMS=1
+fi
+
+for id in $(awk -F'\t' 'NF{print $1}' <<<"$pairs" | sort -u); do
+  ctxs="$(awk -F'\t' -v id="$id" '$1==id{print $2}' <<<"$pairs" | tr '\n' ' ')"
+  ctxs="${ctxs% }"
+  engine_os="$(awk -F'\t' -v id="$id" '$1==id{print $3; exit}' <<<"$pairs")"
+  first_ctx="${ctxs%% *}"
+  marker=""
+  [[ "$id" == "$pinned_daemon" ]] && marker="  <- PINNED ({{PROJECT_NAME}}'s engine)"
+  log "=== Engine: ${engine_os} (contexts: ${ctxs})${marker} ==="
+  docker --context "$first_ctx" info --format '{{.NCPU}} {{.MemTotal}}' 2>/dev/null \
+    | awk '{printf "Resources: %s CPUs, %.1f GiB RAM\n", $1, $2/1073741824}' || true
+
+  # {{PROJECT_NAME}} footprint: compose projects (shared stack + per-worktree stacks) and
+  # testcontainers (live + leaked).
+  projects="$( {
+      docker --context "$first_ctx" compose ls -a 2>/dev/null | awk 'NR>1{print $1}'
+      docker --context "$first_ctx" volume ls --format '{{.Label "com.docker.compose.project"}}' 2>/dev/null
+    } | grep -E '^{{PROJECT_NAME}}($|-wt-)' | sort -u || true)"
+  if [[ -n "$projects" ]]; then
+    while IFS= read -r p; do
+      [[ -n "$p" ]] || continue
+      count="$(docker --context "$first_ctx" ps -a -q --filter "label=com.docker.compose.project=$p" 2>/dev/null | wc -l | tr -d ' ')"
+      log "{{PROJECT_NAME}} stack: $p (${count} container(s))"
+    done <<<"$projects"
+  else
+    log "{{PROJECT_NAME}} stacks: none"
+  fi
+
+  # org.testcontainers (not session-id): ryuk containers carry only the former label.
+  tc_total="$(docker --context "$first_ctx" ps -a -q --filter label=org.testcontainers=true 2>/dev/null | wc -l | tr -d ' ')"
+  # Full-visibility dry-run (running leaks included — dry-run is read-only); the count
+  # comes from tc-reap's stable summary line, not its per-container output format.
+  # Anchor on the text, not the leading '→' (multi-byte in UTF-8; unreliable in non-UTF-8 locales).
+  tc_leaked="$(bash "$SCRIPT_DIR/tc-reap.sh" --dry-run --include-running --context "$first_ctx" 2>/dev/null \
+    | sed -n 's/.*would reap \([0-9][0-9]*\).*/\1/p')"
+  log "testcontainers: ${tc_total} total, ${tc_leaked:-0} leaked (reap: make tc-reap, running leaks: ARGS=--include-running)"
+
+  if [[ "$id" != "$pinned_daemon" && ( -n "$projects" || "$tc_total" -gt 0 ) ]]; then
+    warn "SPLIT-BRAIN: {{PROJECT_NAME}} containers live on this NON-pinned engine. New work targets"
+    warn "the pinned engine, so reapers/doctors here won't see these by default. Migrate or"
+    warn "clean up (single-engine policy)."
+    PROBLEMS=1
+  fi
+  log ""
+done
+
+if [[ $PROBLEMS -eq 0 ]]; then
+  log "→ engine wiring consistent: all {{PROJECT_NAME}} Docker work targets the pinned engine"
+else
+  log "→ problems found (see warnings above)"
+fi
+exit $PROBLEMS

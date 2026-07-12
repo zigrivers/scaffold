@@ -1394,8 +1394,8 @@ worktree cannot also be checked out in the primary repo — git enforces this.
 That constraint is a feature here: it keeps each agent's work pinned to its own
 branch.</p></div>
 <h2 id="setup-setup-agent-worktreesh">Setup — <code>setup-agent-worktree.sh</code></h2>
-<p><code>scripts/setup-agent-worktree.sh &#x3C;agent-name></code> creates a permanent worktree for
-one parallel agent. Given a name like <code>alpha</code>, it:</p>
+<p><code>scripts/setup-agent-worktree.sh &#x3C;agent-name> --install</code> creates a permanent
+worktree for one parallel agent. Given a name like <code>alpha</code>, it:</p>
 <ol>
 <li><strong>Normalizes the name</strong> to a lowercase, hyphenated, alphanumeric slug (so
 <code>Agent_1</code> becomes <code>agent-1</code>), then derives the worktree directory project-local
@@ -1418,6 +1418,10 @@ version. (Beads DB sharing is automatic — worktrees discover the main repo's
 task DB via git's common directory, so there is nothing for <code>bd doctor</code> to
 register.)</li>
 </ol>
+<p>With <code>--install</code>, it additionally runs the project's configured worktree setup
+commands (dependency installs) inside the fresh checkout — pass it whenever the
+worktree needs to build and test, since a plain invocation creates the worktree
+but installs nothing.</p>
 <p>The <code>worktree_id</code> is what later lets the harvester tell one worktree's ledger
 from another's — see the <a href="../observability/index.md">observability guide</a> for
 how identity flows into events.</p>
@@ -1467,9 +1471,11 @@ rather than editing concurrently <span class="cite-advisory" data-path="docs/git
 into needless conflicts.</li>
 </ul>
 <p>Each agent otherwise follows the standard PR workflow from its own worktree:
-branch, commit, push, <code>gh pr create</code>, wait for CI, squash-merge. The shared
-object store means a merge from agent <code>alpha</code>'s worktree is on <code>main</code> for
-everyone the moment it lands.</p>
+commit on <code>agent/&#x3C;name></code>, push, <code>gh pr create</code>, run <code>mmr review</code> (mandatory
+step 5.5), watch the local quality gates go green (pre-commit + <code>make check</code> —
+CI is deferred until launch), then squash-merge. The shared object store means a
+merge from agent <code>alpha</code>'s worktree is on <code>main</code> for everyone the moment it
+lands.</p>
 <h2 id="teardown-harvest">Teardown &#x26; harvest</h2>
 <p>When an agent's work is merged, retire its worktree. The single command for this
 is <code>scripts/teardown-agent-worktree.sh &#x3C;worktree-path></code>, and the <strong>order of

@@ -7,6 +7,16 @@ description: >
 project-type: data-pipeline
 
 # ---------------------------------------------------------------------------
+# step-overrides
+# ---------------------------------------------------------------------------
+# Data pipelines routinely run databases, queues, and workers in Docker for
+# local development — keep staging-environments available even under the
+# mvp preset. It self-skips at runtime when tech-stack.md declares no
+# containerized services.
+step-overrides:
+  staging-environments: { enabled: true, conditional: "if-needed" }
+
+# ---------------------------------------------------------------------------
 # knowledge-overrides
 # ---------------------------------------------------------------------------
 # Map data-pipeline knowledge entries into existing pipeline steps so that

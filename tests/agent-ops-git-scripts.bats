@@ -1,0 +1,228 @@
+#!/usr/bin/env bats
+# Behavior tests for the agent-ops git-component templates, run against a
+# sandbox repo with resolved placeholders. Mirrors tests/setup-agent-worktree.bats
+# sandbox conventions.
+
+load fixtures/agent-ops/resolve-template.bash
+
+TEMPLATES="$BATS_TEST_DIRNAME/../content/assets/agent-ops/git"
+
+setup() {
+    RESOLVED_TMPDIR="$(cd "$BATS_TMPDIR" && pwd -P)"
+    export ORIG_DIR="$RESOLVED_TMPDIR/orig-$$"
+    export CLONE_DIR="$RESOLVED_TMPDIR/proj-$$"
+    mkdir -p "$ORIG_DIR"
+    git -C "$ORIG_DIR" init --bare --quiet --initial-branch=main
+    git clone --quiet "$ORIG_DIR" "$CLONE_DIR"
+    git -C "$CLONE_DIR" config user.email t@t.com
+    git -C "$CLONE_DIR" config user.name T
+    git -C "$CLONE_DIR" commit --allow-empty -m initial --quiet
+    git -C "$CLONE_DIR" push --quiet origin main 2>/dev/null
+    mkdir -p "$CLONE_DIR/scripts"
+    for t in "$TEMPLATES"/*.sh.tmpl; do
+        name="$(basename "$t" .tmpl)"
+        resolve_agent_ops_template "$t" "$CLONE_DIR/scripts/$name"
+    done
+    # Stub gh and bd so preflight paths run without network/tools
+    mkdir -p "$CLONE_DIR/stubs"
+    cat > "$CLONE_DIR/stubs/gh" <<'EOF'
+#!/usr/bin/env bash
+# `gh pr list ... --json title` consumers get an empty list by default
+echo "[]"
+EOF
+    cat > "$CLONE_DIR/stubs/bd" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+    chmod +x "$CLONE_DIR/stubs/gh" "$CLONE_DIR/stubs/bd"
+    export PATH="$CLONE_DIR/stubs:$PATH"
+}
+
+teardown() { rm -rf "$ORIG_DIR" "$CLONE_DIR"; }
+
+@test "setup: creates .worktrees/<name> on branch agent/<name> and excludes .worktrees repo-locally" {
+    run bash -c "cd '$CLONE_DIR' && scripts/setup-agent-worktree.sh alpha"
+    [ "$status" -eq 0 ]
+    [ -d "$CLONE_DIR/.worktrees/alpha" ]
+    run git -C "$CLONE_DIR/.worktrees/alpha" branch --show-current
+    [ "$output" = "agent/alpha" ]
+    # F5: the exclusion lands in the repo-local .git/info/exclude, NOT the tracked
+    # .gitignore — so the shared primary checkout is never dirtied by a tracked-file change.
+    grep -q '\.worktrees' "$CLONE_DIR/.git/info/exclude"
+    [ ! -f "$CLONE_DIR/.gitignore" ] || ! grep -q '\.worktrees' "$CLONE_DIR/.gitignore"
+    # git genuinely ignores the directory.
+    run git -C "$CLONE_DIR" check-ignore -q .worktrees/
+    [ "$status" -eq 0 ]
+}
+
+@test "setup: skips the exclude write when .worktrees is already committed to .gitignore" {
+    printf '.worktrees/\n' > "$CLONE_DIR/.gitignore"
+    git -C "$CLONE_DIR" add .gitignore
+    git -C "$CLONE_DIR" commit -q -m "ignore worktrees"
+    run bash -c "cd '$CLONE_DIR' && scripts/setup-agent-worktree.sh alpha"
+    [ "$status" -eq 0 ]
+    # Already ignored via the committed .gitignore → info/exclude is not touched.
+    [ ! -f "$CLONE_DIR/.git/info/exclude" ] || ! grep -q '\.worktrees' "$CLONE_DIR/.git/info/exclude"
+}
+
+@test "setup: sets per-worktree agent identity with project domain" {
+    bash -c "cd '$CLONE_DIR' && scripts/setup-agent-worktree.sh alpha"
+    run git -C "$CLONE_DIR/.worktrees/alpha" config user.email
+    [ "$output" = "agent-alpha@testproj.local" ]
+}
+
+@test "setup: is idempotent" {
+    bash -c "cd '$CLONE_DIR' && scripts/setup-agent-worktree.sh alpha"
+    run bash -c "cd '$CLONE_DIR' && scripts/setup-agent-worktree.sh alpha"
+    [ "$status" -eq 0 ]
+}
+
+@test "setup: branches off the remote's default branch when it is not 'main' (F7)" {
+    # A repo whose default branch is 'trunk' — hardcoding origin/main would make
+    # `git worktree add` fail. Prove creation resolves origin/HEAD dynamically.
+    local o="$RESOLVED_TMPDIR/orig-trunk-$$" c="$RESOLVED_TMPDIR/proj-trunk-$$"
+    git init --bare --quiet --initial-branch=trunk "$o"
+    git clone --quiet "$o" "$c"
+    git -C "$c" config user.email t@t.com
+    git -C "$c" config user.name T
+    git -C "$c" commit --allow-empty -m initial --quiet
+    git -C "$c" push --quiet origin trunk 2>/dev/null
+    git -C "$c" remote set-head origin trunk
+    mkdir -p "$c/scripts"
+    for t in "$TEMPLATES"/*.sh.tmpl; do
+        resolve_agent_ops_template "$t" "$c/scripts/$(basename "$t" .tmpl)"
+    done
+    run env PATH="$CLONE_DIR/stubs:$PATH" bash -c "cd '$c' && scripts/setup-agent-worktree.sh beta"
+    [ "$status" -eq 0 ]
+    [ -d "$c/.worktrees/beta" ]
+    [ "$(git -C "$c/.worktrees/beta" branch --show-current)" = "agent/beta" ]
+    # The worktree is based on origin/trunk (same tip), not a nonexistent origin/main.
+    [ "$(git -C "$c/.worktrees/beta" rev-parse HEAD)" = "$(git -C "$c" rev-parse origin/trunk)" ]
+    rm -rf "$o" "$c"
+}
+
+@test "setup: --preflight-only reports overlap against in-flight PR titles" {
+    cat > "$CLONE_DIR/stubs/gh" <<'EOF'
+#!/usr/bin/env bash
+echo '[{"title":"feat: add user login flow"}]'
+EOF
+    run bash -c "cd '$CLONE_DIR' && scripts/setup-agent-worktree.sh --preflight-only --task 'user login flow'"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *login* ]]
+}
+
+@test "main-sync: fast-forwards main from a worktree" {
+    bash -c "cd '$CLONE_DIR' && scripts/setup-agent-worktree.sh alpha"
+    git -C "$CLONE_DIR" commit --allow-empty -m ahead --quiet
+    git -C "$CLONE_DIR" push --quiet origin main
+    git -C "$CLONE_DIR" reset --hard --quiet HEAD~1
+    run bash -c "cd '$CLONE_DIR/.worktrees/alpha' && ../../scripts/main-sync.sh"
+    [ "$status" -eq 0 ]
+    [ "$(git -C "$CLONE_DIR" rev-parse main)" = "$(git -C "$CLONE_DIR" rev-parse origin/main)" ]
+}
+
+@test "main-sync: fast-forwards a non-'main' default branch (trunk) (G7)" {
+    # A repo whose default branch is 'trunk' — hardcoding origin/main would make
+    # main-sync a no-op (or error). Prove it resolves origin/HEAD and syncs trunk.
+    local o="$RESOLVED_TMPDIR/orig-ms-trunk-$$" c="$RESOLVED_TMPDIR/proj-ms-trunk-$$"
+    git init --bare --quiet --initial-branch=trunk "$o"
+    git clone --quiet "$o" "$c"
+    git -C "$c" config user.email t@t.com
+    git -C "$c" config user.name T
+    git -C "$c" commit --allow-empty -m initial --quiet
+    git -C "$c" push --quiet origin trunk 2>/dev/null
+    git -C "$c" remote set-head origin trunk
+    mkdir -p "$c/scripts"
+    for t in "$TEMPLATES"/*.sh.tmpl; do
+        resolve_agent_ops_template "$t" "$c/scripts/$(basename "$t" .tmpl)"
+    done
+    # advance origin/trunk, then rewind local trunk so it is behind by one.
+    git -C "$c" commit --allow-empty -m ahead --quiet
+    git -C "$c" push --quiet origin trunk
+    git -C "$c" reset --hard --quiet HEAD~1
+    run env PATH="$CLONE_DIR/stubs:$PATH" bash -c "cd '$c' && scripts/main-sync.sh"
+    [ "$status" -eq 0 ]
+    [ "$(git -C "$c" rev-parse trunk)" = "$(git -C "$c" rev-parse origin/trunk)" ]
+    rm -rf "$o" "$c"
+}
+
+@test "setup: fetch failure is non-fatal — falls back to local tracking refs (G9)" {
+    # Break the remote so `git fetch origin` fails; the origin/main tracking ref
+    # already exists from the clone, so worktree creation must still succeed.
+    git -C "$CLONE_DIR" remote set-url origin "$RESOLVED_TMPDIR/nonexistent-$$.git"
+    run bash -c "cd '$CLONE_DIR' && scripts/setup-agent-worktree.sh gamma"
+    [ "$status" -eq 0 ]
+    [ -d "$CLONE_DIR/.worktrees/gamma" ]
+    [[ "$output" == *"fetch failed"* ]]
+    [ "$(git -C "$CLONE_DIR/.worktrees/gamma" branch --show-current)" = "agent/gamma" ]
+}
+
+@test "doctor: clean primary on main passes; detached primary is diagnosed" {
+    run bash -c "cd '$CLONE_DIR' && scripts/doctor.sh"
+    [ "$status" -eq 0 ]
+    git -C "$CLONE_DIR" checkout --quiet --detach HEAD
+    run bash -c "cd '$CLONE_DIR' && scripts/doctor.sh"
+    [ "$status" -ne 0 ]
+    run bash -c "cd '$CLONE_DIR' && scripts/doctor.sh --fix"
+    [ "$status" -eq 0 ]
+    run git -C "$CLONE_DIR" branch --show-current
+    [ "$output" = "main" ]
+}
+
+@test "doctor: passes on a repo whose default branch is 'trunk' (G3)" {
+    # doctor must resolve origin/HEAD, not assume 'main'. A fresh clone on 'trunk'
+    # satisfies every invariant, so the read-only run should exit 0 and name trunk.
+    local o="$RESOLVED_TMPDIR/orig-dr-trunk-$$" c="$RESOLVED_TMPDIR/proj-dr-trunk-$$"
+    git init --bare --quiet --initial-branch=trunk "$o"
+    git clone --quiet "$o" "$c"
+    git -C "$c" config user.email t@t.com
+    git -C "$c" config user.name T
+    git -C "$c" commit --allow-empty -m initial --quiet
+    git -C "$c" push --quiet origin trunk 2>/dev/null
+    git -C "$c" remote set-head origin trunk
+    mkdir -p "$c/scripts"
+    for t in "$TEMPLATES"/*.sh.tmpl; do
+        resolve_agent_ops_template "$t" "$c/scripts/$(basename "$t" .tmpl)"
+    done
+    run env PATH="$CLONE_DIR/stubs:$PATH" bash -c "cd '$c' && scripts/doctor.sh"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *trunk* ]]
+    [[ "$output" != *"should be on 'main'"* ]]
+    rm -rf "$o" "$c"
+}
+
+@test "prune: removes a branch merged by ancestry and reports triage for unmerged" {
+    git -C "$CLONE_DIR" checkout --quiet -b feat/done
+    git -C "$CLONE_DIR" commit --allow-empty -m done --quiet
+    git -C "$CLONE_DIR" checkout --quiet main
+    git -C "$CLONE_DIR" merge --quiet --ff-only feat/done
+    git -C "$CLONE_DIR" push --quiet origin main
+    git -C "$CLONE_DIR" checkout --quiet -b feat/wip
+    git -C "$CLONE_DIR" commit --allow-empty -m wip --quiet
+    git -C "$CLONE_DIR" checkout --quiet main
+    run bash -c "cd '$CLONE_DIR' && scripts/cleanup-merged-branches.sh"
+    [ "$status" -eq 0 ]
+    run git -C "$CLONE_DIR" branch --list feat/done
+    [ -z "$output" ]
+    run git -C "$CLONE_DIR" branch --list feat/wip
+    [ -n "$output" ]
+}
+
+@test "beads-snapshot: no-ops gracefully when bd is absent" {
+    rm "$CLONE_DIR/stubs/bd"
+    run bash -c "cd '$CLONE_DIR' && scripts/beads-snapshot.sh"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *bd* ]]
+}
+
+@test "agent-ops.mk: git targets run; staging targets fail cleanly without staging component" {
+    sed 's/{{PROJECT_NAME}}/testproj/g' \
+        "$BATS_TEST_DIRNAME/../content/assets/agent-ops/make/agent-ops.mk.tmpl" \
+        > "$CLONE_DIR/agent-ops.mk"
+    printf -- '-include agent-ops.mk\n' > "$CLONE_DIR/Makefile"
+    run make -C "$CLONE_DIR" doctor
+    [ "$status" -eq 0 ]
+    run make -C "$CLONE_DIR" staging-up
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"staging component not installed"* ]]
+}

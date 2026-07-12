@@ -7,3 +7,4 @@ export {
   agentsBlockBegin,
   agentsBlockEnd,
 } from './render.js'
+export type { CursorMdcOptions } from './render.js'

@@ -117,9 +117,8 @@ Before writing any code, verify the worktree environment:
 These rules are critical for multi-agent operation:
 
 - **Never run `git checkout main`** — it will fail because main is checked out in the main repo
-- **Always branch from remote**: `git fetch origin && git checkout -b <branch-name> origin/main`
-- **Between tasks, clean up**: `git fetch origin --prune && git clean -fd` then run the install command from CLAUDE.md Key Commands
-- **Use unique branch names** — include the agent name or task ID to avoid conflicts with other agents
+- **Work on your `agent/<name>` branch** — the worktree already tracks `origin/main`; commit each bead's task work **directly** on `agent/<name>`. Do NOT create per-task branches, and never put an agent name or task ID in a branch name (reference the task ID in the commit/PR body as `Closes <id>`)
+- **Between beads, rebase your own branch**: `git fetch origin --prune && git rebase origin/main && git clean -fd`, then run the install command from CLAUDE.md Key Commands
 
 ### Beads Detection
 
@@ -152,8 +151,9 @@ tracker looks done" bug):
 
 **Step 3 — `beads_usable` + valid contract → orchestrator materializes, workers wait, then claim:**
 
-Branch naming: `bd-<id>/<desc>`. Verify `$BEADS_ACTOR` is set per agent (echo it;
-bail if empty).
+Branch naming: `<type>/<short-desc>` (worktree workspace branches are
+`agent/<name>`); bead IDs go in commit/PR bodies (`Closes <id>`), never in
+branch names. Verify `$BEADS_ACTOR` is set per agent (echo it; bail if empty).
 
 **Two distinct identities.** The merge-slot needs a **per-process unique** holder
 (e.g. `agent-$$` or a UUID) so two local agents sharing one `git user.name` don't
@@ -199,9 +199,10 @@ the stable actor before claiming.
    - This sets `assignee=$BEADS_ACTOR` and `status=in_progress` in a single
      round-trip — eliminates the race window where two agents both see the same
      "ready" task.
-4. Implement following the TDD workflow below.
-5. After the PR is merged: `bd close <id>`.
-6. Repeat the scoped claim (`bd ready --claim --has-metadata-key plan_task_id --json`)
+4. Build, verify, review, and merge following the work-beads skill's per-bead
+   loop — see "Execute the Ship Loop" below. Close only after the merge is
+   verified.
+5. Repeat the scoped claim (`bd ready --claim --has-metadata-key plan_task_id --json`)
    until it returns no ready task, then run the **completion check**.
 
 **Completion check (empty `bd ready` ≠ done).** An empty scoped-ready result does
@@ -232,90 +233,39 @@ legacy plan per the table — never past existing Beads state):
    Fall back to `docs/implementation-plan.md` when no playbook is present.
 2. Pick the first uncompleted task that has no unfinished dependencies and is not being
    worked on by another agent (check for open PRs or in-progress markers).
-3. Implement following the TDD workflow below.
+3. Implement using red-green-refactor: write a failing test, make it pass, then
+   refactor. Run `make check` (and `make eval` if `tests/evals/` exists) before
+   opening a PR (`gh pr create`) and running code review per
+   `docs/git-workflow.md` or CLAUDE.md; merge only after review passes.
 4. Mark the task complete in the plan/playbook.
 5. Repeat in dependency order until all tasks are done.
 
-### TDD Execution Loop
+### Execute the Ship Loop
 
-For each task:
+From here, follow the **work-beads skill** exactly — it owns the per-bead loop
+(claim → worktree → build with draft-PR-on-first-push → verify → review with
+the 3-round cap → squash-merge → close → batch report):
 
-1. **Claim the task**
-   - Create a feature branch from remote main:
-     `git fetch origin && git checkout -b <branch-name> origin/main`
-   - If Beads: use `bd-<id>/<desc>` naming
+- Claude Code: `.claude/skills/work-beads/SKILL.md`
+- Other agents: `.agents/skills/work-beads/SKILL.md`
 
-2. **Red phase — write failing tests**
-   - Check `docs/story-tests-map.md` (if it exists) to find test skeletons that correspond to this task's user stories
-   - Check `tests/acceptance/` for existing test skeletons that correspond to the task
-   - If skeletons exist, use them as your starting point
-   - Otherwise, write test cases from the task's acceptance criteria
-   - Run the test suite — confirm the new tests FAIL (red)
+**Worktree note:** you already work inside your persistent agent worktree
+(`.worktrees/<agent-name>`) — that satisfies the skill's Step 2.2. Do not
+create a per-bead worktree; `setup-agent-worktree.sh` is idempotent, so
+re-running it for your agent name is safe but unnecessary. All other skill
+steps apply unchanged from inside your worktree, except steps the skill marks
+"from the primary checkout" (claims, `bd close`, main-sync/prune-merged),
+which you run against the primary as the skill directs.
 
-3. **Green phase — implement**
-   - Write the minimum code to make the failing tests pass
-   - Follow conventions from `docs/coding-standards.md`
-   - Follow file placement from `docs/project-structure.md`
-   - Run tests after each meaningful change — stop when green
+**Claim reentry:** the claim you already performed above satisfies the
+skill's Step 2.1 for the FIRST bead — do not claim a second bead; enter the
+skill's loop at Step 2.2 for that bead, and use the skill's Step 2.1 only
+for subsequent beads after the current one is merged and closed.
 
-4. **Refactor phase — clean up**
-   - Refactor for clarity, DRY, and convention compliance
-   - Run the full test suite — confirm everything still passes
-
-5. **Quality gates**
-   - Run `make check` (or equivalent from CLAUDE.md Key Commands)
-   - If `tests/evals/` exists, run `make eval` (or equivalent eval command)
-   - Fix any failures before proceeding
-
-6. **Pre-push local code review (when requested or required)**
-   - If the user says to review before committing or pushing, or the project's workflow requires a local multi-model gate before `git push`, run `scaffold run review-code`
-   - This reviews the local delivery candidate without requiring a PR
-   - Surface auth failures immediately and retry after recovery
-   - If recovery is not possible, document reduced review coverage and continue with the available channels
-   - Fix any findings at or above `fix_threshold` before proceeding
-
-7. **Create PR**
-   - If Beads is configured, run the PR-readiness checklist first:
-     ```bash
-     if [ -d .beads ]; then
-       bd preflight
-     fi
-     ```
-     Fix any issues `bd preflight` flags before proceeding.
-   - **For 3+ parallel agents**, acquire the project's merge slot to serialize merge-time conflicts:
-     ```bash
-     if [ -d .beads ]; then
-       bd merge-slot acquire --wait    # blocks if held; queues you in priority order
-     fi
-     ```
-     There is one merge slot per project; `--wait` blocks until you have it. Skip for single-agent or two-agent runs. See `content/knowledge/execution/multi-agent-coordination.md`.
-   - Push the branch: `git push -u origin HEAD`
-   - Create a pull request: `gh pr create`
-   - After the PR merges (or if you abandon the work), release the slot:
-     ```bash
-     if [ -d .beads ]; then
-       bd merge-slot release   # holder verified via $BEADS_ACTOR
-     fi
-     ```
-   - Include in the PR description: what was implemented, key decisions, files changed, agent name
-   - Follow the PR workflow from `docs/git-workflow.md` or CLAUDE.md
-
-8. **Run code reviews (MANDATORY)**
-   - Run the review-pr tool: `scaffold run review-pr` (CLI) or `/scaffold:review-pr` (plugin)
-   - This runs the three MMR CLI channels on the PR diff plus the Superpowers code-reviewer agent as a complementary 4th channel reconciled through `mmr reconcile`:
-     1. **Codex CLI**: `codex exec --skip-git-repo-check -s read-only --ephemeral "REVIEW_PROMPT" 2>/dev/null`
-     2. **Antigravity CLI**: `printf '%s' "REVIEW_PROMPT" | agy --print --sandbox --dangerously-skip-permissions --print-timeout 300s 2>/dev/null`
-     3. **Claude CLI**: `claude -p "REVIEW_PROMPT" --output-format json 2>/dev/null`
-     4. **Superpowers code-reviewer** (4th channel): dispatch `superpowers:code-reviewer` subagent with BASE_SHA and HEAD_SHA
-   - Verify auth before each CLI (`mmr config test` pre-flights all three at once)
-   - All four channels should execute. Missing Codex or Antigravity → MMR runs a compensating Claude pass in its place (degraded-pass verdict). Missing Claude CLI → review proceeds without compensation.
-   - Fix any findings at or above `fix_threshold` before proceeding
-   - Do NOT move to the next task until the review completes
-
-9. **Between-task cleanup**
-   - `git fetch origin --prune && git clean -fd`
-   - Run the install command from CLAUDE.md Key Commands
-   - This ensures a clean state before the next task
+Loop until the completion check confirms all plan tasks are closed. Do not
+re-derive the loop from memory; open the skill file and follow it. Your claims
+stay scoped to materialized plan tasks (`bd ready --claim
+--has-metadata-key plan_task_id`) as detected above.
 
 ### Recovery Procedures
 
@@ -324,7 +274,9 @@ For each task:
 - Or reference `docs/git-workflow.md` section 7 for manual worktree setup
 
 **`git checkout main` fails:**
-- This is expected in a worktree. Use `git fetch origin && git checkout -b <branch> origin/main` instead.
+- This is expected in a worktree. Recover by rebasing your own branch onto the
+  remote: `git fetch origin && git rebase origin/main` — never create a per-task
+  branch; you commit directly on `agent/<name>`.
 
 **Merge conflicts on PR:**
 - `git fetch origin && git rebase origin/main`
@@ -354,13 +306,10 @@ For each task:
 
 1. **Verify worktree first** — Never start implementation without confirming you are in a worktree.
 2. **Branch from remote, not local** — Always use `origin/main` as the branch point.
-3. **Clean between tasks** — Run cleanup after each task to prevent state leakage.
-4. **TDD is not optional** — Write failing tests before implementation. No exceptions.
-5. **Quality gates before PR** — Never create a PR with failing checks.
-6. **Honor pre-push review when requested** — If the user or project workflow asks for pre-push multi-model review, run `scaffold run review-code` after quality gates and before `git push`.
-7. **Code review before next task** — After creating a PR, run `scaffold run review-pr`: three CLI channels (Codex CLI, Antigravity CLI, Claude CLI) via MMR plus the Superpowers code-reviewer agent as a complementary 4th channel. Fix all findings at or above `fix_threshold` before moving on.
-8. **Avoid task conflicts** — Check what other agents are working on before claiming.
-9. **Follow CLAUDE.md** — It is the authority on project conventions and commands.
+3. **Avoid task conflicts** — Check what other agents are working on before claiming.
+4. **Follow CLAUDE.md** — It is the authority on project conventions and commands.
+5. **Follow the work-beads skill exactly for the ship loop** — Do not re-derive
+   claim → build → verify → review → merge → close from memory.
 
 ---
 

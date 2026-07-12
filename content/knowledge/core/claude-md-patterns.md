@@ -10,7 +10,7 @@ topics:
   - memory-management
   - project-setup
 volatility: fast-moving
-last-reviewed: 2026-06-07
+last-reviewed: 2026-07-11
 version-pin: null
 sources:
   - url: https://docs.anthropic.com/en/docs/claude-code/memory
@@ -60,7 +60,7 @@ Rules must be specific, actionable, and testable:
 **Good rules:**
 - "Run `make check` before every commit"
 - "Never push directly to main — always use branch + PR"
-- "Every commit message starts with `[bd-<id>]` task ID"
+- "Reference the Beads task ID in the commit body (`Closes bd-<id>`), never the subject line"
 
 **Bad rules:**
 - "Write clean code" — what does clean mean?
@@ -256,13 +256,76 @@ When updating a section, prefer additive changes over destructive ones:
 - Append to lists rather than replacing them
 - Only remove content if it is demonstrably wrong or duplicated
 
+### The AGENTS.md Operations-Core Split
+
+Once a project accumulates git-workflow, Beads, and PR-review setup content,
+CLAUDE.md's Committing/PR Workflow, Task Closure, Parallel Sessions,
+Worktree Awareness, and Code Review sections start competing with Core
+Principles and Key Commands for the scarce first-50-lines budget. The
+consolidation pattern splits them out: AGENTS.md becomes the single binding
+source for the **operations core** — a section titled exactly
+`## Operations core (binding for every agent)` containing, in order, the
+ship-loop summary (an 8-step condensation of the project's task-working
+skill, ending in a batch report), the standing authorization ("Run this
+whole loop without asking permission; do not end your turn after opening a
+draft PR," with the one named exception being a verified, still-reproducing
+P0 or a blocker you can name), the parallel-safety hard rules (primary
+checkout shared/read-only, one agent per module/migration-sequence/shared
+surface, one open PR per agent, staging-up from worktrees only), the Beads
+rules (start from the ready queue, defer = bead immediately, never bootstrap
+on a populated DB), an optional Project invariants subsection (only when the
+project's PRD or tech-stack doc declares a cross-cutting invariant — omitted
+entirely otherwise), and `/work-beads` routing. CLAUDE.md is left with Core
+Principles, navigation, Key Commands, and an error-recovery table, plus a
+one-line pointer: "The binding operations core lives in AGENTS.md and
+applies to Claude Code sessions too." Every other harness file already
+present in the project root (GEMINI.md, etc.) collapses to a two-line
+pointer at AGENTS.md — ops-core content is never duplicated into a third
+file. This split is a *relocation*, not new rules: it moves content that
+already existed somewhere in the project's docs, and it never rewrites
+inside a `bd setup claude`/`bd setup codex` marker block
+(`<!-- BEGIN BEADS INTEGRATION ... -->` … `<!-- END BEADS INTEGRATION -->`),
+which stays owned by Beads' own setup recipe.
+
+### Agent-Safe / Ask-First Command Marking
+
+Every row in the Key Commands table carries a third column, the Marker,
+valued `Agent-safe` or `Ask-first` — not free text. **Agent-safe** covers
+anything that runs unattended with no destructive effect: dev server, test,
+lint --check, install, doctor/diagnostic commands, snapshot/export commands.
+**Ask-first** covers formatting sweeps that rewrite files in place, database
+resets, or any other destructive command — an agent running the standing
+autonomous loop must still confirm with the user before running one of
+these, even though it otherwise has standing authorization to act without
+asking. A marker can carry a qualifier beyond the two-value taxonomy (e.g.
+`Agent-safe (worktree-only)` for a command that's only safe from inside a
+worktree, never the primary checkout) — preserve the qualifier as a
+parenthetical; it's a safety caveat, not decoration, and dropping it during
+a later consolidation pass silently widens what the agent believes it may
+run unattended.
+
+### The Error-Recovery Table
+
+The consolidation pass replaces CLAUDE.md's scattered "what do I do when X
+breaks" advice with one table, seven required rows: test failure, Docker
+contention, pre-commit failure, merge conflict, crashed mid-task, detached
+primary, and review-channel auth failure. Each row names the exact
+first-command(s) to run and the follow-up decision, cross-referenced to a
+detailed doc rather than restated in full — e.g. "Detached primary" points
+at `make doctor` first, `make doctor-fix` second, with "ambiguous cases need
+a human decision" as the caveat, rather than re-explaining the
+primary-checkout invariant inline. The table's job is triage speed: an agent
+that hits a failure should find the row, run the first command, and know the
+decision branch without re-reading the full git-workflow or
+Beads-workflow doc.
+
 ### Common Anti-Patterns
 
 **Inline everything.** CLAUDE.md becomes 500+ lines with full coding standards, complete git workflow, entire project structure. Agent adherence drops, load time increases, signal drowns in noise. Fix: use the pointer pattern. Keep CLAUDE.md under 200 lines.
 
 **Stale commands.** Key Commands table references `npm test` but the project switched to `bun test` two months ago. The agent runs the wrong command and wastes a cycle. Fix: keep Key Commands in sync with actual build tool configuration. The `claude-md-optimization` step verifies this.
 
-**Conflicting rules.** CLAUDE.md says "always use conventional commits" in one section and "use `[bd-<id>]` prefix" in another, with no guidance on which takes precedence. Fix: consolidate commit message rules in one place. If both apply, show the combined format: `[bd-a3f8] feat(api): implement endpoint`.
+**Conflicting rules.** CLAUDE.md says "reference the Beads task ID in the commit body, never the subject" in one section and shows an example with the task ID as a subject-line prefix in another, with no guidance on which takes precedence. Fix: consolidate commit message rules in one place. Show the single canonical format: `feat(api): implement endpoint`, with `Closes bd-a3f8` in the commit body.
 
 **Redundant instructions.** The same rule appears in Core Principles, Workflow, and Rules sections with slightly different wording. The agent may follow one version and violate another. Fix: state each rule once in its canonical section. Other sections reference it.
 

@@ -6,6 +6,13 @@ description: >
   analytical work and model prototyping.
 project-type: data-science
 
+# Data science is local-first by default (see data-science-dev-environment)
+# but reaches for Docker at OS-boundary or MLOps-handoff time — keep
+# staging-environments available even under mvp; it self-skips at runtime
+# when tech-stack.md declares no containerized services.
+step-overrides:
+  staging-environments: { enabled: true, conditional: "if-needed" }
+
 knowledge-overrides:
   # Foundational
   create-prd:            { append: [data-science-requirements] }

@@ -7,6 +7,9 @@ description: >
 # step-overrides
 # ---------------------------------------------------------------------------
 step-overrides:
+  # Per-worktree Docker staging is the archetypal need for a multi-service
+  # monorepo — many containerized services that must not collide across agents.
+  staging-environments: { enabled: true, conditional: "if-needed" }
   # Cross-service steps (wave 2)
   service-ownership-map: { enabled: true }
   inter-service-contracts: { enabled: true }

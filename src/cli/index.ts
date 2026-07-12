@@ -26,6 +26,7 @@ import reworkCommand from './commands/rework.js'
 import observeCommand from './commands/observe.js'
 import knowledgeFreshnessCommand from './commands/knowledge-freshness.js'
 import guidesCommand from './commands/guides.js'
+import agentOpsCommand from './commands/agent-ops.js'
 
 export async function runCli(argv: string[]): Promise<void> {
   shutdown.install()
@@ -56,6 +57,7 @@ export async function runCli(argv: string[]): Promise<void> {
     .command(reworkCommand)
     .command(observeCommand)
     .command(knowledgeFreshnessCommand)
+    .command(agentOpsCommand)
     .options({
       format: {
         type: 'string',

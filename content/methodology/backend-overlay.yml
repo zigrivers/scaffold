@@ -7,6 +7,16 @@ description: >
 project-type: backend
 
 # ---------------------------------------------------------------------------
+# step-overrides
+# ---------------------------------------------------------------------------
+# Backend services are containerized by default (databases, queues, app
+# processes) — keep staging-environments available even under the mvp
+# preset. It self-skips at runtime when tech-stack.md declares no
+# containerized services.
+step-overrides:
+  staging-environments: { enabled: true, conditional: "if-needed" }
+
+# ---------------------------------------------------------------------------
 # knowledge-overrides
 # ---------------------------------------------------------------------------
 # Map backend knowledge entries into existing pipeline steps so that backend

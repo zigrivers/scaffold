@@ -7,6 +7,15 @@ description: >
 project-type: browser-extension
 
 # ---------------------------------------------------------------------------
+# step-overrides
+# ---------------------------------------------------------------------------
+# Browser extensions run entirely client-side in the browser — no
+# containerized backend services of their own — staging-environments never
+# applies.
+step-overrides:
+  staging-environments: { enabled: false }
+
+# ---------------------------------------------------------------------------
 # knowledge-overrides
 # ---------------------------------------------------------------------------
 # Map browser-extension knowledge entries into existing pipeline steps so that

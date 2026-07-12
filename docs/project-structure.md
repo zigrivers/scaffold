@@ -26,6 +26,11 @@ scaffold/
 │   │   ├── finalization/
 │   │   └── build/
 │   ├── tools/                 # 12 tool meta-prompts (stateless, category: tool)
+│   ├── assets/                # Versioned template bundles installed into generated projects
+│   │   └── agent-ops/         # scaffold agent-ops install|check source bundle
+│   │       ├── git/           # Worktree/branch scripts (setup, doctor, main-sync, prune, beads-snapshot)
+│   │       ├── staging/       # Per-worktree Docker staging scripts
+│   │       └── make/          # agent-ops.mk Makefile fragment
 │   ├── knowledge/             # 278 domain expertise entries in 20 categories
 │   │   ├── core/
 │   │   ├── product/
@@ -42,6 +47,7 @@ scaffold/
 ├── src/                       # TypeScript CLI source code
 │   ├── cli/                   # CLI commands, middleware, output strategies
 │   ├── core/                  # Assembly engine, adapters, dependency graph, knowledge
+│   │   └── agent-ops/         # Config loader + installer/drift-check for scaffold agent-ops
 │   ├── state/                 # State manager, lock manager, decision logger
 │   ├── config/                # Config loading, migration, schema validation
 │   ├── project/               # Project detector, CLAUDE.md/GEMINI.md managers
@@ -159,10 +165,12 @@ Scaffold uses a **role-based** organization. Each directory has a single clear p
 |------|-----------|----------|
 | Pipeline meta-prompts | `content/pipeline/` | 60 `.md` files organized by 16 phases |
 | Tool meta-prompts | `content/tools/` | 10 stateless tool `.md` files |
+| Asset bundles | `content/assets/` | Versioned template bundles installed into generated projects (`agent-ops/` git + staging scripts, `agent-ops.mk`) |
 | Knowledge base | `content/knowledge/` | 278 domain expertise entries in 20 categories |
 | Methodology presets | `content/methodology/` | YAML preset configs (deep, mvp, custom) |
 | Skill templates | `content/skills/` | Skill sources with `{{markers}}` for multi-platform resolution |
 | TypeScript CLI | `src/` | CLI commands, assembly engine, state management |
+| Agent-ops core | `src/core/agent-ops/` | Config loader + installer/drift-check backing the `scaffold agent-ops install\|check` command |
 | Scripts (deterministic ops) | `scripts/` | Bash utilities and JSON schemas |
 | Shared assets | `lib/` | `dashboard-theme.css` (embedded into generated HTML) |
 | Tests | `tests/` | bats-core `.bats` files and vitest TypeScript tests |

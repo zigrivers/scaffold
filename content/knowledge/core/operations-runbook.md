@@ -10,7 +10,7 @@ topics:
   - alerting
   - rollback
 volatility: evolving
-last-reviewed: 2026-06-10
+last-reviewed: 2026-07-11
 version-pin: null
 sources:
   - url: https://sre.google/sre-book/table-of-contents/
@@ -51,12 +51,13 @@ Production secrets should never be in code or `.env` files:
 
 ## Deployment Pipeline
 
-The base CI pipeline (lint + test on PRs) is configured by the Git Workflow prompt in `.github/workflows/ci.yml`. The operations runbook extends this with production deployment stages — it does not redefine the base CI.
+Generated projects deliberately defer CI: the quality gate is local — pre-commit hooks + `make check` + `mmr review` — per the "Quality gates (CI deferred)" section of docs/git-workflow.md, and no `.github/workflows/` exists until a launch target is chosen. When operations work introduces CI at launch, it builds the pipeline from scratch — wiring those same local gates into hosted verification stages, then adding the production deployment stages below. There is no pre-existing base CI to extend; the runbook must not describe one.
 
 ### Pipeline Architecture
 
 ```
-Existing CI (from git-workflow — already configured):
+Launch-time CI verification (added with the deploy target —
+mirrors the local gates):
   -> Stage 1: Fast checks (30s) — lint, format, type check
   -> Stage 2: Tests (2-5 min) — unit + integration in parallel
 

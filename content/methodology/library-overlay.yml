@@ -7,6 +7,14 @@ description: >
 project-type: library
 
 # ---------------------------------------------------------------------------
+# step-overrides
+# ---------------------------------------------------------------------------
+# A library has no runtime services of its own — it is consumed by other
+# projects, not deployed with a stack — staging-environments never applies.
+step-overrides:
+  staging-environments: { enabled: false }
+
+# ---------------------------------------------------------------------------
 # knowledge-overrides
 # ---------------------------------------------------------------------------
 # Map library knowledge entries into existing pipeline steps so that library

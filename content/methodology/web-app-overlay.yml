@@ -7,6 +7,16 @@ description: >
 project-type: web-app
 
 # ---------------------------------------------------------------------------
+# step-overrides
+# ---------------------------------------------------------------------------
+# Web apps routinely run local dependencies (databases, caches, queues) in
+# Docker Compose (see web-app-dev-environment) — keep staging-environments
+# available even under the mvp preset. It self-skips at runtime when
+# tech-stack.md declares no containerized services.
+step-overrides:
+  staging-environments: { enabled: true, conditional: "if-needed" }
+
+# ---------------------------------------------------------------------------
 # knowledge-overrides
 # ---------------------------------------------------------------------------
 # Map web-app knowledge entries into existing pipeline steps so that web-app

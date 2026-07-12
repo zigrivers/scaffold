@@ -43,6 +43,12 @@ function seedVersionMarker(projectRoot: string, installDir: string, version: str
   fs.writeFileSync(path.join(dir, '.scaffold-skill-version'), version, 'utf8')
 }
 
+describe('INSTALLABLE_SKILLS', () => {
+  it('includes work-beads in INSTALLABLE_SKILLS', () => {
+    expect(INSTALLABLE_SKILLS.map(s => s.name)).toContain('work-beads')
+  })
+})
+
 describe('syncSkillsIfNeeded', () => {
   let tmpDir: string
   let packageRoot: string

@@ -1,0 +1,343 @@
+#!/usr/bin/env bash
+# {{PROJECT_NAME}} — primary-checkout doctor: verify (and, with --fix, safely repair) the invariant that the
+# top-level clone stays on an up-to-date default branch. The default branch (main/master/trunk) is
+# resolved from origin/HEAD, never hardcoded, so this works on repos whose default is not `main`.
+#
+# Usage: scripts/doctor.sh [--fix] [--offline]   (or: make doctor / make doctor-fix)
+#
+# Checks (read-only by default):
+#   on-main       — the primary checkout is on branch `main` (not detached, not a feature branch)
+#   main-location — `main` is not checked out in a NON-primary worktree ("hostage"). This is the
+#                   gap main-sync.sh misses: with main hostage it fast-forwards main in the WRONG
+#                   worktree and leaves the primary detached.
+#   no-conflict   — the primary has no in-progress merge/rebase and no unmerged paths
+#   identity      — no agent identity (agent-*/…@{{PROJECT_NAME}}.local) leaked into the shared .git/config
+#                   (worktree identities belong in per-worktree config; a shared leak misattributes
+#                   every non-overridden worktree's commits)
+#   main-sync     — the local default branch is in sync with its origin (behind = fixable; diverged = manual)
+#
+# --fix performs ONLY non-destructive repairs: free a hostage worktree (rebrand to agent/<name>,
+# else detach — all files, committed or not, are preserved) then hand off to main-sync.sh to
+# restore a clean detached primary onto main and fast-forward. It REFUSES to touch a primary on a
+# feature branch, an unresolved conflict/rebase, or a diverged main — those need a human decision.
+#
+# Note: --offline makes doctor read-only — it skips the fetch and does not verify sync. --fix
+# refuses BRANCH repairs under --offline / a failed fetch (it can't confirm the true state); the
+# identity repair is purely local config and still runs.
+set -euo pipefail
+
+FIX=0
+OFFLINE=0
+for arg in "$@"; do
+  case "$arg" in
+    --fix) FIX=1 ;;
+    --offline) OFFLINE=1 ;;
+    -h|--help) awk 'NR>1{ if (/^#/) { sub(/^# ?/, ""); print } else exit }' "$0"; exit 0 ;;
+    *) printf "! unknown argument: %s\n" "$arg" >&2; exit 2 ;;
+  esac
+done
+
+log()  { printf "→ %s\n" "$*"; }
+ok()   { printf "  ✓ %s\n" "$*"; }
+bad()  { printf "  ✗ %s\n" "$*"; }
+warn() { printf "  ! %s\n" "$*"; }
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+git rev-parse --is-inside-work-tree >/dev/null 2>&1 || { printf "! not in a git repository\n" >&2; exit 1; }
+
+# Resolve the remote's default branch NAME (bare, e.g. "main"), falling back to "main" when
+# origin/HEAD is unset. Same helper as setup-agent-worktree.sh / main-sync.sh — every check and
+# message below uses $DEFAULT instead of a hardcoded "main" so this works on master/trunk repos.
+resolve_default_branch() {
+  local d
+  d="$(git symbolic-ref refs/remotes/origin/HEAD --short 2>/dev/null | sed 's@^origin/@@')"
+  printf '%s' "${d:-main}"
+}
+DEFAULT="$(resolve_default_branch)"
+
+# --- locate the primary checkout (first worktree) and where the default branch lives -----------
+primary="$(git worktree list --porcelain | awk 'NR==1 && /^worktree /{ print substr($0, 10) }')"
+main_wt="$(git worktree list --porcelain | awk -v def="refs/heads/$DEFAULT" '
+  /^worktree /{ wt = substr($0, 10) }
+  $0 == "branch " def { print wt }')"
+primary_branch="$(git -C "$primary" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+# Shared repo config path — consumed by the identity check AND its --fix repair below.
+# Resolve without `--path-format=absolute` (git >= 2.31 only): a relative --git-common-dir is
+# relative to $primary, which is already absolute, so prefixing it yields a portable absolute path.
+common_dir="$(git -C "$primary" rev-parse --git-common-dir)"
+case "$common_dir" in /*) : ;; *) common_dir="$primary/$common_dir" ;; esac
+
+log "Primary-checkout doctor — $primary"
+
+problems=0
+
+# --- check: on-main ----------------------------------------------------------------------------
+if [[ "$primary_branch" == "$DEFAULT" ]]; then
+  ok "on-main: primary is on '$DEFAULT'"
+elif [[ -z "$primary_branch" ]]; then
+  bad "on-main: primary checkout is DETACHED (should be on '$DEFAULT')"
+  problems=$((problems + 1))
+else
+  bad "on-main: primary checkout is on feature branch '$primary_branch' (should be '$DEFAULT')"
+  problems=$((problems + 1))
+fi
+
+# --- check: main-location (hostage) ------------------------------------------------------------
+hostage=""
+if [[ -z "$main_wt" ]]; then
+  warn "main-location: '$DEFAULT' is checked out nowhere (restorable into the primary)"
+  problems=$((problems + 1))
+elif [[ "$main_wt" == "$primary" ]]; then
+  ok "main-location: '$DEFAULT' lives in the primary checkout"
+else
+  hostage="$main_wt"
+  bad "main-location: '$DEFAULT' is HOSTAGE in a non-primary worktree: $main_wt"
+  problems=$((problems + 1))
+fi
+
+# --- check: no-conflict (in-progress op / unmerged paths in the primary) -----------------------
+gitdir="$(git -C "$primary" rev-parse --git-dir)"
+case "$gitdir" in /*) : ;; *) gitdir="$primary/$gitdir" ;; esac
+conflict=""
+[[ -e "$gitdir/MERGE_HEAD" ]] && conflict="merge"
+{ [[ -d "$gitdir/rebase-merge" ]] || [[ -d "$gitdir/rebase-apply" ]]; } && conflict="rebase"
+[[ -n "$(git -C "$primary" ls-files --unmerged)" ]] && conflict="${conflict:-conflict} (unmerged paths)"
+if [[ -z "$conflict" ]]; then
+  ok "no-conflict: no merge/rebase in progress"
+else
+  bad "no-conflict: primary has an unresolved $conflict"
+  problems=$((problems + 1))
+fi
+
+# --- check: identity (agent identity must not leak into the shared repo config) ----------------
+# setup-agent-worktree.sh sets per-worktree identities (git config --worktree). A buggy version
+# could write them to the SHARED .git/config instead, misattributing the primary's and every
+# non-overridden worktree's commits to whichever agent ran the script last.
+#
+# Detection scans EVERY stored value, not just the effective (last) one. git's last-value-wins
+# semantics mean an earlier agent-* entry shadowed by a later non-agent value is inert — but it
+# still lingers in the shared config and silently resurfaces if the later value is ever removed,
+# so it is reported (and --fix clears it) the same as an effective leak.
+# Contract: returns 0 if a leak is present (and sets the globals below), 1 otherwise.
+#   - shared_identity_name / shared_identity_email: the EFFECTIVE (last) values (empty if the
+#     key is absent) — drive the non-leak "has an override" message below.
+#   - leaked_identity: a human-readable description of EVERY leaked agent-pattern value found,
+#     pairing each name with its convention email (name@{{PROJECT_NAME}}.local) when both leaked so the
+#     report never reads several values as one combined identity or renders a '<?>' placeholder
+#     for an absent half.
+#   - leaked_name_list / leaked_email_list: newline-separated leaked values, consumed by --fix to
+#     unset each offending value exactly.
+# A human who deliberately uses an agent-* name (colliding with the per-worktree identity
+# convention by choice) exempts it via the multi-valued shared-config key `{{PROJECT_NAME}}.identityAllow`;
+# allowlisted values are excluded from detection, the report, and --fix. Detection still flags every
+# non-allowlisted agent-* value — effective or shadowed — so a real name-only leak is never missed.
+
+# Drop stdin lines that exactly match an allowlisted value ($1 = newline-separated allowlist).
+# Blank/whitespace-only allowlist lines are stripped, and when nothing real remains the input is
+# passed through unfiltered — so a stray blank value never turns into an empty pattern file whose
+# grep behavior is platform-dependent.
+_drop_allowlisted() {
+  local patterns
+  patterns="$(printf '%s\n' "$1" | grep -v '^[[:space:]]*$' || true)"
+  if [[ -z "$patterns" ]]; then cat; else grep -Fxv -f <(printf '%s\n' "$patterns"); fi
+}
+# Escape a literal string into a git-config value regex for an anchored exact match.
+# shellcheck disable=SC2016  # the sed script must stay literal (not shell-expanded).
+_regex_escape() { printf '%s' "$1" | sed 's/[][\\.*^$(){}?+|]/\\&/g'; }
+
+shared_identity_leaked() {
+  local all_names all_emails allow nm em consumed
+  all_names="$(git config --file "$common_dir/config" --get-all user.name 2>/dev/null || true)"
+  all_emails="$(git config --file "$common_dir/config" --get-all user.email 2>/dev/null || true)"
+  allow="$(git config --file "$common_dir/config" --get-all {{PROJECT_NAME}}.identityAllow 2>/dev/null || true)"
+  # Effective (last) values — used for the non-leak "has an override" message. printf '%s\n'
+  # (not '%s') so the trailing-newline-stripped command-substitution output still reads as a
+  # line to tail on every implementation (some BSD tail variants drop a final newline-less line).
+  shared_identity_name="$(printf '%s\n' "$all_names" | tail -1 || true)"
+  shared_identity_email="$(printf '%s\n' "$all_emails" | tail -1 || true)"
+  # Leaked (non-allowlisted) agent-pattern values on each side — deduped, newline-separated,
+  # covering both effective and shadowed entries so the fix loop clears every lingering value.
+  leaked_name_list="$(printf '%s\n' "$all_names" | grep '^agent-' | _drop_allowlisted "$allow" | awk 'NF && !seen[$0]++' || true)"
+  leaked_email_list="$(printf '%s\n' "$all_emails" | grep '@{{PROJECT_NAME}}\.local$' | _drop_allowlisted "$allow" | awk 'NF && !seen[$0]++' || true)"
+  leaked_identity=""
+  [[ -z "$leaked_name_list" && -z "$leaked_email_list" ]] && return 1
+  # Pair each leaked name with its convention email when both leaked; list any unmatched half
+  # alone (never a '<?>' for an absent half).
+  consumed=""
+  while IFS= read -r nm; do
+    [[ -z "$nm" ]] && continue
+    em="${nm}@{{PROJECT_NAME}}.local"
+    if printf '%s\n' "$leaked_email_list" | grep -qxF -- "$em"; then
+      leaked_identity="${leaked_identity:+$leaked_identity, }${nm} <${em}>"
+      consumed="${consumed}${em}"$'\n'
+    else
+      leaked_identity="${leaked_identity:+$leaked_identity, }${nm}"
+    fi
+  done <<< "$leaked_name_list"
+  while IFS= read -r em; do
+    [[ -z "$em" ]] && continue
+    printf '%s\n' "$consumed" | grep -qxF -- "$em" && continue
+    leaked_identity="${leaked_identity:+$leaked_identity, }<${em}>"
+  done <<< "$leaked_email_list"
+  return 0
+}
+if shared_identity_leaked; then
+  bad "identity: agent identity leaked into the shared .git/config: $leaked_identity (must be per-worktree only; run 'make doctor-fix', or if it is intentional allow each flagged value — a name and/or its @{{PROJECT_NAME}}.local email — in the shared config: git config --add {{PROJECT_NAME}}.identityAllow '<value>')"
+  problems=$((problems + 1))
+elif [[ -n "$shared_identity_name" || -n "$shared_identity_email" ]]; then
+  ok "identity: shared .git/config has a [user] override (assumed intentional)"
+else
+  ok "identity: no [user] override in the shared .git/config"
+fi
+
+# --- check: main-sync --------------------------------------------------------------------------
+sync_state="ok"
+fetched=1
+if [[ "$OFFLINE" == "1" ]]; then
+  # Unverified sync is not a clean bill of health — exit 0 must mean "fully verified".
+  warn "main-sync: skipped (offline) — sync not verified; re-run online to check"
+  fetched=0
+  problems=$((problems + 1))
+elif ! git -C "$primary" fetch --quiet origin 2>/dev/null; then
+  # An unexpected fetch failure means we cannot verify sync — never claim a clean bill of health.
+  warn "main-sync: fetch failed — cannot verify sync"
+  fetched=0
+  problems=$((problems + 1))
+fi
+# Only compare when we actually fetched; a stale/absent ref must not masquerade as "in sync".
+if [[ "$fetched" == "1" ]]; then
+  if ! git -C "$primary" rev-parse --verify --quiet "origin/$DEFAULT" >/dev/null; then
+    warn "main-sync: origin/$DEFAULT not found — cannot verify sync"
+    sync_state="unknown"; problems=$((problems + 1))
+  elif ! git -C "$primary" rev-parse --verify --quiet "refs/heads/$DEFAULT" >/dev/null; then
+    warn "main-sync: no local '$DEFAULT' ref yet (restorable)"
+    sync_state="behind"; problems=$((problems + 1))
+  else
+    ahead="$(git -C "$primary" rev-list --count "origin/$DEFAULT..$DEFAULT")"
+    behind="$(git -C "$primary" rev-list --count "$DEFAULT..origin/$DEFAULT")"
+    if [[ "$ahead" != "0" && "$behind" != "0" ]]; then
+      bad "main-sync: $DEFAULT has DIVERGED from origin/$DEFAULT ($ahead ahead, $behind behind) — manual"
+      sync_state="diverged"; problems=$((problems + 1))
+    elif [[ "$ahead" != "0" ]]; then
+      bad "main-sync: $DEFAULT is AHEAD of origin/$DEFAULT ($ahead unpushed) — manual"
+      sync_state="ahead"; problems=$((problems + 1))
+    elif [[ "$behind" != "0" ]]; then
+      warn "main-sync: $DEFAULT is behind origin/$DEFAULT by $behind (fast-forwardable)"
+      sync_state="behind"; problems=$((problems + 1))
+    else
+      ok "main-sync: $DEFAULT == origin/$DEFAULT ($(git -C "$primary" rev-parse --short "$DEFAULT"))"
+    fi
+  fi
+fi
+
+# --- report / --fix ----------------------------------------------------------------------------
+if [[ "$problems" == "0" ]]; then
+  ok "primary checkout healthy"
+  exit 0
+fi
+
+if [[ "$FIX" == "0" ]]; then
+  bad "primary checkout needs attention ($problems issue(s)) — re-run with --fix (or: make doctor-fix)"
+  exit 1
+fi
+
+# ---- --fix: refuse the ambiguous cases, then perform the safe repair ----
+# Identity repair FIRST — it is purely local (config-only; commits fall back to the global
+# identity; per-worktree overrides are untouched), so unlike the branch repairs below it does
+# not need a fresh fetch and must not be blocked by an offline/failed-fetch refusal.
+# Re-detect here rather than trusting check-phase state, and unset ONLY the offending
+# entries: --unset-all with a value regex removes just the agent-pattern values, so a mixed
+# config (agent-* name alongside an intentional non-agent email) keeps the intentional half,
+# and a shadowed earlier intentional value under a duplicated key becomes effective again.
+# The unset is unconditional (not gated on the effective value): a shadowed agent-* entry is
+# inert but lingers, and --unset-all is a no-op when no agent-pattern value exists, so running
+# it whenever detection fired is both safe and necessary to clear the shadowed case.
+if shared_identity_leaked; then
+  fixed_identity="$leaked_identity"
+  # Unset ONLY the offending (non-allowlisted) values, each by an anchored exact-match regex, so
+  # an allowlisted agent-* identity a human chose on purpose (excluded from the lists above) is
+  # preserved. --unset-all with an exact-value regex still clears shadowed duplicates of that value.
+  while IFS= read -r leak_nm; do
+    [[ -z "$leak_nm" ]] && continue
+    git config --file "$common_dir/config" --unset-all user.name "^$(_regex_escape "$leak_nm")$" 2>/dev/null || true
+  done <<< "$leaked_name_list"
+  while IFS= read -r leak_em; do
+    [[ -z "$leak_em" ]] && continue
+    git config --file "$common_dir/config" --unset-all user.email "^$(_regex_escape "$leak_em")$" 2>/dev/null || true
+  done <<< "$leaked_email_list"
+  # Trust the re-read, not the unset exit codes: a locked/unwritable config must not let
+  # doctor-fix report success while the leak remains.
+  if shared_identity_leaked; then
+    bad "identity repair FAILED: the shared .git/config still carries $leaked_identity — is the file locked or read-only?"
+    exit 1
+  fi
+  log "removed leaked agent identity from the shared .git/config (was: $fixed_identity)"
+  problems=$((problems - 1))
+  if [[ "$problems" == "0" ]]; then
+    ok "repaired: identity was the only issue; primary checkout healthy"
+    exit 0
+  fi
+fi
+# Never mutate branch state on stale data: without a fresh fetch we can't verify the true state.
+if [[ "$fetched" == "0" ]]; then
+  bad "Refusing to auto-fix branch state: could not fetch origin (network down or --offline) — cannot verify state safely. Re-run online, without --offline."
+  exit 1
+fi
+if [[ -n "$primary_branch" && "$primary_branch" != "$DEFAULT" ]]; then
+  msg="Refusing to auto-fix: primary is on feature branch '$primary_branch'. Finish or park it, then restore $DEFAULT."
+  [[ -n "$hostage" ]] && msg="$msg NOTE: '$DEFAULT' is also hostage in $hostage — free it first (git -C \"$hostage\" switch -c agent/<name>)."
+  bad "$msg"
+  exit 1
+fi
+if [[ -n "$conflict" ]]; then
+  bad "Refusing to auto-fix: unresolved $conflict in the primary. Resolve by hand, then re-run."
+  exit 1
+fi
+if [[ "$sync_state" == "diverged" || "$sync_state" == "ahead" ]]; then
+  bad "Refusing to auto-fix: local $DEFAULT is not fast-forwardable ($sync_state vs origin/$DEFAULT). Investigate: git -C \"$primary\" log --oneline origin/$DEFAULT..$DEFAULT"
+  exit 1
+fi
+if [[ "$sync_state" == "unknown" ]]; then
+  bad "Refusing to auto-fix: origin/$DEFAULT not found, so sync cannot be verified — check the remote."
+  exit 1
+fi
+# Verify the primary is restorable BEFORE mutating anything, so a hostage is never freed only to
+# have the restore fail afterwards (a half-finished repair). main-sync needs a primary with no
+# uncommitted TRACKED changes; untracked files are preserved by the branch switch, so they do not
+# block the restore.
+if [[ -n "$(git -C "$primary" status --porcelain --untracked-files=no)" ]]; then
+  bad "Refusing to auto-fix: the primary checkout has uncommitted changes to tracked files. Commit or stash them first, then re-run."
+  exit 1
+fi
+# A detached primary must hold no commits of its own — switching to main would orphan them
+# (reflog-only), so a "non-destructive" repair would silently lose work.
+if [[ -z "$primary_branch" ]] && ! git -C "$primary" merge-base --is-ancestor HEAD "origin/$DEFAULT" 2>/dev/null; then
+  short="$(git -C "$primary" rev-parse --short HEAD)"
+  bad "Refusing to auto-fix: the primary's detached HEAD ($short) has commit(s) not on origin/$DEFAULT — restoring $DEFAULT would orphan them. Rescue first: git -C \"$primary\" branch recovery/$short"
+  exit 1
+fi
+
+# free a hostage worktree non-destructively (all files, committed or not, are preserved)
+detach_err=""
+if [[ -n "$hostage" ]]; then
+  name="agent/$(basename "$hostage")"
+  if git -C "$hostage" switch -c "$name" >/dev/null 2>&1; then
+    log "freed 'main' from $hostage → rebranded onto $name (files preserved)"
+  elif detach_err="$(git -C "$hostage" switch --detach HEAD 2>&1)"; then
+    log "freed 'main' from $hostage → detached (could not create $name; files preserved)"
+  else
+    bad "Could not free 'main' from the hostage worktree $hostage — leaving it untouched:"
+    printf '    %s\n' "$detach_err" >&2
+    exit 1
+  fi
+fi
+
+# restore + fast-forward via the canonical main-sync (the default branch is now free; primary clean)
+log "repairing: restoring '$DEFAULT' into the primary checkout via main-sync"
+if (cd "$primary" && bash "$SCRIPT_DIR/main-sync.sh"); then
+  ok "repaired: primary checkout is on up-to-date $DEFAULT"
+else
+  bad "repair incomplete: '$DEFAULT' was freed but main-sync could not restore the primary (transient?) — re-run 'make doctor-fix'."
+  exit 1
+fi

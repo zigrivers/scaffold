@@ -48,6 +48,14 @@ A daily cron audits entries against their declared authoritative sources and ope
 
 **Dependency graph** — Steps declare their prerequisites in frontmatter. Scaffold builds a DAG, runs topological sort (Kahn's algorithm), detects cycles, and computes which steps are eligible at any point.
 
+### Parallel-Agent Operations Kit
+
+Multiple AI agents working the same repo at once need worktree isolation, branch hygiene, and — for containerized projects — staging environments that don't collide on ports; `scaffold agent-ops install` sets all of it up in one pass. It installs a versioned bundle of git scripts (worktree setup, doctor, prune, main-sync) and, once the `staging-environments` step is enabled, per-worktree Docker Compose isolation with deterministic port bands. The `git-workflow` and `staging-environments` pipeline steps call it automatically, but you can also install or drift-check the bundle directly:
+
+```bash
+scaffold agent-ops install
+```
+
 ## Prerequisites
 
 ### Required
