@@ -85,6 +85,61 @@ env_var_at() { bash -c "cd '$1' && source scripts/ops/staging-env.sh && echo \${
     [[ "$output" == *primary* ]]
 }
 
+@test "offset collision with a live sibling warns (LIVE_WT_OFFSETS hook), never fails (G2)" {
+    git -C "$REPO" worktree add --quiet "$REPO/.worktrees/d" -b agent/d
+    mkdir -p "$REPO/.worktrees/d/scripts/ops"
+    cp "$REPO/scripts/ops/staging-env.sh" "$REPO/.worktrees/d/scripts/ops/"
+    o=$(env_var_at "$REPO/.worktrees/d" STAGING_OFFSET)
+    # A sibling that resolves to the SAME slot must produce a loud warning naming
+    # STAGING_WT_OFFSET; sourcing still succeeds (warn-only, never fail).
+    run bash -c "cd '$REPO/.worktrees/d' && LIVE_WT_OFFSETS='$o' source scripts/ops/staging-env.sh"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"collides"* ]]
+    [[ "$output" == *"STAGING_WT_OFFSET"* ]]
+    # A non-colliding sibling slot produces no collision warning.
+    other=$(( o == 254 ? 1 : o + 1 ))
+    run bash -c "cd '$REPO/.worktrees/d' && LIVE_WT_OFFSETS='$other' source scripts/ops/staging-env.sh"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"collides"* ]]
+}
+
+@test "sourcing staging-env does not leak strict mode into the caller (G8)" {
+    # Caller has errexit OFF; after sourcing, a failing command must NOT abort the
+    # shell — proving `set -euo pipefail` was save/restored, not leaked.
+    run bash -c "cd '$REPO' && set +e; source scripts/ops/staging-env.sh; false; echo SURVIVED"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *SURVIVED* ]]
+    # And the happy-path exports still survive the restore.
+    [ "$(env_var_at "$REPO" COMPOSE_PROJECT_NAME)" = "testproj" ]
+}
+
+@test "staging-down refuses from the primary checkout; names staging-shared-down (G5)" {
+    sed 's/{{PROJECT_NAME}}/testproj/g' \
+        "$BATS_TEST_DIRNAME/../content/assets/agent-ops/make/agent-ops.mk.tmpl" \
+        > "$REPO/agent-ops.mk"
+    printf -- '-include agent-ops.mk\n' > "$REPO/Makefile"
+    # From the PRIMARY checkout, staging-down must refuse before touching docker
+    # (it would wipe the shared stack) and point at the ask-first alternative.
+    run make -C "$REPO" staging-down
+    [ "$status" -ne 0 ]
+    [[ "$output" == *worktree-only* ]]
+    [[ "$output" == *staging-shared-down* ]]
+}
+
+@test "staging-shared-down refuses from a worktree (G5)" {
+    sed 's/{{PROJECT_NAME}}/testproj/g' \
+        "$BATS_TEST_DIRNAME/../content/assets/agent-ops/make/agent-ops.mk.tmpl" \
+        > "$REPO/agent-ops.mk"
+    git -C "$REPO" worktree add --quiet "$REPO/.worktrees/e" -b agent/e
+    mkdir -p "$REPO/.worktrees/e/scripts/ops"
+    cp "$REPO/scripts/ops/staging-env.sh" "$REPO/.worktrees/e/scripts/ops/"
+    cp "$REPO/agent-ops.mk" "$REPO/.worktrees/e/agent-ops.mk"
+    printf -- '-include agent-ops.mk\n' > "$REPO/.worktrees/e/Makefile"
+    run make -C "$REPO/.worktrees/e" staging-shared-down
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"only from the primary"* ]]
+}
+
 @test "docker-env pins DOCKER_CONTEXT via eval, not sourcing (F2)" {
     resolve_agent_ops_template "$TEMPLATES/docker-env.sh.tmpl" "$REPO/scripts/ops/docker-env.sh"
     mkdir -p "$REPO/stubs"

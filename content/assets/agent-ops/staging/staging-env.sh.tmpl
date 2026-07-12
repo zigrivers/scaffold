@@ -2,7 +2,8 @@
 # staging-env.sh — deterministic per-worktree staging environment.
 # SOURCE this file (do not execute). Installed by `scaffold agent-ops install`.
 #
-# Every worktree gets a collision-free slot derived from its path:
+# Every worktree gets a deterministic, collision-resistant slot derived from its
+# path (254 slots; automatic collision warning + STAGING_WT_OFFSET override):
 #   O = (cksum(worktree_path) % 254) + 1          # 1..254
 #   compose project = {{PROJECT_NAME}}-wt-<cksum>
 #   host port for service S = BAND_S + O
@@ -10,6 +11,11 @@
 # The primary checkout gets the shared stack ({{PROJECT_NAME}}, SHARED_* ports).
 # Never select the shared stack from a worktree.
 
+# This file is SOURCED, so a bare `set -euo pipefail` would leak into the caller's
+# shell — an interactive shell or parent script would then exit on the first
+# failing command or unset-variable lookup. Snapshot the caller's options, run the
+# body strict, and restore the snapshot before every path that returns control.
+_staging_env_old_opts="$(set +o)"
 set -euo pipefail
 
 PROJECT_NAME="{{PROJECT_NAME}}"
@@ -23,6 +29,7 @@ PROJECT_NAME="{{PROJECT_NAME}}"
 # message rather than crashing on the unbound $SERVICES below.
 if [ -z "${SERVICES:-}" ]; then
     echo "staging-env: no services configured in .scaffold/agent-ops.yaml — staging disabled" >&2
+    eval "$_staging_env_old_opts"
     return 0 2>/dev/null || exit 0
 fi
 
@@ -46,6 +53,38 @@ worktree_offset() {
     echo $(( (cksum_val % 254) + 1 ))
 }
 
+# Deterministic slot allocation is collision-RESISTANT, not collision-free: two
+# worktree paths can cksum to the same 1..254 slot and would then share host ports
+# and the /16 subnet. Warn loudly (never fail) when this worktree's slot matches a
+# live sibling's, naming both paths and the STAGING_WT_OFFSET override that fixes it.
+# LIVE_WT_OFFSETS (space/newline-separated) overrides the derived sibling list for
+# tests — mirrors LIVE_WT_HASHES in staging-teardown.sh.
+_staging_detect_offset_collision() {
+    local self mine sibling_path sib_cksum sibling_off collided=""
+    mine="$STAGING_OFFSET"
+    self="$(_repo_root)"
+    if [ -n "${LIVE_WT_OFFSETS:-}" ]; then
+        for sibling_off in $LIVE_WT_OFFSETS; do
+            [ "$sibling_off" = "$mine" ] && { collided="another live worktree (test override)"; break; }
+        done
+    else
+        while IFS= read -r sibling_path; do
+            [ -n "$sibling_path" ] || continue
+            [ "$sibling_path" = "$self" ] && continue
+            sib_cksum="$(printf '%s' "$sibling_path" | cksum | awk '{print $1}')"
+            [ -n "$sib_cksum" ] || continue
+            sibling_off=$(( (sib_cksum % 254) + 1 ))
+            if [ "$sibling_off" = "$mine" ]; then collided="$sibling_path"; break; fi
+        done < <(git worktree list --porcelain 2>/dev/null | awk '/^worktree /{ print substr($0, 10) }')
+    fi
+    if [ -n "$collided" ]; then
+        echo "! staging-env: staging slot ${mine} collides with ${collided}" >&2
+        echo "!   (this worktree: ${self}). Its host ports and the 10.${mine}.0.0/16 subnet would clash." >&2
+        echo "!   Pick a free slot for THIS worktree: export STAGING_WT_OFFSET=<free 1..254>, then 'make staging-up'." >&2
+    fi
+    return 0
+}
+
 _cksum_val=$(printf '%s' "$(_repo_root)" | cksum | awk '{print $1}')
 STAGING_OFFSET="$(worktree_offset)"
 export STAGING_OFFSET
@@ -54,6 +93,7 @@ if is_primary_checkout || [ "${STAGING_COMPOSE_PROJECT:-}" = "$PROJECT_NAME" ]; 
     if ! is_primary_checkout; then
         echo "ERROR: the shared '$PROJECT_NAME' stack may only be selected from the primary checkout." >&2
         echo "       From a worktree, use the default per-worktree stack instead." >&2
+        eval "$_staging_env_old_opts"    # restore caller options; still return non-zero
         return 1 2>/dev/null || exit 1
     fi
     export COMPOSE_PROJECT_NAME="$PROJECT_NAME"
@@ -72,6 +112,7 @@ if is_primary_checkout || [ "${STAGING_COMPOSE_PROJECT:-}" = "$PROJECT_NAME" ]; 
     export STAGING_SUBNET=""
 else
     export COMPOSE_PROJECT_NAME="${PROJECT_NAME}-wt-${_cksum_val}"
+    _staging_detect_offset_collision
     for svc in $SERVICES; do
         band_var="BAND_$(_svc_var_suffix "$svc")"
         port_var="PORT_$(echo "$svc" | tr '[:lower:]' '[:upper:]' | tr -- '-' '_')"
@@ -113,3 +154,7 @@ _staging_env_check_envfile() {
     return 0
 }
 _staging_env_check_envfile || true
+
+# Restore the caller's shell options (snapshot at the top) so sourced strict-mode
+# does not leak into an interactive shell or a parent script.
+eval "$_staging_env_old_opts"

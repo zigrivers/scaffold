@@ -198,4 +198,12 @@ describe('defaultAgentOpsConfig', () => {
   it('sanitizes the project name', () => {
     expect(defaultAgentOpsConfig('/tmp/My App_2').project_name).toBe('my-app-2')
   })
+
+  it('prefixes a digit-leading directory name so it satisfies NAME_RE', () => {
+    // e.g. a "3d-app" directory must not yield a project_name that fails the
+    // ^[a-z][a-z0-9_-]*$ contract enforced elsewhere in this module.
+    const cfg = defaultAgentOpsConfig('/tmp/3d-app')
+    expect(cfg.project_name).toBe('p-3d-app')
+    expect(/^[a-z][a-z0-9_-]*$/.test(cfg.project_name)).toBe(true)
+  })
 })

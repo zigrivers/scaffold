@@ -121,6 +121,42 @@ EOF
     [ "$(git -C "$CLONE_DIR" rev-parse main)" = "$(git -C "$CLONE_DIR" rev-parse origin/main)" ]
 }
 
+@test "main-sync: fast-forwards a non-'main' default branch (trunk) (G7)" {
+    # A repo whose default branch is 'trunk' — hardcoding origin/main would make
+    # main-sync a no-op (or error). Prove it resolves origin/HEAD and syncs trunk.
+    local o="$RESOLVED_TMPDIR/orig-ms-trunk-$$" c="$RESOLVED_TMPDIR/proj-ms-trunk-$$"
+    git init --bare --quiet --initial-branch=trunk "$o"
+    git clone --quiet "$o" "$c"
+    git -C "$c" config user.email t@t.com
+    git -C "$c" config user.name T
+    git -C "$c" commit --allow-empty -m initial --quiet
+    git -C "$c" push --quiet origin trunk 2>/dev/null
+    git -C "$c" remote set-head origin trunk
+    mkdir -p "$c/scripts"
+    for t in "$TEMPLATES"/*.sh.tmpl; do
+        resolve_agent_ops_template "$t" "$c/scripts/$(basename "$t" .tmpl)"
+    done
+    # advance origin/trunk, then rewind local trunk so it is behind by one.
+    git -C "$c" commit --allow-empty -m ahead --quiet
+    git -C "$c" push --quiet origin trunk
+    git -C "$c" reset --hard --quiet HEAD~1
+    run env PATH="$CLONE_DIR/stubs:$PATH" bash -c "cd '$c' && scripts/main-sync.sh"
+    [ "$status" -eq 0 ]
+    [ "$(git -C "$c" rev-parse trunk)" = "$(git -C "$c" rev-parse origin/trunk)" ]
+    rm -rf "$o" "$c"
+}
+
+@test "setup: fetch failure is non-fatal — falls back to local tracking refs (G9)" {
+    # Break the remote so `git fetch origin` fails; the origin/main tracking ref
+    # already exists from the clone, so worktree creation must still succeed.
+    git -C "$CLONE_DIR" remote set-url origin "$RESOLVED_TMPDIR/nonexistent-$$.git"
+    run bash -c "cd '$CLONE_DIR' && scripts/setup-agent-worktree.sh gamma"
+    [ "$status" -eq 0 ]
+    [ -d "$CLONE_DIR/.worktrees/gamma" ]
+    [[ "$output" == *"fetch failed"* ]]
+    [ "$(git -C "$CLONE_DIR/.worktrees/gamma" branch --show-current)" = "agent/gamma" ]
+}
+
 @test "doctor: clean primary on main passes; detached primary is diagnosed" {
     run bash -c "cd '$CLONE_DIR' && scripts/doctor.sh"
     [ "$status" -eq 0 ]
@@ -131,6 +167,28 @@ EOF
     [ "$status" -eq 0 ]
     run git -C "$CLONE_DIR" branch --show-current
     [ "$output" = "main" ]
+}
+
+@test "doctor: passes on a repo whose default branch is 'trunk' (G3)" {
+    # doctor must resolve origin/HEAD, not assume 'main'. A fresh clone on 'trunk'
+    # satisfies every invariant, so the read-only run should exit 0 and name trunk.
+    local o="$RESOLVED_TMPDIR/orig-dr-trunk-$$" c="$RESOLVED_TMPDIR/proj-dr-trunk-$$"
+    git init --bare --quiet --initial-branch=trunk "$o"
+    git clone --quiet "$o" "$c"
+    git -C "$c" config user.email t@t.com
+    git -C "$c" config user.name T
+    git -C "$c" commit --allow-empty -m initial --quiet
+    git -C "$c" push --quiet origin trunk 2>/dev/null
+    git -C "$c" remote set-head origin trunk
+    mkdir -p "$c/scripts"
+    for t in "$TEMPLATES"/*.sh.tmpl; do
+        resolve_agent_ops_template "$t" "$c/scripts/$(basename "$t" .tmpl)"
+    done
+    run env PATH="$CLONE_DIR/stubs:$PATH" bash -c "cd '$c' && scripts/doctor.sh"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *trunk* ]]
+    [[ "$output" != *"should be on 'main'"* ]]
+    rm -rf "$o" "$c"
 }
 
 @test "prune: removes a branch merged by ancestry and reports triage for unmerged" {

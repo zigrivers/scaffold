@@ -26,8 +26,11 @@ export interface AgentOpsConfig {
 const NAME_RE = /^[a-z][a-z0-9_-]*$/
 
 function sanitizeName(raw: string): string {
-  const s = raw.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '')
-  return s || 'project'
+  const cleaned = raw.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '')
+  if (!cleaned) return 'project'
+  // NAME_RE requires a leading letter; a digit-leading directory (e.g. "3d-app")
+  // would otherwise yield a default project_name that fails the config contract.
+  return /^[a-z]/.test(cleaned) ? cleaned : `p-${cleaned}`
 }
 
 export function defaultAgentOpsConfig(projectRoot: string): AgentOpsConfig {

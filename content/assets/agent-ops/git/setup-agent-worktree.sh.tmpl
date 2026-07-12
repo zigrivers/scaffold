@@ -516,7 +516,9 @@ cmd_create() {
     local default_branch
     default_branch="$(resolve_default_branch)"
     log "Creating branch $branch and worktree at $wt (off origin/$default_branch)."
-    git fetch origin
+    # Non-fatal fetch: offline should not abort creation when a local origin/<default>
+    # tracking ref already exists — `git worktree add` below falls back to it.
+    git fetch origin || warn "fetch failed — proceeding with local refs"
     git worktree add -b "$branch" "$wt" "origin/$default_branch"
   fi
 

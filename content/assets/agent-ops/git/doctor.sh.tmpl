@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # {{PROJECT_NAME}} — primary-checkout doctor: verify (and, with --fix, safely repair) the invariant that the
-# top-level clone stays on an up-to-date `main`.
+# top-level clone stays on an up-to-date default branch. The default branch (main/master/trunk) is
+# resolved from origin/HEAD, never hardcoded, so this works on repos whose default is not `main`.
 #
 # Usage: scripts/doctor.sh [--fix] [--offline]   (or: make doctor / make doctor-fix)
 #
@@ -13,7 +14,7 @@
 #   identity      — no agent identity (agent-*/…@{{PROJECT_NAME}}.local) leaked into the shared .git/config
 #                   (worktree identities belong in per-worktree config; a shared leak misattributes
 #                   every non-overridden worktree's commits)
-#   main-sync     — local `main` is in sync with origin/main (behind = fixable; diverged = manual)
+#   main-sync     — the local default branch is in sync with its origin (behind = fixable; diverged = manual)
 #
 # --fix performs ONLY non-destructive repairs: free a hostage worktree (rebrand to agent/<name>,
 # else detach — all files, committed or not, are preserved) then hand off to main-sync.sh to
@@ -45,11 +46,21 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 || { printf "! not in a git repository\n" >&2; exit 1; }
 
-# --- locate the primary checkout (first worktree) and where `main` lives -----------------------
+# Resolve the remote's default branch NAME (bare, e.g. "main"), falling back to "main" when
+# origin/HEAD is unset. Same helper as setup-agent-worktree.sh / main-sync.sh — every check and
+# message below uses $DEFAULT instead of a hardcoded "main" so this works on master/trunk repos.
+resolve_default_branch() {
+  local d
+  d="$(git symbolic-ref refs/remotes/origin/HEAD --short 2>/dev/null | sed 's@^origin/@@')"
+  printf '%s' "${d:-main}"
+}
+DEFAULT="$(resolve_default_branch)"
+
+# --- locate the primary checkout (first worktree) and where the default branch lives -----------
 primary="$(git worktree list --porcelain | awk 'NR==1 && /^worktree /{ print substr($0, 10) }')"
-main_wt="$(git worktree list --porcelain | awk '
+main_wt="$(git worktree list --porcelain | awk -v def="refs/heads/$DEFAULT" '
   /^worktree /{ wt = substr($0, 10) }
-  /^branch refs\/heads\/main$/{ print wt }')"
+  $0 == "branch " def { print wt }')"
 primary_branch="$(git -C "$primary" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
 # Shared repo config path — consumed by the identity check AND its --fix repair below.
 # Resolve without `--path-format=absolute` (git >= 2.31 only): a relative --git-common-dir is
@@ -62,26 +73,26 @@ log "Primary-checkout doctor — $primary"
 problems=0
 
 # --- check: on-main ----------------------------------------------------------------------------
-if [[ "$primary_branch" == "main" ]]; then
-  ok "on-main: primary is on 'main'"
+if [[ "$primary_branch" == "$DEFAULT" ]]; then
+  ok "on-main: primary is on '$DEFAULT'"
 elif [[ -z "$primary_branch" ]]; then
-  bad "on-main: primary checkout is DETACHED (should be on 'main')"
+  bad "on-main: primary checkout is DETACHED (should be on '$DEFAULT')"
   problems=$((problems + 1))
 else
-  bad "on-main: primary checkout is on feature branch '$primary_branch' (should be 'main')"
+  bad "on-main: primary checkout is on feature branch '$primary_branch' (should be '$DEFAULT')"
   problems=$((problems + 1))
 fi
 
 # --- check: main-location (hostage) ------------------------------------------------------------
 hostage=""
 if [[ -z "$main_wt" ]]; then
-  warn "main-location: 'main' is checked out nowhere (restorable into the primary)"
+  warn "main-location: '$DEFAULT' is checked out nowhere (restorable into the primary)"
   problems=$((problems + 1))
 elif [[ "$main_wt" == "$primary" ]]; then
-  ok "main-location: 'main' lives in the primary checkout"
+  ok "main-location: '$DEFAULT' lives in the primary checkout"
 else
   hostage="$main_wt"
-  bad "main-location: 'main' is HOSTAGE in a non-primary worktree: $main_wt"
+  bad "main-location: '$DEFAULT' is HOSTAGE in a non-primary worktree: $main_wt"
   problems=$((problems + 1))
 fi
 
@@ -196,26 +207,26 @@ elif ! git -C "$primary" fetch --quiet origin 2>/dev/null; then
 fi
 # Only compare when we actually fetched; a stale/absent ref must not masquerade as "in sync".
 if [[ "$fetched" == "1" ]]; then
-  if ! git -C "$primary" rev-parse --verify --quiet origin/main >/dev/null; then
-    warn "main-sync: origin/main not found — cannot verify sync"
+  if ! git -C "$primary" rev-parse --verify --quiet "origin/$DEFAULT" >/dev/null; then
+    warn "main-sync: origin/$DEFAULT not found — cannot verify sync"
     sync_state="unknown"; problems=$((problems + 1))
-  elif ! git -C "$primary" rev-parse --verify --quiet refs/heads/main >/dev/null; then
-    warn "main-sync: no local 'main' ref yet (restorable)"
+  elif ! git -C "$primary" rev-parse --verify --quiet "refs/heads/$DEFAULT" >/dev/null; then
+    warn "main-sync: no local '$DEFAULT' ref yet (restorable)"
     sync_state="behind"; problems=$((problems + 1))
   else
-    ahead="$(git -C "$primary" rev-list --count origin/main..main)"
-    behind="$(git -C "$primary" rev-list --count main..origin/main)"
+    ahead="$(git -C "$primary" rev-list --count "origin/$DEFAULT..$DEFAULT")"
+    behind="$(git -C "$primary" rev-list --count "$DEFAULT..origin/$DEFAULT")"
     if [[ "$ahead" != "0" && "$behind" != "0" ]]; then
-      bad "main-sync: main has DIVERGED from origin/main ($ahead ahead, $behind behind) — manual"
+      bad "main-sync: $DEFAULT has DIVERGED from origin/$DEFAULT ($ahead ahead, $behind behind) — manual"
       sync_state="diverged"; problems=$((problems + 1))
     elif [[ "$ahead" != "0" ]]; then
-      bad "main-sync: main is AHEAD of origin/main ($ahead unpushed) — manual"
+      bad "main-sync: $DEFAULT is AHEAD of origin/$DEFAULT ($ahead unpushed) — manual"
       sync_state="ahead"; problems=$((problems + 1))
     elif [[ "$behind" != "0" ]]; then
-      warn "main-sync: main is behind origin/main by $behind (fast-forwardable)"
+      warn "main-sync: $DEFAULT is behind origin/$DEFAULT by $behind (fast-forwardable)"
       sync_state="behind"; problems=$((problems + 1))
     else
-      ok "main-sync: main == origin/main ($(git -C "$primary" rev-parse --short main))"
+      ok "main-sync: $DEFAULT == origin/$DEFAULT ($(git -C "$primary" rev-parse --short "$DEFAULT"))"
     fi
   fi
 fi
@@ -273,9 +284,9 @@ if [[ "$fetched" == "0" ]]; then
   bad "Refusing to auto-fix branch state: could not fetch origin (network down or --offline) — cannot verify state safely. Re-run online, without --offline."
   exit 1
 fi
-if [[ -n "$primary_branch" && "$primary_branch" != "main" ]]; then
-  msg="Refusing to auto-fix: primary is on feature branch '$primary_branch'. Finish or park it, then restore main."
-  [[ -n "$hostage" ]] && msg="$msg NOTE: 'main' is also hostage in $hostage — free it first (git -C \"$hostage\" switch -c agent/<name>)."
+if [[ -n "$primary_branch" && "$primary_branch" != "$DEFAULT" ]]; then
+  msg="Refusing to auto-fix: primary is on feature branch '$primary_branch'. Finish or park it, then restore $DEFAULT."
+  [[ -n "$hostage" ]] && msg="$msg NOTE: '$DEFAULT' is also hostage in $hostage — free it first (git -C \"$hostage\" switch -c agent/<name>)."
   bad "$msg"
   exit 1
 fi
@@ -284,11 +295,11 @@ if [[ -n "$conflict" ]]; then
   exit 1
 fi
 if [[ "$sync_state" == "diverged" || "$sync_state" == "ahead" ]]; then
-  bad "Refusing to auto-fix: local main is not fast-forwardable ($sync_state vs origin/main). Investigate: git -C \"$primary\" log --oneline origin/main..main"
+  bad "Refusing to auto-fix: local $DEFAULT is not fast-forwardable ($sync_state vs origin/$DEFAULT). Investigate: git -C \"$primary\" log --oneline origin/$DEFAULT..$DEFAULT"
   exit 1
 fi
 if [[ "$sync_state" == "unknown" ]]; then
-  bad "Refusing to auto-fix: origin/main not found, so sync cannot be verified — check the remote."
+  bad "Refusing to auto-fix: origin/$DEFAULT not found, so sync cannot be verified — check the remote."
   exit 1
 fi
 # Verify the primary is restorable BEFORE mutating anything, so a hostage is never freed only to
@@ -301,9 +312,9 @@ if [[ -n "$(git -C "$primary" status --porcelain --untracked-files=no)" ]]; then
 fi
 # A detached primary must hold no commits of its own — switching to main would orphan them
 # (reflog-only), so a "non-destructive" repair would silently lose work.
-if [[ -z "$primary_branch" ]] && ! git -C "$primary" merge-base --is-ancestor HEAD origin/main 2>/dev/null; then
+if [[ -z "$primary_branch" ]] && ! git -C "$primary" merge-base --is-ancestor HEAD "origin/$DEFAULT" 2>/dev/null; then
   short="$(git -C "$primary" rev-parse --short HEAD)"
-  bad "Refusing to auto-fix: the primary's detached HEAD ($short) has commit(s) not on origin/main — restoring main would orphan them. Rescue first: git -C \"$primary\" branch recovery/$short"
+  bad "Refusing to auto-fix: the primary's detached HEAD ($short) has commit(s) not on origin/$DEFAULT — restoring $DEFAULT would orphan them. Rescue first: git -C \"$primary\" branch recovery/$short"
   exit 1
 fi
 
@@ -322,11 +333,11 @@ if [[ -n "$hostage" ]]; then
   fi
 fi
 
-# restore + fast-forward via the canonical main-sync (main is now free; primary clean)
-log "repairing: restoring 'main' into the primary checkout via main-sync"
+# restore + fast-forward via the canonical main-sync (the default branch is now free; primary clean)
+log "repairing: restoring '$DEFAULT' into the primary checkout via main-sync"
 if (cd "$primary" && bash "$SCRIPT_DIR/main-sync.sh"); then
-  ok "repaired: primary checkout is on up-to-date main"
+  ok "repaired: primary checkout is on up-to-date $DEFAULT"
 else
-  bad "repair incomplete: 'main' was freed but main-sync could not restore the primary (transient?) — re-run 'make doctor-fix'."
+  bad "repair incomplete: '$DEFAULT' was freed but main-sync could not restore the primary (transient?) — re-run 'make doctor-fix'."
   exit 1
 fi
