@@ -15,8 +15,9 @@ Initialize the Beads issue tracker for AI-friendly task tracking, create the
 lessons-learned file for cross-session memory, establish the initial CLAUDE.md
 skeleton with core principles, task management commands, self-improvement rules,
 and autonomous behavior guidelines, and generate docs/beads-workflow.md as the
-day-to-day Beads reference (defer-immediately rule, `bd create` template,
-bootstrap-trap warning, and the D7 relationship between Beads IDs and git).
+day-to-day Beads reference (defer-immediately rule, `bd create` template, the
+Durability & the bootstrap trap runbook, the Upgrades & migration recipe, and
+the D7 relationship between Beads IDs and git).
 
 ## Inputs
 - Project root directory (required) — must be a git repository
@@ -76,9 +77,12 @@ bootstrap-trap warning, and the D7 relationship between Beads IDs and git).
   git (D7: IDs out of branch names/commit subjects, `Closes <id>` in bodies,
   close only after the squash-merge is verified)
 - (mvp) Auto-export to `.beads/issues.jsonl` is explicitly enabled after `bd init`:
-  `bd config set export.auto true && bd config set export.git-add true`. As of
-  Beads v1.0.4-Unreleased this is opt-in (previously default); explicit enable means
+  `bd config set export.auto true && bd config set export.git-add true`. Opt-in
+  since Beads v1.0.4 (previously default); explicit enable means
   release/version-bump tooling can rely on `.beads/issues.jsonl` being current.
+- (mvp) A `bd backup` target is configured (`bd backup status` reports a
+  configured destination, not "No backup") and an initial `bd backup sync`
+  completed — the full-history disaster-recovery path, kept outside the repo.
 - (mvp) Agents pick up Beads workflow context via `bd prime` (loaded automatically by
   the hooks `bd setup claude` installs). Scaffold does NOT hand-roll a Beads command
   reference table — that lives upstream in `bd prime` output. If a project wants
@@ -95,19 +99,21 @@ bootstrap-trap warning, and the D7 relationship between Beads IDs and git).
   releases. Scaffold-owned CLAUDE.md content (Core Principles + commit convention +
   upgrade-remediation callout) is composed ADJACENT to the recipe-managed integration
   block. Detailed priority level documentation. Generates the full
-  docs/beads-workflow.md reference (all six sections) and cross-doc consistency
+  docs/beads-workflow.md reference (all seven sections, including "Durability &
+  the bootstrap trap" and "Upgrades & migration") and cross-doc consistency
   checks against existing git-workflow.md and coding-standards.md (D7 branch/commit
   conventions must agree).
 - **mvp**: `bd init`, `bd doctor --fix`, `bd setup claude`, create tasks/lessons.md,
   add minimal scaffold-owned CLAUDE.md sections (Core Principles + commit convention +
-  upgrade-remediation callout), and generate docs/beads-workflow.md with its core six
+  upgrade-remediation callout), and generate docs/beads-workflow.md with its core seven
   sections. Skip cross-doc checks. Custom types stay off — only built-in
   `bug|feature|task|epic|chore|decision` available.
 - **custom:depth(1-5)**:
   - Depth 1: `bd init` + `bd doctor --fix` + `bd setup claude` + create tasks/lessons.md. Minimal scaffold CLAUDE.md content (Core Principles only).
   - Depth 2: Depth 1 + add commit convention + upgrade-remediation callout + generate
     docs/beads-workflow.md (defer rule, `bd create` template, day-to-day commands,
-    bootstrap trap, epics & phases, relationship to git).
+    durability & the bootstrap trap, epics & phases, relationship to git,
+    upgrades & migration).
   - Depth 3: Add priority level documentation and autonomous behavior rules.
   - Depth 4: Full setup with cross-doc consistency checks (docs/beads-workflow.md
     against git-workflow.md and coding-standards.md). Enable `bd config set types.custom '["story","milestone","spike"]'`.
@@ -120,8 +126,11 @@ existing setup updates rather than re-initializes.
 
 1. **Initialize Beads** (skip if `.beads/` already contains a Dolt DB):
    ```bash
-   bd init
+   bd init --init-if-missing   # idempotent (bd >= 1.1.0): no-op when a DB already exists
    ```
+   bd ≥ 1.1.0 may ask a one-time usage-metrics consent question on first run
+   (`bd metrics`) — answer per project policy; either answer is fine for
+   Scaffold's purposes.
 
 2. **Sync hooks and project config against the installed bd version** (idempotent; also
    the canonical recovery path if `bd` is upgraded later):
@@ -148,21 +157,37 @@ existing setup updates rather than re-initializes.
    ```
 
 5. **Enable JSONL auto-export** so release/version-bump tooling can rely on
-   `.beads/issues.jsonl` being current (Beads v1.0.4-Unreleased flipped these
-   to opt-in):
+   `.beads/issues.jsonl` being current:
    ```bash
    bd config set export.auto true
    bd config set export.git-add true
    ```
+   Opt-in since Beads v1.0.4. Upstream treats the Dolt database as the source of
+   truth and JSONL as an export/interchange copy; we enable auto-export + git-add
+   so `.beads/issues.jsonl` stays current and **committed** — it is the
+   issue-level restore copy `make beads-snapshot` refreshes and the recovery
+   source that survived a real database wipe.
 
-6. **(deep methodology only) Enable custom issue types** so downstream prompts can
+6. **Configure a full-fidelity backup** (Dolt history included — `bd export`
+   JSONL is issue-level only and NOT a substitute). The target lives outside
+   the repository so a checkout deletion or reset cannot take the backup with
+   it. Skip if `bd backup status` already reports a configured target:
+   ```bash
+   bd backup status >/dev/null 2>&1 || bd backup init "$HOME/.beads-backups/$(basename "$(pwd)")"
+   bd backup sync
+   ```
+   From now on `make beads-snapshot` (agent-ops git component) refreshes both
+   the JSONL copy and this backup. Restore path after a disaster:
+   `bd backup restore` (see docs/beads-workflow.md section 4).
+
+7. **(deep methodology only) Enable custom issue types** so downstream prompts can
    use `-t story` for user stories and `-t milestone` for releases:
    ```bash
    bd config set types.custom '["story","milestone","spike"]'
    ```
    Verify with `bd config get types.custom`.
 
-7. **Create the lessons-learned file** for cross-session memory (skip if it already exists — never overwrite accumulated lessons):
+8. **Create the lessons-learned file** for cross-session memory (skip if it already exists — never overwrite accumulated lessons):
    ```bash
    mkdir -p tasks
    if [ ! -f tasks/lessons.md ]; then
@@ -189,7 +214,7 @@ existing setup updates rather than re-initializes.
    fi
    ```
 
-8. **Compose scaffold-owned CLAUDE.md sections** ADJACENT to (not replacing) the
+9. **Compose scaffold-owned CLAUDE.md sections** ADJACENT to (not replacing) the
    recipe-managed block from step 3. The scaffold-owned content includes Core
    Principles (Simplicity, No Laziness, TDD, Prove It), the commit-message
    convention (Conventional Commits `type(scope): subject`; a Beads task ID,
@@ -199,7 +224,7 @@ existing setup updates rather than re-initializes.
    `bd init`, run `bd doctor --fix`..."), and (deep) autonomous behavior
    rules.
 
-9. **Bootstrap commit** — Conventional Commits subject; the bootstrap bead ID
+10. **Bootstrap commit** — Conventional Commits subject; the bootstrap bead ID
    is referenced only in the body (D7):
    ```bash
    git add .beads tasks/lessons.md CLAUDE.md
@@ -237,18 +262,52 @@ reference content — it does not touch (and is never overwritten by) the
 3. **Day-to-day commands** — `bd ready` (start here — surfaces unblocked
    work) / `bd list` / `bd show <id>` / `bd update <id> --status in_progress`
    / `bd close <id>` (only after the PR is merged and verified) / `bd stats`.
-4. **The bootstrap trap** — verbatim warning: never run `bd bootstrap`,
-   `bd init --force`, or any reset on a checkout with a populated local
-   Beads DB — it silently replaces local (usually ahead) state with the
-   stale remote. Bootstrap is for fresh clones only. Before any reset, run
-   `make beads-snapshot` (installed by the agent-ops git component). Drive
-   embedded storage only through `bd` subcommands, never a standalone CLI.
+4. **Durability & the bootstrap trap** — verbatim rules:
+   - Never run `bd bootstrap`, destructive `bd init`
+     (`--reinit-local` / `--discard-remote` / `--destroy-token`; legacy
+     `--force`), or any reset on a checkout with a populated local Beads DB —
+     it silently replaces local (usually ahead) state with the stale remote.
+     Bootstrap is for fresh clones only. Since bd v1.0.4, destructive init
+     refuses without explicit flags plus a destroy token (exit codes
+     10/11/12) — treat any such refusal as a stop sign, not a puzzle.
+   - Push before any reset, and before deleting a checkout with local beads:
+     `bd stats` (confirm counts) → `bd dolt commit` → `bd dolt push`. The
+     push — not a local snapshot — is what makes beads survivable.
+   - Before any reset also run `make beads-snapshot` (agent-ops git
+     component): refreshes the committed `.beads/issues.jsonl` restore copy
+     and syncs the full `bd backup` target. Bootstrap will NOT auto-use
+     either — they are manual restore sources.
+   - Drive embedded storage only through `bd` subcommands (`bd dolt …`),
+     never a standalone `dolt` CLI — a mismatched engine on the same storage
+     can corrupt it.
+   - Recovery order if beads go missing: FIRST confirm the remote actually
+     lost them (`bd dolt pull`, then `bd stats`) — if the remote still has
+     them, pull, don't rebuild. Then `bd backup restore` (full history), then
+     `bd import -i .beads/issues.jsonl` (issue-level), and only as a last
+     resort reconstruct from committed docs. After any restore:
+     `bd dolt commit && bd dolt push`.
+   - `scripts/bd-guard.sh` (a PreToolUse hook, registered during git-workflow
+     setup) blocks the destructive commands above while the DB is populated.
+     A deliberate, human-approved reset sets `BEADS_DESTRUCTIVE_OK=1` for
+     that one command — never set it to silence the guard routinely.
 5. **Epics & phases** — `bd create "<title>" -t epic --parent <parent-epic>`
    for containers; phase epics `blocks:` each other so `bd ready` surfaces
    only the current phase's work.
 6. **Relationship to git** — bead IDs stay out of branch names and commit
    subjects (D7); reference them only in commit/PR bodies as `Closes <id>`;
    close the bead only after the squash-merge is verified on `main`.
+7. **Upgrades & migration** — upgrading the `bd` binary can trigger schema
+   migrations; crossing a breaking migration un-coordinated can fork Dolt
+   histories permanently. Rules: back up first (`make beads-snapshot`). A
+   single-clone project just upgrades and runs `bd doctor --fix`. A
+   multi-clone project (a second machine, or any fresh clone that pushes)
+   follows the designated-migrator recipe: (1) every clone pushes with the
+   OLD binary (`bd dolt commit && bd dolt push`); (2) exactly ONE clone runs
+   `BD_ALLOW_REMOTE_MIGRATE=1 bd migrate`, then `bd dolt push`; (3) every
+   other clone upgrades its binary and re-clones the tracker with
+   `bd bootstrap` — safe here ONLY because step 1 pushed everything. Never
+   migrate independently on two clones. bd's migrate gate (on by default
+   since v1.1.0) refuses unsafe cases — a refusal is a stop sign.
 
 ## Conditional Evaluation
 Enable when: project uses Beads task tracking methodology (user selects Beads during
@@ -279,9 +338,10 @@ in-place preserving project-specific customizations.
   customizations layered onto docs/beads-workflow.md
 - **Triggers for update**: new CLAUDE.md sections need Beads references,
   Beads CLI version changed requiring command updates, git hooks need
-  reconfiguration after workflow changes, or docs/beads-workflow.md is
+  reconfiguration after workflow changes, docs/beads-workflow.md is
   missing or still documents the retired bead-ID commit-prefix convention
-  instead of the D7 body-reference form
+  instead of the D7 body-reference form, or docs/beads-workflow.md is missing
+  the Durability & the bootstrap trap runbook or the Upgrades & migration section
 - **Conflict resolution**: if CLAUDE.md Beads section was manually customized,
   merge new content around existing customizations rather than replacing;
   the same rule applies to docs/beads-workflow.md
