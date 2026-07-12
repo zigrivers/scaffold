@@ -1535,9 +1535,9 @@ threshold (<span class="sev sev-p2">P2</span> by default; override per-run with
 is derived from gate result + channel health.</p>
 <div class="callout callout-warning"><p><strong>Proceed only on <code>pass</code> or <code>degraded-pass</code>.</strong> On <code>blocked</code> or
 <code>needs-user-decision</code>, never merge automatically — surface the verdict and the
-remaining findings to the user. The wrappers enforce this: a <code>blocked</code> /
-<code>needs-user-decision</code> outcome takes the "Stop path" and does <strong>not</strong> print the
-ready-for-merge message <span class="fp" data-path="content/tools/review-pr.md:610">content/tools/review-pr.md:610</span>.</p></div>
+remaining findings to the user. The wrappers enforce this: report only says the
+PR is merge-ready on <code>pass</code> / <code>degraded-pass</code>
+<span class="fp" data-path="content/tools/review-pr.md:122">content/tools/review-pr.md:122</span>.</p></div>
 <h2 id="step-4-fix-the-blocking-findings-bounded">Step 4 — Fix the blocking findings (bounded)</h2>
 <p>When the verdict is <code>blocked</code>, the loop is: fix the findings at or above the
 threshold → re-review → repeat. The guard rail is that this loop is <strong>bounded
@@ -1561,26 +1561,23 @@ wording produces a new identity each time.</li>
 </ul>
 <p>When you stop, <strong>do not merge</strong>. Document each unresolved finding (severity,
 location, attempt count) and hand the decision to the user
-<span class="fp" data-path="content/tools/review-pr.md:610">content/tools/review-pr.md:610</span>.</p>
+<span class="fp" data-path="content/tools/review-pr.md:122">content/tools/review-pr.md:122</span>.</p>
 <h3 id="where-the-bookkeeping-lives-today">Where the bookkeeping lives today</h3>
-<p>The engine ships <strong>native</strong> multi-round sessions — <code>mmr review --session &#x3C;id> --round N --max-rounds M</code> <span class="fp" data-path="packages/mmr/src/commands/review.ts:289">packages/mmr/src/commands/review.ts:289</span> — and a
+<p>Round-bounding is <strong>native</strong> to the engine. The wrappers pass <code>mmr review --session &#x3C;id> --max-rounds 3</code>
+<span class="fp" data-path="content/tools/review-pr.md:76">content/tools/review-pr.md:76</span>, and MMR enforces the budget itself using a
 stable, line-number-independent <code>finding_key</code>
-<span class="fp" data-path="packages/mmr/src/core/stable-id.ts:115">packages/mmr/src/core/stable-id.ts:115</span>. (See the
+<span class="fp" data-path="packages/mmr/src/core/stable-id.ts:115">packages/mmr/src/core/stable-id.ts:115</span> — the same identity across a
+finding's re-wordings and severity changes. (See the
 <a href="../mmr/index.md">MMR reference</a> for how that key collapses the same issue at
-different severities.)</p>
-<p>The scaffold <strong>wrappers</strong> have not yet migrated to native sessions. Until they
-do, <code>review-pr</code> and <code>review-code</code> enforce the 3-strike rule with their own
-bookkeeping: a per-session attempts file at
-<code>.scaffold/review-attempts/&#x3C;session-id>.json</code>. Each fix round computes a hash
-over the same four identity components, increments that finding's counter, and
-the <code>_review_at_strike_limit</code> helper blocks once it hits 3
-<span class="fp" data-path="content/tools/review-pr.md:468">content/tools/review-pr.md:468</span>. The wrapper hash deliberately mirrors the
-engine's <code>finding_key</code> components, so the eventual swap to
-<code>mmr review --session</code> is a clean migration rather than a re-think.</p>
-<div class="callout callout-note"><p><strong>Practical takeaway.</strong> You drive the fix loop through the wrapper; the attempts
-file under <code>.scaffold/review-attempts/</code> is the current source of truth for the
-strike count. For a very noisy loop you may narrow the gate for one run with
-<code>--fix-threshold P1</code> — but don't permanently lower the project default (P2).</p></div>
+different severities.) A finding that survives the budget stops being
+re-attempted; you don't track strikes by hand.</p>
+<p>This replaced the former wrapper-side attempts file
+(<code>.scaffold/review-attempts/&#x3C;session-id>.json</code>), retired when the review tools
+were slimmed to the MMR-dispatch core.</p>
+<div class="callout callout-note"><p><strong>Practical takeaway.</strong> Pass <code>--session</code> so the round budget actually applies —
+without it, <code>--max-rounds</code> is inert. For a very noisy loop you may narrow the
+gate for one run with <code>--fix-threshold P1</code> — but don't permanently lower the
+project default (P2).</p></div>
 <h2 id="step-5-handle-degraded-mode">Step 5 — Handle degraded mode</h2>
 <p>A review never silently runs with fewer reviewers. A channel is <em>degraded</em> when
 its binary isn't installed, auth fails, it times out, or it errors out. The
@@ -1608,7 +1605,7 @@ table.</li>
 to invoking Codex / Gemini / Claude / Grok directly, run them as <strong>foreground</strong>
 Bash calls — never with <code>run_in_background</code>, <code>&#x26;</code>, or <code>nohup</code>. Background
 execution produces empty output, which the parser then reads as a degraded
-channel <span class="fp" data-path="content/tools/review-code.md:265">content/tools/review-code.md:265</span>.</p></div>
+channel <span class="fp" data-path="content/tools/review-code.md:160">content/tools/review-code.md:160</span>.</p></div>
 <p>Once any channel was compensated, the best possible verdict is
 <code>degraded-pass</code> — full <code>pass</code> requires all channels to have completed for real.</p>
 <h2 id="see-also">See also</h2>
