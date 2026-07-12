@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Export the local beads DB to .beads/issues.jsonl — a committed restore copy
-# for `bd import` after a wipe — and sync the full `bd backup` target when one
-# is configured. Invoked by `make beads-snapshot`.
+# Export the local beads DB to .beads/issues.jsonl — a restore copy for
+# `bd import` after a wipe (commit it and push the Dolt remote to make it
+# durable) — and sync the full `bd backup` target when one is configured.
+# Invoked by `make beads-snapshot`.
 #
 # Beads is OPTIONAL: if the `bd` CLI is not installed, or this project has no
 # .beads/ database, the script prints a note and exits 0 (nothing to snapshot).
@@ -36,7 +37,7 @@ tmp="$(mktemp .beads/issues.jsonl.XXXXXX)"
 # bd's exit status, so `set -e` does not abort on a failed export.
 if err="$(bd export --all -o "$tmp" 2>&1)"; then
 	if mv -f "$tmp" .beads/issues.jsonl; then
-		printf '%s\n' "✓ wrote .beads/issues.jsonl — a committed restore copy for 'bd import' after a wipe; still push the Dolt remote (bootstrap won't auto-use it)"
+		printf '%s\n' "✓ wrote .beads/issues.jsonl — a restore copy for 'bd import' after a wipe; COMMIT it (git add/commit) and push the Dolt remote to make it durable (bootstrap won't auto-use it)"
 		# Full-fidelity Dolt backup (history included) when the project has one
 		# configured via `bd backup init`. Detected via the stable machine
 		# contract `bd backup status --json` → `.dolt.configured` (a boolean):
@@ -50,7 +51,12 @@ if err="$(bd export --all -o "$tmp" 2>&1)"; then
 			if bd backup sync >/dev/null 2>&1; then
 				printf '%s\n' "✓ bd backup sync — full-history Dolt backup updated"
 			else
-				printf '%s\n' "⚠ bd backup sync failed — JSONL snapshot still written; check 'bd backup status'" >&2
+				# A backup IS configured but its full-history copy failed to
+				# update — fail non-zero so reset automation stops rather than
+				# proceeding while a promised durable copy is stale. (The JSONL
+				# was still written above, so restore-from-JSONL remains possible.)
+				printf '%s\n' "✗ bd backup sync FAILED — a backup is configured but its full-history copy is now stale; resolve before relying on it (check 'bd backup status')" >&2
+				exit 1
 			fi
 		fi
 	else

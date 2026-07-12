@@ -35,42 +35,68 @@ fi
 
 # Match-only normalized copy: collapse newlines and backslash line-continuations
 # to spaces so a split like `bd \<newline>bootstrap` (or a multiline script)
-# cannot slip past the single-line patterns below. NEVER executed — used only
-# for matching.
+# cannot slip past the single-line patterns below. NEVER executed — matching only.
 scan=$(printf '%s' "$cmd" | tr '\n\\' '  ')
 
-# Deliberate, human-approved override (procedure documented in
-# docs/beads-workflow.md — not here). Primary path: the real environment
-# variable. Inline path (a PreToolUse hook cannot see the not-yet-applied env
-# assignment): honor it ONLY as a genuine leading assignment at a command
-# boundary — the start of the command or right after a ; & | separator — never a
-# bare mention elsewhere (e.g. inside an echo/heredoc), which would otherwise
-# disarm the guard wholesale.
+# Deliberate, human-approved override via the REAL environment variable (applies
+# globally; the inline `BEADS_DESTRUCTIVE_OK=1 <cmd>` form is honored per-segment
+# below). Procedure documented in docs/beads-workflow.md — not here.
 if [ "${BEADS_DESTRUCTIVE_OK:-0}" = "1" ]; then exit 0; fi
-if printf '%s' "$scan" | grep -qE '(^|[;&|])[[:space:]]*BEADS_DESTRUCTIVE_OK=1[[:space:]]'; then exit 0; fi
 
-# Guard only when there is a populated database to lose.
+# Populated-DB check — guard only when there is state to lose. Judge the current
+# checkout AND, if the command retargets one with `bd -C <dir>` / `--directory
+# <dir>`, that target too (a destructive `bd -C <populated> bootstrap` run from
+# an empty cwd must still be caught).
+target=""
+if [[ "$scan" =~ (-C|--directory)[[:space:]]+([^[:space:]]+) ]]; then
+	target="${BASH_REMATCH[2]}"
+fi
 db_populated() {
-	[ -d .beads/embeddeddolt ] && return 0
-	[ -d .beads/dolt ] && return 0
-	compgen -G ".beads/*.db" >/dev/null 2>&1
+	local base="${1:-.}"
+	[ -d "$base/.beads/embeddeddolt" ] && return 0
+	[ -d "$base/.beads/dolt" ] && return 0
+	compgen -G "$base/.beads/*.db" >/dev/null 2>&1
 }
-db_populated || exit 0
+populated=0
+db_populated "." && populated=1
+[ -n "$target" ] && db_populated "$target" && populated=1
+[ "$populated" = "1" ] || exit 0
 
-# `bd`/`rm`/`dolt` must appear as their own token, not as the tail of another
-# word. The boundary class excludes `/` so a path-qualified binary
-# (/opt/homebrew/bin/bd) is still caught, and `.beads` is anchored to a real
-# boundary so a sibling like `.beads-backups` is not a false positive. Each
-# pattern is bounded to one command segment ([^|;&]*) so a safe command chained
-# after && is not misread as flags of a dangerous one.
+# `bd`/`rm`/`dolt` must appear as their own token, not the tail of another word.
+# The boundary class excludes `/` so a path-qualified binary
+# (/opt/homebrew/bin/bd) is caught; `opt` permits global option tokens (e.g.
+# `-C <dir>`, `--db <path>`) between `bd` and its subcommand so `bd -C /x
+# bootstrap` is caught; `.beads` is anchored to a real boundary so a sibling like
+# `.beads-backups` is not a false positive.
 b='(^|[^[:alnum:]_.-])'
-dangerous="${b}bd[[:space:]]+bootstrap([[:space:]|;&]|\$)"
-dangerous="${dangerous}|${b}bd[[:space:]]+init[^|;&]*--(force|reinit-local|discard-remote|destroy-token)"
-dangerous="${dangerous}|${b}bd[[:space:]]+admin[[:space:]]+reset"
+opt='([[:space:]]+-[A-Za-z-]+(=[^[:space:]]*)?([[:space:]]+[^-[:space:]][^[:space:]]*)?)*'
+dangerous="${b}bd${opt}[[:space:]]+bootstrap([[:space:]|;&]|\$)"
+dangerous="${dangerous}|${b}bd${opt}[[:space:]]+init[^|;&]*--(force|reinit-local|discard-remote|destroy-token)"
+dangerous="${dangerous}|${b}bd${opt}[[:space:]]+admin[[:space:]]+reset"
 dangerous="${dangerous}|${b}rm[[:space:]][^|;&]*\.beads([[:space:]/|;&]|\$)"
 dangerous="${dangerous}|${b}dolt[[:space:]][^|;&]*\.beads([[:space:]/|;&]|\$)"
 
-if printf '%s' "$scan" | grep -qE "$dangerous"; then
+# Evaluate PER command segment (split on ; & |, so || && collapse too). An inline
+# override authorizes ONLY the segment it directly prefixes — so
+# `BEADS_DESTRUCTIVE_OK=1 echo x && bd bootstrap` still blocks the bd segment,
+# and an override attached to some other command never disarms the whole chain.
+blocked=0
+while IFS= read -r seg; do
+	seg="${seg#"${seg%%[![:space:]]*}"}"   # strip leading whitespace
+	[ -n "$seg" ] || continue
+	# Inline deliberate override: a genuine leading env-assignment on THIS command.
+	case "$seg" in
+		BEADS_DESTRUCTIVE_OK=1[[:space:]]*) continue ;;
+	esac
+	if printf '%s' "$seg" | grep -qE "$dangerous"; then
+		blocked=1
+		break
+	fi
+done <<SEGMENTS
+$(printf '%s' "$scan" | tr ';&|' '\n\n\n')
+SEGMENTS
+
+if [ "$blocked" = "1" ]; then
 	{
 		printf '%s\n' "bd-guard: BLOCKED — this command can destroy the populated Beads database (.beads/)."
 		printf '%s\n' "Bootstrap/reset is for FRESH CLONES ONLY; on this checkout it would replace local"

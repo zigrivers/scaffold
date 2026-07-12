@@ -306,6 +306,31 @@ EOF
     # bare mention inside an echo (not a leading assignment) → still BLOCKED
     run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check 'echo BEADS_DESTRUCTIVE_OK=1 && bd bootstrap'"
     [ "$status" -eq 2 ]
+    # override attached to a DIFFERENT command in the chain must not bless bd
+    run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check 'BEADS_DESTRUCTIVE_OK=1 echo x && bd bootstrap'"
+    [ "$status" -eq 2 ]
+}
+
+@test "bd-guard: blocks bd with a global-option prefix before the destructive subcommand" {
+    mkdir -p "$CLONE_DIR/.beads/embeddeddolt"
+    for c in 'bd -C /some/path bootstrap' 'bd --db /x/y.db init --reinit-local' 'bd --global admin reset'; do
+        run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check '$c'"
+        [ "$status" -eq 2 ] || { echo "not blocked: $c"; false; }
+    done
+    # a non-destructive subcommand behind global opts is still allowed
+    run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check 'bd -C /some/path ready'"
+    [ "$status" -eq 0 ]
+}
+
+@test "bd-guard: judges bd -C <dir> against the TARGET checkout, not just cwd" {
+    # cwd has NO populated DB; the -C target does — the destructive command must
+    # still be blocked (and a bare bootstrap from the empty cwd stays allowed).
+    rm -rf "$CLONE_DIR/.beads"
+    mkdir -p "$CLONE_DIR/primary/.beads/embeddeddolt" "$CLONE_DIR/empty"
+    run bash -c "cd '$CLONE_DIR/empty' && '$CLONE_DIR/scripts/bd-guard.sh' --check 'bd -C $CLONE_DIR/primary bootstrap'"
+    [ "$status" -eq 2 ]
+    run bash -c "cd '$CLONE_DIR/empty' && '$CLONE_DIR/scripts/bd-guard.sh' --check 'bd bootstrap'"
+    [ "$status" -eq 0 ]
 }
 
 @test "beads-snapshot: writes issues.jsonl and syncs bd backup when configured" {
@@ -313,6 +338,7 @@ EOF
     # richer bd stub: export writes the -o target; `bd backup status --json`
     # always exits 0 (real bd behavior) but its .dolt.configured boolean differs
     # — detection is via the stable JSON contract, not exit code or prose.
+    # BD_BACKUP_CONFIGURED toggles the status boolean; BD_SYNC_EXIT the sync rc.
     cat > "$CLONE_DIR/stubs/bd" <<'EOF'
 #!/usr/bin/env bash
 if [ "$1" = "export" ]; then
@@ -325,13 +351,13 @@ fi
 if [ "$1" = "backup" ]; then
     case "$2" in
         status)
-            if [ "${BD_BACKUP_EXIT:-1}" = "0" ]; then
+            if [ "${BD_BACKUP_CONFIGURED:-0}" = "1" ]; then
                 printf '{"dolt":{"configured": true}}\n'
             else
                 printf '{"dolt":{"configured": false}}\n'
             fi
             exit 0 ;;
-        sync) exit "${BD_BACKUP_EXIT:-1}" ;;
+        sync) exit "${BD_SYNC_EXIT:-0}" ;;
         *) exit 0 ;;
     esac
 fi
@@ -339,14 +365,24 @@ exit 0
 EOF
     chmod +x "$CLONE_DIR/stubs/bd"
     # unconfigured backup: snapshot succeeds, no backup line
-    run bash -c "cd '$CLONE_DIR' && BD_BACKUP_EXIT=1 scripts/beads-snapshot.sh"
+    run bash -c "cd '$CLONE_DIR' && BD_BACKUP_CONFIGURED=0 scripts/beads-snapshot.sh"
     [ "$status" -eq 0 ]
     [ -f "$CLONE_DIR/.beads/issues.jsonl" ]
     [[ "$output" != *"backup"*"updated"* ]]
-    # configured backup: sync runs and is reported
-    run bash -c "cd '$CLONE_DIR' && BD_BACKUP_EXIT=0 scripts/beads-snapshot.sh"
+    # configured backup, sync ok: sync runs and is reported
+    run bash -c "cd '$CLONE_DIR' && BD_BACKUP_CONFIGURED=1 BD_SYNC_EXIT=0 scripts/beads-snapshot.sh"
     [ "$status" -eq 0 ]
     [[ "$output" == *"full-history"* ]]
+    # configured backup, sync FAILS: snapshot fails non-zero so reset automation stops
+    run bash -c "cd '$CLONE_DIR' && BD_BACKUP_CONFIGURED=1 BD_SYNC_EXIT=1 scripts/beads-snapshot.sh"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *FAILED* ]]
+    [ -f "$CLONE_DIR/.beads/issues.jsonl" ]
+}
+
+@test "beads-snapshot: success message does not claim the copy is already committed" {
+    run grep -iE 'a committed restore copy' "$BATS_TEST_DIRNAME/../content/assets/agent-ops/git/beads-snapshot.sh.tmpl"
+    [ "$status" -ne 0 ]
 }
 
 @test "beads-snapshot: success message calls the copy committed, not git-ignored" {
