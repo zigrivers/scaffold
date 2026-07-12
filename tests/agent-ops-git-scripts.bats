@@ -345,6 +345,24 @@ EOF
     done
 }
 
+@test "bd-guard: blocks a destructive command on a later line of a multiline block" {
+    mkdir -p "$CLONE_DIR/.beads/embeddeddolt"
+    multi=$(printf 'echo preparing\nbd bootstrap')
+    run bash -c 'cd "$1" && scripts/bd-guard.sh --check "$2"' _ "$CLONE_DIR" "$multi"
+    [ "$status" -eq 2 ]
+}
+
+@test "bd-guard: blocks common wrapper/grouping forms (sudo, time, subshell, braces)" {
+    mkdir -p "$CLONE_DIR/.beads/embeddeddolt"
+    for c in 'sudo bd bootstrap' 'time bd bootstrap' '(bd bootstrap)' '{ bd bootstrap; }' 'sudo rm -rf .beads'; do
+        run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check '$c'"
+        [ "$status" -eq 2 ] || { echo "not blocked: $c"; false; }
+    done
+    # a wrapper in front of a safe subcommand is still allowed
+    run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check 'sudo apt install ripgrep'"
+    [ "$status" -eq 0 ]
+}
+
 @test "bd-guard: does NOT block a safe command that merely mentions a destructive one in an argument" {
     mkdir -p "$CLONE_DIR/.beads/embeddeddolt"
     for c in 'bd create "Document the bd bootstrap trap"' \

@@ -33,10 +33,11 @@ else
 fi
 [ -n "$cmd" ] || exit 0
 
-# Match-only normalized copy: collapse newlines and backslash line-continuations
-# to spaces so a split like `bd \<newline>bootstrap` (or a multiline script)
-# cannot slip past the single-line patterns below. NEVER executed — matching only.
-scan=$(printf '%s' "$cmd" | tr '\n\\' '  ')
+# Match-only normalized copy: FOLD backslash line-continuations into one logical
+# line, but KEEP bare newlines as the command separators they are (a multiline
+# block's second command must still be inspected — collapsing newlines to spaces
+# would hide it). NEVER executed — used only for matching.
+scan=$(printf '%s' "$cmd" | awk 'BEGIN{ORS=""} { if (sub(/\\$/,"")) printf "%s", $0; else print $0 "\n" }')
 
 # Deliberate, human-approved override via the REAL environment variable (applies
 # globally; the inline `BEADS_DESTRUCTIVE_OK=1 <cmd>` form is honored per-segment
@@ -76,19 +77,28 @@ fi
 # merely appears inside it — otherwise `bd create "fix the bd bootstrap trap"` or
 # `git commit -m "explain bd bootstrap"` (pervasive in Beads projects) would be
 # blocked. So each pattern is anchored to the START of the (already
-# whitespace-stripped) segment, permitting only leading VAR=value env-assignments
-# and an optional path prefix before the binary. `opt` permits global option
-# tokens (e.g. `-C <dir>`, `--db <path>`) between `bd` and its subcommand so
-# `bd -C /x bootstrap` is caught; the path prefix catches `/opt/homebrew/bin/bd`;
-# `.beads` is anchored to a real boundary so `.beads-backups` is not a false
-# positive.
-start='^([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)*([^[:space:]]*/)?'
+# whitespace-stripped) segment, permitting only: an optional subshell/brace
+# opener, a bounded set of leading wrapper keywords (sudo/time/…), leading
+# VAR=value env-assignments, and an optional path prefix before the binary. `opt`
+# permits global option tokens (e.g. `-C <dir>`, `--db <path>`) between `bd` and
+# its subcommand so `bd -C /x bootstrap` is caught; the path prefix catches
+# `/opt/homebrew/bin/bd`; `.beads` is anchored to a real boundary so
+# `.beads-backups` is not a false positive.
+#
+# KNOWN, ACCEPTED limits (this is an accident net, not a security boundary; see
+# the header): a destructive command hidden inside command substitution
+# (`$(bd bootstrap)`), behind an escaped separator, in a `-C` target with spaces,
+# or reached by `cd`-ing into a *different* populated checkout from an unpopulated
+# cwd is NOT caught. The layered durability defenses (push-before-reset, the
+# committed JSONL restore copy, the `bd backup` full-history copy, and bd's own
+# destroy-token refusals) are the real guarantee.
+start='^[({]?[[:space:]]*((sudo|time|command|env|nice|nohup)[[:space:]]+)*([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)*([^[:space:]]*/)?'
 opt='([[:space:]]+-[A-Za-z-]+(=[^[:space:]]*)?([[:space:]]+[^-[:space:]][^[:space:]]*)?)*'
-dangerous="${start}bd${opt}[[:space:]]+bootstrap([[:space:]|;&]|\$)"
+dangerous="${start}bd${opt}[[:space:]]+bootstrap([[:space:]|;&)}]|\$)"
 dangerous="${dangerous}|${start}bd${opt}[[:space:]]+init[^|;&]*--(force|reinit-local|discard-remote|destroy-token)"
 dangerous="${dangerous}|${start}bd${opt}[[:space:]]+admin[[:space:]]+reset"
-dangerous="${dangerous}|${start}rm[[:space:]][^|;&]*\.beads([[:space:]/|;&]|\$)"
-dangerous="${dangerous}|${start}dolt[[:space:]][^|;&]*\.beads([[:space:]/|;&]|\$)"
+dangerous="${dangerous}|${start}rm[[:space:]][^|;&]*\.beads([[:space:]/|;&)}]|\$)"
+dangerous="${dangerous}|${start}dolt[[:space:]][^|;&]*\.beads([[:space:]/|;&)}]|\$)"
 
 # Evaluate PER command segment (split on ; & |, so || && collapse too). An inline
 # override authorizes ONLY the segment it directly prefixes — so
@@ -107,7 +117,7 @@ while IFS= read -r seg; do
 		break
 	fi
 done <<SEGMENTS
-$(printf '%s' "$scan" | tr ';&|' '\n\n\n')
+$(printf '%s' "$scan" | tr ';&|\n' '\n\n\n\n')
 SEGMENTS
 
 if [ "$blocked" = "1" ]; then

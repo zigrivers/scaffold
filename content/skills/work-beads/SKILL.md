@@ -43,8 +43,9 @@ commands below require it). Older? Stop and report: upgrade with
 `brew upgrade beads` or the project's equivalent — never work around the gate.
 
 **Database safety (binding for every step):** never run `bd bootstrap`,
-destructive `bd init` (`--reinit-local`/`--discard-remote`; legacy `--force`),
-or any reset against a populated `.beads/` — bootstrap replaces local state
+destructive `bd init` (`--reinit-local`/`--discard-remote`/`--destroy-token`;
+legacy `--force`), or any reset against a populated `.beads/` — bootstrap
+replaces local state
 with the often-stale remote and silently drops unpushed beads (fresh clones
 only). Before any deliberate reset, and before deleting a checkout with local
 beads: `bd stats && bd dolt commit && bd dolt push`, then `make beads-snapshot`.
@@ -151,10 +152,17 @@ Beads filed (open): <id - one-line title - or none>
 
 Before reporting, refresh the durability net (feature-detect; skip silently
 when the target is absent): `make beads-snapshot`, then COMMIT the refreshed
-restore copy so it is durable — `git add .beads/issues.jsonl && git commit -m
-"chore(beads): refresh restore snapshot" || true` (a no-op when nothing
-changed). Uncommitted, the copy is stranded locally and a later reset destroys
-it. One batch-end snapshot covers every bead closed above.
+restore copy so it is durable (uncommitted, it is stranded locally and a later
+reset destroys it). Stage it, and commit only when it actually changed — don't
+mask a real commit failure behind `|| true`:
+
+```bash
+git add .beads/issues.jsonl
+git diff --cached --quiet -- .beads/issues.jsonl \
+  || git commit -m "chore(beads): refresh restore snapshot"
+```
+
+One batch-end snapshot covers every bead closed above.
 
 If the batch ran long and `launchpad` is installed: `launchpad notify "<summary>"`.
 
