@@ -152,17 +152,22 @@ Docs updated in-PR: <paths - or "none needed: <why>">
 Beads filed (open): <id - one-line title - or none>
 ```
 
-Before reporting, make the batch durable and refresh the restore net
-(feature-detect; skip silently when unavailable):
+Before reporting, make the batch durable and refresh the restore net. Every step
+is BEST-EFFORT — none may abort the report (a purely local Beads DB has no Dolt
+remote; a `bd backup` target may be absent):
 
-1. **Push the beads off-machine — this is the real durability:**
-   `bd dolt commit && bd dolt push`. The Dolt remote (not a local git commit) is
-   what survives a lost machine or a reset.
+1. **Push the beads off-machine when a Dolt remote is configured — this is the
+   real durability:** `bd dolt commit`, then `bd dolt push` ONLY if the project
+   has a Dolt remote (a purely local Beads DB has none — skip the push; its local
+   Dolt DB plus the committed JSONL export is its durability). Note a push failure
+   for a *configured* remote in your report, but never abort the batch over it.
 2. `make beads-snapshot` — refresh the `.beads/issues.jsonl` restore copy and
-   sync the `bd backup` full-history copy.
+   sync any configured `bd backup` full-history copy.
 3. Keep the working tree clean by committing the refreshed restore copy — commit
-   only when it actually changed, and don't mask a real failure behind `|| true`
-   (this is tree-hygiene; step 1's push is the off-machine durability):
+   only when it actually changed, and don't mask a real failure behind `|| true`.
+   This is tree-hygiene, NOT the off-machine copy (that is step 1's Dolt remote);
+   the primary stays on its base branch, so this is a normal local commit — do
+   not open a PR for it and do not strand it on a feature branch:
    ```bash
    git add .beads/issues.jsonl
    git diff --cached --quiet -- .beads/issues.jsonl \
