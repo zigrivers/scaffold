@@ -47,7 +47,7 @@ if err="$(bd export --all -o "$tmp" 2>&1)"; then
 		# — piping bd straight into `grep -q` can race the pipe. Silently skipped
 		# when `bd backup` is unavailable (old bd → non-zero) or unconfigured.
 		if backup_status="$(bd backup status --json 2>/dev/null | tr -d '[:space:]')" \
-			&& printf '%s' "$backup_status" | grep -q '"configured":true'; then
+			&& printf '%s' "$backup_status" | grep -qE '"dolt":\{[^}]*"configured":true'; then
 			if bd backup sync >/dev/null 2>&1; then
 				printf '%s\n' "✓ bd backup sync — full-history Dolt backup updated"
 			else

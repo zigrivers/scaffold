@@ -313,8 +313,8 @@ EOF
 
 @test "bd-guard: a global-option prefix does not evade the destructive-subcommand match" {
     mkdir -p "$CLONE_DIR/.beads/embeddeddolt"
-    # options that do NOT retarget the directory operate on the populated cwd → blocked
-    for c in 'bd --db /x/y.db init --reinit-local' 'bd --global admin reset'; do
+    # a boolean flag operates on cwd → blocked; --global targets the shared DB → blocked
+    for c in 'bd --json init --reinit-local' 'bd -q bootstrap' 'bd --global admin reset'; do
         run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check '$c'"
         [ "$status" -eq 2 ] || { echo "not blocked: $c"; false; }
     done
@@ -350,6 +350,34 @@ EOF
     mkdir -p "$CLONE_DIR/fresh4"
     run bash -c "cd '$CLONE_DIR/empty4' && '$CLONE_DIR/scripts/bd-guard.sh' --check 'cd $CLONE_DIR/fresh4 && bd bootstrap'"
     [ "$status" -eq 0 ]
+}
+
+@test "bd-guard: judges --global / --db / BEADS_DB retargets, not just cwd" {
+    rm -rf "$CLONE_DIR/.beads"
+    mkdir -p "$CLONE_DIR/popdb/.beads/embeddeddolt"; : > "$CLONE_DIR/popdb/.beads/beads.db"
+    mkdir -p "$CLONE_DIR/here8"
+    # --global targets the shared DB → always blocked
+    run bash -c "cd '$CLONE_DIR/here8' && '$CLONE_DIR/scripts/bd-guard.sh' --check 'bd --global bootstrap'"
+    [ "$status" -eq 2 ]
+    # --db to an EXISTING db → blocked; to an ABSENT path → allowed (fresh)
+    run bash -c "cd '$CLONE_DIR/here8' && '$CLONE_DIR/scripts/bd-guard.sh' --check 'bd --db $CLONE_DIR/popdb/.beads/beads.db init --reinit-local'"
+    [ "$status" -eq 2 ]
+    run bash -c "cd '$CLONE_DIR/here8' && '$CLONE_DIR/scripts/bd-guard.sh' --check 'bd --db /no/such/new.db init --reinit-local'"
+    [ "$status" -eq 0 ]
+    # BEADS_DB / BEADS_DIR env retarget to a populated target → blocked
+    run bash -c "cd '$CLONE_DIR/here8' && '$CLONE_DIR/scripts/bd-guard.sh' --check 'BEADS_DIR=$CLONE_DIR/popdb bd bootstrap'"
+    [ "$status" -eq 2 ]
+}
+
+@test "bd-guard: a boolean global flag never swallows a bare 'bootstrap' argument (no false positive)" {
+    mkdir -p "$CLONE_DIR/.beads/embeddeddolt"
+    for c in 'bd -v create bootstrap' 'bd --json create bootstrap' 'bd -q show bootstrap'; do
+        run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check '$c'"
+        [ "$status" -eq 0 ] || { echo "wrongly blocked: $c"; false; }
+    done
+    # …but the real destructive form behind a boolean flag is still blocked
+    run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check 'bd --json bootstrap'"
+    [ "$status" -eq 2 ]
 }
 
 @test "bd-guard: catches attached -C<dir>, upward discovery, and a .beads redirect" {

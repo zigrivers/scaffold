@@ -115,9 +115,13 @@ any_risky() {
 # (push-before-reset, the committed JSONL restore copy, the `bd backup`
 # full-history copy, and bd's own destroy-token refusals) are the real guarantee.
 start='^([^[:space:]]*/)?'
-# A global option token is `-<anything-non-space>` (covers `-C`, an attached
-# `-C/path` or `--db=/x`, and long flags), optionally followed by a spaced value.
-opt='([[:space:]]+-[^[:space:]]+([[:space:]]+[^-[:space:]][^[:space:]]*)?)*'
+# Global option tokens between `bd` and its subcommand. A VALUE-TAKING global flag
+# consumes its value (spaced or =); every OTHER flag is boolean and consumes only
+# itself — so a boolean flag never swallows the subcommand (`bd -v create
+# bootstrap` is a safe `bd create`, not a false positive), while `bd -C /x
+# bootstrap` and attached `bd -C/x bootstrap` are still caught.
+vflag='(-C|--directory|--db|--actor|--dolt-auto-commit)'
+opt="([[:space:]]+(${vflag}([[:space:]]+|=)[^[:space:]]+|-[^[:space:]]+))*"
 dangerous="${start}bd${opt}[[:space:]]+bootstrap([[:space:]|;&]|\$)"
 dangerous="${dangerous}|${start}bd${opt}[[:space:]]+init[^;&|]*--(force|reinit-local|discard-remote|destroy-token)"
 dangerous="${dangerous}|${start}bd${opt}[[:space:]]+admin[[:space:]]+reset"
@@ -178,6 +182,9 @@ while IFS= read -r seg; do
 	case "$seg" in
 		BEADS_DESTRUCTIVE_OK=1[[:space:]]* | env[[:space:]]BEADS_DESTRUCTIVE_OK=1[[:space:]]*) continue ;;
 	esac
+	# Keep the pre-strip form so a leading DB-retargeting env (BEADS_DB=/BEADS_DIR=)
+	# is still visible after the assignment strip below removes it.
+	pre="$seg"
 	# Strip leading wrapper commands (+ their own options/args, up to the command
 	# they wrap) and env-assignments, so `sudo -u root bd bootstrap`,
 	# `nice -n 10 bd bootstrap`, `timeout 30 bd bootstrap`, and
@@ -202,6 +209,28 @@ while IFS= read -r seg; do
 	done
 	# Not a destructive command → move on.
 	printf '%s' "$seg" | grep -qE "$dangerous" || continue
+	# `--global` retargets to the shared global database — bootstrapping or
+	# resetting THAT is always wrong; block outright.
+	if printf '%s' "$seg" | grep -qE '(^|[[:space:]])--global([[:space:]]|$)'; then
+		blocked=1
+		break
+	fi
+	# Explicit DB retargets judged ALONE (they aim bd away from cwd): `--db <file>`
+	# or a `BEADS_DB=`/`BEADS_DIR=` env. Absolute path that EXISTS, or an
+	# unresolvable one → block; an absolute path that is absent is a fresh target.
+	dbt=""
+	if [[ "$seg" =~ (--db)([[:space:]]+|=)([^[:space:]]+) ]]; then
+		dbt="${BASH_REMATCH[3]}"
+	elif [[ "$pre" =~ (^|[[:space:]])BEADS_D(B|IR)=([^[:space:]]+) ]]; then
+		dbt="${BASH_REMATCH[3]}"
+	fi
+	if [ -n "$dbt" ]; then
+		case "$dbt" in
+			/*) if [ -e "$dbt" ]; then blocked=1; break; fi ;;
+			*) blocked=1; break ;;
+		esac
+		continue
+	fi
 	# `bd -C <dir>` is an explicit, unambiguous retarget — judge it ALONE
 	# (absolute → that dir; anything else, incl. relative/masked/variable → "?").
 	if [[ "$seg" =~ $c_re ]]; then
