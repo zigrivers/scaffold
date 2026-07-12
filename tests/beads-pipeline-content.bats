@@ -26,3 +26,9 @@ F="$BATS_TEST_DIRNAME/../content/pipeline/foundation/beads.md"
 @test "stale version framing is gone" {
   run grep -qE "1\.0\.4-Unreleased" "$F"; [ "$status" -ne 0 ]
 }
+
+@test "git-workflow registers bd-guard as a PreToolUse hook (merge, never overwrite)" {
+  G="$BATS_TEST_DIRNAME/../content/pipeline/environment/git-workflow.md"
+  run grep -qE "bd-guard\.sh" "$G"; [ "$status" -eq 0 ]
+  run grep -qE "PreToolUse" "$G"; [ "$status" -eq 0 ]
+}

@@ -43,7 +43,8 @@ for CI until a launch target is chosen and automated CI is deliberately wired up
 - .github/pull_request_template.md — PR template with Summary / Test plan /
   References sections
 - .claude/settings.json — gains a PostToolUse reminder hook that fires after
-  `gh pr create`, merged into any existing file (never overwritten)
+  `gh pr create`, and, when the project uses Beads, a PreToolUse `bd-guard.sh`
+  entry (merged, never overwritten)
 - .scaffold/agent-ops.yaml — written with the minimal form (`project_name` +
   `worktree_setup_commands`) if it doesn't already exist
 - CLAUDE.md updated with Committing/PR Workflow, Task Closure, Parallel
@@ -76,6 +77,8 @@ for CI until a launch target is chosen and automated CI is deliberately wired up
   identity
 - (mvp) Branch cleanup documented for both single-agent (`git branch -d`)
   and worktree-agent (`make prune-merged`) variants
+- (mvp) When `.beads/` exists, `.claude/settings.json` registers
+  `scripts/bd-guard.sh` under hooks.PreToolUse with matcher `Bash`
 - (deep) Agent crash recovery procedure documented: diagnose commands, a
   continue/abort/restart decision table, and `git reflog` recovery
 - (mvp) Conflict-prevention rules documented: single-writer surfaces,
@@ -165,11 +168,33 @@ modified files without `--force`; never pass `--force` in generation mode.
    ```
    This installs `scripts/setup-agent-worktree.sh`,
    `scripts/cleanup-merged-branches.sh`, `scripts/main-sync.sh`,
-   `scripts/doctor.sh`, `scripts/beads-snapshot.sh`, and the
-   `agent-ops.mk` Makefile fragment (wired into the project Makefile via a
-   one-line managed `include`, appended if missing). The installer is
+   `scripts/doctor.sh`, `scripts/beads-snapshot.sh`, `scripts/bd-guard.sh`,
+   and the `agent-ops.mk` Makefile fragment (wired into the project Makefile
+   via a one-line managed `include`, appended if missing). The installer is
    idempotent and refuses to overwrite locally modified files without
    `--force` — never pass `--force` in generation mode.
+
+3. **Register the Beads destructive-command guard** (only when the project
+   uses Beads — skip entirely when `.beads/` is absent). `scripts/bd-guard.sh`
+   (installed by the git component above) is a Claude Code PreToolUse hook
+   that refuses `bd bootstrap`, destructive `bd init`, and `.beads` deletion
+   while a populated database exists. Merge it into `.claude/settings.json` —
+   never overwrite the file; `bd setup claude` hooks and the PR-review
+   reminder hook also own entries there:
+   ```bash
+   if [ -d .beads ] && [ -x scripts/bd-guard.sh ]; then
+     mkdir -p .claude
+     [ -f .claude/settings.json ] || printf '{}\n' > .claude/settings.json
+     if ! grep -q 'bd-guard.sh' .claude/settings.json; then
+       tmp=$(mktemp)
+       jq '.hooks.PreToolUse = ((.hooks.PreToolUse // []) + [{"matcher":"Bash","hooks":[{"type":"command","command":"scripts/bd-guard.sh"}]}])' \
+         .claude/settings.json > "$tmp" && mv "$tmp" .claude/settings.json
+     fi
+   fi
+   ```
+   Codex, Cursor, and other harnesses have no PreToolUse hook: for them the
+   guard is available as `scripts/bd-guard.sh --check "<command>"`, and the
+   AGENTS.md Beads rules (see claude-md-optimization) carry the prose rule.
 
 ### Generate docs/git-workflow.md
 Write docs/git-workflow.md with the sections below, synthesized from the
