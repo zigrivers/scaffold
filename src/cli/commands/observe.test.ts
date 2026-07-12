@@ -38,7 +38,7 @@ describe('observe event subcommand', () => {
     const log = join(dir, 'bd-invocations.log')
     const shim = join(dir, 'fake-bd.sh')
     writeFileSync(shim, `#!/usr/bin/env bash
-if [ "$1" = "--version" ]; then echo "bd version 1.0.4"; exit 0; fi
+if [ "$1" = "--version" ]; then echo "bd version 1.1.0"; exit 0; fi
 if [ "$1" = "update" ]; then echo "$@" >> "${log}"; exit 0; fi
 exit 0
 `, { mode: 0o755 })

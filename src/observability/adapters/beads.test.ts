@@ -20,15 +20,15 @@ describe('beads adapter', () => {
     expect(s.reason).toMatch(/bd binary/)
   })
 
-  it('probe returns available when .beads/ + bd both exist', async () => {
+  it('probe returns available when .beads/ + bd both exist (at the 1.1.0 floor)', async () => {
     mkdirSync(join(dir, '.beads'), { recursive: true })
     const shim = join(dir, 'fake-bd.sh')
-    writeFileSync(shim, '#!/usr/bin/env bash\necho "bd version 1.0.4"\n', { mode: 0o755 })
+    writeFileSync(shim, '#!/usr/bin/env bash\necho "bd version 1.1.0"\n', { mode: 0o755 })
     const s = await beadsAdapter.probe(dir, { bdBin: shim })
     expect(s.status).toBe('available')
   })
 
-  it('probe returns degraded when bd is too old (below v1.0.0)', async () => {
+  it('probe returns degraded when bd is far below the floor (0.62.0)', async () => {
     mkdirSync(join(dir, '.beads'), { recursive: true })
     const oldBd = join(dir, 'fake-bd.sh')
     writeFileSync(oldBd, '#!/usr/bin/env bash\necho "bd version 0.62.0"\n', { mode: 0o755 })
@@ -37,10 +37,19 @@ describe('beads adapter', () => {
     expect(s.reason).toMatch(/version/)
   })
 
-  it('probe returns available when bd is v1.0.0 or newer', async () => {
+  it('probe returns degraded when bd is 1.0.x (below the 1.1.0 floor)', async () => {
+    mkdirSync(join(dir, '.beads'), { recursive: true })
+    const oldMinor = join(dir, 'fake-bd.sh')
+    writeFileSync(oldMinor, '#!/usr/bin/env bash\necho "bd version 1.0.5"\n', { mode: 0o755 })
+    const s = await beadsAdapter.probe(dir, { bdBin: oldMinor })
+    expect(s.status).toBe('degraded')
+    expect(s.reason).toMatch(/1\.1\.0/)
+  })
+
+  it('probe returns available when bd is v1.1.0 or newer', async () => {
     mkdirSync(join(dir, '.beads'), { recursive: true })
     const newBd = join(dir, 'fake-bd.sh')
-    writeFileSync(newBd, '#!/usr/bin/env bash\necho "bd version 1.0.4 (Homebrew)"\n', { mode: 0o755 })
+    writeFileSync(newBd, '#!/usr/bin/env bash\necho "bd version 1.1.0 (Homebrew)"\n', { mode: 0o755 })
     const s = await beadsAdapter.probe(dir, { bdBin: newBd })
     expect(s.status).toBe('available')
   })
@@ -50,7 +59,7 @@ describe('beads adapter', () => {
     const log = join(dir, 'bd-invocations.log')
     const shim = join(dir, 'fake-bd.sh')
     writeFileSync(shim, `#!/usr/bin/env bash
-if [ "$1" = "--version" ]; then echo "bd version 1.0.4"; exit 0; fi
+if [ "$1" = "--version" ]; then echo "bd version 1.1.0"; exit 0; fi
 if [ "$1" = "update" ]; then echo "$@" >> "${log}"; exit 0; fi
 exit 0
 `, { mode: 0o755 })

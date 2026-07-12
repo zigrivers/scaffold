@@ -73,7 +73,7 @@ corresponding epics, stories, tasks, and dependency edges in Beads.
 ## Methodology Scaling
 Structure is a function of **methodology/depth only** — read it from scaffold
 state, never probe `bd` for type availability. Both `-t story` and `-t epic` are
-usable directly on the supported `bd` (≥ v1.0.5); mvp stays flat as a deliberate
+usable directly on the supported `bd` (≥ v1.1.0); mvp stays flat as a deliberate
 *simplicity* choice, not because the type is unavailable. **Dependencies are
 materialized at every depth** (the plan is a DAG even at mvp); depth scales only
 the container hierarchy and `wave`/`risk` metadata.
@@ -160,7 +160,7 @@ started work:
 
 ## Instructions
 
-Execute the steps below in order. All `bd` commands use the verified v1.0.5
+Execute the steps below in order. All `bd` commands use the verified v1.1.0
 surface — do **not** invent flags (in particular, there is **no `bd list
 --external-ref` filter**; join by metadata keys only).
 
@@ -170,7 +170,7 @@ Compute a single shared `beads_usable` check. It is true **only** when *all* of:
 
 1. `.beads/` exists.
 2. `bd` is on PATH (`command -v bd`).
-3. `bd version` parses to **≥ 1.0.5**, using a **macOS/BSD-portable** numeric
+3. `bd version` parses to **≥ 1.1.0**, using a **macOS/BSD-portable** numeric
    compare (do **not** depend on GNU `sort -V`). Split major/minor/patch and
    compare numerically.
 4. `jq` is on PATH (`command -v jq`).
@@ -180,19 +180,17 @@ beads_usable() {
   [ -d .beads ] || return 1
   command -v bd >/dev/null 2>&1 || return 1
   command -v jq >/dev/null 2>&1 || return 1
-  # Portable >= 1.0.5 compare — no `sort -V` (absent on macOS/BSD).
+  # Portable >= 1.1.0 compare — no `sort -V` (absent on macOS/BSD).
   local ver have_major have_minor have_patch
   ver=$(bd version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
   [ -n "$ver" ] || return 1
   IFS=. read -r have_major have_minor have_patch <<EOF
 $ver
 EOF
-  # Compare against floor 1.0.5
+  # Compare against floor 1.1.0
   if [ "$have_major" -gt 1 ]; then return 0; fi
   if [ "$have_major" -lt 1 ]; then return 1; fi
-  if [ "$have_minor" -gt 0 ]; then return 0; fi
-  if [ "$have_minor" -lt 0 ]; then return 1; fi
-  [ "$have_patch" -ge 5 ]
+  [ "$have_minor" -ge 1 ]
 }
 ```
 
@@ -209,7 +207,7 @@ there is no Beads state to diverge from:
 - **`.beads/` present but `bd`/`jq` missing or too old** (`beads_usable` false)
   → **FAIL CLOSED.** Do **not** markdown-fallback — the tracker may already hold
   execution state (claimed/closed tasks) and the markdown loop would re-run
-  completed work. Stop and tell the user to install/upgrade `bd` (≥ v1.0.5) and
+  completed work. Stop and tell the user to install/upgrade `bd` (≥ v1.1.0) and
   `jq`.
 
 Once `beads_usable` is true, resolve **methodology/depth** from scaffold state
