@@ -152,19 +152,24 @@ Docs updated in-PR: <paths - or "none needed: <why>">
 Beads filed (open): <id - one-line title - or none>
 ```
 
-Before reporting, refresh the durability net (feature-detect; skip silently
-when the target is absent): `make beads-snapshot`, then COMMIT the refreshed
-restore copy so it is durable (uncommitted, it is stranded locally and a later
-reset destroys it). Stage it, and commit only when it actually changed — don't
-mask a real commit failure behind `|| true`:
+Before reporting, make the batch durable and refresh the restore net
+(feature-detect; skip silently when unavailable):
 
-```bash
-git add .beads/issues.jsonl
-git diff --cached --quiet -- .beads/issues.jsonl \
-  || git commit -m "chore(beads): refresh restore snapshot"
-```
+1. **Push the beads off-machine — this is the real durability:**
+   `bd dolt commit && bd dolt push`. The Dolt remote (not a local git commit) is
+   what survives a lost machine or a reset.
+2. `make beads-snapshot` — refresh the `.beads/issues.jsonl` restore copy and
+   sync the `bd backup` full-history copy.
+3. Keep the working tree clean by committing the refreshed restore copy — commit
+   only when it actually changed, and don't mask a real failure behind `|| true`
+   (this is tree-hygiene; step 1's push is the off-machine durability):
+   ```bash
+   git add .beads/issues.jsonl
+   git diff --cached --quiet -- .beads/issues.jsonl \
+     || git commit -m "chore(beads): refresh restore snapshot"
+   ```
 
-One batch-end snapshot covers every bead closed above.
+One batch-end pass covers every bead closed above.
 
 If the batch ran long and `launchpad` is installed: `launchpad notify "<summary>"`.
 

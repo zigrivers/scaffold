@@ -351,6 +351,30 @@ EOF
     [ "$status" -eq 0 ]
 }
 
+@test "bd-guard: cd-tracking is SOUND — never allows a bootstrap that runs in the populated cwd" {
+    # From a populated cwd, tricks that really return to (or never leave) it must
+    # stay blocked: `cd -`, and a cd scoped inside a command substitution.
+    mkdir -p "$CLONE_DIR/.beads/embeddeddolt" "$CLONE_DIR/fresh5"
+    run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check 'cd $CLONE_DIR/fresh5 && cd - && bd bootstrap'"
+    [ "$status" -eq 2 ]
+    run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check 'x=\$(cd $CLONE_DIR/fresh5 && pwd); bd bootstrap'"
+    [ "$status" -eq 2 ]
+}
+
+@test "bd-guard: rm/dolt against a sibling .beads is judged against that path's directory" {
+    rm -rf "$CLONE_DIR/.beads"
+    mkdir -p "$CLONE_DIR/pop6/.beads/embeddeddolt" "$CLONE_DIR/here6" "$CLONE_DIR/fresh6"
+    # absolute sibling that is populated → blocked even from an unpopulated cwd
+    run bash -c "cd '$CLONE_DIR/here6' && '$CLONE_DIR/scripts/bd-guard.sh' --check 'rm -rf $CLONE_DIR/pop6/.beads'"
+    [ "$status" -eq 2 ]
+    # relative sibling path → unresolvable → conservatively blocked
+    run bash -c "cd '$CLONE_DIR/here6' && '$CLONE_DIR/scripts/bd-guard.sh' --check 'rm -rf ../pop6/.beads'"
+    [ "$status" -eq 2 ]
+    # absolute EMPTY target → allowed
+    run bash -c "cd '$CLONE_DIR/here6' && '$CLONE_DIR/scripts/bd-guard.sh' --check 'rm -rf $CLONE_DIR/fresh6/.beads'"
+    [ "$status" -eq 0 ]
+}
+
 @test "bd-guard: judges bd -C <dir> against the TARGET checkout, not just cwd" {
     # cwd has NO populated DB; the -C target does — the destructive command must
     # still be blocked (and a bare bootstrap from the empty cwd stays allowed).
@@ -383,7 +407,7 @@ EOF
 
 @test "bd-guard: blocks common wrapper/grouping forms (sudo, time, subshell, braces)" {
     mkdir -p "$CLONE_DIR/.beads/embeddeddolt"
-    for c in 'sudo bd bootstrap' 'time bd bootstrap' '(bd bootstrap)' '{ bd bootstrap; }' 'sudo rm -rf .beads'; do
+    for c in 'sudo bd bootstrap' 'time bd bootstrap' '(bd bootstrap)' '{ bd bootstrap; }' 'sudo rm -rf .beads' 'BEADS_ACTOR=me sudo bd bootstrap' 'sudo BEADS_ACTOR=me bd bootstrap'; do
         run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check '$c'"
         [ "$status" -eq 2 ] || { echo "not blocked: $c"; false; }
     done

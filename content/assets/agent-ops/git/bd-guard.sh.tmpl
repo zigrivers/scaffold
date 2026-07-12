@@ -59,18 +59,17 @@ db_populated() {
 	compgen -G "$base/.beads/*.db" >/dev/null 2>&1
 }
 
-# Resolve a directory token to a concrete path, or "?" when it depends on shell
-# expansion we cannot evaluate (a variable, tilde, glob, or a quoted value masked
-# to the placeholder). "?" is treated as populated — a destructive command aimed
-# at a checkout we can't prove empty is exactly the accident to prevent (the
-# deliberate case uses BEADS_DESTRUCTIVE_OK=1).
-resolve_dir() {
-	local raw="$1" base="$2"
-	case "$raw" in
-		'' | _Q_ | *'$'* | *'`'* | *'~'* | *'*'*) printf '?' ;;
-		/*) printf '%s' "$raw" ;;
-		*) printf '%s/%s' "${base%/}" "$raw" ;;
-	esac
+# Block if ANY candidate directory holds a populated DB, or is "?" — a target we
+# cannot resolve (a variable, tilde, glob, masked quote, or an untrustworthy cwd),
+# which a destructive command must not be allowed to aim at unproven-empty.
+any_risky() {
+	local d
+	for d in "$@"; do
+		[ -z "$d" ] && continue
+		if [ "$d" = "?" ]; then return 0; fi
+		if db_populated "$d"; then return 0; fi
+	done
+	return 1
 }
 
 # Destructive-command patterns, anchored to the START of each command segment,
@@ -82,14 +81,14 @@ resolve_dir() {
 # bootstrap` is caught; `.beads` is anchored so `.beads-backups` is not a false
 # positive.
 #
-# KNOWN, ACCEPTED limit (this is an accident net, not a security boundary; see the
-# header): a destructive command hidden inside a command substitution that is
-# itself INSIDE double quotes (`echo "$(bd bootstrap)"`) is masked away and not
-# caught. Running bootstrap that way is deliberate, not an accident; the layered
-# durability defenses (push-before-reset, the committed JSONL restore copy, the
-# `bd backup` full-history copy, and bd's own destroy-token refusals) are the real
-# guarantee.
-start='^((sudo|time|command|env|nice|nohup)[[:space:]]+)*([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)*([^[:space:]]*/)?'
+# KNOWN, ACCEPTED limits (this is an accident net, not a security boundary; see
+# the header): a destructive command whose target is hidden inside DOUBLE QUOTES —
+# a nested command substitution (`echo "$(bd bootstrap)"`) or a quoted `.beads`
+# path (`rm -rf "/x/.beads"`) — is masked away and not caught. Doing either is
+# deliberate, not an accident. The layered durability defenses (push-before-reset,
+# the committed JSONL restore copy, the `bd backup` full-history copy, and bd's own
+# destroy-token refusals) are the real guarantee.
+start='^((sudo|time|command|env|nice|nohup)[[:space:]]+|[A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)*([^[:space:]]*/)?'
 opt='([[:space:]]+-[A-Za-z-]+(=[^[:space:]]*)?([[:space:]]+[^-[:space:]][^[:space:]]*)?)*'
 dangerous="${start}bd${opt}[[:space:]]+bootstrap([[:space:]|;&]|\$)"
 dangerous="${dangerous}|${start}bd${opt}[[:space:]]+init[^;&|]*--(force|reinit-local|discard-remote|destroy-token)"
@@ -100,20 +99,30 @@ dangerous="${dangerous}|${start}dolt[[:space:]][^;&|]*\.beads([[:space:]/|;&]|\$
 # Split into simple-command segments: ; & | and newlines, plus the ( ) { } and
 # backtick that introduce subshells, brace groups, and command substitutions —
 # all safe to split on now that quoted literals are masked, so `(bd bootstrap)`,
-# `{ bd bootstrap; }`, and a bare `$(bd bootstrap)` expose their inner command as
-# its own segment. Track a static leading `cd <dir>` so a later destructive
-# command is judged against the directory it will actually run in.
+# `{ bd bootstrap; }`, and a bare `$(bd bootstrap)` expose their inner command.
+#
+# Track a leading `cd <dir>` only when it is a TRUSTWORTHY ABSOLUTE path — a real
+# shell's cwd is also moved by `cd -`, relative targets, and cd's scoped inside
+# subshells/command-substitutions that this flat split cannot model, so anything
+# else makes the chain cwd UNKNOWN ("?"). A non-`-C` destructive command is ALWAYS
+# judged against the real hook cwd (".") too, so cd-tracking can only ever ADD
+# blocking — never make the guard less safe than checking the cwd directly.
 cdre='^cd[[:space:]]+([^[:space:]]+)'
 c_re='(-C|--directory)(=|[[:space:]]+)([^[:space:]]+)'
+rmdolt='(^|[^[:alnum:]_.-])(rm|dolt)[[:space:]]'
+bpath='([^[:space:]]*)\.beads'
 segments=$(printf '%s' "$mcmd" | tr ';&|(){}\140\n' '\n\n\n\n\n\n\n\n\n')
 blocked=0
-cwd="."
+chain="."
 while IFS= read -r seg; do
 	seg="${seg#"${seg%%[![:space:]]*}"}"   # strip leading whitespace
 	[ -n "$seg" ] || continue
-	# Track a static leading `cd <dir>` (masked-quote / variable targets → "?").
+	# Track a static leading `cd <dir>` (absolute → trust it; else cwd unknown).
 	if [[ "$seg" =~ $cdre ]]; then
-		cwd="$(resolve_dir "${BASH_REMATCH[1]}" "$cwd")"
+		case "${BASH_REMATCH[1]}" in
+			/*) chain="${BASH_REMATCH[1]}" ;;
+			*) chain="?" ;;
+		esac
 		continue
 	fi
 	# Inline deliberate override authorizes ONLY this command.
@@ -122,16 +131,28 @@ while IFS= read -r seg; do
 	esac
 	# Not a destructive command → move on.
 	printf '%s' "$seg" | grep -qE "$dangerous" || continue
-	# Destructive: judge the effective target. `bd -C <dir>` retargets THIS
-	# segment; otherwise it runs in the chain's current cwd.
-	tdir="$cwd"
+	# `bd -C <dir>` is an explicit, unambiguous retarget — judge it ALONE
+	# (absolute → that dir; anything else, incl. relative/masked/variable → "?").
 	if [[ "$seg" =~ $c_re ]]; then
-		tdir="$(resolve_dir "${BASH_REMATCH[3]}" "$cwd")"
+		case "${BASH_REMATCH[3]}" in
+			/*) if any_risky "${BASH_REMATCH[3]}"; then blocked=1; break; fi ;;
+			*) blocked=1; break ;;
+		esac
+		continue
 	fi
-	if [ "$tdir" = "?" ] || db_populated "$tdir"; then
-		blocked=1
-		break
+	# Otherwise judge the real cwd "." AND the chain cwd; for rm/dolt also the
+	# directory holding the named `.beads` (absolute → that dir; relative → "?").
+	dirs=(".")
+	if [ "$chain" != "." ]; then dirs+=("$chain"); fi
+	if printf '%s' "$seg" | grep -qE "$rmdolt" && [[ "$seg" =~ $bpath ]]; then
+		d="${BASH_REMATCH[1]%/}"
+		case "$d" in
+			'' | .) ;;
+			/*) dirs+=("$d") ;;
+			*) dirs+=("?") ;;
+		esac
 	fi
+	if any_risky "${dirs[@]}"; then blocked=1; break; fi
 done <<< "$segments"
 
 if [ "$blocked" = "1" ]; then
