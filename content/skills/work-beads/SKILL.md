@@ -111,9 +111,14 @@ merge on a red gate. Never `docker system prune`.
   end the batch.
 - 3+ agents active? Serialize the merge: `bd merge-slot acquire --wait` (if
   the project's Beads has merge-slots), release after merging.
+- Tear down your worktree's staging stack FIRST, from **inside the worktree**
+  (there it targets your per-worktree stack): `make staging-down`. Never run it
+  from the primary for a worktree stack — from the primary it selects the shared
+  QA stack and `down -v` would wipe that shared stack and its volumes.
 - Merge: `gh pr merge <N> --squash --delete-branch`. Then from the primary:
-  `make main-sync && make prune-merged`, and `make staging-down` for this
-  worktree's stack.
+  `make main-sync && make prune-merged` — `prune-merged` also reclaims any
+  leftover worktree staging stack automatically (no separate `staging-down`
+  needed post-merge, and running it from the primary would be wrong anyway).
 
 **2.8 Close out** (from the primary): `bd close <id>` — only now, with the
 merge verified. Noticed a repo-file fix after merging? Micro follow-up PR;
@@ -140,7 +145,7 @@ If the batch ran long and `launchpad` is installed: `launchpad notify "<summary>
 | Leave a TODO/FIXME comment | That work is a bead, filed now |
 | Merge with a red `make check` or Docker gate | Fix or file; never merge red |
 | Chase a clean review past round 3 | Degraded-pass self-merge is the documented path |
-| Leave the staging stack running after merge | `make staging-down`, always |
+| Leave the staging stack running | `make staging-down` from the worktree BEFORE merging (never from the primary; `prune-merged` reclaims it too) |
 | `--no-verify`, plain `--force`, merge commits | Forbidden; `--force-with-lease` after rebase only |
 | Close the bead when the PR opens | Close only after MERGED + verified |
 | Prose summary instead of the Step 3 slots | The slots are the report format |

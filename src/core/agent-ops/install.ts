@@ -188,10 +188,16 @@ export function installAgentOps(projectRoot: string, opts: AgentOpsInstallOption
     }
   }
 
-  manifest.version = getPackageVersion()
+  // Always persist the hashes of files that DID install (so a re-run can detect
+  // and re-resolve them). But only advance the recorded version + the version
+  // marker on a fully clean install: if any file failed (missing template, write
+  // error), leaving the version stale is what makes checkAgentOps report the kit
+  // as not-up-to-date instead of masking the partial failure behind a current marker.
   fs.mkdirSync(path.join(projectRoot, '.scaffold'), { recursive: true })
+  const clean = result.errors.length === 0
+  if (clean) manifest.version = getPackageVersion()
   fs.writeFileSync(path.join(projectRoot, MANIFEST_PATH), `${JSON.stringify(manifest, null, 2)}\n`)
-  fs.writeFileSync(path.join(projectRoot, VERSION_MARKER_PATH), manifest.version)
+  if (clean) fs.writeFileSync(path.join(projectRoot, VERSION_MARKER_PATH), manifest.version)
   // The make fragment (and thus the include) is component-agnostic — ensure the
   // Makefile wires it in for any requested component, not just 'git'. Staging
   // targets self-guard; git targets fail loudly if their scripts are absent.

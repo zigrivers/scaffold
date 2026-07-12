@@ -52,7 +52,10 @@ main_wt="$(git worktree list --porcelain | awk '
   /^branch refs\/heads\/main$/{ print wt }')"
 primary_branch="$(git -C "$primary" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
 # Shared repo config path — consumed by the identity check AND its --fix repair below.
-common_dir="$(git -C "$primary" rev-parse --path-format=absolute --git-common-dir)"
+# Resolve without `--path-format=absolute` (git >= 2.31 only): a relative --git-common-dir is
+# relative to $primary, which is already absolute, so prefixing it yields a portable absolute path.
+common_dir="$(git -C "$primary" rev-parse --git-common-dir)"
+case "$common_dir" in /*) : ;; *) common_dir="$primary/$common_dir" ;; esac
 
 log "Primary-checkout doctor — $primary"
 

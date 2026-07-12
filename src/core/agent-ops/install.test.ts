@@ -151,6 +151,29 @@ describe('installAgentOps / checkAgentOps', () => {
     expect(res.errors.some(e => e.includes('agent-ops.mk'))).toBe(true)
   })
 
+  it('does not advance the version marker on a partial (errored) install', () => {
+    // A template root missing some git sources → the install has errors.
+    const partialRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'agentops-partial-'))
+    seedTemplates(partialRoot, ['git/setup-agent-worktree.sh.tmpl'])
+    const res = installAgentOps(projectRoot, { components: ['git'], templateRoot: partialRoot })
+    expect(res.errors.length).toBeGreaterThan(0)
+    // The successfully-installed file IS recorded in the manifest…
+    const manifest = JSON.parse(
+      fs.readFileSync(path.join(projectRoot, '.scaffold', 'agent-ops-manifest.json'), 'utf8'),
+    )
+    expect(manifest.files['scripts/setup-agent-worktree.sh']).toMatch(/^[0-9a-f]{64}$/)
+    // …but the version marker is NOT advanced, so a failed install never looks up-to-date.
+    expect(fs.existsSync(path.join(projectRoot, '.scaffold', 'agent-ops-version'))).toBe(false)
+    const check = checkAgentOps(projectRoot)
+    expect(check.staleVersion).toBe(true)
+    expect(check.upToDate).toBe(false)
+    // A subsequent CLEAN install (all sources present) recovers and advances the marker.
+    const ok = installAgentOps(projectRoot, { components: ['git'], templateRoot })
+    expect(ok.errors).toEqual([])
+    expect(fs.existsSync(path.join(projectRoot, '.scaffold', 'agent-ops-version'))).toBe(true)
+    expect(checkAgentOps(projectRoot).upToDate).toBe(true)
+  })
+
   it('reports pre-existing files as unmanaged (informational) when they exist on disk', () => {
     // Pre-create a git-owned dest as a user file, then install git: the installer
     // refuses to clobber it, so it never enters the manifest.

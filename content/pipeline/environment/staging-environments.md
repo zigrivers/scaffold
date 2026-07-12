@@ -97,13 +97,28 @@ compose's conventional default network). Every data-store service
 (postgres, mysql, mongo, redis) gets a `healthcheck:` — app services wait on
 `condition: service_healthy` rather than a fixed sleep.
 
+### Create the local staging env file
+The installer ships only `ops/compose/staging.env.example` (tracked). Create the
+git-ignored, machine-local `ops/compose/staging.env` from it during setup so the
+non-derived, port-bearing values (CORS origins, callback URLs) exist for
+`make staging-up`:
+```
+cp ops/compose/staging.env.example ops/compose/staging.env   # then edit as needed
+```
+`make staging-up`/`staging-down` add `--env-file ops/compose/staging.env` only
+when that file exists, so a fresh clone that hasn't created it yet still comes up
+(just without the extra overrides). Add `ops/compose/staging.env` to `.gitignore`
+— never commit it.
+
 ### Document
 Append a "Per-worktree staging" section to docs/dev-setup.md covering: the
 Docker engine pin (`docker-env.sh` — `orbstack` on macOS, `default`
-elsewhere); `make staging-up` runs **from a worktree only**, never from the
-primary checkout; `make staging-down` when a session ends; `make
-staging-prune` / the `--reap` flag on staging-teardown.sh for orphaned
-stacks whose worktree no longer exists; `make docker-doctor` for engine
+elsewhere); creating the git-ignored `ops/compose/staging.env` from
+`staging.env.example` before first use; `make staging-up` runs **from a worktree
+only**, never from the primary checkout; `make staging-down` from the worktree
+before you merge (never from the primary — there it targets the shared QA
+stack); `make staging-prune` / the `--reap` flag on staging-teardown.sh for
+orphaned stacks whose worktree no longer exists; `make docker-doctor` for engine
 split-brain and port contention; `make tc-reap` for leaked testcontainers;
 and the standing rule that agents must never run `docker system prune` (it
 takes down every other agent's stack, not just their own).

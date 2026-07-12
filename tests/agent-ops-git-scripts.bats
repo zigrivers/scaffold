@@ -40,13 +40,29 @@ EOF
 
 teardown() { rm -rf "$ORIG_DIR" "$CLONE_DIR"; }
 
-@test "setup: creates .worktrees/<name> on branch agent/<name> and gitignores .worktrees" {
+@test "setup: creates .worktrees/<name> on branch agent/<name> and excludes .worktrees repo-locally" {
     run bash -c "cd '$CLONE_DIR' && scripts/setup-agent-worktree.sh alpha"
     [ "$status" -eq 0 ]
     [ -d "$CLONE_DIR/.worktrees/alpha" ]
     run git -C "$CLONE_DIR/.worktrees/alpha" branch --show-current
     [ "$output" = "agent/alpha" ]
-    grep -q '\.worktrees' "$CLONE_DIR/.gitignore"
+    # F5: the exclusion lands in the repo-local .git/info/exclude, NOT the tracked
+    # .gitignore — so the shared primary checkout is never dirtied by a tracked-file change.
+    grep -q '\.worktrees' "$CLONE_DIR/.git/info/exclude"
+    [ ! -f "$CLONE_DIR/.gitignore" ] || ! grep -q '\.worktrees' "$CLONE_DIR/.gitignore"
+    # git genuinely ignores the directory.
+    run git -C "$CLONE_DIR" check-ignore -q .worktrees/
+    [ "$status" -eq 0 ]
+}
+
+@test "setup: skips the exclude write when .worktrees is already committed to .gitignore" {
+    printf '.worktrees/\n' > "$CLONE_DIR/.gitignore"
+    git -C "$CLONE_DIR" add .gitignore
+    git -C "$CLONE_DIR" commit -q -m "ignore worktrees"
+    run bash -c "cd '$CLONE_DIR' && scripts/setup-agent-worktree.sh alpha"
+    [ "$status" -eq 0 ]
+    # Already ignored via the committed .gitignore → info/exclude is not touched.
+    [ ! -f "$CLONE_DIR/.git/info/exclude" ] || ! grep -q '\.worktrees' "$CLONE_DIR/.git/info/exclude"
 }
 
 @test "setup: sets per-worktree agent identity with project domain" {
@@ -59,6 +75,30 @@ teardown() { rm -rf "$ORIG_DIR" "$CLONE_DIR"; }
     bash -c "cd '$CLONE_DIR' && scripts/setup-agent-worktree.sh alpha"
     run bash -c "cd '$CLONE_DIR' && scripts/setup-agent-worktree.sh alpha"
     [ "$status" -eq 0 ]
+}
+
+@test "setup: branches off the remote's default branch when it is not 'main' (F7)" {
+    # A repo whose default branch is 'trunk' — hardcoding origin/main would make
+    # `git worktree add` fail. Prove creation resolves origin/HEAD dynamically.
+    local o="$RESOLVED_TMPDIR/orig-trunk-$$" c="$RESOLVED_TMPDIR/proj-trunk-$$"
+    git init --bare --quiet --initial-branch=trunk "$o"
+    git clone --quiet "$o" "$c"
+    git -C "$c" config user.email t@t.com
+    git -C "$c" config user.name T
+    git -C "$c" commit --allow-empty -m initial --quiet
+    git -C "$c" push --quiet origin trunk 2>/dev/null
+    git -C "$c" remote set-head origin trunk
+    mkdir -p "$c/scripts"
+    for t in "$TEMPLATES"/*.sh.tmpl; do
+        resolve_agent_ops_template "$t" "$c/scripts/$(basename "$t" .tmpl)"
+    done
+    run env PATH="$CLONE_DIR/stubs:$PATH" bash -c "cd '$c' && scripts/setup-agent-worktree.sh beta"
+    [ "$status" -eq 0 ]
+    [ -d "$c/.worktrees/beta" ]
+    [ "$(git -C "$c/.worktrees/beta" branch --show-current)" = "agent/beta" ]
+    # The worktree is based on origin/trunk (same tip), not a nonexistent origin/main.
+    [ "$(git -C "$c/.worktrees/beta" rev-parse HEAD)" = "$(git -C "$c" rev-parse origin/trunk)" ]
+    rm -rf "$o" "$c"
 }
 
 @test "setup: --preflight-only reports overlap against in-flight PR titles" {

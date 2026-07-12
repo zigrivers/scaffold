@@ -59,7 +59,7 @@ if is_primary_checkout || [ "${STAGING_COMPOSE_PROJECT:-}" = "$PROJECT_NAME" ]; 
     export COMPOSE_PROJECT_NAME="$PROJECT_NAME"
     for svc in $SERVICES; do
         shared_var="SHARED_$(_svc_var_suffix "$svc")"
-        port_var="PORT_$(echo "$svc" | tr '[:lower:]-' '[:upper:]_')"
+        port_var="PORT_$(echo "$svc" | tr '[:lower:]' '[:upper:]' | tr -- '-' '_')"
         # A service that isn't in shared_stack has no SHARED_ port. Warn and skip
         # its export rather than failing the whole source (spec §4.3: never fail).
         if [ -z "${!shared_var:-}" ]; then
@@ -74,7 +74,7 @@ else
     export COMPOSE_PROJECT_NAME="${PROJECT_NAME}-wt-${_cksum_val}"
     for svc in $SERVICES; do
         band_var="BAND_$(_svc_var_suffix "$svc")"
-        port_var="PORT_$(echo "$svc" | tr '[:lower:]-' '[:upper:]_')"
+        port_var="PORT_$(echo "$svc" | tr '[:lower:]' '[:upper:]' | tr -- '-' '_')"
         export "$port_var"="$(( ${!band_var} + STAGING_OFFSET ))"
     done
     export STAGING_SUBNET="10.${STAGING_OFFSET}.0.0/16"
@@ -96,7 +96,7 @@ _staging_env_check_envfile() {
         for svc in $SERVICES; do
             band_var="BAND_$(_svc_var_suffix "$svc")"
             shared_var="SHARED_$(_svc_var_suffix "$svc")"
-            port_var="PORT_$(echo "$svc" | tr '[:lower:]-' '[:upper:]_')"
+            port_var="PORT_$(echo "$svc" | tr '[:lower:]' '[:upper:]' | tr -- '-' '_')"
             band="${!band_var:-}"
             shared="${!shared_var:-}"
             resolved="${!port_var:-}"

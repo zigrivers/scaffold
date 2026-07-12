@@ -23,13 +23,18 @@ define staging_guard
 	@test -f scripts/ops/staging-env.sh || { echo "staging component not installed (run: scaffold agent-ops install --component staging)"; exit 1; }
 endef
 
+# docker-env.sh PRINTS an `export DOCKER_CONTEXT=…` line for `eval` (its canonical mode —
+# see the script header); it is NOT a sourceable exporter, so `eval "$(…)"` is required to
+# actually pin the engine. --env-file is added only when ops/compose/staging.env exists
+# (fresh projects ship only staging.env.example), so the first staging-up never fails on a
+# missing file.
 staging-up: ## [agent-safe, worktree-only] Start this worktree's staging stack
 	$(staging_guard)
-	@bash -c 'source scripts/ops/docker-env.sh && source scripts/ops/staging-env.sh && docker compose -f ops/compose/staging.yml --env-file ops/compose/staging.env up -d'
+	@bash -c 'eval "$$(bash scripts/ops/docker-env.sh)" && source scripts/ops/staging-env.sh && { env_file=""; if [ -f ops/compose/staging.env ]; then env_file="--env-file ops/compose/staging.env"; fi; docker compose -f ops/compose/staging.yml $$env_file up -d; }'
 
 staging-down: ## [agent-safe] Stop this worktree's staging stack
 	$(staging_guard)
-	@bash -c 'source scripts/ops/docker-env.sh && source scripts/ops/staging-env.sh && docker compose -f ops/compose/staging.yml --env-file ops/compose/staging.env down -v'
+	@bash -c 'eval "$$(bash scripts/ops/docker-env.sh)" && source scripts/ops/staging-env.sh && { env_file=""; if [ -f ops/compose/staging.env ]; then env_file="--env-file ops/compose/staging.env"; fi; docker compose -f ops/compose/staging.yml $$env_file down -v; }'
 
 staging-prune: ## [agent-safe] Reap orphaned per-worktree staging stacks
 	$(staging_guard)

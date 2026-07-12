@@ -379,18 +379,26 @@ configure_identity() {
   log "Set worktree-local git identity: agent-$name_val <agent-$name_val@{{PROJECT_NAME}}.local>"
 }
 
-# Ensure `.worktrees/` is gitignored so a project-local worktree checkout is never
-# accidentally committed. Idempotent — the rule is added at most once.
+# Ensure `.worktrees/` is ignored so a project-local worktree checkout is never accidentally
+# committed. Idempotent — the rule is added at most once.
+#
+# The exclusion goes in the repo-local `.git/info/exclude` (never tracked, never shows as a
+# working-tree change) rather than the tracked `.gitignore`: the primary checkout is shared and
+# treated read-only, so appending to its `.gitignore` would dirty it outside any agent's PR and
+# trip doctor/clean-state checks. `git check-ignore` reads `.gitignore` FIRST, so a project that
+# already committed `.worktrees/` to `.gitignore` (git-workflow step 8 recommends this) is
+# detected and skipped silently — no duplicate exclude entry.
 ensure_worktrees_gitignored() {
   # Use the trailing-slash directory pattern in the check so `git check-ignore` matches
-  # the directory even before its contents exist.
+  # the directory even before its contents exist (this consults .gitignore AND info/exclude).
   if ! git -C "$REPO_ROOT" check-ignore -q .worktrees/ 2>/dev/null; then
-    local gitignore_file="$REPO_ROOT/.gitignore"
-    if [ -f "$gitignore_file" ] && [ -s "$gitignore_file" ] && [ "$(tail -c1 "$gitignore_file")" != "" ]; then
-      printf '\n' >> "$gitignore_file"
+    local exclude_file="$COMMON_DIR/info/exclude"
+    mkdir -p "$(dirname "$exclude_file")"
+    if [ -f "$exclude_file" ] && [ -s "$exclude_file" ] && [ "$(tail -c1 "$exclude_file")" != "" ]; then
+      printf '\n' >> "$exclude_file"
     fi
-    printf '# Git worktrees ({{PROJECT_NAME}} parallel agents)\n.worktrees/\n' >> "$gitignore_file"
-    log "Added .worktrees/ to $gitignore_file"
+    printf '# Git worktrees ({{PROJECT_NAME}} parallel agents)\n.worktrees/\n' >> "$exclude_file"
+    log "Ignored .worktrees/ via $exclude_file (repo-local, uncommitted). To share it, commit '.worktrees/' to .gitignore."
   fi
 }
 
@@ -442,6 +450,15 @@ run_dependency_installs() {
   ) || fatal "worktree setup commands failed in $wt — re-run manually, then proceed."
 }
 
+# Resolve the remote's default branch NAME (bare, e.g. "main"), falling back to "main" when
+# origin/HEAD is unset. New worktrees branch off `origin/<default>`, so hardcoding `origin/main`
+# would fail `git worktree add` on a repo whose default is `master`/`trunk`/etc.
+resolve_default_branch() {
+  local d
+  d="$(git symbolic-ref refs/remotes/origin/HEAD --short 2>/dev/null | sed 's@^origin/@@')"
+  printf '%s' "${d:-main}"
+}
+
 cmd_create() {
   local name="$1" task="$2" install="${3:-0}"
   [[ -n "$name" ]] || fatal "name is required"
@@ -472,7 +489,7 @@ cmd_create() {
   if [[ -d "$wt" ]]; then
     log "Worktree $wt already exists — refreshing branch tracking."
     local default_branch existing_upstream
-    default_branch="$(git symbolic-ref refs/remotes/origin/HEAD --short 2>/dev/null || echo "origin/main")"
+    default_branch="origin/$(resolve_default_branch)"
     existing_upstream="$(git -C "$wt" config "branch.$branch.merge" 2>/dev/null || true)"
     if ! git -C "$wt" fetch origin 2>/dev/null; then
       warn "Could not fetch from remote repository. Tracking branch refresh might be outdated."
@@ -496,9 +513,11 @@ cmd_create() {
     log "Branch $branch exists; creating worktree at $wt."
     git worktree add "$wt" "$branch"
   else
-    log "Creating branch $branch and worktree at $wt (off origin/main)."
+    local default_branch
+    default_branch="$(resolve_default_branch)"
+    log "Creating branch $branch and worktree at $wt (off origin/$default_branch)."
     git fetch origin
-    git worktree add -b "$branch" "$wt" "origin/main"
+    git worktree add -b "$branch" "$wt" "origin/$default_branch"
   fi
 
   # Set per-worktree git identity so blame is meaningful.

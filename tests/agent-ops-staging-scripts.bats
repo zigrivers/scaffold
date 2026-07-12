@@ -85,6 +85,61 @@ env_var_at() { bash -c "cd '$1' && source scripts/ops/staging-env.sh && echo \${
     [[ "$output" == *primary* ]]
 }
 
+@test "docker-env pins DOCKER_CONTEXT via eval, not sourcing (F2)" {
+    resolve_agent_ops_template "$TEMPLATES/docker-env.sh.tmpl" "$REPO/scripts/ops/docker-env.sh"
+    mkdir -p "$REPO/stubs"
+    cat > "$REPO/stubs/docker" <<'EOF'
+#!/usr/bin/env bash
+# `docker context inspect <ctx>` succeeds so docker-env pins the context.
+exit 0
+EOF
+    chmod +x "$REPO/stubs/docker"
+    # eval (what the make targets now do) DOES export DOCKER_CONTEXT.
+    run env -u DOCKER_CONTEXT -u DOCKER_HOST PATH="$REPO/stubs:$PATH" \
+        bash -c "cd '$REPO' && eval \"\$(bash scripts/ops/docker-env.sh)\"; echo \"CTX=\${DOCKER_CONTEXT:-unset}\""
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"CTX=default"* ]]
+    # sourcing it (the old, buggy approach) is a no-op — the script only PRINTS the export.
+    run env -u DOCKER_CONTEXT -u DOCKER_HOST PATH="$REPO/stubs:$PATH" \
+        bash -c "cd '$REPO' && source scripts/ops/docker-env.sh >/dev/null; echo \"CTX=\${DOCKER_CONTEXT:-unset}\""
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"CTX=unset"* ]]
+}
+
+@test "staging-up omits --env-file when staging.env is absent, adds it when present (F3)" {
+    resolve_agent_ops_template "$TEMPLATES/docker-env.sh.tmpl" "$REPO/scripts/ops/docker-env.sh"
+    sed 's/{{PROJECT_NAME}}/testproj/g' \
+        "$BATS_TEST_DIRNAME/../content/assets/agent-ops/make/agent-ops.mk.tmpl" \
+        > "$REPO/agent-ops.mk"
+    printf -- '-include agent-ops.mk\n' > "$REPO/Makefile"
+    mkdir -p "$REPO/ops/compose" "$REPO/stubs"
+    : > "$REPO/ops/compose/staging.yml"
+    cat > "$REPO/stubs/docker" <<'EOF'
+#!/usr/bin/env bash
+# record compose invocations; succeed for everything (incl. context inspect)
+[[ "$1" == "compose" ]] && echo "$*" >> "${DOCKER_CALLS:?}"
+exit 0
+EOF
+    chmod +x "$REPO/stubs/docker"
+    export DOCKER_CALLS="$REPO/docker-calls.log"
+
+    # Fresh project: no ops/compose/staging.env yet → recipe must NOT pass --env-file.
+    : > "$DOCKER_CALLS"
+    run env -u DOCKER_CONTEXT -u DOCKER_HOST PATH="$REPO/stubs:$PATH" make -C "$REPO" staging-up
+    [ "$status" -eq 0 ]
+    run cat "$DOCKER_CALLS"
+    [[ "$output" == *"compose -f ops/compose/staging.yml up -d"* ]]
+    [[ "$output" != *"--env-file"* ]]
+
+    # After the local env file is created → the recipe includes --env-file.
+    : > "$DOCKER_CALLS"
+    printf 'FOO=bar\n' > "$REPO/ops/compose/staging.env"
+    run env -u DOCKER_CONTEXT -u DOCKER_HOST PATH="$REPO/stubs:$PATH" make -C "$REPO" staging-up
+    [ "$status" -eq 0 ]
+    run cat "$DOCKER_CALLS"
+    [[ "$output" == *"--env-file ops/compose/staging.env"* ]]
+}
+
 @test "teardown --reap only names orphaned -wt- stacks (dry run with stubbed docker)" {
     resolve_agent_ops_template "$TEMPLATES/staging-teardown.sh.tmpl" "$REPO/scripts/ops/staging-teardown.sh"
     mkdir -p "$REPO/stubs"
