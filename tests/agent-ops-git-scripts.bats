@@ -311,14 +311,43 @@ EOF
     [ "$status" -eq 2 ]
 }
 
-@test "bd-guard: blocks bd with a global-option prefix before the destructive subcommand" {
+@test "bd-guard: a global-option prefix does not evade the destructive-subcommand match" {
     mkdir -p "$CLONE_DIR/.beads/embeddeddolt"
-    for c in 'bd -C /some/path bootstrap' 'bd --db /x/y.db init --reinit-local' 'bd --global admin reset'; do
+    # options that do NOT retarget the directory operate on the populated cwd → blocked
+    for c in 'bd --db /x/y.db init --reinit-local' 'bd --global admin reset'; do
         run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check '$c'"
         [ "$status" -eq 2 ] || { echo "not blocked: $c"; false; }
     done
+    # -C to a POPULATED target is blocked (detection survives the option prefix)
+    mkdir -p "$CLONE_DIR/pop2/.beads/embeddeddolt"
+    run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check 'bd -C $CLONE_DIR/pop2 bootstrap'"
+    [ "$status" -eq 2 ]
+    # -C to an EMPTY target retargets AWAY from the populated cwd → allowed (a safe
+    # fresh-clone bootstrap that never touches the populated checkout)
+    mkdir -p "$CLONE_DIR/fresh"
+    run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check 'bd -C $CLONE_DIR/fresh bootstrap'"
+    [ "$status" -eq 0 ]
     # a non-destructive subcommand behind global opts is still allowed
     run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check 'bd -C /some/path ready'"
+    [ "$status" -eq 0 ]
+}
+
+@test "bd-guard: closes the residual bypasses — command substitution, quoted-space -C, cd-chain" {
+    mkdir -p "$CLONE_DIR/.beads/embeddeddolt"
+    # bare command substitution exposes its inner destructive command
+    run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check '\$(bd bootstrap)'"
+    [ "$status" -eq 2 ]
+    # a -C target with spaces (masked) is treated as unresolvable → blocked
+    run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check 'bd -C \"my dir\" bootstrap'"
+    [ "$status" -eq 2 ]
+    # cd into a different POPULATED checkout from an empty cwd → judged against it
+    rm -rf "$CLONE_DIR/.beads"
+    mkdir -p "$CLONE_DIR/pop3/.beads/embeddeddolt" "$CLONE_DIR/empty4"
+    run bash -c "cd '$CLONE_DIR/empty4' && '$CLONE_DIR/scripts/bd-guard.sh' --check 'cd $CLONE_DIR/pop3 && bd bootstrap'"
+    [ "$status" -eq 2 ]
+    # …but cd into an EMPTY dir then bootstrap stays allowed (fresh clone)
+    mkdir -p "$CLONE_DIR/fresh4"
+    run bash -c "cd '$CLONE_DIR/empty4' && '$CLONE_DIR/scripts/bd-guard.sh' --check 'cd $CLONE_DIR/fresh4 && bd bootstrap'"
     [ "$status" -eq 0 ]
 }
 

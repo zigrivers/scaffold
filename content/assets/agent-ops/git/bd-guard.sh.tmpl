@@ -33,92 +33,106 @@ else
 fi
 [ -n "$cmd" ] || exit 0
 
-# Match-only normalized copy: FOLD backslash line-continuations into one logical
-# line, but KEEP bare newlines as the command separators they are (a multiline
-# block's second command must still be inspected — collapsing newlines to spaces
-# would hide it). NEVER executed — used only for matching.
-scan=$(printf '%s' "$cmd" | awk 'BEGIN{ORS=""} { if (sub(/\\$/,"")) printf "%s", $0; else print $0 "\n" }')
-
 # Deliberate, human-approved override via the REAL environment variable (applies
 # globally; the inline `BEADS_DESTRUCTIVE_OK=1 <cmd>` form is honored per-segment
 # below). Procedure documented in docs/beads-workflow.md — not here.
 if [ "${BEADS_DESTRUCTIVE_OK:-0}" = "1" ]; then exit 0; fi
 
-# Populated-DB check — guard only when there is state to lose. Judge the current
-# checkout AND, if the command retargets one with `bd -C <dir>` / `--directory
-# <dir>`, that target too (a destructive `bd -C <populated> bootstrap` run from
-# an empty cwd must still be caught).
-target=""
-if [[ "$scan" =~ (-C|--directory)(=|[[:space:]]+)([^[:space:]]+) ]]; then
-	target="${BASH_REMATCH[3]}"
-fi
+# Normalize for matching (never executed). (1) FOLD backslash line-continuations
+# into one logical line but KEEP bare newlines as the command separators they are.
+# (2) MASK quoted string literals to a bare placeholder: a destructive phrase
+# inside a bead title or commit message (`bd create "fix the bd bootstrap trap"`)
+# is text, not a command, and any grouping chars inside a quote must not create
+# spurious segments. Command substitution / grouping that is NOT inside quotes is
+# preserved and split into segments below.
+scan=$(printf '%s' "$cmd" | awk 'BEGIN{ORS=""} { if (sub(/\\$/,"")) printf "%s", $0; else print $0 "\n" }')
+mcmd=$(printf '%s' "$scan" | sed -e 's/"[^"]*"/_Q_/g' -e "s/'[^']*'/_Q_/g")
+
+# Fast path: no destructive keyword survives masking → allow without the
+# per-segment analysis (the common case — every other Bash command the hook sees).
+printf '%s' "$mcmd" | grep -qE 'bootstrap|init|admin|\.beads' || exit 0
+
 db_populated() {
 	local base="${1:-.}"
 	[ -d "$base/.beads/embeddeddolt" ] && return 0
 	[ -d "$base/.beads/dolt" ] && return 0
 	compgen -G "$base/.beads/*.db" >/dev/null 2>&1
 }
-populated=0
-db_populated "." && populated=1
-if [ -n "$target" ]; then
-	# A retarget we cannot resolve to a concrete path — a shell variable, tilde,
-	# glob, command substitution, or a quoted path whose spaces truncate the
-	# captured token — must be treated as populated: a destructive command aimed
-	# at a checkout we can't prove empty is exactly the accident to prevent (the
-	# deliberate case uses BEADS_DESTRUCTIVE_OK=1).
-	case "$target" in
-		*'$'* | *'`'* | *'~'* | *'*'* | *'"'* | *"'"*) populated=1 ;;
-		*) db_populated "$target" && populated=1 ;;
+
+# Resolve a directory token to a concrete path, or "?" when it depends on shell
+# expansion we cannot evaluate (a variable, tilde, glob, or a quoted value masked
+# to the placeholder). "?" is treated as populated — a destructive command aimed
+# at a checkout we can't prove empty is exactly the accident to prevent (the
+# deliberate case uses BEADS_DESTRUCTIVE_OK=1).
+resolve_dir() {
+	local raw="$1" base="$2"
+	case "$raw" in
+		'' | _Q_ | *'$'* | *'`'* | *'~'* | *'*'*) printf '?' ;;
+		/*) printf '%s' "$raw" ;;
+		*) printf '%s/%s' "${base%/}" "$raw" ;;
 	esac
-fi
-[ "$populated" = "1" ] || exit 0
+}
 
-# The destructive token must be the COMMAND the segment RUNS, not a word that
-# merely appears inside it — otherwise `bd create "fix the bd bootstrap trap"` or
-# `git commit -m "explain bd bootstrap"` (pervasive in Beads projects) would be
-# blocked. So each pattern is anchored to the START of the (already
-# whitespace-stripped) segment, permitting only: an optional subshell/brace
-# opener, a bounded set of leading wrapper keywords (sudo/time/…), leading
-# VAR=value env-assignments, and an optional path prefix before the binary. `opt`
-# permits global option tokens (e.g. `-C <dir>`, `--db <path>`) between `bd` and
-# its subcommand so `bd -C /x bootstrap` is caught; the path prefix catches
-# `/opt/homebrew/bin/bd`; `.beads` is anchored to a real boundary so
-# `.beads-backups` is not a false positive.
+# Destructive-command patterns, anchored to the START of each command segment,
+# permitting only a bounded set of leading wrapper keywords (sudo/time/…), leading
+# VAR=value env-assignments, and an optional path prefix before the binary — so a
+# destructive command NAME inside an argument is never matched, and a path-
+# qualified binary (`/opt/homebrew/bin/bd`) is. `opt` permits global option tokens
+# (`-C <dir>`, `--db <path>`) between `bd` and its subcommand so `bd -C /x
+# bootstrap` is caught; `.beads` is anchored so `.beads-backups` is not a false
+# positive.
 #
-# KNOWN, ACCEPTED limits (this is an accident net, not a security boundary; see
-# the header): a destructive command hidden inside command substitution
-# (`$(bd bootstrap)`), behind an escaped separator, in a `-C` target with spaces,
-# or reached by `cd`-ing into a *different* populated checkout from an unpopulated
-# cwd is NOT caught. The layered durability defenses (push-before-reset, the
-# committed JSONL restore copy, the `bd backup` full-history copy, and bd's own
-# destroy-token refusals) are the real guarantee.
-start='^[({]?[[:space:]]*((sudo|time|command|env|nice|nohup)[[:space:]]+)*([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)*([^[:space:]]*/)?'
+# KNOWN, ACCEPTED limit (this is an accident net, not a security boundary; see the
+# header): a destructive command hidden inside a command substitution that is
+# itself INSIDE double quotes (`echo "$(bd bootstrap)"`) is masked away and not
+# caught. Running bootstrap that way is deliberate, not an accident; the layered
+# durability defenses (push-before-reset, the committed JSONL restore copy, the
+# `bd backup` full-history copy, and bd's own destroy-token refusals) are the real
+# guarantee.
+start='^((sudo|time|command|env|nice|nohup)[[:space:]]+)*([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)*([^[:space:]]*/)?'
 opt='([[:space:]]+-[A-Za-z-]+(=[^[:space:]]*)?([[:space:]]+[^-[:space:]][^[:space:]]*)?)*'
-dangerous="${start}bd${opt}[[:space:]]+bootstrap([[:space:]|;&)}]|\$)"
-dangerous="${dangerous}|${start}bd${opt}[[:space:]]+init[^|;&]*--(force|reinit-local|discard-remote|destroy-token)"
+dangerous="${start}bd${opt}[[:space:]]+bootstrap([[:space:]|;&]|\$)"
+dangerous="${dangerous}|${start}bd${opt}[[:space:]]+init[^;&|]*--(force|reinit-local|discard-remote|destroy-token)"
 dangerous="${dangerous}|${start}bd${opt}[[:space:]]+admin[[:space:]]+reset"
-dangerous="${dangerous}|${start}rm[[:space:]][^|;&]*\.beads([[:space:]/|;&)}]|\$)"
-dangerous="${dangerous}|${start}dolt[[:space:]][^|;&]*\.beads([[:space:]/|;&)}]|\$)"
+dangerous="${dangerous}|${start}rm[[:space:]][^;&|]*\.beads([[:space:]/|;&]|\$)"
+dangerous="${dangerous}|${start}dolt[[:space:]][^;&|]*\.beads([[:space:]/|;&]|\$)"
 
-# Evaluate PER command segment (split on ; & |, so || && collapse too). An inline
-# override authorizes ONLY the segment it directly prefixes — so
-# `BEADS_DESTRUCTIVE_OK=1 echo x && bd bootstrap` still blocks the bd segment,
-# and an override attached to some other command never disarms the whole chain.
+# Split into simple-command segments: ; & | and newlines, plus the ( ) { } and
+# backtick that introduce subshells, brace groups, and command substitutions —
+# all safe to split on now that quoted literals are masked, so `(bd bootstrap)`,
+# `{ bd bootstrap; }`, and a bare `$(bd bootstrap)` expose their inner command as
+# its own segment. Track a static leading `cd <dir>` so a later destructive
+# command is judged against the directory it will actually run in.
+cdre='^cd[[:space:]]+([^[:space:]]+)'
+c_re='(-C|--directory)(=|[[:space:]]+)([^[:space:]]+)'
+segments=$(printf '%s' "$mcmd" | tr ';&|(){}\140\n' '\n\n\n\n\n\n\n\n\n')
 blocked=0
+cwd="."
 while IFS= read -r seg; do
 	seg="${seg#"${seg%%[![:space:]]*}"}"   # strip leading whitespace
 	[ -n "$seg" ] || continue
-	# Inline deliberate override: a genuine leading env-assignment on THIS command.
+	# Track a static leading `cd <dir>` (masked-quote / variable targets → "?").
+	if [[ "$seg" =~ $cdre ]]; then
+		cwd="$(resolve_dir "${BASH_REMATCH[1]}" "$cwd")"
+		continue
+	fi
+	# Inline deliberate override authorizes ONLY this command.
 	case "$seg" in
 		BEADS_DESTRUCTIVE_OK=1[[:space:]]*) continue ;;
 	esac
-	if printf '%s' "$seg" | grep -qE "$dangerous"; then
+	# Not a destructive command → move on.
+	printf '%s' "$seg" | grep -qE "$dangerous" || continue
+	# Destructive: judge the effective target. `bd -C <dir>` retargets THIS
+	# segment; otherwise it runs in the chain's current cwd.
+	tdir="$cwd"
+	if [[ "$seg" =~ $c_re ]]; then
+		tdir="$(resolve_dir "${BASH_REMATCH[3]}" "$cwd")"
+	fi
+	if [ "$tdir" = "?" ] || db_populated "$tdir"; then
 		blocked=1
 		break
 	fi
-done <<SEGMENTS
-$(printf '%s' "$scan" | tr ';&|\n' '\n\n\n\n')
-SEGMENTS
+done <<< "$segments"
 
 if [ "$blocked" = "1" ]; then
 	{
