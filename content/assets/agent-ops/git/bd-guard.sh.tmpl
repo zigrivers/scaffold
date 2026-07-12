@@ -106,13 +106,14 @@ any_risky() {
 # `.beads` is anchored so `.beads-backups` is not a false positive.
 #
 # KNOWN, ACCEPTED limits (this is an accident net, not a security boundary; see
-# the header): a destructive command hidden as a quoted STRING ARGUMENT passed to
-# another interpreter — `bash -c "bd bootstrap"`, `sh -c "…"`, `eval "…"` — or a
-# command substitution nested inside double quotes (`echo "$(bd bootstrap)"`) is
-# not inspected. Reaching for any of these is deliberate, not an accident. The
-# layered durability defenses (push-before-reset, the committed JSONL restore
-# copy, the `bd backup` full-history copy, and bd's own destroy-token refusals)
-# are the real guarantee.
+# the header): a destructive token deliberately hidden inside QUOTES is masked and
+# not inspected — a command passed as a quoted string to another interpreter
+# (`bash -c "bd bootstrap"`, `sh -c "…"`, `eval "…"`), a command substitution
+# nested inside double quotes (`echo "$(bd bootstrap)"`), or a quoted subcommand /
+# flag (`bd "bootstrap"`, `bd init '--reinit-local'`). Quoting a bare keyword like
+# that is deliberate, not an accident. The layered durability defenses
+# (push-before-reset, the committed JSONL restore copy, the `bd backup`
+# full-history copy, and bd's own destroy-token refusals) are the real guarantee.
 start='^([^[:space:]]*/)?'
 # A global option token is `-<anything-non-space>` (covers `-C`, an attached
 # `-C/path` or `--db=/x`, and long flags), optionally followed by a spaced value.
@@ -141,8 +142,10 @@ cdre='^cd[[:space:]]+([^[:space:]]+)'
 c_re='(-C[[:space:]]*|-C=|--directory[[:space:]]+|--directory=)([^[:space:]]+)'
 rmdolt='(^|[^[:alnum:]_.-])(rm|dolt)[[:space:]]'
 bpath='([^[:space:]]*)\.beads'
+# A pipe is also a scope boundary — each stage runs in a subshell, so a `cd` on
+# the left of `|` does NOT move the cwd of the stage on the right.
 case "$mcmd" in
-	*'('* | *')'* | *'{'* | *'}'* | *'`'*) has_grouping=1 ;;
+	*'('* | *')'* | *'{'* | *'}'* | *'`'* | *'|'*) has_grouping=1 ;;
 	*) has_grouping=0 ;;
 esac
 segments=$(printf '%s' "$mcmd" | tr ';&|(){}\140\n' '\n\n\n\n\n\n\n\n\n')
@@ -158,10 +161,13 @@ while IFS= read -r seg; do
 		seg="${BASH_REMATCH[2]}"
 	done
 	[ -n "$seg" ] || continue
-	# Track a static leading `cd <dir>` (absolute → trust it; else cwd unknown).
+	# Track a static leading `cd <dir>`. Trust it only when it is an absolute path
+	# that ACTUALLY EXISTS — a `cd` to a missing directory FAILS at runtime and
+	# leaves the cwd unchanged, so `cd /missing; bd bootstrap` really runs in the
+	# prior cwd (keep `chain` as-is). A relative target is cwd-unknown ("?").
 	if [[ "$seg" =~ $cdre ]]; then
 		case "${BASH_REMATCH[1]}" in
-			/*) chain="${BASH_REMATCH[1]}" ;;
+			/*) if [ -d "${BASH_REMATCH[1]}" ]; then chain="${BASH_REMATCH[1]}"; fi ;;
 			*) chain="?" ;;
 		esac
 		continue

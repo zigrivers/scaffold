@@ -385,6 +385,14 @@ EOF
     [ "$status" -eq 2 ]
     run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check 'x=\$(cd $CLONE_DIR/fresh5 && pwd); bd bootstrap'"
     [ "$status" -eq 2 ]
+    # a cd on the LEFT of a pipe is a subshell — cwd unchanged on the right
+    run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check 'cd $CLONE_DIR/fresh5 | bd bootstrap'"
+    [ "$status" -eq 2 ]
+    # a cd to a MISSING dir fails at runtime → bootstrap runs in the populated cwd
+    run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check 'cd /no/such/dir-xyz; bd bootstrap'"
+    [ "$status" -eq 2 ]
+    run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check 'cd /no/such/dir-xyz || bd bootstrap'"
+    [ "$status" -eq 2 ]
 }
 
 @test "bd-guard: rm/dolt against a sibling .beads is judged against that path's directory" {

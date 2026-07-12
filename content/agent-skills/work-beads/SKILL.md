@@ -163,12 +163,15 @@ remote; a `bd backup` target may be absent):
    for a *configured* remote in your report, but never abort the batch over it.
 2. `make beads-snapshot` — refresh the `.beads/issues.jsonl` restore copy and
    sync any configured `bd backup` full-history copy.
-3. Keep the working tree clean by committing the refreshed restore copy — commit
-   only when it actually changed, and don't mask a real failure behind `|| true`.
-   This is tree-hygiene, NOT the off-machine copy (that is step 1's Dolt remote);
-   the primary stays on its base branch, so this is a normal local commit — do
-   not open a PR for it and do not strand it on a feature branch:
+3. The refreshed `.beads/issues.jsonl` is staged by bd's auto-export
+   (`export.git-add`); let it ride your project's NORMAL git flow (a work commit
+   or bd's git hooks). Do NOT force a direct commit onto a protected base branch
+   and do not push one outside the PR flow — the off-machine durability is step
+   1's Dolt remote, not this local copy. Only when the primary's base branch
+   accepts direct maintenance commits AND the snapshot left a change is a local
+   commit appropriate:
    ```bash
+   # optional — only if the base branch accepts direct commits:
    git add .beads/issues.jsonl
    git diff --cached --quiet -- .beads/issues.jsonl \
      || git commit -m "chore(beads): refresh restore snapshot"
