@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# bd-guard.sh — refuses destructive Beads commands against a populated database.
+# Installed by `scaffold agent-ops install --component git`.
+#
+# Two modes:
+#   1. Claude Code PreToolUse hook (default): reads the hook JSON envelope on
+#      stdin, inspects .tool_input.command, exits 2 (block, stderr shown to the
+#      agent) or 0 (allow). Registered under hooks.PreToolUse, matcher "Bash".
+#   2. CLI check for other harnesses/scripts: bd-guard.sh --check "<command>"
+#      — same exit semantics.
+#
+# Why: bootstrap/reset on a populated .beads/ replaces local (usually-ahead)
+# state with the often-stale Dolt remote — this silently wiped ~50 beads in a
+# sibling project. The guard is an accident net, not a security boundary; the
+# deliberate-reset procedure lives in docs/beads-workflow.md (Durability).
+#
+# Deliberately does NOT print an override recipe on block (upstream Beads'
+# error-text-no-echo lesson: an agent once wiped 247 issues by copying the
+# destructive command out of an error message).
+set -euo pipefail
+
+cmd=""
+if [ "${1:-}" = "--check" ]; then
+	cmd="${2:-}"
+else
+	# Hook mode: JSON envelope on stdin. jq is required to parse it; without
+	# jq, fail open — a guard that blocks every Bash call is worse than none.
+	if ! command -v jq >/dev/null 2>&1; then
+		printf '%s\n' "bd-guard: jq not found — cannot parse hook input; allowing. Install jq to arm the guard." >&2
+		exit 0
+	fi
+	cmd="$(jq -r '.tool_input.command // empty' 2>/dev/null || true)"
+fi
+[ -n "$cmd" ] || exit 0
+
+# Deliberate, human-approved override (procedure documented in
+# docs/beads-workflow.md — not here).
+if [ "${BEADS_DESTRUCTIVE_OK:-0}" = "1" ]; then exit 0; fi
+case "$cmd" in *BEADS_DESTRUCTIVE_OK=1*) exit 0 ;; esac
+
+# Guard only when there is a populated database to lose.
+db_populated() {
+	[ -d .beads/embeddeddolt ] && return 0
+	[ -d .beads/dolt ] && return 0
+	compgen -G ".beads/*.db" >/dev/null 2>&1
+}
+db_populated || exit 0
+
+# Each pattern is bounded to one command segment ([^|;&]*) so a safe command
+# chained after && is not misread as flags of a dangerous one.
+dangerous='(^|[^[:alnum:]_./-])bd[[:space:]]+bootstrap([[:space:]|;&]|$)'
+dangerous="${dangerous}|(^|[^[:alnum:]_./-])bd[[:space:]]+init[^|;&]*--(force|reinit-local|discard-remote|destroy-token)"
+dangerous="${dangerous}|(^|[^[:alnum:]_./-])bd[[:space:]]+admin[[:space:]]+reset"
+dangerous="${dangerous}|(^|[^[:alnum:]_./-])rm[[:space:]][^|;&]*\.beads"
+dangerous="${dangerous}|(^|[^[:alnum:]_./-])dolt[[:space:]][^|;&]*\.beads"
+
+if printf '%s' "$cmd" | grep -qE "$dangerous"; then
+	{
+		printf '%s\n' "bd-guard: BLOCKED — this command can destroy the populated Beads database (.beads/)."
+		printf '%s\n' "Bootstrap/reset is for FRESH CLONES ONLY; on this checkout it would replace local"
+		printf '%s\n' "beads with the (often stale) remote and silently drop unpushed work."
+		printf '%s\n' "If beads may be unpushed, first run: bd stats && bd dolt commit && bd dolt push"
+		printf '%s\n' "then: make beads-snapshot"
+		printf '%s\n' "Deliberate-reset procedure: docs/beads-workflow.md (Durability & the bootstrap trap)."
+	} >&2
+	exit 2
+fi
+exit 0

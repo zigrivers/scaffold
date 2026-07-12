@@ -226,3 +226,48 @@ EOF
     [ "$status" -ne 0 ]
     [[ "$output" == *"staging component not installed"* ]]
 }
+
+@test "bd-guard: blocks bd bootstrap when the DB is populated (and never echoes the command)" {
+    mkdir -p "$CLONE_DIR/.beads/embeddeddolt"
+    run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check 'bd bootstrap'"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *BLOCKED* ]]
+    # error-text-no-echo: the refusal must not contain the blocked command itself
+    [[ "$output" != *"bd bootstrap"* ]]
+}
+
+@test "bd-guard: blocks destructive bd init flags and rm/dolt against .beads" {
+    mkdir -p "$CLONE_DIR/.beads/embeddeddolt"
+    for c in 'bd init --reinit-local --discard-remote' 'bd admin reset' 'rm -rf .beads' 'dolt sql --data-dir .beads/embeddeddolt'; do
+        run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check '$c'"
+        [ "$status" -eq 2 ] || { echo "not blocked: $c"; false; }
+    done
+}
+
+@test "bd-guard: allows bootstrap on a fresh clone (no populated DB)" {
+    rm -rf "$CLONE_DIR/.beads"
+    run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check 'bd bootstrap'"
+    [ "$status" -eq 0 ]
+}
+
+@test "bd-guard: allows safe bd commands against a populated DB" {
+    mkdir -p "$CLONE_DIR/.beads/embeddeddolt"
+    for c in 'bd ready && bd stats' 'bd dolt commit && bd dolt push' 'make beads-snapshot' 'bd init --init-if-missing'; do
+        run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check '$c'"
+        [ "$status" -eq 0 ] || { echo "wrongly blocked: $c"; false; }
+    done
+}
+
+@test "bd-guard: BEADS_DESTRUCTIVE_OK=1 overrides the block" {
+    mkdir -p "$CLONE_DIR/.beads/embeddeddolt"
+    run bash -c "cd '$CLONE_DIR' && BEADS_DESTRUCTIVE_OK=1 scripts/bd-guard.sh --check 'bd bootstrap'"
+    [ "$status" -eq 0 ]
+}
+
+@test "bd-guard: hook mode parses the PreToolUse JSON envelope" {
+    mkdir -p "$CLONE_DIR/.beads/embeddeddolt"
+    run bash -c "cd '$CLONE_DIR' && printf '%s' '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"bd bootstrap\"}}' | scripts/bd-guard.sh"
+    [ "$status" -eq 2 ]
+    run bash -c "cd '$CLONE_DIR' && printf '%s' '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"bd stats\"}}' | scripts/bd-guard.sh"
+    [ "$status" -eq 0 ]
+}
