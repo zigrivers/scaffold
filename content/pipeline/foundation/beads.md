@@ -183,8 +183,8 @@ existing setup updates rather than re-initializes.
    ```bash
    slug="$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")"
    uniq="$(printf '%s' "$(git config --get remote.origin.url 2>/dev/null || pwd -P)" | cksum | cut -d' ' -f1)"
-   bstatus="$(bd backup status --json 2>/dev/null || true)"
-   if ! printf '%s' "$bstatus" | grep -qE '"configured":[[:space:]]*true'; then
+   bstatus="$(bd backup status --json 2>/dev/null | tr -d '[:space:]' || true)"
+   if ! printf '%s' "$bstatus" | grep -q '"configured":true'; then
      mkdir -p "$HOME/.beads-backups"
      bd backup init "$HOME/.beads-backups/${slug}-${uniq}"
    fi

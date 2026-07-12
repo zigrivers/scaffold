@@ -46,8 +46,8 @@ if err="$(bd export --all -o "$tmp" 2>&1)"; then
 		# Capture via command substitution first, then match the captured string
 		# — piping bd straight into `grep -q` can race the pipe. Silently skipped
 		# when `bd backup` is unavailable (old bd → non-zero) or unconfigured.
-		if backup_status="$(bd backup status --json 2>/dev/null)" \
-			&& printf '%s' "$backup_status" | grep -qE '"configured":[[:space:]]*true'; then
+		if backup_status="$(bd backup status --json 2>/dev/null | tr -d '[:space:]')" \
+			&& printf '%s' "$backup_status" | grep -q '"configured":true'; then
 			if bd backup sync >/dev/null 2>&1; then
 				printf '%s\n' "✓ bd backup sync — full-history Dolt backup updated"
 			else

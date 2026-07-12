@@ -416,6 +416,49 @@ EOF
     [ "$status" -eq 0 ]
 }
 
+@test "bd-guard: blocks rm of a quoted .beads path, and honors the env override form" {
+    mkdir -p "$CLONE_DIR/.beads/embeddeddolt"
+    # a quoted .beads path is preserved as an unresolvable token → blocked
+    run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check 'rm -rf \"\$PWD/.beads\"'"
+    [ "$status" -eq 2 ]
+    # `env BEADS_DESTRUCTIVE_OK=1 bd bootstrap` is a valid deliberate override → allowed
+    run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check 'env BEADS_DESTRUCTIVE_OK=1 bd bootstrap'"
+    [ "$status" -eq 0 ]
+    # …but a bead title / message that merely names .beads is not a false positive
+    run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check 'bd create \"fix the .beads bug\"'"
+    [ "$status" -eq 0 ]
+}
+
+@test "bd-guard: blocks a destructive command inside if/then/else/while control flow" {
+    mkdir -p "$CLONE_DIR/.beads/embeddeddolt"
+    for c in 'if ! bd ready; then bd bootstrap; fi' \
+             'if bd stats; then :; else bd bootstrap; fi' \
+             'while ! bd ready; do bd init --force; done'; do
+        run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check '$c'"
+        [ "$status" -eq 2 ] || { echo "not blocked: $c"; false; }
+    done
+}
+
+@test "bd-guard: blocks wrappers carrying their own options (nice -n, sudo -u, timeout N)" {
+    mkdir -p "$CLONE_DIR/.beads/embeddeddolt"
+    for c in 'nice -n 10 bd bootstrap' 'sudo -u root bd bootstrap' 'sudo --preserve-env bd bootstrap' 'timeout 30 bd bootstrap'; do
+        run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check '$c'"
+        [ "$status" -eq 2 ] || { echo "not blocked: $c"; false; }
+    done
+}
+
+@test "bd-guard: control-flow and wrappers around SAFE commands are not false-positives" {
+    mkdir -p "$CLONE_DIR/.beads/embeddeddolt"
+    for c in 'if true; then make build; fi' \
+             'for f in a b; do echo $f; done' \
+             'sudo systemctl restart nginx' \
+             'time make check' \
+             'while read l; do echo $l; done'; do
+        run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check '$c'"
+        [ "$status" -eq 0 ] || { echo "wrongly blocked: $c"; false; }
+    done
+}
+
 @test "bd-guard: does NOT block a safe command that merely mentions a destructive one in an argument" {
     mkdir -p "$CLONE_DIR/.beads/embeddeddolt"
     for c in 'bd create "Document the bd bootstrap trap"' \
