@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Export the local beads DB to .beads/issues.jsonl — a durable local recovery
-# point before any DB reset. Invoked by `make beads-snapshot`.
+# Export the local beads DB to .beads/issues.jsonl — a committed restore copy
+# for `bd import` after a wipe — and sync the full `bd backup` target when one
+# is configured. Invoked by `make beads-snapshot`.
 #
 # Beads is OPTIONAL: if the `bd` CLI is not installed, or this project has no
 # .beads/ database, the script prints a note and exits 0 (nothing to snapshot).
@@ -35,7 +36,21 @@ tmp="$(mktemp .beads/issues.jsonl.XXXXXX)"
 # bd's exit status, so `set -e` does not abort on a failed export.
 if err="$(bd export --all -o "$tmp" 2>&1)"; then
 	if mv -f "$tmp" .beads/issues.jsonl; then
-		printf '%s\n' "✓ wrote .beads/issues.jsonl — a local restore copy for 'bd import' after a wipe; still push to the remote (bootstrap won't auto-use it)"
+		printf '%s\n' "✓ wrote .beads/issues.jsonl — a committed restore copy for 'bd import' after a wipe; still push the Dolt remote (bootstrap won't auto-use it)"
+		# Full-fidelity Dolt backup (history included) when the project has one
+		# configured via `bd backup init`. Feature-detected by CONTENT, not exit
+		# code: real `bd backup status` exits 0 even when unconfigured, printing
+		# "No backup has been performed yet." — so we sync only when the status
+		# names a destination. Silently skipped when `bd backup` is unavailable
+		# (old bd → non-zero, empty stdout) or no target is configured.
+		if backup_status="$(bd backup status 2>/dev/null)" \
+			&& ! printf '%s' "$backup_status" | grep -qi 'no backup'; then
+			if bd backup sync >/dev/null 2>&1; then
+				printf '%s\n' "✓ bd backup sync — full-history Dolt backup updated"
+			else
+				printf '%s\n' "⚠ bd backup sync failed — JSONL snapshot still written; check 'bd backup status'" >&2
+			fi
+		fi
 	else
 		printf '%s\n' "✗ beads-snapshot failed — could not move the snapshot into place; prior snapshot unchanged" >&2
 		exit 1

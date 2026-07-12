@@ -271,3 +271,50 @@ EOF
     run bash -c "cd '$CLONE_DIR' && printf '%s' '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"bd stats\"}}' | scripts/bd-guard.sh"
     [ "$status" -eq 0 ]
 }
+
+@test "beads-snapshot: writes issues.jsonl and syncs bd backup when configured" {
+    mkdir -p "$CLONE_DIR/.beads"
+    # richer bd stub: export writes the -o target; `bd backup status` always
+    # exits 0 (real bd behavior) but its OUTPUT differs — "No backup" when
+    # unconfigured — so detection is content-based, not exit-code-based.
+    cat > "$CLONE_DIR/stubs/bd" <<'EOF'
+#!/usr/bin/env bash
+if [ "$1" = "export" ]; then
+    while [ $# -gt 0 ]; do
+        if [ "$1" = "-o" ]; then printf '{}\n' > "$2"; exit 0; fi
+        shift
+    done
+    exit 1
+fi
+if [ "$1" = "backup" ]; then
+    case "$2" in
+        status)
+            if [ "${BD_BACKUP_EXIT:-1}" = "0" ]; then
+                printf 'Dolt Backup:\n  Destination: file:///tmp/bk\n'
+            else
+                printf 'No backup has been performed yet.\n'
+            fi
+            exit 0 ;;
+        sync) exit "${BD_BACKUP_EXIT:-1}" ;;
+        *) exit 0 ;;
+    esac
+fi
+exit 0
+EOF
+    chmod +x "$CLONE_DIR/stubs/bd"
+    # unconfigured backup: snapshot succeeds, no backup line
+    run bash -c "cd '$CLONE_DIR' && BD_BACKUP_EXIT=1 scripts/beads-snapshot.sh"
+    [ "$status" -eq 0 ]
+    [ -f "$CLONE_DIR/.beads/issues.jsonl" ]
+    [[ "$output" != *"backup"*"updated"* ]]
+    # configured backup: sync runs and is reported
+    run bash -c "cd '$CLONE_DIR' && BD_BACKUP_EXIT=0 scripts/beads-snapshot.sh"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"full-history"* ]]
+}
+
+@test "beads-snapshot: success message calls the copy committed, not git-ignored" {
+    run grep -i 'git-ignored' "$BATS_TEST_DIRNAME/../content/assets/agent-ops/git/beads-snapshot.sh.tmpl" \
+        "$BATS_TEST_DIRNAME/../content/assets/agent-ops/make/agent-ops.mk.tmpl"
+    [ "$status" -ne 0 ]
+}
