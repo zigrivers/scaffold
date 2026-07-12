@@ -38,6 +38,19 @@ git worktree list
 make doctor                    # wedged home base? make doctor-fix (unattended-safe)
 ```
 
+Version gate: `bd version` must be **≥ 1.1.0** (the `bd dolt` durability
+commands below require it). Older? Stop and report: upgrade with
+`brew upgrade beads` or the project's equivalent — never work around the gate.
+
+**Database safety (binding for every step):** never run `bd bootstrap`,
+destructive `bd init` (`--reinit-local`/`--discard-remote`; legacy `--force`),
+or any reset against a populated `.beads/` — bootstrap replaces local state
+with the often-stale remote and silently drops unpushed beads (fresh clones
+only). Before any deliberate reset, and before deleting a checkout with local
+beads: `bd stats && bd dolt commit && bd dolt push`, then `make beads-snapshot`.
+Drive the database only through `bd` subcommands — never a standalone `dolt`
+CLI. Full runbook: docs/beads-workflow.md ("Durability & the bootstrap trap").
+
 If `bd` or the agent-ops scripts are missing, stop and instruct:
 `scaffold agent-ops install` (scripts) / see docs/beads-workflow.md (tracker).
 
@@ -136,6 +149,10 @@ Docs updated in-PR: <paths - or "none needed: <why>">
 Beads filed (open): <id - one-line title - or none>
 ```
 
+Before reporting, refresh the durability net (feature-detect; skip silently
+when the target is absent): `make beads-snapshot` — one batch-end snapshot
+covers every bead closed above.
+
 If the batch ran long and `launchpad` is installed: `launchpad notify "<summary>"`.
 
 ## Red flags — stop if you're about to…
@@ -153,3 +170,4 @@ If the batch ran long and `launchpad` is installed: `launchpad notify "<summary>
 | `--no-verify`, plain `--force`, merge commits | Forbidden; `--force-with-lease` after rebase only |
 | Close the bead when the PR opens | Close only after MERGED + verified |
 | Prose summary instead of the Step 3 slots | The slots are the report format |
+| Bootstrap/reset a populated `.beads` DB | Wipes unpushed beads — fresh clones only; push first (`bd dolt commit && bd dolt push`) |
