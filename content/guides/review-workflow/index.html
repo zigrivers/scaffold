@@ -1368,7 +1368,7 @@ nav.toc li.toc-3 a { padding-left: var(--sp-6); font-size: var(--text-xs); }
 <div class="layout">
   <aside class="rail" id="guide-toc">
     <button class="rail-close" data-action="nav" aria-label="Close navigation">✕</button>
-    <nav class="toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#what-this-guide-covers">What this guide covers</a></li><li class="toc-2"><a href="#step-1-pick-the-entry-point">Step 1 — Pick the entry point</a></li><li class="toc-3"><a href="#when-no-wrapper-fits">When no wrapper fits</a></li><li class="toc-2"><a href="#step-2-choose-the-input-mode">Step 2 — Choose the input mode</a></li><li class="toc-2"><a href="#step-3-read-the-verdict-then-act">Step 3 — Read the verdict, then act</a></li><li class="toc-2"><a href="#step-4-fix-the-blocking-findings-bounded">Step 4 — Fix the blocking findings (bounded)</a></li><li class="toc-3"><a href="#the-3-round-per-finding-limit">The 3-round-per-finding limit</a></li><li class="toc-3"><a href="#where-the-bookkeeping-lives-today">Where the bookkeeping lives today</a></li><li class="toc-2"><a href="#step-5-handle-degraded-mode">Step 5 — Handle degraded mode</a></li><li class="toc-2"><a href="#see-also">See also</a></li></ul></nav>
+    <nav class="toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#what-this-guide-covers">What this guide covers</a></li><li class="toc-2"><a href="#step-1-pick-the-entry-point">Step 1 — Pick the entry point</a></li><li class="toc-3"><a href="#when-no-wrapper-fits">When no wrapper fits</a></li><li class="toc-2"><a href="#step-2-choose-the-input-mode">Step 2 — Choose the input mode</a></li><li class="toc-2"><a href="#step-3-read-the-verdict-then-act">Step 3 — Read the verdict, then act</a></li><li class="toc-2"><a href="#step-4-fix-the-blocking-findings-bounded">Step 4 — Fix the blocking findings (bounded)</a></li><li class="toc-3"><a href="#the-3-round-per-finding-limit">The 3-round-per-finding limit</a></li><li class="toc-3"><a href="#how-the-round-budget-is-enforced">How the round budget is enforced</a></li><li class="toc-2"><a href="#step-5-handle-degraded-mode">Step 5 — Handle degraded mode</a></li><li class="toc-2"><a href="#see-also">See also</a></li></ul></nav>
   </aside>
   <main class="content"><h2 id="what-this-guide-covers">What this guide covers</h2>
 <p>This is the <strong>workflow</strong> around multi-model review: <em>when</em> to review, <em>which</em>
@@ -1418,7 +1418,7 @@ reconciliation only as an optional add-on. Consult its own doc for specifics.</p
 
 
 
-<table><thead><tr><th>Entry point</th><th>Target</th><th>Notes</th></tr></thead><tbody><tr><td><code>scaffold run review-pr</code></td><td>One PR (<code>--pr N</code>, auto-detected from the branch)</td><td><strong>MMR wrapper.</strong> Adds auth checks, the Superpowers agent channel, the per-finding round bookkeeping, an opt-in Beads bridge over a bare <code>mmr review</code>.</td></tr><tr><td><code>scaffold run review-code</code></td><td>Local pre-push: committed branch diff + staged + unstaged, as one synthesized "delivery candidate"</td><td><strong>MMR wrapper.</strong> Adds the same agent channel + round bounding, plus file &#x26; standards context for the file-blind CLIs. <strong>Untracked files are not covered.</strong></td></tr><tr><td><code>scaffold run post-implementation-review</code></td><td>The full implemented codebase against stories + standards</td><td><strong>Independent, not an MMR wrapper.</strong> A release-time review (systemic sweep + per-story functional review via parallel agents) with its own report under <code>docs/reviews/</code>; MMR injection is optional. Consult its own doc.</td></tr></tbody></table>
+<table><thead><tr><th>Entry point</th><th>Target</th><th>Notes</th></tr></thead><tbody><tr><td><code>scaffold run review-pr</code></td><td>One PR (<code>--pr N</code>, auto-detected from the branch)</td><td><strong>MMR wrapper.</strong> Adds the Superpowers agent channel and native round-bounding (<code>--session</code>/<code>--max-rounds</code>) over a bare <code>mmr review</code>.</td></tr><tr><td><code>scaffold run review-code</code></td><td>Local pre-push: committed branch diff + staged + unstaged, as one synthesized "delivery candidate"</td><td><strong>MMR wrapper.</strong> Adds the same agent channel and native round-bounding, scoped to the local delivery candidate. <strong>Untracked files are not covered.</strong></td></tr><tr><td><code>scaffold run post-implementation-review</code></td><td>The full implemented codebase against stories + standards</td><td><strong>Independent, not an MMR wrapper.</strong> A release-time review (systemic sweep + per-story functional review via parallel agents) with its own report under <code>docs/reviews/</code>; MMR injection is optional. Consult its own doc.</td></tr></tbody></table>
 <div class="callout callout-note"><p><strong>The mandatory one.</strong> After <code>gh pr create</code>, running <code>review-pr</code> is mandatory
 before moving to the next task (a PostToolUse hook reminds you).
 <code>review-code</code> is the recommended preflight before a push but isn't gated.
@@ -1537,7 +1537,7 @@ is derived from gate result + channel health.</p>
 <code>needs-user-decision</code>, never merge automatically — surface the verdict and the
 remaining findings to the user. The wrappers enforce this: report only says the
 PR is merge-ready on <code>pass</code> / <code>degraded-pass</code>
-<span class="fp" data-path="content/tools/review-pr.md:122">content/tools/review-pr.md:122</span>.</p></div>
+<span class="fp" data-path="content/tools/review-pr.md:124">content/tools/review-pr.md:124</span>.</p></div>
 <h2 id="step-4-fix-the-blocking-findings-bounded">Step 4 — Fix the blocking findings (bounded)</h2>
 <p>When the verdict is <code>blocked</code>, the loop is: fix the findings at or above the
 threshold → re-review → repeat. The guard rail is that this loop is <strong>bounded
@@ -1561,8 +1561,8 @@ wording produces a new identity each time.</li>
 </ul>
 <p>When you stop, <strong>do not merge</strong>. Document each unresolved finding (severity,
 location, attempt count) and hand the decision to the user
-<span class="fp" data-path="content/tools/review-pr.md:122">content/tools/review-pr.md:122</span>.</p>
-<h3 id="where-the-bookkeeping-lives-today">Where the bookkeeping lives today</h3>
+<span class="fp" data-path="content/tools/review-pr.md:124">content/tools/review-pr.md:124</span>.</p>
+<h3 id="how-the-round-budget-is-enforced">How the round budget is enforced</h3>
 <p>Round-bounding is <strong>native</strong> to the engine. The wrappers pass <code>mmr review --session &#x3C;id> --max-rounds 3</code>
 <span class="fp" data-path="content/tools/review-pr.md:76">content/tools/review-pr.md:76</span>, and MMR enforces the budget itself using a
 stable, line-number-independent <code>finding_key</code>
@@ -1605,7 +1605,7 @@ table.</li>
 to invoking Codex / Gemini / Claude / Grok directly, run them as <strong>foreground</strong>
 Bash calls — never with <code>run_in_background</code>, <code>&#x26;</code>, or <code>nohup</code>. Background
 execution produces empty output, which the parser then reads as a degraded
-channel <span class="fp" data-path="content/tools/review-code.md:160">content/tools/review-code.md:160</span>.</p></div>
+channel <span class="fp" data-path="content/tools/review-code.md:167">content/tools/review-code.md:167</span>.</p></div>
 <p>Once any channel was compensated, the best possible verdict is
 <code>degraded-pass</code> — full <code>pass</code> requires all channels to have completed for real.</p>
 <h2 id="see-also">See also</h2>

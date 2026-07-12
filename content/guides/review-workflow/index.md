@@ -52,8 +52,8 @@ after all tasks land]
 
 | Entry point | Target | Notes |
 | --- | --- | --- |
-| `scaffold run review-pr` | One PR (`--pr N`, auto-detected from the branch) | **MMR wrapper.** Adds auth checks, the Superpowers agent channel, the per-finding round bookkeeping, an opt-in Beads bridge over a bare `mmr review`. |
-| `scaffold run review-code` | Local pre-push: committed branch diff + staged + unstaged, as one synthesized "delivery candidate" | **MMR wrapper.** Adds the same agent channel + round bounding, plus file & standards context for the file-blind CLIs. **Untracked files are not covered.** |
+| `scaffold run review-pr` | One PR (`--pr N`, auto-detected from the branch) | **MMR wrapper.** Adds the Superpowers agent channel and native round-bounding (`--session`/`--max-rounds`) over a bare `mmr review`. |
+| `scaffold run review-code` | Local pre-push: committed branch diff + staged + unstaged, as one synthesized "delivery candidate" | **MMR wrapper.** Adds the same agent channel and native round-bounding, scoped to the local delivery candidate. **Untracked files are not covered.** |
 | `scaffold run post-implementation-review` | The full implemented codebase against stories + standards | **Independent, not an MMR wrapper.** A release-time review (systemic sweep + per-story functional review via parallel agents) with its own report under `docs/reviews/`; MMR injection is optional. Consult its own doc. |
 
 :::callout{type=note}
@@ -145,7 +145,7 @@ is derived from gate result + channel health.
 `needs-user-decision`, never merge automatically — surface the verdict and the
 remaining findings to the user. The wrappers enforce this: report only says the
 PR is merge-ready on `pass` / `degraded-pass`
-:cite[content/tools/review-pr.md:122].
+:cite[content/tools/review-pr.md:124].
 :::
 
 ## Step 4 — Fix the blocking findings (bounded)
@@ -175,9 +175,9 @@ stop conditions:
 
 When you stop, **do not merge**. Document each unresolved finding (severity,
 location, attempt count) and hand the decision to the user
-:cite[content/tools/review-pr.md:122].
+:cite[content/tools/review-pr.md:124].
 
-### Where the bookkeeping lives today
+### How the round budget is enforced
 
 Round-bounding is **native** to the engine. The wrappers pass `mmr review
 --session <id> --max-rounds 3`
@@ -229,7 +229,7 @@ what it means for *your* workflow.
 to invoking Codex / Gemini / Claude / Grok directly, run them as **foreground**
 Bash calls — never with `run_in_background`, `&`, or `nohup`. Background
 execution produces empty output, which the parser then reads as a degraded
-channel :cite[content/tools/review-code.md:160].
+channel :cite[content/tools/review-code.md:167].
 :::
 
 Once any channel was compensated, the best possible verdict is

@@ -62,8 +62,13 @@ FIX_THRESHOLD=""
 if [[ "$ARGUMENTS" =~ (^|[[:space:]])--fix-threshold[[:space:]=]+(P[0-3])($|[[:space:]]) ]]; then
   FIX_THRESHOLD="${BASH_REMATCH[2]}"
 fi
-# Read BASE_REF from `--base <ref>` and HEAD_REF from `--head <ref>` if present.
-# If --head is given without --base, stop: both refs are required for a range.
+BASE_REF=""; HEAD_REF=""
+[[ "$ARGUMENTS" =~ (^|[[:space:]])--base[[:space:]=]+([^[:space:]]+) ]] && BASE_REF="${BASH_REMATCH[2]}"
+[[ "$ARGUMENTS" =~ (^|[[:space:]])--head[[:space:]=]+([^[:space:]]+) ]] && HEAD_REF="${BASH_REMATCH[2]}"
+# --head without --base is an error: both refs are required for an explicit range.
+if [ -n "$HEAD_REF" ] && [ -z "$BASE_REF" ]; then
+  echo "error: --head requires --base"; exit 1
+fi
 ```
 
 ### Step 2: Run MMR review (binding), matched to scope
@@ -122,8 +127,10 @@ and reconcile its findings into the job. On Claude Code, dispatch the
 the external CLIs cannot.
 
 ```bash
-echo "$AGENT_FINDINGS" > "$(mktemp)/agent-findings.json"
-mmr reconcile "$JOB_ID" --channel superpowers --input <findings.json>
+FINDINGS_FILE=$(mktemp)
+printf '%s\n' "$AGENT_FINDINGS" > "$FINDINGS_FILE"
+mmr reconcile "$JOB_ID" --channel superpowers --input "$FINDINGS_FILE"
+rm -f "$FINDINGS_FILE"
 ```
 
 Each finding needs `severity` (P0–P3), `location` (file:line), and

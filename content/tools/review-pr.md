@@ -96,8 +96,10 @@ cannot.
 
 ```bash
 # Write the agent's findings (MMR schema) to a temp file, then reconcile.
-echo "$AGENT_FINDINGS" > "$(mktemp)/agent-findings.json"   # or reuse a known path
-mmr reconcile "$JOB_ID" --channel superpowers --input <findings.json>
+FINDINGS_FILE=$(mktemp)
+printf '%s\n' "$AGENT_FINDINGS" > "$FINDINGS_FILE"
+mmr reconcile "$JOB_ID" --channel superpowers --input "$FINDINGS_FILE"
+rm -f "$FINDINGS_FILE"
 ```
 
 Each finding needs `severity` (P0–P3), `location` (file:line), and
