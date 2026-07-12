@@ -52,8 +52,8 @@ after all tasks land]
 
 | Entry point | Target | Notes |
 | --- | --- | --- |
-| `scaffold run review-pr` | One PR (`--pr N`, auto-detected from the branch) | **MMR wrapper.** Adds auth checks, the Superpowers agent channel, the per-finding round bookkeeping, an opt-in Beads bridge over a bare `mmr review`. |
-| `scaffold run review-code` | Local pre-push: committed branch diff + staged + unstaged, as one synthesized "delivery candidate" | **MMR wrapper.** Adds the same agent channel + round bounding, plus file & standards context for the file-blind CLIs. **Untracked files are not covered.** |
+| `scaffold run review-pr` | One PR (`--pr N`, auto-detected from the branch) | **MMR wrapper.** Adds the Superpowers agent channel and native round-bounding (`--session`/`--round`/`--max-rounds`) over a bare `mmr review`. |
+| `scaffold run review-code` | Local pre-push: committed branch diff + staged + unstaged, as one synthesized "delivery candidate" | **MMR wrapper.** Adds the same agent channel and native round-bounding, scoped to the local delivery candidate. **Untracked files are not covered.** |
 | `scaffold run post-implementation-review` | The full implemented codebase against stories + standards | **Independent, not an MMR wrapper.** A release-time review (systemic sweep + per-story functional review via parallel agents) with its own report under `docs/reviews/`; MMR injection is optional. Consult its own doc. |
 
 :::callout{type=note}
@@ -143,9 +143,9 @@ is derived from gate result + channel health.
 :::callout{type=warning}
 **Proceed only on `pass` or `degraded-pass`.** On `blocked` or
 `needs-user-decision`, never merge automatically — surface the verdict and the
-remaining findings to the user. The wrappers enforce this: a `blocked` /
-`needs-user-decision` outcome takes the "Stop path" and does **not** print the
-ready-for-merge message :cite[content/tools/review-pr.md:610].
+remaining findings to the user. The wrappers enforce this: report only says the
+PR is merge-ready on `pass` / `degraded-pass`
+:cite[content/tools/review-pr.md:147].
 :::
 
 ## Step 4 — Fix the blocking findings (bounded)
@@ -175,32 +175,33 @@ stop conditions:
 
 When you stop, **do not merge**. Document each unresolved finding (severity,
 location, attempt count) and hand the decision to the user
-:cite[content/tools/review-pr.md:610].
+:cite[content/tools/review-pr.md:147].
 
-### Where the bookkeeping lives today
+### How the round budget is enforced
 
-The engine ships **native** multi-round sessions — `mmr review --session <id>
---round N --max-rounds M` :cite[packages/mmr/src/commands/review.ts:289] — and a
+Round-bounding is **native** to the engine. The wrappers pass `mmr review
+--session <id> --round <N> --max-rounds 3`
+:cite[content/tools/review-pr.md:81], incrementing `--round` each fix round
+(`--round` is required — MMR compares it against `--max-rounds`, so without it
+every call is round 1 and the cap never fires). MMR enforces the budget using a
 stable, line-number-independent `finding_key`
-:cite[packages/mmr/src/core/stable-id.ts:115]. (See the
+:cite[packages/mmr/src/core/stable-id.ts:115] — the same identity across
+severity changes and line-number shifts (a materially reworded description does
+change the key, since description and suggestion are part of it). (See the
 [MMR reference](../mmr/index.md) for how that key collapses the same issue at
-different severities.)
+different severities.) A finding that survives the budget stops being
+re-attempted; you don't track strikes by hand.
 
-The scaffold **wrappers** have not yet migrated to native sessions. Until they
-do, `review-pr` and `review-code` enforce the 3-strike rule with their own
-bookkeeping: a per-session attempts file at
-`.scaffold/review-attempts/<session-id>.json`. Each fix round computes a hash
-over the same four identity components, increments that finding's counter, and
-the `_review_at_strike_limit` helper blocks once it hits 3
-:cite[content/tools/review-pr.md:468]. The wrapper hash deliberately mirrors the
-engine's `finding_key` components, so the eventual swap to
-`mmr review --session` is a clean migration rather than a re-think.
+This replaced the former wrapper-side attempts file
+(`.scaffold/review-attempts/<session-id>.json`), retired when the review tools
+were slimmed to the MMR-dispatch core.
 
 :::callout{type=note}
-**Practical takeaway.** You drive the fix loop through the wrapper; the attempts
-file under `.scaffold/review-attempts/` is the current source of truth for the
-strike count. For a very noisy loop you may narrow the gate for one run with
-`--fix-threshold P1` — but don't permanently lower the project default (P2).
+**Practical takeaway.** Pass `--session` **and** an incrementing `--round` so
+the round budget actually applies — `--max-rounds` is inert without `--round`
+(MMR compares `--round` to the cap; `--session` alone doesn't). For a very noisy
+loop you may narrow the gate for one run with `--fix-threshold P1` — but don't
+permanently lower the project default (P2).
 :::
 
 ## Step 5 — Handle degraded mode
@@ -232,7 +233,7 @@ what it means for *your* workflow.
 to invoking Codex / Gemini / Claude / Grok directly, run them as **foreground**
 Bash calls — never with `run_in_background`, `&`, or `nohup`. Background
 execution produces empty output, which the parser then reads as a degraded
-channel :cite[content/tools/review-code.md:265].
+channel :cite[content/tools/review-code.md:204].
 :::
 
 Once any channel was compensated, the best possible verdict is

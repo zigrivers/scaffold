@@ -273,23 +273,21 @@ way.
 - **Verdict handling** — proceed only on `pass` or `degraded-pass`. If the
   review returns `blocked` or `needs-user-decision`, stop and surface the
   verdict and remaining findings to the user. Do NOT merge automatically.
-- **3-round limit** — the limit is **per finding hash**, enforced by the
-  wrapper-side bookkeeping in `content/tools/review-pr.md` Step 7a (and the
-  parallel Step 7a in `content/tools/review-code.md`). The hash combines normalized
-  `location` + `category` + `description` + `suggestion` and is persisted
-  in `.scaffold/review-attempts/<session-id>.json`. Stop and ask the user
-  when a blocking finding's hash hits 3 attempts (`_review_at_strike_limit`
-  returns true), or when the same underlying defect recurs across 3 rounds even
-  if reviewer wording produces new hashes. Each round surfacing genuinely
-  different findings with *new* hashes is healthy review/fix iteration — keep
-  going. Other stop conditions: a finding is genuinely ambiguous or channels
-  contradict each other; the user explicitly asks to stop. This wrapper-side
-  bookkeeping predates MMR's native round-bounding. As of mmr 1.4.0 the engine
-  ships native `--session`/`--round`/`--max-rounds` and a stable `finding_key`
-  (`packages/mmr/src/core/stable-id.ts`), so the wrappers can migrate to native
-  sessions — until they do, the `.scaffold/review-attempts/` bookkeeping above
-  remains the active mechanism (see
-  `docs/superpowers/specs/2026-05-22-mmr-config-ux-and-round-bounding-design.md`).
+- **3-round limit — native.** Round-bounding is enforced by MMR itself: the
+  `review-pr`/`review-code` meta-prompts pass `mmr review --session <id>
+  --max-rounds 3`. MMR tracks recurrence with its stable `finding_key`
+  (normalized `location` + `category` + `description` + `suggestion`, severity
+  excluded — `packages/mmr/src/core/stable-id.ts`) and stops re-attempting a
+  finding that survives the budget. Keep going while each round surfaces
+  *genuinely different* findings; stop when the same finding recurs past the
+  budget, when channels contradict each other (`needs-user-decision`), or when
+  the user asks to stop. (This replaces the former wrapper-side
+  `.scaffold/review-attempts/` hash bookkeeping, retired with the review-tool
+  slim — see `docs/superpowers/specs/2026-07-11-review-pr-code-mmr-slim-design.md`.)
+- **Review policy lives in `docs/review-standards.md`** — the single home for
+  fix threshold, round budget, verdict handling, verify-don't-dismiss, and
+  channel rules. The meta-prompts point there; consuming projects may ship
+  their own.
 
 **Quick reference** (when `scaffold run` is unavailable):
 <!-- Escape hatch only. Canonical commands live in content/tools/review-pr.md.
