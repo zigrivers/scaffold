@@ -48,8 +48,8 @@ if [ "${BEADS_DESTRUCTIVE_OK:-0}" = "1" ]; then exit 0; fi
 # <dir>`, that target too (a destructive `bd -C <populated> bootstrap` run from
 # an empty cwd must still be caught).
 target=""
-if [[ "$scan" =~ (-C|--directory)[[:space:]]+([^[:space:]]+) ]]; then
-	target="${BASH_REMATCH[2]}"
+if [[ "$scan" =~ (-C|--directory)(=|[[:space:]]+)([^[:space:]]+) ]]; then
+	target="${BASH_REMATCH[3]}"
 fi
 db_populated() {
 	local base="${1:-.}"
@@ -59,22 +59,36 @@ db_populated() {
 }
 populated=0
 db_populated "." && populated=1
-[ -n "$target" ] && db_populated "$target" && populated=1
+if [ -n "$target" ]; then
+	# A retarget we cannot resolve to a concrete path — a shell variable, tilde,
+	# glob, command substitution, or a quoted path whose spaces truncate the
+	# captured token — must be treated as populated: a destructive command aimed
+	# at a checkout we can't prove empty is exactly the accident to prevent (the
+	# deliberate case uses BEADS_DESTRUCTIVE_OK=1).
+	case "$target" in
+		*'$'* | *'`'* | *'~'* | *'*'* | *'"'* | *"'"*) populated=1 ;;
+		*) db_populated "$target" && populated=1 ;;
+	esac
+fi
 [ "$populated" = "1" ] || exit 0
 
-# `bd`/`rm`/`dolt` must appear as their own token, not the tail of another word.
-# The boundary class excludes `/` so a path-qualified binary
-# (/opt/homebrew/bin/bd) is caught; `opt` permits global option tokens (e.g.
-# `-C <dir>`, `--db <path>`) between `bd` and its subcommand so `bd -C /x
-# bootstrap` is caught; `.beads` is anchored to a real boundary so a sibling like
-# `.beads-backups` is not a false positive.
-b='(^|[^[:alnum:]_.-])'
+# The destructive token must be the COMMAND the segment RUNS, not a word that
+# merely appears inside it — otherwise `bd create "fix the bd bootstrap trap"` or
+# `git commit -m "explain bd bootstrap"` (pervasive in Beads projects) would be
+# blocked. So each pattern is anchored to the START of the (already
+# whitespace-stripped) segment, permitting only leading VAR=value env-assignments
+# and an optional path prefix before the binary. `opt` permits global option
+# tokens (e.g. `-C <dir>`, `--db <path>`) between `bd` and its subcommand so
+# `bd -C /x bootstrap` is caught; the path prefix catches `/opt/homebrew/bin/bd`;
+# `.beads` is anchored to a real boundary so `.beads-backups` is not a false
+# positive.
+start='^([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)*([^[:space:]]*/)?'
 opt='([[:space:]]+-[A-Za-z-]+(=[^[:space:]]*)?([[:space:]]+[^-[:space:]][^[:space:]]*)?)*'
-dangerous="${b}bd${opt}[[:space:]]+bootstrap([[:space:]|;&]|\$)"
-dangerous="${dangerous}|${b}bd${opt}[[:space:]]+init[^|;&]*--(force|reinit-local|discard-remote|destroy-token)"
-dangerous="${dangerous}|${b}bd${opt}[[:space:]]+admin[[:space:]]+reset"
-dangerous="${dangerous}|${b}rm[[:space:]][^|;&]*\.beads([[:space:]/|;&]|\$)"
-dangerous="${dangerous}|${b}dolt[[:space:]][^|;&]*\.beads([[:space:]/|;&]|\$)"
+dangerous="${start}bd${opt}[[:space:]]+bootstrap([[:space:]|;&]|\$)"
+dangerous="${dangerous}|${start}bd${opt}[[:space:]]+init[^|;&]*--(force|reinit-local|discard-remote|destroy-token)"
+dangerous="${dangerous}|${start}bd${opt}[[:space:]]+admin[[:space:]]+reset"
+dangerous="${dangerous}|${start}rm[[:space:]][^|;&]*\.beads([[:space:]/|;&]|\$)"
+dangerous="${dangerous}|${start}dolt[[:space:]][^|;&]*\.beads([[:space:]/|;&]|\$)"
 
 # Evaluate PER command segment (split on ; & |, so || && collapse too). An inline
 # override authorizes ONLY the segment it directly prefixes — so

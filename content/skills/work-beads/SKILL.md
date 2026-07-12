@@ -150,8 +150,11 @@ Beads filed (open): <id - one-line title - or none>
 ```
 
 Before reporting, refresh the durability net (feature-detect; skip silently
-when the target is absent): `make beads-snapshot` — one batch-end snapshot
-covers every bead closed above.
+when the target is absent): `make beads-snapshot`, then COMMIT the refreshed
+restore copy so it is durable — `git add .beads/issues.jsonl && git commit -m
+"chore(beads): refresh restore snapshot" || true` (a no-op when nothing
+changed). Uncommitted, the copy is stranded locally and a later reset destroys
+it. One batch-end snapshot covers every bead closed above.
 
 If the batch ran long and `launchpad` is installed: `launchpad notify "<summary>"`.
 

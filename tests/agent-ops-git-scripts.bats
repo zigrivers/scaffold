@@ -331,6 +331,33 @@ EOF
     [ "$status" -eq 2 ]
     run bash -c "cd '$CLONE_DIR/empty' && '$CLONE_DIR/scripts/bd-guard.sh' --check 'bd bootstrap'"
     [ "$status" -eq 0 ]
+    # equals form (--directory=<dir>) is judged against the target too
+    run bash -c "cd '$CLONE_DIR/empty' && '$CLONE_DIR/scripts/bd-guard.sh' --check 'bd --directory=$CLONE_DIR/primary bootstrap'"
+    [ "$status" -eq 2 ]
+}
+
+@test "bd-guard: conservatively blocks a -C retarget it cannot resolve (variable/tilde/quoted)" {
+    rm -rf "$CLONE_DIR/.beads"
+    mkdir -p "$CLONE_DIR/empty3"
+    for c in 'bd -C "$PRIMARY" bootstrap' 'bd --directory ~/proj bootstrap' 'bd -C "$(pwd)/p" bootstrap'; do
+        run bash -c "cd '$CLONE_DIR/empty3' && '$CLONE_DIR/scripts/bd-guard.sh' --check '$c'"
+        [ "$status" -eq 2 ] || { echo "not blocked (unresolvable target): $c"; false; }
+    done
+}
+
+@test "bd-guard: does NOT block a safe command that merely mentions a destructive one in an argument" {
+    mkdir -p "$CLONE_DIR/.beads/embeddeddolt"
+    for c in 'bd create "Document the bd bootstrap trap"' \
+             'git commit -m "explain bd bootstrap risk"' \
+             'bd update x --notes "ran bd bootstrap by mistake"' \
+             'echo see docs about bd bootstrap' \
+             'git commit -m "note: never rm -rf .beads"'; do
+        run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check '$c'"
+        [ "$status" -eq 0 ] || { echo "wrongly blocked: $c"; false; }
+    done
+    # …but a genuine leading invocation (even behind an env-assignment) is blocked
+    run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check 'BEADS_ACTOR=me bd bootstrap'"
+    [ "$status" -eq 2 ]
 }
 
 @test "beads-snapshot: writes issues.jsonl and syncs bd backup when configured" {
