@@ -164,12 +164,13 @@ remote; a `bd backup` target may be absent):
 2. `make beads-snapshot` — refresh the `.beads/issues.jsonl` restore copy and
    sync any configured `bd backup` full-history copy.
 `.beads/issues.jsonl` (refreshed by step 2) is a LOCAL, regenerable restore copy
-— `bd export` recreates it from the DB — NOT an off-machine copy, so nothing here
-is the durability guarantee: that is step 1's Dolt remote plus step 2's `bd
-backup` full-history copy, both of which survive a reset or a lost machine even
-if this local copy is never committed. Let the refreshed copy ride your project's
-normal beads-commit flow; do NOT force a direct commit onto a protected base
-branch or push one outside the PR flow.
+— `bd export` recreates it from the DB. Durability is layered: step 1's Dolt
+remote is the OFF-MACHINE copy (survives a lost machine); step 2's `bd backup`
+(default target `$HOME/.beads-backups`, same machine) survives checkout deletion
+or a reset but NOT machine loss unless you point it at a remote (DoltHub/S3); the
+JSONL copy is neither — commit it through your project's normal beads-commit flow.
+Do NOT force a direct commit onto a protected base branch or push one outside the
+PR flow.
 
 One batch-end pass covers every bead closed above.
 

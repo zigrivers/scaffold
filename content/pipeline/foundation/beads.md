@@ -165,9 +165,9 @@ existing setup updates rather than re-initializes.
    Opt-in since Beads v1.0.4. Upstream treats the Dolt database as the source of
    truth and JSONL as an export/interchange copy; we enable auto-export + git-add
    so `.beads/issues.jsonl` stays current and **staged** (`export.git-add` runs
-   `git add` only — commit it in your normal commits, and the work-beads skill's
-   batch-end step commits any refresh, so an uncommitted copy is never stranded).
-   It is the issue-level restore copy `make beads-snapshot` refreshes and the
+   `git add` only — commit it in your normal commits; it is a regenerable local
+   copy, so the durability guarantee is the Dolt remote plus `bd backup`, not this
+   file). It is the issue-level restore copy `make beads-snapshot` refreshes and the
    recovery source that survived a real database wipe.
 
 6. **Configure a full-fidelity backup** (Dolt history included — `bd export`

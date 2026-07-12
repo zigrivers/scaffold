@@ -291,7 +291,13 @@ EOF
     mkdir -p "$CLONE_DIR/.beads/embeddeddolt"
     run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check 'rm -rf .beads-backups'"
     [ "$status" -eq 0 ]
+    # the same holds for a QUOTED .beads-backups path (mask preserves only real .beads)
+    run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check 'rm -rf \"\$HOME/.beads-backups/project\"'"
+    [ "$status" -eq 0 ]
     run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check 'rm -rf .beads'"
+    [ "$status" -eq 2 ]
+    # …but a quoted real .beads path is still blocked
+    run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check 'rm -rf \"\$PWD/.beads\"'"
     [ "$status" -eq 2 ]
 }
 

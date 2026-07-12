@@ -51,9 +51,12 @@ scan=$(printf '%s' "$cmd" | awk 'BEGIN{ORS=""} { if (sub(/\\$/,"")) printf "%s",
 # conservatively blocked) — while a bead title / commit message that merely
 # mentions `.beads` stays anchored to its own (non-rm) command and is not a false
 # positive. Every other quoted literal collapses to the bare `_Q_` placeholder.
-mcmd=$(printf '%s' "$scan" | sed \
-	-e 's#"[^"]*\.beads[^"]*"# _Q_/.beads #g' \
-	-e "s#'[^']*\.beads[^']*'# _Q_/.beads #g" \
+# Preserve only a quoted path whose component IS `.beads` (`.beads` followed by
+# `/` or the closing quote) — NOT a sibling like `.beads-backups`, so
+# `rm -rf "$HOME/.beads-backups/x"` is not a false positive.
+mcmd=$(printf '%s' "$scan" | sed -E \
+	-e 's#"[^"]*\.beads(/[^"]*)?"# _Q_/.beads #g' \
+	-e "s#'[^']*\.beads(/[^']*)?'# _Q_/.beads #g" \
 	-e 's/"[^"]*"/_Q_/g' \
 	-e "s/'[^']*'/_Q_/g")
 
@@ -106,14 +109,18 @@ any_risky() {
 # `.beads` is anchored so `.beads-backups` is not a false positive.
 #
 # KNOWN, ACCEPTED limits (this is an accident net, not a security boundary; see
-# the header): a destructive token deliberately hidden inside QUOTES is masked and
-# not inspected — a command passed as a quoted string to another interpreter
+# the header). Not inspected (a destructive token deliberately hidden inside
+# QUOTES): a command passed as a quoted string to another interpreter
 # (`bash -c "bd bootstrap"`, `sh -c "…"`, `eval "…"`), a command substitution
 # nested inside double quotes (`echo "$(bd bootstrap)"`), or a quoted subcommand /
-# flag (`bd "bootstrap"`, `bd init '--reinit-local'`). Quoting a bare keyword like
-# that is deliberate, not an accident. The layered durability defenses
-# (push-before-reset, the committed JSONL restore copy, the `bd backup`
-# full-history copy, and bd's own destroy-token refusals) are the real guarantee.
+# flag (`bd "bootstrap"`, `bd init '--reinit-local'`). Conversely, a heredoc/
+# multiline DATA line that literally reads `bd bootstrap` (e.g. writing a doc or
+# script) may be over-blocked — that is the SAFE direction for an accident net
+# (heredoc parsing is deliberately omitted because a spurious `<<` match could
+# hide a real command); set BEADS_DESTRUCTIVE_OK=1 for that one call. The layered
+# durability defenses (push-before-reset, the committed JSONL restore copy, the
+# `bd backup` full-history copy, and bd's own destroy-token refusals) are the real
+# guarantee.
 start='^([^[:space:]]*/)?'
 # Global option tokens between `bd` and its subcommand. A VALUE-TAKING global flag
 # consumes its value (spaced or =); every OTHER flag is boolean and consumes only
