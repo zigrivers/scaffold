@@ -83,7 +83,10 @@ session id must match `^[a-zA-Z0-9_-]+$`, so sanitize the branch name (strip
 
 ```bash
 BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
-SESSION_ID="local-$(printf '%s' "$BRANCH" | tr -c 'a-zA-Z0-9_-' '-')"
+# Repo-qualify the session so the same branch name in different repos doesn't
+# share round state. Sanitize to MMR's id rule (^[a-zA-Z0-9_-]+$).
+REPO=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" | tr -c 'a-zA-Z0-9_-' '-')
+SESSION_ID="local-$REPO-$(printf '%s' "$BRANCH" | tr -c 'a-zA-Z0-9_-' '-')"
 ROUND="${ROUND:-1}"
 MMR_FLAGS=(--session "$SESSION_ID" --round "$ROUND" --max-rounds 3 --sync --format json)
 [ -n "$FIX_THRESHOLD" ] && MMR_FLAGS+=(--fix-threshold "$FIX_THRESHOLD")
@@ -96,12 +99,16 @@ review output so Step 3 has a real `JOB_ID`:
 ```bash
 STAGED_ONLY=false; [[ "$ARGUMENTS" == *--staged* ]] && STAGED_ONLY=true
 
+# mmr exits 0 pass/degraded · 2 blocked · 3 needs-user-decision — the exit code
+# IS the verdict, so capture it without aborting the routing (matters under
+# `set -e`); `|| MMR_EXIT=$?` on each branch does that.
+MMR_EXIT=0
 if [ "$STAGED_ONLY" = true ]; then
   # --staged → staged changes only:
-  MMR_RESULT=$(mmr review --staged "${MMR_FLAGS[@]}")
+  MMR_RESULT=$(mmr review --staged "${MMR_FLAGS[@]}") || MMR_EXIT=$?
 elif [ -n "$BASE_REF" ]; then
   # --base/--head → explicit ref range (base-only defaults head to HEAD):
-  MMR_RESULT=$(mmr review --base "$BASE_REF" ${HEAD_REF:+--head "$HEAD_REF"} "${MMR_FLAGS[@]}")
+  MMR_RESULT=$(mmr review --base "$BASE_REF" ${HEAD_REF:+--head "$HEAD_REF"} "${MMR_FLAGS[@]}") || MMR_EXIT=$?
 else
   # No flags → full local delivery candidate: committed branch diff + staged +
   # unstaged, synthesized into one bundle and piped in. `mmr review` with no
@@ -122,7 +129,7 @@ else
   # upstream drift. `git diff <merge-base>` covers committed branch work + staged
   # + unstaged in one coherent patch.
   MERGE_BASE=$(git merge-base "$TRUNK" HEAD 2>/dev/null || echo "$TRUNK")
-  MMR_RESULT=$(git diff "$MERGE_BASE" | mmr review --diff - "${MMR_FLAGS[@]}")
+  MMR_RESULT=$(git diff "$MERGE_BASE" | mmr review --diff - "${MMR_FLAGS[@]}") || MMR_EXIT=$?
 fi
 
 echo "$MMR_RESULT"   # surface the review JSON
@@ -188,5 +195,5 @@ single-source per channel and can reach at most `degraded-pass`.
 3. **Foreground only** — never background any CLI review (`&`, `nohup`, `run_in_background` produce empty output).
 4. **Independence** — never share one channel's output with another.
 5. **Fix before proceeding** — resolve findings at or above the fix threshold before the next task; policy in `docs/review-standards.md`.
-6. **Native round-bounding** — always pass `--session`/`--max-rounds`; do not reintroduce wrapper-side attempt bookkeeping.
+6. **Native round-bounding** — always pass `--session`/`--round`/`--max-rounds` (the cap is inert without `--round`); do not reintroduce wrapper-side attempt bookkeeping.
 7. **Consistency** — when changing dispatch here, keep `review-pr.md` and `post-implementation-review.md` in sync (`multi-model-review-dispatch` knowledge).

@@ -145,7 +145,7 @@ is derived from gate result + channel health.
 `needs-user-decision`, never merge automatically — surface the verdict and the
 remaining findings to the user. The wrappers enforce this: report only says the
 PR is merge-ready on `pass` / `degraded-pass`
-:cite[content/tools/review-pr.md:134].
+:cite[content/tools/review-pr.md:140].
 :::
 
 ## Step 4 — Fix the blocking findings (bounded)
@@ -175,13 +175,13 @@ stop conditions:
 
 When you stop, **do not merge**. Document each unresolved finding (severity,
 location, attempt count) and hand the decision to the user
-:cite[content/tools/review-pr.md:134].
+:cite[content/tools/review-pr.md:140].
 
 ### How the round budget is enforced
 
 Round-bounding is **native** to the engine. The wrappers pass `mmr review
 --session <id> --round <N> --max-rounds 3`
-:cite[content/tools/review-pr.md:79], incrementing `--round` each fix round
+:cite[content/tools/review-pr.md:81], incrementing `--round` each fix round
 (`--round` is required — MMR compares it against `--max-rounds`, so without it
 every call is round 1 and the cap never fires). MMR enforces the budget using a
 stable, line-number-independent `finding_key`
@@ -233,7 +233,7 @@ what it means for *your* workflow.
 to invoking Codex / Gemini / Claude / Grok directly, run them as **foreground**
 Bash calls — never with `run_in_background`, `&`, or `nohup`. Background
 execution produces empty output, which the parser then reads as a degraded
-channel :cite[content/tools/review-code.md:188].
+channel :cite[content/tools/review-code.md:195].
 :::
 
 Once any channel was compensated, the best possible verdict is

@@ -36,7 +36,7 @@ const PHASE_ORDER = [
 //
 // 4th-channel note: the Superpowers code-reviewer reconcile path requires a
 // harness that can dispatch agent skills (e.g. Claude Code). Codex has no
-// such loader, so the recipes below run the 3 MMR CLI channels only and
+// such loader, so the recipes below run the 4 MMR CLI channels only and
 // point users at the Claude Code path when they need 4-channel coverage.
 //
 // Source-of-truth meta-prompts: `content/tools/review-code.md` and
@@ -47,7 +47,7 @@ const PHASE_ORDER = [
 // is deliberately omitted.
 const CODEX_EXECUTOR_RECIPES: Record<string, string> = {
   'review-code': `Run multi-model review on local code before commit or push
-(3 MMR CLI channels: Codex, Antigravity, Claude). Pick **one** of the three modes
+(4 MMR CLI channels: Codex, Claude, Grok, Antigravity). Pick **one** of the three modes
 below.
 
 **Mode 1 — full local delivery candidate** (committed branch diff + staged
@@ -101,7 +101,7 @@ harness that can dispatch agent skills. Codex cannot do this directly — for
 instead.`,
 
   'review-pr': `Run multi-model review on a pull request
-(3 MMR CLI channels: Codex, Antigravity, Claude).
+(4 MMR CLI channels: Codex, Claude, Grok, Antigravity).
 
 \`\`\`bash
 # Detect PR number from current branch, or set explicitly:

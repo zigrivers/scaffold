@@ -129,10 +129,15 @@ Surgical edits only:
 ### F. `src/core/adapters/codex.ts` — sync the hardcoded recipe
 
 The Codex executor recipes for `review-pr`/`review-code` are hand-maintained
-copies that must track the meta-prompt. Update their `mmr review` flags to add
-`--session`/`--max-rounds`. Keep their deliberate omission of the Superpowers
-channel (Codex treats `scaffold run` stdout as a final result, not executable
-steps).
+copies that must track the meta-prompt. **Round-bounding (`--session`/`--round`/
+`--max-rounds`) is deliberately NOT added to the Codex recipes:** Codex runs a
+recipe once (single shot, no fix loop), so the round cap has nothing to bound;
+and a hardcoded session id like `BRANCH_NAME@main` would violate MMR's session
+rule (`^[a-zA-Z0-9_-]+$`) and error out. The recipes keep their deliberate
+omission of the Superpowers channel too (Codex treats `scaffold run` stdout as a
+final result, not executable steps). (Revised during dogfooding — round 3 of the
+PR #761 review surfaced that adding these flags to Codex is both invalid and
+pointless.)
 
 ## Verification (TDD)
 

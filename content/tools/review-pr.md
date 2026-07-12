@@ -76,9 +76,15 @@ the cap never fires. `ROUND` starts at 1 and increments each fix round (Step 4).
 
 ```bash
 ROUND="${ROUND:-1}"
-MMR_FLAGS=(--pr "$PR_NUMBER" --session "pr-$PR_NUMBER" --round "$ROUND" --max-rounds 3 --sync --format json)
+# Repo-qualify the session so PR #N in different repos don't share round state.
+REPO=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" | tr -c 'a-zA-Z0-9_-' '-')
+MMR_FLAGS=(--pr "$PR_NUMBER" --session "pr-$REPO-$PR_NUMBER" --round "$ROUND" --max-rounds 3 --sync --format json)
 [ -n "$FIX_THRESHOLD" ] && MMR_FLAGS+=(--fix-threshold "$FIX_THRESHOLD")
-MMR_RESULT=$(mmr review "${MMR_FLAGS[@]}")
+# mmr exits 0 pass/degraded · 2 blocked · 3 needs-user-decision — the exit code
+# IS the verdict, so capture it without aborting (matters under `set -e`).
+MMR_EXIT=0
+MMR_RESULT=$(mmr review "${MMR_FLAGS[@]}") || MMR_EXIT=$?
+echo "$MMR_RESULT"
 JOB_ID=$(echo "$MMR_RESULT" | grep -o '"job_id": "[^"]*"' | head -1 | cut -d'"' -f4)
 ```
 
@@ -149,5 +155,5 @@ fallback is single-source per channel and can reach at most `degraded-pass`.
 3. **Foreground only** — never background any CLI review (`&`, `nohup`, `run_in_background` produce empty output).
 4. **Independence** — never share one channel's output with another.
 5. **Fix before proceeding** — resolve findings at or above the fix threshold before the next task; policy in `docs/review-standards.md`.
-6. **Native round-bounding** — always pass `--session`/`--max-rounds`; do not reintroduce wrapper-side attempt bookkeeping.
+6. **Native round-bounding** — always pass `--session`/`--round`/`--max-rounds` (the cap is inert without `--round`); do not reintroduce wrapper-side attempt bookkeeping.
 7. **Consistency** — when changing dispatch here, keep `review-code.md` and `post-implementation-review.md` in sync (`multi-model-review-dispatch` knowledge).
