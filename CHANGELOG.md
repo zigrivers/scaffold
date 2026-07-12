@@ -2,6 +2,45 @@
 
 All notable changes to Scaffold are documented here.
 
+## [3.41.0] - 2026-07-12
+
+### Changed
+
+- **`review-pr` / `review-code` meta-prompts slimmed to the MMR-dispatch core**
+  (`content/tools/review-pr.md` 676→166 lines, `content/tools/review-code.md`
+  821→208 lines). Both now run **one** `mmr review` invocation and let the CLI
+  own channel dispatch, reconciliation, compensating passes, and verdict,
+  instead of the agent hand-executing hundreds of lines of shell. The Superpowers
+  agent channel stays mandatory as a single crisp `mmr reconcile --channel
+  superpowers` step. Completes PR #759's direction (which was CI-failing and
+  incomplete).
+- **Native round-bounding replaces the wrapper-side 3-strike bookkeeping.** The
+  prompts pass `mmr review --session <id> --round <N> --max-rounds 3` (MMR
+  enforces the budget with its stable `finding_key`). `--round` is required —
+  without it the cap is inert. `CLAUDE.md` and the `review-workflow` guide are
+  reconciled to match.
+- **README** review-tooling descriptions corrected to four MMR CLI channels
+  (Codex, Claude, Grok, Antigravity) with Superpowers as the fifth channel.
+
+### Added
+
+- **`docs/review-standards.md`** — the single home for review policy (fix
+  threshold, round budget, verdict handling, verify-don't-dismiss, channel
+  rules). The meta-prompts point here; consuming projects may ship their own.
+- **Knowledge-freshness batch** (#747–#756) — frontmatter refresh of ten
+  knowledge entries (`security-best-practices` + nine `web3-*`): `last-reviewed`
+  stamps, source content hashes, and retrieval dates. Prose unchanged.
+
+### Removed
+
+- **The wrapper-side per-finding hash bookkeeping** (`.scaffold/review-attempts/`,
+  `tests/review-wrapper-hash.bats`) — superseded by MMR-native round-bounding.
+- **BREAKING (opt-in feature):** the automated Beads bridge
+  (`beads.create_issues_from_blocking_findings` → `bd create`) is removed from
+  `review-pr`/`review-code`. Projects that set that flag no longer get findings
+  auto-filed as Beads; file them manually per `docs/review-standards.md`
+  (round-budget escalation). No `scaffold` CLI command or flag changed.
+
 ## [3.40.0] - 2026-07-11
 
 ### Added
