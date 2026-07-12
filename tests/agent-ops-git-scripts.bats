@@ -322,11 +322,12 @@ EOF
     mkdir -p "$CLONE_DIR/pop2/.beads/embeddeddolt"
     run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check 'bd -C $CLONE_DIR/pop2 bootstrap'"
     [ "$status" -eq 2 ]
-    # -C to an EMPTY target retargets AWAY from the populated cwd → allowed (a safe
-    # fresh-clone bootstrap that never touches the populated checkout)
-    mkdir -p "$CLONE_DIR/fresh"
-    run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check 'bd -C $CLONE_DIR/fresh bootstrap'"
+    # -C to a genuinely-independent EMPTY target (NOT nested under a populated
+    # tree, so bd's upward discovery finds nothing) retargets away → allowed
+    local freshdir; freshdir="$(mktemp -d)"
+    run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check 'bd -C $freshdir bootstrap'"
     [ "$status" -eq 0 ]
+    rm -rf "$freshdir"
     # a non-destructive subcommand behind global opts is still allowed
     run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check 'bd -C /some/path ready'"
     [ "$status" -eq 0 ]
@@ -349,6 +350,31 @@ EOF
     mkdir -p "$CLONE_DIR/fresh4"
     run bash -c "cd '$CLONE_DIR/empty4' && '$CLONE_DIR/scripts/bd-guard.sh' --check 'cd $CLONE_DIR/fresh4 && bd bootstrap'"
     [ "$status" -eq 0 ]
+}
+
+@test "bd-guard: catches attached -C<dir>, upward discovery, and a .beads redirect" {
+    # attached short-option form `bd -C<dir>` (bd/pflag accepts it)
+    rm -rf "$CLONE_DIR/.beads"
+    mkdir -p "$CLONE_DIR/pop7/.beads/embeddeddolt" "$CLONE_DIR/here7"
+    run bash -c "cd '$CLONE_DIR/here7' && '$CLONE_DIR/scripts/bd-guard.sh' --check 'bd -C$CLONE_DIR/pop7 bootstrap'"
+    [ "$status" -eq 2 ]
+    # bootstrap in a SUBDIR of a populated tree — bd discovers the parent's DB
+    mkdir -p "$CLONE_DIR/pop7/sub"
+    run bash -c "cd '$CLONE_DIR/pop7/sub' && '$CLONE_DIR/scripts/bd-guard.sh' --check 'bd bootstrap'"
+    [ "$status" -eq 2 ]
+    # a .beads that is a redirect (no local DB dir) is treated as populated
+    mkdir -p "$CLONE_DIR/redir7/.beads"; : > "$CLONE_DIR/redir7/.beads/redirect"
+    run bash -c "cd '$CLONE_DIR/redir7' && '$CLONE_DIR/scripts/bd-guard.sh' --check 'bd bootstrap'"
+    [ "$status" -eq 2 ]
+}
+
+@test "bd-guard: a reliable 'cd <fresh> && bd bootstrap' from a populated cwd is allowed (no over-block)" {
+    # no grouping → the cd is trustworthy → judged only against the fresh target
+    mkdir -p "$CLONE_DIR/.beads/embeddeddolt"
+    local freshdir; freshdir="$(mktemp -d)"
+    run bash -c "cd '$CLONE_DIR' && scripts/bd-guard.sh --check 'cd $freshdir && bd bootstrap'"
+    [ "$status" -eq 0 ]
+    rm -rf "$freshdir"
 }
 
 @test "bd-guard: cd-tracking is SOUND — never allows a bootstrap that runs in the populated cwd" {

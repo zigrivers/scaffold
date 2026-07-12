@@ -61,11 +61,26 @@ mcmd=$(printf '%s' "$scan" | sed \
 # per-segment analysis (the common case — every other Bash command the hook sees).
 printf '%s' "$mcmd" | grep -qE 'bootstrap|init|admin|\.beads' || exit 0
 
+# Populated when the directory (or, following bd's own upward auto-discovery, any
+# ancestor before the first `.beads` is reached) holds a real Beads DB or a
+# redirect. This matters for worktrees/subdirs: `bd bootstrap` there operates on
+# whichever `.beads` bd discovers, not necessarily one directly under the cwd.
 db_populated() {
-	local base="${1:-.}"
-	[ -d "$base/.beads/embeddeddolt" ] && return 0
-	[ -d "$base/.beads/dolt" ] && return 0
-	compgen -G "$base/.beads/*.db" >/dev/null 2>&1
+	local base
+	base="$(cd "${1:-.}" 2>/dev/null && pwd -P)" || return 1
+	while :; do
+		if [ -e "$base/.beads/redirect" ] \
+			|| [ -d "$base/.beads/embeddeddolt" ] \
+			|| [ -d "$base/.beads/dolt" ] \
+			|| compgen -G "$base/.beads/*.db" >/dev/null 2>&1; then
+			return 0
+		fi
+		# A `.beads` with none of the above is not a recognized populated DB, and
+		# bd would discover THIS one — stop the upward search here.
+		[ -d "$base/.beads" ] && return 1
+		[ "$base" = "/" ] && return 1
+		base="$(dirname "$base")"
+	done
 }
 
 # Block if ANY candidate directory holds a populated DB, or is "?" — a target we
@@ -99,7 +114,9 @@ any_risky() {
 # copy, the `bd backup` full-history copy, and bd's own destroy-token refusals)
 # are the real guarantee.
 start='^([^[:space:]]*/)?'
-opt='([[:space:]]+-[A-Za-z-]+(=[^[:space:]]*)?([[:space:]]+[^-[:space:]][^[:space:]]*)?)*'
+# A global option token is `-<anything-non-space>` (covers `-C`, an attached
+# `-C/path` or `--db=/x`, and long flags), optionally followed by a spaced value.
+opt='([[:space:]]+-[^[:space:]]+([[:space:]]+[^-[:space:]][^[:space:]]*)?)*'
 dangerous="${start}bd${opt}[[:space:]]+bootstrap([[:space:]|;&]|\$)"
 dangerous="${dangerous}|${start}bd${opt}[[:space:]]+init[^;&|]*--(force|reinit-local|discard-remote|destroy-token)"
 dangerous="${dangerous}|${start}bd${opt}[[:space:]]+admin[[:space:]]+reset"
@@ -111,16 +128,23 @@ dangerous="${dangerous}|${start}dolt[[:space:]][^;&|]*\.beads([[:space:]/|;&]|\$
 # all safe to split on now that quoted literals are masked, so `(bd bootstrap)`,
 # `{ bd bootstrap; }`, and a bare `$(bd bootstrap)` expose their inner command.
 #
-# Track a leading `cd <dir>` only when it is a TRUSTWORTHY ABSOLUTE path — a real
-# shell's cwd is also moved by `cd -`, relative targets, and cd's scoped inside
-# subshells/command-substitutions that this flat split cannot model, so anything
-# else makes the chain cwd UNKNOWN ("?"). A non-`-C` destructive command is ALWAYS
-# judged against the real hook cwd (".") too, so cd-tracking can only ever ADD
-# blocking — never make the guard less safe than checking the cwd directly.
+# Track a leading `cd <dir>` only when it is a TRUSTWORTHY ABSOLUTE path — `cd -`,
+# relative targets, and cd's scoped inside subshells/command-substitutions make
+# the chain cwd UNKNOWN ("?"). When the command contains ANY grouping
+# (`( ) { }`/backtick — where a flat split cannot model cd scope), a non-`-C`
+# destructive command is ALSO judged against the real hook cwd (".") so
+# cd-tracking can never make the guard less safe (e.g. `x=$(cd /fresh && pwd);
+# bd bootstrap` from a populated cwd still blocks). Without grouping, a reliable
+# `cd /fresh && bd bootstrap` is judged only against /fresh — no false positive.
 cdre='^cd[[:space:]]+([^[:space:]]+)'
-c_re='(-C|--directory)(=|[[:space:]]+)([^[:space:]]+)'
+# `-C <dir>` / `-C=<dir>` / attached `-C<dir>` / `--directory <dir>` / `--directory=<dir>`.
+c_re='(-C[[:space:]]*|-C=|--directory[[:space:]]+|--directory=)([^[:space:]]+)'
 rmdolt='(^|[^[:alnum:]_.-])(rm|dolt)[[:space:]]'
 bpath='([^[:space:]]*)\.beads'
+case "$mcmd" in
+	*'('* | *')'* | *'{'* | *'}'* | *'`'*) has_grouping=1 ;;
+	*) has_grouping=0 ;;
+esac
 segments=$(printf '%s' "$mcmd" | tr ';&|(){}\140\n' '\n\n\n\n\n\n\n\n\n')
 blocked=0
 chain="."
@@ -175,15 +199,17 @@ while IFS= read -r seg; do
 	# `bd -C <dir>` is an explicit, unambiguous retarget — judge it ALONE
 	# (absolute → that dir; anything else, incl. relative/masked/variable → "?").
 	if [[ "$seg" =~ $c_re ]]; then
-		case "${BASH_REMATCH[3]}" in
-			/*) if any_risky "${BASH_REMATCH[3]}"; then blocked=1; break; fi ;;
+		case "${BASH_REMATCH[2]}" in
+			/*) if any_risky "${BASH_REMATCH[2]}"; then blocked=1; break; fi ;;
 			*) blocked=1; break ;;
 		esac
 		continue
 	fi
-	# Otherwise judge the real cwd "." AND the chain cwd; for rm/dolt also the
+	# Otherwise judge the chain cwd, plus the real hook cwd "." when the command has
+	# grouping (cd scope is then unmodelable) or no cd happened; for rm/dolt also the
 	# directory holding the named `.beads` (absolute → that dir; relative → "?").
-	dirs=(".")
+	dirs=()
+	if [ "$has_grouping" = "1" ] || [ "$chain" = "." ]; then dirs+=("."); fi
 	if [ "$chain" != "." ]; then dirs+=("$chain"); fi
 	if printf '%s' "$seg" | grep -qE "$rmdolt" && [[ "$seg" =~ $bpath ]]; then
 		d="${BASH_REMATCH[1]%/}"
