@@ -111,12 +111,16 @@ merge on a red gate. Never `docker system prune`.
 - The one thing that still blocks the merge: a verified, still-reproducing
   real P0 — file it, keep the PR open, post the reproduction, notify the user,
   end the batch.
-- 3+ agents active? Serialize the merge: `bd merge-slot acquire --wait` (if
-  the project's Beads has merge-slots), release after merging.
-- Tear down your worktree's staging stack FIRST, from **inside the worktree**
-  (there it targets your per-worktree stack): `make staging-down`. Never run it
-  from the primary for a worktree stack — from the primary it selects the shared
-  QA stack and `down -v` would wipe that shared stack and its volumes.
+- 3+ agents active? Serialize the merge: `bd merge-slot acquire --wait` → merge
+  → `bd merge-slot release` (if the project's Beads has merge-slots) — release
+  even if the merge fails, or the slot stays held and blocks every other agent.
+- If the staging component is installed **and** you brought a stack up this bead
+  (`make staging-up`), tear it down FIRST from **inside the worktree** (there
+  `make staging-down` targets your per-worktree stack). Skip it when staging was
+  never installed or you never ran `staging-up` — `staging-down` exits non-zero
+  then and must not block the merge. Never run it from the primary: it refuses
+  there (from the primary it would select the shared QA stack and `down -v` its
+  volumes).
 - Merge: `gh pr merge <N> --squash --delete-branch`. Then from the primary:
   `make main-sync && make prune-merged` — `prune-merged` also reclaims any
   leftover worktree staging stack automatically (no separate `staging-down`
@@ -147,7 +151,7 @@ If the batch ran long and `launchpad` is installed: `launchpad notify "<summary>
 | Leave a TODO/FIXME comment | That work is a bead, filed now |
 | Merge with a red `make check` or Docker gate | Fix or file; never merge red |
 | Chase a clean review past round 3 | Degraded-pass self-merge is the documented path |
-| Leave the staging stack running | `make staging-down` from the worktree BEFORE merging (never from the primary; `prune-merged` reclaims it too) |
+| Leave a staging stack you started running | `make staging-down` from the worktree before merging (only if you ran `staging-up`; never from the primary — it refuses there, and `prune-merged` reclaims it too) |
 | `--no-verify`, plain `--force`, merge commits | Forbidden; `--force-with-lease` after rebase only |
 | Close the bead when the PR opens | Close only after MERGED + verified |
 | Prose summary instead of the Step 3 slots | The slots are the report format |

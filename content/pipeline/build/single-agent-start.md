@@ -180,9 +180,20 @@ legacy plan per the table — never past existing Beads state):
 
 ### Execute the Ship Loop
 
-**Sequential variant:** you work in the primary checkout on `<type>/<desc>`
-branches (no worktree, skip `setup-agent-worktree.sh`, skip merge-slot); every
-other step of the skill applies unchanged.
+**Sequential (solo) variant — one agent, no worktrees.** With exactly one agent
+there is no shared primary to protect, so the skill's "work only in
+`.worktrees/`, treat the primary as read-only" rule does **not** apply: you work
+directly in the primary checkout on `<type>/<desc>` branches. Skip
+`setup-agent-worktree.sh`, skip the merge-slot (nothing to serialize against),
+and skip the worktree-scoped `make staging-up/down`. One catch that the skill's
+multi-agent flow hides: `make main-sync` refuses to run while the primary sits on
+a feature branch — so after `gh pr merge <N> --squash --delete-branch`, check the
+default branch back out FIRST (`git checkout <default>` — `main`/`master`/`trunk`
+per the repo) BEFORE running `make main-sync && make prune-merged`. Every other
+step (draft PR on first push, `make check`, the 3-round review cap,
+close-after-merge) applies unchanged. The moment a second agent joins, the
+parallel-safety rules reactivate: move to `.worktrees/<name>` and treat the
+primary as shared/read-only again.
 
 From here, follow the **work-beads skill** exactly — it owns the per-bead loop
 (claim → worktree → build with draft-PR-on-first-push → verify → review with

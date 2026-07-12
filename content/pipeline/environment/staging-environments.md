@@ -1,7 +1,7 @@
 ---
 name: staging-environments
 description: Per-worktree Docker staging environments with deterministic port allocation for parallel agents
-summary: "Installs the agent-ops staging scripts and generates a compose file so every agent worktree gets its own isolated stack — deterministic ports derived from the worktree path, no collisions, orphan reaping, and a protected shared QA stack."
+summary: "Installs the agent-ops staging scripts and generates a compose file so every agent worktree gets its own isolated stack — deterministic, collision-resistant ports derived from the worktree path, orphan reaping, and a protected shared QA stack."
 phase: "environment"
 order: 315
 dependencies: [dev-env-setup]

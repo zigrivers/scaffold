@@ -17,7 +17,8 @@ a cache, a queue, the app itself — to exercise real behavior instead of
 mocks. If every worktree reaches for the same `docker-compose up`, they
 collide on ports, share (and corrupt) the same database, and one agent's
 `docker system prune` takes down every other agent's stack. Per-worktree
-staging environments solve this with deterministic, collision-free port and
+staging environments solve this with deterministic, collision-resistant (254
+slots; automatic collision warning + `STAGING_WT_OFFSET` override) port and
 network allocation derived purely from the worktree's filesystem path — no
 registry, no locking, no coordination between agents required.
 
@@ -36,8 +37,9 @@ absolute path — `O = (cksum(worktree_path) % 254) + 1`, always in `1..254`.
 Every service gets a 1000-wide port band (assigned in config, starting at
 20000); the worktree's host port for that service is `band + O`. Two
 worktrees only collide if their paths checksum to the same offset, which is
-rare enough in practice and has an escape hatch (`STAGING_WT_OFFSET`) for
-the case where it happens. The private subnet (`10.<O>.0.0/16`) uses the
+rare in practice; when it does happen, sourcing `staging-env.sh` prints a loud
+collision warning naming both worktrees, and `STAGING_WT_OFFSET` is the escape
+hatch to move one to a free slot. The private subnet (`10.<O>.0.0/16`) uses the
 same reduced offset, but the compose project name does not — it embeds the
 raw, unreduced checksum (`<project>-wt-<cksum>`), so container, network,
 and volume names stay distinct across worktrees even in the rare case where

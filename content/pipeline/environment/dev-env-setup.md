@@ -133,7 +133,8 @@ from its `##` comment rather than re-deriving it:
 | `make doctor-fix` | Repair unattended-safe primary-checkout problems | Agent-safe |
 | `make beads-snapshot` | Export the Beads DB to a local restore copy | Agent-safe |
 | `make staging-up` | Start this worktree's staging stack | Agent-safe (worktree-only) |
-| `make staging-down` | Stop this worktree's staging stack | Agent-safe |
+| `make staging-down` | Stop this worktree's staging stack | Agent-safe (worktree-only) |
+| `make staging-shared-down` | Destroy the shared QA stack (volumes included) | Ask-first |
 | `make staging-prune` | Reap orphaned per-worktree staging stacks | Agent-safe |
 | `make docker-doctor` | Show engine placement, warn on split-brain | Agent-safe |
 | `make tc-reap` | Remove leaked testcontainers from dead sessions | Agent-safe |
@@ -143,12 +144,14 @@ come from the agent-ops **git** component, installed by the git-workflow
 step at most depths (its custom depth 1-2 does not install it) — add these
 five rows only once `agent-ops.mk` is included in the Makefile and
 `scripts/setup-agent-worktree.sh` exists. `staging-up`, `staging-down`,
-`staging-prune`, `docker-doctor`, and `tc-reap` come from the agent-ops
-**staging** component, installed only when the staging-environments step
-ran (conditional on containerized services). The staging targets guard
-themselves (`staging component not installed`) when `scripts/ops/` is
-absent, so only add those five rows once `ops/compose/staging.yml` or
-`scripts/ops/staging-env.sh` actually exists. In both cases the rule is
+`staging-shared-down`, `staging-prune`, `docker-doctor`, and `tc-reap` come
+from the agent-ops **staging** component, installed only when the
+staging-environments step ran (conditional on containerized services). The
+staging targets guard themselves (`staging component not installed`) when
+`scripts/ops/` is absent, so only add those rows once `ops/compose/staging.yml`
+or `scripts/ops/staging-env.sh` actually exists. `staging-shared-down` is the
+one **ask-first** target — it destroys the shared QA stack and its volumes and
+runs only from the primary checkout. In both cases the rule is
 the same: never add a row for a target that isn't installed yet.
 
 **Sequencing note.** This step runs at phase order 310 — before both
