@@ -1537,7 +1537,7 @@ is derived from gate result + channel health.</p>
 <code>needs-user-decision</code>, never merge automatically — surface the verdict and the
 remaining findings to the user. The wrappers enforce this: report only says the
 PR is merge-ready on <code>pass</code> / <code>degraded-pass</code>
-<span class="fp" data-path="content/tools/review-pr.md:140">content/tools/review-pr.md:140</span>.</p></div>
+<span class="fp" data-path="content/tools/review-pr.md:147">content/tools/review-pr.md:147</span>.</p></div>
 <h2 id="step-4-fix-the-blocking-findings-bounded">Step 4 — Fix the blocking findings (bounded)</h2>
 <p>When the verdict is <code>blocked</code>, the loop is: fix the findings at or above the
 threshold → re-review → repeat. The guard rail is that this loop is <strong>bounded
@@ -1561,7 +1561,7 @@ wording produces a new identity each time.</li>
 </ul>
 <p>When you stop, <strong>do not merge</strong>. Document each unresolved finding (severity,
 location, attempt count) and hand the decision to the user
-<span class="fp" data-path="content/tools/review-pr.md:140">content/tools/review-pr.md:140</span>.</p>
+<span class="fp" data-path="content/tools/review-pr.md:147">content/tools/review-pr.md:147</span>.</p>
 <h3 id="how-the-round-budget-is-enforced">How the round budget is enforced</h3>
 <p>Round-bounding is <strong>native</strong> to the engine. The wrappers pass <code>mmr review --session &#x3C;id> --round &#x3C;N> --max-rounds 3</code>
 <span class="fp" data-path="content/tools/review-pr.md:81">content/tools/review-pr.md:81</span>, incrementing <code>--round</code> each fix round
@@ -1609,7 +1609,7 @@ table.</li>
 to invoking Codex / Gemini / Claude / Grok directly, run them as <strong>foreground</strong>
 Bash calls — never with <code>run_in_background</code>, <code>&#x26;</code>, or <code>nohup</code>. Background
 execution produces empty output, which the parser then reads as a degraded
-channel <span class="fp" data-path="content/tools/review-code.md:195">content/tools/review-code.md:195</span>.</p></div>
+channel <span class="fp" data-path="content/tools/review-code.md:204">content/tools/review-code.md:204</span>.</p></div>
 <p>Once any channel was compensated, the best possible verdict is
 <code>degraded-pass</code> — full <code>pass</code> requires all channels to have completed for real.</p>
 <h2 id="see-also">See also</h2>

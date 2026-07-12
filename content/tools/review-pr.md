@@ -75,10 +75,10 @@ bookkeeping). **`--round` is required for the cap to work:** MMR compares
 the cap never fires. `ROUND` starts at 1 and increments each fix round (Step 4).
 
 ```bash
+# ROUND is carried by YOU (the agent) across the fix loop — it is not persistent
+# shell state. Start at 1; increment it on each re-review (Step 4).
 ROUND="${ROUND:-1}"
-# Repo-qualify the session so PR #N in different repos don't share round state.
-REPO=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" | tr -c 'a-zA-Z0-9_-' '-')
-MMR_FLAGS=(--pr "$PR_NUMBER" --session "pr-$REPO-$PR_NUMBER" --round "$ROUND" --max-rounds 3 --sync --format json)
+MMR_FLAGS=(--pr "$PR_NUMBER" --session "pr-$PR_NUMBER" --round "$ROUND" --max-rounds 3 --sync --format json)
 [ -n "$FIX_THRESHOLD" ] && MMR_FLAGS+=(--fix-threshold "$FIX_THRESHOLD")
 # mmr exits 0 pass/degraded · 2 blocked · 3 needs-user-decision — the exit code
 # IS the verdict, so capture it without aborting (matters under `set -e`).
@@ -108,16 +108,23 @@ cannot.
 
 ```bash
 # $AGENT_FINDINGS is the agent code-reviewer's output, captured as an MMR-schema
-# JSON array (see the schema note below). Write it to a temp file, then reconcile.
-FINDINGS_FILE=$(mktemp)
-printf '%s\n' "$AGENT_FINDINGS" > "$FINDINGS_FILE"
-mmr reconcile "$JOB_ID" --channel superpowers --input "$FINDINGS_FILE"
-rm -f "$FINDINGS_FILE"
+# JSON array (see the schema note below). Guard on JOB_ID — reconcile needs it.
+if [ -z "$JOB_ID" ]; then
+  echo "No JOB_ID from Step 2 (did mmr review fail?) — resolve that before reconciling." >&2
+else
+  FINDINGS_FILE=$(mktemp)
+  printf '%s\n' "$AGENT_FINDINGS" > "$FINDINGS_FILE"
+  # reconcile re-runs the pipeline and emits the UPDATED unified verdict — read
+  # its exit code / JSON here; do NOT rely on Step 2's pre-reconcile MMR_EXIT.
+  mmr reconcile "$JOB_ID" --channel superpowers --input "$FINDINGS_FILE"
+  rm -f "$FINDINGS_FILE"
+fi
 ```
 
 Each finding needs `severity` (P0–P3), `location` (file:line), and
 `description`; `category` is recommended (it feeds finding identity). `reconcile`
-re-runs reconciliation across all channels and emits the unified verdict.
+re-runs reconciliation across all channels and emits the unified verdict — the
+final verdict is the reconciled one, not Step 2's.
 
 Non-Claude harnesses that lack an agent code-reviewer run the four CLI channels
 only — note this in the summary rather than skipping silently.

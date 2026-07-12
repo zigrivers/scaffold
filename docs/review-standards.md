@@ -44,15 +44,17 @@ Because description and suggestion are part of the key, a *materially reworded*
 report of the same defect can hash to a new key — so also stop when the same
 underlying defect recurs across rounds even under new wording.
 
-- **Rounds 1–3:** fix every real finding at or above the threshold, re-run the
-  review, repeat.
-- **Round 4+ / budget exhausted:** stop. Fix any remaining P0/P1 by hand and,
-  where the project uses Beads, file remaining P2/P3 as follow-up beads rather
-  than looping indefinitely.
-- **Keep going** while each round surfaces *genuinely different* findings — that
-  is healthy iteration, not a stuck loop. **Stop** when the same finding recurs
-  past the budget, when channels contradict each other (verdict
-  `needs-user-decision`), or when the user asks to stop.
+- **The `--max-rounds` cap (default 3) is a safety bound, not a quality target.**
+  Each round, fix every real finding at or above the threshold and re-review.
+  Within the cap, keep going while each round surfaces *genuinely different*
+  findings — that is healthy iteration, not a stuck loop.
+- **When the cap is reached, MMR returns `needs-user-decision` — stop and surface
+  to the user** with the remaining findings. That is the escalation point: the
+  user decides whether to fix remaining P0/P1 by hand, file P2/P3 as follow-ups
+  (Beads where the project uses it), raise the budget for more rounds, or accept
+  and proceed. Do not silently loop past the cap.
+- **Also stop early** when the same finding recurs without progress, when
+  channels contradict each other, or when the user asks to stop.
 
 ## Verify, don't dismiss
 

@@ -82,11 +82,14 @@ session id must match `^[a-zA-Z0-9_-]+$`, so sanitize the branch name (strip
 `/`, `.`, and anything else — not just `/`).
 
 ```bash
+# Session id must match ^[a-zA-Z0-9_-]+$, so sanitize the branch name (strip `/`,
+# `.`, and anything else). In detached HEAD (`git rev-parse --abbrev-ref` returns
+# "HEAD") fall back to the short commit so distinct reviews don't collide.
 BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
-# Repo-qualify the session so the same branch name in different repos doesn't
-# share round state. Sanitize to MMR's id rule (^[a-zA-Z0-9_-]+$).
-REPO=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" | tr -c 'a-zA-Z0-9_-' '-')
-SESSION_ID="local-$REPO-$(printf '%s' "$BRANCH" | tr -c 'a-zA-Z0-9_-' '-')"
+[ "$BRANCH" = "HEAD" ] && BRANCH="detached-$(git rev-parse --short HEAD 2>/dev/null)"
+SESSION_ID="local-$(printf '%s' "$BRANCH" | tr -c 'a-zA-Z0-9_-' '-')"
+# ROUND is carried by YOU (the agent) across the fix loop (Step 4), not
+# persistent shell state. Start at 1; increment on each re-review.
 ROUND="${ROUND:-1}"
 MMR_FLAGS=(--session "$SESSION_ID" --round "$ROUND" --max-rounds 3 --sync --format json)
 [ -n "$FIX_THRESHOLD" ] && MMR_FLAGS+=(--fix-threshold "$FIX_THRESHOLD")
@@ -151,11 +154,17 @@ the external CLIs cannot.
 
 ```bash
 # $AGENT_FINDINGS is the agent code-reviewer's output, captured as an MMR-schema
-# JSON array (see the schema note below). Write it to a temp file, then reconcile.
-FINDINGS_FILE=$(mktemp)
-printf '%s\n' "$AGENT_FINDINGS" > "$FINDINGS_FILE"
-mmr reconcile "$JOB_ID" --channel superpowers --input "$FINDINGS_FILE"
-rm -f "$FINDINGS_FILE"
+# JSON array (see the schema note below). Guard on JOB_ID — reconcile needs it.
+if [ -z "$JOB_ID" ]; then
+  echo "No JOB_ID from Step 2 (did mmr review fail?) — resolve that before reconciling." >&2
+else
+  FINDINGS_FILE=$(mktemp)
+  printf '%s\n' "$AGENT_FINDINGS" > "$FINDINGS_FILE"
+  # reconcile re-runs the pipeline and emits the UPDATED unified verdict — read
+  # its exit code / JSON here; the reconciled verdict is the final one.
+  mmr reconcile "$JOB_ID" --channel superpowers --input "$FINDINGS_FILE"
+  rm -f "$FINDINGS_FILE"
+fi
 ```
 
 Each finding needs `severity` (P0–P3), `location` (file:line), and
