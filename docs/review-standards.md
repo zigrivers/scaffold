@@ -53,6 +53,8 @@ underlying defect recurs across rounds even under new wording.
   user decides whether to fix remaining P0/P1 by hand, file P2/P3 as follow-ups
   (Beads where the project uses it), raise the budget for more rounds, or accept
   and proceed. Do not silently loop past the cap.
+  (Filing is manual: the former automatic MMR→Beads bridge was removed in
+  scaffold v3.41.0.)
 - **Also stop early** when the same finding recurs without progress, when
   channels contradict each other, or when the user asks to stop.
 
