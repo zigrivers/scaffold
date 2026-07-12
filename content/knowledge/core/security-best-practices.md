@@ -10,13 +10,13 @@ topics:
   - secrets-management
   - dependency-auditing
 volatility: fast-moving
-last-reviewed: null
+last-reviewed: 2026-06-25
 version-pin: OWASP Top 10:2025
 sources:
   - url: https://owasp.org/Top10/
     anchor: '#top-10-list'
     hash: sha256:9c81589b5ccefa00952524cf50d4bbcd9b077a3c842dc209b1db04714b545e20
-    retrieved: 2026-06-24
+    retrieved: 2026-06-25
 ---
 
 ## Summary
