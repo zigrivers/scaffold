@@ -1,13 +1,23 @@
 ---
 name: web3-project-structure
-description: Opinionated Foundry project layout for smart-contract teams — src, test, script, lib, broadcast, foundry.toml, remappings — covering test naming, deploy provenance, and what belongs in git
-topics: [web3, project-structure, foundry, solidity]
+description: >-
+  Opinionated Foundry project layout for smart-contract teams — src, test, script, lib, broadcast, foundry.toml,
+  remappings — covering test naming, deploy provenance, and what belongs in git
+topics:
+  - web3
+  - project-structure
+  - foundry
+  - solidity
 volatility: stable
-last-reviewed: null
+last-reviewed: 2026-06-25
 version-pin: null
 sources:
   - url: https://ethereum.org/en/developers/docs/smart-contracts/
+    hash: sha256:4e6d80e22802251aac3f8a74d2a59c8dff2f6783ee9697d932f0ddd49a1531c8
+    retrieved: 2026-06-25
   - url: https://docs.openzeppelin.com/contracts/5.x/
+    hash: sha256:aee37a66febcf95b90da7c60d6c0a4962fa0d54432f928db48512a1ca4ef0cd2
+    retrieved: 2026-06-25
 ---
 
 A smart-contract repository is read by more adversarial eyes than almost any other kind of codebase: auditors, MEV searchers, frontrunners, and the occasional regulator. Structure carries weight that goes beyond developer ergonomics. An auditor opening the repo for the first time should be able to find the contract under review, its tests, its deploy script, and its on-chain deployment receipts within thirty seconds. Gas snapshots and fuzz seeds need a fixed home so regressions are diffable. Broadcast logs are the audit trail tying a verified contract address back to a commit SHA — losing or muddling them turns "which version is mainnet running?" into a forensic exercise. Foundry's conventions answer most of these questions; this doc records the opinionated version a team should adopt before the first PR lands.
