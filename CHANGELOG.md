@@ -2,7 +2,7 @@
 
 All notable changes to Scaffold are documented here.
 
-## [Unreleased]
+## [3.40.0] - 2026-07-11
 
 ### Added
 
