@@ -276,13 +276,18 @@ applies) — filed at creation time, resolved at merge time. Docs travel with
 the code: when a bead's `docs:` tail names stale files, update them in the
 same PR that closes the bead, not in a follow-up.
 
-**The bootstrap trap.** Never run `bd bootstrap`, `bd init --force`, or any
-reset on a checkout with a populated local Beads DB — it silently replaces
+**The bootstrap trap.** Never run `bd bootstrap`, destructive `bd init`
+(`--reinit-local`/`--discard-remote`/`--destroy-token`; legacy `--force`), or
+any reset on a checkout with a populated local Beads DB — it silently replaces
 local (usually-ahead) state with the stale remote. Bootstrap is for fresh
-clones only. Before any reset, snapshot first (`make beads-snapshot`, when
-the agent-ops git component is installed). Drive embedded storage only
-through `bd` subcommands, never a standalone CLI against the data files
-directly.
+clones only. Push before any reset (`bd stats` → `bd dolt commit` →
+`bd dolt push` — the push is what makes beads survivable), then snapshot
+(`make beads-snapshot`, when the agent-ops git component is installed). Drive
+embedded storage only through `bd` subcommands, never a standalone `dolt` CLI
+against the data files directly. If beads go missing, confirm the remote
+actually lost them (`bd dolt pull`) before rebuilding — restore order is
+`bd backup restore` (full history) → `bd import -i .beads/issues.jsonl` →
+reconstruct from committed docs.
 
 **Close after merge, not after PR-open.** Bead IDs stay out of branch names
 and commit subjects (per D7 — see the branch-naming rules in
@@ -292,6 +297,24 @@ commit/PR bodies as `Closes <id>`. `bd close
 creation, before review or merge, is a common but incorrect shortcut that
 leaves `bd ready` reporting work as available when it's actually already
 spoken for.
+
+### Durability toolkit (bd ≥ 1.1.0)
+
+- **`bd backup init <path>` / `bd backup sync` / `bd backup restore`** — full
+  Dolt-history backups; the blessed disaster-recovery and backend-migration
+  path. `bd export` JSONL is issue-level only and NOT a substitute. Point the
+  target outside the repository (a checkout wipe must not take the backup
+  with it).
+- **`bd batch`** — atomic multi-operation transactions (commands from stdin or
+  `-f <file>`, all in one Dolt transaction); prefer it when a script must
+  create/update several issues as one unit.
+- **`bd doctor --agent`** — agent-oriented health check output; run when a
+  loop hits unexplained bd errors.
+- **`bd prune --force`** — permanently deletes closed non-ephemeral beads;
+  requires `--older-than` or `--pattern` as a safety gate and skips pinned,
+  open/in-progress, and ephemeral beads. Destructive; never run it casually.
+- **Import safety** — `bd import` refuses stale overwrites (only a strictly
+  newer `updated_at` wins); `--allow-stale` exists for deliberate rollback only.
 
 ### Agent context: `bd prime` is the SSOT
 

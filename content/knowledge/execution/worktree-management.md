@@ -276,6 +276,10 @@ export BEADS_ACTOR="agent-1"
 
 This ensures that task claims, completions, and other Beads operations are attributed to the correct agent. Set it in the agent's shell environment before starting work.
 
+Tip: from inside a worktree, `bd -C <primary-checkout-path> …` (bd ≥ 1.0.4)
+targets the primary's database without `cd` — useful in scripts that must not
+change directory.
+
 > Older Beads versions (<v1.0.0) used `BD_ACTOR`. It's still accepted as a deprecated alias — if you see it in legacy scripts, rename when you next edit.
 
 ### Listing Active Worktrees

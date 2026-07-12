@@ -32,3 +32,12 @@ F="$BATS_TEST_DIRNAME/../content/pipeline/foundation/beads.md"
   run grep -qE "bd-guard\.sh" "$G"; [ "$status" -eq 0 ]
   run grep -qE "PreToolUse" "$G"; [ "$status" -eq 0 ]
 }
+
+@test "knowledge + ops-core carry the modernized durability rules" {
+  K="$BATS_TEST_DIRNAME/../content/knowledge/core/task-tracking.md"
+  C="$BATS_TEST_DIRNAME/../content/pipeline/consolidation/claude-md-optimization.md"
+  run grep -qE "bd dolt push" "$K"; [ "$status" -eq 0 ]
+  run grep -qE "bd backup" "$K"; [ "$status" -eq 0 ]
+  run grep -qE "bd batch" "$K"; [ "$status" -eq 0 ]
+  run grep -qE "reinit-local" "$C"; [ "$status" -eq 0 ]
+}

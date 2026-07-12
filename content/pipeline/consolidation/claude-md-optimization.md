@@ -210,9 +210,11 @@ order:
 
 4. **Beads rules** — start from `bd ready` (the ready queue); anything you
    decide not to do now becomes a bead immediately (a TODO comment, PR note,
-   or mental note is not tracking); never run `bd bootstrap` or
-   `bd init --force` on a checkout with a populated local Beads DB. End the
-   Beads rules with: see docs/beads-workflow.md for the `bd create`
+   or mental note is not tracking); never run `bd bootstrap`, destructive
+   `bd init` (`--reinit-local`/`--discard-remote`; legacy `--force`), or any
+   reset on a checkout with a populated local Beads DB — push first
+   (`bd dolt commit && bd dolt push`); `scripts/bd-guard.sh` enforces this.
+   End the Beads rules with: see docs/beads-workflow.md for the `bd create`
    template, day-to-day commands, and the bootstrap trap (when that file
    exists).
 

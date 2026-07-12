@@ -390,6 +390,9 @@ add/remove — readiness is computed from open blockers.
 
 **Detect cycles after applying:** `bd dep cycles` — surface any cycle as an error
 (the plan DAG is validated upstream, but a manual edit could reintroduce one).
+Also run `bd graph check` (graph-integrity check, bd ≥ 1.0.0 — cycles, orphans,
+and other integrity issues; exit 0 clean, exit 1 on issues) in the same pass and
+fail closed on a non-zero exit, exactly as with `bd dep cycles`.
 
 ### Pass 3 — Stale reconcile (tasks/containers removed from the plan)
 
