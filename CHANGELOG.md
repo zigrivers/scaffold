@@ -2,6 +2,55 @@
 
 All notable changes to Scaffold are documented here.
 
+## [3.42.0] - 2026-07-12
+
+### Added
+
+- **New agent-ops template `bd-guard.sh`** (`content/assets/agent-ops/git/bd-guard.sh.tmpl`,
+  installed by `scaffold agent-ops install --component git`). A Claude Code
+  PreToolUse hook (also usable as `bd-guard.sh --check "<command>"`) that refuses
+  destructive Beads commands — `bd bootstrap`, destructive `bd init`
+  (`--reinit-local`/`--discard-remote`/`--destroy-token`; legacy `--force`),
+  `bd admin reset`, and `rm`/`dolt` against `.beads` — while a populated Beads
+  database exists, so bootstrap/reset can no longer silently replace local
+  (usually-ahead) state with the stale remote. It follows bd's own
+  upward `.beads` discovery and judges `-C`/`--db`/`--global`/`BEADS_DB`
+  retargets, not just the cwd. Override a deliberate reset with
+  `BEADS_DESTRUCTIVE_OK=1`. `git-workflow` setup registers it as a PreToolUse
+  hook (merged into `.claude/settings.json`, never overwritten) when the project
+  uses Beads. It is an accident-net, not a security boundary — the layered
+  durability defenses remain the guarantee.
+- **`bd backup` adoption in generated Beads setup.** `content/pipeline/foundation/beads.md`
+  now configures a full-fidelity `bd backup` target outside the repository
+  (unique per repo), documents a **Durability & the bootstrap trap** runbook and
+  an **Upgrades & migration** (designated-migrator) recipe in the generated
+  `docs/beads-workflow.md`, and initializes with the idempotent
+  `bd init --init-if-missing`.
+
+### Changed
+
+- **`make beads-snapshot` now also syncs the `bd backup` full-history copy**
+  (in addition to writing the `.beads/issues.jsonl` restore copy), detected via
+  the stable `bd backup status --json` → `.dolt.configured` contract. A
+  *configured* backup whose sync fails is now a non-zero (fatal) exit so
+  reset automation stops; the wording no longer calls the JSONL copy
+  "git-ignored" (it is a committed restore copy). **Behavior change** for
+  generated projects that install the agent-ops git component.
+- **bd version floor unified at 1.1.0** across the pipeline meta-prompts, the
+  observability Beads adapter (`bd < 1.1.0` now reports `degraded` with a
+  `1.1.0` remediation), and the tests. Previously the adapter accepted ≥1.0.0
+  and the pipeline stated ≥1.0.5. The `bd dolt` durability commands the runbooks
+  rely on require ≥1.1.0. **Downstream projects on bd < 1.1.0 should upgrade**
+  (`brew upgrade beads`).
+
+### Fixed
+
+- Knowledge/ops-core Beads durability rules modernized (v1.0.4 init-safety
+  flags, `bd batch` / `bd -C` / `bd doctor --agent` / `bd graph check`), upstream
+  Beads URLs pointed at `gastownhall/beads` (org rename), the dashboard renders
+  its Beads section only when a `.beads/` directory is present, and migration
+  guidance added for the v3.41.0 MMR→Beads bridge removal.
+
 ## [3.41.0] - 2026-07-12
 
 ### Changed
