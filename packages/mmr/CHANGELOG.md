@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [3.1.1] — 2026-07-13
+
 ### Fixed
 
 - **grok channel: unblock reviews broken by an upstream grok regression.**
