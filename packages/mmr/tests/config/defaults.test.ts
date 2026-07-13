@@ -96,6 +96,19 @@ describe('BUILTIN_CHANNELS — grok', () => {
     expect(BUILTIN_CHANNELS.grok?.flags).toContain('--no-plan')
   })
 
+  it('removes the run_terminal_cmd tool so grok 0.2.99+ can build the headless session', () => {
+    // grok 0.2.99 aborts headless session creation ("agent building failed:
+    // ... RequirementError { tool: GrokBuild:run_terminal_cmd,
+    // auto_background_on_timeout requires enabled_background to be true }") because
+    // it BUILDS + validates every built-in tool before applying --tools. The
+    // web-only allowlist above does not prevent the build, so we must remove the
+    // offending tool outright. A closed-book text review never needs bash anyway.
+    const flags = BUILTIN_CHANNELS.grok?.flags ?? []
+    const i = flags.indexOf('--disallowed-tools')
+    expect(i).toBeGreaterThanOrEqual(0)
+    expect((flags[i + 1] ?? '').split(',')).toContain('run_terminal_cmd')
+  })
+
   it('isolates host config via neutral HOME/XDG and cwd', () => {
     expect(BUILTIN_CHANNELS.grok?.env?.HOME).toBe('{{neutral_home}}')
     expect(BUILTIN_CHANNELS.grok?.env?.XDG_CONFIG_HOME).toBe('{{neutral_home}}')

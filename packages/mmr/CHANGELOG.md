@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **grok channel: unblock reviews on grok >= 0.2.99.** grok 0.2.99 aborts
+  headless session creation with `agent building failed: ... RequirementError {
+  tool: GrokBuild:run_terminal_cmd, auto_background_on_timeout requires
+  enabled_background to be true }` because it **builds and validates every
+  built-in tool before applying the `--tools` allowlist** — so restricting tools
+  to `web_search,web_fetch` was not enough; the broken `run_terminal_cmd`
+  definition still failed the build and exited 1 before any model call, degrading
+  the grok channel on every review. The built-in grok channel now passes
+  `--disallowed-tools run_terminal_cmd`, removing the offending tool from the
+  build. A closed-book text review never needs a terminal, so this also tightens
+  the hardened posture (no bash surface) and stays correct once grok fixes the
+  upstream default. Customizers who override `channels.grok.flags` in `.mmr.yaml`
+  must restate this flag (array overrides replace, not merge).
+
 ## [3.1.0] — 2026-06-21
 
 ### Added
