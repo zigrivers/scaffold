@@ -106,17 +106,18 @@ export const BUILTIN_CHANNELS: Record<string, SubprocessChannelParsed> = {
       '--output-format', 'json',
       '--no-memory',
       '--tools', 'web_search,web_fetch',
-      // grok >= 0.2.99 aborts headless session creation with
+      // An upstream grok regression (first observed in grok 0.2.99) aborts
+      // headless session creation with
       //   "agent building failed: ... RequirementError { tool:
       //    GrokBuild:run_terminal_cmd, auto_background_on_timeout requires
       //    enabled_background to be true }"
-      // because it BUILDS + validates EVERY built-in tool before applying the
+      // because grok BUILDS + validates EVERY built-in tool before applying the
       // --tools allowlist above — so restricting tools to web-only is not enough;
       // the broken run_terminal_cmd definition still fails the build and exits 1
       // before any model call. Remove the tool from the build entirely. A
       // closed-book text review never needs a terminal, so this also tightens
-      // the hardened posture (no bash surface) and stays correct once grok
-      // fixes the upstream default. See tasks/lessons.md.
+      // the hardened posture (no bash surface) and is harmless once grok fixes
+      // the upstream default. See tasks/lessons.md.
       '--disallowed-tools', 'run_terminal_cmd',
       '--no-subagents', '--no-plan',
     ],

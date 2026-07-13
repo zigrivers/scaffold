@@ -324,12 +324,14 @@ claude -p "PROMPT" --output-format json 2>/dev/null
 # isolated HOME/cwd (strips host config: skills/MCP/hooks/instructions), no
 # cross-session memory, web-only tools (denies filesystem reads).
 # NOTE: --prompt-file must be ABSOLUTE — a neutral HOME/cwd breaks relative paths.
-# NOTE: --disallowed-tools run_terminal_cmd is REQUIRED on grok >= 0.2.99: grok
-#   builds + validates every built-in tool before applying --tools, and its
+# NOTE: --disallowed-tools run_terminal_cmd is REQUIRED on any grok carrying the
+#   upstream run_terminal_cmd regression (first seen in grok 0.2.99): grok builds
+#   + validates every built-in tool before applying --tools, and its
 #   run_terminal_cmd default is self-inconsistent ("auto_background_on_timeout
 #   requires enabled_background to be true"), so headless session creation aborts
 #   ("agent building failed") on EVERY grok -p run until the tool is removed. A
-#   closed-book text review never needs bash, so this is a permanent hardening.
+#   closed-book text review never needs bash, so keep this flag regardless — it
+#   is harmless on unaffected versions and a permanent hardening.
 D="$(mktemp -d)"; trap 'rm -rf "$D"' EXIT INT TERM   # cleanup even on Ctrl-C/early exit
 # Preserve ONLY file-based creds (Linux/CI) — keeps auth, not skills/MCP/config:
 mkdir -p "$D/.grok"; ln -s "$HOME/.grok/auth.json" "$D/.grok/auth.json" 2>/dev/null || true

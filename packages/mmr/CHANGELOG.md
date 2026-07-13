@@ -4,7 +4,8 @@
 
 ### Fixed
 
-- **grok channel: unblock reviews on grok >= 0.2.99.** grok 0.2.99 aborts
+- **grok channel: unblock reviews broken by an upstream grok regression.**
+  Starting with grok 0.2.99, grok aborts
   headless session creation with `agent building failed: ... RequirementError {
   tool: GrokBuild:run_terminal_cmd, auto_background_on_timeout requires
   enabled_background to be true }` because it **builds and validates every
