@@ -102,7 +102,7 @@ runs the **same defensive preflight** as the start prompt — it never claims
 against an empty or stale tracker.
 
 **Step 1 — compute `beads_usable`.** `beads_usable` is true only when **all**
-hold: `.beads/` exists, `bd` is on `PATH`, `bd version` parses to **≥ 1.0.5**
+hold: `.beads/` exists, `bd` is on `PATH`, `bd version` parses to **≥ 1.1.0**
 (using a macOS/BSD-safe numeric compare — split major/minor/patch and compare
 numerically, never rely on GNU `sort -V`), and `jq` is on `PATH`. Never write
 `[ -d .beads ] && bd …` as a whole command — it returns exit 1 when `.beads/` is
@@ -114,7 +114,7 @@ tracker looks done" bug):
 | Condition | Action |
 |---|---|
 | `.beads/` **absent** | Non-Beads project → drive the loop from the markdown playbook/plan (see "Markdown fallback" below). Do **not** call `bd`. |
-| `.beads/` present but `beads_usable` is false (`bd`/`jq` missing or `bd` < 1.0.5) | **Fail closed.** Stop and tell the user to install/upgrade `bd` (≥ v1.0.5) and `jq`. Do **not** markdown-fall-back — Beads may already hold execution state. |
+| `.beads/` present but `beads_usable` is false (`bd`/`jq` missing or `bd` < 1.1.0) | **Fail closed.** Stop and tell the user to install/upgrade `bd` (≥ v1.1.0) and `jq`. Do **not** markdown-fall-back — Beads may already hold execution state. |
 | `beads_usable`, plan has **no** stable IDs **and** Beads holds no plan-derived issues and no non-bootstrap claimed/closed work | Genuinely legacy plan → markdown loop, emit "re-run planning to assign stable task IDs". Do **not** claim. |
 | `beads_usable`, plan has no stable IDs **but** Beads already holds plausible build work | **Fail closed** — markdown would bypass existing execution state. |
 | `beads_usable`, contract **partially present or malformed** | **Fail closed.** Do **not** markdown-fall-back. Require planning to be re-run/fixed. |

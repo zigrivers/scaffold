@@ -40,6 +40,9 @@ All notable changes to Scaffold are documented here.
   `review-pr`/`review-code`. Projects that set that flag no longer get findings
   auto-filed as Beads; file them manually per `docs/review-standards.md`
   (round-budget escalation). No `scaffold` CLI command or flag changed.
+  Migration: delete the `beads:` block from `.mmr.yaml` if present, and file
+  surviving findings manually at the round-budget cap (`bd create` with a
+  `discovered-from` dependency) per `docs/review-standards.md`.
 
 ## [3.40.0] - 2026-07-11
 

@@ -35,9 +35,10 @@ export const beadsAdapter: BaseAdapter & {
     const m = stdout.match(/(\d+)\.(\d+)\.(\d+)/)
     if (!m) return { status: 'degraded', reason: `bd version could not be parsed from: ${stdout.trim()}` }
     const major = Number(m[1])
-    if (major < 1) {
+    const minor = Number(m[2])
+    if (major < 1 || (major === 1 && minor < 1)) {
       const reason =
-        `bd version ${m[0]} is below the supported minimum (1.0.0). `
+        `bd version ${m[0]} is below the supported minimum (1.1.0). `
         + 'Run \'brew upgrade beads\' or your equivalent.'
       return { status: 'degraded', reason }
     }

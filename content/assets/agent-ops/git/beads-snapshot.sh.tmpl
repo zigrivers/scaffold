@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Export the local beads DB to .beads/issues.jsonl — a durable local recovery
-# point before any DB reset. Invoked by `make beads-snapshot`.
+# Export the local beads DB to .beads/issues.jsonl — a restore copy for
+# `bd import` after a wipe (commit it and push the Dolt remote to make it
+# durable) — and sync the full `bd backup` target when one is configured.
+# Invoked by `make beads-snapshot`.
 #
 # Beads is OPTIONAL: if the `bd` CLI is not installed, or this project has no
 # .beads/ database, the script prints a note and exits 0 (nothing to snapshot).
@@ -35,7 +37,28 @@ tmp="$(mktemp .beads/issues.jsonl.XXXXXX)"
 # bd's exit status, so `set -e` does not abort on a failed export.
 if err="$(bd export --all -o "$tmp" 2>&1)"; then
 	if mv -f "$tmp" .beads/issues.jsonl; then
-		printf '%s\n' "✓ wrote .beads/issues.jsonl — a local restore copy for 'bd import' after a wipe; still push to the remote (bootstrap won't auto-use it)"
+		printf '%s\n' "✓ wrote .beads/issues.jsonl — a restore copy for 'bd import' after a wipe; COMMIT it (git add/commit) and push the Dolt remote to make it durable (bootstrap won't auto-use it)"
+		# Full-fidelity Dolt backup (history included) when the project has one
+		# configured via `bd backup init`. Detected via the stable machine
+		# contract `bd backup status --json` → `.dolt.configured` (a boolean):
+		# the human text is TTY/format-fragile and `bd backup status` exits 0
+		# even when unconfigured, so neither exit code nor prose is reliable.
+		# Capture via command substitution first, then match the captured string
+		# — piping bd straight into `grep -q` can race the pipe. Silently skipped
+		# when `bd backup` is unavailable (old bd → non-zero) or unconfigured.
+		if backup_status="$(bd backup status --json 2>/dev/null | tr -d '[:space:]')" \
+			&& printf '%s' "$backup_status" | grep -qE '"dolt":\{[^}]*"configured":true'; then
+			if bd backup sync >/dev/null 2>&1; then
+				printf '%s\n' "✓ bd backup sync — full-history Dolt backup updated"
+			else
+				# A backup IS configured but its full-history copy failed to
+				# update — fail non-zero so reset automation stops rather than
+				# proceeding while a promised durable copy is stale. (The JSONL
+				# was still written above, so restore-from-JSONL remains possible.)
+				printf '%s\n' "✗ bd backup sync FAILED — a backup is configured but its full-history copy is now stale; resolve before relying on it (check 'bd backup status')" >&2
+				exit 1
+			fi
+		fi
 	else
 		printf '%s\n' "✗ beads-snapshot failed — could not move the snapshot into place; prior snapshot unchanged" >&2
 		exit 1

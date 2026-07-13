@@ -13,7 +13,7 @@ volatility: stable
 last-reviewed: 2026-06-10
 version-pin: null
 sources:
-  - url: https://github.com/steveyegge/beads
+  - url: https://github.com/gastownhall/beads
     hash: sha256:441495c79d8ed282929311e2bcb24db09b28e2c1a2f2dfa017a95bd0c6b9a73c
     retrieved: 2026-06-10
 ---

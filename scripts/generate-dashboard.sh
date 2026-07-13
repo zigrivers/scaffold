@@ -221,7 +221,7 @@ BEADS_CLOSED=0
 HAS_BEADS=false
 BEADS_TASKS_JSON="[]"
 
-if command -v bd &>/dev/null; then
+if [[ -d .beads ]] && command -v bd &>/dev/null; then
     beads_json=$(bd list --all --json 2>/dev/null || echo "")
     if [[ -n "$beads_json" ]]; then
         HAS_BEADS=true

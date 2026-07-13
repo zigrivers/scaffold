@@ -40,6 +40,20 @@ git worktree list
 make doctor                    # wedged home base? make doctor-fix (unattended-safe)
 ```
 
+Version gate: `bd version` must be **≥ 1.1.0** (the `bd dolt` durability
+commands below require it). Older? Stop and report: upgrade with
+`brew upgrade beads` or the project's equivalent — never work around the gate.
+
+**Database safety (binding for every step):** never run `bd bootstrap`,
+destructive `bd init` (`--reinit-local`/`--discard-remote`/`--destroy-token`;
+legacy `--force`), or any reset against a populated `.beads/` — bootstrap
+replaces local state
+with the often-stale remote and silently drops unpushed beads (fresh clones
+only). Before any deliberate reset, and before deleting a checkout with local
+beads: `bd stats && bd dolt commit && bd dolt push`, then `make beads-snapshot`.
+Drive the database only through `bd` subcommands — never a standalone `dolt`
+CLI. Full runbook: docs/beads-workflow.md ("Durability & the bootstrap trap").
+
 If `bd` or the agent-ops scripts are missing, stop and instruct:
 `scaffold agent-ops install` (scripts) / see docs/beads-workflow.md (tracker).
 
@@ -138,6 +152,28 @@ Docs updated in-PR: <paths - or "none needed: <why>">
 Beads filed (open): <id - one-line title - or none>
 ```
 
+Before reporting, make the batch durable and refresh the restore net. Every step
+is BEST-EFFORT — none may abort the report (a purely local Beads DB has no Dolt
+remote; a `bd backup` target may be absent):
+
+1. **Push the beads off-machine when a Dolt remote is configured — this is the
+   real durability:** `bd dolt commit`, then `bd dolt push` ONLY if the project
+   has a Dolt remote (a purely local Beads DB has none — skip the push; its local
+   Dolt DB plus the committed JSONL export is its durability). Note a push failure
+   for a *configured* remote in your report, but never abort the batch over it.
+2. `make beads-snapshot` — refresh the `.beads/issues.jsonl` restore copy and
+   sync any configured `bd backup` full-history copy.
+`.beads/issues.jsonl` (refreshed by step 2) is a LOCAL, regenerable restore copy
+— `bd export` recreates it from the DB. Durability is layered: step 1's Dolt
+remote is the OFF-MACHINE copy (survives a lost machine); step 2's `bd backup`
+(default target `$HOME/.beads-backups`, same machine) survives checkout deletion
+or a reset but NOT machine loss unless you point it at a remote (DoltHub/S3); the
+JSONL copy is neither — commit it through your project's normal beads-commit flow.
+Do NOT force a direct commit onto a protected base branch or push one outside the
+PR flow.
+
+One batch-end pass covers every bead closed above.
+
 If the batch ran long and `launchpad` is installed: `launchpad notify "<summary>"`.
 
 ## Red flags — stop if you're about to…
@@ -155,3 +191,4 @@ If the batch ran long and `launchpad` is installed: `launchpad notify "<summary>
 | `--no-verify`, plain `--force`, merge commits | Forbidden; `--force-with-lease` after rebase only |
 | Close the bead when the PR opens | Close only after MERGED + verified |
 | Prose summary instead of the Step 3 slots | The slots are the report format |
+| Bootstrap/reset a populated `.beads` DB | Wipes unpushed beads — fresh clones only; push first (`bd dolt commit && bd dolt push`) |

@@ -84,6 +84,11 @@ describe('installAgentOps / checkAgentOps', () => {
     expect(fs.existsSync(dest)).toBe(true)
     expect(fs.readFileSync(dest, 'utf8')).not.toContain('{{')
     expect(fs.statSync(dest).mode & 0o111).toBeTruthy()
+    // The bd-guard hook script installs as an executable git-component file.
+    expect(res.installed).toContain('scripts/bd-guard.sh')
+    const guard = path.join(projectRoot, 'scripts', 'bd-guard.sh')
+    expect(fs.existsSync(guard)).toBe(true)
+    expect(fs.statSync(guard).mode & 0o111).toBeTruthy()
     const manifest = JSON.parse(
       fs.readFileSync(path.join(projectRoot, '.scaffold', 'agent-ops-manifest.json'), 'utf8'),
     )

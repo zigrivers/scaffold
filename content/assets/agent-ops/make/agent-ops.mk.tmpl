@@ -16,7 +16,7 @@ doctor: ## [agent-safe] Diagnose primary-checkout invariant (read-only)
 doctor-fix: ## [agent-safe] Repair unattended-safe primary-checkout problems
 	@scripts/doctor.sh --fix
 
-beads-snapshot: ## [agent-safe] Export beads DB to a local git-ignored restore copy
+beads-snapshot: ## [agent-safe] Export beads restore copy (.beads/issues.jsonl) + sync bd backup
 	@scripts/beads-snapshot.sh
 
 define staging_guard

@@ -20,9 +20,10 @@ F="content/pipeline/finalization/materialize-plan-to-beads.md"
   run grep -qiE "## Update Mode" "$F"; [ "$status" -eq 0 ]
 }
 
-@test "guards on beads_usable: .beads + bd>=1.0.5 + jq, never bare [ -d .beads ] && bd" {
+@test "guards on beads_usable: .beads + bd>=1.1.0 + jq, never bare [ -d .beads ] && bd" {
   run grep -qE "beads_usable" "$F"; [ "$status" -eq 0 ]
-  run grep -qE "1\.0\.5" "$F"; [ "$status" -eq 0 ]
+  run grep -qE "1\.1\.0" "$F"; [ "$status" -eq 0 ]
+  run grep -qE "1\.0\.5" "$F"; [ "$status" -ne 0 ]
   run grep -qiE "command -v jq" "$F"; [ "$status" -eq 0 ]
 }
 

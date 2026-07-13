@@ -85,5 +85,5 @@ hosts:
 
 github_repos:
   - modelcontextprotocol/specification
-  - steveyegge/beads
+  - gastownhall/beads
   - joelparkerhenderson/architecture-decision-record
