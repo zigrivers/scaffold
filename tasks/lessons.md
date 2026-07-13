@@ -10,6 +10,22 @@ Patterns and anti-patterns discovered during development. Review before starting
 
 <!-- Add anti-patterns as you discover them -->
 
+- **A `--tools` allowlist does NOT stop grok from BUILDING the other built-in tools.**
+  grok 0.2.99 (auto-updated ~2026-07-11) shipped a self-inconsistent default for its
+  built-in `run_terminal_cmd` tool (`auto_background_on_timeout: true` while
+  `enabled_background: false`), and grok validates *every* built-in tool at session-build
+  time — *before* applying `--tools web_search,web_fetch`. Result: EVERY headless
+  `grok -p` / `--prompt-file` run aborts with `Couldn't create session: ... agent
+  building failed: ... RequirementError { tool: GrokBuild:run_terminal_cmd, ... }` and
+  exit 1, degrading MMR's grok channel. Fix: pass `--disallowed-tools run_terminal_cmd`
+  so grok never builds the broken tool. Reproduces in a real HOME too, so it is a
+  grok-side regression, not an MMR neutral-posture bug. When a CLI review channel breaks
+  "in the last couple of days," suspect a silent CLI auto-update (grok has
+  `auto_update = true` + weekly stable releases) and REPRODUCE the raw CLI invocation
+  before touching MMR wiring — a one-word `--output-format json` smoke test surfaces the
+  exact error and confirms the JSON envelope (reply still at `$.text`; v0.2.97 added
+  additive `usage`/`modelUsage` fields that do not break the parser).
+
 - After a refactor that swaps out a helper (e.g. `os.homedir()` → `resolveSessionRoot()`),
   re-run the FULL package gate (`npm run check`), not just the targeted test. A removed last-use
   leaves a dead import that the focused test won't catch but ESLint (and CI) will. Caught on
