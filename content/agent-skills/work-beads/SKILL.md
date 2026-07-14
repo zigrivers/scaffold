@@ -130,11 +130,12 @@ atomic round-trip and fails (exit 1, `already claimed by <actor>`) if anyone
 else holds it. **A lost claim is normal traffic at high parallelism, not an
 error: return to Step 1 and take the next candidate.** Never claim by
 editing the status field — it does not detect a concurrent claimant. Fast
-path: when a filter fully expresses your selection (a materialized plan via
-`--has-metadata-key plan_task_id`, or a label scope), `bd ready --claim
-[filters] --json` selects and claims in one call — add
-`--exclude-label gt:slot` unless the filter already excludes the merge-slot
-bead (Step 1's first hard exclusion) — then run Step 1's
+path — only when ANY ready match inside a filter is acceptable and you are
+not applying Step 1's ranking beyond priority (the normal case for a
+materialized plan queue via `--has-metadata-key plan_task_id`; sometimes a
+label scope): `bd ready --claim [filters] --json` selects and claims in one
+call — add `--exclude-label gt:slot` unless the filter already excludes the
+merge-slot bead (Step 1's first hard exclusion) — then run Step 1's
 duplicate-work preflight for the claimed bead before building; if it reveals
 live duplicate work, release (`bd update <id> --status open --assignee ""`)
 and reselect. If the project has build observability (a `.scaffold/`

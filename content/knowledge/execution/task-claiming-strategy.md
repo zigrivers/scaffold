@@ -34,13 +34,13 @@ Before starting a task, verify all its blockers are resolved. After completing e
 
 **The algorithm:**
 1. List all tasks in the backlog
-2. Filter to tasks with status "ready" or "unblocked"
+2. Filter to tasks with status "ready" or "unblocked" (`bd ready --unassigned` — the `-u` flag trims open-but-assigned beads whose claim would be refused)
 3. Sort by task ID (ascending)
 4. Select the first task in the sorted list
 5. Claim the task you selected atomically (`bd update <id> --claim`) and open a draft PR on the first push; a claim lost to another agent means re-run from step 2. (Skipping explicit selection? `bd ready --claim` claims by Beads' own sort order, not your step-4 choice — only use it when that is acceptable, and add `--exclude-label gt:slot` where a merge slot exists: the slot bead is claimable infrastructure, not work)
 
 **Why lowest-ID first:**
-- Deterministic — two agents independently applying this rule will never pick the same task (the first agent claims it, the second sees it as taken)
+- Deterministic — two agents independently applying this rule converge on the same candidate; the atomic claim resolves the race (one wins, the loser refreshes and selects again)
 - Dependency-friendly — lower IDs are typically earlier in the plan and have fewer blockers
 - Predictable — humans can anticipate which tasks agents will pick next
 
