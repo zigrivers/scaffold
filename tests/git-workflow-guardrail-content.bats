@@ -11,9 +11,9 @@ G="$BATS_TEST_DIRNAME/../content/pipeline/environment/git-workflow.md"
   [ "$status" -eq 0 ]
 }
 
-@test "git-workflow names the guard + heal scripts the git component installs" {
+@test "git-workflow names the guard + detector scripts the git component installs" {
   run grep -qE "primary-checkout-guard\.sh" "$G"; [ "$status" -eq 0 ]
-  run grep -qE "heal-regen-artifacts\.sh" "$G"; [ "$status" -eq 0 ]
+  run grep -qE "check-regen-artifacts\.sh" "$G"; [ "$status" -eq 0 ]
 }
 
 @test "git-workflow states the generator-must-call-the-guard rule (both idioms)" {
@@ -34,8 +34,8 @@ G="$BATS_TEST_DIRNAME/../content/pipeline/environment/git-workflow.md"
   [ "$status" -eq 0 ]
 }
 
-@test "git-workflow Update Mode preserves the guard + heal scripts" {
+@test "git-workflow Update Mode preserves the guard + detector scripts" {
   # both helper scripts appear in the Preserve list so re-running never clobbers them
-  run grep -qE "primary-checkout-guard\.sh.*heal-regen-artifacts\.sh|heal-regen-artifacts\.sh.*primary-checkout-guard\.sh" "$G"
+  run grep -qE "primary-checkout-guard\.sh.*check-regen-artifacts\.sh|check-regen-artifacts\.sh.*primary-checkout-guard\.sh" "$G"
   [ "$status" -eq 0 ]
 }

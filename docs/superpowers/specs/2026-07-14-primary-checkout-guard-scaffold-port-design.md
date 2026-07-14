@@ -31,16 +31,16 @@ check` drift-checks each installed script's on-disk hash against
 `.scaffold/agent-ops-manifest.json` (`src/core/agent-ops/install.ts`).
 
 Decisive consequence: if the step told the generating agent to **hand-edit the
-installed `main-sync.sh`** to add the self-heal call, that project's own
+installed `main-sync.sh`** to add the detector call, that project's own
 `agent-ops check` drift gate would report `scripts/main-sync.sh` as `modified`
-and fail permanently. So the self-heal wiring must live in the **template**
+and fail permanently. So the detector wiring must live in the **template**
 (`content/assets/agent-ops/git/main-sync.sh.tmpl`), not in a meta-prompt
 instruction to edit the installed file.
 
-Therefore the guard and the heal ride in the **agent-ops git-component bundle**
+Therefore the guard and the detector ride in the **agent-ops git-component bundle**
 (installed, manifest-tracked, drift-clean, tested in the existing harness), and
 the git-workflow step **documents** them. Chosen over instructions-only (which
-relies on an agent faithfully re-authoring ~150 lines each generation and trips
+relies on an agent faithfully re-authoring the scripts each generation and trips
 the drift gate on the `main-sync` edit).
 
 ## 3. What ships
@@ -110,76 +110,64 @@ otherwise return 0 (no-op)
   (Human emergency only: AGENT_OPS_GIT_GUARD_BYPASS=1 to override.)
 ```
 
-### 3.2 New git-component script: `scripts/heal-regen-artifacts.sh`
+### 3.2 New git-component script: `scripts/check-regen-artifacts.sh`
 
-Template: `content/assets/agent-ops/git/heal-regen-artifacts.sh.tmpl` → installs
-to `scripts/heal-regen-artifacts.sh` (executable), manifest-tracked.
+Template: `content/assets/agent-ops/git/check-regen-artifacts.sh.tmpl` → installs
+to `scripts/check-regen-artifacts.sh` (executable), manifest-tracked.
 
-`Usage: heal-regen-artifacts.sh <checkout-path>`. For each file in the checkout
-that is **modified only in the working tree** (porcelain `" M"` — tracked,
-unstaged), restore it to HEAD **iff its entire working-tree diff is a
-timestamp-only change** — i.e. the file is byte-identical to HEAD except inside
-`Generated [0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2} UTC` footers.
+`Usage: check-regen-artifacts.sh <checkout-path>`. **DETECT-ONLY** — it never
+modifies, restores, deletes, or stages anything. For each file **modified only in
+the working tree** (porcelain `" M"` — tracked, unstaged) whose **only** change is
+a `Generated <ISO-date> <HH:MM> UTC` footer, it **reports** the file (to stderr)
+and tells the operator to discard it (`git checkout -- <file>`) or regenerate it
+inside a worktree. Always exits 0 — it is advisory and must never fail a sync.
 
-The gate and the restore were hardened across three MMR review rounds into a
-**validate-then-surgically-reverse-apply** design (round-1 substring matching and
-round-3 aggregate line-compare both had data-loss holes):
+**Why detect-and-report, not auto-restore.** Across four MMR review rounds, an
+auto-restoring version accreted an escalating series of data-loss edge cases
+(substring matching, moved lines, EOF-newline, a check-to-restore TOCTOU, mode
+changes). The root cause is fundamental: **content alone cannot prove a file is a
+disposable generated artifact rather than a hand edit that merely contains a
+timestamp** (round-4 finding #3). Rather than keep patching a mechanism that can
+silently discard work, the design was changed (with the maintainer's sign-off) to
+**never modify a file** — it surfaces the likely stray artifact and a person
+decides. This neutralizes the entire data-loss class: the worst case is a
+dismissable advisory line.
 
-1. **Validate — full-file byte compare, timestamps masked.** Read HEAD's raw blob
-   (`git show HEAD:<path>`) and the working file, mask every timestamp to a
-   constant token with `sed`, and require the two to be **byte-identical**
-   (`cmp -s`). A *full-file* compare (not an aggregate of `-`/`+` diff lines)
-   catches a **moved** timestamp line and an **end-of-file-newline** change that an
-   aggregate compare misses (both `sed`s preserve a missing final newline, so the
-   compare is truly byte-exact). Reading HEAD as a raw blob and taking the patch
-   with `--no-ext-diff --no-textconv` means a configured **textconv / external-diff
-   driver cannot conceal** a real change.
-2. **Restore — surgical reverse-apply.** Capture the change as a raw patch and
-   `git apply -R` it. `git apply` re-checks context, so this is **race-safe**: a
-   concurrent edit to the same region makes the apply fail (file untouched), and a
-   concurrent edit elsewhere is **preserved** — unlike a whole-file `git restore`,
-   which would silently discard it (the round-3 check-to-restore TOCTOU).
+**Detection (accurate, but non-load-bearing since nothing is modified).** A file
+is reported iff its raw content **differs** from HEAD (so a mode-only change,
+whose content is identical, is excluded) but is **byte-identical** to HEAD once
+every timestamp is masked to a constant token (`cmp -s` of the raw HEAD blob vs
+the working file, both `sed`-masked). Reading HEAD as a raw blob means a textconv
+/ external-diff filter can conceal nothing. Paths come from `git status
+--porcelain=v1 -z --no-renames` (NUL-delimited, never-quoted — non-ASCII names,
+spaces, and newlines survive).
 
-This is safe against real edits on a timestamped line (`<div>Updated Generated …
-UTC v2</div>` is left alone) yet still heals realistic **embedded** footers
-(`<footer>Generated … UTC</footer>`), which a bare full-line anchor would miss.
-
-Path robustness (also from review): read `git status --porcelain=v1 -z
---no-renames` (NUL-delimited, never-quoted paths — non-ASCII names, spaces, and
-newlines survive; `${line:3}` on quoted porcelain output would otherwise no-op).
-
-Generalization from nibble: drop nibble's `docs/`-only path narrowing and scan
-all modified tracked files. In a generic Scaffold project, generated files are
-not confined to one directory; the full-file compare is the protection, and a
-non-timestamped change can never satisfy it.
+Generalization from nibble: drop nibble's `docs/`-only path narrowing and scan all
+modified tracked files. In a generic Scaffold project, generated files are not
+confined to one directory.
 
 **Safety invariants (load-bearing):**
-- Undo a change **only** when HEAD and the working file are byte-identical after
-  every timestamp is masked; restore surgically by reverse-applying only that
-  patch, never a whole-file restore.
-- **Never** `git clean`, never delete untracked files, never touch staged content
-  (any staged/added/deleted status is skipped), never undo any non-timestamp
-  change.
-- Idempotent: a clean tree is a no-op, exit 0.
-- Log each heal: `→ auto-healed stray regen artifact (timestamp-only): <path>`.
+- **Never** modify, restore, `git clean`, delete, or stage anything — report only.
+- Never treats a staged change (staged/added/deleted status) as a stray artifact.
+- Idempotent and read-only: a clean tree prints nothing, exit 0.
+- Report each stray artifact under `! stray timestamp-only regen artifact(s) …`.
 
-### 3.3 `main-sync.sh.tmpl` calls the heal
+### 3.3 `main-sync.sh.tmpl` calls the detector
 
 Edit `content/assets/agent-ops/git/main-sync.sh.tmpl`: after `$main_wt` (the
 checkout holding the default branch) is resolved and **before** the
-`rev-list` / `merge --ff-only` block, call the heal best-effort:
+`rev-list` / `merge --ff-only` block, call the detector best-effort:
 
 ```bash
-# Best-effort: auto-restore timestamp-only regenerated artifacts a stray generator
-# left in the checkout that holds the default branch, so they never block the
-# ff-only merge. Strictly timestamp-signature-only; never touches real content or
-# untracked files. A hiccup here must never fail the sync (|| true).
-heal="$(dirname "$0")/heal-regen-artifacts.sh"
-[ -x "$heal" ] && "$heal" "$main_wt" || true
+# Best-effort, DETECT-ONLY: report (never modify) stray timestamp-only regenerated
+# artifacts in the checkout that holds the default branch. A hiccup must never fail
+# the sync (|| true).
+check="$(dirname "$0")/check-regen-artifacts.sh"
+[[ -x "$check" ]] && "$check" "$main_wt" || true
 ```
 
-`|| true` mirrors the best-effort convention. On a clean tree the heal is a no-op,
-so existing `main-sync` tests are unaffected.
+`|| true` mirrors the best-effort convention. On a clean tree the detector is
+silent, so existing `main-sync` tests are unaffected.
 
 ### 3.4 Installer wiring — `src/core/agent-ops/install.ts`
 
@@ -187,7 +175,7 @@ Add two entries to `AGENT_OPS_FILE_MAP`:
 
 ```ts
 'git/primary-checkout-guard.sh.tmpl': { dest: 'scripts/primary-checkout-guard.sh', component: 'git', executable: true },
-'git/heal-regen-artifacts.sh.tmpl':   { dest: 'scripts/heal-regen-artifacts.sh',   component: 'git', executable: true },
+'git/check-regen-artifacts.sh.tmpl':  { dest: 'scripts/check-regen-artifacts.sh',  component: 'git', executable: true },
 ```
 
 Both install with the `git` component (depth 3+, mvp and deep), matching the
@@ -198,23 +186,24 @@ marker on a clean install — the new files inherit all of it.
 ### 3.5 Meta-prompt — `content/pipeline/environment/git-workflow.md`
 
 1. **Install list** (Instructions → "Install the agent-ops git component"): add
-   `scripts/primary-checkout-guard.sh` and `scripts/heal-regen-artifacts.sh` to
+   `scripts/primary-checkout-guard.sh` and `scripts/check-regen-artifacts.sh` to
    the enumerated list of what the git component installs.
 2. **New Instructions subsection** "Guardrail: keep generated files out of the
    primary checkout": the git component now ships the write-guard and the
-   `main-sync` self-heal; **the rule** — every generator whose default output is a
-   tracked repo path must call the guard immediately before writing (bash: source
-   it and call `guard_primary_checkout`; other languages: run it as a subprocess
-   and abort on non-zero, or reimplement the detection), enforced in the code that
-   writes, not only a wrapper; the bypass env var; a note that it is a no-op for
-   standalone clones so single-agent projects are unaffected.
+   `main-sync` stray-artifact detector; **the rule** — every generator whose
+   default output is a tracked repo path must call the guard immediately before
+   writing (bash: source it and call `guard_primary_checkout`; other languages:
+   run it as a subprocess and abort on non-zero, or reimplement the detection),
+   enforced in the code that writes, not only a wrapper; the bypass env var; a note
+   that it is a no-op for standalone clones so single-agent projects are
+   unaffected.
 3. **Generated `docs/git-workflow.md`** (section 9, primary-checkout invariant):
    add the one-line rule — "Any script that regenerates a tracked file must call
    the primary-checkout write-guard (`scripts/primary-checkout-guard.sh`);
    regenerate from a worktree, never the primary checkout." — cross-referencing
    the primary-checkout invariant.
 4. **Update Mode "Preserve" list**: name `scripts/primary-checkout-guard.sh` and
-   `scripts/heal-regen-artifacts.sh` so re-running the step never clobbers a
+   `scripts/check-regen-artifacts.sh` so re-running the step never clobbers a
    project's guard customizations (the installer already refuses to overwrite
    locally modified files without `--force`; naming them makes the intent
    explicit).
@@ -232,21 +221,17 @@ Write tests first; each must fail before the code exists.
    - guard: `AGENT_OPS_GIT_GUARD_BYPASS=1` in the primary-with-worktrees case →
      exit 0.
    - guard: outside a git repo → exit 0 (fail-open).
-   - heal: timestamp-only change → restored, tree clean, heal logged.
-   - heal: real content change → left untouched.
-   - heal: mixed (one timestamp-only + one real) → only the timestamp-only
-     restored.
-   - heal: clean tree → no-op, exit 0.
-   - heal: never restores a staged change (staged status skipped).
-   - heal (data-loss guards, added after review): a non-timestamp change on a
-     line that *also* carries a timestamp → **not** restored; real content
-     appended beside the timestamp → **not** restored; an embedded-footer
-     timestamp-only change (`<footer>Generated … UTC</footer>`) → restored.
-   - heal (path robustness): a git-quoted non-ASCII path (`café.html`) is parsed
-     from the NUL-delimited status and healed.
+   - check: a timestamp-only change → **reported**, and the file is left exactly
+     as-is (still dirty — detect-only, never modified). Also an embedded-footer
+     (`<footer>Generated … UTC</footer>`) change → reported.
+   - check: a real content change → **not** reported; a real change bundled with a
+     timestamp change → **not** reported; a mode-only change → **not** reported.
+   - check: a staged change is ignored; a clean tree is silent (exit 0).
+   - check (path robustness): a git-quoted non-ASCII path (`café.html`) is parsed
+     from the NUL-delimited status and reported.
    - main-sync integration: a stray timestamp-only tracked change in the checkout
-     holding the default branch is healed before the ff-only merge (proves
-     `main-sync.sh` calls the heal).
+     holding the default branch is **reported (not modified)** before the ff-only
+     merge, which still advances (proves `main-sync.sh` calls the detector).
 2. **`src/core/agent-ops/install.test.ts`**: the git-component install test
    asserts both new dests install, are executable, and land in the manifest;
    `checkAgentOps().upToDate === true` already covers all manifest files.
@@ -262,7 +247,7 @@ untouched.
 ## 5. Files touched
 
 - **New:** `content/assets/agent-ops/git/primary-checkout-guard.sh.tmpl`,
-  `content/assets/agent-ops/git/heal-regen-artifacts.sh.tmpl`,
+  `content/assets/agent-ops/git/check-regen-artifacts.sh.tmpl`,
   `tests/git-workflow-guardrail-content.bats`, this spec.
 - **Edit:** `content/assets/agent-ops/git/main-sync.sh.tmpl`,
   `src/core/agent-ops/install.ts`, `src/core/agent-ops/install.test.ts`,
@@ -271,12 +256,13 @@ untouched.
 
 ## 6. Risks & mitigations
 
-- *Auto-heal too aggressive* → strict timestamp-only signature; only ever
-  `git restore` tracked, unstaged files; never touches untracked or real edits.
-  Covered by tests.
+- *Detector clobbering real work* → impossible by construction: it is detect-only
+  and never modifies, restores, deletes, or stages anything. The worst case is a
+  dismissable advisory. (This is why auto-restore was dropped after four review
+  rounds — see §3.2.)
 - *Guard false-positive blocks a legit run* → no-op unless primary **and** >1
   worktree; standalone clones/CI unaffected; documented bypass exists.
 - *Sourced guard leaking shell options* → no top-level `set -e`; strict mode only
   on the direct-execution path.
-- *Drift on the `main-sync` edit* → avoided by construction: the heal call lives
-  in the template, so the installed hash matches the manifest.
+- *Drift on the `main-sync` edit* → avoided by construction: the detector call
+  lives in the template, so the installed hash matches the manifest.

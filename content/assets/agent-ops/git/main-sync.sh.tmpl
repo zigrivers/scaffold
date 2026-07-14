@@ -63,13 +63,12 @@ if [[ -z "$main_wt" ]]; then
   main_wt="$primary"
 fi
 
-# Best-effort: auto-restore timestamp-only regenerated artifacts a stray generator
-# left in the checkout that holds the default branch, so they never block the
-# ff-only merge below. Strictly timestamp-signature-only — never touches real
-# content or untracked files (scripts/heal-regen-artifacts.sh). A hiccup here must
-# never fail the sync, so the call is best-effort.
-heal="$(dirname "$0")/heal-regen-artifacts.sh"
-[[ -x "$heal" ]] && "$heal" "$main_wt" || true
+# Best-effort, DETECT-ONLY: report (never modify) stray timestamp-only regenerated
+# artifacts a generator left in the checkout that holds the default branch, so they
+# don't silently block the ff-only merge below — a person decides whether to discard
+# or regenerate in a worktree. A hiccup here must never fail the sync (|| true).
+check="$(dirname "$0")/check-regen-artifacts.sh"
+[[ -x "$check" ]] && "$check" "$main_wt" || true
 
 ahead="$(git -C "$main_wt" rev-list --count "origin/$DEFAULT..$DEFAULT")"
 if [[ "$ahead" != "0" ]]; then

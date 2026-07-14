@@ -40,11 +40,11 @@ for CI until a launch target is chosen and automated CI is deliberately wired up
 - scripts/setup-agent-worktree.sh — installed (not hand-authored) by
   `scaffold agent-ops install --component git`; see "Install the agent-ops
   git component" in Instructions
-- scripts/primary-checkout-guard.sh, scripts/heal-regen-artifacts.sh —
+- scripts/primary-checkout-guard.sh, scripts/check-regen-artifacts.sh —
   installed by the same git component; the write-guard and main-sync
-  self-heal that keep generated files out of the primary checkout (see
-  "Guardrail: keep generated files out of the primary checkout" in
-  Instructions)
+  stray-artifact detector that keep generated files out of the primary
+  checkout (see "Guardrail: keep generated files out of the primary
+  checkout" in Instructions)
 - .github/pull_request_template.md — PR template with Summary / Test plan /
   References sections
 - .claude/settings.json — gains a PostToolUse reminder hook that fires after
@@ -136,7 +136,7 @@ modified files without `--force`; never pass `--force` in generation mode.
   customizations under scripts/ (the installer already refuses to
   overwrite locally modified files without `--force` — do not pass it in
   generation mode) — including the primary-checkout write-guard
-  (`scripts/primary-checkout-guard.sh` and `scripts/heal-regen-artifacts.sh`),
+  (`scripts/primary-checkout-guard.sh` and `scripts/check-regen-artifacts.sh`),
   so re-running the step never clobbers a project's guard customizations
 - **Triggers for update**: coding-standards.md changed commit format,
   Beads status changed (added or removed), new worktree patterns needed
@@ -176,7 +176,7 @@ modified files without `--force`; never pass `--force` in generation mode.
    This installs `scripts/setup-agent-worktree.sh`,
    `scripts/cleanup-merged-branches.sh`, `scripts/main-sync.sh`,
    `scripts/doctor.sh`, `scripts/beads-snapshot.sh`, `scripts/bd-guard.sh`,
-   `scripts/primary-checkout-guard.sh`, `scripts/heal-regen-artifacts.sh`,
+   `scripts/primary-checkout-guard.sh`, `scripts/check-regen-artifacts.sh`,
    and the `agent-ops.mk` Makefile fragment (wired into the project Makefile
    via a one-line managed `include`, appended if missing). The installer is
    idempotent and refuses to overwrite locally modified files without
@@ -206,8 +206,8 @@ modified files without `--force`; never pass `--force` in generation mode.
 
 ### Guardrail: keep generated files out of the primary checkout
 The git component ships a **primary-checkout write-guard**
-(`scripts/primary-checkout-guard.sh`) and a **main-sync self-heal**
-(`scripts/heal-regen-artifacts.sh`) — both installed by `scaffold agent-ops
+(`scripts/primary-checkout-guard.sh`) and a **main-sync stray-artifact detector**
+(`scripts/check-regen-artifacts.sh`) — both installed by `scaffold agent-ops
 install --component git` above. Together they close a gap git hooks cannot: an
 agent (or a regen script an agent runs) writing a **tracked file into the
 primary checkout** is not a git operation, so no commit/push hook fires — the
@@ -237,14 +237,16 @@ projects are unaffected; multi-agent projects get real protection.
   The single documented bypass is `AGENT_OPS_GIT_GUARD_BYPASS=1` (human
   emergency only, never agents) — reuse this one var for any other git guard so
   there is one override, not two.
-- **Recovery — the main-sync self-heal.** `scripts/main-sync.sh` calls
-  `scripts/heal-regen-artifacts.sh` best-effort before it fast-forwards the
-  default branch. The heal restores a modified tracked file **only when its
-  entire diff is the generated-timestamp signature** (every changed line is a
-  `Generated <ISO-date> <HH:MM> UTC` footer); it never `git clean`s, never
-  touches untracked or staged content, and never restores a file with any real
-  content change. This wiring lives in the installed `main-sync.sh` template, so
-  it stays clean against `scaffold agent-ops check` (no drift).
+- **Recovery — detect and report (never modify).** `scripts/main-sync.sh` calls
+  `scripts/check-regen-artifacts.sh` best-effort before it fast-forwards the
+  default branch. The detector **reports** (to stderr, never modifies) any tracked
+  file whose only working-tree change is a `Generated <ISO-date> <HH:MM> UTC`
+  footer — a likely stray regen artifact left in the primary checkout — and tells
+  the operator to discard it (`git checkout -- <file>`) or regenerate it inside a
+  worktree. It is deliberately detect-only: content alone cannot prove a file is a
+  disposable generated artifact rather than a hand edit that merely contains a
+  timestamp, so a person decides. The call lives in the installed `main-sync.sh`
+  template, so it stays clean against `scaffold agent-ops check` (no drift).
 
 ### Generate docs/git-workflow.md
 Write docs/git-workflow.md with the sections below, synthesized from the

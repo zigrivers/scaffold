@@ -650,152 +650,99 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
-# heal-regen-artifacts.sh — auto-restore timestamp-only regenerated trackers.
+# check-regen-artifacts.sh — DETECT and report stray timestamp-only regenerated
+# trackers. It must NEVER modify, restore, delete, or stage anything.
 # ---------------------------------------------------------------------------
 
-@test "heal: restores a timestamp-only regenerated artifact" {
+@test "check: reports a timestamp-only regen artifact without modifying it" {
     printf 'header\nGenerated 2026-07-11 05:11 UTC\nbody\n' > "$CLONE_DIR/report.html"
     git -C "$CLONE_DIR" add report.html
     git -C "$CLONE_DIR" commit -q -m "add tracker"
     printf 'header\nGenerated 2026-07-14 01:47 UTC\nbody\n' > "$CLONE_DIR/report.html"
-    run bash -c "'$CLONE_DIR/scripts/heal-regen-artifacts.sh' '$CLONE_DIR'"
+    run bash -c "'$CLONE_DIR/scripts/check-regen-artifacts.sh' '$CLONE_DIR'"
     [ "$status" -eq 0 ]
-    [[ "$output" == *auto-healed* ]]
+    [[ "$output" == *"stray timestamp-only"* ]]
     [[ "$output" == *report.html* ]]
-    run git -C "$CLONE_DIR" status --porcelain -- report.html
-    [ -z "$output" ]
-}
-
-@test "heal: leaves a file with a real content change untouched" {
-    printf 'header\nGenerated 2026-07-11 05:11 UTC\nbody\n' > "$CLONE_DIR/report.html"
-    git -C "$CLONE_DIR" add report.html
-    git -C "$CLONE_DIR" commit -q -m "add tracker"
-    # A real content change to a non-timestamp line — must NOT be healed.
-    printf 'CHANGED\nGenerated 2026-07-11 05:11 UTC\nbody\n' > "$CLONE_DIR/report.html"
-    run bash -c "'$CLONE_DIR/scripts/heal-regen-artifacts.sh' '$CLONE_DIR'"
-    [ "$status" -eq 0 ]
-    [[ "$output" != *auto-healed* ]]
+    # DETECT-ONLY: the file is reported but left exactly as-is (still dirty).
     run git -C "$CLONE_DIR" status --porcelain -- report.html
     [ -n "$output" ]
+    grep -q '01:47 UTC' "$CLONE_DIR/report.html"
 }
 
-@test "heal: heals only the timestamp-only file when a real change is also present" {
-    printf 'a\nGenerated 2026-07-11 05:11 UTC\nb\n' > "$CLONE_DIR/ts.html"
-    printf 'a\nGenerated 2026-07-11 05:11 UTC\nb\n' > "$CLONE_DIR/real.html"
-    git -C "$CLONE_DIR" add ts.html real.html
-    git -C "$CLONE_DIR" commit -q -m "two trackers"
-    printf 'a\nGenerated 2026-07-14 01:47 UTC\nb\n' > "$CLONE_DIR/ts.html"     # timestamp-only
-    printf 'REAL\nGenerated 2026-07-11 05:11 UTC\nb\n' > "$CLONE_DIR/real.html" # real change
-    run bash -c "'$CLONE_DIR/scripts/heal-regen-artifacts.sh' '$CLONE_DIR'"
-    [ "$status" -eq 0 ]
-    run git -C "$CLONE_DIR" status --porcelain -- ts.html
-    [ -z "$output" ]     # ts.html healed
-    run git -C "$CLONE_DIR" status --porcelain -- real.html
-    [ -n "$output" ]     # real.html left dirty
-}
-
-@test "heal: is a no-op on a clean tree" {
-    run bash -c "'$CLONE_DIR/scripts/heal-regen-artifacts.sh' '$CLONE_DIR'"
-    [ "$status" -eq 0 ]
-    [[ "$output" != *auto-healed* ]]
-}
-
-@test "heal: never restores a staged change" {
-    printf 'a\nGenerated 2026-07-11 05:11 UTC\nb\n' > "$CLONE_DIR/report.html"
-    git -C "$CLONE_DIR" add report.html
-    git -C "$CLONE_DIR" commit -q -m "add tracker"
-    # A timestamp-only change that has been STAGED — heal must not touch staged content.
-    printf 'a\nGenerated 2026-07-14 01:47 UTC\nb\n' > "$CLONE_DIR/report.html"
-    git -C "$CLONE_DIR" add report.html
-    run bash -c "'$CLONE_DIR/scripts/heal-regen-artifacts.sh' '$CLONE_DIR'"
-    [ "$status" -eq 0 ]
-    [[ "$output" != *auto-healed* ]]
-    # still staged with the new timestamp
-    run git -C "$CLONE_DIR" diff --cached --name-only -- report.html
-    [ -n "$output" ]
-}
-
-@test "heal: does NOT restore when a non-timestamp part of a timestamped line changed" {
-    # The signature matches as a substring, but 'alpha'→'BETA' on that same line is
-    # a REAL content change — restoring the file would destroy it. Must NOT heal.
-    printf 'alpha Generated 2026-07-11 05:11 UTC\n' > "$CLONE_DIR/report.html"
-    git -C "$CLONE_DIR" add report.html
-    git -C "$CLONE_DIR" commit -q -m "add tracker"
-    printf 'BETA Generated 2026-07-14 01:47 UTC\n' > "$CLONE_DIR/report.html"
-    run bash -c "'$CLONE_DIR/scripts/heal-regen-artifacts.sh' '$CLONE_DIR'"
-    [ "$status" -eq 0 ]
-    [[ "$output" != *auto-healed* ]]
-    run git -C "$CLONE_DIR" status --porcelain -- report.html
-    [ -n "$output" ]     # real change preserved
-}
-
-@test "heal: does NOT restore when real content is added beside the timestamp" {
-    printf 'Generated 2026-07-11 05:11 UTC\n' > "$CLONE_DIR/report.html"
-    git -C "$CLONE_DIR" add report.html
-    git -C "$CLONE_DIR" commit -q -m "add tracker"
-    printf 'Generated 2026-07-14 01:47 UTC extra\n' > "$CLONE_DIR/report.html"
-    run bash -c "'$CLONE_DIR/scripts/heal-regen-artifacts.sh' '$CLONE_DIR'"
-    [ "$status" -eq 0 ]
-    [[ "$output" != *auto-healed* ]]
-    run git -C "$CLONE_DIR" status --porcelain -- report.html
-    [ -n "$output" ]
-}
-
-@test "heal: restores an embedded-footer timestamp change (ts within a line)" {
-    # A realistic HTML footer where only the timestamp value moved — must heal.
+@test "check: reports an embedded-footer timestamp change" {
     printf '<footer>Generated 2026-07-11 05:11 UTC</footer>\n' > "$CLONE_DIR/report.html"
     git -C "$CLONE_DIR" add report.html
     git -C "$CLONE_DIR" commit -q -m "add tracker"
     printf '<footer>Generated 2026-07-14 01:47 UTC</footer>\n' > "$CLONE_DIR/report.html"
-    run bash -c "'$CLONE_DIR/scripts/heal-regen-artifacts.sh' '$CLONE_DIR'"
+    run bash -c "'$CLONE_DIR/scripts/check-regen-artifacts.sh' '$CLONE_DIR'"
     [ "$status" -eq 0 ]
-    [[ "$output" == *auto-healed* ]]
+    [[ "$output" == *report.html* ]]
     run git -C "$CLONE_DIR" status --porcelain -- report.html
+    [ -n "$output" ]     # still dirty — never modified
+}
+
+@test "check: does NOT report a real content change" {
+    printf 'header\nGenerated 2026-07-11 05:11 UTC\nbody\n' > "$CLONE_DIR/report.html"
+    git -C "$CLONE_DIR" add report.html
+    git -C "$CLONE_DIR" commit -q -m "add tracker"
+    printf 'CHANGED\nGenerated 2026-07-11 05:11 UTC\nbody\n' > "$CLONE_DIR/report.html"
+    run bash -c "'$CLONE_DIR/scripts/check-regen-artifacts.sh' '$CLONE_DIR'"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *report.html* ]]
+}
+
+@test "check: does NOT report a real change bundled with a timestamp change" {
+    printf 'alpha Generated 2026-07-11 05:11 UTC\n' > "$CLONE_DIR/report.html"
+    git -C "$CLONE_DIR" add report.html
+    git -C "$CLONE_DIR" commit -q -m "add tracker"
+    printf 'BETA Generated 2026-07-14 01:47 UTC\n' > "$CLONE_DIR/report.html"
+    run bash -c "'$CLONE_DIR/scripts/check-regen-artifacts.sh' '$CLONE_DIR'"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *report.html* ]]
+}
+
+@test "check: does NOT report a mode-only change (content identical)" {
+    printf 'Generated 2026-07-11 05:11 UTC\n' > "$CLONE_DIR/report.sh"
+    git -C "$CLONE_DIR" add report.sh
+    git -C "$CLONE_DIR" commit -q -m "add tracker"
+    chmod +x "$CLONE_DIR/report.sh"   # mode-only change — file content unchanged
+    run bash -c "'$CLONE_DIR/scripts/check-regen-artifacts.sh' '$CLONE_DIR'"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *report.sh* ]]
+}
+
+@test "check: ignores a staged change" {
+    printf 'a\nGenerated 2026-07-11 05:11 UTC\nb\n' > "$CLONE_DIR/report.html"
+    git -C "$CLONE_DIR" add report.html
+    git -C "$CLONE_DIR" commit -q -m "add tracker"
+    printf 'a\nGenerated 2026-07-14 01:47 UTC\nb\n' > "$CLONE_DIR/report.html"
+    git -C "$CLONE_DIR" add report.html   # STAGED, not a working-tree-only change
+    run bash -c "'$CLONE_DIR/scripts/check-regen-artifacts.sh' '$CLONE_DIR'"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *report.html* ]]
+}
+
+@test "check: is silent on a clean tree" {
+    run bash -c "'$CLONE_DIR/scripts/check-regen-artifacts.sh' '$CLONE_DIR'"
+    [ "$status" -eq 0 ]
     [ -z "$output" ]
 }
 
-@test "heal: does NOT restore a moved timestamp line (position changed)" {
-    # A full-file compare must catch a reordering an aggregate line compare misses.
-    printf 'A\nGenerated 2026-07-11 05:11 UTC\nB\n' > "$CLONE_DIR/report.html"
-    git -C "$CLONE_DIR" add report.html
-    git -C "$CLONE_DIR" commit -q -m "add tracker"
-    # Same lines, but the timestamp line moved to the top AND its value changed.
-    printf 'Generated 2026-07-14 01:47 UTC\nA\nB\n' > "$CLONE_DIR/report.html"
-    run bash -c "'$CLONE_DIR/scripts/heal-regen-artifacts.sh' '$CLONE_DIR'"
-    [ "$status" -eq 0 ]
-    [[ "$output" != *auto-healed* ]]
-    run git -C "$CLONE_DIR" status --porcelain -- report.html
-    [ -n "$output" ]
-}
-
-@test "heal: does NOT restore an end-of-file-newline change" {
-    printf 'Generated 2026-07-11 05:11 UTC\n' > "$CLONE_DIR/report.html"
-    git -C "$CLONE_DIR" add report.html
-    git -C "$CLONE_DIR" commit -q -m "add tracker"
-    # Timestamp changed AND the trailing newline removed — not byte-identical-mod-ts.
-    printf 'Generated 2026-07-14 01:47 UTC' > "$CLONE_DIR/report.html"
-    run bash -c "'$CLONE_DIR/scripts/heal-regen-artifacts.sh' '$CLONE_DIR'"
-    [ "$status" -eq 0 ]
-    [[ "$output" != *auto-healed* ]]
-    run git -C "$CLONE_DIR" status --porcelain -- report.html
-    [ -n "$output" ]
-}
-
-@test "heal: parses a git-quoted non-ASCII path (café.html)" {
+@test "check: parses a git-quoted non-ASCII path (café.html)" {
     # core.quotePath=true C-quotes non-ASCII paths in porcelain output; NUL parsing
-    # must recover the real path so the timestamp-only artifact is still healed.
+    # must recover the real path so the artifact is still detected and reported.
     printf 'Generated 2026-07-11 05:11 UTC\n' > "$CLONE_DIR/café.html"
     git -C "$CLONE_DIR" add "café.html"
     git -C "$CLONE_DIR" commit -q -m "unicode tracker"
     printf 'Generated 2026-07-14 01:47 UTC\n' > "$CLONE_DIR/café.html"
-    run bash -c "'$CLONE_DIR/scripts/heal-regen-artifacts.sh' '$CLONE_DIR'"
+    run bash -c "'$CLONE_DIR/scripts/check-regen-artifacts.sh' '$CLONE_DIR'"
     [ "$status" -eq 0 ]
-    [[ "$output" == *auto-healed* ]]
+    [[ "$output" == *café.html* ]]
     run git -C "$CLONE_DIR" status --porcelain -- "café.html"
-    [ -z "$output" ]
+    [ -n "$output" ]     # reported, never modified
 }
 
-@test "main-sync: heals a stray timestamp-only artifact before fast-forwarding" {
+@test "main-sync: reports (does not modify) a stray timestamp-only artifact before ff" {
     printf 'x\nGenerated 2026-07-11 05:11 UTC\ny\n' > "$CLONE_DIR/report.html"
     git -C "$CLONE_DIR" add report.html
     git -C "$CLONE_DIR" commit -q -m "add tracker"
@@ -808,8 +755,10 @@ EOF
     printf 'x\nGenerated 2026-07-14 01:47 UTC\ny\n' > "$CLONE_DIR/report.html"
     run bash -c "cd '$CLONE_DIR' && scripts/main-sync.sh"
     [ "$status" -eq 0 ]
-    [[ "$output" == *auto-healed* ]]
-    run git -C "$CLONE_DIR" status --porcelain -- report.html
-    [ -z "$output" ]     # the stray artifact was healed
+    [[ "$output" == *"stray timestamp-only"* ]]
+    [[ "$output" == *report.html* ]]
+    # DETECT-ONLY: the stray artifact is reported but NOT modified…
+    grep -q '01:47 UTC' "$CLONE_DIR/report.html"
+    # …and the ff-only sync still advanced main (the empty commit didn't touch report.html)
     [ "$(git -C "$CLONE_DIR" rev-parse main)" = "$(git -C "$CLONE_DIR" rev-parse origin/main)" ]
 }

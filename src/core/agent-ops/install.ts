@@ -37,8 +37,8 @@ export const AGENT_OPS_FILE_MAP: Record<string, AgentOpsFileSpec> = {
     component: 'git',
     executable: true,
   },
-  'git/heal-regen-artifacts.sh.tmpl': {
-    dest: 'scripts/heal-regen-artifacts.sh',
+  'git/check-regen-artifacts.sh.tmpl': {
+    dest: 'scripts/check-regen-artifacts.sh',
     component: 'git',
     executable: true,
   },
