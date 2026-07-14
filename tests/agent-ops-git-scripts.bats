@@ -715,6 +715,59 @@ EOF
     [ -n "$output" ]
 }
 
+@test "heal: does NOT restore when a non-timestamp part of a timestamped line changed" {
+    # The signature matches as a substring, but 'alpha'→'BETA' on that same line is
+    # a REAL content change — restoring the file would destroy it. Must NOT heal.
+    printf 'alpha Generated 2026-07-11 05:11 UTC\n' > "$CLONE_DIR/report.html"
+    git -C "$CLONE_DIR" add report.html
+    git -C "$CLONE_DIR" commit -q -m "add tracker"
+    printf 'BETA Generated 2026-07-14 01:47 UTC\n' > "$CLONE_DIR/report.html"
+    run bash -c "'$CLONE_DIR/scripts/heal-regen-artifacts.sh' '$CLONE_DIR'"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *auto-healed* ]]
+    run git -C "$CLONE_DIR" status --porcelain -- report.html
+    [ -n "$output" ]     # real change preserved
+}
+
+@test "heal: does NOT restore when real content is added beside the timestamp" {
+    printf 'Generated 2026-07-11 05:11 UTC\n' > "$CLONE_DIR/report.html"
+    git -C "$CLONE_DIR" add report.html
+    git -C "$CLONE_DIR" commit -q -m "add tracker"
+    printf 'Generated 2026-07-14 01:47 UTC extra\n' > "$CLONE_DIR/report.html"
+    run bash -c "'$CLONE_DIR/scripts/heal-regen-artifacts.sh' '$CLONE_DIR'"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *auto-healed* ]]
+    run git -C "$CLONE_DIR" status --porcelain -- report.html
+    [ -n "$output" ]
+}
+
+@test "heal: restores an embedded-footer timestamp change (ts within a line)" {
+    # A realistic HTML footer where only the timestamp value moved — must heal.
+    printf '<footer>Generated 2026-07-11 05:11 UTC</footer>\n' > "$CLONE_DIR/report.html"
+    git -C "$CLONE_DIR" add report.html
+    git -C "$CLONE_DIR" commit -q -m "add tracker"
+    printf '<footer>Generated 2026-07-14 01:47 UTC</footer>\n' > "$CLONE_DIR/report.html"
+    run bash -c "'$CLONE_DIR/scripts/heal-regen-artifacts.sh' '$CLONE_DIR'"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *auto-healed* ]]
+    run git -C "$CLONE_DIR" status --porcelain -- report.html
+    [ -z "$output" ]
+}
+
+@test "heal: parses a git-quoted non-ASCII path (café.html)" {
+    # core.quotePath=true C-quotes non-ASCII paths in porcelain output; NUL parsing
+    # must recover the real path so the timestamp-only artifact is still healed.
+    printf 'Generated 2026-07-11 05:11 UTC\n' > "$CLONE_DIR/café.html"
+    git -C "$CLONE_DIR" add "café.html"
+    git -C "$CLONE_DIR" commit -q -m "unicode tracker"
+    printf 'Generated 2026-07-14 01:47 UTC\n' > "$CLONE_DIR/café.html"
+    run bash -c "'$CLONE_DIR/scripts/heal-regen-artifacts.sh' '$CLONE_DIR'"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *auto-healed* ]]
+    run git -C "$CLONE_DIR" status --porcelain -- "café.html"
+    [ -z "$output" ]
+}
+
 @test "main-sync: heals a stray timestamp-only artifact before fast-forwarding" {
     printf 'x\nGenerated 2026-07-11 05:11 UTC\ny\n' > "$CLONE_DIR/report.html"
     git -C "$CLONE_DIR" add report.html

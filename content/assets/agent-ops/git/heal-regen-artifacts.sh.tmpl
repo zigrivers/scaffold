@@ -5,14 +5,16 @@
 # Usage: heal-regen-artifacts.sh <checkout-path>
 #
 # For each file in <checkout-path> modified ONLY in the working tree (porcelain
-# " M" — tracked, unstaged), restore it to HEAD *iff its entire diff is the
-# regenerated-timestamp footer*: every changed content line matches
-# `Generated <ISO-date> <HH:MM> UTC`. Any file with a real content change is left
-# untouched.
+# " M" — tracked, unstaged), restore it to HEAD *iff its entire working-tree diff
+# is a timestamp-only change*: the file is byte-identical to HEAD except inside
+# `Generated <ISO-date> <HH:MM> UTC` footers (e.g. `<footer>Generated ... UTC</footer>`).
+# Any file with a real content change — even on a line that also carries a
+# timestamp — is left untouched.
 #
 # Safety invariants (load-bearing — this git-restores files):
-#   - Only ever `git restore` a tracked file whose *complete* diff matches the
-#     signature. One non-timestamp changed line ⇒ hands off.
+#   - Restore ONLY when the removed and added diff lines are identical after every
+#     timestamp is normalized to a constant token. A single non-timestamp
+#     difference (prefix, suffix, or another line) leaves the file alone.
 #   - Never `git clean`, never delete untracked files, never touch staged content
 #     (staged/added/deleted statuses are skipped).
 #   - Idempotent: a clean tree is a no-op, exit 0.
@@ -29,29 +31,41 @@ fi
 # The regenerated-timestamp signature. Anchored to the literal "Generated " label
 # so a bare date/time appearing in real content can't match by accident.
 TS_RE='Generated [0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2} UTC'
+# A distinctive token a real content line is implausibly going to contain, used to
+# mask timestamps before comparing old vs new.
+TS_TOKEN='<REGEN-TIMESTAMP>'
 
 # Files modified ONLY in the working tree (index char space, worktree char M),
-# tracked. `--no-renames` keeps the two-char status prefix stable.
-git -C "$wt" status --porcelain --no-renames | while IFS= read -r line; do
-  [[ "${line:0:2}" == " M" ]] || continue
-  path="${line:3}"
+# tracked. `-z` gives NUL-terminated, never-quoted paths (so non-ASCII names,
+# spaces, and newlines survive); `--no-renames` keeps the two-char status prefix
+# stable.
+while IFS= read -r -d '' entry; do
+  [[ "${entry:0:2}" == " M" ]] || continue
+  path="${entry:3}"
 
-  # Content lines only: skip everything up to the first @@ hunk header, then
-  # collect +/- lines. This is why the ---/+++ file headers (which appear before
-  # any @@) can never be mistaken for a changed content line.
-  changed="$(git -C "$wt" diff -U0 -- "$path" | awk '
-    /^@@/ { inhunk = 1; next }
-    inhunk && (/^\+/ || /^-/) { print }
-  ' || true)"
+  # `--no-color` so a user's color.diff=always config can't inject ANSI escapes.
+  diff="$(git -C "$wt" diff -U0 --no-color -- "$path")"
+
+  # Content lines only, marker stripped: skip everything up to the first @@ hunk
+  # header (so the ---/+++ file headers can never count), then collect the removed
+  # (-) and added (+) lines separately.
+  old="$(printf '%s\n' "$diff" | awk '/^@@/{h=1;next} h&&/^-/{print substr($0,2)}')"
+  new="$(printf '%s\n' "$diff" | awk '/^@@/{h=1;next} h&&/^\+/{print substr($0,2)}')"
 
   # No content diff (e.g. a mode-only change) ⇒ nothing to heal safely.
-  [[ -n "$changed" ]] || continue
+  [[ -n "$old$new" ]] || continue
 
-  # Healable iff NO changed content line fails the timestamp signature.
-  if printf '%s\n' "$changed" | grep -Evq "$TS_RE"; then
-    continue # a non-timestamp change exists — leave the file alone
-  fi
+  # Necessary condition: the change must actually involve a timestamp footer.
+  printf '%s\n' "$old$new" | grep -qE "$TS_RE" || continue
+
+  # Sufficient condition (the real safety gate): the removed and added text are
+  # identical once every timestamp is masked. A real edit anywhere — including on
+  # a line that also carries a timestamp — makes these differ, so the file is left
+  # untouched and NEVER restored over real work.
+  norm_old="$(printf '%s\n' "$old" | sed -E "s/$TS_RE/$TS_TOKEN/g")"
+  norm_new="$(printf '%s\n' "$new" | sed -E "s/$TS_RE/$TS_TOKEN/g")"
+  [[ "$norm_old" == "$norm_new" ]] || continue
 
   git -C "$wt" restore -- "$path"
   printf '→ auto-healed stray regen artifact (timestamp-only): %s\n' "$path"
-done
+done < <(git -C "$wt" status --porcelain=v1 -z --no-renames)
