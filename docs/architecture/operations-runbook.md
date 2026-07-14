@@ -269,13 +269,13 @@ jobs:
 
 Scaffold uses two tag-triggered workflows:
 
-- **`publish.yml`** — checks out the tagged commit, runs `npm ci`, `npm run build`, `npm test`, and publishes `@zigrivers/scaffold` to npm with provenance. Authentication uses **npm trusted publishing** via GitHub OIDC, not a repo `NPM_TOKEN` secret.
+- **`publish.yml`** — checks out the tagged commit, runs `npm ci`, `npm run build`, `npm test`, and publishes `@zigrivers/scaffold` to npm with provenance. Authentication uses BOTH the GitHub OIDC trusted-publisher config (provenance signing only) AND the `NPM_TOKEN` repo secret (the registry PUT) — as of v3.28.0 the OIDC token alone does NOT authorize the publish; see §4.2a.
 - **`update-homebrew.yml`** — computes the SHA256 for the tagged GitHub source tarball and updates the `zigrivers/homebrew-scaffold` tap so `brew upgrade scaffold` installs the same version.
 
 Important operational detail:
 
 - **GitHub release creation is not automated by these workflows.** Maintainers still create the GitHub release manually after the tag is pushed.
-- **Trusted publishing is a one-time package setting.** The npm package must trust the `zigrivers/scaffold` repository and the `publish.yml` workflow file. If the workflow suddenly reports npm auth failure, verify that trusted-publisher configuration before touching GitHub secrets.
+- **Trusted publishing is a one-time package setting.** The npm package must trust the `zigrivers/scaffold` repository and the `publish.yml` workflow file — but it only signs provenance. If the workflow reports npm auth failure, fix the `NPM_TOKEN` secret per §4.2a (expiry, scope, "Bypass 2FA") — the trusted-publisher config is not the working publish-auth path.
 
 **Partial release failure**:
 - If `publish.yml` succeeds but `update-homebrew.yml` fails, npm users can upgrade immediately but Homebrew users cannot until the tap update is fixed.
@@ -664,9 +664,9 @@ The CLI makes no network requests except `scaffold update` (which checks the npm
 - npm provenance attestation (`--provenance`) links published packages to their source commit
 
 **npm trusted publishing**:
-- `publish.yml` uses GitHub OIDC (`id-token: write`) to request a short-lived npm publish credential at release time
+- `publish.yml` uses GitHub OIDC (`id-token: write`) at release time — but the OIDC credential currently authorizes only the provenance signing, NOT the registry PUT (see §4.2a)
 - The npm package settings must define a trusted publisher for the `zigrivers/scaffold` repository and the `.github/workflows/publish.yml` workflow
-- No long-lived `NPM_TOKEN` repository secret is required for npm publish
+- The long-lived `NPM_TOKEN` repository secret IS required for npm publish (§4.2a: pure-OIDC publishing failed end-to-end at v3.28.0; keep `NODE_AUTH_TOKEN` in `publish.yml`)
 - Limit npm org membership to maintainers who need publish or package-admin access — use the `developer` role for contributors who don't
 
 **npm account compromise recovery**: If the npm account or org access is compromised: (1) remove or disable the trusted publisher in npm package settings, (2) rotate the maintainer's npm credentials and 2FA recovery material, (3) run `npm audit signatures` on the last published version to verify package integrity, (4) contact npm support at security@npmjs.com if unauthorized versions were published
@@ -768,7 +768,7 @@ Scaffold has no database, no persistent user data, and no server. Recovery conce
 - **Git repository**: GitHub is the single host. Maintainers should keep local clones current. For critical redundancy, mirror to a second Git host (e.g., `git push --mirror` to a GitLab or Codeberg remote on each release).
 - **npm registry**: If the npm package is removed (policy violation, legal claim, or account issue), the package can be re-published from a local build of any tagged commit. Provenance attestation would need to be re-established.
 - **Homebrew tap**: The tap repository is a small Git repo. If lost, recreate the formula from the npm package URL and SHA. Keep a local clone.
-- **GitHub Actions secrets**: npm publish no longer uses a repo secret. The remaining release secret is `HOMEBREW_TAP_TOKEN` for the tap update workflow. If npm publish reports auth failure, verify the npm trusted-publisher configuration instead of creating a new `NPM_TOKEN`.
+- **GitHub Actions secrets**: the release secrets are `NPM_TOKEN` (npm registry PUT — §4.2a) and `HOMEBREW_TAP_TOKEN` (tap update workflow). If npm publish reports auth failure, fix the `NPM_TOKEN` secret per the §4.2a decision tree — NOT the OIDC trusted-publisher config.
 
 ### 7.6 Documentation Drift
 

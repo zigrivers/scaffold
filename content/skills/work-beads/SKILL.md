@@ -12,10 +12,12 @@ skip steps.
 **The loop contract (memorize this):**
 
 ```
-for each selected bead (strictly sequential, one open PR per agent):
-  claim -> worktree -> build (draft PR on first push) -> verify (make check)
-  -> review (mmr, 3-round cap) -> squash-merge -> sync + prune -> close bead
-batch end: report in the required slots
+set identity once, then repeat up to N times (one bead in flight per agent):
+  refresh view -> select ONE bead -> claim atomically (lost the claim?
+  take the next candidate) -> worktree -> build (draft PR on first push)
+  -> verify (make check) -> review (mmr, 3-round cap) -> squash-merge
+  -> sync + prune -> close bead
+batch end (budget spent, queue drained, or P0/blocker): report in the slots
 ```
 
 **The bead is not done until the PR is MERGED and the bead is CLOSED.**
@@ -24,10 +26,12 @@ end your turn after opening a draft PR with a list of "next steps" — that is
 the #1 observed agent failure. The only mid-loop stops: a verified,
 still-reproducing P0, or a blocker you can name.
 
-Invocation: `/work-beads` (1 bead) · `/work-beads N` · `/work-beads N <label>`
-· `/work-beads <id> [<id>...]` (explicit IDs, worked in dependency order).
+Invocation: `/work-beads` (1 bead) · `/work-beads N` (up to N beads, selected
+**one at a time at claim time** — N is a budget, not a reservation; never
+pre-pick a list) · `/work-beads N <label>` (same, scoped to a label) ·
+`/work-beads <id> [<id>...]` (explicit IDs, worked in dependency order).
 
-## Step 0 — Orient (read-only, from the primary checkout)
+## Step 0 — Orient (once per batch, read-only, from the primary checkout)
 
 The primary checkout is the first entry of `git worktree list`. Run:
 
@@ -37,6 +41,24 @@ gh pr list --state open        # open + draft PRs = live registry of what others
 git worktree list
 make doctor                    # wedged home base? make doctor-fix (unattended-safe)
 ```
+
+**Identity (required before any claim):** claims key on the Beads actor, and
+same-actor claims are idempotent — two agents sharing the default identity
+(`git user.name`) can both "successfully" claim the SAME bead, silently
+losing mutual exclusion. If `BEADS_ACTOR` is not already set to a per-agent
+value (the multi-agent bootstrap prompts set one), pick a distinctive agent
+name now (e.g. `agent-cobalt-fox`) and use it on every `bd` write this
+session — `export BEADS_ACTOR=<name>` in each shell, or `--actor <name>` per
+command. Unique across concurrent agents = mutual exclusion; stable within
+your session = your own resume path works. (Merge-slot commands are the one
+exception — they use a separately minted holder value; see 2.7.)
+
+**Stale-claim scan (surface, never steal):** a dead agent's bead stays
+`in_progress` forever (bd has no claim lease/TTL yet). Cross-check
+`bd list --status in_progress` against the open-PR list: in progress + no
+open/draft PR + no recent activity = possibly stranded. Note it for the
+batch report — do NOT reclaim it; releasing another agent's claim
+(`bd update <id> --status open --assignee ""`) is an operator decision.
 
 Version gate: `bd version` must be **≥ 1.1.0** (the `bd dolt` durability
 commands below require it). Older? Stop and report: upgrade with
@@ -55,29 +77,67 @@ CLI. Full runbook: docs/beads-workflow.md ("Durability & the bootstrap trap").
 If `bd` or the agent-ops scripts are missing, stop and instruct:
 `scaffold agent-ops install` (scripts) / see docs/beads-workflow.md (tracker).
 
-## Step 1 — Select beads
+## Step 1 — Select ONE bead (repeat before every claim)
+
+Selection happens per bead, at claim time — never pre-select a batch. The
+queue moves while you work: at high parallelism (a 12-agent fleet is
+normal), any bead you "reserved" in your head at batch start will be gone
+by the time you reach it. Refresh the cheap view before each selection:
+
+```bash
+bd ready --unassigned           # the claimable queue as of NOW (-u trims
+                                #   open-but-assigned beads that refuse claims)
+gh pr list --state open         # what others are building NOW
+```
 
 Ranking, strict order: (1) priority P0 > P1 > P2 > P3; (2) beads labeled with a
 `critical_labels` entry from `.scaffold/agent-ops.yaml`, if any; (3) work that
 unblocks other beads; (4) fit to your strengths.
 
 Hard exclusions — never select:
-- a bead already `in_progress` under another agent, or covered by ANY open/draft PR
+- an infrastructure bead: the project's `<prefix>-merge-slot` bead (or
+  anything labeled `gt:slot`) is the merge LOCK, not work — it sits open at
+  P0 whenever the slot is free and an unfiltered claim will happily "claim"
+  it, which holds the global merge lock and blocks every other agent
+- a bead already `in_progress` under another agent, or covered by ANY open/draft PR.
+  (`bd ready` can still list open beads carrying another agent's assignee —
+  those refuse your claim; that is Step 2.1's fallback, not an error.)
 - a bead conflicting with an open PR's surface (same module, same migration
   sequence, same shared code — see docs/git-workflow.md conflict rules)
 
-Mandatory duplicate-work scan per candidate:
+Mandatory duplicate-work scan for the top candidate:
 `scripts/setup-agent-worktree.sh --preflight-only --task "<bead title>"`
 
+Queue drained (or no candidate survives the exclusions) before the budget is
+spent? The batch ends early — go to Step 3 and report
+`queue drained after <k> of N`.
+
 For explicit-ID invocations: topologically sort the listed IDs by dependency
-(blockers first); stop and report if they form a cycle.
+(blockers first); stop and report if they form a cycle. Before claiming each
+ID at its turn (Step 2.1), re-verify its blockers are all closed
+(`bd show <id>`): an ID already claimed by another agent is skipped and
+reported with its holder, and every listed ID that depends on a skipped or
+still-open blocker is skipped too (report as `blocked by <id>`) — never
+start downstream work whose prerequisite isn't done.
 
 ## Step 2 — Per-bead loop
 
-**2.1 Claim** (from the primary checkout): `bd ready --claim` scoped with
-`--has-metadata-key plan_task_id` when a materialized plan exists; otherwise
-`bd update <id> --status in_progress`. If the project has build observability
-(a `.scaffold/` directory and the `scaffold` CLI), also
+**2.1 Claim (atomic, from the primary checkout):** claim exactly the bead you
+selected: `bd update <id> --claim` — sets assignee + `in_progress` in one
+atomic round-trip and fails (exit 1, `already claimed by <actor>`) if anyone
+else holds it. **A lost claim is normal traffic at high parallelism, not an
+error: return to Step 1 and take the next candidate.** Never claim by
+editing the status field — it does not detect a concurrent claimant. Fast
+path — only when ANY ready match inside a filter is acceptable and you are
+not applying Step 1's ranking beyond priority (the normal case for a
+materialized plan queue via `--has-metadata-key plan_task_id`; sometimes a
+label scope): `bd ready --claim [filters] --json` selects and claims in one
+call — add `--exclude-label gt:slot` unless the filter already excludes the
+merge-slot bead (Step 1's first hard exclusion) — then run Step 1's
+duplicate-work preflight for the claimed bead before building; if it reveals
+live duplicate work, release (`bd update <id> --status open --assignee ""`)
+and reselect. If the project has build observability (a `.scaffold/`
+directory and the `scaffold` CLI), also
 `scaffold observe event claim --task <id>` — feature-detect and skip silently.
 
 **2.2 Worktree:** `scripts/setup-agent-worktree.sh <name> --install --task "<bead title>"`,
@@ -123,9 +183,21 @@ merge on a red gate. Never `docker system prune`.
 - The one thing that still blocks the merge: a verified, still-reproducing
   real P0 — file it, keep the PR open, post the reproduction, notify the user,
   end the batch.
-- 3+ agents active? Serialize the merge: `bd merge-slot acquire --wait` → merge
-  → `bd merge-slot release` (if the project's Beads has merge-slots) — release
-  even if the merge fails, or the slot stays held and blocks every other agent.
+- If the project has a merge slot (`bd merge-slot check` reports one — the
+  Beads setup step creates it), serialize EVERY merge. `bd merge-slot
+  acquire` does NOT block: `--wait` only adds you to the waiters queue and
+  exits non-zero while the slot is held, and a released slot never
+  auto-promotes a waiter — so loop on `bd merge-slot acquire` itself until
+  it succeeds, then re-verify ownership with `bd merge-slot check --json`
+  before merging. Merge, then `bd merge-slot release` — release even if the
+  merge fails, or the slot stays held and blocks every other agent. The slot needs
+  a holder identity unique among agents: generate ONE value (e.g. a UUID)
+  and reuse that SAME value for acquire → merge → release — run them as a
+  single scripted block with a release trap where possible. A fresh
+  per-command identity (like `$$` evaluated in separate shell calls)
+  acquires under one holder and tries to release under another, stranding
+  the slot for everyone. Scope any `BEADS_ACTOR` override to the slot
+  commands and restore your stable claim actor before the next claim.
 - If the staging component is installed **and** you brought a stack up this bead
   (`make staging-up`), tear it down FIRST from **inside the worktree** (there
   `make staging-down` targets your per-worktree stack). Skip it when staging was
@@ -145,9 +217,10 @@ never edit the primary checkout directly.
 ## Step 3 — Batch report (required slots — answer each, say "none" out loud)
 
 ```
-Beads:              <id> -> PR #<n> -> merged | parked (why) | skipped (why) | not started (why)
+Beads:              <id> -> PR #<n> -> merged | parked (why) | skipped (why: e.g. claim lost to <actor>) | not started (why: e.g. queue drained after <k> of N)
 Docs updated in-PR: <paths - or "none needed: <why>">
 Beads filed (open): <id - one-line title - or none>
+Stale claims:       <id - assignee - last activity - or "none noticed">
 ```
 
 Before reporting, make the batch durable and refresh the restore net. Every step
@@ -189,4 +262,9 @@ If the batch ran long and `launchpad` is installed: `launchpad notify "<summary>
 | `--no-verify`, plain `--force`, merge commits | Forbidden; `--force-with-lease` after rebase only |
 | Close the bead when the PR opens | Close only after MERGED + verified |
 | Prose summary instead of the Step 3 slots | The slots are the report format |
+| Pick N beads at batch start and work the list | The queue moves under you — select ONE bead at claim time, every time |
+| Claim by setting the status field | Not atomic — a concurrent claimant goes undetected; `bd update <id> --claim` is the claim |
+| Claim without a per-agent `BEADS_ACTOR` | Same-actor claims are idempotent — two agents sharing the default identity both "own" the bead |
+| Retry a lost claim | Normal traffic at high parallelism — take the next candidate |
+| Reclaim another agent's stranded bead | Surface it in the report; releasing a claim is an operator decision |
 | Bootstrap/reset a populated `.beads` DB | Wipes unpushed beads — fresh clones only; push first (`bd dolt commit && bd dolt push`) |

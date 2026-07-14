@@ -11,7 +11,7 @@ topics:
   - coordination
   - parallel-execution
 volatility: evolving
-last-reviewed: 2026-07-11
+last-reviewed: 2026-07-14
 version-pin: null
 sources:
   - url: https://github.com/gastownhall/beads
@@ -42,10 +42,12 @@ The two primitives below are the load-bearing Deep Guidance for this entry. The 
 bd merge-slot create
 
 # Before rebasing your feature branch on main:
-bd merge-slot acquire --wait
-# Without --wait, acquire FAILS immediately if the slot is held. With --wait it
-# adds you to the waiters queue and blocks until the slot frees. Holder defaults
-# to $BEADS_ACTOR; pass --holder <name> to override.
+until bd merge-slot acquire; do sleep 10; done
+bd merge-slot check --json   # re-verify YOU are the holder before proceeding
+# acquire does NOT block: it fails immediately if the slot is held, and
+# --wait only adds you to the waiters queue and still exits non-zero — a
+# released slot never auto-promotes a waiter, so loop on acquire itself.
+# Holder defaults to $BEADS_ACTOR; pass --holder <name> to override.
 
 # Now safe to rebase and push:
 git fetch origin && git rebase origin/main
@@ -62,7 +64,12 @@ bd merge-slot check
 
 ### When to use
 
-Use `bd merge-slot` in multi-agent flows (3+ agents, OR projects where a merge conflict requires careful manual resolution). Skip it for single-agent or two-agent workflows where collisions are rare and `git push` retries are acceptable.
+Serialize EVERY merge through `bd merge-slot` whenever the project has a
+slot (`bd merge-slot check` reports one) — the deterministic rule the
+work-beads skill follows, because an agent cannot reliably count its active
+peers. Projects that are strictly single-agent can simply not create a
+slot; skipping an *existing* slot is how two agents end up merging
+concurrently.
 
 ### Failure modes
 
@@ -129,9 +136,17 @@ done
 
 ## Draft PRs and One-PR-Per-Agent — the Visible-Claim Layer
 
-`bd ready --claim` (or `bd update <id> --status in_progress`) is the
-authoritative, atomic claim, but it's only visible to agents that query
-Beads. `gh pr list --state open` is the *other* live registry other agents
+`bd ready --claim` (or `bd update <id> --claim` for a specific bead) is the
+authoritative, atomic claim — claiming by editing the status field is NOT
+atomic and misses a concurrent claimant. Never run `bd ready --claim`
+unfiltered where a merge slot exists: the slot bead sits open at P0 whenever
+the slot is free and WILL be claimed as if it were work, silently holding
+the global merge lock — add `--exclude-label gt:slot` (or a scope filter
+that already excludes it). Both atomic forms key on the Beads
+actor, and same-actor claims are idempotent: every concurrent agent needs
+its own stable `BEADS_ACTOR`, or agents sharing the default `git user.name`
+identity can all "claim" the same bead successfully. The claim is only
+visible to agents that query Beads. `gh pr list --state open` is the *other* live registry other agents
 (and humans) check first — see the work-beads skill's orient step
 (`bd ready && bd stats; gh pr list --state open; git worktree list`). A bead
 can sit `in_progress` in Beads for a while before any code exists, so the

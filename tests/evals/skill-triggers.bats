@@ -95,6 +95,52 @@ setup() {
   fi
 }
 
+@test "work-beads skill teaches just-in-time atomic claiming" {
+  local skill_file="${SKILLS_DIR}/work-beads/SKILL.md"
+  [[ -f "$skill_file" ]] || skip "work-beads not found"
+
+  local failures=()
+  grep -qF 'bd update <id> --claim' "$skill_file" \
+    || failures+=("missing atomic claim form 'bd update <id> --claim'")
+  grep -qF 'BEADS_ACTOR' "$skill_file" \
+    || failures+=("missing per-agent identity guidance (BEADS_ACTOR)")
+  grep -qF 'budget, not a reservation' "$skill_file" \
+    || failures+=("missing JIT loop language 'budget, not a reservation'")
+  grep -qF 'Stale claims:' "$skill_file" \
+    || failures+=("missing 'Stale claims:' batch-report slot")
+  grep -qF 'bd update <id> --status in_progress' "$skill_file" \
+    && failures+=("still teaches the non-atomic claim 'bd update <id> --status in_progress'")
+
+  if [[ ${#failures[@]} -gt 0 ]]; then
+    printf "work-beads JIT/atomic-claim assertions failed:\n"
+    printf "  %s\n" "${failures[@]}"
+    return 1
+  fi
+}
+
+@test "no living content surface teaches the non-atomic claim" {
+  # 'bd update ... --status in_progress' is retired as a claim (not atomic).
+  # 'bd list --status in_progress' (a filter) remains legitimate (the regex
+  # anchors on 'bd update'). Matches '--status X' and '--status=X', and scans
+  # whitespace-collapsed file contents so markdown line-wrapping cannot hide
+  # an occurrence. The gap is bounded (80 chars) and stops at '|' so table
+  # cells and distant unrelated flags don't false-positive.
+  [[ -d "${PROJECT_ROOT}/content" ]] || {
+    echo "content/ directory not found at ${PROJECT_ROOT}/content — nothing scanned"
+    return 1
+  }
+  local hits="" f
+  while IFS= read -r -d '' f; do
+    if tr '[:space:]' ' ' < "$f" | grep -qE 'bd update[^|]{0,80}--status[= ]*in_progress'; then
+      hits+="$f"$'\n'
+    fi
+  done < <(find "${PROJECT_ROOT}/content" -type f -print0)
+  if [[ -n "$hits" ]]; then
+    printf "non-atomic claim form found in living content:\n%s" "$hits"
+    return 1
+  fi
+}
+
 # --- scaffold-pipeline activation boundary ---
 
 @test "scaffold-pipeline has activation boundary directing status queries away" {
