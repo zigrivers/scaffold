@@ -110,9 +110,12 @@ spent? The batch ends early — go to Step 3 and report
 `queue drained after <k> of N`.
 
 For explicit-ID invocations: topologically sort the listed IDs by dependency
-(blockers first); stop and report if they form a cycle. Claim each ID at its
-turn (Step 2.1); an ID already claimed by another agent is skipped and
-reported with its holder, not worked.
+(blockers first); stop and report if they form a cycle. Before claiming each
+ID at its turn (Step 2.1), re-verify its blockers are all closed
+(`bd show <id>`): an ID already claimed by another agent is skipped and
+reported with its holder, and every listed ID that depends on a skipped or
+still-open blocker is skipped too (report as `blocked by <id>`) — never
+start downstream work whose prerequisite isn't done.
 
 ## Step 2 — Per-bead loop
 
@@ -178,9 +181,13 @@ merge on a red gate. Never `docker system prune`.
   materialization creates it), serialize EVERY merge: `bd merge-slot acquire
   --wait` → merge → `bd merge-slot release` — release even if the merge
   fails, or the slot stays held and blocks every other agent. The slot needs
-  a **per-process unique** holder (e.g. `agent-$$` or a UUID) — scope any
-  `BEADS_ACTOR` override to the slot commands and restore your stable claim
-  actor before the next claim.
+  a holder identity unique among agents: generate ONE value (e.g. a UUID)
+  and reuse that SAME value for acquire → merge → release — run them as a
+  single scripted block with a release trap where possible. A fresh
+  per-command identity (like `$$` evaluated in separate shell calls)
+  acquires under one holder and tries to release under another, stranding
+  the slot for everyone. Scope any `BEADS_ACTOR` override to the slot
+  commands and restore your stable claim actor before the next claim.
 - If the staging component is installed **and** you brought a stack up this bead
   (`make staging-up`), tear it down FIRST from **inside the worktree** (there
   `make staging-down` targets your per-worktree stack). Skip it when staging was
