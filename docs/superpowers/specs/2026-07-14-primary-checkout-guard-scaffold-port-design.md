@@ -117,21 +117,37 @@ to `scripts/heal-regen-artifacts.sh` (executable), manifest-tracked.
 
 `Usage: heal-regen-artifacts.sh <checkout-path>`. For each file in the checkout
 that is **modified only in the working tree** (porcelain `" M"` — tracked,
-unstaged), restore it to HEAD **iff its entire diff is the regenerated-timestamp
-signature**: every added/removed content line matches
-`Generated [0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2} UTC`. One non-matching
-changed line ⇒ leave the file alone.
+unstaged), restore it to HEAD **iff its entire working-tree diff is a
+timestamp-only change** — i.e. the file is byte-identical to HEAD except inside
+`Generated [0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2} UTC` footers.
+
+**The gate is normalize-and-compare, not a per-line substring match** (hardened
+after MMR review — a substring match would treat a line carrying real content
+*plus* a timestamp, e.g. `<div>Updated Generated … UTC v2</div>`, as
+timestamp-only and `git restore` over the real edit). The script collects the
+removed (`-`) and added (`+`) diff lines, masks every timestamp to a constant
+token, and restores **only when the masked removed text equals the masked added
+text**. Any non-timestamp difference — a prefix, a suffix, or another changed
+line — makes the two differ, so the file is left untouched. This is safe against
+real edits on a timestamped line yet still heals realistic **embedded** footers
+(`<footer>Generated … UTC</footer>`), which a full-line anchor would miss.
+
+Robustness (also from review): read `git status --porcelain=v1 -z --no-renames`
+(NUL-delimited, never-quoted paths — non-ASCII names, spaces, and newlines
+survive; `${line:3}` on quoted porcelain output would otherwise no-op), and pass
+`--no-color` to `git diff` so a user's `color.diff=always` cannot inject ANSI.
 
 Generalization from nibble: drop nibble's `docs/`-only path narrowing and scan
 all modified tracked files. In a generic Scaffold project, generated files are
-not confined to one directory; the signature gate is the real protection, and a
-non-timestamped output can never match it.
+not confined to one directory; the normalize-and-compare gate is the protection,
+and a non-timestamped change can never satisfy it.
 
 **Safety invariants (load-bearing):**
-- Only ever `git restore` a tracked file whose *complete* diff is the signature.
+- Restore **only** when the removed and added diff text are identical after every
+  timestamp is masked (byte-exact-except-timestamps).
 - **Never** `git clean`, never delete untracked files, never touch staged content
   (any staged/added/deleted status is skipped), never restore a file with any
-  non-timestamp changed line.
+  non-timestamp change.
 - Idempotent: a clean tree is a no-op, exit 0.
 - Log each heal: `→ auto-healed stray regen artifact (timestamp-only): <path>`.
 
@@ -209,6 +225,13 @@ Write tests first; each must fail before the code exists.
    - heal: mixed (one timestamp-only + one real) → only the timestamp-only
      restored.
    - heal: clean tree → no-op, exit 0.
+   - heal: never restores a staged change (staged status skipped).
+   - heal (data-loss guards, added after review): a non-timestamp change on a
+     line that *also* carries a timestamp → **not** restored; real content
+     appended beside the timestamp → **not** restored; an embedded-footer
+     timestamp-only change (`<footer>Generated … UTC</footer>`) → restored.
+   - heal (path robustness): a git-quoted non-ASCII path (`café.html`) is parsed
+     from the NUL-delimited status and healed.
    - main-sync integration: a stray timestamp-only tracked change in the checkout
      holding the default branch is healed before the ff-only merge (proves
      `main-sync.sh` calls the heal).

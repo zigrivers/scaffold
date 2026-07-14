@@ -44,7 +44,8 @@ while IFS= read -r -d '' entry; do
   path="${entry:3}"
 
   # `--no-color` so a user's color.diff=always config can't inject ANSI escapes.
-  diff="$(git -C "$wt" diff -U0 --no-color -- "$path")"
+  # Tolerate a diff failure (e.g. the file vanished in a race) — best-effort.
+  diff="$(git -C "$wt" diff -U0 --no-color -- "$path" 2>/dev/null || true)"
 
   # Content lines only, marker stripped: skip everything up to the first @@ hunk
   # header (so the ---/+++ file headers can never count), then collect the removed
@@ -66,6 +67,11 @@ while IFS= read -r -d '' entry; do
   norm_new="$(printf '%s\n' "$new" | sed -E "s/$TS_RE/$TS_TOKEN/g")"
   [[ "$norm_old" == "$norm_new" ]] || continue
 
-  git -C "$wt" restore -- "$path"
-  printf '→ auto-healed stray regen artifact (timestamp-only): %s\n' "$path"
+  # Best-effort restore: a race (file vanished, index changed) must not abort the
+  # whole self-heal under `set -e` — skip this one file and carry on with the rest.
+  if git -C "$wt" restore -- "$path" 2>/dev/null; then
+    printf '→ auto-healed stray regen artifact (timestamp-only): %s\n' "$path"
+  else
+    printf '! skipped (restore failed): %s\n' "$path" >&2
+  fi
 done < <(git -C "$wt" status --porcelain=v1 -z --no-renames)

@@ -95,6 +95,13 @@ guard_primary_checkout() {
   Standalone clone with no worktrees? This guard is a no-op — you won't see this.
   (Human emergency only: AGENT_OPS_GIT_GUARD_BYPASS=1 to override.)
 EOF
+  # Abort the caller before it writes. In a generator (non-interactive, sourced or
+  # run) this exits the process, which is the contract. If a human sourced this
+  # into an interactive shell, return non-zero instead of killing their session —
+  # they've already seen the rescue message above.
+  if [[ $- == *i* ]]; then
+    return 1
+  fi
   exit 1
 }
 
