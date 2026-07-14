@@ -581,3 +581,31 @@ channels:
       - --no-plan
       - --disable-web-search   # closed-book: no web
 ```
+
+### Grok mid-review cancellation under load
+
+Under heavy **concurrent grok load** (many parallel grok agents/worktrees on one
+machine), grok frequently **cancels a review mid-run**: the `--output-format json`
+envelope comes back with `stopReason: "Cancelled"` after 1–3 turns (~10–20s) and
+only a short "I'll review…" ack in `$.text` — no findings JSON. This is grok's own
+runtime interrupting the session; it is **not** an auth problem (`mmr doctor` stays
+green) and **not** MMR's dispatch timeout (which is 300s and would report
+`status: timeout`).
+
+MMR handles this in two ways:
+
+1. **Honest error.** The grok channel's parser carries an `incomplete` guard
+   (`status_path: $.stopReason`, `values: ["Cancelled"]`). When the run is
+   cancelled and `$.text` has no findings, the channel reports
+   *"channel run did not complete (stopReason=Cancelled) before emitting findings
+   — … retry the review, or reduce the number of parallel grok agents/worktrees"*
+   instead of the misleading *"No JSON object found in output"*.
+2. **Coverage preserved.** A cancelled grok channel is `status: failed`, which
+   already triggers MMR's **compensating pass** (a `claude -p` run labeled
+   `compensating-grok`), so the review still gates on a full panel and typically
+   returns `degraded-pass` rather than losing a binding channel.
+
+MMR does **not** salvage findings from grok's `thought` field on a cancelled run —
+those come from an interrupted review and could wrongly approve a PR a completed
+review would have blocked. To reduce cancellations, run fewer parallel grok agents
+during a review, or retry the review when the machine is less loaded.

@@ -273,6 +273,28 @@ export function getParser(spec: string | OutputParserConfig): Parser {
   return buildParser(spec)
 }
 
+/**
+ * When an `unwrap-jsonpath` parse fails, return a clear, actionable error IF the
+ * envelope's status field marks an interrupted/incomplete run (per the optional
+ * `incomplete` guard); otherwise return the original error unchanged. This turns
+ * grok's "stopReason: Cancelled + ack-only $.text" case from a misleading
+ * "No JSON object found in output" into an honest "did not complete" message.
+ */
+function incompleteOrDefault(
+  decoded: unknown,
+  spec: Extract<OutputParserConfig, { kind: 'unwrap-jsonpath' }>,
+  fallback: Error,
+): Error {
+  const guard = spec.incomplete
+  if (!guard) return fallback
+  const status = jsonpathGet(decoded, guard.status_path)
+  if (typeof status === 'string' && guard.values.includes(status)) {
+    const field = guard.status_path.replace(/^\$\.?/, '')
+    return new Error(`channel run did not complete (${field}=${status}) before emitting findings — ${guard.message}`)
+  }
+  return fallback
+}
+
 export function buildParser(spec: OutputParserConfig): Parser {
   if (typeof spec === 'string') {
     return getParser(spec)
@@ -284,10 +306,14 @@ export function buildParser(spec: OutputParserConfig): Parser {
       const decoded = parseJsonFromOutput(raw)
       const unwrapped = jsonpathGet(decoded, spec.wrap)
       if (unwrapped === undefined) {
-        throw new Error(`jsonpath did not match: ${spec.wrap}`)
+        throw incompleteOrDefault(decoded, spec, new Error(`jsonpath did not match: ${spec.wrap}`))
       }
       const nextRaw = typeof unwrapped === 'string' ? unwrapped : JSON.stringify(unwrapped)
-      return nextParser(nextRaw)
+      try {
+        return nextParser(nextRaw)
+      } catch (err) {
+        throw incompleteOrDefault(decoded, spec, err instanceof Error ? err : new Error(String(err)))
+      }
     }
   }
   if (spec.kind === 'regex-findings') {

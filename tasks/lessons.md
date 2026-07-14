@@ -10,6 +10,22 @@ Patterns and anti-patterns discovered during development. Review before starting
 
 <!-- Add anti-patterns as you discover them -->
 
+- **A CLI channel error message must name the ACTUAL cause, not the last failed step.**
+  grok often cancels a review mid-run under heavy concurrent load (`stopReason:
+  "Cancelled"`, ack-only `$.text`, no findings). MMR's `unwrap-jsonpath` parser only
+  read `$.text`, so it threw the *symptom* ("No JSON object found in output") and hid
+  the *cause* (the run was cancelled). Fix: give `unwrap-jsonpath` an optional
+  `incomplete` guard (`status_path` + `values` + `message`) that inspects the envelope's
+  terminal-status field on a parse failure and reports the honest cause. When debugging
+  a "parser" failure, check whether the upstream run even COMPLETED before blaming the
+  parser. Also: do NOT salvage findings from a cancelled run's `thought` field — partial
+  findings from an interrupted review could wrongly approve a PR. Ruled out along the way:
+  `track-cli` (transparent `exec`, no signals/timeout) and MMR's dispatch timeout (300s;
+  a timeout yields `status: timeout`, not a `Cancelled` envelope). Isolated small reviews
+  complete fine — cancellation is grok-runtime preemption on longer multi-turn reviews
+  under load, already mitigated by MMR's `compensating-grok` pass (a `failed` channel
+  triggers compensation).
+
 - **A `--tools` allowlist does NOT stop grok from BUILDING the other built-in tools.**
   grok 0.2.99 (auto-updated ~2026-07-11) shipped a self-inconsistent default for its
   built-in `run_terminal_cmd` tool (`auto_background_on_timeout: true` while

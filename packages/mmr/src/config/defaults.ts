@@ -132,9 +132,33 @@ export const BUILTIN_CHANNELS: Record<string, SubprocessChannelParsed> = {
     },
     prompt_wrapper: '{{prompt}}',
     // `grok --output-format json` wraps the reply as { "text": "<reply>",
-    // "thought": "...", ... }. Unwrap $.text, then run the default findings
-    // parser over the model's reply (same shape as the gemini unwrap).
-    output_parser: { kind: 'unwrap-jsonpath', wrap: '$.text', then: 'default' },
+    // "thought": "...", "stopReason": "EndTurn|Cancelled", ... }. Unwrap $.text,
+    // then run the default findings parser over the model's reply (same shape as
+    // the gemini unwrap).
+    //
+    // `incomplete`: under heavy concurrent grok load, grok frequently cancels a
+    // review mid-run — the envelope returns stopReason: "Cancelled" after 1–3
+    // turns with only a short "I'll review…" ack in $.text and NO findings JSON.
+    // Without this guard the parser throws the misleading "No JSON object found
+    // in output". The guard instead reports the honest cause so the degraded
+    // channel is actionable. (A cancelled grok channel is `status: failed`, which
+    // already triggers MMR's compensating pass — coverage is preserved; this only
+    // fixes the error message.) We do NOT fall back to findings embedded in
+    // `thought`: those come from an interrupted run and could approve a PR a
+    // completed review would have blocked.
+    output_parser: {
+      kind: 'unwrap-jsonpath',
+      wrap: '$.text',
+      incomplete: {
+        status_path: '$.stopReason',
+        values: ['Cancelled'],
+        message:
+          'grok was interrupted mid-review (commonly under heavy concurrent grok load) before writing '
+          + 'findings to its reply. Auth is unaffected — retry the review, or reduce the number of '
+          + 'parallel grok agents/worktrees.',
+      },
+      then: 'default',
+    },
     stderr: 'capture',
   },
   antigravity: {

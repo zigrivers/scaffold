@@ -2,6 +2,34 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`unwrap-jsonpath` parser: optional `incomplete` guard.** A parser envelope can
+  now declare `incomplete: { status_path, values[], message }`. When the wrapped
+  payload fails to parse **and** the envelope's `status_path` value is one of
+  `values`, the parser raises a clear, actionable error embedding `message`
+  instead of a generic parse failure. Backward compatible — configs without
+  `incomplete` are unchanged.
+
+### Fixed
+
+- **grok channel: honest error when a review is cancelled mid-run.** Under heavy
+  concurrent grok load, grok often cancels a review after 1–3 turns, returning
+  `stopReason: "Cancelled"` with only a short "I'll review…" ack in `$.text` and
+  no findings JSON. MMR previously surfaced the misleading
+  `Failed to parse channel output: No JSON object found in output`. The grok
+  channel's parser now carries an `incomplete` guard so the channel reports
+  *"channel run did not complete (stopReason=Cancelled) before emitting findings —
+  … retry the review, or reduce the number of parallel grok agents/worktrees"*.
+  Behaviour is otherwise unchanged: a cancelled grok channel is still
+  `status: failed` and still triggers the `compensating-grok` pass, so review
+  coverage is preserved. MMR deliberately does **not** salvage findings from
+  grok's `thought` field — an interrupted run's partial findings could wrongly
+  approve a PR a completed review would have blocked. This changes
+  `mmr config show grok` (the `output_parser` now includes the `incomplete`
+  block); customizers who pin the exact grok parser config should update their
+  expectation.
+
 ## [3.1.1] — 2026-07-13
 
 ### Fixed
