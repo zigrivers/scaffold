@@ -95,6 +95,40 @@ setup() {
   fi
 }
 
+@test "work-beads skill teaches just-in-time atomic claiming" {
+  local skill_file="${SKILLS_DIR}/work-beads/SKILL.md"
+  [[ -f "$skill_file" ]] || skip "work-beads not found"
+
+  local failures=()
+  grep -qF 'bd update <id> --claim' "$skill_file" \
+    || failures+=("missing atomic claim form 'bd update <id> --claim'")
+  grep -qF 'BEADS_ACTOR' "$skill_file" \
+    || failures+=("missing per-agent identity guidance (BEADS_ACTOR)")
+  grep -qF 'budget, not a reservation' "$skill_file" \
+    || failures+=("missing JIT loop language 'budget, not a reservation'")
+  grep -qF 'Stale claims:' "$skill_file" \
+    || failures+=("missing 'Stale claims:' batch-report slot")
+  grep -qF 'bd update <id> --status in_progress' "$skill_file" \
+    && failures+=("still teaches the non-atomic claim 'bd update <id> --status in_progress'")
+
+  if [[ ${#failures[@]} -gt 0 ]]; then
+    printf "work-beads JIT/atomic-claim assertions failed:\n"
+    printf "  %s\n" "${failures[@]}"
+    return 1
+  fi
+}
+
+@test "no living content surface teaches the non-atomic claim" {
+  # 'bd update ... --status in_progress' is retired as a claim (not atomic).
+  # 'bd list --status in_progress' (a filter) remains legitimate and does not match.
+  local hits
+  hits="$(grep -rnE 'bd update[^|]*--status in_progress' "${PROJECT_ROOT}/content" || true)"
+  if [[ -n "$hits" ]]; then
+    printf "non-atomic claim form found in living content:\n%s\n" "$hits"
+    return 1
+  fi
+}
+
 # --- scaffold-pipeline activation boundary ---
 
 @test "scaffold-pipeline has activation boundary directing status queries away" {
