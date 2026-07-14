@@ -107,7 +107,9 @@ export const UnwrapJsonpathParserSchema = z.object({
   then: z.lazy(() => OutputParserSchema).default('default'),
   incomplete: z.object({
     status_path: z.string(),
-    values: z.array(z.string()).nonempty(),
+    // Empty is allowed and harmless (the guard simply never fires) — this keeps
+    // the schema's inferred type aligned with the `string[]` interface field.
+    values: z.array(z.string()),
     message: z.string(),
   }).optional(),
 }) satisfies z.ZodType<UnwrapJsonpathParserConfig>

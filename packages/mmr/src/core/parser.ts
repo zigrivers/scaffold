@@ -287,7 +287,14 @@ function incompleteOrDefault(
 ): Error {
   const guard = spec.incomplete
   if (!guard) return fallback
-  const status = jsonpathGet(decoded, guard.status_path)
+  let status: unknown
+  try {
+    status = jsonpathGet(decoded, guard.status_path)
+  } catch {
+    // A malformed custom status_path must never REPLACE the genuine parse error
+    // with a jsonpath internal error — the guard can only improve the message.
+    return fallback
+  }
   if (typeof status === 'string' && guard.values.includes(status)) {
     // Human-readable label: "$.stopReason" → "stopReason". Fall back to the raw
     // path if stripping the root leaves nothing (e.g. a bare "$").

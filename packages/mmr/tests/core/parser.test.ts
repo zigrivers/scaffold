@@ -90,6 +90,29 @@ describe('unwrap-jsonpath `incomplete` guard (grok Cancelled → honest error)',
     expect(result.summary).toBe('Output parsing failed.')
     expect(result.findings[0].description).toMatch(/No JSON object found/)
   })
+
+  it('does not fire when the status field is a non-string value (keeps the original error)', () => {
+    // stopReason is a number here — typeof status === 'string' guards against it.
+    const raw = JSON.stringify({ text: 'prose, no json', stopReason: 42 })
+    const result = parseChannelOutput(raw, grokParser)
+    expect(result.summary).toBe('Output parsing failed.')
+    expect(result.findings[0].description).toMatch(/No JSON object found/)
+    expect(result.findings[0].description).not.toMatch(/did not complete/)
+  })
+
+  it('a malformed status_path does not replace the original parse error with a jsonpath error', () => {
+    const raw = JSON.stringify({ text: 'prose, no json', stopReason: 'Cancelled' })
+    const badPath: OutputParserConfig = {
+      kind: 'unwrap-jsonpath',
+      wrap: '$.text',
+      incomplete: { status_path: '$.foo[bad', values: ['Cancelled'], message: 'x' },
+      then: 'default',
+    }
+    const result = parseChannelOutput(raw, badPath)
+    expect(result.summary).toBe('Output parsing failed.')
+    expect(result.findings[0].description).toMatch(/No JSON object found/)
+    expect(result.findings[0].description).not.toMatch(/jsonpath/)
+  })
 })
 
 describe('default parser', () => {
