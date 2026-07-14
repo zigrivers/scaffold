@@ -120,18 +120,23 @@ setup() {
 
 @test "no living content surface teaches the non-atomic claim" {
   # 'bd update ... --status in_progress' is retired as a claim (not atomic).
-  # 'bd list --status in_progress' (a filter) remains legitimate and does not
-  # match (the regex anchors on 'bd update'). Matches both '--status X' and
-  # '--status=X' flag forms. Known limitation: grep is line-based, so an
-  # occurrence wrapped across lines or table cells escapes this net.
+  # 'bd list --status in_progress' (a filter) remains legitimate (the regex
+  # anchors on 'bd update'). Matches '--status X' and '--status=X', and scans
+  # whitespace-collapsed file contents so markdown line-wrapping cannot hide
+  # an occurrence. The gap is bounded (80 chars) and stops at '|' so table
+  # cells and distant unrelated flags don't false-positive.
   [[ -d "${PROJECT_ROOT}/content" ]] || {
     echo "content/ directory not found at ${PROJECT_ROOT}/content — nothing scanned"
     return 1
   }
-  local hits
-  hits="$(grep -rnE 'bd update[^|]*--status[= ]in_progress' "${PROJECT_ROOT}/content" || true)"
+  local hits="" f
+  while IFS= read -r -d '' f; do
+    if tr '[:space:]' ' ' < "$f" | grep -qE 'bd update[^|]{0,80}--status[= ]*in_progress'; then
+      hits+="$f"$'\n'
+    fi
+  done < <(find "${PROJECT_ROOT}/content" -type f -print0)
   if [[ -n "$hits" ]]; then
-    printf "non-atomic claim form found in living content:\n%s\n" "$hits"
+    printf "non-atomic claim form found in living content:\n%s" "$hits"
     return 1
   fi
 }

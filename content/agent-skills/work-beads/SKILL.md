@@ -186,9 +186,13 @@ merge on a red gate. Never `docker system prune`.
   real P0 — file it, keep the PR open, post the reproduction, notify the user,
   end the batch.
 - If the project has a merge slot (`bd merge-slot check` reports one — the
-  Beads setup step creates it), serialize EVERY merge: `bd merge-slot acquire
-  --wait` → merge → `bd merge-slot release` — release even if the merge
-  fails, or the slot stays held and blocks every other agent. The slot needs
+  Beads setup step creates it), serialize EVERY merge. `bd merge-slot
+  acquire` does NOT block: `--wait` only adds you to the waiters queue and
+  exits non-zero while the slot is held, and a released slot never
+  auto-promotes a waiter — so loop on `bd merge-slot acquire` itself until
+  it succeeds, then re-verify ownership with `bd merge-slot check --json`
+  before merging. Merge, then `bd merge-slot release` — release even if the
+  merge fails, or the slot stays held and blocks every other agent. The slot needs
   a holder identity unique among agents: generate ONE value (e.g. a UUID)
   and reuse that SAME value for acquire → merge → release — run them as a
   single scripted block with a release trap where possible. A fresh
