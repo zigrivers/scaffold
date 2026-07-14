@@ -359,8 +359,8 @@ git commit -m "docs: changelog for work-beads parallel-claim hardening"
 
 ### Task 6: Release v3.43.0 (maintainer flow, operations-runbook §4)
 
-- [ ] **Step 1:** On main: bump `package.json` version to `3.43.0` (plus any lockfile), verify CHANGELOG section date, commit release prep via PR if any file changed post-merge (CHANGELOG already merged in Task 4; only package.json bump remains — runbook flow).
-- [ ] **Step 2:** Tag and release: `git tag v3.43.0 && git push origin v3.43.0`; `gh release create v3.43.0 --title "scaffold v3.43.0" --notes` from the CHANGELOG section.
+- [ ] **Step 1:** Release-prep PR: bump `package.json` version to `3.43.0` (plus any lockfile) on a branch, open the PR, **wait for the `check` CI job to pass, squash-merge it, then `git checkout main && git pull`** — the tag must point at the merged bump commit, never at a pre-merge local state.
+- [ ] **Step 2:** Only after Step 1's merge is pulled locally — tag and release: `git tag v3.43.0 && git push origin v3.43.0`; `gh release create v3.43.0 --title "scaffold v3.43.0" --notes` from the CHANGELOG section.
 - [ ] **Step 3:** Verify `publish.yml` (npm) and `update-homebrew.yml` workflows succeed (`gh run list/watch`). npm-publish failures → check `NPM_TOKEN` per runbook §4.2a, NOT the OIDC config.
 - [ ] **Step 4:** Verify availability: `npm info @zigrivers/scaffold version` → 3.43.0; `brew update && brew upgrade scaffold` path noted (local `brew trust zigrivers/scaffold` caveat is machine policy, not a defect).
 - [ ] **Step 5:** `launchpad notify "scaffold v3.43.0 released — work-beads parallel-claim hardening"`.
