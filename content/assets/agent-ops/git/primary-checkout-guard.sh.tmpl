@@ -69,6 +69,13 @@ is_primary_checkout_with_worktrees() {
 
 # Exit 1 with a rescue message if writing <output-path> would dirty a primary
 # checkout that has linked worktrees. No-op otherwise. $2 is a short human label.
+#
+# This ABORTS the caller on refuse (exit in a generator, non-zero in an
+# interactive shell) by design: a generator that simply calls this is protected
+# even if its author forgets to check the result — a `return`-only guard would
+# fail OPEN on that mistake. A caller that needs to run cleanup instead of
+# aborting should use the `is_primary_checkout_with_worktrees "$OUT"` predicate
+# above (returns 0/1, never exits) and handle the refusal itself.
 guard_primary_checkout() {
   local output_path="$1" what="${2:-this file}"
   if [[ "${AGENT_OPS_GIT_GUARD_BYPASS:-}" == "1" ]]; then

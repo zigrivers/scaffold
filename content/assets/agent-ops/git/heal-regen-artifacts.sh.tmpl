@@ -5,16 +5,22 @@
 # Usage: heal-regen-artifacts.sh <checkout-path>
 #
 # For each file in <checkout-path> modified ONLY in the working tree (porcelain
-# " M" — tracked, unstaged), restore it to HEAD *iff its entire working-tree diff
-# is a timestamp-only change*: the file is byte-identical to HEAD except inside
-# `Generated <ISO-date> <HH:MM> UTC` footers (e.g. `<footer>Generated ... UTC</footer>`).
-# Any file with a real content change — even on a line that also carries a
-# timestamp — is left untouched.
+# " M" — tracked, unstaged), undo its change *iff the working file is identical to
+# HEAD except inside `Generated <ISO-date> <HH:MM> UTC` footers* (e.g.
+# `<footer>Generated ... UTC</footer>`). Any file with a real content change — even
+# on a line that also carries a timestamp — is left untouched.
 #
-# Safety invariants (load-bearing — this git-restores files):
-#   - Restore ONLY when the removed and added diff lines are identical after every
-#     timestamp is normalized to a constant token. A single non-timestamp
-#     difference (prefix, suffix, or another line) leaves the file alone.
+# How it stays safe (load-bearing — this rewrites working-tree files):
+#   1. Validate with a FULL-FILE byte compare of HEAD vs the working copy after
+#      masking every timestamp to a constant token. A full-file compare (not an
+#      aggregate of +/- diff lines) catches moved lines and end-of-file-newline
+#      changes that an aggregate compare would miss. HEAD is read as a raw blob and
+#      the patch is taken with --no-ext-diff --no-textconv, so a configured
+#      textconv/external-diff driver cannot conceal a real change.
+#   2. Restore surgically by REVERSE-APPLYING only the validated timestamp patch
+#      (`git apply -R`, which re-checks context). This is race-safe: a concurrent
+#      edit to the same region makes the apply fail (nothing changes), and an edit
+#      elsewhere in the file is preserved — unlike a whole-file `git restore`.
 #   - Never `git clean`, never delete untracked files, never touch staged content
 #     (staged/added/deleted statuses are skipped).
 #   - Idempotent: a clean tree is a no-op, exit 0.
@@ -32,7 +38,7 @@ fi
 # so a bare date/time appearing in real content can't match by accident.
 TS_RE='Generated [0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2} UTC'
 # A distinctive token a real content line is implausibly going to contain, used to
-# mask timestamps before comparing old vs new.
+# mask timestamps before comparing HEAD vs the working copy.
 TS_TOKEN='<REGEN-TIMESTAMP>'
 
 # Files modified ONLY in the working tree (index char space, worktree char M),
@@ -43,35 +49,23 @@ while IFS= read -r -d '' entry; do
   [[ "${entry:0:2}" == " M" ]] || continue
   path="${entry:3}"
 
-  # `--no-color` so a user's color.diff=always config can't inject ANSI escapes.
-  # Tolerate a diff failure (e.g. the file vanished in a race) — best-effort.
-  diff="$(git -C "$wt" diff -U0 --no-color -- "$path" 2>/dev/null || true)"
+  # Validate: the working file is byte-identical to HEAD once every timestamp is
+  # masked. Redirection (`< file`) avoids any leading-dash filename hazard; the
+  # HEAD side is the raw committed blob, so a textconv filter can hide nothing.
+  cmp -s \
+    <(git -C "$wt" show "HEAD:$path" 2>/dev/null | sed -E "s/$TS_RE/$TS_TOKEN/g") \
+    <(sed -E "s/$TS_RE/$TS_TOKEN/g" < "$wt/$path" 2>/dev/null) \
+    || continue
 
-  # Content lines only, marker stripped: skip everything up to the first @@ hunk
-  # header (so the ---/+++ file headers can never count), then collect the removed
-  # (-) and added (+) lines separately.
-  old="$(printf '%s\n' "$diff" | awk '/^@@/{h=1;next} h&&/^-/{print substr($0,2)}')"
-  new="$(printf '%s\n' "$diff" | awk '/^@@/{h=1;next} h&&/^\+/{print substr($0,2)}')"
+  # Capture the exact change as a raw patch (filters bypassed), then reverse-apply
+  # ONLY that patch. `git apply -R` verifies context, so a racing edit makes it
+  # fail cleanly (file untouched) and an edit elsewhere is preserved.
+  patch="$(git -C "$wt" diff --no-color --no-ext-diff --no-textconv -- "$path" 2>/dev/null || true)"
+  [[ -n "$patch" ]] || continue
 
-  # No content diff (e.g. a mode-only change) ⇒ nothing to heal safely.
-  [[ -n "$old$new" ]] || continue
-
-  # Necessary condition: the change must actually involve a timestamp footer.
-  printf '%s\n' "$old$new" | grep -qE "$TS_RE" || continue
-
-  # Sufficient condition (the real safety gate): the removed and added text are
-  # identical once every timestamp is masked. A real edit anywhere — including on
-  # a line that also carries a timestamp — makes these differ, so the file is left
-  # untouched and NEVER restored over real work.
-  norm_old="$(printf '%s\n' "$old" | sed -E "s/$TS_RE/$TS_TOKEN/g")"
-  norm_new="$(printf '%s\n' "$new" | sed -E "s/$TS_RE/$TS_TOKEN/g")"
-  [[ "$norm_old" == "$norm_new" ]] || continue
-
-  # Best-effort restore: a race (file vanished, index changed) must not abort the
-  # whole self-heal under `set -e` — skip this one file and carry on with the rest.
-  if git -C "$wt" restore -- "$path" 2>/dev/null; then
+  if printf '%s\n' "$patch" | git -C "$wt" apply -R - 2>/dev/null; then
     printf '→ auto-healed stray regen artifact (timestamp-only): %s\n' "$path"
   else
-    printf '! skipped (restore failed): %s\n' "$path" >&2
+    printf '! skipped (concurrent change or apply failed): %s\n' "$path" >&2
   fi
 done < <(git -C "$wt" status --porcelain=v1 -z --no-renames)

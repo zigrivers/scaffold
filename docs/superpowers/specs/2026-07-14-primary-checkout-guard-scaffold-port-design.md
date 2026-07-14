@@ -121,33 +121,45 @@ unstaged), restore it to HEAD **iff its entire working-tree diff is a
 timestamp-only change** — i.e. the file is byte-identical to HEAD except inside
 `Generated [0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2} UTC` footers.
 
-**The gate is normalize-and-compare, not a per-line substring match** (hardened
-after MMR review — a substring match would treat a line carrying real content
-*plus* a timestamp, e.g. `<div>Updated Generated … UTC v2</div>`, as
-timestamp-only and `git restore` over the real edit). The script collects the
-removed (`-`) and added (`+`) diff lines, masks every timestamp to a constant
-token, and restores **only when the masked removed text equals the masked added
-text**. Any non-timestamp difference — a prefix, a suffix, or another changed
-line — makes the two differ, so the file is left untouched. This is safe against
-real edits on a timestamped line yet still heals realistic **embedded** footers
-(`<footer>Generated … UTC</footer>`), which a full-line anchor would miss.
+The gate and the restore were hardened across three MMR review rounds into a
+**validate-then-surgically-reverse-apply** design (round-1 substring matching and
+round-3 aggregate line-compare both had data-loss holes):
 
-Robustness (also from review): read `git status --porcelain=v1 -z --no-renames`
-(NUL-delimited, never-quoted paths — non-ASCII names, spaces, and newlines
-survive; `${line:3}` on quoted porcelain output would otherwise no-op), and pass
-`--no-color` to `git diff` so a user's `color.diff=always` cannot inject ANSI.
+1. **Validate — full-file byte compare, timestamps masked.** Read HEAD's raw blob
+   (`git show HEAD:<path>`) and the working file, mask every timestamp to a
+   constant token with `sed`, and require the two to be **byte-identical**
+   (`cmp -s`). A *full-file* compare (not an aggregate of `-`/`+` diff lines)
+   catches a **moved** timestamp line and an **end-of-file-newline** change that an
+   aggregate compare misses (both `sed`s preserve a missing final newline, so the
+   compare is truly byte-exact). Reading HEAD as a raw blob and taking the patch
+   with `--no-ext-diff --no-textconv` means a configured **textconv / external-diff
+   driver cannot conceal** a real change.
+2. **Restore — surgical reverse-apply.** Capture the change as a raw patch and
+   `git apply -R` it. `git apply` re-checks context, so this is **race-safe**: a
+   concurrent edit to the same region makes the apply fail (file untouched), and a
+   concurrent edit elsewhere is **preserved** — unlike a whole-file `git restore`,
+   which would silently discard it (the round-3 check-to-restore TOCTOU).
+
+This is safe against real edits on a timestamped line (`<div>Updated Generated …
+UTC v2</div>` is left alone) yet still heals realistic **embedded** footers
+(`<footer>Generated … UTC</footer>`), which a bare full-line anchor would miss.
+
+Path robustness (also from review): read `git status --porcelain=v1 -z
+--no-renames` (NUL-delimited, never-quoted paths — non-ASCII names, spaces, and
+newlines survive; `${line:3}` on quoted porcelain output would otherwise no-op).
 
 Generalization from nibble: drop nibble's `docs/`-only path narrowing and scan
 all modified tracked files. In a generic Scaffold project, generated files are
-not confined to one directory; the normalize-and-compare gate is the protection,
-and a non-timestamped change can never satisfy it.
+not confined to one directory; the full-file compare is the protection, and a
+non-timestamped change can never satisfy it.
 
 **Safety invariants (load-bearing):**
-- Restore **only** when the removed and added diff text are identical after every
-  timestamp is masked (byte-exact-except-timestamps).
+- Undo a change **only** when HEAD and the working file are byte-identical after
+  every timestamp is masked; restore surgically by reverse-applying only that
+  patch, never a whole-file restore.
 - **Never** `git clean`, never delete untracked files, never touch staged content
-  (any staged/added/deleted status is skipped), never restore a file with any
-  non-timestamp change.
+  (any staged/added/deleted status is skipped), never undo any non-timestamp
+  change.
 - Idempotent: a clean tree is a no-op, exit 0.
 - Log each heal: `→ auto-healed stray regen artifact (timestamp-only): <path>`.
 

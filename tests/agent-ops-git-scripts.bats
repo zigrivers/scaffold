@@ -754,6 +754,33 @@ EOF
     [ -z "$output" ]
 }
 
+@test "heal: does NOT restore a moved timestamp line (position changed)" {
+    # A full-file compare must catch a reordering an aggregate line compare misses.
+    printf 'A\nGenerated 2026-07-11 05:11 UTC\nB\n' > "$CLONE_DIR/report.html"
+    git -C "$CLONE_DIR" add report.html
+    git -C "$CLONE_DIR" commit -q -m "add tracker"
+    # Same lines, but the timestamp line moved to the top AND its value changed.
+    printf 'Generated 2026-07-14 01:47 UTC\nA\nB\n' > "$CLONE_DIR/report.html"
+    run bash -c "'$CLONE_DIR/scripts/heal-regen-artifacts.sh' '$CLONE_DIR'"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *auto-healed* ]]
+    run git -C "$CLONE_DIR" status --porcelain -- report.html
+    [ -n "$output" ]
+}
+
+@test "heal: does NOT restore an end-of-file-newline change" {
+    printf 'Generated 2026-07-11 05:11 UTC\n' > "$CLONE_DIR/report.html"
+    git -C "$CLONE_DIR" add report.html
+    git -C "$CLONE_DIR" commit -q -m "add tracker"
+    # Timestamp changed AND the trailing newline removed — not byte-identical-mod-ts.
+    printf 'Generated 2026-07-14 01:47 UTC' > "$CLONE_DIR/report.html"
+    run bash -c "'$CLONE_DIR/scripts/heal-regen-artifacts.sh' '$CLONE_DIR'"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *auto-healed* ]]
+    run git -C "$CLONE_DIR" status --porcelain -- report.html
+    [ -n "$output" ]
+}
+
 @test "heal: parses a git-quoted non-ASCII path (café.html)" {
     # core.quotePath=true C-quotes non-ASCII paths in porcelain output; NUL parsing
     # must recover the real path so the timestamp-only artifact is still healed.
