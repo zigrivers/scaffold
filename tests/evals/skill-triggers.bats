@@ -120,9 +120,16 @@ setup() {
 
 @test "no living content surface teaches the non-atomic claim" {
   # 'bd update ... --status in_progress' is retired as a claim (not atomic).
-  # 'bd list --status in_progress' (a filter) remains legitimate and does not match.
+  # 'bd list --status in_progress' (a filter) remains legitimate and does not
+  # match (the regex anchors on 'bd update'). Matches both '--status X' and
+  # '--status=X' flag forms. Known limitation: grep is line-based, so an
+  # occurrence wrapped across lines or table cells escapes this net.
+  [[ -d "${PROJECT_ROOT}/content" ]] || {
+    echo "content/ directory not found at ${PROJECT_ROOT}/content — nothing scanned"
+    return 1
+  }
   local hits
-  hits="$(grep -rnE 'bd update[^|]*--status in_progress' "${PROJECT_ROOT}/content" || true)"
+  hits="$(grep -rnE 'bd update[^|]*--status[= ]in_progress' "${PROJECT_ROOT}/content" || true)"
   if [[ -n "$hits" ]]; then
     printf "non-atomic claim form found in living content:\n%s\n" "$hits"
     return 1

@@ -37,7 +37,7 @@ Before starting a task, verify all its blockers are resolved. After completing e
 2. Filter to tasks with status "ready" or "unblocked"
 3. Sort by task ID (ascending)
 4. Select the first task in the sorted list
-5. Claim it atomically (`bd ready --claim`) and open a draft PR on the first push
+5. Claim it atomically (`bd ready --claim`, adding `--exclude-label gt:slot` where a merge slot exists — the slot bead is claimable infrastructure, not work) and open a draft PR on the first push
 
 **Why lowest-ID first:**
 - Deterministic — two agents independently applying this rule will never pick the same task (the first agent claims it, the second sees it as taken)

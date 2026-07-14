@@ -85,7 +85,8 @@ normal), any bead you "reserved" in your head at batch start will be gone
 by the time you reach it. Refresh the cheap view before each selection:
 
 ```bash
-bd ready                        # the queue as of NOW
+bd ready --unassigned           # the claimable queue as of NOW (-u trims
+                                #   open-but-assigned beads that refuse claims)
 gh pr list --state open         # what others are building NOW
 ```
 
@@ -94,6 +95,10 @@ Ranking, strict order: (1) priority P0 > P1 > P2 > P3; (2) beads labeled with a
 unblocks other beads; (4) fit to your strengths.
 
 Hard exclusions — never select:
+- an infrastructure bead: the project's `<prefix>-merge-slot` bead (or
+  anything labeled `gt:slot`) is the merge LOCK, not work — it sits open at
+  P0 whenever the slot is free and an unfiltered claim will happily "claim"
+  it, which holds the global merge lock and blocks every other agent
 - a bead already `in_progress` under another agent, or covered by ANY open/draft PR.
   (`bd ready` can still list open beads carrying another agent's assignee —
   those refuse your claim; that is Step 2.1's fallback, not an error.)
@@ -125,7 +130,9 @@ error: return to Step 1 and take the next candidate.** Never claim by
 editing the status field — it does not detect a concurrent claimant. Fast
 path: when a filter fully expresses your selection (a materialized plan via
 `--has-metadata-key plan_task_id`, or a label scope), `bd ready --claim
-[filters] --json` selects and claims in one call — then run Step 1's
+[filters] --json` selects and claims in one call — add
+`--exclude-label gt:slot` unless the filter already excludes the merge-slot
+bead (Step 1's first hard exclusion) — then run Step 1's
 duplicate-work preflight for the claimed bead before building; if it reveals
 live duplicate work, release (`bd update <id> --status open --assignee ""`)
 and reselect. If the project has build observability (a `.scaffold/`
@@ -175,8 +182,8 @@ merge on a red gate. Never `docker system prune`.
 - The one thing that still blocks the merge: a verified, still-reproducing
   real P0 — file it, keep the PR open, post the reproduction, notify the user,
   end the batch.
-- If the project has a merge slot (`bd merge-slot check` reports one — plan
-  materialization creates it), serialize EVERY merge: `bd merge-slot acquire
+- If the project has a merge slot (`bd merge-slot check` reports one — the
+  Beads setup step creates it), serialize EVERY merge: `bd merge-slot acquire
   --wait` → merge → `bd merge-slot release` — release even if the merge
   fails, or the slot stays held and blocks every other agent. The slot needs
   a holder identity unique among agents: generate ONE value (e.g. a UUID)

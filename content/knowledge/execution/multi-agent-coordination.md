@@ -131,7 +131,11 @@ done
 
 `bd ready --claim` (or `bd update <id> --claim` for a specific bead) is the
 authoritative, atomic claim — claiming by editing the status field is NOT
-atomic and misses a concurrent claimant. Both atomic forms key on the Beads
+atomic and misses a concurrent claimant. Never run `bd ready --claim`
+unfiltered where a merge slot exists: the slot bead sits open at P0 whenever
+the slot is free and WILL be claimed as if it were work, silently holding
+the global merge lock — add `--exclude-label gt:slot` (or a scope filter
+that already excludes it). Both atomic forms key on the Beads
 actor, and same-actor claims are idempotent: every concurrent agent needs
 its own stable `BEADS_ACTOR`, or agents sharing the default `git user.name`
 identity can all "claim" the same bead successfully. The claim is only
