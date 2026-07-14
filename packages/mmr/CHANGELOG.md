@@ -2,14 +2,16 @@
 
 ## [Unreleased]
 
+## [3.1.2] — 2026-07-14
+
 ### Added
 
-- **`unwrap-jsonpath` parser: optional `incomplete` guard.** A parser envelope can
-  now declare `incomplete: { status_path, values[], message }`. When the wrapped
-  payload fails to parse **and** the envelope's `status_path` value is one of
-  `values`, the parser raises a clear, actionable error embedding `message`
-  instead of a generic parse failure. Backward compatible — configs without
-  `incomplete` are unchanged.
+- **`unwrap-jsonpath` parser: optional `incomplete` guard.** A parser envelope
+  can now declare `incomplete: { status_path, values[], message }`. When the
+  wrapped payload fails to parse **and** the envelope's `status_path` value is
+  one of `values`, the parser raises a clear, actionable error embedding
+  `message` instead of a generic parse failure. Backward compatible — configs
+  without `incomplete` are unchanged.
 
 ### Fixed
 
