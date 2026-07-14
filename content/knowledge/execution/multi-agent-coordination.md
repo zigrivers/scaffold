@@ -62,7 +62,12 @@ bd merge-slot check
 
 ### When to use
 
-Use `bd merge-slot` in multi-agent flows (3+ agents, OR projects where a merge conflict requires careful manual resolution). Skip it for single-agent or two-agent workflows where collisions are rare and `git push` retries are acceptable.
+Serialize EVERY merge through `bd merge-slot` whenever the project has a
+slot (`bd merge-slot check` reports one) — the deterministic rule the
+work-beads skill follows, because an agent cannot reliably count its active
+peers. Projects that are strictly single-agent can simply not create a
+slot; skipping an *existing* slot is how two agents end up merging
+concurrently.
 
 ### Failure modes
 
