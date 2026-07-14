@@ -33,6 +33,88 @@ describe('grok channel output_parser (unwrap $.text → default)', () => {
   })
 })
 
+describe('unwrap-jsonpath `incomplete` guard (grok Cancelled → honest error)', () => {
+  // grok often cancels a review mid-run under heavy concurrent load: the envelope
+  // comes back stopReason=Cancelled with only a short "I'll review..." ack in
+  // $.text (no findings JSON). Without the guard, MMR throws the misleading
+  // "No JSON object found in output". The guard turns that into an actionable
+  // "did not complete (stopReason=Cancelled)" error instead.
+  const grokParser: OutputParserConfig = {
+    kind: 'unwrap-jsonpath',
+    wrap: '$.text',
+    incomplete: {
+      status_path: '$.stopReason',
+      values: ['Cancelled'],
+      message: 'grok was interrupted mid-review — retry or reduce concurrent grok load.',
+    },
+    then: 'default',
+  }
+
+  it('reports an honest cancellation error (not "No JSON object found") when a Cancelled run has only ack text', () => {
+    const raw = JSON.stringify({
+      text: "I'll review the diff against the surrounding worker module and report findings.",
+      stopReason: 'Cancelled',
+      num_turns: 1,
+    })
+    const result = parseChannelOutput(raw, grokParser)
+    expect(result.summary).toBe('Output parsing failed.')
+    const desc = result.findings[0].description
+    expect(desc).toMatch(/did not complete \(stopReason=Cancelled\)/)
+    expect(desc).toMatch(/retry or reduce concurrent grok load/)
+    expect(desc).not.toMatch(/No JSON object found/)
+  })
+
+  it('still parses findings normally on a completed (EndTurn) run — guard does not interfere', () => {
+    const raw = JSON.stringify({
+      text: '{"approved": false, "findings": [{"severity":"P0","location":"x.js:1","description":"bug","suggestion":"fix"}], "summary": "bad"}',
+      stopReason: 'EndTurn',
+    })
+    const result = parseChannelOutput(raw, grokParser)
+    expect(result.summary).not.toBe('Output parsing failed.')
+    expect(result.findings).toHaveLength(1)
+  })
+
+  it('parses findings even if stopReason=Cancelled but $.text still holds valid findings JSON', () => {
+    const raw = JSON.stringify({
+      text: '{"approved": true, "findings": [], "summary": "ok"}',
+      stopReason: 'Cancelled',
+    })
+    const result = parseChannelOutput(raw, grokParser)
+    expect(result.summary).not.toBe('Output parsing failed.')
+    expect(result.approved).toBe(true)
+  })
+
+  it('without an `incomplete` config, a parse failure keeps the original generic error (backward compatible)', () => {
+    const raw = JSON.stringify({ text: 'just prose, no json', stopReason: 'Cancelled' })
+    const result = parseChannelOutput(raw, { kind: 'unwrap-jsonpath', wrap: '$.text', then: 'default' })
+    expect(result.summary).toBe('Output parsing failed.')
+    expect(result.findings[0].description).toMatch(/No JSON object found/)
+  })
+
+  it('does not fire when the status field is a non-string value (keeps the original error)', () => {
+    // stopReason is a number here — typeof status === 'string' guards against it.
+    const raw = JSON.stringify({ text: 'prose, no json', stopReason: 42 })
+    const result = parseChannelOutput(raw, grokParser)
+    expect(result.summary).toBe('Output parsing failed.')
+    expect(result.findings[0].description).toMatch(/No JSON object found/)
+    expect(result.findings[0].description).not.toMatch(/did not complete/)
+  })
+
+  it('a malformed status_path does not replace the original parse error with a jsonpath error', () => {
+    const raw = JSON.stringify({ text: 'prose, no json', stopReason: 'Cancelled' })
+    const badPath: OutputParserConfig = {
+      kind: 'unwrap-jsonpath',
+      wrap: '$.text',
+      incomplete: { status_path: '$.foo[bad', values: ['Cancelled'], message: 'x' },
+      then: 'default',
+    }
+    const result = parseChannelOutput(raw, badPath)
+    expect(result.summary).toBe('Output parsing failed.')
+    expect(result.findings[0].description).toMatch(/No JSON object found/)
+    expect(result.findings[0].description).not.toMatch(/jsonpath/)
+  })
+})
+
 describe('default parser', () => {
   const parse = getParser('default')
 

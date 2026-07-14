@@ -63,6 +63,21 @@ export interface UnwrapJsonpathParserConfig {
   kind: 'unwrap-jsonpath'
   wrap: string
   then?: OutputParserConfig
+  /**
+   * Optional guard for CLI envelopes that can return a non-terminal/interrupted
+   * run (e.g. grok's `stopReason: "Cancelled"`, where $.text holds only a short
+   * ack and no findings). When the wrapped payload fails to parse AND the
+   * envelope's `status_path` value is one of `values`, the parser throws a clear,
+   * actionable error (embedding `message`) instead of the generic
+   * "No JSON object found in output". A completed run still parses normally —
+   * the guard only rewrites the error on an already-failed parse.
+   */
+  incomplete?: {
+    status_path: string
+    /** Non-empty: an empty list would make the guard silently inert. */
+    values: [string, ...string[]]
+    message: string
+  }
 }
 
 export type OutputParserConfig =
@@ -91,6 +106,13 @@ export const UnwrapJsonpathParserSchema = z.object({
   kind: z.literal('unwrap-jsonpath'),
   wrap: z.string(),
   then: z.lazy(() => OutputParserSchema).default('default'),
+  incomplete: z.object({
+    status_path: z.string(),
+    // Non-empty: an empty list would configure a guard that never fires. The
+    // `.nonempty()` output type `[string, ...string[]]` matches the interface.
+    values: z.array(z.string()).nonempty(),
+    message: z.string(),
+  }).optional(),
 }) satisfies z.ZodType<UnwrapJsonpathParserConfig>
 
 export const OutputParserSchema: z.ZodType<OutputParserConfig> = z.lazy(() =>

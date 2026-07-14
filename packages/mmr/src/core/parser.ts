@@ -273,6 +273,38 @@ export function getParser(spec: string | OutputParserConfig): Parser {
   return buildParser(spec)
 }
 
+/**
+ * When an `unwrap-jsonpath` parse fails, return a clear, actionable error IF the
+ * envelope's status field marks an interrupted/incomplete run (per the optional
+ * `incomplete` guard); otherwise return the original error unchanged. This turns
+ * grok's "stopReason: Cancelled + ack-only $.text" case from a misleading
+ * "No JSON object found in output" into an honest "did not complete" message.
+ */
+function incompleteOrDefault(
+  decoded: unknown,
+  spec: Extract<OutputParserConfig, { kind: 'unwrap-jsonpath' }>,
+  fallback: Error,
+): Error {
+  const guard = spec.incomplete
+  if (!guard) return fallback
+  let status: unknown
+  try {
+    status = jsonpathGet(decoded, guard.status_path)
+  } catch {
+    // A malformed custom status_path must never REPLACE the genuine parse error
+    // with a jsonpath internal error — the guard can only improve the message.
+    return fallback
+  }
+  if (typeof status === 'string' && guard.values.includes(status)) {
+    // Human-readable label: drop the "$." root of a simple property path
+    // ("$.stopReason" → "stopReason"); use the path verbatim otherwise (a bare
+    // "$", a bracket/nested path, etc.) so the label is never empty or garbled.
+    const field = guard.status_path.startsWith('$.') ? guard.status_path.slice(2) : guard.status_path
+    return new Error(`channel run did not complete (${field}=${status}) before emitting findings — ${guard.message}`)
+  }
+  return fallback
+}
+
 export function buildParser(spec: OutputParserConfig): Parser {
   if (typeof spec === 'string') {
     return getParser(spec)
@@ -284,10 +316,17 @@ export function buildParser(spec: OutputParserConfig): Parser {
       const decoded = parseJsonFromOutput(raw)
       const unwrapped = jsonpathGet(decoded, spec.wrap)
       if (unwrapped === undefined) {
-        throw new Error(`jsonpath did not match: ${spec.wrap}`)
+        throw incompleteOrDefault(decoded, spec, new Error(`jsonpath did not match: ${spec.wrap}`))
       }
       const nextRaw = typeof unwrapped === 'string' ? unwrapped : JSON.stringify(unwrapped)
-      return nextParser(nextRaw)
+      try {
+        return nextParser(nextRaw)
+      } catch (err) {
+        // Pass Error objects through unchanged (stack preserved); wrap a rare
+        // non-Error throw while retaining the original value as `cause`.
+        const fallback = err instanceof Error ? err : new Error(String(err), { cause: err })
+        throw incompleteOrDefault(decoded, spec, fallback)
+      }
     }
   }
   if (spec.kind === 'regex-findings') {

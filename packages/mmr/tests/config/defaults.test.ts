@@ -73,6 +73,22 @@ describe('BUILTIN_CHANNELS — grok', () => {
     }
   })
 
+  it('reports grok mid-review cancellation honestly via the incomplete guard', () => {
+    // grok returns stopReason=Cancelled with ack-only $.text under heavy load;
+    // the guard turns the misleading "No JSON object found" into an actionable
+    // "did not complete (stopReason=Cancelled)" error. See parser.test.ts.
+    const parser = BUILTIN_CHANNELS.grok?.output_parser
+    // Assert-or-throw narrows the union (string | OutputParserConfig | undefined)
+    // to the unwrap-jsonpath object so the guard fields are typed AND a wrong
+    // shape fails loudly instead of vacuously passing.
+    if (typeof parser !== 'object' || parser.kind !== 'unwrap-jsonpath') {
+      throw new Error('grok output_parser should be an unwrap-jsonpath object')
+    }
+    expect(parser.incomplete?.status_path).toBe('$.stopReason')
+    expect(parser.incomplete?.values).toContain('Cancelled')
+    expect(parser.incomplete?.message).toMatch(/retry the review|reduce the number of parallel grok/)
+  })
+
   it('auth.check probes grok models and recovery points at grok login', () => {
     expect(BUILTIN_CHANNELS.grok?.auth?.check).toMatch(/grok models/)
     expect(BUILTIN_CHANNELS.grok?.auth?.recovery).toBe('grok login')
