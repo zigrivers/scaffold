@@ -649,6 +649,16 @@ EOF
     [[ "$output" == *"refusing to regenerate"* ]]
 }
 
+@test "guard: follows an output symlink and judges the TARGET's checkout" {
+    bash -c "cd '$CLONE_DIR' && scripts/setup-agent-worktree.sh alpha"
+    # a symlink INSIDE the worktree pointing at a path in the PRIMARY checkout —
+    # writing through it lands in the primary, so the guard must refuse.
+    ln -s "$CLONE_DIR/docs/generated.html" "$CLONE_DIR/.worktrees/alpha/link.html"
+    run bash -c "'$CLONE_DIR/scripts/primary-checkout-guard.sh' '$CLONE_DIR/.worktrees/alpha/link.html' 'the docs'"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"refusing to regenerate"* ]]
+}
+
 # ---------------------------------------------------------------------------
 # check-regen-artifacts.sh — DETECT and report stray timestamp-only regenerated
 # trackers. It must NEVER modify, restore, delete, or stage anything.
@@ -709,6 +719,17 @@ EOF
     run bash -c "'$CLONE_DIR/scripts/check-regen-artifacts.sh' '$CLONE_DIR'"
     [ "$status" -eq 0 ]
     [[ "$output" != *report.sh* ]]
+}
+
+@test "check: does NOT report a timestamp change bundled with a mode change" {
+    printf 'Generated 2026-07-11 05:11 UTC\n' > "$CLONE_DIR/report.sh"
+    git -C "$CLONE_DIR" add report.sh
+    git -C "$CLONE_DIR" commit -q -m "add tracker"
+    printf 'Generated 2026-07-14 01:47 UTC\n' > "$CLONE_DIR/report.sh"   # timestamp change
+    chmod +x "$CLONE_DIR/report.sh"                                       # + a real mode change
+    run bash -c "'$CLONE_DIR/scripts/check-regen-artifacts.sh' '$CLONE_DIR'"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *report.sh* ]]   # not purely a timestamp change → not reported
 }
 
 @test "check: ignores a staged change" {

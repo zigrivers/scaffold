@@ -28,10 +28,22 @@
 # Source-safe: defines functions only; no top-level `set -e` (it would leak into
 # a sourcing generator's shell). Strict mode is applied on the direct-run path.
 
-# Nearest existing ancestor directory of a (possibly not-yet-created) path.
+# Nearest existing ancestor directory of a (possibly not-yet-created) path. If the
+# path itself is an existing symlink, follow it first (bounded, to avoid loops) so
+# a symlinked output is judged by the checkout of its TARGET, not the link — else a
+# generator in a worktree could write THROUGH a symlink into the primary undetected.
 _pcg_nearest_existing_dir() {
+  local p="$1" hops=0 target
+  while [[ -L "$p" ]] && [[ "$hops" -lt 40 ]]; do
+    target="$(readlink "$p")"
+    case "$target" in
+      /*) p="$target" ;;
+      *) p="$(dirname "$p")/$target" ;;
+    esac
+    hops=$((hops + 1))
+  done
   local dir
-  dir="$(dirname "$1")"
+  dir="$(dirname "$p")"
   while [[ ! -d "$dir" ]] && [[ "$dir" != "/" ]] && [[ "$dir" != "." ]]; do
     dir="$(dirname "$dir")"
   done

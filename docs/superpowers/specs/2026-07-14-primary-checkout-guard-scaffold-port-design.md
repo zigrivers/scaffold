@@ -1,7 +1,7 @@
 # Design — Port the primary-checkout write-guard into Scaffold
 
 - **Date:** 2026-07-14
-- **Status:** Approved design, pre-implementation
+- **Status:** Implemented (PR #771) — main-sync recovery shipped as detect-and-report (see §3.2)
 - **Repo:** `zigrivers-scaffold`
 - **Upstream reference:** nibble `docs/superpowers/specs/2026-07-14-primary-checkout-write-guard-design.md`
   (PR zigrivers/nibble#1714, branch `agent/primary-checkout-write-guard`)

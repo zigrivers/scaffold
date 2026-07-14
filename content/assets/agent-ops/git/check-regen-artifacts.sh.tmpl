@@ -35,13 +35,18 @@ while IFS= read -r -d '' entry; do
   [[ "${entry:0:2}" == " M" ]] || continue
   path="${entry:3}"
 
+  # Skip if the file's MODE also changed — the change isn't purely a timestamp then.
+  git -C "$wt" diff --no-color -- "$path" 2>/dev/null | grep -qE '^(old|new) mode ' && continue
+
   # A timestamp-only CONTENT change: the raw file differs from HEAD (a real content
   # change, so a mode-only change is excluded), but is byte-identical to HEAD once
   # every timestamp is masked (the only difference is inside timestamps). HEAD is
-  # read as a raw blob so a textconv/external-diff filter can conceal nothing.
-  cmp -s <(git -C "$wt" show "HEAD:$path" 2>/dev/null) "$wt/$path" && continue
+  # read as a raw blob so a textconv/external-diff filter can conceal nothing. The
+  # `HEAD:./$path` form (note the `./`) tells git the remainder is a PATH, so a
+  # tracked path containing a colon isn't mis-read as rev:path syntax.
+  cmp -s <(git -C "$wt" show "HEAD:./$path" 2>/dev/null) "$wt/$path" && continue
   cmp -s \
-    <(git -C "$wt" show "HEAD:$path" 2>/dev/null | sed -E "s/$TS_RE/$TS_TOKEN/g") \
+    <(git -C "$wt" show "HEAD:./$path" 2>/dev/null | sed -E "s/$TS_RE/$TS_TOKEN/g") \
     <(sed -E "s/$TS_RE/$TS_TOKEN/g" < "$wt/$path" 2>/dev/null) \
     || continue
 
