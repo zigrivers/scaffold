@@ -74,7 +74,8 @@ export interface UnwrapJsonpathParserConfig {
    */
   incomplete?: {
     status_path: string
-    values: string[]
+    /** Non-empty: an empty list would make the guard silently inert. */
+    values: [string, ...string[]]
     message: string
   }
 }
@@ -107,9 +108,9 @@ export const UnwrapJsonpathParserSchema = z.object({
   then: z.lazy(() => OutputParserSchema).default('default'),
   incomplete: z.object({
     status_path: z.string(),
-    // Empty is allowed and harmless (the guard simply never fires) — this keeps
-    // the schema's inferred type aligned with the `string[]` interface field.
-    values: z.array(z.string()),
+    // Non-empty: an empty list would configure a guard that never fires. The
+    // `.nonempty()` output type `[string, ...string[]]` matches the interface.
+    values: z.array(z.string()).nonempty(),
     message: z.string(),
   }).optional(),
 }) satisfies z.ZodType<UnwrapJsonpathParserConfig>

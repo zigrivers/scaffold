@@ -296,9 +296,10 @@ function incompleteOrDefault(
     return fallback
   }
   if (typeof status === 'string' && guard.values.includes(status)) {
-    // Human-readable label: "$.stopReason" → "stopReason". Fall back to the raw
-    // path if stripping the root leaves nothing (e.g. a bare "$").
-    const field = guard.status_path.replace(/^\$\.?/, '') || guard.status_path
+    // Human-readable label: drop the "$." root of a simple property path
+    // ("$.stopReason" → "stopReason"); use the path verbatim otherwise (a bare
+    // "$", a bracket/nested path, etc.) so the label is never empty or garbled.
+    const field = guard.status_path.startsWith('$.') ? guard.status_path.slice(2) : guard.status_path
     return new Error(`channel run did not complete (${field}=${status}) before emitting findings — ${guard.message}`)
   }
   return fallback
@@ -321,7 +322,10 @@ export function buildParser(spec: OutputParserConfig): Parser {
       try {
         return nextParser(nextRaw)
       } catch (err) {
-        throw incompleteOrDefault(decoded, spec, err instanceof Error ? err : new Error(String(err)))
+        // Pass Error objects through unchanged (stack preserved); wrap a rare
+        // non-Error throw while retaining the original value as `cause`.
+        const fallback = err instanceof Error ? err : new Error(String(err), { cause: err })
+        throw incompleteOrDefault(decoded, spec, fallback)
       }
     }
   }
