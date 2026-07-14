@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# {{PROJECT_NAME}} — detect and REPORT stray timestamp-only regenerated trackers a
+# generator wrote into a checkout, so they never silently block the next agent's
+# `make main-sync`.
+#
+# Usage: check-regen-artifacts.sh <checkout-path>
+#
+# DETECT-ONLY — this never modifies, restores, deletes, or stages anything. For each
+# tracked file modified only in the working tree (porcelain " M") whose ONLY
+# difference from HEAD is inside `Generated <ISO-date> <HH:MM> UTC` footers, it
+# prints an advisory naming the file and the remedy, then a person decides. Content
+# alone cannot prove a file is a disposable generated artifact rather than a hand
+# edit that merely contains a timestamp, so this reports and never acts. Always
+# exits 0 — it is advisory and must never fail a sync.
+set -euo pipefail
+
+wt="${1:-}"
+if [[ -z "$wt" ]]; then
+  echo "usage: check-regen-artifacts.sh <checkout-path>" >&2
+  exit 2
+fi
+
+# The regenerated-timestamp signature. Anchored to the literal "Generated " label
+# so a bare date/time appearing in real content can't match by accident.
+TS_RE='Generated [0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2} UTC'
+# A distinctive token a real content line is implausibly going to contain, used to
+# mask timestamps before comparing HEAD vs the working copy.
+TS_TOKEN='<REGEN-TIMESTAMP>'
+
+stray=()
+# Files modified ONLY in the working tree (index char space, worktree char M),
+# tracked. `-z` gives NUL-terminated, never-quoted paths (non-ASCII names, spaces,
+# and newlines survive); `--no-renames` keeps the two-char status prefix stable.
+while IFS= read -r -d '' entry; do
+  [[ "${entry:0:2}" == " M" ]] || continue
+  path="${entry:3}"
+
+  # Skip if the file's MODE also changed — the change isn't purely a timestamp then.
+  git -C "$wt" diff --no-color -- "$path" 2>/dev/null | grep -qE '^(old|new) mode ' && continue
+
+  # A timestamp-only CONTENT change: the raw file differs from HEAD (a real content
+  # change, so a mode-only change is excluded), but is byte-identical to HEAD once
+  # every timestamp is masked (the only difference is inside timestamps). HEAD is
+  # read as a raw blob so a textconv/external-diff filter can conceal nothing. The
+  # `HEAD:./$path` form (note the `./`) tells git the remainder is a PATH, so a
+  # tracked path containing a colon isn't mis-read as rev:path syntax.
+  cmp -s <(git -C "$wt" show "HEAD:./$path" 2>/dev/null) "$wt/$path" && continue
+  cmp -s \
+    <(git -C "$wt" show "HEAD:./$path" 2>/dev/null | sed -E "s/$TS_RE/$TS_TOKEN/g") \
+    <(sed -E "s/$TS_RE/$TS_TOKEN/g" < "$wt/$path" 2>/dev/null) \
+    || continue
+
+  stray+=("$path")
+done < <(git -C "$wt" status --porcelain=v1 -z --no-renames)
+
+if [[ "${#stray[@]}" -gt 0 ]]; then
+  {
+    printf '! stray timestamp-only regen artifact(s) in %s (NOT modified):\n' "$wt"
+    for p in "${stray[@]}"; do printf '    %s\n' "$p"; done
+    printf '  Only a "Generated ... UTC" footer changed — these look like regenerated\n'
+    printf '  files left in the primary checkout. If so, discard them\n'
+    printf '  (git -C %q checkout -- <file>) or regenerate inside a worktree — never\n' "$wt"
+    printf '  regenerate in the primary checkout. Verify before discarding.\n'
+  } >&2
+fi
+exit 0

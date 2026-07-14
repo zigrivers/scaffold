@@ -89,10 +89,21 @@ describe('installAgentOps / checkAgentOps', () => {
     const guard = path.join(projectRoot, 'scripts', 'bd-guard.sh')
     expect(fs.existsSync(guard)).toBe(true)
     expect(fs.statSync(guard).mode & 0o111).toBeTruthy()
+    // The primary-checkout write-guard and the main-sync stray-artifact detector
+    // install as executable git-component files (manifest-tracked, so main-sync's
+    // detect call never drifts against `agent-ops check`).
+    for (const dest of ['scripts/primary-checkout-guard.sh', 'scripts/check-regen-artifacts.sh']) {
+      expect(res.installed).toContain(dest)
+      const p = path.join(projectRoot, dest)
+      expect(fs.existsSync(p)).toBe(true)
+      expect(fs.statSync(p).mode & 0o111).toBeTruthy()
+    }
     const manifest = JSON.parse(
       fs.readFileSync(path.join(projectRoot, '.scaffold', 'agent-ops-manifest.json'), 'utf8'),
     )
     expect(manifest.files['scripts/setup-agent-worktree.sh']).toMatch(/^[0-9a-f]{64}$/)
+    expect(manifest.files['scripts/primary-checkout-guard.sh']).toMatch(/^[0-9a-f]{64}$/)
+    expect(manifest.files['scripts/check-regen-artifacts.sh']).toMatch(/^[0-9a-f]{64}$/)
     expect(checkAgentOps(projectRoot).upToDate).toBe(true)
   })
 

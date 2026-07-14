@@ -599,3 +599,187 @@ EOF
         "$BATS_TEST_DIRNAME/../content/assets/agent-ops/make/agent-ops.mk.tmpl"
     [ "$status" -ne 0 ]
 }
+
+# ---------------------------------------------------------------------------
+# primary-checkout-guard.sh — refuse to regenerate a tracked file into the
+# primary checkout when it has linked worktrees (nibble port).
+# ---------------------------------------------------------------------------
+
+@test "guard: refuses a write into the primary checkout when it has a linked worktree" {
+    bash -c "cd '$CLONE_DIR' && scripts/setup-agent-worktree.sh alpha"
+    run bash -c "cd '$CLONE_DIR' && scripts/primary-checkout-guard.sh '$CLONE_DIR/docs/generated.html' 'the docs'"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"refusing to regenerate"* ]]
+    [[ "$output" == *"the docs"* ]]
+    [[ "$output" == *"setup-agent-worktree.sh"* ]]
+}
+
+@test "guard: no-op in a standalone clone with no linked worktrees" {
+    run bash -c "cd '$CLONE_DIR' && scripts/primary-checkout-guard.sh '$CLONE_DIR/docs/generated.html' 'the docs'"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
+@test "guard: no-op when the output path lives in a linked worktree" {
+    bash -c "cd '$CLONE_DIR' && scripts/setup-agent-worktree.sh alpha"
+    run bash -c "'$CLONE_DIR/scripts/primary-checkout-guard.sh' '$CLONE_DIR/.worktrees/alpha/docs/generated.html' 'the docs'"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
+@test "guard: AGENT_OPS_GIT_GUARD_BYPASS=1 allows the write even in a primary with worktrees" {
+    bash -c "cd '$CLONE_DIR' && scripts/setup-agent-worktree.sh alpha"
+    run bash -c "cd '$CLONE_DIR' && AGENT_OPS_GIT_GUARD_BYPASS=1 scripts/primary-checkout-guard.sh '$CLONE_DIR/docs/generated.html' 'the docs'"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *bypass* ]]
+}
+
+@test "guard: fails open (allows) outside a git repository" {
+    local nd; nd="$(mktemp -d)"
+    run bash -c "'$CLONE_DIR/scripts/primary-checkout-guard.sh' '$nd/generated.html' 'the docs'"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+    rm -rf "$nd"
+}
+
+@test "guard: when sourced, the function aborts (exit 1) on a guarded primary write" {
+    bash -c "cd '$CLONE_DIR' && scripts/setup-agent-worktree.sh alpha"
+    run bash -c "cd '$CLONE_DIR' && . scripts/primary-checkout-guard.sh && guard_primary_checkout '$CLONE_DIR/docs/generated.html' 'the docs'"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"refusing to regenerate"* ]]
+}
+
+@test "guard: follows an output symlink and judges the TARGET's checkout" {
+    bash -c "cd '$CLONE_DIR' && scripts/setup-agent-worktree.sh alpha"
+    # a symlink INSIDE the worktree pointing at a path in the PRIMARY checkout —
+    # writing through it lands in the primary, so the guard must refuse.
+    ln -s "$CLONE_DIR/docs/generated.html" "$CLONE_DIR/.worktrees/alpha/link.html"
+    run bash -c "'$CLONE_DIR/scripts/primary-checkout-guard.sh' '$CLONE_DIR/.worktrees/alpha/link.html' 'the docs'"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"refusing to regenerate"* ]]
+}
+
+# ---------------------------------------------------------------------------
+# check-regen-artifacts.sh — DETECT and report stray timestamp-only regenerated
+# trackers. It must NEVER modify, restore, delete, or stage anything.
+# ---------------------------------------------------------------------------
+
+@test "check: reports a timestamp-only regen artifact without modifying it" {
+    printf 'header\nGenerated 2026-07-11 05:11 UTC\nbody\n' > "$CLONE_DIR/report.html"
+    git -C "$CLONE_DIR" add report.html
+    git -C "$CLONE_DIR" commit -q -m "add tracker"
+    printf 'header\nGenerated 2026-07-14 01:47 UTC\nbody\n' > "$CLONE_DIR/report.html"
+    run bash -c "'$CLONE_DIR/scripts/check-regen-artifacts.sh' '$CLONE_DIR'"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"stray timestamp-only"* ]]
+    [[ "$output" == *report.html* ]]
+    # DETECT-ONLY: the file is reported but left exactly as-is (still dirty).
+    run git -C "$CLONE_DIR" status --porcelain -- report.html
+    [ -n "$output" ]
+    grep -q '01:47 UTC' "$CLONE_DIR/report.html"
+}
+
+@test "check: reports an embedded-footer timestamp change" {
+    printf '<footer>Generated 2026-07-11 05:11 UTC</footer>\n' > "$CLONE_DIR/report.html"
+    git -C "$CLONE_DIR" add report.html
+    git -C "$CLONE_DIR" commit -q -m "add tracker"
+    printf '<footer>Generated 2026-07-14 01:47 UTC</footer>\n' > "$CLONE_DIR/report.html"
+    run bash -c "'$CLONE_DIR/scripts/check-regen-artifacts.sh' '$CLONE_DIR'"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *report.html* ]]
+    run git -C "$CLONE_DIR" status --porcelain -- report.html
+    [ -n "$output" ]     # still dirty — never modified
+}
+
+@test "check: does NOT report a real content change" {
+    printf 'header\nGenerated 2026-07-11 05:11 UTC\nbody\n' > "$CLONE_DIR/report.html"
+    git -C "$CLONE_DIR" add report.html
+    git -C "$CLONE_DIR" commit -q -m "add tracker"
+    printf 'CHANGED\nGenerated 2026-07-11 05:11 UTC\nbody\n' > "$CLONE_DIR/report.html"
+    run bash -c "'$CLONE_DIR/scripts/check-regen-artifacts.sh' '$CLONE_DIR'"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *report.html* ]]
+}
+
+@test "check: does NOT report a real change bundled with a timestamp change" {
+    printf 'alpha Generated 2026-07-11 05:11 UTC\n' > "$CLONE_DIR/report.html"
+    git -C "$CLONE_DIR" add report.html
+    git -C "$CLONE_DIR" commit -q -m "add tracker"
+    printf 'BETA Generated 2026-07-14 01:47 UTC\n' > "$CLONE_DIR/report.html"
+    run bash -c "'$CLONE_DIR/scripts/check-regen-artifacts.sh' '$CLONE_DIR'"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *report.html* ]]
+}
+
+@test "check: does NOT report a mode-only change (content identical)" {
+    printf 'Generated 2026-07-11 05:11 UTC\n' > "$CLONE_DIR/report.sh"
+    git -C "$CLONE_DIR" add report.sh
+    git -C "$CLONE_DIR" commit -q -m "add tracker"
+    chmod +x "$CLONE_DIR/report.sh"   # mode-only change — file content unchanged
+    run bash -c "'$CLONE_DIR/scripts/check-regen-artifacts.sh' '$CLONE_DIR'"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *report.sh* ]]
+}
+
+@test "check: does NOT report a timestamp change bundled with a mode change" {
+    printf 'Generated 2026-07-11 05:11 UTC\n' > "$CLONE_DIR/report.sh"
+    git -C "$CLONE_DIR" add report.sh
+    git -C "$CLONE_DIR" commit -q -m "add tracker"
+    printf 'Generated 2026-07-14 01:47 UTC\n' > "$CLONE_DIR/report.sh"   # timestamp change
+    chmod +x "$CLONE_DIR/report.sh"                                       # + a real mode change
+    run bash -c "'$CLONE_DIR/scripts/check-regen-artifacts.sh' '$CLONE_DIR'"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *report.sh* ]]   # not purely a timestamp change → not reported
+}
+
+@test "check: ignores a staged change" {
+    printf 'a\nGenerated 2026-07-11 05:11 UTC\nb\n' > "$CLONE_DIR/report.html"
+    git -C "$CLONE_DIR" add report.html
+    git -C "$CLONE_DIR" commit -q -m "add tracker"
+    printf 'a\nGenerated 2026-07-14 01:47 UTC\nb\n' > "$CLONE_DIR/report.html"
+    git -C "$CLONE_DIR" add report.html   # STAGED, not a working-tree-only change
+    run bash -c "'$CLONE_DIR/scripts/check-regen-artifacts.sh' '$CLONE_DIR'"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *report.html* ]]
+}
+
+@test "check: is silent on a clean tree" {
+    run bash -c "'$CLONE_DIR/scripts/check-regen-artifacts.sh' '$CLONE_DIR'"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
+@test "check: parses a git-quoted non-ASCII path (café.html)" {
+    # core.quotePath=true C-quotes non-ASCII paths in porcelain output; NUL parsing
+    # must recover the real path so the artifact is still detected and reported.
+    printf 'Generated 2026-07-11 05:11 UTC\n' > "$CLONE_DIR/café.html"
+    git -C "$CLONE_DIR" add "café.html"
+    git -C "$CLONE_DIR" commit -q -m "unicode tracker"
+    printf 'Generated 2026-07-14 01:47 UTC\n' > "$CLONE_DIR/café.html"
+    run bash -c "'$CLONE_DIR/scripts/check-regen-artifacts.sh' '$CLONE_DIR'"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *café.html* ]]
+    run git -C "$CLONE_DIR" status --porcelain -- "café.html"
+    [ -n "$output" ]     # reported, never modified
+}
+
+@test "main-sync: reports (does not modify) a stray timestamp-only artifact before ff" {
+    printf 'x\nGenerated 2026-07-11 05:11 UTC\ny\n' > "$CLONE_DIR/report.html"
+    git -C "$CLONE_DIR" add report.html
+    git -C "$CLONE_DIR" commit -q -m "add tracker"
+    git -C "$CLONE_DIR" push -q origin main
+    # advance origin/main (empty commit touches nothing), rewind local so it is behind by 1
+    git -C "$CLONE_DIR" commit --allow-empty -q -m ahead
+    git -C "$CLONE_DIR" push -q origin main
+    git -C "$CLONE_DIR" reset --hard -q HEAD~1
+    # a stray timestamp-only regen artifact sits in the primary checkout
+    printf 'x\nGenerated 2026-07-14 01:47 UTC\ny\n' > "$CLONE_DIR/report.html"
+    run bash -c "cd '$CLONE_DIR' && scripts/main-sync.sh"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"stray timestamp-only"* ]]
+    [[ "$output" == *report.html* ]]
+    # DETECT-ONLY: the stray artifact is reported but NOT modified…
+    grep -q '01:47 UTC' "$CLONE_DIR/report.html"
+    # …and the ff-only sync still advanced main (the empty commit didn't touch report.html)
+    [ "$(git -C "$CLONE_DIR" rev-parse main)" = "$(git -C "$CLONE_DIR" rev-parse origin/main)" ]
+}

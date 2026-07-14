@@ -63,6 +63,13 @@ if [[ -z "$main_wt" ]]; then
   main_wt="$primary"
 fi
 
+# Best-effort, DETECT-ONLY: report (never modify) stray timestamp-only regenerated
+# artifacts a generator left in the checkout that holds the default branch, so they
+# don't silently block the ff-only merge below — a person decides whether to discard
+# or regenerate in a worktree. A hiccup here must never fail the sync (|| true).
+check="$(dirname "$0")/check-regen-artifacts.sh"
+[[ -x "$check" ]] && "$check" "$main_wt" || true
+
 ahead="$(git -C "$main_wt" rev-list --count "origin/$DEFAULT..$DEFAULT")"
 if [[ "$ahead" != "0" ]]; then
   warn "$DEFAULT has diverged from origin/$DEFAULT ($ahead commit(s) ahead) — refusing to fast-forward."
