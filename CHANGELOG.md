@@ -2,6 +2,36 @@
 
 All notable changes to Scaffold are documented here.
 
+## [3.43.0] - 2026-07-14
+
+### Changed
+
+- **`/work-beads N` selects beads one at a time, at claim time** — N is now a
+  budget, not an upfront reservation. At high parallelism (12-agent fleets)
+  upfront-selected beads were routinely claimed by other agents before their
+  turn. The skill now refreshes the queue view before every claim, claims
+  atomically (`bd update <id> --claim` / `bd ready --claim`), and treats a
+  lost claim as normal traffic (take the next candidate). **Behavior change**
+  delivered to existing projects on next skill sync.
+- **Per-agent claim identity required.** Same-actor claims are idempotent, so
+  agents sharing the default `git user.name` identity could all "claim" the
+  same bead. The work-beads skill now establishes a unique, session-stable
+  `BEADS_ACTOR` before any claim (the multi-agent bootstrap prompts already
+  did; direct `/work-beads` invocations were the gap).
+- **Non-atomic claim form retired everywhere.** `bd update <id> --status
+  in_progress` no longer appears as a claim in any content surface (skill,
+  beads pipeline step, CLAUDE.md-optimization recipe, agent-ops preflight
+  help, coordination/claiming knowledge); a bats eval enforces this.
+- **Deterministic merge-slot trigger** — the work-beads skill serializes every
+  merge when the project has a merge slot, replacing the unknowable
+  "3+ agents active?" condition.
+- **New parallel-work semantics in the work-beads skill** — stale-claim
+  surfacing (report, never auto-steal; release requires clearing the
+  assignee: `bd update <id> --status open --assignee ""`), queue-drained
+  early batch end, explicit-ID invocations skip-and-report beads claimed by
+  other agents, and a new required `Stale claims:` batch-report slot.
+  Design: docs/superpowers/specs/2026-07-14-work-beads-parallel-claim-hardening-design.md.
+
 ## [3.42.0] - 2026-07-12
 
 ### Added
