@@ -2,6 +2,36 @@
 
 All notable changes to Scaffold are documented here.
 
+## [3.44.0] - 2026-07-14
+
+### Added
+
+- **Primary-checkout write-guard for generated multi-agent projects.** The
+  `agent-ops` git component now installs `scripts/primary-checkout-guard.sh`, a
+  harness-agnostic guard that any generator whose default output is a tracked
+  repo path calls immediately before writing. It refuses (with a "regenerate
+  from a worktree" rescue message) when the write would land in a primary
+  checkout that has linked worktrees, and is a **no-op** for standalone clones
+  and for runs from a worktree — so single-agent projects are unaffected while
+  multi-agent projects can no longer silently dirty the shared checkout and
+  block the next agent's `main-sync`. Bash generators source it and call
+  `guard_primary_checkout "$OUTPUT" "<what>"`; other-language generators run it
+  as a subprocess. Documented bypass (human emergency only):
+  `AGENT_OPS_GIT_GUARD_BYPASS=1`.
+- **`main-sync` stray-artifact detector.** The git component also installs
+  `scripts/check-regen-artifacts.sh`, which `main-sync` calls before the
+  fast-forward. It **detects and reports** — never modifies — a tracked file
+  whose only change is a `Generated <ISO-date> <HH:MM> UTC` footer (a likely
+  stray regenerated artifact left in the primary checkout) and points the
+  operator at the fix (discard it, or regenerate inside a worktree). It is
+  deliberately detect-only: content alone cannot prove a file is a disposable
+  generated artifact rather than a hand edit, so a person decides.
+- The `/scaffold:git-workflow` step documents the guardrail, the
+  generator-must-call-the-guard rule (both idioms), and a one-line write-guard
+  rule in the generated `docs/git-workflow.md`, and preserves both scripts on
+  update. Both are manifest-tracked, so `scaffold agent-ops check` stays
+  drift-clean.
+
 ## [3.43.0] - 2026-07-14
 
 ### Changed
