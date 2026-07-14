@@ -289,7 +289,9 @@ function incompleteOrDefault(
   if (!guard) return fallback
   const status = jsonpathGet(decoded, guard.status_path)
   if (typeof status === 'string' && guard.values.includes(status)) {
-    const field = guard.status_path.replace(/^\$\.?/, '')
+    // Human-readable label: "$.stopReason" → "stopReason". Fall back to the raw
+    // path if stripping the root leaves nothing (e.g. a bare "$").
+    const field = guard.status_path.replace(/^\$\.?/, '') || guard.status_path
     return new Error(`channel run did not complete (${field}=${status}) before emitting findings — ${guard.message}`)
   }
   return fallback

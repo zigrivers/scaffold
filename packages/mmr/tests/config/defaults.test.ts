@@ -78,12 +78,15 @@ describe('BUILTIN_CHANNELS — grok', () => {
     // the guard turns the misleading "No JSON object found" into an actionable
     // "did not complete (stopReason=Cancelled)" error. See parser.test.ts.
     const parser = BUILTIN_CHANNELS.grok?.output_parser
-    expect(typeof parser).toBe('object')
-    if (typeof parser === 'object' && parser.kind === 'unwrap-jsonpath') {
-      expect(parser.incomplete?.status_path).toBe('$.stopReason')
-      expect(parser.incomplete?.values).toContain('Cancelled')
-      expect(parser.incomplete?.message).toMatch(/retry the review|reduce the number of parallel grok/)
+    // Assert-or-throw narrows the union (string | OutputParserConfig | undefined)
+    // to the unwrap-jsonpath object so the guard fields are typed AND a wrong
+    // shape fails loudly instead of vacuously passing.
+    if (typeof parser !== 'object' || parser.kind !== 'unwrap-jsonpath') {
+      throw new Error('grok output_parser should be an unwrap-jsonpath object')
     }
+    expect(parser.incomplete?.status_path).toBe('$.stopReason')
+    expect(parser.incomplete?.values).toContain('Cancelled')
+    expect(parser.incomplete?.message).toMatch(/retry the review|reduce the number of parallel grok/)
   })
 
   it('auth.check probes grok models and recovery points at grok login', () => {
