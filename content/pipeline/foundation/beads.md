@@ -71,7 +71,7 @@ the D7 relationship between Beads IDs and git).
   tracking; a bare in-code TODO or FIXME with no issue reference attached is
   forbidden); the `bd create` template with a required `docs:` tail;
   day-to-day commands (`bd ready` / `bd list` /
-  `bd show` / `bd update --status in_progress` / `bd close` / `bd stats`);
+  `bd show` / `bd update <id> --claim` / `bd close` / `bd stats`);
   the bootstrap-trap warning verbatim; epics & phases conventions (`-t epic`
   + `--parent`, phase epics `blocks:` each other); and Beads' relationship to
   git (D7: IDs out of branch names/commit subjects, `Closes <id>` in bodies,
@@ -274,7 +274,8 @@ reference content — it does not touch (and is never overwritten by) the
    `work-beads` skill's defer step (2.5) uses this same template without
    those two optional flags.
 3. **Day-to-day commands** — `bd ready` (start here — surfaces unblocked
-   work) / `bd list` / `bd show <id>` / `bd update <id> --status in_progress`
+   work) / `bd list` / `bd show <id>` / `bd update <id> --claim` (atomic —
+   fails if another agent already holds it)
    / `bd close <id>` (only after the PR is merged and verified) / `bd stats`.
 4. **Durability & the bootstrap trap** — verbatim rules:
    - Never run `bd bootstrap`, destructive `bd init`

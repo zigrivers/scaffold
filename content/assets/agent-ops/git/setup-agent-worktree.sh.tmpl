@@ -161,7 +161,7 @@ preflight_scan() {
 
   if [[ $found -eq 1 ]]; then
     log "If this overlaps existing work, coordinate before building. Claim your task first:"
-    log "  bd update <id> --status in_progress   # or: bd create \"$desc\" -t task -p 2"
+    log "  bd update <id> --claim   # atomic claim; or: bd create \"$desc\" -t task -p 2"
     log "  # then open a DRAFT PR on your first commit:  gh pr create --draft --fill"
   else
     log "preflight: no obvious duplicate open/merged PR for \"$desc\"."

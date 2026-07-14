@@ -176,11 +176,14 @@ order:
    ```markdown
    1. Orient (read-only, primary checkout): `bd ready`, `bd stats`,
       `gh pr list --state open`, `git worktree list`, `make doctor`.
-   2. Select bead(s): priority, then project-critical labels, then work
-      that unblocks others; never a bead already in progress or covered by
-      an open/draft PR.
-   3. Claim from the primary checkout: `bd ready --claim` (or
-      `bd update <id> --status in_progress`).
+   2. Select ONE bead at a time, at claim time (N is a budget, not a
+      reservation): priority, then project-critical labels, then work
+      that unblocks others; never a bead already in progress or covered
+      by an open/draft PR.
+   3. Claim atomically from the primary checkout: `bd update <id> --claim`
+      (or `bd ready --claim` when a filter expresses the selection). Lost
+      the claim to another agent? Take the next candidate — never claim by
+      setting the status field.
    4. Worktree + build: `scripts/setup-agent-worktree.sh <name> --install
       --task "<title>"` (`--install` runs the dependency-install setup
       commands — a plain invocation installs nothing); draft PR on the first

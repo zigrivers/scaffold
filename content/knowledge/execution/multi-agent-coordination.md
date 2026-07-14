@@ -11,7 +11,7 @@ topics:
   - coordination
   - parallel-execution
 volatility: evolving
-last-reviewed: 2026-07-11
+last-reviewed: 2026-07-14
 version-pin: null
 sources:
   - url: https://github.com/gastownhall/beads
@@ -129,9 +129,13 @@ done
 
 ## Draft PRs and One-PR-Per-Agent — the Visible-Claim Layer
 
-`bd ready --claim` (or `bd update <id> --status in_progress`) is the
-authoritative, atomic claim, but it's only visible to agents that query
-Beads. `gh pr list --state open` is the *other* live registry other agents
+`bd ready --claim` (or `bd update <id> --claim` for a specific bead) is the
+authoritative, atomic claim — claiming by editing the status field is NOT
+atomic and misses a concurrent claimant. Both atomic forms key on the Beads
+actor, and same-actor claims are idempotent: every concurrent agent needs
+its own stable `BEADS_ACTOR`, or agents sharing the default `git user.name`
+identity can all "claim" the same bead successfully. The claim is only
+visible to agents that query Beads. `gh pr list --state open` is the *other* live registry other agents
 (and humans) check first — see the work-beads skill's orient step
 (`bd ready && bd stats; gh pr list --state open; git worktree list`). A bead
 can sit `in_progress` in Beads for a while before any code exists, so the

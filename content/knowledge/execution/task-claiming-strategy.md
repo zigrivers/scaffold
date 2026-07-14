@@ -3,7 +3,7 @@ name: task-claiming-strategy
 description: Task selection and management patterns for AI agent execution
 topics: [tasks, execution, agents, planning]
 volatility: stable
-last-reviewed: null
+last-reviewed: 2026-07-14
 version-pin: null
 sources: []
 ---
@@ -70,7 +70,7 @@ Before starting a task, verify all its blockers are resolved. After completing e
 ### Multi-Agent Conflict Avoidance — Extended
 
 **Claiming a task:**
-- The claim is an atomic `bd ready --claim` (sets `in_progress` + assignee) plus a draft PR opened on the first push — not branch creation. The draft PR is the visible claim other agents see; the bead ID stays out of the branch name and rides in the PR body as `Closes bd-a3f8`
+- The claim is an atomic `bd ready --claim` (sets `in_progress` + assignee) plus a draft PR opened on the first push — not branch creation. The draft PR is the visible claim other agents see; the bead ID stays out of the branch name and rides in the PR body as `Closes bd-a3f8`. Claims key on the Beads actor and same-actor claims are idempotent — each concurrent agent needs its own stable `BEADS_ACTOR`. Select one task at a time, at claim time; a claim lost to another agent means take the next candidate
 - Other agents should check open/draft PRs and `bd` status before claiming the same task
 - If two agents accidentally claim the same task, the one with fewer commits yields
 
@@ -82,7 +82,7 @@ Before starting a task, verify all its blockers are resolved. After completing e
 **Communication via draft PRs and `bd`:**
 - Bead `in_progress` + open draft PR = task claimed
 - PR merged + bead `closed` = task complete
-- Bead released back to `ready` (PR closed unmerged) = task abandoned, available for re-claim
+- Bead released back to `ready` (PR closed unmerged) = task abandoned, available for re-claim (release = `bd update <id> --status open --assignee ""` — clearing the assignee is what makes it claimable again)
 
 ### What to Do When Blocked
 
