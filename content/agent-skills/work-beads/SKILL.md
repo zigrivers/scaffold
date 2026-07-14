@@ -53,7 +53,7 @@ name now (e.g. `agent-cobalt-fox`) and use it on every `bd` write this
 session — `export BEADS_ACTOR=<name>` in each shell, or `--actor <name>` per
 command. Unique across concurrent agents = mutual exclusion; stable within
 your session = your own resume path works. (Merge-slot commands are the one
-exception — they need a per-process unique holder; see 2.7.)
+exception — they use a separately minted holder value; see 2.7.)
 
 **Stale-claim scan (surface, never steal):** a dead agent's bead stays
 `in_progress` forever (bd has no claim lease/TTL yet). Cross-check
