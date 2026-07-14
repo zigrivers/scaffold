@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# {{PROJECT_NAME}} — auto-restore timestamp-only regenerated trackers so a stray
+# regen artifact never blocks `make main-sync`.
+#
+# Usage: heal-regen-artifacts.sh <checkout-path>
+#
+# For each file in <checkout-path> modified ONLY in the working tree (porcelain
+# " M" — tracked, unstaged), restore it to HEAD *iff its entire diff is the
+# regenerated-timestamp footer*: every changed content line matches
+# `Generated <ISO-date> <HH:MM> UTC`. Any file with a real content change is left
+# untouched.
+#
+# Safety invariants (load-bearing — this git-restores files):
+#   - Only ever `git restore` a tracked file whose *complete* diff matches the
+#     signature. One non-timestamp changed line ⇒ hands off.
+#   - Never `git clean`, never delete untracked files, never touch staged content
+#     (staged/added/deleted statuses are skipped).
+#   - Idempotent: a clean tree is a no-op, exit 0.
+#
+# main-sync.sh calls this best-effort (`|| true`), so a hiccup never fails a sync.
+set -euo pipefail
+
+wt="${1:-}"
+if [[ -z "$wt" ]]; then
+  echo "usage: heal-regen-artifacts.sh <checkout-path>" >&2
+  exit 2
+fi
+
+# The regenerated-timestamp signature. Anchored to the literal "Generated " label
+# so a bare date/time appearing in real content can't match by accident.
+TS_RE='Generated [0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2} UTC'
+
+# Files modified ONLY in the working tree (index char space, worktree char M),
+# tracked. `--no-renames` keeps the two-char status prefix stable.
+git -C "$wt" status --porcelain --no-renames | while IFS= read -r line; do
+  [[ "${line:0:2}" == " M" ]] || continue
+  path="${line:3}"
+
+  # Content lines only: skip everything up to the first @@ hunk header, then
+  # collect +/- lines. This is why the ---/+++ file headers (which appear before
+  # any @@) can never be mistaken for a changed content line.
+  changed="$(git -C "$wt" diff -U0 -- "$path" | awk '
+    /^@@/ { inhunk = 1; next }
+    inhunk && (/^\+/ || /^-/) { print }
+  ' || true)"
+
+  # No content diff (e.g. a mode-only change) ⇒ nothing to heal safely.
+  [[ -n "$changed" ]] || continue
+
+  # Healable iff NO changed content line fails the timestamp signature.
+  if printf '%s\n' "$changed" | grep -Evq "$TS_RE"; then
+    continue # a non-timestamp change exists — leave the file alone
+  fi
+
+  git -C "$wt" restore -- "$path"
+  printf '→ auto-healed stray regen artifact (timestamp-only): %s\n' "$path"
+done

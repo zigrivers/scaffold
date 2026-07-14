@@ -40,6 +40,11 @@ for CI until a launch target is chosen and automated CI is deliberately wired up
 - scripts/setup-agent-worktree.sh — installed (not hand-authored) by
   `scaffold agent-ops install --component git`; see "Install the agent-ops
   git component" in Instructions
+- scripts/primary-checkout-guard.sh, scripts/heal-regen-artifacts.sh —
+  installed by the same git component; the write-guard and main-sync
+  self-heal that keep generated files out of the primary checkout (see
+  "Guardrail: keep generated files out of the primary checkout" in
+  Instructions)
 - .github/pull_request_template.md — PR template with Summary / Test plan /
   References sections
 - .claude/settings.json — gains a PostToolUse reminder hook that fires after
@@ -130,7 +135,9 @@ modified files without `--force`; never pass `--force` in generation mode.
   directory structure, PR template fields, and agent-ops script
   customizations under scripts/ (the installer already refuses to
   overwrite locally modified files without `--force` — do not pass it in
-  generation mode)
+  generation mode) — including the primary-checkout write-guard
+  (`scripts/primary-checkout-guard.sh` and `scripts/heal-regen-artifacts.sh`),
+  so re-running the step never clobbers a project's guard customizations
 - **Triggers for update**: coding-standards.md changed commit format,
   Beads status changed (added or removed), new worktree patterns needed
   for parallel execution, `scaffold agent-ops check` reports a stale
@@ -169,6 +176,7 @@ modified files without `--force`; never pass `--force` in generation mode.
    This installs `scripts/setup-agent-worktree.sh`,
    `scripts/cleanup-merged-branches.sh`, `scripts/main-sync.sh`,
    `scripts/doctor.sh`, `scripts/beads-snapshot.sh`, `scripts/bd-guard.sh`,
+   `scripts/primary-checkout-guard.sh`, `scripts/heal-regen-artifacts.sh`,
    and the `agent-ops.mk` Makefile fragment (wired into the project Makefile
    via a one-line managed `include`, appended if missing). The installer is
    idempotent and refuses to overwrite locally modified files without
@@ -195,6 +203,48 @@ modified files without `--force`; never pass `--force` in generation mode.
    Codex, Cursor, and other harnesses have no PreToolUse hook: for them the
    guard is available as `scripts/bd-guard.sh --check "<command>"`, and the
    AGENTS.md Beads rules (see claude-md-optimization) carry the prose rule.
+
+### Guardrail: keep generated files out of the primary checkout
+The git component ships a **primary-checkout write-guard**
+(`scripts/primary-checkout-guard.sh`) and a **main-sync self-heal**
+(`scripts/heal-regen-artifacts.sh`) — both installed by `scaffold agent-ops
+install --component git` above. Together they close a gap git hooks cannot: an
+agent (or a regen script an agent runs) writing a **tracked file into the
+primary checkout** is not a git operation, so no commit/push hook fires — the
+stray file then blocks the next agent's `make main-sync`. The guard is a
+**no-op** for standalone clones and for any run from a worktree, so single-agent
+projects are unaffected; multi-agent projects get real protection.
+
+- **Prevention — the write-guard.** `scripts/primary-checkout-guard.sh` refuses
+  (exit non-zero, with a "regenerate from a worktree" rescue message) when a
+  write would land in a primary checkout that has linked worktrees (detection:
+  `git rev-parse --git-dir` equals `--git-common-dir` **and** `git worktree
+  list` shows more than one worktree); it fails open outside a git repo. **Every
+  generator whose default output is a tracked repo path must call the guard
+  immediately before writing**, enforced in the code that actually writes (not
+  only a shell wrapper), so invoking the generator directly is still guarded:
+  - **Bash generators** source it and call the function — on a block it aborts
+    the generator before any write:
+    ```bash
+    . "$(dirname "$0")/primary-checkout-guard.sh"
+    guard_primary_checkout "$OUTPUT" "the API docs"
+    ```
+  - **Other-language generators** (Python, TypeScript, …) run it as a subprocess
+    and abort on a non-zero exit, or reimplement the same detection:
+    ```bash
+    scripts/primary-checkout-guard.sh "$OUTPUT" "the API docs"
+    ```
+  The single documented bypass is `AGENT_OPS_GIT_GUARD_BYPASS=1` (human
+  emergency only, never agents) — reuse this one var for any other git guard so
+  there is one override, not two.
+- **Recovery — the main-sync self-heal.** `scripts/main-sync.sh` calls
+  `scripts/heal-regen-artifacts.sh` best-effort before it fast-forwards the
+  default branch. The heal restores a modified tracked file **only when its
+  entire diff is the generated-timestamp signature** (every changed line is a
+  `Generated <ISO-date> <HH:MM> UTC` footer); it never `git clean`s, never
+  touches untracked or staged content, and never restores a file with any real
+  content change. This wiring lives in the installed `main-sync.sh` template, so
+  it stays clean against `scaffold agent-ops check` (no drift).
 
 ### Generate docs/git-workflow.md
 Write docs/git-workflow.md with the sections below, synthesized from the
@@ -261,7 +311,13 @@ Depth-gate per Methodology Scaling above.
    invariant read-only; `make doctor-fix` performs the safe, unattended
    repair (hostage worktree holding `main`, detached primary) and refuses
    ambiguous cases (primary on a feature branch, mid-conflict, diverged
-   `main`, dirty tree) — those need a human decision.
+   `main`, dirty tree) — those need a human decision. Include the
+   write-guard rule as a one-liner under this invariant: "Any script that
+   regenerates a tracked file must call the primary-checkout write-guard
+   (`scripts/primary-checkout-guard.sh`); regenerate from a worktree, never
+   the primary checkout." — cross-referencing this invariant (see the
+   "Guardrail: keep generated files out of the primary checkout"
+   instruction above).
 10. **Task closure** — sync `main` (`make main-sync`), mark scaffold steps
     complete if the PR finished one (`scaffold complete <step>`), update
     memory/lessons with anything surprising, move to the next task.

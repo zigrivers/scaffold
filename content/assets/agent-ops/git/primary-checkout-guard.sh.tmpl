@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+# {{PROJECT_NAME}} — primary-checkout write-guard.
+#
+# Refuse to regenerate a tracked file INTO the primary checkout when that
+# checkout has linked worktrees. A generator that anchors its output to its own
+# script (OUTPUT="$(dirname "$0")/../docs/foo.html") writes a tracked file into
+# whatever checkout it runs from. When that is the shared primary checkout of a
+# multi-agent project, the stray file blocks the next agent's `make main-sync`.
+# Git hooks cannot catch this — a file write is not a git operation — so
+# prevention has to live at the write site.
+#
+# Usage:
+#   # bash generator: source it, then call immediately before writing
+#   . "$(dirname "$0")/primary-checkout-guard.sh"
+#   guard_primary_checkout "$OUTPUT" "the API docs"
+#
+#   # any-language generator: run it as a subprocess, abort on non-zero exit
+#   scripts/primary-checkout-guard.sh "$OUTPUT" "the API docs"
+#
+# Detection (identical to the shell protected-branch guard's primary check):
+#   is_primary := git-dir == git-common-dir     (a linked worktree's git-dir differs)
+#   REFUSE iff  is_primary AND `git worktree list` shows > 1 worktree
+# No-op for standalone clones (1 worktree) and for runs whose output lives in a
+# linked worktree. Fails OPEN (allows) outside a git repo / when git is absent.
+#
+# Bypass (human emergencies only, never agents): AGENT_OPS_GIT_GUARD_BYPASS=1.
+#
+# Source-safe: defines functions only; no top-level `set -e` (it would leak into
+# a sourcing generator's shell). Strict mode is applied on the direct-run path.
+
+# Nearest existing ancestor directory of a (possibly not-yet-created) path.
+_pcg_nearest_existing_dir() {
+  local dir
+  dir="$(dirname "$1")"
+  while [[ ! -d "$dir" ]] && [[ "$dir" != "/" ]] && [[ "$dir" != "." ]]; do
+    dir="$(dirname "$dir")"
+  done
+  (cd "$dir" 2>/dev/null && pwd -P) || printf '%s' "$dir"
+}
+
+# Resolve `git -C <dir> rev-parse <which>` to a canonical absolute path, matching
+# the shell guard (cd + pwd -P). Prints nothing (rc 1) outside a git repo.
+_pcg_git_path() {
+  local repo_dir="$1" which="$2" out
+  out="$(git -C "$repo_dir" rev-parse "$which" 2>/dev/null)" || return 1
+  [[ -n "$out" ]] || return 1
+  case "$out" in
+    /*) : ;;
+    *) out="$repo_dir/$out" ;;
+  esac
+  if [[ -d "$out" ]]; then (cd "$out" && pwd -P); else printf '%s' "$out"; fi
+}
+
+_pcg_worktree_count() {
+  git -C "$1" worktree list --porcelain 2>/dev/null |
+    awk '/^worktree /{ n++ } END{ print n + 0 }'
+}
+
+# True (rc 0) iff writing <output-path> would land in a primary checkout that has
+# linked worktrees — the multi-agent home base that must stay clean.
+is_primary_checkout_with_worktrees() {
+  local repo_dir git_dir common_dir
+  repo_dir="$(_pcg_nearest_existing_dir "$1")"
+  git_dir="$(_pcg_git_path "$repo_dir" --git-dir)" || return 1       # fail open
+  common_dir="$(_pcg_git_path "$repo_dir" --git-common-dir)" || return 1
+  [[ "$git_dir" == "$common_dir" ]] || return 1   # a linked worktree — allowed here
+  [[ "$(_pcg_worktree_count "$repo_dir")" -gt 1 ]]
+}
+
+# Exit 1 with a rescue message if writing <output-path> would dirty a primary
+# checkout that has linked worktrees. No-op otherwise. $2 is a short human label.
+guard_primary_checkout() {
+  local output_path="$1" what="${2:-this file}"
+  if [[ "${AGENT_OPS_GIT_GUARD_BYPASS:-}" == "1" ]]; then
+    printf '⚠ primary-checkout write-guard bypassed via AGENT_OPS_GIT_GUARD_BYPASS=1 (human emergency use only)\n' >&2
+    return 0
+  fi
+  is_primary_checkout_with_worktrees "$output_path" || return 0
+
+  local repo_dir resolved linked
+  repo_dir="$(_pcg_nearest_existing_dir "$output_path")"
+  linked="$(($(_pcg_worktree_count "$repo_dir") - 1))"
+  case "$output_path" in
+    /*) resolved="$output_path" ;;
+    *) resolved="$(pwd -P)/$output_path" ;;
+  esac
+  cat >&2 <<EOF
+✗ Blocked: refusing to regenerate $what into the primary checkout.
+  $resolved lives in the primary checkout, which has $linked linked worktree(s) —
+  generated files belong in a worktree, never the primary checkout
+  (docs/git-workflow.md — primary-checkout invariant):
+    1. scripts/setup-agent-worktree.sh <name> --install --task "<goal>"
+    2. cd .worktrees/<name>/ && re-run this generator there
+    3. commit + push there, then open a PR.
+  Standalone clone with no worktrees? This guard is a no-op — you won't see this.
+  (Human emergency only: AGENT_OPS_GIT_GUARD_BYPASS=1 to override.)
+EOF
+  exit 1
+}
+
+# Direct-run entrypoint (no-op when sourced).
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  set -euo pipefail
+  if [[ "$#" -lt 1 ]]; then
+    echo "usage: primary-checkout-guard.sh <output-path> [<what>]" >&2
+    exit 2
+  fi
+  guard_primary_checkout "$@"
+fi
