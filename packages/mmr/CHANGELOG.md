@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [3.1.2] — 2026-07-14
+
 ### Added
 
 - **`unwrap-jsonpath` parser: optional `incomplete` guard.** A parser envelope can
