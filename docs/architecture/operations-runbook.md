@@ -275,7 +275,7 @@ Scaffold uses two tag-triggered workflows:
 Important operational detail:
 
 - **GitHub release creation is not automated by these workflows.** Maintainers still create the GitHub release manually after the tag is pushed.
-- **Trusted publishing is a one-time package setting.** The npm package must trust the `zigrivers/scaffold` repository and the `publish.yml` workflow file. If the workflow suddenly reports npm auth failure, verify that trusted-publisher configuration before touching GitHub secrets.
+- **Trusted publishing is a one-time package setting.** The npm package must trust the `zigrivers/scaffold` repository and the `publish.yml` workflow file — but it only signs provenance. If the workflow reports npm auth failure, fix the `NPM_TOKEN` secret per §4.2a (expiry, scope, "Bypass 2FA") — the trusted-publisher config is not the working publish-auth path.
 
 **Partial release failure**:
 - If `publish.yml` succeeds but `update-homebrew.yml` fails, npm users can upgrade immediately but Homebrew users cannot until the tap update is fixed.

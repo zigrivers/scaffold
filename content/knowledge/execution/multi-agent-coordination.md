@@ -42,10 +42,12 @@ The two primitives below are the load-bearing Deep Guidance for this entry. The 
 bd merge-slot create
 
 # Before rebasing your feature branch on main:
-bd merge-slot acquire --wait
-# Without --wait, acquire FAILS immediately if the slot is held. With --wait it
-# adds you to the waiters queue and blocks until the slot frees. Holder defaults
-# to $BEADS_ACTOR; pass --holder <name> to override.
+until bd merge-slot acquire; do sleep 10; done
+bd merge-slot check --json   # re-verify YOU are the holder before proceeding
+# acquire does NOT block: it fails immediately if the slot is held, and
+# --wait only adds you to the waiters queue and still exits non-zero — a
+# released slot never auto-promotes a waiter, so loop on acquire itself.
+# Holder defaults to $BEADS_ACTOR; pass --holder <name> to override.
 
 # Now safe to rebase and push:
 git fetch origin && git rebase origin/main

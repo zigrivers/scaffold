@@ -194,14 +194,18 @@ directory and the `scaffold` CLI), also
 - [ ] **Step 5: Replace the 2.7 merge-slot bullet** ("3+ agents active? …") with:
 
 ```markdown
-- If the project has a merge slot (`bd merge-slot check` reports one — plan
-  materialization creates it), serialize EVERY merge: `bd merge-slot acquire
-  --wait` → merge → `bd merge-slot release` — release even if the merge
-  fails, or the slot stays held and blocks every other agent. The slot needs
-  a **per-process unique** holder (e.g. `agent-$$` or a UUID) — scope any
-  `BEADS_ACTOR` override to the slot commands and restore your stable claim
-  actor before the next claim.
+- If the project has a merge slot (`bd merge-slot check` reports one — the
+  Beads setup step creates it), serialize EVERY merge: loop on
+  `bd merge-slot acquire` until it succeeds (it does not block; `--wait`
+  only enqueues you and exits non-zero), re-verify ownership with
+  `bd merge-slot check --json`, merge, then `bd merge-slot release` —
+  release even if the merge fails, or the slot stays held and blocks every
+  other agent. Mint ONE unique holder value and reuse it for acquire and
+  release.
 ```
+
+*(Wording above superseded during review rounds — the shipped text in
+`content/agent-skills/work-beads/SKILL.md` is authoritative.)*
 
 - [ ] **Step 6: Update the Step 3 report slots** — the slots block becomes:
 

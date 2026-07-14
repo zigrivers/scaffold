@@ -182,3 +182,15 @@ TDD at the content level — assertions first, then edits:
   claim failure must be treated as routine.
 - `bd ready --claim` skips assigned-but-open beads and claims the next
   claimable match — the fast path does not wedge on them.
+- `bd ready --unassigned` (`-u`) trims open-but-assigned beads from the
+  listing (returned "no ready work" when every open bead carried an
+  assignee).
+- The merge-slot bead is claimable as ordinary work: after
+  `bd merge-slot create`, the slot bead sits open at P0 at the TOP of
+  `bd ready` whenever the slot is free, and an unfiltered
+  `bd ready --claim` claimed it (assignee set, `in_progress` = slot held).
+  `bd ready --exclude-label gt:slot` removes it from the listing.
+- `bd merge-slot acquire` does not block; per bd's help, `--wait` only adds
+  the requester to the waiters queue (the command exits) — acquisition
+  requires looping on `acquire` and re-verifying via
+  `bd merge-slot check --json`.
