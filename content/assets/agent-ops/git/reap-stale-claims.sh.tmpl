@@ -63,15 +63,24 @@ done
 command -v bd >/dev/null 2>&1 || { echo "reap: bd not found — skipping."; exit 0; }
 command -v jq >/dev/null 2>&1 || { echo "reap: jq not found — cannot parse Beads JSON; skipping."; exit 0; }
 
-# ISO-8601 UTC (e.g. 2026-07-15T06:00:00Z) → epoch seconds. Tries GNU date then
-# BSD date; unparseable/empty prints nothing (caller treats it as "unknown").
+# RFC-3339 timestamp → epoch seconds. Accepts a trailing `Z` or a numeric offset,
+# and tolerates fractional seconds (`.NNN`). Tries GNU `date -d` (Linux/CI) then
+# BSD `date -jf` (macOS). Unparseable/empty prints nothing (caller treats it as
+# "unknown" and never reaps on it).
 to_epoch() {
   local ts="${1:-}"
   [ -n "$ts" ] || { printf ''; return 0; }
+  # Strip fractional seconds — BSD strptime cannot parse them.
+  ts="$(printf '%s' "$ts" | sed -E 's/\.[0-9]+//')"
   local e=""
-  e="$(date -u -d "$ts" +%s 2>/dev/null || true)"
+  e="$(date -u -d "$ts" +%s 2>/dev/null || true)"   # GNU handles Z + offsets directly
   if [ -z "$e" ]; then
-    e="$(date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$ts" +%s 2>/dev/null || true)"
+    e="$(date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$ts" +%s 2>/dev/null || true)"   # BSD, Z form
+  fi
+  if [ -z "$e" ]; then
+    # BSD numeric-offset form: collapse `+HH:MM` → `+HHMM` for %z.
+    local ts2; ts2="$(printf '%s' "$ts" | sed -E 's/([+-][0-9]{2}):([0-9]{2})$/\1\2/')"
+    e="$(date -u -j -f "%Y-%m-%dT%H:%M:%S%z" "$ts2" +%s 2>/dev/null || true)"
   fi
   printf '%s' "$e"
 }
@@ -79,34 +88,47 @@ to_epoch() {
 STALE_SECONDS=$((STALE_HOURS * 3600))
 
 # ----- gather open/draft PR references (probe 3, always on) -----
-# read into an array so the pluggable command word-splits cleanly (no eval).
+# read the pluggable command into an array so it word-splits cleanly (no eval).
 read -ra PR_LISTER_ARR <<< "$PR_LIST_CMD"
 pr_ok=1
-pr_blob=""        # "<headRefName>\t<title> <body>" per PR
+pr_raw="[]"       # raw PR JSON (used by the opt-in worktree probe)
+pr_lines=""       # one "<title> <body>" line per open/draft PR (for the id test)
+# pr_ok stays 1 ONLY if BOTH the PR command AND the jq parse succeed. A swallowed
+# jq error on malformed output must NOT masquerade as "no PRs" — that would let a
+# PR-protected no-lease claim be reaped. Either failure → pr_ok=0 → hold for triage.
 if pr_raw="$("${PR_LISTER_ARR[@]}" 2>/dev/null)"; then
-  pr_blob="$(printf '%s' "$pr_raw" | jq -r '.[]? | ((.headRefName // "") + "\t" + (.title // "") + " " + (.body // ""))' 2>/dev/null || true)"
+  if pr_lines="$(printf '%s' "$pr_raw" | jq -r '.[]? | ((.title // "") + " " + (.body // ""))' 2>/dev/null)"; then
+    pr_ok=1
+  else
+    pr_ok=0
+  fi
 else
-  pr_ok=0        # cannot verify PRs → the no-lease path stays conservative (HOLD)
+  pr_ok=0
 fi
 
 pr_protects() {  # does any open/draft PR reference this bead id? (probe 3)
-  [ -n "$pr_blob" ] || return 1
-  printf '%s\n' "$pr_blob" | grep -qF -- "$1"
+  [ -n "$pr_lines" ] || return 1
+  # Whole-word match so a bead id is not "protected" merely by being a substring
+  # of a longer id/word in some PR (grep -w boundaries; -F keeps the id literal).
+  printf '%s\n' "$pr_lines" | grep -qFw -- "$1"
 }
 
 worktree_branches() {  # branches checked out in live worktrees on THIS host
   git worktree list --porcelain 2>/dev/null | sed -n 's#^branch refs/heads/##p'
 }
 
-worktree_protects() {  # probe 4, opt-in: a referencing PR's head branch is a live worktree here
-  local id="$1" wbr br rest
+# probe 4 (opt-in, --shared-filesystem): the head branch of a PR referencing this
+# bead is checked out in a live worktree here → the agent is alive; hold. jq's
+# `contains` is a plain substring test (no regex), so a hyphenated bead id is safe.
+worktree_protects() {
+  local id="$1" wbr br
   wbr="$(worktree_branches)"
   [ -n "$wbr" ] || return 1
-  while IFS=$'\t' read -r br rest; do
+  while IFS= read -r br; do
     [ -n "$br" ] || continue
-    printf '%s' "$rest" | grep -qF -- "$id" || continue
     printf '%s\n' "$wbr" | grep -qxF -- "$br" && return 0
-  done <<< "$pr_blob"
+  done < <(printf '%s' "$pr_raw" | jq -r --arg id "$id" \
+    '.[]? | select(((.title // "") + " " + (.body // "")) | contains($id)) | (.headRefName // "")' 2>/dev/null)
   return 1
 }
 
@@ -137,8 +159,11 @@ guarded_release() {
 }
 
 # ----- scan in_progress claims -----
+# Parse each bead field-by-field with jq (NOT a delimiter-joined line): tab/whitespace
+# delimiters collapse empty fields under `read`, which would shift columns and corrupt
+# the liveness check. One compact JSON object per line is unambiguous.
 inprogress="$(bd list --status in_progress --json 2>/dev/null || echo '[]')"
-rows="$(printf '%s' "$inprogress" | jq -r '.[]? | [ .id, (.assignee // ""), (.updated_at // ""), (.issue_type // ""), (.metadata.lease_until // "") ] | @tsv' 2>/dev/null || true)"
+rows="$(printf '%s' "$inprogress" | jq -c '.[]?' 2>/dev/null || true)"
 
 reap_count=0 hold_count=0 live_count=0
 
@@ -148,9 +173,15 @@ else
   echo "reap-stale-claims: REPORT ONLY (dry-run) — pass --apply to release (ask-first)"
 fi
 
-while IFS=$'\t' read -r id assignee updated itype lease; do
+while IFS= read -r row; do
+  [ -n "$row" ] || continue
+  id="$(printf '%s' "$row" | jq -r '.id // ""')"
   [ -n "$id" ] || continue
+  itype="$(printf '%s' "$row" | jq -r '.issue_type // ""')"
   [ "$itype" = "epic" ] && continue        # never reap an umbrella epic
+  assignee="$(printf '%s' "$row" | jq -r '.assignee // ""')"
+  updated="$(printf '%s' "$row" | jq -r '.updated_at // ""')"
+  lease="$(printf '%s' "$row" | jq -r '.metadata.lease_until // ""')"
 
   lease_epoch="$(to_epoch "$lease")"
   updated_epoch="$(to_epoch "$updated")"

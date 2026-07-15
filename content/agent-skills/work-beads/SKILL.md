@@ -50,11 +50,13 @@ the atomic claim is a compare-and-set *keyed on the Beads actor*, and a
 same-actor claim is idempotent (exit 0). Two agents sharing one identity (the
 default `git user.name`) therefore BOTH "win" the same bead — the claim gives
 **zero** collision protection. Establish a distinct actor BEFORE any claim:
-- `BEADS_ACTOR` already holds a per-agent value (the worktree bootstrap and the
-  multi-agent prompts set one — see the [HOST] note) → use it.
-- Otherwise pick a distinctive name now (e.g. `agent-cobalt-fox`) and put it on
-  every `bd` write this session — `export BEADS_ACTOR=<name>` per shell, or
-  `--actor <name>` per command.
+- Already have `BEADS_ACTOR` exported in THIS shell (the multi-agent prompt set
+  it, or you sourced a worktree `.agent-env` on resume)? Keep it.
+- Otherwise `export BEADS_ACTOR=<distinctive-name>` (e.g. `agent-cobalt-fox`) in
+  THIS shell **now, before Step 1** — or pass `--actor <name>` on every `bd`
+  write. The first claim runs from the primary checkout, BEFORE any worktree
+  exists, so the actor must live in your current shell; a not-yet-created
+  worktree cannot supply it.
 - Cannot get an actor distinct from the shared human identity? You MUST NOT trust
   `--claim` for safety: **fail loud** — refuse the claim path, or fall back to a
   plain non-atomic in-progress write AND record in the batch report that
@@ -64,12 +66,14 @@ Unique across concurrent agents = mutual exclusion; stable within your session =
 your resume path works. (Merge-slot commands are the exception — a separately
 minted holder value; see 2.7.)
 
-> **[HOST] The worktree bootstrap exports `BEADS_ACTOR`.** The generated
-> `scripts/setup-agent-worktree.sh` writes `BEADS_ACTOR=agent-<name>` into a
-> worktree-local `.agent-env` file so every `bd` write from that worktree is
-> attributable; source it in the worktree shell, and any `bd` wrapper the project
-> ships MUST preserve it (env is inherited across `cd`, so a wrapper only has to
-> avoid overriding it). Project not wired yet? Do the manual step above.
+> **[HOST] `.agent-env` persists the actor for the worktree, not the first claim.**
+> The generated `scripts/setup-agent-worktree.sh` writes `BEADS_ACTOR=agent-<name>`
+> into a worktree-local `.agent-env` so `bd` writes made FROM that worktree (and a
+> resumed session) are attributable — but a child script cannot export into your
+> shell, so you must `source .agent-env` yourself, and it does NOT set the actor
+> for the pre-worktree claim above (that is the in-shell `export` you just did).
+> Any `bd` wrapper the project ships MUST preserve `BEADS_ACTOR` (env is inherited
+> across `cd`, so a wrapper only has to avoid overriding it).
 
 **Stale-claim orient (surface + self-resume):** run the reaper in **report
 mode** and list your own live claims:
@@ -171,9 +175,10 @@ a. **Claim** the ranked candidate: `bd update <id> --claim` — one atomic
      sabotage them.
    - **exit 0 = you hold it.** Immediately stamp a lease (§6.1) so a crash frees
      it: `bd update <id> --set-metadata lease_until=<now+TTL>` (default TTL 4h —
-     compute an ISO/RFC-3339 UTC timestamp; do NOT use `--defer` for the lease,
-     which would only HIDE the bead instead of releasing it on expiry). Then run
-     the validation gates in (b). If the project has build observability (a
+     compute the stamp as `date -u +%Y-%m-%dT%H:%M:%SZ` plus your TTL: UTC, whole
+     seconds, `...Z`, the exact form the reaper parses; do NOT use `--defer` for
+     the lease, which would only HIDE the bead instead of releasing it on expiry).
+     Then run the validation gates in (b). If the project has build observability (a
      `.scaffold/` directory + the `scaffold` CLI), also
      `scaffold observe event claim --task <id>` — feature-detect, skip silently.
 
@@ -219,14 +224,24 @@ TDD); otherwise write the failing test first. Commit and push frequently on
 claim.** Bead IDs go in commit/PR bodies (`Closes <id>`), never in branch names
 or commit subjects.
 
-**Lease heartbeat (§6.1):** on each push, renew your claim's lease so a live
-agent is never mistaken for a dead one — `bd update <id> --set-metadata
-lease_until=<now+TTL>` (from the primary). A renewed lease stays far beyond the
-reaper's grace margin, so the reaper never even evaluates you as expired; a
-crashed agent stops renewing and its lease lapses, which is what frees the bead.
+**Lease heartbeat + lost-claim check (§6.1, §5.2):** on each push, first re-read
+your bead, then renew its lease. This is both the liveness signal AND your
+self-heal against a wrongful reap:
+1. **Re-read:** `bd show <id> --json`. If the assignee is no longer your
+   `BEADS_ACTOR` (or the lease was cleared), your claim was reaped/reassigned out
+   from under you — try to re-claim `bd update <id> --claim`: exit 0 = you have it
+   back, keep going; **exit 1 = another agent now holds it, so STOP and report**
+   (never double-work a bead someone else owns).
+2. **Renew:** `bd update <id> --set-metadata lease_until=<now+TTL>`, computing the
+   stamp as `date -u +%Y-%m-%dT%H:%M:%SZ` **plus your TTL** (default 4h) — always
+   UTC, whole seconds, `...Z` (the exact form the reaper parses; avoid fractional
+   seconds or numeric offsets). A renewed lease stays far beyond the reaper's grace
+   margin, so a live agent is never evaluated as expired; a crashed agent stops
+   renewing and its lease lapses, which frees the bead.
+
 A long build with no pushes could let the lease lapse — renew explicitly in 2.6
-before a long-running gate. *([HOST] a project may wire this into a post-push
-hook instead of doing it by hand; the cadence is the host's to bind.)*
+before a long-running gate. *([HOST] a project may wire the renew into a post-push
+hook; the cadence is the host's to bind.)*
 
 **2.4 Docs travel with the PR:** resolve the bead's `docs:` tail and update
 every stale doc in this same PR. Check the project-invariants section of

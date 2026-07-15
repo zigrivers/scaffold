@@ -391,8 +391,12 @@ configure_identity() {
   # and same-actor claims are idempotent (both "win"), so every agent MUST carry a
   # DISTINCT actor or the atomic claim gives ZERO collision protection. Write
   # BEADS_ACTOR=agent-<name> into a worktree-local `.agent-env` so every `bd` write
-  # from this worktree is attributable to this agent. The agent's shell loads it
-  # (`set -a; . ./.agent-env; set +a`) after cd-ing in.
+  # from this worktree is attributable to this agent. This is PERSISTENCE only: a
+  # child script cannot export into the caller's shell, so the agent must
+  # `set -a; . ./.agent-env; set +a` after cd-ing in. It does NOT cover the FIRST
+  # claim, which the work-beads loop makes from the primary checkout BEFORE this
+  # worktree exists — that claim relies on BEADS_ACTOR already exported in the
+  # agent's shell (see SKILL.md Step 0).
   #
   # TODO(host): if this project ships a `bd` wrapper that pins bd's cwd to the
   # primary checkout, make the wrapper `source` this file (or otherwise PRESERVE

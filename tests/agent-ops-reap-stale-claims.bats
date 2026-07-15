@@ -127,3 +127,44 @@ mirror_show() {
     [ "$status" -eq 0 ]
     [ ! -f "$FX/bd-update.log" ]  # recent updated_at, no lease → not expired
 }
+
+@test "parses fields correctly when assignee is EMPTY (no delimiter-collapse regression)" {
+    # Empty middle field would shift columns under IFS=tab; per-field jq must not.
+    write_inprogress '[{"id":"proj-empty","assignee":"","updated_at":"2026-07-15T05:00:00Z","issue_type":"task","metadata":{"lease_until":"2026-07-15T06:00:00Z"}}]'
+    run "$FX/reap-stale-claims.sh"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"proj-empty"* ]]
+    [[ "$output" == *"REAP"* ]]   # lapsed lease still detected despite empty assignee
+}
+
+@test "to_epoch tolerates fractional-second lease timestamps (lease path still fires)" {
+    # updated_at is RECENT (not stale) so the ONLY way this reaps is via the lease
+    # path — which requires parsing the fractional-second lease. lease >= updated (F6).
+    write_inprogress '[{"id":"proj-frac","assignee":"agent-q","updated_at":"2026-07-15T09:00:00Z","issue_type":"task","metadata":{"lease_until":"2026-07-15T10:00:00.500Z"}}]'
+    run "$FX/reap-stale-claims.sh"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"proj-frac"* ]]
+    [[ "$output" == *"REAP"* ]]   # fractional lease parsed → lapsed → candidate
+}
+
+@test "malformed PR-lister output does NOT reap a no-lease claim (F1: pr_ok=0)" {
+    write_inprogress '[{"id":"proj-x","assignee":"agent-x","updated_at":"2026-07-13T12:00:00Z","issue_type":"task"}]'
+    mirror_show proj-x '[{"id":"proj-x","assignee":"agent-x","updated_at":"2026-07-13T12:00:00Z","issue_type":"task"}]'
+    printf '%s' 'not valid json {' > "$FX/prs.json"   # gh succeeds but jq cannot parse
+    run "$FX/reap-stale-claims.sh" --apply
+    [ "$status" -eq 0 ]
+    [ ! -f "$FX/bd-update.log" ]  # PR check unusable → hold, never reap
+    [[ "$output" == *"proj-x"* ]]
+    [[ "$output" == *"HOLD"* ]]
+}
+
+@test "pr_protects matches whole-word only (F7): a substring bead id is not falsely held" {
+    write_inprogress '[{"id":"proj-ab","assignee":"agent-a","updated_at":"2026-07-13T12:00:00Z","issue_type":"task"}]'
+    mirror_show proj-ab '[{"id":"proj-ab","assignee":"agent-a","updated_at":"2026-07-13T12:00:00Z","issue_type":"task"}]'
+    # A PR references a DIFFERENT, longer id that merely contains "proj-ab".
+    printf '%s' '[{"number":9,"title":"work","body":"Closes proj-abcd","isDraft":false}]' > "$FX/prs.json"
+    run "$FX/reap-stale-claims.sh" --apply
+    [ "$status" -eq 0 ]
+    [ -f "$FX/bd-update.log" ]
+    grep -q 'proj-ab' "$FX/bd-update.log"   # not protected by proj-abcd → reaped
+}
