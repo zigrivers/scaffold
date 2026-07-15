@@ -86,3 +86,9 @@ EOF
     [ "$status" -eq 0 ]
     [ -z "$(ls -A "$FX/empty")" ]
 }
+
+@test "falls back to \$RANDOM and still emits a valid name when the entropy source is unreadable" {
+    run env AGENT_NAME_ENTROPY_FILE="$FX/does-not-exist" "$FX/agent-name.sh"
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ ^agent-[a-z]+-[a-z]+(-[0-9]{2})?$ ]]
+}
