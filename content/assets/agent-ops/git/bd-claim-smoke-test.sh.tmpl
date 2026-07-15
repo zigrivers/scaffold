@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+# {{PROJECT_NAME}} — Beads claim/lease smoke test.
+# Installed by `scaffold agent-ops install --component git`.
+#
+# Verifies that THIS project's installed `bd` supports the primitives the
+# work-beads concurrency-hardening protocol relies on, BEFORE the fleet relies on
+# them (Beads versions drift). Runs entirely inside a throwaway temp project — it
+# NEVER touches the project's real `.beads/`.
+#
+# Exit 0 = all supported (or safely skipped when bd is absent / sandboxed).
+# Exit 1 = a required primitive is missing or behaves differently — do NOT rely
+#          on the atomic-claim protocol until fixed (upgrade bd, or adapt the skill).
+#
+# Covers (spec: Work-Beads Concurrency Hardening §12):
+#   * `bd update <id> --claim` is an actor-keyed compare-and-set
+#     (different actor refused, same actor idempotent) — the collision guard.
+#   * `--assignee ""` clears the assignee (the release).
+#   * single-command cooldown-release `--assignee "" --defer +1h` defers + hides.
+#   * `lease_until` metadata set + clear (the TTL lease).
+#   * `bd ready --claim` claims a normal ready bead (the generic path).
+set -euo pipefail
+
+command -v bd >/dev/null 2>&1 || { echo "SKIP: bd not installed."; exit 0; }
+
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT INT TERM
+
+pass=0
+ok()   { printf '  ok   %s\n' "$1"; pass=$((pass + 1)); }
+fail() { printf '  FAIL %s\n' "$1" >&2; exit 1; }
+
+# Read one top-level field from `bd --json` output (object OR [object]).
+extract() {
+  local field="$1"
+  if command -v jq >/dev/null 2>&1; then
+    jq -r "(if type==\"array\" then .[0] else . end) | (.${field} // \"\")"
+  else
+    tr -d ' \n' | sed -n "s/.*\"${field}\":\"\\([^\"]*\\)\".*/\\1/p" | head -1
+  fi
+}
+
+echo "bd-claim-smoke-test: $(bd version 2>/dev/null | head -1)"
+
+# Isolated throwaway project (bd init needs a real cwd, not -C, to CREATE a DB).
+cd "$TMP"
+bd init >/dev/null 2>&1 || { echo "SKIP: bd init failed in a temp dir (sandboxed env?)."; exit 0; }
+
+mkbead() { bd create "$1" -t task -p 2 --json 2>/dev/null | extract id; }
+ISO_FUTURE="2999-01-01T00:00:00Z"
+
+# 1) Atomic, actor-keyed claim CAS.
+A="$(mkbead 'claim cas')"
+[ -n "$A" ] || fail "could not create a test bead (bd create --json / id parse)"
+bd update "$A" --claim --actor alpha-agent >/dev/null 2>&1 || fail "first --claim should exit 0"
+if bd update "$A" --claim --actor bravo-agent >/dev/null 2>&1; then
+  fail "--claim by a DIFFERENT actor MUST be refused (exit 1) — the CAS is not actor-keyed"
+fi
+ok "different-actor --claim is refused (actor-keyed CAS)"
+bd update "$A" --claim --actor alpha-agent >/dev/null 2>&1 || fail "same-actor re-claim must be idempotent (exit 0)"
+ok "same-actor --claim is idempotent"
+[ "$(bd show "$A" --json 2>/dev/null | extract assignee)" = "alpha-agent" ] || fail "claim did not set assignee=actor"
+ok "claim sets assignee to the actor"
+
+# 2) Release clears the assignee.
+bd update "$A" --status open --assignee "" >/dev/null 2>&1 || fail "release update failed"
+[ -z "$(bd show "$A" --json 2>/dev/null | extract assignee)" ] || fail '--assignee "" must clear the assignee'
+ok 'release (--assignee "") clears the assignee'
+
+# 3) Single-command cooldown-release: --assignee "" --defer +1h (NOT --status open).
+B="$(mkbead 'cooldown')"
+bd update "$B" --claim --actor alpha-agent >/dev/null 2>&1 || fail "claim B failed"
+bd update "$B" --assignee "" --defer +1h --unset-metadata lease_until >/dev/null 2>&1 || fail "cooldown-release failed"
+if bd ready --json 2>/dev/null | grep -qF -- "$B"; then
+  fail "a deferred bead must be HIDDEN from bd ready (did --status open cancel the defer?)"
+fi
+ok 'single-command cooldown-release defers + clears + hides from bd ready'
+
+# 4) Lease metadata lifecycle (jq-gated — the reaper needs to read metadata.lease_until).
+if command -v jq >/dev/null 2>&1; then
+  bd update "$B" --defer "" --status open >/dev/null 2>&1 || true
+  bd update "$B" --claim --actor alpha-agent >/dev/null 2>&1 || true
+  bd update "$B" --set-metadata "lease_until=${ISO_FUTURE}" >/dev/null 2>&1 || fail "--set-metadata lease_until failed"
+  bd show "$B" --json 2>/dev/null \
+    | jq -e '(if type=="array" then .[0] else . end).metadata.lease_until == "'"${ISO_FUTURE}"'"' >/dev/null \
+    || fail "lease_until metadata was not stored"
+  bd update "$B" --unset-metadata lease_until >/dev/null 2>&1 || fail "--unset-metadata lease_until failed"
+  bd show "$B" --json 2>/dev/null \
+    | jq -e '((if type=="array" then .[0] else . end).metadata.lease_until // "") | length == 0' >/dev/null \
+    || fail "lease_until metadata was not cleared"
+  ok "lease_until metadata set + cleared"
+else
+  echo "  skip lease_until metadata check (jq not installed — the reaper needs jq)"
+fi
+
+# 5) Generic path: bd ready --claim claims a normal ready bead.
+mkbead 'generic claim' >/dev/null
+CLAIMED="$(bd ready --claim --actor gamma-agent --json 2>/dev/null | extract id)"
+[ -n "$CLAIMED" ] || fail "bd ready --claim returned nothing on a non-empty ready queue"
+ok "bd ready --claim claims a normal ready bead (generic path)"
+
+# Note: `bd --defer` reads the bare unit `m` as MONTHS (+30m → +30 months); the
+# protocol always uses +1h / +6h / +1d. This is a documented caution, not asserted.
+
+echo "PASS: bd supports the concurrency-hardening claim protocol (${pass} checks)."

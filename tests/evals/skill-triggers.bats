@@ -118,6 +118,39 @@ setup() {
   fi
 }
 
+@test "work-beads skill teaches the concurrency-hardening protocol" {
+  local skill_file="${SKILLS_DIR}/work-beads/SKILL.md"
+  [[ -f "$skill_file" ]] || skip "work-beads not found"
+
+  local failures=()
+  # §4.1 claim-then-validate ordering (claim BEFORE the validation gates).
+  grep -qiF 'claim first' "$skill_file" \
+    || failures+=("missing claim-then-validate ordering ('claim first')")
+  # §4.1 single-command cooldown-release on a validation reject (NOT --status open).
+  grep -qF 'bd update <id> --assignee "" --defer +1h' "$skill_file" \
+    || failures+=("missing single-command cooldown-release 'bd update <id> --assignee \"\" --defer +1h'")
+  # §6.1 claims-as-leases (TTL + heartbeat).
+  grep -qF 'lease_until' "$skill_file" \
+    || failures+=("missing lease mechanism (lease_until)")
+  # §5.2/§5.3 reaper report surfaced during orient.
+  grep -qF 'reap-stale-claims' "$skill_file" \
+    || failures+=("missing stale-claim reaper (reap-stale-claims)")
+  # §6.2 partitioning is a within-tier tie-breaker, never a pre-filter.
+  grep -qiF 'tie-break' "$skill_file" \
+    || failures+=("missing capability partitioning as a tie-breaker")
+  grep -qiF 'pre-filter' "$skill_file" \
+    || failures+=("missing the never-pre-filter warning for partitioning")
+  # §6.3 epic-sibling PR re-poll (Window C / semantic-dup defense).
+  grep -qiF 'sibling' "$skill_file" \
+    || failures+=("missing epic-sibling PR re-poll (Window C defense)")
+
+  if [[ ${#failures[@]} -gt 0 ]]; then
+    printf "work-beads concurrency-hardening assertions failed:\n"
+    printf "  %s\n" "${failures[@]}"
+    return 1
+  fi
+}
+
 @test "no living content surface teaches the non-atomic claim" {
   # 'bd update ... --status in_progress' is retired as a claim (not atomic).
   # 'bd list --status in_progress' (a filter) remains legitimate (the regex

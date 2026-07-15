@@ -14,8 +14,9 @@ skip steps.
 
 ```
 set identity once, then repeat up to N times (one bead in flight per agent):
-  refresh view -> select ONE bead -> claim atomically (lost the claim?
-  take the next candidate) -> worktree -> build (draft PR on first push)
+  refresh view -> select ONE bead -> claim atomically, then validate (lost the
+  claim? next candidate; dup/conflict? cooldown-release + next) -> worktree
+  -> build (draft PR on first push; renew lease on each push)
   -> verify (make check) -> review (mmr, 3-round cap) -> squash-merge
   -> sync + prune -> close bead
 batch end (budget spent, queue drained, or P0/blocker): report in the slots
@@ -44,23 +45,46 @@ git worktree list
 make doctor                    # wedged home base? make doctor-fix (unattended-safe)
 ```
 
-**Identity (required before any claim):** claims key on the Beads actor, and
-same-actor claims are idempotent — two agents sharing the default identity
-(`git user.name`) can both "successfully" claim the SAME bead, silently
-losing mutual exclusion. If `BEADS_ACTOR` is not already set to a per-agent
-value (the multi-agent bootstrap prompts set one), pick a distinctive agent
-name now (e.g. `agent-cobalt-fox`) and use it on every `bd` write this
-session — `export BEADS_ACTOR=<name>` in each shell, or `--actor <name>` per
-command. Unique across concurrent agents = mutual exclusion; stable within
-your session = your own resume path works. (Merge-slot commands are the one
-exception — they use a separately minted holder value; see 2.7.)
+**Identity — T1-ACTOR (a HARD, blocking prerequisite, not an enhancement):**
+the atomic claim is a compare-and-set *keyed on the Beads actor*, and a
+same-actor claim is idempotent (exit 0). Two agents sharing one identity (the
+default `git user.name`) therefore BOTH "win" the same bead — the claim gives
+**zero** collision protection. Establish a distinct actor BEFORE any claim:
+- `BEADS_ACTOR` already holds a per-agent value (the worktree bootstrap and the
+  multi-agent prompts set one — see the [HOST] note) → use it.
+- Otherwise pick a distinctive name now (e.g. `agent-cobalt-fox`) and put it on
+  every `bd` write this session — `export BEADS_ACTOR=<name>` per shell, or
+  `--actor <name>` per command.
+- Cannot get an actor distinct from the shared human identity? You MUST NOT trust
+  `--claim` for safety: **fail loud** — refuse the claim path, or fall back to a
+  plain non-atomic in-progress write AND record in the batch report that
+  collision protection is DISABLED. Never degrade silently.
 
-**Stale-claim scan (surface, never steal):** a dead agent's bead stays
-`in_progress` forever (bd has no claim lease/TTL yet). Cross-check
-`bd list --status in_progress` against the open-PR list: in progress + no
-open/draft PR + no recent activity = possibly stranded. Note it for the
-batch report — do NOT reclaim it; releasing another agent's claim
-(`bd update <id> --status open --assignee ""`) is an operator decision.
+Unique across concurrent agents = mutual exclusion; stable within your session =
+your resume path works. (Merge-slot commands are the exception — a separately
+minted holder value; see 2.7.)
+
+> **[HOST] The worktree bootstrap exports `BEADS_ACTOR`.** The generated
+> `scripts/setup-agent-worktree.sh` writes `BEADS_ACTOR=agent-<name>` into a
+> worktree-local `.agent-env` file so every `bd` write from that worktree is
+> attributable; source it in the worktree shell, and any `bd` wrapper the project
+> ships MUST preserve it (env is inherited across `cd`, so a wrapper only has to
+> avoid overriding it). Project not wired yet? Do the manual step above.
+
+**Stale-claim orient (surface + self-resume):** run the reaper in **report
+mode** and list your own live claims:
+
+```bash
+scripts/reap-stale-claims.sh                              # REPORT ONLY — never releases
+bd list --status in_progress --assignee "$BEADS_ACTOR"   # your own crashed-session claims to resume
+```
+
+The reaper report names beads whose claim looks abandoned (lease lapsed, or —
+absent a lease — stale with no open/draft PR). It NEVER mutates in report mode;
+its `--apply` release is gated (see the red flags). Resume your OWN stranded
+claims; for another agent's, leave it in the report — releasing a claim is an
+`--apply`/operator decision, not a manual `bd` edit. (Missing script? It ships
+with `scaffold agent-ops install`; feature-detect and skip if absent.)
 
 Version gate: `bd version` must be **≥ 1.1.0** (the `bd dolt` durability
 commands below require it). Older? Stop and report: upgrade with
@@ -92,27 +116,36 @@ bd ready --unassigned           # the claimable queue as of NOW (-u trims
 gh pr list --state open         # what others are building NOW
 ```
 
-Ranking, strict order: (1) priority P0 > P1 > P2 > P3; (2) beads labeled with a
-`critical_labels` entry from `.scaffold/agent-ops.yaml`, if any; (3) work that
-unblocks other beads; (4) fit to your strengths.
+Ranking, strict order over the WHOLE ready queue: (1) priority P0 > P1 > P2 >
+P3; (2) beads labeled with a `critical_labels` entry from
+`.scaffold/agent-ops.yaml`, if any; (3) work that unblocks other beads.
+**Capability fit is a within-tier TIE-BREAKER only — applied AFTER the priority
+sort to separate otherwise-equal candidates, NEVER a pre-filter.** Ranking always
+sees the whole queue, so an out-of-slice P0 is always taken over an in-slice P2.
+Do NOT run `bd ready -l <your-slice>` first with a fallback-when-empty: that is
+exactly the pre-filter that wrongly picks an in-slice P2 over an out-of-slice P0
+(§6.2). (The capability→label mapping is project-specific; a project may ship an
+example in `.scaffold/agent-ops.yaml` — treat an empty/absent mapping as "no
+tie-breaker.")
 
-Hard exclusions — never select:
-- an infrastructure bead: the project's `<prefix>-merge-slot` bead (or
-  anything labeled `gt:slot`) is the merge LOCK, not work — it sits open at
-  P0 whenever the slot is free and an unfiltered claim will happily "claim"
-  it, which holds the global merge lock and blocks every other agent
-- a bead already `in_progress` under another agent, or covered by ANY open/draft PR.
-  (`bd ready` can still list open beads carrying another agent's assignee —
-  those refuse your claim; that is Step 2.1's fallback, not an error.)
-- a bead conflicting with an open PR's surface (same module, same migration
-  sequence, same shared code — see docs/git-workflow.md conflict rules)
+Maintain a per-pass SKIP-SET of bead IDs you have already lost-raced or
+cooldown-released this invocation, and skip them when you re-rank.
 
-Mandatory duplicate-work scan for the top candidate:
-`scripts/setup-agent-worktree.sh --preflight-only --task "<bead title>"`
+Cheap pre-claim exclusions (knowable from the queue view — skip before claiming):
+- the merge-slot infrastructure bead: the project's `<prefix>-merge-slot` bead
+  (or anything labeled `gt:slot`) is the merge LOCK, not work — it sits open at
+  P0 whenever the slot is free, and an unfiltered claim would hold the global
+  merge lock and block every other agent. Exclude it (`--exclude-label gt:slot`).
+- a bead already `in_progress` under another agent (`bd ready --unassigned`
+  trims open-but-assigned beads; a lingering assigned one just refuses your claim
+  at 2.1 — normal traffic, not an error).
 
-Queue drained (or no candidate survives the exclusions) before the budget is
-spent? The batch ends early — go to Step 3 and report
-`queue drained after <k> of N`.
+The expensive gates — duplicate-work scan, open-PR-surface conflict, and
+epic-sibling re-poll — are **validation gates that run AFTER the claim** (Step
+2.1): claim first so the bead is invisible to peers while you evaluate it.
+
+Queue drained (or no candidate survives) before the budget is spent? The batch
+ends early — go to Step 3 and report `queue drained after <k> of N`.
 
 For explicit-ID invocations: topologically sort the listed IDs by dependency
 (blockers first); stop and report if they form a cycle. Before claiming each
@@ -124,23 +157,55 @@ start downstream work whose prerequisite isn't done.
 
 ## Step 2 — Per-bead loop
 
-**2.1 Claim (atomic, from the primary checkout):** claim exactly the bead you
-selected: `bd update <id> --claim` — sets assignee + `in_progress` in one
-atomic round-trip and fails (exit 1, `already claimed by <actor>`) if anyone
-else holds it. **A lost claim is normal traffic at high parallelism, not an
-error: return to Step 1 and take the next candidate.** Never claim by
-editing the status field — it does not detect a concurrent claimant. Fast
-path — only when ANY ready match inside a filter is acceptable and you are
-not applying Step 1's ranking beyond priority (the normal case for a
-materialized plan queue via `--has-metadata-key plan_task_id`; sometimes a
-label scope): `bd ready --claim [filters] --json` selects and claims in one
-call — add `--exclude-label gt:slot` unless the filter already excludes the
-merge-slot bead (Step 1's first hard exclusion) — then run Step 1's
-duplicate-work preflight for the claimed bead before building; if it reveals
-live duplicate work, release (`bd update <id> --status open --assignee ""`)
-and reselect. If the project has build observability (a `.scaffold/`
-directory and the `scaffold` CLI), also
-`scaffold observe event claim --task <id>` — feature-detect and skip silently.
+**2.1 Claim first, then validate (atomic; from the primary checkout).** The bead
+leaves `bd ready` the instant you claim it, so claim FIRST and evaluate it while
+it is invisible to peers — this shrinks the collision window to zero.
+
+a. **Claim** the ranked candidate: `bd update <id> --claim` — one atomic
+   round-trip that sets assignee + `in_progress`, and fails (exit 1,
+   `already claimed by <actor>`) if anyone else holds it. Never claim by editing
+   the status field — a plain write cannot detect a concurrent claimant.
+   - **exit 1 = LOST RACE** (normal traffic at high parallelism, not an error):
+     add the ID to the SKIP-SET and take the next candidate. Do **not** retry it
+     and do **not** defer it — it is another agent's LIVE claim; deferring would
+     sabotage them.
+   - **exit 0 = you hold it.** Immediately stamp a lease (§6.1) so a crash frees
+     it: `bd update <id> --set-metadata lease_until=<now+TTL>` (default TTL 4h —
+     compute an ISO/RFC-3339 UTC timestamp; do NOT use `--defer` for the lease,
+     which would only HIDE the bead instead of releasing it on expiry). Then run
+     the validation gates in (b). If the project has build observability (a
+     `.scaffold/` directory + the `scaffold` CLI), also
+     `scaffold observe event claim --task <id>` — feature-detect, skip silently.
+
+b. **Validation gates** (they read shared state, so they run AFTER the claim):
+   - duplicate-work scan: `scripts/setup-agent-worktree.sh --preflight-only --task "<bead title>"`
+   - open-PR-surface conflict: does any open/draft PR touch the same module,
+     migration sequence, or shared single-writer code? (docs/git-workflow.md)
+   - **epic-sibling re-poll (§6.3 — Window C / semantic-dup defense):** if the
+     bead's parent/epic is under active work, re-poll `gh pr list` (open AND
+     draft) for a PR referencing ANY sibling under the same parent (`bd dep tree`
+     / `bd children <parent>`); a sibling PR on the same surface is a conflict.
+     Re-poll again right before each rebase — siblings can appear mid-flight.
+
+c. **On a gate REJECT** (you hold it, but it is a dup/conflict — a PERSISTENT
+   condition that would reject the next agent too), cooldown-release in ONE
+   command so the whole fleet backs off (prevents a claim→reject→release
+   busy-loop): `bd update <id> --assignee "" --defer +1h --unset-metadata lease_until`.
+   That clears ownership + the lease AND leaves the bead `deferred` (out of
+   `bd ready`) until the cooldown lapses, when it reappears unassigned. Do NOT
+   add `--status open` — it cancels the defer. (Never write `+30m`; `bd` reads
+   `m` as MONTHS → 2029. Use `+1h`/`+6h`/`+1d`.) Add the ID to the SKIP-SET and
+   take the next candidate.
+
+d. **All gates pass → this is your bead.** Go to worktree setup (2.2).
+
+**Generic no-ranking path (§4.2):** for a bare `/work-beads` (or a materialized
+plan queue via `--has-metadata-key plan_task_id`, or a label scope) you MAY
+substitute the one-shot `bd ready --claim [filters] --json` for the
+rank-then-claim of (a) — add `--exclude-label gt:slot`. This changes only HOW the
+candidate is chosen; it does NOT skip validation: the claimed bead still stamps
+the (a) lease, runs the (b) gates, and on reject follows the SAME single-command
+cooldown-release in (c). It still requires a distinct `BEADS_ACTOR`.
 
 **2.2 Worktree:** `scripts/setup-agent-worktree.sh <name> --install --task "<bead title>"`,
 then `cd .worktrees/<name>`. The `--install` flag runs the configured worktree
@@ -153,6 +218,15 @@ TDD); otherwise write the failing test first. Commit and push frequently on
 `agent/<name>`. **Open a draft PR on the first push — the draft is the visible
 claim.** Bead IDs go in commit/PR bodies (`Closes <id>`), never in branch names
 or commit subjects.
+
+**Lease heartbeat (§6.1):** on each push, renew your claim's lease so a live
+agent is never mistaken for a dead one — `bd update <id> --set-metadata
+lease_until=<now+TTL>` (from the primary). A renewed lease stays far beyond the
+reaper's grace margin, so the reaper never even evaluates you as expired; a
+crashed agent stops renewing and its lease lapses, which is what frees the bead.
+A long build with no pushes could let the lease lapse — renew explicitly in 2.6
+before a long-running gate. *([HOST] a project may wire this into a post-push
+hook instead of doing it by hand; the cadence is the host's to bind.)*
 
 **2.4 Docs travel with the PR:** resolve the bead's `docs:` tail and update
 every stale doc in this same PR. Check the project-invariants section of
@@ -268,5 +342,8 @@ If the batch ran long and `launchpad` is installed: `launchpad notify "<summary>
 | Claim by setting the status field | Not atomic — a concurrent claimant goes undetected; `bd update <id> --claim` is the claim |
 | Claim without a per-agent `BEADS_ACTOR` | Same-actor claims are idempotent — two agents sharing the default identity both "own" the bead |
 | Retry a lost claim | Normal traffic at high parallelism — take the next candidate |
-| Reclaim another agent's stranded bead | Surface it in the report; releasing a claim is an operator decision |
+| Validate a bead before claiming it | Claim first — validation reads shared state; holding the claim hides the bead from peers while you decide |
+| Release a rejected bead straight to `--status open` | Persistent dup/conflict → the fleet re-claims/re-rejects it forever; cooldown-release `bd update <id> --assignee "" --defer +1h` instead |
+| Pre-filter the queue to your capability slice | Rank the WHOLE queue; capability fit is a within-tier tie-break only — an out-of-slice P0 beats an in-slice P2 |
+| Reap/release another agent's stranded bead by hand | Surface it in the reaper report; releasing a claim is an `--apply`/operator decision |
 | Bootstrap/reset a populated `.beads` DB | Wipes unpushed beads — fresh clones only; push first (`bd dolt commit && bd dolt push`) |

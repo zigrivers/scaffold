@@ -8,8 +8,9 @@ skip steps.
 
 ```
 set identity once, then repeat up to N times (one bead in flight per agent):
-  refresh view -> select ONE bead -> claim atomically (lost the claim?
-  take the next candidate) -> worktree -> build (draft PR on first push)
+  refresh view -> select ONE bead -> claim atomically, then validate (lost the
+  claim? next candidate; dup/conflict? cooldown-release + next) -> worktree
+  -> build (draft PR on first push; renew lease on each push)
   -> verify (make check) -> review (mmr, 3-round cap) -> squash-merge
   -> sync + prune -> close bead
 batch end (budget spent, queue drained, or P0/blocker): report in the slots
