@@ -412,14 +412,21 @@ configure_identity() {
   ensure_agent_env_excluded
   local env_file="$wt_path/.agent-env"
   if [ ! -f "$env_file" ] || ! grep -q '^export BEADS_ACTOR=' "$env_file" 2>/dev/null; then
-    # Persist the caller's ALREADY-EXPORTED actor verbatim when there is one:
-    # the claim was made under that exact identity, and persisting a rewritten
+    # Persist the caller's ALREADY-EXPORTED actor when there is one: the claim
+    # was made under that exact identity, and persisting a rewritten
     # agent-<name> here would make resume/heartbeat run as a DIFFERENT actor
     # than the one holding the claim. Only when no actor is exported do we
     # fall back to deriving agent-<name>.
-    local actor_val="${BEADS_ACTOR:-agent-$name_val}"
-    printf 'export BEADS_ACTOR=%s\n' "$actor_val" >> "$env_file"
-    log "Wrote BEADS_ACTOR=$actor_val to $env_file (source it in the worktree shell)"
+    #
+    # This file gets SOURCED, so the value must never be written bare: strip
+    # control characters, then single-quote with embedded quotes escaped —
+    # an actor like '$(cmd)' or one with spaces round-trips as literal data
+    # instead of executing or corrupting the restored identity.
+    local actor_val actor_sq
+    actor_val="$(printf '%s' "${BEADS_ACTOR:-agent-$name_val}" | tr -d '[:cntrl:]')"
+    actor_sq="${actor_val//\'/\'\\\'\'}"
+    printf "export BEADS_ACTOR='%s'\n" "$actor_sq" >> "$env_file"
+    log "Wrote BEADS_ACTOR='$actor_val' to $env_file (source it in the worktree shell)"
   fi
 }
 

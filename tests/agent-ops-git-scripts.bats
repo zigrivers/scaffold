@@ -798,7 +798,7 @@ EOF
     bash -c "cd '$CLONE_DIR' && scripts/setup-agent-worktree.sh alpha --bead proj-42"
     run git -C "$CLONE_DIR/.worktrees/alpha" config user.name
     [ "$output" = "agent-alpha" ]
-    grep -q 'BEADS_ACTOR=agent-alpha$' "$CLONE_DIR/.worktrees/alpha/.agent-env"
+    grep -q "BEADS_ACTOR='agent-alpha'\$" "$CLONE_DIR/.worktrees/alpha/.agent-env"
 }
 
 @test "setup: --bead rejects an invalid bead id before any mutation" {
@@ -854,5 +854,16 @@ EOF
     # rewriting it to agent-<name> would desync resume/heartbeats from the claim.
     run bash -c "cd '$CLONE_DIR' && BEADS_ACTOR=worker-123 scripts/setup-agent-worktree.sh alpha --bead proj-9"
     [ "$status" -eq 0 ]
-    grep -q '^export BEADS_ACTOR=worker-123$' "$CLONE_DIR/.worktrees/alpha/.agent-env"
+    grep -q "^export BEADS_ACTOR='worker-123'\$" "$CLONE_DIR/.worktrees/alpha/.agent-env"
+    # sourcing restores the exact identity
+    run bash -c "set -a; . '$CLONE_DIR/.worktrees/alpha/.agent-env'; set +a; echo \$BEADS_ACTOR"
+    [ "$output" = "worker-123" ]
+}
+
+@test "setup: a hostile BEADS_ACTOR is persisted as inert data — sourcing .agent-env executes nothing" {
+    run bash -c "cd '$CLONE_DIR' && BEADS_ACTOR='\$(touch \"$CLONE_DIR/pwned\")' scripts/setup-agent-worktree.sh alpha"
+    [ "$status" -eq 0 ]
+    # sourcing the env file must NOT run the command substitution
+    bash -c "set -a; . '$CLONE_DIR/.worktrees/alpha/.agent-env'; set +a"
+    [ ! -f "$CLONE_DIR/pwned" ]
 }
