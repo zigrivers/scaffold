@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+# {{PROJECT_NAME}} — agent name generator.
+#
+# Usage:
+#   scripts/agent-name.sh            Print a unique agent name (agent-<adjective>-<noun>).
+#   scripts/agent-name.sh --short    Same, without the leading "agent-" (for worktree names).
+#
+# Why a generator instead of "pick a distinctive name": the atomic bead claim
+# (`bd update <id> --claim`) is a compare-and-set KEYED ON THE ACTOR, and
+# same-actor claims are idempotent — two agents that converge on the same name
+# get ZERO collision protection. Agents asked to invent names converge (they
+# sample the same distribution), so unique names need real entropy plus a
+# collision check. The name doubles as the human-readable ownership label in
+# `bd list`, the reaper report, branch names, and git blame.
+#
+# Collision sources checked (all best-effort; a missing tool never blocks):
+#   - assignees of in-progress beads (`bd list --status in_progress --json`)
+#   - actors persisted in .worktrees/*/.agent-env (cwd and the git toplevel)
+#   - local agent/* branches (the <name> segment maps to actor agent-<name>)
+#
+# Read-only: never mutates the repo, the tracker, or the filesystem.
+
+set -euo pipefail
+
+log() { printf "agent-name: %s\n" "$*" >&2; }
+
+ADJECTIVES=(
+  bouncy breezy chunky crispy dapper dizzy feisty fuzzy goofy grumpy
+  jazzy jolly lanky mellow mighty nifty nimble peppy perky plucky
+  quirky rowdy sassy shiny sleepy snazzy soggy sparkly spiffy spunky
+  sturdy swanky toasty turbo wiggly witty wobbly zany zesty zippy
+)
+NOUNS=(
+  badger banjo biscuit burrito cactus donut ferret gecko gizmo hammock
+  kazoo llama mango marmot meerkat mongoose muffin nacho narwhal noodle
+  otter pancake panda pelican pickle pretzel pudding quokka raccoon taco
+  toucan tuba turnip ukulele waffle walrus wombat yeti zebra zucchini
+)
+
+# Entropy: 2 fresh bytes per draw from /dev/urandom. AGENT_NAME_ENTROPY_FILE
+# is a TEST-ONLY hook substituting a fixed byte file (each draw reads from its
+# start, so a constant file yields deterministic picks). An unreadable source
+# falls back to $RANDOM — the generator must always produce a name.
+ENTROPY_SRC="${AGENT_NAME_ENTROPY_FILE:-/dev/urandom}"
+
+rand_index() {
+  local mod="$1" raw=""
+  raw="$(dd if="$ENTROPY_SRC" bs=2 count=1 2>/dev/null | od -An -tu2 | tr -d '[:space:]')" || raw=""
+  [[ -n "$raw" ]] || raw=$((RANDOM * 32768 + RANDOM))
+  printf '%d' $((raw % mod))
+}
+
+# Gather every taken name (one per line) from the best-effort sources.
+taken_names() {
+  # In-progress bead assignees.
+  if command -v bd >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+    bd list --status in_progress --json 2>/dev/null \
+      | jq -r '.[]? | .assignee // empty' 2>/dev/null || true
+  fi
+  # Worktree-persisted actors (cwd and, when inside a repo, the toplevel).
+  local root
+  for root in "." "$(git rev-parse --show-toplevel 2>/dev/null || true)"; do
+    [[ -n "$root" ]] || continue
+    local env_file
+    for env_file in "$root"/.worktrees/*/.agent-env; do
+      [[ -f "$env_file" ]] || continue
+      sed -n 's/^BEADS_ACTOR=//p' "$env_file"
+    done
+  done
+  # Local agent/* branches: agent/<name>[/<bead-id>] → actor agent-<name>.
+  git for-each-ref --format='%(refname:short)' 'refs/heads/agent/*' 2>/dev/null \
+    | awk -F/ 'NF >= 2 { print "agent-" $2 }' || true
+}
+
+main() {
+  local short=0
+  case "${1:-}" in
+    --short) short=1 ;;
+    "") ;;
+    *) printf 'usage: %s [--short]\n' "$0" >&2; exit 1 ;;
+  esac
+
+  local taken candidate adj noun tries=0
+  taken="$(taken_names)"
+
+  while :; do
+    adj="${ADJECTIVES[$(rand_index "${#ADJECTIVES[@]}")]}"
+    noun="${NOUNS[$(rand_index "${#NOUNS[@]}")]}"
+    candidate="agent-$adj-$noun"
+    if ! grep -qxF "$candidate" <<<"$taken"; then
+      break
+    fi
+    tries=$((tries + 1))
+    if [[ "$tries" -ge 10 ]]; then
+      # Persistent collisions: disambiguate with a two-digit suffix instead of
+      # looping forever (the suffix keeps the name inside the [a-z0-9-] grammar).
+      candidate="agent-$adj-$noun-$(printf '%02d' "$(rand_index 100)")"
+      log "wordlist collisions persisted — using suffixed name"
+      break
+    fi
+  done
+
+  if [[ "$short" -eq 1 ]]; then
+    printf '%s\n' "${candidate#agent-}"
+  else
+    printf '%s\n' "$candidate"
+  fi
+}
+
+main "$@"

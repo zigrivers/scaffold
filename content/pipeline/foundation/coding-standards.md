@@ -35,8 +35,9 @@ self-review checklist.
 - (deep) Includes >= 2 runnable code examples per section showing the RIGHT way for the stack
 - (mvp) Commit message format documented: `type(scope): description`
   following conventional commits; if the project uses Beads task tracking,
-  the task ID appears only in the commit body/footer (e.g. `Closes bd-<id>`),
-  never as a subject-line prefix (D7)
+  the task ID leads the subject and the PR title
+  (`bd-<id>: type(scope): description`) and the PR body carries
+  `Closes bd-<id>` — the canonical machine-readable mapping
 - (mvp) AI-specific coding rules section addresses common AI mistakes (dead code,
   duplication, magic numbers, premature abstraction, unnecessary features)
 - (mvp) Linter/formatter configs created and referenced from the document

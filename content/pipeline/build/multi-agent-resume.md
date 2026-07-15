@@ -104,7 +104,7 @@ Recover your context by checking the current state of work:
    - Read `tasks/lessons.md` for relevant anti-patterns
 
 2. **Git state assessment**
-   - `git branch --show-current` — confirm you are on your `agent/<name>` workspace branch (all task work commits directly on it)
+   - `git branch --show-current` — confirm you are on your workspace branch: `agent/<name>/<bead-id>` (bare `agent/<name>` on older setups); all task work commits directly on it
    - `git status` — check for uncommitted changes or staged files
    - `git stash list` — check for stashed work
    - `git log --oneline -5` — review recent commits for context
@@ -319,7 +319,7 @@ stay scoped to materialized plan tasks (`bd ready --claim
 **`git checkout main` fails:**
 - This is expected in a worktree. Recover by rebasing your own branch onto the
   remote: `git fetch origin && git rebase origin/main` — never create a per-task
-  branch; you commit directly on `agent/<name>`.
+  branch; you commit directly on your `agent/<name>/<bead-id>` workspace branch.
 
 **Dependency install fails after cleanup:**
 - `git clean -fd` may have removed generated files — re-run the full install sequence

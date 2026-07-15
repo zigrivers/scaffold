@@ -94,11 +94,13 @@ describe('installAgentOps / checkAgentOps', () => {
     // detect call never drifts against `agent-ops check`).
     // The stale-claim reaper and the bd-claim smoke test install as executable
     // git-component files (Work-Beads Concurrency Hardening §5.2 / §12).
+    // The agent-name generator installs alongside them (Agent Identity §5.1).
     for (const dest of [
       'scripts/primary-checkout-guard.sh',
       'scripts/check-regen-artifacts.sh',
       'scripts/reap-stale-claims.sh',
       'scripts/bd-claim-smoke-test.sh',
+      'scripts/agent-name.sh',
     ]) {
       expect(res.installed).toContain(dest)
       const p = path.join(projectRoot, dest)
@@ -113,6 +115,7 @@ describe('installAgentOps / checkAgentOps', () => {
     expect(manifest.files['scripts/check-regen-artifacts.sh']).toMatch(/^[0-9a-f]{64}$/)
     expect(manifest.files['scripts/reap-stale-claims.sh']).toMatch(/^[0-9a-f]{64}$/)
     expect(manifest.files['scripts/bd-claim-smoke-test.sh']).toMatch(/^[0-9a-f]{64}$/)
+    expect(manifest.files['scripts/agent-name.sh']).toMatch(/^[0-9a-f]{64}$/)
     expect(checkAgentOps(projectRoot).upToDate).toBe(true)
   })
 

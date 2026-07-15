@@ -23,12 +23,12 @@ Expert knowledge for managing git worktrees to enable parallel multi-agent execu
 
 ### Setup
 
-Use `scripts/setup-agent-worktree.sh <agent-name> --install` to create a worktree at `.worktrees/<agent-name>/` (project-local). Each agent gets its own isolated working directory on its own `agent/<name>` branch. The `--install` flag runs the project's configured worktree setup commands (dependency installs); a plain invocation creates the worktree but installs nothing.
+Use `scripts/setup-agent-worktree.sh <agent-name> --install --bead <id>` to create a worktree at `.worktrees/<agent-name>/` (project-local). Each agent gets its own isolated working directory on branch `agent/<name>/<bead-id>` — the bead id as the branch's final segment turns `git branch -r` into a roster of in-flight beads (omit `--bead` for non-bead work and the branch is `agent/<name>`). The `--install` flag runs the project's configured worktree setup commands (dependency installs); a plain invocation creates the worktree but installs nothing.
 
 ### Branching Conventions
 
-- Each agent commits its task work **directly** on its own `agent/<name>` branch — there are no per-task feature branches, and no work-item or bead IDs ever appear in a branch name (reference them in the commit/PR body as `Closes <id>`)
-- Keep `agent/<name>` current by rebasing it onto `origin/main` between beads — never branch from local `main` (it may be stale)
+- Each agent commits its task work **directly** on its own `agent/<name>/<bead-id>` branch — no additional per-task feature branches. The bead ID also leads commit subjects and the PR title (`<bead-id>: …`); the PR body's `Closes <id>` stays the canonical machine mapping
+- Keep the branch current by rebasing it onto `origin/main` while the bead is in flight — never branch from local `main` (it may be stale)
 - Never run `git checkout main` inside a worktree — it will fail because `main` is checked out in the primary repo
 
 ### Cleanup
@@ -72,34 +72,39 @@ Each agent has one persistent branch — `agent/<name>` — that it commits **al
 of its task work to directly. There are no per-task feature branches layered on
 top of it:
 
-- The worktree is created on `agent/<name>`, which tracks `origin/main`
-- Each bead's work is committed straight onto `agent/<name>`; one PR per agent at
+- The worktree is created on `agent/<name>/<bead-id>`, which tracks
+  `origin/main`
+- Each bead's work is committed straight onto that branch; one PR per agent at
   a time carries that work to `main`
-- The bead/task ID never appears in the branch name — it goes in the commit/PR
-  body as `Closes <id>`
+- The bead/task ID ends the branch name and leads commit subjects and the PR
+  title; the PR body's `Closes <id>` is the canonical machine mapping
 
-**Why one branch per worktree (not one per task):**
-- A worktree requires a branch that isn't checked out elsewhere; `agent/<name>`
-  is that branch and it never collides with `main` (checked out in the primary)
-- Committing directly on it keeps the model simple — no branch bookkeeping, no
-  IDs in branch names, nothing to "switch back" to between beads
+**Why one live branch per worktree (not a pile of task branches):**
+- A worktree requires a branch that isn't checked out elsewhere;
+  `agent/<name>/<bead-id>` is that branch and it never collides with `main`
+  (checked out in the primary)
+- Committing directly on it keeps the model simple — no extra branch
+  bookkeeping, nothing to "switch back" to mid-bead; the squash-merge's
+  `--delete-branch` plus `make prune-merged` retire the branch and worktree
+  when the bead finishes, and the next bead gets a fresh
+  `setup-agent-worktree.sh … --bead <next-id>`
 
 ### Branching — Extended
 
-**Starting the next bead on `agent/<name>`:**
+**While a bead is in flight, keep its branch current:**
 
 ```bash
-# Inside the agent's worktree, before starting the next bead
+# Inside the agent's worktree, whenever main advances
 git fetch origin
-git rebase origin/main   # bring agent/<name> up to date; do NOT create a new branch
+git rebase origin/main   # bring the branch up to date; do NOT create a new branch
 ```
 
 **Critical rules:**
-- Rebase `agent/<name>` onto `origin/main` between beads — never branch from
-  local `main` (it may be stale)
-- Commit task work directly on `agent/<name>`; do **not** create per-task
-  branches, and never put a work-item or bead ID in the branch name — reference
-  the task ID in the commit/PR body instead (e.g. `Closes bd-42`)
+- Rebase the workspace branch onto `origin/main` whenever `main` advances —
+  never branch from local `main` (it may be stale)
+- Commit task work directly on the workspace branch; do **not** create extra
+  per-task branches. The bead ID leads the commit subject (`bd-42: …`) and the
+  PR body carries `Closes bd-42` (the canonical machine mapping)
 
 **Never run `git checkout main` in a worktree:**
 - The `main` branch is checked out in the primary repo

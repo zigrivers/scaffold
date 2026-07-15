@@ -54,13 +54,18 @@ all issues found.
   report, and docs/git-workflow.md documents all 8 PR-workflow steps plus
   step 5.5 (`mmr review --pr <N> --sync --format json`) — the two
   enumerations agree rather than compete
-- (mvp) No `bd-<id>` branch-name or commit-subject-prefix convention appears
-  anywhere (CLAUDE.md, AGENTS.md, docs/git-workflow.md,
-  docs/coding-standards.md, docs/beads-workflow.md) — a Beads task ID, when
-  configured, appears only in the commit/PR body as `Closes <id>`
+- (mvp) The traceable-IDs convention is consistent everywhere (CLAUDE.md,
+  AGENTS.md, docs/git-workflow.md, docs/coding-standards.md,
+  docs/beads-workflow.md): a Beads task ID, when configured, leads commit
+  subjects and PR titles as `<bead-id>: `, ends the work branch name, and is
+  referenced in the PR body as `Closes <id>` (the canonical machine mapping).
+  No document still teaches either retired form — the body-only rule ("IDs
+  never in branch names or commit subjects") or the pre-nibble `bd-<id>/<desc>`
+  leading-path-segment + `[bd-<id>]` bracket-prefix convention
 - (mvp) Branch naming is `<type>/<short-desc>` everywhere (worktree
-  workspace branches `agent/<name>`); no document still documents the
-  retired convention of a bead ID as the branch's leading path segment
+  workspace branches `agent/<name>/<bead-id>`, bare `agent/<name>` for
+  non-bead work); the bead ID appears only as the branch's FINAL segment,
+  never its leading one
 - (mvp) No `.github/workflows/` reference is presented as present-tense
   setup — every mention uses deferral language ("when a launch target is
   chosen…"), never "the CI pipeline runs…" or similar
@@ -93,18 +98,19 @@ all issues found.
 - **deep**: Full six-phase audit (inventory, completeness check with all
   sub-checklists, consistency check, gap analysis, recommendations,
   execution). Every workflow step verified in every document, including the
-  D7 branch/commit sweep, the D4 CI-deferral language sweep, and the
+  traceable-IDs branch/commit sweep, the D4 CI-deferral language sweep, and the
   agent-ops.mk ↔ Key Commands parity check.
-- **mvp**: Quick consistency check of commit format, branch naming, the D7
-  sweep (no `bd-<id>` conventions anywhere), the D4 sweep (no present-tense
-  CI setup language), and PR workflow across CLAUDE.md, AGENTS.md, and
+- **mvp**: Quick consistency check of commit format, branch naming, the
+  traceable-IDs sweep (`<bead-id>: ` subject/title prefix + branch-tail id
+  taught consistently; neither retired convention anywhere), the D4 sweep (no
+  present-tense CI setup language), and PR workflow across CLAUDE.md, AGENTS.md, and
   git-workflow.md. Verify AGENTS.md carries `/work-beads` routing and
   CLAUDE.md carries the error-recovery table. Fix obvious contradictions.
 - **custom:depth(1-5)**:
   - Depth 1: AGENTS.md ship-loop summary and CLAUDE.md error-recovery table
     completeness check only.
-  - Depth 2: add commit format and branch naming verification (D7 sweep for
-    `bd-<id>` conventions).
+  - Depth 2: add commit format and branch naming verification (traceable-IDs
+    sweep: `<bead-id>: ` prefix + branch-tail id, no retired conventions).
   - Depth 3: add cross-doc consistency (git-workflow.md, coding-standards.md
     alignment) and the D4 CI-deferral language sweep.
   - Depth 4: add gap analysis (missing steps, stale references,

@@ -783,3 +783,54 @@ EOF
     # …and the ff-only sync still advanced main (the empty commit didn't touch report.html)
     [ "$(git -C "$CLONE_DIR" rev-parse main)" = "$(git -C "$CLONE_DIR" rev-parse origin/main)" ]
 }
+
+# ----- --bead branch suffix (spec: Agent Identity & Bead Traceability §5.2) -----
+
+@test "setup: --bead appends the bead id as the branch's final segment" {
+    run bash -c "cd '$CLONE_DIR' && scripts/setup-agent-worktree.sh alpha --bead proj-42"
+    [ "$status" -eq 0 ]
+    [ -d "$CLONE_DIR/.worktrees/alpha" ]   # worktree dir stays per-agent
+    run git -C "$CLONE_DIR/.worktrees/alpha" branch --show-current
+    [ "$output" = "agent/alpha/proj-42" ]
+}
+
+@test "setup: --bead keeps the actor and identity per-agent (no bead id in them)" {
+    bash -c "cd '$CLONE_DIR' && scripts/setup-agent-worktree.sh alpha --bead proj-42"
+    run git -C "$CLONE_DIR/.worktrees/alpha" config user.name
+    [ "$output" = "agent-alpha" ]
+    grep -q 'BEADS_ACTOR=agent-alpha$' "$CLONE_DIR/.worktrees/alpha/.agent-env"
+}
+
+@test "setup: --bead rejects an invalid bead id before any mutation" {
+    run bash -c "cd '$CLONE_DIR' && scripts/setup-agent-worktree.sh alpha --bead 'Bad_ID!'"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"bead"* ]]
+    [ ! -d "$CLONE_DIR/.worktrees/alpha" ]
+}
+
+@test "setup: --bead requires an argument" {
+    run bash -c "cd '$CLONE_DIR' && scripts/setup-agent-worktree.sh alpha --bead"
+    [ "$status" -ne 0 ]
+}
+
+@test "setup: --bead is idempotent for the same bead" {
+    bash -c "cd '$CLONE_DIR' && scripts/setup-agent-worktree.sh alpha --bead proj-42"
+    run bash -c "cd '$CLONE_DIR' && scripts/setup-agent-worktree.sh alpha --bead proj-42"
+    [ "$status" -eq 0 ]
+    [ "$(git -C "$CLONE_DIR/.worktrees/alpha" branch --show-current)" = "agent/alpha/proj-42" ]
+}
+
+@test "setup: --bead refuses to rebind a live worktree to a different bead's branch" {
+    bash -c "cd '$CLONE_DIR' && scripts/setup-agent-worktree.sh alpha --bead proj-1"
+    run bash -c "cd '$CLONE_DIR' && scripts/setup-agent-worktree.sh alpha --bead proj-2"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"proj-1"* ]]   # names the branch it is still on
+    # the live worktree is untouched
+    [ "$(git -C "$CLONE_DIR/.worktrees/alpha" branch --show-current)" = "agent/alpha/proj-1" ]
+}
+
+@test "setup: legacy no---bead invocation still creates agent/<name> (back-compat)" {
+    run bash -c "cd '$CLONE_DIR' && scripts/setup-agent-worktree.sh legacy"
+    [ "$status" -eq 0 ]
+    [ "$(git -C "$CLONE_DIR/.worktrees/legacy" branch --show-current)" = "agent/legacy" ]
+}

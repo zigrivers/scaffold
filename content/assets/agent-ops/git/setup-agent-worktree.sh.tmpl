@@ -2,13 +2,17 @@
 # {{PROJECT_NAME}} — agent worktree helper.
 #
 # Usage:
-#   scripts/setup-agent-worktree.sh <name> [--task "<description>"] [--install]
+#   scripts/setup-agent-worktree.sh <name> [--task "<description>"] [--install] [--bead <id>]
 #       Create or update .worktrees/<name>/ on branch agent/<name>.
 #       Idempotent: re-running on an existing worktree is safe.
 #       First runs an advisory duplicate-work scan (open/merged PRs + in-progress beads);
 #       --task "<desc>" gives it better keywords than the bare <name>.
 #       --install also runs the project's worktree setup commands (dependency installs, etc.)
 #       inside the fresh worktree. Flags may appear in any order.
+#       --bead <id> appends the bead id to the branch (agent/<name>/<id>) so open
+#       branches show which beads are in flight; the worktree dir and the agent
+#       identity stay per-agent. Refuses to rebind a live worktree that is
+#       checked out on a different bead's branch.
 #
 #   scripts/setup-agent-worktree.sh --preflight-only --task "<description>"
 #       Run only the duplicate-work scan (no worktree created).
@@ -18,7 +22,8 @@
 #
 # Conventions:
 #   - Worktrees live under `.worktrees/<name>/` (gitignored).
-#   - Each worktree's branch is named `agent/<name>` and tracks origin/main initially.
+#   - Each worktree's branch is named `agent/<name>` — or `agent/<name>/<bead-id>`
+#     with --bead — and tracks origin/main initially.
 #   - Each worktree gets a per-name git author identity for traceable blame.
 
 set -euo pipefail
@@ -162,8 +167,10 @@ preflight_scan() {
     # is to key on the PARENT EPIC: when the bead being started has a parent, resolve
     # its siblings (`bd dep tree <id>` / `bd children <parent>`) and raise a HARD
     # warning if ANY sibling already carries an open/draft PR touching the same
-    # surface. The bead↔PR mapping lives in the PR body (branch names exclude bead
-    # IDs), so match sibling IDs against `gh pr list --state open --json title,body`.
+    # surface. The canonical bead↔PR mapping is the PR body ("Closes <id>"); the
+    # PR title and the head branch (agent/<name>/<bead-id>) carry the id
+    # redundantly — so match sibling IDs against
+    # `gh pr list --state open --json title,headRefName,body`.
     # Left as a host TODO because the epic/label taxonomy is project-specific.
   fi
 
@@ -507,13 +514,17 @@ resolve_default_branch() {
 }
 
 cmd_create() {
-  local name="$1" task="$2" install="${3:-0}"
+  local name="$1" task="$2" install="${3:-0}" bead="${4:-}"
   [[ -n "$name" ]] || fatal "name is required"
 
   # Validate name: lowercase + digits + dashes, ≤ 40 chars.
   # Validate name early before performing any repository configuration changes.
   if ! [[ "$name" =~ ^[a-z0-9][a-z0-9-]{0,39}$ ]]; then
     fatal "name must be lowercase alphanumeric/dashes, 1–40 chars (got: '$name')"
+  fi
+  # Validate the bead id with the same grammar, before any mutation.
+  if [[ -n "$bead" ]] && ! [[ "$bead" =~ ^[a-z0-9][a-z0-9-]{0,39}$ ]]; then
+    fatal "--bead id must be lowercase alphanumeric/dashes, 1–40 chars (got: '$bead')"
   fi
 
   # Advisory: warn on likely-duplicate in-flight work before creating the worktree.
@@ -529,11 +540,21 @@ cmd_create() {
   # Verify Git version and enable extensions before any git mutations occur
   ensure_worktree_config_enabled
 
+  # The bead id rides as the branch's FINAL segment so `git branch -r` reads as
+  # a live in-flight-work roster; the worktree dir and identity stay per-agent.
   local branch="agent/$name"
+  [[ -n "$bead" ]] && branch="agent/$name/$bead"
   local wt="$WORKTREE_DIR/$name"
 
   # If the worktree already exists, just refresh tracking and exit.
   if [[ -d "$wt" ]]; then
+    # Never silently rebind a live worktree to another bead's branch: finish or
+    # tear down the current work first (`make prune-merged` after its PR merges).
+    local current_branch
+    current_branch="$(git -C "$wt" branch --show-current 2>/dev/null || true)"
+    if [[ -n "$current_branch" && "$current_branch" != "$branch" ]]; then
+      fatal "worktree $wt is checked out on '$current_branch', not '$branch' — finish that work (or run 'make prune-merged' once its PR merges), or use a different worktree name"
+    fi
     log "Worktree $wt already exists — refreshing branch tracking."
     local default_branch existing_upstream
     default_branch="origin/$(resolve_default_branch)"
@@ -609,7 +630,8 @@ case "${1:-}" in
     shift
     task=""
     install=0
-    # Parse trailing flags in any order: --task "<desc>" and/or --install.
+    bead=""
+    # Parse trailing flags in any order: --task "<desc>", --install, --bead <id>.
     while [[ $# -gt 0 ]]; do
       case "$1" in
         --task)
@@ -622,11 +644,17 @@ case "${1:-}" in
           install=1
           shift
           ;;
+        --bead)
+          [[ $# -ge 2 ]] || fatal "--bead requires a bead id argument"
+          [[ "$2" == --* ]] && fatal "--bead requires a bead id argument, not another flag (got: '$2')"
+          bead="$2"
+          shift 2
+          ;;
         *)
-          fatal "unknown argument: $1 (after name '$name'); supported flags: --task \"<desc>\", --install"
+          fatal "unknown argument: $1 (after name '$name'); supported flags: --task \"<desc>\", --install, --bead <id>"
           ;;
       esac
     done
-    cmd_create "$name" "$task" "$install"
+    cmd_create "$name" "$task" "$install" "$bead"
     ;;
 esac

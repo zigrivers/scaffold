@@ -189,3 +189,15 @@ mirror_show() {
     [[ "$output" == *"INCONCLUSIVE"* ]]
     [ ! -f "$FX/bd-update.log" ]
 }
+
+@test "a bead id carried only in a PR's headRefName still HOLDs the claim (branch-suffix convention)" {
+    # New branch convention agent/<name>/<bead-id>: the reaper's PR guard must
+    # match the head branch too, not just title+body.
+    write_inprogress '[{"id":"proj-branchy","assignee":"agent-a","updated_at":"2026-07-13T12:00:00Z","issue_type":"task"}]'
+    mirror_show proj-branchy '[{"id":"proj-branchy","assignee":"agent-a","updated_at":"2026-07-13T12:00:00Z","issue_type":"task"}]'
+    printf '%s' '[{"number":12,"title":"work","body":"no ids here","isDraft":false,"headRefName":"agent/alpha/proj-branchy"}]' > "$FX/prs.json"
+    run "$FX/reap-stale-claims.sh" --apply
+    [ "$status" -eq 0 ]
+    [ ! -f "$FX/bd-update.log" ]   # protected by the branch name → not reaped
+    [[ "$output" == *"proj-branchy"* ]]
+}
