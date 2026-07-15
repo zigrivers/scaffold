@@ -1,0 +1,240 @@
+#!/usr/bin/env bash
+# {{PROJECT_NAME}} — stale-claim reaper for the Beads work queue.
+# Installed by `scaffold agent-ops install --component git`.
+#
+# Surfaces (and, with --apply, releases) Beads claims that look abandoned, so a
+# crashed agent's `in_progress` bead returns to the queue instead of rotting.
+#
+#   scripts/reap-stale-claims.sh                 # REPORT ONLY (default) — never mutates
+#   scripts/reap-stale-claims.sh --apply         # guarded release of reapable claims
+#
+# Liveness authority (spec: Work-Beads Concurrency Hardening §5.2 / §6.1):
+#   * A claim carries a `lease_until` metadata stamp, renewed on every push.
+#     A live agent's lease is always far in the future, so it is never a candidate.
+#     A lapsed lease (now > lease_until + grace) is the AUTHORITATIVE reap trigger —
+#     correct across crashes AND across machines.
+#   * A claim with NO usable lease (missing/empty, or a stale lease older than the
+#     bead's current claim) falls back to the coarse Tier-2 test: stale by
+#     updated_at AND no open/draft PR references the bead id (a conservative guard,
+#     never proof of liveness).
+#   * Epics are never reaped (umbrellas sit in_progress for days by design).
+#
+# NOTE on the spec's probe (4), the machine-local worktree check: it is intentionally
+# omitted. Under this project's branch-naming convention (bead ids live in the PR
+# BODY, never in branch names — git-workflow §2.2), a live worktree is linkable to a
+# bead ONLY through its PR, so probe (3) — the PR guard — already subsumes it. A bare
+# `git worktree list` probe would add nothing here and is invalid across machines
+# anyway (§5.2). If a future convention puts bead ids on branches, add the probe then.
+#
+# Safety: the release `bd update <id> --status open --assignee ""` is unconditional,
+# so --apply performs a GUARDED release — it re-reads the bead immediately before
+# releasing and ABORTS if the assignee, updated_at, or lease changed since the scan
+# (someone re-claimed/renewed). This shrinks but does NOT close the race (a renewal
+# landing between the re-read and the write still loses); a provably-safe release
+# needs an upstream `bd` fenced/conditional-release primitive. Until then --apply is
+# gated (report-only default) and agents self-heal via lost-claim re-claim on
+# heartbeat. Report-only mode is unattended-safe; --apply is "ask before".
+set -euo pipefail
+
+APPLY=0
+# Reap only leases lapsed by more than this grace margin (seconds). A live agent
+# heartbeats each push, so it is never within a grace margin of expiry.
+GRACE_SECONDS="${REAP_GRACE_SECONDS:-3600}"
+# No-lease fallback: how many hours since updated_at before a claim is "stale".
+STALE_HOURS="${REAP_STALE_HOURS:-24}"
+# [HOST] The PR-lister is pluggable so a project on a non-GitHub forge can swap it.
+# It MUST emit a JSON array with (at least) title and body.
+PR_LIST_CMD="${REAP_PR_LIST_CMD:-gh pr list --state open --limit 500 --json number,title,body,isDraft}"
+# Clock is injectable so tests can pin "now".
+NOW="${REAP_NOW:-$(date +%s)}"
+
+usage() {
+  sed -n '2,/^set -/p' "$0" | sed 's/^# \{0,1\}//; /^set -/d'
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --apply) APPLY=1; shift ;;
+    --dry-run) APPLY=0; shift ;;            # explicit alias of the default
+    --grace) GRACE_SECONDS="${2:?}"; shift 2 ;;
+    --stale-hours) STALE_HOURS="${2:?}"; shift 2 ;;
+    --pr-lister) PR_LIST_CMD="${2:?}"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) printf 'reap: unknown argument: %s\n' "$1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+command -v bd >/dev/null 2>&1 || { echo "reap: bd not found — skipping."; exit 0; }
+command -v jq >/dev/null 2>&1 || { echo "reap: jq not found — cannot parse Beads JSON; skipping."; exit 0; }
+
+# RFC-3339 timestamp → epoch seconds. Accepts a trailing `Z` or a numeric offset,
+# and tolerates fractional seconds (`.NNN`). Tries GNU `date -d` (Linux/CI) then
+# BSD `date -jf` (macOS). Unparseable/empty prints nothing (caller treats it as
+# "unknown" and never reaps on it).
+to_epoch() {
+  local ts="${1:-}"
+  [ -n "$ts" ] || { printf ''; return 0; }
+  # Strip fractional seconds — BSD strptime cannot parse them.
+  ts="$(printf '%s' "$ts" | sed -E 's/\.[0-9]+//')"
+  local e=""
+  e="$(date -u -d "$ts" +%s 2>/dev/null || true)"   # GNU handles Z + offsets directly
+  if [ -z "$e" ]; then
+    e="$(date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$ts" +%s 2>/dev/null || true)"   # BSD, Z form
+  fi
+  if [ -z "$e" ]; then
+    # BSD numeric-offset form: collapse `+HH:MM` → `+HHMM` for %z.
+    local ts2; ts2="$(printf '%s' "$ts" | sed -E 's/([+-][0-9]{2}):([0-9]{2})$/\1\2/')"
+    e="$(date -u -j -f "%Y-%m-%dT%H:%M:%S%z" "$ts2" +%s 2>/dev/null || true)"
+  fi
+  printf '%s' "$e"
+}
+
+STALE_SECONDS=$((STALE_HOURS * 3600))
+
+# Escape ERE metacharacters so a bead id is matched literally.
+regex_escape() { printf '%s' "$1" | sed -E 's/[][(){}.^$*+?|\\]/\\&/g'; }
+
+# Is bead id $1 present as a WHOLE token in text $2? A bead id contains an internal
+# hyphen, and `grep -w` treats `-` as a word boundary, so `grep -Fw proj-abc` wrongly
+# matches `proj-abc-2`. Require the id to be delimited by a non-id char (anything
+# outside [A-Za-z0-9-]) or string edge instead.
+bead_referenced() {
+  local esc; esc="$(regex_escape "$1")"
+  printf '%s' "$2" | grep -Eq "(^|[^A-Za-z0-9-])${esc}([^A-Za-z0-9-]|$)"
+}
+
+# ----- gather open/draft PR references (probe 3) -----
+# read the pluggable command into an array so it word-splits cleanly (no eval).
+read -ra PR_LISTER_ARR <<< "$PR_LIST_CMD"
+pr_ok=1
+pr_lines=""       # one "<title> <body>" line per open/draft PR (for the id test)
+# pr_ok stays 1 ONLY if BOTH the PR command AND the jq parse succeed. A swallowed
+# jq error on malformed output must NOT masquerade as "no PRs" — that would let a
+# PR-protected no-lease claim be reaped. Either failure → pr_ok=0 → hold for triage.
+if pr_raw="$("${PR_LISTER_ARR[@]}" 2>/dev/null)"; then
+  if pr_lines="$(printf '%s' "$pr_raw" | jq -r '.[]? | ((.title // "") + " " + (.body // ""))' 2>/dev/null)"; then
+    pr_ok=1
+  else
+    pr_ok=0
+  fi
+else
+  pr_ok=0
+fi
+
+pr_protects() {  # does any open/draft PR reference this bead id? (probe 3)
+  [ -n "$pr_lines" ] || return 1
+  bead_referenced "$1" "$pr_lines"
+}
+
+# ----- guarded release (spec §5.2, resolves F1 as far as bd primitives allow) -----
+guarded_release() {
+  local id="$1" was_assignee="$2" was_updated="$3"
+  local reread na nu nl nl_epoch
+  reread="$(bd show "$id" --json 2>/dev/null || echo '[]')"
+  na="$(printf '%s' "$reread" | jq -r '(if type=="array" then .[0] else . end) | (.assignee // "")' 2>/dev/null || true)"
+  nu="$(printf '%s' "$reread" | jq -r '(if type=="array" then .[0] else . end) | (.updated_at // "")' 2>/dev/null || true)"
+  nl="$(printf '%s' "$reread" | jq -r '(if type=="array" then .[0] else . end) | (.metadata.lease_until // "")' 2>/dev/null || true)"
+  if [ "$na" != "$was_assignee" ]; then
+    printf 'ABORT     %s  reassigned to %s since scan — not released\n' "$id" "${na:-<none>}"
+    return 0
+  fi
+  if [ "$nu" != "$was_updated" ]; then
+    printf 'ABORT     %s  activity since scan (updated_at moved) — not released\n' "$id"
+    return 0
+  fi
+  nl_epoch="$(to_epoch "$nl")"
+  if [ -n "$nl_epoch" ] && [ "$nl_epoch" -ge "$NOW" ]; then
+    printf 'ABORT     %s  lease renewed into the future since scan — not released\n' "$id"
+    return 0
+  fi
+  # Only the SAME stale claim reaches here. Release + clear the lease.
+  bd update "$id" --status open --assignee "" --unset-metadata lease_until >/dev/null 2>&1
+  printf 'RELEASED  %s  (was %s)\n' "$id" "${was_assignee:-<none>}"
+}
+
+# ----- scan in_progress claims -----
+# A read failure must NOT look like "no abandoned claims" (that would silently
+# disable the recovery path). Distinguish a genuine bd/jq error (warn + exit 1,
+# inconclusive) from a valid empty queue (exit 0).
+if ! inprogress="$(bd list --status in_progress --json 2>/dev/null)"; then
+  echo "reap: WARNING — could not read in_progress claims (bd error); reaper INCONCLUSIVE." >&2
+  exit 1
+fi
+# Parse each bead field-by-field with jq (NOT a delimiter-joined line): tab/whitespace
+# delimiters collapse empty fields under `read`, shifting columns. One compact JSON
+# object per line is unambiguous.
+if ! rows="$(printf '%s' "$inprogress" | jq -c '.[]?' 2>/dev/null)"; then
+  echo "reap: WARNING — could not parse Beads JSON; reaper INCONCLUSIVE." >&2
+  exit 1
+fi
+
+reap_count=0 hold_count=0 live_count=0
+
+if [ "$APPLY" = "1" ]; then
+  echo "reap-stale-claims: --apply (guarded release; report-only is the default)"
+else
+  echo "reap-stale-claims: REPORT ONLY (dry-run) — pass --apply to release (ask-first)"
+fi
+
+while IFS= read -r row; do
+  [ -n "$row" ] || continue
+  id="$(printf '%s' "$row" | jq -r '.id // ""')"
+  [ -n "$id" ] || continue
+  itype="$(printf '%s' "$row" | jq -r '.issue_type // ""')"
+  [ "$itype" = "epic" ] && continue        # never reap an umbrella epic
+  assignee="$(printf '%s' "$row" | jq -r '.assignee // ""')"
+  updated="$(printf '%s' "$row" | jq -r '.updated_at // ""')"
+  lease="$(printf '%s' "$row" | jq -r '.metadata.lease_until // ""')"
+
+  lease_epoch="$(to_epoch "$lease")"
+  updated_epoch="$(to_epoch "$updated")"
+
+  # A lease governs this claim only if it is this claim's lease: present and not
+  # older than the bead's current activity (F6 — a lease stamped before the
+  # current claim is stale and ignored).
+  is_lease=0
+  if [ -n "$lease_epoch" ]; then
+    if [ -z "$updated_epoch" ] || [ "$lease_epoch" -ge "$updated_epoch" ]; then
+      is_lease=1
+    fi
+  fi
+
+  verdict="" reason=""
+  if [ "$is_lease" = "1" ]; then
+    # Lease is authoritative; the PR probe is not consulted (it would reintroduce
+    # the crashed-with-stale-PR false negative).
+    if [ "$NOW" -le $((lease_epoch + GRACE_SECONDS)) ]; then
+      live_count=$((live_count + 1)); continue          # lease live (within grace)
+    fi
+    verdict="REAP"; reason="lease lapsed at ${lease} (>${GRACE_SECONDS}s grace)"
+  else
+    # No usable lease → coarse Tier-2 fallback. Missing/unknown updated_at or a
+    # not-yet-stale claim is treated as freshly claimed (F6) — never reaped.
+    if [ -z "$updated_epoch" ] || [ "$NOW" -le $((updated_epoch + STALE_SECONDS)) ]; then
+      live_count=$((live_count + 1)); continue
+    fi
+    if [ "$pr_ok" != "1" ]; then
+      verdict="HOLD"; reason="stale ${STALE_HOURS}h+, no lease; PR check unavailable — left for triage"
+    elif pr_protects "$id"; then
+      verdict="HOLD"; reason="stale ${STALE_HOURS}h+, no lease; open/draft PR references it — left for triage"
+    else
+      verdict="REAP"; reason="stale ${STALE_HOURS}h+, no lease, no open/draft PR"
+    fi
+  fi
+
+  if [ "$verdict" = "REAP" ]; then
+    reap_count=$((reap_count + 1))
+    if [ "$APPLY" = "1" ]; then
+      guarded_release "$id" "$assignee" "$updated"
+    else
+      printf 'REAP      %s  assignee=%s  %s\n' "$id" "${assignee:-<none>}" "$reason"
+    fi
+  else
+    hold_count=$((hold_count + 1))
+    printf 'HOLD      %s  assignee=%s  %s\n' "$id" "${assignee:-<none>}" "$reason"
+  fi
+done <<< "$rows"
+
+printf 'summary: %s reapable, %s held-for-triage, %s live\n' "$reap_count" "$hold_count" "$live_count"
+# Report-only mode is advisory and always exits 0 (agents run it during orient).
+exit 0

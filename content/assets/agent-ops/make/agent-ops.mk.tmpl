@@ -1,11 +1,14 @@
 # agent-ops.mk — installed by `scaffold agent-ops install`. Do not edit; re-run
 # the installer to update. Targets marked [agent-safe] may run unattended.
 
-.PHONY: main-sync prune-merged doctor doctor-fix beads-snapshot \
+.PHONY: main-sync prune-merged doctor doctor-fix beads-snapshot reap-stale-claims \
         staging-up staging-down staging-shared-down staging-prune docker-doctor tc-reap
 
 main-sync: ## [agent-safe] Fetch + fast-forward main from anywhere
 	@scripts/main-sync.sh
+
+reap-stale-claims: ## [agent-safe] Report abandoned Beads claims (ARGS=--apply to release, ask-first)
+	@scripts/reap-stale-claims.sh $(ARGS)
 
 prune-merged: ## [agent-safe] Sweep merged branches/worktrees + reclaim staging
 	@scripts/cleanup-merged-branches.sh $(ARGS)

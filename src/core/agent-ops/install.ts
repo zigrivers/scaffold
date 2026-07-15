@@ -42,6 +42,16 @@ export const AGENT_OPS_FILE_MAP: Record<string, AgentOpsFileSpec> = {
     component: 'git',
     executable: true,
   },
+  'git/reap-stale-claims.sh.tmpl': {
+    dest: 'scripts/reap-stale-claims.sh',
+    component: 'git',
+    executable: true,
+  },
+  'git/bd-claim-smoke-test.sh.tmpl': {
+    dest: 'scripts/bd-claim-smoke-test.sh',
+    component: 'git',
+    executable: true,
+  },
   'make/agent-ops.mk.tmpl': { dest: 'agent-ops.mk', component: 'git', executable: false },
   'staging/staging-env.sh.tmpl': {
     dest: 'scripts/ops/staging-env.sh',

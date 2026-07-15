@@ -157,6 +157,14 @@ preflight_scan() {
         break
       fi
     done
+    # TODO(host — epic-sibling hardening, Work-Beads Concurrency Hardening §6.3):
+    # this keyword scan is the FLOOR. The stronger, semantic-dup (Window C) defense
+    # is to key on the PARENT EPIC: when the bead being started has a parent, resolve
+    # its siblings (`bd dep tree <id>` / `bd children <parent>`) and raise a HARD
+    # warning if ANY sibling already carries an open/draft PR touching the same
+    # surface. The bead↔PR mapping lives in the PR body (branch names exclude bead
+    # IDs), so match sibling IDs against `gh pr list --state open --json title,body`.
+    # Left as a host TODO because the epic/label taxonomy is project-specific.
   fi
 
   if [[ $found -eq 1 ]]; then
@@ -377,6 +385,29 @@ configure_identity() {
   git -C "$wt_path" config --worktree user.email "agent-$name_val@{{PROJECT_NAME}}.local" || fatal "Failed to set worktree-local email config at: $wt_path"
   git -C "$wt_path" config --worktree user.name  "agent-$name_val" || fatal "Failed to set worktree-local name config at: $wt_path"
   log "Set worktree-local git identity: agent-$name_val <agent-$name_val@{{PROJECT_NAME}}.local>"
+
+  # [HOST binding — T1-ACTOR, Work-Beads Concurrency Hardening §4.3] Per-agent
+  # Beads actor. `bd update <id> --claim` is a compare-and-set KEYED ON THE ACTOR,
+  # and same-actor claims are idempotent (both "win"), so every agent MUST carry a
+  # DISTINCT actor or the atomic claim gives ZERO collision protection. Write
+  # BEADS_ACTOR=agent-<name> into a worktree-local `.agent-env` so every `bd` write
+  # from this worktree is attributable to this agent. This is PERSISTENCE only: a
+  # child script cannot export into the caller's shell, so the agent must
+  # `set -a; . ./.agent-env; set +a` after cd-ing in. It does NOT cover the FIRST
+  # claim, which the work-beads loop makes from the primary checkout BEFORE this
+  # worktree exists — that claim relies on BEADS_ACTOR already exported in the
+  # agent's shell (see SKILL.md Step 0).
+  #
+  # TODO(host): if this project ships a `bd` wrapper that pins bd's cwd to the
+  # primary checkout, make the wrapper `source` this file (or otherwise PRESERVE
+  # BEADS_ACTOR) so the actor survives the `cd` — env is inherited across `cd`, so
+  # the wrapper only has to avoid OVERRIDING it.
+  ensure_agent_env_excluded
+  local env_file="$wt_path/.agent-env"
+  if [ ! -f "$env_file" ] || ! grep -q '^export BEADS_ACTOR=' "$env_file" 2>/dev/null; then
+    printf 'export BEADS_ACTOR=agent-%s\n' "$name_val" >> "$env_file"
+    log "Wrote BEADS_ACTOR=agent-$name_val to $env_file (source it in the worktree shell)"
+  fi
 }
 
 # Ensure `.worktrees/` is ignored so a project-local worktree checkout is never accidentally
@@ -399,6 +430,22 @@ ensure_worktrees_gitignored() {
     fi
     printf '# Git worktrees ({{PROJECT_NAME}} parallel agents)\n.worktrees/\n' >> "$exclude_file"
     log "Ignored .worktrees/ via $exclude_file (repo-local, uncommitted). To share it, commit '.worktrees/' to .gitignore."
+  fi
+}
+
+# Keep the per-worktree `.agent-env` (BEADS_ACTOR) file out of `git status` in EVERY
+# worktree. info/exclude lives in the shared common git dir, so one entry covers all
+# linked worktrees (a linked worktree's status is relative to its own root, where the
+# `.worktrees/` pattern does NOT match). Idempotent; skipped if already ignored.
+ensure_agent_env_excluded() {
+  if ! git -C "$REPO_ROOT" check-ignore -q .agent-env 2>/dev/null; then
+    local exclude_file="$COMMON_DIR/info/exclude"
+    mkdir -p "$(dirname "$exclude_file")"
+    if [ -f "$exclude_file" ] && [ -s "$exclude_file" ] && [ "$(tail -c1 "$exclude_file")" != "" ]; then
+      printf '\n' >> "$exclude_file"
+    fi
+    printf '# Per-agent Beads actor env ({{PROJECT_NAME}} worktrees)\n.agent-env\n' >> "$exclude_file"
+    log "Ignored .agent-env via $exclude_file (repo-local, uncommitted)."
   fi
 }
 

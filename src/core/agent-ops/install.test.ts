@@ -92,7 +92,14 @@ describe('installAgentOps / checkAgentOps', () => {
     // The primary-checkout write-guard and the main-sync stray-artifact detector
     // install as executable git-component files (manifest-tracked, so main-sync's
     // detect call never drifts against `agent-ops check`).
-    for (const dest of ['scripts/primary-checkout-guard.sh', 'scripts/check-regen-artifacts.sh']) {
+    // The stale-claim reaper and the bd-claim smoke test install as executable
+    // git-component files (Work-Beads Concurrency Hardening §5.2 / §12).
+    for (const dest of [
+      'scripts/primary-checkout-guard.sh',
+      'scripts/check-regen-artifacts.sh',
+      'scripts/reap-stale-claims.sh',
+      'scripts/bd-claim-smoke-test.sh',
+    ]) {
       expect(res.installed).toContain(dest)
       const p = path.join(projectRoot, dest)
       expect(fs.existsSync(p)).toBe(true)
@@ -104,6 +111,8 @@ describe('installAgentOps / checkAgentOps', () => {
     expect(manifest.files['scripts/setup-agent-worktree.sh']).toMatch(/^[0-9a-f]{64}$/)
     expect(manifest.files['scripts/primary-checkout-guard.sh']).toMatch(/^[0-9a-f]{64}$/)
     expect(manifest.files['scripts/check-regen-artifacts.sh']).toMatch(/^[0-9a-f]{64}$/)
+    expect(manifest.files['scripts/reap-stale-claims.sh']).toMatch(/^[0-9a-f]{64}$/)
+    expect(manifest.files['scripts/bd-claim-smoke-test.sh']).toMatch(/^[0-9a-f]{64}$/)
     expect(checkAgentOps(projectRoot).upToDate).toBe(true)
   })
 
