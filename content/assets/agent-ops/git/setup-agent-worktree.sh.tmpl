@@ -543,6 +543,11 @@ cmd_create() {
     if ! [[ "$bead" =~ ^[a-z0-9][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)*$ ]] || [[ "${#bead}" -gt 40 ]]; then
       fatal "--bead id must be lowercase alphanumeric/dashes with optional dot-separated segments, 1–40 chars (got: '$bead')"
     fi
+    # git refuses any ref component ending in .lock — catch it here so the
+    # advertised pre-mutation validation holds instead of failing mid-create.
+    if [[ "$bead" == *.lock ]]; then
+      fatal "--bead id may not end in '.lock' (git rejects such ref names; got: '$bead')"
+    fi
   fi
 
   # Advisory: warn on likely-duplicate in-flight work before creating the worktree.

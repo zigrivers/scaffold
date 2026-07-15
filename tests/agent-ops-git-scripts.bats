@@ -841,8 +841,8 @@ EOF
     [ "$(git -C "$CLONE_DIR/.worktrees/alpha" branch --show-current)" = "agent/alpha/bd-a3f8.1" ]
 }
 
-@test "setup: --bead rejects malformed dot forms (leading/trailing/consecutive)" {
-    for bad in '.proj-1' 'proj-1.' 'proj-1..2'; do
+@test "setup: --bead rejects malformed dot forms (leading/trailing/consecutive/.lock)" {
+    for bad in '.proj-1' 'proj-1.' 'proj-1..2' 'proj.lock'; do
         run bash -c "cd '$CLONE_DIR' && scripts/setup-agent-worktree.sh alpha --bead '$bad'"
         [ "$status" -ne 0 ]
         [ ! -d "$CLONE_DIR/.worktrees/alpha" ]

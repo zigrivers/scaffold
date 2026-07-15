@@ -110,8 +110,12 @@ The full benefit list:
 - New optional flag on `create` (the default subcommand): branch becomes
   `agent/<name>/<bead-id>`; everything else (worktree dir, `.agent-env` actor,
   identity, installs) is unchanged.
-- `<bead-id>` validated against the existing name grammar
-  (`^[a-z0-9][a-z0-9-]{0,39}$`).
+- `<bead-id>` validated before any mutation:
+  `^[a-z0-9][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)*$`, ≤ 40 chars, and not ending
+  in `.lock` — dots are allowed between segments because Beads emits
+  hierarchical child ids (`bd-a3f8.1`), while leading/trailing/consecutive
+  dots and `.lock` endings would make an invalid git ref. *(Revised during
+  review R1/R5: originally the dot-free worktree-name grammar.)*
 - Existing-worktree refresh path: if `.worktrees/<name>` exists but is checked
   out on a different branch than the computed one, fail loudly with guidance
   (finish/teardown or `make prune-merged` first) — never silently rebind a live
