@@ -57,21 +57,32 @@ taken_names() {
     bd list --status in_progress --json 2>/dev/null \
       | jq -r '.[]? | .assignee // empty' 2>/dev/null || true
   fi
-  # Worktree-persisted actors (cwd and, when inside a repo, the toplevel).
-  local root
-  for root in "." "$(git rev-parse --show-toplevel 2>/dev/null || true)"; do
+  # Worktree-persisted actors: scan the cwd, the current toplevel, AND the
+  # PRIMARY checkout root — from inside a worktree, --show-toplevel is the
+  # worktree itself, and sibling worktrees' .agent-env files live under the
+  # primary root's .worktrees/ (derived via --git-common-dir).
+  local root common primary=""
+  common="$(git rev-parse --git-common-dir 2>/dev/null || true)"
+  if [[ -n "$common" ]]; then
+    primary="$(cd "$common/.." 2>/dev/null && pwd || true)"
+  fi
+  for root in "." "$(git rev-parse --show-toplevel 2>/dev/null || true)" "$primary"; do
     [[ -n "$root" ]] || continue
     local env_file
     for env_file in "$root"/.worktrees/*/.agent-env; do
       [[ -f "$env_file" ]] || continue
-      # tr strips optional quoting (BEADS_ACTOR="agent-x") — the actor grammar
-      # itself never contains quotes, so this is lossless.
-      sed -n 's/^BEADS_ACTOR=//p' "$env_file" | tr -d "'\""
+      # setup-agent-worktree persists the sourceable `export BEADS_ACTOR=...`
+      # form, so the pattern accepts an optional `export `. tr strips optional
+      # quoting (BEADS_ACTOR="agent-x") — the actor grammar itself never
+      # contains quotes, so this is lossless.
+      sed -n -E 's/^(export[[:space:]]+)?BEADS_ACTOR=//p' "$env_file" | tr -d "'\""
     done
   done
-  # Local agent/* branches: agent/<name>[/<bead-id>] → actor agent-<name>.
-  git for-each-ref --format='%(refname:short)' 'refs/heads/agent/*' 2>/dev/null \
-    | awk -F/ 'NF >= 2 { print "agent-" $2 }' || true
+  # Local AND remote-tracking agent/* branches: agent/<name>[/<bead-id>] →
+  # actor agent-<name>. Remote refs cover concurrent agents on other machines
+  # whose branches were fetched but never checked out here.
+  git for-each-ref --format='%(refname)' 'refs/heads/agent/*' 'refs/remotes/*/agent/*' 2>/dev/null \
+    | sed -n -E 's#.*/agent/([^/]+).*#agent-\1#p' || true
 }
 
 main() {

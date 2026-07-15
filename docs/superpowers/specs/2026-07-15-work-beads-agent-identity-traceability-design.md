@@ -46,7 +46,7 @@ So the reversal is additive: no consumer of the old convention breaks.
 
 | # | Decision |
 |---|---|
-| N1 | Ship a name generator (`scripts/agent-name.sh`) in the agent-ops git component: `agent-<adjective>-<noun>` from curated funny wordlists, `/dev/urandom` entropy, collision-checked, numeric-suffix fallback. The skill's Step 0 uses it when present; self-invented names remain the fallback. |
+| N1 | Ship a name generator (`scripts/agent-name.sh`) in the agent-ops git component: `agent-<adjective>-<noun>-<NN>` from curated funny wordlists + an ALWAYS-PRESENT two-digit suffix (`/dev/urandom` entropy, collision-checked, fail-closed when no unused name can be proven). The suffix is unconditional — 40×40 words alone leave a real birthday-collision chance for a fleet starting concurrently, before any claim is visible to the collision check; the suffix widens the space to ~160k. The skill's Step 0 uses it when present; self-invented names remain the fallback. *(Revised during review R2/R3: originally suffix-on-collision-only; also gained fail-closed exhaustion.)* |
 | N2 | Commit subjects on the work branch AND the PR title begin `<bead-id>: `. The PR title is the load-bearing half: under `gh pr merge --squash` the PR title becomes the commit subject on main, so `git log --oneline` on main shows the bead per commit. PR body keeps `Closes <id>` (canonical). |
 | N3 | Work branches become `agent/<name>/<bead-id>` via a new `--bead <id>` flag on `setup-agent-worktree.sh`. Worktree directory (`.worktrees/<name>`) and Beads actor (`agent-<name>`) are unchanged — the actor stays stable per agent across beads while each bead gets a unique branch. Without `--bead` the legacy `agent/<name>` behavior is preserved. |
 | N4 | The stale-claim reaper's PR guard also matches `headRefName` (branch names now carry bead IDs). Additive only — it can only HOLD more, never reap more. |
@@ -89,13 +89,18 @@ The full benefit list:
 
 - Wordlists baked into the script: ~40 adjectives × ~40 nouns, lowercase
   `[a-z]`, kid-safe, deliberately silly (`turbo`, `soggy`, `waffle`, `banjo`,
-  `walrus`, `pickle`, …). Output: `agent-<adj>-<noun>` (fits the existing
-  `^[a-z0-9][a-z0-9-]*$` name grammar everywhere).
-- Entropy from `/dev/urandom` (via `od`), not `$RANDOM`.
+  `walrus`, `pickle`, …). Output: `agent-<adj>-<noun>-<NN>` — the two-digit
+  suffix is unconditional (see revised N1) and the name fits the existing
+  `^[a-z0-9][a-z0-9-]*$` grammar everywhere.
+- Entropy from `/dev/urandom` (via `dd`+`od`), not `$RANDOM`.
 - Collision check (all best-effort, feature-detected): in-progress assignees
   (`bd list --status in_progress --json` + jq), actors persisted in
-  `.worktrees/*/.agent-env`, and local `agent/*` branch name segments. On
-  collision resample up to 10×, then append two random digits.
+  `.worktrees/*/.agent-env` (cwd, toplevel, AND the primary root via
+  `--git-common-dir` so it works from inside a worktree; accepts the
+  `export`-prefixed sourceable form), and local + remote-tracking `agent/*`
+  branch name segments. On collision resample up to 10×, then walk every
+  suffix of the last word pair, checking each; if NO unused name can be
+  proven, FAIL CLOSED (exit 1) rather than emit a known collision.
 - Prints the bare name (`agent-turbo-walrus`) to stdout; diagnostic chatter to
   stderr. `--short` prints without the `agent-` prefix (for worktree names).
 - No arguments required; never mutates anything.

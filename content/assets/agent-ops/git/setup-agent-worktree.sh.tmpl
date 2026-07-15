@@ -412,8 +412,14 @@ configure_identity() {
   ensure_agent_env_excluded
   local env_file="$wt_path/.agent-env"
   if [ ! -f "$env_file" ] || ! grep -q '^export BEADS_ACTOR=' "$env_file" 2>/dev/null; then
-    printf 'export BEADS_ACTOR=agent-%s\n' "$name_val" >> "$env_file"
-    log "Wrote BEADS_ACTOR=agent-$name_val to $env_file (source it in the worktree shell)"
+    # Persist the caller's ALREADY-EXPORTED actor verbatim when there is one:
+    # the claim was made under that exact identity, and persisting a rewritten
+    # agent-<name> here would make resume/heartbeat run as a DIFFERENT actor
+    # than the one holding the claim. Only when no actor is exported do we
+    # fall back to deriving agent-<name>.
+    local actor_val="${BEADS_ACTOR:-agent-$name_val}"
+    printf 'export BEADS_ACTOR=%s\n' "$actor_val" >> "$env_file"
+    log "Wrote BEADS_ACTOR=$actor_val to $env_file (source it in the worktree shell)"
   fi
 }
 

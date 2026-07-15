@@ -219,9 +219,13 @@ the (a) lease, runs the (b) gates, and on reject follows the SAME single-command
 cooldown-release in (c). It still requires a distinct `BEADS_ACTOR`.
 
 **2.2 Worktree:** `scripts/setup-agent-worktree.sh <name> --install --task "<bead title>" --bead <id>`
-with `<name>` = your existing actor minus the prefix (`${BEADS_ACTOR#agent-}` —
-never a fresh `agent-name.sh` call here, which would mint a DIFFERENT name and
-desync the worktree from your claims), then `cd .worktrees/<name>`. The `--install` flag runs the
+with `<name>` = your existing actor minus any `agent-` prefix
+(`${BEADS_ACTOR#agent-}` — never a fresh `agent-name.sh` call here, which would
+mint a DIFFERENT name and desync the worktree from your claims), then
+`cd .worktrees/<name>`. The setup script persists your exported `BEADS_ACTOR`
+into the worktree's `.agent-env` VERBATIM (only deriving `agent-<name>` when
+none is exported), so resume and heartbeats always run as the same actor that
+made the claim. The `--install` flag runs the
 configured worktree setup commands (dependency installs) — omitting it is a
 known `make check` breaker, because a plain invocation creates the worktree but
 installs nothing. `--bead <id>` puts the bead id on the branch (below); an
@@ -237,7 +241,7 @@ claim.** Bead traceability (every surface a human scans leads with the id):
   read as the roster of in-flight beads.
 - **Commit subjects** start with the bead id, then the project's normal
   Conventional-Commits subject — `<bead-id>: type(scope): subject`
-  (e.g. `proj-42: feat(api): add webhook rate limiter`).
+  (e.g. `bd-a3f8: feat(api): add webhook rate limiter`).
 - **PR title** starts with `<bead-id>: ` too — the squash-merge subject comes
   from the PR title, so this is what makes bead ids visible in
   `git log --oneline` on main.

@@ -63,11 +63,11 @@ EOF
     [[ "$output" =~ ^agent-[a-z]+-[a-z]+-[0-9]{2}$ ]]
 }
 
-@test "avoids an actor persisted in a worktree .agent-env" {
+@test "avoids an actor persisted in a worktree .agent-env (sourceable export form)" {
     local first
     first="$(AGENT_NAME_ENTROPY_FILE="$ZERO_ENTROPY" "$FX/agent-name.sh")"
     mkdir -p "$FX/repo/.worktrees/old-agent"
-    printf 'BEADS_ACTOR=%s\n' "$first" > "$FX/repo/.worktrees/old-agent/.agent-env"
+    printf 'export BEADS_ACTOR=%s\n' "$first" > "$FX/repo/.worktrees/old-agent/.agent-env"
     run env AGENT_NAME_ENTROPY_FILE="$ZERO_ENTROPY" bash -c "cd '$FX/repo' && '$FX/agent-name.sh'"
     [ "$status" -eq 0 ]
     [ "$output" != "$first" ]
@@ -97,7 +97,7 @@ EOF
     local first
     first="$(AGENT_NAME_ENTROPY_FILE="$ZERO_ENTROPY" "$FX/agent-name.sh")"
     mkdir -p "$FX/repo2/.worktrees/old"
-    printf 'BEADS_ACTOR="%s"\n' "$first" > "$FX/repo2/.worktrees/old/.agent-env"
+    printf 'export BEADS_ACTOR="%s"\n' "$first" > "$FX/repo2/.worktrees/old/.agent-env"
     run env AGENT_NAME_ENTROPY_FILE="$ZERO_ENTROPY" bash -c "cd '$FX/repo2' && '$FX/agent-name.sh'"
     [ "$status" -eq 0 ]
     [ "$output" != "$first" ]

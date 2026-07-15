@@ -848,3 +848,11 @@ EOF
         [ ! -d "$CLONE_DIR/.worktrees/alpha" ]
     done
 }
+
+@test "setup: persists an already-exported BEADS_ACTOR verbatim into .agent-env" {
+    # The claim was made under this exact identity BEFORE the worktree existed —
+    # rewriting it to agent-<name> would desync resume/heartbeats from the claim.
+    run bash -c "cd '$CLONE_DIR' && BEADS_ACTOR=worker-123 scripts/setup-agent-worktree.sh alpha --bead proj-9"
+    [ "$status" -eq 0 ]
+    grep -q '^export BEADS_ACTOR=worker-123$' "$CLONE_DIR/.worktrees/alpha/.agent-env"
+}
