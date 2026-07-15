@@ -2,6 +2,44 @@
 
 All notable changes to Scaffold are documented here.
 
+## [3.45.0] - 2026-07-15
+
+### Added
+
+- **Stale-claim reaper for parallel-agent Beads queues.** The `agent-ops` git
+  component now installs `scripts/reap-stale-claims.sh` (plus a `make
+  reap-stale-claims` target). It surfaces `in_progress` beads whose claim looks
+  abandoned — **report-only by default**; `--apply` performs a guarded release
+  (re-reads the bead and aborts if the assignee, `updated_at`, or lease changed
+  since the scan). Liveness is authoritative on a renewable `lease_until` claim
+  lease (correct across crashes and across machines); a no-lease claim falls back
+  to a conservative "stale AND no open/draft PR references it" test, and epics are
+  never reaped. A read/parse failure reports **inconclusive** rather than a silent
+  "all clear".
+- **`bd`-claim smoke test.** The git component also installs
+  `scripts/bd-claim-smoke-test.sh`, which self-verifies — against a throwaway temp
+  DB, never the project's real one — that the installed `bd` supports the atomic
+  claim protocol (actor-keyed `--claim`, `--assignee ""` release, single-command
+  cooldown defer, `lease_until` metadata, `bd ready --claim`) before the fleet
+  relies on it.
+
+### Changed
+
+- **`work-beads` skill hardened against concurrent same-bead pickup.** The
+  canonical skill now claims **before** it validates — the bead leaves `bd ready`
+  the instant it is claimed, closing the old select→claim race — and:
+  cooldown-releases a rejected candidate in one command
+  (`bd update <id> --assignee "" --defer +1h`, never `--status open`, which would
+  cancel the defer); stamps and heartbeats a `lease_until` claim lease with
+  agent-side lost-claim re-claim, so a wrongful reap self-heals; makes a distinct
+  per-agent `BEADS_ACTOR` a hard, fail-loud prerequisite (same-actor claims are
+  idempotent, so a shared identity gives zero collision protection); treats
+  capability fit as a within-tier tie-breaker over the full ranked queue, never a
+  pre-filter (an out-of-slice P0 always beats an in-slice P2); and re-polls
+  epic-sibling PRs to catch semantic duplicates. The worktree bootstrap writes the
+  per-agent `BEADS_ACTOR` into a git-ignored `.agent-env`. Backward-compatible:
+  un-upgraded skill copies keep working (they just keep the old race).
+
 ## [3.44.0] - 2026-07-14
 
 ### Added
