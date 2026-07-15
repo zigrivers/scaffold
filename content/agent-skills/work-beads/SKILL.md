@@ -221,8 +221,9 @@ the (a) lease, runs the (b) gates, and on reject follows the SAME single-command
 cooldown-release in (c). It still requires a distinct `BEADS_ACTOR`.
 
 **2.2 Worktree:** `scripts/setup-agent-worktree.sh <name> --install --task "<bead title>" --bead <id>`
-(`<name>` = your actor without the `agent-` prefix — `scripts/agent-name.sh
---short` prints it), then `cd .worktrees/<name>`. The `--install` flag runs the
+with `<name>` = your existing actor minus the prefix (`${BEADS_ACTOR#agent-}` —
+never a fresh `agent-name.sh` call here, which would mint a DIFFERENT name and
+desync the worktree from your claims), then `cd .worktrees/<name>`. The `--install` flag runs the
 configured worktree setup commands (dependency installs) — omitting it is a
 known `make check` breaker, because a plain invocation creates the worktree but
 installs nothing. `--bead <id>` puts the bead id on the branch (below); an
