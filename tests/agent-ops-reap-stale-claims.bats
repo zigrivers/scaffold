@@ -168,3 +168,24 @@ mirror_show() {
     [ -f "$FX/bd-update.log" ]
     grep -q 'proj-ab' "$FX/bd-update.log"   # not protected by proj-abcd → reaped
 }
+
+@test "pr_protects is exact even for a HYPHEN-suffix id (proj-abc not protected by proj-abc-2)" {
+    # grep -Fw treats '-' as a word boundary, so it would wrongly match proj-abc
+    # inside proj-abc-2. The exact-token match must not.
+    write_inprogress '[{"id":"proj-abc","assignee":"agent-a","updated_at":"2026-07-13T12:00:00Z","issue_type":"task"}]'
+    mirror_show proj-abc '[{"id":"proj-abc","assignee":"agent-a","updated_at":"2026-07-13T12:00:00Z","issue_type":"task"}]'
+    printf '%s' '[{"number":9,"title":"work","body":"Closes proj-abc-2","isDraft":false}]' > "$FX/prs.json"
+    run "$FX/reap-stale-claims.sh" --apply
+    [ "$status" -eq 0 ]
+    [ -f "$FX/bd-update.log" ]
+    grep -q 'proj-abc' "$FX/bd-update.log"   # proj-abc-2 does not protect proj-abc → reaped
+}
+
+@test "scan failure is INCONCLUSIVE (exit 1 + warning), not a silent zero-candidate pass (R2-F1)" {
+    # bd list returns unparseable JSON — the reaper must not report 'all clear'.
+    printf '%s' 'not valid json {' > "$FX/inprogress.json"
+    run "$FX/reap-stale-claims.sh"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"INCONCLUSIVE"* ]]
+    [ ! -f "$FX/bd-update.log" ]
+}

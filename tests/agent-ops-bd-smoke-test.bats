@@ -16,11 +16,13 @@ setup() {
 
 teardown() { rm -rf "$WORK"; }
 
-@test "bd-claim smoke test PASSes against the installed bd (skips if bd absent)" {
+@test "bd-claim smoke test PASSes against the installed bd (no vacuous skip)" {
     command -v bd >/dev/null 2>&1 || skip "bd not installed"
     run "$WORK/bd-claim-smoke-test.sh"
+    # bd is present, so the script must actually exercise the protocol and PASS —
+    # a SKIP here (bd present but init failed) is a real failure, not acceptable.
     [ "$status" -eq 0 ]
-    [[ "$output" == *"PASS"* || "$output" == *"SKIP"* ]]
+    [[ "$output" == *"PASS"* ]]
 }
 
 @test "bd-claim smoke test SKIPs cleanly (exit 0) when bd is not on PATH" {

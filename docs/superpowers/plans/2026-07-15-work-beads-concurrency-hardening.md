@@ -44,7 +44,7 @@ All primitives the spec relies on were re-confirmed against the installed `bd`:
 | §4.2 generic path | `bd ready --claim` still validates + same cooldown-release | same |
 | §4.3 T1-ACTOR (HARD, [HOST]) | Blocking prerequisite + fail-loud fallback; `[HOST]` worktree-bootstrap wiring | same + `setup-agent-worktree.sh.tmpl` |
 | §5.1 one-at-a-time | keep/clarify (already shipped) | same |
-| §5.2 reaper ([CORE]+[HOST]) | New project-agnostic script: report-only default, guarded `--apply`, lease-authoritative, epic-excluded, `--shared-filesystem` gated, pluggable PR-lister | `content/assets/agent-ops/git/reap-stale-claims.sh.tmpl` + `make/agent-ops.mk.tmpl` + `src/core/agent-ops/install.ts` |
+| §5.2 reaper ([CORE]+[HOST]) | New project-agnostic script: report-only default, guarded `--apply`, lease-authoritative, epic-excluded, pluggable PR-lister. Probe (4) — the machine-local worktree check — is intentionally omitted: under this project's branch convention (bead ids live in PR bodies, not branch names — git-workflow §2.2) a live worktree links to a bead only via its PR, so probe (3) already subsumes it. Documented in the script header. | `content/assets/agent-ops/git/reap-stale-claims.sh.tmpl` + `make/agent-ops.mk.tmpl` + `src/core/agent-ops/install.ts` |
 | §5.3 orient | Reaper **report** + `bd list --status in_progress --assignee <me>` | SKILL.md Step 0 |
 | §6.1 leases ([CORE]) | Stamp `lease_until` on claim; renew on push (heartbeat); clear on release; reaper uses `lease_until` as authoritative; `[HOST]` cadence hook | SKILL.md §2.1/§2.3/§2.7 + reaper |
 | §6.2 partitioning | Rank FULL queue; capability slice is a within-tier **tie-breaker only**, never a pre-filter; priority always wins | SKILL.md Step 1 |
@@ -58,7 +58,8 @@ All primitives the spec relies on were re-confirmed against the installed `bd`:
   `BEADS_ACTOR=agent-<name>` to a worktree-local env file; a TODO marks where a project's
   `bd` wrapper must preserve it.
 - **Reaper packaging + probes** (§5.2): `make reap-stale-claims` target; PR-lister pluggable
-  (default `gh pr list`); worktree probe gated behind `--shared-filesystem`.
+  (default `gh pr list`). Probe (4) (worktree) is omitted — subsumed by the PR guard under
+  this project's branch-naming convention (see the reaper header).
 - **Heartbeat cadence** (§6.1): SKILL.md §2.3 states renew-on-push; TODO in the template for
   a project that wants a push hook.
 - **Capability taxonomy** (§6.2): SKILL.md ships the mechanism + an example label mapping;

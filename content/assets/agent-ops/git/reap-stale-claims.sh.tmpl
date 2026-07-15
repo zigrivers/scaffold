@@ -7,7 +7,6 @@
 #
 #   scripts/reap-stale-claims.sh                 # REPORT ONLY (default) — never mutates
 #   scripts/reap-stale-claims.sh --apply         # guarded release of reapable claims
-#   scripts/reap-stale-claims.sh --shared-filesystem   # also run the machine-local worktree probe
 #
 # Liveness authority (spec: Work-Beads Concurrency Hardening §5.2 / §6.1):
 #   * A claim carries a `lease_until` metadata stamp, renewed on every push.
@@ -16,9 +15,16 @@
 #     correct across crashes AND across machines.
 #   * A claim with NO usable lease (missing/empty, or a stale lease older than the
 #     bead's current claim) falls back to the coarse Tier-2 test: stale by
-#     updated_at AND no open/draft PR references it (a conservative guard, never
-#     proof of liveness) AND — only with --shared-filesystem — no live worktree.
+#     updated_at AND no open/draft PR references the bead id (a conservative guard,
+#     never proof of liveness).
 #   * Epics are never reaped (umbrellas sit in_progress for days by design).
+#
+# NOTE on the spec's probe (4), the machine-local worktree check: it is intentionally
+# omitted. Under this project's branch-naming convention (bead ids live in the PR
+# BODY, never in branch names — git-workflow §2.2), a live worktree is linkable to a
+# bead ONLY through its PR, so probe (3) — the PR guard — already subsumes it. A bare
+# `git worktree list` probe would add nothing here and is invalid across machines
+# anyway (§5.2). If a future convention puts bead ids on branches, add the probe then.
 #
 # Safety: the release `bd update <id> --status open --assignee ""` is unconditional,
 # so --apply performs a GUARDED release — it re-reads the bead immediately before
@@ -31,15 +37,14 @@
 set -euo pipefail
 
 APPLY=0
-SHARED_FS=0
 # Reap only leases lapsed by more than this grace margin (seconds). A live agent
 # heartbeats each push, so it is never within a grace margin of expiry.
 GRACE_SECONDS="${REAP_GRACE_SECONDS:-3600}"
 # No-lease fallback: how many hours since updated_at before a claim is "stale".
 STALE_HOURS="${REAP_STALE_HOURS:-24}"
 # [HOST] The PR-lister is pluggable so a project on a non-GitHub forge can swap it.
-# It MUST emit a JSON array with (at least) title, body, isDraft, headRefName.
-PR_LIST_CMD="${REAP_PR_LIST_CMD:-gh pr list --state open --limit 500 --json number,title,body,isDraft,headRefName}"
+# It MUST emit a JSON array with (at least) title and body.
+PR_LIST_CMD="${REAP_PR_LIST_CMD:-gh pr list --state open --limit 500 --json number,title,body,isDraft}"
 # Clock is injectable so tests can pin "now".
 NOW="${REAP_NOW:-$(date +%s)}"
 
@@ -51,7 +56,6 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --apply) APPLY=1; shift ;;
     --dry-run) APPLY=0; shift ;;            # explicit alias of the default
-    --shared-filesystem) SHARED_FS=1; shift ;;
     --grace) GRACE_SECONDS="${2:?}"; shift 2 ;;
     --stale-hours) STALE_HOURS="${2:?}"; shift 2 ;;
     --pr-lister) PR_LIST_CMD="${2:?}"; shift 2 ;;
@@ -87,11 +91,22 @@ to_epoch() {
 
 STALE_SECONDS=$((STALE_HOURS * 3600))
 
-# ----- gather open/draft PR references (probe 3, always on) -----
+# Escape ERE metacharacters so a bead id is matched literally.
+regex_escape() { printf '%s' "$1" | sed -E 's/[][(){}.^$*+?|\\]/\\&/g'; }
+
+# Is bead id $1 present as a WHOLE token in text $2? A bead id contains an internal
+# hyphen, and `grep -w` treats `-` as a word boundary, so `grep -Fw proj-abc` wrongly
+# matches `proj-abc-2`. Require the id to be delimited by a non-id char (anything
+# outside [A-Za-z0-9-]) or string edge instead.
+bead_referenced() {
+  local esc; esc="$(regex_escape "$1")"
+  printf '%s' "$2" | grep -Eq "(^|[^A-Za-z0-9-])${esc}([^A-Za-z0-9-]|$)"
+}
+
+# ----- gather open/draft PR references (probe 3) -----
 # read the pluggable command into an array so it word-splits cleanly (no eval).
 read -ra PR_LISTER_ARR <<< "$PR_LIST_CMD"
 pr_ok=1
-pr_raw="[]"       # raw PR JSON (used by the opt-in worktree probe)
 pr_lines=""       # one "<title> <body>" line per open/draft PR (for the id test)
 # pr_ok stays 1 ONLY if BOTH the PR command AND the jq parse succeed. A swallowed
 # jq error on malformed output must NOT masquerade as "no PRs" — that would let a
@@ -108,28 +123,7 @@ fi
 
 pr_protects() {  # does any open/draft PR reference this bead id? (probe 3)
   [ -n "$pr_lines" ] || return 1
-  # Whole-word match so a bead id is not "protected" merely by being a substring
-  # of a longer id/word in some PR (grep -w boundaries; -F keeps the id literal).
-  printf '%s\n' "$pr_lines" | grep -qFw -- "$1"
-}
-
-worktree_branches() {  # branches checked out in live worktrees on THIS host
-  git worktree list --porcelain 2>/dev/null | sed -n 's#^branch refs/heads/##p'
-}
-
-# probe 4 (opt-in, --shared-filesystem): the head branch of a PR referencing this
-# bead is checked out in a live worktree here → the agent is alive; hold. jq's
-# `contains` is a plain substring test (no regex), so a hyphenated bead id is safe.
-worktree_protects() {
-  local id="$1" wbr br
-  wbr="$(worktree_branches)"
-  [ -n "$wbr" ] || return 1
-  while IFS= read -r br; do
-    [ -n "$br" ] || continue
-    printf '%s\n' "$wbr" | grep -qxF -- "$br" && return 0
-  done < <(printf '%s' "$pr_raw" | jq -r --arg id "$id" \
-    '.[]? | select(((.title // "") + " " + (.body // "")) | contains($id)) | (.headRefName // "")' 2>/dev/null)
-  return 1
+  bead_referenced "$1" "$pr_lines"
 }
 
 # ----- guarded release (spec §5.2, resolves F1 as far as bd primitives allow) -----
@@ -159,11 +153,20 @@ guarded_release() {
 }
 
 # ----- scan in_progress claims -----
+# A read failure must NOT look like "no abandoned claims" (that would silently
+# disable the recovery path). Distinguish a genuine bd/jq error (warn + exit 1,
+# inconclusive) from a valid empty queue (exit 0).
+if ! inprogress="$(bd list --status in_progress --json 2>/dev/null)"; then
+  echo "reap: WARNING — could not read in_progress claims (bd error); reaper INCONCLUSIVE." >&2
+  exit 1
+fi
 # Parse each bead field-by-field with jq (NOT a delimiter-joined line): tab/whitespace
-# delimiters collapse empty fields under `read`, which would shift columns and corrupt
-# the liveness check. One compact JSON object per line is unambiguous.
-inprogress="$(bd list --status in_progress --json 2>/dev/null || echo '[]')"
-rows="$(printf '%s' "$inprogress" | jq -c '.[]?' 2>/dev/null || true)"
+# delimiters collapse empty fields under `read`, shifting columns. One compact JSON
+# object per line is unambiguous.
+if ! rows="$(printf '%s' "$inprogress" | jq -c '.[]?' 2>/dev/null)"; then
+  echo "reap: WARNING — could not parse Beads JSON; reaper INCONCLUSIVE." >&2
+  exit 1
+fi
 
 reap_count=0 hold_count=0 live_count=0
 
@@ -198,8 +201,8 @@ while IFS= read -r row; do
 
   verdict="" reason=""
   if [ "$is_lease" = "1" ]; then
-    # Lease is authoritative; PR/worktree probes are not consulted (they would
-    # reintroduce the crashed-with-stale-PR false negative).
+    # Lease is authoritative; the PR probe is not consulted (it would reintroduce
+    # the crashed-with-stale-PR false negative).
     if [ "$NOW" -le $((lease_epoch + GRACE_SECONDS)) ]; then
       live_count=$((live_count + 1)); continue          # lease live (within grace)
     fi
@@ -214,8 +217,6 @@ while IFS= read -r row; do
       verdict="HOLD"; reason="stale ${STALE_HOURS}h+, no lease; PR check unavailable — left for triage"
     elif pr_protects "$id"; then
       verdict="HOLD"; reason="stale ${STALE_HOURS}h+, no lease; open/draft PR references it — left for triage"
-    elif [ "$SHARED_FS" = "1" ] && worktree_protects "$id"; then
-      verdict="HOLD"; reason="stale ${STALE_HOURS}h+, no lease; live worktree for it — left for triage"
     else
       verdict="REAP"; reason="stale ${STALE_HOURS}h+, no lease, no open/draft PR"
     fi

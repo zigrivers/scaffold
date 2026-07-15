@@ -42,8 +42,10 @@ extract() {
 echo "bd-claim-smoke-test: $(bd version 2>/dev/null | head -1)"
 
 # Isolated throwaway project (bd init needs a real cwd, not -C, to CREATE a DB).
+# bd is present (checked above), so an init failure is a REAL problem — fail loudly
+# rather than SKIP, or a broken bd would make this required gate pass vacuously.
 cd "$TMP"
-bd init >/dev/null 2>&1 || { echo "SKIP: bd init failed in a temp dir (sandboxed env?)."; exit 0; }
+bd init >/dev/null 2>&1 || { echo "FAIL: bd is installed but 'bd init' failed in a temp dir — cannot verify the claim protocol." >&2; exit 1; }
 
 mkbead() { bd create "$1" -t task -p 2 --json 2>/dev/null | extract id; }
 ISO_FUTURE="2999-01-01T00:00:00Z"
@@ -68,6 +70,7 @@ ok 'release (--assignee "") clears the assignee'
 
 # 3) Single-command cooldown-release: --assignee "" --defer +1h (NOT --status open).
 B="$(mkbead 'cooldown')"
+[ -n "$B" ] || fail "could not create the cooldown test bead (bd create --json / id parse)"
 bd update "$B" --claim --actor alpha-agent >/dev/null 2>&1 || fail "claim B failed"
 bd update "$B" --assignee "" --defer +1h --unset-metadata lease_until >/dev/null 2>&1 || fail "cooldown-release failed"
 if bd ready --json 2>/dev/null | grep -qF -- "$B"; then
