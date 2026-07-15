@@ -60,8 +60,9 @@ all issues found.
   subjects and PR titles as `<bead-id>: `, ends the work branch name, and is
   referenced in the PR body as `Closes <id>` (the canonical machine mapping).
   No document still teaches either retired form — the body-only rule ("IDs
-  never in branch names or commit subjects") or the pre-nibble `bd-<id>/<desc>`
-  leading-path-segment + `[bd-<id>]` bracket-prefix convention
+  never in branch names or commit subjects") or the pre-nibble convention
+  that used the bead ID as the branch's leading path segment and a bracketed
+  subject prefix
 - (mvp) Branch naming is `<type>/<short-desc>` everywhere (worktree
   workspace branches `agent/<name>/<bead-id>`, bare `agent/<name>` for
   non-bead work); the bead ID appears only as the branch's FINAL segment,
