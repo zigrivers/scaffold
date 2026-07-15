@@ -102,3 +102,20 @@ EOF
     [ "$status" -eq 0 ]
     [ "$output" != "$first" ]
 }
+
+@test "fails closed (exit 1, no name) when every candidate is taken — never emits a collision" {
+    # Zero entropy pins the word pair; the bd stub claims ALL 100 suffixes.
+    cat > "$FX/bin/bd" <<'STUB'
+#!/usr/bin/env bash
+printf '['
+for i in $(seq -w 0 99); do
+  [ "$i" != "00" ] && printf ','
+  printf '{"id":"x-%s","assignee":"agent-bouncy-badger-%s","status":"in_progress"}' "$i" "$i"
+done
+printf ']\n'
+STUB
+    chmod +x "$FX/bin/bd"
+    run env AGENT_NAME_ENTROPY_FILE="$ZERO_ENTROPY" bash -c "'$FX/agent-name.sh' 2>&1"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"refusing to emit"* ]]
+}

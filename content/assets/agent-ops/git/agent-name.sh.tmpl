@@ -82,7 +82,7 @@ main() {
     *) printf 'usage: %s [--short]\n' "$0" >&2; exit 1 ;;
   esac
 
-  local taken candidate adj noun tries=0
+  local taken candidate adj noun attempt s found=0
   taken="$(taken_names)"
 
   # Every name carries a two-digit suffix from the START: the 40x40 wordlists
@@ -91,32 +91,34 @@ main() {
   # check below. The suffix widens the space to ~160,000, shrinking that
   # blind-window risk two orders of magnitude; the check then covers everything
   # already persisted.
-  while :; do
+  for ((attempt = 0; attempt < 10; attempt++)); do
     adj="${ADJECTIVES[$(rand_index "${#ADJECTIVES[@]}")]}"
     noun="${NOUNS[$(rand_index "${#NOUNS[@]}")]}"
     candidate="agent-$adj-$noun-$(printf '%02d' "$(rand_index 100)")"
     if ! grep -qxF "$candidate" <<<"$taken"; then
-      break
-    fi
-    tries=$((tries + 1))
-    if [[ "$tries" -ge 10 ]]; then
-      # Ten straight collisions means degenerate entropy or a crowded
-      # namespace: walk every suffix for this word pair deterministically,
-      # CHECKING each candidate (never emit an unchecked fallback).
-      local s found=0
-      for ((s = 0; s < 100; s++)); do
-        candidate="agent-$adj-$noun-$(printf '%02d' "$s")"
-        if ! grep -qxF "$candidate" <<<"$taken"; then
-          found=1
-          break
-        fi
-      done
-      if [[ "$found" -ne 1 ]]; then
-        log "no unused suffix for $adj-$noun after exhaustive search — emitting a best-effort name; verify uniqueness manually"
-      fi
+      found=1
       break
     fi
   done
+  if [[ "$found" -ne 1 ]]; then
+    # Ten straight collisions means degenerate entropy or a crowded namespace:
+    # walk every suffix of the last word pair deterministically, CHECKING each.
+    for ((s = 0; s < 100; s++)); do
+      candidate="agent-$adj-$noun-$(printf '%02d' "$s")"
+      if ! grep -qxF "$candidate" <<<"$taken"; then
+        found=1
+        break
+      fi
+    done
+  fi
+  if [[ "$found" -ne 1 ]]; then
+    # FAIL CLOSED — this generator exists to guarantee actor uniqueness, so a
+    # known-taken name must never be emitted. (Reaching this needs 110 straight
+    # collisions across a 160k namespace: a stuck entropy source or a pathological
+    # taken-list. Either way the operator must intervene.)
+    log "ERROR: could not find an unused name (entropy source stuck, or namespace exhausted) — refusing to emit a colliding actor name"
+    exit 1
+  fi
 
   if [[ "$short" -eq 1 ]]; then
     printf '%s\n' "${candidate#agent-}"

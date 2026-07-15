@@ -69,6 +69,13 @@ for CI until a launch target is chosen and automated CI is deliberately wired up
   branch copies are human-first redundancy). The PR title prefix is what makes
   bead IDs visible in `git log --oneline` on main: the squash-merge subject
   comes from the PR title
+- (mvp) If the project adopts commit-header tooling (commitlint,
+  semantic-release, changelog generators), the generated doc says so
+  explicitly: those parsers expect the type FIRST, so they must be configured
+  to strip the leading `<bead-id>: ` before parsing (e.g. a commitlint
+  `parserPreset` headerPattern such as
+  `^(?:[a-z0-9][a-z0-9.-]*: )?(\w+)(?:\(([^)]*)\))?: (.+)$`) — never silently
+  adopt a default config that would reject every bead-prefixed commit
 - (mvp) The "Quality gates (CI deferred)" section states the gate
   explicitly (pre-commit hooks + `make check` + agent self-review + `mmr
   review`), states that `.github/workflows/` is deliberately absent until a

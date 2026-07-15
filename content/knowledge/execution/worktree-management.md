@@ -66,11 +66,14 @@ scripts/setup-agent-worktree.sh agent-3 --install
 
 Each agent has a completely isolated working directory. They share the same `.git` object store but have separate working trees, index files, and HEAD pointers.
 
-### The `agent/<name>` Branch
+### The `agent/<name>/<bead-id>` Branch
 
-Each agent has one persistent branch — `agent/<name>` — that it commits **all**
-of its task work to directly. There are no per-task feature branches layered on
-top of it:
+Each agent's worktree carries ONE live branch at a time —
+`agent/<name>/<bead-id>` — and the agent commits that bead's work to it
+directly. The branch is retired when the bead ships (squash-merge with
+`--delete-branch`, then `make prune-merged`), and the next bead starts a fresh
+branch via `setup-agent-worktree.sh … --bead <next-id>`. There are no per-task
+feature branches layered on top of it:
 
 - The worktree is created on `agent/<name>/<bead-id>`, which tracks
   `origin/main`

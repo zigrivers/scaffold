@@ -118,7 +118,7 @@ These rules are critical for multi-agent operation:
 
 - **Never run `git checkout main`** — it will fail because main is checked out in the main repo
 - **Work on your `agent/<name>/<bead-id>` branch** (created by `setup-agent-worktree.sh --bead <id>`; bare `agent/<name>` on older setups) — the worktree already tracks `origin/main`; commit each bead's task work **directly** on it. Do NOT create additional per-task branches. Traceable IDs: commit subjects and the PR title lead with `<bead-id>: `, and the PR body carries `Closes <id>` (the canonical machine mapping)
-- **Between beads, rebase your own branch**: `git fetch origin --prune && git rebase origin/main && git clean -fd`, then run the install command from CLAUDE.md Key Commands
+- **Mid-bead, keep your branch current**: `git fetch origin --prune && git rebase origin/main && git clean -fd`, then run the install command from CLAUDE.md Key Commands. **Between beads**, the merged branch is already retired (`--delete-branch` + `make prune-merged`) — start the next bead on a fresh branch with `scripts/setup-agent-worktree.sh <name> --install --bead <next-id>`
 
 ### Beads Detection
 
