@@ -30,16 +30,16 @@ EOF
 
 teardown() { rm -rf "$FX"; }
 
-@test "emits a name matching agent-<adjective>-<noun> with optional numeric suffix" {
+@test "emits a name matching agent-<adjective>-<noun>-<NN> (always suffixed)" {
     run "$FX/agent-name.sh"
     [ "$status" -eq 0 ]
-    [[ "$output" =~ ^agent-[a-z]+-[a-z]+(-[0-9]{2})?$ ]]
+    [[ "$output" =~ ^agent-[a-z]+-[a-z]+-[0-9]{2}$ ]]
 }
 
 @test "--short drops the agent- prefix (for worktree names)" {
     run "$FX/agent-name.sh" --short
     [ "$status" -eq 0 ]
-    [[ "$output" =~ ^[a-z]+-[a-z]+(-[0-9]{2})?$ ]]
+    [[ "$output" =~ ^[a-z]+-[a-z]+-[0-9]{2}$ ]]
     [[ "$output" != agent-* ]]
 }
 
@@ -47,7 +47,7 @@ teardown() { rm -rf "$FX"; }
     # First run with fixed entropy: learn the deterministic pick.
     local first
     first="$(AGENT_NAME_ENTROPY_FILE="$ZERO_ENTROPY" "$FX/agent-name.sh")"
-    [[ "$first" =~ ^agent-[a-z]+-[a-z]+ ]]
+    [[ "$first" =~ ^agent-[a-z]+-[a-z]+-[0-9]{2}$ ]]
     # Now bd reports that exact name as a live assignee — same entropy must NOT
     # return it again (resample or suffix fallback).
     cat > "$FX/bin/bd" <<EOF
@@ -60,7 +60,7 @@ EOF
     run env AGENT_NAME_ENTROPY_FILE="$ZERO_ENTROPY" bash -c "'$FX/agent-name.sh' 2>/dev/null"
     [ "$status" -eq 0 ]
     [ "$output" != "$first" ]
-    [[ "$output" =~ ^agent-[a-z]+-[a-z]+(-[0-9]{2})?$ ]]
+    [[ "$output" =~ ^agent-[a-z]+-[a-z]+-[0-9]{2}$ ]]
 }
 
 @test "avoids an actor persisted in a worktree .agent-env" {
@@ -77,7 +77,7 @@ EOF
     rm "$FX/bin/bd"
     run "$FX/agent-name.sh"
     [ "$status" -eq 0 ]
-    [[ "$output" =~ ^agent-[a-z]+-[a-z]+(-[0-9]{2})?$ ]]
+    [[ "$output" =~ ^agent-[a-z]+-[a-z]+-[0-9]{2}$ ]]
 }
 
 @test "never mutates anything (no files created in cwd)" {
@@ -90,5 +90,15 @@ EOF
 @test "falls back to \$RANDOM and still emits a valid name when the entropy source is unreadable" {
     run env AGENT_NAME_ENTROPY_FILE="$FX/does-not-exist" "$FX/agent-name.sh"
     [ "$status" -eq 0 ]
-    [[ "$output" =~ ^agent-[a-z]+-[a-z]+(-[0-9]{2})?$ ]]
+    [[ "$output" =~ ^agent-[a-z]+-[a-z]+-[0-9]{2}$ ]]
+}
+
+@test "collision check also strips quoting in .agent-env values" {
+    local first
+    first="$(AGENT_NAME_ENTROPY_FILE="$ZERO_ENTROPY" "$FX/agent-name.sh")"
+    mkdir -p "$FX/repo2/.worktrees/old"
+    printf 'BEADS_ACTOR="%s"\n' "$first" > "$FX/repo2/.worktrees/old/.agent-env"
+    run env AGENT_NAME_ENTROPY_FILE="$ZERO_ENTROPY" bash -c "cd '$FX/repo2' && '$FX/agent-name.sh'"
+    [ "$status" -eq 0 ]
+    [ "$output" != "$first" ]
 }

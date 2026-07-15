@@ -2,7 +2,7 @@
 # {{PROJECT_NAME}} — agent name generator.
 #
 # Usage:
-#   scripts/agent-name.sh            Print a unique agent name (agent-<adjective>-<noun>).
+#   scripts/agent-name.sh            Print a unique agent name (agent-<adjective>-<noun>-<NN>).
 #   scripts/agent-name.sh --short    Same, without the leading "agent-" (for worktree names).
 #
 # Why a generator instead of "pick a distinctive name": the atomic bead claim
@@ -64,7 +64,9 @@ taken_names() {
     local env_file
     for env_file in "$root"/.worktrees/*/.agent-env; do
       [[ -f "$env_file" ]] || continue
-      sed -n 's/^BEADS_ACTOR=//p' "$env_file"
+      # tr strips optional quoting (BEADS_ACTOR="agent-x") — the actor grammar
+      # itself never contains quotes, so this is lossless.
+      sed -n 's/^BEADS_ACTOR=//p' "$env_file" | tr -d "'\""
     done
   done
   # Local agent/* branches: agent/<name>[/<bead-id>] → actor agent-<name>.
@@ -83,19 +85,35 @@ main() {
   local taken candidate adj noun tries=0
   taken="$(taken_names)"
 
+  # Every name carries a two-digit suffix from the START: the 40x40 wordlists
+  # alone are ~1,600 names, and a fleet of agents starting CONCURRENTLY has a
+  # real birthday-collision chance before any claim is visible to the collision
+  # check below. The suffix widens the space to ~160,000, shrinking that
+  # blind-window risk two orders of magnitude; the check then covers everything
+  # already persisted.
   while :; do
     adj="${ADJECTIVES[$(rand_index "${#ADJECTIVES[@]}")]}"
     noun="${NOUNS[$(rand_index "${#NOUNS[@]}")]}"
-    candidate="agent-$adj-$noun"
+    candidate="agent-$adj-$noun-$(printf '%02d' "$(rand_index 100)")"
     if ! grep -qxF "$candidate" <<<"$taken"; then
       break
     fi
     tries=$((tries + 1))
     if [[ "$tries" -ge 10 ]]; then
-      # Persistent collisions: disambiguate with a two-digit suffix instead of
-      # looping forever (the suffix keeps the name inside the [a-z0-9-] grammar).
-      candidate="agent-$adj-$noun-$(printf '%02d' "$(rand_index 100)")"
-      log "wordlist collisions persisted — using suffixed name"
+      # Ten straight collisions means degenerate entropy or a crowded
+      # namespace: walk every suffix for this word pair deterministically,
+      # CHECKING each candidate (never emit an unchecked fallback).
+      local s found=0
+      for ((s = 0; s < 100; s++)); do
+        candidate="agent-$adj-$noun-$(printf '%02d' "$s")"
+        if ! grep -qxF "$candidate" <<<"$taken"; then
+          found=1
+          break
+        fi
+      done
+      if [[ "$found" -ne 1 ]]; then
+        log "no unused suffix for $adj-$noun after exhaustive search — emitting a best-effort name; verify uniqueness manually"
+      fi
       break
     fi
   done

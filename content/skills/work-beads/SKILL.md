@@ -52,8 +52,8 @@ default `git user.name`) therefore BOTH "win" the same bead — the claim gives
   it, or you sourced a worktree `.agent-env` on resume)? Keep it.
 - Otherwise, in THIS shell **now, before Step 1**:
   `export BEADS_ACTOR="$(scripts/agent-name.sh)"` — the generator draws a
-  memorable `agent-<adjective>-<noun>` name (e.g. `agent-turbo-walrus`) with
-  real entropy and collision-checks it against live assignees, worktree
+  memorable `agent-<adjective>-<noun>-<NN>` name (e.g. `agent-turbo-walrus-07`)
+  with real entropy and collision-checks it against live assignees, worktree
   actors, and `agent/*` branches. Prefer it over inventing a name yourself:
   self-picked "distinctive" names converge across concurrent agents, and two
   agents on one name get zero claim protection. No generator installed? Invent
@@ -235,8 +235,9 @@ your branch. **Open a draft PR on the first push — the draft is the visible
 claim.** Bead traceability (every surface a human scans leads with the id):
 - **Branch** = `agent/<name>/<bead-id>` (what `--bead` created): open branches
   read as the roster of in-flight beads.
-- **Commit subjects** start with the bead id — `<bead-id>: <imperative summary>`
-  (e.g. `proj-42: add webhook rate limiter`).
+- **Commit subjects** start with the bead id, then the project's normal
+  Conventional-Commits subject — `<bead-id>: type(scope): subject`
+  (e.g. `proj-42: feat(api): add webhook rate limiter`).
 - **PR title** starts with `<bead-id>: ` too — the squash-merge subject comes
   from the PR title, so this is what makes bead ids visible in
   `git log --oneline` on main.

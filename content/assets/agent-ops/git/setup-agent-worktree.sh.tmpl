@@ -522,9 +522,14 @@ cmd_create() {
   if ! [[ "$name" =~ ^[a-z0-9][a-z0-9-]{0,39}$ ]]; then
     fatal "name must be lowercase alphanumeric/dashes, 1–40 chars (got: '$name')"
   fi
-  # Validate the bead id with the same grammar, before any mutation.
-  if [[ -n "$bead" ]] && ! [[ "$bead" =~ ^[a-z0-9][a-z0-9-]{0,39}$ ]]; then
-    fatal "--bead id must be lowercase alphanumeric/dashes, 1–40 chars (got: '$bead')"
+  # Validate the bead id before any mutation. Beads emits hierarchical child
+  # ids with dots (bd-a3f8.1), so dots are allowed BETWEEN alphanumeric
+  # segments — never leading, trailing, or consecutive (which would also make
+  # an invalid git ref).
+  if [[ -n "$bead" ]]; then
+    if ! [[ "$bead" =~ ^[a-z0-9][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)*$ ]] || [[ "${#bead}" -gt 40 ]]; then
+      fatal "--bead id must be lowercase alphanumeric/dashes with optional dot-separated segments, 1–40 chars (got: '$bead')"
+    fi
   fi
 
   # Advisory: warn on likely-duplicate in-flight work before creating the worktree.

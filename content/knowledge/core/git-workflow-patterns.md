@@ -50,9 +50,10 @@ The trunk-based development model works best for AI-agent workflows:
 Traceable IDs — when a tracker is configured, the work-item/bead ID leads the
 commit subject and the PR title as `<bead-id>: ` and ends the worktree branch
 name; the PR body's `Closes <id>` stays the CANONICAL machine-readable
-bead↔PR mapping (tooling — the stale-claim reaper, duplicate-work gates —
-parses the body, never branch names; the title/branch copies are human-first
-redundancy). Under squash-merge the PR title becomes the commit subject on
+bead↔PR mapping. Tooling treats the body as authoritative; the stale-claim
+reaper may additionally use a bead id found in the PR title or head branch as
+a conservative HOLD signal (extra protection only, never a substitute for the
+body). Under squash-merge the PR title becomes the commit subject on
 main, which is what makes `git log --oneline` show the bead per commit.
 
 Branch naming conventions — `<type>` matches the Conventional Commits type;

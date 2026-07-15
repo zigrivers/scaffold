@@ -834,3 +834,17 @@ EOF
     [ "$status" -eq 0 ]
     [ "$(git -C "$CLONE_DIR/.worktrees/legacy" branch --show-current)" = "agent/legacy" ]
 }
+
+@test "setup: --bead accepts a hierarchical (dotted) child bead id" {
+    run bash -c "cd '$CLONE_DIR' && scripts/setup-agent-worktree.sh alpha --bead bd-a3f8.1"
+    [ "$status" -eq 0 ]
+    [ "$(git -C "$CLONE_DIR/.worktrees/alpha" branch --show-current)" = "agent/alpha/bd-a3f8.1" ]
+}
+
+@test "setup: --bead rejects malformed dot forms (leading/trailing/consecutive)" {
+    for bad in '.proj-1' 'proj-1.' 'proj-1..2'; do
+        run bash -c "cd '$CLONE_DIR' && scripts/setup-agent-worktree.sh alpha --bead '$bad'"
+        [ "$status" -ne 0 ]
+        [ ! -d "$CLONE_DIR/.worktrees/alpha" ]
+    done
+}
