@@ -867,3 +867,11 @@ EOF
     bash -c "set -a; . '$CLONE_DIR/.worktrees/alpha/.agent-env'; set +a"
     [ ! -f "$CLONE_DIR/pwned" ]
 }
+
+@test "setup: refuses to refresh a worktree left on a detached HEAD" {
+    bash -c "cd '$CLONE_DIR' && scripts/setup-agent-worktree.sh alpha --bead proj-1"
+    git -C "$CLONE_DIR/.worktrees/alpha" checkout --detach -q
+    run bash -c "cd '$CLONE_DIR' && scripts/setup-agent-worktree.sh alpha --bead proj-1"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"detached"* ]]
+}

@@ -573,9 +573,15 @@ cmd_create() {
   if [[ -d "$wt" ]]; then
     # Never silently rebind a live worktree to another bead's branch: finish or
     # tear down the current work first (`make prune-merged` after its PR merges).
+    # A detached HEAD is equally unsafe — succeeding here would report the
+    # worktree ready while it is NOT on the requested branch, so commits would
+    # silently lose their bead traceability.
     local current_branch
     current_branch="$(git -C "$wt" branch --show-current 2>/dev/null || true)"
-    if [[ -n "$current_branch" && "$current_branch" != "$branch" ]]; then
+    if [[ -z "$current_branch" ]]; then
+      fatal "worktree $wt is on a detached HEAD — resolve it manually (git -C $wt checkout $branch, or remove the worktree) before rerunning"
+    fi
+    if [[ "$current_branch" != "$branch" ]]; then
       fatal "worktree $wt is checked out on '$current_branch', not '$branch' — finish that work (or run 'make prune-merged' once its PR merges), or use a different worktree name"
     fi
     log "Worktree $wt already exists — refreshing branch tracking."

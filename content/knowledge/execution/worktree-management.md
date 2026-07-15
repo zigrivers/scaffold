@@ -43,16 +43,16 @@ After all agents finish, remove worktrees and prune stale references. Delete mer
 
 ```bash
 # From the main repository
-scripts/setup-agent-worktree.sh agent-1 --install
+scripts/setup-agent-worktree.sh agent-1 --install --bead bd-a3f8
 
 # This creates:
-#   .worktrees/agent-1/    (working directory, project-local)
-#   Branch: agent/agent-1  (the agent's own branch — task work commits here)
+#   .worktrees/agent-1/          (working directory, project-local)
+#   Branch: agent/agent-1/bd-a3f8  (this bead's branch — task work commits here)
 ```
 
 **What the setup script does:**
 1. Creates a new worktree directory project-local under `.worktrees/`
-2. Creates the agent's `agent/<name>` branch tracking `origin/main`
+2. Creates the agent's `agent/<name>/<bead-id>` branch tracking `origin/main` (bare `agent/<name>` without `--bead`)
 3. Sets up the working directory with a clean state
 4. Runs the project's configured worktree setup commands (dependency installs) **only when passed `--install`** — a plain invocation installs nothing
 
@@ -117,28 +117,25 @@ git rebase origin/main   # bring the branch up to date; do NOT create a new bran
 ### Between Tasks
 
 After a bead's PR has merged (local quality gates green + `mmr review` passed —
-CI is deferred until launch), prepare for the next one on the same
-`agent/<name>` branch:
+CI is deferred until launch), the bead's branch is already retired — the
+squash-merge ran with `--delete-branch`. From the PRIMARY checkout, reclaim the
+finished worktree and start the next bead on a fresh branch:
 
 ```bash
-# Fetch latest state from remote
-git fetch origin --prune
+# From the primary checkout: sync main and prune merged worktrees/branches
+make main-sync && make prune-merged
 
-# Rebase agent/<name> onto the freshly-merged main (stay on your own branch)
-git rebase origin/main
-
-# Clean up untracked files and directories
-git clean -fd
-
-# Reinstall dependencies (important if package files changed on main)
-# npm install / pip install -r requirements.txt / etc.
+# Start the next bead with a fresh worktree branch carrying its id
+scripts/setup-agent-worktree.sh <name> --install --bead <next-id>
+cd .worktrees/<name>
 ```
 
 **Why this matters:**
-- `git fetch --prune` ensures you see newly merged branches and removed remote branches
-- Rebasing `agent/<name>` onto `origin/main` picks up other agents' merged work
-- `git clean -fd` removes artifacts from the previous task
-- Dependency reinstallation catches changes merged by other agents
+- `main-sync` + `prune-merged` pick up other agents' merged work and remove
+  the retired branch/worktree (squash-aware detection)
+- A fresh `--bead <next-id>` branch keeps the open-branch list an accurate
+  roster of in-flight beads — never reuse the previous bead's branch
+- `--install` reinstalls dependencies, catching changes merged by other agents
 
 ### Rebase Strategy
 
@@ -202,14 +199,14 @@ git branch --merged origin/main | grep -vE '^\*|main|agent/' | xargs -r git bran
 ```
 
 This deletes all local branches merged to `origin/main`, excluding the
-current branch, `main`, and the worktree `agent/<name>` branches.
+current branch, `main`, and the worktree `agent/*` branches.
 Safe because `--merged` ensures only fully-merged branches are deleted, and
 `-d` (not `-D`) refuses to delete unmerged branches.
 
-**Cleanup of `agent/<name>` branches:**
+**Cleanup of `agent/*` branches:**
 
 Prefer `scripts/teardown-agent-worktree.sh <path>`, which harvests the ledger,
-removes the worktree, and deletes its `agent/<name>` branch under guards (it
+removes the worktree, and deletes its `agent/*` branch under guards (it
 never deletes the primary's checked-out branch or the default branch). For a
 manual sweep after all agents are done and their worktrees removed:
 
