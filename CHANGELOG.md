@@ -2,6 +2,47 @@
 
 All notable changes to Scaffold are documented here.
 
+## [3.46.0] - 2026-07-16
+
+### Added
+
+- **Unique, memorable agent names.** The `agent-ops` git component now installs
+  `scripts/agent-name.sh`, which mints `agent-<adjective>-<noun>-<NN>` names
+  (e.g. `agent-turbo-walrus-07`) from curated wordlists plus a two-digit suffix,
+  collision-checked against live in-progress bead assignees, other worktrees'
+  persisted actors, and existing `agent/*` branches. The name is the claim lock
+  key, not just a label: `bd update --claim` is keyed on the actor and
+  same-actor claims are idempotent, so two agents that converge on one name get
+  zero collision protection — a real generator with entropy plus a collision
+  check is a concurrency-safety upgrade over self-picked names. Fails closed
+  (exits non-zero) rather than ever emit a name it cannot prove unique.
+- **Bead-suffixed worktree branches.** `setup-agent-worktree.sh` gains
+  `--bead <id>`: the workspace branch becomes `agent/<name>/<bead-id>` (bare
+  `agent/<name>` without the flag), so `git branch -r` reads as a live roster of
+  in-flight beads. Includes a migration guard that detects a pre-upgrade bare
+  `agent/<name>` ref (local or remote) which would D/F-conflict, and a
+  detached-HEAD refresh guard, both failing loud with clear instructions instead
+  of a cryptic git error. The worktree's git identity now derives from the bead
+  actor so `git blame` matches the `bd` assignee, and `.agent-env` is written as
+  inert single-quoted data (safe to `source`).
+
+### Changed
+
+- **Bead IDs are now traceable across branches, commits, and PR titles.** Commit
+  subjects and PR titles append the bead id as a trailing `(<bead-id>)` tag
+  (e.g. `feat(api): add rate limiter (bd-a3f8)`) — visible on every
+  `git log --oneline` line on `main` (the squash-merge subject comes from the PR
+  title) while keeping the Conventional-Commits `type` first, so
+  commitlint/semantic-release/changelog tooling parses them with zero config.
+  The PR body's `Closes <id>` remains the canonical machine-readable mapping.
+  This supersedes the prior body-only convention; the `work-beads` skill,
+  pipeline prompts, and knowledge entries are swept accordingly.
+- **Stale-claim reaper reads branch names too.** The reaper's PR guard now
+  matches a bead id found in a PR's head branch (`agent/<name>/<bead-id>`)
+  alongside the title and body, and its whole-token matching correctly handles
+  hierarchical dotted child ids (`bd-a3f8.1` no longer falsely holds parent
+  `bd-a3f8`, and a sentence-final `Closes bd-a3f8.` still protects the claim).
+
 ## [3.45.0] - 2026-07-15
 
 ### Added
