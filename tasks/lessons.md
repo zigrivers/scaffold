@@ -188,3 +188,25 @@ Patterns and anti-patterns discovered during development. Review before starting
   such an example, and green only after the sweep. Before editing, grep
   `tests/evals/*.bats` for patterns that touch the file/line you're changing, and
   run the affected eval right after the edit rather than at the end of the batch.
+
+## 2026-07-15 — `bd init` (bd 1.1.0) hijacks core.hooksPath, silently disabling scaffold gates
+
+- **`bd init` / `bd setup` set `git config core.hooksPath .beads/hooks`.** git then
+  reads hooks ONLY from that dir, so scaffold's `.git/hooks/pre-commit` (ShellCheck +
+  frontmatter) and `.git/hooks/pre-push` (full bats suite) — installed by `make hooks`
+  / `scripts/install-hooks.sh` — stop running entirely. The safety gates are bypassed
+  with no error. `make check-all` still works (it's a direct target, not a hook), so
+  the bypass is easy to miss.
+- **Fix / correct coexistence:** `git config --unset core.hooksPath`, re-run
+  `./scripts/install-hooks.sh` (scaffold gates → `.git/hooks/`), then `bd hooks install`
+  (bd's marker-wrapped blocks APPEND to `.git/hooks/pre-commit`/`pre-push` and add
+  post-checkout/post-merge/prepare-commit-msg shims). With hooksPath unset, bd 1.1.0's
+  `bd hooks install` composes instead of hijacking: scaffold checks run first, bd's
+  block runs after. Verify with `git config --get core.hooksPath` (should be empty) and
+  `grep -c "BEADS INTEGRATION" .git/hooks/pre-push` (should be 2 = begin+end markers,
+  alongside the scaffold `bats … || exit 1` line).
+- **This affects generated projects too** (they run `bd init` + `make hooks`). The
+  `.git/hooks/` shim model is the one scaffold documents (see
+  docs/audits/beads-integration-audit-2026-05-24.md); core.hooksPath is the deviation.
+- `core.hooksPath` is LOCAL `.git/config`, never committed — so the bypass is per-clone
+  and does NOT travel in a PR, but it DOES silently break the person who ran `bd init`.
