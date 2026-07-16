@@ -13,9 +13,11 @@ knowledge-base: [dev-environment, git-workflow-patterns]
 ## Purpose
 Configure the repository for parallel Claude Code sessions working simultaneously.
 Define the branching strategy (one task -> one branch -> one PR -> squash-merge ->
-delete branch), Conventional Commits format (bead IDs, when Beads is configured,
-referenced in commit/PR bodies via `Closes <id>` — never in branch names or commit
-subjects), a rebase-never-merge strategy, the 8-step PR workflow with `mmr review`
+delete branch), Conventional Commits format (when Beads is configured, the bead ID
+is appended to the commit subject and PR title as a trailing `(<bead-id>)`, rides the
+work branch as its final segment, and is referenced in the PR body via `Closes <id>` —
+the body form is
+the canonical machine mapping), a rebase-never-merge strategy, the 8-step PR workflow with `mmr review`
 as mandatory AI-review step 5.5, the agent-ops worktree scripts for parallel agents
 (setup, doctor, prune), conflict-prevention rules, and the local quality gate
 (pre-commit hooks + `make check` + agent self-review + `mmr review`) that stands in
@@ -58,11 +60,20 @@ for CI until a launch target is chosen and automated CI is deliberately wired up
 ## Quality Criteria
 - (mvp) Branch naming format is `<type>/<short-desc>` — `<type>` is a
   Conventional Commits type, `<short-desc>` is kebab-case and <= 40 chars;
-  worktree workspace branches are `agent/<name>`; no bead IDs appear
-  anywhere in a branch name
-- (mvp) Commit format is `type(scope): subject` (Conventional Commits); a
-  bead ID, when Beads is configured, appears only in the commit/PR body as
-  `Closes <id>` — never in the branch name or the commit subject
+  worktree workspace branches are `agent/<name>/<bead-id>` (via
+  `setup-agent-worktree.sh --bead <id>`; bare `agent/<name>` without a bead),
+  so open branches read as the roster of in-flight beads
+- (mvp) Commit format is `type(scope): subject` (Conventional Commits); when
+  Beads is configured the bead ID is APPENDED to the subject and the PR title
+  as a trailing tag — `type(scope): subject (<bead-id>)` — and the PR body
+  carries `Closes <id>`, which stays the canonical machine-readable bead↔PR
+  mapping (the title and branch copies are human-first redundancy). The trailing
+  `(<bead-id>)` on the PR title is what makes bead IDs visible in
+  `git log --oneline` on main: the squash-merge subject comes from the PR title.
+  Because the Conventional Commits `type` stays FIRST, commitlint,
+  semantic-release, and changelog generators parse these commits unchanged — no
+  parser config needed (the trailing `(<bead-id>)` is just part of the subject
+  text)
 - (mvp) The "Quality gates (CI deferred)" section states the gate
   explicitly (pre-commit hooks + `make check` + agent self-review + `mmr
   review`), states that `.github/workflows/` is deliberately absent until a
@@ -260,12 +271,16 @@ Depth-gate per Methodology Scaling above.
    `<type>` matches the Conventional Commits type set from
    docs/coding-standards.md (e.g. `feat`, `fix`, `refactor`, `perf`, `docs`,
    `test`, `build`, `ci`, `chore`); `<short-desc>` is kebab-case and <= 40
-   chars; no bead IDs in the branch name. Worktree workspace branches are
-   `agent/<name>` (per §8 below). A branch lives only as long as its PR is
+   chars. Worktree workspace branches are `agent/<name>/<bead-id>` (per §8
+   below) — the bead id as the final segment turns `git branch -r` into a
+   live roster of in-flight beads. A branch lives only as long as its PR is
    open — squash-merge with `--delete-branch` removes it automatically.
-3. **Commits** — Conventional Commits format `type(scope): subject`; a bead
-   ID, when Beads is configured, is referenced only in the body as
-   `Closes <id>`, never in the branch name or subject line. Pre-commit
+3. **Commits** — Conventional Commits format `type(scope): subject`; when
+   Beads is configured the bead ID is appended to the subject and the PR title
+   as a trailing tag (`type(scope): subject (<bead-id>)`), and the PR body
+   carries `Closes <id>` — the canonical machine mapping tooling parses; title
+   and branch copies are human-first redundancy. The `type` stays first, so
+   Conventional-Commits tooling needs no special config. Pre-commit
    hooks are mandatory — never `--no-verify`.
 4. **Rebase strategy** — `git fetch origin && git rebase origin/main`
    before pushing and whenever `main` advances while the PR is open;
@@ -302,9 +317,11 @@ Depth-gate per Methodology Scaling above.
    contention files require coordination before a second writer touches
    them, and one open PR per agent at a time.
 8. **Parallel agents and worktrees** — `.worktrees/<name>` on branch
-   `agent/<name>`, created via `scripts/setup-agent-worktree.sh <name>
-   --install --task "..."` (`--install` runs the dependency-install setup
-   commands — a plain invocation installs nothing); per-worktree agent
+   `agent/<name>/<bead-id>`, created via `scripts/setup-agent-worktree.sh <name>
+   --install --task "..." --bead <id>` (`--install` runs the dependency-install
+   setup commands — a plain invocation installs nothing; omit `--bead` for
+   non-bead work and the branch is `agent/<name>`); agent names come from
+   `scripts/agent-name.sh` (unique, collision-checked); per-worktree agent
    identity via git config; cleanup via `make prune-merged` (squash-aware —
    detects merged branches even when ancestry alone would miss a squash merge).
 9. **The primary-checkout invariant** — the top-level clone stays on

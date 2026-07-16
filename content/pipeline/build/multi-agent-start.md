@@ -117,8 +117,8 @@ Before writing any code, verify the worktree environment:
 These rules are critical for multi-agent operation:
 
 - **Never run `git checkout main`** — it will fail because main is checked out in the main repo
-- **Work on your `agent/<name>` branch** — the worktree already tracks `origin/main`; commit each bead's task work **directly** on `agent/<name>`. Do NOT create per-task branches, and never put an agent name or task ID in a branch name (reference the task ID in the commit/PR body as `Closes <id>`)
-- **Between beads, rebase your own branch**: `git fetch origin --prune && git rebase origin/main && git clean -fd`, then run the install command from CLAUDE.md Key Commands
+- **Work on your `agent/<name>/<bead-id>` branch** (created by `setup-agent-worktree.sh --bead <id>`; bare `agent/<name>` on older setups) — the worktree already tracks `origin/main`; commit each bead's task work **directly** on it. Do NOT create additional per-task branches. Traceable IDs: commit subjects and the PR title end with a trailing `(<bead-id>)` tag, and the PR body carries `Closes <id>` (the canonical machine mapping)
+- **Mid-bead, keep your branch current**: `git fetch origin --prune && git rebase origin/main && git clean -fd`, then run the install command from CLAUDE.md Key Commands. **Between beads**, the merged branch is already retired (`--delete-branch` + `make prune-merged`) — start the next bead on a fresh branch with `scripts/setup-agent-worktree.sh <name> --install --bead <next-id>`
 
 ### Beads Detection
 
@@ -152,8 +152,11 @@ tracker looks done" bug):
 **Step 3 — `beads_usable` + valid contract → orchestrator materializes, workers wait, then claim:**
 
 Branch naming: `<type>/<short-desc>` (worktree workspace branches are
-`agent/<name>`); bead IDs go in commit/PR bodies (`Closes <id>`), never in
-branch names. Verify `$BEADS_ACTOR` is set per agent (echo it; bail if empty).
+`agent/<name>/<bead-id>` — the bead id as the branch's final segment); the bead
+ID is appended to commit subjects and PR titles as a trailing `(<bead-id>)`, and
+the PR body's `Closes <id>` is the canonical machine mapping. Verify `$BEADS_ACTOR` is set
+per agent (echo it; bail if empty — `scripts/agent-name.sh` generates a unique,
+collision-checked one).
 
 **Two distinct identities.** The merge-slot needs a **per-process unique** holder
 (e.g. `agent-$$` or a UUID) so two local agents sharing one `git user.name` don't

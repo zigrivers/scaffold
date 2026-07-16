@@ -23,12 +23,12 @@ Expert knowledge for managing git worktrees to enable parallel multi-agent execu
 
 ### Setup
 
-Use `scripts/setup-agent-worktree.sh <agent-name> --install` to create a worktree at `.worktrees/<agent-name>/` (project-local). Each agent gets its own isolated working directory on its own `agent/<name>` branch. The `--install` flag runs the project's configured worktree setup commands (dependency installs); a plain invocation creates the worktree but installs nothing.
+Use `scripts/setup-agent-worktree.sh <agent-name> --install --bead <id>` to create a worktree at `.worktrees/<agent-name>/` (project-local). Each agent gets its own isolated working directory on branch `agent/<name>/<bead-id>` — the bead id as the branch's final segment turns `git branch -r` into a roster of in-flight beads (omit `--bead` for non-bead work and the branch is `agent/<name>`). The `--install` flag runs the project's configured worktree setup commands (dependency installs); a plain invocation creates the worktree but installs nothing.
 
 ### Branching Conventions
 
-- Each agent commits its task work **directly** on its own `agent/<name>` branch — there are no per-task feature branches, and no work-item or bead IDs ever appear in a branch name (reference them in the commit/PR body as `Closes <id>`)
-- Keep `agent/<name>` current by rebasing it onto `origin/main` between beads — never branch from local `main` (it may be stale)
+- Each agent commits its task work **directly** on its own `agent/<name>/<bead-id>` branch — no additional per-task feature branches. The bead ID is also appended to commit subjects and the PR title as a trailing `(<bead-id>)`; the PR body's `Closes <id>` stays the canonical machine mapping
+- Keep the branch current by rebasing it onto `origin/main` while the bead is in flight — never branch from local `main` (it may be stale)
 - Never run `git checkout main` inside a worktree — it will fail because `main` is checked out in the primary repo
 
 ### Cleanup
@@ -43,16 +43,16 @@ After all agents finish, remove worktrees and prune stale references. Delete mer
 
 ```bash
 # From the main repository
-scripts/setup-agent-worktree.sh agent-1 --install
+scripts/setup-agent-worktree.sh agent-1 --install --bead bd-a3f8
 
 # This creates:
-#   .worktrees/agent-1/    (working directory, project-local)
-#   Branch: agent/agent-1  (the agent's own branch — task work commits here)
+#   .worktrees/agent-1/          (working directory, project-local)
+#   Branch: agent/agent-1/bd-a3f8  (this bead's branch — task work commits here)
 ```
 
 **What the setup script does:**
 1. Creates a new worktree directory project-local under `.worktrees/`
-2. Creates the agent's `agent/<name>` branch tracking `origin/main`
+2. Creates the agent's `agent/<name>/<bead-id>` branch tracking `origin/main` (bare `agent/<name>` without `--bead`)
 3. Sets up the working directory with a clean state
 4. Runs the project's configured worktree setup commands (dependency installs) **only when passed `--install`** — a plain invocation installs nothing
 
@@ -66,40 +66,49 @@ scripts/setup-agent-worktree.sh agent-3 --install
 
 Each agent has a completely isolated working directory. They share the same `.git` object store but have separate working trees, index files, and HEAD pointers.
 
-### The `agent/<name>` Branch
+### The `agent/<name>/<bead-id>` Branch
 
-Each agent has one persistent branch — `agent/<name>` — that it commits **all**
-of its task work to directly. There are no per-task feature branches layered on
-top of it:
+Each agent's worktree carries ONE live branch at a time —
+`agent/<name>/<bead-id>` — and the agent commits that bead's work to it
+directly. The branch is retired when the bead ships (squash-merge with
+`--delete-branch`, then `make prune-merged`), and the next bead starts a fresh
+branch via `setup-agent-worktree.sh … --bead <next-id>`. There are no per-task
+feature branches layered on top of it:
 
-- The worktree is created on `agent/<name>`, which tracks `origin/main`
-- Each bead's work is committed straight onto `agent/<name>`; one PR per agent at
+- The worktree is created on `agent/<name>/<bead-id>`, which tracks
+  `origin/main`
+- Each bead's work is committed straight onto that branch; one PR per agent at
   a time carries that work to `main`
-- The bead/task ID never appears in the branch name — it goes in the commit/PR
-  body as `Closes <id>`
+- The bead/task ID ends the branch name and is appended to commit subjects and
+  the PR title as a trailing `(<bead-id>)`; the PR body's `Closes <id>` is the
+  canonical machine mapping
 
-**Why one branch per worktree (not one per task):**
-- A worktree requires a branch that isn't checked out elsewhere; `agent/<name>`
-  is that branch and it never collides with `main` (checked out in the primary)
-- Committing directly on it keeps the model simple — no branch bookkeeping, no
-  IDs in branch names, nothing to "switch back" to between beads
+**Why one live branch per worktree (not a pile of task branches):**
+- A worktree requires a branch that isn't checked out elsewhere;
+  `agent/<name>/<bead-id>` is that branch and it never collides with `main`
+  (checked out in the primary)
+- Committing directly on it keeps the model simple — no extra branch
+  bookkeeping, nothing to "switch back" to mid-bead; the squash-merge's
+  `--delete-branch` plus `make prune-merged` retire the branch and worktree
+  when the bead finishes, and the next bead gets a fresh
+  `setup-agent-worktree.sh … --bead <next-id>`
 
 ### Branching — Extended
 
-**Starting the next bead on `agent/<name>`:**
+**While a bead is in flight, keep its branch current:**
 
 ```bash
-# Inside the agent's worktree, before starting the next bead
+# Inside the agent's worktree, whenever main advances
 git fetch origin
-git rebase origin/main   # bring agent/<name> up to date; do NOT create a new branch
+git rebase origin/main   # bring the branch up to date; do NOT create a new branch
 ```
 
 **Critical rules:**
-- Rebase `agent/<name>` onto `origin/main` between beads — never branch from
-  local `main` (it may be stale)
-- Commit task work directly on `agent/<name>`; do **not** create per-task
-  branches, and never put a work-item or bead ID in the branch name — reference
-  the task ID in the commit/PR body instead (e.g. `Closes bd-42`)
+- Rebase the workspace branch onto `origin/main` whenever `main` advances —
+  never branch from local `main` (it may be stale)
+- Commit task work directly on the workspace branch; do **not** create extra
+  per-task branches. The bead ID is appended to the commit subject (`… (bd-42)`)
+  and the PR body carries `Closes bd-42` (the canonical machine mapping)
 
 **Never run `git checkout main` in a worktree:**
 - The `main` branch is checked out in the primary repo
@@ -109,28 +118,25 @@ git rebase origin/main   # bring agent/<name> up to date; do NOT create a new br
 ### Between Tasks
 
 After a bead's PR has merged (local quality gates green + `mmr review` passed —
-CI is deferred until launch), prepare for the next one on the same
-`agent/<name>` branch:
+CI is deferred until launch), the bead's branch is already retired — the
+squash-merge ran with `--delete-branch`. From the PRIMARY checkout, reclaim the
+finished worktree and start the next bead on a fresh branch:
 
 ```bash
-# Fetch latest state from remote
-git fetch origin --prune
+# From the primary checkout: sync main and prune merged worktrees/branches
+make main-sync && make prune-merged
 
-# Rebase agent/<name> onto the freshly-merged main (stay on your own branch)
-git rebase origin/main
-
-# Clean up untracked files and directories
-git clean -fd
-
-# Reinstall dependencies (important if package files changed on main)
-# npm install / pip install -r requirements.txt / etc.
+# Start the next bead with a fresh worktree branch carrying its id
+scripts/setup-agent-worktree.sh <name> --install --bead <next-id>
+cd .worktrees/<name>
 ```
 
 **Why this matters:**
-- `git fetch --prune` ensures you see newly merged branches and removed remote branches
-- Rebasing `agent/<name>` onto `origin/main` picks up other agents' merged work
-- `git clean -fd` removes artifacts from the previous task
-- Dependency reinstallation catches changes merged by other agents
+- `main-sync` + `prune-merged` pick up other agents' merged work and remove
+  the retired branch/worktree (squash-aware detection)
+- A fresh `--bead <next-id>` branch keeps the open-branch list an accurate
+  roster of in-flight beads — never reuse the previous bead's branch
+- `--install` reinstalls dependencies, catching changes merged by other agents
 
 ### Rebase Strategy
 
@@ -194,14 +200,14 @@ git branch --merged origin/main | grep -vE '^\*|main|agent/' | xargs -r git bran
 ```
 
 This deletes all local branches merged to `origin/main`, excluding the
-current branch, `main`, and the worktree `agent/<name>` branches.
+current branch, `main`, and the worktree `agent/*` branches.
 Safe because `--merged` ensures only fully-merged branches are deleted, and
 `-d` (not `-D`) refuses to delete unmerged branches.
 
-**Cleanup of `agent/<name>` branches:**
+**Cleanup of `agent/*` branches:**
 
 Prefer `scripts/teardown-agent-worktree.sh <path>`, which harvests the ledger,
-removes the worktree, and deletes its `agent/<name>` branch under guards (it
+removes the worktree, and deletes its `agent/*` branch under guards (it
 never deletes the primary's checked-out branch or the default branch). For a
 manual sweep after all agents are done and their worktrees removed:
 

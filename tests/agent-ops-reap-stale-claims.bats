@@ -189,3 +189,36 @@ mirror_show() {
     [[ "$output" == *"INCONCLUSIVE"* ]]
     [ ! -f "$FX/bd-update.log" ]
 }
+
+@test "a bead id carried only in a PR's headRefName still HOLDs the claim (branch-suffix convention)" {
+    # New branch convention agent/<name>/<bead-id>: the reaper's PR guard must
+    # match the head branch too, not just title+body.
+    write_inprogress '[{"id":"proj-branchy","assignee":"agent-a","updated_at":"2026-07-13T12:00:00Z","issue_type":"task"}]'
+    mirror_show proj-branchy '[{"id":"proj-branchy","assignee":"agent-a","updated_at":"2026-07-13T12:00:00Z","issue_type":"task"}]'
+    printf '%s' '[{"number":12,"title":"work","body":"no ids here","isDraft":false,"headRefName":"agent/alpha/proj-branchy"}]' > "$FX/prs.json"
+    run "$FX/reap-stale-claims.sh" --apply
+    [ "$status" -eq 0 ]
+    [ ! -f "$FX/bd-update.log" ]   # protected by the branch name → not reaped
+    [[ "$output" == *"proj-branchy"* ]]
+}
+
+@test "a child PR (bd-a3f8.1) does NOT falsely HOLD the stale parent (bd-a3f8) — dotted boundary" {
+    write_inprogress '[{"id":"bd-a3f8","assignee":"agent-a","updated_at":"2026-07-13T12:00:00Z","issue_type":"task"}]'
+    mirror_show bd-a3f8 '[{"id":"bd-a3f8","assignee":"agent-a","updated_at":"2026-07-13T12:00:00Z","issue_type":"task"}]'
+    # An open PR references only the CHILD id in its branch + body.
+    printf '%s' '[{"number":5,"title":"child work","body":"Closes bd-a3f8.1","isDraft":false,"headRefName":"agent/bob/bd-a3f8.1"}]' > "$FX/prs.json"
+    run "$FX/reap-stale-claims.sh" --apply
+    [ "$status" -eq 0 ]
+    [ -f "$FX/bd-update.log" ]                 # parent is reapable (not protected by child)
+    grep -q 'bd-a3f8' "$FX/bd-update.log"
+}
+
+@test "a bead id with a sentence-final period (Closes bd-a3f8.) still HOLDs the claim" {
+    write_inprogress '[{"id":"bd-a3f8","assignee":"agent-a","updated_at":"2026-07-13T12:00:00Z","issue_type":"task"}]'
+    mirror_show bd-a3f8 '[{"id":"bd-a3f8","assignee":"agent-a","updated_at":"2026-07-13T12:00:00Z","issue_type":"task"}]'
+    printf '%s' '[{"number":8,"title":"work","body":"Fixes bd-a3f8. Ready for review.","isDraft":false,"headRefName":"feature"}]' > "$FX/prs.json"
+    run "$FX/reap-stale-claims.sh" --apply
+    [ "$status" -eq 0 ]
+    [ ! -f "$FX/bd-update.log" ]        # trailing-period reference still protects → not reaped
+    [[ "$output" == *"bd-a3f8"* ]]
+}

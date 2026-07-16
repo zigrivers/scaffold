@@ -40,18 +40,26 @@ The trunk-based development model works best for AI-agent workflows:
   and PR review; CI is deliberately deferred until a launch target is chosen
   — see "Quality gates (CI deferred)" below
 - **Feature branches** — short-lived, one per task (`feat/short-desc`,
-  `fix/bug-description`); no work-item or bead IDs in the branch name — those
-  are referenced only in the commit/PR body as `Closes <id>`
+  `fix/bug-description`)
 - **Worktree branches** — parallel agent execution using git worktrees; the
-  workspace branch is `agent/<name>` (one branch per worktree, not one per
-  task — an agent commits its task work directly on this branch, with the
-  task ID referenced in commit/PR bodies, never appended to the branch name)
+  workspace branch is `agent/<name>/<bead-id>` — the agent's name plus the
+  bead id as the final segment, so `git branch -r` reads as a live roster of
+  in-flight work (bare `agent/<name>` when there is no bead; an agent commits
+  its task work directly on this branch)
+
+Traceable IDs — when a tracker is configured, the work-item/bead ID is appended
+to the commit subject and the PR title as a trailing `(<bead-id>)` and ends the
+worktree branch name; the PR body's `Closes <id>` stays the CANONICAL
+machine-readable bead↔PR mapping. Keeping the Conventional-Commits `type` first
+means commitlint/semantic-release/changelog tooling parses these commits with no
+special config. Tooling treats the body as authoritative; the stale-claim
+reaper may additionally use a bead id found in the PR title or head branch as
+a conservative HOLD signal (extra protection only, never a substitute for the
+body). Under squash-merge the PR title becomes the commit subject on
+main, which is what makes `git log --oneline` show the bead per commit.
 
 Branch naming conventions — `<type>` matches the Conventional Commits type;
-`<short-desc>` is kebab-case, <= 40 chars, and never embeds a work-item or
-bead ID (IDs live in the commit/PR body as `Closes <id>` so squash-merge, PR
-search, and `git log --grep` don't have to parse branch names for
-traceability):
+`<short-desc>` is kebab-case and <= 40 chars:
 ```
 feat/user-registration           # Feature work
 fix/login-timeout-handling       # Bug fix

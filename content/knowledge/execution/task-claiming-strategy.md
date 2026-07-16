@@ -70,7 +70,7 @@ Before starting a task, verify all its blockers are resolved. After completing e
 ### Multi-Agent Conflict Avoidance — Extended
 
 **Claiming a task:**
-- The claim is an atomic `bd ready --claim` (sets `in_progress` + assignee) plus a draft PR opened on the first push — not branch creation. The draft PR is the visible claim other agents see; the bead ID stays out of the branch name and rides in the PR body as `Closes bd-a3f8`. Claims key on the Beads actor and same-actor claims are idempotent — each concurrent agent needs its own stable `BEADS_ACTOR`. Select one task at a time, at claim time; a claim lost to another agent means take the next candidate
+- The claim is an atomic `bd ready --claim` (sets `in_progress` + assignee) plus a draft PR opened on the first push — not branch creation. The draft PR is the visible claim other agents see; the PR body's `Closes bd-a3f8` is the canonical machine-readable bead↔PR mapping (the bead ID is also appended to the PR title as a trailing `(bd-a3f8)` and ends the branch name as human-visible redundancy). Claims key on the Beads actor and same-actor claims are idempotent — each concurrent agent needs its own stable `BEADS_ACTOR` (generate one with `scripts/agent-name.sh`; self-picked names converge across agents). Select one task at a time, at claim time; a claim lost to another agent means take the next candidate
 - Other agents should check open/draft PRs and `bd` status before claiming the same task
 - If two agents accidentally claim the same task, the one with fewer commits yields
 
@@ -108,13 +108,15 @@ Beads is an optional task-tracking tool. Detect its presence and adapt.
 - Use `bd close <id>` after PR is merged to mark task complete
 - Task IDs come from Beads (`bd-a3f8`, `bd-a3f9`, etc. — hash-based, lowercase)
 - Branch naming follows the `<type>/<short-desc>` convention (worktree
-  branches use `agent/<name>`) — bead IDs never appear in the branch name;
-  reference the task ID in the commit/PR body instead (e.g. `Closes bd-a3f8`)
+  branches use `agent/<name>/<bead-id>` — the bead id as the final segment,
+  so open branches show what's in flight); the bead ID is appended to commit
+  subjects and the PR title as a trailing `(bd-a3f8)`, and the PR body carries
+  `Closes bd-a3f8` (the canonical machine mapping)
 
 **Without Beads:**
 - Parse `implementation-plan.md` task list for task IDs and dependencies
 - Or use the project's task tracking system (GitHub Issues, Linear, Jira)
-- Branch naming uses the project's convention (e.g., `feat/user-registration`) — no work-item IDs in the branch name; put the ID in the PR body as `Closes <id>`
+- Branch naming uses the project's convention (e.g., `feat/user-registration`); when the tracker issues IDs, lead the commit subject and PR title with the ID and put `Closes <id>` in the PR body (the canonical machine mapping)
 - Task status is tracked via PR state: open PR = in progress, merged PR = done
 
 ### Task Completion Criteria

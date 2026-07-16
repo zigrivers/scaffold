@@ -52,11 +52,19 @@ default `git user.name`) therefore BOTH "win" the same bead — the claim gives
 **zero** collision protection. Establish a distinct actor BEFORE any claim:
 - Already have `BEADS_ACTOR` exported in THIS shell (the multi-agent prompt set
   it, or you sourced a worktree `.agent-env` on resume)? Keep it.
-- Otherwise `export BEADS_ACTOR=<distinctive-name>` (e.g. `agent-cobalt-fox`) in
-  THIS shell **now, before Step 1** — or pass `--actor <name>` on every `bd`
-  write. The first claim runs from the primary checkout, BEFORE any worktree
-  exists, so the actor must live in your current shell; a not-yet-created
-  worktree cannot supply it.
+- Otherwise, in THIS shell **now, before Step 1**:
+  `export BEADS_ACTOR="$(scripts/agent-name.sh)"` — the generator draws a
+  memorable `agent-<adjective>-<noun>-<NN>` name (e.g. `agent-turbo-walrus-07`)
+  with real entropy and collision-checks it against live assignees, worktree
+  actors, and `agent/*` branches. Prefer it over inventing a name yourself:
+  self-picked "distinctive" names converge across concurrent agents, and two
+  agents on one name get zero claim protection. No generator installed? Invent
+  a distinctive name (e.g. `agent-cobalt-fox`) — or pass `--actor <name>` on
+  every `bd` write. The first claim runs from the primary checkout, BEFORE any
+  worktree exists, so the actor must live in your current shell; a
+  not-yet-created worktree cannot supply it. The name is also your public
+  ownership label — it shows up in `bd list` assignees, the reaper report,
+  branch names, and git blame — so keep ONE name per session.
 - Cannot get an actor distinct from the shared human identity? You MUST NOT trust
   `--claim` for safety: **fail loud** — refuse the claim path, or fall back to a
   plain non-atomic in-progress write AND record in the batch report that
@@ -212,17 +220,37 @@ candidate is chosen; it does NOT skip validation: the claimed bead still stamps
 the (a) lease, runs the (b) gates, and on reject follows the SAME single-command
 cooldown-release in (c). It still requires a distinct `BEADS_ACTOR`.
 
-**2.2 Worktree:** `scripts/setup-agent-worktree.sh <name> --install --task "<bead title>"`,
-then `cd .worktrees/<name>`. The `--install` flag runs the configured worktree
-setup commands (dependency installs) — omitting it is a known `make check`
-breaker, because a plain invocation creates the worktree but installs nothing.
-Need a live stack? `make staging-up` **from the worktree** (never the primary).
+**2.2 Worktree:** `scripts/setup-agent-worktree.sh <name> --install --task "<bead title>" --bead <id>`
+with `<name>` = your existing actor minus any `agent-` prefix
+(`${BEADS_ACTOR#agent-}` — never a fresh `agent-name.sh` call here, which would
+mint a DIFFERENT name and desync the worktree from your claims), then
+`cd .worktrees/<name>`. The setup script persists your exported `BEADS_ACTOR`
+into the worktree's `.agent-env` VERBATIM (only deriving `agent-<name>` when
+none is exported), so resume and heartbeats always run as the same actor that
+made the claim. The `--install` flag runs the
+configured worktree setup commands (dependency installs) — omitting it is a
+known `make check` breaker, because a plain invocation creates the worktree but
+installs nothing. `--bead <id>` puts the bead id on the branch (below); an
+older installed script without the flag errors on it — then drop the flag and
+keep the rest of the convention. Need a live stack? `make staging-up` **from
+the worktree** (never the primary).
 
 **2.3 Build:** use the Superpowers discipline if available (brainstorm → plan →
 TDD); otherwise write the failing test first. Commit and push frequently on
-`agent/<name>`. **Open a draft PR on the first push — the draft is the visible
-claim.** Bead IDs go in commit/PR bodies (`Closes <id>`), never in branch names
-or commit subjects.
+your branch. **Open a draft PR on the first push — the draft is the visible
+claim.** Bead traceability (every surface a human scans carries the id):
+- **Branch** = `agent/<name>/<bead-id>` (what `--bead` created): open branches
+  read as the roster of in-flight beads.
+- **Commit subjects** keep the normal Conventional-Commits form and append the
+  bead id as a trailing tag — `type(scope): subject (<bead-id>)`
+  (e.g. `feat(api): add webhook rate limiter (bd-a3f8)`). The type stays first,
+  so commitlint/semantic-release work unchanged.
+- **PR title** carries the same trailing `(<bead-id>)` — the squash-merge
+  subject comes from the PR title, so this is what makes bead ids visible in
+  `git log --oneline` on main.
+- **PR body** carries `Closes <id>` — the CANONICAL machine-readable mapping
+  (the stale-claim reaper and duplicate-work gates parse it); the title/branch
+  copies are redundant human-first surfaces, never a substitute.
 
 **Lease heartbeat + lost-claim check (§6.1, §5.2):** on each push, first re-read
 your bead, then renew its lease. This is both the liveness signal AND your
@@ -296,7 +324,9 @@ merge on a red gate. Never `docker system prune`.
   then and must not block the merge. Never run it from the primary: it refuses
   there (from the primary it would select the shared QA stack and `down -v` its
   volumes).
-- Merge: `gh pr merge <N> --squash --delete-branch`. Then from the primary:
+- Merge: `gh pr merge <N> --squash --delete-branch` (the squash subject is the
+  PR title — which is why the title leads with the bead id). Then from the
+  primary:
   `make main-sync && make prune-merged` — `prune-merged` also reclaims any
   leftover worktree staging stack automatically (no separate `staging-down`
   needed post-merge, and running it from the primary would be wrong anyway).

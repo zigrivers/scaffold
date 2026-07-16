@@ -36,8 +36,10 @@ the D7 relationship between Beads IDs and git).
 - docs/beads-workflow.md — scaffold-owned reference for day-to-day Beads usage:
   the defer-immediately rule, the `bd create` template (with the required
   `docs:` tail), day-to-day commands, the bootstrap-trap warning, epics & phase
-  conventions, and Beads' relationship to git (D7: IDs referenced only in
-  commit/PR bodies, never branch names or commit subjects). Not part of the
+  conventions, and Beads' relationship to git (traceable-IDs convention: the
+  bead ID is appended to commit subjects and PR titles as a trailing
+  `(<bead-id>)`, rides the work branch as its final segment, and the PR body's
+  `Closes <id>` stays the canonical machine mapping). Not part of the
   `bd setup claude` marker block — safe to edit freely and unaffected by future
   `bd setup claude` re-runs.
 
@@ -54,16 +56,17 @@ the D7 relationship between Beads IDs and git).
   were run. Verify with `bd setup claude --check`.
 - (mvp) CLAUDE.md contains Core Principles with all four tenets (Simplicity, No Laziness, TDD, Prove It) — scaffold-owned content, ADJACENT to the Beads-managed block
 - (mvp) CLAUDE.md contains commit-message convention documenting that a Beads
-  task ID, when Beads is configured, is referenced only in the commit/PR body
-  as `Closes <id>` — never as a subject-line prefix and never in the branch
-  name (D7) — scaffold-owned content
+  task ID, when Beads is configured, is APPENDED to the commit subject and the
+  PR title as a trailing `(<bead-id>)` and appears at the end of the work branch
+  name, while the PR body carries `Closes <id>` as the canonical machine-readable
+  mapping — scaffold-owned content
 - (mvp) CLAUDE.md contains an upgrade-remediation callout: "If `bd` was upgraded since
   last `bd init`, run `bd doctor --fix` to re-sync git hooks and project config. This
   fixes errors like `unknown command \"hook\" for \"bd\"` from stale post-checkout /
   post-merge hook shims."
-- (mvp) Bootstrap commit uses Conventional Commits subject `chore: initialize
-  Beads task tracking`; the bootstrap bead ID is referenced only in the commit
-  body as `Closes <id>` — never as a subject-line prefix (D7)
+- (mvp) Bootstrap commit subject appends the bootstrap bead ID —
+  `chore: initialize Beads task tracking (<bead-id>)` — and the commit body
+  also references it as `Closes <id>` (the canonical machine mapping)
 - (mvp) docs/beads-workflow.md exists and documents: the defer-immediately
   rule verbatim ("If you decide not to do something now, it becomes a bead —
   immediately.") plus the tracking-exemptions note (a commit-body note, a PR
@@ -74,8 +77,10 @@ the D7 relationship between Beads IDs and git).
   `bd show` / `bd update <id> --claim` / `bd close` / `bd stats`);
   the bootstrap-trap warning verbatim; epics & phases conventions (`-t epic`
   + `--parent`, phase epics `blocks:` each other); and Beads' relationship to
-  git (D7: IDs out of branch names/commit subjects, `Closes <id>` in bodies,
-  close only after the squash-merge is verified)
+  git (traceable-IDs convention: a trailing `(<bead-id>)` on commit subjects and
+  PR titles, the bead id ends the work branch name, `Closes <id>` in the PR body
+  stays the canonical machine mapping, close only after the squash-merge is
+  verified)
 - (mvp) Auto-export to `.beads/issues.jsonl` is explicitly enabled after `bd init`:
   `bd config set export.auto true && bd config set export.git-add true`. Opt-in
   since Beads v1.0.4 (previously default); explicit enable means
@@ -232,18 +237,19 @@ existing setup updates rather than re-initializes.
    recipe-managed block from step 3. The scaffold-owned content includes Core
    Principles (Simplicity, No Laziness, TDD, Prove It), the commit-message
    convention (Conventional Commits `type(scope): subject`; a Beads task ID,
-   when configured, is referenced only in the commit/PR body as `Closes <id>`
-   — never as a subject-line prefix and never in the branch name, per D7),
+   when configured, is appended to the subject and PR title as a trailing
+   `type(scope): subject (<bead-id>)`, ends the work branch name, and is
+   referenced in the PR body as `Closes <id>` — the canonical machine mapping),
    the upgrade-remediation callout ("If `bd` was upgraded since last
    `bd init`, run `bd doctor --fix`..."), and (deep) autonomous behavior
    rules.
 
-10. **Bootstrap commit** — Conventional Commits subject; the bootstrap bead ID
-   is referenced only in the body (D7):
+10. **Bootstrap commit** — the bootstrap bead ID is appended to the
+   Conventional Commits subject and the body references it as `Closes <id>`:
    ```bash
    git add .beads tasks/lessons.md CLAUDE.md
    git commit -m "$(cat <<'EOF'
-   chore: initialize Beads task tracking
+   chore: initialize Beads task tracking (<id>)
 
    Closes <id>
    EOF
@@ -308,9 +314,11 @@ reference content — it does not touch (and is never overwritten by) the
 5. **Epics & phases** — `bd create "<title>" -t epic --parent <parent-epic>`
    for containers; phase epics `blocks:` each other so `bd ready` surfaces
    only the current phase's work.
-6. **Relationship to git** — bead IDs stay out of branch names and commit
-   subjects (D7); reference them only in commit/PR bodies as `Closes <id>`;
-   close the bead only after the squash-merge is verified on `main`.
+6. **Relationship to git** — bead IDs are appended to commit subjects and PR
+   titles as a trailing `(<bead-id>)` and end the work branch name; the PR
+   body's `Closes <id>` is
+   the canonical machine-readable mapping; close the bead only after the
+   squash-merge is verified on `main`.
 7. **Upgrades & migration** — upgrading the `bd` binary can trigger schema
    migrations; crossing a breaking migration un-coordinated can fork Dolt
    histories permanently. Rules: back up first (`make beads-snapshot`). A

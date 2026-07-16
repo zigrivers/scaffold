@@ -1,0 +1,141 @@
+#!/usr/bin/env bash
+# {{PROJECT_NAME}} — agent name generator.
+#
+# Usage:
+#   scripts/agent-name.sh            Print a unique agent name (agent-<adjective>-<noun>-<NN>).
+#   scripts/agent-name.sh --short    Same, without the leading "agent-" (for worktree names).
+#
+# Why a generator instead of "pick a distinctive name": the atomic bead claim
+# (`bd update <id> --claim`) is a compare-and-set KEYED ON THE ACTOR, and
+# same-actor claims are idempotent — two agents that converge on the same name
+# get ZERO collision protection. Agents asked to invent names converge (they
+# sample the same distribution), so unique names need real entropy plus a
+# collision check. The name doubles as the human-readable ownership label in
+# `bd list`, the reaper report, branch names, and git blame.
+#
+# Collision sources checked (all best-effort; a missing tool never blocks):
+#   - assignees of in-progress beads (`bd list --status in_progress --json`)
+#   - actors persisted in .worktrees/*/.agent-env (cwd and the git toplevel)
+#   - local agent/* branches (the <name> segment maps to actor agent-<name>)
+#
+# Read-only: never mutates the repo, the tracker, or the filesystem.
+
+set -euo pipefail
+
+log() { printf "agent-name: %s\n" "$*" >&2; }
+
+ADJECTIVES=(
+  bouncy breezy chunky crispy dapper dizzy feisty fuzzy goofy grumpy
+  jazzy jolly lanky mellow mighty nifty nimble peppy perky plucky
+  quirky rowdy sassy shiny sleepy snazzy soggy sparkly spiffy spunky
+  sturdy swanky toasty turbo wiggly witty wobbly zany zesty zippy
+)
+NOUNS=(
+  badger banjo biscuit burrito cactus donut ferret gecko gizmo hammock
+  kazoo llama mango marmot meerkat mongoose muffin nacho narwhal noodle
+  otter pancake panda pelican pickle pretzel pudding quokka raccoon taco
+  toucan tuba turnip ukulele waffle walrus wombat yeti zebra zucchini
+)
+
+# Entropy: 2 fresh bytes per draw from /dev/urandom. AGENT_NAME_ENTROPY_FILE
+# is a TEST-ONLY hook substituting a fixed byte file (each draw reads from its
+# start, so a constant file yields deterministic picks). An unreadable source
+# falls back to $RANDOM — the generator must always produce a name.
+ENTROPY_SRC="${AGENT_NAME_ENTROPY_FILE:-/dev/urandom}"
+
+rand_index() {
+  local mod="$1" raw=""
+  raw="$(dd if="$ENTROPY_SRC" bs=2 count=1 2>/dev/null | od -An -tu2 | tr -d '[:space:]')" || raw=""
+  [[ -n "$raw" ]] || raw=$((RANDOM * 32768 + RANDOM))
+  printf '%d' $((raw % mod))
+}
+
+# Gather every taken name (one per line) from the best-effort sources.
+taken_names() {
+  # In-progress bead assignees.
+  if command -v bd >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+    bd list --status in_progress --json 2>/dev/null \
+      | jq -r '.[]? | .assignee // empty' 2>/dev/null || true
+  fi
+  # Worktree-persisted actors: scan the cwd, the current toplevel, AND the
+  # PRIMARY checkout root — from inside a worktree, --show-toplevel is the
+  # worktree itself, and sibling worktrees' .agent-env files live under the
+  # primary root's .worktrees/ (derived via --git-common-dir).
+  local root common primary=""
+  common="$(git rev-parse --git-common-dir 2>/dev/null || true)"
+  if [[ -n "$common" ]]; then
+    primary="$(cd "$common/.." 2>/dev/null && pwd || true)"
+  fi
+  for root in "." "$(git rev-parse --show-toplevel 2>/dev/null || true)" "$primary"; do
+    [[ -n "$root" ]] || continue
+    local env_file
+    for env_file in "$root"/.worktrees/*/.agent-env; do
+      [[ -f "$env_file" ]] || continue
+      # setup-agent-worktree persists the sourceable `export BEADS_ACTOR=...`
+      # form, so the pattern accepts an optional `export `. tr strips optional
+      # quoting (BEADS_ACTOR="agent-x") — the actor grammar itself never
+      # contains quotes, so this is lossless.
+      sed -n -E 's/^(export[[:space:]]+)?BEADS_ACTOR=//p' "$env_file" | tr -d "'\""
+    done
+  done
+  # Local AND remote-tracking agent/* branches: agent/<name>[/<bead-id>] →
+  # actor agent-<name>. Remote refs cover concurrent agents on other machines
+  # whose branches were fetched but never checked out here.
+  git for-each-ref --format='%(refname)' 'refs/heads/agent/*' 'refs/remotes/*/agent/*' 2>/dev/null \
+    | sed -n -E 's#.*/agent/([^/]+).*#agent-\1#p' || true
+}
+
+main() {
+  local short=0
+  case "${1:-}" in
+    --short) short=1 ;;
+    "") ;;
+    *) printf 'usage: %s [--short]\n' "$0" >&2; exit 1 ;;
+  esac
+
+  local taken candidate adj noun attempt s found=0
+  taken="$(taken_names)"
+
+  # Every name carries a two-digit suffix from the START: the 40x40 wordlists
+  # alone are ~1,600 names, and a fleet of agents starting CONCURRENTLY has a
+  # real birthday-collision chance before any claim is visible to the collision
+  # check below. The suffix widens the space to ~160,000, shrinking that
+  # blind-window risk two orders of magnitude; the check then covers everything
+  # already persisted.
+  for ((attempt = 0; attempt < 10; attempt++)); do
+    adj="${ADJECTIVES[$(rand_index "${#ADJECTIVES[@]}")]}"
+    noun="${NOUNS[$(rand_index "${#NOUNS[@]}")]}"
+    candidate="agent-$adj-$noun-$(printf '%02d' "$(rand_index 100)")"
+    if ! grep -qxF "$candidate" <<<"$taken"; then
+      found=1
+      break
+    fi
+  done
+  if [[ "$found" -ne 1 ]]; then
+    # Ten straight collisions means degenerate entropy or a crowded namespace:
+    # walk every suffix of the last word pair deterministically, CHECKING each.
+    for ((s = 0; s < 100; s++)); do
+      candidate="agent-$adj-$noun-$(printf '%02d' "$s")"
+      if ! grep -qxF "$candidate" <<<"$taken"; then
+        found=1
+        break
+      fi
+    done
+  fi
+  if [[ "$found" -ne 1 ]]; then
+    # FAIL CLOSED — this generator exists to guarantee actor uniqueness, so a
+    # known-taken name must never be emitted. (Reaching this needs 110 straight
+    # collisions across a 160k namespace: a stuck entropy source or a pathological
+    # taken-list. Either way the operator must intervene.)
+    log "ERROR: could not find an unused name (entropy source stuck, or namespace exhausted) — refusing to emit a colliding actor name"
+    exit 1
+  fi
+
+  if [[ "$short" -eq 1 ]]; then
+    printf '%s\n' "${candidate#agent-}"
+  else
+    printf '%s\n' "$candidate"
+  fi
+}
+
+main "$@"

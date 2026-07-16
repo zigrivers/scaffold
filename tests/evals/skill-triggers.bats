@@ -310,3 +310,30 @@ setup() {
     return 1
   fi
 }
+
+@test "work-beads skill teaches agent identity + bead traceability" {
+  local skill_file="${SKILLS_DIR}/work-beads/SKILL.md"
+  [[ -f "$skill_file" ]] || skip "work-beads not found"
+
+  local failures=()
+  # §5.1 generated names: Step 0 prefers the generator over self-picked names.
+  grep -qF 'agent-name.sh' "$skill_file" \
+    || failures+=("missing the agent-name generator (agent-name.sh)")
+  # §5.2 branch carries the bead id as its final segment.
+  grep -qF -- '--bead' "$skill_file" \
+    || failures+=("missing the --bead worktree flag")
+  grep -qF 'agent/<name>/<bead-id>' "$skill_file" \
+    || failures+=("missing the agent/<name>/<bead-id> branch shape")
+  # §N2 commit subjects and the PR title carry the bead id as a trailing tag.
+  grep -qF '(<bead-id>)' "$skill_file" \
+    || failures+=("missing the trailing '(<bead-id>)' subject/title convention")
+  # The canonical machine mapping is unchanged.
+  grep -qF 'Closes <id>' "$skill_file" \
+    || failures+=("missing the canonical 'Closes <id>' PR-body mapping")
+
+  if [[ ${#failures[@]} -gt 0 ]]; then
+    printf "work-beads identity/traceability assertions failed:\n"
+    printf "  %s\n" "${failures[@]}"
+    return 1
+  fi
+}

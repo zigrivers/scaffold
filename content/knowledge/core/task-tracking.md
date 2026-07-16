@@ -35,7 +35,7 @@ Core properties:
 - **Repository-local** — Task data lives in `.beads/`, committed alongside code
 - **Git-hook synced** — Task state updates automatically on commit via data-sync hooks
 - **CLI-driven** — All operations via `bd` commands (create, list, status, ready)
-- **Body-referenced commits** — Every commit message references its task ID in the body (`Closes bd-<id>`), never as a subject-line prefix (D7)
+- **Traceable commits** — Every commit appends the task ID to its subject as a trailing tag (`type(scope): subject (bd-<id>)`), and the PR body carries `Closes bd-<id>` — the canonical machine-readable mapping
 
 > IDs are hash-based and lowercase (e.g., `bd-a3f8`). The `bd-` prefix is configurable at `bd init` time. Hierarchical IDs for epic children: `bd-a3f8.1`, `bd-a3f8.1.1`. Older example IDs in this doc using `BD-42`-style uppercase digits reflect a pre-v1.0.0 convention; current upstream emits hash-based lowercase IDs.
 
@@ -112,11 +112,14 @@ Initialization creates:
 
 #### Commit Message Convention
 
-Every commit references its Beads task in the body, never the subject line
-(D7 — bead IDs stay out of branch names and commit subjects):
+Every commit appends the bead ID to its subject as a trailing tag (as does the
+PR title — the squash-merge subject on main comes from it), and the PR body
+references the task as `Closes <id>`, the canonical machine-readable mapping.
+Keeping the Conventional-Commits `type` first means commitlint/semantic-release
+parse it with no special config:
 
 ```
-feat(api): implement user registration endpoint
+feat(api): implement user registration endpoint (bd-a3f8)
 
 - Add POST /api/v1/auth/register
 - Add input validation with zod schema
@@ -125,7 +128,7 @@ feat(api): implement user registration endpoint
 Closes bd-a3f8
 ```
 
-Referencing the task ID in the body enables:
+The subject prefix plus the body reference together enable:
 - Automatic task-to-commit traceability
 - Progress tracking based on commit activity
 - Session reconstruction (which commits belong to which task)
@@ -142,7 +145,7 @@ Referencing the task ID in the body enables:
 
 #### Session End Protocol
 
-1. Commit all work referencing the task ID in the commit body (`Closes bd-<id>`), never the subject line
+1. Commit all work with the task ID appended to the subject as a trailing tag (`… (bd-<id>)`) and referenced in the PR body (`Closes bd-<id>`)
 2. If task is complete: create PR, run `bd close <id>` (alias: `bd done`)
 3. If task is incomplete: leave clear notes about current state and next steps
 4. If lessons were learned: update `tasks/lessons.md`
@@ -289,10 +292,10 @@ actually lost them (`bd dolt pull`) before rebuilding — restore order is
 `bd backup restore` (full history) → `bd import -i .beads/issues.jsonl` →
 reconstruct from committed docs.
 
-**Close after merge, not after PR-open.** Bead IDs stay out of branch names
-and commit subjects (per D7 — see the branch-naming rules in
-[git-workflow-patterns](./git-workflow-patterns.md)); reference them only in
-commit/PR bodies as `Closes <id>`. `bd close
+**Close after merge, not after PR-open.** Bead IDs lead commit subjects and
+PR titles and end the worktree branch name (see the traceable-IDs rules in
+[git-workflow-patterns](./git-workflow-patterns.md)); the PR body's
+`Closes <id>` stays the canonical machine mapping. `bd close
 <id>` runs only after the squash-merge is verified on `main` — closing on PR
 creation, before review or merge, is a common but incorrect shortcut that
 leaves `bd ready` reporting work as available when it's actually already

@@ -168,5 +168,7 @@ describe('mixed subprocess + HTTP channel review', () => {
       fs.rmSync(dir, { recursive: true, force: true })
       fs.rmSync(home, { recursive: true, force: true })
     }
-  })
+    // Real subprocess + HTTP dispatch: ~2s alone, but repeatedly exceeds the 5s
+    // default under full-suite load — an integration test needs its own budget.
+  }, 30_000)
 })

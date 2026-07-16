@@ -20,11 +20,12 @@
 #   * Epics are never reaped (umbrellas sit in_progress for days by design).
 #
 # NOTE on the spec's probe (4), the machine-local worktree check: it is intentionally
-# omitted. Under this project's branch-naming convention (bead ids live in the PR
-# BODY, never in branch names — git-workflow §2.2), a live worktree is linkable to a
-# bead ONLY through its PR, so probe (3) — the PR guard — already subsumes it. A bare
-# `git worktree list` probe would add nothing here and is invalid across machines
-# anyway (§5.2). If a future convention puts bead ids on branches, add the probe then.
+# omitted. Branch names carry the bead id as their final segment
+# (agent/<name>/<bead-id>), and that signal already feeds probe (3): the PR guard
+# matches headRefName alongside title+body, so a pushed branch protects its claim.
+# The only gap a `git worktree list` probe would cover is a claim with NO lease and
+# NO pushed branch — but the loop stamps a lease at claim time, so that window is
+# lease-protected; and a worktree probe is invalid across machines anyway (§5.2).
 #
 # Safety: the release `bd update <id> --status open --assignee ""` is unconditional,
 # so --apply performs a GUARDED release — it re-reads the bead immediately before
@@ -43,8 +44,10 @@ GRACE_SECONDS="${REAP_GRACE_SECONDS:-3600}"
 # No-lease fallback: how many hours since updated_at before a claim is "stale".
 STALE_HOURS="${REAP_STALE_HOURS:-24}"
 # [HOST] The PR-lister is pluggable so a project on a non-GitHub forge can swap it.
-# It MUST emit a JSON array with (at least) title and body.
-PR_LIST_CMD="${REAP_PR_LIST_CMD:-gh pr list --state open --limit 500 --json number,title,body,isDraft}"
+# It MUST emit a JSON array with (at least) title and body; headRefName is read
+# when present (branches carry the bead id as their final segment, so the head
+# branch protects a claim too — an additional HOLD signal, never a reap signal).
+PR_LIST_CMD="${REAP_PR_LIST_CMD:-gh pr list --state open --limit 500 --json number,title,headRefName,body,isDraft}"
 # Clock is injectable so tests can pin "now".
 NOW="${REAP_NOW:-$(date +%s)}"
 
@@ -94,25 +97,31 @@ STALE_SECONDS=$((STALE_HOURS * 3600))
 # Escape ERE metacharacters so a bead id is matched literally.
 regex_escape() { printf '%s' "$1" | sed -E 's/[][(){}.^$*+?|\\]/\\&/g'; }
 
-# Is bead id $1 present as a WHOLE token in text $2? A bead id contains an internal
-# hyphen, and `grep -w` treats `-` as a word boundary, so `grep -Fw proj-abc` wrongly
-# matches `proj-abc-2`. Require the id to be delimited by a non-id char (anything
-# outside [A-Za-z0-9-]) or string edge instead.
+# Is bead id $1 present as a WHOLE token in text $2? Bead ids contain an internal
+# hyphen and MAY contain dots (hierarchical children like bd-a3f8.1), so neither
+# `grep -w` nor a naive delimiter class is correct:
+#   - `grep -Fw proj-abc` wrongly matches `proj-abc-2`   (hyphen extension)
+#   - excluding `.` from the delimiter wrongly matches `bd-a3f8` inside `bd-a3f8.1`
+#     (child) but ALSO wrongly REJECTS `Closes bd-a3f8.` (sentence-final period)
+# The id is a whole reference iff it is NOT extended on the right by another
+# id segment — i.e. the following char is a string edge, a plain non-id char, or
+# a `.`/`-` that is itself NOT followed by an alphanumeric (a trailing period is a
+# boundary; `.1` / `-2` are extensions). Left edge: start or a non-id char.
 bead_referenced() {
   local esc; esc="$(regex_escape "$1")"
-  printf '%s' "$2" | grep -Eq "(^|[^A-Za-z0-9-])${esc}([^A-Za-z0-9-]|$)"
+  printf '%s' "$2" | grep -Eq "(^|[^A-Za-z0-9.-])${esc}(\$|[^A-Za-z0-9.-]|[.-](\$|[^A-Za-z0-9]))"
 }
 
 # ----- gather open/draft PR references (probe 3) -----
 # read the pluggable command into an array so it word-splits cleanly (no eval).
 read -ra PR_LISTER_ARR <<< "$PR_LIST_CMD"
 pr_ok=1
-pr_lines=""       # one "<title> <body>" line per open/draft PR (for the id test)
+pr_lines=""       # one "<title> <headRefName> <body>" line per open/draft PR (for the id test)
 # pr_ok stays 1 ONLY if BOTH the PR command AND the jq parse succeed. A swallowed
 # jq error on malformed output must NOT masquerade as "no PRs" — that would let a
 # PR-protected no-lease claim be reaped. Either failure → pr_ok=0 → hold for triage.
 if pr_raw="$("${PR_LISTER_ARR[@]}" 2>/dev/null)"; then
-  if pr_lines="$(printf '%s' "$pr_raw" | jq -r '.[]? | ((.title // "") + " " + (.body // ""))' 2>/dev/null)"; then
+  if pr_lines="$(printf '%s' "$pr_raw" | jq -r '.[]? | ((.title // "") + " " + (.headRefName // "") + " " + (.body // ""))' 2>/dev/null)"; then
     pr_ok=1
   else
     pr_ok=0

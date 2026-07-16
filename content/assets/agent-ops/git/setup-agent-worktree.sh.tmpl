@@ -2,13 +2,17 @@
 # {{PROJECT_NAME}} — agent worktree helper.
 #
 # Usage:
-#   scripts/setup-agent-worktree.sh <name> [--task "<description>"] [--install]
+#   scripts/setup-agent-worktree.sh <name> [--task "<description>"] [--install] [--bead <id>]
 #       Create or update .worktrees/<name>/ on branch agent/<name>.
 #       Idempotent: re-running on an existing worktree is safe.
 #       First runs an advisory duplicate-work scan (open/merged PRs + in-progress beads);
 #       --task "<desc>" gives it better keywords than the bare <name>.
 #       --install also runs the project's worktree setup commands (dependency installs, etc.)
 #       inside the fresh worktree. Flags may appear in any order.
+#       --bead <id> appends the bead id to the branch (agent/<name>/<id>) so open
+#       branches show which beads are in flight; the worktree dir and the agent
+#       identity stay per-agent. Refuses to rebind a live worktree that is
+#       checked out on a different bead's branch.
 #
 #   scripts/setup-agent-worktree.sh --preflight-only --task "<description>"
 #       Run only the duplicate-work scan (no worktree created).
@@ -18,7 +22,8 @@
 #
 # Conventions:
 #   - Worktrees live under `.worktrees/<name>/` (gitignored).
-#   - Each worktree's branch is named `agent/<name>` and tracks origin/main initially.
+#   - Each worktree's branch is named `agent/<name>` — or `agent/<name>/<bead-id>`
+#     with --bead — and tracks origin/main initially.
 #   - Each worktree gets a per-name git author identity for traceable blame.
 
 set -euo pipefail
@@ -162,8 +167,10 @@ preflight_scan() {
     # is to key on the PARENT EPIC: when the bead being started has a parent, resolve
     # its siblings (`bd dep tree <id>` / `bd children <parent>`) and raise a HARD
     # warning if ANY sibling already carries an open/draft PR touching the same
-    # surface. The bead↔PR mapping lives in the PR body (branch names exclude bead
-    # IDs), so match sibling IDs against `gh pr list --state open --json title,body`.
+    # surface. The canonical bead↔PR mapping is the PR body ("Closes <id>"); the
+    # PR title and the head branch (agent/<name>/<bead-id>) carry the id
+    # redundantly — so match sibling IDs against
+    # `gh pr list --state open --json title,headRefName,body`.
     # Left as a host TODO because the epic/label taxonomy is project-specific.
   fi
 
@@ -382,17 +389,13 @@ configure_identity() {
   # Auto-heal: ensure extensions.worktreeConfig is enabled when configuring identity
   ensure_worktree_config_enabled
 
-  git -C "$wt_path" config --worktree user.email "agent-$name_val@{{PROJECT_NAME}}.local" || fatal "Failed to set worktree-local email config at: $wt_path"
-  git -C "$wt_path" config --worktree user.name  "agent-$name_val" || fatal "Failed to set worktree-local name config at: $wt_path"
-  log "Set worktree-local git identity: agent-$name_val <agent-$name_val@{{PROJECT_NAME}}.local>"
-
   # [HOST binding — T1-ACTOR, Work-Beads Concurrency Hardening §4.3] Per-agent
   # Beads actor. `bd update <id> --claim` is a compare-and-set KEYED ON THE ACTOR,
   # and same-actor claims are idempotent (both "win"), so every agent MUST carry a
-  # DISTINCT actor or the atomic claim gives ZERO collision protection. Write
-  # BEADS_ACTOR=agent-<name> into a worktree-local `.agent-env` so every `bd` write
-  # from this worktree is attributable to this agent. This is PERSISTENCE only: a
-  # child script cannot export into the caller's shell, so the agent must
+  # DISTINCT actor or the atomic claim gives ZERO collision protection. A
+  # worktree-local `.agent-env` persists that actor so every `bd` write from this
+  # worktree (and a resumed session) is attributable to it. This is PERSISTENCE
+  # only: a child script cannot export into the caller's shell, so the agent must
   # `set -a; . ./.agent-env; set +a` after cd-ing in. It does NOT cover the FIRST
   # claim, which the work-beads loop makes from the primary checkout BEFORE this
   # worktree exists — that claim relies on BEADS_ACTOR already exported in the
@@ -404,9 +407,45 @@ configure_identity() {
   # the wrapper only has to avoid OVERRIDING it.
   ensure_agent_env_excluded
   local env_file="$wt_path/.agent-env"
-  if [ ! -f "$env_file" ] || ! grep -q '^export BEADS_ACTOR=' "$env_file" 2>/dev/null; then
-    printf 'export BEADS_ACTOR=agent-%s\n' "$name_val" >> "$env_file"
-    log "Wrote BEADS_ACTOR=agent-$name_val to $env_file (source it in the worktree shell)"
+
+  # Read any actor already pinned by a prior run (handles the sourceable
+  # `export BEADS_ACTOR='...'` form, single- or double-quoted or bare).
+  local persisted_actor=""
+  if [ -f "$env_file" ]; then
+    persisted_actor="$(sed -n -E "s/^(export[[:space:]]+)?BEADS_ACTOR=//p" "$env_file" | head -1 | tr -d "'\"")"
+  fi
+
+  # Resolve ONE actor used for BOTH the git identity and the persisted env, so
+  # blame, resume, and heartbeats never disagree:
+  #   exported BEADS_ACTOR  >  already-persisted actor  >  derived agent-<name>.
+  # Guard the desync the reviewer flagged: if the shell exports an actor AND the
+  # worktree already pins a DIFFERENT one, fail loud rather than run git identity
+  # as one actor while resume sources the other.
+  if [ -n "${BEADS_ACTOR:-}" ] && [ -n "$persisted_actor" ] && [ "$BEADS_ACTOR" != "$persisted_actor" ]; then
+    fatal "worktree $wt_path pins BEADS_ACTOR='$persisted_actor' but this shell exports BEADS_ACTOR='$BEADS_ACTOR' — reconcile before continuing (use the worktree matching your actor, or remove the stale worktree/.agent-env)"
+  fi
+  local resolved_actor="${BEADS_ACTOR:-${persisted_actor:-agent-$name_val}}"
+
+  # git blame should attribute to the SAME identity that claims beads, so
+  # user.name is the resolved actor; the email is a synthetic project-local
+  # address keyed off it (sanitized to a valid local-part).
+  local ident_local
+  ident_local="$(printf '%s' "$resolved_actor" | tr -c 'A-Za-z0-9._-' '-')"
+  git -C "$wt_path" config --worktree user.email "$ident_local@{{PROJECT_NAME}}.local" || fatal "Failed to set worktree-local email config at: $wt_path"
+  git -C "$wt_path" config --worktree user.name  "$resolved_actor" || fatal "Failed to set worktree-local name config at: $wt_path"
+  log "Set worktree-local git identity: $resolved_actor <$ident_local@{{PROJECT_NAME}}.local>"
+
+  # Persist the resolved actor when nothing is pinned yet. This file gets
+  # SOURCED, so the value must never be written bare: strip control characters,
+  # then single-quote with embedded quotes escaped — an actor like `$(cmd)` or
+  # one with spaces round-trips as literal data instead of executing or
+  # corrupting the restored identity.
+  if [ -z "$persisted_actor" ]; then
+    local actor_val actor_sq
+    actor_val="$(printf '%s' "$resolved_actor" | tr -d '[:cntrl:]')"
+    actor_sq="${actor_val//\'/\'\\\'\'}"
+    printf "export BEADS_ACTOR='%s'\n" "$actor_sq" >> "$env_file"
+    log "Wrote BEADS_ACTOR='$actor_val' to $env_file (source it in the worktree shell)"
   fi
 }
 
@@ -507,13 +546,27 @@ resolve_default_branch() {
 }
 
 cmd_create() {
-  local name="$1" task="$2" install="${3:-0}"
+  local name="$1" task="$2" install="${3:-0}" bead="${4:-}"
   [[ -n "$name" ]] || fatal "name is required"
 
   # Validate name: lowercase + digits + dashes, ≤ 40 chars.
   # Validate name early before performing any repository configuration changes.
   if ! [[ "$name" =~ ^[a-z0-9][a-z0-9-]{0,39}$ ]]; then
     fatal "name must be lowercase alphanumeric/dashes, 1–40 chars (got: '$name')"
+  fi
+  # Validate the bead id before any mutation. Beads emits hierarchical child
+  # ids with dots (bd-a3f8.1), so dots are allowed BETWEEN alphanumeric
+  # segments — never leading, trailing, or consecutive (which would also make
+  # an invalid git ref).
+  if [[ -n "$bead" ]]; then
+    if ! [[ "$bead" =~ ^[a-z0-9][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)*$ ]] || [[ "${#bead}" -gt 40 ]]; then
+      fatal "--bead id must be lowercase alphanumeric/dashes with optional dot-separated segments, 1–40 chars (got: '$bead')"
+    fi
+    # git refuses any ref component ending in .lock — catch it here so the
+    # advertised pre-mutation validation holds instead of failing mid-create.
+    if [[ "$bead" == *.lock ]]; then
+      fatal "--bead id may not end in '.lock' (git rejects such ref names; got: '$bead')"
+    fi
   fi
 
   # Advisory: warn on likely-duplicate in-flight work before creating the worktree.
@@ -529,11 +582,27 @@ cmd_create() {
   # Verify Git version and enable extensions before any git mutations occur
   ensure_worktree_config_enabled
 
+  # The bead id rides as the branch's FINAL segment so `git branch -r` reads as
+  # a live in-flight-work roster; the worktree dir and identity stay per-agent.
   local branch="agent/$name"
+  [[ -n "$bead" ]] && branch="agent/$name/$bead"
   local wt="$WORKTREE_DIR/$name"
 
   # If the worktree already exists, just refresh tracking and exit.
   if [[ -d "$wt" ]]; then
+    # Never silently rebind a live worktree to another bead's branch: finish or
+    # tear down the current work first (`make prune-merged` after its PR merges).
+    # A detached HEAD is equally unsafe — succeeding here would report the
+    # worktree ready while it is NOT on the requested branch, so commits would
+    # silently lose their bead traceability.
+    local current_branch
+    current_branch="$(git -C "$wt" branch --show-current 2>/dev/null || true)"
+    if [[ -z "$current_branch" ]]; then
+      fatal "worktree $wt is on a detached HEAD — resolve it manually (git -C $wt checkout $branch, or remove the worktree) before rerunning"
+    fi
+    if [[ "$current_branch" != "$branch" ]]; then
+      fatal "worktree $wt is checked out on '$current_branch', not '$branch' — finish that work (or run 'make prune-merged' once its PR merges), or use a different worktree name"
+    fi
     log "Worktree $wt already exists — refreshing branch tracking."
     local default_branch existing_upstream
     default_branch="origin/$(resolve_default_branch)"
@@ -553,6 +622,31 @@ cmd_create() {
       run_dependency_installs "$wt"
     fi
     return 0
+  fi
+
+  # Migration guard (bead-suffixed branches): git stores refs as paths, so a
+  # bare ref `refs/heads/agent/<name>` (from a pre-`--bead` worktree) and a
+  # nested `refs/heads/agent/<name>/<bead-id>` cannot coexist — creating the
+  # nested one fails with an opaque "cannot lock ref … is a directory"/D-F
+  # conflict. Detect the conflicting ancestor ref up front and give a clear
+  # migration instruction instead of a cryptic git error.
+  if [[ "$branch" == */* ]]; then
+    local ancestor="${branch%/*}" rr
+    while [[ "$ancestor" == */* || "$ancestor" == "agent" ]]; do
+      if git show-ref --verify --quiet "refs/heads/$ancestor"; then
+        fatal "cannot create branch '$branch': the local ref '$ancestor' already exists and blocks it (a pre-upgrade $ancestor worktree/branch). Retire it first — e.g. 'make prune-merged', or 'git branch -D $ancestor' once its work is merged — then rerun."
+      fi
+      # A bare ancestor on the REMOTE would make the eventual push D/F-conflict
+      # even when nothing local blocks creation. Catch fetched remote-tracking
+      # refs here (a never-fetched remote ref still can't be seen without a
+      # network call, so that residual case surfaces only at push time).
+      while IFS= read -r rr; do
+        [[ "${rr#*/}" == "$ancestor" ]] || continue
+        fatal "cannot create branch '$branch': the remote branch '$rr' would make its push D/F-conflict (a pre-upgrade $ancestor branch on the remote). Delete it on the remote — e.g. 'git push origin --delete ${rr#*/}' once its work is merged — then rerun."
+      done < <(git for-each-ref --format='%(refname:short)' refs/remotes/ 2>/dev/null)
+      [[ "$ancestor" == */* ]] || break
+      ancestor="${ancestor%/*}"
+    done
   fi
 
   # If the branch exists locally but no worktree, create the worktree pointing at it.
@@ -609,7 +703,8 @@ case "${1:-}" in
     shift
     task=""
     install=0
-    # Parse trailing flags in any order: --task "<desc>" and/or --install.
+    bead=""
+    # Parse trailing flags in any order: --task "<desc>", --install, --bead <id>.
     while [[ $# -gt 0 ]]; do
       case "$1" in
         --task)
@@ -622,11 +717,17 @@ case "${1:-}" in
           install=1
           shift
           ;;
+        --bead)
+          [[ $# -ge 2 ]] || fatal "--bead requires a bead id argument"
+          [[ "$2" == --* ]] && fatal "--bead requires a bead id argument, not another flag (got: '$2')"
+          bead="$2"
+          shift 2
+          ;;
         *)
-          fatal "unknown argument: $1 (after name '$name'); supported flags: --task \"<desc>\", --install"
+          fatal "unknown argument: $1 (after name '$name'); supported flags: --task \"<desc>\", --install, --bead <id>"
           ;;
       esac
     done
-    cmd_create "$name" "$task" "$install"
+    cmd_create "$name" "$task" "$install" "$bead"
     ;;
 esac

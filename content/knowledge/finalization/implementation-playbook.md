@@ -280,7 +280,7 @@ Format: Include `Closes T-XXX` or `[T-XXX]` in the commit message footer or body
 2. **Implement the task.** Make focused commits — each commit should be atomic and meaningful.
 3. **Run all quality gates** locally before pushing.
 4. **Push the branch** and create a pull request.
-5. **PR title** follows commit message format: `type(scope): description` — work-item IDs stay out of the title (under squash-merge it becomes the commit subject on main); reference the task in the PR body instead (`Closes <id>` / `Refs T-XXX`)
+5. **PR title** follows commit message format with the work-item ID appended as a trailing tag: `type(scope): description (<id>)` — under squash-merge the title becomes the commit subject on main, so the trailing ID is what makes `git log --oneline` traceable per task (and the `type` stays first for Conventional-Commits tooling); the PR body still carries the canonical machine-readable reference (`Closes <id>` / `Refs T-XXX`)
 6. **PR body** includes:
    - What changed and why
    - How to test it
