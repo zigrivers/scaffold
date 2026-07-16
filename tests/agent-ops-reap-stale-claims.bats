@@ -201,3 +201,14 @@ mirror_show() {
     [ ! -f "$FX/bd-update.log" ]   # protected by the branch name → not reaped
     [[ "$output" == *"proj-branchy"* ]]
 }
+
+@test "a child PR (bd-a3f8.1) does NOT falsely HOLD the stale parent (bd-a3f8) — dotted boundary" {
+    write_inprogress '[{"id":"bd-a3f8","assignee":"agent-a","updated_at":"2026-07-13T12:00:00Z","issue_type":"task"}]'
+    mirror_show bd-a3f8 '[{"id":"bd-a3f8","assignee":"agent-a","updated_at":"2026-07-13T12:00:00Z","issue_type":"task"}]'
+    # An open PR references only the CHILD id in its branch + body.
+    printf '%s' '[{"number":5,"title":"child work","body":"Closes bd-a3f8.1","isDraft":false,"headRefName":"agent/bob/bd-a3f8.1"}]' > "$FX/prs.json"
+    run "$FX/reap-stale-claims.sh" --apply
+    [ "$status" -eq 0 ]
+    [ -f "$FX/bd-update.log" ]                 # parent is reapable (not protected by child)
+    grep -q 'bd-a3f8' "$FX/bd-update.log"
+}

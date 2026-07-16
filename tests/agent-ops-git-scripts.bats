@@ -875,3 +875,21 @@ EOF
     [ "$status" -ne 0 ]
     [[ "$output" == *"detached"* ]]
 }
+
+@test "setup: --bead gives a clear migration error when a bare agent/<name> ref blocks the nested branch" {
+    # Pre-upgrade state: a bare agent/alice branch exists (no worktree). Git
+    # cannot create agent/alice/proj-1 alongside it (D/F ref conflict).
+    git -C "$CLONE_DIR" branch agent/alice
+    run bash -c "cd '$CLONE_DIR' && scripts/setup-agent-worktree.sh alice --bead proj-1"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"agent/alice"* ]]
+    [[ "$output" == *"prune-merged"* || "$output" == *"branch -D"* ]]
+    [ ! -d "$CLONE_DIR/.worktrees/alice" ]
+}
+
+@test "setup: worktree git identity matches an exported BEADS_ACTOR (blame == bd assignee)" {
+    run bash -c "cd '$CLONE_DIR' && BEADS_ACTOR=worker-123 scripts/setup-agent-worktree.sh alpha --bead proj-9"
+    [ "$status" -eq 0 ]
+    [ "$(git -C "$CLONE_DIR/.worktrees/alpha" config user.name)" = "worker-123" ]
+    [ "$(git -C "$CLONE_DIR/.worktrees/alpha" config user.email)" = "worker-123@testproj.local" ]
+}

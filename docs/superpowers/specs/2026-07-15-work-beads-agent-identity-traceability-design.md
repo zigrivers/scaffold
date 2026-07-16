@@ -122,6 +122,15 @@ The full benefit list:
   worktree to another bead's branch. Same-branch → normal refresh.
 - Crash recovery: branch exists without a worktree → existing path re-attaches
   (works unchanged with the suffixed name).
+- **Migration (pre-`--bead` projects):** git stores refs as paths, so a bare
+  `refs/heads/agent/<name>` and a nested `agent/<name>/<bead-id>` cannot
+  coexist (a directory/file ref conflict). The script detects a conflicting
+  ancestor ref before creating the branch and fails with a clear
+  "retire the bare `agent/<name>` first (`make prune-merged` / `git branch -D`)"
+  instruction rather than a cryptic git lock error.
+- **Identity:** the worktree's git `user.name`/`user.email` derive from the
+  exported `BEADS_ACTOR` when present (so `git blame`/`git log --author` match
+  the bead assignee), falling back to `agent-<name>` only when no actor is set.
 - The stale "bead↔PR mapping lives in the PR body (branch names exclude bead
   IDs)" comment is rewritten to the new convention.
 

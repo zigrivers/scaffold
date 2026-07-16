@@ -389,9 +389,17 @@ configure_identity() {
   # Auto-heal: ensure extensions.worktreeConfig is enabled when configuring identity
   ensure_worktree_config_enabled
 
-  git -C "$wt_path" config --worktree user.email "agent-$name_val@{{PROJECT_NAME}}.local" || fatal "Failed to set worktree-local email config at: $wt_path"
-  git -C "$wt_path" config --worktree user.name  "agent-$name_val" || fatal "Failed to set worktree-local name config at: $wt_path"
-  log "Set worktree-local git identity: agent-$name_val <agent-$name_val@{{PROJECT_NAME}}.local>"
+  # git blame should attribute to the SAME identity that claims beads. When the
+  # caller exported a BEADS_ACTOR (e.g. a generated name, or a custom one like
+  # worker-123), use it verbatim for user.name so `git log --author` and
+  # `bd list` assignees agree; only derive agent-<name> when no actor is set.
+  # The email stays a synthetic project-local address keyed off the actor.
+  local ident_name ident_local
+  ident_name="${BEADS_ACTOR:-agent-$name_val}"
+  ident_local="$(printf '%s' "$ident_name" | tr -c 'A-Za-z0-9._-' '-')"
+  git -C "$wt_path" config --worktree user.email "$ident_local@{{PROJECT_NAME}}.local" || fatal "Failed to set worktree-local email config at: $wt_path"
+  git -C "$wt_path" config --worktree user.name  "$ident_name" || fatal "Failed to set worktree-local name config at: $wt_path"
+  log "Set worktree-local git identity: $ident_name <$ident_local@{{PROJECT_NAME}}.local>"
 
   # [HOST binding — T1-ACTOR, Work-Beads Concurrency Hardening §4.3] Per-agent
   # Beads actor. `bd update <id> --claim` is a compare-and-set KEYED ON THE ACTOR,
@@ -603,6 +611,23 @@ cmd_create() {
       run_dependency_installs "$wt"
     fi
     return 0
+  fi
+
+  # Migration guard (bead-suffixed branches): git stores refs as paths, so a
+  # bare ref `refs/heads/agent/<name>` (from a pre-`--bead` worktree) and a
+  # nested `refs/heads/agent/<name>/<bead-id>` cannot coexist — creating the
+  # nested one fails with an opaque "cannot lock ref … is a directory"/D-F
+  # conflict. Detect the conflicting ancestor ref up front and give a clear
+  # migration instruction instead of a cryptic git error.
+  if [[ "$branch" == */* ]]; then
+    local ancestor="${branch%/*}"
+    while [[ "$ancestor" == */* || "$ancestor" == "agent" ]]; do
+      if git show-ref --verify --quiet "refs/heads/$ancestor"; then
+        fatal "cannot create branch '$branch': the ref '$ancestor' already exists and blocks it (a pre-upgrade $ancestor worktree/branch). Retire it first — e.g. 'make prune-merged', or 'git branch -D $ancestor' once its work is merged — then rerun."
+      fi
+      [[ "$ancestor" == */* ]] || break
+      ancestor="${ancestor%/*}"
+    done
   fi
 
   # If the branch exists locally but no worktree, create the worktree pointing at it.

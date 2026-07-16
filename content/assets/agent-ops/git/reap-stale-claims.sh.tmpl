@@ -99,11 +99,13 @@ regex_escape() { printf '%s' "$1" | sed -E 's/[][(){}.^$*+?|\\]/\\&/g'; }
 
 # Is bead id $1 present as a WHOLE token in text $2? A bead id contains an internal
 # hyphen, and `grep -w` treats `-` as a word boundary, so `grep -Fw proj-abc` wrongly
-# matches `proj-abc-2`. Require the id to be delimited by a non-id char (anything
-# outside [A-Za-z0-9-]) or string edge instead.
+# matches `proj-abc-2`. Bead ids can ALSO contain dots (hierarchical children like
+# bd-a3f8.1), so the delimiter class must exclude `.` too — otherwise a parent id
+# `bd-a3f8` would match inside a child `bd-a3f8.1` and wrongly HOLD the parent.
+# Require the id to be delimited by a char outside [A-Za-z0-9.-], or a string edge.
 bead_referenced() {
   local esc; esc="$(regex_escape "$1")"
-  printf '%s' "$2" | grep -Eq "(^|[^A-Za-z0-9-])${esc}([^A-Za-z0-9-]|$)"
+  printf '%s' "$2" | grep -Eq "(^|[^A-Za-z0-9.-])${esc}([^A-Za-z0-9.-]|$)"
 }
 
 # ----- gather open/draft PR references (probe 3) -----
