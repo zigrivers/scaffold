@@ -1,4 +1,28 @@
 {
+  "hooks": {
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "if echo \"$CC_BASH_COMMAND\" | grep -q 'gh pr create'; then echo '\\n⚠️  MANDATORY: Run `scaffold run review-pr` to execute the 3-channel review.\\n\\nAuth recovery if needed: `! codex login` (Codex) / `! gemini -p \"hello\"` (Gemini)\\nAlways run CLI commands in foreground — never use run_in_background.\\nFix all P0/P1/P2 findings before moving on. Do NOT skip any channel.'; fi",
+            "type": "command"
+          }
+        ],
+        "matcher": "Bash"
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "command": "bd prime --hook-json",
+            "type": "command"
+          }
+        ],
+        "matcher": ""
+      }
+    ]
+  },
   "permissions": {
     "allow": [],
     "deny": [
@@ -12,19 +36,6 @@
       "Bash(git push --force origin main)",
       "Bash(git reset --hard *)",
       "Bash(bd edit *)"
-    ]
-  },
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "if echo \"$CC_BASH_COMMAND\" | grep -q 'gh pr create'; then echo '\\n⚠️  MANDATORY: Run `scaffold run review-pr` to execute the 3-channel review.\\n\\nAuth recovery if needed: `! codex login` (Codex) / `! gemini -p \"hello\"` (Gemini)\\nAlways run CLI commands in foreground — never use run_in_background.\\nFix all P0/P1/P2 findings before moving on. Do NOT skip any channel.'; fi"
-          }
-        ]
-      }
     ]
   }
 }
