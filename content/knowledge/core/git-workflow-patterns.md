@@ -47,10 +47,12 @@ The trunk-based development model works best for AI-agent workflows:
   in-flight work (bare `agent/<name>` when there is no bead; an agent commits
   its task work directly on this branch)
 
-Traceable IDs — when a tracker is configured, the work-item/bead ID leads the
-commit subject and the PR title as `<bead-id>: ` and ends the worktree branch
-name; the PR body's `Closes <id>` stays the CANONICAL machine-readable
-bead↔PR mapping. Tooling treats the body as authoritative; the stale-claim
+Traceable IDs — when a tracker is configured, the work-item/bead ID is appended
+to the commit subject and the PR title as a trailing `(<bead-id>)` and ends the
+worktree branch name; the PR body's `Closes <id>` stays the CANONICAL
+machine-readable bead↔PR mapping. Keeping the Conventional-Commits `type` first
+means commitlint/semantic-release/changelog tooling parses these commits with no
+special config. Tooling treats the body as authoritative; the stale-claim
 reaper may additionally use a bead id found in the PR title or head branch as
 a conservative HOLD signal (extra protection only, never a substitute for the
 body). Under squash-merge the PR title becomes the commit subject on

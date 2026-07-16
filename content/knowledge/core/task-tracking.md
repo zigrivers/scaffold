@@ -35,7 +35,7 @@ Core properties:
 - **Repository-local** — Task data lives in `.beads/`, committed alongside code
 - **Git-hook synced** — Task state updates automatically on commit via data-sync hooks
 - **CLI-driven** — All operations via `bd` commands (create, list, status, ready)
-- **Traceable commits** — Every commit leads its subject with the task ID (`bd-<id>: type(scope): subject`), and the PR body carries `Closes bd-<id>` — the canonical machine-readable mapping
+- **Traceable commits** — Every commit appends the task ID to its subject as a trailing tag (`type(scope): subject (bd-<id>)`), and the PR body carries `Closes bd-<id>` — the canonical machine-readable mapping
 
 > IDs are hash-based and lowercase (e.g., `bd-a3f8`). The `bd-` prefix is configurable at `bd init` time. Hierarchical IDs for epic children: `bd-a3f8.1`, `bd-a3f8.1.1`. Older example IDs in this doc using `BD-42`-style uppercase digits reflect a pre-v1.0.0 convention; current upstream emits hash-based lowercase IDs.
 
@@ -112,12 +112,14 @@ Initialization creates:
 
 #### Commit Message Convention
 
-Every commit leads its subject with the bead ID (as does the PR title — the
-squash-merge subject on main comes from it), and the PR body references the
-task as `Closes <id>`, the canonical machine-readable mapping:
+Every commit appends the bead ID to its subject as a trailing tag (as does the
+PR title — the squash-merge subject on main comes from it), and the PR body
+references the task as `Closes <id>`, the canonical machine-readable mapping.
+Keeping the Conventional-Commits `type` first means commitlint/semantic-release
+parse it with no special config:
 
 ```
-bd-a3f8: feat(api): implement user registration endpoint
+feat(api): implement user registration endpoint (bd-a3f8)
 
 - Add POST /api/v1/auth/register
 - Add input validation with zod schema
@@ -143,7 +145,7 @@ The subject prefix plus the body reference together enable:
 
 #### Session End Protocol
 
-1. Commit all work with the task ID leading the subject (`bd-<id>: …`) and referenced in the PR body (`Closes bd-<id>`)
+1. Commit all work with the task ID appended to the subject as a trailing tag (`… (bd-<id>)`) and referenced in the PR body (`Closes bd-<id>`)
 2. If task is complete: create PR, run `bd close <id>` (alias: `bd done`)
 3. If task is incomplete: leave clear notes about current state and next steps
 4. If lessons were learned: update `tasks/lessons.md`

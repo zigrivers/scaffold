@@ -238,14 +238,15 @@ the worktree** (never the primary).
 **2.3 Build:** use the Superpowers discipline if available (brainstorm → plan →
 TDD); otherwise write the failing test first. Commit and push frequently on
 your branch. **Open a draft PR on the first push — the draft is the visible
-claim.** Bead traceability (every surface a human scans leads with the id):
+claim.** Bead traceability (every surface a human scans carries the id):
 - **Branch** = `agent/<name>/<bead-id>` (what `--bead` created): open branches
   read as the roster of in-flight beads.
-- **Commit subjects** start with the bead id, then the project's normal
-  Conventional-Commits subject — `<bead-id>: type(scope): subject`
-  (e.g. `bd-a3f8: feat(api): add webhook rate limiter`).
-- **PR title** starts with `<bead-id>: ` too — the squash-merge subject comes
-  from the PR title, so this is what makes bead ids visible in
+- **Commit subjects** keep the normal Conventional-Commits form and append the
+  bead id as a trailing tag — `type(scope): subject (<bead-id>)`
+  (e.g. `feat(api): add webhook rate limiter (bd-a3f8)`). The type stays first,
+  so commitlint/semantic-release work unchanged.
+- **PR title** carries the same trailing `(<bead-id>)` — the squash-merge
+  subject comes from the PR title, so this is what makes bead ids visible in
   `git log --oneline` on main.
 - **PR body** carries `Closes <id>` — the CANONICAL machine-readable mapping
   (the stale-claim reaper and duplicate-work gates parse it); the title/branch

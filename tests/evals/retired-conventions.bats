@@ -1,10 +1,11 @@
 #!/usr/bin/env bats
 # Traceable-IDs convention (spec 2026-07-15, superseding D7's body-only rule):
-# the bead ID leads commit subjects and PR titles as `<bead-id>: `, ends the
-# work branch name (agent/<name>/<bead-id>), and the PR body's `Closes <id>`
-# stays the canonical machine mapping. STILL retired: the pre-nibble forms —
-# the bead ID as a branch's LEADING path segment (bd-<id>/<desc>) and the
-# bracketed [bd-<id>] subject prefix. D4: generated projects defer CI.
+# the bead ID is appended to commit subjects and PR titles as a trailing
+# `(<bead-id>)`, ends the work branch name (agent/<name>/<bead-id>), and the PR
+# body's `Closes <id>` stays the canonical machine mapping. STILL retired: the
+# pre-nibble forms — the bead ID as a branch's LEADING path segment
+# (bd-<id>/<desc>) and the bracketed [bd-<id>] subject prefix. D4: generated
+# projects defer CI.
 
 @test "no bd-<id> branch-name convention remains in content/" {
     run grep -rn 'bd-<task-id>/\|bd-<id>/' content/

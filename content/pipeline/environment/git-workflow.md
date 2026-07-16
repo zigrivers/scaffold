@@ -14,8 +14,9 @@ knowledge-base: [dev-environment, git-workflow-patterns]
 Configure the repository for parallel Claude Code sessions working simultaneously.
 Define the branching strategy (one task -> one branch -> one PR -> squash-merge ->
 delete branch), Conventional Commits format (when Beads is configured, the bead ID
-leads the commit subject and PR title as `<bead-id>: `, rides the work branch as its
-final segment, and is referenced in the PR body via `Closes <id>` — the body form is
+is appended to the commit subject and PR title as a trailing `(<bead-id>)`, rides the
+work branch as its final segment, and is referenced in the PR body via `Closes <id>` —
+the body form is
 the canonical machine mapping), a rebase-never-merge strategy, the 8-step PR workflow with `mmr review`
 as mandatory AI-review step 5.5, the agent-ops worktree scripts for parallel agents
 (setup, doctor, prune), conflict-prevention rules, and the local quality gate
@@ -63,19 +64,16 @@ for CI until a launch target is chosen and automated CI is deliberately wired up
   `setup-agent-worktree.sh --bead <id>`; bare `agent/<name>` without a bead),
   so open branches read as the roster of in-flight beads
 - (mvp) Commit format is `type(scope): subject` (Conventional Commits); when
-  Beads is configured the bead ID LEADS the subject and the PR title —
-  `<bead-id>: type(scope): subject` — and the PR body carries `Closes <id>`,
-  which stays the canonical machine-readable bead↔PR mapping (the title and
-  branch copies are human-first redundancy). The PR title prefix is what makes
-  bead IDs visible in `git log --oneline` on main: the squash-merge subject
-  comes from the PR title
-- (mvp) If the project adopts commit-header tooling (commitlint,
-  semantic-release, changelog generators), the generated doc says so
-  explicitly: those parsers expect the type FIRST, so they must be configured
-  to strip the leading `<bead-id>: ` before parsing (e.g. a commitlint
-  `parserPreset` headerPattern such as
-  `^(?:[a-z0-9][a-z0-9.-]*: )?(\w+)(?:\(([^)]*)\))?: (.+)$`) — never silently
-  adopt a default config that would reject every bead-prefixed commit
+  Beads is configured the bead ID is APPENDED to the subject and the PR title
+  as a trailing tag — `type(scope): subject (<bead-id>)` — and the PR body
+  carries `Closes <id>`, which stays the canonical machine-readable bead↔PR
+  mapping (the title and branch copies are human-first redundancy). The trailing
+  `(<bead-id>)` on the PR title is what makes bead IDs visible in
+  `git log --oneline` on main: the squash-merge subject comes from the PR title.
+  Because the Conventional Commits `type` stays FIRST, commitlint,
+  semantic-release, and changelog generators parse these commits unchanged — no
+  parser config needed (the trailing `(<bead-id>)` is just part of the subject
+  text)
 - (mvp) The "Quality gates (CI deferred)" section states the gate
   explicitly (pre-commit hooks + `make check` + agent self-review + `mmr
   review`), states that `.github/workflows/` is deliberately absent until a
@@ -278,10 +276,11 @@ Depth-gate per Methodology Scaling above.
    live roster of in-flight beads. A branch lives only as long as its PR is
    open — squash-merge with `--delete-branch` removes it automatically.
 3. **Commits** — Conventional Commits format `type(scope): subject`; when
-   Beads is configured the bead ID leads the subject and the PR title
-   (`<bead-id>: type(scope): subject`), and the PR body carries
-   `Closes <id>` — the canonical machine mapping tooling parses; title and
-   branch copies are human-first redundancy. Pre-commit
+   Beads is configured the bead ID is appended to the subject and the PR title
+   as a trailing tag (`type(scope): subject (<bead-id>)`), and the PR body
+   carries `Closes <id>` — the canonical machine mapping tooling parses; title
+   and branch copies are human-first redundancy. The `type` stays first, so
+   Conventional-Commits tooling needs no special config. Pre-commit
    hooks are mandatory — never `--no-verify`.
 4. **Rebase strategy** — `git fetch origin && git rebase origin/main`
    before pushing and whenever `main` advances while the PR is open;

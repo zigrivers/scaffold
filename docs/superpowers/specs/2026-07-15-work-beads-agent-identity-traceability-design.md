@@ -47,7 +47,7 @@ So the reversal is additive: no consumer of the old convention breaks.
 | # | Decision |
 |---|---|
 | N1 | Ship a name generator (`scripts/agent-name.sh`) in the agent-ops git component: `agent-<adjective>-<noun>-<NN>` from curated funny wordlists + an ALWAYS-PRESENT two-digit suffix (`/dev/urandom` entropy, collision-checked, fail-closed when no unused name can be proven). The suffix is unconditional — 40×40 words alone leave a real birthday-collision chance for a fleet starting concurrently, before any claim is visible to the collision check; the suffix widens the space to ~160k. The skill's Step 0 uses it when present; self-invented names remain the fallback. *(Revised during review R2/R3: originally suffix-on-collision-only; also gained fail-closed exhaustion.)* |
-| N2 | Commit subjects on the work branch AND the PR title begin `<bead-id>: `. The PR title is the load-bearing half: under `gh pr merge --squash` the PR title becomes the commit subject on main, so `git log --oneline` on main shows the bead per commit. PR body keeps `Closes <id>` (canonical). |
+| N2 | Commit subjects on the work branch AND the PR title append the bead id as a trailing `(<bead-id>)` tag. The PR title is the load-bearing half: under `gh pr merge --squash` the PR title becomes the commit subject on main, so `git log --oneline` on main shows the bead per commit. PR body keeps `Closes <id>` (canonical). *(Format decided by the user during review: the trailing tag keeps the Conventional-Commits `type` first, so commitlint/semantic-release parse it with zero config — chosen over the interim `<bead-id>: `-prefix form, which multiple reviewers flagged as breaking type-first tooling.)* |
 | N3 | Work branches become `agent/<name>/<bead-id>` via a new `--bead <id>` flag on `setup-agent-worktree.sh`. Worktree directory (`.worktrees/<name>`) and Beads actor (`agent-<name>`) are unchanged — the actor stays stable per agent across beads while each bead gets a unique branch. Without `--bead` the legacy `agent/<name>` behavior is preserved. |
 | N4 | The stale-claim reaper's PR guard also matches `headRefName` (branch names now carry bead IDs). Additive only — it can only HOLD more, never reap more. |
 | N5 | Pipeline prompts and knowledge entries that teach the D7 convention are swept to the new one; the workflow-audit prompt's D7 checks flip to assert the new convention. |
@@ -140,9 +140,9 @@ The full benefit list:
   when the script exists; fallback stays self-invented + distinctive. One line
   on why generated > self-picked (convergent-pick collision).
 - **2.2 (worktree):** pass `--bead <id>`; `cd .worktrees/<name>` unchanged.
-- **2.3 (build):** convention reversal — commit subjects start `<bead-id>: `;
-  the draft PR title starts `<bead-id>: `; the PR body carries `Closes <id>`
-  (canonical machine mapping, unchanged).
+- **2.3 (build):** convention reversal — commit subjects append a trailing
+  `(<bead-id>)`; the draft PR title appends the same trailing `(<bead-id>)`; the
+  PR body carries `Closes <id>` (canonical machine mapping, unchanged).
 - **2.7 (merge):** note the squash subject comes from the PR title, which is
   why the title carries the ID.
 - Derived per-platform copies regenerated (`generate-agent-skills.mjs`); the
@@ -191,8 +191,8 @@ The full benefit list:
 - **bats** `tests/agent-ops-reap-stale-claims.bats` (extend): a PR whose
   `headRefName` ends in the bead ID (body without it) HOLDs the claim.
 - **eval** `tests/evals/skill-triggers.bats` (extend): skill text teaches
-  `agent-name.sh`, the `<bead-id>: ` subject/title prefix, `--bead`, and keeps
-  `Closes <id>` as the body contract.
+  `agent-name.sh`, the trailing `(<bead-id>)` subject/title tag, `--bead`, and
+  keeps `Closes <id>` as the body contract.
 - **vitest** `src/core/agent-ops/install.test.ts` (extend): new template in
   `AGENT_OPS_FILE_MAP`, installed executable, manifest-hashed.
 

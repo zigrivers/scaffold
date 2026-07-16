@@ -56,13 +56,13 @@ all issues found.
   enumerations agree rather than compete
 - (mvp) The traceable-IDs convention is consistent everywhere (CLAUDE.md,
   AGENTS.md, docs/git-workflow.md, docs/coding-standards.md,
-  docs/beads-workflow.md): a Beads task ID, when configured, leads commit
-  subjects and PR titles as `<bead-id>: `, ends the work branch name, and is
-  referenced in the PR body as `Closes <id>` (the canonical machine mapping).
-  No document still teaches either retired form — the body-only rule ("IDs
-  never in branch names or commit subjects") or the pre-nibble convention
-  that used the bead ID as the branch's leading path segment and a bracketed
-  subject prefix
+  docs/beads-workflow.md): a Beads task ID, when configured, is appended to
+  commit subjects and PR titles as a trailing `(<bead-id>)`, ends the work
+  branch name, and is referenced in the PR body as `Closes <id>` (the canonical
+  machine mapping). No document still teaches a retired form — the body-only
+  rule ("IDs never in branch names or commit subjects"), the pre-nibble
+  convention that used the bead ID as the branch's leading path segment and a
+  bracketed subject prefix, or the interim leading-`<bead-id>:` subject prefix
 - (mvp) Branch naming is `<type>/<short-desc>` everywhere (worktree
   workspace branches `agent/<name>/<bead-id>`, bare `agent/<name>` for
   non-bead work); the bead ID appears only as the branch's FINAL segment,
@@ -102,8 +102,8 @@ all issues found.
   traceable-IDs branch/commit sweep, the D4 CI-deferral language sweep, and the
   agent-ops.mk ↔ Key Commands parity check.
 - **mvp**: Quick consistency check of commit format, branch naming, the
-  traceable-IDs sweep (`<bead-id>: ` subject/title prefix + branch-tail id
-  taught consistently; neither retired convention anywhere), the D4 sweep (no
+  traceable-IDs sweep (trailing `(<bead-id>)` subject/title tag + branch-tail id
+  taught consistently; no retired convention anywhere), the D4 sweep (no
   present-tense CI setup language), and PR workflow across CLAUDE.md, AGENTS.md, and
   git-workflow.md. Verify AGENTS.md carries `/work-beads` routing and
   CLAUDE.md carries the error-recovery table. Fix obvious contradictions.
@@ -111,7 +111,7 @@ all issues found.
   - Depth 1: AGENTS.md ship-loop summary and CLAUDE.md error-recovery table
     completeness check only.
   - Depth 2: add commit format and branch naming verification (traceable-IDs
-    sweep: `<bead-id>: ` prefix + branch-tail id, no retired conventions).
+    sweep: trailing `(<bead-id>)` tag + branch-tail id, no retired conventions).
   - Depth 3: add cross-doc consistency (git-workflow.md, coding-standards.md
     alignment) and the D4 CI-deferral language sweep.
   - Depth 4: add gap analysis (missing steps, stale references,

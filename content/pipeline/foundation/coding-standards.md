@@ -35,12 +35,12 @@ self-review checklist.
 - (deep) Includes >= 2 runnable code examples per section showing the RIGHT way for the stack
 - (mvp) Commit message format documented: `type(scope): description`
   following conventional commits; if the project uses Beads task tracking,
-  the task ID leads the subject and the PR title
-  (`bd-<id>: type(scope): description`) and the PR body carries
-  `Closes bd-<id>` — the canonical machine-readable mapping. If commit-header
-  tooling (commitlint, semantic-release) is in use, its parser must be
-  configured to strip the leading `bd-<id>: ` prefix before parsing the
-  conventional type — default configs reject prefixed headers
+  the task ID is appended to the subject and the PR title as a trailing tag
+  (`type(scope): description (bd-<id>)`) and the PR body carries
+  `Closes bd-<id>` — the canonical machine-readable mapping. Because the
+  conventional `type` stays first, commit-header tooling (commitlint,
+  semantic-release, changelog generators) parses these commits unchanged — the
+  trailing `(bd-<id>)` is just part of the subject text, no config needed
 - (mvp) AI-specific coding rules section addresses common AI mistakes (dead code,
   duplication, magic numbers, premature abstraction, unnecessary features)
 - (mvp) Linter/formatter configs created and referenced from the document

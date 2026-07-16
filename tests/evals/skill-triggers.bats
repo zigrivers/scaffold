@@ -324,9 +324,9 @@ setup() {
     || failures+=("missing the --bead worktree flag")
   grep -qF 'agent/<name>/<bead-id>' "$skill_file" \
     || failures+=("missing the agent/<name>/<bead-id> branch shape")
-  # §N2 commit subjects and the PR title lead with the bead id.
-  grep -qF '<bead-id>: ' "$skill_file" \
-    || failures+=("missing the '<bead-id>: ' subject/title prefix convention")
+  # §N2 commit subjects and the PR title carry the bead id as a trailing tag.
+  grep -qF '(<bead-id>)' "$skill_file" \
+    || failures+=("missing the trailing '(<bead-id>)' subject/title convention")
   # The canonical machine mapping is unchanged.
   grep -qF 'Closes <id>' "$skill_file" \
     || failures+=("missing the canonical 'Closes <id>' PR-body mapping")

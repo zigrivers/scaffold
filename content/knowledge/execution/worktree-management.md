@@ -27,7 +27,7 @@ Use `scripts/setup-agent-worktree.sh <agent-name> --install --bead <id>` to crea
 
 ### Branching Conventions
 
-- Each agent commits its task work **directly** on its own `agent/<name>/<bead-id>` branch — no additional per-task feature branches. The bead ID also leads commit subjects and the PR title (`<bead-id>: …`); the PR body's `Closes <id>` stays the canonical machine mapping
+- Each agent commits its task work **directly** on its own `agent/<name>/<bead-id>` branch — no additional per-task feature branches. The bead ID is also appended to commit subjects and the PR title as a trailing `(<bead-id>)`; the PR body's `Closes <id>` stays the canonical machine mapping
 - Keep the branch current by rebasing it onto `origin/main` while the bead is in flight — never branch from local `main` (it may be stale)
 - Never run `git checkout main` inside a worktree — it will fail because `main` is checked out in the primary repo
 
@@ -79,8 +79,9 @@ feature branches layered on top of it:
   `origin/main`
 - Each bead's work is committed straight onto that branch; one PR per agent at
   a time carries that work to `main`
-- The bead/task ID ends the branch name and leads commit subjects and the PR
-  title; the PR body's `Closes <id>` is the canonical machine mapping
+- The bead/task ID ends the branch name and is appended to commit subjects and
+  the PR title as a trailing `(<bead-id>)`; the PR body's `Closes <id>` is the
+  canonical machine mapping
 
 **Why one live branch per worktree (not a pile of task branches):**
 - A worktree requires a branch that isn't checked out elsewhere;
@@ -106,8 +107,8 @@ git rebase origin/main   # bring the branch up to date; do NOT create a new bran
 - Rebase the workspace branch onto `origin/main` whenever `main` advances —
   never branch from local `main` (it may be stale)
 - Commit task work directly on the workspace branch; do **not** create extra
-  per-task branches. The bead ID leads the commit subject (`bd-42: …`) and the
-  PR body carries `Closes bd-42` (the canonical machine mapping)
+  per-task branches. The bead ID is appended to the commit subject (`… (bd-42)`)
+  and the PR body carries `Closes bd-42` (the canonical machine mapping)
 
 **Never run `git checkout main` in a worktree:**
 - The `main` branch is checked out in the primary repo
