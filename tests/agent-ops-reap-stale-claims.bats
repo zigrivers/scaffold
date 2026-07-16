@@ -212,3 +212,13 @@ mirror_show() {
     [ -f "$FX/bd-update.log" ]                 # parent is reapable (not protected by child)
     grep -q 'bd-a3f8' "$FX/bd-update.log"
 }
+
+@test "a bead id with a sentence-final period (Closes bd-a3f8.) still HOLDs the claim" {
+    write_inprogress '[{"id":"bd-a3f8","assignee":"agent-a","updated_at":"2026-07-13T12:00:00Z","issue_type":"task"}]'
+    mirror_show bd-a3f8 '[{"id":"bd-a3f8","assignee":"agent-a","updated_at":"2026-07-13T12:00:00Z","issue_type":"task"}]'
+    printf '%s' '[{"number":8,"title":"work","body":"Fixes bd-a3f8. Ready for review.","isDraft":false,"headRefName":"feature"}]' > "$FX/prs.json"
+    run "$FX/reap-stale-claims.sh" --apply
+    [ "$status" -eq 0 ]
+    [ ! -f "$FX/bd-update.log" ]        # trailing-period reference still protects → not reaped
+    [[ "$output" == *"bd-a3f8"* ]]
+}

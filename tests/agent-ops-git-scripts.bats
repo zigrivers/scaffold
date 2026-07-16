@@ -893,3 +893,25 @@ EOF
     [ "$(git -C "$CLONE_DIR/.worktrees/alpha" config user.name)" = "worker-123" ]
     [ "$(git -C "$CLONE_DIR/.worktrees/alpha" config user.email)" = "worker-123@testproj.local" ]
 }
+
+@test "setup: fails loud when the shell actor differs from the worktree's pinned actor" {
+    bash -c "cd '$CLONE_DIR' && BEADS_ACTOR=worker-123 scripts/setup-agent-worktree.sh alpha"
+    run bash -c "cd '$CLONE_DIR' && BEADS_ACTOR=worker-456 scripts/setup-agent-worktree.sh alpha"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"worker-123"* ]]
+    [[ "$output" == *"worker-456"* ]]
+    # the pinned actor is untouched
+    grep -q "BEADS_ACTOR='worker-123'" "$CLONE_DIR/.worktrees/alpha/.agent-env"
+}
+
+@test "setup: --bead flags a bare agent/<name> branch that exists only on the remote" {
+    git -C "$CLONE_DIR" branch agent/alice
+    git -C "$CLONE_DIR" push -q origin agent/alice
+    git -C "$CLONE_DIR" fetch -q origin
+    git -C "$CLONE_DIR" branch -D agent/alice   # keep only refs/remotes/origin/agent/alice
+    run bash -c "cd '$CLONE_DIR' && scripts/setup-agent-worktree.sh alice --bead proj-1"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"remote"* ]]
+    [[ "$output" == *"agent/alice"* ]]
+    [ ! -d "$CLONE_DIR/.worktrees/alice" ]
+}

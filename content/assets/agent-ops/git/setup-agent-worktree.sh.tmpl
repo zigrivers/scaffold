@@ -389,25 +389,13 @@ configure_identity() {
   # Auto-heal: ensure extensions.worktreeConfig is enabled when configuring identity
   ensure_worktree_config_enabled
 
-  # git blame should attribute to the SAME identity that claims beads. When the
-  # caller exported a BEADS_ACTOR (e.g. a generated name, or a custom one like
-  # worker-123), use it verbatim for user.name so `git log --author` and
-  # `bd list` assignees agree; only derive agent-<name> when no actor is set.
-  # The email stays a synthetic project-local address keyed off the actor.
-  local ident_name ident_local
-  ident_name="${BEADS_ACTOR:-agent-$name_val}"
-  ident_local="$(printf '%s' "$ident_name" | tr -c 'A-Za-z0-9._-' '-')"
-  git -C "$wt_path" config --worktree user.email "$ident_local@{{PROJECT_NAME}}.local" || fatal "Failed to set worktree-local email config at: $wt_path"
-  git -C "$wt_path" config --worktree user.name  "$ident_name" || fatal "Failed to set worktree-local name config at: $wt_path"
-  log "Set worktree-local git identity: $ident_name <$ident_local@{{PROJECT_NAME}}.local>"
-
   # [HOST binding — T1-ACTOR, Work-Beads Concurrency Hardening §4.3] Per-agent
   # Beads actor. `bd update <id> --claim` is a compare-and-set KEYED ON THE ACTOR,
   # and same-actor claims are idempotent (both "win"), so every agent MUST carry a
-  # DISTINCT actor or the atomic claim gives ZERO collision protection. Write
-  # BEADS_ACTOR=agent-<name> into a worktree-local `.agent-env` so every `bd` write
-  # from this worktree is attributable to this agent. This is PERSISTENCE only: a
-  # child script cannot export into the caller's shell, so the agent must
+  # DISTINCT actor or the atomic claim gives ZERO collision protection. A
+  # worktree-local `.agent-env` persists that actor so every `bd` write from this
+  # worktree (and a resumed session) is attributable to it. This is PERSISTENCE
+  # only: a child script cannot export into the caller's shell, so the agent must
   # `set -a; . ./.agent-env; set +a` after cd-ing in. It does NOT cover the FIRST
   # claim, which the work-beads loop makes from the primary checkout BEFORE this
   # worktree exists — that claim relies on BEADS_ACTOR already exported in the
@@ -419,19 +407,42 @@ configure_identity() {
   # the wrapper only has to avoid OVERRIDING it.
   ensure_agent_env_excluded
   local env_file="$wt_path/.agent-env"
-  if [ ! -f "$env_file" ] || ! grep -q '^export BEADS_ACTOR=' "$env_file" 2>/dev/null; then
-    # Persist the caller's ALREADY-EXPORTED actor when there is one: the claim
-    # was made under that exact identity, and persisting a rewritten
-    # agent-<name> here would make resume/heartbeat run as a DIFFERENT actor
-    # than the one holding the claim. Only when no actor is exported do we
-    # fall back to deriving agent-<name>.
-    #
-    # This file gets SOURCED, so the value must never be written bare: strip
-    # control characters, then single-quote with embedded quotes escaped —
-    # an actor like '$(cmd)' or one with spaces round-trips as literal data
-    # instead of executing or corrupting the restored identity.
+
+  # Read any actor already pinned by a prior run (handles the sourceable
+  # `export BEADS_ACTOR='...'` form, single- or double-quoted or bare).
+  local persisted_actor=""
+  if [ -f "$env_file" ]; then
+    persisted_actor="$(sed -n -E "s/^(export[[:space:]]+)?BEADS_ACTOR=//p" "$env_file" | head -1 | tr -d "'\"")"
+  fi
+
+  # Resolve ONE actor used for BOTH the git identity and the persisted env, so
+  # blame, resume, and heartbeats never disagree:
+  #   exported BEADS_ACTOR  >  already-persisted actor  >  derived agent-<name>.
+  # Guard the desync the reviewer flagged: if the shell exports an actor AND the
+  # worktree already pins a DIFFERENT one, fail loud rather than run git identity
+  # as one actor while resume sources the other.
+  if [ -n "${BEADS_ACTOR:-}" ] && [ -n "$persisted_actor" ] && [ "$BEADS_ACTOR" != "$persisted_actor" ]; then
+    fatal "worktree $wt_path pins BEADS_ACTOR='$persisted_actor' but this shell exports BEADS_ACTOR='$BEADS_ACTOR' — reconcile before continuing (use the worktree matching your actor, or remove the stale worktree/.agent-env)"
+  fi
+  local resolved_actor="${BEADS_ACTOR:-${persisted_actor:-agent-$name_val}}"
+
+  # git blame should attribute to the SAME identity that claims beads, so
+  # user.name is the resolved actor; the email is a synthetic project-local
+  # address keyed off it (sanitized to a valid local-part).
+  local ident_local
+  ident_local="$(printf '%s' "$resolved_actor" | tr -c 'A-Za-z0-9._-' '-')"
+  git -C "$wt_path" config --worktree user.email "$ident_local@{{PROJECT_NAME}}.local" || fatal "Failed to set worktree-local email config at: $wt_path"
+  git -C "$wt_path" config --worktree user.name  "$resolved_actor" || fatal "Failed to set worktree-local name config at: $wt_path"
+  log "Set worktree-local git identity: $resolved_actor <$ident_local@{{PROJECT_NAME}}.local>"
+
+  # Persist the resolved actor when nothing is pinned yet. This file gets
+  # SOURCED, so the value must never be written bare: strip control characters,
+  # then single-quote with embedded quotes escaped — an actor like `$(cmd)` or
+  # one with spaces round-trips as literal data instead of executing or
+  # corrupting the restored identity.
+  if [ -z "$persisted_actor" ]; then
     local actor_val actor_sq
-    actor_val="$(printf '%s' "${BEADS_ACTOR:-agent-$name_val}" | tr -d '[:cntrl:]')"
+    actor_val="$(printf '%s' "$resolved_actor" | tr -d '[:cntrl:]')"
     actor_sq="${actor_val//\'/\'\\\'\'}"
     printf "export BEADS_ACTOR='%s'\n" "$actor_sq" >> "$env_file"
     log "Wrote BEADS_ACTOR='$actor_val' to $env_file (source it in the worktree shell)"
@@ -620,11 +631,19 @@ cmd_create() {
   # conflict. Detect the conflicting ancestor ref up front and give a clear
   # migration instruction instead of a cryptic git error.
   if [[ "$branch" == */* ]]; then
-    local ancestor="${branch%/*}"
+    local ancestor="${branch%/*}" rr
     while [[ "$ancestor" == */* || "$ancestor" == "agent" ]]; do
       if git show-ref --verify --quiet "refs/heads/$ancestor"; then
-        fatal "cannot create branch '$branch': the ref '$ancestor' already exists and blocks it (a pre-upgrade $ancestor worktree/branch). Retire it first — e.g. 'make prune-merged', or 'git branch -D $ancestor' once its work is merged — then rerun."
+        fatal "cannot create branch '$branch': the local ref '$ancestor' already exists and blocks it (a pre-upgrade $ancestor worktree/branch). Retire it first — e.g. 'make prune-merged', or 'git branch -D $ancestor' once its work is merged — then rerun."
       fi
+      # A bare ancestor on the REMOTE would make the eventual push D/F-conflict
+      # even when nothing local blocks creation. Catch fetched remote-tracking
+      # refs here (a never-fetched remote ref still can't be seen without a
+      # network call, so that residual case surfaces only at push time).
+      while IFS= read -r rr; do
+        [[ "${rr#*/}" == "$ancestor" ]] || continue
+        fatal "cannot create branch '$branch': the remote branch '$rr' would make its push D/F-conflict (a pre-upgrade $ancestor branch on the remote). Delete it on the remote — e.g. 'git push origin --delete ${rr#*/}' once its work is merged — then rerun."
+      done < <(git for-each-ref --format='%(refname:short)' refs/remotes/ 2>/dev/null)
       [[ "$ancestor" == */* ]] || break
       ancestor="${ancestor%/*}"
     done
