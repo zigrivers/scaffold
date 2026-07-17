@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# setup-gh-runner.sh — register this Mac as a self-hosted GitHub Actions runner
+# for the current repo. Installed by `scaffold agent-ops install --component ci`.
+#
+# Self-hosted runner usage is FREE on every GitHub plan (Actions minutes bill
+# only for GitHub-hosted runners). The runner is persistent, managed by launchd
+# via the runner's own svc.sh (start at login, restart on crash). Requires: gh
+# authenticated with admin on the repo (registration-token API).
+#
+#   setup-gh-runner.sh               register + start
+#   setup-gh-runner.sh --print-only  preview without side effects
+set -euo pipefail
+
+PRINT_ONLY=0
+[ "${1:-}" = "--print-only" ] && PRINT_ONLY=1
+
+command -v gh >/dev/null 2>&1 || { echo "gh CLI required" >&2; exit 2; }
+REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
+RUNNER_DIR="$HOME/.gh-runner/{{PROJECT_NAME}}"
+NAME="{{PROJECT_NAME}}-mq-runner"
+
+if [ "$PRINT_ONLY" = 1 ]; then
+	echo "would register runner '$NAME' for $REPO"
+	echo "  dir:    $RUNNER_DIR"
+	echo "  labels: self-hosted,macOS,ARM64"
+	echo "  mgmt:   ./svc.sh install && ./svc.sh start (launchd)"
+	exit 0
+fi
+
+mkdir -p "$RUNNER_DIR"
+cd "$RUNNER_DIR"
+
+if [ ! -f config.sh ]; then
+	echo "downloading latest actions runner (osx-arm64)…"
+	URL="$(gh api repos/actions/runner/releases/latest \
+		-q '.assets[] | select(.name | test("actions-runner-osx-arm64-[0-9.]+\\.tar\\.gz$")) | .browser_download_url')"
+	curl -fsSL "$URL" -o runner.tar.gz
+	tar xzf runner.tar.gz
+	rm runner.tar.gz
+fi
+
+TOKEN="$(gh api -X POST "repos/$REPO/actions/runners/registration-token" -q .token)"
+./config.sh --unattended --url "https://github.com/$REPO" --token "$TOKEN" \
+	--name "$NAME" --labels self-hosted,macOS,ARM64 --replace
+./svc.sh install
+./svc.sh start
+echo "runner '$NAME' registered and started (launchd keeps it alive)."
+echo "verify: gh api repos/$REPO/actions/runners -q '.runners[].name'"

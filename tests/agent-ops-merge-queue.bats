@@ -108,3 +108,36 @@ teardown() { rm -rf "$TMP"; }
   grep -q 'make e2e' "$W"
   grep -q 'scaffold mq stats' "$W"
 }
+
+@test "setup-gh-runner: --print-only previews without side effects" {
+  WORK="$(mktemp -d)"
+  sed -e 's/{{PROJECT_NAME}}/myproj/g' \
+    "$BATS_TEST_DIRNAME/../content/assets/agent-ops/ci/setup-gh-runner.sh.tmpl" \
+    > "$WORK/setup-gh-runner.sh"
+  chmod +x "$WORK/setup-gh-runner.sh"
+  mkdir -p "$WORK/bin"
+  printf '#!/usr/bin/env bash\nif [ "$1 $2" = "repo view" ]; then echo "acme/myproj"; else exit 1; fi\n' > "$WORK/bin/gh"
+  chmod +x "$WORK/bin/gh"
+  run env PATH="$WORK/bin:$PATH" HOME="$WORK" "$WORK/setup-gh-runner.sh" --print-only
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"acme/myproj"* ]]
+  [[ "$output" == *"myproj-mq-runner"* ]]
+  [ ! -d "$WORK/.gh-runner" ]
+  rm -rf "$WORK"
+}
+
+@test "setup-gh-runner: fails loudly without gh" {
+  WORK="$(mktemp -d)"
+  sed -e 's/{{PROJECT_NAME}}/myproj/g' \
+    "$BATS_TEST_DIRNAME/../content/assets/agent-ops/ci/setup-gh-runner.sh.tmpl" \
+    > "$WORK/setup-gh-runner.sh"
+  chmod +x "$WORK/setup-gh-runner.sh"
+  # PATH keeps /usr/bin:/bin (needed so the "#!/usr/bin/env bash" shebang can
+  # still resolve bash itself) but omits every dir gh could live in (e.g.
+  # Homebrew's /opt/homebrew/bin), so the script's own `command -v gh` check
+  # is what fails — not the shebang lookup.
+  run env PATH="/usr/bin:/bin" "$WORK/setup-gh-runner.sh" --print-only
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"gh CLI required"* ]]
+  rm -rf "$WORK"
+}
