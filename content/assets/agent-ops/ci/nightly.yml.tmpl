@@ -1,0 +1,31 @@
+# nightly.yml — installed by `scaffold agent-ops install --component ci`.
+# Nightly full regression on the self-hosted runner: full uncached gate, e2e
+# when the project defines a `make e2e` target, and the merge-queue flake
+# report. 09:00 UTC ~= 2am US Pacific.
+name: nightly
+on:
+  schedule:
+    - cron: '0 9 * * *'
+  workflow_dispatch: {}
+jobs:
+  full-regression:
+    runs-on: [self-hosted, macOS, ARM64]
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - name: Full uncached gate
+        run: {{FULL_GATE_COMMAND}}
+      - name: E2E (when the project defines it)
+        run: |
+          if make -n e2e >/dev/null 2>&1; then
+            make e2e
+          else
+            echo "no e2e target — skipped"
+          fi
+      - name: Flake report
+        run: |
+          if command -v scaffold >/dev/null 2>&1; then
+            scaffold mq stats
+          else
+            echo "scaffold CLI not installed on runner — skipped"
+          fi

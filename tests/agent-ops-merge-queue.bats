@@ -87,3 +87,24 @@ teardown() { rm -rf "$TMP"; }
   grep -q 'mq enqueue --pr 42' "$WORK/calls.log"
   rm -rf "$WORK"
 }
+
+@test "post-merge workflow: self-hosted, default-branch push, coalescing concurrency" {
+  W="$BATS_TEST_DIRNAME/../content/assets/agent-ops/ci/post-merge.yml.tmpl"
+  grep -q 'name: post-merge' "$W"
+  grep -q 'branches: \[{{DEFAULT_BRANCH}}\]' "$W"
+  grep -q 'runs-on: \[self-hosted, macOS, ARM64\]' "$W"
+  grep -q 'group: post-merge' "$W"
+  grep -q 'cancel-in-progress: true' "$W"
+  grep -q 'run: {{FULL_GATE_COMMAND}}' "$W"
+  # the merge gate must NOT run here — this is post-merge only (D4')
+  ! grep -q 'pull_request' "$W"
+}
+
+@test "nightly workflow: schedule + dispatch, full gate, e2e feature-detect, flake report" {
+  W="$BATS_TEST_DIRNAME/../content/assets/agent-ops/ci/nightly.yml.tmpl"
+  grep -q 'schedule:' "$W"
+  grep -q 'workflow_dispatch' "$W"
+  grep -q 'run: {{FULL_GATE_COMMAND}}' "$W"
+  grep -q 'make e2e' "$W"
+  grep -q 'scaffold mq stats' "$W"
+}
