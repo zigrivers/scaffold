@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { checkSync, lockSync } from 'proper-lockfile'
 import mqCommand, { mqHandler } from './mq.js'
 import { readJournal } from '../../merge-queue/journal.js'
 
@@ -57,5 +58,29 @@ describe('scaffold mq', () => {
     process.env.MQ_NO_AUTOSTART = '1'
     const root = scratchRepo()
     await expect(mqHandler({ action: 'stats', root })).resolves.toBeUndefined()
+  })
+
+  it('daemon returns cleanly when the lock is already held', async () => {
+    const root = scratchRepo()
+    const mqDir = path.join(root, '.mq')
+    fs.mkdirSync(mqDir, { recursive: true })
+    const release = lockSync(mqDir, { lockfilePath: path.join(mqDir, 'daemon.lock'), stale: 60_000 })
+    try {
+      await expect(mqHandler({ action: 'daemon', once: true, root })).resolves.toBeUndefined()
+    } finally {
+      release()
+    }
+  })
+
+  it('daemon releases the lock when deps construction throws', async () => {
+    const root = scratchRepo()
+    const mqDir = path.join(root, '.mq')
+    process.env.MQ_GH_CMD = '/nonexistent/gh-binary'
+    try {
+      await expect(mqHandler({ action: 'daemon', once: true, root })).rejects.toThrow(/gh CLI/)
+    } finally {
+      delete process.env.MQ_GH_CMD
+    }
+    expect(checkSync(mqDir, { lockfilePath: path.join(mqDir, 'daemon.lock'), stale: 60_000 })).toBe(false)
   })
 })

@@ -127,33 +127,38 @@ export async function mqHandler(argv: MqArgs): Promise<void> {
     return
   }
   case 'daemon': {
-    let release: (() => Promise<void>) | undefined
+    let release: () => Promise<void>
     try {
       release = await lock(mqDir, { ...lockOpts(mqDir), update: 15_000 })
-    } catch {
-      output.info('mq daemon already running — nothing to do')
+    } catch (err) {
+      if ((err as { code?: string }).code === 'ELOCKED') {
+        output.info('mq daemon already running — nothing to do')
+        return
+      }
+      output.error(`mq daemon: could not acquire the lock: ${String(err)}`)
+      process.exitCode = 1
       return
     }
-    const logFile = path.join(mqDir, 'logs', 'daemon.log')
-    fs.mkdirSync(path.dirname(logFile), { recursive: true })
-    const log = (msg: string): void => {
-      const line = `${new Date().toISOString()} ${msg}`
-      fs.appendFileSync(logFile, line + '\n')
-      if (argv.foreground) output.info(line)
-    }
-    const config = loadAgentOpsConfig(primary).merge_queue
-    const daemon = new MergeQueueDaemon({
-      gh: createGhClient(primary),
-      git: createGitOps(primary),
-      runGate,
-      config,
-      mqDir,
-      projectRoot: primary,
-      log,
-      now: () => new Date(),
-    })
-    log(`daemon started (pid ${process.pid})`)
     try {
+      const logFile = path.join(mqDir, 'logs', 'daemon.log')
+      fs.mkdirSync(path.dirname(logFile), { recursive: true })
+      const log = (msg: string): void => {
+        const line = `${new Date().toISOString()} ${msg}`
+        fs.appendFileSync(logFile, line + '\n')
+        if (argv.foreground) output.info(line)
+      }
+      const config = loadAgentOpsConfig(primary).merge_queue
+      const daemon = new MergeQueueDaemon({
+        gh: createGhClient(primary),
+        git: createGitOps(primary),
+        runGate,
+        config,
+        mqDir,
+        projectRoot: primary,
+        log,
+        now: () => new Date(),
+      })
+      log(`daemon started (pid ${process.pid})`)
       await daemon.run({ once: argv.once })
     } finally {
       await release()
