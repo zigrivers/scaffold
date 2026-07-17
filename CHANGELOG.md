@@ -2,6 +2,17 @@
 
 All notable changes to Scaffold are documented here.
 
+## [Unreleased]
+
+### Added
+
+- `scaffold mq` — local batching merge-queue engine for multi-agent projects:
+  fire-and-forget enqueue, bors-style batch-then-bisect testing, flake retry with
+  auto-quarantine, squash landing with the Not-Rocket-Science tree assertion,
+  JSONL write-ahead journal with crash recovery, `mq:ready` label seam for remote
+  agents. Spec: `docs/superpowers/specs/2026-07-17-merge-throughput-design.md`
+  (Plan 1 of 3; agent-ops component + pipeline content land in follow-ups).
+
 ## [3.46.0] - 2026-07-16
 
 ### Added

@@ -84,6 +84,11 @@ When modifying prompts:
 | `scripts/teardown-agent-worktree.sh <path>` | Harvest ledger, remove worktree, and delete its workspace branch |
 | `scaffold observe audit --output-mode=mmr-findings` | Emit findings in MMR Finding shape (used by the doc-conformance MMR channel) |
 | `mmr review --channels=doc-conformance` | Run only the audit channel under MMR (e.g., for a focused doc-conformance pass) |
+| `scaffold mq enqueue --pr <N>` | Enqueue a PR into the local merge queue (fire-and-forget; auto-starts the daemon) |
+| `scaffold mq daemon --foreground` | Run the merge-queue daemon in the foreground (debugging) |
+| `scaffold mq status [--pr <N>] [--format json]` | Show queue state, paused banner, per-PR states |
+| `scaffold mq eject --pr <N>` | Withdraw a PR from the queue |
+| `scaffold mq stats` | Calibration metrics: arrivals, gate outcomes, median gate time, flakes |
 
 ### Committing and Creating PRs
 
