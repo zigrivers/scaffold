@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { AGENT_OPS_FILE_MAP, buildTemplateVars, checkAgentOps, installAgentOps } from './install.js'
+import { defaultMergeQueueConfig } from '../../merge-queue/types.js'
 
 let projectRoot: string
 let templateRoot: string
@@ -35,6 +36,7 @@ describe('buildTemplateVars', () => {
         services: [{ name: 'postgres', band: 20000 }, { name: 'api', band: 21000 }],
         shared_stack: { postgres: 55432, api: 8001 },
       },
+      merge_queue: defaultMergeQueueConfig(),
     })
     expect(vars.PROJECT_NAME).toBe('myapp')
     expect(vars.DOCKER_CONTEXT).toBe('orbstack')
@@ -53,6 +55,7 @@ describe('buildTemplateVars', () => {
         services: [{ name: 'postgres', band: 20000 }],
         shared_stack: {},
       },
+      merge_queue: defaultMergeQueueConfig(),
     })
     expect(vars.DOCKER_CONTEXT).toBe(process.platform === 'darwin' ? 'orbstack' : 'default')
   })
@@ -66,6 +69,7 @@ describe('buildTemplateVars', () => {
         services: [{ name: 'redis-cache', band: 20000 }],
         shared_stack: { 'redis-cache': 6379 },
       },
+      merge_queue: defaultMergeQueueConfig(),
     })
     // SERVICES keeps the raw name; BAND_/SHARED_ suffixes replace `-` with `_`
     // so the generated lines are valid shell assignments.

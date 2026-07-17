@@ -194,6 +194,60 @@ docker:
   })
 })
 
+describe('merge_queue config', () => {
+  it('applies defaults when the section is absent', () => {
+    const cfg = loadAgentOpsConfig(tmpProject())
+    expect(cfg.merge_queue).toEqual({
+      gate_command: 'make check-affected',
+      full_gate_command: 'make check',
+      batch_cap: 16,
+      poll_seconds: 60,
+      gate_timeout_minutes: 45,
+      quarantine_path: '.mq/quarantine.txt',
+      ready_label: 'mq:ready',
+    })
+  })
+
+  it('accepts overrides and keeps defaults for omitted keys', () => {
+    const cfg = loadAgentOpsConfig(tmpProject(`
+project_name: myapp
+merge_queue:
+  batch_cap: 4
+  gate_command: "make quick"
+`))
+    expect(cfg.merge_queue.batch_cap).toBe(4)
+    expect(cfg.merge_queue.gate_command).toBe('make quick')
+    expect(cfg.merge_queue.poll_seconds).toBe(60)
+  })
+
+  it('fails loud on a non-integer batch_cap', () => {
+    const bad = tmpProject(`
+project_name: myapp
+merge_queue:
+  batch_cap: lots
+`)
+    expect(() => loadAgentOpsConfig(bad)).toThrow(/batch_cap/)
+  })
+
+  it('fails loud on a non-positive poll_seconds', () => {
+    const bad = tmpProject(`
+project_name: myapp
+merge_queue:
+  poll_seconds: 0
+`)
+    expect(() => loadAgentOpsConfig(bad)).toThrow(/poll_seconds/)
+  })
+
+  it('fails loud on an empty gate_command', () => {
+    const bad = tmpProject(`
+project_name: myapp
+merge_queue:
+  gate_command: ""
+`)
+    expect(() => loadAgentOpsConfig(bad)).toThrow(/gate_command/)
+  })
+})
+
 describe('defaultAgentOpsConfig', () => {
   it('sanitizes the project name', () => {
     expect(defaultAgentOpsConfig('/tmp/My App_2').project_name).toBe('my-app-2')
