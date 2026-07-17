@@ -1,5 +1,5 @@
 // src/merge-queue/daemon.ts
-import { execFileSync } from 'node:child_process'
+import { execFile } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { ulid } from 'ulid'
@@ -526,11 +526,15 @@ export class MergeQueueDaemon {
     }
     const match = body.match(/Closes ([a-z][a-z0-9-]*-[a-z0-9]+)/i)
     if (!match) return
-    try {
-      execFileSync('bd', argTemplate.map(a => a === '{id}' ? match[1] : a), {
-        cwd: this.deps.projectRoot, stdio: 'ignore',
-      })
-    } catch { /* bd absent — advisory only */ }
+    // Fire-and-forget (matches the method names): the bd call is best-effort and
+    // must not block the daemon's event loop — dispatch async and ignore the
+    // result (bd absent / failed is advisory only).
+    execFile(
+      'bd',
+      argTemplate.map(a => a === '{id}' ? match[1] : a),
+      { cwd: this.deps.projectRoot },
+      () => { /* advisory only — ignore stdout/stderr and any error */ },
+    )
   }
 
   /** Startup recovery (spec §5.4): journal vs refs vs GitHub. */
