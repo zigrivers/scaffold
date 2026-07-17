@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# mq-guard.sh — routes merges through the merge queue.
+# Installed by `scaffold agent-ops install --component merge-queue`.
+#
+# Two modes (bd-guard.sh precedent):
+#   1. Claude Code PreToolUse hook (default): reads the hook JSON envelope on
+#      stdin, inspects .tool_input.command, exits 2 (block) or 0 (allow).
+#   2. CLI check for other harnesses: mq-guard.sh --check "<command>".
+#
+# Why: a direct `gh pr merge` bypasses the queue's batch testing and invalidates
+# every in-flight gate (the livelock this project's merge queue exists to fix).
+# This guard is an ACCIDENT NET, not a security boundary. Known deliberate
+# bypasses it does not attempt to catch: `bash -c "..."`, `eval`, command
+# substitution, scripts that call gh internally. The deliberate direct-merge
+# procedure lives in the generated git-workflow doc — not here (no override
+# recipe in error text, upstream Beads lesson).
+set -euo pipefail
+
+cmd=""
+if [ "${1:-}" = "--check" ]; then
+	cmd="${2:-}"
+else
+	if ! command -v jq >/dev/null 2>&1; then
+		printf '%s\n' "mq-guard: jq not found — cannot parse hook input; allowing. Install jq to arm the guard." >&2
+		exit 0
+	fi
+	cmd="$(jq -r '.tool_input.command // empty' 2>/dev/null || true)"
+fi
+[ -n "$cmd" ] || exit 0
+
+# Deliberate, human-approved override (documented in the git-workflow doc).
+if [ "${MQ_DIRECT_MERGE_OK:-0}" = "1" ]; then exit 0; fi
+
+# Fold backslash continuations into logical lines; mask quoted string literals so
+# a PR title mentioning "gh pr merge" is text, not a command (bd-guard pattern).
+scan=$(printf '%s' "$cmd" | awk 'BEGIN{ORS=""} { if (sub(/\\$/,"")) printf "%s", $0; else print $0 "\n" }')
+mcmd=$(printf '%s' "$scan" | sed -E -e 's/"[^"]*"/_Q_/g' -e "s/'[^']*'/_Q_/g")
+
+if printf '%s' "$mcmd" | grep -qE '(^|[^[:alnum:]_])gh[[:space:]]+pr[[:space:]]+merge([^[:alnum:]_]|$)'; then
+	printf '%s\n' "mq-guard: direct 'gh pr merge' is routed through the merge queue on this project. Enqueue instead: scaffold mq enqueue --pr <N> (or: make mq-enqueue PR=<N>). The queue batch-tests against latest {{DEFAULT_BRANCH}} and lands green PRs for you; watch with: scaffold mq status." >&2
+	exit 2
+fi
+exit 0
