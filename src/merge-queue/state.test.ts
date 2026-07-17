@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { reduceState, queuedPrs, TERMINAL_PR_STATES } from './state.js'
-import type { JournalEvent } from './types.js'
 
 const at = (m: number) => `2026-07-17T00:${String(m).padStart(2, '0')}:00.000Z`
 
