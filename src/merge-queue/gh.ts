@@ -79,7 +79,13 @@ export function createGhClient(cwd: string): GhClient {
           'run', 'list', '--workflow', 'post-merge.yml', '--branch', defaultBranch,
           '--limit', '1', '--json', 'conclusion',
         ])) as { conclusion: string | null }[]
-        return raw.length > 0 && raw[0].conclusion === 'failure'
+        if (raw.length === 0) return false
+        const c = raw[0].conclusion
+        // null = still running (not red). Any terminal conclusion that isn't a
+        // clean pass — timed_out, cancelled, action_required, startup_failure,
+        // stale, failure — must hold the queue, not just the literal "failure".
+        const GREENISH = new Set(['success', 'neutral', 'skipped'])
+        return c !== null && !GREENISH.has(c)
       } catch {
         return false
       }

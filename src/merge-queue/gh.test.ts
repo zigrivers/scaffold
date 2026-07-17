@@ -64,6 +64,21 @@ describe('createGhClient', () => {
     expect(createGhClient(stubDir).postMergeRed('main')).toBe(true)
   })
 
+  it('postMergeRed treats a non-failure bad conclusion (timed_out) as red', () => {
+    process.env.MQ_GH_CMD = writeStub('echo \'[{"conclusion":"timed_out"}]\'')
+    expect(createGhClient(stubDir).postMergeRed('main')).toBe(true)
+  })
+
+  it('postMergeRed treats success as not red', () => {
+    process.env.MQ_GH_CMD = writeStub('echo \'[{"conclusion":"success"}]\'')
+    expect(createGhClient(stubDir).postMergeRed('main')).toBe(false)
+  })
+
+  it('postMergeRed treats an in-progress (null conclusion) run as not red', () => {
+    process.env.MQ_GH_CMD = writeStub('echo \'[{"conclusion":null}]\'')
+    expect(createGhClient(stubDir).postMergeRed('main')).toBe(false)
+  })
+
   it('throws a clear error when the gh binary is missing', () => {
     process.env.MQ_GH_CMD = '/nonexistent/gh-binary'
     expect(() => createGhClient(stubDir)).toThrow(/gh CLI/)

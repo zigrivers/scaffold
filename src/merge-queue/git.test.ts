@@ -39,6 +39,18 @@ function pushBranch(clone: string, name: string, file: string): string {
   return sha
 }
 
+/** Create a branch adding `file` with EXACT `content`, push it, return its head SHA. */
+function pushBranchWith(clone: string, name: string, file: string, content: string): string {
+  git(clone, 'checkout', '-b', name, 'origin/main')
+  fs.writeFileSync(path.join(clone, file), content)
+  git(clone, 'add', file)
+  git(clone, 'commit', '-m', name)
+  git(clone, 'push', '-u', 'origin', name)
+  const sha = git(clone, 'rev-parse', 'HEAD')
+  git(clone, 'checkout', 'main')
+  return sha
+}
+
 describe('createGitOps', () => {
   it('resolves the default branch from origin/HEAD', () => {
     const { clone } = scratchRepos()
@@ -144,6 +156,24 @@ describe('createGitOps', () => {
     git(clone, 'push', 'origin', 'main')
     ops.fetchOrigin()
     expect(ops.originHeadSha('main')).not.toBe(before)
+  })
+
+  it('rejects a duplicate sibling (identical change) rather than cancelling it as already-applied', () => {
+    const { clone } = scratchRepos()
+    // Two PRs that make the SAME change to a new file: the first applies, the
+    // second stages nothing against the cumulative candidate. It must be rejected
+    // (rebuild) — NOT cancelled as "already applied to base", because the sibling
+    // that introduced the change may not land.
+    const shaA = pushBranchWith(clone, 'dupe-a', 'twin.txt', 'twin\n')
+    const shaB = pushBranchWith(clone, 'dupe-b', 'twin.txt', 'twin\n')
+    const ops = createGitOps(clone)
+    ops.fetchOrigin()
+    const res = ops.constructCandidate('bdupe', [
+      { pr: 1, headSha: shaA }, { pr: 2, headSha: shaB },
+    ], 'main')
+    expect(res.applied).toEqual([1])
+    expect(res.rejected).toEqual([2])
+    expect(res.alreadyApplied).toEqual([])
   })
 
   it('treats an already-landed diff as alreadyApplied instead of throwing', () => {

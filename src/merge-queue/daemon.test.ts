@@ -1,5 +1,6 @@
 // src/merge-queue/daemon.test.ts
 import { describe, expect, it, vi } from 'vitest'
+import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -363,6 +364,32 @@ describe('MergeQueueDaemon.cycle', () => {
     expect(h.daemon.paused()).toBeNull() // not a partial-landing pause
   })
 
+  it('a merge failure before any land requeues and rebuilds without pausing the queue', async () => {
+    const h = harness()
+    h.enqueue(1)
+    h.gh.failMerge.add(1) // fails, and the PR is NOT actually merged
+    await h.daemon.cycle()
+    expect(h.states()[1]).toBe('REQUEUED_SPLIT')
+    expect(h.gh.merged).toEqual([])
+    expect(h.daemon.paused()).toBeNull() // 0 landed => not a partial landing => no pause
+  })
+
+  it('closes the bead when a PR is cancelled as already-applied', async () => {
+    const h = harness()
+    h.enqueue(1)
+    h.enqueue(2)
+    h.gh.infos.set(2, prInfo(2, { body: 'Closes proj-2' }))
+    h.git.candidates.push({
+      ref: 'refs/merge-queue/batch-x', applied: [1], rejected: [], alreadyApplied: [2],
+    })
+    const spy = vi.spyOn(
+      h.daemon as unknown as { closeBead: (pr: number, body?: string) => void }, 'closeBead',
+    )
+    await h.daemon.cycle()
+    expect(h.states()[2]).toBe('CANCELLED')
+    expect(spy).toHaveBeenCalledWith(2)
+  })
+
   it('binds each merge to the head SHA that was tested (--match-head-commit)', async () => {
     const h = harness()
     h.enqueue(1)
@@ -477,15 +504,32 @@ describe('MergeQueueDaemon.reconcile', () => {
     expect(h.states()[1]).toBe('REQUEUED_SPLIT')
   })
 
-  it('reaps an orphaned gate process group and clears the pid file', () => {
-    const h = harness()
+  it('reaps an orphaned gate group only when the live process still runs the gate command', () => {
+    const h = harness({ config: { ...defaultMergeQueueConfig(), gate_command: 'sleep 41.7' } })
     fs.mkdirSync(h.mqDir, { recursive: true })
-    fs.writeFileSync(path.join(h.mqDir, 'gate.pid'), '424242')
-    const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true)
+    const child = spawn('sleep', ['41.7'], { detached: true, stdio: 'ignore' })
+    child.unref()
+    fs.writeFileSync(path.join(h.mqDir, 'gate.pid'), String(child.pid))
+    const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true) // assert intent, don't really kill
     h.daemon.reconcile()
-    expect(killSpy).toHaveBeenCalledWith(-424242, 'SIGKILL')
+    expect(killSpy).toHaveBeenCalledWith(-(child.pid as number), 'SIGKILL')
     expect(fs.existsSync(path.join(h.mqDir, 'gate.pid'))).toBe(false)
     killSpy.mockRestore()
+    try { process.kill(-(child.pid as number), 'SIGKILL') } catch { /* cleanup */ }
+  })
+
+  it('does NOT kill a recycled pid whose process is not our gate (PID-reuse safety)', () => {
+    const h = harness({ config: { ...defaultMergeQueueConfig(), gate_command: 'sleep 88.3' } })
+    fs.mkdirSync(h.mqDir, { recursive: true })
+    const child = spawn('sleep', ['41.7'], { detached: true, stdio: 'ignore' }) // command ≠ gate_command
+    child.unref()
+    fs.writeFileSync(path.join(h.mqDir, 'gate.pid'), String(child.pid))
+    const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true)
+    h.daemon.reconcile()
+    expect(killSpy).not.toHaveBeenCalled()                            // command mismatch → left untouched
+    expect(fs.existsSync(path.join(h.mqDir, 'gate.pid'))).toBe(false) // stale file still cleared
+    killSpy.mockRestore()
+    try { process.kill(-(child.pid as number), 'SIGKILL') } catch { /* cleanup */ }
   })
 })
 

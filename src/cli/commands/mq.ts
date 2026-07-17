@@ -151,6 +151,7 @@ export async function mqHandler(argv: MqArgs): Promise<void> {
       process.exitCode = 1
       return
     }
+    let onSignal: (() => void) | undefined
     try {
       const logFile = path.join(mqDir, 'logs', 'daemon.log')
       fs.mkdirSync(path.dirname(logFile), { recursive: true })
@@ -182,7 +183,7 @@ export async function mqHandler(argv: MqArgs): Promise<void> {
         }
         fs.rmSync(pf, { force: true })
       }
-      const onSignal = (): void => {
+      onSignal = (): void => {
         killGate()
         void release().finally(() => process.exit(130))
       }
@@ -191,6 +192,13 @@ export async function mqHandler(argv: MqArgs): Promise<void> {
       log(`daemon started (pid ${process.pid})`)
       await daemon.run({ once: argv.once })
     } finally {
+      // Remove the handlers on normal completion (the --once path returns here) so
+      // they don't accumulate across invocations; process.once only auto-removes
+      // when the signal actually fires.
+      if (onSignal !== undefined) {
+        process.removeListener('SIGINT', onSignal)
+        process.removeListener('SIGTERM', onSignal)
+      }
       await release()
     }
     return

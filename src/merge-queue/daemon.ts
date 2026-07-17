@@ -1,5 +1,5 @@
 // src/merge-queue/daemon.ts
-import { execFile } from 'node:child_process'
+import { execFile, execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { ulid } from 'ulid'
@@ -427,9 +427,28 @@ export class MergeQueueDaemon {
           this.closeBead(pr, live.get(pr)?.body)
           continue
         }
-        // Partial landing: what already merged is real and must not be re-tested
-        // against a stale candidate (spec D9) — pause instead of running the NRS
-        // check, and requeue everything that did not get a chance to merge.
+        if (landed.length === 0) {
+          // Nothing has landed yet — this is NOT a partial landing (a transient
+          // failure, head race, or externally-closed PR). Requeue the whole batch
+          // and rebuild next cycle; pausing the entire queue here would be a
+          // denial of service on a routine, recoverable merge error.
+          appendEvent(mqDir, {
+            type: 'batch_state', batchId, state: 'ABORTED', at: this.at(),
+            note: `merge failed before any land (${String(err)}) — rebuilding`,
+          })
+          const fresh = this.state()
+          for (const m of members) {
+            if (this.isTerminal(fresh, m)) continue
+            appendEvent(mqDir, {
+              type: 'pr_state', pr: m, state: 'REQUEUED_SPLIT', batchId, at: this.at(),
+              note: 'merge failed before any land — rebuilding',
+            })
+          }
+          return
+        }
+        // Partial landing (some PRs already merged): what landed is real and must
+        // not be re-tested against a stale candidate (spec D9) — pause instead of
+        // running the NRS check, and requeue everything that did not get to merge.
         appendEvent(mqDir, {
           type: 'pr_state', pr, state: 'REQUEUED_SPLIT', batchId, at: this.at(),
           note: 'merge failed mid-batch',
@@ -501,6 +520,9 @@ export class MergeQueueDaemon {
     } catch (err) {
       log(`warn: could not comment for PR #${pr}: ${String(err)}`)
     }
+    // The change is already on the base, so the underlying work landed — close the
+    // bead too (fire-and-forget contract), don't leave it open forever.
+    this.closeBead(pr)
   }
 
   /** Bead feedback loop (spec §5.5): reopen the bead named by "Closes <id>" in the PR body. */
@@ -601,18 +623,32 @@ export class MergeQueueDaemon {
 
   /** Kill an orphaned gate process group left by a crashed prior daemon before the
    *  gate worktree is reused — otherwise it mutates the worktree concurrently with
-   *  the new run and corrupts gate results (spec §5.4). */
+   *  the new run and corrupts gate results (spec §5.4). Guards against PID reuse:
+   *  a stored PID that a reboot has recycled to an UNRELATED process must never be
+   *  SIGKILLed, so we only kill when the live process still runs our gate command. */
   private reapOrphanGate(): void {
     const { mqDir, log } = this.deps
     const pidFile = path.join(mqDir, GATE_PID_FILE)
     if (!fs.existsSync(pidFile)) return
     const pid = Number(fs.readFileSync(pidFile, 'utf8').trim())
-    if (Number.isInteger(pid) && pid > 0) {
+    if (Number.isInteger(pid) && pid > 0 && this.looksLikeOurGate(pid)) {
       try {
         process.kill(-pid, 'SIGKILL') // negative pid = whole group
         log(`reaped orphaned gate process group ${pid}`)
       } catch { /* already gone */ }
     }
     fs.rmSync(pidFile, { force: true })
+  }
+
+  /** PID-reuse guard: the live process with this pid must still be running our
+   *  configured gate command before we send it SIGKILL. A recycled pid pointing
+   *  at some unrelated process fails this check and is left untouched. */
+  private looksLikeOurGate(pid: number): boolean {
+    try {
+      const cmd = execFileSync('ps', ['-o', 'command=', '-p', String(pid)], { encoding: 'utf8' })
+      return cmd.includes(this.deps.config.gate_command)
+    } catch {
+      return false // no such pid, or ps unavailable — do not kill
+    }
   }
 }

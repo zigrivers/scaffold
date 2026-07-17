@@ -109,11 +109,22 @@ export function createGitOps(repoRoot: string): GitOps {
       for (const { pr, headSha } of prs) {
         if (gitAllowFail(['merge', '--squash', headSha], gate)) {
           // A squash-merge that lands cleanly but stages nothing means this PR's
-          // diff is already present on the base (e.g. it landed earlier and the
-          // branch never rebased). `git commit` on an empty index would throw
-          // and wedge the whole batch — treat it as a no-op instead.
+          // diff is already present in the candidate. `git commit` on an empty
+          // index would throw and wedge the whole batch — never commit it.
           if (gitAllowFail(['diff', '--cached', '--quiet'], gate)) {
-            alreadyApplied.push(pr)
+            // Only `applied` members change the candidate tree, so applied.length
+            // === 0 proves the candidate is still exactly origin/base — the diff is
+            // therefore already on the BASE (durably landed): cancel the stale PR.
+            // With a sibling already applied, the emptiness could be caused by that
+            // sibling (a duplicate). That sibling may not land, so do NOT cancel —
+            // reject to rebuild, where it will be re-classified correctly.
+            if (applied.length === 0) {
+              alreadyApplied.push(pr)
+            } else {
+              git(['reset', '--hard', 'HEAD'], gate)
+              gitAllowFail(['clean', '-fd'], gate)
+              rejected.push(pr)
+            }
           } else {
             git(['commit', '--no-verify', '-m', `mq: squash PR #${pr}`], gate)
             applied.push(pr)
