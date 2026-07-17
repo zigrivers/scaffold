@@ -87,6 +87,29 @@ describe('createGitOps', () => {
     expect(files).toContain('shared.txt')
   })
 
+  it('recovers a gate worktree left mid-conflict by a crashed prior build', () => {
+    const { clone } = scratchRepos()
+    const shaA = pushBranch(clone, 'pr-crash1', 'crash.txt')
+    const shaB = pushBranch(clone, 'pr-crash2', 'crash.txt')
+    const ops = createGitOps(clone)
+    ops.fetchOrigin()
+    const gate = ops.ensureGateWorktree()
+    // Simulate a crashed prior build: land on base, squash-commit one PR,
+    // then start squash-merging a conflicting PR and never resolve it —
+    // no `merge --abort`, no commit. This is the exact wedged state a
+    // killed daemon process would leave behind.
+    git(gate, 'checkout', '--detach', 'origin/main')
+    git(gate, 'reset', '--hard', 'origin/main')
+    git(gate, 'merge', '--squash', shaA)
+    git(gate, 'commit', '--no-verify', '-m', 'wip')
+    expect(() => git(gate, 'merge', '--squash', shaB)).toThrow()
+    // gate worktree is now wedged with an unresolved conflict in the index.
+    const res = ops.constructCandidate('bcrash', [{ pr: 1, headSha: shaA }], 'main')
+    expect(res.applied).toEqual([1])
+    expect(res.rejected).toEqual([])
+    expect(res.ref).toBe('refs/merge-queue/batch-bcrash')
+  })
+
   it('deleteCandidate removes the ref; listCandidateRefs enumerates them', () => {
     const { clone } = scratchRepos()
     const shaA = pushBranch(clone, 'pr-del', 'd.txt')

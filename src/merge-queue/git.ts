@@ -72,6 +72,17 @@ export function createGitOps(repoRoot: string): GitOps {
       const ref = `${CANDIDATE_PREFIX}${batchId}`
       // Make sure every PR head object is present locally.
       for (const { headSha } of prs) gitAllowFail(['fetch', 'origin', headSha])
+      // Recover from a crashed prior build: if a previous run died mid-`merge
+      // --squash` (e.g. the daemon was killed while the index held unresolved
+      // conflicts), the gate worktree is left dirty and every subsequent
+      // command here — starting with `checkout --detach` — would fail with
+      // "you need to resolve your current index first". A crashed build must
+      // never wedge future builds, so unconditionally clear any leftover
+      // merge/conflict state before touching the worktree. These are no-ops
+      // (and their failures are ignored) when the worktree is already clean.
+      gitAllowFail(['merge', '--abort'], gate)
+      gitAllowFail(['reset', '--hard'], gate)
+      gitAllowFail(['clean', '-fd'], gate)
       git(['checkout', '--detach', `origin/${base}`], gate)
       git(['reset', '--hard', `origin/${base}`], gate)
       const applied: number[] = []
