@@ -38,6 +38,9 @@ node_modules
 .claude/scheduled_tasks.lock
 .claude/*.lock
 
+# MMR local review-acknowledgement state (per-machine runtime)
+.mmr/
+
 # Machine-local Claude Code settings (per-developer permissions/env — never commit)
 .claude/settings.local.json
 
