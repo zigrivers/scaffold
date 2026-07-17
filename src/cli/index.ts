@@ -27,6 +27,7 @@ import observeCommand from './commands/observe.js'
 import knowledgeFreshnessCommand from './commands/knowledge-freshness.js'
 import guidesCommand from './commands/guides.js'
 import agentOpsCommand from './commands/agent-ops.js'
+import mqCommand from './commands/mq.js'
 
 export async function runCli(argv: string[]): Promise<void> {
   shutdown.install()
@@ -58,6 +59,7 @@ export async function runCli(argv: string[]): Promise<void> {
     .command(observeCommand)
     .command(knowledgeFreshnessCommand)
     .command(agentOpsCommand)
+    .command(mqCommand)
     .options({
       format: {
         type: 'string',

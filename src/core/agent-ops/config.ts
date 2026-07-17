@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import yaml from 'js-yaml'
+import { defaultMergeQueueConfig, type MergeQueueConfig } from '../../merge-queue/types.js'
 
 export const AGENT_OPS_CONFIG_PATH = '.scaffold/agent-ops.yaml'
 
@@ -21,6 +22,7 @@ export interface AgentOpsConfig {
   critical_labels: string[]
   worktree_setup_commands: string[]
   docker?: AgentOpsDocker
+  merge_queue: MergeQueueConfig
 }
 
 const NAME_RE = /^[a-z][a-z0-9_-]*$/
@@ -38,6 +40,7 @@ export function defaultAgentOpsConfig(projectRoot: string): AgentOpsConfig {
     project_name: sanitizeName(path.basename(projectRoot)),
     critical_labels: [],
     worktree_setup_commands: [],
+    merge_queue: defaultMergeQueueConfig(),
   }
 }
 
@@ -111,5 +114,29 @@ export function loadAgentOpsConfig(projectRoot: string): AgentOpsConfig {
     cfg.docker = { services, shared_stack: shared }
     if (typeof d.context === 'string' && d.context) cfg.docker.context = d.context
   }
+
+  if (raw.merge_queue !== undefined) {
+    if (raw.merge_queue === null || typeof raw.merge_queue !== 'object' || Array.isArray(raw.merge_queue)) {
+      fail('merge_queue must be a mapping')
+    }
+    const mq = raw.merge_queue as Record<string, unknown>
+    const strKeys = ['gate_command', 'full_gate_command', 'quarantine_path', 'ready_label'] as const
+    for (const key of strKeys) {
+      const v = mq[key]
+      if (v === undefined) continue
+      if (typeof v !== 'string' || v.trim() === '') fail(`merge_queue.${key} must be a non-empty string`)
+      cfg.merge_queue[key] = v
+    }
+    const intKeys = ['batch_cap', 'poll_seconds', 'gate_timeout_minutes'] as const
+    for (const key of intKeys) {
+      const v = mq[key]
+      if (v === undefined) continue
+      if (typeof v !== 'number' || !Number.isInteger(v) || v < 1) {
+        fail(`merge_queue.${key} must be a positive integer, got ${JSON.stringify(v)}`)
+      }
+      cfg.merge_queue[key] = v
+    }
+  }
+
   return cfg
 }
