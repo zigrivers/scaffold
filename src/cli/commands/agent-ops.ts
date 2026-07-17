@@ -12,9 +12,12 @@ import {
 } from '../../core/agent-ops/install.js'
 
 export function resolveComponents(raw: string | undefined): AgentOpsComponent[] {
+  // 'all'/default stays git+staging on purpose: merge-queue and ci are explicit
+  // opt-ins so upgrade re-installs never surprise existing projects with
+  // workflows or merge guards.
   if (raw === undefined || raw === 'all') return ['git', 'staging']
-  if (raw === 'git' || raw === 'staging') return [raw]
-  throw new Error(`unknown component "${raw}" (expected git, staging, or all)`)
+  if (raw === 'git' || raw === 'staging' || raw === 'merge-queue' || raw === 'ci') return [raw]
+  throw new Error(`unknown component "${raw}" (expected git, staging, merge-queue, ci, or all)`)
 }
 
 interface AgentOpsArgs {
@@ -40,7 +43,7 @@ const agentOpsCommand: CommandModule<Record<string, unknown>, AgentOpsArgs> = {
       })
       .option('component', {
         type: 'string',
-        describe: 'git | staging | all (default all)',
+        describe: 'git | staging | merge-queue | ci | all (default all = git+staging)',
       })
       .option('force', {
         type: 'boolean',
