@@ -60,4 +60,45 @@ describe('createGhClient', () => {
     process.env.MQ_GH_CMD = '/nonexistent/gh-binary'
     expect(() => createGhClient(stubDir)).toThrow(/gh CLI/)
   })
+
+  it('constructs correct viewPr arguments', () => {
+    const json = '{"number":7,"state":"OPEN","headRefOid":"abc123","mergedAt":null,' +
+      '"additions":3,"deletions":1,"title":"t","body":"Closes prj-x"}'
+    process.env.MQ_GH_CMD = writeStub(
+      `echo '${json}'; echo "$@" >> '${os.tmpdir()}/mq-gh-args.txt'`,
+    )
+    fs.rmSync(path.join(os.tmpdir(), 'mq-gh-args.txt'), { force: true })
+    createGhClient(stubDir).viewPr(7)
+    const args = fs.readFileSync(path.join(os.tmpdir(), 'mq-gh-args.txt'), 'utf8')
+    expect(args).toContain('pr view 7 --json')
+    expect(args).toContain('number,state,headRefOid,mergedAt,additions,deletions,title,body')
+  })
+
+  it('constructs correct listLabeled arguments', () => {
+    process.env.MQ_GH_CMD = writeStub(
+      `echo '[{"number":4},{"number":9}]'; echo "$@" >> '${os.tmpdir()}/mq-gh-args.txt'`,
+    )
+    fs.rmSync(path.join(os.tmpdir(), 'mq-gh-args.txt'), { force: true })
+    createGhClient(stubDir).listLabeled('mq:ready')
+    const args = fs.readFileSync(path.join(os.tmpdir(), 'mq-gh-args.txt'), 'utf8')
+    expect(args).toContain('pr list --label mq:ready --state open --json number')
+  })
+
+  it('constructs correct postMergeRed arguments', () => {
+    process.env.MQ_GH_CMD = writeStub(
+      `echo '[{"conclusion":"failure"}]'; echo "$@" >> '${os.tmpdir()}/mq-gh-args.txt'`,
+    )
+    fs.rmSync(path.join(os.tmpdir(), 'mq-gh-args.txt'), { force: true })
+    createGhClient(stubDir).postMergeRed('main')
+    const args = fs.readFileSync(path.join(os.tmpdir(), 'mq-gh-args.txt'), 'utf8')
+    expect(args).toContain('run list --workflow post-merge.yml --branch main --limit 1 --json conclusion')
+  })
+
+  it('records the args gh was invoked with for comment', () => {
+    process.env.MQ_GH_CMD = writeStub(`echo "$@" >> '${os.tmpdir()}/mq-gh-args.txt'`)
+    fs.rmSync(path.join(os.tmpdir(), 'mq-gh-args.txt'), { force: true })
+    createGhClient(stubDir).comment(9, 'hello there')
+    const args = fs.readFileSync(path.join(os.tmpdir(), 'mq-gh-args.txt'), 'utf8')
+    expect(args).toContain('pr comment 9 --body hello there')
+  })
 })
