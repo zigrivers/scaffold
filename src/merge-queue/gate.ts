@@ -31,9 +31,19 @@ export function runGate(opts: {
       stdio: ['ignore', 'pipe', 'pipe'],
     })
     const chunks: Buffer[] = []
-    child.stdout.on('data', c => chunks.push(c as Buffer))
-    child.stderr.on('data', c => chunks.push(c as Buffer))
+    const MAX_LOG_BYTES = 64 * 1024 * 1024
+    let captured = 0
+    const capture = (c: Buffer) => {
+      if (captured >= MAX_LOG_BYTES) return // cap: log is truncated, gate keeps running
+      captured += c.length
+      chunks.push(c)
+    }
+    child.stdout.on('data', capture)
+    child.stdout.on('error', () => { /* stream error — close still decides the result */ })
+    child.stderr.on('data', capture)
+    child.stderr.on('error', () => { /* stream error — close still decides the result */ })
     let timedOut = false
+    let settled = false
     const timer = setTimeout(() => {
       timedOut = true
       if (child.pid !== undefined) {
@@ -43,6 +53,8 @@ export function runGate(opts: {
       }
     }, opts.timeoutMs)
     const finish = (result: GateResult['result']) => {
+      if (settled) return
+      settled = true
       clearTimeout(timer)
       fs.writeFileSync(opts.logPath, Buffer.concat(chunks))
       const failedFile = path.join(opts.cwd, FAILED_TESTS_FILE)
