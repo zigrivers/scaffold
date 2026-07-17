@@ -35,9 +35,12 @@ class FakeGh implements GhClient {
   indeterminate = new Set<number>()     // squashMerge throws AND the confirming view then fails
   onSquash?: (pr: number) => void       // fired after a successful merge (to inject mid-loop events)
   private breakView = new Set<number>()
+  viewErrors = new Map<number, string>() // pr -> exact error message viewPr should throw
   viewPr(pr: number): PrInfo {
     if (this.breakView.has(pr)) throw new Error('network unreachable during confirmation')
     if (this.notFound.has(pr)) throw new Error('Could not resolve to a PullRequest')
+    const custom = this.viewErrors.get(pr)
+    if (custom !== undefined) throw new Error(custom)
     const info = this.infos.get(pr)
     if (!info) throw new Error(`transient blip viewing PR ${pr}`)
     return info
@@ -323,6 +326,42 @@ describe('MergeQueueDaemon.cycle', () => {
     expect(h.daemon.paused()).toBeNull()
   })
 
+  it('does NOT cancel on a generic "could not resolve" (repo/auth) — treats it as transient', async () => {
+    const h = harness()
+    // A repository-access / auth failure, NOT a PR-not-found. Must stay QUEUED and
+    // (after 5) pause — never cancel, which the old broad regex would have done.
+    h.gh.viewErrors.set(1, 'GraphQL: Could not resolve to a Repository with the name X (HTTP 404)')
+    appendEvent(h.mqDir, { type: 'enqueued', pr: 1, at: AT })
+    for (let i = 0; i < 4; i++) {
+      expect(await h.daemon.cycle()).toBe('idle')
+      expect(h.states()[1]).toBe('QUEUED')
+    }
+    await h.daemon.cycle()
+    expect(h.states()[1]).toBe('QUEUED')                     // NOT cancelled
+    expect(h.daemon.paused()).toMatch(/GitHub API failures/) // paused instead
+  })
+
+  it('a pause fired during PR collection aborts the cycle before any batch runs', async () => {
+    const h = harness()
+    h.enqueue(1)
+    h.enqueue(2)
+    // Simulate a pause landing mid-collection (e.g. from a concurrent transient
+    // path): the cycle must not go on to compose/run/land a batch.
+    const origView = h.gh.viewPr.bind(h.gh)
+    let pausedOnce = false
+    h.gh.viewPr = (pr: number) => {
+      if (pr === 1 && !pausedOnce) {
+        pausedOnce = true
+        fs.writeFileSync(path.join(h.mqDir, 'PAUSED'), 'concurrent pause\n')
+      }
+      return origView(pr)
+    }
+    expect(await h.daemon.cycle()).toBe('idle')
+    expect(h.gh.merged).toEqual([])
+    expect(h.states()[1]).not.toBe('LANDED')
+    expect(h.states()[2]).not.toBe('LANDED')
+  })
+
   it('an EJECTED PR relabeled mq:ready is not re-absorbed', async () => {
     const h = harness()
     h.enqueue(1)
@@ -391,6 +430,16 @@ describe('MergeQueueDaemon.cycle', () => {
     expect(h.daemon.paused()).toMatch(/indeterminate/)
     expect(h.states()[1]).not.toBe('LANDED')
     expect(h.gh.merged).toEqual([])
+  })
+
+  it('an indeterminate merge requeues the untried tail before pausing (no stranded PASSED)', async () => {
+    const h = harness()
+    h.enqueue(1)
+    h.enqueue(2)
+    h.gh.indeterminate.add(1) // first member's merge outcome is unknowable
+    await h.daemon.cycle()
+    expect(h.daemon.paused()).toMatch(/indeterminate/)
+    expect(h.states()[2]).toBe('REQUEUED_SPLIT') // tail recovered, not left in PASSED
   })
 
   it('a withdrawal DURING the landing loop stops the later PR and pauses (partial)', async () => {

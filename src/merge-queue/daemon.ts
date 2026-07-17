@@ -56,6 +56,13 @@ export class MergeQueueDaemon {
   private at(): string { return this.deps.now().toISOString() }
   private state(): QueueState { return reduceState(readJournal(this.deps.mqDir)) }
 
+  /** Hand control back to the event loop so proper-lockfile's lock-renewal timer
+   *  can run between long synchronous git/gh calls (keeps the singleton lock from
+   *  going falsely stale during a busy cycle). */
+  private yieldToLoop(): Promise<void> {
+    return new Promise<void>(resolve => setImmediate(resolve))
+  }
+
   /** True when the PR's current journal state is terminal (LANDED/EJECTED/
    *  NEEDS_REBASE/CANCELLED) — i.e. it was withdrawn or finished elsewhere. */
   private isTerminal(state: QueueState, pr: number): boolean {
@@ -131,11 +138,13 @@ export class MergeQueueDaemon {
         info = gh.viewPr(entry.pr)
       } catch (err) {
         const msg = String(err)
-        // Only a DEFINITIVE "gone" answer cancels the PR. A transient failure
-        // (network, auth expiry, rate limit, GitHub outage) must never cancel —
-        // during an outage every viewPr throws, and cancelling on that would nuke
-        // the whole queue. Transient failures pause the daemon instead (recoverable).
-        if (/not found|could not resolve|no pull requests|404/i.test(msg)) {
+        // Only a DEFINITIVE PR-not-found answer cancels the PR. Match gh's specific
+        // "not a PR" phrasings — NOT a bare "404"/"could not resolve", which also
+        // covers repository-access, auth, and remote-config failures. A transient
+        // failure (network, auth expiry, rate limit, outage) must never cancel:
+        // during an outage every viewPr throws, and cancelling then would nuke the
+        // whole queue. Transient failures pause the daemon instead (recoverable).
+        if (/could not resolve to a pull\s?request|no pull requests found/i.test(msg)) {
           appendEvent(mqDir, {
             type: 'pr_state', pr: entry.pr, state: 'CANCELLED', at: this.at(),
             note: 'PR not found on GitHub — check the number',
@@ -151,6 +160,7 @@ export class MergeQueueDaemon {
             `repeated GitHub API failures viewing PR #${entry.pr} (${msg}) — ` +
             'check gh auth / network, then rm .mq/PAUSED',
           )
+          break // a pause is queue-wide — stop collecting and let this cycle end
         }
         continue
       }
@@ -163,7 +173,14 @@ export class MergeQueueDaemon {
         continue
       }
       infos.set(entry.pr, info)
+      // Yield between blocking viewPr calls so proper-lockfile's heartbeat timer
+      // can fire — a long unbroken run of synchronous gh/git calls would otherwise
+      // starve it past the stale threshold and let a second daemon start.
+      await this.yieldToLoop()
     }
+    // A transient-error pause may have fired mid-collection — do not compose/run/
+    // land a batch while paused; end the cycle so the pause is honored.
+    if (this.paused() !== null) return 'idle'
     const eligible = queued.filter(e => infos.has(e.pr))
     if (eligible.length === 0) return 'idle'
 
@@ -309,7 +326,7 @@ export class MergeQueueDaemon {
 
     if (gate.result === 'green') {
       const testedHeads = new Map(prs.map(p => [p.pr, p.headSha]))
-      this.land(batchId, applied, base, candidateTree, testedHeads)
+      await this.land(batchId, applied, base, candidateTree, testedHeads)
       git.deleteCandidate(batchId)
       return { kind: 'done' }
     }
@@ -349,13 +366,13 @@ export class MergeQueueDaemon {
     })
   }
 
-  private land(
+  private async land(
     batchId: string,
     members: number[],
     base: string,
     candidateTree: string,
     testedHeads: Map<number, string>,
-  ): void {
+  ): Promise<void> {
     const { gh, git, mqDir, log } = this.deps
 
     // Pre-land validation (spec D9). The candidate tree was built from these exact
@@ -431,6 +448,7 @@ export class MergeQueueDaemon {
           }
           return
         }
+        this.requeueUnlanded(members, i + 1, batchId, 'sibling withdrawn mid-landing — retry after review')
         this.pause(
           `#${pr} withdrawn mid-landing of batch ${batchId} after ${landed.length} landed — ` +
           `verify origin/${base}, then rm .mq/PAUSED`,
@@ -466,9 +484,13 @@ export class MergeQueueDaemon {
           continue
         }
         if (confirmed === 'unknown') {
+          // Leave #${pr} in LANDING (its true state is unknown — reconcile resolves
+          // it on the next daemon restart). Requeue the untried tail so it is not
+          // stranded in PASSED while the queue is paused.
+          this.requeueUnlanded(members, i + 1, batchId, 'after an indeterminate landing — retry after review')
           this.pause(
             `indeterminate merge for PR #${pr} in batch ${batchId} (${String(err)}) — ` +
-            'confirm on GitHub whether it merged, then rm .mq/PAUSED',
+            'confirm on GitHub whether it merged, then rm .mq/PAUSED and restart the daemon',
           )
           appendEvent(mqDir, {
             type: 'batch_state', batchId, state: 'DONE', at: this.at(),
@@ -523,6 +545,8 @@ export class MergeQueueDaemon {
         gh.comment(pr, `**merge-queue**: landed in batch ${batchId}`)
       } catch { /* comment is best-effort */ }
       this.closeBead(pr, live.get(pr)?.body)
+      // Yield so the lock heartbeat can fire between blocking merge calls.
+      await this.yieldToLoop()
     }
     git.fetchOrigin()
     const landedTree = git.treeOf(`origin/${base}`)
@@ -539,6 +563,18 @@ export class MergeQueueDaemon {
     }
     appendEvent(mqDir, { type: 'batch_state', batchId, state: 'DONE', at: this.at() })
     log(`batch ${batchId}: landed ${members.length} PR(s)`)
+  }
+
+  /** Requeue every not-yet-terminal member from `fromIndex` on, so a paused batch
+   *  never leaves its untried tail stranded in a mid-flight (PASSED/LANDING) state. */
+  private requeueUnlanded(members: number[], fromIndex: number, batchId: string, note: string): void {
+    const fresh = this.state()
+    for (const pr of members.slice(fromIndex)) {
+      if (this.isTerminal(fresh, pr)) continue
+      appendEvent(this.deps.mqDir, {
+        type: 'pr_state', pr, state: 'REQUEUED_SPLIT', batchId, at: this.at(), note,
+      })
+    }
   }
 
   private eject(
