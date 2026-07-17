@@ -54,3 +54,36 @@ teardown() { rm -rf "$TMP"; }
   run bash -c "echo '{}' | '$TMP/mq-guard.sh'"
   [ "$status" -eq 0 ]
 }
+
+@test "agent-ops.mk defines the mq targets with doc-comments" {
+  MK="$BATS_TEST_DIRNAME/../content/assets/agent-ops/make/agent-ops.mk.tmpl"
+  grep -qE '^mq-enqueue: ## \[agent-safe\]' "$MK"
+  grep -qE '^mq-status: ## \[agent-safe\]' "$MK"
+  grep -qE '^mq-daemon: ## \[agent-safe\]' "$MK"
+  grep -qE '^mq-eject: ## \[agent-safe\]' "$MK"
+  grep -qE '^mq-stats: ## \[agent-safe\]' "$MK"
+  grep -qE '^post-merge-watch: ## \[agent-safe\]' "$MK"
+}
+
+@test "mq targets self-guard on the scaffold CLI" {
+  MK="$BATS_TEST_DIRNAME/../content/assets/agent-ops/make/agent-ops.mk.tmpl"
+  grep -q 'define mq_guard' "$MK"
+  grep -q 'command -v scaffold' "$MK"
+}
+
+@test "mq-enqueue requires PR= and is wired through a real make run" {
+  WORK="$(mktemp -d)"
+  cp "$BATS_TEST_DIRNAME/../content/assets/agent-ops/make/agent-ops.mk.tmpl" "$WORK/agent-ops.mk"
+  printf -- '-include agent-ops.mk\n' > "$WORK/Makefile"
+  # stub scaffold on PATH so mq_guard passes and enqueue is observable
+  mkdir -p "$WORK/bin"
+  printf '#!/usr/bin/env bash\necho "scaffold $*" >> "%s/calls.log"\n' "$WORK" > "$WORK/bin/scaffold"
+  chmod +x "$WORK/bin/scaffold"
+  run env PATH="$WORK/bin:$PATH" make -C "$WORK" mq-enqueue
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"PR="* ]]
+  run env PATH="$WORK/bin:$PATH" make -C "$WORK" mq-enqueue PR=42
+  [ "$status" -eq 0 ]
+  grep -q 'mq enqueue --pr 42' "$WORK/calls.log"
+  rm -rf "$WORK"
+}
