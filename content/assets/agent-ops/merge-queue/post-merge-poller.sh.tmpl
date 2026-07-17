@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# post-merge-poller.sh — the `local-poller` gate executor (merge_queue.gate_executor).
+# Installed by `scaffold agent-ops install --component merge-queue`.
+#
+# One pass per invocation: if origin/<default-branch> moved since the last
+# recorded full-suite run, run the FULL UNCACHED gate in a dedicated worktree.
+# RED  -> write .mq/PAUSED (the merge-queue daemon stops landing until a human
+#         fixes forward or reverts, then removes the file). Exit 1.
+# GREEN-> record the sha; clear a pause only if THIS script wrote it (a pause
+#         starting "post-merge red") — an NRS pause is never touched.
+# Schedule: cron/launchd every ~10 min, or ad hoc via `make post-merge-watch`.
+set -euo pipefail
+
+GATE="{{FULL_GATE_COMMAND}}"
+
+# Resolve relative to where this script itself lives, not the caller's cwd —
+# cron/launchd invoke it with an unpredictable working directory (often $HOME),
+# so we cd to our own install location first, then ask git for the PRIMARY
+# checkout (first entry in `worktree list`), matching this project's other
+# ops scripts (e.g. main-sync.sh.tmpl).
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+PRIMARY="$(git worktree list --porcelain | head -1 | sed 's/^worktree //')"
+cd "$PRIMARY"
+MQ_DIR="$PRIMARY/.mq"
+MARKER="$MQ_DIR/last-full-suite-sha"
+PAUSE="$MQ_DIR/PAUSED"
+WT="$MQ_DIR/post-merge"
+
+BRANCH="$(git rev-parse --abbrev-ref origin/HEAD | sed 's#^origin/##')"
+git fetch origin --prune --quiet
+HEAD_SHA="$(git rev-parse "origin/$BRANCH")"
+LAST="$(cat "$MARKER" 2>/dev/null || echo none)"
+if [ "$HEAD_SHA" = "$LAST" ]; then
+	echo "post-merge: up to date at $HEAD_SHA"
+	exit 0
+fi
+
+mkdir -p "$MQ_DIR/logs"
+# Prune stale registrations first: if the worktree dir was deleted by hand, git
+# still has it registered and `git worktree add` would abort ("already exists").
+git worktree prune
+if [ ! -d "$WT" ]; then
+	git worktree add --detach --quiet "$WT" "origin/$BRANCH"
+fi
+git -C "$WT" fetch origin --quiet
+git -C "$WT" checkout --detach --quiet "origin/$BRANCH"
+git -C "$WT" reset --hard --quiet "origin/$BRANCH"
+
+LOG="$MQ_DIR/logs/post-merge-$HEAD_SHA.log"
+if (cd "$WT" && bash -c "$GATE") >"$LOG" 2>&1; then
+	echo "$HEAD_SHA" > "$MARKER"
+	if grep -q '^post-merge red' "$PAUSE" 2>/dev/null; then
+		rm -f "$PAUSE"
+		echo "post-merge: green at $HEAD_SHA — cleared poller pause"
+	else
+		echo "post-merge: green at $HEAD_SHA"
+	fi
+else
+	printf 'post-merge red at %s — full suite failed; see %s. Fix forward or revert (runbook: docs/git-workflow), then rm .mq/PAUSED\n' \
+		"$HEAD_SHA" "$LOG" > "$PAUSE"
+	echo "post-merge: RED at $HEAD_SHA — merge queue paused ($LOG)" >&2
+	exit 1
+fi

@@ -141,3 +141,61 @@ teardown() { rm -rf "$TMP"; }
   [[ "$output" == *"gh CLI required"* ]]
   rm -rf "$WORK"
 }
+
+poller_world() { # builds origin+clone, installs resolved poller with gate cmd $1
+  WORK="$(mktemp -d)"
+  git init -q --bare -b main "$WORK/origin.git"
+  git clone -q "$WORK/origin.git" "$WORK/clone"
+  git -C "$WORK/clone" config user.name t
+  git -C "$WORK/clone" config user.email t@t.invalid
+  echo base > "$WORK/clone/f.txt"
+  git -C "$WORK/clone" add f.txt
+  git -C "$WORK/clone" commit -qm base
+  git -C "$WORK/clone" push -qu origin main
+  git -C "$WORK/clone" remote set-head origin main
+  mkdir -p "$WORK/clone/scripts/ops"
+  sed -e "s|{{FULL_GATE_COMMAND}}|$1|g" \
+    "$BATS_TEST_DIRNAME/../content/assets/agent-ops/merge-queue/post-merge-poller.sh.tmpl" \
+    > "$WORK/clone/scripts/ops/post-merge-poller.sh"
+  chmod +x "$WORK/clone/scripts/ops/post-merge-poller.sh"
+}
+
+@test "poller: green run records the sha and stays quiet when nothing moved" {
+  poller_world "true"
+  run git -C "$WORK/clone" rev-parse origin/main
+  SHA="$output"
+  run "$WORK/clone/scripts/ops/post-merge-poller.sh"
+  [ "$status" -eq 0 ]
+  [ "$(cat "$WORK/clone/.mq/last-full-suite-sha")" = "$SHA" ]
+  run "$WORK/clone/scripts/ops/post-merge-poller.sh"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"up to date"* ]]
+  rm -rf "$WORK"
+}
+
+@test "poller: red run pauses the queue; green clears only a poller pause" {
+  poller_world "false"
+  run "$WORK/clone/scripts/ops/post-merge-poller.sh"
+  [ "$status" -eq 1 ]
+  grep -q 'post-merge red' "$WORK/clone/.mq/PAUSED"
+  # switch gate to green and advance origin so the poller re-runs
+  sed -i '' -e 's|^GATE=.*|GATE="true"|' "$WORK/clone/scripts/ops/post-merge-poller.sh" 2>/dev/null || \
+    sed -i -e 's|^GATE=.*|GATE="true"|' "$WORK/clone/scripts/ops/post-merge-poller.sh"
+  echo more >> "$WORK/clone/f.txt"
+  git -C "$WORK/clone" commit -qam more
+  git -C "$WORK/clone" push -q origin main
+  run "$WORK/clone/scripts/ops/post-merge-poller.sh"
+  [ "$status" -eq 0 ]
+  [ ! -f "$WORK/clone/.mq/PAUSED" ]
+  rm -rf "$WORK"
+}
+
+@test "poller: never clears a non-poller (NRS) pause" {
+  poller_world "true"
+  mkdir -p "$WORK/clone/.mq"
+  echo "NRS violation: trees differ" > "$WORK/clone/.mq/PAUSED"
+  run "$WORK/clone/scripts/ops/post-merge-poller.sh"
+  [ -f "$WORK/clone/.mq/PAUSED" ]
+  grep -q 'NRS violation' "$WORK/clone/.mq/PAUSED"
+  rm -rf "$WORK"
+}
