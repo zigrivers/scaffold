@@ -2176,6 +2176,7 @@ export class MergeQueueDaemon {
       try {
         gh.comment(pr, `**merge-queue**: landed in batch ${batchId}`)
       } catch { /* comment is best-effort */ }
+      this.closeBead(pr)
     }
     git.fetchOrigin()
     const landedTree = git.treeOf(`origin/${base}`)
@@ -2212,6 +2213,16 @@ export class MergeQueueDaemon {
 
   /** Bead feedback loop (spec §5.5): reopen the bead named by "Closes <id>" in the PR body. */
   private reopenBead(pr: number): void {
+    this.beadCmd(pr, ['update', '{id}', '--status', 'open'])
+  }
+
+  /** Fire-and-forget contract (spec §5.5): the DAEMON closes the bead on land —
+   *  the enqueueing agent moved on and never returns to verify the merge. */
+  private closeBead(pr: number): void {
+    this.beadCmd(pr, ['close', '{id}'])
+  }
+
+  private beadCmd(pr: number, argTemplate: string[]): void {
     let body = ''
     try {
       body = this.deps.gh.viewPr(pr).body
@@ -2221,7 +2232,7 @@ export class MergeQueueDaemon {
     const match = body.match(/Closes ([a-z][a-z0-9-]*-[a-z0-9]+)/i)
     if (!match) return
     try {
-      execFileSync('bd', ['update', match[1], '--status', 'open'], {
+      execFileSync('bd', argTemplate.map(a => a === '{id}' ? match[1] : a), {
         cwd: this.deps.projectRoot, stdio: 'ignore',
       })
     } catch { /* bd absent — advisory only */ }
