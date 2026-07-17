@@ -809,7 +809,15 @@ worktree machinery); skip for solo projects — `bd merge-slot` suffices there.
   `scaffold agent-ops check` passes
 - (mvp) docs/merge-queue.md documents: enqueue-and-move-on, ejection → bead
   reopened → any agent fixes, NEVER `gh pr merge` directly, `.mq/PAUSED`
-  semantics (NRS violation vs post-merge red) with the recovery for each
+  semantics (NRS violation vs partial landing vs post-merge red) with the
+  recovery for each
+- (mvp) Engine-behavior facts from Plan 1 execution documented: a PR whose diff
+  is already on the base is CANCELLED with a "close the PR" comment (not
+  ejected); the `mq:ready` label enqueues only PRs the queue has never seen (or
+  previously landed) — after an ejection, RE-LABELING DOES NOT RE-ENQUEUE;
+  recovery is `scaffold mq enqueue --pr <N>` (or `make mq-enqueue`) after the
+  fix, which remote agents must route through a colocated agent until a
+  label-removal protocol exists
 - (mvp) gate_executor decision recorded: `gha-selfhosted` (default — `ci`
   component installed, runner registration in the day-one checklist) or
   `local-poller` (poller scheduled via cron/launchd, no workflows)
@@ -883,9 +891,11 @@ Synthesize from the knowledge entries and the ACTUAL installed commands (never
 invent): the enqueue flow (`make mq-enqueue PR=<N>` after mmr review passes;
 move to the next bead immediately), what landing looks like (PR comment, bead
 closed by the daemon), ejection recovery (failing log comment, bead reopened,
-NEEDS_REBASE vs EJECTED), `.mq/PAUSED` semantics and recovery (NRS violation:
-investigate tree divergence before unpausing; post-merge red: fix forward or
-revert, then `rm .mq/PAUSED`), flake quarantine (`.mq/quarantine.txt`, auto
+NEEDS_REBASE vs EJECTED vs CANCELLED-already-applied; re-enqueue after the fix
+— a lingering `mq:ready` label does NOT re-enqueue an ejected PR), `.mq/PAUSED`
+semantics and recovery (NRS violation: investigate tree divergence before
+unpausing; partial landing: verify the base with the post-merge suite first;
+post-merge red: fix forward or revert, then `rm .mq/PAUSED`), flake quarantine (`.mq/quarantine.txt`, auto
 bead, fix-SLA), calibration (`scaffold mq stats`), and the deliberate
 direct-merge procedure (human-only). Close with a short **Alternatives**
 note (spec D2): Mergify's free tier (private repos, ≤5 active contributors —
