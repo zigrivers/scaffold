@@ -205,6 +205,7 @@ describe('merge_queue config', () => {
       gate_timeout_minutes: 45,
       quarantine_path: '.mq/quarantine.txt',
       ready_label: 'mq:ready',
+      gate_executor: 'gha-selfhosted',
     })
   })
 
@@ -245,6 +246,28 @@ merge_queue:
   gate_command: ""
 `)
     expect(() => loadAgentOpsConfig(bad)).toThrow(/gate_command/)
+  })
+
+  it('defaults gate_executor to gha-selfhosted', () => {
+    expect(loadAgentOpsConfig(tmpProject()).merge_queue.gate_executor).toBe('gha-selfhosted')
+  })
+
+  it('accepts local-poller', () => {
+    const cfg = loadAgentOpsConfig(tmpProject(`
+project_name: myapp
+merge_queue:
+  gate_executor: local-poller
+`))
+    expect(cfg.merge_queue.gate_executor).toBe('local-poller')
+  })
+
+  it('fails loud on an unknown gate_executor', () => {
+    const bad = tmpProject(`
+project_name: myapp
+merge_queue:
+  gate_executor: jenkins
+`)
+    expect(() => loadAgentOpsConfig(bad)).toThrow(/gate_executor/)
   })
 })
 

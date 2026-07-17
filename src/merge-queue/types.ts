@@ -60,6 +60,8 @@ export interface MergeQueueConfig {
   gate_timeout_minutes: number
   quarantine_path: string
   ready_label: string
+  /** Who runs the post-merge/nightly full suite (spec D4′). Not read by the daemon. */
+  gate_executor: 'gha-selfhosted' | 'local-poller'
 }
 
 export function defaultMergeQueueConfig(): MergeQueueConfig {
@@ -71,5 +73,6 @@ export function defaultMergeQueueConfig(): MergeQueueConfig {
     gate_timeout_minutes: 45,
     quarantine_path: '.mq/quarantine.txt',
     ready_label: 'mq:ready',
+    gate_executor: 'gha-selfhosted',
   }
 }
