@@ -1,5 +1,5 @@
 // src/merge-queue/daemon.test.ts
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -28,12 +28,14 @@ class FakeGh implements GhClient {
   comments: { pr: number; body: string }[] = []
   labeled: number[] = []
   red = false
+  failMerge = new Set<number>()
   viewPr(pr: number): PrInfo {
     const info = this.infos.get(pr)
     if (!info) throw new Error(`no such PR ${pr}`)
     return info
   }
   squashMerge(pr: number): void {
+    if (this.failMerge.has(pr)) throw new Error('boom')
     this.merged.push(pr)
     this.infos.set(pr, { ...this.viewPr(pr), state: 'MERGED', mergedAt: AT })
   }
@@ -247,6 +249,33 @@ describe('MergeQueueDaemon.cycle', () => {
     h.enqueue(2)
     expect(await h.daemon.cycle()).toBe('idle')
   })
+
+  it('a mid-cycle NRS pause stops the bisection stack', async () => {
+    const h = harness()
+    h.enqueue(1)
+    h.enqueue(2)
+    h.git.trees['origin/main'] = 'DIFFERENT'
+    // parent(1,2) red -> split -> [1] green (lands, then NRS pause fires) -> [2] never runs
+    h.gateResults.push(
+      { result: 'red', seconds: 2, logPath: '/l/p.log', failedTests: [] },
+      { result: 'green', seconds: 1, logPath: '/l/l.log', failedTests: [] },
+    )
+    await h.daemon.cycle()
+    expect(h.gh.merged).toEqual([1])
+    expect(h.git.constructed.map(c => c.prs)).toEqual([[1, 2], [1]])
+    expect(h.daemon.paused()).toMatch(/NRS violation/)
+  })
+
+  it('partial landing pauses and requeues the unmerged tail', async () => {
+    const h = harness()
+    h.enqueue(1)
+    h.enqueue(2)
+    h.gh.failMerge.add(2)
+    await h.daemon.cycle()
+    expect(h.states()).toEqual({ 1: 'LANDED', 2: 'REQUEUED_SPLIT' })
+    expect(h.daemon.paused()).toMatch(/partial landing/)
+    expect(h.gh.merged).toEqual([1])
+  })
 })
 
 describe('MergeQueueDaemon.reconcile', () => {
@@ -263,5 +292,20 @@ describe('MergeQueueDaemon.reconcile', () => {
     h.daemon.reconcile()
     expect(h.states()).toEqual({ 1: 'LANDED', 2: 'REQUEUED_SPLIT' })
     expect(h.git.deleted).toContain('dead')
+  })
+})
+
+describe('MergeQueueDaemon.run', () => {
+  it('a cycle error triggers reconcile', async () => {
+    const h = harness()
+    h.enqueue(1)
+    const spy = vi.spyOn(h.daemon, 'reconcile')
+    let calls = 0
+    h.git.fetchOrigin = () => {
+      calls++
+      if (calls === 1) throw new Error('network blip')
+    }
+    await h.daemon.run({ once: true })
+    expect(spy).toHaveBeenCalledTimes(2)
   })
 })

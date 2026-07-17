@@ -64,6 +64,11 @@ export class MergeQueueDaemon {
         outcome = await this.cycle()
       } catch (err) {
         this.deps.log(`cycle error: ${String(err)}`)
+        try {
+          this.reconcile()
+        } catch (reconcileErr) {
+          this.deps.log(`reconcile after error failed: ${String(reconcileErr)}`)
+        }
       }
       if (opts.once) return
       if (outcome === 'idle') await sleep(this.deps.config.poll_seconds * 1000)
@@ -119,6 +124,10 @@ export class MergeQueueDaemon {
     // requeue AHEAD of new arrivals by construction (they run in this cycle).
     const stack: { members: number[]; parent?: string }[] = [{ members }]
     while (stack.length > 0) {
+      if (this.paused() !== null) {
+        log('paused mid-cycle — stopping the bisection stack')
+        break
+      }
       const item = stack.shift()
       if (!item) break
       const outcome = await this.runBatch(item.members, item.parent, infos, base)
@@ -267,11 +276,38 @@ export class MergeQueueDaemon {
       appendEvent(mqDir, { type: 'pr_state', pr, state: 'PASSED', batchId, at: this.at() })
     }
     appendEvent(mqDir, { type: 'batch_state', batchId, state: 'LANDING', at: this.at() })
-    for (const pr of members) {
+    const landed: number[] = []
+    for (let i = 0; i < members.length; i++) {
+      const pr = members[i]
       // Write-ahead: LANDING before the merge attempt; idempotent via mergedAt.
       appendEvent(mqDir, { type: 'pr_state', pr, state: 'LANDING', batchId, at: this.at() })
-      if (gh.viewPr(pr).mergedAt === null) gh.squashMerge(pr)
+      try {
+        if (gh.viewPr(pr).mergedAt === null) gh.squashMerge(pr)
+      } catch (err) {
+        // Partial landing: what already merged is real and must not be re-tested
+        // against a stale candidate (spec D9) — pause instead of running the NRS
+        // check, and requeue everything that did not get a chance to merge.
+        appendEvent(mqDir, {
+          type: 'pr_state', pr, state: 'REQUEUED_SPLIT', batchId, at: this.at(),
+          note: 'merge failed mid-batch',
+        })
+        for (const rest of members.slice(i + 1)) {
+          appendEvent(mqDir, {
+            type: 'pr_state', pr: rest, state: 'REQUEUED_SPLIT', batchId, at: this.at(),
+            note: 'batch landing aborted',
+          })
+        }
+        this.pause(
+          `partial landing in batch ${batchId}: ${landed.length}/${members.length} merged before ` +
+          `"${String(err)}" — verify origin/${base} (post-merge suite), then rm .mq/PAUSED`,
+        )
+        appendEvent(mqDir, {
+          type: 'batch_state', batchId, state: 'DONE', at: this.at(), note: 'partial land — paused',
+        })
+        return
+      }
       appendEvent(mqDir, { type: 'pr_state', pr, state: 'LANDED', batchId, at: this.at() })
+      landed.push(pr)
       try {
         gh.comment(pr, `**merge-queue**: landed in batch ${batchId}`)
       } catch { /* comment is best-effort */ }
