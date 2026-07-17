@@ -219,7 +219,9 @@ const GITIGNORE_MQ_ENTRY = '.mq/'
 function ensureGitignoreEntry(projectRoot: string, entry: string): void {
   const p = path.join(projectRoot, '.gitignore')
   const body = fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : ''
-  if (body.split('\n').includes(entry)) return
+  // CRLF-safe: split on \r?\n and trim so a Windows-checkout .gitignore does not
+  // fail the presence check and append a duplicate .mq/ on every install.
+  if (body.split(/\r?\n/).map(l => l.trim()).includes(entry)) return
   const sep = body === '' || body.endsWith('\n') ? '' : '\n'
   fs.writeFileSync(p, `${body}${sep}${entry}\n`)
 }
@@ -911,6 +913,9 @@ if [ "$HEAD_SHA" = "$LAST" ]; then
 fi
 
 mkdir -p "$MQ_DIR/logs"
+# Prune stale registrations first: if the worktree dir was deleted by hand, git
+# still has it registered and `git worktree add` would abort ("already exists").
+git worktree prune
 if [ ! -d "$WT" ]; then
 	git worktree add --detach --quiet "$WT" "origin/$BRANCH"
 fi

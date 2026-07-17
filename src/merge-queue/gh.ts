@@ -14,7 +14,9 @@ export interface PrInfo {
 
 export interface GhClient {
   viewPr(pr: number): PrInfo
-  squashMerge(pr: number): void
+  /** Squash-merge. When expectedHead is given, gh refuses unless the PR head still
+   *  matches it — so a push during the gate can never land an untested revision. */
+  squashMerge(pr: number, expectedHead?: string): void
   comment(pr: number, body: string): void
   listLabeled(label: string): number[]
   postMergeRed(defaultBranch: string): boolean
@@ -57,8 +59,10 @@ export function createGhClient(cwd: string): GhClient {
         body: (raw.body as string) ?? '',
       }
     },
-    squashMerge(pr) {
-      gh(['pr', 'merge', String(pr), '--squash', '--delete-branch'])
+    squashMerge(pr, expectedHead) {
+      const args = ['pr', 'merge', String(pr), '--squash', '--delete-branch']
+      if (expectedHead) args.push('--match-head-commit', expectedHead)
+      gh(args)
     },
     comment(pr, body) {
       gh(['pr', 'comment', String(pr), '--body', body])

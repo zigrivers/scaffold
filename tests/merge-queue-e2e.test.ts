@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it } from 'vitest'
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -61,6 +61,14 @@ function sh(cwd: string, ...args: string[]): string {
   return execFileSync('git', args, { cwd, encoding: 'utf8' }).trim()
 }
 
+// Every buildWorld() temp root, torn down in afterAll so runs don't leak the
+// MQ_GH_CMD override or accumulate mq-e2e-* directories on disk.
+const worldRoots: string[] = []
+afterAll(() => {
+  delete process.env.MQ_GH_CMD
+  for (const root of worldRoots) fs.rmSync(root, { recursive: true, force: true })
+})
+
 interface World {
   clone: string
   stubDir: string
@@ -75,6 +83,7 @@ interface World {
 
 function buildWorld(gateCommand: string): World {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mq-e2e-'))
+  worldRoots.push(dir)
   const stubDir = path.join(dir, 'stub')
   fs.mkdirSync(stubDir)
   const origin = path.join(stubDir, 'origin.git')

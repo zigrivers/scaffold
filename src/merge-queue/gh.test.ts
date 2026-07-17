@@ -41,6 +41,14 @@ describe('createGhClient', () => {
     expect(args).toContain('pr merge 12 --squash --delete-branch')
   })
 
+  it('binds squashMerge to the tested head with --match-head-commit', () => {
+    process.env.MQ_GH_CMD = writeStub(`echo "$@" >> '${os.tmpdir()}/mq-gh-args.txt'`)
+    fs.rmSync(path.join(os.tmpdir(), 'mq-gh-args.txt'), { force: true })
+    createGhClient(stubDir).squashMerge(12, 'deadbeef')
+    const args = fs.readFileSync(path.join(os.tmpdir(), 'mq-gh-args.txt'), 'utf8')
+    expect(args).toContain('pr merge 12 --squash --delete-branch --match-head-commit deadbeef')
+  })
+
   it('parses listLabeled numbers', () => {
     process.env.MQ_GH_CMD = writeStub('echo \'[{"number":4},{"number":9}]\'')
     expect(createGhClient(stubDir).listLabeled('mq:ready')).toEqual([4, 9])

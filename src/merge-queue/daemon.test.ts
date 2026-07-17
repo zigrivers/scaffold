@@ -34,9 +34,11 @@ class FakeGh implements GhClient {
     if (!info) throw new Error(`no such PR ${pr}`)
     return info
   }
-  squashMerge(pr: number): void {
+  mergeHeads: (string | undefined)[] = []
+  squashMerge(pr: number, expectedHead?: string): void {
     if (this.failMerge.has(pr)) throw new Error('boom')
     this.merged.push(pr)
+    this.mergeHeads.push(expectedHead)
     this.infos.set(pr, { ...this.viewPr(pr), state: 'MERGED', mergedAt: AT })
   }
   comment(pr: number, body: string): void { this.comments.push({ pr, body }) }
@@ -307,6 +309,44 @@ describe('MergeQueueDaemon.cycle', () => {
     expect(h.git.constructed.length).toBe(1)
   })
 
+  it('binds each merge to the head SHA that was tested (--match-head-commit)', async () => {
+    const h = harness()
+    h.enqueue(1)
+    await h.daemon.cycle()
+    expect(h.gh.merged).toEqual([1])
+    expect(h.gh.mergeHeads).toEqual(['sha1']) // the head captured at batch construction
+  })
+
+  it('does not land a member ejected during the gate; requeues the survivors', async () => {
+    let onGate: (() => void) | null = null
+    const h = harness({
+      runGate: () => { onGate?.(); return { result: 'green', seconds: 1, logPath: '/dev/null', failedTests: [] } },
+    })
+    h.enqueue(1)
+    h.enqueue(2)
+    // Simulate `mq eject --pr 2` landing in the journal while the gate runs.
+    onGate = () => appendEvent(h.mqDir, {
+      type: 'pr_state', pr: 2, state: 'CANCELLED', at: AT, note: 'user eject',
+    })
+    await h.daemon.cycle()
+    expect(h.gh.merged).toEqual([]) // candidate tree included the ejected diff — land nothing
+    expect(h.states()[2]).toBe('CANCELLED')
+    expect(h.states()[1]).toBe('REQUEUED_SPLIT') // survivor requeued for a clean rebuild
+  })
+
+  it('does not land a member whose head advanced during the gate', async () => {
+    let onGate: (() => void) | null = null
+    const h = harness({
+      runGate: () => { onGate?.(); return { result: 'green', seconds: 1, logPath: '/dev/null', failedTests: [] } },
+    })
+    h.enqueue(1)
+    // A push mid-gate: the live head no longer matches the tested head.
+    onGate = () => h.gh.infos.set(1, prInfo(1, { headSha: 'sha1-NEW' }))
+    await h.daemon.cycle()
+    expect(h.gh.merged).toEqual([])
+    expect(h.states()[1]).toBe('REQUEUED_SPLIT')
+  })
+
   it('cancels an already-applied PR without ejecting or blocking the rest of the batch', async () => {
     const h = harness()
     h.enqueue(1)
@@ -337,6 +377,22 @@ describe('MergeQueueDaemon.reconcile', () => {
     h.daemon.reconcile()
     expect(h.states()).toEqual({ 1: 'LANDED', 2: 'REQUEUED_SPLIT' })
     expect(h.git.deleted).toContain('dead')
+  })
+
+  it('closes the bead when it recovers a crash-merged PR', () => {
+    const h = harness()
+    h.enqueue(1)
+    appendEvent(h.mqDir, { type: 'batch_created', batchId: 'dead', members: [1], at: AT })
+    appendEvent(h.mqDir, { type: 'pr_state', pr: 1, state: 'TESTING', batchId: 'dead', at: AT })
+    appendEvent(h.mqDir, { type: 'batch_state', batchId: 'dead', state: 'RUNNING', at: AT })
+    h.gh.infos.set(1, prInfo(1, { state: 'MERGED', mergedAt: AT, body: 'Closes proj-1' }))
+    const spy = vi.spyOn(
+      h.daemon as unknown as { closeBead: (pr: number, body?: string) => void },
+      'closeBead',
+    )
+    h.daemon.reconcile()
+    expect(h.states()[1]).toBe('LANDED')
+    expect(spy).toHaveBeenCalledWith(1, 'Closes proj-1')
   })
 })
 

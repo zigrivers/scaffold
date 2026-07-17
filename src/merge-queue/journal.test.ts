@@ -39,6 +39,15 @@ describe('journal', () => {
     expect(readJournal(dir)).toEqual([e1])
   })
 
+  it('truncates a torn final line before appending so later reads still parse', () => {
+    const dir = tmpMqDir()
+    appendEvent(dir, e1)
+    // Simulate a crash mid-write: a partial record with no trailing newline.
+    fs.appendFileSync(path.join(dir, JOURNAL_FILE), '{"type":"pr_state","pr":13')
+    appendEvent(dir, e2) // must NOT fuse onto the torn tail
+    expect(readJournal(dir)).toEqual([e1, e2])
+  })
+
   it('throws on a corrupt NON-final line (real corruption, not a crash)', () => {
     const dir = tmpMqDir()
     fs.mkdirSync(dir, { recursive: true })

@@ -255,7 +255,8 @@ export class MergeQueueDaemon {
     }
 
     if (gate.result === 'green') {
-      this.land(batchId, applied, base, candidateTree)
+      const testedHeads = new Map(prs.map(p => [p.pr, p.headSha]))
+      this.land(batchId, applied, base, candidateTree, testedHeads)
       git.deleteCandidate(batchId)
       return { kind: 'done' }
     }
@@ -292,8 +293,60 @@ export class MergeQueueDaemon {
     })
   }
 
-  private land(batchId: string, members: number[], base: string, candidateTree: string): void {
+  private land(
+    batchId: string,
+    members: number[],
+    base: string,
+    candidateTree: string,
+    testedHeads: Map<number, string>,
+  ): void {
     const { gh, git, mqDir, log } = this.deps
+
+    // Pre-land validation (spec D9). The candidate tree was built from these exact
+    // members at these exact head SHAs. Between batch construction and here the
+    // gate ran for minutes — during which a member may have been ejected/cancelled
+    // (`mq eject`, external close) or pushed a new revision. Either way the tested
+    // tree no longer reflects reality, so landing it would merge a withdrawn or
+    // untested diff. Re-read the journal + live heads; if anything moved, requeue
+    // the still-valid members for a clean rebuild and land nothing.
+    const fresh = this.state()
+    const live = new Map<number, PrInfo>()
+    let invalidated: string | null = null
+    for (const pr of members) {
+      const entry = fresh.entries.get(pr)
+      if (entry && TERMINAL_PR_STATES.has(entry.state) && entry.state !== 'LANDED') {
+        invalidated ??= `#${pr} left the batch (${entry.state}) during the gate`
+        continue
+      }
+      let info: PrInfo
+      try {
+        info = gh.viewPr(pr)
+      } catch (err) {
+        invalidated ??= `#${pr} unviewable at land time (${String(err)})`
+        continue
+      }
+      live.set(pr, info)
+      if (info.mergedAt === null && info.headSha !== testedHeads.get(pr)) {
+        invalidated ??= `#${pr} head advanced during the gate`
+      }
+    }
+    if (invalidated !== null) {
+      appendEvent(mqDir, {
+        type: 'batch_state', batchId, state: 'ABORTED', at: this.at(),
+        note: `candidate invalidated (${invalidated}) — rebuilding`,
+      })
+      for (const pr of members) {
+        const entry = fresh.entries.get(pr)
+        if (entry && TERMINAL_PR_STATES.has(entry.state)) continue // already terminal — leave it
+        appendEvent(mqDir, {
+          type: 'pr_state', pr, state: 'REQUEUED_SPLIT', batchId, at: this.at(),
+          note: 'candidate invalidated — rebuilding',
+        })
+      }
+      log(`batch ${batchId}: ${invalidated} — requeued survivors, landed nothing`)
+      return
+    }
+
     appendEvent(mqDir, { type: 'batch_state', batchId, state: 'GREEN', at: this.at() })
     for (const pr of members) {
       appendEvent(mqDir, { type: 'pr_state', pr, state: 'PASSED', batchId, at: this.at() })
@@ -305,7 +358,8 @@ export class MergeQueueDaemon {
       // Write-ahead: LANDING before the merge attempt; idempotent via mergedAt.
       appendEvent(mqDir, { type: 'pr_state', pr, state: 'LANDING', batchId, at: this.at() })
       try {
-        if (gh.viewPr(pr).mergedAt === null) gh.squashMerge(pr)
+        // gh refuses (--match-head-commit) if the head raced past our validation.
+        if ((live.get(pr)?.mergedAt ?? null) === null) gh.squashMerge(pr, testedHeads.get(pr))
       } catch (err) {
         // Partial landing: what already merged is real and must not be re-tested
         // against a stale candidate (spec D9) — pause instead of running the NRS
@@ -334,7 +388,7 @@ export class MergeQueueDaemon {
       try {
         gh.comment(pr, `**merge-queue**: landed in batch ${batchId}`)
       } catch { /* comment is best-effort */ }
-      this.closeBead(pr)
+      this.closeBead(pr, live.get(pr)?.body)
     }
     git.fetchOrigin()
     const landedTree = git.treeOf(`origin/${base}`)
@@ -384,22 +438,25 @@ export class MergeQueueDaemon {
   }
 
   /** Bead feedback loop (spec §5.5): reopen the bead named by "Closes <id>" in the PR body. */
-  private reopenBead(pr: number): void {
-    this.beadCmd(pr, ['update', '{id}', '--status', 'open'])
+  private reopenBead(pr: number, knownBody?: string): void {
+    this.beadCmd(pr, ['update', '{id}', '--status', 'open'], knownBody)
   }
 
   /** Fire-and-forget contract (spec §5.5): the DAEMON closes the bead on land —
    *  the enqueueing agent moved on and never returns to verify the merge. */
-  private closeBead(pr: number): void {
-    this.beadCmd(pr, ['close', '{id}'])
+  private closeBead(pr: number, knownBody?: string): void {
+    this.beadCmd(pr, ['close', '{id}'], knownBody)
   }
 
-  private beadCmd(pr: number, argTemplate: string[]): void {
-    let body = ''
-    try {
-      body = this.deps.gh.viewPr(pr).body
-    } catch {
-      return
+  /** knownBody lets callers that already fetched the PR skip a redundant gh.viewPr. */
+  private beadCmd(pr: number, argTemplate: string[], knownBody?: string): void {
+    let body = knownBody
+    if (body === undefined) {
+      try {
+        body = this.deps.gh.viewPr(pr).body
+      } catch {
+        return
+      }
     }
     const match = body.match(/Closes ([a-z][a-z0-9-]*-[a-z0-9]+)/i)
     if (!match) return
@@ -423,19 +480,24 @@ export class MergeQueueDaemon {
       for (const pr of batch.members) {
         const entry = state.entries.get(pr)
         if (!entry || TERMINAL_PR_STATES.has(entry.state)) continue
-        let mergedAt: string | null = null
+        let info: PrInfo | null = null
         try {
-          mergedAt = gh.viewPr(pr).mergedAt
+          info = gh.viewPr(pr)
         } catch { /* treat as unmerged */ }
-        appendEvent(mqDir, mergedAt !== null
-          ? {
+        if (info?.mergedAt != null) {
+          appendEvent(mqDir, {
             type: 'pr_state', pr, state: 'LANDED', batchId: batch.id, at: this.at(),
             note: 'recovered: merged before crash',
-          }
-          : {
+          })
+          // A crash between squashMerge and closeBead would otherwise leave the
+          // bead open forever, breaking the fire-and-forget contract (spec §5.5).
+          this.closeBead(pr, info.body)
+        } else {
+          appendEvent(mqDir, {
             type: 'pr_state', pr, state: 'REQUEUED_SPLIT', batchId: batch.id, at: this.at(),
             note: 'recovered: daemon restart',
           })
+        }
       }
     }
     // Sweep candidate refs that no longer belong to an active batch.

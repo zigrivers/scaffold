@@ -1430,7 +1430,7 @@ export function runGate(opts: {
   const failedFile = path.join(opts.cwd, FAILED_TESTS_FILE)
   let failedTests: string[] = []
   if (fs.existsSync(failedFile)) {
-    failedTests = fs.readFileSync(failedFile, 'utf8').split('\n').filter(l => l.trim() !== '')
+    failedTests = fs.readFileSync(failedFile, 'utf8').split('\n').map(l => l.trim()).filter(l => l !== '')
     fs.rmSync(failedFile, { force: true })
   }
 
@@ -1565,7 +1565,7 @@ export function addToQuarantine(
   const file = path.join(projectRoot, quarantinePath)
   fs.mkdirSync(path.dirname(file), { recursive: true })
   const existing = fs.existsSync(file)
-    ? fs.readFileSync(file, 'utf8').split('\n').filter(l => l.trim() !== '')
+    ? fs.readFileSync(file, 'utf8').split('\n').map(l => l.trim()).filter(l => l !== '')
     : []
   if (existing.includes(testId)) return false
   fs.appendFileSync(file, testId + '\n')
@@ -1933,6 +1933,17 @@ Run: `npx vitest run src/merge-queue/daemon.test.ts`
 Expected: FAIL — `Cannot find module './daemon.js'`
 
 - [ ] **Step 3: Write daemon.ts**
+
+> **SUPERSEDED — do not transcribe verbatim.** The block below is the original
+> synchronous sketch. AMENDMENT (post-Task-8) and AMENDMENT 2 (post-Task-10)
+> above are binding and change it materially: `cycle()`/`runBatch()`/`gateRun()`/
+> `run()` are `async`, the bisection stack re-checks `paused()` each iteration, a
+> partial landing pauses instead of running the NRS check, and `run()` reconciles
+> on any cycle error. A later review round also added pre-land validation (a
+> member ejected or pushed during the gate must not land — `land()` takes a
+> `testedHeads` map and passes `--match-head-commit`) and `closeBead` on the
+> reconcile-LANDED path. **The authoritative implementation is the shipped
+> `src/merge-queue/daemon.ts` — read it, not this block, when in doubt.**
 
 ```typescript
 // src/merge-queue/daemon.ts
