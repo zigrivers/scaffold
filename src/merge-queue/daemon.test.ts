@@ -29,13 +29,20 @@ class FakeGh implements GhClient {
   labeled: number[] = []
   red = false
   failMerge = new Set<number>()
+  notFound = new Set<number>()          // viewPr throws a definitive "gone" error
+  failMergeButLands = new Set<number>() // squashMerge throws but the PR is merged (lost ack)
   viewPr(pr: number): PrInfo {
+    if (this.notFound.has(pr)) throw new Error('Could not resolve to a PullRequest')
     const info = this.infos.get(pr)
-    if (!info) throw new Error(`no such PR ${pr}`)
+    if (!info) throw new Error(`transient blip viewing PR ${pr}`)
     return info
   }
   mergeHeads: (string | undefined)[] = []
   squashMerge(pr: number, expectedHead?: string): void {
+    if (this.failMergeButLands.has(pr)) {
+      this.infos.set(pr, { ...this.viewPr(pr), state: 'MERGED', mergedAt: AT })
+      throw new Error('lost response after merge')
+    }
     if (this.failMerge.has(pr)) throw new Error('boom')
     this.merged.push(pr)
     this.mergeHeads.push(expectedHead)
@@ -283,18 +290,27 @@ describe('MergeQueueDaemon.cycle', () => {
     expect(h.gh.merged).toEqual([1])
   })
 
-  it('an unviewable PR keeps the daemon idle and is cancelled after 5 consecutive attempts', async () => {
+  it('a transient view error keeps the PR QUEUED and pauses the daemon after 5 attempts (never cancels)', async () => {
     const h = harness()
-    // No gh.infos entry for pr 1 -> viewPr always throws "no such PR 1".
+    // No gh.infos entry -> viewPr throws a transient (non-"gone") error.
     appendEvent(h.mqDir, { type: 'enqueued', pr: 1, at: AT })
     for (let i = 0; i < 4; i++) {
       expect(await h.daemon.cycle()).toBe('idle')
       expect(h.states()[1]).toBe('QUEUED')
+      expect(h.daemon.paused()).toBeNull()
     }
     expect(await h.daemon.cycle()).toBe('idle')
+    expect(h.states()[1]).toBe('QUEUED')                     // NOT cancelled — an outage must not nuke the queue
+    expect(h.daemon.paused()).toMatch(/GitHub API failures/) // paused for a human instead
+  })
+
+  it('cancels a PR that GitHub reports as genuinely gone (not-found)', async () => {
+    const h = harness()
+    h.gh.notFound.add(1)
+    appendEvent(h.mqDir, { type: 'enqueued', pr: 1, at: AT })
+    expect(await h.daemon.cycle()).toBe('idle')
     expect(h.states()[1]).toBe('CANCELLED')
-    const entry = reduceState(readJournal(h.mqDir)).entries.get(1)
-    expect(entry?.note).toBe('unviewable after 5 attempts — check the PR number and gh auth')
+    expect(h.daemon.paused()).toBeNull()
   })
 
   it('an EJECTED PR relabeled mq:ready is not re-absorbed', async () => {
@@ -307,6 +323,44 @@ describe('MergeQueueDaemon.cycle', () => {
     expect(await h.daemon.cycle()).toBe('idle')
     expect(h.states()[1]).toBe('EJECTED')
     expect(h.git.constructed.length).toBe(1)
+  })
+
+  it('a LANDED PR with a lingering mq:ready label is not re-enqueued (stays LANDED)', async () => {
+    const h = harness()
+    h.enqueue(1)
+    await h.daemon.cycle()
+    expect(h.states()[1]).toBe('LANDED')
+    // The label was never removed; a second cycle must not re-view+re-enqueue it
+    // (which would flip the good landing to CANCELLED when the next view sees MERGED).
+    h.gh.labeled = [1]
+    expect(await h.daemon.cycle()).toBe('idle')
+    expect(h.states()[1]).toBe('LANDED')
+  })
+
+  it('a member withdrawn during a RED gate is neither ejected nor split — survivors rebuild', async () => {
+    let onGate: (() => void) | null = null
+    const h = harness({
+      runGate: () => { onGate?.(); return { result: 'red', seconds: 2, logPath: '/l/r.log', failedTests: [] } },
+    })
+    h.enqueue(1)
+    h.enqueue(2)
+    onGate = () => appendEvent(h.mqDir, {
+      type: 'pr_state', pr: 2, state: 'CANCELLED', at: AT, note: 'user eject',
+    })
+    await h.daemon.cycle()
+    expect(h.states()[2]).toBe('CANCELLED')            // stays withdrawn — not re-EJECTED
+    expect(h.states()[1]).toBe('REQUEUED_SPLIT')       // survivor rebuilds, no bisection of the poisoned tree
+    expect(h.gh.merged).toEqual([])
+    expect(h.git.constructed.map(c => c.prs)).toEqual([[1, 2]]) // no split happened
+  })
+
+  it('a lost-ack merge (command errors but GitHub merged) is recorded LANDED, not requeued', async () => {
+    const h = harness()
+    h.enqueue(1)
+    h.gh.failMergeButLands.add(1)
+    await h.daemon.cycle()
+    expect(h.states()[1]).toBe('LANDED')
+    expect(h.daemon.paused()).toBeNull() // not a partial-landing pause
   })
 
   it('binds each merge to the head SHA that was tested (--match-head-commit)', async () => {
@@ -393,6 +447,45 @@ describe('MergeQueueDaemon.reconcile', () => {
     h.daemon.reconcile()
     expect(h.states()[1]).toBe('LANDED')
     expect(spy).toHaveBeenCalledWith(1, 'Closes proj-1')
+  })
+
+  it('replays closeBead for a member already journaled LANDED (crash between LANDED and close)', () => {
+    const h = harness()
+    h.enqueue(1)
+    appendEvent(h.mqDir, { type: 'batch_created', batchId: 'dead', members: [1], at: AT })
+    // The PR was journaled LANDED but the daemon crashed before closeBead ran.
+    appendEvent(h.mqDir, { type: 'pr_state', pr: 1, state: 'LANDED', batchId: 'dead', at: AT })
+    appendEvent(h.mqDir, { type: 'batch_state', batchId: 'dead', state: 'LANDING', at: AT })
+    h.gh.infos.set(1, prInfo(1, { state: 'MERGED', mergedAt: AT, body: 'Closes proj-1' }))
+    const spy = vi.spyOn(
+      h.daemon as unknown as { closeBead: (pr: number, body?: string) => void },
+      'closeBead',
+    )
+    h.daemon.reconcile()
+    expect(spy).toHaveBeenCalledWith(1) // idempotent replay for the already-LANDED member
+  })
+
+  it('recovers an orphaned mid-flight member even when its batch is already terminal', () => {
+    const h = harness()
+    h.enqueue(1)
+    // Crash after the batch was journaled ABORTED but before the member was
+    // transitioned: the in-flight-batch loop never revisits it, so the sweep must.
+    appendEvent(h.mqDir, { type: 'batch_created', batchId: 'dead', members: [1], at: AT })
+    appendEvent(h.mqDir, { type: 'pr_state', pr: 1, state: 'TESTING', batchId: 'dead', at: AT })
+    appendEvent(h.mqDir, { type: 'batch_state', batchId: 'dead', state: 'ABORTED', at: AT })
+    h.daemon.reconcile()
+    expect(h.states()[1]).toBe('REQUEUED_SPLIT')
+  })
+
+  it('reaps an orphaned gate process group and clears the pid file', () => {
+    const h = harness()
+    fs.mkdirSync(h.mqDir, { recursive: true })
+    fs.writeFileSync(path.join(h.mqDir, 'gate.pid'), '424242')
+    const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true)
+    h.daemon.reconcile()
+    expect(killSpy).toHaveBeenCalledWith(-424242, 'SIGKILL')
+    expect(fs.existsSync(path.join(h.mqDir, 'gate.pid'))).toBe(false)
+    killSpy.mockRestore()
   })
 })
 

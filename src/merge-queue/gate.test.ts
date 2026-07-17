@@ -49,6 +49,23 @@ describe('runGate', () => {
     expect(res.result).toBe('green')
   })
 
+  it('writes the gate PGID to pidFile while running and removes it when settled', async () => {
+    const dir = tmp()
+    const pidFile = path.join(dir, 'gate.pid')
+    // The command reads its own pid file mid-run to prove it existed during the gate.
+    const seen = path.join(dir, 'seen-pid.txt')
+    const res = await runGate({
+      cwd: dir,
+      command: `cat '${pidFile}' > '${seen}'`,
+      timeoutMs: 10_000,
+      logPath: logIn(dir),
+      pidFile,
+    })
+    expect(res.result).toBe('green')
+    expect(Number(fs.readFileSync(seen, 'utf8').trim())).toBeGreaterThan(0)
+    expect(fs.existsSync(pidFile)).toBe(false) // removed once the gate settled
+  })
+
   it('timeout kills the whole process group, not just bash', async () => {
     const dir = tmp()
     const res = await runGate({

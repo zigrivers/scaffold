@@ -7,9 +7,9 @@ import type { Argv, CommandModule } from 'yargs'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
 import { loadAgentOpsConfig } from '../../core/agent-ops/config.js'
-import { MergeQueueDaemon, PAUSED_FILE } from '../../merge-queue/daemon.js'
+import { GATE_PID_FILE, MergeQueueDaemon, PAUSED_FILE } from '../../merge-queue/daemon.js'
 import { appendEvent, readJournal } from '../../merge-queue/journal.js'
-import { reduceState } from '../../merge-queue/state.js'
+import { reduceState, TERMINAL_PR_STATES } from '../../merge-queue/state.js'
 import { computeStats } from '../../merge-queue/stats.js'
 import { createGhClient } from '../../merge-queue/gh.js'
 import { createGitOps } from '../../merge-queue/git.js'
@@ -80,6 +80,18 @@ export async function mqHandler(argv: MqArgs): Promise<void> {
   case 'eject': {
     const pr = needPr()
     if (pr === null) return
+    // Don't clobber a terminal state: ejecting an already-LANDED PR would flip its
+    // journal entry LANDED → CANCELLED and mis-report a good landing. Match the
+    // daemon's own terminal-state guards.
+    const entry = reduceState(readJournal(mqDir)).entries.get(pr)
+    if (!entry) {
+      output.warn(`PR #${pr} is not in the queue — nothing to eject`)
+      return
+    }
+    if (TERMINAL_PR_STATES.has(entry.state)) {
+      output.warn(`PR #${pr} is already ${entry.state} — nothing to eject`)
+      return
+    }
     appendEvent(mqDir, {
       type: 'pr_state', pr, state: 'CANCELLED', at: new Date().toISOString(),
       note: 'ejected by user',
@@ -158,6 +170,24 @@ export async function mqHandler(argv: MqArgs): Promise<void> {
         log,
         now: () => new Date(),
       })
+      // Graceful shutdown: kill any in-flight gate process group and release the
+      // lock immediately, instead of leaking the gate and leaving the lock stale
+      // for up to LOCK_STALE_MS before a replacement daemon can take over.
+      const killGate = (): void => {
+        const pf = path.join(mqDir, GATE_PID_FILE)
+        if (!fs.existsSync(pf)) return
+        const pid = Number(fs.readFileSync(pf, 'utf8').trim())
+        if (Number.isInteger(pid) && pid > 0) {
+          try { process.kill(-pid, 'SIGKILL') } catch { /* already gone */ }
+        }
+        fs.rmSync(pf, { force: true })
+      }
+      const onSignal = (): void => {
+        killGate()
+        void release().finally(() => process.exit(130))
+      }
+      process.once('SIGINT', onSignal)
+      process.once('SIGTERM', onSignal)
       log(`daemon started (pid ${process.pid})`)
       await daemon.run({ once: argv.once })
     } finally {

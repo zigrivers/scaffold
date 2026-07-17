@@ -48,6 +48,16 @@ describe('journal', () => {
     expect(readJournal(dir)).toEqual([e1, e2])
   })
 
+  it('preserves a valid final record that only lost its trailing newline', () => {
+    const dir = tmpMqDir()
+    appendEvent(dir, e1)
+    // A crash AFTER the full JSON was written but BEFORE the newline: the record
+    // is valid and must NOT be discarded by the next append.
+    fs.appendFileSync(path.join(dir, JOURNAL_FILE), JSON.stringify(e2))
+    appendEvent(dir, e1)
+    expect(readJournal(dir)).toEqual([e1, e2, e1])
+  })
+
   it('throws on a corrupt NON-final line (real corruption, not a crash)', () => {
     const dir = tmpMqDir()
     fs.mkdirSync(dir, { recursive: true })

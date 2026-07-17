@@ -76,8 +76,20 @@ export function createGitOps(repoRoot: string): GitOps {
     constructCandidate(batchId, prs, base) {
       const gate = ensureGateWorktree()
       const ref = `${CANDIDATE_PREFIX}${batchId}`
-      // Make sure every PR head object is present locally.
-      for (const { headSha } of prs) gitAllowFail(['fetch', 'origin', headSha])
+      // Make sure every PR head object is present locally. A transient fetch
+      // failure must NOT be left to surface later as a bogus merge conflict (which
+      // would falsely eject a clean PR) — retry once, then verify the object is
+      // actually present and fail the whole batch construction if not. The caller
+      // aborts + requeues on the throw, so the batch is retried, never mis-ejected.
+      for (const { headSha } of prs) {
+        if (gitAllowFail(['fetch', 'origin', headSha])) continue
+        gitAllowFail(['fetch', 'origin', headSha]) // one retry
+        if (!gitAllowFail(['cat-file', '-e', `${headSha}^{commit}`], gate)) {
+          throw new Error(
+            `merge-queue: cannot fetch PR head ${headSha} from origin (network?) — batch deferred`,
+          )
+        }
+      }
       // Recover from a crashed prior build: if a previous run died mid-`merge
       // --squash` (e.g. the daemon was killed while the index held unresolved
       // conflicts), the gate worktree is left dirty and every subsequent
@@ -107,8 +119,11 @@ export function createGitOps(repoRoot: string): GitOps {
             applied.push(pr)
           }
         } else {
-          // Conflict: clear the failed squash and continue with the rest.
+          // Conflict: clear the failed squash — including any untracked files/dirs
+          // it created, which `reset --hard` leaves behind and which would corrupt
+          // the next member's merge — and continue with the rest.
           git(['reset', '--hard', 'HEAD'], gate)
+          gitAllowFail(['clean', '-fd'], gate)
           rejected.push(pr)
         }
       }

@@ -23,7 +23,18 @@ export function appendEvent(mqDir: string, event: JournalEvent): void {
       fs.closeSync(fd)
       if (last[0] !== 0x0a) { // 0x0a === '\n'
         const buf = fs.readFileSync(file)
-        fs.truncateSync(file, buf.lastIndexOf(0x0a) + 1) // -1 → truncate to empty
+        const lastNl = buf.lastIndexOf(0x0a)
+        const tail = buf.subarray(lastNl + 1).toString('utf8')
+        // Distinguish a fully-written record that lost only its trailing newline
+        // (a valid event — complete it, don't discard it) from a genuinely torn
+        // partial record (invalid JSON — drop it before appending).
+        let tailIsValid = false
+        try { JSON.parse(tail); tailIsValid = true } catch { tailIsValid = false }
+        if (tailIsValid) {
+          fs.appendFileSync(file, '\n')
+        } else {
+          fs.truncateSync(file, lastNl + 1) // -1 → truncate to empty
+        }
       }
     }
   }

@@ -12,14 +12,14 @@ import {
 import type { GhClient, PrInfo } from './gh.js'
 import type { GitOps } from './git.js'
 import type { GateResult } from './gate.js'
-import type { MergeQueueConfig, QueueState } from './types.js'
+import type { MergeQueueConfig, PrState, QueueState } from './types.js'
 
 export interface DaemonDeps {
   gh: GhClient
   git: GitOps
   runGate: (opts: {
     cwd: string; command: string; timeoutMs: number; logPath: string
-    env?: Record<string, string>
+    env?: Record<string, string>; pidFile?: string
   }) => GateResult | Promise<GateResult>
   config: MergeQueueConfig
   mqDir: string
@@ -29,8 +29,14 @@ export interface DaemonDeps {
 }
 
 export const PAUSED_FILE = 'PAUSED'
+export const GATE_PID_FILE = 'gate.pid'
 
 const IN_FLIGHT_BATCH_STATES = ['CONSTRUCTING', 'RUNNING', 'GREEN', 'LANDING', 'SPLITTING']
+
+/** PR states that mean "mid-flight in a batch" — a crash here must be recovered. */
+const MIDFLIGHT_PR_STATES: ReadonlySet<PrState> = new Set<PrState>([
+  'IN_BATCH', 'TESTING', 'FLAKE_RETRY', 'PASSED', 'LANDING',
+])
 
 const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms))
 
@@ -49,6 +55,13 @@ export class MergeQueueDaemon {
 
   private at(): string { return this.deps.now().toISOString() }
   private state(): QueueState { return reduceState(readJournal(this.deps.mqDir)) }
+
+  /** True when the PR's current journal state is terminal (LANDED/EJECTED/
+   *  NEEDS_REBASE/CANCELLED) — i.e. it was withdrawn or finished elsewhere. */
+  private isTerminal(state: QueueState, pr: number): boolean {
+    const e = state.entries.get(pr)
+    return e ? TERMINAL_PR_STATES.has(e.state) : false
+  }
 
   paused(): string | null {
     const file = path.join(this.deps.mqDir, PAUSED_FILE)
@@ -90,14 +103,13 @@ export class MergeQueueDaemon {
       return 'idle'
     }
 
-    // Remote-agent seam (spec D10): absorb PRs labeled mq:ready. Only a fresh PR
-    // or one that already landed cleanly gets re-enqueued — an EJECTED,
-    // NEEDS_REBASE, or CANCELLED entry is a decision (human or daemon) that a
-    // lingering label must not silently overturn.
+    // Remote-agent seam (spec D10): absorb PRs labeled mq:ready. Absorb ONLY a PR
+    // the queue has never seen — any existing entry (LANDED included) is a decision
+    // a lingering label must not overturn. Re-enqueuing a LANDED PR would re-view it
+    // as MERGED and flip its final state to CANCELLED, mis-reporting a good landing.
     const pre = this.state()
     for (const pr of gh.listLabeled(config.ready_label)) {
-      const existing = pre.entries.get(pr)
-      if (!existing || existing.state === 'LANDED') {
+      if (!pre.entries.has(pr)) {
         appendEvent(mqDir, { type: 'enqueued', pr, at: this.at() })
       }
     }
@@ -111,15 +123,27 @@ export class MergeQueueDaemon {
       try {
         info = gh.viewPr(entry.pr)
       } catch (err) {
-        const failures = (this.viewFailures.get(entry.pr) ?? 0) + 1
-        this.viewFailures.set(entry.pr, failures)
-        log(`warn: cannot view PR #${entry.pr}: ${String(err)} (attempt ${failures})`)
-        if (failures >= 5) {
+        const msg = String(err)
+        // Only a DEFINITIVE "gone" answer cancels the PR. A transient failure
+        // (network, auth expiry, rate limit, GitHub outage) must never cancel —
+        // during an outage every viewPr throws, and cancelling on that would nuke
+        // the whole queue. Transient failures pause the daemon instead (recoverable).
+        if (/not found|could not resolve|no pull requests|404/i.test(msg)) {
           appendEvent(mqDir, {
             type: 'pr_state', pr: entry.pr, state: 'CANCELLED', at: this.at(),
-            note: 'unviewable after 5 attempts — check the PR number and gh auth',
+            note: 'PR not found on GitHub — check the number',
           })
           this.viewFailures.delete(entry.pr)
+          continue
+        }
+        const failures = (this.viewFailures.get(entry.pr) ?? 0) + 1
+        this.viewFailures.set(entry.pr, failures)
+        log(`warn: transient error viewing PR #${entry.pr}: ${msg} (attempt ${failures})`)
+        if (failures >= 5) {
+          this.pause(
+            `repeated GitHub API failures viewing PR #${entry.pr} (${msg}) — ` +
+            'check gh auth / network, then rm .mq/PAUSED',
+          )
         }
         continue
       }
@@ -239,6 +263,28 @@ export class MergeQueueDaemon {
       }
     }
 
+    // A member withdrawn during the gate (mq eject / external close) poisons the
+    // tested candidate — its diff is in the tree. Abort and requeue the survivors
+    // for a clean rebuild WHATEVER the gate said. This guards every post-gate path
+    // (green, red-singleton, split, base-moved) — not just the green pre-land check.
+    const afterGate = this.state()
+    const withdrawn = applied.filter(pr => this.isTerminal(afterGate, pr))
+    if (withdrawn.length > 0) {
+      appendEvent(mqDir, {
+        type: 'batch_state', batchId, state: 'ABORTED', at: this.at(),
+        note: `member(s) ${withdrawn.map(p => `#${p}`).join(', ')} withdrawn during gate — rebuilding`,
+      })
+      for (const pr of applied) {
+        if (this.isTerminal(afterGate, pr)) continue // leave the withdrawn PR terminal
+        appendEvent(mqDir, {
+          type: 'pr_state', pr, state: 'REQUEUED_SPLIT', batchId, at: this.at(),
+          note: 'batch member withdrawn — rebuilding',
+        })
+      }
+      git.deleteCandidate(batchId)
+      return { kind: 'aborted' }
+    }
+
     // Base moved during the gate → candidate tested against a stale base (spec §5.2 step 6).
     git.fetchOrigin()
     if (git.originHeadSha(base) !== baseSha) {
@@ -290,6 +336,9 @@ export class MergeQueueDaemon {
       timeoutMs: config.gate_timeout_minutes * 60_000,
       logPath: path.join(mqDir, 'logs', `${batchId}${retryTests ? '-retry' : ''}.log`),
       env,
+      // Record the gate PGID so a crashed daemon's orphaned gate can be reaped on
+      // the next startup before the gate worktree is reused (spec §5.4).
+      pidFile: path.join(mqDir, GATE_PID_FILE),
     })
   }
 
@@ -361,6 +410,23 @@ export class MergeQueueDaemon {
         // gh refuses (--match-head-commit) if the head raced past our validation.
         if ((live.get(pr)?.mergedAt ?? null) === null) gh.squashMerge(pr, testedHeads.get(pr))
       } catch (err) {
+        // The merge command failed — but its response may just have been lost
+        // (network blip after GitHub already merged). Re-query before assuming it
+        // didn't land: a merged-but-unacked PR must not be requeued (double-merge)
+        // or left with an open bead.
+        let alreadyMerged = false
+        try {
+          alreadyMerged = (gh.viewPr(pr).mergedAt ?? null) !== null
+        } catch { /* still unreachable — fall through to the partial-landing path */ }
+        if (alreadyMerged) {
+          appendEvent(mqDir, { type: 'pr_state', pr, state: 'LANDED', batchId, at: this.at() })
+          landed.push(pr)
+          try {
+            gh.comment(pr, `**merge-queue**: landed in batch ${batchId}`)
+          } catch { /* comment is best-effort */ }
+          this.closeBead(pr, live.get(pr)?.body)
+          continue
+        }
         // Partial landing: what already merged is real and must not be re-tested
         // against a stale candidate (spec D9) — pause instead of running the NRS
         // check, and requeue everything that did not get a chance to merge.
@@ -469,7 +535,8 @@ export class MergeQueueDaemon {
 
   /** Startup recovery (spec §5.4): journal vs refs vs GitHub. */
   reconcile(): void {
-    const { gh, git, mqDir, log } = this.deps
+    const { git, mqDir, log } = this.deps
+    this.reapOrphanGate()
     const state = this.state()
     for (const batch of state.batches.values()) {
       if (!IN_FLIGHT_BATCH_STATES.includes(batch.state)) continue
@@ -479,25 +546,23 @@ export class MergeQueueDaemon {
       })
       for (const pr of batch.members) {
         const entry = state.entries.get(pr)
-        if (!entry || TERMINAL_PR_STATES.has(entry.state)) continue
-        let info: PrInfo | null = null
-        try {
-          info = gh.viewPr(pr)
-        } catch { /* treat as unmerged */ }
-        if (info?.mergedAt != null) {
-          appendEvent(mqDir, {
-            type: 'pr_state', pr, state: 'LANDED', batchId: batch.id, at: this.at(),
-            note: 'recovered: merged before crash',
-          })
-          // A crash between squashMerge and closeBead would otherwise leave the
-          // bead open forever, breaking the fire-and-forget contract (spec §5.5).
-          this.closeBead(pr, info.body)
-        } else {
-          appendEvent(mqDir, {
-            type: 'pr_state', pr, state: 'REQUEUED_SPLIT', batchId: batch.id, at: this.at(),
-            note: 'recovered: daemon restart',
-          })
+        if (!entry) continue
+        if (TERMINAL_PR_STATES.has(entry.state)) {
+          // A crash between the LANDED journal write and closeBead() would leave the
+          // bead open forever (spec §5.5). Replay the idempotent close before skipping.
+          if (entry.state === 'LANDED') this.closeBead(pr)
+          continue
         }
+        this.recoverMember(pr, batch.id, 'recovered: daemon restart')
+      }
+    }
+    // Crash-safety sweep: a crash after a terminal batch_state (ABORTED/RED/DONE)
+    // but before its members were transitioned leaves them stuck in a mid-flight PR
+    // state that the in-flight-batch loop above never revisits. Recover any such
+    // orphan regardless of its batch's state.
+    for (const entry of this.state().entries.values()) {
+      if (MIDFLIGHT_PR_STATES.has(entry.state)) {
+        this.recoverMember(entry.pr, entry.batchId, 'recovered: orphaned mid-flight')
       }
     }
     // Sweep candidate refs that no longer belong to an active batch.
@@ -512,5 +577,38 @@ export class MergeQueueDaemon {
       }
     }
     log('reconcile complete')
+  }
+
+  /** Requeue (or, if it actually merged, LAND) a member left mid-flight by a crash. */
+  private recoverMember(pr: number, batchId: string | undefined, note: string): void {
+    const { gh, mqDir } = this.deps
+    let info: PrInfo | null = null
+    try {
+      info = gh.viewPr(pr)
+    } catch { /* treat as unmerged */ }
+    if (info?.mergedAt != null) {
+      appendEvent(mqDir, { type: 'pr_state', pr, state: 'LANDED', batchId, at: this.at(), note })
+      // Fire-and-forget: close the bead a crash may have skipped (spec §5.5).
+      this.closeBead(pr, info.body)
+    } else {
+      appendEvent(mqDir, { type: 'pr_state', pr, state: 'REQUEUED_SPLIT', batchId, at: this.at(), note })
+    }
+  }
+
+  /** Kill an orphaned gate process group left by a crashed prior daemon before the
+   *  gate worktree is reused — otherwise it mutates the worktree concurrently with
+   *  the new run and corrupts gate results (spec §5.4). */
+  private reapOrphanGate(): void {
+    const { mqDir, log } = this.deps
+    const pidFile = path.join(mqDir, GATE_PID_FILE)
+    if (!fs.existsSync(pidFile)) return
+    const pid = Number(fs.readFileSync(pidFile, 'utf8').trim())
+    if (Number.isInteger(pid) && pid > 0) {
+      try {
+        process.kill(-pid, 'SIGKILL') // negative pid = whole group
+        log(`reaped orphaned gate process group ${pid}`)
+      } catch { /* already gone */ }
+    }
+    fs.rmSync(pidFile, { force: true })
   }
 }

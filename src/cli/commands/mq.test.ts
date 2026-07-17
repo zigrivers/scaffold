@@ -6,7 +6,8 @@ import os from 'node:os'
 import path from 'node:path'
 import { checkSync, lockSync } from 'proper-lockfile'
 import mqCommand, { mqHandler } from './mq.js'
-import { readJournal } from '../../merge-queue/journal.js'
+import { appendEvent, readJournal } from '../../merge-queue/journal.js'
+import { reduceState } from '../../merge-queue/state.js'
 
 function scratchRepo(): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mq-cli-'))
@@ -52,6 +53,23 @@ describe('scaffold mq', () => {
     await mqHandler({ action: 'eject', pr: 7, root })
     const events = readJournal(path.join(root, '.mq'))
     expect(events[1]).toMatchObject({ type: 'pr_state', pr: 7, state: 'CANCELLED' })
+  })
+
+  it('eject on a PR not in the queue is a no-op (no CANCELLED appended)', async () => {
+    process.env.MQ_NO_AUTOSTART = '1'
+    const root = scratchRepo()
+    await mqHandler({ action: 'eject', pr: 99, root })
+    expect(readJournal(path.join(root, '.mq'))).toHaveLength(0)
+  })
+
+  it('eject does not clobber a terminal state (LANDED stays LANDED)', async () => {
+    process.env.MQ_NO_AUTOSTART = '1'
+    const root = scratchRepo()
+    const mqDir = path.join(root, '.mq')
+    await mqHandler({ action: 'enqueue', pr: 5, root })
+    appendEvent(mqDir, { type: 'pr_state', pr: 5, state: 'LANDED', at: new Date().toISOString() })
+    await mqHandler({ action: 'eject', pr: 5, root })
+    expect(reduceState(readJournal(mqDir)).entries.get(5)?.state).toBe('LANDED')
   })
 
   it('stats runs against an empty queue without throwing', async () => {

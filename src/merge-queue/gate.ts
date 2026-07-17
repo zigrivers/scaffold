@@ -18,6 +18,9 @@ export function runGate(opts: {
   timeoutMs: number
   logPath: string
   env?: Record<string, string>
+  /** When set, the gate PGID is written here while running and removed when it
+   *  settles, so a crashed daemon's orphaned gate can be reaped on next startup. */
+  pidFile?: string
 }): Promise<GateResult> {
   fs.mkdirSync(path.dirname(opts.logPath), { recursive: true })
   const started = Date.now()
@@ -30,6 +33,9 @@ export function runGate(opts: {
       detached: true,
       stdio: ['ignore', 'pipe', 'pipe'],
     })
+    if (opts.pidFile !== undefined && child.pid !== undefined) {
+      try { fs.writeFileSync(opts.pidFile, String(child.pid)) } catch { /* best-effort */ }
+    }
     const chunks: Buffer[] = []
     const MAX_LOG_BYTES = 64 * 1024 * 1024
     let captured = 0
@@ -56,6 +62,9 @@ export function runGate(opts: {
       if (settled) return
       settled = true
       clearTimeout(timer)
+      if (opts.pidFile !== undefined) {
+        try { fs.rmSync(opts.pidFile, { force: true }) } catch { /* best-effort */ }
+      }
       fs.writeFileSync(opts.logPath, Buffer.concat(chunks))
       const failedFile = path.join(opts.cwd, FAILED_TESTS_FILE)
       let failedTests: string[] = []

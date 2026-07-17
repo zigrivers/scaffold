@@ -110,6 +110,18 @@ describe('createGitOps', () => {
     expect(res.ref).toBe('refs/merge-queue/batch-bcrash')
   })
 
+  it('throws (batch deferred) when a PR head cannot be fetched, rather than mis-ejecting it', () => {
+    const { clone } = scratchRepos()
+    const ops = createGitOps(clone)
+    ops.fetchOrigin()
+    // A head SHA that does not exist on origin: a transient fetch failure must
+    // surface as a thrown "batch deferred" (caller requeues), not a bogus
+    // "does not apply cleanly" rejection of a PR whose head simply isn't local.
+    const ghost = 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
+    expect(() => ops.constructCandidate('bghost', [{ pr: 1, headSha: ghost }], 'main'))
+      .toThrow(/cannot fetch PR head/i)
+  })
+
   it('deleteCandidate removes the ref; listCandidateRefs enumerates them', () => {
     const { clone } = scratchRepos()
     const shaA = pushBranch(clone, 'pr-del', 'd.txt')
