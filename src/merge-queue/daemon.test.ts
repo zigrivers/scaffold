@@ -65,6 +65,7 @@ class FakeGit implements GitOps {
     const scripted = this.candidates.shift()
     return scripted ?? {
       ref: `refs/merge-queue/batch-${batchId}`, applied: prs.map(p => p.pr), rejected: [],
+      alreadyApplied: [],
     }
   }
   deleteCandidate(batchId: string): void { this.deleted.push(batchId) }
@@ -136,7 +137,8 @@ describe('MergeQueueDaemon.cycle', () => {
     const h = harness()
     h.enqueue(1)
     h.gh.infos.set(1, prInfo(1, { state: 'MERGED', mergedAt: AT }))
-    expect(await h.daemon.cycle()).toBe('worked')
+    // No batch ever runs (nothing was eligible) -> idle, so the poll sleep applies.
+    expect(await h.daemon.cycle()).toBe('idle')
     expect(h.states()[1]).toBe('CANCELLED')
     expect(h.gh.merged).toEqual([])
   })
@@ -201,7 +203,9 @@ describe('MergeQueueDaemon.cycle', () => {
     const h = harness()
     h.enqueue(1)
     h.enqueue(2)
-    h.git.candidates.push({ ref: 'refs/merge-queue/batch-x', applied: [1], rejected: [2] })
+    h.git.candidates.push({
+      ref: 'refs/merge-queue/batch-x', applied: [1], rejected: [2], alreadyApplied: [],
+    })
     await h.daemon.cycle()
     expect(h.states()).toEqual({ 1: 'LANDED', 2: 'NEEDS_REBASE' })
     expect(h.gh.comments.some(c => c.pr === 2 && /rebase/i.test(c.body))).toBe(true)
@@ -274,6 +278,47 @@ describe('MergeQueueDaemon.cycle', () => {
     await h.daemon.cycle()
     expect(h.states()).toEqual({ 1: 'LANDED', 2: 'REQUEUED_SPLIT' })
     expect(h.daemon.paused()).toMatch(/partial landing/)
+    expect(h.gh.merged).toEqual([1])
+  })
+
+  it('an unviewable PR keeps the daemon idle and is cancelled after 5 consecutive attempts', async () => {
+    const h = harness()
+    // No gh.infos entry for pr 1 -> viewPr always throws "no such PR 1".
+    appendEvent(h.mqDir, { type: 'enqueued', pr: 1, at: AT })
+    for (let i = 0; i < 4; i++) {
+      expect(await h.daemon.cycle()).toBe('idle')
+      expect(h.states()[1]).toBe('QUEUED')
+    }
+    expect(await h.daemon.cycle()).toBe('idle')
+    expect(h.states()[1]).toBe('CANCELLED')
+    const entry = reduceState(readJournal(h.mqDir)).entries.get(1)
+    expect(entry?.note).toBe('unviewable after 5 attempts — check the PR number and gh auth')
+  })
+
+  it('an EJECTED PR relabeled mq:ready is not re-absorbed', async () => {
+    const h = harness()
+    h.enqueue(1)
+    h.gateResults.push({ result: 'red', seconds: 2, logPath: '/l/b.log', failedTests: [] })
+    await h.daemon.cycle()
+    expect(h.states()[1]).toBe('EJECTED')
+    h.gh.labeled = [1]
+    expect(await h.daemon.cycle()).toBe('idle')
+    expect(h.states()[1]).toBe('EJECTED')
+    expect(h.git.constructed.length).toBe(1)
+  })
+
+  it('cancels an already-applied PR without ejecting or blocking the rest of the batch', async () => {
+    const h = harness()
+    h.enqueue(1)
+    h.enqueue(2)
+    h.git.candidates.push({
+      ref: 'refs/merge-queue/batch-x', applied: [1], rejected: [], alreadyApplied: [2],
+    })
+    await h.daemon.cycle()
+    expect(h.states()).toEqual({ 1: 'LANDED', 2: 'CANCELLED' })
+    const entry = reduceState(readJournal(h.mqDir)).entries.get(2)
+    expect(entry?.note).toBe('diff already applied to origin/main — close the PR')
+    expect(h.gh.comments.some(c => c.pr === 2 && /already applied/i.test(c.body))).toBe(true)
     expect(h.gh.merged).toEqual([1])
   })
 })

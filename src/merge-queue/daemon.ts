@@ -42,6 +42,11 @@ type BatchOutcome =
 export class MergeQueueDaemon {
   constructor(private deps: DaemonDeps) {}
 
+  /** Consecutive gh.viewPr failures per PR (spec: cap runaway retries). In-memory
+   *  only — resets on daemon restart, which is fine since reconcile() re-derives
+   *  ground truth from the journal/GitHub anyway. */
+  private viewFailures = new Map<number, number>()
+
   private at(): string { return this.deps.now().toISOString() }
   private state(): QueueState { return reduceState(readJournal(this.deps.mqDir)) }
 
@@ -85,11 +90,14 @@ export class MergeQueueDaemon {
       return 'idle'
     }
 
-    // Remote-agent seam (spec D10): absorb PRs labeled mq:ready.
+    // Remote-agent seam (spec D10): absorb PRs labeled mq:ready. Only a fresh PR
+    // or one that already landed cleanly gets re-enqueued — an EJECTED,
+    // NEEDS_REBASE, or CANCELLED entry is a decision (human or daemon) that a
+    // lingering label must not silently overturn.
     const pre = this.state()
     for (const pr of gh.listLabeled(config.ready_label)) {
       const existing = pre.entries.get(pr)
-      if (!existing || TERMINAL_PR_STATES.has(existing.state)) {
+      if (!existing || existing.state === 'LANDED') {
         appendEvent(mqDir, { type: 'enqueued', pr, at: this.at() })
       }
     }
@@ -103,9 +111,19 @@ export class MergeQueueDaemon {
       try {
         info = gh.viewPr(entry.pr)
       } catch (err) {
-        log(`warn: cannot view PR #${entry.pr}: ${String(err)}`)
+        const failures = (this.viewFailures.get(entry.pr) ?? 0) + 1
+        this.viewFailures.set(entry.pr, failures)
+        log(`warn: cannot view PR #${entry.pr}: ${String(err)} (attempt ${failures})`)
+        if (failures >= 5) {
+          appendEvent(mqDir, {
+            type: 'pr_state', pr: entry.pr, state: 'CANCELLED', at: this.at(),
+            note: 'unviewable after 5 attempts — check the PR number and gh auth',
+          })
+          this.viewFailures.delete(entry.pr)
+        }
         continue
       }
+      this.viewFailures.delete(entry.pr)
       if (info.state !== 'OPEN') {
         appendEvent(mqDir, {
           type: 'pr_state', pr: entry.pr, state: 'CANCELLED', at: this.at(),
@@ -116,13 +134,14 @@ export class MergeQueueDaemon {
       infos.set(entry.pr, info)
     }
     const eligible = queued.filter(e => infos.has(e.pr))
-    if (eligible.length === 0) return 'worked'
+    if (eligible.length === 0) return 'idle'
 
     const members = composeBatch(eligible, infos, config.batch_cap)
 
     // Bisection stack — bors batch-then-bisect within the single lane. Halves
     // requeue AHEAD of new arrivals by construction (they run in this cycle).
     const stack: { members: number[]; parent?: string }[] = [{ members }]
+    let batchRan = false
     while (stack.length > 0) {
       if (this.paused() !== null) {
         log('paused mid-cycle — stopping the bisection stack')
@@ -130,6 +149,7 @@ export class MergeQueueDaemon {
       }
       const item = stack.shift()
       if (!item) break
+      batchRan = true
       const outcome = await this.runBatch(item.members, item.parent, infos, base)
       if (outcome.kind === 'split') {
         stack.unshift({ members: outcome.right, parent: outcome.batchId })
@@ -138,7 +158,7 @@ export class MergeQueueDaemon {
         break
       }
     }
-    return 'worked'
+    return batchRan ? 'worked' : 'idle'
   }
 
   private async runBatch(
@@ -160,10 +180,13 @@ export class MergeQueueDaemon {
       if (!info) throw new Error(`no PrInfo for batched PR #${pr}`)
       return { pr, headSha: info.headSha }
     })
-    const { ref, applied, rejected } = git.constructCandidate(batchId, prs, base)
+    const { ref, applied, rejected, alreadyApplied } = git.constructCandidate(batchId, prs, base)
     for (const pr of rejected) {
       this.eject(pr, batchId, 'NEEDS_REBASE',
         `does not apply cleanly onto origin/${base} — rebase and re-enqueue`)
+    }
+    for (const pr of alreadyApplied) {
+      this.cancelAlreadyApplied(pr, batchId, base)
     }
     if (applied.length === 0) {
       appendEvent(mqDir, {
@@ -343,6 +366,20 @@ export class MergeQueueDaemon {
       this.reopenBead(pr)
     } catch (err) {
       log(`warn: could not comment/reopen for PR #${pr}: ${String(err)}`)
+    }
+  }
+
+  /** A squash-merge that staged nothing means the diff is already on the base
+   *  (spec: don't wedge the batch on a stale-but-already-landed PR). No
+   *  queueFailures increment — this isn't a queue failure, it's a stale PR. */
+  private cancelAlreadyApplied(pr: number, batchId: string, base: string): void {
+    const { gh, mqDir, log } = this.deps
+    const note = `diff already applied to origin/${base} — close the PR`
+    appendEvent(mqDir, { type: 'pr_state', pr, state: 'CANCELLED', batchId, at: this.at(), note })
+    try {
+      gh.comment(pr, `**merge-queue**: ${note}`)
+    } catch (err) {
+      log(`warn: could not comment for PR #${pr}: ${String(err)}`)
     }
   }
 

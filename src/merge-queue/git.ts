@@ -2,7 +2,13 @@ import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 
-export interface CandidateResult { ref: string; applied: number[]; rejected: number[] }
+export interface CandidateResult {
+  ref: string
+  applied: number[]
+  rejected: number[]
+  /** Squash-merged cleanly but staged nothing — the diff is already on the base. */
+  alreadyApplied: number[]
+}
 
 export interface GitOps {
   primaryRoot(): string
@@ -87,10 +93,19 @@ export function createGitOps(repoRoot: string): GitOps {
       git(['reset', '--hard', `origin/${base}`], gate)
       const applied: number[] = []
       const rejected: number[] = []
+      const alreadyApplied: number[] = []
       for (const { pr, headSha } of prs) {
         if (gitAllowFail(['merge', '--squash', headSha], gate)) {
-          git(['commit', '--no-verify', '-m', `mq: squash PR #${pr}`], gate)
-          applied.push(pr)
+          // A squash-merge that lands cleanly but stages nothing means this PR's
+          // diff is already present on the base (e.g. it landed earlier and the
+          // branch never rebased). `git commit` on an empty index would throw
+          // and wedge the whole batch — treat it as a no-op instead.
+          if (gitAllowFail(['diff', '--cached', '--quiet'], gate)) {
+            alreadyApplied.push(pr)
+          } else {
+            git(['commit', '--no-verify', '-m', `mq: squash PR #${pr}`], gate)
+            applied.push(pr)
+          }
         } else {
           // Conflict: clear the failed squash and continue with the rest.
           git(['reset', '--hard', 'HEAD'], gate)
@@ -98,7 +113,7 @@ export function createGitOps(repoRoot: string): GitOps {
         }
       }
       git(['update-ref', ref, 'HEAD'], gate)
-      return { ref, applied, rejected }
+      return { ref, applied, rejected, alreadyApplied }
     },
     deleteCandidate(batchId) {
       gitAllowFail(['update-ref', '-d', `${CANDIDATE_PREFIX}${batchId}`])

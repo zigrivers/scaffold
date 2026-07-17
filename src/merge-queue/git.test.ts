@@ -133,4 +133,26 @@ describe('createGitOps', () => {
     ops.fetchOrigin()
     expect(ops.originHeadSha('main')).not.toBe(before)
   })
+
+  it('treats an already-landed diff as alreadyApplied instead of throwing', () => {
+    const { clone } = scratchRepos()
+    const shaDup = pushBranch(clone, 'pr-dup', 'dup.txt')
+    // Simulate pr-dup having landed already through some other path: merge its
+    // content directly into main and push, so squash-merging pr-dup again
+    // onto origin/main produces an empty diff (already applied).
+    git(clone, 'merge', '--squash', 'origin/pr-dup')
+    git(clone, 'commit', '--no-verify', '-m', 'land pr-dup directly')
+    git(clone, 'push', 'origin', 'main')
+    const shaClean = pushBranch(clone, 'pr-clean', 'clean.txt')
+    const ops = createGitOps(clone)
+    ops.fetchOrigin()
+    const res = ops.constructCandidate('bdup', [
+      { pr: 1, headSha: shaDup }, { pr: 2, headSha: shaClean },
+    ], 'main')
+    expect(res.alreadyApplied).toEqual([1])
+    expect(res.applied).toEqual([2])
+    expect(res.rejected).toEqual([])
+    const files = git(clone, 'ls-tree', '--name-only', res.ref)
+    expect(files).toContain('clean.txt')
+  })
 })
