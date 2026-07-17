@@ -145,6 +145,19 @@ describe('createGitOps', () => {
     expect(ops.listCandidateRefs()).toEqual([])
   })
 
+  it('ensureGateWorktree recreates the gate after its directory is deleted by hand', () => {
+    const { clone } = scratchRepos()
+    const ops = createGitOps(clone)
+    const gate = ops.ensureGateWorktree()
+    expect(fs.existsSync(path.join(gate, '.git'))).toBe(true)
+    // Simulate someone deleting the worktree dir without telling git — the
+    // registration in .git/worktrees is left stale.
+    fs.rmSync(gate, { recursive: true, force: true })
+    const recreated = ops.ensureGateWorktree()
+    expect(recreated).toBe(gate)
+    expect(fs.existsSync(path.join(gate, '.git'))).toBe(true)
+  })
+
   it('originHeadSha reflects remote movement after fetch', () => {
     const { clone } = scratchRepos()
     const ops = createGitOps(clone)

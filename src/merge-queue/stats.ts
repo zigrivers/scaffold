@@ -39,6 +39,10 @@ export function computeStats(events: JournalEvent[], now: Date): MqStats {
   gateSeconds.sort((a, b) => a - b)
   const medianGateSeconds = gateSeconds.length === 0
     ? null
-    : gateSeconds[Math.floor((gateSeconds.length - 1) / 2)]
+    : gateSeconds.length % 2 === 1
+      ? gateSeconds[(gateSeconds.length - 1) / 2]
+      : Math.round(
+        (gateSeconds[gateSeconds.length / 2 - 1] + gateSeconds[gateSeconds.length / 2]) / 2,
+      )
   return { arrivalsLast24h, landedTotal, gateRuns, medianGateSeconds, flakesLast7d }
 }

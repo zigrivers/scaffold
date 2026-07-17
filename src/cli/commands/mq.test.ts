@@ -5,6 +5,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { checkSync, lockSync } from 'proper-lockfile'
+import yargs from 'yargs'
 import mqCommand, { mqHandler } from './mq.js'
 import { appendEvent, readJournal } from '../../merge-queue/journal.js'
 import { reduceState } from '../../merge-queue/state.js'
@@ -27,6 +28,18 @@ afterEach(() => {
 describe('scaffold mq', () => {
   it('declares the five actions', () => {
     expect(mqCommand.command).toBe('mq <action>')
+  })
+
+  it('parses "mq daemon --root <path>" under strict mode (autostart contract)', async () => {
+    // Regression: autostart spawns `mq daemon --root <primary>`. Under the CLI's
+    // strict parser an undeclared --root aborts the detached daemon silently.
+    let seen: { action?: string; root?: string } = {}
+    await yargs(['mq', 'daemon', '--root', '/tmp/x'])
+      .command({ ...mqCommand, handler: a => { seen = { action: String(a.action), root: a.root as string } } })
+      .strict()
+      .fail(false)
+      .parseAsync()
+    expect(seen).toEqual({ action: 'daemon', root: '/tmp/x' })
   })
 
   it('enqueue appends a journal event (autostart suppressed)', async () => {

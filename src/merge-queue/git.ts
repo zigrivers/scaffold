@@ -30,10 +30,10 @@ const CANDIDATE_PREFIX = 'refs/merge-queue/batch-'
 
 export function createGitOps(repoRoot: string): GitOps {
   const git = (args: string[], cwd = repoRoot): string =>
-    execFileSync('git', args, { cwd, encoding: 'utf8' }).trim()
+    execFileSync('git', args, { cwd, encoding: 'utf8', timeout: 120_000 }).trim()
   const gitAllowFail = (args: string[], cwd = repoRoot): boolean => {
     try {
-      execFileSync('git', args, { cwd, stdio: 'ignore' })
+      execFileSync('git', args, { cwd, stdio: 'ignore', timeout: 120_000 })
       return true
     } catch {
       return false
@@ -51,6 +51,11 @@ export function createGitOps(repoRoot: string): GitOps {
     const gate = path.join(root, '.mq', 'gate')
     if (!fs.existsSync(path.join(gate, '.git'))) {
       fs.mkdirSync(path.join(root, '.mq'), { recursive: true })
+      // The gate dir may have been deleted by hand while git still has it
+      // registered as a worktree — `worktree add` would then abort with
+      // "already registered". Prune stale registrations first so recreation
+      // always succeeds.
+      git(['worktree', 'prune'], root)
       git(['worktree', 'add', '--detach', gate], root)
     }
     return gate
@@ -101,7 +106,7 @@ export function createGitOps(repoRoot: string): GitOps {
       gitAllowFail(['merge', '--abort'], gate)
       gitAllowFail(['reset', '--hard'], gate)
       gitAllowFail(['clean', '-fd'], gate)
-      git(['checkout', '--detach', `origin/${base}`], gate)
+      git(['checkout', '--force', '--detach', `origin/${base}`], gate)
       git(['reset', '--hard', `origin/${base}`], gate)
       const applied: number[] = []
       const rejected: number[] = []

@@ -28,4 +28,12 @@ describe('computeStats', () => {
   it('returns null median with no gate runs', () => {
     expect(computeStats([], NOW).medianGateSeconds).toBeNull()
   })
+
+  it('averages the two middle values for an even-length gate sample', () => {
+    const events: JournalEvent[] = [
+      { type: 'gate_metrics', batchId: 'a', seconds: 100, result: 'green', at: '2026-07-17T02:00:00.000Z' },
+      { type: 'gate_metrics', batchId: 'b', seconds: 300, result: 'green', at: '2026-07-17T03:00:00.000Z' },
+    ]
+    expect(computeStats(events, NOW).medianGateSeconds).toBe(200)
+  })
 })

@@ -84,6 +84,13 @@ describe('createGhClient', () => {
     expect(() => createGhClient(stubDir)).toThrow(/gh CLI/)
   })
 
+  it('accepts a bare command name resolvable on PATH (not a filesystem path)', () => {
+    // Not an absolute/relative path, so fs.existsSync is false — but it must
+    // still resolve via a PATH lookup rather than being rejected outright.
+    process.env.MQ_GH_CMD = 'true'
+    expect(() => createGhClient(stubDir)).not.toThrow()
+  })
+
   it('constructs correct viewPr arguments', () => {
     const json = '{"number":7,"state":"OPEN","headRefOid":"abc123","mergedAt":null,' +
       '"additions":3,"deletions":1,"title":"t","body":"Closes prj-x"}'

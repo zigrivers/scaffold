@@ -32,7 +32,11 @@ class FakeGh implements GhClient {
   failMerge = new Set<number>()
   notFound = new Set<number>()          // viewPr throws a definitive "gone" error
   failMergeButLands = new Set<number>() // squashMerge throws but the PR is merged (lost ack)
+  indeterminate = new Set<number>()     // squashMerge throws AND the confirming view then fails
+  onSquash?: (pr: number) => void       // fired after a successful merge (to inject mid-loop events)
+  private breakView = new Set<number>()
   viewPr(pr: number): PrInfo {
+    if (this.breakView.has(pr)) throw new Error('network unreachable during confirmation')
     if (this.notFound.has(pr)) throw new Error('Could not resolve to a PullRequest')
     const info = this.infos.get(pr)
     if (!info) throw new Error(`transient blip viewing PR ${pr}`)
@@ -40,6 +44,10 @@ class FakeGh implements GhClient {
   }
   mergeHeads: (string | undefined)[] = []
   squashMerge(pr: number, expectedHead?: string): void {
+    if (this.indeterminate.has(pr)) {
+      this.breakView.add(pr) // the post-merge confirmation view will also fail
+      throw new Error('merge ack lost')
+    }
     if (this.failMergeButLands.has(pr)) {
       this.infos.set(pr, { ...this.viewPr(pr), state: 'MERGED', mergedAt: AT })
       throw new Error('lost response after merge')
@@ -48,6 +56,7 @@ class FakeGh implements GhClient {
     this.merged.push(pr)
     this.mergeHeads.push(expectedHead)
     this.infos.set(pr, { ...this.viewPr(pr), state: 'MERGED', mergedAt: AT })
+    this.onSquash?.(pr)
   }
   comment(pr: number, body: string): void { this.comments.push({ pr, body }) }
   listLabeled(): number[] { return this.labeled }
@@ -374,6 +383,34 @@ describe('MergeQueueDaemon.cycle', () => {
     expect(h.daemon.paused()).toBeNull() // 0 landed => not a partial landing => no pause
   })
 
+  it('pauses on an indeterminate merge (the merge AND its confirmation both fail)', async () => {
+    const h = harness()
+    h.enqueue(1)
+    h.gh.indeterminate.add(1)
+    await h.daemon.cycle()
+    expect(h.daemon.paused()).toMatch(/indeterminate/)
+    expect(h.states()[1]).not.toBe('LANDED')
+    expect(h.gh.merged).toEqual([])
+  })
+
+  it('a withdrawal DURING the landing loop stops the later PR and pauses (partial)', async () => {
+    const h = harness()
+    h.enqueue(1)
+    h.enqueue(2)
+    // Eject #2 the instant #1 merges — after the pre-land validation has passed.
+    h.gh.onSquash = pr => {
+      if (pr === 1) {
+        appendEvent(h.mqDir, {
+          type: 'pr_state', pr: 2, state: 'CANCELLED', at: AT, note: 'user eject mid-landing',
+        })
+      }
+    }
+    await h.daemon.cycle()
+    expect(h.gh.merged).toEqual([1])                 // #1 landed before the eject
+    expect(h.states()[2]).toBe('CANCELLED')          // #2 withdrawn mid-loop — never merged
+    expect(h.daemon.paused()).toMatch(/withdrawn mid-landing/)
+  })
+
   it('closes the bead when a PR is cancelled as already-applied', async () => {
     const h = harness()
     h.enqueue(1)
@@ -489,7 +526,43 @@ describe('MergeQueueDaemon.reconcile', () => {
       'closeBead',
     )
     h.daemon.reconcile()
-    expect(spy).toHaveBeenCalledWith(1) // idempotent replay for the already-LANDED member
+    expect(spy).toHaveBeenCalledWith(1, 'Closes proj-1') // idempotent replay for the already-LANDED member
+  })
+
+  it('recovers a crashed LANDING batch that fully merged and asserts NRS (no pause)', () => {
+    const h = harness()
+    h.enqueue(1)
+    h.enqueue(2)
+    appendEvent(h.mqDir, { type: 'batch_created', batchId: 'land', members: [1, 2], at: AT })
+    appendEvent(h.mqDir, { type: 'pr_state', pr: 1, state: 'LANDING', batchId: 'land', at: AT })
+    appendEvent(h.mqDir, { type: 'pr_state', pr: 2, state: 'LANDING', batchId: 'land', at: AT })
+    appendEvent(h.mqDir, {
+      type: 'batch_state', batchId: 'land', state: 'LANDING', candidateTree: 'TREE', at: AT,
+    })
+    h.gh.infos.set(1, prInfo(1, { state: 'MERGED', mergedAt: AT }))
+    h.gh.infos.set(2, prInfo(2, { state: 'MERGED', mergedAt: AT }))
+    // FakeGit.treeOf returns 'TREE' by default → matches the recorded candidateTree.
+    h.daemon.reconcile()
+    expect(h.states()).toEqual({ 1: 'LANDED', 2: 'LANDED' })
+    expect(h.daemon.paused()).toBeNull()
+  })
+
+  it('pauses and requeues the tail when a LANDING batch crashed mid-partial-landing', () => {
+    const h = harness()
+    h.enqueue(1)
+    h.enqueue(2)
+    appendEvent(h.mqDir, { type: 'batch_created', batchId: 'land', members: [1, 2], at: AT })
+    appendEvent(h.mqDir, { type: 'pr_state', pr: 1, state: 'LANDING', batchId: 'land', at: AT })
+    appendEvent(h.mqDir, { type: 'pr_state', pr: 2, state: 'LANDING', batchId: 'land', at: AT })
+    appendEvent(h.mqDir, {
+      type: 'batch_state', batchId: 'land', state: 'LANDING', candidateTree: 'TREE', at: AT,
+    })
+    h.gh.infos.set(1, prInfo(1, { state: 'MERGED', mergedAt: AT })) // merged before crash
+    h.gh.infos.set(2, prInfo(2))                                    // did not merge
+    h.daemon.reconcile()
+    expect(h.states()[1]).toBe('LANDED')
+    expect(h.states()[2]).toBe('REQUEUED_SPLIT')
+    expect(h.daemon.paused()).toMatch(/crash during landing/)
   })
 
   it('recovers an orphaned mid-flight member even when its batch is already terminal', () => {
@@ -534,7 +607,7 @@ describe('MergeQueueDaemon.reconcile', () => {
 })
 
 describe('MergeQueueDaemon.run', () => {
-  it('a cycle error triggers reconcile', async () => {
+  it('a cycle error triggers reconcile and propagates on the --once path', async () => {
     const h = harness()
     h.enqueue(1)
     const spy = vi.spyOn(h.daemon, 'reconcile')
@@ -543,7 +616,7 @@ describe('MergeQueueDaemon.run', () => {
       calls++
       if (calls === 1) throw new Error('network blip')
     }
-    await h.daemon.run({ once: true })
-    expect(spy).toHaveBeenCalledTimes(2)
+    await expect(h.daemon.run({ once: true })).rejects.toThrow(/network blip/)
+    expect(spy).toHaveBeenCalledTimes(2) // startup + after the cycle error
   })
 })

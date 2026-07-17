@@ -26,7 +26,11 @@ export interface MqArgs {
   verbose?: boolean
 }
 
-const LOCK_STALE_MS = 60_000
+// Must exceed the longest time a single blocking git/gh call can hold the event
+// loop (those are execFileSync with a 120s cap) so the lock is never judged stale
+// while the daemon is alive and merely busy — a false-stale lock would let a
+// SECOND daemon start and break the singleton guarantee.
+const LOCK_STALE_MS = 180_000
 
 function lockOpts(mqDir: string) {
   return { lockfilePath: path.join(mqDir, 'daemon.lock'), stale: LOCK_STALE_MS }
@@ -224,6 +228,10 @@ const mqCommand: CommandModule<Record<string, unknown>, MqArgs> = {
       .option('foreground', {
         type: 'boolean', default: false, describe: 'Log to stdout as well as .mq/logs/daemon.log',
       })
+      // Required by autostart, which spawns `mq daemon --root <primary>`. Without
+      // this declaration the CLI's strict parser rejects --root and the detached
+      // daemon exits immediately, silently breaking fire-and-forget autostart.
+      .option('root', { type: 'string', hidden: true, describe: 'Project root directory' })
       .option('once', { type: 'boolean', default: false, hidden: true })
   },
   handler: mqHandler,

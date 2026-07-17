@@ -12,7 +12,7 @@ import {
 import type { GhClient, PrInfo } from './gh.js'
 import type { GitOps } from './git.js'
 import type { GateResult } from './gate.js'
-import type { MergeQueueConfig, PrState, QueueState } from './types.js'
+import type { BatchRecord, MergeQueueConfig, PrState, QueueState } from './types.js'
 
 export interface DaemonDeps {
   gh: GhClient
@@ -78,9 +78,11 @@ export class MergeQueueDaemon {
     this.reconcile()
     for (;;) {
       let outcome: 'idle' | 'worked' = 'idle'
+      let caught: unknown = null
       try {
         outcome = await this.cycle()
       } catch (err) {
+        caught = err
         this.deps.log(`cycle error: ${String(err)}`)
         try {
           this.reconcile()
@@ -88,7 +90,12 @@ export class MergeQueueDaemon {
           this.deps.log(`reconcile after error failed: ${String(reconcileErr)}`)
         }
       }
-      if (opts.once) return
+      if (opts.once) {
+        // The one-shot path is for tests/debugging — surface a swallowed cycle
+        // error instead of masking it (the long-running daemon keeps going).
+        if (caught) throw caught
+        return
+      }
       if (outcome === 'idle') await sleep(this.deps.config.poll_seconds * 1000)
     }
   }
@@ -404,21 +411,52 @@ export class MergeQueueDaemon {
     const landed: number[] = []
     for (let i = 0; i < members.length; i++) {
       const pr = members[i]
+      // Per-merge withdrawal recheck (spec D9): an `mq eject` issued DURING the
+      // landing loop — after the pre-land validation — must still stop this PR
+      // from merging. With nothing landed yet, abort+rebuild; once earlier members
+      // have landed we are committed to the candidate, so pause for a human.
+      if (this.isTerminal(this.state(), pr)) {
+        if (landed.length === 0) {
+          appendEvent(mqDir, {
+            type: 'batch_state', batchId, state: 'ABORTED', at: this.at(),
+            note: `#${pr} withdrawn during landing — rebuilding`,
+          })
+          const fresh = this.state()
+          for (const m of members) {
+            if (this.isTerminal(fresh, m)) continue
+            appendEvent(mqDir, {
+              type: 'pr_state', pr: m, state: 'REQUEUED_SPLIT', batchId, at: this.at(),
+              note: 'sibling withdrawn during landing — rebuilding',
+            })
+          }
+          return
+        }
+        this.pause(
+          `#${pr} withdrawn mid-landing of batch ${batchId} after ${landed.length} landed — ` +
+          `verify origin/${base}, then rm .mq/PAUSED`,
+        )
+        appendEvent(mqDir, {
+          type: 'batch_state', batchId, state: 'DONE', at: this.at(),
+          note: 'withdrawn mid-landing — paused',
+        })
+        return
+      }
       // Write-ahead: LANDING before the merge attempt; idempotent via mergedAt.
       appendEvent(mqDir, { type: 'pr_state', pr, state: 'LANDING', batchId, at: this.at() })
       try {
         // gh refuses (--match-head-commit) if the head raced past our validation.
         if ((live.get(pr)?.mergedAt ?? null) === null) gh.squashMerge(pr, testedHeads.get(pr))
       } catch (err) {
-        // The merge command failed — but its response may just have been lost
-        // (network blip after GitHub already merged). Re-query before assuming it
-        // didn't land: a merged-but-unacked PR must not be requeued (double-merge)
-        // or left with an open bead.
-        let alreadyMerged = false
+        // The merge command failed. Its response may have been lost AFTER GitHub
+        // merged, so re-query. Three outcomes: merged → treat as landed (lost ack);
+        // not-merged → safe to requeue/partial-pause; unknown (the confirmation
+        // view ALSO failed) → indeterminate, and requeuing would risk a double
+        // merge / NRS bypass, so pause for a human.
+        let confirmed: 'merged' | 'not-merged' | 'unknown' = 'unknown'
         try {
-          alreadyMerged = (gh.viewPr(pr).mergedAt ?? null) !== null
-        } catch { /* still unreachable — fall through to the partial-landing path */ }
-        if (alreadyMerged) {
+          confirmed = (gh.viewPr(pr).mergedAt ?? null) !== null ? 'merged' : 'not-merged'
+        } catch { confirmed = 'unknown' }
+        if (confirmed === 'merged') {
           appendEvent(mqDir, { type: 'pr_state', pr, state: 'LANDED', batchId, at: this.at() })
           landed.push(pr)
           try {
@@ -426,6 +464,17 @@ export class MergeQueueDaemon {
           } catch { /* comment is best-effort */ }
           this.closeBead(pr, live.get(pr)?.body)
           continue
+        }
+        if (confirmed === 'unknown') {
+          this.pause(
+            `indeterminate merge for PR #${pr} in batch ${batchId} (${String(err)}) — ` +
+            'confirm on GitHub whether it merged, then rm .mq/PAUSED',
+          )
+          appendEvent(mqDir, {
+            type: 'batch_state', batchId, state: 'DONE', at: this.at(),
+            note: 'indeterminate merge — paused',
+          })
+          return
         }
         if (landed.length === 0) {
           // Nothing has landed yet — this is NOT a partial landing (a transient
@@ -566,6 +615,13 @@ export class MergeQueueDaemon {
     const state = this.state()
     for (const batch of state.batches.values()) {
       if (!IN_FLIGHT_BATCH_STATES.includes(batch.state)) continue
+      // A crash mid-LANDING is special: some members may have merged. Recover it
+      // as a UNIT — pause on a partial landing, run the NRS assertion when all
+      // merged — instead of the generic per-member requeue (spec §5.4).
+      if (batch.state === 'LANDING') {
+        this.recoverLandingBatch(batch, state)
+        continue
+      }
       appendEvent(mqDir, {
         type: 'batch_state', batchId: batch.id, state: 'ABORTED', at: this.at(),
         note: 'daemon restart',
@@ -603,6 +659,83 @@ export class MergeQueueDaemon {
       }
     }
     log('reconcile complete')
+  }
+
+  /** Recover a batch that crashed mid-LANDING as a UNIT (spec §5.4): query every
+   *  member, mark the merged ones LANDED + close their beads, and then —
+   *  - partial (some merged, some not): requeue the tail and PAUSE (a human must
+   *    reconcile what did/didn't land against a now-stale candidate);
+   *  - all merged: run the NRS tree assertion (pause on mismatch);
+   *  - none merged: requeue everyone for a clean rebuild. */
+  private recoverLandingBatch(batch: BatchRecord, state: QueueState): void {
+    const { gh, git, mqDir } = this.deps
+    const merged: number[] = []
+    const unmerged: number[] = []
+    for (const pr of batch.members) {
+      const entry = state.entries.get(pr)
+      if (!entry || (TERMINAL_PR_STATES.has(entry.state) && entry.state !== 'LANDED')) continue
+      let info: PrInfo | null = null
+      try {
+        info = gh.viewPr(pr)
+      } catch { /* treat as unmerged */ }
+      if (info?.mergedAt != null) {
+        merged.push(pr)
+        if (entry.state !== 'LANDED') {
+          appendEvent(mqDir, {
+            type: 'pr_state', pr, state: 'LANDED', batchId: batch.id, at: this.at(),
+            note: 'recovered: merged during landing',
+          })
+        }
+        this.closeBead(pr, info.body)
+      } else {
+        unmerged.push(pr)
+      }
+    }
+    if (merged.length > 0 && unmerged.length > 0) {
+      for (const pr of unmerged) {
+        appendEvent(mqDir, {
+          type: 'pr_state', pr, state: 'REQUEUED_SPLIT', batchId: batch.id, at: this.at(),
+          note: 'recovered: unmerged tail of a crashed partial landing',
+        })
+      }
+      this.pause(
+        `crash during landing of batch ${batch.id}: ${merged.length}/${batch.members.length} merged` +
+        ' — verify origin and the post-merge suite, then rm .mq/PAUSED',
+      )
+      appendEvent(mqDir, {
+        type: 'batch_state', batchId: batch.id, state: 'DONE', at: this.at(),
+        note: 'recovered partial landing — paused',
+      })
+      return
+    }
+    if (merged.length > 0 && unmerged.length === 0) {
+      if (batch.candidateTree) {
+        git.fetchOrigin()
+        const base = git.defaultBranch()
+        const landedTree = git.treeOf(`origin/${base}`)
+        if (landedTree !== batch.candidateTree) {
+          this.pause(
+            `NRS violation recovered for batch ${batch.id}: origin/${base} tree ${landedTree} != ` +
+            `tested candidate ${batch.candidateTree} — investigate before unpausing (rm .mq/PAUSED)`,
+          )
+        }
+      }
+      appendEvent(mqDir, {
+        type: 'batch_state', batchId: batch.id, state: 'DONE', at: this.at(),
+        note: 'recovered: fully landed',
+      })
+      return
+    }
+    for (const pr of unmerged) {
+      appendEvent(mqDir, {
+        type: 'pr_state', pr, state: 'REQUEUED_SPLIT', batchId: batch.id, at: this.at(),
+        note: 'recovered: landing never started',
+      })
+    }
+    appendEvent(mqDir, {
+      type: 'batch_state', batchId: batch.id, state: 'ABORTED', at: this.at(),
+      note: 'recovered: no members merged',
+    })
   }
 
   /** Requeue (or, if it actually merged, LAND) a member left mid-flight by a crash. */

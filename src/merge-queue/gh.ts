@@ -22,10 +22,22 @@ export interface GhClient {
   postMergeRed(defaultBranch: string): boolean
 }
 
+// null = still running (not red). Any terminal conclusion that isn't a clean
+// pass — timed_out, cancelled, action_required, startup_failure, stale,
+// failure — must hold the queue, not just the literal "failure".
+const GREENISH = new Set(['success', 'neutral', 'skipped'])
+
 function resolveGhBin(): string {
   const bin = process.env.MQ_GH_CMD ?? 'gh'
   if (bin !== 'gh' && !fs.existsSync(bin)) {
-    throw new Error(`merge-queue requires the gh CLI (not found: ${bin})`)
+    // Not a filesystem path — it may still be a bare command name resolvable
+    // on PATH (e.g. MQ_GH_CMD=gh-wrapper). Confirm before rejecting it.
+    try {
+      execFileSync(bin, ['--version'], { stdio: 'ignore' })
+      return bin
+    } catch {
+      throw new Error(`merge-queue requires the gh CLI (not found: ${bin})`)
+    }
   }
   if (bin === 'gh') {
     try {
@@ -40,7 +52,7 @@ function resolveGhBin(): string {
 export function createGhClient(cwd: string): GhClient {
   const bin = resolveGhBin()
   const gh = (args: string[]): string =>
-    execFileSync(bin, args, { cwd, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 })
+    execFileSync(bin, args, { cwd, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024, timeout: 120_000 })
 
   return {
     viewPr(pr) {
@@ -81,10 +93,6 @@ export function createGhClient(cwd: string): GhClient {
         ])) as { conclusion: string | null }[]
         if (raw.length === 0) return false
         const c = raw[0].conclusion
-        // null = still running (not red). Any terminal conclusion that isn't a
-        // clean pass — timed_out, cancelled, action_required, startup_failure,
-        // stale, failure — must hold the queue, not just the literal "failure".
-        const GREENISH = new Set(['success', 'neutral', 'skipped'])
         return c !== null && !GREENISH.has(c)
       } catch {
         return false
