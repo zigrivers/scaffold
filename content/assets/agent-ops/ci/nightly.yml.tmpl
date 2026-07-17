@@ -14,7 +14,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Full uncached gate
-        run: {{FULL_GATE_COMMAND}}
+        run: |
+          {{FULL_GATE_COMMAND}}
       - name: E2E (when the project defines it)
         run: |
           if make -n e2e >/dev/null 2>&1; then
@@ -22,10 +23,14 @@ jobs:
           else
             echo "no e2e target — skipped"
           fi
-      - name: Flake report
+      - name: Flake report (best-effort — reads THIS checkout's queue)
         run: |
+          # The authoritative merge-queue journal lives in the developer's PRIMARY
+          # checkout (.mq/), not this fresh CI checkout — so stats here are usually
+          # empty. Kept as a hook for a future shared-journal location; it reports
+          # explicitly and never fails the run.
           if command -v scaffold >/dev/null 2>&1; then
-            scaffold mq stats
+            scaffold mq stats || echo "no merge-queue state in this checkout"
           else
             echo "scaffold CLI not installed on runner — skipped"
           fi

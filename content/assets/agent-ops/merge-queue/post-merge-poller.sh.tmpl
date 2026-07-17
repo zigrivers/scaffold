@@ -7,17 +7,14 @@
 # RED  -> write .mq/PAUSED (the merge-queue daemon stops landing until a human
 #         fixes forward or reverts, then removes the file). Exit 1.
 # GREEN-> record the sha; clear a pause only if THIS script wrote it (a pause
-#         starting "post-merge red") — an NRS pause is never touched.
+#         starting "post-merge red") — an NRS/human pause is never touched.
 # Schedule: cron/launchd every ~10 min, or ad hoc via `make post-merge-watch`.
 set -euo pipefail
-
-GATE="{{FULL_GATE_COMMAND}}"
 
 # Resolve relative to where this script itself lives, not the caller's cwd —
 # cron/launchd invoke it with an unpredictable working directory (often $HOME),
 # so we cd to our own install location first, then ask git for the PRIMARY
-# checkout (first entry in `worktree list`), matching this project's other
-# ops scripts (e.g. main-sync.sh.tmpl).
+# checkout (first entry in `worktree list`).
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 PRIMARY="$(git worktree list --porcelain | head -1 | sed 's/^worktree //')"
@@ -26,29 +23,57 @@ MQ_DIR="$PRIMARY/.mq"
 MARKER="$MQ_DIR/last-full-suite-sha"
 PAUSE="$MQ_DIR/PAUSED"
 WT="$MQ_DIR/post-merge"
+mkdir -p "$MQ_DIR/logs"
 
-BRANCH="$(git rev-parse --abbrev-ref origin/HEAD | sed 's#^origin/##')"
+# Mutual exclusion: the schedule (~10 min) is shorter than a full gate can take,
+# so overlapping invocations must not share the worktree/log/marker. macOS has no
+# `flock`, so use an atomic mkdir lock with a staleness steal (older than the gate
+# timeout + slack ⇒ a crashed holder). A second LIVE invocation exits 0 (handled).
+LOCK="$MQ_DIR/poller.lock"
+if ! mkdir "$LOCK" 2>/dev/null; then
+	if [ -n "$(find "$LOCK" -maxdepth 0 -mmin +90 2>/dev/null)" ]; then
+		rmdir "$LOCK" 2>/dev/null || true
+		mkdir "$LOCK" 2>/dev/null || { echo "post-merge: another poller is running — skipping"; exit 0; }
+	else
+		echo "post-merge: another poller is running — skipping"
+		exit 0
+	fi
+fi
+trap 'rmdir "$LOCK" 2>/dev/null || true' EXIT
+
+# Fetch FIRST, then resolve the default branch. origin/HEAD is unset on some
+# clones (git init + remote add), so fall back to the install-time default.
 git fetch origin --prune --quiet
+BRANCH="$(git rev-parse --abbrev-ref origin/HEAD 2>/dev/null | sed 's#^origin/##' || true)"
+[ -n "$BRANCH" ] || BRANCH="{{DEFAULT_BRANCH}}"
 HEAD_SHA="$(git rev-parse "origin/$BRANCH")"
+
 LAST="$(cat "$MARKER" 2>/dev/null || echo none)"
 if [ "$HEAD_SHA" = "$LAST" ]; then
 	echo "post-merge: up to date at $HEAD_SHA"
 	exit 0
 fi
 
-mkdir -p "$MQ_DIR/logs"
-# Prune stale registrations first: if the worktree dir was deleted by hand, git
-# still has it registered and `git worktree add` would abort ("already exists").
+# A non-poller pause (NRS mismatch / human) halts the queue for a more serious
+# reason. Don't run the gate and NEVER touch that pause — leave it for a human.
+if [ -f "$PAUSE" ] && ! grep -q '^post-merge red' "$PAUSE" 2>/dev/null; then
+	echo "post-merge: a non-poller pause is set — skipping until it is resolved"
+	exit 0
+fi
+
 git worktree prune
 if [ ! -d "$WT" ]; then
 	git worktree add --detach --quiet "$WT" "origin/$BRANCH"
 fi
 git -C "$WT" fetch origin --quiet
-git -C "$WT" checkout --detach --quiet "origin/$BRANCH"
+# --force: a previous run may have left tracked files dirty; discard them.
+git -C "$WT" checkout -f --detach --quiet "origin/$BRANCH"
 git -C "$WT" reset --hard --quiet "origin/$BRANCH"
 
 LOG="$MQ_DIR/logs/post-merge-$HEAD_SHA.log"
-if (cd "$WT" && bash -c "$GATE") >"$LOG" 2>&1; then
+# The gate command is inlined (not assigned to a var and re-parsed) so a command
+# containing quotes/substitutions keeps its meaning.
+if (cd "$WT" && {{FULL_GATE_COMMAND}}) >"$LOG" 2>&1; then
 	echo "$HEAD_SHA" > "$MARKER"
 	if grep -q '^post-merge red' "$PAUSE" 2>/dev/null; then
 		rm -f "$PAUSE"
@@ -57,8 +82,19 @@ if (cd "$WT" && bash -c "$GATE") >"$LOG" 2>&1; then
 		echo "post-merge: green at $HEAD_SHA"
 	fi
 else
+	# A daemon NRS/human pause may have appeared WHILE the gate ran — re-check and
+	# never clobber it (that would make it look poller-owned and get auto-cleared).
+	if [ -f "$PAUSE" ] && ! grep -q '^post-merge red' "$PAUSE" 2>/dev/null; then
+		echo "post-merge: RED at $HEAD_SHA but a non-poller pause is now set — leaving it ($LOG)" >&2
+		exit 1
+	fi
+	# PAUSE first (halt the daemon), THEN record the sha: a crash in between must
+	# leave the queue paused, never mark a red sha done without a pause.
 	printf 'post-merge red at %s — full suite failed; see %s. Fix forward or revert (runbook: docs/git-workflow), then rm .mq/PAUSED\n' \
 		"$HEAD_SHA" "$LOG" > "$PAUSE"
+	# Record the sha so a persistent red does not re-run the full gate every poll —
+	# only a fix-forward that MOVES origin/$BRANCH re-triggers it.
+	echo "$HEAD_SHA" > "$MARKER"
 	echo "post-merge: RED at $HEAD_SHA — merge queue paused ($LOG)" >&2
 	exit 1
 fi

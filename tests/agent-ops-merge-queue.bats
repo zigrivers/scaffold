@@ -95,7 +95,7 @@ teardown() { rm -rf "$TMP"; }
   grep -q 'runs-on: \[self-hosted, macOS, ARM64\]' "$W"
   grep -q 'group: post-merge' "$W"
   grep -q 'cancel-in-progress: true' "$W"
-  grep -q 'run: {{FULL_GATE_COMMAND}}' "$W"
+  grep -q '{{FULL_GATE_COMMAND}}' "$W"   # block scalar: `run: |` then the marker
   # the merge gate must NOT run here — this is post-merge only (D4')
   ! grep -q 'pull_request' "$W"
 }
@@ -104,7 +104,7 @@ teardown() { rm -rf "$TMP"; }
   W="$BATS_TEST_DIRNAME/../content/assets/agent-ops/ci/nightly.yml.tmpl"
   grep -q 'schedule:' "$W"
   grep -q 'workflow_dispatch' "$W"
-  grep -q 'run: {{FULL_GATE_COMMAND}}' "$W"
+  grep -q '{{FULL_GATE_COMMAND}}' "$W"   # block scalar
   grep -q 'make e2e' "$W"
   grep -q 'scaffold mq stats' "$W"
 }
@@ -178,9 +178,11 @@ poller_world() { # builds origin+clone, installs resolved poller with gate cmd $
   run "$WORK/clone/scripts/ops/post-merge-poller.sh"
   [ "$status" -eq 1 ]
   grep -q 'post-merge red' "$WORK/clone/.mq/PAUSED"
-  # switch gate to green and advance origin so the poller re-runs
-  sed -i '' -e 's|^GATE=.*|GATE="true"|' "$WORK/clone/scripts/ops/post-merge-poller.sh" 2>/dev/null || \
-    sed -i -e 's|^GATE=.*|GATE="true"|' "$WORK/clone/scripts/ops/post-merge-poller.sh"
+  # re-resolve the poller with a green gate and advance origin so it re-runs
+  sed -e "s|{{FULL_GATE_COMMAND}}|true|g" \
+    "$BATS_TEST_DIRNAME/../content/assets/agent-ops/merge-queue/post-merge-poller.sh.tmpl" \
+    > "$WORK/clone/scripts/ops/post-merge-poller.sh"
+  chmod +x "$WORK/clone/scripts/ops/post-merge-poller.sh"
   echo more >> "$WORK/clone/f.txt"
   git -C "$WORK/clone" commit -qam more
   git -C "$WORK/clone" push -q origin main
@@ -190,12 +192,44 @@ poller_world() { # builds origin+clone, installs resolved poller with gate cmd $
   rm -rf "$WORK"
 }
 
-@test "poller: never clears a non-poller (NRS) pause" {
+@test "poller: records the sha on RED so it does not re-run the full gate without movement" {
+  poller_world "false"
+  run "$WORK/clone/scripts/ops/post-merge-poller.sh"
+  [ "$status" -eq 1 ]
+  SHA="$(git -C "$WORK/clone" rev-parse origin/main)"
+  [ "$(cat "$WORK/clone/.mq/last-full-suite-sha")" = "$SHA" ]
+  # same sha -> "up to date", the (expensive) gate is NOT re-run every poll
+  run "$WORK/clone/scripts/ops/post-merge-poller.sh"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"up to date"* ]]
+  rm -rf "$WORK"
+}
+
+@test "poller: skips (exit 0) when another poller holds the lock" {
+  poller_world "true"
+  mkdir -p "$WORK/clone/.mq/poller.lock"   # simulate a live concurrent poller
+  run "$WORK/clone/scripts/ops/post-merge-poller.sh"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"another poller is running"* ]]
+  [ ! -f "$WORK/clone/.mq/last-full-suite-sha" ]   # gate never ran
+  rm -rf "$WORK"
+}
+
+@test "poller: never clears a non-poller (NRS) pause on green" {
   poller_world "true"
   mkdir -p "$WORK/clone/.mq"
   echo "NRS violation: trees differ" > "$WORK/clone/.mq/PAUSED"
   run "$WORK/clone/scripts/ops/post-merge-poller.sh"
   [ -f "$WORK/clone/.mq/PAUSED" ]
   grep -q 'NRS violation' "$WORK/clone/.mq/PAUSED"
+  rm -rf "$WORK"
+}
+
+@test "poller: a RED gate never clobbers an existing non-poller pause" {
+  poller_world "false"
+  mkdir -p "$WORK/clone/.mq"
+  echo "NRS violation: trees differ" > "$WORK/clone/.mq/PAUSED"
+  run "$WORK/clone/scripts/ops/post-merge-poller.sh"
+  grep -q 'NRS violation' "$WORK/clone/.mq/PAUSED"   # untouched — queue halted for a worse reason
   rm -rf "$WORK"
 }

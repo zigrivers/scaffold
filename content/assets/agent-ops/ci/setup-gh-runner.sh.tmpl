@@ -34,15 +34,39 @@ if [ ! -f config.sh ]; then
 	echo "downloading latest actions runner (osx-arm64)…"
 	URL="$(gh api repos/actions/runner/releases/latest \
 		-q '.assets[] | select(.name | test("actions-runner-osx-arm64-[0-9.]+\\.tar\\.gz$")) | .browser_download_url')"
+	DIGEST="$(gh api repos/actions/runner/releases/latest \
+		-q '.assets[] | select(.name | test("actions-runner-osx-arm64-[0-9.]+\\.tar\\.gz$")) | .digest // ""')"
 	curl -fsSL "$URL" -o runner.tar.gz
+	# Verify the download against the release's published digest when available —
+	# a compromised asset or MITM would otherwise run arbitrary code as this user.
+	if [ -n "$DIGEST" ]; then
+		EXPECTED="${DIGEST#sha256:}"
+		ACTUAL="$(shasum -a 256 runner.tar.gz | awk '{print $1}')"
+		if [ "$EXPECTED" != "$ACTUAL" ]; then
+			echo "runner tarball checksum mismatch (expected $EXPECTED, got $ACTUAL)" >&2
+			rm -f runner.tar.gz
+			exit 3
+		fi
+		echo "runner tarball checksum verified"
+	else
+		echo "warning: release provided no digest — skipping checksum verification" >&2
+	fi
 	tar xzf runner.tar.gz
 	rm runner.tar.gz
 fi
 
-TOKEN="$(gh api -X POST "repos/$REPO/actions/runners/registration-token" -q .token)"
-./config.sh --unattended --url "https://github.com/$REPO" --token "$TOKEN" \
-	--name "$NAME" --labels self-hosted,macOS,ARM64 --replace
-./svc.sh install
-./svc.sh start
+# Rerunnable: config.sh refuses when a .runner config already exists, so on a
+# re-run just (re)install and start the service instead of reconfiguring.
+if [ -f .runner ]; then
+	echo "runner already configured — ensuring the launchd service is installed and running"
+	./svc.sh install 2>/dev/null || true
+	./svc.sh start  2>/dev/null || true
+else
+	TOKEN="$(gh api -X POST "repos/$REPO/actions/runners/registration-token" -q .token)"
+	./config.sh --unattended --url "https://github.com/$REPO" --token "$TOKEN" \
+		--name "$NAME" --labels self-hosted,macOS,ARM64 --replace
+	./svc.sh install
+	./svc.sh start
+fi
 echo "runner '$NAME' registered and started (launchd keeps it alive)."
 echo "verify: gh api repos/$REPO/actions/runners -q '.runners[].name'"
