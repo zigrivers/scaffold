@@ -1606,6 +1606,42 @@ git commit -m "feat(mq): flake tracking, quarantine list, advisory bead filing"
 
 ### Task 10: Daemon orchestrator (cycle, bisection, landing, recovery)
 
+> **AMENDMENT (post-Task-8, binding):** Task 8's review surfaced that a sync
+> `spawnSync` gate cannot kill the process GROUP on timeout, so `runGate` is now
+> **async**: `runGate(opts): Promise<GateResult>`. Apply these exact mechanical
+> changes to this task's code blocks while implementing:
+> 1. `DaemonDeps.runGate` type becomes
+>    `(opts: { cwd: string; command: string; timeoutMs: number; logPath: string; env?: Record<string, string> }) => GateResult | Promise<GateResult>`
+>    (union keeps the test fakes synchronous).
+> 2. `cycle()` becomes `async cycle(): Promise<'idle' | 'worked'>`; `runBatch`
+>    becomes `private async runBatch(...): Promise<BatchOutcome>`; `gateRun`
+>    becomes `private async gateRun(...): Promise<GateResult>` (its body returns
+>    `this.deps.runGate({...})` — async auto-wraps).
+> 3. Await every call: `await this.cycle()` in `run()`,
+>    `await this.runBatch(...)` in the bisection loop, `let gate = await
+>    this.gateRun(...)` and `const retry = await this.gateRun(...)` in
+>    `runBatch`.
+> 4. In `daemon.test.ts`, every `it` that calls `cycle()` becomes `async`, and
+>    every `h.daemon.cycle()` becomes `await h.daemon.cycle()` (assertions
+>    unchanged, e.g. `expect(await h.daemon.cycle()).toBe('worked')`).
+>    `reconcile()` stays synchronous.
+
+> **AMENDMENT 2 (post-Task-10 review, binding):** three safety defects in this
+> task's original code were found by review and fixed in-tree:
+> 1. `cycle()`'s bisection `while` loop re-checks `this.paused()` at the top of
+>    every iteration and breaks when paused — an NRS pause mid-stack must stop
+>    the remaining halves from landing onto a flagged base.
+> 2. `land()` wraps each per-PR merge in try/catch: a `viewPr`/`squashMerge`
+>    throw mid-batch requeues the failed member + the unmerged tail
+>    (REQUEUED_SPLIT), pauses with a "partial landing in batch …" reason, marks
+>    the batch DONE with note `'partial land — paused'`, and returns without
+>    running the NRS check (base is unverified; the pause says so).
+> 3. `run()`'s catch calls `this.reconcile()` (itself try/caught) after logging
+>    a cycle error, so a mid-cycle exception cannot strand in-flight PRs until
+>    a manual restart.
+> Three regression tests cover these (NRS-pause-stops-stack, partial-landing
+> pause+requeue, cycle-error-triggers-reconcile).
+
 **Files:**
 - Create: `src/merge-queue/daemon.ts`
 - Test: `src/merge-queue/daemon.test.ts`
@@ -2727,6 +2763,12 @@ git commit -m "feat(mq): scaffold mq CLI — enqueue/daemon/status/eject/stats w
 ## Wave 4 — Integration + closeout
 
 ### Task 13: End-to-end harness (real git, stub gh, full cycles)
+
+> **AMENDMENT (post-Task-8, binding):** `runGate` and `MergeQueueDaemon.cycle()`
+> are async (see Task 10's amendment). In this task's test code, every
+> `w.daemon.cycle()` call becomes `await w.daemon.cycle()` and the enclosing
+> tests are already async-compatible (add `async` to the `it` callbacks that
+> lack it). `reconcile()` stays synchronous.
 
 **Files:**
 - Test: `tests/merge-queue-e2e.test.ts`
