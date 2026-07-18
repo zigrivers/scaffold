@@ -4,6 +4,12 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.47.0] - 2026-07-18
+
+Merge throughput for many-agent projects (the "merge-lease livelock" fix),
+shipped in three layers: the engine, the installable tooling, and the generation
+content. See `docs/superpowers/specs/2026-07-17-merge-throughput-design.md`.
+
 ### Added
 
 - `scaffold mq` — local batching merge-queue engine for multi-agent projects:

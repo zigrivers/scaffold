@@ -56,6 +56,13 @@ Multiple AI agents working the same repo at once need worktree isolation, branch
 scaffold agent-ops install
 ```
 
+At scale (20+ agents), the bottleneck shifts from worktree hygiene to *merging*: every agent racing a long quality gate against a constantly-moving `main` livelocks. Two opt-in `agent-ops` components fix that. `--component merge-queue` installs a local batching **merge queue** — agents `scaffold mq enqueue --pr <N>` and move on; a single daemon batch-tests ready PRs against current `main` and lands only trees that actually passed (the bors "Not-Rocket-Science" rule), bisecting failures and quarantining flakes. `--component ci` adds day-one post-merge + nightly full-suite CI on a **$0 self-hosted runner** (no paid Actions minutes). The gate itself is made cheap via test-impact analysis (`make check-affected` runs only affected tests; the full suite is the post-merge safety net). `--component all` deliberately stays `git`+`staging` — the queue and CI are explicit opt-ins that the `merge-throughput` pipeline step wires up for projects that expect 3+ concurrent agents.
+
+```bash
+scaffold agent-ops install --component merge-queue --component ci
+scaffold mq status          # inspect the queue; enqueue/eject/stats also available
+```
+
 ## Prerequisites
 
 ### Required
