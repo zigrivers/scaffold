@@ -202,6 +202,13 @@ export function extractLastJson(text: string): string {
   }
   if (last !== undefined) return last
   if (firstError) throw firstError
+  // Self-diagnosing hint for a miswired channel whose CLI emits a top-level
+  // array: the object-root restriction is by design (see docstring).
+  if (text.includes('[')) {
+    throw new Error(
+      'No JSON object found in output (default-last scans only object roots; a top-level array is not supported)',
+    )
+  }
   throw new Error('No JSON object found in output')
 }
 

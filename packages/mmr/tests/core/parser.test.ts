@@ -191,6 +191,12 @@ describe('default-last parser (grok --json-schema emits one JSON object per turn
     expect(result.summary).toBe('Output parsing failed.')
     expect(result.findings[0].description).toMatch(/No JSON object found/)
   })
+
+  it('self-diagnoses a top-level array (object-root restriction is by design)', () => {
+    const result = parseChannelOutput('[{"severity":"P1"}]', 'default-last')
+    expect(result.summary).toBe('Output parsing failed.')
+    expect(result.findings[0].description).toMatch(/only object roots/)
+  })
 })
 
 describe('channelOutputMatchesIncompleteGuard (review-time retry probe)', () => {
