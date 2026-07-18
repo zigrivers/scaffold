@@ -43,12 +43,14 @@ by the entire workflow.
 - (mvp) Setup process works for first-time clone (max 5 steps)
 - (mvp) Makefile/package.json includes at minimum: dev, test, lint, check,
   check-affected targets
-- (mvp) `check-affected` honors the merge-queue contract: selects tests
-  affected relative to `${MQ_AFFECTED_BASE:-origin/main}`; falls back to full
-  `make check` when it cannot classify the change; excludes ids listed in
-  `.mq/quarantine.txt`; on failure MAY write failing test ids to
-  `.mq-failed-tests.txt` and SHOULD honor `MQ_RETRY_TESTS` on reruns (recipes
-  per stack: test-impact-analysis knowledge entry)
+- (mvp) `check-affected` selects tests affected relative to
+  `${MQ_AFFECTED_BASE:-origin/main}` and falls back to full `make check` when it
+  cannot classify the change (recipes per stack: test-impact-analysis knowledge
+  entry) — this cheap gate is the baseline for every project
+- (deep) When the merge-queue component is installed, `check-affected` also
+  honors the full queue contract: excludes ids listed in `.mq/quarantine.txt`;
+  on failure MAY write failing test ids to `.mq-failed-tests.txt` and SHOULD
+  honor `MQ_RETRY_TESTS` on reruns
 - (deep) Every agent-ops target present in the Makefile (via `agent-ops.mk`)
   has a matching Key Commands row using that target's own `## [agent-safe]`
   doc-comment as its marker

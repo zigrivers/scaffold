@@ -195,7 +195,10 @@ order:
       blocks it). Fallback without the queue: merge-slot-serialized
       `gh pr merge --squash --delete-branch`; `make main-sync && make
       prune-merged`.
-   7. Close: `bd close <id>` only after the merge is verified.
+   7. Close-out: on the queue path the DAEMON closes the bead when the PR
+      lands — do NOT `bd close` an enqueued bead yourself. Only on the
+      merge-slot fallback (no queue) do you `bd close <id>` after verifying
+      the merge.
    8. Batch report: the required slots (Beads / Docs updated in-PR / Beads
       filed) — say "none" out loud when there's nothing to report.
    ```
@@ -211,8 +214,10 @@ order:
 
 3. **Parallel-safety hard rules** — the primary checkout is shared and
    read-only (agents work in worktrees, never commit there); one agent per
-   module, migration sequence, or other shared surface at a time; one open
-   PR per agent; `make staging-up` only from a worktree, never the primary;
+   module, migration sequence, or other shared surface at a time; one bead
+   IN FLIGHT per agent (a draft PR you're actively building) — an enqueued PR
+   awaiting the queue does NOT count, you've moved on to the next bead;
+   `make staging-up` only from a worktree, never the primary;
    merges go through the queue: enqueue and move on; direct `gh pr merge`
    is blocked.
 

@@ -82,15 +82,19 @@ mark which parts are queue-only.
   text)
 - (mvp) The "Quality gates (two layers, D4′)" section states the merge
   gate explicitly (pre-commit hooks + `make check-affected` + agent
-  self-review + `mmr review`, executed against the batch by the
-  merge-queue daemon), and states that the full `make check` runs
-  post-merge and nightly via `.github/workflows/post-merge.yml`/
-  `nightly.yml` on a self-hosted runner (or the local poller) from day one
+  self-review + `mmr review`) with the full `make check` as the safety net.
+  A merge-throughput project ADDS: the gate runs against the batch by the
+  merge-queue daemon, and full `make check` runs post-merge and nightly via
+  `.github/workflows/post-merge.yml`/`nightly.yml` on a $0 self-hosted runner
+  (or the local poller) from day one. A base project runs the gate locally
+  with no server CI until launch.
 - (deep) PR workflow documents all 8 steps plus step 5.5 — (1) commit,
   (2) local review, (3) rebase, (4) push, (5) create PR, (6) confirm the
-  fast local gate (`make check-affected`), (7) enqueue via `scaffold mq
-  enqueue --pr <N>` (never `gh pr merge` directly — blocked by the
-  mq-guard hook), (8) sync main via `make main-sync && make
+  fast local gate (`make check-affected`), (7) land it — when the merge
+  queue is installed, `scaffold mq enqueue --pr <N>` and move on (never
+  `gh pr merge` directly — blocked by the mq-guard hook); otherwise
+  serialize a merge-slot `gh pr merge --squash --delete-branch` —,
+  (8) sync main via `make main-sync && make
   prune-merged` — with step 5.5 = `mmr review --pr <N> --sync
   --format json` between creating the PR and the gate/enqueue steps,
   including the 3-round cap and the degraded-pass self-merge path
