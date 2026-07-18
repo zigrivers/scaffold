@@ -1,7 +1,7 @@
 ---
 name: git-workflow
 description: Configure git workflow with branching, PRs, local quality gates, and worktree tooling for parallel agents
-summary: "Sets up your branching strategy, commit format, PR workflow with squash-merge, the agent-ops worktree scripts (setup, doctor, prune), and conflict-prevention rules so multiple AI agents work in parallel without conflicts. CI is deliberately deferred to launch; the quality gate is local (pre-commit + make check + MMR review)."
+summary: "Sets up your branching strategy, commit format, PR workflow with squash-merge, the agent-ops worktree scripts (setup, doctor, prune), and conflict-prevention rules so multiple AI agents work in parallel without conflicts. The merge gate is local and fast (pre-commit + make check-affected + MMR review, serialized through the scaffold mq merge queue); post-merge and nightly full-suite CI runs from day one on a $0 self-hosted runner (or a local poller)."
 phase: "environment"
 order: 330
 dependencies: [dev-env-setup]
@@ -19,9 +19,11 @@ work branch as its final segment, and is referenced in the PR body via `Closes <
 the body form is
 the canonical machine mapping), a rebase-never-merge strategy, the 8-step PR workflow with `mmr review`
 as mandatory AI-review step 5.5, the agent-ops worktree scripts for parallel agents
-(setup, doctor, prune), conflict-prevention rules, and the local quality gate
-(pre-commit hooks + `make check` + agent self-review + `mmr review`) that stands in
-for CI until a launch target is chosen and automated CI is deliberately wired up.
+(setup, doctor, prune), conflict-prevention rules, and the two-layer quality
+architecture: a fast local merge gate (pre-commit hooks + `make check-affected` +
+agent self-review + `mmr review`) whose merges are serialized and batch-tested by
+the scaffold mq merge queue, plus day-one post-merge/nightly full-suite CI on a
+self-hosted runner (D4′ — see the merge-throughput step, order 335).
 
 ## Inputs
 - CLAUDE.md (required) — Key Commands table for lint/test/install commands
@@ -34,8 +36,8 @@ for CI until a launch target is chosen and automated CI is deliberately wired up
 
 ## Expected Outputs
 - docs/git-workflow.md — the single rule, branching strategy, commit
-  standards, rebase-never-merge strategy, the "Quality gates (CI deferred)"
-  section, the 8-step PR workflow (with `mmr review --pr` as step 5.5),
+  standards, rebase-never-merge strategy, the "Quality gates (two layers,
+  D4′)" section, the 8-step PR workflow (with `mmr review --pr` as step 5.5),
   conflict-prevention rules, worktree documentation, the primary-checkout
   invariant, task closure, agent crash recovery, and a cheat sheet — see
   "Generate docs/git-workflow.md" in Instructions for the full section list
@@ -51,7 +53,8 @@ for CI until a launch target is chosen and automated CI is deliberately wired up
   References sections
 - .claude/settings.json — gains a PostToolUse reminder hook that fires after
   `gh pr create`, and, when the project uses Beads, a PreToolUse `bd-guard.sh`
-  entry (merged, never overwritten)
+  entry (merged, never overwritten); when the merge-queue component is
+  installed, a PreToolUse `mq-guard.sh` entry as well (same merge discipline)
 - .scaffold/agent-ops.yaml — written with the minimal form (`project_name` +
   `worktree_setup_commands`) if it doesn't already exist
 - CLAUDE.md updated with Committing/PR Workflow, Task Closure, Parallel
@@ -74,16 +77,20 @@ for CI until a launch target is chosen and automated CI is deliberately wired up
   semantic-release, and changelog generators parse these commits unchanged — no
   parser config needed (the trailing `(<bead-id>)` is just part of the subject
   text)
-- (mvp) The "Quality gates (CI deferred)" section states the gate
-  explicitly (pre-commit hooks + `make check` + agent self-review + `mmr
-  review`), states that `.github/workflows/` is deliberately absent until a
-  launch target is chosen, and includes a short "adding CI later" pointer
+- (mvp) The "Quality gates (two layers, D4′)" section states the merge
+  gate explicitly (pre-commit hooks + `make check-affected` + agent
+  self-review + `mmr review`, executed against the batch by the
+  merge-queue daemon), and states that the full `make check` runs
+  post-merge and nightly via `.github/workflows/post-merge.yml`/
+  `nightly.yml` on a self-hosted runner (or the local poller) from day one
 - (deep) PR workflow documents all 8 steps plus step 5.5 — (1) commit,
-  (2) local review, (3) rebase, (4) push, (5) create PR, (6) watch local
-  gates (CI deferred), (7) merge, (8) sync main via `make main-sync &&
-  make prune-merged` — with step 5.5 = `mmr review --pr <N> --sync
-  --format json` between creating the PR and the gates/merge, including
-  the 3-round cap and the degraded-pass self-merge path
+  (2) local review, (3) rebase, (4) push, (5) create PR, (6) confirm the
+  fast local gate (`make check-affected`), (7) enqueue via `scaffold mq
+  enqueue --pr <N>` (never `gh pr merge` directly — blocked by the
+  mq-guard hook), (8) sync main via `make main-sync && make
+  prune-merged` — with step 5.5 = `mmr review --pr <N> --sync
+  --format json` between creating the PR and the gate/enqueue steps,
+  including the 3-round cap and the degraded-pass self-merge path
 - (deep) `scripts/setup-agent-worktree.sh` is confirmed present via
   `scaffold agent-ops install --component git` + `scaffold agent-ops
   check` — not hand-authored; creates worktrees at the project-local
@@ -95,6 +102,9 @@ for CI until a launch target is chosen and automated CI is deliberately wired up
   and worktree-agent (`make prune-merged`) variants
 - (mvp) When `.beads/` exists, `.claude/settings.json` registers
   `scripts/bd-guard.sh` under hooks.PreToolUse with matcher `Bash`
+- (mvp) When the merge-queue component is installed (`scripts/mq-guard.sh`
+  present), `.claude/settings.json` registers it under hooks.PreToolUse
+  with matcher `Bash` as well, following the same merge discipline
 - (deep) Agent crash recovery procedure documented: diagnose commands, a
   continue/abort/restart decision table, and `git reflog` recovery
 - (mvp) Conflict-prevention rules documented: single-writer surfaces,
@@ -108,14 +118,14 @@ for CI until a launch target is chosen and automated CI is deliberately wired up
 
 ## Methodology Scaling
 - **deep**: Full docs/git-workflow.md with every section — the single
-  rule, branching, commits, rebase strategy, quality gates (CI deferred),
-  the 8-step PR workflow with `mmr review` as step 5.5, conflict-prevention
+  rule, branching, commits, rebase strategy, quality gates (two layers,
+  D4′), the 8-step PR workflow with `mmr review` as step 5.5, conflict-prevention
   rules, worktree documentation, the primary-checkout invariant, task
   closure, agent crash recovery, and the cheat sheet. Agent-ops git
   component installed, PR template generated, PostToolUse hook configured,
   and comprehensive CLAUDE.md updates.
-- **mvp**: The single rule, branching, commit format, quality gates (CI
-  deferred), and the 8-step PR workflow (mmr review still mandatory as
+- **mvp**: The single rule, branching, commit format, quality gates (two
+  layers, D4′), and the 8-step PR workflow (mmr review still mandatory as
   step 5.5). The agent-ops git component is installed for the mvp preset
   (as it is for deep) — it is a cheap, idempotent script install that
   `/work-beads` depends on. Custom depth follows its own ladder below (the
@@ -123,7 +133,7 @@ for CI until a launch target is chosen and automated CI is deliberately wired up
   conflict-prevention detail sections; keep CLAUDE.md updates minimal.
 - **custom:depth(1-5)**:
   - Depth 1: the single rule, branching strategy, commit format, and the
-    "Quality gates (CI deferred)" section.
+    "Quality gates (two layers, D4′)" section.
   - Depth 2: add the 8-step PR workflow (with `mmr review` as step 5.5)
     and the PR template.
   - Depth 3: install the agent-ops git component and document the
@@ -153,12 +163,12 @@ modified files without `--force`; never pass `--force` in generation mode.
   Beads status changed (added or removed), new worktree patterns needed
   for parallel execution, `scaffold agent-ops check` reports a stale
   bundle version
-- **Conflict resolution**: if the existing doc still documents an
-  automated CI workflow from before CI was deferred, do not silently
-  delete that section — flag the discrepancy to the user (a prior CI
-  decision may be intentional) and only replace it with the "Quality
-  gates (CI deferred)" section on explicit confirmation; verify the
-  CLAUDE.md workflow section stays consistent after any changes
+- **Conflict resolution**: if the existing doc still carries the retired
+  pre-D4′ quality-gates section (titled around a deferred CI rollout) or a
+  merge-slot-serialized step 7, flag the discrepancy and replace them with
+  the two-layer D4′ section and the enqueue flow only on explicit
+  confirmation; verify the CLAUDE.md workflow section stays consistent
+  after any changes
 
 ## Instructions
 
@@ -214,6 +224,24 @@ modified files without `--force`; never pass `--force` in generation mode.
    Codex, Cursor, and other harnesses have no PreToolUse hook: for them the
    guard is available as `scripts/bd-guard.sh --check "<command>"`, and the
    AGENTS.md Beads rules (see claude-md-optimization) carry the prose rule.
+
+4. **Register the merge-queue guard** (only when the merge-queue component is
+   installed — skip when `scripts/mq-guard.sh` is absent). Same merge
+   discipline as bd-guard — never overwrite `.claude/settings.json`:
+   ```bash
+   if [ -x scripts/mq-guard.sh ]; then
+     mkdir -p .claude
+     [ -f .claude/settings.json ] || printf '{}\n' > .claude/settings.json
+     if ! grep -q 'mq-guard.sh' .claude/settings.json; then
+       tmp=$(mktemp)
+       jq '.hooks.PreToolUse = ((.hooks.PreToolUse // []) + [{"matcher":"Bash","hooks":[{"type":"command","command":"scripts/mq-guard.sh"}]}])' \
+         .claude/settings.json > "$tmp" && mv "$tmp" .claude/settings.json
+     fi
+   fi
+   ```
+   Other harnesses use `scripts/mq-guard.sh --check "<command>"`; the AGENTS.md
+   operations core (claude-md-optimization) carries the prose rule ("enqueue,
+   never `gh pr merge`").
 
 ### Guardrail: keep generated files out of the primary checkout
 The git component ships a **primary-checkout write-guard**
@@ -286,13 +314,19 @@ Depth-gate per Methodology Scaling above.
    before pushing and whenever `main` advances while the PR is open;
    `git push --force-with-lease` only, never plain `--force`. No merge
    commits land on `main` — squash-merge is the only merge mode.
-5. **Quality gates (CI deferred)** — state explicitly: the gate is
-   pre-commit hooks + `make check` + agent self-review + `mmr review`;
-   `.github/workflows/` is deliberately absent until a launch/deploy
-   target is chosen. Include a short "adding CI later" pointer: when a
-   launch target is picked, wire the same `make check` and `mmr review`
-   commands into a CI workflow and enable branch protection referencing
-   that workflow's job name — until then, this document is the gate.
+5. **Quality gates (two layers, D4′)** — the merge gate is local and fast:
+   pre-commit hooks + `make check-affected` + agent self-review + `mmr
+   review`, executed against the batch by the merge-queue daemon (below).
+   The full `make check` runs post-merge on every landing and nightly —
+   uncached — via `.github/workflows/post-merge.yml`/`nightly.yml` on a
+   self-hosted runner ($0 Actions minutes; register with
+   `scripts/ops/setup-gh-runner.sh`), or via the local poller
+   (`make post-merge-watch`, cron/launchd) when
+   `merge_queue.gate_executor: local-poller`. When post-merge goes red the
+   queue pauses (`.mq/PAUSED`): fix forward or revert per docs/merge-queue.md,
+   then remove the pause file. Note: on free-plan private repos GitHub offers
+   no branch protection — the queue is enforced by convention + the mq-guard
+   hook; GitHub Pro adds server-side protection if ever wanted.
 6. **The 8-step PR workflow** — (1) commit -> (2) local review
    (`make check`, re-read the diff) -> (3) rebase -> (4) push ->
    (5) `gh pr create` (auto-applies `.github/pull_request_template.md`) ->
@@ -300,13 +334,20 @@ Depth-gate per Methodology Scaling above.
    3-round cap — round 1 fixes every real finding, round 2+ fixes P0/P1
    only and files beads for P2/P3, hard cap 3 rounds then
    complete a degraded-pass self-merge; the one thing that still blocks
-   the merge is a verified, still-reproducing P0) -> (6) watch local
-   gates — CI is deferred, so this means confirming pre-commit hooks ran
-   and `make check` is green on the branch HEAD -> (7) `gh pr merge
-   --squash --delete-branch` — with 3+ concurrent agents, serialize the
-   merge via `bd merge-slot acquire --wait` when the project's Beads has
-   merge-slots, releasing after the merge -> (8) `make main-sync && make
-   prune-merged` from the primary checkout. Cross-reference the
+   the merge is a verified, still-reproducing P0) -> (6) confirm the fast
+   gate green on the branch HEAD (`make check-affected`; run full `make
+   check` instead when you touched gate config, shared test utils, or
+   anything in the force-full list) -> (7) **enqueue, never merge
+   directly**: `make mq-enqueue PR=<N>` (or `scaffold mq enqueue --pr
+   <N>`) and MOVE ON to the next task — the merge-queue daemon
+   batch-tests the PR against latest `main` with peers, lands it on green
+   (closing the bead), or ejects it with the failing log as a PR comment
+   and reopens the bead for any agent to fix. Direct `gh pr merge` is
+   blocked by the mq-guard hook; queue state: `scaffold mq status`.
+   Fallback when the merge-queue component is not installed: serialize
+   via `bd merge-slot` per the multi-agent-coordination knowledge entry
+   -> (8) `make main-sync && make prune-merged` from the primary
+   checkout. Cross-reference the
    work-beads skill's Step 2.7 for the exact review contract this mirrors
    (`content/agent-skills/work-beads/SKILL.md` in the Scaffold repo;
    installed at `.claude/skills/work-beads/SKILL.md` or
@@ -347,8 +388,8 @@ Depth-gate per Methodology Scaling above.
     push --force`, `git branch -D`) without confirming with the user;
     recover missing commits via `git reflog`.
 12. **Cheat sheet** — a fenced code block with the full loop (branch,
-    commit, push, `gh pr create`, `mmr review --pr`, `gh pr merge
-    --squash --delete-branch`, `make main-sync && make prune-merged`) and
+    commit, push, `gh pr create`, `mmr review --pr`, `make mq-enqueue
+    PR=<N>`, `make main-sync && make prune-merged`) and
     the parallel-agent worktree variant (`scripts/setup-agent-worktree.sh
     <name> --install`, `cd .worktrees/<name>`, work normally).
 
