@@ -71,8 +71,8 @@ export interface UnwrapJsonpathParserConfig {
    * the wrapped payload — even a parseable payload from an interrupted run is
    * untrustworthy (under grok's --json-schema flag, intermediate progress turns
    * are schema-shaped JSON that would otherwise masquerade as a clean review).
-   * The guard also drives the dispatcher's one-shot re-dispatch
-   * (dispatchChannelWithIncompleteRetry).
+   * The guard also drives the dispatcher's one-shot re-dispatch (the
+   * `retryOnIncomplete` option on `dispatchChannel`).
    */
   incomplete?: {
     status_path: string

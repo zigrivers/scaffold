@@ -160,8 +160,19 @@ describe('default-last parser (grok --json-schema emits one JSON object per turn
     expect(result.summary).toBe('done')
   })
 
-  it('falls back to the previous valid object when a trailing candidate is unparseable', () => {
-    const raw = '{"approved": true, "findings": [], "summary": "real"} {"truncated": '
+  it('rejects a truncated trailing candidate instead of silently using the previous object (strict tail)', () => {
+    // The truncated tail could be the REAL final verdict; the earlier object
+    // can be a progress ack (observed live with "approved": true). Falling
+    // back silently could wrongly approve — fail the parse instead, which
+    // fails the channel and triggers the compensating pass.
+    const raw = '{"approved": true, "findings": [], "summary": "ack"} {"truncated": '
+    const result = parseChannelOutput(raw, 'default-last')
+    expect(result.summary).toBe('Output parsing failed.')
+    expect(result.findings[0].description).toMatch(/may be truncated/)
+  })
+
+  it('ignores a broken candidate that appears BEFORE the final complete object', () => {
+    const raw = '{bad json} {"approved": true, "findings": [], "summary": "real"}'
     const result = parse(raw)
     expect(result.summary).toBe('real')
   })

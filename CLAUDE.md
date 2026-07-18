@@ -336,6 +336,9 @@ claude -p "PROMPT" --output-format json 2>/dev/null
 #   lands in $.text — but grok then emits one schema-shaped JSON object PER TURN
 #   (intermediate "Reviewing…" acks included), so parse the LAST object, and treat
 #   any stopReason=Cancelled envelope as failed even if its $.text parses.
+#   The inline schema below is a copy of FINDINGS_JSON_SCHEMA in
+#   packages/mmr/src/core/output-schema.ts — keep them in sync if the findings
+#   shape ever changes.
 # NOTE: --disallowed-tools run_terminal_cmd is REQUIRED on any grok carrying the
 #   upstream run_terminal_cmd regression (first seen in grok 0.2.99): grok builds
 #   + validates every built-in tool before applying --tools, and its

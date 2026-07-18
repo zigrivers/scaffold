@@ -52,9 +52,15 @@ describe('stripFindingsSchemaFlags', () => {
     expect(stripFindingsSchemaFlags(flags)).toEqual(['--output-format', 'json', '--no-memory'])
   })
 
-  it('removes a bare placeholder arg even without a preceding flag', () => {
-    const flags = ['--x', FINDINGS_SCHEMA_PLACEHOLDER]
-    expect(stripFindingsSchemaFlags(flags)).toEqual(['--x'])
+  it('removes the preceding flag token whatever its name (custom flag carrying the placeholder)', () => {
+    // A valueless flag left behind would break the CLI invocation.
+    const flags = ['--custom-schema-flag', FINDINGS_SCHEMA_PLACEHOLDER]
+    expect(stripFindingsSchemaFlags(flags)).toEqual([])
+  })
+
+  it('removes a bare placeholder arg when the previous token is not a flag', () => {
+    const flags = ['positional', FINDINGS_SCHEMA_PLACEHOLDER]
+    expect(stripFindingsSchemaFlags(flags)).toEqual(['positional'])
   })
 
   it('is a no-op when no placeholder is present', () => {

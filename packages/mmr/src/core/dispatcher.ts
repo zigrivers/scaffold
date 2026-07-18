@@ -124,9 +124,31 @@ function completedRunMatchesIncompleteGuard(
 }
 
 /**
+ * Jittered delay before the incomplete-run retry. The first attempt's own
+ * duration already spaces the retry out, but sibling MMR processes/worktrees
+ * whose grok runs were cancelled by the SAME concurrency burst would otherwise
+ * all retry in lockstep and can re-collide; the jitter de-synchronizes them.
+ * (Cross-process coordination is deliberately out of scope — the schema
+ * constraint plus one retry plus the compensating pass cover the residue.)
+ * Overridable for tests via MMR_INCOMPLETE_RETRY_DELAY_MS.
+ */
+function incompleteRetryDelayMs(): number {
+  const override = process.env.MMR_INCOMPLETE_RETRY_DELAY_MS
+  if (override !== undefined && Number.isFinite(Number(override))) {
+    return Math.max(0, Number(override))
+  }
+  return 2000 + Math.floor(Math.random() * 3000)
+}
+
+/**
  * Spawn a background process for a review channel and monitor it. When
  * `opts.retryOnIncomplete` carries an `incomplete` guard, a completed run
- * whose envelope matches the guard is re-dispatched once (see DispatchOptions).
+ * whose envelope matches the guard is re-dispatched once after a jittered
+ * delay (see DispatchOptions). If the retry ALSO completes guard-matched, the
+ * channel is marked `failed` here — at dispatch time — so the compensating
+ * pass (which reads channel statuses right after dispatch) actually fires;
+ * leaving it `completed` would defer the failure to results-time parsing,
+ * after compensation has already been skipped.
  */
 export async function dispatchChannel(
   store: JobStore,
@@ -135,9 +157,29 @@ export async function dispatchChannel(
   opts: DispatchOptions,
 ): Promise<void> {
   await dispatchChannelOnce(store, jobId, channelName, opts)
-  if (opts.retryOnIncomplete !== undefined
-    && completedRunMatchesIncompleteGuard(store, jobId, channelName, opts.retryOnIncomplete)) {
-    await dispatchChannelOnce(store, jobId, channelName, opts)
+  if (opts.retryOnIncomplete === undefined
+    || !completedRunMatchesIncompleteGuard(store, jobId, channelName, opts.retryOnIncomplete)) {
+    return
+  }
+
+  await new Promise((resolve) => setTimeout(resolve, incompleteRetryDelayMs()))
+  await dispatchChannelOnce(store, jobId, channelName, opts)
+
+  if (completedRunMatchesIncompleteGuard(store, jobId, channelName, opts.retryOnIncomplete)) {
+    try {
+      store.updateChannel(jobId, channelName, {
+        status: 'failed',
+        completed_at: new Date().toISOString(),
+      })
+      store.saveChannelLog(
+        jobId,
+        channelName,
+        'channel run remained incomplete after one retry (envelope matched the parser\'s '
+        + '`incomplete` guard on both attempts) — failing the channel so the compensating pass covers it.',
+      )
+    } catch {
+      // Best effort — a bookkeeping failure must not reject a settled dispatch.
+    }
   }
 }
 

@@ -239,10 +239,12 @@ describe('dispatchChannel retryOnIncomplete (grok Cancelled → one serial re-di
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-retry-'))
     store = new JobStore(tmpDir)
+    process.env.MMR_INCOMPLETE_RETRY_DELAY_MS = '0'
   })
 
   afterEach(() => {
     fs.rmSync(tmpDir, { recursive: true })
+    delete process.env.MMR_INCOMPLETE_RETRY_DELAY_MS
   })
 
   it('re-dispatches once when the first run ends Cancelled, keeping the completed second output', async () => {
@@ -312,8 +314,12 @@ describe('dispatchChannel retryOnIncomplete (grok Cancelled → one serial re-di
     })
 
     expect(fs.readFileSync(marker, 'utf8')).toBe('2')
-    // Output stays Cancelled; the parser's preemptive incomplete guard turns it
-    // into the honest "did not complete" channel failure at results time.
+    // A double-cancelled run is marked failed AT DISPATCH TIME so the
+    // compensating pass (which reads statuses right after dispatch, before
+    // results-time parsing) actually covers the channel.
+    const loaded = store.loadJob(job.job_id)
+    expect(loaded.channels.grokish.status).toBe('failed')
+    expect(store.loadChannelLog(job.job_id, 'grokish')).toMatch(/remained incomplete after one retry/)
     const raw = JSON.parse(store.loadChannelOutput(job.job_id, 'grokish'))
     expect(raw).toContain('Cancelled')
   })

@@ -124,28 +124,56 @@ function parseJsonFromOutput(raw: string): unknown {
 
 /**
  * Extract the LAST top-level JSON value in the text. Candidates are scanned
- * sequentially — once a balanced, parseable value is found the scan resumes
- * AFTER it, so values nested inside an earlier object are never treated as
- * candidates. Needed for schema-constrained CLIs (grok --json-schema) that
- * emit one schema-shaped JSON object per turn: intermediate progress turns
- * parse fine but only the final object is the real verdict.
+ * sequentially — a balanced region is always skipped in one step (never
+ * rescanned from inside), so values nested inside an earlier object are never
+ * treated as candidates and scanning stays linear. Needed for
+ * schema-constrained CLIs (grok --json-schema) that emit one schema-shaped
+ * JSON object per turn: intermediate progress turns parse fine but only the
+ * final object is the real verdict.
+ *
+ * STRICT TAIL: if any candidate AFTER the last complete object fails to
+ * balance or parse, this throws instead of silently returning the earlier
+ * object. A truncated final turn must fail the channel — the preceding turn
+ * can be a progress ack (observed live with "approved": true) that would
+ * wrongly stand in for the real verdict.
  */
 export function extractLastJson(text: string): string {
   let last: string | undefined
   let firstError: Error | undefined
+  let brokenTail = false
 
-  for (let start = 0; start < text.length; start++) {
-    if (text[start] !== '{') continue
+  let i = 0
+  while (i < text.length) {
+    if (text[i] !== '{') {
+      i++
+      continue
+    }
+    let candidate: string
     try {
-      const candidate = extractBalancedJsonValue(text, start)
+      candidate = extractBalancedJsonValue(text, i)
+    } catch (err) {
+      // Unbalanced from here ⇒ the region runs to end-of-text, so nothing
+      // later can be balanced either.
+      firstError ??= err instanceof Error ? err : new Error(String(err))
+      if (last !== undefined) brokenTail = true
+      break
+    }
+    try {
       JSON.parse(fixTrailingCommas(candidate))
       last = candidate
-      start += candidate.length - 1
+      brokenTail = false
     } catch (err) {
       firstError ??= err instanceof Error ? err : new Error(String(err))
+      if (last !== undefined) brokenTail = true
     }
+    i += candidate.length
   }
 
+  if (brokenTail) {
+    throw new Error(
+      'Trailing JSON after the last complete object failed to parse — the final reply may be truncated',
+    )
+  }
   if (last !== undefined) return last
   if (firstError) throw firstError
   throw new Error('No JSON object found in output')

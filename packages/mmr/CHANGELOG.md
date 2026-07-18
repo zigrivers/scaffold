@@ -26,11 +26,20 @@
      grok emits one schema-shaped JSON object *per turn* (intermediate
      "Reviewing…" acks included), and first-object extraction was observed to
      flip a 3-finding review into "approved, no issues found". The new
-     `default-last` builtin parser extracts the **last** top-level JSON value.
-  3. The dispatcher **retries a Cancelled run once** (serially, after the
-     concurrency burst has passed) via the new `retryOnIncomplete` dispatch
-     option, restoring real grok coverage instead of falling through to the
-     compensating pass.
+     `default-last` builtin parser extracts the **last** top-level JSON value,
+     and is strict about the tail: a truncated/unparseable candidate AFTER the
+     last complete object fails the parse (the earlier object can be an
+     `approved: true` progress ack that must not stand in for a truncated
+     final verdict).
+  3. The dispatcher **retries a Cancelled run once** (serially, with a 2–5s
+     jittered delay so sibling MMR processes cancelled by the same burst don't
+     retry in lockstep) via the new `retryOnIncomplete` dispatch option,
+     restoring real grok coverage instead of falling through to the
+     compensating pass. If the retry is ALSO cancelled, the channel is marked
+     `failed` at dispatch time — so the compensating pass (which reads channel
+     statuses right after dispatch) actually fires; previously a cancelled-but-
+     exit-0 run stayed `completed` until results-time parsing, after
+     compensation had already been skipped.
   4. The `incomplete` guard is now **preemptive**: a guard-matching envelope
      (`stopReason: "Cancelled"`) is rejected *before* parsing, even when
      `$.text` holds a parseable intermediate ack — an interrupted run must
