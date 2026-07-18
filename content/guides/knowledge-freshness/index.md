@@ -602,11 +602,11 @@ Every host plus its category, and the pinned GitHub repos.
 Totals over `content/knowledge/`, broken down per category.
 
 <!-- gen:kb-inventory -->
-**299 entries** across 21 categories:
+**300 entries** across 21 categories:
 
 | Category | Entries |
 | --- | --- |
-| core | 35 |
+| core | 36 |
 | game | 25 |
 | research | 25 |
 | backend | 22 |
