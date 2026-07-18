@@ -320,6 +320,13 @@ export const critiqueCommand: CommandModule<object, CritiqueArgs> = {
         command: ch.command!, prompt, flags: stripFindingsSchemaFlags(ch.flags), env: ch.env, timeout,
         stderr: ch.stderr === 'passthrough' ? 'passthrough' : ch.stderr === 'suppress' ? 'suppress' : 'capture',
         promptDelivery: ch.prompt_delivery, cwd: ch.cwd,
+        // Unconstrained grok (schema stripped above) is exactly the mode that
+        // cancels under concurrent sessions; without the retry a Cancelled
+        // envelope silently becomes "completed, 0 items". The probe keys off
+        // the channel's incomplete guard, so guardless channels stay a plain
+        // single dispatch; a double-cancel marks the channel failed, which
+        // critique's per-channel status reporting surfaces honestly.
+        retryOnIncomplete: ch.output_parser,
       })
     }
     if (config.defaults.parallel) {
