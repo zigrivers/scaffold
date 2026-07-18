@@ -1,7 +1,7 @@
 ---
 name: git-workflow
 description: Configure git workflow with branching, PRs, local quality gates, and worktree tooling for parallel agents
-summary: "Sets up your branching strategy, commit format, PR workflow with squash-merge, the agent-ops worktree scripts (setup, doctor, prune), and conflict-prevention rules so multiple AI agents work in parallel without conflicts. The merge gate is local and fast (pre-commit + make check-affected + MMR review); projects that adopt the merge-throughput step serialize and batch-test merges through the scaffold mq queue and add day-one post-merge/nightly CI on a $0 self-hosted runner (or a local poller), while smaller projects land through a single serialized merge slot with no server CI until launch."
+summary: "Sets up your branching strategy, commit format, PR workflow with squash-merge, the agent-ops worktree scripts (setup, doctor, prune), and conflict-prevention rules so multiple AI agents work in parallel without conflicts. The merge gate is local and fast (pre-commit + make check-affected + MMR review); merge-throughput projects serialize merges through the scaffold mq queue and add day-one post-merge/nightly CI on a $0 self-hosted runner, while smaller projects use a serialized merge slot."
 phase: "environment"
 order: 330
 dependencies: [dev-env-setup]
