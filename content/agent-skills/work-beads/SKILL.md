@@ -287,11 +287,13 @@ bd create "<imperative title>" -t task -p 2 --deps discovered-from:<id> \
 
 A TODO comment, PR note, or mental note is NOT tracking.
 
-**2.6 Verify yourself:** `make check-affected` green on the branch HEAD,
-personally watched — a subagent's or reviewer's claim doesn't count. Run full
-`make check` instead when you touched gate config, shared test utils, env
-files, or migrations (the force-full list in docs/tdd-standards.md) — and
-whenever in doubt. Docker contention (testcontainer timeouts, DockerException)
+**2.6 Verify yourself:** personally watched — a subagent's or reviewer's claim
+doesn't count. On a merge-throughput project, `make check-affected` green on the
+branch HEAD is the gate (the post-merge full suite is the net for anything it
+skips). On a project WITHOUT the merge queue there is NO post-merge net, so the
+gate is the full `make check`. Either way, run the full `make check` when you
+touched gate config, shared test utils, env files, or migrations (the
+force-full list in docs/tdd-standards.md) — and whenever in doubt. Docker contention (testcontainer timeouts, DockerException)
 is not a code defect: `make docker-doctor` → `make tc-reap && make
 staging-prune` → re-run. Never enqueue on a red gate. Never `docker system
 prune`. Long local test loops run at reduced priority so the merge lane stays

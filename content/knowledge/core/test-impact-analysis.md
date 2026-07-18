@@ -110,16 +110,17 @@ imports, env-driven behavior, data/asset files, snapshot inputs.
 
 `check-affected` runs `npx turbo run test --affected` (with
 `TURBO_SCM_BASE="$BASE"`). Declare `inputs` per task. Turborepo's cache is
-content-addressed, so the same content hash resolves to the same artifact
-regardless of which worktree produced it — one agent's green result becomes
-another worktree's instant cache hit. Validated live (each linked worktree with
-its own installed `node_modules`, default cache location): 8 concurrent
-`turbo run test` invocations across 4 worktrees produced zero failed runs, zero
+content-addressed, so the same content hash always resolves to the same
+artifact. To make worktrees SHARE that cache, don't rely on the default cache
+location being shared (Turbo's default `.turbo/cache` is resolved per workspace
+root, so linked worktrees can end up with isolated caches) — point every
+worktree's `cacheDir` at ONE shared absolute path (or set `TURBO_CACHE_DIR`), so
+one agent's green result is another worktree's instant hit. A shared cache under
+concurrent writers is safe: a live spike ran 8 concurrent `turbo run test`
+invocations across 4 worktrees against one cache dir with zero failed runs, zero
 corrupted (zero-byte) artifacts, and a real cross-worktree `FULL TURBO` hit from
-a fifth worktree that never ran the task itself (see
-`docs/superpowers/spikes/2026-07-17-turbo-worktree-cache.md`). If your worktrees
-end up with *isolated* caches (no cross-worktree hits), point each worktree's
-`cacheDir` at one shared absolute path to force sharing. Treat a
+a fifth worktree that never ran the task (see
+`docs/superpowers/spikes/2026-07-17-turbo-worktree-cache.md`). Treat a
 localhost remote-cache container (e.g. `ducktors/turborepo-remote-cache`) as
 something you reach for only past a single machine (self-hosted CI runners,
 a cache too large for local disk) — for on-box worktrees the shared local

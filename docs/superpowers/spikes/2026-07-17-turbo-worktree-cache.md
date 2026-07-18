@@ -9,14 +9,14 @@ repo's `"turbo": "^2"` devDependency resolving to the same latest 2.x)
 
 ## Question
 
-Turborepo shares a single `.turbo/cache` directory across all git worktrees
-of a repo (it walks up to the repo root, not the worktree root). Multiple
-agents working in parallel worktrees (per `docs/git-workflow.md` §7) will
-therefore write to that shared cache concurrently. Does Turborepo's automatic
-worktree cache sharing stay correct under **concurrent writers** — no failed
-runs, real cross-worktree cache hits, no corrupted cache artifacts — or does
-it need to be avoided (per-worktree caches / a remote-cache container)
-instead?
+To share a cache across git worktrees, point every worktree's cache at ONE
+directory (via `TURBO_CACHE_DIR` / `cacheDir`) — do NOT rely on Turbo's default
+location being shared, which is resolved per workspace root and can leave
+worktrees isolated. Given that shared cache, multiple agents in parallel
+worktrees (per `docs/git-workflow.md` §7) write to it concurrently. Does a
+single Turborepo cache stay correct under **concurrent writers** — no failed
+runs, real cross-worktree cache hits, no corrupted cache artifacts — or does it
+need to be avoided (per-worktree caches / a remote-cache container) instead?
 
 ## Method
 
@@ -28,7 +28,8 @@ output files to tar). It committed the base repo, then created four linked
 git worktrees (`wt1`-`wt4`, each with its own copied `node_modules` so the
 `turbo` binary resolves locally), and launched **8 concurrent** `npx turbo
 run test` invocations — two per worktree, fired back-to-back with `&` — all
-racing against the same shared `<repo>/.turbo/cache` directory.
+pointed at ONE shared cache directory via `TURBO_CACHE_DIR` (an absolute path
+outside every worktree), so they genuinely race the same cache.
 
 After the concurrent phase, it asserted:
 

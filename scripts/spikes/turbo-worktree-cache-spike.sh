@@ -13,6 +13,10 @@ cd "${WORK}"
 
 git init -q -b main repo
 cd repo
+# One cache dir shared by every worktree (the recommended config — do NOT rely on
+# turbo's default per-worktree location being shared). All runs point here.
+SHARED="${WORK}/shared-turbo-cache"
+mkdir -p "${SHARED}"
 git config user.name spike
 git config user.email spike@test.invalid
 
@@ -57,8 +61,8 @@ done
 echo "running 8 concurrent turbo test invocations across 4 worktrees…"
 pids=()
 for i in 1 2 3 4; do
-  (cd "../wt${i}" && npx turbo run test >"../wt${i}.log" 2>&1) & pids+=($!)
-  (cd "../wt${i}" && npx turbo run test >"../wt${i}-b.log" 2>&1) & pids+=($!)
+  (cd "../wt${i}" && TURBO_CACHE_DIR="${SHARED}" npx turbo run test >"../wt${i}.log" 2>&1) & pids+=($!)
+  (cd "../wt${i}" && TURBO_CACHE_DIR="${SHARED}" npx turbo run test >"../wt${i}-b.log" 2>&1) & pids+=($!)
 done
 fail=0
 for pid in "${pids[@]}"; do wait "${pid}" || fail=1; done
@@ -67,11 +71,11 @@ for pid in "${pids[@]}"; do wait "${pid}" || fail=1; done
 # follow-up run in a fresh worktree must be a full cache hit
 git worktree add -q ../wt5 -b agent/w5 main
 cp -R node_modules ../wt5/node_modules
-OUT="$(cd ../wt5 && npx turbo run test 2>&1)"
+OUT="$(cd ../wt5 && TURBO_CACHE_DIR="${SHARED}" npx turbo run test 2>&1)"
 echo "${OUT}" | grep -q 'FULL TURBO' || { echo "VERDICT: UNSAFE — no cross-worktree cache hit"; echo "${OUT}"; exit 1; }
 
 # corrupt artifact scan in the shared cache
-if find .turbo/cache -type f -size 0 2>/dev/null | grep -q .; then
+if find "${SHARED}" -type f -size 0 2>/dev/null | grep -q .; then
   echo "VERDICT: UNSAFE — zero-byte cache artifacts found"
   exit 1
 fi

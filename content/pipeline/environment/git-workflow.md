@@ -322,14 +322,16 @@ Depth-gate per Methodology Scaling above.
    `git push --force-with-lease` only, never plain `--force`. No merge
    commits land on `main` — squash-merge is the only merge mode.
 5. **Quality gates (two layers, D4′)** — the merge gate is local and fast:
-   pre-commit hooks + `make check-affected` + agent self-review + `mmr
-   review`, executed against the batch by the merge-queue daemon (below).
-   The full `make check` runs post-merge on every landing and nightly —
-   uncached — via `.github/workflows/post-merge.yml`/`nightly.yml` on a
-   self-hosted runner ($0 Actions minutes; register with
-   `scripts/ops/setup-gh-runner.sh`), or via the local poller
-   (`make post-merge-watch`, cron/launchd) when
-   `merge_queue.gate_executor: local-poller`. When post-merge goes red the queue
+   pre-commit hooks + `make check-affected` + agent self-review + `mmr review`.
+   A merge-throughput project runs that gate against the batch via the
+   merge-queue daemon (below) AND adds a full-suite net: `make check` runs
+   post-merge on every landing and nightly — uncached — via
+   `.github/workflows/post-merge.yml`/`nightly.yml` on a self-hosted runner ($0
+   Actions minutes; register with `scripts/ops/setup-gh-runner.sh`), or via the
+   local poller (`make post-merge-watch`, cron/launchd) when
+   `merge_queue.gate_executor: local-poller`. A base project has NO post-merge
+   net, so its merge gate is the full `make check` (there, `check-affected` is a
+   local speed aid, not the bar). When post-merge goes red the queue
    HOLDS — but the mechanism differs by executor: with the default
    `gha-selfhosted`, the daemon sees the red `post-merge.yml` run (via `gh run
    list`) and stops landing until a green run supersedes it (no `.mq/PAUSED`
