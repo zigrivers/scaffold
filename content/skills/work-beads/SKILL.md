@@ -282,11 +282,16 @@ bd create "<imperative title>" -t task -p 2 --deps discovered-from:<id> \
 
 A TODO comment, PR note, or mental note is NOT tracking.
 
-**2.6 Verify yourself:** `make check` green on the branch HEAD, personally
-watched — a subagent's or reviewer's claim doesn't count. Docker contention
-(testcontainer timeouts, DockerException) is not a code defect:
-`make docker-doctor` → `make tc-reap && make staging-prune` → re-run. Never
-merge on a red gate. Never `docker system prune`.
+**2.6 Verify yourself:** `make check-affected` green on the branch HEAD,
+personally watched — a subagent's or reviewer's claim doesn't count. Run full
+`make check` instead when you touched gate config, shared test utils, env
+files, or migrations (the force-full list in docs/tdd-standards.md) — and
+whenever in doubt. Docker contention (testcontainer timeouts, DockerException)
+is not a code defect: `make docker-doctor` → `make tc-reap && make
+staging-prune` → re-run. Never enqueue on a red gate. Never `docker system
+prune`. Long local test loops run at reduced priority so the merge lane stays
+fast on a saturated machine: `taskpolicy -c utility make check-affected`
+(macOS; skip the wrapper where `taskpolicy` is absent).
 
 **2.7 Review and merge:** `mmr review --pr <N> --sync --format json`.
 - Check the diff is uncontaminated first: `gh pr diff <N> --name-only` shows
@@ -300,43 +305,43 @@ merge on a red gate. Never `docker system prune`.
 - The one thing that still blocks the merge: a verified, still-reproducing
   real P0 — file it, keep the PR open, post the reproduction, notify the user,
   end the batch.
-- If the project has a merge slot (`bd merge-slot check` reports one — the
-  Beads setup step creates it), serialize EVERY merge. `bd merge-slot
-  acquire` does NOT block: `--wait` only adds you to the waiters queue and
-  exits non-zero while the slot is held, and a released slot never
-  auto-promotes a waiter — so loop on `bd merge-slot acquire` itself until
-  it succeeds, then re-verify ownership with `bd merge-slot check --json`
-  before merging. Merge, then `bd merge-slot release` — release even if the
-  merge fails, or the slot stays held and blocks every other agent. The slot needs
-  a holder identity unique among agents: generate ONE value (e.g. a UUID)
-  and reuse that SAME value for acquire → merge → release — run them as a
-  single scripted block with a release trap where possible. A fresh
-  per-command identity (like `$$` evaluated in separate shell calls)
-  acquires under one holder and tries to release under another, stranding
-  the slot for everyone. Scope any `BEADS_ACTOR` override to the slot
-  commands and restore your stable claim actor before the next claim.
-- If the staging component is installed **and** you brought a stack up this bead
-  (`make staging-up`), tear it down FIRST from **inside the worktree** (there
-  `make staging-down` targets your per-worktree stack). Skip it when staging was
-  never installed or you never ran `staging-up` — `staging-down` exits non-zero
-  then and must not block the merge. Never run it from the primary: it refuses
-  there (from the primary it would select the shared QA stack and `down -v` its
-  volumes).
-- Merge: `gh pr merge <N> --squash --delete-branch` (the squash subject is the
-  PR title — which is why the title leads with the bead id). Then from the
-  primary:
-  `make main-sync && make prune-merged` — `prune-merged` also reclaims any
-  leftover worktree staging stack automatically (no separate `staging-down`
-  needed post-merge, and running it from the primary would be wrong anyway).
+- **Merge queue installed** (`scripts/mq-guard.sh` exists — the
+  merge-throughput step installs it): after the review passes, tear down
+  staging first if you brought a stack up this bead (from INSIDE the worktree:
+  `make staging-down`; skip when staging was never installed or never started —
+  a non-zero exit then must not block the enqueue). Then **enqueue and move
+  on**: `make mq-enqueue PR=<N>`. Do NOT merge, do NOT wait, do NOT rebase in
+  a loop — the daemon batch-tests against latest main, lands green PRs
+  (closing your bead and commenting on the PR), and on ejection comments the
+  failing log and REOPENS the bead so any agent picks up the fix.
+  `NEEDS_REBASE` ejection means your PR no longer applies onto main: rebase,
+  push, re-enqueue. Queue state: `scaffold mq status` (a `.mq/PAUSED` banner
+  means merges are held — read docs/merge-queue.md before touching anything).
+  Never run `gh pr merge` yourself — the mq-guard hook blocks it; the
+  deliberate-override procedure is in docs/merge-queue.md and is human-only.
+- **No merge queue** (`scripts/mq-guard.sh` absent): fall back to the
+  serialized manual merge. If the project has a merge slot (`bd merge-slot
+  check` reports one), serialize EVERY merge: loop on `bd merge-slot acquire`
+  until it succeeds (acquire does NOT block; `--wait` only queues you), then
+  re-verify with `bd merge-slot check --json`, merge with `gh pr merge <N>
+  --squash --delete-branch`, then `bd merge-slot release` — release even if
+  the merge fails, with ONE holder identity across acquire → merge → release
+  (a fresh per-command `$$` strands the slot). Tear down staging first from
+  inside the worktree exactly as above. Then from the primary:
+  `make main-sync && make prune-merged`.
 
-**2.8 Close out** (from the primary): `bd close <id>` — only now, with the
-merge verified. Noticed a repo-file fix after merging? Micro follow-up PR;
-never edit the primary checkout directly.
+**2.8 Close out:** With the merge queue, the DAEMON closes the bead when the
+PR lands — do not `bd close` an enqueued bead yourself; confirm later via
+`scaffold mq status --pr <N>` or `bd show <id>`, and treat a reopened bead as
+the ejection signal. Without the queue (fallback path), close manually from
+the primary after the merge is verified: `bd close <id>`. Noticed a repo-file
+fix after merging? Micro follow-up PR; never edit the primary checkout
+directly.
 
 ## Step 3 — Batch report (required slots — answer each, say "none" out loud)
 
 ```
-Beads:              <id> -> PR #<n> -> merged | parked (why) | skipped (why: e.g. claim lost to <actor>) | not started (why: e.g. queue drained after <k> of N)
+Beads:              <id> -> PR #<n> -> merged | enqueued (PR #<n> awaiting queue) | parked (why) | skipped (why: e.g. claim lost to <actor>) | not started (why: e.g. queue drained after <k> of N)
 Docs updated in-PR: <paths - or "none needed: <why>">
 Beads filed (open): <id - one-line title - or none>
 Stale claims:       <id - assignee - last activity - or "none noticed">
