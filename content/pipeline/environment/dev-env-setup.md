@@ -8,7 +8,7 @@ dependencies: [project-structure]
 outputs: [docs/dev-setup.md]
 conditional: null
 reads: [tdd]
-knowledge-base: [dev-environment]
+knowledge-base: [dev-environment, test-impact-analysis]
 ---
 
 ## Purpose
@@ -41,7 +41,14 @@ by the entire workflow.
 - (mvp) Lint and test commands exist and are runnable
 - (deep) Verification checklist passes (install, dev server, browser, live reload, tests, db)
 - (mvp) Setup process works for first-time clone (max 5 steps)
-- (mvp) Makefile/package.json includes at minimum: dev, test, lint targets
+- (mvp) Makefile/package.json includes at minimum: dev, test, lint, check,
+  check-affected targets
+- (mvp) `check-affected` honors the merge-queue contract: selects tests
+  affected relative to `${MQ_AFFECTED_BASE:-origin/main}`; falls back to full
+  `make check` when it cannot classify the change; excludes ids listed in
+  `.mq/quarantine.txt`; on failure MAY write failing test ids to
+  `.mq-failed-tests.txt` and SHOULD honor `MQ_RETRY_TESTS` on reruns (recipes
+  per stack: test-impact-analysis knowledge entry)
 - (deep) Every agent-ops target present in the Makefile (via `agent-ops.mk`)
   has a matching Key Commands row using that target's own `## [agent-safe]`
   doc-comment as its marker
@@ -108,6 +115,8 @@ Table format:
 |---------|---------|--------|
 | `make dev` | Start dev server with live reload | Agent-safe |
 | `make test` | Run test suite | Agent-safe |
+| `make check-affected` | Fast merge gate: tests affected vs origin/main (falls back to full check) | Agent-safe |
+| `make check` | Full authoritative gate (post-merge / nightly / when unsure) | Agent-safe |
 | `make db-reset` | Drop and recreate the local database | Ask-first |
 ```
 
