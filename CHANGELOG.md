@@ -4,6 +4,22 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **MMR 3.2.0: grok review channel restored under concurrent sessions.** Root
+  cause verified on grok 0.2.103 / grok-4.5: same-account concurrent grok
+  sessions frequently cancel a review mid-run (`stopReason: "Cancelled"`) with
+  the computed answer lost — MMR's earlier "heavy concurrent load" message was
+  right about the trigger, but the channel stayed effectively unusable for
+  projects running parallel agents. MMR now forces schema-constrained final
+  output (grok `--json-schema` + a `{{findings_schema}}` placeholder substituted
+  at review dispatch), parses the **last** schema-shaped JSON object per reply
+  (`default-last` parser — intermediate progress turns also emit schema-shaped
+  acks that could flip a verdict), retries a Cancelled run once serially, and
+  makes the `incomplete` guard preemptive so an interrupted run can never
+  masquerade as a clean review. `mmr critique` strips the schema pair (its reply
+  shape differs). See `packages/mmr/CHANGELOG.md` 3.2.0.
+
 ## [3.47.0] - 2026-07-18
 
 Merge throughput for many-agent projects (the "merge-lease livelock" fix),

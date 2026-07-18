@@ -6,6 +6,7 @@ import { JobStore } from '../core/job-store.js'
 import { checkInstalled, checkAuth, checkHttpAuth } from '../core/auth.js'
 import { assemblePrompt } from '../core/prompt.js'
 import { dispatchChannel } from '../core/dispatcher.js'
+import { substituteFindingsSchema, coerceParserForSchemaFlags } from '../core/output-schema.js'
 import { dispatchHttpChannel } from '../core/http-dispatcher.js'
 import { runResultsPipeline } from '../core/results-pipeline.js'
 import { redactCommandString } from '../core/redact.js'
@@ -707,12 +708,16 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
           })
           continue
         }
-        store.updateChannel(job.job_id, name, { output_parser: chConfig.output_parser })
+        // Schema-constrained flags force one JSON object per turn, so the parser
+        // must take the LAST object — coerce a drifted terminal 'default'
+        // (e.g. a user config restating the pre-3.2.0 grok parser) accordingly.
+        const outputParser = coerceParserForSchemaFlags(chConfig.flags, chConfig.output_parser)
+        store.updateChannel(job.job_id, name, { output_parser: outputParser })
         dispatches.push(
           dispatchChannel(store, job.job_id, name, {
             command: chConfig.command,
             prompt: buildChannelPrompt(chConfig, prompt),
-            flags: chConfig.flags,
+            flags: substituteFindingsSchema(chConfig.flags),
             env: chConfig.env,
             timeout: chConfig.timeout ?? config.defaults.timeout,
             stderr: chConfig.stderr === 'passthrough' ? 'passthrough'
@@ -720,6 +725,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
                 : 'capture',
             promptDelivery: chConfig.prompt_delivery,
             cwd: chConfig.cwd,
+            retryOnIncomplete: outputParser,
           }),
         )
       }
@@ -743,11 +749,13 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
           })
           continue
         }
-        store.updateChannel(job.job_id, name, { output_parser: chConfig.output_parser })
+        // Same last-object coercion as the parallel branch above.
+        const outputParser = coerceParserForSchemaFlags(chConfig.flags, chConfig.output_parser)
+        store.updateChannel(job.job_id, name, { output_parser: outputParser })
         await dispatchChannel(store, job.job_id, name, {
           command: chConfig.command,
           prompt: buildChannelPrompt(chConfig, prompt),
-          flags: chConfig.flags,
+          flags: substituteFindingsSchema(chConfig.flags),
           env: chConfig.env,
           timeout: chConfig.timeout ?? config.defaults.timeout,
           stderr: chConfig.stderr === 'passthrough' ? 'passthrough'
@@ -755,6 +763,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
               : 'capture',
           promptDelivery: chConfig.prompt_delivery,
           cwd: chConfig.cwd,
+          retryOnIncomplete: outputParser,
         })
       }
     }

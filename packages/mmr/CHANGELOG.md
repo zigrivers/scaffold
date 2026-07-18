@@ -2,6 +2,65 @@
 
 ## [Unreleased]
 
+## [3.2.0] — 2026-07-18
+
+### Fixed
+
+- **grok channel: restore reliability under concurrent sessions (root-cause
+  fix for the "Cancelled / empty `$.text`" failures).** Verified on grok
+  0.2.103 with grok-4.5: when the account runs concurrent grok sessions
+  (parallel MMR jobs, agents, or worktrees), an unconstrained review frequently
+  ends `stopReason: "Cancelled"` with only a progress ack in `$.text` — the
+  computed answer is lost (the envelope truncates `thought` to ~200 chars, so
+  nothing is salvageable; a `$.thought` fallback is a dead end). The same
+  prompt completes serially and cancelled 5/8 times under a 4-way concurrency
+  repro. MMR now defends in four layers:
+  1. The built-in grok flags pass **`--json-schema`** with MMR's findings
+     schema, forcing the final answer into `$.text` (5/8 → 1/8 cancellations in
+     the repro). The flags carry a `{{findings_schema}}` placeholder,
+     substituted at review dispatch (`core/output-schema.ts`); `mmr critique`
+     strips the pair — its reply shape differs. Requires a grok CLI with
+     `--json-schema`; older groks fail the channel with an unknown-argument
+     error (fix: update grok).
+  2. The grok parser is now **`then: 'default-last'`**: with the schema active,
+     grok emits one schema-shaped JSON object *per turn* (intermediate
+     "Reviewing…" acks included), and first-object extraction was observed to
+     flip a 3-finding review into "approved, no issues found". The new
+     `default-last` builtin parser extracts the **last** top-level JSON value,
+     and is strict about the tail: a truncated/unparseable candidate AFTER the
+     last complete object fails the parse (the earlier object can be an
+     `approved: true` progress ack that must not stand in for a truncated
+     final verdict).
+  3. The dispatcher **retries a Cancelled run once** (serially, with a 2–5s
+     jittered delay so sibling MMR processes cancelled by the same burst don't
+     retry in lockstep) via the new `retryOnIncomplete` dispatch option,
+     restoring real grok coverage instead of falling through to the
+     compensating pass. If the retry is ALSO cancelled, the channel is marked
+     `failed` at dispatch time — so the compensating pass (which reads channel
+     statuses right after dispatch) actually fires; previously a cancelled-but-
+     exit-0 run stayed `completed` until results-time parsing, after
+     compensation had already been skipped.
+  4. The `incomplete` guard is now **preemptive**: a guard-matching envelope
+     (`stopReason: "Cancelled"`) is rejected *before* parsing, even when
+     `$.text` holds a parseable intermediate ack — an interrupted run must
+     never masquerade as a clean completed review. Previously the guard only
+     rewrote the error message after a parse failure.
+
+### Changed
+
+- `mmr config show grok` output changes: `flags` now include
+  `--json-schema {{findings_schema}}` and `output_parser.then` is
+  `default-last`. Customizers who restate `channels.grok.flags` should add the
+  new pair (see README "Grok channel" section for the full hardened array).
+  Customizers who restate `channels.grok.output_parser` (a copy of the
+  pre-3.2.0 block with `then: 'default'`) are protected automatically: when a
+  channel's flags carry `{{findings_schema}}`, review dispatch coerces a
+  terminal `'default'` parser to `'default-last'` — honoring the drifted combo
+  would silently reintroduce the first-object verdict flip. The placeholder is
+  also handled on every other dispatch path: compensating passes substitute
+  the real schema (their replies are findings-shaped); critique and its
+  synthesis pass strip the pair (their reply shapes differ).
+
 ## [3.1.2] — 2026-07-14
 
 ### Added

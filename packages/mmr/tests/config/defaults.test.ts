@@ -65,12 +65,27 @@ describe('BUILTIN_CHANNELS — grok', () => {
     expect(BUILTIN_CHANNELS.grok?.flags).toContain('json')
   })
 
-  it('unwraps grok JSON ($.text) before the default findings parser', () => {
+  it('unwraps grok JSON ($.text) before the last-object findings parser', () => {
     const parser = BUILTIN_CHANNELS.grok?.output_parser
     expect(typeof parser).toBe('object')
     if (typeof parser === 'object') {
-      expect(parser).toMatchObject({ kind: 'unwrap-jsonpath', wrap: '$.text' })
+      // then: 'default-last' — under --json-schema, grok emits one schema-shaped
+      // JSON object per turn into $.text; only the LAST is the real verdict.
+      expect(parser).toMatchObject({ kind: 'unwrap-jsonpath', wrap: '$.text', then: 'default-last' })
     }
+  })
+
+  it('forces structured final output via --json-schema (grok-4.5 strands unconstrained answers on Cancelled)', () => {
+    // Verified on grok 0.2.103 (2026-07-18): under same-account concurrent
+    // sessions, unconstrained reviews frequently end stopReason=Cancelled with
+    // only an ack in $.text. With --json-schema the final answer reliably lands
+    // in $.text (5/8 → 1/8 cancellation in a 4-way concurrency repro). The
+    // value is the {{findings_schema}} placeholder: review dispatch substitutes
+    // the findings schema; critique strips the pair (its reply shape differs).
+    const flags = BUILTIN_CHANNELS.grok?.flags ?? []
+    const i = flags.indexOf('--json-schema')
+    expect(i).toBeGreaterThanOrEqual(0)
+    expect(flags[i + 1]).toBe('{{findings_schema}}')
   })
 
   it('reports grok mid-review cancellation honestly via the incomplete guard', () => {

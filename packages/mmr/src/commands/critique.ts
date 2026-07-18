@@ -4,6 +4,7 @@ import { JobStore } from '../core/job-store.js'
 import { checkInstalled, checkAuth } from '../core/auth.js'
 import { dispatchChannel } from '../core/dispatcher.js'
 import { dispatchHttpChannel } from '../core/http-dispatcher.js'
+import { stripFindingsSchemaFlags } from '../core/output-schema.js'
 import { redactCommandString } from '../core/redact.js'
 import { classifyTrustMode } from '../core/trust-mode.js'
 import { assembleCritiquePrompt } from '../core/critique-prompt.js'
@@ -312,9 +313,20 @@ export const critiqueCommand: CommandModule<object, CritiqueArgs> = {
         return dispatchHttpChannel(store, job.job_id, name, { channel: ch, prompt, timeout })
       }
       return dispatchChannel(store, job.job_id, name, {
-        command: ch.command!, prompt, flags: ch.flags, env: ch.env, timeout,
+        // Critique reuses review channel flags verbatim, EXCEPT the
+        // {{findings_schema}} pair (grok's --json-schema): a critique reply is
+        // items/summary-shaped, so constraining it to the findings schema
+        // would break parseCritiqueOutput.
+        command: ch.command!, prompt, flags: stripFindingsSchemaFlags(ch.flags), env: ch.env, timeout,
         stderr: ch.stderr === 'passthrough' ? 'passthrough' : ch.stderr === 'suppress' ? 'suppress' : 'capture',
         promptDelivery: ch.prompt_delivery, cwd: ch.cwd,
+        // Unconstrained grok (schema stripped above) is exactly the mode that
+        // cancels under concurrent sessions; without the retry a Cancelled
+        // envelope silently becomes "completed, 0 items". The probe keys off
+        // the channel's incomplete guard, so guardless channels stay a plain
+        // single dispatch; a double-cancel marks the channel failed, which
+        // critique's per-channel status reporting surfaces honestly.
+        retryOnIncomplete: ch.output_parser,
       })
     }
     if (config.defaults.parallel) {
@@ -362,7 +374,9 @@ export const critiqueCommand: CommandModule<object, CritiqueArgs> = {
             runner = async (prompt: string): Promise<string> => {
               await dispatchChannel(store, job.job_id, 'critique-synthesis', {
                 command: claudeCfg.command!, prompt: applyWrapper(claudeCfg.prompt_wrapper, prompt),
-                flags: claudeCfg.flags, env: claudeCfg.env,
+                // A synthesis reply is prose-shaped — strip a customizer's
+                // {{findings_schema}} pair rather than leak the placeholder.
+                flags: stripFindingsSchemaFlags(claudeCfg.flags), env: claudeCfg.env,
                 timeout: claudeCfg.timeout ?? config.defaults.timeout,
                 stderr: 'capture', promptDelivery: claudeCfg.prompt_delivery, cwd: claudeCfg.cwd,
               })

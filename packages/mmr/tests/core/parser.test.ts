@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { OutputParserConfig } from '../../src/config/schema.js'
-import { parseChannelOutput, getParser, validateFindingStrict, validateParsedOutputStrict } from '../../src/core/parser.js'
+import { parseChannelOutput, getParser, validateFindingStrict, validateParsedOutputStrict, channelOutputMatchesIncompleteGuard } from '../../src/core/parser.js'
 
 describe('grok channel output_parser (unwrap $.text → default)', () => {
   // Exercises the exact parser config used by BUILTIN_CHANNELS.grok against a
@@ -74,14 +74,20 @@ describe('unwrap-jsonpath `incomplete` guard (grok Cancelled → honest error)',
     expect(result.findings).toHaveLength(1)
   })
 
-  it('parses findings even if stopReason=Cancelled but $.text still holds valid findings JSON', () => {
+  it('rejects a Cancelled run even when $.text holds parseable findings JSON (guard is preemptive)', () => {
+    // With grok's --json-schema flag, intermediate progress turns are ALSO
+    // schema-shaped JSON — a cancelled run's $.text can contain a parseable
+    // "{approved:…, findings:[], summary:'Reviewing…'}" ack that would
+    // masquerade as a clean completed review (verified against grok 0.2.103,
+    // 2026-07-18 repro). A Cancelled envelope must therefore never be trusted,
+    // parseable or not.
     const raw = JSON.stringify({
-      text: '{"approved": true, "findings": [], "summary": "ok"}',
+      text: '{"approved": true, "findings": [], "summary": "No issues found."}',
       stopReason: 'Cancelled',
     })
     const result = parseChannelOutput(raw, grokParser)
-    expect(result.summary).not.toBe('Output parsing failed.')
-    expect(result.approved).toBe(true)
+    expect(result.summary).toBe('Output parsing failed.')
+    expect(result.findings[0].description).toMatch(/did not complete \(stopReason=Cancelled\)/)
   })
 
   it('without an `incomplete` config, a parse failure keeps the original generic error (backward compatible)', () => {
@@ -112,6 +118,116 @@ describe('unwrap-jsonpath `incomplete` guard (grok Cancelled → honest error)',
     expect(result.summary).toBe('Output parsing failed.')
     expect(result.findings[0].description).toMatch(/No JSON object found/)
     expect(result.findings[0].description).not.toMatch(/jsonpath/)
+  })
+})
+
+describe('default-last parser (grok --json-schema emits one JSON object per turn)', () => {
+  // Under --json-schema, grok's intermediate progress turns are schema-shaped
+  // JSON objects concatenated into $.text ahead of the real final verdict.
+  // Taking the FIRST object can flip the verdict (observed live: a first-turn
+  // '{"approved":true,…,"summary":"No issues found."}' ack preceding a final
+  // object with 3 real findings). default-last extracts the LAST top-level
+  // JSON value instead.
+  const parse = getParser('default-last')
+
+  it('picks the final JSON object when several are concatenated (verdict-flip case)', () => {
+    const raw = '{"approved": true, "findings": [], "summary": "No issues found."}'
+      + '{"approved": true, "findings": [], "summary": "No issues found."}'
+      + '{"approved": false, "findings": [{"severity":"P1","location":"a.ts:3","description":"bug","suggestion":"fix"}], "summary": "one real finding"}'
+    const result = parse(raw)
+    expect(result.approved).toBe(false)
+    expect(result.findings).toHaveLength(1)
+    expect(result.summary).toBe('one real finding')
+  })
+
+  it('behaves like default on a single clean JSON object', () => {
+    const result = parse('{"approved": true, "findings": [], "summary": "ok"}')
+    expect(result.approved).toBe(true)
+    expect(result.findings).toEqual([])
+  })
+
+  it('is not confused by nested objects inside the final value', () => {
+    const raw = '{"approved": true, "findings": [], "summary": "ack"}'
+      + '{"approved": false, "findings": [{"severity":"P0","location":"b.ts:1","description":"nested {brace} case","suggestion":"fix"}], "summary": "real"}'
+    const result = parse(raw)
+    expect(result.summary).toBe('real')
+    expect(result.findings[0].severity).toBe('P0')
+  })
+
+  it('tolerates prose and markdown fences around the objects', () => {
+    const raw = 'Progress:\n{"approved": true, "findings": [], "summary": "ack"}\nFinal:\n```json\n{"approved": true, "findings": [], "summary": "done"}\n```'
+    const result = parse(raw)
+    expect(result.summary).toBe('done')
+  })
+
+  it('rejects a truncated trailing candidate instead of silently using the previous object (strict tail)', () => {
+    // The truncated tail could be the REAL final verdict; the earlier object
+    // can be a progress ack (observed live with "approved": true). Falling
+    // back silently could wrongly approve — fail the parse instead, which
+    // fails the channel and triggers the compensating pass.
+    const raw = '{"approved": true, "findings": [], "summary": "ack"} {"truncated": '
+    const result = parseChannelOutput(raw, 'default-last')
+    expect(result.summary).toBe('Output parsing failed.')
+    expect(result.findings[0].description).toMatch(/may be truncated/)
+  })
+
+  it('ignores a broken candidate that appears BEFORE the final complete object', () => {
+    const raw = '{bad json} {"approved": true, "findings": [], "summary": "real"}'
+    const result = parse(raw)
+    expect(result.summary).toBe('real')
+  })
+
+  it('steps past a mismatched-delimiter fragment and still finds a later valid object', () => {
+    // '{]' is a LOCAL malformation (stray braces in prose), not a truncation —
+    // truncation always presents as unbalanced-at-EOF. Scanning must continue.
+    const raw = '{"approved": true, "findings": [], "summary": "ack"} {] {"approved": false, "findings": [{"severity":"P1","location":"c.ts:9","description":"bug","suggestion":"fix"}], "summary": "real"}'
+    const result = parse(raw)
+    expect(result.summary).toBe('real')
+    expect(result.findings).toHaveLength(1)
+  })
+
+  it('throws the same error shape as default when no JSON is present', () => {
+    const result = parseChannelOutput('no json here at all', 'default-last')
+    expect(result.summary).toBe('Output parsing failed.')
+    expect(result.findings[0].description).toMatch(/No JSON object found/)
+  })
+
+  it('self-diagnoses a top-level array (object-root restriction is by design)', () => {
+    // Note: an array CONTAINING objects still yields its last nested object
+    // (the scanner matches any '{'); the hint fires for object-free output.
+    const result = parseChannelOutput('["P1", "P2"]', 'default-last')
+    expect(result.summary).toBe('Output parsing failed.')
+    expect(result.findings[0].description).toMatch(/only object roots/)
+  })
+})
+
+describe('channelOutputMatchesIncompleteGuard (review-time retry probe)', () => {
+  const grokSpec: OutputParserConfig = {
+    kind: 'unwrap-jsonpath',
+    wrap: '$.text',
+    incomplete: { status_path: '$.stopReason', values: ['Cancelled'], message: 'interrupted' },
+    then: 'default-last',
+  }
+
+  it('matches a Cancelled grok envelope', () => {
+    const raw = JSON.stringify({ text: 'ack only', stopReason: 'Cancelled' })
+    expect(channelOutputMatchesIncompleteGuard(raw, grokSpec)).toBe(true)
+  })
+
+  it('does not match a completed (EndTurn) envelope', () => {
+    const raw = JSON.stringify({ text: '{"approved":true,"findings":[],"summary":"ok"}', stopReason: 'EndTurn' })
+    expect(channelOutputMatchesIncompleteGuard(raw, grokSpec)).toBe(false)
+  })
+
+  it('returns false for parser specs without an incomplete guard', () => {
+    const raw = JSON.stringify({ text: 'x', stopReason: 'Cancelled' })
+    expect(channelOutputMatchesIncompleteGuard(raw, 'default')).toBe(false)
+    expect(channelOutputMatchesIncompleteGuard(raw, { kind: 'unwrap-jsonpath', wrap: '$.text', then: 'default' })).toBe(false)
+  })
+
+  it('never throws on undecodable output', () => {
+    expect(channelOutputMatchesIncompleteGuard('not json', grokSpec)).toBe(false)
+    expect(channelOutputMatchesIncompleteGuard('', grokSpec)).toBe(false)
   })
 })
 

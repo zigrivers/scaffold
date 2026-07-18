@@ -4,6 +4,7 @@ import path from 'node:path'
 import os from 'node:os'
 import { dispatchChannel, isChannelComplete } from '../../src/core/dispatcher.js'
 import { JobStore } from '../../src/core/job-store.js'
+import type { OutputParserConfig } from '../../src/config/schema.js'
 
 describe('dispatchChannel', () => {
   let tmpDir: string
@@ -198,5 +199,214 @@ describe('isChannelComplete', () => {
   it('returns false for in-progress statuses', () => {
     expect(isChannelComplete('dispatched')).toBe(false)
     expect(isChannelComplete('running')).toBe(false)
+  })
+})
+
+describe('dispatchChannel retryOnIncomplete (grok Cancelled → one serial re-dispatch)', () => {
+  // grok cancels reviews under same-account concurrent sessions (verified on
+  // grok 0.2.103). By the time the first dispatch settles the burst has usually
+  // passed, so ONE serial retry recovers real channel coverage instead of
+  // falling through to the compensating pass. The probe only fires on an
+  // envelope matching the parser's `incomplete` guard.
+  let tmpDir: string
+  let store: JobStore
+
+  const grokLikeSpec: OutputParserConfig = {
+    kind: 'unwrap-jsonpath',
+    wrap: '$.text',
+    incomplete: { status_path: '$.stopReason', values: ['Cancelled'], message: 'interrupted' },
+    then: 'default-last',
+  }
+
+  // Fake CLI: first invocation reports Cancelled with an ack-only $.text;
+  // every later invocation completes with real findings JSON. Invocation
+  // count is tracked in the MARKER file.
+  const FAKE_GROK = `
+    const fs = require("fs");
+    const m = process.env.MARKER;
+    const n = fs.existsSync(m) ? Number(fs.readFileSync(m, "utf8")) + 1 : 1;
+    fs.writeFileSync(m, String(n));
+    if (n === 1) {
+      process.stdout.write(JSON.stringify({ text: "I'll review the diff.", stopReason: "Cancelled" }));
+    } else {
+      process.stdout.write(JSON.stringify({
+        text: JSON.stringify({ approved: true, findings: [], summary: "ok" }),
+        stopReason: "EndTurn",
+      }));
+    }
+  `.replace(/\n\s*/g, ' ')
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-retry-'))
+    store = new JobStore(tmpDir)
+    process.env.MMR_INCOMPLETE_RETRY_DELAY_MS = '0'
+  })
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true })
+    delete process.env.MMR_INCOMPLETE_RETRY_DELAY_MS
+  })
+
+  it('re-dispatches once when the first run ends Cancelled, keeping the completed second output', async () => {
+    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['grokish'] })
+    store.savePrompt(job.job_id, 'Review this.')
+    const marker = path.join(tmpDir, 'invocations')
+
+    await dispatchChannel(store, job.job_id, 'grokish', {
+      command: 'node',
+      prompt: '',
+      flags: ['-e', FAKE_GROK],
+      env: { MARKER: marker },
+      timeout: 10,
+      stderr: 'capture',
+      retryOnIncomplete: grokLikeSpec,
+    })
+
+    expect(fs.readFileSync(marker, 'utf8')).toBe('2')
+    const loaded = store.loadJob(job.job_id)
+    expect(loaded.channels.grokish.status).toBe('completed')
+    const raw = JSON.parse(store.loadChannelOutput(job.job_id, 'grokish'))
+    expect(raw).toContain('EndTurn')
+  })
+
+  it('elapsed spans both attempts: started_at is preserved from the FIRST attempt across the retry', async () => {
+    process.env.MMR_INCOMPLETE_RETRY_DELAY_MS = '400'
+    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['grokish'] })
+    store.savePrompt(job.job_id, 'Review this.')
+    const marker = path.join(tmpDir, 'invocations')
+
+    await dispatchChannel(store, job.job_id, 'grokish', {
+      command: 'node',
+      prompt: '',
+      flags: ['-e', FAKE_GROK],
+      env: { MARKER: marker },
+      timeout: 10,
+      stderr: 'capture',
+      retryOnIncomplete: grokLikeSpec,
+    })
+
+    const ch = store.loadJob(job.job_id).channels.grokish
+    expect(ch.status).toBe('completed')
+    const elapsedMs = new Date(ch.completed_at!).getTime() - new Date(ch.started_at!).getTime()
+    // The fake CLI is near-instant, so an elapsed that includes the 400ms
+    // jitter delay proves started_at was NOT reset by the second attempt.
+    expect(elapsedMs).toBeGreaterThanOrEqual(350)
+  })
+
+  it('retries with prompt-file delivery: the prompt file is (re)written and the second attempt completes', async () => {
+    // grok — the sole real retryOnIncomplete consumer — uses prompt-file
+    // delivery; the path is appended as the last argv when no {{prompt_file}}
+    // placeholder is present.
+    const FAKE_GROK_PROMPT_FILE = `
+      const fs = require("fs");
+      const m = process.env.MARKER;
+      const pf = process.argv[process.argv.length - 1];
+      if (fs.readFileSync(pf, "utf8") !== "Review this diff.") { process.exit(3); }
+      const n = fs.existsSync(m) ? Number(fs.readFileSync(m, "utf8")) + 1 : 1;
+      fs.writeFileSync(m, String(n));
+      if (n === 1) {
+        process.stdout.write(JSON.stringify({ text: "ack", stopReason: "Cancelled" }));
+      } else {
+        process.stdout.write(JSON.stringify({
+          text: JSON.stringify({ approved: true, findings: [], summary: "ok" }),
+          stopReason: "EndTurn",
+        }));
+      }
+    `.replace(/\n\s*/g, ' ')
+    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['grokish'] })
+    store.savePrompt(job.job_id, 'Review this diff.')
+    const marker = path.join(tmpDir, 'invocations')
+
+    await dispatchChannel(store, job.job_id, 'grokish', {
+      command: 'node',
+      prompt: 'Review this diff.',
+      flags: ['-e', FAKE_GROK_PROMPT_FILE],
+      env: { MARKER: marker },
+      timeout: 10,
+      stderr: 'capture',
+      promptDelivery: 'prompt-file',
+      retryOnIncomplete: grokLikeSpec,
+    })
+
+    expect(fs.readFileSync(marker, 'utf8')).toBe('2')
+    const loaded = store.loadJob(job.job_id)
+    expect(loaded.channels.grokish.status).toBe('completed')
+    const promptFile = path.join(tmpDir, job.job_id, 'channels', 'grokish.prompt.txt')
+    expect(fs.readFileSync(promptFile, 'utf8')).toBe('Review this diff.')
+    const raw = JSON.parse(store.loadChannelOutput(job.job_id, 'grokish'))
+    expect(raw).toContain('EndTurn')
+  })
+
+  it('does not retry when the first run completes normally', async () => {
+    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['grokish'] })
+    store.savePrompt(job.job_id, 'Review this.')
+    const marker = path.join(tmpDir, 'invocations')
+    // Pre-set the counter to 1 so the fake's next (first actual) run completes.
+    fs.writeFileSync(marker, '1')
+
+    await dispatchChannel(store, job.job_id, 'grokish', {
+      command: 'node',
+      prompt: '',
+      flags: ['-e', FAKE_GROK],
+      env: { MARKER: marker },
+      timeout: 10,
+      stderr: 'capture',
+      retryOnIncomplete: grokLikeSpec,
+    })
+
+    expect(fs.readFileSync(marker, 'utf8')).toBe('2') // exactly one invocation (1 → 2)
+    const loaded = store.loadJob(job.job_id)
+    expect(loaded.channels.grokish.status).toBe('completed')
+  })
+
+  it('retries at most once even when every run ends Cancelled', async () => {
+    const ALWAYS_CANCELLED = `
+      const fs = require("fs");
+      const m = process.env.MARKER;
+      const n = fs.existsSync(m) ? Number(fs.readFileSync(m, "utf8")) + 1 : 1;
+      fs.writeFileSync(m, String(n));
+      process.stdout.write(JSON.stringify({ text: "ack only", stopReason: "Cancelled" }));
+    `.replace(/\n\s*/g, ' ')
+    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['grokish'] })
+    store.savePrompt(job.job_id, 'Review this.')
+    const marker = path.join(tmpDir, 'invocations')
+
+    await dispatchChannel(store, job.job_id, 'grokish', {
+      command: 'node',
+      prompt: '',
+      flags: ['-e', ALWAYS_CANCELLED],
+      env: { MARKER: marker },
+      timeout: 10,
+      stderr: 'capture',
+      retryOnIncomplete: grokLikeSpec,
+    })
+
+    expect(fs.readFileSync(marker, 'utf8')).toBe('2')
+    // A double-cancelled run is marked failed AT DISPATCH TIME so the
+    // compensating pass (which reads statuses right after dispatch, before
+    // results-time parsing) actually covers the channel.
+    const loaded = store.loadJob(job.job_id)
+    expect(loaded.channels.grokish.status).toBe('failed')
+    expect(store.loadChannelLog(job.job_id, 'grokish')).toMatch(/remained incomplete after one retry/)
+    const raw = JSON.parse(store.loadChannelOutput(job.job_id, 'grokish'))
+    expect(raw).toContain('Cancelled')
+  })
+
+  it('is a plain dispatch for parser specs without an incomplete guard', async () => {
+    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['plain'] })
+    store.savePrompt(job.job_id, 'Review this.')
+    const marker = path.join(tmpDir, 'invocations')
+
+    await dispatchChannel(store, job.job_id, 'plain', {
+      command: 'node',
+      prompt: '',
+      flags: ['-e', FAKE_GROK],
+      env: { MARKER: marker },
+      timeout: 10,
+      stderr: 'capture',
+      retryOnIncomplete: 'default',
+    })
+
+    expect(fs.readFileSync(marker, 'utf8')).toBe('1') // no probe, no retry
   })
 })

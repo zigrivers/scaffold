@@ -410,6 +410,38 @@ describe('dispatchCompensatingPasses honors defaults.compensator', () => {
     )
   })
 
+  it('substitutes {{findings_schema}} in a placeholder-carrying compensator channel (never leaks the literal)', async () => {
+    // Compensating replies are findings-shaped, so substitution (not
+    // stripping) is correct — a leaked literal placeholder would be an
+    // invalid --json-schema value and fail the fallback coverage itself.
+    const cfg: MmrConfigParsed = {
+      ...baseConfig,
+      defaults: { ...baseConfig.defaults, compensator: { channel: 'grokish' } },
+      channels: {
+        grokish: {
+          kind: 'subprocess' as const,
+          enabled: true,
+          command: 'grok',
+          flags: ['--json-schema', '{{findings_schema}}'],
+          env: {},
+          auth: { check: 'true', timeout: 5, failure_exit_codes: [1], recovery: 'noop' },
+          prompt_wrapper: '{{prompt}}',
+          output_parser: 'default',
+          stderr: 'capture',
+          abstract: false,
+        },
+      },
+    }
+
+    await dispatchCompensatingPasses({} as never, 'job-1', 'review prompt', compensating, cfg)
+
+    const call = vi.mocked(dispatchChannel).mock.calls[0]
+    const flags = (call[3] as { flags: string[] }).flags
+    expect(flags[0]).toBe('--json-schema')
+    expect(flags[1]).not.toContain('{{findings_schema}}')
+    expect(JSON.parse(flags[1]).required).toEqual(['approved', 'findings', 'summary'])
+  })
+
   it('applies channel_focus_map and prompt_wrapper to the prompt', async () => {
     const cfg: MmrConfigParsed = {
       ...baseConfig,

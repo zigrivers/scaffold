@@ -1,0 +1,117 @@
+import { describe, it, expect } from 'vitest'
+import fs from 'node:fs'
+import {
+  FINDINGS_JSON_SCHEMA,
+  FINDINGS_SCHEMA_PLACEHOLDER,
+  substituteFindingsSchema,
+  stripFindingsSchemaFlags,
+  coerceParserForSchemaFlags,
+} from '../../src/core/output-schema.js'
+
+describe('FINDINGS_JSON_SCHEMA', () => {
+  it('describes the review reply object (approved/findings/summary all required)', () => {
+    expect(FINDINGS_JSON_SCHEMA.type).toBe('object')
+    expect(FINDINGS_JSON_SCHEMA.required).toEqual(['approved', 'findings', 'summary'])
+  })
+
+  it('constrains finding severity to the P0-P3 enum and requires the parser-mandatory fields', () => {
+    const finding = FINDINGS_JSON_SCHEMA.properties.findings.items
+    expect(finding.properties.severity.enum).toEqual(['P0', 'P1', 'P2', 'P3'])
+    // validateFindingStrict requires severity + location + description; the
+    // schema must force the model to emit them so a strict parse never throws.
+    expect(finding.required).toEqual(expect.arrayContaining(['severity', 'location', 'description']))
+  })
+
+  it('serializes to single-line JSON usable as a CLI arg value', () => {
+    const serialized = JSON.stringify(FINDINGS_JSON_SCHEMA)
+    expect(serialized).not.toContain('\n')
+    expect(JSON.parse(serialized)).toEqual(FINDINGS_JSON_SCHEMA)
+  })
+})
+
+describe('substituteFindingsSchema', () => {
+  it('replaces the placeholder arg with the serialized schema', () => {
+    const flags = ['--output-format', 'json', '--json-schema', FINDINGS_SCHEMA_PLACEHOLDER]
+    const out = substituteFindingsSchema(flags)
+    expect(out).toEqual(['--output-format', 'json', '--json-schema', JSON.stringify(FINDINGS_JSON_SCHEMA)])
+  })
+
+  it('is a no-op when no placeholder is present (custom channel configs)', () => {
+    const flags = ['--output-format', 'json']
+    expect(substituteFindingsSchema(flags)).toEqual(flags)
+  })
+
+  it('does not mutate the input array', () => {
+    const flags = ['--json-schema', FINDINGS_SCHEMA_PLACEHOLDER]
+    substituteFindingsSchema(flags)
+    expect(flags).toEqual(['--json-schema', FINDINGS_SCHEMA_PLACEHOLDER])
+  })
+})
+
+describe('stripFindingsSchemaFlags', () => {
+  it('removes the flag/value pair carrying the placeholder (critique reuses channel flags verbatim)', () => {
+    const flags = ['--output-format', 'json', '--json-schema', FINDINGS_SCHEMA_PLACEHOLDER, '--no-memory']
+    expect(stripFindingsSchemaFlags(flags)).toEqual(['--output-format', 'json', '--no-memory'])
+  })
+
+  it('removes the preceding flag token whatever its name (custom flag carrying the placeholder)', () => {
+    // A valueless flag left behind would break the CLI invocation.
+    const flags = ['--custom-schema-flag', FINDINGS_SCHEMA_PLACEHOLDER]
+    expect(stripFindingsSchemaFlags(flags)).toEqual([])
+  })
+
+  it('removes a bare placeholder arg when the previous token is not a flag', () => {
+    const flags = ['positional', FINDINGS_SCHEMA_PLACEHOLDER]
+    expect(stripFindingsSchemaFlags(flags)).toEqual(['positional'])
+  })
+
+  it('is a no-op when no placeholder is present', () => {
+    const flags = ['--output-format', 'json', '--no-memory']
+    expect(stripFindingsSchemaFlags(flags)).toEqual(flags)
+  })
+
+  it('drops only the combined token for equals-form flags, keeping the unrelated token before it', () => {
+    const flags = ['--no-plan', `--json-schema=${FINDINGS_SCHEMA_PLACEHOLDER}`]
+    expect(stripFindingsSchemaFlags(flags)).toEqual(['--no-plan'])
+  })
+})
+
+describe('CLAUDE.md inline schema stays in sync with FINDINGS_JSON_SCHEMA', () => {
+  it('the manual grok fallback in the repo CLAUDE.md embeds exactly the canonical schema', () => {
+    // The repo's CLAUDE.md quick-reference duplicates the schema inline (a
+    // copy-paste snippet cannot import it). This test is the drift guard the
+    // adjacent "keep in sync" comment promises.
+    const claudeMd = fs.readFileSync(new URL('../../../../CLAUDE.md', import.meta.url), 'utf8')
+    const m = claudeMd.match(/--json-schema '([^']+)'/)
+    expect(m).not.toBeNull()
+    expect(JSON.parse(m![1])).toEqual(FINDINGS_JSON_SCHEMA)
+  })
+})
+
+describe('coerceParserForSchemaFlags', () => {
+  const schemaFlags = ['--json-schema', FINDINGS_SCHEMA_PLACEHOLDER]
+
+  it('coerces a bare default parser to default-last when flags carry the placeholder', () => {
+    expect(coerceParserForSchemaFlags(schemaFlags, 'default')).toBe('default-last')
+  })
+
+  it('coerces an unwrap-jsonpath then:default (pre-3.2.0 grok restated in user config)', () => {
+    // Per-field deep-merge can pair an old restated parser with the NEW
+    // builtin flags — honoring then:'default' there reintroduces the
+    // first-object verdict flip.
+    const drifted = { kind: 'unwrap-jsonpath', wrap: '$.text', then: 'default' } as const
+    expect(coerceParserForSchemaFlags(schemaFlags, drifted)).toEqual(
+      { kind: 'unwrap-jsonpath', wrap: '$.text', then: 'default-last' },
+    )
+  })
+
+  it('leaves parsers alone when flags carry no placeholder', () => {
+    expect(coerceParserForSchemaFlags(['--output-format', 'json'], 'default')).toBe('default')
+  })
+
+  it('leaves custom parsers (non-default terminal) alone', () => {
+    const custom = { kind: 'unwrap-jsonpath', wrap: '$.text', then: 'gemini' } as const
+    expect(coerceParserForSchemaFlags(schemaFlags, custom)).toEqual(custom)
+    expect(coerceParserForSchemaFlags(schemaFlags, 'gemini')).toBe('gemini')
+  })
+})

@@ -1,5 +1,6 @@
 import { dispatchChannel } from './dispatcher.js'
 import { dispatchHttpChannel } from './http-dispatcher.js'
+import { substituteFindingsSchema, coerceParserForSchemaFlags } from './output-schema.js'
 import type { JobStore } from './job-store.js'
 import type { ChannelConfigParsed, MmrConfigParsed, OutputParserConfig } from '../config/schema.js'
 import type { ChannelStatus } from '../types.js'
@@ -108,7 +109,13 @@ export function getCompensatorChannel(config: MmrConfigParsed): ChannelConfigPar
 
 /** Output parser for the configured compensator channel (any kind); 'default' when none. */
 export function resolveCompensatorOutputParser(config: MmrConfigParsed): string | OutputParserConfig {
-  return getCompensatorChannel(config)?.output_parser ?? 'default'
+  const ch = getCompensatorChannel(config)
+  if (!ch) return 'default'
+  // Same last-object coercion as review dispatch: a schema-constrained
+  // compensator (flags carry {{findings_schema}}) emits one JSON object per
+  // turn, so a drifted terminal 'default' parser would accept the first
+  // progress ack as the verdict.
+  return coerceParserForSchemaFlags(ch.flags ?? [], ch.output_parser ?? 'default')
 }
 
 export function getDispatchableCompensatorChannel(
@@ -231,12 +238,23 @@ export async function dispatchCompensatingPasses(
       return dispatchChannel(store, jobId, comp.compensatingName, {
         command: dispatch.command,
         prompt: compensatingPrompt,
-        flags: dispatch.flags,
+        // Compensating replies are findings-shaped, so a compensator channel
+        // whose flags carry {{findings_schema}} (e.g. compensator.channel:
+        // grok) gets the real schema substituted — leaking the literal
+        // placeholder would fail the exact fallback coverage this provides.
+        flags: substituteFindingsSchema(dispatch.flags),
         env: dispatch.env,
         timeout: dispatch.timeout,
         stderr: dispatch.stderr,
         promptDelivery: dispatch.prompt_delivery,
         cwd: dispatch.cwd,
+        // Same incomplete-run retry as review dispatch — a grok-like
+        // compensator can be cancelled by the very burst it is compensating
+        // for. Guardless parsers make this a plain single dispatch.
+        retryOnIncomplete: coerceParserForSchemaFlags(
+          dispatch.flags,
+          dispatch.output_parser ?? 'default',
+        ),
       })
     }),
   )

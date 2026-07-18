@@ -82,6 +82,14 @@ function extractJsonValue(text: string): string {
   throw new Error('No JSON object or array found in output')
 }
 
+/**
+ * Thrown when a JSON candidate never closes before end-of-text (a truncated
+ * region). Distinct from a mismatched-delimiter error, which is a local
+ * malformation ('{]') that scanning can step past — truncation, by contrast,
+ * consumes everything to end-of-text, so nothing after it can be balanced.
+ */
+class UnbalancedJsonError extends Error {}
+
 function extractBalancedJsonValue(text: string, start: number): string {
   const opener = text[start]
   const stack: string[] = []
@@ -114,12 +122,94 @@ function extractBalancedJsonValue(text: string, start: number): string {
     }
   }
 
-  throw new Error(`Unbalanced ${opener === '{' ? 'braces' : 'brackets'} in JSON output`)
+  throw new UnbalancedJsonError(`Unbalanced ${opener === '{' ? 'braces' : 'brackets'} in JSON output`)
 }
 
 function parseJsonFromOutput(raw: string): unknown {
   const text = extractJsonValue(stripMarkdownFences(raw))
   return JSON.parse(fixTrailingCommas(text))
+}
+
+/**
+ * Extract the LAST top-level JSON value in the text. Candidates are scanned
+ * sequentially — a balanced region is always skipped in one step (never
+ * rescanned from inside), so values nested inside an earlier object are never
+ * treated as candidates and scanning stays linear. Needed for
+ * schema-constrained CLIs (grok --json-schema) that emit one schema-shaped
+ * JSON object per turn: intermediate progress turns parse fine but only the
+ * final object is the real verdict.
+ *
+ * STRICT TAIL: if a candidate AFTER the last complete object is truncated
+ * (unbalanced to end-of-text) or balanced-but-unparseable, this throws instead
+ * of silently returning the earlier object. A truncated final turn must fail
+ * the channel — the preceding turn can be a progress ack (observed live with
+ * "approved": true) that would wrongly stand in for the real verdict.
+ * Mismatched-delimiter fragments ('{]', typically stray braces in prose) are
+ * stepped past instead: they cannot be a truncated schema reply, and a valid
+ * final object may still follow them.
+ *
+ * Scope: designed for SCHEMA-CONSTRAINED output whose root is always an
+ * object — only `{` candidates are matched (mirroring extractJson, the
+ * terminal `default` findings extractor), and the strict-tail rule assumes
+ * trailing brace-content is model output rather than prose. Reusing
+ * default-last on unconstrained prose-heavy replies would surface both
+ * assumptions.
+ */
+export function extractLastJson(text: string): string {
+  let last: string | undefined
+  let firstError: Error | undefined
+  let brokenTail = false
+
+  let i = 0
+  while (i < text.length) {
+    if (text[i] !== '{') {
+      i++
+      continue
+    }
+    let candidate: string
+    try {
+      candidate = extractBalancedJsonValue(text, i)
+    } catch (err) {
+      firstError ??= err instanceof Error ? err : new Error(String(err))
+      if (err instanceof UnbalancedJsonError) {
+        // Truncated region: it consumes everything to end-of-text, so nothing
+        // later can be balanced — and a truncated tail after a complete object
+        // is exactly the strict-tail case (schema-mode truncation always
+        // presents as unbalanced-at-EOF, never as mismatched delimiters).
+        if (last !== undefined) brokenTail = true
+        break
+      }
+      // Mismatched delimiters ('{]') are a LOCAL malformation — step past the
+      // opening brace and keep scanning; a valid final object may follow.
+      i++
+      continue
+    }
+    try {
+      JSON.parse(fixTrailingCommas(candidate))
+      last = candidate
+      brokenTail = false
+    } catch (err) {
+      firstError ??= err instanceof Error ? err : new Error(String(err))
+      if (last !== undefined) brokenTail = true
+    }
+    i += candidate.length
+  }
+
+  if (brokenTail) {
+    throw new Error(
+      'Trailing JSON after the last complete object failed to parse — the final reply may be truncated',
+    )
+  }
+  if (last !== undefined) return last
+  if (firstError) throw firstError
+  // Self-diagnosing hint for a miswired channel whose CLI emits a top-level
+  // array: the object-root restriction is by design (see docstring).
+  if (text.includes('[')) {
+    throw new Error(
+      'No JSON object found in output (default-last scans only object roots; a top-level array is not supported)',
+    )
+  }
+  throw new Error('No JSON object found in output')
 }
 
 /**
@@ -201,6 +291,19 @@ function defaultParser(raw: string): ParsedOutput {
 }
 
 /**
+ * Like `default`, but extracts the LAST top-level JSON object instead of the
+ * first. Used by the grok channel: with `--json-schema`, every turn's output
+ * (including intermediate "Reviewing…" progress acks) is a schema-shaped JSON
+ * object, so first-object extraction can return an ack — observed live to
+ * flip a 3-finding review into "approved, no issues found".
+ */
+function defaultLastParser(raw: string): ParsedOutput {
+  let text = extractLastJson(stripMarkdownFences(raw))
+  text = fixTrailingCommas(text)
+  return validateParsedOutput(JSON.parse(text))
+}
+
+/**
  * Gemini parser: tries to unwrap `{ "response": "..." }` wrapper,
  * then delegates to defaultParser.
  */
@@ -256,6 +359,7 @@ function docConformanceParser(raw: string): ParsedOutput {
 
 const builtinParsers: Record<string, Parser> = {
   default: defaultParser,
+  'default-last': defaultLastParser,
   gemini: geminiParser,
   'doc-conformance': docConformanceParser,
 }
@@ -273,36 +377,60 @@ export function getParser(spec: string | OutputParserConfig): Parser {
   return buildParser(spec)
 }
 
+type IncompleteGuard = NonNullable<
+  Extract<OutputParserConfig, { kind: 'unwrap-jsonpath' }>['incomplete']
+>
+
 /**
- * When an `unwrap-jsonpath` parse fails, return a clear, actionable error IF the
- * envelope's status field marks an interrupted/incomplete run (per the optional
- * `incomplete` guard); otherwise return the original error unchanged. This turns
- * grok's "stopReason: Cancelled + ack-only $.text" case from a misleading
- * "No JSON object found in output" into an honest "did not complete" message.
+ * True when the decoded CLI envelope's status field marks an
+ * interrupted/incomplete run per the guard. A malformed custom status_path
+ * never throws — the guard can only ever ADD information.
  */
-function incompleteOrDefault(
-  decoded: unknown,
-  spec: Extract<OutputParserConfig, { kind: 'unwrap-jsonpath' }>,
-  fallback: Error,
-): Error {
-  const guard = spec.incomplete
-  if (!guard) return fallback
+function matchesIncompleteGuard(decoded: unknown, guard: IncompleteGuard): boolean {
   let status: unknown
   try {
     status = jsonpathGet(decoded, guard.status_path)
   } catch {
-    // A malformed custom status_path must never REPLACE the genuine parse error
-    // with a jsonpath internal error — the guard can only improve the message.
-    return fallback
+    return false
   }
-  if (typeof status === 'string' && guard.values.includes(status)) {
-    // Human-readable label: drop the "$." root of a simple property path
-    // ("$.stopReason" → "stopReason"); use the path verbatim otherwise (a bare
-    // "$", a bracket/nested path, etc.) so the label is never empty or garbled.
-    const field = guard.status_path.startsWith('$.') ? guard.status_path.slice(2) : guard.status_path
-    return new Error(`channel run did not complete (${field}=${status}) before emitting findings — ${guard.message}`)
+  return typeof status === 'string' && guard.values.includes(status)
+}
+
+function incompleteError(decoded: unknown, guard: IncompleteGuard): Error {
+  // Human-readable label: drop the "$." root of a simple property path
+  // ("$.stopReason" → "stopReason"); use the path verbatim otherwise (a bare
+  // "$", a bracket/nested path, etc.) so the label is never empty or garbled.
+  const field = guard.status_path.startsWith('$.') ? guard.status_path.slice(2) : guard.status_path
+  let status: unknown
+  try {
+    status = jsonpathGet(decoded, guard.status_path)
+  } catch {
+    status = 'unknown'
   }
-  return fallback
+  return new Error(`channel run did not complete (${field}=${status}) before emitting findings — ${guard.message}`)
+}
+
+/**
+ * Probe a channel's raw stdout against the parser spec's `incomplete` guard
+ * without running the full parse. Used by the dispatcher's one-shot retry:
+ * a matching envelope (grok's `stopReason: "Cancelled"`) means the run was
+ * interrupted and is worth ONE serial re-dispatch. Never throws; any
+ * undecodable/guardless input is simply "no match".
+ */
+export function channelOutputMatchesIncompleteGuard(
+  raw: string,
+  spec: string | OutputParserConfig,
+): boolean {
+  if (typeof spec === 'string' || spec.kind !== 'unwrap-jsonpath' || !spec.incomplete) {
+    return false
+  }
+  let decoded: unknown
+  try {
+    decoded = parseJsonFromOutput(raw)
+  } catch {
+    return false
+  }
+  return matchesIncompleteGuard(decoded, spec.incomplete)
 }
 
 export function buildParser(spec: OutputParserConfig): Parser {
@@ -314,19 +442,21 @@ export function buildParser(spec: OutputParserConfig): Parser {
     const nextParser = getParser(nextSpec)
     return (raw: string) => {
       const decoded = parseJsonFromOutput(raw)
+      // PREEMPTIVE guard: an envelope marked interrupted (grok's
+      // `stopReason: "Cancelled"`) is rejected even when the wrapped payload
+      // would parse. Under grok's --json-schema flag, intermediate progress
+      // turns are schema-shaped JSON, so a cancelled run's $.text can hold a
+      // parseable ack ("approved: true … Reviewing the diff") that would
+      // otherwise masquerade as a clean completed review.
+      if (spec.incomplete && matchesIncompleteGuard(decoded, spec.incomplete)) {
+        throw incompleteError(decoded, spec.incomplete)
+      }
       const unwrapped = jsonpathGet(decoded, spec.wrap)
       if (unwrapped === undefined) {
-        throw incompleteOrDefault(decoded, spec, new Error(`jsonpath did not match: ${spec.wrap}`))
+        throw new Error(`jsonpath did not match: ${spec.wrap}`)
       }
       const nextRaw = typeof unwrapped === 'string' ? unwrapped : JSON.stringify(unwrapped)
-      try {
-        return nextParser(nextRaw)
-      } catch (err) {
-        // Pass Error objects through unchanged (stack preserved); wrap a rare
-        // non-Error throw while retaining the original value as `cause`.
-        const fallback = err instanceof Error ? err : new Error(String(err), { cause: err })
-        throw incompleteOrDefault(decoded, spec, fallback)
-      }
+      return nextParser(nextRaw)
     }
   }
   if (spec.kind === 'regex-findings') {

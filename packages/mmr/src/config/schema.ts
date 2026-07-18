@@ -65,12 +65,14 @@ export interface UnwrapJsonpathParserConfig {
   then?: OutputParserConfig
   /**
    * Optional guard for CLI envelopes that can return a non-terminal/interrupted
-   * run (e.g. grok's `stopReason: "Cancelled"`, where $.text holds only a short
-   * ack and no findings). When the wrapped payload fails to parse AND the
-   * envelope's `status_path` value is one of `values`, the parser throws a clear,
-   * actionable error (embedding `message`) instead of the generic
-   * "No JSON object found in output". A completed run still parses normally —
-   * the guard only rewrites the error on an already-failed parse.
+   * run (e.g. grok's `stopReason: "Cancelled"`). The guard is PREEMPTIVE: when
+   * the envelope's `status_path` value is one of `values`, the parser throws a
+   * clear, actionable error (embedding `message`) BEFORE attempting to parse
+   * the wrapped payload — even a parseable payload from an interrupted run is
+   * untrustworthy (under grok's --json-schema flag, intermediate progress turns
+   * are schema-shaped JSON that would otherwise masquerade as a clean review).
+   * The guard also drives the dispatcher's one-shot re-dispatch (the
+   * `retryOnIncomplete` option on `dispatchChannel`).
    */
   incomplete?: {
     status_path: string
