@@ -15,7 +15,9 @@ knowledge-base: [project-structure-patterns]
 Design the directory layout optimized for parallel AI agent work (minimizing
 merge conflicts and maximizing task independence), document file placement rules,
 and scaffold the actual directories and placeholder files. Updates CLAUDE.md
-with a Quick Reference section for file placement.
+with a Quick Reference section for file placement. The layout also serves the
+merge-throughput architecture: package boundaries drive affected-test selection
+(see the test-impact-analysis knowledge entry via tdd-standards).
 
 ## Inputs
 - docs/tech-stack.md (required) — framework conventions determine structure
@@ -34,6 +36,14 @@ with a Quick Reference section for file placement.
 
 ## Quality Criteria
 - (mvp) Module organization strategy chosen and justified (feature-based, layer-based, or hybrid)
+- (mvp) For TypeScript/Node projects: default to a small workspace of 3–5 packages
+  (e.g. `app`/`core`/`ui`) rather than a single blob — package boundaries are
+  what make affected-test selection accurate and cacheable, and layout is cheap
+  at day one but expensive to retrofit. Single-package is the documented
+  exception (tiny scope, no parallel agents), not the default
+- (deep) Boundary enforcement wired: TypeScript project references synced to the
+  workspace graph and dependency-cruiser rules (no cross-package deep imports,
+  no circular dependencies) — these keep graph-based test selection honest
 - (mvp) File placement table covers all file types (routes, services, models, types, utils, tests)
 - (deep) High-contention files identified with merge-conflict mitigation strategies
 - (mvp) Shared utilities rule enforced (2+ features before promoting to shared)
