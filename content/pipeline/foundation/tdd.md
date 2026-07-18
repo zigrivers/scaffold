@@ -8,7 +8,7 @@ dependencies: [coding-standards]
 outputs: [docs/tdd-standards.md]
 reads: [create-prd, system-architecture]
 conditional: null
-knowledge-base: [testing-strategy]
+knowledge-base: [testing-strategy, test-impact-analysis]
 ---
 
 ## Purpose
@@ -33,6 +33,16 @@ actual test framework and assertion library.
 - (mvp) Test pyramid (or equivalent testing model for non-layered architectures) defined with coverage targets per layer (defined per layer, e.g., 80% unit, 50% integration)
 - (mvp) Testing patterns specified for each layer (unit, integration, e2e)
 - (mvp) Quality gates defined: list of commands to run before merge, with expected pass criteria for each
+- (mvp) Two-gate contract defined: `make check-affected` (fast, selection-based —
+  the merge gate; falls back to full `make check` when it cannot classify a
+  change) and `make check` (full, authoritative — post-merge and nightly, always
+  uncached). Force-full-run triggers listed explicitly (lockfiles, tool config,
+  shared test utils, global setup, env files, migrations)
+- (mvp) e2e excluded from the merge gate (tagged smoke subset at most); full e2e
+  runs post-merge/nightly
+- (deep) Flake policy documented: quarantine list location (`.mq/quarantine.txt`),
+  quarantined tests excluded from the merge gate but still run post-merge, with a
+  fix-SLA convention
 - (mvp) Edge cases from domain invariants are test scenarios
 - (deep) Performance testing approach for critical paths
 - (deep) Contract testing strategy documented for service boundaries
@@ -40,8 +50,11 @@ actual test framework and assertion library.
 ## Methodology Scaling
 - **deep**: Comprehensive strategy. Test matrix by layer and component. Specific
   test patterns per architecture pattern. Performance benchmarks. CI integration.
-  Test data strategy. Mutation testing approach.
-- **mvp**: Test pyramid overview. Key testing patterns. What must pass before deploy.
+  Affected-test selection mechanism chosen per stack (see the
+  test-impact-analysis knowledge entry) with declared inputs and force-full
+  triggers. Test data strategy. Mutation testing approach.
+- **mvp**: Test pyramid overview. Key testing patterns. What must pass before
+  deploy. Defines check-affected alongside check.
 - **custom:depth(1-5)**:
   - Depth 1: Test pyramid overview with key patterns. What must pass before deploy.
   - Depth 2: Depth 1 + example test for each layer using the project's actual test framework.
