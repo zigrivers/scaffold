@@ -27,6 +27,7 @@ steps:
   staging-environments: { enabled: false }
   design-system: { enabled: false }
   git-workflow: { enabled: true }
+  merge-throughput: { enabled: false }
   automated-pr-review: { enabled: false }
   ai-memory-setup: { enabled: false }
   # Phase 4 — Testing Integration (integration)
