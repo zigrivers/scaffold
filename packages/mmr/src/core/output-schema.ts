@@ -52,6 +52,8 @@ export const FINDINGS_SCHEMA_PLACEHOLDER = '{{findings_schema}}'
  * `--json-schema`. Honoring that combination silently reintroduces the
  * first-object verdict flip this schema work exists to prevent, so when the
  * flags carry the placeholder, coerce a terminal 'default' to 'default-last'.
+ * An unwrap-jsonpath spec with `then` omitted is treated the same — the zod
+ * schema defaults `then` to 'default', so undefined IS the default terminal.
  * Custom parsers (regex-findings, gemini, etc.) are left untouched — the
  * hazard is specific to first-object 'default' extraction.
  */
@@ -79,17 +81,20 @@ export function substituteFindingsSchema(flags: string[]): string[] {
 
 /**
  * Remove the schema flag from a flags array: drops every arg carrying the
- * placeholder AND the flag token immediately before it (any `--*` token, not
- * just `--json-schema` — a customizer may pass the placeholder to a
- * differently-named flag, and leaving that flag valueless would break the
- * CLI invocation). Used by critique, which reuses review channel flags
- * verbatim but must not constrain replies to the findings shape.
+ * placeholder AND — when the placeholder arg is a bare value — the flag token
+ * immediately before it (any `--*` token, not just `--json-schema`: a
+ * customizer may pass the placeholder to a differently-named flag, and
+ * leaving that flag valueless would break the CLI invocation). A combined
+ * `--flag={{findings_schema}}` token is self-contained, so only it is
+ * dropped — the token before it is unrelated. Used by critique, which reuses
+ * review channel flags verbatim but must not constrain replies to the
+ * findings shape.
  */
 export function stripFindingsSchemaFlags(flags: string[]): string[] {
   const out: string[] = []
   for (const f of flags) {
     if (f.includes(FINDINGS_SCHEMA_PLACEHOLDER)) {
-      if (out[out.length - 1]?.startsWith('--')) out.pop()
+      if (!f.startsWith('--') && out[out.length - 1]?.startsWith('--')) out.pop()
       continue
     }
     out.push(f)

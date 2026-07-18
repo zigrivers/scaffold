@@ -147,6 +147,13 @@ function parseJsonFromOutput(raw: string): unknown {
  * Mismatched-delimiter fragments ('{]', typically stray braces in prose) are
  * stepped past instead: they cannot be a truncated schema reply, and a valid
  * final object may still follow them.
+ *
+ * Scope: designed for SCHEMA-CONSTRAINED output whose root is always an
+ * object — only `{` candidates are matched (mirroring extractJson, the
+ * terminal `default` findings extractor), and the strict-tail rule assumes
+ * trailing brace-content is model output rather than prose. Reusing
+ * default-last on unconstrained prose-heavy replies would surface both
+ * assumptions.
  */
 export function extractLastJson(text: string): string {
   let last: string | undefined

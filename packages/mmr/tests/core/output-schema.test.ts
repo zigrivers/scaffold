@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import fs from 'node:fs'
 import {
   FINDINGS_JSON_SCHEMA,
   FINDINGS_SCHEMA_PLACEHOLDER,
@@ -67,6 +68,23 @@ describe('stripFindingsSchemaFlags', () => {
   it('is a no-op when no placeholder is present', () => {
     const flags = ['--output-format', 'json', '--no-memory']
     expect(stripFindingsSchemaFlags(flags)).toEqual(flags)
+  })
+
+  it('drops only the combined token for equals-form flags, keeping the unrelated token before it', () => {
+    const flags = ['--no-plan', `--json-schema=${FINDINGS_SCHEMA_PLACEHOLDER}`]
+    expect(stripFindingsSchemaFlags(flags)).toEqual(['--no-plan'])
+  })
+})
+
+describe('CLAUDE.md inline schema stays in sync with FINDINGS_JSON_SCHEMA', () => {
+  it('the manual grok fallback in the repo CLAUDE.md embeds exactly the canonical schema', () => {
+    // The repo's CLAUDE.md quick-reference duplicates the schema inline (a
+    // copy-paste snippet cannot import it). This test is the drift guard the
+    // adjacent "keep in sync" comment promises.
+    const claudeMd = fs.readFileSync(new URL('../../../../CLAUDE.md', import.meta.url), 'utf8')
+    const m = claudeMd.match(/--json-schema '([^']+)'/)
+    expect(m).not.toBeNull()
+    expect(JSON.parse(m![1])).toEqual(FINDINGS_JSON_SCHEMA)
   })
 })
 
