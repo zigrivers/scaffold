@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -9,6 +9,11 @@ function sh(cwd: string, cmd: string, args: string[]): string {
   return execFileSync(cmd, args, { cwd, encoding: 'utf8' }).trim()
 }
 function git(cwd: string, ...args: string[]): string { return sh(cwd, 'git', args) }
+
+// These exercise REAL git (init/clone/commit/merge across bare origin + clone),
+// which is inherently slow and can spike well past the 5s default under full-suite
+// CPU contention. Give the file ample headroom so it never flakes the gate/CI.
+vi.setConfig({ testTimeout: 30_000 })
 
 /** origin (bare) + working clone with an initial commit on main; returns { origin, clone } */
 function scratchRepos(): { origin: string; clone: string } {

@@ -136,6 +136,13 @@ export function loadAgentOpsConfig(projectRoot: string): AgentOpsConfig {
       }
       cfg.merge_queue[key] = v
     }
+    if (mq.gate_executor !== undefined) {
+      const ge = mq.gate_executor
+      if (ge !== 'gha-selfhosted' && ge !== 'local-poller') {
+        fail(`merge_queue.gate_executor must be "gha-selfhosted" or "local-poller", got ${JSON.stringify(ge)}`)
+      }
+      cfg.merge_queue.gate_executor = ge
+    }
   }
 
   return cfg

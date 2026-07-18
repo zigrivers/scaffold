@@ -1,11 +1,12 @@
 import crypto from 'node:crypto'
+import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { getPackageRoot } from '../../utils/fs.js'
 import { getPackageVersion, resolveSkillTemplate } from '../skills/sync.js'
 import { loadAgentOpsConfig, type AgentOpsConfig } from './config.js'
 
-export type AgentOpsComponent = 'git' | 'staging'
+export type AgentOpsComponent = 'git' | 'staging' | 'merge-queue' | 'ci'
 
 export interface AgentOpsFileSpec {
   dest: string
@@ -84,6 +85,31 @@ export const AGENT_OPS_FILE_MAP: Record<string, AgentOpsFileSpec> = {
     component: 'staging',
     executable: false,
   },
+  'merge-queue/mq-guard.sh.tmpl': {
+    dest: 'scripts/mq-guard.sh',
+    component: 'merge-queue',
+    executable: true,
+  },
+  'merge-queue/post-merge-poller.sh.tmpl': {
+    dest: 'scripts/ops/post-merge-poller.sh',
+    component: 'merge-queue',
+    executable: true,
+  },
+  'ci/setup-gh-runner.sh.tmpl': {
+    dest: 'scripts/ops/setup-gh-runner.sh',
+    component: 'ci',
+    executable: true,
+  },
+  'ci/post-merge.yml.tmpl': {
+    dest: '.github/workflows/post-merge.yml',
+    component: 'ci',
+    executable: false,
+  },
+  'ci/nightly.yml.tmpl': {
+    dest: '.github/workflows/nightly.yml',
+    component: 'ci',
+    executable: false,
+  },
 }
 
 const MANIFEST_PATH = '.scaffold/agent-ops-manifest.json'
@@ -144,7 +170,37 @@ function shellVarSuffix(name: string): string {
   return name.replace(/-/g, '_')
 }
 
-export function buildTemplateVars(config: AgentOpsConfig): Record<string, string> {
+// origin/HEAD points at the remote's default branch (e.g. "origin/main"); strip
+// the "origin/" prefix so DEFAULT_BRANCH is the bare branch name. When the local
+// origin/HEAD symref is unset (a clone that never ran `git remote set-head`), ask
+// the REMOTE for its default via `git ls-remote --symref` before falling back to
+// "main" — so a repo whose default is "master"/"develop" gets the right value.
+function gitBranchFrom(args: string[], projectRoot: string): string {
+  return execFileSync('git', args, {
+    cwd: projectRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
+  }).trim()
+}
+
+function resolveDefaultBranch(projectRoot: string | undefined): string {
+  if (!projectRoot) return 'main'
+  try {
+    const local = gitBranchFrom(['rev-parse', '--abbrev-ref', 'origin/HEAD'], projectRoot)
+      .replace(/^origin\//, '')
+    if (local) return local
+  } catch { /* origin/HEAD unset — try the remote */ }
+  try {
+    // `ref: refs/heads/<branch>\tHEAD` → take the branch name.
+    const symref = gitBranchFrom(['ls-remote', '--symref', 'origin', 'HEAD'], projectRoot)
+    const match = symref.match(/refs\/heads\/(\S+)\s+HEAD/)
+    if (match) return match[1]
+  } catch { /* no remote / offline — fall back */ }
+  return 'main'
+}
+
+export function buildTemplateVars(
+  config: AgentOpsConfig,
+  projectRoot?: string,
+): Record<string, string> {
   const defaultContext = process.platform === 'darwin' ? 'orbstack' : 'default'
   const bandLines: string[] = []
   if (config.docker) {
@@ -159,6 +215,8 @@ export function buildTemplateVars(config: AgentOpsConfig): Record<string, string
     DOCKER_CONTEXT: config.docker?.context ?? defaultContext,
     WORKTREE_SETUP_COMMANDS: config.worktree_setup_commands.join('\n'),
     SERVICE_PORT_BANDS: bandLines.join('\n'),
+    DEFAULT_BRANCH: resolveDefaultBranch(projectRoot),
+    FULL_GATE_COMMAND: config.merge_queue.full_gate_command,
   }
 }
 
@@ -174,10 +232,22 @@ function ensureMakefileInclude(projectRoot: string): void {
   }
 }
 
+const GITIGNORE_MQ_ENTRY = '.mq/'
+
+function ensureGitignoreEntry(projectRoot: string, entry: string): void {
+  const p = path.join(projectRoot, '.gitignore')
+  const body = fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : ''
+  // CRLF-safe: split on \r?\n and trim so a Windows-checkout .gitignore does not
+  // fail the presence check and append a duplicate .mq/ on every install.
+  if (body.split(/\r?\n/).map(l => l.trim()).includes(entry)) return
+  const sep = body === '' || body.endsWith('\n') ? '' : '\n'
+  fs.writeFileSync(p, `${body}${sep}${entry}\n`)
+}
+
 export function installAgentOps(projectRoot: string, opts: AgentOpsInstallOptions): AgentOpsInstallResult {
   const templateRoot = opts.templateRoot ?? path.join(getPackageRoot(), 'content', 'assets', 'agent-ops')
   const config = loadAgentOpsConfig(projectRoot)
-  const vars = buildTemplateVars(config)
+  const vars = buildTemplateVars(config, projectRoot)
   const manifest = readManifest(projectRoot)
   const result: AgentOpsInstallResult = { installed: [], skippedModified: [], errors: [] }
 
@@ -232,6 +302,7 @@ export function installAgentOps(projectRoot: string, opts: AgentOpsInstallOption
   // Makefile wires it in for any requested component, not just 'git'. Staging
   // targets self-guard; git targets fail loudly if their scripts are absent.
   if (opts.components.length > 0) ensureMakefileInclude(projectRoot)
+  if (opts.components.includes('merge-queue')) ensureGitignoreEntry(projectRoot, GITIGNORE_MQ_ENTRY)
   return result
 }
 

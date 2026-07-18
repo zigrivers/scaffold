@@ -20,6 +20,17 @@ describe('resolveComponents', () => {
   })
 })
 
+describe('resolveComponents — new components', () => {
+  it('accepts merge-queue and ci individually', () => {
+    expect(resolveComponents('merge-queue')).toEqual(['merge-queue'])
+    expect(resolveComponents('ci')).toEqual(['ci'])
+  })
+  it('keeps all/undefined as git+staging (backcompat — no surprise installs)', () => {
+    expect(resolveComponents(undefined)).toEqual(['git', 'staging'])
+    expect(resolveComponents('all')).toEqual(['git', 'staging'])
+  })
+})
+
 /**
  * Sentinel thrown by the mocked process.exit. Unlike skill.test.ts's no-op
  * mock, the agent-ops handler relies on process.exit's never-return for

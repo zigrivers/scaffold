@@ -1,0 +1,24 @@
+# post-merge.yml — installed by `scaffold agent-ops install --component ci`.
+# Full UNCACHED quality gate after every landing on the default branch, on a
+# SELF-HOSTED runner ($0 Actions minutes — billing applies only to GitHub-hosted
+# runners). The merge gate itself runs locally in the merge queue (D4'): this
+# workflow is the safety net that lets that gate be cheap. Coalescing: only the
+# latest HEAD matters, superseded runs are cancelled.
+name: post-merge
+on:
+  push:
+    branches: [{{DEFAULT_BRANCH}}]
+concurrency:
+  group: post-merge
+  cancel-in-progress: true
+jobs:
+  full-suite:
+    runs-on: [self-hosted, macOS, ARM64]
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      # {{FULL_GATE_COMMAND}} runs on a fresh checkout with no pre-installed
+      # dependencies, so it MUST be self-contained (install deps + run checks).
+      - name: Full uncached gate
+        run: |
+          {{FULL_GATE_COMMAND}}

@@ -2,7 +2,8 @@
 # the installer to update. Targets marked [agent-safe] may run unattended.
 
 .PHONY: main-sync prune-merged doctor doctor-fix beads-snapshot reap-stale-claims \
-        staging-up staging-down staging-shared-down staging-prune docker-doctor tc-reap
+        staging-up staging-down staging-shared-down staging-prune docker-doctor tc-reap \
+        mq-enqueue mq-status mq-daemon mq-eject mq-stats post-merge-watch
 
 main-sync: ## [agent-safe] Fetch + fast-forward main from anywhere
 	@scripts/main-sync.sh
@@ -57,3 +58,33 @@ docker-doctor: ## [agent-safe] Show engine placement; warn on split-brain
 tc-reap: ## [agent-safe] Remove leaked testcontainers from dead sessions
 	$(staging_guard)
 	@scripts/ops/tc-reap.sh $(ARGS)
+
+define mq_guard
+	@command -v scaffold >/dev/null 2>&1 || { echo "merge-queue targets need the scaffold CLI (npm i -g @zigrivers/scaffold or brew install scaffold)"; exit 1; }
+endef
+
+mq-enqueue: ## [agent-safe] Enqueue PR=<n> into the local merge queue (fire-and-forget)
+	$(mq_guard)
+	@test -n "$(PR)" || { echo "usage: make mq-enqueue PR=<number>"; exit 1; }
+	@scaffold mq enqueue --pr $(PR)
+
+mq-status: ## [agent-safe] Show merge-queue state (paused banner, per-PR states)
+	$(mq_guard)
+	@scaffold mq status
+
+mq-daemon: ## [agent-safe] Run the merge-queue daemon in the foreground (debugging)
+	$(mq_guard)
+	@scaffold mq daemon --foreground
+
+mq-eject: ## [agent-safe] Withdraw PR=<n> from the queue
+	$(mq_guard)
+	@test -n "$(PR)" || { echo "usage: make mq-eject PR=<number>"; exit 1; }
+	@scaffold mq eject --pr $(PR)
+
+mq-stats: ## [agent-safe] Queue calibration metrics (arrivals, gate outcomes, flakes)
+	$(mq_guard)
+	@scaffold mq stats
+
+post-merge-watch: ## [agent-safe] One local post-merge full-suite pass (local-poller mode)
+	@test -f scripts/ops/post-merge-poller.sh || { echo "merge-queue component not installed (run: scaffold agent-ops install --component merge-queue)"; exit 1; }
+	@scripts/ops/post-merge-poller.sh

@@ -4,6 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { AGENT_OPS_FILE_MAP, buildTemplateVars, checkAgentOps, installAgentOps } from './install.js'
 import { defaultMergeQueueConfig } from '../../merge-queue/types.js'
+import { defaultAgentOpsConfig } from './config.js'
 
 let projectRoot: string
 let templateRoot: string
@@ -219,5 +220,70 @@ describe('installAgentOps / checkAgentOps', () => {
     // …but unmanaged files never flip upToDate to false on their own.
     expect(check.modified).toEqual([])
     expect(check.missing).toEqual([])
+  })
+})
+
+function tmpProjectDir(): string {
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'agentops-proj-'))
+}
+function tmpTemplates(files: Record<string, string>): string {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agentops-tmpl-'))
+  for (const [rel, body] of Object.entries(files)) {
+    const p = path.join(root, rel)
+    fs.mkdirSync(path.dirname(p), { recursive: true })
+    fs.writeFileSync(p, body)
+  }
+  return root
+}
+
+describe('merge-queue and ci components', () => {
+  it('registers the new file-map entries with correct dests', () => {
+    expect(AGENT_OPS_FILE_MAP['merge-queue/mq-guard.sh.tmpl']).toEqual({
+      dest: 'scripts/mq-guard.sh', component: 'merge-queue', executable: true,
+    })
+    expect(AGENT_OPS_FILE_MAP['merge-queue/post-merge-poller.sh.tmpl']).toEqual({
+      dest: 'scripts/ops/post-merge-poller.sh', component: 'merge-queue', executable: true,
+    })
+    expect(AGENT_OPS_FILE_MAP['ci/setup-gh-runner.sh.tmpl']).toEqual({
+      dest: 'scripts/ops/setup-gh-runner.sh', component: 'ci', executable: true,
+    })
+    expect(AGENT_OPS_FILE_MAP['ci/post-merge.yml.tmpl']).toEqual({
+      dest: '.github/workflows/post-merge.yml', component: 'ci', executable: false,
+    })
+    expect(AGENT_OPS_FILE_MAP['ci/nightly.yml.tmpl']).toEqual({
+      dest: '.github/workflows/nightly.yml', component: 'ci', executable: false,
+    })
+  })
+
+  it('adds .mq/ to .gitignore when installing merge-queue, idempotently', () => {
+    const root = tmpProjectDir() // reuse/create the test helper that makes a temp project dir
+    const templateRoot = tmpTemplates({
+      'merge-queue/mq-guard.sh.tmpl': '#!/usr/bin/env bash\necho guard\n',
+      'merge-queue/post-merge-poller.sh.tmpl': '#!/usr/bin/env bash\necho poll\n',
+      'make/agent-ops.mk.tmpl': '# mk\n',
+    })
+    installAgentOps(root, { components: ['merge-queue'], templateRoot })
+    installAgentOps(root, { components: ['merge-queue'], templateRoot })
+    const ignore = fs.readFileSync(path.join(root, '.gitignore'), 'utf8')
+    expect(ignore.split('\n').filter(l => l === '.mq/')).toHaveLength(1)
+  })
+
+  it('does NOT touch .gitignore for git/staging installs', () => {
+    const root = tmpProjectDir()
+    const templateRoot = tmpTemplates({ 'make/agent-ops.mk.tmpl': '# mk\n' })
+    installAgentOps(root, { components: ['git'], templateRoot })
+    expect(fs.existsSync(path.join(root, '.gitignore'))).toBe(false)
+  })
+})
+
+describe('buildTemplateVars extensions', () => {
+  it('provides FULL_GATE_COMMAND from merge_queue config', () => {
+    const vars = buildTemplateVars(defaultAgentOpsConfig('/tmp/x'))
+    expect(vars.FULL_GATE_COMMAND).toBe('make check')
+  })
+
+  it('DEFAULT_BRANCH falls back to main outside a repo with origin/HEAD', () => {
+    const vars = buildTemplateVars(defaultAgentOpsConfig('/tmp/x'), '/tmp/definitely-not-a-repo')
+    expect(vars.DEFAULT_BRANCH).toBe('main')
   })
 })

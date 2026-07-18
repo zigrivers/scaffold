@@ -12,6 +12,10 @@ All notable changes to Scaffold are documented here.
   JSONL write-ahead journal with crash recovery, `mq:ready` label seam for remote
   agents. Spec: `docs/superpowers/specs/2026-07-17-merge-throughput-design.md`
   (Plan 1 of 3; agent-ops component + pipeline content land in follow-ups).
+- agent-ops components `merge-queue` (mq make targets, mq-guard PreToolUse hook,
+  local post-merge poller with pause-on-red) and `ci` (post-merge + nightly
+  workflows on a $0 self-hosted runner, runner setup script). `--component all`
+  deliberately stays git+staging. New config: `merge_queue.gate_executor`.
 
 ## [3.46.0] - 2026-07-16
 

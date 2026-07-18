@@ -1,0 +1,133 @@
+#!/usr/bin/env bash
+# post-merge-poller.sh — the `local-poller` gate executor (merge_queue.gate_executor).
+# Installed by `scaffold agent-ops install --component merge-queue`.
+#
+# One pass per invocation: if origin/<default-branch> moved since the last GREEN
+# full-suite run, run the FULL UNCACHED gate in a dedicated worktree.
+# RED  -> write .mq/PAUSED (the merge-queue daemon stops landing until a human
+#         fixes forward or reverts, then removes the file). Exit 1.
+# GREEN-> record the sha; clear a pause only if THIS script wrote it (a pause
+#         starting "post-merge red") — an NRS/human pause is never touched.
+# NOTE: {{FULL_GATE_COMMAND}} must be SELF-CONTAINED (install deps + run checks) —
+#       it runs on a fresh worktree with no pre-installed dependencies.
+# Schedule: cron/launchd every ~10 min, or ad hoc via `make post-merge-watch`.
+set -euo pipefail
+
+# Resolve relative to where this script itself lives, not the caller's cwd —
+# cron/launchd invoke it with an unpredictable working directory (often $HOME),
+# so we cd to our own install location first, then ask git for the PRIMARY
+# checkout (first entry in `worktree list`).
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+PRIMARY="$(git worktree list --porcelain | head -1 | sed 's/^worktree //')"
+cd "$PRIMARY"
+MQ_DIR="$PRIMARY/.mq"
+MARKER="$MQ_DIR/last-full-suite-sha"   # records the last GREEN sha only
+PAUSE="$MQ_DIR/PAUSED"
+WT="$MQ_DIR/post-merge"
+mkdir -p "$MQ_DIR/logs"
+
+# Mutual exclusion: the schedule (~10 min) is shorter than a full gate can take,
+# so overlapping invocations must not share the worktree/log. macOS has no
+# `flock`, so use an atomic mkdir lock that stores the owner PID. The lock is
+# stolen ONLY when the holder is provably dead (kill -0 fails) — a live-but-slow
+# gate keeps the lock (its poller is alive), which correctly prevents a second
+# concurrent gate rather than racing it.
+LOCK="$MQ_DIR/poller.lock"
+acquire_lock() {
+	if mkdir "$LOCK" 2>/dev/null; then echo "$$" > "$LOCK/pid"; return 0; fi
+	local holder
+	holder="$(cat "$LOCK/pid" 2>/dev/null || echo '')"
+	if [ -n "$holder" ] && kill -0 "$holder" 2>/dev/null; then
+		return 1 # holder alive
+	fi
+	# No readable pid but recently created ⇒ assume a just-starting holder.
+	if [ -z "$holder" ] && [ -z "$(find "$LOCK" -maxdepth 0 -mmin +90 2>/dev/null)" ]; then
+		return 1
+	fi
+	rm -rf "$LOCK" 2>/dev/null || true # holder dead / stale ⇒ steal
+	if mkdir "$LOCK" 2>/dev/null; then echo "$$" > "$LOCK/pid"; return 0; fi
+	return 1
+}
+if ! acquire_lock; then
+	echo "post-merge: another poller is running — skipping"
+	exit 0
+fi
+# Release the lock ONLY if we still own it: a slow prior run whose lock was
+# stolen must not have its EXIT trap delete the NEW owner's lock.
+cleanup() {
+	if [ "$(cat "$LOCK/pid" 2>/dev/null || echo '')" = "$$" ]; then
+		rm -rf "$LOCK" 2>/dev/null || true
+	fi
+}
+trap cleanup EXIT
+
+# Fetch FIRST, then resolve the default branch. origin/HEAD is unset on some
+# clones (git init + remote add), so fall back to the install-time default.
+git fetch origin --prune --quiet
+BRANCH="$(git rev-parse --abbrev-ref origin/HEAD 2>/dev/null | sed 's#^origin/##' || true)"
+[ -n "$BRANCH" ] || BRANCH="{{DEFAULT_BRANCH}}"
+HEAD_SHA="$(git rev-parse "origin/$BRANCH")"
+
+LAST="$(cat "$MARKER" 2>/dev/null || echo none)"
+if [ "$HEAD_SHA" = "$LAST" ]; then
+	echo "post-merge: up to date at $HEAD_SHA"
+	exit 0
+fi
+
+# A non-poller pause (NRS mismatch / human) halts the queue for a more serious
+# reason. Don't run the gate and NEVER touch that pause — leave it for a human.
+if [ -f "$PAUSE" ] && ! grep -q '^post-merge red' "$PAUSE" 2>/dev/null; then
+	echo "post-merge: a non-poller pause is set — skipping until it is resolved"
+	exit 0
+fi
+
+# Already paused (red) for THIS exact sha ⇒ don't re-run the expensive gate every
+# poll. The moment a human removes PAUSED (accepting the fix / declaring a flake),
+# the next poll re-runs and re-verifies — even at the same sha.
+if grep -q "^post-merge red at $HEAD_SHA" "$PAUSE" 2>/dev/null; then
+	echo "post-merge: already paused (red) at $HEAD_SHA — skipping until PAUSED is cleared"
+	exit 0
+fi
+
+git worktree prune
+if [ ! -d "$WT" ]; then
+	git worktree add --detach --quiet "$WT" "origin/$BRANCH"
+fi
+git -C "$WT" fetch origin --quiet
+# --force + clean: a previous run may have left tracked OR untracked files behind.
+git -C "$WT" checkout -f --detach --quiet "origin/$BRANCH"
+git -C "$WT" reset --hard --quiet "origin/$BRANCH"
+git -C "$WT" clean -fdq
+
+LOG="$MQ_DIR/logs/post-merge-$HEAD_SHA.log"
+# The gate command is inlined (not assigned to a var / not prefixed with timeout)
+# so a compound command — pipelines, env assignments, &&/|| — keeps its exact
+# meaning. A hung gate keeps this poller alive and holding the lock (kill -0
+# succeeds), so no second poller starts; there is no wall-clock timeout to distort
+# semantics.
+GATE_RC=0
+(cd "$WT" && {{FULL_GATE_COMMAND}}) >"$LOG" 2>&1 || GATE_RC=$?
+if [ "$GATE_RC" -eq 0 ]; then
+	echo "$HEAD_SHA" > "$MARKER"
+	if grep -q '^post-merge red' "$PAUSE" 2>/dev/null; then
+		rm -f "$PAUSE"
+		echo "post-merge: green at $HEAD_SHA — cleared poller pause"
+	else
+		echo "post-merge: green at $HEAD_SHA"
+	fi
+else
+	# A daemon NRS/human pause may have appeared WHILE the gate ran — re-check and
+	# never clobber it (that would make it look poller-owned and get auto-cleared).
+	if [ -f "$PAUSE" ] && ! grep -q '^post-merge red' "$PAUSE" 2>/dev/null; then
+		echo "post-merge: RED at $HEAD_SHA but a non-poller pause is now set — leaving it ($LOG)" >&2
+		exit 1
+	fi
+	# The pause names the sha, so the same-sha skip above suppresses re-runs while
+	# it stays set; removing it re-verifies. MARKER is NOT written on red (it tracks
+	# only green), so `rm .mq/PAUSED` alone re-triggers a full verification.
+	printf 'post-merge red at %s — full suite failed; see %s. Fix forward or revert (runbook: docs/git-workflow), then rm .mq/PAUSED\n' \
+		"$HEAD_SHA" "$LOG" > "$PAUSE"
+	echo "post-merge: RED at $HEAD_SHA — merge queue paused ($LOG)" >&2
+	exit 1
+fi
