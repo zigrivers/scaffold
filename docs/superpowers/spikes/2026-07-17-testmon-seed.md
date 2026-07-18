@@ -36,15 +36,16 @@ The script built a throwaway two-module Python project (`mod_a.add`,
    the point in generated projects where a warm-DB copy step would run when a
    new worktree is created.
 3. Edited only `wt1/src/mod_a.py` (changed `add`'s body) and re-ran
-   `pytest --testmon -q` in `wt1/`. Asserted the output contains `1 passed`
-   (only `test_add`, the affected test, ran — not both).
-4. Simulated rebase-like history churn: overwrote `wt1/src/mod_a.py` wholesale
-   with `proj/src/mod_a.py`'s original content (reverting it, as a rebase
-   might land a file back to an earlier state) and overwrote
-   `wt1/src/mod_b.py` wholesale with a changed body, then re-ran
-   `pytest --testmon -q`. Asserted the output contains `1 passed` or
-   `2 passed` (testmon is allowed to over-select here and re-run both — the
-   requirement is only that it doesn't crash or leave a test unexamined).
+   `pytest --testmon -v` in `wt1/`. Asserted at the TEST-NAME level (not a bare
+   count): `test_a.py::test_add` ran and passed, and `test_b.py::test_mul` did
+   NOT run — i.e. selection genuinely narrowed to the affected test.
+4. Simulated rebase-like history churn: reverted `wt1/src/mod_a.py` to
+   `proj/src/mod_a.py`'s original content and overwrote `wt1/src/mod_b.py`
+   wholesale with a changed body, then re-ran `pytest --testmon -v`. Asserted
+   that `test_b.py::test_mul` (the CHANGED test) ran and passed — testmon is
+   allowed to over-select and re-run both (that is the "degrade to running more"
+   behavior), but it must not silently run only the stale `test_a` and skip the
+   change. Observed: it re-ran BOTH tests (degraded to more), including test_b.
 
 ## Result
 

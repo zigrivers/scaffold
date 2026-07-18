@@ -60,15 +60,28 @@ still run post-merge.
   exactly those once to detect flakes; honoring `MQ_RETRY_TESTS` (comma-joined
   ids) on the rerun makes the retry cheap, ignoring it and rerunning the whole
   selection is also correct.
-- Excludes test ids listed in `.mq/quarantine.txt` (one per line) when the
-  file exists; the post-merge full run does NOT exclude them.
+- Excludes test ids listed in `.mq/quarantine.txt` (one per line) from the merge
+  gate when the file exists. The post-merge full run still *executes* them
+  (quarantine is a mute, not a delete — a quarantined test that goes reliably
+  green again should be un-quarantined), but a quarantined id's failure there
+  must NOT pause the queue: post-merge treats a red confined to quarantined ids
+  as a non-blocking flake report and pauses only on a NON-quarantined failure.
+  Otherwise every known flake would pause the queue on the next landing —
+  defeating the point of quarantining it.
 
 ### Force-full-run triggers (every stack)
 
-Lockfiles (`package-lock.json`, `pnpm-lock.yaml`, `uv.lock`, `Cargo.lock`),
-the test runner / build tool / TIA tool config itself, shared test utilities
-and fixtures (`src/test-utils/**`, `conftest.py`), global setup files, `.env*`,
-`migrations/**`, and CI/workflow files.
+Dependency manifests AND lockfiles (`package.json`, `pyproject.toml`,
+`Cargo.toml`, `go.mod`; `package-lock.json`, `pnpm-lock.yaml`, `uv.lock`,
+`Cargo.lock`) — a dependency bump can change any test's behavior. Compiler /
+test-runner / build-tool / TIA-tool config (`tsconfig*.json`, `.swcrc`,
+`vitest.config.*`, `turbo.json`, `pytest.ini`, `Makefile`). Generated /
+non-source inputs that impact tools track by import, not by data read, so an edit
+looks like "nothing changed" (SQL, `**/*.proto`, templates, JSON/YAML fixtures,
+codegen outputs). Shared test utilities and fixtures (`src/test-utils/**`,
+`conftest.py`), global setup files, `.env*`, `migrations/**`, and CI/workflow
+files. When in doubt, add the glob — a false force-full costs time; a false
+narrow costs a landed regression.
 
 ### TS, single package — Vitest
 
@@ -193,9 +206,15 @@ ways narrowing goes wrong — every one is covered by routing to a full run:
   Seed from a warm copy, and let history churn degrade to *more* running, never
   less (validated — see the testmon spike).
 
-The daemon's own escape hatch backs this up: a batch that goes red is bisected
-and the culprit ejected, and the post-merge full run is the final net — so a
-mis-selection at the gate costs at most one wasted batch, never a bad landing.
+The affected gate is a performance optimization, NOT the correctness boundary —
+be precise about what it does and doesn't prevent. A mis-selection passes the
+cheap gate green, so the change *does land*; the post-merge full run then catches
+it on the next run and pauses the queue (`.mq/PAUSED`), and a human reverts or
+fixes forward. So a gate mis-selection costs a bounded, quickly-caught bad
+landing on the default branch — not a regression that sits there undetected. (An
+affected-gate failure the gate *does* catch is bisected and the culprit ejected,
+costing at most one wasted batch.) The full suite running post-merge and nightly
+is what makes trusting the cheap gate safe; without that net, do not narrow.
 
 ### Calibration: is the gate actually cheaper?
 

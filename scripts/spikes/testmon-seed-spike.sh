@@ -48,17 +48,25 @@ cat > wt1/src/mod_a.py <<'EOF'
 def add(a, b):
     return int(a) + int(b)
 EOF
-OUT="$(cd wt1 && ../venv/bin/python -m pytest --testmon -q 2>&1 | tail -3)"
+# -v so we verify WHICH test ran, not just a count — a stale selector that runs
+# the wrong test would satisfy a bare "1 passed".
+OUT="$(cd wt1 && ../venv/bin/python -m pytest --testmon -v 2>&1 | tail -12)"
 echo "${OUT}"
-echo "${OUT}" | grep -q '1 passed' || { echo "VERDICT: DEGRADED — seeded selection did not narrow to the affected test"; exit 1; }
+echo "${OUT}" | grep -qiE 'test_a\.py::test_add.*(passed|ok)' \
+  || { echo "VERDICT: DEGRADED — seeded selection did not include the affected test (test_a)"; exit 1; }
+echo "${OUT}" | grep -qiE 'test_b\.py::test_mul.*(passed|ok)' \
+  && { echo "VERDICT: DEGRADED — selection did not narrow: ran the unaffected test_b too"; exit 1; }
 
-# Rebase churn: replace file content wholesale (simulates history rewrite)
+# Rebase churn: reset mod_a, replace mod_b content wholesale (simulates history
+# rewrite). The affected run must re-select the CHANGED test (mod_b -> test_b);
+# running only test_a here would be a silent mis-selection, not degradation.
 cp proj/src/mod_a.py wt1/src/mod_a.py
 cat > wt1/src/mod_b.py <<'EOF'
 def mul(a, b):
     return (a * b) + 0
 EOF
-OUT2="$(cd wt1 && ../venv/bin/python -m pytest --testmon -q 2>&1 | tail -3)"
+OUT2="$(cd wt1 && ../venv/bin/python -m pytest --testmon -v 2>&1 | tail -12)"
 echo "${OUT2}"
-echo "${OUT2}" | grep -qE '(1 passed|2 passed)' || { echo "VERDICT: DEGRADED — post-churn run failed"; exit 1; }
+echo "${OUT2}" | grep -qiE 'test_b\.py::test_mul.*(passed|ok)' \
+  || { echo "VERDICT: DEGRADED — post-churn run did not include the changed test (test_b)"; exit 1; }
 echo "VERDICT: SEEDING WORKS — warm-DB copy narrows selection; churn degrades to re-running, never crashing"

@@ -1,7 +1,7 @@
 ---
 name: git-workflow
 description: Configure git workflow with branching, PRs, local quality gates, and worktree tooling for parallel agents
-summary: "Sets up your branching strategy, commit format, PR workflow with squash-merge, the agent-ops worktree scripts (setup, doctor, prune), and conflict-prevention rules so multiple AI agents work in parallel without conflicts. The merge gate is local and fast (pre-commit + make check-affected + MMR review, serialized through the scaffold mq merge queue); post-merge and nightly full-suite CI runs from day one on a $0 self-hosted runner (or a local poller)."
+summary: "Sets up your branching strategy, commit format, PR workflow with squash-merge, the agent-ops worktree scripts (setup, doctor, prune), and conflict-prevention rules so multiple AI agents work in parallel without conflicts. The merge gate is local and fast (pre-commit + make check-affected + MMR review); projects that adopt the merge-throughput step serialize and batch-test merges through the scaffold mq queue and add day-one post-merge/nightly CI on a $0 self-hosted runner (or a local poller), while smaller projects land through a single serialized merge slot with no server CI until launch."
 phase: "environment"
 order: 330
 dependencies: [dev-env-setup]
@@ -21,9 +21,12 @@ the canonical machine mapping), a rebase-never-merge strategy, the 8-step PR wor
 as mandatory AI-review step 5.5, the agent-ops worktree scripts for parallel agents
 (setup, doctor, prune), conflict-prevention rules, and the two-layer quality
 architecture: a fast local merge gate (pre-commit hooks + `make check-affected` +
-agent self-review + `mmr review`) whose merges are serialized and batch-tested by
-the scaffold mq merge queue, plus day-one post-merge/nightly full-suite CI on a
-self-hosted runner (D4′ — see the merge-throughput step, order 335).
+agent self-review + `mmr review`). A project that adopts the merge-throughput
+step (order 335, for 3+ concurrent agents) serializes and batch-tests those
+merges through the scaffold mq merge queue and adds day-one post-merge/nightly
+full-suite CI on a $0 self-hosted runner (D4′); a smaller project lands through a
+single serialized merge slot with no server CI until launch. The steps below
+mark which parts are queue-only.
 
 ## Inputs
 - CLAUDE.md (required) — Key Commands table for lint/test/install commands
