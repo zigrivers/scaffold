@@ -17,6 +17,8 @@ jobs:
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
+      # {{FULL_GATE_COMMAND}} runs on a fresh checkout with no pre-installed
+      # dependencies, so it MUST be self-contained (install deps + run checks).
       - name: Full uncached gate
         run: |
           {{FULL_GATE_COMMAND}}

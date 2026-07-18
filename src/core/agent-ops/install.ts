@@ -171,21 +171,30 @@ function shellVarSuffix(name: string): string {
 }
 
 // origin/HEAD points at the remote's default branch (e.g. "origin/main"); strip
-// the "origin/" prefix so DEFAULT_BRANCH is the bare branch name. Falls back to
-// "main" whenever there's no projectRoot, no repo, or no origin/HEAD symref
-// (e.g. a fresh clone that never fetched with --tags / set-head).
+// the "origin/" prefix so DEFAULT_BRANCH is the bare branch name. When the local
+// origin/HEAD symref is unset (a clone that never ran `git remote set-head`), ask
+// the REMOTE for its default via `git ls-remote --symref` before falling back to
+// "main" — so a repo whose default is "master"/"develop" gets the right value.
+function gitBranchFrom(args: string[], projectRoot: string): string {
+  return execFileSync('git', args, {
+    cwd: projectRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
+  }).trim()
+}
+
 function resolveDefaultBranch(projectRoot: string | undefined): string {
   if (!projectRoot) return 'main'
   try {
-    const ref = execFileSync('git', ['rev-parse', '--abbrev-ref', 'origin/HEAD'], {
-      cwd: projectRoot,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    }).trim()
-    return ref.replace(/^origin\//, '') || 'main'
-  } catch {
-    return 'main'
-  }
+    const local = gitBranchFrom(['rev-parse', '--abbrev-ref', 'origin/HEAD'], projectRoot)
+      .replace(/^origin\//, '')
+    if (local) return local
+  } catch { /* origin/HEAD unset — try the remote */ }
+  try {
+    // `ref: refs/heads/<branch>\tHEAD` → take the branch name.
+    const symref = gitBranchFrom(['ls-remote', '--symref', 'origin', 'HEAD'], projectRoot)
+    const match = symref.match(/refs\/heads\/(\S+)\s+HEAD/)
+    if (match) return match[1]
+  } catch { /* no remote / offline — fall back */ }
+  return 'main'
 }
 
 export function buildTemplateVars(

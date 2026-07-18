@@ -193,26 +193,52 @@ poller_world() { # builds origin+clone, installs resolved poller with gate cmd $
   rm -rf "$WORK"
 }
 
-@test "poller: records the sha on RED so it does not re-run the full gate without movement" {
+@test "poller: does not re-run the full gate while already paused at the same sha" {
   poller_world "false"
   run "$WORK/clone/scripts/ops/post-merge-poller.sh"
   [ "$status" -eq 1 ]
   SHA="$(git -C "$WORK/clone" rev-parse origin/main)"
-  [ "$(cat "$WORK/clone/.mq/last-full-suite-sha")" = "$SHA" ]
-  # same sha -> "up to date", the (expensive) gate is NOT re-run every poll
+  grep -q "post-merge red at $SHA" "$WORK/clone/.mq/PAUSED"
+  # MARKER tracks GREEN only — it must NOT be written on red
+  [ ! -f "$WORK/clone/.mq/last-full-suite-sha" ]
+  # same sha, still paused -> skip (the expensive gate is not re-run every poll)
   run "$WORK/clone/scripts/ops/post-merge-poller.sh"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"up to date"* ]]
+  [[ "$output" == *"already paused"* ]]
   rm -rf "$WORK"
 }
 
-@test "poller: skips (exit 0) when another poller holds the lock" {
+@test "poller: removing PAUSED re-verifies at the same sha (rm-only, no new commit)" {
+  poller_world "false"
+  run "$WORK/clone/scripts/ops/post-merge-poller.sh"
+  [ "$status" -eq 1 ]
+  rm -f "$WORK/clone/.mq/PAUSED"
+  # gate still red -> a bare `rm PAUSED` re-triggers a full verification, re-pauses
+  run "$WORK/clone/scripts/ops/post-merge-poller.sh"
+  [ "$status" -eq 1 ]
+  [ -f "$WORK/clone/.mq/PAUSED" ]
+  rm -rf "$WORK"
+}
+
+@test "poller: skips (exit 0) when a LIVE poller holds the lock" {
   poller_world "true"
-  mkdir -p "$WORK/clone/.mq/poller.lock"   # simulate a live concurrent poller
+  mkdir -p "$WORK/clone/.mq/poller.lock"
+  echo $$ > "$WORK/clone/.mq/poller.lock/pid"   # a live holder (this bats process)
   run "$WORK/clone/scripts/ops/post-merge-poller.sh"
   [ "$status" -eq 0 ]
   [[ "$output" == *"another poller is running"* ]]
   [ ! -f "$WORK/clone/.mq/last-full-suite-sha" ]   # gate never ran
+  rm -rf "$WORK"
+}
+
+@test "poller: steals a lock whose owner PID is dead" {
+  poller_world "true"
+  mkdir -p "$WORK/clone/.mq/poller.lock"
+  echo 999999 > "$WORK/clone/.mq/poller.lock/pid"  # a PID that is not alive
+  run "$WORK/clone/scripts/ops/post-merge-poller.sh"
+  [ "$status" -eq 0 ]
+  SHA="$(git -C "$WORK/clone" rev-parse origin/main)"
+  [ "$(cat "$WORK/clone/.mq/last-full-suite-sha")" = "$SHA" ]   # green gate ran
   rm -rf "$WORK"
 }
 
