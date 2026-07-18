@@ -17,14 +17,17 @@ set identity once, then repeat up to N times (one bead in flight per agent):
   refresh view -> select ONE bead -> claim atomically, then validate (lost the
   claim? next candidate; dup/conflict? cooldown-release + next) -> worktree
   -> build (draft PR on first push; renew lease on each push)
-  -> verify (make check) -> review (mmr, 3-round cap) -> squash-merge
-  -> sync + prune -> close bead
+  -> verify (make check-affected) -> review (mmr, 3-round cap)
+  -> enqueue (make mq-enqueue) and move on -> daemon lands + closes the bead
 batch end (budget spent, queue drained, or P0/blocker): report in the slots
 ```
 
-**The bead is not done until the PR is MERGED and the bead is CLOSED.**
-Standing authorization: run the whole loop without asking permission. Do not
-end your turn after opening a draft PR with a list of "next steps" — that is
+**The agent's finish line is a green gate + passing review + the PR ENQUEUED** —
+the merge-queue daemon batches, lands, and closes the bead; do not wait for the
+merge or `bd close` an enqueued bead yourself. (No merge queue installed? Land
+via the serialized merge slot instead — same finish line, you just do the
+merge.) Standing authorization: run the whole loop without asking permission. Do
+not end your turn after opening a draft PR with a list of "next steps" — that is
 the #1 observed agent failure. The only mid-loop stops: a verified,
 still-reproducing P0, or a blocker you can name.
 

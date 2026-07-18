@@ -334,7 +334,7 @@ Run on every push and PR (should complete in <5 minutes):
 
 Before a PR can be merged:
 
-- Local quality gates pass (pre-commit hooks + `make check`) — CI is deferred until a launch target is chosen and applies only post-launch
+- Local quality gates pass (pre-commit hooks + `make check`; `make check-affected` is the per-merge gate) — a base project defers server-side CI until launch, but a merge-throughput project runs day-one post-merge/nightly CI on a $0 self-hosted runner (D4′)
 - Code review approved (by human or AI reviewer, e.g. `mmr review`)
 - No merge conflicts
 - Branch is up-to-date with main (or rebased)

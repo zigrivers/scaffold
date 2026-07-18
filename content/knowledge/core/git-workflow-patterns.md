@@ -38,8 +38,9 @@ The trunk-based development model works best for AI-agent workflows:
 - **Main branch** (`main`) — always deployable, protected by the local quality
   gate (pre-commit hooks + `make check` + agent self-review + `mmr review`)
   and PR review; the merge gate is local and fast (check-affected through the
-  merge queue) while post-merge and nightly full-suite CI runs from day one
-  on a self-hosted runner — see "Quality gates (CI deferred)" below
+  merge queue), and merge-throughput projects additionally run post-merge and
+  nightly full-suite CI from day one on a $0 self-hosted runner — see
+  "Quality gates" below
 - **Feature branches** — short-lived, one per task (`feat/short-desc`,
   `fix/bug-description`)
 - **Worktree branches** — parallel agent execution using git worktrees; the
@@ -117,28 +118,36 @@ AI review inserted as step 5.5):
 - **Never force-push** to main or shared branches
 - **Delete branches** after merge to prevent clutter
 
-### Quality gates (CI deferred)
+### Quality gates
 
-Scaffold projects run their quality gate locally, not in CI, until a launch
-or deploy target is chosen:
+By default, scaffold projects run their quality gate **locally**, not in CI,
+until a launch or deploy target is chosen:
 1. **Pre-commit hooks** — lint (ShellCheck, ESLint, or language-appropriate),
    secret scanning, frontmatter validation on changed files
 2. **`make check` (or equivalent)** — full test suite including evals, type
-   check, and build verification
+   check, and build verification (the cheap `check-affected` gate is the
+   per-merge gate; full `make check` is the safety net)
 3. **Agent self-review** — re-read the diff against the project's coding
    standards before pushing
 4. **`mmr review --pr <N> --sync --format json`** — mandatory multi-model AI
    review (3-round cap, degraded-pass self-merge past the cap)
 
-`.github/workflows/` is deliberately absent until a launch/deploy target is
-picked — nothing runs these checks server-side yet, so this local stack **is**
-the gate, not a supplement to one.
+For a **base project**, `.github/workflows/` is deliberately absent until a
+launch/deploy target is picked — nothing runs these checks server-side yet, so
+this local stack **is** the gate, not a supplement to one.
 
-#### Adding CI at launch
-When a launch target is chosen, wire the same `make check` and `mmr review`
-commands into a CI workflow, then turn on branch protection referencing that
-workflow's job name (see "Branch Protection Rules" below) so the gate becomes
-enforced rather than merely documented.
+**Merge-throughput projects are the exception (D4′).** A project that adopts the
+`merge-throughput` step installs day-one CI: `post-merge.yml` + `nightly.yml`
+run the full uncached suite on a $0 self-hosted runner (Actions minutes bill
+only for GitHub-hosted runners) after every landing and nightly — the standing
+safety net behind the cheap local merge gate. See `test-impact-analysis` and the
+`merge-throughput` pipeline step.
+
+#### Adding CI at launch (base projects)
+When a base project reaches a launch target, wire the same `make check` and
+`mmr review` commands into a CI workflow, then turn on branch protection
+referencing that workflow's job name (see "Branch Protection Rules" below) so
+the gate becomes enforced rather than merely documented.
 
 ## Merge queues for agent fleets
 

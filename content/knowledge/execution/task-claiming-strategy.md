@@ -126,7 +126,7 @@ A task is complete when all of the following are true:
 1. **All acceptance criteria met** — every criterion listed in the task description is satisfied
 2. **Tests passing** — new tests written for the task, plus the full existing suite, all pass
 3. **PR created** — code is pushed and a pull request is open with a structured description
-4. **Local quality gates pass** — pre-commit hooks + `make check` are green on the branch HEAD and `mmr review` passed (CI is deferred until a launch target is chosen; it applies only post-launch)
+4. **Local quality gates pass** — pre-commit hooks + `make check` are green on the branch HEAD and `mmr review` passed (server CI deferred until launch by default; merge-throughput projects run day-one post-merge/nightly CI)
 5. **No regressions** — existing functionality is unchanged unless the task explicitly modifies it
 
 Only after all five criteria are met should the task be marked as done.

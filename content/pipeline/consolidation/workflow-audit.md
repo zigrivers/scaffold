@@ -32,10 +32,13 @@ all issues found.
 - Makefile or package.json (required) — actual commands to match against
 - agent-ops.mk (optional) — installed agent-ops targets to verify against
   the Key Commands table
-- .github/ (optional) — verify `pull_request_template.md` exists and that
-  no workflow file or reference reads as present-tense CI setup (CI is
-  deliberately deferred — deferral language only; see the "Quality gates
-  (CI deferred)" section in docs/git-workflow.md)
+- .github/ (optional) — verify `pull_request_template.md` exists. For a BASE
+  project, no workflow file or reference should read as present-tense server CI
+  (deferred until launch — deferral language only; see the "Quality gates"
+  section in docs/git-workflow.md). For a MERGE-THROUGHPUT project (the
+  `merge-throughput` step ran), the opposite holds: `post-merge.yml` +
+  `nightly.yml` SHOULD be present and run the full gate on a self-hosted runner
+  (D4′) — flag only if they claim GitHub-hosted runners
 - docs/operations-runbook.md (optional) — deployment pipeline to verify
   doesn't contradict CI or dev-setup
 - tasks/lessons.md (optional) — verify it exists and is referenced
