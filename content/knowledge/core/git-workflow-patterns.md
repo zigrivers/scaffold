@@ -97,14 +97,16 @@ AI review inserted as step 5.5):
    - **Step 5.5 — mandatory AI review**: `mmr review --pr <N> --sync
      --format json` (3-round cap; a degraded-pass self-merge past the cap
      is the documented path, not a stall)
-6. Watch the local quality gates — pre-commit hooks ran, `make check`
-   passes on the branch HEAD; the full suite runs post-merge and nightly —
-   uncached — on the self-hosted runner or local poller, so these local
-   gates *are* the merge bar
-7. Squash-merge and delete the branch (`gh pr merge --squash
-   --delete-branch`) — with 3+ concurrent agents, serialize the merge via
-   `bd merge-slot acquire --wait` when the project's Beads has merge-slots,
-   releasing after the merge
+6. Watch the local quality gates — pre-commit hooks ran, `make check-affected`
+   (the fast merge gate) passes on the branch HEAD; the full `make check` runs
+   post-merge and nightly — uncached — on the self-hosted runner or local
+   poller, so together these *are* the merge bar
+7. Land it. On a merge-throughput project, `scaffold mq enqueue --pr <N>` (or
+   `make mq-enqueue PR=<N>`) and move on — the merge-queue daemon batches,
+   lands, and closes the bead; NEVER `gh pr merge` directly (the mq-guard hook
+   blocks it). Otherwise squash-merge and delete the branch (`gh pr merge
+   --squash --delete-branch`), serializing via `bd merge-slot acquire --wait`
+   when 3+ concurrent agents share the project's Beads, releasing after
 8. Sync `main` from the primary checkout: `make main-sync &&
    make prune-merged` (squash-aware pruning with a triage report — see
    [worktree-management](../execution/worktree-management.md))

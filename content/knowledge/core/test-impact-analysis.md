@@ -60,14 +60,16 @@ still run post-merge.
   exactly those once to detect flakes; honoring `MQ_RETRY_TESTS` (comma-joined
   ids) on the rerun makes the retry cheap, ignoring it and rerunning the whole
   selection is also correct.
-- Excludes test ids listed in `.mq/quarantine.txt` (one per line) from the merge
-  gate when the file exists. The post-merge full run still *executes* them
-  (quarantine is a mute, not a delete — a quarantined test that goes reliably
-  green again should be un-quarantined), but a quarantined id's failure there
-  must NOT pause the queue: post-merge treats a red confined to quarantined ids
-  as a non-blocking flake report and pauses only on a NON-quarantined failure.
-  Otherwise every known flake would pause the queue on the next landing —
-  defeating the point of quarantining it.
+- Excludes test ids listed in `.mq/quarantine.txt` (one per line) from the MERGE
+  gate (`check-affected`) when the file exists — quarantine is a mute, not a
+  delete; a quarantined test that goes reliably green again should be
+  un-quarantined. Note the asymmetry: the POST-MERGE full gate is a separate
+  command (`make check` on the CI runner / poller) and does NOT read the
+  quarantine list by default, so a quarantined flake failing there still holds
+  the queue. To keep a KNOWN flake from pausing post-merge, make the full-gate
+  command itself skip or soft-fail quarantined ids (a project responsibility);
+  the durable fix is to repair or delete the flake, not to leave it quarantined
+  forever.
 
 ### Force-full-run triggers (every stack)
 

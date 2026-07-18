@@ -329,13 +329,18 @@ Depth-gate per Methodology Scaling above.
    self-hosted runner ($0 Actions minutes; register with
    `scripts/ops/setup-gh-runner.sh`), or via the local poller
    (`make post-merge-watch`, cron/launchd) when
-   `merge_queue.gate_executor: local-poller`. When post-merge goes red the
-   queue pauses (`.mq/PAUSED`): fix forward or revert per docs/merge-queue.md,
-   then remove the pause file. Note: on free-plan private repos GitHub offers
+   `merge_queue.gate_executor: local-poller`. When post-merge goes red the queue
+   HOLDS — but the mechanism differs by executor: with the default
+   `gha-selfhosted`, the daemon sees the red `post-merge.yml` run (via `gh run
+   list`) and stops landing until a green run supersedes it (no `.mq/PAUSED`
+   file); with `local-poller`, the poller writes `.mq/PAUSED`. Either way, fix
+   forward or revert per docs/merge-queue.md (and, for local-poller, remove the
+   pause file). Note: on free-plan private repos GitHub offers
    no branch protection — the queue is enforced by convention + the mq-guard
    hook; GitHub Pro adds server-side protection if ever wanted.
-6. **The 8-step PR workflow** — (1) commit -> (2) local review
-   (`make check`, re-read the diff) -> (3) rebase -> (4) push ->
+6. **The 8-step PR workflow** — (1) commit -> (2) local review (re-read the
+   diff against the coding standards; the gate itself is step 6's
+   `make check-affected`, not a full run here) -> (3) rebase -> (4) push ->
    (5) `gh pr create` (auto-applies `.github/pull_request_template.md`) ->
    **step 5.5: `mmr review --pr <N> --sync --format json`** (mandatory;
    3-round cap — round 1 fixes every real finding, round 2+ fixes P0/P1
