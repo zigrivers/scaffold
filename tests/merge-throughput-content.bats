@@ -86,10 +86,11 @@ ROOT="$BATS_TEST_DIRNAME/.."
   grep -q 'check-affected' "$F"
 }
 
-@test "generated work-beads skills are in sync with the canonical source" {
-  run node "$ROOT/scripts/generate-agent-skills.mjs" --check
-  [ "$status" -eq 0 ]
-}
+# NOTE: work-beads skill drift (canonical content/agent-skills → generated
+# content/skills) is gated by the `agent-skills-check` make target, which builds
+# the renderer (packages/agent-integration) BEFORE running the drift check.
+# A bats copy here would run during `make test` — before that renderer is built —
+# and crash on the missing import, so it is intentionally omitted.
 
 # --- Task 11: mirrors ---
 @test "claude-md-optimization ship-loop condensation enqueues" {
