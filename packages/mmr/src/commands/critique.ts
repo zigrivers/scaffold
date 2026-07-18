@@ -367,7 +367,9 @@ export const critiqueCommand: CommandModule<object, CritiqueArgs> = {
             runner = async (prompt: string): Promise<string> => {
               await dispatchChannel(store, job.job_id, 'critique-synthesis', {
                 command: claudeCfg.command!, prompt: applyWrapper(claudeCfg.prompt_wrapper, prompt),
-                flags: claudeCfg.flags, env: claudeCfg.env,
+                // A synthesis reply is prose-shaped — strip a customizer's
+                // {{findings_schema}} pair rather than leak the placeholder.
+                flags: stripFindingsSchemaFlags(claudeCfg.flags), env: claudeCfg.env,
                 timeout: claudeCfg.timeout ?? config.defaults.timeout,
                 stderr: 'capture', promptDelivery: claudeCfg.prompt_delivery, cwd: claudeCfg.cwd,
               })

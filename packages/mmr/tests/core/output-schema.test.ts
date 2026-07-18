@@ -4,6 +4,7 @@ import {
   FINDINGS_SCHEMA_PLACEHOLDER,
   substituteFindingsSchema,
   stripFindingsSchemaFlags,
+  coerceParserForSchemaFlags,
 } from '../../src/core/output-schema.js'
 
 describe('FINDINGS_JSON_SCHEMA', () => {
@@ -66,5 +67,33 @@ describe('stripFindingsSchemaFlags', () => {
   it('is a no-op when no placeholder is present', () => {
     const flags = ['--output-format', 'json', '--no-memory']
     expect(stripFindingsSchemaFlags(flags)).toEqual(flags)
+  })
+})
+
+describe('coerceParserForSchemaFlags', () => {
+  const schemaFlags = ['--json-schema', FINDINGS_SCHEMA_PLACEHOLDER]
+
+  it('coerces a bare default parser to default-last when flags carry the placeholder', () => {
+    expect(coerceParserForSchemaFlags(schemaFlags, 'default')).toBe('default-last')
+  })
+
+  it('coerces an unwrap-jsonpath then:default (pre-3.2.0 grok restated in user config)', () => {
+    // Per-field deep-merge can pair an old restated parser with the NEW
+    // builtin flags — honoring then:'default' there reintroduces the
+    // first-object verdict flip.
+    const drifted = { kind: 'unwrap-jsonpath', wrap: '$.text', then: 'default' } as const
+    expect(coerceParserForSchemaFlags(schemaFlags, drifted)).toEqual(
+      { kind: 'unwrap-jsonpath', wrap: '$.text', then: 'default-last' },
+    )
+  })
+
+  it('leaves parsers alone when flags carry no placeholder', () => {
+    expect(coerceParserForSchemaFlags(['--output-format', 'json'], 'default')).toBe('default')
+  })
+
+  it('leaves custom parsers (non-default terminal) alone', () => {
+    const custom = { kind: 'unwrap-jsonpath', wrap: '$.text', then: 'gemini' } as const
+    expect(coerceParserForSchemaFlags(schemaFlags, custom)).toEqual(custom)
+    expect(coerceParserForSchemaFlags(schemaFlags, 'gemini')).toBe('gemini')
   })
 })

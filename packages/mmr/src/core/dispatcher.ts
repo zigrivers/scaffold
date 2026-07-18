@@ -162,8 +162,26 @@ export async function dispatchChannel(
     return
   }
 
+  // Preserve the FIRST attempt's start time across the retry: the results
+  // pipeline computes elapsed as completed_at − started_at, and a retried
+  // channel's true latency spans both attempts plus the jitter delay.
+  let firstStartedAt: string | undefined
+  try {
+    firstStartedAt = store.loadJob(jobId).channels[channelName]?.started_at
+  } catch {
+    // Best effort — metrics only.
+  }
+
   await new Promise((resolve) => setTimeout(resolve, incompleteRetryDelayMs()))
   await dispatchChannelOnce(store, jobId, channelName, opts)
+
+  if (firstStartedAt !== undefined) {
+    try {
+      store.updateChannel(jobId, channelName, { started_at: firstStartedAt })
+    } catch {
+      // Best effort — metrics only.
+    }
+  }
 
   if (completedRunMatchesIncompleteGuard(store, jobId, channelName, opts.retryOnIncomplete)) {
     try {

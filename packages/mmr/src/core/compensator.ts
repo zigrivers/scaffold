@@ -1,5 +1,6 @@
 import { dispatchChannel } from './dispatcher.js'
 import { dispatchHttpChannel } from './http-dispatcher.js'
+import { substituteFindingsSchema } from './output-schema.js'
 import type { JobStore } from './job-store.js'
 import type { ChannelConfigParsed, MmrConfigParsed, OutputParserConfig } from '../config/schema.js'
 import type { ChannelStatus } from '../types.js'
@@ -231,7 +232,11 @@ export async function dispatchCompensatingPasses(
       return dispatchChannel(store, jobId, comp.compensatingName, {
         command: dispatch.command,
         prompt: compensatingPrompt,
-        flags: dispatch.flags,
+        // Compensating replies are findings-shaped, so a compensator channel
+        // whose flags carry {{findings_schema}} (e.g. compensator.channel:
+        // grok) gets the real schema substituted — leaking the literal
+        // placeholder would fail the exact fallback coverage this provides.
+        flags: substituteFindingsSchema(dispatch.flags),
         env: dispatch.env,
         timeout: dispatch.timeout,
         stderr: dispatch.stderr,

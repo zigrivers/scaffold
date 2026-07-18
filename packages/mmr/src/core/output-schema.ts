@@ -1,3 +1,5 @@
+import type { OutputParserConfig } from '../config/schema.js'
+
 /**
  * The JSON Schema for a review channel's reply, used to force structured final
  * output from CLIs that support schema-constrained generation (grok's
@@ -40,6 +42,31 @@ export const FINDINGS_JSON_SCHEMA = {
  * schema; critique — whose reply shape differs — strips the flag pair instead.
  */
 export const FINDINGS_SCHEMA_PLACEHOLDER = '{{findings_schema}}'
+
+/**
+ * A schema-constrained channel emits one schema-shaped JSON object PER TURN
+ * (intermediate progress acks included), so extraction MUST take the last
+ * object. Per-field config deep-merge can drift flags and parser apart — e.g.
+ * a user config that restates the pre-3.2.0 grok `output_parser` (whose
+ * terminal parser was 'default') while inheriting the new builtin flags with
+ * `--json-schema`. Honoring that combination silently reintroduces the
+ * first-object verdict flip this schema work exists to prevent, so when the
+ * flags carry the placeholder, coerce a terminal 'default' to 'default-last'.
+ * Custom parsers (regex-findings, gemini, etc.) are left untouched — the
+ * hazard is specific to first-object 'default' extraction.
+ */
+export function coerceParserForSchemaFlags(
+  flags: string[],
+  parser: string | OutputParserConfig,
+): string | OutputParserConfig {
+  if (!flags.some((f) => f.includes(FINDINGS_SCHEMA_PLACEHOLDER))) return parser
+  if (parser === 'default') return 'default-last'
+  if (typeof parser === 'object' && parser.kind === 'unwrap-jsonpath'
+    && (parser.then === undefined || parser.then === 'default')) {
+    return { ...parser, then: 'default-last' }
+  }
+  return parser
+}
 
 /** Replace every placeholder arg with the serialized findings schema. */
 export function substituteFindingsSchema(flags: string[]): string[] {

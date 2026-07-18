@@ -82,6 +82,14 @@ function extractJsonValue(text: string): string {
   throw new Error('No JSON object or array found in output')
 }
 
+/**
+ * Thrown when a JSON candidate never closes before end-of-text (a truncated
+ * region). Distinct from a mismatched-delimiter error, which is a local
+ * malformation ('{]') that scanning can step past — truncation, by contrast,
+ * consumes everything to end-of-text, so nothing after it can be balanced.
+ */
+class UnbalancedJsonError extends Error {}
+
 function extractBalancedJsonValue(text: string, start: number): string {
   const opener = text[start]
   const stack: string[] = []
@@ -114,7 +122,7 @@ function extractBalancedJsonValue(text: string, start: number): string {
     }
   }
 
-  throw new Error(`Unbalanced ${opener === '{' ? 'braces' : 'brackets'} in JSON output`)
+  throw new UnbalancedJsonError(`Unbalanced ${opener === '{' ? 'braces' : 'brackets'} in JSON output`)
 }
 
 function parseJsonFromOutput(raw: string): unknown {
@@ -131,11 +139,14 @@ function parseJsonFromOutput(raw: string): unknown {
  * JSON object per turn: intermediate progress turns parse fine but only the
  * final object is the real verdict.
  *
- * STRICT TAIL: if any candidate AFTER the last complete object fails to
- * balance or parse, this throws instead of silently returning the earlier
- * object. A truncated final turn must fail the channel — the preceding turn
- * can be a progress ack (observed live with "approved": true) that would
- * wrongly stand in for the real verdict.
+ * STRICT TAIL: if a candidate AFTER the last complete object is truncated
+ * (unbalanced to end-of-text) or balanced-but-unparseable, this throws instead
+ * of silently returning the earlier object. A truncated final turn must fail
+ * the channel — the preceding turn can be a progress ack (observed live with
+ * "approved": true) that would wrongly stand in for the real verdict.
+ * Mismatched-delimiter fragments ('{]', typically stray braces in prose) are
+ * stepped past instead: they cannot be a truncated schema reply, and a valid
+ * final object may still follow them.
  */
 export function extractLastJson(text: string): string {
   let last: string | undefined
@@ -152,11 +163,19 @@ export function extractLastJson(text: string): string {
     try {
       candidate = extractBalancedJsonValue(text, i)
     } catch (err) {
-      // Unbalanced from here ⇒ the region runs to end-of-text, so nothing
-      // later can be balanced either.
       firstError ??= err instanceof Error ? err : new Error(String(err))
-      if (last !== undefined) brokenTail = true
-      break
+      if (err instanceof UnbalancedJsonError) {
+        // Truncated region: it consumes everything to end-of-text, so nothing
+        // later can be balanced — and a truncated tail after a complete object
+        // is exactly the strict-tail case (schema-mode truncation always
+        // presents as unbalanced-at-EOF, never as mismatched delimiters).
+        if (last !== undefined) brokenTail = true
+        break
+      }
+      // Mismatched delimiters ('{]') are a LOCAL malformation — step past the
+      // opening brace and keep scanning; a valid final object may follow.
+      i++
+      continue
     }
     try {
       JSON.parse(fixTrailingCommas(candidate))

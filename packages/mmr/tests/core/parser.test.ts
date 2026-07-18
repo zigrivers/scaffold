@@ -177,6 +177,15 @@ describe('default-last parser (grok --json-schema emits one JSON object per turn
     expect(result.summary).toBe('real')
   })
 
+  it('steps past a mismatched-delimiter fragment and still finds a later valid object', () => {
+    // '{]' is a LOCAL malformation (stray braces in prose), not a truncation —
+    // truncation always presents as unbalanced-at-EOF. Scanning must continue.
+    const raw = '{"approved": true, "findings": [], "summary": "ack"} {] {"approved": false, "findings": [{"severity":"P1","location":"c.ts:9","description":"bug","suggestion":"fix"}], "summary": "real"}'
+    const result = parse(raw)
+    expect(result.summary).toBe('real')
+    expect(result.findings).toHaveLength(1)
+  })
+
   it('throws the same error shape as default when no JSON is present', () => {
     const result = parseChannelOutput('no json here at all', 'default-last')
     expect(result.summary).toBe('Output parsing failed.')

@@ -52,6 +52,14 @@
   `--json-schema {{findings_schema}}` and `output_parser.then` is
   `default-last`. Customizers who restate `channels.grok.flags` should add the
   new pair (see README "Grok channel" section for the full hardened array).
+  Customizers who restate `channels.grok.output_parser` (a copy of the
+  pre-3.2.0 block with `then: 'default'`) are protected automatically: when a
+  channel's flags carry `{{findings_schema}}`, review dispatch coerces a
+  terminal `'default'` parser to `'default-last'` — honoring the drifted combo
+  would silently reintroduce the first-object verdict flip. The placeholder is
+  also handled on every other dispatch path: compensating passes substitute
+  the real schema (their replies are findings-shaped); critique and its
+  synthesis pass strip the pair (their reply shapes differ).
 
 ## [3.1.2] — 2026-07-14
 
