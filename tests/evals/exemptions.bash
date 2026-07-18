@@ -13,6 +13,10 @@ TERMINAL_OUTPUT_EXEMPT=(
   "automated-pr-review"
   "beads"
   "create-evals"
+  # merge-throughput's output (docs/merge-queue.md) is an operational runbook
+  # for humans/agents running the merge queue, not a document another
+  # pipeline step reads as a generation Input.
+  "merge-throughput"
   # staging-environments' outputs (.scaffold/agent-ops.yaml, ops/compose/staging.yml,
   # ops/compose/staging.env.example) are operational config consumed by the
   # agent-ops CLI and Docker at runtime, not documents another pipeline step reads.

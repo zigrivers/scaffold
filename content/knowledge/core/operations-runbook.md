@@ -51,7 +51,7 @@ Production secrets should never be in code or `.env` files:
 
 ## Deployment Pipeline
 
-Generated projects deliberately defer CI: the quality gate is local — pre-commit hooks + `make check` + `mmr review` — per the "Quality gates (CI deferred)" section of docs/git-workflow.md, and no `.github/workflows/` exists until a launch target is chosen. When operations work introduces CI at launch, it builds the pipeline from scratch — wiring those same local gates into hosted verification stages, then adding the production deployment stages below. There is no pre-existing base CI to extend; the runbook must not describe one.
+By default a generated project defers server-side CI: the quality gate is local — pre-commit hooks + `make check` + `mmr review` — per the "Quality gates" section of docs/git-workflow.md, and no `.github/workflows/` exists until a launch target is chosen. When operations work introduces CI at launch, it wires those same local gates into hosted verification stages, then adds the production deployment stages below. **Exception (D4′):** a merge-throughput project already ships day-one `post-merge.yml` + `nightly.yml` (full gate on a $0 self-hosted runner) — at launch, extend those existing workflows with the deployment stages rather than building from scratch. For a base project there is no pre-existing CI to extend; the runbook must not invent one.
 
 ### Pipeline Architecture
 

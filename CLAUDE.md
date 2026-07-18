@@ -18,9 +18,9 @@ This is a **prompt pipeline** — a curated sequence of structured meta-prompts 
 This repo is a **Claude Code plugin** (installable via `/plugin marketplace add`) and a TypeScript CLI distributed via npm and Homebrew.
 
 ### Source of Truth
-- `content/pipeline/` — 90 meta-prompt files organized into 16 phases (source of truth for pipeline steps)
+- `content/pipeline/` — 91 meta-prompt files organized into 16 phases (source of truth for pipeline steps)
 - `content/tools/` — 12 tool meta-prompts (`category: tool`, `stateless: true`) orthogonal to the pipeline
-- `content/knowledge/` — 278 domain expertise entries in 20 categories (injected into prompts during assembly)
+- `content/knowledge/` — 300 domain expertise entries in 21 categories (injected into prompts during assembly)
 - `content/skills/` — Skill templates with `{{markers}}` for multi-platform resolution
 - `content/methodology/` — Preset configs (deep, mvp, custom)
 - `src/types/frontmatter.ts` — Canonical `PHASES` constant defining all 16 phase slugs, numbers, and display names

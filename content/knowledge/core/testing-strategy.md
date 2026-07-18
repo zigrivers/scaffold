@@ -10,7 +10,7 @@ topics:
   - test-data
   - mocking
 volatility: stable
-last-reviewed: 2026-06-11
+last-reviewed: 2026-07-17
 version-pin: null
 sources:
   - url: https://martinfowler.com/articles/practical-test-pyramid.html
@@ -291,6 +291,23 @@ Tools: Stryker (JavaScript/TypeScript), mutmut (Python), PITest (Java).
 
 Use mutation testing periodically (not on every CI run — it's slow) to assess test suite quality.
 
+### The two-gate architecture
+
+- **Merge gate** — affected-only selection (`make check-affected`, 2-5 min):
+  runs only the tests a diff can affect. See
+  [test-impact-analysis](../core/test-impact-analysis.md) for per-stack
+  selection recipes and the exact contract the selector must satisfy.
+- **Full suite** — `make check`, uncached: runs post-merge (every landing)
+  and nightly as the safety net that keeps the cheap gate honest.
+- **Force-full triggers** — lockfiles, gate/tool config, shared test utils,
+  global setup, env files, and DB migrations always escalate the merge gate
+  to the full suite.
+- **E2E stays out of the merge gate** — a tagged smoke subset at most; full
+  E2E coverage runs in the full suite only.
+- **Flake quarantine** (`.mq/quarantine.txt`) is excluded from the merge
+  gate but still runs in the full suite — quarantined is a fix-SLA, not a
+  deletion.
+
 ### Quality Gates — Detailed
 
 #### Pre-Commit Checks
@@ -317,7 +334,7 @@ Run on every push and PR (should complete in <5 minutes):
 
 Before a PR can be merged:
 
-- Local quality gates pass (pre-commit hooks + `make check`) — CI is deferred until a launch target is chosen and applies only post-launch
+- Local quality gates pass (pre-commit hooks + `make check`; `make check-affected` is the per-merge gate) — a base project defers server-side CI until launch, but a merge-throughput project runs day-one post-merge/nightly CI on a $0 self-hosted runner (D4′)
 - Code review approved (by human or AI reviewer, e.g. `mmr review`)
 - No merge conflicts
 - Branch is up-to-date with main (or rebased)
@@ -579,3 +596,5 @@ The `story-tests-map.md` file provides a traceability matrix linking user storie
 ## See Also
 
 - [api-design](../core/api-design.md) — Contract testing patterns
+- [test-impact-analysis](../core/test-impact-analysis.md) — Affected-only
+  selection mechanisms and force-full-run triggers for the merge gate

@@ -16,6 +16,13 @@ All notable changes to Scaffold are documented here.
   local post-merge poller with pause-on-red) and `ci` (post-merge + nightly
   workflows on a $0 self-hosted runner, runner setup script). `--component all`
   deliberately stays git+staging. New config: `merge_queue.gate_executor`.
+- Generation layer for merge throughput: new `merge-throughput` pipeline step
+  (environment/335, if-needed) installing the queue + day-one CI; `make
+  check-affected` two-gate contract in tdd/dev-env-setup; TS projects default
+  to a 3–5-package workspace; work-beads ships via `mq enqueue` (merge-slot
+  fallback preserved); new `test-impact-analysis` knowledge entry; D4
+  (CI-deferred) superseded by D4′ per
+  `docs/superpowers/specs/2026-07-17-merge-throughput-design.md`.
 
 ## [3.46.0] - 2026-07-16
 

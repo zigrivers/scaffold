@@ -118,7 +118,8 @@ git rebase origin/main   # bring the branch up to date; do NOT create a new bran
 ### Between Tasks
 
 After a bead's PR has merged (local quality gates green + `mmr review` passed —
-CI is deferred until launch), the bead's branch is already retired — the
+server CI deferred until launch by default, day-one for merge-throughput
+projects), the bead's branch is already retired — the
 squash-merge ran with `--delete-branch`. From the PRIMARY checkout, reclaim the
 finished worktree and start the next bead on a fresh branch:
 

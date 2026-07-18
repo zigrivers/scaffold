@@ -14,7 +14,8 @@ knowledge-base: [operations-runbook]
 ## Purpose
 Define the production operational strategy: deployment pipeline (building on
 the local quality gates from git-workflow — pre-commit hooks, `make check`,
-`mmr review`; CI is deliberately deferred until a launch target is chosen),
+`mmr review`; server CI is deferred until launch by default, though
+merge-throughput projects run day-one post-merge/nightly CI),
 deployment approach, monitoring and alerting, incident response, and
 rollback procedures. References docs/dev-setup.md for local development
 setup rather than redefining it.
@@ -24,8 +25,8 @@ setup rather than redefining it.
 - docs/tdd-standards.md (required) — test stages the deployment pipeline runs
 - docs/adrs/ (required) — infrastructure decisions
 - docs/dev-setup.md (optional) — local dev setup to reference, not redefine
-- docs/git-workflow.md (optional) — local quality gates (CI deferred) to
-  build on, not redefine
+- docs/git-workflow.md (optional) — local quality gates (server CI deferred by
+  default; day-one CI for merge-throughput projects) to build on, not redefine
 
 ## Expected Outputs
 - docs/operations-runbook.md — production operations and deployment runbook

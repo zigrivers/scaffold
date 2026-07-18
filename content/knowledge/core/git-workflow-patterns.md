@@ -12,7 +12,7 @@ topics:
   - merge-strategy
   - worktrees
 volatility: stable
-last-reviewed: 2026-07-11
+last-reviewed: 2026-07-17
 version-pin: null
 sources:
   - url: https://git-scm.com/docs/git-worktree
@@ -37,8 +37,10 @@ The trunk-based development model works best for AI-agent workflows:
 
 - **Main branch** (`main`) — always deployable, protected by the local quality
   gate (pre-commit hooks + `make check` + agent self-review + `mmr review`)
-  and PR review; CI is deliberately deferred until a launch target is chosen
-  — see "Quality gates (CI deferred)" below
+  and PR review; the merge gate is local and fast (check-affected through the
+  merge queue), and merge-throughput projects additionally run post-merge and
+  nightly full-suite CI from day one on a $0 self-hosted runner — see
+  "Quality gates" below
 - **Feature branches** — short-lived, one per task (`feat/short-desc`,
   `fix/bug-description`)
 - **Worktree branches** — parallel agent execution using git worktrees; the
@@ -95,13 +97,15 @@ AI review inserted as step 5.5):
    - **Step 5.5 — mandatory AI review**: `mmr review --pr <N> --sync
      --format json` (3-round cap; a degraded-pass self-merge past the cap
      is the documented path, not a stall)
-6. Watch the local quality gates — pre-commit hooks ran, `make check`
-   passes on the branch HEAD; CI is deliberately deferred until a launch
-   target is chosen, so these local gates *are* the merge bar
-7. Squash-merge and delete the branch (`gh pr merge --squash
-   --delete-branch`) — with 3+ concurrent agents, serialize the merge via
-   `bd merge-slot acquire --wait` when the project's Beads has merge-slots,
-   releasing after the merge
+6. Watch the local quality gates — pre-commit hooks ran, `make check-affected`
+   (the fast merge gate) passes on the branch HEAD; the full `make check` runs
+   post-merge and nightly — uncached — on the self-hosted runner or local
+   poller, so together these *are* the merge bar
+7. Land it. On a merge-throughput project, `scaffold mq enqueue --pr <N>` and
+   move on — the daemon batches, lands, and closes the bead; NEVER `gh pr merge`
+   directly (the mq-guard hook blocks it). Otherwise squash-merge + delete the
+   branch (`gh pr merge --squash --delete-branch`), serialized via
+   `bd merge-slot acquire --wait` for 3+ agents
 8. Sync `main` from the primary checkout: `make main-sync &&
    make prune-merged` (squash-aware pruning with a triage report — see
    [worktree-management](../execution/worktree-management.md))
@@ -115,28 +119,55 @@ AI review inserted as step 5.5):
 - **Never force-push** to main or shared branches
 - **Delete branches** after merge to prevent clutter
 
-### Quality gates (CI deferred)
+### Quality gates
 
-Scaffold projects run their quality gate locally, not in CI, until a launch
-or deploy target is chosen:
+By default, scaffold projects run their quality gate **locally**, not in CI,
+until a launch or deploy target is chosen:
 1. **Pre-commit hooks** — lint (ShellCheck, ESLint, or language-appropriate),
    secret scanning, frontmatter validation on changed files
 2. **`make check` (or equivalent)** — full test suite including evals, type
-   check, and build verification
+   check, and build verification (the cheap `check-affected` gate is the
+   per-merge gate; full `make check` is the safety net)
 3. **Agent self-review** — re-read the diff against the project's coding
    standards before pushing
 4. **`mmr review --pr <N> --sync --format json`** — mandatory multi-model AI
    review (3-round cap, degraded-pass self-merge past the cap)
 
-`.github/workflows/` is deliberately absent until a launch/deploy target is
-picked — nothing runs these checks server-side yet, so this local stack **is**
-the gate, not a supplement to one.
+For a **base project**, `.github/workflows/` is deliberately absent until a
+launch/deploy target is picked — nothing runs these checks server-side yet, so
+this local stack **is** the gate, not a supplement to one.
 
-#### Adding CI at launch
-When a launch target is chosen, wire the same `make check` and `mmr review`
-commands into a CI workflow, then turn on branch protection referencing that
-workflow's job name (see "Branch Protection Rules" below) so the gate becomes
-enforced rather than merely documented.
+**Merge-throughput projects are the exception (D4′).** A project that adopts the
+`merge-throughput` step installs day-one CI: `post-merge.yml` + `nightly.yml`
+run the full uncached suite on a $0 self-hosted runner (Actions minutes bill
+only for GitHub-hosted runners) after every landing and nightly — the standing
+safety net behind the cheap local merge gate. See `test-impact-analysis` and the
+`merge-throughput` pipeline step.
+
+#### Adding CI at launch (base projects)
+When a base project reaches a launch target, wire the same `make check` and
+`mmr review` commands into a CI workflow, then turn on branch protection
+referencing that workflow's job name (see "Branch Protection Rules" below) so
+the gate becomes enforced rather than merely documented.
+
+## Merge queues for agent fleets
+
+**Batch-then-bisect**: a local queue daemon builds each merge candidate from
+latest `main` plus everything queued, runs the gate once against the whole
+batch, and lands green batches while asserting the landed tree equals the
+tested candidate tree; a red batch retries once (to rule out a flake), then
+bisects in two and requeues both halves, ejecting a failing singleton with
+its log.
+
+**Why serialization alone caps throughput**: a one-at-a-time merge lease
+(or `bd merge-slot`) prevents clobbering but not livelock — every landed
+merge invalidates every other agent's in-flight gate run, so a large fleet
+spends more time restarting gates than merging.
+
+**The agent contract**: enqueue and move on. After `mmr review` passes, run
+`make mq-enqueue PR=<N>` (or `scaffold mq enqueue --pr <N>`) and start the
+next bead immediately — the daemon lands or ejects the PR; the agent never
+waits in a merge loop.
 
 ### Worktree Patterns for Multi-Agent Work
 
