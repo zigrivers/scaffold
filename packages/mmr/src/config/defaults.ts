@@ -120,6 +120,21 @@ export const BUILTIN_CHANNELS: Record<string, SubprocessChannelParsed> = {
       // the upstream default. See tasks/lessons.md.
       '--disallowed-tools', 'run_terminal_cmd',
       '--no-subagents', '--no-plan',
+      // Force schema-constrained final output (verified on grok 0.2.103,
+      // 2026-07-18): without it, the grok-4.5 reasoning model frequently ends
+      // a review with stopReason=Cancelled and only a progress ack in $.text
+      // whenever the account runs concurrent grok sessions (parallel MMR
+      // jobs/agents/worktrees) — the computed answer is lost (the envelope's
+      // `thought` is truncated to ~200 chars, so nothing is salvageable). With
+      // the schema, the final answer reliably lands in $.text and cancellation
+      // drops sharply (4-way concurrency repro: 5/8 cancelled → 1/8).
+      // The {{findings_schema}} placeholder is substituted with the serialized
+      // FINDINGS_JSON_SCHEMA at review dispatch (core/output-schema.ts);
+      // critique strips the pair instead — its reply shape differs.
+      // Requires a grok CLI with --json-schema; older groks fail with an
+      // unknown-argument error (channel → failed + compensating pass; fix is
+      // to update grok).
+      '--json-schema', '{{findings_schema}}',
     ],
     auth: {
       // `grok models` lists models and prints the login state; it does not
@@ -133,19 +148,23 @@ export const BUILTIN_CHANNELS: Record<string, SubprocessChannelParsed> = {
     prompt_wrapper: '{{prompt}}',
     // `grok --output-format json` wraps the reply as { "text": "<reply>",
     // "thought": "...", "stopReason": "EndTurn|Cancelled", ... }. Unwrap $.text,
-    // then run the default findings parser over the model's reply (same shape as
-    // the gemini unwrap).
+    // then run the last-object findings parser over the model's reply.
     //
-    // `incomplete`: under heavy concurrent grok load, grok frequently cancels a
-    // review mid-run — the envelope returns stopReason: "Cancelled" after 1–3
-    // turns with only a short "I'll review…" ack in $.text and NO findings JSON.
-    // Without this guard the parser throws the misleading "No JSON object found
-    // in output". The guard instead reports the honest cause so the degraded
-    // channel is actionable. (A cancelled grok channel is `status: failed`, which
-    // already triggers MMR's compensating pass — coverage is preserved; this only
-    // fixes the error message.) We do NOT fall back to findings embedded in
-    // `thought`: those come from an interrupted run and could approve a PR a
-    // completed review would have blocked.
+    // `then: 'default-last'`: with --json-schema, EVERY turn grok emits —
+    // including intermediate "Reviewing…" progress acks — is a schema-shaped
+    // JSON object concatenated into $.text. Only the LAST object is the real
+    // verdict; first-object extraction was observed live to flip a 3-finding
+    // review into "approved, no issues found".
+    //
+    // `incomplete`: under same-account concurrent grok sessions, grok cancels
+    // a review mid-run — stopReason: "Cancelled". The guard is PREEMPTIVE
+    // (parser.ts): a Cancelled envelope is rejected even when $.text holds a
+    // parseable ack object, because trusting it could approve a PR a completed
+    // review would have blocked. The dispatcher retries a Cancelled run once
+    // (dispatchChannelWithIncompleteRetry); if the retry is cancelled too, the
+    // channel fails with this honest message and the compensating pass covers
+    // it. We do NOT salvage findings from `thought`: the envelope truncates it
+    // (~200 chars), and an interrupted run's partial reasoning is untrustworthy.
     output_parser: {
       kind: 'unwrap-jsonpath',
       wrap: '$.text',
@@ -153,11 +172,11 @@ export const BUILTIN_CHANNELS: Record<string, SubprocessChannelParsed> = {
         status_path: '$.stopReason',
         values: ['Cancelled'],
         message:
-          'grok was interrupted mid-review (commonly under heavy concurrent grok load) before writing '
-          + 'findings to its reply. Auth is unaffected — retry the review, or reduce the number of '
-          + 'parallel grok agents/worktrees.',
+          'grok cancelled the review mid-run (typical under same-account concurrent grok sessions) and '
+          + 'the automatic retry did not recover it. Auth is unaffected — retry the review, or reduce '
+          + 'the number of parallel grok agents/worktrees.',
       },
-      then: 'default',
+      then: 'default-last',
     },
     stderr: 'capture',
   },

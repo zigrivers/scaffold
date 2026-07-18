@@ -4,6 +4,7 @@ import { JobStore } from '../core/job-store.js'
 import { checkInstalled, checkAuth } from '../core/auth.js'
 import { dispatchChannel } from '../core/dispatcher.js'
 import { dispatchHttpChannel } from '../core/http-dispatcher.js'
+import { stripFindingsSchemaFlags } from '../core/output-schema.js'
 import { redactCommandString } from '../core/redact.js'
 import { classifyTrustMode } from '../core/trust-mode.js'
 import { assembleCritiquePrompt } from '../core/critique-prompt.js'
@@ -312,7 +313,11 @@ export const critiqueCommand: CommandModule<object, CritiqueArgs> = {
         return dispatchHttpChannel(store, job.job_id, name, { channel: ch, prompt, timeout })
       }
       return dispatchChannel(store, job.job_id, name, {
-        command: ch.command!, prompt, flags: ch.flags, env: ch.env, timeout,
+        // Critique reuses review channel flags verbatim, EXCEPT the
+        // {{findings_schema}} pair (grok's --json-schema): a critique reply is
+        // items/summary-shaped, so constraining it to the findings schema
+        // would break parseCritiqueOutput.
+        command: ch.command!, prompt, flags: stripFindingsSchemaFlags(ch.flags), env: ch.env, timeout,
         stderr: ch.stderr === 'passthrough' ? 'passthrough' : ch.stderr === 'suppress' ? 'suppress' : 'capture',
         promptDelivery: ch.prompt_delivery, cwd: ch.cwd,
       })

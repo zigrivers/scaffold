@@ -6,6 +6,7 @@ import { JobStore } from '../core/job-store.js'
 import { checkInstalled, checkAuth, checkHttpAuth } from '../core/auth.js'
 import { assemblePrompt } from '../core/prompt.js'
 import { dispatchChannel } from '../core/dispatcher.js'
+import { substituteFindingsSchema } from '../core/output-schema.js'
 import { dispatchHttpChannel } from '../core/http-dispatcher.js'
 import { runResultsPipeline } from '../core/results-pipeline.js'
 import { redactCommandString } from '../core/redact.js'
@@ -712,7 +713,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
           dispatchChannel(store, job.job_id, name, {
             command: chConfig.command,
             prompt: buildChannelPrompt(chConfig, prompt),
-            flags: chConfig.flags,
+            flags: substituteFindingsSchema(chConfig.flags),
             env: chConfig.env,
             timeout: chConfig.timeout ?? config.defaults.timeout,
             stderr: chConfig.stderr === 'passthrough' ? 'passthrough'
@@ -720,6 +721,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
                 : 'capture',
             promptDelivery: chConfig.prompt_delivery,
             cwd: chConfig.cwd,
+            retryOnIncomplete: chConfig.output_parser,
           }),
         )
       }
@@ -747,7 +749,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
         await dispatchChannel(store, job.job_id, name, {
           command: chConfig.command,
           prompt: buildChannelPrompt(chConfig, prompt),
-          flags: chConfig.flags,
+          flags: substituteFindingsSchema(chConfig.flags),
           env: chConfig.env,
           timeout: chConfig.timeout ?? config.defaults.timeout,
           stderr: chConfig.stderr === 'passthrough' ? 'passthrough'
@@ -755,6 +757,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
               : 'capture',
           promptDelivery: chConfig.prompt_delivery,
           cwd: chConfig.cwd,
+          retryOnIncomplete: chConfig.output_parser,
         })
       }
     }

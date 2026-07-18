@@ -123,6 +123,35 @@ function parseJsonFromOutput(raw: string): unknown {
 }
 
 /**
+ * Extract the LAST top-level JSON value in the text. Candidates are scanned
+ * sequentially — once a balanced, parseable value is found the scan resumes
+ * AFTER it, so values nested inside an earlier object are never treated as
+ * candidates. Needed for schema-constrained CLIs (grok --json-schema) that
+ * emit one schema-shaped JSON object per turn: intermediate progress turns
+ * parse fine but only the final object is the real verdict.
+ */
+export function extractLastJson(text: string): string {
+  let last: string | undefined
+  let firstError: Error | undefined
+
+  for (let start = 0; start < text.length; start++) {
+    if (text[start] !== '{') continue
+    try {
+      const candidate = extractBalancedJsonValue(text, start)
+      JSON.parse(fixTrailingCommas(candidate))
+      last = candidate
+      start += candidate.length - 1
+    } catch (err) {
+      firstError ??= err instanceof Error ? err : new Error(String(err))
+    }
+  }
+
+  if (last !== undefined) return last
+  if (firstError) throw firstError
+  throw new Error('No JSON object found in output')
+}
+
+/**
  * Default parser: strips markdown fences, extracts JSON from surrounding text,
  * fixes trailing commas, then JSON.parse.
  */
@@ -201,6 +230,19 @@ function defaultParser(raw: string): ParsedOutput {
 }
 
 /**
+ * Like `default`, but extracts the LAST top-level JSON object instead of the
+ * first. Used by the grok channel: with `--json-schema`, every turn's output
+ * (including intermediate "Reviewing…" progress acks) is a schema-shaped JSON
+ * object, so first-object extraction can return an ack — observed live to
+ * flip a 3-finding review into "approved, no issues found".
+ */
+function defaultLastParser(raw: string): ParsedOutput {
+  let text = extractLastJson(stripMarkdownFences(raw))
+  text = fixTrailingCommas(text)
+  return validateParsedOutput(JSON.parse(text))
+}
+
+/**
  * Gemini parser: tries to unwrap `{ "response": "..." }` wrapper,
  * then delegates to defaultParser.
  */
@@ -256,6 +298,7 @@ function docConformanceParser(raw: string): ParsedOutput {
 
 const builtinParsers: Record<string, Parser> = {
   default: defaultParser,
+  'default-last': defaultLastParser,
   gemini: geminiParser,
   'doc-conformance': docConformanceParser,
 }
@@ -273,36 +316,60 @@ export function getParser(spec: string | OutputParserConfig): Parser {
   return buildParser(spec)
 }
 
+type IncompleteGuard = NonNullable<
+  Extract<OutputParserConfig, { kind: 'unwrap-jsonpath' }>['incomplete']
+>
+
 /**
- * When an `unwrap-jsonpath` parse fails, return a clear, actionable error IF the
- * envelope's status field marks an interrupted/incomplete run (per the optional
- * `incomplete` guard); otherwise return the original error unchanged. This turns
- * grok's "stopReason: Cancelled + ack-only $.text" case from a misleading
- * "No JSON object found in output" into an honest "did not complete" message.
+ * True when the decoded CLI envelope's status field marks an
+ * interrupted/incomplete run per the guard. A malformed custom status_path
+ * never throws — the guard can only ever ADD information.
  */
-function incompleteOrDefault(
-  decoded: unknown,
-  spec: Extract<OutputParserConfig, { kind: 'unwrap-jsonpath' }>,
-  fallback: Error,
-): Error {
-  const guard = spec.incomplete
-  if (!guard) return fallback
+function matchesIncompleteGuard(decoded: unknown, guard: IncompleteGuard): boolean {
   let status: unknown
   try {
     status = jsonpathGet(decoded, guard.status_path)
   } catch {
-    // A malformed custom status_path must never REPLACE the genuine parse error
-    // with a jsonpath internal error — the guard can only improve the message.
-    return fallback
+    return false
   }
-  if (typeof status === 'string' && guard.values.includes(status)) {
-    // Human-readable label: drop the "$." root of a simple property path
-    // ("$.stopReason" → "stopReason"); use the path verbatim otherwise (a bare
-    // "$", a bracket/nested path, etc.) so the label is never empty or garbled.
-    const field = guard.status_path.startsWith('$.') ? guard.status_path.slice(2) : guard.status_path
-    return new Error(`channel run did not complete (${field}=${status}) before emitting findings — ${guard.message}`)
+  return typeof status === 'string' && guard.values.includes(status)
+}
+
+function incompleteError(decoded: unknown, guard: IncompleteGuard): Error {
+  // Human-readable label: drop the "$." root of a simple property path
+  // ("$.stopReason" → "stopReason"); use the path verbatim otherwise (a bare
+  // "$", a bracket/nested path, etc.) so the label is never empty or garbled.
+  const field = guard.status_path.startsWith('$.') ? guard.status_path.slice(2) : guard.status_path
+  let status: unknown
+  try {
+    status = jsonpathGet(decoded, guard.status_path)
+  } catch {
+    status = 'unknown'
   }
-  return fallback
+  return new Error(`channel run did not complete (${field}=${status}) before emitting findings — ${guard.message}`)
+}
+
+/**
+ * Probe a channel's raw stdout against the parser spec's `incomplete` guard
+ * without running the full parse. Used by the dispatcher's one-shot retry:
+ * a matching envelope (grok's `stopReason: "Cancelled"`) means the run was
+ * interrupted and is worth ONE serial re-dispatch. Never throws; any
+ * undecodable/guardless input is simply "no match".
+ */
+export function channelOutputMatchesIncompleteGuard(
+  raw: string,
+  spec: string | OutputParserConfig,
+): boolean {
+  if (typeof spec === 'string' || spec.kind !== 'unwrap-jsonpath' || !spec.incomplete) {
+    return false
+  }
+  let decoded: unknown
+  try {
+    decoded = parseJsonFromOutput(raw)
+  } catch {
+    return false
+  }
+  return matchesIncompleteGuard(decoded, spec.incomplete)
 }
 
 export function buildParser(spec: OutputParserConfig): Parser {
@@ -314,19 +381,21 @@ export function buildParser(spec: OutputParserConfig): Parser {
     const nextParser = getParser(nextSpec)
     return (raw: string) => {
       const decoded = parseJsonFromOutput(raw)
+      // PREEMPTIVE guard: an envelope marked interrupted (grok's
+      // `stopReason: "Cancelled"`) is rejected even when the wrapped payload
+      // would parse. Under grok's --json-schema flag, intermediate progress
+      // turns are schema-shaped JSON, so a cancelled run's $.text can hold a
+      // parseable ack ("approved: true … Reviewing the diff") that would
+      // otherwise masquerade as a clean completed review.
+      if (spec.incomplete && matchesIncompleteGuard(decoded, spec.incomplete)) {
+        throw incompleteError(decoded, spec.incomplete)
+      }
       const unwrapped = jsonpathGet(decoded, spec.wrap)
       if (unwrapped === undefined) {
-        throw incompleteOrDefault(decoded, spec, new Error(`jsonpath did not match: ${spec.wrap}`))
+        throw new Error(`jsonpath did not match: ${spec.wrap}`)
       }
       const nextRaw = typeof unwrapped === 'string' ? unwrapped : JSON.stringify(unwrapped)
-      try {
-        return nextParser(nextRaw)
-      } catch (err) {
-        // Pass Error objects through unchanged (stack preserved); wrap a rare
-        // non-Error throw while retaining the original value as `cause`.
-        const fallback = err instanceof Error ? err : new Error(String(err), { cause: err })
-        throw incompleteOrDefault(decoded, spec, fallback)
-      }
+      return nextParser(nextRaw)
     }
   }
   if (spec.kind === 'regex-findings') {

@@ -3,7 +3,9 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { TERMINAL_STATUSES } from '../types.js'
 import type { ChannelStatus } from '../types.js'
+import type { OutputParserConfig } from '../config/schema.js'
 import type { JobStore } from './job-store.js'
+import { channelOutputMatchesIncompleteGuard } from './parser.js'
 import { withNeutralPosture, sweepStaleNeutralDirs } from './host-isolation.js'
 
 export interface DispatchOptions {
@@ -23,6 +25,17 @@ export interface DispatchOptions {
   /** Working directory for the spawned process. {{neutral_cwd}} is expanded
    *  (with {{neutral_home}} in env) into a per-run isolated dir before spawn. */
   cwd?: string
+  /**
+   * The channel's output parser spec. When it carries an `incomplete` guard
+   * (unwrap-jsonpath), a run that completes with a guard-matching envelope
+   * (grok's `stopReason: "Cancelled"` under same-account concurrent sessions,
+   * verified on grok 0.2.103) is re-dispatched ONCE. The retry is serial — it
+   * starts after the concurrency burst that cancelled the first attempt has
+   * largely passed — so it usually restores real channel coverage instead of
+   * falling through to the compensating pass. Omitted or guardless ⇒ plain
+   * single dispatch.
+   */
+  retryOnIncomplete?: string | OutputParserConfig
 }
 
 /** Placeholder token replaced with the prompt-file path in prompt-file mode. */
@@ -77,8 +90,58 @@ export function isChannelComplete(status: ChannelStatus): boolean {
   return TERMINAL_STATUSES.has(status)
 }
 
-/** Spawn a background process for a review channel and monitor it */
+/**
+ * True when the settled channel completed but its saved envelope matches the
+ * parser spec's `incomplete` guard — i.e. the run was interrupted (grok's
+ * `stopReason: "Cancelled"`) and is worth one serial re-dispatch. Probe errors
+ * must never fail a dispatch that already settled, so this never throws.
+ */
+function completedRunMatchesIncompleteGuard(
+  store: JobStore,
+  jobId: string,
+  channelName: string,
+  parserSpec: string | OutputParserConfig,
+): boolean {
+  if (typeof parserSpec === 'string' || parserSpec.kind !== 'unwrap-jsonpath' || !parserSpec.incomplete) {
+    return false
+  }
+  try {
+    if (store.loadJob(jobId).channels[channelName]?.status !== 'completed') return false
+    const stored = store.loadChannelOutput(jobId, channelName)
+    // saveChannelOutput writes JSON.stringify(stdout); recover the raw envelope
+    // string (same decode as the results pipeline).
+    let raw: string
+    try {
+      const decoded = JSON.parse(stored)
+      raw = typeof decoded === 'string' ? decoded : stored
+    } catch {
+      raw = stored
+    }
+    return channelOutputMatchesIncompleteGuard(raw, parserSpec)
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Spawn a background process for a review channel and monitor it. When
+ * `opts.retryOnIncomplete` carries an `incomplete` guard, a completed run
+ * whose envelope matches the guard is re-dispatched once (see DispatchOptions).
+ */
 export async function dispatchChannel(
+  store: JobStore,
+  jobId: string,
+  channelName: string,
+  opts: DispatchOptions,
+): Promise<void> {
+  await dispatchChannelOnce(store, jobId, channelName, opts)
+  if (opts.retryOnIncomplete !== undefined
+    && completedRunMatchesIncompleteGuard(store, jobId, channelName, opts.retryOnIncomplete)) {
+    await dispatchChannelOnce(store, jobId, channelName, opts)
+  }
+}
+
+async function dispatchChannelOnce(
   store: JobStore,
   jobId: string,
   channelName: string,

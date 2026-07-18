@@ -579,33 +579,48 @@ channels:
       - run_terminal_cmd       #   tool or headless session creation aborts
       - --no-subagents
       - --no-plan
+      - --json-schema          # force structured final output (see cancellation
+      - '{{findings_schema}}'  #   section below); review substitutes the schema
       - --disable-web-search   # closed-book: no web
 ```
 
-### Grok mid-review cancellation under load
+### Grok mid-review cancellation under concurrent sessions
 
-Under heavy **concurrent grok load** (many parallel grok agents/worktrees on one
-machine), grok frequently **cancels a review mid-run**: the `--output-format json`
-envelope comes back with `stopReason: "Cancelled"` after 1–3 turns (~10–20s) and
-only a short "I'll review…" ack in `$.text` — no findings JSON. This is grok's own
-runtime interrupting the session; it is **not** an auth problem (`mmr doctor` stays
-green) and **not** MMR's dispatch timeout (which is 300s and would report
-`status: timeout`).
+Under **same-account concurrent grok sessions** (parallel MMR jobs, agents, or
+worktrees), grok frequently **cancels a review mid-run**: the
+`--output-format json` envelope comes back with `stopReason: "Cancelled"` after
+1–3 turns and only a short "I'll review…" ack in `$.text` — the computed answer
+is lost (the envelope truncates `thought` to ~200 chars, so nothing is
+salvageable). Verified on grok 0.2.103 (2026-07-18): the identical prompt
+completes serially and cancels 5/8 times under 4-way concurrency. It is **not**
+an auth problem (`mmr doctor` stays green) and **not** MMR's dispatch timeout
+(which is 300s and would report `status: timeout`).
 
-MMR handles this in two ways:
+MMR defends in four layers:
 
-1. **Honest error.** The grok channel's parser carries an `incomplete` guard
-   (`status_path: $.stopReason`, `values: ["Cancelled"]`). When the run is
-   cancelled and `$.text` has no findings, the channel reports
-   *"channel run did not complete (stopReason=Cancelled) before emitting findings
-   — … retry the review, or reduce the number of parallel grok agents/worktrees"*
-   instead of the misleading *"No JSON object found in output"*.
-2. **Coverage preserved.** A cancelled grok channel is `status: failed`, which
-   already triggers MMR's **compensating pass** (a `claude -p` run labeled
-   `compensating-grok`), so the review still gates on a full panel and typically
-   returns `degraded-pass` rather than losing a binding channel.
+1. **Structured output (primary).** The built-in grok flags pass
+   `--json-schema` with MMR's findings schema (the `{{findings_schema}}`
+   placeholder is substituted at review dispatch; `mmr critique` strips the
+   pair — its reply shape differs). With the schema constraint the final answer
+   reliably lands in `$.text` and cancellations drop sharply (5/8 → 1/8 in the
+   4-way repro). Requires a grok CLI with `--json-schema`; on an older grok the
+   channel fails with an unknown-argument error — update grok.
+2. **Last-object parse.** With the schema active, grok emits one schema-shaped
+   JSON object **per turn** (intermediate "Reviewing…" progress acks included).
+   The grok parser is `then: 'default-last'`, taking the **last** top-level
+   object — first-object extraction was observed to flip a 3-finding review
+   into "approved, no issues found".
+3. **One serial retry.** When a run still completes with
+   `stopReason: "Cancelled"`, the dispatcher re-dispatches it **once**. The
+   retry starts after the concurrency burst that killed the first attempt has
+   largely passed, so it usually restores real grok coverage.
+4. **Honest failure + compensating pass.** If the retry is cancelled too, the
+   parser's **preemptive** `incomplete` guard fails the channel with
+   *"channel run did not complete (stopReason=Cancelled) …"* — even when
+   `$.text` holds a parseable intermediate ack (which must never masquerade as
+   a clean review). The failed channel then triggers MMR's compensating pass
+   (`compensating-grok`), so the review still gates on a full panel.
 
 MMR does **not** salvage findings from grok's `thought` field on a cancelled run —
-those come from an interrupted review and could wrongly approve a PR a completed
-review would have blocked. To reduce cancellations, run fewer parallel grok agents
-during a review, or retry the review when the machine is less loaded.
+the envelope truncates it, and an interrupted review's partial reasoning could
+wrongly approve a PR a completed review would have blocked.

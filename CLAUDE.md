@@ -329,6 +329,13 @@ claude -p "PROMPT" --output-format json 2>/dev/null
 # isolated HOME/cwd (strips host config: skills/MCP/hooks/instructions), no
 # cross-session memory, web-only tools (denies filesystem reads).
 # NOTE: --prompt-file must be ABSOLUTE — a neutral HOME/cwd breaks relative paths.
+# NOTE: --json-schema is REQUIRED for reliability on grok-4.5 (verified 0.2.103):
+#   without it, same-account concurrent grok sessions frequently end
+#   stopReason=Cancelled with only a progress ack in $.text (the answer is lost;
+#   the envelope truncates `thought`). With the schema, the final answer reliably
+#   lands in $.text — but grok then emits one schema-shaped JSON object PER TURN
+#   (intermediate "Reviewing…" acks included), so parse the LAST object, and treat
+#   any stopReason=Cancelled envelope as failed even if its $.text parses.
 # NOTE: --disallowed-tools run_terminal_cmd is REQUIRED on any grok carrying the
 #   upstream run_terminal_cmd regression (first seen in grok 0.2.99): grok builds
 #   + validates every built-in tool before applying --tools, and its
@@ -343,7 +350,9 @@ mkdir -p "$D/.grok"; ln -s "$HOME/.grok/auth.json" "$D/.grok/auth.json" 2>/dev/n
 HOME="$D" XDG_CONFIG_HOME="$D" grok --cwd "$D" --prompt-file "$PROMPT_FILE" \
   --output-format json --no-memory --tools web_search,web_fetch \
   --disallowed-tools run_terminal_cmd \
-  --no-subagents --no-plan 2>/dev/null
+  --no-subagents --no-plan \
+  --json-schema '{"type":"object","properties":{"approved":{"type":"boolean"},"findings":{"type":"array","items":{"type":"object","properties":{"severity":{"type":"string","enum":["P0","P1","P2","P3"]},"location":{"type":"string"},"category":{"type":"string"},"description":{"type":"string"},"suggestion":{"type":"string"}},"required":["severity","location","description","suggestion"]}},"summary":{"type":"string"}},"required":["approved","findings","summary"]}' \
+  2>/dev/null
 # agy (Antigravity) — hardened review posture: neutral cwd (strips project
 # AGENTS.md/.agents/mcp_config.json + denies repo access), OS sandbox, auto-approve
 # to avoid headless approval hangs. Real HOME (agy creds live under $HOME).
