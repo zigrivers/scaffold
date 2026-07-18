@@ -11,7 +11,7 @@ topics:
   - coordination
   - parallel-execution
 volatility: evolving
-last-reviewed: 2026-07-14
+last-reviewed: 2026-07-17
 version-pin: null
 sources:
   - url: https://github.com/gastownhall/beads
@@ -30,6 +30,12 @@ When multiple agents work in parallel worktrees and converge on `main`, two upst
 The two primitives below are the load-bearing Deep Guidance for this entry. The per-command sections explain when to acquire/release each, the failure modes, and the asynchronous coordination patterns they support. Treat the rest of this document (from this heading to EOF) as the section the assembly engine injects.
 
 ## `bd merge-slot` — serialized merge resolution
+
+**Superseded by the scaffold mq merge queue when the merge-throughput
+component is installed** — the queue batch-tests and lands PRs itself
+(agents enqueue and move on), which raises merge throughput instead of
+just serializing it. merge-slot remains the fallback for projects without
+the component; everything below applies to that fallback.
 
 **Problem:** Two agents finish in-flight tasks at roughly the same time. Both rebase on `origin/main` and push. The second agent's push races with the first agent's merge — either gets `non-fast-forward` (retry) or merges a stale base (silent conflict).
 
@@ -64,12 +70,12 @@ bd merge-slot check
 
 ### When to use
 
-Serialize EVERY merge through `bd merge-slot` whenever the project has a
-slot (`bd merge-slot check` reports one) — the deterministic rule the
-work-beads skill follows, because an agent cannot reliably count its active
-peers. Projects that are strictly single-agent can simply not create a
-slot; skipping an *existing* slot is how two agents end up merging
-concurrently.
+On the fallback path (no merge queue installed), serialize EVERY merge
+through `bd merge-slot` whenever the project has a slot (`bd merge-slot
+check` reports one) — the deterministic rule the work-beads skill follows,
+because an agent cannot reliably count its active peers. Projects that are
+strictly single-agent can simply not create a slot; skipping an *existing*
+slot is how two agents end up merging concurrently.
 
 ### Failure modes
 

@@ -48,7 +48,10 @@ format between agents, and success criteria.
 - (mvp) Git workflow is defined (branching strategy, commit format, PR process)
 - (mvp) Success criteria per task (how to know it's done)
 - (deep) Handoff format between agents (what to communicate when passing work)
-- (mvp) Quality gates are defined (what must pass before a task is complete)
+- (mvp) Quality gates are defined (what must pass before a task is complete);
+  when the merge-throughput component is installed, `make check-affected` is
+  named as the pre-enqueue gate and full `make check` as the authoritative,
+  post-merge suite
 - (deep) Test skeleton discovery: playbook instructs agents to check docs/story-tests-map.md before writing new tests
 - (mvp) Dependency-failure recovery: playbook documents what to do when a task's upstream dependency is blocked
 - (deep) Quality gates include `make eval` (or equivalent) as a required check when eval tests exist
@@ -56,9 +59,10 @@ format between agents, and success criteria.
 - (deep) Handoff format includes at minimum: implementation summary, assumptions made, known limitations, gotchas, and files modified
 - (mvp) When Beads and the `work-beads` skill are present, the task-execution
   section routes to the `work-beads` skill for the per-task loop (claim →
-  worktree → build → verify → review → merge → close) instead of restating
-  it — the skill is the single source of truth; the playbook keeps only the
-  generic fallback loop for projects without Beads or the skill installed
+  worktree → build → verify → review → enqueue → close-on-land) instead of
+  restating it — the skill is the single source of truth; the playbook keeps
+  only the generic fallback loop for projects without Beads or the skill
+  installed
 
 ## Methodology Scaling
 - **deep**: Full playbook. Detailed coding standards, git workflow with
