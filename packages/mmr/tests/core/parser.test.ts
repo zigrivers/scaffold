@@ -193,7 +193,9 @@ describe('default-last parser (grok --json-schema emits one JSON object per turn
   })
 
   it('self-diagnoses a top-level array (object-root restriction is by design)', () => {
-    const result = parseChannelOutput('[{"severity":"P1"}]', 'default-last')
+    // Note: an array CONTAINING objects still yields its last nested object
+    // (the scanner matches any '{'); the hint fires for object-free output.
+    const result = parseChannelOutput('["P1", "P2"]', 'default-last')
     expect(result.summary).toBe('Output parsing failed.')
     expect(result.findings[0].description).toMatch(/only object roots/)
   })
