@@ -101,12 +101,11 @@ AI review inserted as step 5.5):
    (the fast merge gate) passes on the branch HEAD; the full `make check` runs
    post-merge and nightly — uncached — on the self-hosted runner or local
    poller, so together these *are* the merge bar
-7. Land it. On a merge-throughput project, `scaffold mq enqueue --pr <N>` (or
-   `make mq-enqueue PR=<N>`) and move on — the merge-queue daemon batches,
-   lands, and closes the bead; NEVER `gh pr merge` directly (the mq-guard hook
-   blocks it). Otherwise squash-merge and delete the branch (`gh pr merge
-   --squash --delete-branch`), serializing via `bd merge-slot acquire --wait`
-   when 3+ concurrent agents share the project's Beads, releasing after
+7. Land it. On a merge-throughput project, `scaffold mq enqueue --pr <N>` and
+   move on — the daemon batches, lands, and closes the bead; NEVER `gh pr merge`
+   directly (the mq-guard hook blocks it). Otherwise squash-merge + delete the
+   branch (`gh pr merge --squash --delete-branch`), serialized via
+   `bd merge-slot acquire --wait` for 3+ agents
 8. Sync `main` from the primary checkout: `make main-sync &&
    make prune-merged` (squash-aware pruning with a triage report — see
    [worktree-management](../execution/worktree-management.md))
