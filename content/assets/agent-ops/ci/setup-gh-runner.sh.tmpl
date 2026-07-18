@@ -15,7 +15,12 @@ PRINT_ONLY=0
 [ "${1:-}" = "--print-only" ] && PRINT_ONLY=1
 
 command -v gh >/dev/null 2>&1 || { echo "gh CLI required" >&2; exit 2; }
-REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
+if [ "$PRINT_ONLY" = 1 ]; then
+	# Preview must not require gh auth / network — show a placeholder if it can't resolve.
+	REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || echo '<owner>/<repo>')"
+else
+	REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
+fi
 RUNNER_DIR="$HOME/.gh-runner/{{PROJECT_NAME}}"
 NAME="{{PROJECT_NAME}}-mq-runner"
 
@@ -32,10 +37,17 @@ cd "$RUNNER_DIR"
 
 if [ ! -f config.sh ]; then
 	echo "downloading latest actions runner (osx-arm64)…"
-	URL="$(gh api repos/actions/runner/releases/latest \
-		-q '.assets[] | select(.name | test("actions-runner-osx-arm64-[0-9.]+\\.tar\\.gz$")) | .browser_download_url')"
-	DIGEST="$(gh api repos/actions/runner/releases/latest \
-		-q '.assets[] | select(.name | test("actions-runner-osx-arm64-[0-9.]+\\.tar\\.gz$")) | .digest // ""')"
+	# One API call; extract both URL and digest from the same response (jq when
+	# available, else two gh calls as a fallback).
+	SEL='.assets[] | select(.name | test("actions-runner-osx-arm64-[0-9.]+\\.tar\\.gz$"))'
+	REL="$(gh api repos/actions/runner/releases/latest)"
+	if command -v jq >/dev/null 2>&1; then
+		URL="$(printf '%s' "$REL" | jq -r "$SEL | .browser_download_url")"
+		DIGEST="$(printf '%s' "$REL" | jq -r "$SEL | .digest // \"\"")"
+	else
+		URL="$(gh api repos/actions/runner/releases/latest -q "$SEL | .browser_download_url")"
+		DIGEST="$(gh api repos/actions/runner/releases/latest -q "$SEL | .digest // \"\"")"
+	fi
 	curl -fsSL "$URL" -o runner.tar.gz
 	# Verify the download against the release's published digest when available —
 	# a compromised asset or MITM would otherwise run arbitrary code as this user.
@@ -58,9 +70,13 @@ fi
 # Rerunnable: config.sh refuses when a .runner config already exists, so on a
 # re-run just (re)install and start the service instead of reconfiguring.
 if [ -f .runner ]; then
-	echo "runner already configured — ensuring the launchd service is installed and running"
-	./svc.sh install 2>/dev/null || true
-	./svc.sh start  2>/dev/null || true
+	echo "runner already configured — ensuring the launchd service is running"
+	./svc.sh install 2>/dev/null || true # may already be installed; that's fine
+	if ! ./svc.sh start; then
+		echo "error: svc.sh start failed — the runner service is NOT running." >&2
+		echo "  inspect: (cd $RUNNER_DIR && ./svc.sh status)" >&2
+		exit 4
+	fi
 else
 	TOKEN="$(gh api -X POST "repos/$REPO/actions/runners/registration-token" -q .token)"
 	./config.sh --unattended --url "https://github.com/$REPO" --token "$TOKEN" \

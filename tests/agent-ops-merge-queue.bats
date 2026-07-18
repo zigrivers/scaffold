@@ -100,13 +100,13 @@ teardown() { rm -rf "$TMP"; }
   ! grep -q 'pull_request' "$W"
 }
 
-@test "nightly workflow: schedule + dispatch, full gate, e2e feature-detect, flake report" {
+@test "nightly workflow: schedule + dispatch, full gate, e2e feature-detect" {
   W="$BATS_TEST_DIRNAME/../content/assets/agent-ops/ci/nightly.yml.tmpl"
   grep -q 'schedule:' "$W"
   grep -q 'workflow_dispatch' "$W"
   grep -q '{{FULL_GATE_COMMAND}}' "$W"   # block scalar
   grep -q 'make e2e' "$W"
-  grep -q 'scaffold mq stats' "$W"
+  grep -q 'runs-on: \[self-hosted, macOS, ARM64\]' "$W"
 }
 
 @test "setup-gh-runner: --print-only previews without side effects" {
@@ -132,11 +132,12 @@ teardown() { rm -rf "$TMP"; }
     "$BATS_TEST_DIRNAME/../content/assets/agent-ops/ci/setup-gh-runner.sh.tmpl" \
     > "$WORK/setup-gh-runner.sh"
   chmod +x "$WORK/setup-gh-runner.sh"
-  # PATH keeps /usr/bin:/bin (needed so the "#!/usr/bin/env bash" shebang can
-  # still resolve bash itself) but omits every dir gh could live in (e.g.
-  # Homebrew's /opt/homebrew/bin), so the script's own `command -v gh` check
-  # is what fails — not the shebang lookup.
-  run env PATH="/usr/bin:/bin" "$WORK/setup-gh-runner.sh" --print-only
+  # Minimal PATH holding ONLY bash (so `#!/usr/bin/env bash` resolves) and NO gh,
+  # on any platform — portable, unlike PATH=/usr/bin:/bin where a Linux runner's
+  # gh lives in /usr/bin and the script would wrongly proceed.
+  mkdir -p "$WORK/minbin"
+  ln -s "$(command -v bash)" "$WORK/minbin/bash"
+  run env PATH="$WORK/minbin" "$WORK/setup-gh-runner.sh" --print-only
   [ "$status" -eq 2 ]
   [[ "$output" == *"gh CLI required"* ]]
   rm -rf "$WORK"

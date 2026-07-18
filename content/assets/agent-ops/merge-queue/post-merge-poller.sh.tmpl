@@ -71,9 +71,21 @@ git -C "$WT" checkout -f --detach --quiet "origin/$BRANCH"
 git -C "$WT" reset --hard --quiet "origin/$BRANCH"
 
 LOG="$MQ_DIR/logs/post-merge-$HEAD_SHA.log"
+# Bound the gate so a hang can't hold the lock until the stale-steal fires
+# (feature-detect coreutils timeout; macOS ships neither by default, in which
+# case the stale-lock steal above is the backstop). ~90m matches the steal window.
+TIMEOUT_BIN=""
+if command -v timeout >/dev/null 2>&1; then TIMEOUT_BIN="timeout"
+elif command -v gtimeout >/dev/null 2>&1; then TIMEOUT_BIN="gtimeout"; fi
 # The gate command is inlined (not assigned to a var and re-parsed) so a command
 # containing quotes/substitutions keeps its meaning.
-if (cd "$WT" && {{FULL_GATE_COMMAND}}) >"$LOG" 2>&1; then
+GATE_RC=0
+if [ -n "$TIMEOUT_BIN" ]; then
+	(cd "$WT" && "$TIMEOUT_BIN" 90m {{FULL_GATE_COMMAND}}) >"$LOG" 2>&1 || GATE_RC=$?
+else
+	(cd "$WT" && {{FULL_GATE_COMMAND}}) >"$LOG" 2>&1 || GATE_RC=$?
+fi
+if [ "$GATE_RC" -eq 0 ]; then
 	echo "$HEAD_SHA" > "$MARKER"
 	if grep -q '^post-merge red' "$PAUSE" 2>/dev/null; then
 		rm -f "$PAUSE"

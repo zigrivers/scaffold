@@ -1,7 +1,8 @@
 # nightly.yml — installed by `scaffold agent-ops install --component ci`.
-# Nightly full regression on the self-hosted runner: full uncached gate, e2e
-# when the project defines a `make e2e` target, and the merge-queue flake
-# report. 09:00 UTC ~= 2am US Pacific.
+# Nightly full regression on the self-hosted runner: full uncached gate + e2e
+# when the project defines a `make e2e` target. 09:00 UTC ~= 2am US Pacific.
+# (No flake report here — the merge-queue journal lives in the developer's
+# primary checkout, not this fresh CI checkout; run `make mq-stats` locally.)
 name: nightly
 on:
   schedule:
@@ -22,15 +23,4 @@ jobs:
             make e2e
           else
             echo "no e2e target — skipped"
-          fi
-      - name: Flake report (best-effort — reads THIS checkout's queue)
-        run: |
-          # The authoritative merge-queue journal lives in the developer's PRIMARY
-          # checkout (.mq/), not this fresh CI checkout — so stats here are usually
-          # empty. Kept as a hook for a future shared-journal location; it reports
-          # explicitly and never fails the run.
-          if command -v scaffold >/dev/null 2>&1; then
-            scaffold mq stats || echo "no merge-queue state in this checkout"
-          else
-            echo "scaffold CLI not installed on runner — skipped"
           fi
