@@ -188,3 +188,7 @@ Patterns and anti-patterns discovered during development. Review before starting
   such an example, and green only after the sweep. Before editing, grep
   `tests/evals/*.bats` for patterns that touch the file/line you're changing, and
   run the affected eval right after the edit rather than at the end of the batch.
+
+## Bats tests that import built (gitignored) packages crash in CI, not locally (2026-07-18)
+**Pattern:** A bats test in `make test` that runs `node scripts/generate-agent-skills.mjs --check` imports `packages/agent-integration/dist/` — which is GITIGNORED (built by `agent-skills-check`). In `make check-all`, `bats` runs inside `check` BEFORE `agent-skills-check` builds that dist. Locally the dist already exists (from a prior build) so the test passes; in CI (fresh `npm ci`, dist not yet built) the import crashes → non-zero exit → the test fails. **This passes local `make check-all` but fails CI, and is NOT a flake** — re-running CI won't help.
+**Rule:** Before adding a bats/`make test` assertion that shells out to a script importing a *built* (gitignored `dist/`) workspace package, check the target ORDER in the Makefile — if the build target runs after `check`/`test`, the import won't exist when bats runs. Prefer the existing dedicated drift target (here `agent-skills-check`, which builds the renderer THEN checks) over a duplicate bats copy. When "green locally, red in CI" on a codegen/drift check, suspect a build-order/gitignored-dist gap before suspecting a flake.
