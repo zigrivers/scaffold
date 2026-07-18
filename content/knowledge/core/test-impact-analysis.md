@@ -143,3 +143,85 @@ gate at most; full e2e belongs post-merge/nightly.
 Profile once before tuning selection: worker/pool counts, moving e2e out of
 `check`, splitting slow integration suites behind tags. 13k tests in 21
 minutes often compresses 2–4x with zero selection risk.
+
+### The `MQ_AFFECTED_BASE` contract
+
+The merge queue owns "affected relative to what?" It exports
+`MQ_AFFECTED_BASE=origin/<default-branch>` before invoking `make check-affected`,
+and the target selects the tests reachable from the diff against that ref — NOT
+against the worktree's local `HEAD` or a guessed base. Pin the contract so it is
+identical whether a human runs the target locally or the daemon runs it in the
+gate worktree:
+
+```make
+MQ_AFFECTED_BASE ?= origin/main            # queue overrides; local default
+check-affected:
+	@base="$(MQ_AFFECTED_BASE)"; \
+	changed="$$(git diff --name-only "$$base"...HEAD)"; \
+	# ...classify $$changed, run the selected subset or fall back to `check`
+```
+
+Three rules keep it honest:
+
+- **Default, don't require.** `?=` lets a bare `make check-affected` work outside
+  the queue (falls back to `origin/main`); the daemon always sets it explicitly.
+- **Three-dot diff.** `$$base...HEAD` is the changes on this branch since it
+  forked from base — not two-dot, which also counts base moving forward and
+  over-selects after the queue advances the default branch mid-gate.
+- **Empty diff ⇒ full run, not zero.** If the base ref is missing or the diff is
+  empty for a reason you cannot explain, run `check`. A gate that selects *no*
+  tests because it mis-resolved the base is worse than a slow gate.
+
+### Failure modes: when affected-selection is unsafe
+
+Selection is a performance optimization layered on a correctness invariant (the
+FULL suite still runs post-merge and nightly). Inside the gate, these are the
+ways narrowing goes wrong — every one is covered by routing to a full run:
+
+- **Cross-cutting config.** Compiler/tsconfig, lint, CI, `Makefile`, lockfiles,
+  and dependency manifests can change *any* test's outcome. They belong in the
+  force-full trigger list, not in per-file impact graphs.
+- **Generated / non-source inputs.** SQL, templates, JSON/YAML fixtures, protobuf,
+  codegen outputs — most impact tools track imports, not data reads, so a fixture
+  edit looks like "nothing changed." Force-full on their globs.
+- **Non-hermetic tests.** A test that reads the clock, the network, or global
+  state has no stable impact edge; selection can pass it while a real regression
+  hides in the unselected set. Fix the hermeticity or exclude the suite from
+  selection (always-run) rather than trusting its edges.
+- **Stale coverage DB.** pytest-testmon and coverage-DB tools trust their last
+  recorded edges; a corrupted or ancient `.testmondata` under-selects silently.
+  Seed from a warm copy, and let history churn degrade to *more* running, never
+  less (validated — see the testmon spike).
+
+The daemon's own escape hatch backs this up: a batch that goes red is bisected
+and the culprit ejected, and the post-merge full run is the final net — so a
+mis-selection at the gate costs at most one wasted batch, never a bad landing.
+
+### Calibration: is the gate actually cheaper?
+
+Measure before and after adopting selection — the win is real only if the
+*affected fraction* is small and stable:
+
+- **Affected fraction.** Log `selected_tests / total_tests` per gate run. Typical
+  well-factored workspaces sit at 5–20%; if most PRs touch shared code and select
+  60%+, the diff-classification overhead may cost more than it saves — invest in
+  package boundaries (D6) first.
+- **Gate wall-clock, p50 and p95.** The queue's throughput is bounded by p95, not
+  p50 — one PR that force-fulls stalls its whole batch. Track how often
+  force-full fires and why.
+- **Escape rate.** Count regressions the affected gate passed but the post-merge
+  full run caught. A non-zero-but-tiny rate is expected and healthy (that is what
+  the safety net is for); a rising rate means the force-full list has a hole.
+
+### Adopting TIA incrementally
+
+Do not flip the merge gate to affected-only on day one. Stage it:
+
+1. Ship `check` and `check-affected` side by side; keep the queue gate on `check`.
+2. Run `check-affected` in *shadow* for a week — compare its verdict to `check`
+   on every PR; every disagreement is a missing force-full trigger.
+3. Once shadow agreement holds, switch the queue gate to `check-affected` and
+   lean on the post-merge/nightly full run as the standing net.
+
+This ordering means the cheap gate is only trusted after it has *earned* trust
+against the full suite on real diffs — never before.
