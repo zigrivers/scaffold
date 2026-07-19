@@ -124,10 +124,15 @@ by B's ingestion; D's TIA hooks into C's gate scaffolding).
   structural, not textual:** the plan carries a `plan_key` — a sha256 over the
   canonical JSON form (sorted step slugs with their dispositions and
   detect-check results, plus the ops-action list once that section exists in
-  R2). `--apply` recomputes the key against live reality; a mismatch (any
-  disposition, detect result, or ops action changed) aborts with a re-review
-  prompt. Prose/whitespace changes in the written markdown never affect the
-  key. This is a breaking behavior change called out in the CHANGELOG as a
+  R2) — embedded in both the JSON output and the written plan document.
+  **The approved key is an input to apply:** `scaffold adopt --apply --plan
+  <path>` (or `--plan-key <sha>`) re-renders against live reality *before
+  any write* and aborts with a re-review prompt when the recomputed key
+  differs (any disposition, detect result, or ops action changed). A bare
+  `--apply` with neither flag renders fresh and requires interactive
+  confirmation of the displayed plan; in non-interactive/auto mode a bare
+  `--apply` is an error — automation must pass the key it approved.
+  Prose/whitespace changes in the written markdown never affect the key. This is a breaking behavior change called out in the CHANGELOG as a
   defect fix (the prior silent behavior violated the draft brownfield spec).
 - **D2 — adopt is first-touch.** `adopt` joins `ROOT_OPTIONAL_COMMANDS`; in a
   repo with no `.scaffold/`, plan mode works read-only and `--apply` performs
@@ -148,7 +153,19 @@ by B's ingestion; D's TIA hooks into C's gate scaffolding).
   set only by a real D3 check. The migration is one-way, automatic, and
   called out in the R1 CHANGELOG (D16). Steps with empty `outputs` and no
   `detect:` block are reported `undetectable` in the plan rather than
-  silently skipped.
+  silently skipped. **Conflict resolution matrix:** `conflict` overrides
+  `completed` everywhere completion is consumed — a conflicted step is
+  treated as *not completed* for pipeline selection, `next`, and mode
+  resolution. Applying a plan that shows a conflict sets the step to
+  `pending` with `verification: unverified`, preserving the prior entry as
+  an audit line in `decisions.jsonl` (who/when/what claimed completion).
+  **Mode resolution follows verification state:** a step whose prior
+  scaffold completion survives as `verified` or `declared` runs in *update*
+  mode; a step with no surviving completion runs in *adoption* mode when
+  `init-mode` is brownfield/v1-migration (once D11's content half ships in
+  R3) and *fresh* mode otherwise — so a reopened false completion correctly
+  enters adoption mode instead of being excluded by D11's
+  not-previously-completed trigger.
 - **D4 — `detect:` frontmatter contract.** Pipeline steps may declare a
   machine-readable detection block mirroring their Mode Detection prose:
 
@@ -176,8 +193,12 @@ by B's ingestion; D's TIA hooks into C's gate scaffolding).
   liveness, `.mq/PAUSED` state + owner), scheduler (job actually loaded via
   `launchctl print` / `systemctl --user status`, last-run heartbeat from logs).
   Read-only by default; `doctor --fix` applies only idempotent safe fixes
-  (re-register hooks, reload scheduler job, delegate `bd doctor --fix`) and
-  never resets state or deletes files. **Capability probing:** every external
+  and never resets state or deletes files. **Fix handlers are
+  release-staged:** in R1, `--fix` ships only the fixes with no dependency
+  on Tier C — delegating `bd doctor --fix` — while every other failure
+  reports its remediation command read-only. The hook-re-registration and
+  scheduler-reload fix handlers land in R2 as thin wrappers over the D8/D6
+  primitives (never duplicated logic). **Capability probing:** every external
   subcommand the beads section relies on (`bd doctor`, `bd backup status
   --json` — both already prescribed by the shipped beads step,
   `content/pipeline/foundation/beads.md`, against the bd ≥ 1.1.0 floor) is
@@ -239,14 +260,23 @@ by B's ingestion; D's TIA hooks into C's gate scaffolding).
   `merge_queue:` config + gate targets resolve, run the full gate locally on
   the PR head; (2) arm everything that does not require the merge — hooks
   install (D8), optional `sched install` (D6); (3) the direct squash-merge
-  under bootstrap semantics (journal event `bootstrap_merged` with PR number
-  and sha — auditable, distinct from `MQ_DIRECT_MERGE_OK` emergencies);
-  (4) post-merge verify — daemon smoke-start and a closing doctor pass,
-  journaled as `bootstrap_armed` on success. The command is **resumable**:
-  re-running (or `scaffold mq bootstrap --finish`) inspects the journal,
-  skips completed stages, and idempotently re-runs unfinished ones — a
-  `bootstrap_merged`-without-`bootstrap_armed` state is exactly what
-  `--finish` and the doctor both surface. Guard messaging updated to point
+  under bootstrap semantics; (4) post-merge verify — daemon smoke-start and
+  a closing doctor pass. **Journal schema and crash safety:** three event
+  types — `bootstrap_intent` (written *before* the merge: PR number + the
+  gated head SHA), `bootstrap_merged` (gated head SHA + resulting merge
+  commit SHA), `bootstrap_armed` (terminal success). Immediately before
+  merging, the PR head is revalidated against the intent's gated SHA; a
+  moved head aborts back to preflight (never merges an ungated head). On any
+  resume (re-run or `scaffold mq bootstrap --finish`), the command
+  reconciles against **GitHub's authoritative PR state**: a
+  `bootstrap_intent` with no `bootstrap_merged` event while GitHub reports
+  the PR MERGED means the crash hit the window between the merge API call
+  and the journal write — the merge is recorded retroactively, never
+  re-attempted. Resume skips journaled stages and idempotently re-runs
+  unfinished ones — a `bootstrap_merged`-without-`bootstrap_armed` state is
+  exactly what `--finish` and the doctor both surface. Bootstrap merges are
+  auditable in the journal and distinct from `MQ_DIRECT_MERGE_OK`
+  emergencies. Guard messaging updated to point
   first-time installers at `mq bootstrap` instead of the env-var bypass.
 - **D10 — existing-equivalent mapping + ingestion.** (a) `artifact_map` in
   `.scaffold/config.yml` maps a step to an existing project artifact
@@ -336,17 +366,22 @@ by B's ingestion; D's TIA hooks into C's gate scaffolding).
 ### 6.1 Adoption Plan (D1, D2)
 
 Plan pipeline: detect project mode/type (existing `detector.ts` + detectors) →
-run D3 verification for every step in the **resolved** pipeline (fix: adopt
-currently scans the unresolved 99-step superset; it will resolve via the
-`brownfield` preset — which ships in R1 for exactly this reason, per D11 —
-plus project-type overlays, like `complete`/`reset` do) → propose per-step
-disposition:
+apply any `--include <step>` requests **before** resolution → resolve the
+pipeline via the `brownfield` preset (ships in R1 for exactly this reason,
+per D11) + project-type overlays, like `complete`/`reset` do (fix: adopt
+currently scans the unresolved 99-step superset) → run D3 verification for
+every step in the resolved pipeline → propose per-step disposition. Steps
+the preset disables are not dropped silently: the plan renders them in a
+separate **"disabled by preset (opt-in)"** section listing each with its
+`--include <step>` flag; because includes are applied before resolution and
+keying, an accepted include changes the `plan_key` and forces re-approval,
+keeping the drift contract intact. Dispositions:
 
 | Disposition | Meaning | Example |
 |---|---|---|
 | `done (verified)` | all outputs + detect pass | github-setup with live origin |
 | `conflict` | state or partial artifacts disagree with live checks | beads: CLAUDE.md present, `bd info` fails |
-| `map-candidate` | incumbent artifact could satisfy the step (D10a) | CONTRIBUTING.md → coding-standards |
+| `map-candidate` *(R3 — ships with D10; absent from R1/R2 plans)* | incumbent artifact could satisfy the step (D10a) | CONTRIBUTING.md → coding-standards |
 | `run (adoption mode)` | valuable; will codify from code | tech-stack |
 | `skip-proposed` | low value for this repo; opt back in with `--include <step>` | domain-modeling on a small PWA |
 | `undetectable` | no outputs, no detect block | review-only steps |
@@ -388,7 +423,8 @@ Checks are skipped (not failed) when their subsystem is not installed
   atomic write); content prompts updated to call the command; bats/vitest
   coverage for merge semantics with pre-existing user hooks.
 - **Bootstrap (D9):** subcommand in `src/cli/commands/mq.ts`; journal event
-  type `bootstrap_merge`; mq-guard message updated.
+  types `bootstrap_intent` / `bootstrap_merged` / `bootstrap_armed` (D9);
+  mq-guard message updated.
 - Content updates: git-workflow, merge-throughput, beads, dev-env-setup
   prompts drop the manual jq/cron instructions in favor of the new commands
   (Mode Detection blocks updated accordingly).
