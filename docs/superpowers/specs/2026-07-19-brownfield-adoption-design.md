@@ -140,8 +140,13 @@ by B's ingestion; D's TIA hooks into C's gate scaffolding).
 - **D2 — adopt is first-touch.** `adopt` joins `ROOT_OPTIONAL_COMMANDS`; in a
   repo with no `.scaffold/`, plan mode works read-only and `--apply` performs
   init (detection → config.yml + state.json) before applying step statuses.
-  `adopt` subsumes the brownfield entry path; `init` remains the greenfield
-  entry.
+  **Initialization is itself an apply action:** the plan renders an
+  `initialize` record containing the exact proposed `config.yml` payload
+  (project type, typed config values, preset) and the initial state summary
+  (init-mode, per-step statuses), in both human and JSON output, and that
+  record's canonical form is part of the `plan_key` — apply can never write
+  configuration the approved plan did not show. `adopt` subsumes the
+  brownfield entry path; `init` remains the greenfield entry.
 - **D3 — completion truth = all outputs + detect contract.** Adopt (and
   `scaffold status`/doctor) route through `src/state/completion.ts`:
   a step is `verified` only when **all** declared outputs exist AND its
@@ -203,7 +208,13 @@ by B's ingestion; D's TIA hooks into C's gate scaffolding).
   `bd info` live, backup configured via `bd backup status --json`, guard
   installed **and registered and armed** — including the jq-missing fail-open),
   hooks (settings.json entries present + scripts executable), gate
-  (`make -n check` / `make -n check-affected` resolve), queue (daemon lock
+  (layered per G2's execute-don't-inspect rule: `make -n` proves only that
+  the targets *resolve* and is reported as exactly that, never as
+  "healthy"; the real check runs the generated gate script in a bounded
+  probe mode — `GATE_PROBE=1` performs dependency presence, runtime
+  resolution (`node --version`, the functional `java -version` test), and
+  test-runner startup without executing the suite; a full gate execution is
+  available behind `doctor --deep` with a timeout), queue (daemon lock
   liveness, `.mq/PAUSED` state + owner), scheduler (job actually loaded via
   `launchctl print` / `systemctl --user status`, last-run heartbeat from logs).
   Read-only by default; `doctor --fix` applies only idempotent safe fixes
@@ -250,7 +261,10 @@ by B's ingestion; D's TIA hooks into C's gate scaffolding).
   lessons: self-contained (`[ -d node_modules ] || npm ci`), functional
   runtime fallbacks (`java -version` test, not `command -v`), and a prompted
   classification of environment-sensitive suites (visual regression → local
-  `check-visual`, excluded from the queue gate). Manifest marks these files
+  `check-visual`, excluded from the queue gate), and a **`GATE_PROBE=1`
+  mode** in the generated scripts — check prerequisites (deps, runtimes,
+  test-runner startup) and exit without running the suite; this is the
+  bounded execution probe doctor's gate section runs (D5). Manifest marks these files
   `seed: true`: `agent-ops check` reports them only if missing, never as
   drifted — they are project-owned after generation. Excluded from
   `--component all` (same opt-in posture as merge-queue/ci).
@@ -331,12 +345,17 @@ by B's ingestion; D's TIA hooks into C's gate scaffolding).
   effect on *prompt content* is nil — stated in the R1 CHANGELOG (D16) so
   nobody expects adoption-mode prompts before R3.
 - **D12 — gate-result cache by tree hash.** The daemon caches green gate
-  results keyed by `(candidate tree hash, gate command string, quarantine
-  file hash)`; a batch whose candidate tree matches a green entry skips the
-  gate run (journal event `gate_cached`). Red results are never cached. The
-  post-merge poller uses the same cache: if the full gate already passed on
-  `origin/main`'s exact tree (e.g. the daemon's final pre-land run), record
-  and skip. Cache lives in `.mq/gate-cache.json`, size-capped, prunable.
+  results; a batch whose cache key matches a green entry skips the gate run
+  (journal event `gate_cached`). **The key covers every input that selects
+  or scopes tests**, not just the tree: `(candidate tree hash, base tree
+  hash — because affected-selection diffs against `MQ_AFFECTED_BASE`, gate
+  command string, quarantine file hash, TIA map content hash when TIA is
+  active)`. Full-gate results (the poller, `full_gate_command`) use the
+  simpler `(tree hash, command, quarantine hash)` key since selection inputs
+  don't apply. Red results are never cached. The post-merge poller uses the
+  full-gate cache: if the full gate already passed on `origin/main`'s exact
+  tree (e.g. the daemon's final pre-land run), record and skip. Cache lives
+  in `.mq/gate-cache.json`, size-capped, prunable.
 - **D13 — conflict-aware batching + overlap zones.** The daemon records each
   queued PR's changed-file set (from `gh pr diff --name-only`, cached in the
   journal). `composeBatch` partitions so PRs with overlapping files never
