@@ -122,9 +122,12 @@ by B's ingestion; D's TIA hooks into C's gate scaffolding).
   document (default `docs/adoption-plan.md`). Re-running re-renders against
   current reality (Renovate's re-render loop). **Drift detection is
   structural, not textual:** the plan carries a `plan_key` — a sha256 over the
-  canonical JSON form (sorted step slugs with their dispositions and
-  detect-check results, plus the ops-action list once that section exists in
-  R2) — embedded in both the JSON output and the written plan document.
+  canonical JSON form of the **complete apply-action records**: sorted step
+  slugs, each with its disposition, detect-check results, and
+  disposition-specific payload (the mapping target path for a
+  map-candidate, the exact file list and parameters for every ops action) —
+  so no apply-relevant detail can change without changing the key. The key
+  is embedded in both the JSON output and the written plan document.
   **The approved key is an input to apply:** `scaffold adopt --apply --plan
   <path>` (or `--plan-key <sha>`) re-renders against live reality *before
   any write* and aborts with a re-review prompt when the recomputed key
@@ -153,12 +156,23 @@ by B's ingestion; D's TIA hooks into C's gate scaffolding).
   set only by a real D3 check. The migration is one-way, automatic, and
   called out in the R1 CHANGELOG (D16). Steps with empty `outputs` and no
   `detect:` block are reported `undetectable` in the plan rather than
-  silently skipped. **Conflict resolution matrix:** `conflict` overrides
-  `completed` everywhere completion is consumed — a conflicted step is
-  treated as *not completed* for pipeline selection, `next`, and mode
-  resolution. Applying a plan that shows a conflict sets the step to
-  `pending` with `verification: unverified`, preserving the prior entry as
-  an audit line in `decisions.jsonl` (who/when/what claimed completion).
+  silently skipped. **Conflict resolution matrix:** conflicts come in two
+  classes, and `conflict` overrides `completed` everywhere completion is
+  consumed — a conflicted step is treated as *not completed* for pipeline
+  selection, `next`, and mode resolution. (a) **State-claim conflict**: a
+  state entry says `completed` but D3 checks fail. Apply reopens the step to
+  `pending` / `verification: unverified` and appends a *reversal* audit
+  record preserving the prior claim (who/when/what claimed completion).
+  (b) **Artifact-only conflict**: no completion claim in state, but partial
+  artifacts exist on disk (the beads case — `CLAUDE.md` present, `bd info`
+  fails). There is no prior claim to reverse; apply records the step
+  `pending` / `unverified` with a *partial-artifacts* audit record listing
+  the artifacts found. Audit records append to the existing
+  `.scaffold/decisions.jsonl` (already part of `.scaffold/` runtime state);
+  record schema for both classes: `{ts, actor, event:
+  "verification-reversal" | "partial-artifacts", step_slug, from_status,
+  from_verification, to_status, to_verification, evidence, reason,
+  plan_key}` — append-only, pure audit, no runtime readers.
   **Mode resolution follows verification state:** a step whose prior
   scaffold completion survives as `verified` or `declared` runs in *update*
   mode; a step with no surviving completion runs in *adoption* mode when
@@ -261,10 +275,15 @@ by B's ingestion; D's TIA hooks into C's gate scaffolding).
   the PR head; (2) arm everything that does not require the merge — hooks
   install (D8), optional `sched install` (D6); (3) the direct squash-merge
   under bootstrap semantics; (4) post-merge verify — daemon smoke-start and
-  a closing doctor pass. **Journal schema and crash safety:** three event
-  types — `bootstrap_intent` (written *before* the merge: PR number + the
-  gated head SHA), `bootstrap_merged` (gated head SHA + resulting merge
-  commit SHA), `bootstrap_armed` (terminal success). Immediately before
+  a closing doctor pass. **Journal schema and crash safety:** every bootstrap
+  attempt gets a `bootstrap_id` (ULID) carried by all three event types,
+  each of which also repeats the PR number and gated head SHA —
+  `bootstrap_intent` (written *before* the merge), `bootstrap_merged`
+  (adds the resulting merge commit SHA), `bootstrap_armed` (terminal
+  success). Resume and doctor reconcile as a per-`bootstrap_id` state
+  machine; an aborted attempt (e.g. head moved) is terminal for its id, and
+  a retry opens a new id — so a stale attempt's events can never make an
+  unfinished bootstrap appear armed. Immediately before
   merging, the PR head is revalidated against the intent's gated SHA; a
   moved head aborts back to preflight (never merges an ungated head). On any
   resume (re-run or `scaffold mq bootstrap --finish`), the command
@@ -382,7 +401,7 @@ keeping the drift contract intact. Dispositions:
 | `done (verified)` | all outputs + detect pass | github-setup with live origin |
 | `conflict` | state or partial artifacts disagree with live checks | beads: CLAUDE.md present, `bd info` fails |
 | `map-candidate` *(R3 — ships with D10; absent from R1/R2 plans)* | incumbent artifact could satisfy the step (D10a) | CONTRIBUTING.md → coding-standards |
-| `run (adoption mode)` | valuable; will codify from code | tech-stack |
+| `run` | valuable; will be executed. From R3 the row is annotated with the resolved mode (`run — adoption mode`); in R1/R2 the disposition is the unannotated `run`, because adoption-mode prompt assembly does not exist before R3 (D11) and the plan never claims a mode it cannot deliver | tech-stack |
 | `skip-proposed` | low value for this repo; opt back in with `--include <step>` | domain-modeling on a small PWA |
 | `undetectable` | no outputs, no detect block | review-only steps |
 
