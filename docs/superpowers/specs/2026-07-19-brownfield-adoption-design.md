@@ -120,9 +120,15 @@ by B's ingestion; D's TIA hooks into C's gate scaffolding).
   `scaffold adopt --apply` executes the approved plan. Plan output: always
   stdout (human format or `--format json`); `--write [path]` persists the plan
   document (default `docs/adoption-plan.md`). Re-running re-renders against
-  current reality (Renovate's re-render loop). This is a breaking behavior
-  change called out in the CHANGELOG as a defect fix (the prior silent
-  behavior violated the draft brownfield spec).
+  current reality (Renovate's re-render loop). **Drift detection is
+  structural, not textual:** the plan carries a `plan_key` — a sha256 over the
+  canonical JSON form (sorted step slugs with their dispositions and
+  detect-check results, plus the ops-action list once that section exists in
+  R2). `--apply` recomputes the key against live reality; a mismatch (any
+  disposition, detect result, or ops action changed) aborts with a re-review
+  prompt. Prose/whitespace changes in the written markdown never affect the
+  key. This is a breaking behavior change called out in the CHANGELOG as a
+  defect fix (the prior silent behavior violated the draft brownfield spec).
 - **D2 — adopt is first-touch.** `adopt` joins `ROOT_OPTIONAL_COMMANDS`; in a
   repo with no `.scaffold/`, plan mode works read-only and `--apply` performs
   init (detection → config.yml + state.json) before applying step statuses.
@@ -132,10 +138,17 @@ by B's ingestion; D's TIA hooks into C's gate scaffolding).
   `scaffold status`/doctor) route through `src/state/completion.ts`:
   a step is `verified` only when **all** declared outputs exist AND its
   `detect:` contract (D4) passes. State-says-done-but-checks-fail surfaces as
-  `conflict`, never silently. `artifacts_verified` is set only on real
-  verification (fixing the current misnomer where it means "declares
-  outputs"). Steps with empty `outputs` and no `detect:` block are reported
-  `undetectable` in the plan rather than silently skipped.
+  `conflict`, never silently. **State-field migration:** the boolean
+  `artifacts_verified` (whose current semantics are the misnomer "declares
+  outputs") is replaced by a `verification: verified | declared | unverified`
+  enum plus a state schema-version bump. On first load of a pre-R1 state
+  file, existing `artifacts_verified: true` entries migrate to `declared`
+  (never `verified` — they were not disk-checked), `false`/absent migrates to
+  `unverified`, and the legacy field is dropped on next save. `verified` is
+  set only by a real D3 check. The migration is one-way, automatic, and
+  called out in the R1 CHANGELOG (D16). Steps with empty `outputs` and no
+  `detect:` block are reported `undetectable` in the plan rather than
+  silently skipped.
 - **D4 — `detect:` frontmatter contract.** Pipeline steps may declare a
   machine-readable detection block mirroring their Mode Detection prose:
 
@@ -164,12 +177,24 @@ by B's ingestion; D's TIA hooks into C's gate scaffolding).
   `launchctl print` / `systemctl --user status`, last-run heartbeat from logs).
   Read-only by default; `doctor --fix` applies only idempotent safe fixes
   (re-register hooks, reload scheduler job, delegate `bd doctor --fix`) and
-  never resets state or deletes files. Exit codes: 0 healthy, 1 warnings,
-  2 errors. `--json` for automation. Existing checkers (`agent-ops check`,
-  `make doctor`) remain and are delegated to, not duplicated.
+  never resets state or deletes files. **Capability probing:** every external
+  subcommand the beads section relies on (`bd doctor`, `bd backup status
+  --json` — both already prescribed by the shipped beads step,
+  `content/pipeline/foundation/beads.md`, against the bd ≥ 1.1.0 floor) is
+  probed first (`bd <sub> --help` exit 0); an absent capability reports
+  "unsupported by installed bd <version>" as a warning with the upgrade
+  remediation — never an error loop. The same probe-don't-assume rule applies
+  to `gh`, `launchctl`/`systemctl`, and `jq`. Exit codes: 0 healthy,
+  1 warnings, 2 errors. `--json` for automation. Existing checkers
+  (`agent-ops check`, `make doctor`) remain and are delegated to, not
+  duplicated.
 - **D6 — `scaffold sched` scheduler manager** (brew-services model).
-  `scaffold sched install|uninstall|status <job>`; first job:
-  `post-merge-poller`. macOS: generate plist into `~/Library/LaunchAgents`
+  R2 command surface: `scaffold sched install|uninstall|status <job>` and
+  `scaffold sched list`. Start/stop/restart are deliberately NOT shipped in
+  R2 — install/uninstall subsume them for interval jobs (restart =
+  `uninstall && install`, which the install path's `bootout || true`
+  idempotency makes safe), and a paused queue is already expressed via
+  `.mq/PAUSED`, not scheduler state. First job: `post-merge-poller`. macOS: generate plist into `~/Library/LaunchAgents`
   with reverse-DNS label, absolute paths resolved at install time (node via
   stable fnm alias or `process.execPath`, keg-only openjdk prepended when the
   gate needs Java and `/usr/bin/java` is a stub, Homebrew bin), explicit
@@ -194,23 +219,35 @@ by B's ingestion; D's TIA hooks into C's gate scaffolding).
   `seed: true`: `agent-ops check` reports them only if missing, never as
   drifted — they are project-owned after generation. Excluded from
   `--component all` (same opt-in posture as merge-queue/ci).
-- **D8 — native hook registration.** `scaffold hooks install [--harness
-  claude|codex|cursor]` performs the `.claude/settings.json` deep-merge in
+- **D8 — native hook registration (Claude Code scope in R2).**
+  `scaffold hooks install` performs the `.claude/settings.json` deep-merge in
   TypeScript (idempotent, no jq): SessionStart (`bd prime`), PreToolUse
   (bd-guard, mq-guard), PostToolUse (`gh pr create` review reminder) — each
   added only when its prerequisite exists, with an explicit report line when a
-  prerequisite is missing (no more silent `-d .beads` no-op). Non-Claude
-  harnesses get the `--check` wiring guidance printed. The jq snippets in
+  prerequisite is missing (no more silent `-d .beads` no-op). Scope is
+  deliberately Claude Code only: `.claude/settings.json` is the only
+  hook-registration surface in evidence (§3); other harnesses have no
+  equivalent hook API today, so they keep the existing behavior — the command
+  prints the `scripts/*-guard.sh --check` wiring guidance for AGENTS.md-based
+  harnesses. A `--harness` flag is deferred (§12) until a second harness
+  exposes a registration surface worth automating. The jq snippets in
   git-workflow.md / merge-throughput.md are replaced by "run `scaffold hooks
   install`" instructions; `doctor` verifies registration.
 - **D9 — `scaffold mq bootstrap`.** One-shot guided first merge for the PR
-  that installs the queue: verifies `merge_queue:` config + gate resolve,
-  runs the full gate locally on the PR head, performs the direct squash-merge
-  under bootstrap semantics (journal event `bootstrap_merge` with PR number
-  and sha — auditable, distinct from `MQ_DIRECT_MERGE_OK` emergencies), then
-  arms: hooks install (D8), optional `sched install` (D6), daemon smoke-start,
-  and a closing doctor pass. Guard messaging updated to point first-time
-  installers at `mq bootstrap` instead of the env-var bypass.
+  that installs the queue, ordered **arm-first** so a mid-sequence failure
+  never strands a merged-but-unprotected repo: (1) preflight — verify
+  `merge_queue:` config + gate targets resolve, run the full gate locally on
+  the PR head; (2) arm everything that does not require the merge — hooks
+  install (D8), optional `sched install` (D6); (3) the direct squash-merge
+  under bootstrap semantics (journal event `bootstrap_merged` with PR number
+  and sha — auditable, distinct from `MQ_DIRECT_MERGE_OK` emergencies);
+  (4) post-merge verify — daemon smoke-start and a closing doctor pass,
+  journaled as `bootstrap_armed` on success. The command is **resumable**:
+  re-running (or `scaffold mq bootstrap --finish`) inspects the journal,
+  skips completed stages, and idempotently re-runs unfinished ones — a
+  `bootstrap_merged`-without-`bootstrap_armed` state is exactly what
+  `--finish` and the doctor both surface. Guard messaging updated to point
+  first-time installers at `mq bootstrap` instead of the env-var bypass.
 - **D10 — existing-equivalent mapping + ingestion.** (a) `artifact_map` in
   `.scaffold/config.yml` maps a step to an existing project artifact
   (`coding-standards: CONTRIBUTING.md`), letting D3 verification accept the
@@ -221,20 +258,29 @@ by B's ingestion; D's TIA hooks into C's gate scaffolding).
   test setups, existing docs) and translate them into scaffold's docs with
   provenance annotations, Biome-migrate style; what cannot translate is
   listed, not guessed.
-- **D11 — adoption mode + brownfield preset + live init-mode.** A third
-  content mode alongside fresh/update. Trigger: `init-mode: brownfield` (or
-  `v1-migration`) in state AND the step not previously completed by scaffold.
-  Mechanics: assembly injects a global adoption-mode preamble (read the repo
-  first; extract facts with evidence; interview only for intent gaps;
-  never propose rewrites of working code) — plus per-step `## Adoption Mode
-  Specifics` blocks added incrementally, starting with the ~18 steps where
-  adoption behavior differs materially (foundation + environment phases,
-  create-prd/create-vision, domain-modeling, system-architecture,
-  security, dev-env-setup, design-system). `content/methodology/brownfield.yml`
-  preset: foundation/environment/quality-first enablement, doc-chain middle
-  (modeling→specification) and parity/validation audits disabled by default
-  (plan lists them as opt-in). Adopt selects `brownfield` instead of
-  hardcoding `deep`. Dashboard stops hardcoding greenfield.
+- **D11 — adoption mode + live init-mode (preset ships early, in R1).**
+  A third content mode alongside fresh/update. Trigger: `init-mode:
+  brownfield` (or `v1-migration`) in state AND the step not previously
+  completed by scaffold. Mechanics: assembly injects a global adoption-mode
+  preamble (read the repo first; extract facts with evidence; interview only
+  for intent gaps; never propose rewrites of working code) — plus per-step
+  `## Adoption Mode Specifics` blocks added incrementally, starting with the
+  ~18 steps where adoption behavior differs materially (foundation +
+  environment phases, create-prd/create-vision, domain-modeling,
+  system-architecture, security, dev-env-setup, design-system).
+  **Split across releases:** `content/methodology/brownfield.yml` — a preset
+  in the existing step-overrides format (enablement only:
+  foundation/environment/quality-first; doc-chain middle
+  (modeling→specification) and parity/validation audits disabled by default,
+  opt-in via the plan) — ships in **R1**, because D1's plan must resolve the
+  pipeline through it (§6.1) and adopt must stop hardcoding `deep`. The
+  content mode itself (preamble, per-step blocks, knowledge sensitivity) is
+  the R3 deliverable. **init-mode staging is explicit:** in R1, `init-mode`
+  gains its first real read-sides — adopt uses it to select the `brownfield`
+  preset, and the dashboard's hardcoded `'greenfield'` is fixed; the
+  assembly/knowledge read-side lands in R3, and until then the field's
+  effect on *prompt content* is nil — stated in the R1 CHANGELOG (D16) so
+  nobody expects adoption-mode prompts before R3.
 - **D12 — gate-result cache by tree hash.** The daemon caches green gate
   results keyed by `(candidate tree hash, gate command string, quarantine
   file hash)`; a batch whose candidate tree matches a green entry skips the
@@ -258,6 +304,11 @@ by B's ingestion; D's TIA hooks into C's gate scaffolding).
   jest `--findRelatedTests`); (3) per-test coverage map, testmon-style:
   the post-merge poller's green full runs record which files each test
   executed (V8/c8 coverage) into `.mq/tia/map.json` keyed by content hashes.
+  Recording is **config-gated with a conservative default**
+  (`tia.record: scheduled | always | off`, default `scheduled` — e.g. only
+  the first poller pass of the day), because coverage instrumentation
+  measurably slows the authoritative full-suite run; the poller logs
+  instrumented-vs-plain durations so the cost stays visible in `mq stats`.
   New command `scaffold tia affected --base <ref>` emits the selected test
   list + a confidence verdict; the D7 gate script consumes it and falls back
   to the full suite when the map is stale (commit distance / hash-miss ratio
@@ -272,10 +323,13 @@ by B's ingestion; D's TIA hooks into C's gate scaffolding).
   remains the safety net for merges from other machines. No new external
   dependencies (watchman deferred).
 - **D16 — release/versioning.** Four minor releases in tier order (nominally
-  3.48–3.51); Tier D items are independently shippable and may split. The D1
-  adopt behavior change ships in the first release with a prominent
-  CHANGELOG "breaking behavior fix" entry and a one-release notice printed
-  when `adopt` runs without `--apply`.
+  3.48–3.51); Tier D items are independently shippable and may split. The R1
+  CHANGELOG carries three prominent entries: the D1 adopt behavior change
+  ("breaking behavior fix", plus a one-release notice printed when `adopt`
+  runs without `--apply`), the D3 state-field migration
+  (`artifacts_verified` → `verification`, automatic and one-way), and the
+  D11 staging note (`init-mode` drives preset selection from R1 but does not
+  change prompt content until R3).
 
 ## 6. Tier A — trust and verification
 
@@ -284,8 +338,9 @@ by B's ingestion; D's TIA hooks into C's gate scaffolding).
 Plan pipeline: detect project mode/type (existing `detector.ts` + detectors) →
 run D3 verification for every step in the **resolved** pipeline (fix: adopt
 currently scans the unresolved 99-step superset; it will resolve via the
-brownfield preset + project-type overlays like `complete`/`reset` do) →
-propose per-step disposition:
+`brownfield` preset — which ships in R1 for exactly this reason, per D11 —
+plus project-type overlays, like `complete`/`reset` do) → propose per-step
+disposition:
 
 | Disposition | Meaning | Example |
 |---|---|---|
@@ -296,12 +351,14 @@ propose per-step disposition:
 | `skip-proposed` | low value for this repo; opt back in with `--include <step>` | domain-modeling on a small PWA |
 | `undetectable` | no outputs, no detect block | review-only steps |
 
-The plan also previews ops actions (components to install, hooks, scheduler,
-bootstrap-merge requirement) with the exact file list, and prints the two
-follow-up commands (`adopt --apply`, `doctor`). `--apply` executes only what
-the rendered plan showed (plan is re-rendered and diffed against the approved
-copy when `--write` was used; a drifted plan aborts with a re-review prompt).
-Apply ends by running `scaffold doctor` and printing its verdict — Terraform's
+**Staged renderer scope:** in R1 the plan renders step dispositions + the
+live verification verdict + the follow-up commands (`adopt --apply`,
+`doctor`) only. The ops-actions preview (components to install, hooks,
+scheduler, bootstrap-merge requirement, with the exact file list) is added in
+R2 when the D6–D9 commands it previews exist; the `plan_key` (D1) covers the
+ops-action list from R2 onward. `--apply` executes only what the rendered
+plan showed, enforced via the `plan_key` comparison defined in D1. Apply ends
+by running `scaffold doctor` and printing its verdict — Terraform's
 "done = clean plan" criterion.
 
 ### 6.2 Detection contracts (D3, D4)
@@ -338,14 +395,13 @@ Checks are skipped (not failed) when their subsystem is not installed
 
 ## 8. Tier B — brownfield-native pipeline
 
-- **Adoption mode (D11):** `update-mode.ts` grows a third resolution
+- **Adoption mode (D11, R3 half):** `update-mode.ts` grows a third resolution
   (`fresh | update | adoption`); assembly injects the adoption preamble from a
   new `content/modes/adoption.md`; per-step `## Adoption Mode Specifics`
   blocks authored for the initial ~18 steps (editing-guidelines pattern
-  extended: the block sits after Update Mode Specifics).
-- **Brownfield preset:** `content/methodology/brownfield.yml`
-  (step-overrides enable/disable only — no order changes; the plan's
-  presentation order conveys foundation-first).
+  extended: the block sits after Update Mode Specifics). (The
+  `brownfield.yml` preset itself ships in R1 — see D11/§6.1; R3 only *reads*
+  it here.)
 - **Knowledge sensitivity:** knowledge-loader may append brownfield-specific
   entries when `init-mode` is brownfield (new `content/knowledge/core/
   brownfield-adoption.md` entry; injected for adoption-mode steps).
@@ -371,9 +427,9 @@ Each independently shippable, in suggested order:
 
 | Release | Content | Depends on |
 |---|---|---|
-| R1 (Tier A) | D1–D5: adopt plan/apply, detect contracts, doctor | — |
-| R2 (Tier C) | D6–D9: sched, gate component, hooks, bootstrap | R1 (doctor verifies installs; plan previews ops actions) |
-| R3 (Tier B) | D10–D11: adoption mode, preset, mapping/ingestion | R1 (plan dispositions), R2 (gate ingestion generalizes) |
+| R1 (Tier A) | D1–D5: adopt plan/apply, detect contracts, doctor, state migration, `brownfield.yml` preset + init-mode preset/dashboard read-sides (D11's R1 half) | — |
+| R2 (Tier C) | D6–D9: sched, gate component, hooks, bootstrap; adopt plan gains the ops-actions preview section | R1 (doctor verifies installs; plan renderer extended) |
+| R3 (Tier B) | D10 + D11's content half: adoption mode, mapping/ingestion, assembly/knowledge init-mode read-side | R1 (plan dispositions, preset), R2 (gate ingestion generalizes) |
 | R4 (Tier D) | D12–D15 (splittable) | R2 (gate scripts consume TIA; sched runs poller) |
 
 Each release: spec'd tasks in its own implementation plan
@@ -399,6 +455,11 @@ operations runbook.
   (~18 initially); eval-suite additions guard the block-placement convention.
 - **TIA false exclusions.** Full-suite post-merge net stays authoritative;
   staleness/confidence fallback to full; quarantine asymmetry preserved.
+- **TIA coverage-recording overhead degrades the safety net.** Always-on
+  instrumentation can slow a full suite severely enough that users disable
+  the post-merge net. Mitigation: `tia.record` defaults to `scheduled`
+  (periodic, not per-run), instrumented-vs-plain durations are logged and
+  surfaced in `mq stats`, and `off` is a first-class setting.
 - **Overlap-zone `hold` starves PRs.** Default policy `solo`; `hold` is
   explicit opt-in; `mq status` surfaces held PRs prominently.
 - **Gate cache staleness/poisoning.** Key includes gate command + quarantine
@@ -408,6 +469,9 @@ operations runbook.
 
 - Watchman-backed triggers; Dagger/container hermetic gate backend
   (Earthly is shut down — Dagger is the live option if ever needed).
+- `scaffold hooks install --harness <name>` multi-harness registration —
+  deferred until a non-Claude harness ships a hook-registration surface;
+  until then those harnesses keep the printed `--check` wiring guidance (D8).
 - Stacked-PR / stack-aware queue semantics.
 - ML-based predictive test selection (heuristic ordering only, per D14).
 - Deep v1-migration artifact mapping (`V1_ARTIFACT_MAP` build-out).
