@@ -377,6 +377,21 @@ describe('detect: frontmatter contract (D4)', () => {
     expect(errors.length).toBeGreaterThan(0)
   })
 
+  it('rejects a detect check item with neither path nor cmd', () => {
+    const file = writeFixture('bad-neither', [
+      'name: bad-neither',
+      'description: d',
+      'phase: "foundation"',
+      'order: 214',
+      'outputs: [x.md]',
+      'detect:',
+      '  all:',
+      '    - timeout: 5',
+    ].join('\n'))
+    const { errors } = parseAndValidate(file)
+    expect(errors.length).toBeGreaterThan(0)
+  })
+
   it('does not warn detect as an unknown field, and defaults to null when absent', () => {
     const file = writeFixture('no-detect', [
       'name: no-detect',
