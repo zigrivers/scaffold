@@ -423,7 +423,7 @@ export function buildSchedPath(p: PathProbes): string {
 
 **Steps:**
 
-- [ ] Append the backend tests to `src/sched/backends/launchd.test.ts` (keep the Task 1 tests; add these imports at the top: `import os from 'node:os'`, `import { createLaunchdBackend } from './launchd.js'`, `import type { ExecResult } from '../exec.js'`):
+- [x] Append the backend tests to `src/sched/backends/launchd.test.ts` (keep the Task 1 tests; add these imports at the top: `import os from 'node:os'`, `import { createLaunchdBackend } from './launchd.js'`, `import type { ExecResult } from '../exec.js'`):
 
 ```ts
 interface Call { cmd: string; args: string[] }
@@ -525,8 +525,8 @@ describe('createLaunchdBackend', () => {
 })
 ```
 
-- [ ] Run: `npx vitest run src/sched/backends/launchd.test.ts` — expect FAILURE (`createLaunchdBackend` not exported).
-- [ ] Append the backend factory to `src/sched/backends/launchd.ts` (add imports `fs`, `path`, and the types):
+- [x] Run: `npx vitest run src/sched/backends/launchd.test.ts` — expect FAILURE (`createLaunchdBackend` not exported).
+- [x] Append the backend factory to `src/sched/backends/launchd.ts` (add imports `fs`, `path`, and the types):
 
 ```ts
 import fs from 'node:fs'
@@ -603,8 +603,8 @@ export function createLaunchdBackend(deps: { exec: Exec; home: string; uid: numb
 }
 ```
 
-- [ ] Run: `npx vitest run src/sched/backends/launchd.test.ts` — expect 9 tests passed (3 renderer + 6 backend).
-- [ ] Commit: `git add -A && git commit -m "feat(sched): launchd backend — bootout||true, bootstrap, launchctl-print verification"`
+- [x] Run: `npx vitest run src/sched/backends/launchd.test.ts` — expect 9 tests passed (3 renderer + 6 backend).
+- [x] Commit: `git add -A && git commit -m "feat(sched): launchd backend — bootout||true, bootstrap, launchctl-print verification"`
 
 ---
 
