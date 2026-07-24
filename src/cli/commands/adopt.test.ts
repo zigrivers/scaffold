@@ -194,13 +194,16 @@ describe('adopt command', () => {
     vi.restoreAllMocks()
   })
 
-  // Test 1: Exits 1 when project root not found
-  it('exits 1 when project root not found', async () => {
+  // Test 1 (R1 D2): first-touch — falls back to cwd instead of erroring when no .scaffold/ is found
+  it('falls back to process.cwd() when no project root is found (first-touch adoption, D2)', async () => {
     mockFindProjectRoot.mockReturnValue(null)
 
     await adoptCommand.handler(defaultArgv())
 
-    expect(process.exitCode).toBe(1)
+    expect(mockRunAdoption).toHaveBeenCalledWith(
+      expect.objectContaining({ projectRoot: process.cwd() }),
+    )
+    expect(process.exitCode).toBe(0)
   })
 
   // Test 3: Dry-run succeeds without modifying files

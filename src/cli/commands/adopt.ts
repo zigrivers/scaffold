@@ -8,7 +8,11 @@ import { createOutputContext } from '../output/context.js'
 import { getPackagePipelineDir } from '../../utils/fs.js'
 import { runAdoption, TYPE_KEY } from '../../project/adopt.js'
 import type { AdoptionResult } from '../../project/adopt.js'
-import { buildAdoptionPlan, renderPlanMarkdown } from '../../project/adoption-plan.js'
+import { buildAdoptionPlan, renderPlanMarkdown, extractPlanKey } from '../../project/adoption-plan.js'
+import { applyAdoptionPlan } from '../../project/adoption-apply.js'
+import { acquireLock, getLockPath, releaseLock } from '../../state/lock-manager.js'
+import { shutdown } from '../shutdown.js'
+import { readPackageVersion } from './version.js'
 import { ProjectTypeSchema } from '../../config/schema.js'
 import { coerceCSV } from '../utils/coerce.js'
 import {
@@ -125,6 +129,19 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
         array: true,
         describe: 'Opt a preset-disabled step into the plan (CSV or repeatable); applied before resolution',
         coerce: coerceCSV,
+      })
+      .option('apply', {
+        type: 'boolean',
+        default: false,
+        describe: 'Execute the approved plan (writes config/state; pass --plan or --plan-key)',
+      })
+      .option('plan', {
+        type: 'string',
+        describe: 'Path to the approved plan document (drift-checked via its embedded plan key)',
+      })
+      .option('plan-key', {
+        type: 'string',
+        describe: 'Approved plan key (sha256) to drift-check against',
       })
       // Project type
       .option('project-type', {
@@ -481,19 +498,14 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
         'game-npc-ai', 'game-modding', 'game-persistence',
       ], 'Game Configuration:')
       .group(
-        ['root', 'force', 'auto', 'format', 'verbose', 'dry-run', 'write', 'include'],
+        ['root', 'force', 'auto', 'format', 'verbose', 'dry-run', 'write', 'include', 'apply', 'plan', 'plan-key'],
         'General:',
       ) as unknown as Argv<AdoptArgs>
   },
   handler: async (argv) => {
-    const projectRoot = argv.root ?? findProjectRoot(process.cwd())
-
-    if (!projectRoot) {
-      const output = createOutputContext('auto')
-      output.error({ code: 'PROJECT_NOT_INITIALIZED', message: 'No .scaffold/ directory found', exitCode: 1 })
-      process.exitCode = 1
-      return
-    }
+    // D2: adopt is first-touch — with no .scaffold/ anywhere, the current
+    // directory is the project root (plan mode is read-only; --apply performs init).
+    const projectRoot = (argv.root as string | undefined) ?? findProjectRoot(process.cwd()) ?? process.cwd()
 
     const outputMode = resolveOutputMode(argv)
     const output = createOutputContext(outputMode)
@@ -547,6 +559,147 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
       process.exitCode = planErrors[0].exitCode
       return
     }
+
+    if (argv.apply === true) {
+      // Resolve the approved key from the plan artifact. Reading the approved
+      // doc is safe pre-lock; the authoritative render + key COMPARE happen
+      // under the lock below.
+      let approvedKey: string | null = (argv['plan-key'] as string | undefined) ?? null
+      if (approvedKey === null && typeof argv.plan === 'string') {
+        const planPath = path.isAbsolute(argv.plan) ? argv.plan : path.join(projectRoot, argv.plan)
+        if (!fs.existsSync(planPath)) {
+          output.error({
+            code: 'ADOPT_PLAN_NOT_FOUND',
+            message: `Plan file not found: ${planPath}`,
+            exitCode: ExitCode.ValidationError,
+          })
+          process.exitCode = ExitCode.ValidationError
+          return
+        }
+        approvedKey = extractPlanKey(fs.readFileSync(planPath, 'utf8'))
+        if (approvedKey === null) {
+          output.error({
+            code: 'ADOPT_PLAN_KEY_MISSING',
+            message: `No plan key found in ${planPath} — re-render with \`scaffold adopt --write\``,
+            exitCode: ExitCode.ValidationError,
+          })
+          process.exitCode = ExitCode.ValidationError
+          return
+        }
+      }
+      // D1: a bare --apply is interactive-only — automation must pass the key
+      // it approved. Fail fast BEFORE taking the lock so a non-interactive
+      // bare apply never acquires (and immediately releases) it.
+      // NOTE: `effectiveAuto` already folds in `outputMode === 'json'` (line
+      // ~509), so re-checking it here would be dead code — TS's aliased-
+      // condition narrowing catches this (TS2367) if left in.
+      if (approvedKey === null && (effectiveAuto || !output.supportsInteractivePrompts())) {
+        output.error({
+          code: 'ADOPT_APPLY_NON_INTERACTIVE',
+          message: 'Bare --apply is interactive-only. In automation, pass the approved plan: '
+            + '--plan <path> or --plan-key <sha256>.',
+          exitCode: ExitCode.ValidationError,
+        })
+        process.exitCode = ExitCode.ValidationError
+        return
+      }
+
+      // Take the lock BEFORE the final detection + render + key compare so no
+      // writer can change config/state between the compare and the writes
+      // (TOCTOU). The SAME lock is held through every write below.
+      const lockResult = acquireLock(projectRoot, 'adopt')
+      if (!lockResult.acquired) {
+        if (lockResult.error) output.error(lockResult.error)
+        process.exitCode = 3
+        return
+      }
+      shutdown.registerLockOwnership(getLockPath(projectRoot))
+      await shutdown.withResource('lock', () => {
+        releaseLock(projectRoot)
+        shutdown.releaseLockOwnership()
+      }, async () => {
+        // Authoritative re-render UNDER the lock: re-run adoption detection
+        // and rebuild the plan against live reality. The plan built outside
+        // the lock (plan mode) is intentionally discarded here.
+        let liveAdopt: AdoptionResult
+        try {
+          liveAdopt = await runAdoption({
+            projectRoot, metaPromptDir, methodology, dryRun,
+            auto: true, force: argv.force === true, verbose: argv.verbose === true,
+            explicitProjectType: argv['project-type'] as ProjectType | undefined,
+            flagOverrides: buildFlagOverrides(argv as Record<string, unknown>),
+          })
+        } catch (err) {
+          output.error(asScaffoldError(err, 'ADOPT_INTERNAL', ExitCode.ValidationError))
+          process.exitCode = ExitCode.ValidationError
+          return
+        }
+        const { plan: livePlan, errors: liveErrors } = buildAdoptionPlan({
+          projectRoot, adoptResult: liveAdopt, includes,
+        })
+        if (liveErrors.length > 0) {
+          for (const e of liveErrors) output.error(e)
+          process.exitCode = liveErrors[0].exitCode
+          return
+        }
+
+        if (approvedKey === null) {
+          // Bare --apply — interactive confirmation against the live render.
+          for (const line of renderPlanMarkdown(livePlan).split('\n')) output.info(line)
+          const typed = await output.prompt<string>(
+            `Type "apply" to execute plan ${livePlan.plan_key.slice(0, 12)}… (anything else aborts)`, '',
+          )
+          if (typed !== 'apply') {
+            output.info('Aborted — nothing was written.')
+            process.exitCode = 0
+            return
+          }
+        } else if (approvedKey !== livePlan.plan_key) {
+          // D1 drift contract: the under-lock re-render IS the pre-write check.
+          output.error({
+            code: 'ADOPT_PLAN_DRIFT',
+            message: `Plan key mismatch: approved ${approvedKey.slice(0, 12)}… but the live re-render `
+              + `produced ${livePlan.plan_key.slice(0, 12)}… — `
+              + 'reality changed since approval (a disposition, detect result, include, or the initialize payload). '
+              + 'Re-review: `scaffold adopt --write`, then re-run --apply against the new plan.',
+            exitCode: ExitCode.ValidationError,
+          })
+          process.exitCode = ExitCode.ValidationError
+          return
+        }
+
+        const applyResult = await applyAdoptionPlan({
+          projectRoot, plan: livePlan, scaffoldVersion: readPackageVersion(),
+        })
+        if (outputMode === 'json') {
+          output.result({
+            schema_version: 3,
+            applied: true,
+            plan_key: livePlan.plan_key,
+            initialized: applyResult.initialized,
+            marked_completed: applyResult.marked_completed,
+            reopened: applyResult.reopened,
+            recorded_pending: applyResult.recorded_pending,
+            audit_records: applyResult.audit_records,
+            doctor: { verdict: applyResult.doctor.verdict, exit_code: applyResult.doctor.exitCode },
+          })
+        } else {
+          output.success(
+            `Applied plan ${livePlan.plan_key.slice(0, 12)}…: `
+            + `${applyResult.marked_completed.length} completed, ${applyResult.reopened.length} reopened, `
+            + `${applyResult.recorded_pending.length} recorded pending`
+            + (applyResult.initialized ? ' (project initialized)' : ''),
+          )
+          output.info(
+            `doctor: ${applyResult.doctor.verdict} (exit ${applyResult.doctor.exitCode}) `
+            + '— run `scaffold doctor` for details',
+          )
+        }
+        process.exitCode = 0
+      })
+      return
+    }
+
     const writeTarget = argv.write === undefined
       ? null
       : (argv.write === '' ? 'docs/adoption-plan.md' : String(argv.write))

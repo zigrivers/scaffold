@@ -167,4 +167,8 @@ describe('ROOT_OPTIONAL_COMMANDS', () => {
     expect(ROOT_OPTIONAL_COMMANDS).toContain('version')
     expect(ROOT_OPTIONAL_COMMANDS).toContain('update')
   })
+
+  it('adopt is root-optional — first-touch adoption needs no .scaffold/ (D2)', () => {
+    expect(ROOT_OPTIONAL_COMMANDS).toContain('adopt')
+  })
 })
