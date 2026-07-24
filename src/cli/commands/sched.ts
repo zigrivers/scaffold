@@ -84,6 +84,11 @@ export async function schedHandler(argv: SchedArgs, overrides: SchedOverrides = 
     }
     const res = backend.uninstall(job)
     for (const m of res.messages) output.info(m)
+    if (!res.ok) {
+      output.error(`sched: ${name} uninstall failed`)
+      process.exitCode = 1
+      return
+    }
     output.success(`sched: ${name} uninstalled`)
     return
   }

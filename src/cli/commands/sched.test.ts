@@ -72,6 +72,18 @@ describe('schedHandler', () => {
     expect(process.exitCode).toBe(1)
     process.exitCode = 0
   })
+  it('uninstall exits non-zero when the backend reports failure', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sched-cli-'))
+    const be = fakeBackend({
+      uninstall: () => ({ ok: false, verified: false, messages: ['boot-out failed'] }),
+    })
+    await schedHandler(argv({ action: 'uninstall', job: 'post-merge-poller', root }), {
+      backend: be,
+      buildJob: (name, projectRoot) => ({ ...fakeJob(projectRoot), name }),
+    })
+    expect(process.exitCode).toBe(1)
+    process.exitCode = 0
+  })
   it('status exits 0 when loaded, 1 when not loaded', async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sched-cli-'))
     const loaded = fakeBackend()
