@@ -275,7 +275,7 @@ ${env}
 
 **Steps:**
 
-- [ ] Write the failing test `src/sched/path-resolver.test.ts`:
+- [x] Write the failing test `src/sched/path-resolver.test.ts`:
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -330,8 +330,8 @@ describe('path-resolver', () => {
 })
 ```
 
-- [ ] Run: `npx vitest run src/sched/path-resolver.test.ts` — expect FAILURE (module missing).
-- [ ] Create `src/sched/path-resolver.ts`:
+- [x] Run: `npx vitest run src/sched/path-resolver.test.ts` — expect FAILURE (module missing).
+- [x] Create `src/sched/path-resolver.ts`:
 
 ```ts
 import fs from 'node:fs'
@@ -406,8 +406,8 @@ export function buildSchedPath(p: PathProbes): string {
 }
 ```
 
-- [ ] Run: `npx vitest run src/sched/path-resolver.test.ts` — expect 5 tests passed.
-- [ ] Commit: `git add -A && git commit -m "feat(sched): absolute-path resolver (fnm alias, java-stub-aware openjdk, homebrew)"`
+- [x] Run: `npx vitest run src/sched/path-resolver.test.ts` — expect 5 tests passed.
+- [x] Commit: `git add -A && git commit -m "feat(sched): absolute-path resolver (fnm alias, java-stub-aware openjdk, homebrew)"`
 
 ---
 
