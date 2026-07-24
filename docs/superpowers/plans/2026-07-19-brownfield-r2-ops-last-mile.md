@@ -869,7 +869,7 @@ export function createSystemdBackend(deps: { exec: Exec; home: string; user: str
 
 **Steps:**
 
-- [ ] Write the failing test `src/sched/jobs.test.ts`:
+- [x] Write the failing test `src/sched/jobs.test.ts`:
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -926,8 +926,8 @@ describe('buildPostMergePollerJob', () => {
 })
 ```
 
-- [ ] Run: `npx vitest run src/sched/jobs.test.ts` — expect FAILURE (module missing).
-- [ ] Create `src/sched/jobs.ts`:
+- [x] Run: `npx vitest run src/sched/jobs.test.ts` — expect FAILURE (module missing).
+- [x] Create `src/sched/jobs.ts`:
 
 ```ts
 import fs from 'node:fs'
@@ -972,8 +972,8 @@ export const SCHED_JOBS: Record<string, (projectRoot: string, opts?: JobBuildOpt
 }
 ```
 
-- [ ] Run: `npx vitest run src/sched/jobs.test.ts` — expect 4 tests passed.
-- [ ] Commit: `git add -A && git commit -m "feat(sched): post-merge-poller job builder + job registry"`
+- [x] Run: `npx vitest run src/sched/jobs.test.ts` — expect 4 tests passed.
+- [x] Commit: `git add -A && git commit -m "feat(sched): post-merge-poller job builder + job registry"`
 
 ---
 
