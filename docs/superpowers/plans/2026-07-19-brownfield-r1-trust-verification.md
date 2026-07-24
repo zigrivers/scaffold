@@ -420,7 +420,7 @@ function runDetect(detect: DetectSpec | null | undefined, projectRoot: string): 
 
 **Steps:**
 
-- [ ] Write failing tests in `src/state/completion.test.ts`:
+- [x] Write failing tests in `src/state/completion.test.ts`:
 
 ```ts
 describe('runDetect (D4)', () => {
@@ -468,8 +468,8 @@ describe('runDetect (D4)', () => {
 
 Add `import os from 'node:os'`, `import fs from 'node:fs'`, `import path from 'node:path'` to the test file if absent, plus `runDetect` to the import from `./completion.js`.
 
-- [ ] Run `npx vitest run src/state/completion.test.ts` — FAIL (`runDetect` is not exported).
-- [ ] Implement in `src/state/completion.ts`. Add imports:
+- [x] Run `npx vitest run src/state/completion.test.ts` — FAIL (`runDetect` is not exported).
+- [x] Implement in `src/state/completion.ts`. Add imports:
 
 ```ts
 import fs from 'node:fs'
@@ -539,8 +539,8 @@ export function runDetect(
 }
 ```
 
-- [ ] Run `npx vitest run src/state/completion.test.ts` — green (the timeout test takes ~1s by design).
-- [ ] Commit: `git add -A && git commit -m "feat(completion): runDetect executor — bounded cmd/path checks, failure=not-detected (R1 D4)"`
+- [x] Run `npx vitest run src/state/completion.test.ts` — green (the timeout test takes ~1s by design).
+- [x] Commit: `git add -A && git commit -m "feat(completion): runDetect executor — bounded cmd/path checks, failure=not-detected (R1 D4)"`
 
 ---
 
