@@ -1138,7 +1138,7 @@ describe('next — conflict overrides completed (D3)', () => {
 
 **Steps:**
 
-- [ ] Create `content/methodology/brownfield.yml` with exactly this content (same step-overrides format as `deep.yml`/`mvp.yml`; enablement only — no content semantics):
+- [x] Create `content/methodology/brownfield.yml` with exactly this content (same step-overrides format as `deep.yml`/`mvp.yml`; enablement only — no content semantics):
 
 ```yaml
 # methodology/brownfield.yml
@@ -1271,7 +1271,7 @@ steps:
   review-macos-release: { enabled: false }
 ```
 
-- [ ] Write the failing content test `src/core/assembly/brownfield-preset.test.ts` (complete file):
+- [x] Write the failing content test `src/core/assembly/brownfield-preset.test.ts` (complete file):
 
 ```ts
 import { describe, it, expect } from 'vitest'
@@ -1310,12 +1310,12 @@ describe('content/methodology/brownfield.yml (D11 R1)', () => {
 })
 ```
 
-- [ ] Run `npx vitest run src/core/assembly/brownfield-preset.test.ts` — first test passes if the YAML is right; treat any error/warning as a defect in the YAML and fix there (every known pipeline step must be enumerated).
-- [ ] Widen the types and validation:
+- [x] Run `npx vitest run src/core/assembly/brownfield-preset.test.ts` — first test passes if the YAML is right; treat any error/warning as a defect in the YAML and fix there (every known pipeline step must be enumerated).
+- [x] Widen the types and validation:
   1. `src/types/enums.ts`: `export type MethodologyName = 'deep' | 'mvp' | 'custom' | 'brownfield'`
   2. `src/config/loader.ts`: `const VALID_METHODOLOGIES = ['deep', 'mvp', 'custom', 'brownfield']`
   3. `src/config/schema.ts` (the `ConfigSchema` literal): `methodology: z.enum(['deep', 'mvp', 'custom', 'brownfield']).default('deep'),`
-- [ ] Load the preset. In `src/core/assembly/preset-loader.ts`, extend `loadAllPresets`: widen the return type with `brownfield: MethodologyPreset | null`, and before the final `return` add:
+- [x] Load the preset. In `src/core/assembly/preset-loader.ts`, extend `loadAllPresets`: widen the return type with `brownfield: MethodologyPreset | null`, and before the final `return` add:
 
 ```ts
   const { preset: brownfield, errors: brownfieldErrors, warnings: brownfieldWarnings } = loadPreset(
@@ -1327,8 +1327,8 @@ describe('content/methodology/brownfield.yml (D11 R1)', () => {
 ```
 
 and add `brownfield,` to the returned object.
-- [ ] Thread it through: in `src/core/pipeline/types.ts` add `brownfield: MethodologyPreset | null` to `PipelineContext['presets']`; in `src/core/pipeline/context.ts` change the destructure to `const { deep, mvp, custom, brownfield } = loadAllPresets(methodologyDir, pipelineStepNames)` and the return to `presets: { deep, mvp, custom, brownfield },`.
-- [ ] Select it in `src/core/pipeline/resolver.ts` — replace the preset-selection expression with:
+- [x] Thread it through: in `src/core/pipeline/types.ts` add `brownfield: MethodologyPreset | null` to `PipelineContext['presets']`; in `src/core/pipeline/context.ts` change the destructure to `const { deep, mvp, custom, brownfield } = loadAllPresets(methodologyDir, pipelineStepNames)` and the return to `presets: { deep, mvp, custom, brownfield },`.
+- [x] Select it in `src/core/pipeline/resolver.ts` — replace the preset-selection expression with:
 
 ```ts
   const methodology = config?.methodology ?? 'deep'
@@ -1340,7 +1340,7 @@ and add `brownfield,` to the returned object.
     presets.deep
 ```
 
-- [ ] Add the resolver test `src/core/pipeline/resolver.brownfield.test.ts` (complete file):
+- [x] Add the resolver test `src/core/pipeline/resolver.brownfield.test.ts` (complete file):
 
 ```ts
 import { describe, it, expect } from 'vitest'
@@ -1370,16 +1370,16 @@ describe('resolvePipeline — brownfield preset selection (D11 R1)', () => {
 })
 ```
 
-- [ ] Run `npx vitest run src/core/pipeline/resolver.brownfield.test.ts src/core/pipeline/resolver.test.ts src/core/assembly/preset-loader.test.ts` — green (fix the `loadAllPresets` mocks in any failing test by adding `brownfield: null` to the mocked return; `grep -rn "loadAllPresets" src --include="*.test.ts"` lists them).
-- [ ] Point adopt at it. In `src/project/adopt.ts`, in the `result` literal (currently `methodology,` at line 167), change to:
+- [x] Run `npx vitest run src/core/pipeline/resolver.brownfield.test.ts src/core/pipeline/resolver.test.ts src/core/assembly/preset-loader.test.ts` — green (fix the `loadAllPresets` mocks in any failing test by adding `brownfield: null` to the mocked return; `grep -rn "loadAllPresets" src --include="*.test.ts"` lists them).
+- [x] Point adopt at it. In `src/project/adopt.ts`, in the `result` literal (currently `methodology,` at line 167), change to:
 
 ```ts
     methodology: detection.mode === 'greenfield' ? methodology : 'brownfield',
 ```
 
 with the comment line above it: `// D11 (R1): init-mode drives preset selection — brownfield/v1-migration repos adopt under the brownfield preset, replacing the hardcoded 'deep'.`
-- [ ] In `src/cli/commands/adopt.ts`: change line 563 to `const methodology = 'deep' // greenfield fallback — runAdoption returns 'brownfield' for brownfield/v1-migration repos (D11 R1)` and change the `writeOrUpdateState(projectRoot, adoptResult, methodology, metaPromptDir)` call to pass `adoptResult.methodology` instead of `methodology`.
-- [ ] Append the adopt test to `src/project/adopt.test.ts` (reuse its existing imports of `runAdoption`, `fs`, `os`, `path` — add any missing):
+- [x] In `src/cli/commands/adopt.ts`: change line 563 to `const methodology = 'deep' // greenfield fallback — runAdoption returns 'brownfield' for brownfield/v1-migration repos (D11 R1)` and change the `writeOrUpdateState(projectRoot, adoptResult, methodology, metaPromptDir)` call to pass `adoptResult.methodology` instead of `methodology`.
+- [x] Append the adopt test to `src/project/adopt.test.ts` (reuse its existing imports of `runAdoption`, `fs`, `os`, `path` — add any missing):
 
 ```ts
 describe('brownfield methodology selection (D11 R1)', () => {
@@ -1401,7 +1401,7 @@ describe('brownfield methodology selection (D11 R1)', () => {
 })
 ```
 
-- [ ] Fix the dashboard hardcode. In `src/cli/commands/dashboard.ts` add this exported helper (near the top, after the imports — `StateManager` and `StatePathResolver` are already imported):
+- [x] Fix the dashboard hardcode. In `src/cli/commands/dashboard.ts` add this exported helper (near the top, after the imports — `StateManager` and `StatePathResolver` are already imported):
 
 ```ts
 /**
@@ -1424,7 +1424,7 @@ export function resolveSkeletonInitMode(
 ```
 
 Then, immediately before the `for (const svc of configuredServices!)` loop, add `const rootInitMode = resolveSkeletonInitMode(projectRoot, config)`, and at line 206 replace `'init-mode': 'greenfield',` with `'init-mode': rootInitMode,`.
-- [ ] Add `src/cli/commands/dashboard.init-mode.test.ts` (complete file):
+- [x] Add `src/cli/commands/dashboard.init-mode.test.ts` (complete file):
 
 ```ts
 import { describe, it, expect } from 'vitest'
@@ -1453,8 +1453,8 @@ describe('resolveSkeletonInitMode (D11 R1)', () => {
 })
 ```
 
-- [ ] Run `npx vitest run src/core src/project src/cli/commands/dashboard.init-mode.test.ts src/cli/commands/adopt.test.ts src/config` — green. Then `npx vitest run src` and fix any remaining `loadAllPresets` mock or `MethodologyName` narrowing fallout (mechanical).
-- [ ] Commit: `git add -A && git commit -m "feat(methodology): brownfield preset + init-mode read-sides in adopt/dashboard (R1 D11)"`
+- [x] Run `npx vitest run src/core src/project src/cli/commands/dashboard.init-mode.test.ts src/cli/commands/adopt.test.ts src/config` — green. Then `npx vitest run src` and fix any remaining `loadAllPresets` mock or `MethodologyName` narrowing fallout (mechanical).
+- [x] Commit: `git add -A && git commit -m "feat(methodology): brownfield preset + init-mode read-sides in adopt/dashboard (R1 D11)"`
 
 ---
 
