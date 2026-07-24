@@ -4,6 +4,8 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.48.0] - 2026-07-24
+
 ### Fixed
 
 - **MMR 3.2.0: grok review channel restored under concurrent sessions.** Root

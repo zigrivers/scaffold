@@ -299,15 +299,20 @@ cd ~/projects/my-nextjs-app
 scaffold init
 ```
 
-Scaffold detects that you already have code (package.json, source files, git history) and classifies the project as **brownfield**. It suggests the `deep` methodology since existing projects benefit from thorough documentation, but you can choose any preset.
+Scaffold detects that you already have code (package.json, source files, git history) and classifies the project as **brownfield**. It adopts under the `brownfield` methodology preset (foundation / environment / quality-first; the doc-chain middle is opt-in via `--include <step>`), but you can choose any preset.
 
-If you already have docs that match Scaffold's expected outputs (a PRD, architecture doc, etc.), bootstrap your state:
+To see which pipeline steps your existing artifacts already satisfy, render an **Adoption Plan** — `scaffold adopt` proposes, then you apply:
 
 ```bash
-scaffold adopt
+scaffold adopt                       # renders the plan to stdout; writes NOTHING
+scaffold adopt --write               # also writes docs/adoption-plan.md
+scaffold adopt --format json         # machine-readable plan (includes a plan_key)
+scaffold adopt --apply --plan-key <sha256>   # executes an approved plan
 ```
 
-This scans your project for existing artifacts and marks those pipeline steps as complete so you don't redo work.
+The plan checks each step's completion against **live** state — all declared outputs present on disk AND the step's `detect:` check passing (e.g. `.beads/` exists and `bd info` runs) — so a repo that merely contains a `CLAUDE.md` no longer gets steps falsely marked complete. `--apply` re-renders against reality and aborts if anything drifted from the plan you approved. Run `scaffold doctor` any time to execute a full health check of the installed surface (0 healthy / 1 warnings / 2 errors).
+
+> **Behavior change (v3.48.0):** `scaffold adopt` used to silently write state on run. It now renders a plan and writes nothing until you `--apply` an approved plan — scripts that relied on the old side effect must pass `--apply`.
 
 **Now open Claude Code and skip what doesn't apply:**
 
@@ -1535,7 +1540,8 @@ You can change methodology mid-pipeline with `scaffold init --methodology <prese
 | `scaffold init` | Initialize `.scaffold/` state, then auto-build hidden adapter artifacts |
 | `scaffold run <step> [args…]` | Execute a pipeline step (assembles and outputs the full prompt). Trailing args bind to the step's `$ARGUMENTS` (e.g. `scaffold run review-pr 376 --fix-threshold P1`) |
 | `scaffold build` | Generate hidden adapter output under `.scaffold/generated/` and update the managed `.gitignore` block |
-| `scaffold adopt` | Bootstrap state from existing artifacts (brownfield projects) |
+| `scaffold adopt` | Render an Adoption Plan for an existing project (propose-then-apply; writes nothing until `--apply --plan-key <sha256>`) |
+| `scaffold doctor` | Execute a health check of the installed surface (pipeline verification, beads, hooks, gate targets, merge queue, scheduler); `--json`, `--fix` |
 | `scaffold skip <step> [<step2>...]` | Skip one or more steps with a reason |
 | `scaffold complete <step>` | Mark a step as completed (for steps executed outside `scaffold run`) |
 | `scaffold reset <step>` | Reset a step back to pending |
