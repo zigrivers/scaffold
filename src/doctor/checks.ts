@@ -209,6 +209,11 @@ export const hooksRegisteredCheck: DoctorCheck = {
         `.claude/settings.json is not valid JSON: ${(err as Error).message}`,
         'fix the JSON by hand — no hooks are loading at all')
     }
+    // Valid JSON but not an object (e.g. literal `null`, an array, or a scalar):
+    // no hooks can be registered, and indexing it below would throw.
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return res(hooksRegisteredCheck, 'skip', 'not configured (no hooks in .claude/settings.json)')
+    }
     const scriptRefs = new Set<string>()
     const visit = (value: unknown): void => {
       if (typeof value === 'string') {

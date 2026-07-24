@@ -85,7 +85,7 @@ describe('adopt --apply (D1/D2)', () => {
     await adoptCommand.handler(argvWith({ apply: true, format: 'json' }))
     expect(process.exitCode).not.toBe(0)
     expect(vi.mocked(applyAdoptionPlan)).not.toHaveBeenCalled()
-    expect(stderrLines.join('') + process.exitCode).toBeTruthy()
+    expect(stderrLines.join('')).toContain('ADOPT_APPLY_NON_INTERACTIVE')
   })
 
   it('aborts with ADOPT_PLAN_DRIFT when the approved key does not match the live re-render', async () => {

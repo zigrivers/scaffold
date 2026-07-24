@@ -66,9 +66,9 @@ steps:
   # Phase 11 — Consolidation (consolidation)
   claude-md-optimization: { enabled: true }
   workflow-audit: { enabled: true }
-  # Phase 12 — Planning (planning)
+  # Phase 12 — Planning (planning) — quality-first: review the plan too
   implementation-plan: { enabled: true }
-  implementation-plan-review: { enabled: false }
+  implementation-plan-review: { enabled: true }
   # Phase 13 — Validation (validation) — audits disabled by default
   cross-phase-consistency: { enabled: false }
   traceability-matrix: { enabled: false }

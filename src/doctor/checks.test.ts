@@ -325,6 +325,15 @@ describe('hooks/registered', () => {
     expect(result.detail).toContain('not valid JSON')
   })
 
+  it('skips (does not throw) when settings.json is valid JSON but null', () => {
+    const root = newTmpRoot()
+    fs.mkdirSync(path.join(root, '.claude'))
+    fs.writeFileSync(path.join(root, '.claude', 'settings.json'), 'null')
+    const result = hooksRegisteredCheck.run(ctxFor(root))
+    expect(result.status).toBe('skip')
+    expect(result.detail).toContain('no hooks')
+  })
+
   it('warns when a registered hook script exists but is not executable', () => {
     const root = newTmpRoot()
     fs.mkdirSync(path.join(root, '.claude'))
