@@ -2384,7 +2384,7 @@ function extractPlanKey(content: string): string | null
 
 **Steps:**
 
-- [ ] Write the failing tests `src/project/adoption-plan.test.ts` (complete file):
+- [x] Write the failing tests `src/project/adoption-plan.test.ts` (complete file):
 
 ```ts
 import { describe, it, expect } from 'vitest'
@@ -2527,8 +2527,8 @@ describe('computePlanKey canonicalization', () => {
 })
 ```
 
-- [ ] Run `npx vitest run src/project/adoption-plan.test.ts` — FAILS (module missing).
-- [ ] Create `src/project/adoption-plan.ts` (complete file):
+- [x] Run `npx vitest run src/project/adoption-plan.test.ts` — FAILS (module missing).
+- [x] Create `src/project/adoption-plan.ts` (complete file):
 
 ```ts
 import fs from 'node:fs'
@@ -2805,8 +2805,8 @@ export function extractPlanKey(content: string): string | null {
 }
 ```
 
-- [ ] Run `npx vitest run src/project/adoption-plan.test.ts` — green.
-- [ ] Commit: `git add -A && git commit -m "feat(adopt): adoption-plan module — resolved-pipeline dispositions, initialize record, canonical plan_key (R1 D1/D2)"`
+- [x] Run `npx vitest run src/project/adoption-plan.test.ts` — green.
+- [x] Commit: `git add -A && git commit -m "feat(adopt): adoption-plan module — resolved-pipeline dispositions, initialize record, canonical plan_key (R1 D1/D2)"`
 
 ---
 
