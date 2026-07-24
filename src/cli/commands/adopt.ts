@@ -5,12 +5,10 @@ import { parseDocument, isMap, isScalar, type Document } from 'yaml'
 import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
-import { StateManager } from '../../state/state-manager.js'
-import { acquireLock, getLockPath, releaseLock } from '../../state/lock-manager.js'
-import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
 import { getPackagePipelineDir } from '../../utils/fs.js'
 import { runAdoption, TYPE_KEY } from '../../project/adopt.js'
 import type { AdoptionResult } from '../../project/adopt.js'
+import { buildAdoptionPlan, renderPlanMarkdown } from '../../project/adoption-plan.js'
 import { ProjectTypeSchema } from '../../config/schema.js'
 import { coerceCSV } from '../utils/coerce.js'
 import {
@@ -21,7 +19,6 @@ import type { ProjectType } from '../../types/index.js'
 import { asScaffoldError } from '../../utils/errors.js'
 import { configParseError, configNotObject } from '../../utils/errors.js'
 import { ExitCode } from '../../types/enums.js'
-import { shutdown } from '../shutdown.js'
 
 interface AdoptArgs {
   format?: string
@@ -45,6 +42,8 @@ function atomicWriteFileSync(target: string, content: string): void {
   fs.renameSync(tmpPath, target)
 }
 
+// Retained for the config-write integration tests; the apply path writes config via
+// writeInitializeConfig (adoption-apply.ts). Slated for removal in R2.
 export function writeOrUpdateConfig(
   projectRoot: string,
   result: AdoptionResult,
@@ -98,68 +97,6 @@ project:
   atomicWriteFileSync(configPath, doc.toString())
 }
 
-function writeOrUpdateState(
-  projectRoot: string,
-  result: AdoptionResult,
-  methodology: string,
-  metaPromptDir: string,
-): void {
-  const stateFile = path.join(projectRoot, '.scaffold', 'state.json')
-
-  if (!fs.existsSync(stateFile)) {
-    // Initialize state
-    const metaPrompts = discoverMetaPrompts(metaPromptDir)
-    const allSteps = [...metaPrompts.entries()].map(([slug, mp]) => ({
-      slug,
-      produces: mp.frontmatter.outputs ?? [],
-    }))
-    // Wave 3a: adopt writes a fresh single-service state.json — no services[]
-    // available here, so pass `() => undefined` for the configProvider and
-    // omit the optional `config` param (schema-version stays 1).
-    const stateManager = new StateManager(
-      projectRoot,
-      () => [],
-      () => undefined,
-      undefined, // pathResolver — fall through to default StatePathResolver(projectRoot)
-      undefined, // globalSteps — init path; no pipeline resolution in scope
-      undefined, // pipelineHash — legacy-safe; first scaffold next will live-recompute and repopulate
-    )
-    stateManager.initializeState({
-      enabledSteps: allSteps,
-      scaffoldVersion: '2.0.0',
-      methodology,
-      initMode: result.mode === 'v1-migration'
-        ? 'v1-migration'
-        : result.mode === 'brownfield'
-          ? 'brownfield'
-          : 'greenfield',
-    })
-  } else {
-    // Update existing state — mark stepsCompleted
-    const stateManager = new StateManager(
-      projectRoot,
-      () => [],
-      () => undefined,
-      undefined, // pathResolver — fall through to default StatePathResolver(projectRoot)
-      undefined, // globalSteps — init path; no pipeline resolution in scope
-      undefined, // pipelineHash — legacy-safe; first scaffold next will live-recompute and repopulate
-    )
-    const state = stateManager.loadState()
-    const now = new Date().toISOString()
-    for (const slug of result.stepsCompleted) {
-      if (state.steps[slug]) {
-        state.steps[slug] = {
-          ...state.steps[slug],
-          status: 'completed',
-          at: now,
-          completed_by: 'scaffold-adopt',
-        }
-      }
-    }
-    stateManager.saveState(state)
-  }
-}
-
 // ---------------------------------------------------------------------------
 // Command
 // ---------------------------------------------------------------------------
@@ -170,11 +107,25 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
   builder: (yargs: Argv<Record<string, unknown>>) => {
     return (yargs
       .option('root', { type: 'string', describe: 'Project root directory' })
-      .option('dry-run', { type: 'boolean', default: false, describe: 'Preview without writing' })
+      .option('dry-run', {
+        type: 'boolean',
+        default: false,
+        describe: 'Deprecated: plan mode is the default and writes nothing',
+      })
       .option('force', { type: 'boolean', default: false, describe: 'Force adoption even if state exists' })
       .option('format', { type: 'string', describe: 'Output format' })
       .option('auto', { type: 'boolean', default: false, describe: 'Non-interactive' })
       .option('verbose', { type: 'boolean', default: false, describe: 'Verbose output' })
+      .option('write', {
+        type: 'string',
+        describe: 'Write the rendered plan document (default path docs/adoption-plan.md)',
+      })
+      .option('include', {
+        type: 'string',
+        array: true,
+        describe: 'Opt a preset-disabled step into the plan (CSV or repeatable); applied before resolution',
+        coerce: coerceCSV,
+      })
       // Project type
       .option('project-type', {
         type: 'string',
@@ -529,7 +480,10 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
         'game-content-structure', 'game-economy', 'game-narrative', 'game-locales',
         'game-npc-ai', 'game-modding', 'game-persistence',
       ], 'Game Configuration:')
-      .group(['root', 'force', 'auto', 'format', 'verbose', 'dry-run'], 'General:') as unknown as Argv<AdoptArgs>
+      .group(
+        ['root', 'force', 'auto', 'format', 'verbose', 'dry-run', 'write', 'include'],
+        'General:',
+      ) as unknown as Argv<AdoptArgs>
   },
   handler: async (argv) => {
     const projectRoot = argv.root ?? findProjectRoot(process.cwd())
@@ -544,113 +498,81 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
     const outputMode = resolveOutputMode(argv)
     const output = createOutputContext(outputMode)
 
-    // Acquire lock
-    const lockResult = acquireLock(projectRoot, 'adopt')
-    if (!lockResult.acquired) {
-      if (lockResult.error) output.error(lockResult.error)
-      process.exitCode = 3
+    const dryRun = argv['dry-run'] ?? false
+    const metaPromptDir = getPackagePipelineDir(projectRoot)
+    // greenfield fallback — runAdoption returns 'brownfield' for brownfield/v1-migration repos (D11 R1)
+    const methodology = 'deep'
+
+    // JSON mode → auto per spec Section 4 R2-delta-8
+    const effectiveAuto = argv.auto === true || outputMode === 'json'
+
+    let adoptResult: AdoptionResult
+    try {
+      adoptResult = await runAdoption({
+        projectRoot,
+        metaPromptDir,
+        methodology,
+        dryRun,
+        auto: effectiveAuto,
+        force: argv.force === true,
+        verbose: argv.verbose === true,
+        explicitProjectType: argv['project-type'] as ProjectType | undefined,
+        flagOverrides: buildFlagOverrides(argv as Record<string, unknown>),
+      })
+    } catch (err) {
+      output.error(asScaffoldError(err, 'ADOPT_INTERNAL', ExitCode.ValidationError))
+      process.exitCode = ExitCode.ValidationError
       return
     }
 
-    shutdown.registerLockOwnership(getLockPath(projectRoot))
+    // Emit warnings
+    for (const w of adoptResult.warnings) {
+      output.warn(w)
+    }
 
-    await shutdown.withResource('lock', () => {
-      releaseLock(projectRoot)
-      shutdown.releaseLockOwnership()
-    }, async () => {
-      const dryRun = argv['dry-run'] ?? false
-      const metaPromptDir = getPackagePipelineDir(projectRoot)
-      // greenfield fallback — runAdoption returns 'brownfield' for brownfield/v1-migration repos (D11 R1)
-      const methodology = 'deep'
-
-      // JSON mode → auto per spec Section 4 R2-delta-8
-      const effectiveAuto = argv.auto === true || outputMode === 'json'
-
-      let adoptResult: AdoptionResult
-      try {
-        adoptResult = await runAdoption({
-          projectRoot,
-          metaPromptDir,
-          methodology,
-          dryRun,
-          auto: effectiveAuto,
-          force: argv.force === true,
-          verbose: argv.verbose === true,
-          explicitProjectType: argv['project-type'] as ProjectType | undefined,
-          flagOverrides: buildFlagOverrides(argv as Record<string, unknown>),
-        })
-      } catch (err) {
-        output.error(asScaffoldError(err, 'ADOPT_INTERNAL', ExitCode.ValidationError))
-        process.exitCode = ExitCode.ValidationError
-        return
+    // Check for errors
+    if (adoptResult.errors.length > 0) {
+      for (const e of adoptResult.errors) {
+        output.error(e)
       }
+      process.exitCode = adoptResult.errors[0].exitCode
+      return
+    }
 
-      // Emit warnings
-      for (const w of adoptResult.warnings) {
-        output.warn(w)
-      }
-
-      // Check for errors
-      if (adoptResult.errors.length > 0) {
-        for (const e of adoptResult.errors) {
-          output.error(e)
-        }
-        process.exitCode = adoptResult.errors[0].exitCode
-        return
-      }
-
-      // Writes (config first, state second)
-      if (!dryRun && adoptResult.errors.length === 0) {
-        // Only write config if there's a detected config to persist
-        if (adoptResult.projectType && adoptResult.detectedConfig) {
-          try {
-            writeOrUpdateConfig(projectRoot, adoptResult)
-          } catch (err) {
-            output.error(asScaffoldError(err, 'ADOPT_CONFIG_WRITE_FAILED', ExitCode.ValidationError))
-            process.exitCode = ExitCode.ValidationError
-            return
-          }
-        }
-        try {
-          writeOrUpdateState(projectRoot, adoptResult, adoptResult.methodology, metaPromptDir)
-        } catch (err) {
-          // State write failure is recoverable — state.json is derived data (re-created
-          // from config + artifacts on the next `scaffold` command). Config is the source
-          // of truth and was already successfully written above.
-          output.warn({
-            code: 'ADOPT_STATE_WRITE_FAILED',
-            message: `state.json write failed (recoverable on next run): ${(err as Error).message}`,
-          })
-        }
-      }
-
-      const resultData = {
-        schema_version: 2,
-        mode: adoptResult.mode,
-        artifacts_found: adoptResult.artifactsFound,
-        detected_artifacts: adoptResult.detectedArtifacts,
-        steps_completed: adoptResult.stepsCompleted,
-        steps_remaining: adoptResult.stepsRemaining,
-        methodology: adoptResult.methodology,
-        dry_run: dryRun,
+    // D1: plan mode — render, never write.
+    const includes = (argv.include as string[] | undefined) ?? []
+    const { plan, errors: planErrors } = buildAdoptionPlan({ projectRoot, adoptResult, includes })
+    if (planErrors.length > 0) {
+      for (const e of planErrors) output.error(e)
+      process.exitCode = planErrors[0].exitCode
+      return
+    }
+    const writeTarget = argv.write === undefined
+      ? null
+      : (argv.write === '' ? 'docs/adoption-plan.md' : String(argv.write))
+    if (writeTarget !== null) {
+      const target = path.isAbsolute(writeTarget) ? writeTarget : path.join(projectRoot, writeTarget)
+      fs.mkdirSync(path.dirname(target), { recursive: true })
+      atomicWriteFileSync(target, renderPlanMarkdown(plan))
+      output.info(`Plan written: ${target}`)
+    }
+    if (outputMode === 'json') {
+      output.result({
+        schema_version: 3,
+        ...plan,
         ...(adoptResult.projectType && { project_type: adoptResult.projectType }),
-        ...(adoptResult.gameConfig && { game_config: adoptResult.gameConfig }),
         ...(adoptResult.detectedConfig && { detected_config: adoptResult.detectedConfig }),
         ...(adoptResult.detectionConfidence !== undefined && { detection_confidence: adoptResult.detectionConfidence }),
         ...(adoptResult.detectionEvidence !== undefined && { detection_evidence: adoptResult.detectionEvidence }),
-      }
-
-      if (outputMode === 'json') {
-        output.result(resultData)
-      } else {
-        output.success(
-          `Adoption complete: ${adoptResult.artifactsFound} artifacts found, ` +
-          `${adoptResult.stepsCompleted.length} steps completed`,
-        )
-      }
-
-      process.exitCode = 0
-    })
+      })
+    } else {
+      for (const line of renderPlanMarkdown(plan).split('\n')) output.info(line)
+      output.success(
+        `Adoption plan rendered (${plan.steps.length} steps). Nothing was written. `
+        + 'Apply with: scaffold adopt --apply',
+      )
+    }
+    process.exitCode = 0
   },
 }
 
