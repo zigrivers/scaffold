@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# gate-check.sh — the FULL quality gate (`make check`).
+# Seeded by: scaffold agent-ops install --component gate
+#
+# PROJECT-OWNED after generation (manifest seed:true): edit freely.
+# `scaffold agent-ops check` reports this file only if it goes MISSING — never
+# as drifted. Re-generating requires --force.
+#
+# Contract:
+#   - Self-contained: installs dependencies before running the FULL gate (the
+#     merge queue and the post-merge poller run it in FRESH worktrees with
+#     nothing installed). Probe mode never installs (see GATE_PROBE=1 below).
+#   - FUNCTIONAL runtime probes, never `command -v` (macOS /usr/bin/java is a
+#     stub that exists but fails at run time — rumble lesson).
+#   - GATE_PROBE=1: READ-ONLY — verify prerequisites (deps present, runtimes,
+#     test-runner startup) and exit WITHOUT installing anything or running the
+#     suite. Used by `scaffold doctor` (gate section) and `scaffold mq bootstrap`
+#     preflight, which must not have heavyweight install side effects.
+set -euo pipefail
+cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# --- dependencies (self-contained on fresh worktrees) ------------------------
+# Probe mode (GATE_PROBE=1 — `scaffold doctor` gate section / `mq bootstrap`
+# preflight) is READ-ONLY and MUST NOT install anything: a cold `npm ci` here
+# would turn a health check into a heavyweight, network-bound install and can
+# exceed the probe timeout, making doctor report a spurious gate failure. Under
+# the probe, missing deps surface through the functional runtime + test-runner
+# startup probes below instead of being silently installed.
+if [ "${GATE_PROBE:-0}" != "1" ]; then
+	{{GATE_ENSURE_DEPS}}
+fi
+
+# --- functional runtime probes ----------------------------------------------
+{{GATE_RUNTIME_PROBES}}
+
+if [ "${GATE_PROBE:-0}" = "1" ]; then
+	# --- test-runner startup probes (no suite execution) --------------------
+	{{GATE_PROBE_COMMANDS}}
+	echo "gate-check: probe OK (prerequisites verified; suite not run)"
+	exit 0
+fi
+
+# --- the full gate -----------------------------------------------------------
+{{GATE_FULL_COMMANDS}}
