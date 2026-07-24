@@ -577,7 +577,7 @@ function applyConflictOverrides(steps: Record<string, StepStateEntry>, projectRo
 
 **Steps:**
 
-- [ ] Write failing tests in `src/state/completion.test.ts`. Add `verifyStep`, `applyConflictOverrides` to the import from `./completion.js` and add `import type { StepStateEntry } from '../types/index.js'`:
+- [x] Write failing tests in `src/state/completion.test.ts`. Add `verifyStep`, `applyConflictOverrides` to the import from `./completion.js` and add `import type { StepStateEntry } from '../types/index.js'`:
 
 ```ts
 describe('verifyStep (D3)', () => {
@@ -682,8 +682,8 @@ describe('applyConflictOverrides (D3 — fs-only eligibility demotion)', () => {
 })
 ```
 
-- [ ] Run `npx vitest run src/state/completion.test.ts` — the new describes FAIL (not exported).
-- [ ] Implement in `src/state/completion.ts`. Widen the type import to `import type { PipelineState, StepStateEntry, VerificationLevel } from '../types/index.js'` and append:
+- [x] Run `npx vitest run src/state/completion.test.ts` — the new describes FAIL (not exported).
+- [x] Implement in `src/state/completion.ts`. Widen the type import to `import type { PipelineState, StepStateEntry, VerificationLevel } from '../types/index.js'` and append:
 
 ```ts
 export type ConflictClass = 'state-claim' | 'artifact-only'
@@ -797,7 +797,7 @@ export function applyConflictOverrides(
 }
 ```
 
-- [ ] Add the pinned audit-record type to `src/types/decision.ts`. Add imports `import type { StepStatus } from './enums.js'` and `import type { VerificationLevel } from './state.js'`, then append:
+- [x] Add the pinned audit-record type to `src/types/decision.ts`. Add imports `import type { StepStatus } from './enums.js'` and `import type { VerificationLevel } from './state.js'`, then append:
 
 ```ts
 /**
@@ -825,7 +825,7 @@ export interface VerificationAuditRecord {
 }
 ```
 
-- [ ] Write failing tests in `src/state/decision-logger.test.ts`. Add `appendAuditRecord` to the existing import from `./decision-logger.js`, add `import type { VerificationAuditRecord } from '../types/index.js'`, and ensure `fs`/`os`/`path` node imports exist (add any that are missing):
+- [x] Write failing tests in `src/state/decision-logger.test.ts`. Add `appendAuditRecord` to the existing import from `./decision-logger.js`, add `import type { VerificationAuditRecord } from '../types/index.js'`, and ensure `fs`/`os`/`path` node imports exist (add any that are missing):
 
 ```ts
 describe('verification audit records (D3)', () => {
@@ -862,8 +862,8 @@ describe('verification audit records (D3)', () => {
 })
 ```
 
-- [ ] Run `npx vitest run src/state/decision-logger.test.ts` — FAILS (`appendAuditRecord` not exported).
-- [ ] Implement in `src/state/decision-logger.ts`. Add `import type { DecisionEntry, VerificationAuditRecord } from '../types/index.js'` (widening the existing import). In `readAllEntries`, replace the try-body line `entries.push(JSON.parse(line) as DecisionEntry)` with:
+- [x] Run `npx vitest run src/state/decision-logger.test.ts` — FAILS (`appendAuditRecord` not exported).
+- [x] Implement in `src/state/decision-logger.ts`. Add `import type { DecisionEntry, VerificationAuditRecord } from '../types/index.js'` (widening the existing import). In `readAllEntries`, replace the try-body line `entries.push(JSON.parse(line) as DecisionEntry)` with:
 
 ```ts
       const parsed = JSON.parse(line) as Record<string, unknown>
@@ -894,8 +894,8 @@ export function appendAuditRecord(
 }
 ```
 
-- [ ] Run `npx vitest run src/state/` — all green. Note: `src/core/assembly/update-mode.ts:24` needs NO change — it already requires the artifact to exist in addition to the state claim, so a conflicted step never resolves to update mode.
-- [ ] Commit: `git add -A && git commit -m "feat(state): verifyStep + fs-only conflict override + pinned audit records (R1 D3)"`
+- [x] Run `npx vitest run src/state/` — all green. Note: `src/core/assembly/update-mode.ts:24` needs NO change — it already requires the artifact to exist in addition to the state claim, so a conflicted step never resolves to update mode.
+- [x] Commit: `git add -A && git commit -m "feat(state): verifyStep + fs-only conflict override + pinned audit records (R1 D3)"`
 
 ---
 
