@@ -31,10 +31,29 @@ const KNOWN_YAML_KEYS = new Set([
   'stateless',
   'category',
   'argument-hint',
+  'detect',
 ])
 
 // Valid categories for meta-prompt source classification
 const VALID_CATEGORIES = ['pipeline', 'tool'] as const
+
+// Machine-readable detection contract (D4) — see DetectCheck/DetectSpec in types/frontmatter.ts
+const detectCheckSchema = z.object({
+  path: z.string().min(1).optional(),
+  cmd: z.string().min(1).optional(),
+  timeout: z.number().int().positive().max(120).optional(),
+}).strict().refine(
+  (c) => (c.path !== undefined) !== (c.cmd !== undefined),
+  { message: 'detect check must have exactly one of path or cmd' },
+)
+
+const detectSpecSchema = z.object({
+  all: z.array(detectCheckSchema).min(1).optional(),
+  any: z.array(detectCheckSchema).min(1).optional(),
+}).strict().refine(
+  (d) => d.all !== undefined || d.any !== undefined,
+  { message: 'detect must declare at least one of all/any' },
+)
 
 // Zod schema for frontmatter validation
 // Tools (category: 'tool') allow null phase/order and empty outputs.
@@ -58,6 +77,7 @@ const frontmatterSchema = z.object({
   ).default([]),
   stateless: z.boolean().default(false),
   category: z.enum(VALID_CATEGORIES).default('pipeline'),
+  detect: detectSpecSchema.nullable().default(null),
 }).superRefine((data, ctx) => {
   // Pipeline steps require phase, order, and non-empty outputs
   if (data.category === 'pipeline') {
@@ -203,6 +223,23 @@ function normalizeRawObject(raw: Record<string, unknown>): Record<string, unknow
   // Coerce arrays parsed via FAILSAFE_SCHEMA (values remain strings, which is correct)
   // Arrays returned by FAILSAFE_SCHEMA are already arrays of strings — no coercion needed
 
+  // FAILSAFE_SCHEMA returns detect timeout values as strings — coerce to numbers
+  const detectRaw = normalized['detect']
+  if (typeof detectRaw === 'object' && detectRaw !== null && !Array.isArray(detectRaw)) {
+    for (const listKey of ['all', 'any']) {
+      const list = (detectRaw as Record<string, unknown>)[listKey]
+      if (!Array.isArray(list)) continue
+      for (const entry of list) {
+        if (typeof entry !== 'object' || entry === null) continue
+        const e = entry as Record<string, unknown>
+        if (typeof e['timeout'] === 'string') {
+          const n = Number(e['timeout'])
+          if (!isNaN(n)) e['timeout'] = n
+        }
+      }
+    }
+  }
+
   return normalized
 }
 
@@ -299,6 +336,7 @@ export function parseAndValidate(filePath: string): {
     crossReads: [],
     stateless: false,
     category: 'pipeline',
+    detect: null,
   }
 
   let content: string

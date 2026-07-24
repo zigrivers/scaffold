@@ -319,3 +319,74 @@ Body.`)
     expect(result.errors.length).toBeGreaterThan(0)
   })
 })
+
+describe('detect: frontmatter contract (D4)', () => {
+  function writeFixture(name: string, frontmatter: string): string {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'detect-fm-'))
+    const file = path.join(dir, `${name}.md`)
+    fs.writeFileSync(file, `---\n${frontmatter}\n---\n\n## Purpose\nbody\n`)
+    return file
+  }
+
+  it('parses a detect block with all: path and cmd checks', () => {
+    const file = writeFixture('beads', [
+      'name: beads',
+      'description: d',
+      'phase: "foundation"',
+      'order: 210',
+      'outputs: [.beads/]',
+      'detect:',
+      '  all:',
+      '    - path: .beads/',
+      '    - cmd: bd info',
+      '      timeout: 5',
+    ].join('\n'))
+    const { frontmatter, errors } = parseAndValidate(file)
+    expect(errors).toEqual([])
+    expect(frontmatter.detect).toEqual({
+      all: [{ path: '.beads/' }, { cmd: 'bd info', timeout: 5 }],
+    })
+  })
+
+  it('rejects a detect check with both path and cmd', () => {
+    const file = writeFixture('bad-both', [
+      'name: bad-both',
+      'description: d',
+      'phase: "foundation"',
+      'order: 211',
+      'outputs: [x.md]',
+      'detect:',
+      '  all:',
+      '    - path: .beads/',
+      '      cmd: bd info',
+    ].join('\n'))
+    const { errors } = parseAndValidate(file)
+    expect(errors.length).toBeGreaterThan(0)
+  })
+
+  it('rejects a detect block with neither all nor any', () => {
+    const file = writeFixture('bad-empty', [
+      'name: bad-empty',
+      'description: d',
+      'phase: "foundation"',
+      'order: 212',
+      'outputs: [x.md]',
+      'detect: {}',
+    ].join('\n'))
+    const { errors } = parseAndValidate(file)
+    expect(errors.length).toBeGreaterThan(0)
+  })
+
+  it('does not warn detect as an unknown field, and defaults to null when absent', () => {
+    const file = writeFixture('no-detect', [
+      'name: no-detect',
+      'description: d',
+      'phase: "foundation"',
+      'order: 213',
+      'outputs: [x.md]',
+    ].join('\n'))
+    const { frontmatter, warnings } = parseAndValidate(file)
+    expect(frontmatter.detect).toBeNull()
+    expect(warnings.filter((w) => w.message.includes('detect'))).toEqual([])
+  })
+})
