@@ -620,7 +620,7 @@ export function createLaunchdBackend(deps: { exec: Exec; home: string; uid: numb
 
 **Steps:**
 
-- [ ] Write the failing test `src/sched/backends/systemd.test.ts`:
+- [x] Write the failing test `src/sched/backends/systemd.test.ts`:
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -729,8 +729,8 @@ describe('createSystemdBackend', () => {
 })
 ```
 
-- [ ] Run: `npx vitest run src/sched/backends/systemd.test.ts` — expect FAILURE (module missing).
-- [ ] Create `src/sched/backends/systemd.ts`:
+- [x] Run: `npx vitest run src/sched/backends/systemd.test.ts` — expect FAILURE (module missing).
+- [x] Create `src/sched/backends/systemd.ts`:
 
 ```ts
 import fs from 'node:fs'
@@ -852,8 +852,8 @@ export function createSystemdBackend(deps: { exec: Exec; home: string; user: str
 }
 ```
 
-- [ ] Run: `npx vitest run src/sched/backends/systemd.test.ts` — expect 6 tests passed.
-- [ ] Commit: `git add -A && git commit -m "feat(sched): systemd user timer backend with enable-linger and is-active verification"`
+- [x] Run: `npx vitest run src/sched/backends/systemd.test.ts` — expect 6 tests passed.
+- [x] Commit: `git add -A && git commit -m "feat(sched): systemd user timer backend with enable-linger and is-active verification"`
 
 ---
 
