@@ -47,7 +47,7 @@ If any R1 file lives at a slightly different path, locate it with the grep given
 
 **Steps:**
 
-- [ ] Write the failing test `src/sched/backends/launchd.test.ts` (renderer half only for now):
+- [x] Write the failing test `src/sched/backends/launchd.test.ts` (renderer half only for now):
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -96,7 +96,7 @@ describe('renderPlist', () => {
 })
 ```
 
-- [ ] Create the golden fixture `tests/fixtures/sched/rumble-merge-poller.plist` with EXACTLY this content (trailing newline after `</plist>`, two-space base indent, four-space member indent):
+- [x] Create the golden fixture `tests/fixtures/sched/rumble-merge-poller.plist` with EXACTLY this content (trailing newline after `</plist>`, two-space base indent, four-space member indent):
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -128,8 +128,8 @@ describe('renderPlist', () => {
 </plist>
 ```
 
-- [ ] Run: `npx vitest run src/sched/backends/launchd.test.ts` — expect FAILURE (module `./launchd.js` does not exist).
-- [ ] Create `src/sched/types.ts`:
+- [x] Run: `npx vitest run src/sched/backends/launchd.test.ts` — expect FAILURE (module `./launchd.js` does not exist).
+- [x] Create `src/sched/types.ts`:
 
 ```ts
 export interface SchedJob {
@@ -177,7 +177,7 @@ export interface SchedBackend {
 }
 ```
 
-- [ ] Create `src/sched/exec.ts`:
+- [x] Create `src/sched/exec.ts`:
 
 ```ts
 import { execFileSync } from 'node:child_process'
@@ -207,7 +207,7 @@ export const realExec: Exec = (cmd, args) => {
 }
 ```
 
-- [ ] Create `src/sched/backends/launchd.ts` (renderer now; backend factory arrives in Task 3):
+- [x] Create `src/sched/backends/launchd.ts` (renderer now; backend factory arrives in Task 3):
 
 ```ts
 import type { SchedJob } from '../types.js'
@@ -256,8 +256,8 @@ ${env}
 }
 ```
 
-- [ ] Run: `npx vitest run src/sched/backends/launchd.test.ts` — expect `Test Files  1 passed`, 3 tests passed. If the fixture comparison fails, fix the FIXTURE (or renderer) so they match byte-for-byte — the fixture is the contract.
-- [ ] Commit: `git add -A && git commit -m "feat(sched): SchedJob types, exec seam, launchd plist renderer + rumble golden fixture"`
+- [x] Run: `npx vitest run src/sched/backends/launchd.test.ts` — expect `Test Files  1 passed`, 3 tests passed. If the fixture comparison fails, fix the FIXTURE (or renderer) so they match byte-for-byte — the fixture is the contract.
+- [x] Commit: `git add -A && git commit -m "feat(sched): SchedJob types, exec seam, launchd plist renderer + rumble golden fixture"`
 
 ---
 
