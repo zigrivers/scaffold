@@ -13,7 +13,7 @@ const VALID_STATUSES = new Set(['pending', 'in_progress', 'completed', 'skipped'
  *
  * - Returns STATE_MISSING error if file does not exist
  * - Returns STATE_PARSE_ERROR if file is not valid JSON
- * - Returns STATE_SCHEMA_VERSION error if schema-version is not 1, 2, or 3
+ * - Returns STATE_SCHEMA_VERSION error if schema-version is not 1, 2, 3, or 4
  * - Returns FIELD_INVALID_VALUE errors for steps with invalid status values
  * - Returns STATE_IN_PROGRESS warning if in_progress is non-null (potential crash)
  *
@@ -72,10 +72,10 @@ export function validateState(projectRoot: string, statePath?: string): {
     return { errors, warnings }
   }
 
-  // Check schema version (Wave 3b: widened to accept 1, 2, or 3)
+  // Check schema version (R1: widened to accept 1, 2, 3, or 4)
   const schemaVersion = parsed['schema-version']
-  if (schemaVersion !== 1 && schemaVersion !== 2 && schemaVersion !== 3) {
-    errors.push(stateSchemaVersion([1, 2, 3], schemaVersion as number, resolvedStatePath))
+  if (schemaVersion !== 1 && schemaVersion !== 2 && schemaVersion !== 3 && schemaVersion !== 4) {
+    errors.push(stateSchemaVersion([1, 2, 3, 4], schemaVersion as number, resolvedStatePath))
     return { errors, warnings }
   }
 

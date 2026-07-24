@@ -139,7 +139,7 @@ describe('pipeline state E2E', () => {
     expect(finalState.in_progress).toBeNull()
     expect(finalState.steps['test-step']?.completed_by).toBe('e2e-test')
     expect(finalState.steps['test-step']?.depth).toBe(3)
-    expect(finalState.steps['test-step']?.artifacts_verified).toBe(true)
+    expect(finalState.steps['test-step']?.verification).toBe('declared')
   })
 
   // Test 2: markSkipped transitions step to skipped status

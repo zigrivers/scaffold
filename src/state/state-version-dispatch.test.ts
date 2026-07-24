@@ -54,4 +54,13 @@ describe('dispatchStateMigration', () => {
     dispatchStateMigration(raw, { hasServices: false }, '/test/state.json')
     expect(raw['schema-version']).toBe(3)
   })
+
+  it('accepts schema-version 4 and bumps 4 → 2 when config has services', () => {
+    const raw: Record<string, unknown> = { 'schema-version': 4 }
+    dispatchStateMigration(raw, { hasServices: true }, '/tmp/state.json')
+    expect(raw['schema-version']).toBe(2)
+    const raw2: Record<string, unknown> = { 'schema-version': 4 }
+    dispatchStateMigration(raw2, { hasServices: false }, '/tmp/state.json')
+    expect(raw2['schema-version']).toBe(4)
+  })
 })

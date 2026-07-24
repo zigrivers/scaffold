@@ -5,9 +5,12 @@ import { afterEach, describe, it, expect, vi } from 'vitest'
 import { migrateState, resolveArtifactPath } from './state-migration.js'
 import type { PipelineState } from '../types/index.js'
 
-function makeState(steps: Record<string, { status: string; produces?: string[] }>): PipelineState {
+function makeState(
+  steps: Record<string, { status: string; produces?: string[] }>,
+  schemaVersion: number = 1,
+): PipelineState {
   const state: Record<string, unknown> = {
-    'schema-version': 1,
+    'schema-version': schemaVersion,
     'scaffold-version': '2.1.2',
     init_methodology: 'deep',
     config_methodology: 'deep',
@@ -108,11 +111,13 @@ describe('migrateState', () => {
     })
 
     it('returns false when no migration needed', () => {
+      // schema-version 4: already in the verification era, so only field-level
+      // migrations are under test here — the 1→4 bump is covered separately.
       const state = makeState({
         'tdd': { status: 'completed' },
         'implementation-plan': { status: 'pending' },
         'create-prd': { status: 'completed' },
-      })
+      }, 4)
 
       const changed = migrateState(state)
 
@@ -237,7 +242,7 @@ describe('migrateState', () => {
     it('does not change docs/plan.md (already canonical)', () => {
       const state = makeState({
         'create-prd': { status: 'completed', produces: ['docs/plan.md'] },
-      })
+      }, 4)
 
       const changed = migrateState(state)
 
@@ -376,7 +381,7 @@ describe('migrateState', () => {
       const state = makeState({
         'create-prd': { status: 'completed' },
         'tdd': { status: 'completed' },
-      })
+      }, 4)
 
       const changed = migrateState(state)
 
@@ -431,8 +436,8 @@ describe('migrateState', () => {
       expect(state.in_progress?.started).toBe('2026-01-15T10:00:00.000Z')
       expect(state.in_progress?.partial_artifacts).toEqual(['docs/impl.md'])
       expect(state.in_progress?.actor).toBe('scaffold-run')
-      // Top-level fields preserved
-      expect(state['schema-version']).toBe(1)
+      // Top-level fields preserved (schema-version 1 bumps to 4 — R1 verification era)
+      expect(state['schema-version']).toBe(4)
       expect(state['scaffold-version']).toBe('2.1.2')
       expect(state.init_methodology).toBe('deep')
       expect(state['init-mode']).toBe('greenfield')
@@ -443,7 +448,7 @@ describe('migrateState', () => {
         'create-prd': { status: 'completed' },
         'some-future-step': { status: 'pending' },
         'another-unknown-step': { status: 'completed', produces: ['docs/something.md'] },
-      })
+      }, 4)
 
       const changed = migrateState(state)
 
@@ -504,7 +509,7 @@ describe('migrateState', () => {
       const state = makeState({
         'create-prd': { status: 'in_progress' },
         'tdd': { status: 'completed' },
-      })
+      }, 4)
       state.in_progress = {
         step: 'create-prd',
         started: '2026-03-01T08:00:00.000Z',
@@ -523,7 +528,7 @@ describe('migrateState', () => {
     })
 
     it('empty steps object — migration succeeds without error', () => {
-      const state = makeState({})
+      const state = makeState({}, 4)
 
       const changed = migrateState(state)
 
@@ -601,5 +606,61 @@ describe('resolveArtifactPath (containment-hardened)', () => {
 
     expect(existsSpy).not.toHaveBeenCalled()
     expect(result).toBe('../../etc/passwd') // function still returns the input
+  })
+})
+
+describe('verification migration (R1)', () => {
+  function vState(steps: Record<string, unknown>, schemaVersion = 1): PipelineState {
+    return {
+      'schema-version': schemaVersion,
+      'scaffold-version': '3.0.0',
+      init_methodology: 'deep',
+      config_methodology: 'deep',
+      'init-mode': 'greenfield',
+      created: '2026-01-01T00:00:00.000Z',
+      in_progress: null,
+      steps,
+      next_eligible: [],
+      'extra-steps': [],
+    } as unknown as PipelineState
+  }
+
+  it('migrates artifacts_verified: true to verification: declared — never verified', () => {
+    const state = vState({
+      beads: { status: 'completed', source: 'pipeline', produces: ['CLAUDE.md'], artifacts_verified: true },
+    })
+    expect(migrateState(state)).toBe(true)
+    expect(state.steps['beads'].verification).toBe('declared')
+    expect('artifacts_verified' in state.steps['beads']).toBe(false)
+  })
+
+  it('migrates artifacts_verified: false to verification: unverified', () => {
+    const state = vState({
+      tdd: { status: 'completed', source: 'pipeline', produces: [], artifacts_verified: false },
+    })
+    expect(migrateState(state)).toBe(true)
+    expect(state.steps['tdd'].verification).toBe('unverified')
+  })
+
+  it('bumps schema-version 1 to 4 (single-service verification era)', () => {
+    const state = vState({})
+    expect(migrateState(state)).toBe(true)
+    expect(state['schema-version']).toBe(4)
+  })
+
+  it('leaves sharded v3 state at version 3 while migrating fields', () => {
+    const state = vState({
+      beads: { status: 'completed', source: 'pipeline', produces: [], artifacts_verified: true },
+    }, 3)
+    expect(migrateState(state)).toBe(true)
+    expect(state['schema-version']).toBe(3)
+    expect(state.steps['beads'].verification).toBe('declared')
+  })
+
+  it('is idempotent on already-migrated state', () => {
+    const state = vState({
+      beads: { status: 'completed', source: 'pipeline', produces: [], verification: 'declared' },
+    }, 4)
+    expect(migrateState(state)).toBe(false)
   })
 })

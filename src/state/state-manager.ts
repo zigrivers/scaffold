@@ -188,9 +188,7 @@ export class StateManager {
     if (!wasCompleted) state.steps[step].completed_at = new Date().toISOString()
     state.steps[step].completed_by = completedBy
     state.steps[step].depth = depth
-    if (outputs.length > 0) {
-      state.steps[step].artifacts_verified = true
-    }
+    state.steps[step].verification = outputs.length > 0 ? 'declared' : 'unverified'
     state.steps[step].produces = outputs
     state.in_progress = null
     this.saveState(state)
@@ -306,12 +304,13 @@ export class StateManager {
     initMode: 'greenfield' | 'brownfield' | 'v1-migration'
     // Wave 3a: config is optional so existing callers compile unchanged.
     // When provided and project.services[] is non-empty, emit schema-version 2.
+    // Otherwise (R1): emit schema-version 4 — the single-service verification era.
     config?: { project?: { services?: unknown[] } }
   }): void {
     this.pathResolver.ensureDir()
 
-    const schemaVersion: 1 | 2 =
-      (options.config?.project?.services?.length ?? 0) > 0 ? 2 : 1
+    const schemaVersion: 2 | 4 =
+      (options.config?.project?.services?.length ?? 0) > 0 ? 2 : 4
 
     const state: PipelineState = {
       'schema-version': schemaVersion,
