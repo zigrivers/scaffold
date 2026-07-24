@@ -2313,6 +2313,15 @@ export function buildTiaMap(opts: {
 
 ### Task 13: D14 — layered selection engine (`selectAffected`)
 
+> **Reviewer note (deferred from PR #783 review — resolve during implementation):**
+> `FORCE_FULL_GLOBS` must cover NESTED infra files, not just root ones — mirror the
+> R2 `is_force_full` list (which already carries `*/`-prefixed alternatives): add
+> recursive `**/` variants for nested lockfiles, `Makefile`, `tsconfig*.json`,
+> test-runner configs (`vitest.config.*`, `vite.config.*`, `playwright.config.*`),
+> and `.env*`. A monorepo change like `packages/app/vitest.config.ts` must force
+> the full suite, never a partial selection. Test representative nested lockfile /
+> tsconfig / vitest / Makefile / env changes.
+
 **Files:**
 - Create: `src/tia/affected.ts`
 - Create: `src/tia/affected.test.ts`
@@ -2597,6 +2606,14 @@ export function selectAffected(opts: {
 ---
 
 ### Task 14: D14 — `scaffold tia` CLI (`affected` | `record-due` | `ingest`)
+
+> **Reviewer note (deferred from PR #783 review — resolve during implementation):**
+> TIA freshness (`rev-list --count mapHead..HEAD`) must first confirm the recorded
+> map head is an ANCESTOR of HEAD: `git merge-base --is-ancestor mapHead HEAD`.
+> Without it, a map recorded on a divergent branch can look "recent" (small
+> distance) yet never described the current branch's dependency graph, so a stale
+> selection runs instead of the full suite. On non-ancestor (or the command
+> failing), return the full-suite fallback. Add a divergent-branch regression test.
 
 **Files:**
 - Create: `src/cli/commands/tia.ts`

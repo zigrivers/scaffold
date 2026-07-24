@@ -3164,6 +3164,18 @@ export function planResume(
 
 ### Task 15: bootstrap engine + `scaffold mq bootstrap` CLI + mq-guard message
 
+> **Reviewer note (deferred from PR #783 review — resolve during implementation):**
+> `armHooks` runs `installHooks(primary)` PRE-merge, but the queue-installing PR
+> may itself commit `.claude/settings.json` changes — leaving primary's working
+> tree dirty so the later `git.syncPrimaryToMerge` `merge --ff-only` fails (or
+> overwrites an untracked/modified settings file). Resolve one of two ways and
+> test it: (a) treat the mq-guard hook registration as a COMMITTED gated-tree
+> asset (verify it in `verifyGatedAssets`) and drop the pre-merge `installHooks`,
+> letting it ride the merge; or (b) move `installHooks(primary)` to AFTER
+> `syncPrimaryToMerge` so it deep-merges into the already-landed settings. Add an
+> integration test where the bootstrap PR modifies `.claude/settings.json` and
+> assert primary ends clean and the guard is registered.
+
 **Files:**
 - Modify: `src/merge-queue/bootstrap.ts` (append the engine)
 - Modify: `src/merge-queue/bootstrap.test.ts` (append engine tests)

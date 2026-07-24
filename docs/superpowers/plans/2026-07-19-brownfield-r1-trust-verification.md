@@ -1460,6 +1460,16 @@ describe('resolveSkeletonInitMode (D11 R1)', () => {
 
 ### Task 7: `scaffold doctor` — check registry + runner + CLI (D5, R1 scope)
 
+> **Reviewer note (deferred from PR #783 review — resolve during implementation):**
+> `schedulerCheck` must scope to the CURRENT project, not "the first
+> `com.*.merge-poller.plist` / `scaffold-*-merge-poller.timer` on the machine".
+> With multiple Scaffold projects installed, the substring/pattern scan can
+> report another project's scheduler. Derive the expected unit from *this*
+> project's job (`buildPostMergePollerJob(primaryRoot).label` / `.unitBase` once
+> R2 ships) and inspect that exact unit; report `skip` when it isn't present.
+> Add a two-project fixture test. (R2 is the producer of the job builder — until
+> then the pattern match is the interim; the project-scoped form lands with R2.)
+
 **Files:**
 - Create: `/Users/kenallred/Developer/scaffold/src/doctor/types.ts`
 - Create: `/Users/kenallred/Developer/scaffold/src/doctor/checks.ts`

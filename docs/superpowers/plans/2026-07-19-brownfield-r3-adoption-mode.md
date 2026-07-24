@@ -180,6 +180,15 @@ These are pinned by the approved spec — do not re-litigate during implementati
 
 ### Task 2: Verification honors mapped artifacts
 
+> **Reviewer note (deferred from PR #783 review — resolve during implementation):**
+> `artifactMap` must also be honored by `applyConflictOverrides` (the fs-only
+> demotion R1 added for `status`/`next`), not only `verifyStep`. Otherwise a
+> legitimately-mapped completed step whose *original* output is absent gets
+> demoted to pending on those surfaces even though the mapped incumbent satisfies
+> it. Thread `config.artifact_map` through `applyConflictOverrides` + `status` +
+> `next`, and add a test: a completed mapped step with its original output absent
+> stays `done`, not `conflict`.
+
 **Files:**
 - `src/state/completion.ts` (thread `artifactMap` through R1's `verifyStep` — the D3 verifier the adoption plan and doctor actually call — AND the legacy `detectCompletion`/`checkCompletion`)
 - `src/doctor/checks.ts`, `src/project/adoption-plan*.ts`, `src/project/adoption-apply.ts` (thread `artifactMap` into `verifyStep`'s callers; locate with `git grep -n "verifyStep(" src/`)

@@ -218,3 +218,30 @@ by re-running the review with grok excluded (`--channels codex,claude,antigravit
 and reconciling Superpowers. Don't reword or "fix" the plan to satisfy a truncation
 artifact. (grok works fine on normal code diffs; this bites only on oversized
 docs-landing PRs.)
+
+## Reviewing very large plan/design docs is a bottomless well — converge on the plan-aware channel, defer pseudocode nitpicks to per-PR implementation review (2026-07-24)
+**Pattern:** Landing a 15k-line docs PR (four TDD plans + a spec) through `mmr
+review` never reached a clean CLI verdict. Across SEVEN passes the review found
+and I fixed 28+ genuinely-real defects (incl. a real P0: `tia ingest` recursively
+deleting an unvalidated `--coverage-dir`), yet every FRESH codex pass on the plans'
+illustrative pseudocode surfaced ~4-6 NEW distinct findings (follow-ons to prior
+fixes, same-class issues in new locations, and correctness nitpicks in intricate
+features like the bootstrap flow / TIA). Session-tracked rounds (`--session X
+--round N`) DID converge (round 3 clean of real findings); fresh sessions re-opened
+the well. grok was structurally degraded the whole time (it truncates a diff this
+large and emits "can't verify" non-defects).
+**Rule:** For a large plan/design-doc review, the **plan-aware Superpowers channel**
+(reads actual `src/`, has the spec + AC context) is the authority on convergence —
+when it verifies the fixes sound and finds no new P0/P1, you have converged, even if
+fresh CLI passes keep surfacing marginal pseudocode findings. These are PLAN GUIDES,
+not shipping code: each implementation PR gets its own mandatory code-level MMR review
+(the real gate), and TDD + a type-checker + tests resolve pseudocode-level issues on
+REAL code far better than perfecting illustrative snippets. Decision procedure: fix
+every P0 and every clearly-real P1; once findings become implementation-refinements in
+intricate features (no P0/security/architectural break) AND the plan-aware channel is
+clean, STOP — annotate the residuals as "deferred reviewer notes" at their tasks (so
+implementers address them during TDD) and merge on a documented `degraded-pass` (grok
+degraded on oversized diff + healthy-channel/plan-aware convergence). Do NOT chase a
+zero-finding CLI verdict on 15k lines of pseudocode — it does not exist and each round
+just moves the well. Use ONE `--session` so the native 3-round budget actually bounds
+you; don't spin up fresh sessions that reset recurrence tracking.
