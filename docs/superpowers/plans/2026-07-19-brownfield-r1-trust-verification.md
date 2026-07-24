@@ -2107,11 +2107,16 @@ export const schedulerCheck: DoctorCheck = {
   run: (ctx) => {
     if (process.platform === 'darwin') {
       const agentsDir = path.join(os.homedir(), 'Library', 'LaunchAgents')
+      // R2's buildPostMergePollerJob labels the job `com.<project>.merge-poller`
+      // (→ file `com.<project>.merge-poller.plist`), NOT the script basename
+      // `post-merge-poller`. Match the label R2 actually installs (forward
+      // reference to R2's job builder, per the R2-interfaces-are-the-contract
+      // rule the other doctor checks follow).
       const plists = fs.existsSync(agentsDir)
-        ? fs.readdirSync(agentsDir).filter((f) => f.endsWith('.plist') && f.includes('post-merge-poller'))
+        ? fs.readdirSync(agentsDir).filter((f) => /^com\..+\.merge-poller\.plist$/.test(f))
         : []
       if (plists.length === 0) {
-        return res(schedulerCheck, 'skip', 'not configured (no post-merge-poller LaunchAgent; `scaffold sched` ships in R2)')
+        return res(schedulerCheck, 'skip', 'not configured (no com.<project>.merge-poller LaunchAgent; `scaffold sched` ships in R2)')
       }
       const label = plists[0].replace(/\.plist$/, '')
       // File presence proves nothing — verify the job is actually LOADED.
@@ -2124,13 +2129,22 @@ export const schedulerCheck: DoctorCheck = {
       return res(schedulerCheck, 'ok', `launchd job ${label} loaded`)
     }
     if (process.platform === 'linux') {
-      const status = ctx.runCmd('systemctl --user status post-merge-poller.timer', 15)
-      if (status.status === 0) return res(schedulerCheck, 'ok', 'systemd user timer post-merge-poller.timer active')
-      if (status.status === 4) {
-        return res(schedulerCheck, 'skip', 'not configured (no post-merge-poller.timer; `scaffold sched` ships in R2)')
+      // R2's systemd backend installs `scaffold-<project>-merge-poller.timer`
+      // (job.unitBase), NOT `post-merge-poller.timer`. Discover the installed
+      // unit by pattern, then verify it is active (mirrors R2's own
+      // `systemctl --user is-active <unitBase>.timer` status check).
+      const unitDir = path.join(os.homedir(), '.config', 'systemd', 'user')
+      const timers = fs.existsSync(unitDir)
+        ? fs.readdirSync(unitDir).filter((f) => /^scaffold-.+-merge-poller\.timer$/.test(f))
+        : []
+      if (timers.length === 0) {
+        return res(schedulerCheck, 'skip', 'not configured (no scaffold-*-merge-poller.timer; `scaffold sched` ships in R2)')
       }
-      return res(schedulerCheck, 'warn', 'post-merge-poller.timer present but not active',
-        'systemctl --user start post-merge-poller.timer')
+      const timer = timers[0]
+      const active = ctx.runCmd(`systemctl --user is-active ${timer}`, 15)
+      if (active.status === 0) return res(schedulerCheck, 'ok', `systemd user timer ${timer} active`)
+      return res(schedulerCheck, 'warn', `${timer} present but not active`,
+        `systemctl --user start ${timer}`)
     }
     return res(schedulerCheck, 'skip', `not configured (unsupported platform ${process.platform})`)
   },
@@ -2929,7 +2943,7 @@ function applyAdoptionPlan(options: { projectRoot: string; plan: AdoptionPlan; s
 ```
 
 - Consumes: `AdoptionPlan`, `InitializeRecord`, `extractPlanKey` (Task 8), `appendAuditRecord`, `VerificationAuditRecord` (Task 4), `runDoctor`, `DoctorReport` (Task 7), `StateManager.initializeState`/`loadState`/`saveState`, `TYPE_KEY`, `readPackageVersion` from `src/cli/commands/version.ts`.
-- CLI contract (D1/D2): `--apply --plan <path>` / `--apply --plan-key <sha256>` re-render against live reality BEFORE any write and abort with `ADOPT_PLAN_DRIFT` on key mismatch; a bare `--apply` is interactive-only (typed confirmation `apply`) and errors with `ADOPT_APPLY_NON_INTERACTIVE` in auto/json/non-TTY mode; `adopt` joins `ROOT_OPTIONAL_COMMANDS` (first-touch); apply ends by running `scaffold doctor` and printing its verdict.
+- CLI contract (D1/D2): `--apply --plan <path>` / `--apply --plan-key <sha256>` acquire the adoption lock FIRST, then re-render against live reality and compare the key UNDER the lock (TOCTOU-safe: no writer can change config/state between the compare and the writes), aborting with `ADOPT_PLAN_DRIFT` on key mismatch; the same lock is held through every write. A bare `--apply` is interactive-only (typed confirmation `apply`) and errors with `ADOPT_APPLY_NON_INTERACTIVE` in auto/json/non-TTY mode (checked before the lock, so a non-interactive bare apply never takes it); `adopt` joins `ROOT_OPTIONAL_COMMANDS` (first-touch); apply ends by running `scaffold doctor` and printing its verdict.
 
 **Steps:**
 
@@ -2999,6 +3013,17 @@ describe('applyAdoptionPlan (D1/D2/D3)', () => {
     expect(result.recorded_pending).toContain('beads')
     expect(result.marked_completed).toContain('tech-stack')
 
+    // Regression: next_eligible + its graph hash come from the REAL resolved
+    // pipeline, not a `() => []` placeholder. With only tech-stack completed,
+    // the pipeline root (create-vision) is an eligible pending step, so the
+    // dashboard and other raw-cache readers see live work after apply.
+    const fullState = JSON.parse(fs.readFileSync(path.join(dir, '.scaffold', 'state.json'), 'utf8')) as {
+      next_eligible: string[]
+      next_eligible_hash?: string
+    }
+    expect(fullState.next_eligible_hash).toBeTruthy()
+    expect(fullState.next_eligible).toContain('create-vision')
+
     const auditLines = fs.readFileSync(path.join(dir, '.scaffold', 'decisions.jsonl'), 'utf8')
       .trim().split('\n').map((line) => JSON.parse(line) as Record<string, unknown>)
     const beadsAudit = auditLines.find((l) => l['step_slug'] === 'beads')
@@ -3052,6 +3077,7 @@ import { StateManager } from '../state/state-manager.js'
 import { appendAuditRecord } from '../state/decision-logger.js'
 import { atomicWriteFile } from '../utils/fs.js'
 import { loadPipelineContext } from '../core/pipeline/context.js'
+import { resolvePipeline } from '../core/pipeline/resolver.js'
 import { runDoctor } from '../doctor/run.js'
 import { TYPE_KEY } from './adopt.js'
 import type { AdoptionPlan, InitializeRecord } from './adoption-plan.js'
@@ -3113,14 +3139,34 @@ export async function applyAdoptionPlan(options: {
   scaffoldVersion: string
 }): Promise<ApplyResult> {
   const { projectRoot, plan } = options
-  const context = loadPipelineContext(projectRoot)
-  const producesFor = (slug: string): string[] =>
-    [...(context.metaPrompts.get(slug)?.frontmatter.outputs ?? [])]
 
-  const stateManager = new StateManager(projectRoot, () => [], () => undefined)
+  // Write the approved config FIRST so the pipeline resolves against the final
+  // methodology + project-type (brownfield preset + overlays), THEN build the
+  // StateManager with the REAL eligibility + config callbacks and the pipeline
+  // graph hash. A placeholder `() => []` would persist an empty `next_eligible`
+  // that raw-cache readers (the dashboard reads state.next_eligible directly)
+  // trust verbatim — so `scaffold` would report no work even with eligible
+  // pending steps. This mirrors how `next`/`status`/`complete` build the manager.
   let initialized = false
   if (plan.initialize !== null) {
     writeInitializeConfig(projectRoot, plan.initialize)
+    initialized = true
+  }
+
+  const context = loadPipelineContext(projectRoot)
+  const pipeline = resolvePipeline(context)
+  const producesFor = (slug: string): string[] =>
+    [...(context.metaPrompts.get(slug)?.frontmatter.outputs ?? [])]
+
+  const stateManager = new StateManager(
+    projectRoot,
+    pipeline.computeEligible,
+    () => context.config ?? undefined,
+    undefined,
+    pipeline.globalSteps,
+    pipeline.getPipelineHash('global'),
+  )
+  if (initialized) {
     stateManager.initializeState({
       enabledSteps: plan.steps.map((record) => ({
         slug: record.step_slug,
@@ -3130,7 +3176,6 @@ export async function applyAdoptionPlan(options: {
       methodology: plan.methodology,
       initMode: plan.mode,
     })
-    initialized = true
   }
 
   const state = stateManager.loadState()
@@ -3238,6 +3283,9 @@ export async function applyAdoptionPlan(options: {
 
 ```ts
       if (argv.apply === true) {
+        // Resolve the approved key from the plan artifact. Reading the approved
+        // doc is safe pre-lock; the authoritative render + key COMPARE happen
+        // under the lock below.
         let approvedKey: string | null = (argv['plan-key'] as string | undefined) ?? null
         if (approvedKey === null && typeof argv.plan === 'string') {
           const planPath = path.isAbsolute(argv.plan) ? argv.plan : path.join(projectRoot, argv.plan)
@@ -3253,40 +3301,22 @@ export async function applyAdoptionPlan(options: {
             return
           }
         }
-        if (approvedKey === null) {
-          // D1: a bare --apply is interactive-only — automation must pass the key it approved.
-          if (effectiveAuto || outputMode === 'json' || !output.supportsInteractivePrompts()) {
-            output.error({
-              code: 'ADOPT_APPLY_NON_INTERACTIVE',
-              message: 'Bare --apply is interactive-only. In automation, pass the approved plan: --plan <path> or --plan-key <sha256>.',
-              exitCode: ExitCode.ValidationError,
-            })
-            process.exitCode = ExitCode.ValidationError
-            return
-          }
-          for (const line of renderPlanMarkdown(plan).split('\n')) output.info(line)
-          const typed = await output.prompt<string>(
-            `Type "apply" to execute plan ${plan.plan_key.slice(0, 12)}… (anything else aborts)`, '',
-          )
-          if (typed !== 'apply') {
-            output.info('Aborted — nothing was written.')
-            process.exitCode = 0
-            return
-          }
-        } else if (approvedKey !== plan.plan_key) {
-          // D1 drift contract: the live re-render above IS the pre-write check.
+        // D1: a bare --apply is interactive-only — automation must pass the key
+        // it approved. Fail fast BEFORE taking the lock so a non-interactive
+        // bare apply never acquires (and immediately releases) it.
+        if (approvedKey === null && (effectiveAuto || outputMode === 'json' || !output.supportsInteractivePrompts())) {
           output.error({
-            code: 'ADOPT_PLAN_DRIFT',
-            message: `Plan key mismatch: approved ${approvedKey.slice(0, 12)}… but the live re-render produced ${plan.plan_key.slice(0, 12)}… — `
-              + 'reality changed since approval (a disposition, detect result, include, or the initialize payload). '
-              + 'Re-review: `scaffold adopt --write`, then re-run --apply against the new plan.',
+            code: 'ADOPT_APPLY_NON_INTERACTIVE',
+            message: 'Bare --apply is interactive-only. In automation, pass the approved plan: --plan <path> or --plan-key <sha256>.',
             exitCode: ExitCode.ValidationError,
           })
           process.exitCode = ExitCode.ValidationError
           return
         }
 
-        // Writes begin here — take the lock (plan mode never does).
+        // Take the lock BEFORE the final detection + render + key compare so no
+        // writer can change config/state between the compare and the writes
+        // (TOCTOU). The SAME lock is held through every write below.
         const lockResult = acquireLock(projectRoot, 'adopt')
         if (!lockResult.acquired) {
           if (lockResult.error) output.error(lockResult.error)
@@ -3298,14 +3328,61 @@ export async function applyAdoptionPlan(options: {
           releaseLock(projectRoot)
           shutdown.releaseLockOwnership()
         }, async () => {
+          // Authoritative re-render UNDER the lock: re-run adoption detection
+          // and rebuild the plan against live reality. The plan built outside
+          // the lock (plan mode) is intentionally discarded here.
+          let liveAdopt: AdoptionResult
+          try {
+            liveAdopt = await runAdoption({
+              projectRoot, metaPromptDir, methodology, dryRun,
+              auto: true, force: argv.force === true, verbose: argv.verbose === true,
+              explicitProjectType: argv['project-type'] as ProjectType | undefined,
+              flagOverrides: buildFlagOverrides(argv as Record<string, unknown>),
+            })
+          } catch (err) {
+            output.error(asScaffoldError(err, 'ADOPT_INTERNAL', ExitCode.ValidationError))
+            process.exitCode = ExitCode.ValidationError
+            return
+          }
+          const { plan: livePlan, errors: liveErrors } = buildAdoptionPlan({ projectRoot, adoptResult: liveAdopt, includes })
+          if (liveErrors.length > 0) {
+            for (const e of liveErrors) output.error(e)
+            process.exitCode = liveErrors[0].exitCode
+            return
+          }
+
+          if (approvedKey === null) {
+            // Bare --apply — interactive confirmation against the live render.
+            for (const line of renderPlanMarkdown(livePlan).split('\n')) output.info(line)
+            const typed = await output.prompt<string>(
+              `Type "apply" to execute plan ${livePlan.plan_key.slice(0, 12)}… (anything else aborts)`, '',
+            )
+            if (typed !== 'apply') {
+              output.info('Aborted — nothing was written.')
+              process.exitCode = 0
+              return
+            }
+          } else if (approvedKey !== livePlan.plan_key) {
+            // D1 drift contract: the under-lock re-render IS the pre-write check.
+            output.error({
+              code: 'ADOPT_PLAN_DRIFT',
+              message: `Plan key mismatch: approved ${approvedKey.slice(0, 12)}… but the live re-render produced ${livePlan.plan_key.slice(0, 12)}… — `
+                + 'reality changed since approval (a disposition, detect result, include, or the initialize payload). '
+                + 'Re-review: `scaffold adopt --write`, then re-run --apply against the new plan.',
+              exitCode: ExitCode.ValidationError,
+            })
+            process.exitCode = ExitCode.ValidationError
+            return
+          }
+
           const applyResult = await applyAdoptionPlan({
-            projectRoot, plan, scaffoldVersion: readPackageVersion(),
+            projectRoot, plan: livePlan, scaffoldVersion: readPackageVersion(),
           })
           if (outputMode === 'json') {
             output.result({
               schema_version: 3,
               applied: true,
-              plan_key: plan.plan_key,
+              plan_key: livePlan.plan_key,
               initialized: applyResult.initialized,
               marked_completed: applyResult.marked_completed,
               reopened: applyResult.reopened,
@@ -3315,7 +3392,7 @@ export async function applyAdoptionPlan(options: {
             })
           } else {
             output.success(
-              `Applied plan ${plan.plan_key.slice(0, 12)}…: `
+              `Applied plan ${livePlan.plan_key.slice(0, 12)}…: `
               + `${applyResult.marked_completed.length} completed, ${applyResult.reopened.length} reopened, `
               + `${applyResult.recorded_pending.length} recorded pending`
               + (applyResult.initialized ? ' (project initialized)' : ''),

@@ -2729,8 +2729,10 @@ describe('scaffold tia record-due', () => {
 describe('scaffold tia ingest', () => {
   it('builds the map, journals tia_recorded, stamps the day marker, clears the dumps', async () => {
     const root = scratchRepo()
-    const cov = path.join(root, 'cov')
-    fs.mkdirSync(cov)
+    // The dump dir is the poller-created .mq/tia/v8 workspace (ingest confines
+    // the recursive remove to a strict descendant of .mq/tia/).
+    const cov = path.join(root, '.mq', 'tia', 'v8')
+    fs.mkdirSync(cov, { recursive: true })
     fs.writeFileSync(path.join(cov, 'coverage-1.json'), JSON.stringify({
       result: [
         { url: pathToFileURL(path.join(root, 'src/a.test.ts')).href },
@@ -2750,6 +2752,43 @@ describe('scaffold tia ingest', () => {
     expect(fs.readFileSync(path.join(mqDir, 'tia', 'last-recorded-day'), 'utf8').trim())
       .toBe(new Date().toISOString().slice(0, 10))
     expect(fs.existsSync(cov)).toBe(false)
+  })
+
+  // Path-safety: `tia ingest` fs.rmSync(recursive) must NEVER escape
+  // <primary>/.mq/tia/. Each hostile input must be refused (exit 1) AND leave
+  // the target on disk. `os` is imported at the top of the file.
+  it.each<[string, (root: string) => string]>([
+    ['an absolute path outside the workspace', () => {
+      const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'tia-outside-'))
+      fs.writeFileSync(path.join(outside, 'keep.txt'), 'x')
+      return outside
+    }],
+    ['a `..` traversal escaping to the project root', (root) => path.join(root, '.mq', 'tia', '..', '..')],
+    ['the project root itself', (root) => root],
+    ['the .mq/tia dir itself (would nuke the map)', (root) => path.join(root, '.mq', 'tia')],
+    ['a home-dir-style absolute path (stand-in for $HOME)', () => {
+      const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'tia-home-'))
+      fs.writeFileSync(path.join(fakeHome, '.bashrc'), 'x')
+      return fakeHome
+    }],
+    ['a symlink whose target escapes the workspace', (root) => {
+      const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'tia-symlink-'))
+      fs.writeFileSync(path.join(outside, 'keep.txt'), 'x')
+      const link = path.join(root, '.mq', 'tia', 'escape')
+      fs.mkdirSync(path.dirname(link), { recursive: true })
+      fs.symlinkSync(outside, link)
+      return link
+    }],
+  ])('refuses %s and removes nothing', async (_label, make) => {
+    const root = scratchRepo()
+    const target = make(root)
+    await tiaHandler({ action: 'ingest', coverageDir: target, head: 'HEADSHA', seconds: 1, root })
+    expect(process.exitCode ?? 0).toBe(1)
+    // Assert survival AFTER the handler (it mkdir's .mq/tia). For a symlink,
+    // assert the escape TARGET survives (the link resolves to it).
+    const survives = fs.lstatSync(target).isSymbolicLink() ? fs.realpathSync(target) : target
+    expect(fs.existsSync(survives)).toBe(true)   // the hostile target was NOT removed
+    process.exitCode = 0
   })
 })
 ```
@@ -2868,9 +2907,24 @@ export async function tiaHandler(argv: TiaArgs): Promise<void> {
       process.exitCode = 1
       return
     }
+    // `tia ingest` recursively removes the dump dir. It is a real (hidden) CLI
+    // verb, so a typo or hostile --coverage-dir must never let fs.rmSync escape
+    // the TIA workspace and delete an arbitrary directory (project root, $HOME,
+    // /). Confine it to a STRICT descendant of <primary>/.mq/tia/, canonicalized
+    // (realpath) to defeat traversal and symlink escapes.
+    fs.mkdirSync(path.join(mqDir, TIA_DIR), { recursive: true })
+    const covDir = resolveTiaDumpDir(argv.coverageDir, mqDir, cwd)
+    if (covDir === null) {
+      output.error(
+        `tia ingest: --coverage-dir must be a directory inside ${path.join(mqDir, TIA_DIR)} — ` +
+        `refusing to remove ${argv.coverageDir}`,
+      )
+      process.exitCode = 1
+      return
+    }
     const at = new Date().toISOString()
     const map = buildTiaMap({
-      coverageDir: argv.coverageDir,
+      coverageDir: covDir,
       projectRoot: cwd,
       headSha: argv.head,
       seconds: argv.seconds ?? 0,
@@ -2884,7 +2938,7 @@ export async function tiaHandler(argv: TiaArgs): Promise<void> {
       type: 'tia_recorded', headSha: argv.head, seconds: argv.seconds ?? 0,
       tests: Object.keys(map.tests).length, files: Object.keys(map.file_hashes).length, at,
     })
-    fs.rmSync(argv.coverageDir, { recursive: true, force: true })
+    fs.rmSync(covDir, { recursive: true, force: true })
     output.success(
       `tia: recorded ${Object.keys(map.tests).length} test file(s) covering ` +
       `${Object.keys(map.file_hashes).length} file(s)`,
@@ -2895,6 +2949,32 @@ export async function tiaHandler(argv: TiaArgs): Promise<void> {
     output.error(`unknown tia action "${argv.action}"`)
     process.exitCode = 1
   }
+}
+
+/** Resolve `--coverage-dir` to a canonical path that is a STRICT descendant of
+ *  <primary>/.mq/tia/, defeating `..` traversal and symlink escapes. Returns
+ *  null (caller errors out; nothing is removed) for anything outside — an
+ *  absolute path, the project root, $HOME, the TIA dir itself, or a symlink
+ *  whose target escapes the workspace. */
+function resolveTiaDumpDir(coverageDir: string, mqDir: string, cwd: string): string | null {
+  let realTiaRoot: string
+  try {
+    realTiaRoot = fs.realpathSync(path.join(mqDir, TIA_DIR))
+  } catch {
+    return null // no .mq/tia workspace -> nothing legitimate to ingest
+  }
+  let realCov: string
+  try {
+    // realpath resolves symlinks in the FULL path, so a link that points
+    // outside the workspace resolves to its outside target and is rejected.
+    realCov = fs.realpathSync(path.resolve(cwd, coverageDir))
+  } catch {
+    return null // the dump dir must exist to be ingested (and removed)
+  }
+  const rel = path.relative(realTiaRoot, realCov)
+  // Strict descendant: non-empty, not the dir itself, no `..`, not absolute.
+  const strictDescendant = rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel)
+  return strictDescendant ? realCov : null
 }
 
 const tiaCommand: CommandModule<Record<string, unknown>, TiaArgs> = {
@@ -2979,14 +3059,36 @@ STUB
   [ ! -s "$WORK/clone/.mq/post-merge/cov-env.txt" ]   # empty: env var was not set
   rm -rf "$WORK"
 }
+
+@test "poller: a due recording runs the instrumented gate even on a full-gate cache hit" {
+  poller_world 'printf "%s" "${NODE_V8_COVERAGE:-}" > cov-env.txt'
+  cat > "$MQ_SCAFFOLD_BIN" <<'STUB'
+#!/usr/bin/env bash
+echo "$@" >> "${SCAFFOLD_STUB_LOG:?}"
+case "$*" in
+  *"gate-cache --check-tree"*) exit 0 ;;   # cache HIT — but recording is due, so the gate must still run
+  *"tia record-due"*) exit 0 ;;
+  *) exit 0 ;;
+esac
+STUB
+  chmod +x "$MQ_SCAFFOLD_BIN"
+  export SCAFFOLD_STUB_LOG="$WORK/stub.log"
+  run "$WORK/clone/scripts/ops/post-merge-poller.sh"
+  [ "$status" -eq 0 ]
+  # The cache hit must NOT short-circuit a due recording: the gate ran under
+  # coverage and the map was ingested.
+  grep -q ".mq/tia/v8" "$WORK/clone/.mq/post-merge/cov-env.txt"
+  grep -q -- "tia ingest --coverage-dir" "$WORK/stub.log"
+  rm -rf "$WORK"
+}
 ```
 
   (`poller_world`'s default stub answers `tia record-due` with exit 1 — Task 4.)
 
-- [ ] Run: `bats tests/agent-ops-merge-queue.bats` — expect the 2 new tests FAIL.
-- [ ] Edit `content/assets/agent-ops/merge-queue/post-merge-poller.sh.tmpl`. Three surgical edits:
+- [ ] Run: `bats tests/agent-ops-merge-queue.bats` — expect the 3 new tests FAIL.
+- [ ] Edit `content/assets/agent-ops/merge-queue/post-merge-poller.sh.tmpl`. Four surgical edits:
 
-  **(a)** Immediately after the Task 4 `SCAFFOLD_BIN` block, insert:
+  **(a)** Immediately after the Task 4 `SCAFFOLD_BIN` block, insert (just the flag — the dump dir is created immediately before the gate in edit **(c)**, so no early exit between here and the gate can ever orphan a provisional coverage dir):
 
 ```bash
 # TIA coverage recording (D14; merge_queue.tia.record: scheduled|always|off,
@@ -2997,12 +3099,26 @@ STUB
 INSTRUMENTED=0
 if [ -n "$SCAFFOLD_BIN" ] && "$SCAFFOLD_BIN" tia record-due >/dev/null 2>&1; then
 	INSTRUMENTED=1
-	rm -rf "$MQ_DIR/tia/v8"
-	mkdir -p "$MQ_DIR/tia/v8"
 fi
 ```
 
-  **(b)** Replace the Task 4 gate invocation lines
+  **(b)** Guard the Task 4 full-gate cache-check so a due recording is never
+  short-circuited by a cache hit. A cache hit skips the gate — but when
+  recording is due the gate MUST run (under coverage) to refresh the map, or the
+  coverage map would never refresh on projects whose daemon seeds the full-gate
+  cache (esp. when merge == full-gate command). Replace the Task 4 line
+
+```bash
+if [ -n "$SCAFFOLD_BIN" ] && "$SCAFFOLD_BIN" mq gate-cache --check-tree "$TREE_SHA" >/dev/null 2>&1; then
+```
+
+  with
+
+```bash
+if [ "$INSTRUMENTED" != "1" ] && [ -n "$SCAFFOLD_BIN" ] && "$SCAFFOLD_BIN" mq gate-cache --check-tree "$TREE_SHA" >/dev/null 2>&1; then
+```
+
+  **(c)** Replace the Task 4 gate invocation lines
 
 ```bash
 GATE_START="$(date +%s)"
@@ -3017,6 +3133,10 @@ GATE_SECONDS=$(( $(date +%s) - GATE_START ))
 GATE_START="$(date +%s)"
 GATE_RC=0
 if [ "$INSTRUMENTED" = "1" ]; then
+	# Create the dump dir HERE (immediately before the gate) so no early exit
+	# above can leave a provisional coverage dir behind.
+	rm -rf "$MQ_DIR/tia/v8"
+	mkdir -p "$MQ_DIR/tia/v8"
 	# export (not a prefix assignment) so a compound gate command — pipelines,
 	# &&-chains — sees the variable in every stage.
 	(cd "$WT" && export NODE_V8_COVERAGE="$MQ_DIR/tia/v8" && {{FULL_GATE_COMMAND}}) >"$LOG" 2>&1 || GATE_RC=$?
@@ -3026,7 +3146,7 @@ fi
 GATE_SECONDS=$(( $(date +%s) - GATE_START ))
 ```
 
-  **(c)** Replace the Task 4 green-branch record block
+  **(d)** Replace the Task 4 green-branch record block
 
 ```bash
 	if [ -n "$SCAFFOLD_BIN" ]; then

@@ -3176,7 +3176,8 @@ export function planResume(
 - Modify: `content/assets/agent-ops/merge-queue/mq-guard.sh.tmpl` + `tests/agent-ops-merge-queue.bats`
 
 **Interfaces:**
-- Produces: `GhClient.mergeCommitSha(pr): string | null`; `GitOps.checkoutDetachedInGate(sha): string`; `BootstrapDeps { gh, git, runGate, config, mqDir, projectRoot, armHooks, armSched, smokeDaemon, runDoctor, gateTargetResolves, log, now, sleep?, newId }`; `BootstrapOutcome { ok, bootstrapId, stage: 'preflight'|'arm'|'merge'|'verify'|'complete'|'aborted', messages }`; `runBootstrap(deps, { pr, finish? }): Promise<BootstrapOutcome>`; `gateTargetResolves(projectRoot, command): boolean` (exported from `src/cli/commands/mq.ts`); `mqHandler` gains an `overrides: MqOverrides = {}` second parameter (`MqOverrides { bootstrapDeps?: Partial<BootstrapDeps> }`); `MqArgs` gains `finish?: boolean`; mq action choices gain `'bootstrap'`.
+- Produces: `GhClient.mergeCommitSha(pr): string | null`; `GitOps.checkoutDetachedInGate(sha): string`; `BootstrapDeps { gh, git, runGate, config, mqDir, projectRoot, readMergeConfig?, verifyGatedAssets?, armHooks, armSched, smokeDaemon, runDoctor, gateTargetResolves, log, now, sleep?, newId }`; `BootstrapOutcome { ok, bootstrapId, stage: 'preflight'|'arm'|'merge'|'verify'|'complete'|'aborted', messages }`; `runBootstrap(deps, { pr, finish? }): Promise<BootstrapOutcome>`; `gateTargetResolves(projectRoot, command): boolean` (exported from `src/cli/commands/mq.ts`); `mqHandler` gains an `overrides: MqOverrides = {}` second parameter (`MqOverrides { bootstrapDeps?: Partial<BootstrapDeps> }`); `MqArgs` gains `finish?: boolean`; mq action choices gain `'bootstrap'`.
+- **Two roots (D9 first-install correctness):** the PR that *installs* the queue commits its config/guard/poller/gate-scripts in the FEATURE branch — so the shared **primary** root (`git.primaryRoot()`, main worktree) does NOT yet contain them; they arrive only at merge. `runBootstrap` therefore verifies committed assets and resolves gate targets from the **gated PR tree** (the `checkoutDetachedInGate(gatedHeadSha)` checkout — where the PR's committed files live), reads the merge-queue config it will install from that tree (`readMergeConfig(gatedTree)`), and runs the full preflight gate there; the journal (`mqDir`) stays at primary and the **scheduler is armed AFTER the merge** (in the post-merge verify step) so `buildPostMergePollerJob(primary)` resolves against the now-landed `scripts/ops/post-merge-poller.sh` (the stable post-merge path). `verifyGatedAssets(gatedTree, cfg)` confirms the config, guard, poller, and hook registration are COMMITTED in the PR (they ride the merge to primary) rather than uncommitted post-gate mutations; `gateTargetResolves` gains the tree root as its first arg (`(root, command)`).
 - Consumes: Task 14's reducers/`planResume`; `installHooks` (Task 12); `pickSchedBackend` (Task 6) + `buildPostMergePollerJob` (Task 5); `runGate` (`src/merge-queue/gate.ts`); `appendEvent`/`readJournal` (`src/merge-queue/journal.ts`); `loadAgentOpsConfig`; `ulid`.
 
 **Steps:**
@@ -3538,6 +3539,21 @@ describe('runBootstrap (D9 engine)', () => {
     expect(out.ok).toBe(false)
     expect(out.messages.join('\n')).toMatch(/agent-ops install --component gate/)
   })
+  it('a PR that does not commit the queue assets in its gated tree fails preflight before arming', async () => {
+    const root = tmpRoot()
+    // The first queue-installing PR must COMMIT its assets so they land at merge;
+    // verifyGatedAssets checks the GATED tree, never primary. A PR that leaves
+    // them out (uncommitted post-gate mutation) is rejected before any arming.
+    const { deps, rec } = makeDeps(root, {
+      verifyGatedAssets: () => ({ ok: false, missing: ['scripts/mq-guard.sh', 'scripts/ops/post-merge-poller.sh'] }),
+    })
+    const out = await runBootstrap(deps, { pr: 41 })
+    expect(out.ok).toBe(false)
+    expect(out.stage).toBe('preflight')
+    expect(out.messages.join('\n')).toMatch(/does not install the queue/)
+    expect(rec.hooksArmed).toBe(0)
+    expect(readJournal(deps.mqDir)).toEqual([])
+  })
   it('a failed daemon smoke leaves merged-without-armed and points at --finish', async () => {
     const root = tmpRoot()
     const { deps } = makeDeps(root, { smokeDaemon: () => ({ ok: false, detail: 'exited 1' }) })
@@ -3588,10 +3604,9 @@ describe('runBootstrap (D9 engine)', () => {
 ```
 
 - [ ] Run: `npx vitest run src/merge-queue/bootstrap.test.ts` — engine tests FAIL (`runBootstrap` not exported).
-- [ ] Append the engine to `src/merge-queue/bootstrap.ts`. Extend the imports at the top of the file to:
+- [ ] Append the engine to `src/merge-queue/bootstrap.ts`. Extend the imports at the top of the file to (the engine reaches the filesystem only through injected seams — `verifyGatedAssets` / `readMergeConfig` — so it imports no `fs`):
 
 ```ts
-import fs from 'node:fs'
 import path from 'node:path'
 import { appendEvent, readJournal } from './journal.js'
 import type { GhClient } from './gh.js'
@@ -3610,19 +3625,34 @@ export interface BootstrapDeps {
     cwd: string; command: string; timeoutMs: number; logPath: string
     env?: Record<string, string>; pidFile?: string
   }) => GateResult | Promise<GateResult>
+  /** Config loaded from PRIMARY (defaults on a first install) — used by resume
+   *  paths, where the PR has already merged its config to primary. */
   config: MergeQueueConfig
   mqDir: string
   projectRoot: string
-  /** D8 primitive (idempotent) — arm the Claude Code hooks. */
+  /** D9: read the merge-queue config the PR *installs*, from the GATED PR tree
+   *  (the checkoutDetachedInGate checkout). Omitted in pure-engine tests — the
+   *  engine then falls back to `config`. */
+  readMergeConfig?: (gatedTree: string) => MergeQueueConfig
+  /** D9: verify the PR's committed queue assets (config, guard, poller, hook
+   *  registration) exist in the GATED PR tree — they must ride the merge to
+   *  primary, not be uncommitted post-gate mutations. Omitted in pure-engine
+   *  tests — the engine then treats assets as present. */
+  verifyGatedAssets?: (gatedTree: string, cfg: MergeQueueConfig) => { ok: boolean; missing: string[] }
+  /** D8 primitive (idempotent) — arm the Claude Code hooks (self-gating at
+   *  runtime, so registering pre-merge is safe). */
   armHooks: () => { messages: string[] }
-  /** D6 primitive — null when the scheduler is not part of this executor
-   *  (gate_executor !== 'local-poller'). */
-  armSched: (() => { ok: boolean; messages: string[] }) | null
+  /** D6 primitive — arm the scheduler. Called POST-merge (the poller script
+   *  lives at <primary>/scripts/ops/, present only once the PR lands), so it
+   *  self-decides on the now-merged executor and no-ops for non-local-poller. */
+  armSched: () => { ok: boolean; messages: string[] }
   /** Post-merge daemon smoke (`mq daemon --once`). */
   smokeDaemon: () => { ok: boolean; detail: string }
   /** Closing doctor pass (advisory) — null when the doctor CLI is unavailable. */
   runDoctor: (() => { exitCode: number; summary: string }) | null
-  gateTargetResolves: (command: string) => boolean
+  /** Does `command` resolve in `root`? Resolved against the GATED PR tree in
+   *  preflight (the PR's gate scripts are not yet at primary). */
+  gateTargetResolves: (root: string, command: string) => boolean
   log: (msg: string) => void
   now: () => Date
   /** Bounded-backoff sleep between merge-SHA lookups. Injected so tests run
@@ -3639,10 +3669,13 @@ export interface BootstrapOutcome {
   messages: string[]
 }
 
-/** D9: arm-first guided first merge. Order — preflight gate on the PR head →
- *  arm hooks/sched (nothing that needs the merge) → journaled squash-merge
- *  with head revalidation → daemon smoke + doctor → bootstrap_armed. A crash
- *  anywhere resumes via planResume with GitHub authoritative. */
+/** D9: arm-first guided first merge. Order — preflight (verify the PR's
+ *  committed queue assets + gate targets + full gate, all against the GATED PR
+ *  tree, since the first queue-installing PR's assets are not yet at primary) →
+ *  arm hooks pre-merge (self-gating, safe) → journaled squash-merge with head
+ *  revalidation → POST-merge arm scheduler (buildPostMergePollerJob(primary)
+ *  now resolves) + daemon smoke + doctor → bootstrap_armed. A crash anywhere
+ *  resumes via planResume with GitHub authoritative. */
 export async function runBootstrap(
   deps: BootstrapDeps,
   opts: { pr: number; finish?: boolean },
@@ -3672,22 +3705,24 @@ export async function runBootstrap(
   const attempt = latestAttemptFor(readJournal(deps.mqDir), opts.pr)
   const decision = planResume(attempt, { state: info.state, headSha: info.headSha })
 
+  // Arm hooks ONLY (pre-merge safe — the guard self-gates at runtime and the
+  // committed .claude/settings.json rides the merge). The scheduler is armed
+  // POST-merge in verifyAndArm, where the poller script exists at primary.
   const arm = (): boolean => {
     for (const m of deps.armHooks().messages) say(m)
-    if (deps.armSched !== null) {
-      const s = deps.armSched()
-      for (const m of s.messages) say(m)
-      if (!s.ok) {
-        say('bootstrap: scheduler arm FAILED — fix it, then resume with: scaffold mq bootstrap --pr ' + String(opts.pr) + ' --finish')
-        return false
-      }
-    } else {
-      say('scheduler arm skipped (gate_executor is not local-poller)')
-    }
     return true
   }
 
   const verifyAndArm = (a: { bootstrapId: string; gatedHeadSha: string }): BootstrapOutcome => {
+    // POST-merge: arm the scheduler now — buildPostMergePollerJob(primary)
+    // resolves because the PR's poller script has landed at primary. The
+    // closure self-decides on the merged executor (no-ops for non-local-poller).
+    const sched = deps.armSched()
+    for (const m of sched.messages) say(m)
+    if (!sched.ok) {
+      say(`bootstrap: the merge is recorded but the scheduler is NOT armed — fix it, then finish with: scaffold mq bootstrap --pr ${opts.pr} --finish`)
+      return { ok: false, bootstrapId: a.bootstrapId, stage: 'arm', messages }
+    }
     const smoke = deps.smokeDaemon()
     say(`daemon smoke: ${smoke.detail}`)
     if (!smoke.ok) {
@@ -3795,24 +3830,32 @@ export async function runBootstrap(
     say(`bootstrap preflight: PR #${opts.pr} is ${info.state}, not OPEN`)
     return { ok: false, bootstrapId: null, stage: 'preflight', messages }
   }
-  if (!fs.existsSync(path.join(deps.projectRoot, '.scaffold', 'agent-ops.yaml'))) {
-    say('bootstrap preflight: .scaffold/agent-ops.yaml not found — configure the queue first (merge-throughput step, or scaffold agent-ops install --component merge-queue)')
+  // Check out the gated PR tree FIRST: the first queue-installing PR's assets
+  // (config, guard, poller, gate scripts, hook registration) live in the PR,
+  // NOT at primary — primary receives them only at merge. Everything below
+  // verifies + reads from the gated tree; the journal stays at primary.
+  const gatedHeadSha = info.headSha
+  deps.git.fetchOrigin()
+  const gatedTree = deps.git.checkoutDetachedInGate(gatedHeadSha)
+  const cfg = deps.readMergeConfig ? deps.readMergeConfig(gatedTree) : deps.config
+  const assets = deps.verifyGatedAssets
+    ? deps.verifyGatedAssets(gatedTree, cfg)
+    : { ok: true, missing: [] as string[] }
+  if (!assets.ok) {
+    say(`bootstrap preflight: PR #${opts.pr} does not install the queue — the gated tree is missing committed asset(s): ${assets.missing.join(', ')}. The bootstrap PR must COMMIT the merge-queue config, guard, poller, and hook registration (scaffold agent-ops install --component merge-queue + scaffold hooks install, committed in the PR) so they land at merge; fix the PR, then re-run scaffold mq bootstrap --pr ${opts.pr}`)
     return { ok: false, bootstrapId: null, stage: 'preflight', messages }
   }
-  for (const cmd of [deps.config.gate_command, deps.config.full_gate_command]) {
-    if (!deps.gateTargetResolves(cmd)) {
-      say(`bootstrap preflight: gate command "${cmd}" does not resolve — install the gate component: scaffold agent-ops install --component gate`)
+  for (const command of [cfg.gate_command, cfg.full_gate_command]) {
+    if (!deps.gateTargetResolves(gatedTree, command)) {
+      say(`bootstrap preflight: gate command "${command}" does not resolve in the gated tree — the PR must install the gate component: scaffold agent-ops install --component gate`)
       return { ok: false, bootstrapId: null, stage: 'preflight', messages }
     }
   }
-  const gatedHeadSha = info.headSha
-  deps.git.fetchOrigin()
-  const cwd = deps.git.checkoutDetachedInGate(gatedHeadSha)
-  say(`preflight: running the FULL gate on PR head ${gatedHeadSha} (${deps.config.full_gate_command})`)
+  say(`preflight: running the FULL gate on PR head ${gatedHeadSha} (${cfg.full_gate_command})`)
   const gate = await deps.runGate({
-    cwd,
-    command: deps.config.full_gate_command,
-    timeoutMs: deps.config.gate_timeout_minutes * 60_000,
+    cwd: gatedTree,
+    command: cfg.full_gate_command,
+    timeoutMs: cfg.gate_timeout_minutes * 60_000,
     logPath: path.join(deps.mqDir, 'logs', `bootstrap-${opts.pr}.log`),
   })
   if (gate.result !== 'green') {
@@ -3821,7 +3864,7 @@ export async function runBootstrap(
   }
   say(`preflight: full gate green in ${gate.seconds}s`)
 
-  // ---- arm-first: everything that does not require the merge (D9) ----------
+  // ---- arm-first: hooks only (the scheduler is armed post-merge, D9) --------
   if (!arm()) return { ok: false, bootstrapId: null, stage: 'arm', messages }
 
   // ---- merge under bootstrap semantics -------------------------------------
@@ -3835,7 +3878,7 @@ export async function runBootstrap(
 
   Note: the `JournalEvent` import becomes type-only usage inside the reducers — keep the single `import type { JournalEvent, MergeQueueConfig } from './types.js'` line (replacing Task 14's narrower import).
 
-- [ ] Run: `npx vitest run src/merge-queue/bootstrap.test.ts` — expect 22 tests passed (12 pure + 10 engine).
+- [ ] Run: `npx vitest run src/merge-queue/bootstrap.test.ts` — expect 23 tests passed (12 pure + 11 engine).
 - [ ] Wire the CLI in `src/cli/commands/mq.ts`:
 
   1. Extend the imports — Edit old string:
@@ -3955,6 +3998,20 @@ export async function mqHandler(argv: MqArgs, overrides: MqOverrides = {}): Prom
       config,
       mqDir: o.mqDir ?? mqDir,
       projectRoot: o.projectRoot ?? primary,
+      // D9: read the config the PR installs, from the gated tree (not primary).
+      readMergeConfig: o.readMergeConfig ?? ((gatedTree: string) => loadAgentOpsConfig(gatedTree).merge_queue),
+      // D9: verify the PR's committed queue assets exist in the gated tree.
+      verifyGatedAssets: o.verifyGatedAssets ?? ((gatedTree: string, cfg): { ok: boolean; missing: string[] } => {
+        const required = [
+          path.join('.scaffold', 'agent-ops.yaml'),
+          path.join('scripts', 'mq-guard.sh'),
+        ]
+        if (cfg.gate_executor === 'local-poller') {
+          required.push(path.join('scripts', 'ops', 'post-merge-poller.sh'))
+        }
+        const missing = required.filter(rel => !fs.existsSync(path.join(gatedTree, rel)))
+        return { ok: missing.length === 0, missing }
+      }),
       armHooks: o.armHooks ?? ((): { messages: string[] } => {
         const r = installHooks(primary)
         return {
@@ -3965,18 +4022,20 @@ export async function mqHandler(argv: MqArgs, overrides: MqOverrides = {}): Prom
           ],
         }
       }),
-      armSched: o.armSched !== undefined
-        ? o.armSched
-        : config.gate_executor === 'local-poller'
-          ? (): { ok: boolean; messages: string[] } => {
-            try {
-              const res = pickSchedBackend().install(buildPostMergePollerJob(primary))
-              return { ok: res.ok, messages: res.messages.map(m => `sched: ${m}`) }
-            } catch (err) {
-              return { ok: false, messages: [`sched: ${err instanceof Error ? err.message : String(err)}`] }
-            }
-          }
-          : null,
+      // Armed POST-merge (see verifyAndArm): the poller script now exists at
+      // primary, so buildPostMergePollerJob(primary) resolves. Re-read the
+      // executor from primary (just merged) and no-op for non-local-poller.
+      armSched: o.armSched ?? ((): { ok: boolean; messages: string[] } => {
+        if (loadAgentOpsConfig(primary).merge_queue.gate_executor !== 'local-poller') {
+          return { ok: true, messages: ['sched: skipped (gate_executor is not local-poller)'] }
+        }
+        try {
+          const res = pickSchedBackend().install(buildPostMergePollerJob(primary))
+          return { ok: res.ok, messages: res.messages.map(m => `sched: ${m}`) }
+        } catch (err) {
+          return { ok: false, messages: [`sched: ${err instanceof Error ? err.message : String(err)}`] }
+        }
+      }),
       smokeDaemon: o.smokeDaemon ?? ((): { ok: boolean; detail: string } => {
         const status = cli(['mq', 'daemon', '--once', '--root', primary], 300_000)
         return status === 0
@@ -3996,7 +4055,9 @@ export async function mqHandler(argv: MqArgs, overrides: MqOverrides = {}): Prom
                 : 'errors — run scaffold doctor for detail',
           }
         },
-      gateTargetResolves: o.gateTargetResolves ?? (cmd => gateTargetResolves(primary, cmd)),
+      // Preflight resolves against the gated tree (the engine passes it); the
+      // exported helper already takes (root, command).
+      gateTargetResolves: o.gateTargetResolves ?? gateTargetResolves,
       log: o.log ?? (m => output.info(m)),
       now: o.now ?? ((): Date => new Date()),
       newId: o.newId ?? ((): string => ulid()),
@@ -4065,7 +4126,7 @@ export async function mqHandler(argv: MqArgs, overrides: MqOverrides = {}): Prom
   it('declares the mq command surface (bootstrap included)', () => {
 ```
 
-  then append a new describe block (add `import type { BootstrapDeps } from '../../merge-queue/bootstrap.js'`, `import type { GhClient, PrInfo } from '../../merge-queue/gh.js'`, `import type { CandidateResult, GitOps } from '../../merge-queue/git.js'` at the top):
+  then append a new describe block (add `import type { BootstrapDeps } from '../../merge-queue/bootstrap.js'`, `import type { GhClient, PrInfo } from '../../merge-queue/gh.js'`, `import type { CandidateResult, GitOps } from '../../merge-queue/git.js'`, and the value import `import { defaultMergeQueueConfig } from '../../merge-queue/types.js'` at the top):
 
 ```ts
 describe('scaffold mq bootstrap (CLI wiring)', () => {
@@ -4100,8 +4161,12 @@ describe('scaffold mq bootstrap (CLI wiring)', () => {
     return {
       gh, git,
       runGate: () => ({ result: 'green' as const, seconds: 1, logPath: '/dev/null', failedTests: [] }),
+      // The fake git returns .mq/gate as the gated tree, which holds no assets —
+      // stub the gated-tree seams so preflight passes without scaffolding one.
+      readMergeConfig: () => defaultMergeQueueConfig(),
+      verifyGatedAssets: () => ({ ok: true, missing: [] }),
       armHooks: () => ({ messages: [] }),
-      armSched: null,
+      armSched: () => ({ ok: true, messages: [] }),
       smokeDaemon: () => ({ ok: true, detail: 'clean' }),
       runDoctor: null,
       gateTargetResolves: () => true,
