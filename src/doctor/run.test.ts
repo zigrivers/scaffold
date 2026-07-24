@@ -21,6 +21,12 @@ describe('runDoctor (D5)', () => {
     expect(runDoctor('/tmp', { checks: [fakeCheck('a', 'warn'), fakeCheck('b', 'error')] }).exitCode).toBe(2)
   })
 
+  it('exit code 0 when every check skips', () => {
+    const report = runDoctor('/tmp', { checks: [fakeCheck('a', 'skip'), fakeCheck('b', 'skip')] })
+    expect(report.exitCode).toBe(0)
+    expect(report.verdict).toBe('healthy')
+  })
+
   it('a crashing check reports error instead of aborting the run', () => {
     const crashing: DoctorCheck = {
       id: 'x', section: 'gate', title: 'x',
