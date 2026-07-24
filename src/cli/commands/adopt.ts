@@ -700,6 +700,13 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
       return
     }
 
+    // D16 one-release notice — REMOVE in the release after R1 ships.
+    output.warn(
+      'Behavior change: `scaffold adopt` now renders an Adoption Plan and writes nothing by default. '
+      + 'Run `scaffold adopt --apply --plan <path>` (or --plan-key <sha256>) to execute an approved plan. '
+      + 'The previous silent write-on-run behavior was a defect — see CHANGELOG.',
+    )
+
     const writeTarget = argv.write === undefined
       ? null
       : (argv.write === '' ? 'docs/adoption-plan.md' : String(argv.write))

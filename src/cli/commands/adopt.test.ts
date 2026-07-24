@@ -457,4 +457,15 @@ describe('adopt command', () => {
     )
     expect(process.exitCode).toBe(0)
   })
+
+  it('prints the one-release behavior-change notice when run without --apply (D16)', async () => {
+    const stderrLines: string[] = []
+    vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+      stderrLines.push(String(chunk))
+      return true
+    })
+    vi.mocked(findProjectRoot).mockReturnValue('/mock')
+    await adoptCommand.handler(defaultArgv())
+    expect(stderrLines.join('')).toContain('Behavior change')
+  })
 })
