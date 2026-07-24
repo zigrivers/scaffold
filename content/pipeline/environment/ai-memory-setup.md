@@ -6,6 +6,10 @@ phase: "environment"
 order: 350
 dependencies: [git-workflow]
 outputs: [.claude/rules/, docs/ai-memory-setup.md]
+detect:
+  any:
+    - path: .claude/rules/
+    - path: docs/ai-memory-setup.md
 reads: [coding-standards, tech-stack]
 conditional: null
 knowledge-base: [ai-memory-management]

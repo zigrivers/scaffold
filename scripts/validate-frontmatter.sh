@@ -40,6 +40,23 @@ for file in "$@"; do
         errors=1
         continue
     fi
+
+    # detect: block sanity (D4) — must declare all:/any:, and every list item
+    # must be exactly one path: or cmd: check (timeout: continuation lines are
+    # indented deeper and pass through).
+    if echo "${frontmatter}" | grep -q '^detect:'; then
+        detect_block=$(echo "${frontmatter}" | awk '/^detect:/{flag=1; next} flag && /^[^ ]/{flag=0} flag {print}')
+        if ! echo "${detect_block}" | grep -qE '^  (all|any):'; then
+            echo "Error: ${file} — detect: must declare all: or any:" >&2
+            errors=1
+            continue
+        fi
+        if echo "${detect_block}" | grep -E '^    - ' | grep -qvE '^    - (path|cmd): '; then
+            echo "Error: ${file} — detect: list items must be 'path:' or 'cmd:' checks" >&2
+            errors=1
+            continue
+        fi
+    fi
 done
 
 exit "${errors}"

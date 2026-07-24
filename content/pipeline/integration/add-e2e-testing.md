@@ -6,6 +6,11 @@ phase: "integration"
 order: 410
 dependencies: [git-workflow, tdd]
 outputs: [tests/screenshots/, maestro/, playwright.config.ts]
+detect:
+  any:
+    - path: playwright.config.ts
+    - path: playwright.config.js
+    - path: maestro/
 reads: [coding-standards, user-stories]
 conditional: "if-needed"
 knowledge-base: [testing-strategy]

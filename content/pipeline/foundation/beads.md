@@ -6,6 +6,10 @@ phase: "foundation"
 order: 210
 dependencies: []
 outputs: [.beads/, tasks/lessons.md, CLAUDE.md, docs/beads-workflow.md]
+detect:
+  all:
+    - path: .beads/
+    - cmd: bd info
 conditional: "if-needed"
 knowledge-base: [task-tracking]
 ---

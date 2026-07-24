@@ -6,6 +6,9 @@ phase: "environment"
 order: 310
 dependencies: [project-structure]
 outputs: [docs/dev-setup.md]
+detect:
+  all:
+    - path: docs/dev-setup.md
 conditional: null
 reads: [tdd]
 knowledge-base: [dev-environment, test-impact-analysis]

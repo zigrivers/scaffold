@@ -6,6 +6,9 @@ phase: "foundation"
 order: 205
 dependencies: []
 outputs: [docs/github-setup.md]
+detect:
+  all:
+    - cmd: git remote get-url origin
 conditional: null
 knowledge-base: [git-workflow-patterns]
 reads: [create-prd]
