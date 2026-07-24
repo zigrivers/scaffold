@@ -239,10 +239,16 @@ export function verifyStep(
     }
   }
   if (stateCompleted) {
-    return { ...base, verification: priorVerification, status: 'conflict', conflictClass: 'state-claim', undetectable: false }
+    return {
+      ...base, verification: priorVerification, status: 'conflict',
+      conflictClass: 'state-claim', undetectable: false,
+    }
   }
   if (outputsPresent.length > 0) {
-    return { ...base, verification: 'unverified', status: 'conflict', conflictClass: 'artifact-only', undetectable: false }
+    return {
+      ...base, verification: 'unverified', status: 'conflict',
+      conflictClass: 'artifact-only', undetectable: false,
+    }
   }
   return { ...base, verification: priorVerification, status: 'incomplete', conflictClass: null, undetectable: false }
 }

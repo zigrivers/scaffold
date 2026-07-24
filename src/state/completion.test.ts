@@ -3,7 +3,9 @@ import os from 'node:os'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import { describe, it, expect, afterEach, beforeEach } from 'vitest'
-import { detectCompletion, checkCompletion, analyzeCrash, runDetect, verifyStep, applyConflictOverrides } from './completion.js'
+import {
+  detectCompletion, checkCompletion, analyzeCrash, runDetect, verifyStep, applyConflictOverrides,
+} from './completion.js'
 import type { PipelineState, StepStateEntry } from '../types/index.js'
 
 const tmpDirs: string[] = []
@@ -328,7 +330,9 @@ describe('verifyStep (D3)', () => {
     const dir = makeTempDir()
     fs.mkdirSync(path.join(dir, 'docs'), { recursive: true })
     fs.writeFileSync(path.join(dir, 'docs/tech-stack.md'), 'x', 'utf8')
-    const entry = { status: 'completed', source: 'pipeline', produces: ['docs/tech-stack.md'], verification: 'declared' } as StepStateEntry
+    const entry = {
+      status: 'completed', source: 'pipeline', produces: ['docs/tech-stack.md'], verification: 'declared',
+    } as StepStateEntry
     const v = verifyStep('tech-stack', entry, ['docs/tech-stack.md'], { all: [{ cmd: 'exit 0' }] }, dir)
     expect(v.status).toBe('confirmed_complete')
     expect(v.verification).toBe('verified')
@@ -337,7 +341,9 @@ describe('verifyStep (D3)', () => {
 
   it('reports a state-claim conflict when state says completed but outputs are missing', () => {
     const dir = makeTempDir()
-    const entry = { status: 'completed', source: 'pipeline', produces: ['docs/x.md'], verification: 'declared' } as StepStateEntry
+    const entry = {
+      status: 'completed', source: 'pipeline', produces: ['docs/x.md'], verification: 'declared',
+    } as StepStateEntry
     const v = verifyStep('tdd', entry, ['docs/x.md'], null, dir)
     expect(v.status).toBe('conflict')
     expect(v.conflictClass).toBe('state-claim')

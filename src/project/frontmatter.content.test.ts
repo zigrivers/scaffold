@@ -28,11 +28,15 @@ describe('shipped pipeline frontmatter (detect: rollout, D4)', () => {
       'foundation/beads.md': { all: [{ path: '.beads/' }, { cmd: 'bd info' }] },
       'foundation/github-setup.md': { all: [{ cmd: 'git remote get-url origin' }] },
       'foundation/tdd.md': { all: [{ path: 'docs/tdd-standards.md' }] },
-      'environment/git-workflow.md': { all: [{ path: 'docs/git-workflow.md' }, { path: 'scripts/setup-agent-worktree.sh' }] },
+      'environment/git-workflow.md': {
+        all: [{ path: 'docs/git-workflow.md' }, { path: 'scripts/setup-agent-worktree.sh' }],
+      },
       'environment/merge-throughput.md': { all: [{ path: 'docs/merge-queue.md' }] },
       'environment/ai-memory-setup.md': { any: [{ path: '.claude/rules/' }, { path: 'docs/ai-memory-setup.md' }] },
       'environment/dev-env-setup.md': { all: [{ path: 'docs/dev-setup.md' }] },
-      'integration/add-e2e-testing.md': { any: [{ path: 'playwright.config.ts' }, { path: 'playwright.config.js' }, { path: 'maestro/' }] },
+      'integration/add-e2e-testing.md': {
+        any: [{ path: 'playwright.config.ts' }, { path: 'playwright.config.js' }, { path: 'maestro/' }],
+      },
     }
     for (const [rel, expected] of Object.entries(expectations)) {
       const { frontmatter, errors } = parseAndValidate(path.join(PIPELINE_DIR, rel))
