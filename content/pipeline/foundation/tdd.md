@@ -6,6 +6,9 @@ phase: "foundation"
 order: 240
 dependencies: [coding-standards]
 outputs: [docs/tdd-standards.md]
+detect:
+  all:
+    - path: docs/tdd-standards.md
 reads: [create-prd, system-architecture]
 conditional: null
 knowledge-base: [testing-strategy, test-impact-analysis]

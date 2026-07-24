@@ -40,7 +40,7 @@ const INIT_OPTIONS = {
 
 describe('StateManager', () => {
   describe('initializeState', () => {
-    it('creates valid state.json with all steps pending, schema-version 1', () => {
+    it('creates valid state.json with all steps pending, schema-version 4 (no services)', () => {
       const tempDir = makeTempDir()
       const manager = new StateManager(tempDir, computeEligible)
       manager.initializeState(INIT_OPTIONS)
@@ -49,7 +49,7 @@ describe('StateManager', () => {
       expect(fs.existsSync(statePath)).toBe(true)
 
       const raw = JSON.parse(fs.readFileSync(statePath, 'utf8'))
-      expect(raw['schema-version']).toBe(1)
+      expect(raw['schema-version']).toBe(4)
       expect(raw.steps['create-prd'].status).toBe('pending')
       expect(raw.steps['create-architecture'].status).toBe('pending')
     })
@@ -82,7 +82,7 @@ describe('StateManager', () => {
       manager.initializeState(INIT_OPTIONS)
 
       const state = manager.loadState()
-      expect(state['schema-version']).toBe(1)
+      expect(state['schema-version']).toBe(4)
       expect(state['scaffold-version']).toBe('2.0.0')
       expect(state.steps['create-prd'].status).toBe('pending')
     })
@@ -214,7 +214,8 @@ describe('StateManager', () => {
       expect(state.steps['create-prd'].status).toBe('completed')
       // State migration normalizes docs/prd.md → docs/plan.md on load
       expect(state.steps['create-prd'].produces).toEqual(['docs/plan.md'])
-      expect(state.steps['create-prd'].artifacts_verified).toBe(true)
+      expect(state.steps['create-prd'].verification).toBe('declared')
+      expect('artifacts_verified' in state.steps['create-prd']).toBe(false)
       expect(typeof state.steps['create-prd'].at).toBe('string')
       expect(state.in_progress).toBeNull()
     })
@@ -230,6 +231,19 @@ describe('StateManager', () => {
       const state = manager.loadState()
       expect(state.steps['create-prd'].completed_by).toBe('agent-1')
       expect(state.steps['create-prd'].depth).toBe(4)
+    })
+
+    it('markCompleted records verification: declared when outputs are declared', async () => {
+      const tempDir = makeTempDir()
+      const manager = new StateManager(tempDir, computeEligible)
+      manager.initializeState(INIT_OPTIONS)
+
+      manager.setInProgress('tech-stack', 'agent')
+      await manager.markCompleted('tech-stack', ['docs/tech-stack.md'], 'agent', 3)
+
+      const state = manager.loadState()
+      expect(state.steps['tech-stack'].verification).toBe('declared')
+      expect('artifacts_verified' in state.steps['tech-stack']).toBe(false)
     })
 
     it('throws STEP_NOT_IN_STATE for an unknown step slug', async () => {
@@ -711,11 +725,13 @@ describe('StateManager', () => {
       }
     }
 
-    it('loads v1 state when config has no services', () => {
+    it('loads v1 state when config has no services (migrateState bumps it to v4)', () => {
       const tempDir = makeTempDir()
       writeRawState(tempDir, baseV1State())
 
-      // configProvider returns a single-service-shaped config (no services[])
+      // configProvider returns a single-service-shaped config (no services[]) —
+      // dispatch alone would leave version 1 unchanged, but loadState() also
+      // runs migrateState, which unconditionally bumps 1 → 4 (R1 verification era).
       const manager = new StateManager(
         tempDir,
         computeEligible,
@@ -723,7 +739,7 @@ describe('StateManager', () => {
       )
 
       const state = manager.loadState()
-      expect(state['schema-version']).toBe(1)
+      expect(state['schema-version']).toBe(4)
     })
 
     it('bumps v1 state to v2 in memory when config has services[]', () => {

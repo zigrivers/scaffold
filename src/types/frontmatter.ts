@@ -95,6 +95,27 @@ export const PHASE_BY_SLUG = Object.fromEntries(
 ) as Record<PhaseSlug, typeof PHASES[number]>
 
 /**
+ * Machine-readable detection contract (D4) mirroring a step's Mode Detection
+ * prose. `cmd` strings are fixed values shipped in the package's pipeline
+ * files only — never read from project-local files (trust boundary).
+ */
+export interface DetectCheck {
+  /** Filesystem existence check (file or directory), relative to project root. */
+  path?: string
+  /** Command that must exit 0 within the timeout. Executed with cwd = project root. */
+  cmd?: string
+  /** Per-cmd timeout in seconds. Default 10. */
+  timeout?: number
+}
+
+export interface DetectSpec {
+  /** Every entry must pass. */
+  all?: DetectCheck[]
+  /** At least one entry must pass. */
+  any?: DetectCheck[]
+}
+
+/**
  * Parsed YAML frontmatter from a meta-prompt .md file.
  * See frontmatter-schema.md (authoritative source).
  * Note: kebab-case YAML keys are converted to camelCase on parse.
@@ -126,6 +147,8 @@ export interface MetaPromptFrontmatter {
   stateless: boolean
   /** Source category: 'pipeline' for sequential steps, 'tool' for utility commands. */
   category: 'pipeline' | 'tool'
+  /** Machine-readable detection contract (D4). Null when the step declares none. */
+  detect?: DetectSpec | null
   [key: string]: unknown  // forward compatibility — unknown fields preserved
 }
 

@@ -245,3 +245,19 @@ degraded on oversized diff + healthy-channel/plan-aware convergence). Do NOT cha
 zero-finding CLI verdict on 15k lines of pseudocode — it does not exist and each round
 just moves the well. Use ONE `--session` so the native 3-round budget actually bounds
 you; don't spin up fresh sessions that reset recurrence tracking.
+
+## Per-file `npx eslint <files>` can under-report vs the branch `npm run lint` — implementers must run the repo's lint script (2026-07-24)
+**Pattern:** During brownfield R1 subagent-driven-development, four implementer
+subagents AND a reviewer subagent each reported `npx eslint <changed-files>`
+clean, yet the branch-level `make check-all` (`ts-check` → `npm run lint` =
+`eslint src/ tests/`) failed with 7 `max-len` (>120 char) errors in files those
+tasks had committed (object literals + a long import). The lines were genuinely
+over-length the whole time.
+**Rule:** In this repo, the authoritative lint is `npm run lint` (whatever the
+`package.json` "lint" script runs), NOT an ad-hoc `npx eslint <path>`. Tell every
+implementer subagent to run `npm run lint` (not `npx eslint <files>`) before
+committing, and ALWAYS run the full `make check-all` at branch level before push
+— it catches lint/format regressions that per-file/per-task checks miss. When an
+implementer says "eslint clean", don't trust it as branch-clean; the branch gate
+is the source of truth. (Fixing max-len is mechanical line-wrapping — no logic
+change — but it must be caught before the PR, not after.)

@@ -6,6 +6,10 @@ phase: "environment"
 order: 330
 dependencies: [dev-env-setup]
 outputs: [docs/git-workflow.md, scripts/setup-agent-worktree.sh, .github/pull_request_template.md]
+detect:
+  all:
+    - path: docs/git-workflow.md
+    - path: scripts/setup-agent-worktree.sh
 conditional: null
 knowledge-base: [dev-environment, git-workflow-patterns]
 ---

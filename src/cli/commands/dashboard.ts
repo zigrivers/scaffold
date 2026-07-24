@@ -45,6 +45,24 @@ interface DashboardArgs {
 type ConfigWithMethodology = { methodology?: { preset?: string } } | null
 
 /**
+ * D11 (R1): init-mode read-side. The skeleton state synthesized for a service
+ * with no state file mirrors the ROOT project's init-mode instead of
+ * hardcoding 'greenfield'. Falls back to 'greenfield' when no root state exists.
+ */
+export function resolveSkeletonInitMode(
+  projectRoot: string,
+  config: { project?: { services?: unknown[] } } | null,
+): 'greenfield' | 'brownfield' | 'v1-migration' {
+  try {
+    return StateManager.loadStateReadOnly(
+      projectRoot, new StatePathResolver(projectRoot), () => config ?? undefined,
+    )['init-mode'] ?? 'greenfield'
+  } catch {
+    return 'greenfield'
+  }
+}
+
+/**
  * Write HTML to the requested path (or a tmpfile), then optionally open it in
  * the system browser. Shared between single-service and multi-service modes.
  * Calls process.exit(0) on success.
@@ -151,6 +169,7 @@ const dashboardCommand: CommandModule<Record<string, unknown>, DashboardArgs> = 
       }> = []
 
       let fallbackStateMethodology: string | undefined
+      const rootInitMode = resolveSkeletonInitMode(projectRoot, config)
       for (const svc of configuredServices!) {
         // NEW: resolve pipeline per service to capture overlay + globalSteps.
         // Wrap in try/catch mirroring loadState's STATE_MISSING fallback — a
@@ -203,7 +222,7 @@ const dashboardCommand: CommandModule<Record<string, unknown>, DashboardArgs> = 
             'scaffold-version': pkg.version,
             init_methodology: configMethodology ?? 'unknown',
             config_methodology: configMethodology ?? 'unknown',
-            'init-mode': 'greenfield',
+            'init-mode': rootInitMode,
             created: new Date().toISOString(),
             in_progress: null,
             steps: {},

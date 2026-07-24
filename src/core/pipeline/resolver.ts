@@ -53,7 +53,10 @@ export function resolvePipeline(
   // 1. Select preset (fallback to deep)
   const methodology = config?.methodology ?? 'deep'
   const preset =
-    (methodology === 'mvp' ? presets.mvp : methodology === 'custom' ? presets.custom : presets.deep) ??
+    (methodology === 'mvp' ? presets.mvp
+      : methodology === 'custom' ? presets.custom
+        : methodology === 'brownfield' ? presets.brownfield
+          : presets.deep) ??
     presets.deep
   const resolvedPreset = preset ?? {
     name: 'deep' as const,

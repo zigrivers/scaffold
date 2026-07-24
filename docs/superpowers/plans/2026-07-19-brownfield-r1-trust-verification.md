@@ -39,7 +39,7 @@
 
 **Steps:**
 
-- [ ] Write the failing migration tests. Append to `src/state/state-migration.test.ts` (imports at top of the new `describe`; reuse the file's existing `PipelineState` import):
+- [x] Write the failing migration tests. Append to `src/state/state-migration.test.ts` (imports at top of the new `describe`; reuse the file's existing `PipelineState` import):
 
 ```ts
 describe('verification migration (R1)', () => {
@@ -99,8 +99,8 @@ describe('verification migration (R1)', () => {
 })
 ```
 
-- [ ] Run `npx vitest run src/state/state-migration.test.ts` — expect the five new tests to FAIL (`verification` undefined, schema-version stays 1).
-- [ ] Implement the type change in `src/types/state.ts`. Replace the `artifacts_verified?: boolean` line and widen the version union:
+- [x] Run `npx vitest run src/state/state-migration.test.ts` — expect the five new tests to FAIL (`verification` undefined, schema-version stays 1).
+- [x] Implement the type change in `src/types/state.ts`. Replace the `artifacts_verified?: boolean` line and widen the version union:
 
 ```ts
 /** Verification level for a step's completion claim (D3). Absent ≡ 'unverified'. */
@@ -115,7 +115,7 @@ In `StepStateEntry`, replace `artifacts_verified?: boolean` with:
 
 In `PipelineState`, change `'schema-version': 1 | 2 | 3` to `'schema-version': 1 | 2 | 3 | 4`.
 
-- [ ] Implement the migration in `src/state/state-migration.ts`. Add `StepStateEntry` to the type import (`import type { PipelineState, StepStateEntry } from '../types/index.js'`) and insert before `return changed` in `migrateState`:
+- [x] Implement the migration in `src/state/state-migration.ts`. Add `StepStateEntry` to the type import (`import type { PipelineState, StepStateEntry } from '../types/index.js'`) and insert before `return changed` in `migrateState`:
 
 ```ts
   // Phase 4 (R1): artifacts_verified → verification enum (one-way, D3).
@@ -141,7 +141,7 @@ In `PipelineState`, change `'schema-version': 1 | 2 | 3` to `'schema-version': 1
   }
 ```
 
-- [ ] Widen `src/state/state-version-dispatch.ts` to accept 4 and route v4-plus-services back into the sharding machine:
+- [x] Widen `src/state/state-version-dispatch.ts` to accept 4 and route v4-plus-services back into the sharding machine:
 
 ```ts
 ): asserts raw is Record<string, unknown> & { 'schema-version': 1 | 2 | 3 | 4 } {
@@ -158,7 +158,7 @@ In `PipelineState`, change `'schema-version': 1 | 2 | 3` to `'schema-version': 1
 }
 ```
 
-- [ ] Add a dispatch test to `src/state/state-version-dispatch.test.ts`:
+- [x] Add a dispatch test to `src/state/state-version-dispatch.test.ts`:
 
 ```ts
   it('accepts schema-version 4 and bumps 4 → 2 when config has services', () => {
@@ -171,7 +171,7 @@ In `PipelineState`, change `'schema-version': 1 | 2 | 3` to `'schema-version': 1
   })
 ```
 
-- [ ] Update `src/state/state-manager.ts`: in `markCompleted`, replace
+- [x] Update `src/state/state-manager.ts`: in `markCompleted`, replace
 
 ```ts
     if (outputs.length > 0) {
@@ -194,7 +194,7 @@ In `initializeState`, replace the `schemaVersion` computation with:
 
 and change the local `const state: PipelineState` literal's `'schema-version': schemaVersion` (unchanged line — it now carries 2|4).
 
-- [ ] Update `src/validation/state-validator.ts` (~line 77) to accept 4:
+- [x] Update `src/validation/state-validator.ts` (~line 77) to accept 4:
 
 ```ts
   if (schemaVersion !== 1 && schemaVersion !== 2 && schemaVersion !== 3 && schemaVersion !== 4) {
@@ -203,7 +203,7 @@ and change the local `const state: PipelineState` literal's `'schema-version': s
   }
 ```
 
-- [ ] Add a `markCompleted` verification test to `src/state/state-manager.test.ts`:
+- [x] Add a `markCompleted` verification test to `src/state/state-manager.test.ts`:
 
 ```ts
   it('markCompleted records verification: declared when outputs are declared', async () => {
@@ -218,8 +218,8 @@ and change the local `const state: PipelineState` literal's `'schema-version': s
 
 (Adapt the setup lines to the file's existing `beforeEach` fixture — the file already constructs managers against a tmp dir; mirror the nearest existing `markCompleted` test.)
 
-- [ ] Run `npx vitest run src/state/` — all state tests green. Then run `npx vitest run src` and fix any test that asserted `artifacts_verified` or `'schema-version': 1` after a save (mechanical: `grep -rn "artifacts_verified" src --include="*.test.ts"` and update each to the `verification` field; states passed through `loadState`+`saveState` now end at version 4).
-- [ ] Commit: `git add -A && git commit -m "feat(state): verification enum + schema-version 4 migration (R1 D3)"`
+- [x] Run `npx vitest run src/state/` — all state tests green. Then run `npx vitest run src` and fix any test that asserted `artifacts_verified` or `'schema-version': 1` after a save (mechanical: `grep -rn "artifacts_verified" src --include="*.test.ts"` and update each to the `verification` field; states passed through `loadState`+`saveState` now end at version 4).
+- [x] Commit: `git add -A && git commit -m "feat(state): verification enum + schema-version 4 migration (R1 D3)"`
 
 ---
 
@@ -236,7 +236,7 @@ and change the local `const state: PipelineState` literal's `'schema-version': s
 
 **Steps:**
 
-- [ ] Write failing tests in `src/project/frontmatter.test.ts` (follow the file's existing tmp-file fixture pattern; if it writes fixtures with `fs.writeFileSync` to a tmp dir, reuse that helper):
+- [x] Write failing tests in `src/project/frontmatter.test.ts` (follow the file's existing tmp-file fixture pattern; if it writes fixtures with `fs.writeFileSync` to a tmp dir, reuse that helper):
 
 ```ts
 describe('detect: frontmatter contract (D4)', () => {
@@ -311,8 +311,8 @@ describe('detect: frontmatter contract (D4)', () => {
 })
 ```
 
-- [ ] Run `npx vitest run src/project/frontmatter.test.ts` — new tests FAIL (`detect` arrives as unknown field, no schema).
-- [ ] Add the types to `src/types/frontmatter.ts` (above `MetaPromptFrontmatter`):
+- [x] Run `npx vitest run src/project/frontmatter.test.ts` — new tests FAIL (`detect` arrives as unknown field, no schema).
+- [x] Add the types to `src/types/frontmatter.ts` (above `MetaPromptFrontmatter`):
 
 ```ts
 /**
@@ -344,7 +344,7 @@ and add to `MetaPromptFrontmatter` (before the index signature):
   detect?: DetectSpec | null
 ```
 
-- [ ] Implement parsing in `src/project/frontmatter.ts`:
+- [x] Implement parsing in `src/project/frontmatter.ts`:
   1. Add `'detect'` to `KNOWN_YAML_KEYS`.
   2. Add the zod schemas above `frontmatterSchema`:
 
@@ -396,8 +396,8 @@ const detectSpecSchema = z.object({
 
   5. In `parseAndValidate`'s `emptyFrontmatter` literal, add `detect: null,`.
 
-- [ ] Run `npx vitest run src/project/frontmatter.test.ts` — green. Run `npx vitest run src/project src/core` to confirm no loader regressions.
-- [ ] Commit: `git add -A && git commit -m "feat(frontmatter): detect: contract schema — path/cmd checks, all/any composition (R1 D4)"`
+- [x] Run `npx vitest run src/project/frontmatter.test.ts` — green. Run `npx vitest run src/project src/core` to confirm no loader regressions.
+- [x] Commit: `git add -A && git commit -m "feat(frontmatter): detect: contract schema — path/cmd checks, all/any composition (R1 D4)"`
 
 ---
 
@@ -420,7 +420,7 @@ function runDetect(detect: DetectSpec | null | undefined, projectRoot: string): 
 
 **Steps:**
 
-- [ ] Write failing tests in `src/state/completion.test.ts`:
+- [x] Write failing tests in `src/state/completion.test.ts`:
 
 ```ts
 describe('runDetect (D4)', () => {
@@ -468,8 +468,8 @@ describe('runDetect (D4)', () => {
 
 Add `import os from 'node:os'`, `import fs from 'node:fs'`, `import path from 'node:path'` to the test file if absent, plus `runDetect` to the import from `./completion.js`.
 
-- [ ] Run `npx vitest run src/state/completion.test.ts` — FAIL (`runDetect` is not exported).
-- [ ] Implement in `src/state/completion.ts`. Add imports:
+- [x] Run `npx vitest run src/state/completion.test.ts` — FAIL (`runDetect` is not exported).
+- [x] Implement in `src/state/completion.ts`. Add imports:
 
 ```ts
 import fs from 'node:fs'
@@ -539,8 +539,8 @@ export function runDetect(
 }
 ```
 
-- [ ] Run `npx vitest run src/state/completion.test.ts` — green (the timeout test takes ~1s by design).
-- [ ] Commit: `git add -A && git commit -m "feat(completion): runDetect executor — bounded cmd/path checks, failure=not-detected (R1 D4)"`
+- [x] Run `npx vitest run src/state/completion.test.ts` — green (the timeout test takes ~1s by design).
+- [x] Commit: `git add -A && git commit -m "feat(completion): runDetect executor — bounded cmd/path checks, failure=not-detected (R1 D4)"`
 
 ---
 
@@ -577,7 +577,7 @@ function applyConflictOverrides(steps: Record<string, StepStateEntry>, projectRo
 
 **Steps:**
 
-- [ ] Write failing tests in `src/state/completion.test.ts`. Add `verifyStep`, `applyConflictOverrides` to the import from `./completion.js` and add `import type { StepStateEntry } from '../types/index.js'`:
+- [x] Write failing tests in `src/state/completion.test.ts`. Add `verifyStep`, `applyConflictOverrides` to the import from `./completion.js` and add `import type { StepStateEntry } from '../types/index.js'`:
 
 ```ts
 describe('verifyStep (D3)', () => {
@@ -682,8 +682,8 @@ describe('applyConflictOverrides (D3 — fs-only eligibility demotion)', () => {
 })
 ```
 
-- [ ] Run `npx vitest run src/state/completion.test.ts` — the new describes FAIL (not exported).
-- [ ] Implement in `src/state/completion.ts`. Widen the type import to `import type { PipelineState, StepStateEntry, VerificationLevel } from '../types/index.js'` and append:
+- [x] Run `npx vitest run src/state/completion.test.ts` — the new describes FAIL (not exported).
+- [x] Implement in `src/state/completion.ts`. Widen the type import to `import type { PipelineState, StepStateEntry, VerificationLevel } from '../types/index.js'` and append:
 
 ```ts
 export type ConflictClass = 'state-claim' | 'artifact-only'
@@ -797,7 +797,7 @@ export function applyConflictOverrides(
 }
 ```
 
-- [ ] Add the pinned audit-record type to `src/types/decision.ts`. Add imports `import type { StepStatus } from './enums.js'` and `import type { VerificationLevel } from './state.js'`, then append:
+- [x] Add the pinned audit-record type to `src/types/decision.ts`. Add imports `import type { StepStatus } from './enums.js'` and `import type { VerificationLevel } from './state.js'`, then append:
 
 ```ts
 /**
@@ -825,7 +825,7 @@ export interface VerificationAuditRecord {
 }
 ```
 
-- [ ] Write failing tests in `src/state/decision-logger.test.ts`. Add `appendAuditRecord` to the existing import from `./decision-logger.js`, add `import type { VerificationAuditRecord } from '../types/index.js'`, and ensure `fs`/`os`/`path` node imports exist (add any that are missing):
+- [x] Write failing tests in `src/state/decision-logger.test.ts`. Add `appendAuditRecord` to the existing import from `./decision-logger.js`, add `import type { VerificationAuditRecord } from '../types/index.js'`, and ensure `fs`/`os`/`path` node imports exist (add any that are missing):
 
 ```ts
 describe('verification audit records (D3)', () => {
@@ -862,8 +862,8 @@ describe('verification audit records (D3)', () => {
 })
 ```
 
-- [ ] Run `npx vitest run src/state/decision-logger.test.ts` — FAILS (`appendAuditRecord` not exported).
-- [ ] Implement in `src/state/decision-logger.ts`. Add `import type { DecisionEntry, VerificationAuditRecord } from '../types/index.js'` (widening the existing import). In `readAllEntries`, replace the try-body line `entries.push(JSON.parse(line) as DecisionEntry)` with:
+- [x] Run `npx vitest run src/state/decision-logger.test.ts` — FAILS (`appendAuditRecord` not exported).
+- [x] Implement in `src/state/decision-logger.ts`. Add `import type { DecisionEntry, VerificationAuditRecord } from '../types/index.js'` (widening the existing import). In `readAllEntries`, replace the try-body line `entries.push(JSON.parse(line) as DecisionEntry)` with:
 
 ```ts
       const parsed = JSON.parse(line) as Record<string, unknown>
@@ -894,8 +894,8 @@ export function appendAuditRecord(
 }
 ```
 
-- [ ] Run `npx vitest run src/state/` — all green. Note: `src/core/assembly/update-mode.ts:24` needs NO change — it already requires the artifact to exist in addition to the state claim, so a conflicted step never resolves to update mode.
-- [ ] Commit: `git add -A && git commit -m "feat(state): verifyStep + fs-only conflict override + pinned audit records (R1 D3)"`
+- [x] Run `npx vitest run src/state/` — all green. Note: `src/core/assembly/update-mode.ts:24` needs NO change — it already requires the artifact to exist in addition to the state claim, so a conflicted step never resolves to update mode.
+- [x] Commit: `git add -A && git commit -m "feat(state): verifyStep + fs-only conflict override + pinned audit records (R1 D3)"`
 
 ---
 
@@ -913,7 +913,7 @@ export function appendAuditRecord(
 
 **Steps:**
 
-- [ ] Write the failing status tests. Append inside the top-level `describe('status command', …)` block of `src/cli/commands/status.test.ts` (it provides `writtenLines`, `MockStateManager`, `mockDiscoverMetaPrompts`, `mockResolveOutputMode`, `mockStateWith`, `mockOverlayEnabled`, `makeFrontmatter`, `defaultArgv`):
+- [x] Write the failing status tests. Append inside the top-level `describe('status command', …)` block of `src/cli/commands/status.test.ts` (it provides `writtenLines`, `MockStateManager`, `mockDiscoverMetaPrompts`, `mockResolveOutputMode`, `mockStateWith`, `mockOverlayEnabled`, `makeFrontmatter`, `defaultArgv`):
 
 ```ts
   describe('conflict overrides completed (D3)', () => {
@@ -953,8 +953,8 @@ export function appendAuditRecord(
   })
 ```
 
-- [ ] Run `npx vitest run src/cli/commands/status.test.ts` — the two new tests FAIL.
-- [ ] Implement in `src/cli/commands/status.ts`:
+- [x] Run `npx vitest run src/cli/commands/status.test.ts` — the two new tests FAIL.
+- [x] Implement in `src/cli/commands/status.ts`:
   1. Add `import { applyConflictOverrides } from '../../state/completion.js'`.
   2. Directly after `const state = stateManager.loadState()` insert:
 
@@ -1002,8 +1002,8 @@ export function appendAuditRecord(
   8. In the compact-JSON steps mapper, replace `const status = entry?.status ?? 'pending'` with `const status = statusOf(slug)` (delete the now-unused `const entry = steps[slug]` line if TS flags it).
   9. In the interactive listing, replace `const status = entry?.status ?? 'pending'` with `const status = statusOf(slug)`.
   10. In the JSON `result` object, add `conflicts: conflictCheck.conflicts,` after `nextEligible`.
-- [ ] Run `npx vitest run src/cli/commands/status.test.ts` — all green. Demotion is now driven by the step's CURRENT resolved outputs (`pipeline.stepMeta.get(slug)?.outputs`, `entry.produces` fallback for steps the resolver doesn't know). Existing fixtures put completed steps at empty resolved outputs (`makeFrontmatter` defaults `outputs: []` and completed fixtures use empty `produces`), so nothing else demotes; if any existing fixture gives a completed step a non-empty resolved output (frontmatter `outputs`) or non-empty `produces` with the file absent and now fails, that fixture is asserting the pre-D3 lie — update its expectation to `conflict`.
-- [ ] Create `src/cli/commands/next.conflict.test.ts` (complete file):
+- [x] Run `npx vitest run src/cli/commands/status.test.ts` — all green. Demotion is now driven by the step's CURRENT resolved outputs (`pipeline.stepMeta.get(slug)?.outputs`, `entry.produces` fallback for steps the resolver doesn't know). Existing fixtures put completed steps at empty resolved outputs (`makeFrontmatter` defaults `outputs: []` and completed fixtures use empty `produces`), so nothing else demotes; if any existing fixture gives a completed step a non-empty resolved output (frontmatter `outputs`) or non-empty `produces` with the file absent and now fails, that fixture is asserting the pre-D3 lie — update its expectation to `conflict`.
+- [x] Create `src/cli/commands/next.conflict.test.ts` (complete file):
 
 ```ts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -1086,8 +1086,8 @@ describe('next — conflict overrides completed (D3)', () => {
 })
 ```
 
-- [ ] Run `npx vitest run src/cli/commands/next.conflict.test.ts` — FAILS (no warning, eligibility still fed the completed entry).
-- [ ] Implement in `src/cli/commands/next.ts`. Add `import { applyConflictOverrides } from '../../state/completion.js'`, then replace the `const eligible = readEligible(…)` call with:
+- [x] Run `npx vitest run src/cli/commands/next.conflict.test.ts` — FAILS (no warning, eligibility still fed the completed entry).
+- [x] Implement in `src/cli/commands/next.ts`. Add `import { applyConflictOverrides } from '../../state/completion.js'`, then replace the `const eligible = readEligible(…)` call with:
 
 ```ts
     // D3: conflict overrides completed — fs-only demotion (never runs detect: cmds).
@@ -1111,8 +1111,8 @@ describe('next — conflict overrides completed (D3)', () => {
       )
 ```
 
-- [ ] Run `npx vitest run src/cli/commands/next.conflict.test.ts src/cli/commands/next.test.ts src/cli/commands/status.test.ts` — green.
-- [ ] Commit: `git add -A && git commit -m "feat(cli): conflict overrides completed in status/next eligibility (R1 D3)"`
+- [x] Run `npx vitest run src/cli/commands/next.conflict.test.ts src/cli/commands/next.test.ts src/cli/commands/status.test.ts` — green.
+- [x] Commit: `git add -A && git commit -m "feat(cli): conflict overrides completed in status/next eligibility (R1 D3)"`
 
 ---
 
@@ -1138,7 +1138,7 @@ describe('next — conflict overrides completed (D3)', () => {
 
 **Steps:**
 
-- [ ] Create `content/methodology/brownfield.yml` with exactly this content (same step-overrides format as `deep.yml`/`mvp.yml`; enablement only — no content semantics):
+- [x] Create `content/methodology/brownfield.yml` with exactly this content (same step-overrides format as `deep.yml`/`mvp.yml`; enablement only — no content semantics):
 
 ```yaml
 # methodology/brownfield.yml
@@ -1271,7 +1271,7 @@ steps:
   review-macos-release: { enabled: false }
 ```
 
-- [ ] Write the failing content test `src/core/assembly/brownfield-preset.test.ts` (complete file):
+- [x] Write the failing content test `src/core/assembly/brownfield-preset.test.ts` (complete file):
 
 ```ts
 import { describe, it, expect } from 'vitest'
@@ -1310,12 +1310,12 @@ describe('content/methodology/brownfield.yml (D11 R1)', () => {
 })
 ```
 
-- [ ] Run `npx vitest run src/core/assembly/brownfield-preset.test.ts` — first test passes if the YAML is right; treat any error/warning as a defect in the YAML and fix there (every known pipeline step must be enumerated).
-- [ ] Widen the types and validation:
+- [x] Run `npx vitest run src/core/assembly/brownfield-preset.test.ts` — first test passes if the YAML is right; treat any error/warning as a defect in the YAML and fix there (every known pipeline step must be enumerated).
+- [x] Widen the types and validation:
   1. `src/types/enums.ts`: `export type MethodologyName = 'deep' | 'mvp' | 'custom' | 'brownfield'`
   2. `src/config/loader.ts`: `const VALID_METHODOLOGIES = ['deep', 'mvp', 'custom', 'brownfield']`
   3. `src/config/schema.ts` (the `ConfigSchema` literal): `methodology: z.enum(['deep', 'mvp', 'custom', 'brownfield']).default('deep'),`
-- [ ] Load the preset. In `src/core/assembly/preset-loader.ts`, extend `loadAllPresets`: widen the return type with `brownfield: MethodologyPreset | null`, and before the final `return` add:
+- [x] Load the preset. In `src/core/assembly/preset-loader.ts`, extend `loadAllPresets`: widen the return type with `brownfield: MethodologyPreset | null`, and before the final `return` add:
 
 ```ts
   const { preset: brownfield, errors: brownfieldErrors, warnings: brownfieldWarnings } = loadPreset(
@@ -1327,8 +1327,8 @@ describe('content/methodology/brownfield.yml (D11 R1)', () => {
 ```
 
 and add `brownfield,` to the returned object.
-- [ ] Thread it through: in `src/core/pipeline/types.ts` add `brownfield: MethodologyPreset | null` to `PipelineContext['presets']`; in `src/core/pipeline/context.ts` change the destructure to `const { deep, mvp, custom, brownfield } = loadAllPresets(methodologyDir, pipelineStepNames)` and the return to `presets: { deep, mvp, custom, brownfield },`.
-- [ ] Select it in `src/core/pipeline/resolver.ts` — replace the preset-selection expression with:
+- [x] Thread it through: in `src/core/pipeline/types.ts` add `brownfield: MethodologyPreset | null` to `PipelineContext['presets']`; in `src/core/pipeline/context.ts` change the destructure to `const { deep, mvp, custom, brownfield } = loadAllPresets(methodologyDir, pipelineStepNames)` and the return to `presets: { deep, mvp, custom, brownfield },`.
+- [x] Select it in `src/core/pipeline/resolver.ts` — replace the preset-selection expression with:
 
 ```ts
   const methodology = config?.methodology ?? 'deep'
@@ -1340,7 +1340,7 @@ and add `brownfield,` to the returned object.
     presets.deep
 ```
 
-- [ ] Add the resolver test `src/core/pipeline/resolver.brownfield.test.ts` (complete file):
+- [x] Add the resolver test `src/core/pipeline/resolver.brownfield.test.ts` (complete file):
 
 ```ts
 import { describe, it, expect } from 'vitest'
@@ -1370,16 +1370,16 @@ describe('resolvePipeline — brownfield preset selection (D11 R1)', () => {
 })
 ```
 
-- [ ] Run `npx vitest run src/core/pipeline/resolver.brownfield.test.ts src/core/pipeline/resolver.test.ts src/core/assembly/preset-loader.test.ts` — green (fix the `loadAllPresets` mocks in any failing test by adding `brownfield: null` to the mocked return; `grep -rn "loadAllPresets" src --include="*.test.ts"` lists them).
-- [ ] Point adopt at it. In `src/project/adopt.ts`, in the `result` literal (currently `methodology,` at line 167), change to:
+- [x] Run `npx vitest run src/core/pipeline/resolver.brownfield.test.ts src/core/pipeline/resolver.test.ts src/core/assembly/preset-loader.test.ts` — green (fix the `loadAllPresets` mocks in any failing test by adding `brownfield: null` to the mocked return; `grep -rn "loadAllPresets" src --include="*.test.ts"` lists them).
+- [x] Point adopt at it. In `src/project/adopt.ts`, in the `result` literal (currently `methodology,` at line 167), change to:
 
 ```ts
     methodology: detection.mode === 'greenfield' ? methodology : 'brownfield',
 ```
 
 with the comment line above it: `// D11 (R1): init-mode drives preset selection — brownfield/v1-migration repos adopt under the brownfield preset, replacing the hardcoded 'deep'.`
-- [ ] In `src/cli/commands/adopt.ts`: change line 563 to `const methodology = 'deep' // greenfield fallback — runAdoption returns 'brownfield' for brownfield/v1-migration repos (D11 R1)` and change the `writeOrUpdateState(projectRoot, adoptResult, methodology, metaPromptDir)` call to pass `adoptResult.methodology` instead of `methodology`.
-- [ ] Append the adopt test to `src/project/adopt.test.ts` (reuse its existing imports of `runAdoption`, `fs`, `os`, `path` — add any missing):
+- [x] In `src/cli/commands/adopt.ts`: change line 563 to `const methodology = 'deep' // greenfield fallback — runAdoption returns 'brownfield' for brownfield/v1-migration repos (D11 R1)` and change the `writeOrUpdateState(projectRoot, adoptResult, methodology, metaPromptDir)` call to pass `adoptResult.methodology` instead of `methodology`.
+- [x] Append the adopt test to `src/project/adopt.test.ts` (reuse its existing imports of `runAdoption`, `fs`, `os`, `path` — add any missing):
 
 ```ts
 describe('brownfield methodology selection (D11 R1)', () => {
@@ -1401,7 +1401,7 @@ describe('brownfield methodology selection (D11 R1)', () => {
 })
 ```
 
-- [ ] Fix the dashboard hardcode. In `src/cli/commands/dashboard.ts` add this exported helper (near the top, after the imports — `StateManager` and `StatePathResolver` are already imported):
+- [x] Fix the dashboard hardcode. In `src/cli/commands/dashboard.ts` add this exported helper (near the top, after the imports — `StateManager` and `StatePathResolver` are already imported):
 
 ```ts
 /**
@@ -1424,7 +1424,7 @@ export function resolveSkeletonInitMode(
 ```
 
 Then, immediately before the `for (const svc of configuredServices!)` loop, add `const rootInitMode = resolveSkeletonInitMode(projectRoot, config)`, and at line 206 replace `'init-mode': 'greenfield',` with `'init-mode': rootInitMode,`.
-- [ ] Add `src/cli/commands/dashboard.init-mode.test.ts` (complete file):
+- [x] Add `src/cli/commands/dashboard.init-mode.test.ts` (complete file):
 
 ```ts
 import { describe, it, expect } from 'vitest'
@@ -1453,8 +1453,8 @@ describe('resolveSkeletonInitMode (D11 R1)', () => {
 })
 ```
 
-- [ ] Run `npx vitest run src/core src/project src/cli/commands/dashboard.init-mode.test.ts src/cli/commands/adopt.test.ts src/config` — green. Then `npx vitest run src` and fix any remaining `loadAllPresets` mock or `MethodologyName` narrowing fallout (mechanical).
-- [ ] Commit: `git add -A && git commit -m "feat(methodology): brownfield preset + init-mode read-sides in adopt/dashboard (R1 D11)"`
+- [x] Run `npx vitest run src/core src/project src/cli/commands/dashboard.init-mode.test.ts src/cli/commands/adopt.test.ts src/config` — green. Then `npx vitest run src` and fix any remaining `loadAllPresets` mock or `MethodologyName` narrowing fallout (mechanical).
+- [x] Commit: `git add -A && git commit -m "feat(methodology): brownfield preset + init-mode read-sides in adopt/dashboard (R1 D11)"`
 
 ---
 
@@ -1497,7 +1497,7 @@ interface DoctorReport { results: DoctorCheckResult[]; verdict: 'healthy' | 'war
 
 **Steps:**
 
-- [ ] Write the failing runner tests `src/doctor/run.test.ts` (complete file):
+- [x] Write the failing runner tests `src/doctor/run.test.ts` (complete file):
 
 ```ts
 import { describe, it, expect } from 'vitest'
@@ -1552,8 +1552,8 @@ describe('runDoctor (D5)', () => {
 })
 ```
 
-- [ ] Run `npx vitest run src/doctor/run.test.ts` — FAILS (module missing).
-- [ ] Create `src/doctor/types.ts` (complete file):
+- [x] Run `npx vitest run src/doctor/run.test.ts` — FAILS (module missing).
+- [x] Create `src/doctor/types.ts` (complete file):
 
 ```ts
 export type DoctorSection = 'pipeline' | 'beads' | 'hooks' | 'gate' | 'queue' | 'scheduler'
@@ -1589,7 +1589,7 @@ export interface DoctorReport {
 }
 ```
 
-- [ ] Create `src/doctor/run.ts` (complete file):
+- [x] Create `src/doctor/run.ts` (complete file):
 
 ```ts
 import { spawnSync } from 'node:child_process'
@@ -1654,7 +1654,7 @@ export function runDoctor(
 }
 ```
 
-- [ ] Write the failing check tests `src/doctor/checks.test.ts` (complete file):
+- [x] Write the failing check tests `src/doctor/checks.test.ts` (complete file):
 
 ```ts
 import { describe, it, expect } from 'vitest'
@@ -1781,7 +1781,7 @@ describe('pipeline/verification', () => {
 })
 ```
 
-- [ ] Create `src/doctor/checks.ts` (complete file):
+- [x] Create `src/doctor/checks.ts` (complete file):
 
 ```ts
 import fs from 'node:fs'
@@ -2174,8 +2174,8 @@ export const DOCTOR_CHECKS: DoctorCheck[] = [
 ]
 ```
 
-- [ ] Run `npx vitest run src/doctor/` — green. (The scheduler check is deliberately untested against a live launchd — its skip path is covered implicitly on Linux CI and it is exercised via `runDoctor` injection tests.)
-- [ ] Write the failing CLI test `src/cli/commands/doctor.test.ts` (complete file):
+- [x] Run `npx vitest run src/doctor/` — green. (The scheduler check is deliberately untested against a live launchd — its skip path is covered implicitly on Linux CI and it is exercised via `runDoctor` injection tests.)
+- [x] Write the failing CLI test `src/cli/commands/doctor.test.ts` (complete file):
 
 ```ts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -2248,7 +2248,7 @@ describe('doctor command', () => {
 })
 ```
 
-- [ ] Create `src/cli/commands/doctor.ts` (complete file):
+- [x] Create `src/cli/commands/doctor.ts` (complete file):
 
 ```ts
 import type { CommandModule } from 'yargs'
@@ -2330,9 +2330,9 @@ const doctorCommand: CommandModule<Record<string, unknown>, DoctorArgs> = {
 export default doctorCommand
 ```
 
-- [ ] Register the command in `src/cli/index.ts`: add `import doctorCommand from './commands/doctor.js'` after the `dashboardCommand` import, and `.command(doctorCommand)` after `.command(dashboardCommand)`.
-- [ ] Run `npx vitest run src/doctor src/cli/commands/doctor.test.ts src/cli/index.test.ts` — green.
-- [ ] Commit: `git add -A && git commit -m "feat(doctor): scaffold doctor — execute-don't-inspect check registry, skip-not-configured, bd-fix delegation (R1 D5)"`
+- [x] Register the command in `src/cli/index.ts`: add `import doctorCommand from './commands/doctor.js'` after the `dashboardCommand` import, and `.command(doctorCommand)` after `.command(dashboardCommand)`.
+- [x] Run `npx vitest run src/doctor src/cli/commands/doctor.test.ts src/cli/index.test.ts` — green.
+- [x] Commit: `git add -A && git commit -m "feat(doctor): scaffold doctor — execute-don't-inspect check registry, skip-not-configured, bd-fix delegation (R1 D5)"`
 
 ---
 
@@ -2384,7 +2384,7 @@ function extractPlanKey(content: string): string | null
 
 **Steps:**
 
-- [ ] Write the failing tests `src/project/adoption-plan.test.ts` (complete file):
+- [x] Write the failing tests `src/project/adoption-plan.test.ts` (complete file):
 
 ```ts
 import { describe, it, expect } from 'vitest'
@@ -2527,8 +2527,8 @@ describe('computePlanKey canonicalization', () => {
 })
 ```
 
-- [ ] Run `npx vitest run src/project/adoption-plan.test.ts` — FAILS (module missing).
-- [ ] Create `src/project/adoption-plan.ts` (complete file):
+- [x] Run `npx vitest run src/project/adoption-plan.test.ts` — FAILS (module missing).
+- [x] Create `src/project/adoption-plan.ts` (complete file):
 
 ```ts
 import fs from 'node:fs'
@@ -2805,8 +2805,8 @@ export function extractPlanKey(content: string): string | null {
 }
 ```
 
-- [ ] Run `npx vitest run src/project/adoption-plan.test.ts` — green.
-- [ ] Commit: `git add -A && git commit -m "feat(adopt): adoption-plan module — resolved-pipeline dispositions, initialize record, canonical plan_key (R1 D1/D2)"`
+- [x] Run `npx vitest run src/project/adoption-plan.test.ts` — green.
+- [x] Commit: `git add -A && git commit -m "feat(adopt): adoption-plan module — resolved-pipeline dispositions, initialize record, canonical plan_key (R1 D1/D2)"`
 
 ---
 
@@ -2822,7 +2822,7 @@ export function extractPlanKey(content: string): string | null {
 
 **Steps:**
 
-- [ ] Write the failing CLI tests. In `src/cli/commands/adopt.test.ts`, add this hoisted mock alongside the existing ones (before the imports section):
+- [x] Write the failing CLI tests. In `src/cli/commands/adopt.test.ts`, add this hoisted mock alongside the existing ones (before the imports section):
 
 ```ts
 vi.mock('../../project/adoption-plan.js', () => ({
@@ -2863,8 +2863,8 @@ then append these tests inside the file's top-level describe, reusing its existi
 ```
 
 (If the file has no shared `writtenLines` stdout capture, add the same `vi.spyOn(process.stdout, 'write')` capture used by `status.test.ts` to these two tests locally.)
-- [ ] Run `npx vitest run src/cli/commands/adopt.test.ts` — the new tests FAIL (handler still writes state and prints "Adoption complete").
-- [ ] Rewrite the handler tail in `src/cli/commands/adopt.ts`:
+- [x] Run `npx vitest run src/cli/commands/adopt.test.ts` — the new tests FAIL (handler still writes state and prints "Adoption complete").
+- [x] Rewrite the handler tail in `src/cli/commands/adopt.ts`:
   1. Add imports: `import { buildAdoptionPlan, renderPlanMarkdown } from '../../project/adoption-plan.js'`. Remove the now-unneeded imports as the steps below make them unused: `StateManager`, `discoverMetaPrompts`, `acquireLock`, `getLockPath`, `releaseLock`, `shutdown` (Task 10 re-adds the lock/shutdown imports for `--apply`).
   2. Add builder options (in the General group):
 
@@ -2923,8 +2923,8 @@ and change the `dry-run` describe to `'Deprecated: plan mode is the default and 
       process.exitCode = 0
 ```
 
-- [ ] Run `npx vitest run src/cli/commands/adopt.test.ts` — new tests green. Then run `npx vitest run src/cli/commands/ src/project/` and update the remaining adopt CLI tests mechanically (`grep -rn "steps_completed\|Adoption complete\|initializeState\|schema_version: 2" src/cli/commands/adopt*.test.ts` finds the assertions). Rules: (a) any test asserting state/config writes in default mode now asserts they do NOT happen (writes return in Task 10 under `--apply`); (b) any test asserting the old `schema_version: 2` result shape (`steps_completed`, `steps_remaining`, `artifacts_found`) now asserts the `schema_version: 3` plan shape (`plan_key`, `steps`, `disabled_by_preset`, `initialize`) — add the Task 9 `adoption-plan.js` mock to each file that invokes the handler; (c) `adopt.config-write-integration.test.ts` targets the exported `writeOrUpdateConfig` directly and keeps passing unchanged; (d) pure-`runAdoption` suites (`src/project/adopt.*.test.ts`) are unaffected.
-- [ ] Commit: `git add -A && git commit -m "feat(adopt): propose-then-apply plan mode — render by default, write nothing (R1 D1) [breaking]"`
+- [x] Run `npx vitest run src/cli/commands/adopt.test.ts` — new tests green. Then run `npx vitest run src/cli/commands/ src/project/` and update the remaining adopt CLI tests mechanically (`grep -rn "steps_completed\|Adoption complete\|initializeState\|schema_version: 2" src/cli/commands/adopt*.test.ts` finds the assertions). Rules: (a) any test asserting state/config writes in default mode now asserts they do NOT happen (writes return in Task 10 under `--apply`); (b) any test asserting the old `schema_version: 2` result shape (`steps_completed`, `steps_remaining`, `artifacts_found`) now asserts the `schema_version: 3` plan shape (`plan_key`, `steps`, `disabled_by_preset`, `initialize`) — add the Task 9 `adoption-plan.js` mock to each file that invokes the handler; (c) `adopt.config-write-integration.test.ts` targets the exported `writeOrUpdateConfig` directly and keeps passing unchanged; (d) pure-`runAdoption` suites (`src/project/adopt.*.test.ts`) are unaffected.
+- [x] Commit: `git add -A && git commit -m "feat(adopt): propose-then-apply plan mode — render by default, write nothing (R1 D1) [breaking]"`
 
 ---
 
@@ -2957,7 +2957,7 @@ function applyAdoptionPlan(options: { projectRoot: string; plan: AdoptionPlan; s
 
 **Steps:**
 
-- [ ] Make adopt first-touch. In `src/cli/middleware/project-root.ts` change the constant to:
+- [x] Make adopt first-touch. In `src/cli/middleware/project-root.ts` change the constant to:
 
 ```ts
 export const ROOT_OPTIONAL_COMMANDS = ['init', 'version', 'update', 'adopt'] as const
@@ -2979,7 +2979,7 @@ and append to `src/cli/middleware/project-root.test.ts`:
     const projectRoot = (argv.root as string | undefined) ?? findProjectRoot(process.cwd()) ?? process.cwd()
 ```
 
-- [ ] Write the failing apply-module tests `src/project/adoption-apply.test.ts` (complete file):
+- [x] Write the failing apply-module tests `src/project/adoption-apply.test.ts` (complete file):
 
 ```ts
 import { describe, it, expect } from 'vitest'
@@ -3076,8 +3076,8 @@ describe('applyAdoptionPlan (D1/D2/D3)', () => {
 })
 ```
 
-- [ ] Run `npx vitest run src/project/adoption-apply.test.ts` — FAILS (module missing).
-- [ ] Create `src/project/adoption-apply.ts` (complete file):
+- [x] Run `npx vitest run src/project/adoption-apply.test.ts` — FAILS (module missing).
+- [x] Create `src/project/adoption-apply.ts` (complete file):
 
 ```ts
 import fs from 'node:fs'
@@ -3278,8 +3278,8 @@ export async function applyAdoptionPlan(options: {
 }
 ```
 
-- [ ] Run `npx vitest run src/project/adoption-apply.test.ts` — green.
-- [ ] Wire the CLI. In `src/cli/commands/adopt.ts`:
+- [x] Run `npx vitest run src/project/adoption-apply.test.ts` — green.
+- [x] Wire the CLI. In `src/cli/commands/adopt.ts`:
   1. Re-add the lock/shutdown imports removed in Task 9 (`acquireLock`, `getLockPath`, `releaseLock` from `'../../state/lock-manager.js'`; `shutdown` from `'../shutdown.js'`) plus `import { applyAdoptionPlan } from '../../project/adoption-apply.js'`, `import { extractPlanKey } from '../../project/adoption-plan.js'` (widen the Task 9 import), and `import { readPackageVersion } from './version.js'`.
   2. Add builder options (General group; also add `'apply', 'plan', 'plan-key'` to the `.group` list):
 
@@ -3415,7 +3415,7 @@ export async function applyAdoptionPlan(options: {
       }
 ```
 
-- [ ] Write the failing CLI apply tests `src/cli/commands/adopt.apply.test.ts` (complete file):
+- [x] Write the failing CLI apply tests `src/cli/commands/adopt.apply.test.ts` (complete file):
 
 ```ts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -3515,8 +3515,8 @@ describe('adopt --apply (D1/D2)', () => {
 })
 ```
 
-- [ ] Run `npx vitest run src/cli/commands/adopt.apply.test.ts src/project/adoption-apply.test.ts src/cli/middleware/project-root.test.ts src/cli/commands/adopt.test.ts` — green.
-- [ ] Commit: `git add -A && git commit -m "feat(adopt): --apply — plan-key drift contract, first-touch init, audit reversals, closing doctor (R1 D1/D2)"`
+- [x] Run `npx vitest run src/cli/commands/adopt.apply.test.ts src/project/adoption-apply.test.ts src/cli/middleware/project-root.test.ts src/cli/commands/adopt.test.ts` — green.
+- [x] Commit: `git add -A && git commit -m "feat(adopt): --apply — plan-key drift contract, first-touch init, audit reversals, closing doctor (R1 D1/D2)"`
 
 ---
 
@@ -3539,7 +3539,7 @@ describe('adopt --apply (D1/D2)', () => {
 
 **Steps:**
 
-- [ ] Write the failing content test `src/project/frontmatter.content.test.ts` (complete file):
+- [x] Write the failing content test `src/project/frontmatter.content.test.ts` (complete file):
 
 ```ts
 import { describe, it, expect } from 'vitest'
@@ -3587,8 +3587,8 @@ describe('shipped pipeline frontmatter (detect: rollout, D4)', () => {
 })
 ```
 
-- [ ] Run `npx vitest run src/project/frontmatter.content.test.ts` — the second test FAILS (`detect` is null everywhere).
-- [ ] Add the blocks. In each file, insert the block immediately after its `outputs:` frontmatter line, mirroring the step's Mode Detection prose:
+- [x] Run `npx vitest run src/project/frontmatter.content.test.ts` — the second test FAILS (`detect` is null everywhere).
+- [x] Add the blocks. In each file, insert the block immediately after its `outputs:` frontmatter line, mirroring the step's Mode Detection prose:
 
 `content/pipeline/foundation/beads.md`:
 
@@ -3659,8 +3659,8 @@ detect:
     - path: maestro/
 ```
 
-- [ ] Run `npx vitest run src/project/frontmatter.content.test.ts` — green.
-- [ ] Teach `make validate` the schema. In `scripts/validate-frontmatter.sh`, insert before the loop's closing `done` (after the `description` check):
+- [x] Run `npx vitest run src/project/frontmatter.content.test.ts` — green.
+- [x] Teach `make validate` the schema. In `scripts/validate-frontmatter.sh`, insert before the loop's closing `done` (after the `description` check):
 
 ```bash
     # detect: block sanity (D4) — must declare all:/any:, and every list item
@@ -3681,7 +3681,7 @@ detect:
     fi
 ```
 
-- [ ] Append to `tests/validate-frontmatter.bats` (fixtures follow the file's existing `frontmatter-*.md` naming so teardown cleans them):
+- [x] Append to `tests/validate-frontmatter.bats` (fixtures follow the file's existing `frontmatter-*.md` naming so teardown cleans them):
 
 ```bash
 @test "passes for a detect block with path and cmd checks" {
@@ -3732,8 +3732,8 @@ EOF
 }
 ```
 
-- [ ] Run `make validate && npx bats tests/validate-frontmatter.bats && npx vitest run src/project src/state/completion.test.ts` — all green (shipped content passes both validators; the beads plan fixtures still classify as conflict because `.beads/` is missing regardless of the `bd info` outcome).
-- [ ] Commit: `git add -A && git commit -m "feat(content): detect: contracts on the eight rollout steps + make validate schema coverage (R1 D4)"`
+- [x] Run `make validate && npx bats tests/validate-frontmatter.bats && npx vitest run src/project src/state/completion.test.ts` — all green (shipped content passes both validators; the beads plan fixtures still classify as conflict because `.beads/` is missing regardless of the `bd info` outcome).
+- [x] Commit: `git add -A && git commit -m "feat(content): detect: contracts on the eight rollout steps + make validate schema coverage (R1 D4)"`
 
 ---
 
@@ -3746,7 +3746,7 @@ EOF
 
 **Steps:**
 
-- [ ] Write the failing notice test. Append to `src/cli/commands/adopt.test.ts` (inside the top-level describe; reuse its argv helper and mocked `findProjectRoot`):
+- [x] Write the failing notice test. Append to `src/cli/commands/adopt.test.ts` (inside the top-level describe; reuse its argv helper and mocked `findProjectRoot`):
 
 ```ts
   it('prints the one-release behavior-change notice when run without --apply (D16)', async () => {
@@ -3761,8 +3761,8 @@ EOF
   })
 ```
 
-- [ ] Run `npx vitest run src/cli/commands/adopt.test.ts` — the new test FAILS.
-- [ ] Add the notice in `src/cli/commands/adopt.ts`, in the plan-mode branch immediately before the plan is rendered (i.e. right after the `argv.apply === true` block from Task 10):
+- [x] Run `npx vitest run src/cli/commands/adopt.test.ts` — the new test FAILS.
+- [x] Add the notice in `src/cli/commands/adopt.ts`, in the plan-mode branch immediately before the plan is rendered (i.e. right after the `argv.apply === true` block from Task 10):
 
 ```ts
       // D16 one-release notice — REMOVE in the release after R1 ships.
@@ -3773,7 +3773,7 @@ EOF
       )
 ```
 
-- [ ] Add the three prominent entries to `CHANGELOG.md` under `## [Unreleased]` (create `### Added` / `### Changed` sub-headings after the existing `### Fixed` block):
+- [x] Add the three prominent entries to `CHANGELOG.md` under `## [Unreleased]` (create `### Added` / `### Changed` sub-headings after the existing `### Fixed` block):
 
 ```markdown
 ### Added
@@ -3824,8 +3824,8 @@ EOF
   the adoption-mode assembly/knowledge read-side lands in R3.
 ```
 
-- [ ] Run `npx vitest run src/cli/commands/adopt.test.ts` — green.
-- [ ] Commit: `git add -A && git commit -m "docs(changelog): R1 brownfield entries + one-release adopt notice (D16)"`
+- [x] Run `npx vitest run src/cli/commands/adopt.test.ts` — green.
+- [x] Commit: `git add -A && git commit -m "docs(changelog): R1 brownfield entries + one-release adopt notice (D16)"`
 
 ---
 
@@ -3836,16 +3836,16 @@ EOF
 
 **Steps:**
 
-- [ ] `grep -rn "artifacts_verified" src scripts content --include="*.ts" --include="*.sh" --include="*.md"` — the ONLY allowed `src/` hits are the Task 1 migration site in `state-migration.ts` (the `legacy` cast that deletes the field) and its migration tests; fix any other straggler to `verification`.
-- [ ] `npx vitest run src` — all green.
-- [ ] `make check-all` — all green (bash lint + validate + bats + eval, TypeScript, mmr, knowledge, guides). Expected failures to watch for and fix at the root:
+- [x] `grep -rn "artifacts_verified" src scripts content --include="*.ts" --include="*.sh" --include="*.md"` — the ONLY allowed `src/` hits are the Task 1 migration site in `state-migration.ts` (the `legacy` cast that deletes the field) and its migration tests; fix any other straggler to `verification`.
+- [x] `npx vitest run src` — all green.
+- [x] `make check-all` — all green (bash lint + validate + bats + eval, TypeScript, mmr, knowledge, guides). Expected failures to watch for and fix at the root:
   - ShellCheck findings in the `validate-frontmatter.sh` addition (quote `${detect_block}` exactly as written above).
   - Bats content suites that assert frontmatter key inventories for the eight modified step files — add `detect` to their expected-keys lists if one exists.
   - Any `loadAllPresets` consumer or mock still missing `brownfield` (grep from Task 6).
-- [ ] Re-run the two end-to-end proofs by hand and paste output in the PR description:
+- [x] Re-run the two end-to-end proofs by hand and paste output in the PR description:
   - `cd "$(mktemp -d)" && printf '{"name":"x"}' > package.json && printf '# rules\n' > CLAUDE.md && node <path-to-repo>/dist/index.js adopt` after `npm run build` in the repo — expect: the one-release notice, an Adoption Plan with beads as `conflict`, a `Plan key:` line, and NO `.scaffold/` created.
   - `node <path-to-repo>/dist/index.js adopt --apply --plan-key <key-from-json-output>` in the same directory — expect: config.yml + state.json written, `doctor:` verdict line printed, and `scaffold status` showing beads pending (not completed).
-- [ ] Commit any fixes: `git add -A && git commit -m "test(brownfield-r1): full-suite green"`
+- [x] Commit any fixes: `git add -A && git commit -m "test(brownfield-r1): full-suite green"`
 
 ---
 

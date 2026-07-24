@@ -3,7 +3,8 @@ import os from 'node:os'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import { describe, it, expect, afterEach, vi } from 'vitest'
-import { appendDecision, readDecisions } from './decision-logger.js'
+import { appendDecision, readDecisions, appendAuditRecord } from './decision-logger.js'
+import type { VerificationAuditRecord } from '../types/index.js'
 
 const tmpDirs: string[] = []
 
@@ -204,5 +205,38 @@ describe('readDecisions', () => {
     expect(entries).toHaveLength(2)
     expect(entries[0].decision).toBe('PRD 2')
     expect(entries[1].decision).toBe('PRD 3')
+  })
+})
+
+describe('verification audit records (D3)', () => {
+  it('appendAuditRecord appends a line that readDecisions skips and id assignment ignores', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-log-'))
+    const record: VerificationAuditRecord = {
+      ts: '2026-07-19T00:00:00.000Z',
+      actor: 'scaffold-adopt',
+      event: 'verification-reversal',
+      step_slug: 'beads',
+      from_status: 'completed',
+      from_verification: 'declared',
+      to_status: 'pending',
+      to_verification: 'unverified',
+      evidence: {
+        outputs_present: ['CLAUDE.md'],
+        outputs_missing: ['.beads/'],
+        detect_checks: [{ kind: 'cmd', target: 'bd info', passed: false }],
+      },
+      reason: 'state claimed completed but verification failed',
+      plan_key: 'a'.repeat(64),
+    }
+    appendAuditRecord(root, record)
+    expect(readDecisions(root)).toEqual([])
+    const id = appendDecision(root, {
+      prompt: 'beads', decision: 'd', at: '2026-07-19T00:00:00.000Z',
+      completed_by: 'agent', step_completed: true,
+    })
+    expect(id).toBe('D-001')
+    const lines = fs.readFileSync(path.join(root, '.scaffold', 'decisions.jsonl'), 'utf8').trim().split('\n')
+    expect(lines).toHaveLength(2)
+    expect((JSON.parse(lines[0]) as { event: string }).event).toBe('verification-reversal')
   })
 })

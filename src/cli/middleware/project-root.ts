@@ -23,7 +23,7 @@ export function findProjectRoot(startDir: string): string | null {
  * Commands that do NOT require an initialized .scaffold/ directory.
  * All other commands require it.
  */
-export const ROOT_OPTIONAL_COMMANDS = ['init', 'version', 'update'] as const
+export const ROOT_OPTIONAL_COMMANDS = ['init', 'version', 'update', 'adopt'] as const
 
 /**
  * Yargs middleware that detects project root and sets it on argv.

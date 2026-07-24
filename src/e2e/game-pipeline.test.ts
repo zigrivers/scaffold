@@ -220,7 +220,7 @@ describe('game pipeline E2E', () => {
 
     const stateManager = new StateManager(tmpDir, () => [])
     const state = stateManager.loadState()
-    expect(state['schema-version']).toBe(1)
+    expect(state['schema-version']).toBe(4)
     expect(state.config_methodology).toBe('deep')
     expect(state['init-mode']).toBe('greenfield')
   })

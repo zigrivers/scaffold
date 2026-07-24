@@ -1,6 +1,6 @@
 // src/state/state-migration.ts
 
-import type { PipelineState } from '../types/index.js'
+import type { PipelineState, StepStateEntry } from '../types/index.js'
 import { fileExists } from '../utils/fs.js'
 import { resolveContainedArtifactPath } from '../utils/artifact-path.js'
 import path from 'node:path'
@@ -114,6 +114,28 @@ export function migrateState(state: PipelineState): boolean {
         }
       }
     }
+  }
+
+  // Phase 4 (R1): artifacts_verified → verification enum (one-way, D3).
+  // true → 'declared' (the old flag only recorded "declares outputs" — it was
+  // never a disk check, so it must not migrate to 'verified').
+  // false → 'unverified'. Absent stays absent (readers treat absent ≡ 'unverified').
+  for (const step of Object.values(state.steps)) {
+    const legacy = step as StepStateEntry & { artifacts_verified?: boolean }
+    if (legacy.artifacts_verified === undefined) continue
+    if (step.verification === undefined) {
+      step.verification = legacy.artifacts_verified ? 'declared' : 'unverified'
+    }
+    delete legacy.artifacts_verified
+    changed = true
+  }
+
+  // Phase 5 (R1): single-service files enter the verification era (schema v4).
+  // Multi-service versions 2 (pre-shard) and 3 (sharded) keep their version —
+  // they encode the sharding state machine, which R1 must not disturb.
+  if (state['schema-version'] === 1) {
+    state['schema-version'] = 4
+    changed = true
   }
 
   return changed

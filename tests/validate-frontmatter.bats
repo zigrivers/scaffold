@@ -118,3 +118,50 @@ EOF
     run "$SCRIPT" "$FIXTURES/frontmatter-unquoted.md"
     [ "$status" -eq 0 ]
 }
+
+@test "passes for a detect block with path and cmd checks" {
+    cat > "$FIXTURES/frontmatter-detect-ok.md" << 'EOF'
+---
+description: "step with detect"
+detect:
+  all:
+    - path: .beads/
+    - cmd: bd info
+      timeout: 5
+---
+
+# Content
+EOF
+    run "$SCRIPT" "$FIXTURES/frontmatter-detect-ok.md"
+    [ "$status" -eq 0 ]
+}
+
+@test "fails for a detect block without all: or any:" {
+    cat > "$FIXTURES/frontmatter-detect-empty.md" << 'EOF'
+---
+description: "step with bad detect"
+detect:
+  paths:
+    - path: .beads/
+---
+
+# Content
+EOF
+    run "$SCRIPT" "$FIXTURES/frontmatter-detect-empty.md"
+    [ "$status" -eq 1 ]
+}
+
+@test "fails for a detect list item that is neither path nor cmd" {
+    cat > "$FIXTURES/frontmatter-detect-badkey.md" << 'EOF'
+---
+description: "step with bad detect item"
+detect:
+  all:
+    - glob: "**/*.ts"
+---
+
+# Content
+EOF
+    run "$SCRIPT" "$FIXTURES/frontmatter-detect-badkey.md"
+    [ "$status" -eq 1 ]
+}

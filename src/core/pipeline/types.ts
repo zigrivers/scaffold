@@ -17,6 +17,7 @@ export interface PipelineContext {
     mvp: MethodologyPreset | null
     deep: MethodologyPreset | null
     custom: MethodologyPreset | null
+    brownfield: MethodologyPreset | null
   }
   methodologyDir: string
 }

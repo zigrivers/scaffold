@@ -44,6 +44,7 @@ vi.mock('../../core/assembly/preset-loader.js', () => ({
     deep: null,
     mvp: null,
     custom: null,
+    brownfield: null,
     errors: [],
     warnings: [],
   })),
@@ -1244,5 +1245,47 @@ describe('status command', () => {
     // With readEligible, it falls back to live-compute result 'FRESH'.
     expect(envelope.data.nextEligible).toEqual(['FRESH'])
     expect(mockComputeEligible).toHaveBeenCalled()
+  })
+
+  describe('conflict overrides completed (D3)', () => {
+    it('renders a completed step with missing outputs as conflict and excludes it from completed totals', async () => {
+      // D3/F5: applyConflictOverrides checks the CURRENT resolved outputs, so the
+      // frontmatter must declare beads' output (makeFrontmatter defaults to []).
+      // Note: `outputs` must be nested inside `frontmatter` (that's what
+      // `pipeline.stepMeta` is built from — resolver.ts stores `mp.frontmatter`)
+      // — a top-level `outputs` key on the meta-prompt object is never read.
+      const beadsFm = makeFrontmatter('beads', 'foundation', 210)
+      const fm = new Map([['beads', { ...beadsFm, frontmatter: { ...beadsFm.frontmatter, outputs: ['.beads/'] } }]])
+      mockDiscoverMetaPrompts.mockReturnValue(fm as never)
+      mockOverlayEnabled(['beads'])
+      mockStateWith(MockStateManager, {
+        beads: { status: 'completed', source: 'pipeline', produces: ['.beads/'], verification: 'declared' },
+      })
+      await statusCommand.handler(defaultArgv())
+      const stdout = writtenLines.join('')
+      expect(stdout).toContain('[conflict] beads')
+      expect(stdout).toContain('Progress: 0% (0/1)')
+    })
+
+    it('JSON output lists conflicts and reports the step status as conflict', async () => {
+      mockResolveOutputMode.mockReturnValue('json')
+      // See note above: `outputs` must be nested inside `frontmatter`.
+      const beadsFm = makeFrontmatter('beads', 'foundation', 210)
+      const fm = new Map([['beads', { ...beadsFm, frontmatter: { ...beadsFm.frontmatter, outputs: ['.beads/'] } }]])
+      mockDiscoverMetaPrompts.mockReturnValue(fm as never)
+      mockOverlayEnabled(['beads'])
+      mockStateWith(MockStateManager, {
+        beads: { status: 'completed', source: 'pipeline', produces: ['.beads/'], verification: 'declared' },
+      })
+      await statusCommand.handler(defaultArgv({ format: 'json' }))
+      const envelope = JSON.parse(writtenLines.join('')) as { data?: unknown }
+      const parsed = (envelope.data ?? envelope) as {
+        conflicts: string[]
+        phases: Array<{ steps: Array<{ slug: string; status: string; verification: string }> }>
+      }
+      expect(parsed.conflicts).toEqual(['beads'])
+      expect(parsed.phases[0].steps[0].status).toBe('conflict')
+      expect(parsed.phases[0].steps[0].verification).toBe('declared')
+    })
   })
 })

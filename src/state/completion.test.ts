@@ -2,9 +2,11 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import crypto from 'node:crypto'
-import { describe, it, expect, afterEach } from 'vitest'
-import { detectCompletion, checkCompletion, analyzeCrash } from './completion.js'
-import type { PipelineState } from '../types/index.js'
+import { describe, it, expect, afterEach, beforeEach } from 'vitest'
+import {
+  detectCompletion, checkCompletion, analyzeCrash, runDetect, verifyStep, applyConflictOverrides,
+} from './completion.js'
+import type { PipelineState, StepStateEntry } from '../types/index.js'
 
 const tmpDirs: string[] = []
 
@@ -278,5 +280,206 @@ describe('analyzeCrash', () => {
     expect(result.action).toBe('recommend_rerun')
     expect(result.presentArtifacts).toEqual([])
     expect(result.missingArtifacts).toEqual([])
+  })
+})
+
+describe('runDetect (D4)', () => {
+  let root: string
+  beforeEach(() => { root = fs.mkdtempSync(path.join(os.tmpdir(), 'detect-run-')) })
+
+  it('returns evaluated=false, passed=true when there is no detect block', () => {
+    expect(runDetect(null, root)).toEqual({ evaluated: false, passed: true, checks: [] })
+    expect(runDetect(undefined, root)).toEqual({ evaluated: false, passed: true, checks: [] })
+  })
+
+  it('passes an all-block when every path and cmd check passes', () => {
+    fs.mkdirSync(path.join(root, '.beads'))
+    const result = runDetect({ all: [{ path: '.beads/' }, { cmd: 'exit 0' }] }, root)
+    expect(result.passed).toBe(true)
+    expect(result.checks).toHaveLength(2)
+  })
+
+  it('fails an all-block when a cmd exits non-zero — failure is not fatal', () => {
+    const result = runDetect({ all: [{ cmd: 'exit 3' }] }, root)
+    expect(result.evaluated).toBe(true)
+    expect(result.passed).toBe(false)
+    expect(result.checks[0]).toEqual({ kind: 'cmd', target: 'exit 3', passed: false })
+  })
+
+  it('passes an any-block when at least one check passes', () => {
+    fs.writeFileSync(path.join(root, 'playwright.config.ts'), '')
+    const result = runDetect(
+      { any: [{ path: 'playwright.config.ts' }, { path: 'maestro/' }] }, root,
+    )
+    expect(result.passed).toBe(true)
+  })
+
+  it('treats a timed-out cmd as not-detected', () => {
+    const result = runDetect({ all: [{ cmd: 'sleep 30', timeout: 1 }] }, root)
+    expect(result.passed).toBe(false)
+  })
+
+  it('treats a missing binary as not-detected', () => {
+    const result = runDetect({ all: [{ cmd: 'definitely-not-a-real-binary-xyz' }] }, root)
+    expect(result.passed).toBe(false)
+  })
+})
+
+describe('verifyStep (D3)', () => {
+  it('reports verified when all outputs exist and detect passes', () => {
+    const dir = makeTempDir()
+    fs.mkdirSync(path.join(dir, 'docs'), { recursive: true })
+    fs.writeFileSync(path.join(dir, 'docs/tech-stack.md'), 'x', 'utf8')
+    const entry = {
+      status: 'completed', source: 'pipeline', produces: ['docs/tech-stack.md'], verification: 'declared',
+    } as StepStateEntry
+    const v = verifyStep('tech-stack', entry, ['docs/tech-stack.md'], { all: [{ cmd: 'exit 0' }] }, dir)
+    expect(v.status).toBe('confirmed_complete')
+    expect(v.verification).toBe('verified')
+    expect(v.conflictClass).toBeNull()
+  })
+
+  it('reports a state-claim conflict when state says completed but outputs are missing', () => {
+    const dir = makeTempDir()
+    const entry = {
+      status: 'completed', source: 'pipeline', produces: ['docs/x.md'], verification: 'declared',
+    } as StepStateEntry
+    const v = verifyStep('tdd', entry, ['docs/x.md'], null, dir)
+    expect(v.status).toBe('conflict')
+    expect(v.conflictClass).toBe('state-claim')
+    expect(v.outputsMissing).toEqual(['docs/x.md'])
+  })
+
+  it('reports a state-claim conflict when outputs exist but detect fails', () => {
+    const dir = makeTempDir()
+    fs.writeFileSync(path.join(dir, 'CLAUDE.md'), 'x', 'utf8')
+    const entry = { status: 'completed', source: 'pipeline', produces: ['CLAUDE.md'] } as StepStateEntry
+    const v = verifyStep('beads', entry, ['CLAUDE.md'], { all: [{ cmd: 'exit 1' }] }, dir)
+    expect(v.status).toBe('conflict')
+    expect(v.conflictClass).toBe('state-claim')
+  })
+
+  it('reports an artifact-only conflict for partial artifacts with no completion claim (the beads case)', () => {
+    const dir = makeTempDir()
+    fs.writeFileSync(path.join(dir, 'CLAUDE.md'), 'x', 'utf8')
+    const v = verifyStep('beads', undefined, ['.beads/', 'CLAUDE.md'], { all: [{ cmd: 'exit 1' }] }, dir)
+    expect(v.status).toBe('conflict')
+    expect(v.conflictClass).toBe('artifact-only')
+    expect(v.outputsPresent).toEqual(['CLAUDE.md'])
+  })
+
+  it('never reports verified for an undetectable step (no outputs, no detect)', () => {
+    const dir = makeTempDir()
+    const entry = { status: 'completed', source: 'pipeline', produces: [], verification: 'verified' } as StepStateEntry
+    const v = verifyStep('review-vision', entry, [], null, dir)
+    expect(v.undetectable).toBe(true)
+    expect(v.verification).toBe('declared')
+    expect(v.status).toBe('confirmed_complete')
+  })
+
+  it('reports incomplete when nothing exists and there is no claim', () => {
+    const dir = makeTempDir()
+    const v = verifyStep('tech-stack', undefined, ['docs/tech-stack.md'], null, dir)
+    expect(v.status).toBe('incomplete')
+    expect(v.conflictClass).toBeNull()
+    expect(v.verification).toBe('unverified')
+  })
+})
+
+describe('applyConflictOverrides (D3 — fs-only eligibility demotion)', () => {
+  it('demotes a completed step with missing outputs to pending without mutating the input', () => {
+    const dir = makeTempDir()
+    const steps: Record<string, StepStateEntry> = {
+      beads: { status: 'completed', source: 'pipeline', produces: ['.beads/'] },
+      tdd: { status: 'completed', source: 'pipeline', produces: [] },
+    }
+    const result = applyConflictOverrides(steps, dir)
+    expect(result.conflicts).toEqual(['beads'])
+    expect(result.steps['beads'].status).toBe('pending')
+    expect(steps['beads'].status).toBe('completed')
+    expect(result.steps['tdd'].status).toBe('completed')
+  })
+
+  it('returns the same steps object when nothing conflicts', () => {
+    const dir = makeTempDir()
+    fs.writeFileSync(path.join(dir, 'CLAUDE.md'), 'x', 'utf8')
+    const steps: Record<string, StepStateEntry> = {
+      beads: { status: 'completed', source: 'pipeline', produces: ['CLAUDE.md'] },
+    }
+    const result = applyConflictOverrides(steps, dir)
+    expect(result.conflicts).toEqual([])
+    expect(result.steps).toBe(steps)
+  })
+
+  it('checks the CURRENT resolved outputs, not the historical produces (a package upgrade added an output)', () => {
+    const dir = makeTempDir()
+    // The step was completed when it only produced legacy.md (present on disk),
+    // but the resolved pipeline now ALSO requires new.md (absent) — the step
+    // must demote even though its stored produces is fully present.
+    fs.writeFileSync(path.join(dir, 'legacy.md'), 'x', 'utf8')
+    const steps: Record<string, StepStateEntry> = {
+      'tech-stack': { status: 'completed', source: 'pipeline', produces: ['legacy.md'] },
+    }
+    const resolved = (slug: string): string[] | undefined =>
+      slug === 'tech-stack' ? ['legacy.md', 'new.md'] : undefined
+    const result = applyConflictOverrides(steps, dir, resolved)
+    expect(result.conflicts).toEqual(['tech-stack'])
+    expect(result.steps['tech-stack'].status).toBe('pending')
+    // Without the resolver (historical produces only) the step would NOT demote.
+    expect(applyConflictOverrides(steps, dir).conflicts).toEqual([])
+  })
+
+  describe('service scope (mirrors detectCompletion)', () => {
+    it('does NOT demote a service-local completed step whose output exists only under services/<svc>/', () => {
+      const dir = makeTempDir()
+      fs.mkdirSync(path.join(dir, 'services', 'api', 'docs'), { recursive: true })
+      fs.writeFileSync(path.join(dir, 'services', 'api', 'docs', 'tech-stack.md'), 'x', 'utf8')
+      const steps: Record<string, StepStateEntry> = {
+        'tech-stack': { status: 'completed', source: 'pipeline', produces: ['docs/tech-stack.md'] },
+      }
+      const result = applyConflictOverrides(steps, dir, undefined, 'api', new Set())
+      expect(result.conflicts).toEqual([])
+      expect(result.steps).toBe(steps)
+    })
+
+    it('DOES demote a service-local step whose service file is missing, even with a same-named root file', () => {
+      // The exact false-complete scenario: the api service's own file was
+      // deleted, but an unrelated root-level (or other-service) file with the
+      // same relative name happens to exist. Without service scoping this
+      // would incorrectly satisfy the check and report a broken step as
+      // COMPLETE — the dishonesty D3/R1 removes.
+      const dir = makeTempDir()
+      fs.mkdirSync(path.join(dir, 'docs'), { recursive: true })
+      fs.writeFileSync(path.join(dir, 'docs', 'tech-stack.md'), 'root file, not the service file', 'utf8')
+      const steps: Record<string, StepStateEntry> = {
+        'tech-stack': { status: 'completed', source: 'pipeline', produces: ['docs/tech-stack.md'] },
+      }
+      const result = applyConflictOverrides(steps, dir, undefined, 'api', new Set())
+      expect(result.conflicts).toEqual(['tech-stack'])
+      expect(result.steps['tech-stack'].status).toBe('pending')
+    })
+
+    it('checks global steps at the root (unprefixed) even in service scope', () => {
+      const dir = makeTempDir()
+      fs.writeFileSync(path.join(dir, 'CLAUDE.md'), 'x', 'utf8')
+      const steps: Record<string, StepStateEntry> = {
+        beads: { status: 'completed', source: 'pipeline', produces: ['CLAUDE.md'] },
+      }
+      const result = applyConflictOverrides(steps, dir, undefined, 'api', new Set(['beads']))
+      expect(result.conflicts).toEqual([])
+      expect(result.steps).toBe(steps)
+    })
+
+    it('is unaffected when service is omitted (root/flat projects behave exactly as before)', () => {
+      const dir = makeTempDir()
+      fs.mkdirSync(path.join(dir, 'services', 'api', 'docs'), { recursive: true })
+      fs.writeFileSync(path.join(dir, 'services', 'api', 'docs', 'tech-stack.md'), 'x', 'utf8')
+      const steps: Record<string, StepStateEntry> = {
+        'tech-stack': { status: 'completed', source: 'pipeline', produces: ['docs/tech-stack.md'] },
+      }
+      // No service arg — checked at the (unprefixed) root, which is absent, so it demotes.
+      const result = applyConflictOverrides(steps, dir)
+      expect(result.conflicts).toEqual(['tech-stack'])
+    })
   })
 })

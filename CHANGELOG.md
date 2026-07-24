@@ -20,6 +20,53 @@ All notable changes to Scaffold are documented here.
   masquerade as a clean review. `mmr critique` strips the schema pair (its reply
   shape differs). See `packages/mmr/CHANGELOG.md` 3.2.0.
 
+### Added
+
+- **`scaffold doctor`** — executes health checks (not config-presence inspection)
+  across pipeline verification, beads (bd version floor, `bd info` live check,
+  `bd backup status --json` behind a capability probe, bd-guard installed +
+  registered + armed including the jq fail-open), hooks, gate targets (reported
+  as resolve-only this release — the bounded `GATE_PROBE` execution ships in
+  R2), merge queue, and scheduler. Not-installed subsystems report "not
+  configured" and never affect the exit code (0 healthy / 1 warnings / 2
+  errors; `--json` for automation). `--fix` ships exactly one fix in R1:
+  delegating `bd doctor --fix`; every other failure prints its remediation.
+- **`content/methodology/brownfield.yml` preset** (enablement-only):
+  foundation / environment / quality-first; the doc-chain middle
+  (modeling → specification), platform parity, and the validation audits are
+  disabled by default — opt in via `scaffold adopt --include <step>`.
+- **`detect:` frontmatter contract (D4)** — machine-readable live checks
+  (`path:` existence + bounded `cmd:` entries, `all:`/`any:` composition)
+  mirroring Mode Detection prose, shipped on beads, github-setup, git-workflow,
+  merge-throughput, ai-memory-setup, add-e2e-testing, tdd, and dev-env-setup.
+  `make validate` learns the schema.
+
+### Changed
+
+- **BREAKING BEHAVIOR FIX: `scaffold adopt` is now propose-then-apply (D1/D2).**
+  `scaffold adopt` renders an Adoption Plan (stdout, `--format json`, or
+  `--write [path]`, default `docs/adoption-plan.md`) and writes NOTHING.
+  `scaffold adopt --apply --plan <path>` (or `--plan-key <sha256>`) re-renders
+  against live reality before any write and aborts on plan-key drift; a bare
+  `--apply` is interactive-only. The prior silent any-output-exists completion
+  marking violated the brownfield spec (a repo containing only a `CLAUDE.md`
+  got beads marked complete). Completion truth is now all-outputs + `detect:`
+  (D3); conflicts override `completed` everywhere completion is consumed, and
+  apply records reversals as append-only audit records in
+  `.scaffold/decisions.jsonl`. Scripts that relied on adopt's side effects must
+  pass `--apply` with an approved plan. A one-release notice prints when
+  `adopt` runs without `--apply`.
+- **State-field migration (D3): `artifacts_verified` → `verification`.**
+  Automatic and one-way on first load (single-service state files bump to
+  schema-version 4): `artifacts_verified: true` migrates to
+  `verification: 'declared'` — never `'verified'`, which only a real
+  disk-plus-detect check can set; `false`/absent becomes `'unverified'`.
+- **`init-mode` staging note (D11).** This release gives `init-mode` its first
+  read-sides: adopt selects the `brownfield` preset for brownfield /
+  v1-migration repos, and the dashboard stops hardcoding `greenfield` when
+  synthesizing skeleton service state. It does NOT change prompt content yet —
+  the adoption-mode assembly/knowledge read-side lands in R3.
+
 ## [3.47.0] - 2026-07-18
 
 Merge throughput for many-agent projects (the "merge-lease livelock" fix),

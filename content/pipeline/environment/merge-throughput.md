@@ -6,6 +6,9 @@ phase: "environment"
 order: 335
 dependencies: [git-workflow]
 outputs: [docs/merge-queue.md]
+detect:
+  all:
+    - path: docs/merge-queue.md
 conditional: "if-needed"
 knowledge-base: [git-workflow-patterns, multi-agent-coordination, test-impact-analysis]
 reads: [dev-env-setup, tdd]

@@ -161,7 +161,7 @@ describe('scaffold init E2E', () => {
     await runWizard({ projectRoot: tmpDir, methodology: 'deep', force: false, auto: true, output })
     const stateManager = new StateManager(tmpDir, () => [])
     const state = stateManager.loadState()
-    expect(state['schema-version']).toBe(1)
+    expect(state['schema-version']).toBe(4)
     expect(state.config_methodology).toBe('deep')
     expect(typeof state.steps).toBe('object')
     expect(state.in_progress).toBeNull()

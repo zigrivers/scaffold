@@ -305,6 +305,56 @@ describe('next command', () => {
     expect(parsed.pipeline_complete).toBe(true)
   })
 
+  it('pipeline_complete is false when a completed step is conflict-demoted (D3)', async () => {
+    // R1 Task-5 review P2: "conflict overrides completed EVERYWHERE" — a
+    // completed step whose declared output is missing on disk is demoted to
+    // pending, so `pipeline_complete` must NOT report true (which would
+    // contradict the artifact-check warning). allDone must read the
+    // conflict-overridden record, not the raw state.
+    const metaPrompts = new Map([
+      ['beads', makeFrontmatter('beads', 'b', 'foundation', 1)],
+    ])
+    mockDiscoverMetaPrompts.mockReturnValue(
+      metaPrompts as unknown as ReturnType<typeof discoverMetaPrompts>,
+    )
+    vi.mocked(resolvePipeline).mockReturnValueOnce({
+      graph: { nodes: new Map(), edges: new Map() },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      preset: {} as any,
+      overlay: {
+        steps: { beads: { enabled: true } },
+        knowledge: {}, reads: {}, dependencies: {}, crossReads: {},
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any,
+      // outputs live inside frontmatter (where stepMeta reads them); '.beads/'
+      // does not exist under /fake/project, so the step demotes.
+      stepMeta: new Map([
+        ['beads', { ...makeFrontmatter('beads', 'b', 'foundation', 1).frontmatter, outputs: ['.beads/'] }],
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ]) as any,
+      computeEligible: mockComputeEligible as unknown as ReturnType<
+        typeof resolvePipeline
+      >['computeEligible'],
+      globalSteps: new Set<string>(),
+      getPipelineHash: vi.fn((_scope) => 'test-hash-conflict'),
+    })
+    mockStateWith(MockStateManager, {
+      beads: { status: 'completed', source: 'pipeline', produces: ['.beads/'], verification: 'declared' },
+    })
+    mockComputeEligible.mockReturnValue([])
+
+    mockResolveOutputMode.mockReturnValue('json')
+    await nextCommand.handler(defaultArgv({ format: 'json' }))
+    // This harness captures stderr into writtenLines too; the conflict warning
+    // (⚠ …) precedes the stdout JSON, so parse from the first `{`.
+    const out = writtenLines.join('')
+    const envelope = JSON.parse(out.slice(out.indexOf('{')))
+    const parsed = envelope.data ?? envelope
+    expect(parsed.pipeline_complete).toBe(false)
+    // Sanity: the demotion path actually ran (proves this isn't a false green).
+    expect(out).toContain('failed the artifact check')
+  })
+
   it('pipeline_complete in --service mode excludes global steps', async () => {
     // Round-3 Codex P1: service-scoped state intentionally omits global
     // steps. With reconcile dropped, allDone was computed across every

@@ -114,7 +114,7 @@ describe('runWizard', () => {
     const statePath = path.join(tmpDir, '.scaffold', 'state.json')
     expect(fs.existsSync(statePath)).toBe(true)
     const parsed = JSON.parse(fs.readFileSync(statePath, 'utf8')) as Record<string, unknown>
-    expect(parsed['schema-version']).toBe(1)
+    expect(parsed['schema-version']).toBe(4)
   })
 
   // Test 4: Creates empty decisions.jsonl
@@ -577,7 +577,7 @@ describe('materializeScaffoldProject', () => {
     const state = JSON.parse(
       fs.readFileSync(path.join(tmpDir, '.scaffold', 'state.json'), 'utf8'),
     ) as Record<string, unknown>
-    expect(state['schema-version']).toBe(1)
+    expect(state['schema-version']).toBe(4)
 
     // decisions.jsonl
     expect(fs.existsSync(path.join(tmpDir, '.scaffold', 'decisions.jsonl'))).toBe(true)

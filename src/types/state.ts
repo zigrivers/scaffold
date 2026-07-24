@@ -1,5 +1,8 @@
 import type { StepStatus, StepSource, DepthLevel, MethodologyName } from './enums.js'
 
+/** Verification level for a step's completion claim (D3). Absent ≡ 'unverified'. */
+export type VerificationLevel = 'verified' | 'declared' | 'unverified'
+
 /** A single step's state entry in state.json. */
 export interface StepStateEntry {
   status: StepStatus
@@ -8,7 +11,7 @@ export interface StepStateEntry {
   completed_at?: string  // ISO 8601; set once on first completion (no-regression)
   in_progress_started_at?: string  // ISO 8601; set when step first enters in_progress
   produces?: string[]  // expected output paths (set at init from frontmatter)
-  artifacts_verified?: boolean
+  verification?: VerificationLevel
   completed_by?: string
   reason?: string  // only when skipped
   depth?: DepthLevel  // only when completed
@@ -41,7 +44,7 @@ export interface ExtraStepEntry {
  * See state-json-schema.md.
  */
 export interface PipelineState {
-  'schema-version': 1 | 2 | 3
+  'schema-version': 1 | 2 | 3 | 4
   'scaffold-version': string  // semver
   init_methodology: MethodologyName
   config_methodology: MethodologyName

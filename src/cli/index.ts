@@ -17,6 +17,7 @@ import infoCommand from './commands/info.js'
 import versionCommand, { readPackageVersion } from './commands/version.js'
 import updateCommand from './commands/update.js'
 import dashboardCommand from './commands/dashboard.js'
+import doctorCommand from './commands/doctor.js'
 import decisionsCommand from './commands/decisions.js'
 import knowledgeCommand from './commands/knowledge.js'
 import skillCommand from './commands/skill.js'
@@ -49,6 +50,7 @@ export async function runCli(argv: string[]): Promise<void> {
     .command(versionCommand)
     .command(updateCommand)
     .command(dashboardCommand)
+    .command(doctorCommand)
     .command(guidesCommand)
     .command(decisionsCommand)
     .command(knowledgeCommand)

@@ -101,6 +101,19 @@ vi.mock('../../utils/fs.js', () => ({
   getPackagePipelineDir: vi.fn(() => '/fake/pipeline'),
 }))
 
+vi.mock('../../project/adoption-plan.js', () => ({
+  buildAdoptionPlan: vi.fn(() => ({
+    plan: {
+      generated_at: '2026-07-19T00:00:00.000Z', project_root: '/mock', mode: 'brownfield',
+      methodology: 'brownfield', includes: [], initialize: null, steps: [], disabled_by_preset: [],
+      plan_key: 'f'.repeat(64),
+    },
+    errors: [],
+  })),
+  renderPlanMarkdown: vi.fn(() => `Plan key: ${'f'.repeat(64)}`),
+  extractPlanKey: vi.fn((content: string) => (content.includes('f'.repeat(64)) ? 'f'.repeat(64) : null)),
+}))
+
 // ---------------------------------------------------------------------------
 // Import after mocks
 // ---------------------------------------------------------------------------
@@ -188,19 +201,18 @@ describe('adopt CLI JSON serialization', () => {
     return envelope.data
   }
 
-  it('emits snake_case keys in JSON output', async () => {
+  it('emits snake_case keys in JSON output (R1 D1: schema_version 3 plan shape)', async () => {
     await adoptCommand.handler(defaultArgv())
     const json = parseJsonOutput()
 
-    expect(json.schema_version).toBe(2)
-    expect(json).toHaveProperty('artifacts_found')
-    expect(json).toHaveProperty('detected_artifacts')
-    expect(json).toHaveProperty('steps_completed')
-    expect(json).toHaveProperty('steps_remaining')
-    expect(json).toHaveProperty('dry_run')
+    expect(json.schema_version).toBe(3)
+    expect(json).toHaveProperty('plan_key')
+    expect(json).toHaveProperty('steps')
+    expect(json).toHaveProperty('disabled_by_preset')
+    expect(json).toHaveProperty('initialize')
     // Verify snake_case, NOT camelCase
-    expect(json).not.toHaveProperty('artifactsFound')
-    expect(json).not.toHaveProperty('stepsCompleted')
+    expect(json).not.toHaveProperty('planKey')
+    expect(json).not.toHaveProperty('disabledByPreset')
   })
 
   it('includes detected_config with correct structure', async () => {
@@ -226,7 +238,7 @@ describe('adopt CLI JSON serialization', () => {
     expect(evidence[1]).toHaveProperty('signal', 'react-dep')
   })
 
-  it('game detection emits both game_config and detected_config', async () => {
+  it('game detection emits detected_config; deprecated game_config field is dropped (R1 D1)', async () => {
     vi.mocked(runAdoption).mockResolvedValueOnce({
       mode: 'brownfield',
       artifactsFound: 0,
@@ -246,8 +258,8 @@ describe('adopt CLI JSON serialization', () => {
     await adoptCommand.handler(defaultArgv())
     const json = parseJsonOutput()
 
-    expect(json.game_config).toEqual({ engine: 'unity' })
     expect(json.detected_config).toEqual({ type: 'game', config: { engine: 'unity' } })
+    expect(json).not.toHaveProperty('game_config')
   })
 
   it('research detection roundtrips through JSON serialization', async () => {

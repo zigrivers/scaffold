@@ -81,6 +81,19 @@ vi.mock('../shutdown.js', () => ({
   },
 }))
 
+vi.mock('../../project/adoption-plan.js', () => ({
+  buildAdoptionPlan: vi.fn(() => ({
+    plan: {
+      generated_at: '2026-07-19T00:00:00.000Z', project_root: '/mock', mode: 'brownfield',
+      methodology: 'brownfield', includes: [], initialize: null, steps: [], disabled_by_preset: [],
+      plan_key: 'f'.repeat(64),
+    },
+    errors: [],
+  })),
+  renderPlanMarkdown: vi.fn(() => `Plan key: ${'f'.repeat(64)}`),
+  extractPlanKey: vi.fn((content: string) => (content.includes('f'.repeat(64)) ? 'f'.repeat(64) : null)),
+}))
+
 // ---------------------------------------------------------------------------
 // Imports (after mocks)
 // ---------------------------------------------------------------------------
@@ -90,6 +103,7 @@ import { resolveOutputMode } from '../middleware/output-mode.js'
 import { StateManager } from '../../state/state-manager.js'
 import { acquireLock, releaseLock } from '../../state/lock-manager.js'
 import { runAdoption } from '../../project/adopt.js'
+import { buildAdoptionPlan } from '../../project/adoption-plan.js'
 import adoptCommand from './adopt.js'
 
 // ---------------------------------------------------------------------------
@@ -127,6 +141,7 @@ describe('adopt command', () => {
   const MockStateManager = vi.mocked(StateManager)
   const mockAcquireLock = vi.mocked(acquireLock)
   const mockRunAdoption = vi.mocked(runAdoption)
+  const mockBuildAdoptionPlan = vi.mocked(buildAdoptionPlan)
 
   beforeEach(() => {
     process.exitCode = undefined
@@ -179,29 +194,16 @@ describe('adopt command', () => {
     vi.restoreAllMocks()
   })
 
-  // Test 1: Exits 1 when project root not found
-  it('exits 1 when project root not found', async () => {
+  // Test 1 (R1 D2): first-touch — falls back to cwd instead of erroring when no .scaffold/ is found
+  it('falls back to process.cwd() when no project root is found (first-touch adoption, D2)', async () => {
     mockFindProjectRoot.mockReturnValue(null)
 
     await adoptCommand.handler(defaultArgv())
 
-    expect(process.exitCode).toBe(1)
-  })
-
-  // Test 2: Exits 3 when lock not acquired
-  it('exits 3 when lock not acquired', async () => {
-    mockAcquireLock.mockReturnValue({
-      acquired: false,
-      error: {
-        code: 'LOCK_HELD',
-        message: 'Lock is held by another process',
-        exitCode: 5,
-      },
-    })
-
-    await adoptCommand.handler(defaultArgv())
-
-    expect(process.exitCode).toBe(3)
+    expect(mockRunAdoption).toHaveBeenCalledWith(
+      expect.objectContaining({ projectRoot: process.cwd() }),
+    )
+    expect(process.exitCode).toBe(0)
   })
 
   // Test 3: Dry-run succeeds without modifying files
@@ -235,36 +237,26 @@ describe('adopt command', () => {
     expect(process.exitCode).toBe(0)
   })
 
-  // Test 4: JSON output has mode, artifacts_found, steps_completed, steps_remaining fields
-  it('JSON output has required fields', async () => {
+  // Test 4 (R1 D1): JSON output has the schema_version 3 plan fields
+  it('JSON output has required plan fields', async () => {
     mockResolveOutputMode.mockReturnValue('json')
-    mockRunAdoption.mockResolvedValue({
-      mode: 'brownfield',
-      artifactsFound: 2,
-      detectedArtifacts: [],
-      stepsCompleted: ['step-a', 'step-b'],
-      stepsRemaining: ['step-c'],
-      methodology: 'deep',
-      errors: [],
-      warnings: [],
-    })
 
     await adoptCommand.handler(defaultArgv({ format: 'json' }))
 
     const allOutput = writtenLines.join('')
     const envelope = JSON.parse(allOutput)
     const parsed = envelope.data ?? envelope
+    expect(parsed).toHaveProperty('schema_version', 3)
     expect(parsed).toHaveProperty('mode', 'brownfield')
-    expect(parsed).toHaveProperty('artifacts_found', 2)
-    expect(parsed).toHaveProperty('steps_completed')
-    expect(parsed).toHaveProperty('steps_remaining')
-    expect(Array.isArray(parsed.steps_completed)).toBe(true)
-    expect(Array.isArray(parsed.steps_remaining)).toBe(true)
+    expect(parsed).toHaveProperty('plan_key')
+    expect(parsed).toHaveProperty('disabled_by_preset')
+    expect(parsed).toHaveProperty('initialize')
+    expect(Array.isArray(parsed.steps)).toBe(true)
     expect(process.exitCode).toBe(0)
   })
 
-  // Test 5: Writes state.json when not dry-run — state gets initialized when state.json doesn't exist
-  it('calls initializeState when state does not exist and not dry-run', async () => {
+  // Test 5 (R1 D1): plan mode never initializes state, even when state.json is absent
+  it('does not call initializeState when state does not exist', async () => {
     // Use real tmpDir with no .scaffold/state.json — existsSync will return false naturally
     mockFindProjectRoot.mockReturnValue(tmpDir)
 
@@ -290,19 +282,17 @@ describe('adopt command', () => {
       initializeState: mockInitializeState,
     }) as unknown as InstanceType<typeof StateManager>)
 
-    await adoptCommand.handler(defaultArgv({ 'dry-run': false }))
+    await adoptCommand.handler(defaultArgv())
 
-    // state.json doesn't exist so initializeState should be called
-    expect(mockInitializeState).toHaveBeenCalled()
+    expect(mockInitializeState).not.toHaveBeenCalled()
     expect(process.exitCode).toBe(0)
   })
 
-  // Test 6: Writes detected game config to config.yml (even when config doesn't exist)
-  it('writes projectType and gameConfig to config.yml when game detected', async () => {
+  // Test 6 (R1 D1): plan mode does not write config.yml, even when a project type is detected
+  it('does not write config.yml when game detected (plan mode)', async () => {
     // Create .scaffold/ dir in tmpDir but no config.yml
     const scaffoldDir = path.join(tmpDir, '.scaffold')
     fs.mkdirSync(scaffoldDir, { recursive: true })
-    // No state.json either — triggers initializeState path
     mockFindProjectRoot.mockReturnValue(tmpDir)
 
     mockRunAdoption.mockResolvedValue({
@@ -319,18 +309,15 @@ describe('adopt command', () => {
       detectedConfig: { type: 'game', config: { engine: 'unity' } } as DetectedConfig,
     })
 
-    await adoptCommand.handler(defaultArgv({ 'dry-run': false }))
+    await adoptCommand.handler(defaultArgv())
 
     const configPath = path.join(scaffoldDir, 'config.yml')
-    expect(fs.existsSync(configPath)).toBe(true)
-    const configContent = fs.readFileSync(configPath, 'utf8')
-    expect(configContent).toContain('projectType: game')
-    expect(configContent).toContain('engine: unity')
+    expect(fs.existsSync(configPath)).toBe(false)
     expect(process.exitCode).toBe(0)
   })
 
-  // Test 7: Marks matched steps as completed in state
-  it('marks stepsCompleted in state when state.json exists', async () => {
+  // Test 7 (R1 D1): plan mode never calls saveState, even when state.json exists
+  it('does not call saveState when state.json exists (plan mode)', async () => {
     // Create .scaffold/state.json in tmpDir so fs.existsSync returns true
     const scaffoldDir = path.join(tmpDir, '.scaffold')
     fs.mkdirSync(scaffoldDir, { recursive: true })
@@ -374,14 +361,9 @@ describe('adopt command', () => {
       warnings: [],
     })
 
-    await adoptCommand.handler(defaultArgv({ 'dry-run': false }))
+    await adoptCommand.handler(defaultArgv())
 
-    // Verify saveState was called and step-a is now completed
-    expect(mockSaveState).toHaveBeenCalled()
-    const savedState = mockSaveState.mock.calls[0][0] as { steps: typeof stepsInState }
-    const stepA = savedState.steps['step-a']
-    expect(stepA.status).toBe('completed')
-    expect(stepA.completed_by).toBe('scaffold-adopt')
+    expect(mockSaveState).not.toHaveBeenCalled()
     expect(process.exitCode).toBe(0)
 
     void releaseLock
@@ -399,5 +381,91 @@ describe('adopt command', () => {
     // runAdoption should be called — no strict-mode rejection
     expect(mockRunAdoption).toHaveBeenCalled()
     expect(process.exitCode).toBe(0)
+  })
+
+  // Test 9 (R1 D1): plan mode writes nothing by default
+  it('plan mode writes nothing: no state initialization, no config write, no lock', async () => {
+    vi.mocked(findProjectRoot).mockReturnValue('/mock')
+    await adoptCommand.handler(defaultArgv())
+    expect(vi.mocked(StateManager)).not.toHaveBeenCalled()
+    expect(mockAcquireLock).not.toHaveBeenCalled()
+    const written = writtenLines.join('')
+    expect(written).toContain('Plan key:')
+  })
+
+  // Test 10 (R1 D1): JSON output is the plan object with schema_version 3
+  it('JSON output is the plan object with schema_version 3', async () => {
+    vi.mocked(findProjectRoot).mockReturnValue('/mock')
+    vi.mocked(resolveOutputMode).mockReturnValue('json')
+    await adoptCommand.handler(defaultArgv({ format: 'json' }))
+    const envelope = JSON.parse(writtenLines.join('')) as { data?: unknown }
+    const parsed = (envelope.data ?? envelope) as { schema_version: number; plan_key: string; steps: unknown[] }
+    expect(parsed.schema_version).toBe(3)
+    expect(parsed.plan_key).toBe('f'.repeat(64))
+    expect(Array.isArray(parsed.steps)).toBe(true)
+  })
+
+  // Test 11 (R1 T9 review): bare --write writes the default path
+  it('bare --write writes the default plan path with rendered plan markdown', async () => {
+    mockFindProjectRoot.mockReturnValue(tmpDir)
+
+    await adoptCommand.handler(defaultArgv({ write: '' }))
+
+    const defaultPath = path.join(tmpDir, 'docs', 'adoption-plan.md')
+    expect(fs.existsSync(defaultPath)).toBe(true)
+    const content = fs.readFileSync(defaultPath, 'utf8')
+    expect(content).toContain('Plan key:')
+    expect(process.exitCode).toBe(0)
+  })
+
+  // Test 12 (R1 T9 review): --write <path> writes the given (nested) path, not the default
+  it('--write <path> writes the given path and not the default path', async () => {
+    mockFindProjectRoot.mockReturnValue(tmpDir)
+
+    await adoptCommand.handler(defaultArgv({ write: 'notes/custom-plan.md' }))
+
+    const customPath = path.join(tmpDir, 'notes', 'custom-plan.md')
+    const defaultPath = path.join(tmpDir, 'docs', 'adoption-plan.md')
+    expect(fs.existsSync(customPath)).toBe(true)
+    const content = fs.readFileSync(customPath, 'utf8')
+    expect(content).toContain('Plan key:')
+    expect(fs.existsSync(defaultPath)).toBe(false)
+    expect(process.exitCode).toBe(0)
+  })
+
+  // Test 13 (R1 T9 review): no --write writes no plan file at all
+  it('writes no plan file when --write is omitted', async () => {
+    mockFindProjectRoot.mockReturnValue(tmpDir)
+
+    await adoptCommand.handler(defaultArgv())
+
+    const defaultPath = path.join(tmpDir, 'docs', 'adoption-plan.md')
+    expect(fs.existsSync(defaultPath)).toBe(false)
+    expect(fs.existsSync(path.join(tmpDir, 'docs'))).toBe(false)
+    expect(process.exitCode).toBe(0)
+  })
+
+  // Test 14 (R1 T9 review): --include is threaded through to buildAdoptionPlan
+  it('passes --include values through to buildAdoptionPlan', async () => {
+    mockFindProjectRoot.mockReturnValue(tmpDir)
+    mockBuildAdoptionPlan.mockClear()
+
+    await adoptCommand.handler(defaultArgv({ include: ['foo'] }))
+
+    expect(mockBuildAdoptionPlan).toHaveBeenCalledWith(
+      expect.objectContaining({ includes: ['foo'] }),
+    )
+    expect(process.exitCode).toBe(0)
+  })
+
+  it('prints the one-release behavior-change notice when run without --apply (D16)', async () => {
+    const stderrLines: string[] = []
+    vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+      stderrLines.push(String(chunk))
+      return true
+    })
+    vi.mocked(findProjectRoot).mockReturnValue('/mock')
+    await adoptCommand.handler(defaultArgv())
+    expect(stderrLines.join('')).toContain('Behavior change')
   })
 })

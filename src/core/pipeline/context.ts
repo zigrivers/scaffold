@@ -24,7 +24,7 @@ export function loadPipelineContext(
 
   // Validate config and presets against pipeline steps only (not tools)
   const { config, errors: configErrors, warnings: configWarnings } = loadConfig(projectRoot, pipelineStepNames)
-  const { deep, mvp, custom } = loadAllPresets(methodologyDir, pipelineStepNames)
+  const { deep, mvp, custom, brownfield } = loadAllPresets(methodologyDir, pipelineStepNames)
 
   return {
     projectRoot,
@@ -32,7 +32,7 @@ export function loadPipelineContext(
     config,
     configErrors,
     configWarnings,
-    presets: { deep, mvp, custom },
+    presets: { deep, mvp, custom, brownfield },
     methodologyDir,
   }
 }
