@@ -1,4 +1,4 @@
-import type { DecisionEntry } from '../types/index.js'
+import type { DecisionEntry, VerificationAuditRecord } from '../types/index.js'
 import type { StatePathResolver } from './state-path-resolver.js'
 import { fileExists, atomicWriteFile } from '../utils/fs.js'
 import { decisionParseError } from '../utils/errors.js'
@@ -28,7 +28,12 @@ function readAllEntries(filePath: string): DecisionEntry[] {
     if (line === '') continue
 
     try {
-      entries.push(JSON.parse(line) as DecisionEntry)
+      const parsed = JSON.parse(line) as Record<string, unknown>
+      // D3 audit records (verification-reversal / partial-artifacts) share the
+      // file but are not decisions — the decisions reader skips any line
+      // carrying an `event` field. They also never participate in D-NNN ids.
+      if ('event' in parsed) continue
+      entries.push(parsed as unknown as DecisionEntry)
     } catch (err) {
       const warning = decisionParseError(filePath, i + 1, (err as Error).message)
       process.stderr.write(`[scaffold] ${warning.message}\n`)
@@ -103,4 +108,20 @@ export function readDecisions(
   }
 
   return entries
+}
+
+/**
+ * Append a D3 verification audit record to .scaffold/decisions.jsonl.
+ * Audit records carry no D-NNN id and are invisible to readDecisions.
+ */
+export function appendAuditRecord(
+  projectRoot: string,
+  record: VerificationAuditRecord,
+  pathResolver?: StatePathResolver,
+): void {
+  const scaffoldDir = pathResolver?.scaffoldDir ?? path.join(projectRoot, SCAFFOLD_DIR)
+  fs.mkdirSync(scaffoldDir, { recursive: true })
+  const filePath = decisionsPath(projectRoot, pathResolver)
+  const existing = fileExists(filePath) ? fs.readFileSync(filePath, 'utf8') : ''
+  atomicWriteFile(filePath, existing + JSON.stringify(record) + '\n')
 }
