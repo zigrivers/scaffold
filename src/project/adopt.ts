@@ -164,7 +164,9 @@ export async function runAdoption(options: {
     detectedArtifacts,
     stepsCompleted,
     stepsRemaining,
-    methodology,
+    // D11 (R1): init-mode drives preset selection — brownfield/v1-migration repos
+    // adopt under the brownfield preset, replacing the hardcoded 'deep'.
+    methodology: detection.mode === 'greenfield' ? methodology : 'brownfield',
     errors: [],
     warnings: [],
   }

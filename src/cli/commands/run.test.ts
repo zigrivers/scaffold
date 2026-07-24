@@ -371,6 +371,7 @@ beforeEach(() => {
     deep: preset,
     mvp: makePreset({ name: 'mvp', default_depth: 1 }),
     custom: null,
+    brownfield: null,
     errors: [],
     warnings: [],
   })

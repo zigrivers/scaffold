@@ -179,7 +179,10 @@ describe('adopt JSON output shape', () => {
       verbose: false,
     })
     expect(result).toHaveProperty('mode')
-    expect(result).toHaveProperty('methodology', 'deep')
+    // D11 (R1): this file's detectProjectMode mock returns mode: 'brownfield'
+    // (line 16 above), so methodology is now 'brownfield' — not the passed-in
+    // 'deep' default — per the init-mode-drives-preset-selection change.
+    expect(result).toHaveProperty('methodology', 'brownfield')
     expect(Array.isArray(result.stepsCompleted)).toBe(true)
     expect(Array.isArray(result.stepsRemaining)).toBe(true)
     expect(result).toHaveProperty('artifactsFound')

@@ -560,6 +560,7 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
     }, async () => {
       const dryRun = argv['dry-run'] ?? false
       const metaPromptDir = getPackagePipelineDir(projectRoot)
+      // greenfield fallback — runAdoption returns 'brownfield' for brownfield/v1-migration repos (D11 R1)
       const methodology = 'deep'
 
       // JSON mode → auto per spec Section 4 R2-delta-8
@@ -611,7 +612,7 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
           }
         }
         try {
-          writeOrUpdateState(projectRoot, adoptResult, methodology, metaPromptDir)
+          writeOrUpdateState(projectRoot, adoptResult, adoptResult.methodology, metaPromptDir)
         } catch (err) {
           // State write failure is recoverable — state.json is derived data (re-created
           // from config + artifacts on the next `scaffold` command). Config is the source

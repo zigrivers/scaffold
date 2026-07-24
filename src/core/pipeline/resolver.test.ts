@@ -28,7 +28,7 @@ function makeCtx(overrides: Partial<PipelineContext> = {}): PipelineContext {
     config: null,
     configErrors: [],
     configWarnings: [],
-    presets: { mvp: null, deep: null, custom: null },
+    presets: { mvp: null, deep: null, custom: null, brownfield: null },
     methodologyDir: '/fake/methodology',
     ...overrides,
   }

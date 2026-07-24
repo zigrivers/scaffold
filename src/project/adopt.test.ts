@@ -388,3 +388,30 @@ describe('runAdoption', () => {
     // Unity must win because Assets/*.meta is detected first in adopt.ts:74-82
   })
 })
+
+describe('brownfield methodology selection (D11 R1)', () => {
+  it('selects brownfield for a brownfield repo instead of the passed-in default', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'adopt-bf-'))
+    fs.writeFileSync(path.join(dir, 'package.json'), '{"name":"x"}')
+    fs.mkdirSync(path.join(dir, 'src'))
+    fs.writeFileSync(path.join(dir, 'src', 'index.ts'), 'export {}')
+    // This file mocks ./detector.js module-wide (see top of file); every other
+    // test in this suite overrides the mock's return value per-test the same
+    // way — real fs-based detection is not exercised here.
+    vi.mocked(detectProjectMode).mockReturnValue({
+      mode: 'brownfield',
+      signals: [],
+      methodologySuggestion: 'mvp',
+      sourceFileCount: 2,
+    })
+    const result = await runAdoption({
+      projectRoot: dir,
+      metaPromptDir: path.join(process.cwd(), 'content', 'pipeline'),
+      methodology: 'deep',
+      dryRun: true,
+      auto: true,
+    })
+    expect(result.mode).toBe('brownfield')
+    expect(result.methodology).toBe('brownfield')
+  })
+})

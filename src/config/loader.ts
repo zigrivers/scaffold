@@ -24,7 +24,7 @@ import { migrateV1 } from './migration.js'
 const KNOWN_FIELDS = new Set(['version', 'methodology', 'custom', 'platforms', 'project'])
 
 /** Valid methodology values. */
-const VALID_METHODOLOGIES = ['deep', 'mvp', 'custom']
+const VALID_METHODOLOGIES = ['deep', 'mvp', 'custom', 'brownfield']
 
 /** Result of loadConfig. */
 interface LoadResult {

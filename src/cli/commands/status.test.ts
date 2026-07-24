@@ -44,6 +44,7 @@ vi.mock('../../core/assembly/preset-loader.js', () => ({
     deep: null,
     mvp: null,
     custom: null,
+    brownfield: null,
     errors: [],
     warnings: [],
   })),

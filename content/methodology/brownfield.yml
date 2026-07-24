@@ -1,0 +1,128 @@
+# methodology/brownfield.yml
+# Enablement-only preset for adopting an existing codebase (D11, R1).
+# Foundation / environment / quality first; the doc-chain middle
+# (modeling -> specification), platform parity, and the validation audits are
+# disabled by default — opt in per-step via `scaffold adopt --include <step>`.
+name: Brownfield
+description: Adopt an existing codebase — codify what exists, interview only for intent
+default_depth: 3
+
+steps:
+  # Phase 0 — Product Vision (vision)
+  create-vision: { enabled: true }
+  review-vision: { enabled: true }
+  innovate-vision: { enabled: false }
+  # Phase 1 — Product Definition (pre)
+  create-prd: { enabled: true }
+  review-prd: { enabled: true }
+  innovate-prd: { enabled: false }
+  user-stories: { enabled: true }
+  review-user-stories: { enabled: true }
+  innovate-user-stories: { enabled: false }
+  # Phase 2 — Project Foundation (foundation)
+  github-setup: { enabled: true }
+  beads: { enabled: true, conditional: "if-needed" }
+  tech-stack: { enabled: true }
+  coding-standards: { enabled: true }
+  tdd: { enabled: true }
+  project-structure: { enabled: true }
+  # Phase 3 — Development Environment (environment)
+  dev-env-setup: { enabled: true }
+  staging-environments: { enabled: true, conditional: "if-needed" }
+  design-system: { enabled: true, conditional: "if-needed" }
+  git-workflow: { enabled: true }
+  merge-throughput: { enabled: true, conditional: "if-needed" }
+  automated-pr-review: { enabled: true, conditional: "if-needed" }
+  ai-memory-setup: { enabled: true }
+  # Phase 4 — Testing Integration (integration)
+  add-e2e-testing: { enabled: true, conditional: "if-needed" }
+  # Phase 5 — Domain Modeling (modeling) — doc-chain middle, disabled by default
+  domain-modeling: { enabled: false }
+  review-domain-modeling: { enabled: false }
+  # Phase 6 — Architecture Decisions (decisions) — doc-chain middle, disabled by default
+  adrs: { enabled: false }
+  review-adrs: { enabled: false }
+  # Phase 7 — System Architecture (architecture) — doc-chain middle, disabled by default
+  system-architecture: { enabled: false }
+  review-architecture: { enabled: false }
+  # Phase 8 — Specifications (specification) — doc-chain middle, disabled by default
+  database-schema: { enabled: false }
+  review-database: { enabled: false }
+  api-contracts: { enabled: false }
+  mcp-tool-resource-contract: { enabled: false }
+  review-api: { enabled: false }
+  ux-spec: { enabled: false }
+  review-ux: { enabled: false }
+  # Phase 9 — Quality Gates (quality) — quality-first: fully enabled
+  review-testing: { enabled: true }
+  story-tests: { enabled: true }
+  create-evals: { enabled: true }
+  operations: { enabled: true }
+  review-operations: { enabled: true }
+  security: { enabled: true }
+  review-security: { enabled: true }
+  # Phase 10 — Platform Parity (parity) — disabled by default
+  platform-parity-review: { enabled: false }
+  # Phase 11 — Consolidation (consolidation)
+  claude-md-optimization: { enabled: true }
+  workflow-audit: { enabled: true }
+  # Phase 12 — Planning (planning)
+  implementation-plan: { enabled: true }
+  implementation-plan-review: { enabled: false }
+  # Phase 13 — Validation (validation) — audits disabled by default
+  cross-phase-consistency: { enabled: false }
+  traceability-matrix: { enabled: false }
+  decision-completeness: { enabled: false }
+  critical-path-walkthrough: { enabled: false }
+  implementability-dry-run: { enabled: false }
+  dependency-graph-validation: { enabled: false }
+  scope-creep-check: { enabled: false }
+  # Phase 14 — Finalization (finalization)
+  apply-fixes-and-freeze: { enabled: false }
+  developer-onboarding-guide: { enabled: false }
+  implementation-playbook: { enabled: true }
+  materialize-plan-to-beads: { enabled: true, conditional: "if-needed" }
+  # Phase 15 — Build (build) — stateless, on-demand execution steps
+  single-agent-start: { enabled: true }
+  single-agent-resume: { enabled: true }
+  multi-agent-start: { enabled: true }
+  multi-agent-resume: { enabled: true }
+  quick-task: { enabled: true }
+  new-enhancement: { enabled: true }
+  # Game development steps (enabled via game overlay)
+  game-design-document: { enabled: false }
+  review-gdd: { enabled: false }
+  performance-budgets: { enabled: false }
+  narrative-bible: { enabled: false }
+  netcode-spec: { enabled: false }
+  review-netcode: { enabled: false }
+  ai-behavior-design: { enabled: false }
+  game-accessibility: { enabled: false }
+  input-controls-spec: { enabled: false }
+  game-ui-spec: { enabled: false }
+  review-game-ui: { enabled: false }
+  content-structure-design: { enabled: false }
+  art-bible: { enabled: false }
+  audio-design: { enabled: false }
+  economy-design: { enabled: false }
+  review-economy: { enabled: false }
+  online-services-spec: { enabled: false }
+  modding-ugc-spec: { enabled: false }
+  save-system-spec: { enabled: false }
+  localization-plan: { enabled: false }
+  playtest-plan: { enabled: false }
+  analytics-telemetry: { enabled: false }
+  live-ops-plan: { enabled: false }
+  platform-cert-prep: { enabled: false }
+  # Multi-service steps (enabled via multi-service overlay)
+  service-ownership-map: { enabled: false }
+  inter-service-contracts: { enabled: false }
+  cross-service-auth: { enabled: false }
+  cross-service-observability: { enabled: false }
+  integration-test-plan: { enabled: false }
+  # macOS-native steps (enabled via macos-native overlay)
+  macos-ui-spec: { enabled: false }
+  review-macos-ui: { enabled: false }
+  macos-distribution-spec: { enabled: false }
+  macos-entitlements-privacy-spec: { enabled: false }
+  review-macos-release: { enabled: false }

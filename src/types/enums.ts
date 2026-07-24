@@ -1,5 +1,5 @@
 /** Methodology preset name. See config-yml-schema.md. */
-export type MethodologyName = 'deep' | 'mvp' | 'custom'
+export type MethodologyName = 'deep' | 'mvp' | 'custom' | 'brownfield'
 
 /**
  * Depth level scale 1-5. 1=minimal, 5=comprehensive.

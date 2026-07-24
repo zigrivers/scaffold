@@ -166,6 +166,7 @@ export function loadAllPresets(
   deep: MethodologyPreset | null
   mvp: MethodologyPreset | null
   custom: MethodologyPreset | null
+  brownfield: MethodologyPreset | null
   errors: ScaffoldError[]
   warnings: ScaffoldWarning[]
 } {
@@ -193,10 +194,18 @@ export function loadAllPresets(
   allErrors.push(...customErrors)
   allWarnings.push(...customWarnings)
 
+  const { preset: brownfield, errors: brownfieldErrors, warnings: brownfieldWarnings } = loadPreset(
+    path.join(methodologyDir, 'brownfield.yml'),
+    knownStepNames,
+  )
+  allErrors.push(...brownfieldErrors)
+  allWarnings.push(...brownfieldWarnings)
+
   return {
     deep,
     mvp,
     custom,
+    brownfield,
     errors: allErrors,
     warnings: allWarnings,
   }

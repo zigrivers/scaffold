@@ -309,7 +309,7 @@ export const ProjectSchema = z.object({
 
 export const ConfigSchema = z.object({
   version: z.literal(2),
-  methodology: z.enum(['deep', 'mvp', 'custom']).default('deep'),
+  methodology: z.enum(['deep', 'mvp', 'custom', 'brownfield']).default('deep'),
   custom: CustomSchema.optional(),
   // Gemini was dropped (its CLI is sunset). Strip a legacy `gemini` entry from
   // existing configs BEFORE the enum validates, so old project configs still
