@@ -2957,7 +2957,7 @@ function applyAdoptionPlan(options: { projectRoot: string; plan: AdoptionPlan; s
 
 **Steps:**
 
-- [ ] Make adopt first-touch. In `src/cli/middleware/project-root.ts` change the constant to:
+- [x] Make adopt first-touch. In `src/cli/middleware/project-root.ts` change the constant to:
 
 ```ts
 export const ROOT_OPTIONAL_COMMANDS = ['init', 'version', 'update', 'adopt'] as const
@@ -2979,7 +2979,7 @@ and append to `src/cli/middleware/project-root.test.ts`:
     const projectRoot = (argv.root as string | undefined) ?? findProjectRoot(process.cwd()) ?? process.cwd()
 ```
 
-- [ ] Write the failing apply-module tests `src/project/adoption-apply.test.ts` (complete file):
+- [x] Write the failing apply-module tests `src/project/adoption-apply.test.ts` (complete file):
 
 ```ts
 import { describe, it, expect } from 'vitest'
@@ -3076,8 +3076,8 @@ describe('applyAdoptionPlan (D1/D2/D3)', () => {
 })
 ```
 
-- [ ] Run `npx vitest run src/project/adoption-apply.test.ts` — FAILS (module missing).
-- [ ] Create `src/project/adoption-apply.ts` (complete file):
+- [x] Run `npx vitest run src/project/adoption-apply.test.ts` — FAILS (module missing).
+- [x] Create `src/project/adoption-apply.ts` (complete file):
 
 ```ts
 import fs from 'node:fs'
@@ -3278,8 +3278,8 @@ export async function applyAdoptionPlan(options: {
 }
 ```
 
-- [ ] Run `npx vitest run src/project/adoption-apply.test.ts` — green.
-- [ ] Wire the CLI. In `src/cli/commands/adopt.ts`:
+- [x] Run `npx vitest run src/project/adoption-apply.test.ts` — green.
+- [x] Wire the CLI. In `src/cli/commands/adopt.ts`:
   1. Re-add the lock/shutdown imports removed in Task 9 (`acquireLock`, `getLockPath`, `releaseLock` from `'../../state/lock-manager.js'`; `shutdown` from `'../shutdown.js'`) plus `import { applyAdoptionPlan } from '../../project/adoption-apply.js'`, `import { extractPlanKey } from '../../project/adoption-plan.js'` (widen the Task 9 import), and `import { readPackageVersion } from './version.js'`.
   2. Add builder options (General group; also add `'apply', 'plan', 'plan-key'` to the `.group` list):
 
@@ -3415,7 +3415,7 @@ export async function applyAdoptionPlan(options: {
       }
 ```
 
-- [ ] Write the failing CLI apply tests `src/cli/commands/adopt.apply.test.ts` (complete file):
+- [x] Write the failing CLI apply tests `src/cli/commands/adopt.apply.test.ts` (complete file):
 
 ```ts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -3515,8 +3515,8 @@ describe('adopt --apply (D1/D2)', () => {
 })
 ```
 
-- [ ] Run `npx vitest run src/cli/commands/adopt.apply.test.ts src/project/adoption-apply.test.ts src/cli/middleware/project-root.test.ts src/cli/commands/adopt.test.ts` — green.
-- [ ] Commit: `git add -A && git commit -m "feat(adopt): --apply — plan-key drift contract, first-touch init, audit reversals, closing doctor (R1 D1/D2)"`
+- [x] Run `npx vitest run src/cli/commands/adopt.apply.test.ts src/project/adoption-apply.test.ts src/cli/middleware/project-root.test.ts src/cli/commands/adopt.test.ts` — green.
+- [x] Commit: `git add -A && git commit -m "feat(adopt): --apply — plan-key drift contract, first-touch init, audit reversals, closing doctor (R1 D1/D2)"`
 
 ---
 
