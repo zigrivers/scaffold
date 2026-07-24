@@ -101,6 +101,7 @@ const nextCommand: CommandModule<Record<string, unknown>, NextArgs> = {
     // Pass the CURRENT resolved outputs so an upgraded output contract is honored.
     const conflictCheck = applyConflictOverrides(
       state.steps, projectRoot, (slug) => pipeline.stepMeta.get(slug)?.outputs,
+      service, pipeline.globalSteps,
     )
     const conflictCount = conflictCheck.conflicts.length
     if (conflictCount > 0) {

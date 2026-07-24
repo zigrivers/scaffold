@@ -265,11 +265,23 @@ export function verifyStep(
  * was completed, and checking only the stored `entry.produces` would let a
  * now-incomplete step stay `completed`. The stored `entry.produces` is used
  * only as a fallback for steps the resolver no longer knows (extra/removed).
+ *
+ * `service`/`globalSteps`, when supplied, mirror `detectCompletion`'s
+ * service-scoping: a service-local step's outputs (any slug not in
+ * `globalSteps`) are checked under `services/<service>/<output>` rather than
+ * at the project root. Without this, `scaffold status --service api` would
+ * check a service-local step's output at the ROOT (always absent), causing a
+ * false conflict — or worse, a same-named root file could mask a genuinely
+ * missing service file and report a broken step as complete. Global steps
+ * (present in `globalSteps`) and callers that omit `service` stay unprefixed,
+ * identical to today's behavior.
  */
 export function applyConflictOverrides(
   steps: Record<string, StepStateEntry>,
   projectRoot: string,
   resolvedOutputs?: (slug: string) => string[] | undefined,
+  service?: string,
+  globalSteps?: ReadonlySet<string>,
 ): { steps: Record<string, StepStateEntry>; conflicts: string[] } {
   const conflicts: string[] = []
   let overridden: Record<string, StepStateEntry> | null = null
@@ -279,8 +291,10 @@ export function applyConflictOverrides(
     // fallback for steps the resolved pipeline no longer knows.
     const outputs = resolvedOutputs?.(slug) ?? entry.produces ?? []
     if (outputs.length === 0) continue
+    const isServiceLocal = service !== undefined && !(globalSteps?.has(slug) ?? false)
     const anyMissing = outputs.some((output) => {
-      const fullPath = resolveContainedArtifactPath(projectRoot, output)
+      const relPath = isServiceLocal ? path.join('services', service, output) : output
+      const fullPath = resolveContainedArtifactPath(projectRoot, relPath)
       return fullPath === null || !fileExists(fullPath)
     })
     if (!anyMissing) continue

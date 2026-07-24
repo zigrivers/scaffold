@@ -175,6 +175,7 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
     // contract is honored (not just the outputs stored at completion time).
     const conflictCheck = applyConflictOverrides(
       state.steps, projectRoot, (slug) => pipeline.stepMeta.get(slug)?.outputs,
+      service, pipeline.globalSteps,
     )
     const conflictSlugs = new Set(conflictCheck.conflicts)
     if (conflictSlugs.size > 0) {

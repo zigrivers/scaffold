@@ -428,4 +428,58 @@ describe('applyConflictOverrides (D3 — fs-only eligibility demotion)', () => {
     // Without the resolver (historical produces only) the step would NOT demote.
     expect(applyConflictOverrides(steps, dir).conflicts).toEqual([])
   })
+
+  describe('service scope (mirrors detectCompletion)', () => {
+    it('does NOT demote a service-local completed step whose output exists only under services/<svc>/', () => {
+      const dir = makeTempDir()
+      fs.mkdirSync(path.join(dir, 'services', 'api', 'docs'), { recursive: true })
+      fs.writeFileSync(path.join(dir, 'services', 'api', 'docs', 'tech-stack.md'), 'x', 'utf8')
+      const steps: Record<string, StepStateEntry> = {
+        'tech-stack': { status: 'completed', source: 'pipeline', produces: ['docs/tech-stack.md'] },
+      }
+      const result = applyConflictOverrides(steps, dir, undefined, 'api', new Set())
+      expect(result.conflicts).toEqual([])
+      expect(result.steps).toBe(steps)
+    })
+
+    it('DOES demote a service-local step whose service file is missing, even with a same-named root file', () => {
+      // The exact false-complete scenario: the api service's own file was
+      // deleted, but an unrelated root-level (or other-service) file with the
+      // same relative name happens to exist. Without service scoping this
+      // would incorrectly satisfy the check and report a broken step as
+      // COMPLETE — the dishonesty D3/R1 removes.
+      const dir = makeTempDir()
+      fs.mkdirSync(path.join(dir, 'docs'), { recursive: true })
+      fs.writeFileSync(path.join(dir, 'docs', 'tech-stack.md'), 'root file, not the service file', 'utf8')
+      const steps: Record<string, StepStateEntry> = {
+        'tech-stack': { status: 'completed', source: 'pipeline', produces: ['docs/tech-stack.md'] },
+      }
+      const result = applyConflictOverrides(steps, dir, undefined, 'api', new Set())
+      expect(result.conflicts).toEqual(['tech-stack'])
+      expect(result.steps['tech-stack'].status).toBe('pending')
+    })
+
+    it('checks global steps at the root (unprefixed) even in service scope', () => {
+      const dir = makeTempDir()
+      fs.writeFileSync(path.join(dir, 'CLAUDE.md'), 'x', 'utf8')
+      const steps: Record<string, StepStateEntry> = {
+        beads: { status: 'completed', source: 'pipeline', produces: ['CLAUDE.md'] },
+      }
+      const result = applyConflictOverrides(steps, dir, undefined, 'api', new Set(['beads']))
+      expect(result.conflicts).toEqual([])
+      expect(result.steps).toBe(steps)
+    })
+
+    it('is unaffected when service is omitted (root/flat projects behave exactly as before)', () => {
+      const dir = makeTempDir()
+      fs.mkdirSync(path.join(dir, 'services', 'api', 'docs'), { recursive: true })
+      fs.writeFileSync(path.join(dir, 'services', 'api', 'docs', 'tech-stack.md'), 'x', 'utf8')
+      const steps: Record<string, StepStateEntry> = {
+        'tech-stack': { status: 'completed', source: 'pipeline', produces: ['docs/tech-stack.md'] },
+      }
+      // No service arg — checked at the (unprefixed) root, which is absent, so it demotes.
+      const result = applyConflictOverrides(steps, dir)
+      expect(result.conflicts).toEqual(['tech-stack'])
+    })
+  })
 })

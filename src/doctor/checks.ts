@@ -346,7 +346,11 @@ export const schedulerCheck: DoctorCheck = {
       }
       const label = plists[0].replace(/\.plist$/, '')
       // File presence proves nothing — verify the job is actually LOADED.
-      const printed = ctx.runCmd(`launchctl print gui/$(id -u)/${label}`, 15)
+      // Argv, not a shell string: `label` comes from a directory listing
+      // matched by a regex whose `.+` admits shell metacharacters, so it
+      // must never be interpolated into a shell command.
+      const uid = process.getuid?.() ?? 0
+      const printed = ctx.runArgv('launchctl', ['print', `gui/${uid}/${label}`], 15)
       if (printed.status !== 0) {
         return res(schedulerCheck, 'error',
           `${plists[0]} exists but the job is not loaded (file presence proves nothing)`,
@@ -368,7 +372,9 @@ export const schedulerCheck: DoctorCheck = {
           'not configured (no scaffold-*-merge-poller.timer; `scaffold sched` ships in R2)')
       }
       const timer = timers[0]
-      const active = ctx.runCmd(`systemctl --user is-active ${timer}`, 15)
+      // Argv, not a shell string — same reasoning as the launchctl call above:
+      // `timer` is a filename matched by a permissive regex.
+      const active = ctx.runArgv('systemctl', ['--user', 'is-active', timer], 15)
       if (active.status === 0) return res(schedulerCheck, 'ok', `systemd user timer ${timer} active`)
       return res(schedulerCheck, 'warn', `${timer} present but not active`,
         `systemctl --user start ${timer}`)

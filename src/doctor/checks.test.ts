@@ -4,9 +4,9 @@ import os from 'node:os'
 import path from 'node:path'
 import {
   beadsBinaryCheck, beadsLiveCheck, beadsBackupCheck, beadsGuardCheck, hooksRegisteredCheck,
-  gateTargetsCheck, queueDaemonCheck, queuePausedCheck, pipelineVerificationCheck,
+  gateTargetsCheck, queueDaemonCheck, queuePausedCheck, pipelineVerificationCheck, schedulerCheck,
 } from './checks.js'
-import { makeRunCmd } from './run.js'
+import { makeRunCmd, makeRunArgv } from './run.js'
 import type { DoctorContext } from './types.js'
 
 function tmpRoot(): string {
@@ -14,7 +14,7 @@ function tmpRoot(): string {
 }
 
 function ctxFor(root: string): DoctorContext {
-  return { projectRoot: root, runCmd: makeRunCmd(root) }
+  return { projectRoot: root, runCmd: makeRunCmd(root), runArgv: makeRunArgv(root) }
 }
 
 // --- hermetic PATH-shim helpers (new tests below) --------------------------
@@ -57,16 +57,15 @@ function writeNoopShim(bin: string, name: string): void {
 
 /** Prepends `bin` to the real PATH — used when a check also needs other real binaries. */
 function ctxWithBin(root: string, bin: string): DoctorContext {
-  return {
-    projectRoot: root,
-    runCmd: makeRunCmd(root, { ...process.env, PATH: `${bin}${path.delimiter}${process.env['PATH'] ?? ''}` }),
-  }
+  const env = { ...process.env, PATH: `${bin}${path.delimiter}${process.env['PATH'] ?? ''}` }
+  return { projectRoot: root, runCmd: makeRunCmd(root, env), runArgv: makeRunArgv(root, env) }
 }
 
 /** PATH = bin ONLY (no fallback to the real PATH) — for tests that must prove a binary is absent
  *  or present regardless of what happens to be installed on the host machine. */
 function ctxWithOnlyBin(root: string, bin: string): DoctorContext {
-  return { projectRoot: root, runCmd: makeRunCmd(root, { ...process.env, PATH: bin }) }
+  const env = { ...process.env, PATH: bin }
+  return { projectRoot: root, runCmd: makeRunCmd(root, env), runArgv: makeRunArgv(root, env) }
 }
 
 describe('doctor checks — not configured means skipped, never failed (D5)', () => {
@@ -118,10 +117,8 @@ describe('beads/binary with a PATH shim', () => {
     const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'doctor-bin-'))
     const shim = path.join(bin, 'bd')
     fs.writeFileSync(shim, '#!/usr/bin/env bash\necho "bd version 1.0.9"\n', { mode: 0o755 })
-    const ctx: DoctorContext = {
-      projectRoot: root,
-      runCmd: makeRunCmd(root, { ...process.env, PATH: `${bin}${path.delimiter}${process.env['PATH'] ?? ''}` }),
-    }
+    const env = { ...process.env, PATH: `${bin}${path.delimiter}${process.env['PATH'] ?? ''}` }
+    const ctx: DoctorContext = { projectRoot: root, runCmd: makeRunCmd(root, env), runArgv: makeRunArgv(root, env) }
     expect(beadsBinaryCheck.run(ctx).status).toBe('warn')
     fs.writeFileSync(shim, '#!/usr/bin/env bash\necho "bd version 1.1.0"\n', { mode: 0o755 })
     expect(beadsBinaryCheck.run(ctx).status).toBe('ok')
@@ -388,5 +385,113 @@ describe('pipeline/verification', () => {
     const result = pipelineVerificationCheck.run(ctxFor(root))
     expect(result.status).toBe('error')
     expect(result.detail).toContain('beads')
+  })
+})
+
+describe('scheduler/loaded — argv exec (no shell)', () => {
+  // schedulerCheck reads the LaunchAgents/systemd-user directory under
+  // os.homedir(), which resolves via $HOME on POSIX — override it (and
+  // process.platform, to exercise both branches regardless of host OS)
+  // for the duration of each call, always restoring afterward.
+  function withPlatform<T>(platform: NodeJS.Platform, fn: () => T): T {
+    const original = process.platform
+    Object.defineProperty(process, 'platform', { value: platform, configurable: true })
+    try {
+      return fn()
+    } finally {
+      Object.defineProperty(process, 'platform', { value: original, configurable: true })
+    }
+  }
+
+  function withHome<T>(home: string, fn: () => T): T {
+    const original = process.env['HOME']
+    process.env['HOME'] = home
+    try {
+      return fn()
+    } finally {
+      if (original === undefined) delete process.env['HOME']
+      else process.env['HOME'] = original
+    }
+  }
+
+  it('macOS: a malicious label is a literal argv element — no shell injection — and reports ok when loaded', () => {
+    const home = newTmpRoot()
+    const agentsDir = path.join(home, 'Library', 'LaunchAgents')
+    fs.mkdirSync(agentsDir, { recursive: true })
+    // A crafted label containing a command substitution. Under the old
+    // shell:true + string-interpolation implementation this would execute
+    // `touch INJECTED` as a side effect of building the command string.
+    const maliciousLabel = 'com.acme$(touch INJECTED).merge-poller'
+    fs.writeFileSync(path.join(agentsDir, `${maliciousLabel}.plist`), '<plist/>')
+
+    const bin = newBinDir()
+    const capture = path.join(bin, 'captured-argv.txt')
+    fs.writeFileSync(
+      path.join(bin, 'launchctl'),
+      `#!/usr/bin/env bash\nprintf '%s\\n' "$@" > "${capture}"\nexit 0\n`,
+      { mode: 0o755 },
+    )
+
+    const root = newTmpRoot()
+    const result = withPlatform('darwin', () => withHome(home, () => schedulerCheck.run(ctxWithBin(root, bin))))
+
+    expect(result.status).toBe('ok')
+    expect(result.detail).toContain(maliciousLabel)
+    expect(fs.existsSync(path.join(root, 'INJECTED'))).toBe(false)
+    const captured = fs.readFileSync(capture, 'utf8').trim().split('\n')
+    const uid = process.getuid?.() ?? 0
+    expect(captured).toEqual(['print', `gui/${uid}/${maliciousLabel}`])
+  })
+
+  it('macOS: reports error with remediation when the launchd job is not loaded', () => {
+    const home = newTmpRoot()
+    const agentsDir = path.join(home, 'Library', 'LaunchAgents')
+    fs.mkdirSync(agentsDir, { recursive: true })
+    fs.writeFileSync(path.join(agentsDir, 'com.acme.merge-poller.plist'), '<plist/>')
+    const bin = newBinDir()
+    fs.writeFileSync(path.join(bin, 'launchctl'), '#!/usr/bin/env bash\nexit 1\n', { mode: 0o755 })
+
+    const root = newTmpRoot()
+    const result = withPlatform('darwin', () => withHome(home, () => schedulerCheck.run(ctxWithBin(root, bin))))
+    expect(result.status).toBe('error')
+    expect(result.remediation).toContain('launchctl bootstrap')
+  })
+
+  it('linux: a malicious timer is a literal argv element — no shell injection — and reports ok when active', () => {
+    const home = newTmpRoot()
+    const unitDir = path.join(home, '.config', 'systemd', 'user')
+    fs.mkdirSync(unitDir, { recursive: true })
+    const maliciousTimer = 'scaffold-acme$(touch INJECTED)-merge-poller.timer'
+    fs.writeFileSync(path.join(unitDir, maliciousTimer), '[Timer]')
+
+    const bin = newBinDir()
+    const capture = path.join(bin, 'captured-argv.txt')
+    fs.writeFileSync(
+      path.join(bin, 'systemctl'),
+      `#!/usr/bin/env bash\nprintf '%s\\n' "$@" > "${capture}"\necho active\nexit 0\n`,
+      { mode: 0o755 },
+    )
+
+    const root = newTmpRoot()
+    const result = withPlatform('linux', () => withHome(home, () => schedulerCheck.run(ctxWithBin(root, bin))))
+
+    expect(result.status).toBe('ok')
+    expect(fs.existsSync(path.join(root, 'INJECTED'))).toBe(false)
+    const captured = fs.readFileSync(capture, 'utf8').trim().split('\n')
+    expect(captured).toEqual(['--user', 'is-active', maliciousTimer])
+  })
+
+  it('linux: reports warn with remediation when the timer is present but not active', () => {
+    const home = newTmpRoot()
+    const unitDir = path.join(home, '.config', 'systemd', 'user')
+    fs.mkdirSync(unitDir, { recursive: true })
+    fs.writeFileSync(path.join(unitDir, 'scaffold-acme-merge-poller.timer'), '[Timer]')
+    const bin = newBinDir()
+    fs.writeFileSync(path.join(bin, 'systemctl'), '#!/usr/bin/env bash\necho inactive\nexit 3\n', { mode: 0o755 })
+
+    const root = newTmpRoot()
+    const result = withPlatform('linux', () => withHome(home, () => schedulerCheck.run(ctxWithBin(root, bin))))
+    expect(result.status).toBe('warn')
+    expect(result.remediation).toContain('systemctl --user start')
   })
 })

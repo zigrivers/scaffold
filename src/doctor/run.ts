@@ -20,11 +20,42 @@ export function makeRunCmd(projectRoot: string, env?: NodeJS.ProcessEnv): Doctor
   }
 }
 
+/**
+ * Bounded argv runner — no shell. `bin` is still resolved via PATH (Node's
+ * spawnSync does its own PATH lookup when `shell` is unset), but `args` are
+ * passed as literal argv elements and never interpreted by a shell. Same
+ * failure-mode contract as `makeRunCmd`.
+ */
+export function makeRunArgv(projectRoot: string, env?: NodeJS.ProcessEnv): DoctorContext['runArgv'] {
+  return (bin, args, timeoutS = 10) => {
+    try {
+      const res = spawnSync(bin, args, {
+        cwd: projectRoot,
+        timeout: timeoutS * 1000,
+        encoding: 'utf8',
+        env: env ?? process.env,
+      })
+      return { status: res.error !== undefined ? null : res.status, stdout: res.stdout ?? '', stderr: res.stderr ?? '' }
+    } catch {
+      return { status: null, stdout: '', stderr: '' }
+    }
+  }
+}
+
 export function runDoctor(
   projectRoot: string,
-  options?: { fix?: boolean; checks?: DoctorCheck[]; runCmd?: DoctorContext['runCmd'] },
+  options?: {
+    fix?: boolean
+    checks?: DoctorCheck[]
+    runCmd?: DoctorContext['runCmd']
+    runArgv?: DoctorContext['runArgv']
+  },
 ): DoctorReport {
-  const ctx: DoctorContext = { projectRoot, runCmd: options?.runCmd ?? makeRunCmd(projectRoot) }
+  const ctx: DoctorContext = {
+    projectRoot,
+    runCmd: options?.runCmd ?? makeRunCmd(projectRoot),
+    runArgv: options?.runArgv ?? makeRunArgv(projectRoot),
+  }
   const safeRun = (check: DoctorCheck): DoctorCheckResult => {
     try {
       return check.run(ctx)

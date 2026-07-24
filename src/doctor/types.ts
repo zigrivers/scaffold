@@ -13,6 +13,15 @@ export interface DoctorCheckResult {
 export interface DoctorContext {
   projectRoot: string
   runCmd: (cmd: string, timeoutS?: number) => { status: number | null; stdout: string; stderr: string }
+  /**
+   * Argv-based runner — spawns `bin` with `args` WITHOUT a shell. Use this
+   * instead of `runCmd` whenever any part of the command is derived from
+   * untrusted/filesystem-sourced data (e.g. a launchd label or systemd unit
+   * name read from a directory listing): passing it as a literal argv
+   * element rather than interpolating into a shell string means shell
+   * metacharacters in the value can never be executed.
+   */
+  runArgv: (bin: string, args: string[], timeoutS?: number) => { status: number | null; stdout: string; stderr: string }
 }
 
 export interface DoctorCheck {
