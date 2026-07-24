@@ -2822,7 +2822,7 @@ export function extractPlanKey(content: string): string | null {
 
 **Steps:**
 
-- [ ] Write the failing CLI tests. In `src/cli/commands/adopt.test.ts`, add this hoisted mock alongside the existing ones (before the imports section):
+- [x] Write the failing CLI tests. In `src/cli/commands/adopt.test.ts`, add this hoisted mock alongside the existing ones (before the imports section):
 
 ```ts
 vi.mock('../../project/adoption-plan.js', () => ({
@@ -2863,8 +2863,8 @@ then append these tests inside the file's top-level describe, reusing its existi
 ```
 
 (If the file has no shared `writtenLines` stdout capture, add the same `vi.spyOn(process.stdout, 'write')` capture used by `status.test.ts` to these two tests locally.)
-- [ ] Run `npx vitest run src/cli/commands/adopt.test.ts` — the new tests FAIL (handler still writes state and prints "Adoption complete").
-- [ ] Rewrite the handler tail in `src/cli/commands/adopt.ts`:
+- [x] Run `npx vitest run src/cli/commands/adopt.test.ts` — the new tests FAIL (handler still writes state and prints "Adoption complete").
+- [x] Rewrite the handler tail in `src/cli/commands/adopt.ts`:
   1. Add imports: `import { buildAdoptionPlan, renderPlanMarkdown } from '../../project/adoption-plan.js'`. Remove the now-unneeded imports as the steps below make them unused: `StateManager`, `discoverMetaPrompts`, `acquireLock`, `getLockPath`, `releaseLock`, `shutdown` (Task 10 re-adds the lock/shutdown imports for `--apply`).
   2. Add builder options (in the General group):
 
@@ -2923,8 +2923,8 @@ and change the `dry-run` describe to `'Deprecated: plan mode is the default and 
       process.exitCode = 0
 ```
 
-- [ ] Run `npx vitest run src/cli/commands/adopt.test.ts` — new tests green. Then run `npx vitest run src/cli/commands/ src/project/` and update the remaining adopt CLI tests mechanically (`grep -rn "steps_completed\|Adoption complete\|initializeState\|schema_version: 2" src/cli/commands/adopt*.test.ts` finds the assertions). Rules: (a) any test asserting state/config writes in default mode now asserts they do NOT happen (writes return in Task 10 under `--apply`); (b) any test asserting the old `schema_version: 2` result shape (`steps_completed`, `steps_remaining`, `artifacts_found`) now asserts the `schema_version: 3` plan shape (`plan_key`, `steps`, `disabled_by_preset`, `initialize`) — add the Task 9 `adoption-plan.js` mock to each file that invokes the handler; (c) `adopt.config-write-integration.test.ts` targets the exported `writeOrUpdateConfig` directly and keeps passing unchanged; (d) pure-`runAdoption` suites (`src/project/adopt.*.test.ts`) are unaffected.
-- [ ] Commit: `git add -A && git commit -m "feat(adopt): propose-then-apply plan mode — render by default, write nothing (R1 D1) [breaking]"`
+- [x] Run `npx vitest run src/cli/commands/adopt.test.ts` — new tests green. Then run `npx vitest run src/cli/commands/ src/project/` and update the remaining adopt CLI tests mechanically (`grep -rn "steps_completed\|Adoption complete\|initializeState\|schema_version: 2" src/cli/commands/adopt*.test.ts` finds the assertions). Rules: (a) any test asserting state/config writes in default mode now asserts they do NOT happen (writes return in Task 10 under `--apply`); (b) any test asserting the old `schema_version: 2` result shape (`steps_completed`, `steps_remaining`, `artifacts_found`) now asserts the `schema_version: 3` plan shape (`plan_key`, `steps`, `disabled_by_preset`, `initialize`) — add the Task 9 `adoption-plan.js` mock to each file that invokes the handler; (c) `adopt.config-write-integration.test.ts` targets the exported `writeOrUpdateConfig` directly and keeps passing unchanged; (d) pure-`runAdoption` suites (`src/project/adopt.*.test.ts`) are unaffected.
+- [x] Commit: `git add -A && git commit -m "feat(adopt): propose-then-apply plan mode — render by default, write nothing (R1 D1) [breaking]"`
 
 ---
 
