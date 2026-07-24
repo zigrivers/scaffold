@@ -168,10 +168,14 @@ const nextCommand: CommandModule<Record<string, unknown>, NextArgs> = {
     const enabledPipelineSlugs = [...context.metaPrompts.keys()]
       .filter(slug => pipeline.overlay.steps[slug]?.enabled === true)
       .filter(inScope)
+    // D3: read the CONFLICT-OVERRIDDEN record so a completed step with missing
+    // outputs (demoted to pending) cannot report "Pipeline complete!" — conflict
+    // overrides completed everywhere completion is consumed. conflictCheck.steps
+    // is the same object as state.steps when nothing conflicts (Task 4).
     const allDone =
       enabledPipelineSlugs.length > 0 &&
       enabledPipelineSlugs.every(slug => {
-        const status = state.steps[slug]?.status
+        const status = conflictCheck.steps[slug]?.status
         return status === 'completed' || status === 'skipped'
       })
 
