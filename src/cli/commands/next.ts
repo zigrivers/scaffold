@@ -12,6 +12,7 @@ import { ensureV3Migration } from '../../state/ensure-v3-migration.js'
 import { resolveCrossReadReadiness, humanCrossReadStatus } from '../../core/assembly/cross-reads.js'
 import { readEligible } from '../../core/pipeline/read-eligible.js'
 import { readRootSaveCounter } from '../../state/root-counter-reader.js'
+import { applyConflictOverrides } from '../../state/completion.js'
 import type { PipelineState } from '../../types/index.js'
 
 interface NextArgs {
@@ -96,12 +97,26 @@ const nextCommand: CommandModule<Record<string, unknown>, NextArgs> = {
         : isMultiServiceRoot
           ? { scope: 'global' as const, globalSteps: pipeline.globalSteps }
           : undefined
-    const eligible = readEligible(
-      state,
-      pipeline,
-      scopeOptions,
-      service ? () => readRootSaveCounter(projectRoot) : undefined,
+    // D3: conflict overrides completed — fs-only demotion (never runs detect: cmds).
+    // Pass the CURRENT resolved outputs so an upgraded output contract is honored.
+    const conflictCheck = applyConflictOverrides(
+      state.steps, projectRoot, (slug) => pipeline.stepMeta.get(slug)?.outputs,
     )
+    const conflictCount = conflictCheck.conflicts.length
+    if (conflictCount > 0) {
+      output.warn(
+        `${conflictCount} completed step(s) failed the artifact check and are treated as not completed: `
+        + `${conflictCheck.conflicts.join(', ')}. Run \`scaffold adopt\` to review.`,
+      )
+    }
+    const eligible = conflictCount > 0
+      ? pipeline.computeEligible(conflictCheck.steps, scopeOptions)
+      : readEligible(
+        state,
+        pipeline,
+        scopeOptions,
+        service ? () => readRootSaveCounter(projectRoot) : undefined,
+      )
 
     // 4. Apply --count limit
     const count = argv.count ?? eligible.length

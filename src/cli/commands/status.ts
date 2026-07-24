@@ -15,6 +15,7 @@ import { ensureV3Migration } from '../../state/ensure-v3-migration.js'
 import { resolveCrossReadReadiness, humanCrossReadStatus } from '../../core/assembly/cross-reads.js'
 import { readEligible } from '../../core/pipeline/read-eligible.js'
 import { readRootSaveCounter } from '../../state/root-counter-reader.js'
+import { applyConflictOverrides } from '../../state/completion.js'
 import type { PipelineState } from '../../types/index.js'
 
 /** Check if any pipeline/knowledge source is newer than its generated command. */
@@ -167,6 +168,22 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
     // pending-entries are not required.
     const state = stateManager.loadState()
 
+    // D3: conflict overrides completed. FS-only check (no detect: cmds here) —
+    // a completed step with missing declared outputs is demoted to pending for
+    // eligibility and rendered as `conflict` on every surface below. Pass the
+    // CURRENT resolved outputs so a package upgrade that changed a step's output
+    // contract is honored (not just the outputs stored at completion time).
+    const conflictCheck = applyConflictOverrides(
+      state.steps, projectRoot, (slug) => pipeline.stepMeta.get(slug)?.outputs,
+    )
+    const conflictSlugs = new Set(conflictCheck.conflicts)
+    if (conflictSlugs.size > 0) {
+      output.warn(
+        `${conflictSlugs.size} completed step(s) failed the artifact check and are treated as not completed: `
+        + `${conflictCheck.conflicts.join(', ')}. Run \`scaffold adopt\` to review.`,
+      )
+    }
+
     // Multi-service root: when config defines services[] and no
     // --service was passed, we're operating at the root scope. Root
     // state holds only global steps; service-local steps live in
@@ -185,12 +202,14 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
         : isMultiServiceRoot
           ? { scope: 'global' as const, globalSteps: pipeline.globalSteps }
           : undefined
-    const validatedEligible = readEligible(
-      state,
-      pipeline,
-      scopeOptionsForRead,
-      service ? () => readRootSaveCounter(projectRoot) : undefined,
-    )
+    const validatedEligible = conflictSlugs.size > 0
+      ? pipeline.computeEligible(conflictCheck.steps, scopeOptionsForRead)
+      : readEligible(
+        state,
+        pipeline,
+        scopeOptionsForRead,
+        service ? () => readRootSaveCounter(projectRoot) : undefined,
+      )
 
     // 5. Build the unified "surfaced" slug set used by progress totals,
     //    phasesData, the interactive listing, and compact JSON. Keeping
@@ -232,7 +251,7 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
       .map(([slug]) => slug)
     const surfacedSlugs = [...new Set<string>([...enabledSlugs, ...auditDisabledSlugs])]
     const statusOf = (slug: string): string =>
-      steps[slug]?.status ?? 'pending'
+      conflictSlugs.has(slug) ? 'conflict' : steps[slug]?.status ?? 'pending'
     const completed = surfacedSlugs.filter(s => statusOf(s) === 'completed').length
     const skipped = surfacedSlugs.filter(s => statusOf(s) === 'skipped').length
     const inProgress = surfacedSlugs.filter(s => statusOf(s) === 'in_progress').length
@@ -246,7 +265,7 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
       ?? 'unknown'
 
     const isCompact = argv.compact === true
-    const actionableStatuses = new Set(['pending', 'in_progress'])
+    const actionableStatuses = new Set(['pending', 'in_progress', 'conflict'])
 
     // Wave 3c — compute cross-dep readiness for EVERY surfaced step with crossReads
     // (not just actionable ones — status surfaces completed/skipped too).
@@ -294,13 +313,14 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
           const cd = crossDepMap.get(m.frontmatter.name)
           return {
             slug: m.frontmatter.name,
-            status: entry?.status ?? 'pending',
+            status: statusOf(m.frontmatter.name),
+            verification: entry?.verification ?? 'unverified',
             ...(cd && cd.length > 0 ? { crossDependencies: cd } : {}),
           }
         })
       const phaseCompleted = phaseSteps.filter(s => s.status === 'completed').length
       const phaseSkipped = phaseSteps.filter(s => s.status === 'skipped').length
-      const phasePending = phaseSteps.filter(s => s.status === 'pending').length
+      const phasePending = phaseSteps.filter(s => s.status === 'pending' || s.status === 'conflict').length
       const phaseInProgress = phaseSteps.filter(s => s.status === 'in_progress').length
       return {
         phase: phaseInfo.slug,
@@ -324,6 +344,7 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
         progress: { completed, skipped, pending, inProgress, total, percentage: pipelineUnresolved ? null : pct },
         phases: phasesData,
         nextEligible: validatedEligible,
+        conflicts: conflictCheck.conflicts,
         orphaned_entries: [],
         staleCommands: staleCommandCount,
         // When true, no pipeline content resolved and the totals/percentage
@@ -337,8 +358,7 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
         // of truth as phases and progress totals.
         result.steps = surfacedSlugs
           .map(slug => {
-            const entry = steps[slug]
-            const status = entry?.status ?? 'pending'
+            const status = statusOf(slug)
             return { slug, status }
           })
           .filter(({ status }) => actionableStatuses.has(status))
@@ -373,13 +393,13 @@ const statusCommand: CommandModule<Record<string, unknown>, StatusArgs> = {
         skipped: '→',
         in_progress: '●',
         pending: '○',
+        conflict: '✗',
       }
 
       // Interactive listing also iterates `surfacedSlugs` — single
       // source of truth shared with phases / compact / progress totals.
       for (const slug of surfacedSlugs) {
-        const entry = steps[slug]
-        const status = entry?.status ?? 'pending'
+        const status = statusOf(slug)
         if (isCompact && !actionableStatuses.has(status)) continue
         const fm = pipeline.stepMeta.get(slug)
         const phase = fm?.phase ?? '?'
