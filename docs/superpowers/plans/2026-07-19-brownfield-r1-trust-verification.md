@@ -3539,7 +3539,7 @@ describe('adopt --apply (D1/D2)', () => {
 
 **Steps:**
 
-- [ ] Write the failing content test `src/project/frontmatter.content.test.ts` (complete file):
+- [x] Write the failing content test `src/project/frontmatter.content.test.ts` (complete file):
 
 ```ts
 import { describe, it, expect } from 'vitest'
@@ -3587,8 +3587,8 @@ describe('shipped pipeline frontmatter (detect: rollout, D4)', () => {
 })
 ```
 
-- [ ] Run `npx vitest run src/project/frontmatter.content.test.ts` — the second test FAILS (`detect` is null everywhere).
-- [ ] Add the blocks. In each file, insert the block immediately after its `outputs:` frontmatter line, mirroring the step's Mode Detection prose:
+- [x] Run `npx vitest run src/project/frontmatter.content.test.ts` — the second test FAILS (`detect` is null everywhere).
+- [x] Add the blocks. In each file, insert the block immediately after its `outputs:` frontmatter line, mirroring the step's Mode Detection prose:
 
 `content/pipeline/foundation/beads.md`:
 
@@ -3659,8 +3659,8 @@ detect:
     - path: maestro/
 ```
 
-- [ ] Run `npx vitest run src/project/frontmatter.content.test.ts` — green.
-- [ ] Teach `make validate` the schema. In `scripts/validate-frontmatter.sh`, insert before the loop's closing `done` (after the `description` check):
+- [x] Run `npx vitest run src/project/frontmatter.content.test.ts` — green.
+- [x] Teach `make validate` the schema. In `scripts/validate-frontmatter.sh`, insert before the loop's closing `done` (after the `description` check):
 
 ```bash
     # detect: block sanity (D4) — must declare all:/any:, and every list item
@@ -3681,7 +3681,7 @@ detect:
     fi
 ```
 
-- [ ] Append to `tests/validate-frontmatter.bats` (fixtures follow the file's existing `frontmatter-*.md` naming so teardown cleans them):
+- [x] Append to `tests/validate-frontmatter.bats` (fixtures follow the file's existing `frontmatter-*.md` naming so teardown cleans them):
 
 ```bash
 @test "passes for a detect block with path and cmd checks" {
@@ -3732,8 +3732,8 @@ EOF
 }
 ```
 
-- [ ] Run `make validate && npx bats tests/validate-frontmatter.bats && npx vitest run src/project src/state/completion.test.ts` — all green (shipped content passes both validators; the beads plan fixtures still classify as conflict because `.beads/` is missing regardless of the `bd info` outcome).
-- [ ] Commit: `git add -A && git commit -m "feat(content): detect: contracts on the eight rollout steps + make validate schema coverage (R1 D4)"`
+- [x] Run `make validate && npx bats tests/validate-frontmatter.bats && npx vitest run src/project src/state/completion.test.ts` — all green (shipped content passes both validators; the beads plan fixtures still classify as conflict because `.beads/` is missing regardless of the `bd info` outcome).
+- [x] Commit: `git add -A && git commit -m "feat(content): detect: contracts on the eight rollout steps + make validate schema coverage (R1 D4)"`
 
 ---
 
