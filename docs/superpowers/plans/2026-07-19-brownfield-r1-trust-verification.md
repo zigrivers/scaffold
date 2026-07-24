@@ -3836,16 +3836,16 @@ EOF
 
 **Steps:**
 
-- [ ] `grep -rn "artifacts_verified" src scripts content --include="*.ts" --include="*.sh" --include="*.md"` — the ONLY allowed `src/` hits are the Task 1 migration site in `state-migration.ts` (the `legacy` cast that deletes the field) and its migration tests; fix any other straggler to `verification`.
-- [ ] `npx vitest run src` — all green.
-- [ ] `make check-all` — all green (bash lint + validate + bats + eval, TypeScript, mmr, knowledge, guides). Expected failures to watch for and fix at the root:
+- [x] `grep -rn "artifacts_verified" src scripts content --include="*.ts" --include="*.sh" --include="*.md"` — the ONLY allowed `src/` hits are the Task 1 migration site in `state-migration.ts` (the `legacy` cast that deletes the field) and its migration tests; fix any other straggler to `verification`.
+- [x] `npx vitest run src` — all green.
+- [x] `make check-all` — all green (bash lint + validate + bats + eval, TypeScript, mmr, knowledge, guides). Expected failures to watch for and fix at the root:
   - ShellCheck findings in the `validate-frontmatter.sh` addition (quote `${detect_block}` exactly as written above).
   - Bats content suites that assert frontmatter key inventories for the eight modified step files — add `detect` to their expected-keys lists if one exists.
   - Any `loadAllPresets` consumer or mock still missing `brownfield` (grep from Task 6).
-- [ ] Re-run the two end-to-end proofs by hand and paste output in the PR description:
+- [x] Re-run the two end-to-end proofs by hand and paste output in the PR description:
   - `cd "$(mktemp -d)" && printf '{"name":"x"}' > package.json && printf '# rules\n' > CLAUDE.md && node <path-to-repo>/dist/index.js adopt` after `npm run build` in the repo — expect: the one-release notice, an Adoption Plan with beads as `conflict`, a `Plan key:` line, and NO `.scaffold/` created.
   - `node <path-to-repo>/dist/index.js adopt --apply --plan-key <key-from-json-output>` in the same directory — expect: config.yml + state.json written, `doctor:` verdict line printed, and `scaffold status` showing beads pending (not completed).
-- [ ] Commit any fixes: `git add -A && git commit -m "test(brownfield-r1): full-suite green"`
+- [x] Commit any fixes: `git add -A && git commit -m "test(brownfield-r1): full-suite green"`
 
 ---
 
