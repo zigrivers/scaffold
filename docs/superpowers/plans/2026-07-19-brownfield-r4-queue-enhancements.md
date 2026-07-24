@@ -1766,6 +1766,16 @@ export function splitBatch(members: number[]): [number[], number[]] {
     },
 ```
 
+- [ ] Add the method to EVERY other `GhClient` implementation / typed fake so the
+  TypeScript gate stays green — widening the interface breaks any object typed as
+  `GhClient` that lacks it. Search first: `grep -rln "GhClient" src --include=*.ts`.
+  If R2 has already merged, this includes R2's fakes in
+  `src/merge-queue/bootstrap.test.ts` and `src/cli/commands/mq.test.ts` (and any
+  daemon-test fake not covered above). Add a deterministic stub to each, e.g.
+  `changedFiles: () => []` (or a scripted list where a test needs specific files).
+  Then re-run `npx tsc --noEmit -p tsconfig.json` and confirm no
+  "Property 'changedFiles' is missing" errors remain.
+
 - [ ] In `src/merge-queue/daemon.ts`:
   - Extend the batch import: `import { composeBatch, splitBatch, touchesOverlapZone } from './batch.js'`
   - In `cycle()`, inside the collection loop, right after `infos.set(entry.pr, info)` (before the `yieldToLoop` call), add:

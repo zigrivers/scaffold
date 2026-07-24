@@ -3177,7 +3177,7 @@ export function planResume(
 
 **Interfaces:**
 - Produces: `GhClient.mergeCommitSha(pr): string | null`; `GitOps.checkoutDetachedInGate(sha): string`; `BootstrapDeps { gh, git, runGate, config, mqDir, projectRoot, readMergeConfig?, verifyGatedAssets?, armHooks, armSched, smokeDaemon, runDoctor, gateTargetResolves, log, now, sleep?, newId }`; `BootstrapOutcome { ok, bootstrapId, stage: 'preflight'|'arm'|'merge'|'verify'|'complete'|'aborted', messages }`; `runBootstrap(deps, { pr, finish? }): Promise<BootstrapOutcome>`; `gateTargetResolves(projectRoot, command): boolean` (exported from `src/cli/commands/mq.ts`); `mqHandler` gains an `overrides: MqOverrides = {}` second parameter (`MqOverrides { bootstrapDeps?: Partial<BootstrapDeps> }`); `MqArgs` gains `finish?: boolean`; mq action choices gain `'bootstrap'`.
-- **Two roots (D9 first-install correctness):** the PR that *installs* the queue commits its config/guard/poller/gate-scripts in the FEATURE branch — so the shared **primary** root (`git.primaryRoot()`, main worktree) does NOT yet contain them; they arrive only at merge. `runBootstrap` therefore verifies committed assets and resolves gate targets from the **gated PR tree** (the `checkoutDetachedInGate(gatedHeadSha)` checkout — where the PR's committed files live), reads the merge-queue config it will install from that tree (`readMergeConfig(gatedTree)`), and runs the full preflight gate there; the journal (`mqDir`) stays at primary and the **scheduler is armed AFTER the merge** (in the post-merge verify step) so `buildPostMergePollerJob(primary)` resolves against the now-landed `scripts/ops/post-merge-poller.sh` (the stable post-merge path). `verifyGatedAssets(gatedTree, cfg)` confirms the config, guard, poller, and hook registration are COMMITTED in the PR (they ride the merge to primary) rather than uncommitted post-gate mutations; `gateTargetResolves` gains the tree root as its first arg (`(root, command)`).
+- **Two roots (D9 first-install correctness):** the PR that *installs* the queue commits its config/guard/poller/gate-scripts in the FEATURE branch — so the shared **primary** root (`git.primaryRoot()`, main worktree) does NOT yet contain them; they arrive only at merge. `runBootstrap` therefore verifies committed assets and resolves gate targets from the **gated PR tree** (the `checkoutDetachedInGate(gatedHeadSha)` checkout — where the PR's committed files live), reads the merge-queue config it will install from that tree (`readMergeConfig(gatedTree)`), and runs the full preflight gate there; the journal (`mqDir`) stays at primary and the **scheduler is armed AFTER the merge** (in the post-merge verify step, once primary has been fast-forwarded — see below). `verifyGatedAssets(gatedTree, cfg)` confirms the config, guard, and poller script are COMMITTED in the PR (they ride the merge to primary) rather than uncommitted post-gate mutations; the mq-guard **hook registration** is not a committed asset — `armHooks` installs it into primary's `.claude/settings.json` pre-merge (`installHooks(primary)`, the guard self-gates at runtime) and the closing doctor pass verifies it. After the merge, the engine fast-forwards the primary worktree to the merge commit (`git.syncPrimaryToMerge(mergeSha)`) BEFORE the post-merge scheduler arm, so `buildPostMergePollerJob(primary)` resolves against the now-landed `scripts/ops/post-merge-poller.sh` (`gh pr merge` updates only the remote — the local primary tree needs the fast-forward first). `gateTargetResolves` gains the tree root as its first arg (`(root, command)`).
 - Consumes: Task 14's reducers/`planResume`; `installHooks` (Task 12); `pickSchedBackend` (Task 6) + `buildPostMergePollerJob` (Task 5); `runGate` (`src/merge-queue/gate.ts`); `appendEvent`/`readJournal` (`src/merge-queue/journal.ts`); `loadAgentOpsConfig`; `ulid`.
 
 **Steps:**
@@ -3263,6 +3263,13 @@ describe('mergeCommitSha (D9)', () => {
    *  preflight runs the full gate there). Clears crashed-merge leftovers
    *  first, fetches the object when absent locally. Returns the gate dir. */
   checkoutDetachedInGate(sha: string): string
+  /** Fast-forward the PRIMARY worktree to the bootstrap merge commit. `gh pr
+   *  merge` updates only the remote, so the local primary tree lacks the
+   *  just-landed queue files (poller script, config) until this fetch +
+   *  fast-forward — without it the post-merge scheduler arm
+   *  (`buildPostMergePollerJob(primary)`) throws on the missing script. Fetches
+   *  origin, then `merge --ff-only` primary to the exact merge SHA. */
+  syncPrimaryToMerge(mergeSha: string): void
 ```
 
   and in the returned object, insert after the `ensureGateWorktree,` line — Edit old string:
@@ -3288,6 +3295,21 @@ describe('mergeCommitSha (D9)', () => {
       }
       git(['checkout', '--force', '--detach', sha], gate)
       return gate
+    },
+    syncPrimaryToMerge(mergeSha) {
+      // Bring the local primary tree up to the just-landed merge commit so the
+      // post-merge scheduler arm sees the PR's poller script + config. Anchor to
+      // the REAL primary worktree via primaryRoot() (resolved from git-common-dir)
+      // — NOT this GitOps' construction cwd: bootstrap may run from a linked
+      // worktree (`git = createGitOps(startRoot)`), and the merge must land in
+      // primary. ff-only: primary sits at the base branch head that the bootstrap
+      // merge advanced — never a non-ff reset.
+      const primary = primaryRoot()
+      gitAllowFail(['fetch', 'origin'], primary)
+      if (!gitAllowFail(['cat-file', '-e', `${mergeSha}^{commit}`], primary)) {
+        gitAllowFail(['fetch', 'origin', mergeSha], primary)
+      }
+      git(['merge', '--ff-only', mergeSha], primary)
     },
     constructCandidate(batchId, prs, base) {
 ```
@@ -3330,9 +3352,10 @@ describe('checkoutDetachedInGate (D9 bootstrap preflight)', () => {
 
 ```ts
   checkoutDetachedInGate(): string { return path.join(this.root, '.mq', 'gate') }
+  syncPrimaryToMerge(): void { /* no-op: the fake primary is always "synced" */ }
 ```
 
-  (`FakeGit`'s `root` is a private constructor property — if the field is not accessible with `this.root`, mirror how `ensureGateWorktree` accesses it in that class.) If the grep surfaces other implementers (e.g. an e2e harness), give them the same two one-liners.
+  (`FakeGit`'s `root` is a private constructor property — if the field is not accessible with `this.root`, mirror how `ensureGateWorktree` accesses it in that class.) If the grep surfaces other implementers (e.g. an e2e harness), give them the same one-liners.
 
 - [ ] Run: `npx vitest run src/merge-queue/gh.test.ts src/merge-queue/git.test.ts src/merge-queue/daemon.test.ts` — all green.
 - [ ] Append the failing engine tests to `src/merge-queue/bootstrap.test.ts` (add imports at the top: `import fs from 'node:fs'`, `import os from 'node:os'`, `import path from 'node:path'`, `import { runBootstrap, type BootstrapDeps } from './bootstrap.js'`, `import { appendEvent, readJournal } from './journal.js'`, `import { defaultMergeQueueConfig } from './types.js'`, `import type { GhClient, PrInfo } from './gh.js'`, `import type { CandidateResult, GitOps } from './git.js'`, `import type { GateResult } from './gate.js'`):
@@ -3378,6 +3401,7 @@ function makeGit(root: string): GitOps & { checkouts: string[] } {
       g.checkouts.push(sha)
       return path.join(root, '.mq', 'gate')
     },
+    syncPrimaryToMerge(sha: string): void { g.checkouts.push(`sync:${sha}`) },
     constructCandidate(): CandidateResult { throw new Error('not used by bootstrap') },
     deleteCandidate(): void { /* unused */ },
     listCandidateRefs: (): string[] => [],
@@ -3713,10 +3737,13 @@ export async function runBootstrap(
     return true
   }
 
-  const verifyAndArm = (a: { bootstrapId: string; gatedHeadSha: string }): BootstrapOutcome => {
-    // POST-merge: arm the scheduler now — buildPostMergePollerJob(primary)
-    // resolves because the PR's poller script has landed at primary. The
+  const verifyAndArm = (a: { bootstrapId: string; gatedHeadSha: string }, mergeSha: string): BootstrapOutcome => {
+    // POST-merge: bring the primary worktree up to the merge commit FIRST —
+    // `gh pr merge` moved only the remote, so the poller script/config land
+    // locally only now. THEN arm the scheduler: buildPostMergePollerJob(primary)
+    // resolves because the PR's poller script has landed at primary. The arm
     // closure self-decides on the merged executor (no-ops for non-local-poller).
+    deps.git.syncPrimaryToMerge(mergeSha)
     const sched = deps.armSched()
     for (const m of sched.messages) say(m)
     if (!sched.ok) {
@@ -3762,7 +3789,7 @@ export async function runBootstrap(
     }
     recordMerged(a, mergeSha)
     say(`merged PR #${opts.pr} (bootstrap ${a.bootstrapId}, merge commit ${mergeSha})`)
-    return verifyAndArm(a)
+    return verifyAndArm(a, mergeSha)
   }
 
   const mergeAndFinish = async (a: { bootstrapId: string; gatedHeadSha: string }): Promise<BootstrapOutcome> => {
@@ -3788,10 +3815,18 @@ export async function runBootstrap(
   case 'complete':
     say(`bootstrap ${decision.attempt.bootstrapId} already completed (armed) — nothing to do`)
     return { ok: true, bootstrapId: decision.attempt.bootstrapId, stage: 'complete', messages }
-  case 'arm-and-verify':
+  case 'arm-and-verify': {
     say(`resuming bootstrap ${decision.attempt.bootstrapId}: merge already journaled — re-arming idempotently`)
     if (!arm()) return { ok: false, bootstrapId: decision.attempt.bootstrapId, stage: 'arm', messages }
-    return verifyAndArm(decision.attempt)
+    // stage 'merged' always journaled a non-empty SHA (D9 invariant), but the
+    // reduced type is `string | null` — narrow it explicitly before arming.
+    const mergedSha = decision.attempt.mergeCommitSha
+    if (mergedSha === null) {
+      say(`bootstrap: attempt ${decision.attempt.bootstrapId} is at the merged stage without a merge SHA — cannot arm; finish with: scaffold mq bootstrap --pr ${opts.pr} --finish`)
+      return { ok: false, bootstrapId: decision.attempt.bootstrapId, stage: 'merge', messages }
+    }
+    return verifyAndArm(decision.attempt, mergedSha)
+  }
   case 'record-merge-then-arm': {
     // Crash window: the merge API call succeeded, the journal write did not.
     const recovered = await resolveMergeSha()
@@ -3804,7 +3839,7 @@ export async function runBootstrap(
     recordMerged(decision.attempt, recovered)
     say(`crash-window reconciliation: GitHub reports PR #${opts.pr} MERGED — merge recorded retroactively (never re-merged)`)
     if (!arm()) return { ok: false, bootstrapId: decision.attempt.bootstrapId, stage: 'arm', messages }
-    return verifyAndArm(decision.attempt)
+    return verifyAndArm(decision.attempt, recovered)
   }
   case 'rerun-merge':
     say(`resuming bootstrap ${decision.attempt.bootstrapId}: intent journaled, merge not — re-running the merge stage`)
@@ -4154,6 +4189,7 @@ describe('scaffold mq bootstrap (CLI wiring)', () => {
       treeOf: () => 'TREE',
       ensureGateWorktree: () => path.join(root, '.mq', 'gate'),
       checkoutDetachedInGate: () => path.join(root, '.mq', 'gate'),
+      syncPrimaryToMerge: (): void => { /* no-op */ },
       constructCandidate: (): CandidateResult => { throw new Error('unused') },
       deleteCandidate: (): void => { /* unused */ },
       listCandidateRefs: (): string[] => [],
