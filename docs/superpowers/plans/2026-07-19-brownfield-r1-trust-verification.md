@@ -913,7 +913,7 @@ export function appendAuditRecord(
 
 **Steps:**
 
-- [ ] Write the failing status tests. Append inside the top-level `describe('status command', …)` block of `src/cli/commands/status.test.ts` (it provides `writtenLines`, `MockStateManager`, `mockDiscoverMetaPrompts`, `mockResolveOutputMode`, `mockStateWith`, `mockOverlayEnabled`, `makeFrontmatter`, `defaultArgv`):
+- [x] Write the failing status tests. Append inside the top-level `describe('status command', …)` block of `src/cli/commands/status.test.ts` (it provides `writtenLines`, `MockStateManager`, `mockDiscoverMetaPrompts`, `mockResolveOutputMode`, `mockStateWith`, `mockOverlayEnabled`, `makeFrontmatter`, `defaultArgv`):
 
 ```ts
   describe('conflict overrides completed (D3)', () => {
@@ -953,8 +953,8 @@ export function appendAuditRecord(
   })
 ```
 
-- [ ] Run `npx vitest run src/cli/commands/status.test.ts` — the two new tests FAIL.
-- [ ] Implement in `src/cli/commands/status.ts`:
+- [x] Run `npx vitest run src/cli/commands/status.test.ts` — the two new tests FAIL.
+- [x] Implement in `src/cli/commands/status.ts`:
   1. Add `import { applyConflictOverrides } from '../../state/completion.js'`.
   2. Directly after `const state = stateManager.loadState()` insert:
 
@@ -1002,8 +1002,8 @@ export function appendAuditRecord(
   8. In the compact-JSON steps mapper, replace `const status = entry?.status ?? 'pending'` with `const status = statusOf(slug)` (delete the now-unused `const entry = steps[slug]` line if TS flags it).
   9. In the interactive listing, replace `const status = entry?.status ?? 'pending'` with `const status = statusOf(slug)`.
   10. In the JSON `result` object, add `conflicts: conflictCheck.conflicts,` after `nextEligible`.
-- [ ] Run `npx vitest run src/cli/commands/status.test.ts` — all green. Demotion is now driven by the step's CURRENT resolved outputs (`pipeline.stepMeta.get(slug)?.outputs`, `entry.produces` fallback for steps the resolver doesn't know). Existing fixtures put completed steps at empty resolved outputs (`makeFrontmatter` defaults `outputs: []` and completed fixtures use empty `produces`), so nothing else demotes; if any existing fixture gives a completed step a non-empty resolved output (frontmatter `outputs`) or non-empty `produces` with the file absent and now fails, that fixture is asserting the pre-D3 lie — update its expectation to `conflict`.
-- [ ] Create `src/cli/commands/next.conflict.test.ts` (complete file):
+- [x] Run `npx vitest run src/cli/commands/status.test.ts` — all green. Demotion is now driven by the step's CURRENT resolved outputs (`pipeline.stepMeta.get(slug)?.outputs`, `entry.produces` fallback for steps the resolver doesn't know). Existing fixtures put completed steps at empty resolved outputs (`makeFrontmatter` defaults `outputs: []` and completed fixtures use empty `produces`), so nothing else demotes; if any existing fixture gives a completed step a non-empty resolved output (frontmatter `outputs`) or non-empty `produces` with the file absent and now fails, that fixture is asserting the pre-D3 lie — update its expectation to `conflict`.
+- [x] Create `src/cli/commands/next.conflict.test.ts` (complete file):
 
 ```ts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -1086,8 +1086,8 @@ describe('next — conflict overrides completed (D3)', () => {
 })
 ```
 
-- [ ] Run `npx vitest run src/cli/commands/next.conflict.test.ts` — FAILS (no warning, eligibility still fed the completed entry).
-- [ ] Implement in `src/cli/commands/next.ts`. Add `import { applyConflictOverrides } from '../../state/completion.js'`, then replace the `const eligible = readEligible(…)` call with:
+- [x] Run `npx vitest run src/cli/commands/next.conflict.test.ts` — FAILS (no warning, eligibility still fed the completed entry).
+- [x] Implement in `src/cli/commands/next.ts`. Add `import { applyConflictOverrides } from '../../state/completion.js'`, then replace the `const eligible = readEligible(…)` call with:
 
 ```ts
     // D3: conflict overrides completed — fs-only demotion (never runs detect: cmds).
@@ -1111,8 +1111,8 @@ describe('next — conflict overrides completed (D3)', () => {
       )
 ```
 
-- [ ] Run `npx vitest run src/cli/commands/next.conflict.test.ts src/cli/commands/next.test.ts src/cli/commands/status.test.ts` — green.
-- [ ] Commit: `git add -A && git commit -m "feat(cli): conflict overrides completed in status/next eligibility (R1 D3)"`
+- [x] Run `npx vitest run src/cli/commands/next.conflict.test.ts src/cli/commands/next.test.ts src/cli/commands/status.test.ts` — green.
+- [x] Commit: `git add -A && git commit -m "feat(cli): conflict overrides completed in status/next eligibility (R1 D3)"`
 
 ---
 
