@@ -13,7 +13,7 @@
 - **`scaffold sched` command surface is exactly `install | uninstall | status | list`** — no start/stop/restart in R2 (restart = `uninstall && install`; a paused queue is expressed via `.mq/PAUSED`, never scheduler state).
 - **launchd (macOS):** gui-domain only (`gui/$UID/<label>`); absolute paths resolved at install time (node via the stable fnm alias dir or `process.execPath`, keg-only Homebrew openjdk prepended before `/usr/bin` when `/usr/bin/java` is a non-functional stub); explicit `EnvironmentVariables.PATH`; install = `launchctl bootout … || true` then `bootstrap`, then **verify via `launchctl print gui/$UID/<label>`** (file presence proves nothing); `StandardOutPath`/`StandardErrorPath` under `<project>/.mq/logs/`.
 - **systemd (Linux):** user timer + service under `~/.config/systemd/user/`, `loginctl enable-linger` (best-effort, reported), verify via `systemctl --user is-active <unit>.timer`.
-- **Bootstrap journal events:** `bootstrap_intent` / `bootstrap_merged` / `bootstrap_armed`, EACH carrying `bootstrapId` (ULID) + `pr` + `gatedHeadSha`; `bootstrap_merged` additionally carries `mergeCommitSha`. Reconciliation is a per-`bootstrapId` state machine; an aborted attempt is terminal for its id (a retry opens a new id); `bootstrap_intent` is written BEFORE the merge; the PR head is revalidated against the intent's gated SHA immediately before merging; on resume, GitHub's PR state is authoritative (intent-without-merged + GitHub MERGED ⇒ record the merge retroactively, never re-merge).
+- **Bootstrap journal events:** `bootstrap_intent` / `bootstrap_merged` / `bootstrap_armed`, EACH carrying `bootstrapId` (ULID) + `pr` + `gatedHeadSha`; `bootstrap_merged` additionally carries `mergeCommitSha` (REQUIRED, non-empty). Because GitHub is eventually consistent about exposing the merge commit, the engine resolves the SHA with bounded backoff; if it is still unavailable it STOPS at the merge stage (outcome `stage: 'merge'`) and never journals `bootstrap_merged`/`bootstrap_armed` with an empty SHA — resume records it once GitHub exposes it. Reconciliation is a per-`bootstrapId` state machine; an aborted attempt is terminal for its id (a retry opens a new id); `bootstrap_intent` is written BEFORE the merge; the PR head is revalidated against the intent's gated SHA immediately before merging; on resume, GitHub's PR state is authoritative (intent-without-merged + GitHub MERGED ⇒ record the merge retroactively, never re-merge).
 - **`GATE_PROBE=1`** in both generated gate scripts checks prerequisites (deps, functional runtimes, test-runner startup) and exits WITHOUT running the suite.
 - **`seed: true` manifest semantics:** seeded files are project-owned after generation — `scaffold agent-ops check` reports them only if MISSING, never as drifted; re-install never overwrites an existing seed without `--force`.
 - **`gate`, hooks, and sched are all excluded from `--component all`** (`all` stays `git`+`staging`); `gate` is an explicit opt-in component like `merge-queue`/`ci`. Hooks and sched are separate top-level commands, not components.
@@ -1000,6 +1000,21 @@ import { createLaunchdBackend } from './backends/launchd.js'
 import { createSystemdBackend } from './backends/systemd.js'
 import type { SchedBackend } from './types.js'
 
+/**
+ * os.userInfo() throws (getpwuid ENOENT) in minimal Linux/Docker images where
+ * the running UID has no /etc/passwd entry. Fall back to the environment, then
+ * to the numeric UID, so scheduling still works in those environments.
+ */
+function resolveUsername(): string {
+  try {
+    return os.userInfo().username
+  } catch {
+    return process.env.USER
+      ?? process.env.USERNAME
+      ?? (typeof process.getuid === 'function' ? String(process.getuid()) : 'unknown')
+  }
+}
+
 /** Shared by `scaffold sched` and `scaffold mq bootstrap` (D9 arm step). */
 export function pickSchedBackend(): SchedBackend {
   if (process.platform === 'darwin') {
@@ -1010,7 +1025,7 @@ export function pickSchedBackend(): SchedBackend {
     })
   }
   if (process.platform === 'linux') {
-    return createSystemdBackend({ exec: realExec, home: os.homedir(), user: os.userInfo().username })
+    return createSystemdBackend({ exec: realExec, home: os.homedir(), user: resolveUsername() })
   }
   throw new Error(
     `scaffold sched: unsupported platform "${process.platform}" (launchd on macOS, systemd on Linux)`,
@@ -1483,6 +1498,17 @@ teardown() { rm -rf "$TMP"; }
   [[ "$output" == *"infra change"* ]]
 }
 
+@test "nested infra change (packages/app/vitest.config.ts) forces the FULL gate in a monorepo" {
+  mkdir -p packages/app
+  echo 'export default {}' > packages/app/vitest.config.ts
+  git add -A && git commit -qm nested-config
+  MQ_AFFECTED_BASE=main run scripts/gate-check-affected.sh
+  [ "$status" -eq 0 ]
+  [ -f .full-ran ]
+  [ ! -f .affected-ran ]
+  [[ "$output" == *"infra change"* ]]
+}
+
 @test "empty diff against base forces the FULL gate, never zero tests" {
   MQ_AFFECTED_BASE=main run scripts/gate-check-affected.sh
   [ "$status" -eq 0 ]
@@ -1577,12 +1603,18 @@ CHANGED="$(git diff --name-only "$BASE...HEAD")"
 # Force-full triggers (see the knowledge entry): when in doubt, add a glob — a
 # false force-full costs minutes; a false narrow costs a landed regression.
 is_force_full() {
+	# Each subdirectory-eligible config/lock/tool-config file carries a `*/`
+	# alternative so a NESTED change in a monorepo (e.g. packages/app/tsconfig.json)
+	# still forces the full gate. Bash `case` globs let `*` span '/', so a single
+	# `*/` prefix covers arbitrary depth. `*.sql`/`*.proto` already match nested.
 	case "$1" in
-	package.json|*/package.json|package-lock.json|pnpm-lock.yaml|yarn.lock|\
-	pyproject.toml|uv.lock|Cargo.toml|Cargo.lock|go.mod|go.sum|\
-	Makefile|tsconfig*.json|.swcrc|vitest.config.*|vite.config.*|playwright.config.*|\
-	turbo.json|pytest.ini|.github/workflows/*|scripts/gate-check.sh|scripts/gate-check-affected.sh|\
-	src/test-utils/*|conftest.py|.env*|migrations/*|*.sql|*.proto)
+	package.json|*/package.json|\
+	package-lock.json|*/package-lock.json|pnpm-lock.yaml|*/pnpm-lock.yaml|yarn.lock|*/yarn.lock|\
+	pyproject.toml|*/pyproject.toml|uv.lock|*/uv.lock|Cargo.toml|*/Cargo.toml|Cargo.lock|*/Cargo.lock|go.mod|*/go.mod|go.sum|*/go.sum|\
+	Makefile|*/Makefile|tsconfig*.json|*/tsconfig*.json|.swcrc|*/.swcrc|\
+	vitest.config.*|*/vitest.config.*|vite.config.*|*/vite.config.*|playwright.config.*|*/playwright.config.*|\
+	turbo.json|*/turbo.json|pytest.ini|*/pytest.ini|.github/workflows/*|scripts/gate-check.sh|scripts/gate-check-affected.sh|\
+	src/test-utils/*|conftest.py|*/conftest.py|.env*|*/.env*|migrations/*|*.sql|*.proto)
 		return 0
 		;;
 	esac
@@ -1612,7 +1644,7 @@ fi
 
   Note the heredoc (`<<EOF_CHANGED`) instead of `<<<"$CHANGED"`: herestrings behave identically here, but the heredoc keeps the loop bash-3.2-safe and shellcheck-clean; `EXCLUDE_ARGS[@]+` expansion is the bash-3.2-safe empty-array idiom under `set -u`.
 
-- [ ] Run: `bats tests/agent-ops-gate-affected.bats` — expect `1..7` with all `ok`.
+- [ ] Run: `bats tests/agent-ops-gate-affected.bats` — expect `1..8` with all `ok`.
 - [ ] Commit: `git add -A && git commit -m "feat(agent-ops): gate-check-affected.sh seed template satisfying the mq contract"`
 
 ---
@@ -3121,7 +3153,7 @@ export function planResume(
 - Modify: `content/assets/agent-ops/merge-queue/mq-guard.sh.tmpl` + `tests/agent-ops-merge-queue.bats`
 
 **Interfaces:**
-- Produces: `GhClient.mergeCommitSha(pr): string | null`; `GitOps.checkoutDetachedInGate(sha): string`; `BootstrapDeps { gh, git, runGate, config, mqDir, projectRoot, armHooks, armSched, smokeDaemon, runDoctor, gateTargetResolves, log, now, newId }`; `BootstrapOutcome { ok, bootstrapId, stage: 'preflight'|'arm'|'merge'|'verify'|'complete'|'aborted', messages }`; `runBootstrap(deps, { pr, finish? }): Promise<BootstrapOutcome>`; `gateTargetResolves(projectRoot, command): boolean` (exported from `src/cli/commands/mq.ts`); `mqHandler` gains an `overrides: MqOverrides = {}` second parameter (`MqOverrides { bootstrapDeps?: Partial<BootstrapDeps> }`); `MqArgs` gains `finish?: boolean`; mq action choices gain `'bootstrap'`.
+- Produces: `GhClient.mergeCommitSha(pr): string | null`; `GitOps.checkoutDetachedInGate(sha): string`; `BootstrapDeps { gh, git, runGate, config, mqDir, projectRoot, armHooks, armSched, smokeDaemon, runDoctor, gateTargetResolves, log, now, sleep?, newId }`; `BootstrapOutcome { ok, bootstrapId, stage: 'preflight'|'arm'|'merge'|'verify'|'complete'|'aborted', messages }`; `runBootstrap(deps, { pr, finish? }): Promise<BootstrapOutcome>`; `gateTargetResolves(projectRoot, command): boolean` (exported from `src/cli/commands/mq.ts`); `mqHandler` gains an `overrides: MqOverrides = {}` second parameter (`MqOverrides { bootstrapDeps?: Partial<BootstrapDeps> }`); `MqArgs` gains `finish?: boolean`; mq action choices gain `'bootstrap'`.
 - Consumes: Task 14's reducers/`planResume`; `installHooks` (Task 12); `pickSchedBackend` (Task 6) + `buildPostMergePollerJob` (Task 5); `runGate` (`src/merge-queue/gate.ts`); `appendEvent`/`readJournal` (`src/merge-queue/journal.ts`); `loadAgentOpsConfig`; `ulid`.
 
 **Steps:**
@@ -3368,6 +3400,7 @@ function makeDeps(root: string, over: Partial<BootstrapDeps> = {}): { deps: Boot
     gateTargetResolves: () => true,
     log: () => { /* silent */ },
     now: () => new Date('2026-07-19T12:00:00.000Z'),
+    sleep: async () => { /* no-op — merge-SHA backoff runs instantly in tests */ },
     newId: () => ids.shift() ?? '01Z',
     ...over,
   }
@@ -3491,6 +3524,27 @@ describe('runBootstrap (D9 engine)', () => {
     expect(out.messages.join('\n')).toMatch(/--finish/)
     expect(readJournal(deps.mqDir).map(e => e.type)).toEqual(['bootstrap_intent', 'bootstrap_merged'])
   })
+  it('never journals an empty merge SHA — stops when GitHub has not exposed the commit, and resume reconciles', async () => {
+    const root = tmpRoot()
+    // Merge succeeds but GitHub has not exposed the merge commit SHA yet.
+    const { deps } = makeDeps(root, { gh: makeGh({ mergeSha: null }) })
+    const out = await runBootstrap(deps, { pr: 41 })
+    expect(out.ok).toBe(false)
+    expect(out.stage).toBe('merge')
+    expect(out.messages.join('\n')).toMatch(/--finish/)
+    // The journal must NOT carry a bootstrap_merged with an empty SHA.
+    expect(readJournal(deps.mqDir).map(e => e.type)).toEqual(['bootstrap_intent'])
+    // Resume once GitHub exposes the SHA: intent-without-merged + MERGED ⇒
+    // record-merge-then-arm records the real SHA, then arms.
+    const { deps: resumed } = makeDeps(root, {
+      gh: makeGh({ states: ['MERGED'], mergeSha: 'LATE-SHA' }),
+    })
+    const out2 = await runBootstrap(resumed, { pr: 41, finish: true })
+    expect(out2.ok).toBe(true)
+    const events = readJournal(deps.mqDir)
+    expect(events.map(e => e.type)).toEqual(['bootstrap_intent', 'bootstrap_merged', 'bootstrap_armed'])
+    expect(events[1]).toMatchObject({ mergeCommitSha: 'LATE-SHA', pr: 41 })
+  })
   it('an armed attempt is a clean no-op', async () => {
     const root = tmpRoot()
     const { deps } = makeDeps(root)
@@ -3548,6 +3602,9 @@ export interface BootstrapDeps {
   gateTargetResolves: (command: string) => boolean
   log: (msg: string) => void
   now: () => Date
+  /** Bounded-backoff sleep between merge-SHA lookups. Injected so tests run
+   *  instantly; defaults to real setTimeout when omitted. */
+  sleep?: (ms: number) => Promise<void>
   /** ULID seam. */
   newId: () => string
 }
@@ -3573,6 +3630,20 @@ export async function runBootstrap(
     deps.log(m)
   }
   const at = (): string => deps.now().toISOString()
+  const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)))
+  // D9 pins bootstrap_merged.mergeCommitSha as a REQUIRED non-empty string, but
+  // GitHub is eventually consistent about exposing the merge commit. Poll with
+  // bounded backoff; return null (NEVER an empty SHA) if it is still unavailable
+  // so callers stop and let resume reconcile — the journal is never advanced
+  // with an empty SHA.
+  const resolveMergeSha = async (): Promise<string | null> => {
+    for (const delayMs of [0, 500, 1000, 2000, 4000]) {
+      if (delayMs > 0) await sleep(delayMs)
+      const sha = deps.gh.mergeCommitSha(opts.pr)
+      if (sha !== null && sha !== '') return sha
+    }
+    return null
+  }
 
   const info = deps.gh.viewPr(opts.pr)
   const attempt = latestAttemptFor(readJournal(deps.mqDir), opts.pr)
@@ -3621,13 +3692,27 @@ export async function runBootstrap(
     })
   }
 
-  const mergeAndFinish = (a: { bootstrapId: string; gatedHeadSha: string }): BootstrapOutcome => {
+  const finalizeMerge = async (a: { bootstrapId: string; gatedHeadSha: string }): Promise<BootstrapOutcome> => {
+    const mergeSha = await resolveMergeSha()
+    if (mergeSha === null) {
+      // The merge is done on GitHub and bootstrap_intent is journaled, so do NOT
+      // advance the journal with an empty SHA. Stop at the merge-verification
+      // stage; resume reconciles once GitHub exposes the commit (planResume:
+      // intent-without-merged + GitHub MERGED ⇒ record-merge-then-arm).
+      say(`bootstrap: PR #${opts.pr} is merged, but GitHub has not exposed the merge commit SHA yet — the journal is NOT advanced; reconcile with: scaffold mq bootstrap --pr ${opts.pr} --finish`)
+      return { ok: false, bootstrapId: a.bootstrapId, stage: 'merge', messages }
+    }
+    recordMerged(a, mergeSha)
+    say(`merged PR #${opts.pr} (bootstrap ${a.bootstrapId}, merge commit ${mergeSha})`)
+    return verifyAndArm(a)
+  }
+
+  const mergeAndFinish = async (a: { bootstrapId: string; gatedHeadSha: string }): Promise<BootstrapOutcome> => {
     // Revalidate IMMEDIATELY before merging: never merge an ungated head (D9).
     const fresh = deps.gh.viewPr(opts.pr)
     if (fresh.state === 'MERGED') {
-      recordMerged(a, deps.gh.mergeCommitSha(opts.pr) ?? '')
-      say(`PR #${opts.pr} is already MERGED on GitHub — recorded, never re-merged`)
-      return verifyAndArm(a)
+      say(`PR #${opts.pr} is already MERGED on GitHub — recording, never re-merging`)
+      return finalizeMerge(a)
     }
     if (fresh.state === 'CLOSED') {
       say(`bootstrap ABORTED: PR #${opts.pr} was closed — attempt ${a.bootstrapId} is terminal`)
@@ -3638,11 +3723,7 @@ export async function runBootstrap(
       return { ok: false, bootstrapId: a.bootstrapId, stage: 'aborted', messages }
     }
     deps.gh.squashMerge(opts.pr, a.gatedHeadSha)
-    const mergeSha = deps.gh.mergeCommitSha(opts.pr) ?? ''
-    if (mergeSha === '') say('note: GitHub has not reported the merge commit SHA yet — recorded empty')
-    recordMerged(a, mergeSha)
-    say(`merged PR #${opts.pr} (bootstrap ${a.bootstrapId}, merge commit ${mergeSha === '' ? 'unknown' : mergeSha})`)
-    return verifyAndArm(a)
+    return finalizeMerge(a)
   }
 
   switch (decision.kind) {
@@ -3653,12 +3734,20 @@ export async function runBootstrap(
     say(`resuming bootstrap ${decision.attempt.bootstrapId}: merge already journaled — re-arming idempotently`)
     if (!arm()) return { ok: false, bootstrapId: decision.attempt.bootstrapId, stage: 'arm', messages }
     return verifyAndArm(decision.attempt)
-  case 'record-merge-then-arm':
+  case 'record-merge-then-arm': {
     // Crash window: the merge API call succeeded, the journal write did not.
-    recordMerged(decision.attempt, deps.gh.mergeCommitSha(opts.pr) ?? '')
+    const recovered = await resolveMergeSha()
+    if (recovered === null) {
+      // Never journal bootstrap_merged with an empty SHA — stop and let a later
+      // resume record it once GitHub exposes the merge commit.
+      say(`crash-window reconciliation: GitHub reports PR #${opts.pr} MERGED but has not exposed the merge commit SHA yet — the journal is NOT advanced; retry: scaffold mq bootstrap --pr ${opts.pr} --finish`)
+      return { ok: false, bootstrapId: decision.attempt.bootstrapId, stage: 'merge', messages }
+    }
+    recordMerged(decision.attempt, recovered)
     say(`crash-window reconciliation: GitHub reports PR #${opts.pr} MERGED — merge recorded retroactively (never re-merged)`)
     if (!arm()) return { ok: false, bootstrapId: decision.attempt.bootstrapId, stage: 'arm', messages }
     return verifyAndArm(decision.attempt)
+  }
   case 'rerun-merge':
     say(`resuming bootstrap ${decision.attempt.bootstrapId}: intent journaled, merge not — re-running the merge stage`)
     if (!arm()) return { ok: false, bootstrapId: decision.attempt.bootstrapId, stage: 'arm', messages }
@@ -3723,7 +3812,7 @@ export async function runBootstrap(
 
   Note: the `JournalEvent` import becomes type-only usage inside the reducers — keep the single `import type { JournalEvent, MergeQueueConfig } from './types.js'` line (replacing Task 14's narrower import).
 
-- [ ] Run: `npx vitest run src/merge-queue/bootstrap.test.ts` — expect 21 tests passed (12 pure + 9 engine).
+- [ ] Run: `npx vitest run src/merge-queue/bootstrap.test.ts` — expect 22 tests passed (12 pure + 10 engine).
 - [ ] Wire the CLI in `src/cli/commands/mq.ts`:
 
   1. Extend the imports — Edit old string:
@@ -4409,11 +4498,12 @@ export function runGateProbe(
 **Files:**
 - Create: `src/project/adoption-ops-actions.ts`
 - Create: `src/project/adoption-ops-actions.test.ts`
+- Modify: `src/core/agent-ops/install.ts` (export `plannedInstallPaths` — the installer dry-run path API)
 - Modify: the R1 adoption-plan builder + renderer (`src/project/adoption-plan*.ts`, located by grep)
 
 **Interfaces:**
-- Produces: `OpsActionRecord { action: 'install-component' | 'hooks-install' | 'sched-install' | 'bootstrap-merge-required', command, files, detail }`, `OpsProbes { schedUnitPaths? }`, `buildOpsActions(projectRoot, probes?): OpsActionRecord[]` (read-only, deterministic, stable-sorted), `renderOpsActionsSection(records): string[]`.
-- Consumes: `AGENT_OPS_FILE_MAP` (`src/core/agent-ops/install.ts` — includes the Task 10 gate entries), `planHooks`/`readSettings` (Task 12), `readJournal` (`src/merge-queue/journal.ts`), `loadAgentOpsConfig`, `pickSchedBackend` (Task 6) + `buildPostMergePollerJob` (Task 5), and the R1 plan renderer's `plan_key` canonicalization (spec D1: sha256 over the canonical JSON of the complete apply-action records — from R2 onward that input includes the ops-action records, so no apply-relevant ops detail can change without changing the key).
+- Produces: `OpsActionRecord { action: 'install-component' | 'hooks-install' | 'sched-install' | 'bootstrap-merge-required', command, files, detail }`, `OpsProbes { schedUnitPaths? }`, `buildOpsActions(projectRoot, probes?): OpsActionRecord[]` (read-only, deterministic, stable-sorted), `renderOpsActionsSection(records): string[]`; `plannedInstallPaths(components): string[]` (exported from `src/core/agent-ops/install.ts`).
+- Consumes: `AGENT_OPS_FILE_MAP` + `plannedInstallPaths` (`src/core/agent-ops/install.ts` — the latter returns the COMPLETE install write set, not just component dests), `planHooks`/`readSettings` (Task 12), `readJournal` (`src/merge-queue/journal.ts`), `loadAgentOpsConfig`, `pickSchedBackend` (Task 6) + `buildPostMergePollerJob` (Task 5), and the R1 plan renderer's `plan_key` canonicalization (spec D1: sha256 over the canonical JSON of the complete apply-action records — from R2 onward that input includes the ops-action records, so no apply-relevant ops detail can change without changing the key).
 
 **Steps:**
 
@@ -4447,11 +4537,15 @@ describe('buildOpsActions (§6.1 R2 preview)', () => {
     expect(keys).toContain('hooks-install:scaffold hooks install')
     expect(keys.join('\n')).not.toMatch(/merge-queue|gate|sched|bootstrap/)
   })
-  it('records carry EXACT file lists (spec: "with the exact file list")', () => {
+  it('records carry EXACT file lists (spec: "with the exact file list") — including the installer-wide writes', () => {
     const records = buildOpsActions(project())
     const git = records.find(r => r.command.endsWith('--component git'))
     expect(git?.files.length).toBeGreaterThan(0)
     expect(git?.files).toContain('scripts/setup-agent-worktree.sh')
+    // The list is the COMPLETE install write set — not just the component dests.
+    expect(git?.files).toContain('.scaffold/agent-ops-manifest.json')
+    expect(git?.files).toContain('.scaffold/agent-ops-version')
+    expect(git?.files).toContain('Makefile')
     expect(git?.files).toEqual([...(git?.files ?? [])].sort())
     const hooks = records.find(r => r.action === 'hooks-install')
     expect(hooks?.files).toEqual(['.claude/settings.json'])
@@ -4467,7 +4561,13 @@ describe('buildOpsActions (§6.1 R2 preview)', () => {
     expect(keys).toContain('install-component:scaffold agent-ops install --component gate')
     expect(keys).toContain('sched-install:scaffold sched install post-merge-poller')
     const gate = records.find(r => r.command.endsWith('--component gate'))
-    expect(gate?.files).toEqual(['scripts/gate-check-affected.sh', 'scripts/gate-check.sh'])
+    // The gate seeds PLUS every installer-wide write (manifest, version marker,
+    // Makefile include, shared make fragment) — the complete apply-relevant set.
+    expect(gate?.files).toContain('scripts/gate-check.sh')
+    expect(gate?.files).toContain('scripts/gate-check-affected.sh')
+    expect(gate?.files).toContain('.scaffold/agent-ops-manifest.json')
+    expect(gate?.files).toContain('Makefile')
+    expect(gate?.files).toEqual([...(gate?.files ?? [])].sort())
     const sched = records.find(r => r.action === 'sched-install')
     expect(sched?.files).toEqual(['/units/scaffold-p-merge-poller.timer'])
     const boot = records.find(r => r.action === 'bootstrap-merge-required')
@@ -4536,13 +4636,41 @@ describe('renderOpsActionsSection', () => {
 ```
 
 - [ ] Run: `npx vitest run src/project/adoption-ops-actions.test.ts` — expect FAILURE (module missing).
+- [ ] Add the installer dry-run path API so the preview derives the COMPLETE write set (not just component dests). In `src/core/agent-ops/install.ts`, export `plannedInstallPaths`, mirroring `installAgentOps`'s own requested-file logic (the make fragment for any component, plus manifest/version/Makefile/gitignore):
+
+```ts
+/** Every project-root-relative path installAgentOps creates or edits for these
+ *  components: the requested component seed/dest files, the shared make fragment
+ *  (installed for ANY component), the ownership manifest, the version marker, the
+ *  Makefile include, and — for merge-queue — the .gitignore entry. Sorted,
+ *  de-duplicated, read-only. The ops-actions preview derives install-component
+ *  file lists from THIS (never from AGENT_OPS_FILE_MAP directly), so the preview
+ *  and its plan_key can never omit an apply-relevant write. Keep this in lockstep
+ *  with installAgentOps — the two must agree on what a component install writes. */
+export function plannedInstallPaths(components: AgentOpsComponent[]): string[] {
+  const set = new Set<string>()
+  for (const [tmpl, spec] of Object.entries(AGENT_OPS_FILE_MAP)) {
+    const requested = tmpl === MAKE_FRAGMENT_TMPL
+      ? components.length > 0
+      : components.includes(spec.component)
+    if (requested) set.add(spec.dest)
+  }
+  set.add(MANIFEST_PATH)
+  set.add(VERSION_MARKER_PATH)
+  if (components.length > 0) set.add('Makefile')
+  if (components.includes('merge-queue')) set.add('.gitignore')
+  return [...set].sort()
+}
+```
+
+  (`AgentOpsComponent`, `MAKE_FRAGMENT_TMPL`, `MANIFEST_PATH`, `VERSION_MARKER_PATH` already live in this file. Export `AgentOpsComponent` if it is not already.)
 - [ ] Create `src/project/adoption-ops-actions.ts`:
 
 ```ts
 import fs from 'node:fs'
 import path from 'node:path'
 import yaml from 'js-yaml'
-import { AGENT_OPS_FILE_MAP, type AgentOpsComponent } from '../core/agent-ops/install.js'
+import { AGENT_OPS_FILE_MAP, plannedInstallPaths, type AgentOpsComponent } from '../core/agent-ops/install.js'
 import { loadAgentOpsConfig } from '../core/agent-ops/config.js'
 import { planHooks, readSettings } from '../core/hooks/install.js'
 import { buildPostMergePollerJob } from '../sched/jobs.js'
@@ -4604,16 +4732,22 @@ export function buildOpsActions(projectRoot: string, probes: OpsProbes = {}): Op
     ? ['git', 'staging', 'merge-queue', 'gate']
     : ['git', 'staging']
   for (const component of components) {
+    // Decision: the component needs installing when any of its own seed/dest
+    // files are missing.
     const missing = componentDests(component)
       .filter(dest => !fs.existsSync(path.join(projectRoot, dest)))
     if (missing.length === 0) continue
     records.push({
       action: 'install-component',
       command: `scaffold agent-ops install --component ${component}`,
-      files: missing,
+      // Report the COMPLETE write set the install command touches — component
+      // files PLUS the manifest, version marker, Makefile include, and (for
+      // merge-queue) .gitignore — so the preview and plan_key never omit an
+      // apply-relevant write. Derived from the installer, never hand-rolled.
+      files: plannedInstallPaths([component]),
       detail: component === 'gate'
-        ? 'generates the gate seeds (project-owned after generation; ingestion-lite classification shown at install)'
-        : `${component} component files currently missing`,
+        ? 'generates the gate seeds (project-owned after generation; ingestion-lite classification shown at install); also refreshes the ownership manifest, version marker, and Makefile include'
+        : `${component} component install (component files currently missing; also refreshes the manifest, version marker, and Makefile include)`,
     })
   }
 
@@ -4662,7 +4796,11 @@ export function buildOpsActions(projectRoot: string, probes: OpsProbes = {}): Op
 
 /** Markdown/human rendering of the preview section (appended to the plan). */
 export function renderOpsActionsSection(records: OpsActionRecord[]): string[] {
-  const lines: string[] = ['## Ops actions (executed only on --apply approval)']
+  // These are a PREVIEW/checklist of follow-up commands the user runs after
+  // adopt — `scaffold adopt --apply` writes only config/state (see
+  // applyAdoptionPlan), it does NOT install components, hooks, schedulers, or
+  // run the bootstrap merge. The header must not claim otherwise.
+  const lines: string[] = ['## Ops actions (recommended follow-up commands — run these after adopt; NOT executed by --apply)']
   if (records.length === 0) {
     lines.push('', 'None — the ops surface is already installed.')
     return lines

@@ -568,7 +568,7 @@ interface StepVerification {
   detect: DetectResult
 }
 function verifyStep(step: string, entry: StepStateEntry | undefined, expectedOutputs: string[], detect: DetectSpec | null | undefined, projectRoot: string): StepVerification
-function applyConflictOverrides(steps: Record<string, StepStateEntry>, projectRoot: string): { steps: Record<string, StepStateEntry>; conflicts: string[] }
+function applyConflictOverrides(steps: Record<string, StepStateEntry>, projectRoot: string, resolvedOutputs?: (slug: string) => string[] | undefined): { steps: Record<string, StepStateEntry>; conflicts: string[] }
 ```
 
 - Produces (exported from `src/types/decision.ts`): `VerificationAuditRecord` — the pinned D3 audit schema.
@@ -661,6 +661,24 @@ describe('applyConflictOverrides (D3 — fs-only eligibility demotion)', () => {
     expect(result.conflicts).toEqual([])
     expect(result.steps).toBe(steps)
   })
+
+  it('checks the CURRENT resolved outputs, not the historical produces (a package upgrade added an output)', () => {
+    const dir = makeTempDir()
+    // The step was completed when it only produced legacy.md (present on disk),
+    // but the resolved pipeline now ALSO requires new.md (absent) — the step
+    // must demote even though its stored produces is fully present.
+    fs.writeFileSync(path.join(dir, 'legacy.md'), 'x', 'utf8')
+    const steps: Record<string, StepStateEntry> = {
+      'tech-stack': { status: 'completed', source: 'pipeline', produces: ['legacy.md'] },
+    }
+    const resolved = (slug: string): string[] | undefined =>
+      slug === 'tech-stack' ? ['legacy.md', 'new.md'] : undefined
+    const result = applyConflictOverrides(steps, dir, resolved)
+    expect(result.conflicts).toEqual(['tech-stack'])
+    expect(result.steps['tech-stack'].status).toBe('pending')
+    // Without the resolver (historical produces only) the step would NOT demote.
+    expect(applyConflictOverrides(steps, dir).conflicts).toEqual([])
+  })
 })
 ```
 
@@ -745,16 +763,26 @@ export function verifyStep(
  * runs on every `status`/`next`, so detect: cmds are never executed here.
  * Returns a shallow copy with conflicted steps demoted to pending; returns the
  * input object unchanged when nothing conflicts.
+ *
+ * `resolvedOutputs`, when supplied, provides each step's CURRENT output
+ * contract from the resolved pipeline (preset + project-type overlays). Passing
+ * it is important: a package upgrade can add or change a step's outputs after it
+ * was completed, and checking only the stored `entry.produces` would let a
+ * now-incomplete step stay `completed`. The stored `entry.produces` is used
+ * only as a fallback for steps the resolver no longer knows (extra/removed).
  */
 export function applyConflictOverrides(
   steps: Record<string, StepStateEntry>,
   projectRoot: string,
+  resolvedOutputs?: (slug: string) => string[] | undefined,
 ): { steps: Record<string, StepStateEntry>; conflicts: string[] } {
   const conflicts: string[] = []
   let overridden: Record<string, StepStateEntry> | null = null
   for (const [slug, entry] of Object.entries(steps)) {
     if (entry.status !== 'completed') continue
-    const outputs = entry.produces ?? []
+    // Current resolved contract first; historical entry.produces only as a
+    // fallback for steps the resolved pipeline no longer knows.
+    const outputs = resolvedOutputs?.(slug) ?? entry.produces ?? []
     if (outputs.length === 0) continue
     const anyMissing = outputs.some((output) => {
       const fullPath = resolveContainedArtifactPath(projectRoot, output)
@@ -890,7 +918,9 @@ export function appendAuditRecord(
 ```ts
   describe('conflict overrides completed (D3)', () => {
     it('renders a completed step with missing outputs as conflict and excludes it from completed totals', async () => {
-      const fm = new Map([['beads', makeFrontmatter('beads', 'foundation', 210)]])
+      // D3/F5: applyConflictOverrides checks the CURRENT resolved outputs, so the
+      // frontmatter must declare beads' output (makeFrontmatter defaults to []).
+      const fm = new Map([['beads', { ...makeFrontmatter('beads', 'foundation', 210), outputs: ['.beads/'] }]])
       mockDiscoverMetaPrompts.mockReturnValue(fm as never)
       mockOverlayEnabled(['beads'])
       mockStateWith(MockStateManager, {
@@ -904,7 +934,7 @@ export function appendAuditRecord(
 
     it('JSON output lists conflicts and reports the step status as conflict', async () => {
       mockResolveOutputMode.mockReturnValue('json')
-      const fm = new Map([['beads', makeFrontmatter('beads', 'foundation', 210)]])
+      const fm = new Map([['beads', { ...makeFrontmatter('beads', 'foundation', 210), outputs: ['.beads/'] }]])
       mockDiscoverMetaPrompts.mockReturnValue(fm as never)
       mockOverlayEnabled(['beads'])
       mockStateWith(MockStateManager, {
@@ -931,8 +961,12 @@ export function appendAuditRecord(
 ```ts
     // D3: conflict overrides completed. FS-only check (no detect: cmds here) —
     // a completed step with missing declared outputs is demoted to pending for
-    // eligibility and rendered as `conflict` on every surface below.
-    const conflictCheck = applyConflictOverrides(state.steps, projectRoot)
+    // eligibility and rendered as `conflict` on every surface below. Pass the
+    // CURRENT resolved outputs so a package upgrade that changed a step's output
+    // contract is honored (not just the outputs stored at completion time).
+    const conflictCheck = applyConflictOverrides(
+      state.steps, projectRoot, (slug) => pipeline.stepMeta.get(slug)?.outputs,
+    )
     const conflictSlugs = new Set(conflictCheck.conflicts)
     if (conflictSlugs.size > 0) {
       output.warn(
@@ -968,7 +1002,7 @@ export function appendAuditRecord(
   8. In the compact-JSON steps mapper, replace `const status = entry?.status ?? 'pending'` with `const status = statusOf(slug)` (delete the now-unused `const entry = steps[slug]` line if TS flags it).
   9. In the interactive listing, replace `const status = entry?.status ?? 'pending'` with `const status = statusOf(slug)`.
   10. In the JSON `result` object, add `conflicts: conflictCheck.conflicts,` after `nextEligible`.
-- [ ] Run `npx vitest run src/cli/commands/status.test.ts` — all green (existing fixtures use empty `produces` on completed steps, so nothing else demotes; if any existing fixture used non-empty `produces` on a completed step and now fails, that fixture is asserting the pre-D3 lie — update its expectation to `conflict`).
+- [ ] Run `npx vitest run src/cli/commands/status.test.ts` — all green. Demotion is now driven by the step's CURRENT resolved outputs (`pipeline.stepMeta.get(slug)?.outputs`, `entry.produces` fallback for steps the resolver doesn't know). Existing fixtures put completed steps at empty resolved outputs (`makeFrontmatter` defaults `outputs: []` and completed fixtures use empty `produces`), so nothing else demotes; if any existing fixture gives a completed step a non-empty resolved output (frontmatter `outputs`) or non-empty `produces` with the file absent and now fails, that fixture is asserting the pre-D3 lie — update its expectation to `conflict`.
 - [ ] Create `src/cli/commands/next.conflict.test.ts` (complete file):
 
 ```ts
@@ -1057,7 +1091,10 @@ describe('next — conflict overrides completed (D3)', () => {
 
 ```ts
     // D3: conflict overrides completed — fs-only demotion (never runs detect: cmds).
-    const conflictCheck = applyConflictOverrides(state.steps, projectRoot)
+    // Pass the CURRENT resolved outputs so an upgraded output contract is honored.
+    const conflictCheck = applyConflictOverrides(
+      state.steps, projectRoot, (slug) => pipeline.stepMeta.get(slug)?.outputs,
+    )
     if (conflictCheck.conflicts.length > 0) {
       output.warn(
         `${conflictCheck.conflicts.length} completed step(s) failed the artifact check and are treated as not completed: `
@@ -2029,7 +2066,11 @@ export const queueDaemonCheck: DoctorCheck = {
     }
     let alive = false
     try {
-      alive = checkSync(mqDir, { lockfilePath: path.join(mqDir, 'daemon.lock'), stale: 15_000 })
+      // `stale` MUST track LOCK_STALE_MS in src/cli/commands/mq.ts (180_000). The
+      // daemon holds the lock through blocking git/gh calls (execFileSync, 120s
+      // cap); a shorter staleness here would judge a busy-but-alive daemon dead
+      // and falsely report it idle. Keep this value in lockstep with mq.ts.
+      alive = checkSync(mqDir, { lockfilePath: path.join(mqDir, 'daemon.lock'), stale: 180_000 })
     } catch {
       alive = false
     }
@@ -3009,12 +3050,13 @@ import path from 'node:path'
 import { parseDocument, type Document } from 'yaml'
 import { StateManager } from '../state/state-manager.js'
 import { appendAuditRecord } from '../state/decision-logger.js'
+import { atomicWriteFile } from '../utils/fs.js'
 import { loadPipelineContext } from '../core/pipeline/context.js'
 import { runDoctor } from '../doctor/run.js'
 import { TYPE_KEY } from './adopt.js'
 import type { AdoptionPlan, InitializeRecord } from './adoption-plan.js'
 import type { DoctorReport } from '../doctor/types.js'
-import type { StepStateEntry, VerificationAuditRecord } from '../types/index.js'
+import type { DepthLevel, StepStateEntry, VerificationAuditRecord } from '../types/index.js'
 
 export interface ApplyResult {
   initialized: boolean
@@ -3054,9 +3096,9 @@ export function writeInitializeConfig(projectRoot: string, initialize: Initializ
     }
   }
   fs.mkdirSync(path.join(projectRoot, '.scaffold'), { recursive: true })
-  const tmpPath = `${configPath}.${process.pid}.tmp`
-  fs.writeFileSync(tmpPath, doc.toString(), 'utf8')
-  fs.renameSync(tmpPath, configPath)
+  // Use the codebase-wide atomic writer (src/utils/fs.ts) — temp-file-then-rename
+  // in one place, so a crash mid-write can never leave a truncated config.yml.
+  atomicWriteFile(configPath, doc.toString())
 }
 
 /**
@@ -3093,6 +3135,13 @@ export async function applyAdoptionPlan(options: {
 
   const state = stateManager.loadState()
   const now = new Date().toISOString()
+  // Completed steps must carry a depth (StepStateEntry types it "only when
+  // completed" and state validation expects it on a completed entry). Adoption
+  // marks a pre-existing completion whose original depth we can't recover, so
+  // preserve the entry's own depth when present, else fall back to the
+  // methodology's default depth (mvp=1, deep=5, else 3 — the wizard's mapping).
+  const defaultDepth: DepthLevel =
+    plan.methodology === 'mvp' ? 1 : plan.methodology === 'deep' ? 5 : 3
   const marked: string[] = []
   const reopened: string[] = []
   const recorded: string[] = []
@@ -3131,6 +3180,7 @@ export async function applyAdoptionPlan(options: {
         completed_by: ACTOR,
         produces: producesFor(record.step_slug),
         verification: 'verified',
+        depth: entry?.depth ?? defaultDepth,
       }
       if (next.completed_at === undefined) next.completed_at = now
       state.steps[record.step_slug] = next

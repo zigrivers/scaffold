@@ -13,7 +13,7 @@
 These are pinned by the approved spec — do not re-litigate during implementation.
 
 - **Mode resolution matrix (D3):** a step whose prior scaffold completion survives with `verification: 'verified' | 'declared'` runs in **update** mode; a step with **no surviving completion** (`status !== 'completed'`) runs in **adoption** mode when `state['init-mode']` is `'brownfield'` or `'v1-migration'`; **else fresh**. A completed step whose `verification` is `'unverified'` is neither update (not verified/declared) nor adoption (completion survives) → fresh. `conflict` never reaches assembly as `completed` — R1's apply reopens conflicted steps to `pending`/`unverified`, so they resolve to adoption mode in a brownfield project (the spec's "reopened false completion correctly enters adoption mode").
-- **Greenfield semantics are unchanged (spec non-goal).** Post-R1, `markCompleted` produces `declared` for any step with outputs (the migrated `artifacts_verified: true` semantics), so the matrix reproduces today's update-mode behavior for greenfield projects. Defensively, a completed entry missing the `verification` field entirely is treated as `'declared'` (R1's on-load migration makes this unreachable in practice; the default preserves pre-R1 behavior if it is ever hit).
+- **Greenfield semantics are unchanged (spec non-goal).** Post-R1, `markCompleted` produces `declared` for any step with outputs (the migrated `artifacts_verified: true` semantics), so the matrix reproduces today's update-mode behavior for greenfield projects. Defensively, a completed entry missing the `verification` field entirely is treated as `'unverified'` — matching R1's contract that an absent value ≡ unverified. R1's on-load migration converts pre-R1 `artifacts_verified: true` completions to `'declared'` (they stay update-eligible through the field, not the default); an entry that is still absent after migration never had verified outputs, so it correctly resolves to fresh — old adopt-created completions never regain update eligibility without a live verification.
 - **Adoption preamble principles (D11), verbatim intent:** read the repo first; extract facts with evidence; interview only for intent gaps; never propose rewrites of working code. Plus the D10b translation rule: translate incumbents with provenance annotations; **list what cannot translate rather than guessing**.
 - **`artifact_map` (D10a):** `.scaffold/config.yml` key `artifact_map` (snake_case, exactly as the spec pins it — the rest of config is camelCase; do not "normalize" it) maps a step slug to one existing project-root-relative artifact path (`coding-standards: CONTRIBUTING.md`). D3 verification honors mapped artifacts: an existing mapped file satisfies the all-outputs requirement (the `detect:` contract, when declared, still must pass — mapping never bypasses detect). In update mode the mapped incumbent is the step's prior artifact **only as a fallback** — the step's own produced artifact wins when both exist. Mappings are proposed in the plan, never applied unapproved.
 - **`map-candidate` disposition (D10 + D1):** joins the adoption plan in R3. Its payload — the mapping target path — lives **inside the disposition record that `plan_key` hashes** (D1: the key is a sha256 over canonical JSON of the complete apply-action records including disposition-specific payload), so changing a proposed target forces re-approval. `README.md` is never a map candidate (the any-output-exists false-positive class this design exists to kill — spec §1).
@@ -181,10 +181,12 @@ These are pinned by the approved spec — do not re-litigate during implementati
 ### Task 2: Verification honors mapped artifacts
 
 **Files:**
-- `src/state/completion.ts` (thread `artifactMap` through `detectCompletion` and `checkCompletion`; same treatment for R1's `verifyStep`/`runDetect` wrapper if it wraps these)
+- `src/state/completion.ts` (thread `artifactMap` through R1's `verifyStep` — the D3 verifier the adoption plan and doctor actually call — AND the legacy `detectCompletion`/`checkCompletion`)
+- `src/doctor/checks.ts`, `src/project/adoption-plan*.ts`, `src/project/adoption-apply.ts` (thread `artifactMap` into `verifyStep`'s callers; locate with `git grep -n "verifyStep(" src/`)
 - `src/state/completion.test.ts` (new cases; create the file if R1 did not already)
 
 **Interfaces:**
+- `verifyStep(step, entry, expectedOutputs, detect, projectRoot, artifactMap?)` — trailing optional param (R1's D3 verifier). An existing mapped incumbent satisfies the all-outputs requirement; the `detect:` contract still runs and still gates `verified` (mapping never bypasses detect).
 - `detectCompletion(step, state, expectedOutputs, projectRoot, service?, artifactMap?)` — trailing optional param, backward compatible
 - `checkCompletion(step, state, projectRoot, artifactMap?)` — same
 - `CompletionResult.mappedArtifactUsed?: string` — set when a mapping satisfied the outputs requirement
@@ -240,8 +242,37 @@ These are pinned by the approved spec — do not re-litigate during implementati
         { 'coding-standards': 'CONTRIBUTING.md' })
       expect(result.status).toBe('confirmed_complete')
     })
+
+    it('verifyStep (the plan/doctor path) accepts a mapped incumbent — detect still gates', () => {
+      fs.writeFileSync(path.join(tmpDir, 'CONTRIBUTING.md'), '# Contributing\n')
+      const entry = {
+        status: 'completed', source: 'pipeline', produces: ['docs/coding-standards.md'],
+        verification: 'declared',
+      } as StepStateEntry
+      // Mapped incumbent present + detect passes → verified/done.
+      const ok = verifyStep(
+        'coding-standards', entry, ['docs/coding-standards.md'], { all: [{ cmd: 'exit 0' }] }, tmpDir,
+        { 'coding-standards': 'CONTRIBUTING.md' },
+      )
+      expect(ok.verification).toBe('verified')
+      expect(ok.status).toBe('confirmed_complete')
+      // Without the map the produced output is still missing → conflict.
+      const missing = verifyStep(
+        'coding-standards', entry, ['docs/coding-standards.md'], { all: [{ cmd: 'exit 0' }] }, tmpDir,
+      )
+      expect(missing.status).toBe('conflict')
+      // Mapping never bypasses detect: mapped present but detect fails → not verified.
+      const detectFails = verifyStep(
+        'coding-standards', entry, ['docs/coding-standards.md'], { all: [{ cmd: 'exit 1' }] }, tmpDir,
+        { 'coding-standards': 'CONTRIBUTING.md' },
+      )
+      expect(detectFails.verification).not.toBe('verified')
+      expect(detectFails.status).toBe('conflict')
+    })
   })
   ```
+
+  (Ensure `verifyStep` and `StepStateEntry` are imported in the test file — R1's `verifyStep` tests already add them; add the imports if this describe block lives in a file that does not.)
 
 - [ ] Run: `npx vitest run src/state/completion.test.ts` — new tests FAIL (no `artifactMap` param yet).
 - [ ] Implement in `src/state/completion.ts`. Add `mappedArtifactUsed?: string` to `CompletionResult`. At the top of `detectCompletion`, before the outputs loop:
@@ -263,9 +294,30 @@ These are pinned by the approved spec — do not re-litigate during implementati
   }
   ```
 
-  Apply the same short-circuit to `checkCompletion`'s outputs-presence loop (an existing mapped incumbent ⇒ `allPresent = true` for the status computation). **R1 integration note:** if R1's `verifyStep`/`runDetect` wrapper calls these functions, thread the map through the outputs-presence layer only — the `detect:` contract layer always still runs (mapping never bypasses detect). Locate with `git grep -n "runDetect" src/state/` if the wrapper lives elsewhere.
+  Apply the same short-circuit to `checkCompletion`'s outputs-presence loop (an existing mapped incumbent ⇒ `allPresent = true` for the status computation).
+- [ ] **Extend R1's `verifyStep`** (the D3 verifier the adoption plan and doctor actually call). It does its OWN outputs check and does NOT call `detectCompletion`/`checkCompletion`, so threading the map through those two alone would leave mapped incumbents reported missing on the plan and doctor paths (the whole point of `artifact_map`). Add a trailing `artifactMap?: Record<string, string>` param, and right after its outputs-presence loop (before the disposition branches) reconcile a mapped incumbent into the all-outputs requirement — detect still runs and still gates `verified`:
+
+  ```ts
+  // D10a (R3): an existing mapped incumbent satisfies the all-outputs
+  // requirement (fallback only — the step's own outputs were checked first).
+  // Mapping NEVER bypasses detect: detectResult still gates 'verified' below.
+  const mapped = artifactMap?.[step]
+  if (outputsMissing.length > 0 && mapped !== undefined) {
+    const mappedFull = resolveContainedArtifactPath(projectRoot, mapped)
+    if (mappedFull !== null && fileExists(mappedFull)) {
+      outputsPresent.push(mapped)
+      outputsMissing.length = 0
+    }
+  }
+  ```
+
+- [ ] Thread `artifactMap` through `verifyStep`'s callers (previously blind to mappings — `git grep -n "verifyStep(" src/`):
+  - **doctor** `pipelineVerificationCheck` (`src/doctor/checks.ts`): pass `context.config?.artifact_map` as the new trailing arg.
+  - **adoption-plan builder** (`src/project/adoption-plan*.ts`): pass `config.artifact_map` to each `verifyStep(...)` call (the builder already loads `config`).
+  - **adoption-apply** (`src/project/adoption-apply.ts`): the map-candidate re-verification (Task 10) passes the updated `artifact_map` here.
+  Add one integration assertion (doctor or plan) that a mapped incumbent reports the step as verified/done rather than missing.
 - [ ] Run: `npx vitest run src/state/completion.test.ts` — all green.
-- [ ] Commit: `feat(state): completion verification honors artifact_map incumbents (D10a)`
+- [ ] Commit: `feat(state): completion + verifyStep verification honors artifact_map incumbents (D10a)`
 
 ---
 
@@ -342,7 +394,7 @@ export function resolveAssemblyMode(options: {
       expect(result.warnings).toHaveLength(0)
     })
 
-    it('completed entry missing the verification field defaults to declared → update', () => {
+    it('completed entry missing the verification field defaults to unverified → fresh (R1 contract: absent ≡ unverified)', () => {
       fs.mkdirSync(path.join(tmpDir, 'docs'), { recursive: true })
       fs.writeFileSync(path.join(tmpDir, 'docs/prd.md'), '# PRD')
       const state = makeState({
@@ -351,7 +403,7 @@ export function resolveAssemblyMode(options: {
         },
       })
       const result = resolveAssemblyMode({ step: 'create-prd', state, currentDepth: 3, projectRoot: tmpDir })
-      expect(result.mode).toBe('update')
+      expect(result.mode).toBe('fresh')
     })
 
     it('not completed + init-mode brownfield → adoption', () => {
@@ -448,12 +500,15 @@ export function resolveAssemblyMode(options: {
     const entry = state.steps[step]
     const completed = entry?.status === 'completed'
 
-    // R1 (D3) verification enum. Pre-R1 entries are migrated on state load;
-    // an absent field defaults to 'declared' so pre-migration greenfield
-    // behavior (completed + artifact on disk → update) is preserved.
+    // R1 (D3) verification enum. R1's contract is that an ABSENT value ≡
+    // 'unverified' (Global Constraints). Migrated greenfield completions carry
+    // 'declared' explicitly (artifacts_verified: true → 'declared' on load), so
+    // update behavior is preserved through the field, not through the default.
+    // Defaulting absent → 'declared' would let old adopt-created entries (which
+    // never had artifacts_verified) regain update eligibility with no live check.
     const verification =
       (entry as { verification?: 'verified' | 'declared' | 'unverified' } | undefined)
-        ?.verification ?? 'declared'
+        ?.verification ?? 'unverified'
     const updateEligible =
       completed && (verification === 'verified' || verification === 'declared')
 
