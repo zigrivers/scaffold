@@ -32,6 +32,14 @@ describe('canonicalJson', () => {
     expect(canonicalJson({ b: 1, a: { d: 2, c: [{ f: 3, e: 4 }] } }))
       .toBe(canonicalJson({ a: { c: [{ e: 4, f: 3 }], d: 2 }, b: 1 }))
   })
+
+  it('omits undefined-valued keys (a present-but-undefined optional field keys the same as an absent one)', () => {
+    // Mirrors JSON.stringify object semantics; keeps the key deterministic when
+    // reused with optional fields (R3 target?/mode?). A bare `undefined` token
+    // would be invalid JSON.
+    expect(canonicalJson({ a: 1, b: undefined })).toBe('{"a":1}')
+    expect(canonicalJson({ a: 1, mode: undefined })).toBe(canonicalJson({ a: 1 }))
+  })
 })
 
 describe('buildAdoptionPlan (D1/D2/§6.1)', () => {

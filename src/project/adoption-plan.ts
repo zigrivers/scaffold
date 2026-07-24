@@ -60,7 +60,11 @@ export function canonicalJson(value: unknown): string {
   }
   if (value !== null && typeof value === 'object') {
     const record = value as Record<string, unknown>
-    const keys = Object.keys(record).sort()
+    // Omit undefined-valued keys, mirroring JSON.stringify's object semantics
+    // (`{a: undefined}` → `{}`). Without this an optional-but-present-undefined
+    // field (e.g. R3's `target?`/`mode?`) would emit a bare `undefined` token —
+    // invalid JSON and a source of key non-determinism when this is reused.
+    const keys = Object.keys(record).filter((k) => record[k] !== undefined).sort()
     return '{' + keys.map((k) => `${JSON.stringify(k)}:${canonicalJson(record[k])}`).join(',') + '}'
   }
   return JSON.stringify(value)
