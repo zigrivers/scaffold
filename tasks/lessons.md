@@ -197,3 +197,51 @@ Patterns and anti-patterns discovered during development. Review before starting
 **Pattern:** A downstream project (nibble) diagnosed grok's `stopReason=Cancelled` + empty `$.text` failures as "answer stranded in the reasoning stream, NOT concurrency — concurrency ruled out", and recommended a `$.thought` parser fallback. Local reproduction with MMR's exact invocation showed the opposite on this machine: the identical failing prompt completes serially every time and cancels 5/8 under 4-way same-account concurrency, and the envelope truncates `thought` to ~200 chars — so the recommended `$.thought` fallback could never recover the answer. The handoff's *evidence* (token accounting) was real, but its mechanism inference and fix recommendation were both wrong.
 **Rule:** When a handoff diagnosis arrives with a recommended fix, re-run the repro yourself under the *conditions the reporter ruled out* (here: concurrency) before implementing their preferred lever. Test candidate fixes empirically head-to-head (baseline vs `--json-schema` under identical concurrency, warm-cache confound controlled) rather than picking the "most robust sounding" one.
 **Bonus gotcha:** grok's `--json-schema` makes EVERY turn schema-shaped — including intermediate progress acks — so "extract first JSON object" parsers can flip a 3-finding review into "approved, no issues". Any schema-constrained multi-turn CLI needs last-object extraction plus a preemptive incomplete-status guard (a Cancelled envelope with parseable text must still fail).
+
+## Grok truncates very large diffs → non-defect "can't verify" findings that read as blocking (2026-07-24)
+**Pattern:** Reviewing a docs-landing PR whose diff was ~15k lines (four large plan
+docs + spec) via `mmr review`, grok emitted round-3 findings that were all
+grok-degradation artifacts: two explicitly said the "documentation-only plan file …
+truncated mid-stream in the review payload" / "Truncated Task 2+ content prevents
+full review", and two flagged behavior that is in fact intended AND unit-tested
+(the `v4 + hasServices → 2` schema-version dispatch, and the `artifacts_verified:true
+→ verification:'declared'` migration). Codex, Claude, Antigravity, and the plan-aware
+Superpowers channel were all clean. mmr's mechanical verdict was `blocked` purely on
+grok's four non-defects.
+**Rule:** On a very large diff, treat grok findings whose own text admits the payload
+was truncated as a **degraded-channel** signal, not real defects — verify each against
+the actual files on disk (grep for the implementation + its test) before acting.
+A finding that describes spec-sanctioned, tested behavior is not a defect no matter
+how it's phrased. When grok is degraded by payload size but the other channels +
+Superpowers converge clean, that is a `degraded-pass`, not a real `blocked` — confirm
+by re-running the review with grok excluded (`--channels codex,claude,antigravity`)
+and reconciling Superpowers. Don't reword or "fix" the plan to satisfy a truncation
+artifact. (grok works fine on normal code diffs; this bites only on oversized
+docs-landing PRs.)
+
+## Reviewing very large plan/design docs is a bottomless well — converge on the plan-aware channel, defer pseudocode nitpicks to per-PR implementation review (2026-07-24)
+**Pattern:** Landing a 15k-line docs PR (four TDD plans + a spec) through `mmr
+review` never reached a clean CLI verdict. Across SEVEN passes the review found
+and I fixed 28+ genuinely-real defects (incl. a real P0: `tia ingest` recursively
+deleting an unvalidated `--coverage-dir`), yet every FRESH codex pass on the plans'
+illustrative pseudocode surfaced ~4-6 NEW distinct findings (follow-ons to prior
+fixes, same-class issues in new locations, and correctness nitpicks in intricate
+features like the bootstrap flow / TIA). Session-tracked rounds (`--session X
+--round N`) DID converge (round 3 clean of real findings); fresh sessions re-opened
+the well. grok was structurally degraded the whole time (it truncates a diff this
+large and emits "can't verify" non-defects).
+**Rule:** For a large plan/design-doc review, the **plan-aware Superpowers channel**
+(reads actual `src/`, has the spec + AC context) is the authority on convergence —
+when it verifies the fixes sound and finds no new P0/P1, you have converged, even if
+fresh CLI passes keep surfacing marginal pseudocode findings. These are PLAN GUIDES,
+not shipping code: each implementation PR gets its own mandatory code-level MMR review
+(the real gate), and TDD + a type-checker + tests resolve pseudocode-level issues on
+REAL code far better than perfecting illustrative snippets. Decision procedure: fix
+every P0 and every clearly-real P1; once findings become implementation-refinements in
+intricate features (no P0/security/architectural break) AND the plan-aware channel is
+clean, STOP — annotate the residuals as "deferred reviewer notes" at their tasks (so
+implementers address them during TDD) and merge on a documented `degraded-pass` (grok
+degraded on oversized diff + healthy-channel/plan-aware convergence). Do NOT chase a
+zero-finding CLI verdict on 15k lines of pseudocode — it does not exist and each round
+just moves the well. Use ONE `--session` so the native 3-round budget actually bounds
+you; don't spin up fresh sessions that reset recurrence tracking.
