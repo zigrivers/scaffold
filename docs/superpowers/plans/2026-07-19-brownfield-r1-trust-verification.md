@@ -236,7 +236,7 @@ and change the local `const state: PipelineState` literal's `'schema-version': s
 
 **Steps:**
 
-- [ ] Write failing tests in `src/project/frontmatter.test.ts` (follow the file's existing tmp-file fixture pattern; if it writes fixtures with `fs.writeFileSync` to a tmp dir, reuse that helper):
+- [x] Write failing tests in `src/project/frontmatter.test.ts` (follow the file's existing tmp-file fixture pattern; if it writes fixtures with `fs.writeFileSync` to a tmp dir, reuse that helper):
 
 ```ts
 describe('detect: frontmatter contract (D4)', () => {
@@ -311,8 +311,8 @@ describe('detect: frontmatter contract (D4)', () => {
 })
 ```
 
-- [ ] Run `npx vitest run src/project/frontmatter.test.ts` — new tests FAIL (`detect` arrives as unknown field, no schema).
-- [ ] Add the types to `src/types/frontmatter.ts` (above `MetaPromptFrontmatter`):
+- [x] Run `npx vitest run src/project/frontmatter.test.ts` — new tests FAIL (`detect` arrives as unknown field, no schema).
+- [x] Add the types to `src/types/frontmatter.ts` (above `MetaPromptFrontmatter`):
 
 ```ts
 /**
@@ -344,7 +344,7 @@ and add to `MetaPromptFrontmatter` (before the index signature):
   detect?: DetectSpec | null
 ```
 
-- [ ] Implement parsing in `src/project/frontmatter.ts`:
+- [x] Implement parsing in `src/project/frontmatter.ts`:
   1. Add `'detect'` to `KNOWN_YAML_KEYS`.
   2. Add the zod schemas above `frontmatterSchema`:
 
@@ -396,8 +396,8 @@ const detectSpecSchema = z.object({
 
   5. In `parseAndValidate`'s `emptyFrontmatter` literal, add `detect: null,`.
 
-- [ ] Run `npx vitest run src/project/frontmatter.test.ts` — green. Run `npx vitest run src/project src/core` to confirm no loader regressions.
-- [ ] Commit: `git add -A && git commit -m "feat(frontmatter): detect: contract schema — path/cmd checks, all/any composition (R1 D4)"`
+- [x] Run `npx vitest run src/project/frontmatter.test.ts` — green. Run `npx vitest run src/project src/core` to confirm no loader regressions.
+- [x] Commit: `git add -A && git commit -m "feat(frontmatter): detect: contract schema — path/cmd checks, all/any composition (R1 D4)"`
 
 ---
 
