@@ -164,7 +164,11 @@ export async function applyAdoptionPlan(options: {
         + `at=${entry?.at ?? 'unknown'}) but D3 verification failed`))
       auditCount++
       state.steps[record.step_slug] = {
-        ...(entry ?? { source: 'pipeline', produces: producesFor(record.step_slug) }),
+        ...(entry ?? { source: 'pipeline' }),
+        // Refresh produces from the CURRENT resolved contract (consistent with
+        // mark-completed/record-pending) — a reopened step must not keep a stale
+        // historical produces list.
+        produces: producesFor(record.step_slug),
         status: 'pending',
         verification: 'unverified',
       } as StepStateEntry
