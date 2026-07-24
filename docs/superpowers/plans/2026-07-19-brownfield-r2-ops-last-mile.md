@@ -1471,7 +1471,7 @@ fi
 
 **Steps:**
 
-- [ ] Write the failing bats test `tests/agent-ops-gate-affected.bats`:
+- [x] Write the failing bats test `tests/agent-ops-gate-affected.bats`:
 
 ```bash
 #!/usr/bin/env bats
@@ -1577,8 +1577,8 @@ teardown() { rm -rf "$TMP"; }
 }
 ```
 
-- [ ] Run: `bats tests/agent-ops-gate-affected.bats` — expect FAILURE (template missing).
-- [ ] Create `content/assets/agent-ops/gate/gate-check-affected.sh.tmpl`:
+- [x] Run: `bats tests/agent-ops-gate-affected.bats` — expect FAILURE (template missing).
+- [x] Create `content/assets/agent-ops/gate/gate-check-affected.sh.tmpl`:
 
 ```bash
 #!/usr/bin/env bash
@@ -1666,8 +1666,8 @@ fi
 
   Note the heredoc (`<<EOF_CHANGED`) instead of `<<<"$CHANGED"`: herestrings behave identically here, but the heredoc keeps the loop bash-3.2-safe and shellcheck-clean; `EXCLUDE_ARGS[@]+` expansion is the bash-3.2-safe empty-array idiom under `set -u`.
 
-- [ ] Run: `bats tests/agent-ops-gate-affected.bats` — expect `1..8` with all `ok`.
-- [ ] Commit: `git add -A && git commit -m "feat(agent-ops): gate-check-affected.sh seed template satisfying the mq contract"`
+- [x] Run: `bats tests/agent-ops-gate-affected.bats` — expect `1..8` with all `ok`.
+- [x] Commit: `git add -A && git commit -m "feat(agent-ops): gate-check-affected.sh seed template satisfying the mq contract"`
 
 ---
 
