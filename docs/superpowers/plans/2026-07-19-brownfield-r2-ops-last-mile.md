@@ -1358,10 +1358,22 @@ teardown() { rm -rf "$TMP"; }
   [[ "$output" == *"suite not run"* ]]
 }
 
-@test "full mode runs deps, runtime probes, then the full commands" {
+@test "GATE_PROBE=1 does NOT install dependencies (read-only health check)" {
   cd "$TMP"
+  render "touch deps-installed" "touch runtime-probed" ":" "touch full-ran"
+  GATE_PROBE=1 run "$TMP/scripts/gate-check.sh"
+  [ "$status" -eq 0 ]
+  [ ! -f "$TMP/deps-installed" ]     # ensure-deps skipped under the probe
+  [ -f "$TMP/runtime-probed" ]        # functional runtime probes still run
+  [ ! -f "$TMP/full-ran" ]
+}
+
+@test "full mode installs deps, runs runtime probes, then the full commands" {
+  cd "$TMP"
+  render "touch deps-installed" "touch runtime-probed" ":" "touch full-ran"
   run "$TMP/scripts/gate-check.sh"
   [ "$status" -eq 0 ]
+  [ -f "$TMP/deps-installed" ]        # ensure-deps runs in full mode
   [ -f "$TMP/runtime-probed" ]
   [ -f "$TMP/full-ran" ]
 }
@@ -1404,18 +1416,28 @@ teardown() { rm -rf "$TMP"; }
 # as drifted. Re-generating requires --force.
 #
 # Contract:
-#   - Self-contained: installs dependencies before running (the merge queue and
-#     the post-merge poller run it in FRESH worktrees with nothing installed).
+#   - Self-contained: installs dependencies before running the FULL gate (the
+#     merge queue and the post-merge poller run it in FRESH worktrees with
+#     nothing installed). Probe mode never installs (see GATE_PROBE=1 below).
 #   - FUNCTIONAL runtime probes, never `command -v` (macOS /usr/bin/java is a
 #     stub that exists but fails at run time — rumble lesson).
-#   - GATE_PROBE=1: verify prerequisites (deps, runtimes, test-runner startup)
-#     and exit WITHOUT running the suite. Used by `scaffold doctor` (gate
-#     section) and `scaffold mq bootstrap` preflight.
+#   - GATE_PROBE=1: READ-ONLY — verify prerequisites (deps present, runtimes,
+#     test-runner startup) and exit WITHOUT installing anything or running the
+#     suite. Used by `scaffold doctor` (gate section) and `scaffold mq bootstrap`
+#     preflight, which must not have heavyweight install side effects.
 set -euo pipefail
 cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # --- dependencies (self-contained on fresh worktrees) ------------------------
-{{GATE_ENSURE_DEPS}}
+# Probe mode (GATE_PROBE=1 — `scaffold doctor` gate section / `mq bootstrap`
+# preflight) is READ-ONLY and MUST NOT install anything: a cold `npm ci` here
+# would turn a health check into a heavyweight, network-bound install and can
+# exceed the probe timeout, making doctor report a spurious gate failure. Under
+# the probe, missing deps surface through the functional runtime + test-runner
+# startup probes below instead of being silently installed.
+if [ "${GATE_PROBE:-0}" != "1" ]; then
+	{{GATE_ENSURE_DEPS}}
+fi
 
 # --- functional runtime probes ----------------------------------------------
 {{GATE_RUNTIME_PROBES}}
@@ -1431,7 +1453,7 @@ fi
 {{GATE_FULL_COMMANDS}}
 ```
 
-- [ ] Run: `bats tests/agent-ops-gate-check.bats` — expect `1..5` with all `ok`.
+- [ ] Run: `bats tests/agent-ops-gate-check.bats` — expect `1..6` with all `ok`.
 - [ ] Run: `make lint` — ShellCheck must pass on the rendered form; the `.tmpl` extension keeps raw templates out of the lint sweep (same as the existing agent-ops templates — verify with `ls content/assets/agent-ops/merge-queue/`).
 - [ ] Commit: `git add -A && git commit -m "feat(agent-ops): gate-check.sh seed template with GATE_PROBE mode"`
 
@@ -2524,6 +2546,7 @@ describe('planHooks / applyHookPlan (pure halves — reused read-only by the ado
 ```ts
 import fs from 'node:fs'
 import path from 'node:path'
+import { atomicWriteFile } from '../../utils/fs.js'
 
 /** .claude/settings.json — only the slice we manage is typed; every unknown
  *  key is preserved verbatim (never overwrite: git-workflow.md contract —
@@ -2691,13 +2714,13 @@ export function readSettings(projectRoot: string): ClaudeSettings {
   return parsed as ClaudeSettings
 }
 
-/** Atomic write: temp file in the same directory + rename (no torn settings). */
+/** Atomic write via the codebase-wide helper (temp file + rename, no torn
+ *  settings). Reuses `atomicWriteFile` from src/utils/fs.ts — do NOT hand-roll
+ *  temp-file-and-rename here. */
 export function writeSettings(projectRoot: string, settings: ClaudeSettings): void {
   const p = path.join(projectRoot, SETTINGS_PATH)
   fs.mkdirSync(path.dirname(p), { recursive: true })
-  const tmp = path.join(path.dirname(p), `.settings.json.tmp-${process.pid}`)
-  fs.writeFileSync(tmp, JSON.stringify(settings, null, 2) + '\n')
-  fs.renameSync(tmp, p)
+  atomicWriteFile(p, JSON.stringify(settings, null, 2) + '\n')
 }
 
 export interface HooksInstallResult {
@@ -3867,15 +3890,22 @@ export interface MqOverrides {
 
 /** Preflight helper (D9): does the configured gate command RESOLVE?
  *  `make -n` for make targets (proves resolution, not health — doctor's
- *  GATE_PROBE covers health); `command -v` on the head word otherwise. */
+ *  GATE_PROBE covers health); `command -v` on the head word otherwise.
+ *  Leading `VAR=value` env assignments (e.g. `NODE_ENV=test vitest`) are
+ *  skipped so the real executable is resolved, not the assignment. */
 export function gateTargetResolves(projectRoot: string, command: string): boolean {
   const words = command.trim().split(/\s+/)
-  if (words.length === 0 || words[0] === '') return false
+  // Drop leading env-assignment words (NAME=value) — shell-prefix syntax.
+  const isEnvAssign = (w: string): boolean => /^[A-Za-z_][A-Za-z0-9_]*=/.test(w)
+  let head = 0
+  while (head < words.length && isEnvAssign(words[head])) head++
+  const exe = words.slice(head)
+  if (exe.length === 0 || exe[0] === '') return false
   try {
-    if (words[0] === 'make') {
-      execFileSync('make', ['-n', ...words.slice(1)], { cwd: projectRoot, stdio: 'ignore', timeout: 30_000 })
+    if (exe[0] === 'make') {
+      execFileSync('make', ['-n', ...exe.slice(1)], { cwd: projectRoot, stdio: 'ignore', timeout: 30_000 })
     } else {
-      execFileSync('bash', ['-c', `command -v ${words[0]}`], { cwd: projectRoot, stdio: 'ignore', timeout: 30_000 })
+      execFileSync('bash', ['-c', `command -v ${exe[0]}`], { cwd: projectRoot, stdio: 'ignore', timeout: 30_000 })
     }
     return true
   } catch {
@@ -4503,7 +4533,7 @@ export function runGateProbe(
 
 **Interfaces:**
 - Produces: `OpsActionRecord { action: 'install-component' | 'hooks-install' | 'sched-install' | 'bootstrap-merge-required', command, files, detail }`, `OpsProbes { schedUnitPaths? }`, `buildOpsActions(projectRoot, probes?): OpsActionRecord[]` (read-only, deterministic, stable-sorted), `renderOpsActionsSection(records): string[]`; `plannedInstallPaths(components): string[]` (exported from `src/core/agent-ops/install.ts`).
-- Consumes: `AGENT_OPS_FILE_MAP` + `plannedInstallPaths` (`src/core/agent-ops/install.ts` — the latter returns the COMPLETE install write set, not just component dests), `planHooks`/`readSettings` (Task 12), `readJournal` (`src/merge-queue/journal.ts`), `loadAgentOpsConfig`, `pickSchedBackend` (Task 6) + `buildPostMergePollerJob` (Task 5), and the R1 plan renderer's `plan_key` canonicalization (spec D1: sha256 over the canonical JSON of the complete apply-action records — from R2 onward that input includes the ops-action records, so no apply-relevant ops detail can change without changing the key).
+- Consumes: `AGENT_OPS_FILE_MAP` + `plannedInstallPaths` (`src/core/agent-ops/install.ts` — the latter returns the COMPLETE install write set, not just component dests), `planHooks`/`readSettings` (Task 12), `readJournal` (`src/merge-queue/journal.ts`), `loadAgentOpsConfig`, `buildPostMergePollerJob` (Task 5, for the machine-independent `unitBase` descriptor — resolved absolute unit paths are OS/home-specific and must never enter `plan_key`), and the R1 plan renderer's `plan_key` canonicalization (spec D1: sha256 over the canonical JSON of the complete apply-action records — from R2 onward that input includes the ops-action records, so no apply-relevant ops detail can change without changing the key).
 
 **Steps:**
 
@@ -4617,6 +4647,26 @@ describe('buildOpsActions (§6.1 R2 preview)', () => {
     const keys = a.map(r => `${r.action}:${r.command}`)
     expect(keys).toEqual([...keys].sort())
   })
+  it('sched-install files are machine/OS-independent (no probe stub — real plan_key input)', () => {
+    // The determinism test above injects a stub, so it never exercises the
+    // production defaultSchedUnitPaths. Exercise the RE-ADOPTION case — the
+    // poller IS installed, so buildPostMergePollerJob resolves and the file
+    // descriptor is non-empty (exactly when resolved absolute paths would have
+    // leaked). Assert no absolute/home/OS-specific path — otherwise the same
+    // repo would hash to different plan_keys on macOS vs Linux.
+    const root = project({ '.scaffold/agent-ops.yaml': QUEUE_YAML })
+    fs.mkdirSync(path.join(root, 'scripts', 'ops'), { recursive: true })
+    fs.writeFileSync(path.join(root, 'scripts', 'ops', 'post-merge-poller.sh'), '#!/bin/bash\n')
+    const sched = buildOpsActions(root).find(r => r.action === 'sched-install')
+    expect(sched).toBeDefined()
+    expect(sched!.files.length).toBeGreaterThan(0)
+    for (const f of sched!.files) {
+      expect(f).not.toMatch(/^\/|^~|Library\/LaunchAgents|\.config\/systemd|\/Users\/|\/home\//)
+    }
+    // The stable descriptor is the project-name-derived unitBase (QUEUE_YAML sets
+    // project_name: p), never a resolved absolute unit path.
+    expect(sched!.files.join(' ')).toContain('scaffold-p-merge-poller')
+  })
 })
 
 describe('renderOpsActionsSection', () => {
@@ -4674,7 +4724,6 @@ import { AGENT_OPS_FILE_MAP, plannedInstallPaths, type AgentOpsComponent } from 
 import { loadAgentOpsConfig } from '../core/agent-ops/config.js'
 import { planHooks, readSettings } from '../core/hooks/install.js'
 import { buildPostMergePollerJob } from '../sched/jobs.js'
-import { pickSchedBackend } from '../sched/platform.js'
 import { readJournal } from '../merge-queue/journal.js'
 
 /** One ops action the adopt plan previews (§6.1 R2). The canonical JSON of
@@ -4689,7 +4738,9 @@ export interface OpsActionRecord {
 }
 
 export interface OpsProbes {
-  /** Test seam: resolved scheduler unit paths for this machine. */
+  /** Test seam: the sched-install record's file descriptors. Yields a STABLE,
+   *  machine/OS-independent form (the job unitBase) — never resolved absolute
+   *  unit paths, which would make plan_key machine-dependent. */
   schedUnitPaths?: (projectRoot: string) => string[]
 }
 
@@ -4715,10 +4766,18 @@ function queueIntent(projectRoot: string): boolean {
 
 function defaultSchedUnitPaths(projectRoot: string): string[] {
   try {
-    return pickSchedBackend().unitPaths(buildPostMergePollerJob(projectRoot))
+    // STABLE, machine/OS-independent descriptor. The resolved absolute unit
+    // paths (`pickSchedBackend().unitPaths(...)`) are home- and OS-specific
+    // (macOS `~/Library/LaunchAgents/com.<p>.merge-poller.plist` vs Linux
+    // `~/.config/systemd/user/scaffold-<p>-merge-poller.{service,timer}`), so
+    // they MUST NOT enter this record: buildOpsActions feeds `plan_key`, and the
+    // same repo state must hash identically on every machine. Key on the job's
+    // project-derived `unitBase` instead — the concrete install paths resolve at
+    // install time and are surfaced by `scaffold sched install` itself.
+    return [`${buildPostMergePollerJob(projectRoot).unitBase} (scheduler unit)`]
   } catch {
-    // Poller script not installed yet (or unsupported platform) — unit paths
-    // resolve at install time; the record still previews the action itself.
+    // Project name unresolvable / unsupported platform — the record still
+    // previews the action itself.
     return []
   }
 }
@@ -4813,7 +4872,7 @@ export function renderOpsActionsSection(records: OpsActionRecord[]): string[] {
 }
 ```
 
-- [ ] Run: `npx vitest run src/project/adoption-ops-actions.test.ts` — expect 9 tests passed.
+- [ ] Run: `npx vitest run src/project/adoption-ops-actions.test.ts` — expect 10 tests passed.
 - [ ] Join the records into the R1 plan + `plan_key`. Locate the builder: `grep -rln "plan_key" src/project --include="*.ts" | grep -v test` (R1 architecture places it at `src/project/adoption-plan*.ts`). Apply three edits at the located sites:
   1. **Key input:** in the object whose canonical JSON is hashed into `plan_key` (D1's "complete apply-action records" — R1 hashes `{initialize, includes, steps, disabled}`-shaped records), add the field `ops_actions: buildOpsActions(projectRoot)` (computed once per render and reused for rendering, never recomputed between keying and rendering). Import: `import { buildOpsActions, renderOpsActionsSection } from './adoption-ops-actions.js'` (adjust relative path).
   2. **JSON output:** include the same `ops_actions` array verbatim in the plan's JSON payload.
