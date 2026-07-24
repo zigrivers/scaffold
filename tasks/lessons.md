@@ -197,3 +197,24 @@ Patterns and anti-patterns discovered during development. Review before starting
 **Pattern:** A downstream project (nibble) diagnosed grok's `stopReason=Cancelled` + empty `$.text` failures as "answer stranded in the reasoning stream, NOT concurrency — concurrency ruled out", and recommended a `$.thought` parser fallback. Local reproduction with MMR's exact invocation showed the opposite on this machine: the identical failing prompt completes serially every time and cancels 5/8 under 4-way same-account concurrency, and the envelope truncates `thought` to ~200 chars — so the recommended `$.thought` fallback could never recover the answer. The handoff's *evidence* (token accounting) was real, but its mechanism inference and fix recommendation were both wrong.
 **Rule:** When a handoff diagnosis arrives with a recommended fix, re-run the repro yourself under the *conditions the reporter ruled out* (here: concurrency) before implementing their preferred lever. Test candidate fixes empirically head-to-head (baseline vs `--json-schema` under identical concurrency, warm-cache confound controlled) rather than picking the "most robust sounding" one.
 **Bonus gotcha:** grok's `--json-schema` makes EVERY turn schema-shaped — including intermediate progress acks — so "extract first JSON object" parsers can flip a 3-finding review into "approved, no issues". Any schema-constrained multi-turn CLI needs last-object extraction plus a preemptive incomplete-status guard (a Cancelled envelope with parseable text must still fail).
+
+## Grok truncates very large diffs → non-defect "can't verify" findings that read as blocking (2026-07-24)
+**Pattern:** Reviewing a docs-landing PR whose diff was ~15k lines (four large plan
+docs + spec) via `mmr review`, grok emitted round-3 findings that were all
+grok-degradation artifacts: two explicitly said the "documentation-only plan file …
+truncated mid-stream in the review payload" / "Truncated Task 2+ content prevents
+full review", and two flagged behavior that is in fact intended AND unit-tested
+(the `v4 + hasServices → 2` schema-version dispatch, and the `artifacts_verified:true
+→ verification:'declared'` migration). Codex, Claude, Antigravity, and the plan-aware
+Superpowers channel were all clean. mmr's mechanical verdict was `blocked` purely on
+grok's four non-defects.
+**Rule:** On a very large diff, treat grok findings whose own text admits the payload
+was truncated as a **degraded-channel** signal, not real defects — verify each against
+the actual files on disk (grep for the implementation + its test) before acting.
+A finding that describes spec-sanctioned, tested behavior is not a defect no matter
+how it's phrased. When grok is degraded by payload size but the other channels +
+Superpowers converge clean, that is a `degraded-pass`, not a real `blocked` — confirm
+by re-running the review with grok excluded (`--channels codex,claude,antigravity`)
+and reconciling Superpowers. Don't reword or "fix" the plan to satisfy a truncation
+artifact. (grok works fine on normal code diffs; this bites only on oversized
+docs-landing PRs.)
