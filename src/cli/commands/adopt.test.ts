@@ -103,6 +103,7 @@ import { resolveOutputMode } from '../middleware/output-mode.js'
 import { StateManager } from '../../state/state-manager.js'
 import { acquireLock, releaseLock } from '../../state/lock-manager.js'
 import { runAdoption } from '../../project/adopt.js'
+import { buildAdoptionPlan } from '../../project/adoption-plan.js'
 import adoptCommand from './adopt.js'
 
 // ---------------------------------------------------------------------------
@@ -140,6 +141,7 @@ describe('adopt command', () => {
   const MockStateManager = vi.mocked(StateManager)
   const mockAcquireLock = vi.mocked(acquireLock)
   const mockRunAdoption = vi.mocked(runAdoption)
+  const mockBuildAdoptionPlan = vi.mocked(buildAdoptionPlan)
 
   beforeEach(() => {
     process.exitCode = undefined
@@ -383,6 +385,7 @@ describe('adopt command', () => {
     vi.mocked(findProjectRoot).mockReturnValue('/mock')
     await adoptCommand.handler(defaultArgv())
     expect(vi.mocked(StateManager)).not.toHaveBeenCalled()
+    expect(mockAcquireLock).not.toHaveBeenCalled()
     const written = writtenLines.join('')
     expect(written).toContain('Plan key:')
   })
@@ -397,5 +400,58 @@ describe('adopt command', () => {
     expect(parsed.schema_version).toBe(3)
     expect(parsed.plan_key).toBe('f'.repeat(64))
     expect(Array.isArray(parsed.steps)).toBe(true)
+  })
+
+  // Test 11 (R1 T9 review): bare --write writes the default path
+  it('bare --write writes the default plan path with rendered plan markdown', async () => {
+    mockFindProjectRoot.mockReturnValue(tmpDir)
+
+    await adoptCommand.handler(defaultArgv({ write: '' }))
+
+    const defaultPath = path.join(tmpDir, 'docs', 'adoption-plan.md')
+    expect(fs.existsSync(defaultPath)).toBe(true)
+    const content = fs.readFileSync(defaultPath, 'utf8')
+    expect(content).toContain('Plan key:')
+    expect(process.exitCode).toBe(0)
+  })
+
+  // Test 12 (R1 T9 review): --write <path> writes the given (nested) path, not the default
+  it('--write <path> writes the given path and not the default path', async () => {
+    mockFindProjectRoot.mockReturnValue(tmpDir)
+
+    await adoptCommand.handler(defaultArgv({ write: 'notes/custom-plan.md' }))
+
+    const customPath = path.join(tmpDir, 'notes', 'custom-plan.md')
+    const defaultPath = path.join(tmpDir, 'docs', 'adoption-plan.md')
+    expect(fs.existsSync(customPath)).toBe(true)
+    const content = fs.readFileSync(customPath, 'utf8')
+    expect(content).toContain('Plan key:')
+    expect(fs.existsSync(defaultPath)).toBe(false)
+    expect(process.exitCode).toBe(0)
+  })
+
+  // Test 13 (R1 T9 review): no --write writes no plan file at all
+  it('writes no plan file when --write is omitted', async () => {
+    mockFindProjectRoot.mockReturnValue(tmpDir)
+
+    await adoptCommand.handler(defaultArgv())
+
+    const defaultPath = path.join(tmpDir, 'docs', 'adoption-plan.md')
+    expect(fs.existsSync(defaultPath)).toBe(false)
+    expect(fs.existsSync(path.join(tmpDir, 'docs'))).toBe(false)
+    expect(process.exitCode).toBe(0)
+  })
+
+  // Test 14 (R1 T9 review): --include is threaded through to buildAdoptionPlan
+  it('passes --include values through to buildAdoptionPlan', async () => {
+    mockFindProjectRoot.mockReturnValue(tmpDir)
+    mockBuildAdoptionPlan.mockClear()
+
+    await adoptCommand.handler(defaultArgv({ include: ['foo'] }))
+
+    expect(mockBuildAdoptionPlan).toHaveBeenCalledWith(
+      expect.objectContaining({ includes: ['foo'] }),
+    )
+    expect(process.exitCode).toBe(0)
   })
 })
