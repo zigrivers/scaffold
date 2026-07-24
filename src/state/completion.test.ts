@@ -2,8 +2,8 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import crypto from 'node:crypto'
-import { describe, it, expect, afterEach } from 'vitest'
-import { detectCompletion, checkCompletion, analyzeCrash } from './completion.js'
+import { describe, it, expect, afterEach, beforeEach } from 'vitest'
+import { detectCompletion, checkCompletion, analyzeCrash, runDetect } from './completion.js'
 import type { PipelineState } from '../types/index.js'
 
 const tmpDirs: string[] = []
@@ -278,5 +278,47 @@ describe('analyzeCrash', () => {
     expect(result.action).toBe('recommend_rerun')
     expect(result.presentArtifacts).toEqual([])
     expect(result.missingArtifacts).toEqual([])
+  })
+})
+
+describe('runDetect (D4)', () => {
+  let root: string
+  beforeEach(() => { root = fs.mkdtempSync(path.join(os.tmpdir(), 'detect-run-')) })
+
+  it('returns evaluated=false, passed=true when there is no detect block', () => {
+    expect(runDetect(null, root)).toEqual({ evaluated: false, passed: true, checks: [] })
+    expect(runDetect(undefined, root)).toEqual({ evaluated: false, passed: true, checks: [] })
+  })
+
+  it('passes an all-block when every path and cmd check passes', () => {
+    fs.mkdirSync(path.join(root, '.beads'))
+    const result = runDetect({ all: [{ path: '.beads/' }, { cmd: 'exit 0' }] }, root)
+    expect(result.passed).toBe(true)
+    expect(result.checks).toHaveLength(2)
+  })
+
+  it('fails an all-block when a cmd exits non-zero — failure is not fatal', () => {
+    const result = runDetect({ all: [{ cmd: 'exit 3' }] }, root)
+    expect(result.evaluated).toBe(true)
+    expect(result.passed).toBe(false)
+    expect(result.checks[0]).toEqual({ kind: 'cmd', target: 'exit 3', passed: false })
+  })
+
+  it('passes an any-block when at least one check passes', () => {
+    fs.writeFileSync(path.join(root, 'playwright.config.ts'), '')
+    const result = runDetect(
+      { any: [{ path: 'playwright.config.ts' }, { path: 'maestro/' }] }, root,
+    )
+    expect(result.passed).toBe(true)
+  })
+
+  it('treats a timed-out cmd as not-detected', () => {
+    const result = runDetect({ all: [{ cmd: 'sleep 30', timeout: 1 }] }, root)
+    expect(result.passed).toBe(false)
+  })
+
+  it('treats a missing binary as not-detected', () => {
+    const result = runDetect({ all: [{ cmd: 'definitely-not-a-real-binary-xyz' }] }, root)
+    expect(result.passed).toBe(false)
   })
 })
