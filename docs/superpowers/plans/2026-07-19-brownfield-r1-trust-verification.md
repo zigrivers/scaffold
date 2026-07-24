@@ -39,7 +39,7 @@
 
 **Steps:**
 
-- [ ] Write the failing migration tests. Append to `src/state/state-migration.test.ts` (imports at top of the new `describe`; reuse the file's existing `PipelineState` import):
+- [x] Write the failing migration tests. Append to `src/state/state-migration.test.ts` (imports at top of the new `describe`; reuse the file's existing `PipelineState` import):
 
 ```ts
 describe('verification migration (R1)', () => {
@@ -99,8 +99,8 @@ describe('verification migration (R1)', () => {
 })
 ```
 
-- [ ] Run `npx vitest run src/state/state-migration.test.ts` — expect the five new tests to FAIL (`verification` undefined, schema-version stays 1).
-- [ ] Implement the type change in `src/types/state.ts`. Replace the `artifacts_verified?: boolean` line and widen the version union:
+- [x] Run `npx vitest run src/state/state-migration.test.ts` — expect the five new tests to FAIL (`verification` undefined, schema-version stays 1).
+- [x] Implement the type change in `src/types/state.ts`. Replace the `artifacts_verified?: boolean` line and widen the version union:
 
 ```ts
 /** Verification level for a step's completion claim (D3). Absent ≡ 'unverified'. */
@@ -115,7 +115,7 @@ In `StepStateEntry`, replace `artifacts_verified?: boolean` with:
 
 In `PipelineState`, change `'schema-version': 1 | 2 | 3` to `'schema-version': 1 | 2 | 3 | 4`.
 
-- [ ] Implement the migration in `src/state/state-migration.ts`. Add `StepStateEntry` to the type import (`import type { PipelineState, StepStateEntry } from '../types/index.js'`) and insert before `return changed` in `migrateState`:
+- [x] Implement the migration in `src/state/state-migration.ts`. Add `StepStateEntry` to the type import (`import type { PipelineState, StepStateEntry } from '../types/index.js'`) and insert before `return changed` in `migrateState`:
 
 ```ts
   // Phase 4 (R1): artifacts_verified → verification enum (one-way, D3).
@@ -141,7 +141,7 @@ In `PipelineState`, change `'schema-version': 1 | 2 | 3` to `'schema-version': 1
   }
 ```
 
-- [ ] Widen `src/state/state-version-dispatch.ts` to accept 4 and route v4-plus-services back into the sharding machine:
+- [x] Widen `src/state/state-version-dispatch.ts` to accept 4 and route v4-plus-services back into the sharding machine:
 
 ```ts
 ): asserts raw is Record<string, unknown> & { 'schema-version': 1 | 2 | 3 | 4 } {
@@ -158,7 +158,7 @@ In `PipelineState`, change `'schema-version': 1 | 2 | 3` to `'schema-version': 1
 }
 ```
 
-- [ ] Add a dispatch test to `src/state/state-version-dispatch.test.ts`:
+- [x] Add a dispatch test to `src/state/state-version-dispatch.test.ts`:
 
 ```ts
   it('accepts schema-version 4 and bumps 4 → 2 when config has services', () => {
@@ -171,7 +171,7 @@ In `PipelineState`, change `'schema-version': 1 | 2 | 3` to `'schema-version': 1
   })
 ```
 
-- [ ] Update `src/state/state-manager.ts`: in `markCompleted`, replace
+- [x] Update `src/state/state-manager.ts`: in `markCompleted`, replace
 
 ```ts
     if (outputs.length > 0) {
@@ -194,7 +194,7 @@ In `initializeState`, replace the `schemaVersion` computation with:
 
 and change the local `const state: PipelineState` literal's `'schema-version': schemaVersion` (unchanged line — it now carries 2|4).
 
-- [ ] Update `src/validation/state-validator.ts` (~line 77) to accept 4:
+- [x] Update `src/validation/state-validator.ts` (~line 77) to accept 4:
 
 ```ts
   if (schemaVersion !== 1 && schemaVersion !== 2 && schemaVersion !== 3 && schemaVersion !== 4) {
@@ -203,7 +203,7 @@ and change the local `const state: PipelineState` literal's `'schema-version': s
   }
 ```
 
-- [ ] Add a `markCompleted` verification test to `src/state/state-manager.test.ts`:
+- [x] Add a `markCompleted` verification test to `src/state/state-manager.test.ts`:
 
 ```ts
   it('markCompleted records verification: declared when outputs are declared', async () => {
@@ -218,8 +218,8 @@ and change the local `const state: PipelineState` literal's `'schema-version': s
 
 (Adapt the setup lines to the file's existing `beforeEach` fixture — the file already constructs managers against a tmp dir; mirror the nearest existing `markCompleted` test.)
 
-- [ ] Run `npx vitest run src/state/` — all state tests green. Then run `npx vitest run src` and fix any test that asserted `artifacts_verified` or `'schema-version': 1` after a save (mechanical: `grep -rn "artifacts_verified" src --include="*.test.ts"` and update each to the `verification` field; states passed through `loadState`+`saveState` now end at version 4).
-- [ ] Commit: `git add -A && git commit -m "feat(state): verification enum + schema-version 4 migration (R1 D3)"`
+- [x] Run `npx vitest run src/state/` — all state tests green. Then run `npx vitest run src` and fix any test that asserted `artifacts_verified` or `'schema-version': 1` after a save (mechanical: `grep -rn "artifacts_verified" src --include="*.test.ts"` and update each to the `verification` field; states passed through `loadState`+`saveState` now end at version 4).
+- [x] Commit: `git add -A && git commit -m "feat(state): verification enum + schema-version 4 migration (R1 D3)"`
 
 ---
 
