@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# gate-check-affected.sh — the AFFECTED-ONLY merge gate (`make check-affected`).
+# Seeded by: scaffold agent-ops install --component gate
+#
+# PROJECT-OWNED after generation (manifest seed:true): edit freely.
+# `scaffold agent-ops check` reports this file only if it goes MISSING.
+#
+# Satisfies the merge-queue contract (content/knowledge/core/test-impact-analysis.md):
+#   - selects tests vs ${MQ_AFFECTED_BASE:-origin/{{DEFAULT_BRANCH}}} using a
+#     THREE-DOT diff (base...HEAD) — never two-dot
+#   - forces the FULL gate on infra changes (manifests, lockfiles, tool config,
+#     workflows, shared test utils, env files, migrations, non-source data)
+#   - excludes ids in .mq/quarantine.txt from the MERGE gate only (the
+#     post-merge full gate still runs them — quarantine is a mute, not a delete)
+#   - empty or unclassifiable diff ==> FULL run, never zero tests
+#   - GATE_PROBE=1 delegates to gate-check.sh probe mode
+#   - OPTIONAL flake-retry channel: on failure this script MAY write failing
+#     test ids (one per line) to .mq-failed-tests.txt; wire your runner's
+#     reporter to do so if you want the queue's cheap single-retry.
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$(cd "$SCRIPT_DIR/.." && pwd)"
+
+if [ "${GATE_PROBE:-0}" = "1" ]; then
+	GATE_PROBE=1 exec "$SCRIPT_DIR/gate-check.sh"
+fi
+
+full() {
+	echo "gate-check-affected: falling back to FULL gate — $1" >&2
+	exec "$SCRIPT_DIR/gate-check.sh"
+}
+
+BASE="${MQ_AFFECTED_BASE:-origin/{{DEFAULT_BRANCH}}}"
+git rev-parse --verify --quiet "$BASE" >/dev/null || full "base ref $BASE not found"
+
+# Three-dot: only the changes on THIS branch since it forked from base — a
+# two-dot diff also counts base moving forward and over-selects after the
+# queue advances the default branch mid-gate.
+CHANGED="$(git diff --name-only "$BASE...HEAD")"
+[ -n "$CHANGED" ] || full "empty diff against $BASE (cannot classify)"
+
+# Force-full triggers (see the knowledge entry): when in doubt, add a glob — a
+# false force-full costs minutes; a false narrow costs a landed regression.
+is_force_full() {
+	# Each subdirectory-eligible config/lock/tool-config file carries a `*/`
+	# alternative so a NESTED change in a monorepo (e.g. packages/app/tsconfig.json)
+	# still forces the full gate. Bash `case` globs let `*` span '/', so a single
+	# `*/` prefix covers arbitrary depth. `*.sql`/`*.proto` already match nested.
+	case "$1" in
+	package.json|*/package.json|\
+	package-lock.json|*/package-lock.json|pnpm-lock.yaml|*/pnpm-lock.yaml|yarn.lock|*/yarn.lock|\
+	pyproject.toml|*/pyproject.toml|uv.lock|*/uv.lock|Cargo.toml|*/Cargo.toml|Cargo.lock|*/Cargo.lock|go.mod|*/go.mod|go.sum|*/go.sum|\
+	Makefile|*/Makefile|tsconfig*.json|*/tsconfig*.json|.swcrc|*/.swcrc|\
+	vitest.config.*|*/vitest.config.*|vite.config.*|*/vite.config.*|playwright.config.*|*/playwright.config.*|\
+	turbo.json|*/turbo.json|pytest.ini|*/pytest.ini|.github/workflows/*|scripts/gate-check.sh|scripts/gate-check-affected.sh|\
+	src/test-utils/*|conftest.py|*/conftest.py|.env*|*/.env*|migrations/*|*.sql|*.proto)
+		return 0
+		;;
+	esac
+	return 1
+}
+while IFS= read -r f || [ -n "$f" ]; do
+	[ -n "$f" ] || continue
+	if is_force_full "$f"; then full "infra change: $f"; fi
+done <<EOF_CHANGED
+$CHANGED
+EOF_CHANGED
+
+{{GATE_ENSURE_DEPS}}
+
+# Quarantine: mute for the MERGE gate only (asymmetry is deliberate — the
+# post-merge full gate does NOT read this list).
+EXCLUDE_ARGS=()
+if [ -f .mq/quarantine.txt ]; then
+	while IFS= read -r id || [ -n "$id" ]; do
+		[ -n "$id" ] || continue
+		EXCLUDE_ARGS+=(--exclude "$id")
+	done <.mq/quarantine.txt
+fi
+
+{{GATE_AFFECTED_INVOCATION}}
