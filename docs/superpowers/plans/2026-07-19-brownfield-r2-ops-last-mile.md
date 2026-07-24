@@ -991,7 +991,7 @@ export const SCHED_JOBS: Record<string, (projectRoot: string, opts?: JobBuildOpt
 
 **Steps:**
 
-- [ ] Create `src/sched/platform.ts`:
+- [x] Create `src/sched/platform.ts`:
 
 ```ts
 import os from 'node:os'
@@ -1033,7 +1033,7 @@ export function pickSchedBackend(): SchedBackend {
 }
 ```
 
-- [ ] Write the failing test `src/cli/commands/sched.test.ts`:
+- [x] Write the failing test `src/cli/commands/sched.test.ts`:
 
 ```ts
 import { describe, expect, it, vi } from 'vitest'
@@ -1139,8 +1139,8 @@ describe('schedHandler', () => {
 })
 ```
 
-- [ ] Run: `npx vitest run src/cli/commands/sched.test.ts` — expect FAILURE (module missing).
-- [ ] Create `src/cli/commands/sched.ts`:
+- [x] Run: `npx vitest run src/cli/commands/sched.test.ts` — expect FAILURE (module missing).
+- [x] Create `src/cli/commands/sched.ts`:
 
 ```ts
 import type { Argv, CommandModule } from 'yargs'
@@ -1291,7 +1291,7 @@ const schedCommand: CommandModule<Record<string, unknown>, SchedArgs> = {
 export default schedCommand
 ```
 
-- [ ] Register the command in `src/cli/index.ts` — Edit old string `import mqCommand from './commands/mq.js'` → new string:
+- [x] Register the command in `src/cli/index.ts` — Edit old string `import mqCommand from './commands/mq.js'` → new string:
 
 ```ts
 import mqCommand from './commands/mq.js'
@@ -1307,9 +1307,9 @@ then find the registration (`grep -n "command(mqCommand)" src/cli/index.ts`) and
 
 (match the file's existing chain indentation exactly — 4 spaces before `.command`).
 
-- [ ] Run: `npx vitest run src/cli/commands/sched.test.ts` — expect 5 tests passed.
-- [ ] Run: `npx tsc --noEmit -p tsconfig.json` — expect clean (no output). If the repo's TS gate is invoked differently, use `make ts-check`.
-- [ ] Commit: `git add -A && git commit -m "feat(sched): scaffold sched CLI (install|uninstall|status|list) with platform dispatch"`
+- [x] Run: `npx vitest run src/cli/commands/sched.test.ts` — expect 5 tests passed.
+- [x] Run: `npx tsc --noEmit -p tsconfig.json` — expect clean (no output). If the repo's TS gate is invoked differently, use `make ts-check`.
+- [x] Commit: `git add -A && git commit -m "feat(sched): scaffold sched CLI (install|uninstall|status|list) with platform dispatch"`
 
 ---
 
