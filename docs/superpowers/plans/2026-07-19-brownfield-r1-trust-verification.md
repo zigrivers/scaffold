@@ -1497,7 +1497,7 @@ interface DoctorReport { results: DoctorCheckResult[]; verdict: 'healthy' | 'war
 
 **Steps:**
 
-- [ ] Write the failing runner tests `src/doctor/run.test.ts` (complete file):
+- [x] Write the failing runner tests `src/doctor/run.test.ts` (complete file):
 
 ```ts
 import { describe, it, expect } from 'vitest'
@@ -1552,8 +1552,8 @@ describe('runDoctor (D5)', () => {
 })
 ```
 
-- [ ] Run `npx vitest run src/doctor/run.test.ts` — FAILS (module missing).
-- [ ] Create `src/doctor/types.ts` (complete file):
+- [x] Run `npx vitest run src/doctor/run.test.ts` — FAILS (module missing).
+- [x] Create `src/doctor/types.ts` (complete file):
 
 ```ts
 export type DoctorSection = 'pipeline' | 'beads' | 'hooks' | 'gate' | 'queue' | 'scheduler'
@@ -1589,7 +1589,7 @@ export interface DoctorReport {
 }
 ```
 
-- [ ] Create `src/doctor/run.ts` (complete file):
+- [x] Create `src/doctor/run.ts` (complete file):
 
 ```ts
 import { spawnSync } from 'node:child_process'
@@ -1654,7 +1654,7 @@ export function runDoctor(
 }
 ```
 
-- [ ] Write the failing check tests `src/doctor/checks.test.ts` (complete file):
+- [x] Write the failing check tests `src/doctor/checks.test.ts` (complete file):
 
 ```ts
 import { describe, it, expect } from 'vitest'
@@ -1781,7 +1781,7 @@ describe('pipeline/verification', () => {
 })
 ```
 
-- [ ] Create `src/doctor/checks.ts` (complete file):
+- [x] Create `src/doctor/checks.ts` (complete file):
 
 ```ts
 import fs from 'node:fs'
@@ -2174,8 +2174,8 @@ export const DOCTOR_CHECKS: DoctorCheck[] = [
 ]
 ```
 
-- [ ] Run `npx vitest run src/doctor/` — green. (The scheduler check is deliberately untested against a live launchd — its skip path is covered implicitly on Linux CI and it is exercised via `runDoctor` injection tests.)
-- [ ] Write the failing CLI test `src/cli/commands/doctor.test.ts` (complete file):
+- [x] Run `npx vitest run src/doctor/` — green. (The scheduler check is deliberately untested against a live launchd — its skip path is covered implicitly on Linux CI and it is exercised via `runDoctor` injection tests.)
+- [x] Write the failing CLI test `src/cli/commands/doctor.test.ts` (complete file):
 
 ```ts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -2248,7 +2248,7 @@ describe('doctor command', () => {
 })
 ```
 
-- [ ] Create `src/cli/commands/doctor.ts` (complete file):
+- [x] Create `src/cli/commands/doctor.ts` (complete file):
 
 ```ts
 import type { CommandModule } from 'yargs'
@@ -2330,9 +2330,9 @@ const doctorCommand: CommandModule<Record<string, unknown>, DoctorArgs> = {
 export default doctorCommand
 ```
 
-- [ ] Register the command in `src/cli/index.ts`: add `import doctorCommand from './commands/doctor.js'` after the `dashboardCommand` import, and `.command(doctorCommand)` after `.command(dashboardCommand)`.
-- [ ] Run `npx vitest run src/doctor src/cli/commands/doctor.test.ts src/cli/index.test.ts` — green.
-- [ ] Commit: `git add -A && git commit -m "feat(doctor): scaffold doctor — execute-don't-inspect check registry, skip-not-configured, bd-fix delegation (R1 D5)"`
+- [x] Register the command in `src/cli/index.ts`: add `import doctorCommand from './commands/doctor.js'` after the `dashboardCommand` import, and `.command(doctorCommand)` after `.command(dashboardCommand)`.
+- [x] Run `npx vitest run src/doctor src/cli/commands/doctor.test.ts src/cli/index.test.ts` — green.
+- [x] Commit: `git add -A && git commit -m "feat(doctor): scaffold doctor — execute-don't-inspect check registry, skip-not-configured, bd-fix delegation (R1 D5)"`
 
 ---
 
