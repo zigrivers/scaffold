@@ -3746,7 +3746,7 @@ EOF
 
 **Steps:**
 
-- [ ] Write the failing notice test. Append to `src/cli/commands/adopt.test.ts` (inside the top-level describe; reuse its argv helper and mocked `findProjectRoot`):
+- [x] Write the failing notice test. Append to `src/cli/commands/adopt.test.ts` (inside the top-level describe; reuse its argv helper and mocked `findProjectRoot`):
 
 ```ts
   it('prints the one-release behavior-change notice when run without --apply (D16)', async () => {
@@ -3761,8 +3761,8 @@ EOF
   })
 ```
 
-- [ ] Run `npx vitest run src/cli/commands/adopt.test.ts` — the new test FAILS.
-- [ ] Add the notice in `src/cli/commands/adopt.ts`, in the plan-mode branch immediately before the plan is rendered (i.e. right after the `argv.apply === true` block from Task 10):
+- [x] Run `npx vitest run src/cli/commands/adopt.test.ts` — the new test FAILS.
+- [x] Add the notice in `src/cli/commands/adopt.ts`, in the plan-mode branch immediately before the plan is rendered (i.e. right after the `argv.apply === true` block from Task 10):
 
 ```ts
       // D16 one-release notice — REMOVE in the release after R1 ships.
@@ -3773,7 +3773,7 @@ EOF
       )
 ```
 
-- [ ] Add the three prominent entries to `CHANGELOG.md` under `## [Unreleased]` (create `### Added` / `### Changed` sub-headings after the existing `### Fixed` block):
+- [x] Add the three prominent entries to `CHANGELOG.md` under `## [Unreleased]` (create `### Added` / `### Changed` sub-headings after the existing `### Fixed` block):
 
 ```markdown
 ### Added
@@ -3824,8 +3824,8 @@ EOF
   the adoption-mode assembly/knowledge read-side lands in R3.
 ```
 
-- [ ] Run `npx vitest run src/cli/commands/adopt.test.ts` — green.
-- [ ] Commit: `git add -A && git commit -m "docs(changelog): R1 brownfield entries + one-release adopt notice (D16)"`
+- [x] Run `npx vitest run src/cli/commands/adopt.test.ts` — green.
+- [x] Commit: `git add -A && git commit -m "docs(changelog): R1 brownfield entries + one-release adopt notice (D16)"`
 
 ---
 
