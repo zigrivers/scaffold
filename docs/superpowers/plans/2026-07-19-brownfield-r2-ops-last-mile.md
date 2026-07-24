@@ -1325,7 +1325,7 @@ then find the registration (`grep -n "command(mqCommand)" src/cli/index.ts`) and
 
 **Steps:**
 
-- [ ] Write the failing bats test `tests/agent-ops-gate-check.bats`:
+- [x] Write the failing bats test `tests/agent-ops-gate-check.bats`:
 
 ```bash
 #!/usr/bin/env bats
@@ -1403,8 +1403,8 @@ teardown() { rm -rf "$TMP"; }
 }
 ```
 
-- [ ] Run: `bats tests/agent-ops-gate-check.bats` — expect FAILURE (template missing).
-- [ ] Create `content/assets/agent-ops/gate/gate-check.sh.tmpl`:
+- [x] Run: `bats tests/agent-ops-gate-check.bats` — expect FAILURE (template missing).
+- [x] Create `content/assets/agent-ops/gate/gate-check.sh.tmpl`:
 
 ```bash
 #!/usr/bin/env bash
@@ -1453,9 +1453,9 @@ fi
 {{GATE_FULL_COMMANDS}}
 ```
 
-- [ ] Run: `bats tests/agent-ops-gate-check.bats` — expect `1..6` with all `ok`.
-- [ ] Run: `make lint` — ShellCheck must pass on the rendered form; the `.tmpl` extension keeps raw templates out of the lint sweep (same as the existing agent-ops templates — verify with `ls content/assets/agent-ops/merge-queue/`).
-- [ ] Commit: `git add -A && git commit -m "feat(agent-ops): gate-check.sh seed template with GATE_PROBE mode"`
+- [x] Run: `bats tests/agent-ops-gate-check.bats` — expect `1..6` with all `ok`.
+- [x] Run: `make lint` — ShellCheck must pass on the rendered form; the `.tmpl` extension keeps raw templates out of the lint sweep (same as the existing agent-ops templates — verify with `ls content/assets/agent-ops/merge-queue/`).
+- [x] Commit: `git add -A && git commit -m "feat(agent-ops): gate-check.sh seed template with GATE_PROBE mode"`
 
 ---
 
