@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -22,6 +22,27 @@ describe('scaffold hooks', () => {
     })
     expect(process.exitCode ?? 0).toBe(0)
     process.exitCode = 0
+  })
+  it('prints distinct report lines per result type and stays exit 0 on skips-only', async () => {
+    const out: string[] = []
+    const spyOut = vi.spyOn(process.stdout, 'write').mockImplementation((c) => { out.push(String(c)); return true })
+    const spyErr = vi.spyOn(process.stderr, 'write').mockImplementation((c) => { out.push(String(c)); return true })
+    const root = tmpRoot()
+    await hooksHandler({ action: 'install', root }, {
+      install: () => ({
+        added: ['PostToolUse: gh pr create review reminder'],
+        alreadyPresent: ['PreToolUse: bd-guard.sh'],
+        skipped: [{ hook: 'SessionStart bd prime', reason: '.beads/ not found' }],
+        settingsPath: path.join(root, '.claude/settings.json'),
+        changed: true,
+      }),
+    })
+    const text = out.join('')
+    expect(text).toContain('registered PostToolUse: gh pr create review reminder')
+    expect(text).toContain('already registered PreToolUse: bd-guard.sh')
+    expect(text).toContain('.beads/ not found')
+    expect(process.exitCode ?? 0).toBe(0) // skipped-only is not an error
+    spyOut.mockRestore(); spyErr.mockRestore(); process.exitCode = 0
   })
   it('surfaces install errors (malformed settings.json) with exit 1', async () => {
     await hooksHandler({ action: 'install', root: tmpRoot() }, {
