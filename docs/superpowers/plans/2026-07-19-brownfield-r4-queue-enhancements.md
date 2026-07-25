@@ -379,7 +379,7 @@ merge_queue:
 
 **Steps:**
 
-- [ ] In `src/merge-queue/daemon.test.ts`, change the harness default config so the ~35 existing tests are untouched by caching (FakeGit collapses every tree to `'TREE'`, which would otherwise make a bisected red half spuriously hit the green half's cache entry — a fake-only artifact, since real halves have distinct trees). In `harness()`, replace:
+- [x] In `src/merge-queue/daemon.test.ts`, change the harness default config so the ~35 existing tests are untouched by caching (FakeGit collapses every tree to `'TREE'`, which would otherwise make a bisected red half spuriously hit the green half's cache entry — a fake-only artifact, since real halves have distinct trees). In `harness()`, replace:
 
 ```ts
     config: defaultMergeQueueConfig(),
@@ -393,7 +393,7 @@ merge_queue:
     config: { ...defaultMergeQueueConfig(), gate_cache_max_entries: 0 },
 ```
 
-- [ ] Add the failing tests to `src/merge-queue/daemon.test.ts` (inside `describe('MergeQueueDaemon.cycle', …)`). The opt-in tests exploit the collapsed-tree artifact deliberately: identical trees model "identical content re-batched".
+- [x] Add the failing tests to `src/merge-queue/daemon.test.ts` (inside `describe('MergeQueueDaemon.cycle', …)`). The opt-in tests exploit the collapsed-tree artifact deliberately: identical trees model "identical content re-batched".
 
 ```ts
   it('skips the gate on an identical cache key and journals gate_cached (D12)', async () => {
@@ -447,8 +447,8 @@ merge_queue:
   })
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/daemon.test.ts` — expect the 4 new tests FAIL, all existing tests pass.
-- [ ] In `src/merge-queue/daemon.ts`, add the import:
+- [x] Run: `npx vitest run src/merge-queue/daemon.test.ts` — expect the 4 new tests FAIL, all existing tests pass.
+- [x] In `src/merge-queue/daemon.ts`, add the import:
 
 ```ts
 import {
@@ -456,7 +456,7 @@ import {
 } from './gate-cache.js'
 ```
 
-- [ ] In `runBatch`, replace the gate section — everything from `let gate = await this.gateRun(batchId, base)` down to (and including) the closing brace of the flake-protocol `if (gate.result === 'red' && …)` block — with:
+- [x] In `runBatch`, replace the gate section — everything from `let gate = await this.gateRun(batchId, base)` down to (and including) the closing brace of the flake-protocol `if (gate.result === 'red' && …)` block — with:
 
 ```ts
     // D12: gate-result cache. The key covers every input that selects or scopes
@@ -548,9 +548,9 @@ import {
 
   Note: the pre-existing lines between the flake block and the green branch (the withdrawn-member check, the base-moved check, the land/eject/split logic) are untouched — a cache hit flows through all of them.
 
-- [ ] Run: `npx vitest run src/merge-queue/daemon.test.ts` — expect ALL tests pass (existing + 4 new).
-- [ ] Run: `npm run check` — expect green.
-- [ ] Commit: `git add -A && git commit -m "feat(mq): daemon gate skip on cache hit, untainted-green recording (D12)"`
+- [x] Run: `npx vitest run src/merge-queue/daemon.test.ts` — expect ALL tests pass (existing + 4 new).
+- [x] Run: `npm run check` — expect green.
+- [x] Commit: `git add -A && git commit -m "feat(mq): daemon gate skip on cache hit, untainted-green recording (D12)"`
 
 ---
 
