@@ -1420,7 +1420,7 @@ export function proposeMapCandidates(options: {
 
 **Steps:**
 
-- [ ] Write failing tests `src/ingestion/incumbents.test.ts`:
+- [x] Write failing tests `src/ingestion/incumbents.test.ts`:
 
   ```ts
   import { describe, it, expect, beforeEach, afterEach } from 'vitest'
@@ -1461,7 +1461,7 @@ export function proposeMapCandidates(options: {
   })
   ```
 
-- [ ] Write failing tests `src/ingestion/map-candidates.test.ts`:
+- [x] Write failing tests `src/ingestion/map-candidates.test.ts`:
 
   ```ts
   import { describe, it, expect, beforeEach, afterEach } from 'vitest'
@@ -1512,8 +1512,8 @@ export function proposeMapCandidates(options: {
   })
   ```
 
-- [ ] Run: `npx vitest run src/ingestion/` — FAIL (modules missing).
-- [ ] Create `src/ingestion/incumbents.ts`:
+- [x] Run: `npx vitest run src/ingestion/` — FAIL (modules missing).
+- [x] Create `src/ingestion/incumbents.ts`:
 
   ```ts
   import fs from 'node:fs'
@@ -1583,7 +1583,7 @@ export function proposeMapCandidates(options: {
   }
   ```
 
-- [ ] Create `src/ingestion/map-candidates.ts`:
+- [x] Create `src/ingestion/map-candidates.ts`:
 
   ```ts
   import fs from 'node:fs'
@@ -1641,8 +1641,8 @@ export function proposeMapCandidates(options: {
   }
   ```
 
-- [ ] Run: `npx vitest run src/ingestion/` — all green.
-- [ ] Commit: `feat(ingestion): incumbent inventory + map-candidate proposals (D10)`
+- [x] Run: `npx vitest run src/ingestion/` — all green.
+- [x] Commit: `feat(ingestion): incumbent inventory + map-candidate proposals (D10)`
 
 ---
 
