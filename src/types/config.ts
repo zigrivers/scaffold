@@ -189,6 +189,8 @@ export interface ScaffoldConfig {
   custom?: CustomConfig
   platforms: Array<'claude-code' | 'codex'>
   project?: ProjectConfig
+  /** D10a: step slug → existing incumbent artifact path (project-root-relative). */
+  artifact_map?: Record<string, string>
   [key: string]: unknown  // forward compatibility — unknown fields preserved per ADR-033
 }
 

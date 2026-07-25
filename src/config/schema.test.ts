@@ -175,6 +175,49 @@ describe('ConfigSchema', () => {
   })
 })
 
+describe('artifact_map (D10a)', () => {
+  it('accepts a valid artifact_map', () => {
+    const result = ConfigSchema.safeParse({
+      version: 2,
+      methodology: 'deep',
+      platforms: ['claude-code'],
+      artifact_map: { 'coding-standards': 'CONTRIBUTING.md' },
+    })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.artifact_map).toEqual({ 'coding-standards': 'CONTRIBUTING.md' })
+    }
+  })
+
+  it('rejects an artifact_map with a non-string target', () => {
+    const result = ConfigSchema.safeParse({
+      version: 2,
+      methodology: 'deep',
+      platforms: ['claude-code'],
+      artifact_map: { 'coding-standards': ['CONTRIBUTING.md'] },
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects an artifact_map with an empty-string target', () => {
+    const result = ConfigSchema.safeParse({
+      version: 2,
+      methodology: 'deep',
+      platforms: ['claude-code'],
+      artifact_map: { 'coding-standards': '' },
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('omitting artifact_map stays valid', () => {
+    const result = ConfigSchema.safeParse({
+      version: 2, methodology: 'deep', platforms: ['claude-code'],
+    })
+    expect(result.success).toBe(true)
+    if (result.success) expect(result.data.artifact_map).toBeUndefined()
+  })
+})
+
 describe('GameConfigSchema', () => {
   it('accepts valid game config with all fields', () => {
     const result = GameConfigSchema.safeParse({

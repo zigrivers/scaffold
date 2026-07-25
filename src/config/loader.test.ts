@@ -350,4 +350,45 @@ project:
     )
     expect(domainErrors).toHaveLength(1)
   })
+
+  describe('artifact_map validation (D10a)', () => {
+    // NOTE: `platforms` is included in every fixture below even though the
+    // task brief's literal snippets omitted it — loadConfig's Phase 4 treats
+    // `platforms` as unconditionally required for version:2 configs
+    // (independent of the Zod schema's `.default(['claude-code'])`), so a
+    // fixture without it always fails with an unrelated FIELD_MISSING error.
+    it('warns on an artifact_map entry for an unknown step', () => {
+      const root = makeTmpDir()
+      writeConfig(root, 'version: 2\nmethodology: deep\nplatforms: [claude-code]\n'
+        + 'artifact_map:\n  not-a-step: CONTRIBUTING.md\n')
+      const result = loadConfig(root, ['coding-standards', 'tech-stack'])
+      expect(result.warnings.some(w => w.code === 'CONFIG_ARTIFACT_MAP_UNKNOWN_STEP')).toBe(true)
+      expect(result.errors).toHaveLength(0)
+    })
+
+    it('errors on an absolute artifact_map target', () => {
+      const root = makeTmpDir()
+      writeConfig(root, 'version: 2\nmethodology: deep\nplatforms: [claude-code]\n'
+        + 'artifact_map:\n  coding-standards: /etc/passwd\n')
+      const result = loadConfig(root, ['coding-standards'])
+      expect(result.errors.some(e => e.code === 'CONFIG_ARTIFACT_MAP_PATH_INVALID')).toBe(true)
+    })
+
+    it('errors on a traversal artifact_map target', () => {
+      const root = makeTmpDir()
+      writeConfig(root, 'version: 2\nmethodology: deep\nplatforms: [claude-code]\n'
+        + 'artifact_map:\n  coding-standards: ../outside.md\n')
+      const result = loadConfig(root, ['coding-standards'])
+      expect(result.errors.some(e => e.code === 'CONFIG_ARTIFACT_MAP_PATH_INVALID')).toBe(true)
+    })
+
+    it('accepts a valid artifact_map entry', () => {
+      const root = makeTmpDir()
+      writeConfig(root, 'version: 2\nmethodology: deep\nplatforms: [claude-code]\n'
+        + 'artifact_map:\n  coding-standards: CONTRIBUTING.md\n')
+      const result = loadConfig(root, ['coding-standards'])
+      expect(result.errors).toHaveLength(0)
+      expect(result.config?.artifact_map).toEqual({ 'coding-standards': 'CONTRIBUTING.md' })
+    })
+  })
 })
