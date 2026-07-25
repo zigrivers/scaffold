@@ -99,6 +99,8 @@ All other findings (F1 through F8) receive code changes.
 | `src/cli/middleware/output-mode.ts` | Resolve non-TTY to `auto` | Modify |
 | `src/cli/index.ts` | Add `.fail()` so handler errors stop printing the usage block | Modify |
 | `src/cli/commands/init.ts` | Honor `err.exitCode`; map `ScaffoldUserError` to coded errors; `requiresArg` on `--from`; emit a result on the `--from` path | Modify |
+| `src/cli/commands/adopt.ts` | Route every terminal failure through `output.fail()` | Modify |
+| `src/cli/commands/adopt.result-shape.test.ts` | Adopt failure-envelope assertions | Modify |
 | `src/utils/user-errors.ts` | Correct the "typically 2" header comment | Modify |
 | `content/guides/cli/index.md` | Publish exit codes, the envelope contract, and the agent driving loop | Modify |
 | `content/guides/install/index.md` | Repair the stale adopt guidance at lines 125, 148, 151 | Modify |
@@ -641,7 +643,7 @@ Closes **F1** (the 200-line-dump half), and improves **F6**'s error.
 - Test: `src/cli/index.test.ts` (append)
 
 **Interfaces:**
-- Consumes: `OutputContext.fail` (Task 1), `AutoFlagRequiredError` (Task 4).
+- Consumes: `OutputContext.fail` (Task 1) only. This task deliberately references no Release 2 symbol.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -653,12 +655,39 @@ describe('CLI failure handler', () => {
     const spy = vi.spyOn(process.stderr, 'write').mockImplementation((c: unknown) => {
       err.push(String(c)); return true
     })
-    await runCli(['init', '--from', '-', '--nonexistent-flag']).catch(() => undefined)
+    await runCli(['init', '--nonexistent-flag']).catch(() => undefined)
     spy.mockRestore()
     const text = err.join('')
     expect(text).not.toContain('Web-App Configuration:')
     expect(text).not.toContain('Game Configuration:')
     expect(text).toContain('scaffold init --help')
+  })
+
+  it('emits a parseable envelope for an argument error under --format json', async () => {
+    const out: string[] = []
+    const spy = vi.spyOn(process.stdout, 'write').mockImplementation((c: unknown) => {
+      out.push(String(c)); return true
+    })
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    await runCli(['init', '--format', 'json', '--nonexistent-flag']).catch(() => undefined)
+    spy.mockRestore()
+    vi.restoreAllMocks()
+    const parsed = JSON.parse(out.join(''))
+    expect(parsed.success).toBe(false)
+    expect(parsed.errors[0].code).toBe('CLI_ARGUMENT_ERROR')
+    expect(parsed.errors[0].recovery).toContain('scaffold init --help')
+    expect(parsed.exit_code).toBe(1)
+  })
+
+  it('resolves on a parse error, so only handler exceptions take the re-throw path', async () => {
+    // The handler re-throws whenever `err` is set. A parse error carries only
+    // `msg`, so it must be absorbed into the envelope rather than propagating.
+    // This is the observable half of "internal errors are not relabelled":
+    // if the guard were inverted, this call would reject.
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    await expect(runCli(['init', '--nonexistent-flag'])).resolves.toBeUndefined()
+    vi.restoreAllMocks()
   })
 })
 ```
@@ -673,14 +702,24 @@ Expected: FAIL, the captured stderr contains `Web-App Configuration:`
 ```typescript
 // src/cli/index.ts — insert between .strict() and .demandCommand(), line 97
     .fail((msg, err, yargsInstance) => {
-      // Handler errors that already carry a ScaffoldError are printed by the
-      // command's own output context. Anything reaching here is an argument
-      // error, which needs the message and a pointer, never the full usage.
-      const command = String(yargsInstance.parsed?.argv?._?.[0] ?? '')
+      // A present `err` means a command handler threw and yargs caught it.
+      // Those are internal failures: re-throw so they surface as stack traces
+      // rather than being mislabelled as bad input. Only `msg` is a genuine
+      // yargs parse error, and it must reach stdout as an envelope when the
+      // caller asked for json, or the failure is unparseable (acceptance
+      // criterion 2: never exit non-zero with empty stdout under --format json).
+      if (err) throw err
+      const argv = (yargsInstance.parsed && yargsInstance.parsed.argv) || {}
+      const command = String((argv._ ?? [])[0] ?? '')
       const hint = command ? `scaffold ${command} --help` : 'scaffold --help'
-      const text = msg || (err instanceof Error ? err.message : String(err))
-      process.stderr.write(`✗ ${text}\n`)
-      process.stderr.write(`  Run \`${hint}\` for available options.\n`)
+      const scaffoldError: ScaffoldError = {
+        code: 'CLI_ARGUMENT_ERROR',
+        message: msg,
+        exitCode: ExitCode.ValidationError,
+        recovery: `Run \`${hint}\` for available options`,
+      }
+      const mode = resolveOutputMode(argv as { format?: string; auto?: boolean })
+      createOutputContext(mode).fail([scaffoldError])
       process.exitCode = ExitCode.ValidationError
     })
 ```
@@ -689,6 +728,9 @@ Add to the imports at the top of `src/cli/index.ts`:
 
 ```typescript
 import { ExitCode } from '../types/enums.js'
+import type { ScaffoldError } from '../types/errors.js'
+import { createOutputContext } from './output/context.js'
+import { resolveOutputMode } from './middleware/output-mode.js'
 ```
 
 - [ ] **Step 4: Route init's own failures through `fail()`**
@@ -703,26 +745,11 @@ Replace `src/cli/commands/init.ts:786-792`:
           }
 ```
 
-Replace the catch at `src/cli/commands/init.ts:841-848`:
+**Leave the `catch` block at `src/cli/commands/init.ts:841-848` exactly as it is.** It is rewritten by Task 8, in Release 2.
 
-```typescript
-    } catch (err) {
-      if (err instanceof AutoFlagRequiredError) {
-        output.fail([err.scaffoldError])
-        process.exitCode = err.scaffoldError.exitCode
-        return
-      }
-      if (isScaffoldUserError(err)) {
-        const scaffoldError = toScaffoldError(err)
-        output.fail([scaffoldError])
-        process.exitCode = scaffoldError.exitCode
-        return
-      }
-      throw err
-    }
-```
+This boundary is deliberate. Routing that catch through `fail()` requires `toScaffoldError` (Task 8) and the `AutoFlagRequiredError` shape (Task 4), both of which live in Release 2. Reaching for them here would put Release 2 symbols in a Release 1 unit, which cannot compile. It would also drag Task 8's exit-code correction (2 to 1) into what is meant to be a non-breaking patch.
 
-`toScaffoldError` is defined in Task 8. Until then, implement it inline in `init.ts` as a temporary shim returning `{ code: 'INIT_FAILED', message: err.message, exitCode: ExitCode.ValidationError }`, and replace it in Task 8.
+The consequence, stated plainly so it is not mistaken for an oversight: after Release 1 the **wizard** path emits a failure envelope, and the **`--from`** path still exits 2 with empty stdout under `--format json`. Acceptance criterion 2 is therefore only fully satisfied at Release 2, which is why Task 12 ships there.
 
 - [ ] **Step 5: Run tests to verify they pass**
 
@@ -783,6 +810,23 @@ describe('resolveOutputMode TTY detection', () => {
     expect(resolveOutputMode({ format: 'json' }, { stdin: false, stdout: false })).toBe('json')
   })
 })
+
+describe('createOutputModeMiddleware auto normalization', () => {
+  it('sets argv.auto when the resolved mode is non-interactive', () => {
+    const middleware = createOutputModeMiddleware()
+    const argv: Record<string, unknown> = { format: 'json' }
+    middleware(argv)
+    expect(argv['auto']).toBe(true)
+  })
+
+  it('leaves argv.auto false in interactive mode', () => {
+    const middleware = createOutputModeMiddleware()
+    const argv: Record<string, unknown> = { auto: false }
+    // Interactive requires a real TTY; in the test process stdout is not one,
+    // so assert through resolveOutputMode's injectable form instead.
+    expect(resolveOutputMode(argv, { stdin: true, stdout: true })).toBe('interactive')
+  })
+})
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -819,6 +863,30 @@ export function resolveOutputMode(
 }
 ```
 
+- [ ] **Step 3b: Normalize `argv.auto` in the middleware — this is the half that actually closes the trap**
+
+Changing the output context is **not sufficient on its own**. The discriminator checks in `src/wizard/questions.ts` are gated on `options.auto`, which `src/cli/commands/init.ts:686` populates from `argv.auto ?? false`, the *explicit flag*. Without this step a non-TTY run still falls through to `AutoOutput.select()` and takes `options[0]`, and the trap stays open while appearing fixed.
+
+```typescript
+// src/cli/middleware/output-mode.ts — replace createOutputModeMiddleware
+/**
+ * Resolve output mode and normalize `auto`.
+ *
+ * Any non-interactive mode implies auto. Commands read `argv.auto` to decide
+ * whether a question may be defaulted, so normalizing here is what makes a
+ * piped invocation behave identically to an explicit `--auto` one. Setting
+ * only `outputMode` would change how answers are printed without changing
+ * whether they may be invented.
+ */
+export function createOutputModeMiddleware(): (argv: Record<string, unknown>) => void {
+  return (argv: Record<string, unknown>) => {
+    const mode = resolveOutputMode(argv as { format?: string; auto?: boolean })
+    argv['outputMode'] = mode
+    if (mode !== 'interactive') argv['auto'] = true
+  }
+}
+```
+
 - [ ] **Step 4: Add the breadcrumb to the non-TTY interactive path**
 
 `AutoOutput` delegates its non-prompt methods to `InteractiveOutput`, so `select` and `multiSelect` still resolve silently. Add the same breadcrumb `AutoOutput.prompt` already emits (`src/cli/output/auto.ts:33`):
@@ -850,10 +918,13 @@ Expected: PASS. Any existing test that asserted silent non-TTY success on a disc
 
 Run:
 ```bash
-cd "$(mktemp -d)" && git init -q
+D="$(mktemp -d)"; cd "$D" && git init -q
 node "$OLDPWD/dist/index.js" init --project-type web-app < /dev/null; echo "exit=$?"
+test -f "$D/.scaffold/config.yml" && echo "REGRESSION: config was written" || echo "no config written"
 ```
-Expected: `exit=1` with `INIT_AUTO_FLAG_REQUIRED`. Before this task the same command exited 0 and wrote `renderingStrategy: spa`.
+Expected: `exit=1` with `INIT_AUTO_FLAG_REQUIRED`, and `no config written`. Before this task the same command exited 0 and wrote `renderingStrategy: spa`.
+
+The second assertion is the one that matters. An earlier draft of this task changed only the output context, which made the command *print* differently while still writing the invented config. Checking the exit code alone would have passed that draft.
 
 - [ ] **Step 7: Commit**
 
@@ -896,7 +967,12 @@ describe('auto-mode project type enforcement', () => {
     })
   })
 
-  it('does not throw when a type-specific flag implies the project type', async () => {
+  it('does not throw once both the type and its discriminator are resolved', async () => {
+    // This asserts only that a fully-resolved input passes the two guards. It
+    // does NOT test type inference: inference happens upstream in the
+    // flag-family layer (src/cli/init-flag-families.ts), not here, so proving
+    // it requires driving the real CLI. That case lives in Task 12's e2e suite
+    // ("infers the project type from a type-specific flag alone").
     const output = createOutputContext('auto')
     await expect(
       askWizardQuestions({
@@ -1002,21 +1078,39 @@ describe('toScaffoldError', () => {
     expect(e.recovery).toContain('--force')
   })
 
-  it('maps every user-error subclass to a validation exit code, never 2', () => {
+  it('maps every user-error subclass to a validation exit code with non-empty recovery', () => {
     const cases = [
       new FlagConflictError('--methodology'),
       new InvalidYamlError('cfg.yml', 'bad indent'),
+      new InvalidConfigError('cfg.yml', 'methodology: invalid'),
       new FromPathReadError('cfg.yml', 'ENOENT'),
       new TTYStdinError(),
+      new ExistingScaffoldError('/tmp/p'),
+      new MultiServiceNotSupportedError('init'),
+      new ServiceRequiredError('tech-stack'),
+      new ServiceRejectedError('tech-stack'),
+      new ServiceNotFoundError('api'),
+      new ServiceFlagWithoutServicesError(),
+      new MultiServiceOverlayMissingError(),
     ]
     for (const c of cases) {
       const mapped = toScaffoldError(c)
-      expect(mapped.exitCode).toBe(ExitCode.ValidationError)
-      expect(mapped.code).toMatch(/^INIT_[A-Z_]+$/)
+      expect(mapped.exitCode, `${c.name} exitCode`).toBe(ExitCode.ValidationError)
+      expect(mapped.code, `${c.name} code`).toMatch(/^(INIT|RUN)_[A-Z_]+$/)
+      expect(mapped.recovery ?? '', `${c.name} recovery`).not.toBe('')
     }
+  })
+
+  it('throws on an unmapped subclass rather than emitting a recovery-less error', () => {
+    class NewlyAddedError extends ScaffoldUserError {
+      constructor() { super('something new') }
+    }
+    expect(() => toScaffoldError(new NewlyAddedError())).toThrow(/Unmapped ScaffoldUserError/)
   })
 })
 ```
+
+The second test is the exhaustiveness gate: adding a `ScaffoldUserError` subclass without a mapping entry now fails a test instead of silently producing an error with no recovery text. Import every subclass plus `ScaffoldUserError` itself at the top of the file.
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -1043,32 +1137,83 @@ Expected: FAIL, `toScaffoldError is not exported`
 import { ExitCode } from '../types/enums.js'
 import type { ScaffoldError } from '../types/errors.js'
 
-const USER_ERROR_CODES: Record<string, { code: string; recovery?: string }> = {
+// `recovery` is REQUIRED, not optional. The global constraint and acceptance
+// criterion 4 both say every user-facing failure names its own fix, so a
+// mapping that permits an entry without one would let that guarantee rot
+// silently. The type enforces it; the exhaustiveness test below enforces that
+// every subclass has an entry.
+const USER_ERROR_CODES: Record<string, { code: string; recovery: string }> = {
   ExistingScaffoldError: {
     code: 'INIT_SCAFFOLD_EXISTS',
     recovery: 'Use --force to back up and reinitialize',
   },
-  FlagConflictError: { code: 'INIT_FLAG_CONFLICT', recovery: 'Use --from alone, or drop it and pass flags' },
-  InvalidYamlError: { code: 'INIT_INVALID_YAML', recovery: 'Fix the YAML syntax and re-run' },
-  InvalidConfigError: { code: 'INIT_INVALID_CONFIG', recovery: 'Correct the reported fields and re-run' },
-  FromPathReadError: { code: 'INIT_FROM_READ_FAILED', recovery: 'Check the --from path is readable' },
-  TTYStdinError: { code: 'INIT_FROM_TTY_STDIN', recovery: 'Pipe the config: cat cfg.yml | scaffold init --from=-' },
-  MultiServiceNotSupportedError: { code: 'INIT_MULTI_SERVICE_UNSUPPORTED' },
-  ServiceRequiredError: { code: 'RUN_SERVICE_REQUIRED', recovery: 'Pass --service <name>' },
-  ServiceRejectedError: { code: 'RUN_SERVICE_REJECTED', recovery: 'Drop --service for this step' },
-  ServiceNotFoundError: { code: 'RUN_SERVICE_NOT_FOUND', recovery: 'Check services[] in .scaffold/config.yml' },
-  ServiceFlagWithoutServicesError: { code: 'RUN_SERVICE_WITHOUT_SERVICES' },
-  MultiServiceOverlayMissingError: { code: 'INIT_OVERLAY_MISSING' },
+  FlagConflictError: {
+    code: 'INIT_FLAG_CONFLICT',
+    recovery: 'Use --from on its own, or drop --from and pass the config flags directly',
+  },
+  InvalidYamlError: {
+    code: 'INIT_INVALID_YAML',
+    recovery: 'Fix the reported YAML syntax error and re-run',
+  },
+  InvalidConfigError: {
+    code: 'INIT_INVALID_CONFIG',
+    recovery: 'Correct the fields listed in the message and re-run',
+  },
+  FromPathReadError: {
+    code: 'INIT_FROM_READ_FAILED',
+    recovery: 'Check the --from path exists and is readable',
+  },
+  TTYStdinError: {
+    code: 'INIT_FROM_TTY_STDIN',
+    recovery: 'Pipe the config in: cat config.yml | scaffold init --from=-',
+  },
+  MultiServiceNotSupportedError: {
+    code: 'INIT_MULTI_SERVICE_UNSUPPORTED',
+    recovery: 'Remove services[] from the config, or run the per-service commands directly',
+  },
+  ServiceRequiredError: {
+    code: 'RUN_SERVICE_REQUIRED',
+    recovery: 'Pass --service <name>, using a name from services[] in .scaffold/config.yml',
+  },
+  ServiceRejectedError: {
+    code: 'RUN_SERVICE_REJECTED',
+    recovery: 'Drop --service; this step runs once across all services',
+  },
+  ServiceNotFoundError: {
+    code: 'RUN_SERVICE_NOT_FOUND',
+    recovery: 'Use a service name listed under services[] in .scaffold/config.yml',
+  },
+  ServiceFlagWithoutServicesError: {
+    code: 'RUN_SERVICE_WITHOUT_SERVICES',
+    recovery: 'Drop --service, or add a services[] block to .scaffold/config.yml',
+  },
+  MultiServiceOverlayMissingError: {
+    code: 'INIT_OVERLAY_MISSING',
+    recovery: 'Add multi-service-overlay.yml, or remove services[] from the config',
+  },
 }
 
-/** Normalize a ScaffoldUserError into the coded ScaffoldError the CLI emits. */
+/**
+ * Normalize a ScaffoldUserError into the coded ScaffoldError the CLI emits.
+ *
+ * Throws on an unmapped subclass rather than falling back to a generic code.
+ * A silent fallback would emit an error with no actionable recovery, which is
+ * the exact failure mode this plan exists to remove; failing loudly during
+ * development is strictly better than shipping an unhelpful error.
+ */
 export function toScaffoldError(err: ScaffoldUserError): ScaffoldError {
-  const mapped = USER_ERROR_CODES[err.name] ?? { code: 'INIT_FAILED' }
+  const mapped = USER_ERROR_CODES[err.name]
+  if (!mapped) {
+    throw new Error(
+      `Unmapped ScaffoldUserError subclass "${err.name}". `
+      + 'Add it to USER_ERROR_CODES with a code and an actionable recovery string.',
+    )
+  }
   return {
     code: mapped.code,
     message: err.message,
     exitCode: ExitCode.ValidationError,
-    ...(mapped.recovery ? { recovery: mapped.recovery } : {}),
+    recovery: mapped.recovery,
   }
 }
 ```
@@ -1208,6 +1353,107 @@ git commit -m "fix(init): accept --from - and emit its result envelope (F6, gap 
 
 ---
 
+## Task 13: Route adopt's failures through the envelope
+
+Closes the **F4** gap on the adopt path, and is a prerequisite for Task 12's brownfield assertions. Numbered 13 because it was added after the first review; it executes here, between Tasks 9 and 10.
+
+Without this task, `scaffold adopt --format json --apply` and the plan-drift refusal still exit 1 with empty stdout, and Task 12's brownfield cases (`ADOPT_APPLY_NON_INTERACTIVE`, `ADOPT_PLAN_DRIFT`) cannot pass. Task 1 adds the capability; no task was routing adopt into it.
+
+**Files:**
+- Modify: `src/cli/commands/adopt.ts` (the `ADOPT_APPLY_NON_INTERACTIVE` path near line 600, the `ADOPT_PLAN_DRIFT` path, and the command's terminal error handling)
+- Test: `src/cli/commands/adopt.result-shape.test.ts` (append)
+
+**Interfaces:**
+- Consumes: `OutputContext.fail` (Task 1).
+
+- [ ] **Step 1: Write the failing test**
+
+```typescript
+// src/cli/commands/adopt.result-shape.test.ts — append
+describe('adopt failure envelope', () => {
+  it('emits success:false with a coded error for a bare --apply', async () => {
+    const out: string[] = []
+    const spy = vi.spyOn(process.stdout, 'write').mockImplementation((c: unknown) => {
+      out.push(String(c)); return true
+    })
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    await runAdopt({ auto: true, format: 'json', apply: true, root: fixtureRoot } as never)
+      .catch(() => undefined)
+    spy.mockRestore()
+    vi.restoreAllMocks()
+    const parsed = JSON.parse(out.join(''))
+    expect(parsed.success).toBe(false)
+    expect(parsed.errors[0].code).toBe('ADOPT_APPLY_NON_INTERACTIVE')
+    expect(parsed.errors[0].recovery).toContain('--plan-key')
+    expect(parsed.exit_code).toBe(1)
+  })
+})
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `npx vitest run src/cli/commands/adopt.result-shape.test.ts -t 'failure envelope'`
+Expected: FAIL with `Unexpected end of JSON input` (stdout is currently empty on this path)
+
+- [ ] **Step 3: Route adopt's terminal errors through `fail()`**
+
+Locate every site in `src/cli/commands/adopt.ts` that reports a terminal failure via `output.error(...)` followed by a non-zero `process.exitCode`, and replace each with a single `output.fail([...])` call carrying the same code, message, and an explicit recovery string:
+
+```typescript
+// Pattern to apply at each adopt failure site.
+output.fail([{
+  code: 'ADOPT_APPLY_NON_INTERACTIVE',
+  message: 'Bare --apply is interactive-only. In automation, pass the approved plan.',
+  exitCode: ExitCode.ValidationError,
+  recovery: 'Pass --plan <path> or --plan-key <sha256> from a rendered plan',
+}])
+process.exitCode = ExitCode.ValidationError
+return
+```
+
+```typescript
+output.fail([{
+  code: 'ADOPT_PLAN_DRIFT',
+  message: driftMessage,   // the existing message, unchanged
+  exitCode: ExitCode.ValidationError,
+  recovery: 'Re-render with `scaffold adopt --write`, then re-run --apply against the new plan key',
+}])
+process.exitCode = ExitCode.ValidationError
+return
+```
+
+Apply the same treatment to every remaining terminal-failure site in the file. Do not stop at the two named above: the acceptance criterion is that no adopt failure exits non-zero with empty stdout, so each one must be converted.
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+Run: `npx vitest run src/cli/commands/ && npm run build`
+Expected: PASS
+
+- [ ] **Step 5: Verify end to end**
+
+Run:
+```bash
+D="$(mktemp -d)"; cd "$D" && git init -q
+printf '{"name":"x","dependencies":{"express":"^4.19.0"}}\n' > package.json
+git add -A && git -c user.email=t@t.co -c user.name=t commit -qm i
+node "$OLDPWD/dist/index.js" adopt --auto --format json --apply > out.json 2>/dev/null; echo "exit=$?"
+jq -r '.errors[0].code' out.json
+```
+Expected: `exit=1` and `ADOPT_APPLY_NON_INTERACTIVE`
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add src/cli/commands/adopt.ts src/cli/commands/adopt.result-shape.test.ts
+git commit -m "feat(adopt): emit the failure envelope on terminal errors (F4)"
+```
+
+**Agent-visible behavior:** `scaffold adopt --format json` failures now carry a parseable envelope on stdout instead of exiting with nothing to read.
+
+**Breaking:** No. Stdout goes from empty to populated on failure; exit codes are unchanged.
+
+---
+
 ## Task 10: Publish the exit-code and envelope contracts
 
 Closes **F8**, gap **05**, and the documentation half of gaps **02** and **08**. Also carries the **F9** note.
@@ -1226,12 +1472,29 @@ Closes **F8**, gap **05**, and the documentation half of gaps **02** and **08**.
 CLI_GUIDE="content/guides/cli/index.md"
 ENUM="src/types/enums.ts"
 
-@test "cli guide documents every ExitCode enum member" {
-  run bash -c "grep -oE '^  [A-Za-z]+ = [0-9]+' '$ENUM' | awk '{print \$1}'"
+@test "cli guide documents every ExitCode name paired with its numeric value" {
+  # Name alone is not enough: a value could change in the enum while the guide
+  # kept the old number and a name-only grep stayed green. Assert the pair.
+  run bash -c "grep -oE '^  [A-Za-z]+ = [0-9]+' '$ENUM' | tr -d ' '"
   [ "$status" -eq 0 ]
-  for member in $output; do
-    grep -q "$member" "$CLI_GUIDE" || {
-      echo "ExitCode.$member is not documented in $CLI_GUIDE"
+  [ -n "$output" ]
+  for pair in $output; do
+    name="${pair%%=*}"
+    value="${pair##*=}"
+    # The guide's table row must carry both the number and the name.
+    grep -qE "^\|[[:space:]]*${value}[[:space:]]*\|[^|]*\`?${name}\`?" "$CLI_GUIDE" || {
+      echo "ExitCode.${name} = ${value} is not documented as a matching pair in $CLI_GUIDE"
+      return 1
+    }
+  done
+}
+
+@test "cli guide exit-code table has no rows for values absent from the enum" {
+  run bash -c "grep -oE '^\|[[:space:]]*[0-9]+[[:space:]]*\|' '$CLI_GUIDE' | tr -dc '0-9\n'"
+  [ "$status" -eq 0 ]
+  for value in $output; do
+    grep -qE "^  [A-Za-z]+ = ${value}\$" "$ENUM" || {
+      echo "Guide documents exit code ${value}, which no longer exists in $ENUM"
       return 1
     }
   done
@@ -1595,7 +1858,27 @@ describe('agent-drivability: path (a) new project', () => {
     const dir = tmpRepo()
     const r = run(['init', '--project-type', 'web-app'], dir)
     expect(r.code).toBe(1)
+    // The config assertion is the load-bearing one. An implementation that
+    // changes only the output context fails here while passing on exit code.
     expect(fs.existsSync(path.join(dir, '.scaffold', 'config.yml'))).toBe(false)
+  })
+
+  it('infers the project type from a type-specific flag alone', () => {
+    const dir = tmpRepo()
+    const r = run(['init', '--auto', '--format', 'json', '--cli-interactivity', 'args-only'], dir)
+    expect(r.code).toBe(0)
+    expect(JSON.parse(r.stdout).success).toBe(true)
+    const config = fs.readFileSync(path.join(dir, '.scaffold', 'config.yml'), 'utf-8')
+    expect(config).toContain('projectType: cli')
+  })
+
+  it('emits a parseable envelope for an argument error', () => {
+    const dir = tmpRepo()
+    const r = run(['init', '--format', 'json', '--nonexistent-flag'], dir)
+    expect(r.code).not.toBe(0)
+    const parsed = JSON.parse(r.stdout)
+    expect(parsed.success).toBe(false)
+    expect(parsed.errors[0].code).toBe('CLI_ARGUMENT_ERROR')
   })
 })
 
@@ -1737,30 +2020,46 @@ No `scaffold init` appears in path (b). That is the correction Task 11 makes to 
 
 ## Work Units, Sequencing and Shippability
 
-| Unit | Tasks | Depends on | Independently shippable | Release type |
+| Unit | Tasks | Depends on | Independently shippable | Release |
 |---|---|---|---|---|
-| **A. Output foundation** | 1, 5 | none | Yes | patch |
-| **B. Contract and discoverability** | 2, 3, 4, 8 | A (Task 5 wires `fail()`; Task 8 replaces Task 5's shim) | Yes | minor, contains the exit-2 to exit-1 change |
-| **C. Close the silent traps** | 6, 7 | B (the new failures must already be coded and annotated, or the breaking change lands without an actionable message) | Yes | minor, **breaking behavior** |
-| **D. Documentation and bootstrap** | 10, 11 | none for 11; Task 10 documents behavior from A and B, so publish it with or after B | Yes | patch |
-| **E. `--from` repair** | 9 | A (needs `fail()` and the result-emission branch) | Yes | patch |
-| **F. Acceptance** | 12 | A, B, C, E | No, it is the gate | n/a |
+| **A. Output foundation** | 1, 5, 13 | none | Yes | 1 (patch) |
+| **D1. Adopt docs and bootstrap** | 11 | none | Yes | 1 (patch) |
+| **E. `--from` repair** | 9 | A (needs `fail()` and the result-emission branch) | Yes | 1 (patch) |
+| **B. Contract and discoverability** | 2, 3, 4, 8 | A | Yes | 2 (minor) |
+| **C. Close the silent traps** | 6, 7 | B (the failures must already be coded and annotated, or the breaking change lands without an actionable message) | Yes | 2 (minor, **breaking**) |
+| **D2. Contract docs** | 10 | B (documents the auto-flag table B delivers) | Yes | 2 (minor) |
+| **F. Acceptance** | 12 | A, B, C, E, D2 | No, it is the gate | 2 (minor) |
 
-Critical path: **A → B → C**. Units D and E can proceed in parallel with B and C by separate workers; neither touches a file that A, B, or C modifies, except that Task 9 and Task 5 both edit `src/cli/commands/init.ts`, so Task 9 must rebase after Task 5 lands.
+Critical path: **A → B → C → F**. Units D1 and E run in parallel with B and C. Task 9 and Task 5 both edit `src/cli/commands/init.ts`, so Task 9 rebases after Task 5 lands.
 
-Recommended shipping order across two releases:
+### Why this cut, and what the first review changed
 
-- **Release 1 (patch, no breaking change):** Units A, D, E. This alone closes F4, F5, F6, F8, F9 and gaps 01, 06, 07, 08. An agent that already knows the flags gets parseable failures and correct docs immediately.
-- **Release 2 (minor, one breaking behavior change):** Units B, C, F. This closes F1, F2, F3, F7 and gaps 02, 03, 04, 05. One CHANGELOG entry under "Behavior change" covers Tasks 6, 7 and 8, following the v3.48.0 `scaffold adopt` precedent.
+The original cut put Unit D (Tasks 10 and 11) and a broader Task 5 in Release 1. Review found two ways that could not work, both corrected above:
+
+- **Task 10 documented behavior Release 1 does not ship.** It publishes the auto-required-flag table, which Unit B delivers in Release 2. Release 1 would have shipped a documented contract the binary did not implement. Task 10 moved to Release 2 as unit **D2**; Task 11 stayed in Release 1 as **D1**, because it only corrects adopt guidance that is already wrong about today's binary.
+- **Task 5 referenced Release 2 symbols.** Its `catch` rewrite needed `AutoFlagRequiredError` (Task 4) and `toScaffoldError` (Task 8). Task 5 is now scoped to the yargs `.fail()` handler and the wizard-path routing only; the `catch` block is left untouched until Task 8 rewrites it in Release 2. This also keeps Task 8's exit-2-to-exit-1 correction out of the patch release.
+
+A third gap the review caught: nothing routed **adopt** into the envelope, so Task 12's brownfield assertions could not pass. That is now Task 13, in Release 1.
+
+### Shipping order
+
+- **Release 1 (patch, `v3.51.1`, no breaking change):** Units A, D1, E — Tasks 1, 5, 9, 11, 13. Closes F5, F6, F9, gaps 06, 07, and the adopt and wizard halves of F4/gap 01. Every failure path an agent hits on `adopt`, and the wizard path on `init`, becomes parseable.
+- **Release 2 (minor, `v3.52.0`, one breaking behavior change):** Units B, C, D2, F — Tasks 2, 3, 4, 6, 7, 8, 10, 12. Closes F1, F2, F3, F7, F8, gaps 02, 03, 04, 05, 08, and completes F4/gap 01 on the `--from` path. One CHANGELOG entry under "Behavior change" covers Tasks 6, 7 and 8, following the v3.48.0 `scaffold adopt` precedent.
+
+Acceptance criterion 2 ("never exits non-zero with empty stdout under `--format json`") is only fully true at Release 2, because the `--from` path's `catch` is rewritten by Task 8. This is why Task 12 ships in Release 2 rather than gating Release 1.
 
 ---
 
 ## Self-Review
 
-**Coverage.** F1 → Tasks 2, 3, 4, 5. F2 → Task 6. F3 → Task 7. F4 → Tasks 1, 5. F5 → Task 11. F6 → Task 9. F7 → Task 8. F8 → Task 10. F9 → no code change, documented in Task 10. Gaps 01 → 1; 02 → 2, 3, 10; 03 → 6; 04 → 7; 05 → 8, 10; 06 → 11; 07 → 9; 08 → 10, 11. Nothing unassigned.
+**Coverage.** F1 → Tasks 2, 3, 4, 5. F2 → Task 6. F3 → Task 7. F4 → Tasks 1, 5, 13. F5 → Task 11. F6 → Task 9. F7 → Task 8. F8 → Task 10. F9 → no code change, documented in Task 10. Gaps 01 → 1, 5, 13; 02 → 2, 3, 10; 03 → 6; 04 → 7; 05 → 8, 10; 06 → 11; 07 → 9; 08 → 10, 11. Nothing unassigned.
 
-**Placeholders.** None. Every code step carries the code. The one forward reference, `toScaffoldError` in Task 5, names its temporary shim and the task that replaces it.
+**Placeholders.** None. Every code step carries the code. After the first review there are no forward references either: Task 5 no longer reaches for Release 2 symbols, so the temporary `toScaffoldError` shim that earlier drafts required is gone.
 
-**Type consistency.** `OutputContext.fail(errors: ScaffoldError[], exitCode?: ExitCode)` is declared in Task 1 and called with that signature in Tasks 5 and 8. `AutoFlagRequiredError.scaffoldError` is declared in Task 4 and read in Tasks 5 and 7. `AUTO_REQUIRED_FLAG` and `autoRequiredSuffix` are declared in Task 2 and consumed in Tasks 3, 4 and 10. `toScaffoldError` is declared in Task 8 and consumed in Task 5.
+**Type consistency.** `OutputContext.fail(errors: ScaffoldError[], exitCode?: ExitCode)` is declared in Task 1 and called with that signature in Tasks 5, 8 and 13. `AutoFlagRequiredError.scaffoldError` is declared in Task 4 and read in Tasks 7 and 8. `AUTO_REQUIRED_FLAG` and `autoRequiredSuffix` are declared in Task 2 and consumed in Tasks 3, 4 and 10. `toScaffoldError` is declared in Task 8 and consumed only within Task 8's own rewrite of the `init.ts` catch.
 
-**Known risk.** Task 9 Step 3 assumes yargs' `requiresArg: true` is sufficient to consume a bare `-` under `.strict()`. The test in Step 1 asserts only the declaration; the end-to-end check in Step 5 is what proves the behavior. If `requiresArg` proves insufficient, the fallback is to normalize `--from -` to `--from=-` in `runCli` before handing argv to yargs, which is a three-line change in `src/cli/index.ts:36-38`.
+**Known risks.**
+
+1. Task 9 Step 3 assumes yargs' `requiresArg: true` is sufficient to consume a bare `-` under `.strict()`. The test in Step 1 asserts only the declaration; the end-to-end check in Step 5 is what proves the behavior. If `requiresArg` proves insufficient, the fallback is to normalize `--from -` to `--from=-` in `runCli` before handing argv to yargs, a three-line change in `src/cli/index.ts:36-38`.
+2. Task 6 Step 3b normalizes `argv.auto` for **all** non-interactive modes, which means `scaffold init --format json` in a TTY now also requires a discriminator. That is intended and consistent (JsonOutput never prompts, so it was already silently defaulting), but it widens the breaking surface slightly beyond the non-TTY case. It belongs in the same CHANGELOG entry.
+3. Task 13 says to convert *every* terminal-failure site in `adopt.ts`, and the file is large. The end-to-end check covers only the bare-`--apply` path. An implementer should grep for remaining `output.error(` calls in that file before marking the task done.
