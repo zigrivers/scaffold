@@ -2333,7 +2333,7 @@ export function buildTiaMap(opts: {
 
 **Steps:**
 
-- [ ] Write the failing test `src/tia/affected.test.ts`:
+- [x] Write the failing test `src/tia/affected.test.ts`:
 
 ```ts
 // src/tia/affected.test.ts
@@ -2470,8 +2470,8 @@ describe('selectAffected — selection and ordering', () => {
 })
 ```
 
-- [ ] Run: `npx vitest run src/tia/affected.test.ts` — expect FAILURE (module missing).
-- [ ] Create `src/tia/affected.ts`:
+- [x] Run: `npx vitest run src/tia/affected.test.ts` — expect FAILURE (module missing).
+- [x] Create `src/tia/affected.ts`:
 
 ```ts
 // src/tia/affected.ts — D14: layered TIA selection. Pure core — every git fact
@@ -2599,9 +2599,9 @@ export function selectAffected(opts: {
 }
 ```
 
-- [ ] Run: `npx vitest run src/tia/affected.test.ts` — expect all pass.
-- [ ] Run: `npm run check` — expect green.
-- [ ] Commit: `git add -A && git commit -m "feat(tia): layered affected-test selection engine with fail-closed fallbacks (D14)"`
+- [x] Run: `npx vitest run src/tia/affected.test.ts` — expect all pass.
+- [x] Run: `npm run check` — expect green.
+- [x] Commit: `git add -A && git commit -m "feat(tia): layered affected-test selection engine with fail-closed fallbacks (D14)"`
 
 ---
 
