@@ -6,10 +6,20 @@ import path from 'node:path'
 import { waitForWake } from './wake.js'
 import { appendEvent, JOURNAL_FILE } from './journal.js'
 
-// Tests below that assert resolves.toBe('timeout') (2, 3, 5) use REAL
-// fs.watch and have proven reliable: their pass condition holds whether or
-// not a watch event ever fires. Tests that assert resolves.toBe('journal')
-// (1, 4) stub fs.watch instead — see mockJournalWatch below for why.
+// Every test below stubs fs.watch — none depend on real OS fs-event delivery
+// or real watcher teardown timing. That matters because under this repo's
+// full `npm run check` suite (309 files, heavy concurrent git/fs load across
+// many worker threads), real fs.watch delivery was empirically found to be
+// unreliably delayed — sometimes past the test ceiling, even for a single
+// write — most likely due to libuv threadpool contention shared across the
+// whole suite, not a defect in waitForWake's own logic (in isolation, on an
+// idle system, the same code delivers in tens of milliseconds). A hard
+// pass/fail assertion can't depend on that, so these stubs let every test
+// deterministically verify wake.ts's own logic — listener wiring, filename
+// filtering, debounce coalescing, error-path degradation — independent of
+// real OS timing. The only real timing left is the fallback setTimeout
+// (a plain timer, far more reliable than fs.watch); delays are kept small
+// and the suite-wide testTimeout below stays generous as a further margin.
 vi.setConfig({ testTimeout: 10_000 })
 
 function tmp(): string { return fs.mkdtempSync(path.join(os.tmpdir(), 'mq-wake-')) }
@@ -19,22 +29,16 @@ afterEach(() => {
 })
 
 /**
- * Stub fs.watch to deliver synthetic journal-change notifications on a
- * controlled schedule, bypassing real OS event delivery entirely.
- *
- * Why: under this repo's full `npm run check` suite (309 files, heavy
- * concurrent git/fs load across many worker threads), real fs.watch delivery
- * was empirically found to be unreliably delayed — sometimes past 10s, even
- * for a single write — most likely due to libuv threadpool contention shared
- * across the whole suite, not a defect in waitForWake's own logic (in
- * isolation, on an idle system, the same code delivers in tens of
- * milliseconds). A hard pass/fail assertion can't depend on that. This stub
- * lets these two tests deterministically verify wake.ts's own logic — listener
- * wiring, debounce coalescing, resolving 'journal' — without depending on
- * real OS timing. The 'timeout'-asserting tests below keep real fs.watch,
- * since their outcome doesn't depend on it firing.
+ * Stub fs.watch to deliver synthetic 'change' notifications on a controlled
+ * schedule, bypassing real OS event delivery entirely. `filename` defaults to
+ * the journal file (the "wake" case); pass an unrelated name to exercise the
+ * filter branch, or an empty `fireDelaysMs` array for a watcher that never
+ * fires (the pure-fallback case).
  */
-function mockJournalWatch(fireDelaysMs: number[]): { closed: () => boolean } {
+function mockWatch(
+  fireDelaysMs: number[],
+  filename: string | null = JOURNAL_FILE,
+): { closed: () => boolean } {
   let closed = false
   const fakeWatcher = {
     close: () => { closed = true },
@@ -45,17 +49,41 @@ function mockJournalWatch(fireDelaysMs: number[]): { closed: () => boolean } {
     listener?: (event: string, filename: string | null) => void,
   ) => {
     for (const delay of fireDelaysMs) {
-      setTimeout(() => listener?.('change', JOURNAL_FILE), delay)
+      setTimeout(() => listener?.('change', filename), delay)
     }
     return fakeWatcher
   }) as typeof fs.watch)
   return { closed: () => closed }
 }
 
+/**
+ * Stub fs.watch to return a watcher whose 'error' handler fires after a short
+ * delay — simulating the watch backend dying mid-wait (e.g. the directory
+ * vanished), which is exactly the case wake.ts's `watcher.on('error', ...)`
+ * exists to degrade gracefully from.
+ */
+function mockWatchError(delayMs = 10): { errored: () => boolean } {
+  let errored = false
+  const fakeWatcher = {
+    close: () => { /* no-op */ },
+    on: (event: string, cb: (err: Error) => void) => {
+      if (event === 'error') {
+        setTimeout(() => {
+          errored = true
+          cb(new Error('ENOENT: vanished'))
+        }, delayMs)
+      }
+      return fakeWatcher
+    },
+  } as unknown as fs.FSWatcher
+  vi.spyOn(fs, 'watch').mockImplementation((() => fakeWatcher) as unknown as typeof fs.watch)
+  return { errored: () => errored }
+}
+
 describe('waitForWake', () => {
   it('resolves "journal" promptly when the journal is appended', async () => {
     const mqDir = tmp()
-    const watcher = mockJournalWatch([50])
+    const watcher = mockWatch([50])
     const started = Date.now()
     const p = waitForWake(mqDir, 10_000, 25)
     setTimeout(() => {
@@ -67,19 +95,23 @@ describe('waitForWake', () => {
   })
 
   it('falls back to the poll timer when nothing is written', async () => {
-    await expect(waitForWake(tmp(), 120, 25)).resolves.toBe('timeout')
+    const watcher = mockWatch([]) // never fires — pure fallback path
+    await expect(waitForWake(tmp(), 100, 25)).resolves.toBe('timeout')
+    expect(watcher.closed()).toBe(true)
   })
 
   it('ignores writes to unrelated files in .mq', async () => {
     const mqDir = tmp()
-    const p = waitForWake(mqDir, 250, 25)
-    setTimeout(() => fs.writeFileSync(path.join(mqDir, 'other.txt'), 'x\n'), 40)
-    await expect(p).resolves.toBe('timeout')
+    // Fires a 'change' event for a file that isn't the journal — wake.ts's
+    // filename filter must ignore it and let the fallback timer resolve.
+    const watcher = mockWatch([40], 'other.txt')
+    await expect(waitForWake(mqDir, 100, 25)).resolves.toBe('timeout')
+    expect(watcher.closed()).toBe(true)
   })
 
   it('debounces a burst of appends into one wake (single resolution)', async () => {
     const mqDir = tmp()
-    const watcher = mockJournalWatch([0, 2, 4, 6, 8])
+    const watcher = mockWatch([0, 2, 4, 6, 8])
     const p = waitForWake(mqDir, 2_000, 50)
     for (let i = 0; i < 5; i++) {
       appendEvent(mqDir, { type: 'enqueued', pr: i + 1, at: new Date().toISOString() })
@@ -90,8 +122,8 @@ describe('waitForWake', () => {
 
   it('a vanished mqDir degrades to the poll timer instead of throwing', async () => {
     const mqDir = tmp()
-    const p = waitForWake(mqDir, 200, 25)
-    fs.rmSync(mqDir, { recursive: true, force: true })
-    await expect(p).resolves.toBe('timeout')
+    const watch = mockWatchError()
+    await expect(waitForWake(mqDir, 100, 25)).resolves.toBe('timeout')
+    expect(watch.errored()).toBe(true)
   })
 })
