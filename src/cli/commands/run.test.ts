@@ -58,6 +58,7 @@ vi.mock('../../utils/fs.js', () => ({
 vi.mock('../../core/assembly/knowledge-loader.js', () => ({
   buildIndexWithOverrides: vi.fn(),
   loadEntries: vi.fn(),
+  withAdoptionKnowledge: vi.fn((names: string[]) => names),
 }))
 
 vi.mock('../../core/assembly/instruction-loader.js', () => ({
@@ -69,7 +70,11 @@ vi.mock('../../core/assembly/depth-resolver.js', () => ({
 }))
 
 vi.mock('../../core/assembly/update-mode.js', () => ({
-  detectUpdateMode: vi.fn(),
+  resolveAssemblyMode: vi.fn(),
+}))
+
+vi.mock('../../core/assembly/mode-loader.js', () => ({
+  loadAdoptionPreamble: vi.fn(),
 }))
 
 vi.mock('../../core/assembly/methodology-change.js', () => ({
@@ -185,10 +190,11 @@ import { analyzeCrash } from '../../state/completion.js'
 import { AssemblyEngine } from '../../core/assembly/engine.js'
 import { resolveTransitiveCrossReads } from '../../core/assembly/cross-reads.js'
 import { discoverMetaPrompts, discoverAllMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
-import { buildIndexWithOverrides, loadEntries } from '../../core/assembly/knowledge-loader.js'
+import { buildIndexWithOverrides, loadEntries, withAdoptionKnowledge } from '../../core/assembly/knowledge-loader.js'
 import { loadInstructions } from '../../core/assembly/instruction-loader.js'
 import { resolveDepth } from '../../core/assembly/depth-resolver.js'
-import { detectUpdateMode } from '../../core/assembly/update-mode.js'
+import { resolveAssemblyMode } from '../../core/assembly/update-mode.js'
+import { loadAdoptionPreamble } from '../../core/assembly/mode-loader.js'
 import { detectMethodologyChange } from '../../core/assembly/methodology-change.js'
 import { loadAllPresets } from '../../core/assembly/preset-loader.js'
 import { loadOverlay } from '../../core/assembly/overlay-loader.js'
@@ -325,6 +331,7 @@ function makeSuccessAssemblyResult(): AssemblyResult {
         assembledAt: '2024-01-01T00:00:00.000Z',
         updateMode: false,
         sectionsIncluded: [],
+        assemblyMode: 'fresh',
       },
     },
     errors: [],
@@ -400,11 +407,13 @@ beforeEach(() => {
   vi.mocked(computeEligible).mockReturnValue([])
 
   vi.mocked(resolveDepth).mockReturnValue({ depth: 3, provenance: 'preset-default' })
-  vi.mocked(detectUpdateMode).mockReturnValue({
-    isUpdateMode: false,
+  vi.mocked(resolveAssemblyMode).mockReturnValue({
+    mode: 'fresh',
+    updateDetection: { isUpdateMode: false, currentDepth: 3, warnings: [] },
     currentDepth: 3,
     warnings: [],
   })
+  vi.mocked(loadAdoptionPreamble).mockReturnValue({ content: null, warnings: [] })
   vi.mocked(detectMethodologyChange).mockReturnValue({
     changed: false,
     stateMeta: 'deep',
@@ -723,15 +732,17 @@ describe('run command handler', () => {
 
   describe('update mode', () => {
     it('proceeds in update mode without prompt when --force is set', async () => {
-      vi.mocked(detectUpdateMode).mockReturnValue({
-        isUpdateMode: true,
+      const existingArtifact = {
+        filePath: 'docs/prd.md',
+        content: 'old content',
+        previousDepth: 3 as const,
+        completionTimestamp: '2024-01-01T00:00:00.000Z',
+      }
+      vi.mocked(resolveAssemblyMode).mockReturnValue({
+        mode: 'update',
+        updateDetection: { isUpdateMode: true, currentDepth: 3, existingArtifact, warnings: [] },
+        existingArtifact,
         currentDepth: 3,
-        existingArtifact: {
-          filePath: 'docs/prd.md',
-          content: 'old content',
-          previousDepth: 3,
-          completionTimestamp: '2024-01-01T00:00:00.000Z',
-        },
         warnings: [],
       })
 
@@ -813,15 +824,17 @@ describe('run command handler', () => {
 
   describe('update mode: interactive confirmation', () => {
     function setupUpdateMode(warnings: Array<{ code: string; message: string }> = []) {
-      vi.mocked(detectUpdateMode).mockReturnValue({
-        isUpdateMode: true,
+      const existingArtifact = {
+        filePath: 'docs/prd.md',
+        content: 'old content',
+        previousDepth: 3 as const,
+        completionTimestamp: '2024-01-01T00:00:00.000Z',
+      }
+      vi.mocked(resolveAssemblyMode).mockReturnValue({
+        mode: 'update',
+        updateDetection: { isUpdateMode: true, currentDepth: 3, existingArtifact, warnings },
+        existingArtifact,
         currentDepth: 3,
-        existingArtifact: {
-          filePath: 'docs/prd.md',
-          content: 'old content',
-          previousDepth: 3,
-          completionTimestamp: '2024-01-01T00:00:00.000Z',
-        },
         warnings,
       })
       vi.mocked(resolveOutputMode).mockReturnValue('interactive')
@@ -877,16 +890,19 @@ describe('run command handler', () => {
     })
 
     it('outputs warnings and proceeds in auto mode with depth downgrade', async () => {
-      vi.mocked(detectUpdateMode).mockReturnValue({
-        isUpdateMode: true,
+      const existingArtifact = {
+        filePath: 'docs/prd.md',
+        content: 'old content',
+        previousDepth: 4 as const,
+        completionTimestamp: '2024-01-01T00:00:00.000Z',
+      }
+      const warnings = [{ code: 'ASM_DEPTH_DOWNGRADE', message: 'Depth downgraded from 4 to 3' }]
+      vi.mocked(resolveAssemblyMode).mockReturnValue({
+        mode: 'update',
+        updateDetection: { isUpdateMode: true, currentDepth: 3, existingArtifact, warnings },
+        existingArtifact,
         currentDepth: 3,
-        existingArtifact: {
-          filePath: 'docs/prd.md',
-          content: 'old content',
-          previousDepth: 4,
-          completionTimestamp: '2024-01-01T00:00:00.000Z',
-        },
-        warnings: [{ code: 'ASM_DEPTH_DOWNGRADE', message: 'Depth downgraded from 4 to 3' }],
+        warnings,
       })
       vi.mocked(resolveOutputMode).mockReturnValue('auto')
 
@@ -896,6 +912,196 @@ describe('run command handler', () => {
         expect.objectContaining({ code: 'ASM_DEPTH_DOWNGRADE' }),
       )
       expect(process.exitCode).toBeUndefined()
+    })
+  })
+
+  describe('adoption mode (brownfield R3)', () => {
+    it('loads the preamble, injects it, and appends adoption knowledge when mode is adoption', async () => {
+      vi.mocked(resolveAssemblyMode).mockReturnValue({
+        mode: 'adoption',
+        updateDetection: { isUpdateMode: false, currentDepth: 3, warnings: [] },
+        currentDepth: 3,
+        warnings: [],
+      })
+      vi.mocked(loadAdoptionPreamble).mockReturnValue({ content: 'ADOPTION PREAMBLE TEXT', warnings: [] })
+      vi.mocked(resolveOutputMode).mockReturnValue('auto')
+
+      await invokeHandler({ step: 'create-prd', _: ['run'], auto: true })
+
+      expect(loadAdoptionPreamble).toHaveBeenCalledWith(PROJECT_ROOT)
+      expect(withAdoptionKnowledge).toHaveBeenCalledWith(expect.any(Array), 'adoption')
+      expect(AssemblyEngine.prototype.assemble).toHaveBeenCalledWith(
+        'create-prd',
+        expect.objectContaining({
+          assemblyMode: 'adoption',
+          adoptionPreamble: 'ADOPTION PREAMBLE TEXT',
+        }),
+      )
+      expect(process.exitCode).toBeUndefined()
+    })
+
+    it('does not load the preamble or mark assemblyMode adoption when mode is fresh', async () => {
+      vi.mocked(resolveOutputMode).mockReturnValue('auto')
+
+      await invokeHandler({ step: 'create-prd', _: ['run'], auto: true })
+
+      expect(loadAdoptionPreamble).not.toHaveBeenCalled()
+      expect(withAdoptionKnowledge).toHaveBeenCalledWith(expect.any(Array), 'fresh')
+      expect(AssemblyEngine.prototype.assemble).toHaveBeenCalledWith(
+        'create-prd',
+        expect.objectContaining({
+          assemblyMode: 'fresh',
+          adoptionPreamble: undefined,
+        }),
+      )
+    })
+
+    it('surfaces loadAdoptionPreamble warnings the same way other warnings are surfaced', async () => {
+      vi.mocked(resolveAssemblyMode).mockReturnValue({
+        mode: 'adoption',
+        updateDetection: { isUpdateMode: false, currentDepth: 3, warnings: [] },
+        currentDepth: 3,
+        warnings: [],
+      })
+      vi.mocked(loadAdoptionPreamble).mockReturnValue({
+        content: null,
+        warnings: [{
+          code: 'ASM_ADOPTION_PREAMBLE_MISSING',
+          message: 'Adoption-mode preamble not found — assembling without it',
+        }],
+      })
+      vi.mocked(resolveOutputMode).mockReturnValue('auto')
+
+      await invokeHandler({ step: 'create-prd', _: ['run'], auto: true })
+
+      expect(mockOutput.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ code: 'ASM_ADOPTION_PREAMBLE_MISSING' }),
+      )
+      expect(AssemblyEngine.prototype.assemble).toHaveBeenCalledWith(
+        'create-prd',
+        expect.objectContaining({ adoptionPreamble: undefined }),
+      )
+    })
+
+    it('prints an adoption-mode info message in interactive mode', async () => {
+      const state = makeState()
+      state['init-mode'] = 'brownfield'
+      vi.mocked(StateManager.prototype.loadState).mockReturnValue(state)
+      vi.mocked(resolveAssemblyMode).mockReturnValue({
+        mode: 'adoption',
+        updateDetection: { isUpdateMode: false, currentDepth: 3, warnings: [] },
+        currentDepth: 3,
+        warnings: [],
+      })
+      vi.mocked(resolveOutputMode).mockReturnValue('interactive')
+      mockOutput.confirm = vi.fn().mockResolvedValue(true)
+
+      await invokeHandler({ step: 'create-prd', _: ['run'] })
+
+      expect(mockOutput.info).toHaveBeenCalledWith(
+        expect.stringContaining('adoption mode (init-mode: brownfield)'),
+      )
+    })
+
+    it('passes expectedOutputs and detect through to resolveAssemblyMode (R1 live-conflict gate)', async () => {
+      const frontmatterWithDetect = makeFrontmatter({
+        outputs: ['docs/prd.md'],
+        detect: { any: [{ path: 'docs/prd.md' }] },
+      })
+      const metaPrompt = makeMetaPrompt({ frontmatter: frontmatterWithDetect })
+      const map = new Map([['create-prd', metaPrompt]])
+      vi.mocked(discoverMetaPrompts).mockReturnValue(map)
+      vi.mocked(discoverAllMetaPrompts).mockReturnValue(map)
+      vi.mocked(resolveOutputMode).mockReturnValue('auto')
+
+      await invokeHandler({ step: 'create-prd', _: ['run'], auto: true })
+
+      expect(resolveAssemblyMode).toHaveBeenCalledWith(
+        expect.objectContaining({
+          step: 'create-prd',
+          expectedOutputs: ['docs/prd.md'],
+          detect: { any: [{ path: 'docs/prd.md' }] },
+        }),
+      )
+    })
+
+    // R3 whole-branch review finding 1: tool/stateless steps must never enter
+    // adoption mode — the adoption preamble ("never propose rewrites of
+    // working code") is wrong for a tool like review-code/review-pr/release.
+    it('passes stateless: true to resolveAssemblyMode for a category: tool step', async () => {
+      const frontmatterTool = makeFrontmatter({ category: 'tool' })
+      const metaPrompt = makeMetaPrompt({ frontmatter: frontmatterTool })
+      const map = new Map([['create-prd', metaPrompt]])
+      vi.mocked(discoverMetaPrompts).mockReturnValue(map)
+      vi.mocked(discoverAllMetaPrompts).mockReturnValue(map)
+      vi.mocked(resolveOutputMode).mockReturnValue('auto')
+
+      await invokeHandler({ step: 'create-prd', _: ['run'], auto: true })
+
+      expect(resolveAssemblyMode).toHaveBeenCalledWith(
+        expect.objectContaining({ stateless: true }),
+      )
+    })
+
+    it('passes stateless: true to resolveAssemblyMode for a stateless: true step', async () => {
+      const frontmatterStateless = makeFrontmatter({ stateless: true })
+      const metaPrompt = makeMetaPrompt({ frontmatter: frontmatterStateless })
+      const map = new Map([['create-prd', metaPrompt]])
+      vi.mocked(discoverMetaPrompts).mockReturnValue(map)
+      vi.mocked(discoverAllMetaPrompts).mockReturnValue(map)
+      vi.mocked(resolveOutputMode).mockReturnValue('auto')
+
+      await invokeHandler({ step: 'create-prd', _: ['run'], auto: true })
+
+      expect(resolveAssemblyMode).toHaveBeenCalledWith(
+        expect.objectContaining({ stateless: true }),
+      )
+    })
+
+    it('passes stateless: false for a normal pipeline step (not scoped to "only the 18")', async () => {
+      await invokeHandler({ step: 'create-prd', _: ['run'], auto: true })
+
+      expect(resolveAssemblyMode).toHaveBeenCalledWith(
+        expect.objectContaining({ stateless: false }),
+      )
+    })
+
+    it('does not inject the adoption preamble for a category: tool step in a brownfield project', async () => {
+      const state = makeState()
+      state['init-mode'] = 'brownfield'
+      vi.mocked(StateManager.prototype.loadState).mockReturnValue(state)
+
+      const frontmatterTool = makeFrontmatter({ category: 'tool' })
+      const metaPrompt = makeMetaPrompt({ frontmatter: frontmatterTool })
+      const map = new Map([['create-prd', metaPrompt]])
+      vi.mocked(discoverMetaPrompts).mockReturnValue(map)
+      vi.mocked(discoverAllMetaPrompts).mockReturnValue(map)
+
+      // Reflects the FIXED resolveAssemblyMode: a stateless/tool step never
+      // resolves to 'adoption', even in a brownfield project (resolveAssemblyMode
+      // itself is unit-tested directly in update-mode.test.ts — this test proves
+      // run.ts wires the resolved mode through without injecting the preamble).
+      vi.mocked(resolveAssemblyMode).mockReturnValue({
+        mode: 'fresh',
+        updateDetection: { isUpdateMode: false, currentDepth: 3, warnings: [] },
+        currentDepth: 3,
+        warnings: [],
+      })
+      vi.mocked(resolveOutputMode).mockReturnValue('auto')
+
+      await invokeHandler({ step: 'create-prd', _: ['run'], auto: true })
+
+      expect(resolveAssemblyMode).toHaveBeenCalledWith(
+        expect.objectContaining({ stateless: true }),
+      )
+      expect(loadAdoptionPreamble).not.toHaveBeenCalled()
+      expect(AssemblyEngine.prototype.assemble).toHaveBeenCalledWith(
+        'create-prd',
+        expect.objectContaining({
+          assemblyMode: 'fresh',
+          adoptionPreamble: undefined,
+        }),
+      )
     })
   })
 

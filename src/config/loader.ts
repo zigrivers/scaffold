@@ -3,6 +3,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import yaml from 'js-yaml'
+import { ExitCode } from '../types/index.js'
 import type { ScaffoldConfig } from '../types/index.js'
 import type { ScaffoldError, ScaffoldWarning } from '../utils/errors.js'
 import { fileExists } from '../utils/fs.js'
@@ -21,7 +22,7 @@ import { ConfigSchema } from './schema.js'
 import { migrateV1 } from './migration.js'
 
 /** Known valid top-level fields in a v2 config. */
-const KNOWN_FIELDS = new Set(['version', 'methodology', 'custom', 'platforms', 'project'])
+const KNOWN_FIELDS = new Set(['version', 'methodology', 'custom', 'platforms', 'project', 'artifact_map'])
 
 /** Valid methodology values. */
 const VALID_METHODOLOGIES = ['deep', 'mvp', 'custom', 'brownfield']
@@ -176,6 +177,33 @@ export function loadConfig(projectRoot: string, knownSteps: string[]): LoadResul
             })
           }
         }
+      }
+    }
+  }
+
+  // D10a: validate artifact_map entries. Unknown step slugs are warnings
+  // (the mapping may target a step added by a newer content version);
+  // absolute or root-escaping paths are hard errors.
+  const artifactMap = obj['artifact_map'] as Record<string, string> | undefined
+  if (artifactMap) {
+    for (const [stepSlug, target] of Object.entries(artifactMap)) {
+      if (knownSteps.length > 0 && !knownSteps.includes(stepSlug)) {
+        warnings.push({
+          code: 'CONFIG_ARTIFACT_MAP_UNKNOWN_STEP',
+          message: `artifact_map references unknown step '${stepSlug}'`,
+          context: { file: configPath, field: 'artifact_map', value: stepSlug },
+        })
+      }
+      if (path.isAbsolute(target) || target.split(/[\\/]/).includes('..')) {
+        errors.push({
+          code: 'CONFIG_ARTIFACT_MAP_PATH_INVALID',
+          message:
+            `artifact_map['${stepSlug}'] must be a project-root-relative path `
+            + `without '..' segments (got '${target}')`,
+          exitCode: ExitCode.ValidationError,
+          recovery: 'Use a relative path inside the project, e.g. CONTRIBUTING.md',
+          context: { file: configPath, field: `artifact_map.${stepSlug}`, value: target },
+        })
       }
     }
   }

@@ -59,6 +59,14 @@ KNOWLEDGE_TEMPLATE_EXEMPT=(
   "review-{artifact}"
 )
 
+# --- knowledge-quality.bats ---
+# Knowledge entries injected by CODE, not referenced from step frontmatter.
+# brownfield-adoption is appended at assembly time for adoption-mode steps
+# (src/core/assembly/knowledge-loader.ts withAdoptionKnowledge — D11).
+CODE_INJECTED_KNOWLEDGE=(
+  "brownfield-adoption"
+)
+
 # --- data-flow.bats ---
 # Phase-ordering reads that are legitimate but not in transitive dependency closure.
 # Format: "reader:target" — reader step reads from target step via sequential execution.

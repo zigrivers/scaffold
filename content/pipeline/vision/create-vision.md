@@ -65,6 +65,20 @@ document. Check for tracking comment: `<!-- scaffold:vision v<ver> <date> -->`.
 - **Conflict resolution**: if update contradicts existing guiding principles,
   surface the conflict to the user before proceeding
 
+## Adoption Mode Specifics
+- **Codify from repo evidence**: positioning evidence only — the README
+  pitch, package or app-store descriptions, and any marketing copy in the
+  repo — as seed material. This step stays interview-led in adoption mode:
+  vision is intent, and code cannot answer intent.
+- **Interview only for**: essentially everything — who it's for,
+  differentiation, and what success looks like — using repo evidence to
+  sharpen the questions ("the README targets X; is that still the
+  audience?") rather than to answer them.
+- **Do not**: reverse-engineer a vision from the code and present it as the
+  user's strategy; treat incumbent marketing copy as validated positioning
+  without confirmation; skip the vision interview because the product
+  already exists.
+
 ## Instructions
 
 I have an idea for an application and I want you to help me create a

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { detectUpdateMode } from './update-mode.js'
+import { detectUpdateMode, resolveAssemblyMode } from './update-mode.js'
 import type { PipelineState } from '../../types/index.js'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -326,5 +326,240 @@ describe('detectUpdateMode', () => {
     expect(result.depthIncreased).toBe(true)
     expect(result.previousDepth).toBe(2)
     expect(result.currentDepth).toBe(4)
+  })
+})
+
+describe('resolveAssemblyMode (D3 matrix + D10a)', () => {
+  function brownfieldState(steps: PipelineState['steps'] = {}): PipelineState {
+    return { ...makeState(steps), 'init-mode': 'brownfield' }
+  }
+
+  it('completed + verification declared + artifact on disk → update', () => {
+    fs.mkdirSync(path.join(tmpDir, 'docs'), { recursive: true })
+    fs.writeFileSync(path.join(tmpDir, 'docs/prd.md'), '# PRD')
+    const state = makeState({
+      'create-prd': {
+        status: 'completed', source: 'pipeline', at: '2024-01-01T00:00:00.000Z',
+        produces: ['docs/prd.md'], depth: 3,
+        verification: 'declared',
+      },
+    })
+    const result = resolveAssemblyMode({ step: 'create-prd', state, currentDepth: 3, projectRoot: tmpDir })
+    expect(result.mode).toBe('update')
+    expect(result.existingArtifact?.filePath).toBe('docs/prd.md')
+  })
+
+  it('completed + verification unverified → fresh (matrix "else"), no update warnings leak', () => {
+    fs.mkdirSync(path.join(tmpDir, 'docs'), { recursive: true })
+    fs.writeFileSync(path.join(tmpDir, 'docs/prd.md'), '# PRD')
+    const state = brownfieldState({
+      'create-prd': {
+        status: 'completed', source: 'pipeline', produces: ['docs/prd.md'], depth: 5,
+        verification: 'unverified',
+      },
+    })
+    const result = resolveAssemblyMode({ step: 'create-prd', state, currentDepth: 3, projectRoot: tmpDir })
+    expect(result.mode).toBe('fresh')
+    expect(result.warnings).toHaveLength(0)
+  })
+
+  it('completed entry missing verification defaults to unverified → fresh (R1: absent ≡ unverified)', () => {
+    fs.mkdirSync(path.join(tmpDir, 'docs'), { recursive: true })
+    fs.writeFileSync(path.join(tmpDir, 'docs/prd.md'), '# PRD')
+    const state = makeState({
+      'create-prd': {
+        status: 'completed', source: 'pipeline', produces: ['docs/prd.md'], depth: 3,
+      },
+    })
+    const result = resolveAssemblyMode({ step: 'create-prd', state, currentDepth: 3, projectRoot: tmpDir })
+    expect(result.mode).toBe('fresh')
+  })
+
+  it('not completed + init-mode brownfield → adoption', () => {
+    const state = brownfieldState({
+      'tech-stack': { status: 'pending', source: 'pipeline', produces: ['docs/tech-stack.md'] },
+    })
+    const result = resolveAssemblyMode({ step: 'tech-stack', state, currentDepth: 3, projectRoot: tmpDir })
+    expect(result.mode).toBe('adoption')
+  })
+
+  it('not completed + init-mode v1-migration → adoption', () => {
+    const state = { ...makeState({}), 'init-mode': 'v1-migration' as const }
+    const result = resolveAssemblyMode({ step: 'tech-stack', state, currentDepth: 3, projectRoot: tmpDir })
+    expect(result.mode).toBe('adoption')
+  })
+
+  it('not completed + init-mode greenfield → fresh', () => {
+    const state = makeState({})
+    const result = resolveAssemblyMode({ step: 'tech-stack', state, currentDepth: 3, projectRoot: tmpDir })
+    expect(result.mode).toBe('fresh')
+  })
+
+  it('completed verified + own output missing + mapped incumbent present → update with mapped prior artifact', () => {
+    fs.writeFileSync(path.join(tmpDir, 'CONTRIBUTING.md'), '# House rules\n')
+    const state = brownfieldState({
+      'coding-standards': {
+        status: 'completed', source: 'pipeline', at: '2026-07-19T00:00:00.000Z',
+        produces: ['docs/coding-standards.md'], depth: 3,
+        verification: 'verified',
+      },
+    })
+    const result = resolveAssemblyMode({
+      step: 'coding-standards', state, currentDepth: 3, projectRoot: tmpDir,
+      artifactMap: { 'coding-standards': 'CONTRIBUTING.md' },
+    })
+    expect(result.mode).toBe('update')
+    expect(result.existingArtifact?.filePath).toBe('CONTRIBUTING.md')
+    expect(result.existingArtifact?.content).toContain('House rules')
+  })
+
+  it('own produced artifact wins over the mapped incumbent when both exist', () => {
+    fs.mkdirSync(path.join(tmpDir, 'docs'), { recursive: true })
+    fs.writeFileSync(path.join(tmpDir, 'docs/coding-standards.md'), '# Own doc')
+    fs.writeFileSync(path.join(tmpDir, 'CONTRIBUTING.md'), '# Incumbent')
+    const state = makeState({
+      'coding-standards': {
+        status: 'completed', source: 'pipeline', produces: ['docs/coding-standards.md'], depth: 3,
+        verification: 'declared',
+      },
+    })
+    const result = resolveAssemblyMode({
+      step: 'coding-standards', state, currentDepth: 3, projectRoot: tmpDir,
+      artifactMap: { 'coding-standards': 'CONTRIBUTING.md' },
+    })
+    expect(result.mode).toBe('update')
+    expect(result.existingArtifact?.filePath).toBe('docs/coding-standards.md')
+  })
+
+  // R1 carry-forward amendment (LIVE conflict gate) — see task-3-brief.md AMENDMENT block.
+  it('completed + declared but LIVE detect fails (output present) → adoption in brownfield', () => {
+    fs.mkdirSync(path.join(tmpDir, 'docs'), { recursive: true })
+    fs.writeFileSync(path.join(tmpDir, 'docs/tech-stack.md'), '# stack')
+    const state = brownfieldState({
+      'tech-stack': {
+        status: 'completed', source: 'pipeline', at: '2026-07-19T00:00:00.000Z',
+        produces: ['docs/tech-stack.md'], depth: 3, verification: 'declared',
+      },
+    })
+    const result = resolveAssemblyMode({
+      step: 'tech-stack', state, currentDepth: 3, projectRoot: tmpDir,
+      expectedOutputs: ['docs/tech-stack.md'], detect: { all: [{ cmd: 'exit 1' }] },
+    })
+    expect(result.mode).toBe('adoption')
+  })
+
+  it('completed + verified but LIVE detect fails → fresh in greenfield', () => {
+    fs.mkdirSync(path.join(tmpDir, 'docs'), { recursive: true })
+    fs.writeFileSync(path.join(tmpDir, 'docs/tech-stack.md'), '# stack')
+    const state = makeState({
+      'tech-stack': {
+        status: 'completed', source: 'pipeline', at: '2026-07-19T00:00:00.000Z',
+        produces: ['docs/tech-stack.md'], depth: 3, verification: 'verified',
+      },
+    })
+    const result = resolveAssemblyMode({
+      step: 'tech-stack', state, currentDepth: 3, projectRoot: tmpDir,
+      expectedOutputs: ['docs/tech-stack.md'], detect: { all: [{ cmd: 'exit 1' }] },
+    })
+    expect(result.mode).toBe('fresh')
+  })
+
+  it('completed + declared but output deleted → adoption in brownfield (live check routes, not fresh)', () => {
+    const state = brownfieldState({
+      'tech-stack': {
+        status: 'completed', source: 'pipeline', at: '2026-07-19T00:00:00.000Z',
+        produces: ['docs/tech-stack.md'], depth: 3, verification: 'declared',
+      },
+    })
+    const result = resolveAssemblyMode({
+      step: 'tech-stack', state, currentDepth: 3, projectRoot: tmpDir,
+      expectedOutputs: ['docs/tech-stack.md'],
+    })
+    expect(result.mode).toBe('adoption')
+  })
+
+  // R3 whole-branch review finding 1: a stateless/tool step has no completion
+  // to adopt and must never resolve to 'adoption' — even in a brownfield
+  // project where a non-tool pending step legitimately routes to adoption.
+  it('stateless: true + not completed + init-mode brownfield → fresh, NOT adoption', () => {
+    const state = brownfieldState({
+      'review-code': { status: 'pending', source: 'pipeline', produces: [] },
+    })
+    const result = resolveAssemblyMode({
+      step: 'review-code', state, currentDepth: 3, projectRoot: tmpDir, stateless: true,
+    })
+    expect(result.mode).toBe('fresh')
+  })
+
+  it('a non-tool pending step (stateless omitted) still resolves to adoption in brownfield', () => {
+    const state = brownfieldState({
+      'tech-stack': { status: 'pending', source: 'pipeline', produces: ['docs/tech-stack.md'] },
+    })
+    const result = resolveAssemblyMode({
+      step: 'tech-stack', state, currentDepth: 3, projectRoot: tmpDir,
+    })
+    expect(result.mode).toBe('adoption')
+  })
+
+  // MMR round-2 (PR #786) finding: the D10a mapped-incumbent fallback was not
+  // gated on service scope, so a ROOT artifact_map entry could wrongly supply
+  // a root document as the prior artifact for a `--service` run even though
+  // R3's artifact_map is root-only (mirrors the `options.service === undefined`
+  // gate already on the live-conflict check above).
+  it('D10a mapped-incumbent fallback is service-gated: a --service run does NOT use the root mapping', () => {
+    fs.writeFileSync(path.join(tmpDir, 'CONTRIBUTING.md'), '# House rules\n')
+    const state = brownfieldState({
+      'coding-standards': {
+        status: 'completed', source: 'pipeline', at: '2026-07-19T00:00:00.000Z',
+        produces: ['docs/coding-standards.md'], depth: 3,
+        verification: 'verified',
+      },
+    })
+    const result = resolveAssemblyMode({
+      step: 'coding-standards', state, currentDepth: 3, projectRoot: tmpDir,
+      artifactMap: { 'coding-standards': 'CONTRIBUTING.md' },
+      service: 'api',
+    })
+    expect(result.mode).not.toBe('update')
+    expect(result.existingArtifact).toBeUndefined()
+  })
+
+  it('D10a mapped-incumbent fallback still updates from the mapped file with no service (no regression)', () => {
+    fs.writeFileSync(path.join(tmpDir, 'CONTRIBUTING.md'), '# House rules\n')
+    const state = brownfieldState({
+      'coding-standards': {
+        status: 'completed', source: 'pipeline', at: '2026-07-19T00:00:00.000Z',
+        produces: ['docs/coding-standards.md'], depth: 3,
+        verification: 'verified',
+      },
+    })
+    const result = resolveAssemblyMode({
+      step: 'coding-standards', state, currentDepth: 3, projectRoot: tmpDir,
+      artifactMap: { 'coding-standards': 'CONTRIBUTING.md' },
+    })
+    expect(result.mode).toBe('update')
+    expect(result.existingArtifact?.filePath).toBe('CONTRIBUTING.md')
+  })
+
+  // MMR round-2 (PR #786) finding: the D10a mapped-incumbent fallback
+  // hardcoded `warnings: []` and never computed the depth-downgrade warning
+  // that run.ts reads to drive its depth-downgrade confirmation gate.
+  it('D10a mapped-incumbent fallback preserves depth-downgrade warnings (does not hardcode warnings: [])', () => {
+    fs.writeFileSync(path.join(tmpDir, 'CONTRIBUTING.md'), '# House rules\n')
+    const state = brownfieldState({
+      'coding-standards': {
+        status: 'completed', source: 'pipeline', at: '2026-07-19T00:00:00.000Z',
+        produces: ['docs/coding-standards.md'], depth: 5,
+        verification: 'verified',
+      },
+    })
+    const result = resolveAssemblyMode({
+      step: 'coding-standards', state, currentDepth: 3, projectRoot: tmpDir,
+      artifactMap: { 'coding-standards': 'CONTRIBUTING.md' },
+    })
+    expect(result.mode).toBe('update')
+    expect(result.existingArtifact?.filePath).toBe('CONTRIBUTING.md')
+    expect(result.warnings.some(w => w.code === 'ASM_DEPTH_DOWNGRADE')).toBe(true)
+    expect(result.depthIncreased).toBe(false)
   })
 })

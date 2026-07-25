@@ -3,17 +3,21 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import { loadPipelineContext } from '../core/pipeline/context.js'
 import { resolvePipeline } from '../core/pipeline/resolver.js'
+import { resolveDepth } from '../core/assembly/depth-resolver.js'
+import { resolveAssemblyMode } from '../core/assembly/update-mode.js'
 import { StateManager } from '../state/state-manager.js'
 import { StatePathResolver } from '../state/state-path-resolver.js'
 import { verifyStep } from '../state/completion.js'
 import type { DetectCheckResult, StepVerification } from '../state/completion.js'
+import { proposeMapCandidates } from '../ingestion/map-candidates.js'
 import { TYPE_KEY } from './adopt.js'
 import type { AdoptionResult } from './adopt.js'
 import { buildOpsActions, renderOpsActionsSection, type OpsActionRecord } from './adoption-ops-actions.js'
 import type { MethodologyName, PipelineState, ScaffoldError } from '../types/index.js'
 import type { ScaffoldConfig, StepEnablementEntry } from '../types/config.js'
 
-export type AdoptionDisposition = 'done-verified' | 'conflict' | 'run' | 'skip-proposed' | 'undetectable'
+export type AdoptionDisposition =
+  'done-verified' | 'conflict' | 'run' | 'skip-proposed' | 'undetectable' | 'map-candidate'
 export type ApplyAction = 'mark-completed' | 'reopen-pending' | 'record-pending' | 'none'
 
 export interface StepPlanRecord {
@@ -24,6 +28,10 @@ export interface StepPlanRecord {
   detect_checks: DetectCheckResult[]
   outputs_present: string[]
   outputs_missing: string[]
+  /** Proposed artifact_map target (D10). Present iff disposition === 'map-candidate'. */
+  target?: string
+  /** Resolved assembly mode (§6.1). Present iff disposition === 'run'. */
+  mode?: 'fresh' | 'update' | 'adoption'
 }
 
 export interface InitializeRecord {
@@ -171,6 +179,10 @@ export function buildAdoptionPlan(options: {
 
   const records: StepPlanRecord[] = []
   const disabled: string[] = []
+  // D10 (R3): steps whose verification already reads verified/declared-complete
+  // are "satisfied" — never offered as a map-candidate target, matching
+  // proposeMapCandidates' own contract (Task 8).
+  const satisfiedSteps = new Set<string>()
   for (const [slug, mp] of context.metaPrompts.entries()) {
     if (mp.frontmatter.stateless) continue  // no completion state — nothing to adopt
     if (pipeline.overlay.steps[slug]?.enabled !== true) {
@@ -180,7 +192,11 @@ export function buildAdoptionPlan(options: {
     const entry = state?.steps[slug]
     const verification = verifyStep(
       slug, entry, mp.frontmatter.outputs ?? [], mp.frontmatter.detect ?? null, projectRoot,
+      context.config?.artifact_map,
     )
+    if (verification.verification === 'verified' || verification.verification === 'declared') {
+      satisfiedSteps.add(slug)
+    }
     const mapped = dispositionFor(verification)
     records.push({
       step_slug: slug,
@@ -194,6 +210,51 @@ export function buildAdoptionPlan(options: {
   }
   records.sort((a, b) => a.step_slug.localeCompare(b.step_slug))
   disabled.sort()
+
+  // D10 (R3): propose artifact_map candidates for unsatisfied, unmapped steps.
+  // A candidate outranks a plain `run` disposition but never overrides
+  // done-verified/conflict/undetectable — those rows are left untouched. The
+  // target flows into the record the plan_key hashes, so a different proposed
+  // target forces re-approval.
+  const mapCandidates = proposeMapCandidates({
+    projectRoot,
+    resolvedSteps: records.map((r) => r.step_slug),
+    satisfiedSteps,
+    existingMap: context.config?.artifact_map ?? {},
+  })
+  for (const candidate of mapCandidates) {
+    const record = records.find((r) => r.step_slug === candidate.step)
+    // Intentionally conservative: a candidate may only override a plain `run`
+    // row. A state-claim conflict can report verification: 'unverified' (same
+    // level as an untouched step), so satisfiedSteps alone would not exclude
+    // it above — this exact equality check is what keeps conflict/done/
+    // undetectable rows from ever being masked.
+    if (record !== undefined && record.disposition === 'run') {
+      record.disposition = 'map-candidate'
+      record.target = candidate.target
+    }
+  }
+
+  // §6.1 (R3): annotate remaining `run` rows with the resolved assembly mode.
+  // First-touch (state === null — the primary D2 brownfield entry has no
+  // .scaffold/ yet): there is no per-step PipelineState to hand
+  // resolveAssemblyMode (which requires a non-null state), so the mode is
+  // derived from the plan's own init-mode instead — there is no per-step
+  // history to consult on first touch anyway.
+  for (const record of records) {
+    if (record.disposition !== 'run') continue
+    if (state === null) {
+      record.mode = adoptResult.mode === 'brownfield' || adoptResult.mode === 'v1-migration'
+        ? 'adoption' : 'fresh'
+      continue
+    }
+    const { depth: currentDepth } = resolveDepth(record.step_slug, planConfig, pipeline.preset)
+    const modeResult = resolveAssemblyMode({
+      step: record.step_slug, state, currentDepth, projectRoot,
+      artifactMap: context.config?.artifact_map,
+    })
+    record.mode = modeResult.mode
+  }
 
   const initialize: InitializeRecord | null = stateExists ? null : {
     config: { version: 2, methodology, platforms, project: baseProject },
@@ -232,6 +293,17 @@ export function buildAdoptionPlan(options: {
   }
 }
 
+/** Human-readable disposition cell (§6.1): annotates map-candidate and run rows. */
+function renderDisposition(record: StepPlanRecord): string {
+  if (record.disposition === 'map-candidate' && record.target !== undefined) {
+    return `map-candidate → ${record.target}   (accept: --apply writes artifact_map.${record.step_slug})`
+  }
+  if (record.disposition === 'run' && record.mode !== undefined) {
+    return `run — ${record.mode} mode`
+  }
+  return record.disposition
+}
+
 export function renderPlanMarkdown(plan: AdoptionPlan): string {
   const lines: string[] = []
   lines.push('# Adoption Plan')
@@ -265,7 +337,7 @@ export function renderPlanMarkdown(plan: AdoptionPlan): string {
       evidence.push(`${check.kind} \`${check.target}\`: ${check.passed ? 'pass' : 'fail'}`)
     }
     lines.push(
-      `| ${record.step_slug} | ${record.disposition} | ${record.apply_action} | ${evidence.join('; ') || '—'} |`,
+      `| ${record.step_slug} | ${renderDisposition(record)} | ${record.apply_action} | ${evidence.join('; ') || '—'} |`,
     )
   }
   lines.push('')

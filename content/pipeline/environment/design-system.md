@@ -76,3 +76,20 @@ theme config file customizations.
 - **Conflict resolution**: if a new component pattern conflicts with existing
   token usage, extend the token set rather than modifying existing values;
   always verify WCAG AA compliance after any color changes
+
+## Adoption Mode Specifics
+- **Codify from repo evidence**: the visual language already shipped —
+  existing token sources (tailwind.config, CSS custom properties, theme
+  files), the fonts and color values in actual use, and recurring component
+  patterns in the UI code. The document names what exists before proposing
+  anything.
+- **Interview only for**: which current visuals are intentional brand
+  decisions versus accidents — this is the one step where the user may want
+  change, but every change is opt-in per token, never assumed.
+- **Ingest with provenance**: fold incumbent token definitions into the
+  design-system doc with provenance annotations; record WCAG contrast
+  measurements of the existing palette as findings, not as automatic
+  changes.
+- **Do not**: restyle working UI; introduce a parallel token system when one
+  exists (extend the incumbent scale); swap fonts or palette values without
+  explicit approval.

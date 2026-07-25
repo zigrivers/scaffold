@@ -4,6 +4,53 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.50.0] - 2026-07-25
+
+Brownfield adoption, Tier B — **Adoption Mode**. Makes pipeline content
+itself brownfield-native: steps with no surviving completion now assemble
+with adoption-specific guidance instead of greenfield prompts, and existing
+documents can satisfy a step outright through an explicit mapping.
+
+### Added
+
+- **Adoption mode (D11).** A third assembly mode alongside fresh/update.
+  Steps with no surviving scaffold completion in a project with
+  `init-mode: brownfield` (or `v1-migration`) now assemble with a global
+  adoption-mode preamble (`content/modes/adoption.md`: read the repo first,
+  extract facts with evidence, interview only for intent gaps, never propose
+  rewrites of working code), per-step `## Adoption Mode Specifics` blocks on
+  the initial 18 adoption-capable steps, and an automatically injected
+  `brownfield-adoption` knowledge entry. This completes the `init-mode`
+  staging announced in R1 — the field now changes prompt content.
+- **`artifact_map` (D10a).** `.scaffold/config.yml` can map a step slug to
+  an existing project-root-relative file (`coding-standards:
+  CONTRIBUTING.md`). It's a fallback only, checked when the step's own
+  declared outputs are absent: a mapped incumbent satisfies the all-outputs
+  requirement and stands in as the prior artifact for update mode, but the
+  step's `detect:` contract still runs and still gates `verified` — a
+  mapping can never manufacture a false `verified`. `README.md` is never a
+  map candidate. The adoption plan proposes mappings as `map-candidate`
+  dispositions (the target path is folded into `plan_key`, so changing a
+  proposed target forces re-approval); `adopt --apply` writes approved
+  mappings into `artifact_map` and re-verifies honestly.
+- **Ingestion framework (D10b).** `src/ingestion/` generalizes R2's gate
+  seeding into a reusable incumbent inventory (lint configs, CI workflows,
+  test configs, compose files, docs) that both proposes `map-candidate`
+  targets and feeds the per-step translate-with-provenance guidance.
+- **Plan annotation.** `run` dispositions in the adoption plan now carry the
+  resolved mode (e.g. `run — adoption mode`).
+
+### Changed
+
+- **Live-conflict gate now routes through adoption, not just fresh (D3/D11).**
+  A stored completion must still survive a live check — matching declared
+  outputs on disk plus a passing `detect:` — before it can drive update
+  mode; a completion whose outputs are gone or whose `detect:` now fails is
+  conflicted. Previously a conflicted step in a brownfield project fell
+  straight through to fresh assembly (adoption mode didn't exist yet); it
+  now re-enters adoption mode when `init-mode` is `brownfield` or
+  `v1-migration`, and falls back to fresh only otherwise.
+
 ## [3.49.0] - 2026-07-24
 
 Brownfield adoption, Tier C — **Ops Last-Mile**. Turns R1's propose-then-apply

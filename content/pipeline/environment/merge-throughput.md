@@ -106,6 +106,20 @@ upstream contracts changed.
   with the enqueue flow only on explicit confirmation (merge-slot remains
   documented as the no-component fallback)
 
+## Adoption Mode Specifics
+- **Codify from repo evidence**: the merge pressure that actually exists —
+  open-PR count, merges per day from
+  `git log --merges --since='2 weeks ago' --oneline`, and the measured gate
+  duration from CI logs or a timed local `make check`. Install the queue
+  because the measured cadence needs it, never because the step exists.
+- **Interview only for**: expected concurrent agents going forward (3+ is
+  the signal; solo cadence keeps `bd merge-slot`), and which suites are
+  environment-sensitive and must be excluded from the queue gate.
+- **Do not**: enqueue-gate suites the local environment cannot run
+  deterministically (the visual-regression lesson); replace an incumbent CI
+  merge gate without documenting the division of responsibility between it
+  and the local queue; install the queue speculatively on a solo project.
+
 ## Instructions
 
 ### 1. Decide the gate executor

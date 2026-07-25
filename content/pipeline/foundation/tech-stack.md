@@ -75,3 +75,21 @@ under docs/reviews/tech-stack/, preserve prior recommendation dispositions.
 - **Conflict resolution**: if a new requirement conflicts with an existing
   technology choice, document the conflict and propose alternatives with
   migration cost — never silently swap a technology
+
+## Adoption Mode Specifics
+- **Codify from repo evidence**: the stack as-installed — languages and
+  versions from lockfiles (package-lock.json / pnpm-lock.yaml / poetry.lock /
+  go.mod / Cargo.toml), frameworks and databases from actual imports and
+  config files, hosting and deploy targets from infra manifests (Dockerfile,
+  fly.toml, vercel.json, .github/workflows). Record versions from lockfile
+  evidence, never from memory or the README.
+- **Interview only for**: planned migrations or upgrades, known pain points
+  with current choices, deploy-target intent the manifests don't show, and
+  constraints on adding new dependencies.
+- **Ingest with provenance**: translate the dependency manifest into the
+  Quick Reference section with a provenance annotation; competitive-analysis
+  sections cover only genuinely open decisions, never already-made ones.
+- **Do not**: propose replacing any working technology, or present
+  alternatives for choices the codebase has already made — document each
+  incumbent choice as a decision with its observed rationale, and record any
+  concern as a gap, not a migration plan.

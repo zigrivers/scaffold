@@ -72,3 +72,19 @@ existing decisions unless explicitly revisiting them.
 - **Conflict resolution**: if a new feature introduces an entity name that
   conflicts with existing ubiquitous language, resolve by renaming the new
   entity and documenting the distinction; never silently merge aggregates
+
+## Adoption Mode Specifics
+- **Codify from repo evidence**: the domain the code already speaks —
+  entities from the database schema and migrations, model/type definitions,
+  API resource names, and event names in the codebase. The ubiquitous
+  language starts from the names in the code; the model documents what those
+  names mean and how they relate, with file-path evidence per entity.
+- **Interview only for**: invariants the code cannot express (business
+  rules enforced socially or not at all), mismatches between code names and
+  the words the team actually uses, and which aggregates are load-bearing
+  versus vestigial.
+- **Do not**: rename existing code concepts to fit textbook DDD vocabulary
+  (document the mapping between code name and team term instead); model
+  aspirational entities with no code or story evidence; declare aggregate
+  boundaries the persistence layer contradicts without flagging the
+  conflict.

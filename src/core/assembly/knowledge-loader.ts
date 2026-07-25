@@ -1,5 +1,6 @@
 import type { KnowledgeEntry } from '../../types/index.js'
 import type { ScaffoldWarning } from '../../types/index.js'
+import type { AssemblyMode } from '../../types/index.js'
 import { fileExists } from '../../utils/fs.js'
 import yaml from 'js-yaml'
 import fs from 'node:fs'
@@ -329,6 +330,20 @@ export function loadEntries(
   }
 
   return { entries, warnings }
+}
+
+/** Knowledge entry injected for adoption-mode steps (brownfield R3, D11). */
+export const ADOPTION_KNOWLEDGE_ENTRY = 'brownfield-adoption'
+
+/**
+ * Append the brownfield-adoption knowledge entry when assembling in
+ * adoption mode. Pure; never mutates the input; dedupes.
+ */
+export function withAdoptionKnowledge(names: string[], mode: AssemblyMode): string[] {
+  if (mode !== 'adoption') return names
+  return names.includes(ADOPTION_KNOWLEDGE_ENTRY)
+    ? names
+    : [...names, ADOPTION_KNOWLEDGE_ENTRY]
 }
 
 /**

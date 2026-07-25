@@ -3,13 +3,15 @@ import fs from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import type { PipelineState, StepStateEntry, VerificationLevel } from '../types/index.js'
 import type { DetectSpec, DetectCheck } from '../types/frontmatter.js'
-import { fileExists } from '../utils/fs.js'
+import { fileExists, isFile } from '../utils/fs.js'
 import { resolveContainedArtifactPath } from '../utils/artifact-path.js'
 
 export interface CompletionResult {
   complete: boolean
   artifactsPresent: string[]
   artifactsMissing: string[]
+  /** Set when an artifact_map mapping (not the step's own outputs) satisfied completion. */
+  mappedArtifactUsed?: string
 }
 
 export interface CrashRecoveryAction {
@@ -25,7 +27,11 @@ export function detectCompletion(
   expectedOutputs: string[],
   projectRoot: string,
   service?: string,
+  artifactMap?: Record<string, string>,
+  globalSteps?: ReadonlySet<string>,
 ): CompletionResult {
+  // Own outputs win over a mapped incumbent (mirrors verifyStep's own-first
+  // ordering) — check the step's own declared outputs first.
   const artifactsPresent: string[] = []
   const artifactsMissing: string[] = []
 
@@ -39,8 +45,39 @@ export function detectCompletion(
     }
   }
 
+  if (artifactsMissing.length === 0) {
+    return {
+      complete: true,
+      artifactsPresent,
+      artifactsMissing,
+    }
+  }
+
+  // D10a (R3): an existing mapped incumbent satisfies the all-outputs
+  // requirement (fallback only — own outputs were checked first). A stale
+  // mapping (file gone) or one that escapes the project root falls through
+  // to the normal all-outputs result below — a broken mapping must not
+  // silently verify. artifact_map is a ROOT-level mapping (R3 scope:
+  // root-only) — it may only satisfy a root-scoped or global-step check, so
+  // it is skipped entirely for a service-local step (mirrors
+  // applyConflictOverrides's `!isServiceLocal` gate on the same fallback).
+  const isServiceLocal = service !== undefined && !(globalSteps?.has(step) ?? false)
+  const mapped = !isServiceLocal ? artifactMap?.[step] : undefined
+  if (mapped !== undefined) {
+    // Mapped incumbent must be a FILE, not a directory (matches resolveAssemblyMode).
+    const mappedFull = resolveContainedArtifactPath(projectRoot, mapped)
+    if (mappedFull !== null && isFile(mappedFull)) {
+      return {
+        complete: true,
+        artifactsPresent: [mapped],
+        artifactsMissing: [],
+        mappedArtifactUsed: mapped,
+      }
+    }
+  }
+
   return {
-    complete: artifactsMissing.length === 0,
+    complete: false,
     artifactsPresent,
     artifactsMissing,
   }
@@ -51,6 +88,7 @@ export function checkCompletion(
   step: string,
   state: PipelineState,
   projectRoot: string,
+  artifactMap?: Record<string, string>,
 ): {
   status: 'confirmed_complete' | 'likely_complete' | 'conflict' | 'incomplete'
   presentArtifacts: string[]
@@ -72,7 +110,23 @@ export function checkCompletion(
     }
   }
 
-  const allPresent = missingArtifacts.length === 0
+  // D10a (R3): an existing mapped incumbent satisfies the all-outputs
+  // requirement (fallback only — the step's own outputs were checked first).
+  let allPresent = missingArtifacts.length === 0
+  if (!allPresent) {
+    const mapped = artifactMap?.[step]
+    if (mapped !== undefined) {
+      // Mapped incumbent must be a FILE (matches resolveAssemblyMode). When it
+      // satisfies, reflect it in the evidence arrays so a confirmed_complete
+      // result is not contradicted by a still-populated missingArtifacts.
+      const mappedFull = resolveContainedArtifactPath(projectRoot, mapped)
+      if (mappedFull !== null && isFile(mappedFull)) {
+        allPresent = true
+        presentArtifacts.push(mapped)
+        missingArtifacts.length = 0
+      }
+    }
+  }
 
   if (stateCompleted && allPresent) {
     return { status: 'confirmed_complete', presentArtifacts, missingArtifacts }
@@ -201,6 +255,7 @@ export function verifyStep(
   expectedOutputs: string[],
   detect: DetectSpec | null | undefined,
   projectRoot: string,
+  artifactMap?: Record<string, string>,
 ): StepVerification {
   const outputsPresent: string[] = []
   const outputsMissing: string[] = []
@@ -210,6 +265,20 @@ export function verifyStep(
       outputsPresent.push(output)
     } else {
       outputsMissing.push(output)
+    }
+  }
+  // D10a (R3): an existing mapped incumbent satisfies the all-outputs
+  // requirement (fallback only — the step's own outputs were checked first).
+  // Mapping NEVER bypasses detect: detectResult still gates 'verified' below.
+  const mapped = artifactMap?.[step]
+  if (outputsMissing.length > 0 && mapped !== undefined) {
+    // A mapped incumbent must be a FILE (a doc), never a directory — matching
+    // resolveAssemblyMode's `.isFile()` check so the two paths agree and a
+    // mapping to a directory never marks a step verified.
+    const mappedFull = resolveContainedArtifactPath(projectRoot, mapped)
+    if (mappedFull !== null && isFile(mappedFull)) {
+      outputsPresent.push(mapped)
+      outputsMissing.length = 0
     }
   }
   const detectResult = runDetect(detect, projectRoot)
@@ -275,6 +344,12 @@ export function verifyStep(
  * missing service file and report a broken step as complete. Global steps
  * (present in `globalSteps`) and callers that omit `service` stay unprefixed,
  * identical to today's behavior.
+ *
+ * `artifactMap`, when supplied (D10a, R3), mirrors `verifyStep`'s fallback: a
+ * step whose declared outputs are missing but whose `artifact_map[slug]`
+ * incumbent exists on disk is NOT demoted here. This stays fs-only (no
+ * detect: cmds) like the rest of this function — mapping only ever
+ * substitutes for the outputs-presence check.
  */
 export function applyConflictOverrides(
   steps: Record<string, StepStateEntry>,
@@ -282,6 +357,7 @@ export function applyConflictOverrides(
   resolvedOutputs?: (slug: string) => string[] | undefined,
   service?: string,
   globalSteps?: ReadonlySet<string>,
+  artifactMap?: Record<string, string>,
 ): { steps: Record<string, StepStateEntry>; conflicts: string[] } {
   const conflicts: string[] = []
   let overridden: Record<string, StepStateEntry> | null = null
@@ -292,11 +368,25 @@ export function applyConflictOverrides(
     const outputs = resolvedOutputs?.(slug) ?? entry.produces ?? []
     if (outputs.length === 0) continue
     const isServiceLocal = service !== undefined && !(globalSteps?.has(slug) ?? false)
-    const anyMissing = outputs.some((output) => {
+    let anyMissing = outputs.some((output) => {
       const relPath = isServiceLocal ? path.join('services', service, output) : output
       const fullPath = resolveContainedArtifactPath(projectRoot, relPath)
       return fullPath === null || !fileExists(fullPath)
     })
+    // artifact_map is a ROOT-level mapping (R3 scope: root-only). It may only
+    // satisfy a root-scoped check — for a service-local step the mapped root
+    // incumbent must NOT mask a genuinely-missing services/<svc>/ artifact, or
+    // `scaffold status --service <svc>` would report a false completion (mirrors
+    // resolveAssemblyMode's `service === undefined` guard on the same fallback).
+    if (anyMissing && !isServiceLocal) {
+      const mapped = artifactMap?.[slug]
+      if (mapped !== undefined) {
+        // Mapped incumbent must be a FILE, not a directory (matches
+        // resolveAssemblyMode/verifyStep/detectCompletion/checkCompletion).
+        const mappedFull = resolveContainedArtifactPath(projectRoot, mapped)
+        if (mappedFull !== null && isFile(mappedFull)) anyMissing = false
+      }
+    }
     if (!anyMissing) continue
     conflicts.push(slug)
     if (overridden === null) overridden = { ...steps }

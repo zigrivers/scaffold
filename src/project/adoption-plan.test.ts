@@ -177,3 +177,150 @@ describe('computePlanKey canonicalization', () => {
     expect(a).toMatch(/^[0-9a-f]{64}$/)
   })
 })
+
+describe('map-candidate disposition (R3, D10)', () => {
+  it('renders a map-candidate row when an incumbent matches an unsatisfied step', () => {
+    const dir = makeRepo()
+    fs.writeFileSync(path.join(dir, 'CONTRIBUTING.md'), '# contributing\n')
+    const { plan } = buildAdoptionPlan({ projectRoot: dir, adoptResult: brownfieldResult() })
+    const row = plan.steps.find((s) => s.step_slug === 'coding-standards')
+    expect(row?.disposition).toBe('map-candidate')
+    expect(row?.target).toBe('CONTRIBUTING.md')
+  })
+
+  it('the map-candidate target participates in plan_key', () => {
+    // Two otherwise-identical fixtures whose only difference is which candidate
+    // path exists for `coding-standards` — CONTRIBUTING.md vs docs/CONTRIBUTING.md
+    // — forces proposeMapCandidates to pick a different target in each. Every
+    // other input to the plan (project files, adoptResult, includes) is identical,
+    // so the ONLY thing that can move plan_key is the map-candidate's target.
+    const dirA = makeRepo()
+    fs.writeFileSync(path.join(dirA, 'CONTRIBUTING.md'), '# a\n')
+    const planA = buildAdoptionPlan({ projectRoot: dirA, adoptResult: brownfieldResult() }).plan
+
+    const dirB = makeRepo()
+    fs.mkdirSync(path.join(dirB, 'docs'), { recursive: true })
+    fs.writeFileSync(path.join(dirB, 'docs', 'CONTRIBUTING.md'), '# b\n')
+    const planB = buildAdoptionPlan({ projectRoot: dirB, adoptResult: brownfieldResult() }).plan
+
+    const rowA = planA.steps.find((s) => s.step_slug === 'coding-standards')
+    const rowB = planB.steps.find((s) => s.step_slug === 'coding-standards')
+    expect(rowA?.target).toBe('CONTRIBUTING.md')
+    expect(rowB?.target).toBe('docs/CONTRIBUTING.md')
+    expect(planA.plan_key).not.toBe(planB.plan_key)
+  })
+
+  it('run rows are annotated with the resolved mode in a brownfield project', () => {
+    const dir = makeRepo()
+    fs.mkdirSync(path.join(dir, '.scaffold'))
+    fs.writeFileSync(path.join(dir, '.scaffold', 'config.yml'),
+      'version: 2\nmethodology: brownfield\nplatforms: [claude-code]\n')
+    fs.writeFileSync(path.join(dir, '.scaffold', 'state.json'), JSON.stringify({
+      'schema-version': 1, 'scaffold-version': '3.0.0',
+      init_methodology: 'brownfield', config_methodology: 'brownfield', 'init-mode': 'brownfield',
+      created: '2026-01-01T00:00:00.000Z', in_progress: null,
+      steps: {},
+      next_eligible: [], 'extra-steps': [],
+    }))
+    const { plan } = buildAdoptionPlan({ projectRoot: dir, adoptResult: brownfieldResult() })
+    const row = plan.steps.find((s) => s.step_slug === 'tech-stack')
+    expect(row?.disposition).toBe('run')
+    expect(row?.mode).toBe('adoption')
+  })
+
+  it('first-touch (no .scaffold/, state=null) annotates run rows adoption from plan.mode', () => {
+    const dir = makeRepo()
+    const { plan } = buildAdoptionPlan({ projectRoot: dir, adoptResult: brownfieldResult() })
+    const row = plan.steps.find((s) => s.step_slug === 'tech-stack')
+    expect(row?.disposition).toBe('run')
+    expect(row?.mode).toBe('adoption')
+  })
+
+  it('the resolved mode participates in plan_key', () => {
+    // Same project, same everything, except init-mode: brownfield (state
+    // present) vs a state whose init-mode is greenfield — resolveAssemblyMode
+    // must annotate 'tech-stack' as 'adoption' in the former and 'fresh' in the
+    // latter, and that mode difference alone must move plan_key.
+    const stateJson = (initMode: 'brownfield' | 'greenfield') => JSON.stringify({
+      'schema-version': 1, 'scaffold-version': '3.0.0',
+      init_methodology: 'brownfield', config_methodology: 'brownfield', 'init-mode': initMode,
+      created: '2026-01-01T00:00:00.000Z', in_progress: null,
+      steps: {},
+      next_eligible: [], 'extra-steps': [],
+    })
+    const dirA = makeRepo()
+    fs.mkdirSync(path.join(dirA, '.scaffold'))
+    fs.writeFileSync(path.join(dirA, '.scaffold', 'config.yml'),
+      'version: 2\nmethodology: brownfield\nplatforms: [claude-code]\n')
+    fs.writeFileSync(path.join(dirA, '.scaffold', 'state.json'), stateJson('brownfield'))
+    const planA = buildAdoptionPlan({ projectRoot: dirA, adoptResult: brownfieldResult() }).plan
+
+    const dirB = makeRepo()
+    fs.mkdirSync(path.join(dirB, '.scaffold'))
+    fs.writeFileSync(path.join(dirB, '.scaffold', 'config.yml'),
+      'version: 2\nmethodology: brownfield\nplatforms: [claude-code]\n')
+    fs.writeFileSync(path.join(dirB, '.scaffold', 'state.json'), stateJson('greenfield'))
+    const planB = buildAdoptionPlan({ projectRoot: dirB, adoptResult: brownfieldResult() }).plan
+
+    const rowA = planA.steps.find((s) => s.step_slug === 'tech-stack')
+    const rowB = planB.steps.find((s) => s.step_slug === 'tech-stack')
+    expect(rowA?.mode).toBe('adoption')
+    expect(rowB?.mode).toBe('fresh')
+    expect(planA.plan_key).not.toBe(planB.plan_key)
+  })
+
+  it('human renderer prints the annotated forms', () => {
+    const dir = makeRepo()
+    fs.writeFileSync(path.join(dir, 'CONTRIBUTING.md'), '# contributing\n')
+    const { plan } = buildAdoptionPlan({ projectRoot: dir, adoptResult: brownfieldResult() })
+    const text = renderPlanMarkdown(plan)
+    expect(text).toContain('map-candidate')
+    expect(text).toContain('CONTRIBUTING.md')
+    expect(text).toContain('run — adoption mode')
+  })
+
+  it('map-candidate never overrides a done-verified or conflict disposition', () => {
+    const dir = makeRepo()
+    fs.mkdirSync(path.join(dir, 'docs'), { recursive: true })
+    fs.writeFileSync(path.join(dir, 'docs', 'coding-standards.md'), 'x')
+    fs.writeFileSync(path.join(dir, 'CONTRIBUTING.md'), '# contributing\n')
+    const { plan } = buildAdoptionPlan({ projectRoot: dir, adoptResult: brownfieldResult() })
+    const row = plan.steps.find((s) => s.step_slug === 'coding-standards')
+    expect(row?.disposition).toBe('done-verified')
+    expect(row?.target).toBeUndefined()
+  })
+
+  it('map-candidate never overrides a state-claim conflict (unverified) with a mappable incumbent', () => {
+    // A state-claim conflict (state says completed, own output missing) can
+    // report verification: 'unverified' — the same level as a plain unstarted
+    // step. That means the satisfiedSteps filter in proposeMapCandidates
+    // (which only excludes 'verified'/'declared') does NOT by itself keep this
+    // step off the map-candidate target list; CONTRIBUTING.md still qualifies
+    // as a candidate. Only the `disposition === 'run'` guard in the override
+    // loop (adoption-plan.ts) stops the candidate from masking the conflict.
+    // This test is a tripwire for that guard.
+    const dir = makeRepo()
+    fs.writeFileSync(path.join(dir, 'CONTRIBUTING.md'), '# contributing\n')
+    fs.mkdirSync(path.join(dir, '.scaffold'))
+    fs.writeFileSync(path.join(dir, '.scaffold', 'config.yml'),
+      'version: 2\nmethodology: brownfield\nplatforms: [claude-code]\n')
+    fs.writeFileSync(path.join(dir, '.scaffold', 'state.json'), JSON.stringify({
+      'schema-version': 1, 'scaffold-version': '3.0.0',
+      init_methodology: 'brownfield', config_methodology: 'brownfield', 'init-mode': 'brownfield',
+      created: '2026-01-01T00:00:00.000Z', in_progress: null,
+      steps: {
+        'coding-standards': {
+          status: 'completed', source: 'pipeline',
+          produces: ['docs/coding-standards.md'], verification: 'unverified',
+        },
+      },
+      next_eligible: [], 'extra-steps': [],
+    }))
+    // docs/coding-standards.md (the step's own output) is never written, so
+    // verifyStep reports a state-claim conflict.
+    const { plan } = buildAdoptionPlan({ projectRoot: dir, adoptResult: brownfieldResult() })
+    const row = plan.steps.find((s) => s.step_slug === 'coding-standards')
+    expect(row?.disposition).toBe('conflict')
+    expect(row?.target).toBeUndefined()
+  })
+})

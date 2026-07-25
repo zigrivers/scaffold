@@ -677,3 +677,34 @@ describe('$ARGUMENTS substitution', () => {
     expect(result.prompt!.text).toContain('XY')
   })
 })
+
+describe('adoption mode (brownfield R3, D11)', () => {
+  it('injects the adoption preamble into the Instructions section', () => {
+    const result = new AssemblyEngine().assemble('tech-stack', makeOptions({
+      assemblyMode: 'adoption',
+      adoptionPreamble: 'You are running this step in **adoption mode**. Read the repository first.',
+    }))
+    expect(result.success).toBe(true)
+    const instructions = result.prompt!.sections.find(s => s.heading === 'Instructions')!
+    expect(instructions.content).toContain('### Adoption Mode')
+    expect(instructions.content).toContain('Read the repository first.')
+    expect(result.prompt!.metadata.assemblyMode).toBe('adoption')
+  })
+
+  it('does not inject the preamble outside adoption mode', () => {
+    const result = new AssemblyEngine().assemble('tech-stack', makeOptions({
+      assemblyMode: 'fresh',
+      adoptionPreamble: 'SHOULD NOT APPEAR',
+    }))
+    const instructions = result.prompt!.sections.find(s => s.heading === 'Instructions')!
+    expect(instructions.content).not.toContain('SHOULD NOT APPEAR')
+    expect(result.prompt!.metadata.assemblyMode).toBe('fresh')
+  })
+
+  it('metadata.assemblyMode defaults from updateMode when assemblyMode is absent', () => {
+    const updated = new AssemblyEngine().assemble('tech-stack', makeOptions({ updateMode: true }))
+    expect(updated.prompt!.metadata.assemblyMode).toBe('update')
+    const fresh = new AssemblyEngine().assemble('tech-stack', makeOptions({ updateMode: false }))
+    expect(fresh.prompt!.metadata.assemblyMode).toBe('fresh')
+  })
+})

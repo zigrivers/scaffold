@@ -131,6 +131,19 @@ Check if AGENTS.md exists first. If it exists, check for scaffold tracking comme
   `gh pr create` reminder hook (installed by git-workflow), do not install a
   second one — update the existing hook's message in place instead
 
+## Adoption Mode Specifics
+- **Codify from repo evidence**: review automation already in place —
+  CODEOWNERS, existing review bots or GitHub Actions review workflows, and
+  branch-protection review requirements. Document the incumbent review path
+  before adding MMR.
+- **Interview only for**: whether incumbent review automation stays (and how
+  MMR divides responsibility with it), and the team's severity threshold for
+  blocking findings on a codebase with long-standing patterns.
+- **Do not**: disable or bypass incumbent review requirements; double-report
+  the same findings through two channels without documenting which one
+  gates; treat pre-existing incumbent code patterns as review findings on
+  unrelated PRs.
+
 ## Instructions
 
 ### MMR Configuration

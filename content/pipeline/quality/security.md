@@ -72,3 +72,18 @@ components. Update auth requirements if API contracts changed.
 - **Conflict resolution**: if a new component introduces a trust boundary
   that conflicts with existing auth approach, document both and flag for
   user decision; never weaken existing security controls without approval
+
+## Adoption Mode Specifics
+- **Codify from repo evidence**: controls as-implemented — auth middleware
+  and session handling from the code, input validation at trust boundaries,
+  secrets handling (env files, vaults, CI secrets), dependency audit state
+  (`npm audit` / `pip-audit` output), and any existing SECURITY.md policy.
+  The threat model covers the system that exists, with evidence per
+  control.
+- **Interview only for**: risk appetite and compliance obligations (they are
+  not in the code), known past incidents, and which of the pre-existing gaps
+  the user wants prioritized.
+- **Do not**: file long-standing accepted risks as new blockers without
+  marking them pre-existing; propose rewrites of working auth flows —
+  record gaps with evidence and severity instead; weaken or "simplify" any
+  existing control.

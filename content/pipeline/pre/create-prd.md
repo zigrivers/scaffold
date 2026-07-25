@@ -70,3 +70,18 @@ Preserve existing decisions unless explicitly revisiting them.
 - What problem does this solve and for whom? Push me to be specific about the target user.
 - What does success look like? How will we know this is working?
 - What's the single most important thing this app must do well?
+
+## Adoption Mode Specifics
+- **Codify from repo evidence**: what the product demonstrably is — features
+  from the routes, screens, or commands in the code, README claims verified
+  against the implementation, and existing product docs. Write the
+  current-capabilities baseline from this evidence, each item citing its
+  source, before any forward-looking requirements.
+- **Interview only for**: intent the repo cannot show — target users and
+  their priorities, the roadmap, what is missing or broken from the user's
+  perspective, and success criteria going forward.
+- **Do not**: invent requirements without code or user evidence; blend
+  shipped behavior and aspirations into one undifferentiated feature list —
+  keep "Current capabilities (as-built)" and "Planned" sections distinct;
+  re-spec removed-but-still-documented features instead of marking them
+  removed.

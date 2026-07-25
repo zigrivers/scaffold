@@ -95,6 +95,27 @@ customizations. Update CLAUDE.md Key Commands section in-place.
   Commands table to match actual Makefile/package.json after changes,
   re-deriving the marker for any row whose underlying command changed
 
+## Adoption Mode Specifics
+- **Codify from repo evidence**: the dev workflow that already works —
+  existing package.json scripts and Makefile targets under their current
+  names, real .env.example variables, incumbent database setup, and the
+  observed first-clone steps. The Key Commands table documents incumbent
+  commands with their existing names, each row still marked
+  Agent-safe/Ask-first.
+- **Interview only for**: which incumbent command is the canonical dev entry
+  point when several exist, current setup pain points, and the
+  classification of environment-sensitive suites (e.g. visual regression)
+  that must stay out of the merge gate.
+- **Ingest with provenance**: package.json scripts and CI workflow test/lint
+  commands are the seed candidates for the `check` / `check-affected` gate
+  targets (the same inventory the agent-ops gate component ingests) —
+  present them for confirmation, mapped from their source with provenance
+  annotations.
+- **Do not**: rename or replace working scripts/targets; add a duplicate
+  target when an incumbent exists under another name (alias it instead);
+  regenerate .env.example from scratch when one exists — append missing
+  variables only.
+
 ## Instructions
 
 ### Populate the Key Commands table

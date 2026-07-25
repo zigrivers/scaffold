@@ -88,3 +88,16 @@ stable layer definitions or custom assertion patterns.
 - **Conflict resolution**: if tech stack changed test runner, migrate pattern
   examples to new runner syntax; preserve coverage targets unless user requests
   adjustment
+
+## Adoption Mode Specifics
+- **Codify from repo evidence**: the test stack as-built — runner and config
+  (vitest/jest/pytest/playwright config files), observed test directory
+  layout and naming, coverage thresholds already configured, and which CI
+  workflow steps actually run tests.
+- **Interview only for**: target coverage goals versus the measured current
+  baseline, which untested areas matter most to the user, and appetite for
+  TDD on new work versus retrofitting tests onto existing code.
+- **Do not**: prescribe a different test runner; set coverage gates the
+  current suite immediately fails (ratchet upward from the measured baseline
+  instead); mark legacy untested modules as rewrite candidates — record them
+  as coverage gaps with evidence.

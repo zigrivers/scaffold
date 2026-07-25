@@ -314,6 +314,13 @@ The plan checks each step's completion against **live** state — all declared o
 
 > **Behavior change (v3.48.0):** `scaffold adopt` used to silently write state on run. It now renders a plan and writes nothing until you `--apply` an approved plan — scripts that relied on the old side effect must pass `--apply`.
 
+In a brownfield project, pipeline steps that have not already been satisfied
+run in **adoption mode**: prompts instruct the agent to read the repository
+first, codify what exists with evidence, interview only for intent gaps, and
+never propose rewrites of working code. Existing documents can satisfy steps
+outright via `artifact_map` in `.scaffold/config.yml` — the adoption plan
+proposes these mappings as `map-candidate` rows for approval.
+
 **Now open Claude Code and skip what doesn't apply:**
 
 ```

@@ -311,6 +311,13 @@ export const ConfigSchema = z.object({
   version: z.literal(2),
   methodology: z.enum(['deep', 'mvp', 'custom', 'brownfield']).default('deep'),
   custom: CustomSchema.optional(),
+  /**
+   * D10a (brownfield R3): maps a pipeline step slug to an existing project
+   * artifact that satisfies it (e.g. `coding-standards: CONTRIBUTING.md`).
+   * Key name is snake_case by spec pin. Step-slug validity and path shape are
+   * enforced in loader.ts (the schema layer has no knownSteps or projectRoot).
+   */
+  artifact_map: z.record(z.string(), z.string().min(1)).optional(),
   // Gemini was dropped (its CLI is sunset). Strip a legacy `gemini` entry from
   // existing configs BEFORE the enum validates, so old project configs still
   // load; if that empties the list, fall back to the default.

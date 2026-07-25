@@ -79,3 +79,22 @@ and CI config for references.
 - **Conflict resolution**: if tech stack added a new framework, add its
   conventions as a new section rather than modifying existing sections;
   verify commit format consistency with git-workflow.md before any changes
+
+## Adoption Mode Specifics
+- **Codify from repo evidence**: the conventions the code already follows —
+  read incumbent linter/formatter configs (.eslintrc*, eslint.config.*,
+  biome.json, .prettierrc*, ruff.toml), sample real source files for naming,
+  import, and error-handling patterns, and derive the commit-message
+  convention from `git log --oneline -50` (conventional-commit adherence is
+  measured, not assumed).
+- **Interview only for**: whether observed inconsistencies are deliberate,
+  which currently-unenforced rules the team wants tightened going forward,
+  and whether new lint rules apply to new code only or to the whole repo.
+- **Ingest with provenance**: translate the incumbent lint/formatter config
+  into the standards document with provenance annotations; when
+  `artifact_map` maps this step to an incumbent doc (e.g. CONTRIBUTING.md),
+  treat that doc as the prior artifact and extend it rather than starting
+  over.
+- **Do not**: generate a new linter config when one exists (extend the
+  incumbent); propose repo-wide reformatting sweeps; write standards the
+  existing codebase violates without marking them "new code only".

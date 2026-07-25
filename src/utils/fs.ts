@@ -18,6 +18,15 @@ export function fileExists(filePath: string): boolean {
   return fs.existsSync(filePath)
 }
 
+/** Check if a path exists AND is a regular file (not a directory). */
+export function isFile(filePath: string): boolean {
+  try {
+    return fs.statSync(filePath).isFile()
+  } catch {
+    return false
+  }
+}
+
 /** Ensure a directory exists, creating it recursively if needed. */
 export function ensureDir(dirPath: string): void {
   fs.mkdirSync(dirPath, { recursive: true })
@@ -126,4 +135,9 @@ export function getPackageMethodologyDir(projectRoot?: string): string {
 /** Resolve the guides directory (bundled, unless running against scaffold itself). */
 export function getPackageGuidesDir(projectRoot?: string): string {
   return resolveContentDir('guides', projectRoot)
+}
+
+/** Resolve the modes directory (bundled, unless running against scaffold itself). */
+export function getPackageModesDir(projectRoot?: string): string {
+  return resolveContentDir('modes', projectRoot)
 }

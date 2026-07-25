@@ -351,3 +351,45 @@ covered by `phase-audit.test.ts`). More broadly: if a unit under test kicks off
 a real subprocess/fs/network side effect that isn't the assertion's subject,
 stub it — an occasional >5s run is a latent CI flake, and "green locally" can't
 catch it.
+
+## A backgrounded `cmd > log; echo $?` reports the WRAPPER's exit, not cmd's — capture the real code (2026-07-25)
+**Pattern:** During R3 Task 17 I ran `make check-all > log 2>&1; echo "EXIT=$?"` as a
+background task. The harness reported "completed (exit code 0)" — but that was the
+exit of the whole shell wrapper (the trailing `echo` always succeeds), NOT make's.
+make had actually FAILED (exit 2) at `check-reference-citations`. I nearly checked
+the task off as green off the misleading notification.
+**Rule:** For a backgrounded/wrapped command whose real exit matters, write the
+inner command's `$?` INTO the log (`make check-all > log 2>&1; echo "EXIT=$?" >> log`)
+and read it back, or check the wrapper's own output file for the echoed value — never
+trust the harness "exit code 0" for a `cmd; echo` wrapper. Better: grep the log for
+the tool's own failure signature (`make: *** [target] Error`, `not ok`, `FAIL`) before
+declaring green.
+
+## Adding a content/knowledge/ entry drifts the knowledge-freshness reference guide — rebake it (2026-07-25)
+**Pattern:** R3 Task 6 added `content/knowledge/core/brownfield-adoption.md` (corpus
+300→301, core 36→37). `make check-all`'s `check-reference-citations` gate then failed
+with "rebake DRIFT" on `content/guides/knowledge-freshness/` — its auto-generated
+inventory data block (`<!-- gen:kb-inventory -->`) was stale. Task 6's own tests +
+`make validate` passed, so the drift only surfaced at the full-gate step.
+**Rule:** Any change to the `content/knowledge/` corpus (add/remove/recategorize an
+entry) requires rebaking the knowledge-freshness guide: `node scripts/build-freshness-reference.mjs`
+then `node dist/index.js guides --build` (or `scaffold guides --build`), and commit the
+updated `content/guides/knowledge-freshness/index.{md,html}`. Fold this into the
+knowledge-entry task itself, or a full `make check-all` at branch level will catch it
+late. (Same class: any source a reference guide cites by line number can drift its guide.)
+
+## When fixing a bug pattern, grep for EVERY instance in the same PR — I fixed 3 of 4 twice (2026-07-25)
+**Pattern:** R3 PR #786 round 3 flagged that the mapped-incumbent presence check used
+`fileExists` (accepts directories) instead of `.isFile()`. I fixed it in
+`verifyStep`, `detectCompletion`, and `checkCompletion` — but MISSED the 4th
+consumer, `applyConflictOverrides` (a LIVE function backing `scaffold status`/`next`).
+The final plan-aware confirmation caught it. This is the SECOND time this exact
+failure mode bit in this initiative (R2: the graceful-degradation guard was applied
+one-throwing-call-at-a-time across armHooks/armSched/syncPrimaryToMerge/squashMerge/
+preflight over multiple rounds).
+**Rule:** The moment you fix a bug that's a PATTERN (a specific wrong call/idiom),
+immediately `grep` the whole codebase for every other instance of that idiom and fix
+them ALL in the same change — don't wait for the reviewer to find instances 2, 3, 4.
+For artifact_map specifically: all consumers (`resolveAssemblyMode`, `verifyStep`,
+`detectCompletion`, `checkCompletion`, `applyConflictOverrides`) must treat the mapped
+incumbent identically (root-only via service gate; must be a FILE via `isFile`).

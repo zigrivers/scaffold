@@ -40,7 +40,7 @@ These are pinned by the approved spec — do not re-litigate during implementati
 
 **Steps:**
 
-- [ ] Write failing schema tests in `src/config/schema.test.ts` (follow the file's existing parse-fixture style):
+- [x] Write failing schema tests in `src/config/schema.test.ts` (follow the file's existing parse-fixture style):
 
   ```ts
   describe('artifact_map (D10a)', () => {
@@ -87,8 +87,8 @@ These are pinned by the approved spec — do not re-litigate during implementati
   })
   ```
 
-- [ ] Run: `npx vitest run src/config/schema.test.ts` — expect the four new tests to FAIL (unknown key passes through `.passthrough()` untyped; the rejection cases fail because no schema rejects them yet).
-- [ ] Add to `ConfigSchema` in `src/config/schema.ts`, between `custom:` and `platforms:`:
+- [x] Run: `npx vitest run src/config/schema.test.ts` — expect the four new tests to FAIL (unknown key passes through `.passthrough()` untyped; the rejection cases fail because no schema rejects them yet).
+- [x] Add to `ConfigSchema` in `src/config/schema.ts`, between `custom:` and `platforms:`:
 
   ```ts
   /**
@@ -100,15 +100,15 @@ These are pinned by the approved spec — do not re-litigate during implementati
   artifact_map: z.record(z.string(), z.string().min(1)).optional(),
   ```
 
-- [ ] Add to `ScaffoldConfig` in `src/types/config.ts` (after `project?:`):
+- [x] Add to `ScaffoldConfig` in `src/types/config.ts` (after `project?:`):
 
   ```ts
   /** D10a: step slug → existing incumbent artifact path (project-root-relative). */
   artifact_map?: Record<string, string>
   ```
 
-- [ ] Run: `npx vitest run src/config/schema.test.ts` — expect all green.
-- [ ] Write failing loader tests in `src/config/loader.test.ts` (follow the file's existing tmp-dir + `loadConfig(projectRoot, knownSteps)` pattern):
+- [x] Run: `npx vitest run src/config/schema.test.ts` — expect all green.
+- [x] Write failing loader tests in `src/config/loader.test.ts` (follow the file's existing tmp-dir + `loadConfig(projectRoot, knownSteps)` pattern):
 
   ```ts
   describe('artifact_map validation (D10a)', () => {
@@ -141,8 +141,8 @@ These are pinned by the approved spec — do not re-litigate during implementati
   ```
 
   (Use the file's existing helper for writing `.scaffold/config.yml` into the tmp project — if none exists, add a local `writeConfig` that mkdirs `.scaffold/` and writes the string.)
-- [ ] Run: `npx vitest run src/config/loader.test.ts` — expect the new tests to FAIL.
-- [ ] Implement semantic validation in `src/config/loader.ts`, immediately after the existing `custom` steps-vs-`knownSteps` validation block (~line 163), following that block's error/warning accumulation pattern (adapt local variable names to the surrounding code):
+- [x] Run: `npx vitest run src/config/loader.test.ts` — expect the new tests to FAIL.
+- [x] Implement semantic validation in `src/config/loader.ts`, immediately after the existing `custom` steps-vs-`knownSteps` validation block (~line 163), following that block's error/warning accumulation pattern (adapt local variable names to the surrounding code):
 
   ```ts
   // D10a: validate artifact_map entries. Unknown step slugs are warnings
@@ -173,12 +173,34 @@ These are pinned by the approved spec — do not re-litigate during implementati
   ```
 
   (Import `path` if the loader does not already; runtime consumers additionally re-check containment via `resolveContainedArtifactPath` — defense in depth.)
-- [ ] Run: `npx vitest run src/config/loader.test.ts src/config/schema.test.ts` — all green.
-- [ ] Commit: `feat(config): artifact_map schema + validation (brownfield R3, D10a)`
+- [x] Run: `npx vitest run src/config/loader.test.ts src/config/schema.test.ts` — all green.
+- [x] Commit: `feat(config): artifact_map schema + validation (brownfield R3, D10a)`
 
 ---
 
 ### Task 2: Verification honors mapped artifacts
+
+> **Reviewer note — RESOLVED (P1/P2, PR #786 round 3).** The mapped-incumbent
+> presence check in `verifyStep`/`detectCompletion`/`checkCompletion` used
+> `fileExists` (which accepts directories), so an `artifact_map` entry pointing at
+> a DIRECTORY could mark a step verified — inconsistent with `resolveAssemblyMode`'s
+> `.isFile()` gate. Added a shared `isFile` helper (`src/utils/fs.ts`) and switched
+> all three mapped checks to it (a doc mapping must be a file). Also fixed
+> `checkCompletion` to clear `missingArtifacts` + record the mapped file in
+> `presentArtifacts` when a mapping satisfies (it previously returned
+> `confirmed_complete` with a still-populated `missingArtifacts` — contradictory
+> evidence). Tests: a directory-mapped incumbent fails to satisfy each of the
+> three, and `checkCompletion` reports consistent evidence.
+
+> **Reviewer note — RESOLVED (P1, PR #786 plan-aware review).** `applyConflictOverrides`'s
+> `artifactMap` fallback (masking a missing output with a mapped incumbent) was
+> not gated on service scope, unlike the parallel live-conflict guard in
+> `resolveAssemblyMode`. R3's `artifact_map` is ROOT-only, so a root mapping could
+> mask a genuinely-missing `services/<svc>/` artifact — `scaffold status --service <svc>`
+> would report a false completion (the exact dishonesty R3 removes). Fixed by
+> gating the fallback on `!isServiceLocal`. Test: a root `artifact_map` entry does
+> not mask a service-local missing artifact (still a conflict) while root scope
+> still honors the mapping.
 
 > **Reviewer note (deferred from PR #783 review — resolve during implementation):**
 > `artifactMap` must also be honored by `applyConflictOverrides` (the fs-only
@@ -202,7 +224,7 @@ These are pinned by the approved spec — do not re-litigate during implementati
 
 **Steps:**
 
-- [ ] Write failing tests (tmp-dir pattern as in `update-mode.test.ts`):
+- [x] Write failing tests (tmp-dir pattern as in `update-mode.test.ts`):
 
   ```ts
   describe('artifact_map integration (D10a)', () => {
@@ -283,8 +305,8 @@ These are pinned by the approved spec — do not re-litigate during implementati
 
   (Ensure `verifyStep` and `StepStateEntry` are imported in the test file — R1's `verifyStep` tests already add them; add the imports if this describe block lives in a file that does not.)
 
-- [ ] Run: `npx vitest run src/state/completion.test.ts` — new tests FAIL (no `artifactMap` param yet).
-- [ ] Implement in `src/state/completion.ts`. Add `mappedArtifactUsed?: string` to `CompletionResult`. At the top of `detectCompletion`, before the outputs loop:
+- [x] Run: `npx vitest run src/state/completion.test.ts` — new tests FAIL (no `artifactMap` param yet).
+- [x] Implement in `src/state/completion.ts`. Add `mappedArtifactUsed?: string` to `CompletionResult`. At the top of `detectCompletion`, before the outputs loop:
 
   ```ts
   const mapped = artifactMap?.[step]
@@ -304,7 +326,7 @@ These are pinned by the approved spec — do not re-litigate during implementati
   ```
 
   Apply the same short-circuit to `checkCompletion`'s outputs-presence loop (an existing mapped incumbent ⇒ `allPresent = true` for the status computation).
-- [ ] **Extend R1's `verifyStep`** (the D3 verifier the adoption plan and doctor actually call). It does its OWN outputs check and does NOT call `detectCompletion`/`checkCompletion`, so threading the map through those two alone would leave mapped incumbents reported missing on the plan and doctor paths (the whole point of `artifact_map`). Add a trailing `artifactMap?: Record<string, string>` param, and right after its outputs-presence loop (before the disposition branches) reconcile a mapped incumbent into the all-outputs requirement — detect still runs and still gates `verified`:
+- [x] **Extend R1's `verifyStep`** (the D3 verifier the adoption plan and doctor actually call). It does its OWN outputs check and does NOT call `detectCompletion`/`checkCompletion`, so threading the map through those two alone would leave mapped incumbents reported missing on the plan and doctor paths (the whole point of `artifact_map`). Add a trailing `artifactMap?: Record<string, string>` param, and right after its outputs-presence loop (before the disposition branches) reconcile a mapped incumbent into the all-outputs requirement — detect still runs and still gates `verified`:
 
   ```ts
   // D10a (R3): an existing mapped incumbent satisfies the all-outputs
@@ -320,17 +342,146 @@ These are pinned by the approved spec — do not re-litigate during implementati
   }
   ```
 
-- [ ] Thread `artifactMap` through `verifyStep`'s callers (previously blind to mappings — `git grep -n "verifyStep(" src/`):
+- [x] Thread `artifactMap` through `verifyStep`'s callers (previously blind to mappings — `git grep -n "verifyStep(" src/`):
   - **doctor** `pipelineVerificationCheck` (`src/doctor/checks.ts`): pass `context.config?.artifact_map` as the new trailing arg.
   - **adoption-plan builder** (`src/project/adoption-plan*.ts`): pass `config.artifact_map` to each `verifyStep(...)` call (the builder already loads `config`).
   - **adoption-apply** (`src/project/adoption-apply.ts`): the map-candidate re-verification (Task 10) passes the updated `artifact_map` here.
   Add one integration assertion (doctor or plan) that a mapped incumbent reports the step as verified/done rather than missing.
-- [ ] Run: `npx vitest run src/state/completion.test.ts` — all green.
-- [ ] Commit: `feat(state): completion + verifyStep verification honors artifact_map incumbents (D10a)`
+- [x] Run: `npx vitest run src/state/completion.test.ts` — all green.
+- [x] Commit: `feat(state): completion + verifyStep verification honors artifact_map incumbents (D10a)`
 
 ---
 
 ### Task 3: `AssemblyMode` type + `resolveAssemblyMode()` (fresh | update | adoption)
+
+> **AMENDMENT — R1 carry-forward: LIVE conflict gate (AUTHORITATIVE; supersedes the code blocks below where they conflict).**
+> The code below decides update-eligibility from the STORED `verification` field
+> only. R1's review requires a LIVE check: a step stored as `completed +
+> declared/verified` whose reality has drifted (a declared output deleted, or its
+> `detect:` contract now failing) must NOT run update mode on a stale claim, and in
+> a brownfield/v1-migration project such a conflicted completion must route to
+> **adoption** (matching R1 apply's reopen-to-pending), else **fresh**. Reuse R1's
+> `verifyStep` (the D3 verifier) — for a stored-`completed` entry, `status ===
+> 'conflict'` (class `state-claim`) means the completion is conflicted.
+>
+> **Signature (add two options)** — apply to BOTH the Interfaces block and the impl:
+> ```ts
+> export function resolveAssemblyMode(options: {
+>   step: string
+>   state: PipelineState
+>   currentDepth: DepthLevel
+>   projectRoot: string
+>   service?: string
+>   artifactMap?: Record<string, string>
+>   expectedOutputs?: string[]   // NEW — current step outputs (frontmatter); falls back to entry.produces
+>   detect?: DetectSpec | null   // NEW — the step's detect: contract, re-evaluated live
+> }): AssemblyModeResult
+> ```
+> Add imports to `src/core/assembly/update-mode.ts` (no cycle — `completion.ts` does not import `core/assembly`):
+> ```ts
+> import { verifyStep } from '../../state/completion.js'
+> import type { DetectSpec } from '../../types/frontmatter.js'
+> ```
+>
+> **Impl delta** — replace the function-body head (the `const { … } = options` through the `updateEligible` line) with:
+> ```ts
+>   const { step, state, currentDepth, projectRoot, artifactMap } = options
+>   const detection = detectUpdateMode(options)
+>   const entry = state.steps[step]
+>   const completed = entry?.status === 'completed'
+>
+>   // R1 carry-forward (live-conflict gate): a stored completion must survive a
+>   // LIVE check before it can drive update mode OR count as a surviving
+>   // completion. A completed step whose declared outputs are gone OR whose
+>   // detect: contract now fails is conflicted (verifyStep → status 'conflict',
+>   // class 'state-claim'); its stale claim must not enter update mode, and it
+>   // routes like a reopened step — adoption in brownfield/v1, else fresh.
+>   // Gated on `completed` so the common adoption path (pending steps) never
+>   // spawns a detect: subprocess, and on `service === undefined` because R3
+>   // mapping/adoption is root-only and verifyStep does not service-prefix
+>   // outputs (a service-local completion would otherwise be a false conflict).
+>   const liveConflict =
+>     completed &&
+>     options.service === undefined &&
+>     verifyStep(
+>       step,
+>       entry,
+>       options.expectedOutputs ?? entry?.produces ?? [],
+>       options.detect ?? null,
+>       projectRoot,
+>       artifactMap,
+>     ).status === 'conflict'
+>   const completionSurvives = completed && !liveConflict
+>
+>   const verification =
+>     (entry as { verification?: 'verified' | 'declared' | 'unverified' } | undefined)
+>       ?.verification ?? 'unverified'
+>   const updateEligible =
+>     completionSurvives && (verification === 'verified' || verification === 'declared')
+> ```
+> Everything from the `update` branch through the mapped-incumbent fallback is
+> UNCHANGED (both already key off `updateEligible`). Then change the adoption
+> guard `if (!completed && (initMode === …))` to `if (!completionSurvives && (initMode === …))`.
+>
+> **Load-bearing:** `artifactMap` MUST be passed to `verifyStep` (6th arg, added in
+> Task 2) — else the existing "mapped incumbent → update" test flips to a false
+> conflict. Greenfield stays a strict no-op: a healthy completion returns
+> `confirmed_complete`, so `liveConflict` is false and behavior is identical to the
+> pre-amendment code; the gate only bites on a genuinely-broken stored claim.
+>
+> **Task 7 caller** (`src/cli/commands/run.ts`) must pass the two new inputs — both
+> already in hand as `metaPrompt.frontmatter.outputs` and `.detect`:
+> `resolveAssemblyMode({ step, state, currentDepth: depth, projectRoot, service, artifactMap: config.artifact_map, expectedOutputs: metaPrompt.frontmatter.outputs, detect: metaPrompt.frontmatter.detect ?? null })`.
+>
+> **Add these 3 tests** to the `resolveAssemblyMode` describe block:
+> ```ts
+> it('completed + declared but LIVE detect fails (output present) → adoption in brownfield', () => {
+>   fs.mkdirSync(path.join(tmpDir, 'docs'), { recursive: true })
+>   fs.writeFileSync(path.join(tmpDir, 'docs/tech-stack.md'), '# stack')
+>   const state = brownfieldState({
+>     'tech-stack': {
+>       status: 'completed', source: 'pipeline', at: '2026-07-19T00:00:00.000Z',
+>       produces: ['docs/tech-stack.md'], depth: 3, verification: 'declared',
+>     } as PipelineState['steps'][string],
+>   })
+>   const result = resolveAssemblyMode({
+>     step: 'tech-stack', state, currentDepth: 3, projectRoot: tmpDir,
+>     expectedOutputs: ['docs/tech-stack.md'], detect: { all: [{ cmd: 'exit 1' }] },
+>   })
+>   expect(result.mode).toBe('adoption')
+> })
+> it('completed + verified but LIVE detect fails → fresh in greenfield', () => {
+>   fs.mkdirSync(path.join(tmpDir, 'docs'), { recursive: true })
+>   fs.writeFileSync(path.join(tmpDir, 'docs/tech-stack.md'), '# stack')
+>   const state = makeState({
+>     'tech-stack': {
+>       status: 'completed', source: 'pipeline', at: '2026-07-19T00:00:00.000Z',
+>       produces: ['docs/tech-stack.md'], depth: 3, verification: 'verified',
+>     } as PipelineState['steps'][string],
+>   })
+>   const result = resolveAssemblyMode({
+>     step: 'tech-stack', state, currentDepth: 3, projectRoot: tmpDir,
+>     expectedOutputs: ['docs/tech-stack.md'], detect: { all: [{ cmd: 'exit 1' }] },
+>   })
+>   expect(result.mode).toBe('fresh')
+> })
+> it('completed + declared but declared output deleted → adoption in brownfield (live check routes it, not fresh)', () => {
+>   const state = brownfieldState({
+>     'tech-stack': {
+>       status: 'completed', source: 'pipeline', at: '2026-07-19T00:00:00.000Z',
+>       produces: ['docs/tech-stack.md'], depth: 3, verification: 'declared',
+>     } as PipelineState['steps'][string],
+>   })
+>   const result = resolveAssemblyMode({
+>     step: 'tech-stack', state, currentDepth: 3, projectRoot: tmpDir,
+>     expectedOutputs: ['docs/tech-stack.md'],
+>   })
+>   expect(result.mode).toBe('adoption')
+> })
+> ```
+> (`detectUpdateMode` alone catches only the "don't run update" half of a deleted
+> output; the live gate is required for the ROUTING half — else the still-`completed`
+> entry falls through to `fresh` instead of `adoption` in a brownfield project.)
 
 **Files:**
 - `src/types/assembly.ts` (add `AssemblyMode` type)
@@ -366,7 +517,7 @@ export function resolveAssemblyMode(options: {
 
 **Steps:**
 
-- [ ] Write failing tests in `src/core/assembly/update-mode.test.ts` (reuse the file's `makeState` helper — pass `'init-mode'` via a spread override where needed; extend `makeState` with an optional `initMode` second parameter if cleaner):
+- [x] Write failing tests in `src/core/assembly/update-mode.test.ts` (reuse the file's `makeState` helper — pass `'init-mode'` via a spread override where needed; extend `makeState` with an optional `initMode` second parameter if cleaner):
 
   ```ts
   describe('resolveAssemblyMode (D3 matrix + D10a)', () => {
@@ -474,8 +625,8 @@ export function resolveAssemblyMode(options: {
   ```
 
   (If R1's `StepStateEntry` already types `verification`, drop the `as PipelineState['steps'][string]` casts.)
-- [ ] Run: `npx vitest run src/core/assembly/update-mode.test.ts` — new tests FAIL.
-- [ ] Implement in `src/core/assembly/update-mode.ts` (below `detectUpdateMode`, reusing its imports):
+- [x] Run: `npx vitest run src/core/assembly/update-mode.test.ts` — new tests FAIL.
+- [x] Implement in `src/core/assembly/update-mode.ts` (below `detectUpdateMode`, reusing its imports):
 
   ```ts
   export interface AssemblyModeResult {
@@ -574,8 +725,8 @@ export function resolveAssemblyMode(options: {
   ```
 
   Add `export type AssemblyMode = 'fresh' | 'update' | 'adoption'` to `src/types/assembly.ts` and import it (types must not import from core, so the type lives in types/).
-- [ ] Run: `npx vitest run src/core/assembly/update-mode.test.ts` — all green (existing `detectUpdateMode` tests must stay green untouched).
-- [ ] Commit: `feat(assembly): resolveAssemblyMode — fresh|update|adoption per D3 matrix (brownfield R3)`
+- [x] Run: `npx vitest run src/core/assembly/update-mode.test.ts` — all green (existing `detectUpdateMode` tests must stay green untouched).
+- [x] Commit: `feat(assembly): resolveAssemblyMode — fresh|update|adoption per D3 matrix (brownfield R3)`
 
 ---
 
@@ -601,7 +752,7 @@ assemblyMode: AssemblyMode
 
 **Steps:**
 
-- [ ] Write failing tests in `src/core/assembly/engine.test.ts` (use the existing `makeOptions` helper):
+- [x] Write failing tests in `src/core/assembly/engine.test.ts` (use the existing `makeOptions` helper):
 
   ```ts
   describe('adoption mode (brownfield R3, D11)', () => {
@@ -636,8 +787,8 @@ assemblyMode: AssemblyMode
   })
   ```
 
-- [ ] Run: `npx vitest run src/core/assembly/engine.test.ts` — new tests FAIL.
-- [ ] Implement in `engine.ts`:
+- [x] Run: `npx vitest run src/core/assembly/engine.test.ts` — new tests FAIL.
+- [x] Implement in `engine.ts`:
   - Instructions section call becomes:
 
     ```ts
@@ -656,8 +807,8 @@ assemblyMode: AssemblyMode
     }
     ```
   - Metadata: `assemblyMode: options.assemblyMode ?? (options.updateMode ? 'update' : 'fresh')`.
-- [ ] Run: `npx vitest run src/core/assembly/engine.test.ts` — all green (all pre-existing engine tests must also stay green; they don't pass `assemblyMode`, so the default path covers them).
-- [ ] Commit: `feat(assembly): engine injects adoption preamble into Instructions section (D11)`
+- [x] Run: `npx vitest run src/core/assembly/engine.test.ts` — all green (all pre-existing engine tests must also stay green; they don't pass `assemblyMode`, so the default path covers them).
+- [x] Commit: `feat(assembly): engine injects adoption preamble into Instructions section (D11)`
 
 ---
 
@@ -681,7 +832,7 @@ export function loadAdoptionPreamble(projectRoot?: string): {
 
 **Steps:**
 
-- [ ] Write failing test `src/core/assembly/mode-loader.test.ts`:
+- [x] Write failing test `src/core/assembly/mode-loader.test.ts`:
 
   ```ts
   import { describe, it, expect } from 'vitest'
@@ -699,8 +850,8 @@ export function loadAdoptionPreamble(projectRoot?: string): {
   })
   ```
 
-- [ ] Run: `npx vitest run src/core/assembly/mode-loader.test.ts` — FAIL (module missing).
-- [ ] Create `content/modes/adoption.md` with exactly this content:
+- [x] Run: `npx vitest run src/core/assembly/mode-loader.test.ts` — FAIL (module missing).
+- [x] Create `content/modes/adoption.md` with exactly this content:
 
   ```markdown
   <!-- Global adoption-mode preamble (brownfield R3, D11). Injected by the
@@ -751,7 +902,7 @@ export function loadAdoptionPreamble(projectRoot?: string): {
   dropped.
   ```
 
-- [ ] Add to `src/utils/fs.ts`, alongside the other `getPackage*Dir` functions:
+- [x] Add to `src/utils/fs.ts`, alongside the other `getPackage*Dir` functions:
 
   ```ts
   /** Resolve the modes directory (bundled, unless running against scaffold itself). */
@@ -760,7 +911,7 @@ export function loadAdoptionPreamble(projectRoot?: string): {
   }
   ```
 
-- [ ] Create `src/core/assembly/mode-loader.ts`:
+- [x] Create `src/core/assembly/mode-loader.ts`:
 
   ```ts
   import path from 'node:path'
@@ -792,8 +943,8 @@ export function loadAdoptionPreamble(projectRoot?: string): {
   }
   ```
 
-- [ ] Run: `npx vitest run src/core/assembly/mode-loader.test.ts` — green.
-- [ ] Commit: `feat(content): global adoption-mode preamble + loader (D11)`
+- [x] Run: `npx vitest run src/core/assembly/mode-loader.test.ts` — green.
+- [x] Commit: `feat(content): global adoption-mode preamble + loader (D11)`
 
 ---
 
@@ -815,7 +966,7 @@ export function withAdoptionKnowledge(names: string[], mode: AssemblyMode): stri
 
 **Steps:**
 
-- [ ] Write failing loader tests in `src/core/assembly/knowledge-loader.test.ts`:
+- [x] Write failing loader tests in `src/core/assembly/knowledge-loader.test.ts`:
 
   ```ts
   describe('withAdoptionKnowledge (brownfield R3)', () => {
@@ -844,8 +995,8 @@ export function withAdoptionKnowledge(names: string[], mode: AssemblyMode): stri
   ```
 
   (Import `getPackageKnowledgeDir` from `../../utils/fs.js`; `buildIndex` is already exported.)
-- [ ] Run: `npx vitest run src/core/assembly/knowledge-loader.test.ts` — new tests FAIL.
-- [ ] Add to `knowledge-loader.ts`:
+- [x] Run: `npx vitest run src/core/assembly/knowledge-loader.test.ts` — new tests FAIL.
+- [x] Add to `knowledge-loader.ts`:
 
   ```ts
   import type { AssemblyMode } from '../../types/index.js'
@@ -866,7 +1017,7 @@ export function withAdoptionKnowledge(names: string[], mode: AssemblyMode): stri
   ```
 
   (Export `AssemblyMode` from `src/types/index.ts` if not already re-exported.)
-- [ ] Create `content/knowledge/core/brownfield-adoption.md` with exactly this content:
+- [x] Create `content/knowledge/core/brownfield-adoption.md` with exactly this content:
 
   ````markdown
   ---
@@ -1062,7 +1213,7 @@ export function withAdoptionKnowledge(names: string[], mode: AssemblyMode): stri
     listing it under "Not translated". If it can't translate, say so.
   ````
 
-- [ ] Wire the orphan-check exemption, matching the established split (`KNOWLEDGE_TEMPLATE_EXEMPT` array in `exemptions.bash`, its `is_knowledge_template` helper in the bats file). In `tests/evals/exemptions.bash`, next to `KNOWLEDGE_TEMPLATE_EXEMPT`, add the array only:
+- [x] Wire the orphan-check exemption, matching the established split (`KNOWLEDGE_TEMPLATE_EXEMPT` array in `exemptions.bash`, its `is_knowledge_template` helper in the bats file). In `tests/evals/exemptions.bash`, next to `KNOWLEDGE_TEMPLATE_EXEMPT`, add the array only:
 
   ```bash
   # --- knowledge-quality.bats ---
@@ -1092,13 +1243,20 @@ export function withAdoptionKnowledge(names: string[], mode: AssemblyMode): stri
   is_code_injected_knowledge "$name" && continue
   ```
 
-- [ ] Verify the entry clears the core-category eval floor: `wc -l content/knowledge/core/brownfield-adoption.md` — must print ≥ 200. If short, expand the Deep Guidance "Anti-patterns" section with additional grounded items (e.g. "trusting CI config over CI history", "mapping an incumbent doc that contradicts the code") until it clears — never pad with filler.
-- [ ] Run: `npx vitest run src/core/assembly/knowledge-loader.test.ts` — green. Then `npx bats tests/evals/knowledge-quality.bats tests/evals/knowledge-injection.bats` — expect all `ok` (entry ≥200 lines, has code blocks, has Summary + Deep Guidance, orphan check exempted).
-- [ ] Commit: `feat(knowledge): brownfield-adoption entry + adoption-mode injection (D11)`
+- [x] Verify the entry clears the core-category eval floor: `wc -l content/knowledge/core/brownfield-adoption.md` — must print ≥ 200. If short, expand the Deep Guidance "Anti-patterns" section with additional grounded items (e.g. "trusting CI config over CI history", "mapping an incumbent doc that contradicts the code") until it clears — never pad with filler.
+- [x] Run: `npx vitest run src/core/assembly/knowledge-loader.test.ts` — green. Then `npx bats tests/evals/knowledge-quality.bats tests/evals/knowledge-injection.bats` — expect all `ok` (entry ≥200 lines, has code blocks, has Summary + Deep Guidance, orphan check exempted).
+- [x] Commit: `feat(knowledge): brownfield-adoption entry + adoption-mode injection (D11)`
 
 ---
 
 ### Task 7: Wire `scaffold run` — mode resolution, preamble, knowledge append
+
+> **AMENDMENT (see Task 3 R1 carry-forward).** The `resolveAssemblyMode(...)` call
+> here MUST also pass the step's live-check inputs — both already in hand as
+> `metaPrompt.frontmatter.outputs` and `metaPrompt.frontmatter.detect`:
+> `resolveAssemblyMode({ …, artifactMap: config.artifact_map, expectedOutputs: metaPrompt.frontmatter.outputs, detect: metaPrompt.frontmatter.detect ?? null })`.
+> Without them the live-conflict gate can't re-evaluate `detect:` and a stale
+> `declared/verified` claim would wrongly drive update mode.
 
 **Files:**
 - `src/cli/commands/run.ts`
@@ -1108,7 +1266,7 @@ export function withAdoptionKnowledge(names: string[], mode: AssemblyMode): stri
 
 **Steps:**
 
-- [ ] Write the failing integration test `src/e2e/adoption-mode.test.ts` (module-level integration mirroring run.ts's wiring — this is the contract run.ts must implement):
+- [x] Write the failing integration test `src/e2e/adoption-mode.test.ts` (module-level integration mirroring run.ts's wiring — this is the contract run.ts must implement):
 
   ```ts
   import { describe, it, expect, beforeEach, afterEach } from 'vitest'
@@ -1197,8 +1355,8 @@ export function withAdoptionKnowledge(names: string[], mode: AssemblyMode): stri
   })
   ```
 
-- [ ] Run: `npx vitest run src/e2e/adoption-mode.test.ts` — green already if Tasks 3–6 are complete (this test locks the contract); if anything fails, fix the earlier task, not the test.
-- [ ] Rewire `src/cli/commands/run.ts` (Step 6 and Step 8 regions):
+- [x] Run: `npx vitest run src/e2e/adoption-mode.test.ts` — green already if Tasks 3–6 are complete (this test locks the contract); if anything fails, fix the earlier task, not the test.
+- [x] Rewire `src/cli/commands/run.ts` (Step 6 and Step 8 regions):
   - Replace the `detectUpdateMode` import with `resolveAssemblyMode` (from the same module) and `loadAdoptionPreamble` (from `../../core/assembly/mode-loader.js`), and add `withAdoptionKnowledge` to the knowledge-loader import.
   - Replace the Step 6 detection call:
 
@@ -1250,12 +1408,27 @@ export function withAdoptionKnowledge(names: string[], mode: AssemblyMode): stri
     adoptionPreamble,
     ```
 
-- [ ] Run: `npx vitest run src/e2e/ src/core/assembly/ src/cli/` — all green. Then `make check-all` for a full sweep — expect exit 0.
-- [ ] Commit: `feat(run): wire adoption mode into scaffold run assembly (D11 read-side of init-mode)`
+- [x] Run: `npx vitest run src/e2e/ src/core/assembly/ src/cli/` — all green. Then `make check-all` for a full sweep — expect exit 0.
+- [x] Commit: `feat(run): wire adoption mode into scaffold run assembly (D11 read-side of init-mode)`
 
 ---
 
 ### Task 8: `src/ingestion/` — incumbent inventory + map-candidate proposals
+
+> **Reviewer note — PR #786 round 2 (dispositions).** (1) `scanIncumbents` (the
+> incumbent inventory) has no R3 production consumer: `proposeMapCandidates` uses
+> its own `CANDIDATE_SOURCES` step→file scan, and the adoption prompt's
+> provenance guidance (D10b) is delivered generically via `content/modes/adoption.md`,
+> not by injecting the discovered inventory. So D10b's user-facing behavior IS
+> implemented; `scanIncumbents` remains a tested reusable primitive without an R3
+> caller (a future release may wire it for per-incumbent provenance). Not a
+> correctness defect — recorded as a code-vs-plan deviation (the plan's "inventory
+> feeds the map-candidate proposal" is satisfied by the equivalent CANDIDATE_SOURCES
+> scan, not by consuming `scanIncumbents`). (2) A flagged uncaught-TypeError on a
+> non-string `artifact_map` value was a FALSE POSITIVE — Zod's
+> `z.record(z.string(), z.string())` rejects it (`config: null` + FIELD_INVALID_VALUE)
+> before the loader's `path.isAbsolute` runs (verified by repro); regression tests
+> added.
 
 **Files:**
 - `src/ingestion/incumbents.ts` (new)
@@ -1284,7 +1457,7 @@ export function proposeMapCandidates(options: {
 
 **Steps:**
 
-- [ ] Write failing tests `src/ingestion/incumbents.test.ts`:
+- [x] Write failing tests `src/ingestion/incumbents.test.ts`:
 
   ```ts
   import { describe, it, expect, beforeEach, afterEach } from 'vitest'
@@ -1325,7 +1498,7 @@ export function proposeMapCandidates(options: {
   })
   ```
 
-- [ ] Write failing tests `src/ingestion/map-candidates.test.ts`:
+- [x] Write failing tests `src/ingestion/map-candidates.test.ts`:
 
   ```ts
   import { describe, it, expect, beforeEach, afterEach } from 'vitest'
@@ -1376,8 +1549,8 @@ export function proposeMapCandidates(options: {
   })
   ```
 
-- [ ] Run: `npx vitest run src/ingestion/` — FAIL (modules missing).
-- [ ] Create `src/ingestion/incumbents.ts`:
+- [x] Run: `npx vitest run src/ingestion/` — FAIL (modules missing).
+- [x] Create `src/ingestion/incumbents.ts`:
 
   ```ts
   import fs from 'node:fs'
@@ -1447,7 +1620,7 @@ export function proposeMapCandidates(options: {
   }
   ```
 
-- [ ] Create `src/ingestion/map-candidates.ts`:
+- [x] Create `src/ingestion/map-candidates.ts`:
 
   ```ts
   import fs from 'node:fs'
@@ -1505,8 +1678,8 @@ export function proposeMapCandidates(options: {
   }
   ```
 
-- [ ] Run: `npx vitest run src/ingestion/` — all green.
-- [ ] Commit: `feat(ingestion): incumbent inventory + map-candidate proposals (D10)`
+- [x] Run: `npx vitest run src/ingestion/` — all green.
+- [x] Commit: `feat(ingestion): incumbent inventory + map-candidate proposals (D10)`
 
 ---
 
@@ -1524,7 +1697,7 @@ R1 ships the plan renderer with the disposition union `done (verified) | conflic
 
 **Steps:**
 
-- [ ] Write failing tests in `src/project/adoption-plan.test.ts`, following R1's existing plan-builder test fixtures (tmp project + injected state). Add:
+- [x] Write failing tests in `src/project/adoption-plan.test.ts`, following R1's existing plan-builder test fixtures (tmp project + injected state). Add:
 
   ```ts
   describe('map-candidate disposition (R3, D10)', () => {
@@ -1571,14 +1744,14 @@ R1 ships the plan renderer with the disposition union `done (verified) | conflic
   ```
 
   (Adapt constructor/args names to R1's actual API — the assertions above are the contract; the fixture plumbing follows the file's existing tests.)
-- [ ] Run: `npx vitest run src/project/adoption-plan.test.ts` — new tests FAIL.
-- [ ] Implement:
+- [x] Run: `npx vitest run src/project/adoption-plan.test.ts` — new tests FAIL.
+- [x] Implement:
   - Extend the disposition union with `'map-candidate'` and add `target?: string` (present iff disposition is `map-candidate`) plus `mode?: 'fresh' | 'update' | 'adoption'` (present iff disposition is `run`) to the step-record type. Because R1's `plan_key` hashes the canonical JSON of the complete records, both fields flow into the key with no hasher change — the second test proves it.
   - In the plan builder, after D3 verification produces per-step verdicts: call `proposeMapCandidates` (Task 8) with `resolvedSteps` = the preset-resolved pipeline, `satisfiedSteps` = steps whose verification verdict is verified/declared-complete, `existingMap` = `config.artifact_map ?? {}`. A proposed candidate sets the step's disposition to `map-candidate` with its `target` (map-candidate outranks `run`/`skip-proposed` for that step; it never overrides `done (verified)` or `conflict`).
   - For each `run` disposition, compute `mode`. **First-touch guard:** R1's `buildAdoptionPlan` sets `state: PipelineState | null = null` and only loads it when `.scaffold/state.json` exists — the primary D2 brownfield entry has no `.scaffold/`, so `state` is null there. When `state === null`, derive the mode from the plan's own init-mode instead of calling `resolveAssemblyMode` with a null state: `plan.mode === 'brownfield' || plan.mode === 'v1-migration'` ⇒ `'adoption'`, else `'fresh'` (there is no per-step state to consult on first touch). Only when `state !== null` call `resolveAssemblyMode({ step, state, currentDepth: <resolved depth>, projectRoot, artifactMap: config.artifact_map })`. (`resolveAssemblyMode` requires a non-null `PipelineState`; do not widen its signature.)
   - Renderer rows (human format): `map-candidate` → `map-candidate → <target>   (accept: --apply writes artifact_map.<step>)`; `run` → `run — <mode> mode`. JSON output carries `target` and `mode` verbatim.
-- [ ] Run: `npx vitest run src/project/adoption-plan.test.ts` — all green; also `npx vitest run src/project/` to confirm no R1 plan tests regressed.
-- [ ] Commit: `feat(adopt): map-candidate disposition + run-mode annotation in adoption plan (D10, §6.1)`
+- [x] Run: `npx vitest run src/project/adoption-plan.test.ts` — all green; also `npx vitest run src/project/` to confirm no R1 plan tests regressed.
+- [x] Commit: `feat(adopt): map-candidate disposition + run-mode annotation in adoption plan (D10, §6.1)`
 
 ---
 
@@ -1601,7 +1774,7 @@ export function applyArtifactMappings(
 
 **Steps:**
 
-- [ ] Write failing tests:
+- [x] Write failing tests:
 
   ```ts
   describe('applyArtifactMappings (D10a apply)', () => {
@@ -1633,8 +1806,8 @@ export function applyArtifactMappings(
   })
   ```
 
-- [ ] Run: `npx vitest run src/cli/commands/adopt.test.ts` — FAIL.
-- [ ] Implement in `src/cli/commands/adopt.ts`, next to `writeOrUpdateConfig` (same `parseDocument` + `atomicWriteFileSync` pattern):
+- [x] Run: `npx vitest run src/cli/commands/adopt.test.ts` — FAIL.
+- [x] Implement in `src/cli/commands/adopt.ts`, next to `writeOrUpdateConfig` (same `parseDocument` + `atomicWriteFileSync` pattern):
 
   ```ts
   /**
@@ -1660,9 +1833,9 @@ export function applyArtifactMappings(
   }
   ```
 
-- [ ] Wire the apply driver: where R1's apply path iterates approved dispositions, handle `map-candidate` as: (1) collect all approved mappings and call `applyArtifactMappings` once; (2) **re-run D3 verification for each mapped step with the updated map** (Task 2's `artifactMap` param); (3) only when verification passes, record the step `completed` / `verification: 'verified'` through R1's state-write path — a mapping whose verification still fails (e.g. the file vanished between plan and apply) leaves the step `pending` and surfaces a warning. Apply never blind-writes `completed` from the disposition alone — completion is always the verification result. Add one integration assertion to the R1 apply test suite: approved map-candidate ⇒ config contains the mapping AND state shows `completed`/`verified` for the step.
-- [ ] Run: `npx vitest run src/cli/commands/adopt.test.ts src/project/` — all green.
-- [ ] Commit: `feat(adopt): apply approved artifact mappings with honest re-verification (D10a)`
+- [x] Wire the apply driver: where R1's apply path iterates approved dispositions, handle `map-candidate` as: (1) collect all approved mappings and call `applyArtifactMappings` once; (2) **re-run D3 verification for each mapped step with the updated map** (Task 2's `artifactMap` param); (3) only when verification passes, record the step `completed` / `verification: 'verified'` through R1's state-write path — a mapping whose verification still fails (e.g. the file vanished between plan and apply) leaves the step `pending` and surfaces a warning. Apply never blind-writes `completed` from the disposition alone — completion is always the verification result. Add one integration assertion to the R1 apply test suite: approved map-candidate ⇒ config contains the mapping AND state shows `completed`/`verified` for the step.
+- [x] Run: `npx vitest run src/cli/commands/adopt.test.ts src/project/` — all green.
+- [x] Commit: `feat(adopt): apply approved artifact mappings with honest re-verification (D10a)`
 
 ---
 
@@ -1680,7 +1853,7 @@ export function applyArtifactMappings(
 
 **Steps:**
 
-- [ ] Create `tests/evals/adoption-mode-specifics.bats`:
+- [x] Create `tests/evals/adoption-mode-specifics.bats`:
 
   ```bash
   #!/usr/bin/env bats
@@ -1767,8 +1940,8 @@ export function applyArtifactMappings(
   }
   ```
 
-- [ ] Run: `npx bats tests/evals/adoption-mode-specifics.bats` — expect test 1 to FAIL for all five files (blocks absent). Tests 2–3 pass vacuously.
-- [ ] Append to `content/pipeline/foundation/tech-stack.md` (at end of file — Update Mode Specifics is its last section):
+- [x] Run: `npx bats tests/evals/adoption-mode-specifics.bats` — expect test 1 to FAIL for all five files (blocks absent). Tests 2–3 pass vacuously.
+- [x] Append to `content/pipeline/foundation/tech-stack.md` (at end of file — Update Mode Specifics is its last section):
 
   ```markdown
 
@@ -1791,7 +1964,7 @@ export function applyArtifactMappings(
     concern as a gap, not a migration plan.
   ```
 
-- [ ] Append to `content/pipeline/foundation/coding-standards.md` (at end of file):
+- [x] Append to `content/pipeline/foundation/coding-standards.md` (at end of file):
 
   ```markdown
 
@@ -1815,7 +1988,7 @@ export function applyArtifactMappings(
     existing codebase violates without marking them "new code only".
   ```
 
-- [ ] Append to `content/pipeline/foundation/tdd.md` (after the Update Mode Specifics section, per the Global Constraints placement rule):
+- [x] Append to `content/pipeline/foundation/tdd.md` (after the Update Mode Specifics section, per the Global Constraints placement rule):
 
   ```markdown
 
@@ -1833,7 +2006,7 @@ export function applyArtifactMappings(
     as coverage gaps with evidence.
   ```
 
-- [ ] Append to `content/pipeline/foundation/project-structure.md` (per placement rule):
+- [x] Append to `content/pipeline/foundation/project-structure.md` (per placement rule):
 
   ```markdown
 
@@ -1851,7 +2024,7 @@ export function applyArtifactMappings(
     organization strategy that contradicts the observed one.
   ```
 
-- [ ] Append to `content/pipeline/foundation/beads.md` (per placement rule):
+- [x] Append to `content/pipeline/foundation/beads.md` (per placement rule):
 
   ```markdown
 
@@ -1872,8 +2045,8 @@ export function applyArtifactMappings(
     issues and beads.
   ```
 
-- [ ] Run: `npx bats tests/evals/adoption-mode-specifics.bats` — expect `ok` ×3. Then `npx bats tests/evals/update-mode-specifics-paths.bats` — must remain green (the new blocks don't touch UMS Detect lines).
-- [ ] Commit: `feat(content): Adoption Mode Specifics — foundation batch 1 + eval (D11)`
+- [x] Run: `npx bats tests/evals/adoption-mode-specifics.bats` — expect `ok` ×3. Then `npx bats tests/evals/update-mode-specifics-paths.bats` — must remain green (the new blocks don't touch UMS Detect lines).
+- [x] Commit: `feat(content): Adoption Mode Specifics — foundation batch 1 + eval (D11)`
 
 ---
 
@@ -1889,7 +2062,7 @@ export function applyArtifactMappings(
 
 **Steps:**
 
-- [ ] Extend `ADOPTION_STEP_FILES` in the eval with:
+- [x] Extend `ADOPTION_STEP_FILES` in the eval with:
 
   ```bash
     "foundation/github-setup.md"
@@ -1899,8 +2072,8 @@ export function applyArtifactMappings(
     "environment/staging-environments.md"
   ```
 
-- [ ] Run: `npx bats tests/evals/adoption-mode-specifics.bats` — test 1 FAILS for the five new files.
-- [ ] Add to `content/pipeline/foundation/github-setup.md` (per placement rule — after the Update Mode Specifics section and its trailing `###` subsections, before the next `##` heading or at EOF):
+- [x] Run: `npx bats tests/evals/adoption-mode-specifics.bats` — test 1 FAILS for the five new files.
+- [x] Add to `content/pipeline/foundation/github-setup.md` (per placement rule — after the Update Mode Specifics section and its trailing `###` subsections, before the next `##` heading or at EOF):
 
   ```markdown
 
@@ -1920,7 +2093,7 @@ export function applyArtifactMappings(
     secret scan the Update Mode Specifics above already requires.
   ```
 
-- [ ] Add to `content/pipeline/environment/dev-env-setup.md` (insert immediately before the `## Instructions` heading):
+- [x] Add to `content/pipeline/environment/dev-env-setup.md` (insert immediately before the `## Instructions` heading):
 
   ```markdown
   ## Adoption Mode Specifics
@@ -1946,7 +2119,7 @@ export function applyArtifactMappings(
 
   ```
 
-- [ ] Add to `content/pipeline/environment/git-workflow.md` (per placement rule):
+- [x] Add to `content/pipeline/environment/git-workflow.md` (per placement rule):
 
   ```markdown
 
@@ -1969,7 +2142,7 @@ export function applyArtifactMappings(
     alongside via `scaffold hooks install`); force any branch renames.
   ```
 
-- [ ] Add to `content/pipeline/environment/merge-throughput.md` (per placement rule):
+- [x] Add to `content/pipeline/environment/merge-throughput.md` (per placement rule):
 
   ```markdown
 
@@ -1988,7 +2161,7 @@ export function applyArtifactMappings(
     and the local queue; install the queue speculatively on a solo project.
   ```
 
-- [ ] Add to `content/pipeline/environment/staging-environments.md` (per placement rule):
+- [x] Add to `content/pipeline/environment/staging-environments.md` (per placement rule):
 
   ```markdown
 
@@ -2010,8 +2183,8 @@ export function applyArtifactMappings(
     configuration.
   ```
 
-- [ ] Run: `npx bats tests/evals/adoption-mode-specifics.bats` — `ok` ×3 (ten files now enforced).
-- [ ] Commit: `feat(content): Adoption Mode Specifics — batch 2, github-setup + environment core (D11)`
+- [x] Run: `npx bats tests/evals/adoption-mode-specifics.bats` — `ok` ×3 (ten files now enforced).
+- [x] Commit: `feat(content): Adoption Mode Specifics — batch 2, github-setup + environment core (D11)`
 
 ---
 
@@ -2027,7 +2200,7 @@ export function applyArtifactMappings(
 
 **Steps:**
 
-- [ ] Extend `ADOPTION_STEP_FILES` with:
+- [x] Extend `ADOPTION_STEP_FILES` with:
 
   ```bash
     "environment/design-system.md"
@@ -2037,8 +2210,8 @@ export function applyArtifactMappings(
     "vision/create-vision.md"
   ```
 
-- [ ] Run: `npx bats tests/evals/adoption-mode-specifics.bats` — test 1 FAILS for the five new files.
-- [ ] Add to `content/pipeline/environment/design-system.md` (per placement rule):
+- [x] Run: `npx bats tests/evals/adoption-mode-specifics.bats` — test 1 FAILS for the five new files.
+- [x] Add to `content/pipeline/environment/design-system.md` (per placement rule):
 
   ```markdown
 
@@ -2060,7 +2233,7 @@ export function applyArtifactMappings(
     explicit approval.
   ```
 
-- [ ] Add to `content/pipeline/environment/ai-memory-setup.md` (per placement rule):
+- [x] Add to `content/pipeline/environment/ai-memory-setup.md` (per placement rule):
 
   ```markdown
 
@@ -2079,7 +2252,7 @@ export function applyArtifactMappings(
     stale-looking instructions without confirmation.
   ```
 
-- [ ] Add to `content/pipeline/environment/automated-pr-review.md` (per placement rule):
+- [x] Add to `content/pipeline/environment/automated-pr-review.md` (per placement rule):
 
   ```markdown
 
@@ -2097,7 +2270,7 @@ export function applyArtifactMappings(
     unrelated PRs.
   ```
 
-- [ ] Add to `content/pipeline/pre/create-prd.md` (per placement rule — after the Update Mode Specifics section and its trailing `###` subsections, i.e. at end of file):
+- [x] Add to `content/pipeline/pre/create-prd.md` (per placement rule — after the Update Mode Specifics section and its trailing `###` subsections, i.e. at end of file):
 
   ```markdown
 
@@ -2117,7 +2290,7 @@ export function applyArtifactMappings(
     removed.
   ```
 
-- [ ] Add to `content/pipeline/vision/create-vision.md` (per placement rule):
+- [x] Add to `content/pipeline/vision/create-vision.md` (per placement rule):
 
   ```markdown
 
@@ -2136,8 +2309,8 @@ export function applyArtifactMappings(
     already exists.
   ```
 
-- [ ] Run: `npx bats tests/evals/adoption-mode-specifics.bats` — `ok` ×3 (fifteen files enforced).
-- [ ] Commit: `feat(content): Adoption Mode Specifics — batch 3, design/memory/review + product docs (D11)`
+- [x] Run: `npx bats tests/evals/adoption-mode-specifics.bats` — `ok` ×3 (fifteen files enforced).
+- [x] Commit: `feat(content): Adoption Mode Specifics — batch 3, design/memory/review + product docs (D11)`
 
 ---
 
@@ -2151,7 +2324,7 @@ export function applyArtifactMappings(
 
 **Steps:**
 
-- [ ] Extend `ADOPTION_STEP_FILES` with:
+- [x] Extend `ADOPTION_STEP_FILES` with:
 
   ```bash
     "modeling/domain-modeling.md"
@@ -2170,8 +2343,8 @@ export function applyArtifactMappings(
   }
   ```
 
-- [ ] Run: `npx bats tests/evals/adoption-mode-specifics.bats` — test 1 FAILS for the three new files; count lock passes.
-- [ ] Add to `content/pipeline/modeling/domain-modeling.md` (per placement rule):
+- [x] Run: `npx bats tests/evals/adoption-mode-specifics.bats` — test 1 FAILS for the three new files; count lock passes.
+- [x] Add to `content/pipeline/modeling/domain-modeling.md` (per placement rule):
 
   ```markdown
 
@@ -2192,7 +2365,7 @@ export function applyArtifactMappings(
     conflict.
   ```
 
-- [ ] Add to `content/pipeline/architecture/system-architecture.md` (per placement rule):
+- [x] Add to `content/pipeline/architecture/system-architecture.md` (per placement rule):
 
   ```markdown
 
@@ -2211,7 +2384,7 @@ export function applyArtifactMappings(
     structure as a defect — absence of a diagram is not absence of a design.
   ```
 
-- [ ] Add to `content/pipeline/quality/security.md` (per placement rule):
+- [x] Add to `content/pipeline/quality/security.md` (per placement rule):
 
   ```markdown
 
@@ -2231,8 +2404,8 @@ export function applyArtifactMappings(
     existing control.
   ```
 
-- [ ] Run: `npx bats tests/evals/adoption-mode-specifics.bats` — all 4 tests `ok`; all 18 files enforced. Then run the neighboring content evals to prove no regression: `npx bats tests/evals/update-mode-specifics-paths.bats tests/evals/prompt-quality.bats tests/evals/pipeline-completeness.bats` — all `ok`.
-- [ ] Commit: `feat(content): Adoption Mode Specifics — batch 4, modeling/architecture/security; 18-step manifest locked (D11)`
+- [x] Run: `npx bats tests/evals/adoption-mode-specifics.bats` — all 4 tests `ok`; all 18 files enforced. Then run the neighboring content evals to prove no regression: `npx bats tests/evals/update-mode-specifics-paths.bats tests/evals/prompt-quality.bats tests/evals/pipeline-completeness.bats` — all `ok`.
+- [x] Commit: `feat(content): Adoption Mode Specifics — batch 4, modeling/architecture/security; 18-step manifest locked (D11)`
 
 ---
 
@@ -2243,7 +2416,7 @@ export function applyArtifactMappings(
 
 **Steps:**
 
-- [ ] In CLAUDE.md's **Editing Guidelines** section, after the existing bullet about Mode Detection + Update Mode Specifics blocks, add:
+- [x] In CLAUDE.md's **Editing Guidelines** section, after the existing bullet about Mode Detection + Update Mode Specifics blocks, add:
 
   ```markdown
   - Adoption-capable steps (18 initially — the pinned list lives in
@@ -2259,8 +2432,8 @@ export function applyArtifactMappings(
     eval's `ADOPTION_STEP_FILES` manifest.
   ```
 
-- [ ] Verify the eval still gates the claim: `npx bats tests/evals/adoption-mode-specifics.bats` — `ok` ×4.
-- [ ] Commit: `docs(claude-md): adoption-mode block convention in editing guidelines (D11)`
+- [x] Verify the eval still gates the claim: `npx bats tests/evals/adoption-mode-specifics.bats` — `ok` ×4.
+- [x] Commit: `docs(claude-md): adoption-mode block convention in editing guidelines (D11)`
 
 ---
 
@@ -2272,7 +2445,7 @@ export function applyArtifactMappings(
 
 **Steps:**
 
-- [ ] Add the R3 entry at the top of `CHANGELOG.md` (version number per the release mapping — nominally the third minor after R1; confirm against the actual R1/R2 released versions and the operations runbook before tagging):
+- [x] Add the R3 entry at the top of `CHANGELOG.md` (version number per the release mapping — nominally the third minor after R1; confirm against the actual R1/R2 released versions and the operations runbook before tagging):
 
   ```markdown
   ## [Unreleased] — brownfield R3 (Tier B): adoption mode + ingestion
@@ -2307,7 +2480,7 @@ export function applyArtifactMappings(
     (completed steps with outputs migrate to `declared`).
   ```
 
-- [ ] In `README.md`, in the section covering brownfield adoption / `scaffold adopt`, append:
+- [x] In `README.md`, in the section covering brownfield adoption / `scaffold adopt`, append:
 
   ```markdown
   In a brownfield project, pipeline steps that have not already been satisfied
@@ -2319,7 +2492,7 @@ export function applyArtifactMappings(
   ```
 
   (Place it where the adopt plan/apply flow is described; match the surrounding tone.)
-- [ ] Commit: `docs: CHANGELOG + README for brownfield R3 adoption mode (D16)`
+- [x] Commit: `docs: CHANGELOG + README for brownfield R3 adoption mode (D16)`
 
 ---
 
@@ -2329,11 +2502,11 @@ export function applyArtifactMappings(
 
 **Steps:**
 
-- [ ] Run the TypeScript suite: `npx vitest run` — expect 0 failures.
-- [ ] Run the full quality gates: `make check-all` — expect exit 0 (ShellCheck, frontmatter validation, full bats suite including all evals, TypeScript gates). Known-sensitive evals to watch: `knowledge-quality.bats` (the new entry must be ≥200 lines with ≥1 code block and exempted from the orphan check), `knowledge-injection.bats` (Summary ⇒ Deep Guidance pairing), `update-mode-specifics-paths.bats` (untouched UMS Detect lines), `adoption-mode-specifics.bats` (18/18).
-- [ ] If any gate fails: fix the root cause (per CLAUDE.md — no exemption-padding to silence a legitimate finding), re-run `make check-all` to green.
-- [ ] Review the full branch diff against the Global Constraints section of this plan: every constraint either implemented or explicitly N/A; grep the diff for stray `TODO`/`FIXME`/placeholder text introduced by this work: `git diff origin/main...HEAD | grep -nE "TODO|FIXME|PLACEHOLDER"` — expect no new hits from this plan's files.
-- [ ] Commit any final fixes: `test: green make check-all for brownfield R3`
+- [x] Run the TypeScript suite: `npx vitest run` — expect 0 failures.
+- [x] Run the full quality gates: `make check-all` — expect exit 0 (ShellCheck, frontmatter validation, full bats suite including all evals, TypeScript gates). Known-sensitive evals to watch: `knowledge-quality.bats` (the new entry must be ≥200 lines with ≥1 code block and exempted from the orphan check), `knowledge-injection.bats` (Summary ⇒ Deep Guidance pairing), `update-mode-specifics-paths.bats` (untouched UMS Detect lines), `adoption-mode-specifics.bats` (18/18).
+- [x] If any gate fails: fix the root cause (per CLAUDE.md — no exemption-padding to silence a legitimate finding), re-run `make check-all` to green.
+- [x] Review the full branch diff against the Global Constraints section of this plan: every constraint either implemented or explicitly N/A; grep the diff for stray `TODO`/`FIXME`/placeholder text introduced by this work: `git diff origin/main...HEAD | grep -nE "TODO|FIXME|PLACEHOLDER"` — expect no new hits from this plan's files.
+- [x] Commit any final fixes: `test: green make check-all for brownfield R3`
 
 ---
 

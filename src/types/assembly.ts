@@ -4,6 +4,9 @@ import type { ScaffoldConfig } from './config.js'
 import type { PipelineState } from './state.js'
 import type { ScaffoldError, ScaffoldWarning } from './errors.js'
 
+/** Resolved assembly mode for a step (D3 matrix, brownfield R3). */
+export type AssemblyMode = 'fresh' | 'update' | 'adoption'
+
 export interface KnowledgeSource {
   url: string
   anchor?: string
@@ -75,6 +78,8 @@ export interface AssemblyMetadata {
   assembledAt: string
   updateMode: boolean
   sectionsIncluded: string[]
+  /** Resolved assembly mode for this step (D3 matrix, brownfield R3). */
+  assemblyMode: AssemblyMode
 }
 
 /** The complete assembled prompt. */
@@ -103,6 +108,10 @@ export interface AssemblyOptions {
   existingArtifact?: ExistingArtifact
   /** When true, inject auto-fix instructions for review steps in rework mode. */
   reworkFix?: boolean
+  /** Resolved assembly mode (brownfield R3). Defaults from updateMode when absent. */
+  assemblyMode?: AssemblyMode
+  /** Global adoption-mode preamble text (content/modes/adoption.md). Injected only when assemblyMode === 'adoption'. */
+  adoptionPreamble?: string
 }
 
 /** Result from AssemblyEngine.assemble(). */

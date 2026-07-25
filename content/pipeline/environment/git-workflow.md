@@ -185,6 +185,24 @@ repairs missing hook registrations without touching user entries.
   confirmation; verify the CLAUDE.md workflow section stays consistent
   after any changes
 
+## Adoption Mode Specifics
+- **Codify from repo evidence**: the collaboration patterns git history
+  proves — branch naming from recent branches
+  (`git branch -a --sort=-committerdate`), merge style from
+  `git log --merges --oneline -30` (squash versus merge commits), the
+  existing PR template, hooks already installed, and protected-branch
+  rules. Document the incumbent workflow before layering the
+  parallel-agent machinery on top of it.
+- **Interview only for**: willingness to move to squash-merge and
+  one-branch-per-task where history shows another style; how many parallel
+  agents are expected (drives the worktree and queue decisions); and which
+  incumbent hooks must be preserved.
+- **Ingest with provenance**: an existing .github/pull_request_template.md
+  is extended, not replaced, with provenance annotations on added sections.
+- **Do not**: rewrite commit-format conventions retroactively or demand
+  history cleanup; overwrite existing git hooks (scaffold hooks are merged
+  alongside via `scaffold hooks install`); force any branch renames.
+
 ## Instructions
 
 ### Install the agent-ops git component

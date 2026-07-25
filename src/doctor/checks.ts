@@ -57,6 +57,7 @@ export const pipelineVerificationCheck: DoctorCheck = {
       const meta = pipeline.stepMeta.get(slug)
       const verification = verifyStep(
         slug, entry, meta?.outputs ?? entry.produces ?? [], meta?.detect ?? null, ctx.projectRoot,
+        context.config?.artifact_map,
       )
       if (verification.status === 'conflict') conflicts.push(slug)
       else if (verification.verification === 'verified') verified++
