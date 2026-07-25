@@ -4306,7 +4306,7 @@ describe('scaffold mq bootstrap (CLI wiring)', () => {
 
 **Steps:**
 
-- [ ] Write the failing test `src/doctor/fixes/ops-fixes.test.ts`:
+- [x] Write the failing test `src/doctor/fixes/ops-fixes.test.ts`:
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -4402,8 +4402,8 @@ describe('fixSchedulerReload (thin D6 wrapper)', () => {
 })
 ```
 
-- [ ] Run: `npx vitest run src/doctor/fixes/ops-fixes.test.ts` — expect FAILURE (module missing).
-- [ ] Create `src/doctor/fixes/ops-fixes.ts`:
+- [x] Run: `npx vitest run src/doctor/fixes/ops-fixes.test.ts` — expect FAILURE (module missing).
+- [x] Create `src/doctor/fixes/ops-fixes.ts`:
 
 ```ts
 import { installHooks, type HooksInstallResult } from '../../core/hooks/install.js'
@@ -4457,8 +4457,8 @@ export function fixSchedulerReload(
 }
 ```
 
-- [ ] Run: `npx vitest run src/doctor/fixes/ops-fixes.test.ts` — expect 6 tests passed.
-- [ ] Register the fixes on the R1 checks. Locate them: `grep -rn "section" src/doctor --include="*.ts" | grep -iv test | grep -i "hooks\|sched"` (fall back to `grep -rln "hooks\|scheduler" src/doctor --include="*.ts"`). In the **hooks section check**, add the optional `fix` member the R1 registry shape declares (`{section, run(), severity, remediation, fix?()}`):
+- [x] Run: `npx vitest run src/doctor/fixes/ops-fixes.test.ts` — expect 6 tests passed.
+- [x] Register the fixes on the R1 checks. Locate them: `grep -rn "section" src/doctor --include="*.ts" | grep -iv test | grep -i "hooks\|sched"` (fall back to `grep -rln "hooks\|scheduler" src/doctor --include="*.ts"`). In the **hooks section check**, add the optional `fix` member the R1 registry shape declares (`{section, run(), severity, remediation, fix?()}`):
 
 ```ts
   fix: (ctx) => {
@@ -4477,9 +4477,9 @@ export function fixSchedulerReload(
 ```
 
   with `import { fixHookRegistration, fixSchedulerReload } from '../fixes/ops-fixes.js'` (adjust the relative path to each check file's location). The adapter closures above are the registration glue: R1's registry pins `fix?: (ctx: DoctorContext) => { applied: boolean; detail: string }` (R1 plan Task 7), while the R2 wrappers return `OpsFixResult { ok, messages }` — map `ok → applied` and `messages.join('; ') → detail` exactly as shown, and take `projectRoot` from the `DoctorContext` the registry passes.
-- [ ] Update R1's `--fix` gating so these two fixes are eligible: R1 shipped with only the `bd doctor --fix` delegation enabled (spec D5 "release-staged"). Find the gate — `grep -rn "fix" src/cli/commands/doctor.ts src/doctor --include="*.ts" | grep -iv test | grep -i "delegat\|only\|R1\|stage"` — and remove/replace any allowlist that excludes checks carrying a `fix()` member, so `doctor --fix` now runs every registered `fix()` (still only idempotent safe fixes exist: bd delegation, hook re-registration, scheduler reload — all three never reset state or delete files).
-- [ ] Run: `npx vitest run src/doctor` — the R1 doctor tests plus the 6 new wrapper tests all green. If an R1 test asserted that hooks/scheduler failures are report-only under `--fix`, update it to assert the fix now runs (that staging note was explicitly "fix handlers land in R2", spec D5).
-- [ ] Commit: `git add -A && git commit -m "feat(doctor): R2 --fix wrappers — hook re-registration (D8) + scheduler reload (D6), thin over primitives"`
+- [x] Update R1's `--fix` gating so these two fixes are eligible: R1 shipped with only the `bd doctor --fix` delegation enabled (spec D5 "release-staged"). Find the gate — `grep -rn "fix" src/cli/commands/doctor.ts src/doctor --include="*.ts" | grep -iv test | grep -i "delegat\|only\|R1\|stage"` — and remove/replace any allowlist that excludes checks carrying a `fix()` member, so `doctor --fix` now runs every registered `fix()` (still only idempotent safe fixes exist: bd delegation, hook re-registration, scheduler reload — all three never reset state or delete files).
+- [x] Run: `npx vitest run src/doctor` — the R1 doctor tests plus the 6 new wrapper tests all green. If an R1 test asserted that hooks/scheduler failures are report-only under `--fix`, update it to assert the fix now runs (that staging note was explicitly "fix handlers land in R2", spec D5).
+- [x] Commit: `git add -A && git commit -m "feat(doctor): R2 --fix wrappers — hook re-registration (D8) + scheduler reload (D6), thin over primitives"`
 
 ---
 
