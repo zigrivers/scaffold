@@ -1971,7 +1971,7 @@ export function gateTemplateVars(seed: GateSeed): Record<string, string> {
 
 **Steps:**
 
-- [ ] Write the failing test `src/core/agent-ops/install.gate.test.ts`:
+- [x] Write the failing test `src/core/agent-ops/install.gate.test.ts`:
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -2085,8 +2085,8 @@ describe('ensureGateMakeTargets', () => {
 })
 ```
 
-- [ ] Run: `npx vitest run src/core/agent-ops/install.gate.test.ts` — expect FAILURE.
-- [ ] Edit `src/core/agent-ops/install.ts`. The complete set of changes:
+- [x] Run: `npx vitest run src/core/agent-ops/install.gate.test.ts` — expect FAILURE.
+- [x] Edit `src/core/agent-ops/install.ts`. The complete set of changes:
 
   1. Type + import changes at the top:
 
@@ -2272,9 +2272,9 @@ export function ensureGateMakeTargets(projectRoot: string, seed: GateSeed): stri
 }
 ```
 
-- [ ] Run: `npx vitest run src/core/agent-ops/install.gate.test.ts` — expect 8 tests passed.
-- [ ] Run: `npx vitest run src/core/agent-ops src/cli/commands/agent-ops.test.ts` — the pre-existing install/check tests must still pass (the `seeds: []`/`seedKept: []` additions are backward-compatible; fix any result-shape assertion that lists exact keys).
-- [ ] Commit: `git add -A && git commit -m "feat(agent-ops): gate component with seed:true manifest semantics + thin Makefile targets"`
+- [x] Run: `npx vitest run src/core/agent-ops/install.gate.test.ts` — expect 8 tests passed.
+- [x] Run: `npx vitest run src/core/agent-ops src/cli/commands/agent-ops.test.ts` — the pre-existing install/check tests must still pass (the `seeds: []`/`seedKept: []` additions are backward-compatible; fix any result-shape assertion that lists exact keys).
+- [x] Commit: `git add -A && git commit -m "feat(agent-ops): gate component with seed:true manifest semantics + thin Makefile targets"`
 
 ---
 
