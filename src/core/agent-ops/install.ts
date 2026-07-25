@@ -349,6 +349,29 @@ export function installAgentOps(projectRoot: string, opts: AgentOpsInstallOption
   return result
 }
 
+/** Every project-root-relative path installAgentOps creates or edits for these
+ *  components: the requested component seed/dest files, the shared make fragment
+ *  (installed for ANY component), the ownership manifest, the version marker, the
+ *  Makefile include, and — for merge-queue — the .gitignore entry. Sorted,
+ *  de-duplicated, read-only. The ops-actions preview derives install-component
+ *  file lists from THIS (never from AGENT_OPS_FILE_MAP directly), so the preview
+ *  and its plan_key can never omit an apply-relevant write. Keep this in lockstep
+ *  with installAgentOps — the two must agree on what a component install writes. */
+export function plannedInstallPaths(components: AgentOpsComponent[]): string[] {
+  const set = new Set<string>()
+  for (const [tmpl, spec] of Object.entries(AGENT_OPS_FILE_MAP)) {
+    const requested = tmpl === MAKE_FRAGMENT_TMPL
+      ? components.length > 0
+      : components.includes(spec.component)
+    if (requested) set.add(spec.dest)
+  }
+  set.add(MANIFEST_PATH)
+  set.add(VERSION_MARKER_PATH)
+  if (components.length > 0) set.add('Makefile')
+  if (components.includes('merge-queue')) set.add('.gitignore')
+  return [...set].sort()
+}
+
 export function checkAgentOps(projectRoot: string): AgentOpsCheckResult {
   const manifest = readManifest(projectRoot)
   const markerPath = path.join(projectRoot, VERSION_MARKER_PATH)

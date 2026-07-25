@@ -121,6 +121,28 @@ describe('buildAdoptionPlan (D1/D2/§6.1)', () => {
     expect(after.steps.find((s) => s.step_slug === 'tech-stack')!.disposition).toBe('done-verified')
     expect(after.steps.find((s) => s.step_slug === 'tech-stack')!.apply_action).toBe('mark-completed')
   })
+
+  it('plan_key changes when an ops-action record changes (R2 §6.1)', () => {
+    // Render once on a bare tmp project, then install every file the git
+    // component's ops-action record would write (its complete plannedInstallPaths
+    // set) so that record disappears from the ops-actions preview entirely, and
+    // render again: the two keys MUST differ, because ops-action records are part
+    // of the keyed records. Prose/whitespace edits to the written markdown must
+    // NOT change the key (covered by R1's existing tests, which still pass
+    // unchanged).
+    const dir = makeRepo()
+    const before = buildAdoptionPlan({ projectRoot: dir, adoptResult: brownfieldResult() }).plan
+    const gitRecord = before.ops_actions.find((r) => r.command.endsWith('--component git'))
+    expect(gitRecord).toBeDefined()
+    for (const f of gitRecord!.files) {
+      const p = path.join(dir, f)
+      fs.mkdirSync(path.dirname(p), { recursive: true })
+      fs.writeFileSync(p, 'x\n')
+    }
+    const after = buildAdoptionPlan({ projectRoot: dir, adoptResult: brownfieldResult() }).plan
+    expect(after.ops_actions.some((r) => r.command.endsWith('--component git'))).toBe(false)
+    expect(after.plan_key).not.toBe(before.plan_key)
+  })
 })
 
 describe('renderPlanMarkdown + extractPlanKey', () => {
