@@ -357,7 +357,12 @@ export function applyConflictOverrides(
       const fullPath = resolveContainedArtifactPath(projectRoot, relPath)
       return fullPath === null || !fileExists(fullPath)
     })
-    if (anyMissing) {
+    // artifact_map is a ROOT-level mapping (R3 scope: root-only). It may only
+    // satisfy a root-scoped check — for a service-local step the mapped root
+    // incumbent must NOT mask a genuinely-missing services/<svc>/ artifact, or
+    // `scaffold status --service <svc>` would report a false completion (mirrors
+    // resolveAssemblyMode's `service === undefined` guard on the same fallback).
+    if (anyMissing && !isServiceLocal) {
       const mapped = artifactMap?.[slug]
       if (mapped !== undefined) {
         const mappedFull = resolveContainedArtifactPath(projectRoot, mapped)

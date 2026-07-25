@@ -180,6 +180,16 @@ These are pinned by the approved spec — do not re-litigate during implementati
 
 ### Task 2: Verification honors mapped artifacts
 
+> **Reviewer note — RESOLVED (P1, PR #786 plan-aware review).** `applyConflictOverrides`'s
+> `artifactMap` fallback (masking a missing output with a mapped incumbent) was
+> not gated on service scope, unlike the parallel live-conflict guard in
+> `resolveAssemblyMode`. R3's `artifact_map` is ROOT-only, so a root mapping could
+> mask a genuinely-missing `services/<svc>/` artifact — `scaffold status --service <svc>`
+> would report a false completion (the exact dishonesty R3 removes). Fixed by
+> gating the fallback on `!isServiceLocal`. Test: a root `artifact_map` entry does
+> not mask a service-local missing artifact (still a conflict) while root scope
+> still honors the mapping.
+
 > **Reviewer note (deferred from PR #783 review — resolve during implementation):**
 > `artifactMap` must also be honored by `applyConflictOverrides` (the fs-only
 > demotion R1 added for `status`/`next`), not only `verifyStep`. Otherwise a

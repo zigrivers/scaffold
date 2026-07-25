@@ -593,5 +593,25 @@ describe('applyConflictOverrides (D3 — fs-only eligibility demotion)', () => {
       const result = applyConflictOverrides(steps, dir)
       expect(result.conflicts).toEqual(['tech-stack'])
     })
+
+    it('a ROOT artifact_map entry does NOT mask a service-local missing artifact (mapping is root-only)', () => {
+      // Multi-service project: the api service's own coding-standards doc is
+      // missing, but a root-level CONTRIBUTING.md is mapped via artifact_map.
+      // R3's artifact_map is root-scoped — it must NOT satisfy a --service check,
+      // or `scaffold status --service api` would report a false completion.
+      const dir = makeTempDir()
+      fs.writeFileSync(path.join(dir, 'CONTRIBUTING.md'), '# house rules', 'utf8')
+      const steps: Record<string, StepStateEntry> = {
+        'coding-standards': { status: 'completed', source: 'pipeline', produces: ['docs/coding-standards.md'] },
+      }
+      const artifactMap = { 'coding-standards': 'CONTRIBUTING.md' }
+      // service scope: the root mapping is ignored → still a conflict.
+      const svc = applyConflictOverrides(steps, dir, undefined, 'api', new Set(), artifactMap)
+      expect(svc.conflicts).toEqual(['coding-standards'])
+      expect(svc.steps['coding-standards'].status).toBe('pending')
+      // root scope (service omitted): the mapping DOES satisfy → no conflict.
+      const root = applyConflictOverrides(steps, dir, undefined, undefined, undefined, artifactMap)
+      expect(root.conflicts).toEqual([])
+    })
   })
 })
