@@ -261,3 +261,32 @@ committing, and ALWAYS run the full `make check-all` at branch level before push
 implementer says "eslint clean", don't trust it as branch-clean; the branch gate
 is the source of truth. (Fixing max-len is mechanical line-wrapping — no logic
 change — but it must be caught before the PR, not after.)
+
+## Never interpolate config-derived strings into `bash -c` — use quoted positionals ($1) (2026-07-24)
+**Pattern:** R2 review (PR #785) surfaced a P0 in `gateTargetResolves`
+(`src/cli/commands/mq.ts`): it built `bash -c` with the command's first token
+interpolated raw — `execFileSync('bash', ['-c', \`command -v ${exe[0]}\`])`.
+Because that token comes from a project's `.scaffold/agent-ops.yaml` gate
+command — attacker-controllable in a brownfield repo being *adopted* — a value
+like `$(touch pwned)x` or `` `evil` `` (one whitespace-delimited token) is
+evaluated by the shell as command substitution → arbitrary code execution, run
+by `scaffold doctor` and the bootstrap preflight.
+**Rule:** When a value that could come from an untrusted repo must reach a
+shell, NEVER string-interpolate it. Pass it as a quoted positional and reference
+it as `"$1"`: `execFileSync('bash', ['-c', 'command -v "$1"', '--', exe[0]])`.
+The shell then treats it as literal data, never syntax. Prefer `execFileSync`/
+`spawnSync` with an argv array over any `execSync`/`bash -c "${x}"` form. The
+brownfield threat model (running scaffold against a repo you don't control)
+makes every project-config-derived string untrusted input by default.
+
+## A doctor probe must exercise what real usage needs, not a laxer path (2026-07-24)
+**Pattern:** Same R2 review flagged that `runGateProbe` ran the gate seed via
+`spawnSync('bash', [script])`, which succeeds even without the executable bit —
+but the Makefile `check` target runs `./scripts/gate-check.sh` DIRECTLY, which
+requires `+x`. So `scaffold doctor` reported the gate healthy while `make check`
+would fail "permission denied". A health probe that uses a more permissive
+invocation than production masks exactly the drift it exists to catch.
+**Rule:** Make a probe faithful to real usage. If production runs a script
+directly (needs `+x`), the probe must verify the exec bit (or invoke it the same
+way) and fail with actionable remediation (`chmod +x <path>`), not silently pass
+under `bash <script>`.

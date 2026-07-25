@@ -58,4 +58,15 @@ describe('runGateProbe (D5 gate section, R2)', () => {
     expect(res.ran).toBe(true)
     expect(res.ok).toBe(false)
   })
+  it('fails a non-executable gate script (make check runs it directly, needs +x) with remediation', () => {
+    const root = project(HONORS_PROBE)
+    fs.chmodSync(path.join(root, 'scripts', 'gate-check.sh'), 0o644)
+    const res = runGateProbe(root)
+    expect(res.ran).toBe(true)
+    expect(res.ok).toBe(false)
+    expect(res.detail).toMatch(/not executable/)
+    expect(res.detail).toMatch(/chmod \+x scripts\/gate-check\.sh/)
+    // The probe short-circuits before running the script — the suite never runs.
+    expect(fs.existsSync(path.join(root, 'suite-ran'))).toBe(false)
+  })
 })

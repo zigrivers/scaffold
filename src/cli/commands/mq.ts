@@ -54,7 +54,12 @@ export function gateTargetResolves(projectRoot: string, command: string): boolea
     if (exe[0] === 'make') {
       execFileSync('make', ['-n', ...exe.slice(1)], { cwd: projectRoot, stdio: 'ignore', timeout: 30_000 })
     } else {
-      execFileSync('bash', ['-c', `command -v ${exe[0]}`], { cwd: projectRoot, stdio: 'ignore', timeout: 30_000 })
+      // exe[0] comes from a project-supplied command (possibly an untrusted
+      // adopted repo) — pass it as a quoted positional ($1), NEVER interpolated
+      // into the bash string, so backticks/$(...)/; in it can't execute.
+      execFileSync('bash', ['-c', 'command -v "$1"', '--', exe[0]], {
+        cwd: projectRoot, stdio: 'ignore', timeout: 30_000,
+      })
     }
     return true
   } catch {

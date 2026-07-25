@@ -3196,6 +3196,16 @@ export function planResume(
 > throwing `armHooks` and a throwing `armSched` each yield `stage:'arm'` with a
 > `--finish` message and the merge still journaled (`bootstrap_merged`).
 
+> **Reviewer note — RESOLVED (P0, PR #785 review).** `gateTargetResolves`
+> originally built the `bash -c` probe by interpolating the command's head token
+> raw (``command -v ${exe[0]}``). That token comes from a project's
+> `.scaffold/agent-ops.yaml` — untrusted in a brownfield repo being adopted — so
+> a single-token payload like `$(touch pwned)x` executed as command substitution
+> under `scaffold doctor`/bootstrap preflight. Fixed by passing the token as a
+> quoted positional (`['-c', 'command -v "$1"', '--', exe[0]]`) so the shell
+> treats it as literal data, never syntax. Test asserts a `$(…)`/`;` payload
+> resolves `false` and creates no file, while real executables still resolve.
+
 **Files:**
 - Modify: `src/merge-queue/bootstrap.ts` (append the engine)
 - Modify: `src/merge-queue/bootstrap.test.ts` (append engine tests)
@@ -4498,6 +4508,15 @@ export function fixSchedulerReload(
 ---
 
 ### Task 17: doctor gate section — upgrade resolve-only to the bounded `GATE_PROBE=1` probe
+
+> **Reviewer note — RESOLVED (P2, PR #785 review).** `runGateProbe` invoked the
+> seed via `spawnSync('bash', [script])`, which succeeds even without the exec
+> bit — but the Makefile `check` target runs `./scripts/gate-check.sh` DIRECTLY
+> (needs `+x`). The probe therefore reported the gate healthy while `make check`
+> would fail "permission denied". Fixed by verifying `mode & 0o111` before the
+> run and failing with actionable remediation (`chmod +x <path>`) when the bit is
+> missing. Test asserts a `0o644` seed yields `ok:false` with the chmod guidance
+> and never runs the suite.
 
 **Files:**
 - Create: `src/doctor/gate-probe.ts`

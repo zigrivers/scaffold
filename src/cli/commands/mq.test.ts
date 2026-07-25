@@ -6,7 +6,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { checkSync, lockSync } from 'proper-lockfile'
 import yargs from 'yargs'
-import mqCommand, { mqHandler } from './mq.js'
+import mqCommand, { gateTargetResolves, mqHandler } from './mq.js'
 import { appendEvent, readJournal } from '../../merge-queue/journal.js'
 import { reduceState } from '../../merge-queue/state.js'
 import type { BootstrapDeps } from '../../merge-queue/bootstrap.js'
@@ -200,5 +200,26 @@ describe('scaffold mq bootstrap (CLI wiring)', () => {
       .fail(false)
       .parseAsync()
     expect(seen).toEqual({ action: 'bootstrap', pr: 7, finish: true })
+  })
+})
+
+describe('gateTargetResolves (security: no shell injection via the command string)', () => {
+  it('does not execute shell metacharacters in the command — a $(...) payload never runs', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mq-gate-inj-'))
+    const marker = path.join(root, 'PWNED')
+    // If exe[0] were interpolated into `bash -c`, this substitution would run
+    // `touch PWNED` and create the file. With the quoted-positional fix, bash
+    // looks for a command literally named "$(touch …)x" — not found, no exec.
+    const payload = `$(touch ${marker})x`
+    expect(gateTargetResolves(root, payload)).toBe(false)
+    expect(fs.existsSync(marker)).toBe(false)
+    // A `;` chained payload likewise never reaches the shell as syntax.
+    expect(gateTargetResolves(root, `foo;touch ${marker}`)).toBe(false)
+    expect(fs.existsSync(marker)).toBe(false)
+  })
+  it('still resolves a real executable on PATH (true) and a missing one (false)', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mq-gate-ok-'))
+    expect(gateTargetResolves(root, 'bash --version')).toBe(true)
+    expect(gateTargetResolves(root, 'definitely-not-a-real-cmd-xyz')).toBe(false)
   })
 })

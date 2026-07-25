@@ -32,13 +32,25 @@ export function runGateProbe(
         + '(install: scaffold agent-ops install --component gate)',
     }
   }
+  // The Makefile `check` target runs `./scripts/gate-check.sh` DIRECTLY, which
+  // needs the executable bit. Running it under `bash` here would mask a missing
+  // bit and report healthy while `make check` fails "permission denied" — so
+  // verify the bit first and fail with actionable remediation if it's gone.
+  const name = path.basename(script)
+  if ((fs.statSync(script).mode & 0o111) === 0) {
+    return {
+      ran: true,
+      ok: false,
+      detail: `${name} is not executable — \`make check\` runs it directly and will fail; `
+        + `fix with: chmod +x ${path.relative(projectRoot, script)}`,
+    }
+  }
   const res = spawnSync('bash', [script], {
     cwd: projectRoot,
     env: { ...process.env, GATE_PROBE: '1' },
     timeout: opts.timeoutMs ?? GATE_PROBE_TIMEOUT_MS,
     encoding: 'utf8',
   })
-  const name = path.basename(script)
   if (res.status === 0) {
     return { ran: true, ok: true, detail: `GATE_PROBE=1 ${name}: prerequisites verified (suite not run)` }
   }
