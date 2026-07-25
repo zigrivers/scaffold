@@ -122,6 +122,47 @@ describe('selectAffected — full-suite fallbacks', () => {
     expect(s.verdict).toBe('full')
     expect(s.reason).toContain('no coverage evidence')
   })
+
+  it('a dangling covering-test edge fails closed despite a co-changed selectable file (R4 Task 13)', () => {
+    // src/a.ts's only recorded (and sibling-convention) covering test,
+    // src/a.test.ts, no longer exists on disk. src/b.ts is co-changed and
+    // DOES have a live covering test (src/b.test.ts). Pre-fix, src/a.ts's
+    // dangling map edge still set `evidence = true` without ever landing a
+    // hit, so it silently contributed nothing while src/b.ts's real hit kept
+    // the overall `selected` set non-empty — the result rode through as
+    // verdict 'selected' with zero coverage for src/a.ts. Post-fix, the
+    // per-file hits.size === 0 check catches src/a.ts and forces 'full'.
+    //
+    // Extra untouched c/d/e pairs dilute the hash-miss ratio (1 unexplained
+    // miss — the deleted a.test.ts — out of 8 considered paths = 0.125,
+    // under the 0.2 staleness threshold) so this test isolates the per-file
+    // coverage-edge check rather than tripping the earlier staleness guard.
+    const wideMap = mkMap({
+      file_hashes: {
+        'src/a.ts': 'hash-a', 'src/b.ts': 'hash-b',
+        'src/a.test.ts': 'hash-at', 'src/b.test.ts': 'hash-bt',
+        'src/c.ts': 'hash-c', 'src/c.test.ts': 'hash-ct',
+        'src/d.ts': 'hash-d', 'src/d.test.ts': 'hash-dt',
+        'src/e.ts': 'hash-e', 'src/e.test.ts': 'hash-et',
+      },
+      tests: {
+        'src/a.test.ts': ['src/a.ts'],
+        'src/b.test.ts': ['src/b.ts'],
+        'src/c.test.ts': ['src/c.ts'],
+        'src/d.test.ts': ['src/d.ts'],
+        'src/e.test.ts': ['src/e.ts'],
+      },
+    })
+    const s = selectAffected({
+      map: wideMap, changedFiles: ['src/a.ts', 'src/b.ts'], commitDistance: 0,
+      hashOf: hashOf(wideMap, {
+        'src/a.ts': 'edited', 'src/b.ts': 'edited',
+        'src/a.test.ts': null, // deleted from disk
+      }),
+    })
+    expect(s.verdict).toBe('full')
+    expect(s.reason).toContain('src/a.ts')
+  })
 })
 
 describe('selectAffected — selection and ordering', () => {

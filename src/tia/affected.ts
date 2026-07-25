@@ -109,10 +109,10 @@ export function selectAffected(opts: {
     // Collect this file's hits as a SET first so a test reached via both the
     // map and the sibling convention counts f's churn once, not twice.
     const hits = new Set<string>()
-    let evidence = false
+    let mapEdgeExists = false
     for (const [test, sources] of Object.entries(map.tests)) {
       if (sources.includes(f)) {
-        evidence = true
+        mapEdgeExists = true
         if (opts.hashOf(test) !== null) hits.add(test)
       }
     }
@@ -120,13 +120,21 @@ export function selectAffected(opts: {
     // edges the recorded map cannot know about yet).
     const sibling = f.replace(/\.([^./]+)$/, '.test.$1')
     if (sibling !== f && opts.hashOf(sibling) !== null) {
-      evidence = true
       hits.add(sibling)
     }
-    if (!evidence) {
-      // A changed source with no covering test, no sibling, and no map entry is
-      // an unknown edge — fail closed.
-      return full(`no coverage evidence for changed file: ${f}`, 'low')
+    if (hits.size === 0) {
+      // Gate on REAL, on-disk coverage — not merely a recorded edge. A map
+      // entry (or the sibling convention) can point at a test that has since
+      // been deleted, which would otherwise leave `hits` empty while still
+      // "explaining" f, letting a co-changed file's non-empty selection mask
+      // this file's true zero-coverage state past the global zero-selection
+      // guard below (which only fires when the WHOLE result is empty). Fail
+      // closed per-file instead, whether the edge was never recorded (unknown
+      // edge) or was recorded but is now dangling (deleted covering test).
+      const reason = mapEdgeExists
+        ? `changed file's recorded covering test(s) no longer exist on disk: ${f}`
+        : `no coverage evidence for changed file: ${f}`
+      return full(reason, 'low')
     }
     for (const test of hits) {
       selected.add(test)
