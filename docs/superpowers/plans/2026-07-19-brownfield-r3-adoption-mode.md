@@ -944,7 +944,7 @@ export function withAdoptionKnowledge(names: string[], mode: AssemblyMode): stri
 
 **Steps:**
 
-- [ ] Write failing loader tests in `src/core/assembly/knowledge-loader.test.ts`:
+- [x] Write failing loader tests in `src/core/assembly/knowledge-loader.test.ts`:
 
   ```ts
   describe('withAdoptionKnowledge (brownfield R3)', () => {
@@ -973,8 +973,8 @@ export function withAdoptionKnowledge(names: string[], mode: AssemblyMode): stri
   ```
 
   (Import `getPackageKnowledgeDir` from `../../utils/fs.js`; `buildIndex` is already exported.)
-- [ ] Run: `npx vitest run src/core/assembly/knowledge-loader.test.ts` — new tests FAIL.
-- [ ] Add to `knowledge-loader.ts`:
+- [x] Run: `npx vitest run src/core/assembly/knowledge-loader.test.ts` — new tests FAIL.
+- [x] Add to `knowledge-loader.ts`:
 
   ```ts
   import type { AssemblyMode } from '../../types/index.js'
@@ -995,7 +995,7 @@ export function withAdoptionKnowledge(names: string[], mode: AssemblyMode): stri
   ```
 
   (Export `AssemblyMode` from `src/types/index.ts` if not already re-exported.)
-- [ ] Create `content/knowledge/core/brownfield-adoption.md` with exactly this content:
+- [x] Create `content/knowledge/core/brownfield-adoption.md` with exactly this content:
 
   ````markdown
   ---
@@ -1191,7 +1191,7 @@ export function withAdoptionKnowledge(names: string[], mode: AssemblyMode): stri
     listing it under "Not translated". If it can't translate, say so.
   ````
 
-- [ ] Wire the orphan-check exemption, matching the established split (`KNOWLEDGE_TEMPLATE_EXEMPT` array in `exemptions.bash`, its `is_knowledge_template` helper in the bats file). In `tests/evals/exemptions.bash`, next to `KNOWLEDGE_TEMPLATE_EXEMPT`, add the array only:
+- [x] Wire the orphan-check exemption, matching the established split (`KNOWLEDGE_TEMPLATE_EXEMPT` array in `exemptions.bash`, its `is_knowledge_template` helper in the bats file). In `tests/evals/exemptions.bash`, next to `KNOWLEDGE_TEMPLATE_EXEMPT`, add the array only:
 
   ```bash
   # --- knowledge-quality.bats ---
@@ -1221,9 +1221,9 @@ export function withAdoptionKnowledge(names: string[], mode: AssemblyMode): stri
   is_code_injected_knowledge "$name" && continue
   ```
 
-- [ ] Verify the entry clears the core-category eval floor: `wc -l content/knowledge/core/brownfield-adoption.md` — must print ≥ 200. If short, expand the Deep Guidance "Anti-patterns" section with additional grounded items (e.g. "trusting CI config over CI history", "mapping an incumbent doc that contradicts the code") until it clears — never pad with filler.
-- [ ] Run: `npx vitest run src/core/assembly/knowledge-loader.test.ts` — green. Then `npx bats tests/evals/knowledge-quality.bats tests/evals/knowledge-injection.bats` — expect all `ok` (entry ≥200 lines, has code blocks, has Summary + Deep Guidance, orphan check exempted).
-- [ ] Commit: `feat(knowledge): brownfield-adoption entry + adoption-mode injection (D11)`
+- [x] Verify the entry clears the core-category eval floor: `wc -l content/knowledge/core/brownfield-adoption.md` — must print ≥ 200. If short, expand the Deep Guidance "Anti-patterns" section with additional grounded items (e.g. "trusting CI config over CI history", "mapping an incumbent doc that contradicts the code") until it clears — never pad with filler.
+- [x] Run: `npx vitest run src/core/assembly/knowledge-loader.test.ts` — green. Then `npx bats tests/evals/knowledge-quality.bats tests/evals/knowledge-injection.bats` — expect all `ok` (entry ≥200 lines, has code blocks, has Summary + Deep Guidance, orphan check exempted).
+- [x] Commit: `feat(knowledge): brownfield-adoption entry + adoption-mode injection (D11)`
 
 ---
 
