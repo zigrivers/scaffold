@@ -2163,7 +2163,7 @@ export function applyArtifactMappings(
 
 **Steps:**
 
-- [ ] Extend `ADOPTION_STEP_FILES` with:
+- [x] Extend `ADOPTION_STEP_FILES` with:
 
   ```bash
     "environment/design-system.md"
@@ -2173,8 +2173,8 @@ export function applyArtifactMappings(
     "vision/create-vision.md"
   ```
 
-- [ ] Run: `npx bats tests/evals/adoption-mode-specifics.bats` — test 1 FAILS for the five new files.
-- [ ] Add to `content/pipeline/environment/design-system.md` (per placement rule):
+- [x] Run: `npx bats tests/evals/adoption-mode-specifics.bats` — test 1 FAILS for the five new files.
+- [x] Add to `content/pipeline/environment/design-system.md` (per placement rule):
 
   ```markdown
 
@@ -2196,7 +2196,7 @@ export function applyArtifactMappings(
     explicit approval.
   ```
 
-- [ ] Add to `content/pipeline/environment/ai-memory-setup.md` (per placement rule):
+- [x] Add to `content/pipeline/environment/ai-memory-setup.md` (per placement rule):
 
   ```markdown
 
@@ -2215,7 +2215,7 @@ export function applyArtifactMappings(
     stale-looking instructions without confirmation.
   ```
 
-- [ ] Add to `content/pipeline/environment/automated-pr-review.md` (per placement rule):
+- [x] Add to `content/pipeline/environment/automated-pr-review.md` (per placement rule):
 
   ```markdown
 
@@ -2233,7 +2233,7 @@ export function applyArtifactMappings(
     unrelated PRs.
   ```
 
-- [ ] Add to `content/pipeline/pre/create-prd.md` (per placement rule — after the Update Mode Specifics section and its trailing `###` subsections, i.e. at end of file):
+- [x] Add to `content/pipeline/pre/create-prd.md` (per placement rule — after the Update Mode Specifics section and its trailing `###` subsections, i.e. at end of file):
 
   ```markdown
 
@@ -2253,7 +2253,7 @@ export function applyArtifactMappings(
     removed.
   ```
 
-- [ ] Add to `content/pipeline/vision/create-vision.md` (per placement rule):
+- [x] Add to `content/pipeline/vision/create-vision.md` (per placement rule):
 
   ```markdown
 
@@ -2272,8 +2272,8 @@ export function applyArtifactMappings(
     already exists.
   ```
 
-- [ ] Run: `npx bats tests/evals/adoption-mode-specifics.bats` — `ok` ×3 (fifteen files enforced).
-- [ ] Commit: `feat(content): Adoption Mode Specifics — batch 3, design/memory/review + product docs (D11)`
+- [x] Run: `npx bats tests/evals/adoption-mode-specifics.bats` — `ok` ×3 (fifteen files enforced).
+- [x] Commit: `feat(content): Adoption Mode Specifics — batch 3, design/memory/review + product docs (D11)`
 
 ---
 
