@@ -1737,7 +1737,7 @@ export function applyArtifactMappings(
 
 **Steps:**
 
-- [ ] Write failing tests:
+- [x] Write failing tests:
 
   ```ts
   describe('applyArtifactMappings (D10a apply)', () => {
@@ -1769,8 +1769,8 @@ export function applyArtifactMappings(
   })
   ```
 
-- [ ] Run: `npx vitest run src/cli/commands/adopt.test.ts` — FAIL.
-- [ ] Implement in `src/cli/commands/adopt.ts`, next to `writeOrUpdateConfig` (same `parseDocument` + `atomicWriteFileSync` pattern):
+- [x] Run: `npx vitest run src/cli/commands/adopt.test.ts` — FAIL.
+- [x] Implement in `src/cli/commands/adopt.ts`, next to `writeOrUpdateConfig` (same `parseDocument` + `atomicWriteFileSync` pattern):
 
   ```ts
   /**
@@ -1796,9 +1796,9 @@ export function applyArtifactMappings(
   }
   ```
 
-- [ ] Wire the apply driver: where R1's apply path iterates approved dispositions, handle `map-candidate` as: (1) collect all approved mappings and call `applyArtifactMappings` once; (2) **re-run D3 verification for each mapped step with the updated map** (Task 2's `artifactMap` param); (3) only when verification passes, record the step `completed` / `verification: 'verified'` through R1's state-write path — a mapping whose verification still fails (e.g. the file vanished between plan and apply) leaves the step `pending` and surfaces a warning. Apply never blind-writes `completed` from the disposition alone — completion is always the verification result. Add one integration assertion to the R1 apply test suite: approved map-candidate ⇒ config contains the mapping AND state shows `completed`/`verified` for the step.
-- [ ] Run: `npx vitest run src/cli/commands/adopt.test.ts src/project/` — all green.
-- [ ] Commit: `feat(adopt): apply approved artifact mappings with honest re-verification (D10a)`
+- [x] Wire the apply driver: where R1's apply path iterates approved dispositions, handle `map-candidate` as: (1) collect all approved mappings and call `applyArtifactMappings` once; (2) **re-run D3 verification for each mapped step with the updated map** (Task 2's `artifactMap` param); (3) only when verification passes, record the step `completed` / `verification: 'verified'` through R1's state-write path — a mapping whose verification still fails (e.g. the file vanished between plan and apply) leaves the step `pending` and surfaces a warning. Apply never blind-writes `completed` from the disposition alone — completion is always the verification result. Add one integration assertion to the R1 apply test suite: approved map-candidate ⇒ config contains the mapping AND state shows `completed`/`verified` for the step.
+- [x] Run: `npx vitest run src/cli/commands/adopt.test.ts src/project/` — all green.
+- [x] Commit: `feat(adopt): apply approved artifact mappings with honest re-verification (D10a)`
 
 ---
 
