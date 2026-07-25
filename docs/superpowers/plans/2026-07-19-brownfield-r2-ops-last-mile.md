@@ -1683,7 +1683,7 @@ fi
 
 **Steps:**
 
-- [ ] Write the failing test `src/core/agent-ops/gate-ingest.test.ts`:
+- [x] Write the failing test `src/core/agent-ops/gate-ingest.test.ts`:
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -1789,8 +1789,8 @@ describe('gateTemplateVars', () => {
 })
 ```
 
-- [ ] Run: `npx vitest run src/core/agent-ops/gate-ingest.test.ts` — expect FAILURE (module missing).
-- [ ] Create `src/core/agent-ops/gate-ingest.ts`:
+- [x] Run: `npx vitest run src/core/agent-ops/gate-ingest.test.ts` — expect FAILURE (module missing).
+- [x] Create `src/core/agent-ops/gate-ingest.ts`:
 
 ```ts
 import fs from 'node:fs'
@@ -1877,7 +1877,10 @@ export function ingestGateSeed(projectRoot: string): GateSeed {
   const scriptNames = Object.keys(scripts)
   const ordered = [
     ...GATE_SCRIPT_ORDER.filter(n => scriptNames.includes(n)),
-    ...scriptNames.filter(n => !(GATE_SCRIPT_ORDER as readonly string[]).includes(n)).sort(),
+    // AMENDMENT (impl f4d21308): no .sort() on the non-priority tail — this task's
+    // own test asserts package.json DECLARATION order (test:visual before e2e),
+    // which an alphabetical .sort() (e2e before test:visual) would violate.
+    ...scriptNames.filter(n => !(GATE_SCRIPT_ORDER as readonly string[]).includes(n)),
   ]
   for (const name of ordered) {
     const body = scripts[name]
@@ -1951,8 +1954,8 @@ export function gateTemplateVars(seed: GateSeed): Record<string, string> {
 }
 ```
 
-- [ ] Run: `npx vitest run src/core/agent-ops/gate-ingest.test.ts` — expect 8 tests passed.
-- [ ] Commit: `git add -A && git commit -m "feat(agent-ops): ingestion-lite gate seeding from package.json scripts + CI workflows"`
+- [x] Run: `npx vitest run src/core/agent-ops/gate-ingest.test.ts` — expect 8 tests passed.
+- [x] Commit: `git add -A && git commit -m "feat(agent-ops): ingestion-lite gate seeding from package.json scripts + CI workflows"`
 
 ---
 
