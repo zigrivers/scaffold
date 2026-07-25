@@ -110,7 +110,19 @@ export function buildOpsActions(projectRoot: string, probes: OpsProbes = {}): Op
     })
   }
 
-  if (queue && loadAgentOpsConfig(projectRoot).merge_queue.gate_executor === 'local-poller') {
+  let schedRecommended = false
+  if (queue) {
+    try {
+      schedRecommended = loadAgentOpsConfig(projectRoot).merge_queue.gate_executor === 'local-poller'
+    } catch {
+      // Malformed/invalid .scaffold/agent-ops.yaml — loadAgentOpsConfig throws.
+      // buildOpsActions is a read-only preview (feeds plan_key), so degrade
+      // gracefully: skip the sched recommendation rather than crash `scaffold
+      // adopt` with a raw stack trace. `scaffold doctor` reports the bad config.
+      schedRecommended = false
+    }
+  }
+  if (schedRecommended) {
     records.push({
       action: 'sched-install',
       command: 'scaffold sched install post-merge-poller',

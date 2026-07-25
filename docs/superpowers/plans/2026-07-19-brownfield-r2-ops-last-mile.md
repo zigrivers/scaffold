@@ -3213,6 +3213,17 @@ export function planResume(
 > throwing `armHooks` and a throwing `armSched` each yield `stage:'arm'` with a
 > `--finish` message and the merge still journaled (`bootstrap_merged`).
 
+> **Reviewer note — RESOLVED (P2, PR #785 round 3).** For symmetry with the
+> arm-path guards, the merge step itself (`deps.gh.squashMerge` in
+> `mergeAndFinish`) was also unwrapped: a gh failure (network blip, auth expiry,
+> PR-state conflict) threw uncaught out of `runBootstrap`. Recovery was already
+> correct (only `bootstrap_intent` is journaled pre-merge, so resume revalidates
+> the head and records-then-arms an already-merged PR), but the UX crashed with a
+> raw stack trace instead of the graceful `--finish` guidance. Wrapped it to
+> return `stage:'merge'` with a recovery message. Test: a throwing `squashMerge`
+> yields `stage:'merge'` + `--finish`, journals only `bootstrap_intent`, and arms
+> nothing.
+
 > **Reviewer note — RESOLVED (P0, PR #785 review).** `gateTargetResolves`
 > originally built the `bash -c` probe by interpolating the command's head token
 > raw (``command -v ${exe[0]}``). That token comes from a project's
@@ -4554,6 +4565,14 @@ export function fixSchedulerReload(
 > path) before running. Test: gate-check.sh executable + affected seed `0o644`
 > ⇒ `ok:false` citing `check-affected`.
 
+> **Reviewer note — RESOLVED (P2, PR #785 round 3).** The `gateTargetsCheck`
+> wiring in `src/doctor/checks.ts` still printed the R1 placeholder "bounded
+> GATE_PROBE execution ships in R2" on the no-gate-script path — misleading now
+> that R2 (this release) shipped the probe. Fixed that string to accurate
+> present tense with an install hint, and swept the same "`scaffold sched` ships
+> in R2" future-tense staleness out of the launchd + systemd scheduler checks
+> (root-cause fix, not just the one flagged line).
+
 **Files:**
 - Create: `src/doctor/gate-probe.ts`
 - Create: `src/doctor/gate-probe.test.ts`
@@ -4712,6 +4731,21 @@ export function runGateProbe(
 ---
 
 ### Task 18: adopt plan — ops-actions preview section joined into `plan_key` (§6.1 R2)
+
+> **Reviewer note — RESOLVED (P1, PR #785 round 3; found by BOTH the plan-aware
+> and opencode channels).** `buildOpsActions` read
+> `loadAgentOpsConfig(projectRoot).merge_queue.gate_executor` UNGUARDED while its
+> two sibling risky reads in the same function (`queueIntent`'s yaml.load and the
+> `hookAdds` readSettings) were already try/catch-wrapped. A `.scaffold/agent-ops.yaml`
+> that is valid YAML (so `queueIntent` returns true) but fails
+> `loadAgentOpsConfig`'s stricter validation (e.g. an unknown `gate_executor`)
+> threw uncaught — crashing plain `scaffold adopt` (read-only plan mode) with a
+> raw yargs-help + stack-trace dump instead of the `ScaffoldError` contract every
+> other adopt path uses (reproduced against `dist/`). Wrapped the read in
+> try/catch matching the siblings; on failure the sched-install record is skipped
+> (doctor reports the bad config). Test: an invalid `gate_executor` no longer
+> throws, drops only the sched hint, and still previews the queue components +
+> bootstrap requirement.
 
 **Files:**
 - Create: `src/project/adoption-ops-actions.ts`

@@ -312,3 +312,21 @@ existing one and extract it to a shared module (here `src/core/parse-shell.ts`)
 so both callers get the same battle-tested behavior. Keep the extracted function
 byte-identical to the original unless you deliberately intend a behavior change
 (and then re-run the original caller's tests).
+
+## When you establish a graceful-degradation contract on a critical path, apply it to EVERY throwing call on that path (2026-07-24)
+**Pattern:** R2's bootstrap engine kept leaking uncaught throws one at a time
+across three review rounds: `syncPrimaryToMerge` (fixed during task review),
+then `armHooks` (whole-branch review P2), then `armSched` (Superpowers round 1
+P1), then `squashMerge` (opencode round 3 P2) — plus the same class in adopt's
+`buildOpsActions` (`loadAgentOpsConfig` unguarded, round 3 P1). Every one was a
+call that throws and strands or crashes a partially-completed multi-step
+operation, and each was found separately because the fix only patched the
+specific call flagged, not the whole path.
+**Rule:** The moment you wrap ONE call in a critical sequence for
+graceful-degradation (recoverable `--finish`, `ScaffoldError`, skip-and-continue),
+audit EVERY other call in that same sequence that can throw and give them the
+SAME treatment in the same change — grep the function for `loadX(`, `readX(`,
+network/gh/git calls, and config parsers. Reviewers will otherwise surface them
+one per round (this cost 3 rounds here). A function's siblings are the strongest
+hint: if two of three risky reads are try/catch-wrapped and one isn't, the
+unwrapped one is a bug, not a deliberate exception.

@@ -295,10 +295,12 @@ export const gateTargetsCheck: DoctorCheck = {
       return res(gateTargetsCheck, 'warn', probe.detail,
         'fix the reported prerequisite, then re-run scaffold doctor')
     }
-    // probe.ran === false: no generated gate script — keep the R1
-    // resolve-only wording untouched.
+    // probe.ran === false: the targets resolve but no generated gate script
+    // exists, so only resolution was checked (the bounded GATE_PROBE probe runs
+    // once a seed is installed). Present-tense — the probe ships in THIS release.
     return res(gateTargetsCheck, 'ok',
-      'check and check-affected resolve — NOT executed (bounded GATE_PROBE execution ships in R2)')
+      'check and check-affected resolve — NOT executed (no generated gate script; install '
+      + '`scaffold agent-ops install --component gate` for the bounded GATE_PROBE check)')
   },
 }
 
@@ -366,7 +368,8 @@ export const schedulerCheck: DoctorCheck = {
         : []
       if (plists.length === 0) {
         return res(schedulerCheck, 'skip',
-          'not configured (no com.<project>.merge-poller LaunchAgent; `scaffold sched` ships in R2)')
+          'not configured (no com.<project>.merge-poller LaunchAgent; '
+          + 'install with `scaffold sched install post-merge-poller`)')
       }
       const label = plists[0].replace(/\.plist$/, '')
       // File presence proves nothing — verify the job is actually LOADED.
@@ -393,7 +396,8 @@ export const schedulerCheck: DoctorCheck = {
         : []
       if (timers.length === 0) {
         return res(schedulerCheck, 'skip',
-          'not configured (no scaffold-*-merge-poller.timer; `scaffold sched` ships in R2)')
+          'not configured (no scaffold-*-merge-poller.timer; '
+          + 'install with `scaffold sched install post-merge-poller`)')
       }
       const timer = timers[0]
       // Argv, not a shell string — same reasoning as the launchctl call above:

@@ -70,6 +70,21 @@ describe('buildOpsActions (§6.1 R2 preview)', () => {
     expect(actions).not.toContain('sched-install')
     expect(actions).toContain('bootstrap-merge-required')
   })
+  it('a semantically-invalid agent-ops.yaml degrades (no crash) — skips sched-install, still previews the rest', () => {
+    // merge_queue key present (queueIntent → true) but gate_executor is invalid,
+    // so loadAgentOpsConfig throws. buildOpsActions is a read-only preview feeding
+    // plan_key — it must NOT crash `scaffold adopt`; it drops only the sched hint.
+    const root = project({
+      '.scaffold/agent-ops.yaml': 'project_name: p\nmerge_queue:\n  gate_executor: not-a-real-executor\n',
+    })
+    let records: ReturnType<typeof buildOpsActions> = []
+    expect(() => { records = buildOpsActions(root) }).not.toThrow()
+    const actions = records.map(r => r.action)
+    expect(actions).not.toContain('sched-install')
+    // The queue components + bootstrap requirement still render.
+    expect(actions).toContain('bootstrap-merge-required')
+    expect(records.map(r => r.command)).toContain('scaffold agent-ops install --component merge-queue')
+  })
   it('an already-armed queue omits the bootstrap requirement', () => {
     const root = project({
       '.scaffold/agent-ops.yaml': QUEUE_YAML,

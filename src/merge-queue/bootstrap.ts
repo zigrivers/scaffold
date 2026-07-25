@@ -321,7 +321,22 @@ export async function runBootstrap(
       )
       return { ok: false, bootstrapId: a.bootstrapId, stage: 'aborted', messages }
     }
-    deps.gh.squashMerge(opts.pr, a.gatedHeadSha)
+    // squashMerge can throw on a network blip / auth expiry / PR-state conflict.
+    // Only bootstrap_intent is journaled at this point, so nothing is merged or
+    // armed — degrade to the same recoverable --finish UX as the arm-path guards
+    // rather than crashing with a raw stack trace. Resume revalidates the head
+    // and records-then-arms if the PR turns out to have merged.
+    try {
+      deps.gh.squashMerge(opts.pr, a.gatedHeadSha)
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err)
+      say(
+        `bootstrap: the squash-merge of PR #${opts.pr} did not complete (${detail}) — nothing was ` +
+        'merged or armed; retry with: scaffold mq bootstrap --pr ' +
+        `${opts.pr} --finish (resume revalidates the head and detects an already-merged PR)`,
+      )
+      return { ok: false, bootstrapId: a.bootstrapId, stage: 'merge', messages }
+    }
     return finalizeMerge(a)
   }
 

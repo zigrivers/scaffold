@@ -326,6 +326,24 @@ describe('runBootstrap (D9 engine)', () => {
       expect(events.map(e => e.type)).toEqual(['bootstrap_intent', 'bootstrap_merged'])
     },
   )
+  it(
+    'a squashMerge failure (network/auth/PR-state) degrades to stage:merge + --finish, never an uncaught crash',
+    async () => {
+      const root = tmpRoot()
+      const gh = makeGh({})
+      gh.squashMerge = (): void => { throw new Error('gh: could not merge (HTTP 502)') }
+      const { deps, rec } = makeDeps(root, { gh })
+      const out = await runBootstrap(deps, { pr: 41 })
+      expect(out.ok).toBe(false)
+      expect(out.stage).toBe('merge')
+      expect(out.messages.join('\n')).toMatch(/did not complete/)
+      expect(out.messages.join('\n')).toMatch(/--finish/)
+      // Only the intent is journaled — nothing merged or armed.
+      expect(readJournal(deps.mqDir).map(e => e.type)).toEqual(['bootstrap_intent'])
+      expect(rec.hooksArmed).toBe(0)
+      expect(rec.schedArmed).toBe(0)
+    },
+  )
   it('aborts when the head moves between intent and merge — id terminal, retry uses a new id', async () => {
     const root = tmpRoot()
     // viewPr call 1 (reconcile+preflight): SHA-A; call 2 (revalidation): SHA-NEW.
