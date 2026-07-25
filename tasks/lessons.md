@@ -377,3 +377,19 @@ then `node dist/index.js guides --build` (or `scaffold guides --build`), and com
 updated `content/guides/knowledge-freshness/index.{md,html}`. Fold this into the
 knowledge-entry task itself, or a full `make check-all` at branch level will catch it
 late. (Same class: any source a reference guide cites by line number can drift its guide.)
+
+## When fixing a bug pattern, grep for EVERY instance in the same PR — I fixed 3 of 4 twice (2026-07-25)
+**Pattern:** R3 PR #786 round 3 flagged that the mapped-incumbent presence check used
+`fileExists` (accepts directories) instead of `.isFile()`. I fixed it in
+`verifyStep`, `detectCompletion`, and `checkCompletion` — but MISSED the 4th
+consumer, `applyConflictOverrides` (a LIVE function backing `scaffold status`/`next`).
+The final plan-aware confirmation caught it. This is the SECOND time this exact
+failure mode bit in this initiative (R2: the graceful-degradation guard was applied
+one-throwing-call-at-a-time across armHooks/armSched/syncPrimaryToMerge/squashMerge/
+preflight over multiple rounds).
+**Rule:** The moment you fix a bug that's a PATTERN (a specific wrong call/idiom),
+immediately `grep` the whole codebase for every other instance of that idiom and fix
+them ALL in the same change — don't wait for the reviewer to find instances 2, 3, 4.
+For artifact_map specifically: all consumers (`resolveAssemblyMode`, `verifyStep`,
+`detectCompletion`, `checkCompletion`, `applyConflictOverrides`) must treat the mapped
+incumbent identically (root-only via service gate; must be a FILE via `isFile`).

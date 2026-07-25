@@ -703,5 +703,18 @@ describe('applyConflictOverrides (D3 — fs-only eligibility demotion)', () => {
       const root = applyConflictOverrides(steps, dir, undefined, undefined, undefined, artifactMap)
       expect(root.conflicts).toEqual([])
     })
+
+    it('a mapped incumbent that is a DIRECTORY does not satisfy applyConflictOverrides (must be a file)', () => {
+      const dir = makeTempDir()
+      fs.mkdirSync(path.join(dir, 'CONTRIBUTING.md')) // directory, not a doc file
+      const steps: Record<string, StepStateEntry> = {
+        'coding-standards': { status: 'completed', source: 'pipeline', produces: ['docs/coding-standards.md'] },
+      }
+      // Root scope, mapping present but it's a directory → does NOT satisfy → conflict.
+      const result = applyConflictOverrides(
+        steps, dir, undefined, undefined, undefined, { 'coding-standards': 'CONTRIBUTING.md' },
+      )
+      expect(result.conflicts).toEqual(['coding-standards'])
+    })
   })
 })

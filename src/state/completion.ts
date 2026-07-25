@@ -381,8 +381,10 @@ export function applyConflictOverrides(
     if (anyMissing && !isServiceLocal) {
       const mapped = artifactMap?.[slug]
       if (mapped !== undefined) {
+        // Mapped incumbent must be a FILE, not a directory (matches
+        // resolveAssemblyMode/verifyStep/detectCompletion/checkCompletion).
         const mappedFull = resolveContainedArtifactPath(projectRoot, mapped)
-        if (mappedFull !== null && fileExists(mappedFull)) anyMissing = false
+        if (mappedFull !== null && isFile(mappedFull)) anyMissing = false
       }
     }
     if (!anyMissing) continue
