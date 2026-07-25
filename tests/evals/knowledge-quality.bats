@@ -96,6 +96,14 @@ is_knowledge_template() {
   return 1
 }
 
+is_code_injected_knowledge() {
+  local name="$1"
+  for exempt in "${CODE_INJECTED_KNOWLEDGE[@]}"; do
+    [[ "$name" == "$exempt" ]] && return 0
+  done
+  return 1
+}
+
 @test "all knowledge entries are referenced by at least one pipeline step or tool" {
   local orphans=()
 
@@ -122,6 +130,7 @@ is_knowledge_template() {
     name="$(extract_field "$file" "name")"
     [[ -z "$name" ]] && continue
     is_knowledge_template "$name" && continue
+    is_code_injected_knowledge "$name" && continue
 
     if ! echo "$all_refs" | grep -qx "$name"; then
       orphans+=("$name")

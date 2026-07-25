@@ -6,7 +6,9 @@ import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
 import {
   buildIndex, buildIndexWithOverrides, loadEntries,
   loadFullEntries, extractDeepGuidance, extractKBFrontmatter,
+  withAdoptionKnowledge,
 } from './knowledge-loader.js'
+import { getPackageKnowledgeDir } from '../../utils/fs.js'
 
 const tmpDirs: string[] = []
 
@@ -866,5 +868,29 @@ body`
     expect(fm!.lastReviewed).toBe('2026-04-01')
     expect(typeof fm!.lastReviewed).toBe('string')
     expect(fm!.sources[0].retrieved).toBe('2026-04-01')
+  })
+})
+
+describe('withAdoptionKnowledge (brownfield R3)', () => {
+  it('appends brownfield-adoption for adoption mode', () => {
+    expect(withAdoptionKnowledge(['tech-stack-selection'], 'adoption'))
+      .toEqual(['tech-stack-selection', 'brownfield-adoption'])
+  })
+  it('returns names unchanged for fresh and update modes', () => {
+    expect(withAdoptionKnowledge(['tech-stack-selection'], 'fresh'))
+      .toEqual(['tech-stack-selection'])
+    expect(withAdoptionKnowledge(['tech-stack-selection'], 'update'))
+      .toEqual(['tech-stack-selection'])
+  })
+  it('does not duplicate an already-present entry', () => {
+    expect(withAdoptionKnowledge(['brownfield-adoption'], 'adoption'))
+      .toEqual(['brownfield-adoption'])
+  })
+  it('the bundled brownfield-adoption entry loads from the package index', () => {
+    const index = buildIndex(getPackageKnowledgeDir())
+    const { entries, warnings } = loadEntries(index, ['brownfield-adoption'])
+    expect(warnings).toHaveLength(0)
+    expect(entries).toHaveLength(1)
+    expect(entries[0].content).toContain('provenance')
   })
 })
