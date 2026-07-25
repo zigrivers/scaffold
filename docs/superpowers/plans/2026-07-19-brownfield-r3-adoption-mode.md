@@ -2408,7 +2408,7 @@ export function applyArtifactMappings(
 
 **Steps:**
 
-- [ ] Add the R3 entry at the top of `CHANGELOG.md` (version number per the release mapping — nominally the third minor after R1; confirm against the actual R1/R2 released versions and the operations runbook before tagging):
+- [x] Add the R3 entry at the top of `CHANGELOG.md` (version number per the release mapping — nominally the third minor after R1; confirm against the actual R1/R2 released versions and the operations runbook before tagging):
 
   ```markdown
   ## [Unreleased] — brownfield R3 (Tier B): adoption mode + ingestion
@@ -2443,7 +2443,7 @@ export function applyArtifactMappings(
     (completed steps with outputs migrate to `declared`).
   ```
 
-- [ ] In `README.md`, in the section covering brownfield adoption / `scaffold adopt`, append:
+- [x] In `README.md`, in the section covering brownfield adoption / `scaffold adopt`, append:
 
   ```markdown
   In a brownfield project, pipeline steps that have not already been satisfied
@@ -2455,7 +2455,7 @@ export function applyArtifactMappings(
   ```
 
   (Place it where the adopt plan/apply flow is described; match the surrounding tone.)
-- [ ] Commit: `docs: CHANGELOG + README for brownfield R3 adoption mode (D16)`
+- [x] Commit: `docs: CHANGELOG + README for brownfield R3 adoption mode (D16)`
 
 ---
 
