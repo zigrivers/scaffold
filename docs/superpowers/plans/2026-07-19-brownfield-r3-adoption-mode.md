@@ -2379,7 +2379,7 @@ export function applyArtifactMappings(
 
 **Steps:**
 
-- [ ] In CLAUDE.md's **Editing Guidelines** section, after the existing bullet about Mode Detection + Update Mode Specifics blocks, add:
+- [x] In CLAUDE.md's **Editing Guidelines** section, after the existing bullet about Mode Detection + Update Mode Specifics blocks, add:
 
   ```markdown
   - Adoption-capable steps (18 initially — the pinned list lives in
@@ -2395,8 +2395,8 @@ export function applyArtifactMappings(
     eval's `ADOPTION_STEP_FILES` manifest.
   ```
 
-- [ ] Verify the eval still gates the claim: `npx bats tests/evals/adoption-mode-specifics.bats` — `ok` ×4.
-- [ ] Commit: `docs(claude-md): adoption-mode block convention in editing guidelines (D11)`
+- [x] Verify the eval still gates the claim: `npx bats tests/evals/adoption-mode-specifics.bats` — `ok` ×4.
+- [x] Commit: `docs(claude-md): adoption-mode block convention in editing guidelines (D11)`
 
 ---
 
