@@ -127,3 +127,8 @@ export function getPackageMethodologyDir(projectRoot?: string): string {
 export function getPackageGuidesDir(projectRoot?: string): string {
   return resolveContentDir('guides', projectRoot)
 }
+
+/** Resolve the modes directory (bundled, unless running against scaffold itself). */
+export function getPackageModesDir(projectRoot?: string): string {
+  return resolveContentDir('modes', projectRoot)
+}
