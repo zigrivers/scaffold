@@ -64,3 +64,17 @@ than regenerating.
 - **Conflict resolution**: if a new ADR contradicts the current architecture,
   update the affected components and data flows while preserving unaffected
   sections; flag breaking changes for user review
+
+## Adoption Mode Specifics
+- **Codify from repo evidence**: the architecture as-built — components from
+  the real module tree, data flows traced through imports and configuration,
+  integration points from client/SDK usage, and deployment topology from
+  infra manifests. Every component section cites the directories and files
+  it describes.
+- **Interview only for**: known pain points, scaling concerns, and the
+  intended target architecture where it differs from as-built — captured in
+  a clearly separated "Evolution" section, never blended into the as-built
+  description.
+- **Do not**: propose restructuring working modules; document an idealized
+  architecture the code contradicts; treat undocumented-but-working
+  structure as a defect — absence of a diagram is not absence of a design.

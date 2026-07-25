@@ -11,7 +11,7 @@ setup() {
   load eval_helper
 }
 
-# Grows with each authoring batch; final list is the 18 adoption-capable steps.
+# Pinned final list: the 18 adoption-capable steps (D11).
 ADOPTION_STEP_FILES=(
   "foundation/tech-stack.md"
   "foundation/coding-standards.md"
@@ -28,6 +28,9 @@ ADOPTION_STEP_FILES=(
   "environment/automated-pr-review.md"
   "pre/create-prd.md"
   "vision/create-vision.md"
+  "modeling/domain-modeling.md"
+  "architecture/system-architecture.md"
+  "quality/security.md"
 )
 
 @test "adoption-capable steps carry exactly one Adoption Mode Specifics block" {
@@ -89,4 +92,11 @@ ADOPTION_STEP_FILES=(
     printf "  %s\n" "${failures[@]}"
     return 1
   fi
+}
+
+@test "the adoption-capable manifest is the pinned 18-step list" {
+  [[ "${#ADOPTION_STEP_FILES[@]}" -eq 18 ]] || {
+    printf "expected 18 adoption-capable files, manifest has %d\n" "${#ADOPTION_STEP_FILES[@]}"
+    return 1
+  }
 }
