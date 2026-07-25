@@ -2292,7 +2292,7 @@ export function ensureGateMakeTargets(projectRoot: string, seed: GateSeed): stri
 
 **Steps:**
 
-- [ ] Add the failing tests to `src/cli/commands/agent-ops.test.ts` (append to the existing `resolveComponents — new components` describe block or add a sibling):
+- [x] Add the failing tests to `src/cli/commands/agent-ops.test.ts` (append to the existing `resolveComponents — new components` describe block or add a sibling):
 
 ```ts
 describe('resolveComponents — gate (R2)', () => {
@@ -2309,8 +2309,8 @@ describe('resolveComponents — gate (R2)', () => {
 })
 ```
 
-- [ ] Run: `npx vitest run src/cli/commands/agent-ops.test.ts` — expect FAILURE (gate rejected).
-- [ ] Edit `src/cli/commands/agent-ops.ts`:
+- [x] Run: `npx vitest run src/cli/commands/agent-ops.test.ts` — expect FAILURE (gate rejected).
+- [x] Edit `src/cli/commands/agent-ops.ts`:
 
   1. Replace `resolveComponents`:
 
@@ -2363,8 +2363,8 @@ import { ingestGateSeed, type GateSeed } from '../../core/agent-ops/gate-ingest.
 
   4. Update the `--component` option describe string to `'git | staging | merge-queue | ci | gate | all (default all = git+staging)'`.
 
-- [ ] Run: `npx vitest run src/cli/commands/agent-ops.test.ts` — expect all tests passed (pre-existing + 3 new).
-- [ ] End-to-end smoke (from the repo root, against a throwaway dir):
+- [x] Run: `npx vitest run src/cli/commands/agent-ops.test.ts` — expect all tests passed (pre-existing + 3 new).
+- [x] End-to-end smoke (from the repo root, against a throwaway dir):
 
 ```bash
 T="$(mktemp -d)" && mkdir -p "$T/.scaffold" \
@@ -2375,7 +2375,7 @@ T="$(mktemp -d)" && mkdir -p "$T/.scaffold" \
 ```
 
   Expected: classification lines, `installed scripts/gate-check.sh`, `installed scripts/gate-check-affected.sh`; the probe delegation may fail on npm ci in the throwaway dir — the point is the scripts exist, are executable, and contain no `{{` markers (`grep -c '{{' "$T/scripts/"*.sh` → both 0). (If the repo invokes the CLI differently in dev, use `node dist/...` after `npm run build` or the repo's documented dev-run command.)
-- [ ] Commit: `git add -A && git commit -m "feat(agent-ops): gate component CLI wiring — classification report, opt-in posture"`
+- [x] Commit: `git add -A && git commit -m "feat(agent-ops): gate component CLI wiring — classification report, opt-in posture"`
 
 ---
 
