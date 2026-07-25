@@ -7,6 +7,7 @@ import { resolvePipeline } from '../core/pipeline/resolver.js'
 import { StateManager } from '../state/state-manager.js'
 import { StatePathResolver } from '../state/state-path-resolver.js'
 import { verifyStep } from '../state/completion.js'
+import { fixHookRegistration, fixSchedulerReload } from './fixes/ops-fixes.js'
 import type { DoctorCheck, DoctorCheckResult, DoctorStatus } from './types.js'
 
 const BD_VERSION_FLOOR = '1.1.0'
@@ -116,8 +117,7 @@ export const beadsLiveCheck: DoctorCheck = {
     return res(beadsLiveCheck, 'ok', 'bd info answers')
   },
   fix: (ctx) => {
-    // R1 --fix ships ONLY this delegation (D5). Capability-probe first —
-    // never assume the installed bd supports the subcommand.
+    // Capability-probe first — never assume the installed bd supports the subcommand.
     if (ctx.runCmd('bd doctor --help').status !== 0) {
       return { applied: false, detail: 'bd doctor unsupported by installed bd — upgrade bd' }
     }
@@ -257,6 +257,10 @@ export const hooksRegisteredCheck: DoctorCheck = {
     }
     return res(hooksRegisteredCheck, 'ok', `${scriptRefs.size} registered hook script(s) present and executable`)
   },
+  fix: (ctx) => {
+    const res = fixHookRegistration(ctx.projectRoot)
+    return { applied: res.ok, detail: res.messages.join('; ') }
+  },
 }
 
 // --- gate -----------------------------------------------------------------
@@ -385,6 +389,10 @@ export const schedulerCheck: DoctorCheck = {
         `systemctl --user start ${timer}`)
     }
     return res(schedulerCheck, 'skip', `not configured (unsupported platform ${process.platform})`)
+  },
+  fix: (ctx) => {
+    const res = fixSchedulerReload(ctx.projectRoot)
+    return { applied: res.ok, detail: res.messages.join('; ') }
   },
 }
 

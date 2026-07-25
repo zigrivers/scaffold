@@ -29,7 +29,9 @@ export interface DoctorCheck {
   section: DoctorSection
   title: string
   run: (ctx: DoctorContext) => DoctorCheckResult
-  /** R1 ships exactly one fix handler: the beads `bd doctor --fix` delegation (D5). */
+  /** Optional safe-fix handler (D5): beads `bd doctor --fix` delegation (R1), plus
+   *  hook re-registration and scheduler reload (R2) — both thin wrappers over their
+   *  D8/D6 primitives. */
   fix?: (ctx: DoctorContext) => { applied: boolean; detail: string }
 }
 

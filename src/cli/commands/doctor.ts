@@ -27,7 +27,8 @@ const doctorCommand: CommandModule<Record<string, unknown>, DoctorArgs> = {
     return yargs
       .option('fix', {
         type: 'boolean', default: false,
-        describe: 'Apply safe fixes (R1: delegates bd doctor --fix only; everything else reports its remediation)',
+        describe: 'Apply safe fixes (bd doctor --fix delegation, hook re-registration, scheduler reload; '
+          + 'everything else still reports its remediation)',
       })
       .option('json', { type: 'boolean', default: false, describe: 'Machine-readable report' })
   },
