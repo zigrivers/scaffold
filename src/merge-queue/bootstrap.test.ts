@@ -281,6 +281,28 @@ describe('runBootstrap (D9 engine)', () => {
       expect(events.map(e => e.type)).toEqual(['bootstrap_intent', 'bootstrap_merged'])
     },
   )
+  it(
+    'an armHooks failure (e.g. malformed .claude/settings.json in the merged tree) degrades ' +
+      'gracefully to a recoverable --finish instead of throwing uncaught',
+    async () => {
+      const root = tmpRoot()
+      const { deps, rec } = makeDeps(root, {
+        armHooks: (): { messages: string[] } => {
+          throw new Error('.claude/settings.json is not a JSON object — refusing to modify it')
+        },
+      })
+      const out = await runBootstrap(deps, { pr: 41 })
+      expect(out.ok).toBe(false)
+      expect(out.stage).toBe('arm')
+      expect(out.messages.join('\n')).toMatch(/hooks were NOT registered/)
+      expect(out.messages.join('\n')).toMatch(/--finish/)
+      // Scheduler is never armed after a hooks failure.
+      expect(rec.schedArmed).toBe(0)
+      // The merge is still recorded (armHooks runs after the SHA is journaled).
+      const events = readJournal(deps.mqDir)
+      expect(events.map(e => e.type)).toEqual(['bootstrap_intent', 'bootstrap_merged'])
+    },
+  )
   it('aborts when the head moves between intent and merge — id terminal, retry uses a new id', async () => {
     const root = tmpRoot()
     // viewPr call 1 (reconcile+preflight): SHA-A; call 2 (revalidation): SHA-NEW.

@@ -212,7 +212,22 @@ export async function runBootstrap(
       )
       return { ok: false, bootstrapId: a.bootstrapId, stage: 'arm', messages }
     }
-    const hooks = deps.armHooks()
+    // armHooks → installHooks(primary) → readSettings THROWS by design on a
+    // malformed/non-object .claude/settings.json in the merged tree. The merge is
+    // already journaled, so degrade to a recoverable --finish instead of crashing
+    // (mirrors the syncPrimaryToMerge + armSched graceful-failure guards).
+    let hooks: { messages: string[] }
+    try {
+      hooks = deps.armHooks()
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err)
+      say(
+        `bootstrap: the merge is recorded (commit ${mergeSha}) but the hooks were NOT ` +
+        `registered (${detail}) — likely a malformed .claude/settings.json in the merged ` +
+        `tree; fix it, then finish with: scaffold mq bootstrap --pr ${opts.pr} --finish`,
+      )
+      return { ok: false, bootstrapId: a.bootstrapId, stage: 'arm', messages }
+    }
     for (const m of hooks.messages) say(m)
     const sched = deps.armSched()
     for (const m of sched.messages) say(m)
