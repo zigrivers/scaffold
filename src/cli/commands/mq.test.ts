@@ -95,6 +95,37 @@ describe('scaffold mq', () => {
     await expect(mqHandler({ action: 'stats', root })).resolves.toBeUndefined()
   })
 
+  it('gate-cache --record-tree then --check-tree round-trips (full-gate key)', async () => {
+    process.env.MQ_NO_AUTOSTART = '1'
+    const root = scratchRepo()
+    await mqHandler({ action: 'gate-cache', recordTree: 'T1', seconds: 42, root })
+    const events = readJournal(path.join(root, '.mq'))
+    expect(events[0]).toMatchObject({
+      type: 'full_gate_recorded', tree: 'T1', seconds: 42, instrumented: false,
+    })
+    await mqHandler({ action: 'gate-cache', checkTree: 'T1', root })
+    expect(process.exitCode ?? 0).toBe(0)
+    await mqHandler({ action: 'gate-cache', checkTree: 'T2', root })
+    expect(process.exitCode).toBe(1)
+    process.exitCode = 0
+  })
+
+  it('gate-cache --record-tree --instrumented flags the journal event', async () => {
+    process.env.MQ_NO_AUTOSTART = '1'
+    const root = scratchRepo()
+    await mqHandler({ action: 'gate-cache', recordTree: 'T1', seconds: 9, instrumented: true, root })
+    const events = readJournal(path.join(root, '.mq'))
+    expect(events[0]).toMatchObject({ type: 'full_gate_recorded', instrumented: true })
+  })
+
+  it('gate-cache with neither flag errors', async () => {
+    process.env.MQ_NO_AUTOSTART = '1'
+    const root = scratchRepo()
+    await mqHandler({ action: 'gate-cache', root })
+    expect(process.exitCode).toBe(1)
+    process.exitCode = 0
+  })
+
   it('daemon returns cleanly when the lock is already held', async () => {
     const root = scratchRepo()
     const mqDir = path.join(root, '.mq')

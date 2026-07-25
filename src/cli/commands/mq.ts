@@ -20,6 +20,9 @@ import { runBootstrap, type BootstrapDeps } from '../../merge-queue/bootstrap.js
 import { installHooks } from '../../core/hooks/install.js'
 import { pickSchedBackend } from '../../sched/platform.js'
 import { buildPostMergePollerJob } from '../../sched/jobs.js'
+import {
+  fullGateKey, hashFileOrAbsent, lookupGateCache, recordGateCache,
+} from '../../merge-queue/gate-cache.js'
 
 export interface MqArgs {
   action: string
@@ -31,6 +34,10 @@ export interface MqArgs {
   format?: string
   auto?: boolean
   verbose?: boolean
+  checkTree?: string
+  recordTree?: string
+  seconds?: number
+  instrumented?: boolean
 }
 
 export interface MqOverrides {
@@ -187,6 +194,53 @@ export async function mqHandler(argv: MqArgs, overrides: MqOverrides = {}): Prom
     )
     output.info(`median gate: ${stats.medianGateSeconds ?? '—'} s`)
     output.info(`flake events (7d): ${stats.flakesLast7d}`)
+    output.info(
+      `gate cache: ${stats.gateCacheHits} hit(s), ~${stats.gateCacheSecondsSaved} s saved`,
+    )
+    output.info(
+      `full gate (poller): ${stats.fullGatePlain.runs} plain ` +
+      `(median ${stats.fullGatePlain.medianSeconds ?? '—'} s) / ` +
+      `${stats.fullGateInstrumented.runs} instrumented ` +
+      `(median ${stats.fullGateInstrumented.medianSeconds ?? '—'} s)`,
+    )
+    return
+  }
+  case 'gate-cache': {
+    // Full-gate cache plumbing for the post-merge poller (D12). The key is
+    // computed HERE so the hashing logic lives in exactly one place (TS), never
+    // re-implemented in bash.
+    const cfg = loadAgentOpsConfig(primary).merge_queue
+    const quarantineHash = hashFileOrAbsent(path.join(primary, cfg.quarantine_path), 'quarantine')
+    if (argv.checkTree) {
+      const hit = cfg.gate_cache_max_entries > 0
+        ? lookupGateCache(mqDir, fullGateKey({
+          tree: argv.checkTree, command: cfg.full_gate_command, quarantineHash,
+        }))
+        : null
+      if (hit !== null) {
+        output.success(`full-gate cache hit (recorded ${hit.at}, ${hit.seconds}s)`)
+        return
+      }
+      output.info('full-gate cache miss')
+      process.exitCode = 1
+      return
+    }
+    if (argv.recordTree) {
+      const at = new Date().toISOString()
+      recordGateCache(mqDir, {
+        key: fullGateKey({ tree: argv.recordTree, command: cfg.full_gate_command, quarantineHash }),
+        seconds: argv.seconds ?? 0,
+        at,
+      }, cfg.gate_cache_max_entries)
+      appendEvent(mqDir, {
+        type: 'full_gate_recorded', tree: argv.recordTree, seconds: argv.seconds ?? 0,
+        instrumented: argv.instrumented === true, at,
+      })
+      output.success(`recorded green full gate for tree ${argv.recordTree}`)
+      return
+    }
+    output.error('mq gate-cache: pass --check-tree <sha> or --record-tree <sha>')
+    process.exitCode = 1
     return
   }
   case 'bootstrap': {
@@ -363,7 +417,7 @@ const mqCommand: CommandModule<Record<string, unknown>, MqArgs> = {
     return yargs
       .positional('action', {
         describe: 'Action to perform',
-        choices: ['enqueue', 'daemon', 'status', 'eject', 'stats', 'bootstrap'] as const,
+        choices: ['enqueue', 'daemon', 'status', 'eject', 'stats', 'bootstrap', 'gate-cache'] as const,
         type: 'string',
         demandOption: true,
       })
@@ -380,6 +434,19 @@ const mqCommand: CommandModule<Record<string, unknown>, MqArgs> = {
       // daemon exits immediately, silently breaking fire-and-forget autostart.
       .option('root', { type: 'string', hidden: true, describe: 'Project root directory' })
       .option('once', { type: 'boolean', default: false, hidden: true })
+      .option('check-tree', {
+        type: 'string', hidden: true, describe: 'gate-cache: tree sha to look up (full-gate key)',
+      })
+      .option('record-tree', {
+        type: 'string', hidden: true, describe: 'gate-cache: tree sha to record as green',
+      })
+      .option('seconds', {
+        type: 'number', hidden: true, describe: 'gate-cache: wall-clock seconds of the recorded run',
+      })
+      .option('instrumented', {
+        type: 'boolean', default: false, hidden: true,
+        describe: 'gate-cache: the recorded run was coverage-instrumented',
+      })
   },
   handler: mqHandler,
 }
