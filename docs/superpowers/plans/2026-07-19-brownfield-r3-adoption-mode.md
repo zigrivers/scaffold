@@ -1403,6 +1403,21 @@ export function withAdoptionKnowledge(names: string[], mode: AssemblyMode): stri
 
 ### Task 8: `src/ingestion/` — incumbent inventory + map-candidate proposals
 
+> **Reviewer note — PR #786 round 2 (dispositions).** (1) `scanIncumbents` (the
+> incumbent inventory) has no R3 production consumer: `proposeMapCandidates` uses
+> its own `CANDIDATE_SOURCES` step→file scan, and the adoption prompt's
+> provenance guidance (D10b) is delivered generically via `content/modes/adoption.md`,
+> not by injecting the discovered inventory. So D10b's user-facing behavior IS
+> implemented; `scanIncumbents` remains a tested reusable primitive without an R3
+> caller (a future release may wire it for per-incumbent provenance). Not a
+> correctness defect — recorded as a code-vs-plan deviation (the plan's "inventory
+> feeds the map-candidate proposal" is satisfied by the equivalent CANDIDATE_SOURCES
+> scan, not by consuming `scanIncumbents`). (2) A flagged uncaught-TypeError on a
+> non-string `artifact_map` value was a FALSE POSITIVE — Zod's
+> `z.record(z.string(), z.string())` rejects it (`config: null` + FIELD_INVALID_VALUE)
+> before the loader's `path.isAbsolute` runs (verified by repro); regression tests
+> added.
+
 **Files:**
 - `src/ingestion/incumbents.ts` (new)
 - `src/ingestion/incumbents.test.ts` (new)
