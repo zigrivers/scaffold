@@ -2776,7 +2776,7 @@ export function installHooks(projectRoot: string): HooksInstallResult {
 
 **Steps:**
 
-- [ ] Write the failing test `src/cli/commands/hooks.test.ts`:
+- [x] Write the failing test `src/cli/commands/hooks.test.ts`:
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -2831,8 +2831,8 @@ describe('scaffold hooks', () => {
 })
 ```
 
-- [ ] Run: `npx vitest run src/cli/commands/hooks.test.ts` — expect FAILURE (module missing).
-- [ ] Create `src/cli/commands/hooks.ts`:
+- [x] Run: `npx vitest run src/cli/commands/hooks.test.ts` — expect FAILURE (module missing).
+- [x] Create `src/cli/commands/hooks.ts`:
 
 ```ts
 import type { Argv, CommandModule } from 'yargs'
@@ -2905,7 +2905,7 @@ const hooksCommand: CommandModule<Record<string, unknown>, HooksArgs> = {
 export default hooksCommand
 ```
 
-- [ ] Register the command in `src/cli/index.ts` — Edit old string:
+- [x] Register the command in `src/cli/index.ts` — Edit old string:
 
 ```ts
 import schedCommand from './commands/sched.js'
@@ -2927,9 +2927,9 @@ import hooksCommand from './commands/hooks.js'
 
   (match the file's existing chain indentation exactly — 4 spaces before `.command`, same as the Task 6 registration).
 
-- [ ] Run: `npx vitest run src/cli/commands/hooks.test.ts` — expect 4 tests passed.
-- [ ] Run: `npx tsc --noEmit -p tsconfig.json` — expect clean.
-- [ ] Commit: `git add -A && git commit -m "feat(hooks): scaffold hooks install CLI — report lines + AGENTS.md --check guidance"`
+- [x] Run: `npx vitest run src/cli/commands/hooks.test.ts` — expect 4 tests passed.
+- [x] Run: `npx tsc --noEmit -p tsconfig.json` — expect clean.
+- [x] Commit: `git add -A && git commit -m "feat(hooks): scaffold hooks install CLI — report lines + AGENTS.md --check guidance"`
 
 ---
 
