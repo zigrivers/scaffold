@@ -2626,7 +2626,7 @@ export function selectAffected(opts: {
 
 **Steps:**
 
-- [ ] Write the failing test `src/cli/commands/tia.test.ts`:
+- [x] Write the failing test `src/cli/commands/tia.test.ts`:
 
 ```ts
 // src/cli/commands/tia.test.ts
@@ -2820,8 +2820,8 @@ describe('scaffold tia ingest', () => {
 })
 ```
 
-- [ ] Run: `npx vitest run src/cli/commands/tia.test.ts` — expect FAILURE (module missing).
-- [ ] Create `src/cli/commands/tia.ts`:
+- [x] Run: `npx vitest run src/cli/commands/tia.test.ts` — expect FAILURE (module missing).
+- [x] Create `src/cli/commands/tia.ts`:
 
 ```ts
 // src/cli/commands/tia.ts — D14: test-impact analysis CLI.
@@ -3035,10 +3035,10 @@ const tiaCommand: CommandModule<Record<string, unknown>, TiaArgs> = {
 export default tiaCommand
 ```
 
-- [ ] In `src/cli/index.ts`, add `import tiaCommand from './commands/tia.js'` (after the `mqCommand` import) and `.command(tiaCommand)` (after `.command(mqCommand)`).
-- [ ] Run: `npx vitest run src/cli/commands/tia.test.ts` — expect all pass.
-- [ ] Run: `npm run check` — expect green. (If `process.stdout.write` trips a lint rule, keep the raw-stdout contract — the bash consumer needs unprefixed lines — and add a scoped `// eslint-disable-next-line` with a comment explaining why, rather than switching to output.info.)
-- [ ] Commit: `git add -A && git commit -m "feat(tia): scaffold tia CLI — affected / record-due / ingest (D14)"`
+- [x] In `src/cli/index.ts`, add `import tiaCommand from './commands/tia.js'` (after the `mqCommand` import) and `.command(tiaCommand)` (after `.command(mqCommand)`).
+- [x] Run: `npx vitest run src/cli/commands/tia.test.ts` — expect all pass.
+- [x] Run: `npm run check` — expect green. (If `process.stdout.write` trips a lint rule, keep the raw-stdout contract — the bash consumer needs unprefixed lines — and add a scoped `// eslint-disable-next-line` with a comment explaining why, rather than switching to output.info.)
+- [x] Commit: `git add -A && git commit -m "feat(tia): scaffold tia CLI — affected / record-due / ingest (D14)"`
 
 ---
 
