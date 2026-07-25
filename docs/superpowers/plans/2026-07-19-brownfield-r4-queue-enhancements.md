@@ -836,7 +836,7 @@ import {
 
 **Steps:**
 
-- [ ] Update `poller_world` in `tests/agent-ops-merge-queue.bats` so ALL poller tests are hermetic (a real `scaffold` on PATH must never be invoked). Append to the end of the `poller_world()` function body:
+- [x] Update `poller_world` in `tests/agent-ops-merge-queue.bats` so ALL poller tests are hermetic (a real `scaffold` on PATH must never be invoked). Append to the end of the `poller_world()` function body:
 
 ```bash
   # Hermetic scaffold stub (MQ_SCAFFOLD_BIN mirrors the engine's MQ_GH_CMD
@@ -856,7 +856,7 @@ STUB
   export MQ_SCAFFOLD_BIN="$WORK/stub-bin/scaffold"
 ```
 
-- [ ] Append the failing tests to `tests/agent-ops-merge-queue.bats`:
+- [x] Append the failing tests to `tests/agent-ops-merge-queue.bats`:
 
 ```bash
 @test "poller: full-gate cache hit skips the gate and records the sha" {
@@ -900,8 +900,8 @@ STUB
 }
 ```
 
-- [ ] Run: `bats tests/agent-ops-merge-queue.bats` — expect the 3 new tests FAIL, all existing pass.
-- [ ] Edit `content/assets/agent-ops/merge-queue/post-merge-poller.sh.tmpl`. Three surgical edits:
+- [x] Run: `bats tests/agent-ops-merge-queue.bats` — expect the 3 new tests FAIL, all existing pass.
+- [x] Edit `content/assets/agent-ops/merge-queue/post-merge-poller.sh.tmpl`. Three surgical edits:
 
   **(a)** Immediately after the line `HEAD_SHA="$(git rev-parse "origin/$BRANCH")"`, insert:
 
@@ -958,9 +958,9 @@ GATE_SECONDS=$(( $(date +%s) - GATE_START ))
 	fi
 ```
 
-- [ ] Run: `bats tests/agent-ops-merge-queue.bats` — expect ALL tests pass (existing 23 + 3 new).
-- [ ] Run: `make lint` — expect ShellCheck green (`.tmpl` files are excluded; the rendered form is exercised by bats).
-- [ ] Commit: `git add -A && git commit -m "feat(agent-ops): poller consults and feeds the full-gate cache (D12)"`
+- [x] Run: `bats tests/agent-ops-merge-queue.bats` — expect ALL tests pass (existing 23 + 3 new).
+- [x] Run: `make lint` — expect ShellCheck green (`.tmpl` files are excluded; the rendered form is exercised by bats).
+- [x] Commit: `git add -A && git commit -m "feat(agent-ops): poller consults and feeds the full-gate cache (D12)"`
 
 **D12 is complete and shippable here.**
 
