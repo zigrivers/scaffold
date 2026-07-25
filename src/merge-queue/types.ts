@@ -66,6 +66,8 @@ export type JournalEvent =
   // D13 overlap-zone events.
   | { type: 'pr_files'; pr: number; headSha: string; files: string[]; at: string }
   | { type: 'released'; pr: number; at: string }
+  // D14: coverage map recorded for a green full-gate run.
+  | { type: 'tia_recorded'; headSha: string; seconds: number; tests: number; files: number; at: string }
 
 export interface QueueState {
   entries: Map<number, PrEntry>
@@ -93,6 +95,9 @@ export interface MergeQueueConfig {
   /** D13: zone-touching PR handling — land it solo-gated (default) or hold it
    *  for `scaffold mq release`. */
   overlap_zone_policy: 'solo' | 'hold'
+  /** D14: coverage-map recording cadence for the poller's full runs.
+   *  scheduled = first green pass per UTC day (default); always; off. */
+  tia: { record: 'scheduled' | 'always' | 'off' }
 }
 
 export function defaultMergeQueueConfig(): MergeQueueConfig {
@@ -108,5 +113,6 @@ export function defaultMergeQueueConfig(): MergeQueueConfig {
     gate_cache_max_entries: 200,
     overlap_zones: [],
     overlap_zone_policy: 'solo',
+    tia: { record: 'scheduled' },
   }
 }

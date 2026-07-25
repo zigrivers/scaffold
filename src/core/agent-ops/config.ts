@@ -171,6 +171,20 @@ export function loadAgentOpsConfig(projectRoot: string): AgentOpsConfig {
       }
       cfg.merge_queue.overlap_zone_policy = mq.overlap_zone_policy
     }
+    if (mq.tia !== undefined) {
+      if (mq.tia === null || typeof mq.tia !== 'object' || Array.isArray(mq.tia)) {
+        fail('merge_queue.tia must be a mapping')
+      }
+      const tia = mq.tia as Record<string, unknown>
+      if (tia.record !== undefined) {
+        if (tia.record !== 'scheduled' && tia.record !== 'always' && tia.record !== 'off') {
+          fail(
+            `merge_queue.tia.record must be "scheduled", "always", or "off", got ${JSON.stringify(tia.record)}`,
+          )
+        }
+        cfg.merge_queue.tia.record = tia.record
+      }
+    }
   }
 
   return cfg

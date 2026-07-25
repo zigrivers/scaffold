@@ -209,6 +209,7 @@ describe('merge_queue config', () => {
       gate_cache_max_entries: 200,
       overlap_zones: [],
       overlap_zone_policy: 'solo',
+      tia: { record: 'scheduled' },
     })
   })
 
@@ -319,6 +320,27 @@ merge_queue:
   overlap_zones: [""]
 `)
     expect(() => loadAgentOpsConfig(badZone)).toThrow(/overlap_zones/)
+  })
+
+  it('defaults tia.record to scheduled and parses explicit values', () => {
+    expect(loadAgentOpsConfig(tmpProject()).merge_queue.tia.record).toBe('scheduled')
+    const dir = tmpProject(`
+project_name: myapp
+merge_queue:
+  tia:
+    record: "off"
+`)
+    expect(loadAgentOpsConfig(dir).merge_queue.tia.record).toBe('off')
+  })
+
+  it('rejects an unknown tia.record value', () => {
+    const bad = tmpProject(`
+project_name: myapp
+merge_queue:
+  tia:
+    record: sometimes
+`)
+    expect(() => loadAgentOpsConfig(bad)).toThrow(/tia\.record/)
   })
 })
 

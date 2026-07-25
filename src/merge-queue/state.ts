@@ -61,6 +61,7 @@ export function reduceState(events: JournalEvent[]): QueueState {
       break
     case 'gate_cached':
     case 'full_gate_recorded':
+    case 'tia_recorded':
       break
     }
   }
