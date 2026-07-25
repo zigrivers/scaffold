@@ -3352,7 +3352,7 @@ fi
 
 **Steps:**
 
-- [ ] Update `src/merge-queue/stats.test.ts`: add `tiaLastRecorded: null` to the first test's `toEqual` object, and add:
+- [x] Update `src/merge-queue/stats.test.ts`: add `tiaLastRecorded: null` to the first test's `toEqual` object, and add:
 
 ```ts
   it('reports the last TIA recording', () => {
@@ -3365,8 +3365,8 @@ fi
   })
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/stats.test.ts` — expect FAILURE.
-- [ ] In `src/merge-queue/stats.ts`: add the field to `MqStats`:
+- [x] Run: `npx vitest run src/merge-queue/stats.test.ts` — expect FAILURE.
+- [x] In `src/merge-queue/stats.ts`: add the field to `MqStats`:
 
 ```ts
   /** D14: the most recent coverage-map recording, or null when none exists. */
@@ -3382,7 +3382,7 @@ fi
 ```
 
   and `tiaLastRecorded,` in the returned object.
-- [ ] In `src/cli/commands/mq.ts` (stats case), after the Task 3 full-gate line:
+- [x] In `src/cli/commands/mq.ts` (stats case), after the Task 3 full-gate line:
 
 ```ts
     output.info(
@@ -3393,9 +3393,9 @@ fi
     )
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/stats.test.ts src/cli/commands/mq.test.ts` — expect all pass.
-- [ ] Run: `npm run check` — expect green.
-- [ ] Commit: `git add -A && git commit -m "feat(mq): TIA recording visibility in mq stats (D14)"`
+- [x] Run: `npx vitest run src/merge-queue/stats.test.ts src/cli/commands/mq.test.ts` — expect all pass.
+- [x] Run: `npm run check` — expect green.
+- [x] Commit: `git add -A && git commit -m "feat(mq): TIA recording visibility in mq stats (D14)"`
 
 **D14 is complete and shippable here.**
 
