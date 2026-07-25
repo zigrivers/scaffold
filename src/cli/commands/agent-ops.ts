@@ -10,14 +10,17 @@ import {
   checkAgentOps,
   installAgentOps,
 } from '../../core/agent-ops/install.js'
+import { ingestGateSeed, type GateSeed } from '../../core/agent-ops/gate-ingest.js'
 
 export function resolveComponents(raw: string | undefined): AgentOpsComponent[] {
-  // 'all'/default stays git+staging on purpose: merge-queue and ci are explicit
-  // opt-ins so upgrade re-installs never surprise existing projects with
-  // workflows or merge guards.
+  // 'all'/default stays git+staging on purpose: merge-queue, ci, and gate are
+  // explicit opt-ins so upgrade re-installs never surprise existing projects
+  // with workflows, merge guards, or generated gate scripts.
   if (raw === undefined || raw === 'all') return ['git', 'staging']
-  if (raw === 'git' || raw === 'staging' || raw === 'merge-queue' || raw === 'ci') return [raw]
-  throw new Error(`unknown component "${raw}" (expected git, staging, merge-queue, ci, or all)`)
+  if (raw === 'git' || raw === 'staging' || raw === 'merge-queue' || raw === 'ci' || raw === 'gate') {
+    return [raw]
+  }
+  throw new Error(`unknown component "${raw}" (expected git, staging, merge-queue, ci, gate, or all)`)
 }
 
 interface AgentOpsArgs {
@@ -43,7 +46,7 @@ const agentOpsCommand: CommandModule<Record<string, unknown>, AgentOpsArgs> = {
       })
       .option('component', {
         type: 'string',
-        describe: 'git | staging | merge-queue | ci | all (default all = git+staging)',
+        describe: 'git | staging | merge-queue | ci | gate | all (default all = git+staging)',
       })
       .option('force', {
         type: 'boolean',
@@ -87,9 +90,25 @@ const agentOpsCommand: CommandModule<Record<string, unknown>, AgentOpsArgs> = {
       process.exit(ExitCode.ValidationError)
     }
 
-    const result = installAgentOps(projectRoot, { components, force: argv.force })
+    let gateSeed: GateSeed | undefined
+    if (components.includes('gate')) {
+      gateSeed = ingestGateSeed(projectRoot)
+      output.info('gate seed classification (ingestion-lite — review the generated scripts before committing):')
+      for (const src of gateSeed.sources) output.info(`  ${src}`)
+      if (gateSeed.gateCommands.length === 0) {
+        output.warn('  no gate commands detected — the seed will fail loudly until you add your test/lint commands')
+      }
+      for (const v of gateSeed.visualCommands) {
+        output.info(`  excluded from the queue gate (run via make check-visual): ${v}`)
+      }
+    }
+
+    const result = installAgentOps(projectRoot, { components, force: argv.force, gateSeed })
 
     for (const f of result.installed) output.info(`installed ${f}`)
+    for (const f of result.seedKept) {
+      output.info(`seed kept (project-owned — use --force to regenerate from ingestion): ${f}`)
+    }
     for (const f of result.skippedModified) {
       output.warn(`SKIPPED (locally modified or pre-existing — use --force to overwrite): ${f}`)
     }

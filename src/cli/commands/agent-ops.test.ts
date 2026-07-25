@@ -31,6 +31,19 @@ describe('resolveComponents — new components', () => {
   })
 })
 
+describe('resolveComponents — gate (R2)', () => {
+  it('accepts gate individually', () => {
+    expect(resolveComponents('gate')).toEqual(['gate'])
+  })
+  it('keeps gate OUT of all/default (explicit opt-in like merge-queue/ci)', () => {
+    expect(resolveComponents('all')).toEqual(['git', 'staging'])
+    expect(resolveComponents(undefined)).toEqual(['git', 'staging'])
+  })
+  it('names gate in the unknown-component error', () => {
+    expect(() => resolveComponents('nope')).toThrow(/gate/)
+  })
+})
+
 /**
  * Sentinel thrown by the mocked process.exit. Unlike skill.test.ts's no-op
  * mock, the agent-ops handler relies on process.exit's never-return for
