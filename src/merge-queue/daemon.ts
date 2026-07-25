@@ -15,6 +15,7 @@ import {
 import type { GhClient, PrInfo } from './gh.js'
 import type { GitOps } from './git.js'
 import type { GateResult } from './gate.js'
+import { tiaMapPath } from '../tia/map.js'
 import type { BatchRecord, MergeQueueConfig, PrEntry, PrState, QueueState } from './types.js'
 import { waitForWake } from './wake.js'
 
@@ -328,7 +329,11 @@ export class MergeQueueDaemon {
       baseTree: git.treeOf(`origin/${base}`),
       command: config.gate_command,
       quarantineHash,
-      tiaMapHash: hashFileOrAbsent(path.join(mqDir, 'tia', 'map.json'), 'tia'),
+      // Shared helper (not a hardcoded literal) so this cache key always tracks
+      // the real map path — if TIA_DIR/TIA_MAP_FILE ever change, invalidation
+      // must change with them, or a stale TIA-narrowed green could satisfy a
+      // later tree with a different map.
+      tiaMapHash: hashFileOrAbsent(tiaMapPath(mqDir), 'tia'),
     })
     const cached = cacheEnabled ? lookupGateCache(mqDir, cacheKey) : null
     let gate: GateResult

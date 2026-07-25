@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { defaultAgentOpsConfig, loadAgentOpsConfig } from './config.js'
+import { defaultAgentOpsConfig, loadAgentOpsConfig, mergeQueueConfigWarnings } from './config.js'
+import { defaultMergeQueueConfig } from '../../merge-queue/types.js'
 
 function tmpProject(yamlBody?: string): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentops-'))
@@ -341,6 +342,26 @@ merge_queue:
     record: sometimes
 `)
     expect(() => loadAgentOpsConfig(bad)).toThrow(/tia\.record/)
+  })
+})
+
+describe('mergeQueueConfigWarnings', () => {
+  it('warns when full_gate_command looks like the affected/narrowed gate', () => {
+    const cfg = { ...defaultMergeQueueConfig(), full_gate_command: 'make check-affected' }
+    const warnings = mergeQueueConfigWarnings(cfg)
+    expect(warnings).toHaveLength(1)
+    expect(warnings[0].code).toBe('CONFIG_FULL_GATE_LOOKS_AFFECTED')
+    expect(warnings[0].message).toMatch(/full_gate_command/)
+  })
+
+  it('also catches the gate-check-affected.sh script name', () => {
+    const cfg = { ...defaultMergeQueueConfig(), full_gate_command: 'scripts/ops/gate-check-affected.sh' }
+    expect(mergeQueueConfigWarnings(cfg)).toHaveLength(1)
+  })
+
+  it('does not warn for a normal full-suite command', () => {
+    const cfg = { ...defaultMergeQueueConfig(), full_gate_command: 'make check' }
+    expect(mergeQueueConfigWarnings(cfg)).toEqual([])
   })
 })
 

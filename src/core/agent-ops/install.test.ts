@@ -274,6 +274,44 @@ describe('merge-queue and ci components', () => {
     installAgentOps(root, { components: ['git'], templateRoot })
     expect(fs.existsSync(path.join(root, '.gitignore'))).toBe(false)
   })
+
+  it('warns when installing merge-queue with full_gate_command set to the affected gate', () => {
+    const root = tmpProjectDir()
+    fs.mkdirSync(path.join(root, '.scaffold'), { recursive: true })
+    fs.writeFileSync(
+      path.join(root, '.scaffold', 'agent-ops.yaml'),
+      'merge_queue:\n  full_gate_command: "make check-affected"\n',
+    )
+    const templateRoot = tmpTemplates({
+      'merge-queue/mq-guard.sh.tmpl': '#!/usr/bin/env bash\necho guard\n',
+      'merge-queue/post-merge-poller.sh.tmpl': '#!/usr/bin/env bash\necho poll\n',
+      'make/agent-ops.mk.tmpl': '# mk\n',
+    })
+    const res = installAgentOps(root, { components: ['merge-queue'], templateRoot })
+    expect(res.warnings).toHaveLength(1)
+    expect(res.warnings[0].code).toBe('CONFIG_FULL_GATE_LOOKS_AFFECTED')
+  })
+
+  it('does not warn for a normal full_gate_command, or for non-merge-queue installs', () => {
+    const root = tmpProjectDir()
+    const templateRoot = tmpTemplates({
+      'merge-queue/mq-guard.sh.tmpl': '#!/usr/bin/env bash\necho guard\n',
+      'merge-queue/post-merge-poller.sh.tmpl': '#!/usr/bin/env bash\necho poll\n',
+      'make/agent-ops.mk.tmpl': '# mk\n',
+    })
+    expect(installAgentOps(root, { components: ['merge-queue'], templateRoot }).warnings).toEqual([])
+    const gitRoot = tmpProjectDir()
+    fs.mkdirSync(path.join(gitRoot, '.scaffold'), { recursive: true })
+    fs.writeFileSync(
+      path.join(gitRoot, '.scaffold', 'agent-ops.yaml'),
+      'merge_queue:\n  full_gate_command: "make check-affected"\n',
+    )
+    const gitTemplateRoot = tmpTemplates({ 'make/agent-ops.mk.tmpl': '# mk\n' })
+    // Not installing merge-queue: the misconfigured field is irrelevant here.
+    expect(
+      installAgentOps(gitRoot, { components: ['git'], templateRoot: gitTemplateRoot }).warnings,
+    ).toEqual([])
+  })
 })
 
 describe('buildTemplateVars extensions', () => {

@@ -25,6 +25,11 @@ export interface AgentOpsConfig {
   merge_queue: MergeQueueConfig
 }
 
+export interface AgentOpsConfigWarning {
+  code: string
+  message: string
+}
+
 const NAME_RE = /^[a-z][a-z0-9_-]*$/
 
 function sanitizeName(raw: string): string {
@@ -188,4 +193,34 @@ export function loadAgentOpsConfig(projectRoot: string): AgentOpsConfig {
   }
 
   return cfg
+}
+
+/**
+ * Non-fatal merge_queue config checks — detected post-parse so a hit never
+ * blocks loading (unlike fail() above, which is used for shape/type errors).
+ *
+ * The daemon seeds the full-gate cache from a batch run only when
+ * `gate_command === full_gate_command` (see src/merge-queue/daemon.ts D12).
+ * The full gate is the authoritative post-merge safety net and must run the
+ * COMPLETE suite: if a user points full_gate_command at the affected/narrowed
+ * gate script by mistake, the daemon will seed the full-gate cache from a
+ * narrowed run, and the poller will then skip a real post-merge full suite.
+ */
+export function mergeQueueConfigWarnings(mq: MergeQueueConfig): AgentOpsConfigWarning[] {
+  const warnings: AgentOpsConfigWarning[] = []
+  // 'gate-check-affected' already contains 'check-affected', so one substring
+  // check catches both the `make check-affected` target and the
+  // `gate-check-affected.sh` script name.
+  if (mq.full_gate_command.includes('check-affected')) {
+    warnings.push({
+      code: 'CONFIG_FULL_GATE_LOOKS_AFFECTED',
+      message:
+        `merge_queue.full_gate_command ("${mq.full_gate_command}") looks like the affected/narrowed ` +
+        'gate command, not the full suite. full_gate_command must run the complete test suite — it is ' +
+        'the authoritative post-merge safety net and its cache is seeded from batch runs when it ' +
+        'matches gate_command; pointing it at the narrowed gate would let a post-merge full-suite check ' +
+        'get skipped.',
+    })
+  }
+  return warnings
 }

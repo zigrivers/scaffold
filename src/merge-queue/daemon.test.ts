@@ -8,6 +8,7 @@ import { MergeQueueDaemon, PAUSED_FILE, type DaemonDeps } from './daemon.js'
 import { appendEvent, readJournal } from './journal.js'
 import { reduceState, queuedPrs } from './state.js'
 import { defaultMergeQueueConfig } from './types.js'
+import { tiaMapPath } from '../tia/map.js'
 import type { GhClient, PrInfo } from './gh.js'
 import type { CandidateResult, GitOps } from './git.js'
 import type { GateResult } from './gate.js'
@@ -554,6 +555,27 @@ describe('MergeQueueDaemon.cycle', () => {
     const cachedEvents = readJournal(h.mqDir).filter(e => e.type === 'gate_cached')
     expect(cachedEvents).toHaveLength(1)
     expect(cachedEvents[0]).toMatchObject({ savedSeconds: 1 })
+  })
+
+  it('a TIA map written at the shared tiaMapPath() invalidates the D12 cache key', async () => {
+    // The cache key must track the REAL map path, not a hardcoded literal —
+    // if daemon.ts and tia/map.ts ever disagree on where the map lives, a
+    // stale TIA-narrowed green could satisfy a later tree with a different
+    // map. This test writes the map at tiaMapPath(mqDir) — the same helper
+    // daemon.ts uses — so it fails if that wiring ever regresses.
+    const h = harness({ config: defaultMergeQueueConfig() }) // cache ON (200)
+    h.enqueue(1)
+    await h.daemon.cycle()               // green run, cache seeded with no map file present
+    expect(h.gateCalls.length).toBe(1)
+
+    const mapFile = tiaMapPath(h.mqDir)
+    fs.mkdirSync(path.dirname(mapFile), { recursive: true })
+    fs.writeFileSync(mapFile, JSON.stringify({ version: 1 }))
+
+    h.enqueue(2)
+    await h.daemon.cycle()               // map now exists -> hash differs -> cache key differs
+    expect(h.gateCalls.length).toBe(2)   // gate reran instead of a stale hit
+    expect(h.states()[2]).toBe('LANDED')
   })
 
   it('never caches a red result (D12 green-only)', async () => {
