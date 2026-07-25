@@ -1474,7 +1474,7 @@ merge_queue:
 
 **Steps:**
 
-- [ ] Add the failing tests to `src/merge-queue/batch.test.ts`:
+- [x] Add the failing tests to `src/merge-queue/batch.test.ts`:
 
 ```ts
 describe('composeBatch — conflict-aware partitioning (D13)', () => {
@@ -1541,8 +1541,8 @@ describe('touchesOverlapZone', () => {
 
   (import `touchesOverlapZone` alongside the existing `composeBatch` import.)
 
-- [ ] Run: `npx vitest run src/merge-queue/batch.test.ts` — expect FAILURE.
-- [ ] Rewrite `src/merge-queue/batch.ts`:
+- [x] Run: `npx vitest run src/merge-queue/batch.test.ts` — expect FAILURE.
+- [x] Rewrite `src/merge-queue/batch.ts`:
 
 ```ts
 import { minimatch } from 'minimatch'
@@ -1620,9 +1620,9 @@ export function splitBatch(members: number[]): [number[], number[]] {
 }
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/batch.test.ts` — expect ALL pass (legacy tests included, untouched).
-- [ ] Run: `npm run check` — expect green.
-- [ ] Commit: `git add -A && git commit -m "feat(mq): conflict-aware composeBatch with overlap zones (D13)"`
+- [x] Run: `npx vitest run src/merge-queue/batch.test.ts` — expect ALL pass (legacy tests included, untouched).
+- [x] Run: `npm run check` — expect green.
+- [x] Commit: `git add -A && git commit -m "feat(mq): conflict-aware composeBatch with overlap zones (D13)"`
 
 ---
 
