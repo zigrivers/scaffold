@@ -40,7 +40,12 @@ actual test framework and assertion library.
   the merge gate; falls back to full `make check` when it cannot classify a
   change) and `make check` (full, authoritative — post-merge and nightly, always
   uncached). Force-full-run triggers listed explicitly (lockfiles, tool config,
-  shared test utils, global setup, env files, migrations)
+  shared test utils, global setup, env files, migrations). When the targets do
+  not exist yet, seed them: `scaffold agent-ops install --component gate`
+  generates `scripts/gate-check.sh` + `scripts/gate-check-affected.sh`
+  satisfying this contract — CONFIRM its printed classification (gate commands
+  vs environment-sensitive suites excluded to `make check-visual`) with the
+  user before committing the seeds
 - (mvp) e2e excluded from the merge gate (tagged smoke subset at most); full e2e
   runs post-merge/nightly
 - (deep) Flake policy documented: quarantine list location (`.mq/quarantine.txt`),

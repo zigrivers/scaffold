@@ -62,6 +62,7 @@ mark which parts are queue-only.
   `gh pr create`, and, when the project uses Beads, a PreToolUse `bd-guard.sh`
   entry (merged, never overwritten); when the merge-queue component is
   installed, a PreToolUse `mq-guard.sh` entry as well (same merge discipline)
+  — all registered via `scaffold hooks install`, never hand-merged
 - .scaffold/agent-ops.yaml — written with the minimal form (`project_name` +
   `worktree_setup_commands`) if it doesn't already exist
 - CLAUDE.md updated with Committing/PR Workflow, Task Closure, Parallel
@@ -160,6 +161,8 @@ project's branch-naming and commit-format conventions, preserve worktree
 directory naming, and keep any local customizations to the agent-ops
 scripts intact — the installer already refuses to overwrite locally
 modified files without `--force`; never pass `--force` in generation mode.
+Re-run `scaffold hooks install` in update mode too — it is idempotent and
+repairs missing hook registrations without touching user entries.
 
 ## Update Mode Specifics
 - **Detect prior artifact**: docs/git-workflow.md exists
@@ -173,7 +176,8 @@ modified files without `--force`; never pass `--force` in generation mode.
 - **Triggers for update**: coding-standards.md changed commit format,
   Beads status changed (added or removed), new worktree patterns needed
   for parallel execution, `scaffold agent-ops check` reports a stale
-  bundle version
+  bundle version, hook registrations missing from `.claude/settings.json`
+  (repair: `scaffold hooks install`)
 - **Conflict resolution**: if the existing doc still carries the retired
   pre-D4′ quality-gates section (titled around a deferred CI rollout) or a
   merge-slot-serialized step 7, flag the discrepancy and replace them with
@@ -214,45 +218,38 @@ modified files without `--force`; never pass `--force` in generation mode.
    idempotent and refuses to overwrite locally modified files without
    `--force` — never pass `--force` in generation mode.
 
-3. **Register the Beads destructive-command guard** (only when the project
-   uses Beads — skip entirely when `.beads/` is absent). `scripts/bd-guard.sh`
-   (installed by the git component above) is a Claude Code PreToolUse hook
-   that refuses `bd bootstrap`, destructive `bd init`, and `.beads` deletion
-   while a populated database exists. Merge it into `.claude/settings.json` —
-   never overwrite the file; `bd setup claude` hooks and the PR-review
-   reminder hook also own entries there:
+3. **Register the agent hooks natively** — run the hook installer instead of
+   hand-editing `.claude/settings.json`:
    ```bash
-   if [ -d .beads ] && [ -x scripts/bd-guard.sh ]; then
-     mkdir -p .claude
-     [ -f .claude/settings.json ] || printf '{}\n' > .claude/settings.json
-     if ! grep -q 'bd-guard.sh' .claude/settings.json; then
-       tmp=$(mktemp)
-       jq '.hooks.PreToolUse = ((.hooks.PreToolUse // []) + [{"matcher":"Bash","hooks":[{"type":"command","command":"scripts/bd-guard.sh"}]}])' \
-         .claude/settings.json > "$tmp" && mv "$tmp" .claude/settings.json
-     fi
-   fi
+   scaffold hooks install
    ```
-   Codex, Cursor, and other harnesses have no PreToolUse hook: for them the
-   guard is available as `scripts/bd-guard.sh --check "<command>"`, and the
-   AGENTS.md Beads rules (see claude-md-optimization) carry the prose rule.
+   One idempotent TypeScript deep-merge (atomic write, no jq dependency)
+   registers every hook whose prerequisite exists, and prints an explicit
+   report line for each one it skips:
+   - SessionStart `bd prime --hook-json` — only when `.beads/` exists
+   - PreToolUse `scripts/bd-guard.sh` (matcher `Bash`) — the Beads
+     destructive-command guard that refuses `bd bootstrap`, destructive
+     `bd init`, and `.beads` deletion while a populated database exists;
+     only when `.beads/` exists AND the git component above installed the
+     script
+   - PreToolUse `scripts/mq-guard.sh` (matcher `Bash`) — the merge-queue
+     routing guard; only when the merge-queue component is installed
+   - PostToolUse `gh pr create` review reminder (see "Configure the
+     PostToolUse review-reminder hook" below — the installer registers it
+     and skips when an equivalent reminder is already present)
+   It never overwrites the file and never drops existing entries
+   (`bd setup claude` hooks and user hooks survive), so re-running is always
+   safe. A missing prerequisite prints a report line instead of silently
+   no-opping — install the prerequisite, then re-run `scaffold hooks
+   install`.
 
-4. **Register the merge-queue guard** (only when the merge-queue component is
-   installed — skip when `scripts/mq-guard.sh` is absent). Same merge
-   discipline as bd-guard — never overwrite `.claude/settings.json`:
-   ```bash
-   if [ -x scripts/mq-guard.sh ]; then
-     mkdir -p .claude
-     [ -f .claude/settings.json ] || printf '{}\n' > .claude/settings.json
-     if ! grep -q 'mq-guard.sh' .claude/settings.json; then
-       tmp=$(mktemp)
-       jq '.hooks.PreToolUse = ((.hooks.PreToolUse // []) + [{"matcher":"Bash","hooks":[{"type":"command","command":"scripts/mq-guard.sh"}]}])' \
-         .claude/settings.json > "$tmp" && mv "$tmp" .claude/settings.json
-     fi
-   fi
-   ```
-   Other harnesses use `scripts/mq-guard.sh --check "<command>"`; the AGENTS.md
-   operations core (claude-md-optimization) carries the prose rule ("enqueue,
-   never `gh pr merge`").
+4. **Wire the guards into non-Claude harnesses.** Codex, Cursor, and other
+   AGENTS.md-based harnesses have no hook-registration surface: for them the
+   guards run as pre-flight checks — `scripts/bd-guard.sh --check
+   "<command>"` and `scripts/mq-guard.sh --check "<command>"` — and the
+   AGENTS.md rules (see claude-md-optimization) carry the prose rules (the
+   Beads durability rules; "enqueue, never `gh pr merge`").
+   `scaffold hooks install` prints this wiring guidance too.
 
 ### Guardrail: keep generated files out of the primary checkout
 The git component ships a **primary-checkout write-guard**
@@ -332,7 +329,8 @@ Depth-gate per Methodology Scaling above.
    post-merge on every landing and nightly — uncached — via
    `.github/workflows/post-merge.yml`/`nightly.yml` on a self-hosted runner ($0
    Actions minutes; register with `scripts/ops/setup-gh-runner.sh`), or via the
-   local poller (`make post-merge-watch`, cron/launchd) when
+   local poller (`make post-merge-watch`, scheduled by `scaffold sched
+   install post-merge-poller`) when
    `merge_queue.gate_executor: local-poller`. A base project has NO post-merge
    net, so its merge gate is the full `make check` (there, `check-affected` is a
    local speed aid, not the bar). When post-merge goes red the queue
@@ -412,12 +410,13 @@ Depth-gate per Methodology Scaling above.
     <name> --install`, `cd .worktrees/<name>`, work normally).
 
 ### Configure the PostToolUse review-reminder hook
-Merge (never overwrite) the following into the target project's
-`.claude/settings.json`. If the file doesn't exist, create it with just
-this content. If it exists, deep-merge into the `hooks.PostToolUse` array —
-append this hook object only if an equivalent `gh pr create` reminder isn't
-already present (e.g. from the `automated-pr-review` step); never replace
-or drop unrelated existing hooks.
+`scaffold hooks install` (instruction 3 above) registers this hook: it
+deep-merges into the `hooks.PostToolUse` array of the target project's
+`.claude/settings.json`, creates the file when missing, appends the hook
+object only if an equivalent `gh pr create` reminder isn't already present
+(e.g. from the `automated-pr-review` step), and never replaces or drops
+unrelated existing hooks. The registered hook, for reference (equivalence
+is detected on the `gh pr create` trigger string):
 
 ```json
 {

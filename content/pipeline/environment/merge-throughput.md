@@ -33,13 +33,16 @@ worktree machinery); skip for solo projects — `bd merge-slot` suffices there.
 ## Expected Outputs
 - docs/merge-queue.md — how the queue works (enqueue → batch → land/eject),
   ejection recovery, the pause-on-red runbook (fix forward vs revert decision
-  tree), flake quarantine policy, calibration via `scaffold mq stats`, and the
-  deliberate-direct-merge procedure (`MQ_DIRECT_MERGE_OK=1`, human-only)
+  tree), flake quarantine policy, calibration via `scaffold mq stats`, the
+  first-merge bootstrap (`scaffold mq bootstrap --pr <N>` — the PR that
+  installs the queue), and the deliberate-direct-merge procedure
+  (`MQ_DIRECT_MERGE_OK=1`, human-only)
 - Installed `merge-queue` component (+ `ci` component unless
   `gate_executor: local-poller`)
 - `.scaffold/agent-ops.yaml` gains a `merge_queue:` section
 - CLAUDE.md Key Commands rows for `make mq-enqueue` / `mq-status` / `mq-stats`
-- Registered mq-guard hook (via the git-workflow step's instruction 4)
+- Registered mq-guard hook (via `scaffold hooks install` — git-workflow
+  instruction 3)
 
 ## Quality Criteria
 - (mvp) `scaffold agent-ops install --component merge-queue` completed clean and
@@ -57,7 +60,8 @@ worktree machinery); skip for solo projects — `bd merge-slot` suffices there.
   label-removal protocol exists
 - (mvp) gate_executor decision recorded: `gha-selfhosted` (default — `ci`
   component installed, runner registration in the day-one checklist) or
-  `local-poller` (poller scheduled via cron/launchd, no workflows)
+  `local-poller` (poller scheduled via `scaffold sched install
+  post-merge-poller`, verified loaded, no workflows)
 - (mvp) batch_cap set consciously: 16 when `gate_command` is the affected gate,
   8 when it is the full gate (single knob — spec Plan-1 note)
 - (deep) Post-merge-red drill documented: a deliberate red landing walked
@@ -82,15 +86,21 @@ worktree machinery); skip for solo projects — `bd merge-slot` suffices there.
 Update mode if docs/merge-queue.md exists. In update mode: re-run
 `scaffold agent-ops install --component merge-queue` (and `ci` per
 gate_executor) to refresh stale bundle files (`scaffold agent-ops check`
-reports drift), preserve the project's tuned `merge_queue:` config values, and
-re-generate only runbook sections whose upstream contracts changed.
+reports drift), re-run `scaffold hooks install` (idempotent) to repair hook
+registrations, for `local-poller` confirm the scheduler job is still loaded
+(`scaffold sched status post-merge-poller`; reinstall with `scaffold sched
+install post-merge-poller` when it is not), preserve the project's tuned
+`merge_queue:` config values, and re-generate only runbook sections whose
+upstream contracts changed.
 
 ## Update Mode Specifics
 - **Detect prior artifact**: docs/merge-queue.md exists
 - **Preserve**: tuned `merge_queue:` values (batch_cap, poll_seconds, timeouts,
   gate_executor), quarantine list contents, any project-specific red-drill notes
 - **Triggers for update**: `scaffold agent-ops check` reports a stale bundle,
-  gate commands renamed in dev-env-setup, gate_executor switched
+  gate commands renamed in dev-env-setup, gate_executor switched,
+  `scaffold sched status post-merge-poller` reports not-loaded, hook
+  registrations missing from `.claude/settings.json`
 - **Conflict resolution**: if the project still documents lease- or
   merge-slot-serialized merging as primary, flag the discrepancy and replace
   with the enqueue flow only on explicit confirmation (merge-slot remains
@@ -113,18 +123,36 @@ merge_queue:
 ### 2. Install the components
 ```bash
 scaffold agent-ops install --component merge-queue
+# when make check / make check-affected do not exist yet — generates the
+# gate seeds from ingestion-lite (package.json scripts + CI workflows):
+scaffold agent-ops install --component gate
 # unless gate_executor is local-poller:
 scaffold agent-ops install --component ci
 scaffold agent-ops check
 ```
-Then register the mq-guard hook per the git-workflow step's instruction 4.
+The gate install prints its ingestion-lite classification (gate commands vs
+environment-sensitive suites excluded to `make check-visual`) — CONFIRM that
+classification with the user before committing the generated seeds. The seeds
+are project-owned after generation (`agent-ops check` reports them only if
+missing; `--force` regenerates from a fresh ingestion).
+Then register the mq-guard hook: run `scaffold hooks install` (idempotent;
+skips hooks whose prerequisites are missing and reports why).
 
 ### 3. Wire the executor
 - `gha-selfhosted`: put `scripts/ops/setup-gh-runner.sh` in the day-one
   checklist in docs/dev-setup.md (it needs the human's gh admin auth once);
   until the runner registers, pushed workflows simply queue.
-- `local-poller`: schedule `make post-merge-watch` every ~10 minutes via
-  cron/launchd and document the schedule in docs/dev-setup.md.
+- `local-poller`: install the scheduler job (launchd on macOS, systemd user
+  timer on Linux; 600s default interval — `--interval <seconds>` to change;
+  the installer verifies the job actually LOADED, because file presence
+  proves nothing):
+  ```bash
+  scaffold sched install post-merge-poller
+  scaffold sched status post-merge-poller
+  ```
+  Document it in docs/dev-setup.md: `scaffold sched status
+  post-merge-poller` is the health check, and `scaffold doctor` reads the
+  same heartbeat.
 
 ### 4. Generate docs/merge-queue.md
 Synthesize from the knowledge entries and the ACTUAL installed commands (never
@@ -136,7 +164,10 @@ NEEDS_REBASE vs EJECTED vs CANCELLED-already-applied; re-enqueue after the fix
 semantics and recovery (NRS violation: investigate tree divergence before
 unpausing; partial landing: verify the base with the post-merge suite first;
 post-merge red: fix forward or revert, then `rm .mq/PAUSED`), flake quarantine (`.mq/quarantine.txt`, auto
-bead, fix-SLA), calibration (`scaffold mq stats`), and the deliberate
+bead, fix-SLA), calibration (`scaffold mq stats`), the first-merge bootstrap
+(the queue-installing PR cannot ride the queue — `scaffold mq bootstrap --pr
+<N>` runs the arm-first guided first merge, journals it, and the mq-guard
+block message points at it), and the deliberate
 direct-merge procedure (human-only). Close with a short **Alternatives**
 note (spec D2): Mergify's free tier (private repos, ≤5 active contributors —
 agents sharing one identity count once) offers a SaaS merge queue with
