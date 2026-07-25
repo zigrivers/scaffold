@@ -2060,6 +2060,15 @@ Acceptance criterion 2 ("never exits non-zero with empty stdout under `--format 
 
 **Known risks.**
 
-1. Task 9 Step 3 assumes yargs' `requiresArg: true` is sufficient to consume a bare `-` under `.strict()`. The test in Step 1 asserts only the declaration; the end-to-end check in Step 5 is what proves the behavior. If `requiresArg` proves insufficient, the fallback is to normalize `--from -` to `--from=-` in `runCli` before handing argv to yargs, a three-line change in `src/cli/index.ts:36-38`.
+1. ~~Task 9's `requiresArg` assumption.~~ **Resolved by experiment before implementation.** Against this repo's own yargs 17, with a `.strict()` command identical in shape to `init`:
+
+   | Option config | `init --from - ` | Result |
+   |---|---|---|
+   | `{type:'string'}` | space form | `FAIL  Unknown argument: -` (reproduces today's bug exactly) |
+   | `{type:'string', requiresArg:true}` | space form | `OK  from="-"` |
+   | `{type:'string', requiresArg:true}` | `--from=-` | `OK  from="-"` |
+   | `{type:'string', requiresArg:true}` | `--from cfg.yml` | `OK  from="cfg.yml"` |
+
+   `requiresArg: true` is sufficient and does not regress the ordinary path. The `runCli` argv-normalization fallback is not needed.
 2. Task 6 Step 3b normalizes `argv.auto` for **all** non-interactive modes, which means `scaffold init --format json` in a TTY now also requires a discriminator. That is intended and consistent (JsonOutput never prompts, so it was already silently defaulting), but it widens the breaking surface slightly beyond the non-TTY case. It belongs in the same CHANGELOG entry.
 3. Task 13 says to convert *every* terminal-failure site in `adopt.ts`, and the file is large. The end-to-end check covers only the bare-`--apply` path. An implementer should grep for remaining `output.error(` calls in that file before marking the task done.
