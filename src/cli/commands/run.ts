@@ -7,10 +7,11 @@ import { AssemblyEngine } from '../../core/assembly/engine.js'
 import { resolveTransitiveCrossReads } from '../../core/assembly/cross-reads.js'
 import type { PipelineState } from '../../types/index.js'
 import { getPackageKnowledgeDir } from '../../utils/fs.js'
-import { buildIndexWithOverrides, loadEntries } from '../../core/assembly/knowledge-loader.js'
+import { buildIndexWithOverrides, loadEntries, withAdoptionKnowledge } from '../../core/assembly/knowledge-loader.js'
 import { loadInstructions } from '../../core/assembly/instruction-loader.js'
 import { resolveDepth } from '../../core/assembly/depth-resolver.js'
-import { detectUpdateMode } from '../../core/assembly/update-mode.js'
+import { resolveAssemblyMode } from '../../core/assembly/update-mode.js'
+import { loadAdoptionPreamble } from '../../core/assembly/mode-loader.js'
 import { detectMethodologyChange } from '../../core/assembly/methodology-change.js'
 import { detectCycles } from '../../core/dependency/dependency.js'
 import { loadPipelineContext } from '../../core/pipeline/context.js'
@@ -314,9 +315,15 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
       const cliDepth = argv.depth !== undefined ? (argv.depth as DepthLevel) : undefined
       const { depth, provenance } = resolveDepth(step, config, pipeline.preset, cliDepth)
 
-      const updateModeResult = detectUpdateMode({ step, state, currentDepth: depth, projectRoot, service })
+      const modeResult = resolveAssemblyMode({
+        step, state, currentDepth: depth, projectRoot, service,
+        artifactMap: config.artifact_map,
+        expectedOutputs: metaPrompt.frontmatter.outputs,
+        detect: metaPrompt.frontmatter.detect ?? null,
+      })
+      const isUpdate = modeResult.mode === 'update'
 
-      if (updateModeResult.isUpdateMode) {
+      if (isUpdate) {
         if (!argv.force) {
           if (outputMode === 'interactive') {
             const proceed = await shutdown.withPrompt(() =>
@@ -335,7 +342,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
         }
 
         // Check for depth downgrade
-        const hasDowngrade = updateModeResult.warnings.some(w => w.code === 'ASM_DEPTH_DOWNGRADE')
+        const hasDowngrade = modeResult.warnings.some(w => w.code === 'ASM_DEPTH_DOWNGRADE')
         if (hasDowngrade && !argv.force) {
           if (outputMode === 'interactive') {
             const proceedWithDowngrade = await shutdown.withPrompt(() =>
@@ -349,11 +356,15 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
               return
             }
           } else {
-            for (const w of updateModeResult.warnings) {
+            for (const w of modeResult.warnings) {
               output.warn(w)
             }
           }
         }
+      }
+
+      if (modeResult.mode === 'adoption' && outputMode === 'interactive') {
+        output.info(`Running step '${step}' in adoption mode (init-mode: ${state['init-mode']})`)
       }
 
       // Check methodology change
@@ -395,10 +406,20 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
             // -----------------------------------------------------------------------
             const { instructions } = loadInstructions(projectRoot, step, argv.instructions)
 
+            let adoptionPreamble: string | undefined
+            if (modeResult.mode === 'adoption') {
+              const preamble = loadAdoptionPreamble(projectRoot)
+              for (const w of preamble.warnings) output.warn(w)
+              adoptionPreamble = preamble.content ?? undefined
+            }
+
             const kbIndex = buildIndexWithOverrides(projectRoot, getPackageKnowledgeDir(projectRoot))
             const { entries: knowledgeEntries, warnings: kbWarnings } = loadEntries(
               kbIndex,
-              pipeline.overlay.knowledge[step] ?? metaPrompt.frontmatter.knowledgeBase ?? [],
+              withAdoptionKnowledge(
+                pipeline.overlay.knowledge[step] ?? metaPrompt.frontmatter.knowledgeBase ?? [],
+                modeResult.mode,
+              ),
             )
             for (const w of kbWarnings) {
               output.warn(w)
@@ -535,8 +556,10 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
               arguments: boundArguments,
               depth,
               depthProvenance: provenance,
-              updateMode: updateModeResult.isUpdateMode,
-              existingArtifact: updateModeResult.existingArtifact,
+              updateMode: isUpdate,
+              existingArtifact: isUpdate ? modeResult.existingArtifact : undefined,
+              assemblyMode: modeResult.mode,
+              adoptionPreamble,
               artifacts,
               decisions,
             })
