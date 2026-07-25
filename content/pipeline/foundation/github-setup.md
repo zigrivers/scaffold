@@ -148,3 +148,18 @@ Never assume visibility — wait for the choice before creating the remote.
 - Never force-push, never overwrite an existing remote, and never rewrite history.
 - Defer branching strategy, commit standards, CI, PR workflow, branch protection, and
   worktrees to the `git-workflow` step (order 330) — do not duplicate that work here.
+
+## Adoption Mode Specifics
+- **Codify from repo evidence**: the hosting state as it exists — remote URL
+  and visibility (`git remote get-url origin`, `gh repo view`), default
+  branch, and branch-protection rules
+  (`gh api repos/{owner}/{repo}/branches/{branch}/protection`) — recorded in
+  docs/github-setup.md as facts. In adoption this step is usually already
+  `done (verified)` via its detect contract; this block governs the residual
+  cases.
+- **Interview only for**: nothing, when a pushed remote already exists; for
+  a local-only repository, only the visibility choice (private default)
+  before the first push.
+- **Do not**: create a second remote or rename `origin`; change visibility
+  or branch-protection settings; push a never-pushed history without the
+  secret scan the Update Mode Specifics above already requires.

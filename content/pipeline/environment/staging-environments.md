@@ -193,3 +193,20 @@ updates, and never clobber local script modifications in scripts/ops/.
   (existing bands never shift); if a new service's healthcheck or port
   mapping conflicts with a locally-modified compose file, surface the
   conflict and let the user reconcile rather than overwriting their edit
+
+## Adoption Mode Specifics
+- **Codify from repo evidence**: the incumbent container topology — existing
+  compose files, their services, published ports, volumes, and healthchecks.
+  The per-worktree service list starts from what the incumbent compose
+  actually runs, not from the tech-stack doc alone.
+- **Interview only for**: which services agents genuinely need per-worktree
+  versus shared, and whether existing published ports are load-bearing for
+  other tools (port bands must avoid them).
+- **Ingest with provenance**: translate incumbent compose services into the
+  staging compose with provenance annotations; anything not translatable
+  (host-mounted secrets, external networks) is listed under "Not
+  translated" with the reason — never guessed.
+- **Do not**: rebind or renumber ports the incumbent stack already
+  publishes; replace the incumbent compose file (the staging compose is
+  layered alongside it); copy production credentials into staging
+  configuration.

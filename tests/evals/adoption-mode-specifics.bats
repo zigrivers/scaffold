@@ -18,6 +18,11 @@ ADOPTION_STEP_FILES=(
   "foundation/tdd.md"
   "foundation/project-structure.md"
   "foundation/beads.md"
+  "foundation/github-setup.md"
+  "environment/dev-env-setup.md"
+  "environment/git-workflow.md"
+  "environment/merge-throughput.md"
+  "environment/staging-environments.md"
 )
 
 @test "adoption-capable steps carry exactly one Adoption Mode Specifics block" {
