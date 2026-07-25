@@ -3220,8 +3220,8 @@ GATE_SECONDS=$(( $(date +%s) - GATE_START ))
 
 **Steps:**
 
-- [ ] Read `src/core/agent-ops/gate-ingest.ts` and `content/assets/agent-ops/gate/gate-check-affected.sh.tmpl` as actually merged. The edits below are written against the R2 plan's published interfaces (`GateSeed`, `gateTemplateVars(seed)`, the template's quarantine/`{{GATE_AFFECTED_INVOCATION}}` tail); if merged names drifted, apply the same change to the merged names.
-- [ ] Append the failing bats tests to `tests/agent-ops-gate-affected.bats`, and add one line to its `setup()` sed pipeline so the new marker is rendered:
+- [x] Read `src/core/agent-ops/gate-ingest.ts` and `content/assets/agent-ops/gate/gate-check-affected.sh.tmpl` as actually merged. The edits below are written against the R2 plan's published interfaces (`GateSeed`, `gateTemplateVars(seed)`, the template's quarantine/`{{GATE_AFFECTED_INVOCATION}}` tail); if merged names drifted, apply the same change to the merged names.
+- [x] Append the failing bats tests to `tests/agent-ops-gate-affected.bats`, and add one line to its `setup()` sed pipeline so the new marker is rendered:
 
 ```bash
       -e 's|{{GATE_TIA_INVOCATION}}|printf "%s" "$TIA_TESTS" > .tia-tests; touch .tia-ran|g' \
@@ -3281,8 +3281,8 @@ STUB
 }
 ```
 
-- [ ] Run: `bats tests/agent-ops-gate-affected.bats` — expect the 3 new tests FAIL, existing 7 pass.
-- [ ] In `content/assets/agent-ops/gate/gate-check-affected.sh.tmpl`, replace the tail — from the quarantine comment block through the final `{{GATE_AFFECTED_INVOCATION}}` line — with:
+- [x] Run: `bats tests/agent-ops-gate-affected.bats` — expect the 3 new tests FAIL, existing 7 pass.
+- [x] In `content/assets/agent-ops/gate/gate-check-affected.sh.tmpl`, replace the tail — from the quarantine comment block through the final `{{GATE_AFFECTED_INVOCATION}}` line — with:
 
 ```bash
 # Quarantine: mute for the MERGE gate only (asymmetry is deliberate — the
@@ -3321,7 +3321,7 @@ fi
 {{GATE_AFFECTED_INVOCATION}}
 ```
 
-- [ ] In `src/core/agent-ops/gate-ingest.ts`: add `tiaInvocation: string` to `GateSeed`; in `ingestGateSeed`, seed it next to `affectedInvocation` — for a vitest-detected project:
+- [x] In `src/core/agent-ops/gate-ingest.ts`: add `tiaInvocation: string` to `GateSeed`; in `ingestGateSeed`, seed it next to `affectedInvocation` — for a vitest-detected project:
 
 ```ts
     tiaInvocation:
@@ -3335,9 +3335,9 @@ fi
 ```
 
   In `gateTemplateVars`, add `GATE_TIA_INVOCATION: seed.tiaInvocation`. Extend the colocated `gate-ingest.test.ts` expectations accordingly (the vars object now carries `GATE_TIA_INVOCATION`; assert the vitest seed contains `xargs npx vitest run` and the fallback contains `full "no TIA invocation`).
-- [ ] Run: `bats tests/agent-ops-gate-affected.bats` — expect ALL pass (7 existing + 3 new; the existing tests never hit the TIA branch because their fixtures have no `map.json`, and `PRIMARY_MQ` resolves to the fixture-local `.mq` in a plain checkout).
-- [ ] Run: `npx vitest run src/core/agent-ops` and `npm run check` — expect green.
-- [ ] Commit: `git add -A && git commit -m "feat(agent-ops): affected gate consumes scaffold tia affected with full-suite fallback (D14)"`
+- [x] Run: `bats tests/agent-ops-gate-affected.bats` — expect ALL pass (7 existing + 3 new; the existing tests never hit the TIA branch because their fixtures have no `map.json`, and `PRIMARY_MQ` resolves to the fixture-local `.mq` in a plain checkout).
+- [x] Run: `npx vitest run src/core/agent-ops` and `npm run check` — expect green.
+- [x] Commit: `git add -A && git commit -m "feat(agent-ops): affected gate consumes scaffold tia affected with full-suite fallback (D14)"`
 
 ---
 
