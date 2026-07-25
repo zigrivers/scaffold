@@ -92,6 +92,8 @@ describe('ensureGateMakeTargets', () => {
     expect(mk).toContain('\t./scripts/gate-check-affected.sh')
     expect(mk).toContain('check-visual:')
     expect(mk).toContain('\tnpm run test:visual')
+    // .PHONY so a stray file/dir named `check` can't silently no-op the gate.
+    expect(mk).toContain('.PHONY: check check-affected check-visual')
   })
   it('never duplicates an existing target (check: present ==> only the others append)', () => {
     const root = tmpProject()
@@ -101,6 +103,10 @@ describe('ensureGateMakeTargets', () => {
     const mk = fs.readFileSync(path.join(root, 'Makefile'), 'utf8')
     expect(mk.match(/^check:/gm)?.length).toBe(1)
     expect(mk).toContain('@echo custom')
+    // Only the targets we actually appended are declared .PHONY — never the
+    // user's pre-existing `check`.
+    expect(mk).toContain('.PHONY: check-affected check-visual')
+    expect(mk).not.toMatch(/\.PHONY:.*\bcheck\b(?!-)/)
   })
   it('is idempotent', () => {
     const root = tmpProject()

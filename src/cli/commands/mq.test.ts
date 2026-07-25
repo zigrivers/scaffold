@@ -222,4 +222,11 @@ describe('gateTargetResolves (security: no shell injection via the command strin
     expect(gateTargetResolves(root, 'bash --version')).toBe(true)
     expect(gateTargetResolves(root, 'definitely-not-a-real-cmd-xyz')).toBe(false)
   })
+  it('resolves the head executable past a quoted-space env prefix (quote-aware split)', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mq-gate-q-'))
+    // A strict whitespace split would tokenize "FOO='bar" / "baz'" and mis-read
+    // the executable; quote-aware parsing keeps the env value one token and
+    // finds `bash`.
+    expect(gateTargetResolves(root, 'FOO=\'bar baz\' bash --version')).toBe(true)
+  })
 })

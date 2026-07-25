@@ -69,4 +69,16 @@ describe('runGateProbe (D5 gate section, R2)', () => {
     // The probe short-circuits before running the script — the suite never runs.
     expect(fs.existsSync(path.join(root, 'suite-ran'))).toBe(false)
   })
+  it('catches a non-executable AFFECTED seed even when gate-check.sh is fine', () => {
+    const root = project(HONORS_PROBE) // gate-check.sh present + executable
+    // The affected seed is what the merge queue runs; a missing +x here would
+    // pass a gate-check.sh-only probe but fail `make check-affected`.
+    fs.writeFileSync(path.join(root, 'scripts', 'gate-check-affected.sh'), HONORS_PROBE, { mode: 0o644 })
+    const res = runGateProbe(root)
+    expect(res.ran).toBe(true)
+    expect(res.ok).toBe(false)
+    expect(res.detail).toMatch(/gate-check-affected\.sh is not executable/)
+    expect(res.detail).toMatch(/make check-affected/)
+    expect(res.detail).toMatch(/chmod \+x scripts\/gate-check-affected\.sh/)
+  })
 })

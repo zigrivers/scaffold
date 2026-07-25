@@ -444,6 +444,12 @@ export function ensureGateMakeTargets(projectRoot: string, seed: GateSeed): stri
       `\t${seed.visualCommands.join('\n\t')}\n`
     additions.push('check-visual')
   }
+  // Declare the seeded targets .PHONY so a stray file/dir named `check` (common
+  // in some project layouts) can't make `make check` no-op and silently report
+  // success — a phantom-satisfied target would bypass the quality gate entirely.
+  if (additions.length > 0) {
+    out += `${sep()}\n.PHONY: ${additions.join(' ')}\n`
+  }
   if (out !== body) fs.writeFileSync(mkPath, out)
   return additions
 }

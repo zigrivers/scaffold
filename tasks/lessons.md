@@ -290,3 +290,25 @@ invocation than production masks exactly the drift it exists to catch.
 directly (needs `+x`), the probe must verify the exec bit (or invoke it the same
 way) and fail with actionable remediation (`chmod +x <path>`), not silently pass
 under `bash <script>`.
+
+## Seeded Makefile gate targets MUST be .PHONY, or a stray file silently bypasses the gate (2026-07-24)
+**Pattern:** R2 review round 2 (PR #785) found the generated `check` /
+`check-affected` / `check-visual` targets lacked a `.PHONY` declaration. Because
+they run their script directly (`./scripts/gate-check.sh`), a file or directory
+named `check` in the project root (not uncommon) makes `make check` see the
+target as "up to date", do nothing, and exit 0 — a green gate that ran zero
+tests. A silently-satisfied quality gate is worse than a failing one.
+**Rule:** Any generated Makefile target that represents an ACTION (a gate, a
+build step) must be declared `.PHONY`. When appending targets to a user's
+Makefile, emit `.PHONY: <only the targets you added>` — never phony-ify a target
+the user already owns.
+
+## When two callers need the same fragile parsing, extract & share it — don't re-derive (2026-07-24)
+**Pattern:** R2 round 2 flagged that `gateTargetResolves` used a strict
+whitespace split (mishandling quoted-space commands) while a correct quote-aware
+`parseShell` already existed privately in the observability fix dispatcher.
+**Rule:** Before writing a second tokenizer/parser/validator, grep for an
+existing one and extract it to a shared module (here `src/core/parse-shell.ts`)
+so both callers get the same battle-tested behavior. Keep the extracted function
+byte-identical to the original unless you deliberately intend a behavior change
+(and then re-run the original caller's tests).

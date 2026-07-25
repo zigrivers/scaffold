@@ -8,6 +8,7 @@ import type { Argv, CommandModule } from 'yargs'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
 import { loadAgentOpsConfig } from '../../core/agent-ops/config.js'
+import { parseShell } from '../../core/parse-shell.js'
 import { GATE_PID_FILE, MergeQueueDaemon, PAUSED_FILE } from '../../merge-queue/daemon.js'
 import { appendEvent, readJournal } from '../../merge-queue/journal.js'
 import { reduceState, TERMINAL_PR_STATES } from '../../merge-queue/state.js'
@@ -43,7 +44,10 @@ export interface MqOverrides {
  *  Leading `VAR=value` env assignments (e.g. `NODE_ENV=test vitest`) are
  *  skipped so the real executable is resolved, not the assignment. */
 export function gateTargetResolves(projectRoot: string, command: string): boolean {
-  const words = command.trim().split(/\s+/)
+  // Quote-aware tokenization so `FOO='bar baz' make check` and paths with spaces
+  // resolve to the right head word (a strict whitespace split would over-tokenize
+  // the quoted value and mis-read the executable).
+  const words = parseShell(command)
   // Drop leading env-assignment words (NAME=value) — shell-prefix syntax.
   const isEnvAssign = (w: string): boolean => /^[A-Za-z_][A-Za-z0-9_]*=/.test(w)
   let head = 0

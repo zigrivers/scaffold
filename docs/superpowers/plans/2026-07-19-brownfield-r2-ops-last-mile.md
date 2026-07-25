@@ -1461,6 +1461,14 @@ fi
 
 ### Task 8: gate template — `gate-check-affected.sh.tmpl` (the mq contract)
 
+> **Reviewer note — RESOLVED (P2, PR #785 round 2).** The `is_force_full` case
+> list carried `*/` monorepo variants for every subdirectory-eligible config
+> (its own comment mandates this) but had omitted them for two entries the
+> knowledge contract lists with `**`: `migrations/*` and `src/test-utils/*`. A
+> nested non-SQL migration (`packages/api/migrations/002.rb`) or nested shared
+> test-util would narrow-miss the full gate. Added `*/migrations/*` and
+> `*/src/test-utils/*`; two bats cases assert nested changes now force full.
+
 **Files:**
 - Create: `content/assets/agent-ops/gate/gate-check-affected.sh.tmpl`
 - Create: `tests/agent-ops-gate-affected.bats`
@@ -1960,6 +1968,15 @@ export function gateTemplateVars(seed: GateSeed): Record<string, string> {
 ---
 
 ### Task 10: gate install plumbing — seed manifest semantics + FILE_MAP + Makefile targets
+
+> **Reviewer note — RESOLVED (P1, PR #785 round 2).** The seeded `check` /
+> `check-affected` / `check-visual` Makefile targets were emitted without a
+> `.PHONY` declaration. Since both run their script DIRECTLY (`./scripts/…`), a
+> stray file/dir named `check` in the project root would make `make check`
+> report "up to date", no-op, and exit 0 — silently bypassing the quality gate.
+> `ensureGateMakeTargets` now appends `.PHONY: <targets>` for exactly the targets
+> it added (never the user's pre-existing `check`). Tests assert the `.PHONY`
+> line and that a pre-existing `check` is excluded from it.
 
 **Files:**
 - Modify: `src/core/agent-ops/install.ts`
@@ -3205,6 +3222,16 @@ export function planResume(
 > quoted positional (`['-c', 'command -v "$1"', '--', exe[0]]`) so the shell
 > treats it as literal data, never syntax. Test asserts a `$(…)`/`;` payload
 > resolves `false` and creates no file, while real executables still resolve.
+
+> **Reviewer note — RESOLVED (P1, PR #785 round 2).** `gateTargetResolves` split
+> the command on strict whitespace, so a quoted-space env prefix
+> (`FOO='bar baz' make check`) or a path with spaces over-tokenized and the
+> head-word resolution failed (false negative — refused to arm a valid gate).
+> Switched to the shared quote-aware `parseShell` (extracted from the
+> observability fix dispatcher into `src/core/parse-shell.ts` and reused by both;
+> it strips matched quotes but never expands substitutions, so the quoted-
+> positional injection guard above still holds). Test asserts the head word
+> resolves past a quoted-space env prefix.
 
 **Files:**
 - Modify: `src/merge-queue/bootstrap.ts` (append the engine)
@@ -4517,6 +4544,15 @@ export function fixSchedulerReload(
 > run and failing with actionable remediation (`chmod +x <path>`) when the bit is
 > missing. Test asserts a `0o644` seed yields `ok:false` with the chmod guidance
 > and never runs the suite.
+
+> **Reviewer note — RESOLVED (P2, PR #785 round 2).** The exec-bit check above
+> initially validated only the ONE script the probe runs (`gate-check.sh`
+> preferred). But `make check-affected` runs `./scripts/gate-check-affected.sh`
+> DIRECTLY too, so a non-executable affected seed would pass a gate-check.sh-only
+> probe yet fail the merge-queue gate. The probe now validates the exec bit of
+> EVERY present seed (naming the failing one + its `make` target + `chmod +x`
+> path) before running. Test: gate-check.sh executable + affected seed `0o644`
+> ⇒ `ok:false` citing `check-affected`.
 
 **Files:**
 - Create: `src/doctor/gate-probe.ts`

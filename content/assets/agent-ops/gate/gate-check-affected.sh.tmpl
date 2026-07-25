@@ -53,7 +53,7 @@ is_force_full() {
 	Makefile|*/Makefile|tsconfig*.json|*/tsconfig*.json|.swcrc|*/.swcrc|\
 	vitest.config.*|*/vitest.config.*|vite.config.*|*/vite.config.*|playwright.config.*|*/playwright.config.*|\
 	turbo.json|*/turbo.json|pytest.ini|*/pytest.ini|.github/workflows/*|scripts/gate-check.sh|scripts/gate-check-affected.sh|\
-	src/test-utils/*|conftest.py|*/conftest.py|.env*|*/.env*|migrations/*|*.sql|*.proto)
+	src/test-utils/*|*/src/test-utils/*|conftest.py|*/conftest.py|.env*|*/.env*|migrations/*|*/migrations/*|*.sql|*.proto)
 		return 0
 		;;
 	esac

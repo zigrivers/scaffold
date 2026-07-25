@@ -21,10 +21,10 @@ export function runGateProbe(
   projectRoot: string,
   opts: { timeoutMs?: number } = {},
 ): GateProbeResult {
-  const script = ['scripts/gate-check.sh', 'scripts/gate-check-affected.sh']
-    .map(rel => path.join(projectRoot, rel))
-    .find(p => fs.existsSync(p))
-  if (script === undefined) {
+  const present = ['scripts/gate-check.sh', 'scripts/gate-check-affected.sh']
+    .map(rel => ({ rel, abs: path.join(projectRoot, rel) }))
+    .filter(c => fs.existsSync(c.abs))
+  if (present.length === 0) {
     return {
       ran: false,
       ok: true,
@@ -32,19 +32,26 @@ export function runGateProbe(
         + '(install: scaffold agent-ops install --component gate)',
     }
   }
-  // The Makefile `check` target runs `./scripts/gate-check.sh` DIRECTLY, which
-  // needs the executable bit. Running it under `bash` here would mask a missing
-  // bit and report healthy while `make check` fails "permission denied" — so
-  // verify the bit first and fail with actionable remediation if it's gone.
-  const name = path.basename(script)
-  if ((fs.statSync(script).mode & 0o111) === 0) {
+  // BOTH seeds are invoked DIRECTLY by their Makefile targets (`make check` →
+  // `./scripts/gate-check.sh`, `make check-affected` → `./scripts/gate-check-affected.sh`),
+  // so EVERY present seed needs the executable bit — not just the one we probe.
+  // Running under `bash` here would mask a missing bit and report healthy while
+  // the corresponding `make` target fails "permission denied", so verify each and
+  // fail with actionable remediation before running anything.
+  const notExec = present.find(c => (fs.statSync(c.abs).mode & 0o111) === 0)
+  if (notExec !== undefined) {
     return {
       ran: true,
       ok: false,
-      detail: `${name} is not executable — \`make check\` runs it directly and will fail; `
-        + `fix with: chmod +x ${path.relative(projectRoot, script)}`,
+      detail: `${path.basename(notExec.abs)} is not executable — \`make ${
+        notExec.rel.endsWith('affected.sh') ? 'check-affected' : 'check'
+      }\` runs it directly and will fail; fix with: chmod +x ${notExec.rel}`,
     }
   }
+  // gate-check.sh is preferred for the probe; the affected script delegates its
+  // probe mode there anyway (Task 8), so probing the full seed covers both.
+  const script = present[0].abs
+  const name = path.basename(script)
   const res = spawnSync('bash', [script], {
     cwd: projectRoot,
     env: { ...process.env, GATE_PROBE: '1' },

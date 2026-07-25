@@ -55,6 +55,28 @@ teardown() { rm -rf "$TMP"; }
   [[ "$output" == *"infra change"* ]]
 }
 
+@test "nested migrations change (packages/api/migrations/002.rb) forces the FULL gate in a monorepo" {
+  mkdir -p packages/api/migrations
+  echo 'class M; end' > packages/api/migrations/002.rb
+  git add -A && git commit -qm nested-migration
+  MQ_AFFECTED_BASE=main run scripts/gate-check-affected.sh
+  [ "$status" -eq 0 ]
+  [ -f .full-ran ]
+  [ ! -f .affected-ran ]
+  [[ "$output" == *"infra change"* ]]
+}
+
+@test "nested shared test-utils change (packages/web/src/test-utils/x.ts) forces the FULL gate" {
+  mkdir -p packages/web/src/test-utils
+  echo 'export const x = 1' > packages/web/src/test-utils/x.ts
+  git add -A && git commit -qm nested-testutils
+  MQ_AFFECTED_BASE=main run scripts/gate-check-affected.sh
+  [ "$status" -eq 0 ]
+  [ -f .full-ran ]
+  [ ! -f .affected-ran ]
+  [[ "$output" == *"infra change"* ]]
+}
+
 @test "empty diff against base forces the FULL gate, never zero tests" {
   MQ_AFFECTED_BASE=main run scripts/gate-check-affected.sh
   [ "$status" -eq 0 ]
