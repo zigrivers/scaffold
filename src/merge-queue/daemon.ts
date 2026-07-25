@@ -15,7 +15,7 @@ import {
 import type { GhClient, PrInfo } from './gh.js'
 import type { GitOps } from './git.js'
 import type { GateResult } from './gate.js'
-import type { BatchRecord, MergeQueueConfig, PrState, QueueState } from './types.js'
+import type { BatchRecord, MergeQueueConfig, PrEntry, PrState, QueueState } from './types.js'
 import { waitForWake } from './wake.js'
 
 export interface DaemonDeps {
@@ -42,6 +42,12 @@ export const PAUSED_FILE = 'PAUSED'
 export const GATE_PID_FILE = 'gate.pid'
 
 const IN_FLIGHT_BATCH_STATES = ['CONSTRUCTING', 'RUNNING', 'GREEN', 'LANDING', 'SPLITTING']
+
+/** D13: an entry's changed-file set, or null when unknown (never fetched, or the
+ *  last fetch failed) — an unknown set conservatively conflicts with everything. */
+function knownFiles(e: PrEntry): string[] | null {
+  return e.filesHeadSha !== undefined ? e.files ?? [] : null
+}
 
 /** PR states that mean "mid-flight in a batch" — a crash here must be recovered. */
 const MIDFLIGHT_PR_STATES: ReadonlySet<PrState> = new Set<PrState>([
@@ -224,7 +230,7 @@ export class MergeQueueDaemon {
     if (zones.length > 0 && config.overlap_zone_policy === 'hold') {
       batchable = []
       for (const e of eligible) {
-        const known = e.filesHeadSha !== undefined ? e.files ?? [] : null
+        const known = knownFiles(e)
         if (!e.zoneReleased && known !== null && touchesOverlapZone(known, zones)) {
           appendEvent(mqDir, {
             type: 'pr_state', pr: e.pr, state: 'HELD_HUMAN', at: this.at(),
@@ -238,7 +244,7 @@ export class MergeQueueDaemon {
     }
     const files = new Map<number, string[] | null>()
     for (const e of batchable) {
-      files.set(e.pr, e.filesHeadSha !== undefined ? e.files ?? [] : null)
+      files.set(e.pr, knownFiles(e))
     }
     const members = composeBatch(batchable, infos, config.batch_cap, {
       files, overlapZones: zones,

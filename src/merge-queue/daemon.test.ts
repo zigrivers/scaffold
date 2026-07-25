@@ -709,6 +709,29 @@ describe('MergeQueueDaemon.cycle', () => {
     await h.daemon.cycle()
     expect(h.states()[1]).toBe('LANDED')
   })
+
+  it('tripwire: an unknown file set (changedFiles fails) under hold policy goes SOLO, never HELD_HUMAN', async () => {
+    const h = harness({
+      config: {
+        ...defaultMergeQueueConfig(), gate_cache_max_entries: 0,
+        overlap_zones: ['migrations/**'], overlap_zone_policy: 'hold',
+      },
+    })
+    h.enqueue(1)
+    h.enqueue(2)
+    h.gh.failFiles.add(1) // PR1's file set is unknown — must never be held
+    h.gh.files.set(2, ['src/b.ts'])
+    await h.daemon.cycle()
+    // Unknown file set forces a solo batch this cycle — PR1 lands alone, never HELD_HUMAN.
+    expect(h.git.constructed.map(c => c.prs)).toEqual([[1]])
+    expect(h.states()[1]).not.toBe('HELD_HUMAN')
+    await h.daemon.cycle()
+    expect(h.states()).toEqual({ 1: 'LANDED', 2: 'LANDED' })
+    const heldEvents = readJournal(h.mqDir).filter(
+      e => e.type === 'pr_state' && e.pr === 1 && e.state === 'HELD_HUMAN',
+    )
+    expect(heldEvents).toHaveLength(0)
+  })
 })
 
 describe('MergeQueueDaemon.reconcile', () => {
