@@ -438,6 +438,37 @@ describe('artifact_map integration (D10a)', () => {
     expect(result.mappedArtifactUsed).toBeUndefined()
   })
 
+  // MMR round-2 (PR #786) finding: detectCompletion's mapped-incumbent
+  // fallback was not service-gated, mirroring the bug fixed in
+  // applyConflictOverrides (which gates on `!isServiceLocal`). detectCompletion
+  // has no live production callers today, but this closes the gap so a future
+  // caller cannot reintroduce a false-completion for a service-local step.
+  describe('service scope (mirrors applyConflictOverrides)', () => {
+    it('a ROOT artifact_map entry does NOT satisfy a service-local detectCompletion check', () => {
+      const dir = makeTempDir()
+      fs.writeFileSync(path.join(dir, 'CONTRIBUTING.md'), '# house rules', 'utf8')
+      const state = makeBaseState()
+      const result = detectCompletion(
+        'coding-standards', state, ['docs/coding-standards.md'], dir, 'api',
+        { 'coding-standards': 'CONTRIBUTING.md' },
+      )
+      expect(result.complete).toBe(false)
+      expect(result.mappedArtifactUsed).toBeUndefined()
+    })
+
+    it('a ROOT artifact_map entry DOES satisfy detectCompletion for a global step even in service scope', () => {
+      const dir = makeTempDir()
+      fs.writeFileSync(path.join(dir, 'CONTRIBUTING.md'), '# house rules', 'utf8')
+      const state = makeBaseState()
+      const result = detectCompletion(
+        'coding-standards', state, ['docs/coding-standards.md'], dir, 'api',
+        { 'coding-standards': 'CONTRIBUTING.md' }, new Set(['coding-standards']),
+      )
+      expect(result.complete).toBe(true)
+      expect(result.mappedArtifactUsed).toBe('CONTRIBUTING.md')
+    })
+  })
+
   it('checkCompletion reports confirmed_complete for completed + mapped incumbent present', () => {
     const dir = makeTempDir()
     fs.writeFileSync(path.join(dir, 'CONTRIBUTING.md'), '# Contributing\n')

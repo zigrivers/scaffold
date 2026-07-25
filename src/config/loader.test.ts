@@ -390,5 +390,37 @@ project:
       expect(result.errors).toHaveLength(0)
       expect(result.config?.artifact_map).toEqual({ 'coding-standards': 'CONTRIBUTING.md' })
     })
+
+    // MMR round-2 (PR #786) flagged the D10a raw-obj block above (`path
+    // .isAbsolute(target)` on `obj['artifact_map']` cast as Record<string,
+    // string>) as an uncaught-TypeError risk for a non-string value (e.g.
+    // `artifact_map: {security: [SECURITY.md]}`). It does not reproduce: the
+    // Zod schema (`artifact_map: z.record(z.string(), z.string().min(1))`,
+    // added in the same commit) already rejects non-string values in Phase 4
+    // and short-circuits (line ~152) before the D10a block ever runs. These
+    // are regression tests locking in that non-crashing behavior.
+    it('errors (does not throw) on an artifact_map value that is an array, not a string', () => {
+      const root = makeTmpDir()
+      writeConfig(root, 'version: 2\nmethodology: deep\nplatforms: [claude-code]\n'
+        + 'artifact_map:\n  security:\n    - SECURITY.md\n')
+      expect(() => loadConfig(root, ['security'])).not.toThrow()
+      const result = loadConfig(root, ['security'])
+      expect(result.config).toBeNull()
+      expect(result.errors.length).toBeGreaterThan(0)
+      expect(result.errors.some(e => e.code === 'FIELD_INVALID_VALUE'
+        && e.context?.field === 'artifact_map.security')).toBe(true)
+    })
+
+    it('errors (does not throw) on an artifact_map value that is a number, not a string', () => {
+      const root = makeTmpDir()
+      writeConfig(root, 'version: 2\nmethodology: deep\nplatforms: [claude-code]\n'
+        + 'artifact_map:\n  coding-standards: 42\n')
+      expect(() => loadConfig(root, ['coding-standards'])).not.toThrow()
+      const result = loadConfig(root, ['coding-standards'])
+      expect(result.config).toBeNull()
+      expect(result.errors.length).toBeGreaterThan(0)
+      expect(result.errors.some(e => e.code === 'FIELD_INVALID_VALUE'
+        && e.context?.field === 'artifact_map.coding-standards')).toBe(true)
+    })
   })
 })

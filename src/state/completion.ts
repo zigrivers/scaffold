@@ -28,6 +28,7 @@ export function detectCompletion(
   projectRoot: string,
   service?: string,
   artifactMap?: Record<string, string>,
+  globalSteps?: ReadonlySet<string>,
 ): CompletionResult {
   // Own outputs win over a mapped incumbent (mirrors verifyStep's own-first
   // ordering) — check the step's own declared outputs first.
@@ -56,8 +57,12 @@ export function detectCompletion(
   // requirement (fallback only — own outputs were checked first). A stale
   // mapping (file gone) or one that escapes the project root falls through
   // to the normal all-outputs result below — a broken mapping must not
-  // silently verify.
-  const mapped = artifactMap?.[step]
+  // silently verify. artifact_map is a ROOT-level mapping (R3 scope:
+  // root-only) — it may only satisfy a root-scoped or global-step check, so
+  // it is skipped entirely for a service-local step (mirrors
+  // applyConflictOverrides's `!isServiceLocal` gate on the same fallback).
+  const isServiceLocal = service !== undefined && !(globalSteps?.has(step) ?? false)
+  const mapped = !isServiceLocal ? artifactMap?.[step] : undefined
   if (mapped !== undefined) {
     const mappedFull = resolveContainedArtifactPath(projectRoot, mapped)
     if (mappedFull !== null && fileExists(mappedFull)) {

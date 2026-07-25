@@ -18,6 +18,44 @@ export interface UpdateModeResult {
 }
 
 /**
+ * Compute depth-change warnings (ASM_DEPTH_CHANGED / ASM_DEPTH_DOWNGRADE) and
+ * `depthIncreased` for a step re-run at `currentDepth` after a prior run at
+ * `previousDepth`. Shared by `detectUpdateMode` and the D10a mapped-incumbent
+ * fallback in `resolveAssemblyMode` — both feed `run.ts`'s depth-downgrade
+ * confirmation gate, which reads `modeResult.warnings` for ASM_DEPTH_DOWNGRADE.
+ */
+function depthWarnings(
+  step: string,
+  previousDepth: DepthLevel | undefined,
+  currentDepth: DepthLevel,
+): { warnings: ScaffoldWarning[]; depthIncreased?: boolean } {
+  const warnings: ScaffoldWarning[] = []
+
+  if (previousDepth !== undefined && previousDepth !== currentDepth) {
+    warnings.push({
+      code: 'ASM_DEPTH_CHANGED',
+      message:
+        `Step '${step}' was previously executed at depth ${previousDepth}` +
+        `; now executing at depth ${currentDepth}`,
+    })
+
+    if (currentDepth < previousDepth) {
+      warnings.push({
+        code: 'ASM_DEPTH_DOWNGRADE',
+        message:
+          `Re-running step '${step}' at a lower depth (${currentDepth})` +
+          ` than original execution (${previousDepth})`,
+      })
+    }
+  }
+
+  const depthIncreased =
+    previousDepth !== undefined ? currentDepth > previousDepth : undefined
+
+  return { warnings, depthIncreased }
+}
+
+/**
  * Detect whether a step is being re-run (update mode).
  * Update mode is active when:
  *   1. The step status is 'completed', AND
@@ -84,28 +122,7 @@ export function detectUpdateMode(options: {
     completionTimestamp,
   }
 
-  const warnings: ScaffoldWarning[] = []
-
-  if (previousDepth !== undefined && previousDepth !== currentDepth) {
-    warnings.push({
-      code: 'ASM_DEPTH_CHANGED',
-      message:
-        `Step '${step}' was previously executed at depth ${previousDepth}` +
-        `; now executing at depth ${currentDepth}`,
-    })
-
-    if (currentDepth < previousDepth) {
-      warnings.push({
-        code: 'ASM_DEPTH_DOWNGRADE',
-        message:
-          `Re-running step '${step}' at a lower depth (${currentDepth})` +
-          ` than original execution (${previousDepth})`,
-      })
-    }
-  }
-
-  const depthIncreased =
-    previousDepth !== undefined ? currentDepth > previousDepth : undefined
+  const { warnings, depthIncreased } = depthWarnings(step, previousDepth, currentDepth)
 
   return {
     isUpdateMode: true,
@@ -219,26 +236,31 @@ export function resolveAssemblyMode(options: {
   // D10a fallback: mapped incumbent as prior artifact (own outputs absent).
   // Note: artifact_map targets are project-root-relative; the service prefix
   // is not applied (root-level mapping only — multi-service mapping is out
-  // of scope for R3).
+  // of scope for R3). Gated on `options.service === undefined` — a service
+  // run must never adopt a ROOT mapping as its prior artifact (mirrors the
+  // live-conflict gate above, which applies the same root-only restriction).
   const mapped = artifactMap?.[step]
-  if (updateEligible && mapped !== undefined) {
+  if (updateEligible && mapped !== undefined && options.service === undefined) {
     const mappedFull = resolveContainedArtifactPath(projectRoot, mapped)
     if (mappedFull !== null) {
       try {
         if (fs.statSync(mappedFull).isFile()) {
+          const mappedPreviousDepth = entry?.depth as DepthLevel | undefined
           const existingArtifact: ExistingArtifact = {
             filePath: mapped,
             content: fs.readFileSync(mappedFull, 'utf8'),
-            previousDepth: (entry?.depth ?? currentDepth) as DepthLevel,
+            previousDepth: (mappedPreviousDepth ?? currentDepth) as DepthLevel,
             completionTimestamp: entry?.at ?? '',
           }
+          const { warnings, depthIncreased } = depthWarnings(step, mappedPreviousDepth, currentDepth)
           return {
             mode: 'update',
             updateDetection: detection,
             existingArtifact,
-            previousDepth: entry?.depth as DepthLevel | undefined,
+            previousDepth: mappedPreviousDepth,
             currentDepth,
-            warnings: [],
+            depthIncreased,
+            warnings,
           }
         }
       } catch {

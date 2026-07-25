@@ -500,4 +500,66 @@ describe('resolveAssemblyMode (D3 matrix + D10a)', () => {
     })
     expect(result.mode).toBe('adoption')
   })
+
+  // MMR round-2 (PR #786) finding: the D10a mapped-incumbent fallback was not
+  // gated on service scope, so a ROOT artifact_map entry could wrongly supply
+  // a root document as the prior artifact for a `--service` run even though
+  // R3's artifact_map is root-only (mirrors the `options.service === undefined`
+  // gate already on the live-conflict check above).
+  it('D10a mapped-incumbent fallback is service-gated: a --service run does NOT use the root mapping', () => {
+    fs.writeFileSync(path.join(tmpDir, 'CONTRIBUTING.md'), '# House rules\n')
+    const state = brownfieldState({
+      'coding-standards': {
+        status: 'completed', source: 'pipeline', at: '2026-07-19T00:00:00.000Z',
+        produces: ['docs/coding-standards.md'], depth: 3,
+        verification: 'verified',
+      },
+    })
+    const result = resolveAssemblyMode({
+      step: 'coding-standards', state, currentDepth: 3, projectRoot: tmpDir,
+      artifactMap: { 'coding-standards': 'CONTRIBUTING.md' },
+      service: 'api',
+    })
+    expect(result.mode).not.toBe('update')
+    expect(result.existingArtifact).toBeUndefined()
+  })
+
+  it('D10a mapped-incumbent fallback still updates from the mapped file with no service (no regression)', () => {
+    fs.writeFileSync(path.join(tmpDir, 'CONTRIBUTING.md'), '# House rules\n')
+    const state = brownfieldState({
+      'coding-standards': {
+        status: 'completed', source: 'pipeline', at: '2026-07-19T00:00:00.000Z',
+        produces: ['docs/coding-standards.md'], depth: 3,
+        verification: 'verified',
+      },
+    })
+    const result = resolveAssemblyMode({
+      step: 'coding-standards', state, currentDepth: 3, projectRoot: tmpDir,
+      artifactMap: { 'coding-standards': 'CONTRIBUTING.md' },
+    })
+    expect(result.mode).toBe('update')
+    expect(result.existingArtifact?.filePath).toBe('CONTRIBUTING.md')
+  })
+
+  // MMR round-2 (PR #786) finding: the D10a mapped-incumbent fallback
+  // hardcoded `warnings: []` and never computed the depth-downgrade warning
+  // that run.ts reads to drive its depth-downgrade confirmation gate.
+  it('D10a mapped-incumbent fallback preserves depth-downgrade warnings (does not hardcode warnings: [])', () => {
+    fs.writeFileSync(path.join(tmpDir, 'CONTRIBUTING.md'), '# House rules\n')
+    const state = brownfieldState({
+      'coding-standards': {
+        status: 'completed', source: 'pipeline', at: '2026-07-19T00:00:00.000Z',
+        produces: ['docs/coding-standards.md'], depth: 5,
+        verification: 'verified',
+      },
+    })
+    const result = resolveAssemblyMode({
+      step: 'coding-standards', state, currentDepth: 3, projectRoot: tmpDir,
+      artifactMap: { 'coding-standards': 'CONTRIBUTING.md' },
+    })
+    expect(result.mode).toBe('update')
+    expect(result.existingArtifact?.filePath).toBe('CONTRIBUTING.md')
+    expect(result.warnings.some(w => w.code === 'ASM_DEPTH_DOWNGRADE')).toBe(true)
+    expect(result.depthIncreased).toBe(false)
+  })
 })
