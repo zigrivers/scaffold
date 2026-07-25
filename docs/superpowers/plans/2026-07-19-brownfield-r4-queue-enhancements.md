@@ -1640,7 +1640,7 @@ export function splitBatch(members: number[]): [number[], number[]] {
 
 **Steps:**
 
-- [ ] In `src/merge-queue/daemon.test.ts`, extend `FakeGh` with the new seam (add the fields next to `infos` and the method next to `listLabeled`):
+- [x] In `src/merge-queue/daemon.test.ts`, extend `FakeGh` with the new seam (add the fields next to `infos` and the method next to `listLabeled`):
 
 ```ts
   files = new Map<number, string[]>()
@@ -1655,7 +1655,7 @@ export function splitBatch(members: number[]): [number[], number[]] {
 
   (Unset PRs default to `[]` = known-empty, so every existing test batches exactly as before.)
 
-- [ ] Add the failing tests (inside `describe('MergeQueueDaemon.cycle', …)`):
+- [x] Add the failing tests (inside `describe('MergeQueueDaemon.cycle', …)`):
 
 ```ts
   it('overlapping PRs land in successive cycles, never one batch (D13)', async () => {
@@ -1749,8 +1749,8 @@ export function splitBatch(members: number[]): [number[], number[]] {
   })
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/daemon.test.ts` — expect the 6 new tests FAIL (`changedFiles` missing on the interface).
-- [ ] In `src/merge-queue/gh.ts`, add to the `GhClient` interface (after `listLabeled`):
+- [x] Run: `npx vitest run src/merge-queue/daemon.test.ts` — expect the 6 new tests FAIL (`changedFiles` missing on the interface).
+- [x] In `src/merge-queue/gh.ts`, add to the `GhClient` interface (after `listLabeled`):
 
 ```ts
   /** D13: changed-file paths of the PR (`gh pr diff --name-only`). */
@@ -1766,7 +1766,7 @@ export function splitBatch(members: number[]): [number[], number[]] {
     },
 ```
 
-- [ ] Add the method to EVERY other `GhClient` implementation / typed fake so the
+- [x] Add the method to EVERY other `GhClient` implementation / typed fake so the
   TypeScript gate stays green — widening the interface breaks any object typed as
   `GhClient` that lacks it. Search first: `grep -rln "GhClient" src --include=*.ts`.
   If R2 has already merged, this includes R2's fakes in
@@ -1776,7 +1776,7 @@ export function splitBatch(members: number[]): [number[], number[]] {
   Then re-run `npx tsc --noEmit -p tsconfig.json` and confirm no
   "Property 'changedFiles' is missing" errors remain.
 
-- [ ] In `src/merge-queue/daemon.ts`:
+- [x] In `src/merge-queue/daemon.ts`:
   - Extend the batch import: `import { composeBatch, splitBatch, touchesOverlapZone } from './batch.js'`
   - In `cycle()`, inside the collection loop, right after `infos.set(entry.pr, info)` (before the `yieldToLoop` call), add:
 
@@ -1833,8 +1833,8 @@ export function splitBatch(members: number[]): [number[], number[]] {
     })
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/daemon.test.ts` — expect ALL pass.
-- [ ] In `tests/merge-queue-e2e.test.ts`, teach the `GH_STUB` python registry about `pr diff` (insert before the final `else:` arm):
+- [x] Run: `npx vitest run src/merge-queue/daemon.test.ts` — expect ALL pass.
+- [x] In `tests/merge-queue-e2e.test.ts`, teach the `GH_STUB` python registry about `pr diff` (insert before the final `else:` arm):
 
 ```python
 elif args[:2] == ['pr', 'diff']:
@@ -1845,9 +1845,9 @@ elif args[:2] == ['pr', 'diff']:
 
   (Registry entries carry no `files` key, so every e2e PR reports a known-empty set — batching behavior in the e2e worlds is unchanged.)
 
-- [ ] Run: `npm run test:e2e` — expect the e2e suite green.
-- [ ] Run: `npm run check` — expect green.
-- [ ] Commit: `git add -A && git commit -m "feat(mq): daemon collects changed-file sets, partitions batches, hold policy (D13)"`
+- [x] Run: `npm run test:e2e` — expect the e2e suite green.
+- [x] Run: `npm run check` — expect green.
+- [x] Commit: `git add -A && git commit -m "feat(mq): daemon collects changed-file sets, partitions batches, hold policy (D13)"`
 
 ---
 
