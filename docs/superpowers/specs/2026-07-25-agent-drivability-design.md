@@ -39,9 +39,14 @@ No citation required correction. `src/cli/index.ts` still has no `.fail(` handle
 
 ---
 
-## Decisions Requiring a Call
+## Decisions
 
-Two findings admit more than one defensible fix. Both are presented with a recommendation rather than resolved silently.
+Two findings admitted more than one defensible fix. Both were put to the maintainer with a recommendation, and **both were approved as recommended on 2026-07-25**. The rejected options are kept below because the rationale is the reason the tasks look the way they do, and a future reader deciding whether to revisit them needs the tradeoff, not just the outcome.
+
+| ID | Question | Decision | Implemented by |
+|---|---|---|---|
+| D1 | Non-TTY without `--auto`: refuse, warn, or both? | **A. Refuse** (breaking) | Task 6 |
+| D2 | Shape of the failure envelope | **A. Flip the existing keys** | Task 1 |
 
 ### D1 (F2): non-TTY without `--auto` should refuse, warn, or both
 
@@ -53,7 +58,9 @@ Today `scaffold init --auto --project-type web-app` fails demanding `--web-rende
 | **B. Warn** | `InteractiveOutput` emits the `(auto) Using default for: ...` stderr breadcrumb that `AutoOutput` already emits (`src/cli/output/auto.ts:33, 38`) when `!canPrompt()` | Non-breaking and purely additive, but the command still succeeds with an arbitrary `options[0]`. The agent gets a trace it has no reason to read. |
 | **C. Both, staged** | Ship B in a patch, A in the following minor | Reaches the same destination more slowly, and leaves the defect live in the interim. |
 
-**Recommendation: A.** The repo has direct precedent. In v3.48.0 `scaffold adopt` changed from write-on-run to plan-first, and the shipped warning calls the previous behavior "a defect" (`src/cli/commands/adopt.ts:710`). The same reasoning applies here: silently answering a question nobody asked is a defect, not an interface. Option B's breadcrumb is still worth having and is folded into Task 6, because `AutoOutput` delegates its prompts to `InteractiveOutput`. Migration is self-documenting: the new failure names the exact flag to add, so a broken script's error message is also its fix. An escape-hatch environment variable was considered and rejected as new surface that would have to be supported indefinitely.
+**Decision: A, approved 2026-07-25.** The repo has direct precedent. In v3.48.0 `scaffold adopt` changed from write-on-run to plan-first, and the shipped warning calls the previous behavior "a defect" (`src/cli/commands/adopt.ts:710`). The same reasoning applies here: silently answering a question nobody asked is a defect, not an interface. Option B's breadcrumb is still worth having and is folded into Task 6, because `AutoOutput` delegates its prompts to `InteractiveOutput`. Migration is self-documenting: the new failure names the exact flag to add, so a broken script's error message is also its fix. An escape-hatch environment variable was considered and rejected as new surface that would have to be supported indefinitely.
+
+Because this is the plan's only breaking behavior change, it carries two obligations that Task 6 and the release checklist must honor: a CHANGELOG entry under "Behavior change" naming the exact commands whose exit status changes, and a minor version bump rather than a patch.
 
 ### D2 (F4): shape of the failure envelope
 
@@ -65,7 +72,9 @@ Today `scaffold init --auto --project-type web-app` fails demanding `--web-rende
 | **B. New top-level `error` object** | Add `error` alongside the existing `errors` array | Introduces a parallel convention for the same information, which the plan's constraints forbid. |
 | **C. JSON Lines / streaming** | Emit one object per event | Larger change, no demand from either path, and it breaks every existing single-parse consumer. |
 
-**Recommendation: A.** It activates three fields that are currently dead rather than adding a fourth, which is the whole point of the constraint about reusing conventions.
+**Decision: A, approved 2026-07-25.** It activates three fields that are currently dead rather than adding a fourth, which is the whole point of the constraint about reusing conventions.
+
+One consequence to hold onto while implementing: because `success` and `exit_code` have always been present but always said "true" and "0", any existing consumer that reads them is already correct and keeps working. The change is only that those fields start telling the truth. That is why this ships as a patch in Release 1 rather than waiting for Release 2 alongside D1.
 
 ---
 
