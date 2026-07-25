@@ -46,6 +46,17 @@ When modifying prompts:
 - Respect inter-prompt dependencies (documented in frontmatter `depends-on` fields)
 - Every document-creating prompt has a **Mode Detection** block and **Update Mode Specifics** block — when modifying prompts, preserve these blocks and keep them positioned after the opening paragraph and before the first content section
 - When adding a new document-creating prompt, include Mode Detection + Update Mode Specifics following the same pattern as existing prompts (check any existing prompt for the template)
+- Adoption-capable steps (18 initially — the pinned list lives in
+  `tests/evals/adoption-mode-specifics.bats`) additionally carry an
+  `## Adoption Mode Specifics` block placed after the Update Mode Specifics
+  section ends (after its bullets and any `###` subsections, before the next
+  `##` heading or at end of file). Required bullets: **Codify from repo
+  evidence**, **Interview only for**, **Do not**; optional: **Ingest with
+  provenance**. The global adoption-mode preamble lives in
+  `content/modes/adoption.md` and is injected at assembly time for steps
+  resolving to adoption mode — per-step blocks carry only what differs from
+  it. When adding an adoption block to a new step, add the file to the
+  eval's `ADOPTION_STEP_FILES` manifest.
 
 ### Key Commands
 
