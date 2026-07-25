@@ -152,6 +152,25 @@ export function loadAgentOpsConfig(projectRoot: string): AgentOpsConfig {
       }
       cfg.merge_queue.gate_cache_max_entries = v
     }
+    if (mq.overlap_zones !== undefined) {
+      if (!Array.isArray(mq.overlap_zones)) {
+        fail('merge_queue.overlap_zones must be a list of glob strings')
+      }
+      cfg.merge_queue.overlap_zones = mq.overlap_zones.map(z => {
+        if (typeof z !== 'string' || z.trim() === '') {
+          fail('merge_queue.overlap_zones entries must be non-empty strings')
+        }
+        return z
+      })
+    }
+    if (mq.overlap_zone_policy !== undefined) {
+      if (mq.overlap_zone_policy !== 'solo' && mq.overlap_zone_policy !== 'hold') {
+        fail(
+          `merge_queue.overlap_zone_policy must be "solo" or "hold", got ${JSON.stringify(mq.overlap_zone_policy)}`,
+        )
+      }
+      cfg.merge_queue.overlap_zone_policy = mq.overlap_zone_policy
+    }
   }
 
   return cfg

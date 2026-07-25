@@ -207,6 +207,8 @@ describe('merge_queue config', () => {
       ready_label: 'mq:ready',
       gate_executor: 'gha-selfhosted',
       gate_cache_max_entries: 200,
+      overlap_zones: [],
+      overlap_zone_policy: 'solo',
     })
   })
 
@@ -288,6 +290,35 @@ merge_queue:
   gate_cache_max_entries: -1
 `)
     expect(() => loadAgentOpsConfig(bad)).toThrow(/gate_cache_max_entries/)
+  })
+
+  it('parses overlap zones + policy and applies the solo default', () => {
+    expect(loadAgentOpsConfig(tmpProject()).merge_queue.overlap_zone_policy).toBe('solo')
+    expect(loadAgentOpsConfig(tmpProject()).merge_queue.overlap_zones).toEqual([])
+    const dir = tmpProject(`
+project_name: myapp
+merge_queue:
+  overlap_zones: ["migrations/**", "index.html"]
+  overlap_zone_policy: hold
+`)
+    const cfg = loadAgentOpsConfig(dir)
+    expect(cfg.merge_queue.overlap_zones).toEqual(['migrations/**', 'index.html'])
+    expect(cfg.merge_queue.overlap_zone_policy).toBe('hold')
+  })
+
+  it('rejects a bad overlap_zone_policy and empty zone globs', () => {
+    const badPolicy = tmpProject(`
+project_name: myapp
+merge_queue:
+  overlap_zone_policy: ask
+`)
+    expect(() => loadAgentOpsConfig(badPolicy)).toThrow(/overlap_zone_policy/)
+    const badZone = tmpProject(`
+project_name: myapp
+merge_queue:
+  overlap_zones: [""]
+`)
+    expect(() => loadAgentOpsConfig(badZone)).toThrow(/overlap_zones/)
   })
 })
 

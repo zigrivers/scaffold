@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { reduceState, queuedPrs, TERMINAL_PR_STATES } from './state.js'
 
 const at = (m: number) => `2026-07-17T00:${String(m).padStart(2, '0')}:00.000Z`
+const AT = '2026-07-19T12:00:00.000Z'
 
 describe('reduceState', () => {
   it('creates a QUEUED entry on enqueued', () => {
@@ -65,6 +66,50 @@ describe('reduceState', () => {
       { type: 'full_gate_recorded', tree: 't', seconds: 100, instrumented: false, at: at(2) },
     ])
     expect(s.entries.get(1)?.state).toBe('QUEUED')
+  })
+
+  it('caches pr_files on the entry (files + the head sha they were fetched at)', () => {
+    const state = reduceState([
+      { type: 'enqueued', pr: 1, at: AT },
+      { type: 'pr_files', pr: 1, headSha: 'sha1', files: ['a.ts', 'b.ts'], at: AT },
+    ])
+    expect(state.entries.get(1)?.files).toEqual(['a.ts', 'b.ts'])
+    expect(state.entries.get(1)?.filesHeadSha).toBe('sha1')
+  })
+
+  it('pr_files for an unknown PR is ignored', () => {
+    const state = reduceState([
+      { type: 'pr_files', pr: 9, headSha: 's', files: ['a.ts'], at: AT },
+    ])
+    expect(state.entries.size).toBe(0)
+  })
+
+  it('released flips HELD_HUMAN back to QUEUED and marks zoneReleased', () => {
+    const state = reduceState([
+      { type: 'enqueued', pr: 1, at: AT },
+      { type: 'pr_state', pr: 1, state: 'HELD_HUMAN', at: AT },
+      { type: 'released', pr: 1, at: AT },
+    ])
+    expect(state.entries.get(1)?.state).toBe('QUEUED')
+    expect(state.entries.get(1)?.zoneReleased).toBe(true)
+  })
+
+  it('released on a non-held PR is a no-op', () => {
+    const state = reduceState([
+      { type: 'enqueued', pr: 1, at: AT },
+      { type: 'released', pr: 1, at: AT },
+    ])
+    expect(state.entries.get(1)?.state).toBe('QUEUED')
+    expect(state.entries.get(1)?.zoneReleased).toBeUndefined()
+  })
+
+  it('HELD_HUMAN is neither terminal nor batchable', () => {
+    const state = reduceState([
+      { type: 'enqueued', pr: 1, at: AT },
+      { type: 'pr_state', pr: 1, state: 'HELD_HUMAN', at: AT },
+    ])
+    expect(TERMINAL_PR_STATES.has('HELD_HUMAN')).toBe(false)
+    expect(queuedPrs(state)).toEqual([])
   })
 })
 
