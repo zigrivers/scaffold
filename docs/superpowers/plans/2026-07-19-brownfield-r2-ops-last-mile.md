@@ -2393,7 +2393,7 @@ T="$(mktemp -d)" && mkdir -p "$T/.scaffold" \
 
 **Steps:**
 
-- [ ] Write the failing test `src/core/hooks/install.test.ts`:
+- [x] Write the failing test `src/core/hooks/install.test.ts`:
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -2543,8 +2543,8 @@ describe('planHooks / applyHookPlan (pure halves — reused read-only by the ado
 })
 ```
 
-- [ ] Run: `npx vitest run src/core/hooks/install.test.ts` — expect FAILURE (module missing).
-- [ ] Create `src/core/hooks/install.ts`:
+- [x] Run: `npx vitest run src/core/hooks/install.test.ts` — expect FAILURE (module missing).
+- [x] Create `src/core/hooks/install.ts`:
 
 ```ts
 import fs from 'node:fs'
@@ -2758,8 +2758,8 @@ export function installHooks(projectRoot: string): HooksInstallResult {
 }
 ```
 
-- [ ] Run: `npx vitest run src/core/hooks/install.test.ts` — expect 10 tests passed.
-- [ ] Commit: `git add -A && git commit -m "feat(hooks): TS deep-merge hook registration — idempotent, atomic, prerequisite-reported (D8)"`
+- [x] Run: `npx vitest run src/core/hooks/install.test.ts` — expect 10 tests passed.
+- [x] Commit: `git add -A && git commit -m "feat(hooks): TS deep-merge hook registration — idempotent, atomic, prerequisite-reported (D8)"`
 
 ---
 
