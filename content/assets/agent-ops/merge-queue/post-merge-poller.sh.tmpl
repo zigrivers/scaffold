@@ -75,6 +75,16 @@ HEAD_SHA="$(git rev-parse "origin/$BRANCH")"
 SCAFFOLD_BIN="${MQ_SCAFFOLD_BIN:-scaffold}"
 command -v "$SCAFFOLD_BIN" >/dev/null 2>&1 || SCAFFOLD_BIN=""
 
+# TIA coverage recording (D14; merge_queue.tia.record: scheduled|always|off,
+# default scheduled = first green pass per UTC day). When due, the full gate
+# runs under NODE_V8_COVERAGE so a green run refreshes .mq/tia/map.json.
+# Instrumentation slows the run — the cost is journaled (--instrumented) and
+# visible in `scaffold mq stats` as instrumented-vs-plain medians.
+INSTRUMENTED=0
+if [ -n "$SCAFFOLD_BIN" ] && "$SCAFFOLD_BIN" tia record-due >/dev/null 2>&1; then
+	INSTRUMENTED=1
+fi
+
 LAST="$(cat "$MARKER" 2>/dev/null || echo none)"
 if [ "$HEAD_SHA" = "$LAST" ]; then
 	echo "post-merge: up to date at $HEAD_SHA"
@@ -101,7 +111,7 @@ fi
 # an earlier poller pass at a different sha with an identical tree, e.g. after a
 # revert). Green-only cache; any error here degrades to a normal run.
 TREE_SHA="$(git rev-parse "origin/$BRANCH^{tree}")"
-if [ -n "$SCAFFOLD_BIN" ] && "$SCAFFOLD_BIN" mq gate-cache --check-tree "$TREE_SHA" >/dev/null 2>&1; then
+if [ "$INSTRUMENTED" != "1" ] && [ -n "$SCAFFOLD_BIN" ] && "$SCAFFOLD_BIN" mq gate-cache --check-tree "$TREE_SHA" >/dev/null 2>&1; then
 	echo "$HEAD_SHA" > "$MARKER"
 	if grep -q '^post-merge red' "$PAUSE" 2>/dev/null; then
 		rm -f "$PAUSE"
@@ -130,12 +140,31 @@ LOG="$MQ_DIR/logs/post-merge-$HEAD_SHA.log"
 # semantics.
 GATE_START="$(date +%s)"
 GATE_RC=0
-(cd "$WT" && {{FULL_GATE_COMMAND}}) >"$LOG" 2>&1 || GATE_RC=$?
+if [ "$INSTRUMENTED" = "1" ]; then
+	# Create the dump dir HERE (immediately before the gate) so no early exit
+	# above can leave a provisional coverage dir behind.
+	rm -rf "$MQ_DIR/tia/v8"
+	mkdir -p "$MQ_DIR/tia/v8"
+	# export (not a prefix assignment) so a compound gate command — pipelines,
+	# &&-chains — sees the variable in every stage.
+	(cd "$WT" && export NODE_V8_COVERAGE="$MQ_DIR/tia/v8" && {{FULL_GATE_COMMAND}}) >"$LOG" 2>&1 || GATE_RC=$?
+else
+	(cd "$WT" && {{FULL_GATE_COMMAND}}) >"$LOG" 2>&1 || GATE_RC=$?
+fi
 GATE_SECONDS=$(( $(date +%s) - GATE_START ))
 if [ "$GATE_RC" -eq 0 ]; then
 	echo "$HEAD_SHA" > "$MARKER"
 	if [ -n "$SCAFFOLD_BIN" ]; then
-		"$SCAFFOLD_BIN" mq gate-cache --record-tree "$TREE_SHA" --seconds "$GATE_SECONDS" >/dev/null 2>&1 || true
+		RECORD_ARGS=(mq gate-cache --record-tree "$TREE_SHA" --seconds "$GATE_SECONDS")
+		if [ "$INSTRUMENTED" = "1" ]; then
+			RECORD_ARGS+=(--instrumented)
+		fi
+		"$SCAFFOLD_BIN" "${RECORD_ARGS[@]}" >/dev/null 2>&1 || true
+		if [ "$INSTRUMENTED" = "1" ]; then
+			# Ingest from the gated worktree so content hashing sees the exact
+			# tree the suite ran against.
+			(cd "$WT" && "$SCAFFOLD_BIN" tia ingest --coverage-dir "$MQ_DIR/tia/v8" --head "$HEAD_SHA" --seconds "$GATE_SECONDS") >/dev/null 2>&1 || true
+		fi
 	fi
 	if grep -q '^post-merge red' "$PAUSE" 2>/dev/null; then
 		rm -f "$PAUSE"

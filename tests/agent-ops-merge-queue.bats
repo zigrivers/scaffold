@@ -323,3 +323,55 @@ STUB
   [ "$(cat "$WORK/clone/.mq/last-full-suite-sha")" = "$SHA" ]
   rm -rf "$WORK"
 }
+
+@test "poller: due recording instruments the gate and ingests on green" {
+  poller_world 'printf "%s" "${NODE_V8_COVERAGE:-}" > cov-env.txt'
+  cat > "$MQ_SCAFFOLD_BIN" <<'STUB'
+#!/usr/bin/env bash
+echo "$@" >> "${SCAFFOLD_STUB_LOG:?}"
+case "$*" in
+  *"gate-cache --check-tree"*) exit 1 ;;
+  *"tia record-due"*) exit 0 ;;
+  *) exit 0 ;;
+esac
+STUB
+  chmod +x "$MQ_SCAFFOLD_BIN"
+  export SCAFFOLD_STUB_LOG="$WORK/stub.log"
+  run "$WORK/clone/scripts/ops/post-merge-poller.sh"
+  [ "$status" -eq 0 ]
+  # the gate ran with NODE_V8_COVERAGE pointing into .mq/tia
+  grep -q ".mq/tia/v8" "$WORK/clone/.mq/post-merge/cov-env.txt"
+  grep -q -- "tia ingest --coverage-dir" "$WORK/stub.log"
+  grep -q -- "--instrumented" "$WORK/stub.log"
+  rm -rf "$WORK"
+}
+
+@test "poller: recording not due leaves the gate uninstrumented" {
+  poller_world 'printf "%s" "${NODE_V8_COVERAGE:-}" > cov-env.txt'
+  run "$WORK/clone/scripts/ops/post-merge-poller.sh"
+  [ "$status" -eq 0 ]
+  [ ! -s "$WORK/clone/.mq/post-merge/cov-env.txt" ]   # empty: env var was not set
+  rm -rf "$WORK"
+}
+
+@test "poller: a due recording runs the instrumented gate even on a full-gate cache hit" {
+  poller_world 'printf "%s" "${NODE_V8_COVERAGE:-}" > cov-env.txt'
+  cat > "$MQ_SCAFFOLD_BIN" <<'STUB'
+#!/usr/bin/env bash
+echo "$@" >> "${SCAFFOLD_STUB_LOG:?}"
+case "$*" in
+  *"gate-cache --check-tree"*) exit 0 ;;   # cache HIT — but recording is due, so the gate must still run
+  *"tia record-due"*) exit 0 ;;
+  *) exit 0 ;;
+esac
+STUB
+  chmod +x "$MQ_SCAFFOLD_BIN"
+  export SCAFFOLD_STUB_LOG="$WORK/stub.log"
+  run "$WORK/clone/scripts/ops/post-merge-poller.sh"
+  [ "$status" -eq 0 ]
+  # The cache hit must NOT short-circuit a due recording: the gate ran under
+  # coverage and the map was ingested.
+  grep -q ".mq/tia/v8" "$WORK/clone/.mq/post-merge/cov-env.txt"
+  grep -q -- "tia ingest --coverage-dir" "$WORK/stub.log"
+  rm -rf "$WORK"
+}
