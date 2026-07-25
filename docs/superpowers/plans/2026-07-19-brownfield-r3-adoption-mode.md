@@ -40,7 +40,7 @@ These are pinned by the approved spec — do not re-litigate during implementati
 
 **Steps:**
 
-- [ ] Write failing schema tests in `src/config/schema.test.ts` (follow the file's existing parse-fixture style):
+- [x] Write failing schema tests in `src/config/schema.test.ts` (follow the file's existing parse-fixture style):
 
   ```ts
   describe('artifact_map (D10a)', () => {
@@ -87,8 +87,8 @@ These are pinned by the approved spec — do not re-litigate during implementati
   })
   ```
 
-- [ ] Run: `npx vitest run src/config/schema.test.ts` — expect the four new tests to FAIL (unknown key passes through `.passthrough()` untyped; the rejection cases fail because no schema rejects them yet).
-- [ ] Add to `ConfigSchema` in `src/config/schema.ts`, between `custom:` and `platforms:`:
+- [x] Run: `npx vitest run src/config/schema.test.ts` — expect the four new tests to FAIL (unknown key passes through `.passthrough()` untyped; the rejection cases fail because no schema rejects them yet).
+- [x] Add to `ConfigSchema` in `src/config/schema.ts`, between `custom:` and `platforms:`:
 
   ```ts
   /**
@@ -100,15 +100,15 @@ These are pinned by the approved spec — do not re-litigate during implementati
   artifact_map: z.record(z.string(), z.string().min(1)).optional(),
   ```
 
-- [ ] Add to `ScaffoldConfig` in `src/types/config.ts` (after `project?:`):
+- [x] Add to `ScaffoldConfig` in `src/types/config.ts` (after `project?:`):
 
   ```ts
   /** D10a: step slug → existing incumbent artifact path (project-root-relative). */
   artifact_map?: Record<string, string>
   ```
 
-- [ ] Run: `npx vitest run src/config/schema.test.ts` — expect all green.
-- [ ] Write failing loader tests in `src/config/loader.test.ts` (follow the file's existing tmp-dir + `loadConfig(projectRoot, knownSteps)` pattern):
+- [x] Run: `npx vitest run src/config/schema.test.ts` — expect all green.
+- [x] Write failing loader tests in `src/config/loader.test.ts` (follow the file's existing tmp-dir + `loadConfig(projectRoot, knownSteps)` pattern):
 
   ```ts
   describe('artifact_map validation (D10a)', () => {
@@ -141,8 +141,8 @@ These are pinned by the approved spec — do not re-litigate during implementati
   ```
 
   (Use the file's existing helper for writing `.scaffold/config.yml` into the tmp project — if none exists, add a local `writeConfig` that mkdirs `.scaffold/` and writes the string.)
-- [ ] Run: `npx vitest run src/config/loader.test.ts` — expect the new tests to FAIL.
-- [ ] Implement semantic validation in `src/config/loader.ts`, immediately after the existing `custom` steps-vs-`knownSteps` validation block (~line 163), following that block's error/warning accumulation pattern (adapt local variable names to the surrounding code):
+- [x] Run: `npx vitest run src/config/loader.test.ts` — expect the new tests to FAIL.
+- [x] Implement semantic validation in `src/config/loader.ts`, immediately after the existing `custom` steps-vs-`knownSteps` validation block (~line 163), following that block's error/warning accumulation pattern (adapt local variable names to the surrounding code):
 
   ```ts
   // D10a: validate artifact_map entries. Unknown step slugs are warnings
@@ -173,8 +173,8 @@ These are pinned by the approved spec — do not re-litigate during implementati
   ```
 
   (Import `path` if the loader does not already; runtime consumers additionally re-check containment via `resolveContainedArtifactPath` — defense in depth.)
-- [ ] Run: `npx vitest run src/config/loader.test.ts src/config/schema.test.ts` — all green.
-- [ ] Commit: `feat(config): artifact_map schema + validation (brownfield R3, D10a)`
+- [x] Run: `npx vitest run src/config/loader.test.ts src/config/schema.test.ts` — all green.
+- [x] Commit: `feat(config): artifact_map schema + validation (brownfield R3, D10a)`
 
 ---
 
