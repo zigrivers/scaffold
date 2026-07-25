@@ -23,6 +23,11 @@ ADOPTION_STEP_FILES=(
   "environment/git-workflow.md"
   "environment/merge-throughput.md"
   "environment/staging-environments.md"
+  "environment/design-system.md"
+  "environment/ai-memory-setup.md"
+  "environment/automated-pr-review.md"
+  "pre/create-prd.md"
+  "vision/create-vision.md"
 )
 
 @test "adoption-capable steps carry exactly one Adoption Mode Specifics block" {

@@ -82,3 +82,17 @@ Check if `.claude/rules/` directory or docs/ai-memory-setup.md exists first. If
 - **Conflict resolution**: if a source doc changed a convention, update the
   corresponding rule file but preserve any user-added rules in that file;
   never exceed 500-line total rule budget without consolidating
+
+## Adoption Mode Specifics
+- **Codify from repo evidence**: incumbent agent-instruction surfaces —
+  existing CLAUDE.md, AGENTS.md, .cursorrules, and
+  .github/copilot-instructions.md — and extract rules from the incumbent
+  human docs (README, CONTRIBUTING) as well as scaffold-generated docs: in
+  a brownfield repo the incumbent docs carry the real conventions.
+- **Interview only for**: which agent harnesses the team actually uses
+  (determines which rule surfaces to generate), and which incumbent
+  instructions are stale versus load-bearing.
+- **Do not**: overwrite incumbent instruction files (layer .claude/rules/
+  alongside and cross-link); copy whole incumbent docs into rules — extract
+  the rule and cite the source, the 500-line budget still applies; delete
+  stale-looking instructions without confirmation.
