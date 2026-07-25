@@ -4656,7 +4656,7 @@ export function runGateProbe(
 
 **Steps:**
 
-- [ ] Write the failing test `src/project/adoption-ops-actions.test.ts`:
+- [x] Write the failing test `src/project/adoption-ops-actions.test.ts`:
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -4804,8 +4804,8 @@ describe('renderOpsActionsSection', () => {
 })
 ```
 
-- [ ] Run: `npx vitest run src/project/adoption-ops-actions.test.ts` — expect FAILURE (module missing).
-- [ ] Add the installer dry-run path API so the preview derives the COMPLETE write set (not just component dests). In `src/core/agent-ops/install.ts`, export `plannedInstallPaths`, mirroring `installAgentOps`'s own requested-file logic (the make fragment for any component, plus manifest/version/Makefile/gitignore):
+- [x] Run: `npx vitest run src/project/adoption-ops-actions.test.ts` — expect FAILURE (module missing).
+- [x] Add the installer dry-run path API so the preview derives the COMPLETE write set (not just component dests). In `src/core/agent-ops/install.ts`, export `plannedInstallPaths`, mirroring `installAgentOps`'s own requested-file logic (the make fragment for any component, plus manifest/version/Makefile/gitignore):
 
 ```ts
 /** Every project-root-relative path installAgentOps creates or edits for these
@@ -4833,7 +4833,7 @@ export function plannedInstallPaths(components: AgentOpsComponent[]): string[] {
 ```
 
   (`AgentOpsComponent`, `MAKE_FRAGMENT_TMPL`, `MANIFEST_PATH`, `VERSION_MARKER_PATH` already live in this file. Export `AgentOpsComponent` if it is not already.)
-- [ ] Create `src/project/adoption-ops-actions.ts`:
+- [x] Create `src/project/adoption-ops-actions.ts`:
 
 ```ts
 import fs from 'node:fs'
@@ -4991,12 +4991,12 @@ export function renderOpsActionsSection(records: OpsActionRecord[]): string[] {
 }
 ```
 
-- [ ] Run: `npx vitest run src/project/adoption-ops-actions.test.ts` — expect 10 tests passed.
-- [ ] Join the records into the R1 plan + `plan_key`. Locate the builder: `grep -rln "plan_key" src/project --include="*.ts" | grep -v test` (R1 architecture places it at `src/project/adoption-plan*.ts`). Apply three edits at the located sites:
+- [x] Run: `npx vitest run src/project/adoption-ops-actions.test.ts` — expect 10 tests passed.
+- [x] Join the records into the R1 plan + `plan_key`. Locate the builder: `grep -rln "plan_key" src/project --include="*.ts" | grep -v test` (R1 architecture places it at `src/project/adoption-plan*.ts`). Apply three edits at the located sites:
   1. **Key input:** in the object whose canonical JSON is hashed into `plan_key` (D1's "complete apply-action records" — R1 hashes `{initialize, includes, steps, disabled}`-shaped records), add the field `ops_actions: buildOpsActions(projectRoot)` (computed once per render and reused for rendering, never recomputed between keying and rendering). Import: `import { buildOpsActions, renderOpsActionsSection } from './adoption-ops-actions.js'` (adjust relative path).
   2. **JSON output:** include the same `ops_actions` array verbatim in the plan's JSON payload.
   3. **Human/markdown output:** append `renderOpsActionsSection(opsActions)` lines after the disposition section (before the follow-up-commands footer).
-- [ ] Append the key-sensitivity test to the R1 plan-key test file (locate: `grep -rln "plan_key" src/project --include="*.test.ts"`), using that file's existing plan-render helper (the one its other plan_key tests already call) against a tmp project:
+- [x] Append the key-sensitivity test to the R1 plan-key test file (locate: `grep -rln "plan_key" src/project --include="*.test.ts"`), using that file's existing plan-render helper (the one its other plan_key tests already call) against a tmp project:
 
 ```ts
   it('plan_key changes when an ops-action record changes (R2 §6.1)', () => {
@@ -5010,8 +5010,8 @@ export function renderOpsActionsSection(records: OpsActionRecord[]): string[] {
 ```
 
   Implement the body with the file's own helper + fixture idioms (the comment above is the specification of the assertion; the two renders and `expect(keyA).not.toBe(keyB)` are the required outcome).
-- [ ] Run: `npx vitest run src/project` — R1 plan tests + the new ones all green.
-- [ ] Commit: `git add -A && git commit -m "feat(adopt): ops-actions preview section — records join plan_key (§6.1 R2)"`
+- [x] Run: `npx vitest run src/project` — R1 plan tests + the new ones all green.
+- [x] Commit: `git add -A && git commit -m "feat(adopt): ops-actions preview section — records join plan_key (§6.1 R2)"`
 
 ---
 
