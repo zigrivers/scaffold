@@ -1104,7 +1104,7 @@ export function waitForWake(
 
 **Steps:**
 
-- [ ] Add the failing test to `src/merge-queue/daemon.test.ts` (inside `describe('MergeQueueDaemon.run', …)`):
+- [x] Add the failing test to `src/merge-queue/daemon.test.ts` (inside `describe('MergeQueueDaemon.run', …)`):
 
 ```ts
   it('idle cycles await the journal wake instead of a fixed sleep (D15)', async () => {
@@ -1123,8 +1123,8 @@ export function waitForWake(
   })
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/daemon.test.ts` — expect the new test FAILS (type error / sleep still used).
-- [ ] In `src/merge-queue/daemon.ts`:
+- [x] Run: `npx vitest run src/merge-queue/daemon.test.ts` — expect the new test FAILS (type error / sleep still used).
+- [x] In `src/merge-queue/daemon.ts`:
   - Add the import: `import { waitForWake } from './wake.js'`
   - Add to `DaemonDeps` (after `now`):
 
@@ -1153,9 +1153,9 @@ export function waitForWake(
       }
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/daemon.test.ts` — expect ALL pass.
-- [ ] Run: `npm run check` — expect green.
-- [ ] Commit: `git add -A && git commit -m "feat(mq): daemon idle loop wakes on journal appends (D15)"`
+- [x] Run: `npx vitest run src/merge-queue/daemon.test.ts` — expect ALL pass.
+- [x] Run: `npm run check` — expect green.
+- [x] Commit: `git add -A && git commit -m "feat(mq): daemon idle loop wakes on journal appends (D15)"`
 
 ---
 
