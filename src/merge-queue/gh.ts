@@ -22,6 +22,8 @@ export interface GhClient {
   mergeCommitSha(pr: number): string | null
   comment(pr: number, body: string): void
   listLabeled(label: string): number[]
+  /** D13: changed-file paths of the PR (`gh pr diff --name-only`). */
+  changedFiles(pr: number): string[]
   postMergeRed(defaultBranch: string): boolean
 }
 
@@ -93,6 +95,10 @@ export function createGhClient(cwd: string): GhClient {
         'pr', 'list', '--label', label, '--state', 'open', '--json', 'number',
       ])) as { number: number }[]
       return raw.map(r => r.number)
+    },
+    changedFiles(pr) {
+      return gh(['pr', 'diff', String(pr), '--name-only'])
+        .split('\n').map(l => l.trim()).filter(l => l !== '')
     },
     postMergeRed(defaultBranch) {
       try {

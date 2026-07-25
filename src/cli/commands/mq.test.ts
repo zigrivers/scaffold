@@ -166,6 +166,7 @@ describe('scaffold mq bootstrap (CLI wiring)', () => {
       mergeCommitSha: (): string | null => 'M1',
       comment: (): void => { /* unused */ },
       listLabeled: (): number[] => [],
+      changedFiles: (): string[] => [],
       postMergeRed: (): boolean => false,
     }
     const git: GitOps = {

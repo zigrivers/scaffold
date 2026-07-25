@@ -5,7 +5,7 @@ import path from 'node:path'
 import { ulid } from 'ulid'
 import { appendEvent, readJournal } from './journal.js'
 import { TERMINAL_PR_STATES, queuedPrs, reduceState } from './state.js'
-import { composeBatch, splitBatch } from './batch.js'
+import { composeBatch, splitBatch, touchesOverlapZone } from './batch.js'
 import {
   QUARANTINE_THRESHOLD, addToQuarantine, fileQuarantineBead, recentFlakeCount, recordFlake,
 } from './flakes.js'
@@ -187,6 +187,23 @@ export class MergeQueueDaemon {
         continue
       }
       infos.set(entry.pr, info)
+      // D13: refresh the changed-file set when the head moved (or was never
+      // fetched). Journaled so restarts and later cycles reuse it for free.
+      if (entry.filesHeadSha !== info.headSha) {
+        try {
+          const files = gh.changedFiles(entry.pr)
+          appendEvent(mqDir, {
+            type: 'pr_files', pr: entry.pr, headSha: info.headSha, files, at: this.at(),
+          })
+          entry.files = files
+          entry.filesHeadSha = info.headSha
+        } catch (err) {
+          // Unknown files conservatively overlap with everything (solo batch).
+          log(`warn: could not list changed files for PR #${entry.pr}: ${String(err)}`)
+          entry.files = undefined
+          entry.filesHeadSha = undefined
+        }
+      }
       // Yield between blocking viewPr calls so proper-lockfile's heartbeat timer
       // can fire — a long unbroken run of synchronous gh/git calls would otherwise
       // starve it past the stale threshold and let a second daemon start.
@@ -198,7 +215,34 @@ export class MergeQueueDaemon {
     const eligible = queued.filter(e => infos.has(e.pr))
     if (eligible.length === 0) return 'idle'
 
-    const members = composeBatch(eligible, infos, config.batch_cap)
+    // D13: hold policy — a zone-touching PR is parked for a human instead of
+    // being gated solo. Positive zone match only: unknown file sets go the
+    // conservative SOLO route (never a silent human bottleneck), and a PR a
+    // human already released is never re-held.
+    const zones = config.overlap_zones
+    let batchable = eligible
+    if (zones.length > 0 && config.overlap_zone_policy === 'hold') {
+      batchable = []
+      for (const e of eligible) {
+        const known = e.filesHeadSha !== undefined ? e.files ?? [] : null
+        if (!e.zoneReleased && known !== null && touchesOverlapZone(known, zones)) {
+          appendEvent(mqDir, {
+            type: 'pr_state', pr: e.pr, state: 'HELD_HUMAN', at: this.at(),
+            note: `touches an overlap zone — release with: scaffold mq release --pr ${e.pr}`,
+          })
+          continue
+        }
+        batchable.push(e)
+      }
+      if (batchable.length === 0) return 'idle'
+    }
+    const files = new Map<number, string[] | null>()
+    for (const e of batchable) {
+      files.set(e.pr, e.filesHeadSha !== undefined ? e.files ?? [] : null)
+    }
+    const members = composeBatch(batchable, infos, config.batch_cap, {
+      files, overlapZones: zones,
+    })
 
     // Bisection stack — bors batch-then-bisect within the single lane. Halves
     // requeue AHEAD of new arrivals by construction (they run in this cycle).

@@ -25,6 +25,9 @@ function prInfo(n: number, over: Partial<PrInfo> = {}): PrInfo {
 
 class FakeGh implements GhClient {
   infos = new Map<number, PrInfo>()
+  files = new Map<number, string[]>()
+  failFiles = new Set<number>()
+  filesCalls: number[] = []
   merged: number[] = []
   comments: { pr: number; body: string }[] = []
   labeled: number[] = []
@@ -63,6 +66,11 @@ class FakeGh implements GhClient {
   }
   comment(pr: number, body: string): void { this.comments.push({ pr, body }) }
   listLabeled(): number[] { return this.labeled }
+  changedFiles(pr: number): string[] {
+    this.filesCalls.push(pr)
+    if (this.failFiles.has(pr)) throw new Error('diff unavailable')
+    return this.files.get(pr) ?? []
+  }
   postMergeRed(): boolean { return this.red }
   mergeCommitSha(): string | null { return 'FAKE_MERGE_SHA' }
 }
@@ -610,6 +618,96 @@ describe('MergeQueueDaemon.cycle', () => {
     await h.daemon.cycle()
     expect(h.states()[1]).toBe('LANDED')
     expect(h.daemon.paused()).toBeNull()
+  })
+
+  it('overlapping PRs land in successive cycles, never one batch (D13)', async () => {
+    const h = harness()
+    h.enqueue(1)
+    h.enqueue(2)
+    h.gh.files.set(1, ['src/shared.ts'])
+    h.gh.files.set(2, ['src/shared.ts'])
+    await h.daemon.cycle()
+    expect(h.git.constructed.map(c => c.prs)).toEqual([[1]])
+    expect(h.states()).toEqual({ 1: 'LANDED', 2: 'QUEUED' })
+    await h.daemon.cycle()
+    expect(h.states()).toEqual({ 1: 'LANDED', 2: 'LANDED' })
+  })
+
+  it('journals pr_files and skips refetching while the head is unchanged', async () => {
+    const h = harness()
+    h.enqueue(1)
+    h.enqueue(2)
+    h.gh.files.set(1, ['src/shared.ts'])
+    h.gh.files.set(2, ['src/shared.ts'])
+    await h.daemon.cycle()               // PR2 skipped (overlap) — files journaled
+    await h.daemon.cycle()               // PR2 lands; its files come from the journal
+    expect(h.states()[2]).toBe('LANDED')
+    expect(h.gh.filesCalls.filter(pr => pr === 2)).toHaveLength(1)
+    const filesEvents = readJournal(h.mqDir).filter(e => e.type === 'pr_files')
+    expect(filesEvents.some(e => e.type === 'pr_files' && e.pr === 2 && e.headSha === 'sha2')).toBe(true)
+  })
+
+  it('a failed file listing degrades to a solo batch (unknown = overlaps everything)', async () => {
+    const h = harness()
+    h.enqueue(1)
+    h.enqueue(2)
+    h.gh.files.set(1, ['a.ts'])
+    h.gh.failFiles.add(2)
+    await h.daemon.cycle()
+    expect(h.git.constructed.map(c => c.prs)).toEqual([[1]])
+    expect(h.states()[2]).toBe('QUEUED')
+  })
+
+  it('solo policy gates a zone PR alone without holding it (D13 default)', async () => {
+    const h = harness({
+      config: {
+        ...defaultMergeQueueConfig(), gate_cache_max_entries: 0,
+        overlap_zones: ['migrations/**'],
+      },
+    })
+    h.enqueue(1)
+    h.enqueue(2)
+    h.gh.files.set(1, ['migrations/001.sql'])
+    h.gh.files.set(2, ['src/b.ts'])
+    await h.daemon.cycle()
+    expect(h.git.constructed.map(c => c.prs)).toEqual([[1]]) // zone PR solo (lowest risk anchors)
+    await h.daemon.cycle()
+    expect(h.states()).toEqual({ 1: 'LANDED', 2: 'LANDED' })
+  })
+
+  it('hold policy parks a zone PR in HELD_HUMAN with the release hint', async () => {
+    const h = harness({
+      config: {
+        ...defaultMergeQueueConfig(), gate_cache_max_entries: 0,
+        overlap_zones: ['migrations/**'], overlap_zone_policy: 'hold',
+      },
+    })
+    h.enqueue(1)
+    h.enqueue(2)
+    h.gh.files.set(1, ['migrations/001.sql'])
+    h.gh.files.set(2, ['src/b.ts'])
+    await h.daemon.cycle()
+    expect(h.states()).toEqual({ 1: 'HELD_HUMAN', 2: 'LANDED' })
+    const entry = reduceState(readJournal(h.mqDir)).entries.get(1)
+    expect(entry?.note).toContain('mq release --pr 1')
+    await h.daemon.cycle() // held PR is untouched by later cycles
+    expect(h.states()[1]).toBe('HELD_HUMAN')
+  })
+
+  it('a released PR is never re-held and lands solo-gated', async () => {
+    const h = harness({
+      config: {
+        ...defaultMergeQueueConfig(), gate_cache_max_entries: 0,
+        overlap_zones: ['migrations/**'], overlap_zone_policy: 'hold',
+      },
+    })
+    h.enqueue(1)
+    h.gh.files.set(1, ['migrations/001.sql'])
+    await h.daemon.cycle()
+    expect(h.states()[1]).toBe('HELD_HUMAN')
+    appendEvent(h.mqDir, { type: 'released', pr: 1, at: AT })
+    await h.daemon.cycle()
+    expect(h.states()[1]).toBe('LANDED')
   })
 })
 
