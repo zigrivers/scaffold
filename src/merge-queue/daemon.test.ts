@@ -723,4 +723,19 @@ describe('MergeQueueDaemon.run', () => {
     await expect(h.daemon.run({ once: true })).rejects.toThrow(/network blip/)
     expect(spy).toHaveBeenCalledTimes(2) // startup + after the cycle error
   })
+
+  it('idle cycles await the journal wake instead of a fixed sleep (D15)', async () => {
+    let calls = 0
+    const h = harness({
+      wake: async () => {
+        calls += 1
+        if (calls === 2) throw new Error('stop-loop')
+        return 'journal' as const
+      },
+    })
+    fs.mkdirSync(h.mqDir, { recursive: true })
+    fs.writeFileSync(path.join(h.mqDir, PAUSED_FILE), 'hold\n') // every cycle is idle
+    await expect(h.daemon.run()).rejects.toThrow(/stop-loop/)
+    expect(calls).toBe(2)
+  })
 })

@@ -16,6 +16,7 @@ import type { GhClient, PrInfo } from './gh.js'
 import type { GitOps } from './git.js'
 import type { GateResult } from './gate.js'
 import type { BatchRecord, MergeQueueConfig, PrState, QueueState } from './types.js'
+import { waitForWake } from './wake.js'
 
 export interface DaemonDeps {
   gh: GhClient
@@ -29,6 +30,9 @@ export interface DaemonDeps {
   projectRoot: string
   log: (msg: string) => void
   now: () => Date
+  /** D15 seam: wait for a journal append or the poll timeout while idle.
+   *  Production default is waitForWake (fs.watch + debounce). */
+  wake?: (mqDir: string, timeoutMs: number) => Promise<'journal' | 'timeout'>
 }
 
 export const PAUSED_FILE = 'PAUSED'
@@ -40,8 +44,6 @@ const IN_FLIGHT_BATCH_STATES = ['CONSTRUCTING', 'RUNNING', 'GREEN', 'LANDING', '
 const MIDFLIGHT_PR_STATES: ReadonlySet<PrState> = new Set<PrState>([
   'IN_BATCH', 'TESTING', 'FLAKE_RETRY', 'PASSED', 'LANDING',
 ])
-
-const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms))
 
 type BatchOutcome =
   | { kind: 'done' }
@@ -106,7 +108,13 @@ export class MergeQueueDaemon {
         if (caught) throw caught
         return
       }
-      if (outcome === 'idle') await sleep(this.deps.config.poll_seconds * 1000)
+      if (outcome === 'idle') {
+        // D15: wake immediately on a journal append (enqueue / eject / release
+        // from another process); poll_seconds remains the fallback ceiling.
+        await (this.deps.wake ?? waitForWake)(
+          this.deps.mqDir, this.deps.config.poll_seconds * 1000,
+        )
+      }
     }
   }
 
