@@ -3408,19 +3408,19 @@ fi
 
 **Steps:**
 
-- [ ] Add two rows to the Key Commands table in `CLAUDE.md`, after the `scaffold mq stats` row:
+- [x] Add two rows to the Key Commands table in `CLAUDE.md`, after the `scaffold mq stats` row:
 
 ```markdown
 | `scaffold mq release --pr <N>` | Release a `HELD_HUMAN` (overlap-zone) PR back into the queue; it lands solo-gated |
 | `scaffold tia affected --base <ref>` | Emit the TIA-selected test list + confidence verdict (exit 3 = run the full suite) |
 ```
 
-- [ ] Update the `scaffold mq stats` row's description to: `Calibration metrics: arrivals, gate outcomes, median gate time, flakes, gate-cache hits, instrumented-vs-plain full-gate medians, TIA map age`.
-- [ ] Do NOT touch `CHANGELOG.md` here — the maintainer release flow (operations runbook) owns it at tag time; the PR description should list the four D-items and the new config keys (`gate_cache_max_entries`, `overlap_zones`, `overlap_zone_policy`, `tia.record`) for that write-up.
-- [ ] Run: `npm run test:e2e` — expect the merge-queue e2e suite green.
-- [ ] Run: `make check-all` — expect every gate green (bash: lint + validate + test + eval; TypeScript: lint + type-check + vitest; mmr/agent-integration/knowledge/guides checks). A `git push` after this plan will re-run the suite via the pre-push hook — with `make check-all` green on the exact commit, `git push --no-verify` is the sanctioned shortcut (see CLAUDE.md).
-- [ ] Commit: `git add -A && git commit -m "docs: mq release + tia affected command rows (brownfield R4)"`
-- [ ] Final self-check before opening the PR:
+- [x] Update the `scaffold mq stats` row's description to: `Calibration metrics: arrivals, gate outcomes, median gate time, flakes, gate-cache hits, instrumented-vs-plain full-gate medians, TIA map age`.
+- [x] Do NOT touch `CHANGELOG.md` here — the maintainer release flow (operations runbook) owns it at tag time; the PR description should list the four D-items and the new config keys (`gate_cache_max_entries`, `overlap_zones`, `overlap_zone_policy`, `tia.record`) for that write-up.
+- [x] Run: `npm run test:e2e` — expect the merge-queue e2e suite green.
+- [x] Run: `make check-all` — expect every gate green (bash: lint + validate + test + eval; TypeScript: lint + type-check + vitest; mmr/agent-integration/knowledge/guides checks). A `git push` after this plan will re-run the suite via the pre-push hook — with `make check-all` green on the exact commit, `git push --no-verify` is the sanctioned shortcut (see CLAUDE.md).
+- [x] Commit: `git add -A && git commit -m "docs: mq release + tia affected command rows (brownfield R4)"`
+- [x] Final self-check before opening the PR:
   - `git log --oneline main..HEAD` shows one commit per task (18 commits).
   - `grep -rn "gate_cached\|full_gate_recorded\|pr_files\|released\|tia_recorded" src/merge-queue/types.ts` — all five event types present.
   - `grep -n "HELD_HUMAN" src/merge-queue/types.ts src/merge-queue/state.ts src/cli/commands/mq.ts` — state, reducer, and CLI agree.
