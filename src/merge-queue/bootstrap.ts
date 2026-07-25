@@ -112,8 +112,11 @@ export interface BootstrapDeps {
    *  primary, not be uncommitted post-gate mutations. Omitted in pure-engine
    *  tests — the engine then treats assets as present. */
   verifyGatedAssets?: (gatedTree: string, cfg: MergeQueueConfig) => { ok: boolean; missing: string[] }
-  /** D8 primitive (idempotent) — arm the Claude Code hooks (self-gating at
-   *  runtime, so registering pre-merge is safe). */
+  /** D8 primitive (idempotent) — arm the Claude Code hooks. Called POST-merge,
+   *  immediately after syncPrimaryToMerge, same as armSched: arming pre-merge
+   *  would write an uncommitted change to primary's .claude/settings.json and
+   *  could make the post-merge ff-only sync abort if the PR itself commits that
+   *  file (the armHooks dirty-tree race). */
   armHooks: () => { messages: string[] }
   /** D6 primitive — arm the scheduler. Called POST-merge (the poller script
    *  lives at <primary>/scripts/ops/, present only once the PR lands), so it
@@ -142,13 +145,17 @@ export interface BootstrapOutcome {
   messages: string[]
 }
 
-/** D9: arm-first guided first merge. Order — preflight (verify the PR's
- *  committed queue assets + gate targets + full gate, all against the GATED PR
- *  tree, since the first queue-installing PR's assets are not yet at primary) →
- *  arm hooks pre-merge (self-gating, safe) → journaled squash-merge with head
- *  revalidation → POST-merge arm scheduler (buildPostMergePollerJob(primary)
- *  now resolves) + daemon smoke + doctor → bootstrap_armed. A crash anywhere
- *  resumes via planResume with GitHub authoritative. */
+/** D9: guided first merge. Order — preflight (verify the PR's committed queue
+ *  assets + gate targets + full gate, all against the GATED PR tree, since the
+ *  first queue-installing PR's assets are not yet at primary) → journaled
+ *  squash-merge with head revalidation → POST-merge sync primary to the merge
+ *  commit (ff-only) → arm hooks (deep-merges into the now-synced,
+ *  merge-committed .claude/settings.json — never pre-merge, which could dirty
+ *  primary and make the ff-only sync fail if the PR itself commits that file) →
+ *  arm scheduler (buildPostMergePollerJob(primary) now resolves) + daemon smoke
+ *  + doctor → bootstrap_armed. A crash anywhere resumes via planResume with
+ *  GitHub authoritative; a syncPrimaryToMerge failure degrades gracefully to a
+ *  recoverable --finish rather than throwing. */
 export async function runBootstrap(
   deps: BootstrapDeps,
   opts: { pr: number; finish?: boolean },
@@ -178,21 +185,35 @@ export async function runBootstrap(
   const attempt = latestAttemptFor(readJournal(deps.mqDir), opts.pr)
   const decision = planResume(attempt, { state: info.state, headSha: info.headSha })
 
-  // Arm hooks ONLY (pre-merge safe — the guard self-gates at runtime and the
-  // committed .claude/settings.json rides the merge). The scheduler is armed
-  // POST-merge in verifyAndArm, where the poller script exists at primary.
-  const arm = (): boolean => {
-    for (const m of deps.armHooks().messages) say(m)
-    return true
-  }
-
   const verifyAndArm = (a: { bootstrapId: string; gatedHeadSha: string }, mergeSha: string): BootstrapOutcome => {
     // POST-merge: bring the primary worktree up to the merge commit FIRST —
     // `gh pr merge` moved only the remote, so the poller script/config land
-    // locally only now. THEN arm the scheduler: buildPostMergePollerJob(primary)
-    // resolves because the PR's poller script has landed at primary. The arm
-    // closure self-decides on the merged executor (no-ops for non-local-poller).
-    deps.git.syncPrimaryToMerge(mergeSha)
+    // locally only now. Hooks are armed HERE, right after the sync — never
+    // pre-merge — because arming pre-merge writes an uncommitted change to
+    // primary's .claude/settings.json, and if the bootstrap PR ALSO commits
+    // that file, the ff-only sync below aborts on a dirty tree (the armHooks
+    // dirty-tree race). armHooks is idempotent, so deep-merging into the
+    // already-synced, merge-committed settings.json here is safe. If the sync
+    // itself fails, catch it below instead of crashing: the merge is already
+    // journaled, so this degrades to a recoverable --finish rather than
+    // stranding a merged-but-unarmed repo. THEN arm the scheduler:
+    // buildPostMergePollerJob(primary) resolves because the PR's poller script
+    // has landed at primary. It self-decides on the merged executor (no-ops
+    // for non-local-poller).
+    try {
+      deps.git.syncPrimaryToMerge(mergeSha)
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err)
+      say(
+        `bootstrap: the merge is recorded (commit ${mergeSha}) but primary could not be ` +
+        'fast-forwarded — likely uncommitted or conflicting changes in the primary worktree ' +
+        `(${detail}); reconcile the primary worktree, then finish with: scaffold mq bootstrap ` +
+        `--pr ${opts.pr} --finish`,
+      )
+      return { ok: false, bootstrapId: a.bootstrapId, stage: 'arm', messages }
+    }
+    const hooks = deps.armHooks()
+    for (const m of hooks.messages) say(m)
     const sched = deps.armSched()
     for (const m of sched.messages) say(m)
     if (!sched.ok) {
@@ -280,7 +301,6 @@ export async function runBootstrap(
     return { ok: true, bootstrapId: decision.attempt.bootstrapId, stage: 'complete', messages }
   case 'arm-and-verify': {
     say(`resuming bootstrap ${decision.attempt.bootstrapId}: merge already journaled — re-arming idempotently`)
-    if (!arm()) return { ok: false, bootstrapId: decision.attempt.bootstrapId, stage: 'arm', messages }
     // stage 'merged' always journaled a non-empty SHA (D9 invariant), but the
     // reduced type is `string | null` — narrow it explicitly before arming.
     const mergedSha = decision.attempt.mergeCommitSha
@@ -311,12 +331,10 @@ export async function runBootstrap(
       `crash-window reconciliation: GitHub reports PR #${opts.pr} MERGED — merge recorded ` +
       'retroactively (never re-merged)',
     )
-    if (!arm()) return { ok: false, bootstrapId: decision.attempt.bootstrapId, stage: 'arm', messages }
     return verifyAndArm(decision.attempt, recovered)
   }
   case 'rerun-merge':
     say(`resuming bootstrap ${decision.attempt.bootstrapId}: intent journaled, merge not — re-running the merge stage`)
-    if (!arm()) return { ok: false, bootstrapId: decision.attempt.bootstrapId, stage: 'arm', messages }
     return mergeAndFinish(decision.attempt)
   case 'aborted':
     if (opts.finish === true) {
@@ -381,9 +399,6 @@ export async function runBootstrap(
     return { ok: false, bootstrapId: null, stage: 'preflight', messages }
   }
   say(`preflight: full gate green in ${gate.seconds}s`)
-
-  // ---- arm-first: hooks only (the scheduler is armed post-merge, D9) --------
-  if (!arm()) return { ok: false, bootstrapId: null, stage: 'arm', messages }
 
   // ---- merge under bootstrap semantics -------------------------------------
   const bootstrapId = deps.newId()

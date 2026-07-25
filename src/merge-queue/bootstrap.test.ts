@@ -220,6 +220,67 @@ describe('runBootstrap (D9 engine)', () => {
     expect(events.every(e => 'gatedHeadSha' in e && e.gatedHeadSha === 'SHA-A')).toBe(true)
     expect(events[1]).toMatchObject({ mergeCommitSha: 'MERGESHA', pr: 41 })
   })
+  it(
+    'armHooks dirty-tree race (fix): hooks arm AFTER syncPrimaryToMerge, never before, even ' +
+      'when the gated PR tree itself modifies .claude/settings.json — reaches bootstrap_armed clean',
+    async () => {
+      const root = tmpRoot()
+      const order: string[] = []
+      const git = makeGit(root)
+      const realSync = git.syncPrimaryToMerge
+      git.syncPrimaryToMerge = (sha: string): void => {
+        order.push('sync')
+        realSync(sha)
+      }
+      const { deps, rec } = makeDeps(root, {
+        git,
+        // Simulates the gated PR's tree having modified .claude/settings.json:
+        // armHooks still runs (idempotent deep-merge), but only after sync.
+        armHooks: () => {
+          order.push('armHooks')
+          rec.hooksArmed += 1
+          return { messages: ['hooks: registered PreToolUse: scripts/mq-guard.sh (merge-queue routing guard)'] }
+        },
+      })
+      const out = await runBootstrap(deps, { pr: 41 })
+      expect(out.ok).toBe(true)
+      expect(out.stage).toBe('complete')
+      // The race this test guards: hooks must never arm before the ff-only sync
+      // — arming pre-merge would dirty primary and could abort the sync if the
+      // PR also commits .claude/settings.json.
+      expect(order).toEqual(['sync', 'armHooks'])
+      expect(rec.hooksArmed).toBe(1)
+      const events = readJournal(deps.mqDir)
+      expect(events.map(e => e.type)).toEqual(['bootstrap_intent', 'bootstrap_merged', 'bootstrap_armed'])
+    },
+  )
+  it(
+    'a syncPrimaryToMerge failure (e.g. primary dirty because the PR also commits ' +
+      '.claude/settings.json) degrades gracefully instead of throwing uncaught',
+    async () => {
+      const root = tmpRoot()
+      const git = makeGit(root)
+      git.syncPrimaryToMerge = (): void => {
+        throw new Error(
+          'fatal: Your local changes to the following files would be overwritten by merge:\n'
+            + '\t.claude/settings.json',
+        )
+      }
+      const { deps, rec } = makeDeps(root, { git })
+      const out = await runBootstrap(deps, { pr: 41 })
+      expect(out.ok).toBe(false)
+      expect(out.stage).toBe('arm')
+      expect(out.messages.join('\n')).toMatch(/could not be fast-forwarded/)
+      expect(out.messages.join('\n')).toMatch(/reconcile the primary worktree/)
+      expect(out.messages.join('\n')).toMatch(/--finish/)
+      // Never arm hooks against a primary that failed to sync.
+      expect(rec.hooksArmed).toBe(0)
+      expect(rec.schedArmed).toBe(0)
+      // The merge itself is still recorded — no data loss, just an unarmed pause.
+      const events = readJournal(deps.mqDir)
+      expect(events.map(e => e.type)).toEqual(['bootstrap_intent', 'bootstrap_merged'])
+    },
+  )
   it('aborts when the head moves between intent and merge — id terminal, retry uses a new id', async () => {
     const root = tmpRoot()
     // viewPr call 1 (reconcile+preflight): SHA-A; call 2 (revalidation): SHA-NEW.
