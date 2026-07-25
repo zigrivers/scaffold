@@ -13,6 +13,8 @@ export interface MqStats {
    *  TIA recording overhead stays visible (spec §11). */
   fullGatePlain: { runs: number; medianSeconds: number | null }
   fullGateInstrumented: { runs: number; medianSeconds: number | null }
+  /** D14: the most recent coverage-map recording, or null when none exists. */
+  tiaLastRecorded: { at: string; tests: number; files: number } | null
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -35,6 +37,7 @@ export function computeStats(events: JournalEvent[], now: Date): MqStats {
   let gateCacheSecondsSaved = 0
   const fullPlain: number[] = []
   const fullInstrumented: number[] = []
+  let tiaLastRecorded: MqStats['tiaLastRecorded'] = null
   for (const e of events) {
     switch (e.type) {
     case 'enqueued':
@@ -57,6 +60,9 @@ export function computeStats(events: JournalEvent[], now: Date): MqStats {
     case 'full_gate_recorded':
       (e.instrumented ? fullInstrumented : fullPlain).push(e.seconds)
       break
+    case 'tia_recorded':
+      tiaLastRecorded = { at: e.at, tests: e.tests, files: e.files }
+      break
     default:
       break
     }
@@ -74,5 +80,6 @@ export function computeStats(events: JournalEvent[], now: Date): MqStats {
     gateCacheSecondsSaved,
     fullGatePlain: { runs: fullPlain.length, medianSeconds: median(fullPlain) },
     fullGateInstrumented: { runs: fullInstrumented.length, medianSeconds: median(fullInstrumented) },
+    tiaLastRecorded,
   }
 }

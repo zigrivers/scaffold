@@ -231,6 +231,12 @@ export async function mqHandler(argv: MqArgs, overrides: MqOverrides = {}): Prom
       `${stats.fullGateInstrumented.runs} instrumented ` +
       `(median ${stats.fullGateInstrumented.medianSeconds ?? '—'} s)`,
     )
+    output.info(
+      stats.tiaLastRecorded === null
+        ? 'TIA map: none recorded'
+        : `TIA map: recorded ${stats.tiaLastRecorded.at} ` +
+          `(${stats.tiaLastRecorded.tests} test files / ${stats.tiaLastRecorded.files} files)`,
+    )
     return
   }
   case 'gate-cache': {

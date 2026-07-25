@@ -26,6 +26,7 @@ describe('computeStats', () => {
       gateCacheSecondsSaved: 0,
       fullGatePlain: { runs: 0, medianSeconds: null },
       fullGateInstrumented: { runs: 0, medianSeconds: null },
+      tiaLastRecorded: null,
     })
   })
 
@@ -54,5 +55,14 @@ describe('computeStats', () => {
     expect(s.gateCacheSecondsSaved).toBe(180)
     expect(s.fullGatePlain).toEqual({ runs: 2, medianSeconds: 200 })
     expect(s.fullGateInstrumented).toEqual({ runs: 1, medianSeconds: 500 })
+  })
+
+  it('reports the last TIA recording', () => {
+    const events: JournalEvent[] = [
+      { type: 'tia_recorded', headSha: 'H1', seconds: 100, tests: 10, files: 40, at: '2026-07-16T02:00:00.000Z' },
+      { type: 'tia_recorded', headSha: 'H2', seconds: 90, tests: 12, files: 44, at: '2026-07-17T02:00:00.000Z' },
+    ]
+    expect(computeStats(events, NOW).tiaLastRecorded)
+      .toEqual({ at: '2026-07-17T02:00:00.000Z', tests: 12, files: 44 })
   })
 })
