@@ -2025,7 +2025,7 @@ export function applyArtifactMappings(
 
 **Steps:**
 
-- [ ] Extend `ADOPTION_STEP_FILES` in the eval with:
+- [x] Extend `ADOPTION_STEP_FILES` in the eval with:
 
   ```bash
     "foundation/github-setup.md"
@@ -2035,8 +2035,8 @@ export function applyArtifactMappings(
     "environment/staging-environments.md"
   ```
 
-- [ ] Run: `npx bats tests/evals/adoption-mode-specifics.bats` — test 1 FAILS for the five new files.
-- [ ] Add to `content/pipeline/foundation/github-setup.md` (per placement rule — after the Update Mode Specifics section and its trailing `###` subsections, before the next `##` heading or at EOF):
+- [x] Run: `npx bats tests/evals/adoption-mode-specifics.bats` — test 1 FAILS for the five new files.
+- [x] Add to `content/pipeline/foundation/github-setup.md` (per placement rule — after the Update Mode Specifics section and its trailing `###` subsections, before the next `##` heading or at EOF):
 
   ```markdown
 
@@ -2056,7 +2056,7 @@ export function applyArtifactMappings(
     secret scan the Update Mode Specifics above already requires.
   ```
 
-- [ ] Add to `content/pipeline/environment/dev-env-setup.md` (insert immediately before the `## Instructions` heading):
+- [x] Add to `content/pipeline/environment/dev-env-setup.md` (insert immediately before the `## Instructions` heading):
 
   ```markdown
   ## Adoption Mode Specifics
@@ -2082,7 +2082,7 @@ export function applyArtifactMappings(
 
   ```
 
-- [ ] Add to `content/pipeline/environment/git-workflow.md` (per placement rule):
+- [x] Add to `content/pipeline/environment/git-workflow.md` (per placement rule):
 
   ```markdown
 
@@ -2105,7 +2105,7 @@ export function applyArtifactMappings(
     alongside via `scaffold hooks install`); force any branch renames.
   ```
 
-- [ ] Add to `content/pipeline/environment/merge-throughput.md` (per placement rule):
+- [x] Add to `content/pipeline/environment/merge-throughput.md` (per placement rule):
 
   ```markdown
 
@@ -2124,7 +2124,7 @@ export function applyArtifactMappings(
     and the local queue; install the queue speculatively on a solo project.
   ```
 
-- [ ] Add to `content/pipeline/environment/staging-environments.md` (per placement rule):
+- [x] Add to `content/pipeline/environment/staging-environments.md` (per placement rule):
 
   ```markdown
 
@@ -2146,8 +2146,8 @@ export function applyArtifactMappings(
     configuration.
   ```
 
-- [ ] Run: `npx bats tests/evals/adoption-mode-specifics.bats` — `ok` ×3 (ten files now enforced).
-- [ ] Commit: `feat(content): Adoption Mode Specifics — batch 2, github-setup + environment core (D11)`
+- [x] Run: `npx bats tests/evals/adoption-mode-specifics.bats` — `ok` ×3 (ten files now enforced).
+- [x] Commit: `feat(content): Adoption Mode Specifics — batch 2, github-setup + environment core (D11)`
 
 ---
 
