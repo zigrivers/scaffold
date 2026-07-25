@@ -1397,7 +1397,24 @@ Expected: FAIL with `Unexpected end of JSON input` (stdout is currently empty on
 
 - [ ] **Step 3: Route adopt's terminal errors through `fail()`**
 
-Locate every site in `src/cli/commands/adopt.ts` that reports a terminal failure via `output.error(...)` followed by a non-zero `process.exitCode`, and replace each with a single `output.fail([...])` call carrying the same code, message, and an explicit recovery string:
+The sites are enumerated rather than described, so "every site" is checkable. `src/cli/commands/adopt.ts` has **10** `output.error(` calls; each is followed by a non-zero `process.exitCode`. Convert all ten:
+
+| Line | Site | Exit code today | Note |
+|---|---|---|---|
+| 535 | `asScaffoldError(err, 'ADOPT_INTERNAL', …)` | 1 | already ScaffoldError-shaped |
+| 548 | `adoptResult.errors` loop | `errors[0].exitCode` | pass the whole array to one `fail()` call |
+| 558 | `planErrors` loop | `planErrors[0].exitCode` | same |
+| 571 | inline error literal | 1 | needs a `recovery` string added |
+| 581 | inline error literal | 1 | needs a `recovery` string added |
+| 597 | `ADOPT_APPLY_NON_INTERACTIVE` | 1 | recovery names `--plan` / `--plan-key` |
+| 612 | `lockResult.error` | **3** (`StateCorruption`) | preserve 3; do not normalize to 1 |
+| 633 | `asScaffoldError(err, 'ADOPT_INTERNAL', …)` | 1 | |
+| 641 | `liveErrors` loop | `liveErrors[0].exitCode` | pass the array |
+| 659 | inline error literal (plan drift) | 1 | recovery names the re-render command |
+
+Two things this survey settles. The file already builds `ScaffoldError` values via its own `asScaffoldError` helper, so most conversions are mechanical: `output.error(X); process.exitCode = Y` becomes `output.fail([X], Y)`. And line 612 carries `ExitCode.StateCorruption` (3), which must be preserved rather than flattened to `ValidationError` — the loop sites likewise pass their arrays so per-error exit codes survive.
+
+Apply this shape at each site:
 
 ```typescript
 // Pattern to apply at each adopt failure site.
@@ -1422,7 +1439,14 @@ process.exitCode = ExitCode.ValidationError
 return
 ```
 
-Apply the same treatment to every remaining terminal-failure site in the file. Do not stop at the two named above: the acceptance criterion is that no adopt failure exits non-zero with empty stdout, so each one must be converted.
+Apply the same treatment to every remaining site in the table. Do not stop at the two named above: the acceptance criterion is that no adopt failure exits non-zero with empty stdout, so each of the ten must be converted.
+
+Completion check for this step, which is why the count is stated:
+
+```bash
+grep -c "output.error(" src/cli/commands/adopt.ts   # expected: 0
+grep -c "output.fail(" src/cli/commands/adopt.ts    # expected: 10
+```
 
 - [ ] **Step 4: Run tests to verify they pass**
 
@@ -2071,4 +2095,4 @@ Acceptance criterion 2 ("never exits non-zero with empty stdout under `--format 
 
    `requiresArg: true` is sufficient and does not regress the ordinary path. The `runCli` argv-normalization fallback is not needed.
 2. Task 6 Step 3b normalizes `argv.auto` for **all** non-interactive modes, which means `scaffold init --format json` in a TTY now also requires a discriminator. That is intended and consistent (JsonOutput never prompts, so it was already silently defaulting), but it widens the breaking surface slightly beyond the non-TTY case. It belongs in the same CHANGELOG entry.
-3. Task 13 says to convert *every* terminal-failure site in `adopt.ts`, and the file is large. The end-to-end check covers only the bare-`--apply` path. An implementer should grep for remaining `output.error(` calls in that file before marking the task done.
+3. ~~Task 13's "convert every site" was unbounded.~~ **Resolved by surveying the file before implementation.** The ten call sites are enumerated in Task 13 Step 3 with their current exit codes, and the step carries a mechanical completion check (`output.error(` count must reach 0, `output.fail(` must reach 10). The survey also caught two things a bulk edit would have broken: line 612 carries `ExitCode.StateCorruption` (3) rather than 1, and three sites are loops whose per-error exit codes must survive, so those pass their whole array to a single `fail()` call.
