@@ -405,45 +405,60 @@ export async function runBootstrap(
   // (config, guard, poller, gate scripts, hook registration) live in the PR,
   // NOT at primary — primary receives them only at merge. Everything below
   // verifies + reads from the gated tree; the journal stays at primary.
+  //
+  // The infra calls here (fetchOrigin, checkoutDetachedInGate, readMergeConfig,
+  // runGate) can throw on a network blip / git error / bad config. Preflight is
+  // PRE-journaling, so a throw strands nothing — but degrade to a clean,
+  // recoverable stage:'preflight' message rather than a raw stack trace, matching
+  // the arm/merge-path guards (the logical failures below already do this).
   const gatedHeadSha = info.headSha
-  deps.git.fetchOrigin()
-  const gatedTree = deps.git.checkoutDetachedInGate(gatedHeadSha)
-  const cfg = deps.readMergeConfig ? deps.readMergeConfig(gatedTree) : deps.config
-  const assets = deps.verifyGatedAssets
-    ? deps.verifyGatedAssets(gatedTree, cfg)
-    : { ok: true, missing: [] as string[] }
-  if (!assets.ok) {
-    say(
-      `bootstrap preflight: PR #${opts.pr} does not install the queue — the gated tree ` +
-      `is missing committed asset(s): ${assets.missing.join(', ')}. The bootstrap PR must ` +
-      'COMMIT the merge-queue config, guard, poller, and hook registration (scaffold ' +
-      'agent-ops install --component merge-queue + scaffold hooks install, committed in ' +
-      `the PR) so they land at merge; fix the PR, then re-run scaffold mq bootstrap --pr ${opts.pr}`,
-    )
-    return { ok: false, bootstrapId: null, stage: 'preflight', messages }
-  }
-  for (const command of [cfg.gate_command, cfg.full_gate_command]) {
-    if (!deps.gateTargetResolves(gatedTree, command)) {
+  try {
+    deps.git.fetchOrigin()
+    const gatedTree = deps.git.checkoutDetachedInGate(gatedHeadSha)
+    const cfg = deps.readMergeConfig ? deps.readMergeConfig(gatedTree) : deps.config
+    const assets = deps.verifyGatedAssets
+      ? deps.verifyGatedAssets(gatedTree, cfg)
+      : { ok: true, missing: [] as string[] }
+    if (!assets.ok) {
       say(
-        `bootstrap preflight: gate command "${command}" does not resolve in the gated ` +
-        'tree — the PR must install the gate component: scaffold agent-ops install ' +
-        '--component gate',
+        `bootstrap preflight: PR #${opts.pr} does not install the queue — the gated tree ` +
+        `is missing committed asset(s): ${assets.missing.join(', ')}. The bootstrap PR must ` +
+        'COMMIT the merge-queue config, guard, poller, and hook registration (scaffold ' +
+        'agent-ops install --component merge-queue + scaffold hooks install, committed in ' +
+        `the PR) so they land at merge; fix the PR, then re-run scaffold mq bootstrap --pr ${opts.pr}`,
       )
       return { ok: false, bootstrapId: null, stage: 'preflight', messages }
     }
-  }
-  say(`preflight: running the FULL gate on PR head ${gatedHeadSha} (${cfg.full_gate_command})`)
-  const gate = await deps.runGate({
-    cwd: gatedTree,
-    command: cfg.full_gate_command,
-    timeoutMs: cfg.gate_timeout_minutes * 60_000,
-    logPath: path.join(deps.mqDir, 'logs', `bootstrap-${opts.pr}.log`),
-  })
-  if (gate.result !== 'green') {
-    say(`bootstrap preflight: full gate ${gate.result} after ${gate.seconds}s — see ${gate.logPath}`)
+    for (const command of [cfg.gate_command, cfg.full_gate_command]) {
+      if (!deps.gateTargetResolves(gatedTree, command)) {
+        say(
+          `bootstrap preflight: gate command "${command}" does not resolve in the gated ` +
+          'tree — the PR must install the gate component: scaffold agent-ops install ' +
+          '--component gate',
+        )
+        return { ok: false, bootstrapId: null, stage: 'preflight', messages }
+      }
+    }
+    say(`preflight: running the FULL gate on PR head ${gatedHeadSha} (${cfg.full_gate_command})`)
+    const gate = await deps.runGate({
+      cwd: gatedTree,
+      command: cfg.full_gate_command,
+      timeoutMs: cfg.gate_timeout_minutes * 60_000,
+      logPath: path.join(deps.mqDir, 'logs', `bootstrap-${opts.pr}.log`),
+    })
+    if (gate.result !== 'green') {
+      say(`bootstrap preflight: full gate ${gate.result} after ${gate.seconds}s — see ${gate.logPath}`)
+      return { ok: false, bootstrapId: null, stage: 'preflight', messages }
+    }
+    say(`preflight: full gate green in ${gate.seconds}s`)
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err)
+    say(
+      `bootstrap preflight failed (${detail}) — nothing has been merged or journaled; ` +
+      `re-run when resolved: scaffold mq bootstrap --pr ${opts.pr}`,
+    )
     return { ok: false, bootstrapId: null, stage: 'preflight', messages }
   }
-  say(`preflight: full gate green in ${gate.seconds}s`)
 
   // ---- merge under bootstrap semantics -------------------------------------
   const bootstrapId = deps.newId()

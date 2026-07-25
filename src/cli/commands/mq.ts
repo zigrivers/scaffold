@@ -60,8 +60,10 @@ export function gateTargetResolves(projectRoot: string, command: string): boolea
     } else {
       // exe[0] comes from a project-supplied command (possibly an untrusted
       // adopted repo) — pass it as a quoted positional ($1), NEVER interpolated
-      // into the bash string, so backticks/$(...)/; in it can't execute.
-      execFileSync('bash', ['-c', 'command -v "$1"', '--', exe[0]], {
+      // into the bash string, so backticks/$(...)/; in it can't execute. The
+      // `--` after `command -v` ends option parsing so an executable whose name
+      // starts with `-` is treated as an operand, not a flag.
+      execFileSync('bash', ['-c', 'command -v -- "$1"', '--', exe[0]], {
         cwd: projectRoot, stdio: 'ignore', timeout: 30_000,
       })
     }

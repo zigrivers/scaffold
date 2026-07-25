@@ -34,6 +34,18 @@ If any R1 file lives at a slightly different path, locate it with the grep given
 
 ### Task 1: sched core — types, exec seam, launchd plist renderer, rumble golden fixture
 
+> **Reviewer note — VERIFIED NON-DEFECT (recurring, PR #785 rounds 1/2/4).** Three
+> CLI channels across three rounds flagged the `tests/fixtures/sched/rumble-merge-poller.plist`
+> hard-coded absolute paths (`/Users/ken/...`, fnm/homebrew paths) as
+> "machine-specific / leaks personal environment." This is INTENTIONAL: spec §7
+> designates the rumble plist as the golden fixture, and `launchd.test.ts`'s
+> `rumbleJob()` supplies those exact paths as INPUTS, asserting `renderPlist`
+> reproduces the fixture byte-for-byte — the paths are the expected rendering of
+> the given inputs, not a leak (it is the maintainer's own repo layout, no
+> secrets). Sanitizing to placeholders would break the byte-exact assertion and
+> deviate from the spec's explicit dogfood choice. Kept as-is; the recurrence
+> across the round budget is the documented STOP signal for this finding.
+
 **Files:**
 - Create: `src/sched/types.ts`
 - Create: `src/sched/exec.ts`
@@ -1681,6 +1693,13 @@ fi
 
 ### Task 9: ingestion-lite — seed gate commands from package.json + workflows
 
+> **Reviewer note — RESOLVED (P2, PR #785 round 4).** `workflowRunLines` guarded
+> `.github/workflows` with a bare `existsSync` before `readdirSync` — if that path
+> exists as a FILE (not a directory), `readdirSync` throws ENOTDIR and crashes
+> ingestion. Switched to `statSync(dir, { throwIfNoEntry: false })?.isDirectory()`,
+> which returns `[]` for both missing and not-a-directory. Test: a `.github/workflows`
+> FILE no longer throws.
+
 **Files:**
 - Create: `src/core/agent-ops/gate-ingest.ts`
 - Create: `src/core/agent-ops/gate-ingest.test.ts`
@@ -3223,6 +3242,20 @@ export function planResume(
 > return `stage:'merge'` with a recovery message. Test: a throwing `squashMerge`
 > yields `stage:'merge'` + `--finish`, journals only `bootstrap_intent`, and arms
 > nothing.
+
+> **Reviewer note — RESOLVED (P2, PR #785 round 4).** Completing the
+> graceful-degradation sweep: the PREFLIGHT infra calls (`fetchOrigin`,
+> `checkoutDetachedInGate`, `readMergeConfig`, `runGate`) were still unguarded. A
+> network/git/config failure threw a raw stack trace. Preflight is pre-journaling
+> so nothing is stranded, but for consistency (and per the project's own
+> lessons.md rule the reviewer cited) they're now wrapped to return
+> `stage:'preflight'` with a re-run message; the logical failures (PR not OPEN,
+> assets missing, gate red) already returned that stage. Test: a throwing
+> `fetchOrigin` yields `stage:'preflight'` and journals nothing. Separately,
+> `gateTargetResolves` now runs `command -v -- "$1"` (the `--` ends option
+> parsing so an executable name starting with `-` is treated as an operand).
+
+
 
 > **Reviewer note — RESOLVED (P0, PR #785 review).** `gateTargetResolves`
 > originally built the `bash -c` probe by interpolating the command's head token

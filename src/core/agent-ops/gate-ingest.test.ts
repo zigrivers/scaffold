@@ -67,6 +67,15 @@ describe('ingestGateSeed', () => {
     expect(seed.gateCommands).not.toContain('echo hello')
     expect(seed.sources.join('\n')).toContain('.github/workflows/ci.yml')
   })
+  it('does not crash when .github/workflows exists as a FILE, not a directory', () => {
+    // A bare existsSync + readdirSync would throw ENOTDIR here.
+    const root = project({
+      'package.json': JSON.stringify({ scripts: { test: 'vitest run' } }),
+      '.github/workflows': 'this is a file, not a directory',
+    })
+    expect(() => ingestGateSeed(root)).not.toThrow()
+    expect(ingestGateSeed(root).gateCommands).toContain('npm run test')
+  })
   it('adds a functional java runtime probe when scripts mention java/emulators', () => {
     const root = project({
       'package.json': JSON.stringify({

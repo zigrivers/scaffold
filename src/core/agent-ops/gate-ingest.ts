@@ -46,7 +46,9 @@ function readPackageJson(projectRoot: string): PackageJson | null {
 
 function workflowRunLines(projectRoot: string): { file: string; run: string }[] {
   const dir = path.join(projectRoot, '.github', 'workflows')
-  if (!fs.existsSync(dir)) return []
+  // isDirectory guards the pathological case where .github/workflows exists as a
+  // FILE — a bare existsSync would let readdirSync below throw ENOTDIR.
+  if (!fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory()) return []
   const out: { file: string; run: string }[] = []
   for (const name of fs.readdirSync(dir).filter(f => /\.ya?ml$/.test(f)).sort()) {
     const rel = path.posix.join('.github/workflows', name)

@@ -344,6 +344,22 @@ describe('runBootstrap (D9 engine)', () => {
       expect(rec.schedArmed).toBe(0)
     },
   )
+  it(
+    'a preflight infra failure (e.g. fetchOrigin network error) degrades to stage:preflight, journals nothing',
+    async () => {
+      const root = tmpRoot()
+      const git = makeGit(root)
+      git.fetchOrigin = (): void => { throw new Error('git: could not fetch origin (network)') }
+      const { deps } = makeDeps(root, { git })
+      const out = await runBootstrap(deps, { pr: 41 })
+      expect(out.ok).toBe(false)
+      expect(out.stage).toBe('preflight')
+      expect(out.messages.join('\n')).toMatch(/preflight failed/)
+      expect(out.messages.join('\n')).toMatch(/re-run/)
+      // Preflight is pre-journaling — nothing is written.
+      expect(readJournal(deps.mqDir)).toEqual([])
+    },
+  )
   it('aborts when the head moves between intent and merge — id terminal, retry uses a new id', async () => {
     const root = tmpRoot()
     // viewPr call 1 (reconcile+preflight): SHA-A; call 2 (revalidation): SHA-NEW.
