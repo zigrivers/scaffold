@@ -3182,6 +3182,20 @@ export function planResume(
 > clean + guard registered on a settings-touching PR, and that a throwing sync
 > yields `stage:'arm'` (not a throw).
 
+> **Reviewer note — RESOLVED (whole-branch + plan-aware review).** Two follow-on
+> uncaught-throw holes on the same post-merge arm path were closed for symmetry
+> with the `syncPrimaryToMerge` guard above: (1) `armHooks` → `readSettings`
+> throws on a malformed/non-object `.claude/settings.json` in the merged tree —
+> wrapped in `verifyAndArm` to degrade to recoverable `--finish` guidance; (2)
+> `armSched` → `loadAgentOpsConfig(primary)` throws on a malformed
+> `.scaffold/agent-ops.yaml` (plausible on a `--finish` resume after a manual
+> primary reconciliation) — its `verifyAndArm` call site is now wrapped in the
+> same try/catch, AND the default `armSched` closure in `mq.ts` moves the
+> `loadAgentOpsConfig` read inside its own guard so it honors its never-throw
+> `() => { ok, messages }` contract regardless of the call site. Tests assert a
+> throwing `armHooks` and a throwing `armSched` each yield `stage:'arm'` with a
+> `--finish` message and the merge still journaled (`bootstrap_merged`).
+
 **Files:**
 - Modify: `src/merge-queue/bootstrap.ts` (append the engine)
 - Modify: `src/merge-queue/bootstrap.test.ts` (append engine tests)

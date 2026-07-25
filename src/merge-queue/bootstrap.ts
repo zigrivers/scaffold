@@ -229,7 +229,22 @@ export async function runBootstrap(
       return { ok: false, bootstrapId: a.bootstrapId, stage: 'arm', messages }
     }
     for (const m of hooks.messages) say(m)
-    const sched = deps.armSched()
+    // armSched → loadAgentOpsConfig(primary) THROWS on a malformed/invalid
+    // .scaffold/agent-ops.yaml in the merged (or manually-reconciled) tree. The
+    // merge is already journaled, so degrade to a recoverable --finish instead of
+    // crashing (mirrors the syncPrimaryToMerge + armHooks graceful-failure guards).
+    let sched: { ok: boolean; messages: string[] }
+    try {
+      sched = deps.armSched()
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err)
+      say(
+        `bootstrap: the merge is recorded (commit ${mergeSha}) but the scheduler was NOT ` +
+        `armed (${detail}) — likely a malformed .scaffold/agent-ops.yaml in the merged ` +
+        `tree; fix it, then finish with: scaffold mq bootstrap --pr ${opts.pr} --finish`,
+      )
+      return { ok: false, bootstrapId: a.bootstrapId, stage: 'arm', messages }
+    }
     for (const m of sched.messages) say(m)
     if (!sched.ok) {
       say(

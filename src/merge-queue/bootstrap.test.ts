@@ -303,6 +303,29 @@ describe('runBootstrap (D9 engine)', () => {
       expect(events.map(e => e.type)).toEqual(['bootstrap_intent', 'bootstrap_merged'])
     },
   )
+  it(
+    'an armSched failure (e.g. malformed .scaffold/agent-ops.yaml in the merged tree) degrades ' +
+      'gracefully to a recoverable --finish instead of throwing uncaught',
+    async () => {
+      const root = tmpRoot()
+      const { deps, rec } = makeDeps(root, {
+        armSched: (): { ok: boolean; messages: string[] } => {
+          throw new Error('agent-ops config: invalid YAML — refusing to arm')
+        },
+      })
+      const out = await runBootstrap(deps, { pr: 41 })
+      expect(out.ok).toBe(false)
+      expect(out.stage).toBe('arm')
+      expect(out.messages.join('\n')).toMatch(/scheduler was NOT armed/)
+      expect(out.messages.join('\n')).toMatch(/--finish/)
+      // Hooks armed (they run before sched) but the daemon smoke never ran.
+      expect(rec.hooksArmed).toBe(1)
+      expect(rec.smoked).toBe(0)
+      // The merge is still recorded (armSched runs after the SHA is journaled).
+      const events = readJournal(deps.mqDir)
+      expect(events.map(e => e.type)).toEqual(['bootstrap_intent', 'bootstrap_merged'])
+    },
+  )
   it('aborts when the head moves between intent and merge — id terminal, retry uses a new id', async () => {
     const root = tmpRoot()
     // viewPr call 1 (reconcile+preflight): SHA-A; call 2 (revalidation): SHA-NEW.

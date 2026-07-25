@@ -226,10 +226,13 @@ export async function mqHandler(argv: MqArgs, overrides: MqOverrides = {}): Prom
       // primary, so buildPostMergePollerJob(primary) resolves. Re-read the
       // executor from primary (just merged) and no-op for non-local-poller.
       armSched: o.armSched ?? ((): { ok: boolean; messages: string[] } => {
-        if (loadAgentOpsConfig(primary).merge_queue.gate_executor !== 'local-poller') {
-          return { ok: true, messages: ['sched: skipped (gate_executor is not local-poller)'] }
-        }
+        // loadAgentOpsConfig throws on a malformed .scaffold/agent-ops.yaml — keep it
+        // inside the guard so this closure honors its never-throw contract (verifyAndArm
+        // also wraps the call site, but the default impl must not rely on that).
         try {
+          if (loadAgentOpsConfig(primary).merge_queue.gate_executor !== 'local-poller') {
+            return { ok: true, messages: ['sched: skipped (gate_executor is not local-poller)'] }
+          }
           const res = pickSchedBackend().install(buildPostMergePollerJob(primary))
           return { ok: res.ok, messages: res.messages.map(m => `sched: ${m}`) }
         } catch (err) {
