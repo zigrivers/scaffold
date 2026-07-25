@@ -25,8 +25,14 @@ export function hashFileOrAbsent(file: string, label: string): string {
   return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')
 }
 
+/** Canonicalize fields so no field's content can shift a boundary with its
+ *  neighbor (e.g. a field containing '\n' colliding with the old bare-join
+ *  scheme). Each field is length-prefixed with its UTF-8 byte length before
+ *  concatenation, which makes the encoding unambiguous regardless of field
+ *  content. */
 function keyOf(fields: string[]): string {
-  return crypto.createHash('sha256').update(fields.join('\n')).digest('hex')
+  const canonical = fields.map(f => `${Buffer.byteLength(f, 'utf8')}:${f}`).join('')
+  return crypto.createHash('sha256').update(canonical).digest('hex')
 }
 
 /** Affected-gate key — covers EVERY input that selects or scopes tests: the

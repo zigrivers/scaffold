@@ -29,8 +29,18 @@ describe('gate cache keys', () => {
   it('full key covers tree + command + quarantine and differs from the affected key', () => {
     const parts = { tree: 'tree-a', command: 'make check', quarantineHash: 'quarantine:none' }
     expect(fullGateKey(parts)).toBe(fullGateKey({ ...parts }))
-    expect(fullGateKey({ ...parts, tree: 'X' })).not.toBe(fullGateKey(parts))
+    for (const field of Object.keys(parts) as (keyof typeof parts)[]) {
+      expect(fullGateKey({ ...parts, [field]: 'CHANGED' }))
+        .not.toBe(fullGateKey(parts))
+    }
     expect(fullGateKey(parts)).not.toBe(affectedGateKey(baseParts))
+  })
+
+  it('keyOf is collision-resistant across a shifted field boundary', () => {
+    // A bare '\n'-join would make these two field splits identical:
+    // 'X\nY' + '\0' + 'Z'  vs.  'X' + '\0' + 'Y\nZ'  ==>  'X\nY\nZ' either way.
+    expect(affectedGateKey({ ...baseParts, candidateTree: 'X\nY', baseTree: 'Z' }))
+      .not.toBe(affectedGateKey({ ...baseParts, candidateTree: 'X', baseTree: 'Y\nZ' }))
   })
 
   it('hashFileOrAbsent yields a labeled sentinel for missing files and a sha for content', () => {
