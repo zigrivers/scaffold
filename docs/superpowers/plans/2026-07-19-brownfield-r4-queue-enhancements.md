@@ -3054,7 +3054,7 @@ export default tiaCommand
 
 **Steps:**
 
-- [ ] Append the failing tests to `tests/agent-ops-merge-queue.bats`:
+- [x] Append the failing tests to `tests/agent-ops-merge-queue.bats`:
 
 ```bash
 @test "poller: due recording instruments the gate and ingests on green" {
@@ -3112,8 +3112,8 @@ STUB
 
   (`poller_world`'s default stub answers `tia record-due` with exit 1 — Task 4.)
 
-- [ ] Run: `bats tests/agent-ops-merge-queue.bats` — expect the 3 new tests FAIL.
-- [ ] Edit `content/assets/agent-ops/merge-queue/post-merge-poller.sh.tmpl`. Four surgical edits:
+- [x] Run: `bats tests/agent-ops-merge-queue.bats` — expect the 3 new tests FAIL.
+- [x] Edit `content/assets/agent-ops/merge-queue/post-merge-poller.sh.tmpl`. Four surgical edits:
 
   **(a)** Immediately after the Task 4 `SCAFFOLD_BIN` block, insert (just the flag — the dump dir is created immediately before the gate in edit **(c)**, so no early exit between here and the gate can ever orphan a provisional coverage dir):
 
@@ -3198,9 +3198,9 @@ GATE_SECONDS=$(( $(date +%s) - GATE_START ))
 	fi
 ```
 
-- [ ] Run: `bats tests/agent-ops-merge-queue.bats` — expect ALL tests pass.
-- [ ] Run: `make lint` — expect green.
-- [ ] Commit: `git add -A && git commit -m "feat(agent-ops): poller records V8 coverage on scheduled green runs (D14)"`
+- [x] Run: `bats tests/agent-ops-merge-queue.bats` — expect ALL tests pass.
+- [x] Run: `make lint` — expect green.
+- [x] Commit: `git add -A && git commit -m "feat(agent-ops): poller records V8 coverage on scheduled green runs (D14)"`
 
 ---
 
