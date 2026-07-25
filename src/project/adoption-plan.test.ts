@@ -289,4 +289,38 @@ describe('map-candidate disposition (R3, D10)', () => {
     expect(row?.disposition).toBe('done-verified')
     expect(row?.target).toBeUndefined()
   })
+
+  it('map-candidate never overrides a state-claim conflict (unverified) with a mappable incumbent', () => {
+    // A state-claim conflict (state says completed, own output missing) can
+    // report verification: 'unverified' — the same level as a plain unstarted
+    // step. That means the satisfiedSteps filter in proposeMapCandidates
+    // (which only excludes 'verified'/'declared') does NOT by itself keep this
+    // step off the map-candidate target list; CONTRIBUTING.md still qualifies
+    // as a candidate. Only the `disposition === 'run'` guard in the override
+    // loop (adoption-plan.ts) stops the candidate from masking the conflict.
+    // This test is a tripwire for that guard.
+    const dir = makeRepo()
+    fs.writeFileSync(path.join(dir, 'CONTRIBUTING.md'), '# contributing\n')
+    fs.mkdirSync(path.join(dir, '.scaffold'))
+    fs.writeFileSync(path.join(dir, '.scaffold', 'config.yml'),
+      'version: 2\nmethodology: brownfield\nplatforms: [claude-code]\n')
+    fs.writeFileSync(path.join(dir, '.scaffold', 'state.json'), JSON.stringify({
+      'schema-version': 1, 'scaffold-version': '3.0.0',
+      init_methodology: 'brownfield', config_methodology: 'brownfield', 'init-mode': 'brownfield',
+      created: '2026-01-01T00:00:00.000Z', in_progress: null,
+      steps: {
+        'coding-standards': {
+          status: 'completed', source: 'pipeline',
+          produces: ['docs/coding-standards.md'], verification: 'unverified',
+        },
+      },
+      next_eligible: [], 'extra-steps': [],
+    }))
+    // docs/coding-standards.md (the step's own output) is never written, so
+    // verifyStep reports a state-claim conflict.
+    const { plan } = buildAdoptionPlan({ projectRoot: dir, adoptResult: brownfieldResult() })
+    const row = plan.steps.find((s) => s.step_slug === 'coding-standards')
+    expect(row?.disposition).toBe('conflict')
+    expect(row?.target).toBeUndefined()
+  })
 })

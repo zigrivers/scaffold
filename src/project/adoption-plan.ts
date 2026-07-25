@@ -224,6 +224,11 @@ export function buildAdoptionPlan(options: {
   })
   for (const candidate of mapCandidates) {
     const record = records.find((r) => r.step_slug === candidate.step)
+    // Intentionally conservative: a candidate may only override a plain `run`
+    // row. A state-claim conflict can report verification: 'unverified' (same
+    // level as an untouched step), so satisfiedSteps alone would not exclude
+    // it above — this exact equality check is what keeps conflict/done/
+    // undetectable rows from ever being masked.
     if (record !== undefined && record.disposition === 'run') {
       record.disposition = 'map-candidate'
       record.target = candidate.target
