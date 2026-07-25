@@ -372,3 +372,19 @@ in-place preserving project-specific customizations.
 - **Conflict resolution**: if CLAUDE.md Beads section was manually customized,
   merge new content around existing customizations rather than replacing;
   the same rule applies to docs/beads-workflow.md
+
+## Adoption Mode Specifics
+- **Codify from repo evidence**: the incumbent task-tracking surface —
+  existing GitHub issues usage (`gh issue list --limit 20`), TODO/BACKLOG
+  files, and any existing CLAUDE.md/AGENTS.md content this step would
+  normally create. Beads initialization itself proceeds as in fresh mode (a
+  brownfield repo without `.beads/` genuinely needs `bd init`), but all
+  CLAUDE.md content merges around what already exists.
+- **Interview only for**: whether open incumbent TODOs/issues should be
+  imported as beads now, later, or not at all; and which existing CLAUDE.md
+  workflow conventions must survive verbatim.
+- **Do not**: overwrite or restructure an existing CLAUDE.md (insert
+  scaffold sections around incumbent content); bulk-import historical
+  closed issues; create duplicate tracking — if the team keeps GitHub
+  issues for external reports, document the division of labor between
+  issues and beads.

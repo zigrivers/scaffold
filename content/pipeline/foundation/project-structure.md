@@ -84,3 +84,16 @@ choice, update CLAUDE.md Quick Reference section in-place.
 - **Conflict resolution**: if architecture restructured modules, add new
   directories but do not remove existing ones until migration is complete;
   update CLAUDE.md Quick Reference to reflect additions
+
+## Adoption Mode Specifics
+- **Codify from repo evidence**: the directory layout as it exists — the
+  real tree, observed module boundaries, where each file type actually
+  lives, and the import/barrel conventions in use. In adoption mode this
+  document describes the incumbent structure; it does not design a new one,
+  and no directories are scaffolded.
+- **Interview only for**: which boundaries are intentional versus
+  accidental, where new feature code should go, and growth areas that need
+  placement rules the current tree doesn't yet show.
+- **Do not**: propose moving or renaming existing directories; scaffold
+  placeholder directories into an established tree; impose a module
+  organization strategy that contradicts the observed one.
