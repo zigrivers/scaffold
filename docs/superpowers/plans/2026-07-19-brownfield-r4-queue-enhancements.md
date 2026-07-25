@@ -1172,7 +1172,7 @@ export function waitForWake(
 
 **Steps:**
 
-- [ ] Add the failing tests to `src/merge-queue/daemon.test.ts` (inside `describe('MergeQueueDaemon.cycle', …)`):
+- [x] Add the failing tests to `src/merge-queue/daemon.test.ts` (inside `describe('MergeQueueDaemon.cycle', …)`):
 
 ```ts
   it('kicks one poller pass after a green landing (D15)', async () => {
@@ -1204,8 +1204,8 @@ export function waitForWake(
   })
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/daemon.test.ts` — expect the 3 new tests FAIL.
-- [ ] In `src/merge-queue/daemon.ts`:
+- [x] Run: `npx vitest run src/merge-queue/daemon.test.ts` — expect the 3 new tests FAIL.
+- [x] In `src/merge-queue/daemon.ts`:
   - Add to `DaemonDeps` (after `wake`):
 
 ```ts
@@ -1242,8 +1242,8 @@ export function waitForWake(
     }
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/daemon.test.ts` — expect ALL pass.
-- [ ] In `src/cli/commands/mq.ts`, inside `case 'daemon'` after `const config = loadAgentOpsConfig(primary).merge_queue`, add the production wiring and pass it to the constructor:
+- [x] Run: `npx vitest run src/merge-queue/daemon.test.ts` — expect ALL pass.
+- [x] In `src/cli/commands/mq.ts`, inside `case 'daemon'` after `const config = loadAgentOpsConfig(primary).merge_queue`, add the production wiring and pass it to the constructor:
 
 ```ts
       const pollerScript = path.join(primary, 'scripts', 'ops', 'post-merge-poller.sh')
@@ -1259,9 +1259,9 @@ export function waitForWake(
 
   and in the `new MergeQueueDaemon({ … })` deps object add `triggerPoller,` after `now: () => new Date(),`.
 
-- [ ] Run: `npm run check` — expect green.
-- [ ] Run: `npm run test:e2e` — expect the merge-queue e2e suite still green (wake/trigger are inert there: `run({ once })` never reaches the idle wait, and the worlds have no poller script).
-- [ ] Commit: `git add -A && git commit -m "feat(mq): daemon kicks one poller pass after landing (D15)"`
+- [x] Run: `npm run check` — expect green.
+- [x] Run: `npm run test:e2e` — expect the merge-queue e2e suite still green (wake/trigger are inert there: `run({ once })` never reaches the idle wait, and the worlds have no poller script).
+- [x] Commit: `git add -A && git commit -m "feat(mq): daemon kicks one poller pass after landing (D15)"`
 
 **D15 is complete and shippable here.**
 
