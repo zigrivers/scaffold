@@ -395,6 +395,29 @@ describe('pipeline/verification', () => {
     expect(result.status).toBe('error')
     expect(result.detail).toContain('beads')
   })
+
+  it('reports a step as verified via an artifact_map mapping rather than missing (D10a)', () => {
+    const root = tmpRoot()
+    fs.mkdirSync(path.join(root, '.scaffold'))
+    fs.writeFileSync(path.join(root, '.scaffold', 'config.yml'),
+      'version: 2\nmethodology: deep\nplatforms: [claude-code]\n'
+      + 'artifact_map:\n  coding-standards: CONTRIBUTING.md\n')
+    fs.writeFileSync(path.join(root, 'CONTRIBUTING.md'), '# Contributing\n')
+    fs.writeFileSync(path.join(root, '.scaffold', 'state.json'), JSON.stringify({
+      'schema-version': 1, 'scaffold-version': '3.0.0',
+      init_methodology: 'deep', config_methodology: 'deep', 'init-mode': 'brownfield',
+      created: '2026-01-01T00:00:00.000Z', in_progress: null,
+      steps: {
+        'coding-standards': {
+          status: 'completed', source: 'pipeline', produces: ['docs/coding-standards.md'], verification: 'declared',
+        },
+      },
+      next_eligible: [], 'extra-steps': [],
+    }))
+    const result = pipelineVerificationCheck.run(ctxFor(root))
+    expect(result.status).toBe('ok')
+    expect(result.detail).toContain('1 completed step(s) verified')
+  })
 })
 
 describe('scheduler/loaded — argv exec (no shell)', () => {

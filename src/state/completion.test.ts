@@ -386,6 +386,88 @@ describe('verifyStep (D3)', () => {
   })
 })
 
+describe('artifact_map integration (D10a)', () => {
+  it('detectCompletion accepts an existing mapped incumbent in place of outputs', () => {
+    const dir = makeTempDir()
+    fs.writeFileSync(path.join(dir, 'CONTRIBUTING.md'), '# Contributing\n')
+    const state = makeBaseState()
+    const result = detectCompletion(
+      'coding-standards', state, ['docs/coding-standards.md'], dir, undefined,
+      { 'coding-standards': 'CONTRIBUTING.md' },
+    )
+    expect(result.complete).toBe(true)
+    expect(result.mappedArtifactUsed).toBe('CONTRIBUTING.md')
+    expect(result.artifactsMissing).toHaveLength(0)
+  })
+
+  it('a stale mapping (mapped file missing) falls back to the normal all-outputs check', () => {
+    const dir = makeTempDir()
+    const state = makeBaseState()
+    const result = detectCompletion(
+      'coding-standards', state, ['docs/coding-standards.md'], dir, undefined,
+      { 'coding-standards': 'CONTRIBUTING.md' },
+    )
+    expect(result.complete).toBe(false)
+    expect(result.mappedArtifactUsed).toBeUndefined()
+    expect(result.artifactsMissing).toEqual(['docs/coding-standards.md'])
+  })
+
+  it('a mapping that escapes the project root is ignored', () => {
+    const dir = makeTempDir()
+    const state = makeBaseState()
+    const result = detectCompletion(
+      'coding-standards', state, ['docs/coding-standards.md'], dir, undefined,
+      { 'coding-standards': '../outside.md' },
+    )
+    expect(result.complete).toBe(false)
+    expect(result.mappedArtifactUsed).toBeUndefined()
+  })
+
+  it('checkCompletion reports confirmed_complete for completed + mapped incumbent present', () => {
+    const dir = makeTempDir()
+    fs.writeFileSync(path.join(dir, 'CONTRIBUTING.md'), '# Contributing\n')
+    const state = makeBaseState({
+      steps: {
+        'coding-standards': {
+          status: 'completed', source: 'pipeline',
+          produces: ['docs/coding-standards.md'],
+        },
+      },
+    })
+    const result = checkCompletion('coding-standards', state, dir,
+      { 'coding-standards': 'CONTRIBUTING.md' })
+    expect(result.status).toBe('confirmed_complete')
+  })
+
+  it('verifyStep (the plan/doctor path) accepts a mapped incumbent — detect still gates', () => {
+    const dir = makeTempDir()
+    fs.writeFileSync(path.join(dir, 'CONTRIBUTING.md'), '# Contributing\n')
+    const entry = {
+      status: 'completed', source: 'pipeline', produces: ['docs/coding-standards.md'],
+      verification: 'declared',
+    } as StepStateEntry
+    // Mapped incumbent present + detect passes → verified/done.
+    const ok = verifyStep(
+      'coding-standards', entry, ['docs/coding-standards.md'], { all: [{ cmd: 'exit 0' }] }, dir,
+      { 'coding-standards': 'CONTRIBUTING.md' },
+    )
+    expect(ok.verification).toBe('verified')
+    expect(ok.status).toBe('confirmed_complete')
+    // Without the map the produced output is still missing → conflict.
+    const missing = verifyStep(
+      'coding-standards', entry, ['docs/coding-standards.md'], { all: [{ cmd: 'exit 0' }] }, dir,
+    )
+    expect(missing.status).toBe('conflict')
+    // Mapping never bypasses detect: mapped present but detect fails → not verified.
+    const detectFails = verifyStep(
+      'coding-standards', entry, ['docs/coding-standards.md'], { all: [{ cmd: 'exit 1' }] }, dir,
+      { 'coding-standards': 'CONTRIBUTING.md' },
+    )
+    expect(detectFails.verification).not.toBe('verified')
+    expect(detectFails.status).toBe('conflict')
+  })
+})
+
 describe('applyConflictOverrides (D3 — fs-only eligibility demotion)', () => {
   it('demotes a completed step with missing outputs to pending without mutating the input', () => {
     const dir = makeTempDir()
@@ -427,6 +509,21 @@ describe('applyConflictOverrides (D3 — fs-only eligibility demotion)', () => {
     expect(result.steps['tech-stack'].status).toBe('pending')
     // Without the resolver (historical produces only) the step would NOT demote.
     expect(applyConflictOverrides(steps, dir).conflicts).toEqual([])
+  })
+
+  it('a completed mapped step whose original output is absent stays done, not conflict (D10a)', () => {
+    const dir = makeTempDir()
+    fs.writeFileSync(path.join(dir, 'CONTRIBUTING.md'), 'x', 'utf8')
+    const steps: Record<string, StepStateEntry> = {
+      'coding-standards': { status: 'completed', source: 'pipeline', produces: ['docs/coding-standards.md'] },
+    }
+    const result = applyConflictOverrides(
+      steps, dir, undefined, undefined, undefined, { 'coding-standards': 'CONTRIBUTING.md' },
+    )
+    expect(result.conflicts).toEqual([])
+    expect(result.steps['coding-standards'].status).toBe('completed')
+    // Without the map, the same step demotes to pending as before.
+    expect(applyConflictOverrides(steps, dir).conflicts).toEqual(['coding-standards'])
   })
 
   describe('service scope (mirrors detectCompletion)', () => {

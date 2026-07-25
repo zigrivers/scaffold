@@ -10,6 +10,8 @@ export interface CompletionResult {
   complete: boolean
   artifactsPresent: string[]
   artifactsMissing: string[]
+  /** Set when an artifact_map mapping (not the step's own outputs) satisfied completion. */
+  mappedArtifactUsed?: string
 }
 
 export interface CrashRecoveryAction {
@@ -25,7 +27,25 @@ export function detectCompletion(
   expectedOutputs: string[],
   projectRoot: string,
   service?: string,
+  artifactMap?: Record<string, string>,
 ): CompletionResult {
+  // D10a (R3): an existing mapped incumbent satisfies the all-outputs
+  // requirement. A stale mapping (file gone) or one that escapes the project
+  // root falls through to the normal all-outputs check below — a broken
+  // mapping must not silently verify.
+  const mapped = artifactMap?.[step]
+  if (mapped !== undefined) {
+    const mappedFull = resolveContainedArtifactPath(projectRoot, mapped)
+    if (mappedFull !== null && fileExists(mappedFull)) {
+      return {
+        complete: true,
+        artifactsPresent: [mapped],
+        artifactsMissing: [],
+        mappedArtifactUsed: mapped,
+      }
+    }
+  }
+
   const artifactsPresent: string[] = []
   const artifactsMissing: string[] = []
 
@@ -51,6 +71,7 @@ export function checkCompletion(
   step: string,
   state: PipelineState,
   projectRoot: string,
+  artifactMap?: Record<string, string>,
 ): {
   status: 'confirmed_complete' | 'likely_complete' | 'conflict' | 'incomplete'
   presentArtifacts: string[]
@@ -72,7 +93,16 @@ export function checkCompletion(
     }
   }
 
-  const allPresent = missingArtifacts.length === 0
+  // D10a (R3): an existing mapped incumbent satisfies the all-outputs
+  // requirement (fallback only — the step's own outputs were checked first).
+  let allPresent = missingArtifacts.length === 0
+  if (!allPresent) {
+    const mapped = artifactMap?.[step]
+    if (mapped !== undefined) {
+      const mappedFull = resolveContainedArtifactPath(projectRoot, mapped)
+      if (mappedFull !== null && fileExists(mappedFull)) allPresent = true
+    }
+  }
 
   if (stateCompleted && allPresent) {
     return { status: 'confirmed_complete', presentArtifacts, missingArtifacts }
@@ -201,6 +231,7 @@ export function verifyStep(
   expectedOutputs: string[],
   detect: DetectSpec | null | undefined,
   projectRoot: string,
+  artifactMap?: Record<string, string>,
 ): StepVerification {
   const outputsPresent: string[] = []
   const outputsMissing: string[] = []
@@ -210,6 +241,17 @@ export function verifyStep(
       outputsPresent.push(output)
     } else {
       outputsMissing.push(output)
+    }
+  }
+  // D10a (R3): an existing mapped incumbent satisfies the all-outputs
+  // requirement (fallback only — the step's own outputs were checked first).
+  // Mapping NEVER bypasses detect: detectResult still gates 'verified' below.
+  const mapped = artifactMap?.[step]
+  if (outputsMissing.length > 0 && mapped !== undefined) {
+    const mappedFull = resolveContainedArtifactPath(projectRoot, mapped)
+    if (mappedFull !== null && fileExists(mappedFull)) {
+      outputsPresent.push(mapped)
+      outputsMissing.length = 0
     }
   }
   const detectResult = runDetect(detect, projectRoot)
@@ -275,6 +317,12 @@ export function verifyStep(
  * missing service file and report a broken step as complete. Global steps
  * (present in `globalSteps`) and callers that omit `service` stay unprefixed,
  * identical to today's behavior.
+ *
+ * `artifactMap`, when supplied (D10a, R3), mirrors `verifyStep`'s fallback: a
+ * step whose declared outputs are missing but whose `artifact_map[slug]`
+ * incumbent exists on disk is NOT demoted here. This stays fs-only (no
+ * detect: cmds) like the rest of this function — mapping only ever
+ * substitutes for the outputs-presence check.
  */
 export function applyConflictOverrides(
   steps: Record<string, StepStateEntry>,
@@ -282,6 +330,7 @@ export function applyConflictOverrides(
   resolvedOutputs?: (slug: string) => string[] | undefined,
   service?: string,
   globalSteps?: ReadonlySet<string>,
+  artifactMap?: Record<string, string>,
 ): { steps: Record<string, StepStateEntry>; conflicts: string[] } {
   const conflicts: string[] = []
   let overridden: Record<string, StepStateEntry> | null = null
@@ -292,11 +341,18 @@ export function applyConflictOverrides(
     const outputs = resolvedOutputs?.(slug) ?? entry.produces ?? []
     if (outputs.length === 0) continue
     const isServiceLocal = service !== undefined && !(globalSteps?.has(slug) ?? false)
-    const anyMissing = outputs.some((output) => {
+    let anyMissing = outputs.some((output) => {
       const relPath = isServiceLocal ? path.join('services', service, output) : output
       const fullPath = resolveContainedArtifactPath(projectRoot, relPath)
       return fullPath === null || !fileExists(fullPath)
     })
+    if (anyMissing) {
+      const mapped = artifactMap?.[slug]
+      if (mapped !== undefined) {
+        const mappedFull = resolveContainedArtifactPath(projectRoot, mapped)
+        if (mappedFull !== null && fileExists(mappedFull)) anyMissing = false
+      }
+    }
     if (!anyMissing) continue
     conflicts.push(slug)
     if (overridden === null) overridden = { ...steps }

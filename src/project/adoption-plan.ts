@@ -180,6 +180,7 @@ export function buildAdoptionPlan(options: {
     const entry = state?.steps[slug]
     const verification = verifyStep(
       slug, entry, mp.frontmatter.outputs ?? [], mp.frontmatter.detect ?? null, projectRoot,
+      context.config?.artifact_map,
     )
     const mapped = dispositionFor(verification)
     records.push({
