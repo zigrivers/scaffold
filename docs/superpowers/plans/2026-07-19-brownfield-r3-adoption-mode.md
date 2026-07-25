@@ -180,6 +180,18 @@ These are pinned by the approved spec — do not re-litigate during implementati
 
 ### Task 2: Verification honors mapped artifacts
 
+> **Reviewer note — RESOLVED (P1/P2, PR #786 round 3).** The mapped-incumbent
+> presence check in `verifyStep`/`detectCompletion`/`checkCompletion` used
+> `fileExists` (which accepts directories), so an `artifact_map` entry pointing at
+> a DIRECTORY could mark a step verified — inconsistent with `resolveAssemblyMode`'s
+> `.isFile()` gate. Added a shared `isFile` helper (`src/utils/fs.ts`) and switched
+> all three mapped checks to it (a doc mapping must be a file). Also fixed
+> `checkCompletion` to clear `missingArtifacts` + record the mapped file in
+> `presentArtifacts` when a mapping satisfies (it previously returned
+> `confirmed_complete` with a still-populated `missingArtifacts` — contradictory
+> evidence). Tests: a directory-mapped incumbent fails to satisfy each of the
+> three, and `checkCompletion` reports consistent evidence.
+
 > **Reviewer note — RESOLVED (P1, PR #786 plan-aware review).** `applyConflictOverrides`'s
 > `artifactMap` fallback (masking a missing output with a mapped incumbent) was
 > not gated on service scope, unlike the parallel live-conflict guard in

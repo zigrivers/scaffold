@@ -177,6 +177,35 @@ describe('checkCompletion', () => {
     expect(result.presentArtifacts).toEqual([])
     expect(result.missingArtifacts).toEqual(['docs/prd.md'])
   })
+
+  it('a satisfying mapped incumbent yields confirmed_complete with CONSISTENT evidence', () => {
+    // When a mapped file satisfies the check, missingArtifacts must be cleared
+    // and the mapped file reflected in presentArtifacts — no confirmed_complete
+    // with a still-populated missingArtifacts (contradictory evidence).
+    const dir = makeTempDir()
+    fs.writeFileSync(path.join(dir, 'CONTRIBUTING.md'), '# house rules\n')
+    const state = makeBaseState({
+      steps: {
+        'coding-standards': { status: 'completed', source: 'pipeline', produces: ['docs/coding-standards.md'] },
+      },
+    })
+    const result = checkCompletion('coding-standards', state, dir, { 'coding-standards': 'CONTRIBUTING.md' })
+    expect(result.status).toBe('confirmed_complete')
+    expect(result.missingArtifacts).toEqual([])
+    expect(result.presentArtifacts).toContain('CONTRIBUTING.md')
+  })
+
+  it('a mapped incumbent that is a DIRECTORY does not satisfy checkCompletion', () => {
+    const dir = makeTempDir()
+    fs.mkdirSync(path.join(dir, 'CONTRIBUTING.md'))
+    const state = makeBaseState({
+      steps: {
+        'coding-standards': { status: 'completed', source: 'pipeline', produces: ['docs/coding-standards.md'] },
+      },
+    })
+    const result = checkCompletion('coding-standards', state, dir, { 'coding-standards': 'CONTRIBUTING.md' })
+    expect(result.status).toBe('conflict')
+  })
 })
 
 describe('analyzeCrash', () => {
@@ -427,6 +456,20 @@ describe('artifact_map integration (D10a)', () => {
     expect(result.mappedArtifactUsed).toBeUndefined()
   })
 
+  it('a mapped incumbent that is a DIRECTORY does not satisfy the check (must be a file)', () => {
+    // A doc mapping must point at a file; a directory at the mapped path must
+    // not mark the step complete (matches resolveAssemblyMode's .isFile() gate).
+    const dir = makeTempDir()
+    fs.mkdirSync(path.join(dir, 'CONTRIBUTING.md')) // a DIRECTORY named like a doc
+    const state = makeBaseState()
+    const result = detectCompletion(
+      'coding-standards', state, ['docs/coding-standards.md'], dir, undefined,
+      { 'coding-standards': 'CONTRIBUTING.md' },
+    )
+    expect(result.complete).toBe(false)
+    expect(result.mappedArtifactUsed).toBeUndefined()
+  })
+
   it('a mapping that escapes the project root is ignored', () => {
     const dir = makeTempDir()
     const state = makeBaseState()
@@ -511,6 +554,22 @@ describe('artifact_map integration (D10a)', () => {
     )
     expect(detectFails.verification).not.toBe('verified')
     expect(detectFails.status).toBe('conflict')
+  })
+
+  it('a mapped incumbent that is a DIRECTORY does not satisfy verifyStep (must be a file)', () => {
+    const dir = makeTempDir()
+    fs.mkdirSync(path.join(dir, 'CONTRIBUTING.md')) // a DIRECTORY, not a doc file
+    const entry = {
+      status: 'completed', source: 'pipeline', produces: ['docs/coding-standards.md'],
+      verification: 'declared',
+    } as StepStateEntry
+    const v = verifyStep(
+      'coding-standards', entry, ['docs/coding-standards.md'], null, dir,
+      { 'coding-standards': 'CONTRIBUTING.md' },
+    )
+    // Directory doesn't satisfy the doc mapping → own output still missing → conflict.
+    expect(v.status).toBe('conflict')
+    expect(v.verification).not.toBe('verified')
   })
 })
 

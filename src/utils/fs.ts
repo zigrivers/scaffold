@@ -18,6 +18,15 @@ export function fileExists(filePath: string): boolean {
   return fs.existsSync(filePath)
 }
 
+/** Check if a path exists AND is a regular file (not a directory). */
+export function isFile(filePath: string): boolean {
+  try {
+    return fs.statSync(filePath).isFile()
+  } catch {
+    return false
+  }
+}
+
 /** Ensure a directory exists, creating it recursively if needed. */
 export function ensureDir(dirPath: string): void {
   fs.mkdirSync(dirPath, { recursive: true })

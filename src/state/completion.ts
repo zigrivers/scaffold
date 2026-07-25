@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import type { PipelineState, StepStateEntry, VerificationLevel } from '../types/index.js'
 import type { DetectSpec, DetectCheck } from '../types/frontmatter.js'
-import { fileExists } from '../utils/fs.js'
+import { fileExists, isFile } from '../utils/fs.js'
 import { resolveContainedArtifactPath } from '../utils/artifact-path.js'
 
 export interface CompletionResult {
@@ -64,8 +64,9 @@ export function detectCompletion(
   const isServiceLocal = service !== undefined && !(globalSteps?.has(step) ?? false)
   const mapped = !isServiceLocal ? artifactMap?.[step] : undefined
   if (mapped !== undefined) {
+    // Mapped incumbent must be a FILE, not a directory (matches resolveAssemblyMode).
     const mappedFull = resolveContainedArtifactPath(projectRoot, mapped)
-    if (mappedFull !== null && fileExists(mappedFull)) {
+    if (mappedFull !== null && isFile(mappedFull)) {
       return {
         complete: true,
         artifactsPresent: [mapped],
@@ -115,8 +116,15 @@ export function checkCompletion(
   if (!allPresent) {
     const mapped = artifactMap?.[step]
     if (mapped !== undefined) {
+      // Mapped incumbent must be a FILE (matches resolveAssemblyMode). When it
+      // satisfies, reflect it in the evidence arrays so a confirmed_complete
+      // result is not contradicted by a still-populated missingArtifacts.
       const mappedFull = resolveContainedArtifactPath(projectRoot, mapped)
-      if (mappedFull !== null && fileExists(mappedFull)) allPresent = true
+      if (mappedFull !== null && isFile(mappedFull)) {
+        allPresent = true
+        presentArtifacts.push(mapped)
+        missingArtifacts.length = 0
+      }
     }
   }
 
@@ -264,8 +272,11 @@ export function verifyStep(
   // Mapping NEVER bypasses detect: detectResult still gates 'verified' below.
   const mapped = artifactMap?.[step]
   if (outputsMissing.length > 0 && mapped !== undefined) {
+    // A mapped incumbent must be a FILE (a doc), never a directory — matching
+    // resolveAssemblyMode's `.isFile()` check so the two paths agree and a
+    // mapping to a directory never marks a step verified.
     const mappedFull = resolveContainedArtifactPath(projectRoot, mapped)
-    if (mappedFull !== null && fileExists(mappedFull)) {
+    if (mappedFull !== null && isFile(mappedFull)) {
       outputsPresent.push(mapped)
       outputsMissing.length = 0
     }
