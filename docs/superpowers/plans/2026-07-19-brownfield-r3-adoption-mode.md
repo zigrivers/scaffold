@@ -495,7 +495,7 @@ export function resolveAssemblyMode(options: {
 
 **Steps:**
 
-- [ ] Write failing tests in `src/core/assembly/update-mode.test.ts` (reuse the file's `makeState` helper — pass `'init-mode'` via a spread override where needed; extend `makeState` with an optional `initMode` second parameter if cleaner):
+- [x] Write failing tests in `src/core/assembly/update-mode.test.ts` (reuse the file's `makeState` helper — pass `'init-mode'` via a spread override where needed; extend `makeState` with an optional `initMode` second parameter if cleaner):
 
   ```ts
   describe('resolveAssemblyMode (D3 matrix + D10a)', () => {
@@ -603,8 +603,8 @@ export function resolveAssemblyMode(options: {
   ```
 
   (If R1's `StepStateEntry` already types `verification`, drop the `as PipelineState['steps'][string]` casts.)
-- [ ] Run: `npx vitest run src/core/assembly/update-mode.test.ts` — new tests FAIL.
-- [ ] Implement in `src/core/assembly/update-mode.ts` (below `detectUpdateMode`, reusing its imports):
+- [x] Run: `npx vitest run src/core/assembly/update-mode.test.ts` — new tests FAIL.
+- [x] Implement in `src/core/assembly/update-mode.ts` (below `detectUpdateMode`, reusing its imports):
 
   ```ts
   export interface AssemblyModeResult {
@@ -703,8 +703,8 @@ export function resolveAssemblyMode(options: {
   ```
 
   Add `export type AssemblyMode = 'fresh' | 'update' | 'adoption'` to `src/types/assembly.ts` and import it (types must not import from core, so the type lives in types/).
-- [ ] Run: `npx vitest run src/core/assembly/update-mode.test.ts` — all green (existing `detectUpdateMode` tests must stay green untouched).
-- [ ] Commit: `feat(assembly): resolveAssemblyMode — fresh|update|adoption per D3 matrix (brownfield R3)`
+- [x] Run: `npx vitest run src/core/assembly/update-mode.test.ts` — all green (existing `detectUpdateMode` tests must stay green untouched).
+- [x] Commit: `feat(assembly): resolveAssemblyMode — fresh|update|adoption per D3 matrix (brownfield R3)`
 
 ---
 
