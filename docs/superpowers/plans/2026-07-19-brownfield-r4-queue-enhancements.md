@@ -1281,7 +1281,7 @@ export function waitForWake(
 
 **Steps:**
 
-- [ ] Add the failing reducer tests to `src/merge-queue/state.test.ts` (inside the existing describe; import `TERMINAL_PR_STATES` and `queuedPrs` from `./state.js` if not already imported; `AT` is any ISO timestamp constant the file already uses — add `const AT = '2026-07-19T12:00:00.000Z'` if absent):
+- [x] Add the failing reducer tests to `src/merge-queue/state.test.ts` (inside the existing describe; import `TERMINAL_PR_STATES` and `queuedPrs` from `./state.js` if not already imported; `AT` is any ISO timestamp constant the file already uses — add `const AT = '2026-07-19T12:00:00.000Z'` if absent):
 
 ```ts
   it('caches pr_files on the entry (files + the head sha they were fetched at)', () => {
@@ -1329,8 +1329,8 @@ export function waitForWake(
   })
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/state.test.ts` — expect FAILURE (type errors on the new event/state names).
-- [ ] In `src/merge-queue/types.ts`:
+- [x] Run: `npx vitest run src/merge-queue/state.test.ts` — expect FAILURE (type errors on the new event/state names).
+- [x] In `src/merge-queue/types.ts`:
   - Extend `PrState`:
 
 ```ts
@@ -1379,7 +1379,7 @@ export type PrState =
     overlap_zone_policy: 'solo',
 ```
 
-- [ ] In `src/merge-queue/state.ts`, add the reducer cases (before the `gate_metrics` no-op group):
+- [x] In `src/merge-queue/state.ts`, add the reducer cases (before the `gate_metrics` no-op group):
 
 ```ts
     case 'pr_files': {
@@ -1398,8 +1398,8 @@ export type PrState =
     }
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/state.test.ts` — expect all pass.
-- [ ] In `src/core/agent-ops/config.ts`, add validation inside the `merge_queue` block (after the Task 1 `gate_cache_max_entries` block):
+- [x] Run: `npx vitest run src/merge-queue/state.test.ts` — expect all pass.
+- [x] In `src/core/agent-ops/config.ts`, add validation inside the `merge_queue` block (after the Task 1 `gate_cache_max_entries` block):
 
 ```ts
     if (mq.overlap_zones !== undefined) {
@@ -1423,7 +1423,7 @@ export type PrState =
     }
 ```
 
-- [ ] Add to `src/core/agent-ops/config.test.ts`:
+- [x] Add to `src/core/agent-ops/config.test.ts`:
 
 ```ts
   it('parses overlap zones + policy and applies the solo default', () => {
@@ -1456,9 +1456,9 @@ merge_queue:
   })
 ```
 
-- [ ] Run: `npx vitest run src/core/agent-ops/config.test.ts src/merge-queue` — expect all pass.
-- [ ] Run: `npm run check` — expect green.
-- [ ] Commit: `git add -A && git commit -m "feat(mq): HELD_HUMAN state, pr_files/released events, overlap-zone config (D13)"`
+- [x] Run: `npx vitest run src/core/agent-ops/config.test.ts src/merge-queue` — expect all pass.
+- [x] Run: `npm run check` — expect green.
+- [x] Commit: `git add -A && git commit -m "feat(mq): HELD_HUMAN state, pr_files/released events, overlap-zone config (D13)"`
 
 ---
 
