@@ -1660,7 +1660,7 @@ R1 ships the plan renderer with the disposition union `done (verified) | conflic
 
 **Steps:**
 
-- [ ] Write failing tests in `src/project/adoption-plan.test.ts`, following R1's existing plan-builder test fixtures (tmp project + injected state). Add:
+- [x] Write failing tests in `src/project/adoption-plan.test.ts`, following R1's existing plan-builder test fixtures (tmp project + injected state). Add:
 
   ```ts
   describe('map-candidate disposition (R3, D10)', () => {
@@ -1707,14 +1707,14 @@ R1 ships the plan renderer with the disposition union `done (verified) | conflic
   ```
 
   (Adapt constructor/args names to R1's actual API — the assertions above are the contract; the fixture plumbing follows the file's existing tests.)
-- [ ] Run: `npx vitest run src/project/adoption-plan.test.ts` — new tests FAIL.
-- [ ] Implement:
+- [x] Run: `npx vitest run src/project/adoption-plan.test.ts` — new tests FAIL.
+- [x] Implement:
   - Extend the disposition union with `'map-candidate'` and add `target?: string` (present iff disposition is `map-candidate`) plus `mode?: 'fresh' | 'update' | 'adoption'` (present iff disposition is `run`) to the step-record type. Because R1's `plan_key` hashes the canonical JSON of the complete records, both fields flow into the key with no hasher change — the second test proves it.
   - In the plan builder, after D3 verification produces per-step verdicts: call `proposeMapCandidates` (Task 8) with `resolvedSteps` = the preset-resolved pipeline, `satisfiedSteps` = steps whose verification verdict is verified/declared-complete, `existingMap` = `config.artifact_map ?? {}`. A proposed candidate sets the step's disposition to `map-candidate` with its `target` (map-candidate outranks `run`/`skip-proposed` for that step; it never overrides `done (verified)` or `conflict`).
   - For each `run` disposition, compute `mode`. **First-touch guard:** R1's `buildAdoptionPlan` sets `state: PipelineState | null = null` and only loads it when `.scaffold/state.json` exists — the primary D2 brownfield entry has no `.scaffold/`, so `state` is null there. When `state === null`, derive the mode from the plan's own init-mode instead of calling `resolveAssemblyMode` with a null state: `plan.mode === 'brownfield' || plan.mode === 'v1-migration'` ⇒ `'adoption'`, else `'fresh'` (there is no per-step state to consult on first touch). Only when `state !== null` call `resolveAssemblyMode({ step, state, currentDepth: <resolved depth>, projectRoot, artifactMap: config.artifact_map })`. (`resolveAssemblyMode` requires a non-null `PipelineState`; do not widen its signature.)
   - Renderer rows (human format): `map-candidate` → `map-candidate → <target>   (accept: --apply writes artifact_map.<step>)`; `run` → `run — <mode> mode`. JSON output carries `target` and `mode` verbatim.
-- [ ] Run: `npx vitest run src/project/adoption-plan.test.ts` — all green; also `npx vitest run src/project/` to confirm no R1 plan tests regressed.
-- [ ] Commit: `feat(adopt): map-candidate disposition + run-mode annotation in adoption plan (D10, §6.1)`
+- [x] Run: `npx vitest run src/project/adoption-plan.test.ts` — all green; also `npx vitest run src/project/` to confirm no R1 plan tests regressed.
+- [x] Commit: `feat(adopt): map-candidate disposition + run-mode annotation in adoption plan (D10, §6.1)`
 
 ---
 
