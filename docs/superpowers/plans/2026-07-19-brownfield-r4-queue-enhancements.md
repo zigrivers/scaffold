@@ -2000,7 +2000,7 @@ elif args[:2] == ['pr', 'diff']:
 
 **Steps:**
 
-- [ ] In `src/merge-queue/types.ts`:
+- [x] In `src/merge-queue/types.ts`:
   - Extend the `JournalEvent` union:
 
 ```ts
@@ -2021,7 +2021,7 @@ elif args[:2] == ['pr', 'diff']:
     tia: { record: 'scheduled' },
 ```
 
-- [ ] In `src/merge-queue/state.ts`, extend the no-op group:
+- [x] In `src/merge-queue/state.ts`, extend the no-op group:
 
 ```ts
     case 'gate_cached':
@@ -2030,7 +2030,7 @@ elif args[:2] == ['pr', 'diff']:
       break
 ```
 
-- [ ] In `src/core/agent-ops/config.ts`, add validation (after the Task 8 blocks):
+- [x] In `src/core/agent-ops/config.ts`, add validation (after the Task 8 blocks):
 
 ```ts
     if (mq.tia !== undefined) {
@@ -2049,7 +2049,7 @@ elif args[:2] == ['pr', 'diff']:
     }
 ```
 
-- [ ] Add to `src/core/agent-ops/config.test.ts`:
+- [x] Add to `src/core/agent-ops/config.test.ts`:
 
 ```ts
   it('defaults tia.record to scheduled and parses explicit values', () => {
@@ -2074,7 +2074,7 @@ merge_queue:
   })
 ```
 
-- [ ] Write the failing test `src/tia/map.test.ts`:
+- [x] Write the failing test `src/tia/map.test.ts`:
 
 ```ts
 // src/tia/map.test.ts
@@ -2175,8 +2175,8 @@ describe('readTiaMap / writeTiaMap', () => {
 })
 ```
 
-- [ ] Run: `npx vitest run src/tia/map.test.ts` — expect FAILURE (module missing).
-- [ ] Create `src/tia/map.ts`:
+- [x] Run: `npx vitest run src/tia/map.test.ts` — expect FAILURE (module missing).
+- [x] Create `src/tia/map.ts`:
 
 ```ts
 // src/tia/map.ts — D14: testmon-style test→files coverage map, built from
@@ -2305,9 +2305,9 @@ export function buildTiaMap(opts: {
 }
 ```
 
-- [ ] Run: `npx vitest run src/tia/map.test.ts src/core/agent-ops/config.test.ts src/merge-queue` — expect all pass.
-- [ ] Run: `npm run check` — expect green.
-- [ ] Commit: `git add -A && git commit -m "feat(tia): coverage-map module, tia.record config, tia_recorded event (D14)"`
+- [x] Run: `npx vitest run src/tia/map.test.ts src/core/agent-ops/config.test.ts src/merge-queue` — expect all pass.
+- [x] Run: `npm run check` — expect green.
+- [x] Commit: `git add -A && git commit -m "feat(tia): coverage-map module, tia.record config, tia_recorded event (D14)"`
 
 ---
 
