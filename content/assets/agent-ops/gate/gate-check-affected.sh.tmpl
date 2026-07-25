@@ -69,13 +69,36 @@ EOF_CHANGED
 {{GATE_ENSURE_DEPS}}
 
 # Quarantine: mute for the MERGE gate only (asymmetry is deliberate — the
-# post-merge full gate does NOT read this list).
+# post-merge full gate does NOT read this list). The quarantine file and the
+# TIA map live in the PRIMARY checkout's .mq — resolve it via the git common
+# dir so this also works from the merge-queue daemon's gate worktree, where a
+# cwd-relative .mq does not exist. In a plain checkout this resolves to ./.mq.
+PRIMARY_MQ="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")/.mq"
+QUARANTINE="$PRIMARY_MQ/quarantine.txt"
+[ -f "$QUARANTINE" ] || QUARANTINE=".mq/quarantine.txt"
 EXCLUDE_ARGS=()
-if [ -f .mq/quarantine.txt ]; then
+if [ -f "$QUARANTINE" ]; then
 	while IFS= read -r id || [ -n "$id" ]; do
 		[ -n "$id" ] || continue
 		EXCLUDE_ARGS+=(--exclude "$id")
-	done <.mq/quarantine.txt
+	done <"$QUARANTINE"
+fi
+
+# Layered TIA (D14): when a coverage map exists, `scaffold tia affected` picks
+# the test set (most-likely-to-fail-first, exit 0) or recommends the full suite
+# (exit 3 on staleness / low confidence / unknown edges — and ANY error is
+# treated the same way: fail closed). Without a map, the runner's own static
+# selection below stays in charge. The always-run smoke set belongs in the
+# invocation seeds, not here.
+SCAFFOLD_BIN="${MQ_SCAFFOLD_BIN:-scaffold}"
+if command -v "$SCAFFOLD_BIN" >/dev/null 2>&1 && [ -f "$PRIMARY_MQ/tia/map.json" ]; then
+	if TIA_TESTS="$("$SCAFFOLD_BIN" tia affected --base "$BASE" 2>/dev/null)" && [ -n "$TIA_TESTS" ]; then
+		echo "gate-check-affected: TIA selected $(printf '%s\n' "$TIA_TESTS" | grep -c .) test file(s)"
+		{{GATE_TIA_INVOCATION}}
+		exit $?
+	else
+		full "TIA recommends the full suite (stale map, low confidence, or unknown edge)"
+	fi
 fi
 
 {{GATE_AFFECTED_INVOCATION}}

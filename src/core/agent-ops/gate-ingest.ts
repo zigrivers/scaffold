@@ -14,6 +14,8 @@ export interface GateSeed {
   runtimeProbes: string[]
   /** The affected-selection line for gate-check-affected.sh (or its full fallback). */
   affectedInvocation: string
+  /** The TIA-selection invocation line (receives $TIA_TESTS) or its full fallback. */
+  tiaInvocation: string
   /** Environment-sensitive suites — EXCLUDED from the queue gate (rumble lesson). */
   visualCommands: string[]
   /** Self-contained dependency install ('[ -d node_modules ] || npm ci' or ':'). */
@@ -141,6 +143,9 @@ export function ingestGateSeed(projectRoot: string): GateSeed {
     affectedInvocation: hasVitest
       ? 'npx vitest run --changed "$BASE" ${EXCLUDE_ARGS[@]+"${EXCLUDE_ARGS[@]}"}'
       : 'full "no affected-selection runner detected at seed time"',
+    tiaInvocation: hasVitest
+      ? 'printf \'%s\\n\' "$TIA_TESTS" | xargs npx vitest run "${EXCLUDE_ARGS[@]+"${EXCLUDE_ARGS[@]}"}"'
+      : 'full "no TIA invocation configured for this stack"',
     visualCommands,
     ensureDeps: pkg !== null ? '[ -d node_modules ] || npm ci' : ':',
     sources,
@@ -159,5 +164,6 @@ export function gateTemplateVars(seed: GateSeed): Record<string, string> {
         : 'echo "gate-check: no gate commands were detected at seed time — add your ' +
           'test/lint commands here" >&2; exit 1',
     GATE_AFFECTED_INVOCATION: seed.affectedInvocation,
+    GATE_TIA_INVOCATION: seed.tiaInvocation,
   }
 }
