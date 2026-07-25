@@ -166,6 +166,22 @@ poller_world() { # builds origin+clone, installs resolved poller with gate cmd $
     "$BATS_TEST_DIRNAME/../content/assets/agent-ops/merge-queue/post-merge-poller.sh.tmpl" \
     > "$WORK/clone/scripts/ops/post-merge-poller.sh"
   chmod +x "$WORK/clone/scripts/ops/post-merge-poller.sh"
+
+  # Hermetic scaffold stub (MQ_SCAFFOLD_BIN mirrors the engine's MQ_GH_CMD
+  # pattern): cache checks miss, recording is never due, everything else no-ops.
+  # Tests that need different behavior rewrite the stub file.
+  mkdir -p "$WORK/stub-bin"
+  cat > "$WORK/stub-bin/scaffold" <<'STUB'
+#!/usr/bin/env bash
+echo "$@" >> "${SCAFFOLD_STUB_LOG:-/dev/null}"
+case "$*" in
+  *"gate-cache --check-tree"*) exit 1 ;;
+  *"tia record-due"*) exit 1 ;;
+  *) exit 0 ;;
+esac
+STUB
+  chmod +x "$WORK/stub-bin/scaffold"
+  export MQ_SCAFFOLD_BIN="$WORK/stub-bin/scaffold"
 }
 
 @test "poller: green run records the sha and stays quiet when nothing moved" {
@@ -265,5 +281,45 @@ poller_world() { # builds origin+clone, installs resolved poller with gate cmd $
   echo "NRS violation: trees differ" > "$WORK/clone/.mq/PAUSED"
   run "$WORK/clone/scripts/ops/post-merge-poller.sh"
   grep -q 'NRS violation' "$WORK/clone/.mq/PAUSED"   # untouched — queue halted for a worse reason
+  rm -rf "$WORK"
+}
+
+@test "poller: full-gate cache hit skips the gate and records the sha" {
+  poller_world "false"   # the gate would FAIL if it ran — a cache hit must skip it
+  cat > "$MQ_SCAFFOLD_BIN" <<'STUB'
+#!/usr/bin/env bash
+case "$*" in
+  *"gate-cache --check-tree"*) exit 0 ;;
+  *"tia record-due"*) exit 1 ;;
+  *) exit 0 ;;
+esac
+STUB
+  chmod +x "$MQ_SCAFFOLD_BIN"
+  SHA="$(git -C "$WORK/clone" rev-parse origin/main)"
+  run "$WORK/clone/scripts/ops/post-merge-poller.sh"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"cache hit"* ]]
+  [ "$(cat "$WORK/clone/.mq/last-full-suite-sha")" = "$SHA" ]
+  [ ! -f "$WORK/clone/.mq/PAUSED" ]
+  rm -rf "$WORK"
+}
+
+@test "poller: green run records the tree in the full-gate cache" {
+  poller_world "true"
+  export SCAFFOLD_STUB_LOG="$WORK/stub.log"
+  run "$WORK/clone/scripts/ops/post-merge-poller.sh"
+  [ "$status" -eq 0 ]
+  TREE="$(git -C "$WORK/clone" rev-parse 'origin/main^{tree}')"
+  grep -q -- "mq gate-cache --record-tree $TREE --seconds" "$WORK/stub.log"
+  rm -rf "$WORK"
+}
+
+@test "poller: scaffold absent degrades to a normal full run" {
+  poller_world "true"
+  export MQ_SCAFFOLD_BIN="$WORK/no-such-scaffold"
+  run "$WORK/clone/scripts/ops/post-merge-poller.sh"
+  [ "$status" -eq 0 ]
+  SHA="$(git -C "$WORK/clone" rev-parse origin/main)"
+  [ "$(cat "$WORK/clone/.mq/last-full-suite-sha")" = "$SHA" ]
   rm -rf "$WORK"
 }
