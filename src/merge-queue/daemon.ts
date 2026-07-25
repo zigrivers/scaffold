@@ -9,6 +9,9 @@ import { composeBatch, splitBatch } from './batch.js'
 import {
   QUARANTINE_THRESHOLD, addToQuarantine, fileQuarantineBead, recentFlakeCount, recordFlake,
 } from './flakes.js'
+import {
+  affectedGateKey, fullGateKey, hashFileOrAbsent, lookupGateCache, recordGateCache,
+} from './gate-cache.js'
 import type { GhClient, PrInfo } from './gh.js'
 import type { GitOps } from './git.js'
 import type { GateResult } from './gate.js'
@@ -252,38 +255,89 @@ export class MergeQueueDaemon {
       appendEvent(mqDir, { type: 'pr_state', pr, state: 'TESTING', batchId, at: this.at() })
     }
 
-    let gate = await this.gateRun(batchId, base)
-    appendEvent(mqDir, {
-      type: 'gate_metrics', batchId, seconds: gate.seconds, result: gate.result, at: this.at(),
+    // D12: gate-result cache. The key covers every input that selects or scopes
+    // tests; a hit means this exact combination already ran green, so the gate
+    // is skipped — but every post-gate safety check below still runs.
+    const cacheEnabled = config.gate_cache_max_entries > 0
+    const quarantineHash = hashFileOrAbsent(
+      path.join(this.deps.projectRoot, config.quarantine_path), 'quarantine',
+    )
+    const cacheKey = affectedGateKey({
+      candidateTree,
+      baseTree: git.treeOf(`origin/${base}`),
+      command: config.gate_command,
+      quarantineHash,
+      tiaMapHash: hashFileOrAbsent(path.join(mqDir, 'tia', 'map.json'), 'tia'),
     })
-
-    // Timeout → infra-vs-test disambiguation: retry the whole batch once (spec §5.3).
-    if (gate.result === 'timeout') {
-      log(`batch ${batchId}: gate timeout — retrying once`)
+    const cached = cacheEnabled ? lookupGateCache(mqDir, cacheKey) : null
+    let gate: GateResult
+    if (cached !== null) {
+      appendEvent(mqDir, {
+        type: 'gate_cached', batchId, key: cacheKey, savedSeconds: cached.seconds, at: this.at(),
+      })
+      log(`batch ${batchId}: gate cache hit — skipping the gate (~${cached.seconds}s saved)`)
+      gate = { result: 'green', seconds: 0, logPath: '(gate cache hit)', failedTests: [] }
+    } else {
+      let flakeRetried = false
       gate = await this.gateRun(batchId, base)
       appendEvent(mqDir, {
         type: 'gate_metrics', batchId, seconds: gate.seconds, result: gate.result, at: this.at(),
       })
-      if (gate.result === 'timeout') gate = { ...gate, result: 'red' }
-    }
 
-    // Flake protocol (spec D8): rerun failed test files once with identical config.
-    if (gate.result === 'red' && gate.failedTests.length > 0) {
-      for (const pr of applied) {
-        appendEvent(mqDir, { type: 'pr_state', pr, state: 'FLAKE_RETRY', batchId, at: this.at() })
+      // Timeout → infra-vs-test disambiguation: retry the whole batch once (spec §5.3).
+      if (gate.result === 'timeout') {
+        log(`batch ${batchId}: gate timeout — retrying once`)
+        gate = await this.gateRun(batchId, base)
+        appendEvent(mqDir, {
+          type: 'gate_metrics', batchId, seconds: gate.seconds, result: gate.result, at: this.at(),
+        })
+        if (gate.result === 'timeout') gate = { ...gate, result: 'red' }
       }
-      const retry = await this.gateRun(batchId, base, gate.failedTests)
-      if (retry.result === 'green') {
-        for (const testId of gate.failedTests) {
-          recordFlake(mqDir, testId, this.at())
-          const count = recentFlakeCount(this.state(), testId, this.deps.now())
-          if (count >= QUARANTINE_THRESHOLD &&
-              addToQuarantine(this.deps.projectRoot, config.quarantine_path, testId)) {
-            fileQuarantineBead(this.deps.projectRoot, testId)
-            log(`quarantined flaky test ${testId} (${count} events/7d)`)
-          }
+
+      // Flake protocol (spec D8): rerun failed test files once with identical config.
+      if (gate.result === 'red' && gate.failedTests.length > 0) {
+        for (const pr of applied) {
+          appendEvent(mqDir, { type: 'pr_state', pr, state: 'FLAKE_RETRY', batchId, at: this.at() })
         }
-        gate = retry
+        const retry = await this.gateRun(batchId, base, gate.failedTests)
+        if (retry.result === 'green') {
+          for (const testId of gate.failedTests) {
+            recordFlake(mqDir, testId, this.at())
+            const count = recentFlakeCount(this.state(), testId, this.deps.now())
+            if (count >= QUARANTINE_THRESHOLD &&
+                addToQuarantine(this.deps.projectRoot, config.quarantine_path, testId)) {
+              fileQuarantineBead(this.deps.projectRoot, testId)
+              log(`quarantined flaky test ${testId} (${count} events/7d)`)
+            }
+          }
+          gate = retry
+          flakeRetried = true
+        }
+      }
+
+      // D12: record only an untainted green — a flake-retry green re-proved just
+      // the failed files, not the whole selection, so it must never seed future
+      // skips. Red/timeout results are never cached.
+      if (cacheEnabled && gate.result === 'green' && !flakeRetried) {
+        recordGateCache(
+          mqDir, { key: cacheKey, seconds: gate.seconds, at: this.at() },
+          config.gate_cache_max_entries,
+        )
+        // When the merge gate IS the full gate (small projects run `make check`
+        // for both), seed the full-gate cache too, so the post-merge poller can
+        // skip re-running the identical tree it is about to verify.
+        if (config.gate_command === config.full_gate_command) {
+          recordGateCache(
+            mqDir,
+            {
+              key: fullGateKey({
+                tree: candidateTree, command: config.full_gate_command, quarantineHash,
+              }),
+              seconds: gate.seconds, at: this.at(),
+            },
+            config.gate_cache_max_entries,
+          )
+        }
       }
     }
 

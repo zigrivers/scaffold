@@ -111,7 +111,9 @@ function harness(over: Partial<DaemonDeps> = {}) {
       const next = gateResults.shift()
       return next ?? { result: 'green', seconds: 1, logPath: '/dev/null', failedTests: [] }
     },
-    config: defaultMergeQueueConfig(),
+    // Cache disabled by default: FakeGit collapses all trees to 'TREE', so the
+    // D12 cache would conflate distinct batches. Cache tests opt in explicitly.
+    config: { ...defaultMergeQueueConfig(), gate_cache_max_entries: 0 },
     mqDir, projectRoot: root,
     log: () => {},
     now: () => new Date(AT),
@@ -530,6 +532,56 @@ describe('MergeQueueDaemon.cycle', () => {
     expect(entry?.note).toBe('diff already applied to origin/main — close the PR')
     expect(h.gh.comments.some(c => c.pr === 2 && /already applied/i.test(c.body))).toBe(true)
     expect(h.gh.merged).toEqual([1])
+  })
+
+  it('skips the gate on an identical cache key and journals gate_cached (D12)', async () => {
+    const h = harness({ config: defaultMergeQueueConfig() }) // cache ON (200)
+    h.enqueue(1)
+    await h.daemon.cycle()               // green run records the cache entry
+    expect(h.gateCalls.length).toBe(1)
+    h.enqueue(2)                          // FakeGit collapses every tree to 'TREE',
+    await h.daemon.cycle()                // so the key matches — the gate must not run
+    expect(h.gateCalls.length).toBe(1)
+    expect(h.states()[2]).toBe('LANDED')  // every post-gate safety check still ran
+    const cachedEvents = readJournal(h.mqDir).filter(e => e.type === 'gate_cached')
+    expect(cachedEvents).toHaveLength(1)
+    expect(cachedEvents[0]).toMatchObject({ savedSeconds: 1 })
+  })
+
+  it('never caches a red result (D12 green-only)', async () => {
+    const h = harness({ config: defaultMergeQueueConfig() })
+    h.enqueue(1)
+    h.gateResults.push({ result: 'red', seconds: 2, logPath: '/l/r.log', failedTests: [] })
+    await h.daemon.cycle()               // red singleton -> ejected, nothing recorded
+    h.enqueue(2)
+    await h.daemon.cycle()
+    expect(h.gateCalls.length).toBe(2)   // the second batch ran the gate — no bogus hit
+    expect(h.states()[2]).toBe('LANDED')
+  })
+
+  it('a flake-retry green is not cached (only untainted greens seed skips)', async () => {
+    const h = harness({ config: defaultMergeQueueConfig() })
+    h.enqueue(1)
+    h.gateResults.push(
+      { result: 'red', seconds: 2, logPath: '/l/a.log', failedTests: ['src/f.test.ts'] },
+      { result: 'green', seconds: 1, logPath: '/l/a2.log', failedTests: [] },
+    )
+    await h.daemon.cycle()
+    expect(h.states()[1]).toBe('LANDED')
+    h.enqueue(2)
+    await h.daemon.cycle()
+    expect(h.gateCalls.length).toBe(3)   // gate ran again — the flake green seeded nothing
+  })
+
+  it('gate_cache_max_entries 0 disables lookup and record entirely', async () => {
+    const h = harness() // harness default: cache off
+    h.enqueue(1)
+    await h.daemon.cycle()
+    h.enqueue(2)
+    await h.daemon.cycle()
+    expect(h.gateCalls.length).toBe(2)
+    expect(readJournal(h.mqDir).filter(e => e.type === 'gate_cached')).toHaveLength(0)
+    expect(fs.existsSync(path.join(h.mqDir, 'gate-cache.json'))).toBe(false)
   })
 })
 
