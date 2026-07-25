@@ -978,7 +978,7 @@ GATE_SECONDS=$(( $(date +%s) - GATE_START ))
 
 **Steps:**
 
-- [ ] Write the failing test `src/merge-queue/wake.test.ts`:
+- [x] Write the failing test `src/merge-queue/wake.test.ts`:
 
 ```ts
 // src/merge-queue/wake.test.ts
@@ -1032,8 +1032,8 @@ describe('waitForWake', () => {
 })
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/wake.test.ts` — expect FAILURE (module missing).
-- [ ] Create `src/merge-queue/wake.ts`:
+- [x] Run: `npx vitest run src/merge-queue/wake.test.ts` — expect FAILURE (module missing).
+- [x] Create `src/merge-queue/wake.ts`:
 
 ```ts
 // src/merge-queue/wake.ts — D15: event-driven daemon wake. fs.watch on the .mq
@@ -1086,9 +1086,9 @@ export function waitForWake(
 }
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/wake.test.ts` — expect all 5 pass.
-- [ ] Run: `npm run check` — expect green.
-- [ ] Commit: `git add -A && git commit -m "feat(mq): waitForWake — debounced fs.watch journal wake with poll fallback (D15)"`
+- [x] Run: `npx vitest run src/merge-queue/wake.test.ts` — expect all 5 pass.
+- [x] Run: `npm run check` — expect green.
+- [x] Commit: `git add -A && git commit -m "feat(mq): waitForWake — debounced fs.watch journal wake with poll fallback (D15)"`
 
 ---
 
