@@ -34,6 +34,18 @@ If any R1 file lives at a slightly different path, locate it with the grep given
 
 ### Task 1: sched core — types, exec seam, launchd plist renderer, rumble golden fixture
 
+> **Reviewer note — VERIFIED NON-DEFECT (recurring, PR #785 rounds 1/2/4).** Three
+> CLI channels across three rounds flagged the `tests/fixtures/sched/rumble-merge-poller.plist`
+> hard-coded absolute paths (`/Users/ken/...`, fnm/homebrew paths) as
+> "machine-specific / leaks personal environment." This is INTENTIONAL: spec §7
+> designates the rumble plist as the golden fixture, and `launchd.test.ts`'s
+> `rumbleJob()` supplies those exact paths as INPUTS, asserting `renderPlist`
+> reproduces the fixture byte-for-byte — the paths are the expected rendering of
+> the given inputs, not a leak (it is the maintainer's own repo layout, no
+> secrets). Sanitizing to placeholders would break the byte-exact assertion and
+> deviate from the spec's explicit dogfood choice. Kept as-is; the recurrence
+> across the round budget is the documented STOP signal for this finding.
+
 **Files:**
 - Create: `src/sched/types.ts`
 - Create: `src/sched/exec.ts`
@@ -47,7 +59,7 @@ If any R1 file lives at a slightly different path, locate it with the grep given
 
 **Steps:**
 
-- [ ] Write the failing test `src/sched/backends/launchd.test.ts` (renderer half only for now):
+- [x] Write the failing test `src/sched/backends/launchd.test.ts` (renderer half only for now):
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -96,7 +108,7 @@ describe('renderPlist', () => {
 })
 ```
 
-- [ ] Create the golden fixture `tests/fixtures/sched/rumble-merge-poller.plist` with EXACTLY this content (trailing newline after `</plist>`, two-space base indent, four-space member indent):
+- [x] Create the golden fixture `tests/fixtures/sched/rumble-merge-poller.plist` with EXACTLY this content (trailing newline after `</plist>`, two-space base indent, four-space member indent):
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -128,8 +140,8 @@ describe('renderPlist', () => {
 </plist>
 ```
 
-- [ ] Run: `npx vitest run src/sched/backends/launchd.test.ts` — expect FAILURE (module `./launchd.js` does not exist).
-- [ ] Create `src/sched/types.ts`:
+- [x] Run: `npx vitest run src/sched/backends/launchd.test.ts` — expect FAILURE (module `./launchd.js` does not exist).
+- [x] Create `src/sched/types.ts`:
 
 ```ts
 export interface SchedJob {
@@ -177,7 +189,7 @@ export interface SchedBackend {
 }
 ```
 
-- [ ] Create `src/sched/exec.ts`:
+- [x] Create `src/sched/exec.ts`:
 
 ```ts
 import { execFileSync } from 'node:child_process'
@@ -207,7 +219,7 @@ export const realExec: Exec = (cmd, args) => {
 }
 ```
 
-- [ ] Create `src/sched/backends/launchd.ts` (renderer now; backend factory arrives in Task 3):
+- [x] Create `src/sched/backends/launchd.ts` (renderer now; backend factory arrives in Task 3):
 
 ```ts
 import type { SchedJob } from '../types.js'
@@ -256,8 +268,8 @@ ${env}
 }
 ```
 
-- [ ] Run: `npx vitest run src/sched/backends/launchd.test.ts` — expect `Test Files  1 passed`, 3 tests passed. If the fixture comparison fails, fix the FIXTURE (or renderer) so they match byte-for-byte — the fixture is the contract.
-- [ ] Commit: `git add -A && git commit -m "feat(sched): SchedJob types, exec seam, launchd plist renderer + rumble golden fixture"`
+- [x] Run: `npx vitest run src/sched/backends/launchd.test.ts` — expect `Test Files  1 passed`, 3 tests passed. If the fixture comparison fails, fix the FIXTURE (or renderer) so they match byte-for-byte — the fixture is the contract.
+- [x] Commit: `git add -A && git commit -m "feat(sched): SchedJob types, exec seam, launchd plist renderer + rumble golden fixture"`
 
 ---
 
@@ -275,7 +287,7 @@ ${env}
 
 **Steps:**
 
-- [ ] Write the failing test `src/sched/path-resolver.test.ts`:
+- [x] Write the failing test `src/sched/path-resolver.test.ts`:
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -330,8 +342,8 @@ describe('path-resolver', () => {
 })
 ```
 
-- [ ] Run: `npx vitest run src/sched/path-resolver.test.ts` — expect FAILURE (module missing).
-- [ ] Create `src/sched/path-resolver.ts`:
+- [x] Run: `npx vitest run src/sched/path-resolver.test.ts` — expect FAILURE (module missing).
+- [x] Create `src/sched/path-resolver.ts`:
 
 ```ts
 import fs from 'node:fs'
@@ -406,8 +418,8 @@ export function buildSchedPath(p: PathProbes): string {
 }
 ```
 
-- [ ] Run: `npx vitest run src/sched/path-resolver.test.ts` — expect 5 tests passed.
-- [ ] Commit: `git add -A && git commit -m "feat(sched): absolute-path resolver (fnm alias, java-stub-aware openjdk, homebrew)"`
+- [x] Run: `npx vitest run src/sched/path-resolver.test.ts` — expect 5 tests passed.
+- [x] Commit: `git add -A && git commit -m "feat(sched): absolute-path resolver (fnm alias, java-stub-aware openjdk, homebrew)"`
 
 ---
 
@@ -423,7 +435,7 @@ export function buildSchedPath(p: PathProbes): string {
 
 **Steps:**
 
-- [ ] Append the backend tests to `src/sched/backends/launchd.test.ts` (keep the Task 1 tests; add these imports at the top: `import os from 'node:os'`, `import { createLaunchdBackend } from './launchd.js'`, `import type { ExecResult } from '../exec.js'`):
+- [x] Append the backend tests to `src/sched/backends/launchd.test.ts` (keep the Task 1 tests; add these imports at the top: `import os from 'node:os'`, `import { createLaunchdBackend } from './launchd.js'`, `import type { ExecResult } from '../exec.js'`):
 
 ```ts
 interface Call { cmd: string; args: string[] }
@@ -525,8 +537,8 @@ describe('createLaunchdBackend', () => {
 })
 ```
 
-- [ ] Run: `npx vitest run src/sched/backends/launchd.test.ts` — expect FAILURE (`createLaunchdBackend` not exported).
-- [ ] Append the backend factory to `src/sched/backends/launchd.ts` (add imports `fs`, `path`, and the types):
+- [x] Run: `npx vitest run src/sched/backends/launchd.test.ts` — expect FAILURE (`createLaunchdBackend` not exported).
+- [x] Append the backend factory to `src/sched/backends/launchd.ts` (add imports `fs`, `path`, and the types):
 
 ```ts
 import fs from 'node:fs'
@@ -603,8 +615,8 @@ export function createLaunchdBackend(deps: { exec: Exec; home: string; uid: numb
 }
 ```
 
-- [ ] Run: `npx vitest run src/sched/backends/launchd.test.ts` — expect 9 tests passed (3 renderer + 6 backend).
-- [ ] Commit: `git add -A && git commit -m "feat(sched): launchd backend — bootout||true, bootstrap, launchctl-print verification"`
+- [x] Run: `npx vitest run src/sched/backends/launchd.test.ts` — expect 9 tests passed (3 renderer + 6 backend).
+- [x] Commit: `git add -A && git commit -m "feat(sched): launchd backend — bootout||true, bootstrap, launchctl-print verification"`
 
 ---
 
@@ -620,7 +632,7 @@ export function createLaunchdBackend(deps: { exec: Exec; home: string; uid: numb
 
 **Steps:**
 
-- [ ] Write the failing test `src/sched/backends/systemd.test.ts`:
+- [x] Write the failing test `src/sched/backends/systemd.test.ts`:
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -729,8 +741,8 @@ describe('createSystemdBackend', () => {
 })
 ```
 
-- [ ] Run: `npx vitest run src/sched/backends/systemd.test.ts` — expect FAILURE (module missing).
-- [ ] Create `src/sched/backends/systemd.ts`:
+- [x] Run: `npx vitest run src/sched/backends/systemd.test.ts` — expect FAILURE (module missing).
+- [x] Create `src/sched/backends/systemd.ts`:
 
 ```ts
 import fs from 'node:fs'
@@ -852,8 +864,8 @@ export function createSystemdBackend(deps: { exec: Exec; home: string; user: str
 }
 ```
 
-- [ ] Run: `npx vitest run src/sched/backends/systemd.test.ts` — expect 6 tests passed.
-- [ ] Commit: `git add -A && git commit -m "feat(sched): systemd user timer backend with enable-linger and is-active verification"`
+- [x] Run: `npx vitest run src/sched/backends/systemd.test.ts` — expect 6 tests passed.
+- [x] Commit: `git add -A && git commit -m "feat(sched): systemd user timer backend with enable-linger and is-active verification"`
 
 ---
 
@@ -869,7 +881,7 @@ export function createSystemdBackend(deps: { exec: Exec; home: string; user: str
 
 **Steps:**
 
-- [ ] Write the failing test `src/sched/jobs.test.ts`:
+- [x] Write the failing test `src/sched/jobs.test.ts`:
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -926,8 +938,8 @@ describe('buildPostMergePollerJob', () => {
 })
 ```
 
-- [ ] Run: `npx vitest run src/sched/jobs.test.ts` — expect FAILURE (module missing).
-- [ ] Create `src/sched/jobs.ts`:
+- [x] Run: `npx vitest run src/sched/jobs.test.ts` — expect FAILURE (module missing).
+- [x] Create `src/sched/jobs.ts`:
 
 ```ts
 import fs from 'node:fs'
@@ -972,8 +984,8 @@ export const SCHED_JOBS: Record<string, (projectRoot: string, opts?: JobBuildOpt
 }
 ```
 
-- [ ] Run: `npx vitest run src/sched/jobs.test.ts` — expect 4 tests passed.
-- [ ] Commit: `git add -A && git commit -m "feat(sched): post-merge-poller job builder + job registry"`
+- [x] Run: `npx vitest run src/sched/jobs.test.ts` — expect 4 tests passed.
+- [x] Commit: `git add -A && git commit -m "feat(sched): post-merge-poller job builder + job registry"`
 
 ---
 
@@ -991,7 +1003,7 @@ export const SCHED_JOBS: Record<string, (projectRoot: string, opts?: JobBuildOpt
 
 **Steps:**
 
-- [ ] Create `src/sched/platform.ts`:
+- [x] Create `src/sched/platform.ts`:
 
 ```ts
 import os from 'node:os'
@@ -1033,7 +1045,7 @@ export function pickSchedBackend(): SchedBackend {
 }
 ```
 
-- [ ] Write the failing test `src/cli/commands/sched.test.ts`:
+- [x] Write the failing test `src/cli/commands/sched.test.ts`:
 
 ```ts
 import { describe, expect, it, vi } from 'vitest'
@@ -1139,8 +1151,8 @@ describe('schedHandler', () => {
 })
 ```
 
-- [ ] Run: `npx vitest run src/cli/commands/sched.test.ts` — expect FAILURE (module missing).
-- [ ] Create `src/cli/commands/sched.ts`:
+- [x] Run: `npx vitest run src/cli/commands/sched.test.ts` — expect FAILURE (module missing).
+- [x] Create `src/cli/commands/sched.ts`:
 
 ```ts
 import type { Argv, CommandModule } from 'yargs'
@@ -1291,7 +1303,7 @@ const schedCommand: CommandModule<Record<string, unknown>, SchedArgs> = {
 export default schedCommand
 ```
 
-- [ ] Register the command in `src/cli/index.ts` — Edit old string `import mqCommand from './commands/mq.js'` → new string:
+- [x] Register the command in `src/cli/index.ts` — Edit old string `import mqCommand from './commands/mq.js'` → new string:
 
 ```ts
 import mqCommand from './commands/mq.js'
@@ -1307,9 +1319,9 @@ then find the registration (`grep -n "command(mqCommand)" src/cli/index.ts`) and
 
 (match the file's existing chain indentation exactly — 4 spaces before `.command`).
 
-- [ ] Run: `npx vitest run src/cli/commands/sched.test.ts` — expect 5 tests passed.
-- [ ] Run: `npx tsc --noEmit -p tsconfig.json` — expect clean (no output). If the repo's TS gate is invoked differently, use `make ts-check`.
-- [ ] Commit: `git add -A && git commit -m "feat(sched): scaffold sched CLI (install|uninstall|status|list) with platform dispatch"`
+- [x] Run: `npx vitest run src/cli/commands/sched.test.ts` — expect 5 tests passed.
+- [x] Run: `npx tsc --noEmit -p tsconfig.json` — expect clean (no output). If the repo's TS gate is invoked differently, use `make ts-check`.
+- [x] Commit: `git add -A && git commit -m "feat(sched): scaffold sched CLI (install|uninstall|status|list) with platform dispatch"`
 
 ---
 
@@ -1325,7 +1337,7 @@ then find the registration (`grep -n "command(mqCommand)" src/cli/index.ts`) and
 
 **Steps:**
 
-- [ ] Write the failing bats test `tests/agent-ops-gate-check.bats`:
+- [x] Write the failing bats test `tests/agent-ops-gate-check.bats`:
 
 ```bash
 #!/usr/bin/env bats
@@ -1403,8 +1415,8 @@ teardown() { rm -rf "$TMP"; }
 }
 ```
 
-- [ ] Run: `bats tests/agent-ops-gate-check.bats` — expect FAILURE (template missing).
-- [ ] Create `content/assets/agent-ops/gate/gate-check.sh.tmpl`:
+- [x] Run: `bats tests/agent-ops-gate-check.bats` — expect FAILURE (template missing).
+- [x] Create `content/assets/agent-ops/gate/gate-check.sh.tmpl`:
 
 ```bash
 #!/usr/bin/env bash
@@ -1453,13 +1465,21 @@ fi
 {{GATE_FULL_COMMANDS}}
 ```
 
-- [ ] Run: `bats tests/agent-ops-gate-check.bats` — expect `1..6` with all `ok`.
-- [ ] Run: `make lint` — ShellCheck must pass on the rendered form; the `.tmpl` extension keeps raw templates out of the lint sweep (same as the existing agent-ops templates — verify with `ls content/assets/agent-ops/merge-queue/`).
-- [ ] Commit: `git add -A && git commit -m "feat(agent-ops): gate-check.sh seed template with GATE_PROBE mode"`
+- [x] Run: `bats tests/agent-ops-gate-check.bats` — expect `1..6` with all `ok`.
+- [x] Run: `make lint` — ShellCheck must pass on the rendered form; the `.tmpl` extension keeps raw templates out of the lint sweep (same as the existing agent-ops templates — verify with `ls content/assets/agent-ops/merge-queue/`).
+- [x] Commit: `git add -A && git commit -m "feat(agent-ops): gate-check.sh seed template with GATE_PROBE mode"`
 
 ---
 
 ### Task 8: gate template — `gate-check-affected.sh.tmpl` (the mq contract)
+
+> **Reviewer note — RESOLVED (P2, PR #785 round 2).** The `is_force_full` case
+> list carried `*/` monorepo variants for every subdirectory-eligible config
+> (its own comment mandates this) but had omitted them for two entries the
+> knowledge contract lists with `**`: `migrations/*` and `src/test-utils/*`. A
+> nested non-SQL migration (`packages/api/migrations/002.rb`) or nested shared
+> test-util would narrow-miss the full gate. Added `*/migrations/*` and
+> `*/src/test-utils/*`; two bats cases assert nested changes now force full.
 
 **Files:**
 - Create: `content/assets/agent-ops/gate/gate-check-affected.sh.tmpl`
@@ -1471,7 +1491,7 @@ fi
 
 **Steps:**
 
-- [ ] Write the failing bats test `tests/agent-ops-gate-affected.bats`:
+- [x] Write the failing bats test `tests/agent-ops-gate-affected.bats`:
 
 ```bash
 #!/usr/bin/env bats
@@ -1577,8 +1597,8 @@ teardown() { rm -rf "$TMP"; }
 }
 ```
 
-- [ ] Run: `bats tests/agent-ops-gate-affected.bats` — expect FAILURE (template missing).
-- [ ] Create `content/assets/agent-ops/gate/gate-check-affected.sh.tmpl`:
+- [x] Run: `bats tests/agent-ops-gate-affected.bats` — expect FAILURE (template missing).
+- [x] Create `content/assets/agent-ops/gate/gate-check-affected.sh.tmpl`:
 
 ```bash
 #!/usr/bin/env bash
@@ -1666,12 +1686,19 @@ fi
 
   Note the heredoc (`<<EOF_CHANGED`) instead of `<<<"$CHANGED"`: herestrings behave identically here, but the heredoc keeps the loop bash-3.2-safe and shellcheck-clean; `EXCLUDE_ARGS[@]+` expansion is the bash-3.2-safe empty-array idiom under `set -u`.
 
-- [ ] Run: `bats tests/agent-ops-gate-affected.bats` — expect `1..8` with all `ok`.
-- [ ] Commit: `git add -A && git commit -m "feat(agent-ops): gate-check-affected.sh seed template satisfying the mq contract"`
+- [x] Run: `bats tests/agent-ops-gate-affected.bats` — expect `1..8` with all `ok`.
+- [x] Commit: `git add -A && git commit -m "feat(agent-ops): gate-check-affected.sh seed template satisfying the mq contract"`
 
 ---
 
 ### Task 9: ingestion-lite — seed gate commands from package.json + workflows
+
+> **Reviewer note — RESOLVED (P2, PR #785 round 4).** `workflowRunLines` guarded
+> `.github/workflows` with a bare `existsSync` before `readdirSync` — if that path
+> exists as a FILE (not a directory), `readdirSync` throws ENOTDIR and crashes
+> ingestion. Switched to `statSync(dir, { throwIfNoEntry: false })?.isDirectory()`,
+> which returns `[]` for both missing and not-a-directory. Test: a `.github/workflows`
+> FILE no longer throws.
 
 **Files:**
 - Create: `src/core/agent-ops/gate-ingest.ts`
@@ -1683,7 +1710,7 @@ fi
 
 **Steps:**
 
-- [ ] Write the failing test `src/core/agent-ops/gate-ingest.test.ts`:
+- [x] Write the failing test `src/core/agent-ops/gate-ingest.test.ts`:
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -1789,8 +1816,8 @@ describe('gateTemplateVars', () => {
 })
 ```
 
-- [ ] Run: `npx vitest run src/core/agent-ops/gate-ingest.test.ts` — expect FAILURE (module missing).
-- [ ] Create `src/core/agent-ops/gate-ingest.ts`:
+- [x] Run: `npx vitest run src/core/agent-ops/gate-ingest.test.ts` — expect FAILURE (module missing).
+- [x] Create `src/core/agent-ops/gate-ingest.ts`:
 
 ```ts
 import fs from 'node:fs'
@@ -1877,7 +1904,10 @@ export function ingestGateSeed(projectRoot: string): GateSeed {
   const scriptNames = Object.keys(scripts)
   const ordered = [
     ...GATE_SCRIPT_ORDER.filter(n => scriptNames.includes(n)),
-    ...scriptNames.filter(n => !(GATE_SCRIPT_ORDER as readonly string[]).includes(n)).sort(),
+    // AMENDMENT (impl f4d21308): no .sort() on the non-priority tail — this task's
+    // own test asserts package.json DECLARATION order (test:visual before e2e),
+    // which an alphabetical .sort() (e2e before test:visual) would violate.
+    ...scriptNames.filter(n => !(GATE_SCRIPT_ORDER as readonly string[]).includes(n)),
   ]
   for (const name of ordered) {
     const body = scripts[name]
@@ -1951,12 +1981,21 @@ export function gateTemplateVars(seed: GateSeed): Record<string, string> {
 }
 ```
 
-- [ ] Run: `npx vitest run src/core/agent-ops/gate-ingest.test.ts` — expect 8 tests passed.
-- [ ] Commit: `git add -A && git commit -m "feat(agent-ops): ingestion-lite gate seeding from package.json scripts + CI workflows"`
+- [x] Run: `npx vitest run src/core/agent-ops/gate-ingest.test.ts` — expect 8 tests passed.
+- [x] Commit: `git add -A && git commit -m "feat(agent-ops): ingestion-lite gate seeding from package.json scripts + CI workflows"`
 
 ---
 
 ### Task 10: gate install plumbing — seed manifest semantics + FILE_MAP + Makefile targets
+
+> **Reviewer note — RESOLVED (P1, PR #785 round 2).** The seeded `check` /
+> `check-affected` / `check-visual` Makefile targets were emitted without a
+> `.PHONY` declaration. Since both run their script DIRECTLY (`./scripts/…`), a
+> stray file/dir named `check` in the project root would make `make check`
+> report "up to date", no-op, and exit 0 — silently bypassing the quality gate.
+> `ensureGateMakeTargets` now appends `.PHONY: <targets>` for exactly the targets
+> it added (never the user's pre-existing `check`). Tests assert the `.PHONY`
+> line and that a pre-existing `check` is excluded from it.
 
 **Files:**
 - Modify: `src/core/agent-ops/install.ts`
@@ -1968,7 +2007,7 @@ export function gateTemplateVars(seed: GateSeed): Record<string, string> {
 
 **Steps:**
 
-- [ ] Write the failing test `src/core/agent-ops/install.gate.test.ts`:
+- [x] Write the failing test `src/core/agent-ops/install.gate.test.ts`:
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -2082,8 +2121,8 @@ describe('ensureGateMakeTargets', () => {
 })
 ```
 
-- [ ] Run: `npx vitest run src/core/agent-ops/install.gate.test.ts` — expect FAILURE.
-- [ ] Edit `src/core/agent-ops/install.ts`. The complete set of changes:
+- [x] Run: `npx vitest run src/core/agent-ops/install.gate.test.ts` — expect FAILURE.
+- [x] Edit `src/core/agent-ops/install.ts`. The complete set of changes:
 
   1. Type + import changes at the top:
 
@@ -2269,9 +2308,9 @@ export function ensureGateMakeTargets(projectRoot: string, seed: GateSeed): stri
 }
 ```
 
-- [ ] Run: `npx vitest run src/core/agent-ops/install.gate.test.ts` — expect 8 tests passed.
-- [ ] Run: `npx vitest run src/core/agent-ops src/cli/commands/agent-ops.test.ts` — the pre-existing install/check tests must still pass (the `seeds: []`/`seedKept: []` additions are backward-compatible; fix any result-shape assertion that lists exact keys).
-- [ ] Commit: `git add -A && git commit -m "feat(agent-ops): gate component with seed:true manifest semantics + thin Makefile targets"`
+- [x] Run: `npx vitest run src/core/agent-ops/install.gate.test.ts` — expect 8 tests passed.
+- [x] Run: `npx vitest run src/core/agent-ops src/cli/commands/agent-ops.test.ts` — the pre-existing install/check tests must still pass (the `seeds: []`/`seedKept: []` additions are backward-compatible; fix any result-shape assertion that lists exact keys).
+- [x] Commit: `git add -A && git commit -m "feat(agent-ops): gate component with seed:true manifest semantics + thin Makefile targets"`
 
 ---
 
@@ -2289,7 +2328,7 @@ export function ensureGateMakeTargets(projectRoot: string, seed: GateSeed): stri
 
 **Steps:**
 
-- [ ] Add the failing tests to `src/cli/commands/agent-ops.test.ts` (append to the existing `resolveComponents — new components` describe block or add a sibling):
+- [x] Add the failing tests to `src/cli/commands/agent-ops.test.ts` (append to the existing `resolveComponents — new components` describe block or add a sibling):
 
 ```ts
 describe('resolveComponents — gate (R2)', () => {
@@ -2306,8 +2345,8 @@ describe('resolveComponents — gate (R2)', () => {
 })
 ```
 
-- [ ] Run: `npx vitest run src/cli/commands/agent-ops.test.ts` — expect FAILURE (gate rejected).
-- [ ] Edit `src/cli/commands/agent-ops.ts`:
+- [x] Run: `npx vitest run src/cli/commands/agent-ops.test.ts` — expect FAILURE (gate rejected).
+- [x] Edit `src/cli/commands/agent-ops.ts`:
 
   1. Replace `resolveComponents`:
 
@@ -2360,8 +2399,8 @@ import { ingestGateSeed, type GateSeed } from '../../core/agent-ops/gate-ingest.
 
   4. Update the `--component` option describe string to `'git | staging | merge-queue | ci | gate | all (default all = git+staging)'`.
 
-- [ ] Run: `npx vitest run src/cli/commands/agent-ops.test.ts` — expect all tests passed (pre-existing + 3 new).
-- [ ] End-to-end smoke (from the repo root, against a throwaway dir):
+- [x] Run: `npx vitest run src/cli/commands/agent-ops.test.ts` — expect all tests passed (pre-existing + 3 new).
+- [x] End-to-end smoke (from the repo root, against a throwaway dir):
 
 ```bash
 T="$(mktemp -d)" && mkdir -p "$T/.scaffold" \
@@ -2372,7 +2411,7 @@ T="$(mktemp -d)" && mkdir -p "$T/.scaffold" \
 ```
 
   Expected: classification lines, `installed scripts/gate-check.sh`, `installed scripts/gate-check-affected.sh`; the probe delegation may fail on npm ci in the throwaway dir — the point is the scripts exist, are executable, and contain no `{{` markers (`grep -c '{{' "$T/scripts/"*.sh` → both 0). (If the repo invokes the CLI differently in dev, use `node dist/...` after `npm run build` or the repo's documented dev-run command.)
-- [ ] Commit: `git add -A && git commit -m "feat(agent-ops): gate component CLI wiring — classification report, opt-in posture"`
+- [x] Commit: `git add -A && git commit -m "feat(agent-ops): gate component CLI wiring — classification report, opt-in posture"`
 
 ---
 
@@ -2390,7 +2429,7 @@ T="$(mktemp -d)" && mkdir -p "$T/.scaffold" \
 
 **Steps:**
 
-- [ ] Write the failing test `src/core/hooks/install.test.ts`:
+- [x] Write the failing test `src/core/hooks/install.test.ts`:
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -2540,8 +2579,8 @@ describe('planHooks / applyHookPlan (pure halves — reused read-only by the ado
 })
 ```
 
-- [ ] Run: `npx vitest run src/core/hooks/install.test.ts` — expect FAILURE (module missing).
-- [ ] Create `src/core/hooks/install.ts`:
+- [x] Run: `npx vitest run src/core/hooks/install.test.ts` — expect FAILURE (module missing).
+- [x] Create `src/core/hooks/install.ts`:
 
 ```ts
 import fs from 'node:fs'
@@ -2755,8 +2794,8 @@ export function installHooks(projectRoot: string): HooksInstallResult {
 }
 ```
 
-- [ ] Run: `npx vitest run src/core/hooks/install.test.ts` — expect 10 tests passed.
-- [ ] Commit: `git add -A && git commit -m "feat(hooks): TS deep-merge hook registration — idempotent, atomic, prerequisite-reported (D8)"`
+- [x] Run: `npx vitest run src/core/hooks/install.test.ts` — expect 10 tests passed.
+- [x] Commit: `git add -A && git commit -m "feat(hooks): TS deep-merge hook registration — idempotent, atomic, prerequisite-reported (D8)"`
 
 ---
 
@@ -2773,7 +2812,7 @@ export function installHooks(projectRoot: string): HooksInstallResult {
 
 **Steps:**
 
-- [ ] Write the failing test `src/cli/commands/hooks.test.ts`:
+- [x] Write the failing test `src/cli/commands/hooks.test.ts`:
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -2828,8 +2867,8 @@ describe('scaffold hooks', () => {
 })
 ```
 
-- [ ] Run: `npx vitest run src/cli/commands/hooks.test.ts` — expect FAILURE (module missing).
-- [ ] Create `src/cli/commands/hooks.ts`:
+- [x] Run: `npx vitest run src/cli/commands/hooks.test.ts` — expect FAILURE (module missing).
+- [x] Create `src/cli/commands/hooks.ts`:
 
 ```ts
 import type { Argv, CommandModule } from 'yargs'
@@ -2902,7 +2941,7 @@ const hooksCommand: CommandModule<Record<string, unknown>, HooksArgs> = {
 export default hooksCommand
 ```
 
-- [ ] Register the command in `src/cli/index.ts` — Edit old string:
+- [x] Register the command in `src/cli/index.ts` — Edit old string:
 
 ```ts
 import schedCommand from './commands/sched.js'
@@ -2924,9 +2963,9 @@ import hooksCommand from './commands/hooks.js'
 
   (match the file's existing chain indentation exactly — 4 spaces before `.command`, same as the Task 6 registration).
 
-- [ ] Run: `npx vitest run src/cli/commands/hooks.test.ts` — expect 4 tests passed.
-- [ ] Run: `npx tsc --noEmit -p tsconfig.json` — expect clean.
-- [ ] Commit: `git add -A && git commit -m "feat(hooks): scaffold hooks install CLI — report lines + AGENTS.md --check guidance"`
+- [x] Run: `npx vitest run src/cli/commands/hooks.test.ts` — expect 4 tests passed.
+- [x] Run: `npx tsc --noEmit -p tsconfig.json` — expect clean.
+- [x] Commit: `git add -A && git commit -m "feat(hooks): scaffold hooks install CLI — report lines + AGENTS.md --check guidance"`
 
 ---
 
@@ -2943,7 +2982,7 @@ import hooksCommand from './commands/hooks.js'
 
 **Steps:**
 
-- [ ] Write the failing test `src/merge-queue/bootstrap.test.ts`:
+- [x] Write the failing test `src/merge-queue/bootstrap.test.ts`:
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -3040,8 +3079,8 @@ describe('journal compatibility', () => {
 })
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/bootstrap.test.ts` — expect FAILURE (module missing, event types unknown).
-- [ ] Edit `src/merge-queue/types.ts` — extend the `JournalEvent` union. Edit old string:
+- [x] Run: `npx vitest run src/merge-queue/bootstrap.test.ts` — expect FAILURE (module missing, event types unknown).
+- [x] Edit `src/merge-queue/types.ts` — extend the `JournalEvent` union. Edit old string:
 
 ```ts
   | {
@@ -3067,7 +3106,7 @@ describe('journal compatibility', () => {
   | { type: 'bootstrap_armed'; bootstrapId: string; pr: number; gatedHeadSha: string; at: string }
 ```
 
-- [ ] Create `src/merge-queue/bootstrap.ts` (pure half; the engine is appended in Task 15):
+- [x] Create `src/merge-queue/bootstrap.ts` (pure half; the engine is appended in Task 15):
 
 ```ts
 import type { JournalEvent } from './types.js'
@@ -3156,25 +3195,87 @@ export function planResume(
 }
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/bootstrap.test.ts` — expect 12 tests passed.
-- [ ] Run: `npx tsc --noEmit -p tsconfig.json` and `npx vitest run src/merge-queue` — the widened `JournalEvent` union must not disturb `reduceState`/`computeStats` (their switches have no default and no exhaustiveness sentinel, so unmatched types fall through). If `tsc` reports an exhaustiveness error in either, add explicit no-op cases `case 'bootstrap_intent': case 'bootstrap_merged': case 'bootstrap_armed': break` to that switch.
-- [ ] Commit: `git add -A && git commit -m "feat(mq): bootstrap journal events + per-id state machine with GitHub-authoritative resume (D9)"`
+- [x] Run: `npx vitest run src/merge-queue/bootstrap.test.ts` — expect 12 tests passed.
+- [x] Run: `npx tsc --noEmit -p tsconfig.json` and `npx vitest run src/merge-queue` — the widened `JournalEvent` union must not disturb `reduceState`/`computeStats` (their switches have no default and no exhaustiveness sentinel, so unmatched types fall through). If `tsc` reports an exhaustiveness error in either, add explicit no-op cases `case 'bootstrap_intent': case 'bootstrap_merged': case 'bootstrap_armed': break` to that switch.
+- [x] Commit: `git add -A && git commit -m "feat(mq): bootstrap journal events + per-id state machine with GitHub-authoritative resume (D9)"`
 
 ---
 
 ### Task 15: bootstrap engine + `scaffold mq bootstrap` CLI + mq-guard message
 
-> **Reviewer note (deferred from PR #783 review — resolve during implementation):**
-> `armHooks` runs `installHooks(primary)` PRE-merge, but the queue-installing PR
-> may itself commit `.claude/settings.json` changes — leaving primary's working
-> tree dirty so the later `git.syncPrimaryToMerge` `merge --ff-only` fails (or
-> overwrites an untracked/modified settings file). Resolve one of two ways and
-> test it: (a) treat the mq-guard hook registration as a COMMITTED gated-tree
-> asset (verify it in `verifyGatedAssets`) and drop the pre-merge `installHooks`,
-> letting it ride the merge; or (b) move `installHooks(primary)` to AFTER
-> `syncPrimaryToMerge` so it deep-merges into the already-landed settings. Add an
-> integration test where the bootstrap PR modifies `.claude/settings.json` and
-> assert primary ends clean and the guard is registered.
+> **Reviewer note — RESOLVED (impl aa1e11d6, option b).** `armHooks`
+> (`installHooks(primary)`) originally ran PRE-merge, but the queue-installing PR
+> may itself commit `.claude/settings.json` — leaving primary's tree dirty so the
+> later `git.syncPrimaryToMerge` `merge --ff-only` aborts (confirmed by git-level
+> reproduction: "Your local changes would be overwritten by merge"), throwing
+> uncaught and permanently stranding a merged-but-unarmed repo. Resolved by moving
+> `armHooks` to run INSIDE `verifyAndArm` AFTER `syncPrimaryToMerge` (deep-merging
+> into the already-synced, merge-committed settings — `installHooks` is
+> idempotent), removing the dead pre-merge `arm()` closure + its four call sites
+> (every path still reaches `verifyAndArm`), and wrapping `syncPrimaryToMerge` in a
+> try/catch that degrades any residual ff-only failure to recoverable `--finish`
+> guidance instead of an uncaught crash. Integration tests assert primary ends
+> clean + guard registered on a settings-touching PR, and that a throwing sync
+> yields `stage:'arm'` (not a throw).
+
+> **Reviewer note — RESOLVED (whole-branch + plan-aware review).** Two follow-on
+> uncaught-throw holes on the same post-merge arm path were closed for symmetry
+> with the `syncPrimaryToMerge` guard above: (1) `armHooks` → `readSettings`
+> throws on a malformed/non-object `.claude/settings.json` in the merged tree —
+> wrapped in `verifyAndArm` to degrade to recoverable `--finish` guidance; (2)
+> `armSched` → `loadAgentOpsConfig(primary)` throws on a malformed
+> `.scaffold/agent-ops.yaml` (plausible on a `--finish` resume after a manual
+> primary reconciliation) — its `verifyAndArm` call site is now wrapped in the
+> same try/catch, AND the default `armSched` closure in `mq.ts` moves the
+> `loadAgentOpsConfig` read inside its own guard so it honors its never-throw
+> `() => { ok, messages }` contract regardless of the call site. Tests assert a
+> throwing `armHooks` and a throwing `armSched` each yield `stage:'arm'` with a
+> `--finish` message and the merge still journaled (`bootstrap_merged`).
+
+> **Reviewer note — RESOLVED (P2, PR #785 round 3).** For symmetry with the
+> arm-path guards, the merge step itself (`deps.gh.squashMerge` in
+> `mergeAndFinish`) was also unwrapped: a gh failure (network blip, auth expiry,
+> PR-state conflict) threw uncaught out of `runBootstrap`. Recovery was already
+> correct (only `bootstrap_intent` is journaled pre-merge, so resume revalidates
+> the head and records-then-arms an already-merged PR), but the UX crashed with a
+> raw stack trace instead of the graceful `--finish` guidance. Wrapped it to
+> return `stage:'merge'` with a recovery message. Test: a throwing `squashMerge`
+> yields `stage:'merge'` + `--finish`, journals only `bootstrap_intent`, and arms
+> nothing.
+
+> **Reviewer note — RESOLVED (P2, PR #785 round 4).** Completing the
+> graceful-degradation sweep: the PREFLIGHT infra calls (`fetchOrigin`,
+> `checkoutDetachedInGate`, `readMergeConfig`, `runGate`) were still unguarded. A
+> network/git/config failure threw a raw stack trace. Preflight is pre-journaling
+> so nothing is stranded, but for consistency (and per the project's own
+> lessons.md rule the reviewer cited) they're now wrapped to return
+> `stage:'preflight'` with a re-run message; the logical failures (PR not OPEN,
+> assets missing, gate red) already returned that stage. Test: a throwing
+> `fetchOrigin` yields `stage:'preflight'` and journals nothing. Separately,
+> `gateTargetResolves` now runs `command -v -- "$1"` (the `--` ends option
+> parsing so an executable name starting with `-` is treated as an operand).
+
+
+
+> **Reviewer note — RESOLVED (P0, PR #785 review).** `gateTargetResolves`
+> originally built the `bash -c` probe by interpolating the command's head token
+> raw (``command -v ${exe[0]}``). That token comes from a project's
+> `.scaffold/agent-ops.yaml` — untrusted in a brownfield repo being adopted — so
+> a single-token payload like `$(touch pwned)x` executed as command substitution
+> under `scaffold doctor`/bootstrap preflight. Fixed by passing the token as a
+> quoted positional (`['-c', 'command -v "$1"', '--', exe[0]]`) so the shell
+> treats it as literal data, never syntax. Test asserts a `$(…)`/`;` payload
+> resolves `false` and creates no file, while real executables still resolve.
+
+> **Reviewer note — RESOLVED (P1, PR #785 round 2).** `gateTargetResolves` split
+> the command on strict whitespace, so a quoted-space env prefix
+> (`FOO='bar baz' make check`) or a path with spaces over-tokenized and the
+> head-word resolution failed (false negative — refused to arm a valid gate).
+> Switched to the shared quote-aware `parseShell` (extracted from the
+> observability fix dispatcher into `src/core/parse-shell.ts` and reused by both;
+> it strips matched quotes but never expands substitutions, so the quoted-
+> positional injection guard above still holds). Test asserts the head word
+> resolves past a quoted-space env prefix.
 
 **Files:**
 - Modify: `src/merge-queue/bootstrap.ts` (append the engine)
@@ -3189,12 +3290,12 @@ export function planResume(
 
 **Interfaces:**
 - Produces: `GhClient.mergeCommitSha(pr): string | null`; `GitOps.checkoutDetachedInGate(sha): string`; `BootstrapDeps { gh, git, runGate, config, mqDir, projectRoot, readMergeConfig?, verifyGatedAssets?, armHooks, armSched, smokeDaemon, runDoctor, gateTargetResolves, log, now, sleep?, newId }`; `BootstrapOutcome { ok, bootstrapId, stage: 'preflight'|'arm'|'merge'|'verify'|'complete'|'aborted', messages }`; `runBootstrap(deps, { pr, finish? }): Promise<BootstrapOutcome>`; `gateTargetResolves(projectRoot, command): boolean` (exported from `src/cli/commands/mq.ts`); `mqHandler` gains an `overrides: MqOverrides = {}` second parameter (`MqOverrides { bootstrapDeps?: Partial<BootstrapDeps> }`); `MqArgs` gains `finish?: boolean`; mq action choices gain `'bootstrap'`.
-- **Two roots (D9 first-install correctness):** the PR that *installs* the queue commits its config/guard/poller/gate-scripts in the FEATURE branch — so the shared **primary** root (`git.primaryRoot()`, main worktree) does NOT yet contain them; they arrive only at merge. `runBootstrap` therefore verifies committed assets and resolves gate targets from the **gated PR tree** (the `checkoutDetachedInGate(gatedHeadSha)` checkout — where the PR's committed files live), reads the merge-queue config it will install from that tree (`readMergeConfig(gatedTree)`), and runs the full preflight gate there; the journal (`mqDir`) stays at primary and the **scheduler is armed AFTER the merge** (in the post-merge verify step, once primary has been fast-forwarded — see below). `verifyGatedAssets(gatedTree, cfg)` confirms the config, guard, and poller script are COMMITTED in the PR (they ride the merge to primary) rather than uncommitted post-gate mutations; the mq-guard **hook registration** is not a committed asset — `armHooks` installs it into primary's `.claude/settings.json` pre-merge (`installHooks(primary)`, the guard self-gates at runtime) and the closing doctor pass verifies it. After the merge, the engine fast-forwards the primary worktree to the merge commit (`git.syncPrimaryToMerge(mergeSha)`) BEFORE the post-merge scheduler arm, so `buildPostMergePollerJob(primary)` resolves against the now-landed `scripts/ops/post-merge-poller.sh` (`gh pr merge` updates only the remote — the local primary tree needs the fast-forward first). `gateTargetResolves` gains the tree root as its first arg (`(root, command)`).
+- **Two roots (D9 first-install correctness):** the PR that *installs* the queue commits its config/guard/poller/gate-scripts in the FEATURE branch — so the shared **primary** root (`git.primaryRoot()`, main worktree) does NOT yet contain them; they arrive only at merge. `runBootstrap` therefore verifies committed assets and resolves gate targets from the **gated PR tree** (the `checkoutDetachedInGate(gatedHeadSha)` checkout — where the PR's committed files live), reads the merge-queue config it will install from that tree (`readMergeConfig(gatedTree)`), and runs the full preflight gate there; the journal (`mqDir`) stays at primary and the **scheduler is armed AFTER the merge** (in the post-merge verify step, once primary has been fast-forwarded — see below). `verifyGatedAssets(gatedTree, cfg)` confirms the config, guard, and poller script are COMMITTED in the PR (they ride the merge to primary) rather than uncommitted post-gate mutations; the mq-guard **hook registration** is not a committed asset — `armHooks` installs it into primary's `.claude/settings.json` POST-merge (`installHooks(primary)`, inside `verifyAndArm` right after the fast-forward — never pre-merge, which would dirty primary and abort the ff-only sync; the guard self-gates at runtime) and the closing doctor pass verifies it. After the merge, the engine fast-forwards the primary worktree to the merge commit (`git.syncPrimaryToMerge(mergeSha)`) BEFORE arming hooks + the scheduler, so `buildPostMergePollerJob(primary)` resolves against the now-landed `scripts/ops/post-merge-poller.sh` (`gh pr merge` updates only the remote — the local primary tree needs the fast-forward first). `gateTargetResolves` gains the tree root as its first arg (`(root, command)`).
 - Consumes: Task 14's reducers/`planResume`; `installHooks` (Task 12); `pickSchedBackend` (Task 6) + `buildPostMergePollerJob` (Task 5); `runGate` (`src/merge-queue/gate.ts`); `appendEvent`/`readJournal` (`src/merge-queue/journal.ts`); `loadAgentOpsConfig`; `ulid`.
 
 **Steps:**
 
-- [ ] Add `mergeCommitSha` to `src/merge-queue/gh.ts`. In the `GhClient` interface, Edit old string:
+- [x] Add `mergeCommitSha` to `src/merge-queue/gh.ts`. In the `GhClient` interface, Edit old string:
 
 ```ts
   squashMerge(pr: number, expectedHead?: string): void
@@ -3231,7 +3332,7 @@ export function planResume(
     },
 ```
 
-- [ ] Append a self-contained coverage block to `src/merge-queue/gh.test.ts` (uses the same `MQ_GH_CMD` seam `resolveGhBin` already honors; add imports `fs`/`os`/`path` from `node:fs`/`node:os`/`node:path` and `afterEach` from vitest if the file lacks them):
+- [x] Append a self-contained coverage block to `src/merge-queue/gh.test.ts` (uses the same `MQ_GH_CMD` seam `resolveGhBin` already honors; add imports `fs`/`os`/`path` from `node:fs`/`node:os`/`node:path` and `afterEach` from vitest if the file lacks them):
 
 ```ts
 describe('mergeCommitSha (D9)', () => {
@@ -3261,7 +3362,7 @@ describe('mergeCommitSha (D9)', () => {
 })
 ```
 
-- [ ] Add `checkoutDetachedInGate` to `src/merge-queue/git.ts`. In the `GitOps` interface, Edit old string:
+- [x] Add `checkoutDetachedInGate` to `src/merge-queue/git.ts`. In the `GitOps` interface, Edit old string:
 
 ```ts
   ensureGateWorktree(): string
@@ -3326,7 +3427,7 @@ describe('mergeCommitSha (D9)', () => {
     constructCandidate(batchId, prs, base) {
 ```
 
-- [ ] Append a self-contained real-repo test to `src/merge-queue/git.test.ts` (reuse the file's existing imports; the helper below is local to the new describe block to avoid name collisions):
+- [x] Append a self-contained real-repo test to `src/merge-queue/git.test.ts` (reuse the file's existing imports; the helper below is local to the new describe block to avoid name collisions):
 
 ```ts
 describe('checkoutDetachedInGate (D9 bootstrap preflight)', () => {
@@ -3354,7 +3455,7 @@ describe('checkoutDetachedInGate (D9 bootstrap preflight)', () => {
 
   (If `git.test.ts` does not already import `execFileSync`/`fs`/`os`/`path`, add those imports at the top.)
 
-- [ ] Extend the daemon-test fakes so they still satisfy the widened interfaces. `grep -rn "implements GhClient\|implements GitOps" src tests` — as of this plan the only implementers are in `src/merge-queue/daemon.test.ts`. In `FakeGh`, add after the `squashMerge` method:
+- [x] Extend the daemon-test fakes so they still satisfy the widened interfaces. `grep -rn "implements GhClient\|implements GitOps" src tests` — as of this plan the only implementers are in `src/merge-queue/daemon.test.ts`. In `FakeGh`, add after the `squashMerge` method:
 
 ```ts
   mergeCommitSha(): string | null { return 'FAKE_MERGE_SHA' }
@@ -3369,8 +3470,8 @@ describe('checkoutDetachedInGate (D9 bootstrap preflight)', () => {
 
   (`FakeGit`'s `root` is a private constructor property — if the field is not accessible with `this.root`, mirror how `ensureGateWorktree` accesses it in that class.) If the grep surfaces other implementers (e.g. an e2e harness), give them the same one-liners.
 
-- [ ] Run: `npx vitest run src/merge-queue/gh.test.ts src/merge-queue/git.test.ts src/merge-queue/daemon.test.ts` — all green.
-- [ ] Append the failing engine tests to `src/merge-queue/bootstrap.test.ts` (add imports at the top: `import fs from 'node:fs'`, `import os from 'node:os'`, `import path from 'node:path'`, `import { runBootstrap, type BootstrapDeps } from './bootstrap.js'`, `import { appendEvent, readJournal } from './journal.js'`, `import { defaultMergeQueueConfig } from './types.js'`, `import type { GhClient, PrInfo } from './gh.js'`, `import type { CandidateResult, GitOps } from './git.js'`, `import type { GateResult } from './gate.js'`):
+- [x] Run: `npx vitest run src/merge-queue/gh.test.ts src/merge-queue/git.test.ts src/merge-queue/daemon.test.ts` — all green.
+- [x] Append the failing engine tests to `src/merge-queue/bootstrap.test.ts` (add imports at the top: `import fs from 'node:fs'`, `import os from 'node:os'`, `import path from 'node:path'`, `import { runBootstrap, type BootstrapDeps } from './bootstrap.js'`, `import { appendEvent, readJournal } from './journal.js'`, `import { defaultMergeQueueConfig } from './types.js'`, `import type { GhClient, PrInfo } from './gh.js'`, `import type { CandidateResult, GitOps } from './git.js'`, `import type { GateResult } from './gate.js'`):
 
 ```ts
 function makeGh(script: {
@@ -3639,8 +3740,8 @@ describe('runBootstrap (D9 engine)', () => {
 })
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/bootstrap.test.ts` — engine tests FAIL (`runBootstrap` not exported).
-- [ ] Append the engine to `src/merge-queue/bootstrap.ts`. Extend the imports at the top of the file to (the engine reaches the filesystem only through injected seams — `verifyGatedAssets` / `readMergeConfig` — so it imports no `fs`):
+- [x] Run: `npx vitest run src/merge-queue/bootstrap.test.ts` — engine tests FAIL (`runBootstrap` not exported).
+- [x] Append the engine to `src/merge-queue/bootstrap.ts`. Extend the imports at the top of the file to (the engine reaches the filesystem only through injected seams — `verifyGatedAssets` / `readMergeConfig` — so it imports no `fs`):
 
 ```ts
 import path from 'node:path'
@@ -3925,8 +4026,8 @@ export async function runBootstrap(
 
   Note: the `JournalEvent` import becomes type-only usage inside the reducers — keep the single `import type { JournalEvent, MergeQueueConfig } from './types.js'` line (replacing Task 14's narrower import).
 
-- [ ] Run: `npx vitest run src/merge-queue/bootstrap.test.ts` — expect 23 tests passed (12 pure + 11 engine).
-- [ ] Wire the CLI in `src/cli/commands/mq.ts`:
+- [x] Run: `npx vitest run src/merge-queue/bootstrap.test.ts` — expect 23 tests passed (12 pure + 11 engine).
+- [x] Wire the CLI in `src/cli/commands/mq.ts`:
 
   1. Extend the imports — Edit old string:
 
@@ -4161,7 +4262,7 @@ export async function mqHandler(argv: MqArgs, overrides: MqOverrides = {}): Prom
   describe: 'Local batching merge queue: enqueue PRs, run the daemon, inspect status, bootstrap the first merge',
 ```
 
-- [ ] Update + extend `src/cli/commands/mq.test.ts`. Edit the stale test title — old string:
+- [x] Update + extend `src/cli/commands/mq.test.ts`. Edit the stale test title — old string:
 
 ```ts
   it('declares the five actions', () => {
@@ -4255,8 +4356,8 @@ describe('scaffold mq bootstrap (CLI wiring)', () => {
 })
 ```
 
-- [ ] Run: `npx vitest run src/cli/commands/mq.test.ts` — all tests green (pre-existing + 4 new).
-- [ ] Update the guard message (D9: point first-time installers at `mq bootstrap`, never the env-var bypass). In `content/assets/agent-ops/merge-queue/mq-guard.sh.tmpl`, Edit old string:
+- [x] Run: `npx vitest run src/cli/commands/mq.test.ts` — all tests green (pre-existing + 4 new).
+- [x] Update the guard message (D9: point first-time installers at `mq bootstrap`, never the env-var bypass). In `content/assets/agent-ops/merge-queue/mq-guard.sh.tmpl`, Edit old string:
 
 ```
 	printf '%s\n' "mq-guard: direct 'gh pr merge' is routed through the merge queue on this project. Enqueue instead: scaffold mq enqueue --pr <N> (or: make mq-enqueue PR=<N>). The queue batch-tests against latest {{DEFAULT_BRANCH}} and lands green PRs for you; watch with: scaffold mq status." >&2
@@ -4270,7 +4371,7 @@ describe('scaffold mq bootstrap (CLI wiring)', () => {
 
   (The line is tab-indented inside the `if` block — preserve the leading tab.)
 
-- [ ] Append the guard-message test to `tests/agent-ops-merge-queue.bats` (after the `"mq-guard prints no override recipe on block"` test):
+- [x] Append the guard-message test to `tests/agent-ops-merge-queue.bats` (after the `"mq-guard prints no override recipe on block"` test):
 
 ```bash
 @test "mq-guard block message points first-time installers at mq bootstrap" {
@@ -4281,9 +4382,9 @@ describe('scaffold mq bootstrap (CLI wiring)', () => {
 }
 ```
 
-- [ ] Run: `bats tests/agent-ops-merge-queue.bats` — all `ok` (pre-existing + 1 new).
-- [ ] Run: `npx tsc --noEmit -p tsconfig.json` — expect clean.
-- [ ] Commit: `git add -A && git commit -m "feat(mq): scaffold mq bootstrap — arm-first journaled first merge + guard pointer (D9)"`
+- [x] Run: `bats tests/agent-ops-merge-queue.bats` — all `ok` (pre-existing + 1 new).
+- [x] Run: `npx tsc --noEmit -p tsconfig.json` — expect clean.
+- [x] Commit: `git add -A && git commit -m "feat(mq): scaffold mq bootstrap — arm-first journaled first merge + guard pointer (D9)"`
 
 ---
 
@@ -4300,7 +4401,7 @@ describe('scaffold mq bootstrap (CLI wiring)', () => {
 
 **Steps:**
 
-- [ ] Write the failing test `src/doctor/fixes/ops-fixes.test.ts`:
+- [x] Write the failing test `src/doctor/fixes/ops-fixes.test.ts`:
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -4396,8 +4497,8 @@ describe('fixSchedulerReload (thin D6 wrapper)', () => {
 })
 ```
 
-- [ ] Run: `npx vitest run src/doctor/fixes/ops-fixes.test.ts` — expect FAILURE (module missing).
-- [ ] Create `src/doctor/fixes/ops-fixes.ts`:
+- [x] Run: `npx vitest run src/doctor/fixes/ops-fixes.test.ts` — expect FAILURE (module missing).
+- [x] Create `src/doctor/fixes/ops-fixes.ts`:
 
 ```ts
 import { installHooks, type HooksInstallResult } from '../../core/hooks/install.js'
@@ -4451,8 +4552,8 @@ export function fixSchedulerReload(
 }
 ```
 
-- [ ] Run: `npx vitest run src/doctor/fixes/ops-fixes.test.ts` — expect 6 tests passed.
-- [ ] Register the fixes on the R1 checks. Locate them: `grep -rn "section" src/doctor --include="*.ts" | grep -iv test | grep -i "hooks\|sched"` (fall back to `grep -rln "hooks\|scheduler" src/doctor --include="*.ts"`). In the **hooks section check**, add the optional `fix` member the R1 registry shape declares (`{section, run(), severity, remediation, fix?()}`):
+- [x] Run: `npx vitest run src/doctor/fixes/ops-fixes.test.ts` — expect 6 tests passed.
+- [x] Register the fixes on the R1 checks. Locate them: `grep -rn "section" src/doctor --include="*.ts" | grep -iv test | grep -i "hooks\|sched"` (fall back to `grep -rln "hooks\|scheduler" src/doctor --include="*.ts"`). In the **hooks section check**, add the optional `fix` member the R1 registry shape declares (`{section, run(), severity, remediation, fix?()}`):
 
 ```ts
   fix: (ctx) => {
@@ -4471,13 +4572,39 @@ export function fixSchedulerReload(
 ```
 
   with `import { fixHookRegistration, fixSchedulerReload } from '../fixes/ops-fixes.js'` (adjust the relative path to each check file's location). The adapter closures above are the registration glue: R1's registry pins `fix?: (ctx: DoctorContext) => { applied: boolean; detail: string }` (R1 plan Task 7), while the R2 wrappers return `OpsFixResult { ok, messages }` — map `ok → applied` and `messages.join('; ') → detail` exactly as shown, and take `projectRoot` from the `DoctorContext` the registry passes.
-- [ ] Update R1's `--fix` gating so these two fixes are eligible: R1 shipped with only the `bd doctor --fix` delegation enabled (spec D5 "release-staged"). Find the gate — `grep -rn "fix" src/cli/commands/doctor.ts src/doctor --include="*.ts" | grep -iv test | grep -i "delegat\|only\|R1\|stage"` — and remove/replace any allowlist that excludes checks carrying a `fix()` member, so `doctor --fix` now runs every registered `fix()` (still only idempotent safe fixes exist: bd delegation, hook re-registration, scheduler reload — all three never reset state or delete files).
-- [ ] Run: `npx vitest run src/doctor` — the R1 doctor tests plus the 6 new wrapper tests all green. If an R1 test asserted that hooks/scheduler failures are report-only under `--fix`, update it to assert the fix now runs (that staging note was explicitly "fix handlers land in R2", spec D5).
-- [ ] Commit: `git add -A && git commit -m "feat(doctor): R2 --fix wrappers — hook re-registration (D8) + scheduler reload (D6), thin over primitives"`
+- [x] Update R1's `--fix` gating so these two fixes are eligible: R1 shipped with only the `bd doctor --fix` delegation enabled (spec D5 "release-staged"). Find the gate — `grep -rn "fix" src/cli/commands/doctor.ts src/doctor --include="*.ts" | grep -iv test | grep -i "delegat\|only\|R1\|stage"` — and remove/replace any allowlist that excludes checks carrying a `fix()` member, so `doctor --fix` now runs every registered `fix()` (still only idempotent safe fixes exist: bd delegation, hook re-registration, scheduler reload — all three never reset state or delete files).
+- [x] Run: `npx vitest run src/doctor` — the R1 doctor tests plus the 6 new wrapper tests all green. If an R1 test asserted that hooks/scheduler failures are report-only under `--fix`, update it to assert the fix now runs (that staging note was explicitly "fix handlers land in R2", spec D5).
+- [x] Commit: `git add -A && git commit -m "feat(doctor): R2 --fix wrappers — hook re-registration (D8) + scheduler reload (D6), thin over primitives"`
 
 ---
 
 ### Task 17: doctor gate section — upgrade resolve-only to the bounded `GATE_PROBE=1` probe
+
+> **Reviewer note — RESOLVED (P2, PR #785 review).** `runGateProbe` invoked the
+> seed via `spawnSync('bash', [script])`, which succeeds even without the exec
+> bit — but the Makefile `check` target runs `./scripts/gate-check.sh` DIRECTLY
+> (needs `+x`). The probe therefore reported the gate healthy while `make check`
+> would fail "permission denied". Fixed by verifying `mode & 0o111` before the
+> run and failing with actionable remediation (`chmod +x <path>`) when the bit is
+> missing. Test asserts a `0o644` seed yields `ok:false` with the chmod guidance
+> and never runs the suite.
+
+> **Reviewer note — RESOLVED (P2, PR #785 round 2).** The exec-bit check above
+> initially validated only the ONE script the probe runs (`gate-check.sh`
+> preferred). But `make check-affected` runs `./scripts/gate-check-affected.sh`
+> DIRECTLY too, so a non-executable affected seed would pass a gate-check.sh-only
+> probe yet fail the merge-queue gate. The probe now validates the exec bit of
+> EVERY present seed (naming the failing one + its `make` target + `chmod +x`
+> path) before running. Test: gate-check.sh executable + affected seed `0o644`
+> ⇒ `ok:false` citing `check-affected`.
+
+> **Reviewer note — RESOLVED (P2, PR #785 round 3).** The `gateTargetsCheck`
+> wiring in `src/doctor/checks.ts` still printed the R1 placeholder "bounded
+> GATE_PROBE execution ships in R2" on the no-gate-script path — misleading now
+> that R2 (this release) shipped the probe. Fixed that string to accurate
+> present tense with an install hint, and swept the same "`scaffold sched` ships
+> in R2" future-tense staleness out of the launchd + systemd scheduler checks
+> (root-cause fix, not just the one flagged line).
 
 **Files:**
 - Create: `src/doctor/gate-probe.ts`
@@ -4490,7 +4617,7 @@ export function fixSchedulerReload(
 
 **Steps:**
 
-- [ ] Write the failing test `src/doctor/gate-probe.test.ts`:
+- [x] Write the failing test `src/doctor/gate-probe.test.ts`:
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -4556,8 +4683,8 @@ describe('runGateProbe (D5 gate section, R2)', () => {
 })
 ```
 
-- [ ] Run: `npx vitest run src/doctor/gate-probe.test.ts` — expect FAILURE (module missing).
-- [ ] Create `src/doctor/gate-probe.ts`:
+- [x] Run: `npx vitest run src/doctor/gate-probe.test.ts` — expect FAILURE (module missing).
+- [x] Create `src/doctor/gate-probe.ts`:
 
 ```ts
 import fs from 'node:fs'
@@ -4612,8 +4739,8 @@ export function runGateProbe(
 }
 ```
 
-- [ ] Run: `npx vitest run src/doctor/gate-probe.test.ts` — expect 4 tests passed (the timeout test takes ~0.5s by design).
-- [ ] Wire the probe into the R1 gate check. Locate it: `grep -rln "make -n\|resolve" src/doctor --include="*.ts" | grep -iv test` (the check whose `section` is the gate). In its `run()`, after the existing `make -n` resolution reporting, add:
+- [x] Run: `npx vitest run src/doctor/gate-probe.test.ts` — expect 4 tests passed (the timeout test takes ~0.5s by design).
+- [x] Wire the probe into the R1 gate check. Locate it: `grep -rln "make -n\|resolve" src/doctor --include="*.ts" | grep -iv test` (the check whose `section` is the gate). In its `run()`, after the existing `make -n` resolution reporting, add:
 
 ```ts
     const probe = runGateProbe(projectRoot)
@@ -4631,12 +4758,27 @@ export function runGateProbe(
 ```
 
   with `import { runGateProbe } from '../gate-probe.js'` (adjust the relative path). Express the two branches in the check's own result vocabulary (R1's finding/severity types) — the load-bearing behavior to preserve: a passing probe reports *probed* health (`probe.detail`), a failing probe fails the section with `probe.detail`, and absence of gate scripts leaves the R1 resolve-only report exactly as it was.
-- [ ] Run: `npx vitest run src/doctor` — green. If the R1 gate-check tests pinned the resolve-only wording for projects WITH gate scripts, update those fixtures to expect the probed wording (`prerequisites verified`).
-- [ ] Commit: `git add -A && git commit -m "feat(doctor): gate section runs the bounded GATE_PROBE=1 probe when gate seeds exist (D5)"`
+- [x] Run: `npx vitest run src/doctor` — green. If the R1 gate-check tests pinned the resolve-only wording for projects WITH gate scripts, update those fixtures to expect the probed wording (`prerequisites verified`).
+- [x] Commit: `git add -A && git commit -m "feat(doctor): gate section runs the bounded GATE_PROBE=1 probe when gate seeds exist (D5)"`
 
 ---
 
 ### Task 18: adopt plan — ops-actions preview section joined into `plan_key` (§6.1 R2)
+
+> **Reviewer note — RESOLVED (P1, PR #785 round 3; found by BOTH the plan-aware
+> and opencode channels).** `buildOpsActions` read
+> `loadAgentOpsConfig(projectRoot).merge_queue.gate_executor` UNGUARDED while its
+> two sibling risky reads in the same function (`queueIntent`'s yaml.load and the
+> `hookAdds` readSettings) were already try/catch-wrapped. A `.scaffold/agent-ops.yaml`
+> that is valid YAML (so `queueIntent` returns true) but fails
+> `loadAgentOpsConfig`'s stricter validation (e.g. an unknown `gate_executor`)
+> threw uncaught — crashing plain `scaffold adopt` (read-only plan mode) with a
+> raw yargs-help + stack-trace dump instead of the `ScaffoldError` contract every
+> other adopt path uses (reproduced against `dist/`). Wrapped the read in
+> try/catch matching the siblings; on failure the sched-install record is skipped
+> (doctor reports the bad config). Test: an invalid `gate_executor` no longer
+> throws, drops only the sched hint, and still previews the queue components +
+> bootstrap requirement.
 
 **Files:**
 - Create: `src/project/adoption-ops-actions.ts`
@@ -4650,7 +4792,7 @@ export function runGateProbe(
 
 **Steps:**
 
-- [ ] Write the failing test `src/project/adoption-ops-actions.test.ts`:
+- [x] Write the failing test `src/project/adoption-ops-actions.test.ts`:
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -4798,8 +4940,8 @@ describe('renderOpsActionsSection', () => {
 })
 ```
 
-- [ ] Run: `npx vitest run src/project/adoption-ops-actions.test.ts` — expect FAILURE (module missing).
-- [ ] Add the installer dry-run path API so the preview derives the COMPLETE write set (not just component dests). In `src/core/agent-ops/install.ts`, export `plannedInstallPaths`, mirroring `installAgentOps`'s own requested-file logic (the make fragment for any component, plus manifest/version/Makefile/gitignore):
+- [x] Run: `npx vitest run src/project/adoption-ops-actions.test.ts` — expect FAILURE (module missing).
+- [x] Add the installer dry-run path API so the preview derives the COMPLETE write set (not just component dests). In `src/core/agent-ops/install.ts`, export `plannedInstallPaths`, mirroring `installAgentOps`'s own requested-file logic (the make fragment for any component, plus manifest/version/Makefile/gitignore):
 
 ```ts
 /** Every project-root-relative path installAgentOps creates or edits for these
@@ -4827,7 +4969,7 @@ export function plannedInstallPaths(components: AgentOpsComponent[]): string[] {
 ```
 
   (`AgentOpsComponent`, `MAKE_FRAGMENT_TMPL`, `MANIFEST_PATH`, `VERSION_MARKER_PATH` already live in this file. Export `AgentOpsComponent` if it is not already.)
-- [ ] Create `src/project/adoption-ops-actions.ts`:
+- [x] Create `src/project/adoption-ops-actions.ts`:
 
 ```ts
 import fs from 'node:fs'
@@ -4985,12 +5127,12 @@ export function renderOpsActionsSection(records: OpsActionRecord[]): string[] {
 }
 ```
 
-- [ ] Run: `npx vitest run src/project/adoption-ops-actions.test.ts` — expect 10 tests passed.
-- [ ] Join the records into the R1 plan + `plan_key`. Locate the builder: `grep -rln "plan_key" src/project --include="*.ts" | grep -v test` (R1 architecture places it at `src/project/adoption-plan*.ts`). Apply three edits at the located sites:
+- [x] Run: `npx vitest run src/project/adoption-ops-actions.test.ts` — expect 10 tests passed.
+- [x] Join the records into the R1 plan + `plan_key`. Locate the builder: `grep -rln "plan_key" src/project --include="*.ts" | grep -v test` (R1 architecture places it at `src/project/adoption-plan*.ts`). Apply three edits at the located sites:
   1. **Key input:** in the object whose canonical JSON is hashed into `plan_key` (D1's "complete apply-action records" — R1 hashes `{initialize, includes, steps, disabled}`-shaped records), add the field `ops_actions: buildOpsActions(projectRoot)` (computed once per render and reused for rendering, never recomputed between keying and rendering). Import: `import { buildOpsActions, renderOpsActionsSection } from './adoption-ops-actions.js'` (adjust relative path).
   2. **JSON output:** include the same `ops_actions` array verbatim in the plan's JSON payload.
   3. **Human/markdown output:** append `renderOpsActionsSection(opsActions)` lines after the disposition section (before the follow-up-commands footer).
-- [ ] Append the key-sensitivity test to the R1 plan-key test file (locate: `grep -rln "plan_key" src/project --include="*.test.ts"`), using that file's existing plan-render helper (the one its other plan_key tests already call) against a tmp project:
+- [x] Append the key-sensitivity test to the R1 plan-key test file (locate: `grep -rln "plan_key" src/project --include="*.test.ts"`), using that file's existing plan-render helper (the one its other plan_key tests already call) against a tmp project:
 
 ```ts
   it('plan_key changes when an ops-action record changes (R2 §6.1)', () => {
@@ -5004,8 +5146,8 @@ export function renderOpsActionsSection(records: OpsActionRecord[]): string[] {
 ```
 
   Implement the body with the file's own helper + fixture idioms (the comment above is the specification of the assertion; the two renders and `expect(keyA).not.toBe(keyB)` are the required outcome).
-- [ ] Run: `npx vitest run src/project` — R1 plan tests + the new ones all green.
-- [ ] Commit: `git add -A && git commit -m "feat(adopt): ops-actions preview section — records join plan_key (§6.1 R2)"`
+- [x] Run: `npx vitest run src/project` — R1 plan tests + the new ones all green.
+- [x] Commit: `git add -A && git commit -m "feat(adopt): ops-actions preview section — records join plan_key (§6.1 R2)"`
 
 ---
 
@@ -5024,7 +5166,7 @@ export function renderOpsActionsSection(records: OpsActionRecord[]): string[] {
 
 **Steps:**
 
-- [ ] `git-workflow.md` — replace instructions 3 and 4 (the two jq snippets, currently lines 213–251). Edit old string:
+- [x] `git-workflow.md` — replace instructions 3 and 4 (the two jq snippets, currently lines 213–251). Edit old string:
 
 ````markdown
 3. **Register the Beads destructive-command guard** (only when the project
@@ -5105,7 +5247,7 @@ export function renderOpsActionsSection(records: OpsActionRecord[]): string[] {
    `scaffold hooks install` prints this wiring guidance too.
 ````
 
-- [ ] `git-workflow.md` — update the PostToolUse section intro (keep the heading and the JSON block byte-for-byte; `automated-pr-review` cross-references both). Edit old string:
+- [x] `git-workflow.md` — update the PostToolUse section intro (keep the heading and the JSON block byte-for-byte; `automated-pr-review` cross-references both). Edit old string:
 
 ```markdown
 ### Configure the PostToolUse review-reminder hook
@@ -5130,7 +5272,7 @@ unrelated existing hooks. The registered hook, for reference (equivalence
 is detected on the `gh pr create` trigger string):
 ```
 
-- [ ] `git-workflow.md` — Expected Outputs. Edit old string:
+- [x] `git-workflow.md` — Expected Outputs. Edit old string:
 
 ```markdown
 - .claude/settings.json — gains a PostToolUse reminder hook that fires after
@@ -5149,7 +5291,7 @@ is detected on the `gh pr create` trigger string):
   — all registered via `scaffold hooks install`, never hand-merged
 ```
 
-- [ ] `git-workflow.md` — scheduler mention in the quality-gates section. Edit old string:
+- [x] `git-workflow.md` — scheduler mention in the quality-gates section. Edit old string:
 
 ```markdown
    local poller (`make post-merge-watch`, cron/launchd) when
@@ -5162,7 +5304,7 @@ is detected on the `gh pr create` trigger string):
    install post-merge-poller`) when
 ```
 
-- [ ] `git-workflow.md` — Mode Detection block. Edit old string:
+- [x] `git-workflow.md` — Mode Detection block. Edit old string:
 
 ```markdown
 Update mode if docs/git-workflow.md exists. In update mode: preserve the
@@ -5184,7 +5326,7 @@ Re-run `scaffold hooks install` in update mode too — it is idempotent and
 repairs missing hook registrations without touching user entries.
 ```
 
-- [ ] `git-workflow.md` — Update Mode Specifics triggers. Edit old string:
+- [x] `git-workflow.md` — Update Mode Specifics triggers. Edit old string:
 
 ```markdown
 - **Triggers for update**: coding-standards.md changed commit format,
@@ -5203,7 +5345,7 @@ repairs missing hook registrations without touching user entries.
   (repair: `scaffold hooks install`)
 ```
 
-- [ ] `merge-throughput.md` — Expected Outputs. Edit old string:
+- [x] `merge-throughput.md` — Expected Outputs. Edit old string:
 
 ```markdown
 - docs/merge-queue.md — how the queue works (enqueue → batch → land/eject),
@@ -5236,7 +5378,7 @@ repairs missing hook registrations without touching user entries.
   instruction 3)
 ```
 
-- [ ] `merge-throughput.md` — quality criterion. Edit old string:
+- [x] `merge-throughput.md` — quality criterion. Edit old string:
 
 ```markdown
   `local-poller` (poller scheduled via cron/launchd, no workflows)
@@ -5249,7 +5391,7 @@ repairs missing hook registrations without touching user entries.
   post-merge-poller`, verified loaded, no workflows)
 ```
 
-- [ ] `merge-throughput.md` — Mode Detection block. Edit old string:
+- [x] `merge-throughput.md` — Mode Detection block. Edit old string:
 
 ```markdown
 Update mode if docs/merge-queue.md exists. In update mode: re-run
@@ -5273,7 +5415,7 @@ install post-merge-poller` when it is not), preserve the project's tuned
 upstream contracts changed.
 ```
 
-- [ ] `merge-throughput.md` — Update Mode Specifics triggers. Edit old string:
+- [x] `merge-throughput.md` — Update Mode Specifics triggers. Edit old string:
 
 ```markdown
 - **Triggers for update**: `scaffold agent-ops check` reports a stale bundle,
@@ -5289,7 +5431,7 @@ upstream contracts changed.
   registrations missing from `.claude/settings.json`
 ```
 
-- [ ] `merge-throughput.md` — §2 component installs gain the gate seed + classification confirmation (D7). Edit old string:
+- [x] `merge-throughput.md` — §2 component installs gain the gate seed + classification confirmation (D7). Edit old string:
 
 ````markdown
 ```bash
@@ -5319,7 +5461,7 @@ are project-owned after generation (`agent-ops check` reports them only if
 missing; `--force` regenerates from a fresh ingestion).
 ````
 
-- [ ] `content/pipeline/foundation/tdd.md` — the two-gate criterion points at the gate seed with the same confirmation. Edit old string:
+- [x] `content/pipeline/foundation/tdd.md` — the two-gate criterion points at the gate seed with the same confirmation. Edit old string:
 
 ```markdown
 - (mvp) Two-gate contract defined: `make check-affected` (fast, selection-based —
@@ -5344,7 +5486,7 @@ missing; `--force` regenerates from a fresh ingestion).
   user before committing the seeds
 ```
 
-- [ ] `merge-throughput.md` — §2 hook registration pointer. Edit old string:
+- [x] `merge-throughput.md` — §2 hook registration pointer. Edit old string:
 
 ```markdown
 Then register the mq-guard hook per the git-workflow step's instruction 4.
@@ -5357,7 +5499,7 @@ Then register the mq-guard hook: run `scaffold hooks install` (idempotent;
 skips hooks whose prerequisites are missing and reports why).
 ```
 
-- [ ] `merge-throughput.md` — §3 local-poller scheduling prose. Edit old string:
+- [x] `merge-throughput.md` — §3 local-poller scheduling prose. Edit old string:
 
 ```markdown
 - `local-poller`: schedule `make post-merge-watch` every ~10 minutes via
@@ -5380,7 +5522,7 @@ skips hooks whose prerequisites are missing and reports why).
   same heartbeat.
 ````
 
-- [ ] `merge-throughput.md` — §4 runbook contents. Edit old string:
+- [x] `merge-throughput.md` — §4 runbook contents. Edit old string:
 
 ```markdown
 bead, fix-SLA), calibration (`scaffold mq stats`), and the deliberate
@@ -5397,7 +5539,7 @@ block message points at it), and the deliberate
 direct-merge procedure (human-only). Close with a short **Alternatives**
 ```
 
-- [ ] Update `tests/beads-pipeline-content.bats` — extend the existing registration assertion. Edit old string:
+- [x] Update `tests/beads-pipeline-content.bats` — extend the existing registration assertion. Edit old string:
 
 ```bash
 @test "git-workflow registers bd-guard as a PreToolUse hook (merge, never overwrite)" {
@@ -5418,7 +5560,7 @@ direct-merge procedure (human-only). Close with a short **Alternatives**
 }
 ```
 
-- [ ] Append the R2 content tests to `tests/merge-throughput-content.bats`:
+- [x] Append the R2 content tests to `tests/merge-throughput-content.bats`:
 
 ```bash
 # --- Brownfield R2: ops last mile (D6/D7/D8/D9 content) ---
@@ -5450,9 +5592,9 @@ direct-merge procedure (human-only). Close with a short **Alternatives**
 
   (The PostToolUse reference JSON keeps its `jq -r '.tool_input...'` runtime command — that is the hook's own body, not a registration snippet; the assertion above targets only the retired registration jq.)
 
-- [ ] Run: `bats tests/beads-pipeline-content.bats tests/merge-throughput-content.bats` — all `ok` (pre-existing + 3 new; the pre-existing "tdd step defines the two-gate contract" test keeps passing — its four grep targets all survive the tdd.md edit).
-- [ ] Run: `make validate` — frontmatter untouched, expect clean. Then sweep for stragglers: `grep -rn "cron/launchd\|instruction 4" content/pipeline content/knowledge content/agent-skills` — expect NO hits in `git-workflow.md`/`merge-throughput.md` (hits elsewhere, if any, are out of this task's scope only when they do not instruct manual hook/scheduler setup; anything still instructing the retired manual flow gets the same one-line replacement).
-- [ ] Commit: `git add -A && git commit -m "docs(content): git-workflow + merge-throughput point at scaffold hooks/sched/mq bootstrap (spec §7)"`
+- [x] Run: `bats tests/beads-pipeline-content.bats tests/merge-throughput-content.bats` — all `ok` (pre-existing + 3 new; the pre-existing "tdd step defines the two-gate contract" test keeps passing — its four grep targets all survive the tdd.md edit).
+- [x] Run: `make validate` — frontmatter untouched, expect clean. Then sweep for stragglers: `grep -rn "cron/launchd\|instruction 4" content/pipeline content/knowledge content/agent-skills` — expect NO hits in `git-workflow.md`/`merge-throughput.md` (hits elsewhere, if any, are out of this task's scope only when they do not instruct manual hook/scheduler setup; anything still instructing the retired manual flow gets the same one-line replacement).
+- [x] Commit: `git add -A && git commit -m "docs(content): git-workflow + merge-throughput point at scaffold hooks/sched/mq bootstrap (spec §7)"`
 
 ---
 
@@ -5466,12 +5608,12 @@ direct-merge procedure (human-only). Close with a short **Alternatives**
 
 **Steps:**
 
-- [ ] Run: `npx vitest run src` — the FULL TypeScript suite green (sched, hooks, gate-ingest, agent-ops, merge-queue incl. bootstrap, doctor incl. fixes + gate-probe, project incl. ops-actions, plus all pre-existing suites).
-- [ ] Run: `npx tsc --noEmit -p tsconfig.json` — clean.
-- [ ] Run: `make check-all` — every gate green (ShellCheck, frontmatter validation, the bats suite incl. the new gate/guard/content tests, evals, TypeScript). Expected tail: each sub-gate reporting success and exit code 0.
-- [ ] If any gate fails, fix the root cause and re-run `make check-all` until green — specifically watch for: (a) ShellCheck on the two gate templates (they are `.tmpl` and excluded from the sweep, but the bats-rendered copies must be clean); (b) eval-suite content checks over the edited steps (`tests/evals/` — block-placement and cross-reference lenses must still pass on git-workflow/merge-throughput); (c) any pre-existing test that pinned the mq action list or the `AgentOpsInstallResult` shape (Tasks 10, 11, 15 already include their known fix-ups).
-- [ ] Verify the working tree is fully committed: `git status --short` — empty output (every task committed as it landed).
-- [ ] Commit (only if fix-ups were needed): `git add -A && git commit -m "test: R2 full-suite fix-ups — make check-all green"`
+- [x] Run: `npx vitest run src` — the FULL TypeScript suite green (sched, hooks, gate-ingest, agent-ops, merge-queue incl. bootstrap, doctor incl. fixes + gate-probe, project incl. ops-actions, plus all pre-existing suites).
+- [x] Run: `npx tsc --noEmit -p tsconfig.json` — clean.
+- [x] Run: `make check-all` — every gate green (ShellCheck, frontmatter validation, the bats suite incl. the new gate/guard/content tests, evals, TypeScript). Expected tail: each sub-gate reporting success and exit code 0.
+- [x] If any gate fails, fix the root cause and re-run `make check-all` until green — specifically watch for: (a) ShellCheck on the two gate templates (they are `.tmpl` and excluded from the sweep, but the bats-rendered copies must be clean); (b) eval-suite content checks over the edited steps (`tests/evals/` — block-placement and cross-reference lenses must still pass on git-workflow/merge-throughput); (c) any pre-existing test that pinned the mq action list or the `AgentOpsInstallResult` shape (Tasks 10, 11, 15 already include their known fix-ups).
+- [x] Verify the working tree is fully committed: `git status --short` — empty output (every task committed as it landed).
+- [x] Commit (only if fix-ups were needed): `git add -A && git commit -m "test: R2 full-suite fix-ups — make check-all green"`
 
 ---
 

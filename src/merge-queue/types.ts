@@ -42,6 +42,14 @@ export type JournalEvent =
       type: 'gate_metrics'; batchId: string; seconds: number
       result: 'green' | 'red' | 'timeout'; at: string
     }
+  // D9 bootstrap events: EVERY event carries bootstrapId (ULID) + pr + the
+  // gated head SHA; bootstrap_merged additionally records the merge commit.
+  | { type: 'bootstrap_intent'; bootstrapId: string; pr: number; gatedHeadSha: string; at: string }
+  | {
+      type: 'bootstrap_merged'; bootstrapId: string; pr: number; gatedHeadSha: string
+      mergeCommitSha: string; at: string
+    }
+  | { type: 'bootstrap_armed'; bootstrapId: string; pr: number; gatedHeadSha: string; at: string }
 
 export interface QueueState {
   entries: Map<number, PrEntry>

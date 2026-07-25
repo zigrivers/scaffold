@@ -102,3 +102,29 @@ ROOT="$BATS_TEST_DIRNAME/.."
   grep -q 'fallback' "$ROOT/content/knowledge/execution/multi-agent-coordination.md"
   ! grep -q 'CI is deliberately deferred' "$ROOT/content/knowledge/core/git-workflow-patterns.md"
 }
+
+# --- Brownfield R2: ops last mile (D6/D7/D8/D9 content) ---
+@test "merge-throughput schedules the local poller via scaffold sched (no cron prose)" {
+  F="$ROOT/content/pipeline/environment/merge-throughput.md"
+  grep -q 'scaffold sched install post-merge-poller' "$F"
+  grep -q 'scaffold sched status post-merge-poller' "$F"
+  grep -q 'scaffold hooks install' "$F"
+  grep -q 'mq bootstrap' "$F"
+  ! grep -q 'cron/launchd' "$F"
+}
+
+@test "merge-throughput and tdd seed the gate component with a confirmed classification" {
+  F="$ROOT/content/pipeline/environment/merge-throughput.md"
+  T="$ROOT/content/pipeline/foundation/tdd.md"
+  grep -q 'agent-ops install --component gate' "$F"
+  grep -q 'CONFIRM' "$F"
+  grep -q 'agent-ops install --component gate' "$T"
+  grep -q 'check-visual' "$T"
+}
+
+@test "git-workflow registers hooks via scaffold hooks install (no jq registration snippets)" {
+  F="$ROOT/content/pipeline/environment/git-workflow.md"
+  grep -q 'scaffold hooks install' "$F"
+  ! grep -q "jq '.hooks.PreToolUse" "$F"
+  ! grep -q 'cron/launchd' "$F"
+}

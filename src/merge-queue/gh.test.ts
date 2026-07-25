@@ -132,3 +132,29 @@ describe('createGhClient', () => {
     expect(args).toContain('pr comment 9 --body hello there')
   })
 })
+
+describe('mergeCommitSha (D9)', () => {
+  afterEach(() => {
+    delete process.env.MQ_GH_CMD
+  })
+  function fakeGhBin(mergeCommitJson: string): string {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gh-fake-'))
+    const bin = path.join(dir, 'gh')
+    fs.writeFileSync(bin, [
+      '#!/bin/bash',
+      'if [ "$1" = "--version" ]; then echo gh-fake; exit 0; fi',
+      `printf '%s' '${mergeCommitJson}'`,
+    ].join('\n'), { mode: 0o755 })
+    return bin
+  }
+  it('returns the merge commit oid', () => {
+    process.env.MQ_GH_CMD = fakeGhBin('{"mergeCommit":{"oid":"abc123"}}')
+    const client = createGhClient(os.tmpdir())
+    expect(client.mergeCommitSha(5)).toBe('abc123')
+  })
+  it('returns null while GitHub reports no merge commit yet', () => {
+    process.env.MQ_GH_CMD = fakeGhBin('{"mergeCommit":null}')
+    const client = createGhClient(os.tmpdir())
+    expect(client.mergeCommitSha(5)).toBeNull()
+  })
+})

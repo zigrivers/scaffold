@@ -5,13 +5,18 @@ import path from 'node:path'
 import { getPackageRoot } from '../../utils/fs.js'
 import { getPackageVersion, resolveSkillTemplate } from '../skills/sync.js'
 import { loadAgentOpsConfig, type AgentOpsConfig } from './config.js'
+import { gateTemplateVars, type GateSeed } from './gate-ingest.js'
 
-export type AgentOpsComponent = 'git' | 'staging' | 'merge-queue' | 'ci'
+export type AgentOpsComponent = 'git' | 'staging' | 'merge-queue' | 'ci' | 'gate'
 
 export interface AgentOpsFileSpec {
   dest: string
   component: AgentOpsComponent
   executable: boolean
+  /** seed:true = generated ONCE, project-owned afterward: `agent-ops check`
+   *  reports it only when missing (never drifted); re-install never overwrites
+   *  without --force (spec D7). */
+  seed?: boolean
 }
 
 export const AGENT_OPS_FILE_MAP: Record<string, AgentOpsFileSpec> = {
@@ -95,6 +100,18 @@ export const AGENT_OPS_FILE_MAP: Record<string, AgentOpsFileSpec> = {
     component: 'merge-queue',
     executable: true,
   },
+  'gate/gate-check.sh.tmpl': {
+    dest: 'scripts/gate-check.sh',
+    component: 'gate',
+    executable: true,
+    seed: true,
+  },
+  'gate/gate-check-affected.sh.tmpl': {
+    dest: 'scripts/gate-check-affected.sh',
+    component: 'gate',
+    executable: true,
+    seed: true,
+  },
   'ci/setup-gh-runner.sh.tmpl': {
     dest: 'scripts/ops/setup-gh-runner.sh',
     component: 'ci',
@@ -119,6 +136,8 @@ const MAKEFILE_INCLUDE = '-include agent-ops.mk'
 export interface AgentOpsInstallOptions {
   components: AgentOpsComponent[]
   force?: boolean
+  /** Required when components includes 'gate' (Task 9 ingestion output). */
+  gateSeed?: GateSeed
   /** Test override for content/assets/agent-ops */
   templateRoot?: string
 }
@@ -126,6 +145,8 @@ export interface AgentOpsInstallOptions {
 export interface AgentOpsInstallResult {
   installed: string[]
   skippedModified: string[]
+  /** Seed files that already existed — kept untouched (project-owned). */
+  seedKept: string[]
   errors: string[]
 }
 
@@ -150,6 +171,8 @@ const MAKE_FRAGMENT_TMPL = 'make/agent-ops.mk.tmpl'
 interface Manifest {
   version: string
   files: Record<string, string>
+  /** Dests generated with seed:true — presence-checked only, never hashed. */
+  seeds: string[]
 }
 
 function sha256(content: string | Buffer): string {
@@ -158,8 +181,9 @@ function sha256(content: string | Buffer): string {
 
 function readManifest(projectRoot: string): Manifest {
   const p = path.join(projectRoot, MANIFEST_PATH)
-  if (!fs.existsSync(p)) return { version: '', files: {} }
-  return JSON.parse(fs.readFileSync(p, 'utf8')) as Manifest
+  if (!fs.existsSync(p)) return { version: '', files: {}, seeds: [] }
+  const raw = JSON.parse(fs.readFileSync(p, 'utf8')) as Partial<Manifest>
+  return { version: raw.version ?? '', files: raw.files ?? {}, seeds: raw.seeds ?? [] }
 }
 
 // Shell variable names cannot contain a dash, so a service like `redis-cache`
@@ -247,9 +271,15 @@ function ensureGitignoreEntry(projectRoot: string, entry: string): void {
 export function installAgentOps(projectRoot: string, opts: AgentOpsInstallOptions): AgentOpsInstallResult {
   const templateRoot = opts.templateRoot ?? path.join(getPackageRoot(), 'content', 'assets', 'agent-ops')
   const config = loadAgentOpsConfig(projectRoot)
-  const vars = buildTemplateVars(config, projectRoot)
   const manifest = readManifest(projectRoot)
-  const result: AgentOpsInstallResult = { installed: [], skippedModified: [], errors: [] }
+  if (opts.components.includes('gate') && opts.gateSeed === undefined) {
+    throw new Error('gate component requires a gateSeed — run ingestGateSeed(projectRoot) first')
+  }
+  const vars = {
+    ...buildTemplateVars(config, projectRoot),
+    ...(opts.gateSeed !== undefined ? gateTemplateVars(opts.gateSeed) : {}),
+  }
+  const result: AgentOpsInstallResult = { installed: [], skippedModified: [], seedKept: [], errors: [] }
 
   for (const [tmpl, spec] of Object.entries(AGENT_OPS_FILE_MAP)) {
     const requested =
@@ -264,7 +294,13 @@ export function installAgentOps(projectRoot: string, opts: AgentOpsInstallOption
     }
 
     const destPath = path.join(projectRoot, spec.dest)
-    if (fs.existsSync(destPath) && !opts.force) {
+    if (spec.seed === true && fs.existsSync(destPath) && !opts.force) {
+      // Project-owned seed: NEVER overwrite without --force, regardless of hash.
+      result.seedKept.push(spec.dest)
+      if (!manifest.seeds.includes(spec.dest)) manifest.seeds.push(spec.dest)
+      continue
+    }
+    if (spec.seed !== true && fs.existsSync(destPath) && !opts.force) {
       // Overwrite only files we own (manifest entry exists) and that are
       // unmodified (manifest hash matches disk). A file with no manifest
       // entry is a pre-existing user file — never clobber it without force.
@@ -281,7 +317,11 @@ export function installAgentOps(projectRoot: string, opts: AgentOpsInstallOption
       fs.mkdirSync(path.dirname(destPath), { recursive: true })
       fs.writeFileSync(destPath, resolved)
       if (spec.executable) fs.chmodSync(destPath, 0o755)
-      manifest.files[spec.dest] = sha256(resolved)
+      if (spec.seed === true) {
+        if (!manifest.seeds.includes(spec.dest)) manifest.seeds.push(spec.dest)
+      } else {
+        manifest.files[spec.dest] = sha256(resolved)
+      }
       result.installed.push(spec.dest)
     } catch (err) {
       result.errors.push(`${spec.dest}: ${err}`)
@@ -303,7 +343,33 @@ export function installAgentOps(projectRoot: string, opts: AgentOpsInstallOption
   // targets self-guard; git targets fail loudly if their scripts are absent.
   if (opts.components.length > 0) ensureMakefileInclude(projectRoot)
   if (opts.components.includes('merge-queue')) ensureGitignoreEntry(projectRoot, GITIGNORE_MQ_ENTRY)
+  if (opts.components.includes('gate') && opts.gateSeed !== undefined) {
+    ensureGateMakeTargets(projectRoot, opts.gateSeed)
+  }
   return result
+}
+
+/** Every project-root-relative path installAgentOps creates or edits for these
+ *  components: the requested component seed/dest files, the shared make fragment
+ *  (installed for ANY component), the ownership manifest, the version marker, the
+ *  Makefile include, and — for merge-queue — the .gitignore entry. Sorted,
+ *  de-duplicated, read-only. The ops-actions preview derives install-component
+ *  file lists from THIS (never from AGENT_OPS_FILE_MAP directly), so the preview
+ *  and its plan_key can never omit an apply-relevant write. Keep this in lockstep
+ *  with installAgentOps — the two must agree on what a component install writes. */
+export function plannedInstallPaths(components: AgentOpsComponent[]): string[] {
+  const set = new Set<string>()
+  for (const [tmpl, spec] of Object.entries(AGENT_OPS_FILE_MAP)) {
+    const requested = tmpl === MAKE_FRAGMENT_TMPL
+      ? components.length > 0
+      : components.includes(spec.component)
+    if (requested) set.add(spec.dest)
+  }
+  set.add(MANIFEST_PATH)
+  set.add(VERSION_MARKER_PATH)
+  if (components.length > 0) set.add('Makefile')
+  if (components.includes('merge-queue')) set.add('.gitignore')
+  return [...set].sort()
 }
 
 export function checkAgentOps(projectRoot: string): AgentOpsCheckResult {
@@ -319,18 +385,27 @@ export function checkAgentOps(projectRoot: string): AgentOpsCheckResult {
     if (!fs.existsSync(p)) missing.push(dest)
     else if (sha256(fs.readFileSync(p)) !== hash) modified.push(dest)
   }
+  // Seeds are project-owned after generation: report a seed only when it has
+  // gone missing entirely — never as "modified", since editing it is expected.
+  for (const dest of manifest.seeds) {
+    if (!fs.existsSync(path.join(projectRoot, dest))) missing.push(dest)
+  }
   // A component counts as previously installed if the version marker exists
   // (some install ran) or the manifest already holds one of its dests. For such
   // components, any known dest missing from the manifest is "unmanaged" — a
   // pre-existing file the installer refused to clobber. Reported, never gating.
   const installedComponents = new Set<AgentOpsComponent>()
   for (const spec of Object.values(AGENT_OPS_FILE_MAP)) {
-    if (manifest.files[spec.dest]) installedComponents.add(spec.component)
+    if (manifest.files[spec.dest] || manifest.seeds.includes(spec.dest)) {
+      installedComponents.add(spec.component)
+    }
   }
   const unmanaged: string[] = []
   for (const spec of Object.values(AGENT_OPS_FILE_MAP)) {
     const componentInstalled = markerPresent || installedComponents.has(spec.component)
-    if (componentInstalled && !manifest.files[spec.dest]) unmanaged.push(spec.dest)
+    if (componentInstalled && !manifest.files[spec.dest] && !manifest.seeds.includes(spec.dest)) {
+      unmanaged.push(spec.dest)
+    }
   }
   return {
     upToDate: !staleVersion && modified.length === 0 && missing.length === 0,
@@ -339,4 +414,42 @@ export function checkAgentOps(projectRoot: string): AgentOpsCheckResult {
     missing,
     unmanaged,
   }
+}
+
+/** Thin, project-owned Makefile targets wiring the seeds into the mq contract
+ *  (`make check` / `make check-affected`). Appended ONLY when absent — an
+ *  existing target of the same name is always respected (D7). */
+export function ensureGateMakeTargets(projectRoot: string, seed: GateSeed): string[] {
+  const mkPath = path.join(projectRoot, 'Makefile')
+  const body = fs.existsSync(mkPath) ? fs.readFileSync(mkPath, 'utf8') : ''
+  const hasTarget = (name: string): boolean => new RegExp(`^${name}:`, 'm').test(body)
+  const additions: string[] = []
+  let out = body
+  const sep = (): string => (out === '' || out.endsWith('\n') ? '' : '\n')
+  if (!hasTarget('check')) {
+    out +=
+      `${sep()}\ncheck: ## Full quality gate (seeded — scripts/gate-check.sh is project-owned)\n` +
+      '\t./scripts/gate-check.sh\n'
+    additions.push('check')
+  }
+  if (!hasTarget('check-affected')) {
+    out +=
+      `${sep()}\ncheck-affected: ## Affected-only merge gate (seeded — scripts/gate-check-affected.sh)\n` +
+      '\t./scripts/gate-check-affected.sh\n'
+    additions.push('check-affected')
+  }
+  if (seed.visualCommands.length > 0 && !hasTarget('check-visual')) {
+    out +=
+      `${sep()}\ncheck-visual: ## Environment-sensitive suites — EXCLUDED from the merge-queue gate\n` +
+      `\t${seed.visualCommands.join('\n\t')}\n`
+    additions.push('check-visual')
+  }
+  // Declare the seeded targets .PHONY so a stray file/dir named `check` (common
+  // in some project layouts) can't make `make check` no-op and silently report
+  // success — a phantom-satisfied target would bypass the quality gate entirely.
+  if (additions.length > 0) {
+    out += `${sep()}\n.PHONY: ${additions.join(' ')}\n`
+  }
+  if (out !== body) fs.writeFileSync(mkPath, out)
+  return additions
 }

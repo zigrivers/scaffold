@@ -29,6 +29,8 @@ import knowledgeFreshnessCommand from './commands/knowledge-freshness.js'
 import guidesCommand from './commands/guides.js'
 import agentOpsCommand from './commands/agent-ops.js'
 import mqCommand from './commands/mq.js'
+import schedCommand from './commands/sched.js'
+import hooksCommand from './commands/hooks.js'
 
 export async function runCli(argv: string[]): Promise<void> {
   shutdown.install()
@@ -62,6 +64,8 @@ export async function runCli(argv: string[]): Promise<void> {
     .command(knowledgeFreshnessCommand)
     .command(agentOpsCommand)
     .command(mqCommand)
+    .command(schedCommand)
+    .command(hooksCommand)
     .options({
       format: {
         type: 'string',

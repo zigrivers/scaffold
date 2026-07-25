@@ -43,6 +43,13 @@ teardown() { rm -rf "$TMP"; }
   [[ "$output" != *"MQ_DIRECT_MERGE_OK"* ]]
 }
 
+@test "mq-guard block message points first-time installers at mq bootstrap" {
+  run "$TMP/mq-guard.sh" --check 'gh pr merge 11 --squash'
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"scaffold mq bootstrap"* ]]
+  [[ "$output" != *"MQ_DIRECT_MERGE_OK"* ]]
+}
+
 @test "mq-guard hook mode blocks via stdin JSON envelope" {
   command -v jq >/dev/null 2>&1 || skip "jq not installed"
   run bash -c "echo '{\"tool_input\":{\"command\":\"gh pr merge 3 --squash\"}}' | '$TMP/mq-guard.sh'"

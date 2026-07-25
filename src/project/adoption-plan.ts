@@ -9,6 +9,7 @@ import { verifyStep } from '../state/completion.js'
 import type { DetectCheckResult, StepVerification } from '../state/completion.js'
 import { TYPE_KEY } from './adopt.js'
 import type { AdoptionResult } from './adopt.js'
+import { buildOpsActions, renderOpsActionsSection, type OpsActionRecord } from './adoption-ops-actions.js'
 import type { MethodologyName, PipelineState, ScaffoldError } from '../types/index.js'
 import type { ScaffoldConfig, StepEnablementEntry } from '../types/config.js'
 
@@ -50,6 +51,9 @@ export interface AdoptionPlan {
   initialize: InitializeRecord | null
   steps: StepPlanRecord[]
   disabled_by_preset: string[]
+  /** R2 §6.1 ops-actions preview — joins plan_key (D1: no apply-relevant ops
+   *  detail can change without changing the key). */
+  ops_actions: OpsActionRecord[]
   plan_key: string
 }
 
@@ -73,20 +77,23 @@ export function canonicalJson(value: unknown): string {
 /**
  * plan_key (D1): sha256 hex over the canonical JSON of the COMPLETE apply-action
  * records — initialize record, sorted includes, per-step records sorted by slug,
- * sorted disabled-by-preset slugs. generated_at / project_root / markdown prose
- * never participate.
+ * sorted disabled-by-preset slugs, and (R2 §6.1) the ops-actions preview records.
+ * generated_at / project_root / markdown prose never participate.
  */
 export function computePlanKey(input: {
   initialize: InitializeRecord | null
   includes: string[]
   steps: StepPlanRecord[]
   disabled_by_preset: string[]
+  /** Optional for R1-era callers — omitted keys the same as an empty preview. */
+  ops_actions?: OpsActionRecord[]
 }): string {
   const canonical = canonicalJson({
     initialize: input.initialize,
     includes: [...input.includes].sort(),
     steps: [...input.steps].sort((a, b) => a.step_slug.localeCompare(b.step_slug)),
     disabled_by_preset: [...input.disabled_by_preset].sort(),
+    ops_actions: input.ops_actions ?? [],
   })
   return crypto.createHash('sha256').update(canonical).digest('hex')
 }
@@ -199,7 +206,15 @@ export function buildAdoptionPlan(options: {
     },
   }
 
-  const plan_key = computePlanKey({ initialize, includes, steps: records, disabled_by_preset: disabled })
+  // Computed once per render and reused for both keying and rendering — the
+  // preview shown to the user is guaranteed to be the exact input the key
+  // covers (never recomputed between the two, which could observe a fs change
+  // mid-render and desync the shown preview from the key).
+  const opsActions = buildOpsActions(projectRoot)
+
+  const plan_key = computePlanKey({
+    initialize, includes, steps: records, disabled_by_preset: disabled, ops_actions: opsActions,
+  })
   return {
     plan: {
       generated_at: new Date().toISOString(),
@@ -210,6 +225,7 @@ export function buildAdoptionPlan(options: {
       initialize,
       steps: records,
       disabled_by_preset: disabled,
+      ops_actions: opsActions,
       plan_key,
     },
     errors,
@@ -252,6 +268,8 @@ export function renderPlanMarkdown(plan: AdoptionPlan): string {
       `| ${record.step_slug} | ${record.disposition} | ${record.apply_action} | ${evidence.join('; ') || '—'} |`,
     )
   }
+  lines.push('')
+  lines.push(...renderOpsActionsSection(plan.ops_actions))
   lines.push('')
   lines.push('## Disabled by preset (opt-in)')
   lines.push('')

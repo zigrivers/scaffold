@@ -1542,6 +1542,10 @@ You can change methodology mid-pipeline with `scaffold init --methodology <prese
 | `scaffold build` | Generate hidden adapter output under `.scaffold/generated/` and update the managed `.gitignore` block |
 | `scaffold adopt` | Render an Adoption Plan for an existing project (propose-then-apply; writes nothing until `--apply --plan-key <sha256>`) |
 | `scaffold doctor` | Execute a health check of the installed surface (pipeline verification, beads, hooks, gate targets, merge queue, scheduler); `--json`, `--fix` |
+| `scaffold sched install \| uninstall \| status \| list` | Manage the merge queue's post-merge full-gate poller as a launchd (macOS) or systemd (Linux) job; the install verifies the job actually loaded |
+| `scaffold hooks install` | Register the Claude Code hooks (bd-guard, mq-guard, `bd prime`, review reminder) by deep-merging `.claude/settings.json` — append-only, idempotent, never clobbers a malformed file |
+| `scaffold mq bootstrap --pr <N> [--finish]` | Arm-first guided FIRST merge for a repo installing the queue in its own PR (gate on head → crash-safe journaled squash-merge → arm hooks + scheduler); `--finish` reconciles a partial run |
+| `scaffold agent-ops install --component gate` | Generate the project-owned `scripts/gate-check.sh` + `scripts/gate-check-affected.sh` seeds (the merge-queue gate contract; seeded from `package.json` + workflows) |
 | `scaffold skip <step> [<step2>...]` | Skip one or more steps with a reason |
 | `scaffold complete <step>` | Mark a step as completed (for steps executed outside `scaffold run`) |
 | `scaffold reset <step>` | Reset a step back to pending |

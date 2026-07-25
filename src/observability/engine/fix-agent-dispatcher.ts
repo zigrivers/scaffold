@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import { parseShell } from '../../core/parse-shell.js'
 
 export interface DispatchFixInput {
   prompt: string
@@ -10,22 +11,6 @@ export interface DispatchFixInput {
 export type DispatchFixResult =
   | { ok: true; exit_code: 0; elapsed_ms: number }
   | { ok: false; reason: string; exit_code?: number; timed_out?: boolean; elapsed_ms?: number }
-
-function parseShell(cmd: string): string[] {
-  const args: string[] = []
-  let current = ''
-  let inSingle = false
-  let inDouble = false
-  for (let i = 0; i < cmd.length; i++) {
-    const ch = cmd[i]
-    if (ch === '\'' && !inDouble) { inSingle = !inSingle }
-    else if (ch === '"' && !inSingle) { inDouble = !inDouble }
-    else if (ch === ' ' && !inSingle && !inDouble) { if (current) { args.push(current); current = '' } }
-    else { current += ch }
-  }
-  if (current) args.push(current)
-  return args
-}
 
 // dispatcher_command is maintainer-controlled (.scaffold/observability.yaml in the user's own repo).
 // spawn() without shell:true limits injection to the argv array, but `sh -c "..."` is a valid config.

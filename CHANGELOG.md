@@ -4,6 +4,66 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.49.0] - 2026-07-24
+
+Brownfield adoption, Tier C — **Ops Last-Mile**. Turns R1's propose-then-apply
+plan into runnable ops surfaces: scheduling, gate seeds, native hook
+registration, and an arm-first guided first merge.
+
+### Added
+
+- **`scaffold sched install | uninstall | status | list`** — a scheduler
+  manager for the merge queue's post-merge full-gate poller. Backends are
+  launchd (macOS, gui-domain) and systemd (Linux, `--user` timer + service);
+  both **verify the job actually loaded** (`launchctl print` /
+  `systemctl is-active`) — file presence never counts as installed. Absolute
+  paths (node via the fnm alias dir or `process.execPath`; keg-only openjdk
+  ahead of a non-functional `/usr/bin/java` stub) resolve at install time; logs
+  land under `<project>/.mq/logs/`.
+- **`gate` agent-ops component** — generates project-owned
+  `scripts/gate-check.sh` (full quality gate) and `scripts/gate-check-affected.sh`
+  (the merge-queue affected-only gate: three-dot diff, force-full triggers with
+  monorepo-nested globs, quarantine muted for the merge gate only). Both honor
+  `GATE_PROBE=1` (verify prerequisites — deps, runtimes, test-runner startup —
+  WITHOUT running the suite). Seeded by ingestion-lite from `package.json`
+  scripts + `.github/workflows/*.yml`. `gate` is an explicit opt-in component
+  (excluded from `--component all`); seeds are project-owned (`agent-ops check`
+  reports them only if MISSING, never drifted; re-install never overwrites a
+  seed without `--force`). Seeded `make` targets are declared `.PHONY`.
+- **`scaffold hooks install`** — registers the Claude Code hooks (bd-guard,
+  mq-guard, `bd prime`, the mmr review reminder) by deep-merging
+  `.claude/settings.json` in TypeScript with atomic writes, replacing the
+  hand-run jq snippets. Append-only and idempotent-by-marker; **refuses to touch
+  a malformed or non-object settings file** (never clobbers); reports each
+  skipped hook with its missing prerequisite. Other harnesses get printed
+  `--check` wiring guidance.
+- **`scaffold mq bootstrap --pr <N> [--finish]`** — the arm-first guided FIRST
+  merge for a repo installing the queue in its own PR (the installing PR can't
+  ride a queue that isn't armed yet). Runs the full gate on the PR head, then a
+  crash-safe journaled squash-merge (head revalidated immediately before merge;
+  `bootstrap_merged` never journaled with an empty merge SHA; `--finish`
+  reconciles a partial run — GitHub PR state is authoritative). Post-merge it
+  fast-forwards primary, arms hooks + the scheduler, smoke-tests the daemon, and
+  runs a closing doctor pass. Every post-merge step degrades to recoverable
+  `--finish` guidance rather than stranding a merged repo.
+- **doctor `--fix` handlers (R2)** — hook re-registration (D8) and scheduler
+  reload (D6), thin wrappers over the install primitives — plus a bounded
+  `GATE_PROBE=1` execution probe that upgrades the gate section from
+  resolve-only to a real health signal (still no suite run; the full gate stays
+  behind `make check`). The probe verifies each seed's executable bit that
+  `make check` / `make check-affected` require.
+- **adopt ops-actions preview** — `scaffold adopt`'s plan previews the
+  recommended follow-up ops commands (component installs, `hooks install`,
+  `sched install`, the bootstrap-merge requirement) with their exact write
+  sets, joined into `plan_key` via machine/OS-independent descriptors (`--apply`
+  still writes only config/state — it never runs these).
+
+### Changed
+
+- Content updates point prompts at the new commands: hand-run jq hook snippets →
+  `scaffold hooks install`, cron/launchd prose → `scaffold sched`, and a
+  bootstrap pointer for first-queue-install PRs.
+
 ## [3.48.0] - 2026-07-24
 
 ### Fixed

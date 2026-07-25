@@ -1,12 +1,14 @@
 // src/cli/commands/mq.ts
 import fs from 'node:fs'
 import path from 'node:path'
-import { spawn } from 'node:child_process'
+import { execFileSync, spawn, spawnSync } from 'node:child_process'
+import { ulid } from 'ulid'
 import { checkSync, lock } from 'proper-lockfile'
 import type { Argv, CommandModule } from 'yargs'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
 import { loadAgentOpsConfig } from '../../core/agent-ops/config.js'
+import { parseShell } from '../../core/parse-shell.js'
 import { GATE_PID_FILE, MergeQueueDaemon, PAUSED_FILE } from '../../merge-queue/daemon.js'
 import { appendEvent, readJournal } from '../../merge-queue/journal.js'
 import { reduceState, TERMINAL_PR_STATES } from '../../merge-queue/state.js'
@@ -14,16 +16,61 @@ import { computeStats } from '../../merge-queue/stats.js'
 import { createGhClient } from '../../merge-queue/gh.js'
 import { createGitOps } from '../../merge-queue/git.js'
 import { runGate } from '../../merge-queue/gate.js'
+import { runBootstrap, type BootstrapDeps } from '../../merge-queue/bootstrap.js'
+import { installHooks } from '../../core/hooks/install.js'
+import { pickSchedBackend } from '../../sched/platform.js'
+import { buildPostMergePollerJob } from '../../sched/jobs.js'
 
 export interface MqArgs {
   action: string
   pr?: number
   foreground?: boolean
+  finish?: boolean
   once?: boolean
   root?: string
   format?: string
   auto?: boolean
   verbose?: boolean
+}
+
+export interface MqOverrides {
+  /** Test seam for `mq bootstrap` — any subset of BootstrapDeps. */
+  bootstrapDeps?: Partial<BootstrapDeps>
+}
+
+/** Preflight helper (D9): does the configured gate command RESOLVE?
+ *  `make -n` for make targets (proves resolution, not health — doctor's
+ *  GATE_PROBE covers health); `command -v` on the head word otherwise.
+ *  Leading `VAR=value` env assignments (e.g. `NODE_ENV=test vitest`) are
+ *  skipped so the real executable is resolved, not the assignment. */
+export function gateTargetResolves(projectRoot: string, command: string): boolean {
+  // Quote-aware tokenization so `FOO='bar baz' make check` and paths with spaces
+  // resolve to the right head word (a strict whitespace split would over-tokenize
+  // the quoted value and mis-read the executable).
+  const words = parseShell(command)
+  // Drop leading env-assignment words (NAME=value) — shell-prefix syntax.
+  const isEnvAssign = (w: string): boolean => /^[A-Za-z_][A-Za-z0-9_]*=/.test(w)
+  let head = 0
+  while (head < words.length && isEnvAssign(words[head])) head++
+  const exe = words.slice(head)
+  if (exe.length === 0 || exe[0] === '') return false
+  try {
+    if (exe[0] === 'make') {
+      execFileSync('make', ['-n', ...exe.slice(1)], { cwd: projectRoot, stdio: 'ignore', timeout: 30_000 })
+    } else {
+      // exe[0] comes from a project-supplied command (possibly an untrusted
+      // adopted repo) — pass it as a quoted positional ($1), NEVER interpolated
+      // into the bash string, so backticks/$(...)/; in it can't execute. The
+      // `--` after `command -v` ends option parsing so an executable whose name
+      // starts with `-` is treated as an operand, not a flag.
+      execFileSync('bash', ['-c', 'command -v -- "$1"', '--', exe[0]], {
+        cwd: projectRoot, stdio: 'ignore', timeout: 30_000,
+      })
+    }
+    return true
+  } catch {
+    return false
+  }
 }
 
 // Must exceed the longest time a single blocking git/gh call can hold the event
@@ -52,7 +99,7 @@ function autostartDaemon(primary: string): void {
   child.unref()
 }
 
-export async function mqHandler(argv: MqArgs): Promise<void> {
+export async function mqHandler(argv: MqArgs, overrides: MqOverrides = {}): Promise<void> {
   const outputMode = resolveOutputMode(argv)
   const output = createOutputContext(outputMode)
   const startRoot = argv.root ?? process.cwd()
@@ -142,6 +189,102 @@ export async function mqHandler(argv: MqArgs): Promise<void> {
     output.info(`flake events (7d): ${stats.flakesLast7d}`)
     return
   }
+  case 'bootstrap': {
+    const pr = needPr()
+    if (pr === null) return
+    const o = overrides.bootstrapDeps ?? {}
+    const config = o.config ?? loadAgentOpsConfig(primary).merge_queue
+    // Spawn the scaffold CLI itself for the smoke/doctor passes: the spec pins
+    // those command surfaces (exit codes), so the CLI is the stable seam.
+    const cli = (args: string[], timeoutMs: number): number => {
+      const r = spawnSync(process.execPath, [process.argv[1], ...args], {
+        cwd: primary, stdio: 'ignore', timeout: timeoutMs,
+      })
+      return r.status ?? 2
+    }
+    const deps: BootstrapDeps = {
+      gh: o.gh ?? createGhClient(primary),
+      git: o.git ?? git,
+      runGate: o.runGate ?? runGate,
+      config,
+      mqDir: o.mqDir ?? mqDir,
+      projectRoot: o.projectRoot ?? primary,
+      // D9: read the config the PR installs, from the gated tree (not primary).
+      readMergeConfig: o.readMergeConfig ?? ((gatedTree: string) => loadAgentOpsConfig(gatedTree).merge_queue),
+      // D9: verify the PR's committed queue assets exist in the gated tree.
+      verifyGatedAssets: o.verifyGatedAssets ?? ((gatedTree: string, cfg): { ok: boolean; missing: string[] } => {
+        const required = [
+          path.join('.scaffold', 'agent-ops.yaml'),
+          path.join('scripts', 'mq-guard.sh'),
+        ]
+        if (cfg.gate_executor === 'local-poller') {
+          required.push(path.join('scripts', 'ops', 'post-merge-poller.sh'))
+        }
+        const missing = required.filter(rel => !fs.existsSync(path.join(gatedTree, rel)))
+        return { ok: missing.length === 0, missing }
+      }),
+      armHooks: o.armHooks ?? ((): { messages: string[] } => {
+        const r = installHooks(primary)
+        return {
+          messages: [
+            ...r.added.map(l => `hooks: registered ${l}`),
+            ...r.alreadyPresent.map(l => `hooks: already registered ${l}`),
+            ...r.skipped.map(s => `hooks: ${s.reason}`),
+          ],
+        }
+      }),
+      // Armed POST-merge (see verifyAndArm): the poller script now exists at
+      // primary, so buildPostMergePollerJob(primary) resolves. Re-read the
+      // executor from primary (just merged) and no-op for non-local-poller.
+      armSched: o.armSched ?? ((): { ok: boolean; messages: string[] } => {
+        // loadAgentOpsConfig throws on a malformed .scaffold/agent-ops.yaml — keep it
+        // inside the guard so this closure honors its never-throw contract (verifyAndArm
+        // also wraps the call site, but the default impl must not rely on that).
+        try {
+          if (loadAgentOpsConfig(primary).merge_queue.gate_executor !== 'local-poller') {
+            return { ok: true, messages: ['sched: skipped (gate_executor is not local-poller)'] }
+          }
+          const res = pickSchedBackend().install(buildPostMergePollerJob(primary))
+          return { ok: res.ok, messages: res.messages.map(m => `sched: ${m}`) }
+        } catch (err) {
+          return { ok: false, messages: [`sched: ${err instanceof Error ? err.message : String(err)}`] }
+        }
+      }),
+      smokeDaemon: o.smokeDaemon ?? ((): { ok: boolean; detail: string } => {
+        const status = cli(['mq', 'daemon', '--once', '--root', primary], 300_000)
+        return status === 0
+          ? { ok: true, detail: 'mq daemon --once cycle completed clean' }
+          : { ok: false, detail: `mq daemon --once exited ${status}` }
+      }),
+      runDoctor: o.runDoctor !== undefined
+        ? o.runDoctor
+        : (): { exitCode: number; summary: string } => {
+          const status = cli(['doctor'], 300_000)
+          return {
+            exitCode: status,
+            summary: status === 0
+              ? 'healthy'
+              : status === 1
+                ? 'warnings — run scaffold doctor for detail'
+                : 'errors — run scaffold doctor for detail',
+          }
+        },
+      // Preflight resolves against the gated tree (the engine passes it); the
+      // exported helper already takes (root, command).
+      gateTargetResolves: o.gateTargetResolves ?? gateTargetResolves,
+      log: o.log ?? (m => output.info(m)),
+      now: o.now ?? ((): Date => new Date()),
+      newId: o.newId ?? ((): string => ulid()),
+    }
+    const outcome = await runBootstrap(deps, { pr, finish: argv.finish })
+    if (outcome.ok) {
+      output.success(`mq bootstrap: ${outcome.stage} (attempt ${outcome.bootstrapId ?? '—'})`)
+    } else {
+      output.error(`mq bootstrap stopped at ${outcome.stage} — see messages above`)
+      process.exitCode = 1
+    }
+    return
+  }
   case 'daemon': {
     let release: () => Promise<void>
     try {
@@ -215,16 +358,20 @@ export async function mqHandler(argv: MqArgs): Promise<void> {
 
 const mqCommand: CommandModule<Record<string, unknown>, MqArgs> = {
   command: 'mq <action>',
-  describe: 'Local batching merge queue: enqueue PRs, run the daemon, inspect status',
+  describe: 'Local batching merge queue: enqueue PRs, run the daemon, inspect status, bootstrap the first merge',
   builder: (yargs: Argv) => {
     return yargs
       .positional('action', {
         describe: 'Action to perform',
-        choices: ['enqueue', 'daemon', 'status', 'eject', 'stats'] as const,
+        choices: ['enqueue', 'daemon', 'status', 'eject', 'stats', 'bootstrap'] as const,
         type: 'string',
         demandOption: true,
       })
-      .option('pr', { type: 'number', describe: 'PR number (enqueue / eject / status filter)' })
+      .option('pr', { type: 'number', describe: 'PR number (enqueue / eject / bootstrap / status filter)' })
+      .option('finish', {
+        type: 'boolean', default: false,
+        describe: 'Resume an unfinished bootstrap attempt (never starts a new one)',
+      })
       .option('foreground', {
         type: 'boolean', default: false, describe: 'Log to stdout as well as .mq/logs/daemon.log',
       })

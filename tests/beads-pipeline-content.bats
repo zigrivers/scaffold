@@ -31,6 +31,7 @@ F="$BATS_TEST_DIRNAME/../content/pipeline/foundation/beads.md"
   G="$BATS_TEST_DIRNAME/../content/pipeline/environment/git-workflow.md"
   run grep -qE "bd-guard\.sh" "$G"; [ "$status" -eq 0 ]
   run grep -qE "PreToolUse" "$G"; [ "$status" -eq 0 ]
+  run grep -qE "scaffold hooks install" "$G"; [ "$status" -eq 0 ]
 }
 
 @test "knowledge + ops-core carry the modernized durability rules" {

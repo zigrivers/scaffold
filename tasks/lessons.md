@@ -261,3 +261,93 @@ committing, and ALWAYS run the full `make check-all` at branch level before push
 implementer says "eslint clean", don't trust it as branch-clean; the branch gate
 is the source of truth. (Fixing max-len is mechanical line-wrapping — no logic
 change — but it must be caught before the PR, not after.)
+
+## Never interpolate config-derived strings into `bash -c` — use quoted positionals ($1) (2026-07-24)
+**Pattern:** R2 review (PR #785) surfaced a P0 in `gateTargetResolves`
+(`src/cli/commands/mq.ts`): it built `bash -c` with the command's first token
+interpolated raw — `execFileSync('bash', ['-c', \`command -v ${exe[0]}\`])`.
+Because that token comes from a project's `.scaffold/agent-ops.yaml` gate
+command — attacker-controllable in a brownfield repo being *adopted* — a value
+like `$(touch pwned)x` or `` `evil` `` (one whitespace-delimited token) is
+evaluated by the shell as command substitution → arbitrary code execution, run
+by `scaffold doctor` and the bootstrap preflight.
+**Rule:** When a value that could come from an untrusted repo must reach a
+shell, NEVER string-interpolate it. Pass it as a quoted positional and reference
+it as `"$1"`: `execFileSync('bash', ['-c', 'command -v "$1"', '--', exe[0]])`.
+The shell then treats it as literal data, never syntax. Prefer `execFileSync`/
+`spawnSync` with an argv array over any `execSync`/`bash -c "${x}"` form. The
+brownfield threat model (running scaffold against a repo you don't control)
+makes every project-config-derived string untrusted input by default.
+
+## A doctor probe must exercise what real usage needs, not a laxer path (2026-07-24)
+**Pattern:** Same R2 review flagged that `runGateProbe` ran the gate seed via
+`spawnSync('bash', [script])`, which succeeds even without the executable bit —
+but the Makefile `check` target runs `./scripts/gate-check.sh` DIRECTLY, which
+requires `+x`. So `scaffold doctor` reported the gate healthy while `make check`
+would fail "permission denied". A health probe that uses a more permissive
+invocation than production masks exactly the drift it exists to catch.
+**Rule:** Make a probe faithful to real usage. If production runs a script
+directly (needs `+x`), the probe must verify the exec bit (or invoke it the same
+way) and fail with actionable remediation (`chmod +x <path>`), not silently pass
+under `bash <script>`.
+
+## Seeded Makefile gate targets MUST be .PHONY, or a stray file silently bypasses the gate (2026-07-24)
+**Pattern:** R2 review round 2 (PR #785) found the generated `check` /
+`check-affected` / `check-visual` targets lacked a `.PHONY` declaration. Because
+they run their script directly (`./scripts/gate-check.sh`), a file or directory
+named `check` in the project root (not uncommon) makes `make check` see the
+target as "up to date", do nothing, and exit 0 — a green gate that ran zero
+tests. A silently-satisfied quality gate is worse than a failing one.
+**Rule:** Any generated Makefile target that represents an ACTION (a gate, a
+build step) must be declared `.PHONY`. When appending targets to a user's
+Makefile, emit `.PHONY: <only the targets you added>` — never phony-ify a target
+the user already owns.
+
+## When two callers need the same fragile parsing, extract & share it — don't re-derive (2026-07-24)
+**Pattern:** R2 round 2 flagged that `gateTargetResolves` used a strict
+whitespace split (mishandling quoted-space commands) while a correct quote-aware
+`parseShell` already existed privately in the observability fix dispatcher.
+**Rule:** Before writing a second tokenizer/parser/validator, grep for an
+existing one and extract it to a shared module (here `src/core/parse-shell.ts`)
+so both callers get the same battle-tested behavior. Keep the extracted function
+byte-identical to the original unless you deliberately intend a behavior change
+(and then re-run the original caller's tests).
+
+## When you establish a graceful-degradation contract on a critical path, apply it to EVERY throwing call on that path (2026-07-24)
+**Pattern:** R2's bootstrap engine kept leaking uncaught throws one at a time
+across three review rounds: `syncPrimaryToMerge` (fixed during task review),
+then `armHooks` (whole-branch review P2), then `armSched` (Superpowers round 1
+P1), then `squashMerge` (opencode round 3 P2) — plus the same class in adopt's
+`buildOpsActions` (`loadAgentOpsConfig` unguarded, round 3 P1). Every one was a
+call that throws and strands or crashes a partially-completed multi-step
+operation, and each was found separately because the fix only patched the
+specific call flagged, not the whole path.
+**Rule:** The moment you wrap ONE call in a critical sequence for
+graceful-degradation (recoverable `--finish`, `ScaffoldError`, skip-and-continue),
+audit EVERY other call in that same sequence that can throw and give them the
+SAME treatment in the same change — grep the function for `loadX(`, `readX(`,
+network/gh/git calls, and config parsers. Reviewers will otherwise surface them
+one per round (this cost 3 rounds here). A function's siblings are the strongest
+hint: if two of three risky reads are try/catch-wrapped and one isn't, the
+unwrapped one is a bug, not a deliberate exception.
+
+## Unit tests that trigger the async phase audit must stub it — the real one flakes in CI (2026-07-24)
+**Pattern:** R2's PR #785 CI `check` job failed on a test NOT in the diff —
+`state-manager.test.ts` "markCompleted records verification: declared" timed out
+at 5000ms. `markCompleted` is async for phase-boundary steps (user-stories,
+tech-stack, coding-standards, design-system, implementation-plan,
+implementation-playbook): it fires the REAL `runPhaseAudit` (fs work + audit
+engine) AFTER saving state. That audit usually finishes in <5s but occasionally
+exceeds vitest's default 5s timeout under CI's parallel load (sibling
+boundary-step tests passed in the same run — proof it's a flake, not a hang).
+Passed locally every time; only surfaced under CI contention. `make check-all`
+green locally does NOT prove CI-green when a test does real, timing-sensitive
+async work.
+**Rule:** Any `StateManager` unit test that calls `markCompleted` with a
+PHASE_BOUNDARY step and isn't specifically testing the audit MUST
+`manager.setPhaseAuditFn(async (i) => ({ ran: false, step: i.step, reason:
+'stubbed in test' }))` first (the seam exists for exactly this; the audit is
+covered by `phase-audit.test.ts`). More broadly: if a unit under test kicks off
+a real subprocess/fs/network side effect that isn't the assertion's subject,
+stub it — an occasional >5s run is a latent CI flake, and "green locally" can't
+catch it.
