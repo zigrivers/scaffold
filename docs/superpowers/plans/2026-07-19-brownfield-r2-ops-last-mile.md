@@ -4496,7 +4496,7 @@ export function fixSchedulerReload(
 
 **Steps:**
 
-- [ ] Write the failing test `src/doctor/gate-probe.test.ts`:
+- [x] Write the failing test `src/doctor/gate-probe.test.ts`:
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -4562,8 +4562,8 @@ describe('runGateProbe (D5 gate section, R2)', () => {
 })
 ```
 
-- [ ] Run: `npx vitest run src/doctor/gate-probe.test.ts` — expect FAILURE (module missing).
-- [ ] Create `src/doctor/gate-probe.ts`:
+- [x] Run: `npx vitest run src/doctor/gate-probe.test.ts` — expect FAILURE (module missing).
+- [x] Create `src/doctor/gate-probe.ts`:
 
 ```ts
 import fs from 'node:fs'
@@ -4618,8 +4618,8 @@ export function runGateProbe(
 }
 ```
 
-- [ ] Run: `npx vitest run src/doctor/gate-probe.test.ts` — expect 4 tests passed (the timeout test takes ~0.5s by design).
-- [ ] Wire the probe into the R1 gate check. Locate it: `grep -rln "make -n\|resolve" src/doctor --include="*.ts" | grep -iv test` (the check whose `section` is the gate). In its `run()`, after the existing `make -n` resolution reporting, add:
+- [x] Run: `npx vitest run src/doctor/gate-probe.test.ts` — expect 4 tests passed (the timeout test takes ~0.5s by design).
+- [x] Wire the probe into the R1 gate check. Locate it: `grep -rln "make -n\|resolve" src/doctor --include="*.ts" | grep -iv test` (the check whose `section` is the gate). In its `run()`, after the existing `make -n` resolution reporting, add:
 
 ```ts
     const probe = runGateProbe(projectRoot)
@@ -4637,8 +4637,8 @@ export function runGateProbe(
 ```
 
   with `import { runGateProbe } from '../gate-probe.js'` (adjust the relative path). Express the two branches in the check's own result vocabulary (R1's finding/severity types) — the load-bearing behavior to preserve: a passing probe reports *probed* health (`probe.detail`), a failing probe fails the section with `probe.detail`, and absence of gate scripts leaves the R1 resolve-only report exactly as it was.
-- [ ] Run: `npx vitest run src/doctor` — green. If the R1 gate-check tests pinned the resolve-only wording for projects WITH gate scripts, update those fixtures to expect the probed wording (`prerequisites verified`).
-- [ ] Commit: `git add -A && git commit -m "feat(doctor): gate section runs the bounded GATE_PROBE=1 probe when gate seeds exist (D5)"`
+- [x] Run: `npx vitest run src/doctor` — green. If the R1 gate-check tests pinned the resolve-only wording for projects WITH gate scripts, update those fixtures to expect the probed wording (`prerequisites verified`).
+- [x] Commit: `git add -A && git commit -m "feat(doctor): gate section runs the bounded GATE_PROBE=1 probe when gate seeds exist (D5)"`
 
 ---
 
