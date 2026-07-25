@@ -202,7 +202,7 @@ These are pinned by the approved spec — do not re-litigate during implementati
 
 **Steps:**
 
-- [ ] Write failing tests (tmp-dir pattern as in `update-mode.test.ts`):
+- [x] Write failing tests (tmp-dir pattern as in `update-mode.test.ts`):
 
   ```ts
   describe('artifact_map integration (D10a)', () => {
@@ -283,8 +283,8 @@ These are pinned by the approved spec — do not re-litigate during implementati
 
   (Ensure `verifyStep` and `StepStateEntry` are imported in the test file — R1's `verifyStep` tests already add them; add the imports if this describe block lives in a file that does not.)
 
-- [ ] Run: `npx vitest run src/state/completion.test.ts` — new tests FAIL (no `artifactMap` param yet).
-- [ ] Implement in `src/state/completion.ts`. Add `mappedArtifactUsed?: string` to `CompletionResult`. At the top of `detectCompletion`, before the outputs loop:
+- [x] Run: `npx vitest run src/state/completion.test.ts` — new tests FAIL (no `artifactMap` param yet).
+- [x] Implement in `src/state/completion.ts`. Add `mappedArtifactUsed?: string` to `CompletionResult`. At the top of `detectCompletion`, before the outputs loop:
 
   ```ts
   const mapped = artifactMap?.[step]
@@ -304,7 +304,7 @@ These are pinned by the approved spec — do not re-litigate during implementati
   ```
 
   Apply the same short-circuit to `checkCompletion`'s outputs-presence loop (an existing mapped incumbent ⇒ `allPresent = true` for the status computation).
-- [ ] **Extend R1's `verifyStep`** (the D3 verifier the adoption plan and doctor actually call). It does its OWN outputs check and does NOT call `detectCompletion`/`checkCompletion`, so threading the map through those two alone would leave mapped incumbents reported missing on the plan and doctor paths (the whole point of `artifact_map`). Add a trailing `artifactMap?: Record<string, string>` param, and right after its outputs-presence loop (before the disposition branches) reconcile a mapped incumbent into the all-outputs requirement — detect still runs and still gates `verified`:
+- [x] **Extend R1's `verifyStep`** (the D3 verifier the adoption plan and doctor actually call). It does its OWN outputs check and does NOT call `detectCompletion`/`checkCompletion`, so threading the map through those two alone would leave mapped incumbents reported missing on the plan and doctor paths (the whole point of `artifact_map`). Add a trailing `artifactMap?: Record<string, string>` param, and right after its outputs-presence loop (before the disposition branches) reconcile a mapped incumbent into the all-outputs requirement — detect still runs and still gates `verified`:
 
   ```ts
   // D10a (R3): an existing mapped incumbent satisfies the all-outputs
@@ -320,13 +320,13 @@ These are pinned by the approved spec — do not re-litigate during implementati
   }
   ```
 
-- [ ] Thread `artifactMap` through `verifyStep`'s callers (previously blind to mappings — `git grep -n "verifyStep(" src/`):
+- [x] Thread `artifactMap` through `verifyStep`'s callers (previously blind to mappings — `git grep -n "verifyStep(" src/`):
   - **doctor** `pipelineVerificationCheck` (`src/doctor/checks.ts`): pass `context.config?.artifact_map` as the new trailing arg.
   - **adoption-plan builder** (`src/project/adoption-plan*.ts`): pass `config.artifact_map` to each `verifyStep(...)` call (the builder already loads `config`).
   - **adoption-apply** (`src/project/adoption-apply.ts`): the map-candidate re-verification (Task 10) passes the updated `artifact_map` here.
   Add one integration assertion (doctor or plan) that a mapped incumbent reports the step as verified/done rather than missing.
-- [ ] Run: `npx vitest run src/state/completion.test.ts` — all green.
-- [ ] Commit: `feat(state): completion + verifyStep verification honors artifact_map incumbents (D10a)`
+- [x] Run: `npx vitest run src/state/completion.test.ts` — all green.
+- [x] Commit: `feat(state): completion + verifyStep verification honors artifact_map incumbents (D10a)`
 
 ---
 
