@@ -121,6 +121,13 @@ describe('installHooks (D8)', () => {
     expect(() => installHooks(root)).toThrow()
     expect(fs.readFileSync(path.join(root, SETTINGS_PATH), 'utf8')).toBe('{ not json')
   })
+  it('refuses to touch a valid-JSON-but-non-object settings.json (null/array)', () => {
+    for (const content of ['null', '[]', '42']) {
+      const root = project({ beads: true, bdGuard: true, settings: content })
+      expect(() => installHooks(root)).toThrow(/not a JSON object/)
+      expect(fs.readFileSync(path.join(root, SETTINGS_PATH), 'utf8')).toBe(content)
+    }
+  })
   it('writes atomically — no temp file left behind', () => {
     const root = project({ mqGuard: true })
     installHooks(root)
