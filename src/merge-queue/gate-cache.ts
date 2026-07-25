@@ -21,8 +21,16 @@ interface GateCacheFileShape {
 /** sha256 of the file's bytes, or "<label>:none" when it does not exist — an
  *  absent quarantine list / TIA map is a stable, distinct key component. */
 export function hashFileOrAbsent(file: string, label: string): string {
-  if (!fs.existsSync(file)) return `${label}:none`
-  return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')
+  try {
+    if (!fs.existsSync(file)) return `${label}:none`
+    return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')
+  } catch {
+    // Unreadable (permissions), a directory at the path, or vanished mid-read —
+    // treat as absent so computing a cache key can never crash the daemon cycle.
+    // Fail-safe: a present↔absent transition changes the key (a miss), never a
+    // false hit.
+    return `${label}:none`
+  }
 }
 
 /** Canonicalize fields so no field's content can shift a boundary with its

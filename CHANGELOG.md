@@ -52,7 +52,7 @@ never fewer, tests.
   full-gate medians and TIA map age show in `scaffold mq stats`. New commands:
   `scaffold tia affected | record-due | ingest`.
 
-
+## [3.50.0] - 2026-07-25
 
 Brownfield adoption, Tier B — **Adoption Mode**. Makes pipeline content
 itself brownfield-native: steps with no surviving completion now assemble

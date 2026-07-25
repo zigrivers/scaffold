@@ -53,6 +53,16 @@ describe('gate cache keys', () => {
     fs.writeFileSync(f, 'other.test.ts\n')
     expect(hashFileOrAbsent(f, 'quarantine')).not.toBe(h)
   })
+
+  it('hashFileOrAbsent returns the sentinel (never throws) when the path is a directory or unreadable', () => {
+    const dir = tmp()
+    // A directory at the path would make fs.readFileSync throw EISDIR — must not
+    // crash the daemon cycle; treat as absent.
+    const asDir = path.join(dir, 'tia')
+    fs.mkdirSync(asDir)
+    expect(() => hashFileOrAbsent(asDir, 'tia')).not.toThrow()
+    expect(hashFileOrAbsent(asDir, 'tia')).toBe('tia:none')
+  })
 })
 
 describe('lookupGateCache / recordGateCache', () => {
