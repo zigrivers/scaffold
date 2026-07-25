@@ -730,7 +730,7 @@ assemblyMode: AssemblyMode
 
 **Steps:**
 
-- [ ] Write failing tests in `src/core/assembly/engine.test.ts` (use the existing `makeOptions` helper):
+- [x] Write failing tests in `src/core/assembly/engine.test.ts` (use the existing `makeOptions` helper):
 
   ```ts
   describe('adoption mode (brownfield R3, D11)', () => {
@@ -765,8 +765,8 @@ assemblyMode: AssemblyMode
   })
   ```
 
-- [ ] Run: `npx vitest run src/core/assembly/engine.test.ts` — new tests FAIL.
-- [ ] Implement in `engine.ts`:
+- [x] Run: `npx vitest run src/core/assembly/engine.test.ts` — new tests FAIL.
+- [x] Implement in `engine.ts`:
   - Instructions section call becomes:
 
     ```ts
@@ -785,8 +785,8 @@ assemblyMode: AssemblyMode
     }
     ```
   - Metadata: `assemblyMode: options.assemblyMode ?? (options.updateMode ? 'update' : 'fresh')`.
-- [ ] Run: `npx vitest run src/core/assembly/engine.test.ts` — all green (all pre-existing engine tests must also stay green; they don't pass `assemblyMode`, so the default path covers them).
-- [ ] Commit: `feat(assembly): engine injects adoption preamble into Instructions section (D11)`
+- [x] Run: `npx vitest run src/core/assembly/engine.test.ts` — all green (all pre-existing engine tests must also stay green; they don't pass `assemblyMode`, so the default path covers them).
+- [x] Commit: `feat(assembly): engine injects adoption preamble into Instructions section (D11)`
 
 ---
 
