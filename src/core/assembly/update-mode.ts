@@ -142,6 +142,15 @@ export interface AssemblyModeResult {
  * whose detect: contract now fails is conflicted, and its stale claim must
  * not enter update mode. It instead routes like a reopened step: adoption in
  * brownfield/v1-migration, else fresh.
+ *
+ * `stateless` (R3 whole-branch fix): a `category: tool` / `stateless: true`
+ * step has no completion state to adopt — update mode is already impossible
+ * for it (no stored entry), and it must never resolve to 'adoption' either.
+ * Tools carry no `## Adoption Mode Specifics` block, and the adoption
+ * preamble's "never propose rewrites of working code" framing is wrong for a
+ * tool like review-code/review-pr/release. When `stateless === true`, the
+ * adoption-routing branch is skipped entirely and the step resolves to
+ * 'fresh' — greenfield-identical, regardless of init-mode.
  */
 export function resolveAssemblyMode(options: {
   step: string
@@ -152,6 +161,8 @@ export function resolveAssemblyMode(options: {
   artifactMap?: Record<string, string>
   expectedOutputs?: string[]
   detect?: DetectSpec | null
+  /** True for `category: tool` / `stateless: true` steps — never routes to 'adoption'. */
+  stateless?: boolean
 }): AssemblyModeResult {
   const { step, state, currentDepth, projectRoot, artifactMap } = options
   const detection = detectUpdateMode(options)
@@ -237,7 +248,11 @@ export function resolveAssemblyMode(options: {
   }
 
   const initMode = state['init-mode']
-  if (!completionSurvives && (initMode === 'brownfield' || initMode === 'v1-migration')) {
+  if (
+    !completionSurvives &&
+    !options.stateless &&
+    (initMode === 'brownfield' || initMode === 'v1-migration')
+  ) {
     return { mode: 'adoption', updateDetection: detection, currentDepth, warnings: [] }
   }
 

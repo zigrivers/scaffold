@@ -412,6 +412,21 @@ describe('artifact_map integration (D10a)', () => {
     expect(result.artifactsMissing).toEqual(['docs/coding-standards.md'])
   })
 
+  it('own outputs win over the mapped incumbent when both are present (own-output-first invariant)', () => {
+    const dir = makeTempDir()
+    fs.mkdirSync(path.join(dir, 'docs'), { recursive: true })
+    fs.writeFileSync(path.join(dir, 'docs/coding-standards.md'), '# Own doc\n')
+    fs.writeFileSync(path.join(dir, 'CONTRIBUTING.md'), '# Incumbent\n')
+    const state = makeBaseState()
+    const result = detectCompletion(
+      'coding-standards', state, ['docs/coding-standards.md'], dir, undefined,
+      { 'coding-standards': 'CONTRIBUTING.md' },
+    )
+    expect(result.complete).toBe(true)
+    expect(result.artifactsPresent).toEqual(['docs/coding-standards.md'])
+    expect(result.mappedArtifactUsed).toBeUndefined()
+  })
+
   it('a mapping that escapes the project root is ignored', () => {
     const dir = makeTempDir()
     const state = makeBaseState()

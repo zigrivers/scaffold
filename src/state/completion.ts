@@ -29,23 +29,8 @@ export function detectCompletion(
   service?: string,
   artifactMap?: Record<string, string>,
 ): CompletionResult {
-  // D10a (R3): an existing mapped incumbent satisfies the all-outputs
-  // requirement. A stale mapping (file gone) or one that escapes the project
-  // root falls through to the normal all-outputs check below — a broken
-  // mapping must not silently verify.
-  const mapped = artifactMap?.[step]
-  if (mapped !== undefined) {
-    const mappedFull = resolveContainedArtifactPath(projectRoot, mapped)
-    if (mappedFull !== null && fileExists(mappedFull)) {
-      return {
-        complete: true,
-        artifactsPresent: [mapped],
-        artifactsMissing: [],
-        mappedArtifactUsed: mapped,
-      }
-    }
-  }
-
+  // Own outputs win over a mapped incumbent (mirrors verifyStep's own-first
+  // ordering) — check the step's own declared outputs first.
   const artifactsPresent: string[] = []
   const artifactsMissing: string[] = []
 
@@ -59,8 +44,34 @@ export function detectCompletion(
     }
   }
 
+  if (artifactsMissing.length === 0) {
+    return {
+      complete: true,
+      artifactsPresent,
+      artifactsMissing,
+    }
+  }
+
+  // D10a (R3): an existing mapped incumbent satisfies the all-outputs
+  // requirement (fallback only — own outputs were checked first). A stale
+  // mapping (file gone) or one that escapes the project root falls through
+  // to the normal all-outputs result below — a broken mapping must not
+  // silently verify.
+  const mapped = artifactMap?.[step]
+  if (mapped !== undefined) {
+    const mappedFull = resolveContainedArtifactPath(projectRoot, mapped)
+    if (mappedFull !== null && fileExists(mappedFull)) {
+      return {
+        complete: true,
+        artifactsPresent: [mapped],
+        artifactsMissing: [],
+        mappedArtifactUsed: mapped,
+      }
+    }
+  }
+
   return {
-    complete: artifactsMissing.length === 0,
+    complete: false,
     artifactsPresent,
     artifactsMissing,
   }

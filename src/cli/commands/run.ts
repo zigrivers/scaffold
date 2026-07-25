@@ -320,6 +320,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
         artifactMap: config.artifact_map,
         expectedOutputs: metaPrompt.frontmatter.outputs,
         detect: metaPrompt.frontmatter.detect ?? null,
+        stateless: metaPrompt.frontmatter.stateless === true || metaPrompt.frontmatter.category === 'tool',
       })
       const isUpdate = modeResult.mode === 'update'
 

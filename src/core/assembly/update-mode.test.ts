@@ -477,4 +477,27 @@ describe('resolveAssemblyMode (D3 matrix + D10a)', () => {
     })
     expect(result.mode).toBe('adoption')
   })
+
+  // R3 whole-branch review finding 1: a stateless/tool step has no completion
+  // to adopt and must never resolve to 'adoption' — even in a brownfield
+  // project where a non-tool pending step legitimately routes to adoption.
+  it('stateless: true + not completed + init-mode brownfield → fresh, NOT adoption', () => {
+    const state = brownfieldState({
+      'review-code': { status: 'pending', source: 'pipeline', produces: [] },
+    })
+    const result = resolveAssemblyMode({
+      step: 'review-code', state, currentDepth: 3, projectRoot: tmpDir, stateless: true,
+    })
+    expect(result.mode).toBe('fresh')
+  })
+
+  it('a non-tool pending step (stateless omitted) still resolves to adoption in brownfield', () => {
+    const state = brownfieldState({
+      'tech-stack': { status: 'pending', source: 'pipeline', produces: ['docs/tech-stack.md'] },
+    })
+    const result = resolveAssemblyMode({
+      step: 'tech-stack', state, currentDepth: 3, projectRoot: tmpDir,
+    })
+    expect(result.mode).toBe('adoption')
+  })
 })

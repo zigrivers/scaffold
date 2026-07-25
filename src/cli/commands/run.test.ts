@@ -1024,6 +1024,85 @@ describe('run command handler', () => {
         }),
       )
     })
+
+    // R3 whole-branch review finding 1: tool/stateless steps must never enter
+    // adoption mode — the adoption preamble ("never propose rewrites of
+    // working code") is wrong for a tool like review-code/review-pr/release.
+    it('passes stateless: true to resolveAssemblyMode for a category: tool step', async () => {
+      const frontmatterTool = makeFrontmatter({ category: 'tool' })
+      const metaPrompt = makeMetaPrompt({ frontmatter: frontmatterTool })
+      const map = new Map([['create-prd', metaPrompt]])
+      vi.mocked(discoverMetaPrompts).mockReturnValue(map)
+      vi.mocked(discoverAllMetaPrompts).mockReturnValue(map)
+      vi.mocked(resolveOutputMode).mockReturnValue('auto')
+
+      await invokeHandler({ step: 'create-prd', _: ['run'], auto: true })
+
+      expect(resolveAssemblyMode).toHaveBeenCalledWith(
+        expect.objectContaining({ stateless: true }),
+      )
+    })
+
+    it('passes stateless: true to resolveAssemblyMode for a stateless: true step', async () => {
+      const frontmatterStateless = makeFrontmatter({ stateless: true })
+      const metaPrompt = makeMetaPrompt({ frontmatter: frontmatterStateless })
+      const map = new Map([['create-prd', metaPrompt]])
+      vi.mocked(discoverMetaPrompts).mockReturnValue(map)
+      vi.mocked(discoverAllMetaPrompts).mockReturnValue(map)
+      vi.mocked(resolveOutputMode).mockReturnValue('auto')
+
+      await invokeHandler({ step: 'create-prd', _: ['run'], auto: true })
+
+      expect(resolveAssemblyMode).toHaveBeenCalledWith(
+        expect.objectContaining({ stateless: true }),
+      )
+    })
+
+    it('passes stateless: false for a normal pipeline step (not scoped to "only the 18")', async () => {
+      await invokeHandler({ step: 'create-prd', _: ['run'], auto: true })
+
+      expect(resolveAssemblyMode).toHaveBeenCalledWith(
+        expect.objectContaining({ stateless: false }),
+      )
+    })
+
+    it('does not inject the adoption preamble for a category: tool step in a brownfield project', async () => {
+      const state = makeState()
+      state['init-mode'] = 'brownfield'
+      vi.mocked(StateManager.prototype.loadState).mockReturnValue(state)
+
+      const frontmatterTool = makeFrontmatter({ category: 'tool' })
+      const metaPrompt = makeMetaPrompt({ frontmatter: frontmatterTool })
+      const map = new Map([['create-prd', metaPrompt]])
+      vi.mocked(discoverMetaPrompts).mockReturnValue(map)
+      vi.mocked(discoverAllMetaPrompts).mockReturnValue(map)
+
+      // Reflects the FIXED resolveAssemblyMode: a stateless/tool step never
+      // resolves to 'adoption', even in a brownfield project (resolveAssemblyMode
+      // itself is unit-tested directly in update-mode.test.ts — this test proves
+      // run.ts wires the resolved mode through without injecting the preamble).
+      vi.mocked(resolveAssemblyMode).mockReturnValue({
+        mode: 'fresh',
+        updateDetection: { isUpdateMode: false, currentDepth: 3, warnings: [] },
+        currentDepth: 3,
+        warnings: [],
+      })
+      vi.mocked(resolveOutputMode).mockReturnValue('auto')
+
+      await invokeHandler({ step: 'create-prd', _: ['run'], auto: true })
+
+      expect(resolveAssemblyMode).toHaveBeenCalledWith(
+        expect.objectContaining({ stateless: true }),
+      )
+      expect(loadAdoptionPreamble).not.toHaveBeenCalled()
+      expect(AssemblyEngine.prototype.assemble).toHaveBeenCalledWith(
+        'create-prd',
+        expect.objectContaining({
+          assemblyMode: 'fresh',
+          adoptionPreamble: undefined,
+        }),
+      )
+    })
   })
 
   describe('lock warning display', () => {
