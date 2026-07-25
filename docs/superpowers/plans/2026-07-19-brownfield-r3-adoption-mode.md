@@ -810,7 +810,7 @@ export function loadAdoptionPreamble(projectRoot?: string): {
 
 **Steps:**
 
-- [ ] Write failing test `src/core/assembly/mode-loader.test.ts`:
+- [x] Write failing test `src/core/assembly/mode-loader.test.ts`:
 
   ```ts
   import { describe, it, expect } from 'vitest'
@@ -828,8 +828,8 @@ export function loadAdoptionPreamble(projectRoot?: string): {
   })
   ```
 
-- [ ] Run: `npx vitest run src/core/assembly/mode-loader.test.ts` — FAIL (module missing).
-- [ ] Create `content/modes/adoption.md` with exactly this content:
+- [x] Run: `npx vitest run src/core/assembly/mode-loader.test.ts` — FAIL (module missing).
+- [x] Create `content/modes/adoption.md` with exactly this content:
 
   ```markdown
   <!-- Global adoption-mode preamble (brownfield R3, D11). Injected by the
@@ -880,7 +880,7 @@ export function loadAdoptionPreamble(projectRoot?: string): {
   dropped.
   ```
 
-- [ ] Add to `src/utils/fs.ts`, alongside the other `getPackage*Dir` functions:
+- [x] Add to `src/utils/fs.ts`, alongside the other `getPackage*Dir` functions:
 
   ```ts
   /** Resolve the modes directory (bundled, unless running against scaffold itself). */
@@ -889,7 +889,7 @@ export function loadAdoptionPreamble(projectRoot?: string): {
   }
   ```
 
-- [ ] Create `src/core/assembly/mode-loader.ts`:
+- [x] Create `src/core/assembly/mode-loader.ts`:
 
   ```ts
   import path from 'node:path'
@@ -921,8 +921,8 @@ export function loadAdoptionPreamble(projectRoot?: string): {
   }
   ```
 
-- [ ] Run: `npx vitest run src/core/assembly/mode-loader.test.ts` — green.
-- [ ] Commit: `feat(content): global adoption-mode preamble + loader (D11)`
+- [x] Run: `npx vitest run src/core/assembly/mode-loader.test.ts` — green.
+- [x] Commit: `feat(content): global adoption-mode preamble + loader (D11)`
 
 ---
 
