@@ -5030,7 +5030,7 @@ export function renderOpsActionsSection(records: OpsActionRecord[]): string[] {
 
 **Steps:**
 
-- [ ] `git-workflow.md` — replace instructions 3 and 4 (the two jq snippets, currently lines 213–251). Edit old string:
+- [x] `git-workflow.md` — replace instructions 3 and 4 (the two jq snippets, currently lines 213–251). Edit old string:
 
 ````markdown
 3. **Register the Beads destructive-command guard** (only when the project
@@ -5111,7 +5111,7 @@ export function renderOpsActionsSection(records: OpsActionRecord[]): string[] {
    `scaffold hooks install` prints this wiring guidance too.
 ````
 
-- [ ] `git-workflow.md` — update the PostToolUse section intro (keep the heading and the JSON block byte-for-byte; `automated-pr-review` cross-references both). Edit old string:
+- [x] `git-workflow.md` — update the PostToolUse section intro (keep the heading and the JSON block byte-for-byte; `automated-pr-review` cross-references both). Edit old string:
 
 ```markdown
 ### Configure the PostToolUse review-reminder hook
@@ -5136,7 +5136,7 @@ unrelated existing hooks. The registered hook, for reference (equivalence
 is detected on the `gh pr create` trigger string):
 ```
 
-- [ ] `git-workflow.md` — Expected Outputs. Edit old string:
+- [x] `git-workflow.md` — Expected Outputs. Edit old string:
 
 ```markdown
 - .claude/settings.json — gains a PostToolUse reminder hook that fires after
@@ -5155,7 +5155,7 @@ is detected on the `gh pr create` trigger string):
   — all registered via `scaffold hooks install`, never hand-merged
 ```
 
-- [ ] `git-workflow.md` — scheduler mention in the quality-gates section. Edit old string:
+- [x] `git-workflow.md` — scheduler mention in the quality-gates section. Edit old string:
 
 ```markdown
    local poller (`make post-merge-watch`, cron/launchd) when
@@ -5168,7 +5168,7 @@ is detected on the `gh pr create` trigger string):
    install post-merge-poller`) when
 ```
 
-- [ ] `git-workflow.md` — Mode Detection block. Edit old string:
+- [x] `git-workflow.md` — Mode Detection block. Edit old string:
 
 ```markdown
 Update mode if docs/git-workflow.md exists. In update mode: preserve the
@@ -5190,7 +5190,7 @@ Re-run `scaffold hooks install` in update mode too — it is idempotent and
 repairs missing hook registrations without touching user entries.
 ```
 
-- [ ] `git-workflow.md` — Update Mode Specifics triggers. Edit old string:
+- [x] `git-workflow.md` — Update Mode Specifics triggers. Edit old string:
 
 ```markdown
 - **Triggers for update**: coding-standards.md changed commit format,
@@ -5209,7 +5209,7 @@ repairs missing hook registrations without touching user entries.
   (repair: `scaffold hooks install`)
 ```
 
-- [ ] `merge-throughput.md` — Expected Outputs. Edit old string:
+- [x] `merge-throughput.md` — Expected Outputs. Edit old string:
 
 ```markdown
 - docs/merge-queue.md — how the queue works (enqueue → batch → land/eject),
@@ -5242,7 +5242,7 @@ repairs missing hook registrations without touching user entries.
   instruction 3)
 ```
 
-- [ ] `merge-throughput.md` — quality criterion. Edit old string:
+- [x] `merge-throughput.md` — quality criterion. Edit old string:
 
 ```markdown
   `local-poller` (poller scheduled via cron/launchd, no workflows)
@@ -5255,7 +5255,7 @@ repairs missing hook registrations without touching user entries.
   post-merge-poller`, verified loaded, no workflows)
 ```
 
-- [ ] `merge-throughput.md` — Mode Detection block. Edit old string:
+- [x] `merge-throughput.md` — Mode Detection block. Edit old string:
 
 ```markdown
 Update mode if docs/merge-queue.md exists. In update mode: re-run
@@ -5279,7 +5279,7 @@ install post-merge-poller` when it is not), preserve the project's tuned
 upstream contracts changed.
 ```
 
-- [ ] `merge-throughput.md` — Update Mode Specifics triggers. Edit old string:
+- [x] `merge-throughput.md` — Update Mode Specifics triggers. Edit old string:
 
 ```markdown
 - **Triggers for update**: `scaffold agent-ops check` reports a stale bundle,
@@ -5295,7 +5295,7 @@ upstream contracts changed.
   registrations missing from `.claude/settings.json`
 ```
 
-- [ ] `merge-throughput.md` — §2 component installs gain the gate seed + classification confirmation (D7). Edit old string:
+- [x] `merge-throughput.md` — §2 component installs gain the gate seed + classification confirmation (D7). Edit old string:
 
 ````markdown
 ```bash
@@ -5325,7 +5325,7 @@ are project-owned after generation (`agent-ops check` reports them only if
 missing; `--force` regenerates from a fresh ingestion).
 ````
 
-- [ ] `content/pipeline/foundation/tdd.md` — the two-gate criterion points at the gate seed with the same confirmation. Edit old string:
+- [x] `content/pipeline/foundation/tdd.md` — the two-gate criterion points at the gate seed with the same confirmation. Edit old string:
 
 ```markdown
 - (mvp) Two-gate contract defined: `make check-affected` (fast, selection-based —
@@ -5350,7 +5350,7 @@ missing; `--force` regenerates from a fresh ingestion).
   user before committing the seeds
 ```
 
-- [ ] `merge-throughput.md` — §2 hook registration pointer. Edit old string:
+- [x] `merge-throughput.md` — §2 hook registration pointer. Edit old string:
 
 ```markdown
 Then register the mq-guard hook per the git-workflow step's instruction 4.
@@ -5363,7 +5363,7 @@ Then register the mq-guard hook: run `scaffold hooks install` (idempotent;
 skips hooks whose prerequisites are missing and reports why).
 ```
 
-- [ ] `merge-throughput.md` — §3 local-poller scheduling prose. Edit old string:
+- [x] `merge-throughput.md` — §3 local-poller scheduling prose. Edit old string:
 
 ```markdown
 - `local-poller`: schedule `make post-merge-watch` every ~10 minutes via
@@ -5386,7 +5386,7 @@ skips hooks whose prerequisites are missing and reports why).
   same heartbeat.
 ````
 
-- [ ] `merge-throughput.md` — §4 runbook contents. Edit old string:
+- [x] `merge-throughput.md` — §4 runbook contents. Edit old string:
 
 ```markdown
 bead, fix-SLA), calibration (`scaffold mq stats`), and the deliberate
@@ -5403,7 +5403,7 @@ block message points at it), and the deliberate
 direct-merge procedure (human-only). Close with a short **Alternatives**
 ```
 
-- [ ] Update `tests/beads-pipeline-content.bats` — extend the existing registration assertion. Edit old string:
+- [x] Update `tests/beads-pipeline-content.bats` — extend the existing registration assertion. Edit old string:
 
 ```bash
 @test "git-workflow registers bd-guard as a PreToolUse hook (merge, never overwrite)" {
@@ -5424,7 +5424,7 @@ direct-merge procedure (human-only). Close with a short **Alternatives**
 }
 ```
 
-- [ ] Append the R2 content tests to `tests/merge-throughput-content.bats`:
+- [x] Append the R2 content tests to `tests/merge-throughput-content.bats`:
 
 ```bash
 # --- Brownfield R2: ops last mile (D6/D7/D8/D9 content) ---
@@ -5456,9 +5456,9 @@ direct-merge procedure (human-only). Close with a short **Alternatives**
 
   (The PostToolUse reference JSON keeps its `jq -r '.tool_input...'` runtime command — that is the hook's own body, not a registration snippet; the assertion above targets only the retired registration jq.)
 
-- [ ] Run: `bats tests/beads-pipeline-content.bats tests/merge-throughput-content.bats` — all `ok` (pre-existing + 3 new; the pre-existing "tdd step defines the two-gate contract" test keeps passing — its four grep targets all survive the tdd.md edit).
-- [ ] Run: `make validate` — frontmatter untouched, expect clean. Then sweep for stragglers: `grep -rn "cron/launchd\|instruction 4" content/pipeline content/knowledge content/agent-skills` — expect NO hits in `git-workflow.md`/`merge-throughput.md` (hits elsewhere, if any, are out of this task's scope only when they do not instruct manual hook/scheduler setup; anything still instructing the retired manual flow gets the same one-line replacement).
-- [ ] Commit: `git add -A && git commit -m "docs(content): git-workflow + merge-throughput point at scaffold hooks/sched/mq bootstrap (spec §7)"`
+- [x] Run: `bats tests/beads-pipeline-content.bats tests/merge-throughput-content.bats` — all `ok` (pre-existing + 3 new; the pre-existing "tdd step defines the two-gate contract" test keeps passing — its four grep targets all survive the tdd.md edit).
+- [x] Run: `make validate` — frontmatter untouched, expect clean. Then sweep for stragglers: `grep -rn "cron/launchd\|instruction 4" content/pipeline content/knowledge content/agent-skills` — expect NO hits in `git-workflow.md`/`merge-throughput.md` (hits elsewhere, if any, are out of this task's scope only when they do not instruct manual hook/scheduler setup; anything still instructing the retired manual flow gets the same one-line replacement).
+- [x] Commit: `git add -A && git commit -m "docs(content): git-workflow + merge-throughput point at scaffold hooks/sched/mq bootstrap (spec §7)"`
 
 ---
 
