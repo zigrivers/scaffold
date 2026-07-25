@@ -5472,12 +5472,12 @@ direct-merge procedure (human-only). Close with a short **Alternatives**
 
 **Steps:**
 
-- [ ] Run: `npx vitest run src` — the FULL TypeScript suite green (sched, hooks, gate-ingest, agent-ops, merge-queue incl. bootstrap, doctor incl. fixes + gate-probe, project incl. ops-actions, plus all pre-existing suites).
-- [ ] Run: `npx tsc --noEmit -p tsconfig.json` — clean.
-- [ ] Run: `make check-all` — every gate green (ShellCheck, frontmatter validation, the bats suite incl. the new gate/guard/content tests, evals, TypeScript). Expected tail: each sub-gate reporting success and exit code 0.
-- [ ] If any gate fails, fix the root cause and re-run `make check-all` until green — specifically watch for: (a) ShellCheck on the two gate templates (they are `.tmpl` and excluded from the sweep, but the bats-rendered copies must be clean); (b) eval-suite content checks over the edited steps (`tests/evals/` — block-placement and cross-reference lenses must still pass on git-workflow/merge-throughput); (c) any pre-existing test that pinned the mq action list or the `AgentOpsInstallResult` shape (Tasks 10, 11, 15 already include their known fix-ups).
-- [ ] Verify the working tree is fully committed: `git status --short` — empty output (every task committed as it landed).
-- [ ] Commit (only if fix-ups were needed): `git add -A && git commit -m "test: R2 full-suite fix-ups — make check-all green"`
+- [x] Run: `npx vitest run src` — the FULL TypeScript suite green (sched, hooks, gate-ingest, agent-ops, merge-queue incl. bootstrap, doctor incl. fixes + gate-probe, project incl. ops-actions, plus all pre-existing suites).
+- [x] Run: `npx tsc --noEmit -p tsconfig.json` — clean.
+- [x] Run: `make check-all` — every gate green (ShellCheck, frontmatter validation, the bats suite incl. the new gate/guard/content tests, evals, TypeScript). Expected tail: each sub-gate reporting success and exit code 0.
+- [x] If any gate fails, fix the root cause and re-run `make check-all` until green — specifically watch for: (a) ShellCheck on the two gate templates (they are `.tmpl` and excluded from the sweep, but the bats-rendered copies must be clean); (b) eval-suite content checks over the edited steps (`tests/evals/` — block-placement and cross-reference lenses must still pass on git-workflow/merge-throughput); (c) any pre-existing test that pinned the mq action list or the `AgentOpsInstallResult` shape (Tasks 10, 11, 15 already include their known fix-ups).
+- [x] Verify the working tree is fully committed: `git status --short` — empty output (every task committed as it landed).
+- [x] Commit (only if fix-ups were needed): `git add -A && git commit -m "test: R2 full-suite fix-ups — make check-all green"`
 
 ---
 
