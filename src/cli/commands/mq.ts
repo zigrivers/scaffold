@@ -157,17 +157,45 @@ export async function mqHandler(argv: MqArgs, overrides: MqOverrides = {}): Prom
     output.success(`ejected PR #${pr} from the queue`)
     return
   }
+  case 'release': {
+    const pr = needPr()
+    if (pr === null) return
+    const entry = reduceState(readJournal(mqDir)).entries.get(pr)
+    if (!entry) {
+      output.warn(`PR #${pr} is not in the queue — nothing to release`)
+      return
+    }
+    if (entry.state !== 'HELD_HUMAN') {
+      output.warn(`PR #${pr} is ${entry.state}, not HELD_HUMAN — nothing to release`)
+      return
+    }
+    appendEvent(mqDir, { type: 'released', pr, at: new Date().toISOString() })
+    if (process.env.MQ_NO_AUTOSTART !== '1' && !daemonAlive(mqDir)) autostartDaemon(primary)
+    output.success(
+      `released PR #${pr} — it will be gated SOLO on the next cycle (overlap-zone PRs never batch)`,
+    )
+    return
+  }
   case 'status': {
     const state = reduceState(readJournal(mqDir))
     const pausedFile = path.join(mqDir, PAUSED_FILE)
     const paused = fs.existsSync(pausedFile) ? fs.readFileSync(pausedFile, 'utf8').trim() : null
     const entries = [...state.entries.values()]
       .filter(e => argv.pr === undefined || e.pr === argv.pr)
+    const held = entries.filter(e => e.state === 'HELD_HUMAN')
     if (argv.format === 'json') {
-      output.result({ paused, daemonAlive: daemonAlive(mqDir), entries })
+      output.result({
+        paused, daemonAlive: daemonAlive(mqDir), held: held.map(e => e.pr), entries,
+      })
       return
     }
     if (paused !== null) output.warn(`QUEUE PAUSED: ${paused}`)
+    for (const e of held) {
+      output.warn(
+        `HELD for human review: #${e.pr}${e.note ? ` — ${e.note}` : ''} ` +
+        `(run: scaffold mq release --pr ${e.pr})`,
+      )
+    }
     output.info(`daemon: ${daemonAlive(mqDir) ? 'running' : 'not running'}`)
     if (entries.length === 0) {
       output.info('queue empty')
@@ -427,11 +455,11 @@ const mqCommand: CommandModule<Record<string, unknown>, MqArgs> = {
     return yargs
       .positional('action', {
         describe: 'Action to perform',
-        choices: ['enqueue', 'daemon', 'status', 'eject', 'stats', 'bootstrap', 'gate-cache'] as const,
+        choices: ['enqueue', 'daemon', 'status', 'eject', 'release', 'stats', 'bootstrap', 'gate-cache'] as const,
         type: 'string',
         demandOption: true,
       })
-      .option('pr', { type: 'number', describe: 'PR number (enqueue / eject / bootstrap / status filter)' })
+      .option('pr', { type: 'number', describe: 'PR number (enqueue / eject / release / bootstrap / status filter)' })
       .option('finish', {
         type: 'boolean', default: false,
         describe: 'Resume an unfinished bootstrap attempt (never starts a new one)',
