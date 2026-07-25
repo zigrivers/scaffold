@@ -4,6 +4,9 @@ import type { ScaffoldConfig } from './config.js'
 import type { PipelineState } from './state.js'
 import type { ScaffoldError, ScaffoldWarning } from './errors.js'
 
+/** Resolved assembly mode for a step (D3 matrix, brownfield R3). */
+export type AssemblyMode = 'fresh' | 'update' | 'adoption'
+
 export interface KnowledgeSource {
   url: string
   anchor?: string

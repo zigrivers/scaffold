@@ -1,10 +1,12 @@
 import path from 'node:path'
 import type { DepthLevel } from '../../types/enums.js'
 import type { PipelineState } from '../../types/state.js'
-import type { ExistingArtifact } from '../../types/assembly.js'
+import type { AssemblyMode, ExistingArtifact } from '../../types/assembly.js'
 import type { ScaffoldWarning } from '../../types/errors.js'
+import type { DetectSpec } from '../../types/frontmatter.js'
 import fs from 'node:fs'
 import { resolveContainedArtifactPath } from '../../utils/artifact-path.js'
+import { verifyStep } from '../../state/completion.js'
 
 export interface UpdateModeResult {
   isUpdateMode: boolean
@@ -113,4 +115,131 @@ export function detectUpdateMode(options: {
     depthIncreased,
     warnings,
   }
+}
+
+export interface AssemblyModeResult {
+  mode: AssemblyMode
+  /** Raw update-mode detection result (pre-verification gate). */
+  updateDetection: UpdateModeResult
+  existingArtifact?: ExistingArtifact
+  previousDepth?: DepthLevel
+  currentDepth: DepthLevel
+  depthIncreased?: boolean
+  warnings: ScaffoldWarning[]
+}
+
+/**
+ * Resolve the assembly mode for a step per the D3 matrix (brownfield R3):
+ *   - prior completion surviving as verification verified|declared → 'update'
+ *   - no surviving completion + init-mode brownfield|v1-migration → 'adoption'
+ *   - else → 'fresh'
+ * A D10a artifact_map incumbent stands in as the prior artifact when the
+ * step's own outputs are absent (fallback only — own outputs win).
+ *
+ * R1 carry-forward (live-conflict gate): a stored completion must survive a
+ * LIVE check (verifyStep) before it can drive update mode or count as a
+ * surviving completion — a completed step whose declared outputs are gone or
+ * whose detect: contract now fails is conflicted, and its stale claim must
+ * not enter update mode. It instead routes like a reopened step: adoption in
+ * brownfield/v1-migration, else fresh.
+ */
+export function resolveAssemblyMode(options: {
+  step: string
+  state: PipelineState
+  currentDepth: DepthLevel
+  projectRoot: string
+  service?: string
+  artifactMap?: Record<string, string>
+  expectedOutputs?: string[]
+  detect?: DetectSpec | null
+}): AssemblyModeResult {
+  const { step, state, currentDepth, projectRoot, artifactMap } = options
+  const detection = detectUpdateMode(options)
+  const entry = state.steps[step]
+  const completed = entry?.status === 'completed'
+
+  // R1 carry-forward (live-conflict gate): a stored completion must survive a
+  // LIVE check before it can drive update mode OR count as a surviving
+  // completion. A completed step whose declared outputs are gone OR whose
+  // detect: contract now fails is conflicted (verifyStep → status 'conflict',
+  // class 'state-claim'); its stale claim must not enter update mode, and it
+  // routes like a reopened step — adoption in brownfield/v1, else fresh.
+  // Gated on `completed` so the common adoption path (pending steps) never
+  // spawns a detect: subprocess, and on `service === undefined` because R3
+  // mapping/adoption is root-only and verifyStep does not service-prefix
+  // outputs (a service-local completion would otherwise be a false conflict).
+  const liveConflict =
+    completed &&
+    options.service === undefined &&
+    verifyStep(
+      step,
+      entry,
+      options.expectedOutputs ?? entry?.produces ?? [],
+      options.detect ?? null,
+      projectRoot,
+      artifactMap,
+    ).status === 'conflict'
+  const completionSurvives = completed && !liveConflict
+
+  // R1 (D3) verification enum. R1's contract is that an ABSENT value ≡
+  // 'unverified' (Global Constraints). Migrated greenfield completions carry
+  // 'declared' explicitly (artifacts_verified: true → 'declared' on load), so
+  // update behavior is preserved through the field, not through the default.
+  // Defaulting absent → 'declared' would let old adopt-created entries (which
+  // never had artifacts_verified) regain update eligibility with no live check.
+  const verification =
+    (entry as { verification?: 'verified' | 'declared' | 'unverified' } | undefined)
+      ?.verification ?? 'unverified'
+  const updateEligible =
+    completionSurvives && (verification === 'verified' || verification === 'declared')
+
+  if (updateEligible && detection.isUpdateMode) {
+    return {
+      mode: 'update',
+      updateDetection: detection,
+      existingArtifact: detection.existingArtifact,
+      previousDepth: detection.previousDepth,
+      currentDepth,
+      depthIncreased: detection.depthIncreased,
+      warnings: detection.warnings,
+    }
+  }
+
+  // D10a fallback: mapped incumbent as prior artifact (own outputs absent).
+  // Note: artifact_map targets are project-root-relative; the service prefix
+  // is not applied (root-level mapping only — multi-service mapping is out
+  // of scope for R3).
+  const mapped = artifactMap?.[step]
+  if (updateEligible && mapped !== undefined) {
+    const mappedFull = resolveContainedArtifactPath(projectRoot, mapped)
+    if (mappedFull !== null) {
+      try {
+        if (fs.statSync(mappedFull).isFile()) {
+          const existingArtifact: ExistingArtifact = {
+            filePath: mapped,
+            content: fs.readFileSync(mappedFull, 'utf8'),
+            previousDepth: (entry?.depth ?? currentDepth) as DepthLevel,
+            completionTimestamp: entry?.at ?? '',
+          }
+          return {
+            mode: 'update',
+            updateDetection: detection,
+            existingArtifact,
+            previousDepth: entry?.depth as DepthLevel | undefined,
+            currentDepth,
+            warnings: [],
+          }
+        }
+      } catch {
+        // mapped path unreadable — fall through
+      }
+    }
+  }
+
+  const initMode = state['init-mode']
+  if (!completionSurvives && (initMode === 'brownfield' || initMode === 'v1-migration')) {
+    return { mode: 'adoption', updateDetection: detection, currentDepth, warnings: [] }
+  }
+
+  return { mode: 'fresh', updateDetection: detection, currentDepth, warnings: [] }
 }
