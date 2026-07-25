@@ -330,3 +330,24 @@ network/gh/git calls, and config parsers. Reviewers will otherwise surface them
 one per round (this cost 3 rounds here). A function's siblings are the strongest
 hint: if two of three risky reads are try/catch-wrapped and one isn't, the
 unwrapped one is a bug, not a deliberate exception.
+
+## Unit tests that trigger the async phase audit must stub it — the real one flakes in CI (2026-07-24)
+**Pattern:** R2's PR #785 CI `check` job failed on a test NOT in the diff —
+`state-manager.test.ts` "markCompleted records verification: declared" timed out
+at 5000ms. `markCompleted` is async for phase-boundary steps (user-stories,
+tech-stack, coding-standards, design-system, implementation-plan,
+implementation-playbook): it fires the REAL `runPhaseAudit` (fs work + audit
+engine) AFTER saving state. That audit usually finishes in <5s but occasionally
+exceeds vitest's default 5s timeout under CI's parallel load (sibling
+boundary-step tests passed in the same run — proof it's a flake, not a hang).
+Passed locally every time; only surfaced under CI contention. `make check-all`
+green locally does NOT prove CI-green when a test does real, timing-sensitive
+async work.
+**Rule:** Any `StateManager` unit test that calls `markCompleted` with a
+PHASE_BOUNDARY step and isn't specifically testing the audit MUST
+`manager.setPhaseAuditFn(async (i) => ({ ran: false, step: i.step, reason:
+'stubbed in test' }))` first (the seam exists for exactly this; the audit is
+covered by `phase-audit.test.ts`). More broadly: if a unit under test kicks off
+a real subprocess/fs/network side effect that isn't the assertion's subject,
+stub it — an occasional >5s run is a latent CI flake, and "green locally" can't
+catch it.

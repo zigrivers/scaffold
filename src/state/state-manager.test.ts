@@ -238,6 +238,15 @@ describe('StateManager', () => {
       const manager = new StateManager(tempDir, computeEligible)
       manager.initializeState(INIT_OPTIONS)
 
+      // tech-stack is a phase-boundary step, so markCompleted fires the phase
+      // audit. This test only checks the verification field (set + saved BEFORE
+      // the audit runs), so stub the audit — the real one does fs work that can
+      // exceed the 5s vitest timeout under CI load (it's covered by
+      // phase-audit.test.ts). Without this stub the test flakes in CI.
+      manager.setPhaseAuditFn(async (input): Promise<PhaseAuditResult> => ({
+        ran: false, step: input.step, reason: 'stubbed in test',
+      }))
+
       manager.setInProgress('tech-stack', 'agent')
       await manager.markCompleted('tech-stack', ['docs/tech-stack.md'], 'agent', 3)
 
@@ -1287,14 +1296,19 @@ const INIT_OPTIONS_PLAN6 = {
 import type { PhaseAuditResult } from '../observability/engine/phase-audit.js'
 
 describe('StateManager — step timestamps (Plan 6)', () => {
-  it('markCompleted sets completed_at to an ISO timestamp', () => {
+  it('markCompleted sets completed_at to an ISO timestamp', async () => {
     const tempDir = makeTempDir()
     const manager = new StateManager(tempDir, computeEligible)
     manager.initializeState(INIT_OPTIONS_PLAN6)
+    // user-stories is a phase-boundary step — stub the audit so the real one
+    // (fs work, can exceed the 5s vitest timeout under CI load) never fires.
+    manager.setPhaseAuditFn(async (input): Promise<PhaseAuditResult> => ({
+      ran: false, step: input.step, reason: 'stubbed in test',
+    }))
     manager.setInProgress('user-stories', 'agent-1')
 
     const before = new Date().toISOString()
-    manager.markCompleted('user-stories', ['docs/user-stories.md'], 'pipeline', 1)
+    await manager.markCompleted('user-stories', ['docs/user-stories.md'], 'pipeline', 1)
 
     const state = manager.loadState()
     expect(state.steps['user-stories'].completed_at).toBeDefined()
@@ -1317,6 +1331,10 @@ describe('StateManager — step timestamps (Plan 6)', () => {
     const tempDir = makeTempDir()
     const manager = new StateManager(tempDir, computeEligible)
     manager.initializeState(INIT_OPTIONS_PLAN6)
+    // Stub the phase audit (user-stories is a boundary step) — see note above.
+    manager.setPhaseAuditFn(async (input): Promise<PhaseAuditResult> => ({
+      ran: false, step: input.step, reason: 'stubbed in test',
+    }))
     manager.setInProgress('user-stories', 'agent-1')
     await manager.markCompleted('user-stories', ['docs/user-stories.md'], 'pipeline', 1)
     const firstTs = manager.loadState().steps['user-stories'].completed_at
