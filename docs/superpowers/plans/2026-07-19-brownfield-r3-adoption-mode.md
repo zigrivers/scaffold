@@ -1816,7 +1816,7 @@ export function applyArtifactMappings(
 
 **Steps:**
 
-- [ ] Create `tests/evals/adoption-mode-specifics.bats`:
+- [x] Create `tests/evals/adoption-mode-specifics.bats`:
 
   ```bash
   #!/usr/bin/env bats
@@ -1903,8 +1903,8 @@ export function applyArtifactMappings(
   }
   ```
 
-- [ ] Run: `npx bats tests/evals/adoption-mode-specifics.bats` — expect test 1 to FAIL for all five files (blocks absent). Tests 2–3 pass vacuously.
-- [ ] Append to `content/pipeline/foundation/tech-stack.md` (at end of file — Update Mode Specifics is its last section):
+- [x] Run: `npx bats tests/evals/adoption-mode-specifics.bats` — expect test 1 to FAIL for all five files (blocks absent). Tests 2–3 pass vacuously.
+- [x] Append to `content/pipeline/foundation/tech-stack.md` (at end of file — Update Mode Specifics is its last section):
 
   ```markdown
 
@@ -1927,7 +1927,7 @@ export function applyArtifactMappings(
     concern as a gap, not a migration plan.
   ```
 
-- [ ] Append to `content/pipeline/foundation/coding-standards.md` (at end of file):
+- [x] Append to `content/pipeline/foundation/coding-standards.md` (at end of file):
 
   ```markdown
 
@@ -1951,7 +1951,7 @@ export function applyArtifactMappings(
     existing codebase violates without marking them "new code only".
   ```
 
-- [ ] Append to `content/pipeline/foundation/tdd.md` (after the Update Mode Specifics section, per the Global Constraints placement rule):
+- [x] Append to `content/pipeline/foundation/tdd.md` (after the Update Mode Specifics section, per the Global Constraints placement rule):
 
   ```markdown
 
@@ -1969,7 +1969,7 @@ export function applyArtifactMappings(
     as coverage gaps with evidence.
   ```
 
-- [ ] Append to `content/pipeline/foundation/project-structure.md` (per placement rule):
+- [x] Append to `content/pipeline/foundation/project-structure.md` (per placement rule):
 
   ```markdown
 
@@ -1987,7 +1987,7 @@ export function applyArtifactMappings(
     organization strategy that contradicts the observed one.
   ```
 
-- [ ] Append to `content/pipeline/foundation/beads.md` (per placement rule):
+- [x] Append to `content/pipeline/foundation/beads.md` (per placement rule):
 
   ```markdown
 
@@ -2008,8 +2008,8 @@ export function applyArtifactMappings(
     issues and beads.
   ```
 
-- [ ] Run: `npx bats tests/evals/adoption-mode-specifics.bats` — expect `ok` ×3. Then `npx bats tests/evals/update-mode-specifics-paths.bats` — must remain green (the new blocks don't touch UMS Detect lines).
-- [ ] Commit: `feat(content): Adoption Mode Specifics — foundation batch 1 + eval (D11)`
+- [x] Run: `npx bats tests/evals/adoption-mode-specifics.bats` — expect `ok` ×3. Then `npx bats tests/evals/update-mode-specifics-paths.bats` — must remain green (the new blocks don't touch UMS Detect lines).
+- [x] Commit: `feat(content): Adoption Mode Specifics — foundation batch 1 + eval (D11)`
 
 ---
 
