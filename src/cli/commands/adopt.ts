@@ -671,6 +671,10 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
         const applyResult = await applyAdoptionPlan({
           projectRoot, plan: livePlan, scaffoldVersion: readPackageVersion(),
         })
+        // D10a: a mapped step whose detect: contract still didn't pass after
+        // the mapping was written stays honestly pending — surface why rather
+        // than silently dropping the outcome.
+        for (const w of applyResult.warnings) output.warn(w)
         if (outputMode === 'json') {
           output.result({
             schema_version: 3,

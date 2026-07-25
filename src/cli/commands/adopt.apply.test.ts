@@ -37,7 +37,7 @@ vi.mock('../../project/adoption-plan.js', () => ({
 vi.mock('../../project/adoption-apply.js', () => ({
   applyAdoptionPlan: vi.fn().mockResolvedValue({
     initialized: true, marked_completed: ['tech-stack'], reopened: [], recorded_pending: ['beads'],
-    audit_records: 1, doctor: { results: [], verdict: 'healthy', exitCode: 0 },
+    audit_records: 1, warnings: [], doctor: { results: [], verdict: 'healthy', exitCode: 0 },
   }),
 }))
 

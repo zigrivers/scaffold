@@ -4,8 +4,10 @@ import { parseDocument, type Document } from 'yaml'
 import { StateManager } from '../state/state-manager.js'
 import { appendAuditRecord } from '../state/decision-logger.js'
 import { atomicWriteFile } from '../utils/fs.js'
+import { configParseError } from '../utils/errors.js'
 import { loadPipelineContext } from '../core/pipeline/context.js'
 import { resolvePipeline } from '../core/pipeline/resolver.js'
+import { verifyStep } from '../state/completion.js'
 import { runDoctor } from '../doctor/run.js'
 import { TYPE_KEY } from './adopt.js'
 import type { AdoptionPlan, InitializeRecord } from './adoption-plan.js'
@@ -18,6 +20,10 @@ export interface ApplyResult {
   reopened: string[]
   recorded_pending: string[]
   audit_records: number
+  /** D10a: honest-re-verification warnings — a mapped step whose detect:
+   *  contract (or outputs) still didn't pass after the mapping was written.
+   *  The step is left pending, never falsely completed/verified. */
+  warnings: string[]
   doctor: DoctorReport
 }
 
@@ -56,6 +62,32 @@ export function writeInitializeConfig(projectRoot: string, initialize: Initializ
 }
 
 /**
+ * D10a apply: persist approved map-candidate dispositions into
+ * .scaffold/config.yml `artifact_map`. AST edit (comments and existing
+ * content preserved), atomic write. Callers must only pass mappings the
+ * approved plan showed (plan_key enforcement happens in the apply driver,
+ * i.e. the CLI layer's re-render-and-compare before applyAdoptionPlan is
+ * ever invoked). Writing the mapping is a durable curation decision on its
+ * own — it does not imply the step verifies; that is a separate, honest
+ * re-verification (see applyAdoptionPlan below).
+ */
+export function applyArtifactMappings(
+  projectRoot: string,
+  mappings: ReadonlyArray<{ step: string; target: string }>,
+): void {
+  if (mappings.length === 0) return
+  const configPath = path.join(projectRoot, '.scaffold', 'config.yml')
+  const doc = parseDocument(fs.readFileSync(configPath, 'utf8'))
+  if (doc.errors.length > 0) {
+    throw configParseError(configPath, doc.errors[0].message)
+  }
+  for (const { step, target } of mappings) {
+    doc.setIn(['artifact_map', step], target)
+  }
+  atomicWriteFile(configPath, doc.toString())
+}
+
+/**
  * Execute an approved Adoption Plan (D1/D2/D3). The caller has already
  * re-rendered against live reality and verified the plan_key — this function
  * only performs the writes the plan's apply-action records describe, then
@@ -80,6 +112,16 @@ export async function applyAdoptionPlan(options: {
     writeInitializeConfig(projectRoot, plan.initialize)
     initialized = true
   }
+
+  // D10a: persist approved map-candidate dispositions BEFORE loading pipeline
+  // context, so the honest re-verification below (and config resolution in
+  // general) observes the final artifact_map. applyArtifactMappings no-ops on
+  // an empty list, so this is safe to call unconditionally.
+  const mapCandidates = plan.steps.filter(
+    (record): record is AdoptionPlan['steps'][number] & { target: string } =>
+      record.disposition === 'map-candidate' && record.target !== undefined,
+  )
+  applyArtifactMappings(projectRoot, mapCandidates.map((r) => ({ step: r.step_slug, target: r.target })))
 
   const context = loadPipelineContext(projectRoot)
   const pipeline = resolvePipeline(context)
@@ -188,6 +230,48 @@ export async function applyAdoptionPlan(options: {
     // apply_action 'none': nothing to write
   }
 
+  // D10a: honest re-verification. Applying a mapping NEVER blindly marks a
+  // step complete — only a real verifyStep pass (detect: contract included,
+  // against context.config?.artifact_map which now includes the write above)
+  // promotes the step to completed/verified. Anything else is left exactly as
+  // initialized/loaded (pending, unverified) and surfaces a warning instead —
+  // e.g. the mapped file satisfies outputs but the step's own detect: check
+  // still targets its canonical (unmapped) path, or the file vanished between
+  // plan and apply.
+  const mapWarnings: string[] = []
+  for (const record of mapCandidates) {
+    const mp = context.metaPrompts.get(record.step_slug)
+    const entry = state.steps[record.step_slug]
+    const verification = verifyStep(
+      record.step_slug, entry, mp?.frontmatter.outputs ?? [], mp?.frontmatter.detect ?? null,
+      projectRoot, context.config?.artifact_map,
+    )
+    if (verification.verification === 'verified') {
+      const next: StepStateEntry = {
+        ...(entry ?? { status: 'pending', source: 'pipeline' }),
+        status: 'completed',
+        at: now,
+        completed_by: ACTOR,
+        produces: producesFor(record.step_slug),
+        verification: 'verified',
+        depth: entry?.depth ?? defaultDepth,
+      }
+      if (next.completed_at === undefined) next.completed_at = now
+      state.steps[record.step_slug] = next
+      marked.push(record.step_slug)
+    } else {
+      const failedDetect = verification.detect.checks
+        .filter((check) => !check.passed)
+        .map((check) => `${check.kind}:${check.target}`)
+      mapWarnings.push(
+        `artifact_map.${record.step_slug} -> ${record.target} did not satisfy verification `
+        + `(missing: ${verification.outputsMissing.join(', ') || 'none'}`
+        + (failedDetect.length > 0 ? `; failed detect: ${failedDetect.join(', ')}` : '')
+        + ') — step left pending.',
+      )
+    }
+  }
+
   stateManager.saveState(state)
   const doctor = runDoctor(projectRoot)
   return {
@@ -196,6 +280,7 @@ export async function applyAdoptionPlan(options: {
     reopened,
     recorded_pending: recorded,
     audit_records: auditCount,
+    warnings: mapWarnings,
     doctor,
   }
 }
