@@ -2287,7 +2287,7 @@ export function applyArtifactMappings(
 
 **Steps:**
 
-- [ ] Extend `ADOPTION_STEP_FILES` with:
+- [x] Extend `ADOPTION_STEP_FILES` with:
 
   ```bash
     "modeling/domain-modeling.md"
@@ -2306,8 +2306,8 @@ export function applyArtifactMappings(
   }
   ```
 
-- [ ] Run: `npx bats tests/evals/adoption-mode-specifics.bats` — test 1 FAILS for the three new files; count lock passes.
-- [ ] Add to `content/pipeline/modeling/domain-modeling.md` (per placement rule):
+- [x] Run: `npx bats tests/evals/adoption-mode-specifics.bats` — test 1 FAILS for the three new files; count lock passes.
+- [x] Add to `content/pipeline/modeling/domain-modeling.md` (per placement rule):
 
   ```markdown
 
@@ -2328,7 +2328,7 @@ export function applyArtifactMappings(
     conflict.
   ```
 
-- [ ] Add to `content/pipeline/architecture/system-architecture.md` (per placement rule):
+- [x] Add to `content/pipeline/architecture/system-architecture.md` (per placement rule):
 
   ```markdown
 
@@ -2347,7 +2347,7 @@ export function applyArtifactMappings(
     structure as a defect — absence of a diagram is not absence of a design.
   ```
 
-- [ ] Add to `content/pipeline/quality/security.md` (per placement rule):
+- [x] Add to `content/pipeline/quality/security.md` (per placement rule):
 
   ```markdown
 
@@ -2367,8 +2367,8 @@ export function applyArtifactMappings(
     existing control.
   ```
 
-- [ ] Run: `npx bats tests/evals/adoption-mode-specifics.bats` — all 4 tests `ok`; all 18 files enforced. Then run the neighboring content evals to prove no regression: `npx bats tests/evals/update-mode-specifics-paths.bats tests/evals/prompt-quality.bats tests/evals/pipeline-completeness.bats` — all `ok`.
-- [ ] Commit: `feat(content): Adoption Mode Specifics — batch 4, modeling/architecture/security; 18-step manifest locked (D11)`
+- [x] Run: `npx bats tests/evals/adoption-mode-specifics.bats` — all 4 tests `ok`; all 18 files enforced. Then run the neighboring content evals to prove no regression: `npx bats tests/evals/update-mode-specifics-paths.bats tests/evals/prompt-quality.bats tests/evals/pipeline-completeness.bats` — all `ok`.
+- [x] Commit: `feat(content): Adoption Mode Specifics — batch 4, modeling/architecture/security; 18-step manifest locked (D11)`
 
 ---
 
