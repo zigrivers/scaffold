@@ -106,7 +106,12 @@ export class AssemblyEngine {
           content: this.buildKnowledgeBaseSection(options.knowledgeEntries, step) },
         { heading: 'Project Context', content: this.buildProjectContextSection(artifacts, decisions, options) },
         { heading: 'Methodology', content: this.buildMethodologySection(depth, options.depthProvenance) },
-        { heading: 'Instructions', content: this.buildInstructionsSection(options.instructions, options.reworkFix) },
+        { heading: 'Instructions',
+          content: this.buildInstructionsSection(
+            options.instructions,
+            options.reworkFix,
+            options.assemblyMode === 'adoption' ? options.adoptionPreamble : undefined,
+          ) },
         { heading: 'Execution', content: this.buildExecutionSection(depth) },
       ]
 
@@ -134,6 +139,7 @@ export class AssemblyEngine {
         assembledAt: new Date().toISOString(),
         updateMode: options.updateMode,
         sectionsIncluded: [...SECTION_HEADINGS],
+        assemblyMode: options.assemblyMode ?? (options.updateMode ? 'update' : 'fresh'),
       }
 
       const prompt: AssembledPrompt = { text, sections, metadata }
@@ -238,7 +244,11 @@ export class AssemblyEngine {
     ].join('\n')
   }
 
-  private buildInstructionsSection(instructions: UserInstructions, reworkFix?: boolean): string {
+  private buildInstructionsSection(
+    instructions: UserInstructions,
+    reworkFix?: boolean,
+    adoptionPreamble?: string,
+  ): string {
     const parts: string[] = []
 
     if (instructions.global != null) {
@@ -262,6 +272,10 @@ export class AssemblyEngine {
         '3. Apply fixes directly to the artifact\n' +
         '4. Summarize what you changed and why',
       )
+    }
+
+    if (adoptionPreamble != null && adoptionPreamble.trim() !== '') {
+      parts.push(`### Adoption Mode\n\n${adoptionPreamble.trim()}`)
     }
 
     if (parts.length === 0) {
