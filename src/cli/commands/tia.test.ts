@@ -6,7 +6,9 @@ import os from 'node:os'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { tiaHandler } from './tia.js'
+import { recordFlake } from '../../merge-queue/flakes.js'
 import { readJournal } from '../../merge-queue/journal.js'
+import * as tiaMapModule from '../../tia/map.js'
 import { hashContent, writeTiaMap } from '../../tia/map.js'
 
 function scratchRepo(): string {
@@ -40,6 +42,41 @@ function branchEdit(root: string): void {
   execFileSync('git', ['-C', root, 'checkout', '-q', '-b', 'feat'])
   fs.appendFileSync(path.join(root, 'src/a.ts'), '// edit\n')
   execFileSync('git', ['-C', root, 'commit', '-qam', 'edit'])
+}
+
+/** Like scratchRepo, but with TWO test files ('m' and 'z') covering the same
+ *  source file — used to prove flake-count ordering without any other signal
+ *  (churn) breaking the tie between them. */
+function scratchRepoTwoTests(): string {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tia-cli-'))
+  execFileSync('git', ['init', '-b', 'main', dir])
+  execFileSync('git', ['-C', dir, 'config', 'user.name', 't'])
+  execFileSync('git', ['-C', dir, 'config', 'user.email', 't@t.invalid'])
+  fs.mkdirSync(path.join(dir, 'src'))
+  fs.writeFileSync(path.join(dir, 'src/a.ts'), 'export const a = 1\n')
+  fs.writeFileSync(path.join(dir, 'src/m.test.ts'), 'import "./a"\n')
+  fs.writeFileSync(path.join(dir, 'src/z.test.ts'), 'import "./a"\n')
+  execFileSync('git', ['-C', dir, 'add', '.'])
+  execFileSync('git', ['-C', dir, 'commit', '-m', 'base'])
+  return dir
+}
+
+function mapForTwoTests(root: string, headSha: string) {
+  return {
+    version: 1 as const,
+    head_sha: headSha,
+    recorded_at: new Date().toISOString(),
+    instrumented_seconds: 5,
+    file_hashes: {
+      'src/a.ts': hashContent(fs.readFileSync(path.join(root, 'src/a.ts'))),
+      'src/m.test.ts': hashContent(fs.readFileSync(path.join(root, 'src/m.test.ts'))),
+      'src/z.test.ts': hashContent(fs.readFileSync(path.join(root, 'src/z.test.ts'))),
+    },
+    // 'src/m.test.ts' and 'src/z.test.ts' both cover 'src/a.ts' — equal churn,
+    // so absent a flake boost the sort falls through to plain alphabetical
+    // order (m before z).
+    tests: { 'src/m.test.ts': ['src/a.ts'], 'src/z.test.ts': ['src/a.ts'] },
+  }
 }
 
 /** Diverges the map's head from HEAD: the map is recorded on a sibling branch
@@ -118,6 +155,47 @@ describe('scaffold tia affected', () => {
     expect(process.exitCode).toBe(3)
     expect(writes.join('')).toBe('')
   })
+
+  it('a flake event older than the 7-day recency window does not boost ordering', async () => {
+    const root = scratchRepoTwoTests()
+    const head = execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
+    writeTiaMap(path.join(root, '.mq'), mapForTwoTests(root, head))
+    branchEdit(root)
+    const stale = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+    recordFlake(path.join(root, '.mq'), 'src/z.test.ts', stale)
+    const writes: string[] = []
+    const spy = vi.spyOn(process.stdout, 'write')
+      .mockImplementation((s: unknown) => { writes.push(String(s)); return true })
+    try {
+      await tiaHandler({ action: 'affected', base: 'main', root })
+    } finally {
+      spy.mockRestore()
+    }
+    expect(process.exitCode ?? 0).toBe(0)
+    // Stale flake is outside the window and must not count — falls through
+    // to the alphabetical tie-break (m before z).
+    expect(writes.join('').trim().split('\n')).toEqual(['src/m.test.ts', 'src/z.test.ts'])
+  })
+
+  it('a recent flake event boosts a test to the front of the ordering', async () => {
+    const root = scratchRepoTwoTests()
+    const head = execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
+    writeTiaMap(path.join(root, '.mq'), mapForTwoTests(root, head))
+    branchEdit(root)
+    const recent = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
+    recordFlake(path.join(root, '.mq'), 'src/z.test.ts', recent)
+    const writes: string[] = []
+    const spy = vi.spyOn(process.stdout, 'write')
+      .mockImplementation((s: unknown) => { writes.push(String(s)); return true })
+    try {
+      await tiaHandler({ action: 'affected', base: 'main', root })
+    } finally {
+      spy.mockRestore()
+    }
+    expect(process.exitCode ?? 0).toBe(0)
+    // Recent flake on z outranks the alphabetical tie-break — z sorts first.
+    expect(writes.join('').trim().split('\n')).toEqual(['src/z.test.ts', 'src/m.test.ts'])
+  })
 })
 
 describe('scaffold tia record-due', () => {
@@ -186,6 +264,32 @@ describe('scaffold tia ingest', () => {
     expect(fs.readFileSync(path.join(mqDir, 'tia', 'last-recorded-day'), 'utf8').trim())
       .toBe(new Date().toISOString().slice(0, 10))
     expect(fs.existsSync(cov)).toBe(false)
+  })
+
+  it('removes the dump dir and exits non-zero when writing the map throws mid-ingest', async () => {
+    const root = scratchRepo()
+    const cov = path.join(root, '.mq', 'tia', 'v8')
+    fs.mkdirSync(cov, { recursive: true })
+    fs.writeFileSync(path.join(cov, 'coverage-1.json'), JSON.stringify({
+      result: [
+        { url: pathToFileURL(path.join(root, 'src/a.test.ts')).href },
+        { url: pathToFileURL(path.join(root, 'src/a.ts')).href },
+      ],
+    }))
+    const spy = vi.spyOn(tiaMapModule, 'writeTiaMap').mockImplementation(() => {
+      throw new Error('boom: simulated write failure')
+    })
+    try {
+      await tiaHandler({ action: 'ingest', coverageDir: cov, head: 'HEADSHA', seconds: 1, root })
+    } finally {
+      spy.mockRestore()
+    }
+    expect(process.exitCode).toBe(1)
+    // The dump dir must still be cleaned up even though ingest failed —
+    // otherwise every failed ingest leaks a NODE_V8_COVERAGE dump directory.
+    expect(fs.existsSync(cov)).toBe(false)
+    // Nothing was journaled — the failure happened before appendEvent ran.
+    expect(readJournal(path.join(root, '.mq')).some(e => e.type === 'tia_recorded')).toBe(false)
   })
 
   // Path-safety: `tia ingest` fs.rmSync(recursive) must NEVER escape

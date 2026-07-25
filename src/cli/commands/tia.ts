@@ -11,7 +11,9 @@ import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
 import { loadAgentOpsConfig } from '../../core/agent-ops/config.js'
 import { createGitOps } from '../../merge-queue/git.js'
+import { recentFlakeCount } from '../../merge-queue/flakes.js'
 import { appendEvent, readJournal } from '../../merge-queue/journal.js'
+import { reduceState } from '../../merge-queue/state.js'
 import {
   TIA_DIR, TIA_LAST_RECORDED_DAY_FILE, buildTiaMap, hashContent, readTiaMap, writeTiaMap,
 } from '../../tia/map.js'
@@ -74,9 +76,15 @@ export async function tiaHandler(argv: TiaArgs): Promise<void> {
           commitDistance = null
         }
       }
+      // Same recency window the daemon uses for quarantine decisions
+      // (recentFlakeCount / WINDOW_MS in merge-queue/flakes.ts) — an ancient
+      // flake must not permanently boost a test's most-likely-to-fail-first
+      // ordering here while the daemon has already forgotten it.
+      const flakeState = reduceState(readJournal(mqDir))
+      const now = new Date()
       const flakeCounts = new Map<string, number>()
-      for (const e of readJournal(mqDir)) {
-        if (e.type === 'flake') flakeCounts.set(e.testId, (flakeCounts.get(e.testId) ?? 0) + 1)
+      for (const testId of new Set(flakeState.flakes.map(f => f.testId))) {
+        flakeCounts.set(testId, recentFlakeCount(flakeState, testId, now))
       }
       const selection = selectAffected({
         map,
@@ -144,27 +152,38 @@ export async function tiaHandler(argv: TiaArgs): Promise<void> {
       process.exitCode = 1
       return
     }
-    const at = new Date().toISOString()
-    const map = buildTiaMap({
-      coverageDir: covDir,
-      projectRoot: cwd,
-      headSha: argv.head,
-      seconds: argv.seconds ?? 0,
-      now: at,
-    })
-    writeTiaMap(mqDir, map)
-    fs.writeFileSync(
-      path.join(mqDir, TIA_DIR, TIA_LAST_RECORDED_DAY_FILE), at.slice(0, 10) + '\n',
-    )
-    appendEvent(mqDir, {
-      type: 'tia_recorded', headSha: argv.head, seconds: argv.seconds ?? 0,
-      tests: Object.keys(map.tests).length, files: Object.keys(map.file_hashes).length, at,
-    })
-    fs.rmSync(covDir, { recursive: true, force: true })
-    output.success(
-      `tia: recorded ${Object.keys(map.tests).length} test file(s) covering ` +
-      `${Object.keys(map.file_hashes).length} file(s)`,
-    )
+    // covDir is already confined to a strict descendant of <primary>/.mq/tia/
+    // by resolveTiaDumpDir above, so the cleanup below is safe to run
+    // unconditionally — including when buildTiaMap/writeTiaMap throws — in a
+    // finally. Otherwise a mid-ingest failure leaks the coverage dump dir.
+    try {
+      const at = new Date().toISOString()
+      const map = buildTiaMap({
+        coverageDir: covDir,
+        projectRoot: cwd,
+        headSha: argv.head,
+        seconds: argv.seconds ?? 0,
+        now: at,
+      })
+      writeTiaMap(mqDir, map)
+      fs.writeFileSync(
+        path.join(mqDir, TIA_DIR, TIA_LAST_RECORDED_DAY_FILE), at.slice(0, 10) + '\n',
+      )
+      appendEvent(mqDir, {
+        type: 'tia_recorded', headSha: argv.head, seconds: argv.seconds ?? 0,
+        tests: Object.keys(map.tests).length, files: Object.keys(map.file_hashes).length, at,
+      })
+      output.success(
+        `tia: recorded ${Object.keys(map.tests).length} test file(s) covering ` +
+        `${Object.keys(map.file_hashes).length} file(s)`,
+      )
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      output.error(`tia ingest: ${message}`)
+      process.exitCode = 1
+    } finally {
+      fs.rmSync(covDir, { recursive: true, force: true })
+    }
     return
   }
   default:
