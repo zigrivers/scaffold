@@ -1863,7 +1863,7 @@ elif args[:2] == ['pr', 'diff']:
 
 **Steps:**
 
-- [ ] Add the failing tests to `src/cli/commands/mq.test.ts` (add `vi` to the vitest import):
+- [x] Add the failing tests to `src/cli/commands/mq.test.ts` (add `vi` to the vitest import):
 
 ```ts
   it('release flips a HELD_HUMAN PR back to QUEUED (zoneReleased)', async () => {
@@ -1928,8 +1928,8 @@ elif args[:2] == ['pr', 'diff']:
   })
 ```
 
-- [ ] Run: `npx vitest run src/cli/commands/mq.test.ts` — expect the 4 new tests FAIL.
-- [ ] In `src/cli/commands/mq.ts`:
+- [x] Run: `npx vitest run src/cli/commands/mq.test.ts` — expect the 4 new tests FAIL.
+- [x] In `src/cli/commands/mq.ts`:
   - Add `'release'` to the builder's `choices` array.
   - Add the case (next to `eject`):
 
@@ -1976,9 +1976,9 @@ elif args[:2] == ['pr', 'diff']:
 
     (replacing the existing json-result and paused-banner lines — the remainder of the case is unchanged.)
 
-- [ ] Run: `npx vitest run src/cli/commands/mq.test.ts` — expect ALL pass.
-- [ ] Run: `npm run check` — expect green.
-- [ ] Commit: `git add -A && git commit -m "feat(mq): mq release action + held-PR surfacing in status (D13)"`
+- [x] Run: `npx vitest run src/cli/commands/mq.test.ts` — expect ALL pass.
+- [x] Run: `npm run check` — expect green.
+- [x] Commit: `git add -A && git commit -m "feat(mq): mq release action + held-PR surfacing in status (D13)"`
 
 **D13 is complete and shippable here.**
 
