@@ -37,7 +37,7 @@ scan=$(printf '%s' "$cmd" | awk 'BEGIN{ORS=""} { if (sub(/\\$/,"")) printf "%s",
 mcmd=$(printf '%s' "$scan" | sed -E -e 's/"[^"]*"/_Q_/g' -e "s/'[^']*'/_Q_/g")
 
 if printf '%s' "$mcmd" | grep -qE '(^|[^[:alnum:]_])gh[[:space:]]+pr[[:space:]]+merge([^[:alnum:]_]|$)'; then
-	printf '%s\n' "mq-guard: direct 'gh pr merge' is routed through the merge queue on this project. Enqueue instead: scaffold mq enqueue --pr <N> (or: make mq-enqueue PR=<N>). The queue batch-tests against latest {{DEFAULT_BRANCH}} and lands green PRs for you; watch with: scaffold mq status." >&2
+	printf '%s\n' "mq-guard: direct 'gh pr merge' is routed through the merge queue on this project. Enqueue instead: scaffold mq enqueue --pr <N> (or: make mq-enqueue PR=<N>). The queue batch-tests against latest {{DEFAULT_BRANCH}} and lands green PRs for you; watch with: scaffold mq status. First queue-installing PR (queue not armed yet)? Run the guided first merge: scaffold mq bootstrap --pr <N>." >&2
 	exit 2
 fi
 exit 0

@@ -17,6 +17,9 @@ export interface GhClient {
   /** Squash-merge. When expectedHead is given, gh refuses unless the PR head still
    *  matches it — so a push during the gate can never land an untested revision. */
   squashMerge(pr: number, expectedHead?: string): void
+  /** OID of the merge commit for a MERGED PR; null while GitHub has not yet
+   *  reported one (D9: bootstrap_merged records it). */
+  mergeCommitSha(pr: number): string | null
   comment(pr: number, body: string): void
   listLabeled(label: string): number[]
   postMergeRed(defaultBranch: string): boolean
@@ -75,6 +78,12 @@ export function createGhClient(cwd: string): GhClient {
       const args = ['pr', 'merge', String(pr), '--squash', '--delete-branch']
       if (expectedHead) args.push('--match-head-commit', expectedHead)
       gh(args)
+    },
+    mergeCommitSha(pr) {
+      const raw = JSON.parse(gh(['pr', 'view', String(pr), '--json', 'mergeCommit'])) as {
+        mergeCommit: { oid: string } | null
+      }
+      return raw.mergeCommit?.oid ?? null
     },
     comment(pr, body) {
       gh(['pr', 'comment', String(pr), '--body', body])

@@ -17,6 +17,17 @@ export interface GitOps {
   originHeadSha(branch: string): string
   treeOf(ref: string): string
   ensureGateWorktree(): string
+  /** Detached checkout of an exact SHA in the gate worktree (bootstrap
+   *  preflight runs the full gate there). Clears crashed-merge leftovers
+   *  first, fetches the object when absent locally. Returns the gate dir. */
+  checkoutDetachedInGate(sha: string): string
+  /** Fast-forward the PRIMARY worktree to the bootstrap merge commit. `gh pr
+   *  merge` updates only the remote, so the local primary tree lacks the
+   *  just-landed queue files (poller script, config) until this fetch +
+   *  fast-forward — without it the post-merge scheduler arm
+   *  (`buildPostMergePollerJob(primary)`) throws on the missing script. Fetches
+   *  origin, then `merge --ff-only` primary to the exact merge SHA. */
+  syncPrimaryToMerge(mergeSha: string): void
   constructCandidate(
     batchId: string,
     prs: { pr: number; headSha: string }[],
@@ -78,6 +89,34 @@ export function createGitOps(repoRoot: string): GitOps {
       return git(['rev-parse', `${ref}^{tree}`])
     },
     ensureGateWorktree,
+    checkoutDetachedInGate(sha) {
+      const gate = ensureGateWorktree()
+      // Same crashed-build recovery as constructCandidate: leftovers must
+      // never wedge the checkout.
+      gitAllowFail(['merge', '--abort'], gate)
+      gitAllowFail(['reset', '--hard'], gate)
+      gitAllowFail(['clean', '-fd'], gate)
+      if (!gitAllowFail(['cat-file', '-e', `${sha}^{commit}`], gate)) {
+        gitAllowFail(['fetch', 'origin', sha])
+      }
+      git(['checkout', '--force', '--detach', sha], gate)
+      return gate
+    },
+    syncPrimaryToMerge(mergeSha) {
+      // Bring the local primary tree up to the just-landed merge commit so the
+      // post-merge scheduler arm sees the PR's poller script + config. Anchor to
+      // the REAL primary worktree via primaryRoot() (resolved from git-common-dir)
+      // — NOT this GitOps' construction cwd: bootstrap may run from a linked
+      // worktree (`git = createGitOps(startRoot)`), and the merge must land in
+      // primary. ff-only: primary sits at the base branch head that the bootstrap
+      // merge advanced — never a non-ff reset.
+      const primary = primaryRoot()
+      gitAllowFail(['fetch', 'origin'], primary)
+      if (!gitAllowFail(['cat-file', '-e', `${mergeSha}^{commit}`], primary)) {
+        gitAllowFail(['fetch', 'origin', mergeSha], primary)
+      }
+      git(['merge', '--ff-only', mergeSha], primary)
+    },
     constructCandidate(batchId, prs, base) {
       const gate = ensureGateWorktree()
       const ref = `${CANDIDATE_PREFIX}${batchId}`

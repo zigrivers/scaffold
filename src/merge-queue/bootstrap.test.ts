@@ -1,9 +1,17 @@
 import { describe, expect, it } from 'vitest'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import {
-  latestAttemptFor, planResume, reduceBootstrapAttempts,
+  latestAttemptFor, planResume, reduceBootstrapAttempts, runBootstrap, type BootstrapDeps,
 } from './bootstrap.js'
+import { appendEvent, readJournal } from './journal.js'
 import { reduceState } from './state.js'
+import { defaultMergeQueueConfig } from './types.js'
 import type { JournalEvent } from './types.js'
+import type { GhClient, PrInfo } from './gh.js'
+import type { CandidateResult, GitOps } from './git.js'
+import type { GateResult } from './gate.js'
 
 const T1 = '2026-07-19T10:00:00.000Z'
 const T2 = '2026-07-19T10:01:00.000Z'
@@ -88,5 +96,276 @@ describe('journal compatibility', () => {
     const state = reduceState(events)
     expect(state.entries.get(7)?.state).toBe('QUEUED')
     expect(state.entries.size).toBe(1)
+  })
+})
+
+function makeGh(script: {
+  states?: PrInfo['state'][]
+  heads?: string[]
+  mergeSha?: string | null
+}): GhClient & { merged: { pr: number; expectedHead?: string }[] } {
+  const states = [...(script.states ?? ['OPEN'])]
+  const heads = [...(script.heads ?? ['SHA-A'])]
+  const next = <T>(arr: T[]): T => (arr.length > 1 ? arr.shift() as T : arr[0])
+  const gh = {
+    merged: [] as { pr: number; expectedHead?: string }[],
+    viewPr(pr: number): PrInfo {
+      return {
+        number: pr, state: next(states), headSha: next(heads), mergedAt: null,
+        additions: 0, deletions: 0, title: 't', body: '',
+      }
+    },
+    squashMerge(pr: number, expectedHead?: string): void {
+      gh.merged.push({ pr, expectedHead })
+    },
+    mergeCommitSha: (): string | null => script.mergeSha === undefined ? 'MERGESHA' : script.mergeSha,
+    comment(): void { /* unused */ },
+    listLabeled: (): number[] => [],
+    postMergeRed: (): boolean => false,
+  }
+  return gh
+}
+
+function makeGit(root: string): GitOps & { checkouts: string[] } {
+  const g = {
+    checkouts: [] as string[],
+    primaryRoot: (): string => root,
+    defaultBranch: (): string => 'main',
+    fetchOrigin(): void { /* no-op */ },
+    originHeadSha: (): string => 'BASE',
+    treeOf: (): string => 'TREE',
+    ensureGateWorktree: (): string => path.join(root, '.mq', 'gate'),
+    checkoutDetachedInGate(sha: string): string {
+      g.checkouts.push(sha)
+      return path.join(root, '.mq', 'gate')
+    },
+    syncPrimaryToMerge(sha: string): void { g.checkouts.push(`sync:${sha}`) },
+    constructCandidate(): CandidateResult { throw new Error('not used by bootstrap') },
+    deleteCandidate(): void { /* unused */ },
+    listCandidateRefs: (): string[] => [],
+  }
+  return g
+}
+
+interface Recorded {
+  hooksArmed: number
+  schedArmed: number
+  smoked: number
+  gates: string[]
+}
+
+function makeDeps(root: string, over: Partial<BootstrapDeps> = {}): { deps: BootstrapDeps; rec: Recorded } {
+  fs.mkdirSync(path.join(root, '.scaffold'), { recursive: true })
+  fs.writeFileSync(path.join(root, '.scaffold', 'agent-ops.yaml'), 'project_name: p\n')
+  const rec: Recorded = { hooksArmed: 0, schedArmed: 0, smoked: 0, gates: [] }
+  const ids = ['01A', '01B', '01C']
+  const green: GateResult = { result: 'green', seconds: 3, logPath: '/dev/null', failedTests: [] }
+  const deps: BootstrapDeps = {
+    gh: makeGh({}),
+    git: makeGit(root),
+    runGate: opts => {
+      rec.gates.push(opts.command)
+      return green
+    },
+    config: defaultMergeQueueConfig(),
+    mqDir: path.join(root, '.mq'),
+    projectRoot: root,
+    armHooks: () => {
+      rec.hooksArmed += 1
+      return { messages: ['hooks: registered PreToolUse: scripts/mq-guard.sh (merge-queue routing guard)'] }
+    },
+    armSched: () => {
+      rec.schedArmed += 1
+      return { ok: true, messages: ['sched: verified loaded'] }
+    },
+    smokeDaemon: () => {
+      rec.smoked += 1
+      return { ok: true, detail: 'mq daemon --once cycle completed clean' }
+    },
+    runDoctor: () => ({ exitCode: 0, summary: 'healthy' }),
+    gateTargetResolves: () => true,
+    log: () => { /* silent */ },
+    now: () => new Date('2026-07-19T12:00:00.000Z'),
+    sleep: async () => { /* no-op — merge-SHA backoff runs instantly in tests */ },
+    newId: () => ids.shift() ?? '01Z',
+    ...over,
+  }
+  return { deps, rec }
+}
+
+function tmpRoot(): string {
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'mq-bootstrap-'))
+}
+
+describe('runBootstrap (D9 engine)', () => {
+  it('happy path: gate on head, arm-first, then intent → merge(match-head) → merged → armed', async () => {
+    const root = tmpRoot()
+    const gh = makeGh({})
+    const { deps, rec } = makeDeps(root, { gh })
+    const out = await runBootstrap(deps, { pr: 41 })
+    expect(out.ok).toBe(true)
+    expect(out.stage).toBe('complete')
+    expect(out.bootstrapId).toBe('01A')
+    expect(rec.gates).toEqual([deps.config.full_gate_command]) // FULL gate in preflight
+    // 'SHA-A' from preflight's checkoutDetachedInGate; 'sync:MERGESHA' from
+    // verifyAndArm's post-merge syncPrimaryToMerge (D9: fast-forward primary
+    // to the merge commit BEFORE arming the scheduler — see git.ts).
+    expect(deps.git as ReturnType<typeof makeGit>).toMatchObject({ checkouts: ['SHA-A', 'sync:MERGESHA'] })
+    expect(rec.hooksArmed).toBe(1)
+    expect(rec.schedArmed).toBe(1)
+    expect(gh.merged).toEqual([{ pr: 41, expectedHead: 'SHA-A' }])
+    const events = readJournal(deps.mqDir)
+    expect(events.map(e => e.type)).toEqual(['bootstrap_intent', 'bootstrap_merged', 'bootstrap_armed'])
+    expect(events.every(e => 'bootstrapId' in e && e.bootstrapId === '01A')).toBe(true)
+    expect(events.every(e => 'gatedHeadSha' in e && e.gatedHeadSha === 'SHA-A')).toBe(true)
+    expect(events[1]).toMatchObject({ mergeCommitSha: 'MERGESHA', pr: 41 })
+  })
+  it('aborts when the head moves between intent and merge — id terminal, retry uses a new id', async () => {
+    const root = tmpRoot()
+    // viewPr call 1 (reconcile+preflight): SHA-A; call 2 (revalidation): SHA-NEW.
+    const gh = makeGh({ heads: ['SHA-A', 'SHA-NEW'] })
+    const { deps } = makeDeps(root, { gh })
+    const out = await runBootstrap(deps, { pr: 41 })
+    expect(out.ok).toBe(false)
+    expect(out.stage).toBe('aborted')
+    expect(gh.merged).toEqual([])
+    expect(readJournal(deps.mqDir).map(e => e.type)).toEqual(['bootstrap_intent'])
+    // Retry: fresh gh (head settled at SHA-NEW) reuses the journal — new id 01B.
+    const { deps: deps2 } = makeDeps(root, {
+      gh: makeGh({ heads: ['SHA-NEW'] }),
+      newId: () => '01B',
+    })
+    const out2 = await runBootstrap(deps2, { pr: 41 })
+    expect(out2.ok).toBe(true)
+    expect(out2.bootstrapId).toBe('01B')
+    const intents = readJournal(deps.mqDir).filter(e => e.type === 'bootstrap_intent')
+    expect(intents.map(e => (e as { bootstrapId: string }).bootstrapId)).toEqual(['01A', '01B'])
+  })
+  it('crash window: intent journaled, GitHub reports MERGED ⇒ records retroactively, never re-merges', async () => {
+    const root = tmpRoot()
+    const { deps } = makeDeps(root)
+    appendEvent(deps.mqDir, {
+      type: 'bootstrap_intent', bootstrapId: '00X', pr: 41,
+      gatedHeadSha: 'SHA-A', at: '2026-07-19T11:00:00.000Z',
+    })
+    const gh = makeGh({ states: ['MERGED'], mergeSha: 'RECOVERED' })
+    const { deps: resumed, rec } = makeDeps(root, { gh })
+    const out = await runBootstrap(resumed, { pr: 41 })
+    expect(out.ok).toBe(true)
+    expect(out.bootstrapId).toBe('00X')
+    expect(gh.merged).toEqual([]) // never re-merged
+    const events = readJournal(deps.mqDir)
+    expect(events.map(e => e.type)).toEqual(['bootstrap_intent', 'bootstrap_merged', 'bootstrap_armed'])
+    expect(events[1]).toMatchObject({ bootstrapId: '00X', mergeCommitSha: 'RECOVERED' })
+    expect(rec.hooksArmed).toBe(1) // idempotent re-arm on resume
+  })
+  it('--finish completes a merged-without-armed attempt without re-merging', async () => {
+    const root = tmpRoot()
+    const { deps } = makeDeps(root)
+    appendEvent(deps.mqDir, {
+      type: 'bootstrap_intent', bootstrapId: '00X', pr: 41,
+      gatedHeadSha: 'SHA-A', at: '2026-07-19T11:00:00.000Z',
+    })
+    appendEvent(deps.mqDir, {
+      type: 'bootstrap_merged', bootstrapId: '00X', pr: 41,
+      gatedHeadSha: 'SHA-A', mergeCommitSha: 'M1', at: '2026-07-19T11:00:01.000Z',
+    })
+    const gh = makeGh({ states: ['MERGED'] })
+    const { deps: resumed, rec } = makeDeps(root, { gh })
+    const out = await runBootstrap(resumed, { pr: 41, finish: true })
+    expect(out.ok).toBe(true)
+    expect(out.stage).toBe('complete')
+    expect(gh.merged).toEqual([])
+    expect(rec.smoked).toBe(1)
+    expect(readJournal(deps.mqDir).at(-1)).toMatchObject({ type: 'bootstrap_armed', bootstrapId: '00X' })
+  })
+  it('--finish with no unfinished attempt fails without side effects', async () => {
+    const root = tmpRoot()
+    const { deps, rec } = makeDeps(root)
+    const out = await runBootstrap(deps, { pr: 41, finish: true })
+    expect(out.ok).toBe(false)
+    expect(rec.hooksArmed).toBe(0)
+    expect(readJournal(deps.mqDir)).toEqual([])
+  })
+  it('a red preflight gate stops before arming or journaling anything', async () => {
+    const root = tmpRoot()
+    const red: GateResult = { result: 'red', seconds: 9, logPath: '/tmp/log', failedTests: [] }
+    const { deps, rec } = makeDeps(root, { runGate: () => red })
+    const out = await runBootstrap(deps, { pr: 41 })
+    expect(out.ok).toBe(false)
+    expect(out.stage).toBe('preflight')
+    expect(rec.hooksArmed).toBe(0)
+    expect(readJournal(deps.mqDir)).toEqual([])
+  })
+  it('unresolvable gate targets fail preflight with the gate-component remediation', async () => {
+    const root = tmpRoot()
+    const { deps } = makeDeps(root, { gateTargetResolves: () => false })
+    const out = await runBootstrap(deps, { pr: 41 })
+    expect(out.ok).toBe(false)
+    expect(out.messages.join('\n')).toMatch(/agent-ops install --component gate/)
+  })
+  it('a PR that does not commit the queue assets in its gated tree fails preflight before arming', async () => {
+    const root = tmpRoot()
+    // The first queue-installing PR must COMMIT its assets so they land at merge;
+    // verifyGatedAssets checks the GATED tree, never primary. A PR that leaves
+    // them out (uncommitted post-gate mutation) is rejected before any arming.
+    const { deps, rec } = makeDeps(root, {
+      verifyGatedAssets: () => ({ ok: false, missing: ['scripts/mq-guard.sh', 'scripts/ops/post-merge-poller.sh'] }),
+    })
+    const out = await runBootstrap(deps, { pr: 41 })
+    expect(out.ok).toBe(false)
+    expect(out.stage).toBe('preflight')
+    expect(out.messages.join('\n')).toMatch(/does not install the queue/)
+    expect(rec.hooksArmed).toBe(0)
+    expect(readJournal(deps.mqDir)).toEqual([])
+  })
+  it('a failed daemon smoke leaves merged-without-armed and points at --finish', async () => {
+    const root = tmpRoot()
+    const { deps } = makeDeps(root, { smokeDaemon: () => ({ ok: false, detail: 'exited 1' }) })
+    const out = await runBootstrap(deps, { pr: 41 })
+    expect(out.ok).toBe(false)
+    expect(out.stage).toBe('verify')
+    expect(out.messages.join('\n')).toMatch(/--finish/)
+    expect(readJournal(deps.mqDir).map(e => e.type)).toEqual(['bootstrap_intent', 'bootstrap_merged'])
+  })
+  it(
+    'never journals an empty merge SHA — stops when GitHub has not exposed the commit, ' +
+      'and resume reconciles',
+    async () => {
+      const root = tmpRoot()
+      // Merge succeeds but GitHub has not exposed the merge commit SHA yet.
+      const { deps } = makeDeps(root, { gh: makeGh({ mergeSha: null }) })
+      const out = await runBootstrap(deps, { pr: 41 })
+      expect(out.ok).toBe(false)
+      expect(out.stage).toBe('merge')
+      expect(out.messages.join('\n')).toMatch(/--finish/)
+      // The journal must NOT carry a bootstrap_merged with an empty SHA.
+      expect(readJournal(deps.mqDir).map(e => e.type)).toEqual(['bootstrap_intent'])
+      // Resume once GitHub exposes the SHA: intent-without-merged + MERGED ⇒
+      // record-merge-then-arm records the real SHA, then arms.
+      const { deps: resumed } = makeDeps(root, {
+        gh: makeGh({ states: ['MERGED'], mergeSha: 'LATE-SHA' }),
+      })
+      const out2 = await runBootstrap(resumed, { pr: 41, finish: true })
+      expect(out2.ok).toBe(true)
+      const events = readJournal(deps.mqDir)
+      expect(events.map(e => e.type)).toEqual(['bootstrap_intent', 'bootstrap_merged', 'bootstrap_armed'])
+      expect(events[1]).toMatchObject({ mergeCommitSha: 'LATE-SHA', pr: 41 })
+    })
+  it('an armed attempt is a clean no-op', async () => {
+    const root = tmpRoot()
+    const { deps } = makeDeps(root)
+    for (const type of ['bootstrap_intent', 'bootstrap_merged', 'bootstrap_armed'] as const) {
+      appendEvent(deps.mqDir, {
+        type, bootstrapId: '00X', pr: 41, gatedHeadSha: 'SHA-A',
+        ...(type === 'bootstrap_merged' ? { mergeCommitSha: 'M1' } : {}),
+        at: '2026-07-19T11:00:00.000Z',
+      } as never)
+    }
+    const { deps: again, rec } = makeDeps(root, { gh: makeGh({ states: ['MERGED'] }) })
+    const out = await runBootstrap(again, { pr: 41 })
+    expect(out.ok).toBe(true)
+    expect(rec.hooksArmed).toBe(0)
+    expect(readJournal(deps.mqDir)).toHaveLength(3)
   })
 })

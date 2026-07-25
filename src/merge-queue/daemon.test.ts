@@ -64,6 +64,7 @@ class FakeGh implements GhClient {
   comment(pr: number, body: string): void { this.comments.push({ pr, body }) }
   listLabeled(): number[] { return this.labeled }
   postMergeRed(): boolean { return this.red }
+  mergeCommitSha(): string | null { return 'FAKE_MERGE_SHA' }
 }
 
 class FakeGit implements GitOps {
@@ -82,6 +83,8 @@ class FakeGit implements GitOps {
   }
   treeOf(ref: string): string { return this.trees[ref] ?? 'TREE' }
   ensureGateWorktree(): string { return path.join(this.root, '.mq', 'gate') }
+  checkoutDetachedInGate(): string { return path.join(this.root, '.mq', 'gate') }
+  syncPrimaryToMerge(): void { /* no-op: the fake primary is always "synced" */ }
   constructCandidate(batchId: string, prs: { pr: number }[]): CandidateResult {
     this.constructed.push({ batchId, prs: prs.map(p => p.pr) })
     const scripted = this.candidates.shift()

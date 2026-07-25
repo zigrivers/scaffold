@@ -216,3 +216,28 @@ describe('createGitOps', () => {
     expect(files).toContain('clean.txt')
   })
 })
+
+describe('checkoutDetachedInGate (D9 bootstrap preflight)', () => {
+  it('checks out the exact sha detached in the gate worktree', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'git-bootstrap-'))
+    const run = (args: string[], cwd = dir): string =>
+      execFileSync('git', args, { cwd, encoding: 'utf8' }).trim()
+    run(['init', '-b', 'main', dir], process.cwd())
+    run(['config', 'user.name', 't'])
+    run(['config', 'user.email', 't@t.invalid'])
+    fs.writeFileSync(path.join(dir, 'a.txt'), '1\n')
+    run(['add', 'a.txt'])
+    run(['commit', '-m', 'c1'])
+    const sha1 = run(['rev-parse', 'HEAD'])
+    fs.writeFileSync(path.join(dir, 'a.txt'), '2\n')
+    run(['commit', '-am', 'c2'])
+    const ops = createGitOps(dir)
+    const gate = ops.checkoutDetachedInGate(sha1)
+    // macOS resolves TMPDIR through a /var -> /private/var symlink; git's
+    // --path-format=absolute follows it, so compare realpaths (same idiom as
+    // "primaryRoot resolves..." above) rather than the raw tmpdir string.
+    expect(fs.realpathSync(gate)).toBe(fs.realpathSync(path.join(dir, '.mq', 'gate')))
+    expect(run(['rev-parse', 'HEAD'], gate)).toBe(sha1)
+    expect(fs.readFileSync(path.join(gate, 'a.txt'), 'utf8')).toBe('1\n')
+  })
+})

@@ -9,6 +9,10 @@ import yargs from 'yargs'
 import mqCommand, { mqHandler } from './mq.js'
 import { appendEvent, readJournal } from '../../merge-queue/journal.js'
 import { reduceState } from '../../merge-queue/state.js'
+import type { BootstrapDeps } from '../../merge-queue/bootstrap.js'
+import type { GhClient, PrInfo } from '../../merge-queue/gh.js'
+import type { CandidateResult, GitOps } from '../../merge-queue/git.js'
+import { defaultMergeQueueConfig } from '../../merge-queue/types.js'
 
 function scratchRepo(): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mq-cli-'))
@@ -26,7 +30,7 @@ afterEach(() => {
 })
 
 describe('scaffold mq', () => {
-  it('declares the five actions', () => {
+  it('declares the mq command surface (bootstrap included)', () => {
     expect(mqCommand.command).toBe('mq <action>')
   })
 
@@ -113,5 +117,88 @@ describe('scaffold mq', () => {
       delete process.env.MQ_GH_CMD
     }
     expect(checkSync(mqDir, { lockfilePath: path.join(mqDir, 'daemon.lock'), stale: 60_000 })).toBe(false)
+  })
+})
+
+describe('scaffold mq bootstrap (CLI wiring)', () => {
+  function opsYaml(root: string): void {
+    fs.mkdirSync(path.join(root, '.scaffold'), { recursive: true })
+    fs.writeFileSync(path.join(root, '.scaffold', 'agent-ops.yaml'), 'project_name: p\n')
+  }
+  function fakeDeps(root: string): Partial<BootstrapDeps> {
+    const gh: GhClient = {
+      viewPr: (pr: number): PrInfo => ({
+        number: pr, state: 'OPEN', headSha: 'SHA-A', mergedAt: null,
+        additions: 0, deletions: 0, title: 't', body: '',
+      }),
+      squashMerge: (): void => { /* recorded via journal assertions */ },
+      mergeCommitSha: (): string | null => 'M1',
+      comment: (): void => { /* unused */ },
+      listLabeled: (): number[] => [],
+      postMergeRed: (): boolean => false,
+    }
+    const git: GitOps = {
+      primaryRoot: () => root,
+      defaultBranch: () => 'main',
+      fetchOrigin: (): void => { /* no-op */ },
+      originHeadSha: () => 'BASE',
+      treeOf: () => 'TREE',
+      ensureGateWorktree: () => path.join(root, '.mq', 'gate'),
+      checkoutDetachedInGate: () => path.join(root, '.mq', 'gate'),
+      syncPrimaryToMerge: (): void => { /* no-op */ },
+      constructCandidate: (): CandidateResult => { throw new Error('unused') },
+      deleteCandidate: (): void => { /* unused */ },
+      listCandidateRefs: (): string[] => [],
+    }
+    return {
+      gh, git,
+      runGate: () => ({ result: 'green' as const, seconds: 1, logPath: '/dev/null', failedTests: [] }),
+      // The fake git returns .mq/gate as the gated tree, which holds no assets —
+      // stub the gated-tree seams so preflight passes without scaffolding one.
+      readMergeConfig: () => defaultMergeQueueConfig(),
+      verifyGatedAssets: () => ({ ok: true, missing: [] }),
+      armHooks: () => ({ messages: [] }),
+      armSched: () => ({ ok: true, messages: [] }),
+      smokeDaemon: () => ({ ok: true, detail: 'clean' }),
+      runDoctor: null,
+      gateTargetResolves: () => true,
+      newId: () => '01TEST',
+    }
+  }
+  it('bootstrap journals intent → merged → armed and exits 0', async () => {
+    const root = scratchRepo()
+    opsYaml(root)
+    await mqHandler({ action: 'bootstrap', pr: 41, root }, { bootstrapDeps: fakeDeps(root) })
+    const types = readJournal(path.join(root, '.mq')).map(e => e.type)
+    expect(types).toEqual(['bootstrap_intent', 'bootstrap_merged', 'bootstrap_armed'])
+    expect(process.exitCode ?? 0).toBe(0)
+    process.exitCode = 0
+  })
+  it('bootstrap --finish with no attempt exits 1', async () => {
+    const root = scratchRepo()
+    opsYaml(root)
+    await mqHandler({ action: 'bootstrap', pr: 41, finish: true, root }, { bootstrapDeps: fakeDeps(root) })
+    expect(process.exitCode).toBe(1)
+    process.exitCode = 0
+  })
+  it('bootstrap without --pr exits 1', async () => {
+    const root = scratchRepo()
+    await mqHandler({ action: 'bootstrap', root })
+    expect(process.exitCode).toBe(1)
+    process.exitCode = 0
+  })
+  it('parses "mq bootstrap --pr 7 --finish" under strict mode', async () => {
+    let seen: { action?: string; pr?: number; finish?: boolean } = {}
+    await yargs(['mq', 'bootstrap', '--pr', '7', '--finish'])
+      .command({
+        ...mqCommand,
+        handler: a => {
+          seen = { action: String(a.action), pr: a.pr as number, finish: a.finish as boolean }
+        },
+      })
+      .strict()
+      .fail(false)
+      .parseAsync()
+    expect(seen).toEqual({ action: 'bootstrap', pr: 7, finish: true })
   })
 })
