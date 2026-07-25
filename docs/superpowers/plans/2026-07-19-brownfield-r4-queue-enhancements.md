@@ -81,7 +81,7 @@
 
 **Steps:**
 
-- [ ] Write the failing test `src/merge-queue/gate-cache.test.ts`:
+- [x] Write the failing test `src/merge-queue/gate-cache.test.ts`:
 
 ```ts
 // src/merge-queue/gate-cache.test.ts
@@ -180,8 +180,8 @@ describe('lookupGateCache / recordGateCache', () => {
 })
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/gate-cache.test.ts` — expect FAILURE (module missing).
-- [ ] Create `src/merge-queue/gate-cache.ts`:
+- [x] Run: `npx vitest run src/merge-queue/gate-cache.test.ts` — expect FAILURE (module missing).
+- [x] Create `src/merge-queue/gate-cache.ts`:
 
 ```ts
 // src/merge-queue/gate-cache.ts — D12: green-only gate-result cache, keyed by
@@ -282,15 +282,15 @@ export function recordGateCache(
 }
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/gate-cache.test.ts` — expect all tests pass.
-- [ ] In `src/merge-queue/types.ts`, extend the `JournalEvent` union (append after the `gate_metrics` member):
+- [x] Run: `npx vitest run src/merge-queue/gate-cache.test.ts` — expect all tests pass.
+- [x] In `src/merge-queue/types.ts`, extend the `JournalEvent` union (append after the `gate_metrics` member):
 
 ```ts
   | { type: 'gate_cached'; batchId: string; key: string; savedSeconds: number; at: string }
   | { type: 'full_gate_recorded'; tree: string; seconds: number; instrumented: boolean; at: string }
 ```
 
-- [ ] In `src/merge-queue/types.ts`, add to `MergeQueueConfig` (after `gate_executor`):
+- [x] In `src/merge-queue/types.ts`, add to `MergeQueueConfig` (after `gate_executor`):
 
 ```ts
   /** D12: size cap for .mq/gate-cache.json; 0 disables the gate-result cache. */
@@ -303,7 +303,7 @@ export function recordGateCache(
     gate_cache_max_entries: 200,
 ```
 
-- [ ] In `src/merge-queue/state.ts`, add no-op reducer cases next to the existing `case 'gate_metrics': break`:
+- [x] In `src/merge-queue/state.ts`, add no-op reducer cases next to the existing `case 'gate_metrics': break`:
 
 ```ts
     case 'gate_cached':
@@ -311,7 +311,7 @@ export function recordGateCache(
       break
 ```
 
-- [ ] Add to `src/merge-queue/state.test.ts` (inside the existing `describe('reduceState', …)` block, reusing its `AT`-style timestamp constant — add one if the file names it differently):
+- [x] Add to `src/merge-queue/state.test.ts` (inside the existing `describe('reduceState', …)` block, reusing its `AT`-style timestamp constant — add one if the file names it differently):
 
 ```ts
   it('ignores gate_cached and full_gate_recorded events (metrics-only)', () => {
@@ -324,7 +324,7 @@ export function recordGateCache(
   })
 ```
 
-- [ ] In `src/core/agent-ops/config.ts`, add validation inside the `if (raw.merge_queue !== undefined)` block, after the `intKeys` loop (a dedicated block, NOT in `intKeys`, because `0` is valid here):
+- [x] In `src/core/agent-ops/config.ts`, add validation inside the `if (raw.merge_queue !== undefined)` block, after the `intKeys` loop (a dedicated block, NOT in `intKeys`, because `0` is valid here):
 
 ```ts
     if (mq.gate_cache_max_entries !== undefined) {
@@ -338,7 +338,7 @@ export function recordGateCache(
     }
 ```
 
-- [ ] Add to `src/core/agent-ops/config.test.ts` (inside the existing `describe('loadAgentOpsConfig', …)`, using its `tmpProject` helper):
+- [x] Add to `src/core/agent-ops/config.test.ts` (inside the existing `describe('loadAgentOpsConfig', …)`, using its `tmpProject` helper):
 
 ```ts
   it('defaults merge_queue.gate_cache_max_entries to 200 and accepts 0 (disabled)', () => {
@@ -361,9 +361,9 @@ merge_queue:
   })
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue src/core/agent-ops/config.test.ts` — expect all pass.
-- [ ] Run: `npm run check` — expect lint + type-check + vitest all green.
-- [ ] Commit: `git add -A && git commit -m "feat(mq): gate-result cache module, journal events, config key (D12)"`
+- [x] Run: `npx vitest run src/merge-queue src/core/agent-ops/config.test.ts` — expect all pass.
+- [x] Run: `npm run check` — expect lint + type-check + vitest all green.
+- [x] Commit: `git add -A && git commit -m "feat(mq): gate-result cache module, journal events, config key (D12)"`
 
 ---
 
@@ -379,7 +379,7 @@ merge_queue:
 
 **Steps:**
 
-- [ ] In `src/merge-queue/daemon.test.ts`, change the harness default config so the ~35 existing tests are untouched by caching (FakeGit collapses every tree to `'TREE'`, which would otherwise make a bisected red half spuriously hit the green half's cache entry — a fake-only artifact, since real halves have distinct trees). In `harness()`, replace:
+- [x] In `src/merge-queue/daemon.test.ts`, change the harness default config so the ~35 existing tests are untouched by caching (FakeGit collapses every tree to `'TREE'`, which would otherwise make a bisected red half spuriously hit the green half's cache entry — a fake-only artifact, since real halves have distinct trees). In `harness()`, replace:
 
 ```ts
     config: defaultMergeQueueConfig(),
@@ -393,7 +393,7 @@ merge_queue:
     config: { ...defaultMergeQueueConfig(), gate_cache_max_entries: 0 },
 ```
 
-- [ ] Add the failing tests to `src/merge-queue/daemon.test.ts` (inside `describe('MergeQueueDaemon.cycle', …)`). The opt-in tests exploit the collapsed-tree artifact deliberately: identical trees model "identical content re-batched".
+- [x] Add the failing tests to `src/merge-queue/daemon.test.ts` (inside `describe('MergeQueueDaemon.cycle', …)`). The opt-in tests exploit the collapsed-tree artifact deliberately: identical trees model "identical content re-batched".
 
 ```ts
   it('skips the gate on an identical cache key and journals gate_cached (D12)', async () => {
@@ -447,8 +447,8 @@ merge_queue:
   })
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/daemon.test.ts` — expect the 4 new tests FAIL, all existing tests pass.
-- [ ] In `src/merge-queue/daemon.ts`, add the import:
+- [x] Run: `npx vitest run src/merge-queue/daemon.test.ts` — expect the 4 new tests FAIL, all existing tests pass.
+- [x] In `src/merge-queue/daemon.ts`, add the import:
 
 ```ts
 import {
@@ -456,7 +456,7 @@ import {
 } from './gate-cache.js'
 ```
 
-- [ ] In `runBatch`, replace the gate section — everything from `let gate = await this.gateRun(batchId, base)` down to (and including) the closing brace of the flake-protocol `if (gate.result === 'red' && …)` block — with:
+- [x] In `runBatch`, replace the gate section — everything from `let gate = await this.gateRun(batchId, base)` down to (and including) the closing brace of the flake-protocol `if (gate.result === 'red' && …)` block — with:
 
 ```ts
     // D12: gate-result cache. The key covers every input that selects or scopes
@@ -548,9 +548,9 @@ import {
 
   Note: the pre-existing lines between the flake block and the green branch (the withdrawn-member check, the base-moved check, the land/eject/split logic) are untouched — a cache hit flows through all of them.
 
-- [ ] Run: `npx vitest run src/merge-queue/daemon.test.ts` — expect ALL tests pass (existing + 4 new).
-- [ ] Run: `npm run check` — expect green.
-- [ ] Commit: `git add -A && git commit -m "feat(mq): daemon gate skip on cache hit, untainted-green recording (D12)"`
+- [x] Run: `npx vitest run src/merge-queue/daemon.test.ts` — expect ALL tests pass (existing + 4 new).
+- [x] Run: `npm run check` — expect green.
+- [x] Commit: `git add -A && git commit -m "feat(mq): daemon gate skip on cache hit, untainted-green recording (D12)"`
 
 ---
 
@@ -569,7 +569,7 @@ import {
 
 **Steps:**
 
-- [ ] Update `src/merge-queue/stats.test.ts`: the first test's `toEqual` object gains the new fields, and a new test covers the new counters. Updated first expectation:
+- [x] Update `src/merge-queue/stats.test.ts`: the first test's `toEqual` object gains the new fields, and a new test covers the new counters. Updated first expectation:
 
 ```ts
     expect(computeStats(events, NOW)).toEqual({
@@ -604,8 +604,8 @@ import {
   })
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/stats.test.ts` — expect FAILURE.
-- [ ] Rewrite `src/merge-queue/stats.ts` (extract the median helper; keep the `default: break` arm so future events never break stats):
+- [x] Run: `npx vitest run src/merge-queue/stats.test.ts` — expect FAILURE.
+- [x] Rewrite `src/merge-queue/stats.ts` (extract the median helper; keep the `default: break` arm so future events never break stats):
 
 ```ts
 import type { JournalEvent } from './types.js'
@@ -688,8 +688,8 @@ export function computeStats(events: JournalEvent[], now: Date): MqStats {
 }
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/stats.test.ts` — expect all pass.
-- [ ] Add the failing CLI tests to `src/cli/commands/mq.test.ts`:
+- [x] Run: `npx vitest run src/merge-queue/stats.test.ts` — expect all pass.
+- [x] Add the failing CLI tests to `src/cli/commands/mq.test.ts`:
 
 ```ts
   it('gate-cache --record-tree then --check-tree round-trips (full-gate key)', async () => {
@@ -724,8 +724,8 @@ export function computeStats(events: JournalEvent[], now: Date): MqStats {
   })
 ```
 
-- [ ] Run: `npx vitest run src/cli/commands/mq.test.ts` — expect the 3 new tests FAIL.
-- [ ] In `src/cli/commands/mq.ts`:
+- [x] Run: `npx vitest run src/cli/commands/mq.test.ts` — expect the 3 new tests FAIL.
+- [x] In `src/cli/commands/mq.ts`:
   - Extend `MqArgs`:
 
 ```ts
@@ -818,9 +818,9 @@ import {
       })
 ```
 
-- [ ] Run: `npx vitest run src/cli/commands/mq.test.ts` — expect all pass.
-- [ ] Run: `npm run check` — expect green.
-- [ ] Commit: `git add -A && git commit -m "feat(mq): gate-cache CLI action + cache/full-gate stats lines (D12)"`
+- [x] Run: `npx vitest run src/cli/commands/mq.test.ts` — expect all pass.
+- [x] Run: `npm run check` — expect green.
+- [x] Commit: `git add -A && git commit -m "feat(mq): gate-cache CLI action + cache/full-gate stats lines (D12)"`
 
 ---
 
@@ -836,7 +836,7 @@ import {
 
 **Steps:**
 
-- [ ] Update `poller_world` in `tests/agent-ops-merge-queue.bats` so ALL poller tests are hermetic (a real `scaffold` on PATH must never be invoked). Append to the end of the `poller_world()` function body:
+- [x] Update `poller_world` in `tests/agent-ops-merge-queue.bats` so ALL poller tests are hermetic (a real `scaffold` on PATH must never be invoked). Append to the end of the `poller_world()` function body:
 
 ```bash
   # Hermetic scaffold stub (MQ_SCAFFOLD_BIN mirrors the engine's MQ_GH_CMD
@@ -856,7 +856,7 @@ STUB
   export MQ_SCAFFOLD_BIN="$WORK/stub-bin/scaffold"
 ```
 
-- [ ] Append the failing tests to `tests/agent-ops-merge-queue.bats`:
+- [x] Append the failing tests to `tests/agent-ops-merge-queue.bats`:
 
 ```bash
 @test "poller: full-gate cache hit skips the gate and records the sha" {
@@ -900,8 +900,8 @@ STUB
 }
 ```
 
-- [ ] Run: `bats tests/agent-ops-merge-queue.bats` — expect the 3 new tests FAIL, all existing pass.
-- [ ] Edit `content/assets/agent-ops/merge-queue/post-merge-poller.sh.tmpl`. Three surgical edits:
+- [x] Run: `bats tests/agent-ops-merge-queue.bats` — expect the 3 new tests FAIL, all existing pass.
+- [x] Edit `content/assets/agent-ops/merge-queue/post-merge-poller.sh.tmpl`. Three surgical edits:
 
   **(a)** Immediately after the line `HEAD_SHA="$(git rev-parse "origin/$BRANCH")"`, insert:
 
@@ -958,9 +958,9 @@ GATE_SECONDS=$(( $(date +%s) - GATE_START ))
 	fi
 ```
 
-- [ ] Run: `bats tests/agent-ops-merge-queue.bats` — expect ALL tests pass (existing 23 + 3 new).
-- [ ] Run: `make lint` — expect ShellCheck green (`.tmpl` files are excluded; the rendered form is exercised by bats).
-- [ ] Commit: `git add -A && git commit -m "feat(agent-ops): poller consults and feeds the full-gate cache (D12)"`
+- [x] Run: `bats tests/agent-ops-merge-queue.bats` — expect ALL tests pass (existing 23 + 3 new).
+- [x] Run: `make lint` — expect ShellCheck green (`.tmpl` files are excluded; the rendered form is exercised by bats).
+- [x] Commit: `git add -A && git commit -m "feat(agent-ops): poller consults and feeds the full-gate cache (D12)"`
 
 **D12 is complete and shippable here.**
 
@@ -978,7 +978,7 @@ GATE_SECONDS=$(( $(date +%s) - GATE_START ))
 
 **Steps:**
 
-- [ ] Write the failing test `src/merge-queue/wake.test.ts`:
+- [x] Write the failing test `src/merge-queue/wake.test.ts`:
 
 ```ts
 // src/merge-queue/wake.test.ts
@@ -1032,8 +1032,8 @@ describe('waitForWake', () => {
 })
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/wake.test.ts` — expect FAILURE (module missing).
-- [ ] Create `src/merge-queue/wake.ts`:
+- [x] Run: `npx vitest run src/merge-queue/wake.test.ts` — expect FAILURE (module missing).
+- [x] Create `src/merge-queue/wake.ts`:
 
 ```ts
 // src/merge-queue/wake.ts — D15: event-driven daemon wake. fs.watch on the .mq
@@ -1086,9 +1086,9 @@ export function waitForWake(
 }
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/wake.test.ts` — expect all 5 pass.
-- [ ] Run: `npm run check` — expect green.
-- [ ] Commit: `git add -A && git commit -m "feat(mq): waitForWake — debounced fs.watch journal wake with poll fallback (D15)"`
+- [x] Run: `npx vitest run src/merge-queue/wake.test.ts` — expect all 5 pass.
+- [x] Run: `npm run check` — expect green.
+- [x] Commit: `git add -A && git commit -m "feat(mq): waitForWake — debounced fs.watch journal wake with poll fallback (D15)"`
 
 ---
 
@@ -1104,7 +1104,7 @@ export function waitForWake(
 
 **Steps:**
 
-- [ ] Add the failing test to `src/merge-queue/daemon.test.ts` (inside `describe('MergeQueueDaemon.run', …)`):
+- [x] Add the failing test to `src/merge-queue/daemon.test.ts` (inside `describe('MergeQueueDaemon.run', …)`):
 
 ```ts
   it('idle cycles await the journal wake instead of a fixed sleep (D15)', async () => {
@@ -1123,8 +1123,8 @@ export function waitForWake(
   })
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/daemon.test.ts` — expect the new test FAILS (type error / sleep still used).
-- [ ] In `src/merge-queue/daemon.ts`:
+- [x] Run: `npx vitest run src/merge-queue/daemon.test.ts` — expect the new test FAILS (type error / sleep still used).
+- [x] In `src/merge-queue/daemon.ts`:
   - Add the import: `import { waitForWake } from './wake.js'`
   - Add to `DaemonDeps` (after `now`):
 
@@ -1153,9 +1153,9 @@ export function waitForWake(
       }
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/daemon.test.ts` — expect ALL pass.
-- [ ] Run: `npm run check` — expect green.
-- [ ] Commit: `git add -A && git commit -m "feat(mq): daemon idle loop wakes on journal appends (D15)"`
+- [x] Run: `npx vitest run src/merge-queue/daemon.test.ts` — expect ALL pass.
+- [x] Run: `npm run check` — expect green.
+- [x] Commit: `git add -A && git commit -m "feat(mq): daemon idle loop wakes on journal appends (D15)"`
 
 ---
 
@@ -1172,7 +1172,7 @@ export function waitForWake(
 
 **Steps:**
 
-- [ ] Add the failing tests to `src/merge-queue/daemon.test.ts` (inside `describe('MergeQueueDaemon.cycle', …)`):
+- [x] Add the failing tests to `src/merge-queue/daemon.test.ts` (inside `describe('MergeQueueDaemon.cycle', …)`):
 
 ```ts
   it('kicks one poller pass after a green landing (D15)', async () => {
@@ -1204,8 +1204,8 @@ export function waitForWake(
   })
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/daemon.test.ts` — expect the 3 new tests FAIL.
-- [ ] In `src/merge-queue/daemon.ts`:
+- [x] Run: `npx vitest run src/merge-queue/daemon.test.ts` — expect the 3 new tests FAIL.
+- [x] In `src/merge-queue/daemon.ts`:
   - Add to `DaemonDeps` (after `wake`):
 
 ```ts
@@ -1242,8 +1242,8 @@ export function waitForWake(
     }
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/daemon.test.ts` — expect ALL pass.
-- [ ] In `src/cli/commands/mq.ts`, inside `case 'daemon'` after `const config = loadAgentOpsConfig(primary).merge_queue`, add the production wiring and pass it to the constructor:
+- [x] Run: `npx vitest run src/merge-queue/daemon.test.ts` — expect ALL pass.
+- [x] In `src/cli/commands/mq.ts`, inside `case 'daemon'` after `const config = loadAgentOpsConfig(primary).merge_queue`, add the production wiring and pass it to the constructor:
 
 ```ts
       const pollerScript = path.join(primary, 'scripts', 'ops', 'post-merge-poller.sh')
@@ -1259,9 +1259,9 @@ export function waitForWake(
 
   and in the `new MergeQueueDaemon({ … })` deps object add `triggerPoller,` after `now: () => new Date(),`.
 
-- [ ] Run: `npm run check` — expect green.
-- [ ] Run: `npm run test:e2e` — expect the merge-queue e2e suite still green (wake/trigger are inert there: `run({ once })` never reaches the idle wait, and the worlds have no poller script).
-- [ ] Commit: `git add -A && git commit -m "feat(mq): daemon kicks one poller pass after landing (D15)"`
+- [x] Run: `npm run check` — expect green.
+- [x] Run: `npm run test:e2e` — expect the merge-queue e2e suite still green (wake/trigger are inert there: `run({ once })` never reaches the idle wait, and the worlds have no poller script).
+- [x] Commit: `git add -A && git commit -m "feat(mq): daemon kicks one poller pass after landing (D15)"`
 
 **D15 is complete and shippable here.**
 
@@ -1281,7 +1281,7 @@ export function waitForWake(
 
 **Steps:**
 
-- [ ] Add the failing reducer tests to `src/merge-queue/state.test.ts` (inside the existing describe; import `TERMINAL_PR_STATES` and `queuedPrs` from `./state.js` if not already imported; `AT` is any ISO timestamp constant the file already uses — add `const AT = '2026-07-19T12:00:00.000Z'` if absent):
+- [x] Add the failing reducer tests to `src/merge-queue/state.test.ts` (inside the existing describe; import `TERMINAL_PR_STATES` and `queuedPrs` from `./state.js` if not already imported; `AT` is any ISO timestamp constant the file already uses — add `const AT = '2026-07-19T12:00:00.000Z'` if absent):
 
 ```ts
   it('caches pr_files on the entry (files + the head sha they were fetched at)', () => {
@@ -1329,8 +1329,8 @@ export function waitForWake(
   })
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/state.test.ts` — expect FAILURE (type errors on the new event/state names).
-- [ ] In `src/merge-queue/types.ts`:
+- [x] Run: `npx vitest run src/merge-queue/state.test.ts` — expect FAILURE (type errors on the new event/state names).
+- [x] In `src/merge-queue/types.ts`:
   - Extend `PrState`:
 
 ```ts
@@ -1379,7 +1379,7 @@ export type PrState =
     overlap_zone_policy: 'solo',
 ```
 
-- [ ] In `src/merge-queue/state.ts`, add the reducer cases (before the `gate_metrics` no-op group):
+- [x] In `src/merge-queue/state.ts`, add the reducer cases (before the `gate_metrics` no-op group):
 
 ```ts
     case 'pr_files': {
@@ -1398,8 +1398,8 @@ export type PrState =
     }
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/state.test.ts` — expect all pass.
-- [ ] In `src/core/agent-ops/config.ts`, add validation inside the `merge_queue` block (after the Task 1 `gate_cache_max_entries` block):
+- [x] Run: `npx vitest run src/merge-queue/state.test.ts` — expect all pass.
+- [x] In `src/core/agent-ops/config.ts`, add validation inside the `merge_queue` block (after the Task 1 `gate_cache_max_entries` block):
 
 ```ts
     if (mq.overlap_zones !== undefined) {
@@ -1423,7 +1423,7 @@ export type PrState =
     }
 ```
 
-- [ ] Add to `src/core/agent-ops/config.test.ts`:
+- [x] Add to `src/core/agent-ops/config.test.ts`:
 
 ```ts
   it('parses overlap zones + policy and applies the solo default', () => {
@@ -1456,9 +1456,9 @@ merge_queue:
   })
 ```
 
-- [ ] Run: `npx vitest run src/core/agent-ops/config.test.ts src/merge-queue` — expect all pass.
-- [ ] Run: `npm run check` — expect green.
-- [ ] Commit: `git add -A && git commit -m "feat(mq): HELD_HUMAN state, pr_files/released events, overlap-zone config (D13)"`
+- [x] Run: `npx vitest run src/core/agent-ops/config.test.ts src/merge-queue` — expect all pass.
+- [x] Run: `npm run check` — expect green.
+- [x] Commit: `git add -A && git commit -m "feat(mq): HELD_HUMAN state, pr_files/released events, overlap-zone config (D13)"`
 
 ---
 
@@ -1474,7 +1474,7 @@ merge_queue:
 
 **Steps:**
 
-- [ ] Add the failing tests to `src/merge-queue/batch.test.ts`:
+- [x] Add the failing tests to `src/merge-queue/batch.test.ts`:
 
 ```ts
 describe('composeBatch — conflict-aware partitioning (D13)', () => {
@@ -1541,8 +1541,8 @@ describe('touchesOverlapZone', () => {
 
   (import `touchesOverlapZone` alongside the existing `composeBatch` import.)
 
-- [ ] Run: `npx vitest run src/merge-queue/batch.test.ts` — expect FAILURE.
-- [ ] Rewrite `src/merge-queue/batch.ts`:
+- [x] Run: `npx vitest run src/merge-queue/batch.test.ts` — expect FAILURE.
+- [x] Rewrite `src/merge-queue/batch.ts`:
 
 ```ts
 import { minimatch } from 'minimatch'
@@ -1620,9 +1620,9 @@ export function splitBatch(members: number[]): [number[], number[]] {
 }
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/batch.test.ts` — expect ALL pass (legacy tests included, untouched).
-- [ ] Run: `npm run check` — expect green.
-- [ ] Commit: `git add -A && git commit -m "feat(mq): conflict-aware composeBatch with overlap zones (D13)"`
+- [x] Run: `npx vitest run src/merge-queue/batch.test.ts` — expect ALL pass (legacy tests included, untouched).
+- [x] Run: `npm run check` — expect green.
+- [x] Commit: `git add -A && git commit -m "feat(mq): conflict-aware composeBatch with overlap zones (D13)"`
 
 ---
 
@@ -1640,7 +1640,7 @@ export function splitBatch(members: number[]): [number[], number[]] {
 
 **Steps:**
 
-- [ ] In `src/merge-queue/daemon.test.ts`, extend `FakeGh` with the new seam (add the fields next to `infos` and the method next to `listLabeled`):
+- [x] In `src/merge-queue/daemon.test.ts`, extend `FakeGh` with the new seam (add the fields next to `infos` and the method next to `listLabeled`):
 
 ```ts
   files = new Map<number, string[]>()
@@ -1655,7 +1655,7 @@ export function splitBatch(members: number[]): [number[], number[]] {
 
   (Unset PRs default to `[]` = known-empty, so every existing test batches exactly as before.)
 
-- [ ] Add the failing tests (inside `describe('MergeQueueDaemon.cycle', …)`):
+- [x] Add the failing tests (inside `describe('MergeQueueDaemon.cycle', …)`):
 
 ```ts
   it('overlapping PRs land in successive cycles, never one batch (D13)', async () => {
@@ -1749,8 +1749,8 @@ export function splitBatch(members: number[]): [number[], number[]] {
   })
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/daemon.test.ts` — expect the 6 new tests FAIL (`changedFiles` missing on the interface).
-- [ ] In `src/merge-queue/gh.ts`, add to the `GhClient` interface (after `listLabeled`):
+- [x] Run: `npx vitest run src/merge-queue/daemon.test.ts` — expect the 6 new tests FAIL (`changedFiles` missing on the interface).
+- [x] In `src/merge-queue/gh.ts`, add to the `GhClient` interface (after `listLabeled`):
 
 ```ts
   /** D13: changed-file paths of the PR (`gh pr diff --name-only`). */
@@ -1766,7 +1766,7 @@ export function splitBatch(members: number[]): [number[], number[]] {
     },
 ```
 
-- [ ] Add the method to EVERY other `GhClient` implementation / typed fake so the
+- [x] Add the method to EVERY other `GhClient` implementation / typed fake so the
   TypeScript gate stays green — widening the interface breaks any object typed as
   `GhClient` that lacks it. Search first: `grep -rln "GhClient" src --include=*.ts`.
   If R2 has already merged, this includes R2's fakes in
@@ -1776,7 +1776,7 @@ export function splitBatch(members: number[]): [number[], number[]] {
   Then re-run `npx tsc --noEmit -p tsconfig.json` and confirm no
   "Property 'changedFiles' is missing" errors remain.
 
-- [ ] In `src/merge-queue/daemon.ts`:
+- [x] In `src/merge-queue/daemon.ts`:
   - Extend the batch import: `import { composeBatch, splitBatch, touchesOverlapZone } from './batch.js'`
   - In `cycle()`, inside the collection loop, right after `infos.set(entry.pr, info)` (before the `yieldToLoop` call), add:
 
@@ -1833,8 +1833,8 @@ export function splitBatch(members: number[]): [number[], number[]] {
     })
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/daemon.test.ts` — expect ALL pass.
-- [ ] In `tests/merge-queue-e2e.test.ts`, teach the `GH_STUB` python registry about `pr diff` (insert before the final `else:` arm):
+- [x] Run: `npx vitest run src/merge-queue/daemon.test.ts` — expect ALL pass.
+- [x] In `tests/merge-queue-e2e.test.ts`, teach the `GH_STUB` python registry about `pr diff` (insert before the final `else:` arm):
 
 ```python
 elif args[:2] == ['pr', 'diff']:
@@ -1845,9 +1845,9 @@ elif args[:2] == ['pr', 'diff']:
 
   (Registry entries carry no `files` key, so every e2e PR reports a known-empty set — batching behavior in the e2e worlds is unchanged.)
 
-- [ ] Run: `npm run test:e2e` — expect the e2e suite green.
-- [ ] Run: `npm run check` — expect green.
-- [ ] Commit: `git add -A && git commit -m "feat(mq): daemon collects changed-file sets, partitions batches, hold policy (D13)"`
+- [x] Run: `npm run test:e2e` — expect the e2e suite green.
+- [x] Run: `npm run check` — expect green.
+- [x] Commit: `git add -A && git commit -m "feat(mq): daemon collects changed-file sets, partitions batches, hold policy (D13)"`
 
 ---
 
@@ -1863,7 +1863,7 @@ elif args[:2] == ['pr', 'diff']:
 
 **Steps:**
 
-- [ ] Add the failing tests to `src/cli/commands/mq.test.ts` (add `vi` to the vitest import):
+- [x] Add the failing tests to `src/cli/commands/mq.test.ts` (add `vi` to the vitest import):
 
 ```ts
   it('release flips a HELD_HUMAN PR back to QUEUED (zoneReleased)', async () => {
@@ -1928,8 +1928,8 @@ elif args[:2] == ['pr', 'diff']:
   })
 ```
 
-- [ ] Run: `npx vitest run src/cli/commands/mq.test.ts` — expect the 4 new tests FAIL.
-- [ ] In `src/cli/commands/mq.ts`:
+- [x] Run: `npx vitest run src/cli/commands/mq.test.ts` — expect the 4 new tests FAIL.
+- [x] In `src/cli/commands/mq.ts`:
   - Add `'release'` to the builder's `choices` array.
   - Add the case (next to `eject`):
 
@@ -1976,9 +1976,9 @@ elif args[:2] == ['pr', 'diff']:
 
     (replacing the existing json-result and paused-banner lines — the remainder of the case is unchanged.)
 
-- [ ] Run: `npx vitest run src/cli/commands/mq.test.ts` — expect ALL pass.
-- [ ] Run: `npm run check` — expect green.
-- [ ] Commit: `git add -A && git commit -m "feat(mq): mq release action + held-PR surfacing in status (D13)"`
+- [x] Run: `npx vitest run src/cli/commands/mq.test.ts` — expect ALL pass.
+- [x] Run: `npm run check` — expect green.
+- [x] Commit: `git add -A && git commit -m "feat(mq): mq release action + held-PR surfacing in status (D13)"`
 
 **D13 is complete and shippable here.**
 
@@ -2000,7 +2000,7 @@ elif args[:2] == ['pr', 'diff']:
 
 **Steps:**
 
-- [ ] In `src/merge-queue/types.ts`:
+- [x] In `src/merge-queue/types.ts`:
   - Extend the `JournalEvent` union:
 
 ```ts
@@ -2021,7 +2021,7 @@ elif args[:2] == ['pr', 'diff']:
     tia: { record: 'scheduled' },
 ```
 
-- [ ] In `src/merge-queue/state.ts`, extend the no-op group:
+- [x] In `src/merge-queue/state.ts`, extend the no-op group:
 
 ```ts
     case 'gate_cached':
@@ -2030,7 +2030,7 @@ elif args[:2] == ['pr', 'diff']:
       break
 ```
 
-- [ ] In `src/core/agent-ops/config.ts`, add validation (after the Task 8 blocks):
+- [x] In `src/core/agent-ops/config.ts`, add validation (after the Task 8 blocks):
 
 ```ts
     if (mq.tia !== undefined) {
@@ -2049,7 +2049,7 @@ elif args[:2] == ['pr', 'diff']:
     }
 ```
 
-- [ ] Add to `src/core/agent-ops/config.test.ts`:
+- [x] Add to `src/core/agent-ops/config.test.ts`:
 
 ```ts
   it('defaults tia.record to scheduled and parses explicit values', () => {
@@ -2074,7 +2074,7 @@ merge_queue:
   })
 ```
 
-- [ ] Write the failing test `src/tia/map.test.ts`:
+- [x] Write the failing test `src/tia/map.test.ts`:
 
 ```ts
 // src/tia/map.test.ts
@@ -2175,8 +2175,8 @@ describe('readTiaMap / writeTiaMap', () => {
 })
 ```
 
-- [ ] Run: `npx vitest run src/tia/map.test.ts` — expect FAILURE (module missing).
-- [ ] Create `src/tia/map.ts`:
+- [x] Run: `npx vitest run src/tia/map.test.ts` — expect FAILURE (module missing).
+- [x] Create `src/tia/map.ts`:
 
 ```ts
 // src/tia/map.ts — D14: testmon-style test→files coverage map, built from
@@ -2305,9 +2305,9 @@ export function buildTiaMap(opts: {
 }
 ```
 
-- [ ] Run: `npx vitest run src/tia/map.test.ts src/core/agent-ops/config.test.ts src/merge-queue` — expect all pass.
-- [ ] Run: `npm run check` — expect green.
-- [ ] Commit: `git add -A && git commit -m "feat(tia): coverage-map module, tia.record config, tia_recorded event (D14)"`
+- [x] Run: `npx vitest run src/tia/map.test.ts src/core/agent-ops/config.test.ts src/merge-queue` — expect all pass.
+- [x] Run: `npm run check` — expect green.
+- [x] Commit: `git add -A && git commit -m "feat(tia): coverage-map module, tia.record config, tia_recorded event (D14)"`
 
 ---
 
@@ -2333,7 +2333,7 @@ export function buildTiaMap(opts: {
 
 **Steps:**
 
-- [ ] Write the failing test `src/tia/affected.test.ts`:
+- [x] Write the failing test `src/tia/affected.test.ts`:
 
 ```ts
 // src/tia/affected.test.ts
@@ -2470,8 +2470,8 @@ describe('selectAffected — selection and ordering', () => {
 })
 ```
 
-- [ ] Run: `npx vitest run src/tia/affected.test.ts` — expect FAILURE (module missing).
-- [ ] Create `src/tia/affected.ts`:
+- [x] Run: `npx vitest run src/tia/affected.test.ts` — expect FAILURE (module missing).
+- [x] Create `src/tia/affected.ts`:
 
 ```ts
 // src/tia/affected.ts — D14: layered TIA selection. Pure core — every git fact
@@ -2599,9 +2599,9 @@ export function selectAffected(opts: {
 }
 ```
 
-- [ ] Run: `npx vitest run src/tia/affected.test.ts` — expect all pass.
-- [ ] Run: `npm run check` — expect green.
-- [ ] Commit: `git add -A && git commit -m "feat(tia): layered affected-test selection engine with fail-closed fallbacks (D14)"`
+- [x] Run: `npx vitest run src/tia/affected.test.ts` — expect all pass.
+- [x] Run: `npm run check` — expect green.
+- [x] Commit: `git add -A && git commit -m "feat(tia): layered affected-test selection engine with fail-closed fallbacks (D14)"`
 
 ---
 
@@ -2626,7 +2626,7 @@ export function selectAffected(opts: {
 
 **Steps:**
 
-- [ ] Write the failing test `src/cli/commands/tia.test.ts`:
+- [x] Write the failing test `src/cli/commands/tia.test.ts`:
 
 ```ts
 // src/cli/commands/tia.test.ts
@@ -2820,8 +2820,8 @@ describe('scaffold tia ingest', () => {
 })
 ```
 
-- [ ] Run: `npx vitest run src/cli/commands/tia.test.ts` — expect FAILURE (module missing).
-- [ ] Create `src/cli/commands/tia.ts`:
+- [x] Run: `npx vitest run src/cli/commands/tia.test.ts` — expect FAILURE (module missing).
+- [x] Create `src/cli/commands/tia.ts`:
 
 ```ts
 // src/cli/commands/tia.ts — D14: test-impact analysis CLI.
@@ -3035,10 +3035,10 @@ const tiaCommand: CommandModule<Record<string, unknown>, TiaArgs> = {
 export default tiaCommand
 ```
 
-- [ ] In `src/cli/index.ts`, add `import tiaCommand from './commands/tia.js'` (after the `mqCommand` import) and `.command(tiaCommand)` (after `.command(mqCommand)`).
-- [ ] Run: `npx vitest run src/cli/commands/tia.test.ts` — expect all pass.
-- [ ] Run: `npm run check` — expect green. (If `process.stdout.write` trips a lint rule, keep the raw-stdout contract — the bash consumer needs unprefixed lines — and add a scoped `// eslint-disable-next-line` with a comment explaining why, rather than switching to output.info.)
-- [ ] Commit: `git add -A && git commit -m "feat(tia): scaffold tia CLI — affected / record-due / ingest (D14)"`
+- [x] In `src/cli/index.ts`, add `import tiaCommand from './commands/tia.js'` (after the `mqCommand` import) and `.command(tiaCommand)` (after `.command(mqCommand)`).
+- [x] Run: `npx vitest run src/cli/commands/tia.test.ts` — expect all pass.
+- [x] Run: `npm run check` — expect green. (If `process.stdout.write` trips a lint rule, keep the raw-stdout contract — the bash consumer needs unprefixed lines — and add a scoped `// eslint-disable-next-line` with a comment explaining why, rather than switching to output.info.)
+- [x] Commit: `git add -A && git commit -m "feat(tia): scaffold tia CLI — affected / record-due / ingest (D14)"`
 
 ---
 
@@ -3054,7 +3054,7 @@ export default tiaCommand
 
 **Steps:**
 
-- [ ] Append the failing tests to `tests/agent-ops-merge-queue.bats`:
+- [x] Append the failing tests to `tests/agent-ops-merge-queue.bats`:
 
 ```bash
 @test "poller: due recording instruments the gate and ingests on green" {
@@ -3112,8 +3112,8 @@ STUB
 
   (`poller_world`'s default stub answers `tia record-due` with exit 1 — Task 4.)
 
-- [ ] Run: `bats tests/agent-ops-merge-queue.bats` — expect the 3 new tests FAIL.
-- [ ] Edit `content/assets/agent-ops/merge-queue/post-merge-poller.sh.tmpl`. Four surgical edits:
+- [x] Run: `bats tests/agent-ops-merge-queue.bats` — expect the 3 new tests FAIL.
+- [x] Edit `content/assets/agent-ops/merge-queue/post-merge-poller.sh.tmpl`. Four surgical edits:
 
   **(a)** Immediately after the Task 4 `SCAFFOLD_BIN` block, insert (just the flag — the dump dir is created immediately before the gate in edit **(c)**, so no early exit between here and the gate can ever orphan a provisional coverage dir):
 
@@ -3198,9 +3198,9 @@ GATE_SECONDS=$(( $(date +%s) - GATE_START ))
 	fi
 ```
 
-- [ ] Run: `bats tests/agent-ops-merge-queue.bats` — expect ALL tests pass.
-- [ ] Run: `make lint` — expect green.
-- [ ] Commit: `git add -A && git commit -m "feat(agent-ops): poller records V8 coverage on scheduled green runs (D14)"`
+- [x] Run: `bats tests/agent-ops-merge-queue.bats` — expect ALL tests pass.
+- [x] Run: `make lint` — expect green.
+- [x] Commit: `git add -A && git commit -m "feat(agent-ops): poller records V8 coverage on scheduled green runs (D14)"`
 
 ---
 
@@ -3220,8 +3220,8 @@ GATE_SECONDS=$(( $(date +%s) - GATE_START ))
 
 **Steps:**
 
-- [ ] Read `src/core/agent-ops/gate-ingest.ts` and `content/assets/agent-ops/gate/gate-check-affected.sh.tmpl` as actually merged. The edits below are written against the R2 plan's published interfaces (`GateSeed`, `gateTemplateVars(seed)`, the template's quarantine/`{{GATE_AFFECTED_INVOCATION}}` tail); if merged names drifted, apply the same change to the merged names.
-- [ ] Append the failing bats tests to `tests/agent-ops-gate-affected.bats`, and add one line to its `setup()` sed pipeline so the new marker is rendered:
+- [x] Read `src/core/agent-ops/gate-ingest.ts` and `content/assets/agent-ops/gate/gate-check-affected.sh.tmpl` as actually merged. The edits below are written against the R2 plan's published interfaces (`GateSeed`, `gateTemplateVars(seed)`, the template's quarantine/`{{GATE_AFFECTED_INVOCATION}}` tail); if merged names drifted, apply the same change to the merged names.
+- [x] Append the failing bats tests to `tests/agent-ops-gate-affected.bats`, and add one line to its `setup()` sed pipeline so the new marker is rendered:
 
 ```bash
       -e 's|{{GATE_TIA_INVOCATION}}|printf "%s" "$TIA_TESTS" > .tia-tests; touch .tia-ran|g' \
@@ -3281,8 +3281,8 @@ STUB
 }
 ```
 
-- [ ] Run: `bats tests/agent-ops-gate-affected.bats` — expect the 3 new tests FAIL, existing 7 pass.
-- [ ] In `content/assets/agent-ops/gate/gate-check-affected.sh.tmpl`, replace the tail — from the quarantine comment block through the final `{{GATE_AFFECTED_INVOCATION}}` line — with:
+- [x] Run: `bats tests/agent-ops-gate-affected.bats` — expect the 3 new tests FAIL, existing 7 pass.
+- [x] In `content/assets/agent-ops/gate/gate-check-affected.sh.tmpl`, replace the tail — from the quarantine comment block through the final `{{GATE_AFFECTED_INVOCATION}}` line — with:
 
 ```bash
 # Quarantine: mute for the MERGE gate only (asymmetry is deliberate — the
@@ -3321,7 +3321,7 @@ fi
 {{GATE_AFFECTED_INVOCATION}}
 ```
 
-- [ ] In `src/core/agent-ops/gate-ingest.ts`: add `tiaInvocation: string` to `GateSeed`; in `ingestGateSeed`, seed it next to `affectedInvocation` — for a vitest-detected project:
+- [x] In `src/core/agent-ops/gate-ingest.ts`: add `tiaInvocation: string` to `GateSeed`; in `ingestGateSeed`, seed it next to `affectedInvocation` — for a vitest-detected project:
 
 ```ts
     tiaInvocation:
@@ -3335,9 +3335,9 @@ fi
 ```
 
   In `gateTemplateVars`, add `GATE_TIA_INVOCATION: seed.tiaInvocation`. Extend the colocated `gate-ingest.test.ts` expectations accordingly (the vars object now carries `GATE_TIA_INVOCATION`; assert the vitest seed contains `xargs npx vitest run` and the fallback contains `full "no TIA invocation`).
-- [ ] Run: `bats tests/agent-ops-gate-affected.bats` — expect ALL pass (7 existing + 3 new; the existing tests never hit the TIA branch because their fixtures have no `map.json`, and `PRIMARY_MQ` resolves to the fixture-local `.mq` in a plain checkout).
-- [ ] Run: `npx vitest run src/core/agent-ops` and `npm run check` — expect green.
-- [ ] Commit: `git add -A && git commit -m "feat(agent-ops): affected gate consumes scaffold tia affected with full-suite fallback (D14)"`
+- [x] Run: `bats tests/agent-ops-gate-affected.bats` — expect ALL pass (7 existing + 3 new; the existing tests never hit the TIA branch because their fixtures have no `map.json`, and `PRIMARY_MQ` resolves to the fixture-local `.mq` in a plain checkout).
+- [x] Run: `npx vitest run src/core/agent-ops` and `npm run check` — expect green.
+- [x] Commit: `git add -A && git commit -m "feat(agent-ops): affected gate consumes scaffold tia affected with full-suite fallback (D14)"`
 
 ---
 
@@ -3352,7 +3352,7 @@ fi
 
 **Steps:**
 
-- [ ] Update `src/merge-queue/stats.test.ts`: add `tiaLastRecorded: null` to the first test's `toEqual` object, and add:
+- [x] Update `src/merge-queue/stats.test.ts`: add `tiaLastRecorded: null` to the first test's `toEqual` object, and add:
 
 ```ts
   it('reports the last TIA recording', () => {
@@ -3365,8 +3365,8 @@ fi
   })
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/stats.test.ts` — expect FAILURE.
-- [ ] In `src/merge-queue/stats.ts`: add the field to `MqStats`:
+- [x] Run: `npx vitest run src/merge-queue/stats.test.ts` — expect FAILURE.
+- [x] In `src/merge-queue/stats.ts`: add the field to `MqStats`:
 
 ```ts
   /** D14: the most recent coverage-map recording, or null when none exists. */
@@ -3382,7 +3382,7 @@ fi
 ```
 
   and `tiaLastRecorded,` in the returned object.
-- [ ] In `src/cli/commands/mq.ts` (stats case), after the Task 3 full-gate line:
+- [x] In `src/cli/commands/mq.ts` (stats case), after the Task 3 full-gate line:
 
 ```ts
     output.info(
@@ -3393,9 +3393,9 @@ fi
     )
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/stats.test.ts src/cli/commands/mq.test.ts` — expect all pass.
-- [ ] Run: `npm run check` — expect green.
-- [ ] Commit: `git add -A && git commit -m "feat(mq): TIA recording visibility in mq stats (D14)"`
+- [x] Run: `npx vitest run src/merge-queue/stats.test.ts src/cli/commands/mq.test.ts` — expect all pass.
+- [x] Run: `npm run check` — expect green.
+- [x] Commit: `git add -A && git commit -m "feat(mq): TIA recording visibility in mq stats (D14)"`
 
 **D14 is complete and shippable here.**
 
@@ -3408,19 +3408,19 @@ fi
 
 **Steps:**
 
-- [ ] Add two rows to the Key Commands table in `CLAUDE.md`, after the `scaffold mq stats` row:
+- [x] Add two rows to the Key Commands table in `CLAUDE.md`, after the `scaffold mq stats` row:
 
 ```markdown
 | `scaffold mq release --pr <N>` | Release a `HELD_HUMAN` (overlap-zone) PR back into the queue; it lands solo-gated |
 | `scaffold tia affected --base <ref>` | Emit the TIA-selected test list + confidence verdict (exit 3 = run the full suite) |
 ```
 
-- [ ] Update the `scaffold mq stats` row's description to: `Calibration metrics: arrivals, gate outcomes, median gate time, flakes, gate-cache hits, instrumented-vs-plain full-gate medians, TIA map age`.
-- [ ] Do NOT touch `CHANGELOG.md` here — the maintainer release flow (operations runbook) owns it at tag time; the PR description should list the four D-items and the new config keys (`gate_cache_max_entries`, `overlap_zones`, `overlap_zone_policy`, `tia.record`) for that write-up.
-- [ ] Run: `npm run test:e2e` — expect the merge-queue e2e suite green.
-- [ ] Run: `make check-all` — expect every gate green (bash: lint + validate + test + eval; TypeScript: lint + type-check + vitest; mmr/agent-integration/knowledge/guides checks). A `git push` after this plan will re-run the suite via the pre-push hook — with `make check-all` green on the exact commit, `git push --no-verify` is the sanctioned shortcut (see CLAUDE.md).
-- [ ] Commit: `git add -A && git commit -m "docs: mq release + tia affected command rows (brownfield R4)"`
-- [ ] Final self-check before opening the PR:
+- [x] Update the `scaffold mq stats` row's description to: `Calibration metrics: arrivals, gate outcomes, median gate time, flakes, gate-cache hits, instrumented-vs-plain full-gate medians, TIA map age`.
+- [x] Do NOT touch `CHANGELOG.md` here — the maintainer release flow (operations runbook) owns it at tag time; the PR description should list the four D-items and the new config keys (`gate_cache_max_entries`, `overlap_zones`, `overlap_zone_policy`, `tia.record`) for that write-up.
+- [x] Run: `npm run test:e2e` — expect the merge-queue e2e suite green.
+- [x] Run: `make check-all` — expect every gate green (bash: lint + validate + test + eval; TypeScript: lint + type-check + vitest; mmr/agent-integration/knowledge/guides checks). A `git push` after this plan will re-run the suite via the pre-push hook — with `make check-all` green on the exact commit, `git push --no-verify` is the sanctioned shortcut (see CLAUDE.md).
+- [x] Commit: `git add -A && git commit -m "docs: mq release + tia affected command rows (brownfield R4)"`
+- [x] Final self-check before opening the PR:
   - `git log --oneline main..HEAD` shows one commit per task (18 commits).
   - `grep -rn "gate_cached\|full_gate_recorded\|pr_files\|released\|tia_recorded" src/merge-queue/types.ts` — all five event types present.
   - `grep -n "HELD_HUMAN" src/merge-queue/types.ts src/merge-queue/state.ts src/cli/commands/mq.ts` — state, reducer, and CLI agree.

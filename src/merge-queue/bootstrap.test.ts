@@ -121,6 +121,7 @@ function makeGh(script: {
     mergeCommitSha: (): string | null => script.mergeSha === undefined ? 'MERGESHA' : script.mergeSha,
     comment(): void { /* unused */ },
     listLabeled: (): number[] => [],
+    changedFiles: (): string[] => [],
     postMergeRed: (): boolean => false,
   }
   return gh

@@ -99,7 +99,9 @@ When modifying prompts:
 | `scaffold mq daemon --foreground` | Run the merge-queue daemon in the foreground (debugging) |
 | `scaffold mq status [--pr <N>] [--format json]` | Show queue state, paused banner, per-PR states |
 | `scaffold mq eject --pr <N>` | Withdraw a PR from the queue |
-| `scaffold mq stats` | Calibration metrics: arrivals, gate outcomes, median gate time, flakes |
+| `scaffold mq release --pr <N>` | Release a `HELD_HUMAN` (overlap-zone) PR back into the queue; it lands solo-gated |
+| `scaffold tia affected --base <ref>` | Emit the TIA-selected test list + confidence verdict (exit 3 = run the full suite) |
+| `scaffold mq stats` | Calibration metrics: arrivals, gate outcomes, median gate time, flakes, gate-cache hits, instrumented-vs-plain full-gate medians, TIA map age |
 
 ### Committing and Creating PRs
 

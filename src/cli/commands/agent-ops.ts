@@ -112,6 +112,7 @@ const agentOpsCommand: CommandModule<Record<string, unknown>, AgentOpsArgs> = {
     for (const f of result.skippedModified) {
       output.warn(`SKIPPED (locally modified or pre-existing — use --force to overwrite): ${f}`)
     }
+    for (const w of result.warnings) output.warn(`agent-ops: [${w.code}] ${w.message}`)
     for (const e of result.errors) output.error(e)
 
     process.exit(result.errors.length > 0 ? 1 : 0)

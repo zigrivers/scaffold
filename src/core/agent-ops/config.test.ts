@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { defaultAgentOpsConfig, loadAgentOpsConfig } from './config.js'
+import { defaultAgentOpsConfig, loadAgentOpsConfig, mergeQueueConfigWarnings } from './config.js'
+import { defaultMergeQueueConfig } from '../../merge-queue/types.js'
 
 function tmpProject(yamlBody?: string): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentops-'))
@@ -206,6 +207,10 @@ describe('merge_queue config', () => {
       quarantine_path: '.mq/quarantine.txt',
       ready_label: 'mq:ready',
       gate_executor: 'gha-selfhosted',
+      gate_cache_max_entries: 200,
+      overlap_zones: [],
+      overlap_zone_policy: 'solo',
+      tia: { record: 'scheduled' },
     })
   })
 
@@ -268,6 +273,95 @@ merge_queue:
   gate_executor: jenkins
 `)
     expect(() => loadAgentOpsConfig(bad)).toThrow(/gate_executor/)
+  })
+
+  it('defaults merge_queue.gate_cache_max_entries to 200 and accepts 0 (disabled)', () => {
+    expect(loadAgentOpsConfig(tmpProject()).merge_queue.gate_cache_max_entries).toBe(200)
+    const dir = tmpProject(`
+project_name: myapp
+merge_queue:
+  gate_cache_max_entries: 0
+`)
+    expect(loadAgentOpsConfig(dir).merge_queue.gate_cache_max_entries).toBe(0)
+  })
+
+  it('rejects a negative or non-integer gate_cache_max_entries', () => {
+    const bad = tmpProject(`
+project_name: myapp
+merge_queue:
+  gate_cache_max_entries: -1
+`)
+    expect(() => loadAgentOpsConfig(bad)).toThrow(/gate_cache_max_entries/)
+  })
+
+  it('parses overlap zones + policy and applies the solo default', () => {
+    expect(loadAgentOpsConfig(tmpProject()).merge_queue.overlap_zone_policy).toBe('solo')
+    expect(loadAgentOpsConfig(tmpProject()).merge_queue.overlap_zones).toEqual([])
+    const dir = tmpProject(`
+project_name: myapp
+merge_queue:
+  overlap_zones: ["migrations/**", "index.html"]
+  overlap_zone_policy: hold
+`)
+    const cfg = loadAgentOpsConfig(dir)
+    expect(cfg.merge_queue.overlap_zones).toEqual(['migrations/**', 'index.html'])
+    expect(cfg.merge_queue.overlap_zone_policy).toBe('hold')
+  })
+
+  it('rejects a bad overlap_zone_policy and empty zone globs', () => {
+    const badPolicy = tmpProject(`
+project_name: myapp
+merge_queue:
+  overlap_zone_policy: ask
+`)
+    expect(() => loadAgentOpsConfig(badPolicy)).toThrow(/overlap_zone_policy/)
+    const badZone = tmpProject(`
+project_name: myapp
+merge_queue:
+  overlap_zones: [""]
+`)
+    expect(() => loadAgentOpsConfig(badZone)).toThrow(/overlap_zones/)
+  })
+
+  it('defaults tia.record to scheduled and parses explicit values', () => {
+    expect(loadAgentOpsConfig(tmpProject()).merge_queue.tia.record).toBe('scheduled')
+    const dir = tmpProject(`
+project_name: myapp
+merge_queue:
+  tia:
+    record: "off"
+`)
+    expect(loadAgentOpsConfig(dir).merge_queue.tia.record).toBe('off')
+  })
+
+  it('rejects an unknown tia.record value', () => {
+    const bad = tmpProject(`
+project_name: myapp
+merge_queue:
+  tia:
+    record: sometimes
+`)
+    expect(() => loadAgentOpsConfig(bad)).toThrow(/tia\.record/)
+  })
+})
+
+describe('mergeQueueConfigWarnings', () => {
+  it('warns when full_gate_command looks like the affected/narrowed gate', () => {
+    const cfg = { ...defaultMergeQueueConfig(), full_gate_command: 'make check-affected' }
+    const warnings = mergeQueueConfigWarnings(cfg)
+    expect(warnings).toHaveLength(1)
+    expect(warnings[0].code).toBe('CONFIG_FULL_GATE_LOOKS_AFFECTED')
+    expect(warnings[0].message).toMatch(/full_gate_command/)
+  })
+
+  it('also catches the gate-check-affected.sh script name', () => {
+    const cfg = { ...defaultMergeQueueConfig(), full_gate_command: 'scripts/ops/gate-check-affected.sh' }
+    expect(mergeQueueConfigWarnings(cfg)).toHaveLength(1)
+  })
+
+  it('does not warn for a normal full-suite command', () => {
+    const cfg = { ...defaultMergeQueueConfig(), full_gate_command: 'make check' }
+    expect(mergeQueueConfigWarnings(cfg)).toEqual([])
   })
 })
 

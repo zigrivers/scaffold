@@ -51,6 +51,10 @@ elif args[:2] == ['pr', 'comment']:
         f.write(args[2] + ': ' + args[args.index('--body') + 1] + '\\n')
 elif args[:2] == ['pr', 'list']:
     print('[]')
+elif args[:2] == ['pr', 'diff']:
+    pr = load()[args[2]]
+    for f in pr.get('files', []):
+        print(f)
 elif args[:2] == ['run', 'list']:
     sys.exit(1)  # no workflows -> postMergeRed() treats as green
 else:

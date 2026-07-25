@@ -5,14 +5,19 @@ import path from 'node:path'
 import { ulid } from 'ulid'
 import { appendEvent, readJournal } from './journal.js'
 import { TERMINAL_PR_STATES, queuedPrs, reduceState } from './state.js'
-import { composeBatch, splitBatch } from './batch.js'
+import { composeBatch, splitBatch, touchesOverlapZone } from './batch.js'
 import {
   QUARANTINE_THRESHOLD, addToQuarantine, fileQuarantineBead, recentFlakeCount, recordFlake,
 } from './flakes.js'
+import {
+  affectedGateKey, fullGateKey, hashFileOrAbsent, lookupGateCache, recordGateCache,
+} from './gate-cache.js'
 import type { GhClient, PrInfo } from './gh.js'
 import type { GitOps } from './git.js'
 import type { GateResult } from './gate.js'
-import type { BatchRecord, MergeQueueConfig, PrState, QueueState } from './types.js'
+import { tiaMapPath } from '../tia/map.js'
+import type { BatchRecord, MergeQueueConfig, PrEntry, PrState, QueueState } from './types.js'
+import { waitForWake } from './wake.js'
 
 export interface DaemonDeps {
   gh: GhClient
@@ -26,6 +31,12 @@ export interface DaemonDeps {
   projectRoot: string
   log: (msg: string) => void
   now: () => Date
+  /** D15 seam: wait for a journal append or the poll timeout while idle.
+   *  Production default is waitForWake (fs.watch + debounce). */
+  wake?: (mqDir: string, timeoutMs: number) => Promise<'journal' | 'timeout'>
+  /** D15: fire ONE post-merge poller pass right after a landing (main just
+   *  moved). Best-effort; the scheduler remains the cross-machine safety net. */
+  triggerPoller?: () => void
 }
 
 export const PAUSED_FILE = 'PAUSED'
@@ -33,12 +44,16 @@ export const GATE_PID_FILE = 'gate.pid'
 
 const IN_FLIGHT_BATCH_STATES = ['CONSTRUCTING', 'RUNNING', 'GREEN', 'LANDING', 'SPLITTING']
 
+/** D13: an entry's changed-file set, or null when unknown (never fetched, or the
+ *  last fetch failed) — an unknown set conservatively conflicts with everything. */
+function knownFiles(e: PrEntry): string[] | null {
+  return e.filesHeadSha !== undefined ? e.files ?? [] : null
+}
+
 /** PR states that mean "mid-flight in a batch" — a crash here must be recovered. */
 const MIDFLIGHT_PR_STATES: ReadonlySet<PrState> = new Set<PrState>([
   'IN_BATCH', 'TESTING', 'FLAKE_RETRY', 'PASSED', 'LANDING',
 ])
-
-const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms))
 
 type BatchOutcome =
   | { kind: 'done' }
@@ -103,7 +118,13 @@ export class MergeQueueDaemon {
         if (caught) throw caught
         return
       }
-      if (outcome === 'idle') await sleep(this.deps.config.poll_seconds * 1000)
+      if (outcome === 'idle') {
+        // D15: wake immediately on a journal append (enqueue / eject / release
+        // from another process); poll_seconds remains the fallback ceiling.
+        await (this.deps.wake ?? waitForWake)(
+          this.deps.mqDir, this.deps.config.poll_seconds * 1000,
+        )
+      }
     }
   }
 
@@ -173,6 +194,23 @@ export class MergeQueueDaemon {
         continue
       }
       infos.set(entry.pr, info)
+      // D13: refresh the changed-file set when the head moved (or was never
+      // fetched). Journaled so restarts and later cycles reuse it for free.
+      if (entry.filesHeadSha !== info.headSha) {
+        try {
+          const files = gh.changedFiles(entry.pr)
+          appendEvent(mqDir, {
+            type: 'pr_files', pr: entry.pr, headSha: info.headSha, files, at: this.at(),
+          })
+          entry.files = files
+          entry.filesHeadSha = info.headSha
+        } catch (err) {
+          // Unknown files conservatively overlap with everything (solo batch).
+          log(`warn: could not list changed files for PR #${entry.pr}: ${String(err)}`)
+          entry.files = undefined
+          entry.filesHeadSha = undefined
+        }
+      }
       // Yield between blocking viewPr calls so proper-lockfile's heartbeat timer
       // can fire — a long unbroken run of synchronous gh/git calls would otherwise
       // starve it past the stale threshold and let a second daemon start.
@@ -184,7 +222,34 @@ export class MergeQueueDaemon {
     const eligible = queued.filter(e => infos.has(e.pr))
     if (eligible.length === 0) return 'idle'
 
-    const members = composeBatch(eligible, infos, config.batch_cap)
+    // D13: hold policy — a zone-touching PR is parked for a human instead of
+    // being gated solo. Positive zone match only: unknown file sets go the
+    // conservative SOLO route (never a silent human bottleneck), and a PR a
+    // human already released is never re-held.
+    const zones = config.overlap_zones
+    let batchable = eligible
+    if (zones.length > 0 && config.overlap_zone_policy === 'hold') {
+      batchable = []
+      for (const e of eligible) {
+        const known = knownFiles(e)
+        if (!e.zoneReleased && known !== null && touchesOverlapZone(known, zones)) {
+          appendEvent(mqDir, {
+            type: 'pr_state', pr: e.pr, state: 'HELD_HUMAN', at: this.at(),
+            note: `touches an overlap zone — release with: scaffold mq release --pr ${e.pr}`,
+          })
+          continue
+        }
+        batchable.push(e)
+      }
+      if (batchable.length === 0) return 'idle'
+    }
+    const files = new Map<number, string[] | null>()
+    for (const e of batchable) {
+      files.set(e.pr, knownFiles(e))
+    }
+    const members = composeBatch(batchable, infos, config.batch_cap, {
+      files, overlapZones: zones,
+    })
 
     // Bisection stack — bors batch-then-bisect within the single lane. Halves
     // requeue AHEAD of new arrivals by construction (they run in this cycle).
@@ -252,38 +317,93 @@ export class MergeQueueDaemon {
       appendEvent(mqDir, { type: 'pr_state', pr, state: 'TESTING', batchId, at: this.at() })
     }
 
-    let gate = await this.gateRun(batchId, base)
-    appendEvent(mqDir, {
-      type: 'gate_metrics', batchId, seconds: gate.seconds, result: gate.result, at: this.at(),
+    // D12: gate-result cache. The key covers every input that selects or scopes
+    // tests; a hit means this exact combination already ran green, so the gate
+    // is skipped — but every post-gate safety check below still runs.
+    const cacheEnabled = config.gate_cache_max_entries > 0
+    const quarantineHash = hashFileOrAbsent(
+      path.join(this.deps.projectRoot, config.quarantine_path), 'quarantine',
+    )
+    const cacheKey = affectedGateKey({
+      candidateTree,
+      baseTree: git.treeOf(`origin/${base}`),
+      command: config.gate_command,
+      quarantineHash,
+      // Shared helper (not a hardcoded literal) so this cache key always tracks
+      // the real map path — if TIA_DIR/TIA_MAP_FILE ever change, invalidation
+      // must change with them, or a stale TIA-narrowed green could satisfy a
+      // later tree with a different map.
+      tiaMapHash: hashFileOrAbsent(tiaMapPath(mqDir), 'tia'),
     })
-
-    // Timeout → infra-vs-test disambiguation: retry the whole batch once (spec §5.3).
-    if (gate.result === 'timeout') {
-      log(`batch ${batchId}: gate timeout — retrying once`)
+    const cached = cacheEnabled ? lookupGateCache(mqDir, cacheKey) : null
+    let gate: GateResult
+    if (cached !== null) {
+      appendEvent(mqDir, {
+        type: 'gate_cached', batchId, key: cacheKey, savedSeconds: cached.seconds, at: this.at(),
+      })
+      log(`batch ${batchId}: gate cache hit — skipping the gate (~${cached.seconds}s saved)`)
+      gate = { result: 'green', seconds: 0, logPath: '(gate cache hit)', failedTests: [] }
+    } else {
+      let flakeRetried = false
       gate = await this.gateRun(batchId, base)
       appendEvent(mqDir, {
         type: 'gate_metrics', batchId, seconds: gate.seconds, result: gate.result, at: this.at(),
       })
-      if (gate.result === 'timeout') gate = { ...gate, result: 'red' }
-    }
 
-    // Flake protocol (spec D8): rerun failed test files once with identical config.
-    if (gate.result === 'red' && gate.failedTests.length > 0) {
-      for (const pr of applied) {
-        appendEvent(mqDir, { type: 'pr_state', pr, state: 'FLAKE_RETRY', batchId, at: this.at() })
+      // Timeout → infra-vs-test disambiguation: retry the whole batch once (spec §5.3).
+      if (gate.result === 'timeout') {
+        log(`batch ${batchId}: gate timeout — retrying once`)
+        gate = await this.gateRun(batchId, base)
+        appendEvent(mqDir, {
+          type: 'gate_metrics', batchId, seconds: gate.seconds, result: gate.result, at: this.at(),
+        })
+        if (gate.result === 'timeout') gate = { ...gate, result: 'red' }
       }
-      const retry = await this.gateRun(batchId, base, gate.failedTests)
-      if (retry.result === 'green') {
-        for (const testId of gate.failedTests) {
-          recordFlake(mqDir, testId, this.at())
-          const count = recentFlakeCount(this.state(), testId, this.deps.now())
-          if (count >= QUARANTINE_THRESHOLD &&
-              addToQuarantine(this.deps.projectRoot, config.quarantine_path, testId)) {
-            fileQuarantineBead(this.deps.projectRoot, testId)
-            log(`quarantined flaky test ${testId} (${count} events/7d)`)
-          }
+
+      // Flake protocol (spec D8): rerun failed test files once with identical config.
+      if (gate.result === 'red' && gate.failedTests.length > 0) {
+        for (const pr of applied) {
+          appendEvent(mqDir, { type: 'pr_state', pr, state: 'FLAKE_RETRY', batchId, at: this.at() })
         }
-        gate = retry
+        const retry = await this.gateRun(batchId, base, gate.failedTests)
+        if (retry.result === 'green') {
+          for (const testId of gate.failedTests) {
+            recordFlake(mqDir, testId, this.at())
+            const count = recentFlakeCount(this.state(), testId, this.deps.now())
+            if (count >= QUARANTINE_THRESHOLD &&
+                addToQuarantine(this.deps.projectRoot, config.quarantine_path, testId)) {
+              fileQuarantineBead(this.deps.projectRoot, testId)
+              log(`quarantined flaky test ${testId} (${count} events/7d)`)
+            }
+          }
+          gate = retry
+          flakeRetried = true
+        }
+      }
+
+      // D12: record only an untainted green — a flake-retry green re-proved just
+      // the failed files, not the whole selection, so it must never seed future
+      // skips. Red/timeout results are never cached.
+      if (cacheEnabled && gate.result === 'green' && !flakeRetried) {
+        recordGateCache(
+          mqDir, { key: cacheKey, seconds: gate.seconds, at: this.at() },
+          config.gate_cache_max_entries,
+        )
+        // When the merge gate IS the full gate (small projects run `make check`
+        // for both), seed the full-gate cache too, so the post-merge poller can
+        // skip re-running the identical tree it is about to verify.
+        if (config.gate_command === config.full_gate_command) {
+          recordGateCache(
+            mqDir,
+            {
+              key: fullGateKey({
+                tree: candidateTree, command: config.full_gate_command, quarantineHash,
+              }),
+              seconds: gate.seconds, at: this.at(),
+            },
+            config.gate_cache_max_entries,
+          )
+        }
       }
     }
 
@@ -326,8 +446,15 @@ export class MergeQueueDaemon {
 
     if (gate.result === 'green') {
       const testedHeads = new Map(prs.map(p => [p.pr, p.headSha]))
-      await this.land(batchId, applied, base, candidateTree, testedHeads)
+      const landedCount = await this.land(batchId, applied, base, candidateTree, testedHeads)
       git.deleteCandidate(batchId)
+      if (landedCount > 0) {
+        // D15: the base just moved — kick one post-merge poller pass directly
+        // instead of waiting for the scheduler. Fire-and-forget: a pause set
+        // during landing is respected by the poller itself (non-poller pauses
+        // make it skip), so kicking unconditionally on any landing is safe.
+        try { this.deps.triggerPoller?.() } catch { /* advisory only */ }
+      }
       return { kind: 'done' }
     }
 
@@ -372,7 +499,7 @@ export class MergeQueueDaemon {
     base: string,
     candidateTree: string,
     testedHeads: Map<number, string>,
-  ): Promise<void> {
+  ): Promise<number> {
     const { gh, git, mqDir, log } = this.deps
 
     // Pre-land validation (spec D9). The candidate tree was built from these exact
@@ -417,7 +544,7 @@ export class MergeQueueDaemon {
         })
       }
       log(`batch ${batchId}: ${invalidated} — requeued survivors, landed nothing`)
-      return
+      return 0
     }
 
     appendEvent(mqDir, { type: 'batch_state', batchId, state: 'GREEN', at: this.at() })
@@ -446,7 +573,7 @@ export class MergeQueueDaemon {
               note: 'sibling withdrawn during landing — rebuilding',
             })
           }
-          return
+          return 0
         }
         this.requeueUnlanded(members, i + 1, batchId, 'sibling withdrawn mid-landing — retry after review')
         this.pause(
@@ -457,7 +584,7 @@ export class MergeQueueDaemon {
           type: 'batch_state', batchId, state: 'DONE', at: this.at(),
           note: 'withdrawn mid-landing — paused',
         })
-        return
+        return landed.length
       }
       // Write-ahead: LANDING before the merge attempt; idempotent via mergedAt.
       appendEvent(mqDir, { type: 'pr_state', pr, state: 'LANDING', batchId, at: this.at() })
@@ -496,7 +623,7 @@ export class MergeQueueDaemon {
             type: 'batch_state', batchId, state: 'DONE', at: this.at(),
             note: 'indeterminate merge — paused',
           })
-          return
+          return landed.length
         }
         if (landed.length === 0) {
           // Nothing has landed yet — this is NOT a partial landing (a transient
@@ -515,7 +642,7 @@ export class MergeQueueDaemon {
               note: 'merge failed before any land — rebuilding',
             })
           }
-          return
+          return 0
         }
         // Partial landing (some PRs already merged): what landed is real and must
         // not be re-tested against a stale candidate (spec D9) — pause instead of
@@ -537,7 +664,7 @@ export class MergeQueueDaemon {
         appendEvent(mqDir, {
           type: 'batch_state', batchId, state: 'DONE', at: this.at(), note: 'partial land — paused',
         })
-        return
+        return landed.length
       }
       appendEvent(mqDir, { type: 'pr_state', pr, state: 'LANDED', batchId, at: this.at() })
       landed.push(pr)
@@ -559,10 +686,11 @@ export class MergeQueueDaemon {
       appendEvent(mqDir, {
         type: 'batch_state', batchId, state: 'DONE', at: this.at(), note: 'NRS MISMATCH — paused',
       })
-      return
+      return landed.length
     }
     appendEvent(mqDir, { type: 'batch_state', batchId, state: 'DONE', at: this.at() })
     log(`batch ${batchId}: landed ${members.length} PR(s)`)
+    return landed.length
   }
 
   /** Requeue every not-yet-terminal member from `fromIndex` on, so a paused batch

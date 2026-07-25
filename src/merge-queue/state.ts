@@ -43,7 +43,25 @@ export function reduceState(events: JournalEvent[]): QueueState {
     case 'flake':
       state.flakes.push({ testId: e.testId, at: e.at })
       break
+    case 'pr_files': {
+      const entry = state.entries.get(e.pr)
+      if (!entry) break
+      entry.files = e.files
+      entry.filesHeadSha = e.headSha
+      break
+    }
+    case 'released': {
+      const entry = state.entries.get(e.pr)
+      if (!entry || entry.state !== 'HELD_HUMAN') break // only a hold can be released
+      entry.state = 'QUEUED'
+      entry.zoneReleased = true
+      break
+    }
     case 'gate_metrics':
+      break
+    case 'gate_cached':
+    case 'full_gate_recorded':
+    case 'tia_recorded':
       break
     }
   }

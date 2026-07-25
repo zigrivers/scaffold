@@ -49,6 +49,17 @@ describe('ingestGateSeed', () => {
       'full "no affected-selection runner detected at seed time"',
     )
   })
+  it('detects vitest and emits a TIA invocation that xargs the selection into vitest run', () => {
+    const root = project({
+      'package.json': JSON.stringify({ scripts: { test: 'vitest run' }, devDependencies: { vitest: '^3' } }),
+    })
+    const seed = ingestGateSeed(root)
+    expect(seed.tiaInvocation).toContain('xargs npx vitest run')
+  })
+  it('falls back to the full gate when no TIA-capable runner is detected', () => {
+    const root = project({ 'package.json': JSON.stringify({ scripts: { test: 'mocha' } }) })
+    expect(ingestGateSeed(root).tiaInvocation).toContain('full "no TIA invocation configured')
+  })
   it('extracts additional test commands from workflow run: steps, deduplicated', () => {
     const root = project({
       'package.json': JSON.stringify({ scripts: { test: 'vitest run' }, devDependencies: { vitest: '^3' } }),
@@ -104,7 +115,7 @@ describe('gateTemplateVars', () => {
     const vars = gateTemplateVars(ingestGateSeed(root))
     for (const key of [
       'GATE_ENSURE_DEPS', 'GATE_RUNTIME_PROBES', 'GATE_PROBE_COMMANDS',
-      'GATE_FULL_COMMANDS', 'GATE_AFFECTED_INVOCATION',
+      'GATE_FULL_COMMANDS', 'GATE_AFFECTED_INVOCATION', 'GATE_TIA_INVOCATION',
     ]) {
       expect(vars[key], key).toBeTypeOf('string')
       expect(vars[key].length, key).toBeGreaterThan(0)

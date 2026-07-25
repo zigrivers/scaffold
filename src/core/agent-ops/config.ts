@@ -25,6 +25,11 @@ export interface AgentOpsConfig {
   merge_queue: MergeQueueConfig
 }
 
+export interface AgentOpsConfigWarning {
+  code: string
+  message: string
+}
+
 const NAME_RE = /^[a-z][a-z0-9_-]*$/
 
 function sanitizeName(raw: string): string {
@@ -143,7 +148,79 @@ export function loadAgentOpsConfig(projectRoot: string): AgentOpsConfig {
       }
       cfg.merge_queue.gate_executor = ge
     }
+    if (mq.gate_cache_max_entries !== undefined) {
+      const v = mq.gate_cache_max_entries
+      if (typeof v !== 'number' || !Number.isInteger(v) || v < 0) {
+        fail(
+          `merge_queue.gate_cache_max_entries must be an integer >= 0 (0 disables the cache), got ${JSON.stringify(v)}`,
+        )
+      }
+      cfg.merge_queue.gate_cache_max_entries = v
+    }
+    if (mq.overlap_zones !== undefined) {
+      if (!Array.isArray(mq.overlap_zones)) {
+        fail('merge_queue.overlap_zones must be a list of glob strings')
+      }
+      cfg.merge_queue.overlap_zones = mq.overlap_zones.map(z => {
+        if (typeof z !== 'string' || z.trim() === '') {
+          fail('merge_queue.overlap_zones entries must be non-empty strings')
+        }
+        return z
+      })
+    }
+    if (mq.overlap_zone_policy !== undefined) {
+      if (mq.overlap_zone_policy !== 'solo' && mq.overlap_zone_policy !== 'hold') {
+        fail(
+          `merge_queue.overlap_zone_policy must be "solo" or "hold", got ${JSON.stringify(mq.overlap_zone_policy)}`,
+        )
+      }
+      cfg.merge_queue.overlap_zone_policy = mq.overlap_zone_policy
+    }
+    if (mq.tia !== undefined) {
+      if (mq.tia === null || typeof mq.tia !== 'object' || Array.isArray(mq.tia)) {
+        fail('merge_queue.tia must be a mapping')
+      }
+      const tia = mq.tia as Record<string, unknown>
+      if (tia.record !== undefined) {
+        if (tia.record !== 'scheduled' && tia.record !== 'always' && tia.record !== 'off') {
+          fail(
+            `merge_queue.tia.record must be "scheduled", "always", or "off", got ${JSON.stringify(tia.record)}`,
+          )
+        }
+        cfg.merge_queue.tia.record = tia.record
+      }
+    }
   }
 
   return cfg
+}
+
+/**
+ * Non-fatal merge_queue config checks — detected post-parse so a hit never
+ * blocks loading (unlike fail() above, which is used for shape/type errors).
+ *
+ * The daemon seeds the full-gate cache from a batch run only when
+ * `gate_command === full_gate_command` (see src/merge-queue/daemon.ts D12).
+ * The full gate is the authoritative post-merge safety net and must run the
+ * COMPLETE suite: if a user points full_gate_command at the affected/narrowed
+ * gate script by mistake, the daemon will seed the full-gate cache from a
+ * narrowed run, and the poller will then skip a real post-merge full suite.
+ */
+export function mergeQueueConfigWarnings(mq: MergeQueueConfig): AgentOpsConfigWarning[] {
+  const warnings: AgentOpsConfigWarning[] = []
+  // 'gate-check-affected' already contains 'check-affected', so one substring
+  // check catches both the `make check-affected` target and the
+  // `gate-check-affected.sh` script name.
+  if (mq.full_gate_command.includes('check-affected')) {
+    warnings.push({
+      code: 'CONFIG_FULL_GATE_LOOKS_AFFECTED',
+      message:
+        `merge_queue.full_gate_command ("${mq.full_gate_command}") looks like the affected/narrowed ` +
+        'gate command, not the full suite. full_gate_command must run the complete test suite — it is ' +
+        'the authoritative post-merge safety net and its cache is seeded from batch runs when it ' +
+        'matches gate_command; pointing it at the narrowed gate would let a post-merge full-suite check ' +
+        'get skipped.',
+    })
+  }
+  return warnings
 }

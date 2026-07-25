@@ -22,6 +22,11 @@ describe('computeStats', () => {
       gateRuns: { green: 2, red: 1, timeout: 0 },
       medianGateSeconds: 200,
       flakesLast7d: 1,
+      gateCacheHits: 0,
+      gateCacheSecondsSaved: 0,
+      fullGatePlain: { runs: 0, medianSeconds: null },
+      fullGateInstrumented: { runs: 0, medianSeconds: null },
+      tiaLastRecorded: null,
     })
   })
 
@@ -35,5 +40,29 @@ describe('computeStats', () => {
       { type: 'gate_metrics', batchId: 'b', seconds: 300, result: 'green', at: '2026-07-17T03:00:00.000Z' },
     ]
     expect(computeStats(events, NOW).medianGateSeconds).toBe(200)
+  })
+
+  it('counts gate-cache hits, savings, and full-gate medians by instrumentation', () => {
+    const events: JournalEvent[] = [
+      { type: 'gate_cached', batchId: 'a', key: 'k', savedSeconds: 120, at: '2026-07-17T02:00:00.000Z' },
+      { type: 'gate_cached', batchId: 'b', key: 'k', savedSeconds: 60, at: '2026-07-17T03:00:00.000Z' },
+      { type: 'full_gate_recorded', tree: 't1', seconds: 100, instrumented: false, at: '2026-07-17T02:00:00.000Z' },
+      { type: 'full_gate_recorded', tree: 't2', seconds: 300, instrumented: false, at: '2026-07-17T03:00:00.000Z' },
+      { type: 'full_gate_recorded', tree: 't3', seconds: 500, instrumented: true, at: '2026-07-17T04:00:00.000Z' },
+    ]
+    const s = computeStats(events, NOW)
+    expect(s.gateCacheHits).toBe(2)
+    expect(s.gateCacheSecondsSaved).toBe(180)
+    expect(s.fullGatePlain).toEqual({ runs: 2, medianSeconds: 200 })
+    expect(s.fullGateInstrumented).toEqual({ runs: 1, medianSeconds: 500 })
+  })
+
+  it('reports the last TIA recording', () => {
+    const events: JournalEvent[] = [
+      { type: 'tia_recorded', headSha: 'H1', seconds: 100, tests: 10, files: 40, at: '2026-07-16T02:00:00.000Z' },
+      { type: 'tia_recorded', headSha: 'H2', seconds: 90, tests: 12, files: 44, at: '2026-07-17T02:00:00.000Z' },
+    ]
+    expect(computeStats(events, NOW).tiaLastRecorded)
+      .toEqual({ at: '2026-07-17T02:00:00.000Z', tests: 12, files: 44 })
   })
 })

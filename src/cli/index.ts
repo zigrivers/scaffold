@@ -29,6 +29,7 @@ import knowledgeFreshnessCommand from './commands/knowledge-freshness.js'
 import guidesCommand from './commands/guides.js'
 import agentOpsCommand from './commands/agent-ops.js'
 import mqCommand from './commands/mq.js'
+import tiaCommand from './commands/tia.js'
 import schedCommand from './commands/sched.js'
 import hooksCommand from './commands/hooks.js'
 
@@ -64,6 +65,7 @@ export async function runCli(argv: string[]): Promise<void> {
     .command(knowledgeFreshnessCommand)
     .command(agentOpsCommand)
     .command(mqCommand)
+    .command(tiaCommand)
     .command(schedCommand)
     .command(hooksCommand)
     .options({

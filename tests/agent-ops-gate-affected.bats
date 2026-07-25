@@ -11,6 +11,7 @@ setup() {
   sed -e 's|{{DEFAULT_BRANCH}}|main|g' \
       -e 's|{{GATE_ENSURE_DEPS}}|:|g' \
       -e 's|{{GATE_AFFECTED_INVOCATION}}|touch .affected-ran; printf "%s " "${EXCLUDE_ARGS[@]+"${EXCLUDE_ARGS[@]}"}" > .exclude-args|g' \
+      -e 's|{{GATE_TIA_INVOCATION}}|printf "%s" "$TIA_TESTS" > .tia-tests; touch .tia-ran|g' \
     "$BATS_TEST_DIRNAME/../content/assets/agent-ops/gate/gate-check-affected.sh.tmpl" \
     > scripts/gate-check-affected.sh
   chmod +x scripts/gate-check-affected.sh
@@ -120,4 +121,54 @@ teardown() { rm -rf "$TMP"; }
   # two-dot would see base's package.json and force full; three-dot must not
   [ -f .affected-ran ]
   [ ! -f .full-ran ]
+}
+
+@test "TIA layer: a selection runs the TIA invocation, not the runner selection" {
+  mkdir -p stub-bin .mq/tia
+  echo '{}' > .mq/tia/map.json
+  cat > stub-bin/scaffold <<'STUB'
+#!/usr/bin/env bash
+if [ "$1 $2" = "tia affected" ]; then echo tests/picked.test.ts; exit 0; fi
+exit 0
+STUB
+  chmod +x stub-bin/scaffold
+  export MQ_SCAFFOLD_BIN="$PWD/stub-bin/scaffold"
+  echo change >> app.txt && git commit -qam change
+  MQ_AFFECTED_BASE=main run scripts/gate-check-affected.sh
+  [ "$status" -eq 0 ]
+  [ -f .tia-ran ]
+  grep -q 'tests/picked.test.ts' .tia-tests
+  [ ! -f .affected-ran ]
+  [ ! -f .full-ran ]
+}
+
+@test "TIA layer: exit 3 (stale / low confidence) falls back to the FULL suite" {
+  mkdir -p stub-bin .mq/tia
+  echo '{}' > .mq/tia/map.json
+  cat > stub-bin/scaffold <<'STUB'
+#!/usr/bin/env bash
+if [ "$1 $2" = "tia affected" ]; then exit 3; fi
+exit 0
+STUB
+  chmod +x stub-bin/scaffold
+  export MQ_SCAFFOLD_BIN="$PWD/stub-bin/scaffold"
+  echo change >> app.txt && git commit -qam change
+  MQ_AFFECTED_BASE=main run scripts/gate-check-affected.sh
+  [ "$status" -eq 0 ]
+  [ -f .full-ran ]
+  [ ! -f .tia-ran ]
+  [ ! -f .affected-ran ]
+  [[ "$output" == *"TIA recommends the full suite"* ]]
+}
+
+@test "TIA layer: no coverage map leaves the runner-selection layer in charge" {
+  mkdir -p stub-bin
+  printf '#!/usr/bin/env bash\nexit 0\n' > stub-bin/scaffold
+  chmod +x stub-bin/scaffold
+  export MQ_SCAFFOLD_BIN="$PWD/stub-bin/scaffold"
+  echo change >> app.txt && git commit -qam change
+  MQ_AFFECTED_BASE=main run scripts/gate-check-affected.sh
+  [ "$status" -eq 0 ]
+  [ -f .affected-ran ]
+  [ ! -f .tia-ran ]
 }

@@ -4,6 +4,54 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.51.0] - 2026-07-25
+
+Brownfield adoption, Tier D — **Queue Enhancements**. Four independent local
+merge-queue accelerators: a gate-result cache, event-driven wake, conflict-aware
+batching, and a layered test-impact-analysis loop. The post-merge full suite
+stays authoritative throughout — every acceleration fails closed to running more,
+never fewer, tests.
+
+### Added
+
+- **D12 — gate-result cache by tree hash.** The merge-queue daemon and the
+  post-merge poller skip a full/affected gate run when this exact tree already
+  ran it **green** (recorded by an earlier pass — including a different SHA with
+  an identical tree, e.g. after a revert). Keys are content-addressed (tree +
+  base + gate command + quarantine hash + TIA-map hash), collision-resistant, and
+  **green-only** (red/timeout and flake-retry greens are never cached). A cache
+  hit still runs every post-gate safety check (withdrawal, base-moved, pre-land
+  validation, NRS tree assertion). Config: `merge_queue.gate_cache_max_entries`
+  (default 200; `0` disables). Inspect with `scaffold mq gate-cache`; hit
+  savings surface in `scaffold mq stats`.
+- **D15 — event-driven wake.** The daemon idle loop now wakes on journal appends
+  (`fs.watch`, debounced, with the existing poll interval as the fallback
+  ceiling — identical behavior where `fs.watch` is unavailable) instead of a
+  fixed sleep, and directly kicks one post-merge poller pass after a landing (the
+  scheduler stays the safety net for merges from other machines). No new
+  dependencies.
+- **D13 — conflict-aware batching.** `composeBatch` partitions the queue so two
+  PRs whose changed-file sets intersect (or that both touch a configured overlap
+  zone) NEVER share a batch, preserving low-risk-first order. Per-PR file sets
+  come from `gh pr diff --name-only`, cached in the journal by head sha. Config:
+  `merge_queue.overlap_zones` (globs, default `[]`) and
+  `merge_queue.overlap_zone_policy` (`solo` default — no human bottleneck — or
+  `hold`, which parks the PR in the non-terminal `HELD_HUMAN` state until
+  `scaffold mq release --pr <N>`; `mq status` surfaces held PRs). An unknown file
+  set (diff fetch failed) conservatively gets a solo batch and is never held.
+- **D14 — layered test-impact analysis (TIA).** A coverage map
+  (`.mq/tia/map.json`, built from Node's native `NODE_V8_COVERAGE`) drives
+  `scaffold tia affected --base <ref>`, which emits the most-likely-to-fail-first
+  test selection (exit 0) or recommends the full suite (exit 3) — **failing
+  closed** to the full suite on staleness, low confidence, an unknown edge, a
+  divergent-branch map, or ANY error. The R2 affected-gate consumes it with a
+  full-suite fallback and the primary-`.mq` resolved via the git common dir (so
+  it works from the daemon's gate worktree). The poller records coverage on the
+  first green run per UTC day (`merge_queue.tia.record: scheduled | always |
+  off`, default `scheduled`) under instrumentation; instrumented-vs-plain
+  full-gate medians and TIA map age show in `scaffold mq stats`. New commands:
+  `scaffold tia affected | record-due | ingest`.
+
 ## [3.50.0] - 2026-07-25
 
 Brownfield adoption, Tier B — **Adoption Mode**. Makes pipeline content

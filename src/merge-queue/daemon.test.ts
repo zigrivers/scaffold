@@ -8,6 +8,7 @@ import { MergeQueueDaemon, PAUSED_FILE, type DaemonDeps } from './daemon.js'
 import { appendEvent, readJournal } from './journal.js'
 import { reduceState, queuedPrs } from './state.js'
 import { defaultMergeQueueConfig } from './types.js'
+import { tiaMapPath } from '../tia/map.js'
 import type { GhClient, PrInfo } from './gh.js'
 import type { CandidateResult, GitOps } from './git.js'
 import type { GateResult } from './gate.js'
@@ -25,6 +26,9 @@ function prInfo(n: number, over: Partial<PrInfo> = {}): PrInfo {
 
 class FakeGh implements GhClient {
   infos = new Map<number, PrInfo>()
+  files = new Map<number, string[]>()
+  failFiles = new Set<number>()
+  filesCalls: number[] = []
   merged: number[] = []
   comments: { pr: number; body: string }[] = []
   labeled: number[] = []
@@ -63,6 +67,11 @@ class FakeGh implements GhClient {
   }
   comment(pr: number, body: string): void { this.comments.push({ pr, body }) }
   listLabeled(): number[] { return this.labeled }
+  changedFiles(pr: number): string[] {
+    this.filesCalls.push(pr)
+    if (this.failFiles.has(pr)) throw new Error('diff unavailable')
+    return this.files.get(pr) ?? []
+  }
   postMergeRed(): boolean { return this.red }
   mergeCommitSha(): string | null { return 'FAKE_MERGE_SHA' }
 }
@@ -111,7 +120,9 @@ function harness(over: Partial<DaemonDeps> = {}) {
       const next = gateResults.shift()
       return next ?? { result: 'green', seconds: 1, logPath: '/dev/null', failedTests: [] }
     },
-    config: defaultMergeQueueConfig(),
+    // Cache disabled by default: FakeGit collapses all trees to 'TREE', so the
+    // D12 cache would conflate distinct batches. Cache tests opt in explicitly.
+    config: { ...defaultMergeQueueConfig(), gate_cache_max_entries: 0 },
     mqDir, projectRoot: root,
     log: () => {},
     now: () => new Date(AT),
@@ -531,6 +542,218 @@ describe('MergeQueueDaemon.cycle', () => {
     expect(h.gh.comments.some(c => c.pr === 2 && /already applied/i.test(c.body))).toBe(true)
     expect(h.gh.merged).toEqual([1])
   })
+
+  it('skips the gate on an identical cache key and journals gate_cached (D12)', async () => {
+    const h = harness({ config: defaultMergeQueueConfig() }) // cache ON (200)
+    h.enqueue(1)
+    await h.daemon.cycle()               // green run records the cache entry
+    expect(h.gateCalls.length).toBe(1)
+    h.enqueue(2)                          // FakeGit collapses every tree to 'TREE',
+    await h.daemon.cycle()                // so the key matches — the gate must not run
+    expect(h.gateCalls.length).toBe(1)
+    expect(h.states()[2]).toBe('LANDED')  // every post-gate safety check still ran
+    const cachedEvents = readJournal(h.mqDir).filter(e => e.type === 'gate_cached')
+    expect(cachedEvents).toHaveLength(1)
+    expect(cachedEvents[0]).toMatchObject({ savedSeconds: 1 })
+  })
+
+  it('a TIA map written at the shared tiaMapPath() invalidates the D12 cache key', async () => {
+    // The cache key must track the REAL map path, not a hardcoded literal —
+    // if daemon.ts and tia/map.ts ever disagree on where the map lives, a
+    // stale TIA-narrowed green could satisfy a later tree with a different
+    // map. This test writes the map at tiaMapPath(mqDir) — the same helper
+    // daemon.ts uses — so it fails if that wiring ever regresses.
+    const h = harness({ config: defaultMergeQueueConfig() }) // cache ON (200)
+    h.enqueue(1)
+    await h.daemon.cycle()               // green run, cache seeded with no map file present
+    expect(h.gateCalls.length).toBe(1)
+
+    const mapFile = tiaMapPath(h.mqDir)
+    fs.mkdirSync(path.dirname(mapFile), { recursive: true })
+    fs.writeFileSync(mapFile, JSON.stringify({ version: 1 }))
+
+    h.enqueue(2)
+    await h.daemon.cycle()               // map now exists -> hash differs -> cache key differs
+    expect(h.gateCalls.length).toBe(2)   // gate reran instead of a stale hit
+    expect(h.states()[2]).toBe('LANDED')
+  })
+
+  it('never caches a red result (D12 green-only)', async () => {
+    const h = harness({ config: defaultMergeQueueConfig() })
+    h.enqueue(1)
+    h.gateResults.push({ result: 'red', seconds: 2, logPath: '/l/r.log', failedTests: [] })
+    await h.daemon.cycle()               // red singleton -> ejected, nothing recorded
+    h.enqueue(2)
+    await h.daemon.cycle()
+    expect(h.gateCalls.length).toBe(2)   // the second batch ran the gate — no bogus hit
+    expect(h.states()[2]).toBe('LANDED')
+  })
+
+  it('a flake-retry green is not cached (only untainted greens seed skips)', async () => {
+    const h = harness({ config: defaultMergeQueueConfig() })
+    h.enqueue(1)
+    h.gateResults.push(
+      { result: 'red', seconds: 2, logPath: '/l/a.log', failedTests: ['src/f.test.ts'] },
+      { result: 'green', seconds: 1, logPath: '/l/a2.log', failedTests: [] },
+    )
+    await h.daemon.cycle()
+    expect(h.states()[1]).toBe('LANDED')
+    h.enqueue(2)
+    await h.daemon.cycle()
+    expect(h.gateCalls.length).toBe(3)   // gate ran again — the flake green seeded nothing
+  })
+
+  it('gate_cache_max_entries 0 disables lookup and record entirely', async () => {
+    const h = harness() // harness default: cache off
+    h.enqueue(1)
+    await h.daemon.cycle()
+    h.enqueue(2)
+    await h.daemon.cycle()
+    expect(h.gateCalls.length).toBe(2)
+    expect(readJournal(h.mqDir).filter(e => e.type === 'gate_cached')).toHaveLength(0)
+    expect(fs.existsSync(path.join(h.mqDir, 'gate-cache.json'))).toBe(false)
+  })
+
+  it('kicks one poller pass after a green landing (D15)', async () => {
+    let kicks = 0
+    const h = harness({ triggerPoller: () => { kicks += 1 } })
+    h.enqueue(1)
+    h.enqueue(2)
+    await h.daemon.cycle()
+    expect(h.states()).toEqual({ 1: 'LANDED', 2: 'LANDED' })
+    expect(kicks).toBe(1)
+  })
+
+  it('does not kick the poller when nothing landed', async () => {
+    let kicks = 0
+    const h = harness({ triggerPoller: () => { kicks += 1 } })
+    h.enqueue(1)
+    h.gh.failMerge.add(1) // merge fails, PR not merged -> abort + rebuild, zero landed
+    await h.daemon.cycle()
+    expect(h.states()[1]).toBe('REQUEUED_SPLIT')
+    expect(kicks).toBe(0)
+  })
+
+  it('a throwing triggerPoller never breaks the landing', async () => {
+    const h = harness({ triggerPoller: () => { throw new Error('poller spawn failed') } })
+    h.enqueue(1)
+    await h.daemon.cycle()
+    expect(h.states()[1]).toBe('LANDED')
+    expect(h.daemon.paused()).toBeNull()
+  })
+
+  it('overlapping PRs land in successive cycles, never one batch (D13)', async () => {
+    const h = harness()
+    h.enqueue(1)
+    h.enqueue(2)
+    h.gh.files.set(1, ['src/shared.ts'])
+    h.gh.files.set(2, ['src/shared.ts'])
+    await h.daemon.cycle()
+    expect(h.git.constructed.map(c => c.prs)).toEqual([[1]])
+    expect(h.states()).toEqual({ 1: 'LANDED', 2: 'QUEUED' })
+    await h.daemon.cycle()
+    expect(h.states()).toEqual({ 1: 'LANDED', 2: 'LANDED' })
+  })
+
+  it('journals pr_files and skips refetching while the head is unchanged', async () => {
+    const h = harness()
+    h.enqueue(1)
+    h.enqueue(2)
+    h.gh.files.set(1, ['src/shared.ts'])
+    h.gh.files.set(2, ['src/shared.ts'])
+    await h.daemon.cycle()               // PR2 skipped (overlap) — files journaled
+    await h.daemon.cycle()               // PR2 lands; its files come from the journal
+    expect(h.states()[2]).toBe('LANDED')
+    expect(h.gh.filesCalls.filter(pr => pr === 2)).toHaveLength(1)
+    const filesEvents = readJournal(h.mqDir).filter(e => e.type === 'pr_files')
+    expect(filesEvents.some(e => e.type === 'pr_files' && e.pr === 2 && e.headSha === 'sha2')).toBe(true)
+  })
+
+  it('a failed file listing degrades to a solo batch (unknown = overlaps everything)', async () => {
+    const h = harness()
+    h.enqueue(1)
+    h.enqueue(2)
+    h.gh.files.set(1, ['a.ts'])
+    h.gh.failFiles.add(2)
+    await h.daemon.cycle()
+    expect(h.git.constructed.map(c => c.prs)).toEqual([[1]])
+    expect(h.states()[2]).toBe('QUEUED')
+  })
+
+  it('solo policy gates a zone PR alone without holding it (D13 default)', async () => {
+    const h = harness({
+      config: {
+        ...defaultMergeQueueConfig(), gate_cache_max_entries: 0,
+        overlap_zones: ['migrations/**'],
+      },
+    })
+    h.enqueue(1)
+    h.enqueue(2)
+    h.gh.files.set(1, ['migrations/001.sql'])
+    h.gh.files.set(2, ['src/b.ts'])
+    await h.daemon.cycle()
+    expect(h.git.constructed.map(c => c.prs)).toEqual([[1]]) // zone PR solo (lowest risk anchors)
+    await h.daemon.cycle()
+    expect(h.states()).toEqual({ 1: 'LANDED', 2: 'LANDED' })
+  })
+
+  it('hold policy parks a zone PR in HELD_HUMAN with the release hint', async () => {
+    const h = harness({
+      config: {
+        ...defaultMergeQueueConfig(), gate_cache_max_entries: 0,
+        overlap_zones: ['migrations/**'], overlap_zone_policy: 'hold',
+      },
+    })
+    h.enqueue(1)
+    h.enqueue(2)
+    h.gh.files.set(1, ['migrations/001.sql'])
+    h.gh.files.set(2, ['src/b.ts'])
+    await h.daemon.cycle()
+    expect(h.states()).toEqual({ 1: 'HELD_HUMAN', 2: 'LANDED' })
+    const entry = reduceState(readJournal(h.mqDir)).entries.get(1)
+    expect(entry?.note).toContain('mq release --pr 1')
+    await h.daemon.cycle() // held PR is untouched by later cycles
+    expect(h.states()[1]).toBe('HELD_HUMAN')
+  })
+
+  it('a released PR is never re-held and lands solo-gated', async () => {
+    const h = harness({
+      config: {
+        ...defaultMergeQueueConfig(), gate_cache_max_entries: 0,
+        overlap_zones: ['migrations/**'], overlap_zone_policy: 'hold',
+      },
+    })
+    h.enqueue(1)
+    h.gh.files.set(1, ['migrations/001.sql'])
+    await h.daemon.cycle()
+    expect(h.states()[1]).toBe('HELD_HUMAN')
+    appendEvent(h.mqDir, { type: 'released', pr: 1, at: AT })
+    await h.daemon.cycle()
+    expect(h.states()[1]).toBe('LANDED')
+  })
+
+  it('tripwire: an unknown file set (changedFiles fails) under hold policy goes SOLO, never HELD_HUMAN', async () => {
+    const h = harness({
+      config: {
+        ...defaultMergeQueueConfig(), gate_cache_max_entries: 0,
+        overlap_zones: ['migrations/**'], overlap_zone_policy: 'hold',
+      },
+    })
+    h.enqueue(1)
+    h.enqueue(2)
+    h.gh.failFiles.add(1) // PR1's file set is unknown — must never be held
+    h.gh.files.set(2, ['src/b.ts'])
+    await h.daemon.cycle()
+    // Unknown file set forces a solo batch this cycle — PR1 lands alone, never HELD_HUMAN.
+    expect(h.git.constructed.map(c => c.prs)).toEqual([[1]])
+    expect(h.states()[1]).not.toBe('HELD_HUMAN')
+    await h.daemon.cycle()
+    expect(h.states()).toEqual({ 1: 'LANDED', 2: 'LANDED' })
+    const heldEvents = readJournal(h.mqDir).filter(
+      e => e.type === 'pr_state' && e.pr === 1 && e.state === 'HELD_HUMAN',
+    )
+    expect(heldEvents).toHaveLength(0)
+  })
 })
 
 describe('MergeQueueDaemon.reconcile', () => {
@@ -670,5 +893,20 @@ describe('MergeQueueDaemon.run', () => {
     }
     await expect(h.daemon.run({ once: true })).rejects.toThrow(/network blip/)
     expect(spy).toHaveBeenCalledTimes(2) // startup + after the cycle error
+  })
+
+  it('idle cycles await the journal wake instead of a fixed sleep (D15)', async () => {
+    let calls = 0
+    const h = harness({
+      wake: async () => {
+        calls += 1
+        if (calls === 2) throw new Error('stop-loop')
+        return 'journal' as const
+      },
+    })
+    fs.mkdirSync(h.mqDir, { recursive: true })
+    fs.writeFileSync(path.join(h.mqDir, PAUSED_FILE), 'hold\n') // every cycle is idle
+    await expect(h.daemon.run()).rejects.toThrow(/stop-loop/)
+    expect(calls).toBe(2)
   })
 })

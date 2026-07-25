@@ -1,6 +1,10 @@
 export type PrState =
   | 'QUEUED' | 'IN_BATCH' | 'TESTING' | 'FLAKE_RETRY' | 'PASSED' | 'LANDING' | 'LANDED'
   | 'REQUEUED_SPLIT' | 'EJECTED' | 'NEEDS_REBASE' | 'CANCELLED'
+  /** D13: parked by overlap_zone_policy=hold until `scaffold mq release --pr N`.
+   *  Deliberately NOT terminal: `mq eject` can still cancel a held PR, and
+   *  queuedPrs never selects it, so it sits outside batching until released. */
+  | 'HELD_HUMAN'
 
 export type BatchState =
   | 'CONSTRUCTING' | 'RUNNING' | 'GREEN' | 'LANDING' | 'DONE'
@@ -14,6 +18,13 @@ export interface PrEntry {
   /** Times this PR was ejected from a failing context (risk signal for ordering). */
   queueFailures: number
   note?: string
+  /** D13: changed-file set cached from `gh pr diff --name-only` (pr_files event). */
+  files?: string[]
+  /** Head sha the cached file set was fetched at; a moved head invalidates it. */
+  filesHeadSha?: string
+  /** D13: a human released this PR from an overlap-zone hold — never re-hold it
+   *  (it still only ever lands solo-gated, which is what the zone protects). */
+  zoneReleased?: boolean
 }
 
 export interface BatchRecord {
@@ -42,6 +53,8 @@ export type JournalEvent =
       type: 'gate_metrics'; batchId: string; seconds: number
       result: 'green' | 'red' | 'timeout'; at: string
     }
+  | { type: 'gate_cached'; batchId: string; key: string; savedSeconds: number; at: string }
+  | { type: 'full_gate_recorded'; tree: string; seconds: number; instrumented: boolean; at: string }
   // D9 bootstrap events: EVERY event carries bootstrapId (ULID) + pr + the
   // gated head SHA; bootstrap_merged additionally records the merge commit.
   | { type: 'bootstrap_intent'; bootstrapId: string; pr: number; gatedHeadSha: string; at: string }
@@ -50,6 +63,11 @@ export type JournalEvent =
       mergeCommitSha: string; at: string
     }
   | { type: 'bootstrap_armed'; bootstrapId: string; pr: number; gatedHeadSha: string; at: string }
+  // D13 overlap-zone events.
+  | { type: 'pr_files'; pr: number; headSha: string; files: string[]; at: string }
+  | { type: 'released'; pr: number; at: string }
+  // D14: coverage map recorded for a green full-gate run.
+  | { type: 'tia_recorded'; headSha: string; seconds: number; tests: number; files: number; at: string }
 
 export interface QueueState {
   entries: Map<number, PrEntry>
@@ -70,6 +88,16 @@ export interface MergeQueueConfig {
   ready_label: string
   /** Who runs the post-merge/nightly full suite (spec D4′). Not read by the daemon. */
   gate_executor: 'gha-selfhosted' | 'local-poller'
+  /** D12: size cap for .mq/gate-cache.json; 0 disables the gate-result cache. */
+  gate_cache_max_entries: number
+  /** D13: minimatch globs; a PR touching a zone never shares a batch. */
+  overlap_zones: string[]
+  /** D13: zone-touching PR handling — land it solo-gated (default) or hold it
+   *  for `scaffold mq release`. */
+  overlap_zone_policy: 'solo' | 'hold'
+  /** D14: coverage-map recording cadence for the poller's full runs.
+   *  scheduled = first green pass per UTC day (default); always; off. */
+  tia: { record: 'scheduled' | 'always' | 'off' }
 }
 
 export function defaultMergeQueueConfig(): MergeQueueConfig {
@@ -82,5 +110,9 @@ export function defaultMergeQueueConfig(): MergeQueueConfig {
     quarantine_path: '.mq/quarantine.txt',
     ready_label: 'mq:ready',
     gate_executor: 'gha-selfhosted',
+    gate_cache_max_entries: 200,
+    overlap_zones: [],
+    overlap_zone_policy: 'solo',
+    tia: { record: 'scheduled' },
   }
 }

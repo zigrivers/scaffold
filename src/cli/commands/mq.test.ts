@@ -1,5 +1,5 @@
 // src/cli/commands/mq.test.ts
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -89,10 +89,112 @@ describe('scaffold mq', () => {
     expect(reduceState(readJournal(mqDir)).entries.get(5)?.state).toBe('LANDED')
   })
 
+  it('release flips a HELD_HUMAN PR back to QUEUED (zoneReleased)', async () => {
+    process.env.MQ_NO_AUTOSTART = '1'
+    const root = scratchRepo()
+    const mqDir = path.join(root, '.mq')
+    await mqHandler({ action: 'enqueue', pr: 4, root })
+    appendEvent(mqDir, {
+      type: 'pr_state', pr: 4, state: 'HELD_HUMAN', at: new Date().toISOString(),
+    })
+    await mqHandler({ action: 'release', pr: 4, root })
+    const entry = reduceState(readJournal(mqDir)).entries.get(4)
+    expect(entry?.state).toBe('QUEUED')
+    expect(entry?.zoneReleased).toBe(true)
+  })
+
+  it('release on a PR that is not held appends nothing', async () => {
+    process.env.MQ_NO_AUTOSTART = '1'
+    const root = scratchRepo()
+    await mqHandler({ action: 'enqueue', pr: 4, root })
+    await mqHandler({ action: 'release', pr: 4, root })
+    await mqHandler({ action: 'release', pr: 99, root })
+    const events = readJournal(path.join(root, '.mq'))
+    expect(events.filter(e => e.type === 'released')).toHaveLength(0)
+  })
+
+  it('eject still works on a HELD_HUMAN PR (held is not terminal)', async () => {
+    process.env.MQ_NO_AUTOSTART = '1'
+    const root = scratchRepo()
+    const mqDir = path.join(root, '.mq')
+    await mqHandler({ action: 'enqueue', pr: 5, root })
+    appendEvent(mqDir, {
+      type: 'pr_state', pr: 5, state: 'HELD_HUMAN', at: new Date().toISOString(),
+    })
+    await mqHandler({ action: 'eject', pr: 5, root })
+    expect(reduceState(readJournal(mqDir)).entries.get(5)?.state).toBe('CANCELLED')
+  })
+
+  it('status surfaces held PRs with the release hint', async () => {
+    process.env.MQ_NO_AUTOSTART = '1'
+    const root = scratchRepo()
+    const mqDir = path.join(root, '.mq')
+    await mqHandler({ action: 'enqueue', pr: 9, root })
+    appendEvent(mqDir, {
+      type: 'pr_state', pr: 9, state: 'HELD_HUMAN', at: new Date().toISOString(),
+      note: 'touches an overlap zone',
+    })
+    // NOTE: the output context (src/cli/output/{interactive,auto,json}.ts) writes
+    // via process.stdout.write / process.stderr.write, never console.log/warn/error
+    // — spying on console would capture nothing (verified: a bare
+    // process.stdout.write bypasses a console.log spy entirely). Follow the
+    // established convention elsewhere in this package (status.test.ts,
+    // list.test.ts, complete.test.ts) and spy on the streams directly.
+    const lines: string[] = []
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
+      lines.push(String(chunk))
+      return true
+    })
+    const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+      lines.push(String(chunk))
+      return true
+    })
+    try {
+      await mqHandler({ action: 'status', root })
+    } finally {
+      stdoutSpy.mockRestore()
+      stderrSpy.mockRestore()
+    }
+    const out = lines.join('\n')
+    expect(out).toContain('HELD')
+    expect(out).toContain('release --pr 9')
+  })
+
   it('stats runs against an empty queue without throwing', async () => {
     process.env.MQ_NO_AUTOSTART = '1'
     const root = scratchRepo()
     await expect(mqHandler({ action: 'stats', root })).resolves.toBeUndefined()
+  })
+
+  it('gate-cache --record-tree then --check-tree round-trips (full-gate key)', async () => {
+    process.env.MQ_NO_AUTOSTART = '1'
+    const root = scratchRepo()
+    await mqHandler({ action: 'gate-cache', recordTree: 'T1', seconds: 42, root })
+    const events = readJournal(path.join(root, '.mq'))
+    expect(events[0]).toMatchObject({
+      type: 'full_gate_recorded', tree: 'T1', seconds: 42, instrumented: false,
+    })
+    await mqHandler({ action: 'gate-cache', checkTree: 'T1', root })
+    expect(process.exitCode ?? 0).toBe(0)
+    await mqHandler({ action: 'gate-cache', checkTree: 'T2', root })
+    expect(process.exitCode).toBe(1)
+    process.exitCode = 0
+  })
+
+  it('gate-cache --record-tree --instrumented flags the journal event', async () => {
+    process.env.MQ_NO_AUTOSTART = '1'
+    const root = scratchRepo()
+    await mqHandler({ action: 'gate-cache', recordTree: 'T1', seconds: 9, instrumented: true, root })
+    const events = readJournal(path.join(root, '.mq'))
+    expect(events[0]).toMatchObject({ type: 'full_gate_recorded', instrumented: true })
+  })
+
+  it('gate-cache with neither flag errors', async () => {
+    process.env.MQ_NO_AUTOSTART = '1'
+    const root = scratchRepo()
+    await mqHandler({ action: 'gate-cache', root })
+    expect(process.exitCode).toBe(1)
+    process.exitCode = 0
   })
 
   it('daemon returns cleanly when the lock is already held', async () => {
@@ -135,6 +237,7 @@ describe('scaffold mq bootstrap (CLI wiring)', () => {
       mergeCommitSha: (): string | null => 'M1',
       comment: (): void => { /* unused */ },
       listLabeled: (): number[] => [],
+      changedFiles: (): string[] => [],
       postMergeRed: (): boolean => false,
     }
     const git: GitOps = {

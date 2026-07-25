@@ -4,7 +4,9 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { getPackageRoot } from '../../utils/fs.js'
 import { getPackageVersion, resolveSkillTemplate } from '../skills/sync.js'
-import { loadAgentOpsConfig, type AgentOpsConfig } from './config.js'
+import {
+  loadAgentOpsConfig, mergeQueueConfigWarnings, type AgentOpsConfig, type AgentOpsConfigWarning,
+} from './config.js'
 import { gateTemplateVars, type GateSeed } from './gate-ingest.js'
 
 export type AgentOpsComponent = 'git' | 'staging' | 'merge-queue' | 'ci' | 'gate'
@@ -148,6 +150,8 @@ export interface AgentOpsInstallResult {
   /** Seed files that already existed — kept untouched (project-owned). */
   seedKept: string[]
   errors: string[]
+  /** Non-fatal config issues (e.g. full_gate_command misconfigured). */
+  warnings: AgentOpsConfigWarning[]
 }
 
 export interface AgentOpsCheckResult {
@@ -279,7 +283,12 @@ export function installAgentOps(projectRoot: string, opts: AgentOpsInstallOption
     ...buildTemplateVars(config, projectRoot),
     ...(opts.gateSeed !== undefined ? gateTemplateVars(opts.gateSeed) : {}),
   }
-  const result: AgentOpsInstallResult = { installed: [], skippedModified: [], seedKept: [], errors: [] }
+  const result: AgentOpsInstallResult = {
+    installed: [], skippedModified: [], seedKept: [], errors: [],
+    warnings: opts.components.includes('merge-queue')
+      ? mergeQueueConfigWarnings(config.merge_queue)
+      : [],
+  }
 
   for (const [tmpl, spec] of Object.entries(AGENT_OPS_FILE_MAP)) {
     const requested =
