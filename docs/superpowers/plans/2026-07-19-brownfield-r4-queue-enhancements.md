@@ -81,7 +81,7 @@
 
 **Steps:**
 
-- [ ] Write the failing test `src/merge-queue/gate-cache.test.ts`:
+- [x] Write the failing test `src/merge-queue/gate-cache.test.ts`:
 
 ```ts
 // src/merge-queue/gate-cache.test.ts
@@ -180,8 +180,8 @@ describe('lookupGateCache / recordGateCache', () => {
 })
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/gate-cache.test.ts` — expect FAILURE (module missing).
-- [ ] Create `src/merge-queue/gate-cache.ts`:
+- [x] Run: `npx vitest run src/merge-queue/gate-cache.test.ts` — expect FAILURE (module missing).
+- [x] Create `src/merge-queue/gate-cache.ts`:
 
 ```ts
 // src/merge-queue/gate-cache.ts — D12: green-only gate-result cache, keyed by
@@ -282,15 +282,15 @@ export function recordGateCache(
 }
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/gate-cache.test.ts` — expect all tests pass.
-- [ ] In `src/merge-queue/types.ts`, extend the `JournalEvent` union (append after the `gate_metrics` member):
+- [x] Run: `npx vitest run src/merge-queue/gate-cache.test.ts` — expect all tests pass.
+- [x] In `src/merge-queue/types.ts`, extend the `JournalEvent` union (append after the `gate_metrics` member):
 
 ```ts
   | { type: 'gate_cached'; batchId: string; key: string; savedSeconds: number; at: string }
   | { type: 'full_gate_recorded'; tree: string; seconds: number; instrumented: boolean; at: string }
 ```
 
-- [ ] In `src/merge-queue/types.ts`, add to `MergeQueueConfig` (after `gate_executor`):
+- [x] In `src/merge-queue/types.ts`, add to `MergeQueueConfig` (after `gate_executor`):
 
 ```ts
   /** D12: size cap for .mq/gate-cache.json; 0 disables the gate-result cache. */
@@ -303,7 +303,7 @@ export function recordGateCache(
     gate_cache_max_entries: 200,
 ```
 
-- [ ] In `src/merge-queue/state.ts`, add no-op reducer cases next to the existing `case 'gate_metrics': break`:
+- [x] In `src/merge-queue/state.ts`, add no-op reducer cases next to the existing `case 'gate_metrics': break`:
 
 ```ts
     case 'gate_cached':
@@ -311,7 +311,7 @@ export function recordGateCache(
       break
 ```
 
-- [ ] Add to `src/merge-queue/state.test.ts` (inside the existing `describe('reduceState', …)` block, reusing its `AT`-style timestamp constant — add one if the file names it differently):
+- [x] Add to `src/merge-queue/state.test.ts` (inside the existing `describe('reduceState', …)` block, reusing its `AT`-style timestamp constant — add one if the file names it differently):
 
 ```ts
   it('ignores gate_cached and full_gate_recorded events (metrics-only)', () => {
@@ -324,7 +324,7 @@ export function recordGateCache(
   })
 ```
 
-- [ ] In `src/core/agent-ops/config.ts`, add validation inside the `if (raw.merge_queue !== undefined)` block, after the `intKeys` loop (a dedicated block, NOT in `intKeys`, because `0` is valid here):
+- [x] In `src/core/agent-ops/config.ts`, add validation inside the `if (raw.merge_queue !== undefined)` block, after the `intKeys` loop (a dedicated block, NOT in `intKeys`, because `0` is valid here):
 
 ```ts
     if (mq.gate_cache_max_entries !== undefined) {
@@ -338,7 +338,7 @@ export function recordGateCache(
     }
 ```
 
-- [ ] Add to `src/core/agent-ops/config.test.ts` (inside the existing `describe('loadAgentOpsConfig', …)`, using its `tmpProject` helper):
+- [x] Add to `src/core/agent-ops/config.test.ts` (inside the existing `describe('loadAgentOpsConfig', …)`, using its `tmpProject` helper):
 
 ```ts
   it('defaults merge_queue.gate_cache_max_entries to 200 and accepts 0 (disabled)', () => {
@@ -361,9 +361,9 @@ merge_queue:
   })
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue src/core/agent-ops/config.test.ts` — expect all pass.
-- [ ] Run: `npm run check` — expect lint + type-check + vitest all green.
-- [ ] Commit: `git add -A && git commit -m "feat(mq): gate-result cache module, journal events, config key (D12)"`
+- [x] Run: `npx vitest run src/merge-queue src/core/agent-ops/config.test.ts` — expect all pass.
+- [x] Run: `npm run check` — expect lint + type-check + vitest all green.
+- [x] Commit: `git add -A && git commit -m "feat(mq): gate-result cache module, journal events, config key (D12)"`
 
 ---
 
