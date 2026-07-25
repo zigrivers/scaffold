@@ -2946,7 +2946,7 @@ import hooksCommand from './commands/hooks.js'
 
 **Steps:**
 
-- [ ] Write the failing test `src/merge-queue/bootstrap.test.ts`:
+- [x] Write the failing test `src/merge-queue/bootstrap.test.ts`:
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -3043,8 +3043,8 @@ describe('journal compatibility', () => {
 })
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/bootstrap.test.ts` — expect FAILURE (module missing, event types unknown).
-- [ ] Edit `src/merge-queue/types.ts` — extend the `JournalEvent` union. Edit old string:
+- [x] Run: `npx vitest run src/merge-queue/bootstrap.test.ts` — expect FAILURE (module missing, event types unknown).
+- [x] Edit `src/merge-queue/types.ts` — extend the `JournalEvent` union. Edit old string:
 
 ```ts
   | {
@@ -3070,7 +3070,7 @@ describe('journal compatibility', () => {
   | { type: 'bootstrap_armed'; bootstrapId: string; pr: number; gatedHeadSha: string; at: string }
 ```
 
-- [ ] Create `src/merge-queue/bootstrap.ts` (pure half; the engine is appended in Task 15):
+- [x] Create `src/merge-queue/bootstrap.ts` (pure half; the engine is appended in Task 15):
 
 ```ts
 import type { JournalEvent } from './types.js'
@@ -3159,9 +3159,9 @@ export function planResume(
 }
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/bootstrap.test.ts` — expect 12 tests passed.
-- [ ] Run: `npx tsc --noEmit -p tsconfig.json` and `npx vitest run src/merge-queue` — the widened `JournalEvent` union must not disturb `reduceState`/`computeStats` (their switches have no default and no exhaustiveness sentinel, so unmatched types fall through). If `tsc` reports an exhaustiveness error in either, add explicit no-op cases `case 'bootstrap_intent': case 'bootstrap_merged': case 'bootstrap_armed': break` to that switch.
-- [ ] Commit: `git add -A && git commit -m "feat(mq): bootstrap journal events + per-id state machine with GitHub-authoritative resume (D9)"`
+- [x] Run: `npx vitest run src/merge-queue/bootstrap.test.ts` — expect 12 tests passed.
+- [x] Run: `npx tsc --noEmit -p tsconfig.json` and `npx vitest run src/merge-queue` — the widened `JournalEvent` union must not disturb `reduceState`/`computeStats` (their switches have no default and no exhaustiveness sentinel, so unmatched types fall through). If `tsc` reports an exhaustiveness error in either, add explicit no-op cases `case 'bootstrap_intent': case 'bootstrap_merged': case 'bootstrap_armed': break` to that switch.
+- [x] Commit: `git add -A && git commit -m "feat(mq): bootstrap journal events + per-id state machine with GitHub-authoritative resume (D9)"`
 
 ---
 
