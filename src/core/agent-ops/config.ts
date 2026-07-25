@@ -143,6 +143,15 @@ export function loadAgentOpsConfig(projectRoot: string): AgentOpsConfig {
       }
       cfg.merge_queue.gate_executor = ge
     }
+    if (mq.gate_cache_max_entries !== undefined) {
+      const v = mq.gate_cache_max_entries
+      if (typeof v !== 'number' || !Number.isInteger(v) || v < 0) {
+        fail(
+          `merge_queue.gate_cache_max_entries must be an integer >= 0 (0 disables the cache), got ${JSON.stringify(v)}`,
+        )
+      }
+      cfg.merge_queue.gate_cache_max_entries = v
+    }
   }
 
   return cfg

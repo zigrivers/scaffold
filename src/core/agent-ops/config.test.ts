@@ -206,6 +206,7 @@ describe('merge_queue config', () => {
       quarantine_path: '.mq/quarantine.txt',
       ready_label: 'mq:ready',
       gate_executor: 'gha-selfhosted',
+      gate_cache_max_entries: 200,
     })
   })
 
@@ -268,6 +269,25 @@ merge_queue:
   gate_executor: jenkins
 `)
     expect(() => loadAgentOpsConfig(bad)).toThrow(/gate_executor/)
+  })
+
+  it('defaults merge_queue.gate_cache_max_entries to 200 and accepts 0 (disabled)', () => {
+    expect(loadAgentOpsConfig(tmpProject()).merge_queue.gate_cache_max_entries).toBe(200)
+    const dir = tmpProject(`
+project_name: myapp
+merge_queue:
+  gate_cache_max_entries: 0
+`)
+    expect(loadAgentOpsConfig(dir).merge_queue.gate_cache_max_entries).toBe(0)
+  })
+
+  it('rejects a negative or non-integer gate_cache_max_entries', () => {
+    const bad = tmpProject(`
+project_name: myapp
+merge_queue:
+  gate_cache_max_entries: -1
+`)
+    expect(() => loadAgentOpsConfig(bad)).toThrow(/gate_cache_max_entries/)
   })
 })
 

@@ -42,6 +42,8 @@ export type JournalEvent =
       type: 'gate_metrics'; batchId: string; seconds: number
       result: 'green' | 'red' | 'timeout'; at: string
     }
+  | { type: 'gate_cached'; batchId: string; key: string; savedSeconds: number; at: string }
+  | { type: 'full_gate_recorded'; tree: string; seconds: number; instrumented: boolean; at: string }
   // D9 bootstrap events: EVERY event carries bootstrapId (ULID) + pr + the
   // gated head SHA; bootstrap_merged additionally records the merge commit.
   | { type: 'bootstrap_intent'; bootstrapId: string; pr: number; gatedHeadSha: string; at: string }
@@ -70,6 +72,8 @@ export interface MergeQueueConfig {
   ready_label: string
   /** Who runs the post-merge/nightly full suite (spec D4′). Not read by the daemon. */
   gate_executor: 'gha-selfhosted' | 'local-poller'
+  /** D12: size cap for .mq/gate-cache.json; 0 disables the gate-result cache. */
+  gate_cache_max_entries: number
 }
 
 export function defaultMergeQueueConfig(): MergeQueueConfig {
@@ -82,5 +86,6 @@ export function defaultMergeQueueConfig(): MergeQueueConfig {
     quarantine_path: '.mq/quarantine.txt',
     ready_label: 'mq:ready',
     gate_executor: 'gha-selfhosted',
+    gate_cache_max_entries: 200,
   }
 }

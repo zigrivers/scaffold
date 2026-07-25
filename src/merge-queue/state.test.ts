@@ -57,6 +57,15 @@ describe('reduceState', () => {
     const s = reduceState([{ type: 'pr_state', pr: 9, state: 'TESTING', at: at(0) }])
     expect(s.entries.has(9)).toBe(false)
   })
+
+  it('ignores gate_cached and full_gate_recorded events (metrics-only)', () => {
+    const s = reduceState([
+      { type: 'enqueued', pr: 1, at: at(0) },
+      { type: 'gate_cached', batchId: 'b', key: 'k', savedSeconds: 60, at: at(1) },
+      { type: 'full_gate_recorded', tree: 't', seconds: 100, instrumented: false, at: at(2) },
+    ])
+    expect(s.entries.get(1)?.state).toBe('QUEUED')
+  })
 })
 
 describe('queuedPrs', () => {
