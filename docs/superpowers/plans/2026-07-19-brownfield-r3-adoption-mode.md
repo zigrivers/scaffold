@@ -332,6 +332,135 @@ These are pinned by the approved spec — do not re-litigate during implementati
 
 ### Task 3: `AssemblyMode` type + `resolveAssemblyMode()` (fresh | update | adoption)
 
+> **AMENDMENT — R1 carry-forward: LIVE conflict gate (AUTHORITATIVE; supersedes the code blocks below where they conflict).**
+> The code below decides update-eligibility from the STORED `verification` field
+> only. R1's review requires a LIVE check: a step stored as `completed +
+> declared/verified` whose reality has drifted (a declared output deleted, or its
+> `detect:` contract now failing) must NOT run update mode on a stale claim, and in
+> a brownfield/v1-migration project such a conflicted completion must route to
+> **adoption** (matching R1 apply's reopen-to-pending), else **fresh**. Reuse R1's
+> `verifyStep` (the D3 verifier) — for a stored-`completed` entry, `status ===
+> 'conflict'` (class `state-claim`) means the completion is conflicted.
+>
+> **Signature (add two options)** — apply to BOTH the Interfaces block and the impl:
+> ```ts
+> export function resolveAssemblyMode(options: {
+>   step: string
+>   state: PipelineState
+>   currentDepth: DepthLevel
+>   projectRoot: string
+>   service?: string
+>   artifactMap?: Record<string, string>
+>   expectedOutputs?: string[]   // NEW — current step outputs (frontmatter); falls back to entry.produces
+>   detect?: DetectSpec | null   // NEW — the step's detect: contract, re-evaluated live
+> }): AssemblyModeResult
+> ```
+> Add imports to `src/core/assembly/update-mode.ts` (no cycle — `completion.ts` does not import `core/assembly`):
+> ```ts
+> import { verifyStep } from '../../state/completion.js'
+> import type { DetectSpec } from '../../types/frontmatter.js'
+> ```
+>
+> **Impl delta** — replace the function-body head (the `const { … } = options` through the `updateEligible` line) with:
+> ```ts
+>   const { step, state, currentDepth, projectRoot, artifactMap } = options
+>   const detection = detectUpdateMode(options)
+>   const entry = state.steps[step]
+>   const completed = entry?.status === 'completed'
+>
+>   // R1 carry-forward (live-conflict gate): a stored completion must survive a
+>   // LIVE check before it can drive update mode OR count as a surviving
+>   // completion. A completed step whose declared outputs are gone OR whose
+>   // detect: contract now fails is conflicted (verifyStep → status 'conflict',
+>   // class 'state-claim'); its stale claim must not enter update mode, and it
+>   // routes like a reopened step — adoption in brownfield/v1, else fresh.
+>   // Gated on `completed` so the common adoption path (pending steps) never
+>   // spawns a detect: subprocess, and on `service === undefined` because R3
+>   // mapping/adoption is root-only and verifyStep does not service-prefix
+>   // outputs (a service-local completion would otherwise be a false conflict).
+>   const liveConflict =
+>     completed &&
+>     options.service === undefined &&
+>     verifyStep(
+>       step,
+>       entry,
+>       options.expectedOutputs ?? entry?.produces ?? [],
+>       options.detect ?? null,
+>       projectRoot,
+>       artifactMap,
+>     ).status === 'conflict'
+>   const completionSurvives = completed && !liveConflict
+>
+>   const verification =
+>     (entry as { verification?: 'verified' | 'declared' | 'unverified' } | undefined)
+>       ?.verification ?? 'unverified'
+>   const updateEligible =
+>     completionSurvives && (verification === 'verified' || verification === 'declared')
+> ```
+> Everything from the `update` branch through the mapped-incumbent fallback is
+> UNCHANGED (both already key off `updateEligible`). Then change the adoption
+> guard `if (!completed && (initMode === …))` to `if (!completionSurvives && (initMode === …))`.
+>
+> **Load-bearing:** `artifactMap` MUST be passed to `verifyStep` (6th arg, added in
+> Task 2) — else the existing "mapped incumbent → update" test flips to a false
+> conflict. Greenfield stays a strict no-op: a healthy completion returns
+> `confirmed_complete`, so `liveConflict` is false and behavior is identical to the
+> pre-amendment code; the gate only bites on a genuinely-broken stored claim.
+>
+> **Task 7 caller** (`src/cli/commands/run.ts`) must pass the two new inputs — both
+> already in hand as `metaPrompt.frontmatter.outputs` and `.detect`:
+> `resolveAssemblyMode({ step, state, currentDepth: depth, projectRoot, service, artifactMap: config.artifact_map, expectedOutputs: metaPrompt.frontmatter.outputs, detect: metaPrompt.frontmatter.detect ?? null })`.
+>
+> **Add these 3 tests** to the `resolveAssemblyMode` describe block:
+> ```ts
+> it('completed + declared but LIVE detect fails (output present) → adoption in brownfield', () => {
+>   fs.mkdirSync(path.join(tmpDir, 'docs'), { recursive: true })
+>   fs.writeFileSync(path.join(tmpDir, 'docs/tech-stack.md'), '# stack')
+>   const state = brownfieldState({
+>     'tech-stack': {
+>       status: 'completed', source: 'pipeline', at: '2026-07-19T00:00:00.000Z',
+>       produces: ['docs/tech-stack.md'], depth: 3, verification: 'declared',
+>     } as PipelineState['steps'][string],
+>   })
+>   const result = resolveAssemblyMode({
+>     step: 'tech-stack', state, currentDepth: 3, projectRoot: tmpDir,
+>     expectedOutputs: ['docs/tech-stack.md'], detect: { all: [{ cmd: 'exit 1' }] },
+>   })
+>   expect(result.mode).toBe('adoption')
+> })
+> it('completed + verified but LIVE detect fails → fresh in greenfield', () => {
+>   fs.mkdirSync(path.join(tmpDir, 'docs'), { recursive: true })
+>   fs.writeFileSync(path.join(tmpDir, 'docs/tech-stack.md'), '# stack')
+>   const state = makeState({
+>     'tech-stack': {
+>       status: 'completed', source: 'pipeline', at: '2026-07-19T00:00:00.000Z',
+>       produces: ['docs/tech-stack.md'], depth: 3, verification: 'verified',
+>     } as PipelineState['steps'][string],
+>   })
+>   const result = resolveAssemblyMode({
+>     step: 'tech-stack', state, currentDepth: 3, projectRoot: tmpDir,
+>     expectedOutputs: ['docs/tech-stack.md'], detect: { all: [{ cmd: 'exit 1' }] },
+>   })
+>   expect(result.mode).toBe('fresh')
+> })
+> it('completed + declared but declared output deleted → adoption in brownfield (live check routes it, not fresh)', () => {
+>   const state = brownfieldState({
+>     'tech-stack': {
+>       status: 'completed', source: 'pipeline', at: '2026-07-19T00:00:00.000Z',
+>       produces: ['docs/tech-stack.md'], depth: 3, verification: 'declared',
+>     } as PipelineState['steps'][string],
+>   })
+>   const result = resolveAssemblyMode({
+>     step: 'tech-stack', state, currentDepth: 3, projectRoot: tmpDir,
+>     expectedOutputs: ['docs/tech-stack.md'],
+>   })
+>   expect(result.mode).toBe('adoption')
+> })
+> ```
+> (`detectUpdateMode` alone catches only the "don't run update" half of a deleted
+> output; the live gate is required for the ROUTING half — else the still-`completed`
+> entry falls through to `fresh` instead of `adoption` in a brownfield project.)
+
 **Files:**
 - `src/types/assembly.ts` (add `AssemblyMode` type)
 - `src/core/assembly/update-mode.ts` (add `resolveAssemblyMode`; `detectUpdateMode` unchanged)
@@ -1099,6 +1228,13 @@ export function withAdoptionKnowledge(names: string[], mode: AssemblyMode): stri
 ---
 
 ### Task 7: Wire `scaffold run` — mode resolution, preamble, knowledge append
+
+> **AMENDMENT (see Task 3 R1 carry-forward).** The `resolveAssemblyMode(...)` call
+> here MUST also pass the step's live-check inputs — both already in hand as
+> `metaPrompt.frontmatter.outputs` and `metaPrompt.frontmatter.detect`:
+> `resolveAssemblyMode({ …, artifactMap: config.artifact_map, expectedOutputs: metaPrompt.frontmatter.outputs, detect: metaPrompt.frontmatter.detect ?? null })`.
+> Without them the live-conflict gate can't re-evaluate `detect:` and a stale
+> `declared/verified` claim would wrongly drive update mode.
 
 **Files:**
 - `src/cli/commands/run.ts`
