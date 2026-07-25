@@ -583,6 +583,34 @@ describe('MergeQueueDaemon.cycle', () => {
     expect(readJournal(h.mqDir).filter(e => e.type === 'gate_cached')).toHaveLength(0)
     expect(fs.existsSync(path.join(h.mqDir, 'gate-cache.json'))).toBe(false)
   })
+
+  it('kicks one poller pass after a green landing (D15)', async () => {
+    let kicks = 0
+    const h = harness({ triggerPoller: () => { kicks += 1 } })
+    h.enqueue(1)
+    h.enqueue(2)
+    await h.daemon.cycle()
+    expect(h.states()).toEqual({ 1: 'LANDED', 2: 'LANDED' })
+    expect(kicks).toBe(1)
+  })
+
+  it('does not kick the poller when nothing landed', async () => {
+    let kicks = 0
+    const h = harness({ triggerPoller: () => { kicks += 1 } })
+    h.enqueue(1)
+    h.gh.failMerge.add(1) // merge fails, PR not merged -> abort + rebuild, zero landed
+    await h.daemon.cycle()
+    expect(h.states()[1]).toBe('REQUEUED_SPLIT')
+    expect(kicks).toBe(0)
+  })
+
+  it('a throwing triggerPoller never breaks the landing', async () => {
+    const h = harness({ triggerPoller: () => { throw new Error('poller spawn failed') } })
+    h.enqueue(1)
+    await h.daemon.cycle()
+    expect(h.states()[1]).toBe('LANDED')
+    expect(h.daemon.paused()).toBeNull()
+  })
 })
 
 describe('MergeQueueDaemon.reconcile', () => {

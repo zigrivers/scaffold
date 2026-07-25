@@ -33,6 +33,9 @@ export interface DaemonDeps {
   /** D15 seam: wait for a journal append or the poll timeout while idle.
    *  Production default is waitForWake (fs.watch + debounce). */
   wake?: (mqDir: string, timeoutMs: number) => Promise<'journal' | 'timeout'>
+  /** D15: fire ONE post-merge poller pass right after a landing (main just
+   *  moved). Best-effort; the scheduler remains the cross-machine safety net. */
+  triggerPoller?: () => void
 }
 
 export const PAUSED_FILE = 'PAUSED'
@@ -388,8 +391,15 @@ export class MergeQueueDaemon {
 
     if (gate.result === 'green') {
       const testedHeads = new Map(prs.map(p => [p.pr, p.headSha]))
-      await this.land(batchId, applied, base, candidateTree, testedHeads)
+      const landedCount = await this.land(batchId, applied, base, candidateTree, testedHeads)
       git.deleteCandidate(batchId)
+      if (landedCount > 0) {
+        // D15: the base just moved — kick one post-merge poller pass directly
+        // instead of waiting for the scheduler. Fire-and-forget: a pause set
+        // during landing is respected by the poller itself (non-poller pauses
+        // make it skip), so kicking unconditionally on any landing is safe.
+        try { this.deps.triggerPoller?.() } catch { /* advisory only */ }
+      }
       return { kind: 'done' }
     }
 
@@ -434,7 +444,7 @@ export class MergeQueueDaemon {
     base: string,
     candidateTree: string,
     testedHeads: Map<number, string>,
-  ): Promise<void> {
+  ): Promise<number> {
     const { gh, git, mqDir, log } = this.deps
 
     // Pre-land validation (spec D9). The candidate tree was built from these exact
@@ -479,7 +489,7 @@ export class MergeQueueDaemon {
         })
       }
       log(`batch ${batchId}: ${invalidated} — requeued survivors, landed nothing`)
-      return
+      return 0
     }
 
     appendEvent(mqDir, { type: 'batch_state', batchId, state: 'GREEN', at: this.at() })
@@ -508,7 +518,7 @@ export class MergeQueueDaemon {
               note: 'sibling withdrawn during landing — rebuilding',
             })
           }
-          return
+          return 0
         }
         this.requeueUnlanded(members, i + 1, batchId, 'sibling withdrawn mid-landing — retry after review')
         this.pause(
@@ -519,7 +529,7 @@ export class MergeQueueDaemon {
           type: 'batch_state', batchId, state: 'DONE', at: this.at(),
           note: 'withdrawn mid-landing — paused',
         })
-        return
+        return landed.length
       }
       // Write-ahead: LANDING before the merge attempt; idempotent via mergedAt.
       appendEvent(mqDir, { type: 'pr_state', pr, state: 'LANDING', batchId, at: this.at() })
@@ -558,7 +568,7 @@ export class MergeQueueDaemon {
             type: 'batch_state', batchId, state: 'DONE', at: this.at(),
             note: 'indeterminate merge — paused',
           })
-          return
+          return landed.length
         }
         if (landed.length === 0) {
           // Nothing has landed yet — this is NOT a partial landing (a transient
@@ -577,7 +587,7 @@ export class MergeQueueDaemon {
               note: 'merge failed before any land — rebuilding',
             })
           }
-          return
+          return 0
         }
         // Partial landing (some PRs already merged): what landed is real and must
         // not be re-tested against a stale candidate (spec D9) — pause instead of
@@ -599,7 +609,7 @@ export class MergeQueueDaemon {
         appendEvent(mqDir, {
           type: 'batch_state', batchId, state: 'DONE', at: this.at(), note: 'partial land — paused',
         })
-        return
+        return landed.length
       }
       appendEvent(mqDir, { type: 'pr_state', pr, state: 'LANDED', batchId, at: this.at() })
       landed.push(pr)
@@ -621,10 +631,11 @@ export class MergeQueueDaemon {
       appendEvent(mqDir, {
         type: 'batch_state', batchId, state: 'DONE', at: this.at(), note: 'NRS MISMATCH — paused',
       })
-      return
+      return landed.length
     }
     appendEvent(mqDir, { type: 'batch_state', batchId, state: 'DONE', at: this.at() })
     log(`batch ${batchId}: landed ${members.length} PR(s)`)
+    return landed.length
   }
 
   /** Requeue every not-yet-terminal member from `fromIndex` on, so a paused batch

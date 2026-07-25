@@ -362,6 +362,15 @@ export async function mqHandler(argv: MqArgs, overrides: MqOverrides = {}): Prom
         if (argv.foreground) output.info(line)
       }
       const config = loadAgentOpsConfig(primary).merge_queue
+      const pollerScript = path.join(primary, 'scripts', 'ops', 'post-merge-poller.sh')
+      const triggerPoller = (): void => {
+        // Only meaningful when the local poller is the gate executor and the
+        // script is installed; its own lock serializes overlapping passes.
+        if (config.gate_executor !== 'local-poller') return
+        if (!fs.existsSync(pollerScript)) return
+        const child = spawn('bash', [pollerScript], { detached: true, stdio: 'ignore' })
+        child.unref()
+      }
       const daemon = new MergeQueueDaemon({
         gh: createGhClient(primary),
         git: createGitOps(primary),
@@ -371,6 +380,7 @@ export async function mqHandler(argv: MqArgs, overrides: MqOverrides = {}): Prom
         projectRoot: primary,
         log,
         now: () => new Date(),
+        triggerPoller,
       })
       // Graceful shutdown: kill any in-flight gate process group and release the
       // lock immediately, instead of leaking the gate and leaving the lock stale
