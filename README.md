@@ -1553,6 +1553,9 @@ You can change methodology mid-pipeline with `scaffold init --methodology <prese
 | `scaffold hooks install` | Register the Claude Code hooks (bd-guard, mq-guard, `bd prime`, review reminder) by deep-merging `.claude/settings.json` — append-only, idempotent, never clobbers a malformed file |
 | `scaffold mq bootstrap --pr <N> [--finish]` | Arm-first guided FIRST merge for a repo installing the queue in its own PR (gate on head → crash-safe journaled squash-merge → arm hooks + scheduler); `--finish` reconciles a partial run |
 | `scaffold agent-ops install --component gate` | Generate the project-owned `scripts/gate-check.sh` + `scripts/gate-check-affected.sh` seeds (the merge-queue gate contract; seeded from `package.json` + workflows) |
+| `scaffold mq release --pr <N>` | Release a `HELD_HUMAN` (overlap-zone) PR back into the queue so it lands solo-gated (D13 `overlap_zone_policy: hold`) |
+| `scaffold mq gate-cache` | Inspect the D12 gate-result cache (skips a full/affected gate when this exact tree already ran it green) |
+| `scaffold tia affected --base <ref>` | Emit the TIA-selected, most-likely-to-fail-first test list + a confidence verdict (exit 0 = run the selection, exit 3 = run the full suite; fails closed to full on any uncertainty) |
 | `scaffold skip <step> [<step2>...]` | Skip one or more steps with a reason |
 | `scaffold complete <step>` | Mark a step as completed (for steps executed outside `scaffold run`) |
 | `scaffold reset <step>` | Reset a step back to pending |
