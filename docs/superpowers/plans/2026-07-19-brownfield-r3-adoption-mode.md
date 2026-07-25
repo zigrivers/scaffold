@@ -1244,7 +1244,7 @@ export function withAdoptionKnowledge(names: string[], mode: AssemblyMode): stri
 
 **Steps:**
 
-- [ ] Write the failing integration test `src/e2e/adoption-mode.test.ts` (module-level integration mirroring run.ts's wiring — this is the contract run.ts must implement):
+- [x] Write the failing integration test `src/e2e/adoption-mode.test.ts` (module-level integration mirroring run.ts's wiring — this is the contract run.ts must implement):
 
   ```ts
   import { describe, it, expect, beforeEach, afterEach } from 'vitest'
@@ -1333,8 +1333,8 @@ export function withAdoptionKnowledge(names: string[], mode: AssemblyMode): stri
   })
   ```
 
-- [ ] Run: `npx vitest run src/e2e/adoption-mode.test.ts` — green already if Tasks 3–6 are complete (this test locks the contract); if anything fails, fix the earlier task, not the test.
-- [ ] Rewire `src/cli/commands/run.ts` (Step 6 and Step 8 regions):
+- [x] Run: `npx vitest run src/e2e/adoption-mode.test.ts` — green already if Tasks 3–6 are complete (this test locks the contract); if anything fails, fix the earlier task, not the test.
+- [x] Rewire `src/cli/commands/run.ts` (Step 6 and Step 8 regions):
   - Replace the `detectUpdateMode` import with `resolveAssemblyMode` (from the same module) and `loadAdoptionPreamble` (from `../../core/assembly/mode-loader.js`), and add `withAdoptionKnowledge` to the knowledge-loader import.
   - Replace the Step 6 detection call:
 
@@ -1386,8 +1386,8 @@ export function withAdoptionKnowledge(names: string[], mode: AssemblyMode): stri
     adoptionPreamble,
     ```
 
-- [ ] Run: `npx vitest run src/e2e/ src/core/assembly/ src/cli/` — all green. Then `make check-all` for a full sweep — expect exit 0.
-- [ ] Commit: `feat(run): wire adoption mode into scaffold run assembly (D11 read-side of init-mode)`
+- [x] Run: `npx vitest run src/e2e/ src/core/assembly/ src/cli/` — all green. Then `make check-all` for a full sweep — expect exit 0.
+- [x] Commit: `feat(run): wire adoption mode into scaffold run assembly (D11 read-side of init-mode)`
 
 ---
 
