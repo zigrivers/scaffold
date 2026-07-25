@@ -569,7 +569,7 @@ import {
 
 **Steps:**
 
-- [ ] Update `src/merge-queue/stats.test.ts`: the first test's `toEqual` object gains the new fields, and a new test covers the new counters. Updated first expectation:
+- [x] Update `src/merge-queue/stats.test.ts`: the first test's `toEqual` object gains the new fields, and a new test covers the new counters. Updated first expectation:
 
 ```ts
     expect(computeStats(events, NOW)).toEqual({
@@ -604,8 +604,8 @@ import {
   })
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/stats.test.ts` — expect FAILURE.
-- [ ] Rewrite `src/merge-queue/stats.ts` (extract the median helper; keep the `default: break` arm so future events never break stats):
+- [x] Run: `npx vitest run src/merge-queue/stats.test.ts` — expect FAILURE.
+- [x] Rewrite `src/merge-queue/stats.ts` (extract the median helper; keep the `default: break` arm so future events never break stats):
 
 ```ts
 import type { JournalEvent } from './types.js'
@@ -688,8 +688,8 @@ export function computeStats(events: JournalEvent[], now: Date): MqStats {
 }
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/stats.test.ts` — expect all pass.
-- [ ] Add the failing CLI tests to `src/cli/commands/mq.test.ts`:
+- [x] Run: `npx vitest run src/merge-queue/stats.test.ts` — expect all pass.
+- [x] Add the failing CLI tests to `src/cli/commands/mq.test.ts`:
 
 ```ts
   it('gate-cache --record-tree then --check-tree round-trips (full-gate key)', async () => {
@@ -724,8 +724,8 @@ export function computeStats(events: JournalEvent[], now: Date): MqStats {
   })
 ```
 
-- [ ] Run: `npx vitest run src/cli/commands/mq.test.ts` — expect the 3 new tests FAIL.
-- [ ] In `src/cli/commands/mq.ts`:
+- [x] Run: `npx vitest run src/cli/commands/mq.test.ts` — expect the 3 new tests FAIL.
+- [x] In `src/cli/commands/mq.ts`:
   - Extend `MqArgs`:
 
 ```ts
@@ -818,9 +818,9 @@ import {
       })
 ```
 
-- [ ] Run: `npx vitest run src/cli/commands/mq.test.ts` — expect all pass.
-- [ ] Run: `npm run check` — expect green.
-- [ ] Commit: `git add -A && git commit -m "feat(mq): gate-cache CLI action + cache/full-gate stats lines (D12)"`
+- [x] Run: `npx vitest run src/cli/commands/mq.test.ts` — expect all pass.
+- [x] Run: `npm run check` — expect green.
+- [x] Commit: `git add -A && git commit -m "feat(mq): gate-cache CLI action + cache/full-gate stats lines (D12)"`
 
 ---
 
