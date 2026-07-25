@@ -2465,11 +2465,11 @@ export function applyArtifactMappings(
 
 **Steps:**
 
-- [ ] Run the TypeScript suite: `npx vitest run` — expect 0 failures.
-- [ ] Run the full quality gates: `make check-all` — expect exit 0 (ShellCheck, frontmatter validation, full bats suite including all evals, TypeScript gates). Known-sensitive evals to watch: `knowledge-quality.bats` (the new entry must be ≥200 lines with ≥1 code block and exempted from the orphan check), `knowledge-injection.bats` (Summary ⇒ Deep Guidance pairing), `update-mode-specifics-paths.bats` (untouched UMS Detect lines), `adoption-mode-specifics.bats` (18/18).
-- [ ] If any gate fails: fix the root cause (per CLAUDE.md — no exemption-padding to silence a legitimate finding), re-run `make check-all` to green.
-- [ ] Review the full branch diff against the Global Constraints section of this plan: every constraint either implemented or explicitly N/A; grep the diff for stray `TODO`/`FIXME`/placeholder text introduced by this work: `git diff origin/main...HEAD | grep -nE "TODO|FIXME|PLACEHOLDER"` — expect no new hits from this plan's files.
-- [ ] Commit any final fixes: `test: green make check-all for brownfield R3`
+- [x] Run the TypeScript suite: `npx vitest run` — expect 0 failures.
+- [x] Run the full quality gates: `make check-all` — expect exit 0 (ShellCheck, frontmatter validation, full bats suite including all evals, TypeScript gates). Known-sensitive evals to watch: `knowledge-quality.bats` (the new entry must be ≥200 lines with ≥1 code block and exempted from the orphan check), `knowledge-injection.bats` (Summary ⇒ Deep Guidance pairing), `update-mode-specifics-paths.bats` (untouched UMS Detect lines), `adoption-mode-specifics.bats` (18/18).
+- [x] If any gate fails: fix the root cause (per CLAUDE.md — no exemption-padding to silence a legitimate finding), re-run `make check-all` to green.
+- [x] Review the full branch diff against the Global Constraints section of this plan: every constraint either implemented or explicitly N/A; grep the diff for stray `TODO`/`FIXME`/placeholder text introduced by this work: `git diff origin/main...HEAD | grep -nE "TODO|FIXME|PLACEHOLDER"` — expect no new hits from this plan's files.
+- [x] Commit any final fixes: `test: green make check-all for brownfield R3`
 
 ---
 
