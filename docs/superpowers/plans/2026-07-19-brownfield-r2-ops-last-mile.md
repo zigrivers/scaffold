@@ -3167,17 +3167,20 @@ export function planResume(
 
 ### Task 15: bootstrap engine + `scaffold mq bootstrap` CLI + mq-guard message
 
-> **Reviewer note (deferred from PR #783 review — resolve during implementation):**
-> `armHooks` runs `installHooks(primary)` PRE-merge, but the queue-installing PR
-> may itself commit `.claude/settings.json` changes — leaving primary's working
-> tree dirty so the later `git.syncPrimaryToMerge` `merge --ff-only` fails (or
-> overwrites an untracked/modified settings file). Resolve one of two ways and
-> test it: (a) treat the mq-guard hook registration as a COMMITTED gated-tree
-> asset (verify it in `verifyGatedAssets`) and drop the pre-merge `installHooks`,
-> letting it ride the merge; or (b) move `installHooks(primary)` to AFTER
-> `syncPrimaryToMerge` so it deep-merges into the already-landed settings. Add an
-> integration test where the bootstrap PR modifies `.claude/settings.json` and
-> assert primary ends clean and the guard is registered.
+> **Reviewer note — RESOLVED (impl aa1e11d6, option b).** `armHooks`
+> (`installHooks(primary)`) originally ran PRE-merge, but the queue-installing PR
+> may itself commit `.claude/settings.json` — leaving primary's tree dirty so the
+> later `git.syncPrimaryToMerge` `merge --ff-only` aborts (confirmed by git-level
+> reproduction: "Your local changes would be overwritten by merge"), throwing
+> uncaught and permanently stranding a merged-but-unarmed repo. Resolved by moving
+> `armHooks` to run INSIDE `verifyAndArm` AFTER `syncPrimaryToMerge` (deep-merging
+> into the already-synced, merge-committed settings — `installHooks` is
+> idempotent), removing the dead pre-merge `arm()` closure + its four call sites
+> (every path still reaches `verifyAndArm`), and wrapping `syncPrimaryToMerge` in a
+> try/catch that degrades any residual ff-only failure to recoverable `--finish`
+> guidance instead of an uncaught crash. Integration tests assert primary ends
+> clean + guard registered on a settings-touching PR, and that a throwing sync
+> yields `stage:'arm'` (not a throw).
 
 **Files:**
 - Modify: `src/merge-queue/bootstrap.ts` (append the engine)
@@ -3192,12 +3195,12 @@ export function planResume(
 
 **Interfaces:**
 - Produces: `GhClient.mergeCommitSha(pr): string | null`; `GitOps.checkoutDetachedInGate(sha): string`; `BootstrapDeps { gh, git, runGate, config, mqDir, projectRoot, readMergeConfig?, verifyGatedAssets?, armHooks, armSched, smokeDaemon, runDoctor, gateTargetResolves, log, now, sleep?, newId }`; `BootstrapOutcome { ok, bootstrapId, stage: 'preflight'|'arm'|'merge'|'verify'|'complete'|'aborted', messages }`; `runBootstrap(deps, { pr, finish? }): Promise<BootstrapOutcome>`; `gateTargetResolves(projectRoot, command): boolean` (exported from `src/cli/commands/mq.ts`); `mqHandler` gains an `overrides: MqOverrides = {}` second parameter (`MqOverrides { bootstrapDeps?: Partial<BootstrapDeps> }`); `MqArgs` gains `finish?: boolean`; mq action choices gain `'bootstrap'`.
-- **Two roots (D9 first-install correctness):** the PR that *installs* the queue commits its config/guard/poller/gate-scripts in the FEATURE branch — so the shared **primary** root (`git.primaryRoot()`, main worktree) does NOT yet contain them; they arrive only at merge. `runBootstrap` therefore verifies committed assets and resolves gate targets from the **gated PR tree** (the `checkoutDetachedInGate(gatedHeadSha)` checkout — where the PR's committed files live), reads the merge-queue config it will install from that tree (`readMergeConfig(gatedTree)`), and runs the full preflight gate there; the journal (`mqDir`) stays at primary and the **scheduler is armed AFTER the merge** (in the post-merge verify step, once primary has been fast-forwarded — see below). `verifyGatedAssets(gatedTree, cfg)` confirms the config, guard, and poller script are COMMITTED in the PR (they ride the merge to primary) rather than uncommitted post-gate mutations; the mq-guard **hook registration** is not a committed asset — `armHooks` installs it into primary's `.claude/settings.json` pre-merge (`installHooks(primary)`, the guard self-gates at runtime) and the closing doctor pass verifies it. After the merge, the engine fast-forwards the primary worktree to the merge commit (`git.syncPrimaryToMerge(mergeSha)`) BEFORE the post-merge scheduler arm, so `buildPostMergePollerJob(primary)` resolves against the now-landed `scripts/ops/post-merge-poller.sh` (`gh pr merge` updates only the remote — the local primary tree needs the fast-forward first). `gateTargetResolves` gains the tree root as its first arg (`(root, command)`).
+- **Two roots (D9 first-install correctness):** the PR that *installs* the queue commits its config/guard/poller/gate-scripts in the FEATURE branch — so the shared **primary** root (`git.primaryRoot()`, main worktree) does NOT yet contain them; they arrive only at merge. `runBootstrap` therefore verifies committed assets and resolves gate targets from the **gated PR tree** (the `checkoutDetachedInGate(gatedHeadSha)` checkout — where the PR's committed files live), reads the merge-queue config it will install from that tree (`readMergeConfig(gatedTree)`), and runs the full preflight gate there; the journal (`mqDir`) stays at primary and the **scheduler is armed AFTER the merge** (in the post-merge verify step, once primary has been fast-forwarded — see below). `verifyGatedAssets(gatedTree, cfg)` confirms the config, guard, and poller script are COMMITTED in the PR (they ride the merge to primary) rather than uncommitted post-gate mutations; the mq-guard **hook registration** is not a committed asset — `armHooks` installs it into primary's `.claude/settings.json` POST-merge (`installHooks(primary)`, inside `verifyAndArm` right after the fast-forward — never pre-merge, which would dirty primary and abort the ff-only sync; the guard self-gates at runtime) and the closing doctor pass verifies it. After the merge, the engine fast-forwards the primary worktree to the merge commit (`git.syncPrimaryToMerge(mergeSha)`) BEFORE arming hooks + the scheduler, so `buildPostMergePollerJob(primary)` resolves against the now-landed `scripts/ops/post-merge-poller.sh` (`gh pr merge` updates only the remote — the local primary tree needs the fast-forward first). `gateTargetResolves` gains the tree root as its first arg (`(root, command)`).
 - Consumes: Task 14's reducers/`planResume`; `installHooks` (Task 12); `pickSchedBackend` (Task 6) + `buildPostMergePollerJob` (Task 5); `runGate` (`src/merge-queue/gate.ts`); `appendEvent`/`readJournal` (`src/merge-queue/journal.ts`); `loadAgentOpsConfig`; `ulid`.
 
 **Steps:**
 
-- [ ] Add `mergeCommitSha` to `src/merge-queue/gh.ts`. In the `GhClient` interface, Edit old string:
+- [x] Add `mergeCommitSha` to `src/merge-queue/gh.ts`. In the `GhClient` interface, Edit old string:
 
 ```ts
   squashMerge(pr: number, expectedHead?: string): void
@@ -3234,7 +3237,7 @@ export function planResume(
     },
 ```
 
-- [ ] Append a self-contained coverage block to `src/merge-queue/gh.test.ts` (uses the same `MQ_GH_CMD` seam `resolveGhBin` already honors; add imports `fs`/`os`/`path` from `node:fs`/`node:os`/`node:path` and `afterEach` from vitest if the file lacks them):
+- [x] Append a self-contained coverage block to `src/merge-queue/gh.test.ts` (uses the same `MQ_GH_CMD` seam `resolveGhBin` already honors; add imports `fs`/`os`/`path` from `node:fs`/`node:os`/`node:path` and `afterEach` from vitest if the file lacks them):
 
 ```ts
 describe('mergeCommitSha (D9)', () => {
@@ -3264,7 +3267,7 @@ describe('mergeCommitSha (D9)', () => {
 })
 ```
 
-- [ ] Add `checkoutDetachedInGate` to `src/merge-queue/git.ts`. In the `GitOps` interface, Edit old string:
+- [x] Add `checkoutDetachedInGate` to `src/merge-queue/git.ts`. In the `GitOps` interface, Edit old string:
 
 ```ts
   ensureGateWorktree(): string
@@ -3329,7 +3332,7 @@ describe('mergeCommitSha (D9)', () => {
     constructCandidate(batchId, prs, base) {
 ```
 
-- [ ] Append a self-contained real-repo test to `src/merge-queue/git.test.ts` (reuse the file's existing imports; the helper below is local to the new describe block to avoid name collisions):
+- [x] Append a self-contained real-repo test to `src/merge-queue/git.test.ts` (reuse the file's existing imports; the helper below is local to the new describe block to avoid name collisions):
 
 ```ts
 describe('checkoutDetachedInGate (D9 bootstrap preflight)', () => {
@@ -3357,7 +3360,7 @@ describe('checkoutDetachedInGate (D9 bootstrap preflight)', () => {
 
   (If `git.test.ts` does not already import `execFileSync`/`fs`/`os`/`path`, add those imports at the top.)
 
-- [ ] Extend the daemon-test fakes so they still satisfy the widened interfaces. `grep -rn "implements GhClient\|implements GitOps" src tests` — as of this plan the only implementers are in `src/merge-queue/daemon.test.ts`. In `FakeGh`, add after the `squashMerge` method:
+- [x] Extend the daemon-test fakes so they still satisfy the widened interfaces. `grep -rn "implements GhClient\|implements GitOps" src tests` — as of this plan the only implementers are in `src/merge-queue/daemon.test.ts`. In `FakeGh`, add after the `squashMerge` method:
 
 ```ts
   mergeCommitSha(): string | null { return 'FAKE_MERGE_SHA' }
@@ -3372,8 +3375,8 @@ describe('checkoutDetachedInGate (D9 bootstrap preflight)', () => {
 
   (`FakeGit`'s `root` is a private constructor property — if the field is not accessible with `this.root`, mirror how `ensureGateWorktree` accesses it in that class.) If the grep surfaces other implementers (e.g. an e2e harness), give them the same one-liners.
 
-- [ ] Run: `npx vitest run src/merge-queue/gh.test.ts src/merge-queue/git.test.ts src/merge-queue/daemon.test.ts` — all green.
-- [ ] Append the failing engine tests to `src/merge-queue/bootstrap.test.ts` (add imports at the top: `import fs from 'node:fs'`, `import os from 'node:os'`, `import path from 'node:path'`, `import { runBootstrap, type BootstrapDeps } from './bootstrap.js'`, `import { appendEvent, readJournal } from './journal.js'`, `import { defaultMergeQueueConfig } from './types.js'`, `import type { GhClient, PrInfo } from './gh.js'`, `import type { CandidateResult, GitOps } from './git.js'`, `import type { GateResult } from './gate.js'`):
+- [x] Run: `npx vitest run src/merge-queue/gh.test.ts src/merge-queue/git.test.ts src/merge-queue/daemon.test.ts` — all green.
+- [x] Append the failing engine tests to `src/merge-queue/bootstrap.test.ts` (add imports at the top: `import fs from 'node:fs'`, `import os from 'node:os'`, `import path from 'node:path'`, `import { runBootstrap, type BootstrapDeps } from './bootstrap.js'`, `import { appendEvent, readJournal } from './journal.js'`, `import { defaultMergeQueueConfig } from './types.js'`, `import type { GhClient, PrInfo } from './gh.js'`, `import type { CandidateResult, GitOps } from './git.js'`, `import type { GateResult } from './gate.js'`):
 
 ```ts
 function makeGh(script: {
@@ -3642,8 +3645,8 @@ describe('runBootstrap (D9 engine)', () => {
 })
 ```
 
-- [ ] Run: `npx vitest run src/merge-queue/bootstrap.test.ts` — engine tests FAIL (`runBootstrap` not exported).
-- [ ] Append the engine to `src/merge-queue/bootstrap.ts`. Extend the imports at the top of the file to (the engine reaches the filesystem only through injected seams — `verifyGatedAssets` / `readMergeConfig` — so it imports no `fs`):
+- [x] Run: `npx vitest run src/merge-queue/bootstrap.test.ts` — engine tests FAIL (`runBootstrap` not exported).
+- [x] Append the engine to `src/merge-queue/bootstrap.ts`. Extend the imports at the top of the file to (the engine reaches the filesystem only through injected seams — `verifyGatedAssets` / `readMergeConfig` — so it imports no `fs`):
 
 ```ts
 import path from 'node:path'
@@ -3928,8 +3931,8 @@ export async function runBootstrap(
 
   Note: the `JournalEvent` import becomes type-only usage inside the reducers — keep the single `import type { JournalEvent, MergeQueueConfig } from './types.js'` line (replacing Task 14's narrower import).
 
-- [ ] Run: `npx vitest run src/merge-queue/bootstrap.test.ts` — expect 23 tests passed (12 pure + 11 engine).
-- [ ] Wire the CLI in `src/cli/commands/mq.ts`:
+- [x] Run: `npx vitest run src/merge-queue/bootstrap.test.ts` — expect 23 tests passed (12 pure + 11 engine).
+- [x] Wire the CLI in `src/cli/commands/mq.ts`:
 
   1. Extend the imports — Edit old string:
 
@@ -4164,7 +4167,7 @@ export async function mqHandler(argv: MqArgs, overrides: MqOverrides = {}): Prom
   describe: 'Local batching merge queue: enqueue PRs, run the daemon, inspect status, bootstrap the first merge',
 ```
 
-- [ ] Update + extend `src/cli/commands/mq.test.ts`. Edit the stale test title — old string:
+- [x] Update + extend `src/cli/commands/mq.test.ts`. Edit the stale test title — old string:
 
 ```ts
   it('declares the five actions', () => {
@@ -4258,8 +4261,8 @@ describe('scaffold mq bootstrap (CLI wiring)', () => {
 })
 ```
 
-- [ ] Run: `npx vitest run src/cli/commands/mq.test.ts` — all tests green (pre-existing + 4 new).
-- [ ] Update the guard message (D9: point first-time installers at `mq bootstrap`, never the env-var bypass). In `content/assets/agent-ops/merge-queue/mq-guard.sh.tmpl`, Edit old string:
+- [x] Run: `npx vitest run src/cli/commands/mq.test.ts` — all tests green (pre-existing + 4 new).
+- [x] Update the guard message (D9: point first-time installers at `mq bootstrap`, never the env-var bypass). In `content/assets/agent-ops/merge-queue/mq-guard.sh.tmpl`, Edit old string:
 
 ```
 	printf '%s\n' "mq-guard: direct 'gh pr merge' is routed through the merge queue on this project. Enqueue instead: scaffold mq enqueue --pr <N> (or: make mq-enqueue PR=<N>). The queue batch-tests against latest {{DEFAULT_BRANCH}} and lands green PRs for you; watch with: scaffold mq status." >&2
@@ -4273,7 +4276,7 @@ describe('scaffold mq bootstrap (CLI wiring)', () => {
 
   (The line is tab-indented inside the `if` block — preserve the leading tab.)
 
-- [ ] Append the guard-message test to `tests/agent-ops-merge-queue.bats` (after the `"mq-guard prints no override recipe on block"` test):
+- [x] Append the guard-message test to `tests/agent-ops-merge-queue.bats` (after the `"mq-guard prints no override recipe on block"` test):
 
 ```bash
 @test "mq-guard block message points first-time installers at mq bootstrap" {
@@ -4284,9 +4287,9 @@ describe('scaffold mq bootstrap (CLI wiring)', () => {
 }
 ```
 
-- [ ] Run: `bats tests/agent-ops-merge-queue.bats` — all `ok` (pre-existing + 1 new).
-- [ ] Run: `npx tsc --noEmit -p tsconfig.json` — expect clean.
-- [ ] Commit: `git add -A && git commit -m "feat(mq): scaffold mq bootstrap — arm-first journaled first merge + guard pointer (D9)"`
+- [x] Run: `bats tests/agent-ops-merge-queue.bats` — all `ok` (pre-existing + 1 new).
+- [x] Run: `npx tsc --noEmit -p tsconfig.json` — expect clean.
+- [x] Commit: `git add -A && git commit -m "feat(mq): scaffold mq bootstrap — arm-first journaled first merge + guard pointer (D9)"`
 
 ---
 
