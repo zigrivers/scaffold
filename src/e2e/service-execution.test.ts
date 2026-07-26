@@ -218,8 +218,8 @@ describe('service-qualified execution E2E', () => {
 
     guardSteplessCommand(config, 'api', ctx)
 
-    expect(process.exitCode).toBe(2)
-    expect(output.error).toHaveBeenCalledOnce()
+    expect(process.exitCode).toBe(1)  // guards: ValidationError, not MissingDependency
+    expect(output.fail).toHaveBeenCalledOnce()
   })
 
   // Test 3: global step rejects --service
@@ -234,8 +234,8 @@ describe('service-qualified execution E2E', () => {
 
     guardStepCommand('service-ownership-map', config, 'api', globalSteps, ctx)
 
-    expect(process.exitCode).toBe(2)
-    expect(output.error).toHaveBeenCalledOnce()
+    expect(process.exitCode).toBe(1)  // guards: ValidationError, not MissingDependency
+    expect(output.fail).toHaveBeenCalledOnce()
   })
 
   // Test 4: per-service step requires --service
@@ -249,8 +249,8 @@ describe('service-qualified execution E2E', () => {
 
     guardStepCommand('tech-stack', config, undefined, globalSteps, ctx)
 
-    expect(process.exitCode).toBe(2)
-    expect(output.error).toHaveBeenCalledOnce()
+    expect(process.exitCode).toBe(1)  // guards: ValidationError, not MissingDependency
+    expect(output.fail).toHaveBeenCalledOnce()
   })
 
   // Test 5: globalSteps set contains overlay step-override keys

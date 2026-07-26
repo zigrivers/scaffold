@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import type { MockInstance } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
@@ -43,7 +42,6 @@ import completeCommand from './complete.js'
 // ---------------------------------------------------------------------------
 
 describe('complete command', () => {
-  let exitSpy: MockInstance
   let writtenLines: string[]
   let tempDir: string
 
@@ -56,7 +54,7 @@ describe('complete command', () => {
     fs.mkdirSync(scaffoldDir)
 
     writtenLines = []
-    exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
+    vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
     vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
       writtenLines.push(String(chunk))
       return true
@@ -104,7 +102,7 @@ describe('complete command', () => {
   it('exits 1 when project root not found', async () => {
     mockFindProjectRoot.mockReturnValue(null)
     await completeCommand.handler(defaultArgv({ root: undefined }))
-    expect(exitSpy).toHaveBeenCalledWith(1)
+    expect(process.exitCode).toBe(1)
   })
 
   it('exits 2 when step not found in state', async () => {

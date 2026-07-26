@@ -76,7 +76,6 @@ function makeState(overrides: Record<string, unknown> = {}): Record<string, unkn
 // ---------------------------------------------------------------------------
 
 describe('skip command', () => {
-  let exitSpy: MockInstance
   let stdoutSpy: MockInstance
   let stderrSpy: MockInstance
   let writtenLines: string[]
@@ -89,7 +88,7 @@ describe('skip command', () => {
 
   beforeEach(() => {
     writtenLines = []
-    exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
+    vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
     stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
       writtenLines.push(String(chunk))
       return true
@@ -140,7 +139,7 @@ describe('skip command', () => {
     }
     await skipCommand.handler(argv as Parameters<typeof skipCommand.handler>[0])
 
-    expect(exitSpy).toHaveBeenCalledWith(1)
+    expect(process.exitCode).toBe(1)
   })
 
   // Test 2: Marks step as skipped successfully

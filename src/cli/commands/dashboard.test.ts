@@ -197,14 +197,16 @@ describe('dashboard command', () => {
     vi.restoreAllMocks()
   })
 
-  it('exits 1 when project root not found', async () => {
+  it('exits 1 with a parseable envelope when project root not found', async () => {
+    // Was a raw stderr line + process.exit(1), so `--format json` got a
+    // non-zero exit and empty stdout. Now routed through exitNotInitialized,
+    // which sets process.exitCode and returns rather than exiting — exiting
+    // straight after the write can truncate the envelope.
     vi.spyOn(projectRootModule, 'findProjectRoot').mockReturnValue(null)
 
-    await expect(
-      runDashboardHandler({ ...BASE_ARGV }),
-    ).rejects.toThrow('process.exit(1)')
+    await runDashboardHandler({ ...BASE_ARGV })
 
-    expect(exitSpy).toHaveBeenCalledWith(1)
+    expect(process.exitCode).toBe(1)
   })
 
   it('--json-only outputs JSON to stdout', async () => {

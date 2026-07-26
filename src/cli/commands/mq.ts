@@ -7,6 +7,7 @@ import { checkSync, lock } from 'proper-lockfile'
 import type { Argv, CommandModule } from 'yargs'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
+import { ExitCode } from '../../types/enums.js'
 import { loadAgentOpsConfig } from '../../core/agent-ops/config.js'
 import { parseShell } from '../../core/parse-shell.js'
 import { GATE_PID_FILE, MergeQueueDaemon, PAUSED_FILE } from '../../merge-queue/daemon.js'
@@ -117,8 +118,13 @@ export async function mqHandler(argv: MqArgs, overrides: MqOverrides = {}): Prom
 
   const needPr = (): number | null => {
     if (argv.pr === undefined || !Number.isInteger(argv.pr) || argv.pr < 1) {
-      output.error(`mq ${argv.action}: --pr <number> is required`)
-      process.exitCode = 1
+      output.fail([{
+        code: 'MQ_PR_REQUIRED',
+        message: `mq ${argv.action}: --pr <number> is required`,
+        exitCode: ExitCode.ValidationError,
+        recovery: `Pass --pr <number>, e.g. scaffold mq ${argv.action} --pr 123`,
+      }])
+      process.exitCode = ExitCode.ValidationError
       return null
     }
     return argv.pr
@@ -273,8 +279,13 @@ export async function mqHandler(argv: MqArgs, overrides: MqOverrides = {}): Prom
       output.success(`recorded green full gate for tree ${argv.recordTree}`)
       return
     }
-    output.error('mq gate-cache: pass --check-tree <sha> or --record-tree <sha>')
-    process.exitCode = 1
+    output.fail([{
+      code: 'MQ_GATE_CACHE_NO_TREE',
+      message: 'mq gate-cache: pass --check-tree <sha> or --record-tree <sha>',
+      exitCode: ExitCode.ValidationError,
+      recovery: 'Pass --check-tree <sha> to look a tree up, or --record-tree <sha> to record a green gate',
+    }])
+    process.exitCode = ExitCode.ValidationError
     return
   }
   case 'bootstrap': {
@@ -368,8 +379,13 @@ export async function mqHandler(argv: MqArgs, overrides: MqOverrides = {}): Prom
     if (outcome.ok) {
       output.success(`mq bootstrap: ${outcome.stage} (attempt ${outcome.bootstrapId ?? '—'})`)
     } else {
-      output.error(`mq bootstrap stopped at ${outcome.stage} — see messages above`)
-      process.exitCode = 1
+      output.fail([{
+        code: 'MQ_BOOTSTRAP_STOPPED',
+        message: `mq bootstrap stopped at ${outcome.stage} — see messages above`,
+        exitCode: ExitCode.ValidationError,
+        recovery: 'Read the stage messages above, fix the reported cause, then re-run scaffold mq bootstrap',
+      }])
+      process.exitCode = ExitCode.ValidationError
     }
     return
   }
@@ -382,8 +398,13 @@ export async function mqHandler(argv: MqArgs, overrides: MqOverrides = {}): Prom
         output.info('mq daemon already running — nothing to do')
         return
       }
-      output.error(`mq daemon: could not acquire the lock: ${String(err)}`)
-      process.exitCode = 1
+      output.fail([{
+        code: 'MQ_DAEMON_LOCK_FAILED',
+        message: `mq daemon: could not acquire the lock: ${String(err)}`,
+        exitCode: ExitCode.ValidationError,
+        recovery: 'Check for a stale .mq/daemon.lock; `scaffold mq status` reports whether a daemon is alive',
+      }])
+      process.exitCode = ExitCode.ValidationError
       return
     }
     let onSignal: (() => void) | undefined
@@ -449,8 +470,13 @@ export async function mqHandler(argv: MqArgs, overrides: MqOverrides = {}): Prom
     return
   }
   default:
-    output.error(`unknown mq action "${argv.action}"`)
-    process.exitCode = 1
+    output.fail([{
+      code: 'MQ_UNKNOWN_ACTION',
+      message: `unknown mq action "${argv.action}"`,
+      exitCode: ExitCode.ValidationError,
+      recovery: 'Valid actions: enqueue, eject, release, status, stats, gate-cache, bootstrap, daemon',
+    }])
+    process.exitCode = ExitCode.ValidationError
   }
 }
 

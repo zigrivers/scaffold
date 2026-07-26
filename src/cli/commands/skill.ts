@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
+import { ExitCode } from '../../types/enums.js'
 import {
   type SkillTarget,
   SKILL_TARGETS,
@@ -70,7 +71,6 @@ const skillCommand: CommandModule<Record<string, unknown>, SkillArgs> = {
         const { installed, skipped, errors } = installSkillsForPlatform(
           projectRoot, argv.platform as SkillPlatform, { force: argv.force },
         )
-        for (const err of errors) output.error(err)
         if (installed.length > 0) {
           output.info(`\nInstalled scaffold skills for ${argv.platform}:\n  ${installed.join('\n  ')}`)
         }
@@ -79,7 +79,15 @@ const skillCommand: CommandModule<Record<string, unknown>, SkillArgs> = {
         }
         // A failed native install must not report success.
         if (errors.length > 0) {
-          process.exit(1)
+          output.fail(errors.map(message => ({
+            code: 'SKILL_INSTALL_FAILED',
+            message,
+            exitCode: ExitCode.ValidationError,
+            recovery: 'Check the skill sources are readable, then re-run '
+              + `\`scaffold skill install --platform ${argv.platform}\``,
+          })))
+          process.exitCode = ExitCode.ValidationError
+          return
         }
         if (installed.length === 0 && skipped.length === 0) {
           output.warn('\nNo skills installed.')
@@ -97,10 +105,6 @@ const skillCommand: CommandModule<Record<string, unknown>, SkillArgs> = {
 
       const result = installAllSkills(projectRoot, { force: argv.force })
 
-      for (const err of result.errors) {
-        output.error(err)
-      }
-
       if (result.installed > 0) {
         if (result.errors.length > 0) {
           const msg = `\n${result.installed} skill(s) installed with warnings.`
@@ -113,8 +117,14 @@ const skillCommand: CommandModule<Record<string, unknown>, SkillArgs> = {
           )
         }
       } else if (result.errors.length > 0) {
-        output.warn('\nNo skills installed due to source errors.')
-        process.exit(1) // a failed install must not report success (matches --platform)
+        output.fail(result.errors.map(message => ({
+          code: 'SKILL_INSTALL_FAILED',
+          message,
+          exitCode: ExitCode.ValidationError,
+          recovery: 'Check the bundled skill sources are readable, then re-run `scaffold skill install`',
+        })))
+        process.exitCode = ExitCode.ValidationError
+        return // a failed install must not report success (matches --platform)
       } else {
         output.info('\nAll skills already installed.')
       }

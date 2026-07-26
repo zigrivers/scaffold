@@ -140,7 +140,7 @@ describe('rework command', () => {
       force: undefined,
     } as Parameters<typeof reworkCommand.handler>[0])
 
-    expect(exitSpy).toHaveBeenCalledWith(1)
+    expect(process.exitCode).toBe(1)
   })
 
   describe('--clear', () => {
@@ -234,7 +234,7 @@ describe('rework command', () => {
         force: undefined,
       } as Parameters<typeof reworkCommand.handler>[0])
 
-      expect(exitSpy).toHaveBeenCalledWith(1)
+      expect(process.exitCode).toBe(1)
     })
 
     it('outputs session status in json mode', async () => {
@@ -308,7 +308,7 @@ describe('rework command', () => {
         force: false,
       } as Parameters<typeof reworkCommand.handler>[0])
 
-      expect(exitSpy).toHaveBeenCalledWith(1)
+      expect(process.exitCode).toBe(1)
     })
 
     it('resets selected steps in state.json to pending', async () => {

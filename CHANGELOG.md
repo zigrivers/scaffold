@@ -4,6 +4,67 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.53.0] - 2026-07-26
+
+Agent-drivability follow-up — **the envelope contract is now CLI-wide**.
+Release 1 (3.51.1) made `init` and `adopt` failures parseable; the audit that
+produced it recorded that the rest of the CLI was not covered, and the 3.52.0
+notes said so explicitly rather than implying otherwise. This closes that gap
+and adds a gate so it cannot reopen.
+
+All **68** `output.error(` call sites across **21** files are converted. A
+static test now fails the build if any command reports a failure through the
+stderr-only `error()`, or hand-rolls a `PROJECT_NOT_INITIALIZED` line instead
+of using `exitNotInitialized`.
+
+### Behavior change
+
+**Service-guard failures now exit 1 (ValidationError), not 2
+(MissingDependency).** Exit 2 means "a required dependency is missing"; a
+rejected `--service` flag is a validation failure and always was. The wrong
+code was already documented as a defect for the `init --from` path
+(`user-errors.test.ts`) — this applies the same correction to the guards that
+back `run`, `skip`, `complete`, `next`, `status`, `info`, `reset`, `rework`,
+`dashboard`, and `decisions`.
+
+If you branch on exit 2 from any of those commands, branch on 1 instead. The
+failure now also carries a machine-readable `code` (`RUN_SERVICE_REQUIRED`,
+`RUN_SERVICE_NOT_FOUND`, …) — prefer that over the exit code.
+
+### Fixed
+
+- **Empty stdout on failure, across every command.** `run`, `mq`, `tia`,
+  `knowledge`, `sched`, `reset`, `skip`, `rework`, `complete`, `check`,
+  `info`, `guides`, `dashboard`, `build`, `hooks`, `skill`, `agent-ops`,
+  `validate`, and the shared guard layer reported failures to stderr only, so
+  `--format json` produced a non-zero exit with **nothing to parse**. Every one
+  now emits the standard failure envelope on stdout with a `code`, a `message`,
+  and an actionable `recovery`.
+- **Recovery strings that did not exist.** `TerminalError` makes `recovery`
+  mandatory at the type level, so converting these sites surfaced several
+  failures that had never named a fix — `REWORK_NO_PHASES` and `LOCK_HELD`
+  among them. The compiler refused the conversion until each had one.
+- **Aggregate reporters emitted one stderr line per error and then a bare exit
+  code.** `skill`, `agent-ops`, and `validate` now emit a single envelope
+  carrying every error at the terminal decision point.
+- **Commands ran on past a failed guard.** Every guard caller bailed with
+  `if (process.exitCode === 2) return`, coupling ten command files to a magic
+  number owned by the guard layer. Guards now return a boolean and callers check
+  it; a static test keeps the pattern from coming back.
+- **`knowledge` truncated its own output.** Five sites called `process.exit(1)`
+  immediately after writing, which can drop buffered stdout. They now set
+  `process.exitCode` and return.
+- **Twelve commands** printed a raw "No .scaffold/ directory found" line to
+  stderr instead of routing through `exitNotInitialized`, so
+  `PROJECT_NOT_INITIALIZED` — the single most common failure an agent hits —
+  was unparseable in exactly those places.
+
+### Known exception
+
+`scaffold tia record-due` still exits 1 with no output, by design: it is a
+predicate whose exit code *is* the answer (0 = due, 1 = not due). The CLI guide
+documents this.
+
 ## [3.52.0] - 2026-07-26
 
 Agent-drivability, Release 2 — **the contract becomes explicit**. Release 1

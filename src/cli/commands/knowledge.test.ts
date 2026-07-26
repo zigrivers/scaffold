@@ -53,6 +53,7 @@ function makeOutputMock() {
     success: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
+    fail: vi.fn(),
     info: vi.fn(),
     result: vi.fn(),
     supportsInteractivePrompts: vi.fn().mockReturnValue(false),
@@ -131,14 +132,21 @@ describe('scaffold knowledge show', () => {
   })
 
   it('exits 1 when entry not found in either location', async () => {
-    setupDefaults()
+    const outputMock = setupDefaults()
     vi.mocked(buildIndex)
       .mockReturnValueOnce(new Map())
       .mockReturnValueOnce(new Map())
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as unknown as () => never)
+    vi.spyOn(process, 'exit').mockImplementation((() => undefined) as unknown as () => never)
 
     await runCli(['knowledge', 'show', 'nonexistent'])
-    expect(exitSpy).toHaveBeenCalledWith(1)
+    // Asserts process.exitCode rather than a process.exit(1) call: exiting
+    // immediately after writing can truncate buffered stdout, which would
+    // drop the very envelope this sweep exists to emit.
+    expect(process.exitCode).toBe(1)
+    expect(outputMock.fail).toHaveBeenCalled()
+    const [[errors]] = outputMock.fail.mock.calls
+    expect(errors[0].code).toBeTruthy()
+    expect(errors[0].recovery).toBeTruthy()
   })
 })
 
@@ -227,14 +235,21 @@ describe('scaffold knowledge reset', () => {
   })
 
   it('exits 1 with warning when uncommitted changes and --auto not set', async () => {
-    setupDefaults()
+    const outputMock = setupDefaults()
     const localPath = '/fake/project/.scaffold/knowledge/api-design.md'
     vi.mocked(buildIndex).mockReturnValueOnce(new Map([['api-design', localPath]]))
     vi.mocked(execFileSync).mockReturnValue(Buffer.from(' M .scaffold/knowledge/api-design.md'))
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as unknown as () => never)
+    vi.spyOn(process, 'exit').mockImplementation((() => undefined) as unknown as () => never)
 
     await runCli(['knowledge', 'reset', 'api-design'])
-    expect(exitSpy).toHaveBeenCalledWith(1)
+    // Asserts process.exitCode rather than a process.exit(1) call: exiting
+    // immediately after writing can truncate buffered stdout, which would
+    // drop the very envelope this sweep exists to emit.
+    expect(process.exitCode).toBe(1)
+    expect(outputMock.fail).toHaveBeenCalled()
+    const [[errors]] = outputMock.fail.mock.calls
+    expect(errors[0].code).toBeTruthy()
+    expect(errors[0].recovery).toBeTruthy()
     expect(vi.mocked(fs.unlinkSync)).not.toHaveBeenCalled()
   })
 
@@ -324,27 +339,41 @@ describe('scaffold knowledge update — target resolution', () => {
   })
 
   it('exits 1 with error when target not found', async () => {
-    setupDefaults()
+    const outputMock = setupDefaults()
     vi.mocked(buildIndex).mockReturnValue(new Map())
     vi.mocked(discoverMetaPrompts).mockReturnValue(
       new Map() as Map<string, MetaPromptFile>,
     )
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as unknown as () => never)
+    vi.spyOn(process, 'exit').mockImplementation((() => undefined) as unknown as () => never)
 
     await runCli(['knowledge', 'update', 'nonexistent'])
-    expect(exitSpy).toHaveBeenCalledWith(1)
+    // Asserts process.exitCode rather than a process.exit(1) call: exiting
+    // immediately after writing can truncate buffered stdout, which would
+    // drop the very envelope this sweep exists to emit.
+    expect(process.exitCode).toBe(1)
+    expect(outputMock.fail).toHaveBeenCalled()
+    const [[errors]] = outputMock.fail.mock.calls
+    expect(errors[0].code).toBeTruthy()
+    expect(errors[0].recovery).toBeTruthy()
   })
 
   it('exits 1 when --step target is not a valid step name', async () => {
-    setupDefaults()
+    const outputMock = setupDefaults()
     vi.mocked(buildIndex).mockReturnValue(new Map())
     vi.mocked(discoverMetaPrompts).mockReturnValue(
       new Map() as Map<string, MetaPromptFile>,
     )
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as unknown as () => never)
+    vi.spyOn(process, 'exit').mockImplementation((() => undefined) as unknown as () => never)
 
     await runCli(['knowledge', 'update', 'not-a-step', '--step'])
-    expect(exitSpy).toHaveBeenCalledWith(1)
+    // Asserts process.exitCode rather than a process.exit(1) call: exiting
+    // immediately after writing can truncate buffered stdout, which would
+    // drop the very envelope this sweep exists to emit.
+    expect(process.exitCode).toBe(1)
+    expect(outputMock.fail).toHaveBeenCalled()
+    const [[errors]] = outputMock.fail.mock.calls
+    expect(errors[0].code).toBeTruthy()
+    expect(errors[0].recovery).toBeTruthy()
   })
 
   it('prefers entry name over step name when both match (without --step)', async () => {

@@ -154,6 +154,9 @@ vi.mock('../../cli/middleware/project-root.js', () => ({
 
 vi.mock('../../cli/output/context.js', () => ({
   createOutputContext: vi.fn(),
+  // run's not-initialized path now routes through the shared helper so
+  // `--format json` gets an envelope instead of a raw stderr line.
+  exitNotInitialized: vi.fn(() => { process.exitCode = 1 }),
 }))
 
 vi.mock('../../cli/output/error-display.js', () => ({
@@ -1176,13 +1179,16 @@ describe('run command handler', () => {
         expect.any(Function),
         expect.any(Function),
       )
-      expect(mockOutput.error).toHaveBeenCalledWith(
+      expect(mockOutput.fail).toHaveBeenCalledWith([
         expect.objectContaining({
           code: 'RUN_UNEXPECTED_ERROR',
           message: 'unexpected engine failure',
           exitCode: 1,
+          // Even the catch-all now names a next step; TerminalError makes that
+          // a compile-time requirement rather than a documentation promise.
+          recovery: expect.stringContaining('--verbose'),
         }),
-      )
+      ])
       expect(process.exitCode).toBe(1)
     })
   })

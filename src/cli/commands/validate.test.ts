@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import type { MockInstance } from 'vitest'
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks
@@ -55,7 +54,6 @@ function defaultArgv(overrides: Partial<ValidateArgv> = {}): ValidateArgv {
 // ---------------------------------------------------------------------------
 
 describe('validate command', () => {
-  let exitSpy: MockInstance
   let writtenLines: string[]
   let stderrLines: string[]
 
@@ -66,7 +64,7 @@ describe('validate command', () => {
   beforeEach(() => {
     writtenLines = []
     stderrLines = []
-    exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
+    vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
     vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
       writtenLines.push(String(chunk))
       return true
@@ -96,13 +94,13 @@ describe('validate command', () => {
   it('exits 1 when project root not found', async () => {
     mockFindProjectRoot.mockReturnValue(null)
     await validateCommand.handler(defaultArgv())
-    expect(exitSpy).toHaveBeenCalledWith(1)
+    expect(process.exitCode).toBe(1)
   })
 
   // Test 2: Exits 0 when all valid
   it('exits 0 when all valid', async () => {
     await validateCommand.handler(defaultArgv())
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode).toBe(0)
     const allOutput = writtenLines.join('')
     expect(allOutput).toContain('passed')
   })
@@ -123,7 +121,7 @@ describe('validate command', () => {
       totalFilesCount: 0,
     })
     await validateCommand.handler(defaultArgv())
-    expect(exitSpy).toHaveBeenCalledWith(1)
+    expect(process.exitCode).toBe(1)
   })
 
   // Test 4: JSON output has correct shape (valid, errors, warnings, scopes, files)
@@ -143,7 +141,7 @@ describe('validate command', () => {
     expect(Array.isArray(data.errors)).toBe(true)
     expect(Array.isArray(data.warnings)).toBe(true)
     expect(Array.isArray(data.scopes)).toBe(true)
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode).toBe(0)
   })
 
   // Test 5: --scope config limits validation to config scope
@@ -157,7 +155,7 @@ describe('validate command', () => {
     })
     await validateCommand.handler(defaultArgv({ scope: 'config' }))
     expect(mockRunValidation).toHaveBeenCalledWith('/fake/project', ['config'])
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode).toBe(0)
   })
 
   // Test 6: Displays errors using displayErrors (errors appear in output)
@@ -179,6 +177,6 @@ describe('validate command', () => {
     const allOutput = [...writtenLines, ...stderrLines].join('')
     // displayErrors calls output.error() which writes to stderr in interactive mode
     expect(allOutput).toContain('CONFIG_MISSING')
-    expect(exitSpy).toHaveBeenCalledWith(1)
+    expect(process.exitCode).toBe(1)
   })
 })

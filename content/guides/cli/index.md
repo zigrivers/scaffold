@@ -65,11 +65,14 @@ Two entry points: `init` for a fresh project, `adopt` for an existing codebase.
   project: writes `.scaffold/` state and config. `--force` backs up and
   reinitializes if `.scaffold/` already exists.
 - **`scaffold adopt`** (:cite[src/cli/commands/adopt.ts:168]) — bring an
-  existing project under scaffold. `--dry-run` previews without writing.
+  existing project under scaffold. It **writes nothing by default**: it renders
+  an Adoption Plan and stops. `--dry-run` is deprecated and does nothing, since
+  plan mode is already the default.
 
 ```bash
 scaffold init
-scaffold adopt --dry-run    # preview what adoption would write
+scaffold adopt                              # render the plan, write nothing
+scaffold adopt --apply --plan-key <sha256>  # execute the approved plan
 ```
 
 ## Pipeline navigation
@@ -252,9 +255,18 @@ Failure:
 }
 ```
 
-Branch on `success`. Every failure carries at least one entry in `errors`, and
-every entry carries a `recovery` string naming the flag or command that fixes
-it. `exit_code` always matches the process exit status.
+Branch on `success`. Where the envelope is emitted, it carries at least one
+entry in `errors`, every entry carries a `recovery` string naming the flag or
+command that fixes it, and `exit_code` always matches the process exit status.
+
+Coverage is CLI-wide as of v3.53.0, and a static test fails the build if a
+command reports a failure any other way.
+
+:::callout{type=note}
+**One deliberate exception.** `scaffold tia record-due` is a predicate whose
+exit code *is* the answer (0 = due, 1 = not due). It prints nothing and emits
+no envelope.
+:::
 
 ### Choosing `init` or `adopt`
 

@@ -1,7 +1,8 @@
 import type { CommandModule } from 'yargs'
 import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
-import { createOutputContext } from '../output/context.js'
+import { createOutputContext, exitNotInitialized } from '../output/context.js'
+import { ExitCode } from '../../types/enums.js'
 import { displayErrors } from '../output/error-display.js'
 import { runValidation } from '../../validation/index.js'
 import type { ValidationScope } from '../../validation/index.js'
@@ -27,11 +28,7 @@ const validateCommand: CommandModule<Record<string, unknown>, ValidateArgs> = {
   handler: async (argv) => {
     const projectRoot = argv.root ?? findProjectRoot(process.cwd())
     if (!projectRoot) {
-      process.stderr.write(
-        '✗ error [PROJECT_NOT_INITIALIZED]: No .scaffold/ directory found\n' +
-        '  Fix: Run `scaffold init` to initialize a project\n',
-      )
-      process.exit(1)
+      exitNotInitialized(argv)
       return
     }
 
@@ -67,9 +64,13 @@ const validateCommand: CommandModule<Record<string, unknown>, ValidateArgs> = {
     } else {
       if (result.errors.length > 0) {
         displayErrors(result.errors, result.warnings, output)
-        output.error(
-          `Validation failed: ${result.errors.length} error(s), ${result.warnings.length} warning(s)`,
-        )
+        output.fail([{
+          code: 'VALIDATION_FAILED',
+          message:
+            `Validation failed: ${result.errors.length} error(s), ${result.warnings.length} warning(s)`,
+          exitCode: ExitCode.ValidationError,
+          recovery: 'Fix the errors listed above; each names the file and field that failed',
+        }])
       } else {
         displayErrors([], result.warnings, output)
         output.success(
@@ -79,7 +80,7 @@ const validateCommand: CommandModule<Record<string, unknown>, ValidateArgs> = {
       }
     }
 
-    process.exit(result.errors.length > 0 ? 1 : 0)
+    process.exitCode = result.errors.length > 0 ? ExitCode.ValidationError : 0
   },
 }
 

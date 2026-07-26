@@ -3,6 +3,7 @@ import path from 'node:path'
 import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
+import { ExitCode } from '../../types/enums.js'
 import type { OutputContext } from '../output/context.js'
 import { loadConfig } from '../../config/loader.js'
 import { discoverAllMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
@@ -64,18 +65,26 @@ export async function runBuild(argv: BuildArgs, options: RunBuildOptions = {}): 
     async () => {
       const startTime = Date.now()
 
+      // The output context is built BEFORE the project-root check: that check
+      // is the most common failure an agent hits, and reporting it needs a
+      // context to report through.
+      const outputMode = resolveOutputMode(argv)
+      const output = options.output ?? createOutputContext(outputMode)
+
       // Step 1: Resolve project root
       const projectRoot = argv.root ?? findProjectRoot(process.cwd())
       if (!projectRoot) {
-        process.stderr.write(
-          '\u2717 error [PROJECT_NOT_INITIALIZED]: No .scaffold/ directory found\n' +
-      '  Fix: Run `scaffold init` to initialize a project\n',
-        )
-        return { exitCode: 1 }
+        // build returns its exit code to the caller rather than setting it,
+        // so it emits the envelope itself instead of using exitNotInitialized.
+        output.fail([{
+          code: 'PROJECT_NOT_INITIALIZED',
+          message: 'No .scaffold/ directory found',
+          exitCode: ExitCode.ValidationError,
+          recovery: 'Run `scaffold init` to initialize a project, '
+            + 'or `scaffold adopt` if the directory already has code',
+        }])
+        return { exitCode: ExitCode.ValidationError }
       }
-
-      const outputMode = resolveOutputMode(argv)
-      const output = options.output ?? createOutputContext(outputMode)
 
       // Step 2: Load config
       const { config, errors: configErrors } = loadConfig(projectRoot, [])
@@ -84,8 +93,13 @@ export async function runBuild(argv: BuildArgs, options: RunBuildOptions = {}): 
         return { exitCode: 1, errors: configErrors }
       }
       if (!config) {
-        output.error('Config not found')
-        return { exitCode: 1 }
+        output.fail([{
+          code: 'CONFIG_NOT_FOUND',
+          message: 'Config not found',
+          exitCode: ExitCode.ValidationError,
+          recovery: 'Run `scaffold init` (or `scaffold adopt`) to create .scaffold/config.yml',
+        }])
+        return { exitCode: ExitCode.ValidationError }
       }
 
       // Step 3: Discover meta-prompts from both pipeline/ and tools/ directories

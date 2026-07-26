@@ -1,7 +1,8 @@
 import type { CommandModule, Argv } from 'yargs'
 import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
-import { createOutputContext } from '../output/context.js'
+import { createOutputContext, exitNotInitialized } from '../output/context.js'
+import { ExitCode } from '../../types/enums.js'
 import { StateManager } from '../../state/state-manager.js'
 import { acquireLock, getLockPath, releaseLock } from '../../state/lock-manager.js'
 import { findClosestMatch } from '../../utils/levenshtein.js'
@@ -42,8 +43,7 @@ const completeCommand: CommandModule<Record<string, unknown>, CompleteArgs> = {
   handler: async (argv) => {
     const projectRoot = argv.root ?? findProjectRoot(process.cwd())
     if (!projectRoot) {
-      process.stderr.write('\u2717 error [PROJECT_NOT_INITIALIZED]: No .scaffold/ directory found\n')
-      process.exit(1)
+      exitNotInitialized(argv)
       return
     }
 
@@ -58,10 +58,9 @@ const completeCommand: CommandModule<Record<string, unknown>, CompleteArgs> = {
     ensureV3Migration(projectRoot, context.config, pipeline.globalSteps)
 
     // Guard check (needs globalSteps from pipeline)
-    guardStepCommand(
+    if (!guardStepCommand(
       argv.step, context.config ?? {}, service, pipeline.globalSteps, { commandName: 'complete', output },
-    )
-    if (process.exitCode === 2) return
+    )) return
 
     // Acquire lock
     const pathResolver = new StatePathResolver(projectRoot, service)
@@ -112,13 +111,13 @@ const completeCommand: CommandModule<Record<string, unknown>, CompleteArgs> = {
         const msg = suggestion
           ? `Step '${argv.step}' not found. Did you mean '${suggestion}'?`
           : `Step '${argv.step}' not found`
-        output.error({
+        output.fail([{
           code: 'DEP_TARGET_MISSING',
           message: msg,
-          exitCode: 2,
+          exitCode: ExitCode.MissingDependency,
           recovery: 'Run `scaffold list` to see available steps',
-        })
-        process.exitCode = 2
+        }])
+        process.exitCode = ExitCode.MissingDependency
         return
       }
 

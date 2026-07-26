@@ -62,6 +62,12 @@ function brownfieldRepo(): string {
   return dir
 }
 
+/** Initialize a minimal project in `dir` so post-init commands have state. */
+function initProject(dir: string): void {
+  run(['init', '--auto', '--format', 'json', '--project-type', 'cli',
+    '--cli-interactivity', 'args-only'], dir)
+}
+
 // This suite drives the COMPILED CLI, so it needs dist/. `make check-all` runs
 // `npm run build` before `npm test` (Makefile ts-check), but a bare
 // `npx vitest run` does not. Skip with a clear reason rather than failing every
@@ -119,6 +125,79 @@ describe.skipIf(!DIST_BUILT)('agent-drivability: every failure is parseable', ()
       args: ['adopt', '--auto', '--format', 'json', '--apply', '--plan-key', 'deadbeef'],
     },
     { name: 'status: not initialized', args: ['status', '--format', 'json'] },
+
+    // Tier-1 sweep. Release 2 fixed init/adopt only, so an agent that had
+    // learned "every scaffold failure is parseable JSON" was still wrong the
+    // moment it reached `run`, `mq`, `tia`, `knowledge`, or `sched` — the
+    // commands it actually spends its time in.
+    {
+      name: 'run: unknown step',
+      args: ['run', 'no-such-step', '--format', 'json'],
+      setup: initProject,
+    },
+    {
+      name: 'run: unmet dependencies',
+      args: ['run', 'implementation-plan', '--format', 'json'],
+      setup: initProject,
+    },
+    {
+      name: 'knowledge: unknown subject',
+      args: ['knowledge', 'show', 'definitely-not-a-knowledge-entry', '--format', 'json'],
+      setup: initProject,
+    },
+    {
+      name: 'tia: no map',
+      args: ['tia', 'affected', '--base', 'HEAD~99', '--format', 'json'],
+      setup: initProject,
+    },
+    {
+      name: 'mq: missing required --pr',
+      args: ['mq', 'eject', '--format', 'json'],
+      setup: initProject,
+    },
+    {
+      name: 'mq: gate-cache without a tree flag',
+      args: ['mq', 'gate-cache', '--format', 'json'],
+      setup: initProject,
+    },
+    {
+      name: 'sched: unknown job',
+      args: ['sched', 'status', 'no-such-job', '--format', 'json'],
+      setup: initProject,
+    },
+
+    // Tier-2 sweep — the lower-traffic commands. Less likely to be hit, but
+    // "less likely" is not a contract an agent can branch on.
+    {
+      name: 'reset: unknown step',
+      args: ['reset', 'no-such-step', '--format', 'json'],
+      setup: initProject,
+    },
+    {
+      name: 'skip: unknown step',
+      args: ['skip', 'no-such-step', '--format', 'json'],
+      setup: initProject,
+    },
+    {
+      name: 'complete: unknown step',
+      args: ['complete', 'no-such-step', '--format', 'json'],
+      setup: initProject,
+    },
+    {
+      name: 'guides: unknown topic',
+      args: ['guides', 'no-such-guide', '--format', 'json'],
+      setup: initProject,
+    },
+    {
+      name: 'hooks: unknown action',
+      args: ['hooks', 'no-such-action', '--format', 'json'],
+      setup: initProject,
+    },
+    { name: 'dashboard: not initialized', args: ['dashboard', '--format', 'json', '--no-open'] },
+    { name: 'build: not initialized', args: ['build', '--format', 'json'] },
+    { name: 'reset: not initialized', args: ['reset', '--format', 'json'] },
+    { name: 'skip: not initialized', args: ['skip', 'x', '--format', 'json'] },
+    { name: 'rework: not initialized', args: ['rework', '--format', 'json'] },
   ]
 
   it.each(FAILURE_CASES)('$name exits non-zero with a parseable envelope', ({ args, setup }) => {

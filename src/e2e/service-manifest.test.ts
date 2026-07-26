@@ -180,6 +180,6 @@ describe('E2E: scaffold init --from <nibble.yml>', () => {
       step: 'implementation-plan',
       $0: 'scaffold',
     } as Parameters<typeof runCommand.handler>[0])
-    expect(process.exitCode).toBe(2)
+    expect(process.exitCode).toBe(1)  // guards: ValidationError, not MissingDependency
   })
 })

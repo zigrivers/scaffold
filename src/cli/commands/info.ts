@@ -5,6 +5,7 @@ import { getPackagePipelineDir } from '../../utils/fs.js'
 import { StateManager } from '../../state/state-manager.js'
 import { loadConfig } from '../../config/loader.js'
 import { createOutputContext, exitNotInitialized } from '../output/context.js'
+import { ExitCode } from '../../types/enums.js'
 import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { findClosestMatch } from '../../utils/levenshtein.js'
@@ -55,8 +56,7 @@ const infoCommand: CommandModule<Record<string, unknown>, InfoArgs> = {
       // Trigger v2→v3 migration if needed (no globalSteps — helper loads them itself)
       ensureV3Migration(projectRoot, config)
 
-      guardSteplessCommand(config ?? {}, service, { commandName: 'info', output })
-      if (process.exitCode === 2) return
+      if (!guardSteplessCommand(config ?? {}, service, { commandName: 'info', output })) return
 
       const pathResolver = new StatePathResolver(projectRoot, service)
       const stateManager = new StateManager(
@@ -95,8 +95,7 @@ const infoCommand: CommandModule<Record<string, unknown>, InfoArgs> = {
     // Trigger v2→v3 migration if needed (no globalSteps — helper loads them itself)
     ensureV3Migration(projectRoot, stepInfoConfig)
 
-    guardSteplessCommand(stepInfoConfig ?? {}, service, { commandName: 'info', output })
-    if (process.exitCode === 2) return
+    if (!guardSteplessCommand(stepInfoConfig ?? {}, service, { commandName: 'info', output })) return
 
     const metaPrompts = discoverMetaPrompts(getPackagePipelineDir(projectRoot))
     const mp = metaPrompts.get(argv.step)
@@ -105,8 +104,13 @@ const infoCommand: CommandModule<Record<string, unknown>, InfoArgs> = {
       const msg = suggestion
         ? `Step '${argv.step}' not found. Did you mean '${suggestion}'?`
         : `Step '${argv.step}' not found`
-      output.error({ code: 'DEP_TARGET_MISSING', message: msg, exitCode: 1 })
-      process.exit(1)
+      output.fail([{
+        code: 'DEP_TARGET_MISSING',
+        message: msg,
+        exitCode: ExitCode.ValidationError,
+        recovery: 'Run `scaffold info` with no argument to list steps',
+      }])
+      process.exitCode = ExitCode.ValidationError
       return
     }
 

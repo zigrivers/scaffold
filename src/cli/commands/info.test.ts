@@ -305,7 +305,7 @@ describe('info command — step info mode', () => {
 
     expect(written).toContain('DEP_TARGET_MISSING')
     expect(written).toContain('nonexistent-step')
-    expect(exitSpy).toHaveBeenCalledWith(1)
+    expect(process.exitCode).toBe(1)
   })
 
   it('includes fuzzy match suggestion for close step names', async () => {
@@ -333,7 +333,7 @@ describe('info command — step info mode', () => {
     ].join('')
 
     expect(written).toContain('create-prd')
-    expect(exitSpy).toHaveBeenCalledWith(1)
+    expect(process.exitCode).toBe(1)
   })
 
   it('returns correct JSON shape for step info mode', async () => {

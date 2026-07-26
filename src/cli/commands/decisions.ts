@@ -49,8 +49,7 @@ const decisionsCommand: CommandModule<Record<string, unknown>, DecisionsArgs> = 
     const service = argv.service as string | undefined
     if (service) {
       const { config } = loadConfig(projectRoot, [])
-      guardSteplessCommand(config ?? {}, service, { commandName: 'decisions', output })
-      if (process.exitCode === 2) return
+      if (!guardSteplessCommand(config ?? {}, service, { commandName: 'decisions', output })) return
       ensureV3Migration(projectRoot, config)
     }
 

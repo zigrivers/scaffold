@@ -1,6 +1,7 @@
 import type { Argv, CommandModule } from 'yargs'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
+import { ExitCode } from '../../types/enums.js'
 import { pickSchedBackend } from '../../sched/platform.js'
 import { SCHED_JOBS, type JobBuildOpts } from '../../sched/jobs.js'
 import type { SchedBackend, SchedJob } from '../../sched/types.js'
@@ -29,8 +30,14 @@ export async function schedHandler(argv: SchedArgs, overrides: SchedOverrides = 
   try {
     backend = overrides.backend ?? pickSchedBackend()
   } catch (err) {
-    output.error(String(err instanceof Error ? err.message : err))
-    process.exitCode = 1
+    output.fail([{
+      code: 'SCHED_BACKEND_UNAVAILABLE',
+      message: String(err instanceof Error ? err.message : err),
+      exitCode: ExitCode.ValidationError,
+      recovery: 'Scheduling needs launchd (macOS) or systemd user timers (Linux); '
+        + 'run the job from cron or a CI schedule instead',
+    }])
+    process.exitCode = ExitCode.ValidationError
     return
   }
   const buildJob =
@@ -40,10 +47,13 @@ export async function schedHandler(argv: SchedArgs, overrides: SchedOverrides = 
   const needJob = (): string | null => {
     const name = argv.job
     if (name === undefined || SCHED_JOBS[name] === undefined) {
-      output.error(
-        `sched ${argv.action}: unknown job "${name ?? ''}" — available: ${Object.keys(SCHED_JOBS).join(', ')}`,
-      )
-      process.exitCode = 1
+      output.fail([{
+        code: 'SCHED_UNKNOWN_JOB',
+        message: `sched ${argv.action}: unknown job "${name ?? ''}"`,
+        exitCode: ExitCode.ValidationError,
+        recovery: `Use one of: ${Object.keys(SCHED_JOBS).join(', ')}`,
+      }])
+      process.exitCode = ExitCode.ValidationError
       return null
     }
     return name
@@ -57,8 +67,13 @@ export async function schedHandler(argv: SchedArgs, overrides: SchedOverrides = 
     try {
       job = buildJob(name, projectRoot, { intervalSeconds: argv.interval })
     } catch (err) {
-      output.error(String(err instanceof Error ? err.message : err))
-      process.exitCode = 1
+      output.fail([{
+        code: 'SCHED_JOB_BUILD_FAILED',
+        message: String(err instanceof Error ? err.message : err),
+        exitCode: ExitCode.ValidationError,
+        recovery: 'Check the job arguments (e.g. --interval) and that the project root is a scaffold project',
+      }])
+      process.exitCode = ExitCode.ValidationError
       return
     }
     const res = backend.install(job)
@@ -66,8 +81,13 @@ export async function schedHandler(argv: SchedArgs, overrides: SchedOverrides = 
     if (res.ok) {
       output.success(`sched: ${name} installed and verified (${backend.platform}, every ${job.intervalSeconds}s)`)
     } else {
-      output.error(`sched: ${name} install FAILED — see messages above`)
-      process.exitCode = 1
+      output.fail([{
+        code: 'SCHED_INSTALL_FAILED',
+        message: `sched: ${name} install FAILED — see messages above`,
+        exitCode: ExitCode.ValidationError,
+        recovery: 'Read the backend messages above; on macOS check `launchctl print gui/$UID` for the label',
+      }])
+      process.exitCode = ExitCode.ValidationError
     }
     return
   }
@@ -78,15 +98,25 @@ export async function schedHandler(argv: SchedArgs, overrides: SchedOverrides = 
     try {
       job = buildJob(name, projectRoot, {})
     } catch (err) {
-      output.error(String(err instanceof Error ? err.message : err))
-      process.exitCode = 1
+      output.fail([{
+        code: 'SCHED_JOB_BUILD_FAILED',
+        message: String(err instanceof Error ? err.message : err),
+        exitCode: ExitCode.ValidationError,
+        recovery: 'Check the job arguments (e.g. --interval) and that the project root is a scaffold project',
+      }])
+      process.exitCode = ExitCode.ValidationError
       return
     }
     const res = backend.uninstall(job)
     for (const m of res.messages) output.info(m)
     if (!res.ok) {
-      output.error(`sched: ${name} uninstall failed`)
-      process.exitCode = 1
+      output.fail([{
+        code: 'SCHED_UNINSTALL_FAILED',
+        message: `sched: ${name} uninstall failed`,
+        exitCode: ExitCode.ValidationError,
+        recovery: 'Read the backend messages above; the job may already be removed, or owned by another user',
+      }])
+      process.exitCode = ExitCode.ValidationError
       return
     }
     output.success(`sched: ${name} uninstalled`)
@@ -99,8 +129,13 @@ export async function schedHandler(argv: SchedArgs, overrides: SchedOverrides = 
     try {
       job = buildJob(name, projectRoot, {})
     } catch (err) {
-      output.error(String(err instanceof Error ? err.message : err))
-      process.exitCode = 1
+      output.fail([{
+        code: 'SCHED_JOB_BUILD_FAILED',
+        message: String(err instanceof Error ? err.message : err),
+        exitCode: ExitCode.ValidationError,
+        recovery: 'Check the job arguments (e.g. --interval) and that the project root is a scaffold project',
+      }])
+      process.exitCode = ExitCode.ValidationError
       return
     }
     const st = backend.status(job)
@@ -126,8 +161,13 @@ export async function schedHandler(argv: SchedArgs, overrides: SchedOverrides = 
     return
   }
   default:
-    output.error(`unknown sched action "${argv.action}"`)
-    process.exitCode = 1
+    output.fail([{
+      code: 'SCHED_UNKNOWN_ACTION',
+      message: `unknown sched action "${argv.action}"`,
+      exitCode: ExitCode.ValidationError,
+      recovery: 'Valid actions: install, uninstall, status',
+    }])
+    process.exitCode = ExitCode.ValidationError
   }
 }
 

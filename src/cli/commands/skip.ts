@@ -1,7 +1,8 @@
 import type { CommandModule, Argv } from 'yargs'
 import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
-import { createOutputContext } from '../output/context.js'
+import { createOutputContext, exitNotInitialized } from '../output/context.js'
+import { ExitCode } from '../../types/enums.js'
 import { StateManager } from '../../state/state-manager.js'
 import { acquireLock, getLockPath, releaseLock } from '../../state/lock-manager.js'
 import { shutdown } from '../shutdown.js'
@@ -54,8 +55,7 @@ const skipCommand: CommandModule<Record<string, unknown>, SkipArgs> = {
   handler: async (argv) => {
     const projectRoot = argv.root ?? findProjectRoot(process.cwd())
     if (!projectRoot) {
-      process.stderr.write('\u2717 error [PROJECT_NOT_INITIALIZED]: No .scaffold/ directory found\n')
-      process.exit(1)
+      exitNotInitialized(argv)
       return
     }
 
@@ -74,8 +74,9 @@ const skipCommand: CommandModule<Record<string, unknown>, SkipArgs> = {
     const isBatch = steps.length > 1
 
     // Guard check (needs globalSteps from pipeline)
-    guardStepCommand(steps[0], context.config ?? {}, service, pipeline.globalSteps, { commandName: 'skip', output })
-    if (process.exitCode === 2) return
+    if (!guardStepCommand(
+      steps[0], context.config ?? {}, service, pipeline.globalSteps, { commandName: 'skip', output },
+    )) return
 
     // Acquire lock
     const pathResolver = new StatePathResolver(projectRoot, service)
@@ -214,13 +215,13 @@ async function skipSingle(
     const msg = suggestion
       ? `Step '${stepSlug}' not found. Did you mean '${suggestion}'?`
       : `Step '${stepSlug}' not found`
-    output.error({
+    output.fail([{
       code: 'DEP_TARGET_MISSING',
       message: msg,
-      exitCode: 2,
+      exitCode: ExitCode.MissingDependency,
       recovery: 'Run `scaffold list` to see available steps',
-    })
-    process.exitCode = 2
+    }])
+    process.exitCode = ExitCode.MissingDependency
     return
   }
 
@@ -235,13 +236,13 @@ async function skipSingle(
   if (stepEntry.status === 'completed') {
     if (outputMode !== 'interactive') {
       if (!force) {
-        output.error({
+        output.fail([{
           code: 'PSM_INVALID_TRANSITION',
           message: `Step '${stepSlug}' is already completed`,
-          exitCode: 3,
+          exitCode: ExitCode.StateCorruption,
           recovery: 'Use --force to re-mark as skipped',
-        })
-        process.exitCode = 3
+        }])
+        process.exitCode = ExitCode.StateCorruption
         return
       }
     } else {

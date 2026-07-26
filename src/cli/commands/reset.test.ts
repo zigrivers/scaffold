@@ -116,7 +116,7 @@ describe('reset command', () => {
     }
     await resetCommand.handler(argv as Parameters<typeof resetCommand.handler>[0])
 
-    expect(exitSpy).toHaveBeenCalledWith(1)
+    expect(process.exitCode).toBe(1)
   })
 
   // Test 2: Deletes state.json when it exists
@@ -197,7 +197,7 @@ describe('reset command', () => {
     }
     await resetCommand.handler(argv as Parameters<typeof resetCommand.handler>[0])
 
-    expect(exitSpy).toHaveBeenCalledWith(1)
+    expect(process.exitCode).toBe(1)
     const allOutput = writtenLines.join('')
     expect(allOutput).toContain('RESET_CONFIRM_REQUIRED')
   })

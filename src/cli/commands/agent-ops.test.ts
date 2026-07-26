@@ -90,6 +90,10 @@ describe('agentOpsCommand.handler exit-code contract', () => {
   })
 
   async function run(args: Record<string, unknown>): Promise<number> {
+    // `install` now sets process.exitCode and returns rather than calling
+    // process.exit(), because exiting straight after writing the failure
+    // envelope can truncate buffered stdout. `check` still exits. Accept both.
+    process.exitCode = undefined
     try {
       await agentOpsCommand.handler({
         $0: 'scaffold',
@@ -101,7 +105,8 @@ describe('agentOpsCommand.handler exit-code contract', () => {
       if (e instanceof ExitSignal) return e.code
       throw e
     }
-    throw new Error('handler returned without calling process.exit')
+    if (typeof process.exitCode === 'number') return process.exitCode
+    throw new Error('handler neither exited nor set process.exitCode')
   }
 
   function combinedOutput(): string {
@@ -143,7 +148,6 @@ describe('agentOpsCommand.handler exit-code contract', () => {
   it('install with an unknown component exits 1 via AGENT_OPS_INVALID_COMPONENT', async () => {
     const code = await run({ action: 'install', component: 'nope' })
     expect(code).toBe(1)
-    expect(exitSpy).toHaveBeenCalledWith(1)
     expect(combinedOutput()).toContain('AGENT_OPS_INVALID_COMPONENT')
     expect(combinedOutput()).toContain('unknown component "nope"')
   })

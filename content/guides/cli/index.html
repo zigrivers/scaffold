@@ -1543,10 +1543,13 @@ large surface — see the <a href="../observability/index.md">Build Observabilit
 project: writes <code>.scaffold/</code> state and config. <code>--force</code> backs up and
 reinitializes if <code>.scaffold/</code> already exists.</li>
 <li><strong><code>scaffold adopt</code></strong> (<span class="fp" data-path="src/cli/commands/adopt.ts:168">src/cli/commands/adopt.ts:168</span>) — bring an
-existing project under scaffold. <code>--dry-run</code> previews without writing.</li>
+existing project under scaffold. It <strong>writes nothing by default</strong>: it renders
+an Adoption Plan and stops. <code>--dry-run</code> is deprecated and does nothing, since
+plan mode is already the default.</li>
 </ul>
 <pre><code class="language-bash">scaffold init
-scaffold adopt --dry-run    # preview what adoption would write
+scaffold adopt                              # render the plan, write nothing
+scaffold adopt --apply --plan-key &#x3C;sha256>  # execute the approved plan
 </code></pre>
 <h2 id="pipeline-navigation">Pipeline navigation</h2>
 <p>The core loop. <code>next</code> tells you what's eligible, <code>run</code> emits the assembled
@@ -1757,9 +1760,14 @@ enum agree in both directions, so a code cannot change on one side only.</p>
   "exit_code": 1
 }
 </code></pre>
-<p>Branch on <code>success</code>. Every failure carries at least one entry in <code>errors</code>, and
-every entry carries a <code>recovery</code> string naming the flag or command that fixes
-it. <code>exit_code</code> always matches the process exit status.</p>
+<p>Branch on <code>success</code>. Where the envelope is emitted, it carries at least one
+entry in <code>errors</code>, every entry carries a <code>recovery</code> string naming the flag or
+command that fixes it, and <code>exit_code</code> always matches the process exit status.</p>
+<p>Coverage is CLI-wide as of v3.53.0, and a static test fails the build if a
+command reports a failure any other way.</p>
+<div class="callout callout-note"><p><strong>One deliberate exception.</strong> <code>scaffold tia record-due</code> is a predicate whose
+exit code <em>is</em> the answer (0 = due, 1 = not due). It prints nothing and emits
+no envelope.</p></div>
 <h3 id="choosing-init-or-adopt">Choosing <code>init</code> or <code>adopt</code></h3>
 <p>Run <code>scaffold adopt</code> when the directory already contains source code or docs.
 It initializes <code>.scaffold/</code> itself and selects the <code>brownfield</code> methodology, so

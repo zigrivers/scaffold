@@ -1,14 +1,36 @@
 import {
   ServiceRequiredError, ServiceRejectedError,
   ServiceNotFoundError, ServiceFlagWithoutServicesError,
-  MultiServiceOverlayMissingError,
+  MultiServiceOverlayMissingError, MultiServiceNotSupportedError,
+  toScaffoldError,
 } from '../utils/user-errors.js'
+import type { ScaffoldUserError } from '../utils/user-errors.js'
 import type { ScaffoldConfig } from '../types/index.js'
 import type { OutputContext } from './output/context.js'
 
 export interface GuardContext {
   commandName: string
-  output: Pick<OutputContext, 'error' | 'result' | 'warn'>
+  output: Pick<OutputContext, 'error' | 'fail' | 'result' | 'warn'>
+}
+
+/**
+ * Report a guard failure through the output envelope and set the exit code.
+ *
+ * Guards used to call `output.error(err.message)` — stderr only — and then set
+ * exit 2. That threw away the error's code and recovery, left `--format json`
+ * with a non-zero exit and EMPTY stdout, and used MissingDependency (2) for
+ * what is plainly a validation failure. Because these guards back
+ * run/skip/complete/next/status, every one of those commands inherited it.
+ *
+ * `toScaffoldError` supplies the code, the recovery, and ExitCode.ValidationError
+ * from the single mapping in USER_ERROR_CODES, so the guard layer cannot drift
+ * from the rest of the CLI.
+ */
+function failGuard(ctx: GuardContext, err: ScaffoldUserError): false {
+  const scaffoldError = toScaffoldError(err)
+  ctx.output.fail([scaffoldError])
+  process.exitCode = scaffoldError.exitCode
+  return false
 }
 
 /** Guard for step-targeting commands (run, skip, complete). */
@@ -18,48 +40,34 @@ export function guardStepCommand(
   service: string | undefined,
   globalSteps: Set<string>,
   ctx: GuardContext,
-): void {
+): boolean {
   const services = config?.project?.services
   const hasServices = services && services.length > 0
 
   // Fail-fast: multi-service without overlay → empty globalSteps
   if (hasServices && globalSteps.size === 0) {
-    const err = new MultiServiceOverlayMissingError()
-    ctx.output.error(err.message)
-    process.exitCode = 2
-    return
+    return failGuard(ctx, new MultiServiceOverlayMissingError())
   }
 
   if (service && !hasServices) {
-    const err = new ServiceFlagWithoutServicesError()
-    ctx.output.error(err.message)
-    process.exitCode = 2
-    return
+    return failGuard(ctx, new ServiceFlagWithoutServicesError())
   }
 
   if (hasServices && !globalSteps.has(step) && !service) {
-    const err = new ServiceRequiredError(step)
-    ctx.output.error(err.message)
-    process.exitCode = 2
-    return
+    return failGuard(ctx, new ServiceRequiredError(step))
   }
 
   if (hasServices && globalSteps.has(step) && service) {
-    const err = new ServiceRejectedError(step)
-    ctx.output.error(err.message)
-    process.exitCode = 2
-    return
+    return failGuard(ctx, new ServiceRejectedError(step))
   }
 
   if (service && hasServices) {
     const found = services!.some((s: { name: string }) => s.name === service)
     if (!found) {
-      const err = new ServiceNotFoundError(service)
-      ctx.output.error(err.message)
-      process.exitCode = 2
-      return
+      return failGuard(ctx, new ServiceNotFoundError(service))
     }
   }
+  return true
 }
 
 /** Guard for step-less commands (next, status, dashboard, info, decisions). */
@@ -67,23 +75,18 @@ export function guardSteplessCommand(
   config: Partial<ScaffoldConfig>,
   service: string | undefined,
   ctx: GuardContext,
-): void {
+): boolean {
   if (service) {
     const services = config?.project?.services
     if (!services || services.length === 0) {
-      const err = new ServiceFlagWithoutServicesError()
-      ctx.output.error(err.message)
-      process.exitCode = 2
-      return
+      return failGuard(ctx, new ServiceFlagWithoutServicesError())
     }
     const found = services.some((s: { name: string }) => s.name === service)
     if (!found) {
-      const err = new ServiceNotFoundError(service)
-      ctx.output.error(err.message)
-      process.exitCode = 2
-      return
+      return failGuard(ctx, new ServiceNotFoundError(service))
     }
   }
+  return true
 }
 
 // Backward compat — keep old function during transition
@@ -91,13 +94,13 @@ export function guardSteplessCommand(
 export function assertSingleServiceOrExit(
   config: Partial<ScaffoldConfig>,
   ctx: GuardContext,
-): void {
+): boolean {
   const services = config?.project?.services
   if (services && services.length > 0) {
-    ctx.output.error(
-      'Multi-service projects are not yet executable. '
-      + `"scaffold ${ctx.commandName}" on a config with services[] lands in Wave 2.`,
-    )
-    process.exitCode = 2
+    // The inline string this replaced was character-for-character the message
+    // MultiServiceNotSupportedError already produces; using the class gets the
+    // code and recovery for free rather than duplicating the wording.
+    return failGuard(ctx, new MultiServiceNotSupportedError(ctx.commandName))
   }
+  return true
 }

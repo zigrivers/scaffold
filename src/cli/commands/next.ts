@@ -59,8 +59,7 @@ const nextCommand: CommandModule<Record<string, unknown>, NextArgs> = {
     ensureV3Migration(projectRoot, context.config, pipeline.globalSteps)
 
     // Guard check
-    guardSteplessCommand(context.config ?? {}, service, { commandName: 'next', output })
-    if (process.exitCode === 2) return
+    if (!guardSteplessCommand(context.config ?? {}, service, { commandName: 'next', output })) return
 
     const pathResolver = new StatePathResolver(projectRoot, service)
     const stateManager = new StateManager(
