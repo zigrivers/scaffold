@@ -235,6 +235,23 @@ describe('adopt failure envelope (Task 13)', () => {
     expect(parsed.errors[0].recovery).toBeTruthy()
   }, 60_000)
 
+  it('reports an exit_code in the envelope that matches the process status', () => {
+    // The envelope's exit_code and the process status must agree. They can
+    // diverge whenever a site hardcodes a constant instead of reading the
+    // code off the error it just emitted: asScaffoldError passes an
+    // already-formed ScaffoldError through untouched, so its exitCode is not
+    // always ValidationError.
+    for (const args of [
+      ['adopt', '--auto', '--format', 'json', '--apply'],
+      ['adopt', '--auto', '--format', 'json', '--apply', '--plan-key', 'deadbeef'],
+    ]) {
+      const r = run(args, brownfieldRepo())
+      expect(r.code, `${args.join(' ')} should fail`).not.toBe(0)
+      const parsed = JSON.parse(r.stdout)
+      expect(parsed.exit_code, `${args.join(' ')} envelope vs process status`).toBe(r.code)
+    }
+  }, 60_000)
+
   // Static gate: the e2e cases above reach only two of the ten converted
   // sites, so this guards the rest against silently reverting to output.error.
   it('has converted every terminal-failure site in adopt.ts', () => {

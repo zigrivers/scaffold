@@ -114,6 +114,22 @@ project:
  * carry an optional recovery, so this fills the gap without overwriting one
  * that was already set.
  */
+/**
+ * Pick a fallback recovery that fits the error, for the catch-all sites that
+ * map over a whole error array.
+ *
+ * A blanket "re-run with --project-type" would be stapled onto config-parse
+ * and filesystem failures too, pointing the reader at an unrelated flag. Only
+ * the detection-family codes get that hint; everything else gets a truthful
+ * generic one.
+ */
+function genericRecovery(e: ScaffoldError): string {
+  if (e.code.startsWith('ADOPT_AMBIGUOUS') || e.code.includes('PROJECT_TYPE')) {
+    return 'Re-run with --project-type <type> to choose explicitly'
+  }
+  return 'See the message above; re-run with --verbose for more detail'
+}
+
 function withRecovery(e: ScaffoldError, fallback: string): TerminalError {
   return { ...e, recovery: e.recovery ?? fallback }
 }
@@ -545,11 +561,16 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
         flagOverrides: buildFlagOverrides(argv as Record<string, unknown>),
       })
     } catch (err) {
-      output.fail([withRecovery(
+      // asScaffoldError returns an already-formed ScaffoldError untouched
+      // (utils/errors.ts:363-368), so it can carry a non-validation exitCode.
+      // Bind it and read the code FROM it: hardcoding a constant here would
+      // make the envelope's exit_code disagree with the process status.
+      const terminal = withRecovery(
         asScaffoldError(err, 'ADOPT_INTERNAL', ExitCode.ValidationError),
         'Re-run with --verbose for detail; if it persists, this is a bug worth reporting',
-      )])
-      process.exitCode = ExitCode.ValidationError
+      )
+      output.fail([terminal])
+      process.exitCode = terminal.exitCode
       return
     }
 
@@ -560,8 +581,7 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
 
     // Check for errors
     if (adoptResult.errors.length > 0) {
-      output.fail(adoptResult.errors.map(e => withRecovery(
-        e, 'Re-run with --project-type <type> to resolve, or see the message above')))
+      output.fail(adoptResult.errors.map(e => withRecovery(e, genericRecovery(e))))
       process.exitCode = adoptResult.errors[0].exitCode
       return
     }
@@ -570,8 +590,7 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
     const includes = (argv.include as string[] | undefined) ?? []
     const { plan, errors: planErrors } = buildAdoptionPlan({ projectRoot, adoptResult, includes })
     if (planErrors.length > 0) {
-      output.fail(planErrors.map(e => withRecovery(
-        e, 'Correct the reported step or include and re-render the plan')))
+      output.fail(planErrors.map(e => withRecovery(e, genericRecovery(e))))
       process.exitCode = planErrors[0].exitCode
       return
     }
@@ -654,19 +673,19 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
             flagOverrides: buildFlagOverrides(argv as Record<string, unknown>),
           })
         } catch (err) {
-          output.fail([withRecovery(
+          const terminal = withRecovery(
             asScaffoldError(err, 'ADOPT_INTERNAL', ExitCode.ValidationError),
             'Re-run with --verbose for detail; if it persists, this is a bug worth reporting',
-          )])
-          process.exitCode = ExitCode.ValidationError
+          )
+          output.fail([terminal])
+          process.exitCode = terminal.exitCode
           return
         }
         const { plan: livePlan, errors: liveErrors } = buildAdoptionPlan({
           projectRoot, adoptResult: liveAdopt, includes,
         })
         if (liveErrors.length > 0) {
-          output.fail(liveErrors.map(e => withRecovery(
-            e, 'Correct the reported step or include and re-render the plan')))
+          output.fail(liveErrors.map(e => withRecovery(e, genericRecovery(e))))
           process.exitCode = liveErrors[0].exitCode
           return
         }
