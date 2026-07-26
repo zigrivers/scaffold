@@ -4,7 +4,7 @@ import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
 import { getPackagePipelineDir } from '../../utils/fs.js'
 import { StateManager } from '../../state/state-manager.js'
 import { loadConfig } from '../../config/loader.js'
-import { createOutputContext } from '../output/context.js'
+import { createOutputContext, exitNotInitialized } from '../output/context.js'
 import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { findClosestMatch } from '../../utils/levenshtein.js'
@@ -39,11 +39,7 @@ const infoCommand: CommandModule<Record<string, unknown>, InfoArgs> = {
   handler: async (argv) => {
     const projectRoot = argv.root ?? findProjectRoot(process.cwd())
     if (!projectRoot) {
-      process.stderr.write(
-        '✗ error [PROJECT_NOT_INITIALIZED]: No .scaffold/ directory found\n' +
-        '  Fix: Run `scaffold init` to initialize a project\n',
-      )
-      process.exit(1)
+      exitNotInitialized(argv)
       return
     }
 

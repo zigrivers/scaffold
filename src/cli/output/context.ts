@@ -80,3 +80,28 @@ export function createOutputContext(mode: OutputMode): OutputContext {
     return new InteractiveOutput()
   }
 }
+
+/**
+ * Emit the "no .scaffold/ here" failure through the envelope and exit.
+ *
+ * Five sites reported this by writing to stderr and calling process.exit()
+ * BEFORE any output context existed, so `--format json` produced a non-zero
+ * exit with empty stdout. It is the single most common failure an agent hits
+ * (running any command outside a project), which made it the worst one to
+ * leave unparseable.
+ *
+ * Returns `never`; callers may still `return` after it for clarity.
+ */
+export function exitNotInitialized(argv: { format?: string; auto?: boolean }): never {
+  const output = createOutputContext(
+    argv.format === 'json' ? 'json' : 'auto',
+  )
+  output.fail([{
+    code: 'PROJECT_NOT_INITIALIZED',
+    message: 'No .scaffold/ directory found',
+    exitCode: 1,
+    recovery: 'Run `scaffold init` to initialize a project, '
+      + 'or `scaffold adopt` if the directory already has code',
+  } as never])
+  process.exit(1)
+}
