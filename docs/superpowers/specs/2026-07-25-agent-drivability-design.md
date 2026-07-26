@@ -2390,3 +2390,50 @@ Acceptance criterion 2 ("never exits non-zero with empty stdout under `--format 
    `requiresArg: true` is sufficient and does not regress the ordinary path. The `runCli` argv-normalization fallback is not needed.
 2. Task 6 Step 3b normalizes `argv.auto` for **all** non-interactive modes, which means `scaffold init --format json` in a TTY now also requires a discriminator. That is intended and consistent (JsonOutput never prompts, so it was already silently defaulting), but it widens the breaking surface slightly beyond the non-TTY case. It belongs in the same CHANGELOG entry.
 3. ~~Task 13's "convert every site" was unbounded.~~ **Resolved by surveying the file before implementation.** The ten call sites are enumerated in Task 13 Step 3 with their current exit codes, and the step carries a mechanical completion check (`output.error(` count must reach 0, `output.fail(` must reach 10). The survey also caught two things a bulk edit would have broken: line 612 carries `ExitCode.StateCorruption` (3) rather than 1, and three sites are loops whose per-error exit codes must survive, so those pass their whole array to a single `fail()` call.
+
+---
+
+## Addendum: what actually shipped
+
+Written after the work landed as v3.51.1 and v3.52.0, so this document stays a
+record of what happened rather than only what was planned. Every item below is
+a place implementation contradicted the plan, and each was found by running
+code, not by reviewing this document — which had four review rounds of its own.
+
+**The Task 6 fix as specified would have changed nothing.** The plan had
+`resolveOutputMode` return `auto` for a non-TTY, and Step 3b normalizing
+`argv.auto` in `createOutputModeMiddleware`. But that middleware **is not
+wired into the CLI at all** — commands call `resolveOutputMode` directly. The
+guards read `options.auto`, which `init.ts` filled from the raw flag, so a
+piped run would have kept inventing configs while merely printing differently.
+The real fix was deriving `effectiveAuto` inside `init.ts`, mirroring what
+`adopt.ts:561` already did. That asymmetry was the actual bug.
+
+**The test-fake blast radius was 3x the estimate.** Task 1 predicted 4 files
+with an explicit `: OutputContext` annotation. Reality: **135 `tsc` errors
+across 13 files / 14 fakes**, because most fakes are bare object literals
+checked structurally at the call site, with no annotation to grep for.
+
+**Task 13 did not exist in the first draft.** Nothing routed `adopt` into the
+envelope, so the acceptance test's brownfield cases could not have passed. Added
+after review round 1.
+
+**The release boundary was re-cut.** The original split put Task 10 in
+Release 1, documenting an auto-flag table Release 1 did not ship, and Task 5
+referenced Release 2 symbols so Unit A could not compile.
+
+**`withRecovery` moved to `src/utils/errors.ts`.** It was defined privately in
+`adopt.ts` while `init.ts` kept its own spread-based copy — which reintroduced
+the non-enumerable-`message` bug one file from the comment warning about it.
+Duplication was the cause, so de-duplication was the fix.
+
+**`exitNotInitialized()` is not in this plan.** The acceptance test failed on
+`status --format json` outside a project, and tracing it found the same shape
+in `next`, `doctor` and `info`: all four reported before any output context
+existed, and `doctor` used exit 2. This is the most common failure an agent
+hits and no task covered it.
+
+The pattern worth keeping: **this document was reviewed four times and still
+specified a no-op fix, an uncompilable release split, a missing task, and a
+blast radius off by 3x.** Reviewing prose about code is not a substitute for
+running it.
