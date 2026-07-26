@@ -17,6 +17,15 @@
 - Node >= 18.17.0 (`package.json:34`, `engines.node`).
 - Every exit code must be a member of `ExitCode` in `src/types/enums.ts:17-25`. No new enum members without updating the published table (enforced by Task 9's bats gate).
 - Every user-facing failure must be a `ScaffoldError` (`src/types/errors.ts:4-15`): `code` in SCREAMING_SNAKE prefixed by command (`INIT_`, `ADOPT_`), `message`, `exitCode`, and a `recovery` string that names the exact flag or command that fixes it.
+- **The `fail()` call convention.** Every terminal failure path uses exactly this shape, and no task may deviate:
+
+  ```typescript
+  output.fail(errors)                                     // array, so per-error exit codes survive
+  process.exitCode = errors[0]?.exitCode ?? ExitCode.ValidationError
+  return
+  ```
+
+  Never `process.exit()`, never a hardcoded literal after `fail()`, and never discard `ScaffoldError.exitCode` in favour of a constant. Discarding it is precisely the bug at `src/cli/commands/init.ts:790` that this plan exists to fix, and it would be trivial to reintroduce at a new call site. Where a site's exit code is genuinely fixed and not carried by the error (adopt's lock path, which is `ExitCode.StateCorruption`), pass it explicitly as `fail()`'s second argument rather than assigning it afterwards.
 - Reuse existing conventions. Do not introduce a parallel error object, a parallel envelope key, or a second exit-code scheme. The envelope keys `success`, `data`, `errors`, `warnings`, `exit_code` are already emitted by `src/cli/output/json.ts:45-51` and must keep those names.
 - Flag-family constants live in `src/cli/init-flag-families.ts`, which is already shared by `init` and `adopt` (per its own header comment at lines 1-11). New shared flag data belongs there, not in a new module.
 - Guides: markdown under `content/guides/<topic>/index.md` is the source of truth. After editing, regenerate with `scaffold guides --build`. CI enforces freshness via `make guides-check` and `scripts/check-guides-drift.sh` (job "Guides drift + security gate", `.github/workflows/ci.yml:39`).
@@ -60,7 +69,12 @@ Today `scaffold init --auto --project-type web-app` fails demanding `--web-rende
 
 **Decision: A, approved 2026-07-25.** The repo has direct precedent. In v3.48.0 `scaffold adopt` changed from write-on-run to plan-first, and the shipped warning calls the previous behavior "a defect" (`src/cli/commands/adopt.ts:710`). The same reasoning applies here: silently answering a question nobody asked is a defect, not an interface. Option B's breadcrumb is still worth having and is folded into Task 6, because `AutoOutput` delegates its prompts to `InteractiveOutput`. Migration is self-documenting: the new failure names the exact flag to add, so a broken script's error message is also its fix. An escape-hatch environment variable was considered and rejected as new surface that would have to be supported indefinitely.
 
-Because this is the plan's only breaking behavior change, it carries two obligations that Task 6 and the release checklist must honor: a CHANGELOG entry under "Behavior change" naming the exact commands whose exit status changes, and a minor version bump rather than a patch.
+Because this is the plan's only breaking behavior change, it carries two obligations that Task 6 and the release checklist must honor: a minor version bump rather than a patch, and a CHANGELOG entry under "Behavior change" that names **both** affected cases. Documenting only the first is the likely mistake, because the decision is framed as "non-TTY":
+
+1. **Non-TTY without `--auto`.** `scaffold init --project-type web-app < /dev/null` exits 1 instead of writing `renderingStrategy: spa`.
+2. **Any non-prompting mode, including `--format json` in a real TTY.** Step 3b normalizes `argv.auto` for every mode that is not `interactive`, so `scaffold init --format json --project-type web-app` now also requires `--web-rendering`.
+
+The second is intended and consistent: `JsonOutput` never prompts, so it was already silently defaulting and had the same defect. But it widens the break beyond what "non-TTY" suggests, so it needs its own CHANGELOG line and its own e2e case (Task 12, "requires a discriminator under --format json even in a TTY").
 
 ### D2 (F4): shape of the failure envelope
 
@@ -529,6 +543,26 @@ describe('auto-mode discriminator enforcement', () => {
       expect(se.message).toContain(`--${flag}`)
       expect(se.recovery).toContain(`--${flag}`)
     })
+  })
+
+  // The other half of the table. Without this, a bug that made requireAutoFlag
+  // throw on a null entry would pass every test above while breaking auto mode
+  // for game, browser-extension, macos-native, data-science and web3.
+  const defaultable = Object.entries(AUTO_REQUIRED_FLAG)
+    .filter(entry => entry[1] === null)
+    .map(([projectType]) => projectType)
+
+  it('covers every project type across the two groups', () => {
+    expect(required.length).toBe(9)
+    expect(defaultable.length).toBe(5)
+    expect(required.length + defaultable.length).toBe(ProjectTypeSchema.options.length)
+  })
+
+  it.each(defaultable)('does not demand any flag for %s', async (projectType) => {
+    const output = createOutputContext('auto')
+    await expect(
+      askWizardQuestions({ auto: true, projectType, output } as never),
+    ).resolves.toBeDefined()
   })
 })
 ```
@@ -1904,6 +1938,18 @@ describe('agent-drivability: path (a) new project', () => {
     expect(parsed.success).toBe(false)
     expect(parsed.errors[0].code).toBe('CLI_ARGUMENT_ERROR')
   })
+
+  it('requires a discriminator under --format json even in a TTY', () => {
+    // The second, easier-to-miss half of the D1 break. argv.auto is normalized
+    // for every non-interactive mode, not just non-TTY, because JsonOutput
+    // never prompts and was silently defaulting too. Asserted separately so a
+    // regression here cannot hide behind the non-TTY case passing.
+    const dir = tmpRepo()
+    const r = run(['init', '--format', 'json', '--project-type', 'web-app'], dir)
+    expect(r.code).toBe(1)
+    expect(JSON.parse(r.stdout).errors[0].code).toBe('INIT_AUTO_FLAG_REQUIRED')
+    expect(fs.existsSync(path.join(dir, '.scaffold', 'config.yml'))).toBe(false)
+  })
 })
 
 describe('agent-drivability: path (b) brownfield', () => {
@@ -2067,7 +2113,16 @@ A third gap the review caught: nothing routed **adopt** into the envelope, so Ta
 
 ### Shipping order
 
-- **Release 1 (patch, `v3.51.1`, no breaking change):** Units A, D1, E — Tasks 1, 5, 9, 11, 13. Closes F5, F6, F9, gaps 06, 07, and the adopt and wizard halves of F4/gap 01. Every failure path an agent hits on `adopt`, and the wizard path on `init`, becomes parseable.
+- **Release 1 (patch, `v3.51.1`, no breaking change):** Units A, D1, E — Tasks 1, 5, 9, 11, 13. Closes F5, F6, F9, gaps 06, 07, and **part of** F4/gap 01.
+
+  Release 1 must not be described as closing F4. What it actually delivers: all ten `adopt` failure paths, the `init` wizard path, and yargs argument errors become parseable. What it does **not** deliver, and which must appear in the release notes rather than being discovered by an agent:
+
+  | Still unparseable after Release 1 | Why | Fixed by |
+  |---|---|---|
+  | `init --from` error paths (bad YAML, unreadable path, already-initialized) | Task 5 leaves the `init.ts` catch untouched | Task 8, Release 2 |
+  | Those same paths' exit code (2, meaning `MissingDependency`) | same | Task 8, Release 2 |
+
+  Release-note wording must say "parseable failures on `adopt` and the `init` wizard path" and not "parseable failures", because the difference is exactly what an agent would trip over.
 - **Release 2 (minor, `v3.52.0`, one breaking behavior change):** Units B, C, D2, F — Tasks 2, 3, 4, 6, 7, 8, 10, 12. Closes F1, F2, F3, F7, F8, gaps 02, 03, 04, 05, 08, and completes F4/gap 01 on the `--from` path. One CHANGELOG entry under "Behavior change" covers Tasks 6, 7 and 8, following the v3.48.0 `scaffold adopt` precedent.
 
 Acceptance criterion 2 ("never exits non-zero with empty stdout under `--format json`") is only fully true at Release 2, because the `--from` path's `catch` is rewritten by Task 8. This is why Task 12 ships in Release 2 rather than gating Release 1.
