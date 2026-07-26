@@ -14,6 +14,7 @@ export const DEFAULT_CONFIG: MmrConfigParsed = {
   // their own .mmr.yaml.
   defaults: {
     fix_threshold: 'P2',
+    min_completed_channels: 2,
     timeout: 300,
     format: 'json',
     parallel: true,

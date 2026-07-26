@@ -41,7 +41,10 @@ describe('runResultsPipeline — ack integration (T2-D)', () => {
     }, 'project')
 
     const store = new JobStore(tmpJobs)
-    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['claude'] })
+    // Floor 1: this fixture is about ack suppression, not about quorum.
+    const job = store.createJob({
+      fix_threshold: 'P2', format: 'json', channels: ['claude'], min_completed_channels: 1,
+    })
     store.updateChannel(job.job_id, 'claude', {
       status: 'completed',
       started_at: '2026-05-22T00:00:00Z',

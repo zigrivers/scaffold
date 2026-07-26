@@ -16,7 +16,12 @@ describe('formatText', () => {
       metadata: { channels_dispatched: 1, channels_completed: 1, channels_partial: 0, total_elapsed: '30s' },
     }
     const output = formatText(results)
-    expect(output).toContain('PASSED')
+    const headline = output.split('\n')[0] ?? ''
+    expect(headline).toContain('PASSED')
+    // `toContain('PASSED')` alone also matches "PASSED (DEGRADED — 1/2
+    // channels)", so a clean pass would look identical to a degraded one to
+    // this assertion. Pin the absence of the suffix explicitly.
+    expect(headline).not.toContain('DEGRADED')
     expect(output).toContain('mmr-abc123')
   })
 
@@ -46,7 +51,11 @@ describe('formatText', () => {
     expect(output).toContain('Bug found')
   })
 
-  it('displays PASSED for degraded-pass verdict', () => {
+  it('marks a degraded-pass as degraded in the headline, not a bare PASSED', () => {
+    // The headline used to render `degraded-pass` as the literal string
+    // "PASSED" — identical to a clean pass — with the participation buried
+    // on the next line as "Channels: 3/6". A reader scanning the first line
+    // could not tell a 6-of-6 review from a 3-of-6 one.
     const results: ReconciledResults = {
       job_id: 'mmr-test',
       verdict: 'degraded-pass',
@@ -56,10 +65,14 @@ describe('formatText', () => {
       summary: 'Review passed (degraded — some channels unavailable)',
       reconciled_findings: [],
       per_channel: {},
-      metadata: { channels_dispatched: 2, channels_completed: 1, channels_partial: 1, total_elapsed: '5s' },
+      metadata: { channels_dispatched: 6, channels_completed: 3, channels_partial: 3, total_elapsed: '5s' },
     }
     const output = formatText(results)
-    expect(output).toContain('PASSED')
+    const headline = output.split('\n')[0] ?? ''
+    expect(headline).toContain('DEGRADED')
+    expect(headline).toContain('3/6')
+    // Still greppable as a pass for anything matching on the old string.
+    expect(headline).toContain('PASSED')
   })
 
   it('displays NEEDS DECISION for needs-user-decision verdict', () => {

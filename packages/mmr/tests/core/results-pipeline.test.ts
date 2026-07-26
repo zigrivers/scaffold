@@ -20,17 +20,68 @@ describe('runResultsPipeline', () => {
   })
 
   it('produces pass verdict when all channels complete with no findings', () => {
+    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['claude', 'codex'] })
+    for (const ch of ['claude', 'codex']) {
+      store.updateChannel(job.job_id, ch, {
+        status: 'completed',
+        started_at: '2026-04-13T00:00:00Z',
+        completed_at: '2026-04-13T00:00:10Z',
+      })
+      store.saveChannelOutput(job.job_id, ch, '{"approved": true, "findings": [], "summary": "ok"}')
+    }
+
+    const { results, exitCode } = runResultsPipeline(store, store.loadJob(job.job_id), 'json')
+    expect(results.verdict).toBe('pass')
+    expect(exitCode).toBe(0)
+  })
+
+  it('will not pass a clean single-channel review (completion floor)', () => {
+    // Pre-4.0.0 this was `pass` with exit 0: one dispatched channel that
+    // completes satisfies completed === dispatched, so the run was not even
+    // marked degraded. One opinion is not corroboration.
     const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['claude'] })
-    store.updateChannel(job.job_id, 'claude', {
-      status: 'completed',
-      started_at: '2026-04-13T00:00:00Z',
-      completed_at: '2026-04-13T00:00:10Z',
+    store.updateChannel(job.job_id, 'claude', { status: 'completed' })
+    store.saveChannelOutput(job.job_id, 'claude', '{"approved": true, "findings": [], "summary": "ok"}')
+
+    const { results, exitCode } = runResultsPipeline(store, store.loadJob(job.job_id), 'json')
+    expect(results.verdict).toBe('needs-user-decision')
+    expect(results.approved).toBe(false)
+    expect(exitCode).toBe(3)
+    // The old summary said "No channels completed", which is plainly false
+    // here and would send a reader looking for an outage that didn't happen.
+    expect(results.summary).toContain('1 of 1 completed, floor is 2')
+  })
+
+  it('honours a job-persisted floor of 1 rather than today config default', () => {
+    // The floor is captured on the job at review time, so re-reading an old
+    // job with `mmr results` reproduces the verdict that review actually made.
+    const job = store.createJob({
+      fix_threshold: 'P2', format: 'json', channels: ['claude'], min_completed_channels: 1,
     })
+    store.updateChannel(job.job_id, 'claude', { status: 'completed' })
     store.saveChannelOutput(job.job_id, 'claude', '{"approved": true, "findings": [], "summary": "ok"}')
 
     const { results, exitCode } = runResultsPipeline(store, store.loadJob(job.job_id), 'json')
     expect(results.verdict).toBe('pass')
     expect(exitCode).toBe(0)
+  })
+
+  it('still blocks on a P0 found by a single channel', () => {
+    // The floor must not launder a blocking finding into "ask a human".
+    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['claude', 'codex'] })
+    store.updateChannel(job.job_id, 'claude', { status: 'completed' })
+    store.updateChannel(job.job_id, 'codex', { status: 'timeout' })
+    store.saveChannelOutput(job.job_id, 'claude', JSON.stringify({
+      approved: false,
+      findings: [{
+        severity: 'P0', location: 'f.ts:1', description: 'rm -rf', suggestion: 'do not',
+      }],
+      summary: 'bad',
+    }))
+
+    const { results, exitCode } = runResultsPipeline(store, store.loadJob(job.job_id), 'json')
+    expect(results.verdict).toBe('blocked')
+    expect(exitCode).toBe(2)
   })
 
   it('produces blocked verdict when findings exceed threshold', () => {
@@ -93,18 +144,23 @@ describe('runResultsPipeline', () => {
   })
 
   it('produces degraded-pass when some channels failed', () => {
-    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['claude', 'gemini'] })
-    store.updateChannel(job.job_id, 'claude', {
-      status: 'completed',
-      started_at: '2026-04-13T00:00:00Z',
-      completed_at: '2026-04-13T00:00:10Z',
+    const job = store.createJob({
+      fix_threshold: 'P2', format: 'json', channels: ['claude', 'codex', 'gemini'],
     })
-    store.saveChannelOutput(job.job_id, 'claude', '{"approved": true, "findings": [], "summary": "ok"}')
+    for (const ch of ['claude', 'codex']) {
+      store.updateChannel(job.job_id, ch, {
+        status: 'completed',
+        started_at: '2026-04-13T00:00:00Z',
+        completed_at: '2026-04-13T00:00:10Z',
+      })
+      store.saveChannelOutput(job.job_id, ch, '{"approved": true, "findings": [], "summary": "ok"}')
+    }
     store.updateChannel(job.job_id, 'gemini', { status: 'failed' })
 
     const { results, exitCode } = runResultsPipeline(store, store.loadJob(job.job_id), 'json')
     expect(results.verdict).toBe('degraded-pass')
     expect(exitCode).toBe(0)
+    expect(results.summary).toContain('2 of 3 channels reported')
   })
 
   it('surfaces the captured stderr/log as the failed channel error detail', () => {
@@ -167,7 +223,11 @@ describe('runResultsPipeline', () => {
   })
 
   it('formats as text when requested', () => {
-    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['claude'] })
+    // min_completed_channels: 1 keeps this fixture about formatting rather
+    // than about the completion floor.
+    const job = store.createJob({
+      fix_threshold: 'P2', format: 'json', channels: ['claude'], min_completed_channels: 1,
+    })
     store.updateChannel(job.job_id, 'claude', {
       status: 'completed',
       started_at: '2026-04-13T00:00:00Z',
@@ -180,7 +240,9 @@ describe('runResultsPipeline', () => {
   })
 
   it('formats as markdown when requested', () => {
-    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['claude'] })
+    const job = store.createJob({
+      fix_threshold: 'P2', format: 'json', channels: ['claude'], min_completed_channels: 1,
+    })
     store.updateChannel(job.job_id, 'claude', {
       status: 'completed',
       started_at: '2026-04-13T00:00:00Z',
@@ -244,7 +306,9 @@ describe('runResultsPipeline', () => {
   })
 
   it('emits advisory_count for findings strictly below threshold', () => {
-    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['claude'] })
+    const job = store.createJob({
+      fix_threshold: 'P2', format: 'json', channels: ['claude'], min_completed_channels: 1,
+    })
     store.updateChannel(job.job_id, 'claude', {
       status: 'completed',
       started_at: '2026-04-28T00:00:00Z',
@@ -373,5 +437,83 @@ describe('runResultsPipeline', () => {
     expect(results.per_channel['claude'].status).toBe('failed')
     expect(results.per_channel['claude'].findings).toEqual([])
     expect(results.per_channel['claude'].error).toContain('Failed to parse channel output')
+  })
+})
+
+describe('completion floor — legacy jobs (review round 1, finding 3)', () => {
+  let tmpDir: string
+  let store: JobStore
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-legacy-'))
+    store = new JobStore(tmpDir)
+  })
+  afterEach(() => { fs.rmSync(tmpDir, { recursive: true }) })
+
+  it('re-reads a pre-4.0.0 job at the floor that review actually used', () => {
+    // The CHANGELOG promises the floor is persisted "so results and reconcile
+    // reproduce the verdict the review actually made". A job written before
+    // 4.0.0 carries no floor, and defaulting it to today's 2 would flip a
+    // historical single-channel pass to needs-user-decision — the opposite of
+    // the promise. Absent field ⇒ pre-4.0.0 ⇒ floor 1.
+    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['claude'] })
+    const raw = JSON.parse(fs.readFileSync(path.join(tmpDir, job.job_id, 'job.json'), 'utf8'))
+    delete raw.min_completed_channels
+    fs.writeFileSync(path.join(tmpDir, job.job_id, 'job.json'), JSON.stringify(raw))
+
+    store.updateChannel(job.job_id, 'claude', { status: 'completed' })
+    store.saveChannelOutput(job.job_id, 'claude', '{"approved": true, "findings": [], "summary": "ok"}')
+
+    const { results, exitCode } = runResultsPipeline(store, store.loadJob(job.job_id), 'json')
+    expect(results.verdict).toBe('pass')
+    expect(exitCode).toBe(0)
+  })
+
+  it('persists the floor on every new job so the fallback only ever sees legacy jobs', () => {
+    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['a', 'b'] })
+    const raw = JSON.parse(fs.readFileSync(path.join(tmpDir, job.job_id, 'job.json'), 'utf8'))
+    expect(raw.min_completed_channels).toBe(2)
+  })
+})
+
+describe('completion floor counts USABLE reports (review round 2, finding 2)', () => {
+  let tmpDir: string
+  let store: JobStore
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-floor-parse-'))
+    store = new JobStore(tmpDir)
+  })
+  afterEach(() => { fs.rmSync(tmpDir, { recursive: true }) })
+
+  it('does not let two unparseable "completed" channels satisfy the floor', () => {
+    // Review claimed the floor counts raw process status, so two channels that
+    // exit cleanly with malformed output could buy an exit-0 pass without two
+    // usable reviews. The pipeline downgrades a parse-failed channel to
+    // `failed` before the count, so the floor already means usable reports —
+    // this test pins that ordering so a future refactor cannot separate them.
+    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['a', 'b'] })
+    for (const ch of ['a', 'b']) {
+      store.updateChannel(job.job_id, ch, { status: 'completed' })
+      store.saveChannelOutput(job.job_id, ch, 'not json at all <<<')
+    }
+
+    const { results, exitCode } = runResultsPipeline(store, store.loadJob(job.job_id), 'json')
+    expect(results.metadata.channels_completed).toBe(0)
+    expect(results.verdict).toBe('needs-user-decision')
+    expect(exitCode).toBe(3)
+  })
+
+  it('one valid plus one malformed report is below the floor', () => {
+    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['good', 'bad'] })
+    store.updateChannel(job.job_id, 'good', { status: 'completed' })
+    store.saveChannelOutput(job.job_id, 'good', '{"approved": true, "findings": [], "summary": "ok"}')
+    store.updateChannel(job.job_id, 'bad', { status: 'completed' })
+    store.saveChannelOutput(job.job_id, 'bad', 'not json at all <<<')
+
+    const { results, exitCode } = runResultsPipeline(store, store.loadJob(job.job_id), 'json')
+    expect(results.metadata.channels_completed).toBe(1)
+    expect(results.verdict).toBe('needs-user-decision')
+    expect(exitCode).toBe(3)
   })
 })

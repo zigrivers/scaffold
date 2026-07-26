@@ -229,7 +229,13 @@ export function runResultsPipeline(
   const channelStatuses = Object.fromEntries(
     Object.entries(job.channels).map(([n, ch]) => [n, ch.status]),
   ) as Record<string, ChannelStatus>
-  const verdict = deriveVerdict(gatePassed, channelStatuses)
+  // A job with no floor is a PRE-4.0.0 job: createJob has persisted the field
+  // unconditionally since. Defaulting those to today's floor would flip a
+  // historical single-channel pass to needs-user-decision, contradicting the
+  // guarantee that results/reconcile reproduce the verdict review actually
+  // made. Pre-4.0.0 had no floor, which is floor 1.
+  const minCompleted = job.min_completed_channels ?? 1
+  const verdict = deriveVerdict(gatePassed, channelStatuses, minCompleted)
 
   const totalElapsed = startTimes.length > 0 && endTimes.length > 0
     ? `${((Math.max(...endTimes) - Math.min(...startTimes)) / 1000).toFixed(1)}s`
@@ -237,9 +243,18 @@ export function runResultsPipeline(
 
   const approved = verdict === 'pass' || verdict === 'degraded-pass'
   const summary = approved
-    ? `Review passed${verdict === 'degraded-pass' ? ' (degraded — some channels unavailable)' : ''}`
+    ? `Review passed${verdict === 'degraded-pass'
+      ? ` (degraded — ${completedChannels} of ${Object.keys(job.channels).length} channels reported)`
+      : ''}`
     : verdict === 'needs-user-decision'
-      ? 'No channels completed — manual review needed'
+      // Two different situations reach this verdict, and saying "no channels
+      // completed" for the below-floor one would send a reader hunting an
+      // outage that never happened.
+      ? (completedChannels === 0
+        ? 'No channels completed — manual review needed'
+        : `Too few channels reported to corroborate a pass — ${completedChannels} of `
+          + `${Object.keys(job.channels).length} completed, floor is ${minCompleted}. `
+          + 'Re-run, or set defaults.min_completed_channels to accept thinner evidence')
       : (() => {
         const blockingCount = reconciledFindings.filter((f) => isBlockingFinding(f, fixThreshold)).length
         return `Review blocked — ${blockingCount} finding(s) at or above ${fixThreshold}`

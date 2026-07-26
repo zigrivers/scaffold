@@ -2,6 +2,63 @@
 
 ## [Unreleased]
 
+## [4.0.0] — 2026-07-26
+
+**A verdict now reflects how many channels actually reported.**
+
+Released as a **major**, not a minor: an existing single-channel configuration
+that returned exit 0 now returns exit 3, which would block a downstream CI job
+on a `^3.x` upgrade. (Caught in review — it was first cut as 3.3.0.)
+
+### Behavior change
+
+**New `defaults.min_completed_channels`, default 2.** When the gate passes but
+fewer than this many channels completed, the verdict is `needs-user-decision`
+(exit 3) instead of a pass.
+
+Two shapes of thin evidence used to read as approval:
+
+- `degraded-pass 2/6` — four channels silent, verdict still exit 0
+- `pass 1/1` — not even *marked* degraded, because a single dispatched channel
+  that completes satisfies `completed === dispatched`
+
+A ratio-based floor catches the first and misses the second (1/1 is 100%
+participation), so the floor is an absolute count. `blocked` still outranks it:
+a P0 found by one channel is a real P0, and thin evidence must not launder a
+blocking finding into "go ask a human".
+
+Projects that deliberately run a single channel opt in explicitly:
+
+```yaml
+defaults:
+  min_completed_channels: 1
+```
+
+### Migration
+
+If you run a single channel deliberately, set `min_completed_channels: 1`
+before upgrading. `mmr config init` writes the key with an explanatory comment.
+When the configured floor exceeds the number of enabled channels, `mmr review`
+now warns at dispatch rather than letting the run reach an unreachable verdict.
+
+The floor is persisted on every new job, so `mmr results` and `mmr reconcile`
+reproduce the verdict the review actually made rather than the one today's
+config would make. A job written **before** this release carries no floor and
+is re-read at floor 1 — the behaviour that was in force when it ran — so
+historical single-channel passes stay stable.
+
+### Changed
+
+- **`degraded-pass` no longer renders as a bare `PASSED`.** Both the text
+  headline and the markdown heading now read
+  `PASSED (DEGRADED — 3/6 channels)`. Reviews are read by their first line —
+  and, posted to a PR, by their heading — which is exactly where overstating
+  the evidence is least likely to be double-checked. The suffix is appended
+  rather than replacing `PASSED`, so existing greps still match.
+- **The `needs-user-decision` summary distinguishes its two causes.** It used
+  to say "No channels completed" unconditionally, which is plainly false for a
+  below-floor run and would send a reader hunting an outage that never happened.
+
 ## [3.2.0] — 2026-07-18
 
 ### Fixed

@@ -262,6 +262,11 @@ const LoopControlSchema = z.object({
 
 const DefaultsSchema = z.object({
   fix_threshold: Severity.default('P2'),
+  // Minimum channels that must complete before a passing gate reads as a pass;
+  // below it the verdict is needs-user-decision. Default 2 — the point of
+  // multi-model review is corroboration. Set to 1 to opt back into
+  // single-channel approval (pre-4.0.0 behaviour).
+  min_completed_channels: z.number().int().min(1).default(2),
   timeout: z.number().default(300),
   format: OutputFormat.default('json'),
   parallel: z.boolean().default(true),

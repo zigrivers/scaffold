@@ -232,13 +232,55 @@ export function evaluateGate(findings: ReconciledFinding[], threshold: Severity)
 }
 
 /**
+ * Minimum channels that must complete before a passing gate counts as a pass.
+ *
+ * The point of multi-model review is corroboration; one channel agreeing with
+ * itself is a single opinion wearing a quorum's clothes. Two shapes of thin
+ * evidence used to read as approval:
+ *
+ *   degraded-pass 2/6 — four channels silent, verdict still exit 0
+ *   pass          1/1 — not even *marked* degraded, because a lone dispatched
+ *                       channel that completes satisfies completed === dispatched
+ *
+ * A ratio-based floor catches the first and misses the second (1/1 is 100%
+ * participation), so the floor is absolute. Projects that deliberately run a
+ * single channel opt in explicitly with `defaults.min_completed_channels: 1`.
+ */
+export const DEFAULT_MIN_COMPLETED_CHANNELS = 2
+
+/**
+ * Warn when the configured floor cannot be met by the channels being dispatched.
+ *
+ * Deliberately NOT a clamp to `min(floor, dispatched)`: that would restore the
+ * `pass 1/1` hole the floor exists to close, since one dispatched channel would
+ * always satisfy a floor of one. The run is allowed to reach
+ * needs-user-decision; the operator is just told why before waiting for it.
+ *
+ * Returns null when the floor is reachable.
+ */
+export function unreachableFloorWarning(
+  minCompleted: number,
+  dispatchedChannels: readonly string[],
+): string | null {
+  if (dispatchedChannels.length >= minCompleted) return null
+  return `min_completed_channels is ${minCompleted} but only ${dispatchedChannels.length} `
+    + `channel(s) will be dispatched (${dispatchedChannels.join(', ')}), so a pass is `
+    + 'unreachable. Enable more channels, or set defaults.min_completed_channels lower.'
+}
+
+/**
  * Derive the review verdict from gate evaluation and channel health.
  *
  * Priority: blocked > needs-user-decision > degraded-pass > pass
+ *
+ * `blocked` outranks the completion floor on purpose: a P0 found by one
+ * channel is still a real P0, and downgrading it to "go ask a human" would
+ * let thin evidence launder a blocking finding.
  */
 export function deriveVerdict(
   gatePassed: boolean,
   channelStatuses: Record<string, ChannelStatus>,
+  minCompleted: number = DEFAULT_MIN_COMPLETED_CHANNELS,
 ): Verdict {
   const statuses = Object.values(channelStatuses)
   const completedCount = statuses.filter(s => s === 'completed').length
@@ -248,6 +290,9 @@ export function deriveVerdict(
 
   // Gate failed — findings at or above threshold
   if (!gatePassed) return 'blocked'
+
+  // Gate passed, but too few channels reported to call it corroborated.
+  if (completedCount < minCompleted) return 'needs-user-decision'
 
   // Gate passed but some channels didn't complete
   if (completedCount < statuses.length) return 'degraded-pass'

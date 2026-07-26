@@ -86,6 +86,19 @@ export interface JobMetadata {
   job_id: string
   status: JobStatus
   fix_threshold: Severity
+  /**
+   * Completion floor in effect when the review ran.
+   *
+   * Optional ONLY for jobs written before v4.0.0; createJob has persisted it
+   * unconditionally since, so an absent field reliably identifies a legacy job.
+   * Those are re-read at floor 1 — the behaviour in force when they ran — so a
+   * historical single-channel pass stays a pass.
+   *
+   * Do not "fix" that to today's default: it would flip every historical
+   * single-channel verdict and break the guarantee that `mmr results` and
+   * `mmr reconcile` reproduce what the review actually decided.
+   */
+  min_completed_channels?: number
   format: OutputFormat
   created_at: string
   channels: Record<string, ChannelJobEntry>
