@@ -83,7 +83,7 @@ ENUM="src/types/enums.ts"
   run bash -c "grep -oE '^\|[[:space:]]*[0-9]+[[:space:]]*\|' '$CLI_GUIDE' | tr -dc '0-9\n'"
   [ "$status" -eq 0 ]
   for value in $output; do
-    grep -qE "^  [A-Za-z]+ = ${value}\$" "$ENUM" || {
+    grep -qE "^  [A-Za-z]+ = ${value}([,;[:space:]]|$)" "$ENUM" || {
       echo "Guide documents exit code ${value}, which no longer exists"
       return 1
     }
