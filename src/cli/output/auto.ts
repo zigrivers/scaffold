@@ -1,5 +1,6 @@
 import type { ScaffoldError, ScaffoldWarning } from '../../types/index.js'
 import type { ExitCode } from '../../types/enums.js'
+import type { TerminalError } from '../../types/errors.js'
 import type { OutputContext, SelectOption } from './context.js'
 import { InteractiveOutput } from './interactive.js'
 
@@ -26,7 +27,7 @@ export class AutoOutput implements OutputContext {
     this.interactive.result(data)
   }
 
-  fail(errors: ScaffoldError[], exitCode?: ExitCode): void {
+  fail(errors: TerminalError[], exitCode?: ExitCode): void {
     this.interactive.fail(errors, exitCode)
   }
 

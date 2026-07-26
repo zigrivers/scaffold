@@ -15,6 +15,17 @@ export interface ScaffoldError {
 }
 
 /** Non-fatal warning (same shape as error but never causes non-zero exit). */
+/**
+ * A ScaffoldError at a process-ending site, where `recovery` is mandatory.
+ *
+ * `ScaffoldError.recovery` stays optional because plenty of non-terminal
+ * `warn`/`error` callers legitimately have nothing actionable to add. But the
+ * last thing a caller sees before a non-zero exit must tell them what to do
+ * next, so terminal sites narrow to this type: a site that forgets becomes a
+ * compile error rather than a documentation promise that quietly rots.
+ */
+export type TerminalError = ScaffoldError & { recovery: string }
+
 export interface ScaffoldWarning {
   /** Machine-readable warning code (e.g., 'CONFIG_UNKNOWN_FIELD'). */
   code: string

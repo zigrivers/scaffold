@@ -1,5 +1,6 @@
 import type { ScaffoldError, ScaffoldWarning } from '../../types/index.js'
 import type { ExitCode } from '../../types/enums.js'
+import type { TerminalError } from '../../types/errors.js'
 import type { OutputContext, SelectOption } from './context.js'
 import { shutdown } from '../shutdown.js'
 
@@ -81,7 +82,7 @@ export class InteractiveOutput implements OutputContext {
     process.stdout.write(JSON.stringify(data, null, 2) + '\n')
   }
 
-  fail(errors: ScaffoldError[], _exitCode?: ExitCode): void {
+  fail(errors: TerminalError[], _exitCode?: ExitCode): void {
     // Human output is unchanged: the envelope is a json-mode concern.
     for (const e of errors) {
       this.error(e)

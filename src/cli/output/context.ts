@@ -1,6 +1,7 @@
 import type { ScaffoldError, ScaffoldWarning } from '../../types/index.js'
 import type { OutputMode } from '../../types/index.js'
 import type { ExitCode } from '../../types/enums.js'
+import type { TerminalError } from '../../types/errors.js'
 import { InteractiveOutput } from './interactive.js'
 import { JsonOutput } from './json.js'
 import { AutoOutput } from './auto.js'
@@ -30,7 +31,7 @@ export interface OutputContext {
    * silently skip emitting the envelope, which is the defect this exists to
    * remove. `exitCode` defaults to the first error's, then ValidationError.
    */
-  fail(errors: ScaffoldError[], exitCode?: ExitCode): void
+  fail(errors: TerminalError[], exitCode?: ExitCode): void
 
   // Capability queries
   supportsInteractivePrompts(): boolean

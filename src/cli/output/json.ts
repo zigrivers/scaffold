@@ -1,5 +1,6 @@
 import type { ScaffoldError, ScaffoldWarning } from '../../types/index.js'
 import { ExitCode } from '../../types/enums.js'
+import type { TerminalError } from '../../types/errors.js'
 import type { OutputContext, SelectOption } from './context.js'
 
 function isScaffoldError(e: ScaffoldError | string): e is ScaffoldError {
@@ -52,7 +53,7 @@ export class JsonOutput implements OutputContext {
     }) + '\n')
   }
 
-  fail(errors: ScaffoldError[], exitCode?: ExitCode): void {
+  fail(errors: TerminalError[], exitCode?: ExitCode): void {
     const resolved = exitCode ?? errors[0]?.exitCode ?? ExitCode.ValidationError
     // Human-readable half on stderr, matching error(), so a person piping
     // stdout to jq still sees what went wrong.
