@@ -18,8 +18,9 @@ import { loadPipelineContext } from '../../core/pipeline/context.js'
 import { resolvePipeline } from '../../core/pipeline/resolver.js'
 import { pipelineStepsForReconcile } from '../../core/pipeline/reconcile-input.js'
 import { findProjectRoot } from '../../cli/middleware/project-root.js'
-import { createOutputContext } from '../../cli/output/context.js'
-import { displayErrors } from '../../cli/output/error-display.js'
+import { createOutputContext, exitNotInitialized } from '../../cli/output/context.js'
+import { ExitCode } from '../../types/enums.js'
+import { failWithErrors } from '../../cli/output/error-display.js'
 import { resolveOutputMode } from '../../cli/middleware/output-mode.js'
 import { findClosestMatch } from '../../utils/levenshtein.js'
 import { resolveContainedArtifactPath } from '../../utils/artifact-path.js'
@@ -106,11 +107,7 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
     // -----------------------------------------------------------------------
     const projectRoot = argv.root ?? findProjectRoot(process.cwd())
     if (!projectRoot) {
-      process.stderr.write(
-        '✗ error [PROJECT_NOT_INITIALIZED]: No .scaffold/ directory found\n' +
-        '  Fix: Run `scaffold init` to initialize a project\n',
-      )
-      process.exitCode = 1
+      exitNotInitialized(argv)
       return
     }
 
@@ -122,8 +119,8 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
     // -----------------------------------------------------------------------
     const context = loadPipelineContext(projectRoot, { includeTools: true })
     if (!context.config) {
-      displayErrors(context.configErrors, context.configWarnings, output)
-      process.exitCode = 1
+      failWithErrors(context.configErrors, context.configWarnings, output,
+        'Fix the reported field in .scaffold/config.yml, then re-run')
       return
     }
     const config = context.config
@@ -134,21 +131,20 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
     ensureV3Migration(projectRoot, config, pipeline.globalSteps)
 
     // Guard check (needs globalSteps from pipeline)
-    guardStepCommand(step, config, service, pipeline.globalSteps, { commandName: 'run', output })
-    if (process.exitCode === 2) return
+    if (!guardStepCommand(step, config, service, pipeline.globalSteps, { commandName: 'run', output })) return
 
     const metaPrompt = context.metaPrompts.get(step)
     if (!metaPrompt) {
       const candidates = [...context.metaPrompts.keys()]
       const suggestion = findClosestMatch(step, candidates, 3)
       const suggestionText = suggestion ? ` Did you mean '${suggestion}'?` : ''
-      output.error({
+      output.fail([{
         code: 'STEP_NOT_FOUND',
         message: `Step '${step}' not found in pipeline.${suggestionText}`,
-        exitCode: 1,
+        exitCode: ExitCode.ValidationError,
         recovery: `Available steps: ${candidates.join(', ')}`,
-      })
-      process.exitCode = 1
+      }])
+      process.exitCode = ExitCode.ValidationError
       return
     }
 
@@ -161,8 +157,14 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
     if (service) {
       const globalLock = checkLock(projectRoot)
       if (globalLock) {
-        output.error('Global step in progress, retry after completion')
-        process.exitCode = 3
+        output.fail([{
+          code: 'RUN_GLOBAL_STEP_LOCKED',
+          message: 'Global step in progress, retry after completion',
+          exitCode: ExitCode.StateCorruption,
+          recovery: 'Wait for the in-flight global step to finish, then re-run; '
+            + '`scaffold status` shows what holds the lock',
+        }])
+        process.exitCode = ExitCode.StateCorruption
         return
       }
     }
@@ -276,8 +278,8 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
 
       const cycles = detectCycles(graph)
       if (cycles.length > 0) {
-        displayErrors(cycles, [], output)
-        process.exitCode = 1
+        failWithErrors(cycles, [], output,
+          'Break the dependency cycle in the reported steps\' `depends-on` frontmatter')
         return
       }
 
@@ -298,13 +300,13 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
         })
 
         if (unmetDeps.length > 0) {
-          output.error({
+          output.fail([{
             code: 'DEP_UNMET',
             message: `Step '${step}' has unmet dependencies: ${unmetDeps.join(', ')}`,
-            exitCode: 2,
+            exitCode: ExitCode.MissingDependency,
             recovery: `Complete these steps first: ${unmetDeps.join(', ')}`,
-          })
-          process.exitCode = 2
+          }])
+          process.exitCode = ExitCode.MissingDependency
           return
         }
       }
@@ -566,8 +568,9 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
             })
 
             if (!assemblyResult.success) {
-              displayErrors(assemblyResult.errors, assemblyResult.warnings, output)
-              process.exitCode = 5
+              failWithErrors(assemblyResult.errors, assemblyResult.warnings, output,
+                'Fix the reported meta-prompt or knowledge entry, then re-run',
+                ExitCode.BuildError)
               return
             }
 
@@ -666,8 +669,13 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
         )
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
-        output.error({ code: 'RUN_UNEXPECTED_ERROR', message, exitCode: 1 })
-        process.exitCode = 1
+        output.fail([{
+          code: 'RUN_UNEXPECTED_ERROR',
+          message,
+          exitCode: ExitCode.ValidationError,
+          recovery: 'Re-run with --verbose for the full trace; if it persists, this is a bug worth reporting',
+        }])
+        process.exitCode = ExitCode.ValidationError
         return
       }
     }

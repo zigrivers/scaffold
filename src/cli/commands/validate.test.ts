@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import type { MockInstance } from 'vitest'
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks
@@ -55,7 +54,6 @@ function defaultArgv(overrides: Partial<ValidateArgv> = {}): ValidateArgv {
 // ---------------------------------------------------------------------------
 
 describe('validate command', () => {
-  let exitSpy: MockInstance
   let writtenLines: string[]
   let stderrLines: string[]
 
@@ -66,7 +64,7 @@ describe('validate command', () => {
   beforeEach(() => {
     writtenLines = []
     stderrLines = []
-    exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
+    vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
     vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
       writtenLines.push(String(chunk))
       return true
@@ -96,13 +94,13 @@ describe('validate command', () => {
   it('exits 1 when project root not found', async () => {
     mockFindProjectRoot.mockReturnValue(null)
     await validateCommand.handler(defaultArgv())
-    expect(exitSpy).toHaveBeenCalledWith(1)
+    expect(process.exitCode).toBe(1)
   })
 
   // Test 2: Exits 0 when all valid
   it('exits 0 when all valid', async () => {
     await validateCommand.handler(defaultArgv())
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode).toBe(0)
     const allOutput = writtenLines.join('')
     expect(allOutput).toContain('passed')
   })
@@ -123,7 +121,7 @@ describe('validate command', () => {
       totalFilesCount: 0,
     })
     await validateCommand.handler(defaultArgv())
-    expect(exitSpy).toHaveBeenCalledWith(1)
+    expect(process.exitCode).toBe(1)
   })
 
   // Test 4: JSON output has correct shape (valid, errors, warnings, scopes, files)
@@ -143,7 +141,7 @@ describe('validate command', () => {
     expect(Array.isArray(data.errors)).toBe(true)
     expect(Array.isArray(data.warnings)).toBe(true)
     expect(Array.isArray(data.scopes)).toBe(true)
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode).toBe(0)
   })
 
   // Test 5: --scope config limits validation to config scope
@@ -157,7 +155,7 @@ describe('validate command', () => {
     })
     await validateCommand.handler(defaultArgv({ scope: 'config' }))
     expect(mockRunValidation).toHaveBeenCalledWith('/fake/project', ['config'])
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode).toBe(0)
   })
 
   // Test 6: Displays errors using displayErrors (errors appear in output)
@@ -179,6 +177,93 @@ describe('validate command', () => {
     const allOutput = [...writtenLines, ...stderrLines].join('')
     // displayErrors calls output.error() which writes to stderr in interactive mode
     expect(allOutput).toContain('CONFIG_MISSING')
-    expect(exitSpy).toHaveBeenCalledWith(1)
+    expect(process.exitCode).toBe(1)
+  })
+})
+
+describe('validate --format json on failure (review round 1, PR #793)', () => {
+  let stdout: string[]
+
+  beforeEach(() => {
+    stdout = []
+    vi.mocked(findProjectRoot).mockReturnValue('/fake/project')
+    vi.mocked(resolveOutputMode).mockReturnValue('json')
+    vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
+    vi.spyOn(process.stdout, 'write').mockImplementation((c) => { stdout.push(String(c)); return true })
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    process.exitCode = 0
+  })
+  afterEach(() => { vi.restoreAllMocks(); process.exitCode = 0 })
+
+  it('emits the FAILURE envelope, not a success-shaped payload', async () => {
+    // The JSON branch returned early through output.result(), so a failing
+    // validation exited 1 while stdout said `"success": true`. That is worse
+    // than the empty stdout this sweep set out to fix: empty output is
+    // obviously unusable, whereas success:true on a failed command is a lie a
+    // caller will act on.
+    vi.mocked(runValidation).mockReturnValue({
+      errors: [{ code: 'FM_MISSING_FIELD', message: 'missing name', context: { file: 'a.md' } }],
+      warnings: [],
+      scopes: ['frontmatter'],
+      validFilesCount: 2,
+      totalFilesCount: 3,
+    } as never)
+
+    await validateCommand.handler(defaultArgv({ format: 'json' }))
+
+    const envelope = JSON.parse(stdout.join(''))
+    expect(envelope.success).toBe(false)
+    expect(envelope.exit_code).toBe(1)
+    expect(envelope.errors.length).toBeGreaterThan(0)
+    expect(envelope.errors[0].code).toBe('FM_MISSING_FIELD')
+    expect(envelope.errors[0].recovery).toBeTruthy()
+    expect(process.exitCode).toBe(1)
+  })
+
+  it('still emits the success envelope when validation passes', async () => {
+    vi.mocked(runValidation).mockReturnValue({
+      errors: [], warnings: [], scopes: ['frontmatter'], validFilesCount: 3, totalFilesCount: 3,
+    } as never)
+
+    await validateCommand.handler(defaultArgv({ format: 'json' }))
+
+    const envelope = JSON.parse(stdout.join(''))
+    expect(envelope.success).toBe(true)
+    expect(envelope.data.valid).toBe(true)
+    expect(process.exitCode).toBe(0)
+  })
+})
+
+describe('validate --format json carries warnings on the failure path (round 3)', () => {
+  let stdout: string[]
+
+  beforeEach(() => {
+    stdout = []
+    vi.mocked(findProjectRoot).mockReturnValue('/fake/project')
+    vi.mocked(resolveOutputMode).mockReturnValue('json')
+    vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
+    vi.spyOn(process.stdout, 'write').mockImplementation((c) => { stdout.push(String(c)); return true })
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    process.exitCode = 0
+  })
+  afterEach(() => { vi.restoreAllMocks(); process.exitCode = 0 })
+
+  it('reports warnings whether validation passes or fails', async () => {
+    // Warnings were rendered only in non-JSON mode, and output.warn() is what
+    // buffers them into the envelope — so a failing --format json run listed
+    // no warnings while a passing one did. Same data, present or absent
+    // depending on whether the command happened to succeed.
+    vi.mocked(runValidation).mockReturnValue({
+      errors: [{ code: 'FM_MISSING_FIELD', message: 'missing name', context: { file: 'a.md' } }],
+      warnings: [{ code: 'FM_UNKNOWN_FIELD', message: 'unknown key `foo`' }],
+      scopes: ['frontmatter'], validFilesCount: 2, totalFilesCount: 3,
+    } as never)
+
+    await validateCommand.handler(defaultArgv({ format: 'json' }))
+
+    const envelope = JSON.parse(stdout.join(''))
+    expect(envelope.success).toBe(false)
+    expect(envelope.warnings).toHaveLength(1)
+    expect(envelope.warnings[0].code).toBe('FM_UNKNOWN_FIELD')
   })
 })

@@ -9,6 +9,7 @@ import { execFileSync } from 'node:child_process'
 import type { Argv, CommandModule } from 'yargs'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
+import { ExitCode } from '../../types/enums.js'
 import { loadAgentOpsConfig } from '../../core/agent-ops/config.js'
 import { createGitOps } from '../../merge-queue/git.js'
 import { recentFlakeCount } from '../../merge-queue/flakes.js'
@@ -41,8 +42,13 @@ export async function tiaHandler(argv: TiaArgs): Promise<void> {
   switch (argv.action) {
   case 'affected': {
     if (!argv.base) {
-      output.error('tia affected: --base <ref> is required')
-      process.exitCode = 1
+      output.fail([{
+        code: 'TIA_BASE_REQUIRED',
+        message: 'tia affected: --base <ref> is required',
+        exitCode: ExitCode.ValidationError,
+        recovery: 'Pass --base <ref>, e.g. scaffold tia affected --base origin/main',
+      }])
+      process.exitCode = ExitCode.ValidationError
       return
     }
     try {
@@ -112,8 +118,16 @@ export async function tiaHandler(argv: TiaArgs): Promise<void> {
       // exception) must fail closed to the full suite — NEVER exit 0 with a
       // narrow list. Under-selecting on error would let a regression through.
       const message = err instanceof Error ? err.message : String(err)
-      output.error(`tia affected: ${message} — run the full suite`)
-      process.exitCode = 3
+      // Exit 3 is the documented "selection is not trustworthy — run the full
+      // suite" signal. Preserve it exactly: downgrading to a generic
+      // validation exit would let a caller under-select tests on error.
+      output.fail([{
+        code: 'TIA_SELECTION_UNTRUSTWORTHY',
+        message: `tia affected: ${message} — run the full suite`,
+        exitCode: ExitCode.StateCorruption,
+        recovery: 'Run the full test suite for this change; exit 3 means TIA could not select safely',
+      }])
+      process.exitCode = ExitCode.StateCorruption
     }
     return
   }
@@ -133,8 +147,13 @@ export async function tiaHandler(argv: TiaArgs): Promise<void> {
   }
   case 'ingest': {
     if (!argv.coverageDir || !argv.head) {
-      output.error('tia ingest: --coverage-dir <dir> and --head <sha> are required')
-      process.exitCode = 1
+      output.fail([{
+        code: 'TIA_INGEST_ARGS_REQUIRED',
+        message: 'tia ingest: --coverage-dir <dir> and --head <sha> are required',
+        exitCode: ExitCode.ValidationError,
+        recovery: 'Pass both --coverage-dir <dir> and --head <sha>',
+      }])
+      process.exitCode = ExitCode.ValidationError
       return
     }
     // `tia ingest` recursively removes the dump dir. It is a real (hidden) CLI
@@ -145,11 +164,15 @@ export async function tiaHandler(argv: TiaArgs): Promise<void> {
     fs.mkdirSync(path.join(mqDir, TIA_DIR), { recursive: true })
     const covDir = resolveTiaDumpDir(argv.coverageDir, mqDir, cwd)
     if (covDir === null) {
-      output.error(
-        `tia ingest: --coverage-dir must be a directory inside ${path.join(mqDir, TIA_DIR)} — ` +
-        `refusing to remove ${argv.coverageDir}`,
-      )
-      process.exitCode = 1
+      output.fail([{
+        code: 'TIA_INGEST_DIR_OUTSIDE_WORKSPACE',
+        message:
+          `tia ingest: --coverage-dir must be a directory inside ${path.join(mqDir, TIA_DIR)} — ` +
+          `refusing to remove ${argv.coverageDir}`,
+        exitCode: ExitCode.ValidationError,
+        recovery: `Point --coverage-dir at a directory under ${path.join(mqDir, TIA_DIR)}`,
+      }])
+      process.exitCode = ExitCode.ValidationError
       return
     }
     // covDir is already confined to a strict descendant of <primary>/.mq/tia/
@@ -179,16 +202,26 @@ export async function tiaHandler(argv: TiaArgs): Promise<void> {
       )
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
-      output.error(`tia ingest: ${message}`)
-      process.exitCode = 1
+      output.fail([{
+        code: 'TIA_INGEST_FAILED',
+        message: `tia ingest: ${message}`,
+        exitCode: ExitCode.ValidationError,
+        recovery: 'Check the coverage dump is a readable coverage directory for the given --head sha',
+      }])
+      process.exitCode = ExitCode.ValidationError
     } finally {
       fs.rmSync(covDir, { recursive: true, force: true })
     }
     return
   }
   default:
-    output.error(`unknown tia action "${argv.action}"`)
-    process.exitCode = 1
+    output.fail([{
+      code: 'TIA_UNKNOWN_ACTION',
+      message: `unknown tia action "${argv.action}"`,
+      exitCode: ExitCode.ValidationError,
+      recovery: 'Valid actions: affected, record-due, ingest',
+    }])
+    process.exitCode = ExitCode.ValidationError
   }
 }
 

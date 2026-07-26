@@ -1,5 +1,8 @@
 import type { ScaffoldError, ScaffoldWarning } from '../../types/index.js'
 import type { OutputContext } from './context.js'
+import type { TerminalError } from '../../types/errors.js'
+import { ExitCode } from '../../types/enums.js'
+import { withRecovery } from '../../utils/errors.js'
 import { findClosestMatch } from '../../utils/levenshtein.js'
 
 /**
@@ -99,4 +102,37 @@ export function displayErrors(
   for (const warning of warnings) {
     output.warn(warning)
   }
+}
+
+/**
+ * Terminal variant of {@link displayErrors}: renders the warnings for humans
+ * and emits the failure envelope carrying every error.
+ *
+ * `displayErrors` routes through the stderr-only `output.error()`, so a
+ * command that called it and then exited non-zero produced empty stdout under
+ * `--format json` — the same defect the envelope sweep removed from the
+ * `output.error(` call sites, surviving one indirection deeper. Six terminal
+ * sites across `run`, `build`, and `rework` were still doing that after the
+ * sweep claimed CLI-wide coverage.
+ *
+ * Sets `process.exitCode` and returns rather than exiting, so a buffered
+ * stdout write is never truncated.
+ */
+export function failWithErrors(
+  errors: ScaffoldError[],
+  warnings: ScaffoldWarning[],
+  output: OutputContext,
+  fallbackRecovery: string,
+  exitCode: ExitCode = ExitCode.ValidationError,
+): void {
+  for (const warning of warnings) {
+    output.warn(warning)
+  }
+  // No synthetic fallback for an empty errors array: OutputContext.fail()
+  // already guarantees at least one entry, and fabricating one here would
+  // mask a caller that passed nothing by mistake behind a plausible-looking
+  // error.
+  const reported: TerminalError[] = errors.map(e => withRecovery(e, fallbackRecovery))
+  output.fail(reported, exitCode)
+  process.exitCode = exitCode
 }

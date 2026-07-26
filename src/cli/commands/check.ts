@@ -4,7 +4,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
 import { getPackagePipelineDir } from '../../utils/fs.js'
-import { createOutputContext } from '../output/context.js'
+import { createOutputContext, exitNotInitialized } from '../output/context.js'
+import { ExitCode } from '../../types/enums.js'
 import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { findClosestMatch } from '../../utils/levenshtein.js'
@@ -124,8 +125,7 @@ const checkCommand: CommandModule<Record<string, unknown>, CheckArgs> = {
   handler: async (argv) => {
     const projectRoot = argv.root ?? findProjectRoot(process.cwd())
     if (!projectRoot) {
-      process.stderr.write('✗ error [PROJECT_NOT_INITIALIZED]: No .scaffold/ directory found\n')
-      process.exit(1)
+      exitNotInitialized(argv)
       return
     }
 
@@ -140,8 +140,13 @@ const checkCommand: CommandModule<Record<string, unknown>, CheckArgs> = {
       const msg = suggestion
         ? `Step '${argv.step}' not found. Did you mean '${suggestion}'?`
         : `Step '${argv.step}' not found`
-      output.error({ code: 'DEP_TARGET_MISSING', message: msg, exitCode: 2 })
-      process.exit(2)
+      output.fail([{
+        code: 'DEP_TARGET_MISSING',
+        message: msg,
+        exitCode: ExitCode.MissingDependency,
+        recovery: 'Run `scaffold list` to see available steps',
+      }])
+      process.exitCode = ExitCode.MissingDependency
       return
     }
 

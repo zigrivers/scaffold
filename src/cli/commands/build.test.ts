@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import type { MockInstance } from 'vitest'
 import fs from 'node:fs'
 
 // ---------------------------------------------------------------------------
@@ -72,6 +71,11 @@ vi.mock('../../core/dependency/dependency.js', () => ({
 
 vi.mock('../../cli/output/error-display.js', () => ({
   displayErrors: vi.fn(),
+  // Terminal form: emits the failure envelope and sets the exit code, so the
+  // mock must set it too or every "exits N" assertion below reads 0.
+  failWithErrors: vi.fn((_e: unknown, _w: unknown, _o: unknown, _r: string, code = 1) => {
+    process.exitCode = code
+  }),
 }))
 
 vi.mock('../../core/assembly/knowledge-loader.js', () => ({
@@ -149,7 +153,7 @@ import { discoverAllMetaPrompts } from '../../core/assembly/meta-prompt-loader.j
 import { atomicWriteFile } from '../../utils/fs.js'
 import { buildGraph } from '../../core/dependency/graph.js'
 import { detectCycles, topologicalSort } from '../../core/dependency/dependency.js'
-import { displayErrors } from '../../cli/output/error-display.js'
+import { failWithErrors } from '../../cli/output/error-display.js'
 import { ensureScaffoldGitignore, findLegacyGeneratedOutputs } from '../../project/gitignore.js'
 import { createAdapter } from '../../core/adapters/adapter.js'
 import buildCommand from './build.js'
@@ -207,7 +211,6 @@ function makeGraph(names: string[]): { nodes: Map<string, unknown>; edges: Map<s
 // ---------------------------------------------------------------------------
 
 describe('build command', () => {
-  let exitSpy: MockInstance
 
   const mockFindProjectRoot = vi.mocked(findProjectRoot)
   const mockResolveOutputMode = vi.mocked(resolveOutputMode)
@@ -223,7 +226,10 @@ describe('build command', () => {
   const mockCreateAdapter = vi.mocked(createAdapter)
 
   beforeEach(() => {
-    exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
+    // build's handler now sets process.exitCode instead of calling
+    // process.exit(), so the envelope it just wrote cannot be truncated.
+    process.exitCode = 0
+    vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
     vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
     vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
     vi.spyOn(fs, 'existsSync').mockReturnValue(false)
@@ -275,7 +281,7 @@ describe('build command', () => {
     }
     await buildCommand.handler(argv as Parameters<typeof buildCommand.handler>[0])
 
-    expect(exitSpy).toHaveBeenCalledWith(1)
+    expect(process.exitCode).toBe(1)
   })
 
   // Test 2: Exits 1 when config invalid
@@ -302,8 +308,10 @@ describe('build command', () => {
     }
     await buildCommand.handler(argv as Parameters<typeof buildCommand.handler>[0])
 
-    expect(exitSpy).toHaveBeenCalledWith(1)
-    expect(displayErrors).toHaveBeenCalled()
+    expect(process.exitCode).toBe(1)
+    // failWithErrors, not displayErrors: the latter is stderr-only, so a
+    // terminal call left `--format json` with a non-zero exit and no envelope.
+    expect(failWithErrors).toHaveBeenCalled()
   })
 
   // Test 3: Exits 1 when dependency cycles detected
@@ -327,8 +335,10 @@ describe('build command', () => {
     }
     await buildCommand.handler(argv as Parameters<typeof buildCommand.handler>[0])
 
-    expect(exitSpy).toHaveBeenCalledWith(1)
-    expect(displayErrors).toHaveBeenCalled()
+    expect(process.exitCode).toBe(1)
+    // failWithErrors, not displayErrors: the latter is stderr-only, so a
+    // terminal call left `--format json` with a non-zero exit and no envelope.
+    expect(failWithErrors).toHaveBeenCalled()
   })
 
   // Test 4: --validate-only succeeds without generating files
@@ -343,7 +353,7 @@ describe('build command', () => {
     }
     await buildCommand.handler(argv as Parameters<typeof buildCommand.handler>[0])
 
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode).toBe(0)
     expect(mockOutput.success).toHaveBeenCalledWith(expect.stringContaining('Validation passed'))
   })
 
@@ -359,7 +369,7 @@ describe('build command', () => {
     }
     await buildCommand.handler(argv as Parameters<typeof buildCommand.handler>[0])
 
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode).toBe(0)
     expect(mockOutput.success).toHaveBeenCalledWith(expect.stringContaining('2'))
   })
 
@@ -377,7 +387,7 @@ describe('build command', () => {
     }
     await buildCommand.handler(argv as Parameters<typeof buildCommand.handler>[0])
 
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode).toBe(0)
     expect(mockOutput.result).toHaveBeenCalledTimes(1)
     const data = mockOutput.result.mock.calls[0]?.[0]
     expect(data).toHaveProperty('stepsTotal')
@@ -403,7 +413,7 @@ describe('build command', () => {
     }
     await buildCommand.handler(argv as Parameters<typeof buildCommand.handler>[0])
 
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode).toBe(0)
     expect(mockOutput.success).toHaveBeenCalledWith(expect.stringContaining('0'))
   })
 
@@ -421,7 +431,7 @@ describe('build command', () => {
     }
     await buildCommand.handler(argv as Parameters<typeof buildCommand.handler>[0])
 
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(process.exitCode).toBe(0)
     expect(mockOutput.result).toHaveBeenCalledTimes(1)
     const data = mockOutput.result.mock.calls[0]?.[0]
     expect(data).toHaveProperty('valid', true)

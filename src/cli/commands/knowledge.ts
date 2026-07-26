@@ -4,7 +4,8 @@ import fs from 'node:fs'
 import { execSync, execFileSync } from 'node:child_process'
 import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
-import { createOutputContext } from '../output/context.js'
+import { createOutputContext, exitNotInitialized } from '../output/context.js'
+import { ExitCode } from '../../types/enums.js'
 import { buildIndex, extractKBFrontmatter } from '../../core/assembly/knowledge-loader.js'
 import { KnowledgeUpdateAssembler, loadTemplate } from '../../core/knowledge/knowledge-update-assembler.js'
 import { discoverMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
@@ -47,8 +48,7 @@ const listSubcommand: CommandModule<Record<string, unknown>, ListArgs> = {
   handler: async (argv) => {
     const projectRoot = getProjectRoot(argv)
     if (!projectRoot) {
-      process.stderr.write('✗ error [PROJECT_NOT_INITIALIZED]: No .scaffold/ directory found\n')
-      process.exit(1)
+      exitNotInitialized(argv)
       return
     }
 
@@ -88,7 +88,7 @@ const listSubcommand: CommandModule<Record<string, unknown>, ListArgs> = {
         output.info(e.name.padEnd(nameWidth) + sourceLabel.padEnd(sourceWidth) + e.description)
       }
     }
-    process.exit(0)
+    return
   },
 }
 
@@ -112,8 +112,7 @@ const showSubcommand: CommandModule<Record<string, unknown>, ShowArgs> = {
   handler: async (argv) => {
     const projectRoot = getProjectRoot(argv)
     if (!projectRoot) {
-      process.stderr.write('✗ error [PROJECT_NOT_INITIALIZED]: No .scaffold/ directory found\n')
-      process.exit(1)
+      exitNotInitialized(argv)
       return
     }
 
@@ -130,8 +129,13 @@ const showSubcommand: CommandModule<Record<string, unknown>, ShowArgs> = {
     const filePath = isLocal ? localIndex.get(name) : globalIndex.get(name)
 
     if (!filePath) {
-      output.error({ code: 'ENTRY_NOT_FOUND', message: `Knowledge entry '${name}' not found.`, exitCode: 1 })
-      process.exit(1)
+      output.fail([{
+        code: 'ENTRY_NOT_FOUND',
+        message: `Knowledge entry '${name}' not found.`,
+        exitCode: ExitCode.ValidationError,
+        recovery: 'List available entries with `scaffold knowledge list`',
+      }])
+      process.exitCode = ExitCode.ValidationError
       return
     }
 
@@ -142,11 +146,16 @@ const showSubcommand: CommandModule<Record<string, unknown>, ShowArgs> = {
       output.info(content)
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err)
-      output.error({ code: 'READ_ERROR', message: `Failed to read entry: ${detail}`, exitCode: 1 })
-      process.exit(1)
+      output.fail([{
+        code: 'READ_ERROR',
+        message: `Failed to read entry: ${detail}`,
+        exitCode: ExitCode.ValidationError,
+        recovery: 'Check the entry file is readable; a local override lives under .scaffold/knowledge/',
+      }])
+      process.exitCode = ExitCode.ValidationError
       return
     }
-    process.exit(0)
+    return
   },
 }
 
@@ -170,8 +179,7 @@ const resetSubcommand: CommandModule<Record<string, unknown>, ResetArgs> = {
   handler: async (argv) => {
     const projectRoot = getProjectRoot(argv)
     if (!projectRoot) {
-      process.stderr.write('✗ error [PROJECT_NOT_INITIALIZED]: No .scaffold/ directory found\n')
-      process.exit(1)
+      exitNotInitialized(argv)
       return
     }
 
@@ -185,7 +193,6 @@ const resetSubcommand: CommandModule<Record<string, unknown>, ResetArgs> = {
 
     if (!localPath) {
       output.info(`Nothing to reset for '${name}' — no local override found.`)
-      process.exit(0)
       return
     }
 
@@ -210,11 +217,13 @@ const resetSubcommand: CommandModule<Record<string, unknown>, ResetArgs> = {
     }
 
     if (hasUncommittedChanges && !argv.auto) {
-      process.stderr.write(
-        `warn: '${name}' has uncommitted changes.\n` +
-        '  Re-run with --auto to delete anyway.\n',
-      )
-      process.exit(1)
+      output.fail([{
+        code: 'KNOWLEDGE_UNCOMMITTED_CHANGES',
+        message: `'${name}' has uncommitted changes.`,
+        exitCode: ExitCode.ValidationError,
+        recovery: 'Commit or stash the changes, or re-run with --auto to delete anyway',
+      }])
+      process.exitCode = ExitCode.ValidationError
       return
     }
 
@@ -223,11 +232,16 @@ const resetSubcommand: CommandModule<Record<string, unknown>, ResetArgs> = {
       output.success(`Reset '${name}' — local override removed. Global entry will be used.`)
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err)
-      output.error({ code: 'DELETE_ERROR', message: `Failed to delete override: ${detail}`, exitCode: 1 })
-      process.exit(1)
+      output.fail([{
+        code: 'DELETE_ERROR',
+        message: `Failed to delete override: ${detail}`,
+        exitCode: ExitCode.ValidationError,
+        recovery: 'Check write permissions on .scaffold/knowledge/ and that the override still exists',
+      }])
+      process.exitCode = ExitCode.ValidationError
       return
     }
-    process.exit(0)
+    return
   },
 }
 
@@ -258,8 +272,7 @@ const updateSubcommand: CommandModule<Record<string, unknown>, UpdateArgs> = {
   handler: async (argv) => {
     const projectRoot = getProjectRoot(argv)
     if (!projectRoot) {
-      process.stderr.write('✗ error [PROJECT_NOT_INITIALIZED]: No .scaffold/ directory found\n')
-      process.exit(1)
+      exitNotInitialized(argv)
       return
     }
 
@@ -283,30 +296,37 @@ const updateSubcommand: CommandModule<Record<string, unknown>, UpdateArgs> = {
       // Step resolution path
       const step = metaPrompts.get(target)
       if (!step) {
-        output.error({ code: 'TARGET_NOT_FOUND', message: `No step named '${target}' found.`, exitCode: 1 })
-        process.exit(1)
+        output.fail([{
+          code: 'TARGET_NOT_FOUND',
+          message: `No step named '${target}' found.`,
+          exitCode: ExitCode.ValidationError,
+          recovery: 'List pipeline steps with `scaffold info` or `scaffold next`',
+        }])
+        process.exitCode = ExitCode.ValidationError
         return
       }
       const stepEntries: string[] = step.frontmatter.knowledgeBase ?? []
 
       if (stepEntries.length === 0) {
-        output.error({
+        output.fail([{
           code: 'STEP_NO_ENTRIES',
           message: `Step '${target}' has no knowledge-base entries`,
-          exitCode: 1,
-        })
-        process.exit(1)
+          exitCode: ExitCode.ValidationError,
+          recovery: 'Pick a step that declares knowledgeBase entries, or target an entry name directly',
+        }])
+        process.exitCode = ExitCode.ValidationError
         return
       }
 
       if (argv.entry !== undefined) {
         if (!stepEntries.includes(argv.entry)) {
-          output.error({
+          output.fail([{
             code: 'ENTRY_NOT_IN_STEP',
-            message: `Entry '${argv.entry}' is not in step '${target}'. Available: ${stepEntries.join(', ')}`,
-            exitCode: 1,
-          })
-          process.exit(1)
+            message: `Entry '${argv.entry}' is not in step '${target}'.`,
+            exitCode: ExitCode.ValidationError,
+            recovery: `Use one of: ${stepEntries.join(', ')}`,
+          }])
+          process.exitCode = ExitCode.ValidationError
           return
         }
         entryNames = [argv.entry]
@@ -325,8 +345,13 @@ const updateSubcommand: CommandModule<Record<string, unknown>, UpdateArgs> = {
       const allCandidates = [...globalIndex.keys(), ...metaPrompts.keys()]
       const suggestion = findClosestMatch(target, allCandidates, 3)
       const hint = suggestion ? ` Did you mean '${suggestion}'?` : ''
-      output.error({ code: 'TARGET_NOT_FOUND', message: `Target '${target}' not found.${hint}`, exitCode: 1 })
-      process.exit(1)
+      output.fail([{
+        code: 'TARGET_NOT_FOUND',
+        message: `Target '${target}' not found.${hint}`,
+        exitCode: ExitCode.ValidationError,
+        recovery: 'Target a knowledge entry name or a pipeline step name; `scaffold knowledge list` shows entries',
+      }])
+      process.exitCode = ExitCode.ValidationError
       return
     }
 
@@ -405,7 +430,7 @@ const updateSubcommand: CommandModule<Record<string, unknown>, UpdateArgs> = {
       process.stdout.write(prompt + '\n')
     }
 
-    process.exit(0)
+    return
   },
 }
 

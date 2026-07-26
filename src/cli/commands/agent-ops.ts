@@ -3,7 +3,7 @@ import path from 'node:path'
 import type { CommandModule, Argv } from 'yargs'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
-import { asScaffoldError } from '../../utils/errors.js'
+import { asScaffoldError, withRecovery } from '../../utils/errors.js'
 import { ExitCode } from '../../types/enums.js'
 import {
   type AgentOpsComponent,
@@ -86,8 +86,12 @@ const agentOpsCommand: CommandModule<Record<string, unknown>, AgentOpsArgs> = {
     try {
       components = resolveComponents(argv.component)
     } catch (err) {
-      output.error(asScaffoldError(err, 'AGENT_OPS_INVALID_COMPONENT', ExitCode.ValidationError))
-      process.exit(ExitCode.ValidationError)
+      output.fail([withRecovery(
+        asScaffoldError(err, 'AGENT_OPS_INVALID_COMPONENT', ExitCode.ValidationError),
+        'Valid components: git, staging, merge-queue, ci, gate, all',
+      )])
+      process.exitCode = ExitCode.ValidationError
+      return
     }
 
     let gateSeed: GateSeed | undefined
@@ -113,9 +117,20 @@ const agentOpsCommand: CommandModule<Record<string, unknown>, AgentOpsArgs> = {
       output.warn(`SKIPPED (locally modified or pre-existing — use --force to overwrite): ${f}`)
     }
     for (const w of result.warnings) output.warn(`agent-ops: [${w.code}] ${w.message}`)
-    for (const e of result.errors) output.error(e)
-
-    process.exit(result.errors.length > 0 ? 1 : 0)
+    // One envelope carrying every error, emitted at the terminal decision —
+    // rather than a loop of stderr-only lines followed by a bare exit code.
+    if (result.errors.length > 0) {
+      output.fail(result.errors.map(message => ({
+        code: 'AGENT_OPS_INSTALL_FAILED',
+        message,
+        exitCode: ExitCode.ValidationError,
+        recovery: 'Fix the reported cause and re-run `scaffold agent-ops install`; '
+          + '--force overwrites locally modified files',
+      })))
+      process.exitCode = ExitCode.ValidationError
+      return
+    }
+    process.exitCode = 0
   },
 }
 

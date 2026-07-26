@@ -121,7 +121,7 @@ describe('check command', () => {
   it('exits 1 when project root not found', async () => {
     mockFindProjectRoot.mockReturnValue(null)
     await checkCommand.handler(defaultArgv())
-    expect(exitSpy).toHaveBeenCalledWith(1)
+    expect(process.exitCode).toBe(1)
   })
 
   it('exits 2 when step not found', async () => {
@@ -131,7 +131,7 @@ describe('check command', () => {
       ['some-step', makeMetaPrompt('some-step') as MetaPromptValue],
     ]))
     await checkCommand.handler(defaultArgv({ step: 'nonexistent' }))
-    expect(exitSpy).toHaveBeenCalledWith(2)
+    expect(process.exitCode).toBe(2)
   })
 
   it('shows fuzzy suggestion when step not found', async () => {

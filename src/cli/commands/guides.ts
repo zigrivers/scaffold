@@ -98,12 +98,14 @@ const guidesCommand: CommandModule<Record<string, unknown>, GuidesArgs> = {
 
     const guide = resolveGuide(projectRoot, argv.topic)
     if (!guide) {
-      output.error({
+      output.fail([{
         code: 'GUIDE_NOT_FOUND',
         message: `No guide named "${argv.topic}"`,
         exitCode: ExitCode.ValidationError,
-      })
-      process.exit(1)
+        recovery: 'List available guides with `scaffold guides --list`',
+      }])
+      process.exitCode = ExitCode.ValidationError
+      return
     }
 
     if (argv['print-path']) {

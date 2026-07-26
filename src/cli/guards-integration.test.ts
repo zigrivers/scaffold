@@ -52,11 +52,14 @@ describe('run rejects multi-service configs (per-service step without --service)
   beforeEach(() => { process.exitCode = 0 })
   afterEach(() => { vi.restoreAllMocks() })
 
-  it('exits 2 on services[]-only config', async () => {
+  it('exits 1 with a coded envelope on services[]-only config', async () => {
     const root = mkProjectWithConfig(multiServiceConfig)
     const { default: command } = await import('./commands/run.js')
     await command.handler({ root, step: 'plan', _: [], $0: 'scaffold' } as never)
-    expect(process.exitCode).toBe(2)
+    // Guards report a VALIDATION failure. Exit 2 is MissingDependency in the
+    // enum, so the old code was semantically wrong — the same defect already
+    // documented for the init --from path in user-errors.test.ts.
+    expect(process.exitCode).toBe(1)
   })
 })
 
@@ -64,11 +67,14 @@ describe('complete rejects multi-service configs (per-service step without --ser
   beforeEach(() => { process.exitCode = 0 })
   afterEach(() => { vi.restoreAllMocks() })
 
-  it('exits 2 on services[]-only config', async () => {
+  it('exits 1 with a coded envelope on services[]-only config', async () => {
     const root = mkProjectWithConfig(multiServiceConfig)
     const { default: command } = await import('./commands/complete.js')
     await command.handler({ root, step: 'plan', _: [], $0: 'scaffold' } as never)
-    expect(process.exitCode).toBe(2)
+    // Guards report a VALIDATION failure. Exit 2 is MissingDependency in the
+    // enum, so the old code was semantically wrong — the same defect already
+    // documented for the init --from path in user-errors.test.ts.
+    expect(process.exitCode).toBe(1)
   })
 })
 
@@ -76,11 +82,14 @@ describe('skip rejects multi-service configs (per-service step without --service
   beforeEach(() => { process.exitCode = 0 })
   afterEach(() => { vi.restoreAllMocks() })
 
-  it('exits 2 on services[]-only config', async () => {
+  it('exits 1 with a coded envelope on services[]-only config', async () => {
     const root = mkProjectWithConfig(multiServiceConfig)
     const { default: command } = await import('./commands/skip.js')
     await command.handler({ root, step: ['plan'], _: [], $0: 'scaffold' } as never)
-    expect(process.exitCode).toBe(2)
+    // Guards report a VALIDATION failure. Exit 2 is MissingDependency in the
+    // enum, so the old code was semantically wrong — the same defect already
+    // documented for the init --from path in user-errors.test.ts.
+    expect(process.exitCode).toBe(1)
   })
 })
 
@@ -126,45 +135,58 @@ describe('status allows multi-service configs (shows summary view without --serv
 })
 
 describe('rework allows multi-service configs (shows summary view without --service)', () => {
+  let stderr = ''
   beforeEach(() => {
     process.exitCode = 0
+    stderr = ''
     vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
     vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
-    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    vi.spyOn(process.stderr, 'write').mockImplementation((c) => { stderr += String(c); return true })
   })
   afterEach(() => { vi.restoreAllMocks() })
 
-  it('exits 0 on services[]-only config (no --service required)', async () => {
+  it('is not rejected by the service guard on a services[]-only config', async () => {
+    // This asserted exit 0, and only passed because the mocked process.exit
+    // was a no-op that let a failing command run on with exitCode untouched.
+    // `scaffold rework` with no --phases legitimately fails REWORK_NO_PHASES;
+    // what this test is actually about is that the SERVICE guard let it
+    // through, so assert that directly.
     const root = mkProjectWithConfig(multiServiceConfig)
     const { default: command } = await import('./commands/rework.js')
     await command.handler({ root, _: [], $0: 'scaffold' } as never)
-    expect(process.exitCode).toBe(0)
+    expect(stderr).not.toContain('RUN_SERVICE')
   })
 })
 
 describe('reset allows multi-service configs (shows summary view without --service)', () => {
+  let stderr = ''
   beforeEach(() => {
     process.exitCode = 0
+    stderr = ''
     vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
     vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
-    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    vi.spyOn(process.stderr, 'write').mockImplementation((c) => { stderr += String(c); return true })
   })
   afterEach(() => { vi.restoreAllMocks() })
 
-  it('exits 0 on services[]-only config (no --service required)', async () => {
+  it('is not rejected by the service guard on a services[]-only config', async () => {
+    // Same correction as rework above: `scaffold reset` with no
+    // --confirm-reset legitimately fails RESET_CONFIRM_REQUIRED.
     const root = mkProjectWithConfig(multiServiceConfig)
     const { default: command } = await import('./commands/reset.js')
     await command.handler({ root, _: [], $0: 'scaffold' } as never)
-    expect(process.exitCode).toBe(0)
+    expect(stderr).not.toContain('RUN_SERVICE')
   })
 })
 
 describe('info allows multi-service configs (shows summary view without --service)', () => {
+  let stderr = ''
   beforeEach(() => {
     process.exitCode = 0
+    stderr = ''
     vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
     vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
-    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    vi.spyOn(process.stderr, 'write').mockImplementation((c) => { stderr += String(c); return true })
   })
   afterEach(() => { vi.restoreAllMocks() })
 
@@ -175,11 +197,13 @@ describe('info allows multi-service configs (shows summary view without --servic
     expect(process.exitCode).toBe(0)
   })
 
-  it('exits 0 on services[]-only config (step-info branch)', async () => {
+  it('is not rejected by the service guard on the step-info branch', async () => {
+    // Same correction: step 'plan' does not exist in the fixture, so this
+    // legitimately fails DEP_TARGET_MISSING.
     const root = mkProjectWithConfig(multiServiceConfig)
     const { default: command } = await import('./commands/info.js')
     await command.handler({ root, step: 'plan', _: [], $0: 'scaffold' } as never)
-    expect(process.exitCode).toBe(0)
+    expect(stderr).not.toContain('RUN_SERVICE')
   })
 })
 

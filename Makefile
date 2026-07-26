@@ -25,11 +25,12 @@ check: lint validate test eval ## Run bash quality gates (lint + validate + test
 
 check-all: check ts-check mmr-check agent-integration-check agent-skills-check validate-knowledge check-reference-citations guides-check ## Run all quality gates (bash + TypeScript + knowledge frontmatter + reference-page citations)
 
-ts-check: ## Run TypeScript quality gates (lint + type-check + build + unit tests)
+ts-check: ## Run TypeScript quality gates (lint + type-check + build + unit + e2e tests)
 	npm run lint
 	npm run type-check
 	npm run build
 	npm test
+	npm run test:e2e
 
 eval: ## Run scaffold meta-evals (cross-system consistency checks)
 	npx bats tests/evals/

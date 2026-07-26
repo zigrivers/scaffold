@@ -1,6 +1,7 @@
 import type { Argv, CommandModule } from 'yargs'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
+import { ExitCode } from '../../types/enums.js'
 import { installHooks, type HooksInstallResult } from '../../core/hooks/install.js'
 
 export interface HooksArgs {
@@ -19,8 +20,13 @@ export async function hooksHandler(argv: HooksArgs, overrides: HooksOverrides = 
   const output = createOutputContext(resolveOutputMode(argv))
   const projectRoot = argv.root ?? process.cwd()
   if (argv.action !== 'install') {
-    output.error(`unknown hooks action "${argv.action}" (expected: install)`)
-    process.exitCode = 1
+    output.fail([{
+      code: 'HOOKS_UNKNOWN_ACTION',
+      message: `unknown hooks action "${argv.action}"`,
+      exitCode: ExitCode.ValidationError,
+      recovery: 'The only supported action is `scaffold hooks install`',
+    }])
+    process.exitCode = ExitCode.ValidationError
     return
   }
   const install = overrides.install ?? installHooks
@@ -28,8 +34,13 @@ export async function hooksHandler(argv: HooksArgs, overrides: HooksOverrides = 
   try {
     res = install(projectRoot)
   } catch (err) {
-    output.error(String(err instanceof Error ? err.message : err))
-    process.exitCode = 1
+    output.fail([{
+      code: 'HOOKS_INSTALL_FAILED',
+      message: String(err instanceof Error ? err.message : err),
+      exitCode: ExitCode.ValidationError,
+      recovery: 'Check write permissions on .git/hooks/ and that this is a git repository',
+    }])
+    process.exitCode = ExitCode.ValidationError
     return
   }
   if (argv.format === 'json') {

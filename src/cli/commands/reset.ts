@@ -4,7 +4,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
-import { createOutputContext } from '../output/context.js'
+import { createOutputContext, exitNotInitialized } from '../output/context.js'
+import { ExitCode } from '../../types/enums.js'
 import { StateManager } from '../../state/state-manager.js'
 import { acquireLock, getLockPath, releaseLock } from '../../state/lock-manager.js'
 import { shutdown } from '../shutdown.js'
@@ -50,8 +51,7 @@ const resetCommand: CommandModule<Record<string, unknown>, ResetArgs> = {
   handler: async (argv) => {
     const projectRoot = argv.root ?? findProjectRoot(process.cwd())
     if (!projectRoot) {
-      process.stderr.write('\u2717 error [PROJECT_NOT_INITIALIZED]: No .scaffold/ directory found\n')
-      process.exit(1)
+      exitNotInitialized(argv)
       return
     }
 
@@ -67,12 +67,12 @@ const resetCommand: CommandModule<Record<string, unknown>, ResetArgs> = {
 
     // Route: single step reset vs full pipeline reset
     if (argv.step) {
-      guardStepCommand(argv.step, context.config ?? {}, service, pipeline.globalSteps, { commandName: 'reset', output })
-      if (process.exitCode === 2) return
+      if (!guardStepCommand(
+        argv.step, context.config ?? {}, service, pipeline.globalSteps, { commandName: 'reset', output },
+      )) return
       await resetStep(argv.step, projectRoot, outputMode, output, argv, service, pipeline)
     } else {
-      guardSteplessCommand(context.config ?? {}, service, { commandName: 'reset', output })
-      if (process.exitCode === 2) return
+      if (!guardSteplessCommand(context.config ?? {}, service, { commandName: 'reset', output })) return
       await resetPipeline(projectRoot, outputMode, output, argv, service, context.config)
     }
   },
@@ -130,13 +130,13 @@ async function resetStep(
       const msg = suggestion
         ? `Step '${step}' not found. Did you mean '${suggestion}'?`
         : `Step '${step}' not found`
-      output.error({
+      output.fail([{
         code: 'DEP_TARGET_MISSING',
         message: msg,
-        exitCode: 2,
+        exitCode: ExitCode.MissingDependency,
         recovery: 'Run `scaffold list` to see available steps',
-      })
-      process.exitCode = 2
+      }])
+      process.exitCode = ExitCode.MissingDependency
       return
     }
 
@@ -169,13 +169,13 @@ async function resetStep(
         return
       }
     } else if (stepEntry.status === 'completed' && !argv.force) {
-      output.error({
+      output.fail([{
         code: 'PSM_INVALID_TRANSITION',
         message: `Step '${step}' is completed. Use --force to reset.`,
-        exitCode: 3,
+        exitCode: ExitCode.StateCorruption,
         recovery: 'Use --force to reset a completed step',
-      })
-      process.exitCode = 3
+      }])
+      process.exitCode = ExitCode.StateCorruption
       return
     }
 
@@ -248,13 +248,13 @@ async function resetPipeline(
       return
     }
   } else if (!confirmFlagSet) {
-    output.error({
+    output.fail([{
       code: 'RESET_CONFIRM_REQUIRED',
       message: 'Use --confirm-reset flag in auto mode to confirm reset',
-      exitCode: 1,
+      exitCode: ExitCode.ValidationError,
       recovery: 'Add --confirm-reset flag',
-    })
-    process.exit(1)
+    }])
+    process.exitCode = ExitCode.ValidationError
     return
   }
 

@@ -140,7 +140,7 @@ describe('rework command', () => {
       force: undefined,
     } as Parameters<typeof reworkCommand.handler>[0])
 
-    expect(exitSpy).toHaveBeenCalledWith(1)
+    expect(process.exitCode).toBe(1)
   })
 
   describe('--clear', () => {
@@ -222,6 +222,56 @@ describe('rework command', () => {
       // Session should be cleaned up
       expect(fs.existsSync(reworkPath)).toBe(false)
     })
+
+    it('propagates an advance failure that carries its own exit code', async () => {
+      // advanceStep throws with exitCode 2 for a step absent from the session,
+      // and that code is honoured. The `?? ExitCode.ValidationError` default
+      // changed in review round 3 applies only to a codeless error — see the
+      // next test, which is the one covering the change.
+      const reworkPath = path.join(tempDir, '.scaffold', 'rework.json')
+      const session = makeReworkSession()
+      ;(session.steps as Array<Record<string, unknown>>)[0].status = 'in_progress'
+      session.current_step = 'create-prd'
+      fs.writeFileSync(reworkPath, JSON.stringify(session))
+      process.exitCode = 0
+
+      await reworkCommand.handler({
+        advance: 'no-such-step-in-session',
+        auto: true,
+        format: undefined,
+        root: undefined,
+        force: undefined,
+      } as Parameters<typeof reworkCommand.handler>[0])
+
+      expect(process.exitCode).toBe(2)
+    })
+
+    it('defaults a CODELESS advance failure to ValidationError, not MissingDependency', async () => {
+      // The default was a bare `?? 2` (MissingDependency), which is wrong: a
+      // failed rework advance is not a missing dependency. Changed in review
+      // round 3, and it had shipped untested — this pins it.
+      const reworkPath = path.join(tempDir, '.scaffold', 'rework.json')
+      const session = makeReworkSession()
+      ;(session.steps as Array<Record<string, unknown>>)[0].status = 'in_progress'
+      session.current_step = 'create-prd'
+      fs.writeFileSync(reworkPath, JSON.stringify(session))
+      process.exitCode = 0
+
+      const mgr = await import('../../state/rework-manager.js')
+      vi.spyOn(mgr.ReworkManager.prototype, 'advanceStep').mockImplementation(() => {
+        throw new Error('plain failure with no exitCode')
+      })
+
+      await reworkCommand.handler({
+        advance: 'create-prd',
+        auto: true,
+        format: undefined,
+        root: undefined,
+        force: undefined,
+      } as Parameters<typeof reworkCommand.handler>[0])
+
+      expect(process.exitCode).toBe(1)
+    })
   })
 
   describe('--resume', () => {
@@ -234,7 +284,7 @@ describe('rework command', () => {
         force: undefined,
       } as Parameters<typeof reworkCommand.handler>[0])
 
-      expect(exitSpy).toHaveBeenCalledWith(1)
+      expect(process.exitCode).toBe(1)
     })
 
     it('outputs session status in json mode', async () => {
@@ -308,7 +358,7 @@ describe('rework command', () => {
         force: false,
       } as Parameters<typeof reworkCommand.handler>[0])
 
-      expect(exitSpy).toHaveBeenCalledWith(1)
+      expect(process.exitCode).toBe(1)
     })
 
     it('resets selected steps in state.json to pending', async () => {

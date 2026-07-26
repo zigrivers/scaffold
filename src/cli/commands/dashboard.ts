@@ -9,7 +9,8 @@ const require = createRequire(import.meta.url)
 const pkg = require('../../../package.json') as { version: string }
 import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
-import { createOutputContext } from '../output/context.js'
+import { createOutputContext, exitNotInitialized } from '../output/context.js'
+import { ExitCode } from '../../types/enums.js'
 import { StateManager } from '../../state/state-manager.js'
 import { readDecisions } from '../../state/decision-logger.js'
 import { loadConfig } from '../../config/loader.js'
@@ -119,11 +120,7 @@ const dashboardCommand: CommandModule<Record<string, unknown>, DashboardArgs> = 
     // 1. Resolve project root
     const projectRoot = argv.root ?? findProjectRoot(process.cwd())
     if (!projectRoot) {
-      process.stderr.write(
-        '✗ error [PROJECT_NOT_INITIALIZED]: No .scaffold/ directory found\n' +
-        '  Fix: Run `scaffold init` to initialize a project\n',
-      )
-      process.exit(1)
+      exitNotInitialized(argv)
       return
     }
 
@@ -135,8 +132,7 @@ const dashboardCommand: CommandModule<Record<string, unknown>, DashboardArgs> = 
     const { config } = loadConfig(projectRoot, [])
     const service = argv.service as string | undefined
     ensureV3Migration(projectRoot, config)
-    guardSteplessCommand(config ?? {}, service, { commandName: 'dashboard', output })
-    if (process.exitCode === 2) return
+    if (!guardSteplessCommand(config ?? {}, service, { commandName: 'dashboard', output })) return
 
     // Multi-service mode: config has services[] AND no --service flag.
     // Iterate per-service, render aggregate bird's-eye dashboard.
@@ -284,13 +280,13 @@ const dashboardCommand: CommandModule<Record<string, unknown>, DashboardArgs> = 
     try {
       state = stateManager.loadState()
     } catch {
-      output.error({
+      output.fail([{
         code: 'STATE_MISSING',
         message: 'No state.json found',
-        exitCode: 1,
+        exitCode: ExitCode.ValidationError,
         recovery: 'Run scaffold init',
-      })
-      process.exit(1)
+      }])
+      process.exitCode = ExitCode.ValidationError
       return
     }
 

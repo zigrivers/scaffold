@@ -279,7 +279,7 @@ describe('info command — step info mode', () => {
     expect(exitSpy).toHaveBeenCalledWith(0)
   })
 
-  it('exits 1 with DEP_TARGET_MISSING error when step is not found', async () => {
+  it('exits 2 with DEP_TARGET_MISSING error when step is not found', async () => {
     const root = makeProjectRoot({
       hasConfig: true,
       configContent: validConfig,
@@ -305,7 +305,7 @@ describe('info command — step info mode', () => {
 
     expect(written).toContain('DEP_TARGET_MISSING')
     expect(written).toContain('nonexistent-step')
-    expect(exitSpy).toHaveBeenCalledWith(1)
+    expect(process.exitCode).toBe(2)  // MissingDependency, matching check/complete/reset/skip
   })
 
   it('includes fuzzy match suggestion for close step names', async () => {
@@ -333,7 +333,7 @@ describe('info command — step info mode', () => {
     ].join('')
 
     expect(written).toContain('create-prd')
-    expect(exitSpy).toHaveBeenCalledWith(1)
+    expect(process.exitCode).toBe(2)  // MissingDependency, matching check/complete/reset/skip
   })
 
   it('returns correct JSON shape for step info mode', async () => {

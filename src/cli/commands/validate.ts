@@ -1,7 +1,8 @@
 import type { CommandModule } from 'yargs'
 import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
-import { createOutputContext } from '../output/context.js'
+import { createOutputContext, exitNotInitialized } from '../output/context.js'
+import { ExitCode } from '../../types/enums.js'
 import { displayErrors } from '../output/error-display.js'
 import { runValidation } from '../../validation/index.js'
 import type { ValidationScope } from '../../validation/index.js'
@@ -27,11 +28,7 @@ const validateCommand: CommandModule<Record<string, unknown>, ValidateArgs> = {
   handler: async (argv) => {
     const projectRoot = argv.root ?? findProjectRoot(process.cwd())
     if (!projectRoot) {
-      process.stderr.write(
-        '✗ error [PROJECT_NOT_INITIALIZED]: No .scaffold/ directory found\n' +
-        '  Fix: Run `scaffold init` to initialize a project\n',
-      )
-      process.exit(1)
+      exitNotInitialized(argv)
       return
     }
 
@@ -45,6 +42,30 @@ const validateCommand: CommandModule<Record<string, unknown>, ValidateArgs> = {
       : ['config', 'frontmatter', 'state', 'dependencies']
 
     const result = runValidation(projectRoot, scopes)
+
+    // Failure is decided BEFORE the output-mode branch. Keeping the decision
+    // inside the non-JSON branch is what let `--format json` return the
+    // success-shaped payload with exit 1 — a caller branching on `success`
+    // would have read a failed validation as a pass.
+    if (result.errors.length > 0) {
+      // Warnings go through displayErrors in EVERY mode, not just the human
+      // one: output.warn() buffers them into the envelope's `warnings` array.
+      // Skipping it under --format json meant a failing validation reported no
+      // warnings at all, while the success payload listed them — the same data
+      // present or absent depending on whether the command happened to pass.
+      //
+      // Errors are not passed here; fail() renders those for humans already,
+      // and passing both printed each one twice.
+      displayErrors([], result.warnings, output)
+      output.fail(result.errors.map(e => ({
+        code: e.code,
+        message: e.context?.file ? `${e.context.file}: ${e.message}` : e.message,
+        exitCode: ExitCode.ValidationError,
+        recovery: 'Fix the reported field in the named file, then re-run `scaffold validate`',
+      })))
+      process.exitCode = ExitCode.ValidationError
+      return
+    }
 
     if (outputMode === 'json') {
       output.result({
@@ -65,21 +86,14 @@ const validateCommand: CommandModule<Record<string, unknown>, ValidateArgs> = {
         },
       })
     } else {
-      if (result.errors.length > 0) {
-        displayErrors(result.errors, result.warnings, output)
-        output.error(
-          `Validation failed: ${result.errors.length} error(s), ${result.warnings.length} warning(s)`,
-        )
-      } else {
-        displayErrors([], result.warnings, output)
-        output.success(
-          `Validation passed: ${result.validFilesCount}/${result.totalFilesCount} files valid` +
-          (result.warnings.length > 0 ? `, ${result.warnings.length} warning(s)` : ''),
-        )
-      }
+      displayErrors([], result.warnings, output)
+      output.success(
+        `Validation passed: ${result.validFilesCount}/${result.totalFilesCount} files valid` +
+        (result.warnings.length > 0 ? `, ${result.warnings.length} warning(s)` : ''),
+      )
     }
 
-    process.exit(result.errors.length > 0 ? 1 : 0)
+    process.exitCode = 0
   },
 }
 
