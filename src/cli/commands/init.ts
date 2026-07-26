@@ -20,6 +20,7 @@ import {
   GAME_FLAGS, WEB_FLAGS, BACKEND_FLAGS, CLI_TYPE_FLAGS,
   LIB_FLAGS, MOBILE_FLAGS, PIPELINE_FLAGS, ML_FLAGS, EXT_FLAGS,
   RESEARCH_FLAGS, MCP_SERVER_FLAGS, MACOS_NATIVE_FLAGS, applyFlagFamilyValidation,
+  autoRequiredSuffix,
 } from '../init-flag-families.js'
 import type { ScaffoldConfig } from '../../types/index.js'
 import type {
@@ -214,7 +215,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       // Web-App Configuration
       .option('web-rendering', {
         type: 'string',
-        describe: 'Rendering strategy',
+        describe: `Rendering strategy${autoRequiredSuffix('web-rendering')}`,
         choices: ['spa', 'ssr', 'ssg', 'hybrid'] as const,
       })
       .option('web-deploy-target', {
@@ -235,7 +236,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       // Backend Configuration
       .option('backend-api-style', {
         type: 'string',
-        describe: 'API style',
+        describe: `API style${autoRequiredSuffix('backend-api-style')}`,
         choices: ['rest', 'graphql', 'grpc', 'trpc', 'none'] as const,
       })
       .option('backend-data-store', {
@@ -267,7 +268,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       // CLI Configuration
       .option('cli-interactivity', {
         type: 'string',
-        describe: 'Interactivity model',
+        describe: `Interactivity model${autoRequiredSuffix('cli-interactivity')}`,
         choices: ['args-only', 'interactive', 'hybrid'] as const,
       })
       .option('cli-distribution', {
@@ -283,7 +284,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       // Library Configuration
       .option('lib-visibility', {
         type: 'string',
-        describe: 'Library visibility',
+        describe: `Library visibility${autoRequiredSuffix('lib-visibility')}`,
         choices: ['public', 'internal'] as const,
       })
       .option('lib-runtime-target', {
@@ -308,7 +309,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       // Mobile-App Configuration
       .option('mobile-platform', {
         type: 'string',
-        describe: 'Target platform',
+        describe: `Target platform${autoRequiredSuffix('mobile-platform')}`,
         choices: ['ios', 'android', 'cross-platform'] as const,
       })
       .option('mobile-distribution', {
@@ -328,7 +329,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       // Data Pipeline Configuration
       .option('pipeline-processing', {
         type: 'string',
-        describe: 'Processing model',
+        describe: `Processing model${autoRequiredSuffix('pipeline-processing')}`,
         choices: ['batch', 'streaming', 'hybrid'] as const,
       })
       .option('pipeline-orchestration', {
@@ -353,7 +354,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       // ML Configuration
       .option('ml-phase', {
         type: 'string',
-        describe: 'Project phase',
+        describe: `Project phase${autoRequiredSuffix('ml-phase')}`,
         choices: ['training', 'inference', 'both'] as const,
       })
       .option('ml-model-type', {
@@ -393,7 +394,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       // Research Configuration
       .option('research-driver', {
         type: 'string',
-        describe: 'Experiment driver',
+        describe: `Experiment driver${autoRequiredSuffix('research-driver')}`,
         choices: ['code-driven', 'config-driven', 'api-driven', 'notebook-driven'] as const,
       })
       .option('research-interaction', {
@@ -413,7 +414,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       // MCP Server Configuration
       .option('mcp-language', {
         type: 'string',
-        describe: 'MCP server language',
+        describe: `MCP server language${autoRequiredSuffix('mcp-language')}`,
         choices: ['typescript', 'python'] as const,
       })
       .option('mcp-transport', {
