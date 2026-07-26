@@ -257,7 +257,7 @@ describe('adopt failure envelope (Task 13)', () => {
     // asScaffoldError passes through anything shaped like a ScaffoldError,
     // and an Error subclass carrying code/exitCode satisfies that shape — so
     // a naive {...e} clone yields message: undefined in the envelope.
-    const { withRecovery } = await import('./adopt.js')
+    const { withRecovery } = await import('../../utils/errors.js')
     class CodedError extends Error {
       code = 'ADOPT_INTERNAL'
       exitCode = 1

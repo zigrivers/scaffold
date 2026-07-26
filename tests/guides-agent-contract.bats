@@ -38,8 +38,20 @@ RUNNER_SKILL_GEN="content/skills/scaffold-runner/SKILL.md"
   grep -q 'Never run `scaffold init` before `scaffold adopt`' "$RUNNER_SKILL_SRC"
 }
 
-@test "generated runner skill carries the bootstrap rule through codegen" {
+@test "generated runner skill carries the FULL bootstrap rule through codegen" {
   # Guards the fan-out: canonical can be right while the generated consumer
-  # files are stale.
+  # files are stale. Assert the whole rule, not one phrase — a partial check
+  # would pass on a half-regenerated file.
   grep -q 'has none yet' "$RUNNER_SKILL_GEN"
+  grep -q 'scaffold adopt' "$RUNNER_SKILL_GEN"
+  grep -q 'Never run `scaffold init` before `scaffold adopt`' "$RUNNER_SKILL_GEN"
+  grep -q -- '--plan-key' "$RUNNER_SKILL_GEN"
+  grep -q 'brownfield' "$RUNNER_SKILL_GEN"
+}
+
+@test "install guide pins the correct end-to-end brownfield sequence" {
+  # A positive example, so the intended story is anchored rather than only
+  # the absence of the old wrong one.
+  grep -q 'scaffold adopt --apply --plan-key' "$INSTALL_GUIDE"
+  grep -q 'scaffold adopt --format json' "$INSTALL_GUIDE"
 }
