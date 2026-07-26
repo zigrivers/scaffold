@@ -1,3 +1,4 @@
+import { ExitCode } from '../types/enums.js'
 /**
  * Base class for user-facing errors that the CLI handler layer normalizes
  * to an exit code (typically 2) and a diagnostic line. Internal errors
@@ -175,9 +176,10 @@ export function toScaffoldError(err: ScaffoldUserError): {
   return {
     code: mapped.code,
     message: err.message,
-    // ExitCode.ValidationError (1). Exit 2 is MissingDependency, which the
-    // --from path used to return for input errors — semantically wrong.
-    exitCode: 1,
+    // Use the enum, not a literal: a comment saying "this is
+    // ExitCode.ValidationError" would go stale silently if the value changed,
+    // while the reflective test compares against the enum and stayed green.
+    exitCode: ExitCode.ValidationError,
     recovery: mapped.recovery,
   }
 }

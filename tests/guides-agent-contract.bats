@@ -96,10 +96,32 @@ ENUM="src/types/enums.ts"
   grep -q 'recovery' "$CLI_GUIDE"
 }
 
-@test "cli guide documents the auto-required discriminator flags" {
+@test "cli guide documents ALL nine auto-required discriminators from the code table" {
+  # Checking two flags let the other seven drift out of the guide while the
+  # gate stayed green. The guide table is hand-written markdown, so it is only
+  # "shared with AUTO_REQUIRED_FLAG" to the extent a test enforces it.
   grep -q 'required with --auto' "$CLI_GUIDE"
-  grep -q -- '--cli-interactivity' "$CLI_GUIDE"
-  grep -q -- '--web-rendering' "$CLI_GUIDE"
+  FAMILIES="src/cli/init-flag-families.ts"
+  run bash -c "sed -n '/AUTO_REQUIRED_FLAG/,/^})/p' '$FAMILIES' | grep -oE \"'[a-z0-9-]+': '[a-z-]+'\" | tr -d \"'\" | tr -d ' '"
+  [ "$status" -eq 0 ]
+  [ -n "$output" ]
+  count=0
+  for pair in $output; do
+    type="${pair%%:*}"
+    flag="${pair##*:}"
+    grep -qE "^\|[^|]*\`?${type}\`?[^|]*\|[^|]*--${flag}" "$CLI_GUIDE" || {
+      echo "guide is missing the ${type} -> --${flag} row"
+      return 1
+    }
+    count=$((count + 1))
+  done
+  [ "$count" -eq 9 ] || { echo "expected 9 discriminator pairs, found $count"; return 1; }
+}
+
+@test "cli guide lists the five types needing no discriminator" {
+  for t in game browser-extension macos-native data-science web3; do
+    grep -q "$t" "$CLI_GUIDE" || { echo "guide omits defaultable type $t"; return 1; }
+  done
 }
 
 @test "cli guide states plan_key is content-addressed, not repo-scoped" {
