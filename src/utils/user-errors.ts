@@ -1,8 +1,11 @@
 import { ExitCode } from '../types/enums.js'
+import type { TerminalError } from '../types/errors.js'
 /**
  * Base class for user-facing errors that the CLI handler layer normalizes
- * to an exit code (typically 2) and a diagnostic line. Internal errors
- * that should surface as stack traces do NOT extend this.
+ * into a coded ScaffoldError via toScaffoldError(). Every subclass maps to
+ * ExitCode.ValidationError (1); exit code 2 is MissingDependency
+ * (src/types/enums.ts) and must not be used for input errors. Internal
+ * errors that should surface as stack traces do NOT extend this.
  */
 export abstract class ScaffoldUserError extends Error {
   constructor(message: string) {
@@ -160,12 +163,7 @@ export const USER_ERROR_CODES: Record<string, { code: string; recovery: string }
  * the exact failure this work exists to remove; failing loudly in development
  * beats shipping an unhelpful error.
  */
-export function toScaffoldError(err: ScaffoldUserError): {
-  code: string
-  message: string
-  exitCode: number
-  recovery: string
-} {
+export function toScaffoldError(err: ScaffoldUserError): TerminalError {
   const mapped = USER_ERROR_CODES[err.name]
   if (!mapped) {
     throw new Error(

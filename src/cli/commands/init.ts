@@ -884,7 +884,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
         // message to stderr with empty stdout under --format json, and exit 2
         // means MissingDependency — the wrong code for bad input.
         const scaffoldError = toScaffoldError(err)
-        output.fail([scaffoldError as never])
+        output.fail([scaffoldError])
         process.exitCode = scaffoldError.exitCode
         return
       }

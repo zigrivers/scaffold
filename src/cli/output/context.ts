@@ -1,6 +1,6 @@
 import type { ScaffoldError, ScaffoldWarning } from '../../types/index.js'
 import type { OutputMode } from '../../types/index.js'
-import type { ExitCode } from '../../types/enums.js'
+import { ExitCode } from '../../types/enums.js'
 import type { TerminalError } from '../../types/errors.js'
 import { InteractiveOutput } from './interactive.js'
 import { JsonOutput } from './json.js'
@@ -99,9 +99,9 @@ export function exitNotInitialized(argv: { format?: string; auto?: boolean }): n
   output.fail([{
     code: 'PROJECT_NOT_INITIALIZED',
     message: 'No .scaffold/ directory found',
-    exitCode: 1,
+    exitCode: ExitCode.ValidationError,
     recovery: 'Run `scaffold init` to initialize a project, '
       + 'or `scaffold adopt` if the directory already has code',
-  } as never])
+  }])
   process.exit(1)
 }
