@@ -107,14 +107,6 @@ project:
 // ---------------------------------------------------------------------------
 
 /**
- * Widen a ScaffoldError into a TerminalError, supplying a fallback recovery.
- *
- * fail() takes TerminalError so every process-ending failure names its fix.
- * Errors built elsewhere (asScaffoldError, adoptResult.errors, lock errors)
- * carry an optional recovery, so this fills the gap without overwriting one
- * that was already set.
- */
-/**
  * Pick a fallback recovery that fits the error, for the catch-all sites that
  * map over a whole error array.
  *
@@ -130,6 +122,14 @@ function genericRecovery(e: ScaffoldError): string {
   return 'See the message above; re-run with --verbose for more detail'
 }
 
+/**
+ * Widen a ScaffoldError into a TerminalError, supplying a fallback recovery.
+ *
+ * fail() takes TerminalError so every process-ending failure names its fix.
+ * Errors built elsewhere (asScaffoldError, adoptResult.errors, lock errors)
+ * carry an optional recovery, so this fills the gap without overwriting one
+ * that was already set.
+ */
 function withRecovery(e: ScaffoldError, fallback: string): TerminalError {
   return { ...e, recovery: e.recovery ?? fallback }
 }
@@ -647,12 +647,20 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
       // (TOCTOU). The SAME lock is held through every write below.
       const lockResult = acquireLock(projectRoot, 'adopt')
       if (!lockResult.acquired) {
-        if (lockResult.error) {
-          output.fail([withRecovery(
+        // Always emit. Without the else branch this path exited non-zero with
+        // empty stdout whenever lockResult carried no error object — the exact
+        // silent-failure shape this release exists to remove.
+        output.fail([lockResult.error
+          ? withRecovery(
             lockResult.error,
             'Another scaffold process holds the lock; wait for it, or pass --force to override',
-          )], ExitCode.StateCorruption)
-        }
+          )
+          : {
+            code: 'ADOPT_LOCK_UNAVAILABLE',
+            message: 'Could not acquire the adopt lock.',
+            exitCode: ExitCode.StateCorruption,
+            recovery: 'Another scaffold process may hold it; wait and retry, or pass --force',
+          }], ExitCode.StateCorruption)
         process.exitCode = ExitCode.StateCorruption
         return
       }

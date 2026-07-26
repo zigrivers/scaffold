@@ -81,7 +81,10 @@ describe('JsonOutput.fail', () => {
     expect(JSON.parse(raw).exit_code).toBe(ExitCode.StateCorruption)
   })
 
-  it('falls back to ValidationError when given no errors at all', () => {
+  it('never emits a failure envelope with an empty errors array', () => {
+    // An empty errors array says something failed and nothing about what,
+    // which is barely better than the empty stdout this replaced. Consumers
+    // must always be able to read errors[0].code.
     const output = new JsonOutput()
     const raw = captureStdout(() => {
       output.fail([])
@@ -89,6 +92,9 @@ describe('JsonOutput.fail', () => {
     const parsed = JSON.parse(raw)
     expect(parsed.success).toBe(false)
     expect(parsed.exit_code).toBe(ExitCode.ValidationError)
+    expect(parsed.errors).toHaveLength(1)
+    expect(parsed.errors[0].code).toBe('INTERNAL_ERROR')
+    expect(parsed.errors[0].recovery).toBeTruthy()
   })
 
   it('emits exactly one line of JSON so a caller can parse stdout whole', () => {
