@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
 import yargs, { type Argv } from 'yargs'
-import { execFileSync, execSync } from 'node:child_process'
+import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 const DIST = fileURLToPath(new URL('../../../dist/index.js', import.meta.url))
 
@@ -943,11 +943,18 @@ describe('--from input handling (Task 9)', () => {
   it('accepts the space-separated "--from -" form from stdin', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'scaffold-stdin-'))
     execFileSync('git', ['init', '-q'], { cwd: dir })
-    const out = execSync(
-      `printf 'version: 2\\nmethodology: mvp\\nplatforms:\\n  - claude-code\\n' | ` +
-      `"${process.execPath}" "${DIST}" init --from - --format json`,
-      { cwd: dir, encoding: 'utf-8', timeout: 60_000 })
-    expect(out.trim(), '"--from -" must not be rejected as an unknown argument').not.toBe('')
+    // Feed stdin directly rather than through a shell pipe: it keeps the
+    // assertion on argv parsing (the actual subject) instead of on shell
+    // quoting, and avoids execSync entirely.
+    const out = execFileSync(
+      process.execPath, [DIST, 'init', '--from', '-', '--format', 'json'],
+      {
+        cwd: dir,
+        encoding: 'utf-8',
+        input: 'version: 2\nmethodology: mvp\nplatforms:\n  - claude-code\n',
+        timeout: 60_000,
+      })
+    expect(out.trim(), 'the space-separated --from - form must not be rejected').not.toBe('')
     expect(JSON.parse(out).success).toBe(true)
   }, 60_000)
 })
