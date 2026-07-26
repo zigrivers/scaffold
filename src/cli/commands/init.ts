@@ -1,4 +1,5 @@
 import type { CommandModule, Argv } from 'yargs'
+import { ExitCode } from '../../types/enums.js'
 import fs from 'node:fs'
 import path from 'node:path'
 import { z } from 'zod'
@@ -784,10 +785,14 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
           }))
 
           if (!result!.success) {
-            for (const err of result!.errors) {
-              output.error(err)
-            }
-            process.exitCode = 1
+            // Honour the exit code the error carries. Hardcoding 1 here was the
+            // original defect: ScaffoldError.exitCode has always existed and
+            // runWizard has always populated it, but this site discarded it.
+            output.fail(result!.errors.map(e => ({
+              ...e,
+              recovery: e.recovery ?? 'See the message above and re-run with corrected input',
+            })))
+            process.exitCode = result!.errors[0]?.exitCode ?? ExitCode.ValidationError
             return
           }
           phase1Success = true
