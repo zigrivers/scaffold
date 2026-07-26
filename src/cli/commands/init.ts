@@ -7,6 +7,7 @@ import { parse as parseYaml } from 'yaml'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
 import { runWizard, materializeScaffoldProject, readOldStateIfExists } from '../../wizard/wizard.js'
+import { AutoFlagRequiredError } from '../../wizard/questions.js'
 import { runBuild } from './build.js'
 import { syncSkillsIfNeeded } from '../../core/skills/sync.js'
 import { shutdown } from '../shutdown.js'
@@ -14,15 +15,17 @@ import { ProjectTypeSchema, ConfigSchema } from '../../config/schema.js'
 import { coerceCSV } from '../utils/coerce.js'
 import {
   InvalidYamlError, InvalidConfigError, FromPathReadError,
-  TTYStdinError, isScaffoldUserError,
+  TTYStdinError, isScaffoldUserError, toScaffoldError,
 } from '../../utils/user-errors.js'
 import {
   GAME_FLAGS, WEB_FLAGS, BACKEND_FLAGS, CLI_TYPE_FLAGS,
   LIB_FLAGS, MOBILE_FLAGS, PIPELINE_FLAGS, ML_FLAGS, EXT_FLAGS,
   RESEARCH_FLAGS, MCP_SERVER_FLAGS, MACOS_NATIVE_FLAGS, applyFlagFamilyValidation,
+  autoRequiredSuffix,
 } from '../init-flag-families.js'
 import type { ScaffoldConfig } from '../../types/index.js'
 import { withRecovery } from '../../utils/errors.js'
+import type { ScaffoldError } from '../../types/errors.js'
 import type {
   GameFlags, WebAppFlags, BackendFlags, CliFlags, LibraryFlags,
   MobileAppFlags, DataPipelineFlags, MlFlags, BrowserExtensionFlags,
@@ -215,7 +218,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       // Web-App Configuration
       .option('web-rendering', {
         type: 'string',
-        describe: 'Rendering strategy',
+        describe: `Rendering strategy${autoRequiredSuffix('web-rendering')}`,
         choices: ['spa', 'ssr', 'ssg', 'hybrid'] as const,
       })
       .option('web-deploy-target', {
@@ -236,7 +239,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       // Backend Configuration
       .option('backend-api-style', {
         type: 'string',
-        describe: 'API style',
+        describe: `API style${autoRequiredSuffix('backend-api-style')}`,
         choices: ['rest', 'graphql', 'grpc', 'trpc', 'none'] as const,
       })
       .option('backend-data-store', {
@@ -268,7 +271,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       // CLI Configuration
       .option('cli-interactivity', {
         type: 'string',
-        describe: 'Interactivity model',
+        describe: `Interactivity model${autoRequiredSuffix('cli-interactivity')}`,
         choices: ['args-only', 'interactive', 'hybrid'] as const,
       })
       .option('cli-distribution', {
@@ -284,7 +287,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       // Library Configuration
       .option('lib-visibility', {
         type: 'string',
-        describe: 'Library visibility',
+        describe: `Library visibility${autoRequiredSuffix('lib-visibility')}`,
         choices: ['public', 'internal'] as const,
       })
       .option('lib-runtime-target', {
@@ -309,7 +312,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       // Mobile-App Configuration
       .option('mobile-platform', {
         type: 'string',
-        describe: 'Target platform',
+        describe: `Target platform${autoRequiredSuffix('mobile-platform')}`,
         choices: ['ios', 'android', 'cross-platform'] as const,
       })
       .option('mobile-distribution', {
@@ -329,7 +332,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       // Data Pipeline Configuration
       .option('pipeline-processing', {
         type: 'string',
-        describe: 'Processing model',
+        describe: `Processing model${autoRequiredSuffix('pipeline-processing')}`,
         choices: ['batch', 'streaming', 'hybrid'] as const,
       })
       .option('pipeline-orchestration', {
@@ -354,7 +357,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       // ML Configuration
       .option('ml-phase', {
         type: 'string',
-        describe: 'Project phase',
+        describe: `Project phase${autoRequiredSuffix('ml-phase')}`,
         choices: ['training', 'inference', 'both'] as const,
       })
       .option('ml-model-type', {
@@ -394,7 +397,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       // Research Configuration
       .option('research-driver', {
         type: 'string',
-        describe: 'Experiment driver',
+        describe: `Experiment driver${autoRequiredSuffix('research-driver')}`,
         choices: ['code-driven', 'config-driven', 'api-driven', 'notebook-driven'] as const,
       })
       .option('research-interaction', {
@@ -414,7 +417,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       // MCP Server Configuration
       .option('mcp-language', {
         type: 'string',
-        describe: 'MCP server language',
+        describe: `MCP server language${autoRequiredSuffix('mcp-language')}`,
         choices: ['typescript', 'python'] as const,
       })
       .option('mcp-transport', {
@@ -609,6 +612,13 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
   handler: async (argv) => {
     const projectRoot = argv.root ?? process.cwd()
     const outputMode = resolveOutputMode(argv)
+    // Any non-interactive mode implies auto. A context that cannot ask a
+    // question must not invent the answer, so the discriminator guards have to
+    // see `auto` even when the caller never typed --auto. adopt.ts already
+    // derived this (effectiveAuto); init read the raw flag, which is why a
+    // piped `init --project-type web-app` silently wrote renderingStrategy:
+    // spa while `--auto` on the same input refused.
+    const effectiveAuto = argv.auto === true || outputMode !== 'interactive'
     const output = createOutputContext(outputMode)
 
     // Track whether Phase 1 succeeded so we know to run Phase 2
@@ -639,6 +649,26 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
             throw new InvalidConfigError(sourceLabel, formatZodError(parseResult.error))
           }
           const config = parseResult.data as unknown as ScaffoldConfig
+          // Task 7's guard lives in askWizardQuestions, which --from never
+          // calls: this path parses YAML and materializes it directly. Without
+          // this check a schema-valid config could still write the typeless
+          // project the wizard now refuses to produce, on the one path the
+          // wizard cannot see.
+          // Multi-service configs are exempt: ServiceSchema requires a
+          // projectType on EVERY service (config/schema.ts), so the type is
+          // declared per service rather than at project.projectType. Requiring
+          // it at the top level would reject every valid services[] config.
+          const hasServices = (config.project?.services?.length ?? 0) > 0
+          if (!hasServices && config.project?.projectType === undefined) {
+            throw new AutoFlagRequiredError({
+              code: 'INIT_PROJECT_TYPE_REQUIRED',
+              message: `${sourceLabel} does not set project.projectType`,
+              exitCode: ExitCode.ValidationError,
+              recovery: `Add "project: { projectType: <${ProjectTypeSchema.options.join('|')}> }" `
+                + 'to the config, since a config with no project type disables every '
+                + 'type-conditional step',
+            })
+          }
           fromConfig = config
           const oldState = readOldStateIfExists(projectRoot)
           await materializeScaffoldProject(config, {
@@ -695,7 +725,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
 
           result = await shutdown.withPrompt(async () => runWizard({
             projectRoot,
-            auto: argv.auto ?? false,
+            auto: effectiveAuto,
             force: argv.force ?? false,
             methodology: argv.methodology,
             projectType,
@@ -821,7 +851,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
             'validate-only': false,
             force: false,
             format: argv.format,
-            auto: argv.auto,
+            auto: effectiveAuto,
             verbose: argv.verbose,
             root: projectRoot,
           }, {
@@ -860,9 +890,23 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
         },
       )
     } catch (err) {
+      // Errors already carrying a ScaffoldError (AutoFlagRequiredError from the
+      // wizard, and anything later adopting the same shape) are forwarded as
+      // they are. Structural check rather than `instanceof`, so this does not
+      // depend on class identity across module boundaries.
+      const carried = (err as { scaffoldError?: ScaffoldError } | null)?.scaffoldError
+      if (carried) {
+        output.fail([withRecovery(carried, 'See the message above and re-run with corrected input')])
+        process.exitCode = carried.exitCode
+        return
+      }
       if (isScaffoldUserError(err)) {
-        output.error(err.message)
-        process.exitCode = 2
+        // Was: output.error(err.message) + exit 2. That printed an uncoded
+        // message to stderr with empty stdout under --format json, and exit 2
+        // means MissingDependency — the wrong code for bad input.
+        const scaffoldError = toScaffoldError(err)
+        output.fail([scaffoldError])
+        process.exitCode = scaffoldError.exitCode
         return
       }
       throw err

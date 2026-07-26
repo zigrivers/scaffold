@@ -2,7 +2,7 @@ import type { CommandModule } from 'yargs'
 
 import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
-import { createOutputContext } from '../output/context.js'
+import { createOutputContext, exitNotInitialized } from '../output/context.js'
 import { StateManager } from '../../state/state-manager.js'
 import { loadPipelineContext } from '../../core/pipeline/context.js'
 import { resolvePipeline } from '../../core/pipeline/resolver.js'
@@ -43,13 +43,7 @@ const nextCommand: CommandModule<Record<string, unknown>, NextArgs> = {
     // 1. Resolve project root
     const projectRoot = argv.root ?? findProjectRoot(process.cwd())
     if (!projectRoot) {
-      process.stderr.write(
-        '✗ error [PROJECT_NOT_INITIALIZED]: No .scaffold/ directory found\n',
-      )
-      process.stderr.write(
-        '  Fix: Run `scaffold init` to initialize a project\n',
-      )
-      process.exit(1)
+      exitNotInitialized(argv)
       return
     }
 

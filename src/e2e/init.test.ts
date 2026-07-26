@@ -124,6 +124,7 @@ describe('scaffold init E2E', () => {
   it('creates .scaffold/ directory structure', async () => {
     const output = createMockOutput()
     await runWizard({
+      projectType: 'data-science',
       projectRoot: tmpDir,
       methodology: 'mvp',
       force: false,
@@ -141,7 +142,14 @@ describe('scaffold init E2E', () => {
   // Test 2: config.yml contains correct methodology when methodology is 'mvp'
   it('config.yml contains correct methodology for mvp', async () => {
     const output = createMockOutput()
-    await runWizard({ projectRoot: tmpDir, methodology: 'mvp', force: false, auto: true, output })
+    await runWizard({
+      projectType: 'data-science',
+      projectRoot: tmpDir,
+      methodology: 'mvp',
+      force: false,
+      auto: true,
+      output,
+    })
     const { config } = loadConfig(tmpDir, [])
     expect(config).not.toBeNull()
     expect(config!.methodology).toBe('mvp')
@@ -150,7 +158,14 @@ describe('scaffold init E2E', () => {
   // Test 3: config.yml contains correct methodology when methodology is 'deep'
   it('config.yml contains correct methodology for deep', async () => {
     const output = createMockOutput()
-    await runWizard({ projectRoot: tmpDir, methodology: 'deep', force: false, auto: true, output })
+    await runWizard({
+      projectType: 'data-science',
+      projectRoot: tmpDir,
+      methodology: 'deep',
+      force: false,
+      auto: true,
+      output,
+    })
     const { config } = loadConfig(tmpDir, [])
     expect(config).not.toBeNull()
     expect(config!.methodology).toBe('deep')
@@ -159,7 +174,14 @@ describe('scaffold init E2E', () => {
   // Test 4: state.json has correct structure
   it('state.json has correct structure', async () => {
     const output = createMockOutput()
-    await runWizard({ projectRoot: tmpDir, methodology: 'deep', force: false, auto: true, output })
+    await runWizard({
+      projectType: 'data-science',
+      projectRoot: tmpDir,
+      methodology: 'deep',
+      force: false,
+      auto: true,
+      output,
+    })
     const stateManager = new StateManager(tmpDir, () => [])
     const state = stateManager.loadState()
     expect(state['schema-version']).toBe(4)
@@ -173,9 +195,23 @@ describe('scaffold init E2E', () => {
   it('errors without --force if .scaffold/ exists', async () => {
     const output = createMockOutput()
     // First init
-    await runWizard({ projectRoot: tmpDir, methodology: 'mvp', force: false, auto: true, output })
+    await runWizard({
+      projectType: 'data-science',
+      projectRoot: tmpDir,
+      methodology: 'mvp',
+      force: false,
+      auto: true,
+      output,
+    })
     // Second init without --force should fail
-    const result = await runWizard({ projectRoot: tmpDir, methodology: 'mvp', force: false, auto: true, output })
+    const result = await runWizard({
+      projectType: 'data-science',
+      projectRoot: tmpDir,
+      methodology: 'mvp',
+      force: false,
+      auto: true,
+      output,
+    })
     expect(result.success).toBe(false)
     expect(result.errors[0]?.code).toBe('INIT_SCAFFOLD_EXISTS')
   })
@@ -184,9 +220,23 @@ describe('scaffold init E2E', () => {
   it('--force backs up existing .scaffold/', async () => {
     const output = createMockOutput()
     // First init with mvp
-    await runWizard({ projectRoot: tmpDir, methodology: 'mvp', force: false, auto: true, output })
+    await runWizard({
+      projectType: 'data-science',
+      projectRoot: tmpDir,
+      methodology: 'mvp',
+      force: false,
+      auto: true,
+      output,
+    })
     // Second init with --force and deep
-    await runWizard({ projectRoot: tmpDir, methodology: 'deep', force: true, auto: true, output })
+    await runWizard({
+      projectType: 'data-science',
+      projectRoot: tmpDir,
+      methodology: 'deep',
+      force: true,
+      auto: true,
+      output,
+    })
     // Backup directory must exist
     const backupExists =
       fs.existsSync(path.join(tmpDir, '.scaffold.backup')) ||
@@ -200,7 +250,14 @@ describe('scaffold init E2E', () => {
   // Test 7: Returns success: true with correct fields on first init
   it('returns success: true with correct fields on first init', async () => {
     const output = createMockOutput()
-    const result = await runWizard({ projectRoot: tmpDir, methodology: 'mvp', force: false, auto: true, output })
+    const result = await runWizard({
+      projectType: 'data-science',
+      projectRoot: tmpDir,
+      methodology: 'mvp',
+      force: false,
+      auto: true,
+      output,
+    })
     expect(result.success).toBe(true)
     expect(result.errors).toHaveLength(0)
     expect(result.projectRoot).toBe(tmpDir)
@@ -211,7 +268,14 @@ describe('scaffold init E2E', () => {
   // Test 8: decisions.jsonl is created empty
   it('decisions.jsonl is created as empty file', async () => {
     const output = createMockOutput()
-    await runWizard({ projectRoot: tmpDir, methodology: 'mvp', force: false, auto: true, output })
+    await runWizard({
+      projectType: 'data-science',
+      projectRoot: tmpDir,
+      methodology: 'mvp',
+      force: false,
+      auto: true,
+      output,
+    })
     const decisionsPath = path.join(tmpDir, '.scaffold', 'decisions.jsonl')
     expect(fs.existsSync(decisionsPath)).toBe(true)
     expect(fs.readFileSync(decisionsPath, 'utf8')).toBe('')
@@ -220,7 +284,14 @@ describe('scaffold init E2E', () => {
   // Test 9: instructions/ is a real directory (not a file)
   it('instructions/ is a directory', async () => {
     const output = createMockOutput()
-    await runWizard({ projectRoot: tmpDir, methodology: 'mvp', force: false, auto: true, output })
+    await runWizard({
+      projectType: 'data-science',
+      projectRoot: tmpDir,
+      methodology: 'mvp',
+      force: false,
+      auto: true,
+      output,
+    })
     const instrPath = path.join(tmpDir, '.scaffold', 'instructions')
     expect(fs.statSync(instrPath).isDirectory()).toBe(true)
   })
@@ -234,7 +305,14 @@ describe('scaffold init E2E', () => {
       sourceFileCount: 0,
     })
     const output = createMockOutput()
-    await runWizard({ projectRoot: tmpDir, methodology: 'deep', force: false, auto: true, output })
+    await runWizard({
+      projectType: 'data-science',
+      projectRoot: tmpDir,
+      methodology: 'deep',
+      force: false,
+      auto: true,
+      output,
+    })
     const stateManager = new StateManager(tmpDir, () => [])
     const state = stateManager.loadState()
     expect(state['init-mode']).toBe('brownfield')
@@ -251,6 +329,7 @@ describe('scaffold init E2E', () => {
       $0: 'scaffold',
       root: tmpDir,
       auto: true,
+      'project-type': 'data-science',
       force: false,
       methodology: 'mvp',
       idea: undefined,
@@ -276,6 +355,7 @@ describe('scaffold init E2E', () => {
       $0: 'scaffold',
       root: tmpDir,
       auto: true,
+      'project-type': 'data-science',
       force: false,
       methodology: 'mvp',
       idea: undefined,

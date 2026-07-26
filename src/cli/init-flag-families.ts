@@ -658,3 +658,43 @@ export function buildFlagOverrides(argv: Record<string, unknown>): PartialConfig
     return undefined
   }
 }
+
+// ---------------------------------------------------------------------------
+// Auto-mode discriminators
+// ---------------------------------------------------------------------------
+
+/**
+ * The one flag each project type must be given under `--auto`, because the
+ * wizard has no defensible default for it. `null` means the type is fully
+ * defaultable and needs no flag.
+ *
+ * One source of truth for three consumers: the `--help` annotation in
+ * init.ts, the INIT_AUTO_FLAG_REQUIRED error in wizard/questions.ts, and the
+ * published contract in content/guides/cli/index.md. Adding a project type
+ * without adding a row here fails init-flag-families.test.ts.
+ *
+ * Before this existed the same knowledge was duplicated across nine bare
+ * `throw new Error(...)` sites and documented in none of them, which is why
+ * `--auto` could not be driven from `--help` alone.
+ */
+export const AUTO_REQUIRED_FLAG: Readonly<Record<string, string | null>> = Object.freeze({
+  'web-app': 'web-rendering',
+  'backend': 'backend-api-style',
+  'cli': 'cli-interactivity',
+  'library': 'lib-visibility',
+  'mobile-app': 'mobile-platform',
+  'data-pipeline': 'pipeline-processing',
+  'ml': 'ml-phase',
+  'research': 'research-driver',
+  'mcp-server': 'mcp-language',
+  'game': null,
+  'browser-extension': null,
+  'macos-native': null,
+  'data-science': null,
+  'web3': null,
+})
+
+/** Help-text annotation for a flag that `--auto` requires. Empty otherwise. */
+export function autoRequiredSuffix(flag: string): string {
+  return Object.values(AUTO_REQUIRED_FLAG).includes(flag) ? ' [required with --auto]' : ''
+}

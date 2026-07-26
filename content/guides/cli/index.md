@@ -204,3 +204,104 @@ or read the bundled `content/guides/<topic>/index.md` directly. The generated
 - [Pipeline guide](../pipeline/index.md) — phase ordering and the navigation loop.
 - [Build Observability guide](../observability/index.md) — the full `observe`
   subsystem.
+
+## Driving scaffold from an agent
+
+Every command below is safe to run with no TTY. Pass `--format json` and read
+stdout; human-readable progress goes to stderr and can be discarded.
+
+### Exit codes
+
+| Code | Name | Meaning |
+|------|------|---------|
+| 0 | `Success` | The command did what was asked. |
+| 1 | `ValidationError` | Bad or missing input. `errors[0].recovery` names the fix. |
+| 2 | `MissingDependency` | A required external tool is absent. |
+| 3 | `StateCorruption` | `.scaffold/state.json` could not be read or migrated, or a lock could not be acquired. |
+| 4 | `UserCancellation` | An interactive prompt was cancelled. |
+| 5 | `BuildError` | Adapter generation failed. |
+| 6 | `Ambiguous` | Operator action required, such as detection finding two equally plausible project types. Re-run with `--project-type`. |
+
+Source of truth: `src/types/enums.ts`. A bats gate asserts this table and the
+enum agree in both directions, so a code cannot change on one side only.
+
+### The output envelope
+
+Success:
+
+```json
+{"success": true, "data": {}, "errors": [], "warnings": [], "exit_code": 0}
+```
+
+Failure:
+
+```json
+{
+  "success": false,
+  "data": null,
+  "errors": [
+    {
+      "code": "INIT_AUTO_FLAG_REQUIRED",
+      "message": "--cli-interactivity is required in auto mode for cli projects",
+      "exitCode": 1,
+      "recovery": "Pass --cli-interactivity <args-only|interactive|hybrid>"
+    }
+  ],
+  "warnings": [],
+  "exit_code": 1
+}
+```
+
+Branch on `success`. Every failure carries at least one entry in `errors`, and
+every entry carries a `recovery` string naming the flag or command that fixes
+it. `exit_code` always matches the process exit status.
+
+### Choosing `init` or `adopt`
+
+Run `scaffold adopt` when the directory already contains source code or docs.
+It initializes `.scaffold/` itself and selects the `brownfield` methodology, so
+no separate `scaffold init` is needed. Run `scaffold init` for an empty or
+brand-new directory.
+
+### Flags `--auto` cannot default
+
+Nine project types need one flag chosen explicitly, because there is no
+defensible default. They are annotated `[required with --auto]` in
+`scaffold init --help`.
+
+| `--project-type` | Required flag |
+|---|---|
+| `web-app` | `--web-rendering` |
+| `backend` | `--backend-api-style` |
+| `cli` | `--cli-interactivity` |
+| `library` | `--lib-visibility` |
+| `mobile-app` | `--mobile-platform` |
+| `data-pipeline` | `--pipeline-processing` |
+| `ml` | `--ml-phase` |
+| `research` | `--research-driver` |
+| `mcp-server` | `--mcp-language` |
+
+`game`, `browser-extension`, `macos-native`, `data-science` and `web3` need
+none. A type-specific flag implies its project type, so
+`scaffold init --auto --cli-interactivity args-only` is sufficient on its own.
+
+Any non-interactive mode implies `--auto`: a piped invocation, or `--format
+json`, will refuse to invent an answer rather than silently choosing one.
+
+### The driving loop
+
+```bash
+scaffold next --format json          # .data.eligible[].command is runnable as-is
+scaffold run <slug>                  # prints the assembled meta-prompt on stdout
+scaffold complete <slug> --format json
+```
+
+Repeat until `.data.pipeline_complete` is `true`.
+
+### Adoption plan keys
+
+`plan_key` is content-addressed: it hashes the plan's dispositions and
+initialize payload, and deliberately excludes `project_root` and `generated_at`
+(`src/project/adoption-plan.ts`). Two repos whose plans are identical therefore
+share a key. Do not cache a key across repositories; always read the key from
+the plan you just rendered.

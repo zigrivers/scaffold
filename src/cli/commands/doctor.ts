@@ -1,7 +1,7 @@
 import type { CommandModule } from 'yargs'
 import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
-import { createOutputContext } from '../output/context.js'
+import { createOutputContext, exitNotInitialized } from '../output/context.js'
 import { runDoctor } from '../../doctor/run.js'
 import type { DoctorStatus } from '../../doctor/types.js'
 
@@ -35,11 +35,7 @@ const doctorCommand: CommandModule<Record<string, unknown>, DoctorArgs> = {
   handler: async (argv) => {
     const projectRoot = argv.root ?? findProjectRoot(process.cwd())
     if (!projectRoot) {
-      process.stderr.write(
-        '✗ error [PROJECT_NOT_INITIALIZED]: No .scaffold/ directory found\n' +
-        '  Fix: Run `scaffold init` (or `scaffold adopt` for an existing repo)\n',
-      )
-      process.exitCode = 2
+      exitNotInitialized(argv)
       return
     }
     const outputMode = resolveOutputMode(argv)

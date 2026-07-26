@@ -1,6 +1,6 @@
 import type { ScaffoldError, ScaffoldWarning } from '../../types/index.js'
 import type { OutputMode } from '../../types/index.js'
-import type { ExitCode } from '../../types/enums.js'
+import { ExitCode } from '../../types/enums.js'
 import type { TerminalError } from '../../types/errors.js'
 import { InteractiveOutput } from './interactive.js'
 import { JsonOutput } from './json.js'
@@ -79,4 +79,32 @@ export function createOutputContext(mode: OutputMode): OutputContext {
   default:
     return new InteractiveOutput()
   }
+}
+
+/**
+ * Emit the "no .scaffold/ here" failure through the envelope and exit.
+ *
+ * Five sites reported this by writing to stderr and calling process.exit()
+ * BEFORE any output context existed, so `--format json` produced a non-zero
+ * exit with empty stdout. It is the single most common failure an agent hits
+ * (running any command outside a project), which made it the worst one to
+ * leave unparseable.
+ *
+ * Sets `process.exitCode` and returns rather than calling `process.exit()`:
+ * exiting immediately after writing can truncate buffered stdout, which would
+ * recreate the empty-output failure this helper exists to remove. Every caller
+ * returns straight after invoking it.
+ */
+export function exitNotInitialized(argv: { format?: string; auto?: boolean }): void {
+  const output = createOutputContext(
+    argv.format === 'json' ? 'json' : 'auto',
+  )
+  output.fail([{
+    code: 'PROJECT_NOT_INITIALIZED',
+    message: 'No .scaffold/ directory found',
+    exitCode: ExitCode.ValidationError,
+    recovery: 'Run `scaffold init` to initialize a project, '
+      + 'or `scaffold adopt` if the directory already has code',
+  }])
+  process.exitCode = ExitCode.ValidationError
 }

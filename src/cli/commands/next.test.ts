@@ -223,7 +223,7 @@ describe('next command', () => {
   it('exits 1 when project root not found', async () => {
     mockFindProjectRoot.mockReturnValue(null)
     await nextCommand.handler(defaultArgv())
-    expect(exitSpy).toHaveBeenCalledWith(1)
+    expect(process.exitCode).toBe(1)   // no longer process.exit(): see exitNotInitialized
   })
 
   it('does NOT call reconcileWithPipeline — next is a read-only inspection', async () => {

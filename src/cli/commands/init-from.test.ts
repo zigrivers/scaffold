@@ -25,6 +25,7 @@ vi.mock('../output/context.js', () => ({
     warn: vi.fn(),
     error: vi.fn(),
     result: vi.fn(),
+    fail: vi.fn(),
     supportsInteractivePrompts: vi.fn().mockReturnValue(false),
     prompt: vi.fn().mockResolvedValue(''),
     confirm: vi.fn().mockResolvedValue(false),
@@ -288,47 +289,47 @@ describe('init --from: handler integration', () => {
     )
   })
 
-  it('missing file exits with code 2', async () => {
+  it('missing file exits with code 1', async () => {
     await initCommand.handler(defaultArgv({
       root: tmpDir,
       from: path.join(tmpDir, 'nonexistent.yml'),
     }))
 
-    expect(process.exitCode).toBe(2)
+    expect(process.exitCode).toBe(1)   // Task 8: was 2 (MissingDependency), now ValidationError
     expect(mockMaterialize).not.toHaveBeenCalled()
   })
 
-  it('invalid YAML exits with code 2', async () => {
+  it('invalid YAML exits with code 1', async () => {
     const ymlPath = path.join(tmpDir, 'bad.yml')
     fs.writeFileSync(ymlPath, 'foo: [bar: baz')  // malformed YAML
 
     await initCommand.handler(defaultArgv({ root: tmpDir, from: ymlPath }))
 
-    expect(process.exitCode).toBe(2)
+    expect(process.exitCode).toBe(1)   // Task 8: was 2 (MissingDependency), now ValidationError
     expect(mockMaterialize).not.toHaveBeenCalled()
   })
 
-  it('invalid schema (missing version) exits with code 2', async () => {
+  it('invalid schema (missing version) exits with code 1', async () => {
     const ymlPath = path.join(tmpDir, 'bad-schema.yml')
     fs.writeFileSync(ymlPath, 'methodology: deep\n')
 
     await initCommand.handler(defaultArgv({ root: tmpDir, from: ymlPath }))
 
-    expect(process.exitCode).toBe(2)
+    expect(process.exitCode).toBe(1)   // Task 8: was 2 (MissingDependency), now ValidationError
     expect(mockMaterialize).not.toHaveBeenCalled()
   })
 
-  it('invalid schema (wrong version) exits with code 2', async () => {
+  it('invalid schema (wrong version) exits with code 1', async () => {
     const ymlPath = path.join(tmpDir, 'bad-ver.yml')
     fs.writeFileSync(ymlPath, 'version: 99\nmethodology: deep\n')
 
     await initCommand.handler(defaultArgv({ root: tmpDir, from: ymlPath }))
 
-    expect(process.exitCode).toBe(2)
+    expect(process.exitCode).toBe(1)   // Task 8: was 2 (MissingDependency), now ValidationError
     expect(mockMaterialize).not.toHaveBeenCalled()
   })
 
-  it('ExistingScaffoldError from materialize exits with code 2', async () => {
+  it('ExistingScaffoldError from materialize exits with code 1', async () => {
     const ymlPath = path.join(tmpDir, 'services.yml')
     fs.writeFileSync(ymlPath, VALID_SERVICES_YAML)
 
@@ -338,17 +339,17 @@ describe('init --from: handler integration', () => {
 
     await initCommand.handler(defaultArgv({ root: tmpDir, from: ymlPath }))
 
-    expect(process.exitCode).toBe(2)
+    expect(process.exitCode).toBe(1)   // Task 8: was 2 (MissingDependency), now ValidationError
   })
 
-  it('--from - with TTY stdin exits with code 2', async () => {
+  it('--from - with TTY stdin exits with code 1', async () => {
     // Mock process.stdin.isTTY to be true
     const origIsTTY = process.stdin.isTTY
     Object.defineProperty(process.stdin, 'isTTY', { value: true, writable: true })
 
     try {
       await initCommand.handler(defaultArgv({ root: tmpDir, from: '-' }))
-      expect(process.exitCode).toBe(2)
+      expect(process.exitCode).toBe(1)   // Task 8: was 2 (MissingDependency), now ValidationError
     } finally {
       Object.defineProperty(process.stdin, 'isTTY', { value: origIsTTY, writable: true })
     }

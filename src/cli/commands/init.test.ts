@@ -929,7 +929,8 @@ describe('--from input handling (Task 9)', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'scaffold-from-'))
     execFileSync('git', ['init', '-q'], { cwd: dir })
     fs.writeFileSync(path.join(dir, 'cfg.yml'),
-      'version: 2\nmethodology: mvp\nplatforms:\n  - claude-code\n')
+      'version: 2\nmethodology: mvp\nplatforms:\n  - claude-code\n'
+      + 'project:\n  projectType: data-science\n')
     const out = execFileSync(process.execPath,
       [DIST, 'init', '--from', 'cfg.yml', '--format', 'json'],
       { cwd: dir, encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 60_000 })
@@ -951,7 +952,8 @@ describe('--from input handling (Task 9)', () => {
       {
         cwd: dir,
         encoding: 'utf-8',
-        input: 'version: 2\nmethodology: mvp\nplatforms:\n  - claude-code\n',
+        input: 'version: 2\nmethodology: mvp\nplatforms:\n  - claude-code\n'
+          + 'project:\n  projectType: data-science\n',
         timeout: 60_000,
       })
     expect(out.trim(), 'the space-separated --from - form must not be rejected').not.toBe('')

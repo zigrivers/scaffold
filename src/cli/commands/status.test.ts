@@ -256,7 +256,7 @@ describe('status command', () => {
   it('exits 1 when project root not found', async () => {
     mockFindProjectRoot.mockReturnValue(null)
     await statusCommand.handler(defaultArgv())
-    expect(exitSpy).toHaveBeenCalledWith(1)
+    expect(process.exitCode).toBe(1)   // no longer process.exit(): see exitNotInitialized
   })
 
   it('warns when no pipeline content is resolved instead of silently reporting completion', async () => {
