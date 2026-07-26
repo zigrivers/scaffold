@@ -813,12 +813,25 @@ Expected: PASS
 
 - [ ] **Step 6: Verify the end-to-end shape**
 
-Run:
+Verify against a path Release 1 actually fixes. `INIT_AUTO_FLAG_REQUIRED` does **not** exist yet: Task 4 introduces it in Release 2, and until then the discriminator check is still a bare `throw` that this handler deliberately re-throws. The wizard's preflight error is the Release 1 path, because it arrives via `result.errors` rather than an exception.
+
 ```bash
-cd "$(mktemp -d)" && git init -q
-node "$OLDPWD/dist/index.js" init --auto --format json --project-type cli; echo "exit=$?"
+D="$(mktemp -d)"; cd "$D" && git init -q
+node "$OLDPWD/dist/index.js" init --auto --format json \
+  --project-type cli --cli-interactivity args-only >/dev/null 2>&1   # succeed once
+node "$OLDPWD/dist/index.js" init --auto --format json \
+  --project-type cli --cli-interactivity args-only > out.json 2>err.txt; echo "exit=$?"
+jq -r '"\(.success) \(.errors[0].code) \(.exit_code)"' out.json
+grep -c 'Web-App Configuration:' err.txt   # expected: 0
 ```
-Expected: `exit=1`, stdout is a single line parsing as JSON with `success:false` and `errors[0].code === 'INIT_AUTO_FLAG_REQUIRED'`, stderr is two lines with no usage block
+Expected: `exit=1`, `false INIT_SCAFFOLD_EXISTS 1`, and `0` usage-block lines.
+
+Also verify the argument-error path, which Release 1 does close:
+
+```bash
+node "$OLDPWD/dist/index.js" init --format json --nonexistent-flag > arg.json 2>/dev/null; echo "exit=$?"
+jq -r '.errors[0].code' arg.json    # expected: CLI_ARGUMENT_ERROR
+```
 
 - [ ] **Step 7: Commit**
 
@@ -879,10 +892,32 @@ describe('createOutputModeMiddleware auto normalization', () => {
     const argv: Record<string, unknown> = { auto: false }
     // Interactive requires a real TTY; in the test process stdout is not one,
     // so assert through resolveOutputMode's injectable form instead.
+    void middleware
     expect(resolveOutputMode(argv, { stdin: true, stdout: true })).toBe('interactive')
+  })
+
+  // This is the only place the "json mode alone normalizes auto" claim can be
+  // proved. The e2e helper always runs without a TTY, so a pass there cannot
+  // distinguish json-mode normalization from non-TTY normalization. Here TTY
+  // state is injected, so the two causes are separable.
+  it('normalizes auto for json mode even when both streams ARE TTYs', () => {
+    const tty = { stdin: true, stdout: true }
+    expect(resolveOutputMode({ format: 'json' }, tty)).toBe('json')
+    expect(resolveOutputMode({}, tty)).toBe('interactive')   // control: TTY alone does not
   })
 })
 ```
+
+Because `createOutputModeMiddleware` reads real process TTY state internally, give it the same injectable seam as `resolveOutputMode` so the assertion above can be made through the middleware too:
+
+```typescript
+// src/cli/middleware/output-mode.ts — signature only; body as in Step 3b
+export function createOutputModeMiddleware(
+  tty?: { stdin: boolean; stdout: boolean },
+): (argv: Record<string, unknown>) => void
+```
+
+Pass `tty` straight through to `resolveOutputMode`. Production callers omit it and get real process state.
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -1162,10 +1197,39 @@ describe('toScaffoldError', () => {
     }
     expect(() => toScaffoldError(new NewlyAddedError())).toThrow(/Unmapped ScaffoldUserError/)
   })
+
+  // The real exhaustiveness gate. The hand-written list above proves the
+  // current subclasses behave; it cannot prove a FUTURE subclass was mapped,
+  // because whoever forgets the mapping also forgets the list entry. This
+  // reflects over the module's own exports, so adding an exported subclass
+  // fails here with no list to maintain.
+  it('has a mapping for every exported ScaffoldUserError subclass', async () => {
+    const mod = await import('./user-errors.js')
+    const subclasses = Object.values(mod).filter(
+      (v): v is new (...args: never[]) => ScaffoldUserError =>
+        typeof v === 'function'
+        && v !== mod.ScaffoldUserError
+        && v.prototype instanceof mod.ScaffoldUserError,
+    )
+    expect(subclasses.length).toBeGreaterThanOrEqual(12)
+    const unmapped = subclasses
+      .map(Cls => Cls.name)
+      .filter(name => !(name in USER_ERROR_CODES))
+    expect(unmapped, `unmapped subclasses: ${unmapped.join(', ')}`).toEqual([])
+  })
+
+  it('gives every mapped entry a non-empty recovery', () => {
+    for (const [name, entry] of Object.entries(USER_ERROR_CODES)) {
+      expect(entry.recovery, `${name} recovery`).toBeTruthy()
+      expect(entry.recovery.length, `${name} recovery`).toBeGreaterThan(10)
+    }
+  })
 })
 ```
 
-The second test is the exhaustiveness gate: adding a `ScaffoldUserError` subclass without a mapping entry now fails a test instead of silently producing an error with no recovery text. Import every subclass plus `ScaffoldUserError` itself at the top of the file.
+This requires exporting the map: change `const USER_ERROR_CODES` to `export const USER_ERROR_CODES` in `src/utils/user-errors.ts`, and import it plus `ScaffoldUserError` in the test.
+
+The `>= 12` floor is deliberate. A refactor that stopped exporting the subclasses would otherwise leave `subclasses` empty and the `unmapped` assertion trivially green, so the gate would silently stop gating.
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -1273,13 +1337,45 @@ export function toScaffoldError(err: ScaffoldUserError): ScaffoldError {
 }
 ```
 
-- [ ] **Step 5: Replace Task 5's shim**
+- [ ] **Step 5: Rewrite the `init.ts` catch block — this is the step that closes F4 on the `--from` path**
 
-In `src/cli/commands/init.ts`, delete the temporary inline `toScaffoldError` and import the real one:
+Task 5 deliberately left `src/cli/commands/init.ts:841-848` untouched so Release 1 would carry no Release 2 symbols. This step is where it is finally replaced. Without it the mapper is dead code: `--from` failures stay uncoded, keep exit 2, and still produce empty stdout under `--format json`, so Task 12's "never exits non-zero with empty stdout" case cannot pass.
+
+Update the import:
 
 ```typescript
 import { TTYStdinError, isScaffoldUserError, toScaffoldError } from '../../utils/user-errors.js'
 ```
+
+Replace the catch:
+
+```typescript
+    } catch (err) {
+      // Errors that already carry a ScaffoldError (AutoFlagRequiredError from
+      // Task 4, and anything later adopting the same shape) are forwarded as
+      // they are. Structural check rather than `instanceof` so this does not
+      // depend on the class identity.
+      const carried = (err as { scaffoldError?: ScaffoldError } | null)?.scaffoldError
+      if (carried) {
+        output.fail([carried])
+        process.exitCode = carried.exitCode
+        return
+      }
+      if (isScaffoldUserError(err)) {
+        const scaffoldError = toScaffoldError(err)
+        output.fail([scaffoldError])
+        process.exitCode = scaffoldError.exitCode
+        return
+      }
+      // Genuine internal failure: let it surface as a stack trace rather than
+      // be mislabelled as bad user input.
+      throw err
+    }
+```
+
+Add `import type { ScaffoldError } from '../../types/errors.js'` if it is not already imported.
+
+This follows the `fail()` call convention from Global Constraints: the array form, the exit code read from the error, and no hardcoded literal.
 
 - [ ] **Step 6: Write the convergence test**
 
@@ -1840,16 +1936,35 @@ import path from 'node:path'
 
 const CLI = path.resolve('dist/index.js')
 
-/** Run the CLI exactly as an agent would: no TTY, stdin closed, JSON out. */
+/**
+ * Run the CLI exactly as an agent would: no TTY, stdin closed, JSON out.
+ *
+ * The timeout is load-bearing, not defensive. This suite's headline property is
+ * "no invocation hangs". Without a bound, a regression that waits on input
+ * would hang CI forever instead of failing a test, so the very thing being
+ * asserted would be the thing that stops the assertion from running.
+ */
+const RUN_TIMEOUT_MS = 60_000
+
 function run(args: string[], cwd: string): { code: number; stdout: string; stderr: string } {
   try {
     const stdout = execFileSync(process.execPath, [CLI, ...args], {
-      cwd, encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'],
+      cwd, encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'], timeout: RUN_TIMEOUT_MS,
     })
     return { code: 0, stdout, stderr: '' }
   } catch (e) {
-    const err = e as { status: number; stdout: string; stderr: string }
-    return { code: err.status, stdout: err.stdout ?? '', stderr: err.stderr ?? '' }
+    const err = e as {
+      status: number | null; stdout: string; stderr: string
+      killed?: boolean; signal?: string; code?: string
+    }
+    if (err.killed || err.signal === 'SIGTERM' || err.code === 'ETIMEDOUT') {
+      throw new Error(
+        `scaffold ${args.join(' ')} did not exit within ${RUN_TIMEOUT_MS}ms. `
+        + 'A command waited for input that an agent cannot supply, which is the '
+        + 'exact failure this suite exists to catch.',
+      )
+    }
+    return { code: err.status ?? 1, stdout: err.stdout ?? '', stderr: err.stderr ?? '' }
   }
 }
 
@@ -1960,11 +2075,12 @@ describe('agent-drivability: path (a) new project', () => {
     expect(parsed.errors[0].code).toBe('CLI_ARGUMENT_ERROR')
   })
 
-  it('requires a discriminator under --format json even in a TTY', () => {
-    // The second, easier-to-miss half of the D1 break. argv.auto is normalized
-    // for every non-interactive mode, not just non-TTY, because JsonOutput
-    // never prompts and was silently defaulting too. Asserted separately so a
-    // regression here cannot hide behind the non-TTY case passing.
+  it('requires a discriminator under --format json', () => {
+    // NOT a TTY test. This helper always runs with stdin closed and stdout
+    // piped, so a pass here could equally be explained by non-TTY
+    // normalization. It is kept as a regression guard on the observable
+    // command behavior; the claim that *json mode alone* normalizes argv.auto
+    // is proved in Task 6's middleware test, where TTY state is injectable.
     const dir = tmpRepo()
     const r = run(['init', '--format', 'json', '--project-type', 'web-app'], dir)
     expect(r.code).toBe(1)
