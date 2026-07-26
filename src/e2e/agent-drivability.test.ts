@@ -180,6 +180,35 @@ describe.skipIf(!DIST_BUILT)('agent-drivability: nothing is invented', () => {
     expect(fs.existsSync(path.join(dir, '.scaffold', 'config.yml'))).toBe(false)
   }, RUN_TIMEOUT_MS)
 
+  it('rejects a --from config that omits projectType', () => {
+    // Task 7's guard lives in askWizardQuestions, but --from never calls the
+    // wizard: it parses YAML and materializes it directly. A schema-valid
+    // config without a project type would otherwise write exactly the typeless
+    // config F3 is about, on a path the wizard guard cannot see.
+    const dir = tmpRepo()
+    fs.writeFileSync(
+      path.join(dir, 'cfg.yml'),
+      'version: 2\nmethodology: mvp\nplatforms:\n  - claude-code\n',
+    )
+    const r = run(['init', '--from', 'cfg.yml', '--format', 'json'], dir)
+    expect(r.code).toBe(1)
+    expect(JSON.parse(r.stdout).errors[0].code).toBe('INIT_PROJECT_TYPE_REQUIRED')
+    expect(fs.existsSync(path.join(dir, '.scaffold', 'config.yml'))).toBe(false)
+  }, RUN_TIMEOUT_MS)
+
+  it('accepts a --from config that declares projectType', () => {
+    const dir = tmpRepo()
+    fs.writeFileSync(
+      path.join(dir, 'cfg.yml'),
+      'version: 2\nmethodology: mvp\nplatforms:\n  - claude-code\n'
+      + 'project:\n  projectType: data-science\n',
+    )
+    const r = run(['init', '--from', 'cfg.yml', '--format', 'json'], dir)
+    expect(r.code).toBe(0)
+    expect(fs.readFileSync(path.join(dir, '.scaffold', 'config.yml'), 'utf-8'))
+      .toContain('projectType: data-science')
+  }, RUN_TIMEOUT_MS)
+
   it('records a project type whenever it writes a config', () => {
     const dir = tmpRepo()
     const r = run(

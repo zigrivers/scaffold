@@ -7,6 +7,7 @@ import { parse as parseYaml } from 'yaml'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
 import { runWizard, materializeScaffoldProject, readOldStateIfExists } from '../../wizard/wizard.js'
+import { AutoFlagRequiredError } from '../../wizard/questions.js'
 import { runBuild } from './build.js'
 import { syncSkillsIfNeeded } from '../../core/skills/sync.js'
 import { shutdown } from '../shutdown.js'
@@ -648,6 +649,26 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
             throw new InvalidConfigError(sourceLabel, formatZodError(parseResult.error))
           }
           const config = parseResult.data as unknown as ScaffoldConfig
+          // Task 7's guard lives in askWizardQuestions, which --from never
+          // calls: this path parses YAML and materializes it directly. Without
+          // this check a schema-valid config could still write the typeless
+          // project the wizard now refuses to produce, on the one path the
+          // wizard cannot see.
+          // Multi-service configs are exempt: ServiceSchema requires a
+          // projectType on EVERY service (config/schema.ts), so the type is
+          // declared per service rather than at project.projectType. Requiring
+          // it at the top level would reject every valid services[] config.
+          const hasServices = (config.project?.services?.length ?? 0) > 0
+          if (!hasServices && config.project?.projectType === undefined) {
+            throw new AutoFlagRequiredError({
+              code: 'INIT_PROJECT_TYPE_REQUIRED',
+              message: `${sourceLabel} does not set project.projectType`,
+              exitCode: ExitCode.ValidationError,
+              recovery: `Add "project: { projectType: <${ProjectTypeSchema.options.join('|')}> }" `
+                + 'to the config, since a config with no project type disables every '
+                + 'type-conditional step',
+            })
+          }
           fromConfig = config
           const oldState = readOldStateIfExists(projectRoot)
           await materializeScaffoldProject(config, {

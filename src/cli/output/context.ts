@@ -90,9 +90,12 @@ export function createOutputContext(mode: OutputMode): OutputContext {
  * (running any command outside a project), which made it the worst one to
  * leave unparseable.
  *
- * Returns `never`; callers may still `return` after it for clarity.
+ * Sets `process.exitCode` and returns rather than calling `process.exit()`:
+ * exiting immediately after writing can truncate buffered stdout, which would
+ * recreate the empty-output failure this helper exists to remove. Every caller
+ * returns straight after invoking it.
  */
-export function exitNotInitialized(argv: { format?: string; auto?: boolean }): never {
+export function exitNotInitialized(argv: { format?: string; auto?: boolean }): void {
   const output = createOutputContext(
     argv.format === 'json' ? 'json' : 'auto',
   )
@@ -103,5 +106,5 @@ export function exitNotInitialized(argv: { format?: string; auto?: boolean }): n
     recovery: 'Run `scaffold init` to initialize a project, '
       + 'or `scaffold adopt` if the directory already has code',
   }])
-  process.exit(1)
+  process.exitCode = ExitCode.ValidationError
 }
