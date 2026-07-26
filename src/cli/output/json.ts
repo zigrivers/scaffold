@@ -55,6 +55,18 @@ export class JsonOutput implements OutputContext {
 
   fail(errors: TerminalError[], exitCode?: ExitCode): void {
     const resolved = exitCode ?? errors[0]?.exitCode ?? ExitCode.ValidationError
+    // A failure envelope with an empty errors array tells a caller that
+    // something went wrong and nothing about what, which is only marginally
+    // better than the empty stdout this replaced. Guarantee at least one
+    // actionable entry so `errors[0].code` is always safe to read.
+    if (errors.length === 0) {
+      errors = [{
+        code: 'INTERNAL_ERROR',
+        message: 'The command failed without reporting a specific error.',
+        exitCode: resolved,
+        recovery: 'Re-run with --verbose for detail; if it persists, this is a bug worth reporting',
+      }]
+    }
     // Human-readable half on stderr, matching error(), so a person piping
     // stdout to jq still sees what went wrong.
     for (const e of errors) {
