@@ -177,6 +177,10 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       .option('verbose', { type: 'boolean', default: false, describe: 'Verbose output' })
       .option('from', {
         type: 'string',
+        // Without requiresArg, yargs treats the bare "-" as a positional and
+        // .strict() rejects it with "Unknown argument: -", contradicting this
+        // very describe string. Verified against yargs 17 both ways.
+        requiresArg: true,
         describe: 'Path to a ScaffoldConfig YAML file, or "-" for stdin. Exclusive with config-setting flags.',
       })
       // Configuration options
@@ -610,6 +614,11 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
     let phase1Success = false
     // Wizard result — populated by the wizard path, undefined for --from path
     let result: Awaited<ReturnType<typeof runWizard>> | undefined
+    // The --from path produces no WizardResult, but --format json still
+    // owes the caller a parseable result. Captured here so the emit site
+    // below can synthesize one instead of falling through to a
+    // stderr-only success message.
+    let fromConfig: ScaffoldConfig | undefined
 
     try {
       // Phase 1: collect or parse config (Ctrl-C → clean exit, no changes)
@@ -629,6 +638,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
             throw new InvalidConfigError(sourceLabel, formatZodError(parseResult.error))
           }
           const config = parseResult.data as unknown as ScaffoldConfig
+          fromConfig = config
           const oldState = readOldStateIfExists(projectRoot)
           await materializeScaffoldProject(config, {
             projectRoot, force: argv.force ?? false, oldState, output,
@@ -830,16 +840,20 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
             // best-effort — don't fail init if skill sync fails
           }
 
-          if (outputMode === 'json' && result) {
+          const emitted = result ?? {
+            success: true as const,
+            projectRoot,
+            configPath: path.join(projectRoot, '.scaffold', 'config.yml'),
+            methodology: fromConfig?.methodology ?? 'unknown',
+            errors: [],
+          }
+          if (outputMode === 'json') {
             output.result({
-              ...result,
+              ...emitted,
               buildResult: buildResult.data ?? null,
             })
-          } else if (result) {
-            output.success(`Scaffold initialized at ${result.configPath}`)
           } else {
-            // --from path: no WizardResult, just confirm success
-            output.success(`Scaffold initialized at ${path.join(projectRoot, '.scaffold', 'config.yml')}`)
+            output.success(`Scaffold initialized at ${emitted.configPath}`)
           }
         },
       )
