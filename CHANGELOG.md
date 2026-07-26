@@ -34,6 +34,16 @@ If you branch on exit 2 from any of those commands, branch on 1 instead. The
 failure now also carries a machine-readable `code` (`RUN_SERVICE_REQUIRED`,
 `RUN_SERVICE_NOT_FOUND`, …) — prefer that over the exit code.
 
+Two smaller exit-code corrections ride along, both for the same reason —
+`MissingDependency` was being used where nothing was missing:
+
+- `scaffold rework --advance` defaults to **1** (was 2) when the underlying
+  error carries no exit code of its own.
+- `DEP_TARGET_MISSING` from `scaffold info` is now **2**, matching `check`,
+  `complete`, `reset`, and `skip`. It was the only one of the five reporting 1,
+  so the same error code answered differently depending on which command you
+  asked.
+
 ### Fixed
 
 - **Empty stdout on failure, across every command.** `run`, `mq`, `tia`,

@@ -261,7 +261,10 @@ describe('the envelope contract is CLI-wide', () => {
       lines.forEach((line, i) => {
         if (!/\bdisplayErrors\(/.test(line)) return
         if (/displayErrors\(\s*\[\]/.test(line)) return   // warnings-only
-        const after = lines.slice(i, i + 4).join(' ')
+        // 10-line window, not 4: a terminal site that sets its exit a few
+        // lines below the call would otherwise slip through, which is the
+        // same class of gap as the enum spelling this gate already missed once.
+        const after = lines.slice(i, i + 10).join(' ')
         if (NONZERO_EXIT.test(after)) offenders.push(`${p}:${i + 1}`)
       })
     }

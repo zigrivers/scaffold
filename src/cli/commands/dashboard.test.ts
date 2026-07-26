@@ -203,10 +203,20 @@ describe('dashboard command', () => {
     // which sets process.exitCode and returns rather than exiting — exiting
     // straight after the write can truncate the envelope.
     vi.spyOn(projectRootModule, 'findProjectRoot').mockReturnValue(null)
+    const stdout: string[] = []
+    vi.spyOn(process.stdout, 'write').mockImplementation((c) => { stdout.push(String(c)); return true })
 
-    await runDashboardHandler({ ...BASE_ARGV })
+    await runDashboardHandler({ ...BASE_ARGV, format: 'json' })
 
     expect(process.exitCode).toBe(1)
+    // The name promises "a parseable envelope", so parse one. Asserting only
+    // the exit code would leave the test passing if stdout were empty — which
+    // is precisely the defect it exists to cover.
+    const envelope = JSON.parse(stdout.join(''))
+    expect(envelope.success).toBe(false)
+    expect(envelope.errors[0].code).toBe('PROJECT_NOT_INITIALIZED')
+    expect(envelope.errors[0].recovery).toBeTruthy()
+    expect(envelope.exit_code).toBe(1)
   })
 
   it('--json-only outputs JSON to stdout', async () => {
