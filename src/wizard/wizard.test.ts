@@ -91,14 +91,14 @@ describe('runWizard', () => {
   // Test 1: Creates .scaffold/ directory
   it('creates .scaffold/ directory', async () => {
     const output = makeOutputContext()
-    await runWizard({ projectRoot: tmpDir, auto: true, force: false, output })
+    await runWizard({ projectType: 'data-science', projectRoot: tmpDir, auto: true, force: false, output  })
     expect(fs.existsSync(path.join(tmpDir, '.scaffold'))).toBe(true)
   })
 
   // Test 2: Writes valid config.yml with YAML content
   it('writes valid config.yml with YAML content', async () => {
     const output = makeOutputContext()
-    await runWizard({ projectRoot: tmpDir, auto: true, force: false, output })
+    await runWizard({ projectType: 'data-science', projectRoot: tmpDir, auto: true, force: false, output  })
     const configPath = path.join(tmpDir, '.scaffold', 'config.yml')
     expect(fs.existsSync(configPath)).toBe(true)
     const content = fs.readFileSync(configPath, 'utf8')
@@ -111,7 +111,7 @@ describe('runWizard', () => {
   // Test 3: Creates state.json
   it('creates state.json', async () => {
     const output = makeOutputContext()
-    await runWizard({ projectRoot: tmpDir, auto: true, force: false, output })
+    await runWizard({ projectType: 'data-science', projectRoot: tmpDir, auto: true, force: false, output  })
     const statePath = path.join(tmpDir, '.scaffold', 'state.json')
     expect(fs.existsSync(statePath)).toBe(true)
     const parsed = JSON.parse(fs.readFileSync(statePath, 'utf8')) as Record<string, unknown>
@@ -121,7 +121,7 @@ describe('runWizard', () => {
   // Test 4: Creates empty decisions.jsonl
   it('creates empty decisions.jsonl', async () => {
     const output = makeOutputContext()
-    await runWizard({ projectRoot: tmpDir, auto: true, force: false, output })
+    await runWizard({ projectType: 'data-science', projectRoot: tmpDir, auto: true, force: false, output  })
     const decisionsPath = path.join(tmpDir, '.scaffold', 'decisions.jsonl')
     expect(fs.existsSync(decisionsPath)).toBe(true)
     expect(fs.readFileSync(decisionsPath, 'utf8')).toBe('')
@@ -130,7 +130,7 @@ describe('runWizard', () => {
   // Test 5: Creates .scaffold/instructions/ directory
   it('creates .scaffold/instructions/ directory', async () => {
     const output = makeOutputContext()
-    await runWizard({ projectRoot: tmpDir, auto: true, force: false, output })
+    await runWizard({ projectType: 'data-science', projectRoot: tmpDir, auto: true, force: false, output  })
     expect(fs.existsSync(path.join(tmpDir, '.scaffold', 'instructions'))).toBe(true)
     expect(fs.statSync(path.join(tmpDir, '.scaffold', 'instructions')).isDirectory()).toBe(true)
   })
@@ -139,7 +139,13 @@ describe('runWizard', () => {
   it('returns INIT_SCAFFOLD_EXISTS error when .scaffold/ exists and force=false', async () => {
     fs.mkdirSync(path.join(tmpDir, '.scaffold'))
     const output = makeOutputContext()
-    const result = await runWizard({ projectRoot: tmpDir, auto: true, force: false, output })
+    const result = await runWizard({
+      projectType: 'data-science',
+      projectRoot: tmpDir,
+      auto: true,
+      force: false,
+      output,
+    })
     expect(result.success).toBe(false)
     expect(result.errors.length).toBeGreaterThan(0)
     expect(result.errors[0]!.code).toBe('INIT_SCAFFOLD_EXISTS')
@@ -151,7 +157,13 @@ describe('runWizard', () => {
     fs.mkdirSync(scaffoldDir)
     fs.writeFileSync(path.join(scaffoldDir, 'marker.txt'), 'original')
     const output = makeOutputContext()
-    const result = await runWizard({ projectRoot: tmpDir, auto: true, force: true, output })
+    const result = await runWizard({
+      projectType: 'data-science',
+      projectRoot: tmpDir,
+      auto: true,
+      force: true,
+      output,
+    })
     expect(result.success).toBe(true)
     // Original .scaffold/ backed up — a .scaffold.backup dir should exist
     const backupExists = fs.existsSync(path.join(tmpDir, '.scaffold.backup'))
@@ -164,7 +176,7 @@ describe('runWizard', () => {
   // Test 8: --auto mode uses suggestion as methodology without prompting
   it('uses suggestion methodology in auto mode without calling prompt', async () => {
     const output = makeOutputContext()
-    await runWizard({ projectRoot: tmpDir, auto: true, force: false, output })
+    await runWizard({ projectType: 'data-science', projectRoot: tmpDir, auto: true, force: false, output  })
     expect(output.prompt).not.toHaveBeenCalled()
     const configPath = path.join(tmpDir, '.scaffold', 'config.yml')
     const parsed = yaml.load(fs.readFileSync(configPath, 'utf8')) as Record<string, unknown>
@@ -176,6 +188,7 @@ describe('runWizard', () => {
   it('uses pre-set --methodology flag without prompting', async () => {
     const output = makeOutputContext()
     const result = await runWizard({
+      projectType: 'data-science',
       projectRoot: tmpDir,
       auto: true,
       force: false,
@@ -216,7 +229,13 @@ describe('runWizard', () => {
   // Test 11: Result has success: true on successful init
   it('returns success: true on successful init', async () => {
     const output = makeOutputContext()
-    const result = await runWizard({ projectRoot: tmpDir, auto: true, force: false, output })
+    const result = await runWizard({
+      projectType: 'data-science',
+      projectRoot: tmpDir,
+      auto: true,
+      force: false,
+      output,
+    })
     expect(result.success).toBe(true)
     expect(result.errors).toHaveLength(0)
     expect(result.projectRoot).toBe(tmpDir)
@@ -287,14 +306,21 @@ describe('runWizard', () => {
   })
 
   // Test 14: Auto mode does not write projectType or gameConfig
-  it('does not write projectType or gameConfig in auto mode', async () => {
+  it('records the supplied projectType and omits unrelated type configs', async () => {
+    // Previously asserted projectType === undefined in auto mode, which
+    // encoded the Task 7 defect: a config with no type silently disables
+    // every type-conditional step. Auto mode now requires a type, so the
+    // meaningful assertion is that the chosen one is recorded and other
+    // types' config blocks are absent.
     const output = makeOutputContext()
-    const result = await runWizard({ projectRoot: tmpDir, auto: true, force: false, output })
+    const result = await runWizard({
+      projectType: 'data-science', projectRoot: tmpDir, auto: true, force: false, output,
+    })
     expect(result.success).toBe(true)
     const configPath = path.join(tmpDir, '.scaffold', 'config.yml')
     const parsed = yaml.load(fs.readFileSync(configPath, 'utf8')) as Record<string, unknown>
     const project = parsed['project'] as Record<string, unknown>
-    expect(project['projectType']).toBeUndefined()
+    expect(project['projectType']).toBe('data-science')
     expect(project['gameConfig']).toBeUndefined()
   })
 
@@ -498,6 +524,7 @@ describe('collectWizardAnswers', () => {
     const output = makeOutputContext()
     const config = await collectWizardAnswers({
       projectRoot: tmpDir,
+      projectType: 'data-science',
       auto: true,
       force: false,
       output,
@@ -516,6 +543,7 @@ describe('collectWizardAnswers', () => {
     const output = makeOutputContext()
     const config = await collectWizardAnswers({
       projectRoot: tmpDir,
+      projectType: 'data-science',
       auto: true,
       force: false,
       methodology: 'mvp',

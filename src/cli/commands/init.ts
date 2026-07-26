@@ -609,6 +609,13 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
   handler: async (argv) => {
     const projectRoot = argv.root ?? process.cwd()
     const outputMode = resolveOutputMode(argv)
+    // Any non-interactive mode implies auto. A context that cannot ask a
+    // question must not invent the answer, so the discriminator guards have to
+    // see `auto` even when the caller never typed --auto. adopt.ts already
+    // derived this (effectiveAuto); init read the raw flag, which is why a
+    // piped `init --project-type web-app` silently wrote renderingStrategy:
+    // spa while `--auto` on the same input refused.
+    const effectiveAuto = argv.auto === true || outputMode !== 'interactive'
     const output = createOutputContext(outputMode)
 
     // Track whether Phase 1 succeeded so we know to run Phase 2
@@ -695,7 +702,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
 
           result = await shutdown.withPrompt(async () => runWizard({
             projectRoot,
-            auto: argv.auto ?? false,
+            auto: effectiveAuto,
             force: argv.force ?? false,
             methodology: argv.methodology,
             projectType,
@@ -820,7 +827,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
             'validate-only': false,
             force: false,
             format: argv.format,
-            auto: argv.auto,
+            auto: effectiveAuto,
             verbose: argv.verbose,
             root: projectRoot,
           }, {

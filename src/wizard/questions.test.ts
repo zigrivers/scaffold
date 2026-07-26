@@ -1,5 +1,9 @@
 import { describe, it, expect, vi } from 'vitest'
 import { askWizardQuestions } from './questions.js'
+import { AUTO_REQUIRED_FLAG } from '../cli/init-flag-families.js'
+import { ExitCode } from '../types/enums.js'
+import { createOutputContext } from '../cli/output/context.js'
+import { ProjectTypeSchema } from '../config/schema.js'
 
 function makeOutputContext() {
   return {
@@ -132,7 +136,22 @@ describe('askWizardQuestions', () => {
     expect(result.gameConfig!.onlineServices).toEqual(['matchmaking', 'accounts'])
   })
 
-  it('auto mode creates standard project (game requires interactive wizard)', async () => {
+  it('auto mode refuses to produce a project with no type (Task 7)', async () => {
+    // This case previously asserted result.projectType === undefined, i.e. it
+    // encoded the defect as the contract: auto mode would happily write a
+    // config with no project type, silently disabling every type-conditional
+    // step. Auto mode now refuses instead.
+    const output = makeOutputContext()
+
+    await expect(askWizardQuestions({
+      output,
+      suggestion: 'deep',
+      methodology: 'deep',
+      auto: true,
+    })).rejects.toMatchObject({ scaffoldError: { code: 'INIT_PROJECT_TYPE_REQUIRED' } })
+  })
+
+  it('auto mode builds a standard project when the type is supplied', async () => {
     const output = makeOutputContext()
 
     const result = await askWizardQuestions({
@@ -140,9 +159,10 @@ describe('askWizardQuestions', () => {
       suggestion: 'deep',
       methodology: 'deep',
       auto: true,
+      projectType: 'data-science',
     })
 
-    expect(result.projectType).toBeUndefined()
+    expect(result.projectType).toBe('data-science')
     expect(result.gameConfig).toBeUndefined()
     expect(output.select).not.toHaveBeenCalled()
     expect(output.confirm).not.toHaveBeenCalled()
@@ -324,6 +344,7 @@ describe('askWizardQuestions', () => {
       methodology: 'custom',
       auto: true,
       depth: 2,
+      projectType: 'data-science',
     })
 
     expect(result.methodology).toBe('custom')
@@ -1269,5 +1290,73 @@ describe('mcp-server wizard (auto mode)', () => {
       projectType: 'mcp-server',
       mcpServerFlags: { mcpLanguage: 'typescript', mcpAuth: 'oauth' },
     })).rejects.toThrow(/stdio transport cannot use network auth/)
+  })
+})
+
+describe('auto-mode discriminator enforcement (Task 4)', () => {
+  const entries = Object.entries(AUTO_REQUIRED_FLAG)
+  const required = entries.filter((e): e is [string, string] => e[1] !== null)
+  const defaultable = entries.filter(e => e[1] === null).map(([t]) => t)
+
+  it('covers every project type across the two groups', () => {
+    expect(required).toHaveLength(9)
+    expect(defaultable).toHaveLength(5)
+    expect(entries).toHaveLength(ProjectTypeSchema.options.length)
+  })
+
+  it.each(required)('throws a coded error for %s naming --%s', async (projectType, flag) => {
+    const output = createOutputContext('auto')
+    await expect(
+      askWizardQuestions({ auto: true, projectType, output, suggestion: 'mvp' } as never),
+    ).rejects.toMatchObject({
+      scaffoldError: { code: 'INIT_AUTO_FLAG_REQUIRED', exitCode: ExitCode.ValidationError },
+    })
+    let caught: { scaffoldError: { message: string; recovery: string } } | undefined
+    try {
+      await askWizardQuestions({ auto: true, projectType, output, suggestion: 'mvp' } as never)
+    } catch (e) {
+      caught = e as { scaffoldError: { message: string; recovery: string } }
+    }
+    expect(caught?.scaffoldError.message).toContain(`--${flag}`)
+    expect(caught?.scaffoldError.recovery).toContain(`--${flag}`)
+  })
+
+  // Without this, a bug making requireAutoFlag throw on a null entry would
+  // pass every case above while breaking auto mode for the other five types.
+  it.each(defaultable)('does not demand any flag for %s', async (projectType) => {
+    const output = createOutputContext('auto')
+    await expect(
+      askWizardQuestions({ auto: true, projectType, output, suggestion: 'mvp' } as never),
+    ).resolves.toBeDefined()
+  })
+})
+
+describe('auto-mode project type enforcement (Task 7)', () => {
+  it('throws INIT_PROJECT_TYPE_REQUIRED when auto mode cannot resolve a project type', async () => {
+    // Previously this returned success with a config carrying no projectType,
+    // silently disabling every type-conditional step. Supplying a type made
+    // auto mode refuse to guess a sub-decision; supplying none made it skip
+    // the most important question without comment.
+    const output = createOutputContext('auto')
+    await expect(
+      askWizardQuestions({ auto: true, output, suggestion: 'mvp' } as never),
+    ).rejects.toMatchObject({
+      scaffoldError: {
+        code: 'INIT_PROJECT_TYPE_REQUIRED',
+        exitCode: ExitCode.ValidationError,
+      },
+    })
+  })
+
+  it('names both ways out in the recovery text', async () => {
+    const output = createOutputContext('auto')
+    let caught: { scaffoldError: { recovery: string } } | undefined
+    try {
+      await askWizardQuestions({ auto: true, output, suggestion: 'mvp' } as never)
+    } catch (e) {
+      caught = e as { scaffoldError: { recovery: string } }
+    }
+    expect(caught?.scaffoldError.recovery).toContain('--project-type')
+    expect(caught?.scaffoldError.recovery).toContain('type-specific flag')
   })
 })

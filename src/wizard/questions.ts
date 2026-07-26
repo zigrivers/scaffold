@@ -12,6 +12,9 @@ import type {
 } from './flags.js'
 import { GameConfigSchema, ProjectTypeSchema } from '../config/schema.js'
 import { coreCopy, getCopyForType, optionsFromCopy } from './copy/index.js'
+import { AUTO_REQUIRED_FLAG } from '../cli/init-flag-families.js'
+import { ExitCode } from '../types/enums.js'
+import type { ScaffoldError } from '../types/errors.js'
 
 export interface WizardAnswers {
   methodology: 'deep' | 'mvp' | 'custom'
@@ -39,6 +42,42 @@ export interface WizardAnswers {
  * Ask user the wizard questions interactively.
  * In auto mode, use defaults immediately.
  */
+/** Thrown when --auto is set but a project type's discriminator flag is absent. */
+export class AutoFlagRequiredError extends Error {
+  readonly scaffoldError: ScaffoldError
+  constructor(scaffoldError: ScaffoldError) {
+    super(scaffoldError.message)
+    this.name = 'AutoFlagRequiredError'
+    this.scaffoldError = scaffoldError
+  }
+}
+
+/**
+ * Enforce the one flag `--auto` cannot default for this project type.
+ *
+ * Replaces nine near-identical `throw new Error(...)` sites. Those threw bare
+ * Errors, so they escaped as stack traces with empty stdout instead of the
+ * failure envelope. `choices` is rendered into the recovery line so the
+ * failure names its own fix rather than sending the reader to --help.
+ */
+function requireAutoFlag(
+  auto: boolean,
+  projectType: string,
+  value: unknown,
+  choices: readonly string[],
+): void {
+  if (!auto || value !== undefined) return
+  const flag = AUTO_REQUIRED_FLAG[projectType]
+  if (!flag) return
+  throw new AutoFlagRequiredError({
+    code: 'INIT_AUTO_FLAG_REQUIRED',
+    message: `--${flag} is required in auto mode for ${projectType} projects`,
+    exitCode: ExitCode.ValidationError,
+    recovery: `Pass --${flag} <${choices.join('|')}>`,
+    context: { projectType, flag },
+  })
+}
+
 export async function askWizardQuestions(options: {
   output: OutputContext
   suggestion: 'deep' | 'mvp'
@@ -132,6 +171,18 @@ export async function askWizardQuestions(options: {
   let projectType: ProjectType | undefined
   if (options.projectType) {
     projectType = options.projectType as ProjectType
+  } else if (auto) {
+    // Auto mode has no defensible default here. Leaving projectType undefined
+    // produced a config with no type at all, which silently disables every
+    // type-conditional step — the same class of defect as inventing a
+    // sub-answer, applied to the most consequential question in the wizard.
+    throw new AutoFlagRequiredError({
+      code: 'INIT_PROJECT_TYPE_REQUIRED',
+      message: 'A project type is required in auto mode',
+      exitCode: ExitCode.ValidationError,
+      recovery: `Pass --project-type <${ProjectTypeSchema.options.join('|')}>, `
+        + 'or any type-specific flag such as --cli-interactivity, which implies the type',
+    })
   } else if (!auto) {
     showBannerOnce()
     const ptCopy = coreCopy.projectType
@@ -150,9 +201,8 @@ export async function askWizardQuestions(options: {
     const copy = getCopyForType('web-app')
     showBannerOnce()
 
-    if (auto && !options.webAppFlags?.webRendering) {
-      throw new Error('--web-rendering is required in auto mode for web-app projects')
-    }
+    requireAutoFlag(auto, 'web-app', options.webAppFlags?.webRendering,
+      ['spa', 'ssr', 'ssg', 'hybrid'])
 
     const renderingStrategy: WebAppConfig['renderingStrategy'] = options.webAppFlags?.webRendering
       ?? await output.select(
@@ -198,9 +248,8 @@ export async function askWizardQuestions(options: {
     const copy = getCopyForType('backend')
     showBannerOnce()
 
-    if (auto && !options.backendFlags?.backendApiStyle) {
-      throw new Error('--backend-api-style is required in auto mode for backend projects')
-    }
+    requireAutoFlag(auto, 'backend', options.backendFlags?.backendApiStyle,
+      ['rest', 'graphql', 'grpc', 'trpc', 'none'])
 
     const apiStyle: BackendConfig['apiStyle'] = options.backendFlags?.backendApiStyle
       ?? await output.select('API style?',
@@ -271,9 +320,8 @@ export async function askWizardQuestions(options: {
     const copy = getCopyForType('cli')
     showBannerOnce()
 
-    if (auto && !options.cliFlags?.cliInteractivity) {
-      throw new Error('--cli-interactivity is required in auto mode for cli projects')
-    }
+    requireAutoFlag(auto, 'cli', options.cliFlags?.cliInteractivity,
+      ['args-only', 'interactive', 'hybrid'])
 
     const interactivity: CliConfig['interactivity'] = options.cliFlags?.cliInteractivity
       ?? await output.select('Interactivity model?',
@@ -305,9 +353,8 @@ export async function askWizardQuestions(options: {
     const copy = getCopyForType('library')
     showBannerOnce()
 
-    if (auto && !options.libraryFlags?.libVisibility) {
-      throw new Error('--lib-visibility is required in auto mode for library projects')
-    }
+    requireAutoFlag(auto, 'library', options.libraryFlags?.libVisibility,
+      ['public', 'internal'])
     const visibility: LibraryConfig['visibility'] = options.libraryFlags?.libVisibility
       ?? await output.select('Library visibility?',
         optionsFromCopy(copy.visibility.options, ['public', 'internal']),
@@ -354,9 +401,8 @@ export async function askWizardQuestions(options: {
     const copy = getCopyForType('mobile-app')
     showBannerOnce()
 
-    if (auto && !options.mobileAppFlags?.mobilePlatform) {
-      throw new Error('--mobile-platform is required in auto mode for mobile-app projects')
-    }
+    requireAutoFlag(auto, 'mobile-app', options.mobileAppFlags?.mobilePlatform,
+      ['ios', 'android', 'cross-platform'])
     const platform: MobileAppConfig['platform'] = options.mobileAppFlags?.mobilePlatform
       ?? await output.select(
         'Target platform?',
@@ -480,9 +526,8 @@ export async function askWizardQuestions(options: {
     const copy = getCopyForType('data-pipeline')
     showBannerOnce()
 
-    if (auto && !options.dataPipelineFlags?.pipelineProcessing) {
-      throw new Error('--pipeline-processing is required in auto mode for data-pipeline projects')
-    }
+    requireAutoFlag(auto, 'data-pipeline', options.dataPipelineFlags?.pipelineProcessing,
+      ['batch', 'streaming', 'hybrid'])
 
     const processingModel: DataPipelineConfig['processingModel'] = options.dataPipelineFlags?.pipelineProcessing
       ?? await output.select(
@@ -531,9 +576,8 @@ export async function askWizardQuestions(options: {
     const copy = getCopyForType('ml')
     showBannerOnce()
 
-    if (auto && !options.mlFlags?.mlPhase) {
-      throw new Error('--ml-phase is required in auto mode for ml projects')
-    }
+    requireAutoFlag(auto, 'ml', options.mlFlags?.mlPhase,
+      ['training', 'inference', 'both'])
 
     const projectPhase: MlConfig['projectPhase'] = options.mlFlags?.mlPhase
       ?? await output.select(
@@ -577,9 +621,8 @@ export async function askWizardQuestions(options: {
     const copy = getCopyForType('research')
     showBannerOnce()
 
-    if (auto && !options.researchFlags?.researchDriver) {
-      throw new Error('--research-driver is required in auto mode for research projects')
-    }
+    requireAutoFlag(auto, 'research', options.researchFlags?.researchDriver,
+      ['code-driven', 'config-driven', 'api-driven', 'notebook-driven'])
 
     const experimentDriver: ResearchConfig['experimentDriver'] = options.researchFlags?.researchDriver
       ?? await output.select(
@@ -626,9 +669,8 @@ export async function askWizardQuestions(options: {
     const copy = getCopyForType('mcp-server')
     showBannerOnce()
 
-    if (auto && !options.mcpServerFlags?.mcpLanguage) {
-      throw new Error('--mcp-language is required in auto mode for mcp-server projects')
-    }
+    requireAutoFlag(auto, 'mcp-server', options.mcpServerFlags?.mcpLanguage,
+      ['typescript', 'python'])
 
     const language: McpServerConfig['language'] = options.mcpServerFlags?.mcpLanguage
       ?? await output.select('Implementation language?',
