@@ -4,6 +4,9 @@ import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
 import yargs, { type Argv } from 'yargs'
+import { execFileSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
+const DIST = fileURLToPath(new URL('../../../dist/index.js', import.meta.url))
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks
@@ -26,6 +29,7 @@ vi.mock('../output/context.js', () => ({
     warn: vi.fn(),
     error: vi.fn(),
     result: vi.fn(),
+    fail: vi.fn(),
     supportsInteractivePrompts: vi.fn().mockReturnValue(false),
     prompt: vi.fn().mockResolvedValue(''),
     confirm: vi.fn().mockResolvedValue(false),
@@ -205,6 +209,7 @@ describe('init command', () => {
       warn: vi.fn(),
       error: vi.fn(),
       result: vi.fn(),
+      fail: vi.fn(),
       supportsInteractivePrompts: vi.fn().mockReturnValue(false),
       prompt: vi.fn().mockResolvedValue(''),
       confirm: vi.fn().mockResolvedValue(false),
@@ -906,4 +911,50 @@ describe('init command — .check() validation', () => {
       'ext-background-worker': true,
     })
   })
+})
+
+describe('--from input handling (Task 9)', () => {
+  it('declares requiresArg so a bare "-" is consumed as the value', () => {
+    const captured: Record<string, { requiresArg?: boolean }> = {}
+    const fake = {
+      option(name: string, cfg: { requiresArg?: boolean }) { captured[name] = cfg; return this },
+      group() { return this }, check() { return this }, middleware() { return this },
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(initCommand.builder as (y: any) => unknown)(fake as any)
+    expect(captured['from']?.requiresArg).toBe(true)
+  })
+
+  it('emits a result envelope on the --from path under --format json', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'scaffold-from-'))
+    execFileSync('git', ['init', '-q'], { cwd: dir })
+    fs.writeFileSync(path.join(dir, 'cfg.yml'),
+      'version: 2\nmethodology: mvp\nplatforms:\n  - claude-code\n')
+    const out = execFileSync(process.execPath,
+      [DIST, 'init', '--from', 'cfg.yml', '--format', 'json'],
+      { cwd: dir, encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 60_000 })
+    expect(out.trim(), 'stdout must not be empty under --format json').not.toBe('')
+    const parsed = JSON.parse(out)
+    expect(parsed.success).toBe(true)
+    expect(parsed.data.configPath).toContain('.scaffold')
+    expect(parsed.data.methodology).toBe('mvp')
+  }, 60_000)
+
+  it('accepts the space-separated "--from -" form from stdin', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'scaffold-stdin-'))
+    execFileSync('git', ['init', '-q'], { cwd: dir })
+    // Feed stdin directly rather than through a shell pipe: it keeps the
+    // assertion on argv parsing (the actual subject) instead of on shell
+    // quoting, and avoids execSync entirely.
+    const out = execFileSync(
+      process.execPath, [DIST, 'init', '--from', '-', '--format', 'json'],
+      {
+        cwd: dir,
+        encoding: 'utf-8',
+        input: 'version: 2\nmethodology: mvp\nplatforms:\n  - claude-code\n',
+        timeout: 60_000,
+      })
+    expect(out.trim(), 'the space-separated --from - form must not be rejected').not.toBe('')
+    expect(JSON.parse(out).success).toBe(true)
+  }, 60_000)
 })

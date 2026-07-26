@@ -1,4 +1,5 @@
 import type { CommandModule, Argv } from 'yargs'
+import { ExitCode } from '../../types/enums.js'
 import fs from 'node:fs'
 import path from 'node:path'
 import { z } from 'zod'
@@ -21,6 +22,7 @@ import {
   RESEARCH_FLAGS, MCP_SERVER_FLAGS, MACOS_NATIVE_FLAGS, applyFlagFamilyValidation,
 } from '../init-flag-families.js'
 import type { ScaffoldConfig } from '../../types/index.js'
+import { withRecovery } from '../../utils/errors.js'
 import type {
   GameFlags, WebAppFlags, BackendFlags, CliFlags, LibraryFlags,
   MobileAppFlags, DataPipelineFlags, MlFlags, BrowserExtensionFlags,
@@ -176,6 +178,10 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
       .option('verbose', { type: 'boolean', default: false, describe: 'Verbose output' })
       .option('from', {
         type: 'string',
+        // Without requiresArg, yargs treats the bare "-" as a positional and
+        // .strict() rejects it with "Unknown argument: -", contradicting this
+        // very describe string. Verified against yargs 17 both ways.
+        requiresArg: true,
         describe: 'Path to a ScaffoldConfig YAML file, or "-" for stdin. Exclusive with config-setting flags.',
       })
       // Configuration options
@@ -609,6 +615,11 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
     let phase1Success = false
     // Wizard result — populated by the wizard path, undefined for --from path
     let result: Awaited<ReturnType<typeof runWizard>> | undefined
+    // The --from path produces no WizardResult, but --format json still
+    // owes the caller a parseable result. Captured here so the emit site
+    // below can synthesize one instead of falling through to a
+    // stderr-only success message.
+    let fromConfig: ScaffoldConfig | undefined
 
     try {
       // Phase 1: collect or parse config (Ctrl-C → clean exit, no changes)
@@ -628,6 +639,7 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
             throw new InvalidConfigError(sourceLabel, formatZodError(parseResult.error))
           }
           const config = parseResult.data as unknown as ScaffoldConfig
+          fromConfig = config
           const oldState = readOldStateIfExists(projectRoot)
           await materializeScaffoldProject(config, {
             projectRoot, force: argv.force ?? false, oldState, output,
@@ -784,10 +796,15 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
           }))
 
           if (!result!.success) {
-            for (const err of result!.errors) {
-              output.error(err)
-            }
-            process.exitCode = 1
+            // Honour the exit code the error carries. Hardcoding 1 here was the
+            // original defect: ScaffoldError.exitCode has always existed and
+            // runWizard has always populated it, but this site discarded it.
+            // withRecovery, not object spread: Error.prototype.message is
+            // non-enumerable, so `{ ...e }` would ship message: undefined for
+            // any Error-shaped error. adopt.ts hit this exact bug.
+            output.fail(result!.errors.map(e => withRecovery(
+              e, 'See the message above and re-run with corrected input')))
+            process.exitCode = result!.errors[0]?.exitCode ?? ExitCode.ValidationError
             return
           }
           phase1Success = true
@@ -825,16 +842,20 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
             // best-effort — don't fail init if skill sync fails
           }
 
-          if (outputMode === 'json' && result) {
+          const emitted = result ?? {
+            success: true as const,
+            projectRoot,
+            configPath: path.join(projectRoot, '.scaffold', 'config.yml'),
+            methodology: fromConfig?.methodology ?? 'unknown',
+            errors: [],
+          }
+          if (outputMode === 'json') {
             output.result({
-              ...result,
+              ...emitted,
               buildResult: buildResult.data ?? null,
             })
-          } else if (result) {
-            output.success(`Scaffold initialized at ${result.configPath}`)
           } else {
-            // --from path: no WizardResult, just confirm success
-            output.success(`Scaffold initialized at ${path.join(projectRoot, '.scaffold', 'config.yml')}`)
+            output.success(`Scaffold initialized at ${emitted.configPath}`)
           }
         },
       )

@@ -1,6 +1,10 @@
 import yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
 
+import { ExitCode } from '../types/enums.js'
+import type { TerminalError } from '../types/errors.js'
+import { createOutputContext } from './output/context.js'
+import { resolveOutputMode } from './middleware/output-mode.js'
 import { shutdown } from './shutdown.js'
 import initCommand from './commands/init.js'
 import runCommand from './commands/run.js'
@@ -33,8 +37,79 @@ import tiaCommand from './commands/tia.js'
 import schedCommand from './commands/sched.js'
 import hooksCommand from './commands/hooks.js'
 
+/**
+ * Thrown by the `.fail()` handler purely to stop yargs from continuing.
+ *
+ * Verified against yargs 17: after `.fail()` returns normally, yargs still
+ * invokes the command handler, which would emit a SECOND envelope on stdout
+ * and make the output unparseable. Throwing halts it. `runCli` swallows this
+ * sentinel because the failure has already been reported.
+ */
+class CliArgumentFailure extends Error {}
+
+/**
+ * Read the output-affecting flags straight from raw argv.
+ *
+ * On a parse failure yargs has not populated `parsed.argv`, so reading
+ * `--format` from it silently yields undefined and the failure envelope falls
+ * back to interactive mode — printing to stderr and leaving stdout empty for a
+ * caller that explicitly asked for json. Same reason `commandName` is taken
+ * from raw argv: `parsed.argv._` is empty at that point.
+ */
+function rawOutputHints(argv: string[]): { format?: string; auto?: boolean } {
+  const i = argv.findIndex(a => a === '--format' || a.startsWith('--format='))
+  let format: string | undefined
+  if (i >= 0) {
+    const token = argv[i] ?? ''
+    format = token.includes('=') ? token.slice(token.indexOf('=') + 1) : argv[i + 1]
+  }
+  return { format, auto: argv.includes('--auto') }
+}
+
+/**
+ * Every registered top-level command name, derived from the command modules
+ * themselves so it cannot drift as commands are added.
+ */
+const COMMAND_NAMES: ReadonlySet<string> = new Set(
+  [
+    initCommand, runCommand, buildCommand, adoptCommand, skipCommand, resetCommand,
+    statusCommand, nextCommand, validateCommand, validateKnowledgeCommand, listCommand,
+    infoCommand, versionCommand, updateCommand, dashboardCommand, doctorCommand,
+    guidesCommand, decisionsCommand, knowledgeCommand, skillCommand, checkCommand,
+    completeCommand, reworkCommand, observeCommand, knowledgeFreshnessCommand,
+    agentOpsCommand, mqCommand, tiaCommand, schedCommand, hooksCommand,
+  ].map(c => String(Array.isArray(c.command) ? c.command[0] : c.command).split(' ')[0] ?? ''),
+)
+
+/**
+ * Find the subcommand for the `--help` hint.
+ *
+ * Matching the first non-dash token is wrong: it treats an option VALUE as a
+ * command, so `scaffold --format json init --bad` would suggest
+ * `scaffold json --help`. Checking against the registered names means only a
+ * real command can be picked, and an unrecognized invocation falls back to
+ * the top-level help.
+ */
+function findCommandName(argv: string[]): string {
+  return argv.find(a => !a.startsWith('-') && COMMAND_NAMES.has(a)) ?? ''
+}
+
 export async function runCli(argv: string[]): Promise<void> {
   shutdown.install()
+  const commandName = findCommandName(argv)
+  try {
+    await runYargs(argv, commandName, rawOutputHints(argv))
+  } catch (err) {
+    if (err instanceof CliArgumentFailure) return
+    throw err
+  }
+}
+
+async function runYargs(
+  argv: string[],
+  commandName: string,
+  hints: { format?: string; auto?: boolean },
+): Promise<void> {
   await yargs(argv)
     .scriptName('scaffold')
     .usage('$0 <command> [options]')
@@ -95,6 +170,35 @@ export async function runCli(argv: string[]): Promise<void> {
       },
     })
     .strict()
+    .fail((msg, err, yargsInstance) => {
+      // yargs routes two different things here, and conflating them is a trap.
+      // Verified against yargs 17:
+      //   msg set    -> parse error, strict-mode unknown arg, or a `.check()`
+      //                 callback that threw (yargs copies its message into msg).
+      //                 This repo runs applyFlagFamilyValidation inside
+      //                 `.check()`, which throws a plain Error for ordinary
+      //                 mistakes like mixing --web-rendering with
+      //                 --backend-api-style. All of it is user input.
+      //   msg null   -> a command handler threw. yargs also propagates that to
+      //                 the caller, so rethrowing keeps the stack trace intact
+      //                 rather than mislabelling a crash as bad input.
+      // Note the discriminator is `msg`, not the presence of `err`: a `.check()`
+      // throw sets BOTH, so keying on `err` would misroute every one of them.
+      if (msg === null && err) throw err
+      void yargsInstance
+      const hint = commandName ? `scaffold ${commandName} --help` : 'scaffold --help'
+      const scaffoldError: TerminalError = {
+        code: 'CLI_ARGUMENT_ERROR',
+        message: msg ?? (err ? err.message : 'Invalid arguments'),
+        exitCode: ExitCode.ValidationError,
+        recovery: `Run \`${hint}\` for available options`,
+      }
+      const mode = resolveOutputMode(hints)
+      createOutputContext(mode).fail([scaffoldError])
+      process.exitCode = ExitCode.ValidationError
+      // Halt: yargs would otherwise run the command handler anyway.
+      throw new CliArgumentFailure(scaffoldError.message)
+    })
     .demandCommand(1, 'You must specify a command')
     .help()
     // `--version` is a documented global flag (PRD F-030 / CLI contract) and a

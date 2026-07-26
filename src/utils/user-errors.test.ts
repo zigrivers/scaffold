@@ -15,6 +15,7 @@ import {
   ServiceFlagWithoutServicesError,
   MultiServiceOverlayMissingError,
 } from './user-errors.js'
+import { withRecovery } from './errors.js'
 
 describe('ScaffoldUserError taxonomy', () => {
   it('FlagConflictError extends ScaffoldUserError', () => {
@@ -97,5 +98,39 @@ describe('ScaffoldUserError taxonomy', () => {
     const err = new MultiServiceOverlayMissingError()
     expect(err).toBeInstanceOf(ScaffoldUserError)
     expect(err.message).toContain('multi-service-overlay.yml')
+  })
+})
+
+describe('withRecovery (shared terminal-error widening)', () => {
+  it('preserves message when the source is an Error subclass', () => {
+    // Error.prototype.message is NON-ENUMERABLE. Object spread drops it, so a
+    // `{ ...e }` clone ships message: undefined. Both adopt and init route
+    // wizard/adopt errors through here, and init previously kept its own
+    // spread-based copy — reintroducing the bug one file from the comment
+    // warning about it.
+    class CodedError extends Error {
+      code = 'INIT_SCAFFOLD_EXISTS'
+      exitCode = 1
+    }
+    const widened = withRecovery(new CodedError('the real message') as never, 'fallback')
+    expect(widened.message).toBe('the real message')
+    expect(widened.code).toBe('INIT_SCAFFOLD_EXISTS')
+    expect(widened.recovery).toBe('fallback')
+  })
+
+  it('keeps an existing recovery rather than overwriting it', () => {
+    const widened = withRecovery(
+      { code: 'X', message: 'm', exitCode: 1, recovery: 'the real fix' } as never,
+      'fallback',
+    )
+    expect(widened.recovery).toBe('the real fix')
+  })
+
+  it('carries context through', () => {
+    const widened = withRecovery(
+      { code: 'X', message: 'm', exitCode: 1, context: { file: 'a.ts' } } as never,
+      'fallback',
+    )
+    expect(widened.context).toEqual({ file: 'a.ts' })
   })
 })

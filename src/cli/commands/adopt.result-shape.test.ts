@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { execFileSync } from 'node:child_process'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -187,5 +188,93 @@ describe('adopt JSON output shape', () => {
     expect(Array.isArray(result.stepsRemaining)).toBe(true)
     expect(result).toHaveProperty('artifactsFound')
     expect(Array.isArray(result.detectedArtifacts)).toBe(true)
+  })
+})
+
+describe('adopt failure envelope (Task 13)', () => {
+  const DIST_CLI = fileURLToPath(new URL('../../../dist/index.js', import.meta.url))
+
+  function brownfieldRepo(): string {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'scaffold-adopt-fail-'))
+    execFileSync('git', ['init', '-q'], { cwd: dir })
+    fs.writeFileSync(path.join(dir, 'package.json'),
+      JSON.stringify({ name: 'acme', dependencies: { express: '^4.19.0' } }))
+    execFileSync('git', ['add', '-A'], { cwd: dir })
+    execFileSync('git', ['-c', 'user.email=t@t.co', '-c', 'user.name=t', 'commit', '-qm', 'i'], { cwd: dir })
+    return dir
+  }
+
+  function run(args: string[], cwd: string): { code: number; stdout: string } {
+    try {
+      const stdout = execFileSync(process.execPath, [DIST_CLI, ...args],
+        { cwd, encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 60_000 })
+      return { code: 0, stdout }
+    } catch (e) {
+      const err = e as { status: number | null; stdout: string }
+      return { code: err.status ?? 1, stdout: err.stdout ?? '' }
+    }
+  }
+
+  it('emits a parseable envelope for a bare --apply', () => {
+    const r = run(['adopt', '--auto', '--format', 'json', '--apply'], brownfieldRepo())
+    expect(r.code).toBe(1)
+    expect(r.stdout.trim(), 'stdout must not be empty').not.toBe('')
+    const parsed = JSON.parse(r.stdout)
+    expect(parsed.success).toBe(false)
+    expect(parsed.errors[0].code).toBe('ADOPT_APPLY_NON_INTERACTIVE')
+    expect(parsed.errors[0].recovery).toContain('--plan-key')
+  }, 60_000)
+
+  it('emits a parseable envelope for plan drift', () => {
+    const r = run(['adopt', '--auto', '--format', 'json', '--apply', '--plan-key', 'deadbeef'],
+      brownfieldRepo())
+    expect(r.code).toBe(1)
+    const parsed = JSON.parse(r.stdout)
+    expect(parsed.success).toBe(false)
+    expect(parsed.errors[0].code).toBe('ADOPT_PLAN_DRIFT')
+    expect(parsed.errors[0].recovery).toBeTruthy()
+  }, 60_000)
+
+  it('reports an exit_code in the envelope that matches the process status', () => {
+    // The envelope's exit_code and the process status must agree. They can
+    // diverge whenever a site hardcodes a constant instead of reading the
+    // code off the error it just emitted: asScaffoldError passes an
+    // already-formed ScaffoldError through untouched, so its exitCode is not
+    // always ValidationError.
+    for (const args of [
+      ['adopt', '--auto', '--format', 'json', '--apply'],
+      ['adopt', '--auto', '--format', 'json', '--apply', '--plan-key', 'deadbeef'],
+    ]) {
+      const r = run(args, brownfieldRepo())
+      expect(r.code, `${args.join(' ')} should fail`).not.toBe(0)
+      const parsed = JSON.parse(r.stdout)
+      expect(parsed.exit_code, `${args.join(' ')} envelope vs process status`).toBe(r.code)
+    }
+  }, 60_000)
+
+  it('preserves message when the error is an Error subclass', async () => {
+    // Error.prototype.message is NON-ENUMERABLE, so object spread drops it.
+    // asScaffoldError passes through anything shaped like a ScaffoldError,
+    // and an Error subclass carrying code/exitCode satisfies that shape — so
+    // a naive {...e} clone yields message: undefined in the envelope.
+    const { withRecovery } = await import('../../utils/errors.js')
+    class CodedError extends Error {
+      code = 'ADOPT_INTERNAL'
+      exitCode = 1
+    }
+    const widened = withRecovery(new CodedError('the real message') as never, 'fallback recovery')
+    expect(widened.message).toBe('the real message')
+    expect(widened.code).toBe('ADOPT_INTERNAL')
+    expect(widened.exitCode).toBe(1)
+    expect(widened.recovery).toBe('fallback recovery')
+  })
+
+  // Static gate: the e2e cases above reach only two of the ten converted
+  // sites, so this guards the rest against silently reverting to output.error.
+  it('has converted every terminal-failure site in adopt.ts', () => {
+    const src = fs.readFileSync(
+      fileURLToPath(new URL('./adopt.ts', import.meta.url)), 'utf-8')
+    expect(src.match(/output\.error\(/g) ?? []).toHaveLength(0)
+    expect((src.match(/output\.fail\(/g) ?? []).length).toBeGreaterThanOrEqual(10)
   })
 })

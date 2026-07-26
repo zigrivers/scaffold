@@ -1,4 +1,6 @@
 import type { ScaffoldError, ScaffoldWarning } from '../../types/index.js'
+import type { ExitCode } from '../../types/enums.js'
+import type { TerminalError } from '../../types/errors.js'
 import type { OutputContext, SelectOption } from './context.js'
 import { InteractiveOutput } from './interactive.js'
 
@@ -23,6 +25,10 @@ export class AutoOutput implements OutputContext {
 
   result(data: unknown): void {
     this.interactive.result(data)
+  }
+
+  fail(errors: TerminalError[], exitCode?: ExitCode): void {
+    this.interactive.fail(errors, exitCode)
   }
 
   supportsInteractivePrompts(): boolean {

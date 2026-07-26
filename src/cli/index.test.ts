@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest'
+import { describe, it, expect, beforeAll, vi } from 'vitest'
 import { execFileSync, execSync } from 'node:child_process'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -50,5 +50,83 @@ describe('scaffold --version (global flag, PRD F-030)', () => {
     const out = execFileSync('node', [DIST_CLI, '--version'], { encoding: 'utf8' })
     expect(out).toContain(readPackageVersion())
     expect(out).toMatch(/\d+\.\d+\.\d+/)
+  })
+})
+
+describe('CLI failure handler', () => {
+  it('prints a diagnostic and a help hint, never the usage block', async () => {
+    const err: string[] = []
+    vi.spyOn(process.stderr, 'write').mockImplementation((c: unknown) => {
+      err.push(String(c)); return true
+    })
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+    await runCli(['init', '--nonexistent-flag']).catch(() => undefined)
+    const text = err.join('')
+    vi.restoreAllMocks()
+    expect(text).not.toContain('Web-App Configuration:')
+    expect(text).not.toContain('Game Configuration:')
+    expect(text).toContain('scaffold init --help')
+  })
+
+  it('emits a parseable envelope for an argument error under --format json', async () => {
+    const out: string[] = []
+    vi.spyOn(process.stdout, 'write').mockImplementation((c: unknown) => {
+      out.push(String(c)); return true
+    })
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    await runCli(['init', '--format', 'json', '--nonexistent-flag']).catch(() => undefined)
+    const raw = out.join('')
+    vi.restoreAllMocks()
+    const parsed = JSON.parse(raw)
+    expect(parsed.success).toBe(false)
+    expect(parsed.errors[0].code).toBe('CLI_ARGUMENT_ERROR')
+    expect(parsed.errors[0].recovery).toContain('scaffold init --help')
+    expect(parsed.exit_code).toBe(1)
+  })
+
+  // yargs sets `err` for BOTH handler throws and .check() throws. This repo
+  // runs applyFlagFamilyValidation inside .check() (init.ts, adopt.ts), which
+  // throws ScaffoldUserError for ordinary mistakes. Re-throwing those would
+  // send a user error out as a stack trace with empty stdout.
+  it('sends a .check() validation failure to the envelope, not the stack trace', async () => {
+    const out: string[] = []
+    vi.spyOn(process.stdout, 'write').mockImplementation((c: unknown) => {
+      out.push(String(c)); return true
+    })
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    await runCli([
+      'init', '--format', 'json',
+      '--web-rendering', 'ssr', '--backend-api-style', 'rest',
+    ]).catch(() => undefined)
+    const raw = out.join('')
+    vi.restoreAllMocks()
+    expect(raw.trim(), 'a .check() failure must not leave stdout empty').not.toBe('')
+    const parsed = JSON.parse(raw)
+    expect(parsed.success).toBe(false)
+    expect(parsed.errors[0].recovery).toBeTruthy()
+  })
+
+  it('resolves on a parse error, so only handler exceptions take the re-throw path', async () => {
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    await expect(runCli(['init', '--nonexistent-flag'])).resolves.toBeUndefined()
+    vi.restoreAllMocks()
+  })
+})
+
+describe('help-hint command inference', () => {
+  it('does not mistake an option value for a command', async () => {
+    const out: string[] = []
+    vi.spyOn(process.stdout, 'write').mockImplementation((c: unknown) => {
+      out.push(String(c)); return true
+    })
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    // "json" is the VALUE of --format, not a command.
+    await runCli(['--format', 'json', 'init', '--nonexistent-flag']).catch(() => undefined)
+    const raw = out.join('')
+    vi.restoreAllMocks()
+    const recovery = JSON.parse(raw).errors[0].recovery
+    expect(recovery).toContain('scaffold init --help')
+    expect(recovery).not.toContain('scaffold json --help')
   })
 })

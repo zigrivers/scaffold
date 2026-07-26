@@ -1,4 +1,6 @@
 import type { ScaffoldError, ScaffoldWarning } from '../../types/index.js'
+import { ExitCode } from '../../types/enums.js'
+import type { TerminalError } from '../../types/errors.js'
 import type { OutputContext, SelectOption } from './context.js'
 
 function isScaffoldError(e: ScaffoldError | string): e is ScaffoldError {
@@ -48,6 +50,41 @@ export class JsonOutput implements OutputContext {
       errors: [],
       warnings: this.bufferedWarnings,
       exit_code: 0,
+    }) + '\n')
+  }
+
+  fail(errors: TerminalError[], exitCode?: ExitCode): void {
+    const resolved = exitCode ?? errors[0]?.exitCode ?? ExitCode.ValidationError
+    // A failure envelope with an empty errors array tells a caller that
+    // something went wrong and nothing about what, which is only marginally
+    // better than the empty stdout this replaced. Guarantee at least one
+    // actionable entry so `errors[0].code` is always safe to read.
+    //
+    // Bound to a new const rather than reassigning the parameter: mutating a
+    // parameter is a lint failure under no-param-reassign rules and makes the
+    // emitted value harder to follow.
+    const reported: TerminalError[] = errors.length > 0
+      ? errors
+      : [{
+        code: 'INTERNAL_ERROR',
+        message: 'The command failed without reporting a specific error.',
+        exitCode: resolved,
+        recovery: 'Re-run with --verbose for detail; if it persists, this is a bug worth reporting',
+      }]
+    // Human-readable half on stderr, matching error(), so a person piping
+    // stdout to jq still sees what went wrong.
+    for (const e of reported) {
+      process.stderr.write(`✗ ${e.code}: ${e.message}\n`)
+      if (e.recovery) {
+        process.stderr.write(`  Recovery: ${e.recovery}\n`)
+      }
+    }
+    process.stdout.write(JSON.stringify({
+      success: false,
+      data: null,
+      errors: reported,
+      warnings: this.bufferedWarnings,
+      exit_code: resolved,
     }) + '\n')
   }
 

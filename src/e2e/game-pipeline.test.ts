@@ -59,6 +59,7 @@ function createMockOutput() {
     warn: vi.fn(),
     error: vi.fn(),
     result: vi.fn(),
+    fail: vi.fn(),
     supportsInteractivePrompts: vi.fn().mockReturnValue(false),
     prompt: vi.fn().mockResolvedValue(''),
     confirm: vi.fn().mockResolvedValue(false),

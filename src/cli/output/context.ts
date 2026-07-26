@@ -1,5 +1,7 @@
 import type { ScaffoldError, ScaffoldWarning } from '../../types/index.js'
 import type { OutputMode } from '../../types/index.js'
+import type { ExitCode } from '../../types/enums.js'
+import type { TerminalError } from '../../types/errors.js'
 import { InteractiveOutput } from './interactive.js'
 import { JsonOutput } from './json.js'
 import { AutoOutput } from './auto.js'
@@ -19,6 +21,17 @@ export interface OutputContext {
 
   // Structured output (for commands that return data)
   result(data: unknown): void
+
+  /**
+   * Terminal failure. In json mode this writes the failure envelope to stdout
+   * so a caller always has something to parse; in interactive/auto mode it
+   * delegates to error() so human output is unchanged.
+   *
+   * Required, not optional, on purpose: an optional method would let a command
+   * silently skip emitting the envelope, which is the defect this exists to
+   * remove. `exitCode` defaults to the first error's, then ValidationError.
+   */
+  fail(errors: TerminalError[], exitCode?: ExitCode): void
 
   // Capability queries
   supportsInteractivePrompts(): boolean
