@@ -109,7 +109,13 @@ describe('buildAdoptionPlan (D1/D2/§6.1)', () => {
     expect(included.plan_key).not.toBe(first.plan_key)
     expect(included.steps.some((s) => s.step_slug === 'domain-modeling')).toBe(true)
     expect(included.disabled_by_preset).not.toContain('domain-modeling')
-  })
+    // 15s, not the 5s default: this case builds the plan THREE times where its
+    // siblings build two, and each build walks the whole brownfield pipeline
+    // against a real temp repo. It was already the first test to time out
+    // under a loaded parallel run before this branch; the extra e2e cases
+    // added here make that more likely, so raise the bound rather than leave
+    // a known-slow test riding on the default.
+  }, 15_000)
 
   it('plan_key changes when reality changes a disposition', () => {
     const dir = makeRepo()
