@@ -120,9 +120,9 @@ bootstrap pipeline state from documentation you already have.
 
 ```mermaid
 flowchart TD
-  A[New or existing project] --> B{Have matching docs<br/>PRD, tech-stack, etc.?}
-  B -->|No / brand new| C["scaffold init<br/>wizard + config + skills"]
-  B -->|Yes, already written| D["scaffold init, then<br/>scaffold adopt"]
+  A[New or existing project] --> B{Directory already has<br/>code or docs?}
+  B -->|No, brand new| C["scaffold init<br/>wizard + config + skills"]
+  B -->|Yes| D["scaffold adopt<br/>renders a plan, then --apply"]
   C --> E[Run the pipeline]
   D --> E
 ```
@@ -145,12 +145,25 @@ state before reinitializing (:cite[src/cli/commands/init.ts:157]).
 (:cite[src/project/adopt.ts:72]), discovers which pipeline outputs (PRD,
 tech-stack, coding-standards, etc.) you already have on disk, and marks the
 corresponding steps complete so you don't re-run work you've already done.
-Preview the changes first with `--dry-run`, which reports what it would do
-without writing anything (:cite[src/cli/commands/adopt.ts:173]).
 
-The usual sequence for an existing codebase: `scaffold init` (create the config
-and state), then `scaffold adopt` (backfill state from existing docs), then pick
-up the pipeline at the first incomplete step.
+**It writes nothing by default.** Since v3.48.0, `adopt` renders an Adoption
+Plan and stops. To execute it, pass `--apply` together with the plan you
+approved:
+
+```bash
+scaffold adopt                                # render the plan, write nothing
+scaffold adopt --write                        # also write docs/adoption-plan.md
+scaffold adopt --format json                  # machine-readable plan, includes plan_key
+scaffold adopt --apply --plan-key <sha256>    # execute the approved plan
+```
+
+`--dry-run` is deprecated and does nothing: plan mode is already the default
+(:cite[src/cli/commands/adopt.ts:117]).
+
+**`adopt` initializes for you.** It writes the `.scaffold/` config and state
+itself and selects the `brownfield` methodology. Do not run `scaffold init`
+first on an existing codebase: `init` would select `deep`, and `adopt` would
+then have to replace it.
 
 ## Troubleshooting
 
