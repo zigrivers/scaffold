@@ -23,6 +23,7 @@ import type { ProjectType } from '../../types/index.js'
 import { asScaffoldError } from '../../utils/errors.js'
 import { configParseError, configNotObject } from '../../utils/errors.js'
 import { ExitCode } from '../../types/enums.js'
+import type { ScaffoldError, TerminalError } from '../../types/errors.js'
 
 interface AdoptArgs {
   format?: string
@@ -104,6 +105,18 @@ project:
 // ---------------------------------------------------------------------------
 // Command
 // ---------------------------------------------------------------------------
+
+/**
+ * Widen a ScaffoldError into a TerminalError, supplying a fallback recovery.
+ *
+ * fail() takes TerminalError so every process-ending failure names its fix.
+ * Errors built elsewhere (asScaffoldError, adoptResult.errors, lock errors)
+ * carry an optional recovery, so this fills the gap without overwriting one
+ * that was already set.
+ */
+function withRecovery(e: ScaffoldError, fallback: string): TerminalError {
+  return { ...e, recovery: e.recovery ?? fallback }
+}
 
 const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
   command: 'adopt',
@@ -532,7 +545,10 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
         flagOverrides: buildFlagOverrides(argv as Record<string, unknown>),
       })
     } catch (err) {
-      output.error(asScaffoldError(err, 'ADOPT_INTERNAL', ExitCode.ValidationError))
+      output.fail([withRecovery(
+        asScaffoldError(err, 'ADOPT_INTERNAL', ExitCode.ValidationError),
+        'Re-run with --verbose for detail; if it persists, this is a bug worth reporting',
+      )])
       process.exitCode = ExitCode.ValidationError
       return
     }
@@ -544,9 +560,8 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
 
     // Check for errors
     if (adoptResult.errors.length > 0) {
-      for (const e of adoptResult.errors) {
-        output.error(e)
-      }
+      output.fail(adoptResult.errors.map(e => withRecovery(
+        e, 'Re-run with --project-type <type> to resolve, or see the message above')))
       process.exitCode = adoptResult.errors[0].exitCode
       return
     }
@@ -555,7 +570,8 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
     const includes = (argv.include as string[] | undefined) ?? []
     const { plan, errors: planErrors } = buildAdoptionPlan({ projectRoot, adoptResult, includes })
     if (planErrors.length > 0) {
-      for (const e of planErrors) output.error(e)
+      output.fail(planErrors.map(e => withRecovery(
+        e, 'Correct the reported step or include and re-render the plan')))
       process.exitCode = planErrors[0].exitCode
       return
     }
@@ -568,21 +584,23 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
       if (approvedKey === null && typeof argv.plan === 'string') {
         const planPath = path.isAbsolute(argv.plan) ? argv.plan : path.join(projectRoot, argv.plan)
         if (!fs.existsSync(planPath)) {
-          output.error({
+          output.fail([{
             code: 'ADOPT_PLAN_NOT_FOUND',
             message: `Plan file not found: ${planPath}`,
             exitCode: ExitCode.ValidationError,
-          })
+            recovery: 'Render one first with `scaffold adopt --write`, then pass its path to --plan',
+          }])
           process.exitCode = ExitCode.ValidationError
           return
         }
         approvedKey = extractPlanKey(fs.readFileSync(planPath, 'utf8'))
         if (approvedKey === null) {
-          output.error({
+          output.fail([{
             code: 'ADOPT_PLAN_KEY_MISSING',
             message: `No plan key found in ${planPath} — re-render with \`scaffold adopt --write\``,
             exitCode: ExitCode.ValidationError,
-          })
+            recovery: 'Re-render with `scaffold adopt --write`, then re-run --apply with the new plan',
+          }])
           process.exitCode = ExitCode.ValidationError
           return
         }
@@ -594,12 +612,13 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
       // ~509), so re-checking it here would be dead code — TS's aliased-
       // condition narrowing catches this (TS2367) if left in.
       if (approvedKey === null && (effectiveAuto || !output.supportsInteractivePrompts())) {
-        output.error({
+        output.fail([{
           code: 'ADOPT_APPLY_NON_INTERACTIVE',
           message: 'Bare --apply is interactive-only. In automation, pass the approved plan: '
             + '--plan <path> or --plan-key <sha256>.',
           exitCode: ExitCode.ValidationError,
-        })
+          recovery: 'Render a plan with `scaffold adopt --format json`, then pass its plan_key to --plan-key',
+        }])
         process.exitCode = ExitCode.ValidationError
         return
       }
@@ -609,8 +628,13 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
       // (TOCTOU). The SAME lock is held through every write below.
       const lockResult = acquireLock(projectRoot, 'adopt')
       if (!lockResult.acquired) {
-        if (lockResult.error) output.error(lockResult.error)
-        process.exitCode = 3
+        if (lockResult.error) {
+          output.fail([withRecovery(
+            lockResult.error,
+            'Another scaffold process holds the lock; wait for it, or pass --force to override',
+          )], ExitCode.StateCorruption)
+        }
+        process.exitCode = ExitCode.StateCorruption
         return
       }
       shutdown.registerLockOwnership(getLockPath(projectRoot))
@@ -630,7 +654,10 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
             flagOverrides: buildFlagOverrides(argv as Record<string, unknown>),
           })
         } catch (err) {
-          output.error(asScaffoldError(err, 'ADOPT_INTERNAL', ExitCode.ValidationError))
+          output.fail([withRecovery(
+            asScaffoldError(err, 'ADOPT_INTERNAL', ExitCode.ValidationError),
+            'Re-run with --verbose for detail; if it persists, this is a bug worth reporting',
+          )])
           process.exitCode = ExitCode.ValidationError
           return
         }
@@ -638,7 +665,8 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
           projectRoot, adoptResult: liveAdopt, includes,
         })
         if (liveErrors.length > 0) {
-          for (const e of liveErrors) output.error(e)
+          output.fail(liveErrors.map(e => withRecovery(
+            e, 'Correct the reported step or include and re-render the plan')))
           process.exitCode = liveErrors[0].exitCode
           return
         }
@@ -656,14 +684,15 @@ const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {
           }
         } else if (approvedKey !== livePlan.plan_key) {
           // D1 drift contract: the under-lock re-render IS the pre-write check.
-          output.error({
+          output.fail([{
             code: 'ADOPT_PLAN_DRIFT',
             message: `Plan key mismatch: approved ${approvedKey.slice(0, 12)}… but the live re-render `
               + `produced ${livePlan.plan_key.slice(0, 12)}… — `
               + 'reality changed since approval (a disposition, detect result, include, or the initialize payload). '
               + 'Re-review: `scaffold adopt --write`, then re-run --apply against the new plan.',
             exitCode: ExitCode.ValidationError,
-          })
+            recovery: 'Re-render with `scaffold adopt --write`, then re-run --apply against the new plan key',
+          }])
           process.exitCode = ExitCode.ValidationError
           return
         }

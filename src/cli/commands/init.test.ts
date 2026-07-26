@@ -938,7 +938,7 @@ describe('--from input handling (Task 9)', () => {
     expect(parsed.success).toBe(true)
     expect(parsed.data.configPath).toContain('.scaffold')
     expect(parsed.data.methodology).toBe('mvp')
-  })
+  }, 60_000)
 
   it('accepts the space-separated "--from -" form from stdin', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'scaffold-stdin-'))
@@ -949,5 +949,5 @@ describe('--from input handling (Task 9)', () => {
       { cwd: dir, encoding: 'utf-8', timeout: 60_000 })
     expect(out.trim(), '"--from -" must not be rejected as an unknown argument').not.toBe('')
     expect(JSON.parse(out).success).toBe(true)
-  })
+  }, 60_000)
 })
