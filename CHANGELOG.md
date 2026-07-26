@@ -4,6 +4,67 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.52.0] - 2026-07-26
+
+Agent-drivability, Release 2 — **the contract becomes explicit**. Release 1
+made failures parseable; this release makes the rules discoverable and stops
+the CLI inventing answers nobody chose.
+
+### Behavior change
+
+**Any non-interactive mode now implies `--auto`, and `--auto` refuses to guess.**
+
+Two cases change, and the second is easy to miss because the decision is framed
+as "non-TTY":
+
+1. **A piped invocation without `--auto`.** `scaffold init --project-type web-app`
+   with stdin redirected previously exited 0 and wrote
+   `renderingStrategy: spa` — the first item in the options list, chosen by
+   nobody. It now exits 1 and writes nothing.
+2. **`--format json`, even on a real TTY.** `JsonOutput` never prompts, so it
+   was silently defaulting too. `scaffold init --format json --project-type web-app`
+   now requires `--web-rendering`.
+
+Also: **`scaffold init --auto` with no resolvable project type now fails**
+instead of writing a config with no `projectType`, which silently disabled
+every type-conditional step.
+
+And: **`init --from` input errors move from exit 2 to exit 1.** Exit 2 is
+`MissingDependency` in the exit-code contract; these are validation errors.
+
+Migration is the error message. Each failure names the exact flag to add, so a
+broken script's output is also its fix. This follows the v3.48.0 `scaffold
+adopt` precedent, where silently writing on run was likewise treated as a
+defect rather than an interface.
+
+### Added
+
+- **`--help` marks the flags `--auto` cannot default.** Nine project types need
+  one discriminator chosen explicitly; each is annotated
+  `[required with --auto]`, from a single `AUTO_REQUIRED_FLAG` table shared by
+  the help text, the error, and the guide. An agent can now build a valid
+  `--auto` command from `--help` alone — previously impossible, since nothing
+  marked those flags as required.
+- **The CLI guide publishes the agent contract**: the seven-value exit-code
+  table, the success and failure envelope shapes, the init-vs-adopt choice, the
+  discriminator table, the `next`/`run`/`complete` loop, and the
+  content-addressed nature of `plan_key`. A bidirectional bats gate asserts the
+  guide and `ExitCode` agree, so neither can drift alone.
+- **`src/e2e/agent-drivability.test.ts`** — defines "fully agent-drivable" as
+  five machine-checked properties and asserts them against the built CLI.
+
+### Fixed
+
+- **Every `init` failure now emits the envelope**, including the discriminator
+  and project-type errors, via `toScaffoldError` and a required-`recovery`
+  mapping that throws on an unmapped error rather than shipping one with no
+  actionable text.
+- **`status`, `next`, `doctor` and `info` no longer exit with empty stdout when
+  run outside a project.** All four reported before any output context existed;
+  `doctor` also used exit 2 for it. This is the most common failure an agent
+  hits.
+
+
 ## [3.51.1] - 2026-07-26
 
 Agent-drivability, Release 1 — **parseable failures**. An AI agent driving
