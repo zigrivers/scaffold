@@ -9,12 +9,15 @@ import {
   MultiServiceNotSupportedError,
   ExistingScaffoldError,
   isScaffoldUserError,
+  toScaffoldError,
+  USER_ERROR_CODES,
   ServiceRequiredError,
   ServiceRejectedError,
   ServiceNotFoundError,
   ServiceFlagWithoutServicesError,
   MultiServiceOverlayMissingError,
 } from './user-errors.js'
+import { ExitCode } from '../types/enums.js'
 import { withRecovery } from './errors.js'
 
 describe('ScaffoldUserError taxonomy', () => {
@@ -132,5 +135,63 @@ describe('withRecovery (shared terminal-error widening)', () => {
       'fallback',
     )
     expect(widened.context).toEqual({ file: 'a.ts' })
+  })
+})
+
+describe('toScaffoldError (Task 8)', () => {
+  it('maps ExistingScaffoldError to a coded error with exit 1, not 2', () => {
+    // Exit 2 is MissingDependency in the enum, so the old --from path used a
+    // semantically wrong code for an input error.
+    const e = toScaffoldError(new ExistingScaffoldError('/tmp/p'))
+    expect(e.code).toBe('INIT_SCAFFOLD_EXISTS')
+    expect(e.exitCode).toBe(ExitCode.ValidationError)
+    expect(e.recovery).toContain('--force')
+  })
+
+  it('gives every user-error subclass a code and a non-empty recovery', () => {
+    const cases = [
+      new FlagConflictError('--methodology'),
+      new InvalidYamlError('cfg.yml', 'bad indent'),
+      new InvalidConfigError('cfg.yml', 'methodology: invalid'),
+      new FromPathReadError('cfg.yml', 'ENOENT'),
+      new TTYStdinError(),
+      new ExistingScaffoldError('/tmp/p'),
+      new MultiServiceNotSupportedError('init'),
+      new ServiceRequiredError('tech-stack'),
+      new ServiceRejectedError('tech-stack'),
+      new ServiceNotFoundError('api'),
+      new ServiceFlagWithoutServicesError(),
+      new MultiServiceOverlayMissingError(),
+    ]
+    for (const c of cases) {
+      const m = toScaffoldError(c)
+      expect(m.exitCode, `${c.name} exitCode`).toBe(ExitCode.ValidationError)
+      expect(m.code, `${c.name} code`).toMatch(/^(INIT|RUN)_[A-Z_]+$/)
+      expect(m.recovery, `${c.name} recovery`).toBeTruthy()
+    }
+  })
+
+  it('throws on an unmapped subclass rather than emitting a recovery-less error', () => {
+    class NewlyAddedError extends ScaffoldUserError {
+      constructor() { super('something new') }
+    }
+    expect(() => toScaffoldError(new NewlyAddedError())).toThrow(/Unmapped ScaffoldUserError/)
+  })
+
+  it('has a mapping for every exported ScaffoldUserError subclass', async () => {
+    // Reflective, so a future subclass cannot be forgotten: whoever skips the
+    // mapping would also skip a hand-written list.
+    const mod = await import('./user-errors.js')
+    const subclasses = Object.entries(mod)
+      .filter(([, v]) => {
+        const fn = v as { prototype?: unknown }
+        return typeof v === 'function'
+          && v !== mod.ScaffoldUserError
+          && fn.prototype instanceof mod.ScaffoldUserError
+      })
+      .map(([name]) => name)
+    expect(subclasses.length).toBeGreaterThanOrEqual(12)
+    const unmapped = subclasses.filter(n => !(n in USER_ERROR_CODES))
+    expect(unmapped, `unmapped: ${unmapped.join(', ')}`).toEqual([])
   })
 })

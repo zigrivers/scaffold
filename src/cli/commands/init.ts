@@ -14,7 +14,7 @@ import { ProjectTypeSchema, ConfigSchema } from '../../config/schema.js'
 import { coerceCSV } from '../utils/coerce.js'
 import {
   InvalidYamlError, InvalidConfigError, FromPathReadError,
-  TTYStdinError, isScaffoldUserError,
+  TTYStdinError, isScaffoldUserError, toScaffoldError,
 } from '../../utils/user-errors.js'
 import {
   GAME_FLAGS, WEB_FLAGS, BACKEND_FLAGS, CLI_TYPE_FLAGS,
@@ -24,6 +24,7 @@ import {
 } from '../init-flag-families.js'
 import type { ScaffoldConfig } from '../../types/index.js'
 import { withRecovery } from '../../utils/errors.js'
+import type { ScaffoldError } from '../../types/errors.js'
 import type {
   GameFlags, WebAppFlags, BackendFlags, CliFlags, LibraryFlags,
   MobileAppFlags, DataPipelineFlags, MlFlags, BrowserExtensionFlags,
@@ -868,9 +869,23 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
         },
       )
     } catch (err) {
+      // Errors already carrying a ScaffoldError (AutoFlagRequiredError from the
+      // wizard, and anything later adopting the same shape) are forwarded as
+      // they are. Structural check rather than `instanceof`, so this does not
+      // depend on class identity across module boundaries.
+      const carried = (err as { scaffoldError?: ScaffoldError } | null)?.scaffoldError
+      if (carried) {
+        output.fail([withRecovery(carried, 'See the message above and re-run with corrected input')])
+        process.exitCode = carried.exitCode
+        return
+      }
       if (isScaffoldUserError(err)) {
-        output.error(err.message)
-        process.exitCode = 2
+        // Was: output.error(err.message) + exit 2. That printed an uncoded
+        // message to stderr with empty stdout under --format json, and exit 2
+        // means MissingDependency — the wrong code for bad input.
+        const scaffoldError = toScaffoldError(err)
+        output.fail([scaffoldError as never])
+        process.exitCode = scaffoldError.exitCode
         return
       }
       throw err
