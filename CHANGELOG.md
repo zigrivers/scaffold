@@ -4,6 +4,53 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.51.1] - 2026-07-26
+
+Agent-drivability, Release 1 — **parseable failures**. An AI agent driving
+`scaffold` previously received zero bytes on stdout from every failure under
+`--format json`: `JsonOutput.result()` hardcoded `success: true` / `errors: []`
+/ `exit_code: 0`, and no code path could emit a failure. This release makes
+failures readable.
+
+### Added
+
+- **Failure envelope.** `OutputContext.fail()` emits
+  `{success: false, data: null, errors, warnings, exit_code}` on stdout, using
+  the same envelope keys success already used. Narrowed to
+  `TerminalError = ScaffoldError & { recovery: string }`, so every terminal
+  failure names its own fix and the compiler enforces it.
+- **`scaffold adopt` failures are parseable.** All 10 terminal-failure sites
+  emit the envelope, including `ADOPT_APPLY_NON_INTERACTIVE` and
+  `ADOPT_PLAN_DRIFT`.
+- `tests/guides-agent-contract.bats` — keeps the agent-facing docs from
+  drifting away from shipped behavior.
+
+### Fixed
+
+- **Argument errors no longer dump ~200 lines of help plus a stack trace.** A
+  yargs `.fail()` handler emits a few lines and a parseable envelope. Errors
+  thrown by `.check()` validation (mixing `--web-rendering` with
+  `--backend-api-style`, for example) are reported as user input rather than
+  re-thrown as internal crashes.
+- **`scaffold init --from -` works in the space-separated form.** It was
+  rejected as `Unknown argument: -`, contradicting its own `--help` text. The
+  `--from` path also emits its result envelope under `--format json` instead of
+  exiting 0 with empty stdout.
+- **`init` honours the exit code its error carries** rather than hardcoding 1.
+- **Install guide corrected.** It taught the deprecated `--dry-run` as the adopt
+  preview and told readers to run `init` before `adopt`; `adopt` initializes
+  itself and selects the `brownfield` methodology, so the documented sequence
+  produced a worse result. The `scaffold-runner` skill gains a pre-init
+  bootstrap rule.
+
+### Notes
+
+The envelope contract covers `adopt`, `init`'s wizard path, and the global
+argument handler. It is **not** yet CLI-wide: 59 `output.error(` calls remain
+across 15 command files (`rework`, `sched`, `knowledge`, `tia`, `mq`, `run` and
+others), and `init --from` error paths still exit 2. Both land in 3.52.0.
+
+
 ## [3.51.0] - 2026-07-25
 
 Brownfield adoption, Tier D — **Queue Enhancements**. Four independent local
