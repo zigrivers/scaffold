@@ -234,8 +234,7 @@ export function runResultsPipeline(
   // historical single-channel pass to needs-user-decision, contradicting the
   // guarantee that results/reconcile reproduce the verdict review actually
   // made. Pre-4.0.0 had no floor, which is floor 1.
-  const LEGACY_JOB_FLOOR = 1
-  const minCompleted = job.min_completed_channels ?? LEGACY_JOB_FLOOR
+  const minCompleted = job.min_completed_channels ?? 1
   const verdict = deriveVerdict(gatePassed, channelStatuses, minCompleted)
 
   const totalElapsed = startTimes.length > 0 && endTimes.length > 0

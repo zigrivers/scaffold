@@ -16,7 +16,12 @@ describe('formatText', () => {
       metadata: { channels_dispatched: 1, channels_completed: 1, channels_partial: 0, total_elapsed: '30s' },
     }
     const output = formatText(results)
-    expect(output).toContain('PASSED')
+    const headline = output.split('\n')[0] ?? ''
+    expect(headline).toContain('PASSED')
+    // `toContain('PASSED')` alone also matches "PASSED (DEGRADED — 1/2
+    // channels)", so a clean pass would look identical to a degraded one to
+    // this assertion. Pin the absence of the suffix explicitly.
+    expect(headline).not.toContain('DEGRADED')
     expect(output).toContain('mmr-abc123')
   })
 

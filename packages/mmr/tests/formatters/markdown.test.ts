@@ -43,6 +43,9 @@ describe('formatMarkdown', () => {
     }
     const md = formatMarkdown(results)
     expect(md).toContain('## Multi-Model Review — PASSED')
+    // Same trap as the text formatter: the assertion above is a prefix match
+    // that a degraded heading would also satisfy.
+    expect(md).not.toContain('DEGRADED')
   })
 
   it('marks a degraded-pass as degraded in the heading, not a bare PASSED', () => {
