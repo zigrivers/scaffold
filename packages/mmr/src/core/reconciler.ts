@@ -249,6 +249,26 @@ export function evaluateGate(findings: ReconciledFinding[], threshold: Severity)
 export const DEFAULT_MIN_COMPLETED_CHANNELS = 2
 
 /**
+ * Warn when the configured floor cannot be met by the channels being dispatched.
+ *
+ * Deliberately NOT a clamp to `min(floor, dispatched)`: that would restore the
+ * `pass 1/1` hole the floor exists to close, since one dispatched channel would
+ * always satisfy a floor of one. The run is allowed to reach
+ * needs-user-decision; the operator is just told why before waiting for it.
+ *
+ * Returns null when the floor is reachable.
+ */
+export function unreachableFloorWarning(
+  minCompleted: number,
+  dispatchedChannels: readonly string[],
+): string | null {
+  if (dispatchedChannels.length >= minCompleted) return null
+  return `min_completed_channels is ${minCompleted} but only ${dispatchedChannels.length} `
+    + `channel(s) will be dispatched (${dispatchedChannels.join(', ')}), so a pass is `
+    + 'unreachable. Enable more channels, or set defaults.min_completed_channels lower.'
+}
+
+/**
  * Derive the review verdict from gate evaluation and channel health.
  *
  * Priority: blocked > needs-user-decision > degraded-pass > pass

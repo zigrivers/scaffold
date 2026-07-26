@@ -5,6 +5,7 @@ import { loadConfig } from '../config/loader.js'
 import { JobStore } from '../core/job-store.js'
 import { checkInstalled, checkAuth, checkHttpAuth } from '../core/auth.js'
 import { assemblePrompt } from '../core/prompt.js'
+import { unreachableFloorWarning } from '../core/reconciler.js'
 import { dispatchChannel } from '../core/dispatcher.js'
 import { substituteFindingsSchema, coerceParserForSchemaFlags } from '../core/output-schema.js'
 import { dispatchHttpChannel } from '../core/http-dispatcher.js'
@@ -537,6 +538,13 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       console.error('No channels enabled. Configure channels or pass --channels.')
       process.exit(1)
     }
+
+    // Surface an unreachable floor BEFORE dispatching, so the operator is not
+    // left waiting on a review whose verdict was decided before it started.
+    const floorWarning = unreachableFloorWarning(
+      config.defaults.min_completed_channels, channelNames,
+    )
+    if (floorWarning !== null) console.error(`[mmr] warning: ${floorWarning}`)
 
     const templateCriteria = resolveTemplateCriteria(config, args.template)
     const prompt = assemblePrompt({

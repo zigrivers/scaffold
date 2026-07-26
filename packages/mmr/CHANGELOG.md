@@ -2,9 +2,13 @@
 
 ## [Unreleased]
 
-## [3.3.0] — 2026-07-26
+## [4.0.0] — 2026-07-26
 
 **A verdict now reflects how many channels actually reported.**
+
+Released as a **major**, not a minor: an existing single-channel configuration
+that returned exit 0 now returns exit 3, which would block a downstream CI job
+on a `^3.x` upgrade. (Caught in review — it was first cut as 3.3.0.)
 
 ### Behavior change
 
@@ -30,9 +34,18 @@ defaults:
   min_completed_channels: 1
 ```
 
-The floor is persisted on the job, so `mmr results` and `mmr reconcile`
+### Migration
+
+If you run a single channel deliberately, set `min_completed_channels: 1`
+before upgrading. `mmr config init` writes the key with an explanatory comment.
+When the configured floor exceeds the number of enabled channels, `mmr review`
+now warns at dispatch rather than letting the run reach an unreachable verdict.
+
+The floor is persisted on every new job, so `mmr results` and `mmr reconcile`
 reproduce the verdict the review actually made rather than the one today's
-config would make.
+config would make. A job written **before** this release carries no floor and
+is re-read at floor 1 — the behaviour that was in force when it ran — so
+historical single-channel passes stay stable.
 
 ### Changed
 

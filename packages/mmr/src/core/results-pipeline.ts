@@ -1,11 +1,6 @@
 import { parseChannelOutput } from './parser.js'
 import { getModifiedFilesFromDiff } from './diff-introspect.js'
-import {
-  reconcile,
-  evaluateGate,
-  deriveVerdict,
-  DEFAULT_MIN_COMPLETED_CHANNELS,
-} from './reconciler.js'
+import { reconcile, evaluateGate, deriveVerdict } from './reconciler.js'
 import { redactCommandString } from './redact.js'
 import { formatJson } from '../formatters/json.js'
 import { formatText } from '../formatters/text.js'
@@ -234,7 +229,13 @@ export function runResultsPipeline(
   const channelStatuses = Object.fromEntries(
     Object.entries(job.channels).map(([n, ch]) => [n, ch.status]),
   ) as Record<string, ChannelStatus>
-  const minCompleted = job.min_completed_channels ?? DEFAULT_MIN_COMPLETED_CHANNELS
+  // A job with no floor is a PRE-3.3.0 job: createJob has persisted the field
+  // unconditionally since. Defaulting those to today's floor would flip a
+  // historical single-channel pass to needs-user-decision, contradicting the
+  // guarantee that results/reconcile reproduce the verdict review actually
+  // made. Pre-3.3.0 had no floor, which is floor 1.
+  const LEGACY_JOB_FLOOR = 1
+  const minCompleted = job.min_completed_channels ?? LEGACY_JOB_FLOOR
   const verdict = deriveVerdict(gatePassed, channelStatuses, minCompleted)
 
   const totalElapsed = startTimes.length > 0 && endTimes.length > 0

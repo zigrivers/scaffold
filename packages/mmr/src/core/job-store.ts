@@ -4,6 +4,7 @@ import crypto from 'node:crypto'
 import type { JobMetadata, ChannelJobEntry, Severity, OutputFormat, ReviewControls } from '../types.js'
 import type { ReconciledResults } from '../types.js'
 import { TERMINAL_STATUSES } from '../types.js'
+import { DEFAULT_MIN_COMPLETED_CHANNELS } from './reconciler.js'
 
 export interface CreateJobOpts {
   fix_threshold: Severity
@@ -81,9 +82,11 @@ export class JobStore {
       created_at: new Date().toISOString(),
       channels,
     }
-    if (opts.min_completed_channels !== undefined) {
-      metadata.min_completed_channels = opts.min_completed_channels
-    }
+    // Always persisted, never left to a read-time default. If the field could
+    // be absent on a NEW job, the legacy fallback below would have to serve two
+    // incompatible populations at once.
+    metadata.min_completed_channels =
+      opts.min_completed_channels ?? DEFAULT_MIN_COMPLETED_CHANNELS
     if (opts.session_id !== undefined) metadata.session_id = opts.session_id
     if (opts.round !== undefined) metadata.round = opts.round
     if (opts.review_controls !== undefined) metadata.review_controls = opts.review_controls

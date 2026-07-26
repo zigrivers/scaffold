@@ -439,3 +439,39 @@ describe('runResultsPipeline', () => {
     expect(results.per_channel['claude'].error).toContain('Failed to parse channel output')
   })
 })
+
+describe('completion floor — legacy jobs (review round 1, finding 3)', () => {
+  let tmpDir: string
+  let store: JobStore
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-legacy-'))
+    store = new JobStore(tmpDir)
+  })
+  afterEach(() => { fs.rmSync(tmpDir, { recursive: true }) })
+
+  it('re-reads a pre-3.3.0 job at the floor that review actually used', () => {
+    // The CHANGELOG promises the floor is persisted "so results and reconcile
+    // reproduce the verdict the review actually made". A job written before
+    // 3.3.0 carries no floor, and defaulting it to today's 2 would flip a
+    // historical single-channel pass to needs-user-decision — the opposite of
+    // the promise. Absent field ⇒ pre-3.3.0 ⇒ floor 1.
+    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['claude'] })
+    const raw = JSON.parse(fs.readFileSync(path.join(tmpDir, job.job_id, 'job.json'), 'utf8'))
+    delete raw.min_completed_channels
+    fs.writeFileSync(path.join(tmpDir, job.job_id, 'job.json'), JSON.stringify(raw))
+
+    store.updateChannel(job.job_id, 'claude', { status: 'completed' })
+    store.saveChannelOutput(job.job_id, 'claude', '{"approved": true, "findings": [], "summary": "ok"}')
+
+    const { results, exitCode } = runResultsPipeline(store, store.loadJob(job.job_id), 'json')
+    expect(results.verdict).toBe('pass')
+    expect(exitCode).toBe(0)
+  })
+
+  it('persists the floor on every new job so the fallback only ever sees legacy jobs', () => {
+    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['a', 'b'] })
+    const raw = JSON.parse(fs.readFileSync(path.join(tmpDir, job.job_id, 'job.json'), 'utf8'))
+    expect(raw.min_completed_channels).toBe(2)
+  })
+})
