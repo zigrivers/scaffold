@@ -23,6 +23,7 @@ import {
   autoRequiredSuffix,
 } from '../init-flag-families.js'
 import type { ScaffoldConfig } from '../../types/index.js'
+import { withRecovery } from '../../utils/errors.js'
 import type {
   GameFlags, WebAppFlags, BackendFlags, CliFlags, LibraryFlags,
   MobileAppFlags, DataPipelineFlags, MlFlags, BrowserExtensionFlags,
@@ -806,10 +807,11 @@ const initCommand: CommandModule<Record<string, unknown>, InitArgs> = {
             // Honour the exit code the error carries. Hardcoding 1 here was the
             // original defect: ScaffoldError.exitCode has always existed and
             // runWizard has always populated it, but this site discarded it.
-            output.fail(result!.errors.map(e => ({
-              ...e,
-              recovery: e.recovery ?? 'See the message above and re-run with corrected input',
-            })))
+            // withRecovery, not object spread: Error.prototype.message is
+            // non-enumerable, so `{ ...e }` would ship message: undefined for
+            // any Error-shaped error. adopt.ts hit this exact bug.
+            output.fail(result!.errors.map(e => withRecovery(
+              e, 'See the message above and re-run with corrected input')))
             process.exitCode = result!.errors[0]?.exitCode ?? ExitCode.ValidationError
             return
           }

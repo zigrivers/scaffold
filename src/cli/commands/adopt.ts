@@ -20,10 +20,10 @@ import {
   RESEARCH_FLAGS, MCP_SERVER_FLAGS, MACOS_NATIVE_FLAGS, applyFlagFamilyValidation, buildFlagOverrides,
 } from '../init-flag-families.js'
 import type { ProjectType } from '../../types/index.js'
-import { asScaffoldError } from '../../utils/errors.js'
+import { asScaffoldError, withRecovery } from '../../utils/errors.js'
 import { configParseError, configNotObject } from '../../utils/errors.js'
 import { ExitCode } from '../../types/enums.js'
-import type { ScaffoldError, TerminalError } from '../../types/errors.js'
+import type { ScaffoldError } from '../../types/errors.js'
 
 interface AdoptArgs {
   format?: string
@@ -120,31 +120,6 @@ function genericRecovery(e: ScaffoldError): string {
     return 'Re-run with --project-type <type> to choose explicitly'
   }
   return 'See the message above; re-run with --verbose for more detail'
-}
-
-/**
- * Widen a ScaffoldError into a TerminalError, supplying a fallback recovery.
- *
- * fail() takes TerminalError so every process-ending failure names its fix.
- * Errors built elsewhere (asScaffoldError, adoptResult.errors, lock errors)
- * carry an optional recovery, so this fills the gap without overwriting one
- * that was already set.
- */
-export function withRecovery(e: ScaffoldError, fallback: string): TerminalError {
-  // Fields are copied explicitly rather than spread. asScaffoldError passes
-  // through anything shaped like a ScaffoldError, and an Error subclass
-  // carrying code/exitCode satisfies that shape — but Error.prototype.message
-  // is NON-ENUMERABLE, so `{ ...e }` silently drops it and the envelope ships
-  // `message: undefined`. Reading the properties by name works for both plain
-  // objects and Error instances.
-  const widened: TerminalError = {
-    code: e.code,
-    message: e.message,
-    exitCode: e.exitCode,
-    recovery: e.recovery ?? fallback,
-  }
-  if (e.context !== undefined) widened.context = e.context
-  return widened
 }
 
 const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {

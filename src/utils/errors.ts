@@ -1,6 +1,7 @@
 // src/utils/errors.ts
 
 import path from 'node:path'
+import type { TerminalError } from '../types/errors.js'
 
 /** Structured scaffold error. */
 export interface ScaffoldError {
@@ -355,6 +356,32 @@ export function overlayCrossReadsNotAllowed(file: string): ScaffoldWarning {
  * - Error instances have their message extracted; stack included in context.
  * - String/null/undefined/other throws are wrapped with the fallback code.
  */
+/**
+ * Widen a ScaffoldError into a TerminalError, supplying a fallback recovery.
+ *
+ * Fields are copied by name rather than spread. asScaffoldError passes through
+ * anything shaped like a ScaffoldError, and an Error subclass carrying
+ * code/exitCode satisfies that shape — but Error.prototype.message is
+ * NON-ENUMERABLE, so `{ ...e }` silently drops it and the envelope ships
+ * `message: undefined`. Reading properties by name works for plain objects and
+ * Error instances alike.
+ *
+ * Lives here, next to asScaffoldError, because every terminal site needs it:
+ * an earlier revision defined it privately in adopt.ts and init.ts kept its
+ * own spread-based copy, which reintroduced exactly this bug one file away
+ * from the comment warning about it.
+ */
+export function withRecovery(e: ScaffoldError, fallback: string): TerminalError {
+  const widened: TerminalError = {
+    code: e.code,
+    message: e.message,
+    exitCode: e.exitCode,
+    recovery: e.recovery ?? fallback,
+  }
+  if (e.context !== undefined) widened.context = e.context
+  return widened
+}
+
 export function asScaffoldError(
   err: unknown,
   fallbackCode: string,
