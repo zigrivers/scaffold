@@ -113,3 +113,20 @@ describe('CLI failure handler', () => {
     vi.restoreAllMocks()
   })
 })
+
+describe('help-hint command inference', () => {
+  it('does not mistake an option value for a command', async () => {
+    const out: string[] = []
+    vi.spyOn(process.stdout, 'write').mockImplementation((c: unknown) => {
+      out.push(String(c)); return true
+    })
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    // "json" is the VALUE of --format, not a command.
+    await runCli(['--format', 'json', 'init', '--nonexistent-flag']).catch(() => undefined)
+    const raw = out.join('')
+    vi.restoreAllMocks()
+    const recovery = JSON.parse(raw).errors[0].recovery
+    expect(recovery).toContain('scaffold init --help')
+    expect(recovery).not.toContain('scaffold json --help')
+  })
+})

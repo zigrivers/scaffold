@@ -252,6 +252,23 @@ describe('adopt failure envelope (Task 13)', () => {
     }
   }, 60_000)
 
+  it('preserves message when the error is an Error subclass', async () => {
+    // Error.prototype.message is NON-ENUMERABLE, so object spread drops it.
+    // asScaffoldError passes through anything shaped like a ScaffoldError,
+    // and an Error subclass carrying code/exitCode satisfies that shape — so
+    // a naive {...e} clone yields message: undefined in the envelope.
+    const { withRecovery } = await import('./adopt.js')
+    class CodedError extends Error {
+      code = 'ADOPT_INTERNAL'
+      exitCode = 1
+    }
+    const widened = withRecovery(new CodedError('the real message') as never, 'fallback recovery')
+    expect(widened.message).toBe('the real message')
+    expect(widened.code).toBe('ADOPT_INTERNAL')
+    expect(widened.exitCode).toBe(1)
+    expect(widened.recovery).toBe('fallback recovery')
+  })
+
   // Static gate: the e2e cases above reach only two of the ten converted
   // sites, so this guards the rest against silently reverting to output.error.
   it('has converted every terminal-failure site in adopt.ts', () => {
