@@ -130,8 +130,21 @@ function genericRecovery(e: ScaffoldError): string {
  * carry an optional recovery, so this fills the gap without overwriting one
  * that was already set.
  */
-function withRecovery(e: ScaffoldError, fallback: string): TerminalError {
-  return { ...e, recovery: e.recovery ?? fallback }
+export function withRecovery(e: ScaffoldError, fallback: string): TerminalError {
+  // Fields are copied explicitly rather than spread. asScaffoldError passes
+  // through anything shaped like a ScaffoldError, and an Error subclass
+  // carrying code/exitCode satisfies that shape — but Error.prototype.message
+  // is NON-ENUMERABLE, so `{ ...e }` silently drops it and the envelope ships
+  // `message: undefined`. Reading the properties by name works for both plain
+  // objects and Error instances.
+  const widened: TerminalError = {
+    code: e.code,
+    message: e.message,
+    exitCode: e.exitCode,
+    recovery: e.recovery ?? fallback,
+  }
+  if (e.context !== undefined) widened.context = e.context
+  return widened
 }
 
 const adoptCommand: CommandModule<Record<string, unknown>, AdoptArgs> = {

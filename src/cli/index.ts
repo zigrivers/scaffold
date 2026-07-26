@@ -66,9 +66,37 @@ function rawOutputHints(argv: string[]): { format?: string; auto?: boolean } {
   return { format, auto: argv.includes('--auto') }
 }
 
+/**
+ * Every registered top-level command name, derived from the command modules
+ * themselves so it cannot drift as commands are added.
+ */
+const COMMAND_NAMES: ReadonlySet<string> = new Set(
+  [
+    initCommand, runCommand, buildCommand, adoptCommand, skipCommand, resetCommand,
+    statusCommand, nextCommand, validateCommand, validateKnowledgeCommand, listCommand,
+    infoCommand, versionCommand, updateCommand, dashboardCommand, doctorCommand,
+    guidesCommand, decisionsCommand, knowledgeCommand, skillCommand, checkCommand,
+    completeCommand, reworkCommand, observeCommand, knowledgeFreshnessCommand,
+    agentOpsCommand, mqCommand, tiaCommand, schedCommand, hooksCommand,
+  ].map(c => String(Array.isArray(c.command) ? c.command[0] : c.command).split(' ')[0] ?? ''),
+)
+
+/**
+ * Find the subcommand for the `--help` hint.
+ *
+ * Matching the first non-dash token is wrong: it treats an option VALUE as a
+ * command, so `scaffold --format json init --bad` would suggest
+ * `scaffold json --help`. Checking against the registered names means only a
+ * real command can be picked, and an unrecognized invocation falls back to
+ * the top-level help.
+ */
+function findCommandName(argv: string[]): string {
+  return argv.find(a => !a.startsWith('-') && COMMAND_NAMES.has(a)) ?? ''
+}
+
 export async function runCli(argv: string[]): Promise<void> {
   shutdown.install()
-  const commandName = argv.find(a => !a.startsWith('-')) ?? ''
+  const commandName = findCommandName(argv)
   try {
     await runYargs(argv, commandName, rawOutputHints(argv))
   } catch (err) {
