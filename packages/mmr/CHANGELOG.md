@@ -2,6 +2,50 @@
 
 ## [Unreleased]
 
+## [3.3.0] — 2026-07-26
+
+**A verdict now reflects how many channels actually reported.**
+
+### Behavior change
+
+**New `defaults.min_completed_channels`, default 2.** When the gate passes but
+fewer than this many channels completed, the verdict is `needs-user-decision`
+(exit 3) instead of a pass.
+
+Two shapes of thin evidence used to read as approval:
+
+- `degraded-pass 2/6` — four channels silent, verdict still exit 0
+- `pass 1/1` — not even *marked* degraded, because a single dispatched channel
+  that completes satisfies `completed === dispatched`
+
+A ratio-based floor catches the first and misses the second (1/1 is 100%
+participation), so the floor is an absolute count. `blocked` still outranks it:
+a P0 found by one channel is a real P0, and thin evidence must not launder a
+blocking finding into "go ask a human".
+
+Projects that deliberately run a single channel opt in explicitly:
+
+```yaml
+defaults:
+  min_completed_channels: 1
+```
+
+The floor is persisted on the job, so `mmr results` and `mmr reconcile`
+reproduce the verdict the review actually made rather than the one today's
+config would make.
+
+### Changed
+
+- **`degraded-pass` no longer renders as a bare `PASSED`.** Both the text
+  headline and the markdown heading now read
+  `PASSED (DEGRADED — 3/6 channels)`. Reviews are read by their first line —
+  and, posted to a PR, by their heading — which is exactly where overstating
+  the evidence is least likely to be double-checked. The suffix is appended
+  rather than replacing `PASSED`, so existing greps still match.
+- **The `needs-user-decision` summary distinguishes its two causes.** It used
+  to say "No channels completed" unconditionally, which is plainly false for a
+  below-floor run and would send a reader hunting an outage that never happened.
+
 ## [3.2.0] — 2026-07-18
 
 ### Fixed

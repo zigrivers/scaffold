@@ -1,18 +1,9 @@
 import type { ReconciledResults } from '../types.js'
-
-function verdictLabel(verdict: ReconciledResults['verdict']): string {
-  switch (verdict) {
-  case 'pass': return 'PASSED'
-  case 'degraded-pass': return 'PASSED'
-  case 'blocked': return 'BLOCKED'
-  case 'needs-user-decision': return 'NEEDS DECISION'
-  default: return 'UNKNOWN'
-  }
-}
+import { verdictLabel } from './verdict-label.js'
 
 export function formatMarkdown(results: ReconciledResults): string {
   const lines: string[] = []
-  const gate = verdictLabel(results.verdict)
+  const gate = verdictLabel(results)
 
   lines.push(`## Multi-Model Review — ${gate}`)
   lines.push('')

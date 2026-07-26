@@ -7,6 +7,10 @@ import { TERMINAL_STATUSES } from '../types.js'
 
 export interface CreateJobOpts {
   fix_threshold: Severity
+  /** Completion floor in effect at review time. Persisted alongside
+   *  fix_threshold so `mmr results` and `mmr reconcile` reproduce the verdict
+   *  the review actually made, not the one today's config would make. */
+  min_completed_channels?: number
   format: OutputFormat
   channels: string[]
   session_id?: string
@@ -76,6 +80,9 @@ export class JobStore {
       format: opts.format,
       created_at: new Date().toISOString(),
       channels,
+    }
+    if (opts.min_completed_channels !== undefined) {
+      metadata.min_completed_channels = opts.min_completed_channels
     }
     if (opts.session_id !== undefined) metadata.session_id = opts.session_id
     if (opts.round !== undefined) metadata.round = opts.round

@@ -630,6 +630,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     const store = new JobStore(jobsDir)
     const job = store.createJob({
       fix_threshold: config.defaults.fix_threshold as Severity,
+      min_completed_channels: config.defaults.min_completed_channels,
       format: config.defaults.format as OutputFormat,
       channels: channelNames,
       session_id: args.session,

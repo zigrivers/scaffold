@@ -45,7 +45,10 @@ describe('formatMarkdown', () => {
     expect(md).toContain('## Multi-Model Review — PASSED')
   })
 
-  it('displays PASSED for degraded-pass verdict', () => {
+  it('marks a degraded-pass as degraded in the heading, not a bare PASSED', () => {
+    // A review posted to a PR is read as its heading. "PASSED" over a 3-of-6
+    // run overstates the evidence exactly where it is least likely to be
+    // double-checked.
     const results: ReconciledResults = {
       job_id: 'mmr-test',
       verdict: 'degraded-pass',
@@ -55,10 +58,10 @@ describe('formatMarkdown', () => {
       summary: 'Review passed (degraded — some channels unavailable)',
       reconciled_findings: [],
       per_channel: {},
-      metadata: { channels_dispatched: 2, channels_completed: 1, channels_partial: 1, total_elapsed: '5s' },
+      metadata: { channels_dispatched: 6, channels_completed: 3, channels_partial: 3, total_elapsed: '5s' },
     }
     const md = formatMarkdown(results)
-    expect(md).toContain('## Multi-Model Review — PASSED')
+    expect(md).toContain('## Multi-Model Review — PASSED (DEGRADED — 3/6 channels)')
   })
 
   it('escapes newlines in finding descriptions', () => {

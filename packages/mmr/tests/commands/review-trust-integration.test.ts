@@ -12,6 +12,11 @@ import { restoreEnv } from '../helpers/env.js'
 
 const LOCAL_CHANNEL_YAML = [
   'version: 1',
+  // One mocked channel, and the point of these tests is the trust gate — opt
+  // out of the completion floor so a below-quorum needs-user-decision can't be
+  // mistaken for the trust gate firing.
+  'defaults:',
+  '  min_completed_channels: 1',
   'channels:',
   '  local:',
   '    command: local-review',

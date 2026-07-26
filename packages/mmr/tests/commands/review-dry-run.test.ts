@@ -252,6 +252,7 @@ describe('configured compensator availability', () => {
     version: 1,
     defaults: {
       fix_threshold: 'P2',
+      min_completed_channels: 2,
       timeout: 300,
       format: 'json',
       parallel: true,

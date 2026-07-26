@@ -71,13 +71,36 @@ you do dismiss one, say why in the review summary.
 | Verdict | Exit | Meaning | Action |
 |---|---|---|---|
 | `pass` | 0 | all channels completed, gate passed | proceed (merge / commit / push) |
-| `degraded-pass` | 0 | gate passed but a channel was skipped or compensated | proceed; note the degradation |
+| `degraded-pass` | 0 | gate passed, at least `min_completed_channels` reported, but a channel was skipped or compensated | proceed; note the degradation |
 | `blocked` | 2 | an unresolved finding sits at or above the threshold | **stop** — fix or surface; do not merge |
-| `needs-user-decision` | 3 | no channel completed, channels contradict, or human judgment needed | **stop** — surface to the user |
+| `needs-user-decision` | 3 | no channel completed, **too few channels completed to corroborate**, channels contradict, or human judgment needed | **stop** — surface to the user |
 
 Never merge on `blocked` or `needs-user-decision`. Cross-check each finding's
 `location` against the reviewed diff's file list (`gh pr diff <n> --name-only`
 for PRs); out-of-diff findings are contamination noise.
+
+## Completion floor
+
+A passing gate is only as good as the number of channels that actually
+reported. `defaults.min_completed_channels` (default **2**) is the floor: below
+it, a passing gate returns `needs-user-decision` instead of a pass.
+
+Before this floor existed, two shapes of thin evidence read as approval —
+`degraded-pass 2/6`, where four channels were silent and the verdict was still
+exit 0, and `pass 1/1`, which wasn't even *marked* degraded because a single
+dispatched channel that completes satisfies `completed === dispatched`. A
+ratio-based floor catches the first and misses the second, so the floor is an
+absolute count.
+
+The headline reflects it too: a degraded pass renders as
+`PASSED (DEGRADED — 3/6 channels)` rather than a bare `PASSED`.
+
+Projects that deliberately run one channel opt in explicitly:
+
+```yaml
+defaults:
+  min_completed_channels: 1
+```
 
 ## Degraded channels
 

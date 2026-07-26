@@ -181,6 +181,10 @@ new file mode 100644
         path.join(dir, '.mmr.yaml'),
         [
           'version: 1',
+          // Single-channel fixture: opt out of the completion floor so the
+          // assertion below stays about the trust gate and not about quorum.
+          'defaults:',
+          '  min_completed_channels: 1',
           'channels:',
           '  local:',
           '    command: local-review',

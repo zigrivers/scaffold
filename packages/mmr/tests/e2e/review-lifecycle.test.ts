@@ -126,9 +126,11 @@ describe('review lifecycle (unit integration)', () => {
     const reconciled = reconcile(channelFindings)
     const gatePassed = evaluateGate(reconciled, 'P2')
 
-    // Derive verdict — should be degraded-pass (gate passes but not all channels completed)
+    // Derive verdict — should be degraded-pass (gate passes but not all channels completed).
+    // Floor 1: this fixture is about the failed channel being excluded from
+    // reconciliation, not about quorum.
     const channelStatuses: Record<string, ChannelStatus> = { claude: 'completed', gemini: 'failed' }
-    const verdict = deriveVerdict(gatePassed, channelStatuses)
+    const verdict = deriveVerdict(gatePassed, channelStatuses, 1)
     expect(verdict).toBe('degraded-pass')
 
     const approved = verdict === 'pass' || verdict === 'degraded-pass'
@@ -206,9 +208,10 @@ describe('review lifecycle (unit integration)', () => {
     const gatePassed = evaluateGate(reconciled, 'P2')
     expect(gatePassed).toBe(true)
 
-    // Verdict: degraded-pass (gate passes but gemini timed out)
+    // Verdict: degraded-pass (gate passes but gemini timed out). Floor 1 —
+    // this fixture is about excluding the timed-out channel, not about quorum.
     const channelStatuses: Record<string, ChannelStatus> = { claude: 'completed', gemini: 'timeout' }
-    const verdict = deriveVerdict(gatePassed, channelStatuses)
+    const verdict = deriveVerdict(gatePassed, channelStatuses, 1)
     expect(verdict).toBe('degraded-pass')
   })
 })

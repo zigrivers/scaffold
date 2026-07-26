@@ -86,6 +86,13 @@ export interface JobMetadata {
   job_id: string
   status: JobStatus
   fix_threshold: Severity
+  /**
+   * Completion floor in effect when the review ran. Optional: jobs created
+   * before v3.3.0 don't carry it, and those fall back to the shipped default
+   * rather than to the pre-3.3.0 behaviour — a legacy job re-read today should
+   * be judged by today's standard, not grandfathered into a thinner one.
+   */
+  min_completed_channels?: number
   format: OutputFormat
   created_at: string
   channels: Record<string, ChannelJobEntry>

@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { reconcile, evaluateGate, deriveVerdict } from '../../src/core/reconciler.js'
+import {
+  reconcile,
+  evaluateGate,
+  deriveVerdict,
+  DEFAULT_MIN_COMPLETED_CHANNELS,
+} from '../../src/core/reconciler.js'
 import { computeFindingKey } from '../../src/core/stable-id.js'
 import type { Finding, ReconciledFinding, ChannelStatus } from '../../src/types.js'
 
@@ -388,17 +393,23 @@ describe('deriveVerdict', () => {
   })
 
   it('returns degraded-pass when gate passes but some channels failed', () => {
-    const statuses: Record<string, ChannelStatus> = { claude: 'completed', gemini: 'failed' }
+    const statuses: Record<string, ChannelStatus> = {
+      claude: 'completed', codex: 'completed', gemini: 'failed',
+    }
     expect(deriveVerdict(true, statuses)).toBe('degraded-pass')
   })
 
   it('returns degraded-pass when gate passes but some channels timed out', () => {
-    const statuses: Record<string, ChannelStatus> = { claude: 'completed', codex: 'timeout' }
+    const statuses: Record<string, ChannelStatus> = {
+      claude: 'completed', grok: 'completed', codex: 'timeout',
+    }
     expect(deriveVerdict(true, statuses)).toBe('degraded-pass')
   })
 
   it('returns degraded-pass when some channels are not_installed', () => {
-    const statuses: Record<string, ChannelStatus> = { claude: 'completed', codex: 'not_installed' }
+    const statuses: Record<string, ChannelStatus> = {
+      claude: 'completed', grok: 'completed', codex: 'not_installed',
+    }
     expect(deriveVerdict(true, statuses)).toBe('degraded-pass')
   })
 
@@ -413,7 +424,60 @@ describe('deriveVerdict', () => {
   })
 
   it('returns degraded-pass when some channels are skipped', () => {
-    const statuses: Record<string, ChannelStatus> = { claude: 'completed', codex: 'skipped' }
+    const statuses: Record<string, ChannelStatus> = {
+      claude: 'completed', grok: 'completed', codex: 'skipped',
+    }
     expect(deriveVerdict(true, statuses)).toBe('degraded-pass')
+  })
+})
+
+describe('deriveVerdict — completion floor', () => {
+  // Until v3.3.0 the verdict compared `completed` against `dispatched` and
+  // nothing else, so 1-of-6 and 5-of-6 were the same verdict, and a lone
+  // surviving channel could carry a merge. Both shapes were observed in the
+  // job store: `degraded-pass 2/6` and — worse — `pass 1/1`, a wholly
+  // unqualified pass, because a single dispatched channel that completes
+  // satisfies `completed === dispatched`.
+  const done = 'completed' as ChannelStatus
+
+  it('defaults the floor to 2 so one opinion is never enough', () => {
+    expect(DEFAULT_MIN_COMPLETED_CHANNELS).toBe(2)
+  })
+
+  it('returns needs-user-decision when a single channel completes out of many', () => {
+    const statuses: Record<string, ChannelStatus> = {
+      codex: done, claude: 'timeout', grok: 'failed',
+      antigravity: 'failed', opencode: 'timeout', 'doc-conformance': 'failed',
+    }
+    expect(deriveVerdict(true, statuses)).toBe('needs-user-decision')
+  })
+
+  it('returns needs-user-decision for a solo channel that completed (the pass 1/1 case)', () => {
+    // 1/1 is 100% participation and still one opinion. Ratio-based floors
+    // miss this; an absolute floor does not.
+    expect(deriveVerdict(true, { grok: done })).toBe('needs-user-decision')
+  })
+
+  it('allows degraded-pass once the floor is met', () => {
+    const statuses: Record<string, ChannelStatus> = {
+      codex: done, claude: done, grok: 'failed', antigravity: 'timeout',
+    }
+    expect(deriveVerdict(true, statuses)).toBe('degraded-pass')
+  })
+
+  it('honours an explicit floor of 1, restoring pre-3.3.0 behaviour', () => {
+    const statuses: Record<string, ChannelStatus> = { codex: done, claude: 'failed' }
+    expect(deriveVerdict(true, statuses, 1)).toBe('degraded-pass')
+    expect(deriveVerdict(true, { grok: done }, 1)).toBe('pass')
+  })
+
+  it('never upgrades a failed gate: blocked still wins below the floor', () => {
+    // A single channel finding a P0 is still a real P0. Thin evidence must
+    // not launder a blocking finding into "go ask a human".
+    expect(deriveVerdict(false, { codex: done, claude: 'failed' })).toBe('blocked')
+  })
+
+  it('still returns needs-user-decision when nothing completed', () => {
+    expect(deriveVerdict(true, { codex: 'failed', claude: 'timeout' })).toBe('needs-user-decision')
   })
 })
