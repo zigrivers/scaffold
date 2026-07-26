@@ -271,9 +271,13 @@ no envelope.
 ### Choosing `init` or `adopt`
 
 Run `scaffold adopt` when the directory already contains source code or docs.
-It initializes `.scaffold/` itself and selects the `brownfield` methodology, so
-no separate `scaffold init` is needed. Run `scaffold init` for an empty or
-brand-new directory.
+Run `scaffold init` for an empty or brand-new directory.
+
+`adopt` runs in two steps. Bare `scaffold adopt` **writes nothing** — it renders
+an Adoption Plan and stops. `scaffold adopt --apply --plan-key <sha256>` then
+executes it, and *that* step writes `.scaffold/` and selects the `brownfield`
+methodology itself. So no separate `scaffold init` is needed either way — but
+nothing is written until you approve the plan.
 
 ### Flags `--auto` cannot default
 

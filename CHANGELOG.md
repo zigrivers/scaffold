@@ -12,10 +12,13 @@ produced it recorded that the rest of the CLI was not covered, and the 3.52.0
 notes said so explicitly rather than implying otherwise. This closes that gap
 and adds a gate so it cannot reopen.
 
-All **68** `output.error(` call sites across **21** files are converted. A
-static test now fails the build if any command reports a failure through the
-stderr-only `error()`, or hand-rolls a `PROJECT_NOT_INITIALIZED` line instead
-of using `exitNotInitialized`.
+All **68** `output.error(` call sites across **21** files are converted, plus
+**six terminal `displayErrors()` sites** in `run`, `build`, and `rework` that
+reached the same stderr-only `error()` one indirection deeper — those survived
+the first pass and were caught in review, after the coverage claim had already
+been written. A static test now fails the build if any command reports a
+failure through `error()` directly, or hand-rolls a `PROJECT_NOT_INITIALIZED`
+line instead of using `exitNotInitialized`.
 
 ### Behavior change
 
@@ -47,6 +50,14 @@ failure now also carries a machine-readable `code` (`RUN_SERVICE_REQUIRED`,
 - **Aggregate reporters emitted one stderr line per error and then a bare exit
   code.** `skill`, `agent-ops`, and `validate` now emit a single envelope
   carrying every error at the terminal decision point.
+- **`scaffold validate --format json` reported `success: true` on failure.**
+  The JSON branch returned early, so the failure envelope only ever fired in
+  the human path — a failing validation exited 1 while stdout claimed success.
+  An agent branching on `success`, as the guide instructs, would have read a
+  failed validation as a pass.
+- **`DEP_TARGET_MISSING` exited 1 in `info` and 2 in `check`, `complete`,
+  `reset`, and `skip`.** Same code, different exit status depending on which
+  command you asked. `info` now matches the other four (exit 2).
 - **Commands ran on past a failed guard.** Every guard caller bailed with
   `if (process.exitCode === 2) return`, coupling ten command files to a magic
   number owned by the guard layer. Guards now return a boolean and callers check
@@ -58,6 +69,13 @@ failure now also carries a machine-readable `code` (`RUN_SERVICE_REQUIRED`,
   stderr instead of routing through `exitNotInitialized`, so
   `PROJECT_NOT_INITIALIZED` — the single most common failure an agent hits —
   was unparseable in exactly those places.
+
+### Also
+
+The e2e acceptance suite (`src/e2e/**`) now runs as its own vitest process via
+`make ts-check`. It had been leaking into the default unit run — `test:e2e`
+existed in `package.json` but nothing invoked it — and its subprocess-spawning
+cases starved vitest's reporter RPC, failing CI with every test passing.
 
 ### Known exception
 

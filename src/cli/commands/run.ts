@@ -20,7 +20,7 @@ import { pipelineStepsForReconcile } from '../../core/pipeline/reconcile-input.j
 import { findProjectRoot } from '../../cli/middleware/project-root.js'
 import { createOutputContext, exitNotInitialized } from '../../cli/output/context.js'
 import { ExitCode } from '../../types/enums.js'
-import { displayErrors } from '../../cli/output/error-display.js'
+import { failWithErrors } from '../../cli/output/error-display.js'
 import { resolveOutputMode } from '../../cli/middleware/output-mode.js'
 import { findClosestMatch } from '../../utils/levenshtein.js'
 import { resolveContainedArtifactPath } from '../../utils/artifact-path.js'
@@ -119,8 +119,8 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
     // -----------------------------------------------------------------------
     const context = loadPipelineContext(projectRoot, { includeTools: true })
     if (!context.config) {
-      displayErrors(context.configErrors, context.configWarnings, output)
-      process.exitCode = 1
+      failWithErrors(context.configErrors, context.configWarnings, output,
+        'Fix the reported field in .scaffold/config.yml, then re-run')
       return
     }
     const config = context.config
@@ -278,8 +278,8 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
 
       const cycles = detectCycles(graph)
       if (cycles.length > 0) {
-        displayErrors(cycles, [], output)
-        process.exitCode = 1
+        failWithErrors(cycles, [], output,
+          'Break the dependency cycle in the reported steps\' `depends-on` frontmatter')
         return
       }
 
@@ -568,8 +568,9 @@ const runCommand: CommandModule<Record<string, unknown>, RunArgs> = {
             })
 
             if (!assemblyResult.success) {
-              displayErrors(assemblyResult.errors, assemblyResult.warnings, output)
-              process.exitCode = 5
+              failWithErrors(assemblyResult.errors, assemblyResult.warnings, output,
+                'Fix the reported meta-prompt or knowledge entry, then re-run',
+                ExitCode.BuildError)
               return
             }
 

@@ -104,13 +104,16 @@ const infoCommand: CommandModule<Record<string, unknown>, InfoArgs> = {
       const msg = suggestion
         ? `Step '${argv.step}' not found. Did you mean '${suggestion}'?`
         : `Step '${argv.step}' not found`
+      // MissingDependency, matching check/complete/reset/skip. The same code
+      // exited 1 here and 2 in the other four, so an agent branching on the
+      // exit status for "step not found" got a different answer per command.
       output.fail([{
         code: 'DEP_TARGET_MISSING',
         message: msg,
-        exitCode: ExitCode.ValidationError,
+        exitCode: ExitCode.MissingDependency,
         recovery: 'Run `scaffold info` with no argument to list steps',
       }])
-      process.exitCode = ExitCode.ValidationError
+      process.exitCode = ExitCode.MissingDependency
       return
     }
 

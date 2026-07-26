@@ -231,6 +231,36 @@ describe('the envelope contract is CLI-wide', () => {
     expect(offenders, `use output.fail() instead: ${offenders.join(', ')}`).toEqual([])
   })
 
+  it('no command ends on displayErrors(), which routes through error()', async () => {
+    // The first sweep converted every `output.error(` call site and declared
+    // CLI-wide coverage — but `displayErrors()` calls `output.error()` for
+    // each error, so six terminal sites in run/build/rework still produced
+    // empty stdout under --format json. Banning the direct call was not
+    // enough; the indirection had to be banned at terminal sites too.
+    // `failWithErrors()` is the terminal form.
+    const { readFileSync, readdirSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    const offenders: string[] = []
+    for (const f of readdirSync('src/cli/commands')) {
+      if (!f.endsWith('.ts') || f.endsWith('.test.ts')) continue
+      const p = join('src/cli/commands', f)
+      const src = readFileSync(p, 'utf-8')
+      // A terminal site is a displayErrors() call whose next few lines set a
+      // non-zero exit or return one. Warning-only calls (empty error array)
+      // are fine and are how the remaining callers use it.
+      const lines = src.split('\n')
+      lines.forEach((line, i) => {
+        if (!/\bdisplayErrors\(/.test(line)) return
+        if (/displayErrors\(\s*\[\]/.test(line)) return   // warnings-only
+        const after = lines.slice(i, i + 4).join(' ')
+        if (/process\.exitCode\s*=\s*(?!0)|exitCode:\s*(?!0)[1-9]/.test(after)) {
+          offenders.push(`${p}:${i + 1}`)
+        }
+      })
+    }
+    expect(offenders, `use failWithErrors() instead: ${offenders.join(', ')}`).toEqual([])
+  })
+
   it('no command prints a raw PROJECT_NOT_INITIALIZED line to stderr', async () => {
     // Five commands hand-rolled this to stderr and exited, bypassing
     // exitNotInitialized — so the single most common agent failure (running

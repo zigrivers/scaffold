@@ -1770,9 +1770,12 @@ exit code <em>is</em> the answer (0 = due, 1 = not due). It prints nothing and e
 no envelope.</p></div>
 <h3 id="choosing-init-or-adopt">Choosing <code>init</code> or <code>adopt</code></h3>
 <p>Run <code>scaffold adopt</code> when the directory already contains source code or docs.
-It initializes <code>.scaffold/</code> itself and selects the <code>brownfield</code> methodology, so
-no separate <code>scaffold init</code> is needed. Run <code>scaffold init</code> for an empty or
-brand-new directory.</p>
+Run <code>scaffold init</code> for an empty or brand-new directory.</p>
+<p><code>adopt</code> runs in two steps. Bare <code>scaffold adopt</code> <strong>writes nothing</strong> — it renders
+an Adoption Plan and stops. <code>scaffold adopt --apply --plan-key &#x3C;sha256></code> then
+executes it, and <em>that</em> step writes <code>.scaffold/</code> and selects the <code>brownfield</code>
+methodology itself. So no separate <code>scaffold init</code> is needed either way — but
+nothing is written until you approve the plan.</p>
 <h3 id="flags---auto-cannot-default">Flags <code>--auto</code> cannot default</h3>
 <p>Nine project types need one flag chosen explicitly, because there is no
 defensible default. They are annotated <code>[required with --auto]</code> in

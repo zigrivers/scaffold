@@ -14,7 +14,7 @@ import {
 import { loadAllPresets } from '../../core/assembly/preset-loader.js'
 import { buildGraph } from '../../core/dependency/graph.js'
 import { detectCycles, topologicalSort } from '../../core/dependency/dependency.js'
-import { displayErrors } from '../../cli/output/error-display.js'
+import { failWithErrors } from '../../cli/output/error-display.js'
 import { buildIndexWithOverrides, loadFullEntries } from '../../core/assembly/knowledge-loader.js'
 import { createAdapter } from '../../core/adapters/adapter.js'
 import type { AdapterStepInput, AdapterStepOutput, OutputFile } from '../../core/adapters/adapter.js'
@@ -89,8 +89,9 @@ export async function runBuild(argv: BuildArgs, options: RunBuildOptions = {}): 
       // Step 2: Load config
       const { config, errors: configErrors } = loadConfig(projectRoot, [])
       if (configErrors.length > 0) {
-        displayErrors(configErrors, [], output)
-        return { exitCode: 1, errors: configErrors }
+        failWithErrors(configErrors, [], output,
+          'Fix the reported field in .scaffold/config.yml, then re-run')
+        return { exitCode: ExitCode.ValidationError, errors: configErrors }
       }
       if (!config) {
         output.fail([{
@@ -126,8 +127,9 @@ export async function runBuild(argv: BuildArgs, options: RunBuildOptions = {}): 
       // Step 6: Detect cycles
       const cycles = detectCycles(graph)
       if (cycles.length > 0) {
-        displayErrors(cycles, [], output)
-        return { exitCode: 1, errors: cycles }
+        failWithErrors(cycles, [], output,
+          'Break the dependency cycle in the reported steps\' `depends-on` frontmatter')
+        return { exitCode: ExitCode.ValidationError, errors: cycles }
       }
 
       // Step 7: Topological sort (pipeline steps only — tools are excluded from graph)

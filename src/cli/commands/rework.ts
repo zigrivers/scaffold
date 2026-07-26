@@ -3,7 +3,7 @@ import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext, exitNotInitialized } from '../output/context.js'
 import { ExitCode } from '../../types/enums.js'
-import { displayErrors } from '../output/error-display.js'
+import { failWithErrors } from '../output/error-display.js'
 import { acquireLock, getLockPath, releaseLock } from '../../state/lock-manager.js'
 import { ReworkManager } from '../../state/rework-manager.js'
 import { StateManager } from '../../state/state-manager.js'
@@ -285,7 +285,7 @@ const reworkCommand: CommandModule<Record<string, unknown>, ReworkArgs> = {
         exitCode: ExitCode.StateCorruption,
         recovery: 'Wait for the other process to finish, or pass --force to take the lock',
       }])
-      process.exitCode = 3
+      process.exitCode = ExitCode.StateCorruption
       return
     }
 
@@ -302,8 +302,8 @@ const reworkCommand: CommandModule<Record<string, unknown>, ReworkArgs> = {
       // Load pipeline context and resolve overlay/graph
       const context = loadPipelineContext(projectRoot as string)
       if (!context.config) {
-        displayErrors(context.configErrors, context.configWarnings, output)
-        process.exitCode = ExitCode.ValidationError
+        failWithErrors(context.configErrors, context.configWarnings, output,
+          'Fix the reported field in .scaffold/config.yml, then re-run')
         return
       }
       const pipeline = resolvePipeline(context, { output })

@@ -161,6 +161,11 @@ vi.mock('../../cli/output/context.js', () => ({
 
 vi.mock('../../cli/output/error-display.js', () => ({
   displayErrors: vi.fn(),
+  // Terminal form: emits the failure envelope and sets the exit code, so the
+  // mock must set it too or every "exits N" assertion below reads 0.
+  failWithErrors: vi.fn((_e: unknown, _w: unknown, _o: unknown, _r: string, code = 1) => {
+    process.exitCode = code
+  }),
 }))
 
 vi.mock('../../cli/middleware/output-mode.js', () => ({

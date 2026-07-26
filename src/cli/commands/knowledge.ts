@@ -194,7 +194,6 @@ const resetSubcommand: CommandModule<Record<string, unknown>, ResetArgs> = {
     if (!localPath) {
       output.info(`Nothing to reset for '${name}' — no local override found.`)
       return
-      return
     }
 
     // Check whether we're in a git repo

@@ -48,7 +48,9 @@ const validateCommand: CommandModule<Record<string, unknown>, ValidateArgs> = {
     // success-shaped payload with exit 1 — a caller branching on `success`
     // would have read a failed validation as a pass.
     if (result.errors.length > 0) {
-      if (outputMode !== 'json') displayErrors(result.errors, result.warnings, output)
+      // Warnings only: fail() already renders every error for humans, so
+      // passing the errors here too printed each one twice.
+      if (outputMode !== 'json') displayErrors([], result.warnings, output)
       output.fail(result.errors.map(e => ({
         code: e.code,
         message: e.context?.file ? `${e.context.file}: ${e.message}` : e.message,
