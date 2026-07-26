@@ -14,7 +14,6 @@ export interface ScaffoldError {
   context?: Record<string, string | number | undefined>
 }
 
-/** Non-fatal warning (same shape as error but never causes non-zero exit). */
 /**
  * A ScaffoldError at a process-ending site, where `recovery` is mandatory.
  *
@@ -26,6 +25,7 @@ export interface ScaffoldError {
  */
 export type TerminalError = ScaffoldError & { recovery: string }
 
+/** Non-fatal warning (same shape as error but never causes non-zero exit). */
 export interface ScaffoldWarning {
   /** Machine-readable warning code (e.g., 'CONFIG_UNKNOWN_FIELD'). */
   code: string
