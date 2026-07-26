@@ -204,27 +204,49 @@ Expected: FAIL with `output.fail is not a function`
 
 - [ ] **Step 3: Add `fail` to the interface**
 
+First add the type that makes the recovery guarantee real. `ScaffoldError.recovery` is optional (`src/types/errors.ts:12`) and must stay optional, because plenty of non-terminal `warn`/`error` call sites legitimately have nothing actionable to say. But at a *terminal* site the plan promises every failure names its fix, and a promise the compiler does not check is a promise that rots:
+
+```typescript
+// src/types/errors.ts — append
+/**
+ * A ScaffoldError at a process-ending site. `recovery` is mandatory here:
+ * the last thing a caller sees before a non-zero exit must tell them what to
+ * do next. Narrowing it at the type level means a site that forgets is a
+ * compile error rather than a documentation drift.
+ */
+export type TerminalError = ScaffoldError & { recovery: string }
+```
+
+Then the interface method:
+
 ```typescript
 // src/cli/output/context.ts — inside interface OutputContext, after result()
   /**
    * Terminal failure. In json mode this writes the failure envelope to stdout
-   * so an agent always has something to parse. In interactive/auto mode it
+   * so a caller always has something to parse. In interactive/auto mode it
    * delegates to error() so human output is unchanged.
+   *
+   * Required, not optional, on purpose: an optional method would let a command
+   * silently skip emitting the envelope, which is the defect this removes.
+   * Takes TerminalError, so every failure carries a recovery string by
+   * construction. `exitCode` defaults to the first error's, then
+   * ValidationError.
    */
-  fail(errors: ScaffoldError[], exitCode?: ExitCode): void
+  fail(errors: TerminalError[], exitCode?: ExitCode): void
 ```
 
-Add the import at the top of the file:
+Add the imports at the top of the file:
 
 ```typescript
 import type { ExitCode } from '../../types/enums.js'
+import type { TerminalError } from '../../types/errors.js'
 ```
 
 - [ ] **Step 4: Implement in JsonOutput**
 
 ```typescript
 // src/cli/output/json.ts — after result()
-  fail(errors: ScaffoldError[], exitCode?: ExitCode): void {
+  fail(errors: TerminalError[], exitCode?: ExitCode): void {
     const resolved = exitCode ?? errors[0]?.exitCode ?? ExitCode.ValidationError
     for (const e of errors) {
       process.stderr.write(`✗ ${e.code}: ${e.message}\n`)
@@ -250,14 +272,14 @@ import { ExitCode } from '../../types/enums.js'
 
 ```typescript
 // src/cli/output/interactive.ts — after result()
-  fail(errors: ScaffoldError[], _exitCode?: ExitCode): void {
+  fail(errors: TerminalError[], _exitCode?: ExitCode): void {
     for (const e of errors) this.error(e)
   }
 ```
 
 ```typescript
 // src/cli/output/auto.ts — after result()
-  fail(errors: ScaffoldError[], exitCode?: ExitCode): void {
+  fail(errors: TerminalError[], exitCode?: ExitCode): void {
     this.interactive.fail(errors, exitCode)
   }
 ```
@@ -266,14 +288,22 @@ Both files need `import type { ExitCode } from '../../types/enums.js'` added to 
 
 - [ ] **Step 6: Update the test fakes that implement `OutputContext`**
 
-Adding a required method to the interface breaks every fake that claims to be one. There is no shared test-fake helper in this repo — each file defines its own — so the breakage is distributed. Surveyed before implementation, these four declare an explicit return type and will hard-fail `tsc --noEmit`:
+Adding a required method to the interface breaks every fake that claims to be one. There is no shared test-fake helper in this repo — each file defines its own — so the breakage is distributed and larger than a grep suggests.
 
-- `src/core/pipeline/resolver.test.ts:9` — `function makeOutput(): OutputContext`
-- `src/core/assembly/overlay-state-resolver.test.ts:41` — `function makeOutput(): OutputContext`
-- `src/cli/output/error-display.test.ts:35` — `function makeMockOutput(): OutputContext`
-- `src/e2e/cross-service-references.test.ts:32` — `function mkOutput(): OutputContext`
+**Measured, not estimated:** adding `fail` produces **135 `tsc` errors across 13 files / 14 fake definitions**, every one the identical `Property 'fail' is missing`. An earlier draft of this step listed only the four fakes carrying an explicit `: OutputContext` return annotation. That undercounted by roughly 3x, because most fakes are bare object literals passed straight into a parameter typed `OutputContext`, where the check happens structurally at the call site and no annotation exists to grep for.
 
-A further four sites cast with `as OutputContext`; an object-literal `as` cast still errors when properties are missing, so expect those too.
+The 13 files:
+
+`src/cli/commands/build.test.ts` · `src/cli/commands/init.test.ts` (2 fakes) · `src/cli/commands/run.test.ts` · `src/cli/commands/skip.test.ts` · `src/cli/output/error-display.test.ts` · `src/core/assembly/overlay-state-resolver.test.ts` · `src/e2e/game-pipeline.test.ts` · `src/e2e/init.test.ts` · `src/e2e/multi-service-pipeline.test.ts` · `src/e2e/project-type-overlays.test.ts` · `src/e2e/service-execution.test.ts` · `src/wizard/questions.test.ts` · `src/wizard/wizard.test.ts`
+
+Each fake has exactly one `result: vi.fn(),` line, so the whole set is one mechanical pass:
+
+```bash
+for f in <the 13 files>; do
+  perl -pi -e 's/^(\s*)result: vi\.fn\(\),$/$1result: vi.fn(),\n$1fail: vi.fn(),/' "$f"
+done
+npx tsc --noEmit   # expect 135 -> 0
+```
 
 Add one line to each fake:
 
@@ -757,19 +787,25 @@ Expected: FAIL, the captured stderr contains `Web-App Configuration:`
 ```typescript
 // src/cli/index.ts — insert between .strict() and .demandCommand(), line 97
     .fail((msg, err, yargsInstance) => {
-      // A present `err` means a command handler threw and yargs caught it.
-      // Those are internal failures: re-throw so they surface as stack traces
-      // rather than being mislabelled as bad input. Only `msg` is a genuine
-      // yargs parse error, and it must reach stdout as an envelope when the
-      // caller asked for json, or the failure is unparseable (acceptance
-      // criterion 2: never exit non-zero with empty stdout under --format json).
-      if (err) throw err
+      // yargs populates `err` for TWO different situations, and conflating them
+      // is a trap. It is set when a command handler throws (a genuine internal
+      // failure), but ALSO when a `.check()` callback throws. This repo runs
+      // `applyFlagFamilyValidation` inside `.check()` at init.ts:537 and
+      // adopt.ts:480, and that function throws ScaffoldUserError subclasses for
+      // ordinary user mistakes such as mixing `--web-rendering` with
+      // `--backend-api-style`. Re-throwing everything with an `err` would send
+      // those out as a stack trace with empty stdout, which is exactly the
+      // failure this handler exists to remove.
+      //
+      // So: re-throw only what is provably NOT user input.
+      if (err && !isScaffoldUserError(err)) throw err
+      const text = err ? err.message : msg
       const argv = (yargsInstance.parsed && yargsInstance.parsed.argv) || {}
       const command = String((argv._ ?? [])[0] ?? '')
       const hint = command ? `scaffold ${command} --help` : 'scaffold --help'
-      const scaffoldError: ScaffoldError = {
+      const scaffoldError: TerminalError = {
         code: 'CLI_ARGUMENT_ERROR',
-        message: msg,
+        message: text,
         exitCode: ExitCode.ValidationError,
         recovery: `Run \`${hint}\` for available options`,
       }
@@ -783,9 +819,31 @@ Add to the imports at the top of `src/cli/index.ts`:
 
 ```typescript
 import { ExitCode } from '../types/enums.js'
-import type { ScaffoldError } from '../types/errors.js'
+import type { TerminalError } from '../types/errors.js'
+import { isScaffoldUserError } from '../utils/user-errors.js'
 import { createOutputContext } from './output/context.js'
 import { resolveOutputMode } from './middleware/output-mode.js'
+```
+
+Add this test alongside the others in Step 1, because the `.check()` path is the one a reader is most likely to assume is already covered:
+
+```typescript
+  it('sends a .check() validation failure to the envelope, not the stack trace', async () => {
+    const out: string[] = []
+    vi.spyOn(process.stdout, 'write').mockImplementation((c: unknown) => {
+      out.push(String(c)); return true
+    })
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    // Mixed flag families: applyFlagFamilyValidation throws inside .check().
+    await runCli([
+      'init', '--format', 'json',
+      '--web-rendering', 'ssr', '--backend-api-style', 'rest',
+    ]).catch(() => undefined)
+    vi.restoreAllMocks()
+    const parsed = JSON.parse(out.join(''))
+    expect(parsed.success).toBe(false)
+    expect(parsed.errors[0].recovery).toBeTruthy()
+  })
 ```
 
 - [ ] **Step 4: Route init's own failures through `fail()`**
@@ -1261,7 +1319,7 @@ import type { ScaffoldError } from '../types/errors.js'
 // mapping that permits an entry without one would let that guarantee rot
 // silently. The type enforces it; the exhaustiveness test below enforces that
 // every subclass has an entry.
-const USER_ERROR_CODES: Record<string, { code: string; recovery: string }> = {
+export const USER_ERROR_CODES: Record<string, { code: string; recovery: string }> = {
   ExistingScaffoldError: {
     code: 'INIT_SCAFFOLD_EXISTS',
     recovery: 'Use --force to back up and reinitialize',
@@ -1998,19 +2056,63 @@ describe('agent-drivability: every failure is parseable', () => {
     expect(JSON.parse(r.stdout).errors[0].code).toBe('INIT_PROJECT_TYPE_REQUIRED')
   })
 
-  it('never exits non-zero with empty stdout under --format json', () => {
+  // Table-driven on purpose. An earlier draft sampled three invocations and
+  // called that "never exits non-zero with empty stdout", which left the
+  // --from family and eight of Task 13's ten adopt sites free to regress while
+  // the advertised criterion stayed green. Every distinct failure family that
+  // Tasks 5, 8, 9 and 13 touch gets a row here.
+  const FAILURE_CASES: Array<{ name: string; args: string[]; setup?: (dir: string) => void }> = [
+    { name: 'init: no project type', args: ['init', '--auto', '--format', 'json'] },
+    { name: 'init: missing discriminator', args: ['init', '--auto', '--format', 'json', '--project-type', 'web-app'] },
+    { name: 'init: unknown flag', args: ['init', '--format', 'json', '--nonexistent-flag'] },
+    {
+      name: 'init: mixed flag families (.check path)',
+      args: ['init', '--format', 'json', '--web-rendering', 'ssr', '--backend-api-style', 'rest'],
+    },
+    {
+      name: 'init --from: unreadable path',
+      args: ['init', '--format', 'json', '--from', 'does-not-exist.yml'],
+    },
+    {
+      name: 'init --from: invalid yaml',
+      args: ['init', '--format', 'json', '--from', 'bad.yml'],
+      setup: dir => fs.writeFileSync(path.join(dir, 'bad.yml'), 'methodology: [unclosed\n'),
+    },
+    {
+      name: 'init --from: already initialized',
+      args: ['init', '--format', 'json', '--from', 'ok.yml'],
+      setup: dir => {
+        fs.writeFileSync(path.join(dir, 'ok.yml'), 'version: 2\nmethodology: mvp\nplatforms:\n  - claude-code\n')
+        run(['init', '--auto', '--format', 'json', '--cli-interactivity', 'args-only'], dir)
+      },
+    },
+    { name: 'adopt: bare --apply', args: ['adopt', '--auto', '--format', 'json', '--apply'] },
+    { name: 'adopt: plan drift', args: ['adopt', '--auto', '--format', 'json', '--apply', '--plan-key', 'deadbeef'] },
+    { name: 'status: not initialized', args: ['status', '--format', 'json'] },
+  ]
+
+  it.each(FAILURE_CASES)('$name exits non-zero with a parseable envelope', ({ args, setup }) => {
     const dir = tmpRepo()
-    for (const args of [
-      ['init', '--auto', '--format', 'json'],
-      ['init', '--auto', '--format', 'json', '--project-type', 'web-app'],
-      ['status', '--format', 'json'],
-    ]) {
-      const r = run(args, dir)
-      if (r.code !== 0) {
-        expect(r.stdout.trim(), `${args.join(' ')} produced empty stdout`).not.toBe('')
-        expect(() => JSON.parse(r.stdout)).not.toThrow()
-      }
-    }
+    setup?.(dir)
+    const r = run(args, dir)
+    expect(r.code, `${args.join(' ')} unexpectedly succeeded`).not.toBe(0)
+    expect(r.stdout.trim(), `${args.join(' ')} produced empty stdout`).not.toBe('')
+    const parsed = JSON.parse(r.stdout)
+    expect(parsed.success).toBe(false)
+    expect(parsed.errors.length, 'errors array must not be empty').toBeGreaterThan(0)
+    expect(parsed.exit_code).toBe(r.code)
+    // The whole point of the contract: the failure names its own fix.
+    expect(parsed.errors[0].code, 'error must carry a code').toBeTruthy()
+    expect(parsed.errors[0].recovery, 'error must carry actionable recovery').toBeTruthy()
+  })
+
+  it('covers every adopt terminal-error site converted by Task 13', () => {
+    // Task 13 converts 10 output.error( sites. Two are exercised above by
+    // command-level cases; this guards the rest against silently reverting to
+    // output.error, which no e2e case could otherwise reach.
+    const src = fs.readFileSync(path.resolve('src/cli/commands/adopt.ts'), 'utf-8')
+    expect(src.match(/output\.error\(/g) ?? []).toHaveLength(0)
+    expect(src.match(/output\.fail\(/g) ?? []).toHaveLength(10)
   })
 })
 
@@ -2272,7 +2374,7 @@ Acceptance criterion 2 ("never exits non-zero with empty stdout under `--format 
 
 **Placeholders.** None. Every code step carries the code. After the first review there are no forward references either: Task 5 no longer reaches for Release 2 symbols, so the temporary `toScaffoldError` shim that earlier drafts required is gone.
 
-**Type consistency.** `OutputContext.fail(errors: ScaffoldError[], exitCode?: ExitCode)` is declared in Task 1 and called with that signature in Tasks 5, 8 and 13. `AutoFlagRequiredError.scaffoldError` is declared in Task 4 and read in Tasks 7 and 8. `AUTO_REQUIRED_FLAG` and `autoRequiredSuffix` are declared in Task 2 and consumed in Tasks 3, 4 and 10. `toScaffoldError` is declared in Task 8 and consumed only within Task 8's own rewrite of the `init.ts` catch.
+**Type consistency.** `OutputContext.fail(errors: TerminalError[], exitCode?: ExitCode)` is declared in Task 1 and called with that signature in Tasks 5, 8 and 13. `AutoFlagRequiredError.scaffoldError` is declared in Task 4 and read in Tasks 7 and 8. `AUTO_REQUIRED_FLAG` and `autoRequiredSuffix` are declared in Task 2 and consumed in Tasks 3, 4 and 10. `toScaffoldError` is declared in Task 8 and consumed only within Task 8's own rewrite of the `init.ts` catch.
 
 **Known risks.**
 
