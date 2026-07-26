@@ -1,4 +1,5 @@
 import type { ScaffoldError, ScaffoldWarning } from '../../types/index.js'
+import { ExitCode } from '../../types/enums.js'
 import type { OutputContext, SelectOption } from './context.js'
 
 function isScaffoldError(e: ScaffoldError | string): e is ScaffoldError {
@@ -48,6 +49,25 @@ export class JsonOutput implements OutputContext {
       errors: [],
       warnings: this.bufferedWarnings,
       exit_code: 0,
+    }) + '\n')
+  }
+
+  fail(errors: ScaffoldError[], exitCode?: ExitCode): void {
+    const resolved = exitCode ?? errors[0]?.exitCode ?? ExitCode.ValidationError
+    // Human-readable half on stderr, matching error(), so a person piping
+    // stdout to jq still sees what went wrong.
+    for (const e of errors) {
+      process.stderr.write(`✗ ${e.code}: ${e.message}\n`)
+      if (e.recovery) {
+        process.stderr.write(`  Recovery: ${e.recovery}\n`)
+      }
+    }
+    process.stdout.write(JSON.stringify({
+      success: false,
+      data: null,
+      errors,
+      warnings: this.bufferedWarnings,
+      exit_code: resolved,
     }) + '\n')
   }
 

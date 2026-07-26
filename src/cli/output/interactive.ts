@@ -1,4 +1,5 @@
 import type { ScaffoldError, ScaffoldWarning } from '../../types/index.js'
+import type { ExitCode } from '../../types/enums.js'
 import type { OutputContext, SelectOption } from './context.js'
 import { shutdown } from '../shutdown.js'
 
@@ -78,6 +79,13 @@ export class InteractiveOutput implements OutputContext {
 
   result(data: unknown): void {
     process.stdout.write(JSON.stringify(data, null, 2) + '\n')
+  }
+
+  fail(errors: ScaffoldError[], _exitCode?: ExitCode): void {
+    // Human output is unchanged: the envelope is a json-mode concern.
+    for (const e of errors) {
+      this.error(e)
+    }
   }
 
   supportsInteractivePrompts(): boolean {
