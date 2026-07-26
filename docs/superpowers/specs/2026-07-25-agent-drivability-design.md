@@ -264,15 +264,36 @@ import { ExitCode } from '../../types/enums.js'
 
 Both files need `import type { ExitCode } from '../../types/enums.js'` added to their existing type imports.
 
-- [ ] **Step 6: Run tests to verify they pass**
+- [ ] **Step 6: Update the test fakes that implement `OutputContext`**
+
+Adding a required method to the interface breaks every fake that claims to be one. There is no shared test-fake helper in this repo — each file defines its own — so the breakage is distributed. Surveyed before implementation, these four declare an explicit return type and will hard-fail `tsc --noEmit`:
+
+- `src/core/pipeline/resolver.test.ts:9` — `function makeOutput(): OutputContext`
+- `src/core/assembly/overlay-state-resolver.test.ts:41` — `function makeOutput(): OutputContext`
+- `src/cli/output/error-display.test.ts:35` — `function makeMockOutput(): OutputContext`
+- `src/e2e/cross-service-references.test.ts:32` — `function mkOutput(): OutputContext`
+
+A further four sites cast with `as OutputContext`; an object-literal `as` cast still errors when properties are missing, so expect those too.
+
+Add one line to each fake:
+
+```typescript
+    fail: vi.fn(),
+```
+
+**Do not make `fail()` optional on the interface to avoid this.** An optional method would let a command silently skip emitting the envelope, which is the defect F4 describes. The compiler errors here are the interface doing its job; fix the fakes, not the contract.
+
+- [ ] **Step 7: Run tests to verify they pass**
 
 Run: `npx vitest run src/cli/output/ && npx tsc --noEmit`
-Expected: PASS, and no type errors from the three implementers of `OutputContext`
+Expected: PASS, and no type errors from either the three real implementers or the test fakes
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
-git add src/cli/output/context.ts src/cli/output/json.ts src/cli/output/interactive.ts src/cli/output/auto.ts src/cli/output/json.test.ts
+git add src/cli/output/context.ts src/cli/output/json.ts src/cli/output/interactive.ts src/cli/output/auto.ts src/cli/output/json.test.ts \
+  src/core/pipeline/resolver.test.ts src/core/assembly/overlay-state-resolver.test.ts \
+  src/cli/output/error-display.test.ts src/e2e/cross-service-references.test.ts
 git commit -m "feat(cli): add failure envelope to the output layer (F4, gap 01)"
 ```
 
