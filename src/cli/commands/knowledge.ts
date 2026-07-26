@@ -88,7 +88,7 @@ const listSubcommand: CommandModule<Record<string, unknown>, ListArgs> = {
         output.info(e.name.padEnd(nameWidth) + sourceLabel.padEnd(sourceWidth) + e.description)
       }
     }
-    process.exit(0)
+    return
   },
 }
 
@@ -155,7 +155,7 @@ const showSubcommand: CommandModule<Record<string, unknown>, ShowArgs> = {
       process.exitCode = ExitCode.ValidationError
       return
     }
-    process.exit(0)
+    return
   },
 }
 
@@ -193,7 +193,7 @@ const resetSubcommand: CommandModule<Record<string, unknown>, ResetArgs> = {
 
     if (!localPath) {
       output.info(`Nothing to reset for '${name}' — no local override found.`)
-      process.exit(0)
+      return
       return
     }
 
@@ -242,7 +242,7 @@ const resetSubcommand: CommandModule<Record<string, unknown>, ResetArgs> = {
       process.exitCode = ExitCode.ValidationError
       return
     }
-    process.exit(0)
+    return
   },
 }
 
@@ -431,7 +431,7 @@ const updateSubcommand: CommandModule<Record<string, unknown>, UpdateArgs> = {
       process.stdout.write(prompt + '\n')
     }
 
-    process.exit(0)
+    return
   },
 }
 

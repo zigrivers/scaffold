@@ -71,6 +71,9 @@ const skillCommand: CommandModule<Record<string, unknown>, SkillArgs> = {
         const { installed, skipped, errors } = installSkillsForPlatform(
           projectRoot, argv.platform as SkillPlatform, { force: argv.force },
         )
+        // Errors are surfaced here as well as in the fail() envelope below, so
+        // a partial install (some skills in, some failed) never loses them.
+        for (const e of errors) output.warn(e)
         if (installed.length > 0) {
           output.info(`\nInstalled scaffold skills for ${argv.platform}:\n  ${installed.join('\n  ')}`)
         }
@@ -107,6 +110,12 @@ const skillCommand: CommandModule<Record<string, unknown>, SkillArgs> = {
 
       if (result.installed > 0) {
         if (result.errors.length > 0) {
+          // Report each error, not just the count. Dropping the loop when this
+          // site moved to fail() would have silently discarded every message on
+          // the partial-success path — worse than the stderr-only reporting the
+          // sweep set out to fix. They are warn() rather than error() because
+          // this branch exits 0.
+          for (const e of result.errors) output.warn(e)
           const msg = `\n${result.installed} skill(s) installed with warnings.`
             + ' Start a new agent session (Claude Code, OpenCode, …) to activate.'
           output.warn(msg)

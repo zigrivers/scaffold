@@ -288,7 +288,6 @@ const dashboardCommand: CommandModule<Record<string, unknown>, DashboardArgs> = 
       }])
       process.exitCode = ExitCode.ValidationError
       return
-      return
     }
 
     // 5. Load decisions

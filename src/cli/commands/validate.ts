@@ -43,6 +43,22 @@ const validateCommand: CommandModule<Record<string, unknown>, ValidateArgs> = {
 
     const result = runValidation(projectRoot, scopes)
 
+    // Failure is decided BEFORE the output-mode branch. Keeping the decision
+    // inside the non-JSON branch is what let `--format json` return the
+    // success-shaped payload with exit 1 — a caller branching on `success`
+    // would have read a failed validation as a pass.
+    if (result.errors.length > 0) {
+      if (outputMode !== 'json') displayErrors(result.errors, result.warnings, output)
+      output.fail(result.errors.map(e => ({
+        code: e.code,
+        message: e.context?.file ? `${e.context.file}: ${e.message}` : e.message,
+        exitCode: ExitCode.ValidationError,
+        recovery: 'Fix the reported field in the named file, then re-run `scaffold validate`',
+      })))
+      process.exitCode = ExitCode.ValidationError
+      return
+    }
+
     if (outputMode === 'json') {
       output.result({
         valid: result.errors.length === 0,
@@ -62,25 +78,14 @@ const validateCommand: CommandModule<Record<string, unknown>, ValidateArgs> = {
         },
       })
     } else {
-      if (result.errors.length > 0) {
-        displayErrors(result.errors, result.warnings, output)
-        output.fail([{
-          code: 'VALIDATION_FAILED',
-          message:
-            `Validation failed: ${result.errors.length} error(s), ${result.warnings.length} warning(s)`,
-          exitCode: ExitCode.ValidationError,
-          recovery: 'Fix the errors listed above; each names the file and field that failed',
-        }])
-      } else {
-        displayErrors([], result.warnings, output)
-        output.success(
-          `Validation passed: ${result.validFilesCount}/${result.totalFilesCount} files valid` +
-          (result.warnings.length > 0 ? `, ${result.warnings.length} warning(s)` : ''),
-        )
-      }
+      displayErrors([], result.warnings, output)
+      output.success(
+        `Validation passed: ${result.validFilesCount}/${result.totalFilesCount} files valid` +
+        (result.warnings.length > 0 ? `, ${result.warnings.length} warning(s)` : ''),
+      )
     }
 
-    process.exitCode = result.errors.length > 0 ? ExitCode.ValidationError : 0
+    process.exitCode = 0
   },
 }
 

@@ -180,3 +180,56 @@ describe('validate command', () => {
     expect(process.exitCode).toBe(1)
   })
 })
+
+describe('validate --format json on failure (review round 1, PR #793)', () => {
+  let stdout: string[]
+
+  beforeEach(() => {
+    stdout = []
+    vi.mocked(findProjectRoot).mockReturnValue('/fake/project')
+    vi.mocked(resolveOutputMode).mockReturnValue('json')
+    vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
+    vi.spyOn(process.stdout, 'write').mockImplementation((c) => { stdout.push(String(c)); return true })
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    process.exitCode = 0
+  })
+  afterEach(() => { vi.restoreAllMocks(); process.exitCode = 0 })
+
+  it('emits the FAILURE envelope, not a success-shaped payload', async () => {
+    // The JSON branch returned early through output.result(), so a failing
+    // validation exited 1 while stdout said `"success": true`. That is worse
+    // than the empty stdout this sweep set out to fix: empty output is
+    // obviously unusable, whereas success:true on a failed command is a lie a
+    // caller will act on.
+    vi.mocked(runValidation).mockReturnValue({
+      errors: [{ code: 'FM_MISSING_FIELD', message: 'missing name', context: { file: 'a.md' } }],
+      warnings: [],
+      scopes: ['frontmatter'],
+      validFilesCount: 2,
+      totalFilesCount: 3,
+    } as never)
+
+    await validateCommand.handler(defaultArgv({ format: 'json' }))
+
+    const envelope = JSON.parse(stdout.join(''))
+    expect(envelope.success).toBe(false)
+    expect(envelope.exit_code).toBe(1)
+    expect(envelope.errors.length).toBeGreaterThan(0)
+    expect(envelope.errors[0].code).toBe('FM_MISSING_FIELD')
+    expect(envelope.errors[0].recovery).toBeTruthy()
+    expect(process.exitCode).toBe(1)
+  })
+
+  it('still emits the success envelope when validation passes', async () => {
+    vi.mocked(runValidation).mockReturnValue({
+      errors: [], warnings: [], scopes: ['frontmatter'], validFilesCount: 3, totalFilesCount: 3,
+    } as never)
+
+    await validateCommand.handler(defaultArgv({ format: 'json' }))
+
+    const envelope = JSON.parse(stdout.join(''))
+    expect(envelope.success).toBe(true)
+    expect(envelope.data.valid).toBe(true)
+    expect(process.exitCode).toBe(0)
+  })
+})

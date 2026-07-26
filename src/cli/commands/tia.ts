@@ -126,7 +126,7 @@ export async function tiaHandler(argv: TiaArgs): Promise<void> {
         message: `tia affected: ${message} — run the full suite`,
         exitCode: ExitCode.StateCorruption,
         recovery: 'Run the full test suite for this change; exit 3 means TIA could not select safely',
-      }], ExitCode.StateCorruption)
+      }])
       process.exitCode = ExitCode.StateCorruption
     }
     return

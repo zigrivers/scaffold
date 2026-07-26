@@ -2,6 +2,7 @@ import type { CommandModule, Argv } from 'yargs'
 import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext, exitNotInitialized } from '../output/context.js'
+import { ExitCode } from '../../types/enums.js'
 import { displayErrors } from '../output/error-display.js'
 import { acquireLock, getLockPath, releaseLock } from '../../state/lock-manager.js'
 import { ReworkManager } from '../../state/rework-manager.js'
@@ -115,10 +116,10 @@ const reworkCommand: CommandModule<Record<string, unknown>, ReworkArgs> = {
         output.fail([{
           code: 'REWORK_SESSION_MISSING',
           message: 'No active rework session',
-          exitCode: 1,
+          exitCode: ExitCode.ValidationError,
           recovery: 'Run "scaffold rework" to create a new rework session',
         }])
-        process.exitCode = 1
+        process.exitCode = ExitCode.ValidationError
         return
       }
 
@@ -183,10 +184,10 @@ const reworkCommand: CommandModule<Record<string, unknown>, ReworkArgs> = {
         output.fail([{
           code: 'REWORK_SESSION_MISSING',
           message: 'No active rework session to resume',
-          exitCode: 1,
+          exitCode: ExitCode.ValidationError,
           recovery: 'Run "scaffold rework" to create a new rework session',
         }])
-        process.exitCode = 1
+        process.exitCode = ExitCode.ValidationError
         return
       }
 
@@ -217,10 +218,10 @@ const reworkCommand: CommandModule<Record<string, unknown>, ReworkArgs> = {
       output.fail([{
         code: 'REWORK_SESSION_EXISTS',
         message: 'A rework session already exists',
-        exitCode: 1,
+        exitCode: ExitCode.ValidationError,
         recovery: 'Use --resume to continue, --clear to remove, or --force to replace',
       }])
-      process.exitCode = 1
+      process.exitCode = ExitCode.ValidationError
       return
     }
 
@@ -240,10 +241,10 @@ const reworkCommand: CommandModule<Record<string, unknown>, ReworkArgs> = {
       output.fail([{
         code: 'REWORK_NO_PHASES',
         message: 'No phases specified',
-        exitCode: 1,
+        exitCode: ExitCode.ValidationError,
         recovery: 'Use --phases or --through to specify which phases to rework',
       }])
-      process.exitCode = 1
+      process.exitCode = ExitCode.ValidationError
       return
     } else {
       // Interactive mode — show phase selector
@@ -251,10 +252,10 @@ const reworkCommand: CommandModule<Record<string, unknown>, ReworkArgs> = {
       output.fail([{
         code: 'REWORK_NO_PHASES',
         message: 'Interactive phase selection not yet implemented. Use --phases or --through.',
-        exitCode: 1,
+        exitCode: ExitCode.ValidationError,
         recovery: 'Use --phases 1-5 or --through 5 to specify phases',
       }])
-      process.exitCode = 1
+      process.exitCode = ExitCode.ValidationError
       return
     }
 
@@ -268,10 +269,10 @@ const reworkCommand: CommandModule<Record<string, unknown>, ReworkArgs> = {
       output.fail([{
         code: 'REWORK_NO_PHASES',
         message: 'No phases selected after applying exclusions',
-        exitCode: 1,
+        exitCode: ExitCode.ValidationError,
         recovery: 'Widen --phases/--through, or drop some of the --exclude phases',
       }])
-      process.exitCode = 1
+      process.exitCode = ExitCode.ValidationError
       return
     }
 
@@ -281,7 +282,7 @@ const reworkCommand: CommandModule<Record<string, unknown>, ReworkArgs> = {
       output.fail([{
         code: 'LOCK_HELD',
         message: 'Another scaffold process is running. Use --force to override.',
-        exitCode: 3,
+        exitCode: ExitCode.StateCorruption,
         recovery: 'Wait for the other process to finish, or pass --force to take the lock',
       }])
       process.exitCode = 3
@@ -302,7 +303,7 @@ const reworkCommand: CommandModule<Record<string, unknown>, ReworkArgs> = {
       const context = loadPipelineContext(projectRoot as string)
       if (!context.config) {
         displayErrors(context.configErrors, context.configWarnings, output)
-        process.exitCode = 1
+        process.exitCode = ExitCode.ValidationError
         return
       }
       const pipeline = resolvePipeline(context, { output })
@@ -330,10 +331,10 @@ const reworkCommand: CommandModule<Record<string, unknown>, ReworkArgs> = {
         output.fail([{
           code: 'REWORK_NO_STEPS',
           message: `No eligible steps found in phases ${phaseNumbers.join(', ')}`,
-          exitCode: 1,
+          exitCode: ExitCode.ValidationError,
           recovery: 'Check that the selected phases have steps that are not skipped',
         }])
-        process.exitCode = 1
+        process.exitCode = ExitCode.ValidationError
         return
       }
 
