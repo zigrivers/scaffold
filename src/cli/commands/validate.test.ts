@@ -233,3 +233,37 @@ describe('validate --format json on failure (review round 1, PR #793)', () => {
     expect(process.exitCode).toBe(0)
   })
 })
+
+describe('validate --format json carries warnings on the failure path (round 3)', () => {
+  let stdout: string[]
+
+  beforeEach(() => {
+    stdout = []
+    vi.mocked(findProjectRoot).mockReturnValue('/fake/project')
+    vi.mocked(resolveOutputMode).mockReturnValue('json')
+    vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
+    vi.spyOn(process.stdout, 'write').mockImplementation((c) => { stdout.push(String(c)); return true })
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    process.exitCode = 0
+  })
+  afterEach(() => { vi.restoreAllMocks(); process.exitCode = 0 })
+
+  it('reports warnings whether validation passes or fails', async () => {
+    // Warnings were rendered only in non-JSON mode, and output.warn() is what
+    // buffers them into the envelope — so a failing --format json run listed
+    // no warnings while a passing one did. Same data, present or absent
+    // depending on whether the command happened to succeed.
+    vi.mocked(runValidation).mockReturnValue({
+      errors: [{ code: 'FM_MISSING_FIELD', message: 'missing name', context: { file: 'a.md' } }],
+      warnings: [{ code: 'FM_UNKNOWN_FIELD', message: 'unknown key `foo`' }],
+      scopes: ['frontmatter'], validFilesCount: 2, totalFilesCount: 3,
+    } as never)
+
+    await validateCommand.handler(defaultArgv({ format: 'json' }))
+
+    const envelope = JSON.parse(stdout.join(''))
+    expect(envelope.success).toBe(false)
+    expect(envelope.warnings).toHaveLength(1)
+    expect(envelope.warnings[0].code).toBe('FM_UNKNOWN_FIELD')
+  })
+})

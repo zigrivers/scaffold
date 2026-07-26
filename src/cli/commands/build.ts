@@ -55,7 +55,11 @@ const buildCommand: CommandModule<Record<string, unknown>, BuildArgs> = {
   },
   handler: async (argv) => {
     const result = await runBuild(argv)
-    process.exit(result.exitCode)
+    // process.exitCode, not process.exit(): runBuild has already written the
+    // failure envelope to stdout, and exiting immediately can truncate it —
+    // the same defect this sweep removed from the individual call sites, left
+    // sitting one frame up in the handler that calls them.
+    process.exitCode = result.exitCode
   },
 }
 

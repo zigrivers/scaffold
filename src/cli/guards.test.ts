@@ -245,17 +245,24 @@ describe('the envelope contract is CLI-wide', () => {
       if (!f.endsWith('.ts') || f.endsWith('.test.ts')) continue
       const p = join('src/cli/commands', f)
       const src = readFileSync(p, 'utf-8')
-      // A terminal site is a displayErrors() call whose next few lines set a
-      // non-zero exit or return one. Warning-only calls (empty error array)
-      // are fine and are how the remaining callers use it.
+      // A terminal site is a displayErrors() call whose next few lines set or
+      // return a non-zero exit. Warning-only calls (empty error array) are
+      // fine and are how the remaining callers use it.
+      //
+      // Both spellings must match. An earlier version of this gate only
+      // handled `process.exitCode = …` and the numeric-literal `exitCode: 1`,
+      // so `return { exitCode: ExitCode.ValidationError }` — build.ts's shape —
+      // slipped straight through. It was found by review, not by me: my
+      // not-vacuous check had exercised a single form and I reported the gate
+      // as verified on that basis.
+      const NONZERO_EXIT =
+        /process\.exitCode\s*=\s*(?!0\b)|exitCode:\s*(?:ExitCode\.(?!Success\b)\w+|[1-9])/
       const lines = src.split('\n')
       lines.forEach((line, i) => {
         if (!/\bdisplayErrors\(/.test(line)) return
         if (/displayErrors\(\s*\[\]/.test(line)) return   // warnings-only
         const after = lines.slice(i, i + 4).join(' ')
-        if (/process\.exitCode\s*=\s*(?!0)|exitCode:\s*(?!0)[1-9]/.test(after)) {
-          offenders.push(`${p}:${i + 1}`)
-        }
+        if (NONZERO_EXIT.test(after)) offenders.push(`${p}:${i + 1}`)
       })
     }
     expect(offenders, `use failWithErrors() instead: ${offenders.join(', ')}`).toEqual([])

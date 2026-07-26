@@ -127,7 +127,9 @@ const reworkCommand: CommandModule<Record<string, unknown>, ReworkArgs> = {
         reworkManager.advanceStep(argv.advance)
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
-        const exitCode = (err as { exitCode?: number }).exitCode ?? 2
+        // Default ValidationError, not MissingDependency: a failed rework
+        // advance is not a missing dependency.
+        const exitCode = (err as { exitCode?: number }).exitCode ?? ExitCode.ValidationError
         output.fail([{
           code: 'REWORK_ADVANCE_FAILED',
           message,

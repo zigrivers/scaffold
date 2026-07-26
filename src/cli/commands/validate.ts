@@ -48,9 +48,15 @@ const validateCommand: CommandModule<Record<string, unknown>, ValidateArgs> = {
     // success-shaped payload with exit 1 — a caller branching on `success`
     // would have read a failed validation as a pass.
     if (result.errors.length > 0) {
-      // Warnings only: fail() already renders every error for humans, so
-      // passing the errors here too printed each one twice.
-      if (outputMode !== 'json') displayErrors([], result.warnings, output)
+      // Warnings go through displayErrors in EVERY mode, not just the human
+      // one: output.warn() buffers them into the envelope's `warnings` array.
+      // Skipping it under --format json meant a failing validation reported no
+      // warnings at all, while the success payload listed them — the same data
+      // present or absent depending on whether the command happened to pass.
+      //
+      // Errors are not passed here; fail() renders those for humans already,
+      // and passing both printed each one twice.
+      displayErrors([], result.warnings, output)
       output.fail(result.errors.map(e => ({
         code: e.code,
         message: e.context?.file ? `${e.context.file}: ${e.message}` : e.message,

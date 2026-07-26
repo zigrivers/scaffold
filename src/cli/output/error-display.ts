@@ -128,14 +128,11 @@ export function failWithErrors(
   for (const warning of warnings) {
     output.warn(warning)
   }
-  const reported: TerminalError[] = errors.length > 0
-    ? errors.map(e => withRecovery(e, fallbackRecovery))
-    : [{
-      code: 'UNKNOWN_ERROR',
-      message: 'The command failed without reporting a specific error.',
-      exitCode,
-      recovery: fallbackRecovery,
-    }]
+  // No synthetic fallback for an empty errors array: OutputContext.fail()
+  // already guarantees at least one entry, and fabricating one here would
+  // mask a caller that passed nothing by mistake behind a plausible-looking
+  // error.
+  const reported: TerminalError[] = errors.map(e => withRecovery(e, fallbackRecovery))
   output.fail(reported, exitCode)
   process.exitCode = exitCode
 }
