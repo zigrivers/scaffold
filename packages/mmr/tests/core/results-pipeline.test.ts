@@ -36,7 +36,7 @@ describe('runResultsPipeline', () => {
   })
 
   it('will not pass a clean single-channel review (completion floor)', () => {
-    // Pre-3.3.0 this was `pass` with exit 0: one dispatched channel that
+    // Pre-4.0.0 this was `pass` with exit 0: one dispatched channel that
     // completes satisfies completed === dispatched, so the run was not even
     // marked degraded. One opinion is not corroboration.
     const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['claude'] })
@@ -450,12 +450,12 @@ describe('completion floor — legacy jobs (review round 1, finding 3)', () => {
   })
   afterEach(() => { fs.rmSync(tmpDir, { recursive: true }) })
 
-  it('re-reads a pre-3.3.0 job at the floor that review actually used', () => {
+  it('re-reads a pre-4.0.0 job at the floor that review actually used', () => {
     // The CHANGELOG promises the floor is persisted "so results and reconcile
     // reproduce the verdict the review actually made". A job written before
-    // 3.3.0 carries no floor, and defaulting it to today's 2 would flip a
+    // 4.0.0 carries no floor, and defaulting it to today's 2 would flip a
     // historical single-channel pass to needs-user-decision — the opposite of
-    // the promise. Absent field ⇒ pre-3.3.0 ⇒ floor 1.
+    // the promise. Absent field ⇒ pre-4.0.0 ⇒ floor 1.
     const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['claude'] })
     const raw = JSON.parse(fs.readFileSync(path.join(tmpDir, job.job_id, 'job.json'), 'utf8'))
     delete raw.min_completed_channels
@@ -473,5 +473,47 @@ describe('completion floor — legacy jobs (review round 1, finding 3)', () => {
     const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['a', 'b'] })
     const raw = JSON.parse(fs.readFileSync(path.join(tmpDir, job.job_id, 'job.json'), 'utf8'))
     expect(raw.min_completed_channels).toBe(2)
+  })
+})
+
+describe('completion floor counts USABLE reports (review round 2, finding 2)', () => {
+  let tmpDir: string
+  let store: JobStore
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-floor-parse-'))
+    store = new JobStore(tmpDir)
+  })
+  afterEach(() => { fs.rmSync(tmpDir, { recursive: true }) })
+
+  it('does not let two unparseable "completed" channels satisfy the floor', () => {
+    // Review claimed the floor counts raw process status, so two channels that
+    // exit cleanly with malformed output could buy an exit-0 pass without two
+    // usable reviews. The pipeline downgrades a parse-failed channel to
+    // `failed` before the count, so the floor already means usable reports —
+    // this test pins that ordering so a future refactor cannot separate them.
+    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['a', 'b'] })
+    for (const ch of ['a', 'b']) {
+      store.updateChannel(job.job_id, ch, { status: 'completed' })
+      store.saveChannelOutput(job.job_id, ch, 'not json at all <<<')
+    }
+
+    const { results, exitCode } = runResultsPipeline(store, store.loadJob(job.job_id), 'json')
+    expect(results.metadata.channels_completed).toBe(0)
+    expect(results.verdict).toBe('needs-user-decision')
+    expect(exitCode).toBe(3)
+  })
+
+  it('one valid plus one malformed report is below the floor', () => {
+    const job = store.createJob({ fix_threshold: 'P2', format: 'json', channels: ['good', 'bad'] })
+    store.updateChannel(job.job_id, 'good', { status: 'completed' })
+    store.saveChannelOutput(job.job_id, 'good', '{"approved": true, "findings": [], "summary": "ok"}')
+    store.updateChannel(job.job_id, 'bad', { status: 'completed' })
+    store.saveChannelOutput(job.job_id, 'bad', 'not json at all <<<')
+
+    const { results, exitCode } = runResultsPipeline(store, store.loadJob(job.job_id), 'json')
+    expect(results.metadata.channels_completed).toBe(1)
+    expect(results.verdict).toBe('needs-user-decision')
+    expect(exitCode).toBe(3)
   })
 })

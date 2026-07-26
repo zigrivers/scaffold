@@ -229,11 +229,11 @@ export function runResultsPipeline(
   const channelStatuses = Object.fromEntries(
     Object.entries(job.channels).map(([n, ch]) => [n, ch.status]),
   ) as Record<string, ChannelStatus>
-  // A job with no floor is a PRE-3.3.0 job: createJob has persisted the field
+  // A job with no floor is a PRE-4.0.0 job: createJob has persisted the field
   // unconditionally since. Defaulting those to today's floor would flip a
   // historical single-channel pass to needs-user-decision, contradicting the
   // guarantee that results/reconcile reproduce the verdict review actually
-  // made. Pre-3.3.0 had no floor, which is floor 1.
+  // made. Pre-4.0.0 had no floor, which is floor 1.
   const LEGACY_JOB_FLOOR = 1
   const minCompleted = job.min_completed_channels ?? LEGACY_JOB_FLOOR
   const verdict = deriveVerdict(gatePassed, channelStatuses, minCompleted)

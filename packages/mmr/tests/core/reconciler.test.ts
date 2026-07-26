@@ -432,7 +432,7 @@ describe('deriveVerdict', () => {
 })
 
 describe('deriveVerdict — completion floor', () => {
-  // Until v3.3.0 the verdict compared `completed` against `dispatched` and
+  // Until v4.0.0 the verdict compared `completed` against `dispatched` and
   // nothing else, so 1-of-6 and 5-of-6 were the same verdict, and a lone
   // surviving channel could carry a merge. Both shapes were observed in the
   // job store: `degraded-pass 2/6` and — worse — `pass 1/1`, a wholly
@@ -465,7 +465,7 @@ describe('deriveVerdict — completion floor', () => {
     expect(deriveVerdict(true, statuses)).toBe('degraded-pass')
   })
 
-  it('honours an explicit floor of 1, restoring pre-3.3.0 behaviour', () => {
+  it('honours an explicit floor of 1, restoring pre-4.0.0 behaviour', () => {
     const statuses: Record<string, ChannelStatus> = { codex: done, claude: 'failed' }
     expect(deriveVerdict(true, statuses, 1)).toBe('degraded-pass')
     expect(deriveVerdict(true, { grok: done }, 1)).toBe('pass')
