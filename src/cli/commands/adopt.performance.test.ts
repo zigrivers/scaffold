@@ -5,7 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { writeOrUpdateConfig } from './adopt.js'
 import type { AdoptionResult } from '../../project/adopt.js'
-import type { DetectedConfig } from '../../types/config.js'
+import type { DetectedConfig, WebAppConfig } from '../../types/config.js'
 
 // Why a ratio and not a millisecond budget:
 //
@@ -20,30 +20,31 @@ import type { DetectedConfig } from '../../types/config.js'
 // process. Contention inflates both arms together, so the ratio holds steady
 // while absolute time moves.
 //
-// Ceiling calibration, measured on this path at SAMPLES=200:
-//   clean, isolated ................................ 1.59 - 1.69
-//   clean, full parallel suite ..................... 1.65
+// Ceiling calibration, measured on this path (SAMPLES as set below):
+//   clean, isolated, 8 runs ........................ 1.62 - 1.75
+//   clean, full parallel suite ..................... within that range
 //   clean, 2x-core CPU oversubscription ............ 1.20 - 1.22
-//   ONE redundant write in atomicWriteFileSync ..... 2.17 - 2.37   <- caught
-//   three redundant writes in atomicWriteFileSync .. 2.74 - 3.30   <- caught
+//   three redundant writes in atomicWriteFileSync .. 2.74 - 3.30   <- always caught
+//   ONE redundant write, 8 runs .................... 1.94 - 2.44   <- caught 7 of 8
 //   two extra doc.toString() passes, no extra IO ... 1.76          <- NOT caught
 //
-// That last row is the honest limit of this check. The path's cost is dominated
-// by its filesystem work, not its serialization, so the ratio is sensitive to
-// regressions that add IO and comparatively blunt to ones that only add CPU.
-// Tripling the serialization was still cheaper than adding a single write.
+// Read the last three rows as the real resolution of this check, not marketing.
+// A path doing three redundant writes is caught every time. Doubling the writes
+// sits right at the edge — one run in eight measured 1.94 and slipped under.
+// A CPU-only regression is not caught at all: the path's cost is dominated by
+// its filesystem work, so tripling the serialization was still cheaper than
+// adding a single write. This test is a guard against IO-shaped regressions of
+// roughly 1.5x and up; it is not a general performance monitor.
 //
-// Clean readings are indistinguishable isolated vs. under the full parallel
-// suite (1.65 either way), which is the point of the change. Heavy CPU
-// oversubscription pushes the ratio DOWN, not up: the syscall-bound baseline
-// absorbs scheduling latency worse than the subject arm does.
+// Clean readings are the same isolated as under the full parallel suite, which
+// is the point of the change. Heavy CPU oversubscription pushes the ratio DOWN,
+// not up: the syscall-bound baseline absorbs scheduling latency worse than the
+// subject arm does.
 //
-// 2.0 is placed to catch the weakest regression that could be constructed here
-// — one extra write, i.e. doubling the writes the path performs, at 2.17. That
-// leaves ~18% headroom over the noisiest clean reading (1.69), roughly 6x the
-// observed run-to-run spread. A looser ceiling was tried first and was worse on
-// both counts: at 3.0 a doubled write path passed silently and even a tripled
-// one straddled the line (2.74 - 3.30), failing only on some runs.
+// 1.95 is where the two distributions are best separated: ~11% above the
+// noisiest clean reading (1.75) and below all but one regressed reading. Looser
+// ceilings were tried first and were worse on both counts — at 3.0 a doubled
+// write path passed silently and even a tripled one straddled the line.
 //
 // Because bareConfigWrite mirrors the subject's syscalls, the ratio reduces to
 // 1 + (serialization cost / IO cost). That removes the syscall-count mismatch
@@ -54,11 +55,19 @@ import type { DetectedConfig } from '../../types/config.js'
 // The logged absolute medians are the triage signal when the ceiling is
 // breached: a real regression raises the config-write median, an unusual
 // runner lowers the bare-write one.
-const RATIO_CEILING = 2
-// 200 rather than 50: at 50 the run-to-run spread was wide enough that one
+const RATIO_CEILING = 1.95
+// 201 rather than 50: at 50 the run-to-run spread was wide enough that one
 // measured regression landed at 2.84 on one run and 3.46 on another, straddling
-// the ceiling. 200 tightens both medians; the test still runs in ~0.2s.
-const SAMPLES = 200
+// the ceiling. ~200 tightens both medians; the test still runs in ~0.2s. Going
+// further (401) did not tighten it again — it only shifted the level as warm-up
+// amortized — so 201 is where the sample count stops paying for itself.
+//
+// ODD on purpose. Priming writes results[0] then results[1], leaving the file
+// at payloads[1]. An odd count makes the loop end on results[0], so the
+// post-loop assertion expects a state the loop itself had to produce. With an
+// even count it would expect payloads[1] — already true before the loop ran —
+// and a subject that wrote nothing would still satisfy it.
+const SAMPLES = 201
 
 // Upper-middle element rather than the mean of the two central values. Both
 // arms use it, so the slight upward bias cancels in the ratio.
@@ -93,7 +102,11 @@ function bareConfigWrite(target: string, scaffoldDir: string): void {
   fs.renameSync(tmpPath, target)
 }
 
-function typicalResult(deployTarget: string): AdoptionResult {
+// `satisfies` rather than `as`: an `as` cast would let this fixture keep
+// compiling if AdoptionResult or DetectedConfig gained a required field, and a
+// silently incomplete fixture could send writeOrUpdateConfig down a cheaper
+// branch than real usage — quietly weakening the very thing being measured.
+function typicalResult(deployTarget: WebAppConfig['deployTarget']): AdoptionResult {
   return {
     mode: 'brownfield',
     artifactsFound: 0,
@@ -106,13 +119,17 @@ function typicalResult(deployTarget: string): AdoptionResult {
     projectType: 'web-app',
     detectedConfig: {
       type: 'web-app',
-      config: { renderingStrategy: 'ssr', deployTarget },
-    } as DetectedConfig,
-  } as AdoptionResult
+      // All four WebAppConfig fields. The `as` cast this replaced was hiding a
+      // fixture missing `realtime` and `authFlow`, so the timed path was
+      // serializing a smaller-than-real config — the drift `satisfies` exists
+      // to prevent, caught the moment the cast came off.
+      config: { renderingStrategy: 'ssr', deployTarget, realtime: 'none', authFlow: 'oauth' },
+    } satisfies DetectedConfig,
+  } satisfies AdoptionResult
 }
 
 describe('atomic config write performance', () => {
-  it('writes a typical config.yml within 2x the same write without serialization', () => {
+  it('writes a typical config.yml within 1.95x the same write without serialization', () => {
     // Tracked as they are created so the finally below removes whatever
     // subset exists, even if the second mkdtemp itself throws.
     const created: string[] = []
