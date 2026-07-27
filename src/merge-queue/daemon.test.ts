@@ -106,7 +106,11 @@ class FakeGit implements GitOps {
   listCandidateRefs(): string[] { return this.liveRefs }
 }
 
-function harness(over: Partial<DaemonDeps> = {}) {
+type BeadCommandRunner = (args: string[], cwd: string) => Promise<void>
+
+function harness(
+  over: Partial<DaemonDeps> & { runBeadCommand?: BeadCommandRunner } = {},
+) {
   const root = tmp()
   const mqDir = path.join(root, '.mq')
   const gh = new FakeGh()
@@ -490,6 +494,56 @@ describe('MergeQueueDaemon.cycle', () => {
     expect(spy).toHaveBeenCalledWith(2)
   })
 
+  it('closes a session-created bead when its matching PR lands', async () => {
+    const openBeads = new Set<string>()
+    const commands: string[][] = []
+    const h = harness({
+      runBeadCommand: async args => {
+        commands.push(args)
+        if (args[0] === 'close') openBeads.delete(args[1])
+      },
+    })
+    h.enqueue(1)
+    h.gh.infos.set(1, prInfo(1, { body: 'Bead: proj-session' }))
+
+    // The tracker record appears after daemon construction, matching a Bead filed
+    // during a long-running agent session rather than one present at daemon startup.
+    openBeads.add('proj-session')
+    await h.daemon.cycle()
+
+    await vi.waitFor(() => expect(openBeads.has('proj-session')).toBe(false))
+    expect(commands).toContainEqual(['close', 'proj-session'])
+    expect(readJournal(h.mqDir)).toContainEqual(expect.objectContaining({
+      type: 'bead_sync', pr: 1, action: 'close', beadId: 'proj-session', result: 'succeeded',
+    }))
+  })
+
+  it('logs and retries a failed bead close on the next daemon pass', async () => {
+    let attempts = 0
+    const logs: string[] = []
+    const h = harness({
+      log: msg => logs.push(msg),
+      runBeadCommand: async () => {
+        attempts += 1
+        if (attempts === 1) throw new Error('tracker unavailable')
+      },
+    })
+    h.enqueue(1)
+    h.gh.infos.set(1, prInfo(1, { body: 'Bead: proj-retry' }))
+
+    await h.daemon.cycle()
+    await vi.waitFor(() => expect(readJournal(h.mqDir)).toContainEqual(expect.objectContaining({
+      type: 'bead_sync', pr: 1, action: 'close', result: 'failed',
+    })))
+    expect(logs.some(msg => msg.includes('tracker unavailable'))).toBe(true)
+
+    await h.daemon.cycle()
+    await vi.waitFor(() => expect(readJournal(h.mqDir)).toContainEqual(expect.objectContaining({
+      type: 'bead_sync', pr: 1, action: 'close', result: 'succeeded',
+    })))
+    expect(attempts).toBe(2)
+  })
+
   it('binds each merge to the head SHA that was tested (--match-head-commit)', async () => {
     const h = harness()
     h.enqueue(1)
@@ -802,6 +856,51 @@ describe('MergeQueueDaemon.reconcile', () => {
     )
     h.daemon.reconcile()
     expect(spy).toHaveBeenCalledWith(1, 'Closes proj-1') // idempotent replay for the already-LANDED member
+  })
+
+  it('reconciles a terminal landed PR without a bead close receipt', async () => {
+    const commands: string[][] = []
+    const h = harness({
+      runBeadCommand: async args => { commands.push(args) },
+    })
+    h.enqueue(1)
+    appendEvent(h.mqDir, { type: 'batch_created', batchId: 'done', members: [1], at: AT })
+    appendEvent(h.mqDir, {
+      type: 'pr_state', pr: 1, state: 'LANDED', batchId: 'done', at: AT,
+    })
+    appendEvent(h.mqDir, { type: 'batch_state', batchId: 'done', state: 'DONE', at: AT })
+    h.gh.infos.set(1, prInfo(1, {
+      state: 'MERGED', mergedAt: AT, body: 'Bead: proj-terminal',
+    }))
+
+    h.daemon.reconcile()
+
+    await vi.waitFor(() => expect(commands).toContainEqual(['close', 'proj-terminal']))
+  })
+
+  it('does not replay a landed PR after a successful bead close receipt', async () => {
+    const commands: string[][] = []
+    const h = harness({
+      runBeadCommand: async args => { commands.push(args) },
+    })
+    h.enqueue(1)
+    appendEvent(h.mqDir, { type: 'batch_created', batchId: 'done', members: [1], at: AT })
+    appendEvent(h.mqDir, {
+      type: 'pr_state', pr: 1, state: 'LANDED', batchId: 'done', at: AT,
+    })
+    appendEvent(h.mqDir, { type: 'batch_state', batchId: 'done', state: 'DONE', at: AT })
+    appendEvent(h.mqDir, {
+      type: 'bead_sync', pr: 1, action: 'close', beadId: 'proj-terminal',
+      result: 'succeeded', at: AT,
+    } as never)
+    h.gh.infos.set(1, prInfo(1, {
+      state: 'MERGED', mergedAt: AT, body: 'Bead: proj-terminal',
+    }))
+
+    h.daemon.reconcile()
+    await new Promise(resolve => setTimeout(resolve, 20))
+
+    expect(commands).toEqual([])
   })
 
   it('recovers a crashed LANDING batch that fully merged and asserts NRS (no pause)', () => {
