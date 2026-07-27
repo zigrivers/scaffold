@@ -37,14 +37,19 @@ import type { DetectedConfig } from '../../types/config.js'
 // pretend to; at this magnitude that is below the measurement floor.
 //
 // Because bareConfigWrite mirrors the subject's syscalls, the ratio reduces to
-// 1 + (serialization cost / IO cost), so storage speed cancels to first order.
-// A machine with an extreme CPU-to-IO cost mix (very fast tmpfs, very slow CPU)
-// can still inflate the second term. If this ever fails on a new runner, the
-// logged medians say immediately which arm moved: a real regression raises the
-// config-write median, an unusual runner lowers the bare-write one.
+// 1 + (serialization cost / IO cost). That removes the syscall-count mismatch
+// the earlier bare write+rename baseline had, but it does NOT make the result
+// storage-independent: serialization is roughly half the baseline arm here, so
+// a runner with much faster temp-dir IO (tmpfs) shrinks the denominator and
+// raises the ratio without any regression. That is the known residual risk.
+// The logged absolute medians are the triage signal when the ceiling is
+// breached: a real regression raises the config-write median, an unusual
+// runner lowers the bare-write one.
 const RATIO_CEILING = 3
 const SAMPLES = 50
 
+// Upper-middle element rather than the mean of the two central values. Both
+// arms use it, so the slight upward bias cancels in the ratio.
 function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b)
   return sorted[Math.floor(sorted.length / 2)]
@@ -96,10 +101,18 @@ function typicalResult(): AdoptionResult {
 
 describe('atomic config write performance', () => {
   it('writes a typical config.yml within 3x a bare atomic file write', () => {
-    const subjectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'adopt-perf-'))
-    const baselineDir = fs.mkdtempSync(path.join(os.tmpdir(), 'adopt-perf-base-'))
+    // Tracked as they are created so the finally below removes whatever
+    // subset exists, even if the second mkdtemp itself throws.
+    const created: string[] = []
+    const mkTmp = (prefix: string): string => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix))
+      created.push(dir)
+      return dir
+    }
 
     try {
+      const subjectDir = mkTmp('adopt-perf-')
+      const baselineDir = mkTmp('adopt-perf-base-')
       const result = typicalResult()
 
       // Prime the subject so every timed iteration takes the same branch
@@ -149,8 +162,7 @@ describe('atomic config write performance', () => {
     } finally {
       // In finally so a failing assertion — the case this test exists for —
       // still cleans up instead of leaving adopt-perf-* dirs in $TMPDIR.
-      fs.rmSync(subjectDir, { recursive: true, force: true })
-      fs.rmSync(baselineDir, { recursive: true, force: true })
+      for (const dir of created) fs.rmSync(dir, { recursive: true, force: true })
     }
   })
 })
