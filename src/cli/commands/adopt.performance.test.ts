@@ -24,19 +24,24 @@ import type { DetectedConfig } from '../../types/config.js'
 // machine does not.
 //
 // Ceiling calibration, measured on this path:
-//   clean, isolated ............................. 2.12 - 2.29
-//   clean, full parallel suite ................... 2.41 - 2.48
-//   clean, 2x-core synthetic CPU oversubscription . 1.42 - 1.66
-//   three redundant writes in atomicWriteFileSync . 3.59 - 3.90
-// Contention drives the ratio DOWN (both arms slow, the syscall-bound baseline
-// disproportionately), so load can't push it through the ceiling. 3.0 sits
-// above the noisiest clean reading and below the cheapest regression measured.
+//   clean, isolated ............................. 1.84 - 2.00
+//   clean, full parallel suite ................... 2.04
+//   three redundant writes in atomicWriteFileSync . 3.27 - 3.69
+// Contention drives the ratio toward its floor of 1.0 (both arms slow
+// together), so load cannot push it through the ceiling. 3.0 sits ~47% above
+// the noisiest clean reading and below the cheapest regression measured.
 //
-// The one assumption worth knowing: the ratio is a CPU-work-to-IO-work mix, so
-// a machine with disproportionately fast temp-dir IO (tmpfs) shrinks the
-// denominator and raises the ratio. If this ever fails on a new runner, the
-// logged medians below say immediately which arm moved — a real regression
-// raises the config-write median, a fast-tmpfs runner lowers the bare-write one.
+// What this does and does not catch: it trips on a regression that roughly
+// doubles the config-write path — an added fsync, a second parse pass, a
+// redundant write. It will not notice a 20% slowdown, and it should not
+// pretend to; at this magnitude that is below the measurement floor.
+//
+// Because bareConfigWrite mirrors the subject's syscalls, the ratio reduces to
+// 1 + (serialization cost / IO cost), so storage speed cancels to first order.
+// A machine with an extreme CPU-to-IO cost mix (very fast tmpfs, very slow CPU)
+// can still inflate the second term. If this ever fails on a new runner, the
+// logged medians say immediately which arm moved: a real regression raises the
+// config-write median, an unusual runner lowers the bare-write one.
 const RATIO_CEILING = 3
 const SAMPLES = 50
 
@@ -49,6 +54,26 @@ function elapsedMs(fn: () => void): number {
   const start = process.hrtime.bigint()
   fn()
   return Number(process.hrtime.bigint() - start) / 1_000_000
+}
+
+/**
+ * The baseline arm: the same filesystem work writeOrUpdateConfig does, minus
+ * the YAML parse/mutate/serialize it exists to perform.
+ *
+ * Deliberately mirrors the subject's syscall shape — existsSync, readFileSync,
+ * existsSync, writeFileSync, renameSync. An asymmetric baseline (a bare
+ * write+rename) leaves the ratio sensitive to the machine's CPU-to-IO cost
+ * mix, which is what makes a fast tmpfs runner look like a regression. Matching
+ * the I/O means both arms scale together with storage speed and the residual
+ * difference is the serialization work alone.
+ */
+function bareConfigWrite(target: string, scaffoldDir: string): void {
+  if (!fs.existsSync(target)) throw new Error(`baseline target missing: ${target}`)
+  const content = fs.readFileSync(target, 'utf8')
+  if (!fs.existsSync(scaffoldDir)) fs.mkdirSync(scaffoldDir, { recursive: true })
+  const tmpPath = `${target}.${process.pid}.tmp`
+  fs.writeFileSync(tmpPath, content, 'utf8')
+  fs.renameSync(tmpPath, target)
 }
 
 function typicalResult(): AdoptionResult {
@@ -73,51 +98,59 @@ describe('atomic config write performance', () => {
   it('writes a typical config.yml within 3x a bare atomic file write', () => {
     const subjectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'adopt-perf-'))
     const baselineDir = fs.mkdtempSync(path.join(os.tmpdir(), 'adopt-perf-base-'))
-    const result = typicalResult()
 
-    // The payload the baseline writes is the config the subject produces, so
-    // both arms move the same number of bytes through the same syscalls.
-    writeOrUpdateConfig(subjectDir, result)
-    const payload = fs.readFileSync(
-      path.join(subjectDir, '.scaffold', 'config.yml'),
-      'utf8',
-    )
-    const baselineTarget = path.join(baselineDir, 'config.yml')
+    try {
+      const result = typicalResult()
 
-    const subjectTimings: number[] = []
-    const baselineTimings: number[] = []
-
-    // Interleaved so any drift in machine load hits both arms equally.
-    for (let i = 0; i < SAMPLES; i++) {
-      subjectTimings.push(elapsedMs(() => writeOrUpdateConfig(subjectDir, result)))
-      baselineTimings.push(
-        elapsedMs(() => {
-          const tmpPath = `${baselineTarget}.${process.pid}.tmp`
-          fs.writeFileSync(tmpPath, payload, 'utf8')
-          fs.renameSync(tmpPath, baselineTarget)
-        }),
+      // Prime the subject so every timed iteration takes the same branch
+      // (config exists -> read + reparse), and reuse the config it produces as
+      // the baseline payload so both arms move identical bytes.
+      writeOrUpdateConfig(subjectDir, result)
+      const payload = fs.readFileSync(
+        path.join(subjectDir, '.scaffold', 'config.yml'),
+        'utf8',
       )
-    }
 
-    const subject = median(subjectTimings)
-    const baseline = median(baselineTimings)
-    const ratio = subject / baseline
+      const baselineScaffoldDir = path.join(baselineDir, '.scaffold')
+      fs.mkdirSync(baselineScaffoldDir, { recursive: true })
+      const baselineTarget = path.join(baselineScaffoldDir, 'config.yml')
+      fs.writeFileSync(baselineTarget, payload, 'utf8')
 
-    fs.rmSync(subjectDir, { recursive: true, force: true })
-    fs.rmSync(baselineDir, { recursive: true, force: true })
+      const subjectTimings: number[] = []
+      const baselineTimings: number[] = []
 
-    // Logged like the other perf checks in tests/performance/ so a drifting
-    // ratio is visible before it crosses the ceiling.
-    console.log(
-      `config write median=${subject.toFixed(3)}ms ` +
-        `bare write median=${baseline.toFixed(3)}ms ratio=${ratio.toFixed(2)}`,
-    )
+      // Interleaved so any drift in machine load hits both arms equally.
+      for (let i = 0; i < SAMPLES; i++) {
+        subjectTimings.push(elapsedMs(() => writeOrUpdateConfig(subjectDir, result)))
+        baselineTimings.push(elapsedMs(() => bareConfigWrite(baselineTarget, baselineScaffoldDir)))
+      }
 
-    expect(
-      ratio,
-      `config write median=${subject.toFixed(3)}ms, ` +
+      const subject = median(subjectTimings)
+      const baseline = median(baselineTimings)
+      const ratio = subject / baseline
+      const detail =
+        `config write median=${subject.toFixed(3)}ms, ` +
         `bare write median=${baseline.toFixed(3)}ms, ratio=${ratio.toFixed(2)} ` +
-        `(ceiling ${RATIO_CEILING})`,
-    ).toBeLessThan(RATIO_CEILING)
+        `(ceiling ${RATIO_CEILING})`
+
+      // Logged like the other perf checks in tests/performance/ so a drifting
+      // ratio is visible before it crosses the ceiling.
+      console.log(detail)
+
+      // A zero denominator would make the ratio Infinity/NaN and report as a
+      // regression. Sub-microsecond medians mean the baseline got faster, which
+      // is never the failure this test exists to catch.
+      expect(
+        baseline,
+        `baseline median measured as 0ms — timer resolution too coarse to compare. ${detail}`,
+      ).toBeGreaterThan(0)
+
+      expect(ratio, detail).toBeLessThan(RATIO_CEILING)
+    } finally {
+      // In finally so a failing assertion — the case this test exists for —
+      // still cleans up instead of leaving adopt-perf-* dirs in $TMPDIR.
+      fs.rmSync(subjectDir, { recursive: true, force: true })
+      fs.rmSync(baselineDir, { recursive: true, force: true })
+    }
   })
 })
