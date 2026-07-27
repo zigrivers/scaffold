@@ -46,11 +46,22 @@ import type { DetectedConfig, WebAppConfig } from '../../types/config.js'
 // reports the runner's CPU as a product regression is worse than no timing check
 // at all: it trains readers to re-run instead of investigate.
 //
-// What is NOT covered, stated plainly: a regression that makes this path slower
-// without changing its I/O shape — a slower YAML serializer, say. The timing
-// check did not catch that either (the CPU-only row above), so dropping it lost
-// nothing real, but nothing here guards it. That needs a benchmark with a
-// per-machine baseline, which is a different tool than a suite test.
+// What is NOT covered, stated plainly:
+//
+// 1. A regression that makes this path slower without changing its I/O shape —
+//    a slower YAML serializer, say. The timing check did not catch that either
+//    (the CPU-only row above), so dropping it lost nothing real, but nothing
+//    here guards it. That needs a benchmark with a per-machine baseline, which
+//    is a different tool than a suite test.
+//
+// 2. The production write path. `writeOrUpdateConfig` has no non-test callers —
+//    `applyAdoptionPlan` writes config through `writeInitializeConfig` in
+//    project/adoption-apply.ts, and adopt.ts marks this helper "slated for
+//    removal in R2". So these assertions guard the helper this test has always
+//    targeted, not the code that runs in production. Worth re-pointing at
+//    `writeInitializeConfig` (or retiring with the helper), but that changes
+//    what the test covers rather than how it measures, so it is left as a
+//    deliberate follow-up rather than folded in here.
 
 // `satisfies` rather than `as`: an `as` cast would let this fixture keep
 // compiling if AdoptionResult or DetectedConfig gained a required field, and a
@@ -83,13 +94,23 @@ describe('atomic config write cost', () => {
     const renameSpy = vi.spyOn(fs, 'renameSync')
 
     try {
-      const result = typicalResult('serverless')
-      writeOrUpdateConfig(dir, result) // create branch — not the one under test
+      writeOrUpdateConfig(dir, typicalResult('serverless')) // create branch — not under test
+
+      // Fail loudly if the spies are not intercepting. They work by patching the
+      // `fs` namespace object, which only sees calls made through it; if the
+      // implementation ever switches to named imports (`import { writeFileSync }`)
+      // the counts below would silently read zero and the test would "pass".
+      expect(writeSpy, 'fs spies are not intercepting — the counts below would be meaningless').toHaveBeenCalled()
+
       readSpy.mockClear()
       writeSpy.mockClear()
       renameSpy.mockClear()
 
-      writeOrUpdateConfig(dir, result) // update branch
+      // The measured update CHANGES the config. Re-writing an identical config
+      // would pin the current behaviour so tightly that adding a legitimate
+      // "skip the write when nothing changed" optimisation would fail this test
+      // — penalising an improvement. A genuine change must always write.
+      writeOrUpdateConfig(dir, typicalResult('container')) // update branch
 
       // These three counts are the cost of the path. A redundant write, a second
       // read-and-reparse, or a write-per-key loop each move one of them.
