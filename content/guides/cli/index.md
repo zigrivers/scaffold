@@ -291,7 +291,7 @@ order, so parallel agents don't each re-run the full suite against a moving
 | `release --pr <N>` | Return a `HELD_HUMAN` (overlap-zone) PR to the queue; it lands solo-gated |
 | `stats` | Calibration metrics — arrivals, gate outcomes, median gate time, flakes, cache hits, TIA map age |
 | `bootstrap --pr <N> [--finish]` | Guided FIRST merge for a repo installing the queue in its own PR; `--finish` resumes a partial run |
-| `gate-cache` | Inspect the gate-result cache (skips a gate when this exact tree already ran green) |
+| `gate-cache --check-tree <sha>` / `--record-tree <sha>` | Look up or record a tree in the gate-result cache (which lets the queue skip a gate when this exact tree already ran green). Both flags are hidden from `--help`; a bare `gate-cache` exits with `MQ_GATE_CACHE_NO_TREE`. |
 
 Queue state lives under `.mq/` — an append-only `journal.jsonl` that the queue
 state is a reduction of, plus the gate cache, logs, and the daemon lock.

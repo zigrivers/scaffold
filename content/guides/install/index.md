@@ -212,8 +212,11 @@ directory to your shell `PATH`, or reinstall with a prefix that's already on
   dependency.
 - **`scaffold update` only prints a command.** That's intentional — it never
   runs installs for you. Copy the printed upgrade command for your channel and
-  run it yourself. (`--check-only` reports without printing an upgrade command;
-  `--skip-build` suppresses the post-update rebuild.)
+  run it yourself. `--check-only` reports the same information and exits — it
+  still names the upgrade command when one is available; the difference is that
+  it emits a check-shaped JSON payload under `--format json`. `--skip-build` is
+  accepted but currently has no effect: `scaffold update` never installs or
+  rebuilds anything, so there is no build to skip.
 - **Existing project behaves oddly after upgrade.** Run `scaffold status` to
   trigger automatic state migration before anything else.
 

@@ -193,6 +193,8 @@ brew update && brew upgrade scaffold
 
 The `brew update` prefix is required, not optional: `brew outdated` and `brew upgrade` both read from the local tap cache, so without it a freshly published release reports "already installed" even though the newer formula is live.
 
+Note that `scaffold update` itself prints only `brew upgrade scaffold`, without the prefix — prepend `brew update &&` yourself when you copy it.
+
 ### mmr
 
 ```bash
@@ -1294,7 +1296,7 @@ mmr review --pr 47 --fix-threshold P0    # Only fix critical/security issues
 | Command | Purpose |
 |---------|---------|
 | `mmr review` | Dispatch a review job to all configured channels |
-| `mmr critique [input]` | Multi-model design/brainstorm critique — advisory, no gate, always exits 0 |
+| `mmr critique [input]` | Multi-model design/brainstorm critique — advisory, no gate; exits 0 whatever the critique says (usage errors still exit 1) |
 | `mmr status <job-id>` | Check progress of a running job |
 | `mmr results <job-id>` | Collect, reconcile, and output findings |
 | `mmr reconcile <job-id> --channel <n> --input <d>` | Inject an external channel's findings and re-reconcile |
@@ -1594,7 +1596,7 @@ You can change methodology mid-pipeline with `scaffold init --methodology <prese
 | `scaffold mq bootstrap --pr <N> [--finish]` | Arm-first guided FIRST merge for a repo installing the queue in its own PR (gate on head → crash-safe journaled squash-merge → arm hooks + scheduler); `--finish` reconciles a partial run |
 | `scaffold agent-ops install --component gate` | Generate the project-owned `scripts/gate-check.sh` + `scripts/gate-check-affected.sh` seeds (the merge-queue gate contract; seeded from `package.json` + workflows) |
 | `scaffold mq release --pr <N>` | Release a `HELD_HUMAN` (overlap-zone) PR back into the queue so it lands solo-gated (D13 `overlap_zone_policy: hold`) |
-| `scaffold mq gate-cache` | Inspect the D12 gate-result cache (skips a full/affected gate when this exact tree already ran it green) |
+| `scaffold mq gate-cache --check-tree <sha>` | Look up the D12 gate-result cache (which skips a full/affected gate when this exact tree already ran it green); `--record-tree <sha>` records one. A bare `gate-cache` exits with `MQ_GATE_CACHE_NO_TREE` — one of the two flags is required |
 | `scaffold tia affected --base <ref>` | Emit the TIA-selected, most-likely-to-fail-first test list + a confidence verdict (exit 0 = run the selection, exit 3 = run the full suite; fails closed to full on any uncertainty) |
 | `scaffold skip <step> [<step2>...]` | Skip one or more steps with a reason |
 | `scaffold complete <step>` | Mark a step as completed (for steps executed outside `scaffold run`) |
@@ -1783,11 +1785,11 @@ Options: `--dry-run` to preview, `minor`/`major`/`patch` to specify the bump, `c
 | **CLAUDE.md** | A configuration file in your project root that tells Claude Code how to work in your project. |
 | **Depth** | A 1-5 scale controlling how thorough each step's analysis is, from MVP-focused (1) to exhaustive (5). |
 | **Frontmatter** | The YAML metadata block at the top of meta-prompt files, declaring dependencies, outputs, knowledge entries, and other configuration. |
-| **Knowledge base** | 60 domain expertise entries that get injected into prompts. Can be extended with project-local overrides. |
+| **Knowledge base** | 301 domain expertise entries that get injected into prompts. Can be extended with project-local overrides. |
 | **MCP** | Model Context Protocol. A way for Claude to use external tools like a headless browser. |
 | **Meta-prompt** | A short intent declaration in `content/pipeline/` that gets assembled into a full prompt at runtime. |
 | **mmr** | Multi-Model Review CLI (`@zigrivers/mmr`). Standalone tool for async multi-model code review dispatch, reconciliation, and severity gating. |
-| **Methodology** | A preset (deep, mvp, custom) controlling which steps run and at what depth. |
+| **Methodology** | A preset controlling which steps run and at what depth — `deep`, `mvp`, or `custom` at init, plus `brownfield`, which `scaffold adopt` selects. |
 | **Multi-model review** | Independent validation from Codex/Antigravity CLIs at depth 4-5, catching blind spots a single model misses. |
 | **PRD** | Product Requirements Document. The foundation for everything Scaffold builds. |
 | **Runner skill** | Auto-activated agent-host skill (Claude Code, OpenCode, …) that surfaces decision points before executing pipeline steps. |

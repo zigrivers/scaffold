@@ -181,7 +181,8 @@ Before pushing, review `git diff origin/main...HEAD` against CLAUDE.md and docs/
 > **Design critique vs. code review.** `mmr review` reviews a *diff* for defects
 > and gates by severity. Its **peer** `mmr critique` reviews a *design* — a design
 > doc, a pasted "problem + proposed solution", or a plan — and is **advisory**
-> (no severity, no pass/fail gate, always exits 0). Use it when you want
+> (no severity, no pass/fail gate; exits 0 whatever the critique says — a usage
+> error such as unreadable input still exits 1). Use it when you want
 > independent models to weigh an approach *before* building: it reports
 > **convergence** (where models agreed), **divergence** (genuine splits + the
 > deciding crux), and an editorial **synthesis** that never picks a winner.

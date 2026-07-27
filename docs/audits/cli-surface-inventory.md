@@ -186,10 +186,11 @@ gate asserting the table and the enum agree in both directions.
 
 ## 4.3 `mmr` exit codes
 
-`0` pass / degraded-pass · `2` blocked, **and** the trust ratification gate ·
-`3` needs-user-decision, **and** `max_rounds_exceeded` · `1` usage/dispatch
-errors · `5` job not found · `130`/`143` signals.
-`mmr critique` always exits `0` (advisory).
+`0` pass / degraded-pass · `2` blocked, **and** the base-ref trust ratification
+gate · `3` needs-user-decision, **and** `max_rounds_exceeded` · `1`
+usage/dispatch errors · `5` job not found · `130`/`143` signals.
+`mmr critique` exits `0` once its input resolves, whatever the critique says;
+a usage error still exits `1`.
 
 **Coverage:** [mmr#the-gate--the-four-verdicts](../../content/guides/mmr/index.md)
 and [mmr#trust-modes-and-the-ratification-gate](../../content/guides/mmr/index.md)

@@ -1498,8 +1498,11 @@ Node, or use the Homebrew install, which installs and manages Node as a
 dependency.</li>
 <li><strong><code>scaffold update</code> only prints a command.</strong> That's intentional — it never
 runs installs for you. Copy the printed upgrade command for your channel and
-run it yourself. (<code>--check-only</code> reports without printing an upgrade command;
-<code>--skip-build</code> suppresses the post-update rebuild.)</li>
+run it yourself. <code>--check-only</code> reports the same information and exits — it
+still names the upgrade command when one is available; the difference is that
+it emits a check-shaped JSON payload under <code>--format json</code>. <code>--skip-build</code> is
+accepted but currently has no effect: <code>scaffold update</code> never installs or
+rebuilds anything, so there is no build to skip.</li>
 <li><strong>Existing project behaves oddly after upgrade.</strong> Run <code>scaffold status</code> to
 trigger automatic state migration before anything else.</li>
 </ul>

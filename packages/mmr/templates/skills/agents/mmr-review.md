@@ -51,20 +51,22 @@ review. Treat that as "fix the channels" (`mmr doctor`), not as a pass.
 ## Avoid the nested self-review
 
 `mmr review` includes a channel for the very CLI you are running — `codex` when
-you are in Codex, `antigravity` (`agy`) when you are in Antigravity, `opencode`
-when you are in OpenCode — plus every other installed CLI. Scope out the channel
-you are already running to avoid a redundant nested review (the `--channels` flag
-is a space-separated list, not a comma-separated string):
+you are in Codex, `antigravity` (`agy`) when you are in Antigravity — plus every
+other installed CLI. Scope out the channel you are already running to avoid a
+redundant nested review (the `--channels` flag is a space-separated list, not a
+comma-separated string):
 
 ```bash
 # From Codex:
 mmr review --pr <number> --channels claude grok antigravity --sync --format json
 # From Antigravity (agy):
 mmr review --pr <number> --channels codex claude grok --sync --format json
-# From OpenCode:
-mmr review --pr <number> --channels codex claude grok antigravity --sync --format json
 # or set channels_disabled: ["codex"] / ["antigravity"] in .mmr.yaml
 ```
+
+`opencode` is opt-in, so it is not in the default set and needs no scoping out —
+but if you enabled it *and* you are running inside OpenCode, disable it the same
+way: `channels_disabled: ["opencode"]`.
 
 ## Design critique (`mmr critique`)
 

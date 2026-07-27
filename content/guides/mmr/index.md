@@ -93,7 +93,7 @@ table.
 | `--compensate-missing` | mode | Also run a compensating pass for channels whose CLI isn't installed. Off by default — see *Degraded mode*. |
 | `--session <id>` | rounds | Link this run into a multi-round session; the id must match `^[A-Za-z0-9_-]+$` and not be a reserved name :cite[packages/mmr/src/commands/sessions.ts:15]. |
 | `--round <n>` | rounds | 1-based round counter within a session. |
-| `--max-rounds <n>` | rounds | Hard cap on rounds. Defaults to `defaults.loop_control.max_rounds_default` (**5**) whether or not `--session` is set. Exceeding it exits 3 before dispatch. |
+| `--max-rounds <n>` | rounds | Hard cap on rounds; exceeding it exits 3 before dispatch. Without `--session`, it defaults to `defaults.loop_control.max_rounds_default` (**5**). **With `--session` and no `--max-rounds`, middleware hardcodes 5** and your configured `max_rounds_default` is ignored :cite[packages/mmr/src/commands/review.ts:387] — pass `--max-rounds` explicitly if you configured a different cap. |
 | `--accept-new-acks` | trust | Trust acknowledgment files newly introduced by the diff. |
 | `--trust-project-acks` | trust | Trust working-tree project acks in non-Git / untrusted modes. |
 | `--trust-project-config` | trust | Trust working-tree `.mmr.yaml` in untrusted modes. |
@@ -133,7 +133,7 @@ mmr review --pr 123 --channels grok claude --sync --format json
 | `mmr sessions <start\|list\|show\|end> <id>` | Manage multi-round review sessions (stored under `~/.mmr/sessions/`). |
 | `mmr config <init\|test\|channels\|path\|show\|enable\|disable\|set\|unset>` | Scaffold, inspect, and **mutate** `.mmr.yaml`. `init` scaffolds; `test` pre-flights install + auth; `channels` lists (add `--format text` for a table with a provenance SOURCE column); `show <name>` inspects one channel with provenance; `path` discloses the read/write search order; `enable`/`disable <channel>` toggle a channel; `set <dotted.path> <value>` / `unset <dotted.path>` edit any value (validated before write). All mutators are scope-aware (`--global`/`--project`) and never leave an invalid config on disk. |
 | `mmr doctor [--fix] [--format json]` | Diagnose every channel's health (install + auth) with per-channel remediation. `--fix` disables channels whose CLI is not installed (records to `~/.mmr/config.yaml`). |
-| `mmr critique [input] [--context repo] [--session <id>] [--lenses …] [--no-synthesis] [--format text\|json]` | Multi-model **design/brainstorm critique** of an artifact (a design doc, a pasted "problem + proposed solution", or a plan). Reports **convergence** (where models agreed), **divergence** (genuine splits + the deciding crux), and an editorial **synthesis** that never picks a winner. **Advisory: no pass/fail gate, always exits 0.** A peer to `review`, not a code review. `--context repo` (or `--context-paths a.ts,b.ts`) grounds it in the codebase; `--session <id>` iterates across rounds (each round sees the prior one); `--lenses` gives each channel a persona, cycled one per channel — built-ins are `skeptic`, `simplifier`, `user-advocate`, `pragmatist`, `security`, `scale` (any other name gets a generic preamble), and passing any relabels the output to "perspectives"; `--no-synthesis` skips the synthesis pass, which otherwise runs only when ≥2 items and ≥2 channels came back and the `claude` channel is installed and authed. |
+| `mmr critique [input] [--context repo] [--session <id>] [--lenses …] [--no-synthesis] [--format text\|json]` | Multi-model **design/brainstorm critique** of an artifact (a design doc, a pasted "problem + proposed solution", or a plan). Reports **convergence** (where models agreed), **divergence** (genuine splits + the deciding crux), and an editorial **synthesis** that never picks a winner. **Advisory: no pass/fail gate — once the input resolves, it always exits 0, whatever the critique says** (a usage error, such as a missing or unreadable input, still exits 1). A peer to `review`, not a code review. `--context repo` (or `--context-paths a.ts,b.ts`) grounds it in the codebase; `--session <id>` iterates across rounds (each round sees the prior one); `--lenses` gives each channel a persona, cycled one per channel — built-ins are `skeptic`, `simplifier`, `user-advocate`, `pragmatist`, `security`, `scale` (any other name gets a generic preamble), and passing any relabels the output to "perspectives"; `--no-synthesis` skips the synthesis pass, which otherwise runs only when ≥2 items and ≥2 channels came back and the `claude` channel is installed and authed. |
 | `mmr commands [--format json]` | Machine-readable capability manifest — every command with a runnable example and a `writes` flag. Agents load this once instead of probing `--help`. |
 | `mmr explain [<topic>]` | Inline just-in-time docs for a concept (`channels`, `config`, `scopes`, `compensation`, `redaction`, `provenance`). No arg lists the topics. |
 | `mmr ack <add\|list\|rm\|prune>` | Sticky acknowledgments — silence a finding by its stable key so it stops blocking across rounds. `--scope project` (default, `./.mmr/acks`) or `user` (`~/.mmr/acks`); project acks shadow user acks. A re-worded finding still matches via the same shingle threshold. **`prune` is a no-op stub today** :cite[packages/mmr/src/commands/ack.ts:95]. |
@@ -550,11 +550,11 @@ MMR classifies every run into one of three trust modes
 | `untrusted-head` | `--diff`, anything in CI, or a failed base-ref resolution | not read unless a `--trust-project-*` flag says so |
 | `non-git` | not a Git repository | same as above |
 
-On top of that there is a **ratification gate**: if the diff under review *itself*
-adds or modifies `.mmr.yaml`, or touches `.mmr/acks/`, the run stops with
-`needs-user-decision` and exit **2** before any channel is dispatched — including
-before `--dry-run` :cite[packages/mmr/src/commands/review.ts:487]. A human has to
-ratify the change:
+On top of that, **in `base-ref` mode**, there is a **ratification gate**: if the
+diff under review *itself* adds or modifies `.mmr.yaml`, or touches
+`.mmr/acks/`, the run stops with `needs-user-decision` and exit **2** before any
+channel is dispatched — including before `--dry-run`
+:cite[packages/mmr/src/commands/review.ts:487]. A human has to ratify the change:
 
 | what the diff changes | flag that ratifies it |
 | --- | --- |
@@ -563,3 +563,10 @@ ratify the change:
 
 That is the point: a PR cannot quietly reconfigure the reviewer that is reviewing
 it. Both flags print a warning to stderr when used.
+
+The gate is keyed on having a trusted base ref (`baseRef !== undefined`), so it
+does **not** fire in `untrusted-head` or `non-git` mode. That is not a hole:
+in those modes the working-tree `.mmr.yaml` and project acks are not loaded at
+all unless you pass a `--trust-project-*` flag, so there is nothing for the diff
+to smuggle in. Base-ref mode is the only one that *would* otherwise honor them,
+which is why it is the one that stops and asks.
