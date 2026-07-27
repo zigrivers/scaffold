@@ -1,5 +1,5 @@
 // src/cli/commands/adopt.performance.test.ts
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -52,9 +52,10 @@ import type { DetectedConfig, WebAppConfig } from '../../types/config.js'
 // storage-independent: serialization is a large fraction of the baseline arm
 // here, so a runner with much faster temp-dir IO (tmpfs) shrinks the
 // denominator and raises the ratio without any regression — the residual risk.
-// The logged absolute medians are the triage signal when the ceiling is
-// breached: a real regression raises the config-write median, an unusual
-// runner lowers the bare-write one.
+// The assertion message carries both absolute medians, which is the triage
+// signal when the ceiling is breached: a real regression raises the
+// config-write median, an unusual runner lowers the bare-write one. The
+// deterministic call-count case below is what keeps that caveat affordable.
 const RATIO_CEILING = 1.95
 // 201 rather than 50: at 50 the run-to-run spread was wide enough that one
 // measured regression landed at 2.84 on one run and 3.46 on another, straddling
@@ -199,9 +200,9 @@ describe('atomic config write performance', () => {
         `bare write median=${baseline.toFixed(3)}ms, ratio=${ratio.toFixed(2)} ` +
         `(ceiling ${RATIO_CEILING})`
 
-      // Logged like the other perf checks in tests/performance/ so a drifting
-      // ratio is visible before it crosses the ceiling.
-      console.log(detail)
+      // No console.log of `detail` on green runs — it would print on every
+      // suite run for no one's benefit. Every assertion below carries `detail`
+      // in its message, so a breach reports both medians and the ratio.
 
       // A zero denominator would make the ratio Infinity/NaN and report as a
       // regression. Sub-microsecond medians mean the baseline got faster, which
@@ -216,6 +217,52 @@ describe('atomic config write performance', () => {
       // In finally so a failing assertion — the case this test exists for —
       // still cleans up instead of leaving adopt-perf-* dirs in $TMPDIR.
       for (const dir of created) fs.rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  // The deterministic half of the guard, and the reason the timing check above
+  // can afford its documented environmental caveat.
+  //
+  // Every review round raised the same objection to the ratio: it is a
+  // wall-clock measurement, so an unusual runner can move it without any
+  // product change. True, and the calibration comment says so. This case closes
+  // the gap for the regression class that actually motivated the test —
+  // redundant filesystem work — by counting syscalls instead of timing them.
+  // It cannot flake: no clock, no storage speed, no scheduler.
+  //
+  // The two are complements. This one pins the shape of the IO exactly but is
+  // blind to anything that does not change the call count; the ratio is fuzzier
+  // but would notice a wholesale slowdown. A regression that slipped past the
+  // 1.95 ceiling on a fast runner still has to get past this.
+  it('performs exactly one write and one rename per config update', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'adopt-perf-calls-'))
+    const writeSpy = vi.spyOn(fs, 'writeFileSync')
+    const renameSpy = vi.spyOn(fs, 'renameSync')
+
+    try {
+      const result = typicalResult('serverless')
+      writeOrUpdateConfig(dir, result) // create branch
+      writeSpy.mockClear()
+      renameSpy.mockClear()
+
+      writeOrUpdateConfig(dir, result) // update branch — the one that is timed
+
+      expect(writeSpy, 'atomic config write should write the temp file exactly once').toHaveBeenCalledTimes(1)
+      expect(renameSpy, 'atomic config write should rename exactly once').toHaveBeenCalledTimes(1)
+
+      // The write must land on a temp path and be renamed onto the real one,
+      // so a crash mid-write cannot leave a truncated config behind.
+      const configPath = path.join(dir, '.scaffold', 'config.yml')
+      const writtenPath = String(writeSpy.mock.calls[0][0])
+      const from = String(renameSpy.mock.calls[0][0])
+      const to = String(renameSpy.mock.calls[0][1])
+      expect(writtenPath).not.toBe(configPath)
+      expect(from).toBe(writtenPath)
+      expect(to).toBe(configPath)
+    } finally {
+      writeSpy.mockRestore()
+      renameSpy.mockRestore()
+      fs.rmSync(dir, { recursive: true, force: true })
     }
   })
 })
