@@ -63,10 +63,14 @@ const BEAD_CLOSE_REPLAY_LIMIT = 8
 const BEAD_CLOSE_MAX_ATTEMPTS = 3
 const BEAD_COMMAND_TIMEOUT_MS = 30_000
 
-function runBd(args: string[], cwd: string): Promise<void> {
+export function runBd(
+  args: string[],
+  cwd: string,
+  timeoutMs = BEAD_COMMAND_TIMEOUT_MS,
+): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     execFile('bd', args, {
-      cwd, timeout: BEAD_COMMAND_TIMEOUT_MS, killSignal: 'SIGTERM',
+      cwd, timeout: timeoutMs, killSignal: 'SIGTERM',
     }, err => {
       if (err) reject(err)
       else resolve()
@@ -792,6 +796,18 @@ export class MergeQueueDaemon {
         prior?.result === 'skipped' ||
         prior?.result === 'abandoned')
     ) return
+    if (
+      action === 'close' &&
+      (prior?.attempts ?? 0) >= BEAD_CLOSE_MAX_ATTEMPTS
+    ) {
+      appendEvent(mqDir, {
+        type: 'bead_sync', pr, action, beadId: prior?.beadId,
+        result: 'abandoned', attempts: BEAD_CLOSE_MAX_ATTEMPTS,
+        at: this.at(), note: 'recovered at the closeout attempt limit',
+      })
+      log(`warn: bead close abandoned for PR #${pr} after a daemon restart`)
+      return
+    }
 
     let body = knownBody
     if (body === undefined) {
@@ -800,13 +816,9 @@ export class MergeQueueDaemon {
       } catch (err) {
         const note = `could not read PR body: ${String(err)}`
         if (action === 'close') {
-          const attempts = this.nextBeadAttempt(prior)
-          const result = this.failedBeadResult(attempts)
-          appendEvent(mqDir, {
-            type: 'bead_sync', pr, action, result,
-            attempts, at: this.at(), note,
-          })
-          log(`warn: bead close ${result} for PR #${pr}: ${note}`)
+          // Tracker attempts begin only once `bd` is invoked. A transient GitHub
+          // lookup failure must not exhaust the closeout budget before that.
+          log(`warn: bead close for PR #${pr} deferred: ${note}`)
         } else {
           log(`warn: bead reopen for PR #${pr} failed: ${note}`)
         }

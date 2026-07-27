@@ -4,7 +4,7 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { MergeQueueDaemon, PAUSED_FILE, type DaemonDeps } from './daemon.js'
+import { MergeQueueDaemon, PAUSED_FILE, runBd, type DaemonDeps } from './daemon.js'
 import { appendEvent, readJournal } from './journal.js'
 import { reduceState, queuedPrs } from './state.js'
 import { defaultMergeQueueConfig, type JournalEvent } from './types.js'
@@ -141,6 +141,30 @@ function harness(
   }
   return { daemon, deps, gh, git, gateResults, gateCalls, enqueue, states, mqDir, root }
 }
+
+describe('runBd', () => {
+  it('terminates a hung tracker command at the configured timeout', async () => {
+    const root = tmp()
+    const bin = path.join(root, 'bin')
+    fs.mkdirSync(bin)
+    const fakeBd = path.join(bin, 'bd')
+    fs.writeFileSync(fakeBd, '#!/bin/sh\nwhile :; do :; done\n')
+    fs.chmodSync(fakeBd, 0o755)
+    const originalPath = process.env.PATH
+    process.env.PATH = `${bin}:${originalPath ?? ''}`
+
+    try {
+      const started = Date.now()
+      await expect(runBd([], root, 25)).rejects.toMatchObject({
+        killed: true, signal: 'SIGTERM',
+      })
+      expect(Date.now() - started).toBeLessThan(1_000)
+    } finally {
+      if (originalPath === undefined) delete process.env.PATH
+      else process.env.PATH = originalPath
+    }
+  })
+})
 
 describe('MergeQueueDaemon.cycle', () => {
   it('lands a green batch of two and passes the NRS check', async () => {
@@ -984,7 +1008,7 @@ describe('MergeQueueDaemon.reconcile', () => {
     expect(reduceState(readJournal(h.mqDir)).beadSync.get('close:1')?.result).toBe('succeeded')
   })
 
-  it('retries never-attempted landed PRs before repeatedly failed newer PRs', async () => {
+  it('prioritises never-attempted closeouts, then the oldest failed receipt', async () => {
     const commands: string[][] = []
     const h = harness({
       runBeadCommand: async args => {
@@ -999,12 +1023,23 @@ describe('MergeQueueDaemon.reconcile', () => {
         state: 'MERGED', mergedAt: AT, body: `Closes proj-${pr}`,
       }))
     }
+    appendEvent(h.mqDir, {
+      type: 'bead_sync', pr: 1, action: 'close', beadId: 'proj-1',
+      result: 'failed', attempts: 1, at: '2026-07-17T10:00:00.000Z',
+    })
+    appendEvent(h.mqDir, {
+      type: 'bead_sync', pr: 2, action: 'close', beadId: 'proj-2',
+      result: 'failed', attempts: 1, at: '2026-07-17T11:00:00.000Z',
+    })
 
     h.daemon.reconcile()
 
     await vi.waitFor(() => expect(commands).toHaveLength(8))
+    for (let pr = 3; pr <= 9; pr += 1) {
+      expect(commands).toContainEqual(['close', `proj-${pr}`])
+    }
     expect(commands).toContainEqual(['close', 'proj-1'])
-    expect(commands).not.toContainEqual(['close', 'proj-9'])
+    expect(commands).not.toContainEqual(['close', 'proj-2'])
   })
 
   it('abandons a closeout after three failed attempts', async () => {
@@ -1034,6 +1069,69 @@ describe('MergeQueueDaemon.reconcile', () => {
     expect(reduceState(readJournal(h.mqDir)).beadSync.get('close:1')).toEqual(
       expect.objectContaining({ result: 'abandoned', attempts: 3 }),
     )
+  })
+
+  it('terminalizes a crash-left third attempt without launching a fourth', () => {
+    const commands: string[][] = []
+    const h = harness({
+      runBeadCommand: async args => { commands.push(args) },
+    })
+    h.enqueue(1)
+    appendEvent(h.mqDir, { type: 'pr_state', pr: 1, state: 'LANDED', at: AT })
+    appendEvent(h.mqDir, {
+      type: 'bead_sync', pr: 1, action: 'close', beadId: 'proj-crash',
+      result: 'attempted', attempts: 3, at: AT,
+    })
+    h.gh.infos.set(1, prInfo(1, {
+      state: 'MERGED', mergedAt: AT, body: 'Closes proj-crash',
+    }))
+
+    h.daemon.reconcile()
+
+    expect(commands).toEqual([])
+    expect(reduceState(readJournal(h.mqDir)).beadSync.get('close:1')).toEqual(
+      expect.objectContaining({ result: 'abandoned', attempts: 3 }),
+    )
+  })
+
+  it('records a missing bd executable as terminal skipped without retrying', async () => {
+    let attempts = 0
+    const missing = Object.assign(new Error('spawn bd ENOENT'), { code: 'ENOENT' })
+    const h = harness({
+      runBeadCommand: async () => {
+        attempts += 1
+        throw missing
+      },
+    })
+    h.enqueue(1)
+    appendEvent(h.mqDir, { type: 'pr_state', pr: 1, state: 'LANDED', at: AT })
+    h.gh.infos.set(1, prInfo(1, {
+      state: 'MERGED', mergedAt: AT, body: 'Closes proj-missing-bd',
+    }))
+
+    h.daemon.reconcile()
+    await vi.waitFor(() => expect(
+      reduceState(readJournal(h.mqDir)).beadSync.get('close:1')?.result,
+    ).toBe('skipped'))
+    h.daemon.reconcile()
+    await new Promise(resolve => setTimeout(resolve, 20))
+
+    expect(attempts).toBe(1)
+  })
+
+  it('does not spend tracker attempts when the PR body lookup fails', () => {
+    let attempts = 0
+    const h = harness({
+      runBeadCommand: async () => { attempts += 1 },
+    })
+    h.enqueue(1)
+    appendEvent(h.mqDir, { type: 'pr_state', pr: 1, state: 'LANDED', at: AT })
+    h.gh.viewErrors.set(1, 'temporary GitHub outage')
+
+    for (let pass = 0; pass < 4; pass += 1) h.daemon.reconcile()
+
+    expect(attempts).toBe(0)
+    expect(reduceState(readJournal(h.mqDir)).beadSync.get('close:1')).toBeUndefined()
   })
 
   it('does not retry bead closeouts while paused', async () => {
