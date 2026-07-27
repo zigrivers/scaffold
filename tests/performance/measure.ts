@@ -10,10 +10,19 @@
  *
  * The returned number is still per-call, so budgets stay readable and stay
  * comparable if `batch` is ever retuned.
+ *
+ * `warmup` defaults to one batch, which is the right trade for the
+ * microsecond-scale benchmarks but would cost a full second on an op that
+ * already takes ~10ms. Callers passing a small `batch` (the dependency-graph
+ * build passes 1) get a proportionally small warmup for free; pass `warmup`
+ * explicitly if the two need to diverge.
  */
-export function p95PerOpMs(op: () => void, { batch = 100, samples = 15 } = {}): number {
-  // Warm up: let the JIT settle so sample 1 is not measuring compilation.
-  for (let i = 0; i < batch; i++) op()
+export function p95PerOpMs(
+  op: () => void,
+  { batch = 100, samples = 15, warmup = batch } = {},
+): number {
+  // Let the JIT settle so sample 1 is not measuring compilation.
+  for (let i = 0; i < warmup; i++) op()
 
   const perOp: number[] = []
   for (let s = 0; s < samples; s++) {
