@@ -1,6 +1,6 @@
 # Scaffold
 
-A TypeScript CLI that assembles AI-powered prompts at runtime to guide you from "I have an idea" to working software. Scaffold walks you through 60 structured pipeline steps — organized into 16 phases — plus 11 utility tools, and the supported AI tools handle the research, planning, and implementation for you.
+A TypeScript CLI that assembles AI-powered prompts at runtime to guide you from "I have an idea" to working software. Scaffold walks you through 99 structured pipeline steps — organized into 16 phases, with each methodology preset enabling the subset you need — plus 12 utility tools, and the supported AI tools handle the research, planning, and implementation for you.
 
 By the end, you'll have a fully planned, standards-documented, implementation-ready project with working code.
 
@@ -29,7 +29,7 @@ Either way, Scaffold constructs the prompt and the target AI tool does the work.
 
 **Assembly engine** — At execution time, Scaffold builds a 7-section prompt from: system metadata, the meta-prompt, knowledge base entries, project context (artifacts from prior steps), methodology settings, layered instructions, and depth-specific execution guidance.
 
-**Knowledge base** — 278 domain expertise entries in `content/knowledge/` organized in twenty categories (core, product, review, validation, finalization, execution, tools, game, web-app, backend, cli, library, mobile-app, data-pipeline, ml, browser-extension, research, data-science, web3, mcp-server) covering testing strategy, domain modeling, API design, security best practices, eval craft, TDD execution, task claiming, worktree management, release management, rendering strategies, data stores, CLI patterns, game engines, library bundling, mobile deployment, batch and streaming pipelines, model training and serving, browser extension manifests and service workers, data-science reproducibility and notebook discipline, smart-contract security and audit workflow, MCP protocol fundamentals, tool and resource design, transport patterns, and more. These get injected into prompts based on each step's `knowledge-base` frontmatter field. Knowledge files with a `## Deep Guidance` section are optimized for CLI assembly — only the deep guidance content is loaded, avoiding redundancy with the prompt text. Teams can add project-local overrides in `.scaffold/knowledge/` that layer on top of the global entries.
+**Knowledge base** — 301 domain expertise entries in `content/knowledge/` organized in 21 categories (core, product, review, validation, finalization, execution, tools, game, web-app, backend, cli, library, mobile-app, data-pipeline, ml, browser-extension, research, data-science, web3, mcp-server, macos-native) covering testing strategy, domain modeling, API design, security best practices, eval craft, TDD execution, task claiming, worktree management, release management, rendering strategies, data stores, CLI patterns, game engines, library bundling, mobile deployment, batch and streaming pipelines, model training and serving, browser extension manifests and service workers, data-science reproducibility and notebook discipline, smart-contract security and audit workflow, MCP protocol fundamentals, tool and resource design, transport patterns, and more. These get injected into prompts based on each step's `knowledge-base` frontmatter field. Knowledge files with a `## Deep Guidance` section are optimized for CLI assembly — only the deep guidance content is loaded, avoiding redundancy with the prompt text. Teams can add project-local overrides in `.scaffold/knowledge/` that layer on top of the global entries.
 
 A daily cron audits entries against their declared authoritative sources and opens refresh PRs when they drift — see `docs/knowledge-freshness/operations.md` for the operator guide (provider selection across Z.ai, DeepSeek, and Anthropic, the Z.ai→DeepSeek fallback, secret setup, manual overrides).
 
@@ -396,7 +396,7 @@ scaffold dashboard           # open a visual progress dashboard in your browser
 
 ### Tips for New Users
 
-- **You don't need every step.** The `mvp` preset runs just 7 steps and gets you building fast. Start there and switch to `deep` or `custom` if you want more rigor.
+- **You don't need every step.** The `mvp` preset enables 23 of the 99 steps and gets you building fast. Start there and switch to `deep` or `custom` if you want more rigor.
 - **"I'm not sure" is a valid answer.** When Claude asks a question you can't answer yet, say so — it'll suggest reasonable defaults and explain the trade-offs. You can revisit any decision later.
 - **You can re-run any step.** If your thinking evolves, use `scaffold reset <step>` to reset it, then run it again. Scaffold uses update mode — it improves the existing artifact rather than starting from scratch.
 - **Every step produces a real document.** Vision docs, PRDs, architecture decisions, test strategies — these all land in your project's `docs/` folder as markdown files. They're not throwaway; they're the source of truth your code is built from.
@@ -762,7 +762,7 @@ Overlays are composable with methodology presets. An MVP web-app gets fewer step
 | `web3` | `web3-overlay.yml` | 14 entries (Foundry tooling, smart-contract security, upgradeability, gas optimization, oracles, audit workflow, deployment, testing patterns, EVM fundamentals, ABI/interface design, event/log indexing, supply-chain) | Scope (`contracts` default; `dapp` reserved for W3-2) |
 | `game` | `game-overlay.yml` | 25 entries (engines, networking, audio, VR/AR, economy, save systems, certification) | Engine, multiplayer, platforms, economy, narrative, and 6 more |
 | `mcp-server` | `mcp-server-overlay.yml` | 12 entries (protocol fundamentals, tool design, resource design, transport patterns, SDK selection, auth, error handling, testing, observability, deployment, versioning, prompt primitives) | Language, transport, primitives, auth, deployment, stateful |
-| `macos-native` | `macos-native-overlay.yml` | 20 entries (architecture, SwiftUI/AppKit patterns, accessibility, distribution, entitlements, sandboxing, testing, observability, security, conventions) | UI framework |
+| `macos-native` | `macos-native-overlay.yml` | 20 entries (architecture, SwiftUI/AppKit patterns, accessibility, distribution, entitlements, sandboxing, testing, observability, security, conventions) | UI framework, app style, minimum macOS version, distribution, sandboxing, persistence, auto-update |
 
 ### Game Development
 
@@ -1467,20 +1467,20 @@ scaffold observe progress --no-stall-check      # suppress the Needs Attention s
 scaffold observe progress --output=docs/status.md  # write to a custom path
 ```
 
-`--replay` fuses the ledger with six adapter event streams (git, GitHub, MMR, pipeline state, test results, pipeline docs) into a chronological timeline. The "Needs Attention" surface fires when work appears stalled — unclaimed tasks, unreviewed PRs, unresolved blockers, or repeated lens skips.
+`--replay` fuses the ledger with five event-emitting adapters (git, GitHub, MMR, pipeline state, test results) into a chronological timeline; three further adapters (pipeline docs, beads, audit history) contribute availability and trend data without emitting timeline events. The "Needs Attention" surface fires when work appears stalled — a claimed task with no recent activity, an open PR that hasn't merged, an unresolved blocker, unresolved audit findings, or repeated lens skips.
 
 ### Audit
 
 ```bash
-scaffold observe audit                          # run all eight lenses (A–H)
+scaffold observe audit                          # run all nine lenses (A–I)
 scaffold observe audit --scope=code             # lenses A–G (code conformance only)
-scaffold observe audit --scope=docs             # lens H (cross-document consistency only)
+scaffold observe audit --scope=docs             # lenses H and I (cross-doc + knowledge gaps)
 scaffold observe audit --profile=full           # include LLM-graded Lens H sub-checks
 scaffold observe audit --lens G-decisions       # run a single lens
 scaffold observe audit --output=docs/audit.md   # write to a custom path
 ```
 
-Eight lenses cover TDD evidence (A), acceptance-criteria coverage (B), coding-standards compliance (C), stack conformance (D), design-token usage (E), scope coverage (F), decision-log completeness (G), and cross-document consistency (H). Findings get stable IDs for cross-run tracking:
+Nine lenses cover TDD evidence (A), acceptance-criteria coverage (B), coding-standards compliance (C), stack conformance (D), design-token usage (E), scope coverage (F), decision-log completeness (G), cross-document consistency (H), and knowledge-base gaps (I). Findings get stable IDs for cross-run tracking:
 
 ```bash
 scaffold observe ack abc123 --note "accepted, tracked in INFRA-77"
@@ -1896,7 +1896,7 @@ All build inputs live under `content/`:
 content/
 ├── pipeline/         # 99 meta-prompts organized by 16 phases (phases 0-15, including build)
 ├── tools/            # 12 tool meta-prompts (stateless, category: tool)
-├── knowledge/        # 278 domain expertise entries (core, product, review, validation, finalization, execution, tools, game, web-app, backend, cli, library, mobile-app, data-pipeline, ml, browser-extension, research, data-science, web3, mcp-server)
+├── knowledge/        # 301 domain expertise entries (core, product, review, validation, finalization, execution, tools, game, web-app, backend, cli, library, mobile-app, data-pipeline, ml, browser-extension, research, data-science, web3, mcp-server, macos-native)
 ├── methodology/      # 3 YAML presets (deep, mvp, custom)
 └── skills/           # Skill templates with {{markers}} for multi-platform resolution (includes mmr)
 ```

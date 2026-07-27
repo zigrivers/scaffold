@@ -280,3 +280,10 @@ the guides; listed here so the next audit can tell "already handled" from "new".
 | Event type `pr_open` | `pr_opened` | CLAUDE.md |
 | `brew upgrade scaffold` (README) | needs the `brew update &&` prefix | README |
 | Plugin ships 3 skills | 5 | README |
+| Three methodology presets | four — `brownfield` is adopt-selected, not an `init` choice | pipeline, concepts guides, README |
+| Enable a channel with `channels_enabled:` | **not a config key** — use `channels.<name>.enabled: true` | README |
+| "all 60 steps" / mvp "7 steps" / deep "all steps" | 99 total; mvp 23, custom 60, deep 64, brownfield 39 | README |
+| `--replay` fuses six adapter streams | five emit events; three are probes | README |
+| Audit `--scope=docs` runs lens H only | H and I | README |
+| Eight lenses (A–H) | nine (A–I) | README |
+| 11 utility tools | 12 | README |
