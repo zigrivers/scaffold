@@ -220,6 +220,9 @@ channels:
     prompt_delivery: stdin        # stdin (default) | prompt-file
     prompt_wrapper: "{{prompt}}"  # template wrapped around the prompt
     output_parser: default        # default | default-last | gemini | doc-conformance | {kind:…}
+                                  # (`gemini` the PARSER is still registered and
+                                  #  usable by custom channels — only the gemini
+                                  #  CHANNEL is retired)
     stderr: capture               # capture | suppress | passthrough
     timeout: 300                  # seconds (falls back to defaults.timeout)
     auth: { check, timeout, failure_exit_codes, recovery }
@@ -472,7 +475,7 @@ in this branch order :cite[packages/mmr/src/core/reconciler.ts:280]:
 | `pass` | Gate passed, every dispatched channel completed | 0 |
 | `degraded-pass` | Gate passed, at least `min_completed_channels` reported, but some channel failed / timed out / wasn't installed | 0 |
 | `blocked` | An unacknowledged finding sits at or above the threshold | 2 |
-| `needs-user-decision` | No channel completed, **or** fewer than `min_completed_channels` did | 3 |
+| `needs-user-decision` | No channel completed, **or** fewer than `min_completed_channels` did | 3 (but see the exception below) |
 
 :::callout{type=warning}
 **The completion floor (mmr 4.0.0).** A verdict now reflects how many reviewers
@@ -493,6 +496,16 @@ dispatched:
   `--max-rounds` emits `max_rounds_exceeded` and exits **3**.
 - **Untrusted config in the diff** — see the trust callout at the end of this
   guide; exits **2**.
+
+:::callout{type=warning}
+**`needs-user-decision` does not always exit 3.** The verdict-derived case
+exits 3 :cite[packages/mmr/src/core/results-pipeline.ts:304], but the
+ratification gate short-circuits before the results pipeline ever runs and sets
+exit **2** directly :cite[packages/mmr/src/commands/review.ts:522] — the same
+code `blocked` uses. So do not infer the verdict from the exit code alone: a
+`2` means either "blocked by findings" or "a human must ratify a config/ack
+change". Read the `verdict` field when you need to tell them apart.
+:::
 
 :::callout{type=warning}
 Proceed only on **pass** or **degraded-pass**. On **blocked** or

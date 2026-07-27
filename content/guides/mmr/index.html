@@ -1687,6 +1687,9 @@ edit, not a code change.</p>
     prompt_delivery: stdin        # stdin (default) | prompt-file
     prompt_wrapper: "{{prompt}}"  # template wrapped around the prompt
     output_parser: default        # default | default-last | gemini | doc-conformance | {kind:…}
+                                  # (`gemini` the PARSER is still registered and
+                                  #  usable by custom channels — only the gemini
+                                  #  CHANNEL is retired)
     stderr: capture               # capture | suppress | passthrough
     timeout: 300                  # seconds (falls back to defaults.timeout)
     auth: { check, timeout, failure_exit_codes, recovery }
@@ -1998,7 +2001,7 @@ in this branch order <span class="fp" data-path="packages/mmr/src/core/reconcile
 
 
 
-<table><thead><tr><th>Verdict</th><th>Condition</th><th>Exit</th></tr></thead><tbody><tr><td><code>pass</code></td><td>Gate passed, every dispatched channel completed</td><td>0</td></tr><tr><td><code>degraded-pass</code></td><td>Gate passed, at least <code>min_completed_channels</code> reported, but some channel failed / timed out / wasn't installed</td><td>0</td></tr><tr><td><code>blocked</code></td><td>An unacknowledged finding sits at or above the threshold</td><td>2</td></tr><tr><td><code>needs-user-decision</code></td><td>No channel completed, <strong>or</strong> fewer than <code>min_completed_channels</code> did</td><td>3</td></tr></tbody></table>
+<table><thead><tr><th>Verdict</th><th>Condition</th><th>Exit</th></tr></thead><tbody><tr><td><code>pass</code></td><td>Gate passed, every dispatched channel completed</td><td>0</td></tr><tr><td><code>degraded-pass</code></td><td>Gate passed, at least <code>min_completed_channels</code> reported, but some channel failed / timed out / wasn't installed</td><td>0</td></tr><tr><td><code>blocked</code></td><td>An unacknowledged finding sits at or above the threshold</td><td>2</td></tr><tr><td><code>needs-user-decision</code></td><td>No channel completed, <strong>or</strong> fewer than <code>min_completed_channels</code> did</td><td>3 (but see the exception below)</td></tr></tbody></table>
 <div class="callout callout-warning"><p><strong>The completion floor (mmr 4.0.0).</strong> A verdict now reflects how many reviewers
 actually reported, not just whether the gate passed. <code>defaults.min_completed_channels</code>
 defaults to <strong>2</strong> <span class="fp" data-path="packages/mmr/src/config/schema.ts:269">packages/mmr/src/config/schema.ts:269</span> — so a run where
@@ -2014,6 +2017,13 @@ dispatched:</p>
 <li><strong>Untrusted config in the diff</strong> — see the trust callout at the end of this
 guide; exits <strong>2</strong>.</li>
 </ul>
+<div class="callout callout-warning"><p><strong><code>needs-user-decision</code> does not always exit 3.</strong> The verdict-derived case
+exits 3 <span class="fp" data-path="packages/mmr/src/core/results-pipeline.ts:304">packages/mmr/src/core/results-pipeline.ts:304</span>, but the
+ratification gate short-circuits before the results pipeline ever runs and sets
+exit <strong>2</strong> directly <span class="fp" data-path="packages/mmr/src/commands/review.ts:522">packages/mmr/src/commands/review.ts:522</span> — the same
+code <code>blocked</code> uses. So do not infer the verdict from the exit code alone: a
+<code>2</code> means either "blocked by findings" or "a human must ratify a config/ack
+change". Read the <code>verdict</code> field when you need to tell them apart.</p></div>
 <div class="callout callout-warning"><p>Proceed only on <strong>pass</strong> or <strong>degraded-pass</strong>. On <strong>blocked</strong> or
 <strong>needs-user-decision</strong>, surface the verdict and findings — don't merge
 automatically.</p></div>
