@@ -96,11 +96,17 @@ describe('atomic config write cost', () => {
     try {
       writeOrUpdateConfig(dir, typicalResult('serverless')) // create branch — not under test
 
-      // Fail loudly if the spies are not intercepting. They work by patching the
-      // `fs` namespace object, which only sees calls made through it; if the
-      // implementation ever switches to named imports (`import { writeFileSync }`)
-      // the counts below would silently read zero and the test would "pass".
-      expect(writeSpy, 'fs spies are not intercepting — the counts below would be meaningless').toHaveBeenCalled()
+      // The spies patch the `fs` namespace object, so they only observe calls
+      // made through it. If the implementation ever switches to named imports
+      // (`import { writeFileSync } from 'node:fs'`) they would observe nothing.
+      // The counts below would still fail in that case — 0 is not 1 — but they
+      // would read as "the write path stopped writing" when the truth is "the
+      // spies stopped seeing". This says which it is, before the counters are
+      // cleared and the ambiguity sets in.
+      expect(
+        writeSpy,
+        'fs spies are not intercepting — a count of 0 below would mean this, not a missing write',
+      ).toHaveBeenCalled()
 
       readSpy.mockClear()
       writeSpy.mockClear()
