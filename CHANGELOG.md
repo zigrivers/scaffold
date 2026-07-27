@@ -4,6 +4,8 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.53.2] - 2026-07-27
+
 ### Fixed
 
 - **Merge-queue Bead closeout is observable and retryable.** The daemon now
