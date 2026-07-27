@@ -47,7 +47,9 @@ flowchart LR
   B --> C2["antigravity"]
   B --> C3["claude"]
   B --> C4["grok"]
-  B --> C5["doc-conformance
+  B --> C5["opencode
+(opt-in)"]
+  B --> C6["doc-conformance
 (opt-in)"]
   C1 --> P["Parse
 → Finding"]
@@ -55,6 +57,7 @@ flowchart LR
   C3 --> P
   C4 --> P
   C5 --> P
+  C6 --> P
   P --> RC["Reconcile
 (dedupe + score)"]
   RC --> V["Verdict
@@ -87,9 +90,10 @@ table.
 | `--format <json\|text\|markdown>` | output | Output format. Default `json`. |
 | `--sync` | mode | Run the full pipeline (dispatch → parse → reconcile → verdict) and return results. Without it, dispatch is fire-and-forget. |
 | `--dry-run` | mode | Resolve the diff and assemble the prompt without dispatching any channel. |
+| `--compensate-missing` | mode | Also run a compensating pass for channels whose CLI isn't installed. Off by default — see *Degraded mode*. |
 | `--session <id>` | rounds | Link this run into a multi-round session; the id must match `^[A-Za-z0-9_-]+$` and not be a reserved name :cite[packages/mmr/src/commands/sessions.ts:15]. |
 | `--round <n>` | rounds | 1-based round counter within a session. |
-| `--max-rounds <n>` | rounds | Hard cap on rounds. Defaults to 5 when `--session` is set without it. |
+| `--max-rounds <n>` | rounds | Hard cap on rounds. Defaults to `defaults.loop_control.max_rounds_default` (**5**) whether or not `--session` is set. Exceeding it exits 3 before dispatch. |
 | `--accept-new-acks` | trust | Trust acknowledgment files newly introduced by the diff. |
 | `--trust-project-acks` | trust | Trust working-tree project acks in non-Git / untrusted modes. |
 | `--trust-project-config` | trust | Trust working-tree `.mmr.yaml` in untrusted modes. |
@@ -172,19 +176,29 @@ edit, not a code change.
 ```yaml
 channels:
   <name>:
+    kind: subprocess              # subprocess (default) | http
     enabled: true                 # run by default?
     command: "codex exec"         # whitespace-split, spawned WITHOUT a shell
     flags: ["--ephemeral"]        # appended after the command tokens
     env: { KEY: value }           # extra environment
+    cwd: "{{neutral_cwd}}"        # run from a neutral dir (strips project config)
     prompt_delivery: stdin        # stdin (default) | prompt-file
     prompt_wrapper: "{{prompt}}"  # template wrapped around the prompt
-    output_parser: default        # default | gemini | doc-conformance | {kind:…}
+    output_parser: default        # default | default-last | gemini | doc-conformance | {kind:…}
     stderr: capture               # capture | suppress | passthrough
     timeout: 300                  # seconds (falls back to defaults.timeout)
     auth: { check, timeout, failure_exit_codes, recovery }
     extends: base-channel         # inherit from another channel (≤4 levels)
     abstract: false               # template-only; never dispatched directly
+    required: false               # true ⇒ compensate even when not installed
+    retired: false                # tombstone; forced off, never dispatched
+    headers: { … }                # http channels only (warns on inline secrets)
 ```
+
+An `http` channel swaps `command`/`flags` for `endpoint`, `model`,
+`endpoint_convention: openai-chat`, and an optional `api_key_env` (sent as
+`Authorization: Bearer …` unless `api_key_header` / `api_key_prefix` say
+otherwise) :cite[packages/mmr/src/config/schema.ts:178].
 
 ### Built-in channels
 
@@ -206,9 +220,11 @@ The defaults, commands, and parsers below are the built-in presets :cite[package
 | --- | --- | --- | --- | --- |
 | `codex` | enabled | Correctness, security, API contracts | stdin | `default` |
 | `claude` | enabled | Plan alignment, code quality, testing | stdin | `default` |
-| `grok` | enabled | Independent second opinion (xAI; proprietary) | **prompt-file** | `unwrap $.text → default` |
+| `grok` | enabled | Independent second opinion (xAI; proprietary) | **prompt-file** | `unwrap $.text → default-last` |
 | `antigravity` (`agy`) | enabled | Google's CLI reviewer (replaces the retired Gemini) | stdin | `default` |
-| `doc-conformance` | opt-in | PRD/stories/standards conformance (LLM-graded) | stdin | `doc-conformance` |
+| `opencode` (`opc`) | **opt-in** | Open-source CLI; independent correctness / code-quality pass | stdin | `default` |
+| `doc-conformance` | **opt-in** | PRD/stories/standards conformance (LLM-graded) | stdin | `doc-conformance` |
+| `gemini` | **retired** | Tombstone only — never dispatched | — | — |
 :::
 
 :::tab{title="codex"}
@@ -246,23 +262,59 @@ output_parser: default
 ```yaml
 command: grok
 prompt_delivery: prompt-file
-flags: [--prompt-file, "{{prompt_file}}", --output-format, json]
+flags: [--prompt-file, "{{prompt_file}}", --output-format, json,
+        --no-memory, --tools, web_search,web_fetch,
+        --disallowed-tools, run_terminal_cmd, --no-subagents, --no-plan,
+        --json-schema, "{{findings_schema}}"]
+cwd: "{{neutral_cwd}}"                 # neutral cwd + neutral HOME (auth symlinked in)
 auth.check: grok models                # lists models / login state (no round-trip)
 recovery: grok login
-output_parser: { kind: unwrap-jsonpath, wrap: "$.text", then: default }
+output_parser:
+  kind: unwrap-jsonpath
+  wrap: "$.text"
+  incomplete: { status_path: "$.stopReason", values: [Cancelled] }
+  then: default-last                   # grok emits one object PER TURN — take the last
 ```
 
 Grok is proprietary (xAI), not open-source — it joins the standard set
-mechanically as a 4th CLI channel. Disable it with
+mechanically as a CLI channel. Disable it with
 `channels_disabled: ["grok"]`.
+
+Three of those flags are load-bearing rather than cosmetic: `--json-schema`
+(substituted with the findings schema) is what makes the final answer land in
+`$.text` reliably; `default-last` is required because grok emits one
+schema-shaped object per turn; and the `incomplete` guard catches a
+`stopReason: Cancelled` envelope and re-dispatches once instead of parsing a
+truncated answer.
+:::
+
+:::tab{title="opencode"}
+```yaml
+enabled: false                         # opt-in, like doc-conformance
+command: opencode run
+flags: [--pure]
+cwd: "{{neutral_cwd}}"
+env: { OPENCODE_PERMISSION: '{"*":"deny"}' }   # no OS sandbox flag — deny every tool
+auth.check: printf "respond with ok" | opencode run --pure
+recovery: opencode auth login
+output_parser: default
+timeout: 300
+```
+
+An open-source AI coding CLI offering an independent correctness / code-quality
+pass. Because `opencode` has no OS sandbox flag, every tool is denied via
+`OPENCODE_PERMISSION` so the review stays text-in / text-out with no execution
+surface. Creds live under the real `$HOME`
+(`~/.local/share/opencode/auth.json`). Enable with `--channels opencode` (alias
+`opc`) or `channels: { opencode: { enabled: true } }` in `.mmr.yaml`.
 :::
 
 :::tab{title="doc-conformance"}
 ```yaml
-enabled: false                         # opt-in: runs up to 3 LLM calls (~3 min)
+enabled: false                         # opt-in: runs up to 3 LLM calls
 command: scaffold observe audit --profile=full --scope=all --output-mode=mmr-findings
 output_parser: doc-conformance         # expects a JSON array of findings
-timeout: 240
+timeout: 180
 ```
 
 Enable with `--channels doc-conformance` or in `.mmr.yaml`.
@@ -371,18 +423,41 @@ The gate **passes** when every unacknowledged finding is *below* the
 :sev[P0]{level=p0} (highest) → :sev[P1]{level=p1} → :sev[P2]{level=p2} →
 :sev[P3]{level=p3} (lowest).
 
-The verdict is derived from gate result + channel health, in this branch order:
-**zero channels completed → `needs-user-decision`**; else a failed gate →
-`blocked`; else some channels incomplete → `degraded-pass`; else `pass`
-:cite[packages/mmr/src/core/reconciler.ts:247]. (The no-completed-channels case
-short-circuits first, so it outranks `blocked`.)
+The verdict is derived from gate result + **how many channels actually reported**,
+in this branch order :cite[packages/mmr/src/core/reconciler.ts:280]:
+
+1. zero channels completed → `needs-user-decision`
+2. else a failed gate → `blocked`
+3. else fewer than `min_completed_channels` completed → `needs-user-decision`
+4. else some channels incomplete → `degraded-pass`
+5. else → `pass`
 
 | Verdict | Condition | Exit |
 | --- | --- | --- |
-| `pass` | Gate passed, all channels completed | 0 |
-| `degraded-pass` | Gate passed, but some channels failed / timed out / weren't installed | 0 |
+| `pass` | Gate passed, every dispatched channel completed | 0 |
+| `degraded-pass` | Gate passed, at least `min_completed_channels` reported, but some channel failed / timed out / wasn't installed | 0 |
 | `blocked` | An unacknowledged finding sits at or above the threshold | 2 |
-| `needs-user-decision` | No channel completed (can't make a determination) | 3 |
+| `needs-user-decision` | No channel completed, **or** fewer than `min_completed_channels` did | 3 |
+
+:::callout{type=warning}
+**The completion floor (mmr 4.0.0).** A verdict now reflects how many reviewers
+actually reported, not just whether the gate passed. `defaults.min_completed_channels`
+defaults to **2** :cite[packages/mmr/src/config/schema.ts:263] — so a run where
+only one channel came back is `needs-user-decision`, not `degraded-pass`, even
+with zero findings. One reviewer agreeing with itself is not consensus.
+
+Note `blocked` deliberately outranks the floor: a real blocking finding is
+actionable even when coverage was thin. Jobs created before 4.0.0 are re-read at
+a floor of 1 so old results don't retroactively change verdict.
+:::
+
+Two further `needs-user-decision` outcomes short-circuit *before* any channel is
+dispatched:
+
+- **Round budget exhausted** — `--round N` greater than the effective
+  `--max-rounds` emits `max_rounds_exceeded` and exits **3**.
+- **Untrusted config in the diff** — see the trust callout at the end of this
+  guide; exits **2**.
 
 :::callout{type=warning}
 Proceed only on **pass** or **degraded-pass**. On **blocked** or
@@ -424,9 +499,19 @@ Config is layered: built-in defaults → `~/.mmr/config.yaml` → project
 ```yaml
 version: 1
 defaults:
-  fix_threshold: P2          # gate severity
-  timeout: 300               # default per-channel timeout (s)
+  fix_threshold: P2            # gate severity
+  min_completed_channels: 2    # completion floor (below it → needs-user-decision)
+  timeout: 300                 # default per-channel timeout (s)
+  format: json                 # json | text | markdown
   parallel: true
+  job_retention_days: 7        # used by `mmr jobs prune`
+  loop_control:
+    max_rounds_default: 5
+  compensator:
+    channel: claude            # who runs a compensating pass (default: claude -p)
+review_criteria: ["…"]         # extra criteria appended to every prompt
+templates:                     # named criteria presets, selected by --template
+  security: { criteria: ["…"] }
 channels_disabled: ["grok"]  # opt OUT of a built-in (e.g. no grok installed)
 channels:
   doc-conformance:
@@ -447,9 +532,34 @@ channels:
 - `fix_threshold` — project gate; override per-run with `--fix-threshold`.
 
 :::callout{type=danger}
-**Trust boundary.** When reviewing a diff, project `.mmr.yaml` and acks should
-be read from the diff's *base ref*, not the working tree — otherwise a PR could
-add a channel that exfiltrates secrets or self-acknowledge its own findings. Use
+**Trust boundary.** When reviewing a diff, project `.mmr.yaml` and acks are read
+from the diff's *base ref*, not the working tree — otherwise a PR could add a
+channel that exfiltrates secrets, or self-acknowledge its own findings. Use
 `--config-base-ref` / the `--trust-project-*` flags to control this in untrusted
 (e.g. CI) contexts.
 :::
+
+### Trust modes and the ratification gate
+
+MMR classifies every run into one of three trust modes
+:cite[packages/mmr/src/core/trust-mode.ts:97]:
+
+| mode | when | project config / acks |
+| --- | --- | --- |
+| `base-ref` | `--config-base-ref`, `--pr` (base branch resolved via `gh`), `--base`, or `--staged` outside CI | read from the trusted ref |
+| `untrusted-head` | `--diff`, anything in CI, or a failed base-ref resolution | not read unless a `--trust-project-*` flag says so |
+| `non-git` | not a Git repository | same as above |
+
+On top of that there is a **ratification gate**: if the diff under review *itself*
+adds or modifies `.mmr.yaml`, or touches `.mmr/acks/`, the run stops with
+`needs-user-decision` and exit **2** before any channel is dispatched — including
+before `--dry-run` :cite[packages/mmr/src/commands/review.ts:487]. A human has to
+ratify the change:
+
+| what the diff changes | flag that ratifies it |
+| --- | --- |
+| `.mmr.yaml` | `--trust-project-config` |
+| `.mmr/acks/**` | `--accept-new-acks` (or `--trust-project-acks`) |
+
+That is the point: a PR cannot quietly reconfigure the reviewer that is reviewing
+it. Both flags print a warning to stderr when used.

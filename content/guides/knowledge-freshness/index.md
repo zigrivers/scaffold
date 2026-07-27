@@ -653,18 +653,25 @@ Adding a host is a one-line PR to
 4. **Open a normal PR.** Allowlist additions are not a separate trust delegation;
    any maintainer can review.
 
-## Anthropic vs DeepSeek (cron uses DeepSeek)
+## Providers (cron uses DeepSeek)
 
 The cron switched to DeepSeek HTTP to remove the local `claude` CLI dependency
 from CI. Local audits keep using whichever provider is configured. Precedence is
 resolved by `resolveProvider` (:cite[src/knowledge-freshness/providers/index.ts:36]):
 
 1. `--provider <name>` — explicit flag, operator override
-2. `KNOWLEDGE_FRESHNESS_PROVIDER` env var
-3. A single API key in env — inferred
-4. Both API keys present → error (ambiguous)
+   (`anthropic` | `deepseek` | `zai`)
+2. `KNOWLEDGE_FRESHNESS_PROVIDER` env var — same three values
+3. A single API key in env — inferred (`ANTHROPIC_API_KEY` /
+   `DEEPSEEK_API_KEY` / `ZAI_API_KEY`)
+4. More than one API key present → error (ambiguous)
 5. No env, `claude` on PATH → anthropic (subprocess uses keychain)
 6. Nothing → error (no provider configured)
+
+Set `KNOWLEDGE_FRESHNESS_FALLBACK_PROVIDER` to chain a second provider behind
+the primary. It must name a *different* known provider, or construction throws
+(:cite[src/knowledge-freshness/providers/index.ts:149]). Unset, there is no
+fallback: a primary failure is a failure.
 
 ::::tabs
 :::tab{title="Anthropic"}
@@ -687,6 +694,18 @@ HTTP. No subprocess; works in CI without the Claude CLI.
 - **Thinking mode:** hardcoded `thinking: { type: 'disabled' }`.
 - **URL:** hardcoded to `https://api.deepseek.com/chat/completions`;
   project-local config cannot redirect (decision #7 invariant).
+:::
+:::tab{title="Z.ai (GLM)"}
+HTTP, same shape as DeepSeek — no subprocess, works in CI.
+
+- **Auth:** requires `ZAI_API_KEY`.
+- **Default model:** `glm-4.6` (:cite[src/knowledge-freshness/providers/zai.ts:24]).
+- **Override:** `KNOWLEDGE_FRESHNESS_ZAI_MODEL`, validated against a hardcoded
+  GLM allowlist; anything else throws at dispatcher-build time.
+- **URL:** hardcoded, same non-redirectable invariant as DeepSeek.
+
+Reach for this as the `KNOWLEDGE_FRESHNESS_FALLBACK_PROVIDER` behind DeepSeek
+when you want a second HTTP provider with no extra CI dependency.
 :::
 ::::
 
@@ -720,7 +739,7 @@ All commands ship in the published CLI.
 | Command | Purpose |
 | --- | --- |
 | `scaffold knowledge-freshness audit-prefilter [--max=N]` | Walk `content/knowledge/`, apply cadence + hash check, print a JSON candidate array. `--max` default 10 (:cite[src/cli/commands/knowledge-freshness-audit-prefilter.ts:18]); the CLI emits only `{ name, path }` per candidate (:cite[src/cli/commands/knowledge-freshness-audit-prefilter.ts:43]). |
-| `scaffold knowledge-freshness audit-run-entry <path>` | Pre-fetch each source through SSRF guards, dispatch the grounded audit, print verdict JSON. `--provider anthropic\|deepseek` overrides env precedence. |
+| `scaffold knowledge-freshness audit-run-entry <path>` | Pre-fetch each source through SSRF guards, dispatch the grounded audit, print verdict JSON. `--provider anthropic\|deepseek\|zai` overrides env precedence; `--timeout` defaults to 600s for grounded audits. |
 | `scaffold knowledge-freshness audit-apply <path> <verdict.json> [--open-pr]` | Patch frontmatter + apply `proposed_changes` by H2 heading. The wrapper re-fetches every checked URL and computes its own sha256 (:cite[src/knowledge-freshness/audit-apply.ts:82-101]), so persisted hashes are deterministic, not the LLM's claim. Refuses to advance `last-reviewed` unless every declared source is covered. |
 | `make validate-knowledge` | Gate 1 — runs the Zod validator over every entry (README excluded). |
 
@@ -747,7 +766,7 @@ is consistent throughout.
 | `knowledge-freshness lint-unsourced [<path>] [--files-from <json>] [--diff <patch>]` | 3 | Heuristic scan for normative language in new lines without a `sources[]` reference. Advisory: prints findings but always exits 0. |
 | `knowledge-freshness anti-over-rewrite [--files-from <json>] [--diff <patch>] [--pr-labels <csv>]` | 4 | For each changed `stable` entry, compare deleted-line count to 20% of the body; exit 1 if crossed without `override:anti-over-rewrite`. The cron passes `--pr-labels ""` (it can't self-apply labels). |
 | `knowledge-freshness deep-guidance-check [<path>] [--files-from <json>]` | 5 | Assert each changed entry still contains a `## Deep Guidance` heading (case-sensitive). |
-| `knowledge-freshness bump-version --title <str> --body <str>` | — | Pure-function dry-run of `deriveBumpKind` + `bumpSemver`; prints `bump:` and `next:` lines parsed by the version-bump workflow. |
+| `knowledge-freshness bump-version --title <str> [--body <str>] [--count N] [--replay-stdin]` | — | Pure-function dry-run of `deriveBumpKind` + `bumpSemver`; prints `bump:` and `next:` lines parsed by the version-bump workflow. `--count` is the catch-up multiplier for patch bumps (ignored for minor/major); `--replay-stdin` replays the per-commit bump kind of every un-bumped commit from a `git log -z --format=%B` stream and overrides `--count` — use it for mixed feat/chore batches. |
 
 ## Operations cheat sheet
 

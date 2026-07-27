@@ -16,11 +16,15 @@ earns its own page. For the full mental model of a subsystem, follow the links:
   `reset`, `check`) is the day-to-day loop — see the [Pipeline guide](../pipeline/index.md).
 - **Observability** (`observe event｜progress｜harvest｜audit｜ack`) is its own
   large surface — see the [Build Observability guide](../observability/index.md).
+- **Operations** (`doctor`, `agent-ops`, `hooks`, `mq`, `tia`, `sched`) is the
+  opt-in parallel-agent kit — merge queue, test-impact analysis, scheduler,
+  health checks. Documented [below](#operations--the-parallel-agent-kit); the
+  worktree side lives in the [Multi-agent guide](../multi-agent/index.md).
 
-Commands are registered on a single yargs root
-(:cite[src/cli/index.ts:30]) and every command accepts the global options
+All 30 commands are registered on a single yargs root
+(:cite[src/cli/index.ts:116]) and every command accepts the global options
 `--format json`, `--auto`, `--verbose`, `--root <dir>`, and `--force`
-(:cite[src/cli/index.ts:59]).
+(:cite[src/cli/index.ts:146]).
 
 ## All commands at a glance
 
@@ -55,6 +59,12 @@ Commands are registered on a single yargs root
 | `scaffold build` | Platform & skills | Generate platform adapter output files |
 | `scaffold skill <action>` | Platform & skills | Manage scaffold skills for Claude Code / shared agents |
 | `scaffold guides [topic]` | Platform & skills | Open, list, or build the reference guides |
+| `scaffold doctor` | Operations | Health-check the installed surface (pipeline, beads, hooks, gate, queue, scheduler) |
+| `scaffold agent-ops <action>` | Operations | Install or drift-check the agent-ops script bundle |
+| `scaffold hooks install` | Operations | Register the Claude Code agent hooks into `.claude/settings.json` |
+| `scaffold mq <action>` | Operations | Local batching merge queue — enqueue, daemon, status, stats |
+| `scaffold tia <action>` | Operations | Test-impact analysis — coverage map + affected-test selection |
+| `scaffold sched <action> [job]` | Operations | Manage local scheduler jobs (launchd / systemd user timers) |
 :::
 
 ## Setup & adoption
@@ -202,6 +212,125 @@ or read the bundled `content/guides/<topic>/index.md` directly. The generated
 `index.html` is for humans.
 :::
 
+## Operations — the parallel-agent kit
+
+These six commands are orthogonal to the pipeline: they install and run the
+machinery that lets several agents work one repo at once. None of them touch
+pipeline state. They are opt-in — a project that never runs
+`scaffold agent-ops install` never sees them.
+
+:::filter-table
+| Command | What it does |
+| --- | --- |
+| `scaffold doctor [--fix] [--json]` | Run every health check across the installed surface and print remediation for each. `--fix` applies only the safe ones. |
+| `scaffold agent-ops install [--component <c>] [--force]` | Copy the agent-ops script bundle into the project and record a manifest. |
+| `scaffold agent-ops check` | Drift-check the installed bundle against its manifest. |
+| `scaffold hooks install` | Deep-merge the Claude Code agent hooks into `.claude/settings.json` — append-only and idempotent. |
+| `scaffold mq <action>` | The local batching merge queue (see below). |
+| `scaffold tia <action>` | Test-impact analysis: record a coverage map, select the affected tests. |
+| `scaffold sched <action> [job]` | Install/inspect local scheduler jobs — launchd on macOS, systemd user timers on Linux. |
+:::
+
+### `scaffold doctor`
+
+Ten checks across six sections — `pipeline` (completed steps actually produced
+their outputs), `beads` (binary, live database, backup, guard), `hooks`
+(registered scripts exist and are executable), `gate` (the `check` /
+`check-affected` make targets resolve), `queue` (daemon lock, not paused), and
+`scheduler` (the poller schedule is loaded)
+(:cite[src/doctor/checks.ts:419]). Each check reports `ok` / `warn` / `error` /
+`skip` with its own remediation line.
+
+Three checks can self-heal under `--fix`: the live-Beads check delegates to
+`bd doctor --fix`, hook registration re-runs the installer, and the scheduler
+check reloads the job. Everything else still only *reports* its fix.
+
+:::callout{type=warning}
+**`doctor`'s exit code is a severity, not the usual envelope code.** It exits
+`1` when any check warns and `2` when any check errors
+(:cite[src/doctor/run.ts:89]) — so `2` here means "a check failed", not the
+enum's `MissingDependency`. Branch on the `--json` report rather than the code
+if you need per-check detail.
+:::
+
+### `scaffold agent-ops`
+
+Installs the project-owned script bundle that worktree and merge-queue workflows
+call. `--component` selects what lands:
+
+| `--component` | Installs |
+| --- | --- |
+| `git` | Worktree setup/teardown, branch cleanup, main-sync, Beads guard + snapshot, claim reaping, `agent-ops.mk` |
+| `staging` | Staging-env and Docker helper scripts under `scripts/ops/`, plus a compose env example |
+| `merge-queue` | `scripts/mq-guard.sh`, the post-merge poller, and a `.mq/` gitignore entry |
+| `ci` | Self-hosted-runner setup plus the `post-merge` and `nightly` workflows |
+| `gate` | Seeds the project-owned `scripts/gate-check.sh` + `scripts/gate-check-affected.sh` (the merge-queue gate contract) |
+| `all` *(default)* | `git` + `staging` only |
+
+`all` deliberately does **not** include `merge-queue`, `ci`, or `gate` — each of
+those changes how the repo merges or what CI runs, so they stay explicit
+opt-ins. Seeded files (`gate`) are generated once and never overwritten without
+`--force`. Every install writes `.scaffold/agent-ops-manifest.json` and
+`.scaffold/agent-ops-version`; `scaffold agent-ops check` compares the tree
+against that manifest and exits `1` on a stale version, a locally modified file,
+or a missing file (files the manifest doesn't know about are reported but never
+fail the check).
+
+### `scaffold mq` — the merge queue
+
+A local batching merge queue: PRs are enqueued, gated in batches, and merged in
+order, so parallel agents don't each re-run the full suite against a moving
+`main`.
+
+| Action | What it does |
+| --- | --- |
+| `enqueue --pr <N>` | Add a PR to the queue (fire-and-forget; auto-starts the daemon) |
+| `daemon [--foreground]` | Run the queue daemon; `--foreground` also logs to stdout |
+| `status [--pr <N>] [--format json]` | Queue state, the paused banner, per-PR states |
+| `eject --pr <N>` | Withdraw a PR from the queue |
+| `release --pr <N>` | Return a `HELD_HUMAN` (overlap-zone) PR to the queue; it lands solo-gated |
+| `stats` | Calibration metrics — arrivals, gate outcomes, median gate time, flakes, cache hits, TIA map age |
+| `bootstrap --pr <N> [--finish]` | Guided FIRST merge for a repo installing the queue in its own PR; `--finish` resumes a partial run |
+| `gate-cache` | Inspect the gate-result cache (skips a gate when this exact tree already ran green) |
+
+Queue state lives under `.mq/` — an append-only `journal.jsonl` that the queue
+state is a reduction of, plus the gate cache, logs, and the daemon lock.
+Configuration is the `merge_queue:` block of `.scaffold/agent-ops.yaml`
+(:cite[src/merge-queue/types.ts:95]); notable keys are `gate_command`
+(default `make check-affected`), `full_gate_command` (default `make check`),
+`batch_cap` (16), `ready_label` (`mq:ready`), `overlap_zones`, and
+`overlap_zone_policy` (`solo` | `hold`).
+
+### `scaffold tia` — test-impact analysis
+
+| Action | What it does |
+| --- | --- |
+| `affected --base <ref>` | Print the selected test list plus a confidence verdict |
+| `record-due` | Predicate: is a coverage-map recording due right now? |
+| `ingest` | Fold a V8 coverage dump into `.mq/tia/map.json` |
+
+:::callout{type=warning}
+**Two exit codes here are answers, not failures.** `scaffold tia affected` exits
+**3** to mean *"don't trust this selection — run the full suite"*, and it fails
+closed: any uncertainty, and any thrown error, produces a 3
+(:cite[src/cli/commands/tia.ts:115]). `scaffold tia record-due` exits **1** to
+mean *"not due"* (:cite[src/cli/commands/tia.ts:136]) and prints nothing. Treat
+a non-zero here as a routing decision, not an error.
+:::
+
+Recording cadence is `merge_queue.tia.record` in `.scaffold/agent-ops.yaml` —
+`scheduled` (default; first green pass per UTC day), `always`, or `off`.
+
+### `scaffold sched`
+
+`install` / `uninstall` / `status` / `list` for local scheduler jobs, using
+launchd on macOS and systemd user timers on Linux. One job ships today,
+`post-merge-poller` (:cite[src/sched/jobs.ts:38]), which runs the merge queue's
+post-merge full gate; `--interval <seconds>` sets its period on install
+(default 600). It requires `scripts/ops/post-merge-poller.sh`, so run
+`scaffold agent-ops install --component merge-queue` first. `sched status` exits
+`1` when the job is not loaded, so it doubles as a liveness probe.
+
 ## See also
 
 - [Pipeline guide](../pipeline/index.md) — phase ordering and the navigation loop.
@@ -263,9 +392,19 @@ Coverage is CLI-wide as of v3.53.0, and a static test fails the build if a
 command reports a failure any other way.
 
 :::callout{type=note}
-**One deliberate exception.** `scaffold tia record-due` is a predicate whose
-exit code *is* the answer (0 = due, 1 = not due). It prints nothing and emits
-no envelope.
+**Deliberate exceptions — commands whose exit code is the answer.** A handful of
+operations commands are predicates or severity reporters, not envelope emitters.
+Read their code as a result, not as a failure:
+
+| Command | Non-zero means |
+| --- | --- |
+| `scaffold tia record-due` | `1` = not due (`0` = due). Prints nothing, emits no envelope. |
+| `scaffold tia affected` | `3` = don't trust the selection, run the full suite (fails closed on any error). |
+| `scaffold doctor` | `1` = a check warned · `2` = a check errored. |
+| `scaffold agent-ops check` | `1` = the installed bundle is stale, modified, or missing files. |
+| `scaffold sched status` | `1` = the job is not loaded. |
+| `scaffold mq gate-cache --check-tree` | `1` = cache miss (`0` = hit). |
+| `scaffold observe audit` | `1` = verdict is `blocked` (see the [observability guide](../observability/index.md)). |
 :::
 
 ### Choosing `init` or `adopt`

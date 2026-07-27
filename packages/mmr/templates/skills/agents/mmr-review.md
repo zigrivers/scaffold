@@ -1,8 +1,9 @@
 # mmr — Multi-Model Review
 
-Dispatch code reviews across several AI model CLIs (Claude, Codex, Grok,
-Antigravity), reconcile the findings, and gate on severity. Its peer
-`mmr critique` does the same fan-out for a *design* and is advisory (no gate).
+Dispatch code reviews across several AI model CLIs (Claude, Codex, Grok and
+Antigravity by default; OpenCode opt-in), reconcile the findings, and gate on
+severity. Its peer `mmr critique` does the same fan-out for a *design* and is
+advisory (no gate).
 
 ## Run a review
 
@@ -37,6 +38,11 @@ The verdict blocks on findings at or above `fix_threshold` (default `P2`; lower
 severities are advisory). Override per run with `--fix-threshold P0|P1|P2|P3`.
 Proceed only on `pass` or `degraded-pass`; fix blocking findings on `blocked`.
 
+The verdict also reflects **how many channels reported**: fewer than
+`defaults.min_completed_channels` (default `2`) completing yields
+`needs-user-decision` even with zero findings — one reviewer is not multi-model
+review. Treat that as "fix the channels" (`mmr doctor`), not as a pass.
+
 ## Async flow (without `--sync`)
 
 `mmr review …` prints a job id → `mmr status <job-id>` until complete →
@@ -45,16 +51,18 @@ Proceed only on `pass` or `degraded-pass`; fix blocking findings on `blocked`.
 ## Avoid the nested self-review
 
 `mmr review` includes a channel for the very CLI you are running — `codex` when
-you are in Codex, `antigravity` (`agy`) when you are in Antigravity — plus every
-other installed CLI. Scope out the channel you are already running to avoid a
-redundant nested review (the `--channels` flag is a space-separated list, not a
-comma-separated string):
+you are in Codex, `antigravity` (`agy`) when you are in Antigravity, `opencode`
+when you are in OpenCode — plus every other installed CLI. Scope out the channel
+you are already running to avoid a redundant nested review (the `--channels` flag
+is a space-separated list, not a comma-separated string):
 
 ```bash
 # From Codex:
 mmr review --pr <number> --channels claude grok antigravity --sync --format json
 # From Antigravity (agy):
 mmr review --pr <number> --channels codex claude grok --sync --format json
+# From OpenCode:
+mmr review --pr <number> --channels codex claude grok antigravity --sync --format json
 # or set channels_disabled: ["codex"] / ["antigravity"] in .mmr.yaml
 ```
 

@@ -140,6 +140,17 @@ threshold (:sev[P2]{level=p2} by default; override per-run with
 `--fix-threshold`). See the [MMR reference](../mmr/index.md) for how the verdict
 is derived from gate result + channel health.
 
+:::callout{type=note}
+**A clean run can still be `needs-user-decision`.** Since mmr 4.0.0 the verdict
+also reflects *how many* channels reported. If fewer than
+`defaults.min_completed_channels` (default **2**) completed, the result is
+`needs-user-decision` even with zero findings — one reviewer agreeing with itself
+is not multi-model review. In practice you'll hit this when only one CLI is
+installed or authed: fix the channel (`mmr doctor`) rather than treating the
+empty result as a pass. `blocked` still outranks the floor, so a real blocking
+finding is always reported as `blocked`.
+:::
+
 :::callout{type=warning}
 **Proceed only on `pass` or `degraded-pass`.** On `blocked` or
 `needs-user-decision`, never merge automatically — surface the verdict and the
@@ -230,7 +241,7 @@ what it means for *your* workflow.
 
 :::callout{type=warning}
 **Foreground only.** When the `mmr` CLI is unavailable and a wrapper falls back
-to invoking Codex / Gemini / Claude / Grok directly, run them as **foreground**
+to invoking Codex / Claude / Grok / Antigravity directly, run them as **foreground**
 Bash calls — never with `run_in_background`, `&`, or `nohup`. Background
 execution produces empty output, which the parser then reads as a degraded
 channel :cite[content/tools/review-code.md:204].

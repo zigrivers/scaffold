@@ -1368,7 +1368,7 @@ nav.toc li.toc-3 a { padding-left: var(--sp-6); font-size: var(--text-xs); }
 <div class="layout">
   <aside class="rail" id="guide-toc">
     <button class="rail-close" data-action="nav" aria-label="Close navigation">✕</button>
-    <nav class="toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#why-worktrees-not-just-branches">Why worktrees, not just branches</a></li><li class="toc-2"><a href="#setup-setup-agent-worktreesh">Setup — setup-agent-worktree.sh</a></li><li class="toc-2"><a href="#which-build-phase-entry-point">Which build-phase entry point?</a></li><li class="toc-2"><a href="#working-in-parallel">Working in parallel</a></li><li class="toc-2"><a href="#teardown-harvest">Teardown &amp; harvest</a></li><li class="toc-3"><a href="#the-branch-deletion-guards">The branch-deletion guards</a></li><li class="toc-3"><a href="#recovering-orphaned-ledgers---recover">Recovering orphaned ledgers — --recover</a></li><li class="toc-2"><a href="#resuming-after-a-break">Resuming after a break</a></li><li class="toc-2"><a href="#see-also">See also</a></li></ul></nav>
+    <nav class="toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#why-worktrees-not-just-branches">Why worktrees, not just branches</a></li><li class="toc-2"><a href="#setup-setup-agent-worktreesh">Setup — setup-agent-worktree.sh</a></li><li class="toc-2"><a href="#which-build-phase-entry-point">Which build-phase entry point?</a></li><li class="toc-2"><a href="#working-in-parallel">Working in parallel</a></li><li class="toc-3"><a href="#serializing-the-merges-scaffold-mq">Serializing the merges — scaffold mq</a></li><li class="toc-2"><a href="#teardown-harvest">Teardown &amp; harvest</a></li><li class="toc-3"><a href="#the-branch-deletion-guards">The branch-deletion guards</a></li><li class="toc-3"><a href="#recovering-orphaned-ledgers---recover">Recovering orphaned ledgers — --recover</a></li><li class="toc-2"><a href="#resuming-after-a-break">Resuming after a break</a></li><li class="toc-2"><a href="#see-also">See also</a></li></ul></nav>
   </aside>
   <main class="content"><h2 id="why-worktrees-not-just-branches">Why worktrees, not just branches</h2>
 <p>Several agents implementing the same project at once need two things: a clean
@@ -1476,6 +1476,29 @@ step 5.5), watch the local quality gates go green (pre-commit + <code>make check
 CI is deferred until launch), then squash-merge. The shared object store means a
 merge from agent <code>alpha</code>'s worktree is on <code>main</code> for everyone the moment it
 lands.</p>
+<h3 id="serializing-the-merges-scaffold-mq">Serializing the merges — <code>scaffold mq</code></h3>
+<p>Rebasing by hand stops scaling once several agents are merging within the same
+hour: every merge invalidates the gate run of every open PR behind it. The
+<strong>merge queue</strong> exists for exactly that. <code>scaffold mq enqueue --pr &#x3C;N></code> hands a
+PR to a local daemon that batches PRs, runs the gate once per batch, and merges
+them in order — so N agents pay roughly one gate, not N.</p>
+<pre><code class="language-bash">scaffold agent-ops install --component merge-queue   # install the scripts first
+scaffold mq enqueue --pr 412                         # fire-and-forget; starts the daemon
+scaffold mq status                                   # queue state + per-PR states
+scaffold mq stats                                    # gate timings, flakes, cache hits
+</code></pre>
+<p>Two knobs matter most for parallel agents, both in the <code>merge_queue:</code> block of
+<code>.scaffold/agent-ops.yaml</code>: <code>overlap_zones</code> (globs that must never share a
+batch — the queue's answer to the high-contention-files rule above) and
+<code>overlap_zone_policy</code>, which either lands a zone-touching PR solo-gated
+(<code>solo</code>) or parks it as <code>HELD_HUMAN</code> until you run <code>scaffold mq release --pr &#x3C;N></code>
+(<code>hold</code>).</p>
+<p>Pair it with <strong>test-impact analysis</strong> (<code>scaffold tia affected --base &#x3C;ref></code>) so
+each batch runs only the tests the batch can break, and with
+<code>scaffold sched install post-merge-poller</code> so the authoritative full gate still
+runs after merges land. <code>scaffold doctor</code> health-checks all of it at once. The
+full command surface for these lives in the
+<a href="../cli/index.md#operations--the-parallel-agent-kit">CLI reference</a>.</p>
 <h2 id="teardown-harvest">Teardown &#x26; harvest</h2>
 <p>When an agent's work is merged, retire its worktree. The single command for this
 is <code>scripts/teardown-agent-worktree.sh &#x3C;worktree-path></code>, and the <strong>order of

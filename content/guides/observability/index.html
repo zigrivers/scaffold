@@ -1683,7 +1683,7 @@ events.</p></div>
 
 
 
-<table><thead><tr><th>adapter</th><th>source of truth</th><th>emits</th><th>correlation_id / dedup</th></tr></thead><tbody><tr><td><code>git</code></td><td><code>git log</code>, <code>git worktree list</code> (30 s timeout)</td><td><code>commit</code></td><td>none (<code>null</code>); per-SHA seen-set within the window</td></tr><tr><td><code>gh</code></td><td><code>gh pr list --state {open,merged,closed}</code> (needs auth)</td><td><code>pr_opened</code>, <code>pr_merged</code>, <code>pr_closed</code></td><td><code>pr:&#x3C;n>:&#x3C;state></code> — dedups against the ledger's own PR events</td></tr><tr><td><code>mmr</code></td><td><code>.mmr/jobs/*/result.json</code> (replay keyed on each job's <code>completed_at</code>)</td><td><code>job_completed</code></td><td>none</td></tr><tr><td><code>state</code></td><td><code>.scaffold/state.json</code> + <code>services/*/state.json</code></td><td><code>step_completed</code>, <code>step_in_progress</code></td><td>none; per-step timestamp, mtime fallback</td></tr><tr><td><code>tests</code></td><td><code>.scaffold/last-test-run.json</code></td><td><code>test_run_completed</code>, <code>test_run_failed</code></td><td>none</td></tr><tr><td><code>pipeline_docs</code></td><td>candidate <code>docs/*.md</code> artifact paths</td><td>— (probe: available / degraded / unavailable)</td><td>n/a</td></tr><tr><td><code>beads</code></td><td><code>.beads/</code> + <code>bd</code> CLI (≥ v1.0.0)</td><td>— (task claim ↔ event-id linkage)</td><td>n/a</td></tr><tr><td><code>audit_history</code></td><td><code>docs/audits/*.json</code> (≤ 100 scanned)</td><td>— (trends + <code>lensSkippedStreaks</code>)</td><td>n/a</td></tr></tbody></table>
+<table><thead><tr><th>adapter</th><th>source of truth</th><th>emits</th><th>correlation_id / dedup</th></tr></thead><tbody><tr><td><code>git</code></td><td><code>git log</code>, <code>git worktree list</code> (30 s timeout)</td><td><code>commit</code></td><td>none (<code>null</code>); per-SHA seen-set within the window</td></tr><tr><td><code>gh</code></td><td><code>gh pr list --state {open,merged,closed}</code> (needs auth)</td><td><code>pr_opened</code>, <code>pr_merged</code>, <code>pr_closed</code></td><td><code>pr:&#x3C;n>:&#x3C;state></code> — dedups against the ledger's own PR events</td></tr><tr><td><code>mmr</code></td><td><code>.mmr/jobs/*/result.json</code> (replay keyed on each job's <code>completed_at</code>)</td><td><code>job_completed</code></td><td>none</td></tr><tr><td><code>state</code></td><td><code>.scaffold/state.json</code> + <code>services/*/state.json</code></td><td><code>step_completed</code>, <code>step_in_progress</code></td><td>none; per-step timestamp, mtime fallback</td></tr><tr><td><code>tests</code></td><td><code>.scaffold/last-test-run.json</code></td><td><code>test_run_completed</code>, <code>test_run_failed</code></td><td>none</td></tr><tr><td><code>pipeline_docs</code></td><td>candidate <code>docs/*.md</code> artifact paths</td><td>— (probe: available / degraded / unavailable)</td><td>n/a</td></tr><tr><td><code>beads</code></td><td><code>.beads/</code> + <code>bd</code> CLI (≥ v1.1.0)</td><td>— (task claim ↔ event-id linkage)</td><td>n/a</td></tr><tr><td><code>audit_history</code></td><td><code>docs/audits/*.json</code> (≤ 100 scanned)</td><td>— (trends + <code>lensSkippedStreaks</code>)</td><td>n/a</td></tr></tbody></table>
 <h3 id="source-priority">Source priority</h3>
 <p>When two events describe the same thing (same <code>correlation_id</code>), the synthesizer
 keeps the one from the most authoritative source. The order is fixed in
@@ -2475,8 +2475,9 @@ staged paths plus the stash, not a guaranteed full reset.</p>
 runs against the maintainer's own repo, not untrusted third-party code
 (<code>src/observability/engine/fix-agent-dispatcher.ts</code>). This is the opposite of the
 Lens H LLM dispatcher, which hard-codes its command for untrusted-repo safety.
-CLAUDE.md's <code>--fix</code> note describing the dispatcher as "not
-project-config-overridable" conflates the two.</p></div>
+Both default to <code>claude -p</code>, so read the <em>key name</em> to tell which one a piece of
+documentation means: <code>fix.dispatcher_command</code> exists; <code>llm.dispatcher_command</code>
+deliberately does not.</p></div>
 <p>Exit code: <code>1</code> if any blocking finding survived the loop, else <code>0</code>.</p>
 <h2 id="harvest-recover-teardown">Harvest, recover &#x26; teardown</h2>
 <p>A worktree's ledger is local to that worktree. Harvest copies it into the primary
@@ -3063,24 +3064,25 @@ refinements following after.</p>
 the docs" — surfaced these mismatches. They are deferred findings to resolve in
 the code/docs:</p>
 <ul>
-<li><strong>9 lenses, not 8.</strong> The design spec and CLAUDE.md enumerate A–H;
-<code>I-knowledge-gaps</code> shipped and is registered.</li>
-<li><strong><code>pr_opened</code> vs <code>pr_open</code>.</strong> CLAUDE.md abbreviates the event type as
-<code>pr_open</code>; the code only emits <code>pr_opened</code>.</li>
+<li><strong>9 lenses, not 8.</strong> The design spec enumerates A–H; <code>I-knowledge-gaps</code>
+shipped and is registered. (CLAUDE.md now says nine.)</li>
+<li><strong><code>pr_opened</code> vs <code>pr_open</code>.</strong> Older prose abbreviated the event type as
+<code>pr_open</code>; the code only ever emits <code>pr_opened</code>.</li>
 <li><strong>Three engine verdicts, not four.</strong> <code>needs-user-decision</code> is an MMR review
 verdict; the audit engine emits only <code>pass</code> / <code>degraded-pass</code> / <code>blocked</code>.</li>
-<li><strong>Two dispatchers — don't conflate them.</strong> CLAUDE.md's "not
-project-config-overridable" note is about the <strong>Lens H LLM dispatcher</strong>
-(<code>llm-dispatcher.ts</code>, hard-coded <code>claude -p</code> by design). It does <strong>not</strong> apply
-to the separate <strong><code>--fix</code> agent dispatcher</strong>, whose <code>fix.dispatcher_command</code>
-<em>is</em> project-configurable. The divergence is that the two are easy to conflate.</li>
+<li><strong>Two dispatchers — don't conflate them.</strong> The "not project-config-overridable"
+rule is about the <strong>Lens H LLM dispatcher</strong> (<code>llm-dispatcher.ts</code>, hard-coded
+<code>claude -p</code> by design). It does <strong>not</strong> apply to the separate <strong><code>--fix</code> agent
+dispatcher</strong>, whose <code>fix.dispatcher_command</code> <em>is</em> project-configurable. Both
+ship <code>claude -p</code> as the default command, which is what makes them easy to
+conflate.</li>
 <li><strong><code>pr_review_stale</code> reserved.</strong> The sixth stall signal has a config default but
 is not yet emitted (deferred pending a per-PR correlation_id on the mmr
 adapter).</li>
 <li><strong>Inert config keys.</strong> <code>lenses.G-decisions.keywords_file</code> and
 <code>lenses.H-cross-doc.skip_phase_subsets</code> are typed but unread; the bundled
 <code>decision-keywords.txt</code> is not loaded.</li>
-<li><strong>No <code>F-scope.wave_budget</code> key.</strong> CLAUDE.md implies a wave budget in
+<li><strong>No <code>F-scope.wave_budget</code> key.</strong> Earlier prose implied a wave budget in
 <code>observability.yaml</code>; in fact no wave/phase budget is read anywhere — Lens F
 reads only <code>untouched_story_grace_hours</code>.</li>
 <li><strong><code>ui_glob</code> default narrower than spec.</strong> Spec default covers

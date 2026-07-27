@@ -43,10 +43,16 @@ system Node and updates with `npm update -g`.
 :::tab{title="Homebrew"}
 ```bash
 brew tap zigrivers/scaffold
+brew trust zigrivers/scaffold   # only if the next command refuses the tap
 brew install scaffold
 ```
 The formula installs and manages Node as a dependency, so no separate Node
 install is needed. Verify with `scaffold version`.
+
+Newer Homebrew refuses to load a formula from a tap it doesn't trust. If you see
+`Refusing to load formula … from untrusted tap zigrivers/scaffold`, run
+`brew trust zigrivers/scaffold` once — it's Scaffold's own official tap — then
+retry. This is a local Homebrew policy, not a problem with the release.
 :::
 :::tab{title="Claude Code plugin"}
 Inside a Claude Code session:
@@ -61,6 +67,26 @@ need it: `scaffold init` installs the skills automatically and later CLI
 commands keep them current.
 :::
 ::::
+
+## Installing `mmr` (the review CLI)
+
+`mmr` is a **separate package** — installing `scaffold` does not install it. The
+review workflow (`scaffold run review-pr` / `review-code`, and the mandatory
+post-PR review) drives `mmr`, so install it alongside:
+
+```bash
+npm install -g @zigrivers/mmr
+mmr doctor        # which reviewer CLIs are installed + authed, and how to fix each
+```
+
+Keep it current with `npm update -g @zigrivers/mmr`.
+
+`mmr` orchestrates *other* CLIs — it does not bundle any model. `mmr doctor`
+tells you which of `codex`, `claude`, `grok`, `agy`, and `opencode` are present
+and authenticated, and prints the exact recovery command for each. A channel
+whose CLI simply isn't installed is skipped rather than compensated, so a fresh
+machine typically needs at least two of them before a review yields a usable
+verdict — see [the MMR reference](../mmr/index.md).
 
 ## Keeping current
 
