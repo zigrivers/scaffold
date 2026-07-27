@@ -9,7 +9,12 @@ export default defineConfig({
     // unit run starved vitest's reporter RPC and produced
     // "[vitest-worker]: Timeout calling onTaskUpdate" — a CI failure with
     // every test passing. Separate process, no contention.
-    exclude: ['tests/e2e/**', 'tests/bench/**', 'src/e2e/**'],
+    // tests/performance/** is excluded for the same reason as src/e2e/**: it is
+    // run as its own vitest process (`npm run test:perf`, wired into
+    // `make ts-check`). Those files assert wall-clock budgets, and a budget
+    // measured while ~4000 other cases saturate the worker pool reports
+    // scheduler contention as a performance regression. See vitest.perf.config.ts.
+    exclude: ['tests/e2e/**', 'tests/bench/**', 'src/e2e/**', 'tests/performance/**'],
     typecheck: {
       include: ['src/**/*.test-d.ts'],
     },

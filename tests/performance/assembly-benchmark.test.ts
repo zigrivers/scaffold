@@ -3,6 +3,8 @@ import { AssemblyEngine } from '../../src/core/assembly/engine.js'
 import type { AssemblyOptions } from '../../src/types/index.js'
 import type { MetaPromptFile } from '../../src/types/index.js'
 import type { PipelineState } from '../../src/types/state.js'
+import { BUDGET_ASSEMBLY_MS, BUDGET_ASSEMBLY_HEAVY_MS } from './budgets.js'
+import { p95PerOpMs } from './measure.js'
 
 // Create a realistic mock of assembly inputs
 function createRealisticOptions(): { step: string; options: AssemblyOptions } {
@@ -73,32 +75,69 @@ function createRealisticOptions(): { step: string; options: AssemblyOptions } {
   return { step: 'create-prd', options }
 }
 
+// The heaviest realistic input: a full knowledge-base injection plus the
+// artifacts an update-mode step reads back in. This fixture used to live in
+// src/core/assembly/engine.test.ts, timed with a single Date.now() sample
+// against a 500ms budget — a wall-clock assertion in the middle of the parallel
+// correctness suite, which is the flake pattern documented in
+// src/project/adoption-apply.write-cost.test.ts. The input was worth keeping;
+// the measurement method was not. It lives here now, sampled in an unloaded
+// process, and it earns its keep: it costs several times the light case, so a
+// change that makes assembly scale badly with knowledge-base size moves this
+// budget while leaving the light one alone.
+function createHeavyOptions(): { step: string; options: AssemblyOptions } {
+  const { step, options } = createRealisticOptions()
+  return {
+    step,
+    options: {
+      ...options,
+      knowledgeEntries: Array.from({ length: 10 }, (_, i) => ({
+        name: `entry-${i}`,
+        description: `Entry ${i}`,
+        topics: ['testing'],
+        content: 'Some content '.repeat(100),
+      })),
+      artifacts: Array.from({ length: 5 }, (_, i) => ({
+        stepName: 'create-prd',
+        filePath: `docs/doc-${i}.md`,
+        content: '# Doc '.repeat(200),
+      })),
+    },
+  }
+}
+
 describe('Assembly Engine Performance', () => {
-  it('assembles prompt within 500ms budget (p95)', () => {
+  it('assembles a realistic prompt within budget (p95)', () => {
     const engine = new AssemblyEngine()
     const { step, options } = createRealisticOptions()
 
-    // Warm up
-    engine.assemble(step, options)
+    // Assert the work happened outside the timed region — an assemble that
+    // failed fast would otherwise be the cheapest possible way to pass a
+    // timing budget.
+    expect(engine.assemble(step, options).success).toBe(true)
 
-    // Measure 20 iterations
-    const timings: number[] = []
-    for (let i = 0; i < 20; i++) {
-      const start = performance.now()
-      const result = engine.assemble(step, options)
-      const elapsed = performance.now() - start
-      timings.push(elapsed)
-      expect(result.success).toBe(true)
-    }
+    const p95 = p95PerOpMs(() => { engine.assemble(step, options) })
+    console.log(`Assembly p95=${p95.toFixed(4)}ms/op`)
 
-    timings.sort((a, b) => a - b)
-    const p50 = timings[Math.floor(timings.length * 0.5)]
-    const p95 = timings[Math.floor(timings.length * 0.95)]
-    const p99 = timings[Math.floor(timings.length * 0.99)]
+    // budgets.ts explains why this is not the PRD's original 500ms.
+    expect(p95).toBeLessThan(BUDGET_ASSEMBLY_MS)
+  })
 
-    console.log(`Assembly p50=${p50.toFixed(2)}ms p95=${p95.toFixed(2)}ms p99=${p99.toFixed(2)}ms`)
+  it('assembles a knowledge-heavy prompt within budget (p95)', () => {
+    const engine = new AssemblyEngine()
+    const { step, options } = createHeavyOptions()
 
-    expect(p95).toBeLessThan(500)  // PRD §18 budget
+    const result = engine.assemble(step, options)
+    expect(result.success).toBe(true)
+    // The heavy fixture must actually be heavy. If a refactor ever stopped
+    // inlining knowledge entries into the prompt, this benchmark would quietly
+    // become a duplicate of the light one.
+    expect(result.prompt!.text.length, 'heavy fixture did not produce a large prompt')
+      .toBeGreaterThan(15_000)
+
+    const p95 = p95PerOpMs(() => { engine.assemble(step, options) })
+    console.log(`Assembly (heavy) p95=${p95.toFixed(4)}ms/op`)
+    expect(p95).toBeLessThan(BUDGET_ASSEMBLY_HEAVY_MS)
   })
 
   it('produces deterministic output', () => {

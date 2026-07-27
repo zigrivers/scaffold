@@ -538,19 +538,41 @@ describe('AssemblyEngine', () => {
     expect(metaContent).toContain('Create a detailed PRD with all user stories and acceptance criteria.')
   })
 
-  // 32. Assembly completes within 500ms
-  it('completes within 500ms performance budget', () => {
+  // 32. Assembly of a knowledge-heavy prompt stays correct.
+  //
+  // This case used to be a timing assertion: one Date.now() sample against a
+  // 500ms budget, measuring a path that takes ~0.01ms. Two things were wrong
+  // with it. It was a wall-clock assertion inside the ~4000-case parallel unit
+  // run, which is the flake pattern written up in
+  // src/project/adoption-apply.write-cost.test.ts — a single sample under load
+  // reports scheduler contention as a performance regression. And with 50,000x
+  // headroom it could not have failed for a real reason anyway.
+  //
+  // Deleting the timing check outright is the call here, and the reason it is
+  // not a loss: the budget it was nominally enforcing now lives in
+  // tests/performance/assembly-benchmark.test.ts, against this exact fixture,
+  // sampled in batches in an unloaded process against a budget 800x tighter
+  // than 500ms. The measurement moved somewhere it can be trusted; it did not
+  // disappear. What stays here is what a correctness suite can actually check:
+  // that a knowledge-heavy assembly succeeds and inlines everything it was
+  // given.
+  it('assembles a knowledge-heavy prompt with every entry and artifact inlined', () => {
     const kb: KnowledgeEntry[] = Array.from({ length: 10 }, (_, i) =>
       makeKBEntry({ name: `entry-${i}`, description: `Entry ${i}`, content: 'Some content '.repeat(100) }),
     )
     const artifacts: ArtifactEntry[] = Array.from({ length: 5 }, (_, i) =>
       makeArtifact({ filePath: `docs/doc-${i}.md`, content: '# Doc '.repeat(200) }),
     )
-    const start = Date.now()
-    engine.assemble('create-prd', makeOptions({ knowledgeEntries: kb, artifacts }))
-    const elapsed = Date.now() - start
 
-    expect(elapsed).toBeLessThan(500)
+    const result = engine.assemble('create-prd', makeOptions({ knowledgeEntries: kb, artifacts }))
+
+    expect(result.success).toBe(true)
+    for (let i = 0; i < 10; i++) {
+      expect(result.prompt!.text, `knowledge entry entry-${i} was dropped`).toContain(`entry-${i}`)
+    }
+    for (let i = 0; i < 5; i++) {
+      expect(result.prompt!.text, `artifact docs/doc-${i}.md was dropped`).toContain(`docs/doc-${i}.md`)
+    }
   })
 
   // 33. errors and warnings arrays are empty on success

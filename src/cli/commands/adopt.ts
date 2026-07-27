@@ -1,12 +1,11 @@
 import type { CommandModule, Argv } from 'yargs'
 import fs from 'node:fs'
 import path from 'node:path'
-import { parseDocument, isMap, isScalar, type Document } from 'yaml'
 import { findProjectRoot } from '../middleware/project-root.js'
 import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
 import { getPackagePipelineDir } from '../../utils/fs.js'
-import { runAdoption, TYPE_KEY } from '../../project/adopt.js'
+import { runAdoption } from '../../project/adopt.js'
 import type { AdoptionResult } from '../../project/adopt.js'
 import { buildAdoptionPlan, renderPlanMarkdown, extractPlanKey } from '../../project/adoption-plan.js'
 import { applyAdoptionPlan } from '../../project/adoption-apply.js'
@@ -21,7 +20,6 @@ import {
 } from '../init-flag-families.js'
 import type { ProjectType } from '../../types/index.js'
 import { asScaffoldError, withRecovery } from '../../utils/errors.js'
-import { configParseError, configNotObject } from '../../utils/errors.js'
 import { ExitCode } from '../../types/enums.js'
 import type { ScaffoldError } from '../../types/errors.js'
 
@@ -47,60 +45,10 @@ function atomicWriteFileSync(target: string, content: string): void {
   fs.renameSync(tmpPath, target)
 }
 
-// Retained for the config-write integration tests; the apply path writes config via
-// writeInitializeConfig (adoption-apply.ts). Slated for removal in R2.
-export function writeOrUpdateConfig(
-  projectRoot: string,
-  result: AdoptionResult,
-): void {
-  const configPath = path.join(projectRoot, '.scaffold', 'config.yml')
-
-  let doc: Document
-  if (!fs.existsSync(configPath)) {
-    // Bootstrap minimal config — NO methodology/platforms imposition
-    doc = parseDocument(`# scaffold config — created by scaffold adopt
-version: 2
-project:
-`)
-  } else {
-    const content = fs.readFileSync(configPath, 'utf8')
-    doc = parseDocument(content)
-    if (doc.errors.length > 0) {
-      throw configParseError(configPath, doc.errors[0].message)
-    }
-    const projectNode = doc.get('project', true)
-    if (projectNode !== undefined && !isMap(projectNode) && !isScalar(projectNode)) {
-      throw configNotObject(configPath)
-    }
-  }
-
-  // Ensure project node is a map (YAML `project:` with no value parses as null Scalar)
-  const projectNode = doc.get('project', true)
-  if (!projectNode || isScalar(projectNode)) {
-    doc.set('project', doc.createNode({}))
-  }
-
-  // Mutate AST with detected config (TYPE_KEY constant lookup, NOT string transform)
-  if (result.projectType && result.detectedConfig) {
-    doc.setIn(['project', 'projectType'], result.projectType)
-    doc.setIn(['project', TYPE_KEY[result.projectType]], result.detectedConfig.config)
-
-    // Remove stale config blocks from previous project types
-    for (const [type, key] of Object.entries(TYPE_KEY)) {
-      if (type !== result.projectType && doc.hasIn(['project', key])) {
-        doc.deleteIn(['project', key])
-      }
-    }
-  }
-
-  // Ensure .scaffold directory exists
-  const scaffoldDir = path.join(projectRoot, '.scaffold')
-  if (!fs.existsSync(scaffoldDir)) {
-    fs.mkdirSync(scaffoldDir, { recursive: true })
-  }
-
-  atomicWriteFileSync(configPath, doc.toString())
-}
+// `writeOrUpdateConfig` lived here until R2. `adopt --apply` stopped calling it
+// in R1 — config is written by writeInitializeConfig (adoption-apply.ts) — and
+// the only things keeping it alive were its own tests. Those now target
+// writeInitializeConfig; see src/project/adoption-apply.config-write.test.ts.
 
 // ---------------------------------------------------------------------------
 // Command

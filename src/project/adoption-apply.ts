@@ -39,6 +39,13 @@ export function writeInitializeConfig(projectRoot: string, initialize: Initializ
   let doc: Document
   if (fs.existsSync(configPath)) {
     doc = parseDocument(fs.readFileSync(configPath, 'utf8'))
+    // Without this, a malformed config.yml still fails — but as the yaml
+    // library's opaque "Document with errors cannot be stringified", thrown
+    // from doc.toString() below with no error code and no recovery hint. Check
+    // here so the failure names the file and tells the user what to fix.
+    if (doc.errors.length > 0) {
+      throw configParseError(configPath, doc.errors[0].message)
+    }
   } else {
     doc = parseDocument('# scaffold config — created by scaffold adopt --apply\n')
   }

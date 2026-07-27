@@ -4,6 +4,53 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.53.1] - 2026-07-27
+
+Test-suite integrity follow-up to 3.53.0 — **the timing assertions now measure
+product code, and can fail.**
+
+### Fixed
+
+**A malformed `.scaffold/config.yml` now fails `adopt --apply` with a real
+error.** `writeInitializeConfig` never checked the parsed document for errors,
+so a broken config surfaced as the yaml library's bare `Document with errors
+cannot be stringified` — no error code, no recovery hint, no filename. It now
+throws `CONFIG_PARSE_ERROR` with the offending path, like every other config
+failure. This was found by pointing the config-write tests at the production
+path; nothing else changes about the apply flow.
+
+### Internal
+
+**`writeOrUpdateConfig` is removed.** It had no non-test callers — `adopt
+--apply` writes config through `writeInitializeConfig` — and was marked "slated
+for removal in R2". Its two test files were the only thing keeping it alive, so
+the suite was proving that dead code worked while the production path had no
+direct coverage. Both files now target `writeInitializeConfig`. The package
+exports only the `scaffold` binary, so this is not a public API change.
+
+**The performance suite runs in its own process and its budgets can now fail.**
+`tests/performance/` moves to `vitest.perf.config.ts` (single fork, no file
+parallelism), is excluded from the default run, and is wired into
+`make ts-check`. Before this:
+
+- `build-benchmark` pointed at `pipeline/`, which the `content/`
+  reorganisation moved. It discovered zero files and timed an empty graph —
+  0.2ms against a 2000ms budget, an assertion that could not fail for any
+  reason. It now points at `content/pipeline` and asserts the input is
+  non-empty before timing it.
+- Every budget carried 175x–16,000x headroom. Budgets are now derived from
+  measured p95 on both a developer Mac and `ubuntu-latest`, at ~7-10x the
+  CI-observed value, and each was verified to fail against an injected
+  regression and pass again on revert.
+- Samples are batched, so a p95 at 0.005ms/op is not a measurement of timer
+  granularity.
+
+`engine.test.ts`'s `completes within 500ms` — one `Date.now()` sample against a
+0.01ms path, inside the ~4000-case parallel run — is gone. Its fixture moved to
+the benchmark suite where it is batch-sampled against a budget 800x tighter;
+the correctness suite now asserts that a knowledge-heavy assembly inlines every
+entry and artifact. The reasoning is recorded in `tests/performance/budgets.ts`.
+
 ## [3.53.0] - 2026-07-26
 
 Agent-drivability follow-up — **the envelope contract is now CLI-wide**.
