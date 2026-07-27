@@ -1,11 +1,9 @@
-// src/cli/commands/adopt.performance.test.ts
 import { describe, it, expect, vi } from 'vitest'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { writeOrUpdateConfig } from './adopt.js'
-import type { AdoptionResult } from '../../project/adopt.js'
-import type { DetectedConfig, WebAppConfig } from '../../types/config.js'
+import { writeInitializeConfig } from './adoption-apply.js'
+import type { InitializeRecord } from './adoption-plan.js'
 
 // Why this file counts syscalls instead of measuring elapsed time.
 //
@@ -16,9 +14,9 @@ import type { DetectedConfig, WebAppConfig } from '../../types/config.js'
 // median, so what it actually detected was scheduler contention.
 //
 // The first replacement kept a timing check but made it relative — the real
-// writeOrUpdateConfig against an interleaved baseline doing the same syscalls
-// without the serialization — on the theory that contention inflates both arms
-// together. That held on one machine. It did not survive CI:
+// write against an interleaved baseline doing the same syscalls without the
+// serialization — on the theory that contention inflates both arms together.
+// That held on one machine. It did not survive CI:
 //
 //   local:  config write median=0.30ms  bare write median=0.17ms  ratio=1.65
 //   CI:     config write median=0.94ms  bare write median=0.19ms  ratio=5.04
@@ -46,44 +44,35 @@ import type { DetectedConfig, WebAppConfig } from '../../types/config.js'
 // reports the runner's CPU as a product regression is worse than no timing check
 // at all: it trains readers to re-run instead of investigate.
 //
-// What is NOT covered, stated plainly:
+// What is NOT covered, stated plainly: a regression that makes this path slower
+// without changing its I/O shape — a slower YAML serializer, say. The timing
+// check did not catch that either (the CPU-only row above), so dropping it lost
+// nothing real, but nothing here guards it. That needs a benchmark with a
+// per-machine baseline, which is a different tool than a suite test — see
+// tests/performance/, which runs in its own unloaded process.
 //
-// 1. A regression that makes this path slower without changing its I/O shape —
-//    a slower YAML serializer, say. The timing check did not catch that either
-//    (the CPU-only row above), so dropping it lost nothing real, but nothing
-//    here guards it. That needs a benchmark with a per-machine baseline, which
-//    is a different tool than a suite test.
-//
-// 2. The production write path. `writeOrUpdateConfig` has no non-test callers —
-//    `applyAdoptionPlan` writes config through `writeInitializeConfig` in
-//    project/adoption-apply.ts, and adopt.ts marks this helper "slated for
-//    removal in R2". So these assertions guard the helper this test has always
-//    targeted, not the code that runs in production. Worth re-pointing at
-//    `writeInitializeConfig` (or retiring with the helper), but that changes
-//    what the test covers rather than how it measures, so it is left as a
-//    deliberate follow-up rather than folded in here.
+// The earlier version of this file targeted `writeOrUpdateConfig` in
+// cli/commands/adopt.ts, which had no non-test callers and was slated for
+// removal. It now targets `writeInitializeConfig`, the function `adopt --apply`
+// actually writes config through.
 
-// `satisfies` rather than `as`: an `as` cast would let this fixture keep
-// compiling if AdoptionResult or DetectedConfig gained a required field, and a
-// silently incomplete fixture could send writeOrUpdateConfig down a cheaper
-// branch than real usage. When the cast came off, the fixture turned out to be
-// missing WebAppConfig's `realtime` and `authFlow` already.
-function typicalResult(deployTarget: WebAppConfig['deployTarget']): AdoptionResult {
+function makeInitialize(deployTarget: string): InitializeRecord {
   return {
-    mode: 'brownfield',
-    artifactsFound: 0,
-    detectedArtifacts: [],
-    stepsCompleted: [],
-    stepsRemaining: [],
-    methodology: 'deep',
-    errors: [],
-    warnings: [],
-    projectType: 'web-app',
-    detectedConfig: {
-      type: 'web-app',
-      config: { renderingStrategy: 'ssr', deployTarget, realtime: 'none', authFlow: 'oauth' },
-    } satisfies DetectedConfig,
-  } satisfies AdoptionResult
+    config: {
+      version: 2,
+      methodology: 'deep',
+      platforms: ['claude-code'],
+      project: {
+        projectType: 'web-app',
+        webAppConfig: { renderingStrategy: 'ssr', deployTarget, realtime: 'none', authFlow: 'oauth' },
+      },
+    },
+    state: {
+      'init-mode': 'brownfield',
+      methodology: 'deep',
+      steps: {},
+    },
+  }
 }
 
 describe('atomic config write cost', () => {
@@ -94,7 +83,7 @@ describe('atomic config write cost', () => {
     const renameSpy = vi.spyOn(fs, 'renameSync')
 
     try {
-      writeOrUpdateConfig(dir, typicalResult('serverless')) // create branch — not under test
+      writeInitializeConfig(dir, makeInitialize('serverless')) // create branch — not under test
 
       // The spies patch the `fs` namespace object, so they only observe calls
       // made through it. If the implementation ever switches to named imports
@@ -116,12 +105,12 @@ describe('atomic config write cost', () => {
       // would pin the current behaviour so tightly that adding a legitimate
       // "skip the write when nothing changed" optimisation would fail this test
       // — penalising an improvement. A genuine change must always write.
-      writeOrUpdateConfig(dir, typicalResult('container')) // update branch
+      writeInitializeConfig(dir, makeInitialize('container')) // update branch
 
       // These three counts are the cost of the path. A redundant write, a second
       // read-and-reparse, or a write-per-key loop each move one of them.
       // Verified against an injected regression: adding a single extra
-      // fs.writeFileSync to atomicWriteFileSync fails this on 5 runs of 5, where
+      // fs.writeFileSync to atomicWriteFile fails this on 5 runs of 5, where
       // the timing check it replaced caught the same regression on 7 of 8.
       expect(readSpy, 'config update should read the existing config exactly once').toHaveBeenCalledTimes(1)
       expect(writeSpy, 'config update should write the temp file exactly once').toHaveBeenCalledTimes(1)
@@ -162,10 +151,10 @@ describe('atomic config write cost', () => {
     const configPath = path.join(dir, '.scaffold', 'config.yml')
 
     try {
-      writeOrUpdateConfig(dir, typicalResult('serverless'))
+      writeInitializeConfig(dir, makeInitialize('serverless'))
       const first = fs.readFileSync(configPath, 'utf8')
 
-      writeOrUpdateConfig(dir, typicalResult('container'))
+      writeInitializeConfig(dir, makeInitialize('container'))
       const second = fs.readFileSync(configPath, 'utf8')
 
       expect(first).toContain('deployTarget: serverless')

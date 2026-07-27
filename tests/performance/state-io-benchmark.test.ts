@@ -3,6 +3,8 @@ import { StateManager } from '../../src/state/state-manager.js'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
+import { BUDGET_STATE_READ_MS, BUDGET_STATE_WRITE_MS } from './budgets.js'
+import { p95PerOpMs } from './measure.js'
 
 describe('State I/O Performance', () => {
   let tmpDir: string
@@ -26,30 +28,24 @@ describe('State I/O Performance', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true })
   })
 
-  it('reads state within 100ms (p95)', () => {
-    const timings: number[] = []
-    for (let i = 0; i < 50; i++) {
-      const start = performance.now()
-      stateManager.loadState()
-      timings.push(performance.now() - start)
-    }
-    timings.sort((a, b) => a - b)
-    const p95 = timings[Math.floor(timings.length * 0.95)]
-    console.log(`State read p95=${p95.toFixed(2)}ms`)
-    expect(p95).toBeLessThan(100)
+  it('reads state within budget (p95)', () => {
+    // A load that threw, or that returned a stub, would be the cheapest way to
+    // pass a timing budget. Prove the read is real before timing it.
+    expect(Object.keys(stateManager.loadState().steps)).toHaveLength(36)
+
+    const p95 = p95PerOpMs(() => { stateManager.loadState() })
+    console.log(`State read p95=${p95.toFixed(4)}ms/op`)
+    expect(p95).toBeLessThan(BUDGET_STATE_READ_MS)
   })
 
-  it('writes state within 100ms (p95)', () => {
+  it('writes state within budget (p95)', () => {
     const state = stateManager.loadState()
-    const timings: number[] = []
-    for (let i = 0; i < 50; i++) {
-      const start = performance.now()
-      stateManager.saveState({ ...state })
-      timings.push(performance.now() - start)
-    }
-    timings.sort((a, b) => a - b)
-    const p95 = timings[Math.floor(timings.length * 0.95)]
-    console.log(`State write p95=${p95.toFixed(2)}ms`)
-    expect(p95).toBeLessThan(100)
+
+    stateManager.saveState({ ...state })
+    expect(fs.existsSync(path.join(tmpDir, '.scaffold', 'state.json'))).toBe(true)
+
+    const p95 = p95PerOpMs(() => { stateManager.saveState({ ...state }) })
+    console.log(`State write p95=${p95.toFixed(4)}ms/op`)
+    expect(p95).toBeLessThan(BUDGET_STATE_WRITE_MS)
   })
 })

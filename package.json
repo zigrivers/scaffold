@@ -42,7 +42,7 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
-    "test:perf": "vitest run tests/performance/",
+    "test:perf": "vitest run --config vitest.perf.config.ts",
     "lint": "eslint src/ tests/",
     "type-check": "tsc --noEmit",
     "check": "npm run lint && npm run type-check && npm test",
