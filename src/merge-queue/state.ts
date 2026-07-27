@@ -1,11 +1,19 @@
-import type { JournalEvent, PrEntry, PrState, QueueState } from './types.js'
+import type {
+  BeadSyncAction, JournalEvent, PrEntry, PrState, QueueState,
+} from './types.js'
 
 export const TERMINAL_PR_STATES: ReadonlySet<PrState> = new Set<PrState>([
   'LANDED', 'EJECTED', 'NEEDS_REBASE', 'CANCELLED',
 ])
 
+export function beadSyncKey(pr: number, action: BeadSyncAction): string {
+  return `${action}:${pr}`
+}
+
 export function reduceState(events: JournalEvent[]): QueueState {
-  const state: QueueState = { entries: new Map(), batches: new Map(), flakes: [] }
+  const state: QueueState = {
+    entries: new Map(), batches: new Map(), flakes: [], beadSync: new Map(),
+  }
   for (const e of events) {
     switch (e.type) {
     case 'enqueued': {
@@ -62,6 +70,9 @@ export function reduceState(events: JournalEvent[]): QueueState {
     case 'gate_cached':
     case 'full_gate_recorded':
     case 'tia_recorded':
+      break
+    case 'bead_sync':
+      state.beadSync.set(beadSyncKey(e.pr, e.action), e)
       break
     }
   }

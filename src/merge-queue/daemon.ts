@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { ulid } from 'ulid'
 import { appendEvent, readJournal } from './journal.js'
-import { TERMINAL_PR_STATES, queuedPrs, reduceState } from './state.js'
+import { TERMINAL_PR_STATES, beadSyncKey, queuedPrs, reduceState } from './state.js'
 import { composeBatch, splitBatch, touchesOverlapZone } from './batch.js'
 import {
   QUARANTINE_THRESHOLD, addToQuarantine, fileQuarantineBead, recentFlakeCount, recordFlake,
@@ -16,7 +16,9 @@ import type { GhClient, PrInfo } from './gh.js'
 import type { GitOps } from './git.js'
 import type { GateResult } from './gate.js'
 import { tiaMapPath } from '../tia/map.js'
-import type { BatchRecord, MergeQueueConfig, PrEntry, PrState, QueueState } from './types.js'
+import type {
+  BatchRecord, BeadSyncRecord, MergeQueueConfig, PrEntry, PrState, QueueState,
+} from './types.js'
 import { waitForWake } from './wake.js'
 
 export interface DaemonDeps {
@@ -37,6 +39,8 @@ export interface DaemonDeps {
   /** D15: fire ONE post-merge poller pass right after a landing (main just
    *  moved). Best-effort; the scheduler remains the cross-machine safety net. */
   triggerPoller?: () => void
+  /** Test seam for Beads feedback commands. Production defaults to `bd`. */
+  runBeadCommand?: (args: string[], cwd: string) => Promise<void>
 }
 
 export const PAUSED_FILE = 'PAUSED'
@@ -55,6 +59,25 @@ const MIDFLIGHT_PR_STATES: ReadonlySet<PrState> = new Set<PrState>([
   'IN_BATCH', 'TESTING', 'FLAKE_RETRY', 'PASSED', 'LANDING',
 ])
 
+const BEAD_CLOSE_REPLAY_LIMIT = 8
+const BEAD_CLOSE_MAX_ATTEMPTS = 3
+const BEAD_COMMAND_TIMEOUT_MS = 30_000
+
+export function runBd(
+  args: string[],
+  cwd: string,
+  timeoutMs = BEAD_COMMAND_TIMEOUT_MS,
+): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    execFile('bd', args, {
+      cwd, timeout: timeoutMs, killSignal: 'SIGTERM',
+    }, err => {
+      if (err) reject(err)
+      else resolve()
+    })
+  })
+}
+
 type BatchOutcome =
   | { kind: 'done' }
   | { kind: 'aborted' }
@@ -67,6 +90,7 @@ export class MergeQueueDaemon {
    *  only — resets on daemon restart, which is fine since reconcile() re-derives
    *  ground truth from the journal/GitHub anyway. */
   private viewFailures = new Map<number, number>()
+  private beadCommandsInFlight = new Set<string>()
 
   private at(): string { return this.deps.now().toISOString() }
   private state(): QueueState { return reduceState(readJournal(this.deps.mqDir)) }
@@ -131,6 +155,7 @@ export class MergeQueueDaemon {
   async cycle(): Promise<'idle' | 'worked'> {
     const { gh, git, config, mqDir, log } = this.deps
     if (this.paused() !== null) { log('paused — skipping cycle'); return 'idle' }
+    this.retryBeadCloseouts()
     git.fetchOrigin()
     const base = git.defaultBranch()
     if (gh.postMergeRed(base)) {
@@ -738,38 +763,157 @@ export class MergeQueueDaemon {
     this.closeBead(pr)
   }
 
-  /** Bead feedback loop (spec §5.5): reopen the bead named by "Closes <id>" in the PR body. */
+  /** Bead feedback loop (spec §5.5): reopen the bead named in the PR body. */
   private reopenBead(pr: number, knownBody?: string): void {
-    this.beadCmd(pr, ['update', '{id}', '--status', 'open'], knownBody)
+    // Reopen remains advisory and best-effort. Durable receipts and replay are
+    // intentionally limited to post-merge closeout, where an agent has already
+    // moved on and no human remains in the loop to notice a failed transition.
+    this.beadCmd(pr, 'reopen', ['update', '{id}', '--status', 'open'], knownBody)
   }
 
   /** Fire-and-forget contract (spec §5.5): the DAEMON closes the bead on land —
    *  the enqueueing agent moved on and never returns to verify the merge. */
   private closeBead(pr: number, knownBody?: string): void {
-    this.beadCmd(pr, ['close', '{id}'], knownBody)
+    this.beadCmd(pr, 'close', ['close', '{id}'], knownBody)
   }
 
   /** knownBody lets callers that already fetched the PR skip a redundant gh.viewPr. */
-  private beadCmd(pr: number, argTemplate: string[], knownBody?: string): void {
+  private beadCmd(
+    pr: number,
+    action: 'close' | 'reopen',
+    argTemplate: string[],
+    knownBody?: string,
+  ): void {
+    const { gh, log, mqDir, projectRoot } = this.deps
+    const commandKey = `${action}:${pr}`
+    if (this.beadCommandsInFlight.has(commandKey)) return
+    const prior = action === 'close'
+      ? this.state().beadSync.get(beadSyncKey(pr, action))
+      : undefined
+    if (
+      action === 'close' &&
+      (prior?.result === 'succeeded' ||
+        prior?.result === 'skipped' ||
+        prior?.result === 'abandoned')
+    ) return
+    if (
+      action === 'close' &&
+      (prior?.attempts ?? 0) >= BEAD_CLOSE_MAX_ATTEMPTS
+    ) {
+      appendEvent(mqDir, {
+        type: 'bead_sync', pr, action, beadId: prior?.beadId,
+        result: 'abandoned', attempts: BEAD_CLOSE_MAX_ATTEMPTS,
+        at: this.at(), note: 'recovered at the closeout attempt limit',
+      })
+      log(`warn: bead close abandoned for PR #${pr} after a daemon restart`)
+      return
+    }
+
     let body = knownBody
     if (body === undefined) {
       try {
-        body = this.deps.gh.viewPr(pr).body
-      } catch {
+        body = gh.viewPr(pr).body
+      } catch (err) {
+        const note = `could not read PR body: ${String(err)}`
+        if (action === 'close') {
+          // Tracker attempts begin only once `bd` is invoked. A transient GitHub
+          // lookup failure must not exhaust the closeout budget before that.
+          log(`warn: bead close for PR #${pr} deferred: ${note}`)
+        } else {
+          log(`warn: bead reopen for PR #${pr} failed: ${note}`)
+        }
         return
       }
     }
-    const match = body.match(/Closes ([a-z][a-z0-9-]*-[a-z0-9]+)/i)
-    if (!match) return
-    // Fire-and-forget (matches the method names): the bd call is best-effort and
-    // must not block the daemon's event loop — dispatch async and ignore the
-    // result (bd absent / failed is advisory only).
-    execFile(
-      'bd',
-      argTemplate.map(a => a === '{id}' ? match[1] : a),
-      { cwd: this.deps.projectRoot },
-      () => { /* advisory only — ignore stdout/stderr and any error */ },
-    )
+    const canonical = body.match(/Closes ([a-z][a-z0-9-]*-[a-z0-9]+)/i)
+    const fallback = body.match(/(?:^|\n)\s*Bead:\s*([a-z][a-z0-9-]*-[a-z0-9]+)/i)
+    const beadId = canonical?.[1] ?? fallback?.[1]
+    if (!beadId) {
+      const note = 'PR body has no "Closes <id>" Bead mapping'
+      if (action === 'close') {
+        appendEvent(mqDir, {
+          type: 'bead_sync', pr, action, result: 'skipped', at: this.at(), note,
+        })
+      }
+      log(`warn: bead ${action} skipped for PR #${pr}: ${note}`)
+      return
+    }
+    if (!canonical) {
+      log(`warn: PR #${pr} uses non-canonical "Bead:" mapping; prefer "Closes ${beadId}"`)
+    }
+
+    const args = argTemplate.map(a => a === '{id}' ? beadId : a)
+    this.beadCommandsInFlight.add(commandKey)
+    const attempts = action === 'close' ? this.nextBeadAttempt(prior) : 0
+    if (action === 'close') {
+      appendEvent(mqDir, {
+        type: 'bead_sync', pr, action, beadId, result: 'attempted', attempts, at: this.at(),
+      })
+    }
+    const runner = this.deps.runBeadCommand ?? runBd
+    void runner(args, projectRoot)
+      .then(() => {
+        if (action === 'close') {
+          appendEvent(mqDir, {
+            type: 'bead_sync', pr, action, beadId, result: 'succeeded', attempts, at: this.at(),
+          })
+        }
+      })
+      .catch((err: unknown) => {
+        const note = String(err)
+        if (action === 'close') {
+          const missingCommand =
+            typeof err === 'object' && err !== null &&
+            'code' in err && err.code === 'ENOENT'
+          const result = missingCommand ? 'skipped' : this.failedBeadResult(attempts)
+          appendEvent(mqDir, {
+            type: 'bead_sync', pr, action, beadId, result,
+            attempts, at: this.at(), note,
+          })
+          log(`warn: bead close ${result} for PR #${pr} (${beadId}): ${note}`)
+        } else {
+          log(`warn: bead reopen failed for PR #${pr} (${beadId}): ${note}`)
+        }
+      })
+      .finally(() => this.beadCommandsInFlight.delete(commandKey))
+  }
+
+  private nextBeadAttempt(prior: BeadSyncRecord | undefined): number {
+    if (!prior) return 1
+    return (prior.attempts ?? (
+      prior.result === 'attempted' || prior.result === 'failed' ? 1 : 0
+    )) + 1
+  }
+
+  private failedBeadResult(attempts: number): 'failed' | 'abandoned' {
+    return attempts >= BEAD_CLOSE_MAX_ATTEMPTS ? 'abandoned' : 'failed'
+  }
+
+  /** Retry failed closeouts and migrate legacy LANDED entries that predate
+   *  bead_sync receipts. Never-attempted and oldest-attempted work runs first;
+   *  the fixed batch size limits child-process bursts without starving history. */
+  private retryBeadCloseouts(): void {
+    const state = this.state()
+    const candidates = [...state.entries.values()]
+      .filter(entry => {
+        if (entry.state !== 'LANDED') return false
+        const receipt = state.beadSync.get(beadSyncKey(entry.pr, 'close'))
+        return !this.beadCommandsInFlight.has(beadSyncKey(entry.pr, 'close')) &&
+          receipt?.result !== 'succeeded' &&
+          receipt?.result !== 'skipped' &&
+          receipt?.result !== 'abandoned'
+      })
+      .sort((a, b) => {
+        const aReceipt = state.beadSync.get(beadSyncKey(a.pr, 'close'))
+        const bReceipt = state.beadSync.get(beadSyncKey(b.pr, 'close'))
+        if (!aReceipt && bReceipt) return -1
+        if (aReceipt && !bReceipt) return 1
+        return (aReceipt?.at ?? a.enqueuedAt).localeCompare(
+          bReceipt?.at ?? b.enqueuedAt,
+        ) || a.enqueuedAt.localeCompare(b.enqueuedAt)
+      })
+      .slice(0, BEAD_CLOSE_REPLAY_LIMIT)
+    for (const entry of candidates) this.closeBead(entry.pr)
   }
 
   /** Startup recovery (spec §5.4): journal vs refs vs GitHub. */
@@ -822,6 +966,7 @@ export class MergeQueueDaemon {
         git.deleteCandidate(ref.replace('refs/merge-queue/batch-', ''))
       }
     }
+    this.retryBeadCloseouts()
     log('reconcile complete')
   }
 

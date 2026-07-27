@@ -4,6 +4,17 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Merge-queue Bead closeout is observable and retryable.** The daemon now
+  journals each tracker attempt and result, logs failures, and fairly retries
+  failed or legacy unacknowledged `LANDED` entries in bounded batches. Commands
+  time out after 30 seconds and closeout is abandoned after three failed
+  attempts to prevent a missing tracker from growing the journal indefinitely.
+  `Closes <id>` remains canonical; `Bead: <id>` is accepted with a warning so
+  already-landed agent PRs can be reconciled instead of leaving their claims in
+  progress.
+
 ## [3.53.1] - 2026-07-27
 
 Test-suite integrity follow-up to 3.53.0 — **the timing assertions now measure

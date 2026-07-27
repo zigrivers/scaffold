@@ -37,6 +37,20 @@ export interface BatchRecord {
   candidateTree?: string
 }
 
+/** Durable tracker receipts cover post-merge closeout. Reopen remains advisory. */
+export type BeadSyncAction = 'close'
+export type BeadSyncResult = 'attempted' | 'succeeded' | 'failed' | 'skipped' | 'abandoned'
+
+export interface BeadSyncRecord {
+  pr: number
+  action: BeadSyncAction
+  beadId?: string
+  result: BeadSyncResult
+  attempts?: number
+  at: string
+  note?: string
+}
+
 export type JournalEvent =
   | { type: 'enqueued'; pr: number; at: string }
   | {
@@ -68,11 +82,14 @@ export type JournalEvent =
   | { type: 'released'; pr: number; at: string }
   // D14: coverage map recorded for a green full-gate run.
   | { type: 'tia_recorded'; headSha: string; seconds: number; tests: number; files: number; at: string }
+  // Bead feedback receipts make tracker close/reopen observable and retryable.
+  | ({ type: 'bead_sync' } & BeadSyncRecord)
 
 export interface QueueState {
   entries: Map<number, PrEntry>
   batches: Map<string, BatchRecord>
   flakes: { testId: string; at: string }[]
+  beadSync: Map<string, BeadSyncRecord>
 }
 
 export interface MergeQueueConfig {
