@@ -70,8 +70,10 @@ const RATIO_CEILING = 1.95
 // and a subject that wrote nothing would still satisfy it.
 const SAMPLES = 201
 
-// Upper-middle element rather than the mean of the two central values. Both
-// arms use it, so the slight upward bias cancels in the ratio.
+// SAMPLES is odd, so this is the true median — one central element, nothing to
+// average. (It also degrades sanely to the upper-middle element for an even
+// count, and both arms use the same estimator, so any bias cancels in the
+// ratio.)
 function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b)
   return sorted[Math.floor(sorted.length / 2)]
@@ -126,6 +128,14 @@ function typicalResult(deployTarget: WebAppConfig['deployTarget']): AdoptionResu
       // to prevent, caught the moment the cast came off.
       config: { renderingStrategy: 'ssr', deployTarget, realtime: 'none', authFlow: 'oauth' },
     } satisfies DetectedConfig,
+    // Note the standing tradeoff `satisfies` buys: this fixture now tracks
+    // WebAppConfig, so when the schema gains a field the fixture gains it too,
+    // the subject arm serializes more, and the ratio drifts up. That is the
+    // right default — the fixture stays realistic — but it means the ceiling is
+    // calibrated against today's schema. If this starts failing after a config
+    // schema change rather than a write-path change, the assertion message will
+    // show the config-write median rising while the bare-write median holds:
+    // recalibrate rather than hunt for a regression that is not there.
   } satisfies AdoptionResult
 }
 
