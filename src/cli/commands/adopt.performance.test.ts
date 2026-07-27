@@ -15,38 +15,50 @@ import type { DetectedConfig } from '../../types/config.js'
 // wall-clock sample under full-suite parallel load spikes to ~11ms (vs a 0.3ms
 // median), so the only thing it reliably detected was scheduler contention.
 //
-// Instead we measure the real config-write path against a bare
-// writeFileSync+rename baseline, interleaved in the same process. Contention
-// inflates both arms together, so the ratio holds steady while absolute time
-// doubles (see the calibration table below).
-// A genuine slowdown in the config-write path (an added fsync, a second parse
-// pass, a serialization change) moves the ratio and fails the test; a busy
-// machine does not.
+// Instead we measure the real config-write path against a baseline that does
+// the same filesystem work minus the serialization, interleaved in the same
+// process. Contention inflates both arms together, so the ratio holds steady
+// while absolute time moves.
 //
-// Ceiling calibration, measured on this path:
-//   clean, isolated ............................. 1.84 - 2.00
-//   clean, full parallel suite ................... 2.04
-//   three redundant writes in atomicWriteFileSync . 3.27 - 3.69
-// Contention drives the ratio toward its floor of 1.0 (both arms slow
-// together), so load cannot push it through the ceiling. 3.0 sits ~47% above
-// the noisiest clean reading and below the cheapest regression measured.
+// Ceiling calibration, measured on this path at SAMPLES=200:
+//   clean, isolated ................................ 1.59 - 1.69
+//   clean, full parallel suite ..................... 1.65
+//   clean, 2x-core CPU oversubscription ............ 1.20 - 1.22
+//   ONE redundant write in atomicWriteFileSync ..... 2.17 - 2.37   <- caught
+//   three redundant writes in atomicWriteFileSync .. 2.74 - 3.30   <- caught
+//   two extra doc.toString() passes, no extra IO ... 1.76          <- NOT caught
 //
-// What this does and does not catch: it trips on a regression that roughly
-// doubles the config-write path — an added fsync, a second parse pass, a
-// redundant write. It will not notice a 20% slowdown, and it should not
-// pretend to; at this magnitude that is below the measurement floor.
+// That last row is the honest limit of this check. The path's cost is dominated
+// by its filesystem work, not its serialization, so the ratio is sensitive to
+// regressions that add IO and comparatively blunt to ones that only add CPU.
+// Tripling the serialization was still cheaper than adding a single write.
+//
+// Clean readings are indistinguishable isolated vs. under the full parallel
+// suite (1.65 either way), which is the point of the change. Heavy CPU
+// oversubscription pushes the ratio DOWN, not up: the syscall-bound baseline
+// absorbs scheduling latency worse than the subject arm does.
+//
+// 2.0 is placed to catch the weakest regression that could be constructed here
+// — one extra write, i.e. doubling the writes the path performs, at 2.17. That
+// leaves ~18% headroom over the noisiest clean reading (1.69), roughly 6x the
+// observed run-to-run spread. A looser ceiling was tried first and was worse on
+// both counts: at 3.0 a doubled write path passed silently and even a tripled
+// one straddled the line (2.74 - 3.30), failing only on some runs.
 //
 // Because bareConfigWrite mirrors the subject's syscalls, the ratio reduces to
 // 1 + (serialization cost / IO cost). That removes the syscall-count mismatch
 // the earlier bare write+rename baseline had, but it does NOT make the result
-// storage-independent: serialization is roughly half the baseline arm here, so
-// a runner with much faster temp-dir IO (tmpfs) shrinks the denominator and
-// raises the ratio without any regression. That is the known residual risk.
+// storage-independent: serialization is a large fraction of the baseline arm
+// here, so a runner with much faster temp-dir IO (tmpfs) shrinks the
+// denominator and raises the ratio without any regression — the residual risk.
 // The logged absolute medians are the triage signal when the ceiling is
 // breached: a real regression raises the config-write median, an unusual
 // runner lowers the bare-write one.
-const RATIO_CEILING = 3
-const SAMPLES = 50
+const RATIO_CEILING = 2
+// 200 rather than 50: at 50 the run-to-run spread was wide enough that one
+// measured regression landed at 2.84 on one run and 3.46 on another, straddling
+// the ceiling. 200 tightens both medians; the test still runs in ~0.2s.
+const SAMPLES = 200
 
 // Upper-middle element rather than the mean of the two central values. Both
 // arms use it, so the slight upward bias cancels in the ratio.
@@ -69,8 +81,8 @@ function elapsedMs(fn: () => void): number {
  * existsSync, writeFileSync, renameSync. An asymmetric baseline (a bare
  * write+rename) leaves the ratio sensitive to the machine's CPU-to-IO cost
  * mix, which is what makes a fast tmpfs runner look like a regression. Matching
- * the I/O means both arms scale together with storage speed and the residual
- * difference is the serialization work alone.
+ * the I/O removes that mismatch, leaving the serialization work as the only
+ * difference between the arms (see the residual-risk note in the header).
  */
 function bareConfigWrite(target: string, scaffoldDir: string): void {
   if (!fs.existsSync(target)) throw new Error(`baseline target missing: ${target}`)
@@ -81,7 +93,7 @@ function bareConfigWrite(target: string, scaffoldDir: string): void {
   fs.renameSync(tmpPath, target)
 }
 
-function typicalResult(): AdoptionResult {
+function typicalResult(deployTarget: string): AdoptionResult {
   return {
     mode: 'brownfield',
     artifactsFound: 0,
@@ -94,13 +106,13 @@ function typicalResult(): AdoptionResult {
     projectType: 'web-app',
     detectedConfig: {
       type: 'web-app',
-      config: { renderingStrategy: 'ssr', deployTarget: 'serverless' },
+      config: { renderingStrategy: 'ssr', deployTarget },
     } as DetectedConfig,
   } as AdoptionResult
 }
 
 describe('atomic config write performance', () => {
-  it('writes a typical config.yml within 3x a bare atomic file write', () => {
+  it('writes a typical config.yml within 2x the same write without serialization', () => {
     // Tracked as they are created so the finally below removes whatever
     // subset exists, even if the second mkdtemp itself throws.
     const created: string[] = []
@@ -113,16 +125,24 @@ describe('atomic config write performance', () => {
     try {
       const subjectDir = mkTmp('adopt-perf-')
       const baselineDir = mkTmp('adopt-perf-base-')
-      const result = typicalResult()
+      // Two configs differing in one leaf value. Alternating them means every
+      // timed iteration must genuinely rewrite the file, so a "content
+      // unchanged, skip the write" short-circuit cannot silently turn the
+      // subject arm into a no-op (see the assertion after the loop).
+      const results = [typicalResult('serverless'), typicalResult('container')]
+      const subjectConfigPath = path.join(subjectDir, '.scaffold', 'config.yml')
 
       // Prime the subject so every timed iteration takes the same branch
       // (config exists -> read + reparse), and reuse the config it produces as
       // the baseline payload so both arms move identical bytes.
-      writeOrUpdateConfig(subjectDir, result)
-      const payload = fs.readFileSync(
-        path.join(subjectDir, '.scaffold', 'config.yml'),
-        'utf8',
+      const payloads = results.map((r) => {
+        writeOrUpdateConfig(subjectDir, r)
+        return fs.readFileSync(subjectConfigPath, 'utf8')
+      })
+      expect(payloads[0], 'the two configs must differ or the no-op check below is vacuous').not.toBe(
+        payloads[1],
       )
+      const payload = payloads[0]
 
       const baselineScaffoldDir = path.join(baselineDir, '.scaffold')
       fs.mkdirSync(baselineScaffoldDir, { recursive: true })
@@ -133,10 +153,26 @@ describe('atomic config write performance', () => {
       const baselineTimings: number[] = []
 
       // Interleaved so any drift in machine load hits both arms equally.
+      let lastIndex = 0
       for (let i = 0; i < SAMPLES; i++) {
+        lastIndex = i % results.length
+        const result = results[lastIndex]
         subjectTimings.push(elapsedMs(() => writeOrUpdateConfig(subjectDir, result)))
         baselineTimings.push(elapsedMs(() => bareConfigWrite(baselineTarget, baselineScaffoldDir)))
       }
+
+      // Pin the subject arm to real work. Without this, a short-circuit in
+      // writeOrUpdateConfig collapses the subject median, drops the ratio, and
+      // passes green while measuring nothing — the same decoupling from product
+      // code this test was rewritten to fix. Verified: injecting an early
+      // `if (fs.existsSync(configPath)) return` drove the subject median to
+      // 0.004ms and ratio to 0.02, and without this assertion the test passed.
+      // Because the loop alternates configs, the file must match whichever ran
+      // last; a no-op leaves the other one behind and fails here.
+      expect(
+        fs.readFileSync(subjectConfigPath, 'utf8'),
+        'subject arm stopped writing the expected config — the timing below measures nothing',
+      ).toBe(payloads[lastIndex])
 
       const subject = median(subjectTimings)
       const baseline = median(baselineTimings)
