@@ -7,7 +7,7 @@ import path from 'node:path'
 import { MergeQueueDaemon, PAUSED_FILE, type DaemonDeps } from './daemon.js'
 import { appendEvent, readJournal } from './journal.js'
 import { reduceState, queuedPrs } from './state.js'
-import { defaultMergeQueueConfig } from './types.js'
+import { defaultMergeQueueConfig, type JournalEvent } from './types.js'
 import { tiaMapPath } from '../tia/map.js'
 import type { GhClient, PrInfo } from './gh.js'
 import type { CandidateResult, GitOps } from './git.js'
@@ -106,10 +106,8 @@ class FakeGit implements GitOps {
   listCandidateRefs(): string[] { return this.liveRefs }
 }
 
-type BeadCommandRunner = (args: string[], cwd: string) => Promise<void>
-
 function harness(
-  over: Partial<DaemonDeps> & { runBeadCommand?: BeadCommandRunner } = {},
+  over: Partial<DaemonDeps> = {},
 ) {
   const root = tmp()
   const mqDir = path.join(root, '.mq')
@@ -518,6 +516,44 @@ describe('MergeQueueDaemon.cycle', () => {
     }))
   })
 
+  it('uses canonical Closes mapping without a fallback warning', async () => {
+    const logs: string[] = []
+    const commands: string[][] = []
+    const h = harness({
+      log: msg => logs.push(msg),
+      runBeadCommand: async args => { commands.push(args) },
+    })
+    h.enqueue(1)
+    h.gh.infos.set(1, prInfo(1, { body: 'Closes proj-canonical' }))
+
+    await h.daemon.cycle()
+
+    await vi.waitFor(() => expect(commands).toContainEqual(['close', 'proj-canonical']))
+    expect(logs.some(msg => msg.includes('non-canonical'))).toBe(false)
+    expect(readJournal(h.mqDir)).toContainEqual(expect.objectContaining({
+      type: 'bead_sync', pr: 1, action: 'close',
+      beadId: 'proj-canonical', result: 'succeeded',
+    }))
+  })
+
+  it('keeps advisory reopen failures out of the durable closeout retry state', async () => {
+    const logs: string[] = []
+    const h = harness({
+      log: msg => logs.push(msg),
+      runBeadCommand: async () => { throw new Error('tracker unavailable') },
+    })
+    const reopen = h.daemon as unknown as {
+      reopenBead: (pr: number, body?: string) => void
+    }
+
+    reopen.reopenBead(1, 'Closes proj-reopen')
+
+    await vi.waitFor(() => expect(
+      logs.some(msg => msg.includes('bead reopen failed')),
+    ).toBe(true))
+    expect(readJournal(h.mqDir).filter(event => event.type === 'bead_sync')).toEqual([])
+  })
+
   it('logs and retries a failed bead close on the next daemon pass', async () => {
     let attempts = 0
     const logs: string[] = []
@@ -889,15 +925,131 @@ describe('MergeQueueDaemon.reconcile', () => {
       type: 'pr_state', pr: 1, state: 'LANDED', batchId: 'done', at: AT,
     })
     appendEvent(h.mqDir, { type: 'batch_state', batchId: 'done', state: 'DONE', at: AT })
-    appendEvent(h.mqDir, {
+    const receipt: JournalEvent = {
       type: 'bead_sync', pr: 1, action: 'close', beadId: 'proj-terminal',
       result: 'succeeded', at: AT,
-    } as never)
+    }
+    appendEvent(h.mqDir, receipt)
     h.gh.infos.set(1, prInfo(1, {
       state: 'MERGED', mergedAt: AT, body: 'Bead: proj-terminal',
     }))
 
     h.daemon.reconcile()
+    await new Promise(resolve => setTimeout(resolve, 20))
+
+    expect(commands).toEqual([])
+  })
+
+  it('journals a missing bead mapping once and does not retry it', () => {
+    const commands: string[][] = []
+    const h = harness({
+      runBeadCommand: async args => { commands.push(args) },
+    })
+    h.enqueue(1)
+    appendEvent(h.mqDir, { type: 'pr_state', pr: 1, state: 'LANDED', at: AT })
+    h.gh.infos.set(1, prInfo(1, { state: 'MERGED', mergedAt: AT, body: '' }))
+
+    h.daemon.reconcile()
+    h.daemon.reconcile()
+
+    const skipped = readJournal(h.mqDir).filter(
+      event => event.type === 'bead_sync' &&
+        event.pr === 1 && event.action === 'close' && event.result === 'skipped',
+    )
+    expect(skipped).toHaveLength(1)
+    expect(commands).toEqual([])
+  })
+
+  it('preserves a successful receipt when close is requested redundantly', async () => {
+    const commands: string[][] = []
+    const h = harness({
+      runBeadCommand: async args => { commands.push(args) },
+    })
+    h.enqueue(1)
+    appendEvent(h.mqDir, { type: 'pr_state', pr: 1, state: 'LANDED', at: AT })
+    h.gh.infos.set(1, prInfo(1, {
+      state: 'MERGED', mergedAt: AT, body: 'Closes proj-once',
+    }))
+
+    h.daemon.reconcile()
+    await vi.waitFor(() => expect(commands).toEqual([['close', 'proj-once']]))
+    await vi.waitFor(() => expect(
+      reduceState(readJournal(h.mqDir)).beadSync.get('close:1')?.result,
+    ).toBe('succeeded'))
+    const close = h.daemon as unknown as { closeBead: (pr: number) => void }
+    close.closeBead(1)
+    await new Promise(resolve => setTimeout(resolve, 20))
+
+    expect(commands).toEqual([['close', 'proj-once']])
+    expect(reduceState(readJournal(h.mqDir)).beadSync.get('close:1')?.result).toBe('succeeded')
+  })
+
+  it('retries never-attempted landed PRs before repeatedly failed newer PRs', async () => {
+    const commands: string[][] = []
+    const h = harness({
+      runBeadCommand: async args => {
+        commands.push(args)
+        throw new Error('tracker unavailable')
+      },
+    })
+    for (let pr = 1; pr <= 9; pr += 1) {
+      h.enqueue(pr)
+      appendEvent(h.mqDir, { type: 'pr_state', pr, state: 'LANDED', at: AT })
+      h.gh.infos.set(pr, prInfo(pr, {
+        state: 'MERGED', mergedAt: AT, body: `Closes proj-${pr}`,
+      }))
+    }
+
+    h.daemon.reconcile()
+
+    await vi.waitFor(() => expect(commands).toHaveLength(8))
+    expect(commands).toContainEqual(['close', 'proj-1'])
+    expect(commands).not.toContainEqual(['close', 'proj-9'])
+  })
+
+  it('abandons a closeout after three failed attempts', async () => {
+    let attempts = 0
+    const h = harness({
+      runBeadCommand: async () => {
+        attempts += 1
+        throw new Error('tracker unavailable')
+      },
+    })
+    h.enqueue(1)
+    appendEvent(h.mqDir, { type: 'pr_state', pr: 1, state: 'LANDED', at: AT })
+    h.gh.infos.set(1, prInfo(1, {
+      state: 'MERGED', mergedAt: AT, body: 'Closes proj-bounded',
+    }))
+
+    for (let pass = 1; pass <= 4; pass += 1) {
+      h.daemon.reconcile()
+      await vi.waitFor(() => expect(attempts).toBe(Math.min(pass, 3)))
+      if (pass < 3) {
+        await vi.waitFor(() => expect(
+          reduceState(readJournal(h.mqDir)).beadSync.get('close:1')?.result,
+        ).toBe('failed'))
+      }
+    }
+
+    expect(reduceState(readJournal(h.mqDir)).beadSync.get('close:1')).toEqual(
+      expect.objectContaining({ result: 'abandoned', attempts: 3 }),
+    )
+  })
+
+  it('does not retry bead closeouts while paused', async () => {
+    const commands: string[][] = []
+    const h = harness({
+      runBeadCommand: async args => { commands.push(args) },
+    })
+    h.enqueue(1)
+    appendEvent(h.mqDir, { type: 'pr_state', pr: 1, state: 'LANDED', at: AT })
+    h.gh.infos.set(1, prInfo(1, {
+      state: 'MERGED', mergedAt: AT, body: 'Closes proj-paused',
+    }))
+    fs.mkdirSync(h.mqDir, { recursive: true })
+    fs.writeFileSync(path.join(h.mqDir, PAUSED_FILE), 'operator pause\n')
+
+    expect(await h.daemon.cycle()).toBe('idle')
     await new Promise(resolve => setTimeout(resolve, 20))
 
     expect(commands).toEqual([])

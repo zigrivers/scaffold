@@ -4,7 +4,7 @@
 
 **Goal:** Make merge-queue bead closeout observable, retryable, and able to recover landed PRs whose Beads issues were created after the daemon started.
 
-**Architecture:** Journal every bead synchronization attempt and outcome beside the existing PR state. The daemon will retry failed or legacy-unacknowledged `LANDED` entries in a bounded newest-first batch, while an in-memory key prevents duplicate work during one process lifetime. `Closes <id>` remains canonical; `Bead: <id>` is a logged compatibility fallback for already-landed PRs.
+**Architecture:** Journal every post-merge bead close attempt and outcome beside the existing PR state. The daemon will fairly retry failed or legacy-unacknowledged `LANDED` entries in bounded batches, while an in-memory key prevents duplicate work during one process lifetime. Commands time out, and a fixed attempt cap prevents permanent failures from growing the journal indefinitely. `Closes <id>` remains canonical; `Bead: <id>` is a logged compatibility fallback for already-landed PRs.
 
 **Tech Stack:** TypeScript, Node child processes, Vitest, scaffold merge-queue JSONL journal.
 
@@ -83,10 +83,12 @@ default backed by `execFile`. Parse canonical `Closes <id>` first, accept
 `Bead: <id>` as a logged fallback, journal `attempted` followed by
 `succeeded` or `failed`, and record missing mappings as `skipped`.
 
-Retry failed or unacknowledged `LANDED` entries newest-first, with a fixed
-per-pass limit and an in-memory in-flight key. Invoke retry during startup
-reconciliation and at the beginning of later cycles so failures have an
-automatic retry path.
+Retry failed or unacknowledged `LANDED` entries fairly, prioritising
+never-attempted and then least-recently-attempted entries, with a fixed per-pass
+limit and an in-memory in-flight key. Bound command duration and total attempts.
+Invoke retry during startup reconciliation and at the beginning of unpaused
+cycles so failures have an automatic retry path without violating an operator
+pause.
 
 - [ ] **Step 4: Run the focused tests and verify GREEN**
 

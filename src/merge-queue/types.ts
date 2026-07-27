@@ -37,14 +37,16 @@ export interface BatchRecord {
   candidateTree?: string
 }
 
-export type BeadSyncAction = 'close' | 'reopen'
-export type BeadSyncResult = 'attempted' | 'succeeded' | 'failed' | 'skipped'
+/** Durable tracker receipts cover post-merge closeout. Reopen remains advisory. */
+export type BeadSyncAction = 'close'
+export type BeadSyncResult = 'attempted' | 'succeeded' | 'failed' | 'skipped' | 'abandoned'
 
 export interface BeadSyncRecord {
   pr: number
   action: BeadSyncAction
   beadId?: string
   result: BeadSyncResult
+  attempts?: number
   at: string
   note?: string
 }
