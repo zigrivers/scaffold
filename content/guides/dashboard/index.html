@@ -1385,7 +1385,9 @@ block (classes like <code>.container</code>, <code>.phase-header</code>, <code>.
 <code>lib/dashboard-theme.css</code>, has <strong>no</strong> Beads task section, and does <strong>not</strong>
 inject the Build-Observability panels. The CLI writes the HTML to a temp file
 (or <code>--output &#x3C;path></code>) and opens it via <code>open</code> / <code>xdg-open</code> / <code>start</code>
-(<span class="fp" data-path="src/cli/commands/dashboard.ts:64-66">src/cli/commands/dashboard.ts:64-66</span>).</li>
+(<span class="fp" data-path="src/cli/commands/dashboard.ts:64-66">src/cli/commands/dashboard.ts:64-66</span>). Suppress the browser with
+<code>--no-open</code>, get the underlying data instead of a page with <code>--json-only</code>,
+and target one service of a multi-service project with <code>--service &#x3C;name></code>.</li>
 <li><strong><code>scripts/generate-dashboard.sh</code></strong> is the visual-test fixture that
 <code>make dashboard-test</code> runs. It embeds <code>lib/dashboard-theme.css</code>, renders a
 Beads task section, and injects the two Build-Observability panels. Its

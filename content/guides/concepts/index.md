@@ -115,9 +115,11 @@ is what makes planning phases safe to iterate. See
 [CREATE vs UPDATE mode](../pipeline/index.md#create-vs-update-mode).
 
 ### Methodology preset
-*Which* steps are enabled. Three presets ship — `mvp`, `custom` (balanced), and
-`deep` (the schema default and most thorough). Presets are layered with
-**overlays**. See [Methodology & depth](../pipeline/index.md#methodology-depth).
+*Which* steps are enabled. Four presets ship — `mvp`, `custom` (balanced), and
+`deep` (the schema default and most thorough) are the `init` choices; a fourth,
+`brownfield`, is selected by `scaffold adopt` rather than chosen at init.
+Presets are layered with **overlays**. See
+[Methodology & depth](../pipeline/index.md#methodology-depth).
 
 ### Depth (1–5)
 *How thorough* each enabled step's output is, on a 1–5 scale from Minimal to

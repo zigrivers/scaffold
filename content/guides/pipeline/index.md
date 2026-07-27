@@ -108,10 +108,20 @@ actually gate execution.
 
 Two orthogonal knobs control how much of the pipeline runs and how thoroughly:
 
-1. **Preset** — *which* steps are enabled. Three presets ship
-   (`content/methodology/`): `mvp`, `custom` (balanced, depth 3), and `deep` (the
-   schema default).
+1. **Preset** — *which* steps are enabled. Four presets ship
+   (`content/methodology/`): `mvp`, `custom` (balanced, depth 3), `deep` (the
+   schema default) — and `brownfield`, which `scaffold adopt` selects for you.
 2. **Depth** — *how thorough* each enabled step's output is, on a 1–5 scale.
+
+:::callout{type=note}
+**`brownfield` is not an `init` choice.** `scaffold init --methodology` accepts
+only `mvp`, `custom`, and `deep`. The fourth preset is selected by
+`scaffold adopt --apply` when it brings an existing codebase under Scaffold —
+see [the install guide](../install/index.md#scaffold-adopt). It enables the
+foundation, environment, and quality steps at depth 3 and disables the doc-chain
+middle (modeling → specification), platform parity, and the validation audits;
+opt any of them back in per step with `scaffold adopt --include <step>`.
+:::
 
 ### Depth (1–5)
 
@@ -140,7 +150,7 @@ Depth 3 is the inflection point where steps start adding structure,
 cross-references, and validation beyond the basics. Override depth per run with
 `scaffold run <step> --depth N`.
 
-### The three presets
+### The three `init` presets
 
 ::::tabs
 :::tab{title="mvp (depth 1)"}
@@ -171,10 +181,10 @@ complex or regulated systems.
 ::::
 
 :::callout{type=note}
-**Game / multi-service / platform steps are off in all three presets.** The 24
+**Game / multi-service / platform steps are off in every preset.** The 24
 game steps and 5 cross-service steps are `enabled: false` in `mvp`, `custom`,
-*and* `deep`. They only switch on via a **project-type overlay** — see the
-playbooks below.
+`deep`, *and* `brownfield`. They only switch on via a **project-type
+overlay** — see the playbooks below.
 :::
 
 ## Project-type playbooks

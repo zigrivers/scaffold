@@ -1606,9 +1606,11 @@ human/team customizations and changes only what genuinely needs to change. This
 is what makes planning phases safe to iterate. See
 <a href="../pipeline/index.md#create-vs-update-mode">CREATE vs UPDATE mode</a>.</p>
 <h3 id="methodology-preset">Methodology preset</h3>
-<p><em>Which</em> steps are enabled. Three presets ship — <code>mvp</code>, <code>custom</code> (balanced), and
-<code>deep</code> (the schema default and most thorough). Presets are layered with
-<strong>overlays</strong>. See <a href="../pipeline/index.md#methodology-depth">Methodology &#x26; depth</a>.</p>
+<p><em>Which</em> steps are enabled. Four presets ship — <code>mvp</code>, <code>custom</code> (balanced), and
+<code>deep</code> (the schema default and most thorough) are the <code>init</code> choices; a fourth,
+<code>brownfield</code>, is selected by <code>scaffold adopt</code> rather than chosen at init.
+Presets are layered with <strong>overlays</strong>. See
+<a href="../pipeline/index.md#methodology-depth">Methodology &#x26; depth</a>.</p>
 <h3 id="depth-15">Depth (1–5)</h3>
 <p><em>How thorough</em> each enabled step's output is, on a 1–5 scale from Minimal to
 Exhaustive (depth 3 is the recommended default). Orthogonal to the preset:

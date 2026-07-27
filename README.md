@@ -1294,13 +1294,24 @@ mmr review --pr 47 --fix-threshold P0    # Only fix critical/security issues
 | Command | Purpose |
 |---------|---------|
 | `mmr review` | Dispatch a review job to all configured channels |
+| `mmr critique [input]` | Multi-model design/brainstorm critique — advisory, no gate, always exits 0 |
 | `mmr status <job-id>` | Check progress of a running job |
 | `mmr results <job-id>` | Collect, reconcile, and output findings |
+| `mmr reconcile <job-id> --channel <n> --input <d>` | Inject an external channel's findings and re-reconcile |
+| `mmr doctor [--fix]` | Diagnose every channel's install + auth, with per-channel recovery |
 | `mmr config init` | Auto-detect CLIs and generate `.mmr.yaml` |
 | `mmr config test` | Verify all channels (installation + auth) |
 | `mmr config channels` | List configured channels |
+| `mmr config enable\|disable <channel>` | Toggle a channel without hand-editing YAML |
+| `mmr config set\|unset <dotted.path> [value]` | Edit any config value (validated before write) |
+| `mmr config path` | Show where config is read from and written to |
 | `mmr jobs list` | Show recent review jobs |
 | `mmr jobs prune` | Remove old jobs (default: older than 7 days) |
+| `mmr sessions start\|list\|show\|end <id>` | Manage multi-round review sessions |
+| `mmr ack add\|list\|rm\|prune` | Sticky acknowledgments keyed on a finding's stable id |
+| `mmr skill install` | Install the "use MMR for review" skill per agent CLI |
+| `mmr commands [--json]` | Machine-readable capability manifest for agents |
+| `mmr explain [topic]` | Inline docs for a concept (channels, config, scopes, compensation, redaction, provenance) |
 
 #### mmr Configuration (.mmr.yaml)
 
@@ -1310,10 +1321,11 @@ The config file controls channel definitions, defaults, and project-specific rev
 version: 1
 
 defaults:
-  fix_threshold: P2        # P0/P1/P2 block the gate, P3 is informational
-  timeout: 300             # Per-channel timeout in seconds
-  format: json             # Default output format
-  job_retention_days: 7    # Auto-prune old jobs
+  fix_threshold: P2          # P0/P1/P2 block the gate, P3 is informational
+  min_completed_channels: 2  # below this, a passing gate is needs-user-decision
+  timeout: 300               # Per-channel timeout in seconds
+  format: json               # Default output format
+  job_retention_days: 7      # Auto-prune old jobs
 
 # Project-specific criteria appended to every review prompt
 review_criteria:
@@ -1393,6 +1405,14 @@ When multiple channels return findings, mmr applies consensus rules:
 | One channel flags P0, others approve | **High** | Report P0 (critical from any source) |
 | One channel flags P1/P2, others approve | **Medium** | Report with attribution |
 | Channels contradict each other | **Low** | Present both for user adjudication |
+
+> **A clean run still needs a quorum.** Since mmr 4.0.0 the verdict also reflects
+> how many channels actually reported. If fewer than
+> `defaults.min_completed_channels` (default **2**) completed, the result is
+> `needs-user-decision` — not `pass` — even with zero findings, because one
+> reviewer agreeing with itself is not multi-model review. Run `mmr doctor` to
+> see which channel is missing. A real blocking finding still reports as
+> `blocked` regardless of the floor.
 
 ### How It Works
 
@@ -1537,22 +1557,26 @@ mmr review --channels=doc-conformance
 
 Runs `scaffold observe audit` as a built-in MMR channel, mapping findings to MMR's Finding shape with stable composite location IDs (`<source_doc>::<lens_id>::<short_id>`). Disabled by default — enable per-project in `.mmr.yaml`:
 ```yaml
-channels_enabled:
-  - doc-conformance
+channels:
+  doc-conformance:
+    enabled: true
 ```
 
 ## Methodology Presets
 
-Not every project needs all 60 steps. Choose a methodology when you run `scaffold init`:
+Not every project needs all 99 steps. Choose a methodology when you run `scaffold init`:
 
 ### deep (depth 5)
-All steps enabled. Comprehensive analysis of every angle — domain modeling, ADRs, security review, traceability matrix, the works. At depth 4-5, review steps dispatch to the three MMR CLI channels (Codex, Antigravity, Claude) for multi-model validation, with the Superpowers code-reviewer agent added as a complementary 4th channel via the scaffold wrappers. Best for complex systems, team projects, or when you want thorough documentation.
+64 of the 99 steps enabled — every planning step, including domain modeling, ADRs, security review, and the traceability matrix. (The game and cross-service families stay off until a project-type overlay turns them on.) At depth 4-5, review steps dispatch to the three MMR CLI channels (Codex, Antigravity, Claude) for multi-model validation, with the Superpowers code-reviewer agent added as a complementary 4th channel via the scaffold wrappers. Best for complex systems, team projects, or when you want thorough documentation.
 
 ### mvp (depth 1)
-Only 7 critical steps: create-prd, review-prd, user-stories, review-user-stories, tdd, implementation-plan, and implementation-playbook. Minimal ceremony — get to code fast. Best for prototypes, hackathons, or solo projects.
+23 steps — vision and PRD with their reviews, user stories, github-setup, beads, tech-stack, coding-standards, tdd, project-structure, dev-env-setup, git-workflow, the implementation plan and playbook, plus the stateless build loops. Minimal ceremony — get to code fast. Best for prototypes, hackathons, or solo projects.
 
 ### custom (configurable)
-You choose which steps to enable and set a default depth (1-5). You can also override depth per step. Best when you know which parts of the pipeline matter for your project.
+60 steps enabled by default; you choose which to enable and set a default depth (1-5), and can override depth per step. Best when you know which parts of the pipeline matter for your project.
+
+### brownfield (depth 3) — selected by `adopt`, not `init`
+39 steps: foundation, environment, and quality first, with the doc-chain middle (modeling → specification), platform parity, and the validation audits disabled. `scaffold adopt --apply` selects this for you when bringing an existing codebase under Scaffold; opt individual steps back in with `scaffold adopt --include <step>`. It is **not** a valid `scaffold init --methodology` value.
 
 You can change methodology mid-pipeline with `scaffold init --methodology <preset>`. Scaffold preserves your completed work and adjusts what's remaining.
 
