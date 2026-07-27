@@ -133,7 +133,7 @@ mmr review --pr 123 --channels grok claude --sync --format json
 | `mmr sessions <start\|list\|show\|end> <id>` | Manage multi-round review sessions (stored under `~/.mmr/sessions/`). |
 | `mmr config <init\|test\|channels\|path\|show\|enable\|disable\|set\|unset>` | Scaffold, inspect, and **mutate** `.mmr.yaml`. `init` scaffolds; `test` pre-flights install + auth; `channels` lists (add `--format text` for a table with a provenance SOURCE column); `show <name>` inspects one channel with provenance; `path` discloses the read/write search order; `enable`/`disable <channel>` toggle a channel; `set <dotted.path> <value>` / `unset <dotted.path>` edit any value (validated before write). All mutators are scope-aware (`--global`/`--project`) and never leave an invalid config on disk. |
 | `mmr doctor [--fix] [--format json]` | Diagnose every channel's health (install + auth) with per-channel remediation. `--fix` disables channels whose CLI is not installed (records to `~/.mmr/config.yaml`). |
-| `mmr critique [input] [--context repo] [--session <id>] [--lenses …] [--no-synthesis] [--format text\|json]` | Multi-model **design/brainstorm critique** of an artifact (a design doc, a pasted "problem + proposed solution", or a plan). Reports **convergence** (where models agreed), **divergence** (genuine splits + the deciding crux), and an editorial **synthesis** that never picks a winner. **Advisory: no pass/fail gate — once the input resolves, it always exits 0, whatever the critique says** (a usage error, such as a missing or unreadable input, still exits 1). A peer to `review`, not a code review. `--context repo` (or `--context-paths a.ts,b.ts`) grounds it in the codebase; `--session <id>` iterates across rounds (each round sees the prior one); `--lenses` gives each channel a persona, cycled one per channel — built-ins are `skeptic`, `simplifier`, `user-advocate`, `pragmatist`, `security`, `scale` (any other name gets a generic preamble), and passing any relabels the output to "perspectives"; `--no-synthesis` skips the synthesis pass, which otherwise runs only when ≥2 items and ≥2 channels came back and the `claude` channel is installed and authed. |
+| `mmr critique [input]` | Multi-model **design critique** of an artifact — advisory, never gates. A peer to `review`, not a code review. See [below](#mmr-critique-the-design-peer). |
 | `mmr commands [--format json]` | Machine-readable capability manifest — every command with a runnable example and a `writes` flag. Agents load this once instead of probing `--help`. |
 | `mmr explain [<topic>]` | Inline just-in-time docs for a concept (`channels`, `config`, `scopes`, `compensation`, `redaction`, `provenance`). No arg lists the topics. |
 | `mmr ack <add\|list\|rm\|prune>` | Sticky acknowledgments — silence a finding by its stable key so it stops blocking across rounds. `--scope project` (default, `./.mmr/acks`) or `user` (`~/.mmr/acks`); project acks shadow user acks. A re-worded finding still matches via the same shingle threshold. **`prune` is a no-op stub today** :cite[packages/mmr/src/commands/ack.ts:95]. |
@@ -163,6 +163,41 @@ the managed block and leaves the rest of the file intact; the dedicated Cursor f
 is created fresh and needs `--force` to overwrite. The skill bodies are bundled with
 the package under `packages/mmr/templates/skills/` :cite[packages/mmr/templates/skills/agents/mmr-review.md:1].
 :::
+
+## `mmr critique` — the design peer
+
+`review` judges a diff. `critique` judges a **design**: a design doc, a plan, or
+a pasted "problem + proposed solution". Use it *before* you build, when you want
+independent models to weigh an approach.
+
+It is **advisory and never gates**. Once the input resolves it exits `0`,
+whatever the critique says; only a usage error (missing or unreadable input)
+exits `1`. There is no severity, no `fix_threshold`, and no verdict.
+
+The report has three parts:
+
+- **Convergence** — what the models independently agreed on. High signal.
+- **Divergence** — where they genuinely split, each position paired with the
+  *crux* that decides it.
+- **Synthesis** — an editorial read that deliberately never picks a winner.
+
+| Flag | Effect |
+| --- | --- |
+| `--context repo` | Ground the critique in the codebase so models judge *fit*, not just the idea. Default `none`. |
+| `--context-paths a.ts,b.ts` | Ground against specific files (implies `--context repo`). |
+| `--session <id>` | Iterate: each round sees the prior round and your revisions. |
+| `--lenses <a,b,…>` | Give each channel a persona, cycled one per channel. Built-ins: `skeptic`, `simplifier`, `user-advocate`, `pragmatist`, `security`, `scale`. Any other name gets a generic preamble. Passing any lens relabels the output to "perspectives". |
+| `--no-synthesis` | Skip the synthesis pass (deterministic output only). |
+| `--format text\|json` | Default `text`. Note: no `markdown`, unlike `review`. |
+
+The synthesis pass is conditional, not guaranteed — it runs only when at least
+two items and two channels came back *and* the `claude` channel is installed and
+authenticated. Otherwise you get the deterministic report alone.
+
+```bash
+mmr critique docs/design.md --context repo
+mmr critique - --focus "scaling" --lenses skeptic,pragmatist
+```
 
 ## Channel architecture
 

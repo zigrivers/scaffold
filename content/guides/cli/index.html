@@ -1719,8 +1719,12 @@ or read the bundled <code>content/guides/&#x3C;topic>/index.md</code> directly. 
 <h2 id="operations-the-parallel-agent-kit">Operations — the parallel-agent kit</h2>
 <p>These six commands are orthogonal to the pipeline: they install and run the
 machinery that lets several agents work one repo at once. None of them touch
-pipeline state. They are opt-in — a project that never runs
-<code>scaffold agent-ops install</code> never sees them.</p>
+pipeline state.</p>
+<p>All six are registered on the root CLI, so they always appear in
+<code>scaffold --help</code>. What is opt-in is the <em>machinery</em> they drive: until you run
+<code>scaffold agent-ops install</code>, there are no queue scripts, no gate seeds, and no
+poller for them to operate on, and most will tell you so rather than do
+anything.</p>
 <div class="filter-table"><input type="text" class="filter-input" placeholder="Filter…" aria-label="Filter table rows" disabled>
 
 
@@ -1825,13 +1829,15 @@ project relies on the harvest-before-remove ordering the
 <a href="../multi-agent/index.md">multi-agent guide</a> describes, copy that script in
 yourself or run <code>scaffold observe harvest --worktree &#x3C;path></code> before
 <code>git worktree remove</code>. Removing a worktree without harvesting loses its ledger
-permanently.
-::: Seeded files (<code>gate</code>) are generated once and never overwritten without
+permanently.</p></div>
+<p>Seeded files (<code>gate</code>) are generated once and never overwritten without
 <code>--force</code>. Every install writes <code>.scaffold/agent-ops-manifest.json</code> and
 <code>.scaffold/agent-ops-version</code>; <code>scaffold agent-ops check</code> compares the tree
 against that manifest and exits <code>1</code> on a stale version, a locally modified file,
 or a missing file (files the manifest doesn't know about are reported but never
-fail the check).</p><h3 id="scaffold-mq-the-merge-queue"><code>scaffold mq</code> — the merge queue</h3><p>A local batching merge queue: PRs are enqueued, gated in batches, and merged in
+fail the check).</p>
+<h3 id="scaffold-mq-the-merge-queue"><code>scaffold mq</code> — the merge queue</h3>
+<p>A local batching merge queue: PRs are enqueued, gated in batches, and merged in
 order, so parallel agents don't each re-run the full suite against a moving
 <code>main</code>.</p>
 
@@ -1874,13 +1880,16 @@ order, so parallel agents don't each re-run the full suite against a moving
 
 
 
-<table><thead><tr><th>Action</th><th>What it does</th></tr></thead><tbody><tr><td><code>enqueue --pr &#x3C;N></code></td><td>Add a PR to the queue (fire-and-forget; auto-starts the daemon)</td></tr><tr><td><code>daemon [--foreground]</code></td><td>Run the queue daemon; <code>--foreground</code> also logs to stdout</td></tr><tr><td><code>status [--pr &#x3C;N>] [--format json]</code></td><td>Queue state, the paused banner, per-PR states</td></tr><tr><td><code>eject --pr &#x3C;N></code></td><td>Withdraw a PR from the queue</td></tr><tr><td><code>release --pr &#x3C;N></code></td><td>Return a <code>HELD_HUMAN</code> (overlap-zone) PR to the queue; it lands solo-gated</td></tr><tr><td><code>stats</code></td><td>Calibration metrics — arrivals, gate outcomes, median gate time, flakes, cache hits, TIA map age</td></tr><tr><td><code>bootstrap --pr &#x3C;N> [--finish]</code></td><td>Guided FIRST merge for a repo installing the queue in its own PR; <code>--finish</code> resumes a partial run</td></tr><tr><td><code>gate-cache --check-tree &#x3C;sha></code> / <code>--record-tree &#x3C;sha></code></td><td>Look up or record a tree in the gate-result cache (which lets the queue skip a gate when this exact tree already ran green). Both flags are hidden from <code>--help</code>; a bare <code>gate-cache</code> exits with <code>MQ_GATE_CACHE_NO_TREE</code>.</td></tr></tbody></table><p>Queue state lives under <code>.mq/</code> — an append-only <code>journal.jsonl</code> that the queue
+
+<table><thead><tr><th>Action</th><th>What it does</th></tr></thead><tbody><tr><td><code>enqueue --pr &#x3C;N></code></td><td>Add a PR to the queue (fire-and-forget; auto-starts the daemon)</td></tr><tr><td><code>daemon [--foreground]</code></td><td>Run the queue daemon; <code>--foreground</code> also logs to stdout</td></tr><tr><td><code>status [--pr &#x3C;N>] [--format json]</code></td><td>Queue state, the paused banner, per-PR states</td></tr><tr><td><code>eject --pr &#x3C;N></code></td><td>Withdraw a PR from the queue</td></tr><tr><td><code>release --pr &#x3C;N></code></td><td>Return a <code>HELD_HUMAN</code> (overlap-zone) PR to the queue; it lands solo-gated</td></tr><tr><td><code>stats</code></td><td>Calibration metrics — arrivals, gate outcomes, median gate time, flakes, cache hits, TIA map age</td></tr><tr><td><code>bootstrap --pr &#x3C;N> [--finish]</code></td><td>Guided FIRST merge for a repo installing the queue in its own PR; <code>--finish</code> resumes a partial run</td></tr><tr><td><code>gate-cache --check-tree &#x3C;sha></code> / <code>--record-tree &#x3C;sha></code></td><td>Look up or record a tree in the gate-result cache (which lets the queue skip a gate when this exact tree already ran green). Both flags are hidden from <code>--help</code>; a bare <code>gate-cache</code> exits with <code>MQ_GATE_CACHE_NO_TREE</code>.</td></tr></tbody></table>
+<p>Queue state lives under <code>.mq/</code> — an append-only <code>journal.jsonl</code> that the queue
 state is a reduction of, plus the gate cache, logs, and the daemon lock.
 Configuration is the <code>merge_queue:</code> block of <code>.scaffold/agent-ops.yaml</code>
 (<span class="fp" data-path="src/merge-queue/types.ts:95">src/merge-queue/types.ts:95</span>); notable keys are <code>gate_command</code>
 (default <code>make check-affected</code>), <code>full_gate_command</code> (default <code>make check</code>),
 <code>batch_cap</code> (16), <code>ready_label</code> (<code>mq:ready</code>), <code>overlap_zones</code>, and
-<code>overlap_zone_policy</code> (<code>solo</code> | <code>hold</code>).</p><h3 id="scaffold-tia-test-impact-analysis"><code>scaffold tia</code> — test-impact analysis</h3>
+<code>overlap_zone_policy</code> (<code>solo</code> | <code>hold</code>).</p>
+<h3 id="scaffold-tia-test-impact-analysis"><code>scaffold tia</code> — test-impact analysis</h3>
 
 
 
@@ -1901,12 +1910,14 @@ Configuration is the <code>merge_queue:</code> block of <code>.scaffold/agent-op
 
 
 
-<table><thead><tr><th>Action</th><th>What it does</th></tr></thead><tbody><tr><td><code>affected --base &#x3C;ref></code></td><td>Print the selected test list plus a confidence verdict</td></tr><tr><td><code>record-due</code></td><td>Predicate: is a coverage-map recording due right now?</td></tr><tr><td><code>ingest</code></td><td>Fold a V8 coverage dump into <code>.mq/tia/map.json</code></td></tr></tbody></table><div class="callout callout-warning"><p><strong>Two exit codes here are answers, not failures.</strong> <code>scaffold tia affected</code> exits
+
+<table><thead><tr><th>Action</th><th>What it does</th></tr></thead><tbody><tr><td><code>affected --base &#x3C;ref></code></td><td>Print the selected test list plus a confidence verdict</td></tr><tr><td><code>record-due</code></td><td>Predicate: is a coverage-map recording due right now?</td></tr><tr><td><code>ingest</code></td><td>Fold a V8 coverage dump into <code>.mq/tia/map.json</code></td></tr></tbody></table>
+<div class="callout callout-warning"><p><strong>Two exit codes here are answers, not failures.</strong> <code>scaffold tia affected</code> exits
 <strong>3</strong> to mean <em>"don't trust this selection — run the full suite"</em>, and it fails
 closed: any uncertainty, and any thrown error, produces a 3
 (<span class="fp" data-path="src/cli/commands/tia.ts:115">src/cli/commands/tia.ts:115</span>). <code>scaffold tia record-due</code> exits <strong>1</strong> to
 mean <em>"not due"</em> (<span class="fp" data-path="src/cli/commands/tia.ts:136">src/cli/commands/tia.ts:136</span>) and prints nothing. Treat
-a non-zero here as a routing decision, not an error.</p></div></div>
+a non-zero here as a routing decision, not an error.</p></div>
 <p>Recording cadence is <code>merge_queue.tia.record</code> in <code>.scaffold/agent-ops.yaml</code> —
 <code>scheduled</code> (default; first green pass per UTC day), <code>always</code>, or <code>off</code>.</p>
 <h3 id="scaffold-sched"><code>scaffold sched</code></h3>

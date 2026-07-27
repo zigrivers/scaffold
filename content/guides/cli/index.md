@@ -216,8 +216,13 @@ or read the bundled `content/guides/<topic>/index.md` directly. The generated
 
 These six commands are orthogonal to the pipeline: they install and run the
 machinery that lets several agents work one repo at once. None of them touch
-pipeline state. They are opt-in — a project that never runs
-`scaffold agent-ops install` never sees them.
+pipeline state.
+
+All six are registered on the root CLI, so they always appear in
+`scaffold --help`. What is opt-in is the *machinery* they drive: until you run
+`scaffold agent-ops install`, there are no queue scripts, no gate seeds, and no
+poller for them to operate on, and most will tell you so rather than do
+anything.
 
 :::filter-table
 | Command | What it does |
@@ -284,7 +289,9 @@ project relies on the harvest-before-remove ordering the
 yourself or run `scaffold observe harvest --worktree <path>` before
 `git worktree remove`. Removing a worktree without harvesting loses its ledger
 permanently.
-::: Seeded files (`gate`) are generated once and never overwritten without
+:::
+
+Seeded files (`gate`) are generated once and never overwritten without
 `--force`. Every install writes `.scaffold/agent-ops-manifest.json` and
 `.scaffold/agent-ops-version`; `scaffold agent-ops check` compares the tree
 against that manifest and exits `1` on a stale version, a locally modified file,
