@@ -1408,10 +1408,12 @@ commands keep them current.</p></div></div>
 <p><code>mmr</code> is a <strong>separate package</strong> — installing <code>scaffold</code> does not install it. The
 review workflow (<code>scaffold run review-pr</code> / <code>review-code</code>, and the mandatory
 post-PR review) drives <code>mmr</code>, so install it alongside:</p>
-<pre><code class="language-bash">npm install -g @zigrivers/mmr
-mmr doctor        # which reviewer CLIs are installed + authed, and how to fix each
+<pre><code class="language-bash">npm install -g @zigrivers/mmr    # or: brew install mmr  (same zigrivers/scaffold tap)
+mmr doctor                       # which reviewer CLIs are installed + authed, and how to fix each
 </code></pre>
-<p>Keep it current with <code>npm update -g @zigrivers/mmr</code>.</p>
+<p>Both surfaces are published on every <code>mmr-v*</code> tag, so pick whichever matches how
+you installed <code>scaffold</code>. Keep it current with <code>npm update -g @zigrivers/mmr</code> or
+<code>brew update &#x26;&#x26; brew upgrade mmr</code>.</p>
 <p><code>mmr</code> orchestrates <em>other</em> CLIs — it does not bundle any model. <code>mmr doctor</code>
 tells you which of <code>codex</code>, <code>claude</code>, <code>grok</code>, <code>agy</code>, and <code>opencode</code> are present
 and authenticated, and prints the exact recovery command for each. A channel

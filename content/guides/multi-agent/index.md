@@ -186,13 +186,21 @@ each batch runs only the tests the batch can break, and with
 `scaffold sched install post-merge-poller` so the authoritative full gate still
 runs after merges land. `scaffold doctor` health-checks all of it at once. The
 full command surface for these lives in the
-[CLI reference](../cli/index.md#operations--the-parallel-agent-kit).
+[CLI reference](../cli/index.md#operations-the-parallel-agent-kit).
 
 ## Teardown & harvest
 
 When an agent's work is merged, retire its worktree. The single command for this
 is `scripts/teardown-agent-worktree.sh <worktree-path>`, and the **order of
 operations is the whole point**.
+
+:::callout{type=note}
+**This script lives in Scaffold's own repo, not in the agent-ops bundle.**
+`scaffold agent-ops install --component git` ships `setup-agent-worktree.sh` but
+no teardown counterpart. In a generated project, either copy the script in or do
+the two steps by hand in this order: `scaffold observe harvest --worktree
+<path>` **first**, then `git worktree remove <path>`.
+:::
 
 :::callout{type=danger}
 **Harvest the ledger BEFORE removing the worktree — or lose the build record.**

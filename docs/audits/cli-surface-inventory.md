@@ -47,9 +47,9 @@ options on every command: `--format json`, `--auto`, `--verbose`, `--root <dir>`
 
 | Command | Notable flags | Guide coverage |
 |---|---|---|
-| `init` | `--methodology deep\|mvp\|custom`, `--depth 1-5`, `--adapters`, `--traits`, `--project-type`, `--from <yaml\|->`, `--idea`, plus the flag families | [install#scaffold-init](../../content/guides/install/index.md), [cli#setup--adoption](../../content/guides/cli/index.md) |
-| `adopt` | `--write [path]`, `--include`, `--apply`, `--plan`, `--plan-key`, `--dry-run` *(deprecated no-op)* | [install#scaffold-adopt](../../content/guides/install/index.md), [cli#setup--adoption](../../content/guides/cli/index.md) |
-| `build` | `--validate-only` | [cli#platform--skills](../../content/guides/cli/index.md) |
+| `init` | `--methodology deep\|mvp\|custom`, `--depth 1-5`, `--adapters`, `--traits`, `--project-type`, `--from <yaml\|->`, `--idea`, plus the flag families | [install#scaffold-init](../../content/guides/install/index.md), [cli#setup-adoption](../../content/guides/cli/index.md) |
+| `adopt` | `--write [path]`, `--include`, `--apply`, `--plan`, `--plan-key`, `--dry-run` *(deprecated no-op)* | [install#scaffold-adopt](../../content/guides/install/index.md), [cli#setup-adoption](../../content/guides/cli/index.md) |
+| `build` | `--validate-only` | [cli#platform-skills](../../content/guides/cli/index.md) |
 
 ## 1.2 Pipeline navigation
 
@@ -67,27 +67,27 @@ options on every command: `--format json`, `--auto`, `--verbose`, `--root <dir>`
 
 | Command | Notable flags | Guide coverage |
 |---|---|---|
-| `status` | `--phase`, `--compact`, `--service` | [cli#status--dashboard](../../content/guides/cli/index.md) |
-| `info [step]` | `--service` | [cli#status--dashboard](../../content/guides/cli/index.md) |
-| `list` | `--section methodologies\|platforms\|tools` | [cli#status--dashboard](../../content/guides/cli/index.md) |
-| `decisions` | `--step`, `--last`, `--service` | [cli#status--dashboard](../../content/guides/cli/index.md) |
+| `status` | `--phase`, `--compact`, `--service` | [cli#status-dashboard](../../content/guides/cli/index.md) |
+| `info [step]` | `--service` | [cli#status-dashboard](../../content/guides/cli/index.md) |
+| `list` | `--section methodologies\|platforms\|tools` | [cli#status-dashboard](../../content/guides/cli/index.md) |
+| `decisions` | `--step`, `--last`, `--service` | [cli#status-dashboard](../../content/guides/cli/index.md) |
 | `dashboard` | `--output`, `--open/--no-open`, `--json-only`, `--service` | [dashboard](../../content/guides/dashboard/index.md) |
 | `version` | — | [install#keeping-current](../../content/guides/install/index.md) |
 | `update` | `--check-only`, `--skip-build` | [install#keeping-current](../../content/guides/install/index.md) |
 | `validate` | `--scope config,frontmatter,state,dependencies` | [cli#validation](../../content/guides/cli/index.md) |
 | `validate-knowledge` | — | [knowledge#authoring-a-new-entry](../../content/guides/knowledge/index.md) |
-| `guides [topic]` | `--list`, `--markdown`, `--print-path`, `--open/--no-open`, `--build` | [cli#platform--skills](../../content/guides/cli/index.md) |
-| `skill <install\|list\|remove>` | `--platform codex\|antigravity\|cursor\|opencode` | [cli#platform--skills](../../content/guides/cli/index.md) |
+| `guides [topic]` | `--list`, `--markdown`, `--print-path`, `--open/--no-open`, `--build` | [cli#platform-skills](../../content/guides/cli/index.md) |
+| `skill <install\|list\|remove>` | `--platform codex\|antigravity\|cursor\|opencode` | [cli#platform-skills](../../content/guides/cli/index.md) |
 
 ## 1.4 Observability — `scaffold observe`
 
 | Subcommand | Notable flags | Guide coverage |
 |---|---|---|
 | `event <type>` | `--branch` *(required)*, `--task-id`, payload flags per type | [observability#the-nine-event-types](../../content/guides/observability/index.md) |
-| `progress` | `--replay`, `--stall-check/--no-stall-check`, `--json`, `--mask-paths`, `--since-hours`, `--output`, `--render=dashboard-fragment` | [observability#progress-replay--stall](../../content/guides/observability/index.md) |
+| `progress` | `--replay`, `--stall-check/--no-stall-check`, `--json`, `--mask-paths`, `--since-hours`, `--output`, `--render=dashboard-fragment` | [observability#progress-replay-stall](../../content/guides/observability/index.md) |
 | `audit` | `--scope`, `--lens`, `--profile`, `--fix`, `--fix-threshold`, `--output`, `--render`, `--output-mode`, `--knowledge-root`, `--json`, `--mask-paths`, `--show-acknowledged`, `--since-hours` | [observability#the-observe-audit-cli](../../content/guides/observability/index.md) |
-| `ack <prefix-or-id>` | `--status acknowledged\|open`, `--note` | [observability#companion-verb--scaffold-observe-ack](../../content/guides/observability/index.md) |
-| `harvest` | `--worktree`, `--recover` | [observability#harvest-recover--teardown](../../content/guides/observability/index.md), [multi-agent#teardown--harvest](../../content/guides/multi-agent/index.md) |
+| `ack <prefix-or-id>` | `--status acknowledged\|open`, `--note` | [observability#companion-verb-scaffold-observe-ack](../../content/guides/observability/index.md) |
+| `harvest` | `--worktree`, `--recover` | [observability#harvest-recover-teardown](../../content/guides/observability/index.md), [multi-agent#teardown-harvest](../../content/guides/multi-agent/index.md) |
 
 ## 1.5 Knowledge
 
@@ -100,11 +100,11 @@ options on every command: `--format json`, `--auto`, `--verbose`, `--root <dir>`
 | `knowledge-freshness audit-prefilter` | `--max` *(10)* | [knowledge-freshness#refresh-arm-commands](../../content/guides/knowledge-freshness/index.md) |
 | `knowledge-freshness audit-run-entry <path>` | `--timeout` *(600)*, `--provider anthropic\|deepseek\|zai` | [knowledge-freshness#refresh-arm-commands](../../content/guides/knowledge-freshness/index.md) **(fixed: `zai` + `--timeout` were missing)** |
 | `knowledge-freshness audit-apply <entry> <verdict>` | `--open-pr`, `--mmr-job-id` | [knowledge-freshness#refresh-arm-commands](../../content/guides/knowledge-freshness/index.md) |
-| `knowledge-freshness link-check [files..]` | `--files-from` | [knowledge-freshness#gate-side-subcommands](../../content/guides/knowledge-freshness/index.md) |
-| `knowledge-freshness lint-unsourced [files..]` | `--diff`, `--files-from` | [knowledge-freshness#gate-side-subcommands](../../content/guides/knowledge-freshness/index.md) |
-| `knowledge-freshness anti-over-rewrite [files..]` | `--diff`, `--pr-labels`, `--files-from` | [knowledge-freshness#gate-side-subcommands](../../content/guides/knowledge-freshness/index.md) |
-| `knowledge-freshness deep-guidance-check [files..]` | `--files-from` | [knowledge-freshness#gate-side-subcommands](../../content/guides/knowledge-freshness/index.md) |
-| `knowledge-freshness bump-version` | `--title` *(required)*, `--body`, `--count`, `--replay-stdin` | [knowledge-freshness#gate-side-subcommands](../../content/guides/knowledge-freshness/index.md) **(fixed: `--count`/`--replay-stdin` were missing)** |
+| `knowledge-freshness link-check [files..]` | `--files-from` | [knowledge-freshness#gate-side-subcommands-also-runnable-locally-for-triage](../../content/guides/knowledge-freshness/index.md) |
+| `knowledge-freshness lint-unsourced [files..]` | `--diff`, `--files-from` | [knowledge-freshness#gate-side-subcommands-also-runnable-locally-for-triage](../../content/guides/knowledge-freshness/index.md) |
+| `knowledge-freshness anti-over-rewrite [files..]` | `--diff`, `--pr-labels`, `--files-from` | [knowledge-freshness#gate-side-subcommands-also-runnable-locally-for-triage](../../content/guides/knowledge-freshness/index.md) |
+| `knowledge-freshness deep-guidance-check [files..]` | `--files-from` | [knowledge-freshness#gate-side-subcommands-also-runnable-locally-for-triage](../../content/guides/knowledge-freshness/index.md) |
+| `knowledge-freshness bump-version` | `--title` *(required)*, `--body`, `--count`, `--replay-stdin` | [knowledge-freshness#gate-side-subcommands-also-runnable-locally-for-triage](../../content/guides/knowledge-freshness/index.md) **(fixed: `--count`/`--replay-stdin` were missing)** |
 
 ## 1.6 Operations — the parallel-agent kit
 
@@ -114,9 +114,9 @@ Every command in this group had **zero guide coverage** before this pass.
 |---|---|---|
 | `doctor` | `--fix`, `--json` | [cli#scaffold-doctor](../../content/guides/cli/index.md) **(added)** |
 | `agent-ops <install\|check>` | `--component git\|staging\|merge-queue\|ci\|gate\|all`, `--force` | [cli#scaffold-agent-ops](../../content/guides/cli/index.md) **(added)** |
-| `hooks install` | — | [cli#operations--the-parallel-agent-kit](../../content/guides/cli/index.md) **(added)** |
-| `mq <enqueue\|daemon\|status\|eject\|release\|stats\|bootstrap\|gate-cache>` | `--pr`, `--finish`, `--foreground` | [cli#scaffold-mq--the-merge-queue](../../content/guides/cli/index.md) + [multi-agent#serializing-the-merges--scaffold-mq](../../content/guides/multi-agent/index.md) **(added)** |
-| `tia <affected\|record-due\|ingest>` | `--base` | [cli#scaffold-tia--test-impact-analysis](../../content/guides/cli/index.md) **(added)** |
+| `hooks install` | — | [cli#operations-the-parallel-agent-kit](../../content/guides/cli/index.md) **(added)** |
+| `mq <enqueue\|daemon\|status\|eject\|release\|stats\|bootstrap\|gate-cache>` | `--pr`, `--finish`, `--foreground` | [cli#scaffold-mq-the-merge-queue](../../content/guides/cli/index.md) + [multi-agent#serializing-the-merges-scaffold-mq](../../content/guides/multi-agent/index.md) **(added)** |
+| `tia <affected\|record-due\|ingest>` | `--base` | [cli#scaffold-tia-test-impact-analysis](../../content/guides/cli/index.md) **(added)** |
 | `sched <install\|uninstall\|status\|list> [job]` | `--interval` *(600)* | [cli#scaffold-sched](../../content/guides/cli/index.md) **(added)** |
 
 ---
@@ -147,15 +147,15 @@ Every command in this group had **zero guide coverage** before this pass.
 
 | File | Owner | Guide coverage |
 |---|---|---|
-| `.scaffold/config.yml` | `loadConfig` (`src/config/loader.ts:49`) | *Intentionally undocumented key-by-key* — it is wizard-written, never hand-authored, and every key is a mechanical projection of a CLI flag already covered by `init --help`. The guides document the concepts it encodes (methodology, depth, project type, services, overlays) in [pipeline#methodology--depth](../../content/guides/pipeline/index.md). |
-| `.scaffold/state.json` | `StateManager` | [pipeline#where-it-all-lives](../../content/guides/pipeline/index.md), [observability#config--timestamps](../../content/guides/observability/index.md) (the `completed_at` / `in_progress_started_at` fields) |
+| `.scaffold/config.yml` | `loadConfig` (`src/config/loader.ts:49`) | *Intentionally undocumented key-by-key* — it is wizard-written, never hand-authored, and every key is a mechanical projection of a CLI flag already covered by `init --help`. The guides document the concepts it encodes (methodology, depth, project type, services, overlays) in [pipeline#methodology-depth](../../content/guides/pipeline/index.md). |
+| `.scaffold/state.json` | `StateManager` | [pipeline#where-it-all-lives](../../content/guides/pipeline/index.md), [observability#config-timestamps](../../content/guides/observability/index.md) (the `completed_at` / `in_progress_started_at` fields) |
 | `.scaffold/observability.yaml` | `loadObservabilityConfig` | [observability#config-reference](../../content/guides/observability/index.md) — complete, every key with type/default/reader |
-| `.scaffold/agent-ops.yaml` | `loadAgentOpsConfig` | [cli#scaffold-mq--the-merge-queue](../../content/guides/cli/index.md) documents the `merge_queue:` keys that change behaviour **(added)**. `docker.*`, `project_name`, `critical_labels`, `worktree_setup_commands` are *intentionally undocumented* — they are installer-managed and only meaningful with the staging component. |
+| `.scaffold/agent-ops.yaml` | `loadAgentOpsConfig` | [cli#scaffold-mq-the-merge-queue](../../content/guides/cli/index.md) documents the `merge_queue:` keys that change behaviour **(added)**. `docker.*`, `project_name`, `critical_labels`, `worktree_setup_commands` are *intentionally undocumented* — they are installer-managed and only meaningful with the staging component. |
 | `.scaffold/agent-ops-manifest.json` / `-version` | `agent-ops install/check` | [cli#scaffold-agent-ops](../../content/guides/cli/index.md) **(added)** |
-| `.scaffold/identity.json` | observability | [observability#worktree-identity](../../content/guides/observability/index.md), [multi-agent#setup](../../content/guides/multi-agent/index.md) |
+| `.scaffold/identity.json` | observability | [observability#worktree-identity](../../content/guides/observability/index.md), [multi-agent#setup-setup-agent-worktreesh](../../content/guides/multi-agent/index.md) |
 | `.scaffold/activity.jsonl` + `activity-archive/` | ledger writer / harvester | [observability#the-ledger](../../content/guides/observability/index.md) |
 | `.scaffold/decisions.jsonl`, `lock.json`, `rework.json`, `last-test-run.json` | various | *Intentionally undocumented as file formats* — internal runtime state with no supported hand-editing path; the commands that read them (`decisions`, `rework`, the `tests` adapter) are documented. |
-| `.mq/` (journal, gate-cache, quarantine, locks, logs, `tia/map.json`) | merge queue / TIA | [cli#scaffold-mq--the-merge-queue](../../content/guides/cli/index.md) documents the directory's role **(added)**; per-file formats are *intentionally undocumented* (daemon-internal, journal is append-only and reduced in code). |
+| `.mq/` (journal, gate-cache, quarantine, locks, logs, `tia/map.json`) | merge queue / TIA | [cli#scaffold-mq-the-merge-queue](../../content/guides/cli/index.md) documents the directory's role **(added)**; per-file formats are *intentionally undocumented* (daemon-internal, journal is append-only and reduced in code). |
 | `~/.mmr/config.yaml` + `./.mmr.yaml` | mmr loader | [mmr#configuration-mmryaml](../../content/guides/mmr/index.md) — **(fixed: `min_completed_channels`, `format`, `job_retention_days`, `loop_control`, `compensator`, `review_criteria`, `templates` were missing)** |
 | `~/.mmr/{jobs,sessions,acks,critique-sessions}/` | mmr stores | [mmr#other-subcommands](../../content/guides/mmr/index.md) |
 
@@ -192,7 +192,7 @@ usage/dispatch errors · `5` job not found · `130`/`143` signals.
 `mmr critique` exits `0` once its input resolves, whatever the critique says;
 a usage error still exits `1`.
 
-**Coverage:** [mmr#the-gate--the-four-verdicts](../../content/guides/mmr/index.md)
+**Coverage:** [mmr#the-gate-the-four-verdicts](../../content/guides/mmr/index.md)
 and [mmr#trust-modes-and-the-ratification-gate](../../content/guides/mmr/index.md)
 **(added)**; per-command codes for `status` in
 [mmr#other-subcommands](../../content/guides/mmr/index.md).
@@ -204,11 +204,11 @@ and [mmr#trust-modes-and-the-ratification-gate](../../content/guides/mmr/index.m
 | Extension point | Count / values | Guide coverage |
 |---|---|---|
 | **Project types** | 14: web-app, mobile-app, backend, cli, library, game, data-pipeline, ml, browser-extension, research, data-science, web3, mcp-server, macos-native | [cli#flags---auto-cannot-default](../../content/guides/cli/index.md), [pipeline#project-type-playbooks](../../content/guides/pipeline/index.md) |
-| **Methodology presets** | 4 full presets (`mvp`, `custom-defaults`, `deep`, `brownfield`) + 15 project-type overlays + 4 domain sub-overlays | [pipeline#methodology--depth](../../content/guides/pipeline/index.md) — the `brownfield` preset is covered in [install#scaffold-adopt](../../content/guides/install/index.md) |
+| **Methodology presets** | 4 full presets (`mvp`, `custom-defaults`, `deep`, `brownfield`) + 15 project-type overlays + 4 domain sub-overlays | [pipeline#methodology-depth](../../content/guides/pipeline/index.md) — the `brownfield` preset is covered in [install#scaffold-adopt](../../content/guides/install/index.md) |
 | **Phases** | 16 (`PHASES`, `src/types/frontmatter.ts:6`) | [pipeline#the-16-phases-at-a-glance](../../content/guides/pipeline/index.md) |
 | **Pipeline steps** | **99** files across 16 phase dirs | [pipeline](../../content/guides/pipeline/index.md) **(fixed: said 90)** |
 | **Tool meta-prompts** | 12 | [README §Utility Tools](../../README.md) **(fixed: `knowledge-audit-entry` was missing)** |
-| **Platform adapters** | 3: `claude-code`, `codex`, `universal` | *Intentionally undocumented per-adapter* — users select them via `--adapters` and never author one; `scaffold list --section platforms` enumerates them. Referenced in [cli#platform--skills](../../content/guides/cli/index.md). |
+| **Platform adapters** | 3: `claude-code`, `codex`, `universal` | *Intentionally undocumented per-adapter* — users select them via `--adapters` and never author one; `scaffold list --section platforms` enumerates them. Referenced in [cli#platform-skills](../../content/guides/cli/index.md). |
 | **Skills** | 5 canonical (`scaffold-runner`, `scaffold-pipeline`, `work-beads`, `mmr`, `multi-model-dispatch`); 4 `--platform` targets | [README §Step 2](../../README.md) **(fixed: listed 3 of 5)** |
 | **Audit lenses** | 9 (A–I) | [observability#the-nine-lens-audit](../../content/guides/observability/index.md) |
 | **Observability adapters** | 8 (5 emit, 3 probe) | [observability#adapters](../../content/guides/observability/index.md) **(fixed: `bd` floor was v1.0.0, is v1.1.0)** |
@@ -218,12 +218,12 @@ and [mmr#trust-modes-and-the-ratification-gate](../../content/guides/mmr/index.m
 | **Doctor checks** | 10 checks in 6 sections, 3 with `--fix` | [cli#scaffold-doctor](../../content/guides/cli/index.md) **(added)** |
 | **agent-ops components** | 6: git, staging, merge-queue, ci, gate, all | [cli#scaffold-agent-ops](../../content/guides/cli/index.md) **(added)** |
 | **Scheduler jobs** | 1: `post-merge-poller` | [cli#scaffold-sched](../../content/guides/cli/index.md) **(added)** |
-| **Guides** | 11 topics | [cli#platform--skills](../../content/guides/cli/index.md) |
+| **Guides** | 11 topics | [cli#platform-skills](../../content/guides/cli/index.md) |
 | **MMR channels** | 7 registered: `codex`, `claude`, `grok`, `antigravity` (default-on); `opencode`, `doc-conformance` (opt-in); `gemini` (retired tombstone) | [mmr#built-in-channels](../../content/guides/mmr/index.md) **(fixed: `opencode` missing, `gemini` listed as live)** |
 | **MMR parsers** | 6: `default`, `default-last`, `gemini`, `doc-conformance`, `unwrap-jsonpath`, `regex-findings` | [mmr#channel-architecture](../../content/guides/mmr/index.md) **(fixed: `default-last` was missing)** |
-| **MMR verdicts** | 4, gated by a completion floor of 2 | [mmr#the-gate--the-four-verdicts](../../content/guides/mmr/index.md) **(fixed: floor was undocumented)** |
+| **MMR verdicts** | 4, gated by a completion floor of 2 | [mmr#the-gate-the-four-verdicts](../../content/guides/mmr/index.md) **(fixed: floor was undocumented)** |
 | **MMR critique lenses** | 6: `skeptic`, `simplifier`, `user-advocate`, `pragmatist`, `security`, `scale` | [mmr#other-subcommands](../../content/guides/mmr/index.md) |
-| **Knowledge-freshness providers** | 3: `anthropic`, `deepseek`, `zai` (+ fallback chain) | [knowledge-freshness#providers-cron-uses-deepseek](../../content/guides/knowledge-freshness/index.md) **(fixed: `zai` and the fallback env var were undocumented)** |
+| **Knowledge-freshness providers** | 3: `anthropic`, `deepseek`, `zai` (+ fallback chain) | [knowledge-freshness#providers-cron-uses-zai-deepseek](../../content/guides/knowledge-freshness/index.md) **(fixed: `zai` and the fallback env var were undocumented)** |
 
 ---
 

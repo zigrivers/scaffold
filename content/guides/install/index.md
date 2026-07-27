@@ -75,11 +75,13 @@ review workflow (`scaffold run review-pr` / `review-code`, and the mandatory
 post-PR review) drives `mmr`, so install it alongside:
 
 ```bash
-npm install -g @zigrivers/mmr
-mmr doctor        # which reviewer CLIs are installed + authed, and how to fix each
+npm install -g @zigrivers/mmr    # or: brew install mmr  (same zigrivers/scaffold tap)
+mmr doctor                       # which reviewer CLIs are installed + authed, and how to fix each
 ```
 
-Keep it current with `npm update -g @zigrivers/mmr`.
+Both surfaces are published on every `mmr-v*` tag, so pick whichever matches how
+you installed `scaffold`. Keep it current with `npm update -g @zigrivers/mmr` or
+`brew update && brew upgrade mmr`.
 
 `mmr` orchestrates *other* CLIs — it does not bundle any model. `mmr doctor`
 tells you which of `codex`, `claude`, `grok`, `agy`, and `opencode` are present

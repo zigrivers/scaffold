@@ -653,10 +653,12 @@ Adding a host is a one-line PR to
 4. **Open a normal PR.** Allowlist additions are not a separate trust delegation;
    any maintainer can review.
 
-## Providers (cron uses DeepSeek)
+## Providers (cron uses Z.ai → DeepSeek)
 
-The cron switched to DeepSeek HTTP to remove the local `claude` CLI dependency
-from CI. Local audits keep using whichever provider is configured. Precedence is
+The cron runs on Z.ai HTTP with a DeepSeek fallback chained behind it
+(:cite[.github/workflows/knowledge-freshness-audit.yml:83]), which removes the
+local `claude` CLI dependency from CI entirely. Local audits keep using
+whichever provider is configured. Precedence is
 resolved by `resolveProvider` (:cite[src/knowledge-freshness/providers/index.ts:36]):
 
 1. `--provider <name>` — explicit flag, operator override
@@ -704,8 +706,8 @@ HTTP, same shape as DeepSeek — no subprocess, works in CI.
   GLM allowlist; anything else throws at dispatcher-build time.
 - **URL:** hardcoded, same non-redirectable invariant as DeepSeek.
 
-Reach for this as the `KNOWLEDGE_FRESHNESS_FALLBACK_PROVIDER` behind DeepSeek
-when you want a second HTTP provider with no extra CI dependency.
+This is the **cron's primary provider**, with DeepSeek chained behind it via
+`KNOWLEDGE_FRESHNESS_FALLBACK_PROVIDER=deepseek`.
 :::
 ::::
 
@@ -717,17 +719,19 @@ Hardcoding closes that exfiltration path — the same threat model that hardcode
 Lens H's `claude -p` command in the Build Observability audit.
 :::
 
-The cron wires DeepSeek explicitly
-(:cite[.github/workflows/knowledge-freshness-audit.yml:70]):
+The cron wires the chain explicitly
+(:cite[.github/workflows/knowledge-freshness-audit.yml:83]):
 
 ```yaml
 env:
-  DEEPSEEK_API_KEY:              ${{ secrets.DEEPSEEK_API_KEY }}
-  KNOWLEDGE_FRESHNESS_PROVIDER:  deepseek
-  GH_TOKEN:                      ${{ secrets.GITHUB_TOKEN }}
+  ZAI_API_KEY:                            ${{ secrets.ZAI_API_KEY }}
+  DEEPSEEK_API_KEY:                       ${{ secrets.DEEPSEEK_API_KEY }}
+  KNOWLEDGE_FRESHNESS_PROVIDER:           zai
+  KNOWLEDGE_FRESHNESS_FALLBACK_PROVIDER:  deepseek
+  GH_TOKEN:                               ${{ secrets.GITHUB_TOKEN }}
 ```
 
-A missing `DEEPSEEK_API_KEY` fails the run loudly at preflight rather than
+A missing API key fails the run loudly at preflight rather than
 silently exiting 0 with zero PRs.
 
 ## Every command that touches the system
@@ -766,7 +770,7 @@ is consistent throughout.
 | `knowledge-freshness lint-unsourced [<path>] [--files-from <json>] [--diff <patch>]` | 3 | Heuristic scan for normative language in new lines without a `sources[]` reference. Advisory: prints findings but always exits 0. |
 | `knowledge-freshness anti-over-rewrite [--files-from <json>] [--diff <patch>] [--pr-labels <csv>]` | 4 | For each changed `stable` entry, compare deleted-line count to 20% of the body; exit 1 if crossed without `override:anti-over-rewrite`. The cron passes `--pr-labels ""` (it can't self-apply labels). |
 | `knowledge-freshness deep-guidance-check [<path>] [--files-from <json>]` | 5 | Assert each changed entry still contains a `## Deep Guidance` heading (case-sensitive). |
-| `knowledge-freshness bump-version --title <str> [--body <str>] [--count N] [--replay-stdin]` | — | Pure-function dry-run of `deriveBumpKind` + `bumpSemver`; prints `bump:` and `next:` lines parsed by the version-bump workflow. `--count` is the catch-up multiplier for patch bumps (ignored for minor/major); `--replay-stdin` replays the per-commit bump kind of every un-bumped commit from a `git log -z --format=%B` stream and overrides `--count` — use it for mixed feat/chore batches. |
+| `knowledge-freshness bump-version --title <str> [--body <str>] [--count N] [--replay-stdin]` | — | Pure-function dry-run of `deriveBumpKind` + `bumpSemver`. `--count` is the catch-up multiplier for patch bumps (ignored for minor/major); `--replay-stdin` replays the per-commit bump kind of every un-bumped commit from a `git log -z --format=%B` stream and overrides `--count` — use it for mixed feat/chore batches. **Output differs by mode:** the default prints `current:` / `bump:` / `count:` / `next:`, while `--replay-stdin` prints `current:` / `replayed:` / `next:` and emits **no `bump:` line** — don't grep for one under replay. |
 
 ## Operations cheat sheet
 

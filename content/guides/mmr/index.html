@@ -1947,7 +1947,7 @@ in this branch order <span class="fp" data-path="packages/mmr/src/core/reconcile
 <table><thead><tr><th>Verdict</th><th>Condition</th><th>Exit</th></tr></thead><tbody><tr><td><code>pass</code></td><td>Gate passed, every dispatched channel completed</td><td>0</td></tr><tr><td><code>degraded-pass</code></td><td>Gate passed, at least <code>min_completed_channels</code> reported, but some channel failed / timed out / wasn't installed</td><td>0</td></tr><tr><td><code>blocked</code></td><td>An unacknowledged finding sits at or above the threshold</td><td>2</td></tr><tr><td><code>needs-user-decision</code></td><td>No channel completed, <strong>or</strong> fewer than <code>min_completed_channels</code> did</td><td>3</td></tr></tbody></table>
 <div class="callout callout-warning"><p><strong>The completion floor (mmr 4.0.0).</strong> A verdict now reflects how many reviewers
 actually reported, not just whether the gate passed. <code>defaults.min_completed_channels</code>
-defaults to <strong>2</strong> <span class="fp" data-path="packages/mmr/src/config/schema.ts:263">packages/mmr/src/config/schema.ts:263</span> — so a run where
+defaults to <strong>2</strong> <span class="fp" data-path="packages/mmr/src/config/schema.ts:269">packages/mmr/src/config/schema.ts:269</span> — so a run where
 only one channel came back is <code>needs-user-decision</code>, not <code>degraded-pass</code>, even
 with zero findings. One reviewer agreeing with itself is not consensus.</p><p>Note <code>blocked</code> deliberately outranks the floor: a real blocking finding is
 actionable even when coverage was thin. Jobs created before 4.0.0 are re-read at
@@ -2082,7 +2082,7 @@ channel that exfiltrates secrets, or self-acknowledge its own findings. Use
 
 
 
-<table><thead><tr><th>mode</th><th>when</th><th>project config / acks</th></tr></thead><tbody><tr><td><code>base-ref</code></td><td><code>--config-base-ref</code>, <code>--pr</code> (base branch resolved via <code>gh</code>), <code>--base</code>, or <code>--staged</code> outside CI</td><td>read from the trusted ref</td></tr><tr><td><code>untrusted-head</code></td><td><code>--diff</code>, anything in CI, or a failed base-ref resolution</td><td>not read unless a <code>--trust-project-*</code> flag says so</td></tr><tr><td><code>non-git</code></td><td>not a Git repository</td><td>same as above</td></tr></tbody></table>
+<table><thead><tr><th>mode</th><th>when</th><th>project config / acks</th></tr></thead><tbody><tr><td><code>base-ref</code></td><td><code>--config-base-ref</code>, <code>--pr</code> (base branch resolved via <code>gh</code>), <code>--base</code>, <code>--staged</code> outside CI, or <strong>no input flag at all outside CI</strong> (resolves to <code>HEAD</code>)</td><td>read from the trusted ref</td></tr><tr><td><code>untrusted-head</code></td><td><code>--diff</code>, anything in CI, or a failed base-ref resolution</td><td>not read unless a <code>--trust-project-*</code> flag says so</td></tr><tr><td><code>non-git</code></td><td>not a Git repository</td><td>same as above</td></tr></tbody></table>
 <p>On top of that, <strong>in <code>base-ref</code> mode</strong>, there is a <strong>ratification gate</strong>: if the
 diff under review <em>itself</em> adds or modifies <code>.mmr.yaml</code>, or touches
 <code>.mmr/acks/</code>, the run stops with <code>needs-user-decision</code> and exit <strong>2</strong> before any

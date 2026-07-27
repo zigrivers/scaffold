@@ -33,7 +33,7 @@ an agent worktree's `.scaffold/activity.jsonl` is lost the moment the worktree
 is removed, *unless* it is harvested into the primary archive first. The
 harvester (`src/observability/engine/harvester.ts`) and
 `scripts/teardown-agent-worktree.sh` exist precisely to close this gap — see
-[Harvest, recover & teardown](#harvest-recover--teardown).
+[Harvest, recover & teardown](#harvest-recover-teardown).
 
 ### What good build observability produces
 

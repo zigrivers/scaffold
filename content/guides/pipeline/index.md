@@ -35,7 +35,7 @@ name. Everything in this guide is anchored to it.
 **99 meta-prompts, not 99 steps you run.** The pipeline directory holds 99 files
 across 16 phase directories, but most projects run only a fraction. Game,
 multi-service, and platform-specific steps are disabled unless an overlay turns
-them on, and many steps are conditional (see [Methodology & depth](#methodology--depth)).
+them on, and many steps are conditional (see [Methodology & depth](#methodology-depth)).
 :::
 
 ## The 16 phases at a glance
@@ -386,7 +386,7 @@ how that audit works and what the nine lenses check.
 | path | what it holds |
 | --- | --- |
 | `content/pipeline/<phase>/*.md` | The 99 meta-prompt files, one directory per phase |
-| `content/methodology/*.yml` | Presets (`mvp`, `custom-defaults`, `deep`) + project-type overlays |
+| `content/methodology/*.yml` | Presets (`mvp`, `custom-defaults`, `deep`, `brownfield`) + project-type and domain overlays |
 | `content/knowledge/` | Domain entries injected into prompts during assembly |
 | `src/types/frontmatter.ts` | The canonical `PHASES` constant + frontmatter schema |
 | `src/cli/commands/` | `next`, `run`, `complete`, `skip`, `rework`, `reset`, `status` |

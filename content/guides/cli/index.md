@@ -18,7 +18,7 @@ earns its own page. For the full mental model of a subsystem, follow the links:
   large surface — see the [Build Observability guide](../observability/index.md).
 - **Operations** (`doctor`, `agent-ops`, `hooks`, `mq`, `tia`, `sched`) is the
   opt-in parallel-agent kit — merge queue, test-impact analysis, scheduler,
-  health checks. Documented [below](#operations--the-parallel-agent-kit); the
+  health checks. Documented [below](#operations-the-parallel-agent-kit); the
   worktree side lives in the [Multi-agent guide](../multi-agent/index.md).
 
 All 30 commands are registered on a single yargs root
@@ -260,16 +260,31 @@ call. `--component` selects what lands:
 
 | `--component` | Installs |
 | --- | --- |
-| `git` | Worktree setup/teardown, branch cleanup, main-sync, Beads guard + snapshot, claim reaping, `agent-ops.mk` |
+| `git` | Worktree **setup**, branch cleanup, main-sync, doctor, Beads guard + snapshot, primary-checkout guard, regen-artifact check, claim reaping, `agent-ops.mk`. Note there is no teardown script in the bundle — see the callout below |
 | `staging` | Staging-env and Docker helper scripts under `scripts/ops/`, plus a compose env example |
 | `merge-queue` | `scripts/mq-guard.sh`, the post-merge poller, and a `.mq/` gitignore entry |
 | `ci` | Self-hosted-runner setup plus the `post-merge` and `nightly` workflows |
 | `gate` | Seeds the project-owned `scripts/gate-check.sh` + `scripts/gate-check-affected.sh` (the merge-queue gate contract) |
 | `all` *(default)* | `git` + `staging` only |
 
+`--component` takes exactly one value; it is not repeatable, so
+`--component merge-queue --component ci` fails with
+`AGENT_OPS_INVALID_COMPONENT`. Run the command once per component.
+
 `all` deliberately does **not** include `merge-queue`, `ci`, or `gate` — each of
 those changes how the repo merges or what CI runs, so they stay explicit
-opt-ins. Seeded files (`gate`) are generated once and never overwritten without
+opt-ins.
+
+:::callout{type=warning}
+**Teardown is not in the bundle.** The `git` component installs
+`setup-agent-worktree.sh` but no teardown counterpart —
+`scripts/teardown-agent-worktree.sh` exists only in Scaffold's own repo. If your
+project relies on the harvest-before-remove ordering the
+[multi-agent guide](../multi-agent/index.md) describes, copy that script in
+yourself or run `scaffold observe harvest --worktree <path>` before
+`git worktree remove`. Removing a worktree without harvesting loses its ledger
+permanently.
+::: Seeded files (`gate`) are generated once and never overwritten without
 `--force`. Every install writes `.scaffold/agent-ops-manifest.json` and
 `.scaffold/agent-ops-version`; `scaffold agent-ops check` compares the tree
 against that manifest and exits `1` on a stale version, a locally modified file,

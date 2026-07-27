@@ -442,7 +442,7 @@ in this branch order :cite[packages/mmr/src/core/reconciler.ts:280]:
 :::callout{type=warning}
 **The completion floor (mmr 4.0.0).** A verdict now reflects how many reviewers
 actually reported, not just whether the gate passed. `defaults.min_completed_channels`
-defaults to **2** :cite[packages/mmr/src/config/schema.ts:263] — so a run where
+defaults to **2** :cite[packages/mmr/src/config/schema.ts:269] — so a run where
 only one channel came back is `needs-user-decision`, not `degraded-pass`, even
 with zero findings. One reviewer agreeing with itself is not consensus.
 
@@ -546,7 +546,7 @@ MMR classifies every run into one of three trust modes
 
 | mode | when | project config / acks |
 | --- | --- | --- |
-| `base-ref` | `--config-base-ref`, `--pr` (base branch resolved via `gh`), `--base`, or `--staged` outside CI | read from the trusted ref |
+| `base-ref` | `--config-base-ref`, `--pr` (base branch resolved via `gh`), `--base`, `--staged` outside CI, or **no input flag at all outside CI** (resolves to `HEAD`) | read from the trusted ref |
 | `untrusted-head` | `--diff`, anything in CI, or a failed base-ref resolution | not read unless a `--trust-project-*` flag says so |
 | `non-git` | not a Git repository | same as above |
 

@@ -22,7 +22,7 @@ This repo is a **Claude Code plugin** (installable via `/plugin marketplace add`
 - `content/tools/` — 12 tool meta-prompts (`category: tool`, `stateless: true`) orthogonal to the pipeline
 - `content/knowledge/` — 301 domain expertise entries in 21 categories (injected into prompts during assembly)
 - `content/skills/` — Skill templates with `{{markers}}` for multi-platform resolution
-- `content/methodology/` — Preset configs (deep, mvp, custom)
+- `content/methodology/` — Preset configs (deep, mvp, custom, brownfield — brownfield is adopt-selected, not an `init` choice) plus project-type and domain overlays
 - `src/types/frontmatter.ts` — Canonical `PHASES` constant defining all 16 phase slugs, numbers, and display names
 
 ### Legacy (v1)
@@ -71,7 +71,7 @@ When modifying prompts:
 | `make hooks` | Install pre-commit and pre-push hooks |
 | `scripts/setup-agent-worktree.sh <name>` | Create worktree for parallel agent |
 | `git worktree list` | List all active worktrees |
-| `scaffold agent-ops install [--component git\|staging\|merge-queue\|ci\|all] [--force]` | Install the parallel-agent tooling bundle into a **generated** project (`all` = git+staging; `merge-queue` and `ci` are explicit opt-ins) |
+| `scaffold agent-ops install [--component git\|staging\|merge-queue\|ci\|gate\|all] [--force]` | Install the parallel-agent tooling bundle into a **generated** project (`all` = git+staging; `merge-queue`, `ci`, and `gate` are explicit opt-ins). `--component` takes ONE value — repeat the command per component |
 | `scaffold agent-ops check` | Drift-check an installed agent-ops bundle against its ownership manifest; exits non-zero on staleness |
 | `gh pr create` | Create pull request from current branch |
 | `gh pr merge --squash --delete-branch` | Squash-merge PR and clean up branch |

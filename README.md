@@ -59,7 +59,8 @@ scaffold agent-ops install
 At scale (20+ agents), the bottleneck shifts from worktree hygiene to *merging*: every agent racing a long quality gate against a constantly-moving `main` livelocks. Two opt-in `agent-ops` components fix that. `--component merge-queue` installs a local batching **merge queue** — agents `scaffold mq enqueue --pr <N>` and move on; a single daemon batch-tests ready PRs against current `main` and lands only trees that actually passed (the bors "Not-Rocket-Science" rule), bisecting failures and quarantining flakes. `--component ci` adds day-one post-merge + nightly full-suite CI on a **$0 self-hosted runner** (no paid Actions minutes). The gate itself is made cheap via test-impact analysis (`make check-affected` runs only affected tests; the full suite is the post-merge safety net). `--component all` deliberately stays `git`+`staging` — the queue and CI are explicit opt-ins that the `merge-throughput` pipeline step wires up for projects that expect 3+ concurrent agents.
 
 ```bash
-scaffold agent-ops install --component merge-queue --component ci
+scaffold agent-ops install --component merge-queue
+scaffold agent-ops install --component ci
 scaffold mq status          # inspect the queue; enqueue/eject/stats also available
 ```
 
@@ -140,6 +141,8 @@ Verify: `scaffold version`
 
 ```bash
 npm install -g @zigrivers/mmr
+# or, if you installed scaffold via Homebrew:
+brew install mmr
 ```
 
 Verify with `mmr --help`, then `mmr doctor` to see which reviewer CLIs are installed and authenticated.
@@ -1569,7 +1572,7 @@ channels:
 Not every project needs all 99 steps. Choose a methodology when you run `scaffold init`:
 
 ### deep (depth 5)
-64 of the 99 steps enabled — every planning step, including domain modeling, ADRs, security review, and the traceability matrix. (The game and cross-service families stay off until a project-type overlay turns them on.) At depth 4-5, review steps dispatch to the three MMR CLI channels (Codex, Antigravity, Claude) for multi-model validation, with the Superpowers code-reviewer agent added as a complementary 4th channel via the scaffold wrappers. Best for complex systems, team projects, or when you want thorough documentation.
+64 of the 99 steps enabled — every planning step, including domain modeling, ADRs, security review, and the traceability matrix. (The game, cross-service, macOS-native, and MCP-server step families stay off until a project-type overlay turns them on.) At depth 4-5, review steps dispatch to the three MMR CLI channels (Codex, Antigravity, Claude) for multi-model validation, with the Superpowers code-reviewer agent added as a complementary 4th channel via the scaffold wrappers. Best for complex systems, team projects, or when you want thorough documentation.
 
 ### mvp (depth 1)
 23 steps — vision and PRD with their reviews, user stories, github-setup, beads, tech-stack, coding-standards, tdd, project-structure, dev-env-setup, git-workflow, the implementation plan and playbook, plus the stateless build loops. Minimal ceremony — get to code fast. Best for prototypes, hackathons, or solo projects.
@@ -1621,8 +1624,8 @@ You can change methodology mid-pipeline with `scaffold init --methodology <prese
 | `scaffold observe <subcommand>` | Build observability: `event`, `progress`, `harvest`, `audit`, `ack` — see [Build Observability](#build-observability) |
 | `scaffold guides [topic]` | Open, list (`--list`), or rebuild (`--build`) the reference guides; `--markdown` / `--print-path` for agents |
 | `scaffold agent-ops install \| check` | Install the agent-ops script bundle (`--component git\|staging\|merge-queue\|ci\|gate\|all`), or drift-check an installed bundle |
-| `scaffold mq enqueue \| daemon \| status \| eject \| stats` | Drive the local batching merge queue |
-| `scaffold tia record-due \| ingest` | Record-cadence predicate and V8-coverage ingest for test-impact analysis |
+| `scaffold mq <enqueue\|daemon\|status\|eject\|release\|stats\|bootstrap\|gate-cache>` | Drive the local batching merge queue |
+| `scaffold tia <affected\|record-due\|ingest>` | Affected-test selection, the record-cadence predicate, and V8-coverage ingest |
 
 ### Examples
 
@@ -1899,7 +1902,7 @@ content/
 ├── pipeline/         # 99 meta-prompts organized by 16 phases (phases 0-15, including build)
 ├── tools/            # 12 tool meta-prompts (stateless, category: tool)
 ├── knowledge/        # 301 domain expertise entries (core, product, review, validation, finalization, execution, tools, game, web-app, backend, cli, library, mobile-app, data-pipeline, ml, browser-extension, research, data-science, web3, mcp-server, macos-native)
-├── methodology/      # 3 YAML presets (deep, mvp, custom)
+├── methodology/      # 4 YAML presets (deep, mvp, custom, brownfield) + project-type and domain overlays
 └── skills/           # Skill templates with {{markers}} for multi-platform resolution (includes mmr)
 ```
 
