@@ -1537,7 +1537,7 @@ sources at the same base URL with different <code>#anchor</code>s be tracked ind
 An entry with no <code>last-reviewed</code> always counts as due. Sources with a changed
 hash also become candidates regardless of age, but the hash check only runs for
 entries still <em>inside</em> their cadence window.</p>
-<h4>Which tier does an entry belong in?</h4>
+<h4 id="which-tier-does-an-entry-belong-in">Which tier does an entry belong in?</h4>
 
 
 
@@ -1696,7 +1696,7 @@ warnings (it does not embed the raw verdict JSON). Each candidate gets
 its own PR off <code>origin/main</code> — the cron <code>git checkout main</code> between iterations
 and restores the entry between the dry-run apply (for gates) and the final
 <code>--open-pr</code> call. PRs do not stack; failures isolate per-candidate.</p>
-<h4>VERSION bump on merge</h4>
+<h4 id="version-bump-on-merge">VERSION bump on merge</h4>
 <p>A dedicated workflow
 (<span class="fp" data-path=".github/workflows/knowledge-freshness-version-bump.yml:16">.github/workflows/knowledge-freshness-version-bump.yml:16</span>) fires on PR
 <code>closed</code> (merged-only) when the source branch starts with <code>knowledge-freshness/</code>
