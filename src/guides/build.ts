@@ -32,6 +32,13 @@ export interface BuildGuideArgs {
   guideDir: string
   css: string
   mermaidRender?: (source: string) => Promise<string>
+  /**
+   * Return the rendered HTML instead of writing it. `buildAllGuides` uses this
+   * so a broken CROSS-guide anchor — which cannot be detected until every guide
+   * has been rendered — still leaves the whole tree at its previous content,
+   * matching the per-guide checks rather than half-updating the output.
+   */
+  deferWrite?: boolean
 }
 
 export interface BuildGuideResult {
@@ -40,6 +47,8 @@ export interface BuildGuideResult {
   ids: Set<string>
   /** The source that produced them, so the caller need not re-read it. */
   markdown: string
+  /** Rendered page and its destination; present only with `deferWrite`. */
+  pending?: { outPath: string; html: string }
 }
 
 export async function buildGuide(args: BuildGuideArgs): Promise<BuildGuideResult> {
@@ -56,33 +65,71 @@ export async function buildGuide(args: BuildGuideArgs): Promise<BuildGuideResult
   const fm = extractGuideFrontmatter(md)
   if (!fm) throw new Error(`invalid or missing frontmatter in ${path.join(args.guideDir, 'index.md')}`)
   const diagramIds: string[] = []
-  const { body, headings } = await renderGuideBody(md, {
+  const { body, headings, anchors } = await renderGuideBody(md, {
     plugins: [
       remarkCallout, remarkTabs, remarkFilterTable, remarkChart, remarkSev, remarkCite,
       remarkMermaid({ guideDir: args.guideDir, render: args.mermaidRender, collect: diagramIds }),
     ],
   })
+  // Prune before the anchor checks: diagram pruning is independent of them, and
+  // leaving it after a throw would strand orphaned .diagrams/ artifacts (which
+  // are tracked in git) in the working tree on every failed build.
+  pruneDiagrams(args.guideDir, diagramIds)
+
   // Anchors are checked HERE, not before rendering, so they can be judged
   // against the ids the renderer actually emitted rather than a second
-  // derivation of them. Throwing before the write keeps the check fail-closed:
-  // a guide with a dead fragment leaves its index.html untouched.
-  const dupes = headings.map((h) => h.id).filter((id, i, all) => all.indexOf(id) !== i)
+  // derivation of them. Throwing before atomicWriteFile keeps index.html at its
+  // previous content when a guide has a dead fragment.
+  const blank = anchors.filter((h) => !h.id).map((h) => h.text)
+  if (blank.length) {
+    throw new Error(
+      `guide has heading(s) that produce no id, so nothing can link to them:\n  ${blank.join('\n  ')}`,
+    )
+  }
+  const seen = new Map<string, string[]>()
+  for (const h of anchors) seen.set(h.id, [...(seen.get(h.id) ?? []), h.text])
+  const dupes = [...seen].filter(([, texts]) => texts.length > 1)
   if (dupes.length) {
-    const list = [...new Set(dupes)].join('\n  ')
+    const list = dupes.map(([id, texts]) => `${id}  <- ${texts.join(' / ')}`).join('\n  ')
     throw new Error(
       `guide has duplicate heading id(s), so an anchor to the later one is unreachable:\n  ${list}`,
     )
   }
-  const ids = new Set(headings.map((h) => h.id))
-  const brokenAnchors = findBrokenAnchors(md, { selfIds: ids })
+  const ids = new Set(anchors.map((h) => h.id))
+  const brokenAnchors = findBrokenAnchors(md, { selfIds: ids, topic: path.basename(args.guideDir) })
   if (brokenAnchors.length) {
     throw new Error(`guide has broken anchor link(s):\n  ${brokenAnchors.join('\n  ')}`)
   }
-
-  pruneDiagrams(args.guideDir, diagramIds)
   const html = wrapInChrome({ title: fm.title, body, headings, css: args.css })
-  atomicWriteFile(path.join(args.guideDir, 'index.html'), html)
+  const outPath = path.join(args.guideDir, 'index.html')
+  if (args.deferWrite) return { lint, ids, markdown: md, pending: { outPath, html } }
+  atomicWriteFile(outPath, html)
   return { lint, ids, markdown: md }
+}
+
+/**
+ * Cross-guide anchors that resolve to no heading in their target guide.
+ *
+ * Split out of `buildAllGuides` so it is testable without a guides tree on
+ * disk. Same-page anchors have already thrown inside `buildGuide` by the time
+ * this runs, so in the real pipeline it only ever reports cross-guide targets;
+ * `selfIds` is still supplied so it cannot double-report them.
+ *
+ * `sources` is keyed by `frontmatter.topic`, which `buildGuidesIndex`
+ * guarantees equals the directory name — the same name `../<dir>/` links use.
+ */
+export function crossGuideAnchorErrors(
+  sources: ReadonlyMap<string, string>,
+  idsByTopic: ReadonlyMap<string, ReadonlySet<string>>,
+): string[] {
+  const broken: string[] = []
+  for (const [topic, markdown] of sources) {
+    const selfIds = idsByTopic.get(topic) ?? new Set<string>()
+    for (const a of findBrokenAnchors(markdown, { selfIds, topic, idsByTopic })) {
+      broken.push(`${topic}: ${a}`)
+    }
+  }
+  return broken
 }
 
 export async function buildAllGuides(projectRoot?: string): Promise<void> {
@@ -95,22 +142,22 @@ export async function buildAllGuides(projectRoot?: string): Promise<void> {
   // which is why this pass cannot live inside buildGuide.
   const idsByTopic = new Map<string, Set<string>>()
   const sources = new Map<string, string>()
+  const pending: { outPath: string; html: string }[] = []
   for (const entry of index.values()) {
-    const { ids, markdown } = await buildGuide({ guideDir: entry.dir, css })
-    idsByTopic.set(entry.frontmatter.topic, ids)
-    sources.set(entry.frontmatter.topic, markdown)
+    const res = await buildGuide({ guideDir: entry.dir, css, deferWrite: true })
+    idsByTopic.set(entry.frontmatter.topic, res.ids)
+    sources.set(entry.frontmatter.topic, res.markdown)
+    if (res.pending) pending.push(res.pending)
   }
 
-  const broken: string[] = []
-  for (const [topic, markdown] of sources) {
-    const selfIds = idsByTopic.get(topic) ?? new Set<string>()
-    for (const a of findBrokenAnchors(markdown, { selfIds, idsByTopic })) {
-      broken.push(`${topic}: ${a}`)
-    }
-  }
+  const broken = crossGuideAnchorErrors(sources, idsByTopic)
   if (broken.length) {
     throw new Error(`broken cross-guide anchor link(s):\n  ${broken.join('\n  ')}`)
   }
 
+  // Nothing is written until every guide has rendered AND the cross-guide pass
+  // is clean, so a dead cross-guide fragment leaves the output tree untouched
+  // rather than rewriting each page and stranding a stale root index.
+  for (const p of pending) atomicWriteFile(p.outPath, p.html)
   atomicWriteFile(path.join(guidesDir, 'index.html'), renderIndexPage([...index.values()], css))
 }

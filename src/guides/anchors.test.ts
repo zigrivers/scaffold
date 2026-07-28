@@ -4,9 +4,42 @@ import type { AnchorScope } from './links.js'
 
 const scope = (self: string[], byTopic?: Record<string, string[]>): AnchorScope => ({
   selfIds: new Set(self),
+  topic: 'cli',
   idsByTopic: byTopic
     ? new Map(Object.entries(byTopic).map(([k, v]) => [k, new Set(v)]))
     : undefined,
+})
+
+describe('link spellings — the contract, stated explicitly', () => {
+  // Every row is a spelling an author could plausibly write. `broken` is how
+  // many of them the checker must report. A silent skip on a real guide page is
+  // the failure this whole gate exists to prevent, so each skip below is a
+  // deliberate decision rather than an accident of the matcher.
+  const s = scope(['real'], { mmr: ['x'] })
+  const table: [string, number, string][] = [
+    ['[a](#nope)', 1, 'same page'],
+    ['[a](index.md#nope)', 1, 'self by filename'],
+    ['[a](./index.md#nope)', 1, 'self, dot-slash'],
+    ['[a](index.html#nope)', 1, 'self, built page'],
+    ['[a](index.md#real)', 0, 'self by filename, valid'],
+    ['[a](../mmr/index.md#nope)', 1, 'sibling'],
+    ['[a](../mmr/#nope)', 1, 'sibling, directory'],
+    ['[a](../mmr#nope)', 1, 'sibling, no slash'],
+    ['[a](../mmr/index.MD#nope)', 1, 'sibling, uppercase extension'],
+    ['[a](../mmr//index.md#nope)', 1, 'sibling, double slash'],
+    ['[a](../mmr/index.md?v=1#nope)', 1, 'sibling, query string'],
+    ['[a](../../guides/mmr/index.md#nope)', 1, 'sibling, out and back in'],
+    ['[a](../mmr/index.md#x)', 0, 'sibling, valid'],
+    ['[a](../mmr/other.md#z)', 0, 'skipped: not an index page'],
+    ['[a](../../../docs/x.md#y)', 0, 'skipped: outside the guides tree'],
+    ['[a](../..#nope)', 0, 'skipped: above the guides root'],
+    ['[a](../index.html#nope)', 0, 'skipped: the guides index, not a guide'],
+  ]
+  for (const [md, broken, why] of table) {
+    it(`${why}: ${md}`, () => {
+      expect(findBrokenAnchors(md, s)).toHaveLength(broken)
+    })
+  }
 })
 
 describe('findBrokenAnchors — same-page fragments', () => {
@@ -97,5 +130,19 @@ describe('findBrokenAnchors — encoding and node types', () => {
 
   it('checks reference-style definitions', () => {
     expect(findBrokenAnchors('[a][ref]\n\n[ref]: #nope\n', scope(['real']))).toEqual(['#nope'])
+  })
+
+  it('reports a repeated dead target once, not once per occurrence', () => {
+    expect(findBrokenAnchors('[a](#nope) [b](#nope) [c](#nope)', scope(['real']))).toEqual(['#nope'])
+  })
+
+  it('does not check a definition that only an image reference consumes', () => {
+    // `![d][ref]` makes [ref] an image target even though the node type is
+    // `definition`; its fragment is an SVG view spec, not a heading.
+    expect(findBrokenAnchors('![d][ref]\n\n[ref]: #svgView\n', scope(['real']))).toEqual([])
+  })
+
+  it('still checks a definition consumed by a normal link reference', () => {
+    expect(findBrokenAnchors('[d][ref]\n\n[ref]: #nope\n', scope(['real']))).toEqual(['#nope'])
   })
 })

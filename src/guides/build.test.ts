@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
-import { buildGuide } from './build.js'
+import { buildGuide, crossGuideAnchorErrors } from './build.js'
 import { renderIndexPage } from './index-page.js'
 
 const CSS = ':root{--bg:#fff}'
@@ -104,6 +104,46 @@ describe('buildGuide', () => {
       .rejects.toThrow(/broken anchor link/i)
   })
 
+  it('accepts an anchor to an h4, which now gets an id even though the TOC skips it', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gb-'))
+    const dir = path.join(root, 'mmr')
+    fs.mkdirSync(dir, { recursive: true })
+    fs.writeFileSync(path.join(dir, 'index.md'), GUIDE_MD + '\n#### Deep Thing\n\n[go](#deep-thing)\n')
+    const res = await buildGuide({ guideDir: dir, css: CSS, mermaidRender: async () => '' })
+    expect(res.ids.has('deep-thing')).toBe(true)
+    // …but it stays out of the TOC rail, which is h2/h3 only.
+    expect(res.lint.errors).toEqual([])
+    expect(fs.readFileSync(path.join(dir, 'index.html'), 'utf8')).toContain('id="deep-thing"')
+  })
+
+  it('preserves a previous index.html when the build throws', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gb-'))
+    const dir = path.join(root, 'mmr')
+    fs.mkdirSync(dir, { recursive: true })
+    fs.writeFileSync(path.join(dir, 'index.html'), 'SENTINEL')
+    fs.writeFileSync(path.join(dir, 'index.md'), GUIDE_MD + '\n[x](#nope)\n')
+    await expect(buildGuide({ guideDir: dir, css: CSS, mermaidRender: async () => '' })).rejects.toThrow()
+    expect(fs.readFileSync(path.join(dir, 'index.html'), 'utf8')).toBe('SENTINEL')
+  })
+
+  it('throws when a heading produces no id at all', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gb-'))
+    const dir = path.join(root, 'mmr')
+    fs.mkdirSync(dir, { recursive: true })
+    fs.writeFileSync(path.join(dir, 'index.md'), GUIDE_MD + '\n## ???\n')
+    await expect(buildGuide({ guideDir: dir, css: CSS, mermaidRender: async () => '' }))
+      .rejects.toThrow(/produce no id/i)
+  })
+
+  it('names the colliding headings in the duplicate-id error', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gb-'))
+    const dir = path.join(root, 'mmr')
+    fs.mkdirSync(dir, { recursive: true })
+    fs.writeFileSync(path.join(dir, 'index.md'), GUIDE_MD + '\n## Same One\n\n### Same one\n')
+    await expect(buildGuide({ guideDir: dir, css: CSS, mermaidRender: async () => '' }))
+      .rejects.toThrow(/Same One \/ Same one/)
+  })
+
   it('throws when two headings slug to the same id', async () => {
     // The renderer emits both, so the second is unreachable and an anchor to it
     // silently lands on the first. Reporting it is better than masking it.
@@ -113,6 +153,35 @@ describe('buildGuide', () => {
     fs.writeFileSync(path.join(dir, 'index.md'), GUIDE_MD + '\n## Same One\n\n### Same one\n')
     await expect(buildGuide({ guideDir: dir, css: CSS, mermaidRender: async () => '' }))
       .rejects.toThrow(/duplicate heading id/i)
+  })
+})
+
+describe('crossGuideAnchorErrors', () => {
+  const ids = new Map<string, ReadonlySet<string>>([
+    ['cli', new Set(['setup'])],
+    ['mmr', new Set(['channels'])],
+  ])
+
+  it('reports a fragment missing from the target guide, naming the source', () => {
+    const sources = new Map([['cli', 'See [m](../mmr/index.md#nope).']])
+    expect(crossGuideAnchorErrors(sources, ids)).toEqual(['cli: ../mmr/index.md#nope'])
+  })
+
+  it('passes a fragment the target guide really has', () => {
+    const sources = new Map([['cli', 'See [m](../mmr/index.md#channels).']])
+    expect(crossGuideAnchorErrors(sources, ids)).toEqual([])
+  })
+
+  it('does not re-report same-page anchors, which buildGuide already checked', () => {
+    const sources = new Map([['cli', '[a](#setup)']])
+    expect(crossGuideAnchorErrors(sources, ids)).toEqual([])
+  })
+
+  it('keys on the topic, so ../<dir>/ resolves to that guide', () => {
+    // buildGuidesIndex guarantees frontmatter.topic === directory name
+    // (pinned in loader.test.ts), which is what makes this keying sound.
+    const sources = new Map([['mmr', '[c](../cli/index.md#setup) [d](../cli/index.md#gone)']])
+    expect(crossGuideAnchorErrors(sources, ids)).toEqual(['mmr: ../cli/index.md#gone'])
   })
 })
 

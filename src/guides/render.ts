@@ -33,11 +33,19 @@ export function stripFrontmatter(md: string): string {
   return lines.slice(close + 1).join('\n')
 }
 
-function collectHeadings(out: TocHeading[]): AnyPlugin {
+/**
+ * Assign an id to EVERY heading, but list only h2/h3 in the table of contents.
+ *
+ * The depth split is deliberate: the TOC rail would be unreadable with h4+ in
+ * it, but an anchor to an h4 must still resolve. Emitting ids only for h2/h3
+ * meant `[x](#deep-thing)` pointed at nothing while the heading sat right there
+ * in the page — invisible before the anchor gate, and an opaque build failure
+ * after it.
+ */
+function collectHeadings(toc: TocHeading[], allIds: { id: string; text: string }[]): AnyPlugin {
   return () => (tree: Parameters<typeof visit>[0]) => {
     visit(tree, 'heading', (node) => {
       const h = node as Heading
-      if (h.depth !== 2 && h.depth !== 3) return
       const text = mdToString(h)
       const id = slug(text)
       h.data = h.data ?? {}
@@ -45,7 +53,8 @@ function collectHeadings(out: TocHeading[]): AnyPlugin {
         ...((h.data as Record<string, unknown>).hProperties as Record<string, unknown> ?? {}),
         id,
       }
-      out.push({ depth: h.depth, text, id })
+      allIds.push({ id, text })
+      if (h.depth === 2 || h.depth === 3) toc.push({ depth: h.depth, text, id })
     })
   }
 }
@@ -53,20 +62,21 @@ function collectHeadings(out: TocHeading[]): AnyPlugin {
 export async function renderGuideBody(
   markdown: string,
   opts: RenderOptions = {},
-): Promise<{ body: string; headings: TocHeading[] }> {
+): Promise<{ body: string; headings: TocHeading[]; anchors: { id: string; text: string }[] }> {
   const headings: TocHeading[] = []
+  const anchors: { id: string; text: string }[] = []
   const src = stripFrontmatter(markdown)
 
   // Build processor with loose typing to avoid unified's complex generics
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let proc: any = unified().use(remarkParse).use(remarkGfm).use(remarkDirective)
   for (const p of opts.plugins ?? []) proc = proc.use(p)
-  proc = proc.use(collectHeadings(headings))
+  proc = proc.use(collectHeadings(headings, anchors))
   const file = await proc
     .use(remarkRehype, { allowDangerousHtml: true })
     .use(rehypeRaw)
     .use(rehypeSanitize, guideSanitizeSchema)
     .use(rehypeStringify)
     .process(src)
-  return { body: String(file), headings }
+  return { body: String(file), headings, anchors }
 }

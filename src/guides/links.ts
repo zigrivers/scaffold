@@ -15,30 +15,67 @@ import { stripFrontmatter } from './render.js'
  */
 function linkTargets(markdown: string): { url: string; isImage: boolean }[] {
   const tree = unified().use(remarkParse).use(remarkGfm).parse(stripFrontmatter(markdown))
-  const urls: { url: string; isImage: boolean }[] = []
+  const urls: { url: string; isImage: boolean; identifier?: string }[] = []
+  // A definition consumed by an ![…][ref] is an image target even though the
+  // node type is `definition`, so collect the image references and reconcile.
+  const imageRefs = new Set<string>()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   visit(tree, (node: any) => {
+    if (node.type === 'imageReference' && typeof node.identifier === 'string') {
+      imageRefs.add(node.identifier)
+      return
+    }
     if (
       (node.type === 'link' || node.type === 'image' || node.type === 'definition') &&
       typeof node.url === 'string'
     ) {
-      urls.push({ url: node.url, isImage: node.type === 'image' })
+      urls.push({
+        url: node.url,
+        isImage: node.type === 'image',
+        identifier: typeof node.identifier === 'string' ? node.identifier : undefined,
+      })
     }
   })
-  return urls
+  return urls.map((u) => ({
+    url: u.url,
+    isImage: u.isImage || (u.identifier !== undefined && imageRefs.has(u.identifier)),
+  }))
 }
 
 export interface AnchorScope {
   /** Heading ids of the page being checked, as the renderer emitted them. */
   selfIds: ReadonlySet<string>
+  /** This guide's directory name, used to resolve self- and sibling links. */
+  topic?: string
   /** topic slug -> that guide's heading ids. Omit a topic to skip checking it. */
   idsByTopic?: ReadonlyMap<string, ReadonlySet<string>>
 }
 
-/** `../mmr/index.md`, `../mmr/index.html`, `../mmr/`, `../mmr` -> `mmr`. */
-function siblingTopic(filePart: string): string | null {
-  const m = /^\.\.\/([^/]+)(?:\/(?:index\.(?:md|html))?)?$/.exec(filePart)
-  return m?.[1] ?? null
+/**
+ * Which guide a link points at, from this guide's directory.
+ *
+ * Resolves the path rather than pattern-matching the literal string, so every
+ * spelling of the same file agrees: `../mmr/index.md`, `../mmr/`, `../mmr`,
+ * `../mmr/index.HTML`, `../mmr//index.md`, `../../guides/mmr/index.md` and
+ * `../mmr/index.md?v=1` all resolve to the topic `mmr`. Returns the current
+ * guide's own name for `.`, `./`, `index.md`, `./index.html` and the like —
+ * the self-link spellings an earlier version silently skipped.
+ */
+function resolveTopic(filePart: string, selfTopic: string): string | null {
+  const cleaned = filePart.replace(/[?#].*$/, '')
+  if (!cleaned || cleaned === '.' || cleaned === './') return selfTopic
+  // Drop a trailing index.md / index.html (any case) so a directory and its
+  // index page are the same target.
+  const withoutIndex = cleaned.replace(/(^|\/)index\.(md|html?)\/?$/i, '$1')
+  // Resolve under a virtual `guides/` root so a link that steps out of the tree
+  // and back in (`../../guides/mmr/index.md`) lands on the same topic as the
+  // direct spelling (`../mmr/index.md`) instead of looking like an escape.
+  const resolved = path.posix.normalize(path.posix.join('guides', selfTopic, withoutIndex))
+  const parts = resolved.split('/').filter((p) => p && p !== '.')
+  // A guide page is exactly `guides/<topic>`. Anything else — a deeper path, a
+  // non-index file, or an escape above the root — is not one.
+  if (parts.length !== 2 || parts[0] !== 'guides') return null
+  return parts[1] ?? null
 }
 
 function decode(s: string): string {
@@ -85,19 +122,16 @@ export function findBrokenAnchors(markdown: string, scope: AnchorScope): string[
     const fragment = decode(trimmed.slice(hash + 1))
     if (!fragment) continue // a bare "#" is a placeholder, not a claim
 
-    const filePart = trimmed.slice(0, hash)
-    let ids: ReadonlySet<string> | undefined
-    if (!filePart || filePart === './' || filePart === '.') {
-      ids = scope.selfIds
-    } else {
-      const topic = siblingTopic(decode(filePart))
-      if (topic === null) continue // not a sibling guide — different slug rules
-      ids = scope.idsByTopic?.get(topic)
-      if (ids === undefined) continue // topic not in scope; nothing to check against
-    }
+    const selfTopic = scope.topic ?? '.'
+    const topic = resolveTopic(decode(trimmed.slice(0, hash)), selfTopic)
+    if (topic === null) continue // not a guide page — a different slugger owns it
+    const ids = topic === selfTopic ? scope.selfIds : scope.idsByTopic?.get(topic)
+    if (ids === undefined) continue // topic not in scope; nothing to check against
     if (!ids.has(fragment)) broken.push(url)
   }
-  return broken
+  // One report per distinct target: repeating the same dead link N times in the
+  // build error tells the author nothing extra.
+  return [...new Set(broken)]
 }
 
 /**

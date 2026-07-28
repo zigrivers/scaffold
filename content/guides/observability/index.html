@@ -2098,7 +2098,7 @@ scaffold observe audit --lens I-knowledge-gaps --knowledge-root content/knowledg
 <div class="callout callout-note"><p><strong>"needs-user-decision" is not an engine verdict.</strong> The code-review workflow has
 a <code>needs-user-decision</code> outcome, but that is an <em>MMR review</em> verdict, not one the
 audit engine emits. The audit engine's universe is exactly the three above.</p></div>
-<h4><code>fix_threshold</code></h4>
+<h4 id="fix-threshold"><code>fix_threshold</code></h4>
 <p>A finding is <em>blocking</em> when its status is <code>open</code> and its severity is at or above
 the threshold (<code>src/observability/engine/checks/fix-threshold.ts</code>). Resolution
 order: <code>--fix-threshold</code> flag → <code>.mmr.yaml</code>
