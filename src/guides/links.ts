@@ -4,7 +4,7 @@ import { unified } from 'unified'
 import remarkParse from 'remark-parse'
 import remarkGfm from 'remark-gfm'
 import { visit } from 'unist-util-visit'
-import { stripFrontmatter, headingIds } from './render.js'
+import { stripFrontmatter } from './render.js'
 
 /**
  * Every link/image/reference-definition target in `markdown`.

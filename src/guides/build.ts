@@ -68,8 +68,9 @@ export async function buildGuide(args: BuildGuideArgs): Promise<BuildGuideResult
   // a guide with a dead fragment leaves its index.html untouched.
   const dupes = headings.map((h) => h.id).filter((id, i, all) => all.indexOf(id) !== i)
   if (dupes.length) {
+    const list = [...new Set(dupes)].join('\n  ')
     throw new Error(
-      `guide has duplicate heading id(s), so an anchor to the later heading is unreachable:\n  ${[...new Set(dupes)].join('\n  ')}`,
+      `guide has duplicate heading id(s), so an anchor to the later one is unreachable:\n  ${list}`,
     )
   }
   const ids = new Set(headings.map((h) => h.id))
