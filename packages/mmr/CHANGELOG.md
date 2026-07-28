@@ -2,6 +2,30 @@
 
 ## [Unreleased]
 
+## [4.0.1] — 2026-07-28
+
+Documentation-only follow-up to 4.0.0. The bundled skill templates still
+described the pre-4.0.0 behaviour, so an agent that installed them was told the
+wrong thing about the very change 4.0.0 shipped.
+
+### Fixed
+
+- **The skill templates omitted the completion floor.** They documented the
+  severity gate alone, so an agent reading them would treat a run where only one
+  channel reported as a pass — exactly the thin evidence
+  `defaults.min_completed_channels` exists to catch. All three templates now
+  state that fewer than the floor (default `2`) yields `needs-user-decision`
+  even with zero findings, and that the fix is `mmr doctor`, not proceeding.
+- **`opencode` was missing from the channel list.** The templates named Claude,
+  Codex, Grok and Antigravity without mentioning that OpenCode ships as an
+  opt-in channel, and the "avoid the nested self-review" guidance covered only
+  the CLIs you might be running inside. Both now account for it, including how
+  to scope it out (`channels_disabled: ["opencode"]`) when you have enabled it
+  and are running inside OpenCode.
+
+Affects `mmr skill install` for the `agents` (Codex/Antigravity), `cursor` and
+`opencode` targets. No CLI behaviour changed.
+
 ## [4.0.0] — 2026-07-26
 
 **A verdict now reflects how many channels actually reported.**
