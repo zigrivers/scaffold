@@ -21,8 +21,40 @@ export interface RenderOptions {
   plugins?: AnyPlugin[]
 }
 
+/**
+ * Heading text -> id.
+ *
+ * Unicode-aware: `## Überblick` becomes `überblick`, the anchor an author would
+ * actually write. The former ASCII-only class silently deleted the leading
+ * character and produced `berblick`, reachable only by an id nobody would guess.
+ *
+ * `_` is kept in the first class deliberately. It was inside `\w` before, and
+ * the second replace turns it into a hyphen — so `### Stable identity
+ * (\`finding_key\`)` stays `stable-identity-finding-key`. Dropping it silently
+ * renamed that id to `…-findingkey` and broke a live cross-guide link.
+ */
 function slug(text: string): string {
-  return text.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/[_\s]+/g, '-')
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/[^\p{L}\p{N}_\s-]/gu, '')
+    .replace(/[_\s]+/g, '-')
+}
+
+/**
+ * Make every id unique in document order, GitHub-style: the first `example`
+ * stays `example`, later ones become `example-1`, `example-2`.
+ *
+ * Repeating a heading under different sections (`#### Example` twice) is normal
+ * documentation, and now that every depth carries an id it would otherwise
+ * collide. Suffixing keeps both headings reachable; failing the build would
+ * forbid the pattern outright, which is a far stronger authoring constraint
+ * than an anchor checker has any business imposing.
+ */
+function uniqueId(base: string, seen: Map<string, number>): string {
+  const n = seen.get(base) ?? 0
+  seen.set(base, n + 1)
+  return n === 0 ? base : `${base}-${n}`
 }
 
 export function stripFrontmatter(md: string): string {
@@ -44,10 +76,16 @@ export function stripFrontmatter(md: string): string {
  */
 function collectHeadings(toc: TocHeading[], allIds: { id: string; text: string }[]): AnyPlugin {
   return () => (tree: Parameters<typeof visit>[0]) => {
+    const seen = new Map<string, number>()
+    let n = 0
     visit(tree, 'heading', (node) => {
       const h = node as Heading
       const text = mdToString(h)
-      const id = slug(text)
+      n += 1
+      // A heading of pure punctuation or emoji (`#### \`&&\``, `###### ✅`)
+      // slugs to nothing. Synthesise a positional id so it stays linkable
+      // instead of aborting the build over legitimate content.
+      const id = uniqueId(slug(text) || `section-${n}`, seen)
       h.data = h.data ?? {}
       ;(h.data as Record<string, unknown>).hProperties = {
         ...((h.data as Record<string, unknown>).hProperties as Record<string, unknown> ?? {}),

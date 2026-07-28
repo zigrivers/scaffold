@@ -35,8 +35,13 @@ export interface BuildGuideArgs {
   /**
    * Return the rendered HTML instead of writing it. `buildAllGuides` uses this
    * so a broken CROSS-guide anchor — which cannot be detected until every guide
-   * has been rendered — still leaves the whole tree at its previous content,
-   * matching the per-guide checks rather than half-updating the output.
+   * has been rendered — leaves every `index.html` at its previous content
+   * rather than half-updating the output.
+   *
+   * The guarantee is about `index.html` specifically. Rendering a mermaid block
+   * writes its SVG into `.diagrams/` as a side effect, so a failed build can
+   * still add files there; what it will not do is delete an existing one or
+   * rewrite a page.
    */
   deferWrite?: boolean
 }
@@ -71,35 +76,24 @@ export async function buildGuide(args: BuildGuideArgs): Promise<BuildGuideResult
       remarkMermaid({ guideDir: args.guideDir, render: args.mermaidRender, collect: diagramIds }),
     ],
   })
-  // Prune before the anchor checks: diagram pruning is independent of them, and
-  // leaving it after a throw would strand orphaned .diagrams/ artifacts (which
-  // are tracked in git) in the working tree on every failed build.
-  pruneDiagrams(args.guideDir, diagramIds)
-
   // Anchors are checked HERE, not before rendering, so they can be judged
   // against the ids the renderer actually emitted rather than a second
   // derivation of them. Throwing before atomicWriteFile keeps index.html at its
   // previous content when a guide has a dead fragment.
-  const blank = anchors.filter((h) => !h.id).map((h) => h.text)
-  if (blank.length) {
-    throw new Error(
-      `guide has heading(s) that produce no id, so nothing can link to them:\n  ${blank.join('\n  ')}`,
-    )
-  }
-  const seen = new Map<string, string[]>()
-  for (const h of anchors) seen.set(h.id, [...(seen.get(h.id) ?? []), h.text])
-  const dupes = [...seen].filter(([, texts]) => texts.length > 1)
-  if (dupes.length) {
-    const list = dupes.map(([id, texts]) => `${id}  <- ${texts.join(' / ')}`).join('\n  ')
-    throw new Error(
-      `guide has duplicate heading id(s), so an anchor to the later one is unreachable:\n  ${list}`,
-    )
-  }
+  //
+  // Note there is no duplicate- or empty-id gate: the slugger suffixes
+  // collisions and synthesises an id for a heading that slugs to nothing, so
+  // both are now impossible by construction rather than build failures.
   const ids = new Set(anchors.map((h) => h.id))
   const brokenAnchors = findBrokenAnchors(md, { selfIds: ids, topic: path.basename(args.guideDir) })
   if (brokenAnchors.length) {
     throw new Error(`guide has broken anchor link(s):\n  ${brokenAnchors.join('\n  ')}`)
   }
+
+  // Prune only once the guide is known good. Pruning earlier deleted orphaned
+  // .diagrams/ artifacts (tracked in git) during builds that then aborted,
+  // leaving the cache and the committed index.html disagreeing.
+  pruneDiagrams(args.guideDir, diagramIds)
   const html = wrapInChrome({ title: fm.title, body, headings, css: args.css })
   const outPath = path.join(args.guideDir, 'index.html')
   if (args.deferWrite) return { lint, ids, markdown: md, pending: { outPath, html } }

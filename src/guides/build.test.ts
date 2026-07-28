@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
-import { buildGuide, crossGuideAnchorErrors } from './build.js'
+import { buildGuide, buildAllGuides, crossGuideAnchorErrors } from './build.js'
 import { renderIndexPage } from './index-page.js'
 
 const CSS = ':root{--bg:#fff}'
@@ -126,33 +126,108 @@ describe('buildGuide', () => {
     expect(fs.readFileSync(path.join(dir, 'index.html'), 'utf8')).toBe('SENTINEL')
   })
 
-  it('throws when a heading produces no id at all', async () => {
+  it('suffixes a repeated heading instead of failing the build', async () => {
+    // "#### Example" under two different sections is ordinary documentation.
+    // Both stay reachable: example, then example-1.
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gb-'))
     const dir = path.join(root, 'mmr')
     fs.mkdirSync(dir, { recursive: true })
-    fs.writeFileSync(path.join(dir, 'index.md'), GUIDE_MD + '\n## ???\n')
-    await expect(buildGuide({ guideDir: dir, css: CSS, mermaidRender: async () => '' }))
-      .rejects.toThrow(/produce no id/i)
+    fs.writeFileSync(path.join(dir, 'index.md'),
+      GUIDE_MD + '\n## One\n\n#### Example\n\n## Two\n\n#### Example\n\n[a](#example) [b](#example-1)\n')
+    const res = await buildGuide({ guideDir: dir, css: CSS, mermaidRender: async () => '' })
+    expect(res.ids.has('example')).toBe(true)
+    expect(res.ids.has('example-1')).toBe(true)
   })
 
-  it('names the colliding headings in the duplicate-id error', async () => {
+  it('gives a punctuation- or emoji-only heading a positional id', async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gb-'))
     const dir = path.join(root, 'mmr')
     fs.mkdirSync(dir, { recursive: true })
-    fs.writeFileSync(path.join(dir, 'index.md'), GUIDE_MD + '\n## Same One\n\n### Same one\n')
-    await expect(buildGuide({ guideDir: dir, css: CSS, mermaidRender: async () => '' }))
-      .rejects.toThrow(/Same One \/ Same one/)
+    fs.writeFileSync(path.join(dir, 'index.md'), GUIDE_MD + '\n#### `&&`\n\n###### ✅\n')
+    const res = await buildGuide({ guideDir: dir, css: CSS, mermaidRender: async () => '' })
+    expect([...res.ids].some((id) => /^section-\d+$/.test(id))).toBe(true)
   })
 
-  it('throws when two headings slug to the same id', async () => {
-    // The renderer emits both, so the second is unreachable and an anchor to it
-    // silently lands on the first. Reporting it is better than masking it.
+  it('keeps non-ASCII letters in an id, so the natural anchor resolves', async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gb-'))
     const dir = path.join(root, 'mmr')
     fs.mkdirSync(dir, { recursive: true })
-    fs.writeFileSync(path.join(dir, 'index.md'), GUIDE_MD + '\n## Same One\n\n### Same one\n')
-    await expect(buildGuide({ guideDir: dir, css: CSS, mermaidRender: async () => '' }))
-      .rejects.toThrow(/duplicate heading id/i)
+    fs.writeFileSync(path.join(dir, 'index.md'), GUIDE_MD + '\n## Überblick\n\n[a](#überblick)\n')
+    const res = await buildGuide({ guideDir: dir, css: CSS, mermaidRender: async () => '' })
+    expect(res.ids.has('überblick')).toBe(true)
+  })
+
+  it('turns an underscore into a hyphen, as \\w did before the unicode class', async () => {
+    // "### Stable identity (`finding_key`)" must stay stable-identity-finding-key.
+    // A unicode class without `_` renamed it to …-findingkey and broke a live
+    // cross-guide link — caught by the real build, not by the unit tests.
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gb-'))
+    const dir = path.join(root, 'mmr')
+    fs.mkdirSync(dir, { recursive: true })
+    fs.writeFileSync(path.join(dir, 'index.md'),
+      GUIDE_MD + '\n### Stable identity (`finding_key`)\n\n[a](#stable-identity-finding-key)\n')
+    const res = await buildGuide({ guideDir: dir, css: CSS, mermaidRender: async () => '' })
+    expect(res.ids.has('stable-identity-finding-key')).toBe(true)
+  })
+
+  it('deferWrite returns the html and leaves an existing index.html alone', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gb-'))
+    const dir = path.join(root, 'mmr')
+    fs.mkdirSync(dir, { recursive: true })
+    fs.writeFileSync(path.join(dir, 'index.html'), 'SENTINEL')
+    fs.writeFileSync(path.join(dir, 'index.md'), GUIDE_MD)
+    const res = await buildGuide({
+      guideDir: dir, css: CSS, mermaidRender: async () => '', deferWrite: true,
+    })
+    expect(res.pending?.html).toContain('<title>MMR</title>')
+    expect(res.pending?.outPath).toBe(path.join(dir, 'index.html'))
+    expect(fs.readFileSync(path.join(dir, 'index.html'), 'utf8')).toBe('SENTINEL')
+  })
+})
+
+describe('buildAllGuides (the two-phase render/validate/write path)', () => {
+  /** A temp dir that resolveContentDir will accept as the scaffold package root. */
+  function guidesRoot(guides: Record<string, string>): string {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gall-'))
+    const own = JSON.parse(
+      fs.readFileSync(path.resolve(__dirname, '../../package.json'), 'utf8'),
+    ) as { name: string }
+    fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ name: own.name }))
+    for (const [topic, body] of Object.entries(guides)) {
+      const dir = path.join(root, 'content', 'guides', topic)
+      fs.mkdirSync(dir, { recursive: true })
+      const fm = `---\ntitle: ${topic}\ntopic: ${topic}\ndescription: d\ncategory: c\norder: 1\n---\n\n`
+      fs.writeFileSync(path.join(dir, 'index.md'), fm + body)
+      fs.writeFileSync(path.join(dir, 'index.html'), `SENTINEL-${topic}`)
+    }
+    return root
+  }
+  const page = (root: string, topic: string): string =>
+    fs.readFileSync(path.join(root, 'content', 'guides', topic, 'index.html'), 'utf8')
+
+  it('writes every guide page and the root index on success', async () => {
+    const root = guidesRoot({ a: '## Setup\n\n[m](../b/index.md#channels)\n', b: '## Channels\n' })
+    await buildAllGuides(root)
+    expect(page(root, 'a')).toContain('<title>a</title>')
+    expect(page(root, 'b')).toContain('<title>b</title>')
+    expect(fs.existsSync(path.join(root, 'content', 'guides', 'index.html'))).toBe(true)
+  })
+
+  it('rejects a broken cross-guide anchor and writes NOTHING', async () => {
+    // This is the property deferWrite exists for: the break is only visible
+    // after every guide has rendered, so without buffering both pages would
+    // already be on disk by the time it is found.
+    const root = guidesRoot({ a: '## Setup\n\n[m](../b/index.md#nope)\n', b: '## Channels\n' })
+    await expect(buildAllGuides(root)).rejects.toThrow(/cross-guide anchor/i)
+    expect(page(root, 'a')).toBe('SENTINEL-a')
+    expect(page(root, 'b')).toBe('SENTINEL-b')
+    expect(fs.existsSync(path.join(root, 'content', 'guides', 'index.html'))).toBe(false)
+  })
+
+  it('rejects a broken same-page anchor before any page is written', async () => {
+    const root = guidesRoot({ a: '## Setup\n\n[x](#nope)\n', b: '## Channels\n' })
+    await expect(buildAllGuides(root)).rejects.toThrow(/broken anchor link/i)
+    expect(page(root, 'a')).toBe('SENTINEL-a')
   })
 })
 
