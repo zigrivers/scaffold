@@ -17,12 +17,19 @@ function linkTargets(markdown: string): { url: string; isImage: boolean }[] {
   const tree = unified().use(remarkParse).use(remarkGfm).parse(stripFrontmatter(markdown))
   const urls: { url: string; isImage: boolean; identifier?: string }[] = []
   // A definition consumed by an ![…][ref] is an image target even though the
-  // node type is `definition`, so collect the image references and reconcile.
+  // node type is `definition`. Track BOTH reference kinds: a definition shared
+  // by `[d][ref]` and `![d][ref]` is still reachable as a link, so treating it
+  // as image-only would silently skip the link's fragment.
   const imageRefs = new Set<string>()
+  const linkRefs = new Set<string>()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   visit(tree, (node: any) => {
     if (node.type === 'imageReference' && typeof node.identifier === 'string') {
       imageRefs.add(node.identifier)
+      return
+    }
+    if (node.type === 'linkReference' && typeof node.identifier === 'string') {
+      linkRefs.add(node.identifier)
       return
     }
     if (
@@ -38,7 +45,9 @@ function linkTargets(markdown: string): { url: string; isImage: boolean }[] {
   })
   return urls.map((u) => ({
     url: u.url,
-    isImage: u.isImage || (u.identifier !== undefined && imageRefs.has(u.identifier)),
+    isImage:
+      u.isImage ||
+      (u.identifier !== undefined && imageRefs.has(u.identifier) && !linkRefs.has(u.identifier)),
   }))
 }
 

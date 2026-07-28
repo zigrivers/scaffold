@@ -136,6 +136,14 @@ describe('findBrokenAnchors — encoding and node types', () => {
     expect(findBrokenAnchors('[a](#nope) [b](#nope) [c](#nope)', scope(['real']))).toEqual(['#nope'])
   })
 
+  it('still checks a definition shared by a link AND an image reference', () => {
+    // Reachable as a link, so its fragment must be judged. Treating any
+    // image use as decisive would silently skip the link's broken anchor.
+    expect(findBrokenAnchors('[d][ref] ![e][ref]\n\n[ref]: #nope\n', scope(['real']))).toEqual([
+      '#nope',
+    ])
+  })
+
   it('does not check a definition that only an image reference consumes', () => {
     // `![d][ref]` makes [ref] an image target even though the node type is
     // `definition`; its fragment is an SVG view spec, not a heading.
