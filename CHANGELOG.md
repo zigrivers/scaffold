@@ -4,6 +4,66 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.53.3] - 2026-07-28
+
+Documentation-correctness release. The bundled reference guides are audited
+against the shipped `scaffold` and `mmr` CLI surface, and the guides build now
+validates `#anchor` fragments so this class of drift cannot return silently.
+
+### Fixed
+
+- **The guides described mmr's pre-4.0.0 verdict rule.** Since mmr 4.0.0 a
+  passing gate with fewer than `defaults.min_completed_channels` (default 2)
+  channels reporting is `needs-user-decision`, not `degraded-pass`. The MMR,
+  review-workflow and concepts guides all still documented the old rule, so a
+  run where only one reviewer came back read as a pass.
+- **The README documented a config key that does not exist.** It told users to
+  enable a channel with `channels_enabled:`, which is not in the mmr schema and
+  silently does nothing. The working form is `channels.<name>.enabled: true`.
+- **The retired `gemini` channel was still documented as live** — as a built-in
+  channel (concepts), a fallback reviewer (review-workflow), and the depth-4+
+  external model (pipeline, where the prompts actually name Antigravity).
+- **Stale counts throughout.** 90 → 99 pipeline steps; 278 knowledge entries in
+  twenty categories → 301 in 21 (`macos-native` was missing entirely); mvp
+  "7 steps" → 23; eight audit lenses → nine; three methodology presets → four
+  (`brownfield` is adopt-selected, not an `init` choice).
+- **`scaffold update` flag behavior was described from the flag names rather
+  than the code.** `--check-only` does still print the upgrade command, and
+  `--skip-build` is accepted but currently has no effect.
+- **`mq gate-cache` needs `--check-tree` or `--record-tree`** (both hidden from
+  `--help`); a bare invocation exits `MQ_GATE_CACHE_NO_TREE`.
+- **The knowledge-freshness provider chain was documented backwards.** The cron
+  runs Z.ai primary with DeepSeek as the fallback, not the reverse. The `zai`
+  provider and `KNOWLEDGE_FRESHNESS_FALLBACK_PROVIDER` were undocumented.
+
+### Added
+
+- **Six shipped commands now have guide coverage** — `doctor`, `agent-ops`,
+  `hooks`, `mq`, `tia` and `sched` previously appeared in no guide at all. The
+  CLI guide gains an Operations section and the multi-agent guide a merge-queue
+  section.
+- **The `opencode` MMR channel is documented** (built-in, opt-in), along with
+  MMR's trust modes and the base-ref ratification gate that stops a diff from
+  reconfiguring the reviewer that is reviewing it.
+- **`mmr` install instructions** — it ships as its own package, so installing
+  `scaffold` does not install it. Both npm and Homebrew paths, plus the one-time
+  `brew trust` step.
+- **Predicate exit codes are documented as answers rather than failures** —
+  `tia affected` exit 3 means "run the full suite", `doctor` 1/2 are warn/error,
+  and `agent-ops check`, `sched status` and `mq gate-cache --check-tree` all use
+  exit 1 as a result.
+- **`docs/audits/cli-surface-inventory.md`** — the inventory this audit was
+  built from: every command, flag, config key, exit code and extension point of
+  both CLIs, each with a guide-coverage verdict or a recorded reason it stays
+  undocumented.
+- **The guides build validates `#anchor` fragments.** The link checker stripped
+  the fragment before testing, so a link to a heading id that did not exist
+  passed every gate; two such links were live and two more were introduced
+  during this audit without anything noticing. Heading ids now come from the
+  renderer itself rather than a second derivation, and both same-page and
+  cross-guide failures leave the output tree untouched. Maintainer-facing:
+  `scaffold guides --build` and `make guides-check`.
+
 ## [3.53.2] - 2026-07-27
 
 ### Fixed
