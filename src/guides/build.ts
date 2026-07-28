@@ -34,7 +34,15 @@ export interface BuildGuideArgs {
   mermaidRender?: (source: string) => Promise<string>
 }
 
-export async function buildGuide(args: BuildGuideArgs): Promise<{ lint: LintResult }> {
+export interface BuildGuideResult {
+  lint: LintResult
+  /** Heading ids the renderer emitted, for cross-guide anchor checking. */
+  ids: Set<string>
+  /** The source that produced them, so the caller need not re-read it. */
+  markdown: string
+}
+
+export async function buildGuide(args: BuildGuideArgs): Promise<BuildGuideResult> {
   const md = fs.readFileSync(path.join(args.guideDir, 'index.md'), 'utf8')
   const lint = lintGuide(md)
   if (lint.errors.length) {
@@ -45,10 +53,6 @@ export async function buildGuide(args: BuildGuideArgs): Promise<{ lint: LintResu
   if (brokenLinks.length) {
     throw new Error(`guide has broken relative link(s):\n  ${brokenLinks.join('\n  ')}`)
   }
-  const brokenAnchors = findBrokenAnchors(md, args.guideDir)
-  if (brokenAnchors.length) {
-    throw new Error(`guide has broken anchor link(s):\n  ${brokenAnchors.join('\n  ')}`)
-  }
   const fm = extractGuideFrontmatter(md)
   if (!fm) throw new Error(`invalid or missing frontmatter in ${path.join(args.guideDir, 'index.md')}`)
   const diagramIds: string[] = []
@@ -58,18 +62,54 @@ export async function buildGuide(args: BuildGuideArgs): Promise<{ lint: LintResu
       remarkMermaid({ guideDir: args.guideDir, render: args.mermaidRender, collect: diagramIds }),
     ],
   })
+  // Anchors are checked HERE, not before rendering, so they can be judged
+  // against the ids the renderer actually emitted rather than a second
+  // derivation of them. Throwing before the write keeps the check fail-closed:
+  // a guide with a dead fragment leaves its index.html untouched.
+  const dupes = headings.map((h) => h.id).filter((id, i, all) => all.indexOf(id) !== i)
+  if (dupes.length) {
+    throw new Error(
+      `guide has duplicate heading id(s), so an anchor to the later heading is unreachable:\n  ${[...new Set(dupes)].join('\n  ')}`,
+    )
+  }
+  const ids = new Set(headings.map((h) => h.id))
+  const brokenAnchors = findBrokenAnchors(md, { selfIds: ids })
+  if (brokenAnchors.length) {
+    throw new Error(`guide has broken anchor link(s):\n  ${brokenAnchors.join('\n  ')}`)
+  }
+
   pruneDiagrams(args.guideDir, diagramIds)
   const html = wrapInChrome({ title: fm.title, body, headings, css: args.css })
   atomicWriteFile(path.join(args.guideDir, 'index.html'), html)
-  return { lint }
+  return { lint, ids, markdown: md }
 }
 
 export async function buildAllGuides(projectRoot?: string): Promise<void> {
   const css = loadGuideStyles()
   const guidesDir = getPackageGuidesDir(projectRoot)
   const index = buildGuidesIndex(guidesDir)
+
+  // Build every guide first, collecting the ids each one really emitted. A
+  // cross-guide anchor can only be judged once its target has been rendered,
+  // which is why this pass cannot live inside buildGuide.
+  const idsByTopic = new Map<string, Set<string>>()
+  const sources = new Map<string, string>()
   for (const entry of index.values()) {
-    await buildGuide({ guideDir: entry.dir, css })
+    const { ids, markdown } = await buildGuide({ guideDir: entry.dir, css })
+    idsByTopic.set(entry.frontmatter.topic, ids)
+    sources.set(entry.frontmatter.topic, markdown)
   }
+
+  const broken: string[] = []
+  for (const [topic, markdown] of sources) {
+    const selfIds = idsByTopic.get(topic) ?? new Set<string>()
+    for (const a of findBrokenAnchors(markdown, { selfIds, idsByTopic })) {
+      broken.push(`${topic}: ${a}`)
+    }
+  }
+  if (broken.length) {
+    throw new Error(`broken cross-guide anchor link(s):\n  ${broken.join('\n  ')}`)
+  }
+
   atomicWriteFile(path.join(guidesDir, 'index.html'), renderIndexPage([...index.values()], css))
 }

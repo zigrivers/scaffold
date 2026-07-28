@@ -59,6 +59,61 @@ describe('buildGuide', () => {
     await expect(buildGuide({ guideDir: dir, css: CSS, mermaidRender: async () => '' }))
       .rejects.toThrow(/broken relative link/i)
   })
+
+  it('throws when a same-page anchor matches no heading', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gb-'))
+    const dir = path.join(root, 'mmr')
+    fs.mkdirSync(dir, { recursive: true })
+    fs.writeFileSync(path.join(dir, 'index.md'), GUIDE_MD + '\nSee [below](#no-such-heading).\n')
+    await expect(buildGuide({ guideDir: dir, css: CSS, mermaidRender: async () => '' }))
+      .rejects.toThrow(/broken anchor link/i)
+  })
+
+  it('leaves index.html untouched when an anchor is broken (fails closed)', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gb-'))
+    const dir = path.join(root, 'mmr')
+    fs.mkdirSync(dir, { recursive: true })
+    fs.writeFileSync(path.join(dir, 'index.md'), GUIDE_MD + '\n[x](#nope)\n')
+    await expect(buildGuide({ guideDir: dir, css: CSS, mermaidRender: async () => '' })).rejects.toThrow()
+    expect(fs.existsSync(path.join(dir, 'index.html'))).toBe(false)
+  })
+
+  it('accepts an anchor to a heading whose text is a directive', async () => {
+    // The renderer runs remark-directive and remarkSev BEFORE assigning ids, so
+    // "## The :sev[P0]{level=p0} rule" becomes id="the-p0-rule". Deriving ids by
+    // re-parsing the markdown instead yielded "the-sevp0levelp0-rule", which
+    // rejected this correct anchor and accepted the wrong one. Taking the ids
+    // from the renderer is what makes this pass.
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gb-'))
+    const dir = path.join(root, 'mmr')
+    fs.mkdirSync(dir, { recursive: true })
+    fs.writeFileSync(path.join(dir, 'index.md'),
+      GUIDE_MD + '\n## The :sev[P0]{level=p0} rule\n\n[go](#the-p0-rule)\n')
+    const res = await buildGuide({ guideDir: dir, css: CSS, mermaidRender: async () => '' })
+    expect(res.ids.has('the-p0-rule')).toBe(true)
+    expect(fs.readFileSync(path.join(dir, 'index.html'), 'utf8')).toContain('id="the-p0-rule"')
+  })
+
+  it('rejects the pre-directive spelling of that same id', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gb-'))
+    const dir = path.join(root, 'mmr')
+    fs.mkdirSync(dir, { recursive: true })
+    fs.writeFileSync(path.join(dir, 'index.md'),
+      GUIDE_MD + '\n## The :sev[P0]{level=p0} rule\n\n[go](#the-sevp0levelp0-rule)\n')
+    await expect(buildGuide({ guideDir: dir, css: CSS, mermaidRender: async () => '' }))
+      .rejects.toThrow(/broken anchor link/i)
+  })
+
+  it('throws when two headings slug to the same id', async () => {
+    // The renderer emits both, so the second is unreachable and an anchor to it
+    // silently lands on the first. Reporting it is better than masking it.
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gb-'))
+    const dir = path.join(root, 'mmr')
+    fs.mkdirSync(dir, { recursive: true })
+    fs.writeFileSync(path.join(dir, 'index.md'), GUIDE_MD + '\n## Same One\n\n### Same one\n')
+    await expect(buildGuide({ guideDir: dir, css: CSS, mermaidRender: async () => '' }))
+      .rejects.toThrow(/duplicate heading id/i)
+  })
 })
 
 describe('renderIndexPage', () => {

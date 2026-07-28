@@ -33,24 +33,6 @@ export function stripFrontmatter(md: string): string {
   return lines.slice(close + 1).join('\n')
 }
 
-/**
- * The set of heading ids `renderGuideBody` will emit for `markdown`.
- *
- * Shares `slug()` and the h2/h3 depth rule with `collectHeadings` below, so an
- * anchor checker built on this cannot drift from the renderer — the whole point
- * of exporting it rather than re-deriving slugs elsewhere.
- */
-export function headingIds(markdown: string): Set<string> {
-  const tree = unified().use(remarkParse).use(remarkGfm).parse(stripFrontmatter(markdown))
-  const ids = new Set<string>()
-  visit(tree, 'heading', (node) => {
-    const h = node as Heading
-    if (h.depth !== 2 && h.depth !== 3) return
-    ids.add(slug(mdToString(h)))
-  })
-  return ids
-}
-
 function collectHeadings(out: TocHeading[]): AnyPlugin {
   return () => (tree: Parameters<typeof visit>[0]) => {
     visit(tree, 'heading', (node) => {
