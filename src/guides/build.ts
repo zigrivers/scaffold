@@ -9,7 +9,7 @@ import { wrapInChrome } from './template.js'
 import { renderIndexPage } from './index-page.js'
 import { lintGuide } from './lint.js'
 import type { LintResult } from './lint.js'
-import { findBrokenRelativeLinks } from './links.js'
+import { findBrokenRelativeLinks, findBrokenAnchors } from './links.js'
 
 export function loadGuideStyles(): string {
   // The guide stylesheet is the design tokens (dashboard-theme.css) followed by
@@ -44,6 +44,10 @@ export async function buildGuide(args: BuildGuideArgs): Promise<{ lint: LintResu
   const brokenLinks = findBrokenRelativeLinks(md, args.guideDir)
   if (brokenLinks.length) {
     throw new Error(`guide has broken relative link(s):\n  ${brokenLinks.join('\n  ')}`)
+  }
+  const brokenAnchors = findBrokenAnchors(md, args.guideDir)
+  if (brokenAnchors.length) {
+    throw new Error(`guide has broken anchor link(s):\n  ${brokenAnchors.join('\n  ')}`)
   }
   const fm = extractGuideFrontmatter(md)
   if (!fm) throw new Error(`invalid or missing frontmatter in ${path.join(args.guideDir, 'index.md')}`)
