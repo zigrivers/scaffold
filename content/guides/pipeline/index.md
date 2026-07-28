@@ -32,10 +32,10 @@ The 16 phases are the single source of truth in code: the `PHASES` constant
 name. Everything in this guide is anchored to it.
 
 :::callout{type=note}
-**90 meta-prompts, not 90 steps you run.** The pipeline directory holds 90 files
+**99 meta-prompts, not 99 steps you run.** The pipeline directory holds 99 files
 across 16 phase directories, but most projects run only a fraction. Game,
 multi-service, and platform-specific steps are disabled unless an overlay turns
-them on, and many steps are conditional (see [Methodology & depth](#methodology--depth)).
+them on, and many steps are conditional (see [Methodology & depth](#methodology-depth)).
 :::
 
 ## The 16 phases at a glance
@@ -108,10 +108,20 @@ actually gate execution.
 
 Two orthogonal knobs control how much of the pipeline runs and how thoroughly:
 
-1. **Preset** — *which* steps are enabled. Three presets ship
-   (`content/methodology/`): `mvp`, `custom` (balanced, depth 3), and `deep` (the
-   schema default).
+1. **Preset** — *which* steps are enabled. Four presets ship
+   (`content/methodology/`): `mvp`, `custom` (balanced, depth 3), `deep` (the
+   schema default) — and `brownfield`, which `scaffold adopt` selects for you.
 2. **Depth** — *how thorough* each enabled step's output is, on a 1–5 scale.
+
+:::callout{type=note}
+**`brownfield` is not an `init` choice.** `scaffold init --methodology` accepts
+only `mvp`, `custom`, and `deep`. The fourth preset is selected by
+`scaffold adopt --apply` when it brings an existing codebase under Scaffold —
+see [the install guide](../install/index.md#scaffold-adopt). It enables the
+foundation, environment, and quality steps at depth 3 and disables the doc-chain
+middle (modeling → specification), platform parity, and the validation audits;
+opt any of them back in per step with `scaffold adopt --include <step>`.
+:::
 
 ### Depth (1–5)
 
@@ -127,7 +137,7 @@ linter rules, and code review checklist, 15–20 pages."
 | 1 | Minimal | Bare minimum to start building |
 | 2 | Light | Slightly more detail; still speed-first |
 | 3 | Balanced | Recommended default — good coverage, no excess |
-| 4 | Thorough | Comprehensive; review/validation steps add external-model validation (Codex/Gemini) where their Methodology Scaling declares it |
+| 4 | Thorough | Comprehensive; review/validation steps add external-model validation (Codex/Antigravity) where their Methodology Scaling declares it |
 | 5 | Exhaustive | Maximum detail; multi-model reconciliation on the steps that opt into it; for critical/regulated work |
 :::
 
@@ -140,7 +150,7 @@ Depth 3 is the inflection point where steps start adding structure,
 cross-references, and validation beyond the basics. Override depth per run with
 `scaffold run <step> --depth N`.
 
-### The three presets
+### The three `init` presets
 
 ::::tabs
 :::tab{title="mvp (depth 1)"}
@@ -171,10 +181,10 @@ complex or regulated systems.
 ::::
 
 :::callout{type=note}
-**Game / multi-service / platform steps are off in all three presets.** The 24
+**Game / multi-service / platform steps are off in every preset.** The 24
 game steps and 5 cross-service steps are `enabled: false` in `mvp`, `custom`,
-*and* `deep`. They only switch on via a **project-type overlay** — see the
-playbooks below.
+`deep`, *and* `brownfield`. They only switch on via a **project-type
+overlay** — see the playbooks below.
 :::
 
 ## Project-type playbooks
@@ -375,8 +385,8 @@ how that audit works and what the nine lenses check.
 
 | path | what it holds |
 | --- | --- |
-| `content/pipeline/<phase>/*.md` | The 90 meta-prompt files, one directory per phase |
-| `content/methodology/*.yml` | Presets (`mvp`, `custom-defaults`, `deep`) + project-type overlays |
+| `content/pipeline/<phase>/*.md` | The 99 meta-prompt files, one directory per phase |
+| `content/methodology/*.yml` | Presets (`mvp`, `custom-defaults`, `deep`, `brownfield`) + project-type and domain overlays |
 | `content/knowledge/` | Domain entries injected into prompts during assembly |
 | `src/types/frontmatter.ts` | The canonical `PHASES` constant + frontmatter schema |
 | `src/cli/commands/` | `next`, `run`, `complete`, `skip`, `rework`, `reset`, `status` |

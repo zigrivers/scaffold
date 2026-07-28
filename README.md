@@ -1,6 +1,6 @@
 # Scaffold
 
-A TypeScript CLI that assembles AI-powered prompts at runtime to guide you from "I have an idea" to working software. Scaffold walks you through 60 structured pipeline steps — organized into 16 phases — plus 11 utility tools, and the supported AI tools handle the research, planning, and implementation for you.
+A TypeScript CLI that assembles AI-powered prompts at runtime to guide you from "I have an idea" to working software. Scaffold walks you through 99 structured pipeline steps — organized into 16 phases, with each methodology preset enabling the subset you need — plus 12 utility tools, and the supported AI tools handle the research, planning, and implementation for you.
 
 By the end, you'll have a fully planned, standards-documented, implementation-ready project with working code.
 
@@ -29,7 +29,7 @@ Either way, Scaffold constructs the prompt and the target AI tool does the work.
 
 **Assembly engine** — At execution time, Scaffold builds a 7-section prompt from: system metadata, the meta-prompt, knowledge base entries, project context (artifacts from prior steps), methodology settings, layered instructions, and depth-specific execution guidance.
 
-**Knowledge base** — 278 domain expertise entries in `content/knowledge/` organized in twenty categories (core, product, review, validation, finalization, execution, tools, game, web-app, backend, cli, library, mobile-app, data-pipeline, ml, browser-extension, research, data-science, web3, mcp-server) covering testing strategy, domain modeling, API design, security best practices, eval craft, TDD execution, task claiming, worktree management, release management, rendering strategies, data stores, CLI patterns, game engines, library bundling, mobile deployment, batch and streaming pipelines, model training and serving, browser extension manifests and service workers, data-science reproducibility and notebook discipline, smart-contract security and audit workflow, MCP protocol fundamentals, tool and resource design, transport patterns, and more. These get injected into prompts based on each step's `knowledge-base` frontmatter field. Knowledge files with a `## Deep Guidance` section are optimized for CLI assembly — only the deep guidance content is loaded, avoiding redundancy with the prompt text. Teams can add project-local overrides in `.scaffold/knowledge/` that layer on top of the global entries.
+**Knowledge base** — 301 domain expertise entries in `content/knowledge/` organized in 21 categories (core, product, review, validation, finalization, execution, tools, game, web-app, backend, cli, library, mobile-app, data-pipeline, ml, browser-extension, research, data-science, web3, mcp-server, macos-native) covering testing strategy, domain modeling, API design, security best practices, eval craft, TDD execution, task claiming, worktree management, release management, rendering strategies, data stores, CLI patterns, game engines, library bundling, mobile deployment, batch and streaming pipelines, model training and serving, browser extension manifests and service workers, data-science reproducibility and notebook discipline, smart-contract security and audit workflow, MCP protocol fundamentals, tool and resource design, transport patterns, and more. These get injected into prompts based on each step's `knowledge-base` frontmatter field. Knowledge files with a `## Deep Guidance` section are optimized for CLI assembly — only the deep guidance content is loaded, avoiding redundancy with the prompt text. Teams can add project-local overrides in `.scaffold/knowledge/` that layer on top of the global entries.
 
 A daily cron audits entries against their declared authoritative sources and opens refresh PRs when they drift — see `docs/knowledge-freshness/operations.md` for the operator guide (provider selection across Z.ai, DeepSeek, and Anthropic, the Z.ai→DeepSeek fallback, secret setup, manual overrides).
 
@@ -59,7 +59,8 @@ scaffold agent-ops install
 At scale (20+ agents), the bottleneck shifts from worktree hygiene to *merging*: every agent racing a long quality gate against a constantly-moving `main` livelocks. Two opt-in `agent-ops` components fix that. `--component merge-queue` installs a local batching **merge queue** — agents `scaffold mq enqueue --pr <N>` and move on; a single daemon batch-tests ready PRs against current `main` and lands only trees that actually passed (the bors "Not-Rocket-Science" rule), bisecting failures and quarantining flakes. When a landed PR names its task with `Closes <id>`, the daemon journals Bead closeout and makes at most three close attempts total; missing mappings, unavailable tracker commands, and exhausted closeouts stay logged for operator follow-up. `--component ci` adds day-one post-merge + nightly full-suite CI on a **$0 self-hosted runner** (no paid Actions minutes). The gate itself is made cheap via test-impact analysis (`make check-affected` runs only affected tests; the full suite is the post-merge safety net). `--component all` deliberately stays `git`+`staging` — the queue and CI are explicit opt-ins that the `merge-throughput` pipeline step wires up for projects that expect 3+ concurrent agents.
 
 ```bash
-scaffold agent-ops install --component merge-queue --component ci
+scaffold agent-ops install --component merge-queue
+scaffold agent-ops install --component ci
 scaffold mq status          # inspect the queue; enqueue/eject/stats also available
 ```
 
@@ -132,6 +133,20 @@ brew install scaffold
 
 Verify: `scaffold version`
 
+> **Homebrew, first install only:** newer Homebrew refuses to load a formula from a tap it doesn't trust. If `brew install scaffold` errors with `Refusing to load formula … from untrusted tap zigrivers/scaffold`, run `brew trust zigrivers/scaffold` once (it is Scaffold's own official tap) and retry.
+
+### Step 1b: Install mmr (recommended)
+
+`mmr` is the multi-model review CLI. It ships as its own package, so installing `scaffold` does **not** install it — but the review workflow (`scaffold run review-pr` / `review-code`) needs it.
+
+```bash
+npm install -g @zigrivers/mmr
+# or, if you installed scaffold via Homebrew:
+brew install mmr
+```
+
+Verify with `mmr --help`, then `mmr doctor` to see which reviewer CLIs are installed and authenticated.
+
 ### Step 2: Add the plugin (recommended)
 
 Install the Scaffold plugin inside Claude Code for auto-activated skills:
@@ -141,10 +156,12 @@ Install the Scaffold plugin inside Claude Code for auto-activated skills:
 /plugin install scaffold@zigrivers-scaffold
 ```
 
-This gives you:
+This gives you five skills:
 - **Scaffold Runner skill** — intelligent interactive wrapper that surfaces decision points (depth level, strictness, optional sections) before execution instead of letting Claude pick defaults silently
 - **Pipeline reference skill** — shows pipeline ordering, dependencies, and phase structure
 - **Multi-model dispatch skill** — correct invocation patterns for Codex and Antigravity CLIs
+- **MMR skill** — runs `mmr review` before merging, and `mmr critique` for design review
+- **Work-beads skill** — works the project's Beads task queue end to end (claim → worktree → build → verify → review → merge → close)
 
 **Usage** — just tell Claude Code what you want in natural language:
 ```
@@ -174,8 +191,12 @@ npm update -g @zigrivers/scaffold
 ### Homebrew
 
 ```bash
-brew upgrade scaffold
+brew update && brew upgrade scaffold
 ```
+
+The `brew update` prefix is required, not optional: `brew outdated` and `brew upgrade` both read from the local tap cache, so without it a freshly published release reports "already installed" even though the newer formula is live.
+
+Note that `scaffold update` itself prints only `brew upgrade scaffold`, without the prefix — prepend `brew update &&` yourself when you copy it.
 
 ### mmr
 
@@ -380,7 +401,7 @@ scaffold dashboard           # open a visual progress dashboard in your browser
 
 ### Tips for New Users
 
-- **You don't need every step.** The `mvp` preset runs just 7 steps and gets you building fast. Start there and switch to `deep` or `custom` if you want more rigor.
+- **You don't need every step.** The `mvp` preset enables 23 of the 99 steps and gets you building fast. Start there and switch to `deep` or `custom` if you want more rigor.
 - **"I'm not sure" is a valid answer.** When Claude asks a question you can't answer yet, say so — it'll suggest reasonable defaults and explain the trade-offs. You can revisit any decision later.
 - **You can re-run any step.** If your thinking evolves, use `scaffold reset <step>` to reset it, then run it again. Scaffold uses update mode — it improves the existing artifact rather than starting from scratch.
 - **Every step produces a real document.** Vision docs, PRDs, architecture decisions, test strategies — these all land in your project's `docs/` folder as markdown files. They're not throwaway; they're the source of truth your code is built from.
@@ -746,7 +767,7 @@ Overlays are composable with methodology presets. An MVP web-app gets fewer step
 | `web3` | `web3-overlay.yml` | 14 entries (Foundry tooling, smart-contract security, upgradeability, gas optimization, oracles, audit workflow, deployment, testing patterns, EVM fundamentals, ABI/interface design, event/log indexing, supply-chain) | Scope (`contracts` default; `dapp` reserved for W3-2) |
 | `game` | `game-overlay.yml` | 25 entries (engines, networking, audio, VR/AR, economy, save systems, certification) | Engine, multiplayer, platforms, economy, narrative, and 6 more |
 | `mcp-server` | `mcp-server-overlay.yml` | 12 entries (protocol fundamentals, tool design, resource design, transport patterns, SDK selection, auth, error handling, testing, observability, deployment, versioning, prompt primitives) | Language, transport, primitives, auth, deployment, stateful |
-| `macos-native` | `macos-native-overlay.yml` | 20 entries (architecture, SwiftUI/AppKit patterns, accessibility, distribution, entitlements, sandboxing, testing, observability, security, conventions) | UI framework |
+| `macos-native` | `macos-native-overlay.yml` | 20 entries (architecture, SwiftUI/AppKit patterns, accessibility, distribution, entitlements, sandboxing, testing, observability, security, conventions) | UI framework, app style, minimum macOS version, distribution, sandboxing, persistence, auto-update |
 
 ### Game Development
 
@@ -1278,13 +1299,24 @@ mmr review --pr 47 --fix-threshold P0    # Only fix critical/security issues
 | Command | Purpose |
 |---------|---------|
 | `mmr review` | Dispatch a review job to all configured channels |
+| `mmr critique [input]` | Multi-model design/brainstorm critique — advisory, no gate; exits 0 whatever the critique says (usage errors still exit 1) |
 | `mmr status <job-id>` | Check progress of a running job |
 | `mmr results <job-id>` | Collect, reconcile, and output findings |
+| `mmr reconcile <job-id> --channel <n> --input <d>` | Inject an external channel's findings and re-reconcile |
+| `mmr doctor [--fix]` | Diagnose every channel's install + auth, with per-channel recovery |
 | `mmr config init` | Auto-detect CLIs and generate `.mmr.yaml` |
 | `mmr config test` | Verify all channels (installation + auth) |
 | `mmr config channels` | List configured channels |
+| `mmr config enable\|disable <channel>` | Toggle a channel without hand-editing YAML |
+| `mmr config set\|unset <dotted.path> [value]` | Edit any config value (validated before write) |
+| `mmr config path` | Show where config is read from and written to |
 | `mmr jobs list` | Show recent review jobs |
 | `mmr jobs prune` | Remove old jobs (default: older than 7 days) |
+| `mmr sessions start\|list\|show\|end <id>` | Manage multi-round review sessions |
+| `mmr ack add\|list\|rm\|prune` | Sticky acknowledgments keyed on a finding's stable id |
+| `mmr skill install` | Install the "use MMR for review" skill per agent CLI |
+| `mmr commands [--json]` | Machine-readable capability manifest for agents |
+| `mmr explain [topic]` | Inline docs for a concept (channels, config, scopes, compensation, redaction, provenance) |
 
 #### mmr Configuration (.mmr.yaml)
 
@@ -1294,10 +1326,11 @@ The config file controls channel definitions, defaults, and project-specific rev
 version: 1
 
 defaults:
-  fix_threshold: P2        # P0/P1/P2 block the gate, P3 is informational
-  timeout: 300             # Per-channel timeout in seconds
-  format: json             # Default output format
-  job_retention_days: 7    # Auto-prune old jobs
+  fix_threshold: P2          # P0/P1/P2 block the gate, P3 is informational
+  min_completed_channels: 2  # below this, a passing gate is needs-user-decision
+  timeout: 300               # Per-channel timeout in seconds
+  format: json               # Default output format
+  job_retention_days: 7      # Auto-prune old jobs
 
 # Project-specific criteria appended to every review prompt
 review_criteria:
@@ -1378,6 +1411,14 @@ When multiple channels return findings, mmr applies consensus rules:
 | One channel flags P1/P2, others approve | **Medium** | Report with attribution |
 | Channels contradict each other | **Low** | Present both for user adjudication |
 
+> **A clean run still needs a quorum.** Since mmr 4.0.0 the verdict also reflects
+> how many channels actually reported. If fewer than
+> `defaults.min_completed_channels` (default **2**) completed, the result is
+> `needs-user-decision` — not `pass` — even with zero findings, because one
+> reviewer agreeing with itself is not multi-model review. Run `mmr doctor` to
+> see which channel is missing. A real blocking finding still reports as
+> `blocked` regardless of the floor.
+
 ### How It Works
 
 1. **Claude reviews first** — completes its own structured multi-pass review using different review lenses (coverage, consistency, quality, downstream readiness)
@@ -1431,20 +1472,20 @@ scaffold observe progress --no-stall-check      # suppress the Needs Attention s
 scaffold observe progress --output=docs/status.md  # write to a custom path
 ```
 
-`--replay` fuses the ledger with six adapter event streams (git, GitHub, MMR, pipeline state, test results, pipeline docs) into a chronological timeline. The "Needs Attention" surface fires when work appears stalled — unclaimed tasks, unreviewed PRs, unresolved blockers, or repeated lens skips.
+`--replay` fuses the ledger with five event-emitting adapters (git, GitHub, MMR, pipeline state, test results) into a chronological timeline; three further adapters (pipeline docs, beads, audit history) contribute availability and trend data without emitting timeline events. The "Needs Attention" surface fires when work appears stalled — a claimed task with no recent activity, an open PR that hasn't merged, an unresolved blocker, unresolved audit findings, or repeated lens skips.
 
 ### Audit
 
 ```bash
-scaffold observe audit                          # run all eight lenses (A–H)
+scaffold observe audit                          # run all nine lenses (A–I)
 scaffold observe audit --scope=code             # lenses A–G (code conformance only)
-scaffold observe audit --scope=docs             # lens H (cross-document consistency only)
+scaffold observe audit --scope=docs             # lenses H and I (cross-doc + knowledge gaps)
 scaffold observe audit --profile=full           # include LLM-graded Lens H sub-checks
 scaffold observe audit --lens G-decisions       # run a single lens
 scaffold observe audit --output=docs/audit.md   # write to a custom path
 ```
 
-Eight lenses cover TDD evidence (A), acceptance-criteria coverage (B), coding-standards compliance (C), stack conformance (D), design-token usage (E), scope coverage (F), decision-log completeness (G), and cross-document consistency (H). Findings get stable IDs for cross-run tracking:
+Nine lenses cover TDD evidence (A), acceptance-criteria coverage (B), coding-standards compliance (C), stack conformance (D), design-token usage (E), scope coverage (F), decision-log completeness (G), cross-document consistency (H), and knowledge-base gaps (I). Findings get stable IDs for cross-run tracking:
 
 ```bash
 scaffold observe ack abc123 --note "accepted, tracked in INFRA-77"
@@ -1521,22 +1562,26 @@ mmr review --channels=doc-conformance
 
 Runs `scaffold observe audit` as a built-in MMR channel, mapping findings to MMR's Finding shape with stable composite location IDs (`<source_doc>::<lens_id>::<short_id>`). Disabled by default — enable per-project in `.mmr.yaml`:
 ```yaml
-channels_enabled:
-  - doc-conformance
+channels:
+  doc-conformance:
+    enabled: true
 ```
 
 ## Methodology Presets
 
-Not every project needs all 60 steps. Choose a methodology when you run `scaffold init`:
+Not every project needs all 99 steps. Choose a methodology when you run `scaffold init`:
 
 ### deep (depth 5)
-All steps enabled. Comprehensive analysis of every angle — domain modeling, ADRs, security review, traceability matrix, the works. At depth 4-5, review steps dispatch to the three MMR CLI channels (Codex, Antigravity, Claude) for multi-model validation, with the Superpowers code-reviewer agent added as a complementary 4th channel via the scaffold wrappers. Best for complex systems, team projects, or when you want thorough documentation.
+64 of the 99 steps enabled — every planning step, including domain modeling, ADRs, security review, and the traceability matrix. (The game, cross-service, macOS-native, and MCP-server step families stay off until a project-type overlay turns them on.) At depth 4-5, review steps dispatch to the three MMR CLI channels (Codex, Antigravity, Claude) for multi-model validation, with the Superpowers code-reviewer agent added as a complementary 4th channel via the scaffold wrappers. Best for complex systems, team projects, or when you want thorough documentation.
 
 ### mvp (depth 1)
-Only 7 critical steps: create-prd, review-prd, user-stories, review-user-stories, tdd, implementation-plan, and implementation-playbook. Minimal ceremony — get to code fast. Best for prototypes, hackathons, or solo projects.
+23 steps — vision and PRD with their reviews, user stories, github-setup, beads, tech-stack, coding-standards, tdd, project-structure, dev-env-setup, git-workflow, the implementation plan and playbook, plus the stateless build loops. Minimal ceremony — get to code fast. Best for prototypes, hackathons, or solo projects.
 
 ### custom (configurable)
-You choose which steps to enable and set a default depth (1-5). You can also override depth per step. Best when you know which parts of the pipeline matter for your project.
+60 steps enabled by default; you choose which to enable and set a default depth (1-5), and can override depth per step. Best when you know which parts of the pipeline matter for your project.
+
+### brownfield (depth 3) — selected by `adopt`, not `init`
+39 steps: foundation, environment, and quality first, with the doc-chain middle (modeling → specification), platform parity, and the validation audits disabled. `scaffold adopt --apply` selects this for you when bringing an existing codebase under Scaffold; opt individual steps back in with `scaffold adopt --include <step>`. It is **not** a valid `scaffold init --methodology` value.
 
 You can change methodology mid-pipeline with `scaffold init --methodology <preset>`. Scaffold preserves your completed work and adjusts what's remaining.
 
@@ -1554,7 +1599,7 @@ You can change methodology mid-pipeline with `scaffold init --methodology <prese
 | `scaffold mq bootstrap --pr <N> [--finish]` | Arm-first guided FIRST merge for a repo installing the queue in its own PR (gate on head → crash-safe journaled squash-merge → arm hooks + scheduler); `--finish` reconciles a partial run |
 | `scaffold agent-ops install --component gate` | Generate the project-owned `scripts/gate-check.sh` + `scripts/gate-check-affected.sh` seeds (the merge-queue gate contract; seeded from `package.json` + workflows) |
 | `scaffold mq release --pr <N>` | Release a `HELD_HUMAN` (overlap-zone) PR back into the queue so it lands solo-gated (D13 `overlap_zone_policy: hold`) |
-| `scaffold mq gate-cache` | Inspect the D12 gate-result cache (skips a full/affected gate when this exact tree already ran it green) |
+| `scaffold mq gate-cache --check-tree <sha>` | Look up the D12 gate-result cache (which skips a full/affected gate when this exact tree already ran it green); `--record-tree <sha>` records one. A bare `gate-cache` exits with `MQ_GATE_CACHE_NO_TREE` — one of the two flags is required |
 | `scaffold tia affected --base <ref>` | Emit the TIA-selected, most-likely-to-fail-first test list + a confidence verdict (exit 0 = run the selection, exit 3 = run the full suite; fails closed to full on any uncertainty) |
 | `scaffold skip <step> [<step2>...]` | Skip one or more steps with a reason |
 | `scaffold complete <step>` | Mark a step as completed (for steps executed outside `scaffold run`) |
@@ -1573,6 +1618,14 @@ You can change methodology mid-pipeline with `scaffold init --methodology <prese
 | `scaffold skill install` | Install scaffold skills into the current project (automatic — rarely needed manually) |
 | `scaffold skill list` | Show available skills and installation status |
 | `scaffold skill remove` | Remove scaffold skills from the current project |
+| `scaffold rework` | Re-run pipeline steps **by phase** for depth improvement or cleanup (`--phases`, `--through N`, `--exclude`, `--depth`) |
+| `scaffold validate-knowledge` | Validate frontmatter on every knowledge entry (volatility, last-reviewed, sources, version-pin) |
+| `scaffold knowledge-freshness <command>` | Freshness-audit family: `audit-prefilter`, `audit-run-entry`, `audit-apply`, `link-check`, `lint-unsourced`, `anti-over-rewrite`, `deep-guidance-check`, `bump-version` |
+| `scaffold observe <subcommand>` | Build observability: `event`, `progress`, `harvest`, `audit`, `ack` — see [Build Observability](#build-observability) |
+| `scaffold guides [topic]` | Open, list (`--list`), or rebuild (`--build`) the reference guides; `--markdown` / `--print-path` for agents |
+| `scaffold agent-ops install \| check` | Install the agent-ops script bundle (`--component git\|staging\|merge-queue\|ci\|gate\|all`), or drift-check an installed bundle |
+| `scaffold mq <enqueue\|daemon\|status\|eject\|release\|stats\|bootstrap\|gate-cache>` | Drive the local batching merge queue |
+| `scaffold tia <affected\|record-due\|ingest>` | Affected-test selection, the record-cadence predicate, and V8-coverage ingest |
 
 ### Examples
 
@@ -1616,14 +1669,14 @@ scaffold dashboard
 
 ## Knowledge System
 
-Scaffold ships with 278 domain expertise entries organized in twenty categories:
+Scaffold ships with 301 domain expertise entries organized in 21 categories:
 
-- **core/** (35 entries) — eval craft, testing strategy, domain modeling, API design, database design, system architecture, ADR craft, security best practices, operations, task decomposition, user stories, UX specification, design system tokens, user story innovation, AI memory management, coding conventions, tech stack selection, project structure patterns, task tracking, CLAUDE.md patterns, multi-model review dispatch, review step template, dev environment, git workflow patterns, automated review tooling, vision craft
+- **core/** (37 entries) — eval craft, testing strategy, domain modeling, API design, database design, system architecture, ADR craft, security best practices, operations, task decomposition, user stories, UX specification, design system tokens, user story innovation, AI memory management, coding conventions, tech stack selection, project structure patterns, task tracking, CLAUDE.md patterns, multi-model review dispatch, review step template, dev environment, git workflow patterns, automated review tooling, vision craft, and more
 - **product/** (6 entries) — PRD craft, PRD innovation, gap analysis, vision craft, vision innovation
 - **review/** (20 entries) — review methodology (shared), plus domain-specific review passes for PRD, user stories, domain modeling, ADRs, architecture, API design, database design, UX specification, testing, security, operations, implementation tasks, game design, game economy, game UI, netcode, and more
 - **validation/** (7 entries) — critical path analysis, cross-phase consistency, scope management, traceability, implementability, decision completeness, dependency validation
 - **finalization/** (3 entries) — implementation playbook, developer onboarding, apply-fixes-and-freeze
-- **execution/** (5 entries) — TDD execution loop, task claiming strategy, worktree management, enhancement workflow
+- **execution/** (6 entries) — TDD execution loop, task claiming strategy, worktree management, enhancement workflow
 - **tools/** (4 entries) — release management, version strategy, session analysis, and more
 - **game/** (25 entries) — game engines, networking/netcode, audio middleware, save systems, input patterns, VR/AR, localization, modding/UGC, live operations, platform certification, economy design, AI/behavior, level design, performance, accessibility
 - **web-app/** (17 entries) — rendering strategies (SSR/SSG/SPA), state management, authentication, deploy targets, real-time patterns, PWA, performance, security, testing, session patterns, UX patterns, caching, API integration, accessibility
@@ -1638,6 +1691,7 @@ Scaffold ships with 278 domain expertise entries organized in twenty categories:
 - **data-science/** (13 entries) — reproducibility, experiment tracking, notebook discipline, model evaluation, data versioning, dev environment (Marimo/Jupyter/Hex), observability, project structure, conventions, requirements, security, testing, architecture
 - **web3/** (14 entries) — Foundry tooling and dev environment, smart-contract security and common vulnerabilities, upgradeability patterns, gas optimization, oracles and external data, audit workflow, deployment and verification, testing patterns, access control, EVM/contract architecture, conventions, project structure, requirements
 - **mcp-server/** (12 entries) — MCP protocol fundamentals, tool design patterns, resource design, transport patterns (stdio/SSE/HTTP), SDK selection (TypeScript/Python/FastMCP), authentication (OAuth 2.1/API keys), error handling, testing strategies, observability, deployment patterns, versioning and compatibility, prompt primitives
+- **macos-native/** (20 entries) — app architecture, SwiftUI/AppKit interop, HIG UI patterns, keyboard and menus, Swift concurrency, App Sandbox and entitlements, privacy/TCC, Keychain secrets, untrusted input, data persistence, code signing, notarization, packaging and distribution, App Store submission, CI release automation, project tooling, system integration, performance, accessibility, testing
 
 Each pipeline step declares which knowledge entries it needs in its frontmatter. The assembly engine injects them automatically. Knowledge files with a `## Deep Guidance` section are optimized for the CLI — only the deep guidance content is loaded into the assembled prompt, skipping the summary to avoid redundancy with the prompt text.
 
@@ -1688,6 +1742,7 @@ These are orthogonal to the pipeline — usable at any time, not tied to pipelin
 | `scaffold run post-implementation-review` | Full codebase review (Codex CLI + Antigravity CLI + Superpowers code-reviewer — note: does not currently include Claude CLI as a standard channel) after an AI agent completes all tasks — checks requirements coverage, security, architecture alignment, and more. |
 | `scaffold run spark` | Explore and expand a raw project idea through Socratic questioning, competitive research, and innovation expansion. Produces a `docs/spark-brief.md` that feeds into `create-vision`. At depth 4+, dispatches to external models for independent research and adversarial red-teaming. |
 | `scaffold run session-analyzer` | Analyze Claude Code session logs for patterns and insights. |
+| `scaffold run knowledge-audit-entry` | Audit one knowledge entry against its declared sources via grounded web retrieval. Normally driven by the freshness cron; run it by hand to triage a single entry. |
 
 Use `scaffold run spark` before `create-vision` when you have a vague idea that needs sharpening. Use `scaffold run review-code` before commit or push when you want a local gate on the current delivery candidate. Use `scaffold run review-pr` after a GitHub PR exists.
 
@@ -1733,11 +1788,11 @@ Options: `--dry-run` to preview, `minor`/`major`/`patch` to specify the bump, `c
 | **CLAUDE.md** | A configuration file in your project root that tells Claude Code how to work in your project. |
 | **Depth** | A 1-5 scale controlling how thorough each step's analysis is, from MVP-focused (1) to exhaustive (5). |
 | **Frontmatter** | The YAML metadata block at the top of meta-prompt files, declaring dependencies, outputs, knowledge entries, and other configuration. |
-| **Knowledge base** | 60 domain expertise entries that get injected into prompts. Can be extended with project-local overrides. |
+| **Knowledge base** | 301 domain expertise entries that get injected into prompts. Can be extended with project-local overrides. |
 | **MCP** | Model Context Protocol. A way for Claude to use external tools like a headless browser. |
 | **Meta-prompt** | A short intent declaration in `content/pipeline/` that gets assembled into a full prompt at runtime. |
 | **mmr** | Multi-Model Review CLI (`@zigrivers/mmr`). Standalone tool for async multi-model code review dispatch, reconciliation, and severity gating. |
-| **Methodology** | A preset (deep, mvp, custom) controlling which steps run and at what depth. |
+| **Methodology** | A preset controlling which steps run and at what depth — `deep`, `mvp`, or `custom` at init, plus `brownfield`, which `scaffold adopt` selects. |
 | **Multi-model review** | Independent validation from Codex/Antigravity CLIs at depth 4-5, catching blind spots a single model misses. |
 | **PRD** | Product Requirements Document. The foundation for everything Scaffold builds. |
 | **Runner skill** | Auto-activated agent-host skill (Claude Code, OpenCode, …) that surfaces decision points before executing pipeline steps. |
@@ -1844,10 +1899,10 @@ All build inputs live under `content/`:
 
 ```
 content/
-├── pipeline/         # 90 meta-prompts organized by 16 phases (phases 0-15, including build)
+├── pipeline/         # 99 meta-prompts organized by 16 phases (phases 0-15, including build)
 ├── tools/            # 12 tool meta-prompts (stateless, category: tool)
-├── knowledge/        # 278 domain expertise entries (core, product, review, validation, finalization, execution, tools, game, web-app, backend, cli, library, mobile-app, data-pipeline, ml, browser-extension, research, data-science, web3, mcp-server)
-├── methodology/      # 3 YAML presets (deep, mvp, custom)
+├── knowledge/        # 301 domain expertise entries (core, product, review, validation, finalization, execution, tools, game, web-app, backend, cli, library, mobile-app, data-pipeline, ml, browser-extension, research, data-science, web3, mcp-server, macos-native)
+├── methodology/      # 4 YAML presets (deep, mvp, custom, brownfield) + project-type and domain overlays
 └── skills/           # Skill templates with {{markers}} for multi-platform resolution (includes mmr)
 ```
 
@@ -1874,10 +1929,10 @@ dist/                 # Compiled TypeScript output
 
 ### Testing
 
-- **Vitest** for unit and E2E tests (73 test files, 997 tests, 90% coverage)
+- **Vitest** for unit and E2E tests (314 test files across `src/` and `tests/`)
 - **Performance benchmarks** — assembly p95 < 500ms, state I/O p95 < 100ms, graph build p95 < 2s
-- **Shell script tests** via bats (70 tests covering dashboard, worktree, frontmatter, install/uninstall)
-- **Meta-evals** — 39 cross-system consistency checks validating pipeline ↔ command ↔ knowledge integrity
+- **Shell script tests** via bats (356 tests in 26 files covering dashboard, worktree, frontmatter, install/uninstall)
+- **Meta-evals** — 128 cross-system consistency checks in 29 files, validating pipeline ↔ command ↔ knowledge integrity
 - **Coverage thresholds** — CI enforces 84/80/88/84 minimums (statements/branches/functions/lines)
 - Run: `npm test` (unit + E2E), `npm run test:perf` (performance), `make check` (bash gates), `make check-all` (full CI gate)
 

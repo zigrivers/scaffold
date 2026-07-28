@@ -115,9 +115,11 @@ is what makes planning phases safe to iterate. See
 [CREATE vs UPDATE mode](../pipeline/index.md#create-vs-update-mode).
 
 ### Methodology preset
-*Which* steps are enabled. Three presets ship — `mvp`, `custom` (balanced), and
-`deep` (the schema default and most thorough). Presets are layered with
-**overlays**. See [Methodology & depth](../pipeline/index.md#methodology-depth).
+*Which* steps are enabled. Four presets ship — `mvp`, `custom` (balanced), and
+`deep` (the schema default and most thorough) are the `init` choices; a fourth,
+`brownfield`, is selected by `scaffold adopt` rather than chosen at init.
+Presets are layered with **overlays**. See
+[Methodology & depth](../pipeline/index.md#methodology-depth).
 
 ### Depth (1–5)
 *How thorough* each enabled step's output is, on a 1–5 scale from Minimal to
@@ -261,10 +263,12 @@ These describe Multi-Model Review (MMR). Full treatment:
 
 ### Channel
 One independent AI reviewer in an MMR run — a separate subprocess given the same
-prompt and run in isolation. The built-in channels are `codex`, `gemini`,
-`claude`, `grok`, and the opt-in `doc-conformance`; the `scaffold run` wrappers
-add a Superpowers code-reviewer *agent* channel. A channel is pure config data,
-not per-channel code. See [Channel architecture](../mmr/index.md#channel-architecture).
+prompt and run in isolation. The built-in channels enabled by default are
+`codex`, `claude`, `grok`, and `antigravity` (`agy`); `opencode` and
+`doc-conformance` ship disabled and are opt-in. (`gemini` is a retired
+tombstone — never dispatched.) The `scaffold run` wrappers add a Superpowers
+code-reviewer *agent* channel. A channel is pure config data, not per-channel
+code. See [Channel architecture](../mmr/index.md#channel-architecture).
 
 ### Compensating pass
 When a channel is degraded (not installed, auth-failed, timed out), MMR runs a
@@ -289,8 +293,17 @@ a character-5-gram shingle backs a fuzzy match for re-worded findings. See
 
 ### MMR verdict
 The gate result of a review. MMR computes **four** verdicts: `pass`,
-`degraded-pass`, `blocked`, and `needs-user-decision` (no channel completed).
+`degraded-pass`, `blocked`, and `needs-user-decision` (no channel completed, or
+fewer than `min_completed_channels` did — see [completion floor](#completion-floor)).
 Proceed only on `pass` or `degraded-pass`.
+
+### Completion floor
+`defaults.min_completed_channels` (default **2**) is the number of channels that
+must actually report before a passing gate counts as a verdict. Below it, the
+result is `needs-user-decision` rather than `degraded-pass` — a guard against
+calling a single reviewer's silence "multi-model agreement". Added in mmr 4.0.0;
+`blocked` deliberately outranks it. See
+[the MMR gate](../mmr/index.md#the-gate-the-four-verdicts).
 
 :::callout{type=warning}
 **Two verdict vocabularies — don't conflate them.** The MMR review gate has

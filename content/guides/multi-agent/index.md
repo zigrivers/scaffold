@@ -159,11 +159,48 @@ CI is deferred until launch), then squash-merge. The shared object store means a
 merge from agent `alpha`'s worktree is on `main` for everyone the moment it
 lands.
 
+### Serializing the merges — `scaffold mq`
+
+Rebasing by hand stops scaling once several agents are merging within the same
+hour: every merge invalidates the gate run of every open PR behind it. The
+**merge queue** exists for exactly that. `scaffold mq enqueue --pr <N>` hands a
+PR to a local daemon that batches PRs, runs the gate once per batch, and merges
+them in order — so N agents pay roughly one gate, not N.
+
+```bash
+scaffold agent-ops install --component merge-queue   # install the scripts first
+scaffold mq enqueue --pr 412                         # fire-and-forget; starts the daemon
+scaffold mq status                                   # queue state + per-PR states
+scaffold mq stats                                    # gate timings, flakes, cache hits
+```
+
+Two knobs matter most for parallel agents, both in the `merge_queue:` block of
+`.scaffold/agent-ops.yaml`: `overlap_zones` (globs that must never share a
+batch — the queue's answer to the high-contention-files rule above) and
+`overlap_zone_policy`, which either lands a zone-touching PR solo-gated
+(`solo`) or parks it as `HELD_HUMAN` until you run `scaffold mq release --pr <N>`
+(`hold`).
+
+Pair it with **test-impact analysis** (`scaffold tia affected --base <ref>`) so
+each batch runs only the tests the batch can break, and with
+`scaffold sched install post-merge-poller` so the authoritative full gate still
+runs after merges land. `scaffold doctor` health-checks all of it at once. The
+full command surface for these lives in the
+[CLI reference](../cli/index.md#operations-the-parallel-agent-kit).
+
 ## Teardown & harvest
 
 When an agent's work is merged, retire its worktree. The single command for this
 is `scripts/teardown-agent-worktree.sh <worktree-path>`, and the **order of
 operations is the whole point**.
+
+:::callout{type=note}
+**This script lives in Scaffold's own repo, not in the agent-ops bundle.**
+`scaffold agent-ops install --component git` ships `setup-agent-worktree.sh` but
+no teardown counterpart. In a generated project, either copy the script in or do
+the two steps by hand in this order: `scaffold observe harvest --worktree
+<path>` **first**, then `git worktree remove <path>`.
+:::
 
 :::callout{type=danger}
 **Harvest the ledger BEFORE removing the worktree — or lose the build record.**

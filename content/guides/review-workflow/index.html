@@ -1533,6 +1533,14 @@ exact derivation algorithm; this table is the <em>action</em> you take for each 
 threshold (<span class="sev sev-p2">P2</span> by default; override per-run with
 <code>--fix-threshold</code>). See the <a href="../mmr/index.md">MMR reference</a> for how the verdict
 is derived from gate result + channel health.</p>
+<div class="callout callout-note"><p><strong>A clean run can still be <code>needs-user-decision</code>.</strong> Since mmr 4.0.0 the verdict
+also reflects <em>how many</em> channels reported. If fewer than
+<code>defaults.min_completed_channels</code> (default <strong>2</strong>) completed, the result is
+<code>needs-user-decision</code> even with zero findings — one reviewer agreeing with itself
+is not multi-model review. In practice you'll hit this when only one CLI is
+installed or authed: fix the channel (<code>mmr doctor</code>) rather than treating the
+empty result as a pass. <code>blocked</code> still outranks the floor, so a real blocking
+finding is always reported as <code>blocked</code>.</p></div>
 <div class="callout callout-warning"><p><strong>Proceed only on <code>pass</code> or <code>degraded-pass</code>.</strong> On <code>blocked</code> or
 <code>needs-user-decision</code>, never merge automatically — surface the verdict and the
 remaining findings to the user. The wrappers enforce this: report only says the
@@ -1606,7 +1614,7 @@ command for the failed channel; the channel's <code>recovery</code> string drive
 table.</li>
 </ul>
 <div class="callout callout-warning"><p><strong>Foreground only.</strong> When the <code>mmr</code> CLI is unavailable and a wrapper falls back
-to invoking Codex / Gemini / Claude / Grok directly, run them as <strong>foreground</strong>
+to invoking Codex / Claude / Grok / Antigravity directly, run them as <strong>foreground</strong>
 Bash calls — never with <code>run_in_background</code>, <code>&#x26;</code>, or <code>nohup</code>. Background
 execution produces empty output, which the parser then reads as a degraded
 channel <span class="fp" data-path="content/tools/review-code.md:204">content/tools/review-code.md:204</span>.</p></div>

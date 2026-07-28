@@ -1368,7 +1368,7 @@ nav.toc li.toc-3 a { padding-left: var(--sp-6); font-size: var(--text-xs); }
 <div class="layout">
   <aside class="rail" id="guide-toc">
     <button class="rail-close" data-action="nav" aria-label="Close navigation">✕</button>
-    <nav class="toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#overview">Overview</a></li><li class="toc-2"><a href="#installing">Installing</a></li><li class="toc-2"><a href="#keeping-current">Keeping current</a></li><li class="toc-2"><a href="#starting-fresh-vs-adopting">Starting fresh vs. adopting</a></li><li class="toc-3"><a href="#scaffold-init">scaffold init</a></li><li class="toc-3"><a href="#scaffold-adopt">scaffold adopt</a></li><li class="toc-2"><a href="#troubleshooting">Troubleshooting</a></li><li class="toc-2"><a href="#see-also">See also</a></li></ul></nav>
+    <nav class="toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#overview">Overview</a></li><li class="toc-2"><a href="#installing">Installing</a></li><li class="toc-2"><a href="#installing-mmr-the-review-cli">Installing mmr (the review CLI)</a></li><li class="toc-2"><a href="#keeping-current">Keeping current</a></li><li class="toc-2"><a href="#starting-fresh-vs-adopting">Starting fresh vs. adopting</a></li><li class="toc-3"><a href="#scaffold-init">scaffold init</a></li><li class="toc-3"><a href="#scaffold-adopt">scaffold adopt</a></li><li class="toc-2"><a href="#troubleshooting">Troubleshooting</a></li><li class="toc-2"><a href="#see-also">See also</a></li></ul></nav>
   </aside>
   <main class="content"><h2 id="overview">Overview</h2>
 <p>Scaffold ships as one tool with two install surfaces: the <strong><code>scaffold</code> CLI</strong>
@@ -1391,15 +1391,35 @@ the plugin tab adds the optional Claude Code skills on top.</p>
 <div class="tabs"><div class="tablist" role="tablist"><button id="tab-0-0" class="tab-btn active" role="tab" data-tab="0" aria-controls="tabpane-0-0" aria-selected="true" tabindex="0">npm</button><button id="tab-0-1" class="tab-btn" role="tab" data-tab="1" aria-controls="tabpane-0-1" aria-selected="false" tabindex="-1">Homebrew</button><button id="tab-0-2" class="tab-btn" role="tab" data-tab="2" aria-controls="tabpane-0-2" aria-selected="false" tabindex="-1">Claude Code plugin</button></div><div id="tabpane-0-0" class="tabpane active" role="tabpanel" data-tab="0" aria-labelledby="tab-0-0" tabindex="0"><pre><code class="language-bash">npm install -g @zigrivers/scaffold
 </code></pre><p>Verify with <code>scaffold version</code>. This is the recommended path — it uses your
 system Node and updates with <code>npm update -g</code>.</p></div><div id="tabpane-0-1" class="tabpane" role="tabpanel" data-tab="1" aria-labelledby="tab-0-1" tabindex="0"><pre><code class="language-bash">brew tap zigrivers/scaffold
+brew trust zigrivers/scaffold   # only if the next command refuses the tap
 brew install scaffold
 </code></pre><p>The formula installs and manages Node as a dependency, so no separate Node
-install is needed. Verify with <code>scaffold version</code>.</p></div><div id="tabpane-0-2" class="tabpane" role="tabpanel" data-tab="2" aria-labelledby="tab-0-2" tabindex="0"><p>Inside a Claude Code session:</p><pre><code class="language-text">/plugin marketplace add zigrivers/scaffold
+install is needed. Verify with <code>scaffold version</code>.</p><p>Newer Homebrew refuses to load a formula from a tap it doesn't trust. If you see
+<code>Refusing to load formula … from untrusted tap zigrivers/scaffold</code>, run
+<code>brew trust zigrivers/scaffold</code> once — it's Scaffold's own official tap — then
+retry. This is a local Homebrew policy, not a problem with the release.</p></div><div id="tabpane-0-2" class="tabpane" role="tabpanel" data-tab="2" aria-labelledby="tab-0-2" tabindex="0"><p>Inside a Claude Code session:</p><pre><code class="language-text">/plugin marketplace add zigrivers/scaffold
 /plugin install scaffold@zigrivers-scaffold
 </code></pre><p>This is <strong>optional</strong> and complements the CLI — it auto-activates the Scaffold
 Runner and pipeline-reference skills for interactive guidance. Everything the
 plugin does is also reachable via <code>scaffold run &#x3C;step></code>. CLI-only users don't
 need it: <code>scaffold init</code> installs the skills automatically and later CLI
 commands keep them current.</p></div></div>
+<h2 id="installing-mmr-the-review-cli">Installing <code>mmr</code> (the review CLI)</h2>
+<p><code>mmr</code> is a <strong>separate package</strong> — installing <code>scaffold</code> does not install it. The
+review workflow (<code>scaffold run review-pr</code> / <code>review-code</code>, and the mandatory
+post-PR review) drives <code>mmr</code>, so install it alongside:</p>
+<pre><code class="language-bash">npm install -g @zigrivers/mmr    # or: brew install mmr  (same zigrivers/scaffold tap)
+mmr doctor                       # which reviewer CLIs are installed + authed, and how to fix each
+</code></pre>
+<p>Both surfaces are published on every <code>mmr-v*</code> tag, so pick whichever matches how
+you installed <code>scaffold</code>. Keep it current with <code>npm update -g @zigrivers/mmr</code> or
+<code>brew update &#x26;&#x26; brew upgrade mmr</code>.</p>
+<p><code>mmr</code> orchestrates <em>other</em> CLIs — it does not bundle any model. <code>mmr doctor</code>
+tells you which of <code>codex</code>, <code>claude</code>, <code>grok</code>, <code>agy</code>, and <code>opencode</code> are present
+and authenticated, and prints the exact recovery command for each. A channel
+whose CLI simply isn't installed is skipped rather than compensated, so a fresh
+machine typically needs at least two of them before a review yields a usable
+verdict — see <a href="../mmr/index.md">the MMR reference</a>.</p>
 <h2 id="keeping-current">Keeping current</h2>
 <p>Check what you have and whether a newer release exists with <code>scaffold version</code>
 (or <code>scaffold update --check-only</code>); both query the npm registry for the latest
@@ -1480,7 +1500,11 @@ Node, or use the Homebrew install, which installs and manages Node as a
 dependency.</li>
 <li><strong><code>scaffold update</code> only prints a command.</strong> That's intentional — it never
 runs installs for you. Copy the printed upgrade command for your channel and
-run it yourself.</li>
+run it yourself. <code>--check-only</code> reports the same information and exits — it
+still names the upgrade command when one is available; the difference is that
+it emits a check-shaped JSON payload under <code>--format json</code>. <code>--skip-build</code> is
+accepted but currently has no effect: <code>scaffold update</code> never installs or
+rebuilds anything, so there is no build to skip.</li>
 <li><strong>Existing project behaves oddly after upgrade.</strong> Run <code>scaffold status</code> to
 trigger automatic state migration before anything else.</li>
 </ul>

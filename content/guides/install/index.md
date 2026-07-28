@@ -43,10 +43,16 @@ system Node and updates with `npm update -g`.
 :::tab{title="Homebrew"}
 ```bash
 brew tap zigrivers/scaffold
+brew trust zigrivers/scaffold   # only if the next command refuses the tap
 brew install scaffold
 ```
 The formula installs and manages Node as a dependency, so no separate Node
 install is needed. Verify with `scaffold version`.
+
+Newer Homebrew refuses to load a formula from a tap it doesn't trust. If you see
+`Refusing to load formula … from untrusted tap zigrivers/scaffold`, run
+`brew trust zigrivers/scaffold` once — it's Scaffold's own official tap — then
+retry. This is a local Homebrew policy, not a problem with the release.
 :::
 :::tab{title="Claude Code plugin"}
 Inside a Claude Code session:
@@ -61,6 +67,28 @@ need it: `scaffold init` installs the skills automatically and later CLI
 commands keep them current.
 :::
 ::::
+
+## Installing `mmr` (the review CLI)
+
+`mmr` is a **separate package** — installing `scaffold` does not install it. The
+review workflow (`scaffold run review-pr` / `review-code`, and the mandatory
+post-PR review) drives `mmr`, so install it alongside:
+
+```bash
+npm install -g @zigrivers/mmr    # or: brew install mmr  (same zigrivers/scaffold tap)
+mmr doctor                       # which reviewer CLIs are installed + authed, and how to fix each
+```
+
+Both surfaces are published on every `mmr-v*` tag, so pick whichever matches how
+you installed `scaffold`. Keep it current with `npm update -g @zigrivers/mmr` or
+`brew update && brew upgrade mmr`.
+
+`mmr` orchestrates *other* CLIs — it does not bundle any model. `mmr doctor`
+tells you which of `codex`, `claude`, `grok`, `agy`, and `opencode` are present
+and authenticated, and prints the exact recovery command for each. A channel
+whose CLI simply isn't installed is skipped rather than compensated, so a fresh
+machine typically needs at least two of them before a review yields a usable
+verdict — see [the MMR reference](../mmr/index.md).
 
 ## Keeping current
 
@@ -186,7 +214,11 @@ directory to your shell `PATH`, or reinstall with a prefix that's already on
   dependency.
 - **`scaffold update` only prints a command.** That's intentional — it never
   runs installs for you. Copy the printed upgrade command for your channel and
-  run it yourself.
+  run it yourself. `--check-only` reports the same information and exits — it
+  still names the upgrade command when one is available; the difference is that
+  it emits a check-shaped JSON payload under `--format json`. `--skip-build` is
+  accepted but currently has no effect: `scaffold update` never installs or
+  rebuilds anything, so there is no build to skip.
 - **Existing project behaves oddly after upgrade.** Run `scaffold status` to
   trigger automatic state migration before anything else.
 

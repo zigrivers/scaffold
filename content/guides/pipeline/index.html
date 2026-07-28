@@ -1368,7 +1368,7 @@ nav.toc li.toc-3 a { padding-left: var(--sp-6); font-size: var(--text-xs); }
 <div class="layout">
   <aside class="rail" id="guide-toc">
     <button class="rail-close" data-action="nav" aria-label="Close navigation">✕</button>
-    <nav class="toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#the-mental-model">The mental model</a></li><li class="toc-2"><a href="#the-16-phases-at-a-glance">The 16 phases at a glance</a></li><li class="toc-2"><a href="#methodology-depth">Methodology &amp; depth</a></li><li class="toc-3"><a href="#depth-15">Depth (1–5)</a></li><li class="toc-3"><a href="#the-three-presets">The three presets</a></li><li class="toc-2"><a href="#project-type-playbooks">Project-type playbooks</a></li><li class="toc-2"><a href="#navigating-the-pipeline">Navigating the pipeline</a></li><li class="toc-2"><a href="#why-a-step-is-blocked">Why a step is blocked</a></li><li class="toc-3"><a href="#conditional-if-needed-steps">Conditional (&quot;if-needed&quot;) steps</a></li><li class="toc-3"><a href="#a-representative-dependency-slice">A representative dependency slice</a></li><li class="toc-2"><a href="#create-vs-update-mode">CREATE vs UPDATE mode</a></li><li class="toc-2"><a href="#phase-boundary-audits">Phase-boundary audits</a></li><li class="toc-2"><a href="#where-it-all-lives">Where it all lives</a></li></ul></nav>
+    <nav class="toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#the-mental-model">The mental model</a></li><li class="toc-2"><a href="#the-16-phases-at-a-glance">The 16 phases at a glance</a></li><li class="toc-2"><a href="#methodology-depth">Methodology &amp; depth</a></li><li class="toc-3"><a href="#depth-15">Depth (1–5)</a></li><li class="toc-3"><a href="#the-three-init-presets">The three init presets</a></li><li class="toc-2"><a href="#project-type-playbooks">Project-type playbooks</a></li><li class="toc-2"><a href="#navigating-the-pipeline">Navigating the pipeline</a></li><li class="toc-2"><a href="#why-a-step-is-blocked">Why a step is blocked</a></li><li class="toc-3"><a href="#conditional-if-needed-steps">Conditional (&quot;if-needed&quot;) steps</a></li><li class="toc-3"><a href="#a-representative-dependency-slice">A representative dependency slice</a></li><li class="toc-2"><a href="#create-vs-update-mode">CREATE vs UPDATE mode</a></li><li class="toc-2"><a href="#phase-boundary-audits">Phase-boundary audits</a></li><li class="toc-2"><a href="#where-it-all-lives">Where it all lives</a></li></ul></nav>
   </aside>
   <main class="content"><h2 id="the-mental-model">The mental model</h2>
 <p>Scaffold is a <strong>prompt pipeline</strong>: a curated, ordered sequence of structured
@@ -1392,10 +1392,10 @@ run these <em>over and over</em> while actually writing code.</li>
 <p>The 16 phases are the single source of truth in code: the <code>PHASES</code> constant
 (<span class="fp" data-path="src/types/frontmatter.ts:6">src/types/frontmatter.ts:6</span>) defines every slug, number, and display
 name. Everything in this guide is anchored to it.</p>
-<div class="callout callout-note"><p><strong>90 meta-prompts, not 90 steps you run.</strong> The pipeline directory holds 90 files
+<div class="callout callout-note"><p><strong>99 meta-prompts, not 99 steps you run.</strong> The pipeline directory holds 99 files
 across 16 phase directories, but most projects run only a fraction. Game,
 multi-service, and platform-specific steps are disabled unless an overlay turns
-them on, and many steps are conditional (see <a href="#methodology--depth">Methodology &#x26; depth</a>).</p></div>
+them on, and many steps are conditional (see <a href="#methodology-depth">Methodology &#x26; depth</a>).</p></div>
 <h2 id="the-16-phases-at-a-glance">The 16 phases at a glance</h2>
 <p>Phase numbers and display names below are quoted verbatim from the <code>PHASES</code>
 constant (<span class="fp" data-path="src/types/frontmatter.ts:6">src/types/frontmatter.ts:6</span>). Phases 0–14 are planning; phase 15
@@ -1520,11 +1520,18 @@ actually gate execution.</p>
 <h2 id="methodology-depth">Methodology &#x26; depth</h2>
 <p>Two orthogonal knobs control how much of the pipeline runs and how thoroughly:</p>
 <ol>
-<li><strong>Preset</strong> — <em>which</em> steps are enabled. Three presets ship
-(<code>content/methodology/</code>): <code>mvp</code>, <code>custom</code> (balanced, depth 3), and <code>deep</code> (the
-schema default).</li>
+<li><strong>Preset</strong> — <em>which</em> steps are enabled. Four presets ship
+(<code>content/methodology/</code>): <code>mvp</code>, <code>custom</code> (balanced, depth 3), <code>deep</code> (the
+schema default) — and <code>brownfield</code>, which <code>scaffold adopt</code> selects for you.</li>
 <li><strong>Depth</strong> — <em>how thorough</em> each enabled step's output is, on a 1–5 scale.</li>
 </ol>
+<div class="callout callout-note"><p><strong><code>brownfield</code> is not an <code>init</code> choice.</strong> <code>scaffold init --methodology</code> accepts
+only <code>mvp</code>, <code>custom</code>, and <code>deep</code>. The fourth preset is selected by
+<code>scaffold adopt --apply</code> when it brings an existing codebase under Scaffold —
+see <a href="../install/index.md#scaffold-adopt">the install guide</a>. It enables the
+foundation, environment, and quality steps at depth 3 and disables the doc-chain
+middle (modeling → specification), platform parity, and the validation audits;
+opt any of them back in per step with <code>scaffold adopt --include &#x3C;step></code>.</p></div>
 <h3 id="depth-15">Depth (1–5)</h3>
 <p>Every depth level dials the same step from a sketch to an exhaustive document.
 Each step's <code>## Methodology Scaling</code> section spells out its behavior per level —
@@ -1566,7 +1573,7 @@ linter rules, and code review checklist, 15–20 pages."</p>
 
 
 
-<table><thead><tr><th>depth</th><th>name</th><th>what you get</th></tr></thead><tbody><tr><td>1</td><td>Minimal</td><td>Bare minimum to start building</td></tr><tr><td>2</td><td>Light</td><td>Slightly more detail; still speed-first</td></tr><tr><td>3</td><td>Balanced</td><td>Recommended default — good coverage, no excess</td></tr><tr><td>4</td><td>Thorough</td><td>Comprehensive; review/validation steps add external-model validation (Codex/Gemini) where their Methodology Scaling declares it</td></tr><tr><td>5</td><td>Exhaustive</td><td>Maximum detail; multi-model reconciliation on the steps that opt into it; for critical/regulated work</td></tr></tbody></table></div>
+<table><thead><tr><th>depth</th><th>name</th><th>what you get</th></tr></thead><tbody><tr><td>1</td><td>Minimal</td><td>Bare minimum to start building</td></tr><tr><td>2</td><td>Light</td><td>Slightly more detail; still speed-first</td></tr><tr><td>3</td><td>Balanced</td><td>Recommended default — good coverage, no excess</td></tr><tr><td>4</td><td>Thorough</td><td>Comprehensive; review/validation steps add external-model validation (Codex/Antigravity) where their Methodology Scaling declares it</td></tr><tr><td>5</td><td>Exhaustive</td><td>Maximum detail; multi-model reconciliation on the steps that opt into it; for critical/regulated work</td></tr></tbody></table></div>
 <p>External-model / multi-model dispatch at depth 4–5 is <strong>step-specific</strong> — it
 applies to the prompts whose <code>## Methodology Scaling</code> section declares it
 (chiefly the <code>review-*</code> / <code>innovate-*</code> / validation steps). For most authoring
@@ -1574,7 +1581,7 @@ steps, higher depth just means a more thorough single-model output.</p>
 <p>Depth 3 is the inflection point where steps start adding structure,
 cross-references, and validation beyond the basics. Override depth per run with
 <code>scaffold run &#x3C;step> --depth N</code>.</p>
-<h3 id="the-three-presets">The three presets</h3>
+<h3 id="the-three-init-presets">The three <code>init</code> presets</h3>
 <div class="tabs"><div class="tablist" role="tablist"><button id="tab-0-0" class="tab-btn active" role="tab" data-tab="0" aria-controls="tabpane-0-0" aria-selected="true" tabindex="0">mvp (depth 1)</button><button id="tab-0-1" class="tab-btn" role="tab" data-tab="1" aria-controls="tabpane-0-1" aria-selected="false" tabindex="-1">custom (depth 3)</button><button id="tab-0-2" class="tab-btn" role="tab" data-tab="2" aria-controls="tabpane-0-2" aria-selected="false" tabindex="-1">deep (depth 5)</button></div><div id="tabpane-0-0" class="tabpane active" role="tabpanel" data-tab="0" aria-labelledby="tab-0-0" tabindex="0"><p><strong>Ship fast with minimal ceremony.</strong> Only the essential planning steps are
 enabled: vision, PRD + stories (with reviews), tech-stack, coding-standards,
 tdd, project-structure, dev-env-setup, implementation-plan, and
@@ -1592,10 +1599,10 @@ planning step is enabled, including the
 all specs, every quality gate, all seven validation audits, and the full
 finalization phase. External-model dispatch kicks in at depth 4+. Best for
 complex or regulated systems.</p></div></div>
-<div class="callout callout-note"><p><strong>Game / multi-service / platform steps are off in all three presets.</strong> The 24
+<div class="callout callout-note"><p><strong>Game / multi-service / platform steps are off in every preset.</strong> The 24
 game steps and 5 cross-service steps are <code>enabled: false</code> in <code>mvp</code>, <code>custom</code>,
-<em>and</em> <code>deep</code>. They only switch on via a <strong>project-type overlay</strong> — see the
-playbooks below.</p></div>
+<code>deep</code>, <em>and</em> <code>brownfield</code>. They only switch on via a <strong>project-type
+overlay</strong> — see the playbooks below.</p></div>
 <h2 id="project-type-playbooks">Project-type playbooks</h2>
 <p>Overlays (<code>content/methodology/*-overlay.yml</code>) layer onto a preset. Most overlays
 only <strong>inject domain knowledge</strong> into existing steps (so a web-app build pulls in
@@ -1799,7 +1806,7 @@ how that audit works and what the nine lenses check.</p>
 
 
 
-<table><thead><tr><th>path</th><th>what it holds</th></tr></thead><tbody><tr><td><code>content/pipeline/&#x3C;phase>/*.md</code></td><td>The 90 meta-prompt files, one directory per phase</td></tr><tr><td><code>content/methodology/*.yml</code></td><td>Presets (<code>mvp</code>, <code>custom-defaults</code>, <code>deep</code>) + project-type overlays</td></tr><tr><td><code>content/knowledge/</code></td><td>Domain entries injected into prompts during assembly</td></tr><tr><td><code>src/types/frontmatter.ts</code></td><td>The canonical <code>PHASES</code> constant + frontmatter schema</td></tr><tr><td><code>src/cli/commands/</code></td><td><code>next</code>, <code>run</code>, <code>complete</code>, <code>skip</code>, <code>rework</code>, <code>reset</code>, <code>status</code></td></tr><tr><td><code>.scaffold/state.json</code></td><td>Per-step completion state (planning phases only)</td></tr></tbody></table>
+<table><thead><tr><th>path</th><th>what it holds</th></tr></thead><tbody><tr><td><code>content/pipeline/&#x3C;phase>/*.md</code></td><td>The 99 meta-prompt files, one directory per phase</td></tr><tr><td><code>content/methodology/*.yml</code></td><td>Presets (<code>mvp</code>, <code>custom-defaults</code>, <code>deep</code>, <code>brownfield</code>) + project-type and domain overlays</td></tr><tr><td><code>content/knowledge/</code></td><td>Domain entries injected into prompts during assembly</td></tr><tr><td><code>src/types/frontmatter.ts</code></td><td>The canonical <code>PHASES</code> constant + frontmatter schema</td></tr><tr><td><code>src/cli/commands/</code></td><td><code>next</code>, <code>run</code>, <code>complete</code>, <code>skip</code>, <code>rework</code>, <code>reset</code>, <code>status</code></td></tr><tr><td><code>.scaffold/state.json</code></td><td>Per-step completion state (planning phases only)</td></tr></tbody></table>
 <p>The phase list, ordering, and slugs are defined exactly once, in <code>PHASES</code>
 (<span class="fp" data-path="src/types/frontmatter.ts:6">src/types/frontmatter.ts:6</span>); every doc, skill, and command resolves
 against it.</p></main>

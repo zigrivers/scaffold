@@ -25,7 +25,9 @@ features:
   `lib/dashboard-theme.css`, has **no** Beads task section, and does **not**
   inject the Build-Observability panels. The CLI writes the HTML to a temp file
   (or `--output <path>`) and opens it via `open` / `xdg-open` / `start`
-  (:cite[src/cli/commands/dashboard.ts:64-66]).
+  (:cite[src/cli/commands/dashboard.ts:64-66]). Suppress the browser with
+  `--no-open`, get the underlying data instead of a page with `--json-only`,
+  and target one service of a multi-service project with `--service <name>`.
 - **`scripts/generate-dashboard.sh`** is the visual-test fixture that
   `make dashboard-test` runs. It embeds `lib/dashboard-theme.css`, renders a
   Beads task section, and injects the two Build-Observability panels. Its

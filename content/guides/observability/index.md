@@ -33,7 +33,7 @@ an agent worktree's `.scaffold/activity.jsonl` is lost the moment the worktree
 is removed, *unless* it is harvested into the primary archive first. The
 harvester (`src/observability/engine/harvester.ts`) and
 `scripts/teardown-agent-worktree.sh` exist precisely to close this gap — see
-[Harvest, recover & teardown](#harvest-recover--teardown).
+[Harvest, recover & teardown](#harvest-recover-teardown).
 
 ### What good build observability produces
 
@@ -287,7 +287,7 @@ events.
 | `state` | `.scaffold/state.json` + `services/*/state.json` | `step_completed`, `step_in_progress` | none; per-step timestamp, mtime fallback |
 | `tests` | `.scaffold/last-test-run.json` | `test_run_completed`, `test_run_failed` | none |
 | `pipeline_docs` | candidate `docs/*.md` artifact paths | — (probe: available / degraded / unavailable) | n/a |
-| `beads` | `.beads/` + `bd` CLI (≥ v1.0.0) | — (task claim ↔ event-id linkage) | n/a |
+| `beads` | `.beads/` + `bd` CLI (≥ v1.1.0) | — (task claim ↔ event-id linkage) | n/a |
 | `audit_history` | `docs/audits/*.json` (≤ 100 scanned) | — (trends + `lensSkippedStreaks`) | n/a |
 
 ### Source priority
@@ -814,8 +814,9 @@ staged paths plus the stash, not a guaranteed full reset.
 runs against the maintainer's own repo, not untrusted third-party code
 (`src/observability/engine/fix-agent-dispatcher.ts`). This is the opposite of the
 Lens H LLM dispatcher, which hard-codes its command for untrusted-repo safety.
-CLAUDE.md's `--fix` note describing the dispatcher as "not
-project-config-overridable" conflates the two.
+Both default to `claude -p`, so read the *key name* to tell which one a piece of
+documentation means: `fix.dispatcher_command` exists; `llm.dispatcher_command`
+deliberately does not.
 :::
 
 Exit code: `1` if any blocking finding survived the loop, else `0`.
@@ -1072,24 +1073,25 @@ The audit's own rule — "code is ground truth where it disagrees with the spec 
 the docs" — surfaced these mismatches. They are deferred findings to resolve in
 the code/docs:
 
-- **9 lenses, not 8.** The design spec and CLAUDE.md enumerate A–H;
-  `I-knowledge-gaps` shipped and is registered.
-- **`pr_opened` vs `pr_open`.** CLAUDE.md abbreviates the event type as
-  `pr_open`; the code only emits `pr_opened`.
+- **9 lenses, not 8.** The design spec enumerates A–H; `I-knowledge-gaps`
+  shipped and is registered. (CLAUDE.md now says nine.)
+- **`pr_opened` vs `pr_open`.** Older prose abbreviated the event type as
+  `pr_open`; the code only ever emits `pr_opened`.
 - **Three engine verdicts, not four.** `needs-user-decision` is an MMR review
   verdict; the audit engine emits only `pass` / `degraded-pass` / `blocked`.
-- **Two dispatchers — don't conflate them.** CLAUDE.md's "not
-  project-config-overridable" note is about the **Lens H LLM dispatcher**
-  (`llm-dispatcher.ts`, hard-coded `claude -p` by design). It does **not** apply
-  to the separate **`--fix` agent dispatcher**, whose `fix.dispatcher_command`
-  *is* project-configurable. The divergence is that the two are easy to conflate.
+- **Two dispatchers — don't conflate them.** The "not project-config-overridable"
+  rule is about the **Lens H LLM dispatcher** (`llm-dispatcher.ts`, hard-coded
+  `claude -p` by design). It does **not** apply to the separate **`--fix` agent
+  dispatcher**, whose `fix.dispatcher_command` *is* project-configurable. Both
+  ship `claude -p` as the default command, which is what makes them easy to
+  conflate.
 - **`pr_review_stale` reserved.** The sixth stall signal has a config default but
   is not yet emitted (deferred pending a per-PR correlation_id on the mmr
   adapter).
 - **Inert config keys.** `lenses.G-decisions.keywords_file` and
   `lenses.H-cross-doc.skip_phase_subsets` are typed but unread; the bundled
   `decision-keywords.txt` is not loaded.
-- **No `F-scope.wave_budget` key.** CLAUDE.md implies a wave budget in
+- **No `F-scope.wave_budget` key.** Earlier prose implied a wave budget in
   `observability.yaml`; in fact no wave/phase budget is read anywhere — Lens F
   reads only `untouched_story_grace_hours`.
 - **`ui_glob` default narrower than spec.** Spec default covers
