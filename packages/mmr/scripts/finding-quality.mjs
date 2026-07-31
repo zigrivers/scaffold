@@ -29,15 +29,20 @@
  *     --out runs/calibrated --pr 782 --n 6 --channels claude,codex,opencode-glm \
  *     --config ./candidate.mmr.yaml
  *
- *   # 2. score — pools all conditions, shuffles, judges blind to condition
- *   node scripts/finding-quality.mjs score --conditions runs/baseline,runs/calibrated
+ *   # 2. score — pools both arms, shuffles, judges blind to condition.
+ *   #    Roles are explicit: the direction of the comparison must never depend
+ *   #    on argument order.
+ *   node scripts/finding-quality.mjs score \
+ *     --baseline runs/baseline --candidate runs/calibrated
  *
- *   # 3. report — rates per condition, against the rubric's ship/revert rule
- *   node scripts/finding-quality.mjs report --conditions runs/baseline,runs/calibrated
+ *   # 3. report — rates per arm, against the rubric's ship/revert rule
+ *   node scripts/finding-quality.mjs report \
+ *     --baseline runs/baseline --candidate runs/calibrated
  */
 
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
+import yaml from 'js-yaml'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -176,6 +181,38 @@ function conditionLabel(dir) {
 
 // ---------------------------------------------------------------- collect
 
+/**
+ * Digest of a config's EFFECTIVE settings.
+ *
+ * Hashing raw bytes makes a comment-only or whitespace-only candidate look
+ * like a distinct treatment, so two identical configurations could be compared
+ * against each other and any gap between them — pure resampling — could earn a
+ * ship verdict. Parsing first means only real differences count.
+ *
+ * Returns null for a config that resolves to nothing, which is the same as
+ * having no candidate at all.
+ */
+function configDigestOf(file) {
+  let parsed
+  try {
+    parsed = yaml.load(fs.readFileSync(file, 'utf-8'))
+  } catch (err) {
+    die(`could not parse ${file}: ${err.message}`)
+  }
+  const canonical = canonicalize(parsed)
+  if (canonical === null || (typeof canonical === 'object' && Object.keys(canonical).length === 0)) return null
+  return sha256(JSON.stringify(canonical))
+}
+
+/** Key-sorted deep copy, so key order in the YAML cannot change the digest. */
+function canonicalize(value) {
+  if (Array.isArray(value)) return value.map(canonicalize)
+  if (value === null || typeof value !== 'object') return value ?? null
+  const out = {}
+  for (const k of Object.keys(value).sort()) out[k] = canonicalize(value[k])
+  return out
+}
+
 /** Canonical channel-list form, so two spellings of one set never differ. */
 function normalizeChannels(list) {
   return list.split(',').map((c) => c.trim()).filter(Boolean).sort().join(',')
@@ -284,7 +321,7 @@ function collect(args) {
     channels: normalizeChannels(channels),
     mmrDigest: buildDigest(),
     repoCommit: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoRoot, encoding: 'utf-8' }).trim(),
-    configDigest: args.config ? sha256(fs.readFileSync(path.resolve(args.config), 'utf-8')) : null,
+    configDigest: args.config ? configDigestOf(path.resolve(args.config)) : null,
   }
   fs.writeFileSync(path.join(outDir, PROVENANCE_FILE), JSON.stringify(provenance, null, 2))
 
@@ -440,22 +477,26 @@ function loadCondition(dir) {
   return { id, label: conditionLabel(dir), findings, runs, provenance, digest }
 }
 
-function loadConditions(spec) {
-  const dirs = spec.split(',').map((d) => d.trim()).filter(Boolean)
-  if (dirs.length === 0) die('--conditions listed no directories')
-  const loaded = dirs.map(loadCondition)
-  const seen = new Set()
-  for (const c of loaded) {
-    if (seen.has(c.id)) die(`condition listed twice: ${c.id}`)
-    seen.add(c.id)
-  }
-  return loaded
+/**
+ * Load the two arms by ROLE, never by position.
+ *
+ * A positional list makes the direction of the comparison depend on argument
+ * order, so swapping two directories silently turns a regression into an
+ * apparent improvement — and the verdict would read exactly the same.
+ */
+function loadArms(args) {
+  const baseDir = args.baseline ?? die('--baseline <dir> required')
+  const candDir = args.candidate ?? die('--candidate <dir> required')
+  const base = loadCondition(baseDir)
+  const cand = loadCondition(candDir)
+  if (base.id === cand.id) die('--baseline and --candidate are the same directory')
+  return [base, cand]
 }
 
 // ------------------------------------------------------------------ score
 
 function score(args) {
-  const conditions = loadConditions(args.conditions ?? die('--conditions required'))
+  const conditions = loadArms(args)
   const judge = args.judge ?? 'claude'
   const rubric = fs.readFileSync(RUBRIC, 'utf-8')
 
@@ -557,6 +598,11 @@ function score(args) {
   // read from disk with stale scores read from the file — and still printing a
   // verdict.
   const manifest = {
+    // The rubric says amending a category requires re-scoring EVERY condition
+    // from scratch. Binding its digest is what makes that enforceable instead
+    // of aspirational.
+    rubricDigest: sha256(rubric),
+    roles: { baseline: conditions[0].id, candidate: conditions[1].id },
     conditions: conditions.map((c) => ({
       id: c.id,
       runs: c.runs.map((r) => r.run).sort(),
@@ -679,7 +725,7 @@ function evaluateVerdict(base, cand, opts = {}) {
 }
 
 function report(args) {
-  const conditions = loadConditions(args.conditions ?? die('--conditions required'))
+  const conditions = loadArms(args)
   const scorePath = args.scores ?? 'finding-quality-scores.json'
   if (!fs.existsSync(scorePath)) die(`scores file not found: ${scorePath} (run \`score\` first)`)
   const raw = JSON.parse(fs.readFileSync(scorePath, 'utf-8'))
@@ -687,6 +733,16 @@ function report(args) {
     die(`${scorePath} is not a manifest-bearing scores file — re-run \`score\``)
   }
   const scored = raw.scored
+
+  if (raw.manifest.rubricDigest !== sha256(fs.readFileSync(RUBRIC, 'utf-8'))) {
+    die('the rubric has changed since these scores were produced — re-run `score` for '
+      + 'every condition (the rubric requires re-scoring all arms, never one)')
+  }
+  if (raw.manifest.roles?.baseline !== conditions[0].id
+    || raw.manifest.roles?.candidate !== conditions[1].id) {
+    die('--baseline/--candidate do not match the roles these scores were produced under — '
+      + 're-run `score` with the intended roles')
+  }
 
   // Refuse to report against runs the scores were not produced from.
   for (const c of conditions) {
