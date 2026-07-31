@@ -52,9 +52,34 @@ const CLASSES = ['defect', 'speculative', 'deletion', 'hygiene', 'artifact']
 const RUN_FILE_RE = /^run-\d{2,}\.json$/
 /** Provenance sidecar written by collect; not a run file, but harness-owned. */
 const PROVENANCE_FILE = 'provenance.json'
+/** The pinned diff every run in a condition reviews. Also harness-owned. */
+const SNAPSHOT_FILE = 'reviewed.diff'
 
 function sha256(text) {
   return createHash('sha256').update(text).digest('hex').slice(0, 16)
+}
+
+/**
+ * Digest of every runtime artifact, not just the entry point. dist/index.js is
+ * a few imports; all the behaviour that shapes a review lives in the files it
+ * pulls in and in the prompt templates, so hashing it alone would call two
+ * materially different builds identical.
+ */
+function buildDigest() {
+  const roots = [path.resolve(HERE, '../dist'), path.resolve(HERE, '../templates')]
+  const parts = []
+  const walk = (dir) => {
+    if (!fs.existsSync(dir)) return
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      const full = path.join(dir, entry.name)
+      if (entry.isDirectory()) walk(full)
+      else if (/\.(js|mjs|cjs|md|json)$/.test(entry.name)) {
+        parts.push(`${path.relative(path.resolve(HERE, '..'), full)}:${sha256(fs.readFileSync(full, 'utf-8'))}`)
+      }
+    }
+  }
+  for (const r of roots) walk(r)
+  return sha256(parts.join('\n'))
 }
 /** The rubric's floor. Below this, run-to-run variance dominates any effect. */
 const MIN_RUNS = 6
@@ -118,12 +143,13 @@ function collect(args) {
   // the extra runs are indistinguishable from the new ones once pooled.
   if (fs.existsSync(outDir)) {
     const entries = fs.readdirSync(outDir)
-    const stale = entries.filter((f) => RUN_FILE_RE.test(f) || f === PROVENANCE_FILE)
+    const harnessOwned = (f) => RUN_FILE_RE.test(f) || f === PROVENANCE_FILE || f === SNAPSHOT_FILE
+    const stale = entries.filter(harnessOwned)
     // --force must never be a directory shredder. A mistyped --out pointing at
     // a real directory would otherwise delete its contents, so only files
     // matching the run-NN.json names this harness itself writes are removable,
     // and any other content makes the directory off-limits entirely.
-    const foreign = entries.filter((f) => !RUN_FILE_RE.test(f) && f !== PROVENANCE_FILE)
+    const foreign = entries.filter((f) => !harnessOwned(f))
     if (foreign.length > 0) {
       die(`${outDir} contains ${foreign.length} file(s) this harness did not write `
         + `(e.g. ${foreign.slice(0, 3).join(', ')}). Refusing to use it — pick an empty or harness-owned directory.`)
@@ -148,9 +174,14 @@ function collect(args) {
   const repoRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf-8' }).trim()
   const liveConfig = path.join(repoRoot, '.mmr.yaml')
   let restore = null
+  let installed = false
   let restored = false
   const restoreConfig = () => {
-    if (!args.config || restored) return
+    // Inert until we have actually replaced the file. The handlers below are
+    // registered early on purpose, and without this guard a signal arriving
+    // before installation would run the `restore === null` branch and DELETE
+    // the user's own .mmr.yaml — destroying config the harness never touched.
+    if (!installed || restored) return
     restored = true
     if (restore !== null) fs.writeFileSync(liveConfig, restore)
     else fs.rmSync(liveConfig, { force: true })
@@ -166,10 +197,6 @@ function collect(args) {
   process.once('SIGINT', () => onSignal('SIGINT'))
   process.once('SIGTERM', () => onSignal('SIGTERM'))
 
-  const base = ['review', '--channels', channels, '--sync', '--format', 'json']
-  if (args.pr) base.push('--pr', String(args.pr))
-  else base.push('--diff', path.resolve(args.diff))
-  if (args.config) base.push('--trust-project-config')
 
 
   // Record what was actually reviewed. Without this, two arms can review
@@ -184,11 +211,24 @@ function collect(args) {
     target: args.pr ? `pr:${args.pr}` : `diff:${path.basename(path.resolve(args.diff))}`,
     diffDigest: sha256(reviewedDiff),
     channels,
-    mmrDigest: sha256(fs.readFileSync(MMR, 'utf-8')),
+    mmrDigest: buildDigest(),
     repoCommit: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoRoot, encoding: 'utf-8' }).trim(),
     configDigest: args.config ? sha256(fs.readFileSync(path.resolve(args.config), 'utf-8')) : null,
   }
   fs.writeFileSync(path.join(outDir, PROVENANCE_FILE), JSON.stringify(provenance, null, 2))
+
+  // Every run reviews this exact snapshot rather than re-resolving --pr each
+  // time. A PR that gains a commit mid-collection would otherwise have runs
+  // within one condition reviewing different code, with nothing to detect it —
+  // and the two arms are collected minutes apart, so this is not hypothetical.
+  const snapshot = path.join(outDir, SNAPSHOT_FILE)
+  fs.writeFileSync(snapshot, reviewedDiff)
+
+  const base = ['review', '--channels', channels, '--sync', '--format', 'json', '--diff', snapshot]
+  // --diff is untrusted-head, so the candidate arm needs the explicit opt-in to
+  // have its .mmr.yaml read at all. The baseline arm wants no project config,
+  // which is what untrusted-head already gives it.
+  if (args.config) base.push('--trust-project-config')
 
   // Installed LAST, immediately before the try that restores it. Anything that
   // can fail — gh pr diff, git, writing provenance — must fail while the repo
@@ -197,6 +237,7 @@ function collect(args) {
   if (args.config) {
     if (fs.existsSync(liveConfig)) restore = fs.readFileSync(liveConfig, 'utf-8')
     fs.copyFileSync(path.resolve(args.config), liveConfig)
+    installed = true
   }
 
   try {
