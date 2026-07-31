@@ -114,6 +114,37 @@ function contradicts(s) {
   return null
 }
 
+/**
+ * First balanced JSON array in the text.
+ *
+ * A greedy /\[[\s\S]*\]/ runs to the LAST `]` in the output, so any trailing
+ * prose containing one swallows it into the match and turns a recoverable
+ * result into a parse failure.
+ */
+function firstJsonArray(text) {
+  const start = text.indexOf('[')
+  if (start === -1) return null
+  let depth = 0
+  let inString = false
+  let escaped = false
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i]
+    if (inString) {
+      if (escaped) escaped = false
+      else if (ch === '\\') escaped = true
+      else if (ch === '"') inString = false
+      continue
+    }
+    if (ch === '"') inString = true
+    else if (ch === '[') depth++
+    else if (ch === ']') {
+      depth--
+      if (depth === 0) return text.slice(start, i + 1)
+    }
+  }
+  return null
+}
+
 function die(msg) {
   console.error(`error: ${msg}`)
   process.exit(1)
@@ -288,8 +319,12 @@ function collect(args) {
         })
       } catch (err) {
         // mmr exits 2 on `blocked` and 3 on `needs-user-decision`. Both are
-        // normal outcomes here — we want the findings, not the verdict — so
-        // only a run with no parseable stdout is a real failure.
+        // normal outcomes here — we want the findings, not the verdict. Any
+        // other status is a real failure and must not be mistaken for one.
+        if (err.status !== 2 && err.status !== 3) {
+          process.stderr.write('FAILED\n')
+          die(`run ${i} exited ${err.status ?? 'abnormally'}: ${(err.stderr || err.message || '').toString().slice(0, 500)}`)
+        }
         raw = err.stdout ?? ''
       }
       const secs = ((Date.now() - started) / 1000).toFixed(0)
@@ -297,8 +332,13 @@ function collect(args) {
       try {
         parsed = JSON.parse(raw)
       } catch {
+        // Skipping would leave a condition that looks complete while quietly
+        // missing an attempt — and with --n above the floor, report would still
+        // see enough runs to issue a verdict. An experiment with a hole in it
+        // is not an experiment; re-collect instead.
         process.stderr.write(`FAILED (no JSON) after ${secs}s\n`)
-        continue
+        die(`run ${i} produced no parseable result. Re-run \`collect\` for this condition `
+          + '(a partial condition cannot be compared against a complete one).')
       }
       fs.writeFileSync(target, raw)
       const degraded = Object.entries(parsed.per_channel ?? {})
@@ -378,7 +418,14 @@ function loadCondition(dir) {
   // Hash the finding payloads, not just their count: re-collecting the same
   // number of runs with the same number of findings must not pass a manifest
   // check when every finding changed.
-  const digest = sha256(JSON.stringify(findings.map((f) => [f.run, f.severity, f.location, f.description, f.suggestion])))
+  // Covers the findings AND everything report reads about the runs: a change
+  // to channel status, coverage, or the provenance would otherwise slip past a
+  // findings-only digest while report used scores from the older shape.
+  const digest = sha256(JSON.stringify({
+    findings: findings.map((f) => [f.run, f.severity, f.location, f.description, f.suggestion]),
+    runs: runs.map((r) => [r.run, r.total, r.degraded.join(','), r.coverage, r.dispatched]),
+    provenance,
+  }))
   return { id, label: conditionLabel(dir), findings, runs, provenance, digest }
 }
 
@@ -457,12 +504,12 @@ function score(args) {
       + '--judge must name a binary that accepts `-p` and reads the prompt from stdin '
       + '(Claude Code print mode). codex/opencode use different flags and are not drop-in.')
   }
-  const match = raw.match(/\[[\s\S]*\]/)
+  const match = firstJsonArray(raw)
   if (!match) die(`judge returned no JSON array:\n${raw.slice(0, 500)}`)
 
   let scores
   try {
-    scores = JSON.parse(match[0])
+    scores = JSON.parse(match)
   } catch (err) {
     die(`judge returned malformed JSON: ${err.message}`)
   }
@@ -483,6 +530,9 @@ function score(args) {
     // The rubric defines these two fields in terms of each other, so a judge
     // that contradicts itself has misread it — and the contradiction lands
     // directly on the two metrics the ship rule reads.
+    if (typeof s.why !== 'string' || s.why.trim() === '') {
+      die(`${s.id}: why must be a non-empty string`)
+    }
     const conflict = contradicts(s)
     if (conflict) die(`${s.id}: ${conflict} — re-run \`score\``)
     byId.set(s.id, s)
@@ -811,6 +861,13 @@ function selftest() {
   assert.equal(RUN_FILE_RE.test('notes.json'), false)
   assert.equal(RUN_FILE_RE.test('run-01.json.bak'), false)
   assert.equal(RUN_FILE_RE.test('.mmr.yaml'), false)
+
+  // Trailing prose containing a `]` must not swallow the array.
+  assert.equal(firstJsonArray('noise [1,2] tail ] more'), '[1,2]')
+  assert.equal(firstJsonArray('[{"a":[1]},{"b":2}] trailing'), '[{"a":[1]},{"b":2}]')
+  assert.equal(firstJsonArray('[{"s":"]"}] after'), '[{"s":"]"}]')
+  assert.equal(firstJsonArray('[{"s":"\\\\"}] x'), '[{"s":"\\\\"}]')
+  assert.equal(firstJsonArray('no array here'), null)
 
   // A judge contradicting the rubric must be rejected, not averaged in.
   assert.equal(contradicts({ class: 'speculative', names_path: true }) !== null, true)
