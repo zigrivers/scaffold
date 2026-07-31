@@ -25,8 +25,14 @@ Three consequences, all binding:
    conditions are pooled, shuffled, and re-identified before scoring.
 3. A difference smaller than the baseline's own run-to-run spread is **not a
    result**, and the harness enforces this rather than merely noting it: the
-   candidate's speculative rate must fall below the *lowest* rate any single
-   baseline run produced.
+   *improvement* must exceed the **width** of the baseline's per-run rate
+   spread.
+
+   The margin is the spread's width, not its lowest value. Per-run finding
+   counts here are small enough that a single baseline run can return one
+   finding; if that finding is not speculative, the lowest per-run rate is 0%
+   and a floor-based rule would make shipping arithmetically impossible however
+   good the candidate was.
 
 ## The unit of analysis
 
@@ -78,13 +84,17 @@ across a condition's N runs.
 
 ## Ship / revert rule
 
-A change ships only if, across N ≥ 6 non-degraded runs per condition with
-identical channel coverage:
+A change ships only if, across an **equal** number of non-degraded runs per
+condition (N ≥ 6) with identical channel coverage:
 
 1. `speculative_rate` drops, **and**
-2. it drops below the lowest per-run speculative rate the baseline produced
-   (otherwise the difference is inside the noise band), **and**
+2. the drop exceeds the width of the baseline's per-run rate spread (otherwise
+   it is inside the noise band), **and**
 3. `defect_count` does not drop.
+
+The run counts must match because `defect_count` is an absolute total: the arm
+with more runs has more chances to surface a defect, so unequal N alone can
+satisfy the guard rail.
 
 Condition 2 is the point. A change that suppresses speculative findings by
 making reviewers report less of everything has cut the bar, not the noise, and

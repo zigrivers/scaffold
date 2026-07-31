@@ -47,6 +47,8 @@ const MMR = path.resolve(HERE, '../dist/index.js')
 const RUBRIC = path.join(HERE, 'finding-quality-rubric.md')
 
 const CLASSES = ['defect', 'speculative', 'deletion', 'hygiene', 'artifact']
+/** The only filenames collect ever creates — and so the only ones it may delete. */
+const RUN_FILE_RE = /^run-\d{2,}\.json$/
 /** The rubric's floor. Below this, run-to-run variance dominates any effect. */
 const MIN_RUNS = 6
 
@@ -108,7 +110,17 @@ function collect(args) {
   // experiment into this one — a shorter rerun leaves the old tail behind, and
   // the extra runs are indistinguishable from the new ones once pooled.
   if (fs.existsSync(outDir)) {
-    const stale = fs.readdirSync(outDir).filter((f) => f.endsWith('.json'))
+    const entries = fs.readdirSync(outDir)
+    const stale = entries.filter((f) => RUN_FILE_RE.test(f))
+    // --force must never be a directory shredder. A mistyped --out pointing at
+    // a real directory would otherwise delete its contents, so only files
+    // matching the run-NN.json names this harness itself writes are removable,
+    // and any other content makes the directory off-limits entirely.
+    const foreign = entries.filter((f) => !RUN_FILE_RE.test(f))
+    if (foreign.length > 0) {
+      die(`${outDir} contains ${foreign.length} file(s) this harness did not write `
+        + `(e.g. ${foreign.slice(0, 3).join(', ')}). Refusing to use it — pick an empty or harness-owned directory.`)
+    }
     if (stale.length > 0 && args.force !== true) {
       die(`${outDir} already contains ${stale.length} run file(s). `
         + 'Use a fresh directory, or pass --force to clear it.')
@@ -335,8 +347,19 @@ function score(args) {
   if (missing.length) die(`judge skipped ${missing.length} finding(s): ${missing.slice(0, 10).join(', ')}`)
 
   const scored = shuffled.map((f) => ({ ...f, score: byId.get(f.id) }))
+  // Bind the scores to the exact runs they came from. Without this, re-running
+  // collect between `score` and `report` leaves report mixing fresh run counts
+  // read from disk with stale scores read from the file — and still printing a
+  // verdict.
+  const manifest = {
+    conditions: conditions.map((c) => ({
+      id: c.id,
+      runs: c.runs.map((r) => r.run).sort(),
+      findings: c.findings.length,
+    })),
+  }
   const outPath = args.out ?? 'finding-quality-scores.json'
-  fs.writeFileSync(outPath, JSON.stringify(scored, null, 2))
+  fs.writeFileSync(outPath, JSON.stringify({ manifest, scored }, null, 2))
   process.stderr.write(`wrote ${outPath}\n`)
 }
 
@@ -386,7 +409,9 @@ function summarize(condition, scored) {
     lowValueRate: total ? lowValue / total : 0,
     defects: count('defect'),
     deletions: count('deletion'),
-    scoredAll: total > 0,
+    // Named for what it checks. Real scoring completeness is enforced in
+    // `score`, which dies on any unscored finding.
+    hasFindings: total > 0,
   }
 }
 
@@ -394,7 +419,22 @@ function report(args) {
   const conditions = loadConditions(args.conditions ?? die('--conditions required'))
   const scorePath = args.scores ?? 'finding-quality-scores.json'
   if (!fs.existsSync(scorePath)) die(`scores file not found: ${scorePath} (run \`score\` first)`)
-  const scored = JSON.parse(fs.readFileSync(scorePath, 'utf-8'))
+  const raw = JSON.parse(fs.readFileSync(scorePath, 'utf-8'))
+  if (!raw || !Array.isArray(raw.scored) || !raw.manifest) {
+    die(`${scorePath} is not a manifest-bearing scores file — re-run \`score\``)
+  }
+  const scored = raw.scored
+
+  // Refuse to report against runs the scores were not produced from.
+  for (const c of conditions) {
+    const m = raw.manifest.conditions.find((x) => x.id === c.id)
+    if (!m) die(`${c.label} is not in the scores manifest — re-run \`score\` for these conditions`)
+    const current = c.runs.map((r) => r.run).sort()
+    if (current.join('|') !== m.runs.join('|') || c.findings.length !== m.findings) {
+      die(`${c.label} has changed since scoring (${m.runs.length} runs / ${m.findings} findings scored, `
+        + `${current.length} runs / ${c.findings.length} findings on disk) — re-run \`score\``)
+    }
+  }
 
   const rows = conditions.map((c) => summarize(c, scored))
   const pct = (x) => `${(x * 100).toFixed(0)}%`
@@ -434,10 +474,16 @@ function report(args) {
     if (r.runs < MIN_RUNS) blockers.push(`${r.label} has ${r.runs} run(s), the rubric's floor is ${MIN_RUNS}`)
     if (r.degradedRuns > 0) blockers.push(`${r.label} has ${r.degradedRuns} run(s) with a degraded channel`)
     if (r.coverages.length > 1) blockers.push(`${r.label} has inconsistent channel coverage: ${r.coverages.join(' vs ')}`)
-    if (!r.scoredAll) blockers.push(`${r.label} has no scored findings`)
+    if (!r.hasFindings) blockers.push(`${r.label} produced no findings at all`)
   }
   if (base.coverages[0] !== cand.coverages[0]) {
     blockers.push(`channel coverage differs between conditions: ${base.coverages[0]} vs ${cand.coverages[0]}`)
+  }
+  // defect_count is an absolute total, so unequal N alone can satisfy the guard
+  // rail: the arm with more runs simply had more chances to surface a defect.
+  if (base.runs !== cand.runs) {
+    blockers.push(`run counts differ (${base.label} ${base.runs}, ${cand.label} ${cand.runs}) — `
+      + 'the defect guard rail compares absolute totals and needs equal N')
   }
 
   if (blockers.length > 0) {
@@ -453,15 +499,23 @@ function report(args) {
   // The rubric treats a delta smaller than the baseline's own run-to-run spread
   // as "not a result", and that is binding, not advisory: without this check the
   // verdict prints "ship" on pure resampling.
+  //
+  // The margin is the baseline's spread WIDTH, not its lowest per-run rate.
+  // With the small per-run finding counts this harness documents (a run can
+  // return one finding), a single baseline run that happens to contain no
+  // speculative finding pins the minimum at 0% and makes shipping arithmetically
+  // impossible regardless of how good the candidate is.
   const bandLo = Math.min(...base.specRates)
   const bandHi = Math.max(...base.specRates)
-  const outsideBand = cand.speculativeRate < bandLo
+  const margin = bandHi - bandLo
+  const improvement = base.speculativeRate - cand.speculativeRate
+  const outsideBand = improvement > margin
   const specDown = cand.speculativeRate < base.speculativeRate
   const defectsHeld = cand.defects >= base.defects
 
   console.log(`speculative rate: ${pct(base.speculativeRate)} → ${pct(cand.speculativeRate)}  ${specDown ? 'down' : 'NOT down'}`)
-  console.log(`baseline per-run spread: ${pct(bandLo)}–${pct(bandHi)}  `
-    + `(candidate ${outsideBand ? 'clears it' : 'is INSIDE it — indistinguishable from noise'})`)
+  console.log(`improvement ${pct(improvement)} vs baseline per-run spread ${pct(bandLo)}–${pct(bandHi)} `
+    + `(width ${pct(margin)}) — ${outsideBand ? 'clears the noise band' : 'INSIDE the noise band'}`)
   // The defect guard rail stays strict — any drop blocks the ship — but the
   // message distinguishes a drop that clears the baseline's own run-to-run
   // defect range from one inside it. Both block; only the first is evidence
@@ -517,6 +571,18 @@ function selftest() {
       `verdict math wrong for ${specDown}/${outsideBand}/${defectsHeld}`)
   }
 
+  // The noise band uses the baseline's spread WIDTH. Pinning it to the lowest
+  // per-run rate degenerates: one baseline run with no speculative finding sets
+  // the floor to 0% and nothing can ever ship.
+  const band = (rates, baseRate, candRate) => {
+    const margin = Math.max(...rates) - Math.min(...rates)
+    return (baseRate - candRate) > margin
+  }
+  assert.equal(band([0.0, 0.5], 0.4, 0.3), false, 'a 10pt gain must not clear a 50pt spread')
+  assert.equal(band([0.4, 0.5], 0.45, 0.2), true, 'a 25pt gain must clear a 10pt spread')
+  // The degenerate case the old min-based rule got wrong.
+  assert.equal(band([0.0, 0.0], 0.3, 0.1), true, 'a zero-width spread must not block a real gain')
+
   // Rate arithmetic, including the empty-denominator guard.
   const mk = (cls, worth = true) => ({ score: { class: cls, worth_fixing_now: worth } })
   const sample = [mk('speculative'), mk('defect'), mk('artifact'), mk('hygiene', false)]
@@ -526,6 +592,13 @@ function selftest() {
   ).length / sample.length
   assert.equal(spec, 0.25)
   assert.equal(low, 0.75)
+
+  // Only harness-written filenames are ever deletable.
+  assert.equal(RUN_FILE_RE.test('run-01.json'), true)
+  assert.equal(RUN_FILE_RE.test('run-123.json'), true)
+  assert.equal(RUN_FILE_RE.test('notes.json'), false)
+  assert.equal(RUN_FILE_RE.test('run-01.json.bak'), false)
+  assert.equal(RUN_FILE_RE.test('.mmr.yaml'), false)
 
   assert.equal(conditionLabel('/tmp/a/baseline'), 'baseline')
   assert.notEqual(conditionId('/tmp/a/baseline'), conditionId('/tmp/b/baseline'))
