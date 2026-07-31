@@ -557,7 +557,7 @@ defaults:
     max_rounds_default: 5
   compensator:
     channel: claude            # who runs a compensating pass (default: claude -p)
-review_criteria: ["…"]         # extra criteria appended to every prompt
+review_criteria: ["…"]         # extra criteria added to every prompt (see "Calibrating findings")
 templates:                     # named criteria presets, selected by --template
   security: { criteria: ["…"] }
 channels_disabled: ["grok"]  # opt OUT of a built-in (e.g. no grok installed)
@@ -578,6 +578,65 @@ channels:
 - `extends` — inherit from another channel (≤ 4 levels, cycle-checked); child
   fields override the parent :cite[packages/mmr/src/config/loader.ts:145].
 - `fix_threshold` — project gate; override per-run with `--fix-threshold`.
+
+### Calibrating findings with `review_criteria`
+
+`review_criteria` lines are injected between the core prompt and the diff
+:cite[packages/mmr/src/core/prompt.ts:51], so every channel sees them. The most
+useful thing to put there is what *not* to spend a finding on.
+
+The built-in criteria :cite[packages/mmr/templates/core-prompt.md:9] ask five
+questions that are all about what is **missing**. The severity definitions do
+gesture at likelihood — P1 is scoped to "normal usage" — but no level says what
+evidence of reachability a finding needs, or how to grade something reachable
+but rare. On an early-stage codebase that yields a long tail of
+correct-but-unreachable edge-case findings, and gives reviewers no way to
+recommend removing code. The block below adds the missing calibration; it does
+not replace the built-in severity semantics.
+
+```yaml
+version: 1
+review_criteria:
+  - "Trust boundaries are exempt from every rule below. Any input crossing a public API, exported library surface, CLI argument, HTTP handler, webhook, deserializer, file or database read, or any other boundary an outside party controls, is reachable by definition — you do not need to find a caller for it. Never downgrade a security, data-loss, or data-corruption finding for lack of an in-repository caller."
+  - "For internal code only: before reporting an unhandled input or state, name the caller, flag, config value, or documented contract that can produce it. If you cannot name one and it is not behind a trust boundary, do not report the finding."
+  - "Grade severity by impact AND demonstrated likelihood. An internal state that is reachable but rare in current usage is P2 or P3, not P1. Trust-boundary findings are graded on impact alone and are never downgraded for rarity."
+  - "Also report what is unnecessary, not only what is missing: an abstraction with a single caller, a config knob never varied, a hand-rolled helper the standard library already provides, defensive code for a state that cannot occur. Make the suggestion a deletion. Validation at a trust boundary is never unnecessary."
+  - "Do not report missing tests for internal behavior that has no caller yet, or for a branch you could not show is reachable. Missing tests for trust-boundary handling are always in scope."
+```
+
+:::callout{type=danger}
+**Keep the first line if you keep any of them.** An unqualified "name a caller in
+this codebase" bar suppresses exactly the findings you least want to lose — a
+repository contains no caller for a malicious HTTP request or a corrupt database
+row, so the rule reads those as unreachable and downgrades them. The
+trust-boundary exemption is what keeps the reachability bar from becoming a
+security-finding filter.
+:::
+
+This changes what reviewers report and how they grade it. `fix_threshold`, the
+reconciliation logic and `mmr ack` are untouched — but that is not the same as
+"no effect on merges". A finding that goes unreported, or that lands below your
+threshold, stops blocking. That is the intent when the finding was noise, and it
+is why the trust-boundary exemption above is not optional.
+
+Treat the block as a starting template, not a tuned setting. Do **not** validate
+a change to it by comparing one before run against one after run: MMR's
+run-to-run variance on an identical input is larger than most effects you would
+be looking for. Two consecutive baseline runs of the same PR through the same
+three channels, with no config change at all, returned 4 findings and then 1. To
+get a real answer, hold the diff and channel set fixed, repeat each condition
+many times, and compare the rate of findings you have labelled low-value against
+a rubric written down in advance.
+
+:::callout{type=warning}
+**Criteria are trust-gated and fail silently.** `mmr review --diff …` is
+`untrusted-head`, so your `.mmr.yaml` is never read and the criteria vanish with
+no warning and no non-zero exit. `--pr` and `--base` read the file from the base
+branch, so it must be **committed there**. Verify with
+`mmr review --pr <n> --dry-run | sed -n '/## Project Review Criteria/,/^## /p'`,
+which prints the whole section — `grep -A<n>` would cut it off at *n* lines and
+still look like confirmation.
+:::
 
 :::callout{type=danger}
 **Trust boundary.** When reviewing a diff, project `.mmr.yaml` and acks are read

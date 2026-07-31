@@ -99,6 +99,82 @@ channels:
 > Note: the `gemini` channel was **retired** (its CLI is sunset; use `antigravity`).
 > Existing configs that still name `gemini` keep loading — it is never dispatched.
 
+### Calibrating findings with `review_criteria`
+
+`review_criteria` is a list of extra instruction lines injected into the prompt
+every channel receives, between the core prompt and the diff. Its most common
+use is telling reviewers what *not* to spend a finding on.
+
+The built-in criteria (`templates/core-prompt.md`) ask five questions that are
+all about what is **missing** — correctness, regressions, edge cases, test
+coverage, security. The severity definitions do gesture at likelihood (P1 is
+scoped to "normal usage"), but no level says what *evidence* of reachability a
+finding needs, or how to grade something reachable but rare. On an early-stage
+codebase that combination produces a predictable failure mode: a long tail of
+technically-correct findings about inputs no caller can currently construct, and
+no way for a reviewer to say "unnecessary" instead of "add more". The block below
+supplies the missing calibration rather than replacing the built-in semantics.
+
+This block is a starting point that addresses both biases directly. Treat it as
+a template to tune, not a tuned setting — see the note on measuring it below.
+
+```yaml
+version: 1
+review_criteria:
+  # The exemption comes FIRST so it is never read as an afterthought.
+  - "Trust boundaries are exempt from every rule below. Any input crossing a public API, exported library surface, CLI argument, HTTP handler, webhook, deserializer, file or database read, or any other boundary an outside party controls, is reachable by definition — you do not need to find a caller for it. Never downgrade a security, data-loss, or data-corruption finding for lack of an in-repository caller."
+  # Reachability bar — an edge case must be shown to be reachable, not merely conceivable.
+  - "For internal code only: before reporting an unhandled input or state, name the caller, flag, config value, or documented contract that can produce it. If you cannot name one and it is not behind a trust boundary, do not report the finding."
+  # Severity gets a likelihood term, not just an impact term.
+  - "Grade severity by impact AND demonstrated likelihood. An internal state that is reachable but rare in current usage is P2 or P3, not P1. Trust-boundary findings are graded on impact alone and are never downgraded for rarity."
+  # Restores the missing direction: findings that remove code.
+  - "Also report what is unnecessary, not only what is missing: an abstraction with a single caller, a config knob never varied, a hand-rolled helper the standard library already provides, defensive code for a state that cannot occur. Make the suggestion a deletion. Validation at a trust boundary is never unnecessary."
+  # Stops the most common speculative-test finding.
+  - "Do not report missing tests for internal behavior that has no caller yet, or for a branch you could not show is reachable. Missing tests for trust-boundary handling are always in scope."
+```
+
+Three things to know before you rely on it:
+
+- **The trust-boundary exemption is load-bearing.** Without it, "name a caller in
+  this codebase" quietly suppresses exactly the findings you least want to lose:
+  a repository contains no caller for a malicious HTTP request or a corrupt row,
+  so an unqualified reachability bar reads those as unreachable and downgrades
+  them. Keep the first line if you keep any of the others.
+- **Gate mechanics are unchanged, but verdicts can move.** `fix_threshold`, the
+  reconciliation logic, and `mmr ack` are untouched — these lines only change
+  what reviewers report and how they grade it. That is not the same as "no
+  effect on merges": a finding that goes unreported, or that lands below your
+  threshold, stops blocking. That is the point when the finding was noise, and
+  it is precisely why the trust-boundary exemption above is not optional.
+- **Project config is trust-gated, and it fails silently.** `.mmr.yaml` is only
+  read when the invocation has a trusted base ref. `mmr review --pr <n>` and
+  `--base <ref>` qualify (the file is read from the base branch, so it must be
+  **committed there**). `mmr review --diff …` does **not** — it classifies as
+  `untrusted-head` and your criteria are dropped with no warning. Pass
+  `--trust-project-config` to honor the working-tree file, or
+  `--config-base-ref <ref>` to name a trusted source.
+
+Confirm your criteria actually reached the model before trusting the result:
+
+```bash
+# Prints the whole section, however many criteria you have — grep -A<n> would
+# silently truncate it at n lines and read as confirmation.
+mmr review --pr 123 --dry-run | sed -n '/## Project Review Criteria/,/^## /p'
+```
+
+`--dry-run` prints the fully assembled per-channel prompt, so this is the exact
+text the model receives. If the section is absent, the config was not loaded —
+re-read the trust note above.
+
+**Measuring whether your criteria helped.** Comparing one before run against one
+after run does not work: MMR's run-to-run variance on an *identical* input is
+large. Two consecutive baseline runs of the same PR through the same three
+channels, with no configuration change at all, returned 4 findings and then 1.
+Any single-run before/after difference smaller than that is indistinguishable
+from resampling. If you want a real answer, hold the diff and channel set fixed,
+run each condition many times, and compare the *rate* of findings you have
+labelled low-value against a rubric you wrote down first — not the raw totals.
+
 ## Installable skills
 
 `mmr skill install` drops a "use MMR for code review" skill into a project, written

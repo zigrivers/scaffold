@@ -2,6 +2,33 @@
 
 ## [Unreleased]
 
+### Added
+
+- **A documented calibration recipe for `review_criteria`.** The built-in review
+  criteria only ask what is *missing*, and severity is graded on
+  impact-if-it-happens with no likelihood term — a combination that produces a
+  long tail of correct-but-unreachable edge-case findings on early-stage
+  codebases. The README and the `mmr` guide now ship a copy-pasteable
+  `review_criteria` block that adds a reachability bar, calibrates severity for
+  reachable-but-rare states, and asks reviewers for deletions as well as
+  additions. It leads with a trust-boundary exemption so the reachability bar
+  cannot suppress security or data-loss findings. `fix_threshold`, the
+  reconciliation logic and `mmr ack` are untouched — though a project that
+  adopts the block should expect verdicts to move, since a finding that goes
+  unreported or lands below the threshold no longer blocks.
+
+### Fixed
+
+- **Documented that `review_criteria` is trust-gated and fails silently.**
+  `mmr review --diff …` classifies as `untrusted-head`, so the project
+  `.mmr.yaml` is never read and any configured criteria are dropped with no
+  warning and no non-zero exit. The guide previously described `review_criteria`
+  as "appended to every prompt", which is only true for trusted invocations.
+  Both docs now name the affected modes and the
+  `--dry-run | sed -n '/## Project Review Criteria/,/^## /p'` check, which
+  prints the whole section — a `grep -A<n>` truncates it at *n* lines and still
+  reads as confirmation.
+
 ## [4.0.1] — 2026-07-28
 
 Documentation-only follow-up to 4.0.0. The bundled skill templates still
