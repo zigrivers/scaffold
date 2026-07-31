@@ -48,6 +48,22 @@ A run in which any channel degraded is excluded from the verdict entirely. A
 degraded channel contributes no findings, and treating its silence as "found
 nothing" reads an outage as agreement.
 
+A run that produced **zero** findings also blocks the verdict. Its speculative
+rate is 0/0, so it drops out of the spread that sizes the noise band, making the
+band narrower than the data warrants and the ship rule easier to clear than it
+should be.
+
+## Both arms must review the same thing
+
+`collect` records a `provenance.json` per condition: the review target, a digest
+of the reviewed diff, the channel list, a digest of the MMR build, and the
+repository commit. Every one of those must match across arms before a verdict is
+issued. Only the candidate config digest may differ — that is the treatment.
+
+Without this, a PR that gained a commit between the two collections, or an MMR
+rebuilt in between, produces a difference the report would attribute to the
+prompt change.
+
 ## Classification
 
 Each finding gets exactly one `class`:

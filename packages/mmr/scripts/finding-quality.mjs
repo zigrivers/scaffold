@@ -37,6 +37,7 @@
  */
 
 import { execFileSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -49,6 +50,12 @@ const RUBRIC = path.join(HERE, 'finding-quality-rubric.md')
 const CLASSES = ['defect', 'speculative', 'deletion', 'hygiene', 'artifact']
 /** The only filenames collect ever creates — and so the only ones it may delete. */
 const RUN_FILE_RE = /^run-\d{2,}\.json$/
+/** Provenance sidecar written by collect; not a run file, but harness-owned. */
+const PROVENANCE_FILE = 'provenance.json'
+
+function sha256(text) {
+  return createHash('sha256').update(text).digest('hex').slice(0, 16)
+}
 /** The rubric's floor. Below this, run-to-run variance dominates any effect. */
 const MIN_RUNS = 6
 
@@ -111,12 +118,12 @@ function collect(args) {
   // the extra runs are indistinguishable from the new ones once pooled.
   if (fs.existsSync(outDir)) {
     const entries = fs.readdirSync(outDir)
-    const stale = entries.filter((f) => RUN_FILE_RE.test(f))
+    const stale = entries.filter((f) => RUN_FILE_RE.test(f) || f === PROVENANCE_FILE)
     // --force must never be a directory shredder. A mistyped --out pointing at
     // a real directory would otherwise delete its contents, so only files
     // matching the run-NN.json names this harness itself writes are removable,
     // and any other content makes the directory off-limits entirely.
-    const foreign = entries.filter((f) => !RUN_FILE_RE.test(f))
+    const foreign = entries.filter((f) => !RUN_FILE_RE.test(f) && f !== PROVENANCE_FILE)
     if (foreign.length > 0) {
       die(`${outDir} contains ${foreign.length} file(s) this harness did not write `
         + `(e.g. ${foreign.slice(0, 3).join(', ')}). Refusing to use it — pick an empty or harness-owned directory.`)
@@ -167,6 +174,24 @@ function collect(args) {
   if (args.pr) base.push('--pr', String(args.pr))
   else base.push('--diff', path.resolve(args.diff))
   if (args.config) base.push('--trust-project-config')
+
+  // Record what was actually reviewed. Without this, two arms can review
+  // different code — a PR that gained a commit between runs, a rebuilt MMR, a
+  // different channel set — and report would attribute the difference to the
+  // prompt. Everything here except configDigest must match across arms;
+  // configDigest IS the treatment, so it is expected to differ.
+  const reviewedDiff = args.pr
+    ? execFileSync('gh', ['pr', 'diff', String(args.pr)], { encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024 })
+    : fs.readFileSync(path.resolve(args.diff), 'utf-8')
+  const provenance = {
+    target: args.pr ? `pr:${args.pr}` : `diff:${path.basename(path.resolve(args.diff))}`,
+    diffDigest: sha256(reviewedDiff),
+    channels,
+    mmrDigest: sha256(fs.readFileSync(MMR, 'utf-8')),
+    repoCommit: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoRoot, encoding: 'utf-8' }).trim(),
+    configDigest: args.config ? sha256(fs.readFileSync(path.resolve(args.config), 'utf-8')) : null,
+  }
+  fs.writeFileSync(path.join(outDir, PROVENANCE_FILE), JSON.stringify(provenance, null, 2))
 
   try {
     // Serial, never parallel: concurrent same-account sessions are exactly the
@@ -227,8 +252,27 @@ function loadCondition(dir) {
   if (!fs.existsSync(dir)) die(`condition directory not found: ${dir}`)
   const findings = []
   const runs = []
-  for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.json')).sort()) {
-    const r = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf-8'))
+  let provenance = null
+  const provPath = path.join(dir, PROVENANCE_FILE)
+  if (fs.existsSync(provPath)) {
+    try {
+      provenance = JSON.parse(fs.readFileSync(provPath, 'utf-8'))
+    } catch {
+      die(`${provPath} is not readable JSON — re-run \`collect\` for this condition`)
+    }
+  }
+  for (const f of fs.readdirSync(dir).filter((x) => RUN_FILE_RE.test(x)).sort()) {
+    // A corrupt or foreign file should name itself, not surface as a bare
+    // stack trace from deep inside the scorer.
+    let r
+    try {
+      r = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf-8'))
+    } catch (err) {
+      die(`${path.join(dir, f)} is not readable JSON: ${err.message}`)
+    }
+    if (!Array.isArray(r?.reconciled_findings) || typeof r?.per_channel !== 'object' || r.per_channel === null) {
+      die(`${path.join(dir, f)} is not an MMR run result (missing reconciled_findings / per_channel)`)
+    }
     const degraded = Object.entries(r.per_channel ?? {})
       .filter(([, c]) => c.status !== 'completed')
       .map(([k]) => k)
@@ -253,7 +297,11 @@ function loadCondition(dir) {
       coverage: completed.join(','),
     })
   }
-  return { id, label: conditionLabel(dir), findings, runs }
+  // Hash the finding payloads, not just their count: re-collecting the same
+  // number of runs with the same number of findings must not pass a manifest
+  // check when every finding changed.
+  const digest = sha256(JSON.stringify(findings.map((f) => [f.run, f.severity, f.location, f.description])))
+  return { id, label: conditionLabel(dir), findings, runs, provenance, digest }
 }
 
 function loadConditions(spec) {
@@ -310,7 +358,10 @@ function score(args) {
     `Score every finding — all ${blind.length} of them. Use exactly one class per finding.`,
   ].join('\n')
 
-  process.stderr.write(`scoring ${shuffled.length} reconciled findings via ${judge} …\n`)
+  // --judge names a binary that must accept `-p` and read the prompt from
+  // stdin (Claude Code's print mode). Other CLIs use different flags and will
+  // fail here; swapping in codex/opencode needs a full invocation, not a name.
+  process.stderr.write(`scoring ${shuffled.length} reconciled findings via \`${judge} -p\` (stdin) …\n`)
   // Fed on stdin, not argv: a large pooled set JSON-stringified into a single
   // argument runs into ARG_MAX (E2BIG) once run counts grow.
   const raw = execFileSync(judge, ['-p'], {
@@ -356,6 +407,9 @@ function score(args) {
       id: c.id,
       runs: c.runs.map((r) => r.run).sort(),
       findings: c.findings.length,
+      // Content, not just counts: re-collecting the same number of runs with
+      // the same number of findings must not pass when every finding changed.
+      digest: c.digest,
     })),
   }
   const outPath = args.out ?? 'finding-quality-scores.json'
@@ -403,6 +457,7 @@ function summarize(condition, scored) {
     coverages,
     findings: total,
     perRun: totals.length ? `${Math.min(...totals)}–${Math.max(...totals)}` : 'n/a',
+    emptyRuns: condition.runs.filter((r) => mine.every((f) => f.run !== r.run)).length,
     specRates: perRunSpecRates(condition.runs, mine),
     defectsPerRun: perRunDefects(condition.runs, mine),
     speculativeRate: total ? count('speculative') / total : 0,
@@ -413,6 +468,54 @@ function summarize(condition, scored) {
     // `score`, which dies on any unscored finding.
     hasFindings: total > 0,
   }
+}
+
+/**
+ * The whole ship/revert decision, as a pure function of two summaries.
+ *
+ * Extracted so `selftest` exercises the code `report` actually runs. A test
+ * that re-implements this arithmetic proves only that the copy is correct.
+ */
+export function evaluateVerdict(base, cand, opts = {}) {
+  const blockers = []
+  for (const r of [base, cand]) {
+    if (r.runs < MIN_RUNS) blockers.push(`${r.label} has ${r.runs} run(s), the rubric's floor is ${MIN_RUNS}`)
+    if (r.degradedRuns > 0) blockers.push(`${r.label} has ${r.degradedRuns} run(s) with a degraded channel`)
+    if (r.coverages.length > 1) blockers.push(`${r.label} has inconsistent channel coverage: ${r.coverages.join(' vs ')}`)
+    if (!r.hasFindings) blockers.push(`${r.label} produced no findings at all`)
+    // A run with zero findings has no defined speculative rate, so it drops out
+    // of the spread that sizes the noise band — making the band narrower than
+    // the data warrants and the ship rule easier to clear than it should be.
+    if (r.emptyRuns > 0) {
+      blockers.push(`${r.label} has ${r.emptyRuns} run(s) with zero findings, whose rate is undefined `
+        + 'and would silently shrink the noise band')
+    }
+  }
+  if (base.coverages[0] !== cand.coverages[0]) {
+    blockers.push(`channel coverage differs between conditions: ${base.coverages[0]} vs ${cand.coverages[0]}`)
+  }
+  // defect_count is an absolute total, so unequal N alone can satisfy the guard
+  // rail: the arm with more runs simply had more chances to surface a defect.
+  if (base.runs !== cand.runs) {
+    blockers.push(`run counts differ (${base.label} ${base.runs}, ${cand.label} ${cand.runs}) — `
+      + 'the defect guard rail compares absolute totals and needs equal N')
+  }
+  blockers.push(...(opts.extraBlockers ?? []))
+
+  // The margin is the baseline spread's WIDTH, not its lowest per-run rate.
+  // Per-run finding counts here are small enough that a run can return one
+  // finding; if it is not speculative, a floor-based rule pins to 0% and
+  // nothing can ever ship however good the candidate is.
+  const bandLo = base.specRates.length ? Math.min(...base.specRates) : 0
+  const bandHi = base.specRates.length ? Math.max(...base.specRates) : 0
+  const margin = bandHi - bandLo
+  const improvement = base.speculativeRate - cand.speculativeRate
+  const outsideBand = improvement > margin
+  const specDown = cand.speculativeRate < base.speculativeRate
+  const defectsHeld = cand.defects >= base.defects
+  const ship = blockers.length === 0 && specDown && defectsHeld && outsideBand
+
+  return { blockers, bandLo, bandHi, margin, improvement, outsideBand, specDown, defectsHeld, ship }
 }
 
 function report(args) {
@@ -429,10 +532,8 @@ function report(args) {
   for (const c of conditions) {
     const m = raw.manifest.conditions.find((x) => x.id === c.id)
     if (!m) die(`${c.label} is not in the scores manifest — re-run \`score\` for these conditions`)
-    const current = c.runs.map((r) => r.run).sort()
-    if (current.join('|') !== m.runs.join('|') || c.findings.length !== m.findings) {
-      die(`${c.label} has changed since scoring (${m.runs.length} runs / ${m.findings} findings scored, `
-        + `${current.length} runs / ${c.findings.length} findings on disk) — re-run \`score\``)
+    if (c.digest !== m.digest) {
+      die(`${c.label} has changed since scoring — re-run \`score\``)
     }
   }
 
@@ -461,34 +562,35 @@ function report(args) {
   if (rows.length !== 2) {
     console.log('note: a ship/revert verdict needs exactly two conditions (baseline, candidate).')
     console.log('')
+    // Same exit status as the other no-verdict path, so a caller can treat any
+    // non-zero exit as "no decision" without parsing stdout.
+    process.exitCode = 1
     return
   }
 
   const [base, cand] = rows
 
-  // Refuse a verdict the data cannot support. Every one of these makes the
-  // absolute defect counts incomparable between arms, and the defect count is
-  // the guard rail the whole ship rule rests on.
-  const blockers = []
-  for (const r of rows) {
-    if (r.runs < MIN_RUNS) blockers.push(`${r.label} has ${r.runs} run(s), the rubric's floor is ${MIN_RUNS}`)
-    if (r.degradedRuns > 0) blockers.push(`${r.label} has ${r.degradedRuns} run(s) with a degraded channel`)
-    if (r.coverages.length > 1) blockers.push(`${r.label} has inconsistent channel coverage: ${r.coverages.join(' vs ')}`)
-    if (!r.hasFindings) blockers.push(`${r.label} produced no findings at all`)
-  }
-  if (base.coverages[0] !== cand.coverages[0]) {
-    blockers.push(`channel coverage differs between conditions: ${base.coverages[0]} vs ${cand.coverages[0]}`)
-  }
-  // defect_count is an absolute total, so unequal N alone can satisfy the guard
-  // rail: the arm with more runs simply had more chances to surface a defect.
-  if (base.runs !== cand.runs) {
-    blockers.push(`run counts differ (${base.label} ${base.runs}, ${cand.label} ${cand.runs}) — `
-      + 'the defect guard rail compares absolute totals and needs equal N')
+  // Everything except the config digest must match: the config IS the treatment.
+  const extraBlockers = []
+  const bp = conditions[0].provenance
+  const cp = conditions[1].provenance
+  if (!bp || !cp) {
+    extraBlockers.push('a condition has no provenance.json — re-run `collect` so the reviewed '
+      + 'diff, channel set, and MMR build are recorded')
+  } else {
+    for (const key of ['target', 'diffDigest', 'channels', 'mmrDigest', 'repoCommit']) {
+      if (JSON.stringify(bp[key]) !== JSON.stringify(cp[key])) {
+        extraBlockers.push(`${key} differs between conditions (${bp[key]} vs ${cp[key]}) — `
+          + 'the arms did not review the same thing')
+      }
+    }
   }
 
-  if (blockers.length > 0) {
+  const v = evaluateVerdict(base, cand, { extraBlockers })
+
+  if (v.blockers.length > 0) {
     console.log('NO VERDICT — the experiment does not meet the rubric\'s preconditions:')
-    for (const b of blockers) console.log(`  · ${b}`)
+    for (const b of v.blockers) console.log(`  · ${b}`)
     console.log('')
     console.log('The table above is descriptive only. Fix the above and re-run.')
     console.log('')
@@ -496,43 +598,28 @@ function report(args) {
     return
   }
 
-  // The rubric treats a delta smaller than the baseline's own run-to-run spread
-  // as "not a result", and that is binding, not advisory: without this check the
-  // verdict prints "ship" on pure resampling.
-  //
-  // The margin is the baseline's spread WIDTH, not its lowest per-run rate.
-  // With the small per-run finding counts this harness documents (a run can
-  // return one finding), a single baseline run that happens to contain no
-  // speculative finding pins the minimum at 0% and makes shipping arithmetically
-  // impossible regardless of how good the candidate is.
-  const bandLo = Math.min(...base.specRates)
-  const bandHi = Math.max(...base.specRates)
-  const margin = bandHi - bandLo
-  const improvement = base.speculativeRate - cand.speculativeRate
-  const outsideBand = improvement > margin
-  const specDown = cand.speculativeRate < base.speculativeRate
-  const defectsHeld = cand.defects >= base.defects
-
-  console.log(`speculative rate: ${pct(base.speculativeRate)} → ${pct(cand.speculativeRate)}  ${specDown ? 'down' : 'NOT down'}`)
-  console.log(`improvement ${pct(improvement)} vs baseline per-run spread ${pct(bandLo)}–${pct(bandHi)} `
-    + `(width ${pct(margin)}) — ${outsideBand ? 'clears the noise band' : 'INSIDE the noise band'}`)
   // The defect guard rail stays strict — any drop blocks the ship — but the
   // message distinguishes a drop that clears the baseline's own run-to-run
   // defect range from one inside it. Both block; only the first is evidence
   // the change actually suppressed real defects.
   const defectDropPerRun = Math.max(...base.defectsPerRun) - Math.min(...base.defectsPerRun)
-  const defectVerdict = defectsHeld
+  const defectVerdict = v.defectsHeld
     ? 'held'
     : (base.defects - cand.defects) > defectDropPerRun
       ? 'DROPPED beyond the baseline\'s own defect spread — the bar moved, not the noise'
       : 'dropped, but within the baseline\'s own defect spread — inconclusive, and still not shippable'
+
+  console.log(`speculative rate: ${pct(base.speculativeRate)} → ${pct(cand.speculativeRate)}  ${v.specDown ? 'down' : 'NOT down'}`)
+  console.log(`improvement ${pct(v.improvement)} vs baseline per-run spread ${pct(v.bandLo)}–${pct(v.bandHi)} `
+    + `(width ${pct(v.margin)}) — ${v.outsideBand ? 'clears the noise band' : 'INSIDE the noise band'}`)
   console.log(`defect count:     ${base.defects} → ${cand.defects}  ${defectVerdict}`)
   console.log(`baseline defects per run: ${range(base.defectsPerRun)}`)
   console.log('')
-  console.log(specDown && defectsHeld && outsideBand
+  console.log(v.ship
     ? 'VERDICT: ship — speculative rate fell beyond the noise band and defect count held.'
     : 'VERDICT: revert — the rubric\'s ship rule is not met.')
   console.log('')
+  if (!v.ship) process.exitCode = 1
 }
 
 // --------------------------------------------------------------- selftest
@@ -556,32 +643,43 @@ function selftest() {
   assert.notDeepEqual(shuffle(items, 42), shuffle(items, 43))
   assert.deepEqual([...shuffle(items, 42)].sort((a, b) => a - b), items)
 
-  // Every combination of the three verdict inputs, so the AND cannot silently
-  // become an OR.
-  const cases = [
-    // specDown, outsideBand, defectsHeld, expected ship
-    [true, true, true, true],
-    [true, true, false, false],
-    [true, false, true, false],
-    [false, true, true, false],
-    [false, false, false, false],
-  ]
-  for (const [specDown, outsideBand, defectsHeld, expected] of cases) {
-    assert.equal(specDown && defectsHeld && outsideBand, expected,
-      `verdict math wrong for ${specDown}/${outsideBand}/${defectsHeld}`)
+  // Drive the REAL decision function, not a copy of its arithmetic.
+  const cond = (over = {}) => ({
+    label: 'x', runs: MIN_RUNS, degradedRuns: 0, coverages: ['a,b'], hasFindings: true,
+    emptyRuns: 0, specRates: [0.4, 0.5], speculativeRate: 0.45, defects: 10, ...over,
+  })
+
+  // Every combination of the three decision inputs, so the AND cannot silently
+  // become an OR. specDown+outsideBand are driven together via the rate.
+  for (const specRate of [0.2, 0.44, 0.5]) {
+    for (const defects of [10, 9]) {
+      const base = cond()
+      const cand = cond({ speculativeRate: specRate, defects })
+      const v = evaluateVerdict(base, cand)
+      const expected = specRate < 0.45 && (0.45 - specRate) > 0.1 && defects >= 10
+      assert.equal(v.ship, expected, `verdict wrong for rate ${specRate}, defects ${defects}`)
+    }
   }
 
-  // The noise band uses the baseline's spread WIDTH. Pinning it to the lowest
-  // per-run rate degenerates: one baseline run with no speculative finding sets
-  // the floor to 0% and nothing can ever ship.
-  const band = (rates, baseRate, candRate) => {
-    const margin = Math.max(...rates) - Math.min(...rates)
-    return (baseRate - candRate) > margin
-  }
-  assert.equal(band([0.0, 0.5], 0.4, 0.3), false, 'a 10pt gain must not clear a 50pt spread')
-  assert.equal(band([0.4, 0.5], 0.45, 0.2), true, 'a 25pt gain must clear a 10pt spread')
-  // The degenerate case the old min-based rule got wrong.
-  assert.equal(band([0.0, 0.0], 0.3, 0.1), true, 'a zero-width spread must not block a real gain')
+  // The noise band uses the baseline spread's WIDTH. A floor-based rule
+  // degenerates: one baseline run with no speculative finding pins it to 0%
+  // and nothing can ever ship.
+  assert.equal(evaluateVerdict(cond({ specRates: [0.0, 0.5], speculativeRate: 0.4 }),
+    cond({ speculativeRate: 0.3 })).ship, false, 'a 10pt gain must not clear a 50pt spread')
+  assert.equal(evaluateVerdict(cond({ specRates: [0.0, 0.0], speculativeRate: 0.3 }),
+    cond({ speculativeRate: 0.1 })).ship, true, 'a zero-width spread must not block a real gain')
+
+  // Each precondition blocks on its own.
+  assert.equal(evaluateVerdict(cond({ runs: 3 }), cond({ runs: 3, speculativeRate: 0.1 })).ship, false)
+  assert.equal(evaluateVerdict(cond(), cond({ degradedRuns: 1, speculativeRate: 0.1 })).ship, false)
+  assert.equal(evaluateVerdict(cond(), cond({ emptyRuns: 1, speculativeRate: 0.1 })).ship, false)
+  assert.equal(evaluateVerdict(cond(), cond({ runs: MIN_RUNS + 1, speculativeRate: 0.1 })).ship, false)
+  assert.equal(evaluateVerdict(cond(), cond({ coverages: ['a'], speculativeRate: 0.1 })).ship, false)
+  assert.equal(evaluateVerdict(cond(), cond({ speculativeRate: 0.1 }),
+    { extraBlockers: ['diff differs'] }).ship, false)
+  // …and the same inputs with nothing wrong do ship, so the above prove the
+  // blocker rather than some unrelated failure.
+  assert.equal(evaluateVerdict(cond(), cond({ speculativeRate: 0.1 })).ship, true)
 
   // Rate arithmetic, including the empty-denominator guard.
   const mk = (cls, worth = true) => ({ score: { class: cls, worth_fixing_now: worth } })
