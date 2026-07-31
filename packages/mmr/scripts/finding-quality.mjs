@@ -117,16 +117,39 @@ function collect(args) {
   }
   fs.mkdirSync(outDir, { recursive: true })
 
+  // Without this, an unbuilt package surfaces only as N repetitions of
+  // "FAILED (no JSON)" — the broad catch below hides the real cause.
+  if (!fs.existsSync(MMR)) {
+    die(`${MMR} not found — run \`npm run build\` in packages/mmr first.`)
+  }
+
   // A candidate config is applied by copying it to the repo root as .mmr.yaml
   // and reviewing with --trust-project-config. Doing it via the working tree
   // (rather than committing it) keeps the experiment off the branch under test.
   const repoRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf-8' }).trim()
   const liveConfig = path.join(repoRoot, '.mmr.yaml')
   let restore = null
+  let restored = false
+  const restoreConfig = () => {
+    if (!args.config || restored) return
+    restored = true
+    if (restore !== null) fs.writeFileSync(liveConfig, restore)
+    else fs.rmSync(liveConfig, { force: true })
+  }
   if (args.config) {
     if (fs.existsSync(liveConfig)) restore = fs.readFileSync(liveConfig, 'utf-8')
     fs.copyFileSync(path.resolve(args.config), liveConfig)
   }
+  // A `finally` does not run on SIGINT/SIGTERM, and a collect run takes long
+  // enough that Ctrl-C during it is the common case — leaving the candidate
+  // config sitting at the repo root, where it would silently apply to the
+  // user's next review.
+  const onSignal = (sig) => {
+    restoreConfig()
+    process.exit(sig === 'SIGINT' ? 130 : 143)
+  }
+  process.once('SIGINT', () => onSignal('SIGINT'))
+  process.once('SIGTERM', () => onSignal('SIGTERM'))
 
   const base = ['review', '--channels', channels, '--sync', '--format', 'json']
   if (args.pr) base.push('--pr', String(args.pr))
@@ -175,10 +198,7 @@ function collect(args) {
       )
     }
   } finally {
-    if (args.config) {
-      if (restore !== null) fs.writeFileSync(liveConfig, restore)
-      else fs.rmSync(liveConfig, { force: true })
-    }
+    restoreConfig()
   }
 }
 
@@ -331,6 +351,19 @@ function perRunSpecRates(runs, mine) {
   }).filter((x) => x !== null)
 }
 
+/**
+ * Per-run defect counts. The ship rule hinges on the defect total, so its own
+ * run-to-run spread has to be visible — otherwise a reader cannot tell a real
+ * drop from the same resampling that motivated this harness.
+ */
+function perRunDefects(runs, mine) {
+  return runs.map((r) => mine.filter((f) => f.run === r.run && f.score.class === 'defect').length)
+}
+
+function range(xs) {
+  return xs.length ? `${Math.min(...xs)}–${Math.max(...xs)}` : 'n/a'
+}
+
 function summarize(condition, scored) {
   const mine = scored.filter((f) => f.condition === condition.id && f.score)
   const total = mine.length
@@ -348,6 +381,7 @@ function summarize(condition, scored) {
     findings: total,
     perRun: totals.length ? `${Math.min(...totals)}–${Math.max(...totals)}` : 'n/a',
     specRates: perRunSpecRates(condition.runs, mine),
+    defectsPerRun: perRunDefects(condition.runs, mine),
     speculativeRate: total ? count('speculative') / total : 0,
     lowValueRate: total ? lowValue / total : 0,
     defects: count('defect'),
@@ -366,7 +400,8 @@ function report(args) {
   const pct = (x) => `${(x * 100).toFixed(0)}%`
 
   console.log('')
-  console.log('condition      runs  deg  findings  per-run  spec-rate  low-value  defects  deletions')
+  console.log('condition      runs  deg  findings  per-run  spec-rate  low-value'
+    + '  defects  def/run  deletions')
   for (const r of rows) {
     console.log(
       r.label.slice(0, 14).padEnd(14)
@@ -377,6 +412,7 @@ function report(args) {
       + pct(r.speculativeRate).padStart(11)
       + pct(r.lowValueRate).padStart(11)
       + String(r.defects).padStart(9)
+      + range(r.defectsPerRun).padStart(9)
       + String(r.deletions).padStart(11),
     )
   }
@@ -426,8 +462,18 @@ function report(args) {
   console.log(`speculative rate: ${pct(base.speculativeRate)} → ${pct(cand.speculativeRate)}  ${specDown ? 'down' : 'NOT down'}`)
   console.log(`baseline per-run spread: ${pct(bandLo)}–${pct(bandHi)}  `
     + `(candidate ${outsideBand ? 'clears it' : 'is INSIDE it — indistinguishable from noise'})`)
-  console.log(`defect count:     ${base.defects} → ${cand.defects}  `
-    + `${defectsHeld ? 'held' : 'DROPPED — the bar moved, not the noise'}`)
+  // The defect guard rail stays strict — any drop blocks the ship — but the
+  // message distinguishes a drop that clears the baseline's own run-to-run
+  // defect range from one inside it. Both block; only the first is evidence
+  // the change actually suppressed real defects.
+  const defectDropPerRun = Math.max(...base.defectsPerRun) - Math.min(...base.defectsPerRun)
+  const defectVerdict = defectsHeld
+    ? 'held'
+    : (base.defects - cand.defects) > defectDropPerRun
+      ? 'DROPPED beyond the baseline\'s own defect spread — the bar moved, not the noise'
+      : 'dropped, but within the baseline\'s own defect spread — inconclusive, and still not shippable'
+  console.log(`defect count:     ${base.defects} → ${cand.defects}  ${defectVerdict}`)
+  console.log(`baseline defects per run: ${range(base.defectsPerRun)}`)
   console.log('')
   console.log(specDown && defectsHeld && outsideBand
     ? 'VERDICT: ship — speculative rate fell beyond the noise band and defect count held.'
