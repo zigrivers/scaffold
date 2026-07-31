@@ -604,6 +604,15 @@ This changes what reviewers report and how they grade it. It does not touch
 `fix_threshold`, the verdict logic, or `mmr ack` —
 fewer wrong findings, not fewer blocked merges.
 
+Treat the block as a starting template, not a tuned setting. Do **not** validate
+a change to it by comparing one before run against one after run: MMR's
+run-to-run variance on an identical input is larger than most effects you would
+be looking for. Two consecutive baseline runs of the same PR through the same
+three channels, with no config change at all, returned 4 findings and then 1. To
+get a real answer, hold the diff and channel set fixed, repeat each condition
+many times, and compare the rate of findings you have labelled low-value against
+a rubric written down in advance.
+
 :::callout{type=warning}
 **Criteria are trust-gated and fail silently.** `mmr review --diff …` is
 `untrusted-head`, so your `.mmr.yaml` is never read and the criteria vanish with

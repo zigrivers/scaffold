@@ -2132,6 +2132,14 @@ review_criteria:
 <p>This changes what reviewers report and how they grade it. It does not touch
 <code>fix_threshold</code>, the verdict logic, or <code>mmr ack</code> —
 fewer wrong findings, not fewer blocked merges.</p>
+<p>Treat the block as a starting template, not a tuned setting. Do <strong>not</strong> validate
+a change to it by comparing one before run against one after run: MMR's
+run-to-run variance on an identical input is larger than most effects you would
+be looking for. Two consecutive baseline runs of the same PR through the same
+three channels, with no config change at all, returned 4 findings and then 1. To
+get a real answer, hold the diff and channel set fixed, repeat each condition
+many times, and compare the rate of findings you have labelled low-value against
+a rubric written down in advance.</p>
 <div class="callout callout-warning"><p><strong>Criteria are trust-gated and fail silently.</strong> <code>mmr review --diff …</code> is
 <code>untrusted-head</code>, so your <code>.mmr.yaml</code> is never read and the criteria vanish with
 no warning and no non-zero exit. <code>--pr</code> and <code>--base</code> read the file from the base

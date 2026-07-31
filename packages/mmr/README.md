@@ -112,7 +112,8 @@ early-stage codebase that combination produces a predictable failure mode: a
 long tail of technically-correct findings about inputs no caller can currently
 construct, and no way for a reviewer to say "unnecessary" instead of "add more".
 
-Paste this into `.mmr.yaml` to correct both biases:
+This block is a starting point that addresses both biases directly. Treat it as
+a template to tune, not a tuned setting — see the note on measuring it below.
 
 ```yaml
 version: 1
@@ -148,6 +149,15 @@ mmr review --pr 123 --dry-run | grep -A5 'Project Review Criteria'
 
 `--dry-run` prints the fully assembled per-channel prompt. If that section is
 absent, the config was not loaded — re-read the trust note above.
+
+**Measuring whether your criteria helped.** Comparing one before run against one
+after run does not work: MMR's run-to-run variance on an *identical* input is
+large. Two consecutive baseline runs of the same PR through the same three
+channels, with no configuration change at all, returned 4 findings and then 1.
+Any single-run before/after difference smaller than that is indistinguishable
+from resampling. If you want a real answer, hold the diff and channel set fixed,
+run each condition many times, and compare the *rate* of findings you have
+labelled low-value against a rubric you wrote down first — not the raw totals.
 
 ## Installable skills
 
