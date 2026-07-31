@@ -4,6 +4,18 @@
 
 ### Added
 
+- **A finding-quality harness for evaluating prompt changes** (`scripts/`, not
+  published). Single before/after comparisons cannot judge a change to MMR's
+  review prompts: two consecutive baseline runs of the same PR through the same
+  channels, with no configuration change at all, returned 4 findings and then 1.
+  The harness runs each condition N times, pools the findings, scores them blind
+  to condition against a rubric fixed in advance (`finding-quality-rubric.md`),
+  and reports the speculative rate alongside the defect count. Its ship rule
+  requires both — a change that cuts speculative findings by also cutting
+  defects has moved the bar, not the noise, and is rejected.
+
+### Added
+
 - **A documented calibration recipe for `review_criteria`.** The built-in review
   criteria only ask what is *missing*, and severity is graded on
   impact-if-it-happens with no likelihood term — a combination that produces a
