@@ -45,7 +45,17 @@ async function runDryRun(
   const homeSpy = vi.spyOn(os, 'homedir').mockReturnValue(tmpDir)
   const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never)
   const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+  // Every route to stderr, not just console.error: console.warn also lands
+  // there, and a direct process.stderr.write would bypass both. The docs claim
+  // this path is silent, so the test has to watch all of them or the claim can
+  // become false without failing anything.
   const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+  const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  const writes: string[] = []
+  const writeSpy = vi.spyOn(process.stderr, 'write').mockImplementation(((chunk: unknown) => {
+    writes.push(typeof chunk === 'string' ? chunk : String(chunk))
+    return true
+  }) as never)
   const previousExitCode = process.exitCode
   process.exitCode = undefined
 
@@ -59,13 +69,19 @@ async function runDryRun(
   } as never)
 
   const stdout = logSpy.mock.calls.map((c) => c.join(' ')).join('\n')
-  const stderr = errSpy.mock.calls.map((c) => c.join(' ')).join('\n')
+  const stderr = [
+    ...errSpy.mock.calls.map((c) => c.join(' ')),
+    ...warnSpy.mock.calls.map((c) => c.join(' ')),
+    ...writes,
+  ].join('\n')
   const exitCode = process.exitCode
   cwdSpy.mockRestore()
   homeSpy.mockRestore()
   exitSpy.mockRestore()
   logSpy.mockRestore()
   errSpy.mockRestore()
+  warnSpy.mockRestore()
+  writeSpy.mockRestore()
   process.exitCode = previousExitCode
   vi.doUnmock('../../src/core/dispatcher.js')
   vi.doUnmock('../../src/core/auth.js')
