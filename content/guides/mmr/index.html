@@ -2124,11 +2124,18 @@ that yields a long tail of correct-but-unreachable edge-case findings, and gives
 reviewers no way to recommend removing code.</p>
 <pre><code class="language-yaml">version: 1
 review_criteria:
-  - "Before reporting an unhandled input or state, name the concrete caller, CLI flag, or config value in this codebase that can produce it. If you cannot name one, do not report the finding."
-  - "Grade severity by impact AND reachability. A correct observation about a state no current caller reaches is P3, however severe it would be if reached."
-  - "Also report what is unnecessary, not only what is missing: an abstraction with a single caller, a config knob never varied, a hand-rolled helper the standard library already provides, defensive code for an impossible state. Make the suggestion a deletion."
-  - "Do not report missing tests for behavior that has no caller yet, or for a branch you could not show is reachable."
+  - "Trust boundaries are exempt from every rule below. Any input crossing a public API, exported library surface, CLI argument, HTTP handler, webhook, deserializer, file or database read, or any other boundary an outside party controls, is reachable by definition — you do not need to find a caller for it. Never downgrade a security, data-loss, or data-corruption finding for lack of an in-repository caller."
+  - "For internal code only: before reporting an unhandled input or state, name the caller, flag, config value, or documented contract that can produce it. If you cannot name one and it is not behind a trust boundary, do not report the finding."
+  - "Grade severity by impact AND reachability. A correct observation about an internal state no current caller reaches is P3, however severe it would be if reached. This never applies to the trust-boundary cases above."
+  - "Also report what is unnecessary, not only what is missing: an abstraction with a single caller, a config knob never varied, a hand-rolled helper the standard library already provides, defensive code for a state that cannot occur. Make the suggestion a deletion. Validation at a trust boundary is never unnecessary."
+  - "Do not report missing tests for internal behavior that has no caller yet, or for a branch you could not show is reachable. Missing tests for trust-boundary handling are always in scope."
 </code></pre>
+<div class="callout callout-danger"><p><strong>Keep the first line if you keep any of them.</strong> An unqualified "name a caller in
+this codebase" bar suppresses exactly the findings you least want to lose — a
+repository contains no caller for a malicious HTTP request or a corrupt database
+row, so the rule reads those as unreachable and downgrades them. The
+trust-boundary exemption is what keeps the reachability bar from becoming a
+security-finding filter.</p></div>
 <p>This changes what reviewers report and how they grade it. It does not touch
 <code>fix_threshold</code>, the verdict logic, or <code>mmr ack</code> —
 fewer wrong findings, not fewer blocked merges.</p>
@@ -2144,8 +2151,9 @@ a rubric written down in advance.</p>
 <code>untrusted-head</code>, so your <code>.mmr.yaml</code> is never read and the criteria vanish with
 no warning and no non-zero exit. <code>--pr</code> and <code>--base</code> read the file from the base
 branch, so it must be <strong>committed there</strong>. Verify with
-<code>mmr review --pr &#x3C;n> --dry-run | grep -A5 'Project Review Criteria'</code> — that
-prints the exact text each channel receives.</p></div>
+<code>mmr review --pr &#x3C;n> --dry-run | sed -n '/## Project Review Criteria/,/^## /p'</code>,
+which prints the whole section — <code>grep -A&#x3C;n></code> would cut it off at <em>n</em> lines and
+still look like confirmation.</p></div>
 <div class="callout callout-danger"><p><strong>Trust boundary.</strong> When reviewing a diff, project <code>.mmr.yaml</code> and acks are read
 from the diff's <em>base ref</em>, not the working tree — otherwise a PR could add a
 channel that exfiltrates secrets, or self-acknowledge its own findings. Use

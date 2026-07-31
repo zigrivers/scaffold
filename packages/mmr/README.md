@@ -118,18 +118,25 @@ a template to tune, not a tuned setting — see the note on measuring it below.
 ```yaml
 version: 1
 review_criteria:
+  # The exemption comes FIRST so it is never read as an afterthought.
+  - "Trust boundaries are exempt from every rule below. Any input crossing a public API, exported library surface, CLI argument, HTTP handler, webhook, deserializer, file or database read, or any other boundary an outside party controls, is reachable by definition — you do not need to find a caller for it. Never downgrade a security, data-loss, or data-corruption finding for lack of an in-repository caller."
   # Reachability bar — an edge case must be shown to be reachable, not merely conceivable.
-  - "Before reporting an unhandled input or state, name the concrete caller, CLI flag, or config value in this codebase that can produce it. If you cannot name one, do not report the finding."
+  - "For internal code only: before reporting an unhandled input or state, name the caller, flag, config value, or documented contract that can produce it. If you cannot name one and it is not behind a trust boundary, do not report the finding."
   # Severity gets a likelihood term, not just an impact term.
-  - "Grade severity by impact AND reachability. A correct observation about a state no current caller reaches is P3, however severe it would be if reached."
+  - "Grade severity by impact AND reachability. A correct observation about an internal state no current caller reaches is P3, however severe it would be if reached. This never applies to the trust-boundary cases above."
   # Restores the missing direction: findings that remove code.
-  - "Also report what is unnecessary, not only what is missing: an abstraction with a single caller, a config knob never varied, a hand-rolled helper the standard library already provides, defensive code for an impossible state. Make the suggestion a deletion."
+  - "Also report what is unnecessary, not only what is missing: an abstraction with a single caller, a config knob never varied, a hand-rolled helper the standard library already provides, defensive code for a state that cannot occur. Make the suggestion a deletion. Validation at a trust boundary is never unnecessary."
   # Stops the most common speculative-test finding.
-  - "Do not report missing tests for behavior that has no caller yet, or for a branch you could not show is reachable."
+  - "Do not report missing tests for internal behavior that has no caller yet, or for a branch you could not show is reachable. Missing tests for trust-boundary handling are always in scope."
 ```
 
-Two things to know before you rely on it:
+Three things to know before you rely on it:
 
+- **The trust-boundary exemption is load-bearing.** Without it, "name a caller in
+  this codebase" quietly suppresses exactly the findings you least want to lose:
+  a repository contains no caller for a malicious HTTP request or a corrupt row,
+  so an unqualified reachability bar reads those as unreachable and downgrades
+  them. Keep the first line if you keep any of the others.
 - **The gate is unchanged.** These lines change what reviewers *report* and how
   they *grade* it. `fix_threshold`, the verdict logic, and `mmr ack` are
   untouched — you get fewer wrong findings, not fewer blocked merges.
@@ -144,11 +151,14 @@ Two things to know before you rely on it:
 Confirm your criteria actually reached the model before trusting the result:
 
 ```bash
-mmr review --pr 123 --dry-run | grep -A5 'Project Review Criteria'
+# Prints the whole section, however many criteria you have — grep -A<n> would
+# silently truncate it at n lines and read as confirmation.
+mmr review --pr 123 --dry-run | sed -n '/## Project Review Criteria/,/^## /p'
 ```
 
-`--dry-run` prints the fully assembled per-channel prompt. If that section is
-absent, the config was not loaded — re-read the trust note above.
+`--dry-run` prints the fully assembled per-channel prompt, so this is the exact
+text the model receives. If the section is absent, the config was not loaded —
+re-read the trust note above.
 
 **Measuring whether your criteria helped.** Comparing one before run against one
 after run does not work: MMR's run-to-run variance on an *identical* input is
