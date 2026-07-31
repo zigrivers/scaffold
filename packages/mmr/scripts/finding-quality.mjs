@@ -176,6 +176,11 @@ function conditionLabel(dir) {
 
 // ---------------------------------------------------------------- collect
 
+/** Canonical channel-list form, so two spellings of one set never differ. */
+function normalizeChannels(list) {
+  return list.split(',').map((c) => c.trim()).filter(Boolean).sort().join(',')
+}
+
 function collect(args) {
   // Absolute from here on. The MMR child runs with cwd=repoRoot, so a relative
   // --out would hand it a --diff path resolved against the repo root instead of
@@ -249,6 +254,12 @@ function collect(args) {
   }
   process.once('SIGINT', () => onSignal('SIGINT'))
   process.once('SIGTERM', () => onSignal('SIGTERM'))
+  // die() calls process.exit(), which does NOT unwind the stack — so a `finally`
+  // inside collect is skipped whenever a run fails, leaving the candidate config
+  // live at the repo root. An 'exit' hook runs in every one of those paths, and
+  // restoreConfig is idempotent, so this is the backstop that makes the
+  // try/finally and the signal handlers merely the fast paths.
+  process.once('exit', restoreConfig)
 
 
 
@@ -270,7 +281,7 @@ function collect(args) {
   const provenance = {
     target: args.pr ? `pr:${args.pr}` : `diff:${path.basename(path.resolve(args.diff))}`,
     diffDigest: sha256(reviewedDiff),
-    channels,
+    channels: normalizeChannels(channels),
     mmrDigest: buildDigest(),
     repoCommit: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoRoot, encoding: 'utf-8' }).trim(),
     configDigest: args.config ? sha256(fs.readFileSync(path.resolve(args.config), 'utf-8')) : null,
@@ -477,7 +488,7 @@ function score(args) {
     '## Output',
     '',
     'Return ONLY a JSON array, one object per finding, no prose and no markdown fences:',
-    `[{"id":"F001","class":"${CLASSES.join('|')}",`,
+    '[{"id":"F001","class":"<exactly one of: ' + CLASSES.join(', ') + '>",',
     '  "names_path":true|false,"worth_fixing_now":true|false,"why":"one short sentence"}]',
     '',
     `Score every finding — all ${blind.length} of them. Use exactly one class per finding.`,
@@ -737,7 +748,7 @@ function report(args) {
     // degraded, so it slips past both of those checks while the arm silently
     // ran with less coverage than it asked for.
     for (const [cond, prov] of [[conditions[0], bp], [conditions[1], cp]]) {
-      const requested = prov.channels.split(',').map((c) => c.trim()).sort().join(',')
+      const requested = normalizeChannels(prov.channels)
       for (const r of cond.runs) {
         if (r.dispatched !== requested) {
           extraBlockers.push(`${cond.label}/${r.run} dispatched ${r.dispatched || '(none)'} `
@@ -861,6 +872,10 @@ function selftest() {
   assert.equal(RUN_FILE_RE.test('notes.json'), false)
   assert.equal(RUN_FILE_RE.test('run-01.json.bak'), false)
   assert.equal(RUN_FILE_RE.test('.mmr.yaml'), false)
+
+  assert.equal(normalizeChannels('claude, codex'), 'claude,codex')
+  assert.equal(normalizeChannels('codex,claude'), normalizeChannels('claude, codex'))
+  assert.equal(normalizeChannels('a,,b '), 'a,b')
 
   // Trailing prose containing a `]` must not swallow the array.
   assert.equal(firstJsonArray('noise [1,2] tail ] more'), '[1,2]')
