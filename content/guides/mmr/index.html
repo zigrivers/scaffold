@@ -1368,7 +1368,7 @@ nav.toc li.toc-3 a { padding-left: var(--sp-6); font-size: var(--text-xs); }
 <div class="layout">
   <aside class="rail" id="guide-toc">
     <button class="rail-close" data-action="nav" aria-label="Close navigation">✕</button>
-    <nav class="toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#what-mmr-is">What MMR is</a></li><li class="toc-3"><a href="#the-core-idea-in-five-moves">The core idea in five moves</a></li><li class="toc-2"><a href="#end-to-end-flow">End-to-end flow</a></li><li class="toc-2"><a href="#the-mmr-review-command">The mmr review command</a></li><li class="toc-3"><a href="#copy-paste-commands-by-target">Copy-paste commands by target</a></li><li class="toc-2"><a href="#other-subcommands">Other subcommands</a></li><li class="toc-2"><a href="#mmr-critique-the-design-peer">mmr critique — the design peer</a></li><li class="toc-2"><a href="#channel-architecture">Channel architecture</a></li><li class="toc-3"><a href="#the-channel-config-shape">The channel config shape</a></li><li class="toc-3"><a href="#built-in-channels">Built-in channels</a></li><li class="toc-3"><a href="#the-dispatcher">The dispatcher</a></li><li class="toc-2"><a href="#scaffold-wrappers">Scaffold wrappers</a></li><li class="toc-2"><a href="#findings-reconciliation-verdicts">Findings, reconciliation &amp; verdicts</a></li><li class="toc-3"><a href="#the-finding-shape">The Finding shape</a></li><li class="toc-3"><a href="#stable-identity-finding-key">Stable identity (finding_key)</a></li><li class="toc-3"><a href="#agreement-confidence">Agreement &amp; confidence</a></li><li class="toc-3"><a href="#the-gate-the-four-verdicts">The gate &amp; the four verdicts</a></li><li class="toc-2"><a href="#degraded-mode-compensation-auth">Degraded mode, compensation &amp; auth</a></li><li class="toc-2"><a href="#configuration-mmryaml">Configuration (.mmr.yaml)</a></li><li class="toc-3"><a href="#trust-modes-and-the-ratification-gate">Trust modes and the ratification gate</a></li></ul></nav>
+    <nav class="toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#what-mmr-is">What MMR is</a></li><li class="toc-3"><a href="#the-core-idea-in-five-moves">The core idea in five moves</a></li><li class="toc-2"><a href="#end-to-end-flow">End-to-end flow</a></li><li class="toc-2"><a href="#the-mmr-review-command">The mmr review command</a></li><li class="toc-3"><a href="#copy-paste-commands-by-target">Copy-paste commands by target</a></li><li class="toc-2"><a href="#other-subcommands">Other subcommands</a></li><li class="toc-2"><a href="#mmr-critique-the-design-peer">mmr critique — the design peer</a></li><li class="toc-2"><a href="#channel-architecture">Channel architecture</a></li><li class="toc-3"><a href="#the-channel-config-shape">The channel config shape</a></li><li class="toc-3"><a href="#built-in-channels">Built-in channels</a></li><li class="toc-3"><a href="#the-dispatcher">The dispatcher</a></li><li class="toc-2"><a href="#scaffold-wrappers">Scaffold wrappers</a></li><li class="toc-2"><a href="#findings-reconciliation-verdicts">Findings, reconciliation &amp; verdicts</a></li><li class="toc-3"><a href="#the-finding-shape">The Finding shape</a></li><li class="toc-3"><a href="#stable-identity-finding-key">Stable identity (finding_key)</a></li><li class="toc-3"><a href="#agreement-confidence">Agreement &amp; confidence</a></li><li class="toc-3"><a href="#the-gate-the-four-verdicts">The gate &amp; the four verdicts</a></li><li class="toc-2"><a href="#degraded-mode-compensation-auth">Degraded mode, compensation &amp; auth</a></li><li class="toc-2"><a href="#configuration-mmryaml">Configuration (.mmr.yaml)</a></li><li class="toc-3"><a href="#calibrating-findings-with-review-criteria">Calibrating findings with review_criteria</a></li><li class="toc-3"><a href="#trust-modes-and-the-ratification-gate">Trust modes and the ratification gate</a></li></ul></nav>
   </aside>
   <main class="content"><h2 id="what-mmr-is">What MMR is</h2>
 <p>Multi-Model Review runs your changes past several <strong>independent</strong> AI code
@@ -2091,7 +2091,7 @@ defaults:
     max_rounds_default: 5
   compensator:
     channel: claude            # who runs a compensating pass (default: claude -p)
-review_criteria: ["…"]         # extra criteria appended to every prompt
+review_criteria: ["…"]         # extra criteria added to every prompt (see "Calibrating findings")
 templates:                     # named criteria presets, selected by --template
   security: { criteria: ["…"] }
 channels_disabled: ["grok"]  # opt OUT of a built-in (e.g. no grok installed)
@@ -2113,6 +2113,31 @@ when you pass an explicit <code>--channels</code> list).</li>
 fields override the parent <span class="fp" data-path="packages/mmr/src/config/loader.ts:145">packages/mmr/src/config/loader.ts:145</span>.</li>
 <li><code>fix_threshold</code> — project gate; override per-run with <code>--fix-threshold</code>.</li>
 </ul>
+<h3 id="calibrating-findings-with-review-criteria">Calibrating findings with <code>review_criteria</code></h3>
+<p><code>review_criteria</code> lines are injected between the core prompt and the diff
+<span class="fp" data-path="packages/mmr/src/core/prompt.ts:51">packages/mmr/src/core/prompt.ts:51</span>, so every channel sees them. The most
+useful thing to put there is what <em>not</em> to spend a finding on.</p>
+<p>The built-in criteria <span class="fp" data-path="packages/mmr/templates/core-prompt.md:9">packages/mmr/templates/core-prompt.md:9</span> ask five
+questions that are all about what is <strong>missing</strong>, and the severity definitions
+grade impact-if-it-happens with no likelihood term. On an early-stage codebase
+that yields a long tail of correct-but-unreachable edge-case findings, and gives
+reviewers no way to recommend removing code.</p>
+<pre><code class="language-yaml">version: 1
+review_criteria:
+  - "Before reporting an unhandled input or state, name the concrete caller, CLI flag, or config value in this codebase that can produce it. If you cannot name one, do not report the finding."
+  - "Grade severity by impact AND reachability. A correct observation about a state no current caller reaches is P3, however severe it would be if reached."
+  - "Also report what is unnecessary, not only what is missing: an abstraction with a single caller, a config knob never varied, a hand-rolled helper the standard library already provides, defensive code for an impossible state. Make the suggestion a deletion."
+  - "Do not report missing tests for behavior that has no caller yet, or for a branch you could not show is reachable."
+</code></pre>
+<p>This changes what reviewers report and how they grade it. It does not touch
+<code>fix_threshold</code>, the verdict logic, or <code>mmr ack</code> —
+fewer wrong findings, not fewer blocked merges.</p>
+<div class="callout callout-warning"><p><strong>Criteria are trust-gated and fail silently.</strong> <code>mmr review --diff …</code> is
+<code>untrusted-head</code>, so your <code>.mmr.yaml</code> is never read and the criteria vanish with
+no warning and no non-zero exit. <code>--pr</code> and <code>--base</code> read the file from the base
+branch, so it must be <strong>committed there</strong>. Verify with
+<code>mmr review --pr &#x3C;n> --dry-run | grep -A5 'Project Review Criteria'</code> — that
+prints the exact text each channel receives.</p></div>
 <div class="callout callout-danger"><p><strong>Trust boundary.</strong> When reviewing a diff, project <code>.mmr.yaml</code> and acks are read
 from the diff's <em>base ref</em>, not the working tree — otherwise a PR could add a
 channel that exfiltrates secrets, or self-acknowledge its own findings. Use

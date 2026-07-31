@@ -557,7 +557,7 @@ defaults:
     max_rounds_default: 5
   compensator:
     channel: claude            # who runs a compensating pass (default: claude -p)
-review_criteria: ["…"]         # extra criteria appended to every prompt
+review_criteria: ["…"]         # extra criteria added to every prompt (see "Calibrating findings")
 templates:                     # named criteria presets, selected by --template
   security: { criteria: ["…"] }
 channels_disabled: ["grok"]  # opt OUT of a built-in (e.g. no grok installed)
@@ -578,6 +578,40 @@ channels:
 - `extends` — inherit from another channel (≤ 4 levels, cycle-checked); child
   fields override the parent :cite[packages/mmr/src/config/loader.ts:145].
 - `fix_threshold` — project gate; override per-run with `--fix-threshold`.
+
+### Calibrating findings with `review_criteria`
+
+`review_criteria` lines are injected between the core prompt and the diff
+:cite[packages/mmr/src/core/prompt.ts:51], so every channel sees them. The most
+useful thing to put there is what *not* to spend a finding on.
+
+The built-in criteria :cite[packages/mmr/templates/core-prompt.md:9] ask five
+questions that are all about what is **missing**, and the severity definitions
+grade impact-if-it-happens with no likelihood term. On an early-stage codebase
+that yields a long tail of correct-but-unreachable edge-case findings, and gives
+reviewers no way to recommend removing code.
+
+```yaml
+version: 1
+review_criteria:
+  - "Before reporting an unhandled input or state, name the concrete caller, CLI flag, or config value in this codebase that can produce it. If you cannot name one, do not report the finding."
+  - "Grade severity by impact AND reachability. A correct observation about a state no current caller reaches is P3, however severe it would be if reached."
+  - "Also report what is unnecessary, not only what is missing: an abstraction with a single caller, a config knob never varied, a hand-rolled helper the standard library already provides, defensive code for an impossible state. Make the suggestion a deletion."
+  - "Do not report missing tests for behavior that has no caller yet, or for a branch you could not show is reachable."
+```
+
+This changes what reviewers report and how they grade it. It does not touch
+`fix_threshold`, the verdict logic, or `mmr ack` —
+fewer wrong findings, not fewer blocked merges.
+
+:::callout{type=warning}
+**Criteria are trust-gated and fail silently.** `mmr review --diff …` is
+`untrusted-head`, so your `.mmr.yaml` is never read and the criteria vanish with
+no warning and no non-zero exit. `--pr` and `--base` read the file from the base
+branch, so it must be **committed there**. Verify with
+`mmr review --pr <n> --dry-run | grep -A5 'Project Review Criteria'` — that
+prints the exact text each channel receives.
+:::
 
 :::callout{type=danger}
 **Trust boundary.** When reviewing a diff, project `.mmr.yaml` and acks are read

@@ -99,6 +99,56 @@ channels:
 > Note: the `gemini` channel was **retired** (its CLI is sunset; use `antigravity`).
 > Existing configs that still name `gemini` keep loading — it is never dispatched.
 
+### Calibrating findings with `review_criteria`
+
+`review_criteria` is a list of extra instruction lines injected into the prompt
+every channel receives, between the core prompt and the diff. Its most common
+use is telling reviewers what *not* to spend a finding on.
+
+The built-in criteria (`templates/core-prompt.md`) ask five questions that are
+all about what is **missing** — correctness, regressions, edge cases, test
+coverage, security — and grade severity purely by impact-if-it-happens. On an
+early-stage codebase that combination produces a predictable failure mode: a
+long tail of technically-correct findings about inputs no caller can currently
+construct, and no way for a reviewer to say "unnecessary" instead of "add more".
+
+Paste this into `.mmr.yaml` to correct both biases:
+
+```yaml
+version: 1
+review_criteria:
+  # Reachability bar — an edge case must be shown to be reachable, not merely conceivable.
+  - "Before reporting an unhandled input or state, name the concrete caller, CLI flag, or config value in this codebase that can produce it. If you cannot name one, do not report the finding."
+  # Severity gets a likelihood term, not just an impact term.
+  - "Grade severity by impact AND reachability. A correct observation about a state no current caller reaches is P3, however severe it would be if reached."
+  # Restores the missing direction: findings that remove code.
+  - "Also report what is unnecessary, not only what is missing: an abstraction with a single caller, a config knob never varied, a hand-rolled helper the standard library already provides, defensive code for an impossible state. Make the suggestion a deletion."
+  # Stops the most common speculative-test finding.
+  - "Do not report missing tests for behavior that has no caller yet, or for a branch you could not show is reachable."
+```
+
+Two things to know before you rely on it:
+
+- **The gate is unchanged.** These lines change what reviewers *report* and how
+  they *grade* it. `fix_threshold`, the verdict logic, and `mmr ack` are
+  untouched — you get fewer wrong findings, not fewer blocked merges.
+- **Project config is trust-gated, and it fails silently.** `.mmr.yaml` is only
+  read when the invocation has a trusted base ref. `mmr review --pr <n>` and
+  `--base <ref>` qualify (the file is read from the base branch, so it must be
+  **committed there**). `mmr review --diff …` does **not** — it classifies as
+  `untrusted-head` and your criteria are dropped with no warning. Pass
+  `--trust-project-config` to honor the working-tree file, or
+  `--config-base-ref <ref>` to name a trusted source.
+
+Confirm your criteria actually reached the model before trusting the result:
+
+```bash
+mmr review --pr 123 --dry-run | grep -A5 'Project Review Criteria'
+```
+
+`--dry-run` prints the fully assembled per-channel prompt. If that section is
+absent, the config was not loaded — re-read the trust note above.
+
 ## Installable skills
 
 `mmr skill install` drops a "use MMR for code review" skill into a project, written

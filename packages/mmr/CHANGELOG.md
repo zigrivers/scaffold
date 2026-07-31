@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+### Added
+
+- **A documented calibration recipe for `review_criteria`.** The built-in review
+  criteria only ask what is *missing*, and severity is graded on
+  impact-if-it-happens with no likelihood term — a combination that produces a
+  long tail of correct-but-unreachable edge-case findings on early-stage
+  codebases. The README and the `mmr` guide now ship a copy-pasteable
+  `review_criteria` block that adds a reachability bar, puts a likelihood term
+  into severity, and asks reviewers for deletions as well as additions. No
+  behaviour change: `fix_threshold`, the verdict logic and `mmr ack` are
+  untouched.
+
+### Fixed
+
+- **Documented that `review_criteria` is trust-gated and fails silently.**
+  `mmr review --diff …` classifies as `untrusted-head`, so the project
+  `.mmr.yaml` is never read and any configured criteria are dropped with no
+  warning and no non-zero exit. The guide previously described `review_criteria`
+  as "appended to every prompt", which is only true for trusted invocations.
+  Both docs now name the affected modes and the
+  `--dry-run | grep 'Project Review Criteria'` check that confirms delivery.
+
 ## [4.0.1] — 2026-07-28
 
 Documentation-only follow-up to 4.0.0. The bundled skill templates still
