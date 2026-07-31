@@ -123,7 +123,7 @@ review_criteria:
   # Reachability bar — an edge case must be shown to be reachable, not merely conceivable.
   - "For internal code only: before reporting an unhandled input or state, name the caller, flag, config value, or documented contract that can produce it. If you cannot name one and it is not behind a trust boundary, do not report the finding."
   # Severity gets a likelihood term, not just an impact term.
-  - "Grade severity by impact AND reachability. A correct observation about an internal state no current caller reaches is P3, however severe it would be if reached. This never applies to the trust-boundary cases above."
+  - "Grade severity by impact AND demonstrated likelihood. An internal state that is reachable but rare in current usage is P2 or P3, not P1. Trust-boundary findings are graded on impact alone and are never downgraded for rarity."
   # Restores the missing direction: findings that remove code.
   - "Also report what is unnecessary, not only what is missing: an abstraction with a single caller, a config knob never varied, a hand-rolled helper the standard library already provides, defensive code for a state that cannot occur. Make the suggestion a deletion. Validation at a trust boundary is never unnecessary."
   # Stops the most common speculative-test finding.

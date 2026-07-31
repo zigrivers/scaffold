@@ -22,7 +22,9 @@
   warning and no non-zero exit. The guide previously described `review_criteria`
   as "appended to every prompt", which is only true for trusted invocations.
   Both docs now name the affected modes and the
-  `--dry-run | grep 'Project Review Criteria'` check that confirms delivery.
+  `--dry-run | sed -n '/## Project Review Criteria/,/^## /p'` check, which
+  prints the whole section — a `grep -A<n>` truncates it at *n* lines and still
+  reads as confirmation.
 
 ## [4.0.1] — 2026-07-28
 
