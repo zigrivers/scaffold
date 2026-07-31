@@ -2118,10 +2118,13 @@ fields override the parent <span class="fp" data-path="packages/mmr/src/config/l
 <span class="fp" data-path="packages/mmr/src/core/prompt.ts:51">packages/mmr/src/core/prompt.ts:51</span>, so every channel sees them. The most
 useful thing to put there is what <em>not</em> to spend a finding on.</p>
 <p>The built-in criteria <span class="fp" data-path="packages/mmr/templates/core-prompt.md:9">packages/mmr/templates/core-prompt.md:9</span> ask five
-questions that are all about what is <strong>missing</strong>, and the severity definitions
-grade impact-if-it-happens with no likelihood term. On an early-stage codebase
-that yields a long tail of correct-but-unreachable edge-case findings, and gives
-reviewers no way to recommend removing code.</p>
+questions that are all about what is <strong>missing</strong>. The severity definitions do
+gesture at likelihood — P1 is scoped to "normal usage" — but no level says what
+evidence of reachability a finding needs, or how to grade something reachable
+but rare. On an early-stage codebase that yields a long tail of
+correct-but-unreachable edge-case findings, and gives reviewers no way to
+recommend removing code. The block below adds the missing calibration; it does
+not replace the built-in severity semantics.</p>
 <pre><code class="language-yaml">version: 1
 review_criteria:
   - "Trust boundaries are exempt from every rule below. Any input crossing a public API, exported library surface, CLI argument, HTTP handler, webhook, deserializer, file or database read, or any other boundary an outside party controls, is reachable by definition — you do not need to find a caller for it. Never downgrade a security, data-loss, or data-corruption finding for lack of an in-repository caller."
@@ -2136,9 +2139,11 @@ repository contains no caller for a malicious HTTP request or a corrupt database
 row, so the rule reads those as unreachable and downgrades them. The
 trust-boundary exemption is what keeps the reachability bar from becoming a
 security-finding filter.</p></div>
-<p>This changes what reviewers report and how they grade it. It does not touch
-<code>fix_threshold</code>, the verdict logic, or <code>mmr ack</code> —
-fewer wrong findings, not fewer blocked merges.</p>
+<p>This changes what reviewers report and how they grade it. <code>fix_threshold</code>, the
+reconciliation logic and <code>mmr ack</code> are untouched — but that is not the same as
+"no effect on merges". A finding that goes unreported, or that lands below your
+threshold, stops blocking. That is the intent when the finding was noise, and it
+is why the trust-boundary exemption above is not optional.</p>
 <p>Treat the block as a starting template, not a tuned setting. Do <strong>not</strong> validate
 a change to it by comparing one before run against one after run: MMR's
 run-to-run variance on an identical input is larger than most effects you would

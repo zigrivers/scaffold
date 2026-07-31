@@ -9,10 +9,13 @@
   impact-if-it-happens with no likelihood term — a combination that produces a
   long tail of correct-but-unreachable edge-case findings on early-stage
   codebases. The README and the `mmr` guide now ship a copy-pasteable
-  `review_criteria` block that adds a reachability bar, puts a likelihood term
-  into severity, and asks reviewers for deletions as well as additions. No
-  behaviour change: `fix_threshold`, the verdict logic and `mmr ack` are
-  untouched.
+  `review_criteria` block that adds a reachability bar, calibrates severity for
+  reachable-but-rare states, and asks reviewers for deletions as well as
+  additions. It leads with a trust-boundary exemption so the reachability bar
+  cannot suppress security or data-loss findings. `fix_threshold`, the
+  reconciliation logic and `mmr ack` are untouched — though a project that
+  adopts the block should expect verdicts to move, since a finding that goes
+  unreported or lands below the threshold no longer blocks.
 
 ### Fixed
 

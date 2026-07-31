@@ -586,10 +586,13 @@ channels:
 useful thing to put there is what *not* to spend a finding on.
 
 The built-in criteria :cite[packages/mmr/templates/core-prompt.md:9] ask five
-questions that are all about what is **missing**, and the severity definitions
-grade impact-if-it-happens with no likelihood term. On an early-stage codebase
-that yields a long tail of correct-but-unreachable edge-case findings, and gives
-reviewers no way to recommend removing code.
+questions that are all about what is **missing**. The severity definitions do
+gesture at likelihood — P1 is scoped to "normal usage" — but no level says what
+evidence of reachability a finding needs, or how to grade something reachable
+but rare. On an early-stage codebase that yields a long tail of
+correct-but-unreachable edge-case findings, and gives reviewers no way to
+recommend removing code. The block below adds the missing calibration; it does
+not replace the built-in severity semantics.
 
 ```yaml
 version: 1
@@ -610,9 +613,11 @@ trust-boundary exemption is what keeps the reachability bar from becoming a
 security-finding filter.
 :::
 
-This changes what reviewers report and how they grade it. It does not touch
-`fix_threshold`, the verdict logic, or `mmr ack` —
-fewer wrong findings, not fewer blocked merges.
+This changes what reviewers report and how they grade it. `fix_threshold`, the
+reconciliation logic and `mmr ack` are untouched — but that is not the same as
+"no effect on merges". A finding that goes unreported, or that lands below your
+threshold, stops blocking. That is the intent when the finding was noise, and it
+is why the trust-boundary exemption above is not optional.
 
 Treat the block as a starting template, not a tuned setting. Do **not** validate
 a change to it by comparing one before run against one after run: MMR's

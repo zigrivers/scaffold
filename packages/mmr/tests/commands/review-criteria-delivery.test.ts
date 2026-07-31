@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
@@ -15,6 +16,12 @@ import os from 'node:os'
  * silence, not an error. These tests pin both directions so the docs cannot
  * drift away from the behavior.
  *
+ * The temp dir is `git init`-ed on purpose. Without a `.git`, classifyTrustMode
+ * returns `non-git` rather than `untrusted-head` — both route to
+ * `skipProjectConfig: true`, so the assertions would still pass while testing a
+ * different branch than the docs describe, and a future change that diverged
+ * the two branches would slip through.
+ *
  * --dry-run prints the fully assembled per-channel prompt, so it is the exact
  * byte-level evidence of what the model receives.
  */
@@ -25,7 +32,7 @@ async function runDryRun(
   tmpDir: string,
   diffPath: string,
   extraArgs: Record<string, unknown>,
-): Promise<string> {
+): Promise<{ stdout: string; stderr: string; exitCode: number | string | undefined }> {
   vi.resetModules()
   vi.doMock('../../src/core/dispatcher.js', () => ({ dispatchChannel: vi.fn() }))
   vi.doMock('../../src/core/auth.js', () => ({
@@ -40,6 +47,7 @@ async function runDryRun(
   const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
   const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
   const previousExitCode = process.exitCode
+  process.exitCode = undefined
 
   await reviewCommand.handler({
     diff: diffPath,
@@ -50,7 +58,9 @@ async function runDryRun(
     $0: 'mmr',
   } as never)
 
-  const output = logSpy.mock.calls.map((c) => c.join(' ')).join('\n')
+  const stdout = logSpy.mock.calls.map((c) => c.join(' ')).join('\n')
+  const stderr = errSpy.mock.calls.map((c) => c.join(' ')).join('\n')
+  const exitCode = process.exitCode
   cwdSpy.mockRestore()
   homeSpy.mockRestore()
   exitSpy.mockRestore()
@@ -59,7 +69,7 @@ async function runDryRun(
   process.exitCode = previousExitCode
   vi.doUnmock('../../src/core/dispatcher.js')
   vi.doUnmock('../../src/core/auth.js')
-  return output
+  return { stdout, stderr, exitCode }
 }
 
 describe('review_criteria delivery to the dispatched prompt', () => {
@@ -67,7 +77,8 @@ describe('review_criteria delivery to the dispatched prompt', () => {
   let diffPath: string
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-criteria-'))
+    tmpDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-criteria-')))
+    execFileSync('git', ['init', '-q'], { cwd: tmpDir, stdio: 'ignore' })
     diffPath = path.join(tmpDir, 'sample.diff')
     fs.writeFileSync(diffPath, [
       'diff --git a/x.ts b/x.ts',
@@ -94,19 +105,19 @@ describe('review_criteria delivery to the dispatched prompt', () => {
 
   it('reaches the dispatched prompt when the project config is trusted', async () => {
     writeProjectConfig()
-    const output = await runDryRun(tmpDir, diffPath, { trustProjectConfig: true })
+    const { stdout } = await runDryRun(tmpDir, diffPath, { trustProjectConfig: true })
 
-    expect(output).toContain('## Project Review Criteria')
-    expect(output).toContain(SENTINEL)
+    expect(stdout).toContain('## Project Review Criteria')
+    expect(stdout).toContain(SENTINEL)
   })
 
   it('is placed after the core prompt and before the diff', async () => {
     writeProjectConfig()
-    const output = await runDryRun(tmpDir, diffPath, { trustProjectConfig: true })
+    const { stdout } = await runDryRun(tmpDir, diffPath, { trustProjectConfig: true })
 
-    const coreIdx = output.indexOf('## Severity Definitions')
-    const criteriaIdx = output.indexOf(SENTINEL)
-    const diffIdx = output.indexOf('## Diff')
+    const coreIdx = stdout.indexOf('## Severity Definitions')
+    const criteriaIdx = stdout.indexOf(SENTINEL)
+    const diffIdx = stdout.indexOf('## Diff')
     expect(coreIdx).toBeGreaterThanOrEqual(0)
     expect(criteriaIdx).toBeGreaterThan(coreIdx)
     expect(diffIdx).toBeGreaterThan(criteriaIdx)
@@ -118,11 +129,17 @@ describe('review_criteria delivery to the dispatched prompt', () => {
     // non-zero exit — which is exactly why the calibration docs must lead with
     // the trust flag.
     writeProjectConfig()
-    const output = await runDryRun(tmpDir, diffPath, {})
+    const { stdout, stderr, exitCode } = await runDryRun(tmpDir, diffPath, {})
 
-    expect(output).toContain('## Severity Definitions')
-    expect(output).not.toContain('## Project Review Criteria')
-    expect(output).not.toContain(SENTINEL)
+    expect(stdout).toContain('## Severity Definitions')
+    expect(stdout).not.toContain('## Project Review Criteria')
+    expect(stdout).not.toContain(SENTINEL)
+    // "Silently" is the load-bearing word in the docs, so assert the silence
+    // rather than only the absence: no warning naming the config or criteria,
+    // and no failing exit code. If MMR ever starts warning here, the docs are
+    // what has to change, and this assertion is what says so.
+    expect(stderr).not.toMatch(/\.mmr\.yaml|criteria/i)
+    expect(exitCode === undefined || exitCode === 0).toBe(true)
   })
 
   it('leaves the prompt byte-identical for a project with no review_criteria', async () => {
@@ -133,8 +150,8 @@ describe('review_criteria delivery to the dispatched prompt', () => {
     fs.writeFileSync(path.join(tmpDir, '.mmr.yaml'), 'version: 1\n')
     const withEmptyConfig = await runDryRun(tmpDir, diffPath, { trustProjectConfig: true })
 
-    expect(withEmptyConfig).toBe(withoutConfig)
-    expect(withoutConfig).not.toContain('## Project Review Criteria')
-    expect(withoutConfig).not.toContain('## Template Criteria')
+    expect(withEmptyConfig.stdout).toBe(withoutConfig.stdout)
+    expect(withoutConfig.stdout).not.toContain('## Project Review Criteria')
+    expect(withoutConfig.stdout).not.toContain('## Template Criteria')
   })
 })

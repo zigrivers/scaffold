@@ -107,10 +107,13 @@ use is telling reviewers what *not* to spend a finding on.
 
 The built-in criteria (`templates/core-prompt.md`) ask five questions that are
 all about what is **missing** — correctness, regressions, edge cases, test
-coverage, security — and grade severity purely by impact-if-it-happens. On an
-early-stage codebase that combination produces a predictable failure mode: a
-long tail of technically-correct findings about inputs no caller can currently
-construct, and no way for a reviewer to say "unnecessary" instead of "add more".
+coverage, security. The severity definitions do gesture at likelihood (P1 is
+scoped to "normal usage"), but no level says what *evidence* of reachability a
+finding needs, or how to grade something reachable but rare. On an early-stage
+codebase that combination produces a predictable failure mode: a long tail of
+technically-correct findings about inputs no caller can currently construct, and
+no way for a reviewer to say "unnecessary" instead of "add more". The block below
+supplies the missing calibration rather than replacing the built-in semantics.
 
 This block is a starting point that addresses both biases directly. Treat it as
 a template to tune, not a tuned setting — see the note on measuring it below.
@@ -137,9 +140,12 @@ Three things to know before you rely on it:
   a repository contains no caller for a malicious HTTP request or a corrupt row,
   so an unqualified reachability bar reads those as unreachable and downgrades
   them. Keep the first line if you keep any of the others.
-- **The gate is unchanged.** These lines change what reviewers *report* and how
-  they *grade* it. `fix_threshold`, the verdict logic, and `mmr ack` are
-  untouched — you get fewer wrong findings, not fewer blocked merges.
+- **Gate mechanics are unchanged, but verdicts can move.** `fix_threshold`, the
+  reconciliation logic, and `mmr ack` are untouched — these lines only change
+  what reviewers report and how they grade it. That is not the same as "no
+  effect on merges": a finding that goes unreported, or that lands below your
+  threshold, stops blocking. That is the point when the finding was noise, and
+  it is precisely why the trust-boundary exemption above is not optional.
 - **Project config is trust-gated, and it fails silently.** `.mmr.yaml` is only
   read when the invocation has a trusted base ref. `mmr review --pr <n>` and
   `--base <ref>` qualify (the file is read from the base branch, so it must be
