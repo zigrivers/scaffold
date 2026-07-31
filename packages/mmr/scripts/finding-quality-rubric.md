@@ -44,9 +44,11 @@ channels would count three times, so every rate would be weighted by how much
 the channels happened to agree, and a change that shifted channel agreement
 without changing finding quality would move the numbers.
 
-A run in which any channel degraded is excluded from the verdict entirely. A
-degraded channel contributes no findings, and treating its silence as "found
-nothing" reads an outage as agreement.
+A degraded run invalidates its whole condition rather than being dropped from
+it. A degraded channel contributes no findings, and treating its silence as
+"found nothing" reads an outage as agreement — but silently discarding the run
+instead would leave the arms with unequal N, which the absolute defect count
+cannot survive. Re-collect the condition.
 
 A run that produced **zero** findings also blocks the verdict. Its speculative
 rate is 0/0, so it drops out of the spread that sizes the noise band, making the
@@ -63,6 +65,10 @@ issued. Only the candidate config digest may differ — that is the treatment.
 Without this, a PR that gained a commit between the two collections, or an MMR
 rebuilt in between, produces a difference the report would attribute to the
 prompt change.
+
+The config digests must also **differ**. Two arms with the same configuration
+are the same condition, so any gap between them is resampling by construction
+and a ship verdict from it would be meaningless.
 
 ## Classification
 
@@ -100,8 +106,8 @@ across a condition's N runs.
 
 ## Ship / revert rule
 
-A change ships only if, across an **equal** number of non-degraded runs per
-condition (N ≥ 6) with identical channel coverage:
+A change ships only if, across an **equal** number of runs per condition
+(N ≥ 6) with identical channel coverage and **no degraded run in either arm**:
 
 1. `speculative_rate` drops, **and**
 2. the drop exceeds the width of the baseline's per-run rate spread (otherwise

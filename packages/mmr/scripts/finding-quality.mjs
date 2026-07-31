@@ -155,10 +155,6 @@ function collect(args) {
     if (restore !== null) fs.writeFileSync(liveConfig, restore)
     else fs.rmSync(liveConfig, { force: true })
   }
-  if (args.config) {
-    if (fs.existsSync(liveConfig)) restore = fs.readFileSync(liveConfig, 'utf-8')
-    fs.copyFileSync(path.resolve(args.config), liveConfig)
-  }
   // A `finally` does not run on SIGINT/SIGTERM, and a collect run takes long
   // enough that Ctrl-C during it is the common case — leaving the candidate
   // config sitting at the repo root, where it would silently apply to the
@@ -174,6 +170,7 @@ function collect(args) {
   if (args.pr) base.push('--pr', String(args.pr))
   else base.push('--diff', path.resolve(args.diff))
   if (args.config) base.push('--trust-project-config')
+
 
   // Record what was actually reviewed. Without this, two arms can review
   // different code — a PR that gained a commit between runs, a rebuilt MMR, a
@@ -192,6 +189,15 @@ function collect(args) {
     configDigest: args.config ? sha256(fs.readFileSync(path.resolve(args.config), 'utf-8')) : null,
   }
   fs.writeFileSync(path.join(outDir, PROVENANCE_FILE), JSON.stringify(provenance, null, 2))
+
+  // Installed LAST, immediately before the try that restores it. Anything that
+  // can fail — gh pr diff, git, writing provenance — must fail while the repo
+  // root is still untouched, or a crash leaves the candidate config live and it
+  // silently applies to the user's next review.
+  if (args.config) {
+    if (fs.existsSync(liveConfig)) restore = fs.readFileSync(liveConfig, 'utf-8')
+    fs.copyFileSync(path.resolve(args.config), liveConfig)
+  }
 
   try {
     // Serial, never parallel: concurrent same-account sessions are exactly the
@@ -295,12 +301,13 @@ function loadCondition(dir) {
       total: (r.reconciled_findings ?? []).length,
       degraded,
       coverage: completed.join(','),
+      dispatched: Object.keys(r.per_channel).sort().join(','),
     })
   }
   // Hash the finding payloads, not just their count: re-collecting the same
   // number of runs with the same number of findings must not pass a manifest
   // check when every finding changed.
-  const digest = sha256(JSON.stringify(findings.map((f) => [f.run, f.severity, f.location, f.description])))
+  const digest = sha256(JSON.stringify(findings.map((f) => [f.run, f.severity, f.location, f.description, f.suggestion])))
   return { id, label: conditionLabel(dir), findings, runs, provenance, digest }
 }
 
@@ -364,11 +371,21 @@ function score(args) {
   process.stderr.write(`scoring ${shuffled.length} reconciled findings via \`${judge} -p\` (stdin) …\n`)
   // Fed on stdin, not argv: a large pooled set JSON-stringified into a single
   // argument runs into ARG_MAX (E2BIG) once run counts grow.
-  const raw = execFileSync(judge, ['-p'], {
-    encoding: 'utf-8',
-    input: prompt,
-    maxBuffer: 64 * 1024 * 1024,
-  })
+  let raw
+  try {
+    raw = execFileSync(judge, ['-p'], {
+      encoding: 'utf-8',
+      input: prompt,
+      maxBuffer: 64 * 1024 * 1024,
+    })
+  } catch (err) {
+    // `-p` + stdin is Claude Code's print mode. codex and opencode use
+    // different flags, so --judge is a choice of Claude-compatible binary, not
+    // a general adapter — say so rather than surfacing a spawn stack trace.
+    die(`judge \`${judge} -p\` failed: ${err.message}\n`
+      + '--judge must name a binary that accepts `-p` and reads the prompt from stdin '
+      + '(Claude Code print mode). codex/opencode use different flags and are not drop-in.')
+  }
   const match = raw.match(/\[[\s\S]*\]/)
   if (!match) die(`judge returned no JSON array:\n${raw.slice(0, 500)}`)
 
@@ -501,6 +518,12 @@ export function evaluateVerdict(base, cand, opts = {}) {
       + 'the defect guard rail compares absolute totals and needs equal N')
   }
   blockers.push(...(opts.extraBlockers ?? []))
+  // Two arms with the same config are the same condition. Any apparent
+  // improvement between them is resampling by construction, and a ship verdict
+  // would be meaningless.
+  if (opts.sameTreatment === true) {
+    blockers.push('both conditions used the same config — there is no treatment to measure')
+  }
 
   // The margin is the baseline spread's WIDTH, not its lowest per-run rate.
   // Per-run finding counts here are small enough that a run can return one
@@ -584,9 +607,22 @@ function report(args) {
           + 'the arms did not review the same thing')
       }
     }
+    // A channel that never appears in per_channel is neither completed nor
+    // degraded, so it slips past both of those checks while the arm silently
+    // ran with less coverage than it asked for.
+    for (const [cond, prov] of [[conditions[0], bp], [conditions[1], cp]]) {
+      const requested = prov.channels.split(',').map((c) => c.trim()).sort().join(',')
+      for (const r of cond.runs) {
+        if (r.dispatched !== requested) {
+          extraBlockers.push(`${cond.label}/${r.run} dispatched ${r.dispatched || '(none)'} `
+            + `but ${requested} was requested`)
+        }
+      }
+    }
   }
 
-  const v = evaluateVerdict(base, cand, { extraBlockers })
+  const sameTreatment = bp !== null && cp !== null && bp.configDigest === cp.configDigest
+  const v = evaluateVerdict(base, cand, { extraBlockers, sameTreatment })
 
   if (v.blockers.length > 0) {
     console.log('NO VERDICT — the experiment does not meet the rubric\'s preconditions:')
@@ -677,6 +713,8 @@ function selftest() {
   assert.equal(evaluateVerdict(cond(), cond({ coverages: ['a'], speculativeRate: 0.1 })).ship, false)
   assert.equal(evaluateVerdict(cond(), cond({ speculativeRate: 0.1 }),
     { extraBlockers: ['diff differs'] }).ship, false)
+  assert.equal(evaluateVerdict(cond(), cond({ speculativeRate: 0.1 }),
+    { sameTreatment: true }).ship, false)
   // …and the same inputs with nothing wrong do ship, so the above prove the
   // blocker rather than some unrelated failure.
   assert.equal(evaluateVerdict(cond(), cond({ speculativeRate: 0.1 })).ship, true)
