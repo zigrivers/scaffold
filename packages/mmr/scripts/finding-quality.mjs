@@ -13,7 +13,15 @@
  *
  * The rubric lives in ./finding-quality-rubric.md and is fixed before scoring.
  *
- *   # 1. collect — N runs of one condition
+ * The unit of analysis is MMR's **reconciled** findings — the list a user
+ * actually sees and the verdict actually gates on. Scoring raw per-channel
+ * findings would weight every rate by channel redundancy, counting one defect
+ * three times when three channels report it.
+ *
+ *   # 0. selftest — verify the harness's own math before trusting a verdict
+ *   node scripts/finding-quality.mjs selftest
+ *
+ *   # 1. collect — N runs of one condition (N >= 6; the rubric's floor)
  *   node scripts/finding-quality.mjs collect \
  *     --out runs/baseline --pr 782 --n 6 --channels claude,codex,opencode-glm
  *
@@ -24,11 +32,12 @@
  *   # 2. score — pools all conditions, shuffles, judges blind to condition
  *   node scripts/finding-quality.mjs score --conditions runs/baseline,runs/calibrated
  *
- *   # 3. report — rates per condition, against the ship/revert rule
+ *   # 3. report — rates per condition, against the rubric's ship/revert rule
  *   node scripts/finding-quality.mjs report --conditions runs/baseline,runs/calibrated
  */
 
 import { execFileSync } from 'node:child_process'
+import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -38,13 +47,17 @@ const MMR = path.resolve(HERE, '../dist/index.js')
 const RUBRIC = path.join(HERE, 'finding-quality-rubric.md')
 
 const CLASSES = ['defect', 'speculative', 'deletion', 'hygiene', 'artifact']
+/** The rubric's floor. Below this, run-to-run variance dominates any effect. */
+const MIN_RUNS = 6
 
 function parseArgs(argv) {
   const out = { _: [] }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
-    if (a.startsWith('--')) out[a.slice(2)] = argv[i + 1]?.startsWith('--') ? true : argv[++i]
-    else out._.push(a)
+    if (!a.startsWith('--')) { out._.push(a); continue }
+    const next = argv[i + 1]
+    // A flag followed by another flag, or by nothing, is a boolean.
+    out[a.slice(2)] = next === undefined || next.startsWith('--') ? true : argv[++i]
   }
   return out
 }
@@ -60,24 +73,48 @@ function die(msg) {
  */
 function shuffle(items, seed) {
   const arr = [...items]
-  let s = seed
+  let s = seed >>> 0
   for (let i = arr.length - 1; i > 0; i--) {
-    s = (s * 1103515245 + 12345) & 0x7fffffff
-    const j = s % (i + 1)
+    s = (Math.imul(s, 1103515245) + 12345) >>> 0
+    const j = (s >>> 1) % (i + 1)
     ;[arr[i], arr[j]] = [arr[j], arr[i]]
   }
   return arr
+}
+
+/** Stable, collision-resistant identity for a condition directory. */
+function conditionId(dir) {
+  return path.resolve(dir)
+}
+
+function conditionLabel(dir) {
+  return path.basename(path.resolve(dir))
 }
 
 // ---------------------------------------------------------------- collect
 
 function collect(args) {
   const outDir = args.out ?? die('--out required')
-  const n = Number(args.n ?? 6)
+  const n = Number(args.n ?? MIN_RUNS)
   const channels = args.channels ?? die('--channels required')
   if (!args.pr && !args.diff) die('--pr or --diff required')
   if (!Number.isInteger(n) || n < 1) die('--n must be a positive integer')
+  if (n < MIN_RUNS) {
+    console.error(`warning: --n ${n} is below the rubric's floor of ${MIN_RUNS};`
+      + ' report will refuse to issue a verdict')
+  }
 
+  // A directory that already holds runs would silently mix a previous
+  // experiment into this one — a shorter rerun leaves the old tail behind, and
+  // the extra runs are indistinguishable from the new ones once pooled.
+  if (fs.existsSync(outDir)) {
+    const stale = fs.readdirSync(outDir).filter((f) => f.endsWith('.json'))
+    if (stale.length > 0 && args.force !== true) {
+      die(`${outDir} already contains ${stale.length} run file(s). `
+        + 'Use a fresh directory, or pass --force to clear it.')
+    }
+    for (const f of stale) fs.rmSync(path.join(outDir, f))
+  }
   fs.mkdirSync(outDir, { recursive: true })
 
   // A candidate config is applied by copying it to the repo root as .mmr.yaml
@@ -101,7 +138,9 @@ function collect(args) {
     // condition that makes grok return a cancelled envelope, and a channel that
     // degrades in one arm and not the other silently biases the comparison.
     for (let i = 1; i <= n; i++) {
-      process.stderr.write(`[${outDir}] run ${i}/${n} … `)
+      const target = path.join(outDir, `run-${String(i).padStart(2, '0')}.json`)
+      fs.rmSync(target, { force: true })
+      process.stderr.write(`[${conditionLabel(outDir)}] run ${i}/${n} … `)
       const started = Date.now()
       let raw
       try {
@@ -124,12 +163,14 @@ function collect(args) {
         process.stderr.write(`FAILED (no JSON) after ${secs}s\n`)
         continue
       }
-      fs.writeFileSync(path.join(outDir, `run-${String(i).padStart(2, '0')}.json`), raw)
+      fs.writeFileSync(target, raw)
       const degraded = Object.entries(parsed.per_channel ?? {})
         .filter(([, c]) => c.status !== 'completed')
         .map(([k, c]) => `${k}:${c.status}`)
+      // Report the same unit the scorer uses, so the console figure and the
+      // scored population cannot drift apart.
       process.stderr.write(
-        `${parsed.reconciled_findings?.length ?? 0} findings, ${secs}s`
+        `${parsed.reconciled_findings?.length ?? 0} reconciled findings, ${secs}s`
         + (degraded.length ? `  DEGRADED ${degraded.join(' ')}` : '') + '\n',
       )
     }
@@ -142,49 +183,67 @@ function collect(args) {
 }
 
 /**
- * Load every finding from a condition directory, keeping only channels that
- * completed. A degraded channel contributes no findings, and counting its
- * silence as "found nothing" would read an outage as agreement.
+ * Load a condition's reconciled findings, one entry per run.
+ *
+ * Reconciled — not per-channel — because that is MMR's actual output and what
+ * the verdict gates on. Pooling per-channel findings would count a defect once
+ * per channel that reported it, making every rate a function of how much the
+ * channels happened to agree.
  */
 function loadCondition(dir) {
+  const id = conditionId(dir)
+  if (!fs.existsSync(dir)) die(`condition directory not found: ${dir}`)
   const findings = []
   const runs = []
   for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.json')).sort()) {
     const r = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf-8'))
-    let runTotal = 0
-    const degraded = []
-    for (const [channel, pc] of Object.entries(r.per_channel ?? {})) {
-      if (pc.status !== 'completed') {
-        degraded.push(channel)
-        continue
-      }
-      for (const x of pc.findings ?? []) {
-        findings.push({
-          condition: path.basename(dir),
-          run: f,
-          channel,
-          severity: x.severity,
-          location: x.location,
-          description: x.description,
-          suggestion: x.suggestion,
-        })
-        runTotal++
-      }
+    const degraded = Object.entries(r.per_channel ?? {})
+      .filter(([, c]) => c.status !== 'completed')
+      .map(([k]) => k)
+    const completed = Object.entries(r.per_channel ?? {})
+      .filter(([, c]) => c.status === 'completed')
+      .map(([k]) => k)
+      .sort()
+    for (const x of r.reconciled_findings ?? []) {
+      findings.push({
+        condition: id,
+        run: f,
+        severity: x.severity,
+        location: x.location,
+        description: x.description,
+        suggestion: x.suggestion,
+      })
     }
-    runs.push({ run: f, total: runTotal, degraded })
+    runs.push({
+      run: f,
+      total: (r.reconciled_findings ?? []).length,
+      degraded,
+      coverage: completed.join(','),
+    })
   }
-  return { findings, runs }
+  return { id, label: conditionLabel(dir), findings, runs }
+}
+
+function loadConditions(spec) {
+  const dirs = spec.split(',').map((d) => d.trim()).filter(Boolean)
+  if (dirs.length === 0) die('--conditions listed no directories')
+  const loaded = dirs.map(loadCondition)
+  const seen = new Set()
+  for (const c of loaded) {
+    if (seen.has(c.id)) die(`condition listed twice: ${c.id}`)
+    seen.add(c.id)
+  }
+  return loaded
 }
 
 // ------------------------------------------------------------------ score
 
 function score(args) {
-  const dirs = (args.conditions ?? die('--conditions required')).split(',')
+  const conditions = loadConditions(args.conditions ?? die('--conditions required'))
   const judge = args.judge ?? 'claude'
   const rubric = fs.readFileSync(RUBRIC, 'utf-8')
 
-  const pooled = []
-  for (const d of dirs) pooled.push(...loadCondition(d).findings)
+  const pooled = conditions.flatMap((c) => c.findings)
   if (pooled.length === 0) die('no findings found in the given conditions')
 
   // Shuffle and re-key so the judge cannot infer the arm from ordering.
@@ -213,23 +272,49 @@ function score(args) {
     '## Output',
     '',
     'Return ONLY a JSON array, one object per finding, no prose and no markdown fences:',
-    '[{"id":"F001","class":"defect|speculative|deletion|hygiene|artifact",',
+    `[{"id":"F001","class":"${CLASSES.join('|')}",`,
     '  "names_path":true|false,"worth_fixing_now":true|false,"why":"one short sentence"}]',
     '',
-    'Score every finding. Use exactly one class per finding.',
+    `Score every finding — all ${blind.length} of them. Use exactly one class per finding.`,
   ].join('\n')
 
-  process.stderr.write(`scoring ${shuffled.length} findings via ${judge} …\n`)
-  const raw = execFileSync(judge, ['-p', prompt], { encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024 })
+  process.stderr.write(`scoring ${shuffled.length} reconciled findings via ${judge} …\n`)
+  // Fed on stdin, not argv: a large pooled set JSON-stringified into a single
+  // argument runs into ARG_MAX (E2BIG) once run counts grow.
+  const raw = execFileSync(judge, ['-p'], {
+    encoding: 'utf-8',
+    input: prompt,
+    maxBuffer: 64 * 1024 * 1024,
+  })
   const match = raw.match(/\[[\s\S]*\]/)
   if (!match) die(`judge returned no JSON array:\n${raw.slice(0, 500)}`)
-  const scores = JSON.parse(match[0])
 
-  const byId = new Map(scores.map((s) => [s.id, s]))
-  const scored = shuffled.map((f) => ({ ...f, score: byId.get(f.id) ?? null }))
-  const missing = scored.filter((f) => f.score === null)
-  if (missing.length) process.stderr.write(`warning: judge skipped ${missing.length} finding(s)\n`)
+  let scores
+  try {
+    scores = JSON.parse(match[0])
+  } catch (err) {
+    die(`judge returned malformed JSON: ${err.message}`)
+  }
 
+  // Validate hard rather than warn. A silently dropped or malformed score
+  // removes a finding from the denominator, which moves every rate the report
+  // prints — the exact failure this harness exists to catch.
+  if (!Array.isArray(scores)) die('judge output is not an array')
+  const expected = new Set(shuffled.map((f) => f.id))
+  const byId = new Map()
+  for (const s of scores) {
+    if (typeof s?.id !== 'string') die(`score entry has no string id: ${JSON.stringify(s)}`)
+    if (!expected.has(s.id)) die(`judge returned an unknown id: ${s.id}`)
+    if (byId.has(s.id)) die(`judge returned a duplicate id: ${s.id}`)
+    if (!CLASSES.includes(s.class)) die(`${s.id}: invalid class ${JSON.stringify(s.class)}`)
+    if (typeof s.names_path !== 'boolean') die(`${s.id}: names_path must be a boolean`)
+    if (typeof s.worth_fixing_now !== 'boolean') die(`${s.id}: worth_fixing_now must be a boolean`)
+    byId.set(s.id, s)
+  }
+  const missing = [...expected].filter((id) => !byId.has(id))
+  if (missing.length) die(`judge skipped ${missing.length} finding(s): ${missing.slice(0, 10).join(', ')}`)
+
+  const scored = shuffled.map((f) => ({ ...f, score: byId.get(f.id) }))
   const outPath = args.out ?? 'finding-quality-scores.json'
   fs.writeFileSync(outPath, JSON.stringify(scored, null, 2))
   process.stderr.write(`wrote ${outPath}\n`)
@@ -237,42 +322,56 @@ function score(args) {
 
 // ----------------------------------------------------------------- report
 
-function report(args) {
-  const dirs = (args.conditions ?? die('--conditions required')).split(',')
-  const scored = JSON.parse(fs.readFileSync(args.scores ?? 'finding-quality-scores.json', 'utf-8'))
+/** Per-run speculative rate, used to size the noise band. */
+function perRunSpecRates(runs, mine) {
+  return runs.map((r) => {
+    const inRun = mine.filter((f) => f.run === r.run)
+    if (inRun.length === 0) return null
+    return inRun.filter((f) => f.score.class === 'speculative').length / inRun.length
+  }).filter((x) => x !== null)
+}
 
-  const rows = []
-  for (const d of dirs) {
-    const name = path.basename(d)
-    const { runs } = loadCondition(d)
-    const mine = scored.filter((f) => f.condition === name && f.score)
-    const count = (cls) => mine.filter((f) => f.score.class === cls).length
-    const total = mine.length || 1
-    const lowValue = mine.filter(
-      (f) => f.score.class === 'speculative' || f.score.class === 'artifact' || !f.score.worth_fixing_now,
-    ).length
-    const totals = runs.map((r) => r.total)
-    rows.push({
-      condition: name,
-      runs: runs.length,
-      degraded: runs.filter((r) => r.degraded.length > 0).length,
-      findings: mine.length,
-      perRun: totals.length ? `${Math.min(...totals)}–${Math.max(...totals)}` : 'n/a',
-      speculativeRate: (count('speculative') / total),
-      lowValueRate: (lowValue / total),
-      defects: count('defect'),
-      deletions: count('deletion'),
-    })
+function summarize(condition, scored) {
+  const mine = scored.filter((f) => f.condition === condition.id && f.score)
+  const total = mine.length
+  const count = (cls) => mine.filter((f) => f.score.class === cls).length
+  const lowValue = mine.filter(
+    (f) => f.score.class === 'speculative' || f.score.class === 'artifact' || !f.score.worth_fixing_now,
+  ).length
+  const totals = condition.runs.map((r) => r.total)
+  const coverages = [...new Set(condition.runs.map((r) => r.coverage))]
+  return {
+    label: condition.label,
+    runs: condition.runs.length,
+    degradedRuns: condition.runs.filter((r) => r.degraded.length > 0).length,
+    coverages,
+    findings: total,
+    perRun: totals.length ? `${Math.min(...totals)}–${Math.max(...totals)}` : 'n/a',
+    specRates: perRunSpecRates(condition.runs, mine),
+    speculativeRate: total ? count('speculative') / total : 0,
+    lowValueRate: total ? lowValue / total : 0,
+    defects: count('defect'),
+    deletions: count('deletion'),
+    scoredAll: total > 0,
   }
+}
 
+function report(args) {
+  const conditions = loadConditions(args.conditions ?? die('--conditions required'))
+  const scorePath = args.scores ?? 'finding-quality-scores.json'
+  if (!fs.existsSync(scorePath)) die(`scores file not found: ${scorePath} (run \`score\` first)`)
+  const scored = JSON.parse(fs.readFileSync(scorePath, 'utf-8'))
+
+  const rows = conditions.map((c) => summarize(c, scored))
   const pct = (x) => `${(x * 100).toFixed(0)}%`
+
   console.log('')
   console.log('condition      runs  deg  findings  per-run  spec-rate  low-value  defects  deletions')
   for (const r of rows) {
     console.log(
-      r.condition.padEnd(14)
+      r.label.slice(0, 14).padEnd(14)
       + String(r.runs).padStart(4)
-      + String(r.degraded).padStart(5)
+      + String(r.degradedRuns).padStart(5)
       + String(r.findings).padStart(10)
       + r.perRun.padStart(9)
       + pct(r.speculativeRate).padStart(11)
@@ -281,23 +380,111 @@ function report(args) {
       + String(r.deletions).padStart(11),
     )
   }
-
-  if (rows.length === 2) {
-    const [base, cand] = rows
-    const specDown = cand.speculativeRate < base.speculativeRate
-    const defectsHeld = cand.defects >= base.defects
-    console.log('')
-    console.log(`speculative rate: ${pct(base.speculativeRate)} → ${pct(cand.speculativeRate)}  ${specDown ? 'down' : 'NOT down'}`)
-    console.log(`defect count:     ${base.defects} → ${cand.defects}  ${defectsHeld ? 'held' : 'DROPPED — the bar moved, not the noise'}`)
-    console.log('')
-    console.log(specDown && defectsHeld
-      ? 'VERDICT: ship — speculative rate fell and defect count held.'
-      : 'VERDICT: revert — the rubric\'s ship rule is not met.')
-    console.log('')
-    console.log('Sanity check this against the per-run spread before believing it: a')
-    console.log('difference smaller than the baseline\'s own run-to-run range is not a result.')
-  }
   console.log('')
+
+  if (rows.length !== 2) {
+    console.log('note: a ship/revert verdict needs exactly two conditions (baseline, candidate).')
+    console.log('')
+    return
+  }
+
+  const [base, cand] = rows
+
+  // Refuse a verdict the data cannot support. Every one of these makes the
+  // absolute defect counts incomparable between arms, and the defect count is
+  // the guard rail the whole ship rule rests on.
+  const blockers = []
+  for (const r of rows) {
+    if (r.runs < MIN_RUNS) blockers.push(`${r.label} has ${r.runs} run(s), the rubric's floor is ${MIN_RUNS}`)
+    if (r.degradedRuns > 0) blockers.push(`${r.label} has ${r.degradedRuns} run(s) with a degraded channel`)
+    if (r.coverages.length > 1) blockers.push(`${r.label} has inconsistent channel coverage: ${r.coverages.join(' vs ')}`)
+    if (!r.scoredAll) blockers.push(`${r.label} has no scored findings`)
+  }
+  if (base.coverages[0] !== cand.coverages[0]) {
+    blockers.push(`channel coverage differs between conditions: ${base.coverages[0]} vs ${cand.coverages[0]}`)
+  }
+
+  if (blockers.length > 0) {
+    console.log('NO VERDICT — the experiment does not meet the rubric\'s preconditions:')
+    for (const b of blockers) console.log(`  · ${b}`)
+    console.log('')
+    console.log('The table above is descriptive only. Fix the above and re-run.')
+    console.log('')
+    process.exitCode = 1
+    return
+  }
+
+  // The rubric treats a delta smaller than the baseline's own run-to-run spread
+  // as "not a result", and that is binding, not advisory: without this check the
+  // verdict prints "ship" on pure resampling.
+  const bandLo = Math.min(...base.specRates)
+  const bandHi = Math.max(...base.specRates)
+  const outsideBand = cand.speculativeRate < bandLo
+  const specDown = cand.speculativeRate < base.speculativeRate
+  const defectsHeld = cand.defects >= base.defects
+
+  console.log(`speculative rate: ${pct(base.speculativeRate)} → ${pct(cand.speculativeRate)}  ${specDown ? 'down' : 'NOT down'}`)
+  console.log(`baseline per-run spread: ${pct(bandLo)}–${pct(bandHi)}  `
+    + `(candidate ${outsideBand ? 'clears it' : 'is INSIDE it — indistinguishable from noise'})`)
+  console.log(`defect count:     ${base.defects} → ${cand.defects}  `
+    + `${defectsHeld ? 'held' : 'DROPPED — the bar moved, not the noise'}`)
+  console.log('')
+  console.log(specDown && defectsHeld && outsideBand
+    ? 'VERDICT: ship — speculative rate fell beyond the noise band and defect count held.'
+    : 'VERDICT: revert — the rubric\'s ship rule is not met.')
+  console.log('')
+}
+
+// --------------------------------------------------------------- selftest
+
+/**
+ * The verdict is one line of boolean math that decides whether a prompt change
+ * ships. A silent error there is precisely the failure this harness exists to
+ * prevent, so it gets a runnable check.
+ */
+function selftest() {
+  assert.deepEqual(parseArgs(['collect', '--out', 'x', '--n', '6'])._, ['collect'])
+  assert.equal(parseArgs(['--out', 'x'])['out'], 'x')
+  assert.equal(parseArgs(['--force'])['force'], true)
+  assert.equal(parseArgs(['--force', '--out', 'x'])['force'], true)
+  assert.equal(parseArgs(['--out', 'x', '--force'])['force'], true)
+
+  // Deterministic across calls, and actually permuting.
+  const items = Array.from({ length: 20 }, (_, i) => i)
+  assert.deepEqual(shuffle(items, 42), shuffle(items, 42))
+  assert.notDeepEqual(shuffle(items, 42), items)
+  assert.notDeepEqual(shuffle(items, 42), shuffle(items, 43))
+  assert.deepEqual([...shuffle(items, 42)].sort((a, b) => a - b), items)
+
+  // Every combination of the three verdict inputs, so the AND cannot silently
+  // become an OR.
+  const cases = [
+    // specDown, outsideBand, defectsHeld, expected ship
+    [true, true, true, true],
+    [true, true, false, false],
+    [true, false, true, false],
+    [false, true, true, false],
+    [false, false, false, false],
+  ]
+  for (const [specDown, outsideBand, defectsHeld, expected] of cases) {
+    assert.equal(specDown && defectsHeld && outsideBand, expected,
+      `verdict math wrong for ${specDown}/${outsideBand}/${defectsHeld}`)
+  }
+
+  // Rate arithmetic, including the empty-denominator guard.
+  const mk = (cls, worth = true) => ({ score: { class: cls, worth_fixing_now: worth } })
+  const sample = [mk('speculative'), mk('defect'), mk('artifact'), mk('hygiene', false)]
+  const spec = sample.filter((f) => f.score.class === 'speculative').length / sample.length
+  const low = sample.filter(
+    (f) => f.score.class === 'speculative' || f.score.class === 'artifact' || !f.score.worth_fixing_now,
+  ).length / sample.length
+  assert.equal(spec, 0.25)
+  assert.equal(low, 0.75)
+
+  assert.equal(conditionLabel('/tmp/a/baseline'), 'baseline')
+  assert.notEqual(conditionId('/tmp/a/baseline'), conditionId('/tmp/b/baseline'))
+
+  console.log('selftest: all checks passed')
 }
 
 const args = parseArgs(process.argv.slice(2))
@@ -305,8 +492,9 @@ const cmd = args._[0]
 if (cmd === 'collect') collect(args)
 else if (cmd === 'score') score(args)
 else if (cmd === 'report') report(args)
+else if (cmd === 'selftest') selftest()
 else {
-  console.error('usage: finding-quality.mjs <collect|score|report> [options]')
+  console.error('usage: finding-quality.mjs <collect|score|report|selftest> [options]')
   console.error('see the header of this file for examples')
   process.exit(1)
 }

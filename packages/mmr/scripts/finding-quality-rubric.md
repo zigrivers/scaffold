@@ -17,12 +17,30 @@ run-to-run variance on identical input is larger than any effect these prompt
 changes plausibly produce. A single before/after comparison therefore measures
 resampling, not the change.
 
-Two consequences, both binding:
+Three consequences, all binding:
 
 1. Every condition runs **N times** (N ≥ 6). The unit of comparison is a *rate
    across the pooled findings*, never a single run's total.
 2. The judge scores findings **blind to condition**. Findings from all
    conditions are pooled, shuffled, and re-identified before scoring.
+3. A difference smaller than the baseline's own run-to-run spread is **not a
+   result**, and the harness enforces this rather than merely noting it: the
+   candidate's speculative rate must fall below the *lowest* rate any single
+   baseline run produced.
+
+## The unit of analysis
+
+Scoring counts MMR's **reconciled** findings — the de-duplicated list a user
+actually sees and the verdict actually gates on.
+
+Raw per-channel findings are the wrong unit. One defect reported by three
+channels would count three times, so every rate would be weighted by how much
+the channels happened to agree, and a change that shifted channel agreement
+without changing finding quality would move the numbers.
+
+A run in which any channel degraded is excluded from the verdict entirely. A
+degraded channel contributes no findings, and treating its silence as "found
+nothing" reads an outage as agreement.
 
 ## Classification
 
@@ -60,10 +78,13 @@ across a condition's N runs.
 
 ## Ship / revert rule
 
-A change ships only if, across N ≥ 6 runs per condition:
+A change ships only if, across N ≥ 6 non-degraded runs per condition with
+identical channel coverage:
 
 1. `speculative_rate` drops, **and**
-2. `defect_count` does not drop.
+2. it drops below the lowest per-run speculative rate the baseline produced
+   (otherwise the difference is inside the noise band), **and**
+3. `defect_count` does not drop.
 
 Condition 2 is the point. A change that suppresses speculative findings by
 making reviewers report less of everything has cut the bar, not the noise, and
