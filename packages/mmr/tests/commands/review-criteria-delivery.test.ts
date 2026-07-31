@@ -35,9 +35,15 @@ async function runDryRun(
 ): Promise<{ stdout: string; stderr: string; exitCode: number | string | undefined }> {
   vi.resetModules()
   vi.doMock('../../src/core/dispatcher.js', () => ({ dispatchChannel: vi.fn() }))
+  // checkHttpAuth is unused on the dry-run + subprocess-channel path these
+  // tests take, but review.ts imports it from the same module. Mocking the
+  // full export surface keeps a future http-channel or compensator-probing
+  // test from failing as "checkHttpAuth is not a function" for no visible
+  // reason.
   vi.doMock('../../src/core/auth.js', () => ({
     checkInstalled: vi.fn().mockResolvedValue(true),
     checkAuth: vi.fn().mockResolvedValue({ status: 'ok' }),
+    checkHttpAuth: vi.fn().mockResolvedValue({ status: 'ok' }),
   }))
 
   const { reviewCommand } = await import('../../src/commands/review.js')
