@@ -96,6 +96,24 @@ function parseArgs(argv) {
   return out
 }
 
+/**
+ * The rubric ties `class` and `names_path` together: `speculative` means no
+ * path was named, and `defect` requires one (a trust boundary counts as its
+ * own path). A judge returning either combination has misapplied the rubric,
+ * and both corrupt the speculative rate and the defect count.
+ *
+ * Returns a description of the contradiction, or null when consistent.
+ */
+function contradicts(s) {
+  if (s.class === 'speculative' && s.names_path === true) {
+    return 'classed speculative but names_path is true'
+  }
+  if (s.class === 'defect' && s.names_path === false) {
+    return 'classed defect but names_path is false'
+  }
+  return null
+}
+
 function die(msg) {
   console.error(`error: ${msg}`)
   process.exit(1)
@@ -128,7 +146,11 @@ function conditionLabel(dir) {
 // ---------------------------------------------------------------- collect
 
 function collect(args) {
-  const outDir = args.out ?? die('--out required')
+  // Absolute from here on. The MMR child runs with cwd=repoRoot, so a relative
+  // --out would hand it a --diff path resolved against the repo root instead of
+  // the caller's directory — which silently breaks every invocation made from
+  // packages/mmr, including the ones this file documents.
+  const outDir = args.out ? path.resolve(args.out) : die('--out required')
   const n = Number(args.n ?? MIN_RUNS)
   const channels = args.channels ?? die('--channels required')
   if (!args.pr && !args.diff) die('--pr or --diff required')
@@ -204,9 +226,16 @@ function collect(args) {
   // different channel set — and report would attribute the difference to the
   // prompt. Everything here except configDigest must match across arms;
   // configDigest IS the treatment, so it is expected to differ.
-  const reviewedDiff = args.pr
-    ? execFileSync('gh', ['pr', 'diff', String(args.pr)], { encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024 })
-    : fs.readFileSync(path.resolve(args.diff), 'utf-8')
+  let reviewedDiff
+  try {
+    reviewedDiff = args.pr
+      ? execFileSync('gh', ['pr', 'diff', String(args.pr)], { encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024 })
+      : fs.readFileSync(path.resolve(args.diff), 'utf-8')
+  } catch (err) {
+    die(args.pr
+      ? `could not fetch the diff for PR ${args.pr}: ${err.message}`
+      : `could not read ${path.resolve(args.diff)}: ${err.message}`)
+  }
   const provenance = {
     target: args.pr ? `pr:${args.pr}` : `diff:${path.basename(path.resolve(args.diff))}`,
     diffDigest: sha256(reviewedDiff),
@@ -230,17 +259,18 @@ function collect(args) {
   // which is what untrusted-head already gives it.
   if (args.config) base.push('--trust-project-config')
 
-  // Installed LAST, immediately before the try that restores it. Anything that
-  // can fail — gh pr diff, git, writing provenance — must fail while the repo
-  // root is still untouched, or a crash leaves the candidate config live and it
-  // silently applies to the user's next review.
-  if (args.config) {
-    if (fs.existsSync(liveConfig)) restore = fs.readFileSync(liveConfig, 'utf-8')
-    fs.copyFileSync(path.resolve(args.config), liveConfig)
-    installed = true
-  }
-
   try {
+    // Installed INSIDE the try, and marked installed before the copy: a
+    // copyFileSync that fails after truncating the destination has still
+    // modified the repo root, so the finally must restore it. Everything that
+    // can fail without touching the repo root — gh pr diff, git, provenance —
+    // has already run above.
+    if (args.config) {
+      if (fs.existsSync(liveConfig)) restore = fs.readFileSync(liveConfig, 'utf-8')
+      installed = true
+      fs.copyFileSync(path.resolve(args.config), liveConfig)
+    }
+
     // Serial, never parallel: concurrent same-account sessions are exactly the
     // condition that makes grok return a cancelled envelope, and a channel that
     // degrades in one arm and not the other silently biases the comparison.
@@ -450,6 +480,11 @@ function score(args) {
     if (!CLASSES.includes(s.class)) die(`${s.id}: invalid class ${JSON.stringify(s.class)}`)
     if (typeof s.names_path !== 'boolean') die(`${s.id}: names_path must be a boolean`)
     if (typeof s.worth_fixing_now !== 'boolean') die(`${s.id}: worth_fixing_now must be a boolean`)
+    // The rubric defines these two fields in terms of each other, so a judge
+    // that contradicts itself has misread it — and the contradiction lands
+    // directly on the two metrics the ship rule reads.
+    const conflict = contradicts(s)
+    if (conflict) die(`${s.id}: ${conflict} — re-run \`score\``)
     byId.set(s.id, s)
   }
   const missing = [...expected].filter((id) => !byId.has(id))
@@ -534,7 +569,7 @@ function summarize(condition, scored) {
  * Extracted so `selftest` exercises the code `report` actually runs. A test
  * that re-implements this arithmetic proves only that the copy is correct.
  */
-export function evaluateVerdict(base, cand, opts = {}) {
+function evaluateVerdict(base, cand, opts = {}) {
   const blockers = []
   for (const r of [base, cand]) {
     if (r.runs < MIN_RUNS) blockers.push(`${r.label} has ${r.runs} run(s), the rubric's floor is ${MIN_RUNS}`)
@@ -776,6 +811,14 @@ function selftest() {
   assert.equal(RUN_FILE_RE.test('notes.json'), false)
   assert.equal(RUN_FILE_RE.test('run-01.json.bak'), false)
   assert.equal(RUN_FILE_RE.test('.mmr.yaml'), false)
+
+  // A judge contradicting the rubric must be rejected, not averaged in.
+  assert.equal(contradicts({ class: 'speculative', names_path: true }) !== null, true)
+  assert.equal(contradicts({ class: 'defect', names_path: false }) !== null, true)
+  assert.equal(contradicts({ class: 'speculative', names_path: false }), null)
+  assert.equal(contradicts({ class: 'defect', names_path: true }), null)
+  assert.equal(contradicts({ class: 'hygiene', names_path: false }), null)
+  assert.equal(contradicts({ class: 'deletion', names_path: true }), null)
 
   assert.equal(conditionLabel('/tmp/a/baseline'), 'baseline')
   assert.notEqual(conditionId('/tmp/a/baseline'), conditionId('/tmp/b/baseline'))
