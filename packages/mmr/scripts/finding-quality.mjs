@@ -357,7 +357,7 @@ const BOOLEAN_FLAGS = new Set(['force'])
  */
 const KNOWN_FLAGS = new Set([
   'out', 'paired', 'config', 'pr', 'diff', 'channels', 'n', 'force',
-  'judge', 'scores', 'baseline', 'candidate', 'baseline-mmr',
+  'judge', 'scores', 'baseline', 'candidate', 'baseline-mmr', 'timeout',
 ])
 
 /**
@@ -767,6 +767,10 @@ function collect(args) {
     }
   }
   const n = Number(args.n ?? MIN_RUNS)
+  const channelTimeout = args.timeout === undefined ? null : Number(args.timeout)
+  if (channelTimeout !== null && (!Number.isInteger(channelTimeout) || channelTimeout < 1)) {
+    die('--timeout must be a positive integer number of seconds')
+  }
   const channels = args.channels ?? die('--channels required')
   if (!args.pr && !args.diff) die('--pr or --diff required')
   if (!Number.isInteger(n) || n < 1) die('--n must be a positive integer')
@@ -895,6 +899,10 @@ function collect(args) {
     // differ instead of expected to match. Recorded rather than inferred: a
     // reader of these files should not have to deduce which invariants applied.
     treatment: baselineMmr === MMR ? 'config' : 'build',
+    // Recorded so a reader knows what bounded the runs. Identical in both arms
+    // by construction — it comes from one invocation — so it is documentation
+    // here, not a check.
+    channelTimeout,
     // Resolved commands/models/parsers, so a user-level config change between
     // the two collections cannot be reported as a prompt effect.
     channelConfigDigest: requireChannelDigest(),
@@ -916,6 +924,14 @@ function collect(args) {
   const argsFor = (dir, trusted) => [
     'review', '--channels', channels, '--sync', '--format', 'json',
     '--diff', path.join(dir, SNAPSHOT_FILE),
+    // Identical in both arms by construction. A channel that times out
+    // contributes no findings, and the rubric treats that as invalidating the
+    // whole condition — so on a slow model or a long diff the default bounds
+    // what can be measured at all. Passed as a flag rather than set in the
+    // user's config: config would leak into every unrelated review on the
+    // machine, and a candidate .mmr.yaml may not carry it (it changes how the
+    // review RUNS, which is exactly what must be held constant).
+    ...(channelTimeout === null ? [] : ['--timeout', String(channelTimeout)]),
     ...(trusted ? ['--trust-project-config'] : []),
   ]
   // The candidate arm needs --trust-project-config to have the .mmr.yaml in its
