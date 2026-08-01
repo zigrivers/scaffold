@@ -37,6 +37,11 @@ Three consequences, all binding:
    *improvement* must exceed the **width** of the baseline's per-run rate
    spread.
 
+   The comparison is deliberately conservative: a pooled improvement measured
+   over N runs varies less than any single run does, so testing it against a
+   single run's spread sets a stricter bar than a like-for-like test would. A
+   ship rule should err toward revert.
+
    The margin is the spread's width, not its lowest value. Per-run finding
    counts here are small enough that a single baseline run can return one
    finding; if that finding is not speculative, the lowest per-run rate is 0%
