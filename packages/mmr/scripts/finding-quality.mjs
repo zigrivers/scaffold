@@ -411,7 +411,15 @@ function resolvedChannelDigest() {
     const out = execFileSync('node', [MMR, 'config', 'channels', '--format', 'json'], {
       encoding: 'utf-8', maxBuffer: 16 * 1024 * 1024, cwd: neutral,
     })
-    return sha256(JSON.stringify(canonicalJson(JSON.parse(out))))
+    // Channels alone are not the whole execution environment: defaults.timeout
+    // and defaults.parallel live in the user config and change how a review
+    // runs without appearing in `config channels` output at all. `mmr config
+    // show` takes a channel name, so there is no whole-config dump to lean on;
+    // digest the user config file alongside the resolved channels. Project
+    // config is irrelevant here — every run is --diff, so MMR never reads it.
+    const userConfig = path.join(os.homedir(), '.mmr', 'config.yaml')
+    const userBytes = fs.existsSync(userConfig) ? fs.readFileSync(userConfig, 'utf-8') : ''
+    return sha256(`${JSON.stringify(canonicalJson(JSON.parse(out)))}\n--\n${userBytes}`)
   } catch {
     // Caller decides. Returning null and carrying on would make every later
     // `null !== null` comparison pass, so an unverifiable precondition would
@@ -526,7 +534,26 @@ function lockOutDir(dir) {
   }
   if (alive) die(`${dir} is in use by another collection (pid ${pid}). Wait for it to finish.`)
   console.error(`[harness] clearing a stale lock in ${dir} (pid ${pid || 'unknown'} is not running)`)
-  fs.rmSync(lockPath, { force: true })
+  // Rename, don't remove: between deciding a lock is stale and deleting it,
+  // another collector can take a fresh one — and the delete would then remove a
+  // LIVE lock, leaving two collectors in the same directory. rename is atomic,
+  // so only one of us can move the stale file aside, and it fails if the file
+  // has already been replaced.
+  const aside = `${lockPath}.stale-${process.pid}`
+  try {
+    fs.renameSync(lockPath, aside)
+  } catch {
+    die(`another collection claimed ${dir} first. Re-run in a moment.`)
+  }
+  // Confirm we moved the file we inspected, not one written in between.
+  let movedPid = NaN
+  try {
+    movedPid = Number.parseInt(fs.readFileSync(aside, 'utf-8').trim(), 10)
+  } catch { /* unreadable — treat as the stale one */ }
+  fs.rmSync(aside, { force: true })
+  if (Number.isInteger(movedPid) && movedPid !== pid) {
+    die(`another collection claimed ${dir} first (pid ${movedPid}). Re-run in a moment.`)
+  }
   try {
     take()
   } catch (err) {
