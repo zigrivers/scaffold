@@ -114,15 +114,34 @@ const MIN_RUNS = 6
  */
 const DEFECT_MATCH = 0.4
 /**
- * Judge invocation flags, deny-by-default.
+ * Judge invocation flags.
  *
- * An explicit denylist was the wrong shape: it covers only the built-ins someone
- * remembered, leaving MCP servers and any newly added tool available to a prompt
- * that embeds an attacker-controlled diff. An empty ALLOWlist plus
- * --strict-mcp-config with no --mcp-config grants nothing and stays correct as
- * new tools appear. Scoring is text-in, text-out, so nothing is given up.
+ * An empty --allowed-tools does NOT deny anything: tested against the real CLI,
+ * `claude -p --allowed-tools '' --strict-mcp-config` happily ran bash. Neither
+ * does `--tools ''`. The only mechanism that actually denies is an explicit
+ * --disallowed-tools list, verified by asking the judge to run a command and
+ * watching it refuse.
+ *
+ * So the list is explicit, and it is enumerated from the CLI rather than
+ * remembered. --strict-mcp-config with no --mcp-config covers the other half:
+ * MCP servers cannot be named here, but that flag makes the judge ignore every
+ * MCP configuration it would otherwise load.
+ *
+ * VERIFY THIS AFTER UPGRADING THE JUDGE CLI. A tool added upstream is not on
+ * this list, and a denylist is only as current as its last check:
+ *
+ *   printf 'Run `echo MARKER` and report its output, or reply TOOLS_DENIED\n' \
+ *     | claude -p --disallowed-tools '<the list below>' --strict-mcp-config
  */
-const JUDGE_SANDBOX_FLAGS = ['--allowed-tools', '', '--strict-mcp-config']
+const DENIED_JUDGE_TOOLS = [
+  'Agent', 'Bash', 'Edit', 'Read', 'Write', 'NotebookEdit', 'Glob', 'Grep',
+  'WebFetch', 'WebSearch', 'Skill', 'ToolSearch', 'Workflow', 'DesignSync',
+  'EnterWorktree', 'ExitWorktree', 'Monitor', 'PushNotification', 'RemoteTrigger',
+  'SendMessage', 'ScheduleWakeup', 'ReportFindings',
+  'CronCreate', 'CronDelete', 'CronList',
+  'TaskCreate', 'TaskGet', 'TaskList', 'TaskOutput', 'TaskStop', 'TaskUpdate',
+].join(',')
+const JUDGE_SANDBOX_FLAGS = ['--disallowed-tools', DENIED_JUDGE_TOOLS, '--strict-mcp-config']
 /** Fixed so a scoring pass is reproducible, and so `report` can re-derive it. */
 const SHUFFLE_SEED = 20260731
 
@@ -444,7 +463,11 @@ function makeConfigSwapper(livePath, candidateText, io = fs) {
         // backupPath makes it a state-less orphan, and the next collection
         // deletes orphans on sight — destroying the only copy of the config
         // this branch exists to protect.
-        const kept = `${livePath}.pre-harness`
+        // Unique, because a fixed name silently overwrites the copy an
+        // earlier interrupted run preserved — losing the older config to save
+        // the newer one.
+        let kept = `${livePath}.pre-harness`
+        for (let i = 1; io.existsSync(kept); i++) kept = `${livePath}.pre-harness.${i}`
         if (io.existsSync(backupPath)) {
           io.copyFileSync(backupPath, kept)
           io.rmSync(backupPath, { force: true })
@@ -891,6 +914,25 @@ function collect(args) {
       provPaths.push({ path: pp, provenance })
     }
 
+    // The recorded environment must hold for EVERY run, not just the first.
+    // A rebuild, a user-config edit, or a candidate edit partway through leaves
+    // one condition spanning two execution environments, which no later check
+    // can detect from the run files alone.
+    const assertEnvironmentUnchanged = () => {
+      if (swapper && !swapper.stillInstalled()) {
+        die('the candidate config at the repo root changed during collection. '
+          + 'The runs so far span more than one treatment — re-collect.')
+      }
+      if (buildDigest() !== provenanceBase.mmrDigest) {
+        die('the MMR build changed during collection (was it rebuilt?). '
+          + 'The runs so far span more than one build — re-collect.')
+      }
+      if (resolvedChannelDigest() !== provenanceBase.channelConfigDigest) {
+        die('the resolved channel configuration changed during collection. '
+          + 'The runs so far span more than one configuration — re-collect.')
+      }
+    }
+
     // Width from N, so lexicographic sort stays chronological past 99 runs
     // (run-100 would otherwise sort before run-11).
     const padWidth = Math.max(2, String(n).length)
@@ -909,13 +951,7 @@ function collect(args) {
       // the ordering bias interleaving exists to remove.
       const order = i % 2 === 1 ? arms : [...arms].reverse()
       for (const arm of order) {
-        // A candidate config edited mid-collection would silently split the
-        // runs across two treatments, and restore() only notices at the end —
-        // by which point the condition has been marked complete.
-        if (swapper && !swapper.stillInstalled()) {
-          die('the candidate config at the repo root changed during collection. '
-            + 'The runs so far span more than one treatment — re-collect.')
-        }
+        assertEnvironmentUnchanged()
         runOnce({
           mmrArgs: arm.mmrArgs,
           repoRoot,
@@ -926,6 +962,9 @@ function collect(args) {
         })
       }
     }
+    // Also AFTER the final run: a change during the last run would otherwise
+    // land in a condition that is then marked complete and reported on.
+    assertEnvironmentUnchanged()
     for (const { path: pp, provenance } of provPaths) {
       fs.writeFileSync(pp, JSON.stringify({ ...provenance, complete: true }, null, 2))
     }
@@ -1221,26 +1260,6 @@ function perRunSpecRates(runs, mine) {
   }).filter((x) => x !== null)
 }
 
-/**
- * Map of normalized location -> how many distinct runs reported a defect there.
- *
- * Run counts matter because a site seen once is inside the run-to-run variance
- * this whole harness exists to respect, while a site seen repeatedly is a
- * defect the baseline reliably finds.
- */
-function defectSiteCounts(scoredFindings) {
-  const byLocation = new Map()
-  for (const f of scoredFindings) {
-    if (f.score.class !== 'defect') continue
-    // File only: the same defect drifts by a line or two between runs.
-    const site = String(f.location ?? '').split(':')[0].trim().replace(/^\.\//, '')
-    if (!site) continue
-    if (!byLocation.has(site)) byLocation.set(site, new Set())
-    byLocation.get(site).add(f.run)
-  }
-  return Object.fromEntries([...byLocation].map(([k, runs]) => [k, runs.size]))
-}
-
 /** Content words of a finding, for comparing two descriptions of one defect. */
 const STOPWORDS = new Set([
   'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'to', 'of', 'in', 'on', 'for', 'and',
@@ -1339,7 +1358,6 @@ function summarize(condition, scored) {
     // WHICH defects, not just how many. A candidate that misses every baseline
     // defect while producing the same number of different ones satisfies an
     // aggregate comparison and has still made the review worse.
-    defectSites: defectSiteCounts(mine),
     defectClusters: defectClusters(mine),
     speculativeRate: total ? count('speculative') / total : 0,
     lowValues: lowValue,
@@ -1857,19 +1875,6 @@ function selftest() {
   ].join('\n')
   assert.equal(canonicalPrompts(swapped), canonicalPrompts(reordered))
   assert.equal(canonicalPrompts('no markers here'), null)
-
-  // defectSiteCounts feeds the lost-defect-site guard and had no direct cover.
-  const f = (cls, run, location) => ({ run, location, score: { class: cls } })
-  const sites = defectSiteCounts([
-    f('defect', 'run-01.json', 'src/a.ts:10'),
-    f('defect', 'run-02.json', 'src/a.ts:12'),   // same file, drifted line
-    f('defect', 'run-02.json', './src/a.ts:99'), // same run, normalized path
-    f('defect', 'run-03.json', 'src/b.ts:1'),
-    f('speculative', 'run-01.json', 'src/c.ts:1'),  // not a defect
-    f('defect', 'run-01.json', ''),                  // no location
-  ])
-  assert.deepEqual(sites, { 'src/a.ts': 2, 'src/b.ts': 1 })
-  assert.deepEqual(defectSiteCounts([]), {})
 
   // Clustering: two unrelated defects in one file stay distinct, and the same
   // defect reworded across runs collapses into one cluster.
