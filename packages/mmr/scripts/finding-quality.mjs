@@ -114,10 +114,15 @@ const MIN_RUNS = 6
  */
 const DEFECT_MATCH = 0.4
 /**
- * Tools the judge must not have. Scoring is text-in, text-out, and the prompt
- * carries an untrusted diff, so every capability is pure downside.
+ * Judge invocation flags, deny-by-default.
+ *
+ * An explicit denylist was the wrong shape: it covers only the built-ins someone
+ * remembered, leaving MCP servers and any newly added tool available to a prompt
+ * that embeds an attacker-controlled diff. An empty ALLOWlist plus
+ * --strict-mcp-config with no --mcp-config grants nothing and stays correct as
+ * new tools appear. Scoring is text-in, text-out, so nothing is given up.
  */
-const DENIED_JUDGE_TOOLS = 'Bash,Read,Write,Edit,Glob,Grep,WebFetch,WebSearch,NotebookEdit,Task'
+const JUDGE_SANDBOX_FLAGS = ['--allowed-tools', '', '--strict-mcp-config']
 /** Fixed so a scoring pass is reproducible, and so `report` can re-derive it. */
 const SHUFFLE_SEED = 20260731
 
@@ -435,8 +440,17 @@ function makeConfigSwapper(livePath, candidateText, io = fs) {
       // finished, the damage is ours and restoring is exactly right. Only a
       // mismatch after a completed install means someone else wrote the file.
       if (installCompleted && !stillOurs()) {
+        // Move the pre-run copy OUT of the sidecar namespace. Leaving it at
+        // backupPath makes it a state-less orphan, and the next collection
+        // deletes orphans on sight — destroying the only copy of the config
+        // this branch exists to protect.
+        const kept = `${livePath}.pre-harness`
+        if (io.existsSync(backupPath)) {
+          io.copyFileSync(backupPath, kept)
+          io.rmSync(backupPath, { force: true })
+        }
         console.error(`[harness] ${livePath} changed during the run; leaving it as it is. `
-          + `The pre-run contents are in ${backupPath}.`)
+          + `The pre-run contents are kept at ${kept}.`)
         io.rmSync(statePath, { force: true })
         return
       }
@@ -1118,7 +1132,7 @@ function score(args) {
     // an agentic CLI: a diff carrying injected instructions could otherwise
     // reach the filesystem or a shell. Scoring is text-in, text-out, so there
     // is nothing to lose by removing the capability entirely.
-    raw = execFileSync(judge, ['-p', '--disallowed-tools', DENIED_JUDGE_TOOLS], {
+    raw = execFileSync(judge, ['-p', ...JUDGE_SANDBOX_FLAGS], {
       encoding: 'utf-8',
       input: prompt,
       maxBuffer: 64 * 1024 * 1024,
@@ -1130,8 +1144,8 @@ function score(args) {
     // a general adapter — say so rather than surfacing a spawn stack trace.
     die(`judge \`${judge} -p\` failed: ${err.message}\n`
       + '--judge must name a binary that accepts `-p` and reads the prompt from stdin '
-      + '(Claude Code print mode) and supports --disallowed-tools. codex/opencode use different '
-      + 'flags and are not drop-in.')
+      + `(Claude Code print mode) and accepts ${JUDGE_SANDBOX_FLAGS.join(' ')}. `
+      + 'codex/opencode use different flags and are not drop-in.')
   } finally {
     fs.rmSync(neutralCwd, { recursive: true, force: true })
   }
@@ -1508,10 +1522,6 @@ function report(args) {
       + 'diff, channel set, and MMR build are recorded')
   } else {
     for (const [cond, prov] of [[conditions[0], bp], [conditions[1], cp]]) {
-      if (prov.channelConfigDigest === null || prov.channelConfigDigest === undefined) {
-        extraBlockers.push(`${cond.label} has no resolved channel-config digest — re-run \`collect\` `
-          + 'so a user-config change between the arms cannot pass as a prompt effect')
-      }
       if (prov.complete !== true) {
         extraBlockers.push(`${cond.label} was never finished — re-run \`collect\` for it`)
       } else if (prov.requestedRuns !== cond.runs.length) {
@@ -1519,7 +1529,17 @@ function report(args) {
           + 'were requested — re-collect it')
       }
     }
-    for (const key of ['target', 'diffDigest', 'mmrDigest', 'repoCommit', 'channelConfigDigest']) {
+    for (const key of ['target', 'diffDigest', 'mmrDigest', 'repoCommit', 'channelConfigDigest', 'promptDigest']) {
+      // Absent on both sides is NOT a match: JSON.stringify(undefined) equals
+      // itself, so two conditions missing a field would have "agreed" on it and
+      // an unverifiable precondition would read as verified.
+      if (bp[key] === undefined || bp[key] === null || cp[key] === undefined || cp[key] === null) {
+        extraBlockers.push(`${key} is missing from ${bp[key] == null ? conditions[0].label : ''}`
+          + `${bp[key] == null && cp[key] == null ? ' and ' : ''}`
+          + `${cp[key] == null ? conditions[1].label : ''} — re-run \`collect\``)
+        continue
+      }
+      if (key === 'promptDigest') continue   // handled by the sameTreatment check
       if (JSON.stringify(bp[key]) !== JSON.stringify(cp[key])) {
         extraBlockers.push(`${key} differs between conditions (${bp[key]} vs ${cp[key]}) — `
           + 'the arms did not review the same thing')
@@ -1784,7 +1804,8 @@ function selftest() {
   sw.restore()
   console.error = realErr0
   assert.equal(io2.files['/live'], 'EDITED_MID_RUN')
-  assert.equal(io2.files['/live.harness-backup'], 'ORIGINAL', 'the pre-run copy must be kept')
+  assert.equal('/live.harness-backup' in io2.files, false, 'the orphan-prone sidecar must not remain')
+  assert.equal(io2.files['/live.pre-harness'], 'ORIGINAL', 'the pre-run copy must be kept, out of harm')
   assert.equal(errs0.length > 0, true)
 
   // Recovery must NOT clobber a config the user wrote after the crash.
