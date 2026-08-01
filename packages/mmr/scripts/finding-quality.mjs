@@ -256,6 +256,16 @@ function requireValues(args) {
   return args
 }
 
+/**
+ * Fail with a message and stop.
+ *
+ * IMPORTANT for callers: process.exit does NOT unwind the stack, so any
+ * `finally` between the call site and the top level is skipped. Cleanup that
+ * must survive a die() — the config swap, the repo lock, the judge's temp
+ * directory — is therefore ALSO registered on process.once('exit', ...), and
+ * every such handler is idempotent so the finally and the hook can both run.
+ * If you add cleanup to a finally in this file, add it to an exit hook too.
+ */
 function die(msg) {
   console.error(`error: ${msg}`)
   process.exit(1)
@@ -1209,7 +1219,12 @@ function report(args) {
   const conditions = loadArms(args)
   const scorePath = args.scores ?? args.out ?? 'finding-quality-scores.json'
   if (!fs.existsSync(scorePath)) die(`scores file not found: ${scorePath} (run \`score\` first)`)
-  const raw = JSON.parse(fs.readFileSync(scorePath, 'utf-8'))
+  let raw
+  try {
+    raw = JSON.parse(fs.readFileSync(scorePath, 'utf-8'))
+  } catch (err) {
+    die(`${scorePath} is not readable JSON: ${err.message} — re-run \`score\``)
+  }
   if (!raw || !Array.isArray(raw.scored) || !raw.manifest) {
     die(`${scorePath} is not a manifest-bearing scores file — re-run \`score\``)
   }
