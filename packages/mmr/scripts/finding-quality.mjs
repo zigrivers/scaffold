@@ -40,6 +40,21 @@
  *     --out runs/calibrated --pr 782 --n 6 --channels claude,codex,opencode-glm \
  *     --config ./candidate.mmr.yaml
  *
+ *   # A treatment the candidate config CANNOT carry — a prompt template, since
+ *   # a candidate .mmr.yaml may set only version/review_criteria/stage — is
+ *   # delivered as a second BUILD. --baseline-mmr points the baseline arm at it;
+ *   # the candidate arm stays on this build. `report` then requires mmrDigest and
+ *   # basePromptDigest to DIFFER, and every other provenance field to match.
+ *   node scripts/finding-quality.mjs collect \
+ *     --out runs/baseline --paired runs/candidate \
+ *     --baseline-mmr ../.mmr-pre-change/dist/index.js \
+ *     --pr 796 --n 6 --channels codex,opencode-glm
+ *
+ *   # --timeout bounds every channel, identically in both arms. A channel that
+ *   # times out contributes no findings and the rubric invalidates the whole
+ *   # condition, so on a slow model the default silently caps what is
+ *   # measurable. Set it from a measured run, not a guess.
+ *
  *   # 2. score — pools both arms, shuffles, judges blind to condition.
  *   #    Roles are explicit: the direction of the comparison must never depend
  *   #    on argument order.
