@@ -2,6 +2,31 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **The built-in severity rubric now grades worth-fixing-now, not impact alone**
+  (`templates/core-prompt.md`). Every level carries two tests — what happens if
+  the problem occurs, and whether a maintainer would fix it before the change
+  lands — and the second decides when they disagree. Security, data-loss and
+  data-corruption findings are explicitly exempt and stay graded on impact.
+- **Unhandled inputs and states now need a named path.** A new Reporting Bar
+  asks the reviewer to name the caller, flag, config value, or documented
+  contract in the reviewed code that can produce the state, and to skip the
+  finding otherwise. Trust boundaries — public APIs, exported surfaces, CLI
+  arguments, HTTP handlers, deserializers, file and database reads — are exempt,
+  because a repository contains no caller for a hostile request and an
+  unqualified bar would suppress the findings a review most exists to catch.
+- **The criteria ask what is unnecessary, not only what is missing.** A sixth
+  criterion covers abstractions with one caller, knobs never varied, hand-rolled
+  helpers the standard library provides, and defensive code for impossible
+  states, and asks for the deletion as the suggestion.
+
+  This is the highest-blast-radius text in the package — every channel and every
+  consuming project reads it on every review. Expect verdicts to move: a finding
+  that goes unreported, or lands below your threshold, no longer blocks.
+  `fix_threshold`, the reconciliation logic and `mmr ack` are unchanged, and the
+  four severity tokens the gate keys off are pinned by test.
+
 ### Added
 
 - **A finding-quality harness for evaluating prompt changes** (`scripts/`, not
