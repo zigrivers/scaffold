@@ -351,7 +351,11 @@ function collect(args) {
       die(`${outDir} contains ${foreign.length} file(s) this harness did not write `
         + `(e.g. ${foreign.slice(0, 3).join(', ')}). Refusing to use it — pick an empty or harness-owned directory.`)
     }
-    if (stale.length > 0 && args.force !== true) {
+    // parseArgs supports --flag=value, so --force=true arrives as the STRING
+    // 'true'. A strict boolean check would ignore it and then tell the user to
+    // pass the flag they just passed.
+    const forced = args.force === true || args.force === 'true'
+    if (stale.length > 0 && !forced) {
       die(`${outDir} already contains ${stale.length} run file(s). `
         + 'Use a fresh directory, or pass --force to clear it.')
     }
@@ -461,7 +465,13 @@ function collect(args) {
     // modified the repo root, so the finally must restore it. Everything that
     // can fail without touching the repo root — gh pr diff, git, provenance —
     // has already run above.
-    swapper?.install()
+    try {
+      swapper?.install()
+    } catch (err) {
+      // Restoration is handled by the finally and the exit hook; this only
+      // makes the failure read like the rest of the script's errors.
+      die(`could not install the candidate config at ${liveConfig}: ${err.message}`)
+    }
 
     // The treatment IS the prompt the channels receive, so record that, not a
     // proxy for it. A config digest — however canonicalized — can differ while
