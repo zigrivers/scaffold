@@ -636,6 +636,7 @@ function collect(args) {
         requestedRuns: n,
         complete: false,
       }
+      arm.recordedPromptDigest = provenance.promptDigest
       const pp = path.join(arm.dir, PROVENANCE_FILE)
       fs.writeFileSync(pp, JSON.stringify(provenance, null, 2))
       fs.writeFileSync(path.join(arm.dir, SNAPSHOT_FILE), reviewedDiff)
@@ -646,7 +647,7 @@ function collect(args) {
     // A rebuild, a user-config edit, or a candidate edit partway through leaves
     // one condition spanning two execution environments, which no later check
     // can detect from the run files alone.
-    const assertEnvironmentUnchanged = () => {
+    const assertEnvironmentUnchanged = (arm) => {
       if (buildDigest() !== provenanceBase.mmrDigest) {
         die('the MMR build changed during collection (was it rebuilt?). '
           + 'The runs so far span more than one build — re-collect.')
@@ -654,6 +655,17 @@ function collect(args) {
       if (resolvedChannelDigest() !== provenanceBase.channelConfigDigest) {
         die('the resolved channel configuration changed during collection. '
           + 'The runs so far span more than one configuration — re-collect.')
+      }
+      // Re-assert the PROMPT, not just its inputs. Channel config and build
+      // digests miss the thing that matters most: a user-level review_criteria
+      // edited mid-collection changes what every channel is asked while leaving
+      // both of those identical, mixing two treatments inside one condition.
+      if (arm) {
+        const nowDigest = sha256(canonicalPrompts(assemble(arm.mmrArgs, arm.cwd)) ?? '')
+        if (nowDigest !== arm.recordedPromptDigest) {
+          die(`the assembled prompt for ${conditionLabel(arm.dir)} changed during collection. `
+            + 'The runs so far span more than one treatment — re-collect.')
+        }
       }
     }
 
@@ -675,7 +687,7 @@ function collect(args) {
       // the ordering bias interleaving exists to remove.
       const order = i % 2 === 1 ? arms : [...arms].reverse()
       for (const arm of order) {
-        assertEnvironmentUnchanged()
+        assertEnvironmentUnchanged(arm)
         runOnce({
           mmrArgs: arm.mmrArgs,
           cwd: arm.cwd,
@@ -688,7 +700,7 @@ function collect(args) {
     }
     // Also AFTER the final run: a change during the last run would otherwise
     // land in a condition that is then marked complete and reported on.
-    assertEnvironmentUnchanged()
+    for (const arm of arms) assertEnvironmentUnchanged(arm)
     for (const { path: pp, provenance } of provPaths) {
       fs.writeFileSync(pp, JSON.stringify({ ...provenance, complete: true }, null, 2))
     }
@@ -1038,10 +1050,30 @@ function defectClusters(scoredFindings) {
   return [...byFile.values()].flat().map((c) => ({ file: c.file, tokens: [...c.tokens], runs: c.runs.size }))
 }
 
-/** Whether a candidate's defects cover a baseline cluster. */
-function clusterCovered(cluster, candidateClusters) {
+/**
+ * Every candidate defect, as file -> list of token sets (one per finding).
+ *
+ * Coverage is checked against ALL of them rather than against cluster
+ * centroids: a cluster keeps only its first wording, so a later phrasing that
+ * matches the baseline could sit inside a candidate cluster whose centroid does
+ * not — reporting a defect as lost when the candidate did find it.
+ */
+function defectTokensByFile(scoredFindings) {
+  const byFile = {}
+  for (const f of scoredFindings) {
+    if (f.score.class !== 'defect') continue
+    const file = String(f.location ?? '').split(':')[0].trim().replace(/^\.\//, '')
+    if (!file) continue
+    ;(byFile[file] ??= []).push([...contentTokens(f.description)])
+  }
+  return byFile
+}
+
+/** Whether any candidate defect in the same file describes the baseline one. */
+function clusterCovered(cluster, candidateTokensByFile) {
   const tokens = new Set(cluster.tokens)
-  return candidateClusters.some((c) => c.file === cluster.file && overlap(new Set(c.tokens), tokens) >= DEFECT_MATCH)
+  return (candidateTokensByFile[cluster.file] ?? [])
+    .some((t) => overlap(new Set(t), tokens) >= DEFECT_MATCH)
 }
 
 /**
@@ -1081,6 +1113,7 @@ function summarize(condition, scored) {
     // defect while producing the same number of different ones satisfies an
     // aggregate comparison and has still made the review worse.
     defectClusters: defectClusters(mine),
+    defectTokensByFile: defectTokensByFile(mine),
     speculativeRate: total ? count('speculative') / total : 0,
     lowValues: lowValue,
     lowValueRate: total ? lowValue / total : 0,
@@ -1161,7 +1194,7 @@ function evaluateVerdict(base, cand, opts = {}) {
   // the candidate never found at all. Losing one of these is the failure the
   // aggregate defect count cannot see.
   const lostSites = (base.defectClusters ?? [])
-    .filter((c) => c.runs > 1 && !clusterCovered(c, cand.defectClusters ?? []))
+    .filter((c) => c.runs > 1 && !clusterCovered(c, cand.defectTokensByFile ?? {}))
     .map((c) => `${c.file} (${c.tokens.slice(0, 4).join(' ')}…)`)
   const ship = blockers.length === 0 && specDown && countDown && lowValueDown
     && defectsHeld && lostSites.length === 0 && outsideBand
@@ -1384,7 +1417,8 @@ function selftest() {
     label: 'x', runs: MIN_RUNS, degradedRuns: 0, coverages: ['a,b'], hasFindings: true,
     emptyRuns: 0, specRates: [0.4, 0.5], speculativeRate: 0.45, speculatives: 9,
     lowValues: 12, defects: 10, defectSites: { 'src/a.ts': 3 },
-    defectClusters: [{ file: 'src/a.ts', tokens: ['null', 'pointer', 'deref', 'guard'], runs: 3 }], ...over,
+    defectClusters: [{ file: 'src/a.ts', tokens: ['null', 'pointer', 'deref', 'guard'], runs: 3 }],
+    defectTokensByFile: { 'src/a.ts': [['null', 'pointer', 'deref', 'guard']] }, ...over,
   })
 
   // Every combination of the three decision inputs, so the AND cannot silently
@@ -1422,16 +1456,23 @@ function selftest() {
   // A candidate that stops finding a defect the baseline found repeatedly must
   // not ship, however good its aggregate numbers look.
   assert.equal(evaluateVerdict(cond(), cond({
-    ...good, defectClusters: [{ file: 'src/b.ts', tokens: ['other', 'thing'], runs: 3 }],
+    ...good, defectTokensByFile: { 'src/b.ts': [['other', 'thing']] },
   })).ship, false, 'losing a reproducible defect must block')
   // Same file, UNRELATED defect: filename alone would have called this covered.
   assert.equal(evaluateVerdict(cond(), cond({
-    ...good, defectClusters: [{ file: 'src/a.ts', tokens: ['unrelated', 'timeout', 'retry'], runs: 3 }],
+    ...good, defectTokensByFile: { 'src/a.ts': [['unrelated', 'timeout', 'retry']] },
   })).ship, false, 'a different defect in the same file is not coverage')
   // Reworded description of the SAME defect still counts as covered.
   assert.equal(evaluateVerdict(cond(), cond({
-    ...good, defectClusters: [{ file: 'src/a.ts', tokens: ['null', 'pointer', 'deref', 'missing'], runs: 2 }],
+    ...good, defectTokensByFile: { 'src/a.ts': [['null', 'pointer', 'deref', 'missing']] },
   })).ship, true, 'rewording must not read as a loss')
+  // A NON-first wording inside the candidate must still count as coverage.
+  assert.equal(evaluateVerdict(cond(), cond({
+    ...good,
+    defectTokensByFile: {
+      'src/a.ts': [['unrelated', 'timeout', 'retry'], ['null', 'pointer', 'deref', 'missing']],
+    },
+  })).ship, true, 'coverage must consider every candidate defect, not just the first wording')
   // A defect the baseline saw only once is inside the noise and does not block.
   assert.equal(evaluateVerdict(cond({
     defectClusters: [
