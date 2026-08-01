@@ -30,9 +30,6 @@
  *     --pr 782 --n 6 --channels claude,codex,opencode-glm
  *
  *   # Or one condition at a time (N >= 6; the rubric's floor).
- *   #    NOTE: with --config, the repo-root .mmr.yaml is REPLACED for the
- *   #    duration of the run and restored afterwards. Do not edit it while a
- *   #    collection is in flight — the restore would overwrite your changes.
  *   node scripts/finding-quality.mjs collect \
  *     --out runs/baseline --pr 782 --n 6 --channels claude,codex,opencode-glm
  *
@@ -348,149 +345,6 @@ function conditionLabel(dir) {
 // ---------------------------------------------------------------- collect
 
 /**
- * The one piece of the harness that mutates a file outside its own output
- * directory: the repo-root .mmr.yaml.
- *
- * Extracted because it has been the source of three separate defects — a
- * signal arriving before the backup existed, a `finally` skipped by
- * process.exit, and a partial copy leaving the destination truncated. Hand
- * tracing kept missing one; a factory can be driven by the selftest.
- *
- * `restore()` is idempotent and inert until `install()` has actually run, so it
- * is safe to call from a finally, a signal handler, and an exit hook at once.
- */
-function makeConfigSwapper(livePath, candidateText, io = fs) {
-  // Two sidecars, because the two states must be distinguishable after a
-  // SIGKILL. The state file records THAT we installed and WHAT we installed;
-  // the backup holds the previous contents when there were any. Without the
-  // state file, a run that installed over nothing leaves no trace, so a later
-  // run cannot tell the candidate it should remove from a config the user wrote
-  // themselves — and the candidate stays live forever.
-  const backupPath = `${livePath}.harness-backup`
-  const statePath = `${livePath}.harness-state`
-  let installed = false
-  let installCompleted = false
-  let restored = false
-
-  const readState = () => {
-    try {
-      return JSON.parse(io.readFileSync(statePath, 'utf-8'))
-    } catch {
-      return null
-    }
-  }
-
-  const clearSidecars = () => {
-    io.rmSync(backupPath, { force: true })
-    io.rmSync(statePath, { force: true })
-  }
-
-  const putBack = () => {
-    if (io.existsSync(backupPath)) io.copyFileSync(backupPath, livePath)
-    else io.rmSync(livePath, { force: true })
-    clearSidecars()
-  }
-
-  /** True while the live config is still exactly what we installed. */
-  const stillOurs = () => {
-    const state = readState()
-    if (!state) return false
-    if (!io.existsSync(livePath)) return true      // ours, and already gone
-    return sha256(io.readFileSync(livePath, 'utf-8')) === state.installedDigest
-  }
-
-  return {
-    /**
-     * Undo an install left behind by a run that was killed before restoring.
-     *
-     * Only when the live config is STILL the candidate we installed. Between
-     * the crash and now the user may have written their own config there, and
-     * blindly restoring would destroy it — trading a recoverable mess for an
-     * unrecoverable one. A forged or damaged sidecar hits the same guard.
-     */
-    recoverIfStale() {
-      const state = readState()
-      if (!state) {
-        // No state file means we cannot prove the harness wrote whatever sits
-        // at backupPath — the name is predictable, so it may be the user's own
-        // file. Say so and leave it; deleting on a guess is how a config gets
-        // destroyed by the code meant to protect it.
-        if (io.existsSync(backupPath)) {
-          console.error(`[harness] ${backupPath} exists with no matching state file. `
-            + 'Not touching it — remove it by hand if it is a leftover.')
-        }
-        return 'nothing-to-do'
-      }
-      const live = io.existsSync(livePath) ? io.readFileSync(livePath, 'utf-8') : null
-      if (live !== null && sha256(live) !== state.installedDigest) {
-        console.error(`[harness] ${livePath} has changed since an interrupted run left its `
-          + 'sidecars behind. Leaving it alone — inspect and remove '
-          + `${statePath} / ${backupPath} by hand.`)
-        return 'refused'
-      }
-      putBack()
-      return 'recovered'
-    },
-    install() {
-      if (io.existsSync(livePath)) io.copyFileSync(livePath, backupPath)
-      // Written BEFORE the copy, so a crash between the two still leaves proof
-      // that the harness was mid-swap, and records what to look for on recovery.
-      io.writeFileSync(statePath, JSON.stringify({ installedDigest: sha256(candidateText) }))
-      installed = true
-      // From the bytes validated earlier, not re-read from disk: a file edited
-      // between validation and install could otherwise smuggle in
-      // execution-changing keys the prompt-only check already cleared.
-      io.writeFileSync(livePath, candidateText)
-      installCompleted = true
-    },
-    /**
-     * Whether the live config is still exactly what install() wrote.
-     *
-     * A MISSING file counts as not installed: if the candidate is deleted
-     * mid-collection, later runs execute with no treatment at all, and treating
-     * absence as "ours, so fine" would let those runs into the condition.
-     */
-    stillInstalled() {
-      if (!installed) return true
-      if (!io.existsSync(livePath)) return false
-      const state = readState()
-      return Boolean(state) && sha256(io.readFileSync(livePath, 'utf-8')) === state.installedDigest
-    },
-    restore() {
-      if (!installed || restored) return
-      restored = true
-      // A collection runs for many minutes, so the live file may have been
-      // edited meanwhile and putting the backup back would destroy that work.
-      //
-      // But content alone cannot tell a user's edit from OUR half-written copy:
-      // neither matches the candidate. installCompleted does — if the copy never
-      // finished, the damage is ours and restoring is exactly right. Only a
-      // mismatch after a completed install means someone else wrote the file.
-      if (installCompleted && !stillOurs()) {
-        // Move the pre-run copy OUT of the sidecar namespace. Leaving it at
-        // backupPath makes it a state-less orphan, and the next collection
-        // deletes orphans on sight — destroying the only copy of the config
-        // this branch exists to protect.
-        // Unique, because a fixed name silently overwrites the copy an
-        // earlier interrupted run preserved — losing the older config to save
-        // the newer one.
-        let kept = `${livePath}.pre-harness`
-        for (let i = 1; io.existsSync(kept); i++) kept = `${livePath}.pre-harness.${i}`
-        if (io.existsSync(backupPath)) {
-          io.copyFileSync(backupPath, kept)
-          io.rmSync(backupPath, { force: true })
-        }
-        console.error(`[harness] ${livePath} changed during the run; leaving it as it is. `
-          + `The pre-run contents are kept at ${kept}.`)
-        io.rmSync(statePath, { force: true })
-        return
-      }
-      putBack()
-    },
-  }
-}
-
-/**
  * Map every channel in --dry-run output to its assembled prompt, with the diff
  * payload removed.
  *
@@ -518,33 +372,6 @@ function canonicalPrompts(dryRunOutput) {
       .trim()
   }
   return JSON.stringify(Object.keys(out).sort().map((k) => [k, out[k]]))
-}
-
-/**
- * Whether the process recorded in a lock's pid file is still running.
- *
- * Unreadable or malformed pid file → treat the owner as gone: the alternative
- * is a lock nothing can ever clear.
- *
- * Limitation: signal 0 succeeds for a zombie (exited but unreaped) process, so
- * such a lock reads as held and must be removed by hand. That errs toward
- * refusing to reclaim, which is the safe direction — the unsafe one would be
- * two collectors swapping the shared config at once.
- */
-function ownerAlive(pidFile) {
-  let pid
-  try {
-    pid = Number.parseInt(fs.readFileSync(pidFile, 'utf-8').trim(), 10)
-  } catch {
-    return false
-  }
-  if (!Number.isInteger(pid) || pid <= 0 || pid === process.pid) return false
-  try {
-    process.kill(pid, 0)   // signal 0 tests existence without touching it
-    return true
-  } catch {
-    return false
-  }
 }
 
 /**
@@ -594,14 +421,14 @@ function normalizeChannels(list) {
  * One review run against a fixed diff. Shared by the plain and paired paths so
  * they cannot drift apart in how a run is dispatched or recorded.
  */
-function runOnce({ mmrArgs, repoRoot, target, index, total, label }) {
+function runOnce({ mmrArgs, cwd, target, index, total, label }) {
   fs.rmSync(target, { force: true })
   process.stderr.write(`[${label}] run ${index}/${total} … `)
   const started = Date.now()
   let raw
   try {
     raw = execFileSync('node', [MMR, ...mmrArgs], {
-      encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024, cwd: repoRoot,
+      encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024, cwd,
     })
   } catch (err) {
     if (err.status !== 2 && err.status !== 3) {
@@ -693,125 +520,31 @@ function collect(args) {
     die(`${MMR} not found — run \`npm run build\` in packages/mmr first.`)
   }
 
-  // A candidate config is applied by copying it to the repo root as .mmr.yaml
-  // and reviewing with --trust-project-config. Doing it via the working tree
-  // (rather than committing it) keeps the experiment off the branch under test.
+  // The candidate config is delivered by RUNNING MMR from a temp directory that
+  // contains it, never by writing to the repo root.
+  //
+  // The earlier design swapped the repo-root .mmr.yaml for the duration of a
+  // run. Everything that made that safe — a backup, a state sidecar, crash
+  // recovery, a cross-process lock with pid liveness and atomic reclaim, signal
+  // and exit handlers, mid-run digest checks — existed only to stop the harness
+  // destroying the user's config, and successive review rounds kept finding new
+  // ways it still could. MMR resolves project config from its own cwd, so
+  // pointing the child at a directory we own removes the shared resource, and
+  // with it every one of those failure modes. Nothing outside the output
+  // directories is written at all.
   const repoRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf-8' }).trim()
-  const liveConfig = path.join(repoRoot, '.mmr.yaml')
+  const cwdRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'fq-cwd-'))
+  process.once('exit', () => fs.rmSync(cwdRoot, { recursive: true, force: true }))
+  const baselineCwd = path.join(cwdRoot, 'baseline')
+  const candidateCwd = path.join(cwdRoot, 'candidate')
+  fs.mkdirSync(baselineCwd)
+  fs.mkdirSync(candidateCwd)
   if (args.config) {
-    const cand = path.resolve(args.config)
-    // The candidate must not be any file the swapper owns. Pointing it at a
-    // sidecar makes restore copy the candidate into the live config — the exact
-    // inverse of restoring — or delete the candidate mid-run.
-    const reserved = [liveConfig, `${liveConfig}.harness-backup`, `${liveConfig}.harness-state`]
-    if (reserved.includes(cand)) {
-      die(`--config points at ${cand}, which collect manages itself. The candidate must be a `
-        + 'separate file outside the repo-root .mmr.yaml and its sidecars.')
-    }
-  }
-  // The repo-root config is a single shared resource. Two configured
-  // collections would swap and restore it in interleaved order, leaving one
-  // arm reviewed under the other's config and possibly the candidate left
-  // installed. mkdir is atomic, so it is the whole lock.
-  const lockDir = path.join(repoRoot, '.mmr-harness.lock')
-  const lockPid = path.join(lockDir, 'pid')
-  let holdsLock = false
-  // Assigned once the candidate is validated. The handlers below close over the
-  // holder rather than the value so they can be registered FIRST — before the
-  // lock exists — which is the only ordering where an early die() cannot leak it.
-  let swapper = null
-  const releaseLock = () => {
-    if (!holdsLock) return
-    holdsLock = false
-    try { fs.rmSync(lockDir, { recursive: true, force: true }) } catch { /* already gone */ }
-  }
-  // Restore the config, THEN drop the lock — one handler, so the order cannot
-  // invert. Registered here, before the lock is taken and before the swapper
-  // exists, so no failure between this point and the end of collect can leave
-  // either behind. swapper?.restore() is inert until install() has run, so a
-  // signal arriving early cannot delete a .mmr.yaml the harness never touched.
-  const restoreConfig = () => { swapper?.restore(); releaseLock() }
-  process.once('exit', restoreConfig)
-  const onSignal = (sig) => {
-    restoreConfig()
-    process.exit(sig === 'SIGINT' ? 130 : 143)
-  }
-  process.once('SIGINT', () => onSignal('SIGINT'))
-  process.once('SIGTERM', () => onSignal('SIGTERM'))
-
-  if (args.config) {
-    const takeLock = () => {
-      fs.mkdirSync(lockDir)
-      fs.writeFileSync(lockPid, String(process.pid))
-      holdsLock = true
-    }
-    try {
-      takeLock()
-    } catch {
-      // A killed run leaves both the lock and the candidate config behind, and
-      // the config can only be repaired by a run that gets past this point —
-      // so a lock whose owner is gone must be reclaimable, or the interruption
-      // is unrecoverable by design.
-      // Only ever reclaim a directory that looks exactly like one we wrote: a
-      // single `pid` file. Deleting recursively on a dead-pid check alone would
-      // destroy whatever else happened to sit at that path.
-      const looksLikeOurs = () => {
-        try {
-          const inside = fs.readdirSync(lockDir)
-          return inside.length === 1 && inside[0] === 'pid'
-        } catch {
-          return false
-        }
-      }
-      if (!looksLikeOurs()) {
-        die(`${lockDir} exists but is not a harness lock (expected a single 'pid' file). `
-          + 'Refusing to remove it — inspect it by hand.')
-      }
-      if (!ownerAlive(lockPid)) {
-        console.error(`[harness] reclaiming ${lockDir} from a process that is no longer running`)
-        // Rename, don't remove-then-create. With remove-then-create, two
-        // collectors both seeing the same dead lock can each delete and
-        // recreate it — the second deleting the FIRST one's fresh lock — and
-        // both then swap the shared config concurrently. rename() is atomic, so
-        // exactly one of them can move the stale directory aside, and the loser
-        // finds the winner's live lock.
-        const aside = `${lockDir}.stale-${process.pid}`
-        try {
-          fs.renameSync(lockDir, aside)
-        } catch {
-          die(`another collection reclaimed ${lockDir} first. Re-run in a moment.`)
-        }
-        fs.rmSync(aside, { recursive: true, force: true })
-        try {
-          takeLock()
-        } catch {
-          die(`could not take ${lockDir} after reclaiming it — remove it by hand if no collection is running.`)
-        }
-      } else {
-        die(`another configured collection (pid ${fs.readFileSync(lockPid, 'utf-8').trim()}) holds `
-          + `${lockDir}. Wait for it to finish.`)
-      }
-    }
-  }
-  if (args.config) {
-    // Read ONCE, here. Everything downstream — validation, the digest recorded
-    // in provenance, and the bytes actually installed — uses this same buffer,
-    // so no edit between those steps can change what was checked.
+    // Read ONCE and validated here, so nothing downstream can install bytes
+    // that differ from the ones checked.
     const candidateText = assertPromptOnlyConfig(path.resolve(args.config))
-    swapper = makeConfigSwapper(liveConfig, candidateText)
-    const outcome = swapper.recoverIfStale()
-    if (outcome === 'recovered') {
-      console.error(`[harness] restored ${liveConfig} from an interrupted run`)
-    } else if (outcome === 'refused') {
-      // Continuing would install over the sidecars and destroy the only copy of
-      // whatever the interrupted run had backed up.
-      die(`refusing to collect while ${liveConfig} carries sidecars from an interrupted run that `
-        + 'no longer match it. Resolve them by hand first.')
-    }
+    fs.writeFileSync(path.join(candidateCwd, '.mmr.yaml'), candidateText)
   }
-
-
-
 
   // Record what was actually reviewed. Without this, two arms can review
   // different code — a PR that gained a commit between runs, a rebuilt MMR, a
@@ -846,27 +579,14 @@ function collect(args) {
   const snapshot = path.join(outDir, SNAPSHOT_FILE)
 
   const base = ['review', '--channels', channels, '--sync', '--format', 'json', '--diff', snapshot]
-  // --diff is untrusted-head, so the candidate arm needs the explicit opt-in to
-  // have its .mmr.yaml read at all. The baseline arm wants no project config,
-  // which is what untrusted-head already gives it — which is also what makes
-  // paired mode work without swapping the file between runs.
+  // The candidate arm needs --trust-project-config to have the .mmr.yaml in its
+  // cwd read at all; the baseline arm has no config in its cwd, so it gets the
+  // built-in prompt either way. That one flag, plus the differing cwd, is the
+  // entire difference between the arms.
   const baselineArgs = [...base]
   if (args.config) base.push('--trust-project-config')
 
-  try {
-    // Installed INSIDE the try, and marked installed before the copy: a
-    // copyFileSync that fails after truncating the destination has still
-    // modified the repo root, so the finally must restore it. Everything that
-    // can fail without touching the repo root — gh pr diff, git, provenance —
-    // has already run above.
-    try {
-      swapper?.install()
-    } catch (err) {
-      // Restoration is handled by the finally and the exit hook; this only
-      // makes the failure read like the rest of the script's errors.
-      die(`could not install the candidate config at ${liveConfig}: ${err.message}`)
-    }
-
+  {
     // The treatment IS the prompt the channels receive, so record that, not a
     // proxy for it. A config digest — however canonicalized — can differ while
     // the assembled prompt is identical (a setting restated at its default, a
@@ -875,14 +595,14 @@ function collect(args) {
     // --dry-run assembles and prints the real thing without dispatching.
     // The snapshot must exist before --dry-run can resolve it.
     fs.writeFileSync(snapshot, reviewedDiff)
-    const assemble = (mmrArgs) => execFileSync('node', [MMR, ...mmrArgs, '--dry-run'], {
-      encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024, cwd: repoRoot,
+    const assemble = (mmrArgs, cwd) => execFileSync('node', [MMR, ...mmrArgs, '--dry-run'], {
+      encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024, cwd,
     })
     let dryRun
     let baselineDryRun = null
     try {
-      dryRun = assemble(base)
-      if (pairedOut !== null) baselineDryRun = assemble(baselineArgs)
+      dryRun = assemble(base, args.config ? candidateCwd : baselineCwd)
+      if (pairedOut !== null) baselineDryRun = assemble(baselineArgs, baselineCwd)
     } catch (err) {
       const detail = (err.stderr || err.message || '').toString().slice(0, 300)
       die(`could not assemble the prompt for this condition: ${detail}`)
@@ -896,10 +616,10 @@ function collect(args) {
     // at the repo root is simply not read unless that flag is passed. One
     // install, no per-run swapping, and the baseline is genuinely unaffected.
     const arms = pairedOut === null
-      ? [{ dir: outDir, mmrArgs: base, promptSource: dryRun }]
+      ? [{ dir: outDir, mmrArgs: base, cwd: args.config ? candidateCwd : baselineCwd, promptSource: dryRun }]
       : [
-        { dir: outDir, mmrArgs: baselineArgs, promptSource: baselineDryRun },
-        { dir: pairedOut, mmrArgs: base, promptSource: dryRun },
+        { dir: outDir, mmrArgs: baselineArgs, cwd: baselineCwd, promptSource: baselineDryRun },
+        { dir: pairedOut, mmrArgs: base, cwd: candidateCwd, promptSource: dryRun },
       ]
 
     // Written incomplete first. An interrupted collection leaves its finished
@@ -927,10 +647,6 @@ function collect(args) {
     // one condition spanning two execution environments, which no later check
     // can detect from the run files alone.
     const assertEnvironmentUnchanged = () => {
-      if (swapper && !swapper.stillInstalled()) {
-        die('the candidate config at the repo root changed during collection. '
-          + 'The runs so far span more than one treatment — re-collect.')
-      }
       if (buildDigest() !== provenanceBase.mmrDigest) {
         die('the MMR build changed during collection (was it rebuilt?). '
           + 'The runs so far span more than one build — re-collect.')
@@ -962,7 +678,7 @@ function collect(args) {
         assertEnvironmentUnchanged()
         runOnce({
           mmrArgs: arm.mmrArgs,
-          repoRoot,
+          cwd: arm.cwd,
           target: path.join(arm.dir, `run-${String(i).padStart(padWidth, '0')}.json`),
           index: i,
           total: n,
@@ -976,8 +692,6 @@ function collect(args) {
     for (const { path: pp, provenance } of provPaths) {
       fs.writeFileSync(pp, JSON.stringify({ ...provenance, complete: true }, null, 2))
     }
-  } finally {
-    restoreConfig()
   }
 }
 
@@ -1753,117 +1467,6 @@ function selftest() {
   assert.equal(RUN_FILE_RE.test('notes.json'), false)
   assert.equal(RUN_FILE_RE.test('run-01.json.bak'), false)
   assert.equal(RUN_FILE_RE.test('.mmr.yaml'), false)
-
-  // The config swapper, driven against a fake fs. Three defects have come from
-  // this logic; hand tracing is what let each of them through.
-  const fakeFs = (initial) => {
-    const files = { ...initial }
-    return {
-      files,
-      existsSync: (p2) => p2 in files,
-      readFileSync: (p2) => files[p2],
-      writeFileSync: (p2, v) => { files[p2] = v },
-      copyFileSync: (a, b) => { files[b] = files[a] },
-      rmSync: (p2) => { delete files[p2] },
-    }
-  }
-  // A killed run leaves sidecars that a later run recovers from.
-  let io3 = fakeFs({ '/live': 'ORIGINAL', '/cand': 'CANDIDATE' })
-  makeConfigSwapper('/live', 'CANDIDATE', io3).install()
-  assert.equal(io3.files['/live'], 'CANDIDATE')
-  assert.equal(io3.files['/live.harness-backup'], 'ORIGINAL')  // survives a SIGKILL
-  assert.equal(makeConfigSwapper('/live', 'CANDIDATE', io3).recoverIfStale(), 'recovered')
-  assert.equal(io3.files['/live'], 'ORIGINAL')
-  assert.equal('/live.harness-backup' in io3.files, false)
-  assert.equal('/live.harness-state' in io3.files, false)
-  // Nothing to recover when no run was interrupted.
-  assert.equal(makeConfigSwapper('/live', 'CANDIDATE', io3).recoverIfStale(), 'nothing-to-do')
-  // The case a backup file alone cannot express: nothing existed before, so
-  // there is no backup to find, and without the state sidecar the candidate
-  // would stay installed forever.
-  io3 = fakeFs({ '/cand': 'CANDIDATE' })
-  makeConfigSwapper('/live', 'CANDIDATE', io3).install()
-  assert.equal(io3.files['/live'], 'CANDIDATE')
-  assert.equal(makeConfigSwapper('/live', 'CANDIDATE', io3).recoverIfStale(), 'recovered')
-  assert.equal('/live' in io3.files, false)
-
-  // A pre-existing config is put back byte for byte.
-  let io2 = fakeFs({ '/live': 'ORIGINAL', '/cand': 'CANDIDATE' })
-  let sw = makeConfigSwapper('/live', 'CANDIDATE', io2)
-  sw.install()
-  assert.equal(io2.files['/live'], 'CANDIDATE')
-  sw.restore()
-  assert.equal(io2.files['/live'], 'ORIGINAL')
-  assert.equal('/live.harness-backup' in io2.files, false)  // backup cleaned up
-  // Restore is idempotent — it runs from a finally, a signal handler, and an
-  // exit hook, all of which can fire for one interruption.
-  sw.restore(); sw.restore()
-  assert.equal(io2.files['/live'], 'ORIGINAL')
-  // No pre-existing config: the candidate is removed, not left behind.
-  io2 = fakeFs({ '/cand': 'CANDIDATE' })
-  sw = makeConfigSwapper('/live', 'CANDIDATE', io2)
-  sw.install()
-  sw.restore()
-  assert.equal('/live' in io2.files, false)
-  // Never installed: restore must NOT delete a file the harness did not write.
-  io2 = fakeFs({ '/live': 'USERS_OWN', '/cand': 'CANDIDATE' })
-  sw = makeConfigSwapper('/live', 'CANDIDATE', io2)
-  sw.restore()
-  assert.equal(io2.files['/live'], 'USERS_OWN')
-  // A copy that throws while writing the LIVE file (the backup already taken)
-  // has touched the destination, so restore must undo it. Throwing on the first
-  // copy instead would test the backup step, which is a different scenario.
-  io2 = fakeFs({ '/live': 'ORIGINAL' })
-  const realWrite = io2.writeFileSync
-  io2.writeFileSync = (target, value) => {
-    if (target === '/live') { io2.files[target] = 'HALF-WRITTEN'; throw new Error('ENOSPC') }
-    return realWrite(target, value)
-  }
-  sw = makeConfigSwapper('/live', 'CANDIDATE', io2)
-  assert.throws(() => sw.install())
-  io2.writeFileSync = realWrite
-  sw.restore()
-  assert.equal(io2.files['/live'], 'ORIGINAL')
-
-  // restore() must NOT clobber an edit made DURING the run either.
-  io2 = fakeFs({ '/live': 'ORIGINAL', '/cand': 'CANDIDATE' })
-  sw = makeConfigSwapper('/live', 'CANDIDATE', io2)
-  sw.install()
-  io2.files['/live'] = 'EDITED_MID_RUN'
-  let errs0 = []
-  let realErr0 = console.error
-  console.error = (...a) => errs0.push(a.join(' '))
-  sw.restore()
-  console.error = realErr0
-  assert.equal(io2.files['/live'], 'EDITED_MID_RUN')
-  assert.equal('/live.harness-backup' in io2.files, false, 'the orphan-prone sidecar must not remain')
-  assert.equal(io2.files['/live.pre-harness'], 'ORIGINAL', 'the pre-run copy must be kept, out of harm')
-  assert.equal(errs0.length > 0, true)
-
-  // Recovery must NOT clobber a config the user wrote after the crash.
-  io2 = fakeFs({ '/live': 'ORIGINAL', '/cand': 'CANDIDATE' })
-  makeConfigSwapper('/live', 'CANDIDATE', io2).install()
-  io2.files['/live'] = 'USER_WROTE_THIS_AFTER_THE_CRASH'
-  const errs = []
-  const realErr = console.error
-  console.error = (...a) => errs.push(a.join(' '))
-  assert.equal(makeConfigSwapper('/live', 'CANDIDATE', io2).recoverIfStale(), 'refused')
-  console.error = realErr
-  assert.equal(io2.files['/live'], 'USER_WROTE_THIS_AFTER_THE_CRASH')
-  assert.equal(errs.length > 0, true, 'refusing to recover must say so')
-
-  // A backup with no state means the crash preceded the install, so the live
-  // config was never touched: clean the orphan, change nothing else.
-  io2 = fakeFs({ '/live': 'ORIGINAL', '/live.harness-backup': 'MAYBE_THE_USERS', '/cand': 'CANDIDATE' })
-  errs0 = []
-  realErr0 = console.error
-  console.error = (...a) => errs0.push(a.join(' '))
-  assert.equal(makeConfigSwapper('/live', 'CANDIDATE', io2).recoverIfStale(), 'nothing-to-do')
-  console.error = realErr0
-  assert.equal(io2.files['/live'], 'ORIGINAL')
-  // Unprovable ownership: report it, never delete it.
-  assert.equal(io2.files['/live.harness-backup'], 'MAYBE_THE_USERS')
-  assert.equal(errs0.length > 0, true)
 
   assert.equal(parseArgs(['--config=x.yaml'])['config'], 'x.yaml')
   assert.equal(parseArgs(['--n=6'])['n'], '6')
