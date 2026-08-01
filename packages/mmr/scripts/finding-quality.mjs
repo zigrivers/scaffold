@@ -133,8 +133,8 @@ function sha256(text) {
  * pulls in and in the prompt templates, so hashing it alone would call two
  * materially different builds identical.
  */
-function buildDigest(pkgRoot = path.resolve(HERE, '..')) {
-  const roots = [path.join(pkgRoot, 'dist'), path.join(pkgRoot, 'templates')]
+function buildDigest(pkgRoot = path.resolve(HERE, '..'), subdirs = ['dist', 'templates']) {
+  const roots = subdirs.map((s) => path.join(pkgRoot, s))
   const parts = []
   const walk = (dir) => {
     if (!fs.existsSync(dir)) return
@@ -157,6 +157,35 @@ function buildDigest(pkgRoot = path.resolve(HERE, '..')) {
  */
 function pkgRootOf(mmrEntry) {
   return path.resolve(path.dirname(mmrEntry), '..')
+}
+
+/**
+ * A channel's OWN timeout, or null when it inherits `defaults.timeout`.
+ *
+ * `mmr review --timeout` overrides `defaults.timeout` only — a channel that
+ * sets its own keeps it, silently, because dispatch resolves
+ * `chConfig.timeout ?? config.defaults.timeout`. Measured: with `--timeout 5`,
+ * codex (inherits) timed out at 5s while opencode (owns `timeout: 300`) ran
+ * 241.9s to completion.
+ *
+ * `mmr config show <channel>` prints a top-level `timeout:` line ONLY for a
+ * channel that carries its own, which is exactly the distinction needed.
+ */
+function channelLevelTimeout(channel) {
+  const neutral = fs.mkdtempSync(path.join(os.tmpdir(), 'fq-ch-'))
+  try {
+    const out = execFileSync('node', [MMR, 'config', 'show', channel], {
+      encoding: 'utf-8', maxBuffer: 4 * 1024 * 1024, cwd: neutral,
+    })
+    const m = out.match(/^timeout:\s*(\d+)/m)
+    return m ? Number(m[1]) : null
+  } catch {
+    // Unknown to `config show` (an alias, or a channel this build does not
+    // define). Not this function's job to adjudicate — dispatch will complain.
+    return null
+  } finally {
+    fs.rmSync(neutral, { recursive: true, force: true })
+  }
 }
 /** The rubric's floor. Below this, run-to-run variance dominates any effect. */
 const MIN_RUNS = 6
@@ -845,6 +874,21 @@ function collect(args) {
   }
   const n = Number(args.n ?? MIN_RUNS)
   const channels = args.channels ?? die('--channels required')
+  if (channelTimeout !== null) {
+    // --timeout that does not actually bind is worse than no --timeout: the
+    // experiment reads as bounded, and the channel that ignored it degrades a
+    // condition anyway. Refused rather than warned, because a warning scrolls
+    // past in an hour-long collection.
+    const unbounded = normalizeChannels(channels).split(',')
+      .map((c) => [c, channelLevelTimeout(c)])
+      .filter(([, t]) => t !== null && t !== channelTimeout)
+    if (unbounded.length > 0) {
+      die(`--timeout ${channelTimeout} would not apply to `
+        + `${unbounded.map(([c, t]) => `${c} (has its own timeout: ${t})`).join(', ')}. `
+        + 'MMR overrides defaults.timeout only, so a channel with its own keeps it. '
+        + 'Drop those channels, or set their timeout in ~/.mmr/config.yaml to match.')
+    }
+  }
   if (!args.pr && !args.diff) die('--pr or --diff required')
   if (!Number.isInteger(n) || n < 1) die('--n must be a positive integer')
   if (n < MIN_RUNS) {
@@ -1106,6 +1150,14 @@ function collect(args) {
         // Per-arm, because under a build treatment the two arms deliberately
         // run different builds. `report` decides which relationship to require.
         mmrDigest: buildDigest(pkgRootOf(arm.mmr)),
+        // Split, because "the build differs" is too coarse to license. Two
+        // builds can differ in dispatch logic, parsers, defaults or
+        // dependencies, and any finding difference would then be attributed to
+        // the prompt. A build treatment must change what the review ASKS —
+        // templates — and nothing about how it RUNS, which is the same line
+        // PROMPT_ONLY_KEYS draws for a config treatment.
+        distDigest: buildDigest(pkgRootOf(arm.mmr), ['dist']),
+        templatesDigest: buildDigest(pkgRootOf(arm.mmr), ['templates']),
         requestedRuns: n,
         complete: false,
       }
@@ -1383,6 +1435,13 @@ function incompleteConditionProblem(conditions) {
       return `${c.label} is still collecting (or was interrupted): it holds `
         + `${c.runs.length} of ${c.provenance.requestedRuns} run(s). `
         + 'Wait for `collect` to finish, or re-run it.'
+    }
+    // complete=true only records that collect finished; it does not survive a
+    // run file being removed afterwards. `report` checks this too, but score
+    // spends judge calls first, so it has to check here as well.
+    if (c.provenance.requestedRuns !== c.runs.length) {
+      return `${c.label} holds ${c.runs.length} run(s) but ${c.provenance.requestedRuns} `
+        + 'were requested — re-collect it'
     }
   }
   return null
@@ -1910,9 +1969,27 @@ function provenanceBlockers(conditions) {
   // must then actually differ, or the two arms ran the same build and any gap
   // between them is resampling. Requires BOTH sides to declare it, so a single
   // hand-edited provenance cannot switch off a guard for the pair.
-  const mustDiffer = bTreat === 'build' && cTreat === 'build'
-    ? ['mmrDigest', 'basePromptDigest']
-    : []
+  const buildTreatment = bTreat === 'build' && cTreat === 'build'
+  const mustDiffer = buildTreatment ? ['mmrDigest', 'basePromptDigest'] : []
+  // "The build differs" is too coarse to license. Two builds can differ in
+  // dispatch logic, parsers, defaults or dependencies, and every finding
+  // difference would then be credited to the prompt. So a build treatment must
+  // change templates/ and NOTHING in dist/ — the same line PROMPT_ONLY_KEYS
+  // draws for a config treatment, applied to a build.
+  // Skipped when either side predates these fields: absent is legacy data, not
+  // agreement.
+  if (buildTreatment && bp.distDigest !== undefined && cp.distDigest !== undefined) {
+    if (bp.distDigest !== cp.distDigest) {
+      out.push('the two builds differ in dist/, not only in templates/ — a build treatment may '
+        + 'change what the review ASKS, never how it RUNS, or finding differences cannot be '
+        + 'attributed to the prompt')
+    }
+    if (bp.templatesDigest !== undefined && cp.templatesDigest !== undefined
+      && bp.templatesDigest === cp.templatesDigest) {
+      out.push('the two builds have identical templates/ — a build treatment with no prompt '
+        + 'difference is not a treatment')
+    }
+  }
   // The per-channel timeout bounds what each run could produce: a channel that
   // times out in one arm and completes in the other contributes findings to
   // only one side. Paired collection cannot differ here — one invocation sets
@@ -2170,6 +2247,36 @@ function selftest() {
     assert.equal(blockers.length, 1, `an identical ${key} must block a build treatment`)
     assert.match(blockers[0], new RegExp(`^${key} is identical`))
   }
+  // A build treatment may change templates/ but nothing in dist/: otherwise the
+  // arms differ in how the review RUNS and no finding difference is
+  // attributable to the prompt.
+  // Baseline keeps the fixture's default digests; only the candidate moves, so
+  // the mustDiffer fields genuinely differ and these cases isolate dist vs
+  // templates.
+  const btBase = (over = {}) => ({ ...build, distDigest: 'd', templatesDigest: 't', ...over })
+  const btCand = (over = {}) => ({
+    ...build, mmrDigest: 'm2', basePromptDigest: 'b2', distDigest: 'd', templatesDigest: 't2', ...over,
+  })
+  assert.deepEqual(
+    provenanceBlockers(conds(btBase(), btCand())),
+    [],
+    'same dist, different templates is the valid shape',
+  )
+  assert.match(
+    provenanceBlockers(conds(btBase(), btCand({ distDigest: 'd2' })))[0],
+    /differ in dist\//,
+  )
+  assert.match(
+    provenanceBlockers(conds(btBase(), btCand({ templatesDigest: 't' })))[0],
+    /identical templates\//,
+  )
+  // Legacy provenance lacking the split digests must still validate: absent is
+  // old data, not agreement.
+  assert.deepEqual(
+    provenanceBlockers(conds(build, { ...build, mmrDigest: 'm2', basePromptDigest: 'b2' })),
+    [],
+  )
+
   // The build treatment relaxes ONLY those two fields.
   assert.match(
     provenanceBlockers(conds(build, { ...build, mmrDigest: 'm2', basePromptDigest: 'b2', diffDigest: 'd2' }))[0],
@@ -2207,6 +2314,11 @@ function selftest() {
   assert.match(
     incompleteConditionProblem([cnd(), cnd({ provenance: { complete: false, requestedRuns: 6 }, runs: [1] })]),
     /still collecting.*holds 1 of 6 run\(s\)/,
+  )
+  assert.match(
+    incompleteConditionProblem([cnd({ runs: [1, 2, 3] })]),
+    /holds 3 run\(s\) but 6 were requested/,
+    'complete=true does not survive a run file being deleted afterwards',
   )
   assert.match(incompleteConditionProblem([cnd({ provenance: null })]), /no provenance\.json/)
   assert.match(incompleteConditionProblem([cnd({ provenance: undefined })]), /no provenance\.json/)
