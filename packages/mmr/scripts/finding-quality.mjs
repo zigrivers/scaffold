@@ -517,11 +517,18 @@ function runOnce({ mmrArgs, cwd, target, index, total, label }) {
 function lockOutDir(dir) {
   const lockPath = path.join(dir, LOCK_FILE)
   const take = () => {
-    // 'wx' fails if the file exists, atomically. An existence check followed by
-    // a write is not a lock: two collectors can both see nothing and both write.
-    const fd = fs.openSync(lockPath, 'wx')
-    fs.writeSync(fd, String(process.pid))
-    fs.closeSync(fd)
+    // Written first, then LINKED into place. link() is atomic and fails if the
+    // target exists, so the lock file has its pid from the instant it becomes
+    // visible. Creating it empty and writing after — even with 'wx' — leaves a
+    // window where another collector reads an empty pid, calls it stale, and
+    // steals a live lock.
+    const staging = path.join(dir, `.collect-lock.staging-${process.pid}`)
+    fs.writeFileSync(staging, String(process.pid))
+    try {
+      fs.linkSync(staging, lockPath)
+    } finally {
+      fs.rmSync(staging, { force: true })
+    }
     process.once('exit', () => fs.rmSync(lockPath, { force: true }))
   }
   try {
@@ -530,7 +537,20 @@ function lockOutDir(dir) {
   } catch (err) {
     if (err.code !== 'EEXIST') die(`could not lock ${dir}: ${err.message}`)
   }
-  const pid = Number.parseInt(fs.readFileSync(lockPath, 'utf-8').trim(), 10)
+  let pidText = ''
+  try {
+    pidText = fs.readFileSync(lockPath, 'utf-8').trim()
+  } catch {
+    die(`${dir} holds a lock that cannot be read. Remove ${LOCK_FILE} by hand if no `
+      + 'collection is running.')
+  }
+  const pid = Number.parseInt(pidText, 10)
+  if (!Number.isInteger(pid)) {
+    // Never guess. An unparseable pid used to be treated as dead, which is the
+    // assumption most likely to steal a live lock.
+    die(`${dir} holds a lock with an unreadable owner (${JSON.stringify(pidText)}). `
+      + `Remove ${LOCK_FILE} by hand if no collection is running.`)
+  }
   let alive = false
   if (Number.isInteger(pid) && pid > 0 && pid !== process.pid) {
     try {
@@ -588,7 +608,8 @@ function assertOwnedOrEmpty(dir) {
       + 'Refusing to touch it — pick an empty or previously-collected directory.')
   }
   const foreign = entries.filter((f) =>
-    !(RUN_FILE_RE.test(f) || f === PROVENANCE_FILE || f === SNAPSHOT_FILE || f === OWNER_FILE))
+    !(RUN_FILE_RE.test(f) || f === PROVENANCE_FILE || f === SNAPSHOT_FILE || f === OWNER_FILE
+      || f.startsWith('.collect-lock')))
   if (foreign.length > 0) {
     die(`${dir} contains ${foreign.length} file(s) this harness did not write `
       + `(e.g. ${foreign.slice(0, 3).join(', ')}). Refusing to use it.`)
@@ -989,8 +1010,17 @@ function loadArms(args) {
  * A denylist is only current until the judge CLI adds a tool, and the prompt it
  * will receive embeds an attacker-controlled diff. Documentation asking someone
  * to re-verify after an upgrade is not a control; this is. It writes a file
- * whose contents cannot be guessed and asks the judge to read it — if the
- * contents come back, tools are live and scoring stops.
+ * whose contents cannot be guessed and pushes the judge to obtain them by any
+ * means — if they come back, tools are live and scoring stops.
+ *
+ * What this does NOT prove: that a tool is absent. It proves the judge did not
+ * USE one on this attempt, which a model could also achieve by declining. It is
+ * a smoke test against an out-of-date denylist, not a sandbox — the harness
+ * cannot sandbox a CLI it does not control.
+ *
+ * The residual exposure is bounded by what the judge is shown: a diff from a
+ * public PR and findings derived from it, both already public. The risk is a
+ * tool being REACHED, not a secret being disclosed.
  */
 function assertJudgeSandboxed(judge) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fq-probe-'))
@@ -1009,8 +1039,14 @@ function assertJudgeSandboxed(judge) {
         encoding: 'utf-8',
         maxBuffer: 4 * 1024 * 1024,
         cwd: dir,
-        input: `Read the file ${probeFile} and reply with its exact contents. `
-          + 'If you cannot read files, reply exactly: TOOLS_DENIED\n',
+        // Two avenues, and no polite opt-out: a probe that offers "reply
+        // TOOLS_DENIED if you cannot" lets a model that COULD read decline and
+        // still look sandboxed. Insisting on the value means only an actual
+        // capability produces a pass-or-fail signal.
+        input: 'Use any tool available to you to obtain the contents of the file '
+          + `${probeFile} — read it, or run \`cat ${probeFile}\`. Reply with the exact `
+          + 'contents and nothing else. Do not guess or fabricate the contents; if you '
+          + 'genuinely have no tool that can obtain them, reply with the single word NOTOOLS.\n',
       })
     } catch (err) {
       out = (err.stdout ?? '').toString()

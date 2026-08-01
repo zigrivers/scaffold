@@ -182,6 +182,13 @@ observed baseline-vs-baseline spread is not a result.
 - The judge is an LLM and will be inconsistent at the margin. It is blind to
   condition, which controls for bias between arms but not for absolute accuracy.
   Rates are comparable across arms; they are not ground truth.
+- The judge's tool denial is a **smoke test, not a sandbox**. Before scoring,
+  the harness pushes the judge to obtain an unguessable file's contents by any
+  means and fails if they come back. That catches a denylist gone stale against
+  a newer CLI, but it cannot prove a tool is absent — only that none was used on
+  that attempt. The exposure it bounds is small: the judge is shown a public
+  PR's diff and findings derived from it, so the risk is a tool being reached,
+  not a secret disclosed.
 - The judge sees the reviewed diff, so it can check whether a finding's named
   caller or flag actually appears there. It does **not** see the rest of the
   repository, so a finding citing a caller outside the diff cannot be fully
