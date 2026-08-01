@@ -256,6 +256,26 @@ function firstJsonArray(text) {
  */
 const PROMPT_ONLY_KEYS = ['version', 'review_criteria']
 
+/**
+ * The decision half of assertPromptOnlyConfig, separated so it can be tested.
+ * Returns a problem description, or null when the config is acceptable.
+ */
+function promptOnlyProblem(text) {
+  let parsed
+  try {
+    parsed = yaml.load(text)
+  } catch (err) {
+    return `is not parseable YAML: ${err.message}`
+  }
+  if (parsed === null || parsed === undefined) return null
+  if (typeof parsed !== 'object' || Array.isArray(parsed)) return 'must be a YAML mapping'
+  const offending = Object.keys(parsed).filter((k) => !PROMPT_ONLY_KEYS.includes(k))
+  if (offending.length === 0) return null
+  return `sets ${offending.join(', ')}. A candidate may only set ${PROMPT_ONLY_KEYS.join(', ')} `
+    + '— anything else changes how the review runs, not just what it asks, and the harness would '
+    + 'report that as a prompt effect.'
+}
+
 function assertPromptOnlyConfig(file) {
   let text
   try {
@@ -263,25 +283,8 @@ function assertPromptOnlyConfig(file) {
   } catch (err) {
     die(`could not read ${file}: ${err.message}`)
   }
-  // Parsed, not pattern-matched. A regex over line starts misses flow mappings
-  // ({channels: {...}}), quoted keys, and explicit-key syntax — so a config
-  // that changes execution could pass the guard whose entire job is to catch it.
-  let parsed
-  try {
-    parsed = yaml.load(text)
-  } catch (err) {
-    die(`could not parse ${file}: ${err.message}`)
-  }
-  if (parsed === null || parsed === undefined) return text
-  if (typeof parsed !== 'object' || Array.isArray(parsed)) {
-    die(`${file} must be a YAML mapping`)
-  }
-  const offending = Object.keys(parsed).filter((k) => !PROMPT_ONLY_KEYS.includes(k))
-  if (offending.length > 0) {
-    die(`${file} sets ${offending.join(', ')}. A candidate may only set `
-      + `${PROMPT_ONLY_KEYS.join(', ')} — anything else changes how the review runs, not just `
-      + 'what it asks, and the harness would report that as a prompt effect.')
-  }
+  const problem = promptOnlyProblem(text)
+  if (problem) die(`${file} ${problem}`)
   // Return the validated bytes so the caller installs exactly what was checked.
   return text
 }
@@ -408,9 +411,14 @@ function makeConfigSwapper(livePath, candidateText, io = fs) {
     recoverIfStale() {
       const state = readState()
       if (!state) {
-        // A backup with no state means we died before recording the install, so
-        // the live config was never touched. Clean the orphan and stop.
-        if (io.existsSync(backupPath)) io.rmSync(backupPath, { force: true })
+        // No state file means we cannot prove the harness wrote whatever sits
+        // at backupPath — the name is predictable, so it may be the user's own
+        // file. Say so and leave it; deleting on a guess is how a config gets
+        // destroyed by the code meant to protect it.
+        if (io.existsSync(backupPath)) {
+          console.error(`[harness] ${backupPath} exists with no matching state file. `
+            + 'Not touching it — remove it by hand if it is a leftover.')
+        }
         return 'nothing-to-do'
       }
       const live = io.existsSync(livePath) ? io.readFileSync(livePath, 'utf-8') : null
@@ -429,8 +437,8 @@ function makeConfigSwapper(livePath, candidateText, io = fs) {
       // that the harness was mid-swap, and records what to look for on recovery.
       io.writeFileSync(statePath, JSON.stringify({ installedDigest: sha256(candidateText) }))
       installed = true
-      // Written from the bytes validated earlier, not re-read from disk: a file
-      // edited between validation and install could otherwise smuggle in
+      // From the bytes validated earlier, not re-read from disk: a file edited
+      // between validation and install could otherwise smuggle in
       // execution-changing keys the prompt-only check already cleared.
       io.writeFileSync(livePath, candidateText)
       installCompleted = true
@@ -1601,12 +1609,17 @@ function report(args) {
   // message distinguishes a drop that clears the baseline's own run-to-run
   // defect range from one inside it. Both block; only the first is evidence
   // the change actually suppressed real defects.
-  const defectDropPerRun = Math.max(...base.defectsPerRun) - Math.min(...base.defectsPerRun)
+  // Per-run against per-run. Comparing the POOLED drop against a single run's
+  // spread mixes units — with N runs a drop of one defect per run reads as N,
+  // which clears the spread trivially and labels ordinary noise a real
+  // regression.
+  const baselineSpreadPerRun = Math.max(...base.defectsPerRun) - Math.min(...base.defectsPerRun)
+  const dropPerRun = (base.defects - cand.defects) / Math.max(1, base.runs)
   const defectVerdict = v.defectsHeld
     ? 'held'
-    : (base.defects - cand.defects) > defectDropPerRun
-      ? 'DROPPED beyond the baseline\'s own defect spread — the bar moved, not the noise'
-      : 'dropped, but within the baseline\'s own defect spread — inconclusive, and still not shippable'
+    : dropPerRun > baselineSpreadPerRun
+      ? 'DROPPED beyond the baseline\'s own per-run defect spread — the bar moved, not the noise'
+      : 'dropped, but within the baseline\'s own per-run defect spread — inconclusive, and still not shippable'
 
   console.log(`speculative rate:  ${pct(base.speculativeRate)} → ${pct(cand.speculativeRate)}  `
     + `${v.specDown ? 'down' : 'NOT down'}`)
@@ -1617,7 +1630,8 @@ function report(args) {
   console.log(`improvement ${pct(v.improvement)} vs baseline per-run spread ${pct(v.bandLo)}–${pct(v.bandHi)} `
     + `(width ${pct(v.margin)}) — ${v.outsideBand ? 'clears the noise band' : 'INSIDE the noise band'}`)
   console.log(`defect count:     ${base.defects} → ${cand.defects}  ${defectVerdict}`)
-  console.log(`baseline defects per run: ${range(base.defectsPerRun)}`)
+  console.log(`baseline defects per run: ${range(base.defectsPerRun)} `
+    + `(candidate is ${dropPerRun >= 0 ? '-' : '+'}${Math.abs(dropPerRun).toFixed(2)} per run)`)
   if (v.lostSites.length > 0) {
     console.log(`LOST DEFECT SITES: ${v.lostSites.join(', ')} — the baseline found defects here in `
       + 'more than one run and the candidate found none')
@@ -1840,10 +1854,16 @@ function selftest() {
 
   // A backup with no state means the crash preceded the install, so the live
   // config was never touched: clean the orphan, change nothing else.
-  io2 = fakeFs({ '/live': 'ORIGINAL', '/live.harness-backup': 'ORIGINAL', '/cand': 'CANDIDATE' })
+  io2 = fakeFs({ '/live': 'ORIGINAL', '/live.harness-backup': 'MAYBE_THE_USERS', '/cand': 'CANDIDATE' })
+  errs0 = []
+  realErr0 = console.error
+  console.error = (...a) => errs0.push(a.join(' '))
   assert.equal(makeConfigSwapper('/live', 'CANDIDATE', io2).recoverIfStale(), 'nothing-to-do')
+  console.error = realErr0
   assert.equal(io2.files['/live'], 'ORIGINAL')
-  assert.equal('/live.harness-backup' in io2.files, false)
+  // Unprovable ownership: report it, never delete it.
+  assert.equal(io2.files['/live.harness-backup'], 'MAYBE_THE_USERS')
+  assert.equal(errs0.length > 0, true)
 
   assert.equal(parseArgs(['--config=x.yaml'])['config'], 'x.yaml')
   assert.equal(parseArgs(['--n=6'])['n'], '6')
@@ -1896,6 +1916,19 @@ function selftest() {
   assert.equal(clusters.filter((c) => c.file === 'src/a.ts').length, 2, 'unrelated defects stay separate')
   const nullCluster = clusters.find((c) => c.tokens.includes('dereference'))
   assert.equal(nullCluster.runs, 2, 'the same defect reworded collapses into one cluster')
+
+  // The prompt-only guard is what keeps the treatment from changing HOW a
+  // review runs. It was the one load-bearing check with no coverage.
+  assert.equal(promptOnlyProblem('version: 1\nreview_criteria: ["x"]\n'), null)
+  assert.equal(promptOnlyProblem(''), null)
+  assert.equal(promptOnlyProblem('review_criteria: []\n'), null)
+  assert.equal(promptOnlyProblem('channels:\n  claude:\n    command: evil\n') !== null, true)
+  assert.equal(promptOnlyProblem('defaults:\n  timeout: 1\n') !== null, true)
+  // Flow mapping and quoted keys — the forms a line-start regex used to miss.
+  assert.equal(promptOnlyProblem('{channels: {claude: {command: evil}}}') !== null, true)
+  assert.equal(promptOnlyProblem('"channels":\n  claude: {}\n') !== null, true)
+  assert.equal(promptOnlyProblem('- a\n- b\n') !== null, true)
+  assert.equal(promptOnlyProblem('just a string') !== null, true)
 
   assert.equal(normalizeChannels('claude, codex'), 'claude,codex')
   assert.equal(normalizeChannels('codex,claude'), normalizeChannels('claude, codex'))
