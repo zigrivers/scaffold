@@ -95,6 +95,11 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     if (!a.startsWith('--')) { out._.push(a); continue }
+    // --flag=value, not only --flag value. Without this the whole token became
+    // a key and the real flag read as missing — so `--config=x` silently ran a
+    // baseline collection while the caller believed they had set a treatment.
+    const eq = a.indexOf('=')
+    if (eq !== -1) { out[a.slice(2, eq)] = a.slice(eq + 1); continue }
     const next = argv[i + 1]
     // A flag followed by another flag, or by nothing, is a boolean.
     out[a.slice(2)] = next === undefined || next.startsWith('--') ? true : argv[++i]
@@ -182,6 +187,40 @@ function conditionLabel(dir) {
 
 // ---------------------------------------------------------------- collect
 
+/**
+ * The one piece of the harness that mutates a file outside its own output
+ * directory: the repo-root .mmr.yaml.
+ *
+ * Extracted because it has been the source of three separate defects — a
+ * signal arriving before the backup existed, a `finally` skipped by
+ * process.exit, and a partial copy leaving the destination truncated. Hand
+ * tracing kept missing one; a factory can be driven by the selftest.
+ *
+ * `restore()` is idempotent and inert until `install()` has actually run, so it
+ * is safe to call from a finally, a signal handler, and an exit hook at once.
+ */
+function makeConfigSwapper(livePath, candidatePath, io = fs) {
+  let original = null
+  let installed = false
+  let restored = false
+  return {
+    install() {
+      if (io.existsSync(livePath)) original = io.readFileSync(livePath, 'utf-8')
+      // Set BEFORE the copy: a copy that fails partway has still modified the
+      // destination, and restore must know to undo it.
+      installed = true
+      io.copyFileSync(candidatePath, livePath)
+    },
+    restore() {
+      if (!installed || restored) return
+      restored = true
+      if (original !== null) io.writeFileSync(livePath, original)
+      else io.rmSync(livePath, { force: true })
+    },
+    get installed() { return installed },
+  }
+}
+
 /** Canonical channel-list form, so two spellings of one set never differ. */
 function normalizeChannels(list) {
   return list.split(',').map((c) => c.trim()).filter(Boolean).sort().join(',')
@@ -237,19 +276,10 @@ function collect(args) {
   // (rather than committing it) keeps the experiment off the branch under test.
   const repoRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf-8' }).trim()
   const liveConfig = path.join(repoRoot, '.mmr.yaml')
-  let restore = null
-  let installed = false
-  let restored = false
-  const restoreConfig = () => {
-    // Inert until we have actually replaced the file. The handlers below are
-    // registered early on purpose, and without this guard a signal arriving
-    // before installation would run the `restore === null` branch and DELETE
-    // the user's own .mmr.yaml — destroying config the harness never touched.
-    if (!installed || restored) return
-    restored = true
-    if (restore !== null) fs.writeFileSync(liveConfig, restore)
-    else fs.rmSync(liveConfig, { force: true })
-  }
+  const swapper = args.config ? makeConfigSwapper(liveConfig, path.resolve(args.config)) : null
+  // Inert until install() has run, so a signal arriving before then cannot
+  // delete a .mmr.yaml the harness never touched.
+  const restoreConfig = () => swapper?.restore()
   // A `finally` does not run on SIGINT/SIGTERM, and a collect run takes long
   // enough that Ctrl-C during it is the common case — leaving the candidate
   // config sitting at the repo root, where it would silently apply to the
@@ -311,11 +341,7 @@ function collect(args) {
     // modified the repo root, so the finally must restore it. Everything that
     // can fail without touching the repo root — gh pr diff, git, provenance —
     // has already run above.
-    if (args.config) {
-      if (fs.existsSync(liveConfig)) restore = fs.readFileSync(liveConfig, 'utf-8')
-      installed = true
-      fs.copyFileSync(path.resolve(args.config), liveConfig)
-    }
+    swapper?.install()
 
     // The treatment IS the prompt the channels receive, so record that, not a
     // proxy for it. A config digest — however canonicalized — can differ while
@@ -334,14 +360,27 @@ function collect(args) {
     // Strip the diff, which is identical across arms by construction and would
     // otherwise dominate the digest.
     const promptOnly = dryRun.split('## Diff')[0]
-    const provenance = { ...provenanceBase, promptDigest: sha256(promptOnly) }
-    fs.writeFileSync(path.join(outDir, PROVENANCE_FILE), JSON.stringify(provenance, null, 2))
+    // Written incomplete first. An interrupted collection leaves its finished
+    // runs on disk, and with --n above the floor report would otherwise see
+    // enough of them to call a truncated condition complete and issue a verdict
+    // from it.
+    const provenance = {
+      ...provenanceBase,
+      promptDigest: sha256(promptOnly),
+      requestedRuns: n,
+      complete: false,
+    }
+    const provPath = path.join(outDir, PROVENANCE_FILE)
+    fs.writeFileSync(provPath, JSON.stringify(provenance, null, 2))
 
+    // Width from N, so lexicographic sort stays chronological past 99 runs
+    // (run-100 would otherwise sort before run-11).
+    const padWidth = Math.max(2, String(n).length)
     // Serial, never parallel: concurrent same-account sessions are exactly the
     // condition that makes grok return a cancelled envelope, and a channel that
     // degrades in one arm and not the other silently biases the comparison.
     for (let i = 1; i <= n; i++) {
-      const target = path.join(outDir, `run-${String(i).padStart(2, '0')}.json`)
+      const target = path.join(outDir, `run-${String(i).padStart(padWidth, '0')}.json`)
       fs.rmSync(target, { force: true })
       process.stderr.write(`[${conditionLabel(outDir)}] run ${i}/${n} … `)
       const started = Date.now()
@@ -386,6 +425,7 @@ function collect(args) {
         + (degraded.length ? `  DEGRADED ${degraded.join(' ')}` : '') + '\n',
       )
     }
+    fs.writeFileSync(provPath, JSON.stringify({ ...provenance, complete: true }, null, 2))
   } finally {
     restoreConfig()
   }
@@ -799,6 +839,14 @@ function report(args) {
     extraBlockers.push('a condition has no provenance.json — re-run `collect` so the reviewed '
       + 'diff, channel set, and MMR build are recorded')
   } else {
+    for (const [cond, prov] of [[conditions[0], bp], [conditions[1], cp]]) {
+      if (prov.complete !== true) {
+        extraBlockers.push(`${cond.label} was never finished — re-run \`collect\` for it`)
+      } else if (prov.requestedRuns !== cond.runs.length) {
+        extraBlockers.push(`${cond.label} holds ${cond.runs.length} run(s) but ${prov.requestedRuns} `
+          + 'were requested — re-collect it')
+      }
+    }
     for (const key of ['target', 'diffDigest', 'channels', 'mmrDigest', 'repoCommit']) {
       if (JSON.stringify(bp[key]) !== JSON.stringify(cp[key])) {
         extraBlockers.push(`${key} differs between conditions (${bp[key]} vs ${cp[key]}) — `
@@ -935,6 +983,54 @@ function selftest() {
   assert.equal(RUN_FILE_RE.test('notes.json'), false)
   assert.equal(RUN_FILE_RE.test('run-01.json.bak'), false)
   assert.equal(RUN_FILE_RE.test('.mmr.yaml'), false)
+
+  // The config swapper, driven against a fake fs. Three defects have come from
+  // this logic; hand tracing is what let each of them through.
+  const fakeFs = (initial) => {
+    const files = { ...initial }
+    return {
+      files,
+      existsSync: (p2) => p2 in files,
+      readFileSync: (p2) => files[p2],
+      writeFileSync: (p2, v) => { files[p2] = v },
+      copyFileSync: (a, b) => { files[b] = files[a] },
+      rmSync: (p2) => { delete files[p2] },
+    }
+  }
+  // A pre-existing config is put back byte for byte.
+  let io2 = fakeFs({ '/live': 'ORIGINAL', '/cand': 'CANDIDATE' })
+  let sw = makeConfigSwapper('/live', '/cand', io2)
+  sw.install()
+  assert.equal(io2.files['/live'], 'CANDIDATE')
+  sw.restore()
+  assert.equal(io2.files['/live'], 'ORIGINAL')
+  // Restore is idempotent — it runs from a finally, a signal handler, and an
+  // exit hook, all of which can fire for one interruption.
+  sw.restore(); sw.restore()
+  assert.equal(io2.files['/live'], 'ORIGINAL')
+  // No pre-existing config: the candidate is removed, not left behind.
+  io2 = fakeFs({ '/cand': 'CANDIDATE' })
+  sw = makeConfigSwapper('/live', '/cand', io2)
+  sw.install()
+  sw.restore()
+  assert.equal('/live' in io2.files, false)
+  // Never installed: restore must NOT delete a file the harness did not write.
+  io2 = fakeFs({ '/live': 'USERS_OWN', '/cand': 'CANDIDATE' })
+  sw = makeConfigSwapper('/live', '/cand', io2)
+  sw.restore()
+  assert.equal(io2.files['/live'], 'USERS_OWN')
+  // A copy that throws partway has still touched the destination, so restore
+  // must undo it rather than treating the swap as never having happened.
+  io2 = fakeFs({ '/live': 'ORIGINAL', '/cand': 'CANDIDATE' })
+  io2.copyFileSync = () => { throw new Error('ENOSPC') }
+  sw = makeConfigSwapper('/live', '/cand', io2)
+  assert.throws(() => sw.install())
+  sw.restore()
+  assert.equal(io2.files['/live'], 'ORIGINAL')
+
+  assert.equal(parseArgs(['--config=x.yaml'])['config'], 'x.yaml')
+  assert.equal(parseArgs(['--n=6'])['n'], '6')
+  assert.equal(parseArgs(['--out=/a/b', '--force'])['out'], '/a/b')
 
   assert.equal(normalizeChannels('claude, codex'), 'claude,codex')
   assert.equal(normalizeChannels('codex,claude'), normalizeChannels('claude, codex'))
