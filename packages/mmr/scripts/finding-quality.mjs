@@ -745,6 +745,57 @@ function prepareOutDir(dir, forced) {
   fs.writeFileSync(path.join(dir, OWNER_FILE), 'finding-quality harness output directory\n')
 }
 
+/**
+ * Argument-level problems in a `collect` invocation, as a problem string or
+ * null.
+ *
+ * Pure over `facts` — every filesystem question is answered by the caller and
+ * passed in — so `selftest` can drive branches that otherwise need a built
+ * second package on disk and an hour of collection to reach. The validation
+ * that guards an expensive, long-running command is exactly the validation
+ * worth testing, and inline in `collect` none of it was reachable.
+ */
+function collectProblem(facts) {
+  const {
+    baselineMmrGiven, paired, config, timeout,
+    entryIsDistIndex, entryExists, hasDist, hasTemplates, sameBuild,
+  } = facts
+  if (timeout !== null && (!Number.isInteger(timeout) || timeout < 1)) {
+    return '--timeout must be a positive integer number of seconds'
+  }
+  if (!baselineMmrGiven) {
+    if (paired && !config) {
+      return '--paired needs --config or --baseline-mmr: the paired arm IS the candidate treatment'
+    }
+    return null
+  }
+  // Unpaired collection runs a single arm, so there is no baseline arm for a
+  // second build to be the baseline OF. Silently ignoring the flag would run an
+  // hour of the wrong condition.
+  if (!paired) return '--baseline-mmr requires --paired: it names the build for the baseline arm'
+  // Two treatment mechanisms at once is two treatments, and provenance can only
+  // record one: `treatment: "build"` would be written while the candidate arm
+  // ALSO carried a config the baseline lacked, so a config effect would be
+  // reported as a build effect with nothing able to detect it.
+  if (config) {
+    return '--config and --baseline-mmr are two different treatments — passing both makes the '
+      + 'arms differ in build AND configuration, and provenance can record only one cause. '
+      + 'Run them as separate experiments.'
+  }
+  if (!entryExists) return 'not found'
+  // pkgRootOf resolves the entry point upward exactly one level, so anything
+  // not shaped like <package>/dist/index.js resolves to the wrong root — one
+  // with no dist/ or templates/, where buildDigest walks nothing and digests
+  // the empty string. Two such paths compare equal, and a declared build
+  // treatment silently has no treatment.
+  if (!entryIsDistIndex) return 'must point at <package>/dist/index.js'
+  if (!hasDist || !hasTemplates) {
+    return 'does not look like a built MMR package: dist/ and templates/ must both exist beside it'
+  }
+  if (sameBuild) return 'is byte-identical to this build — there is no treatment'
+  return null
+}
+
 function collect(args) {
   // Absolute from here on. The MMR child runs with cwd=repoRoot, so a relative
   // --out would hand it a --diff path resolved against the repo root instead of
@@ -761,54 +812,38 @@ function collect(args) {
   // identical, and `report` still refuses a verdict when the two assembled
   // prompts turn out the same.
   const baselineMmr = args['baseline-mmr'] ? path.resolve(args['baseline-mmr']) : MMR
-  if (pairedOut !== null) {
-    if (pairedOut === outDir) die('--paired must name a different directory from --out')
-    if (!args.config && baselineMmr === MMR) {
-      die('--paired needs --config or --baseline-mmr: the paired arm IS the candidate treatment')
-    }
-  } else if (baselineMmr !== MMR) {
-    // Unpaired collection runs a single arm, so there is no baseline arm for a
-    // second build to be the baseline OF. Silently ignoring the flag would run
-    // an hour of the wrong condition.
-    die('--baseline-mmr requires --paired: it names the build for the baseline arm')
+  if (pairedOut !== null && pairedOut === outDir) {
+    die('--paired must name a different directory from --out')
   }
-  if (baselineMmr !== MMR) {
-    // Two treatment mechanisms at once is two treatments, and provenance can
-    // only record one. `treatment: 'build'` would be written while the
-    // candidate arm ALSO carried a config the baseline lacked, so a config
-    // effect would be reported as a build effect with nothing able to detect
-    // it. Refused rather than merged into a compound label: an experiment
-    // whose cause is ambiguous answers no question worth asking.
-    if (args.config) {
-      die('--config and --baseline-mmr are two different treatments — passing both makes the '
-        + 'arms differ in build AND configuration, and provenance can record only one cause. '
-        + 'Run them as separate experiments.')
-    }
-    if (!fs.existsSync(baselineMmr)) die(`--baseline-mmr ${baselineMmr} not found`)
-    // pkgRootOf resolves dist/index.js upward one level. A path shaped
-    // differently resolves to a directory with no dist/ or templates/, where
-    // buildDigest walks nothing and returns the digest of an empty string —
-    // two such paths would compare equal and a build treatment would silently
-    // have no treatment.
+  const channelTimeout = args.timeout === undefined ? null : Number(args.timeout)
+  {
+    const given = baselineMmr !== MMR
+    // Answered here so collectProblem itself stays pure and testable. The
+    // digest comparison is skipped unless the layout is right, because on a
+    // wrong root buildDigest walks nothing and digests the empty string.
     const baseRoot = pkgRootOf(baselineMmr)
-    for (const required of ['dist', 'templates']) {
-      if (!fs.existsSync(path.join(baseRoot, required))) {
-        die(`--baseline-mmr ${baselineMmr} does not look like a built MMR package: `
-          + `${path.join(baseRoot, required)} is missing. Point it at <package>/dist/index.js.`)
-      }
-    }
-    // Same bytes means no treatment. Caught here rather than an hour later,
-    // and `report` catches the subtler case where different bytes still
-    // assemble the same prompt.
-    if (buildDigest(pkgRootOf(baselineMmr)) === buildDigest()) {
-      die(`--baseline-mmr ${baselineMmr} is byte-identical to this build — there is no treatment`)
+    const entryExists = given && fs.existsSync(baselineMmr)
+    const entryIsDistIndex = path.basename(baselineMmr) === 'index.js'
+      && path.basename(path.dirname(baselineMmr)) === 'dist'
+    const hasDist = entryExists && fs.existsSync(path.join(baseRoot, 'dist'))
+    const hasTemplates = entryExists && fs.existsSync(path.join(baseRoot, 'templates'))
+    const problem = collectProblem({
+      baselineMmrGiven: given,
+      paired: pairedOut !== null,
+      config: Boolean(args.config),
+      timeout: channelTimeout,
+      entryExists,
+      entryIsDistIndex,
+      hasDist,
+      hasTemplates,
+      sameBuild: given && entryIsDistIndex && hasDist && hasTemplates
+        && buildDigest(baseRoot) === buildDigest(),
+    })
+    if (problem !== null) {
+      die(problem.startsWith('--') ? problem : `--baseline-mmr ${baselineMmr} ${problem}`)
     }
   }
   const n = Number(args.n ?? MIN_RUNS)
-  const channelTimeout = args.timeout === undefined ? null : Number(args.timeout)
-  if (channelTimeout !== null && (!Number.isInteger(channelTimeout) || channelTimeout < 1)) {
-    die('--timeout must be a positive integer number of seconds')
-  }
   const channels = args.channels ?? die('--channels required')
   if (!args.pr && !args.diff) die('--pr or --diff required')
   if (!Number.isInteger(n) || n < 1) die('--n must be a positive integer')
@@ -1330,26 +1365,38 @@ function assertJudgeSandboxed(judge) {
 
 // ------------------------------------------------------------------ score
 
+/**
+ * The first condition that is not a finished collection, as a problem string,
+ * or null when all of them are.
+ *
+ * `score` spends real judge calls, so an unfinished arm has to be refused
+ * BEFORE the judge runs — not two steps later in `report`. Scoring an in-flight
+ * collection silently judges whatever runs happen to be on disk and writes a
+ * scores file indistinguishable from a complete one.
+ */
+function incompleteConditionProblem(conditions) {
+  for (const c of conditions) {
+    if (c.provenance === null || c.provenance === undefined) {
+      return `${c.label} has no provenance.json — run \`collect\` for it first`
+    }
+    if (c.provenance.complete !== true) {
+      return `${c.label} is still collecting (or was interrupted): it holds `
+        + `${c.runs.length} of ${c.provenance.requestedRuns} run(s). `
+        + 'Wait for `collect` to finish, or re-run it.'
+    }
+  }
+  return null
+}
+
 function score(args) {
   if (args.out !== undefined) {
     die('score writes a scores FILE — did you mean --scores? '
       + '(--out is collect\'s run directory)')
   }
   const conditions = loadArms(args)
-  // Refuse an unfinished collection HERE, not two steps later in `report`.
-  // Scoring an in-flight arm silently judges whatever runs happen to be on disk
-  // and spends real judge calls doing it, and the resulting scores file looks
-  // exactly like a complete one — so the mistake is invisible until `report`
-  // blocks on `complete`, long after the collection it should have waited for.
-  for (const c of conditions) {
-    if (c.provenance === null || c.provenance === undefined) {
-      die(`${c.label} has no provenance.json — run \`collect\` for it first`)
-    }
-    if (c.provenance.complete !== true) {
-      die(`${c.label} is still collecting (or was interrupted): it holds `
-        + `${c.runs.length} of ${c.provenance.requestedRuns} run(s). `
-        + 'Wait for `collect` to finish, or re-run it.')
-    }
+  {
+    const problem = incompleteConditionProblem(conditions)
+    if (problem !== null) die(problem)
   }
   const judge = args.judge ?? 'claude'
   const rubric = fs.readFileSync(RUBRIC, 'utf-8')
@@ -2150,6 +2197,62 @@ function selftest() {
   // null is "no timeout passed", and must not read as a mismatch against a
   // legacy record that simply lacks the key.
   assert.deepEqual(provenanceBlockers(conds({ channelTimeout: null }, { channelTimeout: null })), [])
+
+  // --- score's completeness guard ------------------------------------------
+  const cnd = (over = {}) => ({
+    label: 'arm', runs: [1, 2, 3, 4, 5, 6],
+    provenance: { complete: true, requestedRuns: 6 }, ...over,
+  })
+  assert.equal(incompleteConditionProblem([cnd(), cnd()]), null)
+  assert.match(
+    incompleteConditionProblem([cnd(), cnd({ provenance: { complete: false, requestedRuns: 6 }, runs: [1] })]),
+    /still collecting.*holds 1 of 6 run\(s\)/,
+  )
+  assert.match(incompleteConditionProblem([cnd({ provenance: null })]), /no provenance\.json/)
+  assert.match(incompleteConditionProblem([cnd({ provenance: undefined })]), /no provenance\.json/)
+  // The FIRST offender is reported, so a complete arm never masks an
+  // incomplete one that follows it.
+  assert.match(
+    incompleteConditionProblem([cnd(), cnd({ label: 'second', provenance: null })]),
+    /^second has no provenance/,
+  )
+
+  // --- collect argument validation ----------------------------------------
+  // A valid build treatment, then one deviation per case.
+  const cf = (over = {}) => ({
+    baselineMmrGiven: true, paired: true, config: false, timeout: null,
+    entryExists: true, entryIsDistIndex: true, hasDist: true, hasTemplates: true,
+    sameBuild: false, ...over,
+  })
+  assert.equal(collectProblem(cf()), null)
+  assert.match(collectProblem(cf({ paired: false })), /--baseline-mmr requires --paired/)
+  assert.match(collectProblem(cf({ config: true })), /two different treatments/)
+  assert.match(collectProblem(cf({ entryExists: false })), /not found/)
+  assert.match(collectProblem(cf({ entryIsDistIndex: false })), /dist\/index\.js/)
+  assert.match(collectProblem(cf({ hasTemplates: false })), /built MMR package/)
+  assert.match(collectProblem(cf({ hasDist: false })), /built MMR package/)
+  assert.match(collectProblem(cf({ sameBuild: true })), /byte-identical/)
+  // Ordering: --config beats every filesystem complaint, so the message names
+  // the real mistake rather than a symptom of it.
+  assert.match(collectProblem(cf({ config: true, entryExists: false })), /two different treatments/)
+
+  // Timeout is validated for every invocation, not only build treatments.
+  for (const bad of [0, -1, 1.5]) {
+    assert.match(collectProblem(cf({ timeout: bad })), /positive integer/, `timeout ${bad}`)
+    assert.match(
+      collectProblem(cf({ baselineMmrGiven: false, paired: false, timeout: bad })),
+      /positive integer/,
+    )
+  }
+  assert.equal(collectProblem(cf({ timeout: 900 })), null)
+
+  // Config treatments and plain single-arm collections still validate.
+  assert.equal(collectProblem(cf({ baselineMmrGiven: false, paired: true, config: true })), null)
+  assert.equal(collectProblem(cf({ baselineMmrGiven: false, paired: false, config: false })), null)
+  assert.match(
+    collectProblem(cf({ baselineMmrGiven: false, paired: true, config: false })),
+    /--paired needs --config or --baseline-mmr/,
+  )
 
   // Deterministic across calls, and actually permuting.
   const items = Array.from({ length: 20 }, (_, i) => i)
