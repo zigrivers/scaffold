@@ -773,7 +773,30 @@ function collect(args) {
     die('--baseline-mmr requires --paired: it names the build for the baseline arm')
   }
   if (baselineMmr !== MMR) {
+    // Two treatment mechanisms at once is two treatments, and provenance can
+    // only record one. `treatment: 'build'` would be written while the
+    // candidate arm ALSO carried a config the baseline lacked, so a config
+    // effect would be reported as a build effect with nothing able to detect
+    // it. Refused rather than merged into a compound label: an experiment
+    // whose cause is ambiguous answers no question worth asking.
+    if (args.config) {
+      die('--config and --baseline-mmr are two different treatments — passing both makes the '
+        + 'arms differ in build AND configuration, and provenance can record only one cause. '
+        + 'Run them as separate experiments.')
+    }
     if (!fs.existsSync(baselineMmr)) die(`--baseline-mmr ${baselineMmr} not found`)
+    // pkgRootOf resolves dist/index.js upward one level. A path shaped
+    // differently resolves to a directory with no dist/ or templates/, where
+    // buildDigest walks nothing and returns the digest of an empty string —
+    // two such paths would compare equal and a build treatment would silently
+    // have no treatment.
+    const baseRoot = pkgRootOf(baselineMmr)
+    for (const required of ['dist', 'templates']) {
+      if (!fs.existsSync(path.join(baseRoot, required))) {
+        die(`--baseline-mmr ${baselineMmr} does not look like a built MMR package: `
+          + `${path.join(baseRoot, required)} is missing. Point it at <package>/dist/index.js.`)
+      }
+    }
     // Same bytes means no treatment. Caught here rather than an hour later,
     // and `report` catches the subtler case where different bytes still
     // assemble the same prompt.
@@ -1843,6 +1866,20 @@ function provenanceBlockers(conditions) {
   const mustDiffer = bTreat === 'build' && cTreat === 'build'
     ? ['mmrDigest', 'basePromptDigest']
     : []
+  // The per-channel timeout bounds what each run could produce: a channel that
+  // times out in one arm and completes in the other contributes findings to
+  // only one side. Paired collection cannot differ here — one invocation sets
+  // both — but two conditions collected SEPARATELY can, and nothing else
+  // recorded would show it. Absent on both sides means provenance predating the
+  // flag, where no timeout was passed either; absent on one side is a real
+  // mismatch between a collection that set it and one that did not.
+  if (bp.channelTimeout !== undefined || cp.channelTimeout !== undefined) {
+    if (JSON.stringify(bp.channelTimeout ?? null) !== JSON.stringify(cp.channelTimeout ?? null)) {
+      out.push(`channelTimeout differs between conditions (${bp.channelTimeout ?? 'unset'} vs `
+        + `${cp.channelTimeout ?? 'unset'}) — a channel could time out in one arm and complete `
+        + 'in the other, so the arms did not run under the same bound')
+    }
+  }
   for (const key of [
     'target', 'diffDigest', 'mmrDigest', 'repoCommit', 'channelConfigDigest',
     'basePromptDigest', 'promptDigest',
@@ -2096,6 +2133,23 @@ function selftest() {
   const mixed = provenanceBlockers(conds(build, { mmrDigest: 'm2', basePromptDigest: 'b2' }))
   assert.ok(mixed.some((b) => /different treatment kinds \(build vs config\)/.test(b)))
   assert.ok(mixed.some((b) => /mmrDigest differs/.test(b)))
+
+  // channelTimeout bounds what a run could produce, so the arms must share it.
+  // Absent on BOTH sides is provenance predating the flag, which is legacy data
+  // rather than a mismatch; absent on one side is a real difference.
+  assert.deepEqual(provenanceBlockers(conds({ channelTimeout: 900 }, { channelTimeout: 900 })), [])
+  assert.match(
+    provenanceBlockers(conds({ channelTimeout: 900 }, { channelTimeout: 300 }))[0],
+    /channelTimeout differs/,
+  )
+  assert.match(
+    provenanceBlockers(conds({ channelTimeout: 900 }, {}))[0],
+    /channelTimeout differs .*900 vs unset/,
+  )
+  assert.deepEqual(provenanceBlockers(conds({}, {})), [], 'legacy provenance must still validate')
+  // null is "no timeout passed", and must not read as a mismatch against a
+  // legacy record that simply lacks the key.
+  assert.deepEqual(provenanceBlockers(conds({ channelTimeout: null }, { channelTimeout: null })), [])
 
   // Deterministic across calls, and actually permuting.
   const items = Array.from({ length: 20 }, (_, i) => i)
