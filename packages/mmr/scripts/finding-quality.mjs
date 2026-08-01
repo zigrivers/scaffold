@@ -21,7 +21,10 @@
  *   # 0. selftest — verify the harness's own math before trusting a verdict
  *   node scripts/finding-quality.mjs selftest
  *
- *   # 1. collect — N runs of one condition (N >= 6; the rubric's floor)
+ *   # 1. collect — N runs of one condition (N >= 6; the rubric's floor).
+ *   #    NOTE: with --config, the repo-root .mmr.yaml is REPLACED for the
+ *   #    duration of the run and restored afterwards. Do not edit it while a
+ *   #    collection is in flight — the restore would overwrite your changes.
  *   node scripts/finding-quality.mjs collect \
  *     --out runs/baseline --pr 782 --n 6 --channels claude,codex,opencode-glm
  *
@@ -99,7 +102,13 @@ function parseArgs(argv) {
     // a key and the real flag read as missing — so `--config=x` silently ran a
     // baseline collection while the caller believed they had set a treatment.
     const eq = a.indexOf('=')
-    if (eq !== -1) { out[a.slice(2, eq)] = a.slice(eq + 1); continue }
+    if (eq !== -1) {
+      const key = a.slice(2, eq)
+      const val = a.slice(eq + 1)
+      if (val === '') die(`--${key} was given an empty value`)
+      out[key] = val
+      continue
+    }
     const next = argv[i + 1]
     // A flag followed by another flag, or by nothing, is a boolean.
     out[a.slice(2)] = next === undefined || next.startsWith('--') ? true : argv[++i]
@@ -115,6 +124,23 @@ function parseArgs(argv) {
  *
  * Returns a description of the contradiction, or null when consistent.
  */
+/**
+ * Full schema check for one judge entry. Shared so `report` applies exactly the
+ * checks `score` did: re-validating on read matters because a hand-edited
+ * scores file with a missing worth_fixing_now would otherwise read as `false`
+ * via `!undefined` and silently inflate the low-value rate.
+ *
+ * Returns a problem description, or null when the entry is valid.
+ */
+function validateScoreEntry(s) {
+  if (!s || typeof s !== 'object') return 'is not an object'
+  if (!CLASSES.includes(s.class)) return `has invalid class ${JSON.stringify(s.class)}`
+  if (typeof s.names_path !== 'boolean') return 'names_path must be a boolean'
+  if (typeof s.worth_fixing_now !== 'boolean') return 'worth_fixing_now must be a boolean'
+  if (typeof s.why !== 'string' || s.why.trim() === '') return 'why must be a non-empty string'
+  return contradicts(s)
+}
+
 function contradicts(s) {
   if (s.class === 'speculative' && s.names_path === true) {
     return 'classed speculative but names_path is true'
@@ -154,6 +180,21 @@ function firstJsonArray(text) {
     }
   }
   return null
+}
+
+/** Flags that must carry a value; `true` here means the value was swallowed. */
+const VALUE_FLAGS = ['out', 'config', 'pr', 'diff', 'channels', 'n', 'judge', 'scores', 'baseline', 'candidate']
+
+/**
+ * A value-carrying flag immediately followed by another flag parses as `true`,
+ * which then reaches path.resolve() or readFileSync() as a boolean and throws
+ * an uncaught TypeError naming nothing useful.
+ */
+function requireValues(args) {
+  for (const k of VALUE_FLAGS) {
+    if (k in args && typeof args[k] !== 'string') die(`--${k} needs a value`)
+  }
+  return args
 }
 
 function die(msg) {
@@ -276,6 +317,10 @@ function collect(args) {
   // (rather than committing it) keeps the experiment off the branch under test.
   const repoRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf-8' }).trim()
   const liveConfig = path.join(repoRoot, '.mmr.yaml')
+  if (args.config && path.resolve(args.config) === liveConfig) {
+    die('--config is the repo-root .mmr.yaml itself. collect replaces that file for the '
+      + 'duration of the run, so the candidate must be a separate file.')
+  }
   const swapper = args.config ? makeConfigSwapper(liveConfig, path.resolve(args.config)) : null
   // Inert until install() has run, so a signal arriving before then cannot
   // delete a .mmr.yaml the harness never touched.
@@ -802,9 +847,8 @@ function report(args) {
       || a?.location !== e.location || a?.description !== e.description) {
       die(`scores file entry ${i + 1} does not match the finding it claims to score — re-run \`score\``)
     }
-    if (!a.score || !CLASSES.includes(a.score.class) || contradicts(a.score)) {
-      die(`scores file entry ${a.id} has a missing or invalid score — re-run \`score\``)
-    }
+    const problem = validateScoreEntry(a.score)
+    if (problem) die(`scores file entry ${a.id} ${problem} — re-run \`score\``)
   }
 
   const rows = conditions.map((c) => summarize(c, scored))
@@ -1043,6 +1087,14 @@ function selftest() {
   assert.equal(firstJsonArray('[{"s":"\\\\"}] x'), '[{"s":"\\\\"}]')
   assert.equal(firstJsonArray('no array here'), null)
 
+  // report re-validates persisted scores with the same checks score applied.
+  const okEntry = { class: 'defect', names_path: true, worth_fixing_now: true, why: 'x' }
+  assert.equal(validateScoreEntry(okEntry), null)
+  assert.equal(validateScoreEntry({ ...okEntry, worth_fixing_now: undefined }) !== null, true)
+  assert.equal(validateScoreEntry({ ...okEntry, why: '  ' }) !== null, true)
+  assert.equal(validateScoreEntry({ ...okEntry, class: 'nit' }) !== null, true)
+  assert.equal(validateScoreEntry(null) !== null, true)
+
   // A judge contradicting the rubric must be rejected, not averaged in.
   assert.equal(contradicts({ class: 'speculative', names_path: true }) !== null, true)
   assert.equal(contradicts({ class: 'defect', names_path: false }) !== null, true)
@@ -1057,7 +1109,7 @@ function selftest() {
   console.log('selftest: all checks passed')
 }
 
-const args = parseArgs(process.argv.slice(2))
+const args = requireValues(parseArgs(process.argv.slice(2)))
 const cmd = args._[0]
 if (cmd === 'collect') collect(args)
 else if (cmd === 'score') score(args)
