@@ -956,6 +956,10 @@ function loadArms(args) {
  */
 function assertJudgeSandboxed(judge) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fq-probe-'))
+  // die() below calls process.exit, which skips the finally — the exact
+  // contract documented on die(). The hook is what actually cleans up on the
+  // failure path.
+  process.once('exit', () => fs.rmSync(dir, { recursive: true, force: true }))
   const probeFile = path.join(dir, 'probe.txt')
   const secret = createHash('sha256').update(`${process.pid}:${probeFile}:${SHUFFLE_SEED}`)
     .digest('hex').slice(0, 24)
@@ -987,6 +991,7 @@ function assertJudgeSandboxed(judge) {
 // ------------------------------------------------------------------ score
 
 function score(args) {
+  if (args.out !== undefined) die("score writes a scores FILE — did you mean --scores? (--out is collect's run directory)")
   const conditions = loadArms(args)
   const judge = args.judge ?? 'claude'
   const rubric = fs.readFileSync(RUBRIC, 'utf-8')
@@ -1171,7 +1176,7 @@ function score(args) {
       digest: c.digest,
     })),
   }
-  const outPath = args.scores ?? args.out ?? 'finding-quality-scores.json'
+  const outPath = args.scores ?? 'finding-quality-scores.json'
   fs.writeFileSync(outPath, JSON.stringify({ manifest, scored }, null, 2))
   process.stderr.write(`wrote ${outPath}\n`)
 }
@@ -1399,8 +1404,9 @@ function evaluateVerdict(base, cand, opts = {}) {
 }
 
 function report(args) {
+  if (args.out !== undefined) die("report writes nothing — did you mean --scores? (--out is collect's run directory)")
   const conditions = loadArms(args)
-  const scorePath = args.scores ?? args.out ?? 'finding-quality-scores.json'
+  const scorePath = args.scores ?? 'finding-quality-scores.json'
   if (!fs.existsSync(scorePath)) die(`scores file not found: ${scorePath} (run \`score\` first)`)
   let raw
   try {
