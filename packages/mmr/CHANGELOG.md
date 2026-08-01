@@ -4,6 +4,19 @@
 
 ### Added
 
+- **The finding-quality harness can now compare two MMR builds** (`scripts/`,
+  not shipped in the published package). Its only treatment mechanism was a
+  candidate `.mmr.yaml`, which by design may set only `version`,
+  `review_criteria`, and `stage` — so a prompt template the config schema
+  deliberately cannot reach, such as the severity rubric itself, could not be
+  measured at all.
+
+  `collect --baseline-mmr <path>` runs the baseline arm from a second built
+  package. `provenance.json` records which mechanism carried the treatment, and
+  under a build treatment `report` requires `mmrDigest` and `basePromptDigest`
+  to **differ** while every other field must still match — the guard against an
+  accidental rebuild confounding an experiment is moved, not removed.
+
 - **`stage: prototype | mvp | production`** calibrates the built-in severity
   rubric for how mature the product is. The same defect is worth different
   things at different stages: a missing test for an internal helper is noise in
