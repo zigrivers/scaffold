@@ -65,6 +65,63 @@ describe('assemblePrompt', () => {
     expect(prompt).toContain('Security')
   })
 
+  describe('product stage', () => {
+    it('leaves the prompt byte-identical when no stage is set', () => {
+      // The guarantee every existing project depends on: opting into nothing
+      // changes nothing. The marker and the blank line it sits on both vanish.
+      const withoutStage = assemblePrompt({ diff: 'd' })
+      expect(withoutStage).not.toContain('{{stage_calibration}}')
+      expect(withoutStage).not.toContain('Stage:')
+      // No blank-line scar where the marker was.
+      expect(withoutStage).not.toMatch(/impact alone\.\n\n\n/)
+      expect(assemblePrompt({ diff: 'd', stage: undefined })).toBe(withoutStage)
+    })
+
+    it('substitutes calibration INTO the severity section, not after the criteria', () => {
+      // Appending advice at the end leaves it competing with the rubric; the
+      // point of a stage is to change the definitions themselves.
+      const prompt = assemblePrompt({ diff: 'd', stage: 'mvp' })
+      const severityIdx = prompt.indexOf('## Severity Definitions')
+      const stageIdx = prompt.indexOf('Stage: MVP')
+      const criteriaIdx = prompt.indexOf('## Review Criteria')
+      expect(stageIdx).toBeGreaterThan(severityIdx)
+      expect(stageIdx).toBeLessThan(criteriaIdx)
+      expect(prompt).not.toContain('{{stage_calibration}}')
+    })
+
+    it('changes what counts as P1 versus P2 across stages', () => {
+      // Not merely different prose: the same class of finding lands at a
+      // different level in each preset.
+      const proto = assemblePrompt({ diff: 'd', stage: 'prototype' })
+      const prod = assemblePrompt({ diff: 'd', stage: 'production' })
+      expect(proto).toMatch(/Missing tests are P3/)
+      expect(prod).toMatch(/Missing tests for changed behavior are P1/)
+      expect(proto).toMatch(/A bug on a path nobody exercises yet is P3/)
+      expect(prod).toMatch(/A rare but reachable failure in a user-facing path is P1/)
+    })
+
+    it('never lets a stage soften security, data loss, or data corruption', () => {
+      // prototype is the stage most likely to be set on the codebase least able
+      // to absorb a vulnerability, so the floor is asserted on every preset that
+      // relaxes anything.
+      for (const stage of ['prototype', 'mvp'] as const) {
+        const prompt = assemblePrompt({ diff: 'd', stage })
+        expect(prompt, `${stage} must state the floor`)
+          .toMatch(/Unchanged at this stage: security, data loss, and data corruption/)
+      }
+      // The rubric's own floor survives in every case, stage or not.
+      for (const stage of [undefined, 'prototype', 'mvp', 'production'] as const) {
+        expect(assemblePrompt({ diff: 'd', stage }))
+          .toMatch(/Never lower a security, data-loss, or data-corruption finding/)
+      }
+    })
+
+    it('keeps the diff last whatever the stage', () => {
+      const prompt = assemblePrompt({ diff: 'THE_DIFF', stage: 'production' })
+      expect(prompt.indexOf('THE_DIFF')).toBeGreaterThan(prompt.indexOf('Stage: PRODUCTION'))
+    })
+  })
+
   // The severity rubric below is the highest-blast-radius text in the package:
   // every channel and every consuming project reads it on every review. These
   // pin the properties it must keep, so a future edit cannot quietly drop one.

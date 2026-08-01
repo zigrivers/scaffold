@@ -2,6 +2,29 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`stage: prototype | mvp | production`** calibrates the built-in severity
+  rubric for how mature the product is. The same defect is worth different
+  things at different stages: a missing test for an internal helper is noise in
+  a prototype and a real gap in production.
+
+  It is **substituted into** the severity definitions, not appended after the
+  criteria — advice added at the end competes with the rubric, whereas text
+  inside it is read as part of the definition, which is what changing what
+  counts as P1 versus P2 requires. Each preset moves whole classes of finding:
+  missing tests are P3 under `prototype`, P2-for-user-facing-logic under `mvp`,
+  and P1 for changed user-facing behaviour under `production`.
+
+  **No stage set means no change.** A project that does not opt in gets the
+  prompt it got before stages existed, byte for byte, asserted by test.
+
+  **No stage can soften a security, data-loss, or data-corruption finding.**
+  Every preset that relaxes anything states that floor explicitly, and the
+  rubric's own version of it survives in all four cases. `prototype` is the
+  stage most likely to be set on the codebase least able to absorb a
+  vulnerability, so this is asserted per preset rather than assumed.
+
 ### Changed
 
 - **The built-in severity rubric now grades worth-fixing-now, not impact alone**

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { STAGES } from '../core/stage.js'
 
 export const Severity = z.enum(['P0', 'P1', 'P2', 'P3'])
 
@@ -279,6 +280,9 @@ export const MmrConfigSchema = z.object({
   version: z.number(),
   defaults: DefaultsSchema.default({}),
   review_criteria: z.array(z.string()).optional(),
+  // Calibrates the built-in severity rubric in place. Absent means the rubric's
+  // own calibration applies, byte-identical to before stages existed.
+  stage: z.enum(STAGES).optional(),
   templates: z.record(TemplateSchema).optional(),
   channels: z.record(ChannelConfigSchema).default({}),
   channels_disabled: z.array(z.string()).optional(),
