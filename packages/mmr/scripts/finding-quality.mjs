@@ -991,7 +991,10 @@ function assertJudgeSandboxed(judge) {
 // ------------------------------------------------------------------ score
 
 function score(args) {
-  if (args.out !== undefined) die("score writes a scores FILE — did you mean --scores? (--out is collect's run directory)")
+  if (args.out !== undefined) {
+    die('score writes a scores FILE — did you mean --scores? '
+      + '(--out is collect\'s run directory)')
+  }
   const conditions = loadArms(args)
   const judge = args.judge ?? 'claude'
   const rubric = fs.readFileSync(RUBRIC, 'utf-8')
@@ -1404,7 +1407,10 @@ function evaluateVerdict(base, cand, opts = {}) {
 }
 
 function report(args) {
-  if (args.out !== undefined) die("report writes nothing — did you mean --scores? (--out is collect's run directory)")
+  if (args.out !== undefined) {
+    die('report writes nothing — did you mean --scores? '
+      + '(--out is collect\'s run directory)')
+  }
   const conditions = loadArms(args)
   const scorePath = args.scores ?? 'finding-quality-scores.json'
   if (!fs.existsSync(scorePath)) die(`scores file not found: ${scorePath} (run \`score\` first)`)
