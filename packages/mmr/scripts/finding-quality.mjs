@@ -18,8 +18,11 @@
  * findings would weight every rate by channel redundancy, counting one defect
  * three times when three channels report it.
  *
- *   # 0. selftest — verify the harness's own math before trusting a verdict
+ *   # 0. selftest — verify the harness's own math before trusting a verdict.
+ *   #    probe-judge proves the judge really cannot reach the filesystem with
+ *   #    the current CLI; `score` runs the same probe automatically.
  *   node scripts/finding-quality.mjs selftest
+ *   node scripts/finding-quality.mjs probe-judge
  *
  *   # 1. collect — N runs. PREFER --paired: it collects both arms in one
  *   #    interleaved pass, so anything that drifts over the half hour a
@@ -499,20 +502,59 @@ function runOnce({ mmrArgs, cwd, target, index, total, label }) {
  */
 function lockOutDir(dir) {
   const lockPath = path.join(dir, LOCK_FILE)
-  if (fs.existsSync(lockPath)) {
-    const pid = Number.parseInt(fs.readFileSync(lockPath, 'utf-8').trim(), 10)
-    let alive = false
-    if (Number.isInteger(pid) && pid > 0 && pid !== process.pid) {
-      try {
-        process.kill(pid, 0)
-        alive = true
-      } catch { /* gone */ }
-    }
-    if (alive) die(`${dir} is in use by another collection (pid ${pid}). Wait for it to finish.`)
-    console.error(`[harness] clearing a stale lock in ${dir} (pid ${pid || 'unknown'} is not running)`)
+  const take = () => {
+    // 'wx' fails if the file exists, atomically. An existence check followed by
+    // a write is not a lock: two collectors can both see nothing and both write.
+    const fd = fs.openSync(lockPath, 'wx')
+    fs.writeSync(fd, String(process.pid))
+    fs.closeSync(fd)
+    process.once('exit', () => fs.rmSync(lockPath, { force: true }))
   }
-  fs.writeFileSync(lockPath, String(process.pid))
-  process.once('exit', () => fs.rmSync(lockPath, { force: true }))
+  try {
+    take()
+    return
+  } catch (err) {
+    if (err.code !== 'EEXIST') die(`could not lock ${dir}: ${err.message}`)
+  }
+  const pid = Number.parseInt(fs.readFileSync(lockPath, 'utf-8').trim(), 10)
+  let alive = false
+  if (Number.isInteger(pid) && pid > 0 && pid !== process.pid) {
+    try {
+      process.kill(pid, 0)
+      alive = true
+    } catch { /* gone */ }
+  }
+  if (alive) die(`${dir} is in use by another collection (pid ${pid}). Wait for it to finish.`)
+  console.error(`[harness] clearing a stale lock in ${dir} (pid ${pid || 'unknown'} is not running)`)
+  fs.rmSync(lockPath, { force: true })
+  try {
+    take()
+  } catch (err) {
+    die(`another collection took ${dir} first (${err.code}). Re-run in a moment.`)
+  }
+}
+
+/**
+ * Ownership check, read-only, run BEFORE anything is written.
+ *
+ * Locking first meant a --out typo landing on a foreign directory had a lock
+ * file written into it before the marker check could refuse — writing to a
+ * stranger's directory in the course of deciding not to touch it.
+ */
+function assertOwnedOrEmpty(dir) {
+  if (!fs.existsSync(dir)) return
+  const entries = fs.readdirSync(dir).filter((f) => f !== LOCK_FILE)
+  if (entries.length === 0) return
+  if (!entries.includes(OWNER_FILE)) {
+    die(`${dir} is not a harness output directory (no ${OWNER_FILE} marker). `
+      + 'Refusing to touch it — pick an empty or previously-collected directory.')
+  }
+  const foreign = entries.filter((f) =>
+    !(RUN_FILE_RE.test(f) || f === PROVENANCE_FILE || f === SNAPSHOT_FILE || f === OWNER_FILE))
+  if (foreign.length > 0) {
+    die(`${dir} contains ${foreign.length} file(s) this harness did not write `
+      + `(e.g. ${foreign.slice(0, 3).join(', ')}). Refusing to use it.`)
+  }
 }
 
 function prepareOutDir(dir, forced) {
@@ -572,8 +614,11 @@ function collect(args) {
   // A directory that already holds runs would silently mix a previous
   // experiment into this one — a shorter rerun leaves the old tail behind, and
   // the extra runs are indistinguishable from the new ones once pooled.
-  // Claim first, THEN clear: claiming after would let a second collection wipe
-  // the runs of one that is mid-flight.
+  // Prove ownership first (read-only), then claim, then clear. Claiming before
+  // the ownership check writes into a directory we may be about to refuse;
+  // clearing before the claim lets a second collection wipe a live experiment.
+  assertOwnedOrEmpty(outDir)
+  if (pairedOut) assertOwnedOrEmpty(pairedOut)
   fs.mkdirSync(outDir, { recursive: true })
   lockOutDir(outDir)
   if (pairedOut) {
@@ -647,13 +692,15 @@ function collect(args) {
   // and the two arms are collected minutes apart, so this is not hypothetical.
   const snapshot = path.join(outDir, SNAPSHOT_FILE)
 
-  const base = ['review', '--channels', channels, '--sync', '--format', 'json', '--diff', snapshot]
+  const commonArgs = ['review', '--channels', channels, '--sync', '--format', 'json', '--diff', snapshot]
   // The candidate arm needs --trust-project-config to have the .mmr.yaml in its
   // cwd read at all; the baseline arm has no config in its cwd, so it gets the
   // built-in prompt either way. That one flag, plus the differing cwd, is the
   // entire difference between the arms.
-  const baselineArgs = [...base]
-  if (args.config) base.push('--trust-project-config')
+  const baselineArgs = [...commonArgs]
+  // Named for what it IS. It used to be called `base` and then mutated into the
+  // candidate's arguments, which reads exactly backwards.
+  const candidateArgs = args.config ? [...commonArgs, '--trust-project-config'] : [...commonArgs]
 
   {
     // The treatment IS the prompt the channels receive, so record that, not a
@@ -670,7 +717,7 @@ function collect(args) {
     let dryRun
     let baselineDryRun = null
     try {
-      dryRun = assemble(base, args.config ? candidateCwd : baselineCwd)
+      dryRun = assemble(candidateArgs, args.config ? candidateCwd : baselineCwd)
       if (pairedOut !== null) baselineDryRun = assemble(baselineArgs, baselineCwd)
     } catch (err) {
       const detail = (err.stderr || err.message || '').toString().slice(0, 300)
@@ -685,10 +732,15 @@ function collect(args) {
     // at the repo root is simply not read unless that flag is passed. One
     // install, no per-run swapping, and the baseline is genuinely unaffected.
     const arms = pairedOut === null
-      ? [{ dir: outDir, mmrArgs: base, cwd: args.config ? candidateCwd : baselineCwd, promptSource: dryRun }]
+      ? [{
+        dir: outDir,
+        mmrArgs: candidateArgs,
+        cwd: args.config ? candidateCwd : baselineCwd,
+        promptSource: dryRun,
+      }]
       : [
         { dir: outDir, mmrArgs: baselineArgs, cwd: baselineCwd, promptSource: baselineDryRun },
-        { dir: pairedOut, mmrArgs: base, cwd: candidateCwd, promptSource: dryRun },
+        { dir: pairedOut, mmrArgs: candidateArgs, cwd: candidateCwd, promptSource: dryRun },
       ]
 
     // Written incomplete first. An interrupted collection leaves its finished
@@ -883,6 +935,45 @@ function loadArms(args) {
   return [base, cand]
 }
 
+/**
+ * Prove the judge cannot reach the filesystem, right now, with these flags.
+ *
+ * A denylist is only current until the judge CLI adds a tool, and the prompt it
+ * will receive embeds an attacker-controlled diff. Documentation asking someone
+ * to re-verify after an upgrade is not a control; this is. It writes a file
+ * whose contents cannot be guessed and asks the judge to read it — if the
+ * contents come back, tools are live and scoring stops.
+ */
+function assertJudgeSandboxed(judge) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fq-probe-'))
+  const probeFile = path.join(dir, 'probe.txt')
+  const secret = createHash('sha256').update(`${process.pid}:${probeFile}:${SHUFFLE_SEED}`)
+    .digest('hex').slice(0, 24)
+  try {
+    fs.writeFileSync(probeFile, `PROBE-${secret}\n`)
+    let out = ''
+    try {
+      out = execFileSync(judge, ['-p', ...JUDGE_SANDBOX_FLAGS], {
+        encoding: 'utf-8',
+        maxBuffer: 4 * 1024 * 1024,
+        cwd: dir,
+        input: `Read the file ${probeFile} and reply with its exact contents. `
+          + 'If you cannot read files, reply exactly: TOOLS_DENIED\n',
+      })
+    } catch (err) {
+      out = (err.stdout ?? '').toString()
+    }
+    if (out.includes(secret)) {
+      die('the judge sandbox is NOT working: it read a local file despite '
+        + `\`${JUDGE_SANDBOX_FLAGS.join(' ')}\`. The prompt embeds an untrusted diff, so `
+        + 'scoring would run attacker-reachable tools. Update DENIED_JUDGE_TOOLS for this '
+        + 'judge CLI version before scoring.')
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+}
+
 // ------------------------------------------------------------------ score
 
 function score(args) {
@@ -986,6 +1077,7 @@ function score(args) {
   // --judge names a binary that must accept `-p` and read the prompt from
   // stdin (Claude Code's print mode). Other CLIs use different flags and will
   // fail here; swapping in codex/opencode needs a full invocation, not a name.
+  assertJudgeSandboxed(judge)
   process.stderr.write(`scoring ${shuffled.length} reconciled findings via \`${judge} -p\` (stdin) …\n`)
   // Fed on stdin, not argv: a large pooled set JSON-stringified into a single
   // argument runs into ARG_MAX (E2BIG) once run counts grow.
@@ -1041,17 +1133,9 @@ function score(args) {
     if (typeof s?.id !== 'string') die(`score entry has no string id: ${JSON.stringify(s)}`)
     if (!expected.has(s.id)) die(`judge returned an unknown id: ${s.id}`)
     if (byId.has(s.id)) die(`judge returned a duplicate id: ${s.id}`)
-    if (!CLASSES.includes(s.class)) die(`${s.id}: invalid class ${JSON.stringify(s.class)}`)
-    if (typeof s.names_path !== 'boolean') die(`${s.id}: names_path must be a boolean`)
-    if (typeof s.worth_fixing_now !== 'boolean') die(`${s.id}: worth_fixing_now must be a boolean`)
-    // The rubric defines these two fields in terms of each other, so a judge
-    // that contradicts itself has misread it — and the contradiction lands
-    // directly on the two metrics the ship rule reads.
-    if (typeof s.why !== 'string' || s.why.trim() === '') {
-      die(`${s.id}: why must be a non-empty string`)
-    }
-    const conflict = contradicts(s)
-    if (conflict) die(`${s.id}: ${conflict} — re-run \`score\``)
+    // The same validator report applies on read, so the two can never diverge.
+    const problem = validateScoreEntry(s)
+    if (problem) die(`${s.id}: ${problem} — re-run \`score\``)
     byId.set(s.id, s)
   }
   const missing = [...expected].filter((id) => !byId.has(id))
@@ -1515,7 +1599,7 @@ function selftest() {
   const cond = (over = {}) => ({
     label: 'x', runs: MIN_RUNS, degradedRuns: 0, coverages: ['a,b'], hasFindings: true,
     emptyRuns: 0, specRates: [0.4, 0.5], speculativeRate: 0.45, speculatives: 9,
-    lowValues: 12, defects: 10, defectSites: { 'src/a.ts': 3 },
+    lowValues: 12, defects: 10,
     defectClusters: [{ file: 'src/a.ts', tokens: ['null', 'pointer', 'deref', 'guard'], runs: 3 }],
     defectTokensByFile: { 'src/a.ts': [['null', 'pointer', 'deref', 'guard']] }, ...over,
   })
@@ -1715,8 +1799,12 @@ if (cmd === 'collect') collect(args)
 else if (cmd === 'score') score(args)
 else if (cmd === 'report') report(args)
 else if (cmd === 'selftest') selftest()
+else if (cmd === 'probe-judge') {
+  assertJudgeSandboxed(args.judge ?? 'claude')
+  console.log('judge sandbox: tools are denied')
+}
 else {
-  console.error('usage: finding-quality.mjs <collect|score|report|selftest> [options]')
+  console.error('usage: finding-quality.mjs <collect|score|report|selftest|probe-judge> [options]')
   console.error('see the header of this file for examples')
   process.exit(1)
 }
