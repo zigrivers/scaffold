@@ -335,7 +335,21 @@ function assertPromptOnlyConfig(file) {
  * arriving as `true` and reaching readFileSync as a boolean. A new flag is a
  * value flag by default now, and only these three have to be remembered.
  */
-const BOOLEAN_FLAGS = new Set(['force', 'help', 'dry-run'])
+const BOOLEAN_FLAGS = new Set(['force'])
+
+/**
+ * Every flag any subcommand accepts.
+ *
+ * A mistyped flag used to be accepted silently — and the cost is not a typo,
+ * it is a collection that runs for an hour as the wrong condition, which
+ * `--config=x` swallowing its value already demonstrated. BOOLEAN_FLAGS also
+ * once registered `--dry-run` and `--help`, which nothing reads, so a user
+ * asking for a preview got a real run.
+ */
+const KNOWN_FLAGS = new Set([
+  'out', 'paired', 'config', 'pr', 'diff', 'channels', 'n', 'force',
+  'judge', 'scores', 'baseline', 'candidate',
+])
 
 /**
  * A value-carrying flag immediately followed by another flag parses as `true`,
@@ -350,7 +364,20 @@ function missingValueFlag(args) {
   return null
 }
 
+/** The first flag no subcommand accepts, or null. */
+function unknownFlag(args) {
+  for (const k of Object.keys(args)) {
+    if (k === '_') continue
+    if (!KNOWN_FLAGS.has(k)) return k
+  }
+  return null
+}
+
 function requireValues(args) {
+  const unknown = unknownFlag(args)
+  if (unknown) {
+    die(`unknown flag --${unknown}. Accepted: ${[...KNOWN_FLAGS].map((f) => `--${f}`).join(', ')}`)
+  }
   const missing = missingValueFlag(args)
   if (missing) die(`--${missing} needs a value`)
   return args
@@ -1494,6 +1521,10 @@ function summarize(condition, scored) {
     // WHICH defects, not just how many. A candidate that misses every baseline
     // defect while producing the same number of different ones satisfies an
     // aggregate comparison and has still made the review worse.
+    // Only the BASELINE's clusters are read (evaluateVerdict walks them for
+    // lostSites) and only the CANDIDATE's token map is (for coverage). Both are
+    // computed for both arms because summarize is one function for both, and
+    // the cost is trivial next to a collection.
     defectClusters: defectClusters(mine),
     defectTokensByFile: defectTokensByFile(mine),
     speculativeRate: total ? count('speculative') / total : 0,
@@ -1917,7 +1948,12 @@ function selftest() {
   assert.equal(missingValueFlag({ _: [], somethingNew: true }), 'somethingNew')
   assert.equal(missingValueFlag({ _: [], force: true, out: 'x' }), null)
   assert.equal(missingValueFlag({ _: ['collect'], config: true }), 'config')
-  assert.equal(missingValueFlag({ _: [], 'dry-run': true }), null)
+  // A flag nothing implements must be rejected, not silently ignored: --dry-run
+  // used to be accepted and then produce a real, hour-long run.
+  assert.equal(unknownFlag({ _: [], 'dry-run': true }), 'dry-run')
+  assert.equal(unknownFlag({ _: [], help: true }), 'help')
+  assert.equal(unknownFlag({ _: ['collect'], out: 'x', force: true }), null)
+  assert.equal(unknownFlag({ _: [], cofnig: 'typo.yaml' }), 'cofnig')
 
   assert.equal(parseArgs(['--config=x.yaml'])['config'], 'x.yaml')
   assert.equal(parseArgs(['--n=6'])['n'], '6')
