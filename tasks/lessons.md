@@ -442,3 +442,66 @@ measured reviews conducted without repo context, which no real review is. Fixed
 with detached worktrees. Byte-identical prompt digests looked like proof and were
 not: identical prompts through differently-capable channels is a different
 experiment.
+
+## 2026-08-01 — The measured verdict on #807/#808 (#810), and what measuring cost
+
+Both prompt changes were shipped in July on argued merit and review scrutiny.
+Measured properly, both fail. Reverted in #810.
+
+**Argued merit is not evidence, and the gap can be large.** #807 was reviewed
+across many rounds by multiple independent models and every reviewer agreed the
+Reporting Bar was sound. It suppressed a data-loss defect that the prompt it
+replaced found in 5 of 6 runs. No amount of review caught that; only running it
+did.
+
+**Two safeguards can each be correct and still leave a gap.** #807's rubric said
+"never lower a security, data-loss, or data-corruption finding on the
+worth-fixing-now test". Its Reporting Bar was a *separate* gate demanding a
+named caller. A bug whose trigger is a runtime condition ("a later guide fails
+validation") names no caller, so the bar filtered a finding the rubric had
+explicitly protected. When adding a second gate, ask what the first one's
+exemptions mean under it.
+
+**A safety clause can have a cost that inverts the feature.** #808's
+"a finding this stage grades P3 is still REPORTED" was added in review to stop
+demotion silently hiding defects. It worked — and it meant demotion bought no
+quiet at all, so the feature tripled finding volume. The clause was right; the
+feature was wrong.
+
+**Replicate before believing a single deciding number.** #807's first result
+hinged on defect_count 19→14, inside the baseline's own per-run spread — the
+rubric itself called that inconclusive. A second target replicated the drop AND
+named the lost defects. One target would have been a coin flip either way.
+
+**Design the instrument's own escape hatches carefully.** Five separate review
+findings on the harness were the same root cause: validation that guards an
+hour-long command lived inline and was unreachable by tests. Extracting it into
+pure functions (`collectProblem`, `provenanceBlockers`,
+`incompleteConditionProblem`, `timeoutBindingProblem`) is what made the
+invariants testable — and each extraction immediately found a real bug.
+
+**"Legacy data" tolerance must not be applied to new features.** Waiving a check
+when a provenance field is absent is right for fields that predate the check and
+wrong for fields that shipped with it — there, absence means hand-edited data,
+and the waiver lets the guard be switched off by deleting a key.
+
+**Refuse an optimization that weakens a guard, and write down why.** Review
+suggested memoizing `buildDigest` on directory mtime. Rewriting a nested file
+does not change its parent's mtime, so the cache would defeat the check that
+catches a rebuild mid-collection. Declined, with the reasoning recorded at the
+function so it is not re-applied.
+
+**A flag that silently fails to bind is worse than no flag.** `--timeout` was
+added to bound channels; MMR overrides only `defaults.timeout`, so channels
+carrying their own ignored it. Measured: with `--timeout 5`, codex timed out at
+5s and opencode ran 241.9s to completion. Verify a knob took effect; do not
+assume the CLI accepted means the CLI applied.
+
+**Do not trust a wrapper's exit code.** A backgrounded `make check-all` reported
+exit 0 while its log ended in `make: *** [ts-check] Error 1`. Read the log.
+
+**The rubric's own rule 4 is defective.** It requires the improvement to exceed
+the baseline's per-run spread width. On PR #796 the baseline's speculative rate
+(8%) was *smaller* than its own spread (25%), so a candidate scoring a perfect
+0% still failed. Fix before the next attempt. It was not the deciding condition
+for either revert — 2, 3, 5 and 6 were.
