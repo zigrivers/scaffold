@@ -1211,6 +1211,15 @@ function collect(args) {
         // PROMPT_ONLY_KEYS draws for a config treatment.
         distDigest: buildDigest(pkgRootOf(arm.mmr), ['dist']),
         templatesDigest: buildDigest(pkgRootOf(arm.mmr), ['templates']),
+        // dist/ and templates/ are not the whole runtime. Two package roots can
+        // declare different dependencies — a baseline built at an old commit
+        // with its own `npm ci` resolves its own tree — and a dependency delta
+        // would ride along inside a "prompt" treatment. The manifest is what
+        // declares them, so it must match too.
+        manifestDigest: (() => {
+          const p = path.join(pkgRootOf(arm.mmr), 'package.json')
+          return fs.existsSync(p) ? sha256(fs.readFileSync(p, 'utf-8')) : null
+        })(),
         requestedRuns: n,
         complete: false,
       }
@@ -2035,7 +2044,7 @@ function provenanceBlockers(conditions) {
   // it as "nothing to check" would let the one guard that makes a build
   // treatment meaningful be switched off by deleting a key.
   if (buildTreatment) {
-    const missing = ['distDigest', 'templatesDigest'].filter(
+    const missing = ['distDigest', 'templatesDigest', 'manifestDigest'].filter(
       (k) => bp[k] === undefined || bp[k] === null || cp[k] === undefined || cp[k] === null,
     )
     if (missing.length > 0) {
@@ -2047,6 +2056,10 @@ function provenanceBlockers(conditions) {
         out.push('the two builds differ in dist/, not only in templates/ — a build treatment may '
           + 'change what the review ASKS, never how it RUNS, or finding differences cannot be '
           + 'attributed to the prompt')
+      }
+      if (bp.manifestDigest !== cp.manifestDigest) {
+        out.push('the two builds declare different package manifests — their dependency trees '
+          + 'may differ, so a difference in findings cannot be attributed to the prompt')
       }
       if (bp.templatesDigest === cp.templatesDigest) {
         out.push('the two builds have identical templates/ — a build treatment with no prompt '
@@ -2301,7 +2314,7 @@ function selftest() {
   // Build treatment: the build and the untreated prompt are the treatment, so
   // they must differ — and everything else must still match.
   // A build treatment always carries the split digests, so the fixtures do too.
-  const build = { treatment: 'build', distDigest: 'd', templatesDigest: 't' }
+  const build = { treatment: 'build', distDigest: 'd', templatesDigest: 't', manifestDigest: 'pk' }
   assert.deepEqual(
     provenanceBlockers(conds(build, {
       ...build, mmrDigest: 'm2', basePromptDigest: 'b2', templatesDigest: 't2',
@@ -2322,9 +2335,10 @@ function selftest() {
   // Baseline keeps the fixture's default digests; only the candidate moves, so
   // the mustDiffer fields genuinely differ and these cases isolate dist vs
   // templates.
-  const btBase = (over = {}) => ({ ...build, distDigest: 'd', templatesDigest: 't', ...over })
+  const btBase = (over = {}) => ({ ...build, distDigest: 'd', templatesDigest: 't', manifestDigest: 'pk', ...over })
   const btCand = (over = {}) => ({
-    ...build, mmrDigest: 'm2', basePromptDigest: 'b2', distDigest: 'd', templatesDigest: 't2', ...over,
+    ...build, mmrDigest: 'm2', basePromptDigest: 'b2', distDigest: 'd', templatesDigest: 't2',
+    manifestDigest: 'pk', ...over,
   })
   assert.deepEqual(
     provenanceBlockers(conds(btBase(), btCand())),
@@ -2339,6 +2353,13 @@ function selftest() {
     provenanceBlockers(conds(btBase(), btCand({ templatesDigest: 't' })))[0],
     /identical templates\//,
   )
+  // dist/ and templates/ are not the whole runtime: a baseline built at an old
+  // commit resolves its own dependency tree, and that delta would ride along
+  // inside a "prompt" treatment.
+  assert.match(
+    provenanceBlockers(conds(btBase(), btCand({ manifestDigest: 'pk2' })))[0],
+    /different package manifests/,
+  )
   // A build treatment may NOT waive the split digests. They shipped together,
   // so a missing one is hand-edited data — and waiving it would let the guard
   // that makes a build treatment meaningful be switched off by deleting a key.
@@ -2347,7 +2368,7 @@ function selftest() {
     provenanceBlockers(conds(bareBuild, {
       ...bareBuild, mmrDigest: 'm2', basePromptDigest: 'b2',
     }))[0],
-    /distDigest and templatesDigest missing/,
+    /distDigest and templatesDigest and manifestDigest missing/,
   )
   assert.match(
     provenanceBlockers(conds(btBase(), btCand({ templatesDigest: undefined })))[0],
