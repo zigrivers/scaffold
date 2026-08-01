@@ -878,7 +878,12 @@ function collect(args) {
   }
   const channelTimeout = args.timeout === undefined ? null : Number(args.timeout)
   {
-    const given = baselineMmr !== MMR
+    // From the FLAG's presence, not from whether the path happens to differ.
+    // Inferring it meant `--baseline-mmr <this build's own dist/index.js>`
+    // resolved equal to MMR, read as "not given", and silently skipped the
+    // --paired requirement and the --config conflict check — an explicit
+    // build-treatment request quietly demoted to a config treatment.
+    const given = args['baseline-mmr'] !== undefined
     // Answered here so collectProblem itself stays pure and testable. The
     // digest comparison is skipped unless the layout is right, because on a
     // wrong root buildDigest walks nothing and digests the empty string.
@@ -1043,7 +1048,9 @@ function collect(args) {
     // schema cannot reach — where mmrDigest and basePromptDigest are EXPECTED to
     // differ instead of expected to match. Recorded rather than inferred: a
     // reader of these files should not have to deduce which invariants applied.
-    treatment: baselineMmr === MMR ? 'config' : 'build',
+    // From the flag, for the same reason `given` is: a path that resolves to
+    // this build is a rejected build treatment, never a config one.
+    treatment: args['baseline-mmr'] === undefined ? 'config' : 'build',
     // Recorded so a reader knows what bounded the runs. Identical in both arms
     // by construction — it comes from one invocation — so it is documentation
     // here, not a check.
@@ -2004,18 +2011,29 @@ function provenanceBlockers(conditions) {
   // difference would then be credited to the prompt. So a build treatment must
   // change templates/ and NOTHING in dist/ — the same line PROMPT_ONLY_KEYS
   // draws for a config treatment, applied to a build.
-  // Skipped when either side predates these fields: absent is legacy data, not
-  // agreement.
-  if (buildTreatment && bp.distDigest !== undefined && cp.distDigest !== undefined) {
-    if (bp.distDigest !== cp.distDigest) {
-      out.push('the two builds differ in dist/, not only in templates/ — a build treatment may '
-        + 'change what the review ASKS, never how it RUNS, or finding differences cannot be '
-        + 'attributed to the prompt')
-    }
-    if (bp.templatesDigest !== undefined && cp.templatesDigest !== undefined
-      && bp.templatesDigest === cp.templatesDigest) {
-      out.push('the two builds have identical templates/ — a build treatment with no prompt '
-        + 'difference is not a treatment')
+  // REQUIRED under a build treatment, never waived. Build treatments and these
+  // digests shipped together, so no legacy build-treatment provenance can
+  // exist — a missing field means hand-edited or truncated data, and treating
+  // it as "nothing to check" would let the one guard that makes a build
+  // treatment meaningful be switched off by deleting a key.
+  if (buildTreatment) {
+    const missing = ['distDigest', 'templatesDigest'].filter(
+      (k) => bp[k] === undefined || bp[k] === null || cp[k] === undefined || cp[k] === null,
+    )
+    if (missing.length > 0) {
+      out.push(`${missing.join(' and ')} missing from a build-treatment condition — these record `
+        + 'that the arms differ only in templates/, and a build treatment cannot be verified '
+        + 'without them. Re-run `collect`.')
+    } else {
+      if (bp.distDigest !== cp.distDigest) {
+        out.push('the two builds differ in dist/, not only in templates/ — a build treatment may '
+          + 'change what the review ASKS, never how it RUNS, or finding differences cannot be '
+          + 'attributed to the prompt')
+      }
+      if (bp.templatesDigest === cp.templatesDigest) {
+        out.push('the two builds have identical templates/ — a build treatment with no prompt '
+          + 'difference is not a treatment')
+      }
     }
   }
   // The per-channel timeout bounds what each run could produce: a channel that
@@ -2264,13 +2282,18 @@ function selftest() {
 
   // Build treatment: the build and the untreated prompt are the treatment, so
   // they must differ — and everything else must still match.
-  const build = { treatment: 'build' }
+  // A build treatment always carries the split digests, so the fixtures do too.
+  const build = { treatment: 'build', distDigest: 'd', templatesDigest: 't' }
   assert.deepEqual(
-    provenanceBlockers(conds(build, { ...build, mmrDigest: 'm2', basePromptDigest: 'b2' })),
+    provenanceBlockers(conds(build, {
+      ...build, mmrDigest: 'm2', basePromptDigest: 'b2', templatesDigest: 't2',
+    })),
     [],
   )
   for (const key of ['mmrDigest', 'basePromptDigest']) {
-    const same = { ...build, mmrDigest: 'm2', basePromptDigest: 'b2', [key]: prov()[key] }
+    const same = {
+      ...build, mmrDigest: 'm2', basePromptDigest: 'b2', templatesDigest: 't2', [key]: prov()[key],
+    }
     const blockers = provenanceBlockers(conds(build, same))
     assert.equal(blockers.length, 1, `an identical ${key} must block a build treatment`)
     assert.match(blockers[0], new RegExp(`^${key} is identical`))
@@ -2298,17 +2321,30 @@ function selftest() {
     provenanceBlockers(conds(btBase(), btCand({ templatesDigest: 't' })))[0],
     /identical templates\//,
   )
-  // Legacy provenance lacking the split digests must still validate: absent is
-  // old data, not agreement.
-  assert.deepEqual(
-    provenanceBlockers(conds(build, { ...build, mmrDigest: 'm2', basePromptDigest: 'b2' })),
-    [],
-  )
-
-  // The build treatment relaxes ONLY those two fields.
+  // A build treatment may NOT waive the split digests. They shipped together,
+  // so a missing one is hand-edited data — and waiving it would let the guard
+  // that makes a build treatment meaningful be switched off by deleting a key.
+  const bareBuild = { treatment: 'build' }
   assert.match(
-    provenanceBlockers(conds(build, { ...build, mmrDigest: 'm2', basePromptDigest: 'b2', diffDigest: 'd2' }))[0],
-    /diffDigest differs/,
+    provenanceBlockers(conds(bareBuild, {
+      ...bareBuild, mmrDigest: 'm2', basePromptDigest: 'b2',
+    }))[0],
+    /distDigest and templatesDigest missing/,
+  )
+  assert.match(
+    provenanceBlockers(conds(btBase(), btCand({ templatesDigest: undefined })))[0],
+    /templatesDigest missing/,
+  )
+  // A CONFIG treatment predating the fields is genuine legacy data and still
+  // validates — the distinction is that config treatments existed before them.
+  assert.deepEqual(provenanceBlockers(conds({}, {})), [])
+
+  // The build treatment relaxes ONLY those two fields: an otherwise-valid build
+  // pair with a differing diffDigest is still blocked.
+  assert.ok(
+    provenanceBlockers(conds(build, {
+      ...build, mmrDigest: 'm2', basePromptDigest: 'b2', templatesDigest: 't2', diffDigest: 'd2',
+    })).some((b) => /diffDigest differs/.test(b)),
   )
   // One side declaring a build treatment is a mismatch, and must not relax the
   // other side's guards.
