@@ -837,7 +837,7 @@ function prepareOutDir(dir, forced) {
 function collectProblem(facts) {
   const {
     baselineMmrGiven, paired, config, timeout,
-    entryIsDistIndex, entryExists, hasDist, hasTemplates, sameBuild,
+    entryIsDistIndex, entryExists, hasDist, hasTemplates, hasManifest, sameBuild,
   } = facts
   if (timeout !== null && (!Number.isInteger(timeout) || timeout < 1)) {
     return '--timeout must be a positive integer number of seconds'
@@ -870,6 +870,13 @@ function collectProblem(facts) {
   if (!entryIsDistIndex) return 'must point at <package>/dist/index.js'
   if (!hasDist || !hasTemplates) {
     return 'does not look like a built MMR package: dist/ and templates/ must both exist beside it'
+  }
+  // Without it, collect records manifestDigest: null and `report` then refuses
+  // the finished experiment — an hour of collection spent to learn something
+  // knowable before the first run.
+  if (!hasManifest) {
+    return 'has no package.json, so the two arms cannot be shown to declare the same '
+      + 'dependencies — a build treatment requires one'
   }
   if (sameBuild) return 'is byte-identical to this build — there is no treatment'
   return null
@@ -911,6 +918,7 @@ function collect(args) {
       && path.basename(path.dirname(baselineMmr)) === 'dist'
     const hasDist = entryExists && fs.existsSync(path.join(baseRoot, 'dist'))
     const hasTemplates = entryExists && fs.existsSync(path.join(baseRoot, 'templates'))
+    const hasManifest = entryExists && fs.existsSync(path.join(baseRoot, 'package.json'))
     const problem = collectProblem({
       baselineMmrGiven: given,
       paired: pairedOut !== null,
@@ -920,6 +928,7 @@ function collect(args) {
       entryIsDistIndex,
       hasDist,
       hasTemplates,
+      hasManifest,
       sameBuild: given && entryIsDistIndex && hasDist && hasTemplates
         && buildDigest(baseRoot) === buildDigest(),
     })
@@ -2057,6 +2066,13 @@ function provenanceBlockers(conditions) {
           + 'change what the review ASKS, never how it RUNS, or finding differences cannot be '
           + 'attributed to the prompt')
       }
+      // Necessary, not sufficient, and deliberately so: identical semver ranges
+      // can still RESOLVE to different installed versions in two separately
+      // installed trees. Proving the trees equal would mean digesting
+      // node_modules, which is enormous and mostly irrelevant to a review.
+      // Matching manifests catches the realistic mistake — a baseline built
+      // from a commit whose dependencies had moved — and the residual risk is
+      // recorded here rather than papered over.
       if (bp.manifestDigest !== cp.manifestDigest) {
         out.push('the two builds declare different package manifests — their dependency trees '
           + 'may differ, so a difference in findings cannot be attributed to the prompt')
@@ -2469,7 +2485,7 @@ function selftest() {
   const cf = (over = {}) => ({
     baselineMmrGiven: true, paired: true, config: false, timeout: null,
     entryExists: true, entryIsDistIndex: true, hasDist: true, hasTemplates: true,
-    sameBuild: false, ...over,
+    hasManifest: true, sameBuild: false, ...over,
   })
   assert.equal(collectProblem(cf()), null)
   assert.match(collectProblem(cf({ paired: false })), /--baseline-mmr requires --paired/)
@@ -2478,6 +2494,7 @@ function selftest() {
   assert.match(collectProblem(cf({ entryIsDistIndex: false })), /dist\/index\.js/)
   assert.match(collectProblem(cf({ hasTemplates: false })), /built MMR package/)
   assert.match(collectProblem(cf({ hasDist: false })), /built MMR package/)
+  assert.match(collectProblem(cf({ hasManifest: false })), /no package\.json/)
   assert.match(collectProblem(cf({ sameBuild: true })), /byte-identical/)
   // Ordering: --config beats every filesystem complaint, so the message names
   // the real mistake rather than a symptom of it.
