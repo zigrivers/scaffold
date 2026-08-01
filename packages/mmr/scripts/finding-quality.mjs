@@ -829,17 +829,23 @@ function collect(args) {
   // time. A PR that gains a commit mid-collection would otherwise have runs
   // within one condition reviewing different code, with nothing to detect it —
   // and the two arms are collected minutes apart, so this is not hypothetical.
-  const snapshot = path.join(outDir, SNAPSHOT_FILE)
 
-  const commonArgs = ['review', '--channels', channels, '--sync', '--format', 'json', '--diff', snapshot]
+  // Each arm reviews the snapshot in ITS OWN directory. Sharing one file made
+  // the per-arm integrity check theatre: the paired arm's copy was verified and
+  // never read, so swapping the file both arms actually used went undetected.
+  const argsFor = (dir, trusted) => [
+    'review', '--channels', channels, '--sync', '--format', 'json',
+    '--diff', path.join(dir, SNAPSHOT_FILE),
+    ...(trusted ? ['--trust-project-config'] : []),
+  ]
   // The candidate arm needs --trust-project-config to have the .mmr.yaml in its
   // cwd read at all; the baseline arm has no config in its cwd, so it gets the
   // built-in prompt either way. That one flag, plus the differing cwd, is the
   // entire difference between the arms.
-  const baselineArgs = [...commonArgs]
-  // Named for what it IS. It used to be called `base` and then mutated into the
-  // candidate's arguments, which reads exactly backwards.
-  const candidateArgs = args.config ? [...commonArgs, '--trust-project-config'] : [...commonArgs]
+  // Named for what they ARE. These used to be one array called `base`, mutated
+  // into the candidate's arguments, which reads exactly backwards.
+  const baselineArgs = argsFor(outDir, false)
+  const candidateArgs = argsFor(pairedOut === null ? outDir : pairedOut, Boolean(args.config))
 
   {
     // The treatment IS the prompt the channels receive, so record that, not a
@@ -848,8 +854,9 @@ function collect(args) {
     // value a CLI flag overrides), which would let two identical treatments be
     // compared against each other and let resampling alone earn a ship verdict.
     // --dry-run assembles and prints the real thing without dispatching.
-    // The snapshot must exist before --dry-run can resolve it.
-    fs.writeFileSync(snapshot, reviewedDiff)
+    // Every arm's snapshot must exist before --dry-run can resolve it.
+    fs.writeFileSync(path.join(outDir, SNAPSHOT_FILE), reviewedDiff)
+    if (pairedOut) fs.writeFileSync(path.join(pairedOut, SNAPSHOT_FILE), reviewedDiff)
     const assemble = (mmrArgs, cwd) => execFileSync('node', [MMR, ...mmrArgs, '--dry-run'], {
       encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024, cwd,
     })
