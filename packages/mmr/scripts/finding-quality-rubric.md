@@ -60,6 +60,18 @@ rate is 0/0, so it drops out of the spread that sizes the noise band, making the
 band narrower than the data warrants and the ship rule easier to clear than it
 should be.
 
+## Collect the arms interleaved
+
+A collection takes tens of minutes. Running one arm to completion and then the
+other confounds the treatment with everything that drifts in between — a model
+rolled forward, rate limiting, a service degrading — and every such difference
+lands entirely on whichever arm went second.
+
+`collect --paired` alternates the two arms run by run, so that drift is spread
+equally across both. Prefer it. Collecting the arms as separate blocks is still
+supported, but the result carries a confound the report cannot detect and
+cannot correct for.
+
 ## Both arms must review the same thing
 
 `collect` records a `provenance.json` per condition: the review target, a digest

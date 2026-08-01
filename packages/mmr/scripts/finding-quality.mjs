@@ -21,7 +21,15 @@
  *   # 0. selftest — verify the harness's own math before trusting a verdict
  *   node scripts/finding-quality.mjs selftest
  *
- *   # 1. collect — N runs of one condition (N >= 6; the rubric's floor).
+ *   # 1. collect — N runs. PREFER --paired: it collects both arms in one
+ *   #    interleaved pass, so anything that drifts over the half hour a
+ *   #    collection takes (a model rolled forward, rate limiting, a degrading
+ *   #    service) lands on both arms equally instead of on whichever went second.
+ *   node scripts/finding-quality.mjs collect \
+ *     --out runs/baseline --paired runs/calibrated --config ./candidate.mmr.yaml \
+ *     --pr 782 --n 6 --channels claude,codex,opencode-glm
+ *
+ *   # Or one condition at a time (N >= 6; the rubric's floor).
  *   #    NOTE: with --config, the repo-root .mmr.yaml is REPLACED for the
  *   #    duration of the run and restored afterwards. Do not edit it while a
  *   #    collection is in flight — the restore would overwrite your changes.
@@ -242,7 +250,9 @@ function assertPromptOnlyConfig(file) {
 }
 
 /** Flags that must carry a value; `true` here means the value was swallowed. */
-const VALUE_FLAGS = ['out', 'config', 'pr', 'diff', 'channels', 'n', 'judge', 'scores', 'baseline', 'candidate']
+const VALUE_FLAGS = [
+  'out', 'config', 'pr', 'diff', 'channels', 'n', 'judge', 'scores', 'baseline', 'candidate', 'paired',
+]
 
 /**
  * A value-carrying flag immediately followed by another flag parses as `true`,
@@ -319,6 +329,7 @@ function makeConfigSwapper(livePath, candidatePath, io = fs) {
   const backupPath = `${livePath}.harness-backup`
   const statePath = `${livePath}.harness-state`
   let installed = false
+  let installCompleted = false
   let restored = false
 
   const readState = () => {
@@ -338,6 +349,14 @@ function makeConfigSwapper(livePath, candidatePath, io = fs) {
     if (io.existsSync(backupPath)) io.copyFileSync(backupPath, livePath)
     else io.rmSync(livePath, { force: true })
     clearSidecars()
+  }
+
+  /** True while the live config is still exactly what we installed. */
+  const stillOurs = () => {
+    const state = readState()
+    if (!state) return false
+    if (!io.existsSync(livePath)) return true      // ours, and already gone
+    return sha256(io.readFileSync(livePath, 'utf-8')) === state.installedDigest
   }
 
   return {
@@ -375,10 +394,24 @@ function makeConfigSwapper(livePath, candidatePath, io = fs) {
       io.writeFileSync(statePath, JSON.stringify({ installedDigest: sha256(candidateText) }))
       installed = true
       io.copyFileSync(candidatePath, livePath)
+      installCompleted = true
     },
     restore() {
       if (!installed || restored) return
       restored = true
+      // A collection runs for many minutes, so the live file may have been
+      // edited meanwhile and putting the backup back would destroy that work.
+      //
+      // But content alone cannot tell a user's edit from OUR half-written copy:
+      // neither matches the candidate. installCompleted does — if the copy never
+      // finished, the damage is ours and restoring is exactly right. Only a
+      // mismatch after a completed install means someone else wrote the file.
+      if (installCompleted && !stillOurs()) {
+        console.error(`[harness] ${livePath} changed during the run; leaving it as it is. `
+          + `The pre-run contents are in ${backupPath}.`)
+        io.rmSync(statePath, { force: true })
+        return
+      }
       putBack()
     },
   }
@@ -419,6 +452,11 @@ function canonicalPrompts(dryRunOutput) {
  *
  * Unreadable or malformed pid file → treat the owner as gone: the alternative
  * is a lock nothing can ever clear.
+ *
+ * Limitation: signal 0 succeeds for a zombie (exited but unreaped) process, so
+ * such a lock reads as held and must be removed by hand. That errs toward
+ * refusing to reclaim, which is the safe direction — the unsafe one would be
+ * two collectors swapping the shared config at once.
  */
 function ownerAlive(pidFile) {
   let pid
@@ -471,12 +509,87 @@ function normalizeChannels(list) {
   return list.split(',').map((c) => c.trim()).filter(Boolean).sort().join(',')
 }
 
+/**
+ * One review run against a fixed diff. Shared by the plain and paired paths so
+ * they cannot drift apart in how a run is dispatched or recorded.
+ */
+function runOnce({ mmrArgs, repoRoot, target, index, total, label }) {
+  fs.rmSync(target, { force: true })
+  process.stderr.write(`[${label}] run ${index}/${total} … `)
+  const started = Date.now()
+  let raw
+  try {
+    raw = execFileSync('node', [MMR, ...mmrArgs], {
+      encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024, cwd: repoRoot,
+    })
+  } catch (err) {
+    if (err.status !== 2 && err.status !== 3) {
+      process.stderr.write('FAILED\n')
+      const detail = (err.stderr || err.message || '').toString().slice(0, 500)
+      die(`run ${index} exited ${err.status ?? 'abnormally'}: ${detail}`)
+    }
+    raw = err.stdout ?? ''
+  }
+  const secs = ((Date.now() - started) / 1000).toFixed(0)
+  let parsed
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    process.stderr.write(`FAILED (no JSON) after ${secs}s\n`)
+    die(`run ${index} produced no parseable result. Re-run \`collect\` for this condition `
+      + '(a partial condition cannot be compared against a complete one).')
+  }
+  fs.writeFileSync(target, raw)
+  const degraded = Object.entries(parsed.per_channel ?? {})
+    .filter(([, c]) => c.status !== 'completed')
+    .map(([k, c]) => `${k}:${c.status}`)
+  process.stderr.write(
+    `${parsed.reconciled_findings?.length ?? 0} reconciled findings, ${secs}s`
+    + (degraded.length ? `  DEGRADED ${degraded.join(' ')}` : '') + '\n',
+  )
+}
+
+/**
+ * Prepare one output directory: ownership check, clear prior runs, mark it.
+ */
+function prepareOutDir(dir, forced) {
+  if (fs.existsSync(dir)) {
+    const entries = fs.readdirSync(dir)
+    const harnessOwned = (f) =>
+      RUN_FILE_RE.test(f) || f === PROVENANCE_FILE || f === SNAPSHOT_FILE || f === OWNER_FILE
+    const stale = entries.filter(harnessOwned)
+    const foreign = entries.filter((f) => !harnessOwned(f))
+    if (foreign.length > 0) {
+      die(`${dir} contains ${foreign.length} file(s) this harness did not write `
+        + `(e.g. ${foreign.slice(0, 3).join(', ')}). Refusing to use it — pick an empty or harness-owned directory.`)
+    }
+    if (entries.length > 0 && !entries.includes(OWNER_FILE)) {
+      die(`${dir} is not a harness output directory (no ${OWNER_FILE} marker). `
+        + 'Refusing to touch it — pick an empty or previously-collected directory.')
+    }
+    if (stale.some((f) => f !== OWNER_FILE) && !forced) {
+      die(`${dir} already contains data from a previous collection. `
+        + 'Use a fresh directory, or pass --force to clear it.')
+    }
+    for (const f of stale) fs.rmSync(path.join(dir, f))
+  }
+  fs.mkdirSync(dir, { recursive: true })
+  fs.writeFileSync(path.join(dir, OWNER_FILE), 'finding-quality harness output directory\n')
+}
+
 function collect(args) {
   // Absolute from here on. The MMR child runs with cwd=repoRoot, so a relative
   // --out would hand it a --diff path resolved against the repo root instead of
   // the caller's directory — which silently breaks every invocation made from
   // packages/mmr, including the ones this file documents.
   const outDir = args.out ? path.resolve(args.out) : die('--out required')
+  // --paired names the OTHER arm's directory. Both arms are then collected in
+  // one interleaved pass — see the loop below for why that matters.
+  const pairedOut = args.paired ? path.resolve(args.paired) : null
+  if (pairedOut !== null) {
+    if (pairedOut === outDir) die('--paired must name a different directory from --out')
+    if (!args.config) die('--paired needs --config: the paired arm IS the candidate treatment')
+  }
   const n = Number(args.n ?? MIN_RUNS)
   const channels = args.channels ?? die('--channels required')
   if (!args.pr && !args.diff) die('--pr or --diff required')
@@ -486,41 +599,12 @@ function collect(args) {
       + ' report will refuse to issue a verdict')
   }
 
+  const forced = args.force === true || args.force === 'true'
   // A directory that already holds runs would silently mix a previous
   // experiment into this one — a shorter rerun leaves the old tail behind, and
   // the extra runs are indistinguishable from the new ones once pooled.
-  if (fs.existsSync(outDir)) {
-    const entries = fs.readdirSync(outDir)
-    const harnessOwned = (f) =>
-      RUN_FILE_RE.test(f) || f === PROVENANCE_FILE || f === SNAPSHOT_FILE || f === OWNER_FILE
-    const stale = entries.filter(harnessOwned)
-    // --force must never be a directory shredder. A mistyped --out pointing at
-    // a real directory would otherwise delete its contents, so only files
-    // matching the run-NN.json names this harness itself writes are removable,
-    // and any other content makes the directory off-limits entirely.
-    const foreign = entries.filter((f) => !harnessOwned(f))
-    if (foreign.length > 0) {
-      die(`${outDir} contains ${foreign.length} file(s) this harness did not write `
-        + `(e.g. ${foreign.slice(0, 3).join(', ')}). Refusing to use it — pick an empty or harness-owned directory.`)
-    }
-    // parseArgs supports --flag=value, so --force=true arrives as the STRING
-    // 'true'. A strict boolean check would ignore it and then tell the user to
-    // pass the flag they just passed.
-    const forced = args.force === true || args.force === 'true'
-    // Names are a hint; the marker is the proof. A mistyped --out landing on a
-    // directory that happens to hold a run-01.json must not have it deleted.
-    if (entries.length > 0 && !entries.includes(OWNER_FILE)) {
-      die(`${outDir} is not a harness output directory (no ${OWNER_FILE} marker). `
-        + 'Refusing to touch it — pick an empty or previously-collected directory.')
-    }
-    if (stale.some((f) => f !== OWNER_FILE) && !forced) {
-      die(`${outDir} already contains data from a previous collection. `
-        + 'Use a fresh directory, or pass --force to clear it.')
-    }
-    for (const f of stale) fs.rmSync(path.join(outDir, f))
-  }
-  fs.mkdirSync(outDir, { recursive: true })
-  fs.writeFileSync(path.join(outDir, OWNER_FILE), 'finding-quality harness output directory\n')
+  prepareOutDir(outDir, forced)
+  if (pairedOut) prepareOutDir(pairedOut, forced)
 
   // Without this, an unbuilt package surfaces only as N repetitions of
   // "FAILED (no JSON)" — the broad catch below hides the real cause.
@@ -676,12 +760,13 @@ function collect(args) {
   // within one condition reviewing different code, with nothing to detect it —
   // and the two arms are collected minutes apart, so this is not hypothetical.
   const snapshot = path.join(outDir, SNAPSHOT_FILE)
-  fs.writeFileSync(snapshot, reviewedDiff)
 
   const base = ['review', '--channels', channels, '--sync', '--format', 'json', '--diff', snapshot]
   // --diff is untrusted-head, so the candidate arm needs the explicit opt-in to
   // have its .mmr.yaml read at all. The baseline arm wants no project config,
-  // which is what untrusted-head already gives it.
+  // which is what untrusted-head already gives it — which is also what makes
+  // paired mode work without swapping the file between runs.
+  const baselineArgs = [...base]
   if (args.config) base.push('--trust-project-config')
 
   try {
@@ -704,11 +789,16 @@ function collect(args) {
     // value a CLI flag overrides), which would let two identical treatments be
     // compared against each other and let resampling alone earn a ship verdict.
     // --dry-run assembles and prints the real thing without dispatching.
+    // The snapshot must exist before --dry-run can resolve it.
+    fs.writeFileSync(snapshot, reviewedDiff)
+    const assemble = (mmrArgs) => execFileSync('node', [MMR, ...mmrArgs, '--dry-run'], {
+      encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024, cwd: repoRoot,
+    })
     let dryRun
+    let baselineDryRun = null
     try {
-      dryRun = execFileSync('node', [MMR, ...base, '--dry-run'], {
-        encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024, cwd: repoRoot,
-      })
+      dryRun = assemble(base)
+      if (pairedOut !== null) baselineDryRun = assemble(baselineArgs)
     } catch (err) {
       const detail = (err.stderr || err.message || '').toString().slice(0, 300)
       die(`could not assemble the prompt for this condition: ${detail}`)
@@ -717,20 +807,36 @@ function collect(args) {
     // the first "## Diff" hashed a prefix of the first channel only, so a
     // wrapper suffix, a later channel's criteria, or a difference in any
     // channel but the first was invisible.
-    const promptOnly = canonicalPrompts(dryRun)
-    if (promptOnly === null) die('could not parse --dry-run output into per-channel prompts')
+    // In paired mode the two arms differ ONLY by --trust-project-config: with
+    // --diff the trust mode is untrusted-head, so the candidate .mmr.yaml sitting
+    // at the repo root is simply not read unless that flag is passed. One
+    // install, no per-run swapping, and the baseline is genuinely unaffected.
+    const arms = pairedOut === null
+      ? [{ dir: outDir, mmrArgs: base, promptSource: dryRun }]
+      : [
+        { dir: outDir, mmrArgs: baselineArgs, promptSource: baselineDryRun },
+        { dir: pairedOut, mmrArgs: base, promptSource: dryRun },
+      ]
+
     // Written incomplete first. An interrupted collection leaves its finished
     // runs on disk, and with --n above the floor report would otherwise see
     // enough of them to call a truncated condition complete and issue a verdict
     // from it.
-    const provenance = {
-      ...provenanceBase,
-      promptDigest: sha256(promptOnly),
-      requestedRuns: n,
-      complete: false,
+    const provPaths = []
+    for (const arm of arms) {
+      const promptOnly = canonicalPrompts(arm.promptSource)
+      if (promptOnly === null) die('could not parse --dry-run output into per-channel prompts')
+      const provenance = {
+        ...provenanceBase,
+        promptDigest: sha256(promptOnly),
+        requestedRuns: n,
+        complete: false,
+      }
+      const pp = path.join(arm.dir, PROVENANCE_FILE)
+      fs.writeFileSync(pp, JSON.stringify(provenance, null, 2))
+      fs.writeFileSync(path.join(arm.dir, SNAPSHOT_FILE), reviewedDiff)
+      provPaths.push({ path: pp, provenance })
     }
-    const provPath = path.join(outDir, PROVENANCE_FILE)
-    fs.writeFileSync(provPath, JSON.stringify(provenance, null, 2))
 
     // Width from N, so lexicographic sort stays chronological past 99 runs
     // (run-100 would otherwise sort before run-11).
@@ -738,54 +844,26 @@ function collect(args) {
     // Serial, never parallel: concurrent same-account sessions are exactly the
     // condition that makes grok return a cancelled envelope, and a channel that
     // degrades in one arm and not the other silently biases the comparison.
+    //
+    // ALTERNATING, not two solid blocks. Collecting one arm fully and then the
+    // other confounds the treatment with everything that drifts over the half
+    // hour between them — a model rolled forward, rate limiting, a service
+    // degrading. Interleaving spreads that equally across both arms.
     for (let i = 1; i <= n; i++) {
-      const target = path.join(outDir, `run-${String(i).padStart(padWidth, '0')}.json`)
-      fs.rmSync(target, { force: true })
-      process.stderr.write(`[${conditionLabel(outDir)}] run ${i}/${n} … `)
-      const started = Date.now()
-      let raw
-      try {
-        raw = execFileSync('node', [MMR, ...base], {
-          encoding: 'utf-8',
-          maxBuffer: 64 * 1024 * 1024,
-          cwd: repoRoot,
+      for (const arm of arms) {
+        runOnce({
+          mmrArgs: arm.mmrArgs,
+          repoRoot,
+          target: path.join(arm.dir, `run-${String(i).padStart(padWidth, '0')}.json`),
+          index: i,
+          total: n,
+          label: conditionLabel(arm.dir),
         })
-      } catch (err) {
-        // mmr exits 2 on `blocked` and 3 on `needs-user-decision`. Both are
-        // normal outcomes here — we want the findings, not the verdict. Any
-        // other status is a real failure and must not be mistaken for one.
-        if (err.status !== 2 && err.status !== 3) {
-          process.stderr.write('FAILED\n')
-          const detail = (err.stderr || err.message || '').toString().slice(0, 500)
-          die(`run ${i} exited ${err.status ?? 'abnormally'}: ${detail}`)
-        }
-        raw = err.stdout ?? ''
       }
-      const secs = ((Date.now() - started) / 1000).toFixed(0)
-      let parsed
-      try {
-        parsed = JSON.parse(raw)
-      } catch {
-        // Skipping would leave a condition that looks complete while quietly
-        // missing an attempt — and with --n above the floor, report would still
-        // see enough runs to issue a verdict. An experiment with a hole in it
-        // is not an experiment; re-collect instead.
-        process.stderr.write(`FAILED (no JSON) after ${secs}s\n`)
-        die(`run ${i} produced no parseable result. Re-run \`collect\` for this condition `
-          + '(a partial condition cannot be compared against a complete one).')
-      }
-      fs.writeFileSync(target, raw)
-      const degraded = Object.entries(parsed.per_channel ?? {})
-        .filter(([, c]) => c.status !== 'completed')
-        .map(([k, c]) => `${k}:${c.status}`)
-      // Report the same unit the scorer uses, so the console figure and the
-      // scored population cannot drift apart.
-      process.stderr.write(
-        `${parsed.reconciled_findings?.length ?? 0} reconciled findings, ${secs}s`
-        + (degraded.length ? `  DEGRADED ${degraded.join(' ')}` : '') + '\n',
-      )
     }
-    fs.writeFileSync(provPath, JSON.stringify({ ...provenance, complete: true }, null, 2))
+    for (const { path: pp, provenance } of provPaths) {
+      fs.writeFileSync(pp, JSON.stringify({ ...provenance, complete: true }, null, 2))
+    }
   } finally {
     restoreConfig()
   }
@@ -1558,6 +1636,20 @@ function selftest() {
   sw.restore()
   assert.equal(io2.files['/live'], 'ORIGINAL')
 
+  // restore() must NOT clobber an edit made DURING the run either.
+  io2 = fakeFs({ '/live': 'ORIGINAL', '/cand': 'CANDIDATE' })
+  sw = makeConfigSwapper('/live', '/cand', io2)
+  sw.install()
+  io2.files['/live'] = 'EDITED_MID_RUN'
+  let errs0 = []
+  let realErr0 = console.error
+  console.error = (...a) => errs0.push(a.join(' '))
+  sw.restore()
+  console.error = realErr0
+  assert.equal(io2.files['/live'], 'EDITED_MID_RUN')
+  assert.equal(io2.files['/live.harness-backup'], 'ORIGINAL', 'the pre-run copy must be kept')
+  assert.equal(errs0.length > 0, true)
+
   // Recovery must NOT clobber a config the user wrote after the crash.
   io2 = fakeFs({ '/live': 'ORIGINAL', '/cand': 'CANDIDATE' })
   makeConfigSwapper('/live', '/cand', io2).install()
@@ -1607,6 +1699,19 @@ function selftest() {
   ].join('\n')
   assert.equal(canonicalPrompts(swapped), canonicalPrompts(reordered))
   assert.equal(canonicalPrompts('no markers here'), null)
+
+  // defectSiteCounts feeds the lost-defect-site guard and had no direct cover.
+  const f = (cls, run, location) => ({ run, location, score: { class: cls } })
+  const sites = defectSiteCounts([
+    f('defect', 'run-01.json', 'src/a.ts:10'),
+    f('defect', 'run-02.json', 'src/a.ts:12'),   // same file, drifted line
+    f('defect', 'run-02.json', './src/a.ts:99'), // same run, normalized path
+    f('defect', 'run-03.json', 'src/b.ts:1'),
+    f('speculative', 'run-01.json', 'src/c.ts:1'),  // not a defect
+    f('defect', 'run-01.json', ''),                  // no location
+  ])
+  assert.deepEqual(sites, { 'src/a.ts': 2, 'src/b.ts': 1 })
+  assert.deepEqual(defectSiteCounts([]), {})
 
   assert.equal(normalizeChannels('claude, codex'), 'claude,codex')
   assert.equal(normalizeChannels('codex,claude'), normalizeChannels('claude, codex'))
