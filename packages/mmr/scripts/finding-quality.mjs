@@ -345,17 +345,17 @@ function makeConfigSwapper(livePath, candidatePath, io = fs) {
         // A backup with no state means we died before recording the install, so
         // the live config was never touched. Clean the orphan and stop.
         if (io.existsSync(backupPath)) io.rmSync(backupPath, { force: true })
-        return false
+        return 'nothing-to-do'
       }
       const live = io.existsSync(livePath) ? io.readFileSync(livePath, 'utf-8') : null
       if (live !== null && sha256(live) !== state.installedDigest) {
         console.error(`[harness] ${livePath} has changed since an interrupted run left its `
           + 'sidecars behind. Leaving it alone — inspect and remove '
           + `${statePath} / ${backupPath} by hand.`)
-        return false
+        return 'refused'
       }
       putBack()
-      return true
+      return 'recovered'
     },
     install() {
       if (io.existsSync(livePath)) io.copyFileSync(livePath, backupPath)
@@ -541,11 +541,28 @@ function collect(args) {
   const lockDir = path.join(repoRoot, '.mmr-harness.lock')
   const lockPid = path.join(lockDir, 'pid')
   let holdsLock = false
+  // Assigned once the candidate is validated. The handlers below close over the
+  // holder rather than the value so they can be registered FIRST — before the
+  // lock exists — which is the only ordering where an early die() cannot leak it.
+  let swapper = null
   const releaseLock = () => {
     if (!holdsLock) return
     holdsLock = false
     try { fs.rmSync(lockDir, { recursive: true, force: true }) } catch { /* already gone */ }
   }
+  // Restore the config, THEN drop the lock — one handler, so the order cannot
+  // invert. Registered here, before the lock is taken and before the swapper
+  // exists, so no failure between this point and the end of collect can leave
+  // either behind. swapper?.restore() is inert until install() has run, so a
+  // signal arriving early cannot delete a .mmr.yaml the harness never touched.
+  const restoreConfig = () => { swapper?.restore(); releaseLock() }
+  process.once('exit', restoreConfig)
+  const onSignal = (sig) => {
+    restoreConfig()
+    process.exit(sig === 'SIGINT' ? 130 : 143)
+  }
+  process.once('SIGINT', () => onSignal('SIGINT'))
+  process.once('SIGTERM', () => onSignal('SIGTERM'))
 
   if (args.config) {
     const takeLock = () => {
@@ -577,11 +594,23 @@ function collect(args) {
       }
       if (!ownerAlive(lockPid)) {
         console.error(`[harness] reclaiming ${lockDir} from a process that is no longer running`)
+        // Rename, don't remove-then-create. With remove-then-create, two
+        // collectors both seeing the same dead lock can each delete and
+        // recreate it — the second deleting the FIRST one's fresh lock — and
+        // both then swap the shared config concurrently. rename() is atomic, so
+        // exactly one of them can move the stale directory aside, and the loser
+        // finds the winner's live lock.
+        const aside = `${lockDir}.stale-${process.pid}`
         try {
-          fs.rmSync(lockDir, { recursive: true, force: true })
+          fs.renameSync(lockDir, aside)
+        } catch {
+          die(`another collection reclaimed ${lockDir} first. Re-run in a moment.`)
+        }
+        fs.rmSync(aside, { recursive: true, force: true })
+        try {
           takeLock()
         } catch {
-          die(`could not reclaim ${lockDir} — remove it by hand if no collection is running.`)
+          die(`could not take ${lockDir} after reclaiming it — remove it by hand if no collection is running.`)
         }
       } else {
         die(`another configured collection (pid ${fs.readFileSync(lockPid, 'utf-8').trim()}) holds `
@@ -589,29 +618,19 @@ function collect(args) {
       }
     }
   }
-  if (args.config) assertPromptOnlyConfig(path.resolve(args.config))
-  const swapper = args.config ? makeConfigSwapper(liveConfig, path.resolve(args.config)) : null
-  if (swapper?.recoverIfStale()) {
-    console.error(`[harness] restored ${liveConfig} from a backup left by an interrupted run`)
+  if (args.config) {
+    assertPromptOnlyConfig(path.resolve(args.config))
+    swapper = makeConfigSwapper(liveConfig, path.resolve(args.config))
+    const outcome = swapper.recoverIfStale()
+    if (outcome === 'recovered') {
+      console.error(`[harness] restored ${liveConfig} from an interrupted run`)
+    } else if (outcome === 'refused') {
+      // Continuing would install over the sidecars and destroy the only copy of
+      // whatever the interrupted run had backed up.
+      die(`refusing to collect while ${liveConfig} carries sidecars from an interrupted run that `
+        + 'no longer match it. Resolve them by hand first.')
+    }
   }
-  // Inert until install() has run, so a signal arriving before then cannot
-  // delete a .mmr.yaml the harness never touched.
-  const restoreConfig = () => { swapper?.restore(); releaseLock() }
-  // ONE exit handler, registered before the lock is taken. Two separate
-  // listeners would run in registration order, dropping the lock before the
-  // config was restored — and another collector acquiring it in that window
-  // would install its candidate over ours and then "restore" the wrong file.
-  process.once('exit', restoreConfig)
-  // A `finally` does not run on SIGINT/SIGTERM, and a collect run takes long
-  // enough that Ctrl-C during it is the common case — leaving the candidate
-  // config sitting at the repo root, where it would silently apply to the
-  // user's next review.
-  const onSignal = (sig) => {
-    restoreConfig()
-    process.exit(sig === 'SIGINT' ? 130 : 143)
-  }
-  process.once('SIGINT', () => onSignal('SIGINT'))
-  process.once('SIGTERM', () => onSignal('SIGTERM'))
 
 
 
@@ -1469,19 +1488,19 @@ function selftest() {
   makeConfigSwapper('/live', '/cand', io3).install()
   assert.equal(io3.files['/live'], 'CANDIDATE')
   assert.equal(io3.files['/live.harness-backup'], 'ORIGINAL')  // survives a SIGKILL
-  assert.equal(makeConfigSwapper('/live', '/cand', io3).recoverIfStale(), true)
+  assert.equal(makeConfigSwapper('/live', '/cand', io3).recoverIfStale(), 'recovered')
   assert.equal(io3.files['/live'], 'ORIGINAL')
   assert.equal('/live.harness-backup' in io3.files, false)
   assert.equal('/live.harness-state' in io3.files, false)
   // Nothing to recover when no run was interrupted.
-  assert.equal(makeConfigSwapper('/live', '/cand', io3).recoverIfStale(), false)
+  assert.equal(makeConfigSwapper('/live', '/cand', io3).recoverIfStale(), 'nothing-to-do')
   // The case a backup file alone cannot express: nothing existed before, so
   // there is no backup to find, and without the state sidecar the candidate
   // would stay installed forever.
   io3 = fakeFs({ '/cand': 'CANDIDATE' })
   makeConfigSwapper('/live', '/cand', io3).install()
   assert.equal(io3.files['/live'], 'CANDIDATE')
-  assert.equal(makeConfigSwapper('/live', '/cand', io3).recoverIfStale(), true)
+  assert.equal(makeConfigSwapper('/live', '/cand', io3).recoverIfStale(), 'recovered')
   assert.equal('/live' in io3.files, false)
 
   // A pre-existing config is put back byte for byte.
@@ -1531,7 +1550,7 @@ function selftest() {
   const errs = []
   const realErr = console.error
   console.error = (...a) => errs.push(a.join(' '))
-  assert.equal(makeConfigSwapper('/live', '/cand', io2).recoverIfStale(), false)
+  assert.equal(makeConfigSwapper('/live', '/cand', io2).recoverIfStale(), 'refused')
   console.error = realErr
   assert.equal(io2.files['/live'], 'USER_WROTE_THIS_AFTER_THE_CRASH')
   assert.equal(errs.length > 0, true, 'refusing to recover must say so')
@@ -1539,7 +1558,7 @@ function selftest() {
   // A backup with no state means the crash preceded the install, so the live
   // config was never touched: clean the orphan, change nothing else.
   io2 = fakeFs({ '/live': 'ORIGINAL', '/live.harness-backup': 'ORIGINAL', '/cand': 'CANDIDATE' })
-  assert.equal(makeConfigSwapper('/live', '/cand', io2).recoverIfStale(), false)
+  assert.equal(makeConfigSwapper('/live', '/cand', io2).recoverIfStale(), 'nothing-to-do')
   assert.equal(io2.files['/live'], 'ORIGINAL')
   assert.equal('/live.harness-backup' in io2.files, false)
 
