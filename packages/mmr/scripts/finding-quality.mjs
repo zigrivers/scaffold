@@ -48,6 +48,7 @@ import { createHash } from 'node:crypto'
 import yaml from 'js-yaml'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -289,15 +290,23 @@ function conditionLabel(dir) {
  */
 function makeConfigSwapper(livePath, candidatePath, io = fs) {
   // Two sidecars, because the two states must be distinguishable after a
-  // SIGKILL. The state file records THAT we installed; the backup holds the
-  // previous contents when there were any. Without the state file, a run that
-  // installed over nothing leaves no trace at all, so a later run cannot tell
-  // the candidate it should remove from a config the user wrote themselves —
-  // and the candidate stays live forever.
+  // SIGKILL. The state file records THAT we installed and WHAT we installed;
+  // the backup holds the previous contents when there were any. Without the
+  // state file, a run that installed over nothing leaves no trace, so a later
+  // run cannot tell the candidate it should remove from a config the user wrote
+  // themselves — and the candidate stays live forever.
   const backupPath = `${livePath}.harness-backup`
   const statePath = `${livePath}.harness-state`
   let installed = false
   let restored = false
+
+  const readState = () => {
+    try {
+      return JSON.parse(io.readFileSync(statePath, 'utf-8'))
+    } catch {
+      return null
+    }
+  }
 
   const clearSidecars = () => {
     io.rmSync(backupPath, { force: true })
@@ -311,17 +320,38 @@ function makeConfigSwapper(livePath, candidatePath, io = fs) {
   }
 
   return {
-    /** Undo an install left behind by a run that was killed before restoring. */
+    /**
+     * Undo an install left behind by a run that was killed before restoring.
+     *
+     * Only when the live config is STILL the candidate we installed. Between
+     * the crash and now the user may have written their own config there, and
+     * blindly restoring would destroy it — trading a recoverable mess for an
+     * unrecoverable one. A forged or damaged sidecar hits the same guard.
+     */
     recoverIfStale() {
-      if (!io.existsSync(statePath)) return false
+      const state = readState()
+      if (!state) {
+        // A backup with no state means we died before recording the install, so
+        // the live config was never touched. Clean the orphan and stop.
+        if (io.existsSync(backupPath)) io.rmSync(backupPath, { force: true })
+        return false
+      }
+      const live = io.existsSync(livePath) ? io.readFileSync(livePath, 'utf-8') : null
+      if (live !== null && sha256(live) !== state.installedDigest) {
+        console.error(`[harness] ${livePath} has changed since an interrupted run left its `
+          + 'sidecars behind. Leaving it alone — inspect and remove '
+          + `${statePath} / ${backupPath} by hand.`)
+        return false
+      }
       putBack()
       return true
     },
     install() {
       if (io.existsSync(livePath)) io.copyFileSync(livePath, backupPath)
+      const candidateText = io.readFileSync(candidatePath, 'utf-8')
       // Written BEFORE the copy, so a crash between the two still leaves proof
-      // that the harness was mid-swap.
-      io.writeFileSync(statePath, 'installed')
+      // that the harness was mid-swap, and records what to look for on recovery.
+      io.writeFileSync(statePath, JSON.stringify({ installedDigest: sha256(candidateText) }))
       installed = true
       io.copyFileSync(candidatePath, livePath)
     },
@@ -470,6 +500,15 @@ function collect(args) {
   const lockDir = path.join(repoRoot, '.mmr-harness.lock')
   const lockPid = path.join(lockDir, 'pid')
   let holdsLock = false
+  const releaseLock = () => {
+    if (!holdsLock) return
+    holdsLock = false
+    try { fs.rmSync(lockDir, { recursive: true, force: true }) } catch { /* already gone */ }
+  }
+  // Registered BEFORE the lock is taken: every die() between acquisition and
+  // the end of collect calls process.exit, which skips the finally, and the
+  // window used to include the prompt-only config validation.
+  process.once('exit', releaseLock)
   if (args.config) {
     const takeLock = () => {
       fs.mkdirSync(lockDir)
@@ -483,6 +522,21 @@ function collect(args) {
       // the config can only be repaired by a run that gets past this point —
       // so a lock whose owner is gone must be reclaimable, or the interruption
       // is unrecoverable by design.
+      // Only ever reclaim a directory that looks exactly like one we wrote: a
+      // single `pid` file. Deleting recursively on a dead-pid check alone would
+      // destroy whatever else happened to sit at that path.
+      const looksLikeOurs = () => {
+        try {
+          const inside = fs.readdirSync(lockDir)
+          return inside.length === 1 && inside[0] === 'pid'
+        } catch {
+          return false
+        }
+      }
+      if (!looksLikeOurs()) {
+        die(`${lockDir} exists but is not a harness lock (expected a single 'pid' file). `
+          + 'Refusing to remove it — inspect it by hand.')
+      }
       if (!ownerAlive(lockPid)) {
         console.error(`[harness] reclaiming ${lockDir} from a process that is no longer running`)
         try {
@@ -497,12 +551,6 @@ function collect(args) {
       }
     }
   }
-  const releaseLock = () => {
-    if (!holdsLock) return
-    holdsLock = false
-    try { fs.rmSync(lockDir, { recursive: true, force: true }) } catch { /* already gone */ }
-  }
-
   if (args.config) assertPromptOnlyConfig(path.resolve(args.config))
   const swapper = args.config ? makeConfigSwapper(liveConfig, path.resolve(args.config)) : null
   if (swapper?.recoverIfStale()) {
@@ -811,6 +859,11 @@ function score(args) {
     'You are scoring code-review findings against a fixed rubric. You do not know which',
     'configuration produced which finding, and you must not speculate about it.',
     '',
+    'Score ONLY from the text below. Do not read files, list directories, or run',
+    'commands to find out where these findings came from — which arm produced a',
+    'finding must not influence its score, and looking would destroy the blinding',
+    'the whole comparison depends on.',
+    '',
     '## Rubric',
     '',
     rubric,
@@ -845,12 +898,18 @@ function score(args) {
   process.stderr.write(`scoring ${shuffled.length} reconciled findings via \`${judge} -p\` (stdin) …\n`)
   // Fed on stdin, not argv: a large pooled set JSON-stringified into a single
   // argument runs into ARG_MAX (E2BIG) once run counts grow.
+  // Neutral cwd: run directories are named for their arms (runs/baseline,
+  // runs/calibrated), so a judge started in the caller's directory could map
+  // findings back to conditions by relative path and stop being blind. The
+  // instruction above is the policy; this removes the easy means.
+  const neutralCwd = fs.mkdtempSync(path.join(os.tmpdir(), 'fq-judge-'))
   let raw
   try {
     raw = execFileSync(judge, ['-p'], {
       encoding: 'utf-8',
       input: prompt,
       maxBuffer: 64 * 1024 * 1024,
+      cwd: neutralCwd,
     })
   } catch (err) {
     // `-p` + stdin is Claude Code's print mode. codex and opencode use
@@ -859,6 +918,8 @@ function score(args) {
     die(`judge \`${judge} -p\` failed: ${err.message}\n`
       + '--judge must name a binary that accepts `-p` and reads the prompt from stdin '
       + '(Claude Code print mode). codex/opencode use different flags and are not drop-in.')
+  } finally {
+    fs.rmSync(neutralCwd, { recursive: true, force: true })
   }
   const match = firstJsonArray(raw)
   if (!match) die(`judge returned no JSON array:\n${raw.slice(0, 500)}`)
@@ -1353,14 +1414,41 @@ function selftest() {
   sw = makeConfigSwapper('/live', '/cand', io2)
   sw.restore()
   assert.equal(io2.files['/live'], 'USERS_OWN')
-  // A copy that throws partway has still touched the destination, so restore
-  // must undo it rather than treating the swap as never having happened.
+  // A copy that throws while writing the LIVE file (the backup already taken)
+  // has touched the destination, so restore must undo it. Throwing on the first
+  // copy instead would test the backup step, which is a different scenario.
   io2 = fakeFs({ '/live': 'ORIGINAL', '/cand': 'CANDIDATE' })
-  io2.copyFileSync = () => { throw new Error('ENOSPC') }
+  const realCopy = io2.copyFileSync
+  let copies = 0
+  io2.copyFileSync = (a, b) => {
+    copies++
+    if (copies === 2) { io2.files[b] = 'HALF-WRITTEN'; throw new Error('ENOSPC') }
+    return realCopy(a, b)
+  }
   sw = makeConfigSwapper('/live', '/cand', io2)
   assert.throws(() => sw.install())
+  io2.copyFileSync = realCopy
   sw.restore()
   assert.equal(io2.files['/live'], 'ORIGINAL')
+
+  // Recovery must NOT clobber a config the user wrote after the crash.
+  io2 = fakeFs({ '/live': 'ORIGINAL', '/cand': 'CANDIDATE' })
+  makeConfigSwapper('/live', '/cand', io2).install()
+  io2.files['/live'] = 'USER_WROTE_THIS_AFTER_THE_CRASH'
+  const errs = []
+  const realErr = console.error
+  console.error = (...a) => errs.push(a.join(' '))
+  assert.equal(makeConfigSwapper('/live', '/cand', io2).recoverIfStale(), false)
+  console.error = realErr
+  assert.equal(io2.files['/live'], 'USER_WROTE_THIS_AFTER_THE_CRASH')
+  assert.equal(errs.length > 0, true, 'refusing to recover must say so')
+
+  // A backup with no state means the crash preceded the install, so the live
+  // config was never touched: clean the orphan, change nothing else.
+  io2 = fakeFs({ '/live': 'ORIGINAL', '/live.harness-backup': 'ORIGINAL', '/cand': 'CANDIDATE' })
+  assert.equal(makeConfigSwapper('/live', '/cand', io2).recoverIfStale(), false)
+  assert.equal(io2.files['/live'], 'ORIGINAL')
+  assert.equal('/live.harness-backup' in io2.files, false)
 
   assert.equal(parseArgs(['--config=x.yaml'])['config'], 'x.yaml')
   assert.equal(parseArgs(['--n=6'])['n'], '6')

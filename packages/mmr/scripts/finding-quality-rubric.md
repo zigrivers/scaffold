@@ -22,7 +22,12 @@ Three consequences, all binding:
 1. Every condition runs **N times** (N ≥ 6). The unit of comparison is a *rate
    across the pooled findings*, never a single run's total.
 2. The judge scores findings **blind to condition**. Findings from all
-   conditions are pooled, shuffled, and re-identified before scoring.
+   conditions are pooled, shuffled, and re-identified before scoring, the judge
+   is told not to go looking, and it runs in a neutral empty directory so the
+   arm-named run directories are not reachable by relative path. Blinding is
+   enforced by construction where it can be, and by instruction where it
+   cannot — a judge with filesystem tools and absolute paths could still defeat
+   it, so this is a strong convention rather than a sandbox.
 3. A difference smaller than the baseline's own run-to-run spread is **not a
    result**, and the harness enforces this rather than merely noting it: the
    *improvement* must exceed the **width** of the baseline's per-run rate
