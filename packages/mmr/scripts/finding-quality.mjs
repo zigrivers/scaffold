@@ -363,6 +363,28 @@ function canonicalPrompts(dryRunOutput) {
   return JSON.stringify(Object.keys(out).sort().map((k) => [k, out[k]]))
 }
 
+/**
+ * Whether the process recorded in a lock's pid file is still running.
+ *
+ * Unreadable or malformed pid file → treat the owner as gone: the alternative
+ * is a lock nothing can ever clear.
+ */
+function ownerAlive(pidFile) {
+  let pid
+  try {
+    pid = Number.parseInt(fs.readFileSync(pidFile, 'utf-8').trim(), 10)
+  } catch {
+    return false
+  }
+  if (!Number.isInteger(pid) || pid <= 0 || pid === process.pid) return false
+  try {
+    process.kill(pid, 0)   // signal 0 tests existence without touching it
+    return true
+  } catch {
+    return false
+  }
+}
+
 /** Canonical channel-list form, so two spellings of one set never differ. */
 function normalizeChannels(list) {
   return list.split(',').map((c) => c.trim()).filter(Boolean).sort().join(',')
@@ -430,32 +452,58 @@ function collect(args) {
   // (rather than committing it) keeps the experiment off the branch under test.
   const repoRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf-8' }).trim()
   const liveConfig = path.join(repoRoot, '.mmr.yaml')
-  if (args.config) assertPromptOnlyConfig(path.resolve(args.config))
-  if (args.config && path.resolve(args.config) === liveConfig) {
-    die('--config is the repo-root .mmr.yaml itself. collect replaces that file for the '
-      + 'duration of the run, so the candidate must be a separate file.')
+  if (args.config) {
+    const cand = path.resolve(args.config)
+    // The candidate must not be any file the swapper owns. Pointing it at a
+    // sidecar makes restore copy the candidate into the live config — the exact
+    // inverse of restoring — or delete the candidate mid-run.
+    const reserved = [liveConfig, `${liveConfig}.harness-backup`, `${liveConfig}.harness-state`]
+    if (reserved.includes(cand)) {
+      die(`--config points at ${cand}, which collect manages itself. The candidate must be a `
+        + 'separate file outside the repo-root .mmr.yaml and its sidecars.')
+    }
   }
   // The repo-root config is a single shared resource. Two configured
   // collections would swap and restore it in interleaved order, leaving one
   // arm reviewed under the other's config and possibly the candidate left
   // installed. mkdir is atomic, so it is the whole lock.
   const lockDir = path.join(repoRoot, '.mmr-harness.lock')
+  const lockPid = path.join(lockDir, 'pid')
   let holdsLock = false
   if (args.config) {
-    try {
+    const takeLock = () => {
       fs.mkdirSync(lockDir)
+      fs.writeFileSync(lockPid, String(process.pid))
       holdsLock = true
+    }
+    try {
+      takeLock()
     } catch {
-      die(`another configured collection holds ${lockDir}. Wait for it to finish, or remove `
-        + 'that directory if no collection is running.')
+      // A killed run leaves both the lock and the candidate config behind, and
+      // the config can only be repaired by a run that gets past this point —
+      // so a lock whose owner is gone must be reclaimable, or the interruption
+      // is unrecoverable by design.
+      if (!ownerAlive(lockPid)) {
+        console.error(`[harness] reclaiming ${lockDir} from a process that is no longer running`)
+        try {
+          fs.rmSync(lockDir, { recursive: true, force: true })
+          takeLock()
+        } catch {
+          die(`could not reclaim ${lockDir} — remove it by hand if no collection is running.`)
+        }
+      } else {
+        die(`another configured collection (pid ${fs.readFileSync(lockPid, 'utf-8').trim()}) holds `
+          + `${lockDir}. Wait for it to finish.`)
+      }
     }
   }
   const releaseLock = () => {
     if (!holdsLock) return
     holdsLock = false
-    try { fs.rmdirSync(lockDir) } catch { /* already gone */ }
+    try { fs.rmSync(lockDir, { recursive: true, force: true }) } catch { /* already gone */ }
   }
 
+  if (args.config) assertPromptOnlyConfig(path.resolve(args.config))
   const swapper = args.config ? makeConfigSwapper(liveConfig, path.resolve(args.config)) : null
   if (swapper?.recoverIfStale()) {
     console.error(`[harness] restored ${liveConfig} from a backup left by an interrupted run`)
@@ -736,6 +784,16 @@ function score(args) {
   const reviewedDiff = fs.readFileSync(snapshots[0], 'utf-8')
   if (sha256(reviewedDiff) !== sha256(fs.readFileSync(snapshots[1], 'utf-8'))) {
     die('the two conditions reviewed different diffs — re-collect them against the same target')
+  }
+  // Comparing the snapshots only to each other would accept two files that were
+  // BOTH replaced after collection, so the judge would score findings against a
+  // diff the runs never saw. Check each against the digest collect recorded.
+  for (let i = 0; i < conditions.length; i++) {
+    const recorded = conditions[i].provenance?.diffDigest
+    if (!recorded) die(`${conditions[i].label} has no recorded diff digest — re-run \`collect\``)
+    if (sha256(fs.readFileSync(snapshots[i], 'utf-8')) !== recorded) {
+      die(`${snapshots[i]} no longer matches the diff recorded at collection — re-run \`collect\``)
+    }
   }
 
   // Shuffle and re-key so the judge cannot infer the arm from ordering.
