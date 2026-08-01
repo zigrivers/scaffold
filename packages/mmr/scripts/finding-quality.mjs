@@ -85,6 +85,20 @@ const LOCK_FILE = '.collect-lock'
 /** The pinned diff every run in a condition reviews. Also harness-owned. */
 const SNAPSHOT_FILE = 'reviewed.diff'
 
+/** The commit a PR's diff was taken from, not whatever the local tree is on. */
+function prHeadSha(pr, cwd) {
+  try {
+    const out = execFileSync('gh', ['pr', 'view', String(pr), '--json', 'headRefOid'], {
+      encoding: 'utf-8', cwd,
+    })
+    const sha = JSON.parse(out).headRefOid
+    if (typeof sha !== 'string' || sha === '') throw new Error('no headRefOid in response')
+    return sha
+  } catch (err) {
+    return die(`could not read the head commit of PR ${pr}: ${err.message}`)
+  }
+}
+
 /** git, with a failure that names what was being attempted. */
 function git(gitArgs, what, cwd) {
   try {
@@ -768,7 +782,13 @@ function collect(args) {
     // Resolved commands/models/parsers, so a user-level config change between
     // the two collections cannot be reported as a prompt effect.
     channelConfigDigest: requireChannelDigest(),
-    repoCommit: git(['rev-parse', 'HEAD'], 'read the current commit', repoRoot),
+    // For --pr this is the PR's head SHA, which is what the diff was actually
+    // taken from. Recording the local HEAD there would pin an unrelated commit
+    // — the working tree is usually on another branch entirely — so the field
+    // would compare equal across arms while proving nothing about the input.
+    repoCommit: args.pr
+      ? prHeadSha(args.pr, repoRoot)
+      : git(['rev-parse', 'HEAD'], 'read the current commit', repoRoot),
   }
 
   // Every run reviews this exact snapshot rather than re-resolving --pr each
@@ -1993,6 +2013,50 @@ function selftest() {
   assert.equal(contradicts({ class: 'defect', names_path: true }), null)
   assert.equal(contradicts({ class: 'hygiene', names_path: false }), null)
   assert.equal(contradicts({ class: 'deletion', names_path: true }), null)
+
+  // summarize() is the wiring between loaded runs and the verdict inputs, and
+  // it had no coverage — only the pure decision logic below it did. A mistake
+  // here moves every number the report prints while evaluateVerdict stays
+  // provably correct on fixtures.
+  const sf = (run, cls, opts = {}) => ({
+    condition: '/c', run,
+    severity: opts.severity ?? 'P1',
+    location: opts.location ?? 'src/a.ts:1',
+    description: opts.description ?? `${cls} finding`,
+    suggestion: '',
+    score: { class: cls, names_path: cls === 'defect', worth_fixing_now: opts.worth ?? true, why: 'x' },
+  })
+  const cond2 = {
+    id: '/c',
+    label: 'c',
+    runs: [
+      { run: 'run-01.json', total: 3, degraded: [], coverage: 'a,b', dispatched: 'a,b' },
+      { run: 'run-02.json', total: 1, degraded: ['b'], coverage: 'a', dispatched: 'a,b' },
+      { run: 'run-03.json', total: 0, degraded: [], coverage: 'a,b', dispatched: 'a,b' },
+    ],
+  }
+  const scored2 = [
+    sf('run-01.json', 'defect'),
+    sf('run-01.json', 'speculative'),
+    sf('run-01.json', 'artifact'),
+    sf('run-02.json', 'hygiene', { worth: false }),
+    { ...sf('run-01.json', 'defect'), condition: '/other' },   // another condition
+  ]
+  const sum = summarize(cond2, scored2)
+  assert.equal(sum.findings, 4, 'only this condition\'s scored findings count')
+  assert.equal(sum.runs, 3)
+  assert.equal(sum.degradedRuns, 1)
+  assert.equal(sum.emptyRuns, 1, 'run-03 produced nothing and must be visible')
+  assert.deepEqual(sum.coverages.sort(), ['a', 'a,b'])
+  assert.equal(sum.defects, 1)
+  assert.equal(sum.speculatives, 1)
+  // speculative + artifact + the not-worth-fixing hygiene finding
+  assert.equal(sum.lowValues, 3)
+  assert.equal(sum.speculativeRate, 0.25)
+  assert.equal(sum.perRun, '0–3')
+  assert.deepEqual(sum.defectsPerRun, [1, 0, 0])
+  assert.equal(sum.hasFindings, true)
+  assert.equal(summarize({ id: '/z', label: 'z', runs: [] }, []).hasFindings, false)
 
   assert.equal(conditionLabel('/tmp/a/baseline'), 'baseline')
   assert.notEqual(conditionId('/tmp/a/baseline'), conditionId('/tmp/b/baseline'))
