@@ -780,12 +780,56 @@ function collect(args) {
   // with it every one of those failure modes. Nothing outside the output
   // directories is written at all.
   const repoRoot = git(['rev-parse', '--show-toplevel'], 'find the repository root')
+  // The commit the review is about: a PR's head, or the local HEAD otherwise.
+  // Both worktrees check this out, and provenance records it, so "what was
+  // reviewed" and "what the channels could read" are the same thing.
+  const reviewCommit = args.pr
+    ? prHeadSha(args.pr, repoRoot)
+    : git(['rev-parse', 'HEAD'], 'read the current commit', repoRoot)
+  if (args.pr) {
+    // A PR head from a fork, or one never fetched, is not a local object yet.
+    try {
+      execFileSync('git', ['fetch', '--quiet', 'origin', reviewCommit],
+        { cwd: repoRoot, stdio: 'ignore' })
+    } catch { /* already present, or fetchable failure surfaces at worktree add */ }
+  }
+
   const cwdRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'fq-cwd-'))
-  process.once('exit', () => fs.rmSync(cwdRoot, { recursive: true, force: true }))
   const baselineCwd = path.join(cwdRoot, 'baseline')
   const candidateCwd = path.join(cwdRoot, 'candidate')
-  fs.mkdirSync(baselineCwd)
-  fs.mkdirSync(candidateCwd)
+
+  // Real WORKTREES, not empty directories.
+  //
+  // Channels inherit MMR's cwd, so an empty temp directory leaves them unable to
+  // open any file outside the diff — they cannot trace a caller or check a
+  // sibling module, which is precisely what the reachability rules under test
+  // ask them to do. Measuring prompts under conditions no real review runs in
+  // would tune them for the wrong distribution. A detached worktree gives each
+  // arm the repository at the reviewed commit, and touches neither the user's
+  // working tree nor its config.
+  const worktrees = []
+  const cleanupWorktrees = () => {
+    for (const wt of worktrees.splice(0)) {
+      try {
+        execFileSync('git', ['worktree', 'remove', '--force', wt],
+          { cwd: repoRoot, stdio: 'ignore' })
+      } catch { /* best effort; `git worktree prune` will collect it */ }
+    }
+    fs.rmSync(cwdRoot, { recursive: true, force: true })
+  }
+  process.once('exit', cleanupWorktrees)
+  const addWorktree = (dir, commit) => {
+    try {
+      execFileSync('git', ['worktree', 'add', '--detach', dir, commit],
+        { cwd: repoRoot, stdio: 'ignore' })
+      worktrees.push(dir)
+    } catch (err) {
+      die(`could not create a worktree at ${commit}: ${err.message}. `
+        + 'The reviewed commit must be fetched locally.')
+    }
+  }
+  addWorktree(baselineCwd, reviewCommit)
+  addWorktree(candidateCwd, reviewCommit)
   if (args.config) {
     // Read ONCE and validated here, so nothing downstream can install bytes
     // that differ from the ones checked.
@@ -820,9 +864,7 @@ function collect(args) {
     // taken from. Recording the local HEAD there would pin an unrelated commit
     // — the working tree is usually on another branch entirely — so the field
     // would compare equal across arms while proving nothing about the input.
-    repoCommit: args.pr
-      ? prHeadSha(args.pr, repoRoot)
-      : git(['rev-parse', 'HEAD'], 'read the current commit', repoRoot),
+    repoCommit: reviewCommit,
   }
 
   // Every run reviews this exact snapshot rather than re-resolving --pr each
@@ -1252,10 +1294,13 @@ function score(args) {
   const prompt = [
     '## The code under review',
     '',
-    'Every finding below was reported against this diff. Use it to check claims:',
-    'a finding that names a caller, flag, or config value must actually be',
-    'supported by what you can see here. Treat a claim you cannot corroborate as',
-    'unsupported rather than assuming it is correct.',
+    'Every finding below was reported against this diff. Use it to check claims',
+    'where you can: a finding naming something the diff CONTRADICTS is not',
+    'supported. But the reviewers had the whole repository and you have only this',
+    'diff, so a named caller in an untouched file is often invisible from here.',
+    'Absence from the diff is not evidence against a finding — judge it',
+    'speculative only when it names nothing specific, or when what it names is',
+    'visibly absent from the code below.',
     '',
 
     diffOpen,

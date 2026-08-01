@@ -69,6 +69,18 @@ rate is 0/0, so it drops out of the spread that sizes the noise band, making the
 band narrower than the data warrants and the ship rule easier to clear than it
 should be.
 
+## Run the arms with the repository present
+
+Channels inherit MMR's working directory, so a review run from an empty
+directory cannot open any file outside the diff — it cannot trace a caller or
+check a sibling module, which is exactly what the reachability rules under test
+ask it to do. Measuring prompts under conditions no real review runs in would
+tune them for the wrong distribution.
+
+`collect` gives each arm a detached git worktree at the reviewed commit, so the
+channels see the repository as they would in production, and neither the user's
+working tree nor their config is touched.
+
 ## Collect the arms interleaved
 
 A collection takes tens of minutes. Running one arm to completion and then the
@@ -115,6 +127,13 @@ And two independent booleans:
   the code itself does **not** count; the path *to* it must be named. Also true
   when the described state sits at a trust boundary, where the path is the
   boundary itself.
+
+  This is about whether the finding **names** a path, not whether you can see
+  it. Reviewers work with the whole repository; the judge sees only the diff, so
+  a named caller in an untouched file is frequently unverifiable from here. Score
+  `names_path` on the naming. Only drop a finding to `speculative` when it names
+  nothing specific, or when the thing it names is visibly absent from the code
+  you were given — never merely because you cannot see it.
 - `worth_fixing_now` — would a maintainer of an early-stage product fix this
   before shipping, given the cost of the fix? Judged on the finding's own terms,
   independent of `class`.
@@ -194,12 +213,14 @@ observed baseline-vs-baseline spread is not a result.
   that attempt. The exposure it bounds is small: the judge is shown a public
   PR's diff and findings derived from it, so the risk is a tool being reached,
   not a secret disclosed.
-- The judge sees the reviewed diff, so it can check whether a finding's named
-  caller or flag actually appears there. It does **not** see the rest of the
-  repository, so a finding citing a caller outside the diff cannot be fully
-  corroborated — the rubric tells the judge to treat what it cannot corroborate
-  as unsupported, which biases slightly toward `speculative` for findings that
-  reach beyond the diff.
+- The judge sees the reviewed diff but not the rest of the repository, while the
+  reviewers had all of it. A finding citing a caller in an untouched file
+  therefore cannot be corroborated from the judge's position. The rubric handles
+  this by scoring `names_path` on whether a path is NAMED rather than whether it
+  can be seen, and by demoting to `speculative` only when nothing specific is
+  named or the named thing is visibly contradicted. An earlier version told the
+  judge to treat anything uncorroborated as unsupported, which systematically
+  mislabelled real defects reaching beyond the diff.
 - `worth_fixing_now` encodes "early-stage product". It is the wrong question for
   a mature codebase and the rubric should not be reused there unchanged.
 
