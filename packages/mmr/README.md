@@ -105,18 +105,16 @@ channels:
 every channel receives, between the core prompt and the diff. Its most common
 use is telling reviewers what *not* to spend a finding on.
 
-The built-in criteria (`templates/core-prompt.md`) ask five questions that are
-all about what is **missing** — correctness, regressions, edge cases, test
-coverage, security. The severity definitions do gesture at likelihood (P1 is
-scoped to "normal usage"), but no level says what *evidence* of reachability a
-finding needs, or how to grade something reachable but rare. On an early-stage
-codebase that combination produces a predictable failure mode: a long tail of
-technically-correct findings about inputs no caller can currently construct, and
-no way for a reviewer to say "unnecessary" instead of "add more". The block below
-supplies the missing calibration rather than replacing the built-in semantics.
+The built-in criteria (`templates/core-prompt.md`) already carry a reachability
+bar, a worth-fixing-now test on every severity level, and a criterion asking what
+to delete — with trust boundaries exempt from the bar so it cannot suppress
+security findings. Most projects need nothing further.
 
-This block is a starting point that addresses both biases directly. Treat it as
-a template to tune, not a tuned setting — see the note on measuring it below.
+`review_criteria` is for tightening beyond that: rules specific to your codebase,
+or a stricter bar than the default. The block below is the shape those rules
+take. It overlaps the built-ins deliberately, so it also works as a starting
+point on an older MMR whose core prompt lacks them — treat it as a template to
+tune, not a tuned setting, and see the note on measuring it below.
 
 ```yaml
 version: 1
