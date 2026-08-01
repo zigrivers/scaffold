@@ -143,6 +143,13 @@ const MIN_RUNS = 6
  */
 const DEFECT_MATCH = 0.4
 /**
+ * Slack for the noise-band comparison. Both sides are differences of floats, so
+ * mathematically equal values can compare unequal — 0.45-0.35 is greater than
+ * 0.5-0.4 in IEEE 754. Requiring the improvement to clear the margin by this
+ * much makes a tie fail closed, which for a ship rule is the right direction.
+ */
+const BAND_EPSILON = 1e-9
+/**
  * Judge invocation flags.
  *
  * An empty --allowed-tools does NOT deny anything: tested against the real CLI,
@@ -1554,7 +1561,7 @@ function evaluateVerdict(base, cand, opts = {}) {
   const bandHi = base.specRates.length ? Math.max(...base.specRates) : 0
   const margin = bandHi - bandLo
   const improvement = base.speculativeRate - cand.speculativeRate
-  const outsideBand = improvement > margin
+  const outsideBand = improvement > margin + BAND_EPSILON
   // outsideBand already subsumes specDown (margin is never negative, so
   // improvement > margin implies improvement > 0). Both are kept because the
   // rubric states them as separate conditions and the report prints them
@@ -1840,6 +1847,14 @@ function selftest() {
 
   // Each precondition blocks on its own.
   const good = { speculativeRate: 0.1, speculatives: 5, lowValues: 6 }
+
+  // An exact tie must not ship: float subtraction can make equal values compare
+  // as greater, and a ship rule should fail closed.
+  assert.equal(evaluateVerdict(
+    cond({ specRates: [0.4, 0.5], speculativeRate: 0.5 }),
+    cond({ ...good, speculativeRate: 0.4 }),
+  ).ship, false, 'an improvement exactly equal to the margin must not clear it')
+
 
   // A candidate that stops finding a defect the baseline found repeatedly must
   // not ship, however good its aggregate numbers look.
