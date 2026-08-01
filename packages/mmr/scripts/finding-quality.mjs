@@ -248,7 +248,7 @@ function assertPromptOnlyConfig(file) {
   } catch (err) {
     die(`could not parse ${file}: ${err.message}`)
   }
-  if (parsed === null || parsed === undefined) return
+  if (parsed === null || parsed === undefined) return text
   if (typeof parsed !== 'object' || Array.isArray(parsed)) {
     die(`${file} must be a YAML mapping`)
   }
@@ -258,6 +258,8 @@ function assertPromptOnlyConfig(file) {
       + `${PROMPT_ONLY_KEYS.join(', ')} — anything else changes how the review runs, not just `
       + 'what it asks, and the harness would report that as a prompt effect.')
   }
+  // Return the validated bytes so the caller installs exactly what was checked.
+  return text
 }
 
 /** Flags that must carry a value; `true` here means the value was swallowed. */
@@ -330,7 +332,7 @@ function conditionLabel(dir) {
  * `restore()` is idempotent and inert until `install()` has actually run, so it
  * is safe to call from a finally, a signal handler, and an exit hook at once.
  */
-function makeConfigSwapper(livePath, candidatePath, io = fs) {
+function makeConfigSwapper(livePath, candidateText, io = fs) {
   // Two sidecars, because the two states must be distinguishable after a
   // SIGKILL. The state file records THAT we installed and WHAT we installed;
   // the backup holds the previous contents when there were any. Without the
@@ -399,17 +401,28 @@ function makeConfigSwapper(livePath, candidatePath, io = fs) {
     },
     install() {
       if (io.existsSync(livePath)) io.copyFileSync(livePath, backupPath)
-      const candidateText = io.readFileSync(candidatePath, 'utf-8')
       // Written BEFORE the copy, so a crash between the two still leaves proof
       // that the harness was mid-swap, and records what to look for on recovery.
       io.writeFileSync(statePath, JSON.stringify({ installedDigest: sha256(candidateText) }))
       installed = true
-      io.copyFileSync(candidatePath, livePath)
+      // Written from the bytes validated earlier, not re-read from disk: a file
+      // edited between validation and install could otherwise smuggle in
+      // execution-changing keys the prompt-only check already cleared.
+      io.writeFileSync(livePath, candidateText)
       installCompleted = true
     },
-    /** Whether the live config is still exactly what install() wrote. */
+    /**
+     * Whether the live config is still exactly what install() wrote.
+     *
+     * A MISSING file counts as not installed: if the candidate is deleted
+     * mid-collection, later runs execute with no treatment at all, and treating
+     * absence as "ours, so fine" would let those runs into the condition.
+     */
     stillInstalled() {
-      return !installed || stillOurs()
+      if (!installed) return true
+      if (!io.existsSync(livePath)) return false
+      const state = readState()
+      return Boolean(state) && sha256(io.readFileSync(livePath, 'utf-8')) === state.installedDigest
     },
     restore() {
       if (!installed || restored) return
@@ -736,8 +749,11 @@ function collect(args) {
     }
   }
   if (args.config) {
-    assertPromptOnlyConfig(path.resolve(args.config))
-    swapper = makeConfigSwapper(liveConfig, path.resolve(args.config))
+    // Read ONCE, here. Everything downstream — validation, the digest recorded
+    // in provenance, and the bytes actually installed — uses this same buffer,
+    // so no edit between those steps can change what was checked.
+    const candidateText = assertPromptOnlyConfig(path.resolve(args.config))
+    swapper = makeConfigSwapper(liveConfig, candidateText)
     const outcome = swapper.recoverIfStale()
     if (outcome === 'recovered') {
       console.error(`[harness] restored ${liveConfig} from an interrupted run`)
@@ -1249,13 +1265,17 @@ function defectClusters(scoredFindings) {
     if (f.score.class !== 'defect') continue
     const file = String(f.location ?? '').split(':')[0].trim().replace(/^\.\//, '')
     if (!file) continue
-    const tokens = contentTokens(`${f.description} ${f.suggestion}`)
+    // Description only. Suggestions are formulaic ("add a test", "guard the
+    // null case") and pull unrelated defects in the same file together.
+    const tokens = contentTokens(f.description)
     if (!byFile.has(file)) byFile.set(file, [])
     const clusters = byFile.get(file)
     const hit = clusters.find((c) => overlap(c.tokens, tokens) >= DEFECT_MATCH)
     if (hit) {
+      // Runs accumulate; TOKENS DO NOT. A growing union drifts the centroid, so
+      // each near-miss widens the cluster and the next unrelated defect matches
+      // more easily — clusters would keep swallowing their neighbours.
       hit.runs.add(f.run)
-      for (const t of tokens) hit.tokens.add(t)
     } else {
       clusters.push({ file, tokens: new Set(tokens), runs: new Set([f.run]) })
     }
@@ -1697,27 +1717,27 @@ function selftest() {
   }
   // A killed run leaves sidecars that a later run recovers from.
   let io3 = fakeFs({ '/live': 'ORIGINAL', '/cand': 'CANDIDATE' })
-  makeConfigSwapper('/live', '/cand', io3).install()
+  makeConfigSwapper('/live', 'CANDIDATE', io3).install()
   assert.equal(io3.files['/live'], 'CANDIDATE')
   assert.equal(io3.files['/live.harness-backup'], 'ORIGINAL')  // survives a SIGKILL
-  assert.equal(makeConfigSwapper('/live', '/cand', io3).recoverIfStale(), 'recovered')
+  assert.equal(makeConfigSwapper('/live', 'CANDIDATE', io3).recoverIfStale(), 'recovered')
   assert.equal(io3.files['/live'], 'ORIGINAL')
   assert.equal('/live.harness-backup' in io3.files, false)
   assert.equal('/live.harness-state' in io3.files, false)
   // Nothing to recover when no run was interrupted.
-  assert.equal(makeConfigSwapper('/live', '/cand', io3).recoverIfStale(), 'nothing-to-do')
+  assert.equal(makeConfigSwapper('/live', 'CANDIDATE', io3).recoverIfStale(), 'nothing-to-do')
   // The case a backup file alone cannot express: nothing existed before, so
   // there is no backup to find, and without the state sidecar the candidate
   // would stay installed forever.
   io3 = fakeFs({ '/cand': 'CANDIDATE' })
-  makeConfigSwapper('/live', '/cand', io3).install()
+  makeConfigSwapper('/live', 'CANDIDATE', io3).install()
   assert.equal(io3.files['/live'], 'CANDIDATE')
-  assert.equal(makeConfigSwapper('/live', '/cand', io3).recoverIfStale(), 'recovered')
+  assert.equal(makeConfigSwapper('/live', 'CANDIDATE', io3).recoverIfStale(), 'recovered')
   assert.equal('/live' in io3.files, false)
 
   // A pre-existing config is put back byte for byte.
   let io2 = fakeFs({ '/live': 'ORIGINAL', '/cand': 'CANDIDATE' })
-  let sw = makeConfigSwapper('/live', '/cand', io2)
+  let sw = makeConfigSwapper('/live', 'CANDIDATE', io2)
   sw.install()
   assert.equal(io2.files['/live'], 'CANDIDATE')
   sw.restore()
@@ -1729,35 +1749,33 @@ function selftest() {
   assert.equal(io2.files['/live'], 'ORIGINAL')
   // No pre-existing config: the candidate is removed, not left behind.
   io2 = fakeFs({ '/cand': 'CANDIDATE' })
-  sw = makeConfigSwapper('/live', '/cand', io2)
+  sw = makeConfigSwapper('/live', 'CANDIDATE', io2)
   sw.install()
   sw.restore()
   assert.equal('/live' in io2.files, false)
   // Never installed: restore must NOT delete a file the harness did not write.
   io2 = fakeFs({ '/live': 'USERS_OWN', '/cand': 'CANDIDATE' })
-  sw = makeConfigSwapper('/live', '/cand', io2)
+  sw = makeConfigSwapper('/live', 'CANDIDATE', io2)
   sw.restore()
   assert.equal(io2.files['/live'], 'USERS_OWN')
   // A copy that throws while writing the LIVE file (the backup already taken)
   // has touched the destination, so restore must undo it. Throwing on the first
   // copy instead would test the backup step, which is a different scenario.
-  io2 = fakeFs({ '/live': 'ORIGINAL', '/cand': 'CANDIDATE' })
-  const realCopy = io2.copyFileSync
-  let copies = 0
-  io2.copyFileSync = (a, b) => {
-    copies++
-    if (copies === 2) { io2.files[b] = 'HALF-WRITTEN'; throw new Error('ENOSPC') }
-    return realCopy(a, b)
+  io2 = fakeFs({ '/live': 'ORIGINAL' })
+  const realWrite = io2.writeFileSync
+  io2.writeFileSync = (target, value) => {
+    if (target === '/live') { io2.files[target] = 'HALF-WRITTEN'; throw new Error('ENOSPC') }
+    return realWrite(target, value)
   }
-  sw = makeConfigSwapper('/live', '/cand', io2)
+  sw = makeConfigSwapper('/live', 'CANDIDATE', io2)
   assert.throws(() => sw.install())
-  io2.copyFileSync = realCopy
+  io2.writeFileSync = realWrite
   sw.restore()
   assert.equal(io2.files['/live'], 'ORIGINAL')
 
   // restore() must NOT clobber an edit made DURING the run either.
   io2 = fakeFs({ '/live': 'ORIGINAL', '/cand': 'CANDIDATE' })
-  sw = makeConfigSwapper('/live', '/cand', io2)
+  sw = makeConfigSwapper('/live', 'CANDIDATE', io2)
   sw.install()
   io2.files['/live'] = 'EDITED_MID_RUN'
   let errs0 = []
@@ -1771,12 +1789,12 @@ function selftest() {
 
   // Recovery must NOT clobber a config the user wrote after the crash.
   io2 = fakeFs({ '/live': 'ORIGINAL', '/cand': 'CANDIDATE' })
-  makeConfigSwapper('/live', '/cand', io2).install()
+  makeConfigSwapper('/live', 'CANDIDATE', io2).install()
   io2.files['/live'] = 'USER_WROTE_THIS_AFTER_THE_CRASH'
   const errs = []
   const realErr = console.error
   console.error = (...a) => errs.push(a.join(' '))
-  assert.equal(makeConfigSwapper('/live', '/cand', io2).recoverIfStale(), 'refused')
+  assert.equal(makeConfigSwapper('/live', 'CANDIDATE', io2).recoverIfStale(), 'refused')
   console.error = realErr
   assert.equal(io2.files['/live'], 'USER_WROTE_THIS_AFTER_THE_CRASH')
   assert.equal(errs.length > 0, true, 'refusing to recover must say so')
@@ -1784,7 +1802,7 @@ function selftest() {
   // A backup with no state means the crash preceded the install, so the live
   // config was never touched: clean the orphan, change nothing else.
   io2 = fakeFs({ '/live': 'ORIGINAL', '/live.harness-backup': 'ORIGINAL', '/cand': 'CANDIDATE' })
-  assert.equal(makeConfigSwapper('/live', '/cand', io2).recoverIfStale(), 'nothing-to-do')
+  assert.equal(makeConfigSwapper('/live', 'CANDIDATE', io2).recoverIfStale(), 'nothing-to-do')
   assert.equal(io2.files['/live'], 'ORIGINAL')
   assert.equal('/live.harness-backup' in io2.files, false)
 
@@ -1841,6 +1859,14 @@ function selftest() {
     d('run-01.json', 'src/a.ts:80', 'timeout retry loop never terminates on failure'),
     d('run-02.json', 'src/b.ts:1', 'unrelated parsing error'),
   ])
+  // Formulaic suggestions must not merge unrelated defects.
+  const sugg = (run, location, description) =>
+    ({ run, location, description, suggestion: 'add a test and guard the case', score: { class: 'defect' } })
+  const notMerged = defectClusters([
+    sugg('run-01.json', 'src/z.ts:1', 'race between the writer and the reaper'),
+    sugg('run-01.json', 'src/z.ts:90', 'quota accounting drops the remainder'),
+  ])
+  assert.equal(notMerged.length, 2, 'a shared suggestion must not merge distinct defects')
   assert.equal(clusters.filter((c) => c.file === 'src/a.ts').length, 2, 'unrelated defects stay separate')
   const nullCluster = clusters.find((c) => c.tokens.includes('dereference'))
   assert.equal(nullCluster.runs, 2, 'the same defect reworded collapses into one cluster')
