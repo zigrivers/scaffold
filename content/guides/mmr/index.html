@@ -2143,7 +2143,9 @@ fields override the parent <span class="fp" data-path="packages/mmr/src/config/l
 
 
 
-<table><thead><tr><th>stage</th><th>missing tests</th><th>a bug on a path users cannot reach</th></tr></thead><tbody><tr><td><code>prototype</code></td><td>P3 unless it covers the thing being proven</td><td>P3</td></tr><tr><td><code>mvp</code></td><td>P2 for logic users depend on</td><td>P3</td></tr><tr><td><code>production</code></td><td>P1 for changed user-facing behavior</td><td>graded on impact if reachable at all</td></tr></tbody></table>
+<table><thead><tr><th>stage</th><th>missing tests</th><th>a rare or low-traffic (but reachable) bug</th></tr></thead><tbody><tr><td><code>prototype</code></td><td>P3 unless it covers the thing being proven</td><td>P3</td></tr><tr><td><code>mvp</code></td><td>P3 on a rare or internal-only path</td><td>P3</td></tr><tr><td><code>production</code></td><td>P1 for changed user-facing behavior</td><td>P1 in a user-facing path</td></tr></tbody></table>
+<p>Stages grade findings; they never change <em>what gets reported</em>. A state nothing
+can reach is excluded by the Reporting Bar at every stage.</p>
 <p>The preset is substituted <strong>into</strong> the severity definitions rather than appended
 after the criteria, so it changes what counts as P1 versus P2 instead of
 competing with the rubric from outside it.</p>

@@ -109,11 +109,14 @@ version: 1
 stage: mvp        # prototype | mvp | production
 ```
 
-| stage | missing tests | a bug on a path users cannot reach |
+| stage | missing tests | a rare or low-traffic (but reachable) bug |
 | --- | --- | --- |
 | `prototype` | P3 unless it covers the thing being proven | P3 |
-| `mvp` | P2 for logic users depend on | P3 |
-| `production` | P1 for changed user-facing behavior | graded on impact if reachable at all |
+| `mvp` | P3 on a rare or internal-only path | P3 |
+| `production` | P1 for changed user-facing behavior | P1 in a user-facing path |
+
+Stages grade findings; they never change *what gets reported*. A state nothing
+can reach is excluded by the Reporting Bar at every stage.
 
 The block is substituted **into** the severity definitions, so it changes what
 counts as P1 versus P2 rather than adding advice alongside them.

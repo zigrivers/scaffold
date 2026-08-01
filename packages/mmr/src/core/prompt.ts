@@ -62,10 +62,11 @@ export function assemblePrompt(options: AssemblePromptOptions): string {
   // a project that never opts in gets exactly the prompt it got before stages
   // existed — asserted byte-for-byte in the tests.
   const calibration = stageCalibration(stage)
+  const core = loadTemplate()
   layers.push(
     calibration === ''
-      ? loadTemplate().replace(`${STAGE_MARKER}\n\n`, '')
-      : loadTemplate().replace(STAGE_MARKER, calibration),
+      ? core.replace(`${STAGE_MARKER}\n\n`, '')
+      : core.replace(STAGE_MARKER, calibration),
   )
 
   // Layer 2: Project review criteria

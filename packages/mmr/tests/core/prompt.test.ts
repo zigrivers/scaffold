@@ -96,8 +96,19 @@ describe('assemblePrompt', () => {
       const prod = assemblePrompt({ diff: 'd', stage: 'production' })
       expect(proto).toMatch(/Missing tests are P3/)
       expect(prod).toMatch(/Missing tests for changed behavior are P1/)
-      expect(proto).toMatch(/A bug on a path nobody exercises yet is P3/)
-      expect(prod).toMatch(/A rare but reachable failure in a user-facing path is P1/)
+      expect(proto).toMatch(/A reachable bug on any other path is P3/)
+      expect(prod).toMatch(/A rare\s+failure in a user-facing path is P1/)
+    })
+
+    it('defers to the Reporting Bar rather than contradicting it', () => {
+      // The presets grade findings; the Reporting Bar decides what gets
+      // reported at all. Saying an unreachable state is "P3" would tell a model
+      // to report something the bar forbids — the contradiction review caught.
+      for (const stage of ['prototype', 'mvp', 'production'] as const) {
+        const prompt = assemblePrompt({ diff: 'd', stage })
+        expect(prompt, `${stage} must defer to the Reporting Bar`)
+          .toMatch(/A state nothing can reach is not reported at any stage/)
+      }
     })
 
     it('never lets a stage soften security, data loss, or data corruption', () => {
