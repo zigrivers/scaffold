@@ -31,9 +31,10 @@
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "lint": "eslint src/",
+    "lint": "eslint src/ scripts/",
     "type-check": "tsc -p tsconfig.check.json",
-    "check": "npm run lint && npm run type-check && npm test"
+    "harness:selftest": "node scripts/finding-quality.mjs selftest",
+    "check": "npm run lint && npm run type-check && npm test && npm run harness:selftest"
   },
   "dependencies": {
     "js-yaml": "^4.1.0",
