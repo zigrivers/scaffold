@@ -112,7 +112,7 @@ stage: mvp        # prototype | mvp | production
 | stage | missing tests | a rare or low-traffic (but reachable) bug |
 | --- | --- | --- |
 | `prototype` | P3 unless it covers the thing being proven | P3 |
-| `mvp` | P3 on a rare or internal-only path | P3 |
+| `mvp` | P2 for logic users depend on, P3 otherwise | P3 on a rare or internal-only path |
 | `production` | P1 for changed user-facing behavior | P1 in a user-facing path |
 
 Stages grade findings; they never change *what gets reported*. A state nothing
