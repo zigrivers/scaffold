@@ -42,7 +42,6 @@
 
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import yaml from 'js-yaml'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -88,6 +87,8 @@ function buildDigest() {
 }
 /** The rubric's floor. Below this, run-to-run variance dominates any effect. */
 const MIN_RUNS = 6
+/** Fixed so a scoring pass is reproducible, and so `report` can re-derive it. */
+const SHUFFLE_SEED = 20260731
 
 function parseArgs(argv) {
   const out = { _: [] }
@@ -180,38 +181,6 @@ function conditionLabel(dir) {
 }
 
 // ---------------------------------------------------------------- collect
-
-/**
- * Digest of a config's EFFECTIVE settings.
- *
- * Hashing raw bytes makes a comment-only or whitespace-only candidate look
- * like a distinct treatment, so two identical configurations could be compared
- * against each other and any gap between them — pure resampling — could earn a
- * ship verdict. Parsing first means only real differences count.
- *
- * Returns null for a config that resolves to nothing, which is the same as
- * having no candidate at all.
- */
-function configDigestOf(file) {
-  let parsed
-  try {
-    parsed = yaml.load(fs.readFileSync(file, 'utf-8'))
-  } catch (err) {
-    die(`could not parse ${file}: ${err.message}`)
-  }
-  const canonical = canonicalize(parsed)
-  if (canonical === null || (typeof canonical === 'object' && Object.keys(canonical).length === 0)) return null
-  return sha256(JSON.stringify(canonical))
-}
-
-/** Key-sorted deep copy, so key order in the YAML cannot change the digest. */
-function canonicalize(value) {
-  if (Array.isArray(value)) return value.map(canonicalize)
-  if (value === null || typeof value !== 'object') return value ?? null
-  const out = {}
-  for (const k of Object.keys(value).sort()) out[k] = canonicalize(value[k])
-  return out
-}
 
 /** Canonical channel-list form, so two spellings of one set never differ. */
 function normalizeChannels(list) {
@@ -315,15 +284,13 @@ function collect(args) {
       ? `could not fetch the diff for PR ${args.pr}: ${err.message}`
       : `could not read ${path.resolve(args.diff)}: ${err.message}`)
   }
-  const provenance = {
+  const provenanceBase = {
     target: args.pr ? `pr:${args.pr}` : `diff:${path.basename(path.resolve(args.diff))}`,
     diffDigest: sha256(reviewedDiff),
     channels: normalizeChannels(channels),
     mmrDigest: buildDigest(),
     repoCommit: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoRoot, encoding: 'utf-8' }).trim(),
-    configDigest: args.config ? configDigestOf(path.resolve(args.config)) : null,
   }
-  fs.writeFileSync(path.join(outDir, PROVENANCE_FILE), JSON.stringify(provenance, null, 2))
 
   // Every run reviews this exact snapshot rather than re-resolving --pr each
   // time. A PR that gains a commit mid-collection would otherwise have runs
@@ -349,6 +316,26 @@ function collect(args) {
       installed = true
       fs.copyFileSync(path.resolve(args.config), liveConfig)
     }
+
+    // The treatment IS the prompt the channels receive, so record that, not a
+    // proxy for it. A config digest — however canonicalized — can differ while
+    // the assembled prompt is identical (a setting restated at its default, a
+    // value a CLI flag overrides), which would let two identical treatments be
+    // compared against each other and let resampling alone earn a ship verdict.
+    // --dry-run assembles and prints the real thing without dispatching.
+    let dryRun
+    try {
+      dryRun = execFileSync('node', [MMR, ...base, '--dry-run'], {
+        encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024, cwd: repoRoot,
+      })
+    } catch (err) {
+      die(`could not assemble the prompt for this condition: ${(err.stderr || err.message || '').toString().slice(0, 300)}`)
+    }
+    // Strip the diff, which is identical across arms by construction and would
+    // otherwise dominate the digest.
+    const promptOnly = dryRun.split('## Diff')[0]
+    const provenance = { ...provenanceBase, promptDigest: sha256(promptOnly) }
+    fs.writeFileSync(path.join(outDir, PROVENANCE_FILE), JSON.stringify(provenance, null, 2))
 
     // Serial, never parallel: concurrent same-account sessions are exactly the
     // condition that makes grok return a cancelled envelope, and a channel that
@@ -504,7 +491,7 @@ function score(args) {
   if (pooled.length === 0) die('no findings found in the given conditions')
 
   // Shuffle and re-key so the judge cannot infer the arm from ordering.
-  const shuffled = shuffle(pooled, 20260731).map((f, i) => ({ ...f, id: `F${String(i + 1).padStart(3, '0')}` }))
+  const shuffled = shuffle(pooled, SHUFFLE_SEED).map((f, i) => ({ ...f, id: `F${String(i + 1).padStart(3, '0')}` }))
 
   const blind = shuffled.map((f) => ({
     id: f.id,
@@ -717,6 +704,10 @@ function evaluateVerdict(base, cand, opts = {}) {
   const margin = bandHi - bandLo
   const improvement = base.speculativeRate - cand.speculativeRate
   const outsideBand = improvement > margin
+  // outsideBand already subsumes specDown (margin is never negative, so
+  // improvement > margin implies improvement > 0). Both are kept because the
+  // rubric states them as separate conditions and the report prints them
+  // separately — but they are not independent checks.
   const specDown = cand.speculativeRate < base.speculativeRate
   const defectsHeld = cand.defects >= base.defects
   const ship = blockers.length === 0 && specDown && defectsHeld && outsideBand
@@ -753,6 +744,29 @@ function report(args) {
     }
   }
 
+  // Re-derive the pooled, shuffled, keyed list exactly as `score` built it —
+  // the shuffle is seeded, and the inputs were just digest-verified — and
+  // require the file to describe that same set. Without this, a scored entry
+  // that was edited, duplicated, dropped, or reassigned to another condition
+  // changes every rate while all the manifest checks still pass.
+  const expectedList = shuffle(conditions.flatMap((c) => c.findings), SHUFFLE_SEED)
+    .map((f, i) => ({ ...f, id: `F${String(i + 1).padStart(3, '0')}` }))
+  if (scored.length !== expectedList.length) {
+    die(`scores file has ${scored.length} entries but the conditions hold ${expectedList.length} findings `
+      + '— re-run `score`')
+  }
+  for (let i = 0; i < expectedList.length; i++) {
+    const e = expectedList[i]
+    const a = scored[i]
+    if (a?.id !== e.id || a?.condition !== e.condition || a?.run !== e.run
+      || a?.location !== e.location || a?.description !== e.description) {
+      die(`scores file entry ${i + 1} does not match the finding it claims to score — re-run \`score\``)
+    }
+    if (!a.score || !CLASSES.includes(a.score.class) || contradicts(a.score)) {
+      die(`scores file entry ${a.id} has a missing or invalid score — re-run \`score\``)
+    }
+  }
+
   const rows = conditions.map((c) => summarize(c, scored))
   const pct = (x) => `${(x * 100).toFixed(0)}%`
 
@@ -774,15 +788,6 @@ function report(args) {
     )
   }
   console.log('')
-
-  if (rows.length !== 2) {
-    console.log('note: a ship/revert verdict needs exactly two conditions (baseline, candidate).')
-    console.log('')
-    // Same exit status as the other no-verdict path, so a caller can treat any
-    // non-zero exit as "no decision" without parsing stdout.
-    process.exitCode = 1
-    return
-  }
 
   const [base, cand] = rows
 
@@ -814,7 +819,9 @@ function report(args) {
     }
   }
 
-  const sameTreatment = bp !== null && cp !== null && bp.configDigest === cp.configDigest
+  // Identical assembled prompts mean there is no treatment, whatever the
+  // configs looked like on disk.
+  const sameTreatment = bp !== null && cp !== null && bp.promptDigest === cp.promptDigest
   const v = evaluateVerdict(base, cand, { extraBlockers, sameTreatment })
 
   if (v.blockers.length > 0) {
