@@ -715,10 +715,14 @@ function collect(args) {
       encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024, cwd,
     })
     let dryRun
+    // Always assembled, even outside paired mode: it is the untreated prompt,
+    // and recording it in BOTH conditions is what makes a user-level config
+    // change between two separate collections detectable. promptDigest cannot
+    // do that job — it is supposed to differ, since it is the treatment.
     let baselineDryRun = null
     try {
       dryRun = assemble(candidateArgs, args.config ? candidateCwd : baselineCwd)
-      if (pairedOut !== null) baselineDryRun = assemble(baselineArgs, baselineCwd)
+      baselineDryRun = assemble(baselineArgs, baselineCwd)
     } catch (err) {
       const detail = (err.stderr || err.message || '').toString().slice(0, 300)
       die(`could not assemble the prompt for this condition: ${detail}`)
@@ -747,6 +751,7 @@ function collect(args) {
     // runs on disk, and with --n above the floor report would otherwise see
     // enough of them to call a truncated condition complete and issue a verdict
     // from it.
+    const basePromptDigest = sha256(canonicalPrompts(baselineDryRun) ?? '')
     const provPaths = []
     for (const arm of arms) {
       const promptOnly = canonicalPrompts(arm.promptSource)
@@ -754,6 +759,11 @@ function collect(args) {
       const provenance = {
         ...provenanceBase,
         promptDigest: sha256(promptOnly),
+        // The untreated prompt, identical in both arms by definition. A
+        // difference means the user-level configuration moved between the two
+        // collections, which no other recorded field can distinguish from the
+        // treatment itself.
+        basePromptDigest,
         requestedRuns: n,
         complete: false,
       }
@@ -1485,7 +1495,10 @@ function report(args) {
           + 'were requested — re-collect it')
       }
     }
-    for (const key of ['target', 'diffDigest', 'mmrDigest', 'repoCommit', 'channelConfigDigest', 'promptDigest']) {
+    for (const key of [
+      'target', 'diffDigest', 'mmrDigest', 'repoCommit', 'channelConfigDigest',
+      'basePromptDigest', 'promptDigest',
+    ]) {
       // Absent on both sides is NOT a match: JSON.stringify(undefined) equals
       // itself, so two conditions missing a field would have "agreed" on it and
       // an unverifiable precondition would read as verified.
@@ -1495,7 +1508,7 @@ function report(args) {
           + `${cp[key] == null ? conditions[1].label : ''} — re-run \`collect\``)
         continue
       }
-      if (key === 'promptDigest') continue   // handled by the sameTreatment check
+      if (key === 'promptDigest') continue   // must DIFFER; handled by sameTreatment
       if (JSON.stringify(bp[key]) !== JSON.stringify(cp[key])) {
         extraBlockers.push(`${key} differs between conditions (${bp[key]} vs ${cp[key]}) — `
           + 'the arms did not review the same thing')
