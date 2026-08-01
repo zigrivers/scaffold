@@ -551,7 +551,6 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       diff,
       reviewCriteria: config.review_criteria,
       templateCriteria,
-      stage: config.stage,
       focus: args.focus,
     })
 

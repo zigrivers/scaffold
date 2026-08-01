@@ -2,28 +2,29 @@
 
 ## [Unreleased]
 
-### Added
+### Removed
 
-- **`stage: prototype | mvp | production`** calibrates the built-in severity
-  rubric for how mature the product is. The same defect is worth different
-  things at different stages: a missing test for an internal helper is noise in
-  a prototype and a real gap in production.
+- **`stage: prototype | mvp | production` is withdrawn before ever shipping.**
+  It was measured against the prompt without it — 6 paired runs per arm,
+  identical target, channels and build, findings classified by a judge blind to
+  which arm produced them — and it made reviews substantially noisier rather
+  than quieter, which was the whole point of adding it.
 
-  It is **substituted into** the severity definitions, not appended after the
-  criteria — advice added at the end competes with the rubric, whereas text
-  inside it is read as part of the definition, which is what changing what
-  counts as P1 versus P2 requires. Each preset moves whole classes of finding:
-  missing tests are P3 under `prototype`, P2-for-user-facing-logic under `mvp`,
-  and P1 for changed user-facing behaviour under `production`.
+  With `stage: mvp`, findings rose from 8 to 21 across six runs and the
+  low-value rate rose from 38% to 71%. It did surface more real defects (7 → 13),
+  but bought them with 15 low-value findings. The mechanism is visible in the
+  severity split: the baseline emitted no P3s at all, the stage arm emitted
+  twelve.
 
-  **No stage set means no change.** A project that does not opt in gets the
-  prompt it got before stages existed, byte for byte, asserted by test.
+  The cause is the clause added so that stage demotion could never silently
+  suppress a defect — *"a correctness finding this stage grades P3 is still
+  REPORTED"*. It works exactly as written, and the cost is a review that prints
+  everything it demotes. Suppressing quietly is worse, so the honest conclusion
+  is that stage-based demotion is the wrong lever, not that the safety clause
+  should go.
 
-  **No stage can soften a security, data-loss, or data-corruption finding.**
-  Every preset that relaxes anything states that floor explicitly, and the
-  rubric's own version of it survives in all four cases. `prototype` is the
-  stage most likely to be set on the codebase least able to absorb a
-  vulnerability, so this is asserted per preset rather than assumed.
+  Three of the six ship conditions failed, all in the wrong direction.
+  Nothing had been released — no published version ever contained it.
 
 ### Changed
 

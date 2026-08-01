@@ -29,8 +29,6 @@ for damage that is systemic, irreversible, or a security compromise.
 Never lower a security, data-loss, or data-corruption finding on the
 worth-fixing-now test. Those are graded on impact alone.
 
-{{stage_calibration}}
-
 ## Reporting Bar
 
 Before reporting an unhandled input or state, name the caller, flag, config
