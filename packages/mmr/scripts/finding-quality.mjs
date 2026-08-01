@@ -304,20 +304,34 @@ function assertPromptOnlyConfig(file) {
   return text
 }
 
-/** Flags that must carry a value; `true` here means the value was swallowed. */
-const VALUE_FLAGS = [
-  'out', 'config', 'pr', 'diff', 'channels', 'n', 'judge', 'scores', 'baseline', 'candidate', 'paired',
-]
+/**
+ * The ONLY flags that may appear without a value. Everything else must carry
+ * one.
+ *
+ * Inverted deliberately. The list used to enumerate value-carrying flags, which
+ * meant adding a flag and forgetting to register it produced exactly the failure
+ * this check exists to prevent: `--config` swallowing the next token, or
+ * arriving as `true` and reaching readFileSync as a boolean. A new flag is a
+ * value flag by default now, and only these three have to be remembered.
+ */
+const BOOLEAN_FLAGS = new Set(['force', 'help', 'dry-run'])
 
 /**
  * A value-carrying flag immediately followed by another flag parses as `true`,
  * which then reaches path.resolve() or readFileSync() as a boolean and throws
  * an uncaught TypeError naming nothing useful.
  */
-function requireValues(args) {
-  for (const k of VALUE_FLAGS) {
-    if (k in args && typeof args[k] !== 'string') die(`--${k} needs a value`)
+function missingValueFlag(args) {
+  for (const [k, v] of Object.entries(args)) {
+    if (k === '_' || BOOLEAN_FLAGS.has(k)) continue
+    if (typeof v !== 'string') return k
   }
+  return null
+}
+
+function requireValues(args) {
+  const missing = missingValueFlag(args)
+  if (missing) die(`--${missing} needs a value`)
   return args
 }
 
@@ -1862,6 +1876,13 @@ function selftest() {
   assert.equal(RUN_FILE_RE.test('notes.json'), false)
   assert.equal(RUN_FILE_RE.test('run-01.json.bak'), false)
   assert.equal(RUN_FILE_RE.test('.mmr.yaml'), false)
+
+  // A flag nobody registered still has to be caught: that omission is what the
+  // inverted list exists to make impossible.
+  assert.equal(missingValueFlag({ _: [], somethingNew: true }), 'somethingNew')
+  assert.equal(missingValueFlag({ _: [], force: true, out: 'x' }), null)
+  assert.equal(missingValueFlag({ _: ['collect'], config: true }), 'config')
+  assert.equal(missingValueFlag({ _: [], 'dry-run': true }), null)
 
   assert.equal(parseArgs(['--config=x.yaml'])['config'], 'x.yaml')
   assert.equal(parseArgs(['--n=6'])['n'], '6')
