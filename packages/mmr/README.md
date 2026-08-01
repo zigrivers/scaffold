@@ -116,7 +116,9 @@ stage: mvp        # prototype | mvp | production
 | `production` | P1 for changed user-facing behavior | P1 in a user-facing path |
 
 Stages grade findings; they never change *what gets reported*. A state nothing
-can reach is excluded by the Reporting Bar at every stage.
+can reach is excluded by the Reporting Bar at every stage, and a real defect a
+stage grades P3 is still reported — P3's "only report if nothing else found"
+rule governs trivia, not a demoted defect.
 
 The block is substituted **into** the severity definitions, so it changes what
 counts as P1 versus P2 rather than adding advice alongside them.

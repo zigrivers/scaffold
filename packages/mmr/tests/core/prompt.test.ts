@@ -108,6 +108,11 @@ describe('assemblePrompt', () => {
         const prompt = assemblePrompt({ diff: 'd', stage })
         expect(prompt, `${stage} must defer to the Reporting Bar`)
           .toMatch(/A state nothing can reach is not reported at any stage/)
+        // P3 in the core rubric carries "only report if nothing else found", so
+        // demoting a real bug to P3 would silently hide it whenever anything
+        // else was found. Grading down must not mean disappearing.
+        expect(prompt, `${stage} must keep demoted defects visible`)
+          .toMatch(/A correctness finding this stage grades P3 is still REPORTED/)
       }
     })
 
