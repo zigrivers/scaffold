@@ -1313,6 +1313,21 @@ function score(args) {
       + '(--out is collect\'s run directory)')
   }
   const conditions = loadArms(args)
+  // Refuse an unfinished collection HERE, not two steps later in `report`.
+  // Scoring an in-flight arm silently judges whatever runs happen to be on disk
+  // and spends real judge calls doing it, and the resulting scores file looks
+  // exactly like a complete one — so the mistake is invisible until `report`
+  // blocks on `complete`, long after the collection it should have waited for.
+  for (const c of conditions) {
+    if (c.provenance === null || c.provenance === undefined) {
+      die(`${c.label} has no provenance.json — run \`collect\` for it first`)
+    }
+    if (c.provenance.complete !== true) {
+      die(`${c.label} is still collecting (or was interrupted): it holds `
+        + `${c.runs.length} of ${c.provenance.requestedRuns} run(s). `
+        + 'Wait for `collect` to finish, or re-run it.')
+    }
+  }
   const judge = args.judge ?? 'claude'
   const rubric = fs.readFileSync(RUBRIC, 'utf-8')
 
