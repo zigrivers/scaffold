@@ -472,6 +472,12 @@ function runOnce({ mmrArgs, cwd, target, index, total, label }) {
       encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024, cwd,
     })
   } catch (err) {
+    // MMR's exit-code contract (runResultsPipeline in src/core/results-pipeline.ts):
+    // 0 for pass and degraded-pass, 2 for blocked, 3 for needs-user-decision.
+    // All three are normal outcomes here — the harness wants the findings, not
+    // the verdict — so only a status outside that set is a real failure. If
+    // those codes ever change, this allowlist has to change with them, or a
+    // crash will be recorded as a review result.
     if (err.status !== 2 && err.status !== 3) {
       process.stderr.write('FAILED\n')
       const detail = (err.stderr || err.message || '').toString().slice(0, 500)
