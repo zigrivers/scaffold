@@ -117,14 +117,6 @@ function parseArgs(argv) {
 }
 
 /**
- * The rubric ties `class` and `names_path` together: `speculative` means no
- * path was named, and `defect` requires one (a trust boundary counts as its
- * own path). A judge returning either combination has misapplied the rubric,
- * and both corrupt the speculative rate and the defect count.
- *
- * Returns a description of the contradiction, or null when consistent.
- */
-/**
  * Full schema check for one judge entry. Shared so `report` applies exactly the
  * checks `score` did: re-validating on read matters because a hand-edited
  * scores file with a missing worth_fixing_now would otherwise read as `false`
@@ -141,6 +133,14 @@ function validateScoreEntry(s) {
   return contradicts(s)
 }
 
+/**
+ * The rubric ties `class` and `names_path` together: `speculative` means no
+ * path was named, and `defect` requires one (a trust boundary counts as its own
+ * path). A judge returning either combination has misapplied the rubric, and
+ * both corrupt the speculative rate and the defect count.
+ *
+ * Returns a description of the contradiction, or null when consistent.
+ */
 function contradicts(s) {
   if (s.class === 'speculative' && s.names_path === true) {
     return 'classed speculative but names_path is true'
@@ -180,6 +180,34 @@ function firstJsonArray(text) {
     }
   }
   return null
+}
+
+/**
+ * Keys a candidate config may set.
+ *
+ * The harness measures a PROMPT change. A config that also altered a channel's
+ * command, model, flags, timeout, or parser would change how the review runs as
+ * well as what it asks, and every precondition in report would still pass —
+ * attributing an execution difference to the prompt. Rather than trying to
+ * digest resolved channel settings, refuse the config outright.
+ */
+const PROMPT_ONLY_KEYS = ['version', 'review_criteria', 'templates']
+
+function assertPromptOnlyConfig(file) {
+  let text
+  try {
+    text = fs.readFileSync(file, 'utf-8')
+  } catch (err) {
+    die(`could not read ${file}: ${err.message}`)
+  }
+  // Top-level YAML keys, without taking a parser dependency for one check.
+  const keys = [...text.matchAll(/^([A-Za-z_][\w-]*):/gm)].map((m) => m[1])
+  const offending = [...new Set(keys)].filter((k) => !PROMPT_ONLY_KEYS.includes(k))
+  if (offending.length > 0) {
+    die(`${file} sets ${offending.join(', ')}. A candidate may only set `
+      + `${PROMPT_ONLY_KEYS.join(', ')} — anything else changes how the review runs, not just `
+      + 'what it asks, and the harness would report that as a prompt effect.')
+  }
 }
 
 /** Flags that must carry a value; `true` here means the value was swallowed. */
@@ -262,6 +290,31 @@ function makeConfigSwapper(livePath, candidatePath, io = fs) {
   }
 }
 
+/**
+ * Map every channel in --dry-run output to its assembled prompt, with the diff
+ * payload removed.
+ *
+ * The diff is identical across arms by construction (both review the same
+ * snapshot) and would otherwise dominate the digest. Everything else — the core
+ * prompt, project criteria, focus, and any per-channel wrapper that follows the
+ * diff — is treatment and must be included.
+ */
+function canonicalPrompts(dryRunOutput) {
+  const marker = /^--- Assembled prompt for (.+) ---$/gm
+  const hits = [...dryRunOutput.matchAll(marker)]
+  if (hits.length === 0) return null
+  const out = {}
+  for (let i = 0; i < hits.length; i++) {
+    const channel = hits[i][1].trim()
+    const from = hits[i].index + hits[i][0].length
+    const to = i + 1 < hits.length ? hits[i + 1].index : dryRunOutput.length
+    // Remove the fenced diff block wherever it sits, rather than truncating at
+    // it, so anything after it still counts.
+    out[channel] = dryRunOutput.slice(from, to).replace(/## Diff\n```diff\n[\s\S]*?\n```/g, '## Diff <elided>')
+  }
+  return JSON.stringify(Object.keys(out).sort().map((k) => [k, out[k]]))
+}
+
 /** Canonical channel-list form, so two spellings of one set never differ. */
 function normalizeChannels(list) {
   return list.split(',').map((c) => c.trim()).filter(Boolean).sort().join(',')
@@ -317,14 +370,36 @@ function collect(args) {
   // (rather than committing it) keeps the experiment off the branch under test.
   const repoRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf-8' }).trim()
   const liveConfig = path.join(repoRoot, '.mmr.yaml')
+  if (args.config) assertPromptOnlyConfig(path.resolve(args.config))
   if (args.config && path.resolve(args.config) === liveConfig) {
     die('--config is the repo-root .mmr.yaml itself. collect replaces that file for the '
       + 'duration of the run, so the candidate must be a separate file.')
   }
+  // The repo-root config is a single shared resource. Two configured
+  // collections would swap and restore it in interleaved order, leaving one
+  // arm reviewed under the other's config and possibly the candidate left
+  // installed. mkdir is atomic, so it is the whole lock.
+  const lockDir = path.join(repoRoot, '.mmr-harness.lock')
+  let holdsLock = false
+  if (args.config) {
+    try {
+      fs.mkdirSync(lockDir)
+      holdsLock = true
+    } catch {
+      die(`another configured collection holds ${lockDir}. Wait for it to finish, or remove `
+        + 'that directory if no collection is running.')
+    }
+  }
+  const releaseLock = () => {
+    if (!holdsLock) return
+    holdsLock = false
+    try { fs.rmdirSync(lockDir) } catch { /* already gone */ }
+  }
+
   const swapper = args.config ? makeConfigSwapper(liveConfig, path.resolve(args.config)) : null
   // Inert until install() has run, so a signal arriving before then cannot
   // delete a .mmr.yaml the harness never touched.
-  const restoreConfig = () => swapper?.restore()
+  const restoreConfig = () => { swapper?.restore(); releaseLock() }
   // A `finally` does not run on SIGINT/SIGTERM, and a collect run takes long
   // enough that Ctrl-C during it is the common case — leaving the candidate
   // config sitting at the repo root, where it would silently apply to the
@@ -402,9 +477,12 @@ function collect(args) {
     } catch (err) {
       die(`could not assemble the prompt for this condition: ${(err.stderr || err.message || '').toString().slice(0, 300)}`)
     }
-    // Strip the diff, which is identical across arms by construction and would
-    // otherwise dominate the digest.
-    const promptOnly = dryRun.split('## Diff')[0]
+    // Digest EVERY channel's assembled prompt, keyed by channel. Splitting at
+    // the first "## Diff" hashed a prefix of the first channel only, so a
+    // wrapper suffix, a later channel's criteria, or a difference in any
+    // channel but the first was invisible.
+    const promptOnly = canonicalPrompts(dryRun)
+    if (promptOnly === null) die('could not parse --dry-run output into per-channel prompts')
     // Written incomplete first. An interrupted collection leaves its finished
     // runs on disk, and with --n above the floor report would otherwise see
     // enough of them to call a truncated condition complete and issue a verdict
@@ -684,7 +762,7 @@ function score(args) {
       digest: c.digest,
     })),
   }
-  const outPath = args.out ?? 'finding-quality-scores.json'
+  const outPath = args.scores ?? args.out ?? 'finding-quality-scores.json'
   fs.writeFileSync(outPath, JSON.stringify({ manifest, scored }, null, 2))
   process.stderr.write(`wrote ${outPath}\n`)
 }
@@ -802,7 +880,7 @@ function evaluateVerdict(base, cand, opts = {}) {
 
 function report(args) {
   const conditions = loadArms(args)
-  const scorePath = args.scores ?? 'finding-quality-scores.json'
+  const scorePath = args.scores ?? args.out ?? 'finding-quality-scores.json'
   if (!fs.existsSync(scorePath)) die(`scores file not found: ${scorePath} (run \`score\` first)`)
   const raw = JSON.parse(fs.readFileSync(scorePath, 'utf-8'))
   if (!raw || !Array.isArray(raw.scored) || !raw.manifest) {
@@ -891,23 +969,28 @@ function report(args) {
           + 'were requested — re-collect it')
       }
     }
-    for (const key of ['target', 'diffDigest', 'channels', 'mmrDigest', 'repoCommit']) {
+    for (const key of ['target', 'diffDigest', 'mmrDigest', 'repoCommit']) {
       if (JSON.stringify(bp[key]) !== JSON.stringify(cp[key])) {
         extraBlockers.push(`${key} differs between conditions (${bp[key]} vs ${cp[key]}) — `
           + 'the arms did not review the same thing')
       }
     }
-    // A channel that never appears in per_channel is neither completed nor
-    // degraded, so it slips past both of those checks while the arm silently
-    // ran with less coverage than it asked for.
-    for (const [cond, prov] of [[conditions[0], bp], [conditions[1], cp]]) {
-      const requested = normalizeChannels(prov.channels)
-      for (const r of cond.runs) {
-        if (r.dispatched !== requested) {
-          extraBlockers.push(`${cond.label}/${r.run} dispatched ${r.dispatched || '(none)'} `
-            + `but ${requested} was requested`)
-        }
+    // Compare what was DISPATCHED, not the --channels string. MMR canonicalizes
+    // aliases (agy resolves to antigravity) and de-duplicates, so the request
+    // string and the result keys legitimately differ and comparing them would
+    // block a valid experiment. Every run must dispatch the same set, and both
+    // arms must agree — which is the property that actually matters.
+    const dispatchSets = new Set()
+    for (const cond of [conditions[0], conditions[1]]) {
+      const perCond = new Set(cond.runs.map((r) => r.dispatched))
+      if (perCond.size > 1) {
+        extraBlockers.push(`${cond.label} dispatched different channel sets across its runs `
+          + `(${[...perCond].join(' vs ')})`)
       }
+      for (const d of perCond) dispatchSets.add(d)
+    }
+    if (dispatchSets.size > 1) {
+      extraBlockers.push(`the arms dispatched different channel sets (${[...dispatchSets].join(' vs ')})`)
     }
   }
 
