@@ -393,3 +393,52 @@ them ALL in the same change — don't wait for the reviewer to find instances 2,
 For artifact_map specifically: all consumers (`resolveAssemblyMode`, `verifyStep`,
 `detectCompletion`, `checkCompletion`, `applyConflictOverrides`) must treat the mapped
 incumbent identically (root-only via service gate; must be a FILE via `isFile`).
+
+## 2026-08-01 — MMR finding-quality initiative (#805 #806 #807 #808)
+
+**MMR's run-to-run variance exceeds most effects you'd want to measure.** Two
+consecutive baseline reviews of PR #782, identical input and configuration,
+returned 4 findings and then 1. A single before/after comparison therefore
+measures resampling, not the change.
+**Rule:** never accept a one-run before/after as evidence about prompt or review
+quality. Use `packages/mmr/scripts/finding-quality.mjs` (N ≥ 6 per arm, paired
+and interleaved, judged blind against the fixed rubric beside it).
+
+**A degraded review round is not a clean round.** Three times a round returned
+zero findings with a channel timed out; each time, re-running with all channels
+healthy found 2, 4 and 5 real findings.
+**Rule:** treat any round with a non-`completed` channel as no evidence at all
+and re-run. Never report it as convergence.
+
+**Asserting a security control works is not testing it.** Three separate
+controls in this initiative were claimed correct and were not: `--allowed-tools ''`
+did not deny tools (verified by having the judge run `echo`), a "nonce" was a
+hash of the shuffle seed, finding count and diff *length* — all attacker-known —
+and a sandbox probe read a spawn failure as a pass.
+**Rule:** every security control gets an executable adversarial check in the same
+change. If it cannot be executed, say it is unverified rather than describing it
+as a control.
+
+**A rule that grades and a rule that filters must never describe the same case.**
+Hit twice: #805 round 2 (one criterion said "do not report", another said "grade
+it P3") and #808 round 1 (stage presets graded unreachable-path bugs while the
+Reporting Bar excluded them entirely). A model given both follows one and the
+documented behavior becomes unreachable.
+**Rule:** when adding a grading rule near a reporting rule, state explicitly which
+governs, and test that the deferral text is present.
+
+**When successive review rounds keep finding variants of one class, the design
+is the bug.** Rounds 20–32 on #806 each found a new way the harness could destroy
+the user's `.mmr.yaml` — backup, state sidecar, crash recovery, a pid lock, signal
+handlers. All were consequences of swapping the repo-root config. MMR resolves
+project config from its own cwd, so running each arm from a temp directory
+deleted ~400 lines and the whole class with it.
+**Rule:** after the third round in the same area, stop fixing and ask what
+decision creates the surface.
+
+**A simplification can break the thing being measured.** That same refactor left
+channels unable to read the repository — they inherit MMR's cwd — so the harness
+measured reviews conducted without repo context, which no real review is. Fixed
+with detached worktrees. Byte-identical prompt digests looked like proof and were
+not: identical prompts through differently-capable channels is a different
+experiment.
