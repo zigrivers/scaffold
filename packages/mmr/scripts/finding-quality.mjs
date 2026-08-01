@@ -134,6 +134,13 @@ function sha256(text) {
  * materially different builds identical.
  */
 function buildDigest(pkgRoot = path.resolve(HERE, '..'), subdirs = ['dist', 'templates']) {
+  // Deliberately NOT memoized, though it is called three times per arm and
+  // again before every run. A cache keyed on directory mtime would be wrong:
+  // rewriting a nested file does not change its parent directory's mtime, so a
+  // rebuild mid-collection would hit a stale entry and
+  // assertEnvironmentUnchanged -- the guard whose whole job is catching that --
+  // would pass. Re-walking a small dist/ costs nothing against a collection
+  // spent waiting on model calls, and the guard has to be exact.
   const roots = subdirs.map((s) => path.join(pkgRoot, s))
   const parts = []
   const walk = (dir) => {
@@ -160,6 +167,13 @@ function pkgRootOf(mmrEntry) {
 }
 
 /**
+ * Not null ("inherits defaults") and not a number. Declared before its only
+ * user so the reference does not rely on the const being hoisted into scope by
+ * the time a later call runs.
+ */
+const UNKNOWN_TIMEOUT = 'unknown'
+
+/**
  * A channel's OWN timeout, or null when it inherits `defaults.timeout`.
  *
  * `mmr review --timeout` overrides `defaults.timeout` only — a channel that
@@ -177,8 +191,15 @@ function channelLevelTimeout(channel) {
     const out = execFileSync('node', [MMR, 'config', 'show', channel], {
       encoding: 'utf-8', maxBuffer: 4 * 1024 * 1024, cwd: neutral,
     })
-    const m = out.match(/^timeout:\s*(\d+)/m)
-    return m ? Number(m[1]) : null
+    // The WHOLE value, not its leading digits. `\d+` read `900.5` as 900 and
+    // failed to match a negative at all — and a failed match means "inherits
+    // defaults", so an unparseable timeout would have reported the channel as
+    // bound when nothing had been verified. Anything not a positive finite
+    // number is UNKNOWN, which blocks.
+    const m = out.match(/^timeout:\s*(\S+)/m)
+    if (m === null) return null
+    const n = Number(m[1])
+    return Number.isFinite(n) && n > 0 ? n : UNKNOWN_TIMEOUT
   } catch {
     // `config show` exits 1 for a name it does not know — which includes every
     // ALIAS (`agy`, `opc`), since dispatch canonicalizes but this command does
@@ -191,9 +212,6 @@ function channelLevelTimeout(channel) {
     fs.rmSync(neutral, { recursive: true, force: true })
   }
 }
-
-/** Distinct from null ("inherits defaults") and from a number. */
-const UNKNOWN_TIMEOUT = 'unknown'
 
 /**
  * Why a requested `--timeout` would not hold for the given channels, or null.
@@ -2379,6 +2397,14 @@ function selftest() {
   assert.equal(
     timeoutBindingProblem([['opencode', 300]], 300), null,
     'a channel whose own timeout already equals the request is bound',
+  )
+  // A timeout value that will not parse is UNKNOWN, not "inherits defaults":
+  // reading only leading digits turned 900.5 into 900 and matched a negative
+  // not at all, so an unparseable value reported the channel as bound when
+  // nothing had been verified.
+  assert.match(
+    timeoutBindingProblem([['weird', UNKNOWN_TIMEOUT]], 900),
+    /could not resolve the channel configuration for weird/,
   )
   // An unresolvable channel must BLOCK, not read as "inherits defaults" — that
   // is how `--channels agy --timeout 900` slipped past the guard entirely.
