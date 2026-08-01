@@ -60,6 +60,13 @@ const CLASSES = ['defect', 'speculative', 'deletion', 'hygiene', 'artifact']
 const RUN_FILE_RE = /^run-\d{2,}\.json$/
 /** Provenance sidecar written by collect; not a run file, but harness-owned. */
 const PROVENANCE_FILE = 'provenance.json'
+/**
+ * Ownership marker. `run-01.json` and `provenance.json` are generic enough to
+ * occur in someone else's directory, so filenames alone are not proof that the
+ * harness wrote them — and --force would then delete a stranger's files. Only a
+ * directory carrying this marker is ever cleared.
+ */
+const OWNER_FILE = '.finding-quality-harness'
 /** The pinned diff every run in a condition reviews. Also harness-owned. */
 const SNAPSHOT_FILE = 'reviewed.diff'
 
@@ -281,37 +288,47 @@ function conditionLabel(dir) {
  * is safe to call from a finally, a signal handler, and an exit hook at once.
  */
 function makeConfigSwapper(livePath, candidatePath, io = fs) {
-  // Durable, not just in memory. SIGKILL, an OOM kill, or power loss bypasses
-  // every handler, and holding the user's only copy of an uncommitted config in
-  // a variable means losing it outright. The sidecar survives all of those and
-  // lets a later run recover.
+  // Two sidecars, because the two states must be distinguishable after a
+  // SIGKILL. The state file records THAT we installed; the backup holds the
+  // previous contents when there were any. Without the state file, a run that
+  // installed over nothing leaves no trace at all, so a later run cannot tell
+  // the candidate it should remove from a config the user wrote themselves —
+  // and the candidate stays live forever.
   const backupPath = `${livePath}.harness-backup`
+  const statePath = `${livePath}.harness-state`
   let installed = false
   let restored = false
+
+  const clearSidecars = () => {
+    io.rmSync(backupPath, { force: true })
+    io.rmSync(statePath, { force: true })
+  }
+
+  const putBack = () => {
+    if (io.existsSync(backupPath)) io.copyFileSync(backupPath, livePath)
+    else io.rmSync(livePath, { force: true })
+    clearSidecars()
+  }
+
   return {
-    /** Recover from a previous run that was killed before it could restore. */
+    /** Undo an install left behind by a run that was killed before restoring. */
     recoverIfStale() {
-      if (!io.existsSync(backupPath)) return false
-      io.copyFileSync(backupPath, livePath)
-      io.rmSync(backupPath, { force: true })
+      if (!io.existsSync(statePath)) return false
+      putBack()
       return true
     },
     install() {
       if (io.existsSync(livePath)) io.copyFileSync(livePath, backupPath)
-      // Set BEFORE the copy: a copy that fails partway has still modified the
-      // destination, and restore must know to undo it.
+      // Written BEFORE the copy, so a crash between the two still leaves proof
+      // that the harness was mid-swap.
+      io.writeFileSync(statePath, 'installed')
       installed = true
       io.copyFileSync(candidatePath, livePath)
     },
     restore() {
       if (!installed || restored) return
       restored = true
-      if (io.existsSync(backupPath)) {
-        io.copyFileSync(backupPath, livePath)
-        io.rmSync(backupPath, { force: true })
-      } else {
-        io.rmSync(livePath, { force: true })
-      }
+      putBack()
     },
   }
 }
@@ -336,7 +353,12 @@ function canonicalPrompts(dryRunOutput) {
     const to = i + 1 < hits.length ? hits[i + 1].index : dryRunOutput.length
     // Remove the fenced diff block wherever it sits, rather than truncating at
     // it, so anything after it still counts.
-    out[channel] = dryRunOutput.slice(from, to).replace(/## Diff\n```diff\n[\s\S]*?\n```/g, '## Diff <elided>')
+    // Trimmed: the last channel's section ends at end-of-output while the
+    // others end at a newline, so without this the same set of prompts digests
+    // differently depending on the order the channels happened to print in.
+    out[channel] = dryRunOutput.slice(from, to)
+      .replace(/## Diff\n```diff\n[\s\S]*?\n```/g, '## Diff <elided>')
+      .trim()
   }
   return JSON.stringify(Object.keys(out).sort().map((k) => [k, out[k]]))
 }
@@ -366,7 +388,8 @@ function collect(args) {
   // the extra runs are indistinguishable from the new ones once pooled.
   if (fs.existsSync(outDir)) {
     const entries = fs.readdirSync(outDir)
-    const harnessOwned = (f) => RUN_FILE_RE.test(f) || f === PROVENANCE_FILE || f === SNAPSHOT_FILE
+    const harnessOwned = (f) =>
+      RUN_FILE_RE.test(f) || f === PROVENANCE_FILE || f === SNAPSHOT_FILE || f === OWNER_FILE
     const stale = entries.filter(harnessOwned)
     // --force must never be a directory shredder. A mistyped --out pointing at
     // a real directory would otherwise delete its contents, so only files
@@ -381,13 +404,20 @@ function collect(args) {
     // 'true'. A strict boolean check would ignore it and then tell the user to
     // pass the flag they just passed.
     const forced = args.force === true || args.force === 'true'
-    if (stale.length > 0 && !forced) {
-      die(`${outDir} already contains ${stale.length} run file(s). `
+    // Names are a hint; the marker is the proof. A mistyped --out landing on a
+    // directory that happens to hold a run-01.json must not have it deleted.
+    if (entries.length > 0 && !entries.includes(OWNER_FILE)) {
+      die(`${outDir} is not a harness output directory (no ${OWNER_FILE} marker). `
+        + 'Refusing to touch it — pick an empty or previously-collected directory.')
+    }
+    if (stale.some((f) => f !== OWNER_FILE) && !forced) {
+      die(`${outDir} already contains data from a previous collection. `
         + 'Use a fresh directory, or pass --force to clear it.')
     }
     for (const f of stale) fs.rmSync(path.join(outDir, f))
   }
   fs.mkdirSync(outDir, { recursive: true })
+  fs.writeFileSync(path.join(outDir, OWNER_FILE), 'finding-quality harness output directory\n')
 
   // Without this, an unbuilt package surfaces only as N repetitions of
   // "FAILED (no JSON)" — the broad catch below hides the real cause.
@@ -1222,18 +1252,25 @@ function selftest() {
       rmSync: (p2) => { delete files[p2] },
     }
   }
-  // A killed run leaves a backup that a later run recovers.
+  // A killed run leaves sidecars that a later run recovers from.
   let io3 = fakeFs({ '/live': 'ORIGINAL', '/cand': 'CANDIDATE' })
-  let sw3 = makeConfigSwapper('/live', '/cand', io3)
-  sw3.install()
+  makeConfigSwapper('/live', '/cand', io3).install()
   assert.equal(io3.files['/live'], 'CANDIDATE')
   assert.equal(io3.files['/live.harness-backup'], 'ORIGINAL')  // survives a SIGKILL
-  const survivor = makeConfigSwapper('/live', '/cand', io3)
-  assert.equal(survivor.recoverIfStale(), true)
+  assert.equal(makeConfigSwapper('/live', '/cand', io3).recoverIfStale(), true)
   assert.equal(io3.files['/live'], 'ORIGINAL')
   assert.equal('/live.harness-backup' in io3.files, false)
+  assert.equal('/live.harness-state' in io3.files, false)
   // Nothing to recover when no run was interrupted.
   assert.equal(makeConfigSwapper('/live', '/cand', io3).recoverIfStale(), false)
+  // The case a backup file alone cannot express: nothing existed before, so
+  // there is no backup to find, and without the state sidecar the candidate
+  // would stay installed forever.
+  io3 = fakeFs({ '/cand': 'CANDIDATE' })
+  makeConfigSwapper('/live', '/cand', io3).install()
+  assert.equal(io3.files['/live'], 'CANDIDATE')
+  assert.equal(makeConfigSwapper('/live', '/cand', io3).recoverIfStale(), true)
+  assert.equal('/live' in io3.files, false)
 
   // A pre-existing config is put back byte for byte.
   let io2 = fakeFs({ '/live': 'ORIGINAL', '/cand': 'CANDIDATE' })
@@ -1270,6 +1307,33 @@ function selftest() {
   assert.equal(parseArgs(['--config=x.yaml'])['config'], 'x.yaml')
   assert.equal(parseArgs(['--n=6'])['n'], '6')
   assert.equal(parseArgs(['--out=/a/b', '--force'])['out'], '/a/b')
+
+  // canonicalPrompts is load-bearing for treatment identity and has no other
+  // coverage — it was silently deleted once during a refactor and only a manual
+  // smoke run caught it.
+  const dry = [
+    '=== DRY RUN ===',
+    '--- Assembled prompt for claude ---',
+    'CORE', '## Diff', '```diff', '+a', '```', 'WRAPPER-SUFFIX',
+    '--- Assembled prompt for codex ---',
+    'CORE2', '## Diff', '```diff', '+a', '```',
+  ].join('\n')
+  const cp1 = canonicalPrompts(dry)
+  assert.equal(cp1 !== null, true)
+  assert.equal(cp1.includes('WRAPPER-SUFFIX'), true, 'content after the diff is treatment too')
+  assert.equal(cp1.includes('+a'), false, 'the diff payload must be elided')
+  assert.equal(cp1.includes('codex'), true, 'every channel must be included, not just the first')
+  // Channel order in the output must not change the digest.
+  const swapped = [
+    '--- Assembled prompt for codex ---', 'CORE2',
+    '--- Assembled prompt for claude ---', 'CORE', 'WRAPPER-SUFFIX',
+  ].join('\n')
+  const reordered = [
+    '--- Assembled prompt for claude ---', 'CORE', 'WRAPPER-SUFFIX',
+    '--- Assembled prompt for codex ---', 'CORE2',
+  ].join('\n')
+  assert.equal(canonicalPrompts(swapped), canonicalPrompts(reordered))
+  assert.equal(canonicalPrompts('no markers here'), null)
 
   assert.equal(normalizeChannels('claude, codex'), 'claude,codex')
   assert.equal(normalizeChannels('codex,claude'), normalizeChannels('claude, codex'))
