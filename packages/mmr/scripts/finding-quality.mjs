@@ -168,24 +168,35 @@ function contradicts(s) {
  * result into a parse failure.
  */
 function firstJsonArray(text) {
-  const start = text.indexOf('[')
-  if (start === -1) return null
-  let depth = 0
-  let inString = false
-  let escaped = false
-  for (let i = start; i < text.length; i++) {
-    const ch = text[i]
-    if (inString) {
-      if (escaped) escaped = false
-      else if (ch === '\\') escaped = true
-      else if (ch === '"') inString = false
-      continue
-    }
-    if (ch === '"') inString = true
-    else if (ch === '[') depth++
-    else if (ch === ']') {
-      depth--
-      if (depth === 0) return text.slice(start, i + 1)
+  // Every balanced [...] in order, returning the first that actually parses.
+  // Taking the first balanced span alone picked up prose like "Scores [blind]:"
+  // and then failed to parse, discarding the real array that followed.
+  for (let start = text.indexOf('['); start !== -1; start = text.indexOf('[', start + 1)) {
+    let depth = 0
+    let inString = false
+    let escaped = false
+    for (let i = start; i < text.length; i++) {
+      const ch = text[i]
+      if (inString) {
+        if (escaped) escaped = false
+        else if (ch === '\\') escaped = true
+        else if (ch === '"') inString = false
+        continue
+      }
+      if (ch === '"') inString = true
+      else if (ch === '[') depth++
+      else if (ch === ']') {
+        depth--
+        if (depth === 0) {
+          const span = text.slice(start, i + 1)
+          try {
+            JSON.parse(span)
+            return span
+          } catch {
+            break   // not JSON; try the next opening bracket
+          }
+        }
+      }
     }
   }
   return null
@@ -200,7 +211,7 @@ function firstJsonArray(text) {
  * attributing an execution difference to the prompt. Rather than trying to
  * digest resolved channel settings, refuse the config outright.
  */
-const PROMPT_ONLY_KEYS = ['version', 'review_criteria', 'templates']
+const PROMPT_ONLY_KEYS = ['version', 'review_criteria']
 
 function assertPromptOnlyConfig(file) {
   let text
@@ -415,6 +426,36 @@ function ownerAlive(pidFile) {
   }
 }
 
+/**
+ * Digest of the channels as MMR actually resolves them — commands, parsers,
+ * enabled flags — after layering built-in, user, and project config.
+ *
+ * The arms are collected minutes apart, and a change to ~/.mmr/config.yaml
+ * between them (a different model, a wrapper, a channel toggled) would alter
+ * how the review runs while every other precondition still passed.
+ */
+function resolvedChannelDigest(repoRoot) {
+  try {
+    const out = execFileSync('node', [MMR, 'config', 'channels', '--format', 'json'], {
+      encoding: 'utf-8', maxBuffer: 16 * 1024 * 1024, cwd: repoRoot,
+    })
+    return sha256(JSON.stringify(canonicalJson(JSON.parse(out))))
+  } catch {
+    // Older CLI or an unreadable config: record the absence rather than a
+    // fabricated match, and let report treat it as an unverified precondition.
+    return null
+  }
+}
+
+/** Key-sorted deep copy, so key order cannot change a digest. */
+function canonicalJson(value) {
+  if (Array.isArray(value)) return value.map(canonicalJson)
+  if (value === null || typeof value !== 'object') return value ?? null
+  const out = {}
+  for (const k of Object.keys(value).sort()) out[k] = canonicalJson(value[k])
+  return out
+}
+
 /** Canonical channel-list form, so two spellings of one set never differ. */
 function normalizeChannels(list) {
   return list.split(',').map((c) => c.trim()).filter(Boolean).sort().join(',')
@@ -505,10 +546,7 @@ function collect(args) {
     holdsLock = false
     try { fs.rmSync(lockDir, { recursive: true, force: true }) } catch { /* already gone */ }
   }
-  // Registered BEFORE the lock is taken: every die() between acquisition and
-  // the end of collect calls process.exit, which skips the finally, and the
-  // window used to include the prompt-only config validation.
-  process.once('exit', releaseLock)
+
   if (args.config) {
     const takeLock = () => {
       fs.mkdirSync(lockDir)
@@ -559,6 +597,11 @@ function collect(args) {
   // Inert until install() has run, so a signal arriving before then cannot
   // delete a .mmr.yaml the harness never touched.
   const restoreConfig = () => { swapper?.restore(); releaseLock() }
+  // ONE exit handler, registered before the lock is taken. Two separate
+  // listeners would run in registration order, dropping the lock before the
+  // config was restored — and another collector acquiring it in that window
+  // would install its candidate over ours and then "restore" the wrong file.
+  process.once('exit', restoreConfig)
   // A `finally` does not run on SIGINT/SIGTERM, and a collect run takes long
   // enough that Ctrl-C during it is the common case — leaving the candidate
   // config sitting at the repo root, where it would silently apply to the
@@ -569,12 +612,7 @@ function collect(args) {
   }
   process.once('SIGINT', () => onSignal('SIGINT'))
   process.once('SIGTERM', () => onSignal('SIGTERM'))
-  // die() calls process.exit(), which does NOT unwind the stack — so a `finally`
-  // inside collect is skipped whenever a run fails, leaving the candidate config
-  // live at the repo root. An 'exit' hook runs in every one of those paths, and
-  // restoreConfig is idempotent, so this is the backstop that makes the
-  // try/finally and the signal handlers merely the fast paths.
-  process.once('exit', restoreConfig)
+
 
 
 
@@ -598,6 +636,9 @@ function collect(args) {
     diffDigest: sha256(reviewedDiff),
     channels: normalizeChannels(channels),
     mmrDigest: buildDigest(),
+    // Resolved commands/models/parsers, so a user-level config change between
+    // the two collections cannot be reported as a prompt effect.
+    channelConfigDigest: resolvedChannelDigest(repoRoot),
     repoCommit: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoRoot, encoding: 'utf-8' }).trim(),
   }
 
@@ -903,6 +944,10 @@ function score(args) {
   // findings back to conditions by relative path and stop being blind. The
   // instruction above is the policy; this removes the easy means.
   const neutralCwd = fs.mkdtempSync(path.join(os.tmpdir(), 'fq-judge-'))
+  // die() calls process.exit, which skips the finally below, so the temp dir
+  // leaked on exactly the paths most likely to be hit (missing binary, auth
+  // failure, malformed output).
+  process.once('exit', () => fs.rmSync(neutralCwd, { recursive: true, force: true }))
   let raw
   try {
     raw = execFileSync(judge, ['-p'], {
@@ -994,6 +1039,26 @@ function perRunSpecRates(runs, mine) {
 }
 
 /**
+ * Map of normalized location -> how many distinct runs reported a defect there.
+ *
+ * Run counts matter because a site seen once is inside the run-to-run variance
+ * this whole harness exists to respect, while a site seen repeatedly is a
+ * defect the baseline reliably finds.
+ */
+function defectSiteCounts(scoredFindings) {
+  const byLocation = new Map()
+  for (const f of scoredFindings) {
+    if (f.score.class !== 'defect') continue
+    // File only: the same defect drifts by a line or two between runs.
+    const site = String(f.location ?? '').split(':')[0].trim().replace(/^\.\//, '')
+    if (!site) continue
+    if (!byLocation.has(site)) byLocation.set(site, new Set())
+    byLocation.get(site).add(f.run)
+  }
+  return Object.fromEntries([...byLocation].map(([k, runs]) => [k, runs.size]))
+}
+
+/**
  * Per-run defect counts. The ship rule hinges on the defect total, so its own
  * run-to-run spread has to be visible — otherwise a reader cannot tell a real
  * drop from the same resampling that motivated this harness.
@@ -1026,6 +1091,10 @@ function summarize(condition, scored) {
     specRates: perRunSpecRates(condition.runs, mine),
     defectsPerRun: perRunDefects(condition.runs, mine),
     speculatives: count('speculative'),
+    // WHICH defects, not just how many. A candidate that misses every baseline
+    // defect while producing the same number of different ones satisfies an
+    // aggregate comparison and has still made the review worse.
+    defectSites: defectSiteCounts(mine),
     speculativeRate: total ? count('speculative') / total : 0,
     lowValues: lowValue,
     lowValueRate: total ? lowValue / total : 0,
@@ -1102,11 +1171,18 @@ function evaluateVerdict(base, cand, opts = {}) {
   // otherwise satisfy every check above.
   const lowValueDown = cand.lowValues < base.lowValues
   const defectsHeld = cand.defects >= base.defects
-  const ship = blockers.length === 0 && specDown && countDown && lowValueDown && defectsHeld && outsideBand
+  // Sites the baseline found REPEATEDLY (more than one run, so not noise) and
+  // the candidate never found at all. Losing one of these is the failure the
+  // aggregate defect count cannot see.
+  const lostSites = Object.entries(base.defectSites)
+    .filter(([site, runs]) => runs > 1 && !(site in cand.defectSites))
+    .map(([site]) => site)
+  const ship = blockers.length === 0 && specDown && countDown && lowValueDown
+    && defectsHeld && lostSites.length === 0 && outsideBand
 
   return {
     blockers, bandLo, bandHi, margin, improvement,
-    outsideBand, specDown, countDown, lowValueDown, defectsHeld, ship,
+    outsideBand, specDown, countDown, lowValueDown, defectsHeld, lostSites, ship,
   }
 }
 
@@ -1195,6 +1271,10 @@ function report(args) {
       + 'diff, channel set, and MMR build are recorded')
   } else {
     for (const [cond, prov] of [[conditions[0], bp], [conditions[1], cp]]) {
+      if (prov.channelConfigDigest === null || prov.channelConfigDigest === undefined) {
+        extraBlockers.push(`${cond.label} has no resolved channel-config digest — re-run \`collect\` `
+          + 'so a user-config change between the arms cannot pass as a prompt effect')
+      }
       if (prov.complete !== true) {
         extraBlockers.push(`${cond.label} was never finished — re-run \`collect\` for it`)
       } else if (prov.requestedRuns !== cond.runs.length) {
@@ -1202,7 +1282,7 @@ function report(args) {
           + 'were requested — re-collect it')
       }
     }
-    for (const key of ['target', 'diffDigest', 'mmrDigest', 'repoCommit']) {
+    for (const key of ['target', 'diffDigest', 'mmrDigest', 'repoCommit', 'channelConfigDigest']) {
       if (JSON.stringify(bp[key]) !== JSON.stringify(cp[key])) {
         extraBlockers.push(`${key} differs between conditions (${bp[key]} vs ${cp[key]}) — `
           + 'the arms did not review the same thing')
@@ -1263,6 +1343,10 @@ function report(args) {
     + `(width ${pct(v.margin)}) — ${v.outsideBand ? 'clears the noise band' : 'INSIDE the noise band'}`)
   console.log(`defect count:     ${base.defects} → ${cand.defects}  ${defectVerdict}`)
   console.log(`baseline defects per run: ${range(base.defectsPerRun)}`)
+  if (v.lostSites.length > 0) {
+    console.log(`LOST DEFECT SITES: ${v.lostSites.join(', ')} — the baseline found defects here in `
+      + 'more than one run and the candidate found none')
+  }
   console.log('')
   console.log(v.ship
     ? 'VERDICT: ship — speculative rate fell beyond the noise band and defect count held.'
@@ -1296,7 +1380,7 @@ function selftest() {
   const cond = (over = {}) => ({
     label: 'x', runs: MIN_RUNS, degradedRuns: 0, coverages: ['a,b'], hasFindings: true,
     emptyRuns: 0, specRates: [0.4, 0.5], speculativeRate: 0.45, speculatives: 9,
-    lowValues: 12, defects: 10, ...over,
+    lowValues: 12, defects: 10, defectSites: { 'src/a.ts': 3 }, ...over,
   })
 
   // Every combination of the three decision inputs, so the AND cannot silently
@@ -1330,6 +1414,15 @@ function selftest() {
 
   // Each precondition blocks on its own.
   const good = { speculativeRate: 0.1, speculatives: 5, lowValues: 6 }
+
+  // A candidate that stops finding a defect the baseline found repeatedly must
+  // not ship, however good its aggregate numbers look.
+  assert.equal(evaluateVerdict(cond(), cond({ ...good, defectSites: { 'src/b.ts': 3 } })).ship, false,
+    'losing a reproducible defect site must block')
+  // A site the baseline saw only once is inside the noise and does not block.
+  assert.equal(evaluateVerdict(cond({ defectSites: { 'src/a.ts': 3, 'src/rare.ts': 1 } }),
+    cond({ ...good, defectSites: { 'src/a.ts': 2 } })).ship, true)
+
   assert.equal(evaluateVerdict(cond({ runs: 3 }), cond({ ...good, runs: 3 })).ship, false)
   assert.equal(evaluateVerdict(cond(), cond({ ...good, degradedRuns: 1 })).ship, false)
   assert.equal(evaluateVerdict(cond(), cond({ ...good, emptyRuns: 1 })).ship, false)
@@ -1491,6 +1584,9 @@ function selftest() {
   assert.equal(firstJsonArray('[{"s":"]"}] after'), '[{"s":"]"}]')
   assert.equal(firstJsonArray('[{"s":"\\\\"}] x'), '[{"s":"\\\\"}]')
   assert.equal(firstJsonArray('no array here'), null)
+  // A balanced but non-JSON bracket BEFORE the real array must not win.
+  assert.equal(firstJsonArray('Scores [blind]:\n[{"id":"F001"}]'), '[{"id":"F001"}]')
+  assert.equal(firstJsonArray('[not json] then [1,2]'), '[1,2]')
 
   // report re-validates persisted scores with the same checks score applied.
   const okEntry = { class: 'defect', names_path: true, worth_fixing_now: true, why: 'x' }

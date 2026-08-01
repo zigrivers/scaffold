@@ -119,7 +119,16 @@ A change ships only if, across an **equal** number of runs per condition
 3. the **absolute count** of low-value findings drops, **and**
 4. the rate drop exceeds the width of the baseline's per-run rate spread
    (otherwise it is inside the noise band), **and**
-5. `defect_count` does not drop.
+5. `defect_count` does not drop, **and**
+6. no **defect site** the baseline found in more than one run goes unfound by
+   the candidate.
+
+Condition 6 is what condition 5 cannot see. A candidate that misses every
+defect the baseline found, while producing the same number of different ones,
+satisfies an aggregate count and has still made the review worse. Sites are
+compared by file, because the same defect drifts by a line or two between runs,
+and only sites the baseline found repeatedly count — a site seen once is inside
+the run-to-run variance this rubric exists to respect.
 
 Conditions 2 and 3 exist because a rate is gameable in the wrong direction.
 `speculative_rate` falls when the denominator grows, so a change that produced
