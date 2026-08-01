@@ -180,12 +180,44 @@ function channelLevelTimeout(channel) {
     const m = out.match(/^timeout:\s*(\d+)/m)
     return m ? Number(m[1]) : null
   } catch {
-    // Unknown to `config show` (an alias, or a channel this build does not
-    // define). Not this function's job to adjudicate — dispatch will complain.
-    return null
+    // `config show` exits 1 for a name it does not know — which includes every
+    // ALIAS (`agy`, `opc`), since dispatch canonicalizes but this command does
+    // not. Returning null here would mean "inherits defaults", so
+    // `--channels agy --timeout 900` would sail past a guard whose entire
+    // purpose is catching that antigravity ignores the flag. UNKNOWN is its own
+    // answer, and the caller refuses on it.
+    return UNKNOWN_TIMEOUT
   } finally {
     fs.rmSync(neutral, { recursive: true, force: true })
   }
+}
+
+/** Distinct from null ("inherits defaults") and from a number. */
+const UNKNOWN_TIMEOUT = 'unknown'
+
+/**
+ * Why a requested `--timeout` would not hold for the given channels, or null.
+ *
+ * `entries` is [channel, channelLevelTimeout] pairs. Pure so selftest can cover
+ * the alias case without a built MMR that defines one.
+ */
+function timeoutBindingProblem(entries, requested) {
+  if (requested === null) return null
+  const unresolved = entries.filter(([, t]) => t === UNKNOWN_TIMEOUT).map(([c]) => c)
+  if (unresolved.length > 0) {
+    return `could not resolve the channel configuration for ${unresolved.join(', ')}, so it `
+      + 'cannot be confirmed that --timeout applies to them. `mmr config show` does not accept '
+      + 'channel aliases — name the channels canonically (antigravity, not agy; opencode, '
+      + 'not opc).'
+  }
+  const unbounded = entries.filter(([, t]) => t !== null && t !== requested)
+  if (unbounded.length > 0) {
+    return `--timeout ${requested} would not apply to `
+      + `${unbounded.map(([c, t]) => `${c} (has its own timeout: ${t})`).join(', ')}. `
+      + 'MMR overrides defaults.timeout only, so a channel with its own keeps it. '
+      + 'Drop those channels, or set their timeout in ~/.mmr/config.yaml to match.'
+  }
+  return null
 }
 /** The rubric's floor. Below this, run-to-run variance dominates any effect. */
 const MIN_RUNS = 6
@@ -879,15 +911,11 @@ function collect(args) {
     // experiment reads as bounded, and the channel that ignored it degrades a
     // condition anyway. Refused rather than warned, because a warning scrolls
     // past in an hour-long collection.
-    const unbounded = normalizeChannels(channels).split(',')
-      .map((c) => [c, channelLevelTimeout(c)])
-      .filter(([, t]) => t !== null && t !== channelTimeout)
-    if (unbounded.length > 0) {
-      die(`--timeout ${channelTimeout} would not apply to `
-        + `${unbounded.map(([c, t]) => `${c} (has its own timeout: ${t})`).join(', ')}. `
-        + 'MMR overrides defaults.timeout only, so a channel with its own keeps it. '
-        + 'Drop those channels, or set their timeout in ~/.mmr/config.yaml to match.')
-    }
+    const problem = timeoutBindingProblem(
+      normalizeChannels(channels).split(',').map((c) => [c, channelLevelTimeout(c)]),
+      channelTimeout,
+    )
+    if (problem !== null) die(problem)
   }
   if (!args.pr && !args.diff) die('--pr or --diff required')
   if (!Number.isInteger(n) || n < 1) die('--n must be a positive integer')
@@ -2304,6 +2332,30 @@ function selftest() {
   // null is "no timeout passed", and must not read as a mismatch against a
   // legacy record that simply lacks the key.
   assert.deepEqual(provenanceBlockers(conds({ channelTimeout: null }, { channelTimeout: null })), [])
+
+  // --- --timeout binding ----------------------------------------------------
+  assert.equal(timeoutBindingProblem([['codex', null], ['claude', null]], 900), null)
+  assert.equal(timeoutBindingProblem([['opencode', 300]], null), null, 'no --timeout, no claim')
+  assert.match(
+    timeoutBindingProblem([['codex', null], ['opencode', 300]], 900),
+    /would not apply to opencode \(has its own timeout: 300\)/,
+  )
+  assert.equal(
+    timeoutBindingProblem([['opencode', 300]], 300), null,
+    'a channel whose own timeout already equals the request is bound',
+  )
+  // An unresolvable channel must BLOCK, not read as "inherits defaults" — that
+  // is how `--channels agy --timeout 900` slipped past the guard entirely.
+  assert.match(
+    timeoutBindingProblem([['codex', null], ['agy', UNKNOWN_TIMEOUT]], 900),
+    /could not resolve the channel configuration for agy/,
+  )
+  // Unresolvable is reported ahead of a mere mismatch: it is the more
+  // dangerous of the two, because it is the one that silently passes.
+  assert.match(
+    timeoutBindingProblem([['opencode', 300], ['agy', UNKNOWN_TIMEOUT]], 900),
+    /could not resolve/,
+  )
 
   // --- score's completeness guard ------------------------------------------
   const cnd = (over = {}) => ({
