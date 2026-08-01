@@ -111,15 +111,18 @@ A change ships only if, across an **equal** number of runs per condition
 
 1. `speculative_rate` drops, **and**
 2. the **absolute count** of speculative findings drops, **and**
-3. the rate drop exceeds the width of the baseline's per-run rate spread
+3. the **absolute count** of low-value findings drops, **and**
+4. the rate drop exceeds the width of the baseline's per-run rate spread
    (otherwise it is inside the noise band), **and**
-4. `defect_count` does not drop.
+5. `defect_count` does not drop.
 
-Condition 2 exists because the rate alone is gameable in the wrong direction.
-Adding defects, hygiene findings, or artifacts enlarges the denominator and
-lowers `speculative_rate` while the number of speculative findings a reviewer
-must actually read stays flat or rises. Equal N makes the absolute counts
-directly comparable, so both must move.
+Conditions 2 and 3 exist because a rate is gameable in the wrong direction.
+`speculative_rate` falls when the denominator grows, so a change that produced
+more defects, hygiene findings, or artifacts could lower it while leaving a
+reviewer just as many speculative findings to read — and trading speculative
+findings for artifacts would satisfy 1 and 2 while leaving the total wading
+unchanged. Equal N makes the absolute counts directly comparable, so all three
+must move together.
 
 The run counts must match because `defect_count` is an absolute total: the arm
 with more runs has more chances to surface a defect, so unequal N alone can
@@ -142,6 +145,12 @@ observed baseline-vs-baseline spread is not a result.
 - The judge is an LLM and will be inconsistent at the margin. It is blind to
   condition, which controls for bias between arms but not for absolute accuracy.
   Rates are comparable across arms; they are not ground truth.
+- The judge sees the reviewed diff, so it can check whether a finding's named
+  caller or flag actually appears there. It does **not** see the rest of the
+  repository, so a finding citing a caller outside the diff cannot be fully
+  corroborated — the rubric tells the judge to treat what it cannot corroborate
+  as unsupported, which biases slightly toward `speculative` for findings that
+  reach beyond the diff.
 - `worth_fixing_now` encodes "early-stage product". It is the wrong question for
   a mature codebase and the rubric should not be reused there unchanged.
 

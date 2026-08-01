@@ -281,12 +281,23 @@ function conditionLabel(dir) {
  * is safe to call from a finally, a signal handler, and an exit hook at once.
  */
 function makeConfigSwapper(livePath, candidatePath, io = fs) {
-  let original = null
+  // Durable, not just in memory. SIGKILL, an OOM kill, or power loss bypasses
+  // every handler, and holding the user's only copy of an uncommitted config in
+  // a variable means losing it outright. The sidecar survives all of those and
+  // lets a later run recover.
+  const backupPath = `${livePath}.harness-backup`
   let installed = false
   let restored = false
   return {
+    /** Recover from a previous run that was killed before it could restore. */
+    recoverIfStale() {
+      if (!io.existsSync(backupPath)) return false
+      io.copyFileSync(backupPath, livePath)
+      io.rmSync(backupPath, { force: true })
+      return true
+    },
     install() {
-      if (io.existsSync(livePath)) original = io.readFileSync(livePath, 'utf-8')
+      if (io.existsSync(livePath)) io.copyFileSync(livePath, backupPath)
       // Set BEFORE the copy: a copy that fails partway has still modified the
       // destination, and restore must know to undo it.
       installed = true
@@ -295,8 +306,12 @@ function makeConfigSwapper(livePath, candidatePath, io = fs) {
     restore() {
       if (!installed || restored) return
       restored = true
-      if (original !== null) io.writeFileSync(livePath, original)
-      else io.rmSync(livePath, { force: true })
+      if (io.existsSync(backupPath)) {
+        io.copyFileSync(backupPath, livePath)
+        io.rmSync(backupPath, { force: true })
+      } else {
+        io.rmSync(livePath, { force: true })
+      }
     },
   }
 }
@@ -412,6 +427,9 @@ function collect(args) {
   }
 
   const swapper = args.config ? makeConfigSwapper(liveConfig, path.resolve(args.config)) : null
+  if (swapper?.recoverIfStale()) {
+    console.error(`[harness] restored ${liveConfig} from a backup left by an interrupted run`)
+  }
   // Inert until install() has run, so a signal arriving before then cannot
   // delete a .mmr.yaml the harness never touched.
   const restoreConfig = () => { swapper?.restore(); releaseLock() }
@@ -496,7 +514,8 @@ function collect(args) {
         encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024, cwd: repoRoot,
       })
     } catch (err) {
-      die(`could not assemble the prompt for this condition: ${(err.stderr || err.message || '').toString().slice(0, 300)}`)
+      const detail = (err.stderr || err.message || '').toString().slice(0, 300)
+      die(`could not assemble the prompt for this condition: ${detail}`)
     }
     // Digest EVERY channel's assembled prompt, keyed by channel. Splitting at
     // the first "## Diff" hashed a prefix of the first channel only, so a
@@ -541,7 +560,8 @@ function collect(args) {
         // other status is a real failure and must not be mistaken for one.
         if (err.status !== 2 && err.status !== 3) {
           process.stderr.write('FAILED\n')
-          die(`run ${i} exited ${err.status ?? 'abnormally'}: ${(err.stderr || err.message || '').toString().slice(0, 500)}`)
+          const detail = (err.stderr || err.message || '').toString().slice(0, 500)
+          die(`run ${i} exited ${err.status ?? 'abnormally'}: ${detail}`)
         }
         raw = err.stdout ?? ''
       }
@@ -674,6 +694,20 @@ function score(args) {
   const pooled = conditions.flatMap((c) => c.findings)
   if (pooled.length === 0) die('no findings found in the given conditions')
 
+  // The rubric asks the judge whether a finding NAMES A REAL PATH — a question
+  // it cannot answer from the finding's prose alone, so without the diff it was
+  // grading confidence rather than substance, and a confidently-worded
+  // hallucination scored as a defect. Both arms review the same snapshot by
+  // construction, so one copy serves the whole pooled set.
+  const snapshots = conditions.map((c) => path.join(c.id, SNAPSHOT_FILE))
+  for (const sp of snapshots) {
+    if (!fs.existsSync(sp)) die(`${sp} is missing — re-run \`collect\` so the reviewed diff is recorded`)
+  }
+  const reviewedDiff = fs.readFileSync(snapshots[0], 'utf-8')
+  if (sha256(reviewedDiff) !== sha256(fs.readFileSync(snapshots[1], 'utf-8'))) {
+    die('the two conditions reviewed different diffs — re-collect them against the same target')
+  }
+
   // Shuffle and re-key so the judge cannot infer the arm from ordering.
   const shuffled = shuffle(pooled, SHUFFLE_SEED).map((f, i) => ({ ...f, id: `F${String(i + 1).padStart(3, '0')}` }))
 
@@ -692,6 +726,17 @@ function score(args) {
     '## Rubric',
     '',
     rubric,
+    '',
+    '## The code under review',
+    '',
+    'Every finding below was reported against this diff. Use it to check claims:',
+    'a finding that names a caller, flag, or config value must actually be',
+    'supported by what you can see here. Treat a claim you cannot corroborate as',
+    'unsupported rather than assuming it is correct.',
+    '',
+    '```diff',
+    reviewedDiff,
+    '```',
     '',
     '## Findings to score',
     '',
@@ -833,6 +878,7 @@ function summarize(condition, scored) {
     defectsPerRun: perRunDefects(condition.runs, mine),
     speculatives: count('speculative'),
     speculativeRate: total ? count('speculative') / total : 0,
+    lowValues: lowValue,
     lowValueRate: total ? lowValue / total : 0,
     defects: count('defect'),
     deletions: count('deletion'),
@@ -853,7 +899,9 @@ function evaluateVerdict(base, cand, opts = {}) {
   for (const r of [base, cand]) {
     if (r.runs < MIN_RUNS) blockers.push(`${r.label} has ${r.runs} run(s), the rubric's floor is ${MIN_RUNS}`)
     if (r.degradedRuns > 0) blockers.push(`${r.label} has ${r.degradedRuns} run(s) with a degraded channel`)
-    if (r.coverages.length > 1) blockers.push(`${r.label} has inconsistent channel coverage: ${r.coverages.join(' vs ')}`)
+    if (r.coverages.length > 1) {
+      blockers.push(`${r.label} has inconsistent channel coverage: ${r.coverages.join(' vs ')}`)
+    }
     if (!r.hasFindings) blockers.push(`${r.label} produced no findings at all`)
     // A run with zero findings has no defined speculative rate, so it drops out
     // of the spread that sizes the noise band — making the band narrower than
@@ -900,10 +948,17 @@ function evaluateVerdict(base, cand, opts = {}) {
   // With equal N enforced above, the absolute counts are directly comparable,
   // so require the count to fall too.
   const countDown = cand.speculatives < base.speculatives
+  // Closes the other denominator route: trading speculative findings for
+  // artifacts leaves a reviewer with just as much to wade through, and would
+  // otherwise satisfy every check above.
+  const lowValueDown = cand.lowValues < base.lowValues
   const defectsHeld = cand.defects >= base.defects
-  const ship = blockers.length === 0 && specDown && countDown && defectsHeld && outsideBand
+  const ship = blockers.length === 0 && specDown && countDown && lowValueDown && defectsHeld && outsideBand
 
-  return { blockers, bandLo, bandHi, margin, improvement, outsideBand, specDown, countDown, defectsHeld, ship }
+  return {
+    blockers, bandLo, bandHi, margin, improvement,
+    outsideBand, specDown, countDown, lowValueDown, defectsHeld, ship,
+  }
 }
 
 function report(args) {
@@ -950,7 +1005,8 @@ function report(args) {
     const e = expectedList[i]
     const a = scored[i]
     if (a?.id !== e.id || a?.condition !== e.condition || a?.run !== e.run
-      || a?.location !== e.location || a?.description !== e.description) {
+      || a?.location !== e.location || a?.description !== e.description
+      || a?.severity !== e.severity || a?.suggestion !== e.suggestion) {
       die(`scores file entry ${i + 1} does not match the finding it claims to score — re-run \`score\``)
     }
     const problem = validateScoreEntry(a.score)
@@ -1048,9 +1104,12 @@ function report(args) {
       ? 'DROPPED beyond the baseline\'s own defect spread — the bar moved, not the noise'
       : 'dropped, but within the baseline\'s own defect spread — inconclusive, and still not shippable'
 
-  console.log(`speculative rate:  ${pct(base.speculativeRate)} → ${pct(cand.speculativeRate)}  ${v.specDown ? 'down' : 'NOT down'}`)
+  console.log(`speculative rate:  ${pct(base.speculativeRate)} → ${pct(cand.speculativeRate)}  `
+    + `${v.specDown ? 'down' : 'NOT down'}`)
   console.log(`speculative count: ${base.speculatives} → ${cand.speculatives}  `
     + `${v.countDown ? 'down' : 'NOT down — the rate fell only because the denominator grew'}`)
+  console.log(`low-value count:   ${base.lowValues} → ${cand.lowValues}  `
+    + `${v.lowValueDown ? 'down' : 'NOT down — speculative findings were traded for other low-value ones'}`)
   console.log(`improvement ${pct(v.improvement)} vs baseline per-run spread ${pct(v.bandLo)}–${pct(v.bandHi)} `
     + `(width ${pct(v.margin)}) — ${v.outsideBand ? 'clears the noise band' : 'INSIDE the noise band'}`)
   console.log(`defect count:     ${base.defects} → ${cand.defects}  ${defectVerdict}`)
@@ -1087,7 +1146,8 @@ function selftest() {
   // Drive the REAL decision function, not a copy of its arithmetic.
   const cond = (over = {}) => ({
     label: 'x', runs: MIN_RUNS, degradedRuns: 0, coverages: ['a,b'], hasFindings: true,
-    emptyRuns: 0, specRates: [0.4, 0.5], speculativeRate: 0.45, speculatives: 9, defects: 10, ...over,
+    emptyRuns: 0, specRates: [0.4, 0.5], speculativeRate: 0.45, speculatives: 9,
+    lowValues: 12, defects: 10, ...over,
   })
 
   // Every combination of the three decision inputs, so the AND cannot silently
@@ -1095,7 +1155,7 @@ function selftest() {
   for (const specRate of [0.2, 0.44, 0.5]) {
     for (const defects of [10, 9]) {
       const base = cond()
-      const cand = cond({ speculativeRate: specRate, defects, speculatives: 5 })
+      const cand = cond({ speculativeRate: specRate, defects, speculatives: 5, lowValues: 6 })
       const v = evaluateVerdict(base, cand)
       const expected = specRate < 0.45 && (0.45 - specRate) > 0.1 && defects >= 10
       assert.equal(v.ship, expected, `verdict wrong for rate ${specRate}, defects ${defects}`)
@@ -1106,17 +1166,21 @@ function selftest() {
   // degenerates: one baseline run with no speculative finding pins it to 0%
   // and nothing can ever ship.
   // A rate that fell only because the denominator grew must not ship.
-  assert.equal(evaluateVerdict(cond(), cond({ speculativeRate: 0.1, speculatives: 9 })).ship, false,
+  assert.equal(evaluateVerdict(cond(), cond({ speculativeRate: 0.1, speculatives: 9, lowValues: 6 })).ship, false,
     'the speculative COUNT must fall, not just the rate')
-  assert.equal(evaluateVerdict(cond(), cond({ speculativeRate: 0.1, speculatives: 10 })).ship, false)
+  // Trading speculative findings for artifacts is not an improvement.
+  assert.equal(evaluateVerdict(cond(), cond({ speculativeRate: 0.1, speculatives: 5, lowValues: 12 })).ship, false,
+    'the low-value COUNT must fall too')
 
   assert.equal(evaluateVerdict(cond({ specRates: [0.0, 0.5], speculativeRate: 0.4 }),
-    cond({ speculativeRate: 0.3, speculatives: 5 })).ship, false, 'a 10pt gain must not clear a 50pt spread')
+    cond({ speculativeRate: 0.3, speculatives: 5, lowValues: 6 })).ship,
+  false, 'a 10pt gain must not clear a 50pt spread')
   assert.equal(evaluateVerdict(cond({ specRates: [0.0, 0.0], speculativeRate: 0.3 }),
-    cond({ speculativeRate: 0.1, speculatives: 5 })).ship, true, 'a zero-width spread must not block a real gain')
+    cond({ speculativeRate: 0.1, speculatives: 5, lowValues: 6 })).ship,
+  true, 'a zero-width spread must not block a real gain')
 
   // Each precondition blocks on its own.
-  const good = { speculativeRate: 0.1, speculatives: 5 }
+  const good = { speculativeRate: 0.1, speculatives: 5, lowValues: 6 }
   assert.equal(evaluateVerdict(cond({ runs: 3 }), cond({ ...good, runs: 3 })).ship, false)
   assert.equal(evaluateVerdict(cond(), cond({ ...good, degradedRuns: 1 })).ship, false)
   assert.equal(evaluateVerdict(cond(), cond({ ...good, emptyRuns: 1 })).ship, false)
@@ -1158,6 +1222,19 @@ function selftest() {
       rmSync: (p2) => { delete files[p2] },
     }
   }
+  // A killed run leaves a backup that a later run recovers.
+  let io3 = fakeFs({ '/live': 'ORIGINAL', '/cand': 'CANDIDATE' })
+  let sw3 = makeConfigSwapper('/live', '/cand', io3)
+  sw3.install()
+  assert.equal(io3.files['/live'], 'CANDIDATE')
+  assert.equal(io3.files['/live.harness-backup'], 'ORIGINAL')  // survives a SIGKILL
+  const survivor = makeConfigSwapper('/live', '/cand', io3)
+  assert.equal(survivor.recoverIfStale(), true)
+  assert.equal(io3.files['/live'], 'ORIGINAL')
+  assert.equal('/live.harness-backup' in io3.files, false)
+  // Nothing to recover when no run was interrupted.
+  assert.equal(makeConfigSwapper('/live', '/cand', io3).recoverIfStale(), false)
+
   // A pre-existing config is put back byte for byte.
   let io2 = fakeFs({ '/live': 'ORIGINAL', '/cand': 'CANDIDATE' })
   let sw = makeConfigSwapper('/live', '/cand', io2)
@@ -1165,6 +1242,7 @@ function selftest() {
   assert.equal(io2.files['/live'], 'CANDIDATE')
   sw.restore()
   assert.equal(io2.files['/live'], 'ORIGINAL')
+  assert.equal('/live.harness-backup' in io2.files, false)  // backup cleaned up
   // Restore is idempotent — it runs from a finally, a signal handler, and an
   // exit hook, all of which can fire for one interruption.
   sw.restore(); sw.restore()
