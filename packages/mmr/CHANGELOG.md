@@ -17,6 +17,13 @@
   to **differ** while every other field must still match — the guard against an
   accidental rebuild confounding an experiment is moved, not removed.
 
+  `collect --timeout <seconds>` bounds each channel for the experiment,
+  identically in both arms. A channel that times out contributes no findings,
+  and the rubric treats a degraded run as invalidating its whole condition, so
+  on a slow model or a long diff the default timeout bounds what can be
+  measured at all. Passed as a flag rather than set in `~/.mmr/config.yaml`,
+  which would leak the value into every unrelated review on the machine.
+
 - **`stage: prototype | mvp | production`** calibrates the built-in severity
   rubric for how mature the product is. The same defect is worth different
   things at different stages: a missing test for an internal helper is noise in
