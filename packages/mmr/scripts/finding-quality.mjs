@@ -52,7 +52,7 @@
  */
 
 import { execFileSync } from 'node:child_process'
-import { createHash } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import yaml from 'js-yaml'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
@@ -628,9 +628,12 @@ function assertOwnedOrEmpty(dir) {
 function prepareOutDir(dir, forced) {
   if (fs.existsSync(dir)) {
     const entries = fs.readdirSync(dir)
+    // Same predicate assertOwnedOrEmpty uses, including the .collect-lock
+    // staging files: a mismatch between the two meant a leftover staging file
+    // passed the ownership check and then read as foreign content here.
     const harnessOwned = (f) =>
       RUN_FILE_RE.test(f) || f === PROVENANCE_FILE || f === SNAPSHOT_FILE
-      || f === OWNER_FILE || f === LOCK_FILE
+      || f === OWNER_FILE || f.startsWith('.collect-lock')
     const stale = entries.filter(harnessOwned)
     const foreign = entries.filter((f) => !harnessOwned(f))
     if (foreign.length > 0) {
@@ -645,12 +648,12 @@ function prepareOutDir(dir, forced) {
       die(`${dir} is not a harness output directory (no ${OWNER_FILE} marker). `
         + 'Refusing to touch it — pick an empty or previously-collected directory.')
     }
-    if (stale.some((f) => f !== OWNER_FILE && f !== LOCK_FILE) && !forced) {
+    if (stale.some((f) => f !== OWNER_FILE && !f.startsWith('.collect-lock')) && !forced) {
       die(`${dir} already contains data from a previous collection. `
         + 'Use a fresh directory, or pass --force to clear it.')
     }
     // Never clear the lock as part of "old runs" — lockOutDir owns its lifetime.
-    for (const f of stale.filter((x) => x !== LOCK_FILE)) fs.rmSync(path.join(dir, f))
+    for (const f of stale.filter((x) => !x.startsWith('.collect-lock'))) fs.rmSync(path.join(dir, f))
   }
   fs.mkdirSync(dir, { recursive: true })
   fs.writeFileSync(path.join(dir, OWNER_FILE), 'finding-quality harness output directory\n')
@@ -1160,8 +1163,12 @@ function score(args) {
   // Per-invocation, unguessable sentinels. Fixed markers can appear verbatim in
   // a public PR diff, letting attacker text close the untrusted block early and
   // continue as if it were harness instruction.
-  const nonce = createHash('sha256').update(`${SHUFFLE_SEED}:${shuffled.length}:${reviewedDiff.length}`)
-    .digest('hex').slice(0, 16)
+  //
+  // randomBytes, NOT a hash of the inputs. The first attempt derived this from
+  // the seed, the finding count and the diff LENGTH — all of which an attacker
+  // submitting the PR knows or controls, so the closing marker was precomputable
+  // and the fence bought nothing.
+  const nonce = randomBytes(12).toString('hex')
   const diffOpen = `<<<UNTRUSTED_DIFF_${nonce}>>>`
   const diffClose = `<<<END_UNTRUSTED_DIFF_${nonce}>>>`
   const findOpen = `<<<UNTRUSTED_FINDINGS_${nonce}>>>`
@@ -1221,6 +1228,15 @@ function score(args) {
     // an agentic CLI: a diff carrying injected instructions could otherwise
     // reach the filesystem or a shell. Scoring is text-in, text-out, so there
     // is nothing to lose by removing the capability entirely.
+    // The rubric rides on argv, and it grows. ARG_MAX is ~256 KB on macOS and
+    // the failure would be a bare E2BIG, so refuse with an explanation well
+    // before that — the findings payload already goes via stdin for the same
+    // reason, and stdin is taken.
+    if (Buffer.byteLength(systemPrompt) > 128 * 1024) {
+      die(`the rubric plus scoring instructions is ${Math.round(Buffer.byteLength(systemPrompt) / 1024)}KB, `
+        + 'too large to pass on the command line. Shorten the rubric, or switch the judge '
+        + 'invocation to --system-prompt-file.')
+    }
     raw = execFileSync(judge, ['-p', '--system-prompt', systemPrompt, ...JUDGE_SANDBOX_FLAGS], {
       encoding: 'utf-8',
       input: prompt,

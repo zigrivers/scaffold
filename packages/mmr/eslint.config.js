@@ -9,7 +9,7 @@ export default tseslint.config(
     // need the Node globals declared explicitly.
     files: ['scripts/**/*.mjs'],
     languageOptions: {
-      globals: { console: 'readonly', process: 'readonly' },
+      globals: { console: 'readonly', process: 'readonly', Buffer: 'readonly' },
     },
   },
   {
