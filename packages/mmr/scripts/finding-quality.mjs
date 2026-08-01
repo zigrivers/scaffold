@@ -570,8 +570,13 @@ function lockOutDir(dir) {
  */
 function assertOwnedOrEmpty(dir) {
   if (!fs.existsSync(dir)) return
-  const entries = fs.readdirSync(dir).filter((f) => f !== LOCK_FILE)
-  if (entries.length === 0) return
+  const all = fs.readdirSync(dir)
+  // Emptiness is judged on EVERY entry. Excluding the lock first meant a
+  // foreign directory holding only a .collect-lock — a generic enough name to
+  // belong to anything — read as empty, and the harness would then treat it as
+  // its own and clear it.
+  if (all.length === 0) return
+  const entries = all.filter((f) => f !== LOCK_FILE)
   if (!entries.includes(OWNER_FILE)) {
     die(`${dir} is not a harness output directory (no ${OWNER_FILE} marker). `
       + 'Refusing to touch it — pick an empty or previously-collected directory.')
@@ -1267,15 +1272,25 @@ function defectClusters(scoredFindings) {
     const clusters = byFile.get(file)
     const hit = clusters.find((c) => overlap(c.tokens, tokens) >= DEFECT_MATCH)
     if (hit) {
-      // Runs accumulate; TOKENS DO NOT. A growing union drifts the centroid, so
-      // each near-miss widens the cluster and the next unrelated defect matches
-      // more easily — clusters would keep swallowing their neighbours.
+      // Runs accumulate, and each distinct WORDING is kept separately. The
+      // cluster's centroid stays fixed at the first wording — merging them
+      // would drift it, so each near-miss would widen the cluster and the next
+      // unrelated defect would match more easily. But coverage must be able to
+      // match on any wording the baseline actually used: matching is not
+      // transitive, so a later wording that a candidate does match can sit in a
+      // cluster whose FIRST wording it does not.
       hit.runs.add(f.run)
+      hit.wordings.push(tokens)
     } else {
-      clusters.push({ file, tokens: new Set(tokens), runs: new Set([f.run]) })
+      clusters.push({ file, tokens: new Set(tokens), runs: new Set([f.run]), wordings: [tokens] })
     }
   }
-  return [...byFile.values()].flat().map((c) => ({ file: c.file, tokens: [...c.tokens], runs: c.runs.size }))
+  return [...byFile.values()].flat().map((c) => ({
+    file: c.file,
+    tokens: [...c.tokens],
+    wordings: c.wordings.map((w) => [...w]),
+    runs: c.runs.size,
+  }))
 }
 
 /**
@@ -1299,9 +1314,16 @@ function defectTokensByFile(scoredFindings) {
 
 /** Whether any candidate defect in the same file describes the baseline one. */
 function clusterCovered(cluster, candidateTokensByFile) {
-  const tokens = new Set(cluster.tokens)
+  // Every wording the baseline used for this defect, against every candidate
+  // defect in the file. Comparing the centroid alone loses the later wordings,
+  // and similarity is not transitive: A can match B and B match C while A and C
+  // do not, so the wording a candidate matches may not be the first one.
+  const wordings = (cluster.wordings ?? [cluster.tokens]).map((w) => new Set(w))
   return (candidateTokensByFile[cluster.file] ?? [])
-    .some((t) => overlap(new Set(t), tokens) >= DEFECT_MATCH)
+    .some((t) => {
+      const cand = new Set(t)
+      return wordings.some((w) => overlap(cand, w) >= DEFECT_MATCH)
+    })
 }
 
 /**
@@ -1795,6 +1817,21 @@ function selftest() {
   assert.equal(clusters.filter((c) => c.file === 'src/a.ts').length, 2, 'unrelated defects stay separate')
   const nullCluster = clusters.find((c) => c.tokens.includes('dereference'))
   assert.equal(nullCluster.runs, 2, 'the same defect reworded collapses into one cluster')
+  assert.equal(nullCluster.wordings.length, 2, 'every wording is kept, not just the first')
+
+  // Similarity is not transitive: a candidate can match the SECOND wording a
+  // baseline cluster absorbed while missing the first. That must count as
+  // coverage, or the harness reports a defect as lost that was found.
+  const chain = defectClusters([
+    d('run-01.json', 'src/q.ts:1', 'queue drains before the writer flushes pending records'),
+    d('run-02.json', 'src/q.ts:3', 'writer flushes pending records after the drain completes'),
+  ])[0]
+  const matchesSecondOnly = { 'src/q.ts': [[...contentTokens(
+    'flushes pending records after drain completes writer',
+  )]] }
+  assert.equal(clusterCovered(chain, matchesSecondOnly), true,
+    'matching any recorded wording counts as coverage')
+  assert.equal(clusterCovered(chain, { 'src/q.ts': [['entirely', 'different', 'problem']] }), false)
 
   // The prompt-only guard is what keeps the treatment from changing HOW a
   // review runs. It was the one load-bearing check with no coverage.
