@@ -107,6 +107,12 @@ function buildDigest() {
 }
 /** The rubric's floor. Below this, run-to-run variance dominates any effect. */
 const MIN_RUNS = 6
+/**
+ * Token-overlap threshold for treating two defect descriptions as the same
+ * defect. Loose enough to survive rewording between runs, tight enough that
+ * two unrelated defects in one file stay distinct.
+ */
+const DEFECT_MATCH = 0.4
 /** Fixed so a scoring pass is reproducible, and so `report` can re-derive it. */
 const SHUFFLE_SEED = 20260731
 
@@ -482,16 +488,24 @@ function ownerAlive(pidFile) {
  * between them (a different model, a wrapper, a channel toggled) would alter
  * how the review runs while every other precondition still passed.
  */
-function resolvedChannelDigest(repoRoot) {
+function resolvedChannelDigest() {
+  // Resolved from a NEUTRAL directory, not the repo. Every run here uses --diff,
+  // which is untrusted-head, so MMR skips project config entirely — resolving
+  // from the repo would fold in a project .mmr.yaml the runs never see, and a
+  // project override could then mask the user-config drift this digest exists
+  // to catch.
+  const neutral = fs.mkdtempSync(path.join(os.tmpdir(), 'fq-cfg-'))
   try {
     const out = execFileSync('node', [MMR, 'config', 'channels', '--format', 'json'], {
-      encoding: 'utf-8', maxBuffer: 16 * 1024 * 1024, cwd: repoRoot,
+      encoding: 'utf-8', maxBuffer: 16 * 1024 * 1024, cwd: neutral,
     })
     return sha256(JSON.stringify(canonicalJson(JSON.parse(out))))
   } catch {
     // Older CLI or an unreadable config: record the absence rather than a
     // fabricated match, and let report treat it as an unverified precondition.
     return null
+  } finally {
+    fs.rmSync(neutral, { recursive: true, force: true })
   }
 }
 
@@ -751,7 +765,7 @@ function collect(args) {
     mmrDigest: buildDigest(),
     // Resolved commands/models/parsers, so a user-level config change between
     // the two collections cannot be reported as a prompt effect.
-    channelConfigDigest: resolvedChannelDigest(repoRoot),
+    channelConfigDigest: resolvedChannelDigest(),
     repoCommit: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoRoot, encoding: 'utf-8' }).trim(),
   }
 
@@ -1165,6 +1179,64 @@ function defectSiteCounts(scoredFindings) {
   return Object.fromEntries([...byLocation].map(([k, runs]) => [k, runs.size]))
 }
 
+/** Content words of a finding, for comparing two descriptions of one defect. */
+const STOPWORDS = new Set([
+  'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'to', 'of', 'in', 'on', 'for', 'and',
+  'or', 'not', 'this', 'that', 'it', 'its', 'as', 'at', 'by', 'with', 'from', 'but', 'can', 'will',
+  'would', 'so', 'if', 'then', 'when', 'which', 'while', 'has', 'have', 'had', 'does', 'do',
+])
+
+function contentTokens(text) {
+  return new Set(
+    String(text ?? '').toLowerCase().split(/[^a-z0-9_]+/)
+      .filter((w) => w.length > 2 && !STOPWORDS.has(w)),
+  )
+}
+
+/** Jaccard overlap of two token sets. */
+function overlap(a, b) {
+  if (a.size === 0 || b.size === 0) return 0
+  let shared = 0
+  for (const t of a) if (b.has(t)) shared++
+  return shared / (a.size + b.size - shared)
+}
+
+/**
+ * Distinct defects the baseline reported, grouped within a file by description
+ * similarity.
+ *
+ * Filename alone is too coarse: a candidate that misses the defect the baseline
+ * kept finding, while reporting an unrelated one in the same file, would look
+ * like full coverage. Line numbers are too fine — the same defect drifts by a
+ * line or two between runs, and wording shifts too — so defects are clustered
+ * by content-word overlap within a file.
+ */
+function defectClusters(scoredFindings) {
+  const byFile = new Map()
+  for (const f of scoredFindings) {
+    if (f.score.class !== 'defect') continue
+    const file = String(f.location ?? '').split(':')[0].trim().replace(/^\.\//, '')
+    if (!file) continue
+    const tokens = contentTokens(`${f.description} ${f.suggestion}`)
+    if (!byFile.has(file)) byFile.set(file, [])
+    const clusters = byFile.get(file)
+    const hit = clusters.find((c) => overlap(c.tokens, tokens) >= DEFECT_MATCH)
+    if (hit) {
+      hit.runs.add(f.run)
+      for (const t of tokens) hit.tokens.add(t)
+    } else {
+      clusters.push({ file, tokens: new Set(tokens), runs: new Set([f.run]) })
+    }
+  }
+  return [...byFile.values()].flat().map((c) => ({ file: c.file, tokens: [...c.tokens], runs: c.runs.size }))
+}
+
+/** Whether a candidate's defects cover a baseline cluster. */
+function clusterCovered(cluster, candidateClusters) {
+  const tokens = new Set(cluster.tokens)
+  return candidateClusters.some((c) => c.file === cluster.file && overlap(new Set(c.tokens), tokens) >= DEFECT_MATCH)
+}
+
 /**
  * Per-run defect counts. The ship rule hinges on the defect total, so its own
  * run-to-run spread has to be visible — otherwise a reader cannot tell a real
@@ -1202,6 +1274,7 @@ function summarize(condition, scored) {
     // defect while producing the same number of different ones satisfies an
     // aggregate comparison and has still made the review worse.
     defectSites: defectSiteCounts(mine),
+    defectClusters: defectClusters(mine),
     speculativeRate: total ? count('speculative') / total : 0,
     lowValues: lowValue,
     lowValueRate: total ? lowValue / total : 0,
@@ -1281,9 +1354,9 @@ function evaluateVerdict(base, cand, opts = {}) {
   // Sites the baseline found REPEATEDLY (more than one run, so not noise) and
   // the candidate never found at all. Losing one of these is the failure the
   // aggregate defect count cannot see.
-  const lostSites = Object.entries(base.defectSites)
-    .filter(([site, runs]) => runs > 1 && !(site in cand.defectSites))
-    .map(([site]) => site)
+  const lostSites = (base.defectClusters ?? [])
+    .filter((c) => c.runs > 1 && !clusterCovered(c, cand.defectClusters ?? []))
+    .map((c) => `${c.file} (${c.tokens.slice(0, 4).join(' ')}…)`)
   const ship = blockers.length === 0 && specDown && countDown && lowValueDown
     && defectsHeld && lostSites.length === 0 && outsideBand
 
@@ -1492,7 +1565,8 @@ function selftest() {
   const cond = (over = {}) => ({
     label: 'x', runs: MIN_RUNS, degradedRuns: 0, coverages: ['a,b'], hasFindings: true,
     emptyRuns: 0, specRates: [0.4, 0.5], speculativeRate: 0.45, speculatives: 9,
-    lowValues: 12, defects: 10, defectSites: { 'src/a.ts': 3 }, ...over,
+    lowValues: 12, defects: 10, defectSites: { 'src/a.ts': 3 },
+    defectClusters: [{ file: 'src/a.ts', tokens: ['null', 'pointer', 'deref', 'guard'], runs: 3 }], ...over,
   })
 
   // Every combination of the three decision inputs, so the AND cannot silently
@@ -1529,11 +1603,24 @@ function selftest() {
 
   // A candidate that stops finding a defect the baseline found repeatedly must
   // not ship, however good its aggregate numbers look.
-  assert.equal(evaluateVerdict(cond(), cond({ ...good, defectSites: { 'src/b.ts': 3 } })).ship, false,
-    'losing a reproducible defect site must block')
-  // A site the baseline saw only once is inside the noise and does not block.
-  assert.equal(evaluateVerdict(cond({ defectSites: { 'src/a.ts': 3, 'src/rare.ts': 1 } }),
-    cond({ ...good, defectSites: { 'src/a.ts': 2 } })).ship, true)
+  assert.equal(evaluateVerdict(cond(), cond({
+    ...good, defectClusters: [{ file: 'src/b.ts', tokens: ['other', 'thing'], runs: 3 }],
+  })).ship, false, 'losing a reproducible defect must block')
+  // Same file, UNRELATED defect: filename alone would have called this covered.
+  assert.equal(evaluateVerdict(cond(), cond({
+    ...good, defectClusters: [{ file: 'src/a.ts', tokens: ['unrelated', 'timeout', 'retry'], runs: 3 }],
+  })).ship, false, 'a different defect in the same file is not coverage')
+  // Reworded description of the SAME defect still counts as covered.
+  assert.equal(evaluateVerdict(cond(), cond({
+    ...good, defectClusters: [{ file: 'src/a.ts', tokens: ['null', 'pointer', 'deref', 'missing'], runs: 2 }],
+  })).ship, true, 'rewording must not read as a loss')
+  // A defect the baseline saw only once is inside the noise and does not block.
+  assert.equal(evaluateVerdict(cond({
+    defectClusters: [
+      { file: 'src/a.ts', tokens: ['null', 'pointer', 'deref', 'guard'], runs: 3 },
+      { file: 'src/rare.ts', tokens: ['flaky', 'once'], runs: 1 },
+    ],
+  }), cond(good)).ship, true)
 
   assert.equal(evaluateVerdict(cond({ runs: 3 }), cond({ ...good, runs: 3 })).ship, false)
   assert.equal(evaluateVerdict(cond(), cond({ ...good, degradedRuns: 1 })).ship, false)
@@ -1712,6 +1799,19 @@ function selftest() {
   ])
   assert.deepEqual(sites, { 'src/a.ts': 2, 'src/b.ts': 1 })
   assert.deepEqual(defectSiteCounts([]), {})
+
+  // Clustering: two unrelated defects in one file stay distinct, and the same
+  // defect reworded across runs collapses into one cluster.
+  const d = (run, location, description) => ({ run, location, description, suggestion: '', score: { class: 'defect' } })
+  const clusters = defectClusters([
+    d('run-01.json', 'src/a.ts:10', 'null pointer dereference when config missing'),
+    d('run-02.json', 'src/a.ts:14', 'dereference of null pointer if the config is missing'),
+    d('run-01.json', 'src/a.ts:80', 'timeout retry loop never terminates on failure'),
+    d('run-02.json', 'src/b.ts:1', 'unrelated parsing error'),
+  ])
+  assert.equal(clusters.filter((c) => c.file === 'src/a.ts').length, 2, 'unrelated defects stay separate')
+  const nullCluster = clusters.find((c) => c.tokens.includes('dereference'))
+  assert.equal(nullCluster.runs, 2, 'the same defect reworded collapses into one cluster')
 
   assert.equal(normalizeChannels('claude, codex'), 'claude,codex')
   assert.equal(normalizeChannels('codex,claude'), normalizeChannels('claude, codex'))

@@ -137,10 +137,17 @@ A change ships only if, across an **equal** number of runs per condition
 
 Condition 6 is what condition 5 cannot see. A candidate that misses every
 defect the baseline found, while producing the same number of different ones,
-satisfies an aggregate count and has still made the review worse. Sites are
-compared by file, because the same defect drifts by a line or two between runs,
-and only sites the baseline found repeatedly count — a site seen once is inside
-the run-to-run variance this rubric exists to respect.
+satisfies an aggregate count and has still made the review worse.
+
+Defects are matched by **file plus description overlap**, not by file alone and
+not by line. Line numbers drift between runs for the same defect; filenames are
+too coarse, because a candidate reporting an unrelated defect in the same file
+would read as full coverage. Descriptions are compared on content words with a
+0.4 Jaccard threshold — loose enough to survive rewording between runs, tight
+enough to keep two unrelated defects in one file distinct.
+
+Only defects the baseline found in more than one run count. One seen once is
+inside the run-to-run variance this rubric exists to respect.
 
 Conditions 2 and 3 exist because a rate is gameable in the wrong direction.
 `speculative_rate` falls when the denominator grows, so a change that produced
