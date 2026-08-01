@@ -26,30 +26,33 @@
   Three of the six ship conditions failed, all in the wrong direction.
   Nothing had been released — no published version ever contained it.
 
-### Changed
+- **The worth-fixing-now severity rubric and the Reporting Bar are withdrawn
+  before ever shipping** (`templates/core-prompt.md`). Measured against two
+  independent targets, 6 paired runs per arm each, the same build in both arms
+  except for this one file.
 
-- **The built-in severity rubric now grades worth-fixing-now, not impact alone**
-  (`templates/core-prompt.md`). Every level carries two tests — what happens if
-  the problem occurs, and whether a maintainer would fix it before the change
-  lands — and the second decides when they disagree. Security, data-loss and
-  data-corruption findings are explicitly exempt and stay graded on impact.
-- **Unhandled inputs and states now need a named path.** A new Reporting Bar
-  asks the reviewer to name the caller, flag, config value, or documented
-  contract in the reviewed code that can produce the state, and to skip the
-  finding otherwise. Trust boundaries — public APIs, exported surfaces, CLI
-  arguments, HTTP handlers, deserializers, file and database reads — are exempt,
-  because a repository contains no caller for a hostile request and an
-  unqualified bar would suppress the findings a review most exists to catch.
-- **The criteria ask what is unnecessary, not only what is missing.** A sixth
-  criterion covers abstractions with one caller, knobs never varied, hand-rolled
-  helpers the standard library provides, and defensive code for impossible
-  states, and asks for the deletion as the suggestion.
+  On the first target it did what it was designed to do — speculative findings
+  fell from 8% to 0% — but the defect count fell with them, 19 → 14. On a second
+  target the baseline had *no* speculative findings to remove, and the defect
+  count fell anyway, 19 → 17. The drop replicated.
 
-  This is the highest-blast-radius text in the package — every channel and every
-  consuming project reads it on every review. Expect verdicts to move: a finding
-  that goes unreported, or lands below your threshold, no longer blocks.
-  `fix_threshold`, the reconciliation logic and `mmr ack` are unchanged, and the
-  four severity tokens the gate keys off are pinned by test.
+  What settles it is what the second target lost. The pre-change prompt reported,
+  in **5 of 6 runs**, that `pruneDiagrams` runs inside `buildGuide` before
+  cross-guide validation, so a failed validation deletes existing diagram SVGs
+  while the old HTML remains — a data-loss bug against a documented fail-closed
+  guarantee. The changed prompt reported it in **none**.
+
+  The rubric exempted exactly this: *"Never lower a security, data-loss, or
+  data-corruption finding on the worth-fixing-now test."* But the Reporting Bar
+  is a separate gate, and it demands a named caller, flag, or config value that
+  produces the state. This bug's trigger is a runtime condition — *a later guide
+  fails validation* — which names no caller, so the bar filtered a finding the
+  severity rubric had explicitly protected. Two safeguards that were each correct
+  in isolation, and a gap between them.
+
+  A reachability bar that suppresses a data-loss defect is not a calibration
+  problem to tune; the reduction in noise was not worth it, and on the second
+  target there was no noise to reduce.
 
 ### Added
 
