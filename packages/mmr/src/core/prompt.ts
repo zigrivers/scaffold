@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { stageCalibration, type Stage } from './stage.js'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -25,7 +26,18 @@ export interface AssemblePromptOptions {
   focus?: string
   /** Channel prompt wrapper with {{prompt}} placeholder */
   promptWrapper?: string
+  /** Product stage; calibrates the severity rubric in place */
+  stage?: Stage
 }
+
+/**
+ * Marker inside the severity section that stage calibration replaces.
+ *
+ * Substituted, not appended. A stage block added after the criteria would sit
+ * alongside them and compete; text inside the severity definitions is read as
+ * part of them, which is what changing what counts as P1 versus P2 requires.
+ */
+const STAGE_MARKER = '{{stage_calibration}}'
 
 /**
  * Assemble the full review prompt from layered components.
@@ -40,12 +52,22 @@ export interface AssemblePromptOptions {
  * After assembly, applies the optional prompt wrapper.
  */
 export function assemblePrompt(options: AssemblePromptOptions): string {
-  const { diff, reviewCriteria, templateCriteria, focus, promptWrapper } = options
+  const { diff, reviewCriteria, templateCriteria, focus, promptWrapper, stage } = options
 
   const layers: string[] = []
 
-  // Layer 1: Core prompt (always)
-  layers.push(loadTemplate())
+  // Layer 1: Core prompt (always), with the stage marker resolved.
+  //
+  // With no stage the marker and the blank line it occupies both disappear, so
+  // a project that never opts in gets exactly the prompt it got before stages
+  // existed — asserted byte-for-byte in the tests.
+  const calibration = stageCalibration(stage)
+  const core = loadTemplate()
+  layers.push(
+    calibration === ''
+      ? core.replace(`${STAGE_MARKER}\n\n`, '')
+      : core.replace(STAGE_MARKER, calibration),
+  )
 
   // Layer 2: Project review criteria
   if (reviewCriteria && reviewCriteria.length > 0) {

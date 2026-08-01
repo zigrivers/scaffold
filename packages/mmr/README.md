@@ -99,6 +99,38 @@ channels:
 > Note: the `gemini` channel was **retired** (its CLI is sunset; use `antigravity`).
 > Existing configs that still name `gemini` keep loading — it is never dispatched.
 
+### Calibrating findings by product stage
+
+The same defect is worth different things depending on how mature the product
+is. Set `stage` and the built-in severity rubric calibrates itself:
+
+```yaml
+version: 1
+stage: mvp        # prototype | mvp | production
+```
+
+| stage | missing tests | a rare or low-traffic (but reachable) bug |
+| --- | --- | --- |
+| `prototype` | P3 unless it covers the thing being proven | P3 |
+| `mvp` | P2 for logic users depend on, P3 otherwise | P3 on a rare or internal-only path |
+| `production` | P1 for changed user-facing behavior | P1 in a user-facing path |
+
+Stages grade findings; they never change *what gets reported*. A state nothing
+can reach is excluded by the Reporting Bar at every stage, and a real defect a
+stage grades P3 is still reported — P3's "only report if nothing else found"
+rule governs trivia, not a demoted defect.
+
+The block is substituted **into** the severity definitions, so it changes what
+counts as P1 versus P2 rather than adding advice alongside them.
+
+Two guarantees:
+
+- **No `stage` means no change.** A project that does not set it gets exactly
+  the prompt it got before stages existed — asserted byte-for-byte by test.
+- **No stage softens a security, data-loss, or data-corruption finding.** Every
+  preset that relaxes anything says so explicitly. `prototype` is the stage most
+  likely to be set on the codebase least able to absorb a vulnerability.
+
 ### Calibrating findings with `review_criteria`
 
 `review_criteria` is a list of extra instruction lines injected into the prompt
