@@ -6,13 +6,18 @@ Each level has two tests: what happens if the problem occurs, and whether a
 maintainer would fix it before this change lands. A finding belongs at the level
 where **both** tests fit. When they disagree, the worth-fixing-now test decides.
 
-- P0 (Critical): Causes failure, data loss, a security vulnerability, or a
-  fundamental architectural flaw.
+- P0 (Critical): Catastrophic or systemic — the system is unusable, data is lost
+  or corrupted irreversibly, security is compromised, or the architecture is
+  fundamentally wrong.
   *Worth fixing now:* yes — knowingly shipping this would be indefensible.
-- P1 (High): Causes bugs in normal usage, inconsistency, or blocks downstream
-  work.
+- P1 (High): An ordinary bug in normal usage, an inconsistency, or something
+  that blocks downstream work. Serious, but recoverable and contained.
   *Worth fixing now:* yes — a maintainer would fix it in this change rather
   than file it for later.
+
+P0 and P1 are separated by blast radius, not by whether something breaks. A bug
+that fails one operation for one caller is P1 however certainly it fails; P0 is
+for damage that is systemic, irreversible, or a security compromise.
 - P2 (Medium): Improvement opportunity — style, naming, documentation, minor
   optimization.
   *Worth fixing now:* worth doing while the code is already open, but shipping

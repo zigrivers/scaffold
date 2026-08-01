@@ -71,8 +71,24 @@ describe('assemblePrompt', () => {
   describe('severity rubric', () => {
     it('gives every level a worth-fixing-now test, not only an impact test', () => {
       const prompt = assemblePrompt({ diff: 'test' })
-      // Four levels, four tests — an edit that adds a level or drops a test fails here.
-      expect(prompt.match(/\*Worth fixing now:\*/g) ?? []).toHaveLength(4)
+      // Per level, not a global count: four markers bunched under one level
+      // would satisfy a total and leave three levels without the test.
+      for (const level of ['P0', 'P1', 'P2', 'P3']) {
+        const section = prompt.slice(prompt.indexOf(`- ${level} (`))
+        const nextLevel = section.slice(1).search(/\n- P[0-3] \(/)
+        const own = nextLevel === -1 ? section : section.slice(0, nextLevel + 1)
+        expect(own.match(/\*Worth fixing now:\*/g) ?? [],
+          `${level} must carry exactly one worth-fixing-now test`).toHaveLength(1)
+      }
+    })
+
+    it('separates P0 from P1 by blast radius, not by whether something breaks', () => {
+      // Both levels answer "yes" to worth-fixing-now, so the deciding test
+      // cannot resolve them — the impact wording has to.
+      const prompt = assemblePrompt({ diff: 'test' })
+      expect(prompt).toMatch(/P0 \(Critical\): Catastrophic or systemic/)
+      expect(prompt).toMatch(/P1 \(High\): An ordinary bug/)
+      expect(prompt).toMatch(/separated by blast radius, not by whether something breaks/)
     })
 
     it('exempts security, data-loss and data-corruption from the worth-fixing-now test', () => {
