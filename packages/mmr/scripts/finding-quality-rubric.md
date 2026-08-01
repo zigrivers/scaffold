@@ -110,9 +110,16 @@ A change ships only if, across an **equal** number of runs per condition
 (N ≥ 6) with identical channel coverage and **no degraded run in either arm**:
 
 1. `speculative_rate` drops, **and**
-2. the drop exceeds the width of the baseline's per-run rate spread (otherwise
-   it is inside the noise band), **and**
-3. `defect_count` does not drop.
+2. the **absolute count** of speculative findings drops, **and**
+3. the rate drop exceeds the width of the baseline's per-run rate spread
+   (otherwise it is inside the noise band), **and**
+4. `defect_count` does not drop.
+
+Condition 2 exists because the rate alone is gameable in the wrong direction.
+Adding defects, hygiene findings, or artifacts enlarges the denominator and
+lowers `speculative_rate` while the number of speculative findings a reviewer
+must actually read stays flat or rises. Equal N makes the absolute counts
+directly comparable, so both must move.
 
 The run counts must match because `defect_count` is an absolute total: the arm
 with more runs has more chances to surface a defect, so unequal N alone can

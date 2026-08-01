@@ -45,6 +45,7 @@
 
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
+import yaml from 'js-yaml'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -200,9 +201,20 @@ function assertPromptOnlyConfig(file) {
   } catch (err) {
     die(`could not read ${file}: ${err.message}`)
   }
-  // Top-level YAML keys, without taking a parser dependency for one check.
-  const keys = [...text.matchAll(/^([A-Za-z_][\w-]*):/gm)].map((m) => m[1])
-  const offending = [...new Set(keys)].filter((k) => !PROMPT_ONLY_KEYS.includes(k))
+  // Parsed, not pattern-matched. A regex over line starts misses flow mappings
+  // ({channels: {...}}), quoted keys, and explicit-key syntax — so a config
+  // that changes execution could pass the guard whose entire job is to catch it.
+  let parsed
+  try {
+    parsed = yaml.load(text)
+  } catch (err) {
+    die(`could not parse ${file}: ${err.message}`)
+  }
+  if (parsed === null || parsed === undefined) return
+  if (typeof parsed !== 'object' || Array.isArray(parsed)) {
+    die(`${file} must be a YAML mapping`)
+  }
+  const offending = Object.keys(parsed).filter((k) => !PROMPT_ONLY_KEYS.includes(k))
   if (offending.length > 0) {
     die(`${file} sets ${offending.join(', ')}. A candidate may only set `
       + `${PROMPT_ONLY_KEYS.join(', ')} — anything else changes how the review runs, not just `
@@ -286,7 +298,6 @@ function makeConfigSwapper(livePath, candidatePath, io = fs) {
       if (original !== null) io.writeFileSync(livePath, original)
       else io.rmSync(livePath, { force: true })
     },
-    get installed() { return installed },
   }
 }
 
@@ -820,6 +831,7 @@ function summarize(condition, scored) {
     emptyRuns: condition.runs.filter((r) => mine.every((f) => f.run !== r.run)).length,
     specRates: perRunSpecRates(condition.runs, mine),
     defectsPerRun: perRunDefects(condition.runs, mine),
+    speculatives: count('speculative'),
     speculativeRate: total ? count('speculative') / total : 0,
     lowValueRate: total ? lowValue / total : 0,
     defects: count('defect'),
@@ -882,10 +894,16 @@ function evaluateVerdict(base, cand, opts = {}) {
   // rubric states them as separate conditions and the report prints them
   // separately — but they are not independent checks.
   const specDown = cand.speculativeRate < base.speculativeRate
+  // The RATE alone is gameable: adding defects, hygiene findings or artifacts
+  // enlarges the denominator and lowers speculative_rate while the number of
+  // speculative findings a reviewer must actually read stays flat or rises.
+  // With equal N enforced above, the absolute counts are directly comparable,
+  // so require the count to fall too.
+  const countDown = cand.speculatives < base.speculatives
   const defectsHeld = cand.defects >= base.defects
-  const ship = blockers.length === 0 && specDown && defectsHeld && outsideBand
+  const ship = blockers.length === 0 && specDown && countDown && defectsHeld && outsideBand
 
-  return { blockers, bandLo, bandHi, margin, improvement, outsideBand, specDown, defectsHeld, ship }
+  return { blockers, bandLo, bandHi, margin, improvement, outsideBand, specDown, countDown, defectsHeld, ship }
 }
 
 function report(args) {
@@ -1030,7 +1048,9 @@ function report(args) {
       ? 'DROPPED beyond the baseline\'s own defect spread — the bar moved, not the noise'
       : 'dropped, but within the baseline\'s own defect spread — inconclusive, and still not shippable'
 
-  console.log(`speculative rate: ${pct(base.speculativeRate)} → ${pct(cand.speculativeRate)}  ${v.specDown ? 'down' : 'NOT down'}`)
+  console.log(`speculative rate:  ${pct(base.speculativeRate)} → ${pct(cand.speculativeRate)}  ${v.specDown ? 'down' : 'NOT down'}`)
+  console.log(`speculative count: ${base.speculatives} → ${cand.speculatives}  `
+    + `${v.countDown ? 'down' : 'NOT down — the rate fell only because the denominator grew'}`)
   console.log(`improvement ${pct(v.improvement)} vs baseline per-run spread ${pct(v.bandLo)}–${pct(v.bandHi)} `
     + `(width ${pct(v.margin)}) — ${v.outsideBand ? 'clears the noise band' : 'INSIDE the noise band'}`)
   console.log(`defect count:     ${base.defects} → ${cand.defects}  ${defectVerdict}`)
@@ -1067,7 +1087,7 @@ function selftest() {
   // Drive the REAL decision function, not a copy of its arithmetic.
   const cond = (over = {}) => ({
     label: 'x', runs: MIN_RUNS, degradedRuns: 0, coverages: ['a,b'], hasFindings: true,
-    emptyRuns: 0, specRates: [0.4, 0.5], speculativeRate: 0.45, defects: 10, ...over,
+    emptyRuns: 0, specRates: [0.4, 0.5], speculativeRate: 0.45, speculatives: 9, defects: 10, ...over,
   })
 
   // Every combination of the three decision inputs, so the AND cannot silently
@@ -1075,7 +1095,7 @@ function selftest() {
   for (const specRate of [0.2, 0.44, 0.5]) {
     for (const defects of [10, 9]) {
       const base = cond()
-      const cand = cond({ speculativeRate: specRate, defects })
+      const cand = cond({ speculativeRate: specRate, defects, speculatives: 5 })
       const v = evaluateVerdict(base, cand)
       const expected = specRate < 0.45 && (0.45 - specRate) > 0.1 && defects >= 10
       assert.equal(v.ship, expected, `verdict wrong for rate ${specRate}, defects ${defects}`)
@@ -1085,24 +1105,28 @@ function selftest() {
   // The noise band uses the baseline spread's WIDTH. A floor-based rule
   // degenerates: one baseline run with no speculative finding pins it to 0%
   // and nothing can ever ship.
+  // A rate that fell only because the denominator grew must not ship.
+  assert.equal(evaluateVerdict(cond(), cond({ speculativeRate: 0.1, speculatives: 9 })).ship, false,
+    'the speculative COUNT must fall, not just the rate')
+  assert.equal(evaluateVerdict(cond(), cond({ speculativeRate: 0.1, speculatives: 10 })).ship, false)
+
   assert.equal(evaluateVerdict(cond({ specRates: [0.0, 0.5], speculativeRate: 0.4 }),
-    cond({ speculativeRate: 0.3 })).ship, false, 'a 10pt gain must not clear a 50pt spread')
+    cond({ speculativeRate: 0.3, speculatives: 5 })).ship, false, 'a 10pt gain must not clear a 50pt spread')
   assert.equal(evaluateVerdict(cond({ specRates: [0.0, 0.0], speculativeRate: 0.3 }),
-    cond({ speculativeRate: 0.1 })).ship, true, 'a zero-width spread must not block a real gain')
+    cond({ speculativeRate: 0.1, speculatives: 5 })).ship, true, 'a zero-width spread must not block a real gain')
 
   // Each precondition blocks on its own.
-  assert.equal(evaluateVerdict(cond({ runs: 3 }), cond({ runs: 3, speculativeRate: 0.1 })).ship, false)
-  assert.equal(evaluateVerdict(cond(), cond({ degradedRuns: 1, speculativeRate: 0.1 })).ship, false)
-  assert.equal(evaluateVerdict(cond(), cond({ emptyRuns: 1, speculativeRate: 0.1 })).ship, false)
-  assert.equal(evaluateVerdict(cond(), cond({ runs: MIN_RUNS + 1, speculativeRate: 0.1 })).ship, false)
-  assert.equal(evaluateVerdict(cond(), cond({ coverages: ['a'], speculativeRate: 0.1 })).ship, false)
-  assert.equal(evaluateVerdict(cond(), cond({ speculativeRate: 0.1 }),
-    { extraBlockers: ['diff differs'] }).ship, false)
-  assert.equal(evaluateVerdict(cond(), cond({ speculativeRate: 0.1 }),
-    { sameTreatment: true }).ship, false)
+  const good = { speculativeRate: 0.1, speculatives: 5 }
+  assert.equal(evaluateVerdict(cond({ runs: 3 }), cond({ ...good, runs: 3 })).ship, false)
+  assert.equal(evaluateVerdict(cond(), cond({ ...good, degradedRuns: 1 })).ship, false)
+  assert.equal(evaluateVerdict(cond(), cond({ ...good, emptyRuns: 1 })).ship, false)
+  assert.equal(evaluateVerdict(cond(), cond({ ...good, runs: MIN_RUNS + 1 })).ship, false)
+  assert.equal(evaluateVerdict(cond(), cond({ ...good, coverages: ['a'] })).ship, false)
+  assert.equal(evaluateVerdict(cond(), cond(good), { extraBlockers: ['diff differs'] }).ship, false)
+  assert.equal(evaluateVerdict(cond(), cond(good), { sameTreatment: true }).ship, false)
   // …and the same inputs with nothing wrong do ship, so the above prove the
   // blocker rather than some unrelated failure.
-  assert.equal(evaluateVerdict(cond(), cond({ speculativeRate: 0.1 })).ship, true)
+  assert.equal(evaluateVerdict(cond(), cond(good)).ship, true)
 
   // Rate arithmetic, including the empty-denominator guard.
   const mk = (cls, worth = true) => ({ score: { class: cls, worth_fixing_now: worth } })
