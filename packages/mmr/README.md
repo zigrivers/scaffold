@@ -99,54 +99,24 @@ channels:
 > Note: the `gemini` channel was **retired** (its CLI is sunset; use `antigravity`).
 > Existing configs that still name `gemini` keep loading — it is never dispatched.
 
-### Calibrating findings by product stage
-
-The same defect is worth different things depending on how mature the product
-is. Set `stage` and the built-in severity rubric calibrates itself:
-
-```yaml
-version: 1
-stage: mvp        # prototype | mvp | production
-```
-
-| stage | missing tests | a rare or low-traffic (but reachable) bug |
-| --- | --- | --- |
-| `prototype` | P3 unless it covers the thing being proven | P3 |
-| `mvp` | P2 for logic users depend on, P3 otherwise | P3 on a rare or internal-only path |
-| `production` | P1 for changed user-facing behavior | P1 in a user-facing path |
-
-Stages grade findings; they never change *what gets reported*. A state nothing
-can reach is excluded by the Reporting Bar at every stage, and a real defect a
-stage grades P3 is still reported — P3's "only report if nothing else found"
-rule governs trivia, not a demoted defect.
-
-The block is substituted **into** the severity definitions, so it changes what
-counts as P1 versus P2 rather than adding advice alongside them.
-
-Two guarantees:
-
-- **No `stage` means no change.** A project that does not set it gets exactly
-  the prompt it got before stages existed — asserted byte-for-byte by test.
-- **No stage softens a security, data-loss, or data-corruption finding.** Every
-  preset that relaxes anything says so explicitly. `prototype` is the stage most
-  likely to be set on the codebase least able to absorb a vulnerability.
-
 ### Calibrating findings with `review_criteria`
 
 `review_criteria` is a list of extra instruction lines injected into the prompt
 every channel receives, between the core prompt and the diff. Its most common
 use is telling reviewers what *not* to spend a finding on.
 
-The built-in criteria (`templates/core-prompt.md`) already carry a reachability
-bar, a worth-fixing-now test on every severity level, and a criterion asking what
-to delete — with trust boundaries exempt from the bar so it cannot suppress
-security findings. Most projects need nothing further.
+The built-in criteria (`templates/core-prompt.md`) ask five questions that are
+all about what is **missing** — correctness, regressions, edge cases, test
+coverage, security. The severity definitions do gesture at likelihood (P1 is
+scoped to "normal usage"), but no level says what *evidence* of reachability a
+finding needs, or how to grade something reachable but rare. On an early-stage
+codebase that combination produces a predictable failure mode: a long tail of
+technically-correct findings about inputs no caller can currently construct, and
+no way for a reviewer to say "unnecessary" instead of "add more". The block below
+supplies the missing calibration rather than replacing the built-in semantics.
 
-`review_criteria` is for tightening beyond that: rules specific to your codebase,
-or a stricter bar than the default. The block below is the shape those rules
-take. It overlaps the built-ins deliberately, so it also works as a starting
-point on an older MMR whose core prompt lacks them — treat it as a template to
-tune, not a tuned setting, and see the note on measuring it below.
+This block is a starting point that addresses both biases directly. Treat it as
+a template to tune, not a tuned setting — see the note on measuring it below.
 
 ```yaml
 version: 1

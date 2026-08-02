@@ -2,14 +2,66 @@
 
 ## [Unreleased]
 
+### Removed
+
+- **`stage: prototype | mvp | production` is withdrawn before ever shipping.**
+  It was measured against the prompt without it — 6 paired runs per arm,
+  identical target, channels and build, findings classified by a judge blind to
+  which arm produced them — and it made reviews substantially noisier rather
+  than quieter, which was the whole point of adding it.
+
+  With `stage: mvp`, findings rose from 8 to 21 across six runs and the
+  low-value rate rose from 38% to 71%. It did surface more real defects (7 → 13),
+  but bought them with 15 low-value findings. The mechanism is visible in the
+  severity split: the baseline emitted no P3s at all, the stage arm emitted
+  twelve.
+
+  The cause is the clause added so that stage demotion could never silently
+  suppress a defect — *"a correctness finding this stage grades P3 is still
+  REPORTED"*. It works exactly as written, and the cost is a review that prints
+  everything it demotes. Suppressing quietly is worse, so the honest conclusion
+  is that stage-based demotion is the wrong lever, not that the safety clause
+  should go.
+
+  Three of the six ship conditions failed, all in the wrong direction.
+  Nothing had been released — no published version ever contained it.
+
+- **The worth-fixing-now severity rubric and the Reporting Bar are withdrawn
+  before ever shipping** (`templates/core-prompt.md`). Measured against two
+  independent targets, 6 paired runs per arm each, the same build in both arms
+  except for this one file.
+
+  On the first target it did what it was designed to do — speculative findings
+  fell from 8% to 0% — but the defect count fell with them, 19 → 14. On a second
+  target the baseline had *no* speculative findings to remove, and the defect
+  count fell anyway, 19 → 17. The drop replicated.
+
+  What settles it is what the second target lost. The pre-change prompt reported,
+  in **5 of 6 runs**, that `pruneDiagrams` runs inside `buildGuide` before
+  cross-guide validation, so a failed validation deletes existing diagram SVGs
+  while the old HTML remains — a data-loss bug against a documented fail-closed
+  guarantee. The changed prompt reported it in **none**.
+
+  The rubric exempted exactly this: *"Never lower a security, data-loss, or
+  data-corruption finding on the worth-fixing-now test."* But the Reporting Bar
+  is a separate gate, and it demands a named caller, flag, or config value that
+  produces the state. This bug's trigger is a runtime condition — *a later guide
+  fails validation* — which names no caller, so the bar filtered a finding the
+  severity rubric had explicitly protected. Two safeguards that were each correct
+  in isolation, and a gap between them.
+
+  A reachability bar that suppresses a data-loss defect is not a calibration
+  problem to tune; the reduction in noise was not worth it, and on the second
+  target there was no noise to reduce.
+
 ### Added
 
 - **The finding-quality harness can now compare two MMR builds** (`scripts/`,
   not shipped in the published package). Its only treatment mechanism was a
-  candidate `.mmr.yaml`, which by design may set only `version`,
-  `review_criteria`, and `stage` — so a prompt template the config schema
-  deliberately cannot reach, such as the severity rubric itself, could not be
-  measured at all.
+  candidate `.mmr.yaml`, which by design may set only `version` and
+  `review_criteria` — so a prompt template the config schema deliberately
+  cannot reach, such as the severity rubric itself, could not be measured at
+  all.
 
   `collect --baseline-mmr <path>` runs the baseline arm from a second built
   package. `provenance.json` records which mechanism carried the treatment, and
@@ -23,54 +75,6 @@
   on a slow model or a long diff the default timeout bounds what can be
   measured at all. Passed as a flag rather than set in `~/.mmr/config.yaml`,
   which would leak the value into every unrelated review on the machine.
-
-- **`stage: prototype | mvp | production`** calibrates the built-in severity
-  rubric for how mature the product is. The same defect is worth different
-  things at different stages: a missing test for an internal helper is noise in
-  a prototype and a real gap in production.
-
-  It is **substituted into** the severity definitions, not appended after the
-  criteria — advice added at the end competes with the rubric, whereas text
-  inside it is read as part of the definition, which is what changing what
-  counts as P1 versus P2 requires. Each preset moves whole classes of finding:
-  missing tests are P3 under `prototype`, P2-for-user-facing-logic under `mvp`,
-  and P1 for changed user-facing behaviour under `production`.
-
-  **No stage set means no change.** A project that does not opt in gets the
-  prompt it got before stages existed, byte for byte, asserted by test.
-
-  **No stage can soften a security, data-loss, or data-corruption finding.**
-  Every preset that relaxes anything states that floor explicitly, and the
-  rubric's own version of it survives in all four cases. `prototype` is the
-  stage most likely to be set on the codebase least able to absorb a
-  vulnerability, so this is asserted per preset rather than assumed.
-
-### Changed
-
-- **The built-in severity rubric now grades worth-fixing-now, not impact alone**
-  (`templates/core-prompt.md`). Every level carries two tests — what happens if
-  the problem occurs, and whether a maintainer would fix it before the change
-  lands — and the second decides when they disagree. Security, data-loss and
-  data-corruption findings are explicitly exempt and stay graded on impact.
-- **Unhandled inputs and states now need a named path.** A new Reporting Bar
-  asks the reviewer to name the caller, flag, config value, or documented
-  contract in the reviewed code that can produce the state, and to skip the
-  finding otherwise. Trust boundaries — public APIs, exported surfaces, CLI
-  arguments, HTTP handlers, deserializers, file and database reads — are exempt,
-  because a repository contains no caller for a hostile request and an
-  unqualified bar would suppress the findings a review most exists to catch.
-- **The criteria ask what is unnecessary, not only what is missing.** A sixth
-  criterion covers abstractions with one caller, knobs never varied, hand-rolled
-  helpers the standard library provides, and defensive code for impossible
-  states, and asks for the deletion as the suggestion.
-
-  This is the highest-blast-radius text in the package — every channel and every
-  consuming project reads it on every review. Expect verdicts to move: a finding
-  that goes unreported, or lands below your threshold, no longer blocks.
-  `fix_threshold`, the reconciliation logic and `mmr ack` are unchanged, and the
-  four severity tokens the gate keys off are pinned by test.
-
-### Added
 
 - **A finding-quality harness for evaluating prompt changes** (`scripts/`, not
   published). Single before/after comparisons cannot judge a change to MMR's
