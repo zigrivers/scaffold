@@ -2020,9 +2020,10 @@ function floorClearsAlpha(p) {
  * tied values per n baseline runs — and returns the smallest arm size whose
  * floor clears alpha. Signal is rounded DOWN so the answer is never optimistic
  * about how much signal a larger collection would carry. It is null when the
- * floor already clears (nothing to fix), when nothing up to POWER_SCAN_MAX
- * clears, or when `signalRuns` is 0 — which means every pooled run scored at or
- * below the boundary and no number of runs can separate them.
+ * floor already clears (nothing to fix) or when nothing up to POWER_SCAN_MAX
+ * clears. Note `signalRuns === 0` means nothing rose STRICTLY above the boundary
+ * rank; values below it may still exist, so that alone is not the all-identical
+ * case. `requiredRunsAdvice` separates the two on `ties === pooled`.
  *
  * The scaling assumes a larger collection keeps the same shape. That is an
  * assumption about future runs, not a measurement, and the report says so.
@@ -2236,7 +2237,12 @@ function evaluateVerdict(base, cand, opts = {}) {
   // go and collect.
   const otherRulesFailed = !specDown || !countDown || !lowValueDown || !defectsHeld
     || lostSites.length > 0
-  const noVerdict = undecidable && !otherRulesFailed
+  // `blockers` is in here because a blocker is its own decidable reason not to
+  // ship. `report` returns before the verdict line when any blocker is set, so
+  // this cannot change what is printed today — it keeps the field honest for
+  // any other reader of evaluateVerdict, which is the only way this stays true
+  // if that early return ever moves.
+  const noVerdict = undecidable && !otherRulesFailed && blockers.length === 0
 
   return {
     blockers, improvement, perm, floor, undecidable, otherRulesFailed, noVerdict,
@@ -2533,6 +2539,8 @@ function report(args) {
       + `${v.floor.signalRuns} rose above the boundary rank while ${v.floor.ties} sit tied at `
       + 'it, so most relabellings reproduce the observed split exactly. Rule 4 was not '
       + 'weighed and found wanting — it could not be weighed.')
+    // Printed here and NOT again under the verdict below: noVerdict implies
+    // undecidable, so both blocks would fire and repeat the same sentence.
     console.log(`  ${requiredRunsAdvice(v.floor)}`)
   }
   console.log(`defect count:     ${base.defects} → ${cand.defects}  ${defectVerdict}`)
@@ -2546,13 +2554,18 @@ function report(args) {
   if (v.noVerdict) {
     console.log('NO VERDICT — every other condition passed and rule 4 could not be decided at '
       + `N=${base.runs}. This change is neither shipped nor refuted on this evidence.`)
-    console.log(`  ${requiredRunsAdvice(v.floor)}`)
+    console.log('  The run count needed is on the UNDECIDABLE line above.')
   } else {
     console.log(v.ship
       ? 'VERDICT: ship — speculative rate fell beyond the noise band and defect count held.'
       : 'VERDICT: revert — the rubric\'s ship rule is not met.')
   }
   console.log('')
+  // No verdict exits non-zero too, deliberately. "Neither shipped nor refuted"
+  // is not a success: an automated caller that reads exit 0 as "go ahead" would
+  // ship a change on evidence the rubric says does not exist. Every path that
+  // does not end in `ship` fails closed, which is also what the precondition
+  // blockers above do.
   if (!v.ship) process.exitCode = 1
 }
 
@@ -2998,6 +3011,29 @@ function selftest() {
     assert.equal(sparse.p.toFixed(3), '0.500')
     assert.equal(sparse.requiredN, null, 'a signal this sparse is not fixed by more runs')
     assert.match(requiredRunsAdvice(sparse), new RegExp(`more than ${POWER_SCAN_MAX} runs`))
+  }
+
+  // A collection that is BOTH unenumerable and undecidable must take the
+  // blocker path, not the noVerdict path. Review raised this as a hole — the
+  // worry being that `undecidable` is gated on `perm.exact` and so switches off
+  // exactly where the new rubric table sends people (N=30 for a sparse signal).
+  // It is covered, but by the OTHER mechanism: `exact === false` pushes a
+  // blocker, and `report` returns at the blocker check before any verdict line.
+  // Pinned here so that reasoning survives someone moving that early return.
+  {
+    const sparse = (rates) => ({ ...cond(), runs: 15, specRates: rates })
+    const carrier = [0.5, ...Array(14).fill(0)]
+    const v = evaluateVerdict(
+      sparse(carrier),
+      { ...sparse(Array(15).fill(0)), speculativeRate: 0, speculatives: 0, lowValues: 6 },
+    )
+    assert.equal(v.perm.exact, false, 'N=15 is past the enumeration limit')
+    assert.ok(permutationFloor(carrier, Array(15).fill(0)).p >= PERMUTATION_ALPHA,
+      'and this shape is genuinely undecidable, so both conditions hold at once')
+    assert.ok(v.blockers.some((b) => /no verdict can be issued/.test(b)),
+      'it must still block rather than fall through to a verdict')
+    assert.equal(v.noVerdict, false, 'a blocked experiment is not the noVerdict case')
+    assert.equal(v.ship, false)
   }
 
   // Identical arms are a different failure from an underpowered one, and the
