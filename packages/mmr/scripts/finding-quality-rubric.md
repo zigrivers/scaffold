@@ -234,12 +234,19 @@ observed baseline-vs-baseline spread is not a result.
   mislabelled real defects reaching beyond the diff.
 - `worth_fixing_now` encodes "early-stage product". It is the wrong question for
   a mature codebase and the rubric should not be reused there unchanged.
-- **N = 6 is enough to beat variance in finding COUNTS and not enough to resolve
-  differences in RATES.** Measured: a baseline speculative rate of 8% against a
-  candidate at a perfect 0% — a clean sweep of the primary metric — lands at
-  p = 0.227. The floor was set against the count variance that motivated this
-  rubric, and rate comparisons need materially more runs. A future change
-  wanting a positive result on rule 4 should plan for that, not for a friendlier
+- **N = 6 resolves a rate difference only when it is large and consistent across
+  runs.** Six runs per arm can reach significance easily when the arms barely
+  overlap — per-run rates of 0.4/0.5 against a steady 0.2 land at p ≈ 0.001.
+  What six runs cannot resolve is a difference of the size these prompt changes
+  actually produced, where most runs are 0 and the signal lives in one or two of
+  them. Measured: a baseline speculative rate of 8% against a candidate at a
+  perfect 0% — a clean sweep of the primary metric, but carried by two runs out
+  of six — lands at p = 0.227.
+
+  So the floor is not wrong, it is scoped: it was set against the count variance
+  that motivated this rubric, and it holds for that. A change whose effect shows
+  up as *a few runs differing rather than all of them* needs materially more
+  runs to demonstrate — and should plan for that rather than for a friendlier
   rule.
 
 ## Change history
