@@ -1943,11 +1943,23 @@ const PERMUTATION_EXACT_LIMIT = 50_000_000
 /**
  * Largest arm size the required-N search will consider.
  *
- * Not a limit on what can be collected — it is where "you need more runs" stops
- * being useful advice. An answer above this is reported as such rather than
- * printed as a number nobody will act on.
+ * NOT a taste judgement about how many runs anyone will collect. It is the
+ * largest arm the permutation test can actually decide: past it C(2N, N)
+ * exceeds PERMUTATION_EXACT_LIMIT, `permutationTest` refuses to enumerate, and
+ * that becomes a blocker. Advice above this ceiling is advice that cannot be
+ * followed — collect it and the harness answers "compare fewer runs per arm",
+ * the exact opposite instruction.
+ *
+ * Derived from the limit rather than written down, so the two cannot drift. At
+ * the shipped 50M limit it is 14: C(28,14) is 40,116,600, C(30,15) is
+ * 155,117,520.
  */
-const POWER_SCAN_MAX = 200
+function maxDecidableArmSize() {
+  let n = 1
+  while (choose(2 * (n + 1), n + 1) <= PERMUTATION_EXACT_LIMIT) n++
+  return n
+}
+const POWER_SCAN_MAX = maxDecidableArmSize()
 
 /** n choose k, exact for the sizes reached here. */
 function choose(n, k) {
@@ -1985,12 +1997,16 @@ function floorP(n, ties, a) {
 /**
  * Does a floor clear alpha?
  *
- * `floorP` goes through logs, so a ratio that is mathematically exactly alpha
- * can come back either side of it — a one-run signal has a floor of exactly 1/2
- * and computes as 0.49999999999999994. The epsilon makes a borderline value
- * count as NOT clearing, which is the conservative direction for a ship rule:
- * the collection is called undecidable and no verdict is issued, rather than a
- * verdict resting on the sixteenth decimal place.
+ * `floorP` goes through logs, so an exact rational comes back approximately: a
+ * one-run signal has a floor of exactly 1/2 and computes as 0.49999999999999994.
+ * That particular error decides nothing, being nowhere near alpha — but the same
+ * error at a floor mathematically EQUAL to alpha does. Three runs per arm with
+ * the whole pool tied at the boundary give C(3,3)/C(6,3) = 1/20 = alpha exactly,
+ * and whether that clears is then settled by rounding.
+ *
+ * The epsilon makes such a value count as NOT clearing, the conservative
+ * direction for a ship rule: the collection is called undecidable and no verdict
+ * is issued, rather than a verdict resting on the sixteenth decimal place.
  *
  * The enumerated p in `permutationTest` needs no such slack — it is an exact
  * ratio of two integer counts.
@@ -2020,10 +2036,11 @@ function floorClearsAlpha(p) {
  * tied values per n baseline runs — and returns the smallest arm size whose
  * floor clears alpha. Signal is rounded DOWN so the answer is never optimistic
  * about how much signal a larger collection would carry. It is null when the
- * floor already clears (nothing to fix) or when nothing up to POWER_SCAN_MAX
- * clears. Note `signalRuns === 0` means nothing rose STRICTLY above the boundary
- * rank; values below it may still exist, so that alone is not the all-identical
- * case. `requiredRunsAdvice` separates the two on `ties === pooled`.
+ * floor already clears (nothing to fix) or when nothing up to POWER_SCAN_MAX —
+ * the largest arm this harness can decide at all — clears. Note `signalRuns`
+ * being 0 means nothing rose STRICTLY above the boundary rank; values below it
+ * may still exist, so that alone is not the all-identical case.
+ * `requiredRunsAdvice` separates the two on `ties === pooled`.
  *
  * The scaling assumes a larger collection keeps the same shape. That is an
  * assumption about future runs, not a measurement, and the report says so.
@@ -2184,10 +2201,20 @@ function evaluateVerdict(base, cand, opts = {}) {
   // end at ship=false, but only one of them should read as "the evidence was
   // weighed" — collapsing them would report a revert the rule never actually
   // reached. A blocker makes `report` print NO VERDICT and say why.
+  const floor = permutationFloor(base.specRates, cand.specRates)
   if (perm.exact === false) {
+    // "Fewer runs" is the right fix for the enumeration limit and the WRONG fix
+    // when the floor is also above alpha: shrinking the arms leaves that shape
+    // undecidable too, so the reader would be steered out of one dead end into
+    // another. Say which problem they actually have.
     blockers.push(`the permutation test needs ${perm.splits.toLocaleString()} splits, above the `
       + `${PERMUTATION_EXACT_LIMIT.toLocaleString()} split limit — no verdict can be issued `
-      + 'rather than an approximated one. Compare fewer runs per arm.')
+      + 'rather than an approximated one. Compare fewer runs per arm'
+      + (floorClearsAlpha(floor.p)
+        ? '.'
+        : '. That alone will not help here: the smallest p any arrangement of these runs could '
+          + `produce is ${floor.p.toFixed(3)}, so the shape is undecidable at every arm size. `
+          + requiredRunsAdvice(floor)))
   }
   // Named for the rubric's own vocabulary — it prints "inside the noise band" —
   // rather than for the statistic behind it.
@@ -2195,7 +2222,7 @@ function evaluateVerdict(base, cand, opts = {}) {
   // Could this collection have cleared alpha AT ALL? A p of 0.227 reads as "the
   // effect was too small to distinguish", but when the floor is also 0.227 the
   // test never distinguished anything: no arrangement of these runs could have.
-  const floor = permutationFloor(base.specRates, cand.specRates)
+  // (`floor` is computed above — the enumeration blocker needs it too.)
   const undecidable = perm.exact === true && !floorClearsAlpha(floor.p)
   // NOT subsumed by the permutation test, though an earlier comment here said
   // so. The test compares the MEAN OF PER-RUN RATES; specDown compares the
@@ -2576,6 +2603,13 @@ function report(args) {
  * the detail line and the verdict line.
  */
 function requiredRunsAdvice(floor) {
+  // Contract: only meaningful for an UNDECIDABLE floor. A decidable one has no
+  // run count to advise, and prose about collecting more would be wrong rather
+  // than merely unhelpful.
+  if (floorClearsAlpha(floor.p)) {
+    return `The floor is ${floor.p.toFixed(3)}, below alpha — this collection was decidable `
+      + 'and needs no more runs.'
+  }
   // The whole pool tied. Not "the effect was small" — there is no effect to
   // size, and collecting more of the same runs cannot manufacture one. Note
   // this is NOT the same as signalRuns === 0, which merely means nothing rose
@@ -2585,8 +2619,13 @@ function requiredRunsAdvice(floor) {
       + 'did not differ.'
   }
   if (floor.requiredN === null) {
-    return `Clearing alpha with this shape needs more than ${POWER_SCAN_MAX} runs per arm, `
-      + 'which is not a collection anyone will run. Find an effect that shows up in more runs.'
+    // Deliberately NOT a number. The ceiling is the largest arm the exact test
+    // can enumerate, so any answer above it is an instruction the harness then
+    // refuses to carry out.
+    return 'No arm size this harness can decide clears alpha for this shape — the exact test '
+      + `stops at N=${POWER_SCAN_MAX}, past which it refuses rather than approximate. What has `
+      + 'to change is the number of runs CARRYING the signal, not the number collected: an '
+      + 'effect this sparse is not measurable here at any collectable size.'
   }
   return `A result of this shape needs N >= ${floor.requiredN} runs per arm to clear alpha `
     + '(assumes a larger collection keeps this shape — an assumption about future runs, '
@@ -2926,16 +2965,22 @@ function selftest() {
   assert.equal(realShape.floor.ties, 10)
 
   // The shape #808 produced: the whole signal in ONE run. Its floor is exactly
-  // 0.5 — half of all relabellings put that run in the baseline arm — and stays
-  // 0.5 at every N, so no arm size fixes a one-run signal at the SAME density.
-  // It takes 30 runs per arm before the density carries enough separate
-  // carriers to clear alpha.
+  // 0.5 — half of all relabellings put that run in the baseline arm. Scaled at
+  // that density it would take ~30 runs per arm to clear alpha, which is past
+  // the largest arm the exact test can enumerate, so there is NO collectable
+  // answer and the advice must not invent one.
   const oneRunSignal = permutationFloor([0, 0, 0, 0, 0, 0.5], [0, 0, 0, 0, 0, 0])
   assert.equal(oneRunSignal.p.toFixed(3), '0.500', 'a one-run signal has a floor of exactly 0.5')
-  assert.equal(oneRunSignal.requiredN, 30, 'the #808 shape needs N >= 30')
-  // The advice must be reachable and must name that number, since it is the
-  // only actionable thing the report says about an undecidable rule.
-  assert.match(requiredRunsAdvice(oneRunSignal), /N >= 30/)
+  assert.equal(oneRunSignal.requiredN, null, 'the #808 shape is not reachable by collecting more')
+  assert.match(requiredRunsAdvice(oneRunSignal), /No arm size this harness can decide/)
+  // The ceiling itself, pinned: advice above it would be an instruction the
+  // harness then refuses to carry out.
+  assert.equal(POWER_SCAN_MAX, 14, 'the 50M split limit puts the decidable ceiling at N=14')
+  assert.ok(choose(2 * POWER_SCAN_MAX, POWER_SCAN_MAX) <= PERMUTATION_EXACT_LIMIT)
+  assert.ok(choose(2 * (POWER_SCAN_MAX + 1), POWER_SCAN_MAX + 1) > PERMUTATION_EXACT_LIMIT)
+  // Every answer the search CAN give must be one the test can then decide.
+  assert.ok(realShape.floor.requiredN <= POWER_SCAN_MAX,
+    'a required-N the harness cannot enumerate is not advice, it is a dead end')
 
   // requiredN is a boundary, not a suggestion: it clears and its predecessor
   // does not. Guards against an off-by-one that would advise a run count still
@@ -2953,7 +2998,7 @@ function selftest() {
       Array.from({ length: m }, (_, i) => (i < k ? 0.1 * (i + 1) : 0)),
       Array(m).fill(0),
     )
-    for (const [floor, carriers] of [[realShape.floor, 2], [oneRunSignal, 1]]) {
+    for (const [floor, carriers] of [[realShape.floor, 2]]) {
       const scaled = (m) => shaped(m, Math.floor((carriers * m) / MIN_RUNS))
       assert.ok(floorClearsAlpha(scaled(floor.requiredN).p),
         `requiredN=${floor.requiredN} must actually clear alpha`)
@@ -2989,7 +3034,7 @@ function selftest() {
       Array.from({ length: MIN_RUNS }, (_, i) => (i < k ? 0.1 * (i + 1) : 0)),
       Array(MIN_RUNS).fill(0),
     )
-    for (const [k, floorStr, needed] of [[1, '0.500', 30], [2, '0.227', 12], [3, '0.091', 8]]) {
+    for (const [k, floorStr, needed] of [[1, '0.500', null], [2, '0.227', 12], [3, '0.091', 8]]) {
       const f = kOfSix(k)
       assert.equal(f.p.toFixed(3), floorStr, `rubric table: floor for ${k} of 6 runs`)
       assert.equal(f.requiredN, needed, `rubric table: runs needed for ${k} of 6 runs`)
@@ -3010,7 +3055,7 @@ function selftest() {
     )
     assert.equal(sparse.p.toFixed(3), '0.500')
     assert.equal(sparse.requiredN, null, 'a signal this sparse is not fixed by more runs')
-    assert.match(requiredRunsAdvice(sparse), new RegExp(`more than ${POWER_SCAN_MAX} runs`))
+    assert.match(requiredRunsAdvice(sparse), /No arm size this harness can decide/)
   }
 
   // A collection that is BOTH unenumerable and undecidable must take the
@@ -3034,6 +3079,11 @@ function selftest() {
       'it must still block rather than fall through to a verdict')
     assert.equal(v.noVerdict, false, 'a blocked experiment is not the noVerdict case')
     assert.equal(v.ship, false)
+    // And the guidance must not send them the wrong way. "Compare fewer runs"
+    // fixes the enumeration limit; it does nothing for a floor above alpha, and
+    // this collection has both problems at once.
+    assert.ok(v.blockers.some((b) => /undecidable at every arm size/.test(b)),
+      'the blocker must say that shrinking the arms will not fix this shape')
   }
 
   // Identical arms are a different failure from an underpowered one, and the

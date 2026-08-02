@@ -228,7 +228,10 @@ So:
   reason that needs no statistical power, and the verdict stands as `revert`.
 - If every other condition passed and condition 4 alone is undecidable, there is
   **no verdict** — the change is neither shipped nor refuted. Collect the run
-  count the harness reports and re-run.
+  count the harness reports and re-run. When the shape needs more runs than the
+  exact test can enumerate (N > 14), the harness says so instead of naming a
+  count: that effect is not measurable here at any size, and the answer is to
+  find a change whose effect shows up in more runs, not to collect more.
 
 The harness computes the floor in closed form, reports it, and issues no verdict
 in the second case. This is the same failure the pre-permutation rule had, one
@@ -276,22 +279,29 @@ for a particular collection. Neither may be reported as a result.
 
   | signal carried by | floor at N = 6 | runs per arm needed |
   | --- | --- | --- |
-  | 1 of 6 runs | 0.500 | **30** |
+  | 1 of 6 runs | 0.500 | **not reachable** |
   | 2 of 6 runs | 0.227 | **12** |
   | 3 of 6 runs | 0.091 | 8 |
   | every run, cleanly separated | 0.001 | 6 — N = 6 is fine |
 
-  Both measured experiments sat in the top two rows. #808's whole signal was in
-  one run of six, so its p = 0.500 was its floor: at that density it would have
-  taken 30 runs per arm. #807 target 1's was in two, floor 0.227 — which is
-  exactly the p it returned, because its candidate swept the metric and landed
-  on the floor. Twelve runs per arm would have decided it.
+  Both measured experiments sat in the top two rows. #807 target 1's signal was
+  in two runs, floor 0.227 — which is exactly the p it returned, because its
+  candidate swept the metric and landed on the floor. Twelve runs per arm would
+  have decided it.
+
+  #808's whole signal was in one run of six, so its p = 0.500 was its floor. At
+  that density it would take about 30 runs per arm to clear alpha, and the exact
+  permutation test refuses anything past **N = 14** — C(30,15) is 155 million
+  splits against a 50 million limit — so there is no collectable answer at all.
+  The harness reports that rather than naming a number it would then refuse to
+  evaluate. A one-run signal is not an underpowered experiment; it is an effect
+  this rubric cannot measure.
 
   The right-hand column assumes a larger collection keeps the same shape, which
   is an assumption about future runs rather than a measurement. It is also not
   monotone in the obvious way: a one-run signal has a floor of exactly 0.5 at
-  **every** N, and only clears once more runs carry signal — the density is what
-  changes, not the count.
+  **every** N, and only improves once more runs carry signal — the density is
+  what changes, not the count.
 
   So the N ≥ 6 floor is not wrong, it is scoped. It was set against the
   finding-count variance that motivated this rubric and it holds for that. A
@@ -365,6 +375,13 @@ for a particular collection. Neither may be reported as a result.
   future experiment can be sized before collection instead of discovering
   afterwards that it never could have concluded anything. The table is pinned by
   the harness selftest, so it cannot drift from the code that computes it.
+
+  The required-run search is capped at the largest arm the exact test can
+  enumerate, derived from the split limit rather than written down. Without that
+  cap the two guard rails contradicted each other: the first draft advised 30
+  runs per arm for a one-run signal, and collecting 30 would have produced
+  "compare fewer runs per arm" — the opposite instruction. Advice that cannot be
+  followed is worse than none.
 
   Amended after results were known, like the entry above, and bounded the same
   way: the defect is visible in the arithmetic — a floor above α admits no
