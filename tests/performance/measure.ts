@@ -42,6 +42,35 @@
 /** Samples above the p95 rank that a call must leave room for. */
 const MIN_SAMPLES_ABOVE_P95 = 2
 
+/** Nearest-rank p95 index into a sorted array of `n` samples. */
+export function p95Index(n: number): number {
+  return Math.ceil(n * 0.95) - 1
+}
+
+/**
+ * Smallest sample count whose p95 rank leaves `MIN_SAMPLES_ABOVE_P95` above it.
+ *
+ * Searched against the same predicate the guard uses rather than derived from a
+ * formula. `Math.ceil((MIN_SAMPLES_ABOVE_P95 + 1) / 0.05)` looks like the answer
+ * and says 60; the real answer is 40, because `n - 1 - p95Index(n)` is a step
+ * function and 0.95 is not exact in binary (39 * 0.95 is 37.05, 40 * 0.95 is
+ * exactly 38). A hint that overstates the requirement by 50% is a worse error
+ * message than no hint.
+ */
+export function minSamplesForP95(): number {
+  for (let n = MIN_SAMPLES_ABOVE_P95 + 1; n <= 1000; n++) {
+    if (n - 1 - p95Index(n) >= MIN_SAMPLES_ABOVE_P95) return n
+  }
+  /* c8 ignore next -- unreachable: the gap grows ~0.05 per sample */
+  throw new Error('minSamplesForP95: no sample count satisfies the p95 rank guard')
+}
+
+/** True median: the average of the two middle samples when `n` is even. */
+export function medianOf(sorted: readonly number[]): number {
+  const mid = sorted.length >> 1
+  return sorted.length % 2 === 1 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2
+}
+
 export interface PerOpStats {
   /** Nearest-rank p95 of the per-call sample costs, in ms. The budgeted number. */
   p95: number
@@ -69,22 +98,24 @@ export function perOpStatsMs(
 
   perOp.sort((a, b) => a - b)
   // Nearest rank: the smallest value at or above the 95th percentile.
-  const idx = Math.ceil(perOp.length * 0.95) - 1
+  const idx = p95Index(perOp.length)
   const above = perOp.length - 1 - idx
   if (above < MIN_SAMPLES_ABOVE_P95) {
     throw new Error(
       `perOpStatsMs: ${samples} samples puts the p95 rank ${above} sample(s) from the top, `
       + 'so it reports a maximum rather than a p95. Use at least '
-      + `${Math.ceil((MIN_SAMPLES_ABOVE_P95 + 1) / 0.05)} samples.`,
+      + `${minSamplesForP95()} samples.`,
     )
   }
 
-  const p95 = perOp[idx]
+  const p95 = perOp[idx]!
   const stats = {
     p95,
-    min: perOp[0],
-    median: perOp[(perOp.length - 1) >> 1],
-    max: perOp[perOp.length - 1],
+    min: perOp[0]!,
+    // A real median, not the lower-middle element. The write benchmark now
+    // ASSERTS this number, so an even `samples` must not quietly under-report.
+    median: medianOf(perOp),
+    max: perOp[perOp.length - 1]!,
     samples: perOp.length,
   }
   const f = (v: number) => v.toFixed(digits)
