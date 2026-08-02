@@ -276,14 +276,14 @@ for a particular collection. Neither may be reported as a result.
 
   | signal carried by | floor at N = 6 | runs per arm needed |
   | --- | --- | --- |
-  | 1 of 6 runs | 0.500 | **28** |
+  | 1 of 6 runs | 0.500 | **30** |
   | 2 of 6 runs | 0.227 | **12** |
   | 3 of 6 runs | 0.091 | 8 |
   | every run, cleanly separated | 0.001 | 6 — N = 6 is fine |
 
   Both measured experiments sat in the top two rows. #808's whole signal was in
   one run of six, so its p = 0.500 was its floor: at that density it would have
-  taken 28 runs per arm. #807 target 1's was in two, floor 0.227 — which is
+  taken 30 runs per arm. #807 target 1's was in two, floor 0.227 — which is
   exactly the p it returned, because its candidate swept the metric and landed
   on the floor. Twelve runs per arm would have decided it.
 

@@ -2043,13 +2043,22 @@ function permutationFloor(baseRates, candRates) {
   if (floorClearsAlpha(p)) {
     return { p, signalRuns: signal, ties, pooled: pool.length, requiredN: null }
   }
+  const below = pool.length - signal - ties
   let requiredN = null
   for (let m = n + 1; m <= POWER_SCAN_MAX; m++) {
     const signalM = Math.floor((signal * m) / n)
-    // A scaled tie block too small to fill the top group means the boundary has
-    // moved off it, and floorP returns 0 through logChoose's out-of-range guard
-    // — which is the right direction: that structure is easily separable.
-    if (floorClearsAlpha(floorP(m, Math.round((ties * m) / n), m - signalM))) {
+    const belowM = Math.floor((below * m) / n)
+    // Ties are what is LEFT, not a third independently scaled number. Scaling
+    // all three separately loses runs to rounding — at a one-run signal it lost
+    // exactly one, which put requiredN a run below the size that actually
+    // clears. Both other counts round down, which leaves the tie block as large
+    // as the rounding allows, and a larger tie block raises the floor: the
+    // conservative direction for advice about how many runs to collect.
+    const tiesM = 2 * m - signalM - belowM
+    // A tie block too small to fill the top group means the boundary has moved
+    // off it, and floorP returns 0 through logChoose's out-of-range guard —
+    // the right direction, since that structure is easily separable.
+    if (floorClearsAlpha(floorP(m, tiesM, m - signalM))) {
       requiredN = m
       break
     }
@@ -2517,10 +2526,13 @@ function report(args) {
     + `${v.perm.splits.toLocaleString()} splits (alpha ${PERMUTATION_ALPHA}) — `
     + `${v.outsideBand ? 'distinguishable from relabelling' : 'INSIDE the noise band'}`)
   if (v.undecidable) {
-    console.log(`  UNDECIDABLE at N=${base.runs}: the smallest p any arrangement of these runs `
-      + `could produce is ${v.floor.p.toFixed(3)}, because the signal sits in `
-      + `${v.floor.signalRuns} of ${base.runs * 2} pooled runs and the other ${v.floor.ties} `
-      + 'are tied. Rule 4 was not weighed and found wanting — it could not be weighed.')
+    // The three counts do NOT partition the pool — values below the boundary
+    // rank belong to none of them — so the wording must not imply they add up.
+    console.log(`  UNDECIDABLE at N=${base.runs}: the smallest p any arrangement of these `
+      + `${v.floor.pooled} pooled runs could produce is ${v.floor.p.toFixed(3)}. Only `
+      + `${v.floor.signalRuns} rose above the boundary rank while ${v.floor.ties} sit tied at `
+      + 'it, so most relabellings reproduce the observed split exactly. Rule 4 was not '
+      + 'weighed and found wanting — it could not be weighed.')
     console.log(`  ${requiredRunsAdvice(v.floor)}`)
   }
   console.log(`defect count:     ${base.defects} → ${cand.defects}  ${defectVerdict}`)
@@ -2903,24 +2915,38 @@ function selftest() {
   // The shape #808 produced: the whole signal in ONE run. Its floor is exactly
   // 0.5 — half of all relabellings put that run in the baseline arm — and stays
   // 0.5 at every N, so no arm size fixes a one-run signal at the SAME density.
-  // It takes 28 runs per arm before the density carries enough separate
+  // It takes 30 runs per arm before the density carries enough separate
   // carriers to clear alpha.
   const oneRunSignal = permutationFloor([0, 0, 0, 0, 0, 0.5], [0, 0, 0, 0, 0, 0])
   assert.equal(oneRunSignal.p.toFixed(3), '0.500', 'a one-run signal has a floor of exactly 0.5')
-  assert.equal(oneRunSignal.requiredN, 28, 'the #808 shape needs N >= 28')
+  assert.equal(oneRunSignal.requiredN, 30, 'the #808 shape needs N >= 30')
   // The advice must be reachable and must name that number, since it is the
   // only actionable thing the report says about an undecidable rule.
-  assert.match(requiredRunsAdvice(oneRunSignal), /N >= 28/)
+  assert.match(requiredRunsAdvice(oneRunSignal), /N >= 30/)
 
   // requiredN is a boundary, not a suggestion: it clears and its predecessor
-  // does not. Guards against an off-by-one that would advise a run count which
-  // still cannot decide.
-  for (const floor of [realShape.floor, oneRunSignal]) {
-    const at = (m) => floorP(m, Math.round((floor.ties * m) / MIN_RUNS),
-      m - Math.floor((floor.signalRuns * m) / MIN_RUNS))
-    assert.ok(floorClearsAlpha(at(floor.requiredN)), 'requiredN must actually clear alpha')
-    assert.ok(!floorClearsAlpha(at(floor.requiredN - 1)),
-      'requiredN must be the FIRST arm size that clears — otherwise it over-asks')
+  // does not. Guards against an off-by-one that would advise a run count still
+  // unable to decide.
+  //
+  // Checked by building the collection requiredN actually describes and running
+  // it back through permutationFloor, rather than by re-deriving the scan's
+  // arithmetic here. A test that re-implements the formula proves only that the
+  // copy is correct.
+  {
+    // k carriers among m runs, everything else 0 — the shape the scan models,
+    // with the carriers' values distinct so they cannot collapse into the tie
+    // block and change the structure under test.
+    const shaped = (m, k) => permutationFloor(
+      Array.from({ length: m }, (_, i) => (i < k ? 0.1 * (i + 1) : 0)),
+      Array(m).fill(0),
+    )
+    for (const [floor, carriers] of [[realShape.floor, 2], [oneRunSignal, 1]]) {
+      const scaled = (m) => shaped(m, Math.floor((carriers * m) / MIN_RUNS))
+      assert.ok(floorClearsAlpha(scaled(floor.requiredN).p),
+        `requiredN=${floor.requiredN} must actually clear alpha`)
+      assert.ok(!floorClearsAlpha(scaled(floor.requiredN - 1).p),
+        `requiredN=${floor.requiredN} must be the FIRST size that clears — otherwise it over-asks`)
+    }
   }
 
   // A revert that rests on something other than rule 4 must survive an
@@ -2950,7 +2976,7 @@ function selftest() {
       Array.from({ length: MIN_RUNS }, (_, i) => (i < k ? 0.1 * (i + 1) : 0)),
       Array(MIN_RUNS).fill(0),
     )
-    for (const [k, floorStr, needed] of [[1, '0.500', 28], [2, '0.227', 12], [3, '0.091', 8]]) {
+    for (const [k, floorStr, needed] of [[1, '0.500', 30], [2, '0.227', 12], [3, '0.091', 8]]) {
       const f = kOfSix(k)
       assert.equal(f.p.toFixed(3), floorStr, `rubric table: floor for ${k} of 6 runs`)
       assert.equal(f.requiredN, needed, `rubric table: runs needed for ${k} of 6 runs`)
