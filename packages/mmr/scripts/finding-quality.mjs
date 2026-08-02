@@ -1923,11 +1923,21 @@ function summarize(condition, scored) {
 const PERMUTATION_ALPHA = 0.05
 
 /**
- * Above this many possible splits, enumerate a deterministic sample instead.
- * C(12,6) is 924, so the N=6 floor is always exact; C(20,10) is 184,756, which
- * is still fast; beyond that the exhaustive walk stops being worth it.
+ * Largest split count this will enumerate. Above it, no verdict is issued.
+ *
+ * Set from measurement, not taste: enumerating C(24,12) = 2,704,156 splits
+ * takes 44ms, so 50M covers every N up to 14 in well under a second — far past
+ * the rubric's floor of 6 and past any collection anyone has run.
+ *
+ * Deliberately NOT a sampling fallback. An earlier revision sampled above the
+ * limit, and every review round found another way that approximation was
+ * subtly wrong: a proportion treated as exact, a p that could reach zero, a
+ * result that depended on the order the runs arrived in, and finally a seeded
+ * shuffle that truncates its seed to 32 bits and walks consecutive LCG states,
+ * so the "independent" samples were correlated. None of it could be exercised
+ * by a realistic experiment. Deleting the branch removes the whole class.
  */
-const PERMUTATION_EXACT_LIMIT = 200_000
+const PERMUTATION_EXACT_LIMIT = 50_000_000
 
 /** n choose k, exact for the sizes reached here. */
 function choose(n, k) {
@@ -1941,7 +1951,7 @@ function meanOf(xs) {
 }
 
 /**
- * One-sided permutation test on the two arms' per-run rates.
+ * Exact one-sided permutation test on the two arms' per-run rates.
  *
  * Asks the only question a noise band should ask: if these 2N runs carried no
  * treatment at all, how often would relabelling them produce a drop at least
@@ -1949,31 +1959,28 @@ function meanOf(xs) {
  * mean — where the old rule compared a pooled mean against a single run's
  * spread.
  *
- * Exhaustive when the split count allows, so the result is exact and does not
- * move between invocations. Above the limit it samples deterministically with
- * the same seeded shuffle used for blinding — never Math.random, which is
- * unavailable here by design and would make a verdict unreproducible.
+ * Every split is enumerated, so the result is exact, independent of the order
+ * the runs arrived in, and identical on every invocation. There is no sampling
+ * path and no RNG.
  *
- * Returns { p, pBound, splits, exact }. `p` is the estimate; `pBound` is what
- * callers must gate on — equal to `p` under exhaustive enumeration, and the
- * upper end of a Wilson interval when sampling forced an approximation, so a
- * borderline sampled result fails closed. Both are 1 for degenerate input (an
- * empty arm, or arms of unequal length), which fails the rule closed.
+ * Returns { p, splits, exact }. `p` is 1 and `exact` false when the split count
+ * exceeds what will be enumerated — no verdict rather than an approximation —
+ * and `p` is 1 with `exact` true for degenerate input (an empty arm, or arms of
+ * unequal length). Both fail the rule closed.
  */
 function permutationTest(baseRates, candRates) {
   const n = baseRates.length
-  // pBound is set here too. Callers gate on it, and an undefined would compare
-  // false against alpha — failing closed by accident rather than by design,
-  // which is the kind of correctness that quietly stops being true.
-  //
-  // `exact: true` with `splits: 0` reads oddly but is right: the field records
-  // whether SAMPLING was used, and nothing was sampled here. p is 1 because the
-  // input cannot support a test at all, not because a test was run and found
-  // nothing.
-  if (n === 0 || candRates.length !== n) return { p: 1, pBound: 1, splits: 0, exact: true }
+  // `exact: true` with `splits: 0` is right: nothing was approximated. p is 1
+  // because the input cannot support a test at all, not because one ran and
+  // found nothing.
+  if (n === 0 || candRates.length !== n) return { p: 1, splits: 0, exact: true }
   const pool = [...baseRates, ...candRates]
-  const observed = meanOf(baseRates) - meanOf(candRates)
   const total = choose(pool.length, n)
+  // Too large to enumerate: say so and fail closed. Reporting an approximation
+  // here would trade a guarantee the rest of this file depends on for a
+  // convenience nobody has needed.
+  if (total > PERMUTATION_EXACT_LIMIT) return { p: 1, splits: total, exact: false }
+  const observed = meanOf(baseRates) - meanOf(candRates)
   const poolSum = pool.reduce((a, b) => a + b, 0)
   // meanA - meanB reduces to a function of one group's sum, since the other
   // group's sum is the remainder. Comparing sums avoids re-deriving both means
@@ -1982,81 +1989,23 @@ function permutationTest(baseRates, candRates) {
   const diffFromSum = (sumA) => sumA - (poolSum * n) / pool.length
   let hits = 0
   let splits = 0
-  if (total <= PERMUTATION_EXACT_LIMIT) {
-    // Every combination of n indices, iteratively so deep recursion cannot
-    // blow the stack on larger N.
-    const idx = Array.from({ length: n }, (_, i) => i)
-    for (;;) {
-      let sumA = 0
-      for (const i of idx) sumA += pool[i]
-      if (diffFromSum(sumA) >= threshold - BAND_EPSILON) hits++
-      splits++
-      let i = n - 1
-      while (i >= 0 && idx[i] === pool.length - n + i) i--
-      if (i < 0) break
-      idx[i]++
-      for (let j = i + 1; j < n; j++) idx[j] = idx[j - 1] + 1
-    }
-    // Exhaustive: the observed labelling is itself one of the splits and always
-    // counts as a hit, so p >= 1/splits by construction and cannot reach 0.
-    const p = hits / splits
-    return { p, pBound: p, splits, exact: true }
-  }
-  // Deterministic sample. Seeded from the data itself, so the same input always
-  // yields the same p and two different experiments do not share a permutation
-  // order.
-  // SORTED, so the sample does not depend on the order the runs arrived in.
-  //
-  // Seeding and shuffling the pool as-given made the result a function of run
-  // ordering: the same twelve rates read back in a different order produced a
-  // different seed, a different sample, and potentially a different verdict.
-  // The exhaustive branch never had this problem — it enumerates every split,
-  // which is order-invariant by construction — and the sampled branch must
-  // match that guarantee, because "identical evidence, identical verdict" is
-  // the whole reason this is deterministic rather than random.
-  //
-  // Safe to sort: the observed statistic comes from baseRates and candRates
-  // separately and means are order-invariant, so only the sampling order moves.
-  //
-  // 13 hex digits (52 bits) is the most that survives as an exact integer in a
-  // double. Eight gave 32 bits, where distinct inputs start colliding around
-  // 65k by the birthday bound.
-  const canonical = [...pool].sort((a, b) => a - b)
-  const seed = Number.parseInt(sha256(JSON.stringify(canonical)).slice(0, 13), 16)
-  const SAMPLES = 20_000
-  for (let s = 0; s < SAMPLES; s++) {
-    const shuffled = shuffle(canonical, seed + s)
+  // Every combination of n indices, iteratively so deep recursion cannot blow
+  // the stack at larger N.
+  const idx = Array.from({ length: n }, (_, i) => i)
+  for (;;) {
     let sumA = 0
-    for (let i = 0; i < n; i++) sumA += shuffled[i]
+    for (const i of idx) sumA += pool[i]
     if (diffFromSum(sumA) >= threshold - BAND_EPSILON) hits++
     splits++
+    let i = n - 1
+    while (i >= 0 && idx[i] === pool.length - n + i) i--
+    if (i < 0) break
+    idx[i]++
+    for (let j = i + 1; j < n; j++) idx[j] = idx[j - 1] + 1
   }
-  // (hits + 1) / (splits + 1), not hits / splits.
-  //
-  // Two reasons, one fix. The exhaustive branch always includes the observed
-  // labelling among its splits, so its p can never be 0; a sample that happens
-  // to miss it would report p = 0 and claim certainty it does not have. And a
-  // sampled proportion is an ESTIMATE — treating it as exact lets Monte Carlo
-  // error carry a true p above alpha to an estimate below it.
-  const p = (hits + 1) / (splits + 1)
-  // Gate on the upper end of a confidence interval, not the point estimate, so
-  // a borderline sampled result fails closed.
-  //
-  // Wilson rather than p + 2·SE: the Wald interval it replaces is a normal
-  // approximation that misbehaves exactly where this is used — small p, near
-  // the alpha boundary — and can sit BELOW the true value, which is the wrong
-  // direction for a ship rule. Wilson is closed-form, needs no incomplete beta,
-  // and stays well behaved near zero.
-  //
-  // It is still a confidence bound, not a certainty: sampling cannot produce
-  // the exact p that exhaustive enumeration does. That is the price of a split
-  // count too large to enumerate, and the report says when it was paid.
-  const z = 2
-  const z2 = z * z
-  const denom = 1 + z2 / splits
-  const centre = (p + z2 / (2 * splits)) / denom
-  const half = (z * Math.sqrt((p * (1 - p)) / splits + z2 / (4 * splits * splits))) / denom
-  return { p, pBound: Math.min(1, centre + half), splits, exact: false }
+  // The observed labelling is itself one of the splits and always counts as a
+  // hit, so p >= 1/splits by construction and cannot reach 0.
+  return { p: hits / splits, splits, exact: true }
 }
 
 function evaluateVerdict(base, cand, opts = {}) {
@@ -2109,15 +2058,15 @@ function evaluateVerdict(base, cand, opts = {}) {
   // nowhere near normal.
   const improvement = base.speculativeRate - cand.speculativeRate
   const perm = permutationTest(base.specRates, cand.specRates)
-  // pBound, not p: identical under exhaustive enumeration, and two standard
-  // errors above the estimate when the split count forced sampling, so a
-  // borderline sampled result fails closed.
-  const outsideBand = perm.pBound < PERMUTATION_ALPHA
-  // The test is ONE-sided in the direction of improvement, so a significant p
-  // already implies the pooled rate fell — specDown is subsumed, exactly as the
-  // old margin comparison subsumed it. Kept because the rubric states the two
-  // as separate conditions and the report prints them separately; it is not an
-  // independent check.
+  // Named for the rubric's own vocabulary — it prints "inside the noise band" —
+  // rather than for the statistic behind it.
+  const outsideBand = perm.p < PERMUTATION_ALPHA
+  // NOT subsumed by the permutation test, though an earlier comment here said
+  // so. The test compares the MEAN OF PER-RUN RATES; specDown compares the
+  // POOLED rate, which weights each finding equally instead of each run
+  // equally. The two can disagree — the realShape fixture below is a case where
+  // they differ (0.075 against 0.08) — so the direction of the pooled rate is
+  // a genuinely separate check, as the rubric states it.
   const specDown = cand.speculativeRate < base.speculativeRate
   // The RATE alone is gameable: adding defects, hygiene findings or artifacts
   // enlarges the denominator and lowers speculative_rate while the number of
@@ -2421,10 +2370,11 @@ function report(args) {
   console.log(`low-value count:   ${base.lowValues} → ${cand.lowValues}  `
     + `${v.lowValueDown ? 'down' : 'NOT down — speculative findings were traded for other low-value ones'}`)
   console.log(`improvement ${pct(v.improvement)} — permutation p=${v.perm.p.toFixed(3)}`
-    + (v.perm.exact ? '' : ` (sampled; gated on Wilson upper bound ${v.perm.pBound.toFixed(3)})`)
-    + ` over ${v.perm.splits.toLocaleString()} ${v.perm.exact ? 'exact' : 'sampled'} splits `
-    + `(alpha ${PERMUTATION_ALPHA}) — `
-    + `${v.outsideBand ? 'distinguishable from relabelling' : 'INSIDE the noise band'}`)
+    + (v.perm.exact
+      ? ` over ${v.perm.splits.toLocaleString()} splits (alpha ${PERMUTATION_ALPHA}) — `
+        + `${v.outsideBand ? 'distinguishable from relabelling' : 'INSIDE the noise band'}`
+      : ` — NOT TESTED: ${v.perm.splits.toLocaleString()} splits exceeds what is `
+        + 'enumerated, so no verdict is issued rather than an approximation'))
   console.log(`defect count:     ${base.defects} → ${cand.defects}  ${defectVerdict}`)
   console.log(`baseline defects per run: ${range(base.defectsPerRun)} `
     + `(candidate is ${dropPerRun >= 0 ? '-' : '+'}${Math.abs(dropPerRun).toFixed(2)} per run)`)
@@ -2753,7 +2703,6 @@ function selftest() {
   // resolve a rate difference this size. If the number moves, the documentation
   // is wrong and this must fail.
   assert.equal(realShape.perm.p.toFixed(3), '0.227', 'the documented p-value must hold')
-  assert.equal(realShape.perm.pBound, realShape.perm.p, 'exhaustive mode needs no sampling margin')
   assert.equal(realShape.ship, false, 'six runs at this separation cannot ship')
 
   // Exhaustive enumeration always includes the observed labelling, so p can
@@ -2762,29 +2711,28 @@ function selftest() {
   assert.ok(permutationTest([1, 1, 1], [0, 0, 0]).p >= 1 / 20,
     'the observed split must always count as a hit')
 
-  // Sampled mode: N=11 puts C(22,11) at 705,432, past the exhaustive limit.
-  const big = (v) => Array.from({ length: 11 }, (_, i) => v + (i % 2) * 0.01)
-  const sampled = permutationTest(big(0.5), big(0.1))
-  assert.equal(sampled.exact, false, 'past the limit the test must sample')
-  assert.ok(sampled.p > 0, 'the add-one estimator keeps a sampled p above zero')
-  assert.ok(sampled.pBound > sampled.p, 'a sampled result must carry a margin')
-  // Deterministic: seeded from the data, so the same input repeats exactly.
-  assert.deepEqual(permutationTest(big(0.5), big(0.1)), sampled, 'sampling must be reproducible')
-  // And invariant to the order the runs arrived in. Seeding from the pool
-  // as-given made the verdict a function of run ordering, so the same evidence
-  // read back in a different order could sample differently.
+  // Order-invariant by construction: every split is enumerated, so the order
+  // the runs arrived in cannot reach the result.
+  const big = (v) => Array.from({ length: 8 }, (_, i) => v + (i % 3) * 0.01)
+  const straight = permutationTest(big(0.5), big(0.1))
+  assert.equal(straight.exact, true)
   const rev = (xs) => [...xs].reverse()
-  assert.deepEqual(
-    permutationTest(rev(big(0.5)), rev(big(0.1))), sampled,
-    'reordering identical evidence must not change a sampled result',
-  )
-  // Shuffled within each arm, not merely reversed.
-  assert.deepEqual(
-    permutationTest(shuffle(big(0.5), 7), shuffle(big(0.1), 9)), sampled,
-    'run order must not reach the sample at all',
-  )
-  // And it still separates an obvious difference.
-  assert.ok(sampled.pBound < PERMUTATION_ALPHA, 'clean separation must survive sampling')
+  assert.deepEqual(permutationTest(rev(big(0.5)), rev(big(0.1))), straight,
+    'reversing each arm must not change the result')
+  assert.deepEqual(permutationTest(shuffle(big(0.5), 7), shuffle(big(0.1), 9)), straight,
+    'run order must not reach the result at all')
+  assert.ok(straight.p < PERMUTATION_ALPHA, 'clean separation must still separate')
+
+  // Beyond what will be enumerated, NO VERDICT — never an approximation.
+  // N=15 puts C(30,15) at 155,117,520, past the 50M limit.
+  const huge = permutationTest(Array(15).fill(0.5), Array(15).fill(0.1))
+  assert.equal(huge.exact, false, 'too large to enumerate must be reported as such')
+  assert.equal(huge.p, 1, 'too large to enumerate must fail closed')
+  assert.ok(huge.splits > PERMUTATION_EXACT_LIMIT, 'the split count is still reported')
+  // N=12 is 2,704,156 splits and must still be decided exactly.
+  const twelve = permutationTest(Array(12).fill(0.5), Array(12).fill(0.1))
+  assert.equal(twelve.exact, true, 'N=12 must remain exact')
+  assert.equal(twelve.splits, 2_704_156)
 
   // Clear separation is significant; overlap is not.
   const sixBase = { specRates: [0.4, 0.5, 0.4, 0.5, 0.4, 0.5], speculativeRate: 0.45 }
