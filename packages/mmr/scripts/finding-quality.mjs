@@ -290,7 +290,7 @@ function firstJsonArray(text) {
  * attributing an execution difference to the prompt. Rather than trying to
  * digest resolved channel settings, refuse the config outright.
  */
-const PROMPT_ONLY_KEYS = ['version', 'review_criteria', 'stage']
+const PROMPT_ONLY_KEYS = ['version', 'review_criteria']
 
 /**
  * The decision half of assertPromptOnlyConfig, separated so it can be tested.

@@ -1368,7 +1368,7 @@ nav.toc li.toc-3 a { padding-left: var(--sp-6); font-size: var(--text-xs); }
 <div class="layout">
   <aside class="rail" id="guide-toc">
     <button class="rail-close" data-action="nav" aria-label="Close navigation">✕</button>
-    <nav class="toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#what-mmr-is">What MMR is</a></li><li class="toc-3"><a href="#the-core-idea-in-five-moves">The core idea in five moves</a></li><li class="toc-2"><a href="#end-to-end-flow">End-to-end flow</a></li><li class="toc-2"><a href="#the-mmr-review-command">The mmr review command</a></li><li class="toc-3"><a href="#copy-paste-commands-by-target">Copy-paste commands by target</a></li><li class="toc-2"><a href="#other-subcommands">Other subcommands</a></li><li class="toc-2"><a href="#mmr-critique-the-design-peer">mmr critique — the design peer</a></li><li class="toc-2"><a href="#channel-architecture">Channel architecture</a></li><li class="toc-3"><a href="#the-channel-config-shape">The channel config shape</a></li><li class="toc-3"><a href="#built-in-channels">Built-in channels</a></li><li class="toc-3"><a href="#the-dispatcher">The dispatcher</a></li><li class="toc-2"><a href="#scaffold-wrappers">Scaffold wrappers</a></li><li class="toc-2"><a href="#findings-reconciliation-verdicts">Findings, reconciliation &amp; verdicts</a></li><li class="toc-3"><a href="#the-finding-shape">The Finding shape</a></li><li class="toc-3"><a href="#stable-identity-finding-key">Stable identity (finding_key)</a></li><li class="toc-3"><a href="#agreement-confidence">Agreement &amp; confidence</a></li><li class="toc-3"><a href="#the-gate-the-four-verdicts">The gate &amp; the four verdicts</a></li><li class="toc-2"><a href="#degraded-mode-compensation-auth">Degraded mode, compensation &amp; auth</a></li><li class="toc-2"><a href="#configuration-mmryaml">Configuration (.mmr.yaml)</a></li><li class="toc-3"><a href="#calibrating-findings-by-product-stage">Calibrating findings by product stage</a></li><li class="toc-3"><a href="#calibrating-findings-with-review-criteria">Calibrating findings with review_criteria</a></li><li class="toc-3"><a href="#trust-modes-and-the-ratification-gate">Trust modes and the ratification gate</a></li></ul></nav>
+    <nav class="toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#what-mmr-is">What MMR is</a></li><li class="toc-3"><a href="#the-core-idea-in-five-moves">The core idea in five moves</a></li><li class="toc-2"><a href="#end-to-end-flow">End-to-end flow</a></li><li class="toc-2"><a href="#the-mmr-review-command">The mmr review command</a></li><li class="toc-3"><a href="#copy-paste-commands-by-target">Copy-paste commands by target</a></li><li class="toc-2"><a href="#other-subcommands">Other subcommands</a></li><li class="toc-2"><a href="#mmr-critique-the-design-peer">mmr critique — the design peer</a></li><li class="toc-2"><a href="#channel-architecture">Channel architecture</a></li><li class="toc-3"><a href="#the-channel-config-shape">The channel config shape</a></li><li class="toc-3"><a href="#built-in-channels">Built-in channels</a></li><li class="toc-3"><a href="#the-dispatcher">The dispatcher</a></li><li class="toc-2"><a href="#scaffold-wrappers">Scaffold wrappers</a></li><li class="toc-2"><a href="#findings-reconciliation-verdicts">Findings, reconciliation &amp; verdicts</a></li><li class="toc-3"><a href="#the-finding-shape">The Finding shape</a></li><li class="toc-3"><a href="#stable-identity-finding-key">Stable identity (finding_key)</a></li><li class="toc-3"><a href="#agreement-confidence">Agreement &amp; confidence</a></li><li class="toc-3"><a href="#the-gate-the-four-verdicts">The gate &amp; the four verdicts</a></li><li class="toc-2"><a href="#degraded-mode-compensation-auth">Degraded mode, compensation &amp; auth</a></li><li class="toc-2"><a href="#configuration-mmryaml">Configuration (.mmr.yaml)</a></li><li class="toc-3"><a href="#calibrating-findings-with-review-criteria">Calibrating findings with review_criteria</a></li><li class="toc-3"><a href="#trust-modes-and-the-ratification-gate">Trust modes and the ratification gate</a></li></ul></nav>
   </aside>
   <main class="content"><h2 id="what-mmr-is">What MMR is</h2>
 <p>Multi-Model Review runs your changes past several <strong>independent</strong> AI code
@@ -2091,7 +2091,6 @@ defaults:
     max_rounds_default: 5
   compensator:
     channel: claude            # who runs a compensating pass (default: claude -p)
-stage: mvp                     # prototype | mvp | production — calibrates the severity rubric
 review_criteria: ["…"]         # extra criteria added to every prompt (see "Calibrating findings")
 templates:                     # named criteria presets, selected by --template
   security: { criteria: ["…"] }
@@ -2114,49 +2113,6 @@ when you pass an explicit <code>--channels</code> list).</li>
 fields override the parent <span class="fp" data-path="packages/mmr/src/config/loader.ts:145">packages/mmr/src/config/loader.ts:145</span>.</li>
 <li><code>fix_threshold</code> — project gate; override per-run with <code>--fix-threshold</code>.</li>
 </ul>
-<h3 id="calibrating-findings-by-product-stage">Calibrating findings by product stage</h3>
-<p>The same defect is worth different things depending on product maturity, so
-<code>stage</code> calibrates the built-in severity rubric
-<span class="fp" data-path="packages/mmr/src/core/stage.ts:1">packages/mmr/src/core/stage.ts:1</span>.</p>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<table><thead><tr><th>stage</th><th>missing tests</th><th>a rare or low-traffic (but reachable) bug</th></tr></thead><tbody><tr><td><code>prototype</code></td><td>P3 unless it covers the thing being proven</td><td>P3</td></tr><tr><td><code>mvp</code></td><td>P2 for logic users depend on, P3 otherwise</td><td>P3 on a rare or internal-only path</td></tr><tr><td><code>production</code></td><td>P1 for changed user-facing behavior</td><td>P1 in a user-facing path</td></tr></tbody></table>
-<p>Stages grade findings; they never change <em>what gets reported</em>. A state nothing
-can reach is excluded by the Reporting Bar at every stage, and a real defect a
-stage grades P3 is still reported — P3's "only report if nothing else found"
-rule governs trivia, not a demoted defect.</p>
-<p>The preset is substituted <strong>into</strong> the severity definitions rather than appended
-after the criteria, so it changes what counts as P1 versus P2 instead of
-competing with the rubric from outside it.</p>
-<div class="callout callout-warning"><p><strong>No stage can soften a security, data-loss, or data-corruption finding.</strong> Every
-preset that relaxes anything states that floor, and the rubric's own version of
-it survives in all cases. <code>prototype</code> is the stage most likely to be set on the
-codebase least able to absorb a vulnerability — which is exactly why the floor is
-asserted per preset rather than assumed.</p><p>Setting no stage changes nothing: the prompt is byte-identical to one from
-before stages existed.</p></div>
 <h3 id="calibrating-findings-with-review-criteria">Calibrating findings with <code>review_criteria</code></h3>
 <p><code>review_criteria</code> lines are injected between the core prompt and the diff
 <span class="fp" data-path="packages/mmr/src/core/prompt.ts:51">packages/mmr/src/core/prompt.ts:51</span>, so every channel sees them. The most

@@ -557,7 +557,6 @@ defaults:
     max_rounds_default: 5
   compensator:
     channel: claude            # who runs a compensating pass (default: claude -p)
-stage: mvp                     # prototype | mvp | production — calibrates the severity rubric
 review_criteria: ["…"]         # extra criteria added to every prompt (see "Calibrating findings")
 templates:                     # named criteria presets, selected by --template
   security: { criteria: ["…"] }
@@ -579,38 +578,6 @@ channels:
 - `extends` — inherit from another channel (≤ 4 levels, cycle-checked); child
   fields override the parent :cite[packages/mmr/src/config/loader.ts:145].
 - `fix_threshold` — project gate; override per-run with `--fix-threshold`.
-
-### Calibrating findings by product stage
-
-The same defect is worth different things depending on product maturity, so
-`stage` calibrates the built-in severity rubric
-:cite[packages/mmr/src/core/stage.ts:1].
-
-| stage | missing tests | a rare or low-traffic (but reachable) bug |
-| --- | --- | --- |
-| `prototype` | P3 unless it covers the thing being proven | P3 |
-| `mvp` | P2 for logic users depend on, P3 otherwise | P3 on a rare or internal-only path |
-| `production` | P1 for changed user-facing behavior | P1 in a user-facing path |
-
-Stages grade findings; they never change *what gets reported*. A state nothing
-can reach is excluded by the Reporting Bar at every stage, and a real defect a
-stage grades P3 is still reported — P3's "only report if nothing else found"
-rule governs trivia, not a demoted defect.
-
-The preset is substituted **into** the severity definitions rather than appended
-after the criteria, so it changes what counts as P1 versus P2 instead of
-competing with the rubric from outside it.
-
-:::callout{type=warning}
-**No stage can soften a security, data-loss, or data-corruption finding.** Every
-preset that relaxes anything states that floor, and the rubric's own version of
-it survives in all cases. `prototype` is the stage most likely to be set on the
-codebase least able to absorb a vulnerability — which is exactly why the floor is
-asserted per preset rather than assumed.
-
-Setting no stage changes nothing: the prompt is byte-identical to one from
-before stages existed.
-:::
 
 ### Calibrating findings with `review_criteria`
 
