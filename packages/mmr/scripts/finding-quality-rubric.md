@@ -37,14 +37,15 @@ Three consequences, all binding:
    two arms' **per-run rates** must separate under a one-sided permutation
    test, at p < 0.05. The test is **exact** — every split is enumerated, so the
    result does not depend on the order the runs arrived in and does not move
-   between invocations. There is no sampling path: beyond the split count the
-   harness will enumerate (50M, which covers N up to 14), it issues **no
-   verdict** rather than an approximation.
+   between invocations. There is no sampling path: past the 50M splits the
+   harness enumerates, it issues **no verdict** rather than an approximation.
+   That limit admits N up to 14, measured at 673ms for the 40,116,600 splits
+   N = 14 requires.
 
    Pool the 2N per-run rates, enumerate every way to split them into two groups
    of N, and count the splits whose difference in means is at least the observed
    drop. At the N = 6 floor that is C(12,6) = 924 splits; at N = 12 it is
-   2,704,156, which enumerates in 44ms.
+   2,704,156, measured at 44ms.
 
    No distributional assumption is made, which matters: rates built from one to
    six findings per run are nowhere near normal.

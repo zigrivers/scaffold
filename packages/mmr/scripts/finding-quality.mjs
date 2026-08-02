@@ -1925,9 +1925,10 @@ const PERMUTATION_ALPHA = 0.05
 /**
  * Largest split count this will enumerate. Above it, no verdict is issued.
  *
- * Set from measurement, not taste: enumerating C(24,12) = 2,704,156 splits
- * takes 44ms, so 50M covers every N up to 14 in well under a second — far past
- * the rubric's floor of 6 and past any collection anyone has run.
+ * Set from measurement at both ends, not extrapolation: C(24,12) = 2,704,156
+ * splits enumerate in 44ms, and C(28,14) = 40,116,600 — the largest this limit
+ * admits — in 673ms. So every N up to 14 is decided exactly in under a second,
+ * far past the rubric's floor of 6 and past any collection anyone has run.
  *
  * Deliberately NOT a sampling fallback. An earlier revision sampled above the
  * limit, and every review round found another way that approximation was
@@ -2017,12 +2018,13 @@ function evaluateVerdict(base, cand, opts = {}) {
       blockers.push(`${r.label} has inconsistent channel coverage: ${r.coverages.join(' vs ')}`)
     }
     if (!r.hasFindings) blockers.push(`${r.label} produced no findings at all`)
-    // A run with zero findings has no defined speculative rate, so it drops out
-    // of the spread that sizes the noise band — making the band narrower than
-    // the data warrants and the ship rule easier to clear than it should be.
+    // A run with zero findings has a speculative rate of 0/0 — undefined, not
+    // zero — so it cannot enter the permutation test as a data point. Counting
+    // it as 0% would invent a favourable observation, and dropping it would
+    // leave the arms with unequal N, which the test requires.
     if (r.emptyRuns > 0) {
-      blockers.push(`${r.label} has ${r.emptyRuns} run(s) with zero findings, whose rate is undefined `
-        + 'and would silently shrink the noise band')
+      blockers.push(`${r.label} has ${r.emptyRuns} run(s) with zero findings, whose rate is 0/0 `
+        + 'and cannot enter the permutation test')
     }
   }
   if (base.coverages[0] !== cand.coverages[0]) {
@@ -2058,6 +2060,15 @@ function evaluateVerdict(base, cand, opts = {}) {
   // nowhere near normal.
   const improvement = base.speculativeRate - cand.speculativeRate
   const perm = permutationTest(base.specRates, cand.specRates)
+  // An experiment too large to enumerate is UNTESTABLE, not unpersuasive. Both
+  // end at ship=false, but only one of them should read as "the evidence was
+  // weighed" — collapsing them would report a revert the rule never actually
+  // reached. A blocker makes `report` print NO VERDICT and say why.
+  if (perm.exact === false) {
+    blockers.push(`the permutation test needs ${perm.splits.toLocaleString()} splits, above the `
+      + `${PERMUTATION_EXACT_LIMIT.toLocaleString()} this enumerates — no verdict can be issued `
+      + 'rather than an approximated one. Compare fewer runs per arm.')
+  }
   // Named for the rubric's own vocabulary — it prints "inside the noise band" —
   // rather than for the statistic behind it.
   const outsideBand = perm.p < PERMUTATION_ALPHA
@@ -2729,6 +2740,19 @@ function selftest() {
   assert.equal(huge.exact, false, 'too large to enumerate must be reported as such')
   assert.equal(huge.p, 1, 'too large to enumerate must fail closed')
   assert.ok(huge.splits > PERMUTATION_EXACT_LIMIT, 'the split count is still reported')
+  // And it must BLOCK, not merely fail to ship. Untestable and unpersuasive
+  // both end at ship=false; only a blocker distinguishes them, so a reader is
+  // not told the evidence was weighed when it never was.
+  {
+    const fifteen = (rates) => ({ ...cond(), runs: 15, specRates: rates })
+    const v = evaluateVerdict(
+      fifteen(Array(15).fill(0.5)),
+      { ...fifteen(Array(15).fill(0.1)), speculativeRate: 0.1, speculatives: 5, lowValues: 6 },
+    )
+    assert.ok(v.blockers.some((b) => /no verdict can be issued/.test(b)),
+      'an unenumerable experiment must block, not silently read as no-ship')
+    assert.equal(v.ship, false)
+  }
   // N=12 is 2,704,156 splits and must still be decided exactly.
   const twelve = permutationTest(Array(12).fill(0.5), Array(12).fill(0.1))
   assert.equal(twelve.exact, true, 'N=12 must remain exact')
