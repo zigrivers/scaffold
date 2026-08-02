@@ -1940,11 +1940,153 @@ const PERMUTATION_ALPHA = 0.05
  */
 const PERMUTATION_EXACT_LIMIT = 50_000_000
 
+/**
+ * Largest arm size the required-N search will consider.
+ *
+ * NOT a taste judgement about how many runs anyone will collect. It is the
+ * largest arm the permutation test can actually decide: past it C(2N, N)
+ * exceeds PERMUTATION_EXACT_LIMIT, `permutationTest` refuses to enumerate, and
+ * that becomes a blocker. Advice above this ceiling is advice that cannot be
+ * followed — collect it and the harness answers "compare fewer runs per arm",
+ * the exact opposite instruction.
+ *
+ * Derived from the limit rather than written down, so the two cannot drift. At
+ * the shipped 50M limit it is 14: C(28,14) is 40,116,600, C(30,15) is
+ * 155,117,520.
+ */
+function maxDecidableArmSize() {
+  let n = 1
+  while (choose(2 * (n + 1), n + 1) <= PERMUTATION_EXACT_LIMIT) n++
+  return n
+}
+const POWER_SCAN_MAX = maxDecidableArmSize()
+
 /** n choose k, exact for the sizes reached here. */
 function choose(n, k) {
   let r = 1
   for (let i = 1; i <= k; i++) r = (r * (n - k + i)) / i
   return Math.round(r)
+}
+
+/**
+ * log(n choose k). The floor calculation divides two binomials that individually
+ * overflow a double well before the arm sizes it scans do — C(400,200) is 1e119
+ * — and their RATIO is small. Taking logs keeps the ratio exact enough while
+ * each side stays finite.
+ */
+function logChoose(n, k) {
+  if (k < 0 || k > n) return -Infinity
+  const m = Math.min(k, n - k)
+  let r = 0
+  for (let i = 1; i <= m; i++) r += Math.log(n - m + i) - Math.log(i)
+  return r
+}
+
+/**
+ * The smallest p a permutation test could return for a pool with `ties` values
+ * tied at the boundary rank, `a` of which fall in the top group.
+ *
+ * The maximum mean difference puts the n largest pooled values in one arm. Every
+ * split that achieves it differs only in WHICH of the tied boundary values it
+ * takes, so there are exactly C(ties, a) of them out of C(2n, n).
+ */
+function floorP(n, ties, a) {
+  return Math.exp(logChoose(ties, a) - logChoose(2 * n, n))
+}
+
+/**
+ * Does a floor clear alpha?
+ *
+ * `floorP` goes through logs, so an exact rational comes back approximately: a
+ * one-run signal has a floor of exactly 1/2 and computes as 0.49999999999999994.
+ * That particular error decides nothing, being nowhere near alpha — but the same
+ * error at a floor mathematically EQUAL to alpha does. Three runs per arm with
+ * the whole pool tied at the boundary give C(3,3)/C(6,3) = 1/20 = alpha exactly,
+ * and whether that clears is then settled by rounding.
+ *
+ * The epsilon makes such a value count as NOT clearing, the conservative
+ * direction for a ship rule: the collection is called undecidable and no verdict
+ * is issued, rather than a verdict resting on the sixteenth decimal place.
+ *
+ * The enumerated p in `permutationTest` needs no such slack — it is an exact
+ * ratio of two integer counts.
+ */
+function floorClearsAlpha(p) {
+  return p < PERMUTATION_ALPHA - BAND_EPSILON
+}
+
+/**
+ * The smallest p THESE runs could have produced under any relabelling, and the
+ * arm size that would let a result of this shape clear alpha.
+ *
+ * A permutation test's p-value has a floor set by the tie structure of the
+ * pooled values, and that floor is independent of how large the treatment effect
+ * is. When ten of twelve pooled per-run rates are 0 — the shape every experiment
+ * measured here has had — most relabellings reproduce the observed split exactly
+ * and p cannot go below 0.227, however clean the candidate's sweep. Rule 4 is
+ * then UNDECIDABLE: not weighed and found wanting, but impossible to weigh with
+ * this many runs.
+ *
+ * That is the old width-based rule's defect one step milder. The old rule was
+ * unsatisfiable by construction; this is unsatisfiable for a particular
+ * collection. Both have to read as "no verdict", never as a revert the rule
+ * reached on evidence.
+ *
+ * `requiredN` scales the observed composition — `signal` carriers and `ties`
+ * tied values per n baseline runs — and returns the smallest arm size whose
+ * floor clears alpha. Signal is rounded DOWN so the answer is never optimistic
+ * about how much signal a larger collection would carry. It is null when the
+ * floor already clears (nothing to fix) or when nothing up to POWER_SCAN_MAX —
+ * the largest arm this harness can decide at all — clears. Note `signalRuns`
+ * being 0 means nothing rose STRICTLY above the boundary rank; values below it
+ * may still exist, so that alone is not the all-identical case.
+ * `requiredRunsAdvice` separates the two on `ties === pooled`.
+ *
+ * The scaling assumes a larger collection keeps the same shape. That is an
+ * assumption about future runs, not a measurement, and the report says so.
+ */
+function permutationFloor(baseRates, candRates) {
+  const n = baseRates.length
+  // Degenerate input: p = 1 reads as "maximally undecidable", which is the
+  // fail-closed direction but is a sentinel rather than a measurement. It is
+  // unreachable from `evaluateVerdict` — empty and unequal arms are both
+  // blockers there, and a blocker keeps `noVerdict` false regardless — so no
+  // caller can turn a malformed collection into a withheld verdict.
+  if (n === 0 || candRates.length !== n) {
+    return { p: 1, signalRuns: 0, ties: 0, pooled: 0, requiredN: null }
+  }
+  const pool = [...baseRates, ...candRates].sort((a, b) => b - a)
+  const boundary = pool[n - 1]
+  // Values strictly above the boundary are forced into the top group. Values
+  // strictly below can never enter it at the maximum, so only the tie block at
+  // the boundary creates alternative maximum splits.
+  const signal = pool.filter((v) => v > boundary + BAND_EPSILON).length
+  const ties = pool.filter((v) => Math.abs(v - boundary) <= BAND_EPSILON).length
+  const p = floorP(n, ties, n - signal)
+  if (floorClearsAlpha(p)) {
+    return { p, signalRuns: signal, ties, pooled: pool.length, requiredN: null }
+  }
+  const below = pool.length - signal - ties
+  let requiredN = null
+  for (let m = n + 1; m <= POWER_SCAN_MAX; m++) {
+    const signalM = Math.floor((signal * m) / n)
+    const belowM = Math.floor((below * m) / n)
+    // Ties are what is LEFT, not a third independently scaled number. Scaling
+    // all three separately loses runs to rounding — at a one-run signal it lost
+    // exactly one, which put requiredN a run below the size that actually
+    // clears. Both other counts round down, which leaves the tie block as large
+    // as the rounding allows, and a larger tie block raises the floor: the
+    // conservative direction for advice about how many runs to collect.
+    const tiesM = 2 * m - signalM - belowM
+    // A tie block too small to fill the top group means the boundary has moved
+    // off it, and floorP returns 0 through logChoose's out-of-range guard —
+    // the right direction, since that structure is easily separable.
+    if (floorClearsAlpha(floorP(m, tiesM, m - signalM))) {
+      requiredN = m
+      break
+    }
+  }
+  return { p, signalRuns: signal, ties, pooled: pool.length, requiredN }
 }
 
 function meanOf(xs) {
@@ -2064,14 +2206,29 @@ function evaluateVerdict(base, cand, opts = {}) {
   // end at ship=false, but only one of them should read as "the evidence was
   // weighed" — collapsing them would report a revert the rule never actually
   // reached. A blocker makes `report` print NO VERDICT and say why.
+  const floor = permutationFloor(base.specRates, cand.specRates)
   if (perm.exact === false) {
+    // "Fewer runs" is the right fix for the enumeration limit and the WRONG fix
+    // when the floor is also above alpha: shrinking the arms leaves that shape
+    // undecidable too, so the reader would be steered out of one dead end into
+    // another. Say which problem they actually have.
     blockers.push(`the permutation test needs ${perm.splits.toLocaleString()} splits, above the `
       + `${PERMUTATION_EXACT_LIMIT.toLocaleString()} split limit — no verdict can be issued `
-      + 'rather than an approximated one. Compare fewer runs per arm.')
+      + 'rather than an approximated one. Compare fewer runs per arm'
+      + (floorClearsAlpha(floor.p)
+        ? '.'
+        : '. That alone will not help here: the smallest p any arrangement of these runs could '
+          + `produce is ${floor.p.toFixed(3)}, so the shape is undecidable at every arm size. `
+          + requiredRunsAdvice(floor)))
   }
   // Named for the rubric's own vocabulary — it prints "inside the noise band" —
   // rather than for the statistic behind it.
   const outsideBand = perm.p < PERMUTATION_ALPHA
+  // Could this collection have cleared alpha AT ALL? A p of 0.227 reads as "the
+  // effect was too small to distinguish", but when the floor is also 0.227 the
+  // test never distinguished anything: no arrangement of these runs could have.
+  // (`floor` is computed above — the enumeration blocker needs it too.)
+  const undecidable = perm.exact === true && !floorClearsAlpha(floor.p)
   // NOT subsumed by the permutation test, though an earlier comment here said
   // so. The test compares the MEAN OF PER-RUN RATES; specDown compares the
   // POOLED rate, which weights each finding equally instead of each run
@@ -2099,8 +2256,32 @@ function evaluateVerdict(base, cand, opts = {}) {
   const ship = blockers.length === 0 && specDown && countDown && lowValueDown
     && defectsHeld && lostSites.length === 0 && outsideBand
 
+  // A verdict must not rest on a rule that could not be decided.
+  //
+  // When some OTHER condition failed, the change is unshippable for a reason
+  // that needs no statistical power at all — a lost defect site, a count that
+  // rose — and `revert` is a real finding whatever rule 4 could or could not
+  // resolve. That is how both measured experiments were decided.
+  //
+  // When every other condition passed, rule 4 alone stands between this change
+  // and a ship, and it was never evaluated. Reporting `revert` there would claim
+  // the evidence was weighed. There is no verdict to give — only a run count to
+  // go and collect.
+  const otherRulesFailed = !specDown || !countDown || !lowValueDown || !defectsHeld
+    || lostSites.length > 0
+  // `noVerdict` also requires no blockers — a blocker is its own decidable
+  // reason not to ship, so an experiment carrying one is not the "nothing but
+  // rule 4 stood in the way" case. It is a separate conjunct rather than part
+  // of `otherRulesFailed`, which names only the five rubric conditions.
+  //
+  // `report` returns before the verdict line whenever a blocker is set, so this
+  // cannot change what is printed today. It keeps the field honest for any
+  // other reader of evaluateVerdict, which is the only thing that keeps it true
+  // if that early return ever moves.
+  const noVerdict = undecidable && !otherRulesFailed && blockers.length === 0
+
   return {
-    blockers, improvement, perm,
+    blockers, improvement, perm, floor, undecidable, otherRulesFailed, noVerdict,
     outsideBand, specDown, countDown, lowValueDown, defectsHeld, lostSites, ship,
   }
 }
@@ -2386,6 +2567,18 @@ function report(args) {
   console.log(`improvement ${pct(v.improvement)} — permutation p=${v.perm.p.toFixed(3)} over `
     + `${v.perm.splits.toLocaleString()} splits (alpha ${PERMUTATION_ALPHA}) — `
     + `${v.outsideBand ? 'distinguishable from relabelling' : 'INSIDE the noise band'}`)
+  if (v.undecidable) {
+    // The three counts do NOT partition the pool — values below the boundary
+    // rank belong to none of them — so the wording must not imply they add up.
+    console.log(`  UNDECIDABLE at N=${base.runs}: the smallest p any arrangement of these `
+      + `${v.floor.pooled} pooled runs could produce is ${v.floor.p.toFixed(3)}. Only `
+      + `${v.floor.signalRuns} rose above the boundary rank while ${v.floor.ties} sit tied at `
+      + 'it, so most relabellings reproduce the observed split exactly. Rule 4 was not '
+      + 'weighed and found wanting — it could not be weighed.')
+    // Printed here and NOT again under the verdict below: noVerdict implies
+    // undecidable, so both blocks would fire and repeat the same sentence.
+    console.log(`  ${requiredRunsAdvice(v.floor)}`)
+  }
   console.log(`defect count:     ${base.defects} → ${cand.defects}  ${defectVerdict}`)
   console.log(`baseline defects per run: ${range(base.defectsPerRun)} `
     + `(candidate is ${dropPerRun >= 0 ? '-' : '+'}${Math.abs(dropPerRun).toFixed(2)} per run)`)
@@ -2394,11 +2587,58 @@ function report(args) {
       + 'more than one run and the candidate found none')
   }
   console.log('')
-  console.log(v.ship
-    ? 'VERDICT: ship — speculative rate fell beyond the noise band and defect count held.'
-    : 'VERDICT: revert — the rubric\'s ship rule is not met.')
+  if (v.noVerdict) {
+    console.log('NO VERDICT — every other condition passed and rule 4 could not be decided at '
+      + `N=${base.runs}. This change is neither shipped nor refuted on this evidence.`)
+    console.log('  The run count needed is on the UNDECIDABLE line above.')
+  } else {
+    console.log(v.ship
+      ? 'VERDICT: ship — speculative rate fell beyond the noise band and defect count held.'
+      : 'VERDICT: revert — the rubric\'s ship rule is not met.')
+  }
   console.log('')
+  // No verdict exits non-zero too, deliberately. "Neither shipped nor refuted"
+  // is not a success: an automated caller that reads exit 0 as "go ahead" would
+  // ship a change on evidence the rubric says does not exist. Every path that
+  // does not end in `ship` fails closed, which is also what the precondition
+  // blockers above do.
   if (!v.ship) process.exitCode = 1
+}
+
+/**
+ * What to do about an undecidable rule 4, in one line.
+ *
+ * Separated from the two places that print it so the advice cannot drift between
+ * the detail line and the verdict line.
+ */
+function requiredRunsAdvice(floor) {
+  // Contract: only meaningful for an UNDECIDABLE floor. A decidable one has no
+  // run count to advise, and prose about collecting more would be wrong rather
+  // than merely unhelpful.
+  if (floorClearsAlpha(floor.p)) {
+    return `The floor is ${floor.p.toFixed(3)}, below alpha — this collection was decidable `
+      + 'and needs no more runs.'
+  }
+  // The whole pool tied. Not "the effect was small" — there is no effect to
+  // size, and collecting more of the same runs cannot manufacture one. Note
+  // this is NOT the same as signalRuns === 0, which merely means nothing rose
+  // above the boundary rank while structure below it remained.
+  if (floor.pooled > 0 && floor.ties === floor.pooled) {
+    return 'Every pooled run scored identically — no number of runs separates arms that '
+      + 'did not differ.'
+  }
+  if (floor.requiredN === null) {
+    // Deliberately NOT a number. The ceiling is the largest arm the exact test
+    // can enumerate, so any answer above it is an instruction the harness then
+    // refuses to carry out.
+    return 'No arm size this harness can decide clears alpha for this shape — the exact test '
+      + `stops at N=${POWER_SCAN_MAX}, past which it refuses rather than approximate. What has `
+      + 'to change is the number of runs CARRYING the signal, not the number collected: an '
+      + 'effect this sparse is not measurable here at any collectable size.'
+  }
+  return `A result of this shape needs N >= ${floor.requiredN} runs per arm to clear alpha `
+    + '(assumes a larger collection keeps this shape — an assumption about future runs, '
+    + 'not a measurement).'
 }
 
 // --------------------------------------------------------------- selftest
@@ -2715,6 +2955,183 @@ function selftest() {
   // is wrong and this must fail.
   assert.equal(realShape.perm.p.toFixed(3), '0.227', 'the documented p-value must hold')
   assert.equal(realShape.ship, false, 'six runs at this separation cannot ship')
+
+  // ...and the reason it cannot ship is that rule 4 was never decidable. The
+  // floor EQUALS the observed p: no arrangement of these twelve runs could have
+  // cleared alpha, so a `revert` here would report a weighing that never
+  // happened. Every other condition passes on this fixture, which is exactly
+  // when the distinction matters.
+  assert.equal(realShape.undecidable, true, 'the floor must be recognised as unreachable')
+  assert.equal(realShape.floor.p.toFixed(3), '0.227',
+    'the floor equals the observed p — the test had no room to find anything else')
+  assert.equal(realShape.otherRulesFailed, false, 'only rule 4 stands in the way here')
+  assert.equal(realShape.noVerdict, true, 'an undecidable rule 4 alone must yield NO VERDICT')
+  // Pinned: the rubric's Known limitations quotes this number as the answer to
+  // "how many runs would it take". If the derivation moves, the rubric is wrong
+  // and this must fail.
+  assert.equal(realShape.floor.requiredN, 12, 'this shape needs N >= 12 to clear alpha')
+  assert.equal(realShape.floor.signalRuns, 2)
+  assert.equal(realShape.floor.ties, 10)
+
+  // The shape #808 produced: the whole signal in ONE run. Its floor is exactly
+  // 0.5 — half of all relabellings put that run in the baseline arm. Scaled at
+  // that density it would take ~30 runs per arm to clear alpha, which is past
+  // the largest arm the exact test can enumerate, so there is NO collectable
+  // answer and the advice must not invent one.
+  const oneRunSignal = permutationFloor([0, 0, 0, 0, 0, 0.5], [0, 0, 0, 0, 0, 0])
+  assert.equal(oneRunSignal.p.toFixed(3), '0.500', 'a one-run signal has a floor of exactly 0.5')
+  assert.equal(oneRunSignal.requiredN, null, 'the #808 shape is not reachable by collecting more')
+  assert.match(requiredRunsAdvice(oneRunSignal), /No arm size this harness can decide/)
+  // The ceiling itself, pinned: advice above it would be an instruction the
+  // harness then refuses to carry out.
+  assert.equal(POWER_SCAN_MAX, 14, 'the 50M split limit puts the decidable ceiling at N=14')
+  assert.ok(choose(2 * POWER_SCAN_MAX, POWER_SCAN_MAX) <= PERMUTATION_EXACT_LIMIT)
+  assert.ok(choose(2 * (POWER_SCAN_MAX + 1), POWER_SCAN_MAX + 1) > PERMUTATION_EXACT_LIMIT)
+  // Every answer the search CAN give must be one the test can then decide.
+  assert.ok(realShape.floor.requiredN <= POWER_SCAN_MAX,
+    'a required-N the harness cannot enumerate is not advice, it is a dead end')
+
+  // requiredN is a boundary, not a suggestion: it clears and its predecessor
+  // does not. Guards against an off-by-one that would advise a run count still
+  // unable to decide.
+  //
+  // Checked by building the collection requiredN actually describes and running
+  // it back through permutationFloor, rather than by re-deriving the scan's
+  // arithmetic here. A test that re-implements the formula proves only that the
+  // copy is correct.
+  {
+    // k carriers among m runs, everything else 0 — the shape the scan models,
+    // with the carriers' values distinct so they cannot collapse into the tie
+    // block and change the structure under test.
+    const shaped = (m, k) => permutationFloor(
+      Array.from({ length: m }, (_, i) => (i < k ? 0.1 * (i + 1) : 0)),
+      Array(m).fill(0),
+    )
+    for (const [floor, carriers] of [[realShape.floor, 2]]) {
+      const scaled = (m) => shaped(m, Math.floor((carriers * m) / MIN_RUNS))
+      assert.ok(floorClearsAlpha(scaled(floor.requiredN).p),
+        `requiredN=${floor.requiredN} must actually clear alpha`)
+      assert.ok(!floorClearsAlpha(scaled(floor.requiredN - 1).p),
+        `requiredN=${floor.requiredN} must be the FIRST size that clears — otherwise it over-asks`)
+    }
+  }
+
+  // A revert that rests on something other than rule 4 must survive an
+  // undecidable rule 4. This is how BOTH measured experiments were decided —
+  // #807 on a lost defect site, #808 on counts that rose — so a change here
+  // that swallowed those verdicts would be a regression in the thing this
+  // harness is for.
+  {
+    const worse = evaluateVerdict(
+      cond({ specRates: [0, 0.2, 0.25, 0, 0, 0], speculativeRate: 0.08, speculatives: 2 }),
+      cond({
+        specRates: [0, 0, 0, 0, 0, 0], speculativeRate: 0, speculatives: 0,
+        lowValues: 6, defects: 8,
+      }),
+    )
+    assert.equal(worse.undecidable, true, 'same runs, so rule 4 is still undecidable')
+    assert.equal(worse.otherRulesFailed, true, 'the defect count fell')
+    assert.equal(worse.noVerdict, false, 'a revert on decidable evidence must still be a verdict')
+    assert.equal(worse.ship, false)
+  }
+
+  // The sizing table in the rubric's Known limitations, pinned. It is the only
+  // guidance anyone has for choosing N before collecting, so it must be derived
+  // from this code rather than transcribed alongside it and left to rot.
+  {
+    const kOfSix = (k) => permutationFloor(
+      Array.from({ length: MIN_RUNS }, (_, i) => (i < k ? 0.1 * (i + 1) : 0)),
+      Array(MIN_RUNS).fill(0),
+    )
+    for (const [k, floorStr, needed] of [[1, '0.500', null], [2, '0.227', 12], [3, '0.091', 8]]) {
+      const f = kOfSix(k)
+      assert.equal(f.p.toFixed(3), floorStr, `rubric table: floor for ${k} of 6 runs`)
+      assert.equal(f.requiredN, needed, `rubric table: runs needed for ${k} of 6 runs`)
+    }
+    const clean = permutationFloor([0.4, 0.5, 0.4, 0.5, 0.4, 0.5], Array(MIN_RUNS).fill(0.2))
+    assert.equal(clean.p.toFixed(3), '0.001', 'rubric table: floor for a clean separation')
+    assert.equal(clean.requiredN, null, 'rubric table: a clean separation needs no more runs')
+  }
+
+  // The third advice branch: a signal so sparse that even POWER_SCAN_MAX runs
+  // per arm does not clear it. One carrier in a hundred runs stays at a floor of
+  // 0.5 all the way up, so the honest answer is "not by collecting more", not a
+  // number. Reachable here because the floor is closed-form — no enumeration —
+  // so a 100-run arm costs nothing to evaluate.
+  {
+    const sparse = permutationFloor(
+      [0.5, ...Array(99).fill(0)], Array(100).fill(0),
+    )
+    assert.equal(sparse.p.toFixed(3), '0.500')
+    assert.equal(sparse.requiredN, null, 'a signal this sparse is not fixed by more runs')
+    assert.match(requiredRunsAdvice(sparse), /No arm size this harness can decide/)
+  }
+
+  // A collection that is BOTH unenumerable and undecidable must take the
+  // blocker path, not the noVerdict path. Review raised this as a hole — the
+  // worry being that `undecidable` is gated on `perm.exact` and so switches off
+  // exactly where the new rubric table sends people (N=30 for a sparse signal).
+  // It is covered, but by the OTHER mechanism: `exact === false` pushes a
+  // blocker, and `report` returns at the blocker check before any verdict line.
+  // Pinned here so that reasoning survives someone moving that early return.
+  {
+    const sparse = (rates) => ({ ...cond(), runs: 15, specRates: rates })
+    const carrier = [0.5, ...Array(14).fill(0)]
+    const v = evaluateVerdict(
+      sparse(carrier),
+      { ...sparse(Array(15).fill(0)), speculativeRate: 0, speculatives: 0, lowValues: 6 },
+    )
+    assert.equal(v.perm.exact, false, 'N=15 is past the enumeration limit')
+    assert.ok(permutationFloor(carrier, Array(15).fill(0)).p >= PERMUTATION_ALPHA,
+      'and this shape is genuinely undecidable, so both conditions hold at once')
+    assert.ok(v.blockers.some((b) => /no verdict can be issued/.test(b)),
+      'it must still block rather than fall through to a verdict')
+    assert.equal(v.noVerdict, false, 'a blocked experiment is not the noVerdict case')
+    assert.equal(v.ship, false)
+    // And the guidance must not send them the wrong way. "Compare fewer runs"
+    // fixes the enumeration limit; it does nothing for a floor above alpha, and
+    // this collection has both problems at once.
+    assert.ok(v.blockers.some((b) => /undecidable at every arm size/.test(b)),
+      'the blocker must say that shrinking the arms will not fix this shape')
+  }
+
+  // Identical arms are a different failure from an underpowered one, and the
+  // advice must not tell the user to collect runs that cannot help.
+  const noEffect = permutationFloor(Array(6).fill(0.3), Array(6).fill(0.3))
+  assert.equal(noEffect.p.toFixed(6), '1.000000')
+  assert.equal(noEffect.requiredN, null)
+  assert.match(requiredRunsAdvice(noEffect), /scored identically/)
+
+  // A clean separation is decidable, so the gate never fires on the case the
+  // rubric is meant to let through.
+  assert.equal(permutationFloor([0.4, 0.5, 0.4, 0.5, 0.4, 0.5], Array(6).fill(0.2)).requiredN, null,
+    'a decidable collection needs no more runs')
+  assert.ok(floorClearsAlpha(permutationFloor([0.4, 0.5, 0.4, 0.5, 0.4, 0.5], Array(6).fill(0.2)).p),
+    'clean separation must be decidable')
+
+  // The floor is a floor: for any collection, the observed p can never be below
+  // it. Checked against the exhaustive enumeration rather than asserted, since
+  // the two are computed by completely different routes — one closed-form, one
+  // by counting all 924 splits.
+  for (const [b, c] of [
+    [[0, 0.2, 0.25, 0, 0, 0], [0, 0, 0, 0, 0, 0]],
+    [[0, 0, 0, 0, 0, 0.5], [0, 0, 0, 0, 0, 0]],
+    [[0.4, 0.5, 0.4, 0.5, 0.4, 0.5], Array(6).fill(0.2)],
+    [[0.4, 0.5, 0.4, 0.5, 0.4, 0.5], Array(6).fill(0.44)],
+    [[0.4, 0.5, 0.4, 0.5, 0.4, 0.5], Array(6).fill(0.5)],
+    [Array(6).fill(0.3), Array(6).fill(0.3)],
+  ]) {
+    assert.ok(permutationTest(b, c).p >= permutationFloor(b, c).p - BAND_EPSILON,
+      `the closed-form floor must bound the enumerated p for ${JSON.stringify(b)}`)
+  }
+  // And it is TIGHT where it matters: for a candidate that swept the metric, the
+  // enumeration finds exactly the floor. A loose bound would under-report how
+  // undecidable a collection is.
+  assert.equal(
+    permutationTest([0, 0.2, 0.25, 0, 0, 0], [0, 0, 0, 0, 0, 0]).p.toFixed(6),
+    permutationFloor([0, 0.2, 0.25, 0, 0, 0], [0, 0, 0, 0, 0, 0]).p.toFixed(6),
+    'a perfect sweep must land exactly on the floor',
+  )
 
   // Exhaustive enumeration always includes the observed labelling, so p can
   // never be zero — a rule that could return p=0 would claim certainty it has
