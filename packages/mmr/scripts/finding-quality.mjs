@@ -2005,15 +2005,27 @@ function permutationTest(baseRates, candRates) {
   // Deterministic sample. Seeded from the data itself, so the same input always
   // yields the same p and two different experiments do not share a permutation
   // order.
-  // 13 hex digits (52 bits), the most that survives as an exact integer in a
-  // double. Eight digits gave 32 bits, where distinct inputs start colliding
-  // around 65k by the birthday bound — harmless for correctness, since each
-  // experiment's sample is still valid, but two unrelated experiments sharing a
-  // permutation order is a needless coincidence to leave lying around.
-  const seed = Number.parseInt(sha256(JSON.stringify(pool)).slice(0, 13), 16)
+  // SORTED, so the sample does not depend on the order the runs arrived in.
+  //
+  // Seeding and shuffling the pool as-given made the result a function of run
+  // ordering: the same twelve rates read back in a different order produced a
+  // different seed, a different sample, and potentially a different verdict.
+  // The exhaustive branch never had this problem — it enumerates every split,
+  // which is order-invariant by construction — and the sampled branch must
+  // match that guarantee, because "identical evidence, identical verdict" is
+  // the whole reason this is deterministic rather than random.
+  //
+  // Safe to sort: the observed statistic comes from baseRates and candRates
+  // separately and means are order-invariant, so only the sampling order moves.
+  //
+  // 13 hex digits (52 bits) is the most that survives as an exact integer in a
+  // double. Eight gave 32 bits, where distinct inputs start colliding around
+  // 65k by the birthday bound.
+  const canonical = [...pool].sort((a, b) => a - b)
+  const seed = Number.parseInt(sha256(JSON.stringify(canonical)).slice(0, 13), 16)
   const SAMPLES = 20_000
   for (let s = 0; s < SAMPLES; s++) {
-    const shuffled = shuffle(pool, seed + s)
+    const shuffled = shuffle(canonical, seed + s)
     let sumA = 0
     for (let i = 0; i < n; i++) sumA += shuffled[i]
     if (diffFromSum(sumA) >= threshold - BAND_EPSILON) hits++
@@ -2758,6 +2770,19 @@ function selftest() {
   assert.ok(sampled.pBound > sampled.p, 'a sampled result must carry a margin')
   // Deterministic: seeded from the data, so the same input repeats exactly.
   assert.deepEqual(permutationTest(big(0.5), big(0.1)), sampled, 'sampling must be reproducible')
+  // And invariant to the order the runs arrived in. Seeding from the pool
+  // as-given made the verdict a function of run ordering, so the same evidence
+  // read back in a different order could sample differently.
+  const rev = (xs) => [...xs].reverse()
+  assert.deepEqual(
+    permutationTest(rev(big(0.5)), rev(big(0.1))), sampled,
+    'reordering identical evidence must not change a sampled result',
+  )
+  // Shuffled within each arm, not merely reversed.
+  assert.deepEqual(
+    permutationTest(shuffle(big(0.5), 7), shuffle(big(0.1), 9)), sampled,
+    'run order must not reach the sample at all',
+  )
   // And it still separates an obvious difference.
   assert.ok(sampled.pBound < PERMUTATION_ALPHA, 'clean separation must survive sampling')
 

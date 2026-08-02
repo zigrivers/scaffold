@@ -261,15 +261,18 @@ observed baseline-vs-baseline spread is not a result.
   Per this file's own amendment procedure, every condition was re-scored from
   scratch, not one arm — the harness enforces this with a rubric digest and
   refuses to report against scores produced under an earlier version. **The new
-  rule changes no verdict.** #808 stage presets: p = 0.500. #807 target 2:
-  p = 1.000. Both remain `revert`, and conditions 2, 3, 5 and 6 remain the
+  rule changes no verdict.** Across three independent scoring passes #808 came
+  back p = 0.561, 0.500, 0.561, and #807 target 2 p = 1.000 every time. Both
+  remain `revert` in every pass, and conditions 2, 3, 5 and 6 remain the
   deciding ones.
 
-  The re-scoring pass also demonstrated the judge variance this file warns
-  about: with identical findings and an unchanged classification section, #808's
-  speculative count came back 2 rather than 3 and #807 target 2's defect count
-  20 rather than 19. The verdicts did not move, but the individual counts did —
-  another reason no single number should decide a ship. #807 target 1 can no longer be re-scored
+  Those passes are themselves the clearest demonstration of the judge variance
+  this file warns about. With identical findings and an unchanged classification
+  section, #808's speculative count moved between 2 and 3 and its low-value
+  count between 15 and 16; #807 target 2's defect count moved between 19 and 20.
+  **No verdict moved.** That is the argument for judging a change on several
+  conditions rather than one number, and for quoting a range rather than a
+  reading. #807 target 1 can no longer be re-scored
   at all — a later provenance guard requires build-treatment arms to record
   their `dist`, `templates` and manifest digests, and that collection predates
   those fields. Its numbers stand as descriptive only.
