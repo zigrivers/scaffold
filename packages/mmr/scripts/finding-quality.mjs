@@ -1962,6 +1962,11 @@ function permutationTest(baseRates, candRates) {
   // pBound is set here too. Callers gate on it, and an undefined would compare
   // false against alpha — failing closed by accident rather than by design,
   // which is the kind of correctness that quietly stops being true.
+  //
+  // `exact: true` with `splits: 0` reads oddly but is right: the field records
+  // whether SAMPLING was used, and nothing was sampled here. p is 1 because the
+  // input cannot support a test at all, not because a test was run and found
+  // nothing.
   if (n === 0 || candRates.length !== n) return { p: 1, pBound: 1, splits: 0, exact: true }
   const pool = [...baseRates, ...candRates]
   const observed = meanOf(baseRates) - meanOf(candRates)
@@ -1997,7 +2002,12 @@ function permutationTest(baseRates, candRates) {
   // Deterministic sample. Seeded from the data itself, so the same input always
   // yields the same p and two different experiments do not share a permutation
   // order.
-  const seed = Number.parseInt(sha256(JSON.stringify(pool)).slice(0, 8), 16)
+  // 13 hex digits (52 bits), the most that survives as an exact integer in a
+  // double. Eight digits gave 32 bits, where distinct inputs start colliding
+  // around 65k by the birthday bound — harmless for correctness, since each
+  // experiment's sample is still valid, but two unrelated experiments sharing a
+  // permutation order is a needless coincidence to leave lying around.
+  const seed = Number.parseInt(sha256(JSON.stringify(pool)).slice(0, 13), 16)
   const SAMPLES = 20_000
   for (let s = 0; s < SAMPLES; s++) {
     const shuffled = shuffle(pool, seed + s)
@@ -2396,7 +2406,7 @@ function report(args) {
   console.log(`low-value count:   ${base.lowValues} → ${cand.lowValues}  `
     + `${v.lowValueDown ? 'down' : 'NOT down — speculative findings were traded for other low-value ones'}`)
   console.log(`improvement ${pct(v.improvement)} — permutation p=${v.perm.p.toFixed(3)}`
-    + (v.perm.exact ? '' : ` (sampled; gated on p+2se=${v.perm.pBound.toFixed(3)})`)
+    + (v.perm.exact ? '' : ` (sampled; gated on Wilson upper bound ${v.perm.pBound.toFixed(3)})`)
     + ` over ${v.perm.splits.toLocaleString()} ${v.perm.exact ? 'exact' : 'sampled'} splits `
     + `(alpha ${PERMUTATION_ALPHA}) — `
     + `${v.outsideBand ? 'distinguishable from relabelling' : 'INSIDE the noise band'}`)

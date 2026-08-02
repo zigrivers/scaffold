@@ -34,8 +34,11 @@ Three consequences, all binding:
    it, so this is a strong convention rather than a sandbox.
 3. A difference no larger than relabelling the runs would produce is **not a
    result**, and the harness enforces this rather than merely noting it: the
-   two arms' **per-run rates** must separate under an exact one-sided
-   permutation test, at p < 0.05.
+   two arms' **per-run rates** must separate under a one-sided permutation
+   test, at p < 0.05. The test is *exact* at any run count whose splits can be
+   enumerated — which includes every N the rubric's floor makes likely — and
+   falls back to deterministic sampling above that, gated on the upper end of a
+   confidence interval so the approximation fails closed.
 
    Pool the 2N per-run rates, enumerate every way to split them into two groups
    of N, and count the splits whose difference in means is at least the observed
@@ -164,9 +167,10 @@ A change ships only if, across an **equal** number of runs per condition
 1. `speculative_rate` drops, **and**
 2. the **absolute count** of speculative findings drops, **and**
 3. the **absolute count** of low-value findings drops, **and**
-4. the two arms' per-run rates separate under an exact permutation test at
-   p < 0.05 (otherwise the drop is what relabelling the runs would produce),
-   **and**
+4. the two arms' per-run rates separate under the permutation test at p < 0.05
+   — exact wherever the splits can be enumerated, otherwise a deterministic
+   sample gated on a conservative bound (otherwise the drop is what relabelling
+   the runs would produce), **and**
 5. `defect_count` does not drop, **and**
 6. no **defect site** the baseline found in more than one run goes unfound by
    the candidate.
