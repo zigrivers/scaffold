@@ -121,8 +121,9 @@ export function perOpStatsMs(
   const f = (v: number) => v.toFixed(digits)
   return {
     ...stats,
-    // `p95=` stays first and in this exact shape: the budget-derivation script
-    // greps CI logs for it (see budgets.ts).
+    // `p95=` stays first. Re-deriving a budget means grepping this line out of
+    // CI logs by hand (budgets.ts describes the collection), so keep the token
+    // leading and keep the numbers in one line per benchmark.
     summary: `p95=${f(p95)}ms/op (n=${stats.samples} min=${f(stats.min)} `
       + `med=${f(stats.median)} max=${f(stats.max)})`,
   }

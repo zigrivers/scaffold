@@ -74,6 +74,12 @@
 // moves 29x — and a change that makes writes systematically slower moves it
 // directly. So the write benchmark asserts its median and logs its p95.
 //
+// It also asserts a deliberately loose floor on its worst sample, because
+// budgeting the median alone gives up a real thing: a change that inflates the
+// tail without moving the middle would pass. That floor is 100ms and is not a
+// performance budget in the sense the others are — see
+// BUDGET_STATE_WRITE_MAX_MS below.
+//
 // The other four assert p95, because their tails are tight enough to mean
 // something: state read's worst p95 is 2x its best, not 29x.
 //
@@ -112,6 +118,23 @@ export const BUDGET_STATE_READ_MS = 0.6
  * is 0.439ms/op, so 3ms is ~7x that and ~20x a healthy runner's 0.15.
  */
 export const BUDGET_STATE_WRITE_MEDIAN_MS = 3
+
+/**
+ * Structural-explosion floor for the same benchmark, asserted on the WORST
+ * sample.
+ *
+ * Budgeting only the median gives up a real thing: a change that inflates the
+ * tail without moving the middle — an extra flush on some inputs, an
+ * intermittent second fsync — passes. This is the cheapest way to keep a floor
+ * under that without re-importing the flake, and it is deliberately loose.
+ *
+ * 100ms is ~8.6x the worst sample five CI runs produced (11.614ms, on the
+ * runner that was stalling) and ~500x a healthy runner's 0.2. It cannot detect
+ * an ordinary regression and is not meant to: the median budget above does
+ * that. This one only fires if the tail has changed by orders of magnitude,
+ * which is the one tail change that is definitely ours and not the disk's.
+ */
+export const BUDGET_STATE_WRITE_MAX_MS = 100
 
 /** Discover 99 meta-prompts, build the graph, detect cycles, toposort. Asserted on p95; CI worst p95 21.9ms/op. */
 export const BUDGET_BUILD_GRAPH_MS = 150

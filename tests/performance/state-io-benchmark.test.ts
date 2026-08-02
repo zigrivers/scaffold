@@ -3,7 +3,11 @@ import { StateManager } from '../../src/state/state-manager.js'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
-import { BUDGET_STATE_READ_MS, BUDGET_STATE_WRITE_MEDIAN_MS } from './budgets.js'
+import {
+  BUDGET_STATE_READ_MS,
+  BUDGET_STATE_WRITE_MEDIAN_MS,
+  BUDGET_STATE_WRITE_MAX_MS,
+} from './budgets.js'
 import { perOpStatsMs } from './measure.js'
 
 describe('State I/O Performance', () => {
@@ -53,5 +57,8 @@ describe('State I/O Performance', () => {
     const stats = perOpStatsMs(() => { stateManager.saveState({ ...state }) })
     console.log(`State write ${stats.summary}`)
     expect(stats.median).toBeLessThan(BUDGET_STATE_WRITE_MEDIAN_MS)
+    // Plus a deliberately loose floor under the tail, so dropping the p95
+    // assertion does not mean nothing watches it at all. See budgets.ts.
+    expect(stats.max).toBeLessThan(BUDGET_STATE_WRITE_MAX_MS)
   })
 })
