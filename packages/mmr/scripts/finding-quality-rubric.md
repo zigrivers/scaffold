@@ -209,6 +209,32 @@ the change failed regardless of `speculative_rate`.
 Report both numbers with their run-level spread. A difference smaller than the
 observed baseline-vs-baseline spread is not a result.
 
+### When condition 4 cannot be decided
+
+A permutation test's p-value has a floor set by how many of the pooled per-run
+rates are tied, and that floor does not move with the size of the effect. When
+most runs score 0 and the signal lives in one or two, most relabellings
+reproduce the observed split exactly and p cannot get below the floor whatever
+the candidate did.
+
+Condition 4 is then **undecidable**, which is a different thing from failing it.
+Failing means the evidence was weighed and found wanting. Undecidable means this
+many runs could not weigh it, and reporting `revert` would claim a weighing that
+never happened.
+
+So:
+
+- If any of conditions 1, 2, 3, 5 or 6 failed, the change is unshippable for a
+  reason that needs no statistical power, and the verdict stands as `revert`.
+- If every other condition passed and condition 4 alone is undecidable, there is
+  **no verdict** — the change is neither shipped nor refuted. Collect the run
+  count the harness reports and re-run.
+
+The harness computes the floor in closed form, reports it, and issues no verdict
+in the second case. This is the same failure the pre-permutation rule had, one
+step milder: that rule was unsatisfiable by construction, this is unsatisfiable
+for a particular collection. Neither may be reported as a result.
+
 ## Known limitations
 
 - **The rubric author has seen findings from two exploratory runs** (PR #796 and
@@ -235,20 +261,43 @@ observed baseline-vs-baseline spread is not a result.
   mislabelled real defects reaching beyond the diff.
 - `worth_fixing_now` encodes "early-stage product". It is the wrong question for
   a mature codebase and the rubric should not be reused there unchanged.
-- **N = 6 resolves a rate difference only when it is large and consistent across
-  runs.** Six runs per arm can reach significance easily when the arms barely
-  overlap — per-run rates of 0.4/0.5 against a steady 0.2 land at p ≈ 0.001.
-  What six runs cannot resolve is a difference of the size these prompt changes
-  actually produced, where most runs are 0 and the signal lives in one or two of
-  them. Measured: a baseline speculative rate of 8% against a candidate at a
-  perfect 0% — a clean sweep of the primary metric, but carried by two runs out
-  of six — lands at p = 0.227.
+- **N = 6 is enough only when the signal is spread across runs. How many runs a
+  given shape needs is now computed, not guessed.**
 
-  So the floor is not wrong, it is scoped: it was set against the count variance
-  that motivated this rubric, and it holds for that. A change whose effect shows
-  up as *a few runs differing rather than all of them* needs materially more
-  runs to demonstrate — and should plan for that rather than for a friendlier
-  rule.
+  Condition 4's floor is `C(ties, a) / C(2N, N)`, where `ties` counts the pooled
+  per-run rates tied at the boundary rank and `a` counts how many of them fall
+  in the top arm. It depends on the tie structure alone — not on how large the
+  effect is — so a candidate that sweeps the metric perfectly can still be
+  undecidable. Sizing a collection means asking how many runs will *carry* the
+  signal, not how big the effect will be.
+
+  Derived from that formula, at α = 0.05, for a baseline whose remaining runs
+  all score 0:
+
+  | signal carried by | floor at N = 6 | runs per arm needed |
+  | --- | --- | --- |
+  | 1 of 6 runs | 0.500 | **28** |
+  | 2 of 6 runs | 0.227 | **12** |
+  | 3 of 6 runs | 0.091 | 8 |
+  | every run, cleanly separated | 0.001 | 6 — N = 6 is fine |
+
+  Both measured experiments sat in the top two rows. #808's whole signal was in
+  one run of six, so its p = 0.500 was its floor: at that density it would have
+  taken 28 runs per arm. #807 target 1's was in two, floor 0.227 — which is
+  exactly the p it returned, because its candidate swept the metric and landed
+  on the floor. Twelve runs per arm would have decided it.
+
+  The right-hand column assumes a larger collection keeps the same shape, which
+  is an assumption about future runs rather than a measurement. It is also not
+  monotone in the obvious way: a one-run signal has a floor of exactly 0.5 at
+  **every** N, and only clears once more runs carry signal — the density is what
+  changes, not the count.
+
+  So the N ≥ 6 floor is not wrong, it is scoped. It was set against the
+  finding-count variance that motivated this rubric and it holds for that. A
+  change whose effect shows up as *a few runs differing rather than all of them*
+  must be sized from the table above before collection starts, and the harness
+  refuses to issue a verdict if it was not.
 
 ## Change history
 
@@ -288,3 +337,36 @@ observed baseline-vs-baseline spread is not a result.
   this file warns about. Two things bound it: the defect was identified from the
   arithmetic rather than from a disappointing result, and the replacement was
   validated by showing it rescues nothing.
+
+- **Condition 4 gained an undecidability case, and Known limitations gained the
+  derived run counts that replace its qualitative warning.**
+
+  The permutation test that replaced the width-based rule is sound, but its
+  p-value has a floor set by the tie structure of the pooled rates, and that
+  floor can sit above α. When it does, condition 4 was never actually tested —
+  yet the harness reported `revert`, which reads as "weighed and found wanting".
+  That is a milder form of the same defect the width rule had, and it has to be
+  reported the same way: as no result.
+
+  The harness now computes the floor in closed form, and withholds the verdict
+  when condition 4 is undecidable **and** every other condition passed. When some
+  other condition failed, the change is unshippable on evidence that needs no
+  statistical power and the `revert` verdict stands.
+
+  **This changes no past verdict**, and the reasoning is a deduction from the
+  entry above rather than a re-run: conditions 2, 3, 5 and 6 are recorded there
+  as the deciding ones for both experiments, all four sit outside condition 4,
+  so both keep their `revert`. A re-run would require re-scoring both arms of
+  both experiments, and this very amendment would invalidate those scores again
+  the moment it landed.
+
+  Known limitations previously said an effect of this shape "needs materially
+  more runs" without saying how many. It now carries the derived table, so a
+  future experiment can be sized before collection instead of discovering
+  afterwards that it never could have concluded anything. The table is pinned by
+  the harness selftest, so it cannot drift from the code that computes it.
+
+  Amended after results were known, like the entry above, and bounded the same
+  way: the defect is visible in the arithmetic — a floor above α admits no
+  passing candidate — and the change is validated by leaving both measured
+  verdicts exactly where they were.
