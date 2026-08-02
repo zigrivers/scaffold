@@ -1,5 +1,5 @@
 /**
- * Time `op` and report the p95 cost of ONE call, in milliseconds.
+ * Time `op` and report the per-call cost distribution, in milliseconds.
  *
  * Each sample times a batch of `batch` calls rather than a single call. That
  * matters: assembling one prompt takes ~0.02ms, and at that scale a p95 is a
@@ -8,7 +8,7 @@
  * sample pushes the noise below the signal, which is what makes it defensible
  * to set a budget nearer the real cost instead of 1000x above it.
  *
- * The returned number is still per-call, so budgets stay readable and stay
+ * The returned numbers are still per-call, so budgets stay readable and stay
  * comparable if `batch` is ever retuned.
  *
  * `warmup` defaults to one batch, which is the right trade for the
@@ -16,11 +16,47 @@
  * already takes ~10ms. Callers passing a small `batch` (the dependency-graph
  * build passes 1) get a proportionally small warmup for free; pass `warmup`
  * explicitly if the two need to diverge.
+ *
+ * ## Why the sample floor exists
+ *
+ * This used to take 15 samples and index `floor(15 * 0.95) = 14` — the LAST
+ * element of a 15-element sorted array. That is the maximum, not a p95, under
+ * any definition. It went unnoticed for the CPU-bound benchmarks, where the
+ * distribution is tight enough that the two nearly coincide.
+ *
+ * It did not go unnoticed for state writes. Those are fsync-bound on a shared
+ * CI disk, and their distribution has a long right tail: across 27 CI attempts
+ * the median was 0.23ms/op and two attempts read 3.70 and 4.56 — 16-20x — while
+ * every other benchmark in those same two runs came in FASTER than its median.
+ * That is a runner I/O stall landing in one batch, and a max-of-15 reports it
+ * as the headline number. Both attempts failed the budget and were re-run
+ * green.
+ *
+ * A budget is meant to catch a code change that shifts the whole distribution,
+ * not a single stalled syscall. A real p95 does that; a maximum cannot. So the
+ * sample count must be large enough that the p95 rank has samples above it, and
+ * `perOpStatsMs` refuses to run otherwise rather than silently reporting a
+ * maximum under a p95 label.
  */
-export function p95PerOpMs(
+
+/** Samples above the p95 rank that a call must leave room for. */
+const MIN_SAMPLES_ABOVE_P95 = 2
+
+export interface PerOpStats {
+  /** Nearest-rank p95 of the per-call sample costs, in ms. The budgeted number. */
+  p95: number
+  min: number
+  median: number
+  max: number
+  samples: number
+  /** One-line log form, so every benchmark reports the distribution identically. */
+  summary: string
+}
+
+export function perOpStatsMs(
   op: () => void,
-  { batch = 100, samples = 15, warmup = batch } = {},
-): number {
+  { batch = 100, samples = 41, warmup = batch, digits = 4 } = {},
+): PerOpStats {
   // Let the JIT settle so sample 1 is not measuring compilation.
   for (let i = 0; i < warmup; i++) op()
 
@@ -32,5 +68,31 @@ export function p95PerOpMs(
   }
 
   perOp.sort((a, b) => a - b)
-  return perOp[Math.floor(perOp.length * 0.95)]
+  // Nearest rank: the smallest value at or above the 95th percentile.
+  const idx = Math.ceil(perOp.length * 0.95) - 1
+  const above = perOp.length - 1 - idx
+  if (above < MIN_SAMPLES_ABOVE_P95) {
+    throw new Error(
+      `perOpStatsMs: ${samples} samples puts the p95 rank ${above} sample(s) from the top, `
+      + `so it reports a maximum rather than a p95. Use at least `
+      + `${Math.ceil((MIN_SAMPLES_ABOVE_P95 + 1) / 0.05)} samples.`,
+    )
+  }
+
+  const p95 = perOp[idx]
+  const stats = {
+    p95,
+    min: perOp[0],
+    median: perOp[(perOp.length - 1) >> 1],
+    max: perOp[perOp.length - 1],
+    samples: perOp.length,
+  }
+  const f = (v: number) => v.toFixed(digits)
+  return {
+    ...stats,
+    // `p95=` stays first and in this exact shape: the budget-derivation script
+    // greps CI logs for it (see budgets.ts).
+    summary: `p95=${f(p95)}ms/op (n=${stats.samples} min=${f(stats.min)} `
+      + `med=${f(stats.median)} max=${f(stats.max)})`,
+  }
 }

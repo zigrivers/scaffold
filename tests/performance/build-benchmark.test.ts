@@ -4,7 +4,7 @@ import { buildGraph } from '../../src/core/dependency/graph.js'
 import { detectCycles, topologicalSort } from '../../src/core/dependency/dependency.js'
 import path from 'node:path'
 import { BUDGET_BUILD_GRAPH_MS } from './budgets.js'
-import { p95PerOpMs } from './measure.js'
+import { perOpStatsMs } from './measure.js'
 
 describe('Build Performance', () => {
   it('dependency graph build completes within budget (p95)', () => {
@@ -21,15 +21,17 @@ describe('Build Performance', () => {
     expect(discovered.size, `no meta-prompts found under ${pipelineDir} — the benchmark would measure nothing`)
       .toBeGreaterThan(50)
 
-    // One op here is already ~10ms, so it does not need batching the way the
-    // microsecond-scale benchmarks do — but 3 samples is not a p95, so take 15.
-    const p95 = p95PerOpMs(() => {
+    // One op here is already ~24ms, so it does not need batching the way the
+    // microsecond-scale benchmarks do. The sample count is the shared default:
+    // fewer would put the p95 rank at the top of the sorted samples, which is a
+    // maximum, not a p95 (see measure.ts). ~24ms x 41 is about a second.
+    const stats = perOpStatsMs(() => {
       const metaPrompts = discoverMetaPrompts(pipelineDir)
       const graph = buildGraph([...metaPrompts.values()].map(m => m.frontmatter), new Map())
       detectCycles(graph)
       topologicalSort(graph)
-    }, { batch: 1, samples: 15 })
-    console.log(`Build (dep graph) p95=${p95.toFixed(2)}ms over ${discovered.size} meta-prompts`)
-    expect(p95).toBeLessThan(BUDGET_BUILD_GRAPH_MS)
+    }, { batch: 1, digits: 2 })
+    console.log(`Build (dep graph) ${stats.summary} over ${discovered.size} meta-prompts`)
+    expect(stats.p95).toBeLessThan(BUDGET_BUILD_GRAPH_MS)
   })
 })
