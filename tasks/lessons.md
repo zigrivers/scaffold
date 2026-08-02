@@ -505,3 +505,54 @@ the baseline's per-run spread width. On PR #796 the baseline's speculative rate
 (8%) was *smaller* than its own spread (25%), so a candidate scoring a perfect
 0% still failed. Fix before the next attempt. It was not the deciding condition
 for either revert — 2, 3, 5 and 6 were.
+
+## 2026-08-02 — Fixing the instrument and the budget it was reading
+
+**A statistic can be wrong in a way that looks like flakiness.** `p95PerOpMs`
+took 15 samples and indexed `floor(15 * 0.95) = 14` — the last element of a
+15-element sorted array, i.e. the maximum. Labelled p95, and budgeted against
+for months. It only bit on the one benchmark with a long tail (fsync-bound state
+writes), where two CI runs read 3.70 and 4.56ms against a 0.23ms median. Before
+raising a budget that flakes, check whether the number it compares against is
+the statistic you think it is.
+
+**Read the whole distribution, not the failures.** In both runs that tripped the
+budget, every *other* benchmark came in FASTER than its median. That is what
+ruled out "slow runner" and pointed at a single stalled syscall. One benchmark's
+number in isolation could not have shown this.
+
+**`gh run view --log` serves the latest attempt only.** A run that failed and
+was re-run green reports the green attempt, so the failing samples — exactly the
+tail a budget must cover — are invisible. Pull them from
+`repos/{o}/{r}/actions/runs/{id}/attempts/{n}/logs`, which returns a zip that
+must be unzipped before grepping (a compressed stream defeats `grep -a`).
+
+**Applying a doctrine mechanically can violate it.** The repo's timing doctrine
+says "budget = 7-10x measured CI p95". Measured p95 across all attempts was
+3.70ms, so the mechanical answer was a ~30ms budget on a 0.2ms operation — a
+tripwire that catches nothing, which is the exact "green by construction" state
+the doctrine was written to escape. Fix the statistic first, then derive.
+
+**The pre-push hook runs bats only — never `ts-check`.** TypeScript and lint
+errors reach CI unless `make check-all` is run by hand. A one-character quote
+error cost a full CI run.
+
+**Do not re-derive a formula inside its own test.** The required-N search scaled
+two counts independently; the boundary assertion re-implemented that same
+scaling and passed, reproducing the bug faithfully on both sides. Rewriting the
+test to BUILD the collection the answer describes and run it back through the
+real function found an off-by-one immediately — the advice said 28 runs when 28
+does not clear and 30 does.
+
+**Counts that do not partition must not be worded as if they do.** The report
+said "the signal sits in X of Y pooled runs and the other Z are tied". Values
+below the boundary rank belong to neither bucket, so on some inputs the sentence
+was arithmetically false.
+
+**An undecidable rule is not a failed rule.** A permutation test's p has a floor
+set by the tie structure, independent of effect size. Both measured experiments
+landed exactly ON their floor — the test never distinguished anything — yet the
+harness printed `revert`, which reads as "weighed and found wanting". Withhold
+the verdict when the deciding rule could not be decided, but only when it is the
+ONLY thing standing in the way: a revert resting on evidence that needs no
+statistical power is still a real verdict.
